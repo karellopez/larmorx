@@ -112,3 +112,117 @@ decides it by rules A to D then.
 
 Written to the rule "open files carry behaviour only": `larmorx_core::defects`' FS-52 to FS-60 say
 what a caller sees; this file holds the mechanisms above.
+
+## Part 2 (3.1-55 piece 2, 2026-11-13)
+
+Restricted, as the rest of this file (source lines of FreeSurfer 8.2.0).
+
+### FS-161: `MRIcopy`'s same-type row length (rule A)
+
+`mri.cpp` 5814-5838: `bytes = width` then a `switch` over the type multiplies it by the voxel size
+for `MRI_UCHAR`, `MRI_SHORT`, `MRI_USHRT`, `MRI_FLOAT`, `MRI_RGB`/`MRI_INT`, `MRI_LONG`; `MRI_TENSOR`
+(4 bytes a voxel) and `MRI_FLOAT_COMPLEX` (8) have no case, so each `memmove` copies `width` bytes of
+a row of `4 width` or `8 width`. A copy is meant to be whole: corrected by default (the row's
+`width x bytes_per_vox`); `reproduce` copies `width` bytes. Measured on the probe (`copy` cases of
+both types).
+
+### FS-166: the rows of a tensor volume (rule A)
+
+`MRI::initSlices` (`mri.cpp` 264-302) points each row of the contiguous buffer and advances `ptr` by
+a `switch` over the type with no case for `MRI_TENSOR` (nor `MRI_BITMAP`, `MRI_DOUBLE_COMPLEX` and
+unknown codes, which FS-55 keeps from allocating), so every `slices[k][y]` of a tensor volume is the
+buffer's start. `MRIgetVoxVal`/`MRIsetVoxVal` do not use rows for tensors (the setter returns 1 for
+them); `MRIcopy`'s `memmove` does: FreeSurfer's copy of a tensor volume writes the first `width`
+bytes of the destination's buffer `nframes x depth x height` times from the source's first bytes
+(measured: a 2 x 3 x 2 x 2 tensor's copy has two bytes set, all others 0). The port computes rows,
+so it models the pointers only where FreeSurfer's rows are used: `copy.rs` (`ROWS_STEPPED`); the
+macros `MRITseq_vox` & co. of later items must do the same.
+
+### FS-162: `MRIcopy`'s conversions out of range (rule A; one undefined conversion)
+
+`mri.cpp` 5850-5893: float to short, unsigned short and unsigned char go through `nint` and a cast
+`(short)val`, `(unsigned short)val`, `(BUFTYPE)val` (the last after `if (val > 255) val = 255`),
+which GCC 8.4.0 compiles as truncation to the low bits (implementation-defined conversions); short to
+unsigned char (5946: `*cdst++ = (float)*ssrc++`) converts through float, undefined outside [0, 255]:
+GCC dropped the float (no `cvttss2si` in `MRIcopy`'s disassembly from the unit oracle's `mri.cpp.o`)
+and stores the low byte. `MRIsetVoxVal` clips to each type's range (piece 1); the wrapped values
+(40000 -> -25536) are no deliberate design. Corrected by default: clipped; `reproduce` wraps.
+
+### FS-163: `MRIcopy` into a volume of another extent (rule B; memory)
+
+`MRIcopyHeader` keeps the destination's extent (it recomputes the counts from it), and the copy's
+loops run over the source's extent: the same-type copy indexes the destination's slices with the
+source's depth (`slices[z + frame * depth]`, `depth` the source's) and the conversions with the
+destination's (`MRISseq_vox(mri_dst, ...)`); beyond the destination's slices or rows they read
+pointer arrays out of bounds (crashes), and a longer row runs into the next row or past the buffer.
+Copying data into a volume of another shape is not a meaningful request: by default an error; with
+`reproduce` FreeSurfer's placement where every write stays in the destination's buffer and its
+row and slice tables, both modes an error otherwise. The default (voxel-by-voxel) path loops over
+the destination's extent and reads the source with `MRIgetVoxVal` (FS-52/53 there).
+
+### FS-164: `MRItkReg2Native`'s ignored inverse (rule B)
+
+`mri.cpp` 915: `MatrixInverse(D, D)` with the result ignored. For a singular product (a singular R)
+`OpenLUMatrixInverse` fails before writing (vnl's determinant is 0) and `D` comes back as the
+product; for a nearly singular one the inverse's infinities are written into `D` and `MatrixInverse`
+returns `NULL` (its finiteness check) with `D` keeping them. Either way the caller gets a wrong
+matrix silently; a singular registration is not a meaningful input: by default `ErrorExit` with
+`MRItkReg2Native: the registration cannot be inverted`; `reproduce` returns `D`.
+
+### FS-165: `MRIfixTkReg` with a registration of the wrong size (a crash)
+
+`mri.cpp` 1123-1132: `tmp = MatrixMultiply(R, Pxyz, NULL)` and `Pcrs = MatrixMultiply(invTmov,
+tmp, NULL)`; R of 4 columns and j != 4 rows gives a j x 1,000 `tmp`, the second product fails its
+size check and returns `NULL`, and the loop reads `Pcrs->rptr` (a crash, `CRASH 11` in the probe).
+Never reproduced: both modes an error. R with another column count fails the first product and the
+second ends the program (`m2 is null`), as FreeSurfer.
+
+### The volume's transform (FreeSurfer's copy of volume_io)
+
+`packages/minc/minc_volume_io.c` 397-430: FreeSurfer's `get_linear_transform_ptr` and
+`get_inverse_linear_transform_ptr` print their names on standard error and `exit(1)` for a transform
+that is not linear (MINC 1.5.1 reports an internal error and returns `NULL`); 716 `copy_general_transform`
+is `copy_and_invert_transform(transform, false, copy)`, which supports `LINEAR` and
+`CONCATENATED_TRANSFORM` only (the others are compiled out: `BEVIN_ALL_TYPES_SUPPORTED`), `exit(1)`
+after `copy_and_invert_transform bad kind` otherwise. For later items (fs.io): its
+`delete_general_transform` of a concatenation loops `for (trans = 0; transform->n_transforms > 0;
+trans++)` (the condition never changes: it frees past the array and never ends); FreeSurfer's reader
+makes only linear transforms (two in a row are multiplied into one), so no default path reaches it.
+
+### Code generation (the official build, from the unit oracle's `mri.cpp.o`)
+
+- `MRIvoxelToWorld` inlines `AffineMV` with the vector's 1 folded: `mulps` with the broadcast
+  coordinate as the destination (`x * column`), `addps` with the running sum as the destination,
+  the fourth column added without a product.
+- `MRIfsl2TkReg`'s `1.0 / mov->xsize` in double, stored as float, is `divss` (the same value: a double
+  quotient rounded to float equals the float quotient); `*= -1` is `xorps` with the sign (a NaN's sign
+  flips too); `ref->xsize * (ref->width - 1)` is `mulss` with the converted int as the destination.
+  `MRIhfs2Sphinx`'s `*= -1.0` and its swaps through doubles are `xorps` and plain moves.
+- `MRIfixTkReg`'s `floor` and `ceil` of floats are inlined (`cvttss2si`, `cvtsi2ss`, the correction
+  by 1 and the sign copied back with `andnps`/`orps`): IEEE floor and ceil, signed zeros and NaN kept.
+
+### Not reproduced yet: VXL's float determinant and inverse NaN bits
+
+The probe's `fsl2tk`/`tk2fsl` print `MatrixDeterminant` of geometries (`%g`), and `tk2nat` with
+`reproduce` prints FS-164's inverse written in place: with NaN or infinite inputs the NaN signs differ
+from the official build's (2 of the first 860 cases: `ref det = nan` officially, `-nan` here; an
+inverse with one `ffc00000` among `7fc00000`s), because `larmorx_core::vnl_fixed`'s determinant and
+inverse use plain arithmetic, not the official build's operand order (AArch64 would also give
+positive default NaNs there). Those three commands are generated with finite numbers; a request for
+track C (larmorx-core's VXL) is in the track's notes. The port's own 43,000 lines are the same with
+AArch64's NaN emulated, so no other output depends on it.
+
+### `VGras2tkreg`'s second argument
+
+`transform.cpp` 580-586 ignores `ras2tkreg` (it returns `MatrixInverse(M, NULL)`); every caller in
+8.2.0 passes `NULL`, so the port's function has no such argument (no defect: no caller sees it).
+
+### Measured
+
+`validation/probes/fs-mri/check.py`, 43 commands: seed 7, 43,000 cases: `reproduce` identical on
+40,724 of 40,724 comparable lines (2,276 not comparable: 1,967 `vox` FS-53/FS-58, 297 `copy` FS-58 or
+FS-163 refused, 12 `fixtk` FS-165); `fix` differs on 8,298 lines, each with a notice. Seed 1, 860
+cases: 825 identical, 35 skipped, hash `15997e561786c4ae2ee27ae4468e8dd4c5582533b2be329510a8e5e77ca4c078`
+(`tests/fs_mri_official.rs`), passing under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug (8,856 NaNs
+flipped) and release (8,486); the port's 43,000 lines identical with and without the emulation in
+both modes (410,392 and 410,360 flips).

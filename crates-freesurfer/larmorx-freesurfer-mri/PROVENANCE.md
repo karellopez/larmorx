@@ -34,13 +34,22 @@ linear: their name on standard error and `exit(1)`, where MINC reports an intern
 returns `NULL`) and `copy_general_transform` (only linear transforms and concatenations, any other
 kind `copy_and_invert_transform bad kind` and `exit(1)`).
 
-Piece 2 (next): the tkregister and FSL matrices (`MRIxfmCRS2XYZtkreg`, `MRIxfmCRS2XYZfsl`,
-`MRItkReg2Native`, `MRItkRegMtx`, `MRItkRegMtxFromVox2Vox`, `MRIvoxToVoxFromTkRegMtx`,
-`MRIfixTkReg`, `MRIfsl2TkReg`, `MRItkreg2FSL`, `MtxCRS1toCRS0`, `MRIhfs2Sphinx`), `MRIcopy`,
-`MRIvoxelToWorld`, `MRIworldToVoxel(Index)`, `RASFromSurfaceRAS_`, `VGtkreg2RAS`, `VGras2tkreg`,
-`VOL_GEOM`'s printing and comparisons (`vgprint`, `geomprint`, `operator==`, `isNotEqualThresh`,
-`checkgeom`, `checkvox2ras`, `diffvox2ras`, `shearless_components`, `toMatrix`, the `get_*`
-matrices), `MRIinterpCode`/`String`, `MRIprecisionCode`/`String`.
+## FreeSurfer files and functions translated (3.1-55, piece 2 of 2)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `include/mri.h` 213-218 | `VOL_GEOM`'s `get_Vox2RAS`, `get_RAS2Vox`, `get_Vox2TkregRAS`, `get_TkregRAS2Vox`, `get_RAS2TkregRAS`, `get_TkregRAS2RAS` | `tkreg.rs` |
+| `include/mri.h` 329-660 | `VOL_GEOM::vgprint`, `geomprint`, `operator==`, `isNotEqualThresh`, `checkgeom`, `checkvox2ras`, `diffvox2ras`, `shearless_components`, `toMatrix` (`FZEROTHR` of `macros.h`) | `vol_geom.rs` |
+| `include/mri.h` 700-701 | `MRI::Shape`'s `operator==`, `operator!=` | `mri.rs` |
+| `include/transform.h` 74 | `vg_isEqual_Threshold` | `larmorx-freesurfer-core`'s `Globals` |
+| `utils/mri.cpp` 835-1380 | `MRIxfmCRS2XYZtkreg`, `MRIxfmCRS2XYZfsl`, `MRItkReg2Native`, `MRItkRegMtx`, `MRItkRegMtxFromVox2Vox`, `MRIvoxToVoxFromTkRegMtx`, `MRIfixTkReg`, `MRIfsl2TkReg`, `MRItkreg2FSL`, `MtxCRS1toCRS0` | `tkreg.rs` |
+| `utils/mri.cpp` 1437 | `MRIhfs2Sphinx` | `tkreg.rs` |
+| `utils/mri.cpp` 1884-1960 | `MRIinterpCode`, `MRIinterpString`, `MRIprecisionCode`, `MRIprecisionString` (`SAMPLE_*` of `mri.h`) | `mri.rs` |
+| `utils/mri.cpp` 3423, 3491, 3784 | `MRIvoxelToWorld` (with `affine.h`'s `AffineMV` as the official build inlines it), `MRIworldToVoxelIndex`, `MRIworldToVoxel` | `vol_geom.rs` |
+| `utils/mri.cpp` 3634 | `RASFromSurfaceRAS_` | `tkreg.rs` |
+| `utils/mri.cpp` 5783 | `MRIcopy` | `copy.rs` |
+| `utils/transform.cpp` 567, 580 | `VGtkreg2RAS`, `VGras2tkreg` | `tkreg.rs` |
+| `packages/minc/minc_volume_io.c` 397-430, 716 | FreeSurfer's `get_linear_transform_ptr`, `get_inverse_linear_transform_ptr`, `copy_general_transform` (FreeSurfer's changes to MINC 1.5.1's volume_io; the transform itself is `larmorx_io::xfm`) | `mri.rs` |
 
 ## Changes from the originals
 
@@ -50,5 +59,11 @@ matrices), `MRIinterpCode`/`String`, `MRIprecisionCode`/`String`.
 - C++'s inheritance (`MRI : VOL_GEOM`) is a field `vg` with `Deref`; pointers into the transform
   (`linear_transform`) are the matrices they point at; `ischunked`, `valid`, `mean`, `roi.x/y/z`
   that FreeSurfer leaves unset are 0.
-- D13 (`larmorx_core::defects`): FS-52 to FS-60, each corrected by default with `reproduce` giving
-  FreeSurfer's result where it is defined (findings: `docs/findings/freesurfer-mri.md`).
+- D13 (`larmorx_core::defects`): FS-52 to FS-60 and FS-161 to FS-166, each corrected by default
+  with `reproduce` giving FreeSurfer's result where it is defined (findings:
+  `docs/findings/freesurfer-mri.md`).
+- `MRIcopy`'s `mri_src == mri_dst` (return at once) has no counterpart: a volume cannot be passed as
+  both. `VGras2tkreg`'s ignored output argument is left out (no caller passes one).
+- Products FreeSurfer writes into one of their own inputs (`MatrixMultiply(D, R, D)`,
+  `MatrixInverse(D, D)`) are computed from a copy of that input, as `MatrixMultiply` and
+  `MatrixInverse` copy it.

@@ -7,9 +7,10 @@ the official build's outputs, never code or routines. A clean-room implementer w
 the probe `validation/probes/fs-mri/`, a black-box run of FreeSurfer's code) and the cited standards.
 
 Status: **part 1** (§1-8): the geometry and its matrices, the volume, its allocation and messages,
-voxel access, the header and geometry copies, the colour table's copy. **Part 2** (to come): the
-tkregister and FSL matrices, the full copy, world and voxel coordinates, the geometry's printing and
-comparisons, the interpolation and precision names.
+voxel access, the header and geometry copies, the colour table's copy. **Part 2** (§9-16): the
+tkregister and FSL matrices, world and voxel coordinates, the geometry's printing and comparisons,
+the interpolation and precision names, the full copy, the volume's transform, the shapes'
+equality; the validation plan's second part (§16).
 
 ## 1. Conventions
 
@@ -193,3 +194,198 @@ prints `CTABdeepCopy: ct was NULL` and gives none.
   (`723d33a9...`); it passes with AArch64's NaN emulated (`NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`).
 - Later: the replays of the first programs that build volumes (`mri_convert`'s items), through the
   readers of `fs.io`.
+
+## 9. The tkregister and FSL matrices
+
+"The product" below is the float matrix product of `specs/freesurfer-maths.md` §8 (each element
+accumulated in float), "the inverse" the float matrix inverse of the same file (absent when the
+matrix is singular, not square or its inverse not finite). A product with an absent factor ends the
+program with that product's messages (`MatrixMultiply(): m1 is null ` or `m2 is null ` with the
+file and line on standard output, then the error `MatrixMultiply: m1 is null` or `m2 is null`, exit
+status 252); a product whose factors do not fit prints its mismatch messages and gives nothing. Where
+a chain below multiplies into its running result, a step whose sizes do not fit leaves the running
+result as it was; where it assigns the result, the next step meets an absent factor.
+
+- **The tkregister vox2ras** of a geometry: §3's scanner matrix (base 0, no shear) of a geometry with
+  the same extent and voxel sizes, direction cosines (-1, 0, 0) for columns, (0, 0, -1) for rows,
+  (0, 1, 0) for slices, centre 0. It is computed through a volume header of that extent and type
+  `MRI_UCHAR`, so an extent that is not positive prints §4's shape messages each time.
+- **FSL's vox2ras**: the voxel sizes on the diagonal, 1 at (4, 4), zeros elsewhere.
+- **A geometry's six matrices**: the scanner vox2ras (base and shear as given) and its inverse; the
+  tkregister vox2ras and its inverse; tkregister RAS to scanner RAS (below) and its inverse.
+- **Tkregister RAS to scanner RAS** of a geometry: the product of the scanner vox2ras (base 0) and
+  the inverse of the tkregister vox2ras, into a given 4 x 4 matrix or a new one (a given matrix of
+  another size: the inverse's rule for such an output). When the tkregister vox2ras has no inverse
+  (a voxel size of 0) the program ends in the product (the `m2 is null` messages). For a geometry
+  value (`VGtkreg2RAS`): the same on a volume header made from the geometry (its extent, voxel sizes,
+  direction cosines and centre; its shears and `valid` are not used). Scanner RAS to tkregister
+  RAS: the inverse of that (absent when it fails); its output argument is ignored (a new matrix).
+- **Tkregister registration to native** (`MRItkReg2Native(ref, mov, R)`): with T the scanner vox2ras
+  (base 0) and K the tkregister vox2ras of each geometry, in this order: T of ref, T of mov, K of ref,
+  K of mov, the inverses of K mov and of T ref; then `D = T mov x inv(K mov)`, times R (when given),
+  times K ref, times inv(T ref), each product into D; then D inverted into itself. A geometry whose
+  K has no inverse ends the program in the first product. FS-164: when that last inverse fails
+  (R singular), FreeSurfer returns the product itself (or the inverse's infinities, written before
+  the failure was seen) with no message; by default the program ends with the error
+  `MRItkReg2Native: the registration cannot be inverted` (status 252); `reproduce` returns
+  FreeSurfer's matrix.
+- **Native registration to tkregister** (`MRItkRegMtx(ref, mov, D)`): T ref, T mov, K ref, K mov,
+  the inverses of T mov and K ref; `R = K mov x inv(T mov)`, times inv(D) (when D is given; its
+  inverse computed then), times T ref, times inv(K ref).
+- **Tkregister registration from a vox2vox** (`MRItkRegMtxFromVox2Vox(ref, mov, V)`): no V: the
+  previous with no D. Otherwise K ref, K mov, inv(K ref), `R = K mov x V` (a new matrix; nothing when
+  V's rows are not 4, then the program ends in the next product), times inv(K ref).
+- **Vox2vox from a tkregister registration** (`MRIvoxToVoxFromTkRegMtx(mov, targ, R)`): K mov, its
+  inverse, K targ; `inv(K mov) x R x K targ` (the second product into the first's result), or
+  `inv(K mov) x K targ` without R.
+- **The old tkregister's fix** (`MRIfixTkReg(mov, R)`): 1,000 points P (a 4 x 1,000 float matrix) in
+  a 256 mm cube: for each point in turn x, y, z = 256 (u - 0.5) in double, stored as float, from the
+  process's `drand48` sequence (three numbers a point, 3,000 in all), w = 1. C = inv(K mov) x (R x P);
+  the old truncation T: rows floor(C1), ceil(C2), floor(C3) (IEEE floor and ceil of the floats, signed
+  zeros and NaN kept) and 1; the result `(K mov x (T x P')) x inv(P x P')`, P' the transpose. R of
+  another size: the products' messages, then the end of the program in the next product, except R
+  with four columns and another row count, where FreeSurfer crashes: FS-165, both modes the error
+  `MRIfixTkReg: the registration matrix is not 4 x 4` (status 252).
+- **FSL's registrations** (`MRIfsl2TkReg(ref, mov, M)`, `MRItkreg2FSL(ref, mov, R)`): with D the
+  voxel sizes' diagonal of each geometry (1 at (4, 4)), and for FSL to tkregister inv(D mov) = 1 /
+  size on the diagonal (in float). The environment variable `FSLOUTPUTTYPE` must be set: otherwise
+  standard output gets `ERROR: trying to convert FSL registration matrix to FreeSurfer,` (or
+  `FreeSurfer registration matrix to FSL,`) and `       but FSLOUTPUTTYPE variable is not set.`, and
+  the program ends with status 1. Then `FSLOUTPUTTYPE <value> ` (a trailing blank). For `NIFTI`,
+  `NIFTI_PAIR` and `NIFTI_GZ`: the line `fsl2TkReg: mov det = <%g>, ref det = <%g>` (`tkreg2FSL:` for
+  the other direction) with the float determinants of both scanner vox2ras (base 0), and for each
+  positive one the two lines `INFO: FSL2FreeSurfer: Mov volume is NIFTI with positive det,` (`Ref`
+  for the reference) and `      applying LR flip to registration matrix.`, and a left-right flip:
+  the (1, 1) element of that volume's D (of inv(D mov) for FSL's moving volume) negated and (1, 4) set
+  to `xsize (width - 1)` (float), but `width - 1` for inv(D mov). FSL to tkregister: K mov, K ref,
+  inv(K ref), inv(M) (M absent ends the program: `MatrixInverse: NULL input matrix!`), then
+  `K mov x inv(D mov) x inv(M) x D ref x inv(K ref)` left to right, each result assigned. Tkregister to
+  FSL: inv(D ref), K mov, inv(K mov), K ref; `D mov x inv(K mov) x R x K ref x inv(D ref)` left to
+  right, then inverted into itself: absent when that fails.
+- **One-based to zero-based voxels** (`MtxCRS1toCRS0(Q)`): the identity with 1 in the fourth column's
+  first three rows, into Q (a new matrix when none); Q not 4 x 4: `ERROR: MtxCRS1toCRS0(): input
+  matrix is not 4x4` on standard output and nothing.
+- **Sphinx position** (`MRIhfs2Sphinx`): the R components of the three direction cosines and of the
+  centre negated (the sign bit flipped, NaN too); the A and S components of each swapped; returns 0.
+
+## 10. World and voxel coordinates
+
+- **Voxel to scanner RAS** (`MRIvoxelToWorld`): through the geometry's cached voxel-to-RAS matrix
+  (§3; computed and kept when the geometry has none, and the RAS-to-voxel one too): the position
+  rounded to float, then per output row `((x c1 + y c2) + z c3) + c4`, `c` the cached matrix's columns
+  (16 floats column by column), each product `position x element` and each sum `left + right` in
+  float (the NaN operand rule of §1 in that order), widened to double. The cache is not refreshed: a
+  geometry changed after its matrices were cached maps through the old ones.
+- **Scanner RAS to voxel** (`MRIworldToVoxel`): the cached RAS-to-voxel matrix (computed and kept when
+  absent, then the voxel-to-RAS one), times (x, y, z, 1) rounded to float (§9's product), the first
+  three widened to double. A geometry whose matrix has no inverse ends the program in that product
+  (`m1 is null`). **To voxel indices** (`MRIworldToVoxelIndex`): each coordinate rounded to the
+  nearest integer, ties to even; beyond the int range `specs/freesurfer-maths.md`'s conversion rule
+  (FS-17).
+
+## 11. The geometry's printing and comparisons
+
+- `vgprint(nocheck)`: when `valid` is 1 or `nocheck`: `volume geometry:`, with `nocheck`
+  `valid   : <d>`, then `extent  : (<w>, <h>, <d>)`, and `voxel   `, `x_(ras) `, `y_(ras) `,
+  `z_(ras) `, `c_(ras) `, `shears  ` each followed by `: (<a>, <b>, <c>)` with `%7.4f`, then
+  `file    : <name>`; otherwise `volume geometry: info is either not contained or not valid.`, all on
+  standard output.
+- `geomprint(fmt, ...)`: the caller's formatted text (when given), then `        : Dimensions: <w> x
+  <h> x <d>`, `        : voxel size: <%6.6f>, <%6.6f>, <%6.6f>`, and for r, a, s: `        : x_r =
+  <%8.10f>, y_r = <%8.10f>, z_r = <%8.10f>, c_r = <%10.10f>`.
+- **Inequality code** (`isNotEqualThresh(a, b, t)`): 0 when equal, else the first field that differs:
+  1 `valid`, 2-4 width, height, depth, 5-7 the voxel sizes, 8-16 the direction cosines (x_r, x_a,
+  x_s, y_r, ..., z_s), 17-19 the centre, 20-22 the shears; a float field differs unless the absolute
+  value of its float difference is below t (NaN always differs). **Equality** (`==`): 1 when that code
+  is 0 at the process's threshold `vg_isEqual_Threshold` (FLT_EPSILON as a double until a program
+  sets it), else 0. The file name and the matrices are not compared.
+- **The geometry matrix** (`toMatrix`): direction cosines as columns 1-3, the centre as column 4,
+  (0, 0, 0, 1) below, into a given matrix or a new 4 x 4.
+- `checkgeom(a, b, t, debug)`: true when an element of the two geometry matrices differs by more
+  than t (the difference of the widened floats, in double); each such element prints
+  `VOL_GEOM::checkgeom(): Volumes differ in geometry row=<r> col=<c> diff=<%.10lf> (thresh=<%g>)`
+  (`[DEBUG] ` before it with `debug`).
+- `diffvox2ras(m1, m2, t, msg, debug)`: true when an element of the two 4 x 4 matrices differs by
+  more than t; with `debug`: `[DEBUG]VOL_GEOM::diffvox2ras(): <msg>` first, each such element as
+  `                              : vox2ras differs at row=<r> col=<c> diff=<%.10lf> (thresh=<%g>),
+  val1=<%.10lf> val2=<%.10lf>`, and when none differs `                              : vox2ras same`.
+  `checkvox2ras(a, b, t, debug, sform)`: that of the two scanner vox2ras (base 0) with the message
+  `TAG_RAS_XFORM vs MRI_XFORM`; when they differ and `debug`: with a sform, `NII_SFORM vs MRI_XFORM`
+  (sform against b's) and `TAG_RAS_XFORM vs NII_SFORM`, then `VOL_GEOM::checkvox2ras(): vox2ras1
+  (TAG_RAS_XFROM):` (sic), the matrix (precision 10), `VOL_GEOM::checkvox2ras(): vox2ras2
+  (MRI_XFORM):`, the matrix, and with a sform `VOL_GEOM::checkvox2ras(): nii_sform:` and it.
+- **Removing shears** (`shearless_components`): when a shear is above 1e-5 (compared in double), the
+  geometry is set from its sheared scanner vox2ras (§3 with the shear, then the setting from a matrix,
+  which prints its warning when the column lengths differ from the voxel sizes) and the shears set
+  to 0.
+
+## 12. Interpolation and precision names
+
+- Interpolation codes: nearest 0, trilinear 1, sinc 2, cubic 3, weighted 4, cubic B-spline 5, vote
+  6. From a name: its first three characters, case folded (ASCII), against `nea` (0), `tri` and `tli`
+  (1), `sin` (2), `cub` (5); a name shorter than three characters matches nothing; else -1. To a
+  name: 0 `nearest`, 1 `trilinear`, 2 `sinc`, 5 `cubic`, otherwise none.
+- Precision (voxel type) names: `uchar` 0, `short` 4, `ushrt` 10, `int` 1, `long` 2, `float` 3,
+  compared whole, case folded; else -1; and back (others: none).
+
+## 13. The full copy (`MRIcopy(src, dst)`)
+
+- Without a destination: a volume of the source's extent, type and frames (§4), or without voxels
+  (one frame allocated, the frame count then set to the source's) when the source has none. The
+  header is copied (§6) and the destination keeps its own `ptype`; a source without voxels ends the
+  copy there.
+- The same type: the voxels row by row (row y of slice `z + frame depth`, the source's depth used for
+  both), each row's `width x size` bytes, the size 1, 2, 2, 4, 4, 4, 8 bytes for uchar, short, ushrt,
+  float, rgb, int, long. FS-161: FreeSurfer copies `width` bytes for the other types (a tensor's or
+  a complex volume's row is 4 or 8 times longer); by default the whole row; `reproduce` FreeSurfer's.
+  FS-166: a tensor volume's rows, seen row by row, all start at its first voxel, so FreeSurfer's copy
+  of a tensor volume writes only its first `width` bytes; by default the rows are where they belong;
+  `reproduce` gives FreeSurfer's.
+- Conversions element by element over the source's extent into the destination's row y of slice
+  `z + frame dst_depth`: float to short, unsigned short and unsigned char through `nint`
+  (`specs/freesurfer-core.md`; unsigned char first clipped at 255); unsigned char, short, int and rgb
+  to float (exactly, an int rounded to the nearest float); short to unsigned char. FS-162: FreeSurfer
+  wraps values outside the destination's range (the low 16 or 8 bits, two's complement for short);
+  by default they are clipped to the range; `reproduce` wraps. Every other pair of types: voxel by
+  voxel over the destination's extent (column outermost, then row, slice, frame innermost) with §5's
+  read (mode 0) and write (mode 0), their defects included.
+- The destination's file name is the source's.
+- FS-163: a given destination of another extent or frame count is refused by default (the error
+  `MRIcopy: a <w> x <h> x <d> x <f> destination for a <w> x <h> x <d> x <f> source`, status 252);
+  with `reproduce`, FreeSurfer's placement where every row lands inside the destination, and in both
+  modes the error `MRIcopy: the destination is too small for the source's voxels` where it would
+  not. A destination without voxels for a source with them: FS-58, the error `MRIcopy: the
+  destination has no voxels`.
+
+## 14. The volume's transform
+
+A volume may carry a MINC general transform (`larmorx_io::xfm`, MINC 1.5.1's) with its linear
+matrix and inverse. The header copy (§6) copies it when the source has a linear one: the copy takes
+the inverse flag into its matrices (the copy's forward matrix is the source's effective one, its flag
+clear); the linear matrix and inverse of the copy are taken from it. A transform that is not linear
+(FreeSurfer reads only linear ones): copying it prints `copy_and_invert_transform bad kind` on
+standard error and taking its linear matrix `get_linear_transform_ptr` (its inverse
+`get_inverse_linear_transform_ptr`), each ending the program with status 1.
+
+## 15. Shapes
+
+Two shapes are equal when their width, height, depth and frame count are (the product is not
+compared).
+
+## 16. Validation plan (part 2)
+
+- The probe (§8) has 43 commands: part 1's 20 and tkreg (the six matrices, FSL's, the tkregister
+  vox2ras), ras2s (tkregister to scanner RAS into a given or new matrix, of a geometry value),
+  tk2nat, nat2tk, v2v, tkv2v (with absent, singular and odd-sized registrations), fixtk (a seeded
+  `drand48`; the next number drawn after it printed), fsl2tk, tk2fsl (unset, NIFTI and other output
+  types), crs1, sphinx, v2w (fresh, stale and recomputed caches; points with NaN and infinities),
+  codes, vgprint, vgeq (one field perturbed, thresholds from 0 to 10, with and without debug and a
+  sform), shearless, tomat, copy (every type pair, with and without a destination, header-only
+  sources and destinations, other extents), shape. tk2nat, fsl2tk and tk2fsl are drawn with finite
+  numbers only (the port does not yet give the NaN bits of the float determinant and of the inverse written in
+  place that they print).
+- Measured 2026-11-13: seed 7, 43,000 cases: `reproduce` identical on 40,724 of 40,724 comparable
+  lines (2,276 not comparable: FS-53, FS-58, FS-163 where refused, FS-165); the default differs only
+  with a defect's notice; the port's 43,000 lines are the same with AArch64's NaN emulated in both
+  modes. Seed 1, 860 cases: 825 identical, 35 not comparable, the hash `15997e56...` of
+  `fs_mri_official.rs`, passing with the emulation in a debug and a release build.

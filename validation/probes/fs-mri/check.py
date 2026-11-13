@@ -9,8 +9,8 @@ Generates seeded cases with larmorx-freesurfer-mri's example ``fs_mri_probe``, r
 official programs are) by the oracle-output cache at one thread, runs the port on the same cases
 with ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the lines (the result and the
 text FreeSurfer's code printed): ``reproduce`` must give FreeSurfer's on every case but those where
-FreeSurfer reads or writes memory it does not own (FS-53) or crashes (FS-58), which are counted,
-not compared; ``fix`` may differ only where a defect it corrects changed the result (its notices).
+FreeSurfer reads or writes memory it does not own (FS-53, FS-163 where the port refuses the copy)
+or crashes (FS-58, FS-165), which are counted, not compared; ``fix`` may differ only where a defect it corrects changed the result (its notices).
 Prints the counts and the hash the port's recorded test checks (``tests/fs_mri_official.rs``).
 
     python -P validation/probes/fs-mri/check.py --seed 1 --n 400 [--json out.json]
@@ -34,7 +34,10 @@ sys.path.insert(0, str(REPO / "validation" / "src"))
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
-SKIP = ("FS-53", "FS-58")
+SKIP = ("FS-53", "FS-58", "FS-165")
+# FS-163 (MRIcopy into a smaller destination) is skipped where the port refuses the copy (FreeSurfer
+# writes outside the destination there); where both stay inside it the lines are compared
+SKIP_WHEN_REFUSED = ("FS-163",)
 
 
 def probe_binary(ws: Path) -> Path:
@@ -119,7 +122,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd = case.split()[0]
         for x in ids:
             rep_ids[x] += 1
-        if any(x in ids for x in SKIP):
+        refused = r.startswith("EXIT ")
+        if any(x in ids for x in SKIP) or (refused and any(x in ids for x in SKIP_WHEN_REFUSED)):
             skipped[cmd] += 1
             hashed.update(b"SKIP\n")
             continue

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // fs.mri's probe: FreeSurfer 8.2.0's MRI structure (mri.h, mri.cpp, transform.cpp's VOL_GEOM
-// helpers, colortab.cpp's CTABdeepCopy) called case by case, linked with the unit oracle's
+// helpers, colortab.cpp's CTABdeepCopy; the tkregister and FSL matrices, coordinates, MRIcopy)
+// called case by case, linked with the unit oracle's
 // libutils as the official programs are (build.sh). CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS:
 // it names FreeSurfer's functions (running it is a black-box run of FreeSurfer's code).
 //
@@ -32,6 +33,7 @@
 #include "mri.h"
 #include "transform.h"
 #include "utils.h"
+
 
 int MRIcopyVolGeomToMRI(MRI *mri, const VOL_GEOM *vg);
 int MRIcopyVolGeomFromMRI(const MRI *mri, VOL_GEOM *vg);
@@ -151,6 +153,25 @@ MATRIX *get_matrix()
 }
 MATRIX *get_opt_matrix() { return geti() ? get_matrix() : NULL; }
 
+void drop_cache(VOL_GEOM *v)
+{
+  AffineMatrixFree(&v->i_to_r__);
+  MatrixFree(&v->r_to_i__);
+}
+void set_fsloutputtype()
+{
+  std::string t = next();
+  if (t == "-") unsetenv("FSLOUTPUTTYPE");
+  else setenv("FSLOUTPUTTYPE", t.c_str(), 1);
+}
+void fill_chunk(MRI *m, unsigned seed)
+{
+  if (m->chunk && m->ischunked) {
+    unsigned char *b = (unsigned char *)m->chunk;
+    for (size_t i = 0; i < m->bytes_total; i++) b[i] = (unsigned char)((i * 37u + seed) & 0xffu);
+  }
+}
+
 void put_header(const MRI *m)
 {
   oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
@@ -252,6 +273,13 @@ MRI *get_mri()
   return hdr ? MRIallocHeader(w, h, d, type, nf) : MRIallocSequence(w, h, d, type, nf);
 }
 
+// a volume of the case (get_mri) with the case's geometry fields
+MRI *get_vg_mri()
+{
+  MRI *m = get_mri();
+  set_geom(m);
+  return m;
+}
 // the header fields MRIcopyHeader reads, then the optional pointers
 void set_header(MRI *m)
 {
@@ -419,6 +447,140 @@ void run_case()
     set_geom(&vg);
     oi(MRIcopyVolGeomFromMRI(m, &vg));
     put_geom(&vg);
+  } else if (cmd == "tkreg") {
+    MRI *m = get_vg_mri();
+    int base = geti(), shear = geti();
+    om(MRIxfmCRS2XYZtkreg(m));
+    om(MRIxfmCRS2XYZfsl(m));
+    om(m->get_Vox2RAS(base, shear != 0));
+    om(m->get_RAS2Vox(base, shear != 0));
+    om(m->get_Vox2TkregRAS());
+    om(m->get_TkregRAS2Vox());
+    om(m->get_RAS2TkregRAS());
+    om(m->get_TkregRAS2RAS());
+  } else if (cmd == "ras2s") {
+    MRI *m = get_vg_mri();
+    MATRIX *given = geti() ? MatrixAlloc(4, 4, MATRIX_REAL) : NULL;
+    MATRIX *r = RASFromSurfaceRAS_(m, given);
+    oi(given != NULL && r == given);
+    om(r);
+    om(VGtkreg2RAS(m, NULL));
+  } else if (cmd == "tk2nat" || cmd == "nat2tk" || cmd == "v2v" || cmd == "tkv2v") {
+    MRI *a = get_vg_mri();
+    MRI *b = get_vg_mri();
+    MATRIX *r = get_opt_matrix();
+    MATRIX *res;
+    if (cmd == "tk2nat") res = MRItkReg2Native(a, b, r);
+    else if (cmd == "nat2tk") res = MRItkRegMtx(a, b, r);
+    else if (cmd == "v2v") res = MRItkRegMtxFromVox2Vox(a, b, r);
+    else res = MRIvoxToVoxFromTkRegMtx(a, b, r);
+    om(res);
+  } else if (cmd == "fixtk") {
+    MRI *m = get_vg_mri();
+    long seed = geti();
+    MATRIX *r = get_opt_matrix();
+    srand48(seed);
+    om(MRIfixTkReg(m, r));
+    of((float)drand48());
+  } else if (cmd == "fsl2tk" || cmd == "tk2fsl") {
+    set_fsloutputtype();
+    MRI *a = get_vg_mri();
+    MRI *b = get_vg_mri();
+    MATRIX *r = get_opt_matrix();
+    om(cmd == "fsl2tk" ? MRIfsl2TkReg(a, b, r) : MRItkreg2FSL(a, b, r));
+  } else if (cmd == "crs1") {
+    int k = geti();
+    MATRIX *q = k == 0 ? NULL : get_matrix();
+    MATRIX *r = MtxCRS1toCRS0(q);
+    oi(q != NULL && r == q);
+    om(r);
+  } else if (cmd == "sphinx") {
+    VOL_GEOM vg;
+    set_geom(&vg);
+    oi(MRIhfs2Sphinx(&vg));
+    put_geom(&vg);
+  } else if (cmd == "v2w") {
+    MRI *m = get_vg_mri();
+    int cache = geti();
+    if (cache == 1) drop_cache(m);
+    if (cache == 2) MRIreInitCache(m);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      double a, b, c;
+      int ia, ib, ic;
+      if (geti()) {
+        MRIvoxelToWorld(m, x, y, z, &a, &b, &c);
+      } else {
+        MRIworldToVoxel(m, x, y, z, &a, &b, &c);
+        MRIworldToVoxelIndex(m, x, y, z, &ia, &ib, &ic);
+        oi(ia); oi(ib); oi(ic);
+      }
+      od(a); od(b); od(c);
+    }
+    put_geom(m, false);
+  } else if (cmd == "codes") {
+    std::string a = next();
+    int ca = geti();
+    std::string b = next();
+    int cb = geti();
+    oi(MRIinterpCode(a.c_str()));
+    const char *s1 = MRIinterpString(ca);
+    out += s1 ? s1 : "NULL"; out += " ";
+    oi(MRIprecisionCode(b.c_str()));
+    const char *s2 = MRIprecisionString(cb);
+    out += s2 ? s2 : "NULL"; out += " ";
+  } else if (cmd == "vgprint") {
+    VOL_GEOM vg;
+    set_geom(&vg);
+    int nocheck = geti(), pre = geti();
+    vg.vgprint(nocheck != 0);
+    if (pre) vg.geomprint("geom %s %d:\n", "x", 7);
+    else vg.geomprint();
+    oi(0);
+  } else if (cmd == "vgeq") {
+    VOL_GEOM a, b;
+    set_geom(&a);
+    set_geom(&b);
+    double thresh = getd();
+    int debug = geti();
+    MATRIX *sform = get_opt_matrix();
+    vg_isEqual_Threshold = thresh;
+    oi(a == b);
+    oi(VOL_GEOM::isNotEqualThresh(&a, &b, thresh));
+    oi(VOL_GEOM::checkgeom(&a, &b, thresh, debug != 0));
+    oi(VOL_GEOM::checkvox2ras(&a, &b, thresh, debug != 0, sform));
+  } else if (cmd == "shearless") {
+    MRI *m = get_vg_mri();
+    m->shearless_components();
+    put_geom(m, false);
+  } else if (cmd == "tomat") {
+    VOL_GEOM vg;
+    set_geom(&vg);
+    MATRIX *given = geti() ? get_matrix() : NULL;
+    MATRIX *r = vg.toMatrix(given);
+    oi(given != NULL && r == given);
+    om(r);
+  } else if (cmd == "copy") {
+    MRI *src = get_mri();
+    fill_chunk(src, (unsigned)geti());
+    set_header(src);
+    MRI *dst = NULL;
+    if (geti()) {
+      dst = get_mri();
+      fill_chunk(dst, (unsigned)geti());
+      dst->ptype = geti();
+    }
+    MRI *res = MRIcopy(src, dst);
+    oi(res == dst);
+    put_header(res);
+    put_chunk(res);
+  } else if (cmd == "shape") {
+    int w = geti(), h = geti(), d = geti(), f = geti();
+    int w2 = geti(), h2 = geti(), d2 = geti(), f2 = geti();
+    MRI::Shape a({w, h, d, f}), b({w2, h2, d2, f2});
+    oi(a == b);
+    oi(a != b);
   } else if (cmd == "intent") {
     int code = geti();
     os(MRI::intentName(code));

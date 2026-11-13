@@ -1145,6 +1145,8 @@ defects! {
         "MRItkReg2Native of a registration matrix that cannot be inverted (singular) returns the uninverted native product, or a matrix of infinities, with no message";
     FS_165 = "FS-165", "FreeSurfer", true,
         "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
+    FS_166 = "FS-166", "FreeSurfer", true,
+        "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
 }
 
 /// The register entry with ID `id`.

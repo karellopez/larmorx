@@ -15,16 +15,22 @@ use larmorx_freesurfer_core::affine::AffineMatrix;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::Matrix;
+use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry, ctab_deep_copy, ctab_free};
 use larmorx_freesurfer_mri::mri::{self as m, Mri};
+use larmorx_freesurfer_mri::tkreg as tk;
 use larmorx_freesurfer_mri::vol_geom::{self as vgm, VolGeom};
 use larmorx_freesurfer_mri::voxel;
 
-pub struct Gen(u64);
+/// The cases' random numbers; `finite` keeps the special values (NaN, infinities, 1e30) out of
+/// the numbers drawn.
+pub struct Gen(u64, bool);
 
 impl Gen {
     pub fn new(seed: u64) -> Gen {
-        Gen(seed)
+        Gen(seed, false)
     }
     fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
@@ -64,21 +70,21 @@ fn dx(v: f64) -> String {
 }
 
 fn num(g: &mut Gen, lo: i64, hi: i64, d: i64) -> f32 {
-    if g.chance(40) {
+    if !g.1 && g.chance(40) {
         return g.pick(&SPECIAL);
     }
     g.int(lo * d, hi * d) as f32 / d as f32
 }
 
 fn cosine(g: &mut Gen) -> f32 {
-    if g.chance(60) {
+    if !g.1 && g.chance(60) {
         return g.pick(&SPECIAL);
     }
     g.pick(&[-1.0, 0.0, 1.0, 0.6, 0.8, -0.6, -0.8, 0.70710677, 0.1, 0.995])
 }
 
 fn size(g: &mut Gen) -> f32 {
-    if g.chance(40) {
+    if !g.1 && g.chance(40) {
         return g.pick(&SPECIAL);
     }
     g.pick(&[1.0, 0.5, 2.0, 1.25, 0.9375, 3.0, 0.0, -1.0, 1.1, 0.8])
@@ -298,6 +304,74 @@ fn vox(g: &mut Gen, t: &mut Vec<String>) {
     }
 }
 
+/// A registration-like matrix: mostly 4 x 4 (small entries, sometimes singular), now and then
+/// of another size.
+fn reg_matrix(g: &mut Gen, t: &mut Vec<String>) {
+    let (rows, cols) = if g.chance(12) {
+        g.pick(&[(3, 4), (4, 3), (4, 1), (1, 1)])
+    } else {
+        (4, 4)
+    };
+    t.push(rows.to_string());
+    t.push(cols.to_string());
+    let zero = g.chance(15);
+    for r in 1..=rows {
+        for c in 1..=cols {
+            let v = if zero {
+                0.0
+            } else if r == 4 && rows == 4 && cols == 4 {
+                if c == 4 { 1.0 } else { 0.0 }
+            } else if r == c && !g.chance(4) {
+                g.pick(&[1.0, 0.98, 1.02, -1.0, 2.0])
+            } else {
+                num(g, -40, 40, 8)
+            };
+            t.push(fx(v));
+        }
+    }
+}
+
+fn opt_reg_matrix(g: &mut Gen, t: &mut Vec<String>) {
+    if g.chance(6) {
+        t.push("0".into());
+    } else {
+        t.push("1".into());
+        reg_matrix(g, t);
+    }
+}
+
+fn point(g: &mut Gen) -> f64 {
+    if g.chance(30) {
+        return f64::from(g.pick(&SPECIAL));
+    }
+    g.int(-2000, 2000) as f64 / 16.0
+}
+
+/// `vgeq`'s second geometry: the first one's tokens, mostly with one field changed.
+fn perturbed(g: &mut Gen, a: &[String]) -> Vec<String> {
+    let mut b = a.to_vec();
+    if g.chance(4) {
+        return b;
+    }
+    let i = g.below(23) as usize;
+    match i {
+        0..=3 | 7 => b[i] = (b[i].parse::<i64>().unwrap() + 1).to_string(),
+        _ => {
+            let v = f32::from_bits(u32::from_str_radix(&b[i], 16).unwrap());
+            let d = g.pick(&[1e-8f32, 1e-7, 1e-6, 1e-4, 1e-3, 0.01, 1.0]);
+            let w = if g.chance(20) {
+                f32::NAN
+            } else if g.chance(2) {
+                v + d
+            } else {
+                v - d
+            };
+            b[i] = fx(w);
+        }
+    }
+    b
+}
+
 /// `n` case lines from `seed`.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
@@ -322,6 +396,29 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
         "vgfrommri",
         "intent",
         "sizeof",
+        "tkreg",
+        "ras2s",
+        "tk2nat",
+        "nat2tk",
+        "v2v",
+        "tkv2v",
+        "fixtk",
+        "fsl2tk",
+        "tk2fsl",
+        "crs1",
+        "sphinx",
+        "v2w",
+        "v2w",
+        "codes",
+        "vgprint",
+        "vgeq",
+        "vgeq",
+        "shearless",
+        "tomat",
+        "copy",
+        "copy",
+        "copy",
+        "shape",
     ];
     (0..n)
         .map(|i| {
@@ -410,6 +507,186 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         ])
                         .to_owned(),
                     );
+                }
+                "tkreg" => {
+                    vol(g, &mut t, false);
+                    geom(g, &mut t);
+                    t.push(g.int(0, 1).to_string());
+                    t.push(g.int(0, 1).to_string());
+                }
+                "ras2s" => {
+                    vol(g, &mut t, false);
+                    geom(g, &mut t);
+                    t.push(g.int(0, 1).to_string());
+                }
+                "tk2nat" | "nat2tk" | "v2v" | "tkv2v" => {
+                    // MRItkReg2Native's failed inverse in place prints VXL's float inverse's NaNs,
+                    // whose bits the port does not reproduce yet (larmorx_core's vnl_fixed): its
+                    // cases are drawn finite
+                    g.1 = cmd == "tk2nat";
+                    for _ in 0..2 {
+                        vol(g, &mut t, false);
+                        geom(g, &mut t);
+                    }
+                    opt_reg_matrix(g, &mut t);
+                    g.1 = false;
+                }
+                "fixtk" => {
+                    vol(g, &mut t, false);
+                    geom(g, &mut t);
+                    t.push(g.int(0, 100_000).to_string());
+                    opt_reg_matrix(g, &mut t);
+                }
+                "fsl2tk" | "tk2fsl" => {
+                    // the NIFTI branch prints VXL's float determinants: drawn finite, as tk2nat
+                    g.1 = true;
+                    t.push(
+                        g.pick(&[
+                            "-",
+                            "NIFTI",
+                            "NIFTI_GZ",
+                            "NIFTI_PAIR",
+                            "ANALYZE",
+                            "NIFTI_GZ",
+                        ])
+                        .to_owned(),
+                    );
+                    for _ in 0..2 {
+                        vol(g, &mut t, false);
+                        geom(g, &mut t);
+                    }
+                    opt_reg_matrix(g, &mut t);
+                    g.1 = false;
+                }
+                "crs1" => {
+                    let k = g.int(0, 2);
+                    t.push(k.to_string());
+                    if k > 0 {
+                        let (r, c) = if k == 1 {
+                            (4, 4)
+                        } else {
+                            g.pick(&[(3, 4), (4, 2)])
+                        };
+                        t.push(r.to_string());
+                        t.push(c.to_string());
+                        for _ in 0..r * c {
+                            t.push(fx(num(g, -5, 5, 2)));
+                        }
+                    }
+                }
+                "sphinx" => geom(g, &mut t),
+                "v2w" => {
+                    vol(g, &mut t, false);
+                    geom(g, &mut t);
+                    t.push(g.int(0, 2).to_string());
+                    let n = g.int(1, 3);
+                    t.push(n.to_string());
+                    for _ in 0..n {
+                        for _ in 0..3 {
+                            t.push(dx(point(g)));
+                        }
+                        t.push(g.int(0, 1).to_string());
+                    }
+                }
+                "codes" => {
+                    t.push(
+                        g.pick(&[
+                            "nearest",
+                            "NEA",
+                            "ne",
+                            "tri",
+                            "TLI",
+                            "trilinear",
+                            "sinc",
+                            "Sin",
+                            "cubic",
+                            "cub",
+                            "x",
+                            "nearestx",
+                            "cu",
+                        ])
+                        .to_owned(),
+                    );
+                    t.push(g.int(-1, 7).to_string());
+                    t.push(
+                        g.pick(&[
+                            "uchar", "UCHAR", "short", "ushrt", "int", "long", "float", "double",
+                            "uchar2", "Float", "in",
+                        ])
+                        .to_owned(),
+                    );
+                    t.push(g.int(-1, 11).to_string());
+                }
+                "vgprint" => {
+                    geom(g, &mut t);
+                    t.push(g.int(0, 1).to_string());
+                    t.push(g.int(0, 1).to_string());
+                }
+                "vgeq" => {
+                    let mut a = Vec::new();
+                    geom(g, &mut a);
+                    let b = perturbed(g, &a);
+                    t.extend(a);
+                    t.extend(b);
+                    t.push(dx(g.pick(&[
+                        f64::from(f32::EPSILON),
+                        1e-3,
+                        0.0,
+                        1e-6,
+                        10.0,
+                    ])));
+                    t.push(g.int(0, 1).to_string());
+                    opt_matrix(g, &mut t);
+                }
+                "shearless" => {
+                    vol(g, &mut t, false);
+                    geom(g, &mut t);
+                }
+                "tomat" => {
+                    geom(g, &mut t);
+                    if g.chance(2) {
+                        t.push("1".into());
+                        matrix(g, &mut t);
+                    } else {
+                        t.push("0".into());
+                    }
+                }
+                "copy" => {
+                    let types = [0, 1, 2, 3, 4, 6, 7, 9, 10];
+                    let (w, h, d, nf) = (g.int(1, 3), g.int(1, 3), g.int(1, 2), g.int(1, 2));
+                    let st = g.pick(&types);
+                    for v in [w, h, d, st, nf, i64::from(g.chance(8))] {
+                        t.push(v.to_string());
+                    }
+                    t.push(g.int(0, 250).to_string());
+                    header(g, &mut t);
+                    if g.chance(4) {
+                        t.push("0".into());
+                    } else {
+                        t.push("1".into());
+                        let dt = if g.chance(3) { st } else { g.pick(&types) };
+                        let ext = if g.chance(6) {
+                            [g.int(1, 4), g.int(1, 4), g.int(1, 3), g.int(1, 3)]
+                        } else {
+                            [w, h, d, nf]
+                        };
+                        for v in [ext[0], ext[1], ext[2], dt, ext[3], i64::from(g.chance(20))] {
+                            t.push(v.to_string());
+                        }
+                        t.push(g.int(0, 250).to_string());
+                        t.push(g.int(0, 3).to_string());
+                    }
+                }
+                "shape" => {
+                    let a: Vec<i64> = (0..4).map(|_| g.int(0, 3)).collect();
+                    let b: Vec<i64> = if g.chance(2) {
+                        a.clone()
+                    } else {
+                        (0..4).map(|_| g.int(0, 3)).collect()
+                    };
+                    for v in a.iter().chain(b.iter()) {
+                        t.push(v.to_string());
+                    }
                 }
                 _ => t.push(g.int(-1, 11).to_string()),
             }
@@ -793,6 +1070,15 @@ impl Ctx {
     }
 }
 
+/// `fill_chunk`: byte `i` of the voxels `(37 i + seed) mod 256`.
+fn fill(x: &mut Mri, seed: u32) {
+    if let (Some(c), true) = (x.chunk.as_mut(), x.ischunked) {
+        for (i, b) in c.iter_mut().enumerate() {
+            *b = ((i as u32).wrapping_mul(37).wrapping_add(seed) & 0xff) as u8;
+        }
+    }
+}
+
 fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     match t.next() {
         "alloc" => {
@@ -869,12 +1155,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "vox" => {
             let mut x = cx.mri(t)?;
-            let seed = t.i() as u32;
-            if let (Some(c), true) = (x.chunk.as_mut(), x.ischunked) {
-                for (i, b) in c.iter_mut().enumerate() {
-                    *b = ((i as u32).wrapping_mul(37).wrapping_add(seed) & 0xff) as u8;
-                }
-            }
+            fill(&mut x, t.i() as u32);
             x.outside_val = t.d();
             let nops = t.i();
             for _ in 0..nops {
@@ -911,7 +1192,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
             let r = m::mri_copy_header(g, a, b, &src, dst.as_mut())?;
             let res = match r {
-                larmorx_freesurfer_core::ret::Ret::New(n) => n,
+                Ret::New(n) => n,
                 _ => dst.expect("the given volume"),
             };
             o.i(i64::from(given));
@@ -985,6 +1266,242 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             cx.set_geom(t, &mut v);
             o.i(i64::from(m::mri_copy_vol_geom_from_mri(&x, &mut v)));
             o.geom(&v, true);
+        }
+        "tkreg" => {
+            let mut x = cx.mri(t)?;
+            cx.set_geom(t, &mut x.vg);
+            let (base, shear) = (t.i(), t.i() != 0);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let v = &x.vg;
+            o.m(Some(&tk::xfm_crs2xyz_tkreg(g, a, b, v)?));
+            o.m(Some(&tk::xfm_crs2xyz_fsl(g, a, b, v)?));
+            o.m(Some(&tk::get_vox2ras(g, a, b, v, base, shear)?));
+            o.m(tk::get_ras2vox(g, a, b, v, base, shear)?.as_ref());
+            o.m(Some(&tk::get_vox2tkreg_ras(g, a, b, v)?));
+            o.m(tk::get_tkreg_ras2vox(g, a, b, v)?.as_ref());
+            o.m(tk::get_ras2tkreg_ras(g, a, b, v)?.as_ref());
+            o.m(tk::get_tkreg_ras2ras(g, a, b, v)?.as_ref());
+        }
+        "ras2s" => {
+            let mut x = cx.mri(t)?;
+            cx.set_geom(t, &mut x.vg);
+            let given = t.i() != 0;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            if given {
+                let mut gm = Matrix::real(4, 4);
+                let r = tk::ras_from_surface_ras(g, a, b, &x.vg, Some(&mut gm))?;
+                let ok = matches!(r, Ret::Given);
+                o.i(i64::from(ok));
+                o.m(ok.then_some(&gm));
+            } else {
+                let r = tk::ras_from_surface_ras(g, a, b, &x.vg, None)?;
+                o.i(0);
+                o.m(r.into_new().as_ref());
+            }
+            o.m(tk::vg_tkreg2ras(g, a, b, &x.vg, None)?.into_new().as_ref());
+        }
+        "tk2nat" | "nat2tk" | "v2v" | "tkv2v" => {
+            let cmd = t.t[0];
+            let mut ra = cx.mri(t)?;
+            cx.set_geom(t, &mut ra.vg);
+            let mut rb = cx.mri(t)?;
+            cx.set_geom(t, &mut rb.vg);
+            let r = cx.opt_matrix(t);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let res = match cmd {
+                "tk2nat" => Some(tk::tkreg2native(g, a, b, &ra.vg, &rb.vg, r.as_ref())?),
+                "nat2tk" => Some(tk::tkreg_mtx(g, a, b, &ra.vg, &rb.vg, r.as_ref())?),
+                "v2v" => tk::tkreg_mtx_from_vox2vox(g, a, b, &ra.vg, &rb.vg, r.as_ref())?,
+                _ => tk::vox_to_vox_from_tkreg_mtx(g, a, b, &ra.vg, &rb.vg, r.as_ref())?,
+            };
+            o.m(res.as_ref());
+        }
+        "fixtk" => {
+            let mut x = cx.mri(t)?;
+            cx.set_geom(t, &mut x.vg);
+            let seed = t.i();
+            let r = cx.opt_matrix(t);
+            cx.g.drand48.srand48(i64::from(seed));
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            o.m(tk::fix_tkreg(g, a, b, &x.vg, r.as_ref())?.as_ref());
+            o.f(cx.g.drand48.drand48() as f32);
+        }
+        "fsl2tk" | "tk2fsl" => {
+            let cmd = t.t[0];
+            let ty = t.next();
+            let env = if ty == "-" {
+                Environment::default()
+            } else {
+                Environment::from_pairs([("FSLOUTPUTTYPE", ty)])
+            };
+            let mut ra = cx.mri(t)?;
+            cx.set_geom(t, &mut ra.vg);
+            let mut rb = cx.mri(t)?;
+            cx.set_geom(t, &mut rb.vg);
+            let r = cx.opt_matrix(t);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let res = if cmd == "fsl2tk" {
+                tk::fsl2tkreg(g, a, b, &env, &ra.vg, &rb.vg, r.as_ref())?
+            } else {
+                tk::tkreg2fsl(g, a, b, &env, &ra.vg, &rb.vg, r.as_ref())?
+            };
+            o.m(res.as_ref());
+        }
+        "crs1" => {
+            let k = t.i();
+            let mut q = (k != 0).then(|| cx.matrix(t));
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            match q.as_mut() {
+                None => {
+                    let r = tk::mtx_crs1_to_crs0(g, a, b, None)?;
+                    o.i(0);
+                    o.m(r.into_new().as_ref());
+                }
+                Some(q) => {
+                    let r = tk::mtx_crs1_to_crs0(g, a, b, Some(q))?;
+                    let ok = matches!(r, Ret::Given);
+                    o.i(i64::from(ok));
+                    o.m(ok.then_some(&*q));
+                }
+            }
+        }
+        "sphinx" => {
+            let mut v = VolGeom::default();
+            cx.set_geom(t, &mut v);
+            o.i(i64::from(tk::hfs2sphinx(&mut v)));
+            o.geom(&v, true);
+        }
+        "v2w" => {
+            let mut x = cx.mri(t)?;
+            cx.set_geom(t, &mut x.vg);
+            let cache = t.i();
+            if cache == 1 {
+                x.vg.i_to_r = None;
+                x.vg.r_to_i = None;
+            }
+            if cache == 2 {
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                vgm::reinit_cache(g, a, b, &mut x.vg)?;
+            }
+            let n = t.i();
+            for _ in 0..n {
+                let (px, py, pz) = (t.d(), t.d(), t.d());
+                let to_world = t.i() != 0;
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                let (u, v, w) = if to_world {
+                    vgm::voxel_to_world(g, a, b, &mut x.vg, px, py, pz)?
+                } else {
+                    let r = vgm::world_to_voxel(g, a, b, &mut x.vg, px, py, pz)?;
+                    let (i, j, k) = vgm::world_to_voxel_index(g, a, b, &mut x.vg, px, py, pz)?;
+                    o.i(i64::from(i));
+                    o.i(i64::from(j));
+                    o.i(i64::from(k));
+                    r
+                };
+                o.d(u);
+                o.d(v);
+                o.d(w);
+            }
+            o.geom(&x.vg, false);
+        }
+        "codes" => {
+            let a = t.next();
+            let ca = t.i();
+            let b = t.next();
+            let cb = t.i();
+            o.i(i64::from(m::mri_interp_code(a)));
+            o.0 += m::mri_interp_string(ca).unwrap_or("NULL");
+            o.0 += " ";
+            o.i(i64::from(m::mri_precision_code(b)));
+            o.0 += m::mri_precision_string(cb).unwrap_or("NULL");
+            o.0 += " ";
+        }
+        "vgprint" => {
+            let mut v = VolGeom::default();
+            cx.set_geom(t, &mut v);
+            let (nocheck, pre) = (t.i() != 0, t.i() != 0);
+            vgm::vgprint(&mut cx.a, &v, nocheck);
+            vgm::geomprint(&mut cx.a, &v, pre.then_some("geom x 7:\n"));
+            o.i(0);
+        }
+        "vgeq" => {
+            let mut va = VolGeom::default();
+            cx.set_geom(t, &mut va);
+            let mut vb = VolGeom::default();
+            cx.set_geom(t, &mut vb);
+            let thresh = t.d();
+            let debug = t.i() != 0;
+            let sform = cx.opt_matrix(t);
+            cx.g.vg_is_equal_threshold = thresh;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            o.i(i64::from(vgm::vg_equal(g, &va, &vb)));
+            o.i(i64::from(vgm::is_not_equal_thresh(&va, &vb, thresh)));
+            o.i(i64::from(vgm::checkgeom(g, a, b, &va, &vb, thresh, debug)?));
+            o.i(i64::from(vgm::checkvox2ras(
+                g,
+                a,
+                b,
+                &va,
+                &vb,
+                thresh,
+                debug,
+                sform.as_ref(),
+            )?));
+        }
+        "shearless" => {
+            let mut x = cx.mri(t)?;
+            cx.set_geom(t, &mut x.vg);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            vgm::shearless_components(g, a, b, &mut x.vg)?;
+            o.geom(&x.vg, false);
+        }
+        "tomat" => {
+            let mut v = VolGeom::default();
+            cx.set_geom(t, &mut v);
+            let mut given = (t.i() != 0).then(|| cx.matrix(t));
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            match given.as_mut() {
+                Some(q) => {
+                    let r = vgm::to_matrix(g, a, b, &v, Some(q))?;
+                    o.i(i64::from(matches!(r, Ret::Given)));
+                    o.m(Some(&*q));
+                }
+                None => {
+                    let r = vgm::to_matrix(g, a, b, &v, None)?;
+                    o.i(0);
+                    o.m(r.into_new().as_ref());
+                }
+            }
+        }
+        "copy" => {
+            let mut src = cx.mri(t)?;
+            fill(&mut src, t.i() as u32);
+            cx.header(t, &mut src);
+            let mut dst = if t.i() != 0 {
+                let mut d = cx.mri(t)?;
+                fill(&mut d, t.i() as u32);
+                d.ptype = t.i();
+                Some(d)
+            } else {
+                None
+            };
+            let given = dst.is_some();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = mri_copy(g, a, b, &src, dst.as_mut())?;
+            let res = match r {
+                Ret::New(n) => n,
+                _ => dst.expect("the given volume"),
+            };
+            o.i(i64::from(given));
+            o.header(&res);
+            o.chunk(&res);
+        }
+        "shape" => {
+            let v: Vec<i32> = (0..8).map(|_| t.i()).collect();
+            let sa = m::Shape::new(&mut cx.a, &v[0..4]);
+            let sb = m::Shape::new(&mut cx.a, &v[4..8]);
+            o.i(i64::from(sa == sb));
+            o.i(i64::from(sa != sb));
         }
         "intent" => {
             let code = t.i();

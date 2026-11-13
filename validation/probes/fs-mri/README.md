@@ -17,8 +17,18 @@ is a black-box run of FreeSurfer's code).
   port notes FS-53 or FS-58; `fix` different only with a notice), and the hash the test checks.
   Run it inside `scripts/orchestration/boxed.sh` (it allocates volumes from generated sizes).
 
-Measured 2026-11-13: seed 7, 20,000 cases: 18,049 of 18,049 comparable lines identical with
-`reproduce`, 1,951 not comparable; seed 1, 400 cases: 365 identical, 35 not comparable, hash
-`723d33a9cde606610cc6ba0245e31e26be01e110a77b49c639c262574d2ecaaa`, also with AArch64's NaN emulated
+Measured 2026-11-13 (3.1-55 piece 1, 20 commands): seed 7, 20,000 cases: 18,049 of 18,049
+comparable lines identical with `reproduce`, 1,951 not comparable; seed 1, 400 cases: hash
+`723d33a9...`.
+
+Measured 2026-11-13 (piece 2, 43 commands: the tkregister and FSL matrices, coordinates, the
+geometry's printing and comparisons, names, `MRIcopy`, shapes): seed 7, 43,000 cases: 40,724 of
+40,724 comparable lines identical with `reproduce`, 2,276 not comparable (FS-53, FS-58; FS-163
+where the port refuses the copy; FS-165); `fix` different only with a notice. Seed 1, 860 cases
+(`check.py --seed 1 --n 860`, boxed 6 GiB): 825 identical, 35 not comparable, hash
+`15997e561786c4ae2ee27ae4468e8dd4c5582533b2be329510a8e5e77ca4c078`, also with AArch64's NaN emulated
 (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`) in
-debug and release.
+debug and release; the port's 43,000 lines identical with and without the emulation in both modes.
+`tk2nat`, `fsl2tk` and `tk2fsl` cases are drawn finite: they print the float determinant and an
+inverse written in place, whose NaN bits the port does not reproduce yet (larmorx-core's VXL).
+The big run: `check.py --seed 7 --n 43000` inside `boxed.sh 8` (about 8 minutes).

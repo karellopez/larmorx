@@ -35,7 +35,9 @@ mod tests {
     use larmorx_core::cfmt::Silent;
     use larmorx_io::xfm::{GeneralTransform, Mni};
 
-    use larmorx_core::defects::{FS_54, FS_58, FS_59, FS_60, UpstreamDefects};
+    use larmorx_core::defects::{
+        FS_54, FS_58, FS_59, FS_60, FS_161, FS_162, FS_163, FS_164, FS_165, FS_166, UpstreamDefects,
+    };
     use larmorx_freesurfer_core::globals::Globals;
 
     use crate::mri::{self, MRI_FLOAT, MRI_LONG, Mri, Transform4};
@@ -200,5 +202,96 @@ mod tests {
         );
         assert_eq!(copy.free_transform, 1);
         assert!(e.is_empty());
+    }
+
+    #[test]
+    fn fs161_fs166_a_tensor_copy_is_whole_by_default() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, mut o, mut e) = setup(mode);
+            let mut src = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 2, 1, mri::MRI_TENSOR).unwrap();
+            for (i, b) in src.chunk.as_mut().unwrap().iter_mut().enumerate() {
+                *b = i as u8 + 1;
+            }
+            let c = crate::copy::mri_copy(&mut g, &mut o, &mut e, &src, None)
+                .unwrap()
+                .unwrap_new();
+            let bytes = c.chunk.as_ref().unwrap();
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(bytes, src.chunk.as_ref().unwrap());
+            } else {
+                // FreeSurfer: `width` bytes, every row at the first voxel
+                assert_eq!(&bytes[..3], &[1, 2, 0]);
+                assert!(bytes[2..].iter().all(|&b| b == 0));
+            }
+            assert!(g.notices.contains(&FS_161) && g.notices.contains(&FS_166));
+        }
+    }
+
+    #[test]
+    fn fs162_a_copy_clips_by_default() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, mut o, mut e) = setup(mode);
+            let mut src = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 1, 1, MRI_FLOAT).unwrap();
+            voxel::mri_set_vox_val(&mut g, &mut e, &mut src, 0, 0, 0, 0, 40000.0, 0).unwrap();
+            voxel::mri_set_vox_val(&mut g, &mut e, &mut src, 1, 0, 0, 0, -5.0, 0).unwrap();
+            let mut dst = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 1, 1, mri::MRI_SHORT).unwrap();
+            crate::copy::mri_copy(&mut g, &mut o, &mut e, &src, Some(&mut dst)).unwrap();
+            let v = |g: &mut Globals, e: &mut Vec<u8>, m: &Mri, c| {
+                voxel::mri_get_vox_val(g, e, m, c, 0, 0, 0, 0).unwrap()
+            };
+            let x = v(&mut g, &mut e, &dst, 0);
+            assert_eq!(
+                x,
+                if mode == UpstreamDefects::Fix {
+                    32767.0
+                } else {
+                    -25536.0
+                }
+            );
+            assert_eq!(v(&mut g, &mut e, &dst, 1), -5.0);
+            let mut dst = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 1, 1, mri::MRI_UCHAR).unwrap();
+            crate::copy::mri_copy(&mut g, &mut o, &mut e, &src, Some(&mut dst)).unwrap();
+            let y = v(&mut g, &mut e, &dst, 1);
+            assert_eq!(
+                y,
+                if mode == UpstreamDefects::Fix {
+                    0.0
+                } else {
+                    251.0
+                }
+            );
+            assert_eq!(v(&mut g, &mut e, &dst, 0), 255.0);
+            assert!(g.notices.contains(&FS_162));
+        }
+    }
+
+    #[test]
+    fn fs163_another_extent_is_refused_by_default() {
+        let (mut g, mut o, mut e) = setup(UpstreamDefects::Fix);
+        let src = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 2, 1, MRI_FLOAT).unwrap();
+        let mut dst = mri::mri_alloc(&mut g, &mut o, &mut e, 3, 2, 1, MRI_FLOAT).unwrap();
+        assert!(crate::copy::mri_copy(&mut g, &mut o, &mut e, &src, Some(&mut dst)).is_err());
+        assert!(g.notices.contains(&FS_163));
+        // reproduce: rows at FreeSurfer's places inside the larger destination
+        let (mut g, mut o, mut e) = setup(UpstreamDefects::Reproduce);
+        let mut dst = mri::mri_alloc(&mut g, &mut o, &mut e, 3, 2, 1, MRI_FLOAT).unwrap();
+        assert!(crate::copy::mri_copy(&mut g, &mut o, &mut e, &src, Some(&mut dst)).is_ok());
+    }
+
+    #[test]
+    fn fs164_fs165_singular_and_misshapen_registrations() {
+        use larmorx_freesurfer_core::matrix::Matrix;
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, mut o, mut e) = setup(mode);
+            let v = mri::mri_alloc_header(&mut g, &mut o, &mut e, 4, 4, 4, MRI_FLOAT, 1).unwrap();
+            let zero = Matrix::real(4, 4);
+            let r = crate::tkreg::tkreg2native(&mut g, &mut o, &mut e, &v.vg, &v.vg, Some(&zero));
+            assert_eq!(r.is_ok(), mode == UpstreamDefects::Reproduce);
+            assert!(g.notices.contains(&FS_164));
+            let r34 = Matrix::real(3, 4);
+            let r = crate::tkreg::fix_tkreg(&mut g, &mut o, &mut e, &v.vg, Some(&r34));
+            assert!(r.is_err());
+            assert!(g.notices.contains(&FS_165));
+        }
     }
 }

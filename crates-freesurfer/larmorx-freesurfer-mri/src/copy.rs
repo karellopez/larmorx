@@ -12,21 +12,34 @@
 //! destination's slice of the same index and row (the same-type copy) or to its slice `z + frame
 //! dst_depth` (the conversions), so a destination of another extent or with fewer frames gets the
 //! rows in other places or is written outside (FS-163). FS-161 (the same-type copy of tensor and
-//! complex volumes), FS-162 (the conversions' out-of-range values).
+//! complex volumes), FS-162 (the conversions' out-of-range values), FS-166 (a tensor volume's rows).
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_58, FS_161, FS_162, FS_163};
+use larmorx_core::defects::{FS_58, FS_161, FS_162, FS_163, FS_166};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::utils::nint;
 
 use crate::mri::{
-    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, mri_alloc_header,
-    mri_alloc_sequence, mri_copy_header,
+    MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    mri_alloc_header, mri_alloc_sequence, mri_copy_header,
 };
 use crate::voxel::{mri_get_vox_val, mri_set_vox_val};
+
+/// The types whose rows `initSlices` points at their places (every other type's rows all point at
+/// the first voxel: FS-166).
+const ROWS_STEPPED: [i32; 8] = [
+    MRI_UCHAR,
+    MRI_SHORT,
+    MRI_USHRT,
+    MRI_RGB,
+    MRI_INT,
+    MRI_LONG,
+    MRI_FLOAT,
+    MRI_FLOAT_COMPLEX,
+];
 
 /// The byte offset of `slices[k][y]` in a volume's buffer, or `None` where FreeSurfer reads a slice
 /// or row pointer it does not have (an index beyond its slices or rows: memory contents).
@@ -193,6 +206,19 @@ fn copy_same_type(
             if g.notices.reproduce() { width } else { full }
         }
     };
+    // FS-166: initSlices leaves every row pointer of a type its switch does not list (a tensor
+    // volume) at the first voxel
+    let stuck = !ROWS_STEPPED.contains(&src.mtype);
+    if stuck && (i64::from(src.vg.height) * i64::from(src.vg.depth) * i64::from(src.nframes) > 1) {
+        g.notices.add(
+            &FS_166,
+            format!(
+                "MRIcopy of a volume of type {} row by row (FreeSurfer's rows all start at its first voxel)",
+                src.mtype
+            ),
+        );
+    }
+    let at_start = stuck && g.notices.reproduce();
     for frame in 0..i64::from(src.nframes) {
         for z in 0..i64::from(src.vg.depth) {
             for y in 0..i64::from(src.vg.height) {
@@ -201,6 +227,7 @@ fn copy_same_type(
                 let Some(doff) = row_offset(d, k, y) else {
                     return outside(g, err);
                 };
+                let (so, doff) = if at_start { (0, 0) } else { (so, doff) };
                 let row = src_bytes(src, so, bytes).to_vec();
                 match dst_bytes(d, doff, bytes) {
                     Some(t) => t.copy_from_slice(&row),

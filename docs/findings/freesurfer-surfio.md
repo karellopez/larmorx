@@ -1115,7 +1115,8 @@ source centre is taken from it). The `fprintf` of the warning promotes the `floa
 **Defects.** FS-363: `mrisComputeOptimalPlane` (no caller in FreeSurfer 8.2.0) sums the unripped
 positions into `xc`, `yc`, `zc`, then its second loop's initialiser sets them back to 0 and fills the
 scatter matrix from every listed vertex, ripped ones too, and returns `xc = yc = zc = 0`.
-FS-364: `MRIShistoThresholdCurvature` (mris_curvature's `-thresh`): `curv_scale = 999 / (max - min)`
+FS-364: `MRIShistoThresholdCurvature` (mris_curvature's `-thresh`, which recon-all uses: `mris_curvature
+-seed 1234 -thresh .999 -n -a 5 -w -distances 10 10 ?h.inflated`): `curv_scale = 999 / (max - min)`
 is infinite when every unripped curvature is equal (or the range starts at 1000/-1000 with all
 curvatures equal to the start), `curv_scale * 0` a NaN, `nint(NaN)` `INT_MIN` (FS-12): `counts[bin]++`
 writes 8 GiB before the array (a segmentation fault, `CRASH 11` in the probe); likewise a NaN or

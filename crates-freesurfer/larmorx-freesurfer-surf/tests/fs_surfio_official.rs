@@ -2,13 +2,13 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (1,110 cases, thirty of each of
-//! the 37 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1110` on Linux x64 from the unit
-//! oracle's build (2026-11-13, relay 16: 1,078 lines identical, 32 counted, not compared, where
+//! official build's output lines for the probe's cases of seed 1 (1,140 cases, thirty of each of
+//! the 38 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1140` on Linux x64 from the unit
+//! oracle's build (2026-11-13, relay 17: 1,116 lines identical, 24 counted, not compared, where
 //! FreeSurfer reads memory it never wrote or does not own, or writes past a buffer: `SKIP`),
 //! against the port's output with `reproduce` (a case the port marks with one of those defects
-//! hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`, `stl`, `tri`, `fnam`, `swr` and `srd` cases run in a
+//! hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`, `stl`, `tri`, `fnam`, `swr`, `srd` and `mpb` cases run in a
 //! temporary folder of their own.
 
 #[path = "fs_surfio/cases.rs"]
@@ -26,12 +26,12 @@ const SKIP: [&str; 22] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "31bb549125934b62c47bd5df2e01bbd2e6852c51cef2bac3fad5d4a51b90f1b1";
+const OFFICIAL_SHA256: &str = "209163ba486662e79d7931add4d23f34aec8757e0fc8d377a0386266e91e76d3";
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    for line in cases::generate(1, 1110) {
+    for line in cases::generate(1, 1140) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let refused = out.starts_with("EXIT ");
         let skip = ids.iter().any(|x| SKIP.contains(x))
@@ -58,7 +58,7 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
         ..SurfGlobals::default()
     };
     let (mut noted, mut changed, mut cases) = (0, 0, 0);
-    for line in cases::generate(1, 103 * 37) {
+    for line in cases::generate(1, 103 * 38) {
         if !line.starts_with("mprop ") {
             continue;
         }

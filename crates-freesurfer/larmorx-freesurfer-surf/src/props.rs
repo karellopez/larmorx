@@ -156,7 +156,10 @@ pub fn compute_tangent_planes(g: &mut Globals, io: &mut Io, mris: &mut Mris) -> 
         let n = [v.nx, v.ny, v.nz];
         let mut e1 = v3_cross(n, [v.ny, v.nz, v.nx], false);
         // VectorLen: the sum from the first row, `float`
-        let len = sqrt(add(add(mul(e1[0], e1[0]), mul(e1[1], e1[1])), mul(e1[2], e1[2])));
+        let len = sqrt(add(
+            add(mul(e1[0], e1[0]), mul(e1[1], e1[1])),
+            mul(e1[2], e1[2]),
+        ));
         if len < 0.001 {
             e1 = v3_cross(n, [v.ny, -v.nz, v.nx], false);
         }
@@ -315,15 +318,16 @@ pub fn face_centroid(mris: &Mris, fno: usize, which: Centroid) -> [f32; 3] {
 }
 
 /// What the statistics functions give: the mean, the standard deviation, the smallest and largest,
-/// and (vertex spacing) the vertex and neighbour of the largest.
+/// and (vertex spacing) the vertex and neighbour of the largest (`None`: not written, no distance
+/// exceeding -1).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Stats {
     pub mean: f64,
     pub sigma: f64,
     pub min: f64,
     pub max: f64,
-    pub vno: i32,
-    pub vno2: i32,
+    pub vno: Option<i32>,
+    pub vno2: Option<i32>,
 }
 
 /// `MRIScomputeFaceAreaStats(mris, &sigma, &min, &max)`: the metric properties first
@@ -367,8 +371,8 @@ pub fn compute_face_area_stats(
         sigma,
         min: min_area,
         max: max_area,
-        vno: 0,
-        vno2: 0,
+        vno: None,
+        vno2: None,
     })
 }
 
@@ -398,7 +402,7 @@ fn spacing_stats(
 ) -> Result<Stats, Fatal> {
     let (mut min_dist, mut max_dist) = (1000.0f64, -1.0f64);
     let (mut var, mut nv, mut total) = (0.0f64, 0.0f64, 0.0f64);
-    let (mut vno_max, mut vno2_max) = (0, 0);
+    let (mut vno_max, mut vno2_max) = (None, None);
     for vno in 0..nverts(mris) {
         if mris.vertex(vno).ripflag != 0 {
             continue;
@@ -409,8 +413,8 @@ fn spacing_stats(
             // dist_scale is 1.0f in both functions
             let d = mul64(dist(g, mris, vno, vn as usize)?, 1.0);
             if d > max_dist {
-                vno_max = vno as i32;
-                vno2_max = vn;
+                vno_max = Some(vno as i32);
+                vno2_max = Some(vn);
                 max_dist = d;
             }
             if d < min_dist {
@@ -455,31 +459,24 @@ pub fn compute_vertex_spacing_stats(
         |g, m, a, b| {
             let (v, vn) = (m.vertex(a), m.vertex(b));
             let d = match which {
-                ORIGINAL_VERTICES => fdist(
-                    [vn.origx, vn.origy, vn.origz],
-                    [v.origx, v.origy, v.origz],
-                ),
+                ORIGINAL_VERTICES => {
+                    fdist([vn.origx, vn.origy, vn.origz], [v.origx, v.origy, v.origz])
+                }
                 CURRENT_VERTICES => fdist([vn.x, vn.y, vn.z], [v.x, v.y, v.z]),
                 WHITE_VERTICES => fdist(
                     [vn.whitex, vn.whitey, vn.whitez],
                     [v.whitex, v.whitey, v.whitez],
                 ),
-                PIAL_VERTICES => fdist(
-                    [vn.pialx, vn.pialy, vn.pialz],
-                    [v.pialx, v.pialy, v.pialz],
-                ),
-                TARGET_VERTICES => fdist(
-                    [vn.targx, vn.targy, vn.targz],
-                    [v.targx, v.targy, v.targz],
-                ),
+                PIAL_VERTICES => fdist([vn.pialx, vn.pialy, vn.pialz], [v.pialx, v.pialy, v.pialz]),
+                TARGET_VERTICES => {
+                    fdist([vn.targx, vn.targy, vn.targz], [v.targx, v.targy, v.targz])
+                }
                 _ => {
                     log::error_exit(
                         g,
                         err,
                         ERROR_BADPARM,
-                        &format!(
-                            "MRIScomputeVertexSpacingStats: unsupported vertex set {which}"
-                        ),
+                        &format!("MRIScomputeVertexSpacingStats: unsupported vertex set {which}"),
                     )?;
                     0.0
                 }
@@ -532,6 +529,8 @@ pub fn print_tessellation_stats(
     fp: &mut dyn Write,
 ) -> Result<i32, Fatal> {
     let s = compute_vertex_spacing_stats(g, sg, io, mris, CURRENT_VERTICES)?;
+    // the caller's `vno = vno2 = 0`
+    let (svno, svno2) = (s.vno.unwrap_or(0), s.vno2.unwrap_or(0));
     let f2 = |x: f64| fmt_f(x, 2, 2);
     let _ = writeln!(
         fp,
@@ -540,8 +539,8 @@ pub fn print_tessellation_stats(
         f2(s.sigma),
         f2(s.min),
         f2(s.max),
-        s.vno,
-        s.vno2
+        svno,
+        svno2
     );
     let a = compute_face_area_stats(g, sg, io, mris)?;
     let _ = writeln!(
@@ -553,7 +552,7 @@ pub fn print_tessellation_stats(
         f2(a.max)
     );
     if a.max > 20.0 {
-        let vno = s.vno as usize;
+        let vno = svno as usize;
         let vt = mris.topology(vno);
         for n in 0..usize::try_from(vt.vnum).unwrap_or(0) {
             let vn = vt.v.as_ref().expect("a neighbour list")[n];

@@ -63,7 +63,16 @@ pub(super) fn mpb_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
     for _ in 0..nv {
         let mut mask = 0;
-        for (bit, k) in [(1, 8), (2, 3), (4, 3), (8, 3), (16, 3), (32, 3), (64, 2), (128, 6)] {
+        for (bit, k) in [
+            (1, 8),
+            (2, 3),
+            (4, 3),
+            (8, 3),
+            (16, 3),
+            (32, 3),
+            (64, 2),
+            (128, 6),
+        ] {
             if g.chance(k) {
                 mask |= bit;
             }
@@ -356,8 +365,9 @@ pub(super) fn mpb_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 for x in [r.mean, r.sigma, r.min, r.max] {
                     o.d(x);
                 }
-                o.i(i64::from(r.vno));
-                o.i(i64::from(r.vno2));
+                // the probe's 7 where the function writes nothing
+                o.i(i64::from(r.vno.unwrap_or(7)));
+                o.i(i64::from(r.vno2.unwrap_or(7)));
             }
             "nf" => {
                 let n = props::count_negative_faces(&s);

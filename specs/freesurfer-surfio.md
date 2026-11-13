@@ -2544,3 +2544,119 @@ the process's environment) and never writes `mri/orig` as a file. Hand cases (th
 surfaces with a valid geometry of seed 7, each with eight transforms (a source of average_305, a
 destination of it, both, neither, singular, NaN and infinite numbers, a wrong first line, two rows)
 and Gdiag's bits off and on. Observed (relay 17): see the probe README.
+
+## 94. Metric properties, part b, first group (queue item 3.1-50; relay 17)
+
+Arithmetic in `float` unless said; "compiled as" gives the operand order where a NaN's payload
+depends on it (the first operand's NaN wins in SSE; the reference outputs decide).
+
+- **Distances.** Every Euclidean distance of this group between two positions `a` and `b` is
+  `sqrt(dz² + (dx² + dy²))` with `d = a - b` component-wise (`a` the neighbour, the vertex, or the
+  face's second common vertex as named below).
+- **Common vertices of two faces** (`VERTICES_commonInFaces_find(fi, fj, v)`): the vertices of `fi`
+  in its order that `fj` also has, as `float`s in a 3-vector initialised to -1; returns their number
+  (0 to 3). **Common edge length** (`FACES_commonEdgeLength_find(mris, fi, fj)`): with exactly two
+  common vertices `O` and `I` (the vertex numbers read back through the `float`s), the distance
+  from `I` to `O`; any other count ends the program: `FACES_commonEdgeLength_find: No common edge
+  found! <commonVertices> = <n>` and a newline, exit code -4 (status 252).
+- **Tangent planes** (`mrisComputeTangentPlanes`): for every vertex (ripped ones too), with `n` its
+  normal: `e1 = n x (ny, nz, nx)`, the cross product's x as `(b.z a.y) - (a.z b.y)` (`a = n`), y and
+  z as written (`a.z b.x - a.x b.z`, `a.x b.y - a.y b.x`); when `sqrt(((0 + x²) + y²) + z²)` of `e1`
+  is below 0.001, `e1 = n x (ny, -nz, nx)` instead. With verbose diagnostics and `|(x² + y²) + z²|`
+  of `e1` below 1e-15 (as a `double`), `vertex <vno>: degenerate tangent plane` on standard error.
+  `e2 = n x e1` with x as `(e1.z n.y) - (e1.y n.z)`, y and z as written. Each normalised: `len =
+  sqrt((y² + x²) + z²)`; `s = 1` when `|len| < 2^-23`, else `1 / len`; then `(x s, y s, s z)`.
+  Stored in `e1x..e1z`, `e2x..e2z`. Returns 0. **`MRISstoreTangentPlanes(mris, which)`**: each
+  unripped vertex's `e1`, `e2` copied into `pe1`, `pe2` (`which` unused); returns 0.
+- **Plane fit** (`mrisComputeOptimalPlane(mris, vertices, n, &nx, &ny, &nz, &cx, &cy, &cz)`): the
+  unripped listed vertices' positions summed in `double`; fewer than 4 of them: the error
+  `mrisComputeOptimalPlane: must specify at least 4 non-ripped verices` (`ERROR_BADPARM`, the
+  outputs untouched) and -4. Otherwise a 3 x 3 `float` scatter matrix, each element accumulated as
+  `(float)((double)element + product)`, the products `(x - xc)²`, `(y - yc)²`, `(z - zc)²` on the
+  diagonal and `(x - xc)(y - yc)` into (2,1) and (1,2), `(x - xc)(z - zc)` into (3,1) and (1,3),
+  `(y - yc)(z - zc)` into (3,2) and (2,3), in that order per vertex (`double` products of the `float`
+  position minus the `double` centre); fs.core's `MatrixEigenSystem` of it; the third eigenvector
+  column made unit length in `double` (`a / sqrt(a² + b² + c²)` ...) is the normal, the centre
+  returned. **FS-363**: the original fits the plane about (0, 0, 0) with every listed vertex
+  (ripped too) and returns the centre (0, 0, 0); by default the centre is the unripped vertices'
+  mean (each sum divided by their number), the scatter taken over them only. Returns 0.
+- **Face centroids** (`mrisCalculateFaceCentroid`, `mrisCalculateCanonicalFaceCentroid`; a third,
+  original positions, unused): with the face's vertices `v0`, `v1`, `v2` in the positions named,
+  `m = (p1 + p2) / 2`, then `(m + p0) / 2` per coordinate.
+- **Face-area statistics** (`MRIScomputeFaceAreaStats(mris, &sigma, &min, &max)`): the metric
+  properties first (§38); `s = orig_area / total_area` in `float` widened (1 for a patch); over the
+  unripped faces `area = (double)face.area * s`: the mean (the `double` sum over the `double` count:
+  0/0 a NaN for none), `sigma = sqrt(sum of squares / count - mean²)` (glibc's `sqrt`: a negative
+  argument sets `errno` to `EDOM`), the smallest from 1000, the largest from -1 (a NaN area changes
+  neither). `MRISread` leaves `orig_area` 0, so a surface just read has every scaled area 0.
+- **Vertex-spacing statistics** (`MRIScomputeVertexSpacingStats(mris, &sigma, &min, &max, &vno,
+  &vno2, which)`): the metric properties first; when not a patch, `orig_area / total_area` below 0
+  sets `errno` to `EDOM` (its square root is computed and discarded); over each unripped vertex's
+  1-hop neighbours (`vnum`, ripped neighbours included) the distance from the neighbour to the
+  vertex in the positions `which` names: original (0), current (4), white (9), pial (7), target
+  (10); any other value ends the program at the first neighbour: `MRIScomputeVertexSpacingStats:
+  unsupported vertex set <which>` (`ERROR_BADPARM`, status 252). The `float` distance widened;
+  mean, sigma, smallest (from 1000) as above; the largest from -1, each new largest recording the
+  vertex and its neighbour (`vno`, `vno2`; written only when one exceeds -1). Returns the mean.
+  **`MRIScomputeTotalVertexSpacingStats(...)`**: the same over every neighbour in use (`vtotal`),
+  current positions.
+- **Negative faces** (`MRIScountNegativeFaces`, `MRIScountNegativeTriangles`): the unripped faces
+  whose area is below 0.
+- **Tessellation statistics** (`MRISprintTessellationStats(mris, fp)`): the vertex-spacing
+  statistics (current) then `vertex spacing <mean> +- <sigma> (<min>--><max>) (max @ vno <vno> -->
+  <vno2>)`, the face-area statistics then `face area <mean> +- <sigma> (<min>--><max>)`, each
+  number `%2.2f`, into `fp`; when the largest face area exceeds 20, for each 1-hop neighbour of
+  vertex `vno` farther than 20 (the `float` distance from the neighbour), on standard output a tab
+  and `<vno> --> <neighbour> = <d> mm` (`%2.1f`).
+- **Closest vertices**: over the unripped vertices in order, the `float` distance from the vertex
+  to the point; the first strictly below the best so far (from 10000). `MRISfindClosestVertex(mris,
+  x, y, z, &dmin, which)`: current (4) or canonical (3) positions, any other value ends the
+  program at the first unripped vertex (`MRISfindClosestVertex: unsupported vertex set <which>`,
+  `ERROR_UNSUPPORTED`); returns the vertex (-1 for none) and gives the distance (10000 for none).
+  `MRISfindClosestOriginalVertex`, `...CanonicalVertex`, `...WhiteVertex(mris, x, y, z)`: the
+  vertex only.
+- **Curvature edits**, each over the unripped vertices: `MRISsetCurvature(val)`; `MRIStrinarize
+  Curvature(t)`: below `-t` -1, above `t` 1, else (NaN too) 0; `MRISscaleCurvature(scale)`: the
+  mean `m` (`double` sum / count) then `(curv - m) * scale + m` in `double` stored as `float`;
+  `MRISbinarizeCurvature(t, low, high, use_abs)`: the value (absolute with `use_abs`) below `t`
+  gives `low`, else `-high` for a negative curvature and `high` otherwise; `MRISthresholdCurvature
+  (t, use_abs)`: below `t` becomes 0; `MRISnormalizeField(distance_field, which_norm)`: nothing for
+  -1; for a distance field or `which_norm` 2 the largest unripped curvature above 0 (from 0), and
+  unless its magnitude is below 2^-23, `normalizing max <max> to be in [0 1]` (`%2.1f`) on standard
+  output and each curvature divided by it; otherwise `MRISnormalizeCurvature(which_norm)` (the
+  curvature normalisation of an earlier part of this spec).
+- **`MRIShistoThresholdCurvature(mris, pct)`**: the unripped curvatures' range as `double`s (from
+  1000 down and -1000 up); 1,000 bins; `scale = 999 / (max - min)`; bin size `1 / scale` (`float`);
+  each unripped curvature counted at `nint(scale * (curv - min))` (fs.core's `nint`, FS-12 for a
+  NaN); bin `b`'s value `b / scale + min` (`float`); `nint(scale * (0 - min))` also computed (its
+  FS-12 notice only); the counts normalised to sum 1 (fs.core's `HISTOmakePDF`, only when their sum
+  is above 0); with `DIAG_WRITE` and verbose diagnostics `curv.plt` (fs.core's `HISTOplot`) in the
+  working folder; `z` the highest peak (fs.core's `HISTOfindHighestPeakInRegion` over every bin).
+  `T` = the counts from `z` to the last bin summed in `double`; then from `z` up to the last but one
+  bin, the first bin at which the running sum exceeds `pct * T` (or the last but one) gives the upper
+  limit (its bin value). Likewise downwards: `T` = the counts from `z` down to bin 1, then the first
+  bin from `z` down to bin 1 at which the running sum exceeds `pct * T`, or bin 0 when none does
+  (bin 0's count never added), gives the lower limit. Each unripped curvature above the upper limit or below the lower one
+  becomes it (`float`), counted once per side; `min_curv`, `max_curv` the resulting range (from
+  10000 and -10000); with any changed, `<n> vertices thresholded to be in [<low> <high>]` (`%2.2f`)
+  on standard error. **FS-364**: all unripped curvatures equal, or one not finite, gives a bin
+  outside 0..999: the original crashes (segmentation fault); by default the sample is not counted
+  (noted). **FS-365**: no count above 0 (no unripped vertex, or by default every sample refused):
+  no peak; nothing is clipped (the range as measured).
+
+## 95. Validation plan, part 15
+
+The probe's `mpb` command (`validation/probes/fs-surfio/`): an empty work folder with `d`; Gdiag's
+show, verbose and write bits each one in two; `FS_FASTER_MP` one in six; a binary triangle file
+of `srd`'s meshes (one in five scaled by 12) read by `MRISread` as `d/lh.s0`; half the cases set
+the surface's original area (a multiple of 4 up to 16,000 or any special value); per vertex an
+override mask (ripped one in 8; original, white, pial, target and canonical positions each one in
+3; curvature one in 2; normal one in 6; the values small multiples of 1/4 or, in heavy cases, any
+float or NaN with payloads); per face ripped one in 8 and its area one in 4; then 1 to 6
+operations: the common vertices or edge of a face and (mostly) a face sharing an edge with it, the
+tangent planes, storing them, the plane fit of 0 to 8 listed vertices, a centroid, the face-area,
+vertex-spacing (each position set and an unsupported one) and total statistics, the negative-face
+counts, the tessellation statistics, the closest vertices (current, canonical, unsupported; and the
+three others), and every curvature edit; each prints its result and, for the edits and the planes,
+every vertex's curvature, `e1`, `e2`, `pe1`, `pe2` and the surface's curvature range. Observed
+(relay 17): the probe README.

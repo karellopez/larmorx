@@ -24,7 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core, fsl_step
+from larmorx_validation.evidence import common, core, fsl_pages, fsl_step
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1408,7 +1409,7 @@ def export(ctx: core.Context) -> dict:
     )
     e = entry(ctx)
     tc, tcprov = trial_catchup(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "Head-motion correction",
@@ -1470,6 +1471,286 @@ def export(ctx: core.Context) -> dict:
         "speed": speed,
         "examples": [_example(ctx, reg)],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------- the writing guide's words
+
+#: The page's own rewordings, before the FSL pages' (:mod:`fsl_pages`): "larmorx" alone on this
+#: page is the clean room (its runs, its matrices), the replica named "the bit-exact replica";
+#: random testing's trials are random-testing runs (the guide's section 1).
+TEXTS = [
+    (r"\bthe bit-exact replica \(larmorx-nc\)", "the replica (larmorx-nc)"),
+    (r"\bto larmorx's clean-room original, and to FSL 6\.0\.7\.23's mcflirt with the replica "
+     r"compared with it \(the replica's reference since the version update of 2026-10-29\)",
+     "to the clean room, and to FSL 6.0.7.23's mcflirt with both ports' runs compared with it "
+     "(the replica's reference since the version update of 2026-10-29, and the clean room's)"),
+    (r"\(where larmorx deviates most,", "(where the clean room deviates most,"),
+    (r"\bwhere larmorx's matrix deviates most\b", "where the clean room's matrix deviates most"),
+    (r"\bDifferential random testing's trial of the clean-room original after the catch-up's\b",
+     "A random-testing run of the clean room after the catch-up's"),
+    (r"\bthe (\d{4}-\d\d-\d\d) trial's cases drawn again and further\b",
+     r"the cases of the random-testing run of \1 drawn again and further"),
+    (r"\bEvery differing case of the trial\b", "Every differing case of the run"),
+    (r"\bThe reproducer is a finding of the trial\b", "The reproducer is a finding of the run"),
+    (r"\bin reproduce mode as the trial compares\b", "in `reproduce`, as the run compares"),
+    (r"\(the trial's first run, mcflirt live, had none of them\)",
+     "(the first random-testing run, with mcflirt run live, had none of them)"),
+    (r"^The record's thresholds: ", "The clean room's record's thresholds (mri-hmc): "),
+    (r"\bThe default mode's ratio has\b", "In `fix`, the default, the ratio has"),
+    (r"\bA clean-room implementation, so not bit-identical by design\.",
+     "Written without mcflirt's source, the clean room is not bit-identical by design."),
+    (r"\bBoth implementations correct\b", "Both ports correct"),
+    (r"\bthe replica's full-tier record\b", "the replica's full comparison's record"),
+    (r"\bits standard record\b", "its standard comparison's record"),
+    (r"\bso does larmorx with reproduce\b", "so does the clean room in `reproduce`"),
+]  # fmt: skip
+#: The page's mcflirt calls: the clean room's record and the replica's standard comparison are
+#: against FSL 6.0.7.23; the replica's full comparison, the example's first runs and the long
+#: random-testing run of 2026-10-25 against FSL 6.0.7.17 (the version before 2026-10-29); the
+#: benchmark report against "FSL 6.0.7", as it names it.
+PAGE = fsl_pages.page("mcflirt", texts=TEXTS)
+PAGE_17 = fsl_pages.page("mcflirt", version="6.0.7.17", texts=TEXTS)
+SPEED_PAGE = fsl_pages.page("mcflirt", version="6.0.7", port="clean-room", texts=TEXTS)
+#: Each record's port: the clean room's (``original``) and the replica's two.
+PORTS = {"original": "clean-room", "replica": "replica", "replica-23": "replica"}
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def _found(ex: dict, i: str, pat: str) -> re.Match[str]:
+    m = re.search(pat, _diff(ex, i)["reason"])
+    if not m:
+        raise ValueError(f"{ex['id']}: {i}'s reason without {pat!r}")
+    return m
+
+
+#: Each comparison of the example and its verdict, as "What this shows" says them.
+_VERDICTS = {
+    "replica-mcflirt": "bit-identical", "replica23-mcflirt23": "bit-identical",
+    "replica1-replica": "bit-identical", "replica-fix-replica": "d13",
+    "lx-mcflirt": "within-variability", "lx-mcflirt23": "within-variability",
+    "lx1-lx": "bit-identical", "fix-lx": "d13", "lxfix-replicafix": "within-variability",
+    "mc2-mc": None, "rev-mc": None, "mcflirt23-mcflirt": None,
+}  # fmt: skip
+
+
+def _shows(ex: dict) -> tuple[str, list[str]]:
+    """fMRIPrep's mcflirt call: the replica mcflirt's bytes against both versions; the clean
+    room within mcflirt's own variability; both ports' `fix` correcting FSL-01 and FSL-09."""
+    for i, v in _VERDICTS.items():
+        if _diff(ex, i).get("verdict") != v:
+            raise ValueError(f"{ex['id']}: {i} is not {v}")
+    n = _found(ex, "replica-mcflirt", r"(\d+) of (\d+) matrices identical as text")
+    if n.group(1) != n.group(2):
+        raise ValueError(f"{ex['id']}: a matrix of the replica's is not mcflirt's")
+    _found(ex, "replica23-mcflirt23", rf"{n.group(1)} of {n.group(2)} matrices identical as text")
+    _found(
+        ex, "mcflirt23-mcflirt", r"^FSL 6\.0\.7\.23 gives FSL 6\.0\.7\.17's values on fMRIPrep's"
+    )
+    p95 = r"95th-percentile RMS deviation ([0-9.]+) mm, against mcflirt's own ([0-9.]+) mm"
+    a, b = _found(ex, "lx-mcflirt", p95), _found(ex, "lx-mcflirt23", p95)
+    if a.groups() != b.groups():
+        raise ValueError(f"{ex['id']}: the clean room's two comparisons give other numbers")
+    moved = r"^.*: (FSL-01, FSL-09); they move the matrices by up to ([0-9.]+) mm"
+    r_fix, c_fix = _found(ex, "replica-fix-replica", moved), _found(ex, "fix-lx", moved)
+    return (
+        "On fMRIPrep's own call, the replica gives mcflirt's bytes, the realigned series and "
+        f"all {n.group(2)} matrices, against FSL 6.0.7.17 and 6.0.7.23 alike (6.0.7.23 gives "
+        "6.0.7.17's values on this call), at 1 and 3 threads. The clean room's matrices lie "
+        "within mcflirt's own variability: their 95th-percentile RMS deviation from mcflirt's "
+        f"is {a.group(1)} mm, where mcflirt's own under the perturbations reaches {a.group(2)} "
+        "mm; it gives the same bytes at 1 thread and on all CPUs. In `fix`, their default, both "
+        f"correct {r_fix.group(1).replace(', ', ' and ')}, which moves the matrices by up to "
+        f"{r_fix.group(2)} mm in the replica and {c_fix.group(2)} mm in the clean room."
+    ), ["replica23-mcflirt23", "lx-mcflirt23"]
+
+
+#: The comparisons whose labels name mcflirt without its software and version.
+DIFFS = {
+    "lx-mcflirt": ("clean room − FSL mcflirt 6.0.7.17", "the clean room against the original"),
+    "replica-mcflirt": ("replica − FSL mcflirt 6.0.7.17", "the replica against the original"),
+    "lx-mcflirt23": ("clean room − FSL mcflirt 6.0.7.23", "the clean room against the original"),
+}
+#: The motion chart's keys and series, as the panels name the runs.
+LINE_LABELS = {
+    "mcflirt, FSL 6.0.7.17": "FSL mcflirt 6.0.7.17",
+    "larmorx clean-room original (reproduce)": "clean room, reproduce",
+    "larmorx-nc replica (reproduce: mcflirt's bytes)": "replica, reproduce (mcflirt's bytes)",
+    "mcflirt's own variability (worst of its four perturbations)":
+        "the original's own variability (the worst of its four perturbations)",
+    "mcflirt": "FSL mcflirt 6.0.7.17",
+    "larmorx": "clean room, reproduce",
+    "larmorx, reproduce": "clean room, reproduce",
+    "larmorx-nc replica, reproduce": "replica, reproduce",
+    "default − reproduce": "clean room, fix − reproduce",
+    "replica: default − reproduce": "replica, fix − reproduce",
+}  # fmt: skip
+_LINE_PANELS = [(r"^larmorx default mode − reproduce mode\b", "fix − reproduce, both ports")]
+#: The comparisons' table under the chart: each row's name (old -> new), in the guide's order:
+#: the original against itself, fMRIPrep's output, the replica, the clean room; each group's
+#: first row separated.
+STATS_ROWS = [
+    ("mcflirt: noise − unperturbed", "FSL mcflirt 6.0.7.17: noise − unperturbed"),
+    ("mcflirt: noise2 − unperturbed", "FSL mcflirt 6.0.7.17: noise2 − unperturbed"),
+    ("mcflirt: noise3 − unperturbed", "FSL mcflirt 6.0.7.17: noise3 − unperturbed"),
+    ("mcflirt: reversed − unperturbed", "FSL mcflirt 6.0.7.17: reversed − unperturbed"),
+    ("mcflirt: second run − first", "FSL mcflirt 6.0.7.17: second run − first"),
+    ("mcflirt 6.0.7.23 − 6.0.7.17", "FSL mcflirt 6.0.7.23 − 6.0.7.17"),
+    ("fMRIPrep's own matrices − mcflirt 6.0.7.17", "fMRIPrep's output − FSL mcflirt 6.0.7.17"),
+    ("replica (reproduce) − mcflirt", "replica, reproduce − FSL mcflirt 6.0.7.17"),
+    ("replica (default) − mcflirt", "replica, fix − FSL mcflirt 6.0.7.17"),
+    ("replica: default − reproduce", "replica, fix − reproduce"),
+    ("replica: 1 thread − 3 threads", "replica, 1 thread − 3 threads"),
+    ("replica (reproduce) − mcflirt 6.0.7.23", "replica, reproduce − FSL mcflirt 6.0.7.23"),
+    ("larmorx (reproduce) − mcflirt", "clean room, reproduce − FSL mcflirt 6.0.7.17"),
+    ("larmorx (default) − mcflirt", "clean room, fix − FSL mcflirt 6.0.7.17"),
+    ("larmorx: default − reproduce", "clean room, fix − reproduce"),
+    ("clean-room original (reproduce) − mcflirt 6.0.7.23",
+     "clean room, reproduce − FSL mcflirt 6.0.7.23"),
+    ("clean-room original − replica (both default)", "clean room − replica, both fix"),
+]  # fmt: skip
+#: The rows that open a group.
+_GROUPS = ("mcflirt: noise − unperturbed", "fMRIPrep's own matrices − mcflirt 6.0.7.17",
+           "replica (reproduce) − mcflirt", "larmorx (reproduce) − mcflirt")  # fmt: skip
+#: The replica's records' threshold, after the clean room's (the reviewer's round 17, finding 1).
+_REPLICA_THRESHOLD = (
+    " The replica's records' threshold (fsl-mcflirt-replica-full and fsl-mcflirt-replica): every "
+    "output file bit-identical, with mcflirt's exit status and both message streams."
+)
+
+
+def _stats(t: dict) -> None:
+    """The comparisons' table: its rows renamed and in the guide's order, its groups separated,
+    its note naming each record's thresholds."""
+    by = {r["head"]: r for r in t["rows"]}
+    if sorted(by) != sorted(old for old, _ in STATS_ROWS) or len(by) != len(t["rows"]):
+        raise ValueError("the comparisons' table holds other rows")
+    rows = []
+    for old, new in STATS_ROWS:
+        r = by[old]
+        cls = [c for c in (r.get("class") or "").split() if c != "is-sep"]
+        if old in _GROUPS:
+            cls.insert(0, "is-sep")
+        r["head"] = new
+        if cls:
+            r["class"] = " ".join(cls)
+        else:
+            r.pop("class", None)
+        rows.append(r)
+    t["rows"] = rows
+    note = t.get("note") or ""
+    first = note.find(". ")
+    if not note.startswith("The record's thresholds: ") or first < 0:
+        raise ValueError("the comparisons' table: its note's thresholds changed")
+    t["note"] = note[: first + 1] + _REPLICA_THRESHOLD + note[first + 1 :]
+
+
+#: The case categories of the three records, as the page names them.
+CATEGORIES = {
+    "real": "real runs",
+    "options (ds000005)": "options, on ds000005",
+    "synthetic/cli": "synthetic: the command line",
+    "synthetic/content": "synthetic: image content",
+    "synthetic/dtypes": "synthetic: data types",
+    "synthetic/geometry": "synthetic: geometry",
+    "synthetic/motion": "synthetic: motion",
+    "synthetic/orientation": "synthetic: orientation",
+    "failure cases (spec §14.1)": "failure cases (specs/mcflirt.md §14.1)",
+    "replica: edge cases": "the replica's own: edge cases",
+    "replica: fMRIPrep's calls": "the replica's own: fMRIPrep's calls",
+}
+#: The tables' titles by the guide's pattern ({cases}, {date}: the random-testing run's).
+TITLES = {
+    "open": "The clean room's open cases, by why they are open",
+    "trial-catchup": "Random testing after the catch-up, the clean room against the original: FSL "
+    "`mcflirt` 6.0.7.23 ({cases:,} random calls, {date})",
+    "trial-catchup-triage": "The clean room's differences from the original in the run of {date} "
+    "(after the catch-up), by category",
+}
+#: The speed chart's series, as the page names them.
+SPEED_LABELS = {
+    "mcflirt (single-threaded)": "FSL mcflirt 6.0.7, 1 thread",
+    "larmorx, 1 thread": "clean room, 1 thread",
+    "larmorx, 12 threads": "clean room, 12 threads",
+}
+
+
+def present(doc: dict) -> dict:
+    """The head-motion correction's page in the writing guide's words and order: texts, ports
+    and order only."""
+    (ex,) = doc["examples"]
+    line, verdicts = _shows(ex)
+    present_.example(
+        PAGE,
+        ex,
+        shows=line,
+        verdicts=verdicts,
+        title="fMRIPrep's head-motion estimation of a real BOLD run",
+        diffs=DIFFS,
+    )
+    spec = ex["lines"]["params"]
+    _stats(spec["stats"])  # before its texts: its rows by their recorded names
+    present_.lines(
+        PAGE_17,
+        spec,
+        "The six parameters and the framewise displacement over the 240 volumes, both ports "
+        "against the original: FSL `mcflirt` 6.0.7.17",
+        {"larmorx": "clean-room"},
+        LINE_LABELS,
+        _LINE_PANELS,
+    )
+    spec["stats"]["title"] = (  # after its texts: "the original" here is FSL's
+        "The matrices compared, volume by volume, both ports against the original: FSL `mcflirt` "
+        "6.0.7.17 and 6.0.7.23 (RMS deviation over an 80 mm sphere; parameter differences about "
+        "the reference's centre; FD's correlation)"
+    )
+    for im in doc["implementations"]:
+        old = im["id"]
+        pg = PAGE_17 if old == "replica" else PAGE
+        kind = "full comparison" if old == "replica" else "standard comparison"
+        present_.implementation(pg, im, kind, port=PORTS[old])
+        if old != "original":
+            im["short"] = f"replica, FSL {pg.version}"
+    present_.speed(
+        SPEED_PAGE,
+        doc.get("speed"),
+        "Seconds for the whole command (reading the run, the three-stage estimation, writing the "
+        "corrected series and the matrices), the median of three runs after a warm-up (mcflirt "
+        "one run), on a log scale. The factor is how many times faster the clean room is than "
+        "mcflirt, both on one thread.",
+        marks={"larmorx": "clean-room", "larmorx-open": "clean-room-open"},
+        labels=SPEED_LABELS,
+    )
+    present_.random_testing(PAGE_17, doc, {"replica": "replica", "original": "clean-room"})
+    present_.finish(
+        PAGE, doc, CATEGORIES, pages={t: SPEED_PAGE for t in ("open", "trial-catchup",
+                                                               "trial-catchup-triage")},
+        ports=PORTS,
+    )  # fmt: skip
+    dates = {}
+    for t in doc.get("tables", []):
+        if t["id"] == "trial-catchup":
+            m = re.search(r"the trial of (\d{4}-\d\d-\d\d)", t["title"])
+            if not m:
+                raise ValueError(f"{t['id']}: its title without its date")
+            dates[t["id"]] = m.group(1)
+            row = next(r for r in t["rows"] if r["head"].startswith("length"))
+            old = "A random-testing run of the clean room after"
+            if not t["note"].startswith(old + " "):
+                raise ValueError(f"{t['id']}: its note's first words changed")
+            minutes = row["cells"][0]["v"]
+            t["note"] = (
+                f"A random-testing run of the clean room, {minutes:.0f} minutes long, after"
+                f"{t['note'][len(old) :]}"
+            )
+        if t["id"] in TITLES:
+            cases = t["rows"][0]["cells"][0].get("v") if t["id"] == "trial-catchup" else 0
+            date = dates.get(t["id"].removesuffix("-triage"), "")
+            t["title"] = TITLES[t["id"]].format(cases=cases or 0, date=date)
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entry; refresh-original <why>

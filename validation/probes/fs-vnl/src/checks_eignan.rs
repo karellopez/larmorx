@@ -120,9 +120,14 @@ fn from_bytes(b: &[u8]) -> Vec<f64> {
     b.chunks_exact(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect()
 }
 
+/// Values that differ other than as two NaNs (a number, an infinity or a zero on either side).
+static NOT_NAN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn cmp(t: &mut Tally, what: &dyn Fn() -> String, ours: &[f64], theirs: &[f64]) {
     for (i, (a, b)) in ours.iter().zip(theirs).enumerate() {
-        t.bits(&|| format!("{} [{i}]", what()), a.to_bits(), b.to_bits());
+        if !t.bits(&|| format!("{} [{i}]", what()), a.to_bits(), b.to_bits()) && !(a.is_nan() && b.is_nan()) {
+            NOT_NAN.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 }
 
@@ -274,7 +279,8 @@ pub fn run(lib: &Lib, scale: u64, t: &mut Tally) {
         }
     }
     t.notes.push(format!(
-        "real eigensystems: {} compared ({same} identical, {failed} where hqr2 failed: D and V not compared), {crashed} where VNL crashed (not compared), {never} where the port says balanc never returns (not run)",
-        calls.len() - crashed as usize
+        "real eigensystems: {} compared ({same} identical, {failed} where hqr2 failed: D and V not compared), {crashed} where VNL crashed (not compared), {never} where the port says balanc never returns (not run); values differing other than as two NaNs: {}",
+        calls.len() - crashed as usize,
+        NOT_NAN.load(std::sync::atomic::Ordering::Relaxed)
     ));
 }

@@ -1,0 +1,13 @@
+[package]
+name = "fs-maths-nonfinite"
+description = "The main package's VNL ports (eigensystems, SVD, inverses, determinants, QR) on the fs.maths probe's matrices, as text"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build.
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }

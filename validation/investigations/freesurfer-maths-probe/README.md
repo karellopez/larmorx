@@ -17,7 +17,8 @@ tree, which is closed to FreeSurfer's clean-room implementers, so they never bui
 | `fs_maths_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `guard_malloc.c` | the guard allocator of the guard runs (`LD_PRELOAD`): in each child, every allocation on pages of its own, with an inaccessible page right after its last byte (`MALLOC_GUARD_` unset or `over`) or right before its first (`MALLOC_GUARD_=under`), its other bytes a fill byte (`MALLOC_PERTURB_`'s value); no other program's code |
 | `build.sh` | builds both with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>`, the allocator as `guard_malloc.so` beside the output (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §23: 24 groups of seeded cases, run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §23: 24 groups of seeded and fixed cases, run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | statements of the spec checked as models: `affine` (§3's operand order on every `affine` line of the probe), `scanf` (§18.1's `errno` at the end of the input, on the C library's `sscanf` itself: random calls compiled into a small C program with `cc`), `fs13` (§2.2's FS-13 outcome of every negative size of `mmake-sizes` and `mmake-sizes-old`, with `--grid` every size from -20 x -20 to 2 x 2) |
 | `standin.py` | a stand-in candidate that checks the loop's own rules: the probe's saved lines (`refs --save`) with the refusals and NaN signs the spec allows, or (`--break`) without them |
 
 The prebuilt probe and allocator: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_maths_probe`
@@ -290,5 +291,24 @@ of its own, so the groups' other batches keep their cases.
   PYTHONPATH=validation/src python -P validation/investigations/freesurfer-maths-probe/compare.py compare \
     --probe <the probe> --candidate <scratch>/standin.sh --scratch <scratch>/maths --groups eigen,svd
   ```
+- 2026-11-13 (track E, relay 5): the fixed batch `affine-nan` added to the group `affine` (33 calls:
+  two NaNs of different payloads in each product and each sum of `AffineMV` and `AffineMM`);
+  `refs --groups affine` cold, warm and without the cache give the spec's new hash
+  (`oracles/logs/fs-maths-probe-r5-affine-2026-11-13.log`), the probe as its own candidate identical
+  in both modes; `models.py affine --probe <the probe> --scratch <scratch>/models` (through the cache
+  with `PYTHONPATH=validation/src`): 154 of 154 `affine` lines as §3's order.
+- 2026-11-13 (track E, relay 5): the fixed batch `mfiles-end` added to the group `mfiles` (24 calls:
+  ASCII and text matrix files whose last number overflows or underflows at or just before the file's
+  end); `refs --groups mfiles` cold, warm and without the cache give the spec's new hash
+  (`oracles/logs/fs-maths-probe-r5-mfiles-2026-11-13.log`), the probe as its own candidate without
+  an unexplained line; `models.py scanf --scratch <scratch>/scanf --seeds 1,2,3`: 9,008 `sscanf`
+  calls, every `errno` as §18.1's rule.
+- 2026-11-13 (track E, relay 5): the fixed batches `mmake-sizes` and `mmake-sizes-old` added to the
+  group `mmake` (372 calls each, `MatrixAlloc` and `MatrixAlloc2` of negative sizes, both
+  allocators); `refs --groups mmake` cold, warm and without the cache give the spec's new hash
+  (`oracles/logs/fs-maths-probe-r5-mmake-2026-11-13.log`); the probe as its own candidate: identical
+  but 74 memory lines (rows -9 to -16 with a negative column count: their arrays show the matrix's
+  record, addresses included); `models.py fs13 --grid --probe <the probe> --scratch <scratch>/fs13`:
+  4,904 calls as §2.2's FS-13 text.
 - About 40 minutes for a cold `refs` on the reference machine (most of it the guard runs of `eigen`
   and `svd`), seconds warm; `compare` about 10 minutes more (the candidate's runs).

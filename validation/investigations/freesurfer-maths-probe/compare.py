@@ -417,10 +417,30 @@ class Gen:
             L.append(f"mcopy {a} {self.mat(r, max(1, rows - 1), cols, t1)}")
         L += ["mcopy null new", "mfree null"]
         old = [ln for ln in L if ln.startswith(("malloc ", "mcopy"))][:40]
+        sizes = self.mmake_sizes()
         return [
             Batch("mmake", "mmake", L),
             Batch("mmake", "mmake-old", old, env={"FREESURFER_MatrixAlloc_old": "1"}),
+            Batch("mmake", "mmake-sizes", sizes),
+            Batch("mmake", "mmake-sizes-old", sizes, env={"FREESURFER_MatrixAlloc_old": "1"}),
         ]
+
+    @staticmethod
+    def mmake_sizes() -> list[str]:
+        """FS-13 (§2.2, fixed cases): negative row and column counts around the limits of the
+        matrices FreeSurfer makes (rows -16 and -17, -8 and -9, the products -2 and -3, the caller's
+        buffer's 192 bytes), real, complex and an unknown type, through both allocation forms."""
+        rows = [-17, -16, -12, -9, -8, -3, -2, -1, 0, 1, 2]
+        cols = [-17, -6, -5, -3, -2, -1, 0, 1, 2]
+        L = []
+        for cmd in ("malloc", "malloc2"):
+            for t in (1, 2):
+                L += [f"{cmd} {r} {c} {t}" for r in rows for c in cols if r < 0 or c < 0]
+            L += [
+                f"{cmd} {r} {c} 3"
+                for r, c in ((-1, 2), (1, -2), (-3, -4), (-20, -1), (0, -1), (-12, -1))
+            ]
+        return L
 
     def mproduct(self) -> list[Batch]:
         r = self.rng("mproduct")
@@ -466,7 +486,41 @@ class Gen:
             f"affineset {self.mat(r, 3, 4)}",
             f"affineget {self.mat(r, 4, 3)} " + " ".join(["3f800000"] * 16),
         ]
-        return [Batch("affine", "affine", L)]
+        return [Batch("affine", "affine", L), Batch("affine", "affine-nan", self.affine_nan())]
+
+    @staticmethod
+    def affine_nan() -> list[str]:
+        """§3's operand order (fixed cases): two NaNs of different payloads meeting in one product
+        (the matrix's column j against the vector's number j, and against the second matrix's row j)
+        and in each sum (the running sum against the next product), with quiet, signalling and mixed
+        NaNs; and a NaN made from numbers (0 times infinity) meeting a NaN operand."""
+        one = "3f800000"
+
+        def mat(cols: dict[int, str], rows: dict[int, str] | None = None) -> str:
+            m = [[cols.get(c, one) for c in range(4)] for _ in range(4)]
+            for rr, v in (rows or {}).items():
+                m[rr] = [v] * 4
+            return "1 4 4 " + " ".join(x for row in m for x in row)
+
+        L = []
+        for p1, p2 in (
+            ("7fc00001", "ffc00002"),
+            ("7f800003", "ff800004"),
+            ("ffc00005", "7f800006"),
+        ):
+            for j in range(4):
+                v = [one] * 4
+                v[j] = p2
+                L.append(f"affine {mat({j: p1})} {mat({}, {j: p2})} {' '.join(v)}")
+            for k in (1, 2, 3):
+                L.append(f"affine {mat({0: p1, k: p2})} {mat({})} {' '.join([one] * 4)}")
+            for k in (2, 3):
+                L.append(f"affine {mat({k - 1: p1, k: p2})} {mat({})} {' '.join([one] * 4)}")
+            for k in (0, 3):
+                v = [one] * 4
+                v[k] = "00000000"
+                L.append(f"affine {mat({k: '7f800000', 2: p2})} {mat({})} {' '.join(v)}")
+        return L
 
     def dmatrix(self) -> list[Batch]:
         r = self.rng("dmatrix")
@@ -1023,7 +1077,37 @@ class Gen:
             a = self.mat(r, r.randint(1, 4), r.randint(1, 4), typ, special=0.2)
             L += [f"mwriteasc {a}", f"mwritebin {a}", f"mwritetxt {xs('w.txt')} {a}"]
         L.append(f"mwritetxt {xs('no/such/w.txt')} {self.mat(r, 2, 2)}")
-        return [Batch("mfiles", "mfiles", L), self.mfiles_cut()]
+        return [Batch("mfiles", "mfiles", L), self.mfiles_cut(), self.mfiles_end()]
+
+    @staticmethod
+    def mfiles_end() -> Batch:
+        """§18.1's errno at the end of the input (fixed cases): text and ASCII matrix files whose
+        last number overflows or underflows at the very end of the file or just before it, real and
+        complex, with and without the white space after it."""
+        asc = [
+            "1 1 1\n1e40",
+            "1 1 1\n1e40\n",
+            "1 1 1\n1e40 ",
+            "1 1 1\n-1e40",
+            "1 1 1\n1e-50",
+            "1 1 2\n1 1e40",
+            "1 1 2\n1e40 1",
+            "1 1 2\n1e-50 1e40",
+            "1 2 1\n1e40\n1",
+            "2 1 1\n1e40",
+            "2 1 1\n1e40 ",
+            "2 1 1\n5",
+            "2 1 1\n1e-50",
+            "2 1 1\n1e-50 2",
+            "2 1 1\n1e40 1e-50",
+            "2 1 2\n1e40 1 1e-50",
+            "2 1 2\n1 2 3 1e40",
+            "2 1 2\n1 2 3 4",
+        ]
+        txt = ["1e40", "1 1e40", "1e-50\n", "1 2\n3 1e40", "1e40 2", "1e-50 1e40"]
+        L = [f"mreadasc {xs(a)} new" for a in asc]
+        L += [f"mreadtxt {xs('fs-maths-probe.txt')} {xs(t)}" for t in txt]
+        return Batch("mfiles", "mfiles-end", L)
 
     @staticmethod
     def mfiles_cut() -> Batch:

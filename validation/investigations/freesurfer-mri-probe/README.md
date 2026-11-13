@@ -16,7 +16,8 @@ clean-room implementers, so they never build it.
 |---|---|
 | `fs_mri_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §23: 15 groups of seeded cases (9,245 calls in 22 batches), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §23: 15 groups of seeded and fixed cases (9,379 calls in 24 batches), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | two of the spec's §9 statements checked as models of the probe's printed numbers: `surface` (`surfaceRASFromRAS_` is the float product of the K and inv(T) the `tkreg` command prints) and `fs331` (every line of the batch `tkreg-given` as FS-331's model) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_mri_probe`; its guard runs
 use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -169,5 +170,12 @@ each allowed kind, and the IDs the candidate noted on the allowed lines.
 - What the batches of other sizes showed (FS-264, the spec's §3): the writers into a given matrix
   and `RASFromSurfaceRAS_` crash with fewer than 4 rows, and change other elements with 4 x 1 and
   4 x 3; `MRIsetVox2RASFromMatrix` crashes on 1 x 4 and reads memory with 3 x 3 and 4 x 1; matrices
-  larger than 4 x 4 are used by their top-left 4 x 4.
+  larger than 4 x 4 are used by their top-left 4 x 4, except by `RASFromSurfaceRAS_` (FS-331, the
+  spec's §9: found by fs.mri's clean room).
+- Relay 5 (2026-11-13): the fixed batches `matrices-shear` (69 calls) and `tkreg-given` (65): the
+  groups' new hashes in the spec's §23.2, the same cold, warm and without the cache; the probe as its
+  own candidate identical in both modes. `models.py surface`: 40 of 40 geometries as `K x inv(T)`,
+  40 of 40 different from `VGras2tkreg`'s matrix; `models.py fs331`: 65 of 65 lines as the model
+  (both through the oracle-output cache, `PYTHONPATH=validation/src`, `--probe` and `--scratch` as
+  for `refs`).
 - About 2 to 3 minutes for a cold `refs` (most of it the guard runs), seconds warm.

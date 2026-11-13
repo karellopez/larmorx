@@ -76,6 +76,40 @@ DSPECIAL = [
     0x41E0000000000000,  # 2^31
     0xC1E0000000200000,  # -2^31 - 1
 ]
+#: A header-only unsigned-char volume of 2 x 2 x 2 voxels: the volume behind the fixed cases' geometries.
+V2 = "2 2 2 0 1 1"
+INF, NINF, QNAN = "7f800000", "ff800000", "7fc00000"
+
+
+def fx(v: float | str) -> str:
+    """A float argument: a number, or the 8 hex digits of its bits."""
+    return v if isinstance(v, str) else f32(v)
+
+
+def gfix(
+    w: int = 4,
+    h: int = 4,
+    d: int = 4,
+    sizes: tuple = (1.0, 1.0, 1.0),
+    cos: tuple = (-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0),
+    centre: tuple = (1.5, -2.25, 3.0),
+    shears: tuple = (0.0, 0.0, 0.0),
+) -> str:
+    """A fixed geometry G (README.md): valid, the extent, sizes, ras_good 1, the cosines of columns,
+    rows and slices, the centre, the shears, no name."""
+    vals = [fx(v) for v in (*sizes,)] + ["1"] + [fx(v) for v in (*cos, *centre, *shears)]
+    return f"1 {w} {h} {d} " + " ".join(vals) + " x"
+
+
+def mfix(rows: int, cols: int, put: dict[int, str] | None = None) -> str:
+    """A rows x cols matrix of 1, 1.25, 1.5, ... row by row, with the numbers at the places (from 0)
+    in ``put`` replaced."""
+    vals = [f32(1.0 + 0.25 * k) for k in range(rows * cols)]
+    for k, v in (put or {}).items():
+        vals[k] = v
+    return f"{rows} {cols} " + " ".join(vals)
+
+
 TYPES = list(range(11))  # uchar int long float short bitmap tensor fcomplex dcomplex rgb ushort
 SIZED = [0, 1, 2, 3, 4, 6, 7, 9, 10]  # the types with a voxel size
 SCALAR = [0, 1, 2, 3, 4, 9, 10]  # voxels read and written as one number
@@ -379,7 +413,37 @@ class Gen:
         return [
             Batch("matrices", "matrices", lines),
             Batch("matrices", "matrices-sizes", sizes, both="FS-264"),
+            Batch("matrices", "matrices-shear", self.matrices_shear()),
         ]
+
+    @staticmethod
+    def matrices_shear() -> list[str]:
+        """§3's shear (fixed cases): the 4 x 4 product with the shear matrix on the right, its
+        ``DIAG_INFO`` print, shears at and around the 1e-5 limit and non-finite ones, non-finite
+        cosines, sizes and centres with a shear (zeros times infinities reach the last row and
+        column), and the shears removed (``shearless``)."""
+        lines = []
+        for k in range(3):
+            for v in (0.5, -0.25, 2e-5, 1e-5, INF, NINF, QNAN, "7fc12345"):
+                s = [0.0, 0.0, 0.0]
+                s[k] = v
+                for base in (0, 1):
+                    lines.append(f"xfm {V2} {gfix(shears=tuple(s))} {base} 1 null")
+        for s in ((0.5, 0.25, 0.125), (1e-5, 1e-5, 2e-5), (INF, INF, INF)):
+            for base in (0, 1):
+                lines.append(f"+gdiag=10000 xfm {V2} {gfix(shears=s)} {base} 1 null")
+        cos = (-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0)
+        for s in ((0.5, 0.0, 0.0), (0.0, 0.0, 0.25)):
+            for k, v in ((0, INF), (5, NINF), (7, QNAN)):
+                c = list(cos)
+                c[k] = v
+                lines.append(f"xfm {V2} {gfix(cos=tuple(c), shears=s)} 0 1 null")
+            lines.append(f"xfm {V2} {gfix(sizes=(INF, 1.0, 1.0), shears=s)} 0 1 null")
+            lines.append(f"xfm {V2} {gfix(sizes=(1.0, 0.0, 1.0), shears=s)} 0 1 null")
+            lines.append(f"xfm {V2} {gfix(centre=(QNAN, 0.0, 0.0), shears=s)} 0 1 null")
+        for s in ((0.5, 0.25, 0.125), (INF, 0.0, 0.0), (QNAN, 0.5, 0.0)):
+            lines.append(f"shearless {V2} {gfix(shears=s)}")
+        return lines
 
     def voxels(self) -> list[Batch]:
         r = self.rng("voxels")
@@ -507,7 +571,40 @@ class Gen:
         for _ in range(40):
             m = self.mopt(r, p_null=0.0, odd=1.0)
             sizes.append(f"ras2s {self.vol(r, hdr=0.7)} {self.geom(r)} {m}")
-        return [Batch("tkreg", "tkreg", lines), Batch("tkreg", "tkreg-sizes", sizes, both="FS-264")]
+        return [
+            Batch("tkreg", "tkreg", lines),
+            Batch("tkreg", "tkreg-sizes", sizes, both="FS-264"),
+            Batch("tkreg", "tkreg-given", self.tkreg_given()),
+        ]
+
+    @staticmethod
+    def tkreg_given() -> list[str]:
+        """FS-331 (fixed cases): ``RASFromSurfaceRAS_`` given matrices larger than 4 x 4 for four
+        geometries (one with a voxel size of 0, one with an extent of 0), and given 4 x 5, 5 x 5,
+        5 x 4 and 4 x 6 matrices with a non-finite number at each place of their fourth and later
+        rows and at a few others."""
+        lines = []
+        geoms = [
+            gfix(),
+            gfix(
+                w=3,
+                h=5,
+                d=2,
+                sizes=(0.9375, 1.5, 2.0),
+                cos=(0.6, 0.8, 0.0, -0.8, 0.6, 0.0, 0.0, 0.0, 1.0),
+            ),
+            gfix(sizes=(0.0, 1.0, 1.0)),
+            gfix(w=0),
+        ]
+        for g in geoms:
+            for rows, cols in ((4, 5), (4, 6), (5, 4), (5, 5), (6, 6), (8, 8)):
+                lines.append(f"ras2s {V2} {g} {mfix(rows, cols)}")
+        for rows, cols in ((4, 5), (5, 5), (5, 4), (4, 6)):
+            places = [*range(3 * cols, rows * cols), 0, 2 * cols + 1, cols - 1]
+            for k in places:
+                v = INF if k % 3 == 1 else QNAN
+                lines.append(f"ras2s {V2} {geoms[1]} {mfix(rows, cols, {k: v})}")
+        return lines
 
     def registrations(self) -> list[Batch]:
         r = self.rng("registrations")

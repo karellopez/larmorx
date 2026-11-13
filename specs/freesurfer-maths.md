@@ -126,10 +126,35 @@ allocator never uses the buffer.
 - **Unknown type** (neither 1 nor 2) with at least one row: an error (§2 of the core spec), code
   -4, `MatrixAlloc: unknown type <type>` + `\n`; nothing returned. With 0 rows the matrix is made.
 - **FS-13.** A negative row or column count, or more numbers (with the two unused floats) than an
-  `int` holds: FreeSurfer prints `MatrixAlloc(<rows>, <cols>): Using mmap'd tmpfile` + `\n` on
-  standard output and then, depending on the sizes and the allocator, crashes, corrupts memory, or
-  writes `MatrixAlloc(<rows>, <cols>): allocation failed` + `\n` on standard error and exits with
-  status 1. **Both modes:** the two lines, exit status 1, FS-13 noted.
+  `int` holds. "The two lines" below are `MatrixAlloc(<rows>, <cols>): Using mmap'd tmpfile` + `\n`
+  on standard output, then `MatrixAlloc(<rows>, <cols>): allocation failed` + `\n` on standard
+  error. With k = 2 for a complex matrix and 1 otherwise, and the product `rows cols` taken exactly,
+  FreeSurfer does this (**(observed)**: the fixed batches `mmake-sizes` and `mmake-sizes-old` of
+  §23, and every row count from -20 to 2 against every column count from -20 to 2, real and
+  complex, through both allocation forms and both allocators: 4,904 calls as this text,
+  `models.py fs13 --grid` beside the probe):
+  - **The default allocator**, a negative count: a matrix of the given counts when `rows ≥ -16` and
+    `rows cols ≥ -2` (when its numbers fit in memory); otherwise a crash, with no message. The
+    matrix has no element; its array (§2.1's length) is zero, except for rows from -9 to -16, where
+    the array lies over the matrix's own record: as 32-bit integers its floats hold, in order, the
+    type (plus 65,536 when the matrix is in the caller's buffer), the row count, the column count, 0,
+    then four floats of memory contents (two addresses), the rest 0, as far as the array goes. With
+    the buffer form it is in the buffer when its block fits 192 bytes, the block computed as above
+    with every size taken modulo 2^64 before each rounding up: the header's 64 bytes plus the row
+    pointers' `8 (rows + 1)`, rounded up to 64 (so 64 for rows from -1 to -8, 0 for rows from -9 to
+    -16, 128 for rows from 0 to 7), plus `4 k (rows cols + 2)`, rounded up to 64.
+  - **The old allocator**: when `k rows cols + 2 < 0`, the two lines and exit status 1; otherwise,
+    when `rows ≤ -2`, a crash (the C library's abort); otherwise a matrix of the given counts, its
+    array zero, never in the buffer.
+  - **An unknown type**: as a real matrix, but where a matrix with at least one row would be made,
+    the unknown-type error above and nothing returned.
+  - **A product** `rows cols`, or `k (rows cols + 2)`, beyond an `int` (non-negative counts
+    included): a crash, or a matrix whose elements lie outside its array.
+
+  **Default:** every such size refused: the two lines, exit status 1, FS-13 noted. **`reproduce`:**
+  FreeSurfer's matrix where it makes one from a negative count (the four floats of memory contents
+  0, noted), FreeSurfer's two lines and exit where the old allocator gives them; in every other case
+  (FreeSurfer crashes, or a product beyond an `int`) the default's refusal, noted.
 - An allocation that the machine cannot give: the same two lines and exit status 1.
 
 ### 2.3 Freeing
@@ -195,10 +220,22 @@ by column** (float `i + 4j` is row i, column j, from 0).
   (a transposition of the row-major numbers); **to a matrix** the reverse. A matrix that is not 4 x 4:
   `SetAffineMatrix: Bad matrix size` (or `GetAffineMatrix: ...`) + `\n` on standard error and an
   abort (exit status 134), in both modes (FreeSurfer's own check).
-- **Matrix × vector:** each output element i = `((A[i] x0 + A[4 + i] x1) + A[8 + i] x2) + A[12 + i]
-  x3` in float, the sum **starting from the first product** (not from 0: four products of -0 give
+- **Matrix × vector:** each output element i = `((x0 A[i] + x1 A[4 + i]) + x2 A[8 + i]) + x3 A[12 +
+  i]` in float, the sum **starting from the first product** (not from 0: four products of -0 give
   -0).
-- **Matrix × matrix:** output column j = the matrix × vector of the second matrix's column j.
+- **Matrix × matrix:** output column j = the matrix × vector of the second matrix's column j: element
+  (i, j) = `((B[4j] A[i] + B[4j + 1] A[4 + i]) + B[4j + 2] A[8 + i]) + B[4j + 3] A[12 + i]`.
+- **NaN operands** (x86-64's rules of §7; the order matters only where two NaNs meet): in each
+  product the vector's number (for the matrix product the second matrix's number) is the **left**
+  operand, so of two NaNs its NaN passes on, quieted; in each sum the **running sum** is the left
+  operand. A NaN made from numbers (0 times an infinity, the sum of opposite infinities) is the
+  default NaN with the sign bit set, then passes on by the same rules (**(observed)**: the fixed batch
+  `affine-nan`, two NaNs of different payloads in each of the four products and in each sum, quiet,
+  signalling and mixed, and a NaN made from numbers meeting a NaN operand; every `affine` line of
+  the group, 154, as this order: `models.py affine` beside the probe; the order with the matrix's
+  number first in the first and the last product differs on 6 of `affine-nan`'s lines). FreeSurfer
+  builds these helpers into each function that uses them; the order above is the official build's
+  where it was measured, and a spec whose function uses the helpers with another order says so.
 - **Get a vector:** its first three floats. **Floor of a vector:** `(int) floor(v)` of each of the first
   three (FS-17).
 - A new affine matrix is all zeros (FreeSurfer's is not cleared; its callers set it).
@@ -977,9 +1014,9 @@ returned on the 148 the port names and returned on every other one); FreeSurfer 
 modes:** an error `OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an
 infinite or NaN entry)` + `\n`, code -4, failure. The other matrices with such entries are computed
 in both modes as VNL computes them; the signs of NaNs in their vectors follow the official build's
-operand order, which the port does not follow yet (**(observed)** 39 of the 223 whose QR method
-succeeded differ from the port in NaNs' signs only; on §23's lines of such matrices the port's signs
-are FreeSurfer's). **FS-41:** FreeSurfer copies the matrix to the stack (8 bytes an element): above
+operand order, which the port does not follow yet (**(observed)** of the exploration's 252 that
+FreeSurfer finished, 62 differ from the port in NaNs' bits only, none otherwise; on §23's lines of
+such matrices the port's bits are FreeSurfer's). **FS-41:** FreeSurfer copies the matrix to the stack (8 bytes an element): above
 8 MiB (about 1,024 rows) it crashes; both modes compute it, noted.
 
 ### 17.3 Eigensystem of a matrix (m, values, vectors)
@@ -1103,9 +1140,27 @@ to 24 bits with an unbounded exponent, below 2⁻¹²⁶. A number's mismatching
 `%d`: white space, an optional sign, decimal digits (none: a matching failure); the value as a 64-bit
 `long` (beyond its range: its limit and `ERANGE`), kept to its low 32 bits.
 
-`errno` at the end of the input: a conversion that meets it before its item sets `errno` to 0, unless
-an earlier item of the same call ended at the end of the input; directives that meet it change
-nothing.
+`errno` at the end of the input (one call): the first time the call meets the end of its input, it
+keeps the value `errno` has at that moment, and every later attempt of the same call to read (the
+white space a conversion skips before its item, the item, white space or a character the format
+holds) sets `errno` back to that kept value. An item meets the end by looking past its last
+character (a number does; `inf` does, it may go on as `infinity`; a complete `nan` or `infinity`
+does not), and it does so **before** its own `ERANGE`: the kept value is the one from before the
+item's overflow or underflow. When the first meeting is a conversion's skip of the white space
+before its item, the kept value is 0 (so `errno` becomes 0, the input failure). White space in the
+format just before a conversion reads nothing itself (the conversion skips it); white space at the
+format's end does read. A call whose only reading meets the end at once (`fscanf(fp, "\n")` at the
+end of a file) leaves `errno` as it was; each call starts afresh. So, with `errno` 7 before the
+call: `sscanf("1e40", "%f")` leaves 34, `"%f "` and `"%f %f"` leave 7 (the overflow forgotten),
+`sscanf("1e40 ", "%f %f")` 0, `sscanf("1 2 ", "%f %f %f")` 0, `sscanf("1e-50 3", "%f %f %f")` 34
+(`3` met the end after the underflow), `sscanf("-1877   1e40", "%f %f %f %f")` 7; `%d`'s `ERANGE`
+alike. (**(observed)**: `models.py scanf` beside the probe, 9,008 calls of the C library's `sscanf`
+with random numbers, words and white space and formats of `%f`, `%d`, `%s` and white space, every
+`errno` as this rule; the open `validation/investigations/glibc-scanf-probe/`, the same rule as
+`specs/freesurfer-surfio.md` §56; the probe's fixed batch `mfiles-end`: the ASCII read's element
+format ends with white space, so a last element that overflows at the very end of the file leaves
+the `errno` from before it, 0 in the probe, while `1e40` followed by a new line or a blank leaves
+34; the text read's one `%f` a call leaves 34.)
 
 ### 18.2 Reading and writing
 
@@ -1177,7 +1232,11 @@ volume come with the generator's distributions and the volumes.
 ## 20. Validation plan, part 4
 
 In §23 (the groups `eigen`, `svd`, `mfiles`, `rfields`). §18.1's conversions are glibc 2.35's, as
-the main package's `larmorx_core::cscan` gives them.
+the main package's `larmorx_core::cscan` gives them. The **(observed)** marks of §8.8, §17 and
+§18.2 about matrices with infinite or NaN entries and files cut short (the batches
+`eigen-nonfinite`, `svd-nonfinite`, `mfiles-cut` and the explorations of 400 matrices) are measured
+by `validation/investigations/freesurfer-maths-nonfinite/` (open: the probe's runs against the main
+package's VNL ports and §18.2's rule).
 
 
 ## 21. Conventions, part 5: the histograms' NaN operands
@@ -1257,9 +1316,9 @@ it, and again from the cache:
 | `hstats` | 5.6 | 1,651 | 48 | 1 | 0 | `b967819d9feb9a0d3e22e29d8a9fc596ad1cac8278a8a25f9fb8e2598b375689` |
 | `hrobust` | 5.7 | 74 | 29 | 2 | 2 | `0d5172c5fb31984cf4de204efdfe496a890bba4ae89b2fc85d35573b55d38830` |
 | `hfiles` | 5.8 | 62 | 0 | 0 | 0 | `8ae7f99741fe6f2fb95a5de15cf1e6ef3a680fd4e12cf0bec60d4ed2a1145b3f` |
-| `mmake` | 2.2 to 2.4 | 356 | 2 | 2 | 0 | `06cedef9465553f35894e0a276e548f627648f42b7737682b15189924b474d15` |
+| `mmake` | 2.2 to 2.4 | 1,100 | 398 | 98 | 0 | `01eac361431d89fb88f63a3fe8ddce7492fcee9ab2a781e59a91c85e27676914` |
 | `mproduct` | 2.5, 8.1, 16 | 1,202 | 20 | 2 | 0 | `4f285237bdaa014c350f7011104306f2b6f55ade4b4867700d4d17db05d65c5d` |
-| `affine` | 3 | 243 | 2 | 0 | 0 | `514bd8d32cd528c6ed8a062d5ba38f1797a8c218b3940d1dfe902cb239198cfb` |
+| `affine` | 3 | 276 | 2 | 0 | 0 | `b6c634cae9ef4cbf608faf76b9f7c897a1e9118a9a7948876f02221b662dcb43` |
 | `dmatrix` | 4, 12 | 2,904 | 8 | 1 | 1 | `719f4ea4e5bf36174a84e21120f0c7dd87fb4a1086981864ab7daf8acfc040b4` |
 | `melements` | 8.2 | 3,500 | 31 | 0 | 0 | `e60f3eb349c7fed12395e0f494d8d38a4f6789ad19f1ed782f5cecb7717c68c0` |
 | `mregions` | 8.3 | 880 | 83 | 0 | 0 | `c50b1b9f577cc67267a4d837f5e912d4f777409d8237b05c0a1ed9bbfb500742` |
@@ -1272,13 +1331,24 @@ it, and again from the cache:
 | `nr` | 14 | 5 | 0 | 0 | 0 | `ba8b8aea531d281110a5a52a4a2455fe313fc4e8b3a5a4ce6b1e1cc19eaad69d` |
 | `eigen` | 17.1 to 17.3 | 1,460 | 252 | 0 | 153 | `c3ddceff612985227ad6d69acf56662aaa0584974c847c827005539ce38b17f3` |
 | `svd` | 17.4, 17.5 | 2,280 | 354 | 0 | 142 | `af777aba4138e1ab5d48ba2ee4e4cc8477a2f3d0abc1d9334c05d1a10c40aad7` |
-| `mfiles` | 18 | 699 | 28 | 0 | 1 | `ac865eb3e87ec634b6e1580d41005a8da591aff62d674f3463bf984a0b38f157` |
+| `mfiles` | 18 | 723 | 28 | 0 | 1 | `8f0ce51069988159cef0214e0f1d893466876b02e7c25233935648a8668c1886` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 27,367 | 1,373 | 41 | 299 | |
+| all | | 28,168 | 1,769 | 137 | 299 | |
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
-their three hashes are from then, the others from the first runs.
+their three hashes are from then (through the cache, from it and without it, identical, every line
+classified alike), the others from the first runs. The group `affine` gained the fixed batch
+`affine-nan` (§3's operand order) on 2026-11-13 (the spec finisher's relay 5): its hash from then
+(cold, warm and without the cache identical; the probe as its own candidate identical in both modes).
+The group `mfiles` gained the fixed batch `mfiles-end` (§18.1's `errno` at the end of the input, 24
+calls) the same day: its hash from then (cold, warm and without the cache identical; the probe as its
+own candidate without an unexplained line in both modes). The group `mmake` gained the fixed batches
+`mmake-sizes` and `mmake-sizes-old` (FS-13's sizes, §2.2, 372 calls each: the matrices FreeSurfer
+makes, its crashes, the old allocator's exits) the same day: its hash from then (cold, warm and
+without the cache identical; the probe as its own candidate identical but the 74 lines whose arrays
+show the record's addresses, memory lines). `mfiles`' one `TIMEOUT` is a memory line (an empty
+file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
 
 ### 23.3 The comparison
 

@@ -34,3 +34,12 @@ original (through the oracle-output cache). `--cases` and `--systems` choose the
 when the replica differs from FreeSurfer or from the clean room anywhere but the NaN-order systems
 (where the clean room followed the spec's earlier text: `specs/burkardt-spline.md` §6 corrected on
 2026-11-13).
+
+## Results (2026-11-13, `result-2026-11-13-spline.json`, from 879c3370)
+
+- **Against FreeSurfer** (`fs_spline_probe`): 20,000 seeded cases (296,786 evaluation points, 400 with NaN
+  values, 260 with infinite values), 1,000 systems, the five messages and their exit status, FS-103 under
+  `reproduce` (500 NaN-knot cases) and its default error: all identical; 302 NaN-order systems identical.
+- **Against the clean room**: 118 batch runs (cases, systems, NaN-knot cases, `set1`; both modes)
+  byte-identical; on the 302 NaN-order systems the clean room gives FreeSurfer's output on 278: the 24 others
+  are the back substitution's product, whose operand order `specs/burkardt-spline.md` §6 now states (2026-11-13).

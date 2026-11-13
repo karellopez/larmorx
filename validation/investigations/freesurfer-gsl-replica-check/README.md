@@ -38,3 +38,14 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
 `<workspace>/oracles/freesurfer-8.2.0-unit/probes/` serves the `freesurfer` section (its runs are in
 the oracle-output cache from the clean room's validation); `mri_volsynth` reads the FreeSurfer
 licence in place (`--fs-license`). Exits 1 when anything unexpected differs.
+
+## Results (2026-11-13, `result-2026-11-13-gsl.json`, from 879c3370)
+
+- **Against FreeSurfer** (`fs_rng_probe`, the official `mri_volsynth`): 2,022 seeds' first 100,000 values
+  identical; 421 distribution cases, 8,382,003 draws: 8,381,462 identical and the 541 others exactly the
+  large-shape gamma draws that met one of the 41,708 arguments where glibc's `tan` is not correctly rounded
+  (10,613 draws met one; with the C library's `tan` every draw is identical); FS-100 and FS-101 in both modes
+  as `specs/ranlux.md` §8 says; `mri_volsynth`'s 10 fields identical; 3,908 `crafted` draws identical.
+- **Against the clean room** (`cleanroom-probe`): 10,084 runs, every command in both modes and with both
+  tangents, byte-identical (standard output and standard error; 80 of them the same error in both).
+- **Speed**: 20 million integers printed, `fs_rng_probe` 2.26 s, the replica 0.74 s, the clean room 0.69 s.

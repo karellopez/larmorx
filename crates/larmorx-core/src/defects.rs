@@ -1497,6 +1497,8 @@ defects! {
         "MatFileRead goes on after a header it could not read, with the sizes read so far (or 0)";
     FS_251 = "FS-251", "FreeSurfer", true,
         "the .mat readers take a byte 0xff for the end of the file: a version 5 file with 0xff in its first four bytes is refused, a version 4 variable whose first byte is 0xff ends the reading";
+    FS_252 = "FS-252", "FreeSurfer", true,
+        "MRIcopyHeader crashes when the source volume's voxel-to-RAS matrix has not been computed (FreeSurfer's own volumes always have it)";
 }
 
 /// The register entry with ID `id`.

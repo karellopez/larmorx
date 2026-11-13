@@ -150,6 +150,13 @@ no range check; beyond the `int` range or NaN `cvttsd2si` gives `INT_MIN`. Defau
 - `randomNumber` widens `OpenRan1`'s `float` (`drand64` rounded) to `double` before `* range + low`;
   a draw rounded up to `1.0f` can give a value above `hi`, reported with `ErrorPrintf(ERROR_BADPARM,
   "randomNumber(%2.1f, %2.1f) - %2.1f\n", ...)` (FS-01's NUL, two newlines) and returned anyway.
+  Infinite or NaN bounds (relay 17, track D's relay 18 report): the official object code computes
+  `hi - low` (`hi` in the destination), then the draw times that (the draw in the destination), then
+  plus `low` (the product in the destination), in SSE2: `randomNumber(inf, inf)` is SSE's default
+  NaN, `-nan`, where AArch64's arithmetic gives `nan`. The replica uses `crate::sse` in that order;
+  `tests/random_nan.rs` checks the unit oracle's output for 64 pairs of eight bounds
+  (`validation/probes/fs-maths/random_number_nan.py`) and a payload hash, both passing under
+  `NAN_TRAP_ARM=1` in debug and release (the earlier plain arithmetic failed both there).
 - `OpenRan1` (`utils/numerics.cpp` 1256-1279, item 3.1-24 brought forward) constructs its
   `vnl_random` with seed 0 at its first call and stops a program that calls it from an OpenMP thread
   other than 0.

@@ -107,7 +107,7 @@ AND LicenseRef-CTN, the main package's crate, used as a dependency).
 |---|---|---|
 | `utils/mri_identify.cpp`, `include/mri_identify.h` | `type_to_string` (47), `string_to_type` (146), `mri_identify` (201), `IDtypeFromStem` (394), `IDstemFromName` (423), `IDextensionFromName` (486), `IDnameFromStem` (537), `is_cor` (571), `is_brik` (594), `is_siemens` (608), `is_genesis` (664), `is_ge_lx` (697), `is_analyze` (723), `is_mnc` (764), `is_mgh` (802), `is_bshort` (817), `is_bfloat` (829), `is_bhdr` (840), `bhdr_stem` (854), `bhdr_firstslicefname` (878), `bhdr_precisionstring` (909), `bhdr_precision` (942), `is_sdt` (967), `is_gdf` (998), `is_otl` (1011), `is_ximg` (1024), `is_nifti1` (1026), `is_nii` (1071), `is_nrrd` (1112), `IDisCurv` (1195); the magic numbers; `include/mri.h`'s format numbers (1516-1553) | `identify` |
 | `utils/mriio.cpp` | `MRIgetVolumeName` (472); `include/mri.h`'s `MRIIO_Strip_Pound` (2033) | `identify::mri_get_volume_name`; `larmorx_freesurfer_core::globals::Globals::mriio_strip_pound` |
-| `utils/Bruker.cpp` | `checkBrukerFiles` (201), `is_bruker` (834) | `bruker` |
+| `utils/Bruker.cpp` | `checkBrukerFiles` (201), `is_bruker` (834); since relay 17 `brukerRead` (146), `splitParameterValue` (261), `readBrukerD3proc` (290), `buildVoxToRASTransform` (346), `readBrukerAcqp` (532), `readBrukerReco` (657), `readBrukerVolume` (771), `include/Bruker.h`'s `BrukerTransform` | `bruker` |
 | `utils/signa.cpp`, `include/signa.h` | `ghc` (69), `ghi` (77), `ghf` (93), `get_signa_header_info` (144), `is_signa` (179); the header's offsets and `HINFO` | `signa` |
 | `utils/DICOMRead.cpp` | `IsDICOM` (5410), `IsSiemensDICOM` (1479), `GetObjectFromFile` (1207), `GetElementFromFile` (1164), `AllocElementData` (1252) and `FreeElementData` (1408) for the Manufacturer element, `DCMPrintCond` (5523); `IsDICOM`'s static answer | `dicom_probe`; the state in `Globals::dicom` |
 | `packages/dicom/dcm.c` (FreeSurfer's copy of CTN 3.0.6) | `DCM_GetElement` (2699) with `locateElement` (6601), `DCM_GetElementValue` (950) for one element of the object's top level read into memory; FreeSurfer's two changes to CTN's behaviour (the "Data Element ... longer" message, the 4-byte swap in pairs) as `dicom_probe::FsDialect` | `dicom_probe` |
@@ -132,3 +132,28 @@ bounds as `x >= n`, the remainder from the division); C's `ungetc` modelled by a
 compressed variable read with glibc's allocation sizes (zero within, memory contents beyond, noted);
 `MatlabRead2`'s and `MatFileRead`'s files closed (FS-242). The corrected readers (`fix`) are larmorx's
 own: MATLAB's version 4 and 5 formats read by their definition (MATLAB's MAT-file format document).
+
+## FreeSurfer files and functions translated (part 6, relay 16: reading volumes and registration files)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mriio.cpp` 204-257, 488-1105 | `setDirectionCosine`, `mri_read`, `nan_inf_check`, `MRIreadType`, `MRIreadInfo`, `MRIreadHeader` (taken early from 3.1-28) | `mriio.rs` |
+| `utils/mriio.cpp` 10853-11245, 12195-12420 | `local_buffer_to_image`, `mghRead`, `MRITAGread` (taken early from 3.1-30) | `mriio.rs` |
+| `utils/registerio.cpp` 43-162 | `regio_read_register` (taken early from 3.1-34; its `.lta` branch through `RegisterLta`) | `registerio.rs` |
+| `utils/resample.cpp` 109-118 | `float2int_code` | `registerio.rs` |
+| `packages/minc/minc_gaussian.c` 157-290, `minc_volume_io.c` (its changes to MINC 1.5.1's reader: messages, transform types, tokens, `~user`) | `invert_4x4_matrix`, FreeSurfer's volume_io dialect of `larmorx_io::xfm` (MNI's notice: `LicenseRef-MNI`) | `minc.rs` |
+
+Third-party code: `packages/minc` is MNI's volume_io reworked by FreeSurfer (MNI's permissive notice); `minc.rs`
+carries both licence names. No other third-party code in these lines.
+
+Changes for part 7 (relay 17, Bruker's readers): `BrukerTransform`'s and the readers' outputs held as
+`Option`s (`None`: never written, FS-401, 0 in both modes); the line buffer as the C string `fgets`
+gives (its first NUL ends it); the `sscanf` calls through `larmorx_freesurfer_core::cscan::Scanf`;
+`stuff_four_by_four`'s float rounding and `MatrixMultiply` through fs.core's `matrix_multiply` (the
+in-place products as copies, as `MatrixMultiplyD` does); the voxel size and offset in the official
+object code's operation order (`fov * 10 / size`; `-vox * (ft_size - 1) * 0.5`, the halving equal
+to the source's `/ 2.`); the files closed where FreeSurfer leaves them open (FS-260);
+`exec_progress_callback` a no-op (no FreeSurfer program sets a progress callback). The defaults of
+FS-402 and FS-404 are larmorx's own: the voxels read by their type's size and in `$RECO_byte_order`'s
+order (ParaVision's documented parameter).
+

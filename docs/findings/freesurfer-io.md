@@ -613,3 +613,118 @@ known. The mosaic functions serve the Siemens DICOM reader (fs.dicomread, 3.7).
   hash in `fsio.cpp` had the 64-bit offset basis with a digit dropped, found by computing the hash of
   the official numbers in Python (the port's was right).
 
+
+## Part 6: reading volumes and registration files (relay 16 of track A, for track D's surfaces)
+
+**Source-derived (FreeSurfer 8.2.0's `utils/mriio.cpp` 109, 488-1105, 10853-11245, 12195-12420;
+`utils/registerio.cpp` 43-162; `utils/resample.cpp` 109-118; `packages/minc/minc_gaussian.c`,
+`minc_volume_io.c`): closed to FreeSurfer's clean-room implementers.**
+
+- `mri_read` finds the last `@` and the last `#` on the whole name with `strrchr` before it writes
+  a NUL at either: so in `x.mgz@mgz#0` the format's text ends at the `#` (`mgz`) and in
+  `x.mgz#0@mgz` the frames' text ends at the `@`.
+- `nan_inf_check` on a volume read without voxels: `MRIFseq_vox` through `slices`, which
+  `MRIallocHeader` never allocates: a crash for a float volume with a frame list (FS-255; reached
+  by `MRIreadHeader`/`MRIreadInfo` of `name#n`).
+- `mghRead`'s header skip in a compressed file ends with `znzread(buf, total_bytes - count, 1,
+  fp)`: for a volume without voxels the member size is 0, and FreeSurfer's `znzread` divides the
+  bytes read by it (SIGFPE, measured: the probe's `CRASH 8`; FS-76's mechanism, nifticlib's).
+- `MRI::initSlices` advances the row pointer only for uchar, short, unsigned short, RGB, int, long,
+  float and (by the byte count) float complex: a tensor (and bitmap, double complex) volume's rows
+  all point at the chunk's start, so `mghRead`'s `MRIFseq_vox` writes overwrite one row.
+- `mghRead`'s `buf = calloc(bytes, ...)` with a negative `int` byte count fails (`errno` ENOMEM,
+  measured), and `znzread` into the null buffer of a compressed file returns -1 (zlib's
+  `(int)len < 0` check, which also sets the stream's error so every later read fails: the TR, the
+  tags); the replica gives `larmorx_io::znz::GzFile::gzread_too_long` for that state.
+- `FS_MGZIO_USEVOXELBUFREAD`: `bufsrc = &MRIseq_vox(mri, 0, 0, 0, start_frame)` dereferences
+  `slices[start_frame * depth]`: past the one-frame volume for a frame after the first, and a
+  crash for a volume without slices (`slices` of 0 entries; measured `CRASH 11`) (FS-256).
+- `MRITAGread` is called by `mghRead` with its defaults (`ras_xform` NULL): the
+  `TAG_RAS_XFORM_EXTRA` case has no `niftiheaderext` check and calls `read_ras_xform_extra(NULL)`
+  (FS-253).
+- `TAG_MGH_XFORM`: `fstagsio.read_data(mri->transform_fname, len)` reads `len` bytes into the
+  1,024-byte field (FS-254 past it; `transform_fname` is followed by the `General_transform`);
+  `sprintf(tmpstr, "%s/transforms/talairach.xfm", fio_dirname(fname))` into 1,000 bytes (FS-254).
+  The file is read with `input_transform_file`, FreeSurfer's copy (`packages/minc`), whose
+  `create_linear_transform` uses `minc_volume_io.c`'s static `compute_transform_inverse` (no
+  identity check; `minc_inverse.c`'s global one checks the first product against the identity and
+  exits) on `minc_gaussian.c`'s `invert_4x4_matrix` (`invert_4x4_matrix_wkr_fast`; `doPrint` is
+  false in the build).
+- `TAG_CMDLINE` and `TAG_PEDIR`: `calloc(len + 1)` then `read_data(.., len)` and `[len] = 0`: a
+  length of -1 gives an empty string after writing one byte before the allocation; below -1 or
+  beyond memory a null buffer and a crash (FS-257). `TAG_FIELDSTRENGTH` reads `sizeof(float)`
+  bytes whatever the tag's length (no defect ID: FreeSurfer always writes 4; a file with another
+  length is then read as further tags, both modes).
+- `regio_read_register`'s `char tmp[1000]` takes `fscanf("%s")` without a width (FS-258); the `.lta`
+  branch reads `lta->xforms[0]` without checking `num_xforms` (FS-258) and calls `LTAread` and
+  `TransformLTA2RegDat` (transform.cpp, fs.volume: the replica takes them through
+  `registerio::RegisterLta`). `perror` (glibc 2.35) duplicates standard error's descriptor and
+  `fdopen`s it `"w+"` while standard error is not yet oriented: on a descriptor open for writing
+  only that fails with EINVAL and `errno` stays EINVAL (measured in the probe's child, whose
+  standard error is a file opened `O_WRONLY`); the probe orients standard error first.
+- `chklc()` in `MRIreadType`/`MRIread` exits 255 without `FREESURFER_HOME` (the licence check, a
+  runtime matter larmorx's replica does not have: `larmorx-freesurfer-core::chklc` returns 1); the
+  probe calls `mri_read` directly for its `mrd` command.
+- Measured (2026-11-13, the probe's piece 6): seed 3, 310 cases; seed 5, 1,250; seed 11, 2,500:
+  `reproduce` identical on 1,777 of 1,778 comparable lines (572 not compared: formats not ported,
+  `.lta`, crashes, skips beyond 256 MiB; 150 compared apart), the one other FS-256's crash, since
+  noted.
+
+## Part 7: Bruker's readers (3.1-27, relay 17 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/Bruker.cpp` 146-849.
+
+- **FS-259** (class a; both modes the whole strings, noted). `splitParameterValue` (261) `strcpy`s the
+  name into the caller's `Parameter[256]` and the whole remainder after `=` (its newline included,
+  before the loop that cuts it) into `Value[128]`; the three readers' buffers are stack arrays
+  (`char line[512]; char Parameter[256]; char Value[128];`), so a name of 256 bytes or more or a
+  remainder of 128 or more writes over the neighbouring locals. Measured: none (undefined); the
+  probe's own buffers are 8,192 bytes, so such lines are counted, not compared.
+- **FS-260** (class a, resource leak; both modes close, no notice, as FS-242). `readBrukerReco` never
+  calls `fclose` on success (its last lines compute the sizes and return); `readBrukerD3proc` (338)
+  and `readBrukerReco` (753) return without it on an unsupported type; `readBrukerVolume` (807) on an
+  unknown one.
+- **FS-401** (class a, memory never written; both modes 0, noted; the probe marks such lines
+  `VARY`). `brukerRead`'s `width`, `height`, `depth`, `TR`, `TE`, `TI`, `flip_angle` and every
+  `BrukerTransform bTran` field (stack, no initialiser) that `d3proc`, `reco` or `acqp` does not set:
+  `MRIalloc` then gets sizes and a type from the stack, the geometry and times likewise.
+- **FS-402** (class c, rule A: default the type's size; `reproduce` FreeSurfer's). `readBrukerVolume`
+  (813): `fread(mri->slices[k][j], sizeof(short), mri->width, fp)` for every type. A `_32BIT_SGN_INT`
+  study (`MRI_INT`) gets `2 * width` bytes at each row's start and zeros after (MRIalloc's); a byte
+  volume (only through FS-401's type) overlaps the next row and its last row writes `width` bytes
+  past the chunk.
+- **FS-403** (class a, crash; both modes NULL, noted; counted, not compared). A short read in
+  `readBrukerVolume` (814-818) closes the file and `MRIfree(&mri)` on its own copy of the pointer;
+  `brukerRead` (194) then `MRIfree(&mri)` on the caller's copy: a double free (glibc aborts; the probe
+  sees signal 6).
+- **FS-404** (class c, rule A: default byte-swapped for `bigEndian`; `reproduce` as read).
+  `readBrukerReco` does not read `$RECO_byte_order` and `readBrukerVolume`'s `swap_bytes_flag` is
+  always 0 ("this was not needed"): ParaVision's big-endian studies (older SGI-era data) are read in
+  little-endian order. The default reads ParaVision's parameter.
+
+Behaviours kept (rule C, both modes):
+- `readBrukerD3proc` (318-327): two `else if (!strcmp(Parameter, "$IM_SIT"))` branches; the first,
+  `sscanf(Value, "%d", pz)`, makes the second (frames, `ERROR: nframes %d but one is supported.`)
+  unreachable, so the depth is the later of `$IM_SIZ` and `$IM_SIT`. It looks deliberate (the first
+  branch placed before the older one: a 2-D multi-slice study's slices are counted in `IM_SIT`), and
+  no study at hand shows whether correcting it helps (rule D would measure it on real ParaVision
+  data: none in the data panel). Kept in both modes; the spec says so.
+- `$RECO_wordtype` compares 13 characters (`strncmp(..., 13)`: `_16BIT_SGN_IN`), so `_16BIT_SGN_INX`
+  is taken for short; harmless.
+- Messages kept as printed: `ERROR: value must follow RECO_size` for a missing `$RECO_ft_size` line,
+  `ERROR: float value must follow ACQ_slice_offset` for the gradient matrix, the reco file's check
+  line `INFO:    d3proc <reco>` (§30), the open failures without a newline, `OWNER` at the end of the
+  file printing the stale buffer.
+- `$ACQ_flip_angle`'s conversion runs even when `sscanf` read nothing (the old value converted).
+- `buildVoxToRASTransform` passes the transform's doubles to `stuff_four_by_four`'s `float`
+  parameters: the geometry is single precision (`MatrixMultiply` of floats).
+- Object code (the unit oracle's `Bruker.cpp.o`, GCC 8.4.0 `-O3`): `readBrukerReco`'s voxel size is
+  `fov * 10.0` (the third axis `10.0 * fov[2]`: the same for every input, one NaN operand at most),
+  then `/ size`; the offset `(ft_size - 1) * (-vox)` then `* 0.5` (the source's `/ 2.`; equal for
+  every input). larmorx computes `mul64(fov, 10)`, `div64(., size)`, `mul64(-vox, ft - 1)`,
+  `div64(., 2)`: the same bits, NaNs included.
+
+Measured (the probe's piece 7, `tests/fs_io/piece7.rs`): seed 11, 763 cases: `reproduce` identical on
+648, 0 different, 85 counted (FS-259, FS-403), 30 apart (FS-401); seed 13, 3,815 cases: 3,221
+identical, 0 different, 426 counted, 168 apart; `fix` differs only with FS-402 (39) or FS-404 (16)
+noted.

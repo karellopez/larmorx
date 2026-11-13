@@ -7,6 +7,11 @@
 //! double to `int` (`cvttsd2si`). larmorx's own code; candidates for `larmorx-core` with the
 //! C-library item (queue item 3.1-08), where every FreeSurfer crate can share them.
 
+use larmorx_core::defects::GLIBC_07;
+use larmorx_core::math::Libm;
+
+use crate::globals::Globals;
+
 /// `isspace` in the C locale: space, `\t`, `\n`, `\v`, `\f`, `\r`.
 pub fn is_space(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r')
@@ -409,6 +414,22 @@ fn g_digits(v: f64, prec: usize, alt: bool) -> String {
         mant
     };
     format!("{mant}{exp}")
+}
+
+/// GLIBC-07, noted in both modes, when a C library function a [`Libm::new`] evaluated would have
+/// given another value under the other choice (larmorx's correctly rounded default or glibc 2.35's
+/// with `reproduce`); `names` the functions (`"cosf and sinf"`). FreeSurfer's maths notes it at
+/// every site whose values come from the C library (as its clean room does).
+pub fn note_glibc07(g: &mut Globals, libm: &Libm, names: &str) {
+    if !libm.differed() {
+        return;
+    }
+    let detail = if g.notices.reproduce() {
+        format!("glibc's {names}, not correctly rounded, gave this result's last bits")
+    } else {
+        format!("{names} correctly rounded (glibc's differ in the last place)")
+    };
+    g.notices.add(&GLIBC_07, detail);
 }
 
 #[cfg(test)]

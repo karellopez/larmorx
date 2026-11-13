@@ -1551,6 +1551,32 @@ defects! {
         "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
     FS_228 = "FS-228", "FreeSurfer", true,
         "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
+    FS_249 = "FS-249", "FreeSurfer", true,
+        "reading a volume (mri_read, MRIreadHeader) whose name is 1,024 bytes or more once the working directory is put before it writes past FreeSurfer's name buffers: the result is undefined and the program can crash";
+    FS_253 = "FS-253", "FreeSurfer", true,
+        "reading an MGH or MGZ volume that holds the NIfTI header extension's RAS-transform tag (tag 9) crashes";
+    FS_254 = "FS-254", "FreeSurfer", true,
+        "reading an MGH or MGZ volume whose talairach-transform tag holds 1,024 bytes or more, or whose folder's name is 975 bytes or more, writes past FreeSurfer's name buffers: the transform's name and the volume after it are undefined and the program can crash";
+    FS_255 = "FS-255", "FreeSurfer", true,
+        "reading only the header of a float volume (MRIreadHeader, MRIreadInfo) with a frame list (name#0) crashes";
+    FS_256 = "FS-256", "FreeSurfer", true,
+        "with FS_MGZIO_USEVOXELBUFREAD set, reading one frame after the first of an MGH volume writes past the one-frame volume FreeSurfer makes for it, and reading a volume without slices (no frames, or a depth of 0) crashes";
+    FS_257 = "FS-257", "FreeSurfer", true,
+        "an MGH volume's command-line or phase-encoding tag whose length is negative or larger than the machine can allocate crashes FreeSurfer or corrupts its memory";
+    FS_258 = "FS-258", "FreeSurfer", true,
+        "regio_read_register writes past its buffer for a subject or method name of 1,000 bytes or more in a register.dat, and gives sizes from memory contents for an .lta without transforms";
+    FS_259 = "FS-259", "FreeSurfer", true,
+        "reading a Bruker study, a parameter line (##name=value in acqp, reco or d3proc) whose name is 256 bytes or more or whose value is 128 bytes or more writes past FreeSurfer's buffers: memory corruption, a crash or wrong values";
+    FS_260 = "FS-260", "FreeSurfer", true,
+        "reading a Bruker study leaves its reco file open (and d3proc or reco on an unsupported data type, 2dseq on an unknown one): a program that reads many studies runs out of file descriptors";
+    FS_401 = "FS-401", "FreeSurfer", true,
+        "reading a Bruker study whose files lack a value FreeSurfer uses (the sizes in d3proc; the transposition, field of view, sizes, data type in reco; TR, TE, TI, the flip angle, the offsets or the gradient matrix in acqp) takes it from memory contents: the volume's size, type, times or geometry are undefined";
+    FS_402 = "FS-402", "FreeSurfer", true,
+        "reading a Bruker study's voxels takes 2 bytes per voxel whatever the data type: a 32-bit volume (RECO_wordtype _32BIT_SGN_INT) gets only the first half of each row from the file and zeros after it";
+    FS_403 = "FS-403", "FreeSurfer", true,
+        "reading a Bruker study whose 2dseq file is shorter than the volume crashes (the volume is freed twice)";
+    FS_404 = "FS-404", "FreeSurfer", true,
+        "reading a Bruker study ignores RECO_byte_order: a big-endian 2dseq is read in the machine's byte order, so its values are wrong";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

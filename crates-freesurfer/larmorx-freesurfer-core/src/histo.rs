@@ -90,7 +90,7 @@ use larmorx_core::defects::{FS_18, FS_19, FS_20, FS_21, FS_22, FS_23, FS_24, FS_
 use larmorx_core::math::Libm;
 
 use crate::affine::float_to_int;
-use crate::cstd::fmt_f;
+use crate::cstd::{self, fmt_f};
 use crate::diag::{DIAG_WRITE, verbose_on};
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, ERROR_NO_MEMORY, ERROR_NOFILE, ERROR_UNSUPPORTED, Fatal};
@@ -532,7 +532,7 @@ pub fn histo_clear_bins_in_place(h: &mut Histogram, min_val: i32, max_val: i32) 
 
 /// `HISTOsmooth`'s kernel: `len` weights (at most 2000), normalised to sum 1 in `float`.
 fn smooth_kernel(g: &mut Globals, sigma: f32) -> Vec<f32> {
-    let libm = Libm::quiet(g.mode());
+    let libm = Libm::new(g.mode());
     let mut len = nint(g, f64::from(8.0f32 * sigma)) + 1;
     if (len / 2) * 2 == len {
         len += 1;
@@ -561,6 +561,7 @@ fn smooth_kernel(g: &mut Globals, sigma: f32) -> Vec<f32> {
     for k in kernel.iter_mut() {
         *k = sse::div(*k, norm);
     }
+    cstd::note_glibc07(g, &libm, "exp and pow");
     kernel
 }
 
@@ -1713,7 +1714,20 @@ pub fn histo_robust_gaussian_fit(
     h: &mut Histogram,
     max_percentile: f64,
 ) -> Result<(i32, Option<f64>, Option<f64>), Fatal> {
-    let libm = Libm::quiet(g.mode());
+    let libm = Libm::new(g.mode());
+    let r = robust_gaussian_fit(g, err, dir, h, max_percentile, &libm);
+    cstd::note_glibc07(g, &libm, "exp");
+    r
+}
+
+fn robust_gaussian_fit(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    h: &mut Histogram,
+    max_percentile: f64,
+    libm: &Libm,
+) -> Result<(i32, Option<f64>, Option<f64>), Fatal> {
     if h.bin_size <= 0.0 {
         h.bin_size = 1.0;
     }
@@ -1934,7 +1948,7 @@ pub fn histo_abs(
 /// `HISTOgetEntropy(h)`: `-sum p log p` over the bins with a count above 0, `p` the count over
 /// [`histo_total`] (in `double`).
 pub fn histo_get_entropy(g: &mut Globals, h: &Histogram) -> f64 {
-    let libm = Libm::quiet(g.mode());
+    let libm = Libm::new(g.mode());
     let total = f64::from(histo_total(g, h));
     let mut entropy = 0.0f64;
     for &c in &h.counts[..h.n()] {
@@ -1943,6 +1957,7 @@ pub fn histo_get_entropy(g: &mut Globals, h: &Histogram) -> f64 {
             entropy = sse::sub64(entropy, sse::mul64(p, libm.log(p)));
         }
     }
+    cstd::note_glibc07(g, &libm, "log");
     entropy
 }
 

@@ -53,6 +53,7 @@
 #include "signa.h"
 #include "mosaic.h"
 #include "matfile.h"
+#include "registerio.h"
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -429,6 +430,237 @@ void print_anymat(const MATRIX *m)
   if (big) { char t[32]; snprintf(t, sizeof t, "fnv%016" PRIx64 " ", h); out += t; }
 }
 
+
+// piece 6 (relay 16): reading volumes (MRIreadHeader, MRIreadInfo, MRIreadType, mghRead) and
+// registration files (regio_read_register). Names are printed with the fixture's path removed and
+// escaped (the port's fixture is elsewhere).
+std::string fixpfx;
+}
+MRI *mri_read(const char *fname, int type, int volume_flag, int start_frame, int end_frame,
+              std::vector<MRI *> *mrivector);
+int splitParameterValue(char *sWholeLine, char *sParameter, char *sValue);
+namespace {
+void oname(const char *s)
+{
+  if (!s) { out += "N "; return; }
+  std::string t(s);
+  for (size_t at; !fixpfx.empty() && (at = t.find(fixpfx)) != std::string::npos;) t.erase(at, fixpfx.size());
+  out += "n";
+  char b[8];
+  for (unsigned char c : t) {
+    if (c <= 0x20 || c > 0x7e || c == '\\') { snprintf(b, sizeof b, "\\x%02x", c); out += b; }
+    else out += (char)c;
+  }
+  out += " ";
+}
+void fnv_bytes(const unsigned char *b, size_t n)
+{
+  uint64_t h = 0xcbf29ce484222325ull;
+  for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ull; }
+  char t[32];
+  snprintf(t, sizeof t, "fnv%016" PRIx64 " ", h);
+  out += t;
+}
+void print_t(const Transform *t)
+{
+  if (!t) { out += "N "; return; }
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++) od(Transform_elem(*t, i, j));
+}
+// a VOL_GEOM of an MRI's morph fields: valid and the extent are memory contents until a morph tag
+// sets them (VOL_GEOM's constructor leaves them), so they are not printed
+void print_vg6(const VOL_GEOM &v)
+{
+  const float f[] = {v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s,
+                     v.z_r, v.z_a, v.z_s, v.c_r, v.c_a, v.c_s, v.s_r, v.s_a, v.s_s};
+  for (float x : f) of(x);
+  oname(v.fname);
+}
+void print_mri6(const MRI *m)
+{
+  if (!m) { out += "N "; return; }
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type); oi(m->imnr0); oi(m->imnr1);
+  const float f[] = {m->xsize, m->ysize, m->zsize, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a, m->y_s,
+                     m->z_r, m->z_a, m->z_s, m->c_r, m->c_a, m->c_s};
+  for (float x : f) of(x);
+  oi(m->ras_good_flag);
+  const float g[] = {m->xstart, m->xend, m->ystart, m->yend, m->zstart, m->zend, m->fov, m->thick, m->ps,
+                     m->tr, m->te, m->ti};
+  for (float x : g) of(x);
+  od(m->flip_angle); of(m->FieldStrength);
+  oi(m->dof); oi(m->version); oi(m->intent);
+  oi(m->ncmds);
+  for (int i = 0; i < m->ncmds; i++) oname(m->cmdlines[i]);
+  oname(m->transform_fname); oi(m->free_transform);
+  print_t(m->linear_transform); print_t(m->inverse_linear_transform);
+  oname(m->pedir);
+  print_rmat(m->AutoAlign); print_rmat(m->origRas2Vox);
+  oi(m->warpFieldFormat); oi(m->gcamorphSpacing); od(m->gcamorphExp_k);
+  print_vg6(m->gcamorph_image_vg); print_vg6(m->gcamorph_atlas_vg);
+  print_rmat(m->gcamorphAffine);
+  if (!m->gcamorphLabel) out += "N ";
+  else {
+    std::vector<unsigned char> b;
+    for (int c = 0; c < m->width; c++)
+      for (int r = 0; r < m->height; r++)
+        for (int k = 0; k < m->depth; k++) {
+          int v = m->gcamorphLabel[c][r][k];
+          unsigned char t[4];
+          memcpy(t, &v, 4);
+          b.insert(b.end(), t, t + 4);
+        }
+    fnv_bytes(b.data(), b.size());
+  }
+  oname(m->fname);
+  if (!m->i_to_r__) out += "N ";
+  else for (int i = 0; i < 16; i++) of(m->i_to_r__->mat[i]);
+  print_rmat(m->r_to_i__);
+  if (!m->chunk || !m->ischunked) out += "nochunk ";
+  else fnv_bytes((const unsigned char *)m->chunk, m->bytes_total);
+}
+void set_env6(int bits)
+{
+  if (bits & 1) setenv("FS_SKIP_TAGS", "1", 1);
+  if (bits & 2) setenv("FS_MGZIO_USEVOXELBUFREAD", "1", 1);
+}
+
+// piece 7: Bruker ParaVision studies
+void bt_init(BrukerTransform &b)
+{
+  memset(&b, 0, sizeof b);
+  b.transposition = -7;
+  for (int i = 0; i < 3; i++) {
+    b.fov[i] = -7; b.size[i] = -7; b.ft_size[i] = -7; b.vox_size[i] = -7; b.offset[i] = -7;
+  }
+  b.read_offset = b.phase1_offset = b.slice_offset = -7;
+  for (double &x : b.grad_matrix) x = -7;
+  b.type = -7;
+  b.dim = -7;
+}
+void print_bt(const BrukerTransform &b)
+{
+  oi(b.transposition);
+  for (double x : b.fov) od(x);
+  for (int x : b.size) oi(x);
+  for (int x : b.ft_size) oi(x);
+  for (double x : b.vox_size) od(x);
+  for (double x : b.offset) od(x);
+  od(b.read_offset); od(b.phase1_offset); od(b.slice_offset);
+  for (double x : b.grad_matrix) od(x);
+  oi(b.type); oi(b.dim);
+}
+void ocstr(const char *s)
+{
+  out += "x";
+  if (!*s) { out += " "; return; }
+  obytes(std::vector<unsigned char>(s, s + strlen(s)));
+}
+
+void run_piece7(const std::string &cmd)
+{
+  if (cmd == "bsp") {
+    std::vector<unsigned char> raw = unhex(next());
+    static char line[8192], P[8192], V[8192];
+    memset(line, 0, sizeof line);
+    memcpy(line, raw.data(), raw.size() < sizeof line - 1 ? raw.size() : sizeof line - 1);
+    int r = splitParameterValue(line, P, V);
+    oi(r);
+    if (r) { ocstr(P); ocstr(V); ocstr(line); }
+  } else if (cmd == "bd3" || cmd == "brc" || cmd == "bacq") {
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    BrukerTransform b;
+    bt_init(b);
+    if (cmd == "bd3") {
+      int x = -7, y = -7, z = -7, type = -7, nf = -7;
+      int r = readBrukerD3proc((char *)name.c_str(), &x, &y, &z, &type, &nf);
+      oi(r); oi(x); oi(y); oi(z); oi(type); oi(nf);
+    } else if (cmd == "brc") {
+      int r = readBrukerReco((char *)name.c_str(), &b);
+      oi(r); print_bt(b);
+    } else {
+      double TR = -7, TE = -7, TI = -7, flip = -7;
+      int r = readBrukerAcqp((char *)name.c_str(), &TR, &TE, &TI, &flip, &b);
+      oi(r); od(TR); od(TE); od(TI); od(flip); print_bt(b);
+    }
+    oi(errno);
+  } else if (cmd == "bvx") {
+    int w = (int)geti(), h = (int)geti(), d = (int)geti();
+    BrukerTransform b;
+    bt_init(b);
+    b.transposition = (int)geti();
+    b.dim = (int)geti();
+    for (double &x : b.vox_size) x = getd();
+    for (double &x : b.offset) x = getd();
+    b.read_offset = getd(); b.phase1_offset = getd(); b.slice_offset = getd();
+    for (double &x : b.grad_matrix) x = getd();
+    MRI *m = MRIallocHeader(w, h, d, MRI_SHORT, 1);
+    buildVoxToRASTransform(m, &b);
+    const float f[] = {m->c_r, m->c_a, m->c_s, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a, m->y_s,
+                       m->z_r, m->z_a, m->z_s, m->xsize, m->ysize, m->zsize};
+    for (float x : f) of(x);
+    oi(m->ras_good_flag);
+  } else if (cmd == "bkr" || cmd == "bmr") {
+    int rv = 1;
+    if (cmd == "bkr") { Gdiag = strtoull(next(), NULL, 16); rv = (int)geti(); }
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = cmd == "bkr" ? brukerRead((char *)name.c_str(), rv)
+                          : mri_read(name.c_str(), BRUKER_FILE, TRUE, -1, -1, NULL);
+    print_mri6(m);
+    oi(errno);
+    Gdiag = 0;
+  } else {
+    fail("unknown command");
+  }
+}
+
+void run_piece6(const std::string &cmd)
+{
+  char cwd[4096];
+  if (getcwd(cwd, sizeof cwd)) fixpfx = std::string(cwd) + "/";
+  // standard error byte-oriented, as in a program that has written to it: glibc's perror then
+  // leaves errno alone (on an unoriented, write-only standard error it sets EINVAL)
+  fwide(stderr, -1);
+  if (cmd == "mrh" || cmd == "mri" || cmd == "mrd" || cmd == "mgr") {
+    Gdiag = strtoull(next(), NULL, 16);
+    if (cmd != "mgr") MRIIO_Strip_Pound = (int)geti();
+    set_env6((int)geti());
+    int type = -1, rv = 0, frame = -1;
+    if (cmd == "mrh" || cmd == "mrd") type = (int)geti();
+    if (cmd == "mgr") { rv = (int)geti(); frame = (int)geti(); }
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = NULL;
+    if (cmd == "mrh") m = MRIreadHeader(name.c_str(), type);
+    else if (cmd == "mri") m = MRIreadInfo(name.c_str());
+    else if (cmd == "mrd") m = mri_read(name.c_str(), type, TRUE, -1, -1, NULL);
+    else m = mghRead(name.c_str(), rv, frame);
+    print_mri6(m);
+    oi(errno);
+  } else if (cmd == "rrr") {
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    char *subject = NULL;
+    float ip = -7, bp = -7, in = -7;
+    MATRIX *R = NULL;
+    int f2i = -7;
+    int r = regio_read_register(name.c_str(), &subject, &ip, &bp, &in, &R, &f2i);
+    oi(r); oname(subject); of(ip); of(bp); of(in); print_rmat(R); oi(f2i);
+    oi(errno);
+  } else {
+    run_piece7(cmd);
+  }
+}
+
 void run_piece5(const std::string &cmd)
 {
   if (cmd == "mvm" || cmd == "mmv") {
@@ -494,7 +726,7 @@ void run_piece5(const std::string &cmd)
     Gdiag = 0;
     Gdiag_no = -1;
   } else {
-    fail("unknown command");
+    run_piece6(cmd);
   }
 }
 
@@ -1225,6 +1457,7 @@ std::string escape(const std::string &s)
 }
 
 const char *MARK = "\n@@RESULT ";
+std::string realfix;
 
 int rm_entry(const char *p, const struct stat *, int, struct FTW *)
 {
@@ -1266,6 +1499,8 @@ int main(int argc, char *argv[])
   dat = std::string(argv[1]) + ".dat";
   std::string fix = std::string(argv[1]) + ".fix";
   make_fixture(fix);
+  char rp[4096];
+  realfix = realpath(fix.c_str(), rp) ? std::string(rp) : fix;
   FILE *fp = fopen(argv[1], "r");
   if (!fp) fail("cannot open the cases");
   std::vector<std::string> lines;
@@ -1326,6 +1561,15 @@ int main(int argc, char *argv[])
       result = "CRASH " + std::to_string(WTERMSIG(status));
     } else {
       result = "EXIT " + std::to_string(WEXITSTATUS(status));
+    }
+    // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
+    {
+      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr"};
+      std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
+      for (const char *k : p6)
+        if (c0 == k)
+          for (const std::string &pf : {realfix + "/", fix + "/"})
+            for (size_t at; (at = text.find(pf)) != std::string::npos;) text.erase(at, pf.size());
     }
     // messages beyond 1 MiB are shown by their length (the port does the same)
     if (text.size() > (1u << 20)) text = "BIGTEXT " + std::to_string(text.size());

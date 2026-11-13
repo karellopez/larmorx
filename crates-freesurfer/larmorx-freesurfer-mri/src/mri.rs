@@ -728,10 +728,18 @@ impl Mri {
                 &format!("could not allocate memory for {nslices} slices"),
             )?;
         }
-        if nslices > 0 && (h < 0 || !mri.ischunked) {
-            // each slice's row pointers (calloc(height, 8): fails for a negative height, even
-            // with the chunk) and, without the chunk, its buffer (calloc(width * height *
-            // bytes_per_vox, 1)): a volume whose chunk failed cannot allocate its slices either
+        // each slice's row pointers (calloc(height, 8): fails for a negative height, even with
+        // the chunk) and, without the chunk, its buffer (calloc(width * height * bytes_per_vox,
+        // 1), the extents' product in 32-bit int arithmetic, wrapping, then widened): for
+        // extents of 0 and above a volume whose chunk failed cannot allocate its slices either;
+        // a negative width's wrapped product may be a size calloc gives (an extent of
+        // -2147483648 times an even height wraps to 0 bytes), and then the index tables fail
+        let slice_fails = h < 0
+            || (!mri.ischunked
+                && (w >= 0
+                    || size_t(w.wrapping_mul(h)).wrapping_mul(bytes_per_vox as u64)
+                        > CALLOC_LIMIT));
+        if nslices > 0 && slice_fails {
             g.errno = ENOMEM;
             log::fatal(
                 g,

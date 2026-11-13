@@ -569,10 +569,20 @@ and leaves a following `p`); `inf` stops before a non-`i` letter, an unfinished 
 consumes the letter that broke it (as an unfinished `inf` or `nan` does; numbers leave it unread);
 `nan(...)` is never read beyond `nan`; underflow sets `ERANGE` after rounding (`0x1.fffffep-127` sets
 it, `0x1.ffffffp-127` does not), and so does any inexact subnormal result, exactly representable
-ones not; a conversion that meets the end of the input before its item sets `errno` to 0 (unless an
-earlier item of the same call ended there), which is why `MatrixReadTxt`'s `could not scan value`
-after an `ERANGE` read prints no `Numerical result out of range` when the file simply ended.
-`cscan.rs` reproduces each; `scanf_probe.c` and its companions are the measurements.
+ones not; a conversion that meets the end of the input before its item sets `errno` to 0, or, when
+an earlier item of the same call ended at the end of the input, to the value `errno` had when that
+item met it (before that item's own `ERANGE`: `sscanf("-1877   1e40", "%f %f %f %f")` with `errno` 7
+before leaves 7, not 34; `"1e-50 3"` leaves 34; measured by track C's
+`validation/probes/fs-volume/scanf_word_errno.c`). Every later attempt of the same call to read sets
+`errno` back to that value, white space at the format's end included (`sscanf("1e40", "%f ")` with
+`errno` 7 leaves 7, without the blank 34; white space just before a conversion reads nothing itself);
+a call whose only reading meets the end at once (`fscanf(fp, "\n")` at the end of a file) leaves
+`errno` alone (track E's measurement, specs/freesurfer-maths.md §18.1: 9,008 `sscanf` calls, all
+given by `cscan::Scanf`, `validation/probes/fs-maths/scanf_errno_cases.py`). This is why
+`MatrixReadTxt`'s `could not scan value` after an `ERANGE` read prints no `Numerical result out of
+range` when the file simply ended. `cscan.rs` reproduces each (its `EndRule` keeps the `errno` of the
+moment the call first met the end, which gives this rule); `scanf_probe.c` and its companions are the
+measurements.
 
 ## For the main package's VNL (track C), found here, part 4
 
@@ -785,3 +795,41 @@ underneath, the casts), are kept here verbatim; the sections above give their ev
 - **FS-49**: freadInt and freadDouble at the end of the file return a value they never read (the stack's contents; freadInt prints nothing): MatrixReadFrom of a short file fills the matrix's type, sizes or elements with memory contents
 - **FS-50**: HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, asks for a number of bins outside the int range: the undefined conversion gives -2147483648 on x86-64, the allocation fails and the program ends with 'could not allocate histogram' (a saturated conversion would ask for 2^31 bins)
 - **FS-51**: HISTOrobustGaussianFit never returns when its search over sigma cannot advance: an infinite bin size (the search starts at infinity, below an infinite limit), or one so small that a tenth of it rounds to 0
+
+## Relay 16 (track A, 2026-11-13): FS-13, FS-47, FS-48 and FS-49 under `reproduce`
+
+- **FS-13 (decided by the orchestrator, rule B + D13):** the default exits for every negative size;
+  `reproduce` gives FreeSurfer's matrix where `MatrixAlloc_new` makes one. Its block size is
+  computed in `size_t`: 64 bytes of header, `(rows + 1) * sizeof(float *)` (a negative `int`
+  converted to `size_t`: the sum wraps), rounded up to 64, then `((rows * cols) + 2) * (2 for
+  complex)` floats (`int`), rounded up. It returns a matrix when the float count is not negative
+  (so `bzero(data, nelts * 4)` is small) and neither the header's part nor the whole wraps to a size
+  no allocation gives (rows of -16 or more; at -9 to -16 the header's part wraps to 0 and the
+  numbers overlap the header, which a matrix with no rows to visit never reads). Measured with
+  `validation/probes/fs-maths/matrixalloc_negative.cpp` (the unit oracle's `libutils.a`, each size in
+  a forked child, every size from -20 to 3 with a negative one, both types): 724 of 1,120 sizes
+  return, exactly those the rule names (the replica's `Matrix::negative`; its unit test checks all
+  1,120); the others crash after `MatrixAlloc(<r>, <c>): Using mmap'd tmpfile` (`mat` NULL in the
+  mmap branch) or in `bzero`. The old allocator (`FREESURFER_MatrixAlloc_old`) is not reproduced.
+- **FS-47 / FS-48:** per track E's amended §17.1/§17.4: both modes refuse where `larmorx_core`'s
+  `symmetric_eigensystem_f32_full` / `vnl_svd_f32_full` say VNL never returns; `reproduce` gives
+  VNL's result elsewhere (FS-42 and LINPACK's `info` as for finite matrices). The fs-maths probe's
+  port marks the hanging lines `HANG` (not compared) and compares the rest.
+- **FS-49:** per track E's §18.2 (the stack slot shared by `freadDouble`'s `double` and
+  `freadInt`'s `int` 4 bytes higher; `MatrixAlloc` between header and elements clobbers it): the
+  replica's `matrix_io::Slot`. Lines whose numbers took a byte of memory FreeSurfer never wrote are
+  marked `MEM49` (not compared); the others are compared.
+- The fs-maths probe's recorded hash: seed 1, 770 cases, 748 identical (one more than before: an
+  FS-49 line now compared), 22 `SKIP`.
+
+## GLIBC-07 at the C library's sites (relay 17)
+
+The fs-maths probe's seed-7 run (15,400 cases) showed 3 `mrot` lines whose default (`fix`) output
+differed from the official one by one unit in the last place of `cosf` or `sinf` without a notice:
+the correctly rounded default against glibc 2.35's bits, which `reproduce` gives. fs.core now notes
+GLIBC-07 in both modes wherever the two choices give another value on an argument it evaluated
+(`cstd::note_glibc07` with `Libm::new`'s witness), as the clean room does: `MatrixReallocRotation`
+(`cosf`, `sinf`), `GaussianMatrix` (`expf`), `HISTOsmooth`'s kernel (`exp`, `pow`),
+`HISTOrobustGaussianFit` (`exp`), `HISTOgetEntropy` (`log`), `PDFgaussian` (`log`). Measured: seed 7,
+15,400 cases: `reproduce` identical on 15,064, 0 different; `fix` differs without a notice on none
+(the 3 `mrot` lines carry GLIBC-07); the recorded seed-1 hash unchanged (fba798ad...).

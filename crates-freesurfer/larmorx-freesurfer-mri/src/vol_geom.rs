@@ -23,6 +23,7 @@ use larmorx_freesurfer_core::matrix_ops::{
     matrix_identity, matrix_inverse, matrix_print, matrix_zero,
 };
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::sse::{add64, div64, mul64, sqrt64, sub64};
 
 /// `VOL_GEOM`. `valid`, `width`, `height` and `depth` have no initial value in C++ (a new
 /// `VOL_GEOM`'s are memory contents until `initVolGeom` or a caller sets them): 0 here. The other
@@ -211,7 +212,7 @@ pub fn xfm_crs2xyz(
     useshear: bool,
 ) -> Result<Matrix, Fatal> {
     let mut m = m44(g, out, err)?;
-    let p = |a: f32, b: f32| (f64::from(a) * f64::from(b)) as f32;
+    let p = |a: f32, b: f32| mul64(f64::from(a), f64::from(b)) as f32;
     m.set_relt(1, 1, p(vg.x_r, vg.xsize));
     m.set_relt(2, 1, p(vg.x_a, vg.xsize));
     m.set_relt(3, 1, p(vg.x_s, vg.xsize));
@@ -257,7 +258,7 @@ pub fn xfm_crs2xyz(
     pcrs.set_relt(4, 1, 1.0);
     let off = new_of(matrix_multiply_d(g, out, err, Some(&m), Some(&pcrs), None)?)
         .expect("a 4 x 1 product");
-    let d = |c: f32, o: f32| (f64::from(c) - f64::from(o)) as f32;
+    let d = |c: f32, o: f32| sub64(f64::from(c), f64::from(o)) as f32;
     m.set_relt(1, 4, d(vg.c_r, off.relt(1, 1)));
     m.set_relt(2, 4, d(vg.c_a, off.relt(2, 1)));
     m.set_relt(3, 4, d(vg.c_s, off.relt(3, 1)));
@@ -411,15 +412,20 @@ pub fn set_vox2ras_from_matrix(
     let (ax, ay, az) = (e(2, 1), e(2, 2), e(2, 3));
     let (sx, sy, sz) = (e(3, 1), e(3, 2), e(3, 3));
     let (p0r, p0a, p0s) = (e(1, 4), e(2, 4), e(3, 4));
-    let xsize = (rx * rx + ax * ax + sx * sx).sqrt();
-    let ysize = (ry * ry + ay * ay + sy * sy).sqrt();
-    let zsize = (rz * rz + az * az + sz * sz).sqrt();
+    // SSE2's arithmetic (NaNs made from numbers are its default NaN on every platform)
+    let len = |a: f64, b: f64, c: f64| sqrt64(add64(add64(mul64(a, a), mul64(b, b)), mul64(c, c)));
+    let xsize = len(rx, ax, sx);
+    let ysize = len(ry, ay, sy);
+    let zsize = len(rz, az, sz);
     let (mx, my, mz) = (
         f64::from(vg.xsize),
         f64::from(vg.ysize),
         f64::from(vg.zsize),
     );
-    if (xsize - mx).abs() > 0.001 || (ysize - my).abs() > 0.001 || (zsize - mz).abs() > 0.001 {
+    if sub64(xsize, mx).abs() > 0.001
+        || sub64(ysize, my).abs() > 0.001
+        || sub64(zsize, mz).abs() > 0.001
+    {
         use larmorx_core::cfmt::g as cg;
         let _ =
             out.write_all(b"WARNING: MRIsetRas2VoxFromMatrix(): voxels sizes are inconsistent\n");
@@ -437,15 +443,15 @@ pub fn set_vox2ras_from_matrix(
         let _ = out.write_all(b"Input Vox2RAS ------\n");
         print_matrix(g, out, err, m);
     }
-    vg.x_r = (rx / xsize) as f32;
-    vg.x_a = (ax / xsize) as f32;
-    vg.x_s = (sx / xsize) as f32;
-    vg.y_r = (ry / ysize) as f32;
-    vg.y_a = (ay / ysize) as f32;
-    vg.y_s = (sy / ysize) as f32;
-    vg.z_r = (rz / zsize) as f32;
-    vg.z_a = (az / zsize) as f32;
-    vg.z_s = (sz / zsize) as f32;
+    vg.x_r = div64(rx, xsize) as f32;
+    vg.x_a = div64(ax, xsize) as f32;
+    vg.x_s = div64(sx, xsize) as f32;
+    vg.y_r = div64(ry, ysize) as f32;
+    vg.y_a = div64(ay, ysize) as f32;
+    vg.y_s = div64(sy, ysize) as f32;
+    vg.z_r = div64(rz, zsize) as f32;
+    vg.z_a = div64(az, zsize) as f32;
+    vg.z_s = div64(sz, zsize) as f32;
     p0_to_cras(g, out, err, vg, p0r, p0a, p0s)?;
     Ok(NO_ERROR)
 }

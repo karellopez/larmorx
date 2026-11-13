@@ -999,23 +999,32 @@ mod tests {
         assert_eq!(bits("  \t\n7"), (0x40e0_0000, false, 5));
     }
 
-    /// `eof2.c`'s measurements: `"%f %f"` and `"%d %d"` on each input, `errno` 7 before.
+    /// `eof2.c`'s measurements: `"%f %f"` and `"%d %d"` on each input, `errno` 7 before; and
+    /// `validation/probes/fs-volume/scanf_word_errno.c`'s for an `ERANGE` at the end (`%f` only:
+    /// `"%f %f %f %f"`).
     #[test]
     fn errno_at_the_end_of_the_input() {
-        for (input, n, errno) in [
-            ("", 0, 0),
-            (" ", 0, 0),
-            ("5", 1, 7),
-            ("5 ", 1, 0),
-            ("5  ", 1, 0),
-            ("5 6", 2, 7),
+        for (input, n, errno, float_only) in [
+            ("", 0, 0, false),
+            (" ", 0, 0, false),
+            ("5", 1, 7, false),
+            ("5 ", 1, 0, false),
+            ("5  ", 1, 0, false),
+            ("5 6", 2, 7, false),
+            ("1e40", 1, 7, true),
+            ("1e40 ", 1, 0, true),
+            ("-1877   1e40", 2, 7, true),
+            ("1e-50 3", 2, 34, true),
         ] {
             for int in [false, true] {
+                if int && float_only {
+                    continue;
+                }
                 let mut b = Bytes::new(input.as_bytes());
                 let mut call = Call::new();
                 let mut e = 7;
                 let mut got = 0;
-                for _ in 0..2 {
+                for _ in 0..if float_only { 4 } else { 2 } {
                     let ok = if int {
                         call.i32(&mut b, &mut e).is_some()
                     } else {

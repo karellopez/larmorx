@@ -1440,19 +1440,19 @@ defects! {
     FS_220 = "FS-220", "FreeSurfer", true,
         "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
     FS_221 = "FS-221", "FreeSurfer", true,
-        "the volume format probe (mri_identify, the format tests and the volume-name helpers) copies a file name into fixed buffers without checking its length (1,024 bytes; 512 for a Bruker study's file names, 2,000 for the stem helpers): a longer name overflows them, so the answer is undefined and the program can crash";
+        "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,
-        "is_mnc, for a name whose only dot is its first character followed by gz (.gz), reads the byte before the name (its answer is not changed)";
+        "is_mnc, for a name whose only dot is its first character followed by gz (.gz), reads one byte of memory outside the name (its answer is not changed)";
     FS_223 = "FS-223", "FreeSurfer", true,
         "is_mgh compares the whole file name with .mgh, .mgz and .mgh.gz instead of the name's end, so no ordinary name is recognised as MGH (no program calls it)";
     FS_224 = "FS-224", "FreeSurfer", true,
         "is_signa leaves a file shorter than a GE Signa header (14,336 bytes) open: a program that probes many such files runs out of file descriptors";
     FS_225 = "FS-225", "FreeSurfer", true,
-        "the GE Signa header's 16-bit integers are read with their second byte sign-extended: a value whose low byte is 0x80 or more (a matrix of 128, for example) reads as a negative number, so such Signa files are not recognised and their fields are wrong";
+        "a GE Signa header's 16-bit integer whose low byte is 0x80 or more reads as that byte minus 256 whatever its high byte (a matrix of 128 reads as -128), so such Signa files are not recognised and their fields are wrong";
     FS_226 = "FS-226", "FreeSurfer", true,
         "IDextensionFromName takes a name's last letters as its volume extension without the dot before them: a name ending in nii, mgz, mgh, img, bhdr or nii.gz without a dot (brainnii) is taken for a volume of that format, so a surface file so named is read or written as a volume";
     FS_227 = "FS-227", "FreeSurfer", true,
-        "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, writes past its memory: the answer depends on memory contents and the program can crash";
+        "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
     FS_228 = "FS-228", "FreeSurfer", true,
         "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
 }

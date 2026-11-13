@@ -21,12 +21,14 @@
 //! `ERANGE`) and keeps its low 32 bits (measured: `2147483648` reads -2147483648, `99999999999`
 //! reads 1215752191).
 //!
-//! **`errno` at the end of the input** (measured, [`Call`]): a conversion that meets the end of the
-//! input before its item's first character sets `errno` to 0, unless an earlier item of the same
-//! call ended at the end of the input (then `errno` is left alone); white-space directives that meet
-//! it leave `errno` alone (`fscanf(fp, "%f", ...)` at the end of a file returns `EOF` with `errno`
-//! 0; `sscanf("1 2", "%d %d %d", ...)` returns 2 with `errno` unchanged; `"%f %f"` on `"5 "`
-//! returns 1 with `errno` 0).
+//! **A whole call and `errno` at the end of the input** (measured, [`Scanf`], [`Call`]): the first
+//! time a call meets the end of its input it remembers `errno` as it is then, and every later
+//! attempt of the same call to read a character sets `errno` back to that value; an end met while
+//! a conversion skips the white space before its item is remembered as 0; a number and `inf` look
+//! one character past themselves, a complete `nan` or `infinity` does not (`fscanf(fp, "%f", ...)`
+//! at the end of a file returns `EOF` with `errno` 0; `sscanf("1 2", "%d %d %d", ...)` returns 2
+//! with `errno` unchanged; `"%f %f"` on `"5 "` returns 1 with `errno` 0; `"%f %d"` on `"1e99"`
+//! returns 1 with `errno` as it was before the call, on `"1e99 x"` with `ERANGE`).
 
 use std::cmp::Ordering;
 use std::io::BufRead;
@@ -42,9 +44,9 @@ pub trait Stream {
     fn peek(&mut self) -> Option<u8>;
     /// Reads the byte [`Stream::peek`] gave.
     fn bump(&mut self);
-    /// Whether the conversion just made met the end of the input. By default a look at the next
-    /// byte; a C stream says whether a read already found the end, since glibc does not read on
-    /// after a complete `nan` or `inf` (its end-of-file flag stays clear: measured).
+    /// Whether a read already found the end of the input. By default a look at the next byte; a C
+    /// stream says whether its end-of-file flag is set (glibc does not read on after a complete
+    /// `nan` or `infinity`: measured). [`Scanf`] and [`Call`] track the end themselves.
     fn hit_end(&mut self) -> bool {
         self.peek().is_none()
     }
@@ -563,12 +565,269 @@ impl Ord for Big {
     }
 }
 
-/// One `scanf` call's conversions with glibc's `errno` rules: `ERANGE` from a conversion, 0 for a
-/// conversion that meets the end of the input before its item unless an earlier item of the call
-/// ended there.
+/// Why a `scanf` call stopped: a character that does not match (a matching failure) or the end
+/// of the input (an input failure).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stop {
+    Matching,
+    Input,
+}
+
+/// One `scanf` call's state for glibc's rules at the end of the input (measured as a black box:
+/// `validation/investigations/glibc-scanf-probe/` and `validation/investigations/glibc-stdio-
+/// probe/scanf_end.c`, no glibc code):
+///
+/// - the first time the call meets the end of its input it remembers `errno` as it is then, and
+///   every later attempt of the same call to read a character (a conversion's item, a text
+///   character, the white space a format ends with) sets `errno` back to that value;
+/// - an end met while a conversion skips the white space before its item is remembered as 0;
+/// - a conversion meets the end only when it looks past its last character: a number does, and so
+///   does `inf` (it may go on as `infinity`); a complete `nan` or `infinity` does not.
+#[derive(Clone, Copy, Debug, Default)]
+struct EndRule {
+    eof: bool,
+    saved: i32,
+}
+
+impl EndRule {
+    fn peek(&mut self, st: &mut dyn Stream, errno_now: i32) -> Option<u8> {
+        let c = st.peek();
+        if c.is_none() && !self.eof {
+            self.eof = true;
+            self.saved = errno_now;
+        }
+        c
+    }
+
+    /// The white space before a conversion's item (an end met there remembered as 0); whether an
+    /// item character follows. Without one `errno` is the remembered value.
+    fn begin(&mut self, st: &mut dyn Stream, errno: &mut i32) -> bool {
+        if !self.eof {
+            while let Some(c) = self.peek(st, 0) {
+                if !is_space(c) {
+                    return true;
+                }
+                st.bump();
+            }
+        }
+        *errno = self.saved;
+        false
+    }
+}
+
+/// The stream as a conversion reads it, with the call's end rule (the errno of the moment is the
+/// one before the conversion).
+struct Tracked<'b> {
+    st: &'b mut dyn Stream,
+    end: &'b mut EndRule,
+    errno_now: i32,
+}
+
+impl Stream for Tracked<'_> {
+    fn peek(&mut self) -> Option<u8> {
+        self.end.peek(self.st, self.errno_now)
+    }
+    fn bump(&mut self) {
+        self.st.bump();
+    }
+    fn hit_end(&mut self) -> bool {
+        self.st.hit_end()
+    }
+}
+
+/// One `sscanf` or `fscanf` call, directive by directive, as glibc 2.35 behaves (measured as a
+/// black box, [`EndRule`]): text that must match, white space (any amount, none included), `%d`,
+/// `%f`, `%lf`, `%s` with a width, and the suppressed forms; the values come from this module's
+/// conversions. The call returns ([`Scanf::finish`]) the number of items assigned, or `EOF` (-1)
+/// when its input ended before it assigned any (a matching failure returns the count). A number
+/// beyond its type's range sets `errno` to `ERANGE`, suppressed or not. A call that stops (a
+/// matching or input failure) reads nothing more, so a format's final white space is skipped only
+/// by a call that reached it.
+pub struct Scanf<'a> {
+    st: &'a mut dyn Stream,
+    end: EndRule,
+    /// A white-space directive is pending (skipped by the next directive that reads).
+    skip: bool,
+    done: i32,
+    stop: Option<Stop>,
+}
+
+impl<'a> Scanf<'a> {
+    pub fn new(st: &'a mut dyn Stream) -> Scanf<'a> {
+        Scanf {
+            st,
+            end: EndRule::default(),
+            skip: false,
+            done: 0,
+            stop: None,
+        }
+    }
+
+    /// Whether the call has stopped.
+    pub fn stopped(&self) -> bool {
+        self.stop.is_some()
+    }
+
+    /// The items assigned so far.
+    pub fn assigned(&self) -> i32 {
+        self.done
+    }
+
+    /// The format's text `t`: white space (any amount, none included) and characters that must
+    /// match.
+    pub fn text(&mut self, errno: &mut i32, t: &[u8]) {
+        for &b in t {
+            if self.stop.is_some() {
+                return;
+            }
+            if is_space(b) {
+                self.skip = true;
+                continue;
+            }
+            if self.end.eof {
+                *errno = self.end.saved;
+                self.stop = Some(Stop::Input);
+                return;
+            }
+            loop {
+                match self.end.peek(self.st, *errno) {
+                    None => {
+                        self.stop = Some(Stop::Input);
+                        return;
+                    }
+                    Some(c) if self.skip && is_space(c) => self.st.bump(),
+                    Some(c) => {
+                        self.skip = false;
+                        if c == b {
+                            self.st.bump();
+                        } else {
+                            self.stop = Some(Stop::Matching);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    fn begin(&mut self, errno: &mut i32) -> bool {
+        if self.stop.is_some() {
+            return false;
+        }
+        self.skip = false;
+        if self.end.begin(self.st, errno) {
+            return true;
+        }
+        self.stop = Some(Stop::Input);
+        false
+    }
+
+    fn after<T>(&mut self, errno: &mut i32, r: Scan<T>, assign: bool) -> Option<T> {
+        match r {
+            Scan::Value(v, erange) => {
+                if erange {
+                    *errno = ERANGE;
+                }
+                if assign {
+                    self.done += 1;
+                }
+                Some(v)
+            }
+            Scan::Fail => {
+                self.stop = Some(Stop::Matching);
+                None
+            }
+            Scan::Eof => {
+                self.stop = Some(Stop::Input);
+                None
+            }
+        }
+    }
+
+    fn convert<T>(
+        &mut self,
+        errno: &mut i32,
+        assign: bool,
+        f: fn(&mut dyn Stream) -> Scan<T>,
+    ) -> Option<T> {
+        if !self.begin(errno) {
+            return None;
+        }
+        let r = f(&mut Tracked {
+            st: self.st,
+            end: &mut self.end,
+            errno_now: *errno,
+        });
+        self.after(errno, r, assign)
+    }
+
+    /// `%d` (`assign` false: `%*d`): the value read, or `None` when the call stops.
+    pub fn d(&mut self, errno: &mut i32, assign: bool) -> Option<i32> {
+        self.convert(errno, assign, scan_i32)
+    }
+
+    /// `%f` (or `%e`, `%g`) into a `float` (`assign` false: suppressed).
+    pub fn f(&mut self, errno: &mut i32, assign: bool) -> Option<f32> {
+        self.convert(errno, assign, scan_f32)
+    }
+
+    /// `%lf` into a `double` (`assign` false: suppressed).
+    pub fn lf(&mut self, errno: &mut i32, assign: bool) -> Option<f64> {
+        self.convert(errno, assign, scan_f64)
+    }
+
+    /// `%<width>s` (`assign` false: `%*s`): the characters before white space or the end, at most
+    /// `width` (`usize::MAX`: no width).
+    pub fn s(&mut self, errno: &mut i32, width: usize, assign: bool) -> Option<Vec<u8>> {
+        if !self.begin(errno) {
+            return None;
+        }
+        let mut w = Vec::new();
+        while w.len() < width {
+            match self.end.peek(self.st, *errno) {
+                Some(c) if !is_space(c) => {
+                    w.push(c);
+                    self.st.bump();
+                }
+                _ => break,
+            }
+        }
+        if assign {
+            self.done += 1;
+        }
+        Some(w)
+    }
+
+    /// The end of the format: its final white space skipped (when the call reached it); the
+    /// call's return value.
+    pub fn finish(&mut self, errno: &mut i32) -> i32 {
+        if self.stop.is_none() && self.skip {
+            if self.end.eof {
+                *errno = self.end.saved;
+            } else {
+                while let Some(c) = self.end.peek(self.st, *errno) {
+                    if !is_space(c) {
+                        break;
+                    }
+                    self.st.bump();
+                }
+            }
+        }
+        if self.stop == Some(Stop::Input) && self.done == 0 {
+            -1
+        } else {
+            self.done
+        }
+    }
+}
+
+/// One `scanf` call's conversions, each given its stream, with [`Scanf`]'s rules at the end of
+/// the input (the white space between them read by the caller through [`skip_space`], which is
+/// the same as a white-space directive: the next conversion's own skip remembers an end met there
+/// as 0). For calls made of conversions only; [`Scanf`] for the others.
 #[derive(Default)]
 pub struct Call {
-    latched: bool,
+    end: EndRule,
 }
 
 impl Call {
@@ -576,48 +835,44 @@ impl Call {
         Call::default()
     }
 
-    fn after<T>(&mut self, st: &mut dyn Stream, r: Scan<T>, errno: &mut i32) -> Option<T> {
+    fn convert<T>(
+        &mut self,
+        st: &mut dyn Stream,
+        errno: &mut i32,
+        f: fn(&mut dyn Stream) -> Scan<T>,
+    ) -> Option<T> {
+        if !self.end.begin(st, errno) {
+            return None;
+        }
+        let r = f(&mut Tracked {
+            st,
+            end: &mut self.end,
+            errno_now: *errno,
+        });
         match r {
             Scan::Value(v, erange) => {
                 if erange {
                     *errno = ERANGE;
                 }
-                if st.hit_end() {
-                    self.latched = true;
-                }
                 Some(v)
             }
-            Scan::Fail => {
-                if st.hit_end() {
-                    self.latched = true;
-                }
-                None
-            }
-            Scan::Eof => {
-                if !self.latched {
-                    *errno = 0;
-                }
-                None
-            }
+            Scan::Fail | Scan::Eof => None,
         }
     }
 
     /// A `%f` of this call: its value, or `None` for a matching or input failure (the call stops).
     pub fn f32(&mut self, st: &mut dyn Stream, errno: &mut i32) -> Option<f32> {
-        let r = scan_f32(st);
-        self.after(st, r, errno)
+        self.convert(st, errno, scan_f32)
     }
 
     /// A `%lf` of this call.
     pub fn f64(&mut self, st: &mut dyn Stream, errno: &mut i32) -> Option<f64> {
-        let r = scan_f64(st);
-        self.after(st, r, errno)
+        self.convert(st, errno, scan_f64)
     }
 
     /// A `%d` of this call.
     pub fn i32(&mut self, st: &mut dyn Stream, errno: &mut i32) -> Option<i32> {
-        let r = scan_i32(st);
-        self.after(st, r, errno)
+        self.convert(st, errno, scan_i32)
     }
 }
 
@@ -775,6 +1030,101 @@ mod tests {
                 assert_eq!((got, e), (n, errno), "{input:?} int {int}");
             }
         }
+    }
+
+    /// `validation/investigations/glibc-scanf-probe/scanf_errno.c`'s measurements (track D's: the
+    /// surface readers' formats; glibc 2.35, `errno` 5 before each call): the return value and
+    /// `errno` after.
+    #[test]
+    fn whole_calls_at_the_end_of_the_input() {
+        let run = |input: &str, f: &dyn Fn(&mut Scanf, &mut i32)| {
+            let mut b = Bytes::new(input.as_bytes());
+            let mut sc = Scanf::new(&mut b);
+            let mut errno = 5;
+            f(&mut sc, &mut errno);
+            (sc.finish(&mut errno), errno)
+        };
+        let points = |sc: &mut Scanf, e: &mut i32| {
+            sc.text(e, b"POINTS ");
+            sc.d(e, true);
+            sc.text(e, b" float\n");
+        };
+        assert_eq!(run("POINTS", &points), (-1, 0));
+        assert_eq!(run("POINTS ", &points), (-1, 0));
+        assert_eq!(run("POINT", &points), (-1, 5));
+        assert_eq!(run("POINTSX", &points), (0, 5));
+        assert_eq!(run("POINTS 5", &points), (1, 5));
+        assert_eq!(run("POINTS 99999999999 float", &points), (1, 5));
+        let curv = |sc: &mut Scanf, e: &mut i32| {
+            sc.d(e, false);
+            for k in 0..4 {
+                sc.text(e, b" ");
+                sc.f(e, k == 3);
+            }
+            sc.text(e, b"\n");
+        };
+        assert_eq!(run("12", &curv), (-1, 5));
+        assert_eq!(run("12 1 2 3", &curv), (-1, 5));
+        assert_eq!(run("99999999999 1e99 2 3 4", &curv), (1, 34));
+        assert_eq!(run("1 2 3 4 1e99", &curv), (1, 5));
+        assert_eq!(run("x 2 3 4 5", &curv), (0, 5));
+        let field = |sc: &mut Scanf, e: &mut i32| {
+            sc.text(e, b"FIELD ");
+            sc.s(e, usize::MAX, false);
+            sc.text(e, b" ");
+            sc.d(e, true);
+            sc.text(e, b"\n");
+        };
+        assert_eq!(run("FIELD", &field), (-1, 0));
+        assert_eq!(run("FIELD a", &field), (-1, 5));
+        assert_eq!(run("FIELD a 3", &field), (1, 5));
+        let fd = |sc: &mut Scanf, e: &mut i32| {
+            sc.f(e, true);
+            sc.text(e, b" ");
+            sc.d(e, true);
+        };
+        for (input, want) in [
+            ("1e99", (1, 5)),
+            ("1e99 ", (1, 0)),
+            ("1e99 x", (1, 34)),
+            ("inf", (1, 5)),
+            ("nan", (1, 0)),
+            ("-nan", (1, 0)),
+            ("infinity", (1, 0)),
+            ("1", (1, 5)),
+            ("nan(1", (1, 5)),
+            ("in", (0, 5)),
+        ] {
+            assert_eq!(run(input, &fd), want, "{input:?}");
+        }
+        assert_eq!(
+            run("", &|sc, e| {
+                sc.d(e, true);
+            }),
+            (-1, 0)
+        );
+        assert_eq!(
+            run("", &|sc, e| {
+                sc.text(e, b"x");
+                sc.d(e, true);
+            }),
+            (-1, 5)
+        );
+        // a call of conversions only, the white space read by the caller
+        let mut b = Bytes::new(b"1e99");
+        let mut call = Call::new();
+        let mut e = 5;
+        assert!(call.f32(&mut b, &mut e).is_some());
+        assert_eq!(e, ERANGE);
+        skip_space(&mut b);
+        assert!(call.i32(&mut b, &mut e).is_none());
+        assert_eq!(e, 5);
+        let mut b = Bytes::new(b"nan");
+        let mut call = Call::new();
+        let mut e = 5;
+        call.f32(&mut b, &mut e);
+        assert!(call.i32(&mut b, &mut e).is_none());
+        assert_eq!(e, 0);
     }
 
     fn lf(s: &str) -> (Scan<f64>, usize) {

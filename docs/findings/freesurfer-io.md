@@ -250,3 +250,242 @@ item 3.1-30) and colortab.cpp's binary readers and writers (3.1-33), which FStag
   table of millions of empty places printed one mark per place made 33 MB lines that ran check.py out
   of its 8 GiB box: the probe prints the non-empty entries with their indices, and messages beyond 1
   MiB by their length (`BIGTEXT`).
+
+## Part 3: fscnpy.cpp, gifti.cpp 47-212, dti.cpp's b-value files (3.1-25, piece 3)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 13. The behaviour is in `specs/freesurfer-io.md` §19-24; the defect texts (behaviour only) in
+`larmorx_core::defects` (FS-199 to FS-220).
+
+### fscnpy (FS-199 to FS-213)
+
+- The object's layout (fscnpy.h, x86-64): `__magic_string` (a pointer, 0-7), `__header_len_bytes[2] =
+  {2, 4}` (8-15), `__major_version` (16), `__minor_version` (17), two bytes of padding, `__header_len`
+  (`size_t`, 24-31), ... `mriio.cpp` 799 makes it with `new` (heap memory never written but for what
+  the constructor sets).
+- **FS-199/FS-200.** fscnpy.cpp 234 `fread(&__header_len, 1, __header_len_bytes[__major_version-1], fp)`:
+  major 3 reads `__header_len_bytes[2]`, the four bytes at offset 16: major (3), minor, the two padding
+  bytes: 3 + 256 x minor (+ the padding's) bytes into the 8-byte `__header_len`. Version 3.0 (padding
+  0) reads 3 of the 4 length bytes; the header text then starts at the length's fourth byte (0) and
+  the `dict` buffer lacks the header's last byte, its `'\n'`, so the parse of line 249 runs past it
+  (measured: NumPy's own version 3.0 file crashes the probe, `CRASH 11`). Majors 0 (the high half of
+  `__magic_string`, a PIE address: about 21,000 bytes into an 8-byte field), 4 and up (padding,
+  `__header_len` itself, `__endian`...) are memory or nonsense; measured: version 0 crashes.
+- **FS-201/FS-202.** 237 `char dict[__header_len]` is a variable-length array on the stack (up to 4 GiB
+  for version 2); 238's short read leaves its rest unwritten. 241-245: `restheader`, another VLA.
+- **FS-203.** 249 `for (; *currpos != '\n'; currpos++)`: the scan ends only at a newline seen where an
+  item starts; 255's key scan stops at a newline but 320's increment then steps over it; 282 `while
+  (*currpos != ',')` and 292 `while (!isdigit(*currpos))` and the shape loop 296-317 have no end test
+  at all; 267-270 read two bytes and step two without looking.
+- **FS-204.** 298-307: `value` is reset to NULL after each element; a `,` or `)` before the next digit
+  calls `atoi(NULL)` (SIGSEGV). NumPy writes a one-dimensional shape as `(3,)`: every 1-D `.npy`
+  crashes FreeSurfer (measured).
+- **FS-205.** 338 `while (__shape[__ndims-1] == 1)` has no `__ndims > 0` test: an all-ones shape pops
+  to empty and reads `__shape[-1]` (the malloc chunk's size field, not 1), then 346 `while
+  (__shape[0] == 1)` reads the stale 1 and calls `erase(begin())` on an empty vector: libstdc++'s
+  move of `end - (begin + 1) = -1` elements, `memmove` of `(size_t) -4` bytes (measured: `CRASH 11`).
+- **FS-206** (fs.mri, mri.cpp 108-129). `MRI::Shape::Shape(const std::vector<int>&)` prints its
+  message for a count other than 3 or 4 and still reads `shape[0]`, `shape[1]`, `shape[2]`: past the
+  vector's elements for fewer than 3. In npy2mri the vector is `__shape` after the squeeze: its
+  storage (libstdc++: growth 1, 2, 4, 8 by `_M_realloc_insert`, new places unwritten; `pop_back`
+  leaves the place; `erase(begin())` moves the rest down and leaves the last place) still holds the
+  dropped extents, so `(1, 3, 4, 1)` gives depth 4 (measured: `3 x 4 x 4 x 1`, the verbose line) and
+  `(2, 4, 1)` depth 1; a place beyond the storage or left by a growth is heap memory (measured 0 for
+  `(2, 3)`: a volume without voxels). `larmorx_freesurfer_mri::mri::Mri::new_beyond` takes those
+  places (`fscnpy::ShapeVec` models the vector); `Mri::new` (lists made for the call: their storage
+  ends at their elements) gives memory, 0 with `reproduce`.
+- **FS-207.** `__endian`, `__dtype_char`, `__dtype_len`, `__fortran_order` are not set by the
+  constructor (8-26): a header without `'descr'` or `'fortran_order'` leaves them as heap memory; an
+  empty `__shape` reads `__shape[-1]` from a NULL data pointer (crash).
+- **FS-208.** 126-127: `__dtype_len == 8` calls `byteswapbuffloat` (4-byte groups), not
+  `byteswapbufdouble`.
+- **FS-209.** 521 prints `%p` of `data_src` and `data_dst` (heap addresses: ASLR).
+- **FS-210.** 288 `__fortran_order = !strcmp(value, "False") ? false : true`.
+- **FS-211.** 111 `size_t bytes_per_slice = __dtype_len * mri->width * mri->height` multiplies ints.
+- **FS-212.** 118's short `fread`s are only counted (printed with `verbose`).
+- **FS-213.** 241-246 skip `16 - total % 16` bytes when the total is not a multiple of 16; NumPy's
+  `read_array_header` reads the data right after `header_len` bytes (its writer pads inside the
+  header: `_wrap_header`, to `ARRAY_ALIGN` = 64 bytes in NumPy 2.3.5's `_format_impl.py`; the format's
+  version 1.0 text asks for 16).
+- Kept (not defects): `'|'` (and any order byte but `'<'`) counts as "different endian" (only 1-byte
+  types carry `'|'`, and they are not swapped); keys are compared with their quotes, so a header
+  written with double quotes has none of them (FS-207); unknown keys are skipped with the first byte
+  of their value; a repeated `'shape'` appends; `array contiguous reordering ...` is printed for every
+  C-order array, verbose or not; `__getarchendian` is `'<'` on every platform larmorx supports;
+  `exec_progress_callback` (131) does nothing without freeview's callback; `fscnpy::read` (39-64: no
+  caller; its short-read test compares items with bytes) and `fscnpy::write` (empty) are not ported.
+
+### gifti.cpp 47-212 (FS-214 to FS-216)
+
+- Both functions are `static` (no symbol in `libutils.a`): the probe compiles gifti.cpp itself into
+  `fsio` (`gifti_statics.cpp`, with gifti.cpp's own compile command from the unit oracle's
+  `compile_commands.json`) and calls them through two wrappers.
+- **FS-214.** 75: `fprintf(stderr, "... data=%p\n", da)` passes the array, not its data.
+- **FS-215.** 175-180: the COMPLEX64 case reads `*((double *)(da->data) + ...)`.
+- **FS-216.** 143-201: `(dim0_index * dims_1)` and `(dim1_index * dims_0)` are int products added to
+  the pointer.
+- `NIFTI_TYPE_INT8` reads through `char` (signed on x86-64 Linux; unsigned on AArch64 Linux, not an
+  official FreeSurfer platform): the port reads `i8`. `gifti_add_empty_darray`'s failures are out of
+  memory only.
+
+### dti.cpp (FS-217 to FS-220)
+
+- **FS-217.** 853-858 and 936-940 open the file, then 859/942 read `bvals->rows` of a NULL matrix
+  (measured: `CRASH 11`, the file left empty). `MRIwriteType` (mriio.cpp 1268-1290) calls
+  `DTIwriteBVectors(mri->bvecs, ...)` whenever `mri->bvals` is set: a volume with b-values and no
+  gradients crashes there.
+- **FS-218.** 859 `bvals->rptr[n][1]`, 942 `rptr[n][1..3]`: `rptr[n] + c` runs into row `n + 1`; past
+  `data + rows x cols` it reads MatrixAlloc_new's block (matrix.cpp 418-421: rounded up to 64 bytes,
+  only `nelts` floats zeroed, 476-477) or beyond: memory.
+- **FS-219.** 985 `char tmpstr[100]`, filled by 991-996 and 1003-1008 without a bound (Ubuntu's GCC
+  builds with the stack protector: an overflow that reaches the canary aborts).
+- **FS-220.** 1127-1131 `bvec->rptr[i][1] = vol->bvecs->rptr[f][i]` and back for `i = 1..3`.
+- `DTIparsePulseSeqName` has no caller in FreeSurfer 8.2.0 (the inventory lists it in 3.1-25 as part
+  of dti.cpp's reached object); `DTIbvecChangeSpace` is called by the DICOM readers (DICOMRead.cpp 578,
+  6048, queue item 3.7-14) with `FSENVgetenv`'s desired space; `MatrixMultiplyD(M, bvec, bvec)` is in
+  place (the port copies the input, as FreeSurfer's MatrixMultiplyD does).
+- `%d` of a number beyond `int` (`sscanf`, glibc): the low 32 bits of the `long` (measured:
+  `999999999999` gives -727379969), as `larmorx_core::cscan::sscanf_i32` gives.
+
+### The probe's piece-3 commands
+
+`npy`, `gda`, `gdv`, `bvw`, `psn`, `bcs` (validation/probes/fs-io/fsio.cpp; the port's side
+`tests/fs_io/piece3.rs`). Results: below, "Measured (piece 3)".
+
+### Measured (piece 3, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+
+- Seed 7, 58,000 cases (29 commands x 2,000; boxed 12 GiB, about 35 minutes): `reproduce` identical on
+  51,221 of 51,221 comparable lines (1,761 with memory digits); 3,745 lines of memory contents or
+  addresses compared apart (2,009 equal); 3,034 not comparable. Piece 3's 12,000 cases: 10,387
+  comparable lines identical (`npy` 1,055 with 636 not comparable and 309 compared apart; `gda` 2,000;
+  `gdv` 1,802 and 198 apart: FS-214's addresses; `bvw` 1,720, 69 crashes of FS-217, 211 apart; `psn`
+  1,953, 47 of FS-219; `bcs` 1,857, 143 apart: FS-220 past the matrix). `fix` differs only with a notice
+  (piece 3's: FS-206 202, FS-213 207, FS-218 194, FS-55 217, FS-212 70, FS-220 49, FS-210 30, FS-208 21,
+  FS-215 11). The port's 58,000 lines are identical with and without AArch64's NaN rules emulated
+  (NAN_TRAP_ARM=1 with NAN_TRAP_DIR set; 1,877 and 1,996 NaNs flipped in `fix` and `reproduce`).
+- Seed 1, 2,800 portable cases (`tests/fs_io_official.rs`): 2,468 identical (73 with memory digits),
+  332 hashed as SKIP, SHA-256 5832c485...; passing in debug and release and under the trap (150 and
+  148 flips).
+- What the first runs taught (fixed): (1) the shape's places past a list of fewer than 3 extents are
+  set even where they all hold 1 (the first run left them 0: `(2, 4, 1)` gave depth 0, FreeSurfer 1);
+  (2) a message that prints the data file's name differs between the two sides' file names: the
+  `.npy` cases now read `x.npy` in the fixture on both; (3) in the first full run two piece-2 cases
+  (`ctr`, `ztr`) ended by the probe's 5-second alarm (`CRASH 14`) while six agents loaded the machine;
+  run alone, both gave the port's lines at once.
+
+## Part 4: the volume format probe (3.1-27, piece 1)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 14. The behaviour is in `specs/freesurfer-io.md` §25-33; the defect texts (behaviour only) in
+`larmorx_core::defects` (FS-221 to FS-228). Ported: `utils/mri_identify.cpp` whole (lines 47-1208;
+697-1195 taken early from 3.1-28 because `mri_identify` calls every test), `MRIgetVolumeName`
+(mriio.cpp 472-486, from 3.1-28), `checkBrukerFiles` and `is_bruker` (Bruker.cpp 201-260, 834-849),
+`ghc`, `ghi`, `ghf`, `get_signa_header_info`, `is_signa` (signa.cpp 69-198, from 3.1-30), `IsDICOM`,
+`IsSiemensDICOM`, `GetObjectFromFile`, `GetElementFromFile`, `AllocElementData`, `FreeElementData`
+and `DCMPrintCond` as the Manufacturer element reaches them (DICOMRead.cpp 1164-1460, 1479-1522,
+5410-5549), `DCM_GetElement` and `DCM_GetElementValue` (CTN's dcm.c 949-1100, 2699-2717, as
+FreeSurfer's copy has them) for that element only.
+
+### Mechanisms of FS-221 to FS-228
+
+- **FS-221.** Fixed buffers filled by `strcpy`/`strcat`/`sprintf` without a bound: `mri_identify`'s
+  `char fname[STRLEN]` (MRIgetVolumeName's `strcpy(name_only, string)`, mri_identify.cpp 203-209,
+  mriio.cpp 476), `string_to_type`'s `char ls[STRLEN]` (154), `is_analyze`'s `hfname[STRLEN]` (`strcpy`
+  731 and `strcat(".hdr")` 739), `is_sdt`'s `header_fname[STR_LEN]` (980, 983-985), `is_nifti1`'s
+  `fname_stem[STRLEN]` (1036), `IsDICOM`'s `static char file[1024]` (DICOMRead.cpp 5417, filled 5430: a static, so it
+  overwrites the next statics), `is_bruker`'s five `char ...File[512]` (Bruker.cpp 837-841, filled by
+  `checkBrukerFiles`' `strcpy`+`strcat` 214-252), `IDtypeFromStem`'s and `IDnameFromStem`'s `char
+  tmpstr[2000]` (`sprintf("%s.nii")` ... `"%s_000.bfloat"`), `bhdr_precisionstring`'s and
+  `bhdr_precision`'s `tmpstr[2000]`. The official build aborts on the stack protector's canary for
+  `string_to_type` of 1,030 bytes (probe: `CRASH 6`). Every name the C functions then use is still the
+  whole string (the copy keeps its terminator past the buffer), so both modes use it whole; the probe
+  counts these lines, never compares them.
+- **FS-222.** `is_mnc` (mri_identify.cpp 776-781): `for (dot--; *dot != '.' && dot > fname; dot--)`
+  starts one byte before a dot at the name's start and reads it before testing `dot > fname`, then
+  compares from there; the compared text's second byte is the name's dot against `m`, so the answer is
+  always "no". The port starts at the name.
+- **FS-223.** `is_mgh` (802-815) compares `fname`, not `ext`, with `.mgh`/`.mgz`/`.mgh.gz` (its comment
+  describes the extension); `ext` is computed and unused. No caller in FreeSurfer 8.2.0.
+- **FS-224.** `is_signa` (signa.cpp 189): `if ((ret = fread(h, ...)) != HLENGTH) return (0);` before
+  `fclose(fp)`.
+- **FS-225.** `ghi` (signa.cpp 77-91): `num = (num << 8) | *(header + 2*offset + i)` with `char` signed
+  on x86-64 (the official build's `movsbl`): the second byte's sign extension ORs ones into the high
+  bits. The first byte's sign extension is a 16-bit signed reading, so the correction keeps it.
+- **FS-226.** `IDextensionFromName` (486-535) `strncpy`s the last 3/4/6/11 bytes into `ext` and
+  compares them with `nii` ... without looking at the byte before (`IDstemFromName` compares `.nii`
+  with the dot). Callers: `MRISfileNameType` (mrisurf_io.cpp 2561: a name it takes for a volume is
+  read and written as a volume), mri_convert's frame splitting, mri_surf2surf, mrisutils.
+- **FS-227.** `AllocElementData` (DICOMRead.cpp 1252-1305) gives US/SS 2 bytes, UL/SL/AT/FL 4, FD
+  `multiplicity` x 8 (`calloc`), then `DCM_GetElementValue` `memcpy`s the element's whole length into it
+  (dcm.c 1059): a longer value writes past the allocation (within glibc's minimum chunk of 24
+  usable bytes the answer is the text up to the first zero; beyond, memory). The comparison is
+  `strcmp(e->d.string, "SIEMENS")` on the union's pointer.
+- **FS-228.** Representations `AllocElementData` has no case for (OT, UT, DD, RET, CTX, DLM) leave
+  `d.ot` NULL after its message; `DCM_GetElementValue` then `memcpy`s into NULL (a value of 1 byte or
+  more) or returns normally and `strcmp(NULL, ...)` faults (length 0): SIGSEGV either way (probe:
+  `CRASH 11`). A string representation with an undefined length (CTN keeps the value unread, FS-91)
+  allocates `length + 17` = 16 bytes (32-bit wrap) and writes `d.string[0xffffffff]`.
+
+### Other facts
+
+- `FreeElementData` (1408-1460) has no case for UN (which `AllocElementData` handles as text): it
+  prints `FreeElementData: 21 unrecognized` without a newline and leaks the value. A Manufacturer
+  stored as UN (explicit VR files) prints it on every `IsSiemensDICOM`: kept in both modes (rule C, no
+  result depends on it), noted here only.
+- `checkBrukerFiles` prints `INFO:    d3proc %s` for the reco file too (a copied line, 256): kept.
+- `IDtypeFromStem` does not look for `.img` while `IDnameFromStem` does; `IDtypeFromStem` has no caller.
+- `is_sdt` replaces the extension found anywhere in the name (`a.d/s` looks for `a.spr`): FreeSurfer's
+  convention for extensions throughout the file; kept.
+- `ghf`: the union's `long ii` is 8 bytes; only its low 4 are written before `thing.ii >> 24`, `&
+  sign_bit` and `& dmantissa`, which use bits 0-31 only: the uninitialised high half never reaches the
+  result. A zero fraction keeps the exponent (GE's `mvtsunf`): `0x40000000` is 0.0005, not 0.
+- `is_signa`'s sums: `fabs(float)` is libstdc++'s `float` overload (the official build's `andps` and
+  `addss`), compared with the `double` literal after `cvtss2sd`.
+- `IsDICOM`'s fourth attempt (`DCM_FORMATCONVERSION | DCM_ACCEPTVRMISMATCH`) is always refused by CTN
+  before the file is opened (no byte order). After a failed attempt the reader may already have closed
+  the object, so the next `DCM_CloseObject` pushes "NULL object passed to routine DCM_CloseObject"
+  (track C's finding, docs/findings/freesurfer-permissive.md); the stack is emptied at the end.
+- `GetObjectFromFile` (DICOMRead.cpp 1207-1243) repeats the four opens with `options | DCM_ACCEPTVRMISMATCH`
+  and does not empty the stack between them; `GetElementFromFile` empties it only on success, so a
+  missing Manufacturer leaves the failed attempts' conditions and "Requested element (8 70) not found
+  in DCM_GetElementVM" on the stack (the probe dumps it after each case).
+- `errno`: most tests set it to 0 after a failed `fopen` or short `fread`; `is_cor`, `is_bruker` and
+  `checkBrukerFiles` keep `stat`'s error; `IDisCurv`, `is_signa` and `IsDICOM` keep `fopen`'s, and
+  `IDisCurv` and `is_signa` keep the failed read's (21 for a folder). The port's `CFile` now fails a
+  folder's reads with `EISDIR` on every platform (on Windows it used to give an empty file) and keeps
+  the read's error (`read_errno`).
+- Two points for larmorx-io (track C's `larmorx_io::dicom`, told through the orchestrator): (1)
+  `CondStack::dump` writes the stack's texts through `cfmt::Streams` (`&str`), so a message holding a
+  byte that is not UTF-8 (a broken VR code, `DCM Unrecognized VR code (P\xbd)`) prints U+FFFD; the
+  port prints the stack with its own byte-exact dump (`dicom_probe::dump_conditions`); (2) `open_file`
+  uses one path both to open the file and in CTN's messages: the port passes the name joined to the
+  program's folder, so CTN's messages show that path where FreeSurfer shows the name as given (only
+  with `FS_DICOM_DEBUG` or in a dumped stack; the probe shows them relative to its fixture). A variant
+  taking the name for the messages would close both.
+
+### The probe's piece-4 commands
+
+`sty`, `tts`, `mgvn`, `mid`, `isx`, `idf`, `dcm` (validation/probes/fs-io/fsio.cpp's `run_piece4` and
+`setup`; the port's side `tests/fs_io/piece4.rs`). Each file case makes its files in the fixture's
+`w` folder (removed first). Results: below, "Measured (piece 4)".
+
+### Measured (piece 4, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+
+- Seed 7, 72,000 cases (36 commands x 2,000; boxed 12 GiB, about 45 minutes): `reproduce` identical on
+  65,077 of 65,077 comparable lines (1,743 with memory digits); 3,770 lines of memory contents or
+  addresses compared apart (2,074 equal); 3,153 not comparable. Piece 4's 14,000 cases: 13,914
+  identical, 86 not compared (`dcm` 77: FS-227 and FS-228, FreeSurfer's `CRASH 11`; `sty` 8: FS-221's
+  1,030-byte extension, `CRASH 6`; `mid` 1). `fix` differs only with a notice (piece 4's: FS-225 19,
+  FS-226 7, FS-223 2).
+- Coverage of the first 7,000 piece-4 cases (`<scratch>/A/r14/p4stats.py`): `mri_identify` returned
+  every format it can give (-1, 0-12, 14-18, 20-30, 32-34; 13, 19, 31 and 35 never come out of it);
+  each `isx` test said yes on cases made for it (curvature 5, Signa 7, Bruker 12, NIfTI-1 pair 6,
+  ANALYZE 4, ...); `dcm`: `IsDICOM` yes and no, its kept answer, `IsSiemensDICOM` 1 and 0 with 135
+  warnings, 16 sequences and 45 unhandled representations, with and without `FS_DICOM_DEBUG`.
+- Seed 1, 3,600 portable cases (`tests/fs_io_official.rs`): 3,243 identical (98 with memory digits),
+  357 hashed as SKIP, SHA-256 1caecb5a...; passing in debug and release and under AArch64's NaN
+  emulation (NAN_TRAP_ARM=1 with NAN_TRAP_DIR; 64 flips each).
+- What the first runs taught (fixed): (1) CTN's condition stack printed through larmorx-io's text
+  streams turned a broken VR code's byte into U+FFFD: the port dumps it byte for byte; (2) `IDisCurv`
+  and `is_signa` of a folder leave `errno` 21 from the failed read: `CFile` now keeps a failed read's
+  error (and fails a folder's reads on every platform).

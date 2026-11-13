@@ -90,3 +90,7 @@ Taken early from `fs.volume`'s item 3.1-39 for the surfaces' `MRIS::lta` (the or
   label: copied by default), FS-196 (a missing or smaller destination matrix: the copy kept by
   default), FS-197 (`LTAfree` of nothing: nothing freed, both modes), FS-198 (a copy from a missing
   matrix: the destination's dropped, both modes); FS-58 for `MRIboundingBox` of a header.
+- FS-206 (track A relay 13, with `fs.io`'s `.npy` reader): `MRI::Shape` of fewer than 3 extents reads
+  past its list; `Mri::new_beyond` takes what the list's storage holds there (`None`: memory never
+  written), `Mri::new` none. By default each missing extent is 1; with `reproduce` those values, 0
+  for memory never written (`docs/findings/freesurfer-io.md` Part 3).

@@ -120,3 +120,11 @@ official build's order): seed 7, the 3,000 cases of `xyzang`, `mvec` and `v3angl
 `--n 76000`): 3,000 identical with `reproduce`. Seed 1, 760 cases of 76 commands: 734 identical, 26
 not comparable, hash `2b67d14767130507cd9f5804c61af52fd736629169f68c74b6beaeb9821d338d`, checked with
 AArch64's NaN emulated in debug and release builds.
+
+Measured 2026-11-13 (track A relay 14: the command `fnvh`, FreeSurfer's FNV hashes of
+`include/fnv_hash.h` and `include/fnvhash.h`: `fnv_hash` drawn 0-4 times from a counter, `FnvHash`
+of 0-40 bytes, `fnv_add`, the printed value and the two `write`s' files): seed 7, the 1,000 `fnvh`
+cases of `--n 77000`: 1,000 identical with `reproduce` and with `fix`. Seed 1, 770 cases of 77
+commands: 747 identical, 23 not comparable, hash
+`ae473ef0c96b709d7b92307e24d7ad8e9779211f1e913e4f1876d0a85185e1d2`, checked with AArch64's NaN
+emulated in debug and release builds (8,330 and 28,616 flips).

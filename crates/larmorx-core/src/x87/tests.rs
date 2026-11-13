@@ -120,7 +120,7 @@ fn the_hardwares_conversions() {
     }
 }
 
-/// The FreeSurfer-like patterns as GCC 8.4.0 compiles them with FreeSurfer's flags.
+/// The `long double` patterns as GCC 8.4.0 compiles them at `-O3`.
 #[test]
 fn the_hardwares_patterns() {
     for (p, pat) in Pattern::ALL.iter().enumerate() {

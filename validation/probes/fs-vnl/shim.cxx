@@ -26,6 +26,7 @@
 #include <vnl/algo/vnl_real_eigensystem.h>
 #include <vnl/algo/vnl_svd.h>
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
+#include <vnl/vnl_fortran_copy.h>
 
 typedef double (*fv_cost)(void *ctx, const double *x, int n);
 
@@ -121,6 +122,29 @@ int fv_svd_f32(int r, int c, const float *m, float *u, float *w, float *v) {
   svd.V().copy_out(v);
   return 1;
 }
+// LINPACK's ssvdc as vnl_svd<float>'s constructor calls it (job 21, its workspaces; U, W = |s|, V copied
+// out as vnl_svd copies them), returning its info: vnl_svd keeps U, W and V whatever info is.
+long fv_ssvdc_f32(int r, int c, const float *m, float *u, float *w, float *v) {
+  long n = r, p = c, mm = std::min(n + 1L, p);
+  vnl_matrix<float> M(m, r, c);
+  vnl_fortran_copy<float> X(M);
+  vnl_vector<float> work(n, 0.0f), uspace(n * p, 0.0f), vspace(p * p, 0.0f), wspace(mm, 0.0f), espace(p, 0.0f);
+  long info = 0;
+  const long job = 21;
+  v3p_netlib_ssvdc_((float *)X, &n, &n, &p, wspace.data_block(), espace.data_block(), uspace.data_block(), &n,
+                    vspace.data_block(), &p, work.data_block(), &job, &info);
+  const float *d = uspace.data_block();
+  for (long j = 0; j < p; ++j)
+    for (long i = 0; i < n; ++i) u[i * p + j] = *d++;
+  for (long j = 0; j < p; ++j) w[j] = j < mm ? std::abs(wspace(j)) : 0.0f;
+  d = vspace.data_block();
+  for (long j = 0; j < p; ++j)
+    for (long i = 0; i < p; ++i) v[i * p + j] = *d++;
+  return info;
+}
+// EISPACK's pythag (tql2's), as VXL's f2c translation computes it.
+double fv_pythag(double a, double b) { return v3p_netlib_pythag_(&a, &b); }
+
 void fv_matrix_inverse_f64(int n, const double *m, double *out) {
   vnl_matrix<double> inv = vnl_matrix_inverse<double>(vnl_matrix<double>(m, n, n));
   inv.copy_out(out);

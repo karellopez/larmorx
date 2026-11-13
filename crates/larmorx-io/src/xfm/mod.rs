@@ -17,10 +17,10 @@
 //!   [`Transform`] and `transforms.c`'s arithmetic ([`concat_transforms`], [`transform_point`],
 //!   [`make_identity_transform`]); [`compute_transform_inverse`] by `gaussian.c`'s scaled
 //!   maximal-pivoting Gaussian elimination.
-//! - [`Dialect`]: the points where a program built on volume_io changed it (FreeSurfer 8.2.0's
-//!   copy reads only linear transforms, inverts with its own 4 x 4 routine and words some messages
-//!   its own way); [`Mni`] is volume_io's own behaviour. A replica of such a program supplies its
-//!   own dialect (FreeSurfer's: `larmorx-freesurfer`).
+//! - [`Dialect`]: the points where a program built on volume_io may change it (which transform
+//!   types it reads, its 4 x 4 inverse, the wording of its messages, how it reads a token and
+//!   expands `~user`); [`Mni`] is volume_io's own behaviour. A replica of such a program supplies
+//!   its own dialect, in its own crate.
 //!
 //! Not read: the displacement volume of a `Grid_Transform` (MINC volumes are not a larmorx format
 //! yet: the reader reports it, [`Dialect::read_grid_volume`]); not applied: thin-plate splines and

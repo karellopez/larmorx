@@ -2,7 +2,9 @@
 
 The check behind FreeSurfer's foundations' items 3.1-14 and 3.1-15 (`larmorx_io::xfm`,
 `larmorx_io::znz`, `larmorx_io::nifti::niftilib`, `larmorx_core::cscan`). Findings:
-`docs/findings/minc-xfm.md`, `docs/findings/nifti-znz.md`.
+`docs/findings/minc-xfm.md`, `docs/findings/nifti-znz.md` (the upstreams), and
+`docs/findings/freesurfer-permissive.md` (FreeSurfer's copies; this probe, which models them, is
+closed to FreeSurfer's clean-room implementers as that file is).
 
 ```
 bash build.sh <out>        # needs the unit oracle (oracles/freesurfer-8.2.0-unit) and tags/minc-1.5.1,

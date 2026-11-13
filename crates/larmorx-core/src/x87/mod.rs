@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //! The x87's 80-bit extended format, `long double` on x86-64 Linux, in software.
 //!
-//! Rust has no 80-bit floating-point type, but FreeSurfer (and other C and C++ programs built for
-//! x86-64 Linux) computes some sums, products and lengths in `long double`, which GCC evaluates
-//! with the x87 floating-point unit. A replica that must give the same bits needs the x87's
+//! Rust has no 80-bit floating-point type, but C and C++ programs built for x86-64 Linux compute
+//! some sums, products and lengths in `long double`, which GCC evaluates with the x87
+//! floating-point unit. A replica that must give the same bits needs the x87's
 //! arithmetic: [`F80`] is that arithmetic, written from Intel's description of the x87 (*Intel 64
 //! and IA-32 Architectures Software Developer's Manual*, volume 1, chapters 4 and 8: the extended
 //! format, the special encodings, the NaN rules, the masked responses) and IEEE 754's
@@ -43,9 +43,9 @@
 //! **Checked against the hardware** (`validation/probes/x87-extended`): every operation and
 //! conversion on seeded operands of many families (random bit patterns, normals of every exponent,
 //! cancellations, exact results and ties, denormals and the underflow and overflow boundaries,
-//! integers, special values and every unsupported encoding) and the arithmetic patterns of the
-//! FreeSurfer functions that compute in `long double`, compiled by GCC 8.4.0 with FreeSurfer's
-//! flags; the unit tests check the hardware's recorded hashes on every platform.
+//! integers, special values and every unsupported encoding) and six arithmetic patterns of
+//! `long double` code compiled by GCC 8.4.0 at `-O3`; the unit tests check the hardware's
+//! recorded hashes on every platform.
 
 pub mod cases;
 

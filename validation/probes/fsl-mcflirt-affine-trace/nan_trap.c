@@ -26,8 +26,10 @@ static int nsites;
 static uintptr_t exe_lo, exe_hi;
 // NAN_TRAP_ARM=1: after each SSE add, sub, mul, div or sqrt that made a NaN, the destination's
 // lanes that hold x86's default NaN (sign set) are given AArch64's default NaN (sign clear), so
-// the program computes as an ARM CPU would with this binary's instruction order.
-static int arm_mode;
+// the program computes as an ARM CPU would with this binary's instruction order. NAN_TRAP_ARM=exe:
+// only the instructions of the executable itself (not its shared libraries), so a driver can run a
+// port as on ARM beside an original library computing as on x86.
+static int arm_mode, arm_exe_only;
 static __thread int pend_reg = -1, pend_wide;
 static unsigned long flips;
 
@@ -53,7 +55,7 @@ static void on_fpe(int sig, siginfo_t *si, void *ctx) {
   uintptr_t ip = (uintptr_t)uc->uc_mcontext.gregs[REG_RIP];
   record(ip);
   pend_reg = -1;
-  if (arm_mode) {
+  if (arm_mode && (!arm_exe_only || (ip >= exe_lo && ip < exe_hi))) {
     const unsigned char *b = (const unsigned char *)ip;
     int pre = 0, rex = 0, i = 0;
     while (b[i] == 0x66 || b[i] == 0xF2 || b[i] == 0xF3) pre = b[i++];
@@ -135,6 +137,7 @@ __attribute__((constructor)) static void init(void) {
   if (!getenv("NAN_TRAP_DIR")) return;
   exe_range();
   arm_mode = getenv("NAN_TRAP_ARM") != NULL;
+  arm_exe_only = arm_mode && strcmp(getenv("NAN_TRAP_ARM"), "exe") == 0;
   struct sigaction sa;
   memset(&sa, 0, sizeof sa);
   sa.sa_flags = SA_SIGINFO;

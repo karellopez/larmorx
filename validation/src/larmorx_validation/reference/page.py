@@ -279,12 +279,13 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     command = str(meta.get("command", f"larmorx {p.group} {p.name}"))
 
     fn = code.function(repo, str(meta["python"]))
-    cl = code.command_line(repo, str(meta["command-line"]), p.name)
+    cl = code.command_line(repo, str(meta["command-line"]), p.name, command)
     ref.sources = sorted(
         {
             page.path.as_posix(),
             fn.path,
             cl.path,
+            *cl.extra,
             "crates/larmorx-core/src/cli.rs",
             "crates/larmorx-core/src/defects.rs",
             "crates/larmorx-cli/src/replica.rs",
@@ -333,6 +334,9 @@ def build(repo: Path, p: apipage.Program) -> Reference:
             if r.remark:
                 continue
             for s in r.options:
+                glued = next((g for g in cl.glued if s.startswith(g) and s != g), None)
+                if glued is not None and s not in accepted:
+                    s = glued  # `-Dname=value` names AFNI's `-D`
                 if s not in accepted:
                     problems.append(f"{where}: a row names `{s}`, which {cl.path} does not accept")
                 else:
@@ -438,9 +442,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append(what + "\n")
 
     body.append("## Command line {#command-line}\n")
-    syn = [f"larmorx {p.group} {s}" for s in cl.synopsis] or [f"{command} ..."]
-    if command != f"larmorx {p.group} {p.name}":
-        syn = [command + s[len(f"larmorx {p.group} {p.name}") :] for s in syn]
+    syn = cl.synopsis or [f"{command} ..."]
     body.append("```text synopsis\n" + "\n".join(syn) + "\n```\n")
     body.append(
         f"Everything after `{command}` is the original's command line: the arguments of "
@@ -457,8 +459,8 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     if cl.usage:
         usage = cl.usage.strip("\n")
         body.append(
-            f'<details class="usage"><summary><code>{p.name}</code>\'s usage text, as the clean '
-            f"room prints it</summary>\n\n```text\n{usage}\n```\n\n</details>\n"
+            f'<details class="usage"><summary><code>{p.name}</code>\'s usage text, as the '
+            f"{cl.port} prints it</summary>\n\n```text\n{usage}\n```\n\n</details>\n"
         )
 
     body.append("## Python {#python}\n")
@@ -500,8 +502,14 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         f"that does the same. The rows are checked against the code at every test run: the "
         f"options `{p.name}` accepts (`{cl.path}`) and the arguments of `{fn.public}` "
         f"(`{fn.path}`), whose defaults and descriptions are taken from it. Under each "
-        f"option, in grey, {software}'s own help for it.\n"
+        + (
+            f"option, in grey, {software}'s own help for it.\n"
+            if cl.words == "original"
+            else f"option, in grey, its line of the usage text the {cl.port} prints, in the "
+            f"{cl.port}'s own words.\n"
+        )
     )
+    help_label = software if cl.words == "original" else f"The {cl.port}'s usage"
     for t, rows in rows_by_table:
         with_default = len(t.header) > 1 and t.header[1].strip() == "Python"
         header = (
@@ -535,7 +543,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
                         helps.append(o.help)
             if helps:
                 note = note + "".join(
-                    f'<span class="opt-help">{software}: “{_html(h)}”</span>' for h in helps
+                    f'<span class="opt-help">{help_label}: “{_html(h)}”</span>' for h in helps
                 )
             row.append(links(note, page, problems))
             body.append("| " + " | ".join(_cell(c) for c in row) + " |")

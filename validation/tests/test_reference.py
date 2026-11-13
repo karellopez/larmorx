@@ -429,3 +429,127 @@ def test_validated_before_lists_the_earlier_ports(monkeypatch):
     assert problems == [
         "programs.py: VALIDATED_BEFORE names 'gone-record', which validation/tools.toml no longer has"
     ]
+
+
+# ------------------------------------------------------------------------------------------------
+# The command-line readers of the other families, one program each (the reference pages of
+# ANTs, AFNI, tedana, sdcflows and `mri hmc` are written from them)
+
+
+def _cl(rel: str, program: str, command: str):
+    from larmorx_validation.reference import code
+
+    cl = code.command_line(REPO, rel, program, command)
+    by = {s: o for o in cl.options for s in o.spellings}
+    assert {s for o in cl.options for s in o.spellings} <= cl.parsed
+    return cl, by
+
+
+def test_ants_table_of_options_denoise_image():
+    """ANTs' `opt("long", Some('s'))` table: both spellings, the values of the usage text (its
+    lines under an option give its other forms), the module's synopsis; the replica's words."""
+    cl, by = _cl(
+        "crates/larmorx-ants/src/cli/denoise_image.rs", "DenoiseImage", "larmorx ants DenoiseImage"
+    )
+    assert (cl.port, cl.words) == ("replica", "original")
+    assert by["-d"].spellings == ["-d", "--image-dimensionality"]
+    assert by["-d"].arg == "2/3/4"
+    assert by["--patch-radius"].arg == "1 | 1x1x1"
+    assert by["-h"].spellings == ["-h"] and by["--help"].spellings == ["--help"]
+    assert len(cl.options) == 12
+    assert cl.synopsis[0].startswith("larmorx ants DenoiseImage [-d 2/3/4] -i input")
+    assert cl.usage and cl.usage.startswith("COMMAND:")
+
+
+def test_ants_help_menu_registration():
+    """ANTs' help menu (`MenuOption`): ANTs' description of each option, its usages (a usage
+    may hold brackets), `-h` without a long name."""
+    cl, by = _cl(
+        "crates/larmorx-ants/src/cli/registration.rs",
+        "antsRegistration",
+        "larmorx ants antsRegistration",
+    )
+    assert by["--dimensionality"].help.startswith("This option forces the image")
+    assert by["-m"].arg.startswith("CC[fixedImage,movingImage,metricWeight,radius,")
+    assert " | MI[fixedImage" in by["-m"].arg
+    assert by["-x"].arg == "[fixedImageMask,movingImageMask]"
+    assert by["-h"].spellings == ["-h"]
+    assert cl.synopsis == [] and cl.usage is None
+
+
+def test_afni_usage_in_columns_tshift():
+    """An AFNI clean room's usage text in its own words: one option per line, several on one
+    line with their description under them, a description continued; AFNI's global options
+    (`-D` glued to its value); a spelling accepted through the prefix the parser compares."""
+    cl, by = _cl("crates/larmorx-afni/src/cli/tshift.rs", "3dTshift", "larmorx afni 3dTshift")
+    assert (cl.port, cl.words) == ("clean room", "port")
+    assert cl.synopsis == ["larmorx afni 3dTshift [options] dataset"]
+    assert (by["-TR"].arg, by["-TR"].help[:17]) == ("ddd", "use ddd as the TR")
+    assert by["-prefix"].help.endswith("unless -overwrite or AFNI_DECONFLICT says otherwise")
+    for m in ("-Fourier", "-linear", "-cubic", "-quintic", "-heptic", "-wsinc5", "-wsinc9"):
+        assert by[m].help == "interpolation method (default -Fourier)"
+    assert {"-overwrite", "-ok_1D_text", "-skip_afnirc", "-D"} <= set(by)
+    assert cl.glued == {"-D"} and cl.extra == ["crates/larmorx-afni/src/settings.rs"]
+    assert "-voxshift" in by  # refused by the parser, so a row must say so
+    assert "-verbose" in cl.parsed  # `-verb`, the prefix the parser compares
+
+
+def test_mri_hmc_as_mcflirt():
+    """`mri hmc`'s usage, read for mcflirt's page: spellings separated by commas, values in
+    brackets, the parser's lists of options; the synopsis with mcflirt's command."""
+    cl, by = _cl("crates/larmorx-mri/src/cli/hmc.rs", "mcflirt", "larmorx fsl mcflirt")
+    assert (cl.port, cl.words) == ("clean room", "port")
+    assert cl.synopsis == ["larmorx fsl mcflirt -in <infile> [options]"]
+    assert by["-out"].spellings == ["-o", "-out"] and by["-o"].arg == "<outfile>"
+    assert (by["-dof"].arg, by["-dof"].help) == ("<number of transform dofs>", "(default is 6)")
+    assert by["-cost"].arg.startswith("{mutualinfo,woods,")
+    assert {"-in", "-rmsrel", "-gdt", "-help"} <= set(by)
+
+
+def test_tedana_argparse_in_rust_t2smap():
+    """tedana's parser in Rust: the synopsis as Python's argparse formats it in 80 columns,
+    every option string, tedana's help, a hidden option, argparse's own help for -h and -v."""
+    cl, by = _cl("crates/larmorx-tedana/src/cli.rs", "t2smap", "larmorx tedana t2smap")
+    assert (cl.port, cl.words) == ("clean room", "original")
+    lines = cl.synopsis[0].split("\n")
+    assert lines[0] == "larmorx tedana t2smap [-h] -d FILE [FILE ...] -e TE [TE ...]"
+    # argparse breaks between parts only: a part longer than the line stands on its own
+    assert all(len(x) <= 78 or x.strip().count(" [") <= 1 for x in lines)
+    assert all(x.startswith(" " * len("larmorx tedana t2smap ")) for x in lines[1:])
+    assert by["--overwrite"].spellings == ["-f", "--overwrite"]
+    assert by["--masktype"].arg.startswith("{dropout,decay,none}")
+    assert by["--quiet"].help == "" and "--quiet" not in cl.synopsis[0]
+    assert by["-h"].help == "show this help message and exit"
+    assert by["--version"].help == "show program's version number and exit"
+
+
+def test_python_argparse_sdcflows():
+    """A Python program's argparse parser (sdcflows' BIDS app), read from its source: groups,
+    positionals at the synopsis' end, custom actions as values."""
+    cl, by = _cl("python/larmorx/sdcflows/app.py", "sdcflows", "larmorx sdcflows sdcflows")
+    assert (cl.port, cl.words) == ("replica", "original")
+    usage = " ".join(cl.synopsis[0].split())
+    assert usage.startswith("larmorx sdcflows sdcflows [-h] [-v]")
+    assert "bids_dir output_dir {participant,group}" in usage
+    assert by["-w"].spellings == ["-w", "--work-dir"] and by["-w"].arg == "WORK_DIR"
+    assert by["--participant-label"].arg.startswith("PARTICIPANT_LABEL [PARTICIPANT_LABEL")
+
+
+def test_port_words_are_named_as_the_ports(monkeypatch):
+    """A usage text in the port's own words is credited to the port, never to the original's
+    software; the usage block names the port that prints it."""
+    from larmorx_validation.reference import code, page
+
+    real = code.command_line
+
+    def own_words(repo, rel, program, command=None):
+        cl = real(repo, rel, program, command)
+        cl.words, cl.port = "port", "clean room"
+        return cl
+
+    monkeypatch.setattr(code, "command_line", own_words)
+    bet = next(p for p in apipage.read(REPO, API).programs if p.name == "bet")
+    md = page.build(REPO, bet).markdown
+    assert "in the clean room's own words" in md
+    assert "The clean room's usage: “" in md and "FSL: “" not in md
+    assert "usage text, as the clean room prints it" in md

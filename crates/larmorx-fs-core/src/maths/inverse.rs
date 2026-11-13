@@ -178,8 +178,7 @@ impl Process {
                 o
             }
         };
-        let finite;
-        if src.is_complex() {
+        let finite = if src.is_complex() {
             // [[A, -C], [C, A]]
             let k = 2 * n;
             let mut big = vec![0.0f32; k * k];
@@ -207,15 +206,15 @@ impl Process {
                     o.set_pair(r as i32 + 1, c as i32 + 1, re, im);
                 }
             }
-            finite = ok;
+            ok
         } else {
             let Some(inv) = self.real_inverse(&numbers_rm(&src), n) else {
                 return Ok(Returned::Nothing);
             };
             let ok = inv.iter().all(|v| v.is_finite());
             write_numbers(o, &inv);
-            finite = ok;
-        }
+            ok
+        };
         if !finite {
             return Ok(Returned::Nothing);
         }

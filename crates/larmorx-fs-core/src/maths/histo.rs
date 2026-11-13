@@ -2,6 +2,8 @@
 //! Histograms (spec §5, §21): the record, making and copying, arithmetic, smoothing, the
 //! searches, samples, totals and statistics, the robust Gaussian fit and the files. The
 //! operand orders of §21 (which NaN a sum keeps) are followed explicitly.
+// C's comparisons, NaN included: a negated comparison is FreeSurfer's test, not a style choice.
+#![allow(clippy::neg_cmp_op_on_partial_ord)]
 
 use larmorx_core::defects::{FS_18, FS_19, FS_20, FS_21, FS_22, FS_23, FS_24, FS_50, FS_51};
 
@@ -889,8 +891,8 @@ impl Process {
         if let (Some(f0), Some(l0)) = (first, last) {
             for _ in 0..101 {
                 let mut most = 0.0f64;
-                for b in f0 + 1..l0 {
-                    if filled[b] {
+                for (b, &f) in filled.iter().enumerate().take(l0).skip(f0 + 1) {
+                    if f {
                         continue;
                     }
                     let b = b as i32;
@@ -1870,17 +1872,16 @@ impl Process {
         let start = sse::add32(p as f32, sse::div32(10.0, s.bin_size));
         let start = self.to_int(f64::from(start));
         let mut v = self.histo_find_next_valley(&s, start);
-        let theta;
-        if v < 0 {
+        let theta = if v < 0 {
             v = self.histo_find_bin_with_count(&c, sse::narrow(q));
-            theta = c.bin(v);
+            c.bin(v)
         } else {
             let cp = sse::widen(self.hc(h, p));
             while sse::widen(self.hc(h, v)) < sse::mul64(cp, q) && v > p + 1 {
                 v -= 1;
             }
-            theta = sse::sub32(self.hb(h, v), self.hb(h, p));
-        }
+            sse::sub32(self.hb(h, v), self.hb(h, p))
+        };
         if z.nbins <= 0 {
             self.error_printf(codes::BAD_PARM, b"HISTOrobustGaussianFit: 0 length cdf");
             return Ok(RobustFit {

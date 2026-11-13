@@ -110,10 +110,11 @@ impl Process {
                 }
             }
             Some(v) => {
-                if !reproduce && (v.rows != cols || v.cols != cols) {
-                    if !self.fits("MatrixSVD", "V is not cols x cols", false) {
-                        return Ok(Returned::Nothing);
-                    }
+                if !reproduce
+                    && (v.rows != cols || v.cols != cols)
+                    && !self.fits("MatrixSVD", "V is not cols x cols", false)
+                {
+                    return Ok(Returned::Nothing);
                 }
                 v
             }
@@ -377,6 +378,12 @@ impl Process {
         out: Option<&mut Matrix>,
     ) -> Result<Returned<Matrix>, Stop> {
         let reproduce = self.mode().reproduce();
+        if out.is_some() && !reproduce {
+            self.note(
+                &FS_46,
+                "the result written into the given output (FreeSurfer returns a new matrix)",
+            );
+        }
         if m.rows < m.cols {
             let Some(t) = new_or(self.matrix_transpose(m, None)?) else {
                 return Ok(Returned::Nothing);

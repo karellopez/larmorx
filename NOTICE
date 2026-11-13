@@ -66,7 +66,7 @@ HouseholderSequence and Jacobi rotations of a 4 x 4 matrix) - Mozilla Public Lic
   Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL
   was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos, atan2, cbrt, tanh, powf, expf, logf, sinf, cosf, tanhf, cbrtf) - MIT License
+CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos, atan2, cbrt, tanh, hypot, powf, expf, logf, sinf, cosf, tanhf, cbrtf; hypot since 2026-11-11, for the confounds' part) - MIT License
   exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   log.c: Copyright (c) 2022 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   dint.h: Copyright (c) 2022 CERN. Author: Tom Hubrecht.
@@ -171,7 +171,13 @@ Gaussian filters, the minimum, maximum, rank, median and percentile filters with
 grey and binary morphology, label, sum_labels, center_of_mass, watershed_ift) in
 crates/larmorx-ndimage and python/larmorx/_ndimage_filters.py, affine_transform in
 crates/larmorx-interp, and scipy/linalg's inv of 4x4 matrices with its condition estimates in
-crates/larmorx-transform/src/scipy_linalg.rs and scipy_lapack.rs; for the field maps' part B)
+crates/larmorx-transform/src/scipy_linalg.rs and scipy_lapack.rs; for the field maps' part B;
+since 2026-11-11 also scipy/fft's single-precision transforms (SciPy 1.15.3's pocketfft and 1.18.1's
+ducc0, below), linalg.solve's 1 x 1 path and linalg.svd with the gesvd driver (_decomp_svd.py,
+src/_linalg_svd.hh), in crates/larmorx-confounds/src/scipy_fft/, dvars.rs and
+crates/larmorx-transform/src/numpy_linalg/gesvd.rs; since 2026-11-12 spatial/transform's
+Rotation.from_matrix and as_euler (_rotation_cy.pyx) and ndimage's center_of_mass, in
+crates/larmorx-confounds/src/motion.rs and python/larmorx/confounds/motion.py; for the confounds' part)
 - BSD-3-Clause
   Copyright (c) 2001-2002 Enthought, Inc. 2003-2024, SciPy Developers.
   All rights reserved.
@@ -218,7 +224,13 @@ drot, dgemm and nrm2 kernels on numpy's lstsq and on SciPy's and numpy's m x 2 S
 crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap; since 2026-11-09 also the Haswell
 dgemv_t kernel of numpy's float64 matrix-vector product, in crates/larmorx-core/src/numpy/dot.rs,
 and OpenBLAS's own dpotrf, dtrtri and dlauum with the BLAS kernels under SciPy 1.18.1's 4x4 inv, in
-crates/larmorx-transform/src/scipy_lapack.rs, for the field maps' part B) - BSD-3-Clause
+crates/larmorx-transform/src/scipy_lapack.rs, for the field maps' part B; since 2026-11-11, for the
+confounds' part, OpenBLAS 0.3.34-106-g446c436e (numpy 2.5.4's scipy-openblas64 0.3.34.106.0) and
+0.3.30: the level-3 driver (dgemm, dsyrk and dtrmm with the Haswell dgemm kernel's tile chains),
+dgemv, dger, dtrmv and the level-1 axpy, scal, copy, swap, iamax and nrm2 with their Haswell
+kernels, in crates/larmorx-core/src/numpy/gemm.rs and crates/larmorx-transform/src/openblas/;
+and OpenBLAS 0.3.28 and v0.3.31-22-g5ffbf38b (SciPy 1.15.3's and 1.18.1's scipy-openblas32: dgesvd's
+paths, 0.3.28's column-by-column dlarft), in crates/larmorx-transform/src/numpy_linalg/) - BSD-3-Clause
   Copyright (c) 2011-2014, The OpenBLAS Project
   All rights reserved.
 
@@ -305,7 +317,11 @@ crates/larmorx-transform/src/numpy_linalg/, and the extended-precision dot produ
 (LONGDOUBLE_dot) nibabel's get_qform takes, in crates/larmorx-io/src/nifti/nibabel_affine.rs; and,
 since 2026-11-09, for the field maps' part B, numpy's linear percentile and median, float32 exp,
 dot product and matrix-vector product, linspace and histogram, in crates/larmorx-core/src/numpy/
-and src/math/expf_numpy.rs)
+and src/math/expf_numpy.rs; and, since 2026-11-11, for the confounds' part, numpy 2.5.4's, 2.3.5's
+and 2.2.6's matmul and dot through OpenBLAS (cblasfuncs.c, matmul.c.src), linalg's svd, pinv and
+lstsq of any size (umath_linalg.cpp), the reductions and order statistics at the confounds' call
+sites, the complex64 product, float64 power and the casts, in crates/larmorx-core/src/numpy/,
+crates/larmorx-transform/src/numpy_linalg/ and crates/larmorx-confounds)
 - BSD-3-Clause
   Copyright (c) 2005-2025, NumPy Developers.
   All rights reserved.
@@ -347,7 +363,13 @@ dlalsd, dlascl, dlacpy and dgesdd's paths for m x 2 matrices, in
 crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap; since 2026-11-09 also the routines
 of SciPy 1.18.1's 4x4 inv beyond its LU path, LAPACK 3.12.0's dgecon, dtrcon, dpocon and dsycon
 with dlacn2, dlatrs, drscl and dlantr, dpotri, dsytrf, dsytf2, dsytri and dsytrs, in
-crates/larmorx-transform/src/scipy_lapack.rs, for the field maps' part B) - modified BSD licence
+crates/larmorx-transform/src/scipy_lapack.rs, for the field maps' part B; since 2026-11-11, for the
+confounds' part, the blocked QR and LQ factorisations and their generation and application (dgeqrf,
+dgelqf, dgeqr2, dgelq2, dlarft, dlarfb, dlarf, dlarf1f, dlarfg, dorgqr, dorglq, dorg2r, dorgl2,
+dormqr, dormlq, dorm2r, dorml2, dormbr, dorgbr), the bidiagonal reduction (dgebrd, dlabrd, dgebd2),
+the divide-and-conquer SVD (dbdsdc, dlasd0 to dlasd8, dlasdq, dlasdt, dlaed6, dlamrg, dlascl),
+dgesdd on its four thin paths, dgelsd on every path (dlalsd, dlasda, dlalsa, dlals0, dlasrt),
+dgesvd and dbdsqr's lower case, in crates/larmorx-transform/src/numpy_linalg/) - modified BSD licence
   Copyright (c) 1992-2023 The University of Tennessee and The University
                           of Tennessee Research Foundation.  All rights
                           reserved.
@@ -393,7 +415,10 @@ crates/larmorx-transform/src/scipy_lapack.rs, for the field maps' part B) - modi
 
 nitransforms 25.1.0 (coordinate mapping, transform chains, ITK transform loading; since 2026-11-09
 also the ITK text writer and asaffine, in python/larmorx/niworkflows/nitransforms.py, for the field
-maps' part B) - MIT License
+maps' part B; since 2026-11-12 also ITKLinearTransformArray.from_string, ITKLinearTransform's
+from_string and to_ras, FSLLinearTransform.from_ras with _fsl_aff_adapt and linear.load's
+one-transform case, in crates/larmorx-confounds/src/motion.rs and python/larmorx/confounds/motion.py,
+for the confounds' part) - MIT License
   Copyright (c) 2021 The NiPy developers
 
 nibabel 5.4.2 (orientation helpers, from_matvec, apply_affine; since 2026-11-08 also the scaled
@@ -403,7 +428,9 @@ nibabel_header.py and crates/larmorx-io; since 2026-11-08 also get_qform in x86-
 precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap; since 2026-11-11
 also the loading of ANALYZE 7.5 (SPM2) and MGH/MGZ images and MATLAB .mat sidecars of analyze.py,
 spm99analyze.py, spm2analyze.py, freesurfer/mghformat.py and the scaling of arrayproxy.py and
-volumeutils.py, in crates/larmorx-tedana/src/formats.rs) - MIT License
+volumeutils.py, in crates/larmorx-tedana/src/formats.rs; since 2026-11-12 also eulerangles.mat2euler,
+in crates/larmorx-confounds/src/nipy.rs and python/larmorx/confounds/_nipy.py, for the confounds'
+part) - MIT License
   Copyright (c) 2009-2019 Matthew Brett <matthew.brett@gmail.com>
   Copyright (c) 2010-2013 Stephan Gerhard <git@unidesign.ch>
   Copyright (c) 2006-2014 Michael Hanke <michael.hanke@gmail.com>
@@ -465,7 +492,10 @@ interpolation, in python/larmorx/niworkflows/sampling.py, for the field maps' pa
 
 niworkflows 1.15.4 (the interfaces and workflows sdcflows and fMRIPrep's field-map steps call, in
 python/larmorx/niworkflows/, since 2026-11-09, for the field maps' part B; niworkflows'
-nipreps.json shipped in python/larmorx/bids/config/) - Apache License, Version 2.0
+nipreps.json shipped in python/larmorx/bids/config/; since 2026-11-12 its confound interfaces and
+utilities (interfaces/confounds.py, utility.py, morphology.py, images.py' SignalExtraction, patches.py'
+RobustACompCor and RobustTCompCor) in python/larmorx/niworkflows/ and crates/larmorx-confounds, for the
+confounds' part) - Apache License, Version 2.0
   niworkflows
   Copyright 2021 The NiPreps Developers <nipreps@gmail.com>
 
@@ -473,7 +503,13 @@ nipreps.json shipped in python/larmorx/bids/config/) - Apache License, Version 2
   https://www.nipreps.org/community/licensing/
 
 nipype 1.12.0 (the command lines of the interfaces sdcflows runs, fname_presuffix, is_outlier and
-copy_header, in python/larmorx/_nipype.py, since 2026-11-09, for the field maps' part B) - Apache
+copy_header, in python/larmorx/_nipype.py, since 2026-11-09, for the field maps' part B; since
+2026-11-11 its algorithms/confounds.py (CompCor and its functions, ComputeDVARS, TSNR,
+NonSteadyStateDetector, FramewiseDisplacement, normalize_mc_params, combine_mask_files) in
+crates/larmorx-confounds, crates/larmorx-transform/src/numpy_linalg/gesvd.rs (fallback_svd,
+_full_rank) and python/larmorx/confounds/, and since 2026-11-13 nipypecli run (scripts/cli.py,
+instance.py, utils.py, utils/nipype_cmd.py and the interfaces' checks and messages) in
+python/larmorx/nipype/, for the confounds' part) - Apache
 License, Version 2.0
   Copyright (c) 2009-2016, Nipype developers
 
@@ -613,6 +649,94 @@ python/larmorx/niworkflows/header.py, since 2026-11-09) - BSD-2-Clause
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+nitime 0.12.1 (nitime/utils.py: fftconvolve, crosscov, autocov, autocorr; algorithms/autoregressive.py:
+AR_est_YW of order 1; numerically the same in nitime 0.11, fMRIPrep 25.2.6's), in
+crates/larmorx-confounds/src/nitime.rs, since 2026-11-11, and nipy 0.6.1
+(nipy/algorithms/registration/affine.py and scripting.py: threshold, rotation_vec2mat, to_matrix44,
+aff2rot_zooms and aff2euler, the motion parameters' NIPY source of nipype's FramewiseDisplacement), in
+crates/larmorx-confounds/src/nipy.rs and python/larmorx/confounds/_nipy.py, since 2026-11-12; for the
+confounds' part - BSD-3-Clause
+  nitime: Copyright (c) 2006-2011, NIPY Developers
+  nipy: Copyright (c) 2006-2024, NIPY Developers
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+      * Redistributions of source code must retain the above copyright
+         notice, this list of conditions and the following disclaimer.
+
+      * Redistributions in binary form must reproduce the above
+         copyright notice, this list of conditions and the following
+         disclaimer in the documentation and/or other materials provided
+         with the distribution.
+
+      * Neither the name of the NIPY Developers nor the names of any
+         contributors may be used to endorse or promote products derived
+         from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+pocketfft (as SciPy 1.15.3 vendors it: scipy/_lib/pocketfft) and ducc0's FFT (as SciPy 1.18.1 vendors
+it: subprojects/duccfft): the single-precision twiddle tables, the radix-2, 4 and 8 passes and the plans
+of SciPy's FFTs, in crates/larmorx-confounds/src/scipy_fft/, since 2026-11-11, for the confounds' part
+- BSD-3-Clause
+  Copyright (C) 2010-2023 Max-Planck-Society
+  Copyright (C) 2019 Peter Bell
+  All rights reserved.
+
+pandas 3.0.6 and 2.2.3 (pandas/_libs/src/parser/tokenizer.c: precise_xstrtod; parsers.pyx: the column
+conversions; read_csv's and to_csv's text and ujson's Buffer_AppendDoubleUnchecked as to_json formats
+doubles), in crates/larmorx-confounds/src/pandas.rs and python/larmorx/confounds/_tables.py, since
+2026-11-12; traits 7.2.0 (trait_errors.py, trait_base.py, trait_types.py, trait_handlers.py,
+trait_list_object.py: the validation and messages of the trait types nipype's interfaces use) and click
+8.5.0 (click/parser.py, click/exceptions.py: nipypecli's option processing and usage errors), in
+python/larmorx/nipype/_run.py, since 2026-11-13; for the confounds' part - BSD-3-Clause, each under
+these terms with its own copyright holders
+  pandas: Copyright (c) 2008-2011, AQR Capital Management, LLC, Lambda Foundry, Inc. and PyData
+  Development Team; Copyright (c) 2011-2026, Open source contributors.
+  traits: (C) Copyright 2005-2026 Enthought, Inc., Austin, TX
+  click: Copyright 2014 Pallets
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  3. Neither the name of the copyright holder nor the names of its
+     contributors may be used to endorse or promote products derived from
+     this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 CPython 3.12.16 (Lib/argparse.py, Lib/textwrap.py, Lib/json/encoder.py, Lib/shutil.py's
 get_terminal_size, Objects/floatobject.c, Objects/longobject.c and Python/pystrtod.c: options,
 usage, help and error messages, text wrapping, JSON with an indent, and the parsing and printing
@@ -680,7 +804,12 @@ fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampl
 fmriprep/utils/transforms.py), and fMRIPrep 25.2.7 (since 2026-11-09, for the field maps' part B:
 ReconstructFieldmap and DistortionParameters of fmriprep/interfaces/resampling.py in
 python/larmorx/transforms/fieldmap.py; the field-map steps of fmriprep/workflows/base.py and
-workflows/bold/ in python/larmorx/pipelines/larmorprepx/) - Apache License, Version 2.0
+workflows/bold/ in python/larmorx/pipelines/larmorprepx/; since 2026-11-12, for the confounds' part,
+fMRIPrep 25.2.7's and 25.2.6's fmriprep/interfaces/confounds.py (GatherConfounds, FilterDropped,
+RenameACompCor, aCompCorMasks with _binary_union, FSLMotionParams and FSLRMSDeviation in both
+releases' forms, FramewiseDisplacement) in python/larmorx/confounds/ and crates/larmorx-confounds,
+and init_bold_confs_wf of workflows/bold/confounds.py with ds_confounds of workflows/bold/base.py in
+python/larmorx/pipelines/larmorprepx/confounds.py) - Apache License, Version 2.0
   fMRIPrep
   Copyright The NiPreps Developers.
 

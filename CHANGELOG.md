@@ -50,6 +50,21 @@ The changes on `main` since 0.1.0rc1, for the next release.
   finds, where it raised `FileNotFoundError`.
 - **`t2smap` reads ANALYZE 7.5 and MGH/MGZ images** as tedana does through nibabel, in both
   implementations (`larmorx-gpl` 0.1.0rc1 refused them).
+- **fMRIPrep's confound estimation** (`larmorx.pipelines.larmorprepx.confounds.bold_confounds`): a BOLD run's
+  confounds as fMRIPrep computes them, its `desc-confounds_timeseries.tsv` and JSON (CompCor, DVARS, framewise
+  displacement, the motion parameters and their expansion, the tissue signals, the spike and cosine regressors),
+  every step ported exactly from fMRIPrep 25.2.7, nipype 1.12.0 and niworkflows 1.15.4 with numpy's, SciPy's,
+  pandas', nitime's and nipy's arithmetic; fMRIPrep 25.2.6's releases on request. Its steps are the library
+  `lx.confounds` and the confound steps of `lx.niworkflows`. fMRIPrep's own confounds files of 36 runs are
+  reproduced column by column with `upstream_defects="reproduce"`; by default the original programs' defects
+  that change a result are corrected and named (PIPE-41 to PIPE-82, PD-01 to PD-03, SCI-41).
+- **`larmorx nipype run`** (`lx.nipype.run`): nipype's `nipypecli run` for the 37 interfaces of fMRIPrep's
+  confound estimation, without nipype; its two defects corrected (PIPE-81, PIPE-82), `--upstream-defects
+  reproduce` giving nipype's command line.
+- **numpy's and SciPy's linear algebra in Rust**, bit for bit: OpenBLAS's level 1 to 3 routines on its Haswell
+  kernels and LAPACK 3.12.1's and 3.12.0's QR, LQ, bidiagonal, divide-and-conquer SVD and least-squares paths, as
+  numpy 2.5.4, 2.3.5 and 2.2.6 and SciPy 1.18.1 and 1.15 run them (`svd`, `pinv`, `lstsq`, SciPy's `gesvd`), and
+  SciPy's single-precision FFTs.
 
 ### Changed
 
@@ -76,6 +91,10 @@ The changes on `main` since 0.1.0rc1, for the next release.
   samples' value, not a failure). TED-01 leaves out only NaN first-echo means (an infinite mean is kept,
   as tedana keeps it). Each is named on one line, and `--upstream-defects reproduce` gives tedana's
   result.
+- **File names with a blank** (PIPE-80): the programs larmorx runs through nipype's command lines (the field
+  maps' and the confounds' ANTs, TOPUP and BET steps) get each file name whole, so a dataset, working directory
+  or output folder whose path holds a blank works; `--upstream-defects reproduce` keeps nipype's line and its
+  failure. The command lines `command.txt` records are nipype's, unchanged.
 
 ### Deprecated
 
@@ -98,6 +117,13 @@ The changes on `main` since 0.1.0rc1, for the next release.
   errors, "During handling of the above exception, another exception occurred"), the two Python warnings
   it left out (`overflow encountered in cast` for a value beyond float32's range, the temporal means'
   `invalid value encountered in reduce`) and numpy's own digits in the dropout thresholds' line.
+- `lx.skimage.ball` of a negative radius gives scikit-image's footprint (it gave an empty one below -0.5).
+- LAPACK's `DBDSQR` tolerance in `larmorx_transform::numpy_linalg` (numpy's SVD and least squares, the 3 × 3 SVD
+  of nibabel's header arithmetic, tedana's fits): the constant `TOLMUL` is now 2^6.625, correctly rounded, as
+  LAPACK computes it; a superdiagonal between the two values converged one sweep later. No record or golden
+  checksum changed.
+- The text files numpy's `savetxt` writes (CompCor's and DVARS' outputs, nipype's FD, `AddTSVHeader`,
+  `NormalizeMotionParams`) end their lines with `\n` on Windows too, as on Linux.
 
 ## [0.1.0rc1] - 2026-11-11
 

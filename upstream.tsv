@@ -81,3 +81,13 @@ toml-0.10.2	https://files.pythonhosted.org/packages/source/t/toml/toml-0.10.2.ta
 nilearn-0.14.1	https://files.pythonhosted.org/packages/source/n/nilearn/nilearn-0.14.1.tar.gz	sha256:6f7ec639be2c9e4a3625ebc4f25c3de31ae3af21331c8d03e27201c482609672	BSD-3-Clause	tags
 nilearn-0.11.1	https://files.pythonhosted.org/packages/source/n/nilearn/nilearn-0.11.1.tar.gz	sha256:a01df08fc6c8ded3cd6fb7a211634603ad46a6df780504b6d05222c2e7a972fe	BSD-3-Clause	tags
 freesurfer-8.2.0	https://github.com/freesurfer/freesurfer/archive/refs/tags/v8.2.0.tar.gz	sha256:bb1699f7655ebf0f3790db6a78af9532ea7c832c97fe5f71bfd9f0e9526d7e78	FreeSurfer-1.0	tags
+pandas-3.0.6	https://files.pythonhosted.org/packages/source/p/pandas/pandas-3.0.6.tar.gz	sha256:66b07ef7315a31bfe1089cd3d71a7de781c9dca986762d0b4fe7c0ef17465d10	BSD-3-Clause	tags
+pandas-2.2.3	https://files.pythonhosted.org/packages/source/p/pandas/pandas-2.2.3.tar.gz	sha256:4f18ba62b61d7e192368b84517265a99b4d7ee8912f8708660fb4a366cc82667	BSD-3-Clause	tags
+nitime-0.12.1	https://files.pythonhosted.org/packages/source/n/nitime/nitime-0.12.1.tar.gz	sha256:12cbf488b0655dc05aa18a0ca5982de970302604e461fc92e87ebd9b7539b6ff	BSD-3-Clause	tags
+nitime-0.11	https://files.pythonhosted.org/packages/source/n/nitime/nitime-0.11.tar.gz	sha256:e087bc7ee93d08a767ffae13b027cdd8da36754d7a202a4145661eaeaa85d3fd	BSD-3-Clause	tags
+nipy-0.6.1	https://github.com/nipy/nipy/archive/refs/tags/0.6.1.tar.gz	sha256:79babfd76618a3573a4d5920d1fe46829a19df92ff3b98efa16bd9a51f7a7610	BSD-3-Clause	tags
+numpy-2.2.6	https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.2.6.tar.gz	sha256:e29554e2bef54a90aa5cc07da6ce955accb83f21ab5de01a62c8478897b264fd	BSD-3-Clause	tags
+fmriprep-25.2.6	https://files.pythonhosted.org/packages/source/f/fmriprep/fmriprep-25.2.6.tar.gz	sha256:fdc0367339b384b1ed9628417fc58a3420f583043cf9b606f0130e68970a9e89	Apache-2.0	tags
+OpenBLAS-0.3.34-106-g446c436e	https://github.com/OpenMathLib/OpenBLAS.git	446c436e10450c348169808f1a6b3fae0925c9f7	BSD-3-Clause	tags
+OpenBLAS-0.3.31-22-g5ffbf38b	https://github.com/OpenMathLib/OpenBLAS.git	5ffbf38b41a1fe494d038efcb09cf22f4d527c22	BSD-3-Clause	tags
+OpenBLAS-0.3.28	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.28/OpenBLAS-0.3.28.tar.gz	sha256:f1003466ad074e9b0c8d421a204121100b0751c96fc6fcf3d1456bd12f8a00a1	BSD-3-Clause	tags

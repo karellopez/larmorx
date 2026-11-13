@@ -97,6 +97,10 @@ def _make_phase(path: Path) -> None:
     _save(path, wrapped.astype(np.float32), affine)
 
 
+def _make_acqp4(path: Path) -> None:
+    path.write_text("0 1 0 0.05\n0 1 0 0.05\n0 -1 0 0.05\n0 -1 0 0.05\n", encoding="utf-8")
+
+
 def _make_log(path: Path) -> None:
     path.write_text("start\nfirst value 1\nmiddle\nsecond value 2\nend\n", encoding="utf-8")
 
@@ -109,6 +113,10 @@ KINDS: dict[str, Kind] = {
     "points": Kind("eight points in millimetres, one `x y z` per line", _make_points),
     "points-moved": Kind("the same eight points moved by 2, −3 and 4 mm", _make_points_moved),
     "phase": Kind("a phase ramp along x, wrapped into [−pi, pi), on the head's grid", _make_phase),
+    "acqp4": Kind(
+        "the phase encodings of four volumes, two along +y and two along −y, read out in 0.05 s",
+        _make_acqp4,
+    ),
     "log": Kind("a text of five lines, two of them with the word `value`", _make_log),
 }
 

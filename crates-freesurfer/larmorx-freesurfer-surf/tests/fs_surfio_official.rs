@@ -2,14 +2,14 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (1,290 cases, thirty of each of
-//! the 43 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1290` on Linux x64 from the unit
-//! oracle's build (2026-11-13, relay 22: 1,253 lines identical, 37 counted, not compared, where
+//! official build's output lines for the probe's cases of seed 1 (1,320 cases, thirty of each of
+//! the 44 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1320` on Linux x64 from the unit
+//! oracle's build (2026-11-14, relay 23: 1,282 lines identical, 38 counted, not compared, where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
 //! `SKIP`), against the port's output with `reproduce` (a case the port marks with one of those
 //! defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`, `stl`, `tri`,
-//! `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii` and `gwr` cases run in a temporary
+//! `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii`, `gwr` and `mpf` cases run in a temporary
 //! folder of their own.
 
 #[path = "fs_surfio/cases.rs"]
@@ -29,12 +29,12 @@ const SKIP: [&str; 44] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "6eee3fd8f2ff1151c36a81a3f748dcf290272db722225b2274f55572a304decd";
+const OFFICIAL_SHA256: &str = "d09e84accbd867aaf99fcb4d8d0516924b60bf0d7f3ae04d851b083b1009ad2f";
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    for line in cases::generate(1, 1290) {
+    for line in cases::generate(1, 1320) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let refused = out.starts_with("EXIT ");
         let skip = ids.iter().any(|x| SKIP.contains(x))

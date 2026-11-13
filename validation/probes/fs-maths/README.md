@@ -42,7 +42,7 @@ Run (the unit oracle built):
 
 ```
 validation/probes/fs-maths/build.sh
-scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-maths/check.py --seed 7 --n 64000
+scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-maths/check.py --seed 7 --n 67000
 ```
 
 Measured 2026-11-12: seed 7, 49,000 cases: 48,185 of 48,185 comparable lines identical with
@@ -62,3 +62,16 @@ FS-22, 10 FS-16); the default differs on 4,271 lines, all with a defect's notice
 4 Gaussian draws and 10 entropies. Seed 1, 640 cases: 627 identical, 13 not comparable, hash
 `bb0da3dafb4cc3d5a3810a49f2e624a30912bf5302523e52a0b814c4af82ef04`. Complex matrices given to
 `minv` are invertible: FreeSurfer crashes on a singular one (FS-33).
+
+Measured 2026-11-13 (3.1-23's minimizers; NaNs and infinities in the double matrices): seed 7,
+67,000 cases of 67 commands: 66,042 of 66,042 comparable lines identical with `reproduce`, 958 not
+comparable (827 FS-22, 131 ITK-106: `OpenDFPMin`'s verbose L-BFGS printout of the vectors, which
+prints memory before them); the default differs only with a defect's notice, but 29 rotations, 1
+Gaussian draw and 3 entropies (the correctly rounded `sinf`, `cosf`, `log`). FreeSurfer crashes in 29
+of the 1,000 `OpenDFPMin` cases (FS-37: the line `CRASH`, the port's `reproduce` gives the same).
+Seed 1, 670 cases: 657 identical, 13 not comparable, hash
+`642c41982a861dcf793433c0d73274d9672611a0e36612a0312a31cd2c71c3b9`, checked with AArch64's NaN
+emulated (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, `NAN_TRAP_ARM=1` **with**
+`NAN_TRAP_DIR` set: without it the trap is not armed) in debug and release builds. The official code
+varies between runs only in FS-22 cases (`robust`, heap-dependent reads; one of 8 runs crashed in
+one): `robust` and `dfpmin` run in a child process.

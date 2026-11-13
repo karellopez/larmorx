@@ -308,15 +308,20 @@ gradient, weighted absolute values; the iteration callback `powell_iteration_fun
 function and the user callback; every evaluation and callback hashed; standard output and error
 captured byte for byte; `OpenDFPMin` in a child process, since FreeSurfer crashes there, FS-37),
 and NaNs and infinities among the double matrices' inputs (`dmat`, `dmmul`, `dliststats`).
-2026-11-13, seed 7, 67,000 cases of 67 commands: `reproduce` identical on 65,994 of 65,995
-comparable lines (the one other: an `acos` last bit, counted apart as before); 1,005 not comparable
-(870 FS-22, 135 `dfpmin` lines with VNL's L-BFGS printout of the vectors under `DIAG_VERBOSE`,
-ITK-106, which prints the double before each vector: a heap header in FreeSurfer, 0 in the port;
-956 of the 1,005 were identical anyway). The default differs only with a defect's notice, but the
-known correctly rounded `sinf`/`cosf`/`log`/`acos` last bits (30 lines). All 1,000 `powell`, 1,000
-`powell2` and 1,000 `dfpmin` comparable lines identical, including every evaluated point and the
-printed text. FreeSurfer **crashed** in 42 of the 1,000 `OpenDFPMin` cases (FS-37). Seed 1, 670
-cases (the recorded test, `tests/fs_maths_official.rs`): 657 identical, 13 not comparable.
+2026-11-13, seed 7, 67,000 cases of 67 commands: `reproduce` identical on 66,042 of 66,042
+comparable lines; 958 not comparable (827 FS-22, 131 `dfpmin` lines with VNL's L-BFGS printout of
+the vectors under `DIAG_VERBOSE`, ITK-106, which prints the double before each vector: a heap
+header in FreeSurfer, 0 in the port; 906 of the 958 were identical anyway). The default differs only
+with a defect's notice, but the known correctly rounded `sinf`/`cosf`/`log` last bits (33 lines).
+All comparable `powell`, `powell2` and `dfpmin` lines identical (1,000, 1,000 and 869), including
+every evaluated point and the printed text. FreeSurfer **crashed** in 29 of the 1,000 `OpenDFPMin`
+cases (FS-37; 42 of 1,000 in an earlier draw of the cases). Seed 1, 670 cases (the recorded test,
+`tests/fs_maths_official.rs`): 657 identical, 13 not comparable.
+
+The official code's own variation: run 8 times on the same 67,000 cases, one `robust` line
+differed between runs and one run crashed (signal 11) in another `robust` case: both are FS-22
+cases (`HISTOrobustGaussianFit` reading outside its arrays, already not compared), whose reads
+depend on the heap's layout. Since then `fsmaths` runs `robust`, like `dfpmin`, in a child process.
 
 On x86 with AArch64's NaN emulated (`nan_trap.c`, `NAN_TRAP_ARM=1`, `NAN_TRAP_DIR` set): the
 recorded test passes in debug and release builds; the probe's 67,000 lines are identical with and
@@ -374,7 +379,7 @@ on failure the same only `if (best_x.size() != 0)` ("an DJ addition"). So:
   equality when the term is below `f0`'s last bit, common with float costs) returns **empty**
   parameters; `OpenDFPMin` then either runs the next pass on them (the bridge copies nothing, the
   cost function reads stale stack floats, `lbfgs_` dereferences the null data pointer) or converts
-  them back (`ConvertFromVNLDoubleToFloat` reads the empty vector): a crash either way. Measured: 42
+  them back (`ConvertFromVNLDoubleToFloat` reads the empty vector): a crash either way. Measured: 29
   of 1,000 probe cases (`CRASH` lines, signal 11). `mrimorph.cpp` 6743 has `if (iter == 0) break;
   // parms can be corrupted if no step taken`.
 - a failed run without an improvement leaves `x` at the line search's last trial point (netlib's
@@ -397,7 +402,7 @@ crashes, FS-37); a NaN ratio (a cost of 0) continues too. With FS-37 corrected, 
 improve returns the same point and value forever, so the loop must compare with the previous pass:
 rule A (the intent written beside it; without it the corrected driver would not end). Default:
 continue only while the pass improved on the previous one by more than the tolerance relative to it
-(a NaN stops); `reproduce`: FreeSurfer's. Noted where the decisions differ (81 of 1,000 probe cases).
+(a NaN stops); `reproduce`: FreeSurfer's. Noted where the decisions differ (70 of 1,000 probe cases).
 
 ## FS-39: `OpenDFPMin` at the evaluation limit (rule A)
 

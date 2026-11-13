@@ -474,9 +474,13 @@ void run_minimizer(const std::string &cmd, const char *tmpfile)
   free_vector(p, 1, n);
 }
 
-// a case that may crash FreeSurfer (OpenDFPMin, FS-37) runs in a child process: its line, or
-// CRASH when the child dies of a signal (TIMEOUT after 600 s)
-void run_forked(const std::string &cmd, const char *tmpfile)
+void run_case(const char *tmpfile);
+bool in_child = false;
+
+// a case that may crash FreeSurfer runs in a child process (OpenDFPMin: FS-37; the robust
+// Gaussian fit, whose reads outside its arrays, FS-22, sometimes reach unmapped memory): its line,
+// or CRASH when the child dies of a signal (TIMEOUT after 600 s)
+void run_forked(const char *tmpfile)
 {
   int fd[2];
   if (pipe(fd) != 0) fail("pipe");
@@ -488,7 +492,9 @@ void run_forked(const std::string &cmd, const char *tmpfile)
     close(fd[0]);
     alarm(600);
     line_out.clear();
-    run_minimizer(cmd, tmpfile);
+    in_child = true;
+    pos = 0;
+    run_case(tmpfile);
     size_t off = 0;
     while (off < line_out.size()) {
       ssize_t w = write(fd[1], line_out.data() + off, line_out.size() - off);
@@ -519,6 +525,10 @@ void run_forked(const std::string &cmd, const char *tmpfile)
 void run_case(const char *tmpfile)
 {
   std::string cmd = next();
+  if (!in_child && (cmd == "dfpmin" || cmd == "robust")) {
+    run_forked(tmpfile);
+    return;
+  }
   if (cmd == "smooth") {
     HISTOGRAM *h = geth();
     float s = getf();
@@ -1007,7 +1017,7 @@ void run_case(const char *tmpfile)
     run_minimizer(cmd, tmpfile);
   }
   else if (cmd == "dfpmin") {
-    run_forked(cmd, tmpfile);
+    run_minimizer(cmd, tmpfile);
   }
   else
     fail("unknown case");

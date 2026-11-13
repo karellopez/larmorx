@@ -4,7 +4,7 @@
 lines; the behaviour is in `specs/freesurfer-maths.md`). Written by the replica author of queue
 items 3.1-23 and 3.1-24 (FreeSurfer's foundations, track A). Defect IDs FS-13 to FS-24 (this
 part 1), FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), FS-34 to FS-39 (part 3) and FS-40 to
-FS-49 (part 4, the rest of item 3.1-24), decided by rules A to D (CLAUDE.md, D13); the
+FS-49 (part 4, the rest of item 3.1-24) and FS-50 to FS-51 (part 5, the histograms' NaN and infinite inputs), decided by rules A to D (CLAUDE.md, D13); the
 register's entries are in the orchestrator's handoff. Every claim below is from the source of the 8.2.0 tag and, where a number is given, from
 the probe `validation/probes/fs-maths/` (FreeSurfer's own functions from the unit oracle's build).
 
@@ -587,3 +587,97 @@ after an `ERANGE` read prints no `Numerical result out of range` when the file s
 - **LINPACK's `ssvdc` never returning** (`larmorx_core::vnl_svd_f32`): the port loops on the matrix
   above as VNL does. A report of the loop, and the `info` of a failure (`vnl_svd_f32` returns `None`
   without it; the double version has `vnl_svd_info`), would let FS-48 follow VNL exactly.
+
+# Part 5: the histograms with NaN and infinite inputs (item 3.1-23, track A relay 7)
+
+Defect IDs FS-50 and FS-51. The probe's histogram cases now carry NaNs (quiet and signalling, both
+signs, with payloads) and infinities in about a third of the histograms (counts, bin values between
+the ends, the bin size, minimum or maximum) and in the scalar inputs (samples, values to find, scale
+and offset, thresholds, sigma), from a second generator that never draws from the first, so every
+other command's cases are as before (`specs/freesurfer-maths.md` §22).
+
+## The measurement, part 5
+
+`check.py --seed 7 --n 75000` (2026-11-13): 75,000 cases of 75 commands. The port with `reproduce`:
+**73,035 of 73,035 comparable lines identical**; 1,965 not compared (`msvd` 464, `startpeak` 314,
+`robust` 306, `meig` 194, `nextpeak` 152, `dfpmin` 125, `mrdbin` 119, `msvdinv` 74, `mpinv` 67,
+`nextvalley` 41, `prevvalley` 40, `cdf` 29, `abs` 24, `mregion` 9, `prevpeak` 7): memory FreeSurfer
+does not own or never wrote (FS-22, FS-16, FS-42, FS-49, ITK-106, ITK-110, ITK-111; with NaN inputs
+FreeSurfer's bin number -2147483648 reads or writes 8 GiB below the array: the probe's `CRASH` lines,
+`HISTOabs` and the cumulative distributions writing, the robust fit and the searches reading) and the
+313 non-finite matrices of FS-47 and FS-48 (as in part 4). The default differs from FreeSurfer only
+with a defect's notice (among the histograms FS-12 456, FS-19 481, FS-20 311, FS-18 1,000, FS-50 117,
+FS-17 77), but for 8 rotations, 9 entropies and 1 Gaussian draw (the correctly rounded `sinf`,
+`cosf`, `log`). The non-finite subset alone (16,968 histogram cases with a NaN or an infinity):
+16,575 of 16,575 comparable identical. Seed 1, 750 cases: 723 identical, 27 not compared, hash
+`b6452da0...` (`tests/fs_maths_official.rs`), passing with AArch64's NaN emulated (nan_trap.c,
+`NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`) in debug and release builds; the port's lines for the 16,968
+non-finite cases are the same with and without the emulation in both modes.
+
+## The histograms' NaN operands (measured; a porting trap, not a defect)
+
+GCC 8.4.0 compiled `histo.cpp`'s arithmetic with commutative operands swapped and some loops
+vectorised (the unit oracle's `histo.cpp.o`); the values are the same, but of two NaNs SSE keeps the
+first operand's, and Rust's `+` leaves the order to LLVM (it differs between builds and targets), so
+every operation where two NaNs, an infinity and its negative, or 0 and an infinity can meet goes
+through `sse` in the official order (`specs/freesurfer-maths.md` §21):
+
+- `HISTOadd` (`histo.cpp` 402-424, `*pcdst++ = *pc1++ + *pc2++`): with a separate output and 4 or
+  more bins, `addps` with `h1`'s counts as the destination, then the 1 to 3 bins left `h2 + h1`,
+  `h2 + h1`, `h1 + h2` (the tail's loads alternate); with the output one of the inputs (the alias
+  check of the vectorised loop fails) or 3 bins or fewer, one bin at a time `h1 + h2`. FreeSurfer's
+  callers add in place (`HISTOadd(h1, h2, h1)`: `mrisurf_mri.cpp` 8163, 8175, 8994, 9006,
+  `mrihisto.cpp` 169; `HISTOadd(h1, h2, h2)`: `mrihisto.cpp` 1328, `gca.cpp` 15590, 15600, 16513,
+  16522): `histo_add_into_first`, `histo_add_into_second`.
+- `HISTOtotalInRegion` (1250-1260) and `HISTOmakePDF`'s total: vectorised sums in blocks of four,
+  `T + c0`, `T + c1`, `c2 + T`, `c3 + T` and `c0 + T`, `T + c1`, `c2 + T`, `T + c3` (`sse::sum_blocks`).
+- `HISTOlinearScale` (1425-1437): `max` as `offset + (max × scale)` and the bin size `scale ×
+  bin_size`; `HISTOsoapBubbleZeros` (1886-1917): the middle bins' `(c[b+1] + c[b] + c[b-1]) / 3` as
+  `((c[b] + c[b+1]) + c[b-1]) / 3`; `HISTOcorrelate` (1336-1362) and
+  `histoComputeLinearFitCorrelation` (1364-1394): the products in the destination (`(c2 × c1) + Σ`);
+  `HISTOfillHoles`' and the soap bubble's `/ 2` as `× 0.5`.
+- `HISTOabs`' bin values `b × bin_size` with an infinite bin size: `0 × ∞` is the default NaN (sign set
+  on x86, clear on AArch64): through `sse` on every platform, as `HISTObins` and `HISTOinit` for one bin.
+
+One translation error the NaNs found: `HISTOfindCurrentPeak`'s backward scan (1179-1196) skips a bin
+with `if (center_val < min_count) continue;`, which the port had written as `center >= min_count`:
+the same for numbers, but a NaN count is a candidate in FreeSurfer (its comparisons with the window
+all false, so it is a peak). Fixed (37 of 16,968 non-finite cases had differed).
+
+## FS-50: `HISTOabs` of an infinite range (rule B: a clear error)
+
+`histo.cpp` 1818-1842: `HISTOrealloc(habs, nint(ceil((mx - mn) / h->bin_size) + 1))` with an
+infinite largest absolute value (an infinite bin value), or a bin size of 0 or NaN, converts an
+infinity or a NaN to `int` (undefined; `cvttsd2si` gives -2147483648, FS-12): `calloc` of
+-2147483648 floats fails and `HISTOalloc` ends the program, `Cannot allocate memory` and
+`HISTOalloc(-2147483648): could not allocate histogram`, status 254 (measured: the probe's `EXIT 254`
+lines, `abs` and the cumulative distributions, which start with `HISTOabs`). FS-12's correction
+(saturation) would ask for 2³¹ bins, 16 GiB (measured: an unboxed run reached about 70 GB before the
+correction existed). The default ends the program with an error that names the cause, `HISTOabs:
+absolute values from <mn> to <mx> in bins of <bin_size> need <n> bins: outside the int range (an
+infinite range, or a bin size of 0 or NaN)`, status 252 (`ERROR_BADPARM`); `reproduce` gives
+FreeSurfer's. A NaN bin value is never the largest or smallest (`fabs(NaN) > mx` is false), so it
+never causes this.
+
+## FS-51: the robust Gaussian fit's search over sigma that cannot advance (a hang, never reproduced)
+
+`histo.cpp` 1717-1748: `for (sigma = delta_sigma; sigma <= max_sigma; sigma += delta_sigma)` with
+`delta_sigma = h->bin_size / 10` and `max_sigma = habs->nbins * habs->bin_size / 2`: with an
+infinite bin size both are infinite (the bin size `<= 0` check lets it through), `inf <= inf` holds
+and `inf + inf` stays infinite, so FreeSurfer never returns (measured: the probe's `TIMEOUT` lines,
+4 of seed 7's robust fits); a bin size so small that a tenth of it rounds to 0 stops the search the
+same way. Both modes (the hang is never reproduced): the error `HISTOrobustGaussianFit: the bin size
+<s> gives no search over sigma (steps of <d>)`, status `ERROR_BADPARM`, the offset set and sigma
+not. FreeSurfer's callers (`mri_normalize.cpp` 1846, `gca.cpp` 11677, `mrisurf_mri.cpp` 8169, 8177,
+9000, 9008, `gcamorph.cpp` 16965, `mrifilter.cpp` 5508: histograms of intensities) pass finite bin
+sizes, so no default path is known to reach it.
+
+## The probe's fork and the shared file offset (a probe finding)
+
+Every histogram case now runs in a child process (`fsmaths.cpp`'s `run_forked`). Where FreeSurfer's
+code ends the child with `exit()` (FS-50's `HISTOalloc`), glibc's exit flushes the stdio streams the
+child inherited, and the flush of an input stream sets the file offset to the stream's logical
+position; the offset is shared with the parent, whose stream had read ahead, so the parent read the
+following cases again (each `EXIT` line followed by a repeated one, every later line misaligned).
+`fsmaths` now reads every case before the first child (the earlier forked commands never ended
+with `exit()`, so their measurements stand).

@@ -104,3 +104,12 @@ FreeSurfer does not own or never wrote, and 313 non-finite matrices the port ref
 only with a defect's notice but for 8 rotations, 1 Gaussian draw and 10 entropies. Seed 1, 750 cases:
 723 identical, 27 not comparable, hash `6cebc7a8e9a749ae619547d19bba0d991eb2c10efbbaf1cf46b65f5c0d5a6470`,
 checked with AArch64's NaN emulated in debug and release builds.
+
+Measured 2026-11-13 (the histograms with NaN and infinite inputs, every histogram case in a child
+process): seed 7, 75,000 cases of 75 commands: 73,035 of 73,035 comparable lines identical with
+`reproduce`, 1,965 not comparable (memory FreeSurfer does not own or never wrote, now also its
+bin numbers from NaNs, and the 313 non-finite matrices); the default differs only with a defect's
+notice but for 8 rotations, 1 Gaussian draw and 9 entropies. Of the 16,968 histogram cases with a
+NaN or an infinity, 16,575 of 16,575 comparable identical. Seed 1, 750 cases: 723 identical, 27
+not comparable, hash `b6452da0610342e6ff5272ef67167f555327114b533cbaba53ac23a809fd270f`, checked with
+AArch64's NaN emulated in debug and release builds.

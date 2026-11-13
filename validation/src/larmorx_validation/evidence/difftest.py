@@ -312,6 +312,8 @@ RUN_NOTES: dict[str, str] = {
     "2026-11-03-fsl-maths-original": "fslmaths and fslstats in one run",
     "2026-11-08-t2smap-replica-check": "the check of the final build",
     "2026-11-09-fieldmaps-b-noavx512": "numpy's AVX-512 kernels off",
+    "2026-11-12-confounds-check": "the check of the final build",
+    "2026-11-12-confounds-check-noavx512": "the check of the final build, numpy's AVX-512 kernels off",
 }
 
 #: "larmorx" in a sentence names LARMORX (the project): not in code, a path, a package's or a

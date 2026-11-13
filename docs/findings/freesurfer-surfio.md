@@ -1455,3 +1455,55 @@ mechanisms behind the defects:
   promoted to `double` and divided in `double`, stored as `float` (one rounding of the exact
   quotient's double); the volume reader's `(float) gifti_get_DA_value_2D(...)` is inlined as direct
   `cvtsi2ss` / `cvtsd2ss` conversions (one rounding either way, the same `float`).
+
+## 25. Queue item 3.1-51's leftovers: the vertex-to-voxel table, the autocorrelations, the kernel smoothing, surface RAS to voxel (relay 23)
+
+Ported: `src/props9.rs` (PROVENANCE row `props9`); behaviour in `specs/freesurfer-surfio.md`
+§112-114. `mrisurf_metricProperties.cpp` 11683-11766 (`VoxelFromSRASmatrix`, `mriSurfaceRASToVoxel`,
+under `MATRIX_ALLOCATION`, 1 in `mrisurf_base.h` 271), 12508-12604 (`MRISarN`), 12610-12758
+(`MRISsmoothKernel`), 12765-12850 (`MRISar1`), 12857-12895 (`MRIScrsLUT`, `MRIScrsLUTFree`);
+fs.surf's `mrisurf_vals.cpp` 3134-3220 (`SetSurfHopListAlloc`, `SurfHopListFree`, `SetSurfHopList`)
+taken early. Callers: `mri_glmfit` (`MRISar1` 1832, 2033; `MRISarN` 2054; `MRIScrsLUT` 4101),
+`mrisurf_mri.cpp` 5322 (`MRIScrsLUT`); `MRISsmoothKernel` and `mriSurfaceRASToVoxel` have none, and
+nothing assigns `VoxelFromSRASmatrix`. Neither recon-all nor fMRIPrep reaches them.
+
+- **Serial loops**: `MRISarN`'s and `MRISsmoothKernel`'s loops are `#pragma omp parallel for
+  if_ROMP(experimental)`; `ROMP_if_parallel1(ROMP_level_experimental)` is `1 >= romp_level` and
+  `romp_level` starts at `ROMP_level_assume_reproducible` (3): always serial, so the hop lists'
+  `undefval` writes have no race.
+- **Operand orders** (the unit oracle's object code, sections `.text._Z7MRISar1...`,
+  `..._Z7MRISarN..._omp_fn.37`, `..._Z16MRISsmoothKernel..._omp_fn.39`, `..._Z20mriSurfaceRASToVoxel...`):
+  `sumsqvtx += valvtx * valvtx` (`addsd` into the sum); the neighbour's value loaded first,
+  `sumsqnbr += valnbr * valnbr`, `sumsqx += valvtx * valnbr` (`valvtx` the destination); `sqrt(vtxvar
+  * nbrvar)` compiled `nbrvar * vtxvar` (`mulsd 0x80(%rsp),%xmm0` with `nbrvar` in `xmm0`); `arsum +=
+  term` compiled `term + arsum` (`addsd 0x50(%rsp),%xmm3`); `sqrt` called (glibc's wrapper: no
+  `errno`, its argument never below 0); the kernel's `kvsum += vtxval * kern[h]` compiled
+  `vtxval * kern + kvsum`, `ksum += fabs(kern[h])` compiled `fabs(kern) + ksum` (`fabs` called);
+  `mriSurfaceRASToVoxel`'s new way left to right with each element the destination of its product;
+  `closeEnough`'s `maxss` (the second operand when the first is not greater) and its comparisons in
+  `double`.
+- **FS-525 / FS-534**: `MRIFseq_vox` is `((float *) mri->slices[s + f depth][r])[c]`: the row pointer
+  steps by the volume's own voxel size, the column by 4 bytes. A `MRI_UCHAR`, `MRI_SHORT` or `MRI_INT`
+  volume read so gives floats made of other voxels' bytes; for a type smaller than a float the later
+  columns land past the volume's chunk (FS-534: heap contents read, heap corrupted by the writes; the
+  probe's official runs crash in some such cases). The port's reproduce reads the bytes inside the
+  chunk and gives 0 outside; the probe counts FS-534's cases.
+- **FS-526**: line 12728 `kvsum += (vtxval * kern[nthhop])` and 12730 `ksum += fabs(kern[nthhop])`
+  use `kern` (allocated by `calloc` at 12649, filled only from `globkern`) where `vkern` (12705-12706)
+  holds the vertex's weights; the object code loads `kern` (`movsd (%rax,%rsi,8),%xmm0` from the
+  pointer at `0x40(%rsp)`).
+- **FS-527**: line 12751 `MRIFseq_vox(out, 1031, 0, 0, 0)`, a debugging print left in.
+- **FS-528**: 12860 allocates `crslut` before the size check at 12863; the early return leaks it.
+- **FS-529**: the `// Zero the output` comment at 12642 has no code under it. Kept (rule C): no
+  caller passes an output, and a caller that did would see its values where nothing is computed.
+- **FS-530**: `SetSurfHopListAlloc` (3134) with `nHops` 0 allocates zero-length arrays and
+  `SetSurfHopList` writes `nperhop[0]` and `vtxlist[0][0]` (3181-3182): `vtxlist` is a zeroed
+  zero-length allocation, so `vtxlist[0]` is `NULL` and the write faults; a negative count makes
+  `calloc` fail and the first write faults. `MRISarN` with `N` 0 first writes frame 0 of a volume of
+  no frames (12559).
+- **FS-531**: 11754-11757: `if (closeEnough(ox,nx) || ...) { fprintf(stderr, "%s:%d not same
+  answer\n", ...); *(int*)-1 = 0; }`: the condition is the negation of the intended one.
+- **FS-532**: `VoxelFromSRASmatrix` is defined `NULL` at 11685 and never assigned; with the new way
+  tried, `VoxelFromSRASmatrix->type` (11706) faults; with the old way alone, `MatrixMultiply(NULL,
+  ...)` prints `MatrixMultiply(): m1 is null` and its break line and `ErrorExit`s (status 252,
+  `ERROR_BADPARM`); a refused product returns `NULL` and `V3_X(vv)` (11746) faults.

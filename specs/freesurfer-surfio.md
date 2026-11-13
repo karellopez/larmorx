@@ -3717,3 +3717,131 @@ outputs; the volume's extent, frames, type, intent, version, repetition time, co
 voxels. Counted, not compared: FS-521 (memory never written). FS-398's and FS-523's cases compare as
 FreeSurfer's crash; fs.io's FS-214 address written `(nil)` on both sides. Observed (relay 22): the
 probe README. The defaults are checked by `tests/gifti_writers.rs` (each against `reproduce`).
+
+## 112. Volumes of one voxel per vertex: autocorrelation and kernel smoothing (queue item 3.1-51; relay 23)
+
+A volume "of one voxel per vertex" has width x height x depth equal to the surface's vertex count
+(products in `int`); vertex `v` is the voxel at column `v mod width`, row `(v / width) mod height`,
+slice `v / (width height)` (columns fastest). Values are read and written as 32-bit floats at the
+voxel's place (FS-525 below); sums are in `double`, each value made `double` first; NaN operands
+propagate as x86-64 SSE2 does (the first operand's payload, quieted; 0/0 the default NaN with its
+sign bit set), the operand order being the one stated.
+
+**112.1 The vertex-to-voxel table** (`MRIScrsLUT(surf, vol)`): the three lists (column, row, slice)
+of the vertices in that numbering; a volume of another voxel count: `ERROR: MRIScrsLUT: surf/src
+dimension mismatch.` on standard output, no table (FS-528: FreeSurfer leaks the table it began).
+`MRIScrsLUTFree` returns 0.
+
+**112.2 Hop lists** (`SetSurfHopList(centre, surf, n)`): list 0 holds the centre; list `h` (1 to
+`n - 1`) holds, in order, the neighbours (each vertex's first `vnum` neighbours, ripped ones
+included) of the vertices of list `h - 1`, taken in their list order, that no list holds yet. Then
+every listed vertex's `undefval` is set to its list number (the vertices in no list keep theirs).
+`SurfHopListFree` returns 0. FS-530: fewer than one hop: FreeSurfer writes into empty lists and the
+program crashes; by default refused (`SetSurfHopList: <n> hops: at least 1 is needed` on standard
+error, no list).
+
+**112.3 The variance and cross term.** A vertex's sum of squares over the frames,
+`s = s + x * x` frame by frame from 0; a vertex whose sum is exactly 0 is skipped (a NaN sum is
+not). Its variance `s / nframes`. With a neighbour: frame by frame `q = q + y * y` (the neighbour's
+value `y`) and `p = p + x * y`; a neighbour whose `q` is exactly 0 is skipped; otherwise the term
+`(p / nframes) / sqrt(nbrvar * vtxvar)` with `nbrvar = q / nframes` (the product in that order;
+`sqrt` correctly rounded, no `errno`), added as `term + sum`. A vertex or neighbour is also skipped
+when ripped, or when a mask volume is given and its voxel there, frame 0 (`MRIgetVoxVal`, made
+`double`) is below 0.5.
+
+**112.4 `MRISar1(surf, src, mask, ar1)`**: `src` not of one voxel per vertex: `ERROR: MRISar1:
+Surf/Src dimension mismatch.` on standard output, `NULL`. The output: the given volume, else a new
+one-frame `MRI_FLOAT` volume of `src`'s geometry (`MRIcloneBySpace`, zeros). For each vertex in order
+(skipped as §112.3), the mean `sum / count` over its first `vnum` neighbours (skipped as §112.3), in
+`double`, stored as a float at its voxel, frame 0, when the count is not 0.
+
+**112.5 `MRISarN(surf, src, mask, arN, N)`**: the same with `ERROR: MRISarN: Surf/Src dimension
+mismatch.`; the new output has `N` frames. For each vertex (skipped as §112.3): frame 0 set to 1;
+its hop lists (§112.2, `N` hops; their `undefval`s set); for each hop `h` from 1 to `N - 1` the mean
+term over that list's vertices (skipped as §112.3) stored in frame `h` when any counted. FS-530:
+`N` below 1: FreeSurfer crashes at the first vertex not skipped (a new output of `N` frames is made
+first: 0 frames for 0, `src`'s frames for a negative `N`); by default refused (`ERROR: MRISarN: <N>
+hops: at least 1 is needed` on standard output, `NULL`).
+
+**112.6 `MRISsmoothKernel(surf, src, mask, mrikern, globkern, &shl, out)`**:
+1. Both kernels given: `ERROR: MRISsmoothKernel(): cannot spec both mrikern and globkern`, `NULL`.
+2. `src` not of one voxel per vertex: `ERROR: MRISsmoothKernel(): Surf/Src dimension mismatch.`,
+   `NULL`.
+3. No output: a new `MRI_FLOAT` volume of `src`'s geometry and frames; the output `src` itself:
+   `ERROR: MRISsmoothKernel(): cannot run in-place`, `NULL`; a given output is not cleared (FS-529,
+   kept: the vertices skipped keep its values).
+4. `nhops`: the per-vertex kernel's frames, or the global kernel's rows (0 without either);
+   `nhops = <n>`. The weights: the global kernel's first column, rows 1 to `nhops` (as `double`).
+5. FS-530: `nhops` below 1: FreeSurfer crashes making the hop lists (when it makes them); by default
+   refused (`ERROR: MRISsmoothKernel(): <n> hops: at least 1 is needed`, `NULL`).
+6. Without hop lists from an earlier call: `Allocating shl <nv>`, the hop lists of every vertex in
+   order (§112.2, `nhops` hops, setting `undefval`s), kept for the next call; `Done allocating shl
+   <nv>, <s> sec` (`%g` of the elapsed milliseconds / 1000).
+7. `Starting loop over <nv> vertices`. For each vertex not ripped or masked (§112.3), each frame:
+   over the hops `h` and their vertices not ripped or masked, `k = value * w_h + k` and, for frame 0
+   only, `a = |w_h| + a` (`a` kept for the later frames); when any counted, `k / a` stored as a float
+   at the vertex's voxel and frame. FS-526: with a per-vertex kernel FreeSurfer reads each vertex's
+   weights (voxel `(vertex, 0, 0, h)`) but weighs by the global weights, all 0 then: every stored
+   value is 0/0, NaN; by default the vertex's own weights are used. FS-533: hop lists from an earlier
+   call with fewer hops than `nhops`: FreeSurfer reads past them; both modes count the missing hops as
+   empty (noted).
+8. An empty line, `Finished loop over <nv> vertices, <nhops> hops, t=<s> sec`, `vtxval <x>` (`%g` of
+   the output's value at column 1031, row 0, slice 0, frame 0). FS-527: for an output narrower than
+   1,032 columns FreeSurfer prints another voxel's value (the float at that offset from the first
+   row, inside the output's memory) or memory outside it; by default 0 (the other voxel with
+   `reproduce`; outside it 0 in both modes).
+
+**112.7 FS-525 and FS-534.** The functions read `src` and write their output as 32-bit floats at
+the float offset of the voxel's row (rows stepping by the volume's own voxel size): a volume of
+another type gives floats made of other voxels' bytes. By default such a volume is read and written
+by value (`MRIgetVoxVal`, `MRIsetVoxVal`); with `reproduce` the bytes FreeSurfer reads and writes.
+FS-534: for a type smaller than a float the later places lie past the volume's memory: FreeSurfer
+reads memory contents and corrupts memory by writing; with `reproduce` such reads give 0 and such
+writes are dropped (both noted).
+
+## 113. Surface RAS to voxel (`mriSurfaceRASToVoxel`; queue item 3.1-51; relay 23)
+
+A process-wide matrix (`VoxelFromSRASmatrix`, unset in FreeSurfer: no program sets it) maps a
+surface RAS point `(x, y, z)` to voxel coordinates.
+1. At the first call, `FREESURFER_mriSurfaceRASToVoxel_both` set (any value) selects both ways,
+   else `FREESURFER_mriSurfaceRASToVoxel_old` the old way alone, else the new way alone; later calls
+   keep that choice.
+2. The new way applies when chosen and the matrix is real 4 x 4: for rows `i` = 1 to 3,
+   `((m[i][1] x' + m[i][2] y') + m[i][3] z') + m[i][4]` in `double`, with `x' y' z'` the point's
+   coordinates rounded to `float` and the elements made `double`, the sum rounded to `float`.
+3. The old way applies when chosen or when the new way does not: the matrix times the 4 x 1 float
+   vector `(x, y, z, 1)` (`MatrixMultiply`, float arithmetic), its rows 1 to 3.
+4. With both ways: the two are compared coordinate by coordinate (`a` and `b` agree when the larger
+   magnitude is below 1e-6, or when `|a - b|`, in float, is below 1 % of it, compared in `double`).
+   FS-531: FreeSurfer prints `<build folder>/utils/mrisurf_metricProperties.cpp:11755 not same answer`
+   on standard error and crashes when they agree in any coordinate; by default the message is printed
+   when they differ in some coordinate, and the old way's answer returned.
+5. The answer (the old way's when it applied): returns `NO_ERROR` (0) with the three coordinates.
+6. FS-532: no matrix: FreeSurfer crashes (with the old way alone, `MatrixMultiply`'s refusal of the
+   missing matrix ends the program first: `MatrixMultiply(): m1 is null`, its break line, the error,
+   exit status 252); a product `MatrixMultiply` refuses (a matrix of other than four columns: its
+   messages) crashes it; a product of fewer than three rows is read past. By default no matrix gives
+   `mriSurfaceRASToVoxel: no surface RAS to voxel matrix` on standard error and `ERROR_BADPARM`
+   without coordinates, a refused product `ERROR_BADPARM` after `MatrixMultiply`'s messages; missing
+   rows read as 0 in both modes (noted).
+
+## 114. Validation plan, part 21
+
+The probe's `mpf` command (relay 23): a surface read by `MRISread` from a binary triangle file
+(subdivided icosahedra of 42 or 162 vertices on spheres of radius 1, 10 or 100, open grids of 2 to 6
+by 2 to 6 vertices, `srd`'s small meshes), 0 to 3 vertices ripped; one case in three
+`FREESURFER_mriSurfaceRASToVoxel_both`, `_old` or both set; 1 to 3 volumes (`MRI_FLOAT`, one in six
+`MRI_UCHAR`, `MRI_INT` or `MRI_SHORT`) of the vertex count as one column, row or slice, or half
+columns by two rows, one in eight a voxel more or fewer, 1 to 4 frames, values 0 (one in five),
+eighths in [-2, 2], NaNs and infinities in heavy cases; then 1 to 3 of: `MRIScrsLUT` (the lists or
+`NULL`), `MRISar1`, `MRISarN` (1 to 4 hops, 0 or -1 one in eight), `MRISsmoothKernel` (a per-vertex
+kernel volume, a global kernel of 1 to 4 rows and 1 to 2 columns, both, or neither; the earlier
+call's hop lists reused when they have the hops needed; a new output, a volume of the case (written
+in place) or the input itself), `SetSurfHopList` (1 to 5 hops, 0 one in ten), `mriSurfaceRASToVoxel`
+(no matrix one in six, else 4 x 4 or 3 to 5 rows by 3 to 5 columns of such values; 1 to 3 points of
+quarters or any double). Each prints the volume's frames and every voxel's float bits (or `NULL`), the
+lists, the vertices' `undefval`s, the answers and coordinates. `MRISsmoothKernel`'s elapsed times
+and its closing value are written `<t>` and `<v>` on both sides (not compared; FS-527 is checked by
+the defaults' tests). Counted, not compared: FS-534 (memory contents), FS-533 (never generated),
+fs.mri's FS-53. FS-530's, FS-531's and FS-532's cases compare as FreeSurfer's crash. Observed
+(relay 23): the probe README. The defaults are checked by `tests/props9_defaults.rs`.

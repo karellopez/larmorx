@@ -9,6 +9,10 @@
 //! (§16), logic-problem reports (§17), temporary files (§18), threads, the reproducible sums, the
 //! debugging stack and HIPS (§19).
 //!
+//! Also FreeSurfer's mathematics (`maths`, `specs/freesurfer-maths.md`) and its volume structure
+//! (`mri`, `specs/freesurfer-mri.md`: the geometry, the volume and its voxels, the copies, the
+//! tkregister and FSL matrices, the linear transform arrays).
+//!
 //! No global state: a program run owns one [`Process`], which holds what FreeSurfer keeps
 //! process-wide (§1) and the environment table it reads (porting guide §9.1: the library never
 //! reads the process environment). A call that ends the program in FreeSurfer returns
@@ -29,6 +33,7 @@ pub mod fsenv;
 pub mod logic;
 pub mod maths;
 pub mod messages;
+pub mod mri;
 pub mod numbers;
 pub mod process;
 pub mod random;

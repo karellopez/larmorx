@@ -27,6 +27,9 @@ const CASES: &[(&str, bool, bool, &str)] = &[
         "haddsample 1 1 3f000000 3fc00000 3fc00000 3fc00000 00000000 4 7fc00000 c1100000 41b80000 af378426 42c28b63 c2c3527d",
     ),
     ("FS-13", true, false, "malloc -1 3 1"),
+    // FS-13 with `reproduce`: FreeSurfer's matrix of no element; the record under rows -9 to -16
+    ("FS-13", false, true, "malloc -2 1 1"),
+    ("FS-13", false, true, "malloc2 -9 0 2"),
     ("FS-14", false, false, "mclone 2 1 1 c294b01c c23169fc"),
     (
         "FS-15",
@@ -156,8 +159,15 @@ const CASES: &[(&str, bool, bool, &str)] = &[
     (
         "FS-48",
         false,
-        false,
+        true,
         "mnscond 1 1 3 42600000 6fa02ee8 428f757b",
+    ),
+    // FS-48 where VNL never returns: refused in both modes
+    (
+        "FS-48",
+        false,
+        false,
+        "mcond 1 3 3 80000000 ff800000 3f800000 80000000 7fc00000 7f800000 80000000 7fc00000 7fc00000",
     ),
     ("FS-49", false, true, "mreadbin x00 new"),
     (
@@ -245,6 +255,28 @@ fn each_defect_is_noted_in_both_modes() {
             "{id} not noted in reproduce: {line}"
         );
         assert_eq!(fix != rep, differs, "{id}: the modes' results {line}");
+    }
+}
+
+/// FS-47 where VNL never returns (`[[1, NaN], [NaN, 2]]`): refused in both modes, nothing written;
+/// where it returns (`[[inf, -4], [-4, 8]]`): VNL's values with `reproduce`, refused by default.
+#[test]
+fn fs47_never_returns_refused_in_both_modes() {
+    let never = [1.0, f32::NAN, f32::NAN, 2.0];
+    let returns = [f32::INFINITY, -4.0, -4.0, 8.0];
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let e = p.open_eigen_system(&never, 2);
+        assert_eq!((e.status, e.values, e.vectors), (-4, None, None));
+        assert!(p.notices().contains(&larmorx_core::defects::FS_47));
+        let e = p.open_eigen_system(&returns, 2);
+        if mode == UpstreamDefects::Fix {
+            assert_eq!(e.status, -4);
+        } else {
+            assert_eq!(e.status, 0);
+            assert_eq!(e.values, Some(vec![8.0, f32::INFINITY]));
+            assert_eq!(e.vectors, Some(vec![0.0, 1.0, 1.0, 0.0]));
+        }
     }
 }
 

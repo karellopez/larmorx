@@ -32,22 +32,40 @@ fn new_or(r: Returned<Matrix>) -> Option<Matrix> {
 
 impl Process {
     /// `vnl_svd<float>` of a matrix's numbers (§17.4): `None` for fewer rows than columns, or
-    /// after VNL's failure lines (LINPACK not converging; FS-48: any non-finite entry).
+    /// after VNL's failure lines (LINPACK not converging; FS-48: a non-finite entry where VNL
+    /// never returns, and by default any).
     pub fn svd_core(&mut self, m: &Matrix) -> Option<Svd> {
         let (rows, cols) = (m.rows.max(0) as usize, m.cols.max(0) as usize);
         if rows < cols || cols == 0 {
             return None;
         }
         let a = numbers_rm(m);
-        let info = if a.iter().any(|x| !x.is_finite()) {
+        // FS-48: a matrix with an infinite or NaN entry. Where VNL never returns, refused in both
+        // modes (FreeSurfer hangs); where it returns, VNL's result with `reproduce`, refused by
+        // default.
+        let nonfinite = a.iter().any(|x| !x.is_finite());
+        let refused = (rows + 1).min(cols);
+        let info = if nonfinite && self.mode().fix() {
             self.note(
                 &FS_48,
-                "an SVD LINPACK may never return on (a non-finite entry) refused",
+                "an SVD of a matrix with an infinite or NaN entry refused",
             );
-            Some((rows + 1).min(cols))
+            Some(refused)
         } else {
             let s = vnl_svd_f32::vnl_svd_f32_full(&a, rows, cols);
-            if s.info == 0 {
+            if nonfinite {
+                self.note(
+                    &FS_48,
+                    if s.never_returns() {
+                        "an SVD VNL never returns on (an infinite or NaN entry) refused"
+                    } else {
+                        "an SVD of a matrix with an infinite or NaN entry: VNL's result"
+                    },
+                );
+            }
+            if s.never_returns() {
+                Some(refused)
+            } else if s.info == 0 {
                 let u = (0..rows * cols)
                     .map(|k| s.u[(k % cols) * rows + k / cols])
                     .collect();
@@ -59,8 +77,9 @@ impl Process {
                     w: s.w[..cols].to_vec(),
                     v,
                 });
+            } else {
+                Some(s.info)
             }
-            Some(s.info)
         };
         let info = info.expect("a failure");
         let mut t = format!(

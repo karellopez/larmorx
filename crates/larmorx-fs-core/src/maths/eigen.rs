@@ -77,22 +77,35 @@ impl Process {
         }
         // the entries the tridiagonalisation reads: the upper triangle as stored
         let nonfinite = (0..n).any(|r| (r..n).any(|c| !a[r * n + c].is_finite()));
+        let e = vnl_eigen::symmetric_eigensystem_f32_full(&a[..n * n], n);
         if n >= 2 && nonfinite {
+            // FS-47: where VNL never returns, refused in both modes (FreeSurfer hangs); where it
+            // returns, FreeSurfer's result with `reproduce`, refused by default.
+            let never = e.never_returns();
+            if never || self.mode().fix() {
+                self.note(
+                    &FS_47,
+                    if never {
+                        "a symmetric eigensystem VNL never returns on (an infinite or NaN entry) refused"
+                    } else {
+                        "a symmetric eigensystem of a matrix with an infinite or NaN entry refused"
+                    },
+                );
+                self.error_printf(
+                    codes::BAD_PARM,
+                    b"OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)\n",
+                );
+                return Eigen {
+                    status: codes::BAD_PARM,
+                    values: None,
+                    vectors: None,
+                };
+            }
             self.note(
                 &FS_47,
-                "a symmetric eigensystem VNL never returns on (an infinite or NaN entry) refused",
+                "a symmetric eigensystem of a matrix with an infinite or NaN entry: VNL's result",
             );
-            self.error_printf(
-                codes::BAD_PARM,
-                b"OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)\n",
-            );
-            return Eigen {
-                status: codes::BAD_PARM,
-                values: None,
-                vectors: None,
-            };
         }
-        let e = vnl_eigen::symmetric_eigensystem_f32_full(&a[..n * n], n);
         if e.ierr != 0 {
             self.put_err(format!("vnl_symmetric_eigensystem: ierr = {}\n", e.ierr).as_bytes());
             if self.mode().reproduce() {

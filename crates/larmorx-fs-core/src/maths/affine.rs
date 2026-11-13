@@ -67,24 +67,25 @@ impl Process {
     }
 }
 
-/// `AffineMV(w, A, v)`: element i = `((A[i] x0 + A[4 + i] x1) + A[8 + i] x2) + A[12 + i] x3` in
-/// float, from the first product; the official build's operand order (which NaN a result keeps,
-/// measured on the probe's `affine` group): `A[i] × x0`, `x1 × A[4 + i]`, `x2 × A[8 + i]`,
-/// `A[12 + i] × x3` (the last one's order is not told apart by the cases), summed left to right.
+/// `AffineMV(w, A, v)`: element i = `((x0 A[i] + x1 A[4 + i]) + x2 A[8 + i]) + x3 A[12 + i]` in
+/// float, from the first product. NaN operands (spec §3): in each product the vector's number is
+/// the left operand, in each sum the running sum.
 pub fn affine_mv(a: &AffineMatrix, v: &AffineVector) -> AffineVector {
     let (m, x) = (&a.0, &v.0);
     let mut w = [0.0f32; 4];
     for (i, wi) in w.iter_mut().enumerate() {
-        let s = sse::add32(sse::mul32(m[i], x[0]), sse::mul32(x[1], m[4 + i]));
-        let s = sse::add32(s, sse::mul32(x[2], m[8 + i]));
-        *wi = sse::add32(s, sse::mul32(m[12 + i], x[3]));
+        let mut s = sse::mul32(x[0], m[i]);
+        for k in 1..4 {
+            s = sse::add32(s, sse::mul32(x[k], m[4 * k + i]));
+        }
+        *wi = s;
     }
     AffineVector(w)
 }
 
 /// `AffineMM(M, A, B)`: element (i, j) the float sum, from the first product, of
-/// `B[k + 4j] × A[i + 4k]` for k = 0..3 (the official build's operand order: B's element first;
-/// measured, the probe's `affine` group).
+/// `B[k + 4j] × A[i + 4k]` for k = 0..3 (spec §3: the second matrix's number the left operand of
+/// each product, the running sum the left operand of each sum).
 pub fn affine_mm(a: &AffineMatrix, b: &AffineMatrix) -> AffineMatrix {
     let mut m = [0.0f32; 16];
     for j in 0..4 {

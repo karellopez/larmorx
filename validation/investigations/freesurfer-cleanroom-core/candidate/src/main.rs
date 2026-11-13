@@ -12,7 +12,7 @@ use std::process::ExitCode;
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_fs_core::clib::{self, Stol};
 use larmorx_fs_core::numbers::{self, ListStats};
-use larmorx_fs_core::{Environment, Process, Stop, cmdargs, files, strings, swap};
+use larmorx_fs_core::{Environment, Process, Stop, cmdargs, files, romp, strings, swap};
 
 // ---- encodings (README.md, "Encodings") -------------------------------------------------------
 
@@ -259,6 +259,24 @@ fn batch_call(p: &mut Process, a: &[&str]) -> Result<String, Stop> {
             let place = unhex(arg(1));
             p.check_finite(cs(&place), f64a(arg(2))).to_string()
         }
+        "rompsum" => {
+            let vals: Vec<f64> = a[2..].iter().map(|t| f64a(t)).collect();
+            let n = romp::thread_count(p.env.get("OMP_NUM_THREADS"));
+            sd(romp::reproducible_sum(f64a(arg(1)), &vals, n))
+        }
+        "rompparts" => {
+            let parts = romp::pieces(i64::from(atoi(arg(1))), i64::from(atoi(arg(2))));
+            let mut o = parts.len().to_string();
+            for (lo, hi) in parts {
+                o.push_str(&format!(" {lo}:{hi}"));
+            }
+            o
+        }
+        "rompparallel" => romp::Level::ALL
+            .iter()
+            .map(|l| i32::from(l.parallel()).to_string())
+            .collect::<Vec<_>>()
+            .join(" "),
         "strerror" => hex(clib::strerror(atoi(arg(1))).as_bytes()),
         "atoi" => clib::atoi(cs(&unhex(arg(1)))).to_string(),
         "atof" => sd(clib::atof(cs(&unhex(arg(1))))),
@@ -506,6 +524,14 @@ fn run(p: &mut Process, c: &str, a: &[&str]) -> Result<(), Stop> {
                 }
                 p.flush();
             }
+        }
+        "maxthreads" => {
+            let n = romp::thread_count(p.env.get("OMP_NUM_THREADS"));
+            p.put_out(format!("{n}\n").as_bytes());
+        }
+        "threadnum" => {
+            let n = (atoi(arg(0)).max(1) as usize).min(romp::MAX_THREADS);
+            p.put_out(format!("max thread number {}\n", n - 1).as_bytes());
         }
         "hips" => {
             let r = p.hips_unsupported();

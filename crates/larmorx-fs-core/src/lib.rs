@@ -30,6 +30,7 @@ pub mod messages;
 pub mod numbers;
 pub mod process;
 pub mod random;
+pub mod romp;
 pub mod sse;
 pub mod strings;
 pub mod swap;

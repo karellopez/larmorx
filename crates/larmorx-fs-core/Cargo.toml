@@ -8,6 +8,8 @@ repository.workspace = true
 
 [dependencies]
 larmorx-core.workspace = true
+# the reproducible sums' pieces on several threads (§19)
+rayon.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true

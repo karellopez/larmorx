@@ -1233,6 +1233,34 @@ defects! {
         "an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: the program crashes";
     FS_87 = "FS-87", "gifticlib", true,
         "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
+    FS_90 = "FS-90", "CTN", true,
+        "a condition message of 1,024 bytes or more (a long file name in it) overflows the buffer it is formatted in, and a file name of 1,024 bytes or more overflows the object's copy of it: the program crashes or its memory is corrupted";
+    FS_91 = "FS-91", "CTN", true,
+        "an element of undefined length that is neither a sequence nor pixel data (a sequence the 2002 dictionary types otherwise, a stray item) is read with a count of -1, which fails, and the failure is taken for a complete read: the element is kept with a value never written, the remaining length grows by one and the value's bytes are read as the next elements (an item's delimiter there ends the data set early)";
+    FS_92 = "FS-92", "CTN", true,
+        "Bits Allocated, Pixel Representation, the file meta group's length, the transfer syntax and the Waveform Data Representation are read from their values whatever their length and representation: a shorter value, a sequence or a transfer syntax without its zero byte is read past its end, from memory never written";
+    FS_93 = "FS-93", "CTN", true,
+        "a group length element shorter than 4 bytes is given the group's 4-byte length, and a Waveform Data Representation longer than 16 bytes is copied into a 17-byte field: both write past their memory";
+    FS_94 = "FS-94", "CTN (FreeSurfer's copy)", true,
+        "FreeSurfer's copy swaps the 4-byte integers (UL, SL) of big-endian data in 2-byte pairs instead of reversing them: every such value read from a big-endian file is wrong";
+    FS_95 = "FS-95", "CTN", true,
+        "a UL or SL value of big-endian data whose length is not a multiple of 4 is swapped 4 bytes at a time past its end, its 32-bit count wrapping: the program crashes";
+    FS_96 = "FS-96", "CTN", true,
+        "FD and FL values (64- and 32-bit floating point) of big-endian data are left in the file's byte order: every such value read from a big-endian file is wrong";
+    FS_97 = "FS-97", "CTN", true,
+        "sequences are read by recursion, one level per nesting: a file nesting them deeply enough exhausts the stack and the program crashes";
+    FS_98 = "FS-98", "CTN", true,
+        "a fragment of encapsulated pixel data whose length is odd (or over the remaining count) closes the object, and the reader then writes through the closed object: the program crashes";
+    FS_99 = "FS-99", "nlohmann/json", true,
+        "the pretty printer's indent string (512 characters) is doubled once, with spaces, when an indent passes it (past 512 characters a tab indent becomes spaces; an indent more than twice the string's length is read past its memory), and the writer and the value's destructor recurse once per nesting level: a value nested deeply enough exhausts the stack";
+    FS_281 = "FS-281", "miniz 1.15", true,
+        "a deflate stream that ends early, read with no more input to come (the zlib stream API's MZ_FINISH, mz_uncompress), is padded with zero bytes, which are decoded as if they were the stream's: a truncated stream can be accepted with bytes it never held";
+    FS_282 = "FS-282", "miniz 1.15", true,
+        "the length symbols 286 and 287 and the distance symbols 30 and 31, which deflate does not define, are accepted: such a length copies 3 bytes and moves the output by 3 (past the end of the buffer when fewer than 3 bytes are left), such a distance copies the byte under the cursor";
+    FS_283 = "FS-283", "miniz 1.15", true,
+        "a Huffman code with no codes or a single code is accepted whatever its length, and a bit pattern it gives no symbol to is decoded as symbol 0 (from the lookup table without taking any bits)";
+    FS_284 = "FS-284", "miniz 1.15", true,
+        "in the zlib-style stream API, a match farther back than the output so far (or of distance 0 before 32 KiB were output) copies from the 32 KiB dictionary where nothing was written yet: memory never written";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,

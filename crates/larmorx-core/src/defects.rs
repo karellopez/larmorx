@@ -1729,6 +1729,10 @@ defects! {
         "the annotation tables (a table file, or one set from a colour table): a name of 100 bytes or more, or a table path of 1,024 bytes or more, is written past its buffer or read on past its end: memory corruption, a garbled name or a crash";
     FS_431 = "FS-431", "FreeSurfer", true,
         "removing a point outside a point set (fsPointSet::remove) is undefined behaviour: memory corruption or a crash";
+    FS_433 = "FS-433", "FreeSurfer", true,
+        "loading a point set (a JSON file) that is not JSON, or whose vox2ras, points, coordinates or values have other types, ends the program with an uncaught exception: an abort (status 134) instead of an error message";
+    FS_432 = "FS-432", "FreeSurfer", true,
+        "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

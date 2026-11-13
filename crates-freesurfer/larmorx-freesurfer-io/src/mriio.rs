@@ -34,7 +34,9 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421};
+use larmorx_core::defects::{
+    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432,
+};
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
@@ -54,6 +56,7 @@ use crate::fio;
 use crate::fstagsio::FsTagsIo;
 use crate::identify::{self, MRI_MGH_FILE, MRI_VOLUME_TYPE_UNKNOWN};
 use crate::minc;
+use crate::streams::Io;
 use crate::tags::{
     TAG_AUTO_ALIGN, TAG_CMDLINE, TAG_DOF, TAG_FIELDSTRENGTH, TAG_GCAMORPH_AFFINE,
     TAG_GCAMORPH_GEOM, TAG_GCAMORPH_GEOM_PLUSSHEAR, TAG_GCAMORPH_LABELS, TAG_GCAMORPH_META,
@@ -297,7 +300,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         NIFTI1_FILE | NII_FILE => "NIfTI",
         NRRD_FILE => "NRRD",
         MRI_CURV_FILE => "curvature",
-        GIFTI_FILE => "GIFTI",
         IMAGE_FILE => "image",
         MGH_ANNOT => "annotation",
         _ => return None,
@@ -448,6 +450,9 @@ pub fn mri_read(
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {
         crate::bruker::bruker_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::GIFTI_FILE {
+        let mut io = Io { out, err, env };
+        crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?
     } else if let Some(name) = not_ported(mtype) {
         let _ = writeln!(
             err,
@@ -540,6 +545,248 @@ pub fn mri_read(
         return Ok(None);
     }
     Ok(Some(m2))
+}
+
+/// The writers [`mri_write_type`] does not have yet: their formats' names.
+fn write_not_ported(mtype: i32) -> Option<&'static str> {
+    use crate::identify::*;
+    Some(match mtype {
+        MRI_CORONAL_SLICE_DIRECTORY => "COR",
+        MRI_MINC_FILE => "MINC",
+        IMAGE_FILE => "image",
+        BHDR => "bhdr",
+        BSHORT_FILE => "bshort",
+        BFLOAT_FILE => "bfloat",
+        MRI_ANALYZE_FILE => "ANALYZE",
+        MRI_ANALYZE4D_FILE => "ANALYZE 4D",
+        BRIK_FILE => "AFNI BRIK",
+        MGH_MORPH => "GCA morph (m3z)",
+        ITK_MORPH => "ITK warp",
+        MRI_MGH_FILE => "MGH",
+        GDF_FILE => "GDF",
+        NIFTI1_FILE => "NIfTI-1",
+        NII_FILE => "NIfTI",
+        NRRD_FILE => "NRRD",
+        _ => return None,
+    })
+}
+
+/// The formats `MRIwriteType` refuses to write: the name its message gives.
+fn write_unsupported(mtype: i32) -> Option<&'static str> {
+    use crate::identify::*;
+    Some(match mtype {
+        GENESIS_FILE => "GENESIS",
+        GE_LX_FILE => "GE LX",
+        SIEMENS_FILE => "SIEMENS",
+        SDT_FILE => "SDT",
+        OTL_FILE => "OTL",
+        RAW_FILE => "RAW",
+        SIGNA_FILE => "SIGNA",
+        DICOM_FILE => "DICOM",
+        SIEMENS_DICOM_FILE => "SIEMENS DICOM",
+        BRUKER_FILE => "BRUKER",
+        XIMG_FILE => "XIMG",
+        _ => return None,
+    })
+}
+
+/// `ErrorReturn(code, (code, message))` after `errno = 0`: the message as an error, `code`.
+fn fail_code(g: &mut Globals, err: &mut dyn Write, code: i32, message: &str) -> i32 {
+    g.errno = 0;
+    log::error_printf(g, err, code, message);
+    code
+}
+
+/// `MRIwriteType(mri, fname, type, intent)`: the volume written as `type`.
+///
+/// A name that is an existing directory is refused for every format but COR (`MRIwriteType(): <f>
+/// is an existing directory. (type=<t>)` and, on the next line, `A filename should be specified
+/// instead.`; `ERROR_BADFILE`). The formats FreeSurfer cannot write are refused with
+/// `MRIwriteType(): writing of <format> file type not supported` (`ERROR_BADPARM`): Genesis, GE LX,
+/// Siemens, SDT, outline, raw, Signa, DICOM, Siemens DICOM, Bruker, XIMG; an unknown type with
+/// `MRIwriteType(): code inconsistency (file type recognized but not caught)`. An image file needs a
+/// depth of 1 (`MRIwriteType(<f>): image files cannnot have depth > 1`, the program ends), a GCA or
+/// ITK morph three frames (`MRIwriteType: gcam - input mri must have 3 frames, not <n>`, `MRIwriteType:
+/// itk warp - ...`, -1). GIFTI files: [`crate::gifti_vol::mri_write_gifti`]. After a writer that
+/// succeeds, a volume with b-values also writes them beside it: `Saving bvals and bvecs` on
+/// standard output, `<stem>.bvals` and `<stem>.<space>_space.bvecs` (`scanner`, `voxel` or
+/// `unknown`), the stem the name without its volume extension (none: nothing written). The other
+/// writers are not ported yet: a message and -1.
+#[allow(clippy::too_many_arguments)]
+pub fn mri_write_type(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    m: &Mri,
+    fname: &str,
+    mtype: i32,
+    _intent: i32,
+) -> Result<i32, Fatal> {
+    use crate::identify::*;
+    if mtype != MRI_CORONAL_SLICE_DIRECTORY
+        && std::fs::metadata(utils::resolve(dir, fname)).is_ok_and(|md| md.is_dir())
+    {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!(
+                "MRIwriteType(): {fname} is an existing directory. (type={mtype})\n                A filename should be specified instead."
+            ),
+        ));
+    }
+    if mtype == IMAGE_FILE && m.depth != 1 {
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("MRIwriteType({fname}): image files cannnot have depth > 1\n"),
+        )?;
+    }
+    if mtype == MGH_MORPH && m.nframes != 3 {
+        log::error_printf(
+            g,
+            err,
+            ERROR_UNSUPPORTED,
+            &format!(
+                "MRIwriteType: gcam - input mri must have 3 frames, not {}",
+                m.nframes
+            ),
+        );
+        return Ok(-1);
+    }
+    if mtype == ITK_MORPH && m.nframes != 3 {
+        log::error_printf(
+            g,
+            err,
+            ERROR_UNSUPPORTED,
+            &format!(
+                "MRIwriteType: itk warp - input mri must have 3 frames, not {}",
+                m.nframes
+            ),
+        );
+        return Ok(-1);
+    }
+    let error = if mtype == GIFTI_FILE {
+        let mut io = Io { out, err, env };
+        crate::gifti_vol::mri_write_gifti(g, &mut io, dir, m, fname)?
+    } else if let Some(name) = write_not_ported(mtype) {
+        let _ = writeln!(
+            err,
+            "larmorx-freesurfer: writing {name} volumes is not ported yet ({fname})"
+        );
+        return Ok(-1);
+    } else if let Some(name) = write_unsupported(mtype) {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("MRIwriteType(): writing of {name} file type not supported"),
+        ));
+    } else {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADPARM,
+            "MRIwriteType(): code inconsistency (file type recognized but not caught)",
+        ));
+    };
+    if error != 0 || m.bvals.is_none() {
+        return Ok(error);
+    }
+    let Some(stem) = identify::id_stem_from_name(fname) else {
+        return Ok(error);
+    };
+    let _ = out.write_all(b"Saving bvals and bvecs\n");
+    crate::dti::dti_write_bvalues(g, out, dir, m.bvals.as_ref(), &format!("{stem}.bvals"));
+    let space = match m.bvec_space {
+        larmorx_freesurfer_core::fsenv::BVEC_SPACE_SCANNER => "scanner",
+        larmorx_freesurfer_core::fsenv::BVEC_SPACE_VOXEL => "voxel",
+        _ => "unknown",
+    };
+    crate::dti::dti_write_bvectors(
+        g,
+        out,
+        dir,
+        m.bvecs.as_ref(),
+        &format!("{stem}.{space}_space.bvecs"),
+    );
+    Ok(error)
+}
+
+/// `MRIwrite(mri, fname, mriVector, intent)`: the volume written in the format its name gives
+/// (`mri_identify`; none: `unknown file type for file (<f>)`, `ERROR_BADPARM`), by
+/// [`mri_write_type`]. With more than one volume in `several`, each is written in that format
+/// under the name with its own suffix before the extension (the volume's file-name suffix, or
+/// `_<n>` when it has none): the extension is what follows the last dot before the first `.gz`
+/// (which stays with it), `(null)` when there is no dot. FS-432: FreeSurfer builds each name in
+/// 1,024 bytes (a longer one overflows its buffer); larmorx writes the whole name. The last
+/// volume's status.
+#[allow(clippy::too_many_arguments)]
+pub fn mri_write(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    m: &Mri,
+    fname: &str,
+    several: Option<&[Mri]>,
+    intent: i32,
+) -> Result<i32, Fatal> {
+    larmorx_freesurfer_core::chklc::chklc();
+    let int_type = identify::mri_identify(g, dir, env, out, err, fname)?;
+    if int_type < 0 {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("unknown file type for file ({fname})"),
+        ));
+    }
+    let Some(vs) = several.filter(|v| v.len() > 1) else {
+        return mri_write_type(g, out, err, env, dir, m, fname, int_type, intent);
+    };
+    // `.gz` (its first place) cut off, the extension after the last dot before it, `.gz` put back
+    let b = fname.as_bytes();
+    let gz = b.windows(3).position(|w| w == b".gz");
+    let head = &b[..gz.unwrap_or(b.len())];
+    let (stem, ext): (&[u8], Option<Vec<u8>>) = match head.iter().rposition(|&c| c == b'.') {
+        Some(d) => {
+            let mut e = head[d + 1..].to_vec();
+            if let Some(z) = gz {
+                e.extend_from_slice(&b[z..]);
+            }
+            (&b[..d], Some(e))
+        }
+        None => (b, None),
+    };
+    let ext = ext.map_or_else(|| b"(null)".to_vec(), |e| e);
+    let mut error = NO_ERROR;
+    for (n, v) in vs.iter().enumerate() {
+        let mut name = stem.to_vec();
+        if v.len_fname_post_fixes == 0 {
+            name.extend_from_slice(format!("_{n}").as_bytes());
+        } else {
+            name.extend_from_slice(v.fname_post_fixes.as_bytes());
+        }
+        name.push(b'.');
+        name.extend_from_slice(&ext);
+        if name.len() > 1023 {
+            g.notices.add(
+                &FS_432,
+                format!(
+                    "MRIwrite: a name of {} bytes for one of several volumes (FreeSurfer's buffer holds 1,023)",
+                    name.len()
+                ),
+            );
+        }
+        let name = String::from_utf8_lossy(&name).into_owned();
+        error = mri_write_type(g, out, err, env, dir, v, &name, int_type, intent)?;
+    }
+    Ok(error)
 }
 
 /// The value `orderXBytes` gives for a big-endian value of `n` bytes at the start of `b`: the

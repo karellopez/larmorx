@@ -63,6 +63,8 @@
 #include "ctrpoints.h"
 #include "annotation.h"
 #include "pointset.h"
+#include "utils.h"
+#include <zlib.h>
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -633,6 +635,8 @@ const unsigned char help9[] = "<help><name>probe</name><synopsis>probe [options]
 void run_piece10(const std::string &cmd);
 void run_piece11(const std::string &cmd);
 bool piece11_cmd(const std::string &cmd);
+void run_piece12(const std::string &cmd);
+bool piece12_cmd(const std::string &cmd);
 
 void run_piece9(const std::string &cmd)
 {
@@ -749,6 +753,7 @@ void run_piece10(const std::string &cmd)
   fwide(stderr, -1);
   unsetenv("FREESURFER_SEED");
   if (piece11_cmd(cmd)) { run_piece11(cmd); return; }
+  if (piece12_cmd(cmd)) { run_piece12(cmd); return; }
   if (cmd == "cra") {
     int check = (int)geti();
     setup(next());
@@ -1183,6 +1188,175 @@ void run_piece11(const std::string &cmd)
   oi(Gerror);
 }
 
+// piece 12 (relay 21): MRIread's and MRIwrite's GIFTI branches (mgi, mwr), fsPrintHelp's XML help
+// renderer (hlp), loadfsPointSet (lps)
+bool piece12_cmd(const std::string &cmd)
+{
+  return cmd == "mgi" || cmd == "mwr" || cmd == "hlp" || cmd == "lps";
+}
+// a GIFTI file's text with its UserName value written U and each <Data> payload Base64-decoded
+// and inflated (zlib 1.2.11's compressed bytes here, the port's own there; the values the same):
+// fs-surfio's gii_normal (relay 22 of track D)
+int b64val12(unsigned char c)
+{
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
+  return -1;
+}
+std::string gii_normal12(const std::string &f)
+{
+  std::string s = f;
+  size_t u = s.find("<![CDATA[UserName]]></Name>");
+  if (u != std::string::npos) {
+    size_t v = s.find("<Value><![CDATA[", u);
+    if (v != std::string::npos) {
+      v += 16;
+      size_t e = s.find("]]>", v);
+      if (e != std::string::npos) s.replace(v, e - v, "U");
+    }
+  }
+  std::string r;
+  size_t p = 0;
+  char h[4];
+  for (;;) {
+    size_t a = s.find("<Data>", p);
+    size_t b = a == std::string::npos ? a : s.find("</Data>", a + 6);
+    if (b == std::string::npos) { r += s.substr(p); break; }
+    a += 6;
+    r += s.substr(p, a - p);
+    std::string pay = s.substr(a, b - a), bin;
+    unsigned acc = 0;
+    int nb = 0;
+    for (unsigned char c : pay) {
+      int v = b64val12(c);
+      if (v < 0) continue;
+      acc = (acc << 6) | (unsigned)v;
+      nb += 6;
+      if (nb >= 8) { nb -= 8; bin.push_back((char)((acc >> nb) & 0xff)); }
+    }
+    std::string inf;
+    bool ok = false;
+    z_stream zs;
+    memset(&zs, 0, sizeof zs);
+    if (inflateInit(&zs) == Z_OK) {
+      zs.next_in = (Bytef *)bin.data();
+      zs.avail_in = (uInt)bin.size();
+      unsigned char buf[4096];
+      int ret;
+      do {
+        zs.next_out = buf;
+        zs.avail_out = sizeof buf;
+        ret = inflate(&zs, Z_NO_FLUSH);
+        inf.append((char *)buf, sizeof buf - zs.avail_out);
+      } while (ret == Z_OK);
+      ok = ret == Z_STREAM_END;
+      inflateEnd(&zs);
+    }
+    if (ok) {
+      r += "Z";
+      for (unsigned char c : inf) { snprintf(h, sizeof h, "%02x", c); r += h; }
+    } else {
+      r += "B" + pay;
+    }
+    p = b;
+  }
+  return r;
+}
+// every file under w: its name and its bytes (a .gii file, in any case, normalised), FNV-1a 64 beyond 256 bytes
+void odir12()
+{
+  walked11.clear();
+  nftw("w", walk11, 16, FTW_PHYS);
+  std::sort(walked11.begin(), walked11.end());
+  for (const std::string &f : walked11) {
+    ostr(f.c_str());
+    std::vector<unsigned char> b = read_file(f);
+    std::string s(b.begin(), b.end());
+    if (f.size() > 4 && strcasecmp(f.c_str() + f.size() - 4, ".gii") == 0) s = gii_normal12(s);
+    std::vector<unsigned char> c(s.begin(), s.end());
+    if (c.size() <= 256) obytes(c);
+    else fnv_bytes(c.data(), c.size());
+  }
+  out += "| ";
+}
+// a volume: <w> <h> <d> <type> <frames>, the 15 geometry floats, tr, <len> <post-fix N|x..>, <k>
+// voxels <c> <r> <s> <f> <value>
+MRI *read_mri12()
+{
+  int w = (int)geti(), h = (int)geti(), d = (int)geti(), t = (int)geti(), nf = (int)geti();
+  MRI *m = MRIallocSequence(w, h, d, t, nf);
+  m->xsize = getf(); m->ysize = getf(); m->zsize = getf();
+  m->x_r = getf(); m->x_a = getf(); m->x_s = getf();
+  m->y_r = getf(); m->y_a = getf(); m->y_s = getf();
+  m->z_r = getf(); m->z_a = getf(); m->z_s = getf();
+  m->c_r = getf(); m->c_a = getf(); m->c_s = getf();
+  m->ras_good_flag = 1;
+  m->tr = getf();
+  m->len_fnamePostFixes = (int)geti();
+  bool n;
+  std::string pf = getstr(&n);
+  if (!n) snprintf(m->fnamePostFixes, sizeof m->fnamePostFixes, "%s", pf.c_str());
+  int k = (int)geti();
+  for (int i = 0; i < k; i++) {
+    int c = (int)geti(), r = (int)geti(), s = (int)geti(), f = (int)geti();
+    MRIsetVoxVal(m, c, r, s, f, getf());
+  }
+  return m;
+}
+void run_piece12(const std::string &cmd)
+{
+  fwide(stderr, -1);
+  if (cmd == "mgi") {
+    Gdiag = strtoull(next(), NULL, 16);
+    MRIIO_Strip_Pound = (int)geti();
+    int type = (int)geti(), vf = (int)geti();
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = mri_read(name.c_str(), type, vf, -1, -1, NULL);
+    print_mri6(m);
+    print_ct10(m ? m->ct : NULL, false, false);
+    oi(errno);
+  } else if (cmd == "mwr") {
+    Gdiag = strtoull(next(), NULL, 16);
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T", 1);
+    setenv("SURFER_SIDEDOOR", "1", 1);  // FreeSurfer's licence check skipped (the port needs no key)
+    setup(next());
+    int nv = (int)geti(), usevec = (int)geti();
+    std::vector<MRI *> vs;
+    for (int i = 0; i < nv; i++) vs.push_back(read_mri12());
+    std::string fn = name10();
+    errno = 0;
+    int r = MRIwrite(vs[0], fn.c_str(), usevec ? &vs : NULL);
+    fflush(stdout);
+    oi(r);
+    oi(errno);
+    odir12();
+  } else if (cmd == "hlp") {
+    bool n;
+    std::string t = getstr(&n);
+    fflush(stdout);
+    int r = outputHelpXml(n ? NULL : (const unsigned char *)t.data(), (unsigned int)t.size());
+    fflush(stdout);
+    oi(r);
+  } else if (cmd == "lps") {
+    setup(next());
+    std::string fn = name10();
+    errno = 0;
+    fsPointSet ps = loadfsPointSet(fn);
+    ostr(ps.vox2ras.c_str());
+    oi(ps.npoints());
+    for (int i = 0; i < ps.npoints(); i++) opoint11(ps.get(i));
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
 bool piece10_cmd(const std::string &cmd)
 {
   static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme",
@@ -1194,7 +1368,7 @@ bool piece10_cmd(const std::string &cmd)
 
 void run_piece8(const std::string &cmd)
 {
-  if (cmd == "apa" || piece10_cmd(cmd) || piece11_cmd(cmd)) { run_piece9(cmd); return; }
+  if (cmd == "apa" || piece10_cmd(cmd) || piece11_cmd(cmd) || piece12_cmd(cmd)) { run_piece9(cmd); return; }
   fwide(stderr, -1);
   Gerror = (int)geti();
   if (cmd == "ial") {
@@ -2272,7 +2446,7 @@ int main(int argc, char *argv[])
     }
     // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
     {
-      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr"};
+      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

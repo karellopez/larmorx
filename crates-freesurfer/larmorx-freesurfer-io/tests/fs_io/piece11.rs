@@ -683,7 +683,7 @@ fn od(o: &mut Out, v: f64) {
     o.0.push_str(&format!("{:016x} ", v.to_bits()));
 }
 
-fn ostr(o: &mut Out, s: Option<&[u8]>) {
+pub(super) fn ostr(o: &mut Out, s: Option<&[u8]>) {
     o.0.push_str(&enc(s));
     o.0.push(' ');
 }
@@ -697,7 +697,7 @@ fn ocs(o: &mut Out, s: &[u8]) {
     ostr(o, Some(&s[..n]));
 }
 
-fn fnv(o: &mut Out, b: &[u8]) {
+pub(super) fn fnv(o: &mut Out, b: &[u8]) {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for &c in b {
         h ^= u64::from(c);
@@ -706,12 +706,12 @@ fn fnv(o: &mut Out, b: &[u8]) {
     o.0.push_str(&format!("fnv{h:016x} "));
 }
 
-fn obytes(o: &mut Out, b: &[u8]) {
+pub(super) fn obytes(o: &mut Out, b: &[u8]) {
     o.0.push_str(&hex(b));
     o.0.push(' ');
 }
 
-fn f32_of(t: &str) -> f32 {
+pub(super) fn f32_of(t: &str) -> f32 {
     f32::from_bits(u32::from_str_radix(t, 16).unwrap())
 }
 
@@ -932,7 +932,7 @@ fn read_point(tk: &mut Toks) -> Point {
     p
 }
 
-fn opoint(o: &mut Out, p: &Point) {
+pub(super) fn opoint(o: &mut Out, p: &Point) {
     od(o, p.x);
     od(o, p.y);
     od(o, p.z);

@@ -3,21 +3,25 @@
 // 2026 Karel Lopez Vilaret.
 //! Point sets (`include/pointset.h`, `utils/pointset.cpp`; items 3.1-33 and 3.1-34): the class
 //! `fsPointSet` and its writers (`save` as JSON, `save_as_ctrlpoint`, `print`, `printCoords`,
-//! `writeCoords`, `writeCentroidTable`). `loadfsPointSet` reads JSON with nlohmann/json; it comes
-//! with `larmorx_core::json` (track C's port of nlohmann/json 3.2.0).
+//! `writeCoords`, `writeCentroidTable`) and `loadfsPointSet` (JSON read with `larmorx_core::json`,
+//! track C's port of nlohmann/json 3.2.0, with FreeSurfer's copy's `operator[]` message).
 //!
 //! Numbers written to a stream (`<<` of a `double`) use the stream's default format, `%g` with 6
 //! digits; the centroid table's are `%.4f` (`std::fixed`, `setprecision(4)`). Files that do not
 //! open are not written, silently (an `ofstream` that failed), except in `writeCentroidTable`.
 //!
-//! D13: FS-431 (`remove` of an index outside the set: both modes leave the set unchanged).
+//! D13: FS-431 (`remove` of an index outside the set: both modes leave the set unchanged), FS-433
+//! (a point-set file that is not JSON or not a point set: FreeSurfer's uncaught exception ends the
+//! program with `abort`; by default a clear error, `reproduce` the abort).
 
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::FS_431;
+use larmorx_core::defects::{FS_431, FS_433};
+use larmorx_core::json::{self, Dialect, Value};
 use larmorx_freesurfer_core::cstd::{fmt_f, format_double};
 use larmorx_freesurfer_core::globals::Globals;
+use larmorx_freesurfer_core::log::Fatal;
 
 /// `fsPointSet::Point`.
 #[derive(Clone, Debug, PartialEq)]
@@ -359,5 +363,109 @@ impl PointSet {
         let _ = writeln!(out, "writing results to {outfile}");
         let _ = f.write_all(&self.centroid_table_bytes(ltafile));
         true
+    }
+}
+
+/// FreeSurfer's copy of nlohmann/json 3.2.0 words `operator[]`'s `type_error.305` with the
+/// argument's kind.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FsJson;
+
+impl Dialect for FsJson {
+    fn operator_index_message(&self, numeric: bool, type_name: &str) -> String {
+        let arg = if numeric { "numeric" } else { "string" };
+        format!("cannot use operator[] with a {arg} argument with {type_name}")
+    }
+}
+
+/// The point set of a JSON value as `loadfsPointSet` takes it: `vox2ras` a string, then each of
+/// `points` (an array's elements, an object's values in key order, nothing for null, any other
+/// value itself) with `legacy_stat` and the `coordinates`' `z`, `y` and `x` numbers (taken in
+/// that order: the first that is not a number names the exception).
+fn point_set_of(mut j: Value) -> Result<PointSet, json::Error> {
+    let mut ps = PointSet {
+        vox2ras: j.index_key(b"vox2ras", &FsJson)?.get_string()?.to_vec(),
+        ..PointSet::default()
+    };
+    let points = j.index_key(b"points", &FsJson)?.clone();
+    for point in points.iter() {
+        let mut point = point.clone();
+        let mut coord = point.index_key(b"coordinates", &FsJson)?.clone();
+        let value = point.index_key(b"legacy_stat", &FsJson)?.get_f64()?;
+        let z = coord.index_key(b"z", &FsJson)?.get_f64()?;
+        let y = coord.index_key(b"y", &FsJson)?.get_f64()?;
+        let x = coord.index_key(b"x", &FsJson)?.get_f64()?;
+        ps.add_xyz(x, y, z, value);
+    }
+    Ok(ps)
+}
+
+/// `loadfsPointSet(filename)`: the point set a JSON file holds (as [`PointSet::save`] writes it).
+/// A file that does not open reads as empty. FS-433: a file that is not JSON (nlohmann's
+/// `parse_error`) or not a point set (`type_error`: `vox2ras` not a string, a point or its
+/// coordinates not an object, a coordinate or `legacy_stat` not a number) ends FreeSurfer with
+/// `terminate called after throwing an instance of 'nlohmann::detail::<kind>'` and the
+/// exception's text on standard error (a directory: libstdc++'s `std::__ios_failure`, `basic_filebuf::underflow
+/// error reading the file: Is a directory`), then `abort` (`reproduce`: the same, status 134); by
+/// default `loadfsPointSet(<file>): <text>` as an error and status 1.
+pub fn load_fs_point_set(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    filename: &str,
+) -> Result<PointSet, Fatal> {
+    let path = larmorx_freesurfer_core::utils::resolve(dir, filename);
+    let read = if path.is_dir() {
+        // a directory opens, and its first read fails: libstdc++'s stream throws
+        Err(json::Error {
+            kind: "__ios_failure",
+            id: 0,
+            message: b"basic_filebuf::underflow error reading the file: Is a directory".to_vec(),
+        })
+    } else {
+        let bytes = std::fs::read(&path).unwrap_or_default();
+        json::parse(&bytes, false).and_then(|(j, _)| point_set_of(j))
+    };
+    match read {
+        Ok(ps) => Ok(ps),
+        Err(e) => {
+            let class = if e.kind == "__ios_failure" {
+                "std::__ios_failure".to_owned()
+            } else {
+                format!("nlohmann::detail::{}", e.kind)
+            };
+            if g.notices.reproduce() {
+                let _ = write!(
+                    err,
+                    "terminate called after throwing an instance of '{class}'\n  what():  "
+                );
+                let _ = err.write_all(&e.message);
+                let _ = err.write_all(b"\n");
+                g.notices.add(
+                    &FS_433,
+                    format!(
+                        "loadfsPointSet({filename}): an uncaught {}: aborted",
+                        e.kind
+                    ),
+                );
+                return Err(Fatal::Exit(134));
+            }
+            larmorx_freesurfer_core::log::error(
+                g,
+                err,
+                &format!(
+                    "loadfsPointSet({filename}): {}",
+                    String::from_utf8_lossy(&e.message)
+                ),
+            );
+            g.notices.add(
+                &FS_433,
+                format!(
+                    "loadfsPointSet({filename}): an uncaught {}: a clear error, not an abort",
+                    e.kind
+                ),
+            );
+            Err(Fatal::Exit(1))
+        }
     }
 }

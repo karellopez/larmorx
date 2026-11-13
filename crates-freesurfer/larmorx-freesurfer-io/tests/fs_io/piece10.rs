@@ -740,7 +740,7 @@ fn ostr(o: &mut Out, s: &[u8]) {
     }
 }
 
-fn print_table(o: &mut Out, ct: Option<&ColorTable>, alloc: bool, sub_alloc: bool) {
+pub(super) fn print_table(o: &mut Out, ct: Option<&ColorTable>, alloc: bool, sub_alloc: bool) {
     let Some(ct) = ct else {
         o.0.push_str("N ");
         return;

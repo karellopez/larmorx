@@ -29,6 +29,8 @@ use larmorx_io::znz::ZnzFile;
 mod piece10;
 #[path = "piece11.rs"]
 mod piece11;
+#[path = "piece12.rs"]
+mod piece12;
 #[path = "piece2.rs"]
 mod piece2;
 #[path = "piece3.rs"]
@@ -287,6 +289,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece9::KINDS);
     kinds.extend(piece10::KINDS);
     kinds.extend(piece11::KINDS);
+    kinds.extend(piece12::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -327,6 +330,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece11::KINDS.contains(&kind) {
             lines.push(piece11::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece12::KINDS.contains(&kind) {
+            lines.push(piece12::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -729,6 +736,11 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
             let mut e2 = shared.clone();
             return piece11::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece12::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece12::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1116,6 +1128,8 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
     };
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
+        // libstdc++'s terminate ends with abort (SIGABRT); the port's status 134 stands for it
+        Err(134) => "CRASH 6".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
     let mut ids: Vec<&'static str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();

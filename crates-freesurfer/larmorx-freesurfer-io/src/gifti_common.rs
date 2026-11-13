@@ -133,6 +133,16 @@ pub fn scan_f32_errno(errno: &mut i32, s: &[u8]) -> Option<f32> {
     v
 }
 
+/// gifticlib's validity check reads the image's version and "1.0" with `sscanf("%f")` (FsGifti's
+/// `check_version`), which leaves `errno` as glibc's `sscanf` does: the same two scans on the
+/// program's `errno`.
+fn version_scans(g: &mut Globals, image: &GiftiImage) {
+    if let Some(v) = &image.version {
+        scan_f32_errno(&mut g.errno, v);
+        scan_f32_errno(&mut g.errno, GIFTI_XML_VERSION.as_bytes());
+    }
+}
+
 /// `sscanf(s, "%f", &x) == 1`: the value, or `None`.
 pub fn scan_f(g: &mut Globals, s: &[u8]) -> Option<f32> {
     scan_f32_errno(&mut g.errno, s)
@@ -611,6 +621,7 @@ pub fn validate_and_write(
         g.gifti
             .valid_gifti_image(Some(&image), true, &FsGifti, fix, &mut w, &mut g.notices)
     };
+    version_scans(g, &image);
     if !valid {
         let _ = writeln!(io.err, "{who}: GIFTI file {out_fname} is invalid!");
         free(&g.gifti, io, image);
@@ -630,6 +641,19 @@ pub fn validate_and_write(
             .write_image(&mut image, &path, true, &mut w, &mut g.notices)
     };
     if rc != 0 {
+        // gifticlib's fopen left errno set when the file did not open
+        if path.is_dir() {
+            g.errno = 21;
+        } else if path
+            .parent()
+            .is_some_and(|p| !p.as_os_str().is_empty() && !p.is_dir())
+        {
+            g.errno = if path.parent().is_some_and(|p| p.exists()) {
+                20
+            } else {
+                2
+            };
+        }
         let _ = writeln!(io.err, "{who}: couldn't write image");
         free(&g.gifti, io, image);
         return ERROR_BADFILE;
@@ -671,6 +695,10 @@ pub fn read_valid(
             .read_image(&path, true, &FsGifti, &mut w, &mut g.notices)
     };
     let Some(mut image) = image else {
+        // gifticlib's fopen left errno set when the file did not open
+        if let Err(e) = std::fs::File::open(&path) {
+            g.errno = larmorx_freesurfer_core::log::errno_of(&e).unwrap_or(5);
+        }
         let _ = writeln!(io.err, "{who}: gifti_read_image() returned NULL");
         return Ok(None);
     };
@@ -696,6 +724,7 @@ pub fn read_valid(
         g.gifti
             .valid_gifti_image(Some(&image), true, &FsGifti, fix, &mut w, &mut g.notices)
     };
+    version_scans(g, &image);
     if !valid {
         let _ = writeln!(io.err, "{who}: GIFTI file {fname} is invalid!");
         free(&g.gifti, io, image);

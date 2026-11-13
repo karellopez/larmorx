@@ -25,6 +25,9 @@
 //! lines; the first also reads the surface's `LTA`), `mrisDisturbVertices` (it computes the
 //! metric properties).
 
+// The loops index as FreeSurfer's C does (one vertex number for several arrays).
+#![allow(clippy::needless_range_loop)]
+
 use std::io::Write;
 
 use larmorx_core::defects::FS_113;
@@ -187,14 +190,13 @@ pub fn compute_surface_dimensions(mris: &mut Mris) -> i32 {
     0
 }
 
+/// Three arrays of x, y and z.
+pub type Xyz = (Vec<f32>, Vec<f32>, Vec<f32>);
+
 /// `MRISexportXYZ(mris, &px, &py, &pz)`: the current coordinates as three arrays. A negative
 /// vertex count is an allocation `posix_memalign` refuses: a failed `cheapAssert(0 ==
 /// posix_memalign((void**)ppx, 64, n*sizeof(float)))` (line 80, FS-03).
-pub fn export_xyz(
-    g: &mut Globals,
-    io: &mut Io,
-    mris: &Mris,
-) -> Result<(Vec<f32>, Vec<f32>, Vec<f32>), Fatal> {
+pub fn export_xyz(g: &mut Globals, io: &mut Io, mris: &Mris) -> Result<Xyz, Fatal> {
     if mris.nvertices < 0 {
         return Err(diag::assert_failed(
             g,

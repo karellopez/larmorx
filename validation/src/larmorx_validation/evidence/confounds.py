@@ -1151,7 +1151,7 @@ def _example_run(ctx: core.Context, st: dict[str, dict], run: str, bold_run: str
             "crown). The confounds table is compared cell by cell as text in the table below."
         ),
         "provenance": common.provenance(
-            info, f"{TOOL}/workflows", [data], [f"Workflow: `{s['workflow']}`"]
+            _only_inputs(info, tag), f"{TOOL}/workflows", [data], [f"Workflow: `{s['workflow']}`"]
         ),
     }
 
@@ -1348,7 +1348,10 @@ def _example_gaussian(ctx: core.Context, st: dict[str, dict]) -> dict:
         ],
         "metrics_note": "Δ is A − B over every voxel of the files (float64 probabilities).",
         "provenance": common.provenance(
-            gi, f"{TOOL}/gaussian", [data], [f"LARMORX's runs: `{TOOL}/workflows`"]
+            _only_inputs(gi, run),
+            f"{TOOL}/gaussian",
+            [data],
+            [f"LARMORX's runs: `{TOOL}/workflows`"],
         ),
     }
 
@@ -1775,6 +1778,35 @@ def _cases(ctx: core.Context, recs) -> list[dict]:
 # -------------------------------------------------------------------------------- export
 
 
+def _only_inputs(info: dict, key: str) -> dict:
+    """An entry's information with only the inputs whose label names ``key`` (one workflow's or
+    one run's of an entry that holds several): an example credits its own data only."""
+    return {**info, "inputs": {k: v for k, v in info.get("inputs", {}).items() if key in k}}
+
+
+def _provenance(ctx: core.Context, e: fcache.Entry) -> dict:
+    """An entry's provenance without this machine's folders: the checkout as ``<larmorx>``, the
+    workspace as ``<workspace>``, the runs' temporary folder left out."""
+    out = fcache.provenance(e)
+    ws, repo = str(_workspace()), str(ctx.repo)
+    home = str(Path.home())
+    subs = [(x, "<larmorx>") for x in (repo, fcache._short(repo), repo.replace(home, "~", 1))]
+    subs += [(x, "<workspace>") for x in (ws, fcache._short(ws), ws.replace(home, "~", 1))]
+    subs.sort(key=lambda t: -len(t[0]))
+
+    def clean(v: str) -> str:
+        for a, b in subs:
+            if a and a not in ("<workspace>", "<larmorx>"):
+                v = v.replace(a, b)
+        return v
+
+    for c in out["commands"]:
+        c["env"].pop("TMPDIR", None)
+        c["env"] = {k: clean(str(v)) for k, v in c["env"].items()}
+        c["argv"] = [clean(str(a)) for a in c["argv"]]
+    return out
+
+
 def _check_default(ex: dict) -> None:
     """Every panel and comparison the default view names exists and can be drawn."""
     panels = {p["id"] for p in ex["panels"]}
@@ -1825,7 +1857,7 @@ def export(ctx: core.Context) -> dict:
                     "larmorx_commit": _bench(ctx)["nodes"]["machine"].get("commit"),
                 }
             ],
-            "cache": [fcache.provenance(x) for x in ents],
+            "cache": [_provenance(ctx, x) for x in ents],
             "difftest": tprov,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },

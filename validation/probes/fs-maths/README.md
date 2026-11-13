@@ -21,7 +21,9 @@ default differs only where a defect it corrects changed the result (`docs/findin
   float costs passed as C function pointers, with the iteration callback, the step function and
   the user callback; every evaluation and callback hashed; standard output and error captured
   while FreeSurfer runs and hex-encoded into the line; `OpenDFPMin` in a child process, its line
-  `CRASH` when FreeSurfer dies of a signal, FS-37).
+  `CRASH` when FreeSurfer dies of a signal, FS-37; `robust` likewise).
+- `variation.py <cases> [--runs N]`: the official code's own variation on a case file (runs `fsmaths`
+  N times, never cached: crashes and the commands whose lines differ between runs).
 - `build.sh [<workspace>]`: compiles it with the unit oracle's compiler and flags and links it with
   the unit oracle's libraries as the unit oracle's harness is linked
   (`validation/investigations/freesurfer-unit-oracle/`: the official build's `utils` and packages,

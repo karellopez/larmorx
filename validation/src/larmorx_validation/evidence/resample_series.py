@@ -722,10 +722,11 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": bench.source() if bench else [],
+            # the run of its original last: the list keeps its earlier order
             "cache": [
                 fcache.provenance(entry(ctx)),
-                fcache.provenance(numerics_entry(ctx)),
                 fcache.provenance(jacobian_entry(ctx)),
+                fcache.provenance(numerics_entry(ctx)),
             ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },

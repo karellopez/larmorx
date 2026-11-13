@@ -42,8 +42,8 @@ the numbers it needs, no code; what black-box runs confirmed is marked **(observ
   are shown). No fused multiply-add anywhere, no wider intermediate format, no reassociation: the
   official build is SSE2 scalar code without FMA (`FLT_EVAL_METHOD` 0). `sqrt` is IEEE's correctly
   rounded square root; `floor` is exact.
-- `log`, `exp`, `tan`: the C library's functions **as glibc 2.35 computes them on x86-64** (§6),
-  not the correctly rounded ones.
+- `log`, `exp`: the C library's functions **as glibc 2.35 computes them on x86-64** (§6), not the
+  correctly rounded ones; `tan`: the correctly rounded one (§6 says why and what it costs).
 - A **draw** consumes values of the generator's stream in the order this spec lists them; two
   draws written one after the other are made in that order. The number of integers each draw
   consumes is part of the behaviour (later draws of the same stream depend on it).
@@ -203,7 +203,7 @@ For `0 ≤ a < 2³²` (other shapes: FS-100, §8.1). Let `n = floor(a)` (an inte
 **`G_large(A)`**, `A ≥ 12` (the rejection method of Knuth's §3.4.1, with a Cauchy-distributed
 proposal):
 1. Once: `s = sqrt((2·A) − 1)` (`2·A` exact; the subtraction rounded) and `A₁ = A − 1`.
-2. `U`; `y = tan(π_d·U)` (π_d of §5; the product rounded, then glibc's `tan`, §6);
+2. `U`; `y = tan(π_d·U)` (π_d of §5; the product rounded, then the `tan` of §6);
    `T = ((s·y) + A) − 1`. If `T ≤ 0`: repeat step 2 (a new `U`).
 3. `V` = one `U`. If `V > (1 + (y·y)) · exp((A₁·log(T / A₁)) − (s·y))`: repeat from step 2.
 4. The result is `T`.
@@ -264,7 +264,7 @@ products, then the rounded quotient).
 |---|---|---|
 | `log` | `R` in (0, 1] (§4.2), products of `P`'s, `P`, `T / A₁`, `X ≥ 1` | glibc 2.35's (x86-64): `larmorx_core::math::log_glibc` |
 | `exp` | the rejection tests of §4.5 and §4.8 | glibc 2.35's: `larmorx_core::math::exp_glibc` |
-| `tan` | exactly the 2²⁴ values `fl(π_d · k·2⁻²⁴)`, `k = 0, …, 2²⁴ − 1` (`G_large` only) | glibc 2.35's, **which is not correctly rounded there**: on **41,708 of the 16,777,216** arguments glibc's result is one unit in the last place from the correctly rounded one (both directions; 20,360 of them with `k < 2²³`) **(observed**, `tan_check.c`, §10.3**)**. `larmorx_core::math` has a correctly rounded `tan` (CORE-MATH's) but no glibc `tan` yet: track D's piece on the C library's maths (3.1-08) specifies one; until it exists, `G_large` is exact wherever its `U` avoids those 41,708 values of `k` |
+| `tan` | exactly the 2²⁴ values `fl(π_d · k·2⁻²⁴)`, `k = 0, …, 2²⁴ − 1` (`G_large` only) | **correctly rounded** (`larmorx_core::math::tan`, CORE-MATH's), in `fix` and `reproduce` alike. glibc 2.35's `tan` is not correctly rounded there: on **41,708 of the 16,777,216** arguments its result is one unit in the last place from the correctly rounded one (both directions; 20,360 of them with `k < 2²³`) **(observed**, `tan_check.c`, §10.3**)**; its method needs a table of searched points that only glibc's source holds, and the user decided on 2026-11-04 that `tan` stays correctly rounded in `reproduce` too, so that no glibc data enters larmorx (`specs/glibc-dbl.md` §9). So `G_large` gives FreeSurfer's numbers whenever its `U` avoids those 41,708 values of `k`, and may differ in its last bits when it hits one (about 0.25 % of the tangents drawn). No program on FreeSurfer's default paths runs `G_large` (2026-11-12: at run time `tan` is reached only through it, that is through `mri_volsynth`'s and `mri_glmfit`'s simulations with large degrees of freedom; `mri_coreg` dithers with flat draws) |
 | `sqrt` | non-negative values (NaN or a negative value only in §8.1's cases) | correctly rounded (glibc's is the hardware's) |
 | `floor` | the gamma shape | exact |
 
@@ -452,14 +452,15 @@ Reference hashes **(observed)**, seed 53, 20,000 draws: `uni` `0588698480ad8ec24
 `3ff75b40639cd543 bfce260050c592c5 bfc3b77b9f954954`; `gamma(3, 2)` `4024e2b5d995c6dd 400445885bf0942c
 40152c924ed15944`. (`fs_rng_probe`'s `refs.sh` prints them all.)
 
-The gamma cases with a shape of 12 or more pass only with glibc 2.35's `tan` (§6): run them on the
-reference machine, and count separately the draws whose `U` fell on one of §6's 41,708 values.
+The gamma cases with a shape of 12 or more use the correctly rounded `tan` (§6): every draw whose `U`
+avoids §6's 41,708 values of `k` is identical; count the others separately (they may differ in their
+last bits, the expected cost of §6's decision).
 
 ### 10.3 `tan` on its 2²⁴ arguments
 
-The clean room's `tan` (when it exists, §6) against the reference machine's glibc 2.35 `tan` on all
-2²⁴ arguments `fl(π_d · k·2⁻²⁴)`: identical bits. `tan_check.c` is the method (it compares glibc with
-CORE-MATH's `cr_tan`: 41,708 differ).
+`tan_check.c` (the probe folder) compares the reference machine's glibc 2.35 `tan` with CORE-MATH's
+correctly rounded `cr_tan` on all 2²⁴ arguments `fl(π_d · k·2⁻²⁴)`: 41,708 differ; `tan_check list`
+prints their `k`, the list §10.2 uses to separate the expected differences.
 
 ### 10.4 The official programs
 
@@ -492,8 +493,8 @@ One case per path in the cross-platform golden suite (`CLAUDE.md` rule 10): the 
 1,000 values for three seeds, each distribution's first 100 draws for one seed (the gamma branches
 `G_int` below 12, `G_large`, `G_frac` and their sum separately; both t branches), the FS-100 and
 FS-101 defaults; the outputs hashed. They need no input image and run in milliseconds. `G_large`'s
-cases depend on §6's `tan`: until the glibc `tan` exists, choose seeds whose draws avoid §6's 41,708
-values (the golden suite checks platforms against Linux, not against FreeSurfer).
+cases use §6's correctly rounded `tan` (the golden suite checks platforms against Linux, not against
+FreeSurfer: any seed serves).
 
 ## 11. References
 

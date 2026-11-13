@@ -81,3 +81,11 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   sampling is a port error until `fs.bspline` (wave 3.2) exists.
 - `src/resize.rs`, relay 17: `MRIextractPlane` stores the float it read (no round trip through `double`, as the
   official build; the debug build quieted signalling NaNs before).
+- `src/resample.rs` (3.1-37; relay 18): `utils/mri.cpp` `MRIresample`, `MRIresampleFill` (12072-12657), the limit
+  macros (75-95); the trilinear sum's operand orders, the nearest path's bit copies and the 4-byte long stores from
+  the unit oracle's `mri.cpp.o` (`docs/findings/freesurfer-volume.md` §11). Changes: FS-326 (every vote counted),
+  FS-328 (64-bit voxels written whole), rule A; FS-327 (an error, both modes); cubic B-spline sampling is a port
+  error until `fs.bspline` (wave 3.2) exists.
+- `src/arith.rs`, relay 18 (3.1-38): `utils/mriset.cpp` `MRIcheckVolDims` (73-98), `MRIreplaceValues` (2263-2297),
+  `MRIreplaceValuesUchar` (2338-2368). Change: FS-461 (every frame replaced), rule A. FreeSurfer's OpenMP loop over
+  the slices writes each voxel once: run in order.

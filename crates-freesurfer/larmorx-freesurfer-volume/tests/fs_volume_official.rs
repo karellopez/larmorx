@@ -6,7 +6,7 @@
 //! `validation/probes/fs-volume/check.py --seed 1 --n <N>` on Linux x64 from the unit oracle's build,
 //! against the port's output with `reproduce` (lines where FreeSurfer reads or writes memory it does
 //! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, FS-300, FS-302 to FS-310, FS-314,
-//! FS-315, and the
+//! FS-315, FS-322 to FS-325, FS-327, and the
 //! eigen-systems it never returns from, FS-47, FS-48, ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
@@ -15,21 +15,22 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-13 (93 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
+/// Recorded 2026-11-13 (95 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
 /// `USE_AVERAGE305` unset, `true` or empty, 3.1-35's voxel arithmetic, coordinates and geometry,
 /// moves and head box, `MRIaverage`, 3.1-36's samplers, resolution, planes, fills, resampling by whole
 /// factors and changes of type, frame-range samplers, the trilinear kernel and splatting, derivatives,
-/// gradients, neighbour counts and linear transforms, the CMA labels and segmentation functions):
-/// 1,860 cases, 1,713 lines identical, 147 hashed as `SKIP`.
-const N: usize = 1860;
-const OFFICIAL_SHA256: &str = "718b2164c1606fdac499763c22925f59159265321405289580253ec012eefa7c";
-const SKIPPED: usize = 147;
+/// gradients, neighbour counts and linear transforms, 3.1-37's resampling onto a template, 3.1-38's
+/// value replacement, the CMA labels and segmentation functions): 1,900 cases, 1,745 lines
+/// identical, 155 hashed as `SKIP`.
+const N: usize = 1900;
+const OFFICIAL_SHA256: &str = "0b5f671441495eed2d7a7aa8001aa5317d3c1cf986fe06d3c1bf0a911498246b";
+const SKIPPED: usize = 155;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 26] = [
+const SKIP: [&str; 27] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
-    "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325",
+    "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
 ];
 
 #[test]
@@ -123,5 +124,63 @@ fn fill_into_a_smaller_destination_ends() {
         .unwrap();
         assert_eq!(npix, 24);
         assert_eq!(dst.chunk.as_ref().unwrap()[..2], [1, 1]);
+    }
+}
+
+/// A volume geometry with unit cosines, voxels of `size` and its centre at `c` on each axis.
+fn axes(m: &mut larmorx_freesurfer_mri::mri::Mri, size: f32, c: f32) {
+    let vg = &mut m.vg;
+    (vg.xsize, vg.ysize, vg.zsize) = (size, size, size);
+    vg.ras_good_flag = 1;
+    (vg.x_r, vg.x_a, vg.x_s) = (1.0, 0.0, 0.0);
+    (vg.y_r, vg.y_a, vg.y_s) = (0.0, 1.0, 0.0);
+    (vg.z_r, vg.z_a, vg.z_s) = (0.0, 0.0, 1.0);
+    (vg.c_r, vg.c_a, vg.c_s) = (c, c, c);
+}
+
+/// FS-326: 280 votes for label 3 and 320 for label 7 in one template voxel: FreeSurfer's byte
+/// counts stop at 255 and the lower label wins (`reproduce`); the default counts every vote.
+#[test]
+fn vote_counts_past_255() {
+    use larmorx_freesurfer_core::globals::Globals;
+    use larmorx_freesurfer_mri::mri::{MRI_UCHAR, mri_alloc};
+    use larmorx_freesurfer_volume::resample::mri_resample;
+    use larmorx_freesurfer_volume::sample::SAMPLE_VOTE;
+    for (mode, want) in [(UpstreamDefects::Fix, 7u8), (UpstreamDefects::Reproduce, 3)] {
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut src = mri_alloc(&mut g, &mut out, &mut err, 600, 1, 1, MRI_UCHAR).unwrap();
+        for (i, b) in src.chunk.as_mut().unwrap()[..600].iter_mut().enumerate() {
+            *b = if i < 280 { 3 } else { 7 };
+        }
+        axes(&mut src, 1.0, 0.0);
+        let mut t = mri_alloc(&mut g, &mut out, &mut err, 1, 1, 1, MRI_UCHAR).unwrap();
+        axes(&mut t, 1000.0, 500.0);
+        let r = mri_resample(&mut g, &mut out, &mut err, &src, &t, SAMPLE_VOTE)
+            .unwrap()
+            .unwrap();
+        assert_eq!(r.chunk.as_ref().unwrap()[0], want, "{mode}");
+        assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-326"));
+    }
+}
+
+/// FS-461: replacing a value in a two-frame byte volume: FreeSurfer's frame 0 only (`reproduce`),
+/// every frame by default.
+#[test]
+fn byte_replacement_in_every_frame() {
+    use larmorx_freesurfer_core::globals::Globals;
+    use larmorx_freesurfer_mri::mri::{MRI_UCHAR, mri_alloc_sequence};
+    use larmorx_freesurfer_volume::arith::{Pair, mri_replace_values};
+    for (mode, second) in [(UpstreamDefects::Fix, 9u8), (UpstreamDefects::Reproduce, 4)] {
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut m = mri_alloc_sequence(&mut g, &mut out, &mut err, 2, 1, 1, MRI_UCHAR, 2).unwrap();
+        m.chunk.as_mut().unwrap().fill(4);
+        mri_replace_values(&mut g, &mut out, &mut err, Pair::Same(&mut m), 4.0, 9.0).unwrap();
+        let c = m.chunk.as_ref().unwrap();
+        assert_eq!((c[0], c[1]), (9, 9), "{mode}");
+        let n = c.len();
+        assert_eq!(c[n - 1], second, "{mode}");
+        assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-461"));
     }
 }

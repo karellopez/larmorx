@@ -1767,6 +1767,14 @@ defects! {
         "the directional derivative at a scale (MRIsampleVolumeDerivativeScale) with an infinite scale, or one whose double overflows, never returns";
     FS_325 = "FS-325", "FreeSurfer", true,
         "the linear transform of a volume (MRIlinearTransformInterp) stores, where a sample fails (sinc sampling, a type the trilinear sampler refuses), the last sample that succeeded, and before the first a value never written: memory contents";
+    FS_326 = "FS-326", "FreeSurfer", true,
+        "resampling a volume by voting (MRIresample with SAMPLE_VOTE) counts each label's votes for a voxel in a byte, which stops at 255: a label with more votes ties with one of 255 and the lower label wins";
+    FS_327 = "FS-327", "FreeSurfer", true,
+        "resampling a volume by voting onto a template whose orientation is unknown (no good RAS and no principal slice direction) or whose voxel-to-RAS matrix does not invert crashes";
+    FS_328 = "FS-328", "FreeSurfer", true,
+        "resampling a volume of 64-bit integers (long) onto a template writes each voxel as a 32-bit integer at the voxel's index: it changes halves of other voxels";
+    FS_461 = "FS-461", "FreeSurfer", true,
+        "replacing a value in a byte volume (MRIreplaceValues, MRIreplaceValuesUchar) replaces it in the first frame only; the other frames of a new or other destination are not written";
 }
 
 /// The register entry with ID `id`.

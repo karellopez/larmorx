@@ -343,3 +343,47 @@ Source: `utils/mri.cpp` 9147-9156 and 9505-9571 (`FASTER_MRI_EM_REGISTER` is def
 - `MRIsampleVolumeDerivativeScale`'s weight for a huge sigma: `-dist * dist` overflows to `-inf`, `2 *
   sigma * sigma` to `inf`, their quotient is SSE's default NaN, which `exp` passes on; the port computes
   it with the SSE helpers (plain Rust arithmetic gave AArch64's positive NaN under the emulation).
+
+## 11. Resampling onto a template (`MRIresampleFill`, `MRIresample`; 3.1-37) and value replacement (3.1-38; relay 18)
+Source: `utils/mri.cpp` 12072-12657 (`MRIresample`, `MRIresampleFill`), 75-95 (the limit macros: `UCHAR_MIN`
+0.0, `SHORT_MIN`/`SHORT_MAX` as doubles; `UCHAR_MAX`, `INT_*`, `LONG_*`, `USHRT_MAX` from `<limits.h>`);
+`utils/mriset.cpp` 73-98 (`MRIcheckVolDims`), 2263-2297 (`MRIreplaceValues`), 2338-2368
+(`MRIreplaceValuesUchar`). Object code: the unit oracle's `mri.cpp.o` (`<scratch>/C/r18/rf.s`, from
+`<scratch>/C/r11/mri_cpp.s` line 59962).
+- **The trilinear sum's operand orders** (offsets 0x1837-0x1964): `si_f`, `sj_f`, `sk_f` in `xmm0`,
+  `xmm1`, `xmm2`; `1 - x` by `subsd x, 1.0`; `p01 = (1-si) * (1-sj)` (`xmm8 = xmm10; mulsd xmm7, xmm8`);
+  `x5 = sj * (1-si)` (`mulsd xmm10, xmm5`); `x7 = (1-sj) * si` (`mulsd xmm9, xmm7`); terms `(p01 (1-sk))
+  v000`, `(p01 sk) v001`, `((1-sk) x5) v010`, `(x5 sk) v011`, `((1-sk) x7) v100`, `(sk x7) v101`, `((1-sk)
+  (double)(sj si)) v110`; the last `((sj si) sk) v111` by `mulss` (C's float types: `(si_f) * (sj_f) *
+  (sk_f) * val111` has no double operand), converted and added last; each `addsd` keeps the running sum
+  in the destination. The corners' stack slots (`0x18` v000, `0x40` v001, `0x1c` v010, `0x30` v011,
+  `0x20` v100, `0x34` v101, `0x14` v110, `0x24` v111) checked against the short source's loads (row and
+  slice pointers).
+- **The nearest path** selects the upper or lower corner with `cmpltss`/`andps`/`andnps`/`orps`: bit
+  copies, a signalling NaN kept; the float store is a `movss`.
+- **The stores**: `MRI_INT` and `MRI_LONG` both end in `mov %eax, (...)` (4 bytes): `MRILseq_vox` is a
+  `long32` element, so a long destination gets 32-bit integers at index `x` (FS-328, as FS-321). Clamping
+  `val > INT_MAX` assigns `(float) INT_MAX` = 2^31, whose `nint` is out of range (FS-12): a positive
+  overflow becomes -2147483648 under `reproduce`.
+- **FS-326**: `count = MRIgetVoxVal(mri_votes, ...); MRIsetVoxVal(mri_votes, ..., count + 1)` on a byte
+  volume: `MRIsetVoxVal` clips 256 to 255. Votes from every source frame go into the same counts, and every
+  template frame gets the same label (kept: a design for single-frame label volumes).
+- **FS-327**: `minv = MRIgetResampleMatrix(template_vol, src); *MATRIX_RELT(minv, 1, 4) += .5;` before
+  `if (minv == NULL)`: a NULL matrix (the template's orientation unknown, or a singular template matrix
+  the first call did not check) is written through. The probe's case: `CRASH 11` after FreeSurfer's
+  `MRIresample(): source volume orientation is unknown`.
+- **The vote's second loop** runs over `template_vol->nframes`, the destination has `min(src->nframes,
+  template_vol->nframes)` frames: `MRIsetVoxVal` past the destination's slices (`fs.mri`'s outside rules).
+- **Unwritten `pval`**: `MRIsincSampleVolumeFrame` and `MRIcubicSampleVolumeFrame` fail without writing
+  `pval` only for a source type they refuse; the destination has the source's type, which the store
+  `if` chain does not write either, so the never-written value is never stored (no defect).
+- **The fill (kept, rule C)**: `MRIreplaceValues(dest, dest, 0.0f, fill_val)` replaces the fresh volume's
+  zeros, then the sampling writes every voxel of every frame of the six types: the fill shows only in a
+  destination of another type. Only `histo_register_block` (not on recon-all's or fMRIPrep's paths) passes
+  a non-zero fill.
+- **FS-461**: `MRIreplaceValuesUchar` walks `&MRIvox(mri_src, 0, y, z)`: frame 0 only. In
+  `MRIresampleFill` it does not show (the sampling writes every frame).
+- **The probe's coverage** (seed 13, 4,000 `rsfill`/`repval` cases after the generator gave most
+  templates the source's grid): trilinear 124 outputs with sampled values (23 float outputs holding
+  NaNs), nearest 32, sinc 17, cubic 34, weighted 19, vote 93, an unknown type 13; every comparable line
+  identical with `reproduce`.

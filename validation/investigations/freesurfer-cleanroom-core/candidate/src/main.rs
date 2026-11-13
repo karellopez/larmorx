@@ -696,6 +696,7 @@ fn run(p: &mut Process, c: &str, a: &[&str]) -> Result<(), Stop> {
             let r = p.write_rusage(cs(&pre), cs(&f));
             p.put_out(format!("return={r}\n").as_bytes());
         }
+        "bench" => return bench(p, arg(0), atoi(arg(1)).max(1) as usize),
         "maxthreads" => {
             let n = romp::thread_count(p.env.get("OMP_NUM_THREADS"));
             p.put_out(format!("{n}\n").as_bytes());
@@ -714,6 +715,79 @@ fn run(p: &mut Process, c: &str, a: &[&str]) -> Result<(), Stop> {
             return Err(Stop::Exit(2));
         }
     }
+    Ok(())
+}
+
+/// `bench <op> <n>`: the library's own time per call, in process (no parsing or printing): the
+/// speed half of the spec's §20.3 (`speed.py` times the same work through the batch commands).
+fn bench(p: &mut Process, op: &str, n: usize) -> Result<(), Stop> {
+    let mut s: u64 = 7;
+    let mut next = move || {
+        s = s.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = s;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    };
+    let mut unit = move || (next() >> 40) as f32 / (1u64 << 24) as f32 * 2.0 - 1.0;
+    let t0 = std::time::Instant::now();
+    let mut acc = 0.0f64;
+    let what = match op {
+        "atan2" => {
+            let pairs: Vec<(f32, f32)> = (0..n).map(|_| (unit() * 100.0, unit() * 100.0)).collect();
+            let t = std::time::Instant::now();
+            for &(y, x) in &pairs {
+                acc += f64::from(p.fast_approx_atan2f(y, x));
+            }
+            return report(p, op, n, t.elapsed(), acc);
+        }
+        "kth" | "qselect" | "median" => {
+            let lists: Vec<Vec<f32>> = (0..n).map(|_| (0..25).map(|_| unit()).collect()).collect();
+            let t = std::time::Instant::now();
+            for l in lists {
+                let mut l = l;
+                acc += f64::from(match op {
+                    "kth" => numbers::kth_smallest(&mut l, 13),
+                    "qselect" => numbers::quick_select(&mut l, 13),
+                    _ => p.median(&mut l),
+                });
+            }
+            return report(p, op, n, t.elapsed(), acc);
+        }
+        "swap2" | "swap4" | "swap8" => {
+            let k: i32 = op[4..].parse().unwrap_or(4);
+            let mut buf: Vec<u8> = (0..1 << 20).map(|i| (i * 7) as u8).collect();
+            let items = (buf.len() / k as usize) as i64;
+            let t = std::time::Instant::now();
+            for _ in 0..n {
+                p.byte_swap_buf(&mut buf, items, k);
+            }
+            acc += f64::from(buf[3]);
+            return report(p, op, n, t.elapsed(), acc);
+        }
+        "rompsum1" | "rompsum4" => {
+            let threads = if op.ends_with('4') { 4 } else { 1 };
+            let terms: Vec<f64> = (0..n).map(|_| f64::from(unit())).collect();
+            let t = std::time::Instant::now();
+            acc += romp::reproducible_sum(0.0, &terms, threads);
+            return report(p, op, n, t.elapsed(), acc);
+        }
+        _ => "unknown",
+    };
+    let _ = (t0, what);
+    eprintln!("probe: unknown bench {op}");
+    Err(Stop::Exit(2))
+}
+
+fn report(
+    p: &mut Process,
+    op: &str,
+    n: usize,
+    d: std::time::Duration,
+    acc: f64,
+) -> Result<(), Stop> {
+    let ns = d.as_nanos() as f64 / n as f64;
+    p.put_out(format!("bench {op} n={n} ns_per_call={ns:.2} check={acc:.6e}\n").as_bytes());
     Ok(())
 }
 

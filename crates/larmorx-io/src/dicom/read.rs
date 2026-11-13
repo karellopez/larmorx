@@ -179,7 +179,9 @@ pub fn open_file(
         return Err(Unsupported("DCM_USELENGTHTOEND"));
     }
     if (options & opt::ALLOWREPEATELEMENTS) != 0 {
-        return Err(Unsupported("DCM_ALLOWREPEATELEMENTS / DCM_TRYFILENAMECHANGE"));
+        return Err(Unsupported(
+            "DCM_ALLOWREPEATELEMENTS / DCM_TRYFILENAMECHANGE",
+        ));
     }
     if (options & opt::SPECIALFORMATMASK) == opt::EFILM {
         return Err(Unsupported("DCM_EFILM"));
@@ -221,13 +223,26 @@ pub fn open_file(
     };
     let mut offset = 0i64;
     let mut remain_open = false;
-    let cond = read_file1(&mut r, size, &mut offset, 0, options, None, object, None, &mut remain_open);
+    let cond = read_file1(
+        &mut r,
+        size,
+        &mut offset,
+        0,
+        options,
+        None,
+        object,
+        None,
+        &mut remain_open,
+    );
     if cond != DCM_NORMAL || !remain_open {
         r.stack.close_fd(fd);
     }
     if cond != DCM_NORMAL {
         let n = r.name.to_vec();
-        return Ok(r.push(DCM_FILEOPENFAILED, &[Arg::Str(&n), Arg::Str(b"DCM_OpenFile")]));
+        return Ok(r.push(
+            DCM_FILEOPENFAILED,
+            &[Arg::Str(&n), Arg::Str(b"DCM_OpenFile")],
+        ));
     }
     Ok(DCM_NORMAL)
 }
@@ -242,7 +257,13 @@ pub fn close_object(
 ) -> Condition {
     let Some(o) = object.take() else {
         let m = dialect.message(DCM_NULLOBJECT);
-        return stack.push(DCM_NULLOBJECT, m, &[Arg::Str(b"DCM_CloseObject")], out, notices);
+        return stack.push(
+            DCM_NULLOBJECT,
+            m,
+            &[Arg::Str(b"DCM_CloseObject")],
+            out,
+            notices,
+        );
     };
     close_tree(&o, stack);
     DCM_NORMAL
@@ -457,8 +478,7 @@ fn read_file1(
             done = true;
         }
         if part10
-            && o.object_size
-                == (PREAMBLE_LENGTH as u64 + 4 + 12).wrapping_add(o.meta_header_length)
+            && o.object_size == (PREAMBLE_LENGTH as u64 + 4 + 12).wrapping_add(o.meta_header_length)
         {
             options &= !opt::ORDERMASK;
             options |= o.data_options & opt::ORDERMASK;
@@ -511,7 +531,10 @@ fn read_preamble(
     if *size < PREAMBLE_LENGTH as u32 + 4 && known {
         close(r, object);
         let s = *size;
-        return r.push(DCM_ILLEGALSTREAMLENGTH, &[Arg::U32(s), Arg::Str(b"readPreamble")]);
+        return r.push(
+            DCM_ILLEGALSTREAMLENGTH,
+            &[Arg::U32(s), Arg::Str(b"readPreamble")],
+        );
     }
     let mut preamble = [0u8; PREAMBLE_LENGTH];
     let mut label = [0u8; 4];
@@ -523,7 +546,10 @@ fn read_preamble(
     }
     if n != PREAMBLE_LENGTH as i64 + 4 {
         let name = r.name.to_vec();
-        return r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readPreamble")]);
+        return r.push(
+            DCM_FILEACCESSERROR,
+            &[Arg::Str(&name), Arg::Str(b"readPreamble")],
+        );
     }
     if known {
         *size = size.wrapping_sub(PREAMBLE_LENGTH as u32 + 4);
@@ -557,7 +583,10 @@ fn read_group_element(
     if *size < 4 && known {
         close(r, object);
         let s = *size;
-        return r.push(DCM_ILLEGALSTREAMLENGTH, &[Arg::U32(s), Arg::Str(b"readFile")]);
+        return r.push(
+            DCM_ILLEGALSTREAMLENGTH,
+            &[Arg::U32(s), Arg::Str(b"readFile")],
+        );
     }
     let mut buf = [0u8; 4];
     let n = r.read(&mut buf);
@@ -616,17 +645,23 @@ fn read_vr_length(
     if *size < 4 && known {
         close(r, object);
         let s = *size;
-        return r.push(DCM_ILLEGALSTREAMLENGTH, &[Arg::U32(s), Arg::Str(b"readVRLength")]);
+        return r.push(
+            DCM_ILLEGALSTREAMLENGTH,
+            &[Arg::U32(s), Arg::Str(b"readVRLength")],
+        );
     }
     let mut buf = [0u8; 4];
     if r.read(&mut buf) != 4 {
         let name = r.name.to_vec();
-        return r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readVRLength")]);
+        return r.push(
+            DCM_FILEACCESSERROR,
+            &[Arg::Str(&name), Arg::Str(b"readVRLength")],
+        );
     }
     let count = |size: &mut u32,
-                     file_offset: &mut i64,
-                     scanned: &mut Option<&mut u32>,
-                     object: &mut Option<DcmObject>| {
+                 file_offset: &mut i64,
+                 scanned: &mut Option<&mut u32>,
+                 object: &mut Option<DcmObject>| {
         if known {
             *size = size.wrapping_sub(4);
         }
@@ -649,12 +684,16 @@ fn read_vr_length(
         let Some(vr) = Vr::from_code(code) else {
             let mut c = code.to_vec();
             c.push(0);
-            return r.push(DCM_UNRECOGNIZEDVRCODE, &[Arg::Str(&c), Arg::Str(b"readVRLength")]);
+            return r.push(
+                DCM_UNRECOGNIZEDVRCODE,
+                &[Arg::Str(&c), Arg::Str(b"readVRLength")],
+            );
         };
         if vr != e.representation {
-            if vr == Vr::Ob {
-                e.representation = vr;
-            } else if matches!(e.representation, Vr::Un | Vr::Ctx | Vr::Ret)
+            // OB is believed (the waveform supplement's), as are the codes for an element the
+            // dictionary does not type, OW, and any code with DCM_ACCEPTVRMISMATCH
+            if vr == Vr::Ob
+                || matches!(e.representation, Vr::Un | Vr::Ctx | Vr::Ret)
                 || vr == Vr::Ow
                 || accept
             {
@@ -679,7 +718,10 @@ fn read_vr_length(
             }
             if r.read(&mut buf) != 4 {
                 let name = r.name.to_vec();
-                return r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readVRLength")]);
+                return r.push(
+                    DCM_FILEACCESSERROR,
+                    &[Arg::Str(&name), Arg::Str(b"readVRLength")],
+                );
             }
             count(size, file_offset, &mut scanned, object);
         }
@@ -1020,7 +1062,10 @@ fn read_data(
             if length != UNSPECIFIED_LENGTH {
                 close(r, object);
                 let name = r.name.to_vec();
-                return Err(r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readFile")]));
+                return Err(r.push(
+                    DCM_FILEACCESSERROR,
+                    &[Arg::Str(&name), Arg::Str(b"readFile")],
+                ));
             }
             r.notices.add(
                 &defects::FS_91,
@@ -1038,7 +1083,10 @@ fn read_data(
         if n != length as i64 {
             close(r, object);
             let name = r.name.to_vec();
-            return Err(r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readFile")]));
+            return Err(r.push(
+                DCM_FILEACCESSERROR,
+                &[Arg::Str(&name), Arg::Str(b"readFile")],
+            ));
         }
         if item.representation == Vr::At {
             swap_at_group_element(&mut data);
@@ -1094,7 +1142,7 @@ fn swap_at_group_element(d: &mut [u8]) {
 /// `swapInPlace`: values of data in the reverse byte order brought to the machine's.
 fn swap_in_place(r: &mut Reader, item: &ElementItem, bits_allocated: u16, d: &mut [u8]) {
     let pairs = |d: &mut [u8]| {
-        for p in d.chunks_exact_mut(2) {
+        for p in d.as_chunks_mut::<2>().0 {
             p.swap(0, 1);
         }
     };
@@ -1109,20 +1157,25 @@ fn swap_in_place(r: &mut Reader, item: &ElementItem, bits_allocated: u16, d: &mu
             if r.dialect.swap_4byte_in_pairs() && d.len() >= 4 {
                 // FS-94: the dialect's swap, in reproduce; corrected otherwise
                 if r.notices.reproduce() {
-                    r.notices.add(&defects::FS_94, "4-byte integers swapped in 2-byte pairs");
+                    r.notices
+                        .add(&defects::FS_94, "4-byte integers swapped in 2-byte pairs");
                     pairs(d);
                     return;
                 }
                 r.notices.add(&defects::FS_94, "4-byte integers reversed");
             }
             let whole = d.len() / 4 * 4;
-            for q in d[..whole].chunks_exact_mut(4) {
+            for q in d[..whole].as_chunks_mut::<4>().0 {
                 q.reverse();
             }
             if whole < d.len() {
                 r.notices.add(
                     &defects::FS_95,
-                    format!("a {} value of {} bytes", vr_name(item.representation), d.len()),
+                    format!(
+                        "a {} value of {} bytes",
+                        vr_name(item.representation),
+                        d.len()
+                    ),
                 );
                 pairs(&mut d[whole..]);
             }
@@ -1164,7 +1217,12 @@ fn vr_name(v: Vr) -> &'static str {
         .unwrap_or("")
 }
 
-fn check_attribute_order(r: &mut Reader, e: &El, last_group: &mut i64, last_element: &mut i64) -> Condition {
+fn check_attribute_order(
+    r: &mut Reader,
+    e: &El,
+    last_group: &mut i64,
+    last_element: &mut i64,
+) -> Condition {
     let group = tag_group(e.tag) as i64;
     let element = tag_element(e.tag) as i64;
     let out_of_order = if group == *last_group {
@@ -1337,7 +1395,10 @@ fn update_special_elements(o: &mut DcmObject, item: &ElementItem, notices: &mut 
             let d: &[u8] = match &item.data {
                 Data::Bytes(b) => b,
                 _ => {
-                    notices.add(&defects::FS_92, "a Waveform Data Representation without a value");
+                    notices.add(
+                        &defects::FS_92,
+                        "a Waveform Data Representation without a value",
+                    );
                     &[]
                 }
             };

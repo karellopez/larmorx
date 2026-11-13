@@ -16,8 +16,20 @@ fn scratch(tag: &str) -> PathBuf {
 }
 
 fn el(o: &mut Vec<u8>, tag: u32, vr: Option<&[u8; 2]>, len: u32, val: &[u8], big: bool) {
-    let p16 = |o: &mut Vec<u8>, v: u16| o.extend_from_slice(&if big { v.to_be_bytes() } else { v.to_le_bytes() });
-    let p32 = |o: &mut Vec<u8>, v: u32| o.extend_from_slice(&if big { v.to_be_bytes() } else { v.to_le_bytes() });
+    let p16 = |o: &mut Vec<u8>, v: u16| {
+        o.extend_from_slice(&if big {
+            v.to_be_bytes()
+        } else {
+            v.to_le_bytes()
+        })
+    };
+    let p32 = |o: &mut Vec<u8>, v: u32| {
+        o.extend_from_slice(&if big {
+            v.to_be_bytes()
+        } else {
+            v.to_le_bytes()
+        })
+    };
     p16(o, (tag >> 16) as u16);
     p16(o, tag as u16);
     match vr {
@@ -51,8 +63,16 @@ fn open(path: &Path, options: u64, mode: UpstreamDefects, dialect: &dyn Dialect)
         out: Captured::default(),
         notices: Notices::new(mode),
     };
-    r.cond = open_file(path, options, &mut r.object, dialect, &mut r.stack, &mut r.out, &mut r.notices)
-        .unwrap();
+    r.cond = open_file(
+        path,
+        options,
+        &mut r.object,
+        dialect,
+        &mut r.stack,
+        &mut r.out,
+        &mut r.notices,
+    )
+    .unwrap();
     r
 }
 
@@ -60,8 +80,22 @@ fn part10(dataset: &[u8], ts: &[u8]) -> Vec<u8> {
     let mut o = vec![0u8; 128];
     o.extend_from_slice(b"DICM");
     let mut meta = Vec::new();
-    el(&mut meta, 0x0002_0010, Some(b"UI"), ts.len() as u32, ts, false);
-    el(&mut o, 0x0002_0000, Some(b"UL"), 4, &(meta.len() as u32).to_le_bytes(), false);
+    el(
+        &mut meta,
+        0x0002_0010,
+        Some(b"UI"),
+        ts.len() as u32,
+        ts,
+        false,
+    );
+    el(
+        &mut o,
+        0x0002_0000,
+        Some(b"UL"),
+        4,
+        &(meta.len() as u32).to_le_bytes(),
+        false,
+    );
     o.extend_from_slice(&meta);
     o.extend_from_slice(dataset);
     o
@@ -72,14 +106,28 @@ fn messages_format_as_c() {
     let m = ctn_message(DCM_ELEMENTLENGTHERROR).unwrap();
     let t = c_format(
         m,
-        &[Arg::Int(0x10), Arg::Int(0x20), Arg::U32(8), Arg::U32(2), Arg::Str(b"readFile")],
+        &[
+            Arg::Int(0x10),
+            Arg::Int(0x20),
+            Arg::U32(8),
+            Arg::U32(2),
+            Arg::Str(b"readFile"),
+        ],
     );
     assert_eq!(
         t,
         b"DCM Data Element (0010 0020) longer (8) than remaining length (2) of data in stream or file in readFile"
     );
     assert_eq!(
-        c_format(b"%8x|%-4d|%04x|%ld", &[Arg::Long(0x9_0002), Arg::Int(-3), Arg::Int(7), Arg::U32(u32::MAX)]),
+        c_format(
+            b"%8x|%-4d|%04x|%ld",
+            &[
+                Arg::Long(0x9_0002),
+                Arg::Int(-3),
+                Arg::Int(7),
+                Arg::U32(u32::MAX)
+            ]
+        ),
         b"   90002|-3  |0007|4294967295"
     );
     // a long is read by %d as its low 32 bits
@@ -103,17 +151,37 @@ fn the_stack_keeps_256_bytes_and_overflows_at_98() {
     let mut out = Captured::default();
     let mut n = Notices::new(UpstreamDefects::Fix);
     let long = vec![b'x'; 300];
-    s.push(DCM_FILEOPENFAILED, ctn_message(DCM_FILEOPENFAILED), &[Arg::Str(&long), Arg::Str(b"f")], &mut out, &mut n);
+    s.push(
+        DCM_FILEOPENFAILED,
+        ctn_message(DCM_FILEOPENFAILED),
+        &[Arg::Str(&long), Arg::Str(b"f")],
+        &mut out,
+        &mut n,
+    );
     assert_eq!(s.entries()[0].1.len(), 256);
     assert!(n.is_empty());
     for i in 1..98 {
-        s.push(DCM_NULLOBJECT, ctn_message(DCM_NULLOBJECT), &[Arg::Str(format!("r{i}").as_bytes())], &mut out, &mut n);
+        s.push(
+            DCM_NULLOBJECT,
+            ctn_message(DCM_NULLOBJECT),
+            &[Arg::Str(format!("r{i}").as_bytes())],
+            &mut out,
+            &mut n,
+        );
     }
     assert_eq!(s.entries().len(), 98);
     assert!(out.text(Stream::Err).is_empty());
-    s.push(DCM_NULLOBJECT, ctn_message(DCM_NULLOBJECT), &[Arg::Str(b"last")], &mut out, &mut n);
+    s.push(
+        DCM_NULLOBJECT,
+        ctn_message(DCM_NULLOBJECT),
+        &[Arg::Str(b"last")],
+        &mut out,
+        &mut n,
+    );
     let err = out.text(Stream::Err);
-    assert!(err.ends_with("   50092 NULL object passed to routine last\nCONDITION Stack overflow\n"));
+    assert!(
+        err.ends_with("   50092 NULL object passed to routine last\nCONDITION Stack overflow\n")
+    );
     assert_eq!(err.lines().count(), 100);
     // the top is entry 0 again: the first condition pushed
     assert_eq!(s.entries().len(), 1);
@@ -125,7 +193,13 @@ fn the_stack_keeps_256_bytes_and_overflows_at_98() {
     assert_eq!(s.pop(false), COND_NORMAL);
     // a message of 1,024 bytes or more overflows CTN's buffer
     let huge = vec![b'y'; 1100];
-    s.push(DCM_FILEOPENFAILED, ctn_message(DCM_FILEOPENFAILED), &[Arg::Str(&huge), Arg::Str(b"f")], &mut out, &mut n);
+    s.push(
+        DCM_FILEOPENFAILED,
+        ctn_message(DCM_FILEOPENFAILED),
+        &[Arg::Str(&huge), Arg::Str(b"f")],
+        &mut out,
+        &mut n,
+    );
     assert!(n.contains(&larmorx_core::defects::FS_90));
 }
 
@@ -138,15 +212,26 @@ fn a_part10_file_switches_to_its_transfer_syntax() {
     el(&mut ds, 0x7fe0_0010, None, 4, &[1, 2, 3, 4], false);
     let f = d.join("a.dcm");
     std::fs::write(&f, part10(&ds, b"1.2.840.10008.1.2\0")).unwrap();
-    let r = open(&f, opt::PART10FILE | opt::ACCEPTVRMISMATCH, UpstreamDefects::Fix, &Ctn);
+    let r = open(
+        &f,
+        opt::PART10FILE | opt::ACCEPTVRMISMATCH,
+        UpstreamDefects::Fix,
+        &Ctn,
+    );
     assert_eq!(r.cond, DCM_NORMAL);
     let o = r.object.unwrap();
     assert!(o.preamble_flag);
     assert_eq!(o.data_options, opt::ORDERLITTLEENDIAN);
     assert_eq!(o.pixel_bits_allocated, 16);
-    assert_eq!(o.groups.iter().map(|g| g.group).collect::<Vec<_>>(), [2, 8, 0x28, 0x7fe0]);
+    assert_eq!(
+        o.groups.iter().map(|g| g.group).collect::<Vec<_>>(),
+        [2, 8, 0x28, 0x7fe0]
+    );
     let px = &o.groups[3].elements[0];
-    assert_eq!((px.representation, &px.data, px.data_offset), (Vr::Ow, &Data::OnDisk, 200));
+    assert_eq!(
+        (px.representation, &px.data, px.data_offset),
+        (Vr::Ow, &Data::OnDisk, 200)
+    );
     assert!(o.fd.is_some());
     // the group length is recomputed from the elements
     let gl = &o.groups[0].elements[0];
@@ -154,7 +239,12 @@ fn a_part10_file_switches_to_its_transfer_syntax() {
     assert!(r.stack.entries().is_empty());
     // the same file as a bare data set fails: its preamble's zeros are (0000,0000) elements of
     // length 0, the second out of order
-    let r = open(&f, opt::ORDERLITTLEENDIAN | opt::ACCEPTVRMISMATCH, UpstreamDefects::Fix, &Ctn);
+    let r = open(
+        &f,
+        opt::ORDERLITTLEENDIAN | opt::ACCEPTVRMISMATCH,
+        UpstreamDefects::Fix,
+        &Ctn,
+    );
     assert_eq!(r.cond, DCM_FILEOPENFAILED);
     assert!(r.object.is_some());
     assert_eq!(
@@ -178,13 +268,38 @@ fn the_format_probe_sequence_on_a_nifti_header() {
     let mut n = Notices::new(UpstreamDefects::Fix);
     let mut object = None;
     let mut conds = Vec::new();
-    for o in [opt::PART10FILE, opt::ORDERLITTLEENDIAN, opt::ORDERBIGENDIAN, opt::FORMATCONVERSION] {
-        let c = open_file(&f, o | opt::ACCEPTVRMISMATCH, &mut object, &Ctn, &mut stack, &mut out, &mut n).unwrap();
+    for o in [
+        opt::PART10FILE,
+        opt::ORDERLITTLEENDIAN,
+        opt::ORDERBIGENDIAN,
+        opt::FORMATCONVERSION,
+    ] {
+        let c = open_file(
+            &f,
+            o | opt::ACCEPTVRMISMATCH,
+            &mut object,
+            &Ctn,
+            &mut stack,
+            &mut out,
+            &mut n,
+        )
+        .unwrap();
         conds.push(c);
         close_object(&mut object, &Ctn, &mut stack, &mut out, &mut n);
     }
-    assert_eq!(conds, [0, 1, 2, 3].map(|i| if i == 3 { DCM_ILLEGALOPTION } else { DCM_FILEOPENFAILED }));
-    let texts: Vec<String> = stack.entries().iter().map(|(_, t)| String::from_utf8_lossy(t).into_owned()).collect();
+    assert_eq!(
+        conds,
+        [0, 1, 2, 3].map(|i| if i == 3 {
+            DCM_ILLEGALOPTION
+        } else {
+            DCM_FILEOPENFAILED
+        })
+    );
+    let texts: Vec<String> = stack
+        .entries()
+        .iter()
+        .map(|(_, t)| String::from_utf8_lossy(t).into_owned())
+        .collect();
     // 348 read as a tag is (015c,0000) (little endian) or (5c01,0000) (big): a group length of
     // length 0, then the zeros make (0000,0000), out of order; the object stays open
     let order = "DCM group/element out of order (0000 0000) in checkAttributeOrder".to_owned();
@@ -232,7 +347,10 @@ fn an_undefined_length_that_is_no_sequence() {
     let ob = r.object.unwrap();
     assert_eq!(ob.groups[1].elements[0].data, Data::Unread);
     // the item tag ends the reading at its delimiter: (0020,0010) never read
-    assert_eq!(ob.groups.iter().map(|g| g.group).collect::<Vec<_>>(), [0x0008, 0x0010, 0xfffe]);
+    assert_eq!(
+        ob.groups.iter().map(|g| g.group).collect::<Vec<_>>(),
+        [0x0008, 0x0010, 0xfffe]
+    );
     assert_eq!(r.stack.errno, EINVAL);
     std::fs::remove_dir_all(&d).ok();
 }
@@ -250,11 +368,21 @@ fn big_endian_values() {
     let mut o = Vec::new();
     el(&mut o, 0x0008_0018, None, 4, b"1.2\0", true);
     el(&mut o, 0x0018_0050, None, 8, &2.5f64.to_be_bytes(), true);
-    el(&mut o, 0x0018_6020, None, 4, &0x0102_0304u32.to_be_bytes(), true);
+    el(
+        &mut o,
+        0x0018_6020,
+        None,
+        4,
+        &0x0102_0304u32.to_be_bytes(),
+        true,
+    );
     el(&mut o, 0x0028_0010, None, 2, &0x0506u16.to_be_bytes(), true);
     let f = d.join("b.dcm");
     std::fs::write(&f, &o).unwrap();
-    let value = |r: &Run, g: usize, e: usize| match &r.object.as_ref().unwrap().groups[g].elements[e].data {
+    let value = |r: &Run, g: usize, e: usize| match &r.object.as_ref().unwrap().groups[g].elements
+        [e]
+        .data
+    {
         Data::Bytes(b) => b.clone(),
         _ => panic!(),
     };
@@ -265,7 +393,12 @@ fn big_endian_values() {
     // (0018,6020) Reference Pixel X0 is SL, (0028,0010) Rows US
     assert_eq!(value(&r, 1, 1), 0x0102_0304u32.to_le_bytes());
     assert_eq!(value(&r, 2, 0), 0x0506u16.to_le_bytes());
-    let r = open(&f, opt::ORDERBIGENDIAN, UpstreamDefects::Reproduce, &PairSwap);
+    let r = open(
+        &f,
+        opt::ORDERBIGENDIAN,
+        UpstreamDefects::Reproduce,
+        &PairSwap,
+    );
     assert_eq!(value(&r, 1, 1), [0x02, 0x01, 0x04, 0x03]);
     assert!(r.notices.contains(&larmorx_core::defects::FS_94));
     let r = open(&f, opt::ORDERBIGENDIAN, UpstreamDefects::Fix, &PairSwap);
@@ -310,7 +443,10 @@ fn sequences_nest_to_the_limit() {
     let r = open(&f, opt::ORDERLITTLEENDIAN, UpstreamDefects::Fix, &Ctn);
     assert_eq!(r.cond, DCM_FILEOPENFAILED);
     assert!(r.notices.contains(&larmorx_core::defects::FS_97));
-    assert_eq!(r.stack.entries()[0].1, b"DCM Failed to read stream in readSequence");
+    assert_eq!(
+        r.stack.entries()[0].1,
+        b"DCM Failed to read stream in readSequence"
+    );
     std::fs::remove_dir_all(&d).ok();
 }
 
@@ -326,10 +462,22 @@ impl Digest {
         self.bytes(&v.to_le_bytes());
     }
     fn object(&mut self, o: &DcmObject) {
-        for v in [o.object_type as u64, o.object_size, o.offset, o.pixel_bits_allocated as u64, o.pixel_representation as u64] {
+        for v in [
+            o.object_type as u64,
+            o.object_size,
+            o.offset,
+            o.pixel_bits_allocated as u64,
+            o.pixel_representation as u64,
+        ] {
             self.u64(v);
         }
-        for v in [o.fd.is_some() as u64, o.preamble_flag as u64, o.data_options, o.meta_header_length, o.long_vr_attributes as u64] {
+        for v in [
+            o.fd.is_some() as u64,
+            o.preamble_flag as u64,
+            o.data_options,
+            o.meta_header_length,
+            o.long_vr_attributes as u64,
+        ] {
             self.u64(v);
         }
         self.bytes(&o.preamble);
@@ -343,7 +491,12 @@ impl Digest {
                 self.u64(e.multiplicity);
                 self.u64(e.length as u64);
                 self.bytes(e.description.as_bytes());
-                for v in [e.data_offset as u64, e.original_data_length, e.padded_data_length, e.allocated_data_length] {
+                for v in [
+                    e.data_offset as u64,
+                    e.original_data_length,
+                    e.padded_data_length,
+                    e.allocated_data_length,
+                ] {
                     self.u64(v);
                 }
                 match &e.data {
@@ -368,15 +521,22 @@ fn digest_of_generated_files() {
     let d = scratch("digest");
     let mut seed = 0x2026_1113u64;
     let mut next = move || {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (seed >> 33) as u32
     };
-    let tags: Vec<(u32, u32)> = dict::entries().filter(|e| e.tag >> 16 >= 8 && e.tag >> 16 < 0x7fe0).map(|e| (e.tag, e.vr)).collect();
+    let tags: Vec<(u32, u32)> = dict::entries()
+        .filter(|e| e.tag >> 16 >= 8 && e.tag >> 16 < 0x7fe0)
+        .map(|e| (e.tag, e.vr))
+        .collect();
     let mut h = Digest(0xcbf2_9ce4_8422_2325);
     for i in 0..300 {
         let big = i % 5 == 3;
         let mut ds = Vec::new();
-        let mut picked: Vec<(u32, u32)> = (0..next() % 25).map(|_| tags[next() as usize % tags.len()]).collect();
+        let mut picked: Vec<(u32, u32)> = (0..next() % 25)
+            .map(|_| tags[next() as usize % tags.len()])
+            .collect();
         picked.sort();
         picked.dedup_by_key(|x| x.0);
         for (t, vr) in picked {
@@ -395,7 +555,11 @@ fn digest_of_generated_files() {
         if i % 3 == 0 {
             el(&mut ds, 0x7fe0_0010, None, 8, &[9; 8], big);
         }
-        let mut f = if i % 2 == 0 { part10(&ds, b"1.2.840.10008.1.2\0") } else { ds };
+        let mut f = if i % 2 == 0 {
+            part10(&ds, b"1.2.840.10008.1.2\0")
+        } else {
+            ds
+        };
         match i % 7 {
             0 if !f.is_empty() => {
                 let n = next() as usize % f.len();
@@ -414,17 +578,41 @@ fn digest_of_generated_files() {
         let mut out = Captured::default();
         let mut notices = Notices::new(UpstreamDefects::Fix);
         let mut object = None;
-        for o in [opt::PART10FILE, opt::ORDERLITTLEENDIAN, opt::ORDERBIGENDIAN, opt::FORMATCONVERSION] {
-            let c = open_file(&p, o | opt::ACCEPTVRMISMATCH, &mut object, &Ctn, &mut stack, &mut out, &mut notices).unwrap();
+        for o in [
+            opt::PART10FILE,
+            opt::ORDERLITTLEENDIAN,
+            opt::ORDERBIGENDIAN,
+            opt::FORMATCONVERSION,
+        ] {
+            let c = open_file(
+                &p,
+                o | opt::ACCEPTVRMISMATCH,
+                &mut object,
+                &Ctn,
+                &mut stack,
+                &mut out,
+                &mut notices,
+            )
+            .unwrap();
             h.u64(c);
             if let Some(ob) = &object {
                 h.object(ob);
             }
-            h.u64(close_object(&mut object, &Ctn, &mut stack, &mut out, &mut notices));
+            h.u64(close_object(
+                &mut object,
+                &Ctn,
+                &mut stack,
+                &mut out,
+                &mut notices,
+            ));
         }
         for (c, t) in stack.entries() {
             h.u64(*c);
-            h.bytes(String::from_utf8_lossy(t).replace(&name, "<name>").as_bytes());
+            h.bytes(
+                String::from_utf8_lossy(t)
+                    .replace(&name, "<name>")
+                    .as_bytes(),
+            );
         }
         h.bytes(out.text(Stream::Out).as_bytes());
         h.bytes(out.text(Stream::Err).replace(&name, "<name>").as_bytes());
@@ -433,5 +621,9 @@ fn digest_of_generated_files() {
         }
     }
     std::fs::remove_dir_all(&d).ok();
-    assert_eq!(h.0, 0x3028_c185_b5ef_abd5, "digest of the generated files: {:#018x}", h.0);
+    assert_eq!(
+        h.0, 0x3028_c185_b5ef_abd5,
+        "digest of the generated files: {:#018x}",
+        h.0
+    );
 }

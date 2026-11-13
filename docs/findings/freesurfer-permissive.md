@@ -173,11 +173,46 @@ Where FreeSurfer calls them (the call sites the cards name):
   numbers. FreeSurfer reads and writes GIFTI through `gifti_read_image`, `gifti_write_image` and
   `gifti_valid_gifti_image` (its `utils/gifti.cpp`, track A).
 
+## CTN's DICOM library (item 3.1-16)
+
+- FreeSurfer 8.2.0's `packages/dicom` is CTN 3.0.6's object library (`dcm.c`, `dcmdict.c`,
+  `dcmcond.c`, `dcmsupport.c`, `condition.c`, `lst.c`, `ctnthread.c`) reformatted, with casts, a
+  note "Modified Dec 15 2014 by DNG to handle double and float" (`DCM_DumpElements` and the
+  element union's `fl`/`fd`: nothing the reading reaches) and three changes the reading reaches,
+  measured by the probe: (1) `swapInPlace` swaps UL and SL of big-endian data in 2-byte pairs (the
+  4-byte reversal kept under `#if 0`, with a comment on UL values whose length is not a multiple
+  of 4): FS-94, which also makes FS-95's crash unreachable in FreeSurfer; (2) the
+  `DCM_ELEMENTLENGTHERROR` message's continuation line carries 35 spaces ("... of" + 36 blanks +
+  "data in stream or file in %s", the line splice of a reformatted source); (3) `newElementItem`
+  computes the room with a `long`, so an undefined length (FS-91) allocates 4 GiB + 152 bytes
+  where CTN 3.0.6 allocates 152 (neither is ever written). The dictionary is CTN 3.0.6's, entry for
+  entry (`gen_dict.sh` compares them); the platform header defines `LONGSIZE 32` with `U32` an
+  `unsigned int` (the same types as CTN on Linux x86-64), no threads.
+- `IsDICOM` (its `utils/DICOMRead.cpp`, track A's `fs.io`) opens a file four times, as
+  `mri_identify` asks for every volume it cannot tell by name: `DCM_PART10FILE`,
+  `DCM_ORDERLITTLEENDIAN`, `DCM_ORDERBIGENDIAN`, `DCM_FORMATCONVERSION`, each with
+  `DCM_ACCEPTVRMISMATCH`, closing the object after each failure and clearing the condition stack
+  before and after (`COND_PopCondition(1)`). The fourth attempt can never succeed (no byte order:
+  "DCM illegal stream option: Byte order"), and after a failed attempt the close finds the handle
+  empty when the reader had closed the object ("NULL object passed to routine DCM_CloseObject").
+  With `FS_DICOM_DEBUG` set it prints the conditions (`DCMPrintCond`, and `COND_DumpConditions`
+  after the first attempt, which empties the stack). `GetObjectFromFile` repeats the four opens
+  with the caller's options and dumps the stack when all fail; `mri_probedicom` opens three ways.
+  None of FreeSurfer's calls passes another option the port does not follow.
+- A file that is DICOM to CTN in its implicit little-endian attempt is any file whose first bytes
+  read as ascending tags with lengths that fit: a NIfTI-1 header is not (its 348 makes
+  (015c,0000) of length 0, then (0000,0000) out of order), nor is an MGH header (its version and
+  width, read as a tag and a length, run past the file). FreeSurfer asks `IsDICOM` only for names
+  `mri_identify` cannot place by their extension.
+- The probe `validation/probes/fs-dicom` compares the port with the unit oracle's `libdicom.a`
+  through the probe's `FsDialect` (the two changes above): its README has the numbers.
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
 `validation/probes/x87-extended` (`patterns.cpp`: FreeSurfer's `long double` patterns),
 `validation/probes/fs-random` (FreeSurfer's seeds and its `drand64` cast),
 `validation/probes/fs-minc-nifti` (`ProbeFs`, `Flavour::FreeSurfer`: FreeSurfer's copies' changes)
-and `validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) are closed to
+`validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) and
+`validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) are closed to
 FreeSurfer's clean-room implementers, as this file is.

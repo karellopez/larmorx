@@ -472,7 +472,11 @@ impl CondStack {
             self.stderr_oriented = true;
         }
         for (c, t) in self.entries().to_vec() {
-            out.err(&format!("{:8x} {}\n", c as u32, String::from_utf8_lossy(&t)));
+            out.err(&format!(
+                "{:8x} {}\n",
+                c as u32,
+                String::from_utf8_lossy(&t)
+            ));
         }
     }
 

@@ -171,7 +171,10 @@ impl Vr {
     pub fn from_code(code: [u8; 2]) -> Option<Vr> {
         let n = code.iter().position(|&c| c == 0).unwrap_or(2);
         let s = &code[..n];
-        Vr::code_table().iter().find(|(_, c)| *c == s).map(|(v, _)| *v)
+        Vr::code_table()
+            .iter()
+            .find(|(_, c)| *c == s)
+            .map(|(v, _)| *v)
     }
 }
 

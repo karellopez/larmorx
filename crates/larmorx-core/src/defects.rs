@@ -1040,7 +1040,7 @@ defects! {
     FS_90 = "FS-90", "CTN", true,
         "a condition message of 1,024 bytes or more (a long file name in it) overflows the buffer it is formatted in, and a file name of 1,024 bytes or more overflows the object's copy of it: the program crashes or its memory is corrupted";
     FS_91 = "FS-91", "CTN", true,
-        "an element of undefined length that is neither a sequence nor pixel data is given a value buffer of length+1 bytes in 32-bit arithmetic (none: the rest of the file is read past it, corrupting memory; FreeSurfer's copy allocates 4 GiB instead) before the open fails";
+        "an element of undefined length that is neither a sequence nor pixel data (a sequence the 2002 dictionary types otherwise, a stray item) is read with a count of -1, which fails, and the failure is taken for a complete read: the element is kept with a value never written, the remaining length grows by one and the value's bytes are read as the next elements (an item's delimiter there ends the data set early)";
     FS_92 = "FS-92", "CTN", true,
         "Bits Allocated, Pixel Representation, the file meta group's length, the transfer syntax and the Waveform Data Representation are read from their values whatever their length and representation: a shorter value, a sequence or a transfer syntax without its zero byte is read past its end, from memory never written";
     FS_93 = "FS-93", "CTN", true,

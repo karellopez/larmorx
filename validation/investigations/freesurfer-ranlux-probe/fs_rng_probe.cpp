@@ -10,7 +10,12 @@
 //              gamma_frac(a) chisq(nu) fdist(nu1,nu2) tdist(nu) exponential(mu)
 //   fs_rng_probe rf <name> <seed> <count> [p1 [p2]]    RFspecInit(seed) + RFdrawVal, as mri_coreg
 //   fs_rng_probe mixed <seed> <count>               one stream, the draws of a fixed rotation of
-//       every distribution (checks that each consumes the stream as specified)
+//       every distribution (checks that each consumes the stream as specified): draw k is, by k mod 14,
+//       uni, uni_pos, flat(-3.5, 7.25), gaussian(2.5), ugauss, gamma(3, 2), gamma(0.4, 1.5),
+//       gamma(7.3, 0.5), gamma(25, 1), gamma(31.6, 1), chisq(5), fdist(4, 9),
+//       tdist(1.5 if k mod 28 = 12, else 7), exponential(0.75)
+//   fs_rng_probe crafted <name> <a> <b> [p1 [p2]]   one draw from a state whose next integers are a, b
+//   fs_rng_probe zero-seeds <first> <last>          the 32-bit seeds whose seeded state is all zero
 // <seed> is parsed as an unsigned 64-bit integer, or as a signed one when it starts with '-'
 // (converted as C does: modulo 2^64).
 #include <cinttypes>
@@ -119,6 +124,27 @@ int main(int argc, char **argv)
         case 13: put(sc_ran_exponential(r, 0.75)); break;
       }
     }
+    return 0;
+  }
+  if (!strcmp(cmd, "crafted")) {
+    // crafted <name> <a> <b> [p1 [p2]]: a generator state whose next two integers are a and b
+    // (then 0 until the 24th call: every other value of the state is 0, the carry 0, the decimation
+    // counter at its start), then one draw of the distribution. Shows what a distribution does on
+    // a given pair of uniforms (e.g. gaussian 0 8388608: X = -1, Y = 0, R = 1).
+    if (argc < 5) return 2;
+    sc_rng *r = sc_rng_alloc(&intern_rng_type);
+    sc_rng_set(r, 1);
+    sc_status_t *st = (sc_status_t *)r->status;
+    for (int i = 0; i < 24; i++) st->u[i] = 0;
+    st->carry = 0;
+    st->n = 0;
+    st->i = 23;
+    st->j = 9;
+    st->u[9] = strtoul(argv[3], NULL, 10) & 0xffffffUL;
+    st->u[8] = strtoul(argv[4], NULL, 10) & 0xffffffUL;
+    double p1 = argc > 5 ? strtod(argv[5], NULL) : 0.0;
+    double p2 = argc > 6 ? strtod(argv[6], NULL) : 0.0;
+    put(draw(argv[2], r, p1, p2));
     return 0;
   }
   if (!strcmp(cmd, "zero-seeds")) {

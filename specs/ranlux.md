@@ -133,15 +133,36 @@ When the 24 seeded values are all 0 (the carry is 0, §2.2 step 5), the recurren
 every delivered value is 0. Seed 2147483563 does this **(observed)**: its first step gives
 `t₁ = 40014·12211 − 12211·40014 = 0`, and 0 stays 0. Among the 2³² seeds `mri_coreg` can be given
 (its 32-bit `--seed`, sign-extended), exactly two do it, **2147483563 and −2147483563**
-**(observed, all 2³² enumerated by `fs_rng_probe zero-seeds`, 8 minutes)**; among 64-bit seeds,
-the small multiples of 2147483563 do it too **(observed** for 2, 3, 4, 5 and 6 times it and −2, −4,
-−5 times it**)**, and the rule of §8.2 is stated on the state, so it covers any seed that gives it.
-Then a uniform draw is always 0, and every draw that needs a positive uniform or a Gaussian (the
-exponential, gamma with a shape above 0, chi-squared, F and t draws, and the Gaussian itself, whose
-point (−1, −1) is always rejected) never returns: the official
-`mri_volsynth --pdf z --seed 2147483563` and `--pdf chi2 --dof 4 --seed 2147483563` do not end
-**(observed: stopped after 20 s; seed 2147483564 ends at once)**; `mri_coreg --seed 2147483563`
-dithers by 0. What larmorx does: §8.2.
+**(observed, all 2³² enumerated by `fs_rng_probe zero-seeds`, 8 minutes)**. Among the 64-bit seeds
+exactly **`m·2147483563` for `m` = 1, …, 8 and `m` = −1, …, −4** do it **(observed** for every `m`
+with `|m| ≤ 12`, `fs_rng_probe raw`**)**: the state is all zero exactly when step 3's first `t` is 0
+(every later `t` is then 0; any other first `t` lies in (0, 2147483563), where some 32-bit seed starts
+too, and the enumeration found none of those); since 2147483563 is prime, that first `t` is 0 only
+for a multiple `m·2147483563`, and then it is `(40014·m − q)·2147483563` before the correction, with
+`q = (m·2147483563) quo 53668 = 40014·m + (12211·m quo 53668)` (the quotient truncated toward zero):
+0 for `m` = 1 to 4 and −1 to −4, −2147483563 (corrected to 0) for `m` = 5 to 8, and another multiple
+otherwise. The rule of §8.2 is stated on the state, so it covers every such seed.
+
+Then every uniform `U` is 0, and the draws behave as follows **(observed**, `fs_rng_probe dist
+<name> 2147483563 2 …`, each stopped after 5 s**)**:
+
+- **They return:** `uni` (0), `flat(a, b)` (`a·1 + b·0`), the gamma draw of shape 0 (no draw:
+  `b·(−0)`), and **the gamma draw of an integer shape `n ≥ 12`**: `G_large(n)` (§4.5) gets `U = 0`, so
+  `y = tan(0) = 0`, `T = n − 1 > 0` and the test `V > (1 + 0)·exp(A₁·log(1) − 0) = 1` fails for `V = 0`:
+  the result is **`b·(n − 1)`** (`gamma(12, 1)` = 11, `gamma(12, 2.5)` = 27.5, `gamma(24, 2)` = 46,
+  `gamma(10⁶, 1)` = 999999, `gamma(2³² − 1, 1)` = 4294967294, every draw). Through it, `chisq(ν)` for
+  an even `ν ≥ 24` gives `ν − 2` (`chisq(24)` = 22, `chisq(30)` = 28) and `fdist(ν₁, ν₂)` for even
+  `ν₁, ν₂ ≥ 24` gives `((ν₁ − 2)·ν₂) / (ν₁·(ν₂ − 2))` with §4.7's roundings (`fdist(24, 30)` =
+  0.9821428571428571).
+- **They never return:** `uni_pos` and everything that needs it or a Gaussian: the exponential, the
+  gamma draw of an integer shape 1 to 11 (`G_int`'s positive uniforms) or of any shape with a
+  fractional part (`G_frac`'s `V`; for `a > 12` after `G_large` has returned), `chisq(ν)` for every
+  other `ν > 0`, `fdist` with any other degree of freedom, `tdist`, and the Gaussian (its point
+  (−1, −1) is always rejected): the official `mri_volsynth --pdf z --seed 2147483563` and `--pdf chi2
+  --dof 4 --seed 2147483563` do not end **(observed: stopped after 20 s; seed 2147483564 ends at
+  once)**.
+
+`mri_coreg --seed 2147483563` dithers by 0. What larmorx does: §8.2.
 
 ## 3. Uniform deviates
 
@@ -172,8 +193,13 @@ then exact).
 Each attempt consumes two integers. Only `Y` reaches the result; `X` is used only in `R` (the
 method's second deviate is discarded: each call starts a new pair). `−2·log(R)` is exact (a
 multiplication by −2); the division is rounded, then the square root; `σ·Y` is rounded before the
-last multiplication. With `R = 1` (`X = ±1, Y = 0` or `X = 0, Y = ±1`), `log(1) = +0` and the factor is
-`+0`.
+last multiplication. With `R = 1` (`X = −1, Y = 0` or `X = 0, Y = −1`: the uniforms are below 1, so
+`X` and `Y` are never +1), `log(1) = +0`, `−2·(+0) = −0`, `−0 / 1 = −0` and `sqrt(−0) = −0`: the factor
+is **`−0`**, and the result is `(σ·Y)·(−0)`: for `Y = +0` it is `−0` when `σ > 0` and `+0` when
+`σ < 0`; for `Y = −1` it is `+0` when `σ > 0` and `−0` when `σ < 0` **(observed**, `fs_rng_probe
+crafted gaussian 0 8388608 <σ>` and `crafted gaussian 8388608 0 <σ>` for σ = 1, 2.5, −1, and
+`crafted ugauss`: a generator state whose next two integers are those, §10.2**)**. Such an attempt
+needs the integer pair (0, 2²³) or (2²³, 0), about once in 2⁴⁷ attempts.
 
 ### 4.3 The unit Gaussian (`sc_ugauss`)
 
@@ -344,6 +370,11 @@ or the design).
   "FS-100: FreeSurfer's gamma draw truncates the shape <a> to 32 bits and gives a value of the wrong
   size; larmorx uses the whole shape (--upstream-defects reproduce: FreeSurfer's value)". `reproduce`:
   the original's arithmetic with `n′`, bit for bit.
+  For finite shapes from 2¹⁰²³ on, the default's `G_large(a)` overflows: `2·A` is +∞, so `s = +∞`,
+  and the result is +∞ (`s·y = +∞` for `U` in (0, ½), an attempt with `U` in (½, 1) gives `T = −∞`
+  and is repeated), or NaN in the draw whose uniform is 0 (`s·0` is NaN; probability 2⁻²⁴), times
+  `b` (from §4.5's expressions; the spec writer's model gives +∞ for `a` = 2¹⁰²³ and 1.7·10³⁰⁸ and
+  a value equal to `a` for 1.9·2¹⁰²²). The clean room documents this limit of the correction.
 - NaN and ±∞: **rule B** (no gamma distribution has such a shape). The default is an error naming
   the shape ("FS-100: the gamma shape <a> is not a finite number"); `reproduce`: for NaN and +∞ the
   original's value, bit for bit; for −∞ the same error (the original never returns).
@@ -367,9 +398,11 @@ reproduce: FreeSurfer's constant stream)". The corrected stream's first twelve d
 16777215 (ten times: `x₂₄` to `x₃₃`, each `0 − 0 − 1 + 2²⁴` with the carry kept), 16777214
 (`x₃₄ = x₂₄ − x₁₀ − 1`, the carry now 0) and 16777215, then as §2.3 gives (the spec writer's model;
 FreeSurfer has no such stream to compare with).
-`reproduce`: the constant 0 stream; the uniform and flat draws (and gamma and chi-squared of shape
-0, which draw nothing) give FreeSurfer's values; every draw that would never return reports an
-error instead ("FS-101: with seed <S> FreeSurfer's <draw> never returns").
+`reproduce`: the constant 0 stream; the draws that return from it (§2.6: uniform and flat, gamma
+and chi-squared of shape 0, which draw nothing, the gamma draw of an integer shape of 12 or more and
+the chi-squared and F draws built only from such shapes) give FreeSurfer's values; every draw that
+would never return reports an error instead ("FS-101: with seed <S> FreeSurfer's <draw> never
+returns").
 
 ### 8.3 Not defects (kept, documented)
 
@@ -431,7 +464,14 @@ once per run). Expected: all identical.
   `tdist` with ν 0, 0.5, 1, 1.5, 2, 2.25, 3, 7, 30, 1000, NaN, and 2 + 2⁻⁵¹ for 3 draws only (§4.8);
 - `mixed <seed> 14000` (one stream through a fixed rotation of every draw, so each draw's
   consumption is checked: a draw that consumed one integer too many or too few shifts every later
-  value).
+  value). Draw `k` (from 0) is, by `k mod 14`: 0 `uni`, 1 `uni_pos`, 2 `flat(−3.5, 7.25)`,
+  3 `gaussian(2.5)`, 4 `ugauss`, 5 `gamma(3, 2)`, 6 `gamma(0.4, 1.5)`, 7 `gamma(7.3, 0.5)`,
+  8 `gamma(25, 1)`, 9 `gamma(31.6, 1)`, 10 `chisq(5)`, 11 `fdist(4, 9)`, 12 `tdist(ν)` with ν = 1.5
+  when `k mod 28 = 12` and ν = 7 otherwise, 13 `exponential(0.75)`; one value per draw, in order.
+- `crafted <name> <a> <b> [p1 [p2]]`: one draw from a generator state whose next two integers are `a`
+  and `b` and whose following integers are 0 (the probe sets the 24 history values to 0 but the two
+  read next, the carry to 0 and the decimation count to its start): the cases no seed reaches in
+  practice, such as §4.2's `R = 1` (`gaussian 0 8388608 σ`, `gaussian 8388608 0 σ`, `ugauss`).
 
 Reference hashes **(observed)**, seed 53, 20,000 draws: `uni` `0588698480ad8ec24542f5fe26022bf9111f8b62aacac35c9dba4aa63427f583`;
 `flat(−3.5, 7.25)` `269e29edca7cc8250c431f4881377e474b907b096a7f4c42a8a2de89fe9babad`; `gaussian(2.5)`

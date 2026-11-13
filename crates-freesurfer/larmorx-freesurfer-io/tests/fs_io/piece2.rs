@@ -356,8 +356,10 @@ fn ser_ct(g: &mut Gen, d: &mut Vec<u8>, ct: &ColorTable) {
 /// A frame's tokens and the frame.
 fn gen_frame(g: &mut Gen) -> (Vec<String>, MriFrame) {
     let mut t = Vec::new();
-    let mut f = MriFrame::default();
-    f.ftype = if g.chance(2) { 1 } else { g.int(0, 3) as i32 };
+    let mut f = MriFrame {
+        ftype: if g.chance(2) { 1 } else { g.int(0, 3) as i32 },
+        ..MriFrame::default()
+    };
     t.push(f.ftype.to_string());
     let fl = |g: &mut Gen, t: &mut Vec<String>| {
         let b = fbits(g);
@@ -1005,11 +1007,13 @@ impl<'a> Toks<'a> {
 }
 
 fn read_vg(t: &mut Toks) -> VolGeom {
-    let mut v = VolGeom::default();
-    v.valid = t.i() as i32;
-    v.width = t.i() as i32;
-    v.height = t.i() as i32;
-    v.depth = t.i() as i32;
+    let mut v = VolGeom {
+        valid: t.i() as i32,
+        width: t.i() as i32,
+        height: t.i() as i32,
+        depth: t.i() as i32,
+        ..VolGeom::default()
+    };
     let mut f = [0u32; 18];
     for x in &mut f {
         *x = t.f().to_bits();

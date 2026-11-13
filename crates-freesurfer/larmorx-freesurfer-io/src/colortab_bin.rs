@@ -137,16 +137,17 @@ fn take_name(g: &mut Globals, who: &str, bytes: &[u8], got: u64, len: i64, how: 
     let mut end = None;
     let mut memory = false;
     for i in 0..limit {
+        // the first version's `name[len] = 0` ends the name before any byte it never read
+        if how == Copy::StrncpyEntryCut && (i as i64) == len {
+            end = Some(i);
+            break;
+        }
         if i >= known {
             memory = true;
             end = Some(i);
             break;
         }
-        if bytes[i] == 0 {
-            end = Some(i);
-            break;
-        }
-        if how == Copy::StrncpyEntryCut && (i as i64) == len {
+        if bytes.get(i) == Some(&0) {
             end = Some(i);
             break;
         }

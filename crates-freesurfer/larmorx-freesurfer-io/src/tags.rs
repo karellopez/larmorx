@@ -73,10 +73,11 @@ pub(crate) fn m44(g: &mut Globals) -> Matrix {
 /// `M->rptr[r][c]` of a matrix the tag writers expect to be 4 x 4: 0 outside a smaller one
 /// (FS-181: memory outside it in FreeSurfer).
 pub(crate) fn elt44(g: &mut Globals, m: &Matrix, r: i32, c: i32, who: &str) -> f32 {
-    if r <= m.rows && c <= m.cols {
-        if let Some(i) = m.relt_index(r, c) {
-            return m.raw(i).unwrap_or(0.0);
-        }
+    if r <= m.rows
+        && c <= m.cols
+        && let Some(i) = m.relt_index(r, c)
+    {
+        return m.raw(i).unwrap_or(0.0);
     }
     g.notices.add(
         &FS_181,
@@ -341,16 +342,16 @@ pub fn tag_make_command_line_string(g: &mut Globals, argv: &[&[u8]], cap: usize)
 pub fn tag_read_matrix(g: &mut Globals, fp: &mut CFile) -> Matrix {
     let mut m = m44(g);
     let mut errno = g.errno;
-    if let Some(w) = scan_word(fp, &mut errno, true) {
-        if w.len() >= MATRIX_STRLEN {
-            g.notices.add(
-                &FS_179,
-                format!(
-                    "TAGreadMatrix: a first word of {} bytes read whole (FreeSurfer's buffer holds 1600)",
-                    w.len()
-                ),
-            );
-        }
+    if let Some(w) = scan_word(fp, &mut errno, true)
+        && w.len() >= MATRIX_STRLEN
+    {
+        g.notices.add(
+            &FS_179,
+            format!(
+                "TAGreadMatrix: a first word of {} bytes read whole (FreeSurfer's buffer holds 1600)",
+                w.len()
+            ),
+        );
     }
     for r in 1..=4 {
         for c in 1..=4 {

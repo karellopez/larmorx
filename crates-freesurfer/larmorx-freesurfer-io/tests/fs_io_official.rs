@@ -5,7 +5,7 @@
 //! build's output lines for the probe's portable cases of seed 1 (2,200 cases, a hundred of each of
 //! the 22 commands that behave alike on every platform: piece 1's ten and piece 2's twelve),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 2200 --portable` on Linux x64 from the
-//! unit oracle's build (2026-11-13: 1,926 lines identical, 110 of them with memory digits; 274 hashed
+//! unit oracle's build (2026-11-13: 1,927 lines identical, 110 of them with memory digits; 273 hashed
 //! as `SKIP`: lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory
 //! contents), against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from
 //! memory contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`.
@@ -16,8 +16,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "4409201b4a3189d14ad52af54608345e057d5b9895b74afd65c250b126c04055";
-const SKIPPED: usize = 274;
+const OFFICIAL_SHA256: &str = "4bf83403f43287204967a35c1dd3d66f5efde904db46d090c7d5a744838334c3";
+const SKIPPED: usize = 273;
 
 #[test]
 fn reproduce_gives_the_official_outputs() {

@@ -88,6 +88,11 @@ pub struct Process {
     pub(crate) logic: crate::logic::LogicState,
     pub(crate) xdbg: crate::xdbg::DebugStack,
     pub(crate) atan_slow: Option<bool>,
+    /// A fixed "now" (seconds since 1970) for callers and tests that need a reproducible
+    /// clock; `None` reads the system clock.
+    pub clock: Option<i64>,
+    pub(crate) zone: Option<crate::timedate::ZoneCache>,
+    pub(crate) vm_peak: [i32; 5],
 }
 
 impl Process {
@@ -122,6 +127,9 @@ impl Process {
             logic: Default::default(),
             xdbg: Default::default(),
             atan_slow: None,
+            clock: None,
+            zone: None,
+            vm_peak: [0; 5],
         }
     }
 

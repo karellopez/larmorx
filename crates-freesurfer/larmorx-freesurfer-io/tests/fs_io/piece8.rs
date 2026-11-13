@@ -86,9 +86,9 @@ fn pixels(g: &mut Gen, fmt: i64, len: u64) -> Vec<u8> {
     let float = fmt == i64::from(image::PFFLOAT);
     let int = fmt == i64::from(image::PFINT);
     while (b.len() as u64) < len {
-        if float && len % 4 == 0 {
+        if float && len.is_multiple_of(4) {
             b.extend_from_slice(&fbits(g).to_le_bytes());
-        } else if int && len % 4 == 0 {
+        } else if int && len.is_multiple_of(4) {
             let v: u32 = match g.below(6) {
                 0 => g.pick(&[u32::MAX, 0x8000_0000, 0x0100_0001, 0xffff_ff01]),
                 _ => g.below(300) as u32,

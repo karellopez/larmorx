@@ -1538,7 +1538,7 @@ defects! {
     FS_408 = "FS-408", "FreeSurfer", true,
         "ImageScaleDown of a float image of more than one frame by a power of two (0.5, 0.25, ...) reduces only the first frame: the output's other frames are left as they were";
     FS_409 = "FS-409", "FreeSurfer", true,
-        "ImageRescale by 1 into a given output smaller than its input copies into a new image it then drops, and writes into and returns the output it has freed: memory contents or a crash";
+        "ImageRescale by 1 with a given output smaller than its input returns that output after freeing it, without the copy: memory contents or a crash";
     FS_410 = "FS-410", "FreeSurfer", true,
         "ImageAlloc, when the pixels cannot be allocated, ends the program with the code of FreeSurfer's previous error, 0 when there was none: a program that ran out of memory exits with status 0 (success)";
     FS_411 = "FS-411", "FreeSurfer", true,

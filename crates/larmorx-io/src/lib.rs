@@ -11,9 +11,13 @@
 //! - [`znz`]: znzlib's files, plain or gzip (nifticlib 2.0.0 over zlib 1.2.11's file layer).
 //! - [`xfm`]: MNI transform files (`.xfm`), read and written as MINC 1.5.1's volume_io does.
 //!
-//! MGH/MGZ, GIFTI, CIFTI-2 and FreeSurfer surfaces follow.
+//! - [`gifti`]: GIFTI files, read and written as gifticlib 1.12 does, over [`xml`], a pure-Rust
+//!   parser with expat 2.0.1's events and failures.
+//!
+//! MGH/MGZ, CIFTI-2 and FreeSurfer surfaces follow.
 #![forbid(unsafe_code)]
 
+pub mod gifti;
 pub mod gzip;
 pub mod itk_hdf5;
 pub mod itk_output;
@@ -21,4 +25,5 @@ pub mod itk_transform;
 mod itk_transform_names;
 pub mod nifti;
 pub mod xfm;
+pub mod xml;
 pub mod znz;

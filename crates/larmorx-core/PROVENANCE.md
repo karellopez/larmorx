@@ -565,3 +565,10 @@ low 32 bits of `strtol`. Decimal strings through Rust's correctly rounded parser
 rounded here, ties to even, subnormals included. `validation/probes/fs-minc-nifti` (family `scan`)
 compares it with glibc's `sscanf("%lf")`, `sscanf("%d")` and `strtod`: 400,000 generated strings of
 each, 0 differences (scale 1, 2026-11-13; `docs/findings/minc-xfm.md`).
+
+## `cfmt::f80_f`: C's `%Lf` of an x86-64 `long double` (FreeSurfer's foundations, 3.1-12)
+
+Written from the C standard's description of `%f` (ISO C 7.21.6.1) and glibc's spellings of the
+special values, for gifticlib's writer of `NIFTI_TYPE_FLOAT128` and `COMPLEX256` data: the exact
+value of the 80-bit number, correctly rounded with ties to even (glibc's default rounding).
+Original code (Apache-2.0).

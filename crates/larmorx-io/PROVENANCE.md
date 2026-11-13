@@ -202,3 +202,21 @@ with zlib's own bytes is not ported). Defects FS-76 and FS-77 (nifticlib; FS-77 
 settings a program can change (`allow_upper_fext` and the compressed extensions); the variants of
 other programs' copies are not in this crate (`docs/findings/freesurfer-permissive.md`, closed to
 FreeSurfer's clean-room implementers).
+
+## GIFTI: gifticlib 1.12 and an XML parser in expat 2.0.1's place (FreeSurfer's foundations, 3.1-09 to 3.1-12)
+
+| larmorx file | Upstream | Licence |
+|---|---|---|
+| `src/gifti/mod.rs` | gifticlib 1.12 (`gifti_io.c`, `gifti_io.h`, `gifti_xml.h`: the structures, type and intent tables, checks, sizes, metadata, copies, displays) | public domain (Richard Reynolds, NIH/NIMH) |
+| `src/gifti/read.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_read_image`, the element stack and callbacks, the ASCII, Base64Binary and GZipBase64Binary decoders; `gifti_io.c`: `gifti_read_extern_DA_data`, `gifti_check_swap`) | public domain |
+| `src/gifti/write.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_write_image`, `gxml_write_gifti`, the `ewrite_*` functions, `gxml_disp_b64_data`; `gifti_io.c`: `gifti_write_image`, `gifti_write_extern_DA_data`) | public domain |
+| `src/xml.rs` | not a port: a parser written to give expat 2.0.1's events, chunks and errors (its byte classes, UTF-8 checks, tokenizer rules and error texts as `xmltok_impl.c`, `xmltok.c`, `utf8tab.h`, `asciitab.h` and `xmlparse.c` define them) | expat's MIT licence for the facts taken (the error texts, the byte classes) |
+
+- gifticlib 1.12 is the history of github.com/NIFTI-Imaging/gifti_clib at commit 8ec2a95
+  (2012-06-15, "gifti library version 1.12, 15 June, 2012"; the only commit touching the library's
+  files between 1.12 and 1.13's 7d94df8). expat 2.0.1 is libexpat's tag `R_2_0_1` (the GitHub
+  archive's SHA-256 6a26c3fe91d2a05d05fac187c0a092e1602c335ee12b008d9fe4da30788402b9).
+- D13: FS-80 to FS-85 (`gifti::defects`); `Dialect` holds the two points where a program built on
+  gifticlib changes it.
+- Checks: `src/gifti/tests.rs`, `src/xml.rs`'s tests; the differential probe against gifticlib
+  and expat (`validation/probes/fs-gifti`) follows (NOTES of FreeSurfer's foundations, track C).

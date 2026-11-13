@@ -128,6 +128,96 @@ pub fn g(v: f64, prec: usize) -> String {
     }
 }
 
+/// `%.<prec>Lf` of an x86-64 `long double` (`prec` at most 18): the exact value correctly rounded
+/// with ties to even, as glibc prints it; `nan`, `-nan`, `inf`, `-inf`; an encoding the x87 does
+/// not support (an unnormal, a pseudo-NaN or pseudo-infinity) prints as `nan` with its sign, as a
+/// NaN.
+pub fn f80_f(v: crate::x87::F80, prec: usize) -> String {
+    assert!(prec <= 18, "f80_f: precision above 18");
+    let bits = v.to_bits();
+    let m = bits as u64;
+    let se = (bits >> 64) as u16;
+    let neg = se & 0x8000 != 0;
+    let e = (se & 0x7fff) as i32;
+    let sign = if neg { "-" } else { "" };
+    let int_bit = m >> 63 == 1;
+    if e == 0x7fff {
+        return if int_bit && m << 1 == 0 {
+            format!("{sign}inf")
+        } else {
+            format!("{sign}nan")
+        };
+    }
+    if e != 0 && !int_bit {
+        return format!("{sign}nan");
+    }
+    // value = m * 2^ex
+    let ex = if e == 0 {
+        1 - 16383 - 63
+    } else {
+        e - 16383 - 63
+    };
+    let scale = 10u128.pow(prec as u32);
+    let digits = if ex >= 0 {
+        // An integer: m * 2^ex, in decimal, then `prec` zeros.
+        let mut limbs: Vec<u32> = vec![m as u32, (m >> 32) as u32];
+        for _ in 0..ex {
+            let mut carry = 0u32;
+            for l in limbs.iter_mut() {
+                let x = ((*l as u64) << 1) | carry as u64;
+                *l = x as u32;
+                carry = (x >> 32) as u32;
+            }
+            if carry != 0 {
+                limbs.push(carry);
+            }
+        }
+        let mut dec = String::new();
+        while limbs.iter().any(|&l| l != 0) {
+            let mut rem = 0u64;
+            for l in limbs.iter_mut().rev() {
+                let x = (rem << 32) | *l as u64;
+                *l = (x / 1_000_000_000) as u32;
+                rem = x % 1_000_000_000;
+            }
+            while limbs.last() == Some(&0) {
+                limbs.pop();
+            }
+            dec = if limbs.is_empty() {
+                format!("{rem}{dec}")
+            } else {
+                format!("{rem:09}{dec}")
+            };
+        }
+        if dec.is_empty() {
+            dec.push('0');
+        }
+        dec + &"0".repeat(prec)
+    } else {
+        let n = m as u128 * scale;
+        let s = (-ex) as u32;
+        let q = if s >= 128 {
+            0
+        } else {
+            let q = n >> s;
+            let r = n & ((1u128 << s) - 1);
+            let half = 1u128 << (s - 1);
+            if r > half || (r == half && q & 1 == 1) {
+                q + 1
+            } else {
+                q
+            }
+        };
+        format!("{:0>width$}", q, width = prec + 1)
+    };
+    let (ip, fp) = digits.split_at(digits.len() - prec);
+    if prec == 0 {
+        format!("{sign}{ip}")
+    } else {
+        format!("{sign}{ip}.{fp}")
+    }
+}
+
 /// `std::ostream << v` for a `double` (or a `float`, which the stream widens) with the stream's
 /// default flags: `%g` with 6 significant digits.
 pub fn ostream(v: f64) -> String {

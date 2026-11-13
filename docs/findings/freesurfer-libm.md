@@ -118,37 +118,50 @@ correctly rounded one (a replay must still reproduce the recorded files: the shi
 whether FreeSurfer's files change. All on the main machine, 2026-11-12, the recording
 `ds000005-sub-01-classic-1thread` (the classic stream at one thread).
 
-**Count mode** (21 steps so far, all REPRODUCED under the shim):
+**Count mode.** Every step of the recording but one (60 of the 61 recorded so far: the recording was
+still being made; `mri_ca_register`'s step, about two hours, was still running at the time of writing),
+**all reproduced under the shim** (`defect2seg` only with a shorter work folder: §6). The steps that
+called none of the shim's functions: the conversions and headers (1-4, 9), `mri_nu_correct.mni` (5,
+8), `talairach_avi` (6) and `talairach_afd` (7), `mri_normalize` (10, 18), `mri_em_register` (11,
+13), `mri_ca_normalize` (14), `mri_ca_label` (16), `mri_mask` (19), `AntsDenoiseImageFs` (20),
+`mri_segment` (21), `mri_edit_wm_with_aseg` (22), `mri_pretess` (23, 25, 28), `mri_fill` (24),
+`mri_tessellate` (26, 29). The others:
 
-| Step | Calls of the shim's functions (differing from correctly rounded) |
+| Step | Calls of the shim's functions (of them, differing from the correctly rounded value) |
 |---|---|
-| `mri_normalize` (10), `mri_ca_normalize` (14), `AntsDenoiseImageFs` (20), `mri_segment` (21), `mri_edit_wm_with_aseg` (22), `mri_fill` (24), `mri_tessellate` (26) | none |
 | `seg2cc` (17: `mri_cc`) | `asin` 2 (0) |
-| `mri_watershed` (12) | `tanhf` 450,648 (26,974); `atan2` 100,001 (207) |
-| `mris_curvature` (56), `mris_extract_main_component` (27), `mris_smooth` (31), `mris_inflate` (33, 54), `mris_remove_intersection` (42), `mris_autodet_gwstats` (44), `mri_label2label` (48 via `label-cortex`, 49) | `atan2` 100,001 (207) each |
-| `mris_sphere` (35) | `acos` 3,126,439 (11,265); `atan2` 100,001 (207) |
-| `mris_remesh` (40) | `acos` 2,583,042 (4,506); `atan2` 100,001 (207) |
-| `mris_curvature` (57) | `acos` 438,535,528 (600,971); `atan2` 100,001 (207) |
+| `mri_watershed` (12) | `tanhf` 450,648 (26,974) |
+| `mris_fix_topology` (37, 38) | `acosf` 54,114,482 (3,335,320) and 44,208,261 (2,640,446); `tanhf` 6,241,925 (151,512) and 5,568,550 (147,571); `acos` 80,028 (242) and 80,382 (221) |
+| `mris_sphere` (35, 36, 60, 61) | `acos` 3,126,439 (11,265), 2,790,472 (9,905), 279,422,769 (711,903), 290,228,661 (759,217) |
+| `mris_curvature` (57, 59) | `acos` 438,535,528 (600,971), 433,304,952 (592,516) |
+| `mris_remesh` (40, 41) | `acos` 2,583,042 (4,506), 2,550,114 (4,355) |
+| `mris_place_surface` (46, 47) | `acos` 2,583,042 (4,133), 2,550,114 (4,102) |
+| every surface program, `mri_label2label`, `mri_label2vol`, `mris_defects_pointset` | `atan2` 100,001 (207) once per process |
 
 The 100,001 `atan2` calls are `fastApproxAtan2f`'s table, `(float) atan2(i, 100000)` for `i` = 0 to
 100,000, built once per process: 207 of its doubles differ from the correctly rounded ones, **none
 of its floats** (`libm_rates.c`, every entry): the correctly rounded `atan2` gives FreeSurfer's
-table exactly.
+table exactly. `log2`, `log2f`, `log10`, `log10f`, `asinf`, `atan`, `tan`, `csqrt` and the
+unreached functions: no call in these steps.
 
-**`cr` mode:**
+**`cr` mode** (the correctly rounded values returned):
 
 | Step | Correctly rounded | Result |
 |---|---|---|
-| `mris_curvature` (56) | every function of the shim | REPRODUCED (identical curvatures) |
-| `mris_sphere` (35), `mris_remesh` (40), `mris_curvature` (57) | `acos` | REPRODUCED (11,265, 4,506 and 600,971 different `acos` values change no file) |
+| `mris_curvature` (56) | every function of the shim | REPRODUCED |
+| `mris_sphere` (35), `mris_remesh` (40), `mris_curvature` (57) | `acos` | REPRODUCED |
+| `mris_fix_topology` (37, 38), `mris_place_surface` (46, 47), `mris_sphere` (60) | every function of the shim (`acos`, `acosf`, `tanhf` included) | REPRODUCED |
+| `mris_sphere` (61), `mri_watershed` (12) | every function but `tanhf` | REPRODUCED |
+| `mri_ca_label` (16) | every function of the shim | REPRODUCED (none is called) |
 | `mri_watershed` (12) | every function of the shim | **DIFFERS**: `brainmask.auto.mgz`, 10,878 of 16,777,216 voxels, by at most 178 |
 | `mri_watershed` (12) | `tanhf` alone | **DIFFERS**: the same 10,878 voxels |
 | `mri_watershed` (12) | `atan2` alone | REPRODUCED |
 
-So **glibc's `tanhf` decides results** (`mri_watershed`'s skull strip, through
-`MRISFineSegmentation` and `MRISCorrectSurface`; also called by `mri_ca_label` and
-`mris_fix_topology`): `reproduce` needs a `tanhf_glibc`. The correctly rounded `acos` and `atan2`
-gave FreeSurfer's files on every step measured.
+So on this head **only glibc's `tanhf` decides results**, in `mri_watershed`'s skull strip (through
+`MRISFineSegmentation` and `MRISCorrectSurface`): `reproduce` needs a `tanhf_glibc`. In
+`mris_fix_topology` the 151,512 different `tanhf` values and 3.3 million different `acosf` values
+change no file; the correctly rounded `acos` (up to 438 million calls, 760,000 of them different) and
+`atan2` gave FreeSurfer's files on every step.
 
 ## 4. `tan`
 
@@ -166,8 +179,24 @@ paths). Not a defect of FreeSurfer's: the register's GLIBC-07 covers glibc's `ta
 
 ## 5. Still to measure
 
-The count pass over the recording's other steps (the conversions, `mri_nu_correct.mni`,
-`talairach_avi`, `mri_em_register`, `mri_ca_register`, `mri_ca_label`, `mris_fix_topology`,
-`mris_place_surface`, the second hemisphere's steps, `mris_sphere`'s last two) is running at the time
-of writing; then the v8 stream and fMRIPrep's calls (`mri_coreg` through `bbregister`: `log2` in its
-NMI cost). Each function with differing calls is then run in `cr` mode alone.
+`mri_ca_register` (step 15) in count mode (running at the time of writing); the recording's later
+steps once it is complete (`mris_register`, `mris_ca_label`, the statistics, `mri_aparc2aseg`, ...;
+the 4-thread recordings have them, but their comparison needs the steps to be deterministic at 4
+threads, `docs/freesurfer/variation.md`); the v8 stream; fMRIPrep's calls (`mri_coreg` through
+`bbregister`: `log2` in its NMI cost); a second head for `tanhf`, `acosf` and `acos`. Each function
+with differing calls is then run in `cr` mode alone.
+
+## 6. A side finding: FS-104, long paths abort the DICOM format probe
+
+Replaying `defect2seg` in a work folder whose paths were about 240 characters long, its
+`mri_label2vol --defects` aborted with `*** buffer overflow detected ***: terminated` (signal 6);
+the same step in a short folder reproduces. The backtrace (gdb on the official binary) ends in
+`strcpy` into a 256-byte buffer, with the text "DCM failed to open file: <path> ...": CTN's DICOM
+condition stack (`packages/dicom/condition.c` 91 and 162, `statusText[256]`, the message
+`DCM_FILEOPENFAILED`, `dcmcond.c` 67, "DCM failed to open file: %s in %s"), which the volume reader's
+format probe reaches for a file without a known extension (`surf/lh.defect_labels`). The official
+build's `_FORTIFY_SOURCE` turns the overflow into an abort. **Measured** with the official
+`mri_info` on a copy of that file: a path of 213 bytes is read, one of 215 bytes or more aborts.
+recon-all's `defect2seg` (both streams) therefore fails when `<SUBJECTS_DIR>/<subject>/surf/lh.defect_labels`
+reaches 215 bytes (a subjects directory of about 185 characters for a subject named `sub-01`). A crash: never
+reproduced (D13); the DICOM item (3.1-16) decides the text (rule A: any path length).

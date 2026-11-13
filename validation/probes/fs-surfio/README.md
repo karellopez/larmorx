@@ -55,7 +55,7 @@ case in an empty work folder `<cases>.d` with a subfolder `d`: its input files, 
 `MRIScopyMarksToAnnotation`, `MRISmaxMarked`, `MRISwriteAscii`, `MRISwriteNormalsAscii`, `MRISwriteVTK`,
 `MRISwriteCurvVTK` on names relative to the folder, each passed with two NUL bytes before it; `G` where
 FreeSurfer would read memory it does not own; then the state and every file in the folder with its
-bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30 commands. `build.sh` also builds
+bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30 commands; since relay 12 (queue item 3.1-48 part a) `cfile` (as `sfile`: an empty work folder, the input files, a surface from `MRISalloc`, `FS_POSIX`, `FS_GII`, `Gdiag`; then 1 to 3 of `mrisReadAsciiCurvatureFile`, `mrisWriteAsciiCurvatureFile`, `__mrisreadcurvoldformat`, `MRISreadCurvatureVector`, `MRISreadNewCurvatureVector`, `MRISreadCurvatureIntoArray`, `MRISreadNewCurvatureIntoArray`, `MRISreadFloatFile`, `MRISreadBinaryAreas`, `MRISbuildFileName_read`, `MRISwriteDecimation`, `MRISreadDecimation`, `__MRISapplyFSGIIread`, `__MRISapplyFSGIIwrite`, `MRISreadVTK` into a new or the case's surface, `MRISwriteGeo`, `MRISwriteICO`, `getSRASToTalSRAS`, `MatlabPlotFace`, `MatlabPlotVertex`, `UnitizeNormalFace`, a volume of the values given to the readers that take one; `G` where FreeSurfer would write past its caller's buffer or read a number it never wrote; then the state and the folder's files; the port's side in `tests/fs_surfio/cfile.rs`), 31 commands. `io_statics.cpp` builds `mrisurf_io.cpp` into both probes with that file's own compile command from the unit oracle's `compile_commands.json`, so the probe reaches its file-local functions (`__mrisreadcurvoldformat`, the curvature arrays, the `FS_GII` helpers); every `mrisurf_io.cpp` function then runs from that object (relay 11's seed-1 hash unchanged with it). `validation/investigations/glibc-scanf-probe/scanf_errno.c` (open) measures glibc's `sscanf`/`fscanf` return values and `errno` at the end of the input, the model of `src/scanf.rs`. `build.sh` also builds
   `fssurfio-mpstub`: the same probe with a stub `MRIScomputeMetricProperties` (it writes `MP`),
   linked first with `--allow-multiple-definition` so the library's own call (`MRISsmoothSurface`'s
   last step) reaches it; `check.py` runs `metric`'s cases through it.
@@ -66,6 +66,17 @@ bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30
   cache at one thread, the port in both modes, the comparison (`reproduce` identical; `fix`
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+
+Measured 2026-11-13 (relay 12, 31 commands): seed 7, 62,000 cases: 61,334 identical with `reproduce`,
+666 counted, not compared (455 `mprop`, 125 `sfile`, 81 `cfile`, 5 `metric`); `fix` differs only with
+notices or the correctly rounded maths (71 `posn`, 4 `surf`); the port's outputs identical under
+AArch64's NaN emulation in both modes (67,516 and 67,552 NaNs flipped). `cfile` alone, seeds 7, 13 and
+17: 2,000 cases each, every comparable one identical (before the plots' operand orders were read from
+the object code, 13 of the 6,000 differed, all in `MatlabPlotFace`/`MatlabPlotVertex`; before the
+measured `scanf` end-of-input rule, 1 of seed 17's). Seed 1, 930 cases: 919 identical, 11 `SKIP`, hash
+`17da05597cae13550e267517b2858b9932266b37ca7d64ab7894779a948bc7b6` (the test), passing under
+`NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug and release (2,897 and 12,690 flips). Log
+`oracles/logs/fs-surfio-relay12-seed7.log`.
 
 Measured 2026-11-13 (relay 11, 30 commands): seed 7, 60,000 cases: 59,497 identical with `reproduce`,
 503 counted, not compared (404 `mprop` cases of FS-121, FS-123, FS-06; 99 `sfile` cases of FS-167, the
@@ -145,5 +156,5 @@ operand order is each caller's compiled code (`docs/findings/freesurfer-surfio.m
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>
-scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-surfio/check.py --seed 7 --n 56000
+scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 62000
 ```

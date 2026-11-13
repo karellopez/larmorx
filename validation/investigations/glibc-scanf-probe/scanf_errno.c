@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// glibc 2.35's sscanf and fscanf as a black box (relay 12 of fs.surfio): the return value and
-// errno (5 before each call) for the directives the surface library's text readers use (text
-// that must match, white space, %d, %f, %s, the suppressed forms), at and near the end of the
-// input; the model in larmorx-freesurfer-surf's src/scanf.rs reproduces every line (its test
-// glibc_measurements). Calls glibc only; no glibc code.
+// glibc 2.35's sscanf and fscanf as a black box: the return value and errno (5 before each call)
+// for the directives FreeSurfer's surface text readers use (text that must match, white space,
+// %d, %f, %s, the suppressed forms), at and near the end of the input. Calls the C library only;
+// no glibc or FreeSurfer code. The results are listed in specs/freesurfer-surfio.md §56.
 //
 //     gcc -O0 -o scanf_errno scanf_errno.c && ./scanf_errno
 #include <errno.h>

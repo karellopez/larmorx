@@ -6,7 +6,7 @@
 //! `%s` with a width, and the suppressed forms (`%*d`, `%*f`, `%*s`); the value each conversion
 //! assigns comes from fs.core's conversions ([`cscan`]), and the call's return value and `errno`
 //! follow glibc 2.35's behaviour **measured as a black box**
-//! (`validation/probes/fs-surfio/scanf_errno.c`), no glibc code:
+//! (`validation/investigations/glibc-scanf-probe/scanf_errno.c`), no glibc code:
 //!
 //! - the call returns the number of items it assigned, or `EOF` (-1) when its input ended before
 //!   it assigned any (a matching failure returns the count);
@@ -246,7 +246,7 @@ mod tests {
     use super::*;
     use larmorx_freesurfer_core::cscan::Bytes;
 
-    /// The black-box measurements (`scanf_errno.c`, glibc 2.35, `errno` 5 before each call):
+    /// The black-box measurements (`glibc-scanf-probe/scanf_errno.c`, glibc 2.35, `errno` 5 before each call):
     /// the format as a sequence of directives, the return value and `errno` after.
     #[test]
     fn glibc_measurements() {

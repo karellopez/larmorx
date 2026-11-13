@@ -183,6 +183,41 @@ pattern of `sdot`'s second lone block changed: 153 differences (the check sees t
 test `vnl_qr::tests::nan_bits_are_x86_64s` (a digest of kernel calls and QRs on NaNs) passes
 under `NAN_TRAP_ARM=1`, debug and release.
 
+**The float SVD** (`vnl_svd<float>`, LINPACK's `ssvdc` with job 21; 2026-11-13): the kernels it shares
+with the QR (`sdot`, `saxpy`, `sscal`, `snrm2`) follow the tables above. `srot` (unit strides; the two
+vectors are columns of one array) orders element `i`'s `x' = A(M1(c, x), M2(s, y))` and
+`y' = M3(c, y) - M4(s, x)` by position, the same at every alignment and distance between the
+columns: fewer than four elements, every one `x·c`, `y·s`, `s·y + c·x`, `y·c`, `s·x`; in blocks of
+four (vectorized) `x·c`, `y·s`, `c·x + s·y`, `c·y`, `x·s`; the one to three left over
+`c·x`, `s·y`, `s·y + c·x`, `c·y`, `s·x`, then `c·x`, `s·y`, `c·x + s·y`, `c·y`, `x·s`, then `c·x`,
+`y·s`, `s·y + c·x`, `c·y`, `s·x`. `srotg` keeps the source's order; its `r_sign(1, roe)·r` is a
+multiplication in double, so a NaN `r` keeps its sign whatever `roe`'s. `ssvdc` (compiled with
+`-ffloat-store`) keeps the source's order except: in the QR step `e[k]·sn`, `s[k]·sn`, `e[k]·cs`,
+`s[k+1]·sn`, `e[k]·(−sn)` and `s[k+1]·cs` (operands swapped), `emm1·sm` for the shift's
+`sm·emm1`, `shift + b` for `b + shift`, `sm + sl` for `sl + sm`; in the deflation and splitting
+steps (as VNL calls them, with `U` and `V`) `(−sn)·e` and `e·cs`; `t = −sdot(...)/x` is the double
+quotient of the negated `double` dot product; f2c's `abs` (`x >= 0 ? x : −x`) flips a NaN's sign
+where its value is used (the QR step's scale). Check (`fs-vnl`, family `svdnan`): `srot`'s NaN order
+for every length to 300 and every subset of NaN operands; `srot` and `srotg` on random special
+values; `ssvdc` of 20,000 matrices of 1 to 7 columns with special entries (`info`, `U`, `W`, `V`),
+VNL in forked children: scale 1, 68,500 cases, 2,962,513 values, 0 differences (the earlier port:
+1,146,507). Of 36 single-operation changes to the port, 16 are seen by the check; the other 20
+statements never meet two different NaNs there, and their order is the object code's.
+
+**The real eigensystem** (`vnl_real_eigensystem`: `balanc`, `elmhes`, `eltran`, `hqr2`, `balbak`,
+`cdiv`; 2026-11-13): `balanc` balances only a part without infinite or NaN entries off its diagonal
+(ITK-112), but its diagonal and the rows above and columns right of it can hold any value, and
+`elmhes`, `hqr2` and `cdiv` combine them. GCC chose the operand order per statement and, in its
+vectorized loops (two doubles at a time over a column, only from 17 elements over a row), per
+position: the vector body, the one element left over and the one-element loop can differ. The port
+keeps these choices in a table of numbered sites, read from the object code for `cdiv`, `elmhes`,
+the two-root step, the QR sweep's row and column loops (over `H` and the transformations) and the
+back-substitution's sums and complex steps. Check (`fs-vnl`, family `eignan`, matrices with special
+entries on the balanced part's diagonal and in the isolated rows and columns, permuted): 17,302
+eigensystems, 16,790 identical bit for bit (with the source's order: 15,818 of 17,349); the other
+512 differ in NaNs' signs or payloads only (no number differs); the sites behind them are not read
+yet. ITK-117: a NaN imaginary part on the last eigenvalue makes VNL read and write past its arrays.
+
 ## F-VNLN-6. Values VNL never writes (ITK-107, ITK-108, ITK-110, ITK-111, ITK-113, *read*)
 
 VNL allocates `vnl_matrix`, `vnl_vector` and `vnl_matrix_fixed` of `double` and `float`

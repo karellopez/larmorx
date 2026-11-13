@@ -38,7 +38,7 @@ use crate::cfile::CFile;
 
 /// A read of `n` bytes that the file ended after `got`: the missing bytes are 0 here, memory
 /// contents in FreeSurfer (`defect`).
-fn memory(g: &mut Globals, defect: &'static Defect, what: &str, got: usize, n: usize) {
+pub(crate) fn memory(g: &mut Globals, defect: &'static Defect, what: &str, got: usize, n: usize) {
     g.notices.add(
         defect,
         format!(

@@ -64,101 +64,110 @@
 
 // ------------------------------------------------------------------------------------------------
 // Single-precision reference BLAS (unit stride), as f2c translated them.
+//
+// Every `+`, `-`, `*` and `/` below and in `ssvdc` is an `ItkReal::sse_*` operation: of two NaN
+// operands x86-64 passes on the first source's, and a NaN made from numbers (`inf - inf`, `0 * inf`)
+// is SSE's default NaN with the sign bit set, on every platform. GCC keeps the source's expression
+// trees but chooses, per statement (and per vectorized or unrolled position in the kernels), which
+// operand of a `+` or `*` comes first; the order here is the official build's (ITK 4.13.2's netlib
+// as GCC 8.4.0 compiles it at `-O3`, `ssvdc.c` with `-ffloat-store`), read from its object code and,
+// for the vectorized `srot`, by running it on NaNs with distinct payloads
+// (validation/probes/fs-vnl/order/svd, family `svdnan`). Finite results do not depend on it.
 
-/// `snrm2`: the scaled sum of squares in float; the norm is `scale * sqrt(ssq)` with the
-/// square root in double, rounded to float once.
+use crate::itk_real::ItkReal;
+use crate::vnl_qr::{axpy_t, dot_t, nrm2_t, scal_t};
+
+/// `snrm2`: the scaled sum of squares in float; the norm is `sqrt(ssq) * scale` with the square
+/// root in double, rounded to float once ([`crate::vnl_qr`]'s kernel: the same netlib function).
 fn snrm2(x: &[f32]) -> f32 {
-    match x.len() {
-        0 => 0.0,
-        1 => x[0].abs(),
-        _ => {
-            let (mut scale, mut ssq) = (0.0f32, 1.0f32);
-            for &xi in x {
-                if xi != 0.0 {
-                    let absxi = xi.abs();
-                    if scale < absxi {
-                        let r = scale / absxi;
-                        ssq = ssq * (r * r) + 1.0;
-                        scale = absxi;
-                    } else {
-                        let r = absxi / scale;
-                        ssq += r * r;
-                    }
-                }
-            }
-            (f64::from(scale) * f64::from(ssq).sqrt()) as f32
-        }
-    }
+    nrm2_t(x)
 }
 
 /// `sdot` with its unrolling by five (float accumulation, left to right).
 fn sdot(x: &[f32], y: &[f32]) -> f32 {
-    let n = x.len();
-    let m = n % 5;
-    let mut t = 0.0f32;
-    for i in 0..m {
-        t += x[i] * y[i];
-    }
-    let mut i = m;
-    while i + 5 <= n {
-        t = t
-            + x[i] * y[i]
-            + x[i + 1] * y[i + 1]
-            + x[i + 2] * y[i + 2]
-            + x[i + 3] * y[i + 3]
-            + x[i + 4] * y[i + 4];
-        i += 5;
-    }
-    t
+    dot_t(x, y)
 }
 
 /// `y += a·x`; nothing when `a == 0`.
 fn saxpy(a: f32, x: &[f32], y: &mut [f32]) {
-    if a == 0.0 {
-        return;
-    }
-    for (yi, &xi) in y.iter_mut().zip(x) {
-        *yi += a * xi;
-    }
+    axpy_t(a, x, y);
 }
 
+/// `x = a·x`.
 fn sscal(a: f32, x: &mut [f32]) {
-    for xi in x {
-        *xi *= a;
-    }
+    scal_t(a, x);
 }
 
-fn srot(x: &mut [f32], y: &mut [f32], c: f32, s: f32) {
-    for (xi, yi) in x.iter_mut().zip(y.iter_mut()) {
-        let t = c * *xi + s * *yi;
-        *yi = c * *yi - s * *xi;
+/// f2c's `abs(x)`: `x >= 0 ? x : -x` (a NaN's sign is flipped, as C's negation flips it).
+#[inline]
+fn abs_m(x: f32) -> f32 {
+    if x >= 0.0 { x } else { -x }
+}
+
+/// `srot`'s operand orders: for element `i`, `x' = A(M1(c, x), M2(s, y))` and
+/// `y' = M3(c, y) - M4(s, x)`, the letters giving `M1 M2 A M3 M4` (`N`: the source's left operand
+/// first, `c` or `c·x`; `S`: the right one). Fewer than four elements: a scalar loop; otherwise
+/// blocks of four (vectorized), then the remaining one to three elements, each in its own code.
+const SROT_SHORT: &[u8; 5] = b"SSSSN";
+const SROT_BLOCK: &[u8; 5] = b"SSNNS";
+const SROT_REST: [&[u8; 5]; 3] = [b"NNSNN", b"NNNNS", b"NSSNN"];
+
+/// `srot`: the plane rotation `x' = c·x + s·y`, `y' = c·y - s·x` of two vectors.
+#[doc(hidden)]
+pub fn srot(x: &mut [f32], y: &mut [f32], c: f32, s: f32) {
+    let n = x.len();
+    let blocks = if n < 4 { 0 } else { n - n % 4 };
+    let mul = |first: u8, a: f32, b: f32| {
+        if first == b'N' {
+            a.sse_mul(b)
+        } else {
+            b.sse_mul(a)
+        }
+    };
+    for (i, (xi, yi)) in x.iter_mut().zip(y.iter_mut()).enumerate() {
+        let o = if n < 4 {
+            SROT_SHORT
+        } else if i < blocks {
+            SROT_BLOCK
+        } else {
+            SROT_REST[i - blocks]
+        };
+        let (xv, yv) = (*xi, *yi);
+        let (m1, m2) = (mul(o[0], c, xv), mul(o[1], s, yv));
+        let t = if o[2] == b'N' {
+            m1.sse_add(m2)
+        } else {
+            m2.sse_add(m1)
+        };
+        *yi = mul(o[3], c, yv).sse_sub(mul(o[4], s, xv));
         *xi = t;
     }
 }
 
 /// `srotg`: the Givens rotation zeroing `b`; returns `(r, z, c, s)` (`sa` and `sb` on exit,
-/// and `c`, `s`).
-fn srotg(sa: f32, sb: f32) -> (f32, f32, f32, f32) {
-    let roe = if sa.abs() > sb.abs() { sa } else { sb };
-    let scale = sa.abs() + sb.abs();
+/// and `c`, `s`). `r = r_sign(1, roe) * (scale * sqrt(...))` in double: a NaN `r` keeps its sign
+/// whatever `roe`'s.
+#[doc(hidden)]
+pub fn srotg(sa: f32, sb: f32) -> (f32, f32, f32, f32) {
+    let roe = if abs_m(sa) > abs_m(sb) { sa } else { sb };
+    let scale = abs_m(sa).sse_add(abs_m(sb));
     if scale == 0.0 {
         return (0.0, 0.0, 1.0, 0.0);
     }
-    let r1 = sa / scale;
-    let r2 = sb / scale;
-    let mut r = (f64::from(scale) * f64::from(r1 * r1 + r2 * r2).sqrt()) as f32;
-    // `r_sign(1, roe) * r`: exact.
-    if roe < 0.0 {
-        r = -r;
-    }
-    let c = sa / r;
-    let s = sb / r;
+    let r1 = sa.sse_div(scale);
+    let r2 = sb.sse_div(scale);
+    let ssq = f64::from(r1.sse_mul(r1).sse_add(r2.sse_mul(r2)));
+    let r = f64::from(scale).sse_mul(ssq.sqrt()) as f32;
+    let sign = if roe >= 0.0 { 1.0f64 } else { -1.0 };
+    let r = sign.sse_mul(f64::from(r)) as f32;
+    let c = sa.sse_div(r);
+    let s = sb.sse_div(r);
     let mut z = 1.0f32;
-    if sa.abs() > sb.abs() {
+    if abs_m(sa) > abs_m(sb) {
         z = s;
     }
-    if sb.abs() >= sa.abs() && c != 0.0 {
-        z = 1.0 / c;
+    if abs_m(sb) >= abs_m(sa) && c != 0.0 {
+        z = 1.0f32.sse_div(c);
     }
     (r, z, c, s)
 }
@@ -167,6 +176,12 @@ fn srotg(sa: f32, sb: f32) -> (f32, f32, f32, f32) {
 fn r_sign(a: f32, b: f32) -> f32 {
     let x = if a >= 0.0 { a } else { -a };
     if b >= 0.0 { x } else { -x }
+}
+
+/// LINPACK's `t = -sdot(...) / x(l, l)`: `sdot` returns a double, so the quotient is the double
+/// `-dot / (double)x` rounded to float (the float quotient, NaNs as SSE passes them on).
+fn neg_dot_over(dot: f32, x: f32) -> f32 {
+    (-f64::from(dot)).sse_div(f64::from(x)) as f32
 }
 
 /// f2c's `max`/`dmax` macro: `a >= b ? a : b`.
@@ -295,16 +310,19 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                 if x.at(l, l) != 0.0 {
                     s[l] = r_sign(s[l], x.at(l, l));
                 }
-                let scale = 1.0 / s[l];
+                let scale = 1.0f32.sse_div(s[l]);
                 sscal(scale, x.col_mut(l, l, n - l + 1));
-                x.set(l, l, x.at(l, l) + 1.0);
+                x.set(l, l, 1.0f32.sse_add(x.at(l, l)));
             }
             s[l] = -s[l];
         }
         if p >= lp1 {
             for j in lp1..=p {
                 if l <= nct && s[l] != 0.0 {
-                    let t = -sdot(x.col(l, l, n - l + 1), x.col(l, j, n - l + 1)) / x.at(l, l);
+                    let t = neg_dot_over(
+                        sdot(x.col(l, l, n - l + 1), x.col(l, j, n - l + 1)),
+                        x.at(l, l),
+                    );
                     let (xl, xj) = x.two_cols(l, l, j, n - l + 1);
                     saxpy(t, xl, xj);
                 }
@@ -322,9 +340,9 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                 if e[lp1] != 0.0 {
                     e[l] = r_sign(e[l], e[lp1]);
                 }
-                let scale = 1.0 / e[l];
+                let scale = 1.0f32.sse_div(e[l]);
                 sscal(scale, &mut e[lp1..=p]);
-                e[lp1] += 1.0;
+                e[lp1] = 1.0f32.sse_add(e[lp1]);
             }
             e[l] = -e[l];
             if lp1 <= n && e[l] != 0.0 {
@@ -335,7 +353,7 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                     saxpy(e[j], x.col(lp1, j, n - l), &mut work[lp1..=n]);
                 }
                 for j in lp1..=p {
-                    let a = -e[j] / e[lp1];
+                    let a = (-e[j]).sse_div(e[lp1]);
                     saxpy(a, &work[lp1..=n], x.col_mut(lp1, j, n - l));
                 }
             }
@@ -378,13 +396,16 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                 let lp1 = l + 1;
                 if ncu >= lp1 {
                     for j in lp1..=ncu {
-                        let t = -sdot(u.col(l, l, n - l + 1), u.col(l, j, n - l + 1)) / u.at(l, l);
+                        let t = neg_dot_over(
+                            sdot(u.col(l, l, n - l + 1), u.col(l, j, n - l + 1)),
+                            u.at(l, l),
+                        );
                         let (ul, uj) = u.two_cols(l, l, j, n - l + 1);
                         saxpy(t, ul, uj);
                     }
                 }
                 sscal(-1.0, u.col_mut(l, l, n - l + 1));
-                u.set(l, l, u.at(l, l) + 1.0);
+                u.set(l, l, 1.0f32.sse_add(u.at(l, l)));
                 for i in 1..l {
                     u.set(i, l, 0.0);
                 }
@@ -404,7 +425,10 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
             let lp1 = l + 1;
             if l <= nrt && e[l] != 0.0 {
                 for j in lp1..=p {
-                    let t = -sdot(v.col(lp1, l, p - l), v.col(lp1, j, p - l)) / v.at(lp1, l);
+                    let t = neg_dot_over(
+                        sdot(v.col(lp1, l, p - l), v.col(lp1, j, p - l)),
+                        v.at(lp1, l),
+                    );
                     let (vl, vj) = v.two_cols(lp1, l, j, p - l);
                     saxpy(t, vl, vj);
                 }
@@ -500,8 +524,8 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                     let (r, _, cs, sn) = srotg(s[k], f);
                     s[k] = r;
                     if k != l {
-                        f = -sn * e[k - 1];
-                        e[k - 1] *= cs;
+                        f = (-sn).sse_mul(e[k - 1]);
+                        e[k - 1] = e[k - 1].sse_mul(cs);
                     }
                     if wantv {
                         let (vk, vm) = v.two_cols(1, k, m_, p);
@@ -516,8 +540,8 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                 for k in l..=m_ {
                     let (r, _, cs, sn) = srotg(s[k], f);
                     s[k] = r;
-                    f = -sn * e[k];
-                    e[k] *= cs;
+                    f = (-sn).sse_mul(e[k]);
+                    e[k] = e[k].sse_mul(cs);
                     if wantu {
                         let (uk, ul) = u.two_cols(1, k, l - 1, n);
                         srot(uk, ul, cs, sn);
@@ -528,28 +552,34 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                 // One QR step: the shift.
                 let scale = fmax(
                     fmax(
-                        fmax(fmax(s[m_].abs(), s[m_ - 1].abs()), e[m_ - 1].abs()),
-                        s[l].abs(),
+                        fmax(fmax(abs_m(s[m_]), abs_m(s[m_ - 1])), abs_m(e[m_ - 1])),
+                        abs_m(s[l]),
                     ),
-                    e[l].abs(),
+                    abs_m(e[l]),
                 );
-                let sm = s[m_] / scale;
-                let smm1 = s[m_ - 1] / scale;
-                let emm1 = e[m_ - 1] / scale;
-                let sl = s[l] / scale;
-                let el = e[l] / scale;
-                let b = ((smm1 + sm) * (smm1 - sm) + emm1 * emm1) / 2.0;
-                let c = (sm * emm1) * (sm * emm1);
+                let sm = s[m_].sse_div(scale);
+                let smm1 = s[m_ - 1].sse_div(scale);
+                let emm1 = e[m_ - 1].sse_div(scale);
+                let sl = s[l].sse_div(scale);
+                let el = e[l].sse_div(scale);
+                // `/ 2` is `0.5 *` in the official build (the same value).
+                let b = 0.5f32.sse_mul(
+                    smm1.sse_add(sm)
+                        .sse_mul(smm1.sse_sub(sm))
+                        .sse_add(emm1.sse_mul(emm1)),
+                );
+                let smemm1 = emm1.sse_mul(sm);
+                let c = smemm1.sse_mul(smemm1);
                 let mut shift = 0.0f32;
                 if !(b == 0.0 && c == 0.0) {
-                    shift = f64::from(b * b + c).sqrt() as f32;
+                    shift = b.sse_mul(b).sse_add(c).sqrt();
                     if b < 0.0 {
                         shift = -shift;
                     }
-                    shift = c / (b + shift);
+                    shift = c.sse_div(shift.sse_add(b));
                 }
-                let mut f = (sl + sm) * (sl - sm) + shift;
-                let mut g = sl * el;
+                let mut f = sm.sse_add(sl).sse_mul(sl.sse_sub(sm)).sse_add(shift);
+                let mut g = sl.sse_mul(el);
                 // Chase zeros.
                 let mm1 = m_ - 1;
                 for k in l..=mm1 {
@@ -558,10 +588,10 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                     if k != l {
                         e[k - 1] = f;
                     }
-                    f = cs * s[k] + sn * e[k];
-                    e[k] = cs * e[k] - sn * s[k];
-                    g = sn * s[k + 1];
-                    s[k + 1] *= cs;
+                    f = cs.sse_mul(s[k]).sse_add(e[k].sse_mul(sn));
+                    e[k] = e[k].sse_mul(cs).sse_sub(s[k].sse_mul(sn));
+                    g = sn.sse_mul(s[k + 1]);
+                    s[k + 1] = cs.sse_mul(s[k + 1]);
                     if wantv {
                         let (vk, vk1) = v.two_cols(1, k, k + 1, p);
                         srot(vk, vk1, cs, sn);
@@ -569,10 +599,10 @@ pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
                     let (r, _, cs, sn) = srotg(f, g);
                     f = r;
                     s[k] = f;
-                    f = cs * e[k] + sn * s[k + 1];
-                    s[k + 1] = -sn * e[k] + cs * s[k + 1];
-                    g = sn * e[k + 1];
-                    e[k + 1] *= cs;
+                    f = cs.sse_mul(e[k]).sse_add(s[k + 1].sse_mul(sn));
+                    s[k + 1] = e[k].sse_mul(-sn).sse_add(s[k + 1].sse_mul(cs));
+                    g = sn.sse_mul(e[k + 1]);
+                    e[k + 1] = cs.sse_mul(e[k + 1]);
                     if wantu && k < n {
                         let (uk, uk1) = u.two_cols(1, k, k + 1, n);
                         srot(uk, uk1, cs, sn);
@@ -739,6 +769,74 @@ mod tests {
         let s = vnl_svd_f32_full(&[3.0, 1.0, 1.0, 2.0, 0.5, -1.0], 3, 2);
         assert!(s.info == 0 && s.notices.is_empty());
     }
+
+    /// The NaNs' bits (signs and payloads) of `srot` on NaNs with distinct payloads (every subset
+    /// of `c`, `s`, `x`, `y`, lengths 1 to 40), of `srotg` on special pairs and of the decompositions
+    /// of seeded matrices with NaNs, infinities and extreme entries, recorded on Linux x86-64 where
+    /// the probe (validation/probes/fs-vnl, family `svdnan`) matched ITK 4.13.2's own build bit for
+    /// bit.
+    #[test]
+    fn nan_bits_are_x86_64s() {
+        use crate::vnl_fixed::cases;
+        use crate::x87::cases::SplitMix64;
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        let mut word = |w: u32| {
+            for b in w.to_le_bytes() {
+                h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        let nan = |t: u32| f32::from_bits(0x7fc0_0000 | t);
+        for n in 1..=40usize {
+            for sub in 1u32..16 {
+                let c = if sub & 1 != 0 { nan(200_000) } else { 2.0 };
+                let s = if sub & 2 != 0 { nan(300_000) } else { 3.0 };
+                let mut x: Vec<f32> = (0..n)
+                    .map(|i| if sub & 4 != 0 { nan(1 + i as u32) } else { 5.0 })
+                    .collect();
+                let mut y: Vec<f32> = (0..n)
+                    .map(|i| {
+                        if sub & 8 != 0 {
+                            nan(1000 + i as u32)
+                        } else {
+                            7.0
+                        }
+                    })
+                    .collect();
+                srot(&mut x, &mut y, c, s);
+                x.iter().chain(&y).for_each(|v| word(v.to_bits()));
+            }
+        }
+        let mut rng = SplitMix64::new(0x5fd0_a7a0_0001);
+        for _ in 0..2000 {
+            let (a, b) = (cases::special_f32(&mut rng), cases::special_f32(&mut rng));
+            let (r, z, c, s) = srotg(a, b);
+            [r, z, c, s].iter().for_each(|v| word(v.to_bits()));
+        }
+        for _ in 0..1500 {
+            let c = 1 + rng.below(6) as usize;
+            let r = c + rng.below(3) as usize;
+            let mut m: Vec<f32> = (0..r * c)
+                .map(|_| rng.range(-4096, 4096) as f32 / 256.0)
+                .collect();
+            for _ in 0..rng.below(4) {
+                let i = rng.below((r * c) as u64) as usize;
+                m[i] = cases::special_f32(&mut rng);
+            }
+            let svd = vnl_svd_f32_full(&m, r, c);
+            word(svd.info as u32);
+            svd.u
+                .iter()
+                .chain(&svd.w)
+                .chain(&svd.v)
+                .for_each(|v| word(v.to_bits()));
+        }
+        if std::env::var_os("LARMORX_PRINT_DIGESTS").is_some() {
+            println!("SVD_NAN_BITS = {h:#018x}");
+        }
+        assert_eq!(h, SVD_NAN_BITS);
+    }
+
+    const SVD_NAN_BITS: u64 = 0x1296_4f59_3207_544e;
 
     #[test]
     fn solves_well_conditioned_systems() {

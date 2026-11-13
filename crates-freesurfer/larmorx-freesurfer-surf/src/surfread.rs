@@ -28,7 +28,7 @@
 use std::path::Path;
 
 use larmorx_core::defects::{
-    Defect, FS_147, FS_150, FS_151, FS_152, FS_153, FS_154, FS_155, FS_156,
+    Defect, FS_147, FS_150, FS_151, FS_152, FS_153, FS_154, FS_155, FS_156, FS_354,
 };
 use larmorx_freesurfer_core::cscan::Bytes;
 use larmorx_freesurfer_core::cstd::fmt_f;
@@ -61,7 +61,7 @@ fn io_cpp() -> String {
     format!("{}/utils/mrisurf_io.cpp", diag::BUILD_ROOT)
 }
 
-fn verbose_show(g: &Globals) -> bool {
+pub(crate) fn verbose_show(g: &Globals) -> bool {
     g.gdiag & DIAG_SHOW != 0 && diag::verbose_on(g)
 }
 
@@ -176,7 +176,7 @@ fn first_line(
 
 /// `vertices_topology[v].num++` of a face's vertex: one byte (FS-147: past 255 the count wraps
 /// around; refused by default, `false` then).
-fn count_face(g: &mut Globals, mris: &mut Mris, v: usize, fname: &str) -> bool {
+pub(crate) fn count_face(g: &mut Globals, mris: &mut Mris, v: usize, fname: &str) -> bool {
     if mris.topology(v).num == u8::MAX {
         g.notices.add(
             &FS_147,
@@ -642,20 +642,58 @@ pub fn read_geo_file_positions(
 
 // ---- the binary triangle file's positions -----------------------------------------------------
 
-/// The triangle file's start: the 3-byte magic number (not checked), the creator's line (`fgets`
-/// of 199 bytes), `fscanf(fp, "\n")`, the vertex and face counts (`freadInt`).
-fn triangle_counts(g: &mut Globals, fp: &mut CFile) -> (i32, i32) {
+/// The triangle file's start: the 3-byte magic number (not checked), unless `noextra` the
+/// creator's line (`fgets` of 199 bytes; FS-354: a longer line is read to its end by default) and
+/// `fscanf(fp, "\n")`, then the vertex and face counts (`freadInt`).
+pub(crate) fn triangle_counts(
+    g: &mut Globals,
+    fp: &mut CFile,
+    fname: &str,
+    noextra: bool,
+) -> (i32, i32) {
     let _ = fread3(fp);
-    let _ = fp.fgets(200);
-    let mut sc = Scanf::new(fp);
-    sc.text(&mut g.errno, b"\n");
-    sc.finish(&mut g.errno);
+    if !noextra {
+        let line = fp.fgets(200);
+        let long = line
+            .as_ref()
+            .is_some_and(|l| l.len() == 199 && l[198] != b'\n');
+        if long {
+            if g.notices.reproduce() {
+                g.notices.add(
+                    &FS_354,
+                    format!("{fname}: a creator's line of more than 199 bytes: the bytes after them read as the counts"),
+                );
+            } else {
+                // the rest of the line, to its newline (or the end of the file)
+                let mut more = 0usize;
+                loop {
+                    let c = fp.getc();
+                    if c < 0 {
+                        break;
+                    }
+                    more += 1;
+                    if c == i32::from(b'\n') {
+                        break;
+                    }
+                }
+                if more > 0 {
+                    g.notices.add(
+                        &FS_354,
+                        format!("{fname}: a creator's line of {} bytes read to its end (FreeSurfer reads the bytes after its first 199 as the counts)", 199 + more),
+                    );
+                }
+            }
+        }
+        let mut sc = Scanf::new(fp);
+        sc.text(&mut g.errno, b"\n");
+        sc.finish(&mut g.errno);
+    }
     let nvertices = fread_int(g, fp);
     let nfaces = fread_int(g, fp);
     (nvertices, nfaces)
 }
 
-fn show_counts(g: &Globals, io: &mut Io, fname: &str, nvertices: i32, nfaces: i32) {
+pub(crate) fn show_counts(g: &Globals, io: &mut Io, fname: &str, nvertices: i32, nfaces: i32) {
     if verbose_show(g) {
         let _ = writeln!(
             io.out,
@@ -692,7 +730,8 @@ pub fn read_triangle_file_vertex_positions_only(
             return Ok(None);
         }
     };
-    let (nvertices, nfaces) = triangle_counts(g, &mut fp);
+    // (these readers read the creator's line whatever TRIANGULARSURFACE_NOEXTRA_READ says)
+    let (nvertices, nfaces) = triangle_counts(g, &mut fp, fname, false);
     show_counts(g, io, fname, nvertices, nfaces);
     let no_room = |g: &mut Globals, io: &mut Io| {
         log::error_printf(
@@ -777,7 +816,8 @@ pub fn read_triangle_file_positions(
             return Ok(ERROR_NOFILE);
         }
     };
-    let (nvertices, nfaces) = triangle_counts(g, &mut fp);
+    // (these readers read the creator's line whatever TRIANGULARSURFACE_NOEXTRA_READ says)
+    let (nvertices, nfaces) = triangle_counts(g, &mut fp, fname, false);
     if nvertices != mris.nvertices || nfaces != mris.nfaces {
         log::error_printf(
             g,

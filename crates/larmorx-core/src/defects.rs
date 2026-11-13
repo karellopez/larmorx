@@ -614,7 +614,7 @@ defects! {
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,
         "tanh (double precision) is not correctly rounded: about one argument in five gets a result one unit in the last place from the exact value, and FSL's bet2 takes its surface's smoothness weight from it at every step, so where such a last bit survives (most of all where a self-intersecting surface is rerun, which amplifies it) the surface and the brain mask are other than the exact tanh gives";
     GLIBC_07 = "GLIBC-07", "glibc 2.35", true,
-        "the mathematical functions FSL's and AFNI's programs call are not correctly rounded: the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow (on image intensities, between 0.02 % (log) and 0.21 % (tan) of the arguments get a result one unit in the last place from the exact value) and the single-precision sinf, cosf, atan2f, expf, logf and powf; so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values), its kernels, -bptf, -tfce and -roc, fslstats' -e and -E and 3dTshift's -wsinc5 and -wsinc9 weights (about 1 % of them) can take another last bit, and the iterative programs (FLIRT and its programs, mcflirt's mutual-information costs, FAST, topup's smoothing, bet2's powers, betsurf's blurring) another path; nor is sincos, which gives the twiddle factors of fslmaths' FFT convolution (through cexp): of the transform lengths 1 to 256, 80 hold a factor one unit in the last place from the exact one, so a few voxels of such a convolution differ in their last place; and numpy's float64 exp and log are the C library's on x86-64 CPUs without AVX-512 (and SciPy's powers C's pow), which tedana's t2smap takes for its S0, its curve fit's model, the T2* floor, the RMSE and the combination's weights";
+        "the mathematical functions FSL's and AFNI's programs call are not correctly rounded: the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow (on image intensities, between 0.02 % (log) and 0.21 % (tan) of the arguments get a result one unit in the last place from the exact value) and the single-precision sinf, cosf, atan2f, expf, logf and powf; so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values), its kernels, -bptf, -tfce and -roc, fslstats' -e and -E and 3dTshift's -wsinc5 and -wsinc9 weights (about 1 % of them) can take another last bit, and the iterative programs (FLIRT and its programs, mcflirt's mutual-information costs, FAST, topup's smoothing, bet2's powers, betsurf's blurring) another path; nor is sincos, which gives the twiddle factors of fslmaths' FFT convolution (through cexp): of the transform lengths 1 to 256, 80 hold a factor one unit in the last place from the exact one, so a few voxels of such a convolution differ in their last place; and numpy's float64 exp and log are the C library's on x86-64 CPUs without AVX-512 (and SciPy's powers C's pow), which tedana's t2smap takes for its S0, its curve fit's model, the T2* floor, the RMSE and the combination's weights; and FreeSurfer's matrices and histograms call cosf and sinf (rotations), expf (Gaussian matrices), exp, pow and log (the histograms' smoothing, robust fit and entropy) and log (Gaussian draws)";
     AFNI_01 = "AFNI-01", "AFNI", true,
         "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
     AFNI_02 = "AFNI-02", "AFNI", true,
@@ -1061,6 +1061,8 @@ defects! {
         "vnl_symmetric_eigensystem never returns on many matrices with an infinite or NaN entry: EISPACK's pythag loops for ever when its second argument is NaN or both are infinite (its iteration starts from a NaN ratio and never meets its stopping test), and tql2 makes such calls, once after reading and writing one element past its arrays (when a NaN is left at the end of the subdiagonal)";
     ITK_116 = "ITK-116", "VXL", true,
         "vnl_svd (LINPACK's svdc) can loop for ever on a matrix with an infinite or NaN entry: its deflation and splitting steps do not count towards the iteration limit, and they can come back to the same singular values and superdiagonal again and again";
+    ITK_117 = "ITK-117", "VXL", true,
+        "vnl_real_eigensystem takes an eigenvalue whose imaginary part is not 0 for the first of a complex pair; when the last eigenvalue's imaginary part is NaN it reads the eigenvector's imaginary part from one row past its eigenvector matrix and writes the conjugate one element past its eigenvalues: memory contents, and the program can crash";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -1168,11 +1170,11 @@ defects! {
     FS_46 = "FS-46", "FreeSurfer", true,
         "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), returns a pseudo-inverse of infinities when the decomposition fails, and crashes for a zero matrix with fewer rows than columns";
     FS_47 = "FS-47", "FreeSurfer", true,
-        "MatrixEigenSystem of a symmetric matrix with infinite entries, and MatrixCalculateEigenSystemHelper's symmetric case of a matrix with NaN entries, never return";
+        "MatrixEigenSystem of a symmetric matrix with infinite entries, and MatrixCalculateEigenSystemHelper's symmetric case of a matrix with infinite or NaN entries in its upper triangle, never return on many such matrices (VNL's ITK-115), and on the others return the values VNL computes, though such a matrix has no eigensystem";
     FS_48 = "FS-48", "FreeSurfer", true,
         "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
+        "freadInt and freadDouble at the end of a file keep, for the bytes they could not read, bytes of the number read before them (memory contents where none was read; freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with them";
     FS_50 = "FS-50", "FreeSurfer", true,
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,
@@ -1340,7 +1342,7 @@ defects! {
     FS_147 = "FS-147", "FreeSurfer", true,
         "MRISreadVTK and the ASCII and movie.byu surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
     FS_148 = "FS-148", "FreeSurfer", true,
-        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, reads one or two bytes before the name to decide whether it names a hemisphere";
+        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, and the curvature reader's file-name choice with a name whose first dot is its first or second character, read one or two bytes before the name to decide whether it names a hemisphere";
     FS_149 = "FS-149", "FreeSurfer", true,
         "MRISbuildFileName_read (a name with a slash, or without a hemisphere when FS_POSIX is unset) and __MRISapplyFSGIIwrite (FS_GII set to .gii) write a file name of 1,024 bytes or more past their caller's 1,024-byte buffer";
     FS_150 = "FS-150", "FreeSurfer", true,
@@ -1379,8 +1381,6 @@ defects! {
         "MRIcopy of a tensor volume copies every row from the source's first voxel onto the destination's first voxel: only the destination's first row changes, and it becomes the source's first row";
     FS_261 = "FS-261", "FreeSurfer", true,
         "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
-    FS_262 = "FS-262", "FreeSurfer", true,
-        "retired: the same defect as FS-176 (the byte-order swap of a 64-bit integer, swapLong64, rounded to a double's 53 significant bits); kept only until the fs.core clean room names FS-176";
     FS_263 = "FS-263", "FreeSurfer", true,
         "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
     FS_264 = "FS-264", "FreeSurfer", true,
@@ -1493,6 +1493,46 @@ defects! {
         "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
     FS_220 = "FS-220", "FreeSurfer", true,
         "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
+    FS_346 = "FS-346", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface readers given a command-line tag whose length is -1 read the rest of the file into a block of no bytes: memory corruption or a crash when more than a few bytes follow";
+    FS_347 = "FS-347", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface readers given more than 1,000 command-line tags store the 1,001st past the surface's list of command lines, over its command-line count and group-average area (values from a memory address, then wrong command lines or a crash)";
+    FS_348 = "FS-348", "FreeSurfer", true,
+        "the quadrangle surface reader given a command-line tag whose length cannot be allocated (below -1, or 2^63 - 1) writes through the failed allocation: a segmentation fault";
+    FS_349 = "FS-349", "FreeSurfer", true,
+        "the quadrangle surface reader given room for fewer faces than its quadrangles make (a size multiplier below 1) writes the others past its face array before its own check ends the program";
+    FS_350 = "FS-350", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface writers given a surface whose command-line count is larger than the command lines it holds end the program with a segmentation fault (signal 11), leaving a partial file";
+    FS_351 = "FS-351", "FreeSurfer", true,
+        "the quadrangle surface reader accepts a quadrangle vertex number at or above the surface's vertex count (within its room for vertices): the surface's faces then refer to a vertex it does not have";
+    FS_352 = "FS-352", "FreeSurfer", true,
+        "the quadrangle surface reader given a quadrangle vertex number beyond the surface's room for vertices counts the face in memory outside its vertex arrays (memory corruption or a crash)";
+    FS_353 = "FS-353", "FreeSurfer", true,
+        "the quadrangle surface reader drops both triangles of a quadrangle whose first triangle (by the split it chooses) has two equal vertices: a single triangle the quadrangle writer stored as v0 v1 v1 v2 is lost on reading for about half of the vertex pairs";
+    FS_354 = "FS-354", "FreeSurfer", true,
+        "the binary triangle surface readers given a creator's line of more than 199 bytes (a long user name or creation date in the file's first line) read its remaining bytes as the vertex and face counts: the file's surface cannot be read";
+    FS_355 = "FS-355", "FreeSurfer", true,
+        "the surface library's annotation reader, given an annotation name without a folder that starts with the surface's hemisphere letters (lh.aparc.annot for a left surface), adds the hemisphere again (label/lh.lh.aparc.annot), so it does not find the file the annotation writer wrote for the same name; it takes a name as naming the hemisphere only when the name is the two letters alone, in any case";
+    FS_356 = "FS-356", "FreeSurfer", true,
+        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names); the surface reader (MRISread), looking for the subject's Talairach transform beside a surface name of 300 bytes or more, writes past a 300-byte buffer";
+    FS_357 = "FS-357", "FreeSurfer", true,
+        "the surface library's neighbourhood search (the 2- and 3-hop neighbours MRISread and others compute), given a vertex with a ripped vertex among its known neighbours, reads its neighbour list past the part it filled: the vertex's neighbourhood then depends on memory contents (MRISread then ends with a failed assertion at the ripped vertex)";
+    FS_358 = "FS-358", "FreeSurfer", true,
+        "the surface library's older neighbourhood search (taken when MRISfindNeighborsAtVertex_old is set), given a vertex with more than 1,024 vertices within the hops asked for, writes past its caller's 1,024-entry list";
+    FS_359 = "FS-359", "FreeSurfer", true,
+        "the surface reader (MRISread) given a quadrangle surface file in the old format (no magic number) reads each vertex's face list past its end (its count is the file's count plus the faces found): the surface's neighbours depend on memory contents";
+    FS_360 = "FS-360", "FreeSurfer", true,
+        "the surface reader (MRISread), given a surface file with a vertex of more than 255 faces whose one-byte count wrapped around (FS-147 reproduced), writes the vertex's face list past its end";
+    FS_361 = "FS-361", "FreeSurfer", true,
+        "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a surface that is not closed (a vertex with more neighbours than faces) or a vertex of more than 255 faces, writes past the vertex's neighbour or face list (memory corruption or a crash)";
+    FS_362 = "FS-362", "FreeSurfer", true,
+        "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a vertex or face count it cannot read, a vertex or face number outside the counts, or a face whose vertices are not all among the file's vertices (a face line missing, or holding 0), writes or reads outside its arrays (memory corruption or a crash)";
+    FS_363 = "FS-363", "FreeSurfer", true,
+        "the surface library's plane fit (mrisComputeOptimalPlane) fits its plane through the origin instead of the vertices' mean, includes ripped vertices, and returns the centre (0, 0, 0)";
+    FS_364 = "FS-364", "FreeSurfer", true,
+        "MRIShistoThresholdCurvature (mris_curvature's outlier removal) of a surface whose unripped curvatures are all equal, or one of which is not finite (NaN, infinite), writes far outside its 1,000-bin histogram: a segmentation fault";
+    FS_365 = "FS-365", "FreeSurfer", true,
+        "MRIShistoThresholdCurvature of a surface with no unripped vertex reads memory before its histogram (no effect on the result)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,
@@ -1509,6 +1549,104 @@ defects! {
         "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
     FS_228 = "FS-228", "FreeSurfer", true,
         "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
+    FS_285 = "FS-285", "FreeSurfer", true,
+        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
+    FS_286 = "FS-286", "FreeSurfer", true,
+        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes the word past its 2-byte buffer: memory corruption, a crash or wrong values";
+    FS_287 = "FS-287", "FreeSurfer", true,
+        "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
+    FS_288 = "FS-288", "FreeSurfer", true,
+        "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
+    FS_289 = "FS-289", "FreeSurfer", true,
+        "the volume operations that walk a second volume (or the destination, or a frame they are given) with the first volume's extent and frames read and write other voxels of a smaller volume";
+    FS_290 = "FS-290", "FreeSurfer", true,
+        "the same operations read and write memory outside a volume whose extent or frames are smaller than the first's, or outside a frame it does not have";
+    FS_291 = "FS-291", "FreeSurfer", true,
+        "MRIinvertContrast and MRIscaleAndMultiply, written for volumes of bytes, take the first bytes of each row of a volume of another type as byte voxels: meaningless values";
+    FS_292 = "FS-292", "FreeSurfer", true,
+        "MRIdivide of three byte volumes does not move on in the first volume and the destination after a voxel whose divisor is 0: the rest of the row is divided with the wrong voxels and written one place early";
+    FS_293 = "FS-293", "FreeSurfer", true,
+        "MRIextractInto given a destination of another type than the source frees the caller's volume, which the caller then still uses";
+    FS_294 = "FS-294", "FreeSurfer", true,
+        "MRIextractInto with a start at or past the source's extent copies rows of a negative length (a huge size): the program crashes";
+    FS_295 = "FS-295", "FreeSurfer", true,
+        "MRIextractInto sets a new volume's start and end positions (xstart, xend and the others) with the voxel sizes truncated to integers: sub-millimetre voxels give 0, 1.5 mm voxels 1";
+    FS_296 = "FS-296", "FreeSurfer", true,
+        "MRIscalarMulFrame stores a NaN product into a byte volume by C's conversion, which is undefined for NaN";
+    FS_297 = "FS-297", "FreeSurfer", true,
+        "MRIextractInto of a volume of 64-bit integers (long) copies each row of the box from half its first column in the source to half its first column in the destination: the box's voxels come from the wrong place, half voxels included";
+    FS_298 = "FS-298", "FreeSurfer", true,
+        "the trilinear, cubic and sinc samplers read a volume of 64-bit integers (long) as 32-bit integers at the voxel's index: they sample halves of other voxels";
+    FS_299 = "FS-299", "FreeSurfer", true,
+        "MRIcubicSampleVolume (cubic sampling) divides its weighted sum by the number of points it added (64 inside the volume) where its weights sum to 8: a constant volume samples to an eighth of its value, other volumes likewise too dark";
+    FS_300 = "FS-300", "FreeSurfer", true,
+        "MRIcubicSampleVolumeFrame (cubic sampling of a frame) near the volume's edge adds window points it never read: memory contents";
+    FS_301 = "FS-301", "FreeSurfer", true,
+        "MRItranslate and MRIrotate_I (and the rotations about an axis) write each sample as a byte at the voxel's byte place whatever the volume's type: a volume of another type gets bytes inside its voxels";
+    FS_303 = "FS-303", "FreeSurfer", true,
+        "MRItranslate and MRIrotate_I on a volume of a type the trilinear sampler refuses store a value never set (memory contents) or the sample before";
+    FS_304 = "FS-304", "FreeSurfer", true,
+        "MRIrotateX_I, MRIrotateY_I and MRIrotateZ_I with an angle whose rotation cannot be inverted (NaN, infinite) crash after the error message";
+    FS_305 = "FS-305", "FreeSurfer", true,
+        "MRIfindApproximateSkullBoundingBox of a volume whose centre of mass is not a number (infinite voxels) walks about two billion voxels outside the volume and, when its first box is narrow, never returns";
+    FS_306 = "FS-306", "FreeSurfer", true,
+        "reading a transform whose file name has 500 bytes or more overflows the buffer the name is classified in (memory corruption)";
+    FS_307 = "FS-307", "FreeSurfer", true,
+        "reading a MINC transform (.xfm) whose last line starts with % after a second % comment line never returns";
+    FS_308 = "FS-308", "FreeSurfer", true,
+        "reading an .lta whose first two lines are not type = <n> and nxforms = <n> takes the type or the number of transforms from memory contents";
+    FS_309 = "FS-309", "FreeSurfer", true,
+        "reading an .lta of a single line crashes";
+    FS_310 = "FS-310", "FreeSurfer", true,
+        "reading a MINC transform (.xfm) whose %Generated by comment ends with a word containing src or dst crashes";
+    FS_302 = "FS-302", "FreeSurfer", true,
+        "the sinc samplers with a half-width whose window holds more than 128 voxels on an axis write past their weight arrays: memory corruption or a crash";
+    FS_229 = "FS-229", "FreeSurfer", true,
+        "VolSS2MosSS and MosSS2VolSS (a volume's voxel to a mosaic's pixel and back) crash with a division by zero for an image of no columns or rows, VolSS2MosSS also for a mosaic of no columns, and both for sizes of -2147483648 with -1";
+    FS_230 = "FS-230", "FreeSurfer", true,
+        "the .mat readers take every version 4 matrix that is not of little-endian doubles (the type code not 0) for the other byte order: its sizes and numbers are read byte-swapped (wrong sizes, a failed read or an exit)";
+    FS_231 = "FS-231", "FreeSurfer", true,
+        "the .mat readers fail on every matrix of 16-bit integers (could not read val[0, 0]); a file ending one byte into such a number reads it with its other byte from memory";
+    FS_232 = "FS-232", "FreeSurfer", true,
+        "the .mat readers read 8 bytes for each 32-bit integer: the numbers combine two of the file's (or one byte-swapped), and the read fails half-way";
+    FS_233 = "FS-233", "FreeSurfer", true,
+        "the .mat readers read unsigned 8-, 16- and 32-bit integers as signed: values of 128, 32768 or 2147483648 and above come out negative";
+    FS_234 = "FS-234", "FreeSurfer", true,
+        "the .mat readers convert single-precision numbers of the other byte order to integers before swapping their bytes: the values are wrong";
+    FS_235 = "FS-235", "FreeSurfer", true,
+        "the .mat readers read the imaginary part of a complex matrix only for doubles: for other types it is memory contents (or 1) instead of the file's numbers";
+    FS_236 = "FS-236", "FreeSurfer", true,
+        "MatlabRead never sees the complex flag of a version 5 matrix (it tests another bit): a complex matrix comes back real, and its imaginary part is read without skipping its element's tag";
+    FS_237 = "FS-237", "FreeSurfer", true,
+        "MatlabRead does not recognise numbers MATLAB stores in a version 5 small element (4 bytes or fewer: one single-precision number, one 32-bit integer, up to four bytes): unsupported matlab format and zeros";
+    FS_238 = "FS-238", "FreeSurfer", true,
+        "MatlabRead skips 8 bytes too many after a version 5 variable name whose length is a multiple of 8 (an empty name included): the matrix's type and numbers are read from the wrong place";
+    FS_239 = "FS-239", "FreeSurfer", true,
+        "MatlabRead's verbose messages show a version 5 variable name of 4 characters or fewer cut to its first character, and a longer one followed by memory contents";
+    FS_240 = "FS-240", "FreeSurfer", true,
+        "MatlabRead reads compressed (MATLAB 7, the default save format) variables wrongly: the rows, type and complex flag come from the wrong bytes, the byte order from memory never written, numbers from a fixed place and past the variable, and the decoding stops at 100 times the compressed size";
+    FS_241 = "FS-241", "FreeSurfer", true,
+        "MatlabRead, given a version 5 file that ends inside a variable's header, goes on with sizes, type and flags from memory never written";
+    FS_242 = "FS-242", "FreeSurfer", true,
+        "MatlabRead and MatFileRead leave the .mat file open (a compressed one twice): a program reading many files runs out of file descriptors";
+    FS_243 = "FS-243", "FreeSurfer", true,
+        "the .mat readers allocate whatever sizes a file states before reading it: a negative or huge size crashes the program or depends on the machine's memory";
+    FS_244 = "FS-244", "FreeSurfer", true,
+        "MatFileRead's bytes of numbers outside -128 to 127 wrap (300 gives 44), and of numbers beyond the 32-bit range or NaN are 0";
+    FS_245 = "FS-245", "FreeSurfer", true,
+        "the .mat readers' results depend on memory contents for some files (a 16-bit number cut by the file's end, the imaginary part of a matrix that is not of doubles, a compressed variable, a version 5 header cut by the file's end, a name printed past its end): values taken from memory never written or read past their buffers";
+    FS_246 = "FS-246", "FreeSurfer", true,
+        "MatlabRead, given a version 5 array of three or more dimensions, reads its name and type from the third dimension's place: wrong results";
+    FS_247 = "FS-247", "FreeSurfer", true,
+        "MatlabWrite of a complex matrix writes its real and imaginary parts interleaved as the first half of a real matrix";
+    FS_248 = "FS-248", "FreeSurfer", true,
+        "ReadMatlabFileContents of a file of more than 1,000 variables writes past its lists (a crash or corruption)";
+    FS_250 = "FS-250", "FreeSurfer", true,
+        "MatFileRead goes on after a header it could not read, with the sizes read so far (or 0)";
+    FS_251 = "FS-251", "FreeSurfer", true,
+        "the .mat readers take a byte 0xff for the end of the file: a version 5 file with 0xff in its first four bytes is refused, a version 4 variable whose first byte is 0xff ends the reading";
+    FS_252 = "FS-252", "FreeSurfer", true,
+        "MRIcopyHeader crashes when the source volume's voxel-to-RAS matrix has not been computed (FreeSurfer's own volumes always have it)";
 }
 
 /// The register entry with ID `id`.

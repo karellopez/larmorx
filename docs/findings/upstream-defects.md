@@ -232,6 +232,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | ITK-114 | VXL `vnl_brent_minimizer` (and `vnl_brent`, `vnl_powell`) | the loop can come back to a state it had been in and repeat for ever: a bracket with an infinite end where the cost is NaN or not lower, or ends whose sum overflows (an infinite midpoint, two points taking turns) | a | none | stopped at the best point (cycle detection on the loop's state), named; both modes | – |
 | ITK-115 | EISPACK `pythag` (`vnl_symmetric_eigensystem`'s `tql2`) | never returns on a NaN second argument or two infinities, which a matrix with an infinite or NaN entry usually gives it (once after `tql2` reads and writes one element past its arrays) | a | none | stopped, `ierr` the eigenvalue being worked on, named; both modes | – |
 | ITK-116 | LINPACK `ssvdc` (`vnl_svd<float>`) | the deflation and splitting steps do not count towards the iteration limit and can repeat for ever on a matrix with an infinite entry | a | none | stopped with `info` = m, as at the limit, named; both modes | – |
+| ITK-117 | VXL `vnl_real_eigensystem` | when the last eigenvalue's imaginary part is NaN (it is then taken for the first of a complex pair), V's imaginary parts are read one row past the eigenvector matrix and the conjugate is written one element past the eigenvalues | a (memory: it can crash) | none | V's imaginary parts in that column 0, `Vreal`'s column unwritten (as VNL leaves it), named; both modes | – |
 | FS-71 | MINC volume_io `open_file` | a compressed input is decompressed by `system("gunzip -c <name> > <tmp>")` (then `bunzip2`) with the name unquoted: a blank or shell syntax fails, reads other files or runs commands | a | none | gzip and bzip2 in memory, a notice for a name the shell would split; never reproduced | – |
 | FS-72 | MINC volume_io `mni_input_reals` | a thin-plate spline's list that reaches the end of the file after white space without its `;` is read forever | a | none | `Expected ';', found end of file.`, named | – |
 | FS-73 | MINC volume_io `input_one_transform` | `Number_Dimensions = 0` divides by zero; a negative one sizes arrays negatively | a | none | an error message (rule B), named | – |
@@ -265,6 +266,32 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-282 | miniz 1.15 `tinfl_decompress` | the length symbols 286, 287 and distance symbols 30, 31 (undefined by deflate) are accepted: a length of 0 copies 3 bytes and moves the output by 3 (past the buffer when fewer than 3 remain), a distance of 0 copies the byte under the cursor | b (rule B, 2026-11-13) | none | the stream fails; `reproduce` the copies within the buffer (past it: fails, named) | – |
 | FS-283 | miniz 1.15 `tinfl_decompress` | a Huffman code with no codes or one code of any length is accepted, and a bit pattern without a code decodes as symbol 0, taking no bits | b (rule B, 2026-11-13) | none | decoding such a pattern fails (a single code's own pattern decodes); `reproduce` symbol 0, named | – |
 | FS-284 | miniz 1.15 `mz_inflate` (its dictionary) | through the 32 KiB dictionary, a distance farther back than the output so far reads dictionary memory never written | a | none | the stream fails; `reproduce` zeros, named | – |
+| FS-285 | FreeSurfer 8.2.0 `readVolGeom` (the volume-geometry block of linear transforms and surfaces) | a line whose first word has 64 bytes or more is written past FreeSurfer's buffer for it | a (memory: no effect observed in the official build) | none known (FreeSurfer writes the block with the eight usual keys) | the word read whole, named | – |
+| FS-286 | FreeSurfer 8.2.0 `readVolGeom` | a line whose second word (normally `=`) has 2 bytes or more is written past its 2-byte buffer: the official build then compares the second word's bytes from its third on with the keys (`valid == 1` is not recognised) | a (memory, deterministic in the official build) | none known | the first word compared (rule A); `reproduce` the official build's comparison, named | – |
+| FS-287 | FreeSurfer 8.2.0 `readVolGeom` | a blank line inside the block counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, `cras`) is not read and the line after the block is | c (rule A, 2026-11-13) | none known (only hand-edited blocks have blank lines) | a blank line neither counts nor is read; `reproduce` counts it, named | – |
+| FS-288 | FreeSurfer 8.2.0 `readVolGeom` | a blank first line compares memory never written with the block's keys | a (memory) | none known | no key in both modes, named | – |
+| FS-289 | FreeSurfer 8.2.0 `mri.cpp`'s voxel operations (`MRIsubtract`, `MRIadd`, `MRIscalarMulFrame`, `MRIvalRangeFrame`, `MRIextractInto`, ...) | a second volume or destination smaller than the first (or a frame the volume does not have) is read and written at other voxels of its buffer | c (rule A, 2026-11-13) | none known | reads 0 and writes nothing outside the volume; `reproduce` FreeSurfer's other voxels, named | – |
+| FS-290 | FreeSurfer 8.2.0 `mri.cpp`'s voxel operations | the same operations read and write memory outside such a volume (a crash or memory corruption) | a (memory, crash) | none known | reads 0 and writes nothing in both modes, named | – |
+| FS-291 | FreeSurfer 8.2.0 `MRIinvertContrast`, `MRIscaleAndMultiply` | written for byte volumes, they take the first bytes of each row of a volume of another type as byte voxels | c (rule B, 2026-11-13) | none known | an error for another type; `reproduce` the bytes, named | – |
+| FS-292 | FreeSurfer 8.2.0 `MRIdivide` (three byte volumes) | after a voxel whose divisor is 0, the first volume and the destination do not move on: the rest of the row is divided with the wrong voxels and written one place early | c (rule A, 2026-11-13) | none known | every voxel divided in place; `reproduce` the shifted row, named | – |
+| FS-293 | FreeSurfer 8.2.0 `MRIextractInto` | a destination of another type than the source is freed, while the caller still holds it | a (memory: use after free) | none known | the error and `NULL`, the destination kept, in both modes, named | – |
+| FS-294 | FreeSurfer 8.2.0 `MRIextractInto` | a start at or past the source's extent gives rows of a negative length, copied as a size near 2^64: a crash, or nothing copied, depending on the C library | a (crash) | none known | the program ends with an error in both modes, named | – |
+| FS-295 | FreeSurfer 8.2.0 `MRIextractInto` | a new volume's start and end positions (`xstart`, `xend` and the others) use the voxel sizes truncated to integers: 0 for sub-millimetre voxels, 1 for 1.5 mm | c (rule A, 2026-11-13) | none known (these legacy fields) | the voxel sizes as they are (a whole-number size: FreeSurfer's integer product, its signed zeros too); `reproduce` truncated, named | – |
+| FS-296 | FreeSurfer 8.2.0 `MRIscalarMulFrame` | a NaN product stored into a byte volume by C's conversion, undefined for NaN | a (D13's undefined conversion) | none known | 0 in both modes (the official build's value too), named | – |
+| FS-297 | FreeSurfer 8.2.0 `MRIextractInto` (64-bit integer volumes) | each row of the box is copied from half its first column in the source to half its first column in the destination: voxels from the wrong place, half voxels included | c (rule A, 2026-11-13) | none known (no reached program extracts long volumes) | rows copied from their columns; `reproduce` the half-column copy, named | – |
+| FS-298 | FreeSurfer 8.2.0 the trilinear, cubic and sinc samplers (`MRIsampleVolume` and the others; 64-bit integer volumes) | a volume of 64-bit integers is sampled as 32-bit integers at the voxel's index: halves of other voxels | c (rule A, 2026-11-13) | none known (no reached program samples long volumes) | the voxels sampled; `reproduce` the halves, named where they differ | – |
+| FS-299 | FreeSurfer 8.2.0 `MRIcubicSampleVolume` (`SAMPLE_CUBIC`) | the weighted sum is divided by the number of points added (64 inside the volume) where the weights sum to 8: a constant volume samples to an eighth of its value | c (rule A, 2026-11-13) | none known (no default path samples cubically) | divided by 8, as `MRIcubicSampleVolumeFrame` and FreeSurfer 7 do; `reproduce` by the count, named | – |
+| FS-300 | FreeSurfer 8.2.0 `MRIcubicSampleVolumeFrame` | near the volume's edge the window's points outside the volume are added without having been read (memory contents) | a (memory) | none known | those points 0 in both modes (the source's comment: "accept zeroes for the border expansion"), named | – |
+| FS-301 | FreeSurfer 8.2.0 `MRItranslate`, `MRIrotate_I`, `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I` | each sample is written as a byte at the voxel's byte place whatever the volume's type: another type gets bytes inside its voxels | c (rule A, 2026-11-13) | none known (`mri_em_register`'s, `mri_linear_register`'s and `mri_average`'s optional starting moves on byte volumes are not affected) | the sample stored with the volume's own conversion; `reproduce` the bytes, named | – |
+| FS-302 | FreeSurfer 8.2.0 `MRIsincSampleVolume`, `MRIsincSampleVolumeFrame` | a half-width whose window holds more than 128 voxels on an axis writes past the weight arrays | a (crash: memory corruption) | none known (FreeSurfer's callers use 5) | an error in both modes, named | – |
+| FS-303 | FreeSurfer 8.2.0 `MRItranslate`, `MRIrotate_I` | on a volume type the trilinear sampler refuses, each stored sample is a value never set (memory contents) or the sample before | a (memory) | none known | 0 for the value never set in both modes, named | – |
+| FS-304 | FreeSurfer 8.2.0 `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I` | an angle whose rotation cannot be inverted (NaN, infinite) crashes after `MRIrotate_I`'s error | a (crash) | none known | an error in both modes, named | – |
+| FS-305 | FreeSurfer 8.2.0 `MRIfindApproximateSkullBoundingBox` | a volume whose centre of mass is not a number (infinite voxels) walks about two billion voxels outside the volume and, when its first box is narrow, never returns | a (crash: a hang) | none known (brain volumes have finite voxels) | an error in both modes, named | – |
+| FS-306 | FreeSurfer 8.2.0 `TransformFileNameType` (`LTAreadEx`) | a transform file name of 500 bytes or more overflows the buffer it is classified in | a (memory) | none known | the whole name classified in both modes, named | – |
+| FS-307 | FreeSurfer 8.2.0 `ltaMNIreadEx` (`.xfm`) | a file whose last line starts with % after a second % comment line is read forever | a (crash: a hang) | none known | an error in both modes, named | – |
+| FS-308 | FreeSurfer 8.2.0 `ltaReadFileEx` (`.lta`) | first two lines that are not `type = <n>` and `nxforms = <n>` leave the type or the number of transforms as memory contents | a (memory) | none known (FreeSurfer writes both lines) | 0 in both modes, named | – |
+| FS-309 | FreeSurfer 8.2.0 `ltaReadFileEx` (`.lta`) | a file of one line crashes (its missing second line is scanned) | a (crash) | none known | an error in both modes, named | – |
+| FS-310 | FreeSurfer 8.2.0 `mincFindVolume` (`.xfm`) | a `%Generated by` comment whose last word contains `src` or `dst` crashes (the word after it is taken) | a (crash) | none known (FreeSurfer writes `src <volume> dst <volume>`) | an error in both modes, named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -697,15 +724,15 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (639 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 7 and 8 (FS-90 to FS-99 and FS-281 to FS-284 new); before it the confounds' part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 new; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused); before it FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
+**Counts** (666 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 11 to 14 (FS-285 to FS-310 and ITK-117 new); before it track C's relays 7 and 8 (FS-90 to FS-99 and FS-281 to FS-284 new); before it the confounds' part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 new; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused); before it FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 154 | |
+| (a) crash, undefined behaviour, out of bounds | 172 | |
 | (b) race, nondeterminism | 21 | |
-| (c) deterministic bug that changes results | 312 | 17 |
+| (c) deterministic bug that changes results | 321 | 17 |
 | (d) imprecision | 29 | |
 | (e) command-line or parsing quirk | 92 | |
 | (f) documentation or message only | 29 | |
@@ -3748,6 +3775,20 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   the iteration limit, with a notice, in both modes. Found 2026-11-13.
 - **D13 / gap:** none.
 
+### ITK-117 `vnl_real_eigensystem` reads and writes past its arrays on a NaN eigenvalue — (memory)
+- **What:** VNL copies EISPACK's eigenvalues out pairwise: an eigenvalue whose imaginary part is
+  not 0 starts a complex pair, and the next column is its conjugate. A NaN imaginary part is not 0,
+  so on the last eigenvalue VNL reads the eigenvector's imaginary parts from one row past its
+  `n × n` matrix and writes the conjugate eigenvalue one element past `D`; `Vreal`'s column is
+  never written.
+- **Evidence:** verified (`validation/probes/fs-vnl`, family `eignan`: 266 of 17,568 matrices
+  made VNL's process crash; on the others the column's imaginary parts are memory contents).
+- **fMRIPrep:** none. **FreeSurfer:** a real eigensystem of a matrix with a NaN entry (none on its
+  default paths).
+- **larmorx:** `V`'s imaginary parts in that column are 0, `Vreal`'s column is left unwritten as
+  VNL leaves it (`vreal_written` false), with a notice, in both modes. Found 2026-11-13.
+- **D13 / gap:** none (memory is never reproduced).
+
 ## FreeSurfer's bundled libraries: MINC's volume_io, nifticlib, zlib
 
 Found in FreeSurfer's foundations, items 3.1-14 and 3.1-15 (2026-11-12/13), in the upstreams the
@@ -3937,6 +3978,48 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
 - **larmorx:** the stream fails at the defect (FS-281 to FS-283 rule B, FS-284 memory never
   written); `reproduce` gives miniz's bytes where they are defined (the zeros, the copies within
   the buffer, symbol 0, zeros for the dictionary never written), named. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-285 to FS-297 FreeSurfer 8.2.0's fs.volume: the volume-geometry block, the voxel arithmetic — (a, rule A; b, rule B; memory; crash)
+- **What:** reading the volume-geometry block of linear transform and surface files: long words
+  written past their buffers (FS-285, FS-286: the second word's overflow changes which key is
+  compared), a blank line counted as the line before (FS-287), a blank first line compared as
+  memory never written (FS-288). The voxel arithmetic: smaller second volumes, destinations or
+  frames read and written at other voxels or outside (FS-289, FS-290), byte-only functions on other
+  types (FS-291), `MRIdivide`'s byte loop after a zero divisor (FS-292), `MRIextractInto`'s freed
+  destination (FS-293), negative row lengths (FS-294), truncated voxel sizes in the start and end
+  positions (FS-295), 64-bit rows copied from half their column (FS-297); a NaN stored into a byte
+  volume (FS-296).
+- **Evidence:** verified (`validation/probes/fs-volume`: FreeSurfer 8.2.0's functions from the unit
+  oracle's build against the port; seed 7, 37,000 cases, every comparable line identical with
+  `reproduce`). The mechanisms: `docs/findings/freesurfer-volume.md` (closed to FreeSurfer's
+  clean-room implementers).
+- **fMRIPrep:** none known. **FreeSurfer:** none known on its default paths (the replays of the first
+  programs that use these functions will say).
+- **larmorx:** corrected by default where the rule says (FS-286, FS-287, FS-289, FS-292, FS-295,
+  FS-297 rule A; FS-291 rule B); memory and crashes defined in both modes (FS-285, FS-288, FS-290,
+  FS-293, FS-294, FS-296); `reproduce` gives the official build's result wherever it is defined.
+  Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-298 to FS-310 FreeSurfer 8.2.0's fs.volume: the samplers, the moves, the head box, reading transforms — (a, rule A; memory; crash)
+- **What:** the samplers read 64-bit integer volumes as 32-bit halves (FS-298); cubic sampling
+  divides by the number of points where its weights sum to 8 (FS-299) and, per frame, adds window
+  points never read (FS-300); the sinc samplers write past 128 weights (FS-302). The translation and
+  rotations write bytes into volumes of other types (FS-301), store a value never set for types the
+  sampler refuses (FS-303) and crash after a rotation that cannot be inverted (FS-304). The head box
+  of a volume whose centre of mass is not a number never returns (FS-305). Reading transforms: long
+  names (FS-306), an `.xfm` ending in a % line (FS-307), an `.lta` without its header lines (FS-308,
+  FS-309), a `%Generated by` line ending in `src` or `dst` (FS-310).
+- **Evidence:** verified (`validation/probes/fs-volume`: FreeSurfer 8.2.0's functions from the unit
+  oracle's build against the port; seed 7, 10,000 sampler cases, 6,000 move and head-box cases and
+  2,000 transform-reading cases, every comparable line identical with `reproduce`). The mechanisms:
+  `docs/findings/freesurfer-volume.md` (closed to FreeSurfer's clean-room implementers).
+- **fMRIPrep:** none known. **FreeSurfer:** none known on its default paths (the replays of the
+  first programs that use these functions will say).
+- **larmorx:** corrected by default where the rule says (FS-298, FS-299, FS-301 rule A); memory and
+  crashes defined in both modes (FS-300, FS-302 to FS-310); `reproduce` gives the official build's
+  result wherever it is defined. Found 2026-11-13.
 - **D13 / gap:** none.
 
 ## fMRIPrep and its libraries

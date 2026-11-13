@@ -43,27 +43,43 @@ starts no other agent.
 | # | Step | State |
 |---|---|---|
 | 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | **done** 2026-11-13 (the first half merged 2026-11-12); its site page from its export with the documentation revision |
-| 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | starting |
+| 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | step 1 published 2026-11-13; step 2 reduced to what the site's readers see (the user, 2026-11-13), in progress; its other items in the final validation phase |
 | 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`; the queue `docs/freesurfer/queue.md`, replica side) | 3.0 done 2026-11-12 (the inventory, the queue, the replay tool); 3.1 in progress |
 | 4 | **Surfaces**: Workbench-compatible tools (a replica in `larmorx-gpl`, a clean room in `larmorx`), MSM (a clean room only, after a patent check) | planned |
 | 5 | **larmorprepx**, the pipeline, with the MNI-template steps (TemplateFlow; niworkflows' `init_enhance_and_skullstrip_bold_wf`, the data sink's `template_metadata`) | planned |
 | 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps; FreeSurfer's permissive pieces, queue CP-01 to CP-13: the bundled readers, the small pieces, x87 arithmetic, the random numbers, VNL and netlib, ITK 4.13.2's filters, the networks' inference core) | after FreeSurfer |
 | 7 | **The completeness parts**: FSL's FNIRT, `applywarp`, `convertwarp`, `fugue` (each a replica and a clean room), then the FLIRT pieces that wait for them; ANTs' missing operations; FreeSurfer's optional streams | after FreeSurfer |
-| 8 | **The final validation phase** (item 5), then the stage-by-stage and end-to-end comparisons with fMRIPrep | planned |
+| 8 | **The final validation phase** (item 5), with the documentation revision's deferred items (the repository's other documents, the findings', the code's and the tests' words, `programs.py`'s rule for `validated`, the clean rooms' printed lines in the old words, the site's small layout items), then the stage-by-stage and end-to-end comparisons with fMRIPrep | planned |
 | 9 | **Release 0.1.0**, once the full pipeline exists (the user, 2026-11-11) | planned |
 
 **"The templates" part is folded into others** (the user, 2026-11-12): its page template and generated
 option tables into the documentation revision, its replay harness into FreeSurfer's preparation (3.0), the
 MNI-template steps into larmorprepx.
 
-**Side by side.** During a **burst** (a fresh weekly usage window the user opens): about six agents on
-separate files: FreeSurfer two to three (the inventory, then the foundations' modules, then wave 3.2's
-replicas with their specs), the confounds one (its slot then moves to FreeSurfer), the documentation two
-(the writer and the critical reviewer); the orchestrator merges in batches about twice a day and runs the
-reference runs. In a **normal week**: one agent at a time on the queue (`docs/freesurfer/queue.md`, from
-the inventory): the next wave's replicas and the previous wave's clean rooms. Usage limits: the user
-lifted the self-imposed ones on 2026-11-12 until they say otherwise (they reset the weekly window
-themselves).
+**Side by side, then one agent at a time (the user, 2026-11-13).** Until the weekly reset of Saturday
+2026-11-14 23:00 the chains already running continue, and no new parallel chain starts: FreeSurfer's three
+replica tracks (A, C, D), the spec finisher (E), the second clean-room chain (fs.maths, then fs.mri) and the
+documentation writer (no separate reviewer: the writer checks each chunk with the automated checks). From the
+reset on, **one agent at a time**, to save usage:
+- **Before the reset:** each running relay ends at a clean boundary (committed, its NOTES current with the next
+  relay's plan), and the orchestrator merges what passed in one batch, so the one-at-a-time work starts from a
+  published, CI-green main.
+- **The order of relays:** (1) the documentation's reduced step 2, if not yet published (a few relays, then its
+  merge); (2) FreeSurfer's replica wave 3.1 to its end, by its critical path: first what another chain waits for
+  (the "For track X" announcements in the chains' NOTES), then the module nearest completion; the chains A
+  (fs.io, fs.labels), C (fs.volume, then fs.filter) and D (fs.surfio) take turns, each relay continuing its own
+  chain from its NOTES, a blocked chain skipped; (3) after each replica module completes, its spec made ready
+  (track E) and its clean room (the clean-room chain) follow, so the clean rooms trail by about one module. From
+  wave 3.2 on the same rhythm: the next wave's replicas and the previous wave's clean rooms, about two replica
+  relays per clean-room relay, the clean rooms catching up whenever a replica chain is blocked.
+- **Merges:** a batch every two or three relays (or once a day), verified while the next relay works (machine
+  time, not usage); main CI-green before a relay that depends on the batch starts.
+- **Usage:** the pace line again (30 % at the weekly reset plus 10 % a day; `usage.py check` before every
+  relay). A relay costs about 0.5 to 0.7 % of the week, so about 14 relays a day at most; the orchestrator starts
+  a fresh session at clean stops (its long context is the costliest actor).
+- **Continuity:** every chain's brief, NOTES and handoffs are in the orchestrator session's scratch folder
+  (named in the workspace's ORCHESTRATOR-STATE.md), mirrored hourly into `<workspace>/archive/orchestration-notes/`
+  and the USB disk (the scratch folder is cleared at boot); each worktree stays until its part is merged.
 
 **Machines** (the user, 2026-11-12): everything that development depends on runs on the main machine;
 the old laptop runs nothing development-dependent (too slow); the lab's server only adds information

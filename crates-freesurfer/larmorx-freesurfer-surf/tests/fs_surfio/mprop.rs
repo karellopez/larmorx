@@ -474,7 +474,7 @@ pub(super) fn mprop_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
                     o.s("G");
                     continue;
                 }
-                let sd = mp_slow::compute_avg_inter_vertex_dist(&mut m);
+                let sd = mp_slow::compute_avg_inter_vertex_dist(g, &mut m);
                 if op == "ad" {
                     o.d(sd);
                 }

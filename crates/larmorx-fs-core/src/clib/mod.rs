@@ -8,6 +8,7 @@
 mod strerror_table;
 
 pub mod glob;
+pub mod printf;
 pub mod time;
 
 use larmorx_core::cscan;

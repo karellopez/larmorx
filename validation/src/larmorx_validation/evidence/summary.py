@@ -264,6 +264,13 @@ PAGES = [
         "larmorx",
         [("LARMORX's own", "nifti-io", "validated", None, None)],
     ),
+    # after the pages of 2026-11-13's site (each row's place is its index in summary.json)
+    (
+        "/evidence/confounds/",
+        "fMRIPrep's confound estimation",
+        "fmriprep",
+        [("replica", "confounds-fmriprep", "experimental", None, None)],
+    ),
 ]
 STATE = {
     "identical": "bit-identical",

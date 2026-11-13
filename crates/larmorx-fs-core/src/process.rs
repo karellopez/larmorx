@@ -93,6 +93,7 @@ pub struct Process {
     pub clock: Option<i64>,
     pub(crate) zone: Option<crate::timedate::ZoneCache>,
     pub(crate) vm_peak: [i32; 5],
+    pub(crate) maths: crate::maths::MathsState,
 }
 
 impl Process {
@@ -130,6 +131,7 @@ impl Process {
             clock: None,
             zone: None,
             vm_peak: [0; 5],
+            maths: Default::default(),
         }
     }
 

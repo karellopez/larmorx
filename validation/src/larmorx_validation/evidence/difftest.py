@@ -249,6 +249,62 @@ RUNS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "random-testing",
         "t2smap",
     ),
+    (
+        "2026-11-12-confounds-trial",
+        "confounds-linalg",
+        "port",
+        "/evidence/confounds/",
+        "random-testing",
+        "numpy's and SciPy's linear algebra",
+    ),
+    (
+        "2026-11-12-confounds-trial",
+        "confounds-nipype",
+        "port",
+        "/evidence/confounds/",
+        "random-testing",
+        "nipype's confounds module",
+    ),
+    (
+        "2026-11-12-confounds-trial",
+        "confounds-fmriprep",
+        "port",
+        "/evidence/confounds/",
+        "random-testing",
+        "fMRIPrep's confound steps",
+    ),
+    (
+        "2026-11-12-confounds-check",
+        "confounds-linalg",
+        "port",
+        "/evidence/confounds/",
+        "random-testing",
+        "numpy's and SciPy's linear algebra",
+    ),
+    (
+        "2026-11-12-confounds-check",
+        "confounds-nipype",
+        "port",
+        "/evidence/confounds/",
+        "random-testing",
+        "nipype's confounds module",
+    ),
+    (
+        "2026-11-12-confounds-check",
+        "confounds-fmriprep",
+        "port",
+        "/evidence/confounds/",
+        "random-testing",
+        "fMRIPrep's confound steps",
+    ),
+    (
+        "2026-11-12-confounds-check-noavx512",
+        "confounds-fmriprep",
+        "port",
+        "/evidence/confounds/",
+        "random-testing",
+        "fMRIPrep's confound steps",
+    ),
 )
 #: A run's own words, where its folder's name alone does not say it.
 RUN_NOTES: dict[str, str] = {
@@ -256,6 +312,8 @@ RUN_NOTES: dict[str, str] = {
     "2026-11-03-fsl-maths-original": "fslmaths and fslstats in one run",
     "2026-11-08-t2smap-replica-check": "the check of the final build",
     "2026-11-09-fieldmaps-b-noavx512": "numpy's AVX-512 kernels off",
+    "2026-11-12-confounds-check": "the check of the final build",
+    "2026-11-12-confounds-check-noavx512": "the check of the final build, numpy's AVX-512 kernels off",
 }
 
 #: "larmorx" in a sentence names LARMORX (the project): not in code, a path, a package's or a

@@ -150,7 +150,11 @@ pub fn debug(g: &Globals, err: &mut dyn Write, message: &str) {
 /// The message `ErrorPrintf` and `ErrorExit` write: `message`, with FS-01's NUL byte under
 /// `reproduce` (the default drops it and notes FS-01).
 fn c_message(g: &mut Globals, message: &str) -> Vec<u8> {
-    let mut bytes = message.as_bytes().to_vec();
+    c_message_bytes(g, message.as_bytes())
+}
+
+fn c_message_bytes(g: &mut Globals, message: &[u8]) -> Vec<u8> {
+    let mut bytes = message.to_vec();
     if g.notices.reproduce() {
         bytes.push(0);
     }
@@ -169,6 +173,16 @@ pub fn error_printf(g: &mut Globals, err: &mut dyn Write, errcode: i32, message:
         error(g, err, &strerror(g.errno));
     }
     let bytes = c_message(g, message);
+    error_bytes(g, err, &bytes);
+}
+
+/// [`error_printf`] of a message of bytes (a C string that need not be UTF-8).
+pub fn error_printf_bytes(g: &mut Globals, err: &mut dyn Write, errcode: i32, message: &[u8]) {
+    g.gerror = errcode;
+    if g.errno != 0 {
+        error(g, err, &strerror(g.errno));
+    }
+    let bytes = c_message_bytes(g, message);
     error_bytes(g, err, &bytes);
 }
 

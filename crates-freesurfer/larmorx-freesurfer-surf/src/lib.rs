@@ -52,10 +52,20 @@
 //!   files, the file names, the decimation files, `FS_GII`; FS-136..FS-140, FS-148, FS-149).
 //! - [`formats`]: the VTK reader, the movie.byu and icosahedron writers, the Talairach matrix, the
 //!   MATLAB plots (FS-141..FS-147).
-//! - [`scanf`]: one C `scanf` call (the text readers' numbers, `errno` at the input's end).
+//! - [`readwrite`]: a surface written in the format its name says, a patch in ASCII, a surface
+//!   file's vertex positions only.
+//! - [`scanf`]: one C `scanf` call (fs.core's `cscan::Scanf`, re-exported).
 //! - [`stl`]: STL surfaces, read (binary or text) and written (FS-151, FS-152, FS-157..FS-160).
 //! - [`surfread`]: the file-local surface readers (ASCII, movie.byu and its positions, the
 //!   triangle file's positions) and the old writer's quadrangles (FS-147, FS-150..FS-156).
+//! - [`names`]: a surface file's type from its name, the names of the curvature and annotation
+//!   files (FS-148, FS-355, FS-356).
+//! - [`trifile`]: the binary triangle and quadrangle surface files, read and written, with
+//!   their tags (FS-346..FS-353).
+//! - [`nbhd`] (fs.surf, taken for `MRISread`): the neighbour lists from the faces, the
+//!   neighbourhood sizes, the 2- and 3-hop neighbour search with its distances, the vertex-vertex
+//!   check (FS-357, FS-358).
+//! - [`ico`] (fs.surf, taken for `MRISread`): the icosahedron files (FS-361, FS-362).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -68,6 +78,7 @@ pub mod dist;
 pub mod edges;
 pub mod facenorm;
 pub mod formats;
+pub mod ico;
 pub mod lta;
 pub mod metric;
 pub mod mp;
@@ -76,11 +87,16 @@ pub mod mp_slow;
 pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;
+pub mod names;
+pub mod nbhd;
 pub mod positions;
+pub mod props;
+pub mod readwrite;
 pub mod scanf;
 pub mod sfile;
 pub mod stl;
 pub mod surfbase;
 pub mod surfread;
 pub mod topology;
+pub mod trifile;
 pub mod views;

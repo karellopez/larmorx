@@ -69,6 +69,8 @@ class Option:
 class CommandLine:
     path: str
     usage: str | None
+    #: The synopsis lines, each starting with the command the reader types (``larmorx fsl bet
+    #: <input> <output> [options]``); a line may continue on the next ones, indented.
     synopsis: list[str]
     options: list[Option]
     #: The spellings the parser itself accepts (its table of specs and its match arms): an option
@@ -76,24 +78,73 @@ class CommandLine:
     #: handled elsewhere (``usage-only``, as ``bet``'s ``-h``, which its fallback prints the
     #: usage for).
     parsed: set[str] = field(default_factory=set)
+    #: The port whose code this is, which prints the usage text: ``clean room`` for a file of a
+    #: clean room (the clean-room audit's ``CLEANROOM_PATHS``), else ``replica``.
+    port: str = "clean room"
+    #: Whose words the options' help holds: ``original`` (the original's own help, which the
+    #: port prints as it is: FSL's, ANTs', tedana's, sdcflows'), or ``port`` (a usage text of the
+    #: port's own, as the clean rooms of AFNI's programs and of ``mri hmc`` print).
+    words: str = "original"
+    #: The other files the reader read (AFNI's global options), for the page's sources.
+    extra: list[str] = field(default_factory=list)
+    #: Spellings glued to their value (AFNI's ``-Dname=value``): a row whose option begins with
+    #: one names it.
+    glued: set[str] = field(default_factory=set)
+
+
+#: Values before a description in FSL's usage texts: ``<number> | <image>``, ``[4Dnoiseonly]``,
+#: ``< indexMask >``.
+_COLON_VALUES = r"(?:\s*(?:<[^>]*>|\[[^\]]*\]|\{[^}]*\}|\|))*"
 
 
 def usage_options(usage: str) -> list[Option]:
     """The options a usage text lists: lines like ``\\t-o,--outline\\tgenerate ...``,
-    ``\\t-f <f>\\t\\tfractional ...`` and ``  -A2 <T2>    as with -A ...``."""
-    out = []
+    ``\\t-f <f>\\t\\tfractional ...`` and ``  -A2 <T2>    as with -A ...``; FSL's image
+    utilities' lines, at the start of the line too, with their values before a colon (``-add
+    <number> | <image> : add ...``, ``-tfce <H> <E> <connectivity>: ...``, ``-ranknorm: ...``),
+    a word before them (``-kernel box <size> : ...``), or their description after the values
+    without one (``-dt sets the datatype ...``, ``preoption -K < indexMask > will ...``). An
+    option listed on several lines in a row (``-kernel 3D``, ``-kernel 2D``, ...) is one option,
+    its lines' words joined."""
+    out: list[Option] = []
     for line in usage.split("\n"):
-        if not re.match(r"^(\t| {1,4})-", line):
+        if not re.match(r"^(\t| {1,4}|)(preoption )?-", line):
             continue
         s = line.strip()
+        s = s.removeprefix("preoption ")
+        word = ""
+        colon = re.match(rf"({_SPELLING}){_COLON_VALUES}\s*:\s", s)
+        worded = re.match(rf"({_SPELLING}) ([A-Za-z0-9]\w*)((?:\s*<[^>]*>)*)\s*:\s", s)
         if "\t" in s:
             head, _, desc = s.partition("\t")
+        elif re.match(rf"{_SPELLING}(?: <[^>]*>)?\s+: ", s):  # ``  -ssref <ref_image> : ...``
+            head, _, desc = s.partition(" : ")
+        elif colon:  # ``-add <number> | <image> : ...``
+            head, desc = s[: colon.end()].rstrip().rstrip(":"), s[colon.end() :]
+        elif worded:  # ``-kernel box    <size>     : ...``: the word names a form of the option
+            word = " ".join([worded.group(2), *re.findall(r"<[^>]*>", worded.group(3))])
+            head, desc = worded.group(1), s[worded.end() :]
         else:
             parts = re.split(r"\s{2,}", s, maxsplit=1)
             head, desc = parts[0], parts[1] if len(parts) > 1 else ""
-        first, _, arg = head.partition(" ")
-        spellings = [w for w in first.split(",") if w.startswith("-")]
-        out.append(Option(spellings, arg.strip(), desc.strip().lstrip("-").strip()))
+        m = re.match(rf"({_SPELLING}(?:,\s*{_SPELLING})*)\s*(.*)$", head)
+        if not m:
+            continue
+        spellings = re.split(r",\s*", m.group(1))
+        arg = m.group(2).strip()
+        if not desc and arg and line[:1] != "\t" and not line.startswith(" " * 2):
+            # FSL's image utilities: ``-dt sets the datatype ...``, ``-K < indexMask > will ...``
+            v = re.match(rf"({_COLON_VALUES})\s*(.*)$", arg)
+            if v and v.group(2) and not re.match(r"[<\[{|]", v.group(2)):
+                arg, desc = v.group(1).strip(), v.group(2)
+        desc = " ".join(desc.split()).lstrip("-").strip()
+        if word:
+            desc = f"{word}: {desc}"
+        last = out[-1] if out else None
+        if word and last is not None and last.spellings == spellings:
+            last.help = f"{last.help}; {desc}"
+            continue
+        out.append(Option(spellings, word or arg, desc))
     return out
 
 
@@ -105,9 +156,9 @@ def usage_synopsis(usage: str, program: str) -> list[str]:
             cands = [line.split("Usage:", 1)[1], *lines[i + 1 :]]
             out = []
             for c in cands:
-                if out and not c.strip():
-                    break
                 words = c.split()
+                if out and (not words or words[0] != program):
+                    break  # a blank line or an example ("e.g. ...") ends it
                 if words and words[0] == program:
                     out.append(" ".join(words))
             return out
@@ -122,12 +173,15 @@ def specs_options(text: str, name: str = "SPECS") -> list[Option]:
     out = []
     for entry in _top_level(re.sub(r"//[^\n]*", "", m.group(1))):
         short = re.search(r"Some\('(.)'\)|^\s*\w+\('(.)'", entry)
-        long = re.search(r'Some\("([^"]+)"\)|\(\s*\'.\'\s*,\s*"([^"]+)"', entry)
+        long = re.search(
+            r'Some\("([^"]+)"\)|\(\s*\'.\'\s*,\s*"([^"]+)"|(?:Some\(\'.\'\)|None),\s*"([^"]+)"',
+            entry,
+        )
         spellings = []
         if short:
             spellings.append("-" + (short.group(1) or short.group(2)))
         if long:
-            spellings.append("--" + (long.group(1) or long.group(2)))
+            spellings.append("--" + (long.group(1) or long.group(2) or long.group(3)))
         if spellings:
             out.append(Option(spellings))
     return out
@@ -175,13 +229,8 @@ def match_options(text: str) -> list[Option]:
     return out
 
 
-def command_line(repo: Path, rel: str, program: str) -> CommandLine:
-    """A program's command line from its Rust file: the usage text (``USAGE``), the options of
-    its table of specs and of its parser's arms, merged where they share a spelling."""
-    text = (repo / rel).read_text(encoding="utf-8")
-    usage = rust_string(text, "USAGE")
-    parser = specs_options(text) + match_options(text)
-    found = (usage_options(usage) if usage else []) + parser
+def _merge(found: list[Option]) -> list[Option]:
+    """The options found, one per option: entries that share a spelling joined."""
     merged: list[Option] = []
     for o in found:
         same = [m for m in merged if set(m.spellings) & set(o.spellings)]
@@ -196,9 +245,719 @@ def command_line(repo: Path, rel: str, program: str) -> CommandLine:
             merged.append(Option(list(o.spellings), o.arg, o.help))
     for m in merged:  # the short spelling first
         m.spellings.sort(key=lambda s: (s.startswith("--"), s))
-    synopsis = usage_synopsis(usage, program) if usage else []
-    parsed = {s for o in parser for s in o.spellings}
-    return CommandLine(rel, usage, synopsis, merged, parsed)
+    return merged
+
+
+def _port_of(rel: str) -> str:
+    """``clean room`` for a file of a clean room (the clean-room audit's list), else
+    ``replica``."""
+    from larmorx_validation.cleanroom_audit import verdicts
+
+    clean = any(rel == p or rel.startswith(p.rstrip("/") + "/") for p in verdicts.CLEANROOM_PATHS)
+    return "clean room" if clean else "replica"
+
+
+def _commanded(lines: list[str], names: tuple[str, ...], command: str) -> list[str]:
+    """Synopsis lines that start with one of ``names``, that name replaced by ``command``; the
+    lines that continue one (indented) keep their place under it."""
+    out = []
+    for line in lines:
+        name = next((n for n in names if line == n or line.startswith(n + " ")), None)
+        if name is not None:
+            out.append(command + line[len(name) :])
+        elif out and line.startswith(" ") and line.strip():
+            out[-1] += "\n" + " " * (len(command) - len(names[0])) + line
+    return out
+
+
+def command_line(
+    repo: Path, rel: str, program: str, command: str | None = None, parser: str | None = None
+) -> CommandLine:
+    """A program's command line from its code, read by the reader of its family: a Python
+    program's argparse parser (sdcflows' BIDS app), tedana's argparse parser in Rust, ANTs'
+    tables of options, AFNI's and ``mri hmc``'s usage texts and parsers, else (FSL's programs)
+    the usage text (``USAGE``, a string or a file it includes) with the options of the table of
+    specs, of a table of tuples (``const OPTIONS``) and of the parser's arms, merged where they
+    share a spelling. ``command`` is what the reader types for the program (``larmorx fsl
+    bet``); the synopsis lines start with it. ``parser`` names the function whose body holds the
+    parser, where the file matches other words too (``standard_space_roi``'s ``fn parse``, beside
+    its reading of bash's ``test``)."""
+    family = rel.split("/")[1] if rel.startswith("crates/") else ""
+    command = command or f"larmorx {program}"
+    if rel.endswith(".py"):
+        cl = python_argparse(repo, rel, command)
+    elif family == "larmorx-tedana":
+        cl = rust_argparse(repo, rel, command)
+    elif family == "larmorx-ants":
+        cl = ants(repo, rel, program, command)
+    elif family in ("larmorx-afni", "larmorx-mri"):
+        cl = spaced(repo, rel, program, command)
+    else:
+        text = (repo / rel).read_text(encoding="utf-8").split("\n#[cfg(test)]", 1)[0]
+        usage, extra = rust_string(text, "USAGE"), []
+        if usage is None:
+            usage, extra = included_usage(repo, rel, text)
+        if usage is None:
+            usage, extra = formatted_usage(repo, rel, text, program)
+        body = text
+        if parser is not None:
+            m = re.search(rf"\bfn {re.escape(parser)}\(", text)
+            if m is None:
+                raise ValueError(f"{rel}: no fn {parser}")
+            body = _brace_body(text, m.end())
+        found = specs_options(body) + match_options(body) + tuple_arms(body, program)
+        found += listed_options(body) + table_options(text)
+        tables, files = operation_tables(repo, rel, body)
+        found += tables
+        extra += [f for f in files if f not in extra]
+        listed = (usage_options(usage) or spaced_usage_options(usage)) if usage else []
+        merged = _merge(listed + found)
+        synopsis = usage_synopsis(usage, program) if usage else []
+        parsed = {s for o in found for s in o.spellings}
+        synopsis = [command + s[len(program) :] for s in synopsis]
+        cl = CommandLine(rel, usage, synopsis, merged, parsed, extra=extra)
+    cl.port = _port_of(rel)
+    return cl
+
+
+def listed_options(text: str) -> list[Option]:
+    """The options a parser lists or compares with, outside its match arms: arrays of
+    spellings (``let no_arg = ["-help", ...];``), comparisons (``option == "--allparams"``), and
+    arms on the name with its dashes taken off (``w.strip_prefix("--").or_else(||
+    w.strip_prefix('-'))``, then ``Some("singlematrix") =>``: ``-singlematrix`` and
+    ``--singlematrix``)."""
+    words = []
+    for m in re.finditer(r'=\s*&?\[((?:\s*"-[^"]*",?)+)\s*\];', text):
+        words += re.findall(r'"(-[^"]*)"', m.group(1))
+    words += re.findall(r'==\s*"(-[^"]*)"', text) + re.findall(r'"(-[^"]*)"\s*==', text)
+    out = [Option([w]) for w in dict.fromkeys(words) if re.fullmatch(_NAMED, w)]
+    if 'strip_prefix("--")' in text and "strip_prefix('-')" in text:
+        for m in re.finditer(r'Some\(((?:"[\w]+"\s*\|\s*)*"[\w]+")\) =>', text):
+            for w in re.findall(r'"(\w+)"', m.group(1)):
+                out.append(Option([f"-{w}", f"--{w}"]))
+    return out
+
+
+def table_options(text: str) -> list[Option]:
+    """The options of a table of tuples (``const OPTIONS: &[(&str, ...)] = &[...];``): an entry
+    that starts with a short spelling and a long name (``("-i", "imain", ...)``: ``-i``,
+    ``--imain``), or with a long name alone (``("imain", Kind::Text, ...)``: ``--imain``)."""
+    m = re.search(r"\bconst OPTIONS: &\[\(&str[^\]]*\] = &\[(.*?)\n\];", text, re.S)
+    if not m:
+        return []
+    out = []
+    for entry in _top_level(re.sub(r"//[^\n]*", "", m.group(1))):
+        words = re.findall(r'"((?:[^"\\]|\\.)*)"', entry)
+        if not words:
+            continue
+        if words[0].startswith("-") and len(words) > 1 and re.fullmatch(r"[\w-]+", words[1]):
+            out.append(Option([words[0], "--" + words[1]]))
+        elif re.fullmatch(r"[A-Za-z][\w-]*", words[0]):
+            out.append(Option(["--" + words[0]]))
+    return out
+
+
+def included_usage(repo: Path, rel: str, text: str) -> tuple[str | None, list[str]]:
+    """A usage text kept in a file of its own (``const USAGE: &str =
+    include_str!("fslmaths_usage.txt");``), and that file, for the page's sources."""
+    m = re.search(r'\bconst USAGE: &str\s*=\s*include_str!\("([^"]+)"\)\s*;', text)
+    if not m:
+        return None, []
+    path = Path(rel).parent / m.group(1)
+    return (repo / path).read_text(encoding="utf-8"), [path.as_posix()]
+
+
+def _variant_names(text: str) -> dict[str, str]:
+    """The programs' names by their variant (``Program::Img2Img => "img2imgcoord"``): the first
+    string each variant gives, as ``fn name`` does before any message."""
+    out: dict[str, str] = {}
+    for variant, name in re.findall(r"(\w+::\w+) => \"([^\"]+)\"", text):
+        out.setdefault(variant, name)
+    return out
+
+
+def tuple_arms(text: str, program: str) -> list[Option]:
+    """The options of a parser shared by several programs, whose arms match the option with the
+    program (``("-v", Program::Img2Img) =>``, ``("-xfm" | "-premat", _) =>``): those that
+    ``program`` takes, the variants named by the file's ``fn name`` (``Program::Img2Img =>
+    "img2imgcoord"``)."""
+    names = _variant_names(text)
+    out, seen = [], set()
+    for line in text.split("\n"):
+        if "=>" not in line:
+            continue
+        head = line.split("=>", 1)[0]
+        for m in re.finditer(r'\(((?:"-[^"]*"\s*\|\s*)*"-[^"]*"),\s*([^()]*?)\)', head):
+            who = [w.strip() for w in m.group(2).split("|")]
+            if "_" not in who and program not in {names.get(w) for w in who}:
+                continue
+            for w in re.findall(r'"(-[^"]*)"', m.group(1)):
+                if re.fullmatch(_NAMED, w) and w not in seen:
+                    seen.add(w)
+                    out.append(Option([w]))
+    return out
+
+
+def _crate_function(repo: Path, rel: str, pattern: str) -> tuple[str, str] | None:
+    """The body of the first function of ``rel``'s crate whose head matches ``pattern`` (a
+    regular expression ending before the body's brace), and the file that holds it."""
+    parts = Path(rel).parts
+    src = repo / Path(*parts[: parts.index("src") + 1])
+    for f in sorted(src.rglob("*.rs")):
+        text = f.read_text(encoding="utf-8")
+        m = re.search(pattern, text)
+        if m:
+            return _brace_body(text, m.end()), f.relative_to(repo).as_posix()
+    return None
+
+
+def operation_tables(repo: Path, rel: str, text: str) -> tuple[list[Option], list[str]]:
+    """The options a parser looks up in tables of its crate (fslmaths' operations): the arms of
+    each ``fn of(op: &str) -> Option<Name>`` it calls as ``Name::of(op)`` (``"-add" =>
+    Binary::Add``), and the words made of an axis letter and a statistic where it reads them
+    with ``axis_of(op.as_bytes()[1])`` and ``Stat::of(rest)`` (``-Tmean``: the letters of
+    ``fn axis_of``'s arms, ``b'T' =>``, the words of ``Stat``'s, ``"mean" =>``; one option per
+    statistic, its axes its spellings). The files read, for the page's sources."""
+    out: list[Option] = []
+    files: list[str] = []
+    for name in dict.fromkeys(re.findall(r"\b([A-Z]\w*)::of\(op\)", text)):
+        found = _crate_function(repo, rel, rf"\bfn of\(\w+: &str\) -> Option<{name}>\s*")
+        if found is not None:
+            out += match_options(found[0])
+            files.append(found[1])
+    stat = re.search(r"\b([A-Z]\w*)::of\(rest\)", text)
+    if stat and re.search(r"\baxis_of\(op\.as_bytes\(\)\[1\]\)", text):
+        axes = _crate_function(repo, rel, r"\bfn axis_of\(\w+: u8\) -> Option<usize>\s*")
+        words = _crate_function(repo, rel, rf"\bfn of\(\w+: &str\) -> Option<{stat.group(1)}>\s*")
+        if axes is not None and words is not None:
+            letters = re.findall(r"b'([A-Z])' =>", axes[0])
+            for w in re.findall(r'"(\w+)" =>', words[0]):
+                out.append(Option([f"-{a}{w}" for a in letters]))
+            files += [axes[1], words[1]]
+    return out, list(dict.fromkeys(files))
+
+
+def _brace_body(text: str, start: int) -> str:
+    """The text of the block whose ``{`` is the first at or after ``start``."""
+    i = text.index("{", start)
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[i + 1 : j]
+    raise ValueError("unbalanced braces")
+
+
+def _rust_format(fmt: str, values: dict[str, str]) -> str:
+    """A Rust ``format!`` string with its named arguments: ``{{`` and ``}}`` as braces."""
+
+    def sub(m: re.Match) -> str:
+        if m.group(0) in ("{{", "}}"):
+            return m.group(0)[0]
+        return values[m.group(1)]
+
+    return re.sub(r"\{\{|\}\}|\{(\w+)\}", sub, fmt)
+
+
+def formatted_usage(repo: Path, rel: str, text: str, program: str) -> tuple[str | None, list[str]]:
+    """A usage text a function formats (``fn usage(...) -> String { format!("...", bins =
+    o.bins) }``; for a file of several programs, the arm of ``program``), its values filled in:
+    the program's name, and a field of the options (``o.bins``) with its default (the crate's
+    ``impl Default for Options``); and the files read for the defaults."""
+    m = re.search(r"fn usage\(([^)]*)\) -> String", text)
+    if not m:
+        return None, []
+    params = set(re.findall(r"(\w+):\s*&str", m.group(1)))
+    body = _brace_body(text, m.end())
+    names = _variant_names(text)
+    calls = list(re.finditer(r"(?:(\w+::\w+) => )?format!\(", body))
+    call = next((c for c in calls if c.group(1) is None or names.get(c.group(1)) == program), None)
+    if call is None:
+        return None, []
+    inner, _ = _call_args(body, call.end() - 1)
+    lit = re.match(r'\s*"((?:[^"\\]|\\.)*)"', inner, re.S)
+    fmt = _unescape(lit.group(1))
+    values, extra = {}, []
+    for name in set(re.findall(r"(?<!\{)\{(\w+)\}", fmt)):
+        named = re.search(rf"\b{name} = (\w+)\.(\w+)", inner)
+        if named:
+            value, where = _default_field(repo, rel, named.group(2))
+            if value is None:
+                return None, []
+            values[name] = value
+            extra.append(where)
+        elif re.search(rf"let {name} = self\.name\(\);", body):
+            values[name] = program
+        elif name in params:  # ``fn usage(fsldir: &str)``: the variable's value, ``${FSLDIR}``
+            values[name] = "${" + name.upper() + "}"
+        else:
+            return None, []
+    return _rust_format(fmt, values), sorted(set(extra))
+
+
+def _default_field(repo: Path, rel: str, name: str) -> tuple[str | None, str]:
+    """The default of the options' field ``name`` (``bins: 256`` in the crate's ``impl
+    Default for Options``), and the file that holds it."""
+    crate = Path(*Path(rel).parts[:2]) / "src"
+    for f in sorted((repo / crate).rglob("*.rs")):
+        t = f.read_text(encoding="utf-8")
+        m = re.search(r"impl Default for Options \{", t)
+        if not m:
+            continue
+        d = re.search(rf"\b{name}: (-?[\d.]+|\"[^\"]*\"),", _brace_body(t, m.start()))
+        if d:
+            return d.group(1).strip('"'), f.relative_to(repo).as_posix()
+    return None, ""
+
+
+# ------------------------------------------------------------------------------------------------
+# ANTs: the tables of options (`opt("long", Some('s'))` and `MenuOption { ... }`)
+
+
+def _rust_strings(s: str) -> list[str]:
+    """The Rust string literals of ``s``, unescaped."""
+    return [_unescape(x) for x in re.findall(r'"((?:[^"\\]|\\.)*)"', s, re.S)]
+
+
+def ants_specs(text: str) -> list[Option]:
+    """The options of ANTs' table ``const SPECS: &[OptionSpec] = &[opt("long", Some('s')),
+    ...]`` (``DenoiseImage``, ``N4BiasFieldCorrection``, ``antsApplyTransforms``)."""
+    m = re.search(r"\bconst SPECS: &\[OptionSpec\] = &\[(.*?)\n\];", text, re.S)
+    out = []
+    for e in re.finditer(r'opt\("([^"]+)",\s*(?:Some\(\'(.)\'\)|None)\)', m.group(1) if m else ""):
+        out.append(Option(_ants_spellings(e.group(1), e.group(2))))
+    return out
+
+
+def _ants_spellings(long: str, short: str | None) -> list[str]:
+    out = [f"-{short}"] if short else []
+    if long and not (short and long == short):  # `opt("h", Some('h'))`: ANTs' `-h`
+        out.append(f"--{long}")
+    return out
+
+
+def ants_menu(text: str) -> list[Option]:
+    """The options of ANTs' help menu, ``const OPTIONS: &[MenuOption] = &[MenuOption { long,
+    short, usage, description, defaults }, ...]`` (``antsRegistration``, ``Atropos``,
+    ``antsAI``): their spellings, their usages (the values) and ANTs' description."""
+    m = re.search(r"\bconst OPTIONS: &\[MenuOption\] = &\[(.*?)\n\];", text, re.S)
+    out = []
+    for e in re.finditer(r"MenuOption \{(.*?)\n\s*\}", m.group(1) if m else "", re.S):
+        body = e.group(1)
+        long = re.search(r'long: "([^"]*)"', body)
+        short = re.search(r"short: Some\('(.)'\)", body)
+        usage = re.search(r'usage: &\[((?:\s|,|"(?:[^"\\]|\\.)*")*)\]', body, re.S)
+        desc = re.search(r'description: "((?:[^"\\]|\\.)*)"', body, re.S)
+        if not long:
+            continue
+        values = _rust_strings(usage.group(1)) if usage else []
+        out.append(
+            Option(
+                _ants_spellings(long.group(1), short.group(1) if short else None),
+                " | ".join(values),
+                _unescape(desc.group(1)) if desc else "",
+            )
+        )
+    return out
+
+
+def ants_usage_values(usage: str) -> dict[str, str]:
+    """The values each option's line of an ANTs usage text names (``-d,
+    --image-dimensionality 2/3/4``, and the lines under it that give another form)."""
+    out: dict[str, str] = {}
+    last = None
+    for line in usage.split("\n"):
+        m = re.match(r"^\s+(-\w(?:, --[\w-]+)?|--[\w-]+)(?: (.*))?$", line)
+        if m:
+            last = m.group(1).split(", ")
+            for s in last:
+                out[s] = (m.group(2) or "").strip()
+        elif last and line.strip() and not line.strip().startswith("-"):
+            for s in last:
+                out[s] = (out[s] + " | " + line.strip()).strip(" |")
+        else:
+            last = None
+    return out
+
+
+def doc_synopsis(text: str, program: str) -> list[str]:
+    """The synopsis of a Rust file's module documentation: its first ``text`` block whose first
+    word is the program's name (``//! DenoiseImage [-d 2/3/4] -i input ...``), its lines as
+    written."""
+    lines = [raw[4:] if raw.startswith("//! ") else raw[3:] for raw in text.split("\n")]
+    lines = [ln for ln, raw in zip(lines, text.split("\n"), strict=True) if raw.startswith("//!")]
+    for i, line in enumerate(lines):
+        if line.strip() == "```text":
+            block = []
+            for nxt in lines[i + 1 :]:
+                if nxt.strip() == "```":
+                    break
+                block.append(nxt.rstrip())
+            if block and block[0].split()[:1] == [program]:
+                return block
+    return []
+
+
+def ants(repo: Path, rel: str, program: str, command: str) -> CommandLine:
+    """An ANTs program's command line: its table of options (ANTs' parser accepts every entry,
+    in its short and its long spelling), the values its usage text names, ANTs' description of
+    each option where the program keeps ANTs' help menu, the synopsis of the module's
+    documentation."""
+    text = (repo / rel).read_text(encoding="utf-8")
+    usage = rust_string(text, "USAGE")
+    options = ants_menu(text) or ants_specs(text)
+    if usage:
+        values = ants_usage_values(usage)
+        for o in options:
+            o.arg = o.arg or next((values[s] for s in o.spellings if s in values), "")
+    parsed = {s for o in options for s in o.spellings}
+    synopsis = _commanded(doc_synopsis(text, program), (program,), command)
+    return CommandLine(rel, usage, synopsis, _merge(options), parsed, words="original")
+
+
+# ------------------------------------------------------------------------------------------------
+# AFNI's clean rooms and `mri hmc`: usage texts in columns, parsers of their own
+
+#: An option's spelling in a usage text (``-TR``, ``-rlt+``, ``-2d``, ``-wsinc5``, ``--tanh``,
+#: betsurf's ``-1``).
+_SPELLING = r"--?(?:[A-Za-z][\w+.-]*|\d[\w+.-]*)"
+#: An option's spelling in a parser's code, where ``"-1"`` is a number.
+_NAMED = r"--?(?:[A-Za-z][\w+.-]*|\d[A-Za-z][\w+.-]*)"
+
+
+#: An option's values in a usage text: ``<f>``, ``{a,b}``, several (``<min> <max>``).
+_VALUES = r"(?:<[^>]*>|\{[^}]*\})(?: (?:<[^>]*>|\{[^}]*\}))*"
+
+
+def spaced_usage_options(usage: str) -> list[Option]:
+    """The options of a usage text laid out in columns: ``  -TR ddd     use ddd as the TR``,
+    ``  -out, -o <outfile>   (default is infile_mcf)``; several options on one line with their
+    description on the next (``  -Fourier -linear ...``); a description continued on the lines
+    indented further. The options' lines are the lines at the indentation of the first one."""
+    out: list[Option] = []
+    column = None
+    last: list[Option] = []
+    for line in usage.split("\n"):
+        indent = len(line) - len(line.lstrip(" "))
+        m = re.match(rf"^ +({_SPELLING}(?:,\s*{_SPELLING})*)(.*)$", line)
+        if m and (column is None or indent == column):
+            column = indent
+            spellings = re.split(r",\s*", m.group(1))
+            rest = m.group(2)
+            words = rest.split()
+            if words and all(re.fullmatch(_SPELLING, w) for w in words):
+                last = [Option([s]) for s in spellings + words]
+            else:
+                a = re.match(rf"^\s*({_VALUES})\s*(.*)$", rest) or re.match(
+                    r"^ (\S+)(?:\s{2,}(.*))?$", rest
+                )
+                arg, desc = (a.group(1), a.group(2) or "") if a else ("", rest)
+                last = [Option(spellings, arg.strip(), desc.strip())]
+            out.extend(last)
+        elif last and column is not None and indent > column and line.strip():
+            for o in last:
+                o.help = (o.help + " " + line.strip()).strip()
+        else:
+            last = []
+    return out
+
+
+def _option_literals(text: str) -> tuple[set[str], set[str]]:
+    """The string literals of a parser's code that are an option's spelling (``"-heptic"``),
+    outside its usage texts and messages; and the prefixes it compares an argument with
+    (``b"-verb"``, ``starts_with("-D")``)."""
+    code = re.sub(r'const [A-Z_]+: &str\s*=\s*(concat!\()?"(?:[^"\\]|\\.)*"', "", text, flags=re.S)
+    code = re.sub(r"//[^\n]*", "", code)
+    exact = {s for s in re.findall(r'(?<![b\w])"([^"\\]*)"', code) if re.fullmatch(_NAMED, s)}
+    prefixes = set(re.findall(rf'b"({_NAMED})"', code))
+    prefixes |= set(re.findall(rf'starts_with\("({_NAMED})"\)', code))
+    return exact, prefixes
+
+
+def _str_arrays(text: str) -> list[str]:
+    """The spellings of the parser's lists of options (``const FLAGS: &[&str] = &[...]``)."""
+    out = []
+    for m in re.finditer(r"\bconst \w+: &\[&str\] = &\[(.*?)\];", text, re.S):
+        out += [s for s in _rust_strings(m.group(1)) if re.fullmatch(_NAMED, s)]
+    return out
+
+
+AFNI_SETTINGS = "crates/larmorx-afni/src/settings.rs"
+
+
+def afni_global_options(repo: Path) -> tuple[list[Option], set[str]]:
+    """AFNI's global options, which every AFNI program takes wherever they stand
+    (``take_global_options_of``: ``-overwrite``, ``-ok_1D_text``, ``-skip_afnirc`` and the
+    ``-D`` of ``-Dname=value``, glued to its value)."""
+    text = (repo / AFNI_SETTINGS).read_text(encoding="utf-8")
+    m = re.search(r"pub fn take_global_options_of\(.*?\n\}", text, re.S)
+    body = m.group(0) if m else ""
+    out = [o for o in match_options(body)]
+    glued = set()
+    if "is_define(a)" in body:
+        out.append(Option(["-D"], "name=value"))
+        glued.add("-D")
+    return out, glued
+
+
+def spaced(repo: Path, rel: str, program: str, command: str) -> CommandLine:
+    """The command line of an AFNI clean room or of ``mri hmc``: the usage text the clean room
+    prints (its own words), the options of its parser's arms and lists, and for AFNI's
+    programs AFNI's global options. A spelling of the usage text is accepted when the parser
+    names it, or compares the argument with a prefix of it (AFNI's ``-verb``)."""
+    text = (repo / rel).read_text(encoding="utf-8")
+    usage = rust_string(text, "USAGE") or ""
+    arms = match_options(text) + [Option([s]) for s in _str_arrays(text)]
+    found = spaced_usage_options(usage) + arms
+    exact, prefixes = _option_literals(text)
+    for o in found:  # ``-nosquash  ... (also -oink)``: another spelling the parser accepts
+        for also in re.findall(r"\(also ([^)]*)\)", o.help):
+            o.spellings += [w for w in re.findall(_SPELLING, also) if w in exact]
+    parsed = {s for o in arms for s in o.spellings} | exact
+    extra, glued = [], set()
+    if rel.startswith("crates/larmorx-afni/"):
+        more, glued = afni_global_options(repo)
+        found += more
+        parsed |= {s for o in more for s in o.spellings}
+        extra.append(AFNI_SETTINGS)
+    for o in found:  # the usage's `-Dname=value` is the glued `-D`
+        o.spellings = [
+            next((g for g in glued if s.startswith(g) and s != g), s) for s in o.spellings
+        ]
+    options = _merge(found)
+    for o in options:
+        parsed |= {s for s in o.spellings if any(s.startswith(p) for p in prefixes)}
+    tool = Path(rel).stem
+    family = "mri" if rel.startswith("crates/larmorx-mri/") else "afni"
+    names = (program, f"larmorx {family} {tool}")
+    lines = []
+    for line in usage.split("\n"):
+        if "Usage:" in line:
+            lines.append(line.split("Usage:", 1)[1].split("  (")[0].strip())
+    synopsis = _commanded(lines, names, command)
+    return CommandLine(
+        rel, usage or None, synopsis, options, parsed, words="port", extra=extra, glued=glued
+    )
+
+
+# ------------------------------------------------------------------------------------------------
+# argparse: tedana's parser in Rust (larmorx_core::python::argparse), a Python program's own
+
+
+@dataclass
+class Argument:
+    """One argument of an argparse parser, as ``add_argument`` takes it."""
+
+    flags: list[str]  # its option strings; empty for a positional
+    dest: str
+    action: str = "store"
+    nargs: str | int | None = None
+    metavar: str | None = None
+    choices: list | None = None
+    required: bool = False
+    help: str | None = ""  # None: hidden (argparse.SUPPRESS)
+    group: str | None = None
+
+
+def argparse_command_line(
+    rel: str, args: list[Argument], command: str, add_help: bool = True
+) -> CommandLine:
+    """The command line of an argparse parser: its usage line from Python's own argparse (the
+    one the original runs, or the one the clean room reproduces), wrapped as in a terminal of
+    80 columns; every option string; each option's value as the help shows it."""
+    import argparse
+
+    def formatter(prog: str) -> argparse.HelpFormatter:
+        # what argparse takes in a terminal of 80 columns: 80 less 2
+        return argparse.HelpFormatter(prog, width=78)
+
+    parser = argparse.ArgumentParser(prog=command, add_help=add_help, formatter_class=formatter)
+    groups: dict[str, argparse._ArgumentGroup] = {}
+    actions = []
+    for a in args:
+        target = parser
+        if a.group:
+            target = groups.setdefault(a.group, parser.add_argument_group(a.group))
+        kw: dict = {"action": a.action}
+        if a.action in ("store", "append"):
+            for k in ("nargs", "metavar", "choices"):
+                if getattr(a, k) is not None:
+                    kw[k] = getattr(a, k)
+        if a.action == "version":
+            kw["version"] = ""
+        if a.flags:
+            if a.dest:
+                kw["dest"] = a.dest
+            if a.required:
+                kw["required"] = True
+        if a.help is None:
+            kw["help"] = argparse.SUPPRESS
+        actions.append((a, target.add_argument(*(a.flags or [a.dest]), **kw)))
+    usage = parser.format_usage().rstrip("\n")
+    lead = "usage: "
+    lines = usage.split("\n")
+    synopsis = ["\n".join([lines[0][len(lead) :], *(ln[len(lead) :] for ln in lines[1:])])]
+    fmt = formatter(command)
+    options = []
+    if add_help:
+        options.append(Option(["-h", "--help"], "", "show this help message and exit"))
+    for a, act in actions:
+        if not a.flags:
+            continue
+        arg = ""
+        if act.nargs != 0:
+            arg = fmt._format_args(act, act.dest.upper())
+        text = a.help or ""
+        if a.action == "version" and a.help == "":
+            text = "show program's version number and exit"  # argparse's own help
+        options.append(Option(list(a.flags), arg, text))
+    parsed = {s for o in options for s in o.spellings}
+    return CommandLine(rel, None, synopsis, _merge(options), parsed, words="original")
+
+
+def _call_args(text: str, start: int) -> tuple[str, int]:
+    """The text between the parenthesis at ``start`` and its match, and the index after it."""
+    depth, i, quote = 0, start, False
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                quote = False
+        elif c == '"':
+            quote = True
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1 : i], i + 1
+        i += 1
+    raise ValueError("unbalanced parentheses")
+
+
+_NARGS = {"OneOrMore": "+", "ZeroOrMore": "*", "Optional": "?", "Single": None}
+
+
+def rust_argparse(repo: Path, rel: str, command: str) -> CommandLine:
+    """tedana's parser as larmorx's argparse builds it in Rust (``Parser::new``,
+    ``p.add_group``, ``p.add(group, Argument::store(&[...], dest).nargs(...).metavar(...)
+    .choices(...).required().help(...))``)."""
+    text = (repo / rel).read_text(encoding="utf-8")
+    groups = dict(re.findall(r'let (\w+) = p\.add_group\("([^"]*)"\);', text))
+    args = []
+    for m in re.finditer(r"\bp\.add\(", text):
+        inner, _ = _call_args(text, m.end() - 1)
+        g = re.match(r"\s*(?:Some\((\w+)\)|None)\s*,\s*Argument::(\w+)\(", inner)
+        if not g:
+            continue
+        ctor_args, after = _call_args(inner, g.end() - 1)
+        flags = _rust_strings(re.match(r"\s*&\[(.*?)\]", ctor_args, re.S).group(1))
+        rest = ctor_args.split("]", 1)[1]
+        dest = (_rust_strings(rest) or [""])[0]
+        kind = {"store": "store", "store_true": "store_true", "version": "version"}.get(
+            g.group(2), "store"
+        )
+        a = Argument(flags, dest, kind, group=groups.get(g.group(1)) if g.group(1) else None)
+        tail = inner[after:]
+        for c in re.finditer(r"\.(\w+)\(", tail):
+            value, _ = _call_args(tail, c.end() - 1)
+            name = c.group(1)
+            if name == "nargs":
+                n = re.search(r"Nargs::(\w+)(?:\((\d+)\))?", value)
+                if n:
+                    a.nargs = int(n.group(2)) if n.group(2) else _NARGS.get(n.group(1))
+            elif name == "metavar":
+                a.metavar = (_rust_strings(value) or [None])[0]
+            elif name == "choices":
+                a.choices = _rust_strings(value)
+            elif name == "required":
+                a.required = True
+            elif name == "help":
+                a.help = " ".join(_rust_strings(value))
+            elif name == "hidden":
+                a.help = None
+        args.append(a)
+    return argparse_command_line(rel, args, command)
+
+
+def python_argparse(repo: Path, rel: str, command: str) -> CommandLine:
+    """A Python program's argparse parser, from its source: every ``add_argument`` call of the
+    function that builds it, on the parser or on one of its groups (``add_argument_group``)."""
+    src = (repo / rel).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    groups: dict[str, str] = {}
+    args = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and node.value.func.attr == "add_argument_group"
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            title = node.value.args[0] if node.value.args else None
+            groups[node.targets[0].id] = _literal(title) or ""
+    calls = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "add_argument"
+    ]
+    calls.sort(key=lambda n: (n.lineno, n.col_offset))
+    for n in calls:
+        names = [_literal(x) for x in n.args]
+        kw = {k.arg: k.value for k in n.keywords if k.arg}
+        flags = [s for s in names if isinstance(s, str) and s.startswith("-")]
+        dest = _literal(kw.get("dest")) or (
+            names[0] if names and not flags else flags[-1].lstrip("-").replace("-", "_")
+        )
+        action = kw.get("action")
+        a_name = _literal(action) if isinstance(action, ast.Constant) else "store"
+        target = n.func.value.id if isinstance(n.func.value, ast.Name) else ""
+        help_ = _literal(kw.get("help"))
+        if isinstance(kw.get("help"), ast.Attribute) and kw["help"].attr == "SUPPRESS":
+            help_ = None
+        args.append(
+            Argument(
+                flags,
+                dest,
+                a_name
+                if a_name
+                in (
+                    "store",
+                    "store_true",
+                    "store_false",
+                    "count",
+                    "append",
+                    "version",
+                    "store_const",
+                )
+                else "store",
+                nargs=_literal(kw.get("nargs")),
+                metavar=_literal(kw.get("metavar")),
+                choices=_literal(kw.get("choices")),
+                required=bool(_literal(kw.get("required"))),
+                help=help_ if help_ is None or isinstance(help_, str) else "",
+                group=groups.get(target),
+            )
+        )
+    return argparse_command_line(rel, args, command)
+
+
+def _literal(node: ast.AST | None):
+    if node is None:
+        return None
+    try:
+        return ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError):
+        return None
 
 
 # ------------------------------------------------------------------------------------------------
@@ -208,7 +967,7 @@ def command_line(repo: Path, rel: str, program: str) -> CommandLine:
 @dataclass
 class Param:
     name: str
-    kind: str  # "positional", "keyword"
+    kind: str  # "positional", "varargs" (``*options``), "keyword"
     annotation: str
     default: str | None  # source text; None without a default
     doc: str = ""
@@ -238,6 +997,8 @@ class Function:
                 parts.append("*")
                 star = True
             s = p.name
+            if p.kind == "varargs":  # ``*options``: the keyword arguments follow it
+                s, star = "*" + p.name, True
             if annotations and p.annotation:
                 s += f": {p.annotation}"
             if p.default is not None:
@@ -314,7 +1075,7 @@ def numpydoc(doc: str) -> tuple[str, dict[str, list[tuple[list[str], str]]]]:
             i += 2
             continue
         if current and line and not line.startswith(" "):
-            names = [n.strip() for n in line.split(":")[0].split(",")]
+            names = [n.strip().lstrip("*") for n in line.split(":")[0].split(",")]
             sections[current].append((names, ""))
         elif current and line.startswith(" ") and sections[current]:
             names, text = sections[current][-1]
@@ -335,6 +1096,8 @@ def function(repo: Path, dotted: str) -> Function:
     pdefaults = [None] * (len(positional) - len(a.defaults)) + list(a.defaults)
     for arg, d in zip(positional, pdefaults, strict=True):
         params.append(Param(arg.arg, "positional", _seg(src, arg.annotation), _seg(src, d)))
+    if a.vararg is not None:
+        params.append(Param(a.vararg.arg, "varargs", _seg(src, a.vararg.annotation), None))
     for arg, d in zip(a.kwonlyargs, a.kw_defaults, strict=True):
         params.append(Param(arg.arg, "keyword", _seg(src, arg.annotation), _seg(src, d)))
     summary, sections = numpydoc(ast.get_docstring(node) or "")

@@ -255,7 +255,8 @@ pub fn compute_surface_normals(
                 mul(td[2], td[2]),
             )));
             // `!FZERO(norm)`: a NaN length divides too
-            if !(norm.abs() < f64::from(f32::EPSILON)) {
+            let fzero = norm.abs() < f64::from(f32::EPSILON);
+            if !fzero {
                 for x in &mut td {
                     *x = div64(f64::from(*x), norm) as f32;
                 }

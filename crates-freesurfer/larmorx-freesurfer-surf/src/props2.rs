@@ -540,8 +540,12 @@ pub fn compute_analytic_distance_error(
         }
         let vt = mris.topology(vno);
         let nbrs = vt.v.as_deref().unwrap_or(&[]);
-        for n in 0..usize::try_from(vt.vtotal).unwrap_or(0) {
-            let vn = mris.vertex(nbrs[n] as usize);
+        for (n, &nb) in nbrs
+            .iter()
+            .enumerate()
+            .take(usize::try_from(vt.vtotal).unwrap_or(0))
+        {
+            let vn = mris.vertex(nb as usize);
             if vn.ripflag != 0 {
                 continue;
             }

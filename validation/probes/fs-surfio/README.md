@@ -90,6 +90,16 @@ every branch of the transform's completion reached. `mpb`, seeds 7 (1,000), 13 a
 properties), the default different only with notices; the official build's operand orders and its
 `errno` (glibc's `sqrt`/`sqrtf` for a negative variance, the vertex-spacing statistics' discarded
 scale, the metric properties' inter-vertex deviation) were taken from the object code and gdb.
+
+Measured 2026-11-13 (relay 18, 39 commands): `mpc`, seeds 7 (1,000 cases), 13 and 17 (2,000 each): 0 differ
+with `reproduce` (34, 59 and 62 counted, not compared: FS-121 of the read, FS-367's endless loops ended by
+the probe's 5-s alarm, FS-370's arrays), the default different only with notices (FS-366, FS-369 and the
+errors' FS-01/FS-03). The whole probe at seed 7 (7,800 cases): 7,606 identical, 194 counted, 0 different;
+seed 1 (1,170 cases): 1,137 identical, 33 counted, hash `90fbb5e2...`, passing in debug and release and under
+AArch64's NaN emulation. Under the emulation one seed-7 `mpc` case differs (`MRISdisturbOriginalDistances`
+with an infinite percentage: fs.core's `randomNumber` makes `inf - inf` in plain arithmetic, so its NaN takes
+the platform's default sign; reported to fs.core's track). The official build's operand orders were read from
+`mrisurf_metricProperties.cpp.o` and `tritri.cpp.o`.
 Seed 1: 1,140 cases, 1,116 identical, 24 counted, hash `209163ba486662e79d7931add4d23f34aec8757e0fc8d377a0386266e91e76d3`.
 
 Measured 2026-11-13 (relay 15, 36 commands): `fnam` alone, seeds 7 (1,000 cases), 13 and 17 (2,000

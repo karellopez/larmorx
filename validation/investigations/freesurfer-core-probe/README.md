@@ -16,6 +16,8 @@ tree, which is closed to FreeSurfer's clean-room implementers, so they never bui
 | `fs_core_probe.cpp` | the probe: one call (or one sequence of calls) of FreeSurfer's core functions per run, or a batch of calls from a file; its commands below |
 | `build.sh` | builds the probe with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `compare.py` | the comparison loop of the spec's §20: 22 groups of cases (about 162,700 calls in 368 runs), run on the probe (through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `official.sh` | the official `mri_info` as a black box (the spec's §20.4): a missing file, the diagnostic variables, the version options: `official.sh <FREESURFER_HOME>` |
+| `guards.py` | whether the selections and the median depend on memory outside the list, on lists with NaNs and infinities (three guards): `python -P guards.py <fs_core_probe> <scratch folder>` |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_core_probe`. Its build (the
 larmorx commit, this folder's `build.sh`, its SHA-256) is recorded in that folder's `BUILD_INFO.txt`
@@ -143,13 +145,16 @@ directly.
 
 ## Results (2026-11-13, the reference machine: glibc 2.35, Linux 6.8, x86-64)
 
-- `refs`, seed 7, the scratch probe built from this folder at commit `fcead2c8` (the same source as
-  the prebuilt one): the hashes quoted in the spec's §20.2; identical through the cache and without it,
-  and on a second run.
+- `refs`, seed 7, the prebuilt probe (commit `bd50220e`): the hashes quoted in the spec's §20.2;
+  identical through the cache and without it, and on a second run.
 - `compare` with the probe as its own candidate: every run identical in both modes (the loop's own
   check).
-- 3,000 lists with NaNs and infinities through `kth`, `qselect` and `median` with three different
-  guards (7777, -7777, 0): no result and no order depends on memory outside the list.
+- `guards.py`: 3,000 lists with NaNs and infinities through `kth`, `qselect` and `median` with three
+  different guards (7777, -7777, 0): no result and no order depends on memory outside the list.
+- `official.sh`: the official `mri_info` prints the C-style error with its NUL byte and exits 1,
+  prints the profiling and verbose lines as the probe's `init` does, and handles the version options
+  as the probe's `version` does (FS-07); `--version --version x` leaves `--version` to `mri_info`'s
+  own parser, which prints `8.2.0` and exits 1.
 - `threadnum 130` (more than FreeSurfer's 128 threads) is not among the cases: each thread numbered
   128 or more prints the limit's line, and the run ends with status 1 or, at random, a segmentation
   fault (status 139); six runs gave 139, 139, 1, 139, 139, 139.

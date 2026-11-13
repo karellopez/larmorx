@@ -78,7 +78,7 @@ fn io_cpp() -> String {
 
 /// `(int)(m * n)` of `MRISoverAlloc`'s room: x86-64's truncation; FS-02 (an undefined
 /// conversion: saturated by default, `INT_MIN` with `reproduce`).
-fn room(g: &mut Globals, x: f64) -> i32 {
+pub(crate) fn room(g: &mut Globals, x: f64) -> i32 {
     if x.is_nan() || x >= 2147483648.0 || x <= -2147483649.0 {
         g.notices.add(
             &FS_02,

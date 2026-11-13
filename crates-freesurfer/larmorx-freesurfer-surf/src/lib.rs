@@ -62,6 +62,10 @@
 //!   files (FS-148, FS-355, FS-356).
 //! - [`trifile`]: the binary triangle and quadrangle surface files, read and written, with
 //!   their tags (FS-346..FS-353).
+//! - [`nbhd`] (fs.surf, taken for `MRISread`): the neighbour lists from the faces, the
+//!   neighbourhood sizes, the 2- and 3-hop neighbour search with its distances, the vertex-vertex
+//!   check (FS-357, FS-358).
+//! - [`ico`] (fs.surf, taken for `MRISread`): the icosahedron files (FS-361, FS-362).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -74,6 +78,7 @@ pub mod dist;
 pub mod edges;
 pub mod facenorm;
 pub mod formats;
+pub mod ico;
 pub mod lta;
 pub mod metric;
 pub mod mp;
@@ -83,6 +88,7 @@ pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;
 pub mod names;
+pub mod nbhd;
 pub mod positions;
 pub mod readwrite;
 pub mod scanf;

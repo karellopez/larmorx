@@ -1518,7 +1518,19 @@ defects! {
     FS_355 = "FS-355", "FreeSurfer", true,
         "the surface library's annotation reader, given an annotation name without a folder that starts with the surface's hemisphere letters (lh.aparc.annot for a left surface), adds the hemisphere again (label/lh.lh.aparc.annot), so it does not find the file the annotation writer wrote for the same name; it takes a name as naming the hemisphere only when the name is the two letters alone, in any case";
     FS_356 = "FS-356", "FreeSurfer", true,
-        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names)";
+        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names); the surface reader (MRISread), looking for the subject's Talairach transform beside a surface name of 300 bytes or more, writes past a 300-byte buffer";
+    FS_357 = "FS-357", "FreeSurfer", true,
+        "the surface library's neighbourhood search (the 2- and 3-hop neighbours MRISread and others compute), given a vertex with a ripped vertex among its known neighbours, reads its neighbour list past the part it filled: the vertex's neighbourhood then depends on memory contents (MRISread then ends with a failed assertion at the ripped vertex)";
+    FS_358 = "FS-358", "FreeSurfer", true,
+        "the surface library's older neighbourhood search (taken when MRISfindNeighborsAtVertex_old is set), given a vertex with more than 1,024 vertices within the hops asked for, writes past its caller's 1,024-entry list";
+    FS_359 = "FS-359", "FreeSurfer", true,
+        "the surface reader (MRISread) given a quadrangle surface file in the old format (no magic number) reads each vertex's face list past its end (its count is the file's count plus the faces found): the surface's neighbours depend on memory contents";
+    FS_360 = "FS-360", "FreeSurfer", true,
+        "the surface reader (MRISread), given a surface file with a vertex of more than 255 faces whose one-byte count wrapped around (FS-147 reproduced), writes the vertex's face list past its end";
+    FS_361 = "FS-361", "FreeSurfer", true,
+        "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a surface that is not closed (a vertex with more neighbours than faces) or a vertex of more than 255 faces, writes past the vertex's neighbour or face list (memory corruption or a crash)";
+    FS_362 = "FS-362", "FreeSurfer", true,
+        "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a vertex or face count it cannot read, a vertex or face number outside the counts, or a face whose vertices are not all among the file's vertices (a face line missing, or holding 0), writes or reads outside its arrays (memory corruption or a crash)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

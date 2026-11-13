@@ -1,35 +1,51 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! A surface written in the format its name says (queue item 3.1-48, relay 15): `MRISwrite` (with
-//! `MRISwrite_new`, the new behaviour FreeSurfer 8.2.0 always takes), `MRISwriteVertexLocations`,
-//! `MRISwritePatchAscii` and `MRISreadVerticesOnly` (`utils/mrisurf_io.cpp` 3276-3340, 4279-4340,
-//! 4414-4451, 5226-5317). `MRISread` comes here with fs.surf's pieces it needs.
+//! A surface written and read in the format its name says (queue item 3.1-48, relays 15 and 16):
+//! `MRISwrite` (with `MRISwrite_new`, the new behaviour FreeSurfer 8.2.0 always takes),
+//! `MRISwriteVertexLocations`, `MRISwritePatchAscii` and `MRISreadVerticesOnly`
+//! (`utils/mrisurf_io.cpp` 3276-3340, 4279-4340, 4414-4451, 5226-5317); `MRISread`,
+//! `MRISfastRead`, `MRISreadOverAlloc` (with `MRISreadOverAlloc_new`, the reader FreeSurfer 8.2.0
+//! always takes) and `mrisReadTransform` (3519-3791, 4214-4277, 4617-4750), on fs.surf's pieces
+//! taken early ([`crate::nbhd`], [`crate::ico`]). FS-351, FS-356, FS-359, FS-360.
 
 use std::path::Path;
 
+use larmorx_core::defects::{FS_351, FS_356, FS_359, FS_360};
 use larmorx_freesurfer_core::chklc::chklc;
 use larmorx_freesurfer_core::cstd::fmt_f;
+use larmorx_freesurfer_core::diag::verbose_on;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
-    self, ERROR_NOFILE, ERROR_NOMEMORY, ERROR_UNSUPPORTED, Fatal, NO_ERROR,
+    self, ERROR_BADFILE, ERROR_NO_FILE, ERROR_NOFILE, ERROR_NOMEMORY, ERROR_UNSUPPORTED, Fatal,
+    NO_ERROR,
 };
-use larmorx_freesurfer_io::fio::{fread_float, fread2, fread3};
+use larmorx_freesurfer_core::utils::{file_exists, file_name_path};
+use larmorx_freesurfer_io::fio::{
+    fio_extension, fio_file_exists_readable, fread_float, fread2, fread3,
+};
+use larmorx_freesurfer_io::identify::{MRI_MGH_FILE, NII_FILE};
 
+use crate::aaa::{SurfGlobals, VERTICES_PER_FACE};
+use crate::alloc;
 use crate::coords::{self, Io};
-use crate::curvio::apply_fsgii_write;
+use crate::curvio::{apply_fsgii_read, apply_fsgii_write};
 use crate::formats::{self, MRIS_TRIANGULAR_SURFACE};
+use crate::ico;
 use crate::metric;
+use crate::mp;
+use crate::mp_slow;
 use crate::mris::Mris;
 use crate::mrisurf::{SmallSurface, SmallVertex};
 use crate::names::{
     MRIS_ASCII_TRIANGLE_FILE, MRIS_GEO_TRIANGLE_FILE, MRIS_GIFTI_FILE, MRIS_ICO_FILE,
-    MRIS_STL_FILE, MRIS_VTK_FILE, mris_file_name_type,
+    MRIS_STL_FILE, MRIS_VOLUME_FILE, MRIS_VTK_FILE, mris_file_name_type,
 };
+use crate::nbhd;
 use crate::positions;
 use crate::sfile::{self, c_str, nonneg, open, open_failed, strcpy_checked};
 use crate::stl;
-use crate::surfread::{read_triangle_file_vertex_positions_only, verbose_show};
+use crate::surfread::{self, read_triangle_file_vertex_positions_only, verbose_show};
 use crate::topology;
 use crate::trifile::{
     self, NEW_QUAD_FILE_MAGIC_NUMBER, QUAD_FILE_MAGIC_NUMBER, TRIANGLE_FILE_MAGIC_NUMBER,
@@ -308,4 +324,383 @@ pub fn read_vertices_only(
         nvertices,
         vertices,
     }))
+}
+
+// ---- MRISread ---------------------------------------------------------------------------------
+
+/// `RIGHT_HEMISPHERE`, `NO_HEMISPHERE`, `BOTH_HEMISPHERES` (`mrisurf.h` lines 1069-1071).
+pub const RIGHT_HEMISPHERE: i32 = 1;
+pub const NO_HEMISPHERE: i32 = 2;
+pub const BOTH_HEMISPHERES: i32 = 3;
+
+/// `LTAreadEx` (fs.volume's `transform.cpp`, queue item 3.1-39, track C's): reached only when the
+/// surface's subject has `mri/transforms/talairach.xfm`; until it is ported, reaching it is out
+/// of range.
+fn lta_read_ex_pending(fname: &str) -> ! {
+    panic!("mrisReadTransform: reading {fname} needs LTAreadEx (fs.volume, not yet ported)")
+}
+
+/// `MRIread` (fs.io's volume reader) and `MRIScopyMRI`: reached only when a group-average area
+/// file `<surface>.avg.area.mgh` is readable; until they are ported, reaching them is out of range.
+fn mri_read_pending(fname: &str) -> ! {
+    panic!("MRISread: reading {fname} needs MRIread and MRIScopyMRI (not yet ported)")
+}
+
+/// `mrisReadTransform(mris, mris_fname)` (with `MRISreadTransform`, its public name): the
+/// subject's Talairach transform, `<the surface name's folder>/../mri/transforms/talairach.xfm`
+/// (`FileNamePath`'s folder, `.` without one; FS-356: a surface name of 300 bytes or more is taken
+/// whole). Without that file, nothing (`ERROR_NO_FILE`); with it, `LTAreadEx` (fs.volume, not yet
+/// ported: reaching it panics).
+pub fn read_transform(
+    g: &mut Globals,
+    dir: Option<&Path>,
+    _mris: &mut Mris,
+    mris_fname: &str,
+) -> Result<i32, Fatal> {
+    if mris_fname.len() >= 300 {
+        g.notices.add(
+            &FS_356,
+            format!(
+                "mrisReadTransform: a surface name of {} bytes, 300 or more, is taken whole (FreeSurfer writes past its buffer)",
+                mris_fname.len()
+            ),
+        );
+    }
+    let fpref = file_name_path(mris_fname);
+    let transform_fname = format!("{fpref}/../mri/transforms/talairach.xfm");
+    if !file_exists(dir, &transform_fname) {
+        return Ok(ERROR_NO_FILE);
+    }
+    lta_read_ex_pending(&transform_fname)
+}
+
+/// The hemisphere a surface name gives (`MRISreadOverAlloc_new`): from the first byte of its last
+/// part (after its last `/`), in upper case: `R` right, `L` left, `B` both, else none.
+fn hemisphere_from_name(fname: &str) -> i32 {
+    let last = match fname.rfind('/') {
+        Some(i) => &fname[i + 1..],
+        None => fname,
+    };
+    match last.as_bytes().first().map(u8::to_ascii_uppercase) {
+        Some(b'R') => RIGHT_HEMISPHERE,
+        Some(b'L') => sfile::LEFT_HEMISPHERE,
+        Some(b'B') => BOTH_HEMISPHERES,
+        _ => NO_HEMISPHERE,
+    }
+}
+
+/// The surface a reader gave, before `MRISreadOverAlloc_new` completes it; `version` is
+/// FreeSurfer's (-1 quadrangle, -2 new quadrangle, 0 the old format without a magic number, -3
+/// and -4 the other readers).
+fn read_by_type(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    fname: &str,
+    nvf_multiplier: f64,
+    ty: i32,
+) -> Result<Option<(Mris, i32, bool)>, Fatal> {
+    let r = match ty {
+        MRIS_ASCII_TRIANGLE_FILE => {
+            surfread::read_ascii_file(g, sg, io, dir, fname)?.map(|m| (m, -3))
+        }
+        MRIS_ICO_FILE => {
+            let m = ico::ico_read_over_alloc(g, sg, io, dir, fname, nvf_multiplier, 1.0)?;
+            return Ok(m.map(|m| (m, -2, true)));
+        }
+        MRIS_GEO_TRIANGLE_FILE => surfread::read_geo_file(g, sg, io, dir, fname)?.map(|m| (m, -4)),
+        MRIS_STL_FILE => stl::read_stl(g, sg, io, dir, fname)?.map(|m| (m, -3)),
+        MRIS_VTK_FILE => formats::read_vtk(g, sg, io, dir, None, fname, None)?
+            .into_new()
+            .map(|m| (m, -3)),
+        MRIS_GIFTI_FILE => gifti_pending("MRISread"),
+        MRI_MGH_FILE | NII_FILE => {
+            log::error_exit(
+                g,
+                io.err,
+                ERROR_BADFILE,
+                &format!("ERROR: MRISread: cannot read surface data from file {fname}!\n"),
+            )?;
+            None
+        }
+        _ => {
+            let mut fp = match open(dir, fname, "rb") {
+                Ok(f) => f,
+                Err(e) => {
+                    g.errno = e;
+                    let m = format!("MRISread({fname}): could not open file");
+                    log::error_printf(g, io.err, ERROR_NOFILE, &m);
+                    return Ok(None);
+                }
+            };
+            let (nread, magic) = fread3(&mut fp);
+            if nread != 1 {
+                let _ = writeln!(io.out, "ERROR: reading {fname}");
+                let _ = writeln!(io.out, "Read {nread} bytes, expected 1");
+                fp.close();
+                return Ok(None);
+            }
+            let version = if magic == QUAD_FILE_MAGIC_NUMBER {
+                if verbose_show(g) {
+                    let _ = io.out.write_all(b"new surface file format\n");
+                }
+                -1
+            } else if magic == NEW_QUAD_FILE_MAGIC_NUMBER {
+                -2
+            } else if magic == TRIANGLE_FILE_MAGIC_NUMBER {
+                fp.close();
+                let Some(m) = trifile::read_triangle_file(g, sg, io, dir, fname, nvf_multiplier)?
+                else {
+                    let code = g.gerror;
+                    log::error_printf(g, io.err, code, "mrisReadTriangleFile failed.\n");
+                    return Ok(None);
+                };
+                return Ok(Some((m, -3, false)));
+            } else {
+                fp.rewind();
+                if verbose_show(g) {
+                    let _ = io.out.write_all(b"surfer: old surface file format\n");
+                }
+                0
+            };
+            fp.close();
+            trifile::read_quadrangle_file(g, sg, io, dir, fname, nvf_multiplier)?
+                .map(|m| (m, version))
+        }
+    };
+    Ok(r.map(|(m, v)| (m, v, false)))
+}
+
+/// A vertex's face list written at `i` by `MRISreadOverAlloc_new`'s rebuild: past its end only
+/// after a count that wrapped around (FS-360: the list grows, as if the memory after it were its
+/// own; FreeSurfer writes into whatever follows it).
+fn put_face(g: &mut Globals, f: &mut Vec<i32>, i: usize, fno: i32, vno: usize) {
+    if i >= f.len() {
+        g.notices.add(
+            &FS_360,
+            format!(
+                "vertex {vno}: its face list of {} entries is written at {i} (a face count that wrapped around)",
+                f.len()
+            ),
+        );
+        f.resize(i + 1, 0);
+    }
+    f[i] = fno;
+}
+
+/// `MRISreadOverAlloc(fname, nVFMultiplier)`: FreeSurfer 8.2.0 always takes the new reader
+/// (`MRISreadOverAlloc_new`, utils/mrisurf_io.cpp lines 3542-3791). The reader the name's type
+/// chooses (`MRISfileNameType`; the licence check passes): ASCII, icosahedron (returned as its
+/// reader made it), movie.byu, STL, VTK, GIFTI (gifti.cpp's surface part: not yet ported); an MGH
+/// type is the fatal error `ERROR: MRISread: cannot read surface data from file <file>!`; any other
+/// name by its 3-byte magic number: a triangle file (its reader failing: `mrisReadTriangleFile
+/// failed.` with its code), a quadrangle file (new or old), or the old format (no magic number).
+/// A file that cannot be opened is `MRISread(<file>): could not open file` (`ERROR_NOFILE`), one
+/// shorter than 3 bytes `ERROR: reading <file>` and `Read 0 bytes, expected 1` on standard output;
+/// both `None`. Then the surface's name and hemisphere ([`hemisphere_from_name`]); for every reader
+/// but the old format, each vertex's face list rebuilt from the faces in order; every vertex's
+/// curvature 0, original area -1, border 0, its place in each of its faces; the neighbour lists
+/// ([`nbhd::complete_topology`]), the bounding box, the neighbour distances, the normals; the
+/// Talairach transform ([`read_transform`]); `radius` ([`metric::average_radius`]); the metric
+/// properties; the current positions stored; then `<file>.avg.area.mgh`, when readable, needs
+/// `MRIread` (not yet ported: reaching it panics), else `group_avg_vtxarea_loaded` 0. FS-351
+/// (a quadrangle face vertex beyond the vertices, reproduced: a segmentation fault here), FS-359
+/// (the old format: its face lists read past their end; by default rebuilt from the faces as for
+/// the other formats), FS-360.
+pub fn read_over_alloc(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    fname: &str,
+    nvf_multiplier: f64,
+) -> Result<Option<Mris>, Fatal> {
+    let fname = c_str(fname);
+    let ty = mris_file_name_type(g, fname);
+    chklc();
+    let Some((mut mris, version, done)) = read_by_type(g, sg, io, dir, fname, nvf_multiplier, ty)?
+    else {
+        return Ok(None);
+    };
+    if done {
+        return Ok(Some(mris));
+    }
+    mris.fname = fname.to_owned();
+    mris.hemisphere = hemisphere_from_name(fname);
+    let nv = nonneg(mris.nvertices);
+    let nf = nonneg(mris.nfaces);
+    let mut rebuild = version < 0 || ty == MRIS_ASCII_TRIANGLE_FILE;
+    if !rebuild && (0..nv).any(|v| mris.topology(v).num != 0) {
+        g.notices.add(
+            &FS_359,
+            format!("{fname}: a surface file of the old format: its face lists are rebuilt from the faces (FreeSurfer reads them past their end)"),
+        );
+        if g.notices.reproduce() {
+            for vno in 0..nv {
+                let vt = mris.topology_mut(vno);
+                let num = usize::from(vt.num);
+                let f = vt.f.get_or_insert_with(Vec::new);
+                if f.len() < num {
+                    f.resize(num, 0);
+                }
+                let n = vt.n.get_or_insert_with(Vec::new);
+                if n.len() < num {
+                    n.resize(num, 0);
+                }
+            }
+        } else {
+            rebuild = true;
+        }
+    }
+    if rebuild {
+        for vno in 0..nv {
+            let vt = mris.topology_mut(vno);
+            let num = usize::from(vt.num);
+            vt.f = Some(vec![0; num]);
+            vt.n = Some(vec![0; num]);
+            vt.num = 0;
+        }
+        let room = mris.vertices_topology.as_ref().map_or(0, Vec::len);
+        for fno in 0..nf {
+            for n in 0..VERTICES_PER_FACE {
+                let v = mris.face(fno).v[n];
+                if v < 0 || v as usize >= room || v as usize >= nv {
+                    // a face vertex the reader let through (FS-351, FS-352, FS-154 reproduced):
+                    // FreeSurfer writes into a face list it never made
+                    if (v as usize) < room && v >= 0 {
+                        g.notices.add(
+                            &FS_351,
+                            format!("{fname}: face {fno} has vertex {v}, not a vertex of the surface: MRISread ends with a segmentation fault"),
+                        );
+                    }
+                    return Err(Fatal::Exit(139));
+                }
+                let v = v as usize;
+                let vt = mris.topology_mut(v);
+                let i = usize::from(vt.num);
+                vt.num = vt.num.wrapping_add(1);
+                let mut f = vt.f.take().unwrap_or_default();
+                put_face(g, &mut f, i, fno as i32, v);
+                mris.topology_mut(v).f = Some(f);
+            }
+        }
+    }
+    for vno in 0..nv {
+        {
+            let v = mris.vertex_mut(vno);
+            v.curv = 0.0;
+            v.origarea = -1.0;
+            v.border = 0;
+        }
+        let num = usize::from(mris.topology(vno).num);
+        for n in 0..num {
+            let fno = mris.topology(vno).f.as_ref().map_or(0, |f| f[n]);
+            if fno < 0 || fno >= mris.max_faces {
+                // FS-359 reproduced: a face number from the file outside the faces
+                return Err(Fatal::Exit(139));
+            }
+            let fv = mris.face(fno as usize).v;
+            for (m, &x) in fv.iter().enumerate() {
+                if x == vno as i32 {
+                    let nl = mris.topology_mut(vno).n.get_or_insert_with(Vec::new);
+                    if nl.len() <= n {
+                        nl.resize(n + 1, 0);
+                    }
+                    nl[n] = m as u8;
+                }
+            }
+        }
+    }
+    nbhd::complete_topology(g, sg, io, &mut mris)?;
+    coords::compute_surface_dimensions(&mut mris);
+    metric::compute_vertex_distances(g, io, &mut mris)?;
+    mp_slow::compute_normals(g, sg, io, &mut mris);
+    read_transform(g, dir, &mut mris, fname)?;
+    mris.radius = metric::average_radius(&mris);
+    mp::compute_metric_properties(g, sg, io, &mut mris)?;
+    metric::store_current_positions(g, io, &mut mris)?;
+    let tmpstr = format!("{fname}.avg.area.mgh");
+    if g.gdiag_no >= 0 && verbose_on(g) {
+        let _ = writeln!(io.out, "Trying to read average area {tmpstr}");
+    }
+    if fio_file_exists_readable(g, dir, &tmpstr) != 0 {
+        mri_read_pending(&tmpstr);
+    }
+    mris.group_avg_vtxarea_loaded = 0;
+    if g.gdiag_no >= 0 && verbose_on(g) {
+        let _ = writeln!(
+            io.out,
+            "Average area loaded {}",
+            mris.group_avg_vtxarea_loaded
+        );
+    }
+    Ok(Some(mris))
+}
+
+/// `MRISread(fname, dotkrRasConvert)`: a volume name (`MRIS_VOLUME_FILE`) is the fatal error
+/// `MRISread(): input <file> does not appear to be a surface (ext=<extension>, MRIS_VOLUME_FILE)`;
+/// the name copied into a 1,024-byte buffer (FS-126); a type that is not ASCII, icosahedron,
+/// movie.byu, STL, VTK or GIFTI may become a GIFTI name (`__MRISapplyFSGIIread`); then
+/// [`read_over_alloc`] (no extra room). `orig_xyzspace` keeps `useRealRAS`; a surface in scanner
+/// coordinates (`useRealRAS` set) with `dotkr_ras_convert` needs a valid volume geometry (else
+/// `ERROR: Surface <file> doesn't have valid volume geometry!` on standard output, the surface
+/// freed, `None`) and is moved to tkregister space ([`coords::scanner2tkr`]). Then the 3-hop
+/// neighbourhoods with their distances ([`nbhd::set_neighborhood_size_and_dist`]) and the
+/// neighbourhood in use reset to 1 hop.
+pub fn read(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    fname: &str,
+    dotkr_ras_convert: bool,
+) -> Result<Option<Mris>, Fatal> {
+    let fname = c_str(fname);
+    let mut ty = mris_file_name_type(g, fname);
+    if ty == MRIS_VOLUME_FILE {
+        let ext = fio_extension(Some(fname)).unwrap_or_else(|| "(null)".to_owned());
+        log::error_exit(
+            g,
+            io.err,
+            ERROR_BADFILE,
+            &format!(
+                "MRISread(): input {fname} does not appear to be a surface (ext={ext}, MRIS_VOLUME_FILE)\n"
+            ),
+        )?;
+    }
+    let mut surf_to_read = strcpy_checked(g, io, fname, "MRISread")?;
+    if !named_type(ty) {
+        apply_fsgii_read(g, io, dir, &mut surf_to_read, fname, &mut ty)?;
+    }
+    let Some(mut mris) = read_over_alloc(g, sg, io, dir, &surf_to_read, 1.0)? else {
+        return Ok(None);
+    };
+    mris.orig_xyzspace = mris.useRealRAS;
+    if mris.useRealRAS != 0 && dotkr_ras_convert {
+        if mris.vg.valid == 0 {
+            let _ = writeln!(
+                io.out,
+                "ERROR: Surface {surf_to_read} doesn't have valid volume geometry!"
+            );
+            let mut m = Some(mris);
+            alloc::free(g, io.err, &mut m);
+            return Ok(None);
+        }
+        coords::scanner2tkr(g, io, &mut mris)?;
+    }
+    nbhd::set_neighborhood_size_and_dist(g, sg, io, &mut mris, 3)?;
+    nbhd::reset_neighborhood_size(g, io, &mut mris, 1)?;
+    Ok(Some(mris))
+}
+
+/// `MRISfastRead(fname)`: [`read`] with the conversion to tkregister space.
+pub fn fast_read(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    fname: &str,
+) -> Result<Option<Mris>, Fatal> {
+    read(g, sg, io, dir, fname, true)
 }

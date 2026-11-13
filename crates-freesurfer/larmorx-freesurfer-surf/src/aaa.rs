@@ -363,6 +363,27 @@ pub struct SurfGlobals {
     /// `mris_readval_frame` (`mrisurf_io.cpp` line 64, -1): the frame `MRISreadValues` reads
     /// from a volume, `MRISsetReadFrame`'s.
     pub readval_frame: i32,
+    /// `mrisAddEdgeWkr`'s `static int maxVnum` (20, `mrisurf_topology.cpp` line 396).
+    pub add_edge_max_vnum: i32,
+    /// `mrisCompleteTopology`'s choice, read at its first call (`static bool use_new`: whether
+    /// `mrisCompleteTopology_new` is set).
+    pub complete_topology_new: Option<bool>,
+    /// `MRISfindNeighborsAtVertex`'s `static int laterTime`: its calls so far.
+    pub find_nbrs_calls: i32,
+    /// `MRISfindNeighborsAtVertex`'s searches (`use_new`, `use_old`), chosen at its first call.
+    pub find_nbrs_use: (bool, bool),
+    /// `MRISfindNeighborsAtVertex`'s `static bool shownTesting`.
+    pub find_nbrs_shown_testing: bool,
+    /// `MRISfindNeighborsAtVertex_old`'s `static bool laterTime` (its first-call line shown).
+    pub find_nbrs_old_shown: bool,
+    /// `MRISfindNeighborsAtVertex_newWkr`'s set of vertices (`tempForEachThread[0].status`:
+    /// one byte per vertex, kept from call to call, zeroed whole when it grows).
+    pub find_nbrs_status: Vec<u8>,
+    /// `mrisCheckVertexVertexTopologyWkr`'s `forceAlways` (`FREESURFER_always_check_vv` set), read
+    /// at its first call.
+    pub check_vv_force_always: Option<bool>,
+    /// `mrisCheckVertexVertexTopologyWkr`'s `checkDist` (`FREESURFER_checkDist` set), read once.
+    pub check_vv_check_dist: Option<bool>,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -389,6 +410,15 @@ impl Default for SurfGlobals {
             mp_comparisons: 0,
             fs120_write_face_angles: false,
             readval_frame: -1,
+            add_edge_max_vnum: 20,
+            complete_topology_new: None,
+            find_nbrs_calls: 0,
+            find_nbrs_use: (false, false),
+            find_nbrs_shown_testing: false,
+            find_nbrs_old_shown: false,
+            find_nbrs_status: Vec::new(),
+            check_vv_force_always: None,
+            check_vv_check_dist: None,
         }
     }
 }

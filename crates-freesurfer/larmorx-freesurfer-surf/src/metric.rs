@@ -1533,3 +1533,40 @@ pub fn pop_xyz(
     free_xyz(saved);
     Ok(())
 }
+
+/// `MRISaverageRadius(mris)` (`utils/mrisurf_metricProperties.cpp` lines 11485-11535, queue item
+/// 3.1-51's, taken for `MRISread`): the centre of the vertices' bounding box (from -10000 and
+/// 10000, in double: `(lo + hi) * 0.5`), then the mean distance of every vertex (ripped ones too)
+/// from it, summed in double in vertex order (`sqrt((dx·dx + dy·dy) + dz·dz)`); 0 / 0, a NaN,
+/// without vertices. The operand order (and so the NaNs) is the official build's (its object
+/// code).
+pub fn average_radius(mris: &Mris) -> f64 {
+    let n = usize::try_from(mris.nvertices).unwrap_or(0);
+    let (mut lo, mut hi) = ([10000.0f64; 3], [-10000.0f64; 3]);
+    for vno in 0..n {
+        let v = mris.vertex(vno);
+        for (k, c) in [v.x, v.y, v.z].into_iter().enumerate() {
+            let c = f64::from(c);
+            if c > hi[k] {
+                hi[k] = c;
+            }
+            if c < lo[k] {
+                lo[k] = c;
+            }
+        }
+    }
+    let c: [f64; 3] = std::array::from_fn(|k| sse::mul64(sse::add64(lo[k], hi[k]), 0.5));
+    let mut radius = 0.0f64;
+    for vno in 0..n {
+        let v = mris.vertex(vno);
+        let x = sse::sub64(f64::from(v.x), c[0]);
+        let y = sse::sub64(f64::from(v.y), c[1]);
+        let z = sse::sub64(f64::from(v.z), c[2]);
+        let s = sse::add64(
+            sse::add64(sse::mul64(x, x), sse::mul64(y, y)),
+            sse::mul64(z, z),
+        );
+        radius = sse::add64(radius, sse::sqrt64(s));
+    }
+    sse::div64(radius, n as f64)
+}

@@ -247,12 +247,12 @@ const FORMATS: [&str; 20] = [
 ];
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
-/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-13, track A
-/// relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
+/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-14, track A
+/// relay 21, with piece 12's four commands; first 2026-11-13, relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
 /// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
 /// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
 /// them.
-pub const HEAVY_SEED1: [usize; 3] = [2248, 3687, 4361];
+pub const HEAVY_SEED1: [usize; 2] = [1140, 1239];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]

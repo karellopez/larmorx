@@ -193,6 +193,22 @@ So the second head confirms the first: glibc's `tanhf` decides `mri_watershed`'s
 on this smaller head) and glibc's `acosf` `mris_curvature_stats`'s files (the table above), and
 nothing else measured needs glibc's bits.
 
+### The v8 stream
+
+The recording `ds000005-sub-01-v8` (recorded at 4 threads), every step but the four that run neural
+networks in Python (`mri_synthstrip`, `mri_synthseg`, `rca-talairach` and `fs-synthmorph-reg`: their
+maths is PyTorch's and NumPy's, the networks' own port), replayed in count mode at 3 threads
+(2026-11-13): **191 of 191 reproduced** (so these steps do not depend on the thread count between 3
+and 4). The functions called are the classic stream's, with no new one: `acos` (`mris_sphere` 628
+million calls, 1.66 million different; `mris_curvature` 898 million, 1.23 million; `mris_register`,
+`mris_remesh`, `mris_place_surface`, `mris_fix_topology`), `acosf` (`mris_fix_topology` 154 million,
+8.9 million different; `mris_curvature_stats` 1.5 million, 2,034), `tanhf` (`mris_fix_topology` 13.9
+million, 357,516), `asin` (`mri_cc`, 2 calls, 0) and `atan2`'s table (here 300,003 calls per process,
+one table per thread, 621 different doubles, none as floats). The v8 stream has no `mri_watershed`
+(SynthStrip replaces it), so of the two functions that decide results it reaches `acosf`
+(`mris_curvature_stats`), and `tanhf` only where the correctly rounded value changed nothing on the
+classic stream.
+
 ### fMRIPrep's calls
 
 The programs fMRIPrep and sMRIPrep run outside recon-all (`docs/freesurfer/programs.toml`, stream
@@ -234,14 +250,15 @@ holds: `tan` stays correctly rounded in `reproduce` too, and `specs/ranlux.md` �
 costs (large-shape gamma draws whose uniform falls on one of those 41,708 values, off the default
 paths). Not a defect of FreeSurfer's: the register's GLIBC-07 covers glibc's `tan`.
 
-## 5. Still to measure
+## 5. What remains to measure
 
-`mri_ca_register` (step 15) in count mode (running at the time of writing); the recording's later
-steps once it is complete (`mris_register`, `mris_ca_label`, the statistics, `mri_aparc2aseg`, ...;
-the 4-thread recordings have them, but their comparison needs the steps to be deterministic at 4
-threads, `docs/freesurfer/variation.md`); the v8 stream; fMRIPrep's calls (`mri_coreg` through
-`bbregister`: `log2` in its NMI cost); a second head for `tanhf`, `acosf` and `acos`. Each function
-with differing calls is then run in `cr` mode alone.
+Measured (§3): the classic stream at one thread on two heads (every step of the first; steps 1 to
+61, `mris_curvature_stats` and fMRIPrep's calls on the second), the v8 stream's non-network steps
+on the first head, fMRIPrep's FreeSurfer calls on both heads. Not measured: the other four heads
+(ds002422 sub-02, ds004173 sub-603309, ds005003 sub-RS001, ds005454 sub-16; their recordings are
+complete), the v8 stream's correctly rounded runs (no function new to it was found), and a real
+BOLD series through `mri_vol2surf` (the T1w reference stood in for it). The final validation phase
+repeats §3's runs on those heads with the replicas' glibc-exact `tanhf` and `acosf` in place.
 
 ## 6. A side finding: FS-104, long paths abort the DICOM format probe
 

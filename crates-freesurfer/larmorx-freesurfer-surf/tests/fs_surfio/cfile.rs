@@ -56,7 +56,7 @@ fn value_target(fname: &str, hemi: i64, sname: &str) -> Option<String> {
 
 /// A number as text: mostly short decimals, now and then a special or out-of-range one, or (one
 /// in ten of those) text that is no number.
-fn num_text(g: &mut Gen) -> String {
+pub(super) fn num_text(g: &mut Gen) -> String {
     if g.chance(14) {
         return g
             .pick(&[
@@ -69,7 +69,7 @@ fn num_text(g: &mut Gen) -> String {
 
 /// A number as text, never one `scanf` cannot read (NaNs, infinities and out-of-range ones now and
 /// then).
-fn vtk_num(g: &mut Gen) -> String {
+pub(super) fn vtk_num(g: &mut Gen) -> String {
     if g.chance(20) {
         return g
             .pick(&["nan", "-inf", "inf", "1e40", "-1e-50", "-0", "+.5"])
@@ -78,7 +78,7 @@ fn vtk_num(g: &mut Gen) -> String {
     clean_num(g)
 }
 
-fn clean_num(g: &mut Gen) -> String {
+pub(super) fn clean_num(g: &mut Gen) -> String {
     let v = g.int(-4000, 4000) as f32 / 16.0;
     match g.below(3) {
         0 => format!("{v}"),
@@ -102,7 +102,7 @@ fn near(g: &mut Gen, n: i64) -> i64 {
 }
 
 /// Cut a file now and then (fs.io's FS-49 and FS-167: FreeSurfer reads memory then).
-fn maybe_cut(g: &mut Gen, b: &mut Vec<u8>) {
+pub(super) fn maybe_cut(g: &mut Gen, b: &mut Vec<u8>) {
     if g.chance(9) && !b.is_empty() {
         let cut = g.int(1, 6.min(b.len() as i64)) as usize;
         b.truncate(b.len() - cut);

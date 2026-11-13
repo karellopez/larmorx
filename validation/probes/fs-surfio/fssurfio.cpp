@@ -69,6 +69,12 @@ int fssurfio_read_new_curvature_into_array(const char *fname, int size, float **
 int fssurfio_read_curv_old_format(MRIS *mris, const char *fname, MRI *curvmri);
 void fssurfio_apply_fsgii_read(char *file_to_read, const char *fname, int *filetype);
 void fssurfio_apply_fsgii_write(char *file_to_write, const char *fname, int *filetype);
+MRIS *fssurfio_read_ascii_file(const char *fname);
+MRIS *fssurfio_read_geo_file(const char *fname);
+int fssurfio_read_geo_file_positions(MRIS *mris, const char *fname);
+SMALL_SURFACE *fssurfio_read_triangle_vertex_positions_only(const char *fname);
+int fssurfio_read_triangle_file_positions(MRIS *mris, const char *fname);
+bool fssurfio_quad_combine(int quad[4], int vA[3], int vB[3]);
 
 const char *Progname = "fssurfio";
 
@@ -1715,6 +1721,95 @@ void cfile_case()
   }
 }
 
+// `sread` (relay 13, 3.1-48 part b): mrisurf_io.cpp's file-local surface readers, through
+// io_statics.cpp: mrisReadAsciiFile, mrisReadGeoFile, mrisReadGeoFilePositions,
+// mrisReadTriangleFileVertexPositionsOnly, mrisReadTriangleFilePositions, and quadCombine (the old
+// writer's quadrangles). As `cfile`: an empty work folder (with a subfolder `d`), whether
+// FREESURFER_reportLogicErrors is set, Gdiag's bits, the case's input files, a surface from MRISalloc (coordinates, rip flags, faces, the distances' flags and size:
+// MRISsetXYZ's message when the distances are marked allocated), 1 to 3 operations, then the case
+// surface's coordinates and distance state. A surface a reader returns is printed in full, the small surface's vertices too.
+void dump_read_surface(MRIS *s)
+{
+  if (!s) { out += "NULL "; return; }
+  oi(s->nvertices); oi(s->nfaces); oi(s->type); oi(s->patch); oi(s->status);
+  oi(s->max_vertices); oi(s->max_faces);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    of(v->x); of(v->y); of(v->z); oi(v->ripflag);
+    oi(s->vertices_topology[vno].num);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) {
+    for (int k = 0; k < 3; k++) oi(s->faces[fno].v[k]);
+    oi(s->faces[fno].ripflag);
+  }
+  oi(s->dist_alloced_flags);
+}
+
+void sread_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  if (geti()) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->ripflag = (char)geti();
+  }
+  for (int fno = 0; fno < nf; fno++) for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+  m->dist_alloced_flags = (char)geti();
+  m->dist_nsize = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "ra") dump_read_surface(fssurfio_read_ascii_file(name_tok()));
+    else if (op == "rg") dump_read_surface(fssurfio_read_geo_file(name_tok()));
+    else if (op == "rp") oi(fssurfio_read_geo_file_positions(m, name_tok()));
+    else if (op == "rv") {
+      SMALL_SURFACE *s = fssurfio_read_triangle_vertex_positions_only(name_tok());
+      if (!s) { out += "NULL "; continue; }
+      oi(s->nvertices);
+      if (!s->vertices) { out += "NOVERTICES "; continue; }
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        of(s->vertices[vno].x); of(s->vertices[vno].y); of(s->vertices[vno].z);
+      }
+      MRISSfree(&s);
+    }
+    else if (op == "rt") oi(fssurfio_read_triangle_file_positions(m, name_tok()));
+    else if (op == "qc") {
+      int a[3], b[3], q[4] = {-7, -7, -7, -7};
+      for (int &x : a) x = geti();
+      for (int &x : b) x = geti();
+      oi(fssurfio_quad_combine(q, a, b));
+      for (int x : q) oi(x);
+    }
+    else fail("sread op");
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    of(v->x); of(v->y); of(v->z);
+  }
+  oi(m->dist_alloced_flags); oi(m->dist_nsize);
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -1929,6 +2024,8 @@ void run_case()
     sfile_case();
   } else if (cmd == "cfile") {
     cfile_case();
+  } else if (cmd == "sread") {
+    sread_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

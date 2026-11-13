@@ -13,7 +13,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use larmorx_core::defects::{
-    FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, UpstreamDefects,
+    FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153,
+    UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -38,6 +39,8 @@ mod life;
 mod mprop;
 #[path = "sfile.rs"]
 mod sfile;
+#[path = "sread.rs"]
+mod sread;
 
 /// The generator's state, and whether it may make names of about 1,024 bytes (not with seed 1,
 /// the platform-independent set: file systems differ on such names).
@@ -114,10 +117,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 31] = [
+const COMMANDS: [&str; 32] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
+    "sread",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -992,6 +996,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "mprop" => mprop::mprop_tokens(&mut t, &mut g),
             "sfile" => sfile::sfile_tokens(&mut t, &mut g),
             "cfile" => cfile::cfile_tokens(&mut t, &mut g),
+            "sread" => sread::sread_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2648,6 +2653,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "mprop" => mprop::mprop_case(cx, t, o)?,
         "sfile" => sfile::sfile_case(cx, t, o)?,
         "cfile" => cfile::cfile_case(cx, t, o)?,
+        "sread" => sread::sread_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2721,7 +2727,8 @@ pub fn run_line_with(
                 && (cx.g.notices.contains(&FS_03)
                     || cx.g.notices.contains(&FS_116)
                     || cx.g.notices.contains(&FS_138)
-                    || cx.g.notices.contains(&FS_145)) =>
+                    || cx.g.notices.contains(&FS_145)
+                    || cx.g.notices.contains(&FS_150)) =>
         {
             "CRASH 11".to_owned()
         }
@@ -2734,8 +2741,12 @@ pub fn run_line_with(
         {
             "CRASH 6".to_owned()
         }
-        // FS-118 reproduced: the progress bar's modulo by 0 (signal 8)
-        Err(Fatal::Exit(136)) if mode.reproduce() && cx.g.notices.contains(&FS_118) => {
+        // FS-118 and FS-153 reproduced: the progress bar's modulo by 0, the movie.byu reader's
+        // division by 0 (signal 8)
+        Err(Fatal::Exit(136))
+            if mode.reproduce()
+                && (cx.g.notices.contains(&FS_118) || cx.g.notices.contains(&FS_153)) =>
+        {
             "CRASH 8".to_owned()
         }
         Err(f) => format!("EXIT {}", f.status()),

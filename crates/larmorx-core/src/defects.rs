@@ -1234,11 +1234,25 @@ defects! {
     FS_146 = "FS-146", "FreeSurfer", true,
         "MRISreadVTK with a file that ends before a field's values takes the missing values as 0 and reports success";
     FS_147 = "FS-147", "FreeSurfer", true,
-        "MRISreadVTK counts a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
+        "MRISreadVTK and the ASCII and movie.byu surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
     FS_148 = "FS-148", "FreeSurfer", true,
         "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, reads one or two bytes before the name to decide whether it names a hemisphere";
     FS_149 = "FS-149", "FreeSurfer", true,
         "MRISbuildFileName_read (a name with a slash, or without a hemisphere when FS_POSIX is unset) and __MRISapplyFSGIIwrite (FS_GII set to .gii) write a file name of 1,024 bytes or more past their caller's 1,024-byte buffer";
+    FS_150 = "FS-150", "FreeSurfer", true,
+        "the ASCII and movie.byu surface readers (and the movie.byu positions reader) given a file with no line that is not blank or a comment end the program with a segmentation fault (signal 11)";
+    FS_151 = "FS-151", "FreeSurfer", true,
+        "the ASCII surface reader given a first line whose two counts cannot be read, and the ASCII and movie.byu surface and position readers given a first vertex whose numbers cannot be read, take the missing values from memory contents";
+    FS_152 = "FS-152", "FreeSurfer", true,
+        "the ASCII and movie.byu surface and position readers given a vertex or face whose numbers cannot be read (the file ends early, or holds something else there) give it the values read before it (the previous vertex's coordinates, the last rip flag read, an ASCII face's vertex 0) and report success";
+    FS_153 = "FS-153", "FreeSurfer", true,
+        "the movie.byu surface and position readers given a first line with a face count of 0 end the program with an arithmetic exception (signal 8)";
+    FS_154 = "FS-154", "FreeSurfer", true,
+        "the movie.byu surface reader given a face whose vertex number is not one of the surface's (below 1 or above the vertex count, a number it cannot read, or a last vertex not written negative) changes memory outside the surface's vertex arrays (a crash or corrupted memory later)";
+    FS_155 = "FS-155", "FreeSurfer", true,
+        "the movie.byu positions reader takes coordinates from a file of another surface (other vertex and face counts) without a message: the first vertices of a larger surface, or of a smaller one the last coordinates repeated";
+    FS_156 = "FS-156", "FreeSurfer", true,
+        "the vertex-positions reader of a binary triangle file given a negative vertex count returns a surface of that count with no vertices, as if it had read it";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,

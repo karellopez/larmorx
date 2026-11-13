@@ -3337,3 +3337,192 @@ Each prints its result and what it changes; `DIAG_WRITE`'s files (`curv.dat`, `k
 length and FNV-1a hash. Counted, not compared: FS-376, FS-379, FS-380, and FS-48's matrices on which
 FreeSurfer hangs (the probe's alarm ends it). FS-377's cases compare as FreeSurfer's crash.
 Observed (relay 20): the probe README.
+
+## 107. The GIFTI surface reader (queue item 3.1-26, its surface part; relay 21)
+
+**107.1 What it does** (`mrisReadGIFTIfile(fname, mris, overlays, daNum, ctab)`, the same as
+`mrisReadGIFTIdanum(fname, mris, daNum, overlays, ctab)`; `MRISread` calls it with no surface, no
+overlays, every array and no colour table). The file is read with gifticlib 1.12 with its data
+(gifticlib's own messages and failures as `larmorx_io::gifti` gives them, gifticlib's settings and
+persistent state the run's), with FreeSurfer's two changes to gifticlib: an image's `Version` is
+valid when `sscanf("%f")` reads the same `float` from it as from `1.0` (an absent version reads 0
+and so does `1.0` then: valid), and a coordinate system is accepted under a
+`NIFTI_INTENT_TIME_SERIES` array as under a `NIFTI_INTENT_POINTSET` one (gifticlib's message names
+both: `** DA[<k>] has coordsys with intent <intent> (should be NIFTI_INTENT_POINTSET or
+NIFTI_INTENT_TIME_SERIES)`). Messages naming the file name it as the caller did. In order:
+
+1. A file gifticlib cannot read: `mrisReadGIFTIdanum: ERROR reading gifti <file>` on standard error
+   (after gifticlib's own, e.g. `** failed to open GIFTI XML file '<file>'`), `NULL`.
+2. A `Version` of exactly `1` becomes `1.0`. A file without a `Version` (FS-395): FreeSurfer crashes
+   (signal 11); by default it is read on (gifticlib's check accepts it).
+3. gifticlib's validity check with its messages; an invalid image: `mrisReadGIFTIdanum: GIFTI file
+   <file> is invalid!`, `NULL`.
+4. A label table with labels becomes a colour table (§107.3); its failure: `NULL` (no further
+   message).
+5. The last `NIFTI_INTENT_POINTSET` array is the coordinates, the last `NIFTI_INTENT_TRIANGLE` array
+   the faces. With both (§107.2) a new surface is made; the data of the next steps go into it. With
+   either missing they go into the surface the caller passed; without one: `mrisReadGIFTIdanum: mris
+   is NULL! found when parsing file <file>`, `NULL`.
+6. A caller's colour table (`ctab`) becomes the surface's (`mrisReadGIFTIdanum: Use Customized
+   Colortable` on standard output); otherwise the label table's, when there is one. When the file has
+   a label table, the surface's colour table must have as many entries (places not empty) as the file
+   has labels, else `mrisReadGIFTIdanum: ct_entries:<n> != labeltable_entries:<m>`, `NULL`.
+7. The data arrays (§107.4): all of them, or only array `daNum` (`daNum` -1: all). A `daNum` outside
+   the file's arrays (FS-388): FreeSurfer reads outside its list of arrays (a crash); by default
+   `mrisReadGIFTIdanum: data array <daNum> is not in file <file>`, `NULL`.
+8. The surface: the new one, or the caller's (its data read in place). A failure in step 7 returns
+   `NULL` with what was already stored in the caller's surface kept.
+
+The rows and columns of an array are gifticlib's (`gifti_DA_rows_cols`): a one-dimensional array has
+`Dim0` rows and 1 column; a row-major array `Dim0` rows and `nvals / Dim0` columns (1 when `Dim0` is
+0); a column-major one `Dim<last>` rows and `nvals / Dim<last>` columns (1 when not positive). The
+reader takes **rows as the vertex (or face) count and columns as the values per vertex for row-major
+arrays, and the other way round for column-major ones**. A value is read with FreeSurfer's
+two-dimensional accessor (`specs/freesurfer-io.md` §22: its messages; a place outside the array ends
+the program with status 1), as a `double`, then made a `float` (coordinates, values) or an `int`
+(vertex numbers: C's conversion, FS-17 beyond `int`).
+
+**107.2 The new surface.** The coordinates must have at least one vertex and exactly 3 columns, else
+`mrisReadGIFTIdanum: malformed coords data array in file <file>: num_vertices=<n> num_cols=<c>`
+(both as `int`), `NULL`; the faces at least one face and 3 columns, else `mrisReadGIFTIdanum:
+malformed faces data array in file <file>: num_faces=<n> num_cols=<c>`, `NULL`. The surface has
+those counts (`MRISalloc`), the file's name (a name of 1,024 bytes or more: FS-356, kept whole by
+default), type `MRIS_TRIANGULAR_SURFACE`, hemisphere from the coordinates' metadata
+`AnatomicalStructurePrimary` (`CortexRight` right, 1; `CortexLeft` left, 0; anything else or absent
+none, 2; compared exactly), `useRealRAS` 0. From the coordinates' metadata, each read only when the
+entry exists and `sscanf` reads its number (the field keeps its value otherwise): `VolGeomWidth`,
+`VolGeomHeight`, `VolGeomDepth` (`%d`), `VolGeomXsize`, `VolGeomYsize`, `VolGeomZsize`, `VolGeomX_R`,
+`VolGeomX_A`, `VolGeomX_S`, `VolGeomY_R` ... `VolGeomC_S` (`%f`, 15 in all) and `VolGeomFname`
+(copied: the volume geometry's 1,024-byte name gets the value and zeros after it, the first 1,024
+bytes of a longer value: FS-381); the geometry is valid when all 19 were read. Then `SurfaceCenterX`,
+`SurfaceCenterY`, `SurfaceCenterZ` (`%f`, the surface's centre), `TAG_GROUP_AVG_SURFACE_AREA` (`%f`).
+The command lines: `NUM_TAG_CMDLINE` (`%d`, 0 when absent or unreadable); above 1,000 (`MAX_CMDS`):
+`[WARN] mrisReadGIFTIdanum():  too many commands (<n>) in file. Only last 1000 will be saved!` on
+standard output, then FreeSurfer never returns (FS-382); larmorx reads the last 1,000. For each `k`
+from the first kept to `n - 1`, the entry `TAG_CMDLINE#<k>` is added to the surface's command lines
+(`MRISaddCommandLine`, `specs/freesurfer-surfio.md` §8); a missing one (or one without a value) stops
+them: `[ERROR] TAG_CMDLINE out of sync! No value found for TAG_CMDLINE#<k>` on standard output.
+
+Each vertex: its face count 0, its coordinates the coordinate array's three values of its row (as
+`float`). Each face: its three vertex numbers (as `int`); each counts one more face at its vertex (one
+byte: FS-147, a vertex of more than 255 faces, refused by default: `mrisReadGIFTIdanum: vertex <v>
+is in more than 255 faces in file <file>`, `NULL`). A vertex number outside the surface (FS-383):
+FreeSurfer counts it in memory outside the surface; by default `mrisReadGIFTIdanum: face <f> vertex
+<k>: <v> is not a vertex of the surface in file <file>`, `NULL`.
+
+The coordinates' coordinate systems, in order: a `DataSpace` of `NIFTI_XFORM_SCANNER_ANAT` makes
+`useRealRAS` 1; `NIFTI_XFORM_UNKNOWN` with a `TransformedSpace` of `NIFTI_XFORM_TALAIRACH` makes the
+surface's scanner-to-Talairach matrix a new 4 x 4 matrix of the system's sixteen numbers (as `float`,
+row by row; a later one replaces it). A system without a `DataSpace`, or with `NIFTI_XFORM_UNKNOWN` and
+no `TransformedSpace` (FS-387): FreeSurfer crashes; by default the system is passed over.
+
+**107.3 The label table as a colour table.** gifticlib's check of the table (its messages); invalid:
+`readLabelTable(<file>): invalid labeltable found` on standard error, failure. The table has `maxkey
++ 1` places (the largest key; 0 places when every key is negative), all empty, version 2, the file's
+name (at most 1,023 bytes). Without colours in the file, colours are made: the random generator
+seeded with 12 (`setRandomSeed(12)`, `specs/freesurfer-core.md` §9), then for each
+label three draws `randomNumber(0, 1)` (red, green, blue, as `float`) and alpha 1. With `Gdiag`'s
+`DIAG_VERBOSE`: `[DEBUG] readLabelTable(<file>): ct->nentries=<maxkey + 1>, num_entries_to_read=<n>`
+on standard output. Then each label in order: its key is its place. A place already filled keeps its
+entry: `readLabelTable(<file>): Duplicate labelkey <key>:<label>, was <name>` on standard output; the
+colour sets advance only when a place is filled, so the labels after a repeated key take the colours
+one set earlier. A new place (with `DIAG_VERBOSE`: `[DEBUG] readLabelTable(<file>): created
+ct->entries[<key>]`) gets the label's name (at most 1,023 bytes) and the colour set: each component
+`c` kept as a float and as the integer `floor(c * 256)` (C's conversion, FS-17), at most 255. A colour
+the file did not give (gifticlib's FS-80) reads 0. A negative key (FS-389): FreeSurfer writes before
+the table (a crash or a later refusal); by default `readLabelTable(<file>): label key <key> is
+negative` on standard error, failure. Finally the duplicate-name check (§107.5).
+
+**107.4 The data arrays**, in file order (or the one asked for):
+- A coordinate or face array: passed over.
+- A **node index** (`NIFTI_INTENT_NODE_INDEX`, sparse storage): only as the file's first array, else
+  `mrisReadGIFTIdanum: NODE_INDEX data array found but its not the first data array in file <file>`,
+  `NULL`; its row count must be 1 to the surface's vertex count and its columns at most 1, else
+  `mrisReadGIFTIdanum: malformed NODE_INDEX data array in file <file>: num_index_nodes=<n>
+  num_cols=<c> max nvertices=<nv>, num_cols>1`, `NULL`. Its values (as `int`) are the vertices of the
+  following shape, label and statistics arrays' rows.
+- Every other array must have exactly the surface's vertex count of rows (at least 1) and at most
+  the intent's columns (3 for `NIFTI_INTENT_VECTOR` and `NIFTI_INTENT_RGB_VECTOR`, 4 for
+  `NIFTI_INTENT_RGBA_VECTOR`, 9 for `NIFTI_INTENT_GENMATRIX`, 1 otherwise), else
+  `mrisReadGIFTIdanum: malformed data array [<k>] in file <file>: num_vertices=<n> num_cols=<c>
+  expected nvertices=<nv>, num_cols=<e>`, `NULL`. With a node index this holds too: sparse arrays
+  shorter than the surface are refused (FS-390, kept: rule C).
+- **Shape** (`NIFTI_INTENT_SHAPE`): without overlays only the first shape array is read (later ones:
+  `WARNING: a prior data array of shape data has already been read!  Skipping data in array #<k> in
+  file <file>` on standard error); each row's value (as `float`) becomes its vertex's curvature (the
+  node index's vertex, or the row's). With overlays every shape array is read: `INFO:
+  NIFTI_INTENT_SHAPE data in array #<k> in file <file> saved as MRI` on standard error, the values
+  also into a new `MRI_FLOAT` volume of the surface's vertex count by 1 by 1 by 1 frame (column =
+  vertex), and an overlay is added: its name the `Name` metadata's last path component (POSIX
+  `basename`: trailing slashes removed, `.` for an empty name, `/` for slashes only; a name of 1,024
+  bytes or more cut to 1,023, FS-392) without a final `.gii`, no name without the entry; type 100
+  (shape), intent `NIFTI_INTENT_SHAPE`, data type the `ShapeDataType` metadata (empty without it:
+  FS-391, memory contents in FreeSurfer; 255 bytes of a longer one, FS-391), format `GIFTI_FILE`
+  (27), one value per vertex, the volume.
+- **Labels** (`NIFTI_INTENT_LABEL`): `parsing dataarray #<k> (NIFTI_INTENT_LABEL) ...` on standard
+  output; without a colour table on the surface: `mrisReadGIFTIdanum: NULL colortable`, `NULL`. For
+  each vertex (or each node-index row, stopping after the last; the loop also stops once a vertex
+  number at or past the vertex count has been visited) the value is the key: FreeSurfer reads the
+  array's bytes as 32-bit unsigned integers whatever its type (FS-385; by default the value by its
+  type made an `int`); a key among the label table's keys finds the colour entry at the place of
+  that key in the surface's colour table, and the annotation is `(b << 16) + (g << 8) + r` of its
+  integer colours (with `DIAG_VERBOSE`: `mrisReadGIFTIdanum(): vno: <v>, tkey: <key>, tidx: <label
+  index>, name: <name>` on standard output); a key not in the label table gives 0. A key whose place
+  the colour table does not have or holds empty (a caller's table, a table made from a colour array
+  before, FS-386): FreeSurfer reads outside the table (a crash or an undefined annotation); by default
+  0.
+- **Vectors** (`NIFTI_INTENT_VECTOR`): each vertex's `dx dy dz` (rows by vertex, the node index not
+  used).
+- **Colours** (`NIFTI_INTENT_RGB_VECTOR`, `NIFTI_INTENT_RGBA_VECTOR`; only the first three columns
+  read): each vertex's red, green and blue (as `float`) become integers: above 1 the value itself (C's
+  conversion), else `floor(c * 256)`, at most 255 (FS-17 beyond `int`); the annotation is `(r & 255) |
+  (g & 255) << 8 | (b & 255) << 16`. Then the surface's colour table is replaced by one made from the
+  distinct annotations (§107.5).
+- **A general matrix** (`NIFTI_INTENT_GENMATRIX`): `WARNING: ignoring unsupported data array
+  NIFTI_INTENT_GENMATRIX in file <file>` on standard error.
+- **Any other intent** (statistics): without overlays only the first such array is read (later ones:
+  `WARNING: a prior data array of stat/val data has already been read!  Skipping data in array #<k>
+  in file <file>`); each value becomes its vertex's `val` and `stat`. With overlays every such array
+  is read (`INFO: <intent> data in array #<k> in file <file> saved as MRI`) into a new one-frame volume
+  as for shapes; the first array of each run of one intent starts an overlay (type 200, the intent,
+  the file's name, an empty data type, `GIFTI_FILE`, its volume), added to the list when an array of
+  another intent starts the next run; the run's later arrays write their values at slice (dense) or
+  frame (sparse) number `j - 1` for the run's `j`-th array of their own new volume, which is not kept,
+  and the last run is never added (FS-394, kept until measured: rule D). A write outside a volume is
+  fs.mri's (`specs/freesurfer-mri.md` §5: `MRIsetVoxVal`, FS-53).
+
+**107.5 The colour table of a colour array; the duplicate names.** One entry per distinct annotation,
+in increasing annotation order, named `Unknown_Label_<k>` (k from 0), its colours the first vertex's
+with that annotation (the components as read, each also as `floor(c * 256)` at most 255); its alpha:
+FreeSurfer reads it past the three stored components (FS-393: memory contents; larmorx 0). Each
+entry printed on standard output: `<k> <name> <annotation> (<r> <g> <b> <a>)`. Version 2, the file's
+name. Then the duplicate-name check: for every ordered pair of different places with equal names,
+`ERROR: label name '<name>' is duplicated!` on standard output; when any, `CTABfindDuplicateNames:
+<pairs / 2> duplicate names found in:` and `  <table's file name>`.
+
+## 108. Validation plan, part 19
+
+The probe's `gii` command (relay 21): an empty work folder with `d`; `Gdiag`'s show and verbose
+bits; 1 or 2 GIFTI files (one in 25 random bytes): `srd`'s meshes as coordinate (`FLOAT32` mostly,
+`FLOAT64`, `INT32`; NaN, infinite, large and -0 values in heavy cases) and face arrays (`INT32`,
+`UINT8`, `FLOAT32`; vertex numbers outside the surface in heavy cases), in either order, one file in
+four without them; ASCII, Base64Binary or GZipBase64Binary; one array in twelve column-major; the
+coordinates' metadata (hemisphere, all or some of the 19 geometry entries with odd numbers in heavy
+cases, centre, group area, 0 to 3 command lines with a wrong count one in five), 0 to 2 coordinate
+systems (spaces missing one in twelve); a node index first one case in twelve (all or some vertices);
+0 to 3 further arrays: shapes (with or without `Name`, `ShapeDataType`), labels (a label table of 1
+to 5 labels, keys repeated or negative now and then, with or without colours; `INT32`, `UINT32`,
+`FLOAT32` arrays; keys outside the table), vectors, colours (RGB or RGBA, in [0, 1] or 0 to 300, NaN
+and large values in heavy cases), general matrices, runs of 1 to 3 statistics arrays; rows one off
+the vertex count now and then; versions `1.0`, `1`, `2.0` or none; cut files in heavy cases. A
+surface kept for the reads that pass one (`MRISalloc` of the first file's vertex count, another
+count, or none), a caller's colour table one case in three (0 to 6 places, some empty); 1 to 3 reads
+(a missing file one in 30; all arrays or one by number, outside the file in heavy cases; flags: pass
+the kept surface, ask for overlays, give the colour table). Each read prints NULL, PASSED or NEW
+with the surface (counts, type, hemisphere, name, real RAS, geometry, centre, group area, command
+lines, Talairach matrix, colour table with each entry's names and colours, but no alpha for a colour
+array's table, FS-393; per vertex coordinates, curvature, `val`, `stat`, `dx dy dz`, annotation, face
+count; per face its vertices), the kept surface, then the overlays (name, type, intent, data type,
+format, values per vertex, volume size and first slice). `srd` reads GIFTI surfaces too. Counted, not
+compared: FS-382 to FS-384, FS-386, FS-388, FS-389, FS-391, FS-392, fs.mri's FS-53. FS-387's and
+FS-395's cases compare as FreeSurfer's crash. Observed (relay 21): the probe README.

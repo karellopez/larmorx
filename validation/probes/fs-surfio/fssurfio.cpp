@@ -2276,7 +2276,7 @@ void srd_case()
 
 // A surface as gii prints it: counts, type, hemisphere, name, real-RAS flag, volume geometry,
 // centre, group-average area, command lines, the Talairach matrix, the colour table (each entry's
-// name and colours), per vertex its coordinates, curvature, val, stat, annotation, dx dy dz and
+// name and colours; no alpha for a colour array's table), per vertex its coordinates, curvature, val, stat, annotation, dx dy dz and
 // face count, per face its vertices
 void dump_gii_surface(MRIS *s)
 {
@@ -2297,8 +2297,11 @@ void dump_gii_surface(MRIS *s)
     for (int k = 0; k < ct->nentries; k++) {
       CTE *e = ct->entries[k];
       if (!e) { out += "- "; continue; }
-      oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
-      of(e->rf); of(e->gf); of(e->bf); of(e->af);
+      // a colour array's table (makeColorTable's Unknown_Label_<k>): its alpha is memory
+      // contents (FS-393), not printed
+      bool alpha = strncmp(e->name, "Unknown_Label_", 14) != 0;
+      oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); if (alpha) oi(e->ai);
+      of(e->rf); of(e->gf); of(e->bf); if (alpha) of(e->af);
     }
   }
   for (int vno = 0; vno < s->nvertices; vno++) {

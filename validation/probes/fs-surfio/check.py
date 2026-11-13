@@ -31,6 +31,7 @@ import hashlib
 import itertools
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -59,7 +60,11 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # surface without vertices, FS-376; the gradients' averaging over neighbour lists that are not
 # symmetric, FS-379; the vertex report's neighbour lines past the list, FS-380; a matrix on which
 # LINPACK's ssvdc never returns, FS-48h, the runner's mark for FS-48's hanging cases, ended by the
-# probe's alarm): counted, never compared
+# probe's alarm; relay 21, the GIFTI reader: more than 1,000 command lines (never returns), FS-382; a
+# face or sparse vertex outside the surface, FS-383, FS-384; a label key outside the colour table,
+# FS-386; a data array number outside the file's, FS-388; a negative label key, FS-389; a shape
+# overlay's data type and name, FS-391, FS-392; an overlay value written outside its volume, fs.mri's
+# FS-53): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -93,7 +98,19 @@ SKIP: tuple[str, ...] = (
     "FS-379",
     "FS-380",
     "FS-48h",
+    "FS-382",
+    "FS-383",
+    "FS-384",
+    "FS-386",
+    "FS-388",
+    "FS-389",
+    "FS-391",
+    "FS-392",
+    "FS-53",
 )
+# gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`): the port
+# writes placeholders, the official build addresses
+POINTERS = re.compile(r"\(0x[0-9a-f]+,0x[0-9a-f]+,")
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 
@@ -189,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
         for i, line in zip(idx, lines, strict=True):
             official[i] = line
         served.append(done.cached)
+
+    official = [POINTERS.sub("(<buf>,<blen>,", x) for x in official]
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(

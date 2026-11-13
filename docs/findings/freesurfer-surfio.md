@@ -1326,3 +1326,64 @@ Ported: `src/props5.rs` to `src/props8.rs` (PROVENANCE rows `props5` to `props8`
   `fsaverage`'s `lh.white` with `drand48`; no program calls it).
 - **Probe**: the 41st command `mpe` (tests/fs_surfio/mpe.rs; fssurfio.cpp `mpe_case`), the files
   `DIAG_WRITE` writes (`curv.dat`, `k1.plt`, `k2.plt`) compared by length and FNV-1a hash.
+
+## 23. The GIFTI surface reader (gifti.cpp 338-1222 and 2857-3006; relay 21)
+
+Ported: `src/gifti.rs` (PROVENANCE row `gifti`); behaviour in `specs/freesurfer-surfio.md` §107-108.
+`readLabelTable` (2857-3006) lies past the range the orchestrator gave (213-2857) but its callers are
+this reader and `MRISreadGiftiAsMRI` (both in this file), so it is ported here; `gifti_set_DA_value_2D` (213-336) is the
+writers' and comes with them. `include/gifti.h` declares `mrisReadGIFTIdanum` with four parameters
+(no `ctab`), the definition has five; every caller goes through `mrisReadGIFTIfile`, so nothing
+depends on it. The mechanisms behind the defects:
+
+- **FS-395**: line 436 `if (!strcmp(image->version, "1"))`: gifticlib leaves `version` `NULL` when the
+  `GIFTI` element has no `Version` attribute; the crash is in `strcmp` (`__strcmp_evex`, gdb on the
+  probe's case: `<scratch>/D/relay21/one.txt`). FreeSurfer's own gifticlib change (the version
+  compared as a float, `packages/gifti/gifti_io.c` 4238-4247) accepts such a file, so by default the
+  file is read on.
+- **FS-382**: lines 686-687 `while (toskip) gifti_get_meta_value(&coords->meta, "TAG_CMDLINE");`:
+  `toskip` never changes (and the name has no `#<k>`), an endless loop for `NUM_TAG_CMDLINE` above
+  `MAX_CMDS`. Both modes read `TAG_CMDLINE#<toskip>` to `#<n - 1>`, the message's "last 1000".
+- **FS-381**: line 640 `memcpy(mris->vg.fname, stmp, sizeof(mris->vg.fname))` copies 1,024 bytes from
+  gifticlib's `strdup`ed value: past a shorter value it reads the heap; those bytes stay in the
+  name's buffer after its NUL and the surface writers write the buffer whole (fs.core's `CName`).
+- **FS-383**: lines 723-727: `mris->vertices_topology[vertex_index].num++` with the file's number
+  unchecked. **FS-147** applies too (`num` is a `uchar`).
+- **FS-384**: the sparse loops (the shape, label and statistics branches) index `mris->vertices[vno]` with the node index's
+  number unchecked.
+- **FS-385**: line 981 `unsigned int *label_data = (unsigned int *)darray->data;` whatever
+  `darray->datatype` is.
+- **FS-386**: lines 1018-1025 index `mris->ct->entries[table_key]` by the key (not the label's place):
+  right for `readLabelTable`'s table (places by key), outside or `NULL` for a caller's `ctab` or a
+  table `makeColorTable` made from a colour array earlier in the file (places 0 to n - 1).
+- **FS-387**: lines 730-733 `strcmp(coords->coordsys[idx]->dataspace, ...)` and `xformspace`, `NULL`
+  when the file has no `DataSpace` / `TransformedSpace` element.
+- **FS-388**: lines 798-804: `daNum` is not checked against `image->numDA` before
+  `image->darray[numDA]`.
+- **FS-389**: line 2943 `ct->entries[labelkey]` with a negative key reads the allocator's chunk
+  header before the array as an entry pointer.
+- **FS-390**: line 873 compares every non-index array's rows with `mris->nvertices`, so the sparse
+  storage the comments describe (arrays of `num_index_nodes` rows) is refused unless the index lists
+  every vertex. Rule C: no program larmorx serves writes sparse GIFTI files, and the refusal is a
+  clear message.
+- **FS-391**: line 952 `OverlayInfoStruct overlayInfo;` on the stack, `__shapedatatype` written only
+  by `strcpy` when the metadata exists (stack contents otherwise; an overflow past 256 bytes for a
+  longer value).
+- **FS-392**: line 943 `memcpy(shapename, metashapename, sizeof(shapename))` (1,024 bytes) then
+  `basename` (`libgen.h`: POSIX's) and `strrchr` on a buffer with no NUL when the name is 1,024 bytes
+  or more.
+- **FS-393**: line 1108 stores `new float[3]` per annotation; `makeColorTable` (line 390)
+  reads `rgba[3]`. The probe's official runs show heap leftovers there (e.g. `0x00006118`,
+  `0x00007268`); the probe prints no alpha for a colour array's table.
+- **FS-394**: lines 1140-1186: `statInfo` is pushed only when the intent changes, so the last run is
+  never added; each array allocates its own `overlayMRI`, only the run's first is kept in `statInfo`;
+  the dense branch passes `nStatIntentFrame` as the slice, the sparse one as the frame, into a
+  one-frame volume of depth 1 (outside from the run's third array). Rule D: `MRISurfOverlay`'s
+  readers (mris_convert's `--merge-gifti` and the overlay tools) are its only users; measured when
+  they are ported.
+- **Operand order and conversions**: the colour components `floor(c * 256)` are `float` products
+  (`floor` of a `float` exact either way); `(int)` conversions of the values are x86-64's `cvttsd2si`
+  (FS-17's `INT_MIN`).
+
+Observed (relay 21): `gii` at seed 7, 200 cases: 176 compared, 0 differing in either mode (0 without
+notices in the default); see the probe README for the other seeds.

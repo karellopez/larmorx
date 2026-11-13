@@ -701,12 +701,21 @@ fn dump_gii_surface(o: &mut Out, s: &Mris) {
                 match e {
                     None => o.s("-"),
                     Some(e) => {
+                        // a colour array's table: its alpha is memory contents in FreeSurfer
+                        // (FS-393), not printed
+                        let alpha = !e.name.starts_with(b"Unknown_Label_");
                         o.h(Some(&e.name));
-                        for x in [e.ri, e.gi, e.bi, e.ai] {
+                        for x in [e.ri, e.gi, e.bi] {
                             o.i(i64::from(x));
                         }
-                        for x in [e.rf, e.gf, e.bf, e.af] {
+                        if alpha {
+                            o.i(i64::from(e.ai));
+                        }
+                        for x in [e.rf, e.gf, e.bf] {
                             o.f(x);
+                        }
+                        if alpha {
+                            o.f(e.af);
                         }
                     }
                 }

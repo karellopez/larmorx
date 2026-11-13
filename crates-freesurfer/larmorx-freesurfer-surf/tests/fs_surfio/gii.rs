@@ -765,12 +765,7 @@ pub(super) fn gii_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         let mut out = cx.a.clone();
         let mut err = cx.b.clone();
         Some(alloc::alloc(
-            &mut cx.g,
-            &mut out,
-            &mut err,
-            &cx.sg,
-            nkeep as i32,
-            0,
+            &mut cx.g, &mut out, &mut err, &cx.sg, nkeep, 0,
         )?)
     } else {
         None
@@ -788,7 +783,7 @@ pub(super) fn gii_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 continue;
             }
             let name = t.h();
-            let (ri, gi, bi, ai) = (t.i() as i32, t.i() as i32, t.i() as i32, t.i() as i32);
+            let (ri, gi, bi, ai) = (t.i(), t.i(), t.i(), t.i());
             ct.entries.push(Some(Box::new(ColorTableEntry {
                 name,
                 ri,
@@ -809,7 +804,7 @@ pub(super) fn gii_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     let d = Some(dir);
     for _ in 0..nops {
         let n = utf8(t.h());
-        let danum = t.i() as i32;
+        let danum = t.i();
         let flags = t.i();
         let mut out = cx.a.clone();
         let mut err = cx.b.clone();

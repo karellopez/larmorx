@@ -33,7 +33,7 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "48b6b766e91769872cd3b03268c5e30731d504117c3ebb949a50563106f1c1f2";
+const OFFICIAL_SHA256: &str = "5f2d9dfd2c7fe52028b155de819b1f648345198450ace3f87df5ab334ff45118";
 const SKIPPED: usize = 506;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.

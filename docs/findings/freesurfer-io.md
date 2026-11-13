@@ -993,6 +993,15 @@ options (`MRIreadControlPoints`; `MRIfillPoints` from `mri_edit_wm_with_aseg`'s 
   in `MRIfillPoints`, FS-425's short labels).
 - Seed 1's light set with piece 11 (the recorded test, `HEAVY_SEED1` re-measured: [2248, 3687, 4361]):
   4,797 cases, 4,291 identical (51 with memory digits), 0 different, 506 SKIP or VARY
-  (`48b6b766...`), debug 1.1 s; the NaN trap (AArch64's NaN rules) passes in debug (2,857 flips)
+  (`48b6b766...`; with the portable `lrd` names below: `5f2d9dfd...`), debug 1.1 s; the NaN trap (AArch64's NaN rules) passes in debug (2,857 flips)
   and release (2,683). The new case stream met a debug-build overflow in piece 8's generator (a
   wrapped buffer length plus 8): now `wrapping_add`, the value a release build always gave.
+- Windows (CI, 2026-11-14): the recorded hash differed on both Windows runners, and between them,
+  because `mri_read` names a file without `/` by the working directory and a `/` (on Windows
+  `C:\...\fix/f`), which the test's strip (the platform's separator, pieces 4 and 6 only) left in a
+  Bruker check's message: the random temporary folder reached the hash. The strip now removes the
+  fixture's path in every form (`cases::strip_fix`), for every piece. The portable `lrd` cases no
+  longer ask for `w/a.LABEL` beside `w/a.label` (Windows' and macOS' file systems ignore case): the
+  upper-case name is `w/b.LABEL` there; seed 1's light set re-recorded (`5f2d9dfd...`, the same
+  4,291 identical and 506 SKIP or VARY). The test names its first differing case from per-case
+  digests (`tests/fs_io/official_digests.txt`).

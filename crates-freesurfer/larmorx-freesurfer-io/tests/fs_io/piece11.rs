@@ -329,7 +329,7 @@ fn point_toks(g: &mut Gen) -> Vec<String> {
 }
 
 /// One piece-11 case.
-pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
+pub fn generate(g: &mut Gen, kind: &str, portable: bool) -> Vec<String> {
     let mut t = vec![kind.to_string()];
     match kind {
         "lrd" => {
@@ -342,6 +342,11 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
                 "w/a.LABEL",
                 "w/a.label.label",
             ]);
+            let place = if portable && place == "w/a.LABEL" {
+                "w/b.LABEL"
+            } else {
+                place
+            };
             if !g.chance(15) {
                 spec.push(file_entry(place, &label_text(g)));
             }
@@ -370,6 +375,13 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
                 "w/subj",
                 "w/a.LABEL",
             ]);
+            // names that differ from the file's only in case open on Windows' and macOS' file
+            // systems: the portable cases use another name for the upper-case one
+            let asked = if portable && asked == "w/a.LABEL" {
+                "w/b.LABEL"
+            } else {
+                asked
+            };
             t.push(enc(Some(asked.as_bytes())));
         }
         "lwr" => {

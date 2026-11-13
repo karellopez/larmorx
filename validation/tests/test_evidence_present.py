@@ -687,3 +687,47 @@ def test_a_data_panel_line_by_role_for_two_ports():
         "In `fix`, the default, the replica gives AFNI's bytes. No correction by default changes "
         "this call."
     )
+
+
+def test_a_line_chart_by_port_and_larmorx_at_a_commit():
+    """S6: a line chart's marks by port (the old "larmorx" a port's, "replica" a `reproduce`
+    line), every label named, an unknown mark refused; "larmorx `<commit>`" stays the
+    package at a commit in a text."""
+    spec = {
+        "title": "old",
+        "key": [{"label": "AFNI 26.3.05", "mark": "original"},
+                {"label": "larmorx replica, default mode", "mark": "larmorx"},
+                {"label": "larmorx replica, reproduce mode", "mark": "replica"}],
+        "panels": [{"label": "roll (°): original − AFNI", "series": [
+            {"label": "AFNI 26.3.05", "mark": "original", "y": [0.0, 1.0]},
+            {"label": "replica, default", "mark": "larmorx", "y": [0.0, 1.0]},
+            {"label": "replica, reproduce", "mark": "replica", "y": [0.0, 1.0]}],
+            "bands": [{"mark": "band", "lo": [0, 0], "hi": [1, 1]}]}],
+        "note": "Lines that coincide are the same values (larmorx's default mode).",
+        "x": [0, 1],
+    }  # fmt: skip
+    labels = {
+        "AFNI 26.3.05": "AFNI 26.3.05",
+        "larmorx replica, default mode": "replica, fix",
+        "larmorx replica, reproduce mode": "replica, reproduce",
+        "replica, default": "replica, fix",
+        "replica, reproduce": "replica, reproduce",
+    }
+    s = copy.deepcopy(spec)
+    present.lines(AFNI, s, "new title", {"larmorx": "replica", "replica": "replica-reproduce"},
+                  labels, [(r": original\b", ": clean room")])  # fmt: skip
+    assert s["title"] == "new title"
+    assert [k["mark"] for k in s["key"]] == ["original", "replica", "replica-reproduce"]
+    assert [x["mark"] for x in s["panels"][0]["series"]] == [
+        "original", "replica", "replica-reproduce"]  # fmt: skip
+    assert s["panels"][0]["label"] == "roll (°): clean room − AFNI"
+    assert s["panels"][0]["series"][1]["label"] == "replica, fix"
+    assert "default mode" not in s["note"]
+    with pytest.raises(ValueError, match="marks without a port"):
+        present.lines(AFNI, copy.deepcopy(spec), "t", {}, labels)
+    with pytest.raises(KeyError):
+        present.lines(AFNI, copy.deepcopy(spec), "t", {"larmorx": "replica"}, {})
+    assert present.text(AFNI, "seed `s`, larmorx `6d4f2edb8992`, 4 jobs") == (
+        "seed `s`, larmorx `6d4f2edb8992`, 4 jobs"
+    )
+    assert present.text(AFNI, "larmorx refuses it") == "The replica refuses it"

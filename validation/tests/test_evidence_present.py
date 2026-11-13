@@ -1362,3 +1362,125 @@ def test_t2smaps_check_reads_tedanas_files_with_its_empty_figures_folder(tmp_pat
     (entry / "tedana" / "out" / "figures").mkdir()
     tedana_t2smap._check_tedana(E, tmp_path / "other")
     assert seen[-1][1] is True
+
+
+def _sdc10_like() -> dict:
+    """sdcflows' SDC-10 example as its module exports it: the exact field a panel of the role
+    ``reference``, the original and the replica's fix compared with it, fMRIPrep's file no panel."""
+
+    def panel(i, role, label, sub=""):
+        return {"id": i, "role": role, "label": label, "sub": sub, "arrays": {"all": {"blob": i}}}
+
+    def diff(i, a, b, kind, verdict, label, rl, reason=""):
+        return {
+            "id": i, "a": a, "b": b, "kind": kind, "label": label, "role_label": rl,
+            "metrics": {"m": {"identical": verdict == "bit-identical", "max_abs": 0.5}},
+            "verdict": verdict, "reason": reason,
+        }  # fmt: skip
+
+    return {
+        "id": "sdc10",
+        "title": "SDC-10",
+        "summary": "sdcflows and larmorx on an oblique target.",
+        "facts": [{"label": "Programs", "text": "sdcflows 2.17.1; larmorx at commit `abc`"}],
+        "metrics_note": "",
+        "provenance": [],
+        "panels": [
+            panel("bref", "input", "BOLD reference"),
+            panel("exact", "reference", "The exact field where the transform puts the target",
+                  "every voxel's B-spline weights at its registered position"),
+            panel("sdcflows", "original", "sdcflows 2.17.1, B0FieldTransform.fit", "approx=True"),
+            panel("larmorx", "larmorx", "larmorx (port), 1 thread", "reproduce mode"),
+            panel("larmorx-fix", "larmorx", "larmorx (port), 1 thread", "default mode"),
+        ],
+        "diffs": [
+            diff("lx-sdc", "larmorx", "sdcflows", "main", "bit-identical",
+                 "larmorx − sdcflows 2.17.1", "larmorx against the original"),
+            diff("lx-fmriprep", "larmorx", "fmriprep", "fmriprep", "bit-identical",
+                 "larmorx − fMRIPrep 25.2.6's own files", "larmorx against fMRIPrep"),
+            diff("sdc-exact", "sdcflows", "exact", "reference", None,
+                 "sdcflows − the exact field", "against the reference"),
+            diff("fix-exact", "larmorx-fix", "exact", "reference", None,
+                 "larmorx's default − the exact field", "against the reference"),
+            diff("odd", "sdcflows", "sdcflows", "variability", None,
+                 "sdcflows: the second run − the first", "the original against itself"),
+        ],
+        "default": {"panels": ["bref", "exact", "sdcflows", "larmorx-fix"],
+                    "diffs": ["sdc-exact", "fix-exact"]},
+    }  # fmt: skip
+
+
+def test_a_known_answer_split_groups_and_comparisons_the_page_names():
+    """S13: a panel of the known answer (sdcflows' exact field, role ``reference``) is the input's
+    port and is compared as "the known answer"; ``split`` gives each target of a port its own
+    group; a comparison the page names itself is not read by its shape (``odd``'s label has none
+    the presenter knows); fMRIPrep's file without a panel is fMRIPrep's output; a page of one port
+    keeps "larmorx" as its port in the example's texts."""
+    page = present.Page("sdcflows", "B0FieldTransform.fit", "2.17.1", versions_in_labels=True)
+    ex = present.example(
+        page, _sdc10_like(), shows="The replica gives sdcflows' field.", verdicts=["lx-sdc"],
+        runs={"fmriprep": "fmriprep"}, known=("exact",), split=True,
+        diffs={"odd": ("sdcflows B0FieldTransform.fit 2.17.1: the second run − the first",
+                       "the original against itself: two runs of the same command")},
+    )  # fmt: skip
+    ports = {p["id"]: p["port"] for p in ex["panels"]}
+    assert ports["exact"] == "input" and ports["sdcflows"] == "original"
+    assert ex["order"]["panels"][:2] == ["bref", "exact"]
+    roles = {d["id"]: d["role_label"] for d in ex["diffs"]}
+    assert roles["sdc-exact"] == "the original against the known answer"
+    assert roles["fix-exact"] == "the replica against the known answer"
+    assert roles["lx-fmriprep"] == "the replica against fMRIPrep's output"
+    assert roles["odd"] == "the original against itself: two runs of the same command"
+    titles = [t for t, _ in ex["order"]["groups"]]
+    assert titles == [
+        "The original against the known answer",
+        "The original against itself: the yardstick",
+        "The replica against the original",
+        "The replica against fMRIPrep's output",
+        "The replica against the known answer",
+    ]
+    assert ex["facts"][0]["text"] == "sdcflows 2.17.1; the replica at commit `abc`"
+    with pytest.raises(ValueError, match="what changes"):
+        present.example(page, _sdc10_like(), shows="x", verdicts=["lx-sdc"],
+                        runs={"fmriprep": "fmriprep"}, known=("exact",))  # fmt: skip
+    with pytest.raises(ValueError, match="the known answer sdcflows is a original panel"):
+        present.example(page, _sdc10_like(), shows="x", verdicts=["lx-sdc"], known=("sdcflows",))
+
+
+def test_sdcflows_pages_say_what_their_examples_show_from_their_reasons():
+    """S13: the sdcflows pages' "What this shows" lines take their numbers from the examples'
+    own reasons and refuse a verdict or a reason they do not say."""
+    from larmorx_validation.evidence import sdcflows_estimation as est
+    from larmorx_validation.evidence import sdcflows_fieldmap as fm
+
+    def d(i: str, verdict: str | None, reason: str) -> dict:
+        return {"id": i, "verdict": verdict, "reason": reason}
+
+    ex = {"id": "sdc10-ds002603", "diffs": [
+        d("lx-sdc", "bit-identical", "In its reproduce mode larmorx gives sdcflows' field."),
+        d("fix-lx", "d13", "SDC-10, corrected by default."),
+        d("sdc-exact", None, "sdcflows' field departs from the exact one by 8.48 Hz RMS (median "
+          "2.82, largest 82.9 Hz) in the 54,383 voxels of the BOLD brain mask: ..."),
+        d("fix-exact", None, "larmorx's default gives the exact field: 5.2e-06 Hz RMS, largest "
+          "9.2e-05 Hz, in the brain mask."),
+        d("newest-shared", None, "The version step: the same values with both releases."),
+    ]}  # fmt: skip
+    line, verdicts = fm.SHOWS["sdc10-ds002603"](ex)
+    assert "by 8.48 Hz RMS in the 54,383 voxels of the BOLD brain mask (82.9 Hz at most)" in line
+    assert "within 9.2 × 10⁻⁵ Hz (5.2 × 10⁻⁶ Hz RMS)" in line
+    assert verdicts == ["lx-sdc"]
+    ex["diffs"][1]["verdict"] = "bit-identical"
+    with pytest.raises(ValueError, match="fix-lx is bit-identical, not d13"):
+        fm.SHOWS["sdc10-ds002603"](ex)
+    ex = {"id": "epi-mask-ds003592", "diffs": [
+        d("lx-sdc", "bit-identical", "LARMORX's reproduce mode gives sdcflows' mask."),
+        d("fix-lx", "d13", "The default corrects SciPy's watershed (SCI-13: ...; SCI-14: ...) and "
+          "names it. sdcflows' mask holds 12,843 voxels (Dice 0.464 with fMRIPrep's brain mask), "
+          "the corrected one 51,162 (Dice 0.904): rule A."),
+    ]}  # fmt: skip
+    line, _ = est.SHOWS["epi-mask-ds003592"](ex)
+    assert "it corrects SciPy's watershed (SCI-13 and SCI-14)" in line
+    assert "from 12,843 to 51,162 voxels" in line and "from 0.464 to 0.904" in line
+    ex["diffs"][1]["reason"] = "The default corrects SciPy's watershed."
+    with pytest.raises(ValueError, match="fix-lx's reason without"):
+        est.SHOWS["epi-mask-ds003592"](ex)

@@ -1855,6 +1855,7 @@ def export(ctx: core.Context) -> dict:
 
 # ---------------------------------------------------------------------- the presentation
 
+
 def _page(program: str = ""):
     from larmorx_validation.evidence import present as present_
 
@@ -2020,10 +2021,16 @@ DIFFS = {
 }  # fmt: skip
 #: The panels the shapes name otherwise: the SDC-10 example's ports name their mode in the label.
 SDC10_PANELS = {
-    "larmorx": ("replica", "larmorx, Apache-2.0 · reproduce · sdcflows' result · against "
-                "sdcflows B0FieldTransform.fit 2.17.1"),
-    "larmorx-fix": ("replica", "larmorx, Apache-2.0 · fix (the default), SDC-10 corrected: the "
-                    "grid built and sampled where the transform puts the target"),
+    "larmorx": (
+        "replica",
+        "larmorx, Apache-2.0 · reproduce · sdcflows' result · against "
+        "sdcflows B0FieldTransform.fit 2.17.1",
+    ),
+    "larmorx-fix": (
+        "replica",
+        "larmorx, Apache-2.0 · fix (the default), SDC-10 corrected: the "
+        "grid built and sampled where the transform puts the target",
+    ),
 }
 #: The record's threshold, in each example's metrics note (the record's own words).
 THRESHOLD = (

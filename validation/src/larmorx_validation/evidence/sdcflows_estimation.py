@@ -42,6 +42,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence.sdcflows_fieldmap import _NUMBER, _diff, _found, _want
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -2148,8 +2149,6 @@ def export(ctx: core.Context) -> dict:
 
 # ---------------------------------------------------------------------- the presentation
 
-from larmorx_validation.evidence.sdcflows_fieldmap import _NUMBER, _diff, _found, _want
-
 TRIAL_DATE = TRIALS[0][:10]
 
 
@@ -2375,8 +2374,7 @@ CATEGORIES = {
 ORIGINALS = "sdcflows 2.17.1, niworkflows 1.15.4, SciPy, scikit-image and numpy"
 #: The tables' titles by the guide's pattern.
 TABLE_TITLES = {
-    "records": "The replica's records against the originals: " + ORIGINALS + " (every case "
-    "passes)",
+    "records": "The replica's records against the originals: " + ORIGINALS + " (every case passes)",
     "app-runs": "sdcflows' BIDS app whole on the eight datasets of its own runs, the replica "
     "against the original: sdcflows 2.17.1",
     "stage": "fMRIPrep's field-map derivatives, the replica's stage run as fMRIPrep ran it against "
@@ -2426,8 +2424,9 @@ def _labels(ex: dict) -> None:
             p["sub"] = re.sub(r"\bthe replicas and ports\b", "the replicas", p["sub"])
     for d in ex["diffs"]:
         d["label"] = re.sub(r"(?<![\w`/-])LARMORX\b", "larmorx", d["label"])
-        d["label"] = re.sub(r"\bfMRIPrep \d[\d.]*'s own (files?)\b", r"fMRIPrep's own \1",
-                            d["label"])
+        d["label"] = re.sub(
+            r"\bfMRIPrep \d[\d.]*'s own (files?)\b", r"fMRIPrep's own \1", d["label"]
+        )
 
 
 def present(doc: dict) -> dict:
@@ -2441,8 +2440,9 @@ def present(doc: dict) -> dict:
         program, software, version = PAGES.get(ex["id"], ("", "sdcflows", "2.17.1"))
         own = _page(program, software, version)
         _labels(ex)
-        present_.example(own, ex, shows=line, verdicts=verdicts, diffs=DIFFS.get(ex["id"]),
-                         split=True)
+        present_.example(
+            own, ex, shows=line, verdicts=verdicts, diffs=DIFFS.get(ex["id"]), split=True
+        )
         note = ex.get("metrics_note") or ""
         if THRESHOLD in note:
             raise ValueError(f"{ex['id']}: the threshold is in its note already")

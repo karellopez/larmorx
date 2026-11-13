@@ -33,6 +33,8 @@ use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 
 #[path = "cfile.rs"]
 mod cfile;
+#[path = "fnam.rs"]
+mod fnam;
 #[path = "life.rs"]
 mod life;
 #[path = "mprop.rs"]
@@ -121,11 +123,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 34] = [
+const COMMANDS: [&str; 35] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
-    "sread", "stl", "tri",
+    "sread", "stl", "tri", "fnam",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1003,6 +1005,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "sread" => sread::sread_tokens(&mut t, &mut g),
             "stl" => stl::stl_tokens(&mut t, &mut g),
             "tri" => tri::tri_tokens(&mut t, &mut g),
+            "fnam" => fnam::fnam_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2662,6 +2665,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "sread" => sread::sread_case(cx, t, o)?,
         "stl" => stl::stl_case(cx, t, o)?,
         "tri" => tri::tri_case(cx, t, o)?,
+        "fnam" => fnam::fnam_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {

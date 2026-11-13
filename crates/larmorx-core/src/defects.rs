@@ -1515,6 +1515,10 @@ defects! {
         "the quadrangle surface reader drops both triangles of a quadrangle whose first triangle (by the split it chooses) has two equal vertices: a single triangle the quadrangle writer stored as v0 v1 v1 v2 is lost on reading for about half of the vertex pairs";
     FS_354 = "FS-354", "FreeSurfer", true,
         "the binary triangle surface readers given a creator's line of more than 199 bytes (a long user name or creation date in the file's first line) read its remaining bytes as the vertex and face counts: the file's surface cannot be read";
+    FS_355 = "FS-355", "FreeSurfer", true,
+        "the surface library's annotation reader, given an annotation name without a folder that starts with the surface's hemisphere letters (lh.aparc.annot for a left surface), adds the hemisphere again (label/lh.lh.aparc.annot), so it does not find the file the annotation writer wrote for the same name; it takes a name as naming the hemisphere only when the name is the two letters alone, in any case";
+    FS_356 = "FS-356", "FreeSurfer", true,
+        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

@@ -66,6 +66,7 @@ SKIP: tuple[str, ...] = (
     "FS-346",
     "FS-352",
     "FS-354",
+    "FS-356",
 )
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 

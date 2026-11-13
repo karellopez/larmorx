@@ -1926,6 +1926,55 @@ void dump_tri_surface(MRIS *s, const std::vector<int> &nf)
   for (int i = 0; i < s->ncmds && i < MAX_CMDS; i++) oh(s->cmdlines[i]);
 }
 
+// relay 15: the surface library's file names: MRISfileNameType and the curvature and annotation
+// name builders (MRISwriteCurvature_getfilename, MRISreadCurvatureFile_getfilename,
+// MRISwriteAnnotation_getfilename, MRISreadAnnotation_getfilename, with and without a surface),
+// in an empty work folder with the folders d, d/s and label: the environment (a mask: FS_POSIX,
+// FS_GII .gii, FS_GII x), the case's input files, the surface's hemisphere and name, 1 to 4
+// operations; each operation's answer and the name it chose (a 8,192-byte buffer)
+void fnam_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  mkdir("d/s", 0700);
+  mkdir("label", 0700);
+  int env = geti();
+  if (env & 1) setenv("FS_POSIX", "1", 1);
+  if (env & 2) setenv("FS_GII", ".gii", 1);
+  if (env & 4) setenv("FS_GII", "x", 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  MRIS *m = MRISalloc(0, 0);
+  m->hemisphere = geti();
+  std::string sf = geth();
+  if (sf.size() >= STRLEN) fail("a surface name longer than the surface's buffer");
+  strcpy(m->fname, sf.c_str());
+  int nops = geti();
+  static char buf[8192];
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    const char *nm = name_tok();
+    memset(buf, 0, sizeof buf);
+    if (op == "t") { oi(MRISfileNameType(nm)); continue; }
+    if (op == "wc") oi(MRISwriteCurvature_getfilename(m, nm, buf));
+    else if (op == "rc") oi(MRISreadCurvatureFile_getfilename(m, nm, buf));
+    else if (op == "wa") oi(MRISwriteAnnotation_getfilename(m, nm, buf));
+    else if (op == "ra") oi(MRISreadAnnotation_getfilename(m, nm, buf));
+    else if (op == "rn") oi(MRISreadAnnotation_getfilename(NULL, nm, buf));
+    else fail("fnam op");
+    oh(buf);
+  }
+}
+
 void tri_case()
 {
   mkdir(workdir.c_str(), 0700);
@@ -2227,6 +2276,8 @@ void run_case()
     stl_case();
   } else if (cmd == "tri") {
     tri_case();
+  } else if (cmd == "fnam") {
+    fnam_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

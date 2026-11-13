@@ -1057,7 +1057,37 @@ class Gen:
             a = self.mat(r, r.randint(1, 4), r.randint(1, 4), typ, special=0.2)
             L += [f"mwriteasc {a}", f"mwritebin {a}", f"mwritetxt {xs('w.txt')} {a}"]
         L.append(f"mwritetxt {xs('no/such/w.txt')} {self.mat(r, 2, 2)}")
-        return [Batch("mfiles", "mfiles", L), self.mfiles_cut()]
+        return [Batch("mfiles", "mfiles", L), self.mfiles_cut(), self.mfiles_end()]
+
+    @staticmethod
+    def mfiles_end() -> Batch:
+        """§18.1's errno at the end of the input (fixed cases): text and ASCII matrix files whose
+        last number overflows or underflows at the very end of the file or just before it, real and
+        complex, with and without the white space after it."""
+        asc = [
+            "1 1 1\n1e40",
+            "1 1 1\n1e40\n",
+            "1 1 1\n1e40 ",
+            "1 1 1\n-1e40",
+            "1 1 1\n1e-50",
+            "1 1 2\n1 1e40",
+            "1 1 2\n1e40 1",
+            "1 1 2\n1e-50 1e40",
+            "1 2 1\n1e40\n1",
+            "2 1 1\n1e40",
+            "2 1 1\n1e40 ",
+            "2 1 1\n5",
+            "2 1 1\n1e-50",
+            "2 1 1\n1e-50 2",
+            "2 1 1\n1e40 1e-50",
+            "2 1 2\n1e40 1 1e-50",
+            "2 1 2\n1 2 3 1e40",
+            "2 1 2\n1 2 3 4",
+        ]
+        txt = ["1e40", "1 1e40", "1e-50\n", "1 2\n3 1e40", "1e40 2", "1e-50 1e40"]
+        L = [f"mreadasc {xs(a)} new" for a in asc]
+        L += [f"mreadtxt {xs('fs-maths-probe.txt')} {xs(t)}" for t in txt]
+        return Batch("mfiles", "mfiles-end", L)
 
     @staticmethod
     def mfiles_cut() -> Batch:

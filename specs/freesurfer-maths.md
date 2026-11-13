@@ -1115,9 +1115,27 @@ to 24 bits with an unbounded exponent, below 2⁻¹²⁶. A number's mismatching
 `%d`: white space, an optional sign, decimal digits (none: a matching failure); the value as a 64-bit
 `long` (beyond its range: its limit and `ERANGE`), kept to its low 32 bits.
 
-`errno` at the end of the input: a conversion that meets it before its item sets `errno` to 0, unless
-an earlier item of the same call ended at the end of the input; directives that meet it change
-nothing.
+`errno` at the end of the input (one call): the first time the call meets the end of its input, it
+keeps the value `errno` has at that moment, and every later attempt of the same call to read (the
+white space a conversion skips before its item, the item, white space or a character the format
+holds) sets `errno` back to that kept value. An item meets the end by looking past its last
+character (a number does; `inf` does, it may go on as `infinity`; a complete `nan` or `infinity`
+does not), and it does so **before** its own `ERANGE`: the kept value is the one from before the
+item's overflow or underflow. When the first meeting is a conversion's skip of the white space
+before its item, the kept value is 0 (so `errno` becomes 0, the input failure). White space in the
+format just before a conversion reads nothing itself (the conversion skips it); white space at the
+format's end does read. A call whose only reading meets the end at once (`fscanf(fp, "\n")` at the
+end of a file) leaves `errno` as it was; each call starts afresh. So, with `errno` 7 before the
+call: `sscanf("1e40", "%f")` leaves 34, `"%f "` and `"%f %f"` leave 7 (the overflow forgotten),
+`sscanf("1e40 ", "%f %f")` 0, `sscanf("1 2 ", "%f %f %f")` 0, `sscanf("1e-50 3", "%f %f %f")` 34
+(`3` met the end after the underflow), `sscanf("-1877   1e40", "%f %f %f %f")` 7; `%d`'s `ERANGE`
+alike. (**(observed)**: `models.py scanf` beside the probe, 9,008 calls of the C library's `sscanf`
+with random numbers, words and white space and formats of `%f`, `%d`, `%s` and white space, every
+`errno` as this rule; the open `validation/investigations/glibc-scanf-probe/`, the same rule as
+`specs/freesurfer-surfio.md` §56; the probe's fixed batch `mfiles-end`: the ASCII read's element
+format ends with white space, so a last element that overflows at the very end of the file leaves
+the `errno` from before it, 0 in the probe, while `1e40` followed by a new line or a blank leaves
+34; the text read's one `%f` a call leaves 34.)
 
 ### 18.2 Reading and writing
 
@@ -1288,16 +1306,19 @@ it, and again from the cache:
 | `nr` | 14 | 5 | 0 | 0 | 0 | `ba8b8aea531d281110a5a52a4a2455fe313fc4e8b3a5a4ce6b1e1cc19eaad69d` |
 | `eigen` | 17.1 to 17.3 | 1,460 | 252 | 0 | 153 | `c3ddceff612985227ad6d69acf56662aaa0584974c847c827005539ce38b17f3` |
 | `svd` | 17.4, 17.5 | 2,280 | 354 | 0 | 142 | `af777aba4138e1ab5d48ba2ee4e4cc8477a2f3d0abc1d9334c05d1a10c40aad7` |
-| `mfiles` | 18 | 699 | 28 | 0 | 1 | `ac865eb3e87ec634b6e1580d41005a8da591aff62d674f3463bf984a0b38f157` |
+| `mfiles` | 18 | 723 | 28 | 0 | 1 | `8f0ce51069988159cef0214e0f1d893466876b02e7c25233935648a8668c1886` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 27,400 | 1,373 | 41 | 299 | |
+| all | | 27,424 | 1,373 | 41 | 299 | |
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
 their three hashes are from then (through the cache, from it and without it, identical, every line
 classified alike), the others from the first runs. The group `affine` gained the fixed batch
 `affine-nan` (§3's operand order) on 2026-11-13 (the spec finisher's relay 5): its hash from then
-(cold, warm and without the cache identical; the probe as its own candidate identical in both modes). `mfiles`' one `TIMEOUT` is a memory line (an empty
+(cold, warm and without the cache identical; the probe as its own candidate identical in both modes).
+The group `mfiles` gained the fixed batch `mfiles-end` (§18.1's `errno` at the end of the input, 24
+calls) the same day: its hash from then (cold, warm and without the cache identical; the probe as its
+own candidate without an unexplained line in both modes). `mfiles`' one `TIMEOUT` is a memory line (an empty
 file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
 
 ### 23.3 The comparison

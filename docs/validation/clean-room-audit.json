@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-confounds",
+ "dossier": "2026-11-13-freesurfer-batch-8",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 390243,
-  "agents": 404,
+  "accesses": 397480,
+  "agents": 414,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 585,
-  "archived_files": 585,
+  "archive_checksums_matched": 609,
+  "archived_files": 609,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -207,6 +207,10 @@
     "files": 22,
     "sha256": "d20e0b06f397b65362f35631d5de63401e138de2a0084f9b93b736f9c39092c5"
    },
+   "2026-11-13-session-transcripts-confounds-fixci": {
+    "files": 34,
+    "sha256": "71732783988b11556a8b19e8ad72cd911b22646a6be36ea9789fc43ffe4654e7"
+   },
    "2026-11-13-session-transcripts-freesurfer-batch-3": {
     "files": 15,
     "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
@@ -227,6 +231,10 @@
     "files": 31,
     "sha256": "229b613b3729b39b0651f2e3ab73d28ff09148cdd004a2627b59ae8f09f73e79"
    },
+   "2026-11-13-session-transcripts-freesurfer-batch-8": {
+    "files": 23,
+    "sha256": "705e9413729c08575488bb543ec79d85d09ad516e6ca080f0f0583c151439b6d"
+   },
    "2026-11-13-session-transcripts-freesurfer-cleanroom-1-relay-1": {
     "files": 43,
     "sha256": "d9deda02c9c0a21b4c19d92cfbec7330ef631d30857aa81e49c22bacf3c1580a"
@@ -236,30 +244,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3734,
-  "distinct_transcripts": 408,
+  "commits_printed": 3821,
+  "distinct_transcripts": 418,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 301,
+   "agents_without_worktree": 310,
    "bad_lines": 0,
-   "calls_without_result": 68,
+   "calls_without_result": 67,
    "compaction_parent_missing": 9,
-   "compactions": 78,
-   "refused_calls": 1681,
+   "compactions": 79,
+   "refused_calls": 1688,
    "refused_calls_restricted_accesses": 741,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 8642
+   "unresolved_paths": 8782
   },
-  "last_record": "2026-11-13 10:56 UTC",
-  "live_files": 408,
-  "live_files_also_archived": 404,
+  "last_record": "2026-11-13 12:47 UTC",
+  "live_files": 418,
+  "live_files_also_archived": 413,
   "sessions": 4,
-  "tool_calls": 111682,
+  "tool_calls": 113523,
   "tool_calls_by_tool": [
    [
     "Agent",
-    406
+    416
    ],
    [
     "Artifact",
@@ -271,7 +279,7 @@
    ],
    [
     "Bash",
-    95956
+    97666
    ],
    [
     "CronCreate",
@@ -283,7 +291,7 @@
    ],
    [
     "Edit",
-    4490
+    4498
    ],
    [
     "EnterWorktree",
@@ -295,7 +303,7 @@
    ],
    [
     "Read",
-    2818
+    2852
    ],
    [
     "ReadNotifications",
@@ -303,7 +311,7 @@
    ],
    [
     "SendMessage",
-    130
+    134
    ],
    [
     "SendUserFile",
@@ -315,7 +323,7 @@
    ],
    [
     "SubagentHandback",
-    430
+    443
    ],
    [
     "TaskOutput",
@@ -323,11 +331,11 @@
    ],
    [
     "TaskStop",
-    301
+    304
    ],
    [
     "ToolSearch",
-    231
+    233
    ],
    [
     "WebFetch",
@@ -339,12 +347,12 @@
    ],
    [
     "Write",
-    6585
+    6642
    ]
   ],
-  "transcript_bytes": 11968494949,
-  "transcript_files": 993,
-  "unique_paths": 79870
+  "transcript_bytes": 12447934010,
+  "transcript_files": 1027,
+  "unique_paths": 81105
  },
  "levels": [
   [
@@ -425,7 +433,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "1c970b45"
+  "verdicts_repository": "00af405c"
  },
  "overview": {
   "agents_by_role": [
@@ -435,11 +443,11 @@
    ],
    [
     "clean-room implementer",
-    90
+    92
    ],
    [
     "documentation",
-    32
+    33
    ],
    [
     "integration",
@@ -447,15 +455,15 @@
    ],
    [
     "other",
-    128
+    129
    ],
    [
     "replica author",
-    122
+    127
    ],
    [
     "spec writer",
-    27
+    28
    ]
   ],
   "attributed_by": [
@@ -483,11 +491,11 @@
     3
    ]
   ],
-  "implementers": 90,
+  "implementers": 92,
   "register_restricted_lines": 1489,
   "single_file_scopes": {
-   "checked": 70,
-   "shown": 3
+   "checked": 72,
+   "shown": 5
   },
   "unattributed": 0
  },
@@ -4626,6 +4634,77 @@
    ],
    "shown": "the headings of the register's restricted sections (titles of FSL-01 to FSL-17 and of the restricted sections), printed while locating FSL-11; no section body",
    "time": "2026-11-11 16:32 UTC"
+  },
+  {
+   "agent": "ae9c2a891819fe812",
+   "declared": "partly",
+   "description": "FreeSurfer clean room 2 relay 2 (fs.core)",
+   "files": [
+    "validation/probes/fsl-mcflirt-affine-trace/README.md"
+   ],
+   "judged": true,
+   "judgement": "no contamination of substance: another family's probe descriptions, read for the AArch64 NaN emulation the brief named (nan_trap.c and the README's build line allowed); the README rows beyond the build line undeclared",
+   "kind": "restricted material",
+   "line": 264,
+   "nature": "FSL's family (mcflirt's replica probes), not the tool's; the folder name fs-vnl without content",
+   "register": null,
+   "rules": [
+    [
+     "R14 content (FSL)",
+     1
+    ]
+   ],
+   "shown": "two rows of FSL's mcflirt probe folder's README (validation/probes/fsl-mcflirt-affine-trace/: nan_trap.c's row, which names the FreeSurfer probe folder fs-vnl in one clause, and the row of FSL's decompose_aff and rotmat2euler on NaN affines), printed by a grep for nan_trap's build line",
+   "time": "2026-11-13 11:49 UTC"
+  },
+  {
+   "agent": "ae9c2a891819fe812",
+   "declared": "partly",
+   "description": "FreeSurfer clean room 2 relay 2 (fs.core)",
+   "files": [
+    "validation/probes/fsl-mcflirt-affine-trace/README.md"
+   ],
+   "judged": true,
+   "judgement": "no contamination of substance: the same search as line 264, another family's probe descriptions only",
+   "kind": "a search of one restricted file",
+   "line": 267,
+   "nature": "FSL's family, not the tool's; a findings file's section title without its content",
+   "register": null,
+   "rules": [
+    [
+     "R14: None lines of the file",
+     1
+    ]
+   ],
+   "shown": "five rows of the same README (cost_trace.cc's row, a pointer to docs/findings/fsl-mcflirt.md's NaN section by its title, nan_trap.c's and nan_sites.py's rows, the build command's line), printed by a grep for the build line",
+   "time": "2026-11-13 11:50 UTC"
+  },
+  {
+   "agent": "ae9c2a891819fe812",
+   "declared": "yes",
+   "description": "FreeSurfer clean room 2 relay 2 (fs.core)",
+   "files": [
+    "validation/probes/fsl-mcflirt-affine-trace/build.sh",
+    "validation/probes/fsl-mcflirt-affine-trace/nan_trap.c"
+   ],
+   "judged": true,
+   "judgement": "no contamination: nan_trap.c is allowed by the brief, the build line is a compiler command, and neither holds FreeSurfer's or FSL's code",
+   "kind": "restricted material",
+   "line": 271,
+   "nature": "generic C written for larmorx (Apache-2.0, no FSL code) in FSL's probe folder; the build line declared by the implementer as one line beyond the brief",
+   "register": null,
+   "rules": [
+    [
+     "R14 content (FSL)",
+     2
+    ],
+    [
+     "R14: None lines of the file",
+     1
+    ]
+   ],
+   "shown": "nan_trap.c's first 40 lines (its header comment, includes and static state) and build.sh's gcc line that builds libnan_trap.so",
+   "time": "2026-11-13 11:50 UTC"
   }
  ],
  "tools": [

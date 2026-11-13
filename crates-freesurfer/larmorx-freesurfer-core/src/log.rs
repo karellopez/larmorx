@@ -22,7 +22,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::FS_01;
+use larmorx_core::defects::{FS_01, FS_263};
 
 use crate::diag::DIAG_VERBOSE;
 use crate::globals::Globals;
@@ -68,11 +68,29 @@ impl Fatal {
     }
 }
 
-/// `fs::detail::errorExit(code)`: with exceptions off, `exit(code)`; with them on, `throw code`,
-/// except for code 0, which neither throws nor exits (`Ok`: the program goes on).
-pub fn error_exit_code(g: &Globals, code: i32) -> Result<(), Fatal> {
+/// libstdc++'s line when an exception leaves a function that may not throw (`std::terminate`'s
+/// verbose handler, for an `int`).
+pub const TERMINATE_INT: &str = "terminate called after throwing an instance of 'int'\n";
+
+/// `fs::detail::errorExit(code)` as `fs::fatal`'s destructor (its only caller) calls it: with
+/// exceptions off, `exit(code)`; with them on, `throw code`, except for code 0, which neither
+/// throws nor exits (`Ok`: the program goes on). FS-263: thrown from a destructor, the exception
+/// never reaches the program's handler: C++ terminates the program ([`TERMINATE_INT`] on standard
+/// error, then `abort`, status 134). By default the code reaches the caller ([`Fatal::Throw`]);
+/// `reproduce` writes the line and ends with 134 ([`Fatal::Exit`]).
+pub fn error_exit_code(g: &mut Globals, err: &mut dyn Write, code: i32) -> Result<(), Fatal> {
     if g.exceptions {
         if code != 0 {
+            g.notices.add(
+                &FS_263,
+                format!(
+                    "a fatal error with code {code} and exceptions on: FreeSurfer aborts (status 134)"
+                ),
+            );
+            if g.notices.reproduce() {
+                let _ = err.write_all(TERMINATE_INT.as_bytes());
+                return Err(Fatal::Exit(134));
+            }
             return Err(Fatal::Throw(code));
         }
         Ok(())
@@ -111,9 +129,9 @@ fn error_bytes(g: &Globals, err: &mut dyn Write, message: &[u8]) {
 }
 
 /// `fs::fatal(code) << message`: [`error`]'s output, then [`error_exit_code`].
-pub fn fatal(g: &Globals, err: &mut dyn Write, code: i32, message: &str) -> Result<(), Fatal> {
+pub fn fatal(g: &mut Globals, err: &mut dyn Write, code: i32, message: &str) -> Result<(), Fatal> {
     error_bytes(g, err, message.as_bytes());
-    error_exit_code(g, code)
+    error_exit_code(g, err, code)
 }
 
 /// `fs::warning() << message`: `warning: <message>\n` on standard error (not in the log).
@@ -168,7 +186,7 @@ pub fn error_exit(
     }
     let bytes = c_message(g, message);
     error_bytes(g, err, &bytes);
-    error_exit_code(g, errcode)
+    error_exit_code(g, err, errcode)
 }
 
 /// glibc 2.35's `strerror` text for the `errno` values FreeSurfer's I/O meets (Linux's codes;
@@ -310,10 +328,36 @@ mod tests {
         assert_eq!(Fatal::Exit(-4).status(), 252);
         assert_eq!(Fatal::Exit(-1).status(), 255);
         g.exceptions = true;
-        assert_eq!(fatal(&g, &mut e, 3, "m"), Err(Fatal::Throw(3)));
-        assert_eq!(fatal(&g, &mut e, 0, "m"), Ok(()));
+        assert_eq!(fatal(&mut g, &mut e, 3, "m"), Err(Fatal::Throw(3)));
+        assert!(g.notices.contains(&FS_263));
+        assert_eq!(fatal(&mut g, &mut e, 0, "m"), Ok(()));
         g.exceptions = false;
-        assert_eq!(fatal(&g, &mut e, 0, "m"), Err(Fatal::Exit(0)));
+        assert_eq!(fatal(&mut g, &mut e, 0, "m"), Err(Fatal::Exit(0)));
+    }
+
+    #[test]
+    fn fs263_reproduce_aborts() {
+        // the official build (the unit oracle's fs_core_probe, 2026-11-13): `fatal 7 f7 throw`
+        // prints `error: f7` and libstdc++'s terminate line, status 134; code 0 returns
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        g.exceptions = true;
+        let mut e = Vec::new();
+        assert_eq!(fatal(&mut g, &mut e, 7, "f7"), Err(Fatal::Exit(134)));
+        assert_eq!(Fatal::Exit(134).status(), 134);
+        assert_eq!(
+            e,
+            b"error: f7\nterminate called after throwing an instance of 'int'\n"
+        );
+        let mut e = Vec::new();
+        g.errno = 2;
+        assert_eq!(error_exit(&mut g, &mut e, 3, "bad"), Err(Fatal::Exit(134)));
+        assert_eq!(
+            e,
+            b"error: No such file or directory\nerror: bad\0\nterminate called after throwing an instance of 'int'\n"
+        );
+        let mut e = Vec::new();
+        assert_eq!(fatal(&mut g, &mut e, 0, "f7"), Ok(()));
+        assert_eq!(e, b"error: f7\n");
     }
 
     #[test]

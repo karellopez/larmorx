@@ -102,6 +102,18 @@ under them: [confounds-blas.md](confounds-blas.md), [confounds-numpy.md](confoun
 - **A larmorx mistake fixed on the way** (no ID): the absolute output names larmorx gives a program that
   runs in this process (nipype writes them relative to the node's folder, one word) were unquoted, so a
   node folder with a blank broke larmorx in both modes where nipype runs; now quoted always.
+- **Two larmorx mistakes fixed after the merge** (no ID; CI on Windows and macOS, 2026-11-13): (1) on
+  Windows the correction quoted every name with `shlex.quote`, which quotes a backslash, so every line
+  had a "quoted" form although its words were nipype's (no notice, but `quoted_args` set and the quoted
+  line full of quotes); a backslash is a path's separator there (the line's split keeps it), so a name is
+  now quoted only for a blank, a quote or another character a shell reads (`_nipype._quote`; POSIX
+  unchanged: `shlex.quote`). (2) The notice listed every word with a blank, the names nipype itself
+  quotes included, and cut the text at 300 characters, so with a long folder (Windows' and macOS'
+  temporary folders) the split name itself was cut off; it now lists only the names nipype's line splits,
+  each whole (the first three, then how many more). Proof: `tests/python/test_nipype_paths.py`'s three new
+  tests (a long folder, Windows' names with `windows=True`, a folder reached through a symbolic link as
+  macOS' `/var`), run on Linux and, with the 0.1.0rc1 wheel's extension, on the Windows helper laptop
+  (main's code: CI's three failures reproduced; the fix: 7 passed, the link test skipped there).
 - **Proof**: `tests/python/test_nipype_paths.py` (the two lines, the words and notices in both modes,
   antsApplyTransforms below `a b/` in both modes: the default runs and writes the input's voxels through
   the identity, `reproduce` fails as nipype; a node folder alone with a blank runs in both modes without a

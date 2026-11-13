@@ -683,3 +683,59 @@ Written from the C standard's description of `%f` (ISO C 7.21.6.1) and glibc's s
 special values, for gifticlib's writer of `NIFTI_TYPE_FLOAT128` and `COMPLEX256` data: the exact
 value of the 80-bit number, correctly rounded with ties to even (glibc's default rounding).
 Original code (Apache-2.0).
+
+## JSON: nlohmann/json 3.2.0 (`src/json/`; FreeSurfer's foundations, items 3.1-19 and 3.1-20, 2026-11-13)
+
+| larmorx file | Upstream | Licence |
+|---|---|---|
+| `src/json/lex.rs` | nlohmann/json 3.2.0 (`single_include/nlohmann/json.hpp`: `detail::lexer` (`scan`, `scan_string`, `next_byte_in_range`, `get_codepoint`, `scan_number`, `scan_literal`, `skip_bom`, `get`, `unget`, `reset`, `get_token_string`, `token_type_name`), `detail::parser` (`parse`, `sax_parse_internal`, `exception_message`) over `json_sax_dom_parser`) | MIT (Copyright (c) 2013-2018 Niels Lohmann) |
+| `src/json/mod.rs` | nlohmann/json 3.2.0 (`basic_json`'s value types, `type_name`, `size`, iteration, the non-const `operator[]`, `get` through `from_json` and `get_arithmetic_value`, `dump`, `operator<<`; `detail::exception`, `parse_error::create`; `detail::serializer` (`dump`, `dump_escaped`, `decode`)) | MIT; the decoder Bjoern Hoehrmann's (MIT) |
+| `src/json/dtoa.rs` | nlohmann/json 3.2.0 (`detail::dtoa_impl`: `diyfp`, `compute_boundaries`, `get_cached_power_for_binary_exponent`, `find_largest_pow10`, `grisu2_round`, `grisu2_digit_gen`, `grisu2`, `append_exponent`, `format_buffer`; `to_chars`) | MIT |
+| `src/json/tables.rs` | nlohmann/json 3.2.0 (`kCachedPowers`, `utf8d`, generated from the header) | MIT |
+
+- nlohmann/json 3.2.0 is the release tag `v3.2.0` (GitHub's archive, SHA-256
+  2de558ff3b3b32eebfb51cf2ceb835a0fa5170e6b8712b02be9c2c07fcfe52a1), pinned in
+  `<workspace>/tags/nlohmann-json-3.2.0`; its single header is the behaviour, read with the
+  default `basic_json` types (`std::map` objects, `int64_t`, `uint64_t`, `double`) in the C
+  locale.
+- Kept from the C++: the lexer's count of characters read (the positions in its messages), its
+  token string (everything read since the last string or number, controls as `<U+00XX>`), a zero
+  byte ending the input, numbers by `strtoull`/`strtoll` with an overflow falling back to
+  `strtod` (correctly rounded, as Rust's), `operator>>` taking one character past a number, the
+  serializer's 512-byte escape buffer (what an exception leaves in a stream), the indent string's
+  growth (FS-99), C's casts in the accessors (x86-64's indefinite integer for a `double` out of
+  range).
+- Not recursive where nlohmann is: the parser keeps its states in a vector (as nlohmann's), the
+  writer runs on a stack of tasks in the recursive writer's order, values are dropped without
+  recursion (FS-99's crash on deep nesting is never reproduced).
+- `Dialect`: the texts a program's copy changes (`operator[]`'s `type_error.305`).
+- Checks: `src/json/tests.rs` (messages, values, writers, accessors, FS-99; a digest of 200,000
+  doubles printed, recorded on Linux x86-64, also under the AArch64 NaN trap, debug and release);
+  the differential probe `validation/probes/fs-json` against nlohmann/json 3.2.0 and the copy the
+  unit oracle's GCC 8.4.0 compiles (README there).
+
+## miniz's inflater, the FNV hash, libtiff's messages, NrrdIO's constants (FreeSurfer's foundations, item 3.1-18, 2026-11-13)
+
+| larmorx file | Upstream | Licence |
+|---|---|---|
+| `src/miniz.rs` | miniz 1.15 r4 (`miniz.c`: `tinfl_decompress` with its macros `TINFL_GET_BYTE`, `TINFL_NEED_BITS`, `TINFL_GET_BITS`, `TINFL_SKIP_BITS`, `TINFL_HUFF_BITBUF_FILL`, `TINFL_HUFF_DECODE`; `inflate_state`, `mz_inflateInit2`, `mz_inflateInit`, `mz_inflate`, `mz_inflateEnd`, `mz_uncompress`, `mz_error`) | public domain (the Unlicense; Rich Geldreich) |
+| `src/miniz/streams.rs`, `src/miniz/tests.rs` | larmorx's own deflate writer for the checks (RFC 1950, RFC 1951) | Apache-2.0 |
+| `src/fnv.rs` | the FNV-1a algorithm (Fowler, Noll, Vo; Noll's FNV page and `draft-eastlake-fnv`: written from the description) | public domain |
+| `src/libtiff.rs` | libtiff 3.6.1 (`tif_error.c`, `tif_warning.c`, `tif_unix.c`'s `unixErrorHandler` and `unixWarningHandler`) | libtiff's notice (Sam Leffler, Silicon Graphics; `LICENSES/libtiff.txt`) |
+| `src/nrrdio.rs` | NrrdIO 1.9.0 (Teem's `754.c`: `airFloatQNaN`, `airFloatSNaN`, `airFloatPosInf`, `airFloatNegInf` with `TEEM_QNANHIBIT=1`) | Zlib (Gordon Kindlmann, the University of Utah) |
+
+- miniz 1.15 r4 is GitHub richgel999/miniz commit 28f5066e332590c8a68fa4870e89233e72ce7a44
+  (2013-10-14; the repository has no v1.15 tag), pinned in `<workspace>/tags/miniz-1.15r4`
+  (GitHub's archive of the commit, SHA-256
+  fd4502d4dd563a2de8df3b6ba6ec101ff55992e3b779586dd28d987b1238e45a). libtiff 3.6.1 is
+  `tiff-v3.6.1.tar.gz` (download.osgeo.org/libtiff/old, SHA-256
+  538c6302bb2426a69d25e45dcb5e5b11d7235cf497368651b2d6c92612dbf83f), pinned in
+  `<workspace>/tags/libtiff-3.6.1`. NrrdIO 1.9.0's constants are bit patterns, checked against a
+  build of it (the probe).
+- Kept from the C: the decoder's resumption points and read-ahead (the bytes taken from each
+  piece of input, `total_in`), the 64-bit bit buffer, the dictionary's copy-out, every return
+  code, the adler-32 of the output in blocks of 5,552 bytes. Changed only where the C cannot
+  define a result, with D13 switches: FS-281 to FS-284 (`docs/findings/miniz-inflate.md`).
+- Checks: `src/miniz/tests.rs`, `src/fnv.rs`'s and `src/libtiff.rs`'s tests (digests recorded on
+  Linux x86-64), and the differential probe `validation/probes/fs-misc` against miniz 1.15 r4
+  and the copies the unit oracle's GCC 8.4.0 compiles (README there).

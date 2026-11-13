@@ -251,6 +251,20 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-87 | gifticlib 1.12 messages | at verbosity 6 and 7 the `MatrixData` reader's buffer messages show the `Data` element's buffer and length, partly memory never written | f | none | the matrix buffer's; `reproduce` the `Data` buffer's (never-written bytes from zeros), named | – |
 | FS-88 | expat 2.0.1 | a UTF-16 document of an odd length whose last token is cut by its odd byte (white space, a name, a literal or `]` at the end of the prolog or the content) is converted past its end: a crash or a hang | a | none | the odd byte dropped, named (both modes) | – |
 | FS-89 | expat 2.0.1 `XML_GetCurrentLineNumber` | an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: a crash | a | none | the lines before it, named (both modes) | – |
+| FS-90 | CTN 3.0.6 conditions and objects | a condition message of 1,024 bytes or more (a long file name in it) overflows the buffer it is formatted in; a file name of 1,024 bytes or more overflows the object's copy: a crash or memory corrupted | a | none | the message kept to 256 bytes, the name to 1,023, named (both modes) | – |
+| FS-91 | CTN 3.0.6 `readData` | an element of undefined length that is neither a sequence nor pixel data is read with a count of -1, which fails and is taken for complete: the element keeps a value never written, the remaining length grows by one, the value's bytes are read as the next elements (an item delimiter there ends the data set early) | c (rule A, 2026-11-13) | none on its default paths (no default path reads DICOM) | read as a sequence (delimiter tags excepted); `reproduce` CTN's reading, the value marked unread, named | – |
+| FS-92 | CTN 3.0.6 `updateSpecialElements` | Bits Allocated, Pixel Representation, the file meta group's length, the transfer syntax and the Waveform Data Representation are read from their values whatever their length and representation: a shorter value, a sequence, a UID without its zero byte is read past its end, from memory never written | a | none | the bytes past the value read as zero, named (both modes) | – |
+| FS-93 | CTN 3.0.6 `readFile1`, `updateSpecialElements` | a group length element shorter than 4 bytes is given the group's 4-byte length; a Waveform Data Representation longer than 16 bytes is copied into a 17-byte field: both write past their memory (a crash at the next free, often) | a | none | the value's own bytes only; 16 bytes kept; named (both modes) | – |
+| FS-94 | FreeSurfer 8.2.0's copy of CTN, `swapInPlace` | the 4-byte integers (UL, SL) of big-endian data are swapped in 2-byte pairs instead of reversed: every such value read from a big-endian file is wrong | c (rule A, 2026-11-13) | none (big-endian DICOM is retired; no default path reads DICOM) | reversed; `reproduce` the pairs (`dicom::Dialect`'s switch, FreeSurfer's replica), named | – |
+| FS-95 | CTN 3.0.6 `swapInPlace` | a UL or SL value of big-endian data whose length is not a multiple of 4 is swapped 4 bytes at a time past its end, its 32-bit count wrapping: a crash | a | none (FreeSurfer's copy swaps in pairs: FS-94) | whole 4-byte units reversed, the last 2 bytes swapped as a pair, named | – |
+| FS-96 | CTN 3.0.6 `swapInPlace` | FD and FL values of big-endian data are left in the file's byte order: every such value read from a big-endian file is wrong | c (rule A, 2026-11-13) | none | reversed; `reproduce` left, named | – |
+| FS-97 | CTN 3.0.6 `readFile1`, `readSequence` | sequences are read by recursion, one level per nesting: nesting deep enough exhausts the stack (CTN reads 2,000 levels within 8 MiB) | a | none | an error past 128 levels ("DCM Failed to read stream in readSequence"), named | – |
+| FS-98 | CTN 3.0.6 `scanCompressedPixels`, `readData` | a fragment of encapsulated pixel data with an odd length (or one past the count) closes the object, and the reader then writes through the closed object: a crash | a | none | the open fails with the fragment's condition, named | – |
+| FS-99 | nlohmann/json 3.2.0 `serializer::dump`, `basic_json`'s destructor | the pretty printer's 512-character indent string is doubled with spaces whenever an indent passes it (a tab indent past 512 characters becomes spaces; an indent step larger than the doubled string reads past its memory); the writer and the destructor recurse once per nesting level (a value nested deeply enough exhausts the stack) | c (rule A, 2026-11-13) for the padding; a for the rest | none (FreeSurfer writes its JSON with an indent of 4 and nests 3 levels) | the indent character kept (`reproduce`: spaces); no read past, no recursion; named | – |
+| FS-281 | miniz 1.15 `tinfl_decompress` (`TINFL_GET_BYTE`) | with no more input to come (`MZ_FINISH`, `mz_uncompress`) a deflate stream that ends early is padded with zero bytes, decoded as the stream's: a truncated stream can be accepted with bytes it never held | b (rule B, 2026-11-13) | none (FreeSurfer inflates only through `MZ_SYNC_FLUSH`, on one DICOM path) | the stream fails where the first missing byte is needed; `reproduce` the zeros, named | – |
+| FS-282 | miniz 1.15 `tinfl_decompress` | the length symbols 286, 287 and distance symbols 30, 31 (undefined by deflate) are accepted: a length of 0 copies 3 bytes and moves the output by 3 (past the buffer when fewer than 3 remain), a distance of 0 copies the byte under the cursor | b (rule B, 2026-11-13) | none | the stream fails; `reproduce` the copies within the buffer (past it: fails, named) | – |
+| FS-283 | miniz 1.15 `tinfl_decompress` | a Huffman code with no codes or one code of any length is accepted, and a bit pattern without a code decodes as symbol 0, taking no bits | b (rule B, 2026-11-13) | none | decoding such a pattern fails (a single code's own pattern decodes); `reproduce` symbol 0, named | – |
+| FS-284 | miniz 1.15 `mz_inflate` (its dictionary) | through the 32 KiB dictionary, a distance farther back than the output so far reads dictionary memory never written | a | none | the stream fails; `reproduce` zeros, named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -683,15 +697,15 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (625 entries, recounted from the table on 2026-11-13, after the confounds' part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 new; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused); before it FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
+**Counts** (639 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 7 and 8 (FS-90 to FS-99 and FS-281 to FS-284 new); before it the confounds' part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 new; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused); before it FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 147 | |
-| (b) race, nondeterminism | 18 | |
-| (c) deterministic bug that changes results | 308 | 17 |
+| (a) crash, undefined behaviour, out of bounds | 154 | |
+| (b) race, nondeterminism | 21 | |
+| (c) deterministic bug that changes results | 312 | 17 |
 | (d) imprecision | 29 | |
 | (e) command-line or parsing quirk | 92 | |
 | (f) documentation or message only | 29 | |
@@ -3866,6 +3880,63 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
 - **fMRIPrep:** none. **FreeSurfer:** none (its GIFTI files are UTF-8 with an ASCII declaration).
 - **larmorx:** the odd byte dropped (FS-88), the lines counted up to the character (FS-89), named,
   in both modes. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-90 to FS-98 CTN 3.0.6: DICOM files read past their values, through closed objects, and big-endian values swapped wrong
+- **What:** CTN 3.0.6's `DCM_OpenFile`, as `docs/findings/ctn-dicom.md` describes it (its table):
+  long messages and file names overflow fixed buffers (FS-90); an element of undefined length that
+  is no sequence is read with a count of -1, taken for complete, and its value's bytes are read as
+  the next elements (FS-91); the special elements read past short values (FS-92) and a short group
+  length or a long Waveform Data Representation written past their memory (FS-93); FreeSurfer's
+  copy swaps big-endian UL and SL in 2-byte pairs (FS-94); CTN 3.0.6 swaps a UL or SL of a length
+  not a multiple of 4 past its end (FS-95) and leaves big-endian FD and FL unswapped (FS-96);
+  nesting exhausts the stack (FS-97); an odd encapsulated fragment closes the object the reader
+  then writes through (FS-98).
+- **Evidence:** verified (`validation/probes/fs-dicom`: CTN 3.0.6 built from its source and
+  FreeSurfer 8.2.0's copy, 10,030 generated files opened 11 times each in forked children; the
+  crashes are the children's signals).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (no default path reads DICOM; its
+  volume readers ask CTN only whether a file is DICOM; `docs/findings/freesurfer-permissive.md`,
+  closed to FreeSurfer's clean-room implementers).
+- **larmorx:** corrected by default where the input makes sense (FS-91, FS-94, FS-96, rule A), with
+  `reproduce` giving the original's results; crashes and memory never written are never reproduced
+  (FS-90, FS-92, FS-93, FS-95, FS-97, FS-98: the defined part kept, zeros or an error, named).
+  Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-99 nlohmann/json 3.2.0's writer: the indent string's growth and its recursion — (c, rule A; a)
+- **What:** the serializer's indent string starts with 512 copies of the indent character and,
+  each time a level's indent passes its length, is doubled with spaces (`resize(2 * size, ' ')`):
+  a tab-indented document nested past 512 characters of indent gets spaces; an indent step larger
+  than the doubled string (`dump(2000)`) is written from past the string's memory. The writer and
+  `basic_json`'s destructor recurse once per nesting level, so a value nested deeply enough
+  exhausts the stack (the parser itself does not recurse).
+- **Evidence:** verified (`validation/probes/fs-json`: nlohmann/json 3.2.0 and FreeSurfer 8.2.0's
+  copy, documents nested 130 and 300 levels with indents 4 and a tab: the spaces reproduced).
+- **fMRIPrep:** none. **FreeSurfer:** none (`mri_seg_overlap` writes with an indent of 4, three
+  levels deep).
+- **larmorx:** the indent character kept past 512 (rule A; `reproduce` the spaces, named); the
+  string extended rather than read past; the writer and the values without recursion (nesting of
+  10,000 levels or more named). Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-281 to FS-284 miniz 1.15's inflater: zeros past the end, undefined symbols, uncovered patterns, distances past the output — (b, rule B; a)
+- **What:** miniz 1.15 r4's `tinfl_decompress` and `mz_inflate`, as `docs/findings/miniz-inflate.md`
+  describes them: with no more input to come, a stream that ends early is padded with zero bytes
+  and decoded on (FS-281); the undefined length symbols 286 and 287 copy 3 bytes as a length of 0
+  (past the buffer within 3 bytes of its end) and the undefined distance symbols 30 and 31 copy
+  the byte under the cursor (FS-282); an incomplete code (none, or one code of any length) is
+  accepted and a pattern without a code decodes as symbol 0 (FS-283); through the stream API's
+  dictionary, a distance farther back than the output so far reads memory never written (FS-284).
+- **Evidence:** verified (`validation/probes/fs-misc`: miniz 1.15 r4 and FreeSurfer 8.2.0's copy
+  built by GCC 8.4.0, generated streams with these symbols, patterns and distances; the
+  dictionary allocated zeroed to make FS-284 comparable).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (only dcm2niix's reading of GE
+  DICOM protocol data inflates, through `MZ_SYNC_FLUSH`; `docs/findings/freesurfer-permissive.md`,
+  closed to FreeSurfer's clean-room implementers).
+- **larmorx:** the stream fails at the defect (FS-281 to FS-283 rule B, FS-284 memory never
+  written); `reproduce` gives miniz's bytes where they are defined (the zeros, the copies within
+  the buffer, symbol 0, zeros for the dictionary never written), named. Found 2026-11-13.
 - **D13 / gap:** none.
 
 ## fMRIPrep and its libraries

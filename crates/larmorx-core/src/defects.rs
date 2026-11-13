@@ -1108,7 +1108,7 @@ defects! {
     FS_16 = "FS-16", "FreeSurfer", true,
         "matrix functions given an output whose type or size differs from the result's (a complex product into a real matrix) write outside the output: memory the program does not own";
     FS_17 = "FS-17", "FreeSurfer", true,
-        "FreeSurfer's matrices and histograms give -2147483648 on x86-64 where they turn a float or double beyond the int range, or NaN, into an integer (bin numbers, counts compared as integers, the floor of a vector); the C conversion is undefined there";
+        "FreeSurfer's matrices and histograms give -2147483648 where a float or double beyond the 32-bit integer range, or NaN, becomes an integer (bin numbers, counts compared as integers, the floor of a vector)";
     FS_18 = "FS-18", "FreeSurfer", true,
         "HISTOclearCounts resets only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating";
     FS_19 = "FS-19", "FreeSurfer", true,
@@ -1142,13 +1142,13 @@ defects! {
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct and VectorTripleProduct accept column vectors of one or two elements and never check the other vectors; VectorDot and VectorDistance take the second vector to the first's length): values are read from outside the vectors";
     FS_34 = "FS-34", "FreeSurfer", true,
-        "OpenPowell and OpenPowell2 called with no initial directions (NULL) crash when they return the final directions";
+        "OpenPowell and OpenPowell2 called with no initial directions crash at the end of the minimization";
     FS_35 = "FS-35", "FreeSurfer", false,
-        "fs_powell reports FAILED_USER_REQUEST, not FAILED_TOO_MANY_ITERATIONS, when it reaches its iteration limit, so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
+        "OpenPowell and OpenPowell2 never report too many iterations: at the iteration limit OpenPowell does not end the program, and OpenPowell2 neither prints its message nor returns 1 (kept: FreeSurfer's change keeps programs from exiting at the limit)";
     FS_36 = "FS-36", "FreeSurfer", false,
         "OpenPowell's tolerance argument has no effect: every call stops at a relative tolerance of 1e-10 on the cost (kept: the programs' results depend on it)";
     FS_37 = "FS-37", "FreeSurfer", true,
-        "fs_lbfgs never returns its starting point as the best one: when no evaluation improves on it, a successful run returns empty parameters (OpenDFPMin then crashes) and a failed one returns the line search's last trial point with the previous run's end value; and the end value it reports is the last one evaluated, which can be a worse point's";
+        "OpenDFPMin's L-BFGS passes never take the starting point as the best one: when no evaluation improves on it, a successful pass gives empty parameters (OpenDFPMin then crashes) and a failed one the line search's last trial point with the previous pass's end value; and the end value a pass reports is the last one evaluated, which can be a worse point's";
     FS_38 = "FS-38", "FreeSurfer", true,
         "OpenDFPMin repeats its minimization while the cost is better than the caller's starting value by more than the tolerance, never comparing with the previous pass's, so it repeats until a pass fails or crashes (FS-37)";
     FS_39 = "FS-39", "FreeSurfer", true,
@@ -1172,7 +1172,7 @@ defects! {
     FS_48 = "FS-48", "FreeSurfer", true,
         "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), so MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
+        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
     FS_50 = "FS-50", "FreeSurfer", true,
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,
@@ -1233,6 +1233,34 @@ defects! {
         "an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: the program crashes";
     FS_87 = "FS-87", "gifticlib", true,
         "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
+    FS_90 = "FS-90", "CTN", true,
+        "a condition message of 1,024 bytes or more (a long file name in it) overflows the buffer it is formatted in, and a file name of 1,024 bytes or more overflows the object's copy of it: the program crashes or its memory is corrupted";
+    FS_91 = "FS-91", "CTN", true,
+        "an element of undefined length that is neither a sequence nor pixel data (a sequence the 2002 dictionary types otherwise, a stray item) is read with a count of -1, which fails, and the failure is taken for a complete read: the element is kept with a value never written, the remaining length grows by one and the value's bytes are read as the next elements (an item's delimiter there ends the data set early)";
+    FS_92 = "FS-92", "CTN", true,
+        "Bits Allocated, Pixel Representation, the file meta group's length, the transfer syntax and the Waveform Data Representation are read from their values whatever their length and representation: a shorter value, a sequence or a transfer syntax without its zero byte is read past its end, from memory never written";
+    FS_93 = "FS-93", "CTN", true,
+        "a group length element shorter than 4 bytes is given the group's 4-byte length, and a Waveform Data Representation longer than 16 bytes is copied into a 17-byte field: both write past their memory";
+    FS_94 = "FS-94", "CTN (FreeSurfer's copy)", true,
+        "FreeSurfer's copy swaps the 4-byte integers (UL, SL) of big-endian data in 2-byte pairs instead of reversing them: every such value read from a big-endian file is wrong";
+    FS_95 = "FS-95", "CTN", true,
+        "a UL or SL value of big-endian data whose length is not a multiple of 4 is swapped 4 bytes at a time past its end, its 32-bit count wrapping: the program crashes";
+    FS_96 = "FS-96", "CTN", true,
+        "FD and FL values (64- and 32-bit floating point) of big-endian data are left in the file's byte order: every such value read from a big-endian file is wrong";
+    FS_97 = "FS-97", "CTN", true,
+        "sequences are read by recursion, one level per nesting: a file nesting them deeply enough exhausts the stack and the program crashes";
+    FS_98 = "FS-98", "CTN", true,
+        "a fragment of encapsulated pixel data whose length is odd (or over the remaining count) closes the object, and the reader then writes through the closed object: the program crashes";
+    FS_99 = "FS-99", "nlohmann/json", true,
+        "the pretty printer's indent string (512 characters) is doubled once, with spaces, when an indent passes it (past 512 characters a tab indent becomes spaces; an indent more than twice the string's length is read past its memory), and the writer and the value's destructor recurse once per nesting level: a value nested deeply enough exhausts the stack";
+    FS_281 = "FS-281", "miniz 1.15", true,
+        "a deflate stream that ends early, read with no more input to come (the zlib stream API's MZ_FINISH, mz_uncompress), is padded with zero bytes, which are decoded as if they were the stream's: a truncated stream can be accepted with bytes it never held";
+    FS_282 = "FS-282", "miniz 1.15", true,
+        "the length symbols 286 and 287 and the distance symbols 30 and 31, which deflate does not define, are accepted: such a length copies 3 bytes and moves the output by 3 (past the end of the buffer when fewer than 3 bytes are left), such a distance copies the byte under the cursor";
+    FS_283 = "FS-283", "miniz 1.15", true,
+        "a Huffman code with no codes or a single code is accepted whatever its length, and a bit pattern it gives no symbol to is decoded as symbol 0 (from the lookup table without taking any bits)";
+    FS_284 = "FS-284", "miniz 1.15", true,
+        "in the zlib-style stream API, a match farther back than the output so far (or of distance 0 before 32 KiB were output) copies from the 32 KiB dictionary where nothing was written yet: memory never written";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,
@@ -1247,6 +1275,46 @@ defects! {
         "scaling a surface by a negative factor (and the scale-then-translate operation with a negative factor) leaves its bounding box upside down: the low end above the high end";
     FS_114 = "FS-114", "FreeSurfer", true,
         "centring a spherical surface that has no vertex never returns: the search for its centre keeps halving its step without end";
+    FS_115 = "FS-115", "FreeSurfer", true,
+        "restoring the target or layer-IV coordinates of a spherical patch sets its canonical coordinates to the temporary coordinates, not to the restored ones";
+    FS_116 = "FS-116", "FreeSurfer", true,
+        "reading a face's original area while it is still marked to be computed later prints NYI and crashes the program on purpose (a segmentation fault)";
+    FS_117 = "FS-117", "FreeSurfer", true,
+        "reallocating a surface to no faces (also a surface that already has none) fails an assertion and ends the program, and reallocating to no vertices a surface with room for none leaves it without its vertex array (or, the next time, without its other per-vertex arrays) and reports a failure";
+    FS_118 = "FS-118", "FreeSurfer", true,
+        "the progress bar over a surface's vertices (discrete curvatures, the faces' geometric order) ends the program with an arithmetic exception (signal 8) for a surface of fewer than 20 vertices";
+    FS_119 = "FS-119", "FreeSurfer", true,
+        "column printing of a status text of 16,378 bytes or more (mris_curvature_stats' and mris_calc's messages, which show file and surface names) ends the program with a buffer-overflow abort (signal 6) before anything is printed";
+    FS_120 = "FS-120", "FreeSurfer", false,
+        "after the default computation of a surface's metric properties (at every surface read and every deformation step) the faces' angles are not updated: they keep the values they had before (0 for a new surface), while the older and the faster computations update them (kept until its effect on mris_sphere's and mris_register's results is measured; the correction is on request)";
+    FS_121 = "FS-121", "FreeSurfer", true,
+        "the default computation of a surface's metric properties gives a vertex whose normal cannot be computed (its faces' normals sum to no length even after five small random moves, as with NaN or infinite coordinates) a normal of memory contents, and for a plane adds memory contents to the area of every vertex next to a ripped face";
+    FS_122 = "FS-122", "FreeSurfer", true,
+        "computing the metric properties of a surface with a NaN white or pial coordinate, a NaN white normal or a NaN radius prints, every time, up to 11 lines such as 'no:<vertex>  v->whitex  nan != nan  during count_MRIScomputeMetricProperties_calls:<n>' (and once 'b <file>:335  needed'), as if the value had changed";
+    FS_123 = "FS-123", "FreeSurfer", true,
+        "the faster computation of the metric properties (FS_FASTER_MP set) adds memory contents to the areas and normals of the vertices next to a ripped face, and takes the bounding box of a surface with no vertex from memory it does not own";
+    FS_124 = "FS-124", "FreeSurfer", false,
+        "the faster computation of the metric properties (FS_FASTER_MP set) gives a vertex whose normal cannot be computed in five rounds an area of -1 (and an original area of 1 when it had none) and a normal of no length";
+    FS_125 = "FS-125", "FreeSurfer", true,
+        "the faster computation of the metric properties (FS_FASTER_MP set) with several threads sums the faces' areas in an order that depends on the threads' timing, so the total area can change from run to run in its last bits";
+    FS_126 = "FS-126", "FreeSurfer", true,
+        "the surface library's distance, area-error and triangle-property files take their names in 1,024-byte buffers: a name of 1,024 bytes or more ends the program with a buffer-overflow abort (signal 6), or is cut to 1,023 bytes after the message '<function>: Truncation on line <n>', so another file is written or read";
+    FS_127 = "FS-127", "FreeSurfer", true,
+        "MRISreadTriangleProperties reads the vertex and face counts at the start of a triangle-property file as floats where MRISwriteTriangleProperties writes them as integers, so it refuses every file the writer wrote (but one of a surface without vertices) with 'incompatible vertex number in file <file>'";
+    FS_128 = "FS-128", "FreeSurfer", true,
+        "MRISwriteTriangleProperties writes, for every face, the three angles of the place after the surface's last face (a spare place's, or memory past the faces) instead of each face's own angles";
+    FS_129 = "FS-129", "FreeSurfer", true,
+        "MRISreadTriangleProperties and MRISwriteTriangleProperties with a surface name whose last dot is its first or second character take the two letters of the hemisphere from memory before the name";
+    FS_130 = "FS-130", "FreeSurfer", true,
+        "MRISwriteAngleError divides a vertex's running sum of angle differences by three times its face count after every face, so a vertex of more than one face gets less than the mean difference of its angles";
+    FS_131 = "FS-131", "FreeSurfer", true,
+        "MRISwriteAngleError writes an angle error that is NaN or beyond the 32-bit integer range (in hundredths of a degree) as -32767, as if it were the most negative error";
+    FS_132 = "FS-132", "FreeSurfer", true,
+        "MRISmaxMarked starts from vertex 0's mark even when vertex 0 is ripped, and reads it for a surface without vertices (a value from memory)";
+    FS_133 = "FS-133", "FreeSurfer", true,
+        "MRISreadTriangleProperties reads as many faces as a triangle-property file says, even more than the surface has: they go into its spare face places or past its arrays (memory corruption or a crash)";
+    FS_134 = "FS-134", "FreeSurfer", true,
+        "MRISreadTriangleProperties and MRISwriteTriangleProperties with a surface name of 1,024 bytes or more write its folder's name past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names)";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,
@@ -1285,6 +1353,50 @@ defects! {
         "the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
     FS_175 = "FS-175", "FreeSurfer", true,
         "byteswapbufshort, byteswapbuffloat and byteswapbufdouble given a byte count that is not a multiple of the number's size reverse the bytes of a whole last number past the count: past the end of a buffer that ends at the count (memory the program does not own)";
+    FS_177 = "FS-177", "FreeSurfer", true,
+        "TAGskip, znzTAGskip and FStagsIO::skip_tag, when they cannot allocate a tag's data length (a negative length always), end the program with a message that shows the length's low 32 bits as an unsigned number (-1 shows as 4294967295)";
+    FS_178 = "FS-178", "FreeSurfer", true,
+        "the readers that skip a tag's data (TAGskip, znzTAGskip, FStagsIO::skip_tag, and FStagsIO::read_mri_frames' bytes after the frames) given a tag length beyond the machine's memory end the program, or crash the frames' reader, even where the file holds only a few bytes: the outcome depends on the machine's memory";
+    FS_179 = "FS-179", "FreeSurfer", true,
+        "the readers of a matrix tag (TAGreadMatrix, znzReadMatrix, FStagsIO::read_matrix) given a text whose first word has 1,600 bytes or more (TAGreadMatrix) or 100 bytes or more (the other two) corrupt the program's memory: a crash or wrong results";
+    FS_180 = "FS-180", "FreeSurfer", true,
+        "znzReadMatrix and FStagsIO::read_matrix, when the 1,600 bytes of a matrix tag hold no NUL byte (or the file ends inside them and the bytes it gives hold none), read the matrix's text on past them: numbers that reach the end of those bytes continue with memory contents";
+    FS_181 = "FS-181", "FreeSurfer", true,
+        "the matrix tag writers (TAGwriteMatrix, znzWriteMatrix, FStagsIO::write_matrix in both forms) given a matrix smaller than 4 x 4 write numbers read from outside it";
+    FS_182 = "FS-182", "FreeSurfer", true,
+        "TAGmakeCommandLineString given a command line longer than the space its caller has for it (4,096 bytes in mri_segment) corrupts the program's memory";
+    FS_183 = "FS-183", "FreeSurfer", true,
+        "FStagsIO::read_scan_parameters given a tag length below the parameters' 20 bytes, or one beyond the machine's memory, crashes, overwrites the program's memory with the rest of the file, or gives no phase-encoding direction";
+    FS_184 = "FS-184", "FreeSurfer", true,
+        "the length FStagsIO gives a GCA morph's label tag wraps at 2^31: a volume whose voxel count times 4 reaches 2^31 gets a wrong length";
+    FS_185 = "FS-185", "FreeSurfer", true,
+        "VOL_GEOM::read of a geometry in FreeSurfer's NIfTI extension given a name length beyond about 8 MiB (Linux's default stack size) crashes the program";
+    FS_186 = "FS-186", "FreeSurfer", true,
+        "VOL_GEOM::read does not end the name it reads: in a geometry that held a longer name, a name read from FreeSurfer's NIfTI extension (or the end of a file inside it) keeps the earlier name's rest after it, a name of length 0 leaves the earlier name, and a name of 512 bytes or more read from an .mgz continues with the earlier name's bytes after its first 512";
+    FS_187 = "FS-187", "FreeSurfer", true,
+        "the binary colour table readers take a name whose bytes in the file hold no NUL byte (a name length of 0, a name the file ends inside, or 1,023 bytes or more copied into an entry) with memory contents after it";
+    FS_188 = "FS-188", "FreeSurfer", true,
+        "the first version's binary colour table readers given a structure name length of 1,024 or more write a zero byte past the name: no visible effect below 1,064, another object's memory corrupted beyond";
+    FS_189 = "FS-189", "FreeSurfer", true,
+        "the second version's binary colour table readers given a structure number at or beyond the table's entry count read and write the table's list of entries outside it (a crash or another object's corruption)";
+    FS_190 = "FS-190", "FreeSurfer", true,
+        "znzCTABreadFromBinaryV2 reads at most 1,023 bytes of a name (the table's file name or an entry's) and does not skip the rest: the other bytes of a longer name are read as the numbers that follow";
+    FS_191 = "FS-191", "FreeSurfer", true,
+        "the binary colour table readers given an entry count or a name length beyond the machine's memory give an error message, a crash (the first version's), or a table, depending on the machine's memory";
+    FS_192 = "FS-192", "FreeSurfer", true,
+        "the binary colour table readers given a file that ends inside the table take the missing numbers from memory contents (the first version reads as many entries as its count says) and return a table";
+    FS_194 = "FS-194", "FreeSurfer", false,
+        "the first version's binary colour table writers store the table's entry count, empty places included, but only its non-empty entries: a table with empty places is read back with its last entries taken from what follows it (kept: the first version's format, which FreeSurfer writes only for tables read from first-version files, has no empty places)";
+    FS_193 = "FS-193", "FreeSurfer", true,
+        "the length FStagsIO gives a GCA morph's geometry tag in FreeSurfer's NIfTI extension counts the two file names whole, while the geometry's writer stores at most 512 bytes of each: with a longer name the extension's lengths are wrong";
+    FS_195 = "FS-195", "FreeSurfer", true,
+        "copying a linear transform array (LTAcopy) does not copy each transform's own type and label: a new copy's transforms have type -1 (unknown) and label 0, a given destination keeps its own";
+    FS_196 = "FS-196", "FreeSurfer", true,
+        "copying a linear transform array onto one whose transforms lack a matrix, or have smaller ones, loses that matrix's copy: the destination keeps no matrix, or its old numbers";
+    FS_197 = "FS-197", "FreeSurfer", true,
+        "freeing no linear transform array (LTAfree of a null array) crashes";
+    FS_198 = "FS-198", "FreeSurfer", true,
+        "copying a linear transform array from one whose transforms lack a matrix onto one that has it leaves the destination's matrix unusable: using or freeing the copy later crashes or reads garbage";
 }
 
 /// The register entry with ID `id`.

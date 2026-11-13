@@ -37,6 +37,10 @@ nifticlib-2.0.0	https://sourceforge.net/projects/niftilib/files/nifticlib/niftic
 zlib-1.2.11	https://zlib.net/fossils/zlib-1.2.11.tar.gz	sha256:c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1	Zlib	tags
 gifticlib-1.12	https://github.com/NIFTI-Imaging/gifti_clib/archive/8ec2a95bce6360c3f7f655b36767e4d04c61d77c.tar.gz	sha256:965406c74a48a0bf1a58d6d556189da120de5e5fbb6209b145805325be9c0416	public-domain	tags
 expat-2.0.1	https://github.com/libexpat/libexpat/archive/refs/tags/R_2_0_1.tar.gz	sha256:6a26c3fe91d2a05d05fac187c0a092e1602c335ee12b008d9fe4da30788402b9	MIT	tags
+ctn-3.0.6	https://snapshot.debian.org/file/a4d6c89676052fda4f8e786d89fb79d481180a1e	sha256:2e21b5dbe5d1f85ceaaf43b117d22316b48d3ffeb7e8d2e828530dadb8c30861	LicenseRef-CTN	tags
+nlohmann-json-3.2.0	https://github.com/nlohmann/json/archive/refs/tags/v3.2.0.tar.gz	sha256:2de558ff3b3b32eebfb51cf2ceb835a0fa5170e6b8712b02be9c2c07fcfe52a1	MIT	tags
+miniz-1.15r4	https://github.com/richgel999/miniz/archive/28f5066e332590c8a68fa4870e89233e72ce7a44.tar.gz	sha256:fd4502d4dd563a2de8df3b6ba6ec101ff55992e3b779586dd28d987b1238e45a	Unlicense	tags
+libtiff-3.6.1	https://download.osgeo.org/libtiff/old/tiff-v3.6.1.tar.gz	sha256:538c6302bb2426a69d25e45dcb5e5b11d7235cf497368651b2d6c92612dbf83f	libtiff	tags
 ITKAdaptiveDenoising	https://github.com/ntustison/ITKAdaptiveDenoising.git	24825c8d246e941334f47968553f0ae388851f0c	Apache-2.0	tags
 AFNI-25.2.09	https://github.com/afni/afni.git	b1e12b26dae2b56d362eab299520c383cf84798a	public-domain+exceptions	tags
 AFNI-26.3.05	https://github.com/afni/afni.git	07c1dcfb5fdc933d2429669826bcbddbc4047461	public-domain+exceptions	tags

@@ -34,7 +34,8 @@ sys.path.insert(0, str(REPO / "validation" / "src"))
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
-SKIP = ("FS-53", "FS-58", "FS-165")
+# FS-198: FreeSurfer keeps referring to a matrix LTcopy freed (its line reads freed memory)
+SKIP = ("FS-53", "FS-58", "FS-165", "FS-198")
 # FS-163 (MRIcopy into a smaller destination) is skipped where the port refuses the copy (FreeSurfer
 # writes outside the destination there); where both stay inside it the lines are compared
 SKIP_WHEN_REFUSED = ("FS-163",)

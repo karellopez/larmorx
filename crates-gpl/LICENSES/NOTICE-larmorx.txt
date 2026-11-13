@@ -143,6 +143,89 @@ translated into Rust in crates/larmorx-io/src/xml/. Its licence:
   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+The DICOM Central Test Node (CTN) 3.0.6's object library (dcm.c, dcmdict.c, dcmcond.c,
+condition.c: the file reading, conditions, condition stack and data dictionary), translated into
+Rust in crates/larmorx-io/src/dicom/. Its notice (LICENSES/LicenseRef-CTN.txt):
+
+  Copyright (C) 1993, 1994, RSNA and Washington University
+
+  The software and supporting documentation for the Radiological Society of North America (RSNA)
+  1993, 1994 Digital Imaging and Communications in Medicine (DICOM) Demonstration were developed
+  at the Electronic Radiology Laboratory, Mallinckrodt Institute of Radiology, Washington
+  University School of Medicine, 510 S. Kingshighway Blvd., St. Louis, MO 63110 as part of the
+  1993, 1994 DICOM Central Test Node project for, and under contract with, the Radiological
+  Society of North America.
+
+  THIS SOFTWARE IS MADE AVAILABLE, AS IS, AND NEITHER RSNA NOR WASHINGTON UNIVERSITY MAKE ANY
+  WARRANTY ABOUT THE SOFTWARE, ITS PERFORMANCE, ITS MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR
+  USE, FREEDOM FROM ANY COMPUTER DISEASES OR ITS CONFORMITY TO ANY SPECIFICATION. THE ENTIRE RISK
+  AS TO QUALITY AND PERFORMANCE OF THE SOFTWARE IS WITH THE USER.
+
+  Copyright of the software and supporting documentation is jointly owned by RSNA and Washington
+  University, and free access is hereby granted as a license to use this software, copy this
+  software and prepare derivative works based upon this software. However, any distribution of
+  this software source code or supporting documentation or derivative works (source code and
+  supporting documentation) must include the three paragraphs of the copyright notice.
+
+nlohmann/json 3.2.0 (single_include/nlohmann/json.hpp: the lexer, parser, value accessors,
+serializer and its Grisu2 conversion), translated into Rust in crates/larmorx-core/src/json/,
+with Bjoern Hoehrmann's UTF-8 decoder in it. Its licence (MIT License):
+
+  Copyright (c) 2013-2018 Niels Lohmann <http://nlohmann.me>.
+  Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de> (the UTF-8 decoder).
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+  and associated documentation files (the "Software"), to deal in the Software without
+  restriction, including without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or
+  substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+  BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+miniz 1.15 r4's inflater (miniz.c: tinfl_decompress and the zlib-style mz_inflate functions; Rich
+Geldreich, 2013), translated into Rust in crates/larmorx-core/src/miniz.rs. miniz is released into
+the public domain (the Unlicense).
+
+libtiff 3.6.1's error and warning reporting (tif_error.c, tif_warning.c, tif_unix.c's handlers),
+translated into Rust in crates/larmorx-core/src/libtiff.rs. Its notice (LICENSES/libtiff.txt):
+
+  Copyright (c) 1988-1997 Sam Leffler
+  Copyright (c) 1991-1997 Silicon Graphics, Inc.
+
+  Permission to use, copy, modify, distribute, and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that (i) the above copyright notices and
+  this permission notice appear in all copies of the software and related documentation, and
+  (ii) the names of Sam Leffler and Silicon Graphics may not be used in any advertising or
+  publicity relating to the software without the specific, prior written permission of Sam
+  Leffler and Silicon Graphics. (The full text, with its warranty disclaimer, in
+  LICENSES/libtiff.txt.)
+
+NrrdIO 1.9.0's IEEE 754 constants (Teem's 754.c), in crates/larmorx-core/src/nrrdio.rs:
+
+  NrrdIO: stand-alone code for basic nrrd functionality
+  Copyright (C) 2005  Gordon Kindlmann
+  Copyright (C) 2004, 2003, 2002, 2001, 2000, 1999, 1998  University of Utah
+
+  This software is provided 'as-is', without any express or implied warranty. In no event will
+  the authors be held liable for any damages arising from the use of this software. Permission
+  is granted to anyone to use this software for any purpose, including commercial applications,
+  and to alter it and redistribute it freely, subject to the following restrictions: 1. The
+  origin of this software must not be misrepresented; you must not claim that you wrote the
+  original software. If you use this software in a product, an acknowledgment in the product
+  documentation would be appreciated but is not required. 2. Altered source versions must be
+  plainly marked as such, and must not be misrepresented as being the original software. 3. This
+  notice may not be removed or altered from any source distribution.
+
+The FNV-1a hash (Glenn Fowler, Landon Curt Noll, Kiem-Phong Vo; public domain), in
+crates/larmorx-core/src/fnv.rs.
+
 zlib 1.2.11's file layer (gzlib.c, gzread.c, gzwrite.c, gzclose.c), translated into Rust in
 crates/larmorx-io/src/znz.rs (an altered version: inflate and deflate are zlib-rs's). Its licence:
 

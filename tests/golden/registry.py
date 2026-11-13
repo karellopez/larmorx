@@ -8641,13 +8641,19 @@ def _(ctx: Context) -> dict[str, Any]:
                                 "nipype", "run", *args])  # fmt: skip
 
                 def text(t: str, folder: Path = folder, here: str = here) -> str:
+                    # each folder as the run prints it: as given, resolved (nipype resolves
+                    # some inputs: macOS' /private/var, Windows' long names) and inside a
+                    # printed list, whose repr doubles a Windows backslash; then the
+                    # platform's separators (a list's doubled one first)
                     for d, name in (
                         (here, "<cwd>"),
                         (str(folder), "<cwd>"),
+                        (os.path.realpath(folder), "<cwd>"),
                         (str(inputs), "<inputs>"),
+                        (os.path.realpath(inputs), "<inputs>"),
                     ):
-                        t = t.replace(d, name)
-                    return t.replace("\\", "/")
+                        t = t.replace(d.replace("\\", "\\\\"), name).replace(d, name)
+                    return t.replace("\\\\", "/").replace("\\", "/")
 
                 key = f"{mode}.{name}"
                 out[f"{key}.code"] = np.array([code])

@@ -7,6 +7,7 @@ names are quoted: nipype writes them relative to the node directory, one word)."
 
 from __future__ import annotations
 
+import os
 import warnings
 from pathlib import Path
 
@@ -71,6 +72,8 @@ def test_the_line_nipype_writes_and_the_quoted_one(tmp_path: Path) -> None:
     assert xfm + "," in words
     (notice,) = _pipe80(caught)
     assert notice.mode == "fix" and xfm in notice.detail
+    # only the names nipype's line splits: the input image is quoted by nipype itself
+    assert str(folder / "in.nii.gz") not in notice.detail
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         words = _nipype.words(cmd, "reproduce", run=True)
@@ -159,3 +162,67 @@ def test_registration_and_topup_lines(tmp_path: Path) -> None:
     enc = str(folder / "topup" / "in_encfile.txt")
     assert f"--datain={enc}" in topup.cmdline
     assert f"--datain='{enc}'" in topup.quoted_cmdline
+
+
+def test_the_notice_names_each_split_name_whole(tmp_path: Path) -> None:
+    """A long folder (a deep working directory, Windows' and macOS' temporary folders): the
+    notice lists the names nipype's line splits, each whole, not a cut text."""
+    folder = tmp_path / ("x" * 40) / ("y" * 40) / "a b"
+    cmd = _apply(tmp_path, folder, tmp_path / "node")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        _nipype.words(cmd, "reproduce", run=True)
+    (notice,) = _pipe80(caught)
+    assert f"({folder / 'xfm.txt'}): nipype's line kept" in notice.detail
+
+
+def test_windows_names_keep_their_backslashes() -> None:
+    """On Windows a backslash separates a path's folders (no escape): a name needs quotes only
+    for a blank, a quote or another character a shell reads, so a line whose names hold none
+    is nipype's line; quoted names come back whole, drive letters and backslashes kept."""
+    plain = r"C:\Users\runneradmin\AppData\Local\Temp\in\xfm.txt"
+    for name in (plain, r"D:\data", r"\\server\share\sub-01\x.nii.gz", "in_trans.nii.gz"):
+        assert _nipype._quote(name, windows=True) == name
+        assert _nipype._split_line(f"[ {name}, 1 ]", windows=True) == ["[", name + ",", "1", "]"]
+    for name in (r"C:\Users\John Smith\xfm.txt", r"C:\Users\O'Brien\x.nii", r"C:\a&b\x.nii"):
+        quoted = _nipype._quote(name, windows=True)
+        assert quoted != name
+        assert _nipype._split_line(f"[ {quoted}, 1 ]", windows=True) == ["[", name + ",", "1", "]"]
+    # a POSIX shell reads a backslash as an escape: quoted there
+    assert _nipype._quote(plain, windows=False) == f"'{plain}'"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a symbolic link needs a privilege on Windows")
+def test_a_folder_reached_through_a_symbolic_link(tmp_path: Path) -> None:
+    """macOS' temporary folders are reached through a link (/var is /private/var): the names
+    as given, the run in both modes as for a real folder."""
+    real = tmp_path / "private" / "var"
+    real.mkdir(parents=True)
+    link = tmp_path / "var"
+    link.symlink_to(real, target_is_directory=True)
+    folder = link / "a b"
+    cmd = _apply(tmp_path, folder, folder / "node")
+    xfm = str(folder / "xfm.txt")
+    assert f"--transform [ '{xfm}', 1 ]" in cmd.quoted_cmdline
+    assert cmd.outputs["output_image"] == str(folder / "node" / "in_trans.nii.gz")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        _nipype.run(cmd, n_threads=1)
+    (notice,) = _pipe80(caught)
+    assert notice.mode == "fix" and xfm in notice.detail
+    assert (real / "a b" / "node" / "in_trans.nii.gz").is_file()
+    (real / "a b" / "node" / "in_trans.nii.gz").unlink()
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        with pytest.raises(RuntimeError, match="antsApplyTransforms failed"):
+            _nipype.run(cmd, n_threads=1, upstream_defects="reproduce")
+    # a node folder alone with a blank, through the link: both modes run, no notice
+    node = link / "work dir" / "node"
+    cmd = _apply(tmp_path, link / "in", node)
+    assert cmd.quoted_args is None and cmd.quoted_run_args is None
+    for mode in ("fix", "reproduce"):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            _nipype.run(cmd, n_threads=1, upstream_defects=mode)
+        assert (real / "work dir" / "node" / "in_trans.nii.gz").is_file() and not _pipe80(caught)
+        (node / "in_trans.nii.gz").unlink()

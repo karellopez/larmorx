@@ -158,7 +158,12 @@ when no name needs quoting); `larmorx._nipype.words(cmd, upstream_defects)` give
 quoted line's words by default and nipype's with `upstream_defects="reproduce"` (nipype's
 failure), with the `PIPE-80` notice whenever the two differ. The output names larmorx makes
 absolute for a program that runs in this process (nipype writes them relative to the node's
-folder) are quoted in both modes, so a node folder with a blank works as in nipype.
+folder) are quoted in both modes, so a node folder with a blank works as in nipype. On Windows a
+backslash is a path's separator, not an escape: a name such as `C:\data\sub-01\x.nii.gz` needs no
+quotes (only a blank, a quote or another character a shell reads does), so a line whose names hold
+none of them is nipype's line there too; quoted names reach the program whole, drive letter and
+backslashes kept. The notice names the file names nipype's line splits, each one whole (the first
+three, then how many more).
 
 ## The EPI reference and the steps under it (SyN preprocessing)
 

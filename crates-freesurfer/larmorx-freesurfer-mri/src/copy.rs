@@ -170,7 +170,7 @@ pub fn mri_copy(
     } else {
         convert(g, err, src, d)?;
     }
-    d.vg.fname = src.vg.fname.clone();
+    d.vg.fname.strcpy(&src.vg.fname);
     Ok(done(fresh))
 }
 

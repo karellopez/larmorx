@@ -220,6 +220,83 @@ def test_variables_outside_the_family_do_not_count(cache, fake, workdir):
     assert prepared(fake, src, dst, env=env_for(NSLOTS="3")).key != base.key
 
 
+#: The family ``freesurfer``'s variables before 2026-11-13, when the other variables FreeSurfer's
+#: programs read joined its key (``key.FREESURFER_READS``).
+FREESURFER_BEFORE = (
+    *("FS*", "FREESURFER*", "SUBJECTS_DIR", "MNI_", "MINC_", "PERL5LIB", "FUNCTIONALS_DIR"),
+    *("LOCAL_DIR", "FIX_VERTEX_AREA", "OMP_", "GOMP_", "ITK_", "PATH", "PYTHON*"),
+)
+#: Some of the names keyed since 2026-11-13, with a value each.
+FREESURFER_NEW = {
+    "DIAG": "0x10",
+    "diag": "0x10",
+    "DIAG_NO": "12",
+    "DIAGX": "3",
+    "DIAGVZ": "-4",
+    "DIAG_VERBOSE": "",
+    "PROFILE": "1",
+    "IMAGE_SIZE": "256",
+    "XDEBUG": "stderr",
+    "TMPDIR": "/nowhere/tmp",
+    "TMP": "/nowhere/tmp2",
+    "TEMP": "/nowhere/tmp3",
+    "TEMPDIR": "/nowhere/tmp4",
+    "USE_AVERAGE305": "1",
+    "DONT_COMPRESS": "1",
+}
+
+
+def fs_prepared(fake: Path, src: Path, dst: Path, env: dict[str, str], **kw) -> key.Prepared:
+    return key.prepare(
+        key.program_identity(fake, env), [str(src), str(dst)], env, family="freesurfer", **kw
+    )
+
+
+def test_freesurfer_reads_keep_the_key_of_a_run_that_sets_none(cache, fake, workdir, monkeypatch):
+    """A FreeSurfer run that sets none of the names keyed since 2026-11-13 has the key it had
+    before (``validation/investigations/oracle-cache/freesurfer_env.py`` proves that no entry of
+    the cache set one)."""
+    _d, src, dst = workdir()
+    env = env_for(FREESURFER_HOME="/opt/fs", OMP_NUM_THREADS="1", LC_ALL="C")
+    for name in FREESURFER_NEW:
+        env.pop(name, None)
+    now = fs_prepared(fake, src, dst, env)
+    monkeypatch.setitem(key.FAMILY_ONLY_ENV, "freesurfer", FREESURFER_BEFORE)
+    assert fs_prepared(fake, src, dst, env).key == now.key
+    assert set(key.FAMILY_ONLY_ENV["freesurfer"]) < set(FREESURFER_BEFORE + key.FREESURFER_READS)
+
+
+def test_freesurfer_reads_count_by_their_value(cache, fake, workdir):
+    d, src, dst = workdir()
+    env = env_for(FREESURFER_HOME="/opt/fs")
+    for name in FREESURFER_NEW:
+        env.pop(name, None)
+    base = fs_prepared(fake, src, dst, env)
+    for name, value in FREESURFER_NEW.items():
+        k = fs_prepared(fake, src, dst, dict(env, **{name: value}))
+        assert k.key != base.key, name
+        assert k.parts["env"][name] == value, name  # set but empty is not unset (DIAG_VERBOSE)
+    one = fs_prepared(fake, src, dst, dict(env, DIAG_NO="1"))
+    assert one.key != fs_prepared(fake, src, dst, dict(env, DIAG_NO="2")).key
+    # a temporary directory inside the run's place counts by its role, not its path
+    (d / "tmp").mkdir()
+    inside = fs_prepared(fake, src, dst, dict(env, TMPDIR=str(d / "tmp")), cwd=d)
+    assert inside.parts["env"]["TMPDIR"] == "{cwd}/tmp"
+    assert inside.rerun_env["TMPDIR"] == "{cwd}/tmp"
+
+
+def test_freesurfer_reads_join_no_other_familys_key(cache, fake, workdir):
+    _d, src, dst = workdir()
+    base = prepared(fake, src, dst)  # the family itk
+    for name, value in FREESURFER_NEW.items():
+        for family in (None, "itk", "afni", "fsl", "python"):
+            assert not key.env_matters(name, family), (name, family)
+        assert prepared(fake, src, dst, env=env_for(**{name: value})).key == base.key, name
+    # what FreeSurfer reads and the key leaves out: the user's, the machine's, the network's
+    for name in ("USER", "LOGNAME", "HOST", "HOSTNAME", "HOME", "PWD", "TERM", "http_proxy"):
+        assert not key.env_matters(name, "freesurfer"), name
+
+
 def test_home_is_named_like_a_place_and_its_logs_do_not_count(cache, tmp_path, workdir):
     """AFNI prints its HOME (where it appends its crash log): replayed with this run's; the
     files it writes there and never reads are not in the key."""

@@ -1270,12 +1270,14 @@ pub fn xyz_normalized_load(x: f32, y: f32, z: f32) -> (Xyz, f32) {
 /// `XYZApproxAngle_knownLength(n, x2, y2, z2, norm)`: the angle between the unit vector `n` and
 /// `(x2, y2, z2)` of length `norm`: the dot product in `double` rounded to `float`, the norm
 /// raised to `|dot|`, then `acos(dot / norm)` below 0.99 and `sqrt(2 (1 - dot / norm))` (the
-/// series' first term) from 0.99, as `float`.
+/// series' first term) from 0.99, as `float`. The products in the official build's operand order
+/// (the unit oracle's `matrix.cpp.o`): `n.x x2`, `n.y y2`, but `z2 n.z` (it matters where both are
+/// NaNs).
 pub fn xyz_approx_angle_known_length(n: &Xyz, x2: f32, y2: f32, z2: f32, norm: f32) -> f32 {
     let (x1, y1, z1) = (f64::from(n.x), f64::from(n.y), f64::from(n.z));
     let dot = sse::add64(
         sse::add64(sse::mul64(x1, f64::from(x2)), sse::mul64(y1, f64::from(y2))),
-        sse::mul64(z1, f64::from(z2)),
+        sse::mul64(f64::from(z2), z1),
     ) as f32;
     let mut norm = norm;
     if dot.abs() > norm {
@@ -2040,6 +2042,14 @@ mod tests {
         let (n, len) = xyz_normalized_load(3.0, 0.0, 4.0);
         assert_eq!(len, 5.0);
         assert_eq!(xyz_approx_angle_known_length(&n, 3.0, 0.0, 4.0, 5.0), 0.0);
+        // two NaNs meet in the third product: z2's comes through (the official build's order)
+        let nz = Xyz {
+            x: 0.0,
+            y: 0.0,
+            z: f32::from_bits(0x7fc0_0001),
+        };
+        let a = xyz_approx_angle_known_length(&nz, 1.0, 0.0, f32::from_bits(0xffc0_0002), 1.0);
+        assert_eq!(a.to_bits(), 0xffc0_0002);
     }
 
     #[test]

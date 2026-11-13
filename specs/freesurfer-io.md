@@ -444,4 +444,7 @@ Each writer starts with the tag number and, where the tag has one (§14), the da
   (FS-49, FS-167, FS-180, FS-187, FS-192) are compared and counted apart; FreeSurfer's crashes and
   machine-dependent results (FS-179, FS-181, FS-183, FS-185, FS-188 beyond the entry, FS-189,
   FS-191, skips beyond 256 MiB) are counted, not compared.
-- Measured (2026-11-13): see `docs/findings/freesurfer-io.md` Part 2.
+- Measured on the replica (2026-11-13): seed 7, 46,000 cases of the 23 commands: `reproduce`
+  identical on 40,710 of 40,710 comparable lines (2,070 with memory digits), 3,003 lines of memory
+  contents compared apart, 2,287 not comparable; `fix` differs only with a notice. Seed 1, 2,200
+  portable cases: 1,927 identical, 273 not comparable.

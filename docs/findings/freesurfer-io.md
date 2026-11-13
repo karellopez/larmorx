@@ -230,3 +230,23 @@ item 3.1-30) and colortab.cpp's binary readers and writers (3.1-33), which FStag
   version 2's names too (colortab.cpp 749, 802: the version-1 text); `ErrorPrintf` prints `strerror(errno)`
   first when `errno` is set (the probe saw `Cannot allocate memory` from a failed `malloc` of a garbage
   length before the crash).
+
+### Measured (2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+
+- Seed 7, 46,000 cases (23 commands x 2,000; boxed 10 GiB, the official run about 40 minutes): `reproduce`
+  identical on 40,710 of 40,710 comparable lines (2,070 with memory digits); 3,003 lines whose official
+  result is memory contents compared apart (1,769 equal, 1,234 not: FS-49, FS-167, FS-180, FS-187, FS-192);
+  2,287 not comparable (FreeSurfer crashes, reads for ever or depends on the machine). Of piece 2's 24,000
+  cases: 20,453 comparable lines identical, 2,731 compared apart, 816 not comparable. `fix` differs only
+  with a notice (FS-176, FS-174, FS-01, FS-49, FS-167, FS-186, FS-193, FS-177, FS-184, FS-172, FS-190,
+  FS-178, FS-192). The port's 46,000 lines are identical with and without AArch64's NaN rules emulated
+  (`nan_trap.c`, NAN_TRAP_ARM=1 with NAN_TRAP_DIR set; 1,356 NaNs flipped), in both modes.
+- Seed 1, 2,200 portable cases (`tests/fs_io_official.rs`): 1,927 identical (110 with memory digits), 273
+  hashed as SKIP, SHA-256 4bf83403...; passing in debug and release and under the trap.
+- Three things the first runs taught (fixed): (1) glibc's `calloc` failure leaves `errno` ENOMEM, which
+  `ErrorExit` prints first (`error: Cannot allocate memory`); (2) glibc's `fscanf` reads nothing after a
+  complete `nan` or `inf`, so a stream that ends there keeps its end-of-file flag clear (the port's
+  scanner now asks the stream whether a read found the end, `cscan::Stream::hit_end`); (3) a colour
+  table of millions of empty places printed one mark per place made 33 MB lines that ran check.py out
+  of its 8 GiB box: the probe prints the non-empty entries with their indices, and messages beyond 1
+  MiB by their length (`BIGTEXT`).

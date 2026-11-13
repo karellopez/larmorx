@@ -148,6 +148,9 @@ pub fn solve_tridiagonal(l: &[f32], d: &[f32], u: &[f32], b: &[f32]) -> Option<V
     }
     let mut x = b.to_vec();
     let mut dd = d.to_vec();
+    // the operand order decides which of two NaNs passes on (§6): the products with the
+    // super-diagonal take it second, `U[i-1] · m` in the elimination and `x[i+1] · U[i]` in
+    // the back substitution
     for i in 1..n {
         let m = div_f32(l[i], dd[i - 1]);
         dd[i] = sub_f32(d[i], mul_f32(u[i - 1], m));
@@ -157,7 +160,7 @@ pub fn solve_tridiagonal(l: &[f32], d: &[f32], u: &[f32], b: &[f32]) -> Option<V
         x[n - 1] = div_f32(x[n - 1], dd[n - 1]);
     }
     for i in (0..n.saturating_sub(1)).rev() {
-        x[i] = div_f32(sub_f32(x[i], mul_f32(u[i], x[i + 1])), dd[i]);
+        x[i] = div_f32(sub_f32(x[i], mul_f32(x[i + 1], u[i])), dd[i]);
     }
     Some(x)
 }

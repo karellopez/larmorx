@@ -591,7 +591,8 @@ on every platform.
 ## The cubic spline of FreeSurfer's intensity normalisation (`src/cubic_spline/`; FreeSurfer's foundations, item 3.1-06, 2026-11-13)
 
 **Clean-room implementation from [`specs/burkardt-spline.md`](../../specs/burkardt-spline.md)**
-(Apache-2.0; the spec at commit `ca340f58`, SHA-256 `8cccc1e10680…`), by the same implementer, who
+(Apache-2.0; the spec at commit `ca340f58`, SHA-256 `8cccc1e10680…`; the back substitution's operand
+order from its correction at commit `c9adabb9`, SHA-256 `44ffc6d9cc21…`), by the same implementer, who
 never opened John Burkardt's spline routines (any release or copy), FreeSurfer's source, the replica,
 the documents written from FreeSurfer's source, the spec writer's check, the probe's source or
 `docs/parts/`. Its inputs: the spec; textbook material on cubic splines with first-derivative ends and
@@ -601,8 +602,8 @@ tridiagonal elimination (de Boor, *A Practical Guide to Splines*, ch. IV; Burden
 `fs_spline_probe` (its input forms read from its outputs).
 
 **Bit-identical to FreeSurfer's functions** (`docs/findings/cubic-spline-clean-room.md`, 2026-11-13
-from `84a2044d`): 20,000 cases (296,786 evaluation points, every output line), 1,000 tridiagonal
-systems, the five messages byte for byte with their exit status, FS-103's 500 NaN-knot cases under
+from `541e7aed`): 20,000 cases (296,786 evaluation points, every output line), 1,000 tridiagonal
+systems and 1,000 more with NaNs of six payloads in every band and the right-hand side, the five messages byte for byte with their exit status, FS-103's 500 NaN-knot cases under
 `reproduce`. The unit tests check the probe's values and messages and 12 golden checksums (each
 pair of end conditions, two knots with conditions 0 and 0, 80 knots; every evaluation branch).
 
@@ -644,3 +645,41 @@ hashes; **every one of the 2³² seeds**, the first 4 values of each; the offici
 `rand` per value, 11 times per seeding. The unit tests check the spec's numbers and hashes, the
 fast seeding against the spec's steps taken literally (20,011 seeds) and 6 golden checksums recorded
 from the C library's output, on every platform.
+
+## The C library's `qsort` and `qsort_r` (`src/glibc_qsort/`; FreeSurfer's foundations, the GNU family, 2026-11-13)
+
+**Clean-room implementation from [`specs/glibc-qsort.md`](../../specs/glibc-qsort.md)** (Apache-2.0;
+the spec at commit `4c0febc6`, SHA-256 `d8e5b0940932…`), by the implementer of `src/ranlux/`,
+`src/cubic_spline/` and `src/glibc_random/`, who never opened the GNU C Library's source (any release
+or copy, among others its `stdlib/`), its disassembly, the spec writer's model
+(`validation/investigations/glibc-qsort-spec-check/`), `crates-gpl/`, `crates-nc/`, FreeSurfer's
+source, the documents written from it or `docs/parts/`. Its inputs: the spec alone (the textbook
+methods it cites, Knuth's merge sort and Sedgewick's quicksort, were not needed beyond the spec's
+text); black-box runs of the C library's functions through `glibc_qsort_probe` (its source in
+`validation/investigations/glibc-qsort-probe/`, calls of `qsort` and `qsort_r` by name and an allocator
+that forwards to the C library's, read, built with `cc -O2` and run as the spec allows) and through
+`qsort_bench.c` (`validation/investigations/freesurfer-cleanroom-random-spline/`: a plain program
+that calls `qsort`, for the speed).
+
+The merge order (§4) is a top-down merge sort whose array and copy take turns as source and
+destination; elements above 32 bytes are ordered through references and moved once, cycle by cycle;
+the byte functions sort the common sizes as arrays. The quicksort order (§5) works in place with
+signed positions and stops before a call that would leave the array. §3's choice is a function of the
+caller's `Machine`. Index arithmetic only: no threads, no global state, no unsafe code.
+
+**Identical to the C library** (`docs/findings/glibc-qsort-clean-room.md`,
+`validation/investigations/freesurfer-cleanroom-random-spline/compare_glibc_qsort.py`, 2026-11-13
+from `5c9faa6e`, glibc 2.35-0ubuntu3.15): the spec's 15 reference lines and 72,996 cases of its five
+groups (small arrays of every comparator kind and size, the stack limit, arrays up to 10⁶ elements,
+the fallback, elements of 33 to 160 bytes with `qsort` and `qsort_r`), through the typed and the byte
+functions: every call sequence, arrangement and allocation request; in the 1,473 cases where glibc's
+fallback leaves the array, the same calls before the same stopping point. As fast as glibc's `qsort`
+(glibc's time over the clean room's: 0.83 to 1.38 on 10⁵ to 10⁷ elements). The unit tests check the reference
+lines, the spec's examples and 18 golden checksums on every platform.
+
+## `cfmt::f80_f`: C's `%Lf` of an x86-64 `long double`
+
+Written from the C standard's description of `%f` (ISO C 7.21.6.1) and glibc's spellings of the
+special values, for gifticlib's writer of `NIFTI_TYPE_FLOAT128` and `COMPLEX256` data: the exact
+value of the 80-bit number, correctly rounded with ties to even (glibc's default rounding).
+Original code (Apache-2.0).

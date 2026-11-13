@@ -17,6 +17,7 @@
 resolver = "3"
 members = [
     "larmorx-freesurfer-core",
+    "larmorx-freesurfer-mri",
     "larmorx-freesurfer-io",
     "larmorx-freesurfer-volume",
     "larmorx-freesurfer-filter",
@@ -49,6 +50,7 @@ repository = "https://github.com/karellopez/larmorx"
 larmorx-core = { path = "../crates/larmorx-core", version = "0.1.0-rc.1" }
 larmorx-io = { path = "../crates/larmorx-io", version = "0.1.0-rc.1" }
 larmorx-freesurfer-core = { path = "larmorx-freesurfer-core", version = "0.1.0-rc.1" }
+larmorx-freesurfer-mri = { path = "larmorx-freesurfer-mri", version = "0.1.0-rc.1" }
 larmorx-freesurfer-io = { path = "larmorx-freesurfer-io", version = "0.1.0-rc.1" }
 larmorx-freesurfer-volume = { path = "larmorx-freesurfer-volume", version = "0.1.0-rc.1" }
 larmorx-freesurfer-filter = { path = "larmorx-freesurfer-filter", version = "0.1.0-rc.1" }

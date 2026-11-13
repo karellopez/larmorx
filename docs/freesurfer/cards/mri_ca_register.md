@@ -42,8 +42,8 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `B`, `F`, `H`, `J
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/gcamorph.cpp` (12,200), `utils/gca.cpp` (8,955), `utils/mri.cpp` (5,967), `utils/mriio.cpp` (5,610), `packages/expat/xmlparse.c` (4,342), `utils/DICOMRead.cpp` (3,473), `packages/gifti/gifti_xml.c` (2,678), `packages/dicom/dcm.c` (2,191), `utils/transform.cpp` (2,036), `packages/gifti/gifti_io.c` (1,712), `utils/matrix.cpp` (1,463), `packages/dcm2niix/miniz.c` (1,348)
-- Reach per module (waves.md §3): fs.gca 23,685, fs.io 14,424, fs.volume 10,552, perm.gifti 10,365, perm.dicom 4,371, fs.filter 3,194, fs.maths 3,187, own 2,435, perm.minc 1,625, perm.misc 1,437, fs.labels 1,401, fs.core 1,302, fs.bspline 785, fs.surfio 339, perm.nifti 335, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines)
+- Reach per module (waves.md §3): fs.gca 23,685, fs.io 11,315, perm.gifti 10,365, fs.volume 8,711, perm.dicom 4,371, fs.dicomread 3,218, fs.filter 3,194, fs.maths 3,187, own 2,435, fs.mri 1,814, perm.minc 1,625, perm.misc 1,437, fs.labels 1,319, fs.core 1,302, fs.bspline 785, fs.surfio 339, perm.nifti 335, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines)
 - Its queue item brings 5,943 lines (the functions only it reaches)
   - 3.3-15: mri_ca_register (1 of 3): mri_ca_register.cpp, gca.cpp (lines 500-1128) (2,481 lines)
   - 3.3-16: mri_ca_register (2 of 3): gcamorph.cpp (lines 102-12517), gca.cpp (lines 20488-22433) (2,500 lines)

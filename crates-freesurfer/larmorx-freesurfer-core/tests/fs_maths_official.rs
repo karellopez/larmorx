@@ -15,7 +15,7 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "6cebc7a8e9a749ae619547d19bba0d991eb2c10efbbaf1cf46b65f5c0d5a6470";
+const OFFICIAL_SHA256: &str = "b6452da0610342e6ff5272ef67167f555327114b533cbaba53ac23a809fd270f";
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 9] = [

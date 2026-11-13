@@ -92,6 +92,11 @@ MIXED = {
     "crates/larmorx-hdf5/src/write/mod.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-hdf5/src/write/ohdr.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-image/src/vnl_fft.rs": "Apache-2.0 AND BSD-3-Clause",
+    # expat 2.0.1's parser, translated (MIT): the XML parser under GIFTI
+    "crates/larmorx-io/src/xml/mod.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-io/src/xml/tok.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-io/src/xml/role.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-io/src/xml/nametab.rs": "Apache-2.0 AND MIT",
     "crates/larmorx-interp/src/vnl.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-interp/src/ndimage/mod.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-interp/src/ndimage/splines.rs": "Apache-2.0 AND BSD-3-Clause",

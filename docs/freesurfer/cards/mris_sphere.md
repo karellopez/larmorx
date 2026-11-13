@@ -40,8 +40,8 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `B`, `D`, `H`, `I
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,596), `packages/expat/xmlparse.c` (4,342), `utils/mrisurf_metricProperties.cpp` (4,244), `utils/mri.cpp` (4,168), `utils/DICOMRead.cpp` (3,473), `utils/mrisurf_io.cpp` (3,424), `utils/mrisurf_compute_dxyz.cpp` (3,122), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `utils/gifti.cpp` (2,645), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923)
-- Reach per module (waves.md §3): fs.io 16,468, fs.surfio 15,798, perm.gifti 10,365, fs.deform 8,054, fs.volume 7,229, fs.gca 6,014, fs.surf 5,060, perm.dicom 4,371, fs.maths 2,241, perm.minc 1,625, perm.json 1,579, perm.misc 1,431, fs.core 1,410, fs.labels 1,177, fs.filter 834, own 795, fs.bspline 785, perm.nifti 335, fs.mars 328, fs.defect 1
-- Option paths that wait for a later module: fs.mars (328 lines)
+- Reach per module (waves.md §3): fs.surfio 15,798, fs.io 13,359, perm.gifti 10,365, fs.deform 8,054, fs.gca 6,014, fs.volume 5,455, fs.surf 5,060, perm.dicom 4,371, fs.dicomread 3,218, fs.maths 2,241, fs.mri 1,747, perm.minc 1,625, perm.json 1,579, perm.misc 1,431, fs.core 1,410, fs.labels 1,095, fs.filter 834, own 795, fs.bspline 785, perm.nifti 335, fs.mars 328, fs.defect 1
+- Option paths that wait for a later module: fs.dicomread (3,218 lines), fs.mars (328 lines)
 - Its queue item brings 1,725 lines (the functions only it reaches)
   - 3.4-17: mris_sphere (1,725 lines)
 

@@ -251,9 +251,11 @@ The modules (lines: functions of the module that some default-path program reach
 | `perm.argparse` | `larmorx-core` | permissive | 3.1 | the argparse derived from Hilton Bristow's ArgumentParser (P-06): the newer programs' command lines and messages | 396 | 7 |
 | `fs.core` | `larmorx-freesurfer-core` | replica | 3.1 | messages, diagnostics, program name, environment, version stamps, the ROMP switch, timers, paths, signals, the licence check's messages | 2,501 | 70 |
 | `fs.maths` | `larmorx-freesurfer-core` | replica | 3.1 | matrices (float and long double), the numerics wrappers over VNL and Cephes, fs_powell, fs_lbfgs, histograms, statistics, PDFs, random fields | 5,601 | 68 |
-| `fs.io` | `larmorx-freesurfer-io` | replica | 3.1 | volume formats: MRIread/MRIwrite (MGH/MGZ, NIfTI, ANALYZE, the format probe, the other readers), FreeSurfer's tags, .mat, .npy, GIFTI volumes | 18,515 | 68 |
-| `fs.labels` | `larmorx-freesurfer-io` | replica | 3.1 | colour tables, annotations, labels, register.dat, control points, point sets, CSV | 4,596 | 67 |
-| `fs.volume` | `larmorx-freesurfer-volume` | replica | 3.1 | the MRI structure, voxels and frames, conforming, regions, voxel lists, resampling, transforms (LTA, .xfm, FSL matrices), the Talairach helpers, warp fields, CMA labels | 26,345 | 67 |
+| `fs.mri` | `larmorx-freesurfer-mri` | replica | 3.1 | the MRI structure, below fs.io (the orchestrator's decision on 3.1-25, 2026-11-13: the data structure low, the functions that read files above it): the volume and its geometry (VOL_GEOM, MRI, its frames), allocation, free, header copies, the voxel-to-RAS matrices, voxel access, the colour table's structure an MRI carries | 2,101 | 67 |
+| `fs.io` | `larmorx-freesurfer-io` | replica | 3.1 | volume formats: MRIread/MRIwrite (MGH/MGZ, NIfTI, ANALYZE, the format probe, the other readers), FreeSurfer's tags, .mat, .npy, GIFTI volumes | 15,397 | 68 |
+| `fs.dicomread` | `larmorx-freesurfer-io` | replica | 3.7 | DICOM input (the orchestrator's decision on 3.1-25, 2026-11-13: moved to the completeness items, after CTN's element reading [[w3:perm.dicom:elements]]): DICOMRead.cpp's loaders (sdcmLoadVolume and the DICOM series readers, the Siemens, GE and Philips parameters, the mosaic and slice order), no default path reads DICOM; the format probe's pieces (IsDICOM, IsSiemensDICOM) stay in fs.io; SiemensAsciiTagEx's run of the strings program decided at its item by measurement | 3,227 | 67 |
+| `fs.labels` | `larmorx-freesurfer-io` | replica | 3.1 | colour tables, annotations, labels, register.dat, control points, point sets, CSV | 4,514 | 67 |
+| `fs.volume` | `larmorx-freesurfer-volume` | replica | 3.1 | voxels and frames on the MRI structure (fs.mri), conforming, regions, voxel lists, resampling, transforms (LTA, .xfm, FSL matrices), the Talairach helpers, warp fields, CMA labels | 24,217 | 67 |
 | `fs.bspline` | `larmorx-freesurfer-volume` | replica | 3.2 | EPFL's B-splines in Reuter's mriBSpline.cpp (P-10: the replica here crediting EPFL; its own queue item with mri_robust_template) | 2,057 | 67 |
 | `fs.filter` | `larmorx-freesurfer-filter` | replica | 3.1 | volume filters and morphology, intensity normalisation (its cubic spline: fs.spline), segmentation helpers, flood fill, connected components, fast marching, clusters | 11,201 | 67 |
 | `fs.gca` | `larmorx-freesurfer-gca` | replica | 3.3 | GCA atlases and GCA morphs (.gca, .m3z), the linear GCA nodes, MRI morphs, FLASH, the autoencoder | 31,147 | 67 |
@@ -273,82 +275,82 @@ The modules (lines: functions of the module that some default-path program reach
 own files, and what its own queue item brings (functions only it reaches, own files):
 
 <!-- waves.py: map -->
-| Program | Wave | Group | `gifti` | `minc` | `nifti` | `dicom` | `misc` | `json` | `geomtools` | `argparse` | `core` | `maths` | `io` | `labels` | `volume` | `bspline` | `filter` | `gca` | `surfio` | `surf` | `mars` | `deform` | `defect` | `robust` | `4dfp` | `gsl` | `spline` | own | brought by its item |
-|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `AntsDenoiseImageFs` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  | 396 | 1,022 | 1,605 | 13,971 | 968 | 6,331 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 99 | 99 |
-| `AntsN4BiasFieldCorrectionFs` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 | 1,959 |  | 396 | 1,022 | 1,605 | 13,971 | 968 | 6,599 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 271 | 353 |
-| `fs_temp_file` | 3.2 | shared |  |  |  |  |  |  |  | 396 | 127 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 19 | 19 |
-| `lta_convert` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,108 | 1,652 | 14,076 | 1,150 | 7,394 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,321 | 1,460 |
-| `mri_add_xform_to_header` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,139 | 1,605 | 14,060 | 968 | 6,266 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 171 | 224 |
-| `mri_binarize` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,408 | 1,788 | 16,183 | 1,144 | 8,700 | 785 | 1,646 | 6,014 | 8,046 | 2,042 |  | 732 |  |  |  |  |  | 1,345 | 2,351 |
-| `mri_cc` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,215 | 1,805 | 13,971 | 1,150 | 8,676 | 785 | 1,311 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 2,531 | 2,807 |
-| `mri_concat` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,321 | 1,808 | 13,971 | 968 | 7,083 | 785 | 1,468 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,331 | 2,574 |
-| `mri_convert` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,302 | 2,139 | 15,183 | 1,162 | 10,329 | 896 | 2,134 | 6,622 | 156 |  |  | 13 |  |  |  |  |  | 3,920 | 7,131 |
-| `mri_coreg` | 3.2 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,421 | 4 |  |  | 1,228 | 2,452 | 13,971 | 1,230 | 7,862 | 785 | 1,086 | 6,014 | 78 |  |  | 13 |  |  |  | 281 |  | 1,805 | 2,153 |
-| `mri_edit_wm_with_aseg` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,142 | 1,605 | 13,981 | 1,098 | 6,700 | 785 | 833 | 6,014 | 156 |  |  | 13 |  |  |  |  |  | 3,099 | 3,219 |
-| `mri_fill` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,181 | 1,642 | 13,981 | 1,400 | 8,884 | 785 | 1,822 | 6,192 | 246 |  |  | 13 |  |  |  |  |  | 6,278 | 7,112 |
-| `mri_info` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,147 | 1,738 | 14,110 | 996 | 6,329 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,392 | 1,418 |
-| `mri_label2vol` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,387 | 1,755 | 15,006 | 2,244 | 8,811 | 785 | 833 | 6,038 | 7,679 | 2,080 |  | 13 | 89 |  |  |  |  | 1,267 | 2,666 |
-| `mri_make_uchar` | 3.2 | shared | 10,365 | 1,676 | 335 | 4,371 | 1,411 |  |  |  | 1,181 | 1,862 | 13,971 | 1,085 | 7,216 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 224 | 232 |
-| `mri_mask` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,198 | 1,642 | 13,971 | 1,085 | 8,614 | 785 | 833 | 6,198 | 213 |  |  | 13 |  |  |  |  |  | 587 | 845 |
-| `mri_normalize` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,457 |  |  |  | 1,379 | 2,492 | 15,020 | 1,575 | 9,655 | 785 | 5,419 | 6,089 | 7,507 | 1,982 |  | 13 |  |  |  |  | 192 | 1,866 | 4,212 |
-| `mri_pretess` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,049 | 1,605 | 13,981 | 968 | 6,344 | 785 | 833 | 6,014 | 156 |  |  | 13 |  |  |  |  |  | 1,343 | 1,343 |
-| `mri_robust_register` | 3.2 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,135 | 1,709 | 14,223 | 1,150 | 8,173 | 1,657 | 1,951 | 6,014 | 156 |  |  | 13 |  | 5,160 |  |  |  | 1,582 | 2,412 |
-| `mri_robust_template` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,135 | 1,709 | 14,223 | 1,150 | 7,992 | 1,946 | 1,551 | 6,014 | 108 |  |  | 13 |  | 8,391 |  |  |  | 797 | 5,159 |
-| `mri_segment` | 3.2 | shared | 10,365 | 1,676 | 335 | 4,371 | 1,411 |  |  |  | 1,284 | 2,185 | 13,992 | 968 | 7,646 | 785 | 4,020 | 6,014 | 198 |  |  | 13 |  |  |  |  |  | 1,163 | 3,233 |
-| `mri_segstats` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,457 |  |  |  | 1,450 | 1,870 | 14,996 | 1,812 | 8,855 | 785 | 957 | 6,087 | 7,382 | 1,936 |  | 13 |  |  |  |  |  | 2,552 | 3,399 |
-| `mri_vol2vol` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,273 | 1,664 | 14,004 | 1,235 | 10,111 | 896 | 2,136 | 13,641 | 294 |  |  | 13 |  |  |  |  |  | 2,237 | 2,951 |
-| `mris_calc` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,173 | 1,605 | 14,125 | 1,117 | 6,266 | 785 | 833 | 6,014 | 149 |  |  | 13 |  |  |  |  |  | 2,155 | 2,155 |
-| `mri_ca_normalize` | 3.3 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,206 | 2,312 | 14,006 | 1,383 | 9,430 | 785 | 2,282 | 8,949 | 444 |  |  | 13 |  |  |  |  |  | 1,966 | 2,337 |
-| `mri_ca_register` | 3.3 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,302 | 3,187 | 14,424 | 1,401 | 10,552 | 785 | 3,194 | 23,685 | 339 |  |  | 13 |  |  |  |  |  | 2,435 | 5,943 |
-| `mri_em_register` | 3.3 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,390 | 2,847 | 14,424 | 1,448 | 10,402 | 785 | 2,348 | 11,338 | 204 |  |  | 13 |  |  |  |  |  | 2,693 | 5,201 |
-| `mri_label2label` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,795 | 1,755 | 16,256 | 2,627 | 7,623 | 785 | 847 | 6,014 | 9,304 | 3,435 |  | 13 | 75 |  |  |  |  | 1,466 | 2,831 |
-| `mri_tessellate` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,315 | 1,742 | 15,202 | 1,102 | 7,115 | 785 | 833 | 6,014 | 5,352 | 780 |  | 732 |  |  |  |  |  | 575 | 575 |
-| `mris_defects_pointset` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 1,959 |  | 396 | 1,240 | 1,755 | 14,996 | 1,332 | 7,152 | 785 | 833 | 6,014 | 7,161 | 1,831 |  | 13 |  |  |  |  |  | 142 | 157 |
-| `mris_euler_number` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,323 | 1,767 | 15,016 | 1,107 | 7,075 | 785 | 833 | 6,014 | 7,316 | 1,998 |  | 63 |  |  |  |  |  | 163 | 247 |
-| `mris_extract_main_component` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,127 | 1,755 | 16,170 | 1,124 | 7,075 | 785 | 833 | 6,014 | 7,810 | 1,864 |  | 291 |  |  |  |  |  | 25 | 25 |
-| `mris_fix_topology` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,406 | 2,178 | 16,184 | 1,346 | 7,207 | 785 | 848 | 6,014 | 11,843 | 4,696 |  | 465 | 12,104 |  |  |  |  | 805 | 13,518 |
-| `mris_inflate` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,396 | 2,219 | 16,468 | 1,124 | 7,075 | 785 | 834 | 6,014 | 13,860 | 3,889 |  | 3,886 | 1 |  |  |  |  | 609 | 1,238 |
-| `mris_remesh` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 2,053 |  | 396 | 1,246 | 2,029 | 16,170 | 1,124 | 7,114 | 785 | 847 | 6,014 | 8,238 | 3,081 |  | 177 |  |  |  |  |  | 2,105 | 2,191 |
-| `mris_remove_intersection` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 4 |  |  | 1,394 | 2,029 | 16,179 | 1,452 | 7,152 | 785 | 847 | 6,014 | 8,914 | 3,404 |  | 220 |  |  |  |  |  | 391 | 532 |
-| `mris_smooth` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,442 | 2,347 | 16,303 | 1,124 | 7,075 | 785 | 834 | 6,014 | 11,958 | 3,174 |  | 1,182 |  |  |  |  |  | 789 | 872 |
-| `mris_sphere` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,410 | 2,241 | 16,468 | 1,177 | 7,229 | 785 | 834 | 6,014 | 15,798 | 5,060 | 328 | 8,054 | 1 |  |  |  |  | 795 | 1,725 |
-| `mris_topo_fixer` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,319 | 2,278 | 16,170 | 1,124 | 7,110 | 785 | 848 | 6,014 | 11,949 | 3,056 |  | 506 | 3,721 |  |  |  |  | 4,523 | 7,236 |
-| `mri_brainvol_stats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,959 |  | 390 | 1,206 | 1,755 | 14,996 | 1,107 | 7,650 | 785 | 833 | 6,014 | 7,062 | 1,860 |  | 13 |  |  |  |  |  | 30 | 250 |
-| `mri_cor2label` | 3.5 | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,332 | 1,755 | 14,996 | 1,616 | 7,191 | 785 | 847 | 6,014 | 7,218 | 2,282 |  | 13 |  |  |  |  |  | 509 | 528 |
-| `mri_relabel_hypointensities` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,326 | 1,755 | 14,996 | 1,107 | 7,684 | 785 | 1,330 | 6,014 | 7,062 | 1,952 |  | 13 |  |  |  |  |  | 230 | 238 |
-| `mri_segreg` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,377 | 2,314 | 14,996 | 1,553 | 8,433 | 785 | 1,207 | 6,014 | 7,607 | 1,893 |  | 13 |  |  |  |  |  | 2,091 | 2,189 |
-| `mri_surf2surf` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,368 | 2,242 | 16,439 | 1,631 | 8,199 | 785 | 833 | 6,014 | 10,457 | 2,815 |  | 228 |  |  |  |  |  | 2,174 | 3,023 |
-| `mri_surf2volseg` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,373 | 1,755 | 14,996 | 1,503 | 7,075 | 785 | 833 | 6,014 | 7,374 | 1,969 |  | 13 |  |  |  |  |  | 865 | 887 |
-| `mri_vol2surf` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,352 | 2,102 | 16,121 | 1,312 | 8,600 | 785 | 1,139 | 6,014 | 7,990 | 2,619 |  | 13 |  |  |  |  |  | 1,977 | 2,481 |
-| `mris_anatomical_stats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,364 | 2,085 | 14,996 | 1,545 | 7,595 | 785 | 885 | 6,014 | 8,905 | 2,555 |  | 13 |  |  |  |  |  | 1,305 | 1,319 |
-| `mris_autodet_gwstats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,521 | 2,241 | 14,996 | 1,107 | 7,184 | 785 | 1,135 | 6,014 | 7,217 | 2,348 |  | 13 |  |  |  |  |  | 302 | 302 |
-| `mris_ca_label` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,326 | 2,085 | 16,074 | 1,932 | 7,111 | 785 | 833 | 6,014 | 8,860 | 3,362 |  | 13 | 67 |  |  |  |  | 518 | 1,513 |
-| `mris_convert` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,339 | 2,359 | 16,248 | 1,655 | 7,371 | 785 | 833 | 6,014 | 10,733 | 3,267 |  | 60 |  |  |  |  |  | 1,232 | 2,064 |
-| `mris_curvature` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,499 | 2,207 | 16,105 | 1,285 | 7,075 | 785 | 834 | 6,014 | 10,491 | 3,487 |  | 60 |  |  |  |  |  | 661 | 1,081 |
-| `mris_curvature_stats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,499 | 2,085 | 16,105 | 1,441 | 7,075 | 785 | 833 | 6,014 | 9,368 | 2,224 |  | 13 |  |  |  |  |  | 3,038 | 3,269 |
-| `mris_expand` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,410 | 2,288 | 16,468 | 1,294 | 7,111 | 785 | 834 | 6,014 | 15,116 | 4,372 |  | 7,165 | 1 |  |  | 281 |  | 424 | 445 |
-| `mris_jacobian` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,323 | 1,755 | 16,096 | 1,124 | 7,075 | 785 | 833 | 6,014 | 7,619 | 1,834 |  | 13 |  |  |  |  |  | 241 | 241 |
-| `mris_label2annot` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,355 | 1,755 | 16,074 | 1,805 | 7,075 | 785 | 833 | 6,014 | 7,347 | 1,806 |  | 13 |  |  |  |  |  | 707 | 707 |
-| `mris_place_surface` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 1,583 |  |  | 1,628 | 2,921 | 16,533 | 2,067 | 9,527 | 785 | 1,709 | 6,014 | 15,214 | 8,860 |  | 4,641 | 76 |  |  |  |  | 1,862 | 9,501 |
-| `mris_register` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,527 | 2,283 | 16,468 | 1,515 | 7,442 | 785 | 834 | 6,014 | 15,473 | 6,202 |  | 6,795 | 1 |  |  |  |  | 1,312 | 3,926 |
-| `mris_volmask` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 4 | 424 |  | 1,248 | 1,755 | 14,996 | 1,113 | 7,426 | 785 | 1,409 | 6,014 | 7,062 | 2,781 |  | 13 |  |  |  |  |  | 1,117 | 2,577 |
-| `mrisp_paint` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,439 | 2,185 | 16,170 | 1,124 | 7,075 | 785 | 834 | 6,014 | 9,698 | 2,364 |  | 13 |  |  |  |  |  | 324 | 458 |
-| `tkregister2_cmdl` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,324 | 1,755 | 15,071 | 1,288 | 7,976 | 785 | 877 | 6,014 | 7,062 | 1,806 |  |  |  |  |  |  |  | 3,937 | 4,048 |
-| `analyzeto4dfp` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 552 |  |  |  | 338 |
-| `compute_vox2vox` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 226 |  |  |  | 109 |
-| `fs_temp_dir` | 3.6 | classic-only |  |  |  |  |  |  |  | 396 | 126 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 25 |
-| `gauss_4dfp` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 884 |  |  |  | 604 |
-| `imgreg_4dfp` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 387 |  |  |  | 206 |
-| `mri_ca_label` | 3.6 | classic-only | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 4 |  |  | 1,413 | 3,191 | 15,020 | 1,294 | 11,034 | 785 | 3,875 | 16,383 | 7,137 | 1,932 |  | 13 |  |  |  |  |  | 4,849 | 9,340 |
-| `mri_matrix_multiply` | 3.6 | classic-only |  |  |  |  | 436 |  |  |  | 180 | 929 | 786 |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 321 | 321 |
-| `mri_watershed` | 3.6 | classic-only | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,431 | 2,224 | 16,194 | 1,124 | 7,594 | 785 | 1,365 | 6,089 | 9,720 | 2,200 |  | 13 | 1 |  |  |  |  | 10,299 | 10,723 |
-| `talairach_afd` | 3.6 | classic-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,178 | 1,698 | 13,971 | 1,085 | 7,075 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 559 | 600 |
-| `mri_seg_diff` | 3.7 | conditional | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,171 | 1,605 | 13,971 | 968 | 6,319 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 244 | 297 |
-| `mri_compute_seg_overlap` | N | conditional | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,059 | 1,605 | 13,971 | 1,098 | 6,552 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 521 | 732 |
-| `mri_concatenate_lta` | N | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,088 | 1,657 | 13,971 | 1,085 | 7,358 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 636 | 636 |
-| `mri_diff` | N | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,171 | 1,605 | 13,971 | 968 | 6,330 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,125 | 1,155 |
-| `mri_warp_convert` | N | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,108 | 1,642 | 13,971 | 1,085 | 7,475 | 785 | 833 | 6,409 | 123 |  |  | 13 |  |  |  |  |  | 871 | 1,005 |
+| Program | Wave | Group | `gifti` | `minc` | `nifti` | `dicom` | `misc` | `json` | `geomtools` | `argparse` | `core` | `maths` | `mri` | `io` | `dicomread` | `labels` | `volume` | `bspline` | `filter` | `gca` | `surfio` | `surf` | `mars` | `deform` | `defect` | `robust` | `4dfp` | `gsl` | `spline` | own | brought by its item |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `AntsDenoiseImageFs` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  | 396 | 1,022 | 1,605 | 1,747 | 10,862 | 3,218 | 886 | 4,557 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 99 | 99 |
+| `AntsN4BiasFieldCorrectionFs` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 | 1,959 |  | 396 | 1,022 | 1,605 | 1,747 | 10,862 | 3,218 | 886 | 4,825 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 271 | 353 |
+| `fs_temp_file` | 3.2 | shared |  |  |  |  |  |  |  | 396 | 127 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 19 | 19 |
+| `lta_convert` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,108 | 1,652 | 1,747 | 10,967 | 3,218 | 1,068 | 5,620 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,321 | 1,460 |
+| `mri_add_xform_to_header` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,139 | 1,605 | 1,747 | 10,951 | 3,218 | 886 | 4,492 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 171 | 224 |
+| `mri_binarize` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,408 | 1,788 | 1,747 | 13,074 | 3,218 | 1,062 | 6,926 | 785 | 1,646 | 6,014 | 8,046 | 2,042 |  | 732 |  |  |  |  |  | 1,345 | 2,351 |
+| `mri_cc` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,215 | 1,805 | 1,820 | 10,862 | 3,218 | 1,068 | 6,829 | 785 | 1,311 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 2,531 | 2,807 |
+| `mri_concat` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,321 | 1,808 | 1,747 | 10,862 | 3,218 | 886 | 5,309 | 785 | 1,468 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,331 | 2,574 |
+| `mri_convert` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,302 | 2,139 | 1,775 | 12,074 | 3,218 | 1,080 | 8,527 | 896 | 2,134 | 6,622 | 156 |  |  | 13 |  |  |  |  |  | 3,920 | 7,131 |
+| `mri_coreg` | 3.2 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,421 | 4 |  |  | 1,228 | 2,452 | 1,781 | 10,862 | 3,218 | 1,148 | 6,054 | 785 | 1,086 | 6,014 | 78 |  |  | 13 |  |  |  | 281 |  | 1,805 | 2,153 |
+| `mri_edit_wm_with_aseg` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,142 | 1,605 | 1,747 | 10,872 | 3,218 | 1,016 | 4,926 | 785 | 833 | 6,014 | 156 |  |  | 13 |  |  |  |  |  | 3,099 | 3,219 |
+| `mri_fill` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,181 | 1,642 | 1,820 | 10,872 | 3,218 | 1,318 | 7,037 | 785 | 1,822 | 6,192 | 246 |  |  | 13 |  |  |  |  |  | 6,278 | 7,112 |
+| `mri_info` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,147 | 1,738 | 1,757 | 11,001 | 3,218 | 914 | 4,545 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,392 | 1,418 |
+| `mri_label2vol` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,387 | 1,755 | 1,757 | 11,897 | 3,218 | 2,162 | 7,027 | 785 | 833 | 6,038 | 7,679 | 2,080 |  | 13 | 89 |  |  |  |  | 1,267 | 2,666 |
+| `mri_make_uchar` | 3.2 | shared | 10,365 | 1,676 | 335 | 4,371 | 1,411 |  |  |  | 1,181 | 1,862 | 1,777 | 10,862 | 3,218 | 1,003 | 5,412 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 224 | 232 |
+| `mri_mask` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,198 | 1,642 | 1,747 | 10,862 | 3,218 | 1,003 | 6,840 | 785 | 833 | 6,198 | 213 |  |  | 13 |  |  |  |  |  | 587 | 845 |
+| `mri_normalize` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,457 |  |  |  | 1,379 | 2,492 | 1,790 | 11,911 | 3,218 | 1,493 | 7,838 | 785 | 5,419 | 6,089 | 7,507 | 1,982 |  | 13 |  |  |  |  | 192 | 1,866 | 4,212 |
+| `mri_pretess` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,049 | 1,605 | 1,747 | 10,872 | 3,218 | 886 | 4,570 | 785 | 833 | 6,014 | 156 |  |  | 13 |  |  |  |  |  | 1,343 | 1,343 |
+| `mri_robust_register` | 3.2 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,135 | 1,709 | 1,747 | 11,114 | 3,218 | 1,068 | 6,399 | 1,657 | 1,951 | 6,014 | 156 |  |  | 13 |  | 5,160 |  |  |  | 1,582 | 2,412 |
+| `mri_robust_template` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,135 | 1,709 | 1,747 | 11,114 | 3,218 | 1,068 | 6,218 | 1,946 | 1,551 | 6,014 | 108 |  |  | 13 |  | 8,391 |  |  |  | 797 | 5,159 |
+| `mri_segment` | 3.2 | shared | 10,365 | 1,676 | 335 | 4,371 | 1,411 |  |  |  | 1,284 | 2,185 | 1,777 | 10,883 | 3,218 | 886 | 5,842 | 785 | 4,020 | 6,014 | 198 |  |  | 13 |  |  |  |  |  | 1,163 | 3,233 |
+| `mri_segstats` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,457 |  |  |  | 1,450 | 1,870 | 1,764 | 11,887 | 3,218 | 1,730 | 7,064 | 785 | 957 | 6,087 | 7,382 | 1,936 |  | 13 |  |  |  |  |  | 2,552 | 3,399 |
+| `mri_vol2vol` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,273 | 1,664 | 1,864 | 10,895 | 3,218 | 1,153 | 8,220 | 896 | 2,136 | 13,641 | 294 |  |  | 13 |  |  |  |  |  | 2,237 | 2,951 |
+| `mris_calc` | 3.2 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,173 | 1,605 | 1,747 | 11,016 | 3,218 | 1,035 | 4,492 | 785 | 833 | 6,014 | 149 |  |  | 13 |  |  |  |  |  | 2,155 | 2,155 |
+| `mri_ca_normalize` | 3.3 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,206 | 2,312 | 1,790 | 10,897 | 3,218 | 1,301 | 7,613 | 785 | 2,282 | 8,949 | 444 |  |  | 13 |  |  |  |  |  | 1,966 | 2,337 |
+| `mri_ca_register` | 3.3 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,302 | 3,187 | 1,814 | 11,315 | 3,218 | 1,319 | 8,711 | 785 | 3,194 | 23,685 | 339 |  |  | 13 |  |  |  |  |  | 2,435 | 5,943 |
+| `mri_em_register` | 3.3 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,437 |  |  |  | 1,390 | 2,847 | 1,790 | 11,315 | 3,218 | 1,366 | 8,585 | 785 | 2,348 | 11,338 | 204 |  |  | 13 |  |  |  |  |  | 2,693 | 5,201 |
+| `mri_label2label` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,795 | 1,755 | 1,790 | 13,147 | 3,218 | 2,545 | 5,806 | 785 | 847 | 6,014 | 9,304 | 3,435 |  | 13 | 75 |  |  |  |  | 1,466 | 2,831 |
+| `mri_tessellate` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,315 | 1,742 | 1,747 | 12,093 | 3,218 | 1,020 | 5,341 | 785 | 833 | 6,014 | 5,352 | 780 |  | 732 |  |  |  |  |  | 575 | 575 |
+| `mris_defects_pointset` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 1,959 |  | 396 | 1,240 | 1,755 | 1,747 | 11,887 | 3,218 | 1,250 | 5,378 | 785 | 833 | 6,014 | 7,161 | 1,831 |  | 13 |  |  |  |  |  | 142 | 157 |
+| `mris_euler_number` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,323 | 1,767 | 1,747 | 11,907 | 3,218 | 1,025 | 5,301 | 785 | 833 | 6,014 | 7,316 | 1,998 |  | 63 |  |  |  |  |  | 163 | 247 |
+| `mris_extract_main_component` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,127 | 1,755 | 1,747 | 13,061 | 3,218 | 1,042 | 5,301 | 785 | 833 | 6,014 | 7,810 | 1,864 |  | 291 |  |  |  |  |  | 25 | 25 |
+| `mris_fix_topology` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,406 | 2,178 | 1,747 | 13,075 | 3,218 | 1,264 | 5,433 | 785 | 848 | 6,014 | 11,843 | 4,696 |  | 465 | 12,104 |  |  |  |  | 805 | 13,518 |
+| `mris_inflate` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,396 | 2,219 | 1,747 | 13,359 | 3,218 | 1,042 | 5,301 | 785 | 834 | 6,014 | 13,860 | 3,889 |  | 3,886 | 1 |  |  |  |  | 609 | 1,238 |
+| `mris_remesh` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 2,053 |  | 396 | 1,246 | 2,029 | 1,747 | 13,061 | 3,218 | 1,042 | 5,340 | 785 | 847 | 6,014 | 8,238 | 3,081 |  | 177 |  |  |  |  |  | 2,105 | 2,191 |
+| `mris_remove_intersection` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 4 |  |  | 1,394 | 2,029 | 1,747 | 13,061 | 3,227 | 1,370 | 5,378 | 785 | 847 | 6,014 | 8,914 | 3,404 |  | 220 |  |  |  |  |  | 391 | 532 |
+| `mris_smooth` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,442 | 2,347 | 1,747 | 13,194 | 3,218 | 1,042 | 5,301 | 785 | 834 | 6,014 | 11,958 | 3,174 |  | 1,182 |  |  |  |  |  | 789 | 872 |
+| `mris_sphere` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,410 | 2,241 | 1,747 | 13,359 | 3,218 | 1,095 | 5,455 | 785 | 834 | 6,014 | 15,798 | 5,060 | 328 | 8,054 | 1 |  |  |  |  | 795 | 1,725 |
+| `mris_topo_fixer` | 3.4 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,319 | 2,278 | 1,747 | 13,061 | 3,218 | 1,042 | 5,336 | 785 | 848 | 6,014 | 11,949 | 3,056 |  | 506 | 3,721 |  |  |  |  | 4,523 | 7,236 |
+| `mri_brainvol_stats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,959 |  | 390 | 1,206 | 1,755 | 1,747 | 11,887 | 3,218 | 1,025 | 5,876 | 785 | 833 | 6,014 | 7,062 | 1,860 |  | 13 |  |  |  |  |  | 30 | 250 |
+| `mri_cor2label` | 3.5 | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,332 | 1,755 | 1,747 | 11,887 | 3,218 | 1,534 | 5,417 | 785 | 847 | 6,014 | 7,218 | 2,282 |  | 13 |  |  |  |  |  | 509 | 528 |
+| `mri_relabel_hypointensities` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,326 | 1,755 | 1,747 | 11,887 | 3,218 | 1,025 | 5,910 | 785 | 1,330 | 6,014 | 7,062 | 1,952 |  | 13 |  |  |  |  |  | 230 | 238 |
+| `mri_segreg` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,377 | 2,314 | 1,757 | 11,887 | 3,218 | 1,471 | 6,649 | 785 | 1,207 | 6,014 | 7,607 | 1,893 |  | 13 |  |  |  |  |  | 2,091 | 2,189 |
+| `mri_surf2surf` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,368 | 2,242 | 1,747 | 13,330 | 3,218 | 1,549 | 6,425 | 785 | 833 | 6,014 | 10,457 | 2,815 |  | 228 |  |  |  |  |  | 2,174 | 3,023 |
+| `mri_surf2volseg` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,373 | 1,755 | 1,747 | 11,887 | 3,218 | 1,421 | 5,301 | 785 | 833 | 6,014 | 7,374 | 1,969 |  | 13 |  |  |  |  |  | 865 | 887 |
+| `mri_vol2surf` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,352 | 2,102 | 1,845 | 13,012 | 3,218 | 1,230 | 6,728 | 785 | 1,139 | 6,014 | 7,990 | 2,619 |  | 13 |  |  |  |  |  | 1,977 | 2,481 |
+| `mris_anatomical_stats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,364 | 2,085 | 1,747 | 11,887 | 3,218 | 1,463 | 5,821 | 785 | 885 | 6,014 | 8,905 | 2,555 |  | 13 |  |  |  |  |  | 1,305 | 1,319 |
+| `mris_autodet_gwstats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,521 | 2,241 | 1,747 | 11,887 | 3,218 | 1,025 | 5,410 | 785 | 1,135 | 6,014 | 7,217 | 2,348 |  | 13 |  |  |  |  |  | 302 | 302 |
+| `mris_ca_label` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,326 | 2,085 | 1,747 | 12,965 | 3,218 | 1,850 | 5,337 | 785 | 833 | 6,014 | 8,860 | 3,362 |  | 13 | 67 |  |  |  |  | 518 | 1,513 |
+| `mris_convert` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,339 | 2,359 | 1,747 | 13,139 | 3,218 | 1,573 | 5,597 | 785 | 833 | 6,014 | 10,733 | 3,267 |  | 60 |  |  |  |  |  | 1,232 | 2,064 |
+| `mris_curvature` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,499 | 2,207 | 1,747 | 12,987 | 3,227 | 1,203 | 5,301 | 785 | 834 | 6,014 | 10,491 | 3,487 |  | 60 |  |  |  |  |  | 661 | 1,081 |
+| `mris_curvature_stats` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,499 | 2,085 | 1,747 | 12,987 | 3,227 | 1,359 | 5,301 | 785 | 833 | 6,014 | 9,368 | 2,224 |  | 13 |  |  |  |  |  | 3,038 | 3,269 |
+| `mris_expand` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,410 | 2,288 | 1,747 | 13,359 | 3,218 | 1,212 | 5,337 | 785 | 834 | 6,014 | 15,116 | 4,372 |  | 7,165 | 1 |  |  | 281 |  | 424 | 445 |
+| `mris_jacobian` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,323 | 1,755 | 1,747 | 12,987 | 3,218 | 1,042 | 5,301 | 785 | 833 | 6,014 | 7,619 | 1,834 |  | 13 |  |  |  |  |  | 241 | 241 |
+| `mris_label2annot` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,355 | 1,755 | 1,747 | 12,965 | 3,218 | 1,723 | 5,301 | 785 | 833 | 6,014 | 7,347 | 1,806 |  | 13 |  |  |  |  |  | 707 | 707 |
+| `mris_place_surface` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 1,583 |  |  | 1,628 | 2,921 | 1,757 | 13,424 | 3,218 | 1,985 | 7,743 | 785 | 1,709 | 6,014 | 15,214 | 8,860 |  | 4,641 | 76 |  |  |  |  | 1,862 | 9,501 |
+| `mris_register` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 1,579 |  |  | 1,527 | 2,283 | 1,747 | 13,359 | 3,218 | 1,433 | 5,668 | 785 | 834 | 6,014 | 15,473 | 6,202 |  | 6,795 | 1 |  |  |  |  | 1,312 | 3,926 |
+| `mris_volmask` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 | 4 | 424 |  | 1,248 | 1,755 | 1,747 | 11,887 | 3,218 | 1,031 | 5,652 | 785 | 1,409 | 6,014 | 7,062 | 2,781 |  | 13 |  |  |  |  |  | 1,117 | 2,577 |
+| `mrisp_paint` | 3.5 | shared | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,439 | 2,185 | 1,747 | 13,061 | 3,218 | 1,042 | 5,301 | 785 | 834 | 6,014 | 9,698 | 2,364 |  | 13 |  |  |  |  |  | 324 | 458 |
+| `tkregister2_cmdl` | 3.5 | fmriprep | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,324 | 1,755 | 1,832 | 11,962 | 3,218 | 1,206 | 6,117 | 785 | 877 | 6,014 | 7,062 | 1,806 |  |  |  |  |  |  |  | 3,937 | 4,048 |
+| `analyzeto4dfp` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 552 |  |  |  | 338 |
+| `compute_vox2vox` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 226 |  |  |  | 109 |
+| `fs_temp_dir` | 3.6 | classic-only |  |  |  |  |  |  |  | 396 | 126 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 25 |
+| `gauss_4dfp` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 884 |  |  |  | 604 |
+| `imgreg_4dfp` | 3.6 | classic-only |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 387 |  |  |  | 206 |
+| `mri_ca_label` | 3.6 | classic-only | 10,365 | 1,625 | 335 | 4,371 | 1,441 | 4 |  |  | 1,413 | 3,191 | 1,747 | 11,911 | 3,218 | 1,212 | 9,260 | 785 | 3,875 | 16,383 | 7,137 | 1,932 |  | 13 |  |  |  |  |  | 4,849 | 9,340 |
+| `mri_matrix_multiply` | 3.6 | classic-only |  |  |  |  | 436 |  |  |  | 180 | 929 |  | 786 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 321 | 321 |
+| `mri_watershed` | 3.6 | classic-only | 10,365 | 1,625 | 335 | 4,371 | 1,431 |  |  |  | 1,431 | 2,224 | 1,844 | 13,085 | 3,218 | 1,042 | 5,723 | 785 | 1,365 | 6,089 | 9,720 | 2,200 |  | 13 | 1 |  |  |  |  | 10,299 | 10,723 |
+| `talairach_afd` | 3.6 | classic-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,178 | 1,698 | 1,747 | 10,862 | 3,218 | 1,003 | 5,301 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 559 | 600 |
+| `mri_seg_diff` | 3.7 | conditional | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,171 | 1,605 | 1,747 | 10,862 | 3,218 | 886 | 4,545 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 244 | 297 |
+| `mri_compute_seg_overlap` | N | conditional | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,059 | 1,605 | 1,747 | 10,862 | 3,218 | 1,016 | 4,778 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 521 | 732 |
+| `mri_concatenate_lta` | N | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,088 | 1,657 | 1,747 | 10,862 | 3,218 | 1,003 | 5,584 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 636 | 636 |
+| `mri_diff` | N | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,171 | 1,605 | 1,747 | 10,862 | 3,218 | 886 | 4,556 | 785 | 833 | 6,014 | 78 |  |  | 13 |  |  |  |  |  | 1,125 | 1,155 |
+| `mri_warp_convert` | N | v8-only | 10,365 | 1,625 | 335 | 4,371 | 1,411 |  |  |  | 1,108 | 1,642 | 1,757 | 10,862 | 3,218 | 1,003 | 5,691 | 785 | 833 | 6,409 | 123 |  |  | 13 |  |  |  |  |  | 871 | 1,005 |
 <!-- waves.py: end map -->
 
 ## 4. The crates
@@ -363,8 +365,9 @@ or `crates-nc/`. Library crates in layers, each depending only on the ones above
 | Crate | Modules | Depends on |
 |---|---|---|
 | `larmorx-freesurfer-core` | `fs.core` (messages, diagnostics, environment, version stamps, ROMP), `fs.maths` (matrices, numerics wrappers, `fs_powell`, `fs_lbfgs`, statistics), `fs.spline` (Burkardt's 2006 spline, crediting him: P-09, published normally) | `larmorx-core` |
-| `larmorx-freesurfer-io` | `fs.io` (MRIread/MRIwrite, tags, the format probe), `fs.labels` (colour tables, annotations, labels, `register.dat`, point sets) | core, `larmorx-io` |
-| `larmorx-freesurfer-volume` | `fs.volume` (the `MRI` structure, transforms, resampling, warp fields, CMA), `fs.bspline` (EPFL's B-splines) | core, io |
+| `larmorx-freesurfer-mri` | `fs.mri` (the `MRI` structure and `VOL_GEOM`: allocation, free, header copies, the voxel-to-RAS matrices, voxel access, the colour table's structure an `MRI` carries; queue 3.1-55) | core |
+| `larmorx-freesurfer-io` | `fs.io` (MRIread/MRIwrite, tags, the format probe), `fs.labels` (colour tables, annotations, labels, `register.dat`, point sets), `fs.dicomread` (DICOM input, queue 3.7-14 and 3.7-15) | core, mri, `larmorx-io` |
+| `larmorx-freesurfer-volume` | `fs.volume` (voxels and frames on the structure, transforms, resampling, warp fields, CMA), `fs.bspline` (EPFL's B-splines) | core, mri, io |
 | `larmorx-freesurfer-filter` | `fs.filter` (filters, normalisation, segmentation helpers, flood fill) | volume |
 | `larmorx-freesurfer-surf` | `fs.surfio` (the surface structure and its I/O), `fs.surf` (the rest of the surface library), `fs.mars` (later) | volume |
 | `larmorx-freesurfer-deform` | `fs.deform` (surface deformation) | surf |
@@ -377,6 +380,24 @@ and the programs, one crate per wave, one module per program inside it:
 `-cortex` (3.5), `-classic` (3.6), `-networks` (N), `-recon` (3.7: `recon-all` and its helpers,
 which run the other crates' programs in-process), and `larmorx-freesurfer-cli` (the program
 `larmorx-freesurfer`, the wheel, the registry, the settings overlay of larmorx's three options).
+
+**Calls against the layers** (the orchestrator's decision on 3.1-25, 2026-11-13). FreeSurfer's C
+and C++ files call each other in every direction, and a Rust crate depends only on the crates below
+it. The **data structure is low and the functions that read files are above it**: the `MRI` structure
+(`fs.mri`, its own crate under `fs.io`) holds what every reader builds, so `fs.io` no longer needs
+`fs.volume` for it; a structure's methods that read or write files (`VOL_GEOM::read` and `::write`,
+`MRI::write`) go up to `fs.io`, as Rust functions on the structure. What remains against the layers
+is measured by `layering.py` (the call graph's edges, `callgraph.py --edges`): after the move, the
+reached functions of `fs.io` still call 26 functions of `fs.volume` directly (970 lines; 34 with `fs.labels` and `fs.dicomread`, the rest of the crate) (`MRIcopyFrame(s)`,
+`MRIclear`, `MRISeqchangeType`, `mri_reshape`, `MRIresample` for GCA files, `MRIreverseSliceOrder`,
+the warp-field files, CMA's outlines, ...), and the other modules a few each (`layering.py` without
+options lists every pair). Each such call is settled when its item ports the caller, in this order of
+preference: the callee moves down with the structure when it only touches the structure; the caller
+moves up to the module of its callee (a reader that resamples belongs with the resampler); or the
+lower crate takes the operation as an argument (a function or trait the higher crate supplies, as C
+does with its function pointers). Some edges are the static index's over-approximations (a local
+variable named like a function, `sx` in `MRIsetVox2RASFromMatrix`); a port checks each against the
+source before acting on it.
 
 **The replicas in the other companions** (the user, 2026-11-12, "No waiting for permissions"):
 
@@ -446,16 +467,16 @@ items). The clean-room items follow one wave behind (queue.md):
 <!-- waves.py: totals -->
 | Wave | Replica items | Lines brought | Clean-room items |
 |---|---:|---:|---:|
-| 3.1 Foundations | 52 | 89,900 | 8 |
+| 3.1 Foundations | 51 | 86,673 | 8 |
 | 3.2 Volumes | 41 | 65,703 | 30 |
 | 3.3 Atlas | 17 | 35,177 | 4 |
 | 3.4 First surfaces | 33 | 50,885 | 16 |
 | 3.5 Final surfaces and statistics | 37 | 41,047 | 29 |
 | 3.6 The classic-only programs | 21 | 22,586 | 7 |
 | N The v8 networks (a parallel track) | 15 | 3,528 | 14 |
-| 3.7 recon-all | 13 | 297 | 8 |
+| 3.7 recon-all | 16 | 3,524 | 9 |
 | the permissive pieces' clean rooms (with step 6) | - | - | 13 |
-| all | 229 | 309,123 | 129 |
+| all | 231 | 309,123 | 130 |
 <!-- waves.py: end totals -->
 
 So the whole port is about 310,000 lines of function bodies to follow (90,000 of them the
@@ -505,6 +526,15 @@ python -P validation/investigations/freesurfer-inventory/waves.py \
 exits 1 when a reached file has no module, a program no wave, a group sits outside its waves, a
 script comes before a program it runs, a W3 module's function falls in none of its parts, a text
 names an unknown item (`[[key]]`), or a numbered item is no longer generated and not marked
-retired in `queue-ids.toml` (write why, by hand). Only the reference runs count as recorded steps
+retired in `queue-ids.toml` (write why, by hand); a new item's number can be pinned by hand there
+before the run (3.1-55 and 3.1-56 were, to keep the orchestrator's numbers). Only the reference runs count as recorded steps
 (`--run-pattern`, by default the folders ending in `-classic` or `-v8`); the variability runs beside
 them (`-classic-1thread`, ...) are FreeSurfer's own variation.
+
+The calls against the layers (§4): the same `callgraph.py --core` run with `--edges <scratch>/edges.json`
+(the call edges it followed, the union over the programs), then
+
+```
+python -P validation/investigations/freesurfer-inventory/layering.py <scratch>/core.json \
+    <scratch>/edges.json [--from fs.io --into fs.volume --closure --names]
+```

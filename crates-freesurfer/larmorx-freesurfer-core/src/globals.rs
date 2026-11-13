@@ -92,6 +92,9 @@ pub struct Globals {
     /// The C library's 48-bit random numbers' process-wide state (`srand48`, `drand48`:
     /// `larmorx_core::drand48`, POSIX's definition; `PDFgaussian` draws from it).
     pub drand48: Drand48,
+    /// `vg_isEqual_Threshold` (`transform.h`): the tolerance of `VOL_GEOM::operator==` and
+    /// `vg_isEqual`, `FLT_EPSILON` until a program sets it (several set 1e-3).
+    pub vg_is_equal_threshold: f64,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -135,6 +138,7 @@ impl Globals {
             romp_main: None,
             matrix_alloc_old: false,
             drand48: Drand48::default(),
+            vg_is_equal_threshold: f64::from(f32::EPSILON),
             notices: Notices::new(mode),
         }
     }

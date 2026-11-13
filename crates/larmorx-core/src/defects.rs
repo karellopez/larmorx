@@ -16,7 +16,7 @@
 //!   reproduced). Tools return notices; the command lines print [`Notice::line`] on standard
 //!   error and the Python wrappers raise `larmorx.UpstreamDefectWarning`.
 //!
-//! The descriptions of the AFNI and FSL entries describe observable behaviour only, as the
+//! The descriptions of the AFNI, FSL and FreeSurfer entries describe observable behaviour only, as the
 //! register's summary does, so that the clean-room implementations may use them.
 
 use std::fmt;
@@ -1000,103 +1000,125 @@ defects! {
     ANTS_162 = "ANTS-162", "ANTs", true,
         "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
     FS_01 = "FS-01", "FreeSurfer", true,
-        "the C-style error messages (ErrorPrintf, ErrorExit, ErrorReturn and what calls them) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
+        "error messages printed in FreeSurfer's C style (ErrorPrintf, ErrorExit, ErrorReturn and the functions that report through them) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
     FS_02 = "FS-02", "FreeSurfer", true,
-        "DiagInit converts the PROFILE variable to an integer with no range check: a value beyond the int range (or NaN) is an undefined conversion, which gives -2147483648 on x86-64";
+        "a PROFILE environment variable beyond the int range, or NaN, is read as -2147483648 on x86-64 (the C conversion is undefined there)";
     FS_03 = "FS-03", "FreeSurfer", true,
-        "a failed internal assertion (assertFailed) ends the program by writing to address -1 on purpose, a segmentation fault, after its message; with FREESURFER_HANG_ON_ASSERT set it first loops for ever";
+        "a failed internal assertion ends the program with a segmentation fault (exit status 139) after its message; with FREESURFER_HANG_ON_ASSERT set it first waits for ever";
     FS_04 = "FS-04", "FreeSurfer", true,
-        "a program that draws random numbers before setting a seed (or after setting seed 0), with FREESURFER_SEED unset, seeds the generator from the clock: no two runs agree";
+        "a program that draws random numbers before setting a seed (or after setting seed 0), with FREESURFER_SEED unset, takes its seed from the clock: no two runs agree";
     FS_05 = "FS-05", "FreeSurfer", true,
-        "a FREESURFER_SEED that is not an integer, or is beyond a 64-bit integer, ends the program with an uncaught C++ exception (abort, exit status 134) at its first random number";
+        "a FREESURFER_SEED that is not an integer, or is beyond a 64-bit integer, ends the program with an abort (exit status 134, after the C++ library's terminate message) at its first random number";
     FS_06 = "FS-06", "FreeSurfer", true,
-        "the fast arctangent's table lookup (fastApproxAtan2f) reads outside its table when an argument is NaN, both are infinite, or the larger magnitude is so large that 100000 times the smaller overflows a float";
+        "the fast arctangent (fastApproxAtan2f) returns memory contents, or crashes, when an argument is NaN, both are infinite, or 100,000 times the smaller magnitude overflows a float";
     FS_07 = "FS-07", "FreeSurfer", true,
         "the --version and --all-info handling skips the argument that follows each option it removes and examines the last arguments again: a second version option can be missed, another handled twice";
     FS_08 = "FS-08", "FreeSurfer", true,
-        "FSENVgetenv reads memory it never wrote: the b-vector space when FS_DESIRED_BVEC_SPACE holds no number, the working directory when it cannot be read";
+        "FSENVgetenv returns memory contents for the b-vector space when FS_DESIRED_BVEC_SPACE holds no number, and for the working directory when it cannot be read";
     FS_09 = "FS-09", "FreeSurfer", true,
-        "the median (and quick_select) of an empty list reads the value before the list";
+        "the median (and quick_select) of an empty list returns memory contents (the number stored just before the list)";
     FS_10 = "FS-10", "FreeSurfer", true,
-        "the unique-integer helpers (count, list and most frequent value of a list) given an empty list read the integer past its end and report one item";
+        "the unique-integer helpers (count, list and most frequent value of a list) given an empty list report one item, whose value is memory contents";
     FS_11 = "FS-11", "FreeSurfer", true,
-        "the case-insensitive string comparison (stricmp) and the file-name extension helper copy their argument into a 1,024-byte buffer on the stack with no check: a longer string overflows it";
+        "the case-insensitive string comparison (stricmp) and the file-name extension helper crash or corrupt memory when given a string of more than 1,023 bytes";
     FS_12 = "FS-12", "FreeSurfer", true,
-        "nint and nint2 (FreeSurfer's rounding to an integer) convert values beyond the int range, and NaN, with no check, an undefined conversion that gives -2147483648 on x86-64";
+        "nint and nint2 (FreeSurfer's rounding to an integer) give -2147483648 for values beyond the int range and NaN on x86-64 (the C conversion is undefined there)";
     FS_13 = "FS-13", "FreeSurfer", true,
-        "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file (the new allocator reads a file pointer it never set or clears memory with a wrapped size), or exits";
+        "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file, or exits";
     FS_14 = "FS-14", "FreeSurfer", true,
-        "MatrixCopy copies a complex matrix float by float through its real-element pointers: of each row it copies as many floats as the matrix has columns, starting at the float before the row's first pair, so half the values are lost and the rest are shifted";
+        "MatrixCopy of a complex matrix copies, of each row, only as many floats as the row has columns, starting one float before the row's first pair, into the same places of the copy: half the values are missing and the rest are misplaced";
     FS_15 = "FS-15", "FreeSurfer", true,
-        "MatrixMultiply and MatrixMultiplyD of complex matrices add the product onto the output's earlier contents (they never clear the output): a given output, or one that is also an input, gives a wrong product";
+        "MatrixMultiply and MatrixMultiplyD of complex matrices add the product onto the output's earlier contents: a given output, or one that is also an input, gives a wrong product";
     FS_16 = "FS-16", "FreeSurfer", true,
-        "FreeSurfer's float matrices are addressed outside their arrays where types and sizes do not match (a complex product written into a real output writes past its end): memory the program does not own";
+        "matrix functions given an output whose type or size differs from the result's (a complex product into a real matrix) write outside the output: memory the program does not own";
     FS_17 = "FS-17", "FreeSurfer", true,
-        "FreeSurfer's matrices and histograms convert floats and doubles beyond the int range, and NaN, to int with no check (bins, counts compared as integers, floor of a vector), an undefined conversion that gives -2147483648 on x86-64";
+        "FreeSurfer's matrices and histograms give -2147483648 on x86-64 where they turn a float or double beyond the int range, or NaN, into an integer (bin numbers, counts compared as integers, the floor of a vector); the C conversion is undefined there";
     FS_18 = "FS-18", "FreeSurfer", true,
-        "HISTOclearCounts clears only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating";
+        "HISTOclearCounts resets only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating";
     FS_19 = "FS-19", "FreeSurfer", true,
-        "HISTOaddSample decides where a sample outside the range goes by comparing its bin number with the range's lower intensity: below a negative lower intensity it is dropped, above the range with a lower intensity beyond the bin count it is counted in the first bin; a NaN sample is counted in the first bin";
+        "HISTOaddSample places a sample outside the histogram's range by the range's lower intensity: below a negative lower intensity the sample is dropped, above the range with a lower intensity beyond the bin count it is counted in the first bin; a NaN sample is counted in the first bin";
     FS_20 = "FS-20", "FreeSurfer", true,
         "HISTOaddSample gives a sample exactly at a bin's value the weight 0 in both neighbouring bins, so it is not counted at all (with a bin size of 1 and integer intensities, no sample is counted)";
     FS_21 = "FS-21", "FreeSurfer", true,
-        "HISTOcopy, HISTOadd, HISTOsubtract and HISTOcumsum write past the arrays of an output histogram that has fewer bins allocated than the result: memory the program does not own";
+        "HISTOcopy, HISTOadd, HISTOsubtract and HISTOcumsum given an output histogram with fewer bins allocated than the result write past its arrays: memory the program does not own";
     FS_22 = "FS-22", "FreeSurfer", true,
-        "FreeSurfer's histogram searches and helpers read and write bins outside the histogram's arrays when given a start bin outside it (a search's -1 passed on), when a peak window reaches past an end, and for histograms of 0 or 1 bins: memory the program does not own";
+        "FreeSurfer's histogram searches and helpers read and write outside the histogram's bins when given a start bin outside it (-1 included), when a peak window reaches past an end, and for histograms of 0 or 1 bins: memory the program does not own";
     FS_23 = "FS-23", "FreeSurfer", true,
         "HISTOmakePDF given an output histogram other than its source normalises the output's own counts instead of the source's";
     FS_24 = "FS-24", "FreeSurfer", true,
-        "HISTOrobustGaussianFit of a histogram of one bin never returns: the loop that widens its window cannot widen it";
+        "HISTOrobustGaussianFit of a histogram of one bin never returns";
     FS_25 = "FS-25", "FreeSurfer", true,
-        "FreeSurfer's real-only matrix operations (identity, transpose, sums, differences, scalar products, squares, diagonals, constants, reshapes, traces, element sums, symmetry and zero tests, column norms, vector lengths and products) address a complex matrix's floats as if it were real, and MatrixClear clears only part of a complex matrix: wrong values, no message";
+        "FreeSurfer's real-only matrix operations (identity, transpose, sums, differences, scalar products, squares, diagonals, constants, reshapes, traces, element sums, symmetry and zero tests, column norms, vector lengths and products) give a complex matrix the results of a real matrix of its numbers, and MatrixClear clears only part of a complex matrix: wrong values, no message";
     FS_26 = "FS-26", "FreeSurfer", true,
         "MatrixCopyRealRegion into a complex destination copies the source's imaginary parts instead of its real parts";
     FS_27 = "FS-27", "FreeSurfer", true,
-        "MatrixCopyRealRegion and MatrixCopyImagRegion read a real source as if it were complex (DCTcopy passes real vectors: each value comes from the next element, the last from beyond the array), and MatrixCopyRegion between a real and a complex matrix addresses one through the other's layout";
+        "MatrixCopyRealRegion and MatrixCopyImagRegion of a real source take each value from the next element (the last one from beyond the array: memory contents), and MatrixCopyRegion between a real and a complex matrix copies the wrong numbers";
     FS_28 = "FS-28", "FreeSurfer", true,
-        "matrix functions that fill a caller's output do not check that it fits (the region copies' destination region, MatrixTranspose's and MatrixRealToComplex's output, MatrixIdentity's given matrix, MatrixDiag's and MatrixNormalizeColScale's): elements are written into other rows or outside the array";
+        "matrix functions that fill a caller's output do not check that it fits (the region copies' destination region, MatrixTranspose's and MatrixRealToComplex's output, MatrixIdentity's given matrix, MatrixDiag's and MatrixNormalizeColScale's): elements land in other rows or outside the array";
     FS_29 = "FS-29", "FreeSurfer", true,
-        "PDFtodSeed seeds from the clock (seconds plus microseconds): the programs and random fields that take it when no seed is given never repeat a run";
+        "PDFtodSeed's seed comes from the clock (seconds plus microseconds): a run that takes its seed from it when no seed is given never repeats";
     FS_30 = "FS-30", "FreeSurfer", true,
-        "PDFgaussian divides zero by zero when both of its uniform draws give exactly 0 (drand48 returned 0.5 twice): it returns NaN";
+        "PDFgaussian returns NaN (zero divided by zero) when its two uniform draws are both exactly 0.5";
     FS_32 = "FS-32", "FreeSurfer", true,
-        "GetClosestPrimeFactor and GetClosestPrimeFactorLess of 1, which has no prime factor, read the first element of the empty factor list (0 from glibc's calloc): mri_surf2surf and mri_vol2surf reshape a one-vertex surface by a factor of 0";
+        "GetClosestPrimeFactor and GetClosestPrimeFactorLess of 1, which has no prime factor, return memory contents (0 in practice) as the factor";
     FS_33 = "FS-33", "FreeSurfer", true,
-        "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)";
+        "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory that was never allocated (the inverse also writes 16 numbers past its output; the determinant returns memory contents), and MatrixInverse of a singular complex matrix crashes";
     FS_31 = "FS-31", "FreeSurfer", true,
-        "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
+        "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct and VectorTripleProduct accept column vectors of one or two elements and never check the other vectors; VectorDot and VectorDistance take the second vector to the first's length): values are read from outside the vectors";
     FS_34 = "FS-34", "FreeSurfer", true,
-        "OpenPowell and OpenPowell2 accept no initial directions (a NULL matrix) but then write the final directions through it: a crash";
+        "OpenPowell and OpenPowell2 called with no initial directions (NULL) crash when they return the final directions";
     FS_35 = "FS-35", "FreeSurfer", false,
-        "fs_powell returns FAILED_USER_REQUEST where VNL's Powell, which it copies, returns FAILED_TOO_MANY_ITERATIONS (its iteration limit), so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
+        "fs_powell reports FAILED_USER_REQUEST, not FAILED_TOO_MANY_ITERATIONS, when it reaches its iteration limit, so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
     FS_36 = "FS-36", "FreeSurfer", false,
-        "OpenPowell's tolerance argument sets VNL's x tolerance, which Powell's method never reads: every call stops at VNL's default relative tolerance on the cost, 1e-10 (kept: the programs' results depend on it)";
+        "OpenPowell's tolerance argument has no effect: every call stops at a relative tolerance of 1e-10 on the cost (kept: the programs' results depend on it)";
     FS_37 = "FS-37", "FreeSurfer", true,
-        "fs_lbfgs records its best point only from the second evaluation on and reports the last value evaluated: without an improvement on the starting point a successful run empties the parameters (OpenDFPMin then crashes) and a failed one leaves them at the line search's last trial point with the previous run's end value; otherwise the end value can be a worse point's";
+        "fs_lbfgs never returns its starting point as the best one: when no evaluation improves on it, a successful run returns empty parameters (OpenDFPMin then crashes) and a failed one returns the line search's last trial point with the previous run's end value; and the end value it reports is the last one evaluated, which can be a worse point's";
     FS_38 = "FS-38", "FreeSurfer", true,
-        "OpenDFPMin repeats the minimization while the cost improved by more than the tolerance relative to the caller's first value, never to the previous pass's (its comment: keep iterating if the error is not significantly better), so it repeats until a pass fails or FreeSurfer crashes (FS-37)";
+        "OpenDFPMin repeats its minimization while the cost is better than the caller's starting value by more than the tolerance, never comparing with the previous pass's, so it repeats until a pass fails or crashes (FS-37)";
     FS_39 = "FS-39", "FreeSurfer", true,
-        "OpenDFPMin returns FAILED_USER_REQUEST without writing the parameters, the iteration count or the final value when an L-BFGS pass reaches its evaluation limit: the progress made is dropped and the caller reads its own unset count";
+        "OpenDFPMin returns FAILED_USER_REQUEST without writing the parameters, the iteration count or the final value when an L-BFGS pass reaches its evaluation limit: the progress made is lost and the caller's count is left unset";
     FS_40 = "FS-40", "FreeSurfer", true,
-        "MatrixSVDEigenValues and MatrixConditionNumber read the singular values up to the matrix's row count where the decomposition has as many as its columns: for a matrix with more rows than columns they read past the vector (memory the program does not own), and the eigenvalues and the condition number (1e8 where that memory holds 0) depend on it";
+        "MatrixSVDEigenValues and MatrixConditionNumber of a matrix with more rows than columns read values past the singular values (memory the program does not own), so the eigenvalues and the condition number (1e8 where that memory holds 0) are arbitrary";
     FS_41 = "FS-41", "FreeSurfer", true,
-        "OpenNonSymmetricEigenSystem copies the matrix into a variable-length array on the stack (8 bytes an element): a non-symmetric matrix of about a thousand rows or more overflows the default 8 MiB stack, a crash";
+        "OpenNonSymmetricEigenSystem of a non-symmetric matrix of about a thousand rows or more crashes under the default 8 MiB stack limit";
     FS_42 = "FS-42", "FreeSurfer", true,
-        "OpenEigenSystem ignores VNL's failure (EISPACK's tql2 not converging, as on a matrix with NaN entries): it returns success with eigenvectors VNL never wrote (memory contents)";
+        "OpenEigenSystem reports success with eigenvectors that are memory contents when the eigensystem does not converge (as for a matrix with NaN entries)";
     FS_43 = "FS-43", "FreeSurfer", true,
-        "MatrixSVD allocates V with as many rows and columns as the matrix has rows where the decomposition's V has as many as its columns (with more rows than columns V's numbers land in the wrong places), and ignores a failed decomposition (fewer rows than columns, or LINPACK not converging): V comes back unchanged, zeros for a new one, with no message";
+        "MatrixSVD gives V as many rows and columns as the matrix has rows where the decomposition's V has as many as its columns (with more rows than columns V's numbers land in the wrong places), and a failed decomposition (fewer rows than columns, or no convergence) leaves V unchanged (zeros for a new one), with no message";
     FS_44 = "FS-44", "FreeSurfer", true,
-        "MatrixSVDInverse of a matrix with more rows than columns allocates the transpose of U as a square matrix and reads the singular values and writes their inverses up to the row count, past their vectors: FreeSurfer crashes or ends the program";
+        "MatrixSVDInverse of a matrix with more rows than columns crashes or ends the program";
     FS_45 = "FS-45", "FreeSurfer", true,
-        "MatrixPseudoInverse of a matrix with fewer rows than columns crashes when the pseudo-inverse of its transpose is NULL (a zero matrix) or cannot be written into the caller's output, which it passes on although that has the other shape; an output of the inner shape is filled, freed, and a new matrix returned";
+        "MatrixPseudoInverse of a matrix with fewer rows than columns crashes for a zero matrix and for a caller's output it cannot fill (one of the other shape), and given an output of the transposed shape it fills it, frees it and returns a new matrix";
     FS_46 = "FS-46", "FreeSurfer", true,
-        "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), ignores a failed decomposition (a pseudo-inverse of infinities from the unset singular values), and of a zero matrix with fewer rows than columns crashes transposing the NULL inner result";
+        "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), returns a pseudo-inverse of infinities when the decomposition fails, and crashes for a zero matrix with fewer rows than columns";
     FS_47 = "FS-47", "FreeSurfer", true,
-        "OpenEigenSystem passes a matrix with infinite or NaN entries to VNL's symmetric eigensystem, whose EISPACK pythag never returns on a NaN or on two infinite arguments: MatrixEigenSystem of a symmetric matrix with infinite entries (and the helper's symmetric path with NaN ones) hangs";
+        "MatrixEigenSystem of a symmetric matrix with infinite entries, and MatrixCalculateEigenSystemHelper's symmetric case of a matrix with NaN entries, never return";
     FS_48 = "FS-48", "FreeSurfer", true,
-        "OpenSvdcmp passes a matrix with infinite or NaN entries to VNL's singular value decomposition, whose LINPACK ssvdc can loop for ever on such a matrix: the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) hang on some of them";
+        "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of the file return a value they never read (the stack's contents; freadInt prints nothing): MatrixReadFrom of a short file fills the matrix's type, sizes or elements with memory contents";
+        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), so MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
+    FS_50 = "FS-50", "FreeSurfer", true,
+        "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
+    FS_51 = "FS-51", "FreeSurfer", true,
+        "HISTOrobustGaussianFit never returns for an infinite bin size, or one so small that a tenth of it rounds to 0";
+    FS_52 = "FS-52", "FreeSurfer", true,
+        "MRIgetVoxVal and MRIsetVoxVal do not check that a voxel index lies in the volume (but for negative columns, rows and slices when reading): a column, row, slice or frame beyond the volume reads or writes another voxel of it (a column past the end of a row is the next row's first voxel), and writing at a negative index writes an earlier voxel";
+    FS_53 = "FS-53", "FreeSurfer", true,
+        "MRIgetVoxVal and MRIsetVoxVal at an index beyond the volume's whole buffer read memory contents or write outside the volume (a crash or another object's corruption), and so do writes and complex-voxel accesses at a row or slice index outside the volume";
+    FS_54 = "FS-54", "FreeSurfer", true,
+        "MRIsetVoxVal of an MRI_LONG volume rounds the value to an int (-2147483648 beyond the int range) and also stores it as a 4-byte int into half of another voxel of the row (the voxel at half its column), corrupting that voxel";
+    FS_55 = "FS-55", "FreeSurfer", true,
+        "a volume of a type MRIsizeof does not size (MRI_BITMAP, MRI_DOUBLE_COMPLEX, unknown type codes) is not refused as an unsupported type: its allocation fails with 'could not allocate memory for slice 1 out of N' (or, with no voxels, succeeds with impossible sizes)";
+    FS_56 = "FS-56", "FreeSurfer", true,
+        "MRIcopyHeader onto a volume without a registration matrix does not copy the source's: the copy has none";
+    FS_57 = "FS-57", "FreeSurfer", true,
+        "CTABdeepCopy does not copy a colour table's idbase (the copy has 0) nor its entries' voxel counts (memory contents)";
+    FS_58 = "FS-58", "FreeSurfer", true,
+        "reading or writing a voxel of a volume made without voxels (MRIallocHeader, a header read alone) crashes";
+    FS_59 = "FS-59", "FreeSurfer", true,
+        "assigning a geometry (VOL_GEOM) that has no cached voxel-to-RAS matrices onto one that has them keeps the destination's old matrices, computed from its old geometry";
+    FS_60 = "FS-60", "FreeSurfer", true,
+        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform but leaves the destination pointing at it (its use or the volume's end then crashes)";
     FS_71 = "FS-71", "MINC volume_io", true,
         "a compressed input (.gz, .Z, .z, or a missing name whose compressed file exists) is decompressed by running gunzip -c, then bunzip2 -c, through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
     FS_72 = "FS-72", "MINC volume_io", true,
@@ -1113,6 +1135,28 @@ defects! {
         "znzread on a compressed file that ends inside a member counts that member as read (nmemb - remain/size rounds the missing members down): a caller checking the count takes a short read for a complete one";
     FS_78 = "FS-78", "zlib 1.2.11", true,
         "gzseek forward (or gzflush or gzclose after it) before the first gzwrite fills the gap with memory zlib never set instead of zeros: gz_zero clears its buffer once, before allocating it";
+    FS_79 = "FS-79", "MINC volume_io", true,
+        "a backslash in a file name is an escape that expand_filename drops, and only '/' separates directories: a Windows path (C:\\Users\\...) loses its separators, its directory, base name and extension are misread, and a file next to it is never found";
+    FS_80 = "FS-80", "gifticlib", true,
+        "a label table whose Labels carry colours for some labels only leaves holes in its colour array (or makes it shorter than the table), and a Label whose Key attribute is missing or wrong is given no key: the writer, the validity check and the display read memory never written";
+    FS_81 = "FS-81", "gifticlib", true,
+        "Base64 data whose character data hold characters outside the alphabet (skipped and counted, the default) take the bytes carried to the next piece from the wrong place when a group of four is cut at the piece's end: the values after it are decoded from earlier text or from memory never written";
+    FS_82 = "FS-82", "gifticlib", true,
+        "NIFTI_TYPE_FLOAT128 is 6 bytes per value in gifticlib's type table (a long double takes 16): its arrays are allocated, decoded and written with 6 bytes per value, and the ASCII writer reads 16 per value, past the data";
+    FS_83 = "FS-83", "gifticlib", true,
+        "the ASCII decoder's count of a value's pieces (COMPLEX64, COMPLEX128, RGB24) persists from one array to the next, even of another file: after an array whose last value is incomplete the next array of that type starts in the middle of a value";
+    FS_84 = "FS-84", "gifticlib", true,
+        "a metadata entry without a name (an MD whose Name has no text) is compared through a null pointer by gifti_get_meta_value and, at verbosity 2 and below, gifti_add_to_meta: the program crashes";
+    FS_85 = "FS-85", "gifticlib", true,
+        "a GIFTI element outside the element it belongs to (Data, MatrixData, a coordinate system outside a DataArray, a Name or Value outside an MD, a dimension past Dim7 when writing) is read or written through a null or out-of-range pointer: the program crashes or reads memory it never wrote";
+    FS_86 = "FS-86", "gifticlib", true,
+        "character data (white space included) after a CDATA section or a child element inside a GIFTI Name, Value, Label, DataSpace or TransformedSpace, or inside one of them outside its parent, is written through a null pointer: the program crashes";
+    FS_88 = "FS-88", "expat", true,
+        "a UTF-16 document of an odd length whose last token is cut by its odd byte (white space, a name or a ']' at the end of the prolog or the content) is converted past its end: the program crashes or never returns";
+    FS_89 = "FS-89", "expat", true,
+        "an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: the program crashes";
+    FS_87 = "FS-87", "gifticlib", true,
+        "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,
@@ -1131,6 +1175,38 @@ defects! {
         "restoring the target or layer-IV coordinates of a spherical patch sets its canonical coordinates to the temporary coordinates, not to the restored ones";
     FS_116 = "FS-116", "FreeSurfer", true,
         "reading a face's original area while it is still marked to be computed later prints NYI and crashes the program on purpose (a segmentation fault)";
+    FS_161 = "FS-161", "FreeSurfer", true,
+        "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
+    FS_162 = "FS-162", "FreeSurfer", true,
+        "MRIcopy from float to short, unsigned short or unsigned char, and from short to unsigned char, wraps values outside the destination type's range around (40000 becomes -25536 in short, -5 becomes 251 in unsigned char) where the rest of FreeSurfer clips them";
+    FS_163 = "FS-163", "FreeSurfer", true,
+        "MRIcopy into a given volume of another extent or frame count puts the source's rows in other places, or writes past the destination (a crash or another object's corruption)";
+    FS_164 = "FS-164", "FreeSurfer", true,
+        "MRItkReg2Native of a registration matrix that cannot be inverted (singular) returns the uninverted native product, or a matrix of infinities, with no message";
+    FS_165 = "FS-165", "FreeSurfer", true,
+        "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
+    FS_166 = "FS-166", "FreeSurfer", true,
+        "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
+    FS_167 = "FS-167", "FreeSurfer", true,
+        "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
+    FS_168 = "FS-168", "FreeSurfer", true,
+        "fio_dirname of a name of one character (a, or a/ with trailing slashes) can return / instead of ., depending on what the memory allocator left in memory it had just been given back";
+    FS_169 = "FS-169", "FreeSurfer", true,
+        "fio_DirIsWritable of a directory name of 1,982 bytes or more (1,983 when it names a file) overflows a 2,000-byte buffer: the program aborts with *** buffer overflow detected ***";
+    FS_170 = "FS-170", "FreeSurfer", true,
+        "TSV::read of an empty file takes its column names from memory contents";
+    FS_171 = "FS-171", "FreeSurfer", true,
+        "TSV::read of a file whose first line is empty reads, and can change, a byte of memory outside the line it read";
+    FS_172 = "FS-172", "FreeSurfer", true,
+        "TSV::read of a table with an entry that is not a number stores the previous number (memory contents for the first) in its place and, unless the characters it passes over lead to a number, never returns: it reads empty rows until memory runs out";
+    FS_173 = "FS-173", "FreeSurfer", true,
+        "TSV::print and TSV::write with a format that does not print exactly one double (a conversion of another type, or more than one) print register or memory contents or crash, and with a format of more than 998 bytes the program aborts with *** buffer overflow detected ***";
+    FS_174 = "FS-174", "FreeSurfer", true,
+        "an allocation that fails in lcalloc ends the program with exit status 0, as if it had succeeded, after printing Cannot calloc()";
+    FS_176 = "FS-176", "FreeSurfer", true,
+        "the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
+    FS_175 = "FS-175", "FreeSurfer", true,
+        "byteswapbufshort, byteswapbuffloat and byteswapbufdouble given a byte count that is not a multiple of the number's size reverse the bytes of a whole last number past the count: past the end of a buffer that ends at the count (memory the program does not own)";
 }
 
 /// The register entry with ID `id`.

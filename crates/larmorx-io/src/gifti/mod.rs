@@ -13,7 +13,7 @@
 //! check of [`Gifti::valid_gifti_image`] and the coordinate-system intent check of the reader);
 //! [`Gifticlib`] is gifticlib's own behaviour. A replica of such a program supplies its own.
 //!
-//! D13's corrections of gifticlib's and expat's defects are named in [`defects`] (FS-80 to FS-88); the
+//! D13's corrections of gifticlib's and expat's defects are named in [`defects`] (FS-80 to FS-89); the
 //! source is `gifti_io.c` and `gifti_xml.c` of gifticlib's history at version 1.12
 //! (`PROVENANCE.md`).
 
@@ -66,6 +66,10 @@ pub mod defects {
     /// converts it past the end of its buffer (the program crashes or never returns). Both
     /// modes: the odd byte is dropped, with a notice.
     pub const EXPAT_ODD_UTF16: &str = "FS-88";
+    /// An XML error reported inside a multibyte character (a non-ASCII character in the XML
+    /// declaration's pseudo-attributes): expat 2.0.1's line count steps over the error position
+    /// and reads past the document (a crash). Both modes: the lines before it, with a notice.
+    pub const EXPAT_LINE_PAST_END: &str = "FS-89";
 }
 
 // NIfTI-1's codes (nifti1.h).

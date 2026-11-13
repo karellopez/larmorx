@@ -245,6 +245,7 @@ pub struct Parser {
     doctype_sysid: Option<Vec<u8>>,
     doctype_pubid: Option<Vec<u8>>,
     past_end: bool,
+    line_past_end: bool,
 }
 
 impl Default for Parser {
@@ -287,7 +288,16 @@ impl Parser {
             doctype_sysid: None,
             doctype_pubid: None,
             past_end: false,
+            line_past_end: false,
         }
+    }
+
+    /// Whether expat 2.0.1's [`Parser::current_line_number`] would have read past the document:
+    /// an error reported inside a multibyte character (a non-ASCII character in an XML
+    /// declaration's pseudo-attribute), which its line count steps over (the program crashes).
+    /// larmorx counts the lines before it.
+    pub fn line_read_past_end(&self) -> bool {
+        self.line_past_end
     }
 
     /// Whether expat 2.0.1 would have read past the end of the document: the last token of a
@@ -316,7 +326,9 @@ impl Parser {
             let (b, p0, p1) = (self.base, self.position_ptr, e);
             let enc = self.pos_enc();
             let mut pos = self.position;
-            enc.update_position(&self.buf, p0 - b, p1 - b, &mut pos);
+            if !enc.update_position(&self.buf, p0 - b, p1 - b, &mut pos) {
+                self.line_past_end = true;
+            }
             self.position = pos;
             self.position_ptr = e;
         }
@@ -365,7 +377,7 @@ impl Parser {
                 }
                 let enc = self.pos_enc();
                 let mut pos = self.position;
-                enc.update_position(
+                let _ = enc.update_position(
                     &self.buf,
                     self.position_ptr - self.base,
                     next - self.base,

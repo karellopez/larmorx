@@ -292,9 +292,18 @@ fn darray(d: &mut D, da: &DataArray) {
     d.i(da.data.is_some() as i32);
     if let Some(data) = &da.data {
         d.l(data.len() as i64);
-        d.raw(data);
+        d.l(fnv(data) as i64);
     }
     nvp(d, &da.ex_atrs);
+}
+
+/// FNV-1a 64.
+pub fn fnv(b: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &x in b {
+        h = (h ^ x as u64).wrapping_mul(0x100000001b3);
+    }
+    h
 }
 
 /// `put_gim` of the port's image; with `keys_unset` (an FS-80 notice), keys of 0 match anything
@@ -394,15 +403,8 @@ pub fn read_text(b: &[u8]) -> Vec<String> {
                     v.push(format!("DA[{k}] nvals {nv} nbyper {nb}"));
                     if r.i() != 0 {
                         let n = r.l();
-                        let data = r.bytes(n.max(0) as usize);
-                        let mut h: u64 = 0xcbf29ce484222325;
-                        for &x in data {
-                            h = (h ^ x as u64).wrapping_mul(0x100000001b3);
-                        }
-                        let head: Vec<u8> = data.iter().take(24).copied().collect();
-                        v.push(format!(
-                            "DA[{k}] data {n} bytes fnv {h:016x} head {head:02x?}"
-                        ));
+                        let h = r.l() as u64;
+                        v.push(format!("DA[{k}] data {n} bytes fnv {h:016x}"));
                     } else {
                         v.push(format!("DA[{k}] data NULL"));
                     }

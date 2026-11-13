@@ -17,6 +17,7 @@ scripts/orchestration/boxed.sh 12 <out>/fs-gifti <out> [scale] [--only scan|xml|
 - `libfs.so`: FreeSurfer 8.2.0's `libgifti.a`, `libexpat.a`, `libnifti.a` from the unit oracle's
   build, with `shim.c` compiled against FreeSurfer's `packages/` headers (read by the compiler
   only).
+- Data arrays are compared by their length and FNV-1a hash (the dumps stay small).
 - Every call of an original runs in a forked child (`src/ffi.rs`): the libraries' state is fresh
   each time, a crash or a hang (killed after 20 s) is recorded as such.
 - Families: `scan` (`sscanf("%f")` against glibc's: 20,000 strings per scale unit: halfway values,

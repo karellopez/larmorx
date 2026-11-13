@@ -306,10 +306,17 @@ impl Gifti {
             }
             if st.is_err() {
                 let code = parser.error_code();
+                let line = parser.current_line_number();
+                if parser.line_read_past_end() {
+                    r.notices.add(
+                        &d::FS_89,
+                        "an XML error inside a multibyte character: expat's line count reads past the document (a crash); the lines before it",
+                    );
+                }
                 r.out.err(&format!(
                     "** {} at line {}\n",
                     xml::error_string(code).unwrap_or("(null)"),
-                    parser.current_line_number() as u32
+                    line as u32
                 ));
                 ok = false;
                 break;
@@ -1578,6 +1585,10 @@ impl Reader<'_> {
     }
 
     fn hex(&mut self, mesg: &str, bytes: &[u8]) {
+        // gifti_disp_hex_data prints nothing at all for no bytes
+        if bytes.is_empty() {
+            return;
+        }
         let mut s = String::from(mesg);
         for &b in bytes {
             // `%02x` of a (signed) char: bytes above 0x7f print as ffffff..

@@ -126,6 +126,7 @@ pub fn scan(up: &Lib, work: &Work, n: u64) -> Tally {
 
 fn port_events(data: &[u8], pieces: &[i32]) -> (D, bool) {
     let mut d = D::default();
+    let mut past = false;
     let mut p = xml::Parser::new();
     let mut off = 0usize;
     for (k, &n) in pieces.iter().enumerate() {
@@ -139,12 +140,13 @@ fn port_events(data: &[u8], pieces: &[i32]) -> (D, bool) {
             d.c(b'R');
             d.i(p.error_code());
             d.l(p.current_line_number() as i64);
+            past = p.line_read_past_end();
             break;
         }
         off += n;
         d.c(b'K');
     }
-    (d, p.read_past_end())
+    (d, p.read_past_end() || past)
 }
 
 fn c_events(lib: &Lib, work: &Work, data: &[u8], pieces: &[i32]) -> Child {
@@ -224,6 +226,11 @@ pub fn xml(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
         let (ours, past_end) = match std::panic::catch_unwind(|| port_events(&data, &pieces)) {
             Ok(d) => d,
             Err(_) => {
+                let _ = std::fs::write(work.dir.join(format!("xml-panic-{case}.xml")), &data);
+                let _ = std::fs::write(
+                    work.dir.join(format!("xml-panic-{case}.pieces")),
+                    format!("{pieces:?}"),
+                );
                 t.diff(&|| {
                     format!(
                         "case {case}: the port panicked on {:?}",
@@ -424,6 +431,7 @@ fn port_read(
     g.set_zlevel(s[4], &mut cap);
     g.set_indent(s[5]);
     let path = std::path::Path::new("case.gii");
+    let _ = std::fs::remove_file(format!("{wname}.ext"));
     let mut written = None;
     for f in 0..case.nfiles {
         let gim = if !case.dalist.is_empty() {
@@ -614,7 +622,8 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
             let crashy = p.notices.contains(&d::FS_84)
                 || p.notices.contains(&d::FS_85)
                 || p.notices.contains(&d::FS_86)
-                || p.notices.contains(&d::FS_88);
+                || p.notices.contains(&d::FS_88)
+                || p.notices.contains(&d::FS_89);
             let garbage = crashy || p.notices.contains(&d::FS_80) || p.notices.contains(&d::FS_87);
             match c.end {
                 End::Exit(0) => {}

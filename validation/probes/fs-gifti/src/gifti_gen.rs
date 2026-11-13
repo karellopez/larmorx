@@ -283,6 +283,11 @@ impl Gen {
         for d in dims.iter_mut().take(ndim.min(6)) {
             *d = [1usize, 2, 3, 4, 5, 7, 0, 33][self.below(8) as usize];
         }
+        // at most 65,536 values declared (both sides allocate what the dimensions say)
+        while dims.iter().take(ndim.min(6)).product::<usize>() > 65536 {
+            let k = (0..6).max_by_key(|&k| dims[k]).unwrap_or(0);
+            dims[k] /= 2;
+        }
         let nvals: usize = dims.iter().take(ndim.min(6)).product::<usize>().min(4096);
         let enc = [
             "ASCII",

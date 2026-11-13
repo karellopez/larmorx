@@ -574,5 +574,4 @@ mod tests {
         assert_eq!(b("-Infinity"), Some(0xff80_0000));
         assert_eq!(strtof(b"nan(0x7f)").0.to_bits(), 0x7fc0_007f);
     }
-
 }

@@ -216,7 +216,11 @@ fn writer_digests_every_type_and_encoding() {
     ];
     let mut all = Vec::new();
     for (k, &t) in types.iter().enumerate() {
-        for enc in [GIFTI_ENCODING_ASCII, GIFTI_ENCODING_B64BIN, GIFTI_ENCODING_B64GZ] {
+        for enc in [
+            GIFTI_ENCODING_ASCII,
+            GIFTI_ENCODING_B64BIN,
+            GIFTI_ENCODING_B64GZ,
+        ] {
             let mut lib = Gifti::new();
             lib.set_verb(7);
             lib.xml_set_verb(7);

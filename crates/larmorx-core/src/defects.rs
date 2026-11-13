@@ -1033,6 +1033,8 @@ defects! {
         "character data (white space included) after a CDATA section or a child element inside a GIFTI Name, Value, Label, DataSpace or TransformedSpace, or inside one of them outside its parent, is written through a null pointer: the program crashes";
     FS_88 = "FS-88", "expat", true,
         "a UTF-16 document of an odd length whose last token is cut by its odd byte (white space, a name or a ']' at the end of the prolog or the content) is converted past its end: the program crashes or never returns";
+    FS_89 = "FS-89", "expat", true,
+        "an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: the program crashes";
     FS_87 = "FS-87", "gifticlib", true,
         "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
 }

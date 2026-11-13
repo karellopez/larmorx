@@ -511,12 +511,11 @@ impl W<'_> {
             }
         }
         if missing {
-            let id = if t == NIFTI_TYPE_FLOAT128 {
-                &d::FS_82
-            } else {
-                &d::FS_85
-            };
-            self.notices.add(id, "values past the end of the array's data written from zeros (gifticlib reads past it)");
+            // (with FLOAT128's 6-byte size, FS-82, the ASCII writer reads 16 bytes a value)
+            self.notices.add(
+                &d::FS_85,
+                "values past the end of the array's data written from zeros (gifticlib reads past it)",
+            );
         }
         s.push('\n');
         self.put(&s);

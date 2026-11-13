@@ -192,9 +192,12 @@ static void put_gim(gb *b, gifti_image *g) {
         put_i(b, da->nbyper);
         put_i(b, da->data != NULL);
         if (da->data) {
-            long long n = da->nvals * da->nbyper;
+            /* the data's length and FNV-1a hash (a dump of every byte can be too large) */
+            long long n = da->nvals * da->nbyper, k;
+            unsigned long long h = 0xcbf29ce484222325ULL;
+            for (k = 0; k < n; k++) h = (h ^ ((unsigned char *) da->data)[k]) * 0x100000001b3ULL;
             put_l(b, n);
-            put(b, da->data, (long) n);
+            put_l(b, (long long) h);
         }
         put_nvp(b, &da->ex_atrs);
     }

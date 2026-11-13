@@ -157,7 +157,11 @@ fn events_digest() {
     // UTF-16, both byte orders
     let doc = "<a x='\u{e9}'>t\u{4e2d}\r\n</a>";
     for le in [true, false] {
-        let mut v: Vec<u8> = if le { vec![0xFF, 0xFE] } else { vec![0xFE, 0xFF] };
+        let mut v: Vec<u8> = if le {
+            vec![0xFF, 0xFE]
+        } else {
+            vec![0xFE, 0xFF]
+        };
         for u in doc.encode_utf16() {
             v.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
         }

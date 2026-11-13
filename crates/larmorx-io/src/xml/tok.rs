@@ -531,7 +531,7 @@ impl Enc {
                 return TOK_INVALID;
             }
             p += m;
-            while p != end {
+            while p < end {
                 match self.invalid_case(b, &mut p, end, next) {
                     Step::Return(t) => return t,
                     Step::Advanced => continue,
@@ -579,7 +579,7 @@ impl Enc {
                 return TOK_INVALID;
             }
         }
-        while p != end {
+        while p < end {
             match self.bt(b, p) {
                 BT_PERCNT => {
                     if p + m == end {
@@ -641,7 +641,7 @@ impl Enc {
                 return TOK_INVALID;
             }
         }
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -655,7 +655,7 @@ impl Enc {
                         return TOK_INVALID;
                     }
                     p += m;
-                    while p != end {
+                    while p < end {
                         match self.invalid_case(b, &mut p, end, next) {
                             Step::Return(t) => return t,
                             Step::Advanced => continue,
@@ -772,7 +772,7 @@ impl Enc {
                 Step::Other => p += m,
             },
         }
-        while p != end {
+        while p < end {
             match self.bt(b, p) {
                 t @ (BT_LEAD2 | BT_LEAD3 | BT_LEAD4) => {
                     let n = lead(t);
@@ -806,7 +806,7 @@ impl Enc {
                 return TOK_INVALID;
             }
         }
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -815,7 +815,7 @@ impl Enc {
             match self.bt(b, p) {
                 BT_S | BT_CR | BT_LF => {
                     p += m;
-                    while p != end {
+                    while p < end {
                         match self.bt(b, p) {
                             BT_S | BT_CR | BT_LF => {}
                             BT_GT => {
@@ -852,7 +852,7 @@ impl Enc {
                 return TOK_INVALID;
             }
             p += m;
-            while p != end {
+            while p < end {
                 match self.bt(b, p) {
                     BT_DIGIT | BT_HEX => {}
                     BT_SEMI => {
@@ -881,7 +881,7 @@ impl Enc {
                 return TOK_INVALID;
             }
             p += m;
-            while p != end {
+            while p < end {
                 match self.bt(b, p) {
                     BT_DIGIT => {}
                     BT_SEMI => {
@@ -915,7 +915,7 @@ impl Enc {
                 return TOK_INVALID;
             }
         }
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -933,7 +933,7 @@ impl Enc {
 
     fn scan_atts(self, b: &[u8], mut p: usize, end: usize, next: &mut usize) -> i32 {
         let m = self.mbpc();
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -1097,7 +1097,7 @@ impl Enc {
                 }
             },
         }
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -1106,7 +1106,7 @@ impl Enc {
             match self.bt(b, p) {
                 BT_S | BT_CR | BT_LF => {
                     p += m;
-                    while p != end {
+                    while p < end {
                         match self.nmstrt_case(b, &mut p, end, next) {
                             Step::Return(t) => return t,
                             Step::Advanced => return self.scan_atts(b, p, end, next),
@@ -1191,7 +1191,7 @@ impl Enc {
                 Step::Other => p += m,
             },
         }
-        while p != end {
+        while p < end {
             match self.bt(b, p) {
                 t @ (BT_LEAD2 | BT_LEAD3 | BT_LEAD4) => {
                     let n = lead(t);
@@ -1246,7 +1246,7 @@ impl Enc {
                 return TOK_INVALID;
             }
         }
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -1274,7 +1274,7 @@ impl Enc {
                 return TOK_INVALID;
             }
         }
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -1294,7 +1294,7 @@ impl Enc {
 
     fn scan_lit(self, open: u8, b: &[u8], mut p: usize, end: usize, next: &mut usize) -> i32 {
         let m = self.mbpc();
-        while p != end {
+        while p < end {
             match self.invalid_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -1472,7 +1472,7 @@ impl Enc {
                 return TOK_INVALID;
             }
         }
-        while p != end {
+        while p < end {
             match self.name_case(b, &mut p, end, next) {
                 Step::Return(t) => return t,
                 Step::Advanced => continue,
@@ -1519,7 +1519,7 @@ impl Enc {
             return TOK_NONE;
         }
         let start = p;
-        while p != end {
+        while p < end {
             match self.bt(b, p) {
                 t @ (BT_LEAD2 | BT_LEAD3 | BT_LEAD4) => p += lead(t),
                 BT_AMP => {
@@ -1584,7 +1584,7 @@ impl Enc {
             return TOK_NONE;
         }
         let start = p;
-        while p != end {
+        while p < end {
             match self.bt(b, p) {
                 t @ (BT_LEAD2 | BT_LEAD3 | BT_LEAD4) => p += lead(t),
                 BT_AMP => {
@@ -1637,7 +1637,7 @@ impl Enc {
         let m = self.mbpc();
         let mut p = p + m;
         let end = end - m;
-        while p != end {
+        while p < end {
             match self.bt(b, p) {
                 BT_DIGIT | BT_HEX | BT_MINUS | BT_APOS | BT_LPAR | BT_RPAR | BT_PLUS | BT_COMMA
                 | BT_SOL | BT_EQUALS | BT_QUEST | BT_CR | BT_LF | BT_SEMI | BT_EXCL | BT_AST
@@ -1787,7 +1787,7 @@ impl Enc {
     /// `nameMatchesAscii`.
     pub(super) fn name_matches_ascii(self, b: &[u8], mut p: usize, end: usize, kw: &[u8]) -> bool {
         for &c in kw {
-            if p == end || !self.char_matches(b, p, c) {
+            if p >= end || !self.char_matches(b, p, c) {
                 return false;
             }
             p += self.mbpc();
@@ -1817,8 +1817,15 @@ impl Enc {
         p
     }
 
-    /// `updatePosition`: the lines (and columns) of `b[p..end]` added to `pos`.
-    pub(super) fn update_position(self, b: &[u8], mut p: usize, end: usize, pos: &mut (u64, u64)) {
+    /// `updatePosition`: the lines (and columns) of `b[p..end]` added to `pos`; `false` when a
+    /// character steps over `end` (expat's loop then runs past the document: larmorx stops).
+    pub(super) fn update_position(
+        self,
+        b: &[u8],
+        mut p: usize,
+        end: usize,
+        pos: &mut (u64, u64),
+    ) -> bool {
         let m = self.mbpc();
         while p < end && p < b.len() {
             match self.bt(b, p) {
@@ -1840,6 +1847,7 @@ impl Enc {
             }
             pos.1 = pos.1.wrapping_add(1);
         }
+        p == end
     }
 
     /// `XmlUtf8Convert` of `b[*from..from_lim]`, appending at most `room` bytes to `to`

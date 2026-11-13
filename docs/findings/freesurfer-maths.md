@@ -573,7 +573,12 @@ ones not; a conversion that meets the end of the input before its item sets `err
 an earlier item of the same call ended at the end of the input, to the value `errno` had when that
 item met it (before that item's own `ERANGE`: `sscanf("-1877   1e40", "%f %f %f %f")` with `errno` 7
 before leaves 7, not 34; `"1e-50 3"` leaves 34; measured by track C's
-`validation/probes/fs-volume/scanf_word_errno.c`); directives that meet it change nothing. This is why
+`validation/probes/fs-volume/scanf_word_errno.c`). Every later attempt of the same call to read sets
+`errno` back to that value, white space at the format's end included (`sscanf("1e40", "%f ")` with
+`errno` 7 leaves 7, without the blank 34; white space just before a conversion reads nothing itself);
+a call whose only reading meets the end at once (`fscanf(fp, "\n")` at the end of a file) leaves
+`errno` alone (track E's measurement, specs/freesurfer-maths.md §18.1: 9,008 `sscanf` calls, all
+given by `cscan::Scanf`, `validation/probes/fs-maths/scanf_errno_cases.py`). This is why
 `MatrixReadTxt`'s `could not scan value` after an `ERANGE` read prints no `Numerical result out of
 range` when the file simply ended. `cscan.rs` reproduces each (its `EndRule` keeps the `errno` of the
 moment the call first met the end, which gives this rule); `scanf_probe.c` and its companions are the

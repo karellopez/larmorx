@@ -214,6 +214,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-gpl-gsl"
+version = "0.1.0-rc.1"
+dependencies = [
+ "larmorx-core",
+ "sha2",
+]
+
+[[package]]
 name = "larmorx-gpl-tedana"
 version = "0.1.0-rc.1"
 dependencies = [

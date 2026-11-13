@@ -17,6 +17,10 @@
 //!   closed-form determinants and inverses of small matrices; [`vnl_random`]: vnl's
 //!   subtract-with-borrow random numbers (FreeSurfer's `-seed` generator).
 //! - [`drand48`]: POSIX's 48-bit random numbers, as the C library gives them.
+//! - [`cubic_spline`]: the cubic spline of FreeSurfer's intensity normalisation (a clean room of
+//!   `specs/burkardt-spline.md`).
+//! - [`ranlux`]: RANLUX389 and the random distributions FreeSurfer draws from (a clean room of
+//!   `specs/ranlux.md`).
 //! - [`numpy`]: numpy's sums, means, variances, percentiles and weighted averages over one axis
 //!   in numpy's own order (and SciPy's `scoreatpercentile`), for replicas of Python programs.
 //! - [`x87`]: the x87's 80-bit extended arithmetic (`long double` on x86-64 Linux) in software,
@@ -32,6 +36,7 @@ pub mod alloc;
 pub mod array;
 pub mod cfmt;
 pub mod cli;
+pub mod cubic_spline;
 pub mod defects;
 pub mod drand48;
 pub mod eigen_sym;
@@ -44,6 +49,7 @@ pub mod math;
 pub mod numpy;
 pub mod parallel;
 pub mod python;
+pub mod ranlux;
 pub mod rotation;
 pub mod vnl_cholesky;
 #[cfg(test)]

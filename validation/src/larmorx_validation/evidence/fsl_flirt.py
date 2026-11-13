@@ -34,7 +34,8 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import common, core, fsl_pages
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1704,7 +1705,7 @@ def export(ctx: core.Context) -> dict:
     tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
     status = "experimental"
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "FLIRT",
@@ -1744,6 +1745,223 @@ def export(ctx: core.Context) -> dict:
         + [_example_real(ctx, "dof12"), _example_real(ctx, "applyxfm-4d")]
         + [_example_bbr(ctx, ex_id, run, view, words) for ex_id, run, view, words in BBR[1:]],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------- the writing guide's words
+
+#: FLIRT's own rewordings, before the FSL pages' (:mod:`fsl_pages`): "the trial" of random
+#: testing is a random-testing run (the guide's section 1), "relay 10" the catch-up's step 10.
+TEXTS = [
+    (
+        r"\bFixed after the trial \(relay 10\)",
+        "Fixed after the run (the clean-room catch-up, its step 10)",
+    ),
+    (r"\bFixed after the trial\b", "Fixed after the run"),
+    (r"\bthe trial's random\b", "the run's random"),
+    (r"\bthe trial's cases\b", "the run's cases"),
+    (r"\bthe 2026-11-02 trials' cases\b", "the cases of the random-testing runs of 2026-11-02"),
+    (r"\bDifferential random testing's trial of the clean-room original\b",
+     "A random-testing run of the clean room"),
+    (r"\bEvery differing case of the trial\b", "Every differing case of the run"),
+    (r"\bThe reproducer is a finding of the trial\b", "The reproducer is a finding of the run"),
+]  # fmt: skip
+#: The page's examples and speed: FLIRT's `flirt`; its agreement charts and random testing cover
+#: every program of FSL's FLIRT package, named as a part of FSL.
+PAGE = fsl_pages.page("flirt", texts=TEXTS)
+CHARTS = fsl_pages.page("", part="FLIRT programs", texts=TEXTS)
+#: The clean room's random-testing tables: a bare "larmorx" there is the clean room.
+TRIAL = fsl_pages.page("", part="FLIRT programs", port="clean-room", texts=TEXTS)
+
+_MM = re.compile(r"its matrix is ([0-9.e+-]+) mm from")
+_OWN = re.compile(r"FSL's own ([0-9.e+-]+) mm")
+_PART = re.compile(r"matrices part by ([0-9.e+-]+) mm")
+_SHARE = re.compile(r"images differ in ([0-9.]+%) of their values")
+
+
+def _num(s: str) -> str:
+    """A number of a reason as a sentence gives it: "4.87e-06" as 4.87 × 10⁻⁶."""
+    if "e" not in s:
+        return s
+    m, e = s.split("e")
+    sup = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+    return f"{m} × 10{str(int(e)).translate(sup)}"
+
+
+def _reason(ex: dict, diff: str) -> str:
+    return next(d for d in ex["diffs"] if d["id"] == diff)["reason"]
+
+
+def _found(pat: re.Pattern, s: str) -> str:
+    m = pat.search(s)
+    if not m:
+        raise ValueError(f"a reason without its number ({pat.pattern}): {s[:120]!r}")
+    return _num(m.group(1))
+
+
+def _verdict(ex: dict, diff: str) -> str:
+    return next(d for d in ex["diffs"] if d["id"] == diff)["verdict"]
+
+
+def _replica_bbr(ex: dict) -> str:
+    """The replica on a boundary-based call: FSL's bytes, and fMRIPrep's own matrix."""
+    fact = next(f["text"] for f in ex["facts"] if f["label"] == "Matrix")
+    if (
+        _verdict(ex, "replica-fsl") != "bit-identical"
+        or "fMRIPrep's own the same bytes" not in fact
+    ):
+        raise ValueError(f"{ex['id']}: the replica is not FSL's and fMRIPrep's bytes")
+    return (
+        "the replica gives FSL's registered image, every value, and FSL's matrix byte for byte, "
+        "the same bytes as fMRIPrep's own"
+    )
+
+
+def _shows_bbr(where: str):
+    def shows(ex: dict) -> tuple[str, list[str]]:
+        r = _reason(ex, "orig-fsl")
+        mm, own = _found(_MM, r), _found(_OWN, r)
+        v = _verdict(ex, "orig-fsl")
+        head = f"{where}, {_replica_bbr(ex)}. The clean room's matrix is {mm} mm from FSL's at the 95th percentile of the brain"
+        if v == "within-variability":
+            tail = f", within FSL's own variability on this input ({own} mm)."
+        elif v == "open" and "Within the record's threshold (0.1 mm)" in r:
+            tail = (
+                f": within its record's 0.1 mm, but beyond FSL's own variability on this input "
+                f"({own} mm), so the comparison stays open."
+            )
+        else:
+            raise ValueError(f"{ex['id']}: the clean room's verdict {v}")
+        return head + tail, ["replica-fsl", "orig-fsl"]
+
+    return shows
+
+
+def _shows_real(what: str, fix: str):
+    def shows(ex: dict) -> tuple[str, list[str]]:
+        if not (_verdict(ex, "replica-fsl") == _verdict(ex, "orig-fsl") == "bit-identical"):
+            raise ValueError(f"{ex['id']}: a port that is not FSL's bytes")
+        r = _reason(ex, "origfix-orig")
+        if fix == "matrix":
+            moved = (
+                f"its matrix moves by {_found(_PART, r)} mm at the 95th percentile of the brain, "
+                f"more than FSL's own {_found(_OWN, r)} mm on a perturbed input"
+            )
+        else:
+            moved = f"{_found(_SHARE, r)} of the values change"
+        return (
+            f"{what}, the replica and the clean room both give FSL's {'matrix and ' if fix == 'matrix' else ''}"
+            f"image, every value. In `fix`, its default, the clean room computes the C "
+            f"library's functions correctly rounded (GLIBC-07), and {moved}."
+        ), ["replica-fsl", "orig-fsl"]
+
+    return shows
+
+
+#: "What this shows" of each worked example (the writing guide, section 4), from its own
+#: verdicts, reasons and facts; beside it the verdicts of the two ports against FSL.
+SHOWS = {
+    "fmriprep-bbr": _shows_bbr("On fMRIPrep's own call"),
+    "dof12": _shows_real("On FLIRT's default registration", "matrix"),
+    "applyxfm-4d": _shows_real("From the same matrix", "values"),
+    "panel-ds003592-older": _shows_bbr("On the data panel's 82-year-old"),
+    "panel-ds000228-child": _shows_bbr("On the data panel's three-year-old"),
+}
+#: The case categories of FLIRT's records, as the page names them.
+CATEGORIES = {
+    "fmriprep": "fMRIPrep's calls",
+    "real": "real registrations",
+    "bbr": "boundary-based registration",
+    "schedule": "schedules",
+    "verbose": "verbose levels",
+    "convert_xfm": "convert_xfm",
+    "programs": "FLIRT's other programs",
+    "debug": "-debug",
+    "out": "-out's header",
+}
+#: The worked examples' matrix tables: each column's run as the panels name it.
+_COLUMNS = {
+    "FSL 6.0.7.23": "FSL flirt 6.0.7.23",
+    "replica (reproduce)": "replica, reproduce",
+    "replica (default)": "replica, fix",
+    "clean-room original (reproduce)": "clean room, reproduce",
+    "clean-room original (default)": "clean room, fix",
+    "fMRIPrep's own (its image's FSL)": "fMRIPrep's output (FSL in its image)",
+    "the initial matrix (-init)": "the initial matrix (-init)",
+}
+#: The displacement tables' rows, each a comparison named as the examples name it.
+_ROWS = {
+    "replica − FSL 6.0.7.23": "replica − FSL flirt 6.0.7.23",
+    "replica (default) − FSL 6.0.7.23": "replica, fix − FSL flirt 6.0.7.23",
+    "clean-room original − FSL 6.0.7.23": "clean room − FSL flirt 6.0.7.23",
+    "clean-room original (default) − FSL 6.0.7.23": "clean room, fix − FSL flirt 6.0.7.23",
+    "FSL 6.0.7.23 on a perturbed input − FSL 6.0.7.23 (its own variability)":
+        "FSL flirt 6.0.7.23 on a perturbed input − FSL flirt 6.0.7.23 (its own variability)",
+    "fMRIPrep's own − FSL 6.0.7.23": "fMRIPrep's output − FSL flirt 6.0.7.23",
+    "FSL 6.0.7.23 − the initial matrix (what BBR changed)":
+        "FSL flirt 6.0.7.23 − the initial matrix (what the registration changed)",
+}  # fmt: skip
+#: The tables' titles by the guide's pattern.
+_TITLES = {
+    "matrices": "The matrices as the files hold them, both ports against the original: FSL "
+    "`flirt` 6.0.7.23 (input millimetres to reference millimetres, FLIRT's convention)",
+    "shift": "The displacement between two matrices over the reference's brain, both ports "
+    "against the original: FSL `flirt` 6.0.7.23 (mm)",
+    "trial-catchup": "Random testing, the clean room against the original: FSL 6.0.7.23's FLIRT "
+    "programs ({cases:,} random calls, {date})",
+    "trial-catchup-triage": "The clean room's differences from the original in that run, by "
+    "category",
+}
+
+
+def present(doc: dict) -> dict:
+    """FLIRT's page in the writing guide's words and order: texts, ports and order only."""
+    note = (doc.get("speed") or {}).get("note")
+    fsl_pages.present(
+        doc,
+        PAGE,
+        SHOWS,
+        "Seconds for the whole command (reading, registering, writing), one run each, on a log "
+        "scale. The factor is how many times faster the clean room is on 14 threads than FSL "
+        "on one.",
+        {
+            "FSL 6.0.7.23 (single-threaded)": "FSL flirt 6.0.7.23, 1 thread",
+            "replica, 1 thread": "replica, 1 thread",
+            "clean-room original, 1 thread": "clean room, 1 thread",
+            "clean-room original, 14 threads": "clean room, 14 threads",
+        },
+        categories=CATEGORIES,
+        charts=CHARTS,
+        diffs={
+            "fsl-init": (
+                "FSL flirt 6.0.7.23 − initial alignment (-init)",
+                "the original against its starting point: what the registration changed",
+            )
+        },
+        tables={"trial-catchup": TRIAL, "trial-catchup-triage": TRIAL},
+    )
+    if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
+        doc["speed"]["note"] = present_.text(PAGE, note, port="both")
+    for ex in doc["examples"]:
+        for t in ex.get("tables") or []:
+            kind = t["id"].rsplit("-", 1)[1]
+            t["title"] = _TITLES[kind]
+            for c in t["columns"]:
+                c["label"] = _COLUMNS.get(c["label"], c["label"])
+            for r in t["rows"]:
+                if kind == "shift":
+                    r["head"] = _ROWS[r["head"]]
+    for t in doc.get("tables", []):
+        if t["id"] == "trial-catchup":  # the run's length, from its row (the guide: its duration)
+            minutes = next(r for r in t["rows"] if r["head"].startswith("length"))["cells"][0]["v"]
+            t["note"] = t["note"].replace(
+                "A random-testing run of the clean room after",
+                f"A random-testing run of the clean room, {minutes:.0f} minutes long, after",
+            )
+        m = re.search(r"the trial of (\d{4}-\d\d-\d\d)", t["title"])
+        cases = t["rows"][0]["cells"][0].get("v") if t["id"] == "trial-catchup" else 0
+        t["title"] = _TITLES[t["id"]].format(date=m.group(1) if m else "", cases=cases)
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only (``refresh-original WHY``:

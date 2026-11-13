@@ -731,3 +731,146 @@ def test_a_line_chart_by_port_and_larmorx_at_a_commit():
         "seed `s`, larmorx `6d4f2edb8992`, 4 jobs"
     )
     assert present.text(AFNI, "larmorx refuses it") == "The replica refuses it"
+
+
+def _flirt_like() -> dict:
+    """A boundary-based call in FLIRT's shapes: FSL, its starting point, the replica in
+    larmorx-nc and the clean room, which the old texts call "the original"."""
+
+    def panel(i, role, label, sub=""):
+        return {"id": i, "role": role, "label": label, "sub": sub, "arrays": {"all": {"blob": i}}}
+
+    def diff(i, a, b, kind, verdict, label, reason=""):
+        return {
+            "id": i, "a": a, "b": b, "kind": kind, "label": label, "role_label": "x",
+            "metrics": {"m": {"identical": verdict == "bit-identical", "max_abs": 0.5}},
+            "verdict": verdict, "reason": reason,
+        }  # fmt: skip
+
+    return {
+        "id": "panel-ds003592-older",
+        "title": "Data panel: an 82-year-old's BOLD reference",
+        "summary": "Given to FSL 6.0.7.23 and to the larmorx-nc replica in its reproduce and "
+        "default modes; LARMORX's clean-room original runs it in both modes.",
+        "facts": [
+            {
+                "label": "Matrix",
+                "text": "the replica's file byte for byte FSL's; fMRIPrep's own the same bytes",
+            },
+            {"label": "Original", "text": "the clean-room original's matrix 0.0002 mm from FSL's"},
+        ],
+        "metrics_note": "",
+        "provenance": [],
+        "panels": [
+            panel("t1w", "input", "T1w (the reference)"),
+            panel("init", "original", "Initial alignment (-init)", "at the initial matrix"),
+            panel("fsl", "original", "FSL 6.0.7.23, flirt", "the conda installation, as built"),
+            panel("replica", "larmorx", "larmorx-nc replica", "reproduce mode, 4 threads"),
+            panel("replica-fix", "larmorx", "larmorx-nc replica", "default mode (D13 corrections)"),
+            panel(
+                "orig",
+                "larmorx",
+                "larmorx's clean-room original",
+                "reproduce mode, 4 threads (Apache-2.0, crate larmorx-fsl; the record's run)",
+            ),
+            panel("orig-fix", "larmorx", "larmorx's clean-room original", "default mode"),
+        ],
+        "diffs": [
+            diff(
+                "replica-fsl",
+                "replica",
+                "fsl",
+                "main",
+                "bit-identical",
+                "replica − FSL 6.0.7.23",
+                "The same values, every one.",
+            ),
+            diff(
+                "fix-replica",
+                "replica-fix",
+                "replica",
+                "check",
+                "bit-identical",
+                "replica, default − reproduce mode",
+                "No correction of the register applies to this call: both modes give the same "
+                "values.",
+            ),
+            diff(
+                "fsl-init",
+                "fsl",
+                "init",
+                "reference",
+                None,
+                "FSL's result − its initial alignment",
+                "Not a comparison of implementations: what the registration changed.",
+            ),
+            diff(
+                "orig-fsl",
+                "orig",
+                "fsl",
+                "main",
+                "within-variability",
+                "clean-room original − FSL 6.0.7.23",
+                "A clean-room implementation, so not bit-identical by design: its matrix is "
+                "4.87e-06 mm from FSL's at the 95th percentile of the brain, against FSL's own "
+                "0.0907 mm when its input changes. The original refuses nothing here.",
+            ),
+            diff(
+                "origfix-orig",
+                "orig-fix",
+                "orig",
+                "check",
+                "d13",
+                "original, default − reproduce mode",
+                "GLIBC-07, a correction by default.",
+            ),
+        ],
+        "default": {"panels": ["fsl", "replica", "orig"], "diffs": ["replica-fsl", "orig-fsl"]},
+        "poster": {"caption": "Axial slice 13."},
+    }
+
+
+def test_an_fsl_page_of_two_ports():
+    """S7: FSL's pages of two ports (fsl_pages): the replica in larmorx-nc, the clean room
+    (the old texts' "original") named in panels, comparisons, reasons and facts; its panel's
+    licence and crate said once; FLIRT's "What this shows" from the example's own numbers."""
+    from larmorx_validation.evidence import fsl_flirt, fsl_pages
+
+    ex = _flirt_like()
+    ex["diffs"][2]["role_label"] = "what the registration changed"
+    line, verdicts = fsl_flirt.SHOWS["panel-ds003592-older"](ex)
+    assert line == (
+        "On the data panel's 82-year-old, the replica gives FSL's registered image, every value, "
+        "and FSL's matrix byte for byte, the same bytes as fMRIPrep's own. The clean room's "
+        "matrix is 4.87 × 10⁻⁶ mm from FSL's at the 95th percentile of the brain, within FSL's "
+        "own variability on this input (0.0907 mm)."
+    )
+    assert verdicts == ["replica-fsl", "orig-fsl"]
+    pg = fsl_pages.page("flirt")
+    out = present.example(
+        pg, ex, shows=line, verdicts=verdicts,
+        diffs={"fsl-init": ("FSL flirt 6.0.7.23 − initial alignment (-init)",
+                            "the original against its starting point: what the registration "
+                            "changed")},
+    )  # fmt: skip
+    p = {x["id"]: x for x in out["panels"]}
+    assert (p["replica"]["label"], p["orig"]["label"]) == ("replica", "clean room")
+    assert p["replica"]["sub"] == (
+        "larmorx-nc, FSL Licence · reproduce, 4 threads · against FSL flirt 6.0.7.23"
+    )
+    assert p["fsl"]["label"] == "FSL flirt 6.0.7.23"
+    assert p["init"]["label"] == "Initial alignment (-init)"
+    d = {x["id"]: x for x in out["diffs"]}
+    assert d["orig-fsl"]["label"] == "clean room − FSL flirt 6.0.7.23"
+    assert d["orig-fsl"]["reason"].startswith(
+        "Written without FSL's source, the clean room is not bit-identical by design:"
+    )
+    assert "The clean room refuses nothing here." in d["orig-fsl"]["reason"]
+    assert d["fix-replica"]["reason"].endswith("`fix` and `reproduce` give the same values.")
+    assert d["fsl-init"]["reason"].startswith("Not a comparison of ports:")
+    assert d["origfix-orig"]["label"] == "clean room, fix − reproduce"
+    assert "in `reproduce` and in `fix`" in out["summary"]
+    ex2 = _flirt_like()
+    ex2["diffs"][3]["verdict"] = "open"  # beyond FSL's own and without the threshold's words
+    with pytest.raises(ValueError, match="the clean room's verdict"):
+        fsl_flirt.SHOWS["panel-ds003592-older"](ex2)

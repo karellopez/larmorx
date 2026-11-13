@@ -1289,3 +1289,120 @@ is the identity both ways.
   compared, until fs.volume's `LTAread` is wired). Lines of formats not ported, of crashes (FS-76,
   FS-249, FS-253 to FS-258) and of skips beyond 256 MiB (FS-178, the probe's memory limit) are
   counted, not compared; those with numbers from memory (FS-49, FS-167) compared apart.
+
+## 48. Conventions of part 7 (Bruker ParaVision studies)
+
+A study folder holds `method`, `acqp` and `pdata/1/` with `2dseq` (the voxels), `d3proc` and `reco`
+(§30). The three parameter files are text in ParaVision's JCAMP-like form: lines
+`##<name>=<value>`; an array's value is its sizes in parentheses (`( 3 )`) and its numbers are on
+the next line. The readers below take a file line by line, each line read as `fgets` with a
+512-byte buffer (so a line of 512 bytes or more is taken in pieces, each piece a line), and the
+C library's `sscanf` for numbers (§18.1 of `specs/freesurfer-maths.md`: `%d`, `%lf`, `errno`). A
+reader that cannot open its file prints its message without a newline and gives 0 (`errno` from
+the open). Values a file does not give are left as the caller had them; in a whole study read,
+they are memory never written (FS-401).
+
+## 49. A parameter line (`splitParameterValue`)
+
+A line that holds `##` anywhere and, after it, `=`: the name is what lies between them, the value
+what follows the `=`, with every `(` and `)` made a blank and cut at its first newline (a CR
+before it stays); the line itself ends at the `=` afterwards (what is printed of it later shows
+only the text before the `=`). Another line: 0 (skipped). Names of 256 bytes or more and values of
+128 bytes or more (counting the newline) overflow the readers' buffers: FS-259 (both modes: the
+whole name and value, noted).
+
+## 50. The reconstruction's sizes (`readBrukerD3proc`)
+
+Lines up to one named `END`: `$IM_SIX`, `$IM_SIY` → width, height (`%d` of the value); `$IM_SIZ`
+and `$IM_SIT` → depth (each sets it: the depth is the later of the two in the file, kept in both
+modes: a deliberate-looking choice, see the findings); `$DATTYPE`: `ip_short` → short (4),
+`ip_int` → int (1), another → `ERROR: currently only short and int types are supported
+(Value=<v>).` + newline (standard error) and 0. Other lines are skipped. 1 at the end. The count of
+frames is never set. (The type it gives is not used by `brukerRead`.)
+
+## 51. The reconstruction (`readBrukerReco`)
+
+Lines up to one named `END`, into the transform (§53):
+- `$RECO_transposition`: the next line's `%d`; no next line: `ERROR: value must follow
+  RECO_transposition` (no newline) and 0.
+- `$RECO_fov`, `$RECO_size`, `$RECO_ft_size`: the dimension `%d` of the value (a reader-wide
+  dimension, 0 at the start, kept when the value has no number); `$RECO_fov` also stores it as the
+  transform's dimension. A dimension other than 3: `INFO: fov dimension is <d>. The data is not a 3D
+  volume.` (`size`, `ft_size` likewise; standard error, newline). Then the next line (none:
+  `ERROR: value must follow RECO_fov`, or `RECO_size` for both of the others; no newline; 0): for
+  dimension 3 three numbers (`%lf %lf %lf`, or `%d %d %d` for the sizes), for 2 two and the third
+  set to the first; for another nothing.
+- `$RECO_wordtype`: a value whose first 13 characters are `_16BIT_SGN_IN` → short, `_32BIT_SGN_IN`
+  → int; another: `INFO: unsupported data type <v>` + newline (standard error) and 0.
+- `$RECO_mode`: `INFO: reconstruction mode was <v>`; `ORIGIN` (no `$`): `INFO: software by <v>`
+  (standard output, newline).
+Then, for each axis, the voxel size `fov × 10 / size` and the offset `(−vox × (ft_size − 1)) / 2` in
+double precision (x86-64's NaN rules, as `specs/freesurfer-maths.md` states them). 1. The file stays open in FreeSurfer
+(FS-260: larmorx closes it; nothing a caller sees changes). larmorx also reads `$RECO_byte_order`
+(`bigEndian` or not) for FS-404.
+
+## 52. The acquisition (`readBrukerAcqp`)
+
+Lines up to one named `END`:
+- `OWNER`: the next two lines each printed `INFO: <line>` (standard output, the line with its own
+  newline); at the end of the file `warning, no lines read by fgets` (standard error, newline) and
+  the line buffer printed as it stands: the line read before it, or, when none was, the `OWNER`
+  line's text before its `=` (§49), without a newline.
+- `$ACQ_dim`: `%d` of the value into a reader-wide dimension (0 at the start); another than 3:
+  `INFO: acqp tells the dimension is not 3 but <d>`, `INFO: usually the volume has multiple 2d
+  slices`, `INFO: direction cosine info is meaningless.` (standard output, newlines).
+- `$ACQ_flip_angle`: `%lf` of the value into the angle, then the angle (read now or as it was) times
+  3.141592653589793, over 180 (radians).
+- `$ACQ_repetition_time`, `$ACQ_echo_time`, `$ACQ_inversion_time`, `$ACQ_read_offset`,
+  `$ACQ_phase1_offset`, `$ACQ_slice_offset`: `%lf` of the next line; `$ACQ_grad_matrix`: nine
+  (`%lf` nine times with blanks, a blank at the end). No next line: `ERROR: float value must follow
+  <name without $>` (the gradient matrix's message names `ACQ_slice_offset`; no newline) and 0.
+1 at the end.
+
+## 53. The geometry (`buildVoxToRASTransform`)
+
+From the transform (transposition, voxel sizes, offsets, read/phase/slice offsets, the 9-number
+gradient matrix `gm`, dimension) and the volume's extent, with 4 × 4 single-precision matrices
+(each entry the double rounded to float; products as FreeSurfer's `MatrixMultiply` in
+`specs/freesurfer-maths.md`): `T` = transposition (rows 1 and 2 swapped when the transposition is not 0), `V` =
+diag(vox) with the offsets in the last column, `S` = diag(−1, −1, 1, 1), `L` = identity with the
+read, phase and slice offsets in the last column, `R` = the rotation whose row `i` is
+`(gm[i], gm[i+3], gm[i+6], 0)`. `M = R (L (S (V T)))`. The centre is `M (w/2, h/2, d/2, 1)` (each
+half rounded to float); `P = diag(1/vox) M` with the first two inverse sizes swapped when the
+transposition is not 0. Dimension 3: the direction cosines are `P`'s first three columns (x, y, z;
+each column's rows r, a, s); another dimension: x = (−1, 0, 0), y = (0, 0, −1), z = (0, 1, 0). The
+voxel sizes are vox[0], vox[1], vox[2], the first two swapped when the transposition is exactly 1.
+`ras_good_flag` 1.
+
+## 54. A study (`brukerRead`) and its voxels
+
+`brukerRead(name, read_volume)`: §30 with messages and 1,024-byte names (FS-221 from 1,024); then
+`reco`, `d3proc`, `acqp` in that order (0 from any: NULL); a volume of the d3proc's width, height
+and depth and the reco's type (allocated with voxels, zeros, even for a header read); TR, TE, TI
+(rounded to float) and the flip angle; §53; with `read_volume`, the voxels: the volume's name
+becomes the `2dseq` path, the file opened (failure: `ERROR: could not open dataFile <f>`, no
+newline, NULL); a type other than bytes, short, float, int or long: `INFO: unknown size.  bail out`
++ newline and NULL; then the voxels row by row (slice, then row), each row `width` voxels read at
+the row's start. A file that ends before the last row: NULL (FreeSurfer crashes there: FS-403).
+- FS-401: values the files do not give (§50-52) are memory never written: both modes 0, noted.
+- FS-402: FreeSurfer reads 2 bytes per voxel whatever the type (a 32-bit row gets its first half
+  from the file, the rest stays 0; a byte volume's rows overlap and the last lands past the
+  volume). Default: the type's size per voxel; `reproduce` FreeSurfer's reads (bytes past the
+  volume dropped), noted when the type is not short.
+- FS-404: FreeSurfer reads the voxels in the machine's byte order and ignores `$RECO_byte_order`.
+  Default: `bigEndian` voxels byte-swapped; `reproduce` as they are; noted.
+`mri_read` of a study (§42, type 18 or found by §28) goes through `brukerRead`.
+
+## 55. Validation plan (part 7)
+
+The probe's commands (`validation/probes/fs-io/`): `bsp` (`splitParameterValue` on single lines:
+with and without `##` and `=`, text before `##`, parentheses, CR LF, long values), `bd3`, `brc`,
+`bacq` (each reader on a generated file with the caller's values at -7: complete files and files
+with missing, odd, unsupported or cut lines, `##END=` with lines after it, a missing file), `bvx`
+(§53 on given transforms: extents 0 to 6, transposition 0, 1, 2, dimensions 1 to 3, sizes, offsets
+and matrices with zeros of both signs, NaN and infinities), `bkr` (`brukerRead`, header or voxels)
+and `bmr` (`mri_read` of the study) on generated studies: three-quarters complete, short and int
+voxels, `IM_SIT` after `IM_SIZ`, 2dseq files of the right length, half of it, a byte more and
+longer, a missing file. Lines with FS-259 or FS-403 are counted, not compared; those with FS-401
+compared apart. Measured (2026-11-13): seed 13, 3,815 cases: `reproduce` identical on 3,221, 0
+different (426 counted, 168 apart); `fix` differs only where FS-402 or FS-404 is noted.

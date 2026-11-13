@@ -669,3 +669,62 @@ known. The mosaic functions serve the Siemens DICOM reader (fs.dicomread, 3.7).
   `reproduce` identical on 1,777 of 1,778 comparable lines (572 not compared: formats not ported,
   `.lta`, crashes, skips beyond 256 MiB; 150 compared apart), the one other FS-256's crash, since
   noted.
+
+## Part 7: Bruker's readers (3.1-27, relay 17 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/Bruker.cpp` 146-849.
+
+- **FS-259** (class a; both modes the whole strings, noted). `splitParameterValue` (261) `strcpy`s the
+  name into the caller's `Parameter[256]` and the whole remainder after `=` (its newline included,
+  before the loop that cuts it) into `Value[128]`; the three readers' buffers are stack arrays
+  (`char line[512]; char Parameter[256]; char Value[128];`), so a name of 256 bytes or more or a
+  remainder of 128 or more writes over the neighbouring locals. Measured: none (undefined); the
+  probe's own buffers are 8,192 bytes, so such lines are counted, not compared.
+- **FS-260** (class a, resource leak; both modes close, no notice, as FS-242). `readBrukerReco` never
+  calls `fclose` on success (its last lines compute the sizes and return); `readBrukerD3proc` (338)
+  and `readBrukerReco` (753) return without it on an unsupported type; `readBrukerVolume` (807) on an
+  unknown one.
+- **FS-401** (class a, memory never written; both modes 0, noted; the probe marks such lines
+  `VARY`). `brukerRead`'s `width`, `height`, `depth`, `TR`, `TE`, `TI`, `flip_angle` and every
+  `BrukerTransform bTran` field (stack, no initialiser) that `d3proc`, `reco` or `acqp` does not set:
+  `MRIalloc` then gets sizes and a type from the stack, the geometry and times likewise.
+- **FS-402** (class c, rule A: default the type's size; `reproduce` FreeSurfer's). `readBrukerVolume`
+  (813): `fread(mri->slices[k][j], sizeof(short), mri->width, fp)` for every type. A `_32BIT_SGN_INT`
+  study (`MRI_INT`) gets `2 * width` bytes at each row's start and zeros after (MRIalloc's); a byte
+  volume (only through FS-401's type) overlaps the next row and its last row writes `width` bytes
+  past the chunk.
+- **FS-403** (class a, crash; both modes NULL, noted; counted, not compared). A short read in
+  `readBrukerVolume` (814-818) closes the file and `MRIfree(&mri)` on its own copy of the pointer;
+  `brukerRead` (194) then `MRIfree(&mri)` on the caller's copy: a double free (glibc aborts; the probe
+  sees signal 6).
+- **FS-404** (class c, rule A: default byte-swapped for `bigEndian`; `reproduce` as read).
+  `readBrukerReco` does not read `$RECO_byte_order` and `readBrukerVolume`'s `swap_bytes_flag` is
+  always 0 ("this was not needed"): ParaVision's big-endian studies (older SGI-era data) are read in
+  little-endian order. The default reads ParaVision's parameter.
+
+Behaviours kept (rule C, both modes):
+- `readBrukerD3proc` (318-327): two `else if (!strcmp(Parameter, "$IM_SIT"))` branches; the first,
+  `sscanf(Value, "%d", pz)`, makes the second (frames, `ERROR: nframes %d but one is supported.`)
+  unreachable, so the depth is the later of `$IM_SIZ` and `$IM_SIT`. It looks deliberate (the first
+  branch placed before the older one: a 2-D multi-slice study's slices are counted in `IM_SIT`), and
+  no study at hand shows whether correcting it helps (rule D would measure it on real ParaVision
+  data: none in the data panel). Kept in both modes; the spec says so.
+- `$RECO_wordtype` compares 13 characters (`strncmp(..., 13)`: `_16BIT_SGN_IN`), so `_16BIT_SGN_INX`
+  is taken for short; harmless.
+- Messages kept as printed: `ERROR: value must follow RECO_size` for a missing `$RECO_ft_size` line,
+  `ERROR: float value must follow ACQ_slice_offset` for the gradient matrix, the reco file's check
+  line `INFO:    d3proc <reco>` (§30), the open failures without a newline, `OWNER` at the end of the
+  file printing the stale buffer.
+- `$ACQ_flip_angle`'s conversion runs even when `sscanf` read nothing (the old value converted).
+- `buildVoxToRASTransform` passes the transform's doubles to `stuff_four_by_four`'s `float`
+  parameters: the geometry is single precision (`MatrixMultiply` of floats).
+- Object code (the unit oracle's `Bruker.cpp.o`, GCC 8.4.0 `-O3`): `readBrukerReco`'s voxel size is
+  `fov * 10.0` (the third axis `10.0 * fov[2]`: the same for every input, one NaN operand at most),
+  then `/ size`; the offset `(ft_size - 1) * (-vox)` then `* 0.5` (the source's `/ 2.`; equal for
+  every input). larmorx computes `mul64(fov, 10)`, `div64(., size)`, `mul64(-vox, ft - 1)`,
+  `div64(., 2)`: the same bits, NaNs included.
+
+Measured (the probe's piece 7, `tests/fs_io/piece7.rs`): seed 11, 763 cases: `reproduce` identical on
+648, 0 different, 85 counted (FS-259, FS-403), 30 apart (FS-401); seed 13, 3,815 cases: 3,221
+identical, 0 different, 426 counted, 168 apart; `fix` differs only with FS-402 (39) or FS-404 (16)
+noted.

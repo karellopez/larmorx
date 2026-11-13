@@ -1340,7 +1340,7 @@ defects! {
     FS_147 = "FS-147", "FreeSurfer", true,
         "MRISreadVTK and the ASCII and movie.byu surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
     FS_148 = "FS-148", "FreeSurfer", true,
-        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, reads one or two bytes before the name to decide whether it names a hemisphere";
+        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, and the curvature reader's file-name choice with a name whose first dot is its first or second character, read one or two bytes before the name to decide whether it names a hemisphere";
     FS_149 = "FS-149", "FreeSurfer", true,
         "MRISbuildFileName_read (a name with a slash, or without a hemisphere when FS_POSIX is unset) and __MRISapplyFSGIIwrite (FS_GII set to .gii) write a file name of 1,024 bytes or more past their caller's 1,024-byte buffer";
     FS_150 = "FS-150", "FreeSurfer", true,

@@ -95,8 +95,25 @@ pub struct Globals {
     /// `vg_isEqual_Threshold` (`transform.h`): the tolerance of `VOL_GEOM::operator==` and
     /// `vg_isEqual`, `FLT_EPSILON` until a program sets it (several set 1e-3).
     pub vg_is_equal_threshold: f64,
+    /// `MRIIO_Strip_Pound` (`mri.h`: 1): `MRIgetVolumeName` also removes what follows a name's
+    /// last `#`.
+    pub mriio_strip_pound: i32,
+    /// The DICOM format probe's process-wide state: CTN's condition stack and `IsDICOM`'s
+    /// `static` answer for the last name it was asked (fs.io's `identify`).
+    pub dicom: DicomState,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
+}
+
+/// The DICOM format probe's process-wide state (`utils/DICOMRead.cpp`'s `IsDICOM` and the CTN
+/// library it calls).
+#[derive(Clone, Debug, Default)]
+pub struct DicomState {
+    /// CTN's condition stack (and the C library's state its messages use).
+    pub stack: larmorx_io::dicom::CondStack,
+    /// `IsDICOM`'s `static char file[1024]` (empty at the start) and `static int yes`.
+    pub is_dicom_file: Vec<u8>,
+    pub is_dicom_yes: i32,
 }
 
 impl Globals {
@@ -139,6 +156,8 @@ impl Globals {
             matrix_alloc_old: false,
             drand48: Drand48::default(),
             vg_is_equal_threshold: f64::from(f32::EPSILON),
+            mriio_strip_pound: 1,
+            dicom: DicomState::default(),
             notices: Notices::new(mode),
         }
     }

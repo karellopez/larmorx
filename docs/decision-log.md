@@ -2585,3 +2585,24 @@ The part's decisions, from its notes ("FROM THE ORCHESTRATOR", 2026-11-11 to 13;
   figures, viewers, images and links, each moved page paired with its new address; the only numbers that changed
   are those of the three records made again since (3dTshift's replica, antsRegistration, antsAI), which the pages
   show as their records now say.
+
+## 2026-11-13 (evening): the documentation's step 2 reduced, no reviewer; no new parallel chains, then one agent at a time (the user)
+- **The documentation revision without its critical reviewer** (the user: "having a reviewer just make the things
+  slower, and consumes a lot of tokens"): the writer checks each chunk itself with the automated checks (the site's
+  build, the reference check, the inventory against the published site, the summary, site-path and panel-run
+  checks, the gates), every number from the current records, the words rules, no restricted link.
+- **Step 2 reduced to what the site's readers see** (the user: "yes please", on the orchestrator's recommendation):
+  a reference page for every program, the confounds' evidence and reference pages, the wrappers' missing
+  `n_threads` (CLAUDE.md rule 5) and their printed messages, one paragraph in the porting guide's per-tool
+  checklist and `docs/figures.md` naming the writing guide and the shared presenter as how a new tool's pages are
+  made, and a lean merge. Moved to the final validation phase: the repository's other documents, the findings', the
+  code's and the tests' words, `programs.py`'s rule for `validated`, the list of the clean rooms' printed lines in
+  the old words, the site's small layout items.
+- **No new parallel chains** (the user: "DO not parellel more things, we only have until saturday 23:00 to work
+  like that and still have a 61% of weekly usage, reached. After that we will have to continue the old way just to
+  save usage"): the chains already running continue until the weekly reset of Saturday 2026-11-14 23:00 (no second
+  FreeSurfer clean-room chain); from the reset on, one agent at a time, by the order in
+  [next-steps.md](next-steps.md), "Side by side, then one agent at a time".
+- **Continuity** (the user: "make sure you save the progress and information"): the relays' notes, briefs, handoffs
+  and reviews, kept in the orchestrator session's scratch folder that is cleared at boot, are mirrored hourly into
+  `<workspace>/archive/orchestration-notes/` and to the USB disk.

@@ -45,6 +45,10 @@ lib! {
     det_fixed_f64: "fv_det_fixed_f64" => unsafe extern "C" fn(c_int, *const f64) -> f64,
     inverse_fixed_f32: "fv_inverse_fixed_f32" => unsafe extern "C" fn(c_int, *const f32, *mut f32),
     inverse_fixed_f64: "fv_inverse_fixed_f64" => unsafe extern "C" fn(c_int, *const f64, *mut f64),
+    order_inverse_f32: "fv_order_inverse_f32" => unsafe extern "C" fn(c_int, *const f32, *mut f32),
+    order_inverse_f64: "fv_order_inverse_f64" => unsafe extern "C" fn(c_int, *const f64, *mut f64),
+    order_determinant_rows_f32: "fv_order_determinant_rows_f32" => unsafe extern "C" fn(c_int, *const f32) -> f32,
+    order_determinant_rows_f64: "fv_order_determinant_rows_f64" => unsafe extern "C" fn(c_int, *const f64) -> f64,
     determinant_f32: "fv_determinant_f32" => unsafe extern "C" fn(c_int, *const f32, c_int) -> f32,
     determinant_f64: "fv_determinant_f64" => unsafe extern "C" fn(c_int, *const f64, c_int) -> f64,
     qr_f32: "fv_qr_f32" => unsafe extern "C" fn(c_int, c_int, *const f32, *mut f32, *mut f32) -> f32,
@@ -74,6 +78,15 @@ lib! {
     lbfgs_state: "fv_lbfgs_state" => unsafe extern "C" fn(*mut c_void, *mut c_long, *mut f64),
     lbfgs: "fv_lbfgs" => unsafe extern "C" fn(c_long, c_long, *mut f64, f64, *mut f64, c_long, *mut f64, *mut c_long, f64, f64, *mut f64, *mut c_long, *mut c_void),
     fft: "fv_fft" => unsafe extern "C" fn(c_int, c_int, *mut f64),
+    // netlib's BLAS kernels as libitkv3p_netlib holds them (family `qrnan`)
+    k_sdot: "v3p_netlib_sdot_" => unsafe extern "C" fn(*const c_long, *const f32, *const c_long, *const f32, *const c_long) -> f64,
+    k_ddot: "v3p_netlib_ddot_" => unsafe extern "C" fn(*const c_long, *const f64, *const c_long, *const f64, *const c_long) -> f64,
+    k_saxpy: "v3p_netlib_saxpy_" => unsafe extern "C" fn(*const c_long, *const f32, *const f32, *const c_long, *mut f32, *const c_long) -> c_int,
+    k_daxpy: "v3p_netlib_daxpy_" => unsafe extern "C" fn(*const c_long, *const f64, *const f64, *const c_long, *mut f64, *const c_long) -> c_int,
+    k_sscal: "v3p_netlib_sscal_" => unsafe extern "C" fn(*const c_long, *const f32, *mut f32, *const c_long) -> c_int,
+    k_dscal: "v3p_netlib_dscal_" => unsafe extern "C" fn(*const c_long, *const f64, *mut f64, *const c_long) -> c_int,
+    k_snrm2: "v3p_netlib_snrm2_" => unsafe extern "C" fn(*const c_long, *const f32, *const c_long) -> f64,
+    k_dnrm2: "v3p_netlib_dnrm2_" => unsafe extern "C" fn(*const c_long, *const f64, *const c_long) -> f64,
 }
 
 /// Captures what a call writes to file descriptors 1 and 2 (the C library's and libstdc++'s

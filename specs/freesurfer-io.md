@@ -11,7 +11,9 @@ Status: **part 1** (§1-9, queue item 3.1-25's first piece): the binary readers 
 number, the file-name helpers and file tests, the tab-separated tables, the byte swaps of a buffer,
 the zeroed allocation that ends the program. **Part 2** (§10-18, the item's second piece): FreeSurfer's
 tags, the matrix tags, the binary colour tables, a volume geometry's stored form, the tags of an
-`.mgz` and of FreeSurfer's NIfTI header extension (`FStagsIO`). Later parts: the volume formats.
+`.mgz` and of FreeSurfer's NIfTI header extension (`FStagsIO`). **Part 3** (§19-24, the item's third
+piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and gradient spaces.
+Later parts: the volume formats.
 
 ## 1. Conventions
 
@@ -464,3 +466,442 @@ Each writer starts with the tag number and, where the tag has one (§14), the da
   identical on 40,710 of 40,710 comparable lines (2,070 with memory digits), 3,003 lines of memory
   contents compared apart, 2,287 not comparable; `fix` differs only with a notice. Seed 1, 2,200
   portable cases: 1,927 identical, 273 not comparable.
+
+## 19. Conventions of part 3
+
+Part 3 (queue item 3.1-25's third piece): NumPy `.npy` volumes (§20, §21), two helpers over
+gifticlib's GIFTI structures (§22), the b-value and gradient files, pulse-sequence names and
+gradient spaces of diffusion data (§23). §1's conventions hold. "Exits" means the program ends with
+status 1 after the message. "Prints" is standard output; GIFTI's messages go to standard error.
+Every machine larmorx supports is little-endian: the machine's byte-order mark is `<`.
+
+## 20. Reading a `.npy` file into a volume (`npy2mri`)
+
+The input is a file name (relative to the program's directory) and a `verbose` switch (off when
+`MRIread` reads a `.npy`). In order:
+
+1. **Opening.** A file that cannot be opened for reading: prints `Error reading numpy file <name>`
+   and exits. A directory opens (its reads give nothing).
+2. **Magic.** The first 6 bytes must be `\x93NUMPY`; anything else (fewer bytes included): prints
+   `Error <name> is not npy file` and exits.
+3. **Version.** One byte major, one byte minor (0 when the file ends first). The header length that
+   follows is a little-endian unsigned number of 2 bytes for major 1 and 4 bytes for major 2.
+   Major 3 (NumPy's version for headers with non-ASCII text, a 4-byte length): FS-199 (rule A) reads
+   4 bytes; with `reproduce`, version 3.0 reads 3 bytes (the header text then starts one byte early
+   and lacks its last byte); version 3.x with x > 0 crashes FreeSurfer (both modes 4 bytes). Any
+   other major (0, 4-255): FS-200 (rule B, both modes): prints `Error <name>: npy format version
+   <major>.<minor> is not supported` and exits (FreeSurfer: a crash or a header from memory
+   contents). A length the file cuts short keeps the bytes it got as its low bytes.
+4. **Header text.** The next `header_len` bytes. A file that ends inside them: the missing bytes are
+   zeros (FS-202, both modes; FreeSurfer: memory contents), noted when the parse reaches them. A
+   header of 7 MiB or more is read whole (FS-201: FreeSurfer keeps it on its stack and crashes from
+   about 8 MiB, its stack's default size).
+5. **Alignment.** If `6 + 2 + <length's size> + header_len` is not a multiple of 16: FS-213 (rule A)
+   reads the data right after the header, as NumPy does; `reproduce` first skips the bytes up to the
+   next multiple of 16 (FreeSurfer's reading). NumPy's files are always aligned (to 16 or 64).
+6. **Parse** (FreeSurfer's own reading of NumPy's dictionary, not a Python parser). The text is
+   scanned from its first byte until a newline byte is met where a new item would start:
+   - The bytes `{`, `}`, `,` and space are skipped there. Anything else starts a **key**, which runs
+     to the next `:` or newline. A key that ends at a newline is not a key: the scan moves past that
+     newline (and so goes on after it). At a `:`, the colon is replaced by a NUL byte, the spaces
+     after it are skipped, and the key is compared as a C string (up to its first NUL byte) with
+     the three quoted names below; other keys are ignored. In every case the scan then skips the
+     one byte where it stands (for an ignored key: the first byte of its value) and continues.
+   - `'descr'`: the byte after the spaces is skipped (the opening quote); the next byte is the
+     **byte order**, the one after it the **kind**, and the decimal digits after those the **item
+     size** (C's `atoi` of that run: 0 for none; a value beyond `int` keeps its low 32 bits); the
+     byte after the digits (the closing quote, or whatever is there, even a newline) becomes NUL.
+   - `'fortran_order'`: the value runs to the next `,` (no newline stops it), which becomes NUL;
+     the value is the text up to its first NUL. `False` gives C order; `True` Fortran order;
+     anything else is FS-210 (rule B: prints `Error <name>: npy header's fortran_order is <value>,
+     not True or False` and exits; `reproduce` takes it as Fortran order, FreeSurfer's reading).
+   - `'shape'`: bytes are skipped up to the first decimal digit (which may lie far beyond the
+     parenthesis); from there each `,` or `)` ends an element (the element is `atoi` of the text
+     from its first digit, so `3L` is 3; a byte that is neither a digit, `,` nor `)` is passed
+     over), the separator becoming NUL, and `)` ends the shape, after which the scan skips one more
+     byte. An element with no digit before its separator (the `,)` of NumPy's one-dimensional
+     `(3,)`, `(3, )`, `(3,,4)`) is FS-204: FreeSurfer crashes; a clean room skips the element in
+     both modes (so `(3,)` is one extent). A repeated `'shape'` appends its elements.
+   - A key, value or scan that reaches the end of the header text without finishing is FS-203:
+     FreeSurfer reads past the header (a crash, or values from memory contents); a clean room stops
+     the parse there in both modes (what was read so far is kept).
+7. **Missing items** (after the parse; FS-207). No shape element at all: FS-205/FS-207, both modes:
+   prints `Error <name>: npy header has no shape` and exits (FreeSurfer crashes). No `'descr'` or no
+   `'fortran_order'`: rule B, prints `Error <name>: npy header has no descr` (or `fortran_order`) and
+   exits; `reproduce` takes the byte order, kind and size as 0 and the order as C order (FreeSurfer:
+   memory contents).
+8. **Verbose report** (only with `verbose`), each a line: `archendian : < (little endian)`, `NPY
+   version: <major>.<minor>`, `NPY header_len: <header_len>`, `NPY dict.descr : <order byte><kind
+   byte><size>` (the two bytes as they are, a NUL included), `NPY dict.fortran_order: True|False`,
+   then `NPY dict.shape: {` followed by ` <e>, ` for each element and `}`.
+9. **Squeeze.** Trailing extents of 1 are dropped, then leading ones; any drop marks the shape
+   "squeezed". FS-205: an array whose extents are all 1 crashes FreeSurfer; a clean room keeps one
+   extent (1) in both modes.
+10. **Verbose report**, continued: `NPY shape dimension: <n> (squeezed) ( <e>, ... )` (the
+    parenthesis holds the word `squeezed` or nothing; each extent followed by `, `), then `Data is
+    in different endian. Need to swap bytes` when the byte order byte is not `<` (so also for `|`,
+    `=` and `>`), else `Data is in same endian`.
+11. More than 4 extents left: prints `numpy file contains <n>D data. Cannot fit them in MRI
+    structure.` and exits.
+12. **Type.** Kind `f` size 4: float; `i` size 2: short, 4: int, 8: long (8 bytes); `u` size 1:
+    unsigned char, 2: unsigned short. Kind `f`, `i` or `u` with another size: prints `WARN: !!!
+    unsupported __dtype_char=<kind byte>, __dtype_len=<size>`; any other kind: `WARN: !!!
+    unsupported __dtype_char=<kind byte>!!!`; the type is then -1 and the volume's construction
+    refuses it (`specs/freesurfer-mri.md`: FS-55, by default the error `unsupported MRI data type:
+    -1`; with `reproduce` FreeSurfer's failed allocation, `could not allocate memory for slice 1
+    out of <n>`, unless the volume has no voxels). So float64, int8, bool, complex, Unicode and
+    object arrays are not read.
+13. **The volume** is made from the extents (width, height, depth, frames; 3 or 4 extents; its
+    messages for another count and for an extent not above 0, `specs/freesurfer-mri.md`). Fewer
+    than 3 extents (a two- or one-dimensional array, or one the squeeze shortened) is FS-206: each
+    missing extent is 1 by default (rule A: a two-dimensional array is one slice). With
+    `reproduce` each is what FreeSurfer reads past its list of extents: the list keeps, past its
+    elements, the elements its squeeze dropped or moved (the list's storage grows by doubling: 1,
+    2, 4, 8 places, and a growth leaves the new places unwritten; dropping a trailing extent leaves
+    it in its place, dropping the leading one moves the rest down one place and leaves the last
+    place as it was), so `(1, 3, 4, 1)` gives 3 x 4 x 4 and `(1, 1, 2)` gives 2 x 2 x 2; a place
+    never written (beyond the storage, or left by a growth) is memory contents: 0 with the notice
+    (FreeSurfer's runs gave 0). Verbose: `MRI dimensions: <w> x <h> x <d> x <frames>` and `
+    type: <UCHAR|SHORT|USHRT|INT|LONG|BITMAP|TENSOR|FLOAT|UNKNOWN> (<type>)` (ten spaces before
+    `type`).
+14. **Data.** For each frame, each slice: `item size x width x height` bytes are read into the
+    slice (bytes the file does not give stay 0). FS-211: FreeSurfer computes that count in 32 bits
+    (a slice of 2 GiB or more is read wrongly); a clean room uses 64 bits in both modes. When the
+    byte order byte is not `<`, each slice's items are reversed: size 2 in pairs, size 4 in groups
+    of 4; size 8 is FS-208 (rule A: groups of 8; `reproduce` groups of 4, FreeSurfer's: every value
+    wrong). Verbose: `<bytes> bytes read`. FS-212: fewer bytes than the array has is rule B: prints
+    `Error <name>: <got> bytes of data read, <expected> expected` and exits; `reproduce` keeps the
+    zeros silently.
+15. **Order.** A Fortran-order array is the volume as read. A C-order array (shape `(a, b, c[,
+    d])`) is moved into FreeSurfer's order: prints `array contiguous reordering ...`, makes a second
+    volume of the same extents (its messages again) and copies voxel `[i, j, k, l]` of the array
+    (at item `l + d (k + c (j + b i))` of the data read) to voxel `(i, j, k, l)` of the volume. A
+    type outside the six above prints `Unsupported datatype, no array contiguous reordering` and
+    gives no volume. Verbose: for each copied voxel, in the volume's order, two lines `memcpy(<src>,
+    <dst>, <bytes per voxel>)` and `      offset_voxel = <item>, offset_bytes = <item x bytes>`;
+    FreeSurfer prints the two memory addresses there (FS-209: they differ from run to run); a clean
+    room prints the byte offsets in the two volumes in C's `%p` form (`(nil)` for 0, else `0x` and
+    lower-case hexadecimal), in both modes.
+16. The result is the volume (its other fields those of a new volume).
+
+## 21. `.npy` in the validation plan
+
+The probe's command `npy` (§24) reads generated files: NumPy's headers (versions 1.0, 1.1, 2.0, 3.0,
+3.1 and 0, 4, 7; aligned to 64, 16, 1 and 7 bytes; keys reordered, missing, repeated or unknown;
+fortran orders `True`, `False` and odd values; shapes of 0 to 5 extents with 1s, 0, -1 and
+`4294967297`, `L` suffixes; 25 type strings: every supported one in both byte orders and float64,
+bool, int8, complex, float16, Unicode, `=` and `|u2`; header lengths changed), the data patterned or
+random, then cut, mutated, shortened or extended; and fixture names (a missing file, a directory, a
+text file); verbose on small arrays.
+
+## 22. Two GIFTI helpers
+
+On gifticlib's image and data-array structures (the clean room's GIFTI port, `larmorx_io::gifti`):
+
+- **Add an empty data array** (`gifti_alloc_and_add_darray`): no image: prints `** gifti_alloc_and_add_darray:
+  NULL image` and gives nothing. Else gifticlib's add of one empty array (its messages at its
+  verbosity: `++ alloc darray[<n>] (+1)` above 3, `-- clearing DataArray` above 5) and the new last
+  array is the result (every field 0, no data, no metadata); a failed add (out of memory) prints
+  `** gifti_alloc_and_add_darray: gifti_add_empty_darray failed` and gives nothing.
+- **A value as a double** (`gifti_get_DA_value_2D`, array, row, column): each failure exits after its
+  message:
+  - no array or no data: `** gifti_get_DA_value_2D, invalid params: data=(nil)` (FS-214: for an
+    array without data FreeSurfer prints the array's memory address in place of `(nil)`; a clean
+    room prints `(nil)` in both modes);
+  - one dimension: the column must be 0 (else `** gifti_get_DA_value_2D, array dim is 1 but trying
+    to access 2D data element (col=<col>)`), the second extent is taken as 1; another dimension
+    than 1 or 2: `** gifti_get_DA_value_2D, array dim is <n>`;
+  - the index order must be row-major (1) or column-major (2), else `** gifti_get_DA_value_2D,
+    unknown ind_ord: <n>`; then `** gifti_get_DA_value_2D, invalid params: dim0_index=<row>
+    (max=<extent 0>), dim1_index=<col> (max=<extent 1>)` unless `0 <= row < extent 0` and `0 <= col
+    < extent 1`;
+  - the element is `row x extent 1 + col` (row-major) or `row + col x extent 0` (column-major), read
+    from the little-endian data as unsigned 8-bit, signed 16-bit, signed 32-bit, float, double,
+    signed 8-bit, unsigned 16-bit or unsigned 32-bit and converted exactly to a double; any other
+    type: `** gifti_get_DA_value_2D, unsupported type <type>-unknown, or can't convert to double`.
+    COMPLEX64 is FS-215 (rule B: that message by default; `reproduce` reads its 8-byte values as
+    doubles, FreeSurfer's). FS-216: FreeSurfer computes the product in 32 bits (elements beyond
+    2^31 are read from the wrong place); a clean room uses 64 bits in both modes.
+
+## 23. Diffusion files and names
+
+- **B-values file** (`DTIwriteBValues`, matrix, name): opened for writing (else prints `ERROR:
+  DTIwriteBValues(): could not open <name> for writing`, result 1); each row's first number as C's
+  `%f` (6 decimals; `nan`, `-nan`, `inf`, `-inf`) and a newline; result 0.
+- **Gradient file** (`DTIwriteBVectors`): the same with each row's first three numbers as `%16.14f`
+  separated by one space (`ERROR: DTIwriteBVectors(): ...` on failure).
+- Both: no matrix is FS-217 (FreeSurfer makes the file, then crashes; a clean room leaves the file
+  empty, prints `ERROR: <function>(): no matrix` and gives 1, in both modes). A matrix with fewer
+  columns than written (none for b-values, fewer than 3 for gradients) is FS-218: rule B, prints
+  `ERROR: <function>(): the matrix has <n> columns, <k> needed` and gives 1 before opening the file;
+  with `reproduce` the numbers FreeSurfer writes: a row's missing columns are the next numbers of
+  the matrix in row order (the next row's), and past the matrix's last number 0 (FreeSurfer: memory
+  contents).
+- **Pulse-sequence name** (`DTIparsePulseSeqName`, name `ep_b<b>#<n>`): a name of fewer than 7
+  bytes, or with no `#` from its fifth byte on: result 1, the outputs unchanged. Else the text from
+  the fifth byte to the `#` is read with C's `sscanf("%lf")` (the b-value set only when a number is
+  read) and the text after the `#` with `%d` (the direction set only when a number is read; a value
+  beyond `int` keeps its low 32 bits); result 0. The first four bytes are not checked. FS-219: a
+  part of 100 bytes or more overflows FreeSurfer's buffer (a crash or wrong values); a clean room
+  reads it whole in both modes.
+- **Gradient space** (`DTIbvecChangeSpace`, volume, desired space): prints `DTIbvecChangeSpace():
+  <current> <desired>`; no gradients: prints `ERROR: DTIbvecChangeSpace(): bvec is NULL`, result 1;
+  the desired space already: result 0; a desired space other than 1 (scanner) or 2 (voxel): prints
+  `ERROR: DTIbvecChangeSpace(): desired_bvec_space = <b>, must be 1 or 2`, result 1. Else `M` is the
+  4 x 4 matrix of the direction cosines (columns `x`, `y`, `z`, 1 at (4, 4), float) for space 1, its
+  inverse (`specs/freesurfer-maths.md`'s matrix inverse, float) for space 2; with `Gdiag_no` above 0
+  it prints `DTIbvecChangeSpace(): transforming gradient directions from <current> to <desired>`,
+  `M------------------------------`, the matrix (`MatrixPrint`, 5 decimals) and
+  `------------------------------`. Each row's first three numbers with a fourth 1 are multiplied by
+  `M` (each sum in double, in column order, stored as float) and stored back; the volume's space
+  becomes the desired one; result 0. Direction cosines without an inverse: the inverse's message,
+  then the product's `MatrixMultiplyD(): m1 is null` error ends the program (for a matrix with rows).
+  FS-220: fewer than 3 columns is rule B (prints `ERROR: DTIbvecChangeSpace(): bvecs have <n>
+  columns, 3 needed`, result 1); with `reproduce` FreeSurfer's reading and writing across the rows
+  in row order (a row's three numbers run into the next row's; past the matrix's last number reads
+  give 0 and writes are dropped: FreeSurfer reads memory contents and writes outside the matrix).
+
+## 24. Validation plan (part 3)
+
+- The probe's commands `npy` (§21), `gda` (verbosity 0-7, no image, 1-4 additions), `gdv` (both
+  index orders and invalid ones, 0-3 dimensions, extents 0-5, rows and columns from -1 past the
+  extents, every type code gifticlib names and unknown ones, data present or absent), `bvw` (both
+  writers, 0-4 rows, 0-4 columns, every float class, unwritable and directory names), `psn` (names
+  of `ep_b` and other prefixes, numbers in every `%lf` and `%d` spelling, missing `#`, parts of
+  98-150 bytes, random bytes) and `bcs` (`Gdiag_no` 0, 1, -1, every current and desired space,
+  direction cosines in steps of 1/8 and singular ones, gradients of 1-4 columns, 0-4 rows, every
+  float class). Lines whose FreeSurfer result depends on memory or addresses (FS-202, FS-206 where
+  a place was never written, FS-207, FS-209, FS-214, FS-218 and FS-220 past the matrix) are compared
+  and counted apart; FreeSurfer's crashes (FS-199, FS-200, FS-201, FS-203, FS-204, FS-205, FS-207
+  without a shape, FS-211, FS-217, FS-219) are counted, not compared.
+- Measured on the replica (2026-11-13): seed 7, 58,000 cases of the 29 commands (2,000 each):
+  `reproduce` identical on 51,221 of 51,221 comparable lines (1,761 with memory digits), 3,745 lines of
+  memory contents or addresses compared apart (2,009 equal), 3,034 not comparable; of part 3's 12,000
+  cases 10,387 comparable lines identical (`npy` 1,055, `gda` 2,000, `gdv` 1,802, `bvw` 1,720, `psn`
+  1,953, `bcs` 1,857). `fix` differs only with a notice. Seed 1, 2,800 portable cases: 2,468
+  identical (73 with memory digits), 332 not compared.
+
+## 25. Conventions of part 4
+
+Part 4 (queue item 3.1-27's first piece, with the pieces it needs taken early: the rest of
+`mri_identify.cpp` from 3.1-28, `MRIgetVolumeName` from `mriio.cpp`, GE Signa's header test from
+`signa.cpp`, the DICOM format probe from `DICOMRead.cpp`): the volume format probe. §1's conventions
+hold. A name's **extension** is what follows its last `.` anywhere in the name (a dot in a
+folder's name counts: `a.b/c` has the extension `b/c`); "case-insensitive" compares ASCII letters
+only. **`errno`** is part of every result (later messages print it): a test that cannot open a file
+for reading sets `errno` to 0 unless this section says it keeps the open's error; a failed status
+query (`stat`) keeps its error (2 for a missing file or an empty name, 20 for a name through a
+file, 13 without permission, 36 for a name too long); a read of a folder sets 21. A name of 1,024
+bytes or more (or as this section says) overflows FreeSurfer's buffers (FS-221): FreeSurfer's
+answer is then undefined; both modes use the whole name.
+
+## 26. Format numbers and extensions
+
+The formats' numbers: unknown -1, gzip -2 (only as an intermediate), COR 0, MINC 1, ANALYZE 2,
+MGH 3, Genesis 4, GE LX 5, Siemens 6, BRIK 7, bshort 8, bfloat 9, Varian (SDT) 10, outline 11,
+GDF 12, raw 13, Signa 14, DICOM 15, ANALYZE-4D 16, Siemens DICOM 17, Bruker 18, XIMG 19, NIfTI-1
+pair 20, image 21, GCA 22, bhdr 23, NIfTI single file 24, curvature 25, NRRD 26, GIFTI 27, VTK 28,
+morph 29, autoencoder 30, ITK morph 31, label 32, annotation 33, `.npy` 34, ASCII 35.
+
+**`string_to_type(s)`**: empty → -1. Lower-cased, `s` names: `gz` → -2; `ae`, `sae`, `csae` → 30;
+`m3z`, `m3d` → 29; `cor` → 0; `minc`, `mnc` → 1; `spm`, `analyze`, `analyze3d` → 2; `analyze4d`,
+`img` → 16; `mgh`, `mgz` → 3; `gca` → 22; `signa` → 14; `ge`, `genesis` → 4; `gelx`, `lx` → 5;
+`bshort` → 8; `bfloat` → 9; `bhdr` → 23; `siemens`, `ima` → 6; `dicom` → 15; `siemens_dicom` → 17;
+`brik`, `afni` → 7; `sdt`, `varian` → 10; `otl`, `outline` → 11; `gdf` → 12; `bruker` → 18;
+`ximg` → 19; `nifti1` → 20; `nii` → 24; `nrrd` → 26; `mat`, `svs`, `tif`, `tiff`, `jpg`, `jpeg`,
+`pgm`, `ppm`, `pbm`, `rgb` → 21; `curv` → 25; `gii` → 27; `vtk` → 28; `label` → 32; `annot` → 33;
+`npy` → 34; anything else → -1. A string of 1,024 bytes or more: FS-221.
+
+**`type_to_string(t)`**: 0 `COR`, 22 `GCA`, 1 `MINC`, 2 `analyze3d`, 16 `analyze4d`, 3 `MGH`, 4
+`genesis`, 5 `gelx`, 6 `siemens`, 15 `dicom`, 17 `siemens_dicom`, 7 `brik`, 8 `bshort`, 9 `bfloat`,
+23 `bhdr`, 10 `varian`, 11 `outline`, 12 `gdf`, 18 `bruker`, 19 `ximg`, 20 `nifti1`, 24 `nii`, 26
+`nrrd`, 25 `curv`, 27 `gii`, 33 `annot`, 34 `npy`; every other number (Signa, raw, image, VTK, the
+morphs, label, ASCII, unknown) `unknown`.
+
+**`MRIgetVolumeName(s)`**: `s` without what follows its last `@` (the `@` removed too), then,
+while the program's switch `MRIIO_Strip_Pound` is on (it is unless a program turns it off),
+without what follows its last `#`.
+
+## 27. `mri_identify(name)`
+
+1. The name is reduced by `MRIgetVolumeName` (a result of 1,024 bytes or more: FS-221).
+2. If it is not a folder (`fio_IsDirectory`, §6) and has an extension, the extension's number
+   (§26) is checked:
+   - -2 (gzip): MGH (3) if the name contains `.mgh.gz` anywhere, else NIfTI (24) if it contains
+     `.nii.gz`, else prints `INFO: Currently supports gzipped mgh or nifti file (.mgz, .mgh.gz, or
+     nii.gz) only.` and `fname = <name>` (each with a newline) and returns -1.
+   - 21, 34, 3: returned as they are.
+   - 22, 23, 16, 27, 33, 28, 32: returned.
+   - 18, 0, 8, 9, 17, 15, 4, 14, 5, 10, 1, 24, 20, 6, 7, 11, 12, 19, 26: returned if that format's
+     test (§28-§31) says yes; for ANALYZE (2): NIfTI-1 pair (20) if `is_nifti1` says yes, else 2
+     if `is_analyze` does.
+   - any other number (-1, 25, 29, 30): no answer yet.
+3. Otherwise (a folder, no extension, or no answer) the tests run in this order and the first that
+   says yes gives the format: Bruker 18, COR 0, bshort 8, bfloat 9, Siemens DICOM 17, DICOM 15,
+   Genesis 4, NRRD 26, curvature 25, Signa 14, GE LX 5, Varian 10, MINC 1, NIfTI-1 pair 20, NIfTI
+   24, ANALYZE 2, Siemens 6, BRIK 7, outline 11, GDF 12, XIMG 19 (never). Then 29 or 30 if the
+   extension named them; else -1. (So a folder that is not Bruker's is COR, and a `.curv` file is
+   found by its content only.)
+
+## 28. The format tests
+
+Each returns 1 or 0. "Opens" is `fopen(name, "r")` as §1 describes (a folder opens; its reads
+fail). "Reads n bytes" fails on a shorter file; a failed open or read sets `errno` 0 unless said.
+
+- `is_cor`: the name exists (status query; a failure keeps its `errno`) and is a folder, or its last
+  path component (trailing slashes ignored) starts with `COR-`.
+- `is_brik`: extension `BRIK`, case-insensitive.
+- `is_siemens`: extension `ima`, case-insensitive; else the file opens and the bytes at offsets
+  5,790 (2 bytes), 5,802 (2) and 5,838 (3), each read as a C string (it ends at a zero byte), are
+  `SL`, `SP` and `FoV`.
+- `is_genesis`: the whole name (folders included) starts with `I.`; or the extension is exactly
+  `MR`; or the file opens and its first 4 bytes, big-endian, are `0x494d4746` (`IMGF`).
+- `is_ge_lx`: the file opens and its 4 bytes at offset 3,228 are `IMGF`.
+- `is_analyze`: a name with an extension: 1 if the extension is `img` (case-insensitive), else 0.
+  A name without one: `<name>.hdr` opens and gives 348 bytes; its length (in bytes) equals the
+  big-endian 32-bit integer at offset 0, the big-endian integer at offset 32 is 16,384 and the byte
+  at offset 38 is `r`. (`<name>.hdr` of 1,024 bytes or more: FS-221.)
+- `is_mnc`: extension `mnc` (case-insensitive); or extension `gz` and the name ends with `.mnc.gz`
+  (case-insensitive) counted from the dot before the last one (from the name's start when there is
+  none); or the file opens and its first 3 bytes are `CDF`. FS-222: a name whose only dot is its
+  first character (`.gz`) makes FreeSurfer read one byte before the name; the answer is never
+  changed by it.
+- `is_mgh`: 0 without a dot; by default 1 for a name ending in `.mgh`, `.mgz` or `.mgh.gz`; FS-223
+  (rule A; `reproduce`): 1 only for the names `.mgh`, `.mgz` and `.mgh.gz` themselves. No program
+  calls it.
+- `is_bshort`, `is_bfloat`, `is_bhdr`, `is_gdf`, `is_otl`: the extension is exactly `bshort`,
+  `bfloat`, `bhdr`, `gdf`, `otl`. `is_ximg`: always 0.
+- `is_sdt`: the file opens, and so does its header: the name with its extension replaced by `spr`
+  (or `.spr` added when there is no dot).
+- `is_nifti1`: the name without a last `.img` or `.hdr` (exactly), plus `.hdr`: that file opens and
+  its 4 bytes at offset 344 are `ni1\0`.
+- `is_nii`: the extension is exactly `nii`; or it is `gz` and the name contains `.nii.gz`; or the
+  file opens and its 4 bytes at 344 are `n+1\0`.
+- `is_nrrd`: the extension is exactly `nrrd`; or the file opens and its first 4 bytes are `NRRD`.
+- `IDisCurv`: the file opens and its first 3 bytes, big-endian (missing bytes 0), are 16,777,215.
+  A failed open keeps its `errno`; a folder leaves 21.
+
+## 29. Stems and volume extensions
+
+- `IDstemFromName(name)`: names shorter than 3 bytes → none. The first match of: ends with `.w`
+  (removed); a name of at least 5 bytes ending with `.nii`, `.mgz`, `.mgh` or `.img`; at least 6
+  bytes, `.bhdr`; at least 8, `.nii.gz`; at least 12, `_000.bfloat` or `_000.bshort`. Each check
+  that the name is too short for ends the search (none).
+- `IDextensionFromName(name)`: names shorter than 5 bytes → none. The first match of: the name
+  ends with `nii`, `mgz`, `mgh` or `img` (→ that); at least 6 bytes, `bhdr`; at least 8,
+  `nii.gz`; at least 12, `_000.bfloat` → `bfloat`, `_000.bshort` → `bshort`; each length check
+  ends the search. FS-226 (rule A): by default each of the first five must follow a `.`; with
+  `reproduce` they need not (`brainnii` → `nii`).
+- `IDtypeFromStem(stem)`: the first of `<stem>.nii`, `.nii.gz` (→ 24), `.mgh`, `.mgz` (→ 3),
+  `_000.bfloat` (→ 9), `_000.bshort` (→ 8) that opens for reading, else -1 (`errno` from the last
+  failed open).
+- `IDnameFromStem(stem)`: the first of `<stem>` + `.nii`, `.nii.gz`, `.mgh`, `.mgz`, `.img`,
+  `.bhdr`, `_000.bfloat`, `_000.bshort`, `.w` that opens, else none. (Both: a name of 2,000 bytes
+  or more, FS-221.)
+- `bhdr_stem(name)`: for a `.bhdr` name, the name before its last dot; else none.
+  `bhdr_firstslicefname`: `<stem>_000.bfloat`, else `<stem>_000.bshort`, the first that opens; else
+  none. `bhdr_precisionstring`: `bfloat` or `bshort` likewise. `bhdr_precision`: 3 (float) or 4
+  (short) likewise, -1 when neither opens, 0 for a name that is not `.bhdr`.
+
+## 30. Bruker's study folders
+
+`checkBrukerFiles(name, flag)`: 1 when `name` exists and is a folder holding `method`, `acqp`,
+`pdata/1/2dseq`, `pdata/1/d3proc` and `pdata/1/reco` (checked in that order by status queries;
+the five full names are given back, those built before a failure included); else 0 at the first
+failure (its `errno` kept). With `flag` on: `ERROR: could not stat <name>.` or `ERROR: <name> is not
+a directory.` (standard error, a newline), `INFO: directory <name> ` and then, for each file found,
+`INFO:    method <f>`, `INFO:      acqp <f>`, `INFO:     2dseq <f> `, `INFO:    d3proc <f> ` and,
+for the reco file, `INFO:    d3proc <f> ` again (standard output, each with a newline). A full name
+of 512 bytes or more: FS-221. `is_bruker(name)`: 0 when the status query fails (`errno` kept) or
+`name` is not a folder; else `checkBrukerFiles` without messages.
+
+## 31. GE Signa's header test (`is_signa`)
+
+The file opens (`"rb"`; a failure keeps its `errno`) and gives 14,336 bytes (else 0; a folder leaves
+21; FreeSurfer leaves the file open, FS-224: no answer changes). The header is read as 16-bit
+words; the fields are at word offsets (the series block starts at word 2,048, the image block at
+2,560): image x 2,697, y 2,698, TR 2,642, TE 2,646, TI 2,648, start x 2,612, end x 2,614, start y
+2,616, end y 2,618, start z 2,620, end z 2,622, pixel size 2,699; series: field of view 2,199,
+images allocated 2,250.
+
+- **Integers** are the two bytes big-endian as a signed 16-bit number. FS-225 (rule A): FreeSurfer
+  sign-extends the second byte, so a value whose second byte is 0x80 or more reads as (that byte -
+  256) whatever the first byte; `reproduce` does the same.
+- **Floats** are Data General's: 4 bytes big-endian; sign = bit 31, exponent e = bits 24-30, fraction
+  f = bits 0-23. The fraction shifted left by 8 is normalised by shifting left until bit 31 is set
+  (k shifts; none when it is 0); the IEEE exponent is `4 (e - 64) + 126 - k` clamped to 0..255; the
+  IEEE fraction is the 23 bits after the leading one; the result (sign, exponent, fraction as a
+  `float`) is divided by 1,000 in `float`. (A zero fraction keeps the exponent: `0x40000000` gives
+  0.0005.)
+- **The test**: 1 when 2 < x < 10,240, 2 < y < 10,240, 0 < TR < 1,000,000, the field of view in
+  `double` above 0.0002 and in `float` below 300, `|start x| + |end x|`, `|start z| + |end y|` and
+  `|start y| + |end z|` (each sum in `float`, compared in `double`) above 0.000001, |TI| < 100,000,
+  |TE| < 10,000, TI > 0, images allocated ≥ 0 and the pixel size finite. NaNs fail every comparison.
+
+## 32. The DICOM format probe
+
+**FreeSurfer's DICOM reader** is CTN 3.0.6's (`larmorx_io::dicom`, queue item 3.1-16's spec) with
+FreeSurfer's two changes: the "Data Element ... longer" message's longer text and FS-94's swap. The
+reader keeps a process-wide condition stack; `COND_DumpConditions` prints it to standard error, bottom
+first, each entry's code as 8 hexadecimal columns (`%8x`), a space, its text's bytes as they are and
+a newline, then empties it.
+
+**`IsDICOM(name)`**: the answer for the last name asked is kept: the same name gives it again
+without anything else, unless `FS_DICOM_DEBUG` is set (any value), which also prints the steps. In
+order: the name is remembered (answer 0 so far); with debugging `Entering IsDICOM (<name>)`; a file
+that does not open for reading → 0 (`errno` from the open kept); a folder → 0; with debugging
+`Opening <name> as part10`; the stack is emptied; the file is opened as a part-10 file with VR
+mismatches accepted; if that fails, with debugging the condition's name (`DCM_NORMAL`,
+`DCM_ILLEGALOPTION`, `DCM_OBJECTCREATEFAILED`, `DCM_FILEOPENFAILED`, `DCM_FILEACCESSERROR`,
+`DCM_ELEMENTOUTOFORDER`, or `DCMPrintCond: <code as int> unrecognized`) and the stack dumped. Then,
+while the open has failed: the object closed (an empty handle pushes CTN's "NULL object" condition),
+with debugging `Opening as littleendian` (then `bigendian`, then `format conversion`), the file
+opened as a bare data set in implicit little endian (then big endian, then with format conversion
+alone, which CTN always refuses), with debugging the failure's name. At the end: the object closed,
+with debugging `Leaving IsDICOM (<name>)`, the stack emptied; the answer is 1 if an open succeeded.
+All debugging lines go to standard output with a newline. (A name of 1,024 bytes or more: FS-221.)
+
+**`IsSiemensDICOM(name)`**: 0 if `IsDICOM` says no. Then the object is opened again by the same
+four attempts (`IsDICOM` asked first: its kept answer, or with debugging its steps again; if it
+says no, `ERROR: <name> is not a dicom file` on standard error; the stack is not emptied between
+attempts; if no attempt succeeds the stack is dumped and the program exits with status 1; neither
+happens when `IsDICOM` has just said yes for an unchanged file). The Manufacturer element (0008,0070) is looked up in the object's top level (its
+first group 0008, its first element of that tag):
+- missing: CTN's condition "Requested element (8 70) not found in DCM_GetElementVM" is pushed, the
+  object closed; prints `WARNING: searching dicom file <name> for Manufacturer tag 0x8, 0x70` and
+  `WARNING: the result could be a mess.` (standard output); 0;
+- a sequence: `Element is of type dcm_sq, not supported` (standard error), the condition "DCM
+  Cannot retrieve value of element with SQ representation (00080070) in (DCM_GetElementValue)"
+  pushed, the object closed, then the two warnings; 0;
+- a text representation (AE AS CS DA DS DT IS LO LT OB OW PN SH UN ST TM UI) or a number (US, SS:
+  room 2 bytes; UL, SL, AT, FL: 4; FD: 8 per value): the object closed, the stack emptied; the value
+  read as text up to its first zero byte; 1 if it is `SIEMENS` or `SIEMENS `, else 0. For UN,
+  `FreeElementData: 21 unrecognized` is printed to standard error afterwards (no newline; kept, rule
+  C). A number holding more bytes than its room: FS-227 (FreeSurfer writes past its memory; both
+  modes read the value as text);
+- any other representation (OT, UT, DD, RET, context, delimiter): `AllocElementData: <its number>
+  unrecognized` (standard error), then FreeSurfer crashes (FS-228); both modes answer 0. An
+  element of undefined length (its value never read): FreeSurfer crashes (FS-228); both modes 0.
+
+## 33. Validation plan (part 4)
+
+- The probe's commands (`validation/probes/fs-io/`, the official build's functions called by name
+  in `fsio`, each case in its own process inside a fixture folder; the case's files made in its
+  `w` folder first): `sty` (every extension in three cases, odd strings, one of 1,030 bytes), `tts`
+  (-3 to 37), `mgvn` (both switch values; names with several `@` and `#`), `mid` (names in `w` and
+  in a sub-folder with a dot, every extension in several cases, `.gz` endings, no extension; the
+  file absent, a folder (a COR folder, a Bruker study complete or cut at each of its files), or
+  holding a format's header right or broken: NIfTI single and pair, ANALYZE headers of every check,
+  GE Genesis and LX, MINC, NRRD, curvature, Siemens, GE Signa (plausible headers, fields out of
+  range, second bytes of 0x80 or more, cut files), DICOM part 10 and bare in the three transfer
+  syntaxes with a Manufacturer of many values and representations, cut or with one byte changed;
+  companion `.hdr` and `.spr` files; with and without `FS_DICOM_DEBUG`), `isx` (each test on cases
+  made for it), `idf` (the stem and extension helpers on stems with each of their files, the `.bhdr`
+  helpers, `checkBrukerFiles` with its messages), `dcm` (`IsDICOM`, `IsSiemensDICOM` and
+  `mri_identify` in ten sequences, so the kept answer is used). Each prints its results, `errno`
+  and (`mid`, `dcm`) the condition stack. Lines where FreeSurfer crashes or overflows (FS-221,
+  FS-227, FS-228) are counted, not compared.
+- Measured on the replica (2026-11-13): seed 7, 72,000 cases of the 36 commands (2,000 each):
+  `reproduce` identical on 65,077 of 65,077 comparable lines; piece 4's 14,000 cases: 13,914
+  identical, 86 not compared (FreeSurfer's crashes: FS-221, FS-227, FS-228); `fix` differs only with a
+  notice. Seed 1, 3,600 portable cases: 3,243 identical, 357 not compared.

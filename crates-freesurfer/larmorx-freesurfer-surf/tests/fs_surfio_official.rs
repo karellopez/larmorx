@@ -2,13 +2,15 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (900 cases, thirty of each of
-//! the 30 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 900` on Linux x64 from the unit
-//! oracle's build (2026-11-13, relay 11: 894 lines identical, 5 `mprop` cases and 1 `sfile` case
-//! counted, not compared, where FreeSurfer reads memory it never wrote: `SKIP`), against the
-//! port's output with `reproduce` (a case the port marks with one of those defects hashed as
-//! `SKIP`, as `check.py` does). The `sfile` cases run in a temporary folder of their own.
+//! official build's output lines for the probe's cases of seed 1 (990 cases, thirty of each of
+//! the 33 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 990` on Linux x64 from the unit
+//! oracle's build (2026-11-13, relay 13: 980 lines identical, 3 `mprop` cases, 5 `stl`, 1 `sfile`
+//! and 1 `cfile` case counted, not compared, where FreeSurfer reads memory it never wrote or does
+//! not own: `SKIP`),
+//! against the port's output with `reproduce` (a case the port marks with one of those defects
+//! hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread` and `stl` cases run in a
+//! temporary folder of their own.
 
 #[path = "fs_surfio/cases.rs"]
 mod cases;
@@ -18,15 +20,18 @@ use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
-const SKIP: [&str; 4] = ["FS-121", "FS-123", "FS-06", "FS-167"];
+const SKIP: [&str; 12] = [
+    "FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144", "FS-151", "FS-154",
+    "FS-157", "FS-158", "FS-160",
+];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "d927ce4b6aebe9a1f899c92080b8c11b8d45a50b15208a50043e8cb464ca45ef";
+const OFFICIAL_SHA256: &str = "2543d2708fc953a9ec60e5dff31e85b7799e1a20285c2514b338e30f7b7abdaf";
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    for line in cases::generate(1, 900) {
+    for line in cases::generate(1, 990) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let refused = out.starts_with("EXIT ");
         let skip = ids.iter().any(|x| SKIP.contains(x))

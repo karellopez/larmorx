@@ -1194,7 +1194,7 @@ defects! {
     FS_59 = "FS-59", "FreeSurfer", true,
         "assigning a geometry (VOL_GEOM) that has no cached voxel-to-RAS matrices onto one that has them keeps the destination's old matrices, computed from its old geometry";
     FS_60 = "FS-60", "FreeSurfer", true,
-        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform but leaves the destination pointing at it (its use or the volume's end then crashes)";
+        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform yet the destination still shows it as its own: its matrices are then freed memory (using them, or the volume's end, crashes or reads garbage)";
     FS_71 = "FS-71", "MINC volume_io", true,
         "a compressed input (.gz, .Z, .z, or a missing name whose compressed file exists) is decompressed by running gunzip -c, then bunzip2 -c, through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
     FS_72 = "FS-72", "MINC volume_io", true,
@@ -1298,7 +1298,7 @@ defects! {
     FS_125 = "FS-125", "FreeSurfer", true,
         "the faster computation of the metric properties (FS_FASTER_MP set) with several threads sums the faces' areas in an order that depends on the threads' timing, so the total area can change from run to run in its last bits";
     FS_126 = "FS-126", "FreeSurfer", true,
-        "the surface library's distance, area-error and triangle-property files take their names in 1,024-byte buffers: a name of 1,024 bytes or more ends the program with a buffer-overflow abort (signal 6), or is cut to 1,023 bytes after the message '<function>: Truncation on line <n>', so another file is written or read";
+        "the surface library's distance, area-error, triangle-property, curvature, float and area files take their names in 1,024-byte buffers: a name of 1,024 bytes or more (1,020 or more for the GIFTI alternatives of FS_GII) ends the program with a buffer-overflow abort (signal 6), or is cut to 1,023 bytes after the message '<function>: Truncation on line <n>', so another file is written or read";
     FS_127 = "FS-127", "FreeSurfer", true,
         "MRISreadTriangleProperties reads the vertex and face counts at the start of a triangle-property file as floats where MRISwriteTriangleProperties writes them as integers, so it refuses every file the writer wrote (but one of a surface without vertices) with 'incompatible vertex number in file <file>'";
     FS_128 = "FS-128", "FreeSurfer", true,
@@ -1315,6 +1315,56 @@ defects! {
         "MRISreadTriangleProperties reads as many faces as a triangle-property file says, even more than the surface has: they go into its spare face places or past its arrays (memory corruption or a crash)";
     FS_134 = "FS-134", "FreeSurfer", true,
         "MRISreadTriangleProperties and MRISwriteTriangleProperties with a surface name of 1,024 bytes or more write its folder's name past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names)";
+    FS_136 = "FS-136", "FreeSurfer", true,
+        "mrisReadAsciiCurvatureFile, when it cannot open its file, prints 25 bytes of binary data in place of its own name in the message '<name> could not open file <file>.'";
+    FS_137 = "FS-137", "FreeSurfer", true,
+        "mrisReadAsciiCurvatureFile with a file of fewer curvature lines than the surface has unripped vertices stops at the file's end and reports success, the remaining vertices keeping the curvatures they had";
+    FS_138 = "FS-138", "FreeSurfer", true,
+        "MRISreadNewCurvatureIntoArray and MRISreadNewCurvatureVector, when they cannot open their file, end the program with a segmentation fault (signal 11) instead of the message 'MRISreadNewCurvatureIntoArray(<file>): fopen failed'";
+    FS_139 = "FS-139", "FreeSurfer", true,
+        "MRISreadDecimation with a file that ends, or whose numbers stop, before every vertex has its value takes the missing values as decimated (a binary file) or as the last number read (a text file) and reports success";
+    FS_140 = "FS-140", "FreeSurfer", true,
+        "MRISreadDecimation with a text file whose vertex count cannot be read compares memory contents with the surface's vertex count";
+    FS_141 = "FS-141", "FreeSurfer", true,
+        "MRISwriteGeo and MRISwriteICO write an unripped face that has a ripped vertex: MRISwriteGeo writes a vertex number from memory contents for it (and, for a surface of more than 300,000 vertices, writes past a 300,000-entry buffer), MRISwriteICO a number that names another vertex or none";
+    FS_142 = "FS-142", "FreeSurfer", true,
+        "MRISwriteICO numbers the vertices it writes without the ripped ones but writes each face's vertices by their numbers on the surface plus one, so once a vertex is ripped the faces after it name the wrong vertices";
+    FS_143 = "FS-143", "FreeSurfer", true,
+        "MRISreadVTK with a vertex whose three coordinates cannot be read gives it the coordinates read before (those of the vertex before it) and goes on, reporting success when the rest of the file can be read";
+    FS_144 = "FS-144", "FreeSurfer", true,
+        "MRISreadVTK with a first vertex whose coordinates cannot be read gives it coordinates from memory contents";
+    FS_145 = "FS-145", "FreeSurfer", true,
+        "MRISreadVTK with a file that ends after its POINT_DATA line or before all the lines its FIELD line announces ends the program with a segmentation fault (signal 11)";
+    FS_146 = "FS-146", "FreeSurfer", true,
+        "MRISreadVTK with a file that ends before a field's values takes the missing values as 0 and reports success";
+    FS_147 = "FS-147", "FreeSurfer", true,
+        "MRISreadVTK and the ASCII and movie.byu surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
+    FS_148 = "FS-148", "FreeSurfer", true,
+        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, reads one or two bytes before the name to decide whether it names a hemisphere";
+    FS_149 = "FS-149", "FreeSurfer", true,
+        "MRISbuildFileName_read (a name with a slash, or without a hemisphere when FS_POSIX is unset) and __MRISapplyFSGIIwrite (FS_GII set to .gii) write a file name of 1,024 bytes or more past their caller's 1,024-byte buffer";
+    FS_150 = "FS-150", "FreeSurfer", true,
+        "the ASCII and movie.byu surface readers (and the movie.byu positions reader) given a file with no line that is not blank or a comment end the program with a segmentation fault (signal 11)";
+    FS_151 = "FS-151", "FreeSurfer", true,
+        "the ASCII surface reader given a first line whose two counts cannot be read, the ASCII and movie.byu surface and position readers given a first vertex whose numbers cannot be read, and the text STL reader given a first vertex or facet line whose numbers cannot be read, take the missing values from memory contents";
+    FS_152 = "FS-152", "FreeSurfer", true,
+        "the ASCII and movie.byu surface and position readers and the text STL reader given a vertex, face or facet whose numbers cannot be read (the file ends early, or holds something else there) give it the values read before it (the previous vertex's coordinates, the last rip flag read, an ASCII face's vertex 0; in an STL file the numbers of the line before, vertex or facet) and report success";
+    FS_153 = "FS-153", "FreeSurfer", true,
+        "the movie.byu surface and position readers given a first line with a face count of 0 end the program with an arithmetic exception (signal 8)";
+    FS_154 = "FS-154", "FreeSurfer", true,
+        "the movie.byu surface reader given a face whose vertex number is not one of the surface's (below 1 or above the vertex count, a number it cannot read, or a last vertex not written negative) changes memory outside the surface's vertex arrays (a crash or corrupted memory later)";
+    FS_155 = "FS-155", "FreeSurfer", true,
+        "the movie.byu positions reader takes coordinates from a file of another surface (other vertex and face counts) without a message: the first vertices of a larger surface, or of a smaller one the last coordinates repeated";
+    FS_156 = "FS-156", "FreeSurfer", true,
+        "the vertex-positions reader of a binary triangle file given a negative vertex count returns a surface of that count with no vertices, as if it had read it";
+    FS_157 = "FS-157", "FreeSurfer", true,
+        "the STL reader given a vertex of more than 255 faces writes its face lists past their allocation (memory corruption or a crash)";
+    FS_158 = "FS-158", "FreeSurfer", true,
+        "the STL reader given a vertex with a NaN or infinite coordinate (one or three of them) reads memory it does not own to find it: a crash, or a wrong vertex";
+    FS_159 = "FS-159", "FreeSurfer", true,
+        "the STL reader given a facet of fewer than three vertices ends the program with a segmentation fault (signal 11)";
+    FS_160 = "FS-160", "FreeSurfer", true,
+        "the STL reader takes a file for binary when its triangle count times 50, wrapped around 2^32, plus 84 is its size, and then reads the triangles past the file's end from memory contents";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,
@@ -1326,13 +1376,15 @@ defects! {
     FS_165 = "FS-165", "FreeSurfer", true,
         "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
     FS_166 = "FS-166", "FreeSurfer", true,
-        "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
+        "MRIcopy of a tensor volume copies every row from the source's first voxel onto the destination's first voxel: only the destination's first row changes, and it becomes the source's first row";
     FS_261 = "FS-261", "FreeSurfer", true,
         "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
     FS_262 = "FS-262", "FreeSurfer", true,
-        "the byte-order swap of a 64-bit integer (swapLong64) returns the reversed value rounded to a double's 53 significant bits (only values whose reversed form needs more bits change; none below 2^40)";
+        "retired: the same defect as FS-176 (the byte-order swap of a 64-bit integer, swapLong64, rounded to a double's 53 significant bits); kept only until the fs.core clean room names FS-176";
     FS_263 = "FS-263", "FreeSurfer", true,
         "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
+    FS_264 = "FS-264", "FreeSurfer", true,
+        "the 4 x 4 matrix helpers (MRImatrixOfDirectionCosines, MRImatrixOfVoxelSizes, MRImatrixOfTranslations, a geometry's toMatrix and RASFromSurfaceRAS_ given a matrix to fill; MRIsetVox2RASFromMatrix given its matrix) given a matrix with fewer than 4 rows or columns write or read past its elements: a crash, memory contents, or other elements of the matrix changed";
     FS_167 = "FS-167", "FreeSurfer", true,
         "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
     FS_168 = "FS-168", "FreeSurfer", true,
@@ -1350,7 +1402,7 @@ defects! {
     FS_174 = "FS-174", "FreeSurfer", true,
         "an allocation that fails in lcalloc ends the program with exit status 0, as if it had succeeded, after printing Cannot calloc()";
     FS_176 = "FS-176", "FreeSurfer", true,
-        "the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
+        "the byte-order swap of a 64-bit integer (swapLong64) and the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number swapped or read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
     FS_175 = "FS-175", "FreeSurfer", true,
         "byteswapbufshort, byteswapbuffloat and byteswapbufdouble given a byte count that is not a multiple of the number's size reverse the bytes of a whole last number past the count: past the end of a buffer that ends at the count (memory the program does not own)";
     FS_177 = "FS-177", "FreeSurfer", true,
@@ -1397,6 +1449,66 @@ defects! {
         "freeing no linear transform array (LTAfree of a null array) crashes";
     FS_198 = "FS-198", "FreeSurfer", true,
         "copying a linear transform array from one whose transforms lack a matrix onto one that has it leaves the destination's matrix unusable: using or freeing the copy later crashes or reads garbage";
+    FS_199 = "FS-199", "FreeSurfer", true,
+        "npy2mri (reading a NumPy .npy file) reads the header length of a file of format version 3.0 from 3 bytes instead of NumPy's 4: the header text starts a byte early and lacks its last byte, and the reading runs on past it (a crash or a header from memory contents); versions 3.1 and later crash";
+    FS_200 = "FS-200", "FreeSurfer", true,
+        "npy2mri of a .npy file of format version 0 or 4 to 255 reads its header length with a size taken from memory contents: a crash or a header read from memory contents";
+    FS_201 = "FS-201", "FreeSurfer", true,
+        "npy2mri of a .npy file whose header length is about 8 MiB or more (the program's default stack size; version 2 headers may give up to 4 GiB) crashes";
+    FS_202 = "FS-202", "FreeSurfer", true,
+        "npy2mri of a .npy file that ends inside its header takes the header's missing bytes from memory contents";
+    FS_203 = "FS-203", "FreeSurfer", true,
+        "npy2mri reads past a .npy header that has no newline, or whose descr, fortran_order or shape value or a key without a colon runs to its end: memory contents beyond the header (a crash, or a type, order or shape read from memory)";
+    FS_204 = "FS-204", "FreeSurfer", true,
+        "npy2mri crashes on a shape with an empty element: every one-dimensional array as NumPy writes it, (3,), and shapes such as (3, ) or (3,,4)";
+    FS_205 = "FS-205", "FreeSurfer", true,
+        "npy2mri crashes on an array whose extents are all 1 (a single value of any number of dimensions) or that has none";
+    FS_206 = "FS-206", "FreeSurfer", true,
+        "a volume made from fewer than 3 extents (a two- or one-dimensional .npy array, or one whose leading or trailing extents of 1 npy2mri drops) gets its missing extents from memory: for an array whose extents of 1 were dropped, a dropped or earlier extent (an array of shape (1, 3, 4, 1) becomes a volume of 3 x 4 x 4 voxels, (1, 1, 2) one of 2 x 2 x 2), otherwise memory contents (often 0: a volume without voxels)";
+    FS_207 = "FS-207", "FreeSurfer", true,
+        "npy2mri of a .npy header without a descr or a fortran_order entry takes the data type or the order from memory contents, and of one without a shape entry crashes";
+    FS_208 = "FS-208", "FreeSurfer", true,
+        "npy2mri reverses the bytes of a big-endian array of 8-byte integers in 4-byte halves: every value is wrong";
+    FS_209 = "FS-209", "FreeSurfer", true,
+        "npy2mri's verbose output for a C-order array prints memory addresses, which differ from run to run";
+    FS_210 = "FS-210", "FreeSurfer", true,
+        "npy2mri takes any fortran_order value other than False (such as 0, false or a misspelling) as True: the voxels are placed transposed";
+    FS_211 = "FS-211", "FreeSurfer", true,
+        "npy2mri reads a slice of 2 GiB or more wrongly or past the volume's memory (its byte count does not fit 32 bits)";
+    FS_212 = "FS-212", "FreeSurfer", true,
+        "npy2mri of a .npy file shorter than its array leaves the missing voxels 0 without a message";
+    FS_213 = "FS-213", "FreeSurfer", true,
+        "npy2mri of a .npy header whose length does not make the data start at a multiple of 16 bytes skips the bytes up to the next multiple: the voxels are shifted by those bytes (NumPy reads the data right after the header)";
+    FS_214 = "FS-214", "FreeSurfer", true,
+        "gifti_get_DA_value_2D's message for a GIFTI data array without data prints the array's memory address as data= (it differs from run to run), not the data's (nil)";
+    FS_215 = "FS-215", "FreeSurfer", true,
+        "gifti_get_DA_value_2D reads a COMPLEX64 array's values as 8-byte doubles: each value is a meaningless number made of a value's real and imaginary parts";
+    FS_216 = "FS-216", "FreeSurfer", true,
+        "gifti_get_DA_value_2D reads the elements of an array of more than 2^31 values beyond the 2^31st from the wrong place";
+    FS_217 = "FS-217", "FreeSurfer", true,
+        "DTIwriteBValues and DTIwriteBVectors given no matrix create (or empty) the file and crash";
+    FS_218 = "FS-218", "FreeSurfer", true,
+        "DTIwriteBVectors of a matrix with fewer than 3 columns, and DTIwriteBValues of one without columns, write the next rows' numbers in each row's missing columns and, past the matrix's last number, memory contents";
+    FS_219 = "FS-219", "FreeSurfer", true,
+        "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
+    FS_220 = "FS-220", "FreeSurfer", true,
+        "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
+    FS_221 = "FS-221", "FreeSurfer", true,
+        "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
+    FS_222 = "FS-222", "FreeSurfer", true,
+        "is_mnc, for a name whose only dot is its first character followed by gz (.gz), reads one byte of memory outside the name (its answer is not changed)";
+    FS_223 = "FS-223", "FreeSurfer", true,
+        "is_mgh compares the whole file name with .mgh, .mgz and .mgh.gz instead of the name's end, so no ordinary name is recognised as MGH (no program calls it)";
+    FS_224 = "FS-224", "FreeSurfer", true,
+        "is_signa leaves a file shorter than a GE Signa header (14,336 bytes) open: a program that probes many such files runs out of file descriptors";
+    FS_225 = "FS-225", "FreeSurfer", true,
+        "a GE Signa header's 16-bit integer whose low byte is 0x80 or more reads as that byte minus 256 whatever its high byte (a matrix of 128 reads as -128), so such Signa files are not recognised and their fields are wrong";
+    FS_226 = "FS-226", "FreeSurfer", true,
+        "IDextensionFromName takes a name's last letters as its volume extension without the dot before them: a name ending in nii, mgz, mgh, img, bhdr or nii.gz without a dot (brainnii) is taken for a volume of that format, so a surface file so named is read or written as a volume";
+    FS_227 = "FS-227", "FreeSurfer", true,
+        "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
+    FS_228 = "FS-228", "FreeSurfer", true,
+        "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
 }
 
 /// The register entry with ID `id`.

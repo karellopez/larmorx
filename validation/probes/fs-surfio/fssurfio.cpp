@@ -61,6 +61,23 @@ void mrisDumpVertex(FILE *file, MRIS const *mris, int vno);
 int signum_eval(float af);
 int mrisOrientSurface(MRIS *mris);
 int mrisOrientPlane(MRIS *mris);
+// mrisurf_io.cpp's functions of queue item 3.1-48 that no header declares, and its file-local
+// ones through io_statics.cpp (which builds mrisurf_io.cpp into the probe)
+MATRIX *getSRASToTalSRAS(LT *lt);
+int fssurfio_read_curvature_into_array(const char *fname, int size, float **out);
+int fssurfio_read_new_curvature_into_array(const char *fname, int size, float **out);
+int fssurfio_read_curv_old_format(MRIS *mris, const char *fname, MRI *curvmri);
+void fssurfio_apply_fsgii_read(char *file_to_read, const char *fname, int *filetype);
+void fssurfio_apply_fsgii_write(char *file_to_write, const char *fname, int *filetype);
+MRIS *fssurfio_read_ascii_file(const char *fname);
+MRIS *fssurfio_read_geo_file(const char *fname);
+int fssurfio_read_geo_file_positions(MRIS *mris, const char *fname);
+SMALL_SURFACE *fssurfio_read_triangle_vertex_positions_only(const char *fname);
+int fssurfio_read_triangle_file_positions(MRIS *mris, const char *fname);
+bool fssurfio_quad_combine(int quad[4], int vA[3], int vB[3]);
+// mrisurf_io_stl.cpp's reader and writer (declared in mrisurf_io.cpp only)
+MRIS *mrisReadSTL(const std::string &filename);
+bool mrisWriteSTL(const MRIS *mris, const std::string &filename);
 
 const char *Progname = "fssurfio";
 
@@ -1503,6 +1520,378 @@ void sfile_case()
   }
 }
 
+// `cfile` (relay 12, 3.1-48 part a): mrisurf_io.cpp's curvature, value and format files that need
+// nothing unported: mrisReadAsciiCurvatureFile, mrisWriteAsciiCurvatureFile,
+// __mrisreadcurvoldformat, MRISreadCurvatureVector, MRISreadCurvatureIntoArray,
+// MRISreadNewCurvatureIntoArray, MRISreadNewCurvatureVector, MRISreadFloatFile,
+// MRISreadBinaryAreas, MRISbuildFileName_read, MRISwriteDecimation, MRISreadDecimation,
+// __MRISapplyFSGIIread, __MRISapplyFSGIIwrite, MRISreadVTK, MRISwriteGeo, MRISwriteICO,
+// getSRASToTalSRAS, MatlabPlotFace, MatlabPlotVertex. As `sfile`: an empty work folder (with a
+// subfolder `d`), the case's input files, a surface from MRISalloc with the case's vertices and
+// faces, 1 to 3 operations on names relative to the folder, then the surface's state and every
+// file in the folder. `G`: an operation that would read or write memory the program does not own
+// (the port applies the same test). A volume for the values (`mt` >= 0: MRIalloc(nv, 1, 1, mt))
+// is printed after the operation.
+MRI *case_mri(int nv)
+{
+  int t = geti();
+  if (t < 0 || nv < 1) return NULL;
+  return MRIalloc(nv, 1, 1, t);
+}
+
+void dump_mri(MRI *mri)
+{
+  if (!mri) { out += "NOMRI "; return; }
+  for (int i = 0; i < mri->width; i++) of(MRIgetVoxVal(mri, i, 0, 0, 0));
+  MRIfree(&mri);
+}
+
+void dump_floats(const float *p, int n)
+{
+  if (!p) { out += "NULL "; return; }
+  for (int i = 0; i < n; i++) of(p[i]);
+}
+
+void dump_vtk_surface(MRIS *s)
+{
+  oi(s->nvertices); oi(s->nfaces); oi(s->type); oi(s->max_vertices); oi(s->max_faces);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    of(v->x); of(v->y); of(v->z); of(v->curv); of(v->val);
+    oi(s->vertices_topology[vno].num);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) for (int k = 0; k < 3; k++) oi(s->faces[fno].v[k]);
+  of(s->max_curv); of(s->min_curv); oi(s->dist_alloced_flags);
+}
+
+void cfile_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  errno = 0;
+  int envs = geti();
+  if (envs & 1) setenv("FS_POSIX", "1", 1);
+  if (envs & 2) {
+    std::string f = geth();
+    setenv("FS_GII", f.c_str(), 1);
+  }
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  m->hemisphere = geti();
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->nx = getf(); v->ny = getf(); v->nz = getf();
+    v->d = getf(); v->curv = getf(); v->val = getf(); v->origarea = getf();
+    v->ripflag = (char)geti(); v->undefval = geti(); v->fixedval = geti();
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    FACE *f = &m->faces[fno];
+    for (int k = 0; k < 3; k++) f->v[k] = geti();
+    f->ripflag = (char)geti();
+  }
+  m->max_curv = getf();
+  m->min_curv = getf();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "ra") { const char *nm = name_tok(); MRI *mri = case_mri(nv);
+      oi(mrisReadAsciiCurvatureFile(m, nm, mri)); dump_mri(mri); }
+    else if (op == "wa") oi(mrisWriteAsciiCurvatureFile(m, (char *)name_tok()));
+    else if (op == "ro") { const char *nm = name_tok(); MRI *mri = case_mri(nv);
+      oi(fssurfio_read_curv_old_format(m, nm, mri)); dump_mri(mri); }
+    else if (op == "cv" || op == "nv") {
+      // a name of 1,024 bytes or more is copied into a 1,024-byte buffer (FS-126: abort)
+      const char *nm = name_tok();
+      float *p = op == "cv" ? MRISreadCurvatureVector(m, nm) : MRISreadNewCurvatureVector(m, nm);
+      dump_floats(p, nv);
+    }
+    else if (op == "ca" || op == "na") {
+      const char *nm = name_tok();
+      int size = geti();
+      float *p = NULL;
+      oi(op == "ca" ? fssurfio_read_curvature_into_array(nm, size, &p)
+                   : fssurfio_read_new_curvature_into_array(nm, size, &p));
+      dump_floats(p, size);
+    }
+    else if (op == "rf") oi(MRISreadFloatFile(m, name_tok()));
+    else if (op == "rr") oi(MRISreadBinaryAreas(m, name_tok()));
+    else if (op == "bf") {
+      const char *nm = name_tok();
+      // the unchecked sprintf and strcpy into the caller's buffer
+      if (strlen(nm) + strlen(m->fname.data()) + 8 >= STRLEN) { out += "G "; continue; }
+      char buf[STRLEN];
+      oi(MRISbuildFileName_read(m, nm, buf));
+      oh(buf);
+    }
+    else if (op == "wd") oi(MRISwriteDecimation(m, (char *)name_tok()));
+    else if (op == "rd") oi(MRISreadDecimation(m, (char *)name_tok()));
+    else if (op == "gr" || op == "gw") {
+      const char *nm = name_tok();
+      int type = geti();
+      const char *g = getenv("FS_GII");
+      // the unchecked sprintf into the caller's buffer of MRISwrite (FS_GII set: it comes first)
+      if (op == "gw" && g && !strcmp(g, ".gii") && strlen(nm) + 5 > STRLEN) { out += "G "; continue; }
+      static char buf[4 * STRLEN];
+      snprintf(buf, sizeof buf, "%s", nm);
+      if (op == "gr") fssurfio_apply_fsgii_read(buf, nm, &type);
+      else fssurfio_apply_fsgii_write(buf, nm, &type);
+      oh(buf); oi(type);
+    }
+    else if (op == "vt") {
+      int given = geti();
+      const char *nm = name_tok();
+      MRI *mri = case_mri(nv);
+      MRIS *r = MRISreadVTK(given ? m : NULL, nm, mri);
+      if (!r) out += "NULL ";
+      else if (r == m) out += "SAME ";
+      else { out += "NEW "; dump_vtk_surface(r); }
+      dump_mri(mri);
+    }
+    else if (op == "wg") {
+      const char *nm = name_tok();
+      // an unripped face of a ripped vertex reads a vertex number never written
+      bool bad = false;
+      for (int fno = 0; fno < nf; fno++) {
+        FACE *f = &m->faces[fno];
+        if (f->ripflag) continue;
+        for (int n = 0; n < 3; n++) if (m->vertices[f->v[n]].ripflag) bad = true;
+      }
+      if (bad) { out += "G "; continue; }
+      oi(MRISwriteGeo(m, nm));
+    }
+    else if (op == "wi") oi(MRISwriteICO(m, name_tok()));
+    else if (op == "st") {
+      LTA *lta = LTAalloc(1, NULL);
+      LT *lt = &lta->xforms[0];
+      for (int r = 1; r <= 4; r++) for (int c = 1; c <= 4; c++) *MATRIX_RELT(lt->m_L, r, c) = getf();
+      lt->src.c_r = getf(); lt->src.c_a = getf(); lt->src.c_s = getf();
+      lt->dst.c_r = getf(); lt->dst.c_a = getf(); lt->dst.c_s = getf();
+      MATRIX *res = getSRASToTalSRAS(lt);
+      if (!res) out += "NULL ";
+      else for (int r = 1; r <= 4; r++) for (int c = 1; c <= 4; c++) of(*MATRIX_RELT(res, r, c));
+    }
+    else if (op == "mf" || op == "mv") {
+      const char *nm = name_tok();
+      int which = geti();
+      char color = (char)geti();
+      double len = getd();
+      FILE *fp = fopen(nm, "w");
+      if (!fp) { out += "NOFP "; continue; }
+      oi(op == "mf" ? MatlabPlotFace(fp, m, which, color, len) : MatlabPlotVertex(fp, m, which, color, len));
+      fclose(fp);
+    }
+    else if (op == "un") UnitizeNormalFace = geti();
+    else fail("cfile op");
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    float c[10] = {v->x, v->y, v->z, v->nx, v->ny, v->nz, v->d, v->curv, v->val, v->origarea};
+    for (float x : c) of(x);
+    oi(v->undefval); oi(v->fixedval);
+  }
+  of(m->max_curv); of(m->min_curv);
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *fp = fopen(name.c_str(), "rb");
+    if (!fp) { out += "NOFILE "; continue; }
+    std::string b;
+    int ch;
+    while ((ch = fgetc(fp)) != EOF) b += (char)ch;
+    fclose(fp);
+    ox(b);
+  }
+}
+
+// `sread` (relay 13, 3.1-48 part b): mrisurf_io.cpp's file-local surface readers, through
+// io_statics.cpp: mrisReadAsciiFile, mrisReadGeoFile, mrisReadGeoFilePositions,
+// mrisReadTriangleFileVertexPositionsOnly, mrisReadTriangleFilePositions, and quadCombine (the old
+// writer's quadrangles). As `cfile`: an empty work folder (with a subfolder `d`), whether
+// FREESURFER_reportLogicErrors is set, Gdiag's bits, the case's input files, a surface from MRISalloc (coordinates, rip flags, faces, the distances' flags and size:
+// MRISsetXYZ's message when the distances are marked allocated), 1 to 3 operations, then the case
+// surface's coordinates and distance state. A surface a reader returns is printed in full, the small surface's vertices too.
+void dump_read_surface(MRIS *s)
+{
+  if (!s) { out += "NULL "; return; }
+  oi(s->nvertices); oi(s->nfaces); oi(s->type); oi(s->patch); oi(s->status);
+  oi(s->max_vertices); oi(s->max_faces);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    of(v->x); of(v->y); of(v->z); oi(v->ripflag);
+    oi(s->vertices_topology[vno].num);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) {
+    for (int k = 0; k < 3; k++) oi(s->faces[fno].v[k]);
+    oi(s->faces[fno].ripflag);
+  }
+  oi(s->dist_alloced_flags);
+}
+
+void sread_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  if (geti()) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->ripflag = (char)geti();
+  }
+  for (int fno = 0; fno < nf; fno++) for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+  m->dist_alloced_flags = (char)geti();
+  m->dist_nsize = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "ra") dump_read_surface(fssurfio_read_ascii_file(name_tok()));
+    else if (op == "rg") dump_read_surface(fssurfio_read_geo_file(name_tok()));
+    else if (op == "rp") oi(fssurfio_read_geo_file_positions(m, name_tok()));
+    else if (op == "rv") {
+      SMALL_SURFACE *s = fssurfio_read_triangle_vertex_positions_only(name_tok());
+      if (!s) { out += "NULL "; continue; }
+      oi(s->nvertices);
+      if (!s->vertices) { out += "NOVERTICES "; continue; }
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        of(s->vertices[vno].x); of(s->vertices[vno].y); of(s->vertices[vno].z);
+      }
+      MRISSfree(&s);
+    }
+    else if (op == "rt") oi(fssurfio_read_triangle_file_positions(m, name_tok()));
+    else if (op == "qc") {
+      int a[3], b[3], q[4] = {-7, -7, -7, -7};
+      for (int &x : a) x = geti();
+      for (int &x : b) x = geti();
+      oi(fssurfio_quad_combine(q, a, b));
+      for (int x : q) oi(x);
+    }
+    else fail("sread op");
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    of(v->x); of(v->y); of(v->z);
+  }
+  oi(m->dist_alloced_flags); oi(m->dist_nsize);
+}
+
+// `stl` (relay 13, 3.1-49): mrisurf_io_stl.cpp's mrisReadSTL (binary or text) and mrisWriteSTL.
+// As `sread`: an empty work folder (with `d`), Gdiag's bits, the case's input files, a surface
+// from MRISalloc (coordinates, faces, the face-normal cache's entries and deferred flags) for the
+// writer, 1 to 3 operations, then every file in the folder. A surface the reader returns is
+// printed in full: counts and type, each vertex's coordinates, face count, neighbour counts and
+// lists, face lists and positions, each face's vertices and cached normal.
+void dump_stl_surface(MRIS *s)
+{
+  if (!s) { out += "NULL "; return; }
+  oi(s->nvertices); oi(s->nfaces); oi(s->type); oi(s->max_vertices); oi(s->max_faces);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &s->vertices_topology[vno];
+    of(v->x); of(v->y); of(v->z);
+    oi(vt->num); oi(vt->vnum); oi(vt->vtotal);
+    for (int k = 0; k < vt->vnum; k++) oi(vt->v[k]);
+    for (int k = 0; k < vt->num; k++) { oi(vt->f[k]); oi(vt->n[k]); }
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) {
+    for (int k = 0; k < 3; k++) oi(s->faces[fno].v[k]);
+    FaceNormCacheEntry *e = &s->faceNormCacheEntries[fno];
+    of(e->nx); of(e->ny); of(e->nz);
+    oi(s->faceNormDeferredEntries[fno].deferred);
+  }
+}
+
+void stl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    e->nx = getf(); e->ny = getf(); e->nz = getf(); e->orig_area = getf();
+    m->faceNormDeferredEntries[fno].deferred = (char)geti();
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "rs") dump_stl_surface(mrisReadSTL(name_tok()));
+    else if (op == "ws") oi(mrisWriteSTL(m, name_tok()));
+    else fail("stl op");
+  }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *fp = fopen(name.c_str(), "rb");
+    if (!fp) { out += "NOFILE "; continue; }
+    std::string b;
+    int ch;
+    while ((ch = fgetc(fp)) != EOF) b += (char)ch;
+    fclose(fp);
+    ox(b);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -1715,6 +2104,12 @@ void run_case()
     mprop_case();
   } else if (cmd == "sfile") {
     sfile_case();
+  } else if (cmd == "cfile") {
+    cfile_case();
+  } else if (cmd == "sread") {
+    sread_case();
+  } else if (cmd == "stl") {
+    stl_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

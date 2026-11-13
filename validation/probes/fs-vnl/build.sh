@@ -27,7 +27,18 @@ libs=(libitkvnl_algo-4.13.a libitkvnl-4.13.a libitkv3p_netlib-4.13.a libitkvcl-4
 # FreeSurfer 8.2.0's C++ flags for utils/numerics.cpp (the unit oracle's compile_commands.json).
 FLAGS=(-std=c++11 -O3 -DNDEBUG -fopenmp -fno-builtin -fPIC -fdata-sections -ffunction-sections -w -isystem "$inc")
 "$CXX" "${FLAGS[@]}" -c "$here/shim.cxx" -o "$out/shim.o"
-"$CXX" -shared -fopenmp -o "$out/libfsvnl.so" "$out/shim.o" "${libs[@]/#/$lib/}" -lm
+# vnl_inverse's stand-alone instances under the shim's names (family `order`; order/orders.py
+# shows they are libutils' byte for byte)
+"$CXX" -std=c++11 -O3 -DNDEBUG -fopenmp -fno-builtin -fPIC -w -isystem "$inc" -c "$here/order/inst.cxx" -o "$out/inst.o"
+renames=()
+for t in f d; do
+  for n in 2 3 4; do
+    new=$(nm -u "$out/shim.o" | grep -o "_Z15fv_inst_inverseRK16vnl_matrix_fixedI${t}Lj${n}ELj${n}EE")
+    renames+=(--redefine-sym "_Z11vnl_inverseI${t}E16vnl_matrix_fixedIT_Lj${n}ELj${n}EERKS2_=$new")
+  done
+done
+objcopy "${renames[@]}" "$out/inst.o" "$out/inst-renamed.o"
+"$CXX" -shared -fopenmp -o "$out/libfsvnl.so" "$out/shim.o" "$out/inst-renamed.o" "${libs[@]/#/$lib/}" -lm
 { "$CXX" --version | head -1; echo "flags: ${FLAGS[*]}"; } > "$out/compiler.txt"
 CARGO_TARGET_DIR="$out/target" cargo build --release --offline --manifest-path "$here/Cargo.toml"
 cp "$out/target/release/fs-vnl" "$out/"

@@ -193,13 +193,14 @@ whose prebuilt `fs_core_probe` this relay ran as a black box for the unit tests'
   `4 3` of 12 bytes swaps the first item only, `8 2` the first, `2 5` the first three; `k = 3` prints
   `ERROR: ByteSwapBuf: nBytesPerItem = 3 not supported` and returns 1; counts 0 and -1 swap nothing:
   the unit test `machine::tests::fs261_a_buffer_swap` holds these lines.
-- **FS-262 is FS-176.** `swapLong64` (37-53) stores the reversed 64-bit integer in a `double` before
-  returning it; the replica has had it since relay 10 (`machine::swap_long64`, with FS-176's switch and
-  notice, the readers' and writers' defect: `freadLong`, `fwriteLong`, `znzreadLong`, `znzwriteLong`
-  are its only callers). Track E's FS-262 describes the same behaviour from the function's side (its
-  branch predated relay 10's merge): one ID should be retired (recommendation: keep FS-176, which the
-  register's handoff of relay 10 and the replica's notices already use; FS-262's text could become
-  FS-176's). The replica keeps noting FS-176.
+- **FS-262 retired: a duplicate of FS-176** (the orchestrator's decision, 2026-11-13, applied in track
+  A relay 13). `swapLong64` (37-53) stores the reversed 64-bit integer in a `double` before returning
+  it; the replica has had it since relay 10 (`machine::swap_long64`, with FS-176's switch and notice,
+  the readers' and writers' defect: `freadLong`, `fwriteLong`, `znzreadLong`, `znzwriteLong` are its
+  only callers). Track E's FS-262 described the same behaviour from the function's side (its branch
+  predated relay 10's merge). FS-262 is no longer in `larmorx_core::defects`; FS-176 keeps its ID, and
+  its text now names `swapLong64` beside the readers and writers. The replica notes FS-176 wherever
+  the rounding changes a value. The ID FS-262 is not reused.
 - **FS-263** (rule A). `include/log.h` 45-54: `fs::fatal`'s destructor calls `detail::errorExit`
   (`utils/log.cpp` 99-106), which with exceptions on throws the code; a destructor is `noexcept` in
   C++11, so `std::terminate` runs: libstdc++'s verbose handler prints `terminate called after throwing

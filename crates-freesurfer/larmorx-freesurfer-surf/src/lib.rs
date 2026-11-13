@@ -48,6 +48,14 @@
 //! - [`sfile`]: `mrisurf_io.cpp`'s small file readers and writers (the read frame, the
 //!   triangle-property files, the distance, area-error, angle-error and curvature w files, the
 //!   backup and imaginary value readers, the marks, the ASCII and VTK formats; FS-126..FS-134).
+//! - [`curvio`]: the per-vertex value files (the curvature as text and binary, the float and area
+//!   files, the file names, the decimation files, `FS_GII`; FS-136..FS-140, FS-148, FS-149).
+//! - [`formats`]: the VTK reader, the movie.byu and icosahedron writers, the Talairach matrix, the
+//!   MATLAB plots (FS-141..FS-147).
+//! - [`scanf`]: one C `scanf` call (the text readers' numbers, `errno` at the input's end).
+//! - [`stl`]: STL surfaces, read (binary or text) and written (FS-151, FS-152, FS-157..FS-160).
+//! - [`surfread`]: the file-local surface readers (ASCII, movie.byu and its positions, the
+//!   triangle file's positions) and the old writer's quadrangles (FS-147, FS-150..FS-156).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -55,9 +63,11 @@ pub mod alloc;
 pub mod base;
 pub mod basemisc;
 pub mod coords;
+pub mod curvio;
 pub mod dist;
 pub mod edges;
 pub mod facenorm;
+pub mod formats;
 pub mod lta;
 pub mod metric;
 pub mod mp;
@@ -67,7 +77,10 @@ pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;
 pub mod positions;
+pub mod scanf;
 pub mod sfile;
+pub mod stl;
 pub mod surfbase;
+pub mod surfread;
 pub mod topology;
 pub mod views;

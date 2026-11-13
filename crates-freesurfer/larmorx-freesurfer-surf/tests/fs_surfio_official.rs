@@ -20,12 +20,12 @@ use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
-const SKIP: [&str; 42] = [
+const SKIP: [&str; 44] = [
     "FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144", "FS-151", "FS-154",
     "FS-157", "FS-158", "FS-160", "FS-346", "FS-352", "FS-354", "FS-356", "FS-357", "FS-358",
     "FS-359", "FS-360", "FS-361", "FS-362", "FS-367", "FS-370", "FS-371", "FS-372", "FS-373",
     "FS-76", "FS-376", "FS-379", "FS-380", "FS-48h", "FS-382", "FS-383", "FS-384", "FS-386",
-    "FS-388", "FS-389", "FS-391", "FS-392", "FS-53", "FS-521",
+    "FS-388", "FS-389", "FS-391", "FS-392", "FS-53", "FS-521", "FS-533", "FS-534",
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
@@ -61,7 +61,7 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
         ..SurfGlobals::default()
     };
     let (mut noted, mut changed, mut cases) = (0, 0, 0);
-    for line in cases::generate(1, 103 * 43) {
+    for line in cases::generate(1, 103 * 44) {
         if !line.starts_with("mprop ") {
             continue;
         }

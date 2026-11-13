@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
-    FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, Notice,
-    UpstreamDefects,
+    FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, FS_530, FS_531, FS_532,
+    Notice, UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -50,6 +50,8 @@ mod mpc;
 mod mpd;
 #[path = "mpe.rs"]
 mod mpe;
+#[path = "mpf.rs"]
+mod mpf;
 #[path = "mprop.rs"]
 mod mprop;
 #[path = "sfile.rs"]
@@ -140,11 +142,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 43] = [
+const COMMANDS: [&str; 44] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
-    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr",
+    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1031,6 +1033,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "mpc" => mpc::mpc_tokens(&mut t, &mut g),
             "mpd" => mpd::mpd_tokens(&mut t, &mut g),
             "mpe" => mpe::mpe_tokens(&mut t, &mut g),
+            "mpf" => mpf::mpf_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2702,6 +2705,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "mpc" => mpc::mpc_case(cx, t, o)?,
         "mpd" => mpd::mpd_case(cx, t, o)?,
         "mpe" => mpe::mpe_case(cx, t, o)?,
+        "mpf" => mpf::mpf_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2726,6 +2730,40 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         c => panic!("unknown command {c}"),
     }
     Ok(())
+}
+
+/// MRISsmoothKernel's timings (`Done allocating shl <n>, <s> sec`, `... t=<s> sec`) and its
+/// closing value (`vtxval <x>`: column 1031 of the output's first row, memory outside a small
+/// volume) as `<t>` and `<v>`, as `fssurfio.cpp` writes them (relay 23).
+fn untime(b: &[u8]) -> Vec<u8> {
+    let mut r = Vec::with_capacity(b.len());
+    for (k, line) in b.split(|&c| c == b'\n').enumerate() {
+        if k > 0 {
+            r.push(b'\n');
+        }
+        let find = |pat: &[u8]| line.windows(pat.len()).rposition(|w| w == pat);
+        let sec = find(b" sec");
+        if line.starts_with(b"Done allocating shl ")
+            && let (Some(a), Some(e)) = (find(b", "), sec)
+            && e > a
+        {
+            r.extend_from_slice(&line[..a + 2]);
+            r.extend_from_slice(b"<t>");
+            r.extend_from_slice(&line[e..]);
+        } else if line.starts_with(b"Finished loop over ")
+            && let (Some(a), Some(e)) = (find(b"t="), sec)
+            && e > a
+        {
+            r.extend_from_slice(&line[..a + 2]);
+            r.extend_from_slice(b"<t>");
+            r.extend_from_slice(&line[e..]);
+        } else if line.starts_with(b"vtxval ") {
+            r.extend_from_slice(b"vtxval <v>");
+        } else {
+            r.extend_from_slice(line);
+        }
+    }
+    r
 }
 
 fn escape(b: &[u8]) -> String {
@@ -2792,7 +2830,7 @@ pub fn run_line_with(
         }
         r
     };
-    let text = escape(&work(&shared.0.borrow()));
+    let text = escape(&untime(&work(&shared.0.borrow())));
     o.0 = String::from_utf8(work(o.0.as_bytes())).expect("the output's text");
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
@@ -2815,7 +2853,10 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_395)
                     || cx.g.notices.contains(&FS_396)
                     || cx.g.notices.contains(&FS_398)
-                    || cx.g.notices.contains(&FS_523)) =>
+                    || cx.g.notices.contains(&FS_523)
+                    || cx.g.notices.contains(&FS_530)
+                    || cx.g.notices.contains(&FS_531)
+                    || cx.g.notices.contains(&FS_532)) =>
         {
             "CRASH 11".to_owned()
         }

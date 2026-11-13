@@ -1613,6 +1613,26 @@ defects! {
         "the combined GIFTI writer (a surface with its overlays) reads each shape or statistics overlay's volume without checking that it has one: an overlay without its values crashes the program";
     FS_524 = "FS-524", "FreeSurfer", true,
         "the combined GIFTI writer looks an overlay's GIFTI intent up by its overlay type, and the generic statistics type (the one the GIFTI reader gives its statistics overlays) has none: such overlays are dropped from the file without a message";
+    FS_525 = "FS-525", "FreeSurfer", true,
+        "the surface autocorrelation and kernel smoothing functions (MRISar1, MRISarN, MRISsmoothKernel) read their input volume's voxels, and write an output volume the caller gives, as 32-bit floats whatever the volume's type: a volume of another type gives values made of other voxels' bytes (or of memory past the volume)";
+    FS_526 = "FS-526", "FreeSurfer", true,
+        "MRISsmoothKernel given a per-vertex kernel volume weighs every neighbour by the global kernel instead, which is then all zeros: every smoothed value is 0/0 (NaN)";
+    FS_527 = "FS-527", "FreeSurfer", true,
+        "MRISsmoothKernel's closing message prints the output's value at column 1031 of its first row whatever the output's size: for a surface of fewer than 1,032 vertices it prints another voxel's value or memory outside the volume";
+    FS_528 = "FS-528", "FreeSurfer", true,
+        "MRIScrsLUT, for a surface whose vertex count differs from the volume's voxels, does not free the table it began (a small memory leak; the result is not changed)";
+    FS_529 = "FS-529", "FreeSurfer", false,
+        "MRISsmoothKernel given an output volume does not clear it: the vertices it skips (ripped, masked, or without neighbours) keep the caller's values";
+    FS_530 = "FS-530", "FreeSurfer", true,
+        "the surface hop lists (SetSurfHopList) and their users MRISarN and MRISsmoothKernel accept fewer than one hop and then write into empty lists: the program crashes at the first vertex they handle";
+    FS_531 = "FS-531", "FreeSurfer", true,
+        "mriSurfaceRASToVoxel with FREESURFER_mriSurfaceRASToVoxel_both set checks its two computations the wrong way round: it reports \"not same answer\" and crashes the program whenever they agree (in any coordinate)";
+    FS_532 = "FS-532", "FreeSurfer", true,
+        "mriSurfaceRASToVoxel uses a surface-RAS-to-voxel matrix that nothing in FreeSurfer sets: called without one, or with one whose product with a point is refused (a matrix of other than four columns) or has fewer than three rows, it crashes the program or reads memory outside the product";
+    FS_533 = "FS-533", "FreeSurfer", true,
+        "MRISsmoothKernel given hop lists made by an earlier call for fewer hops than its kernel has reads past the lists (memory contents)";
+    FS_534 = "FS-534", "FreeSurfer", true,
+        "with FS-525, a volume of a type smaller than a float has its later voxels read and written past the end of its memory: the values read are memory contents, and the writes corrupt the program's memory (it can crash later)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

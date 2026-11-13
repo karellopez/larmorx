@@ -3217,6 +3217,123 @@ void dump_curv_only(MRIS *s)
 // original area, 8 cached normal) with its values, then the operations, each printing what it
 // gives; the counts, status, extremes, Gdiag_no and FREESURFER_MRISaverageGradients_optimize_suppress
 // come before the read
+// relay 23: queue item 3.1-51's leftovers (MRIScrsLUT, MRISar1, MRISarN, MRISsmoothKernel,
+// SetSurfHopList, mriSurfaceRASToVoxel) on a surface read by MRISread and volumes of one voxel per
+// vertex; each operation prints its volume (or NULL) and the vertices' undefval
+static void mpf_vol(MRI *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->nframes);
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) of(MRIgetVoxVal(m, c, r, s, f));
+}
+
+static void mpf_undef(MRIS *s)
+{
+  for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].undefval);
+}
+
+void mpf_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int nrip = geti();
+  std::vector<int> rips;
+  for (int k = 0; k < nrip; k++) rips.push_back(geti());
+  int flags = geti();
+  if (flags & 1) setenv("FREESURFER_mriSurfaceRASToVoxel_both", "1", 1);
+  if (flags & 2) setenv("FREESURFER_mriSurfaceRASToVoxel_old", "1", 1);
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno : rips) s->vertices[vno].ripflag = 1;
+  int nvol = geti();
+  std::vector<MRI *> vols;
+  for (int k = 0; k < nvol; k++) {
+    int type = geti(), w = geti(), h = geti(), d = geti(), fr = geti();
+    MRI *v = MRIallocSequence(w, h, d, type, fr);
+    for (int f = 0; f < fr; f++)
+      for (int z = 0; z < d; z++)
+        for (int r = 0; r < h; r++)
+          for (int c = 0; c < w; c++) MRIsetVoxVal(v, c, r, z, f, getf());
+    vols.push_back(v);
+  }
+  SURFHOPLIST **shl = NULL;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "lut") {
+      MRI *v = vols[geti()];
+      int **lut = MRIScrsLUT(s, v);
+      if (!lut) { out += "NULL "; continue; }
+      int n = v->width * v->height * v->depth;
+      for (int i = 0; i < n; i++) { oi(lut[0][i]); oi(lut[1][i]); oi(lut[2][i]); }
+      oi(MRIScrsLUTFree(lut));
+    } else if (op == "ar1") {
+      int vi = geti(), mi = geti();
+      mpf_vol(MRISar1(s, vols[vi], mi >= 0 ? vols[mi] : NULL, NULL));
+    } else if (op == "arn") {
+      int vi = geti(), mi = geti(), n = geti();
+      mpf_vol(MRISarN(s, vols[vi], mi >= 0 ? vols[mi] : NULL, NULL, n));
+      mpf_undef(s);
+    } else if (op == "skn") {
+      int vi = geti(), mi = geti(), kind = geti(), ki = geti();
+      int rows = geti(), cols = geti();
+      MATRIX *gk = MatrixAlloc(rows, cols, MATRIX_REAL);
+      for (int r = 1; r <= rows; r++)
+        for (int c = 1; c <= cols; c++) *MATRIX_RELT(gk, r, c) = getf();
+      int reuse = geti(), ok = geti(), oi_ = geti();
+      if (!reuse) shl = NULL;
+      MRI *outv = ok == 0 ? NULL : ok == 1 ? vols[oi_] : vols[vi];
+      MRI *r = MRISsmoothKernel(s, vols[vi], mi >= 0 ? vols[mi] : NULL, (kind & 1) ? vols[ki] : NULL,
+                                (kind & 2) ? gk : NULL, &shl, outv);
+      mpf_vol(r);
+      mpf_undef(s);
+    } else if (op == "hop") {
+      int vtx = geti(), n = geti();
+      SURFHOPLIST *l = SetSurfHopList(vtx, s, n);
+      oi(l->cvtx);
+      oi(l->nhops);
+      for (int h = 0; h < l->nhops; h++) {
+        oi(l->nperhop[h]);
+        for (int i = 0; i < l->nperhop[h]; i++) oi(l->vtxlist[h][i]);
+      }
+      oi(SurfHopListFree(&l));
+      mpf_undef(s);
+    } else if (op == "sras") {
+      VoxelFromSRASmatrix = NULL;
+      if (geti()) {
+        int rows = geti(), cols = geti();
+        VoxelFromSRASmatrix = MatrixAlloc(rows, cols, MATRIX_REAL);
+        for (int r = 1; r <= rows; r++)
+          for (int c = 1; c <= cols; c++) *MATRIX_RELT(VoxelFromSRASmatrix, r, c) = getf();
+      }
+      int np = geti();
+      for (int i = 0; i < np; i++) {
+        double x = getd(), y = getd(), z = getd(), xv = 0, yv = 0, zv = 0;
+        oi(mriSurfaceRASToVoxel(x, y, z, &xv, &yv, &zv));
+        od(xv); od(yv); od(zv);
+      }
+    } else {
+      fail("mpf op");
+    }
+  }
+}
+
 void mpe_case()
 {
   mkdir(workdir.c_str(), 0700);
@@ -3669,6 +3786,8 @@ void run_case()
     mpd_case();
   } else if (cmd == "mpe") {
     mpe_case();
+  } else if (cmd == "mpf") {
+    mpf_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {
@@ -3690,6 +3809,38 @@ void run_case()
   } else {
     fail("unknown command");
   }
+}
+
+// relay 23: MRISsmoothKernel's timings ("Done allocating shl <n>, <s> sec", "... t=<s> sec") and its
+// closing value ("vtxval <x>": column 1031 of the output's first row, memory outside a small volume)
+// as <t> and <v>, as the port writes them
+static std::string untime(const std::string &t)
+{
+  std::string r;
+  size_t i = 0;
+  bool first = true;
+  while (true) {
+    size_t j = t.find('\n', i);
+    std::string line = t.substr(i, j == std::string::npos ? std::string::npos : j - i);
+    if (!first) r += '\n';
+    first = false;
+    size_t sec = line.rfind(" sec");
+    if (line.rfind("Done allocating shl ", 0) == 0 && line.rfind(", ") != std::string::npos &&
+        sec != std::string::npos && sec > line.rfind(", ")) {
+      size_t a = line.rfind(", ");
+      line = line.substr(0, a + 2) + "<t>" + line.substr(sec);
+    } else if (line.rfind("Finished loop over ", 0) == 0 && line.rfind("t=") != std::string::npos &&
+               sec != std::string::npos && sec > line.rfind("t=")) {
+      size_t a = line.rfind("t=");
+      line = line.substr(0, a + 2) + "<t>" + line.substr(sec);
+    } else if (line.rfind("vtxval ", 0) == 0) {
+      line = "vtxval <v>";
+    }
+    r += line;
+    if (j == std::string::npos) break;
+    i = j + 1;
+  }
+  return r;
 }
 
 std::string escape(const std::string &s)
@@ -3790,7 +3941,7 @@ int main(int argc, char *argv[])
     for (std::string *t : {&result, &text})
       for (size_t at = t->find(workdir); at != std::string::npos; at = t->find(workdir, at + 3))
         t->replace(at, workdir.size(), "<w>");
-    printf("%s | %s\n", result.c_str(), escape(text).c_str());
+    printf("%s | %s\n", result.c_str(), escape(untime(text)).c_str());
   }
   unlink(scratch.c_str());
   clear_dir(workdir, false);

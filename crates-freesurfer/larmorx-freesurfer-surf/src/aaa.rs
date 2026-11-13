@@ -402,6 +402,12 @@ pub struct SurfGlobals {
     /// `FREESURFER_MRISaverageGradients_optimize_suppress` was unset), `None` before its first
     /// call.
     pub avg_gradients_optimize: Option<bool>,
+    /// `VoxelFromSRASmatrix` (`mrisurf_metricProperties.cpp` line 11685): the surface-RAS-to-voxel
+    /// matrix `mriSurfaceRASToVoxel` uses; nothing in FreeSurfer sets it (`None`, `NULL`).
+    pub voxel_from_sras: Option<larmorx_freesurfer_core::matrix::Matrix>,
+    /// `mriSurfaceRASToVoxel`'s statics `try_new_way` and `try_old_way`, `None` before its first
+    /// call reads `FREESURFER_mriSurfaceRASToVoxel_both` and `_old`.
+    pub sras_ways: Option<(bool, bool)>,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -443,6 +449,8 @@ impl Default for SurfGlobals {
             around_vertex_limit: 1,
             sff_at_vertex_eigen: None,
             avg_gradients_optimize: None,
+            voxel_from_sras: None,
+            sras_ways: None,
         }
     }
 }

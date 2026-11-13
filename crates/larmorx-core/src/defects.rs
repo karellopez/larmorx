@@ -1731,6 +1731,12 @@ defects! {
         "removing a point outside a point set (fsPointSet::remove) is undefined behaviour: memory corruption or a crash";
     FS_433 = "FS-433", "FreeSurfer", true,
         "loading a point set (a JSON file) that is not JSON, or whose vox2ras, points, coordinates or values have other types, ends the program with an uncaught exception: an abort (status 134) instead of an error message";
+    FS_434 = "FS-434", "FreeSurfer", true,
+        "printing a program's help, an element of the help text without text (an empty section or argument), or a comment, processing instruction or CDATA section between its sections or arguments, crashes the program (a null pointer)";
+    FS_435 = "FS-435", "FreeSurfer", true,
+        "printing a program's help, a word longer than a line (70 characters, 62 in an explanation) is cut at the line's end and its next character is dropped";
+    FS_436 = "FS-436", "FreeSurfer", true,
+        "printing a program's help, a comment or processing instruction among the kinds of arguments is printed as a section of that name in capitals followed by ARGUMENTS";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

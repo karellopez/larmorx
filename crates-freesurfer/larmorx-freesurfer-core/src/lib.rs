@@ -47,6 +47,7 @@ pub mod fnv;
 pub mod fs_vnl;
 pub mod fsenv;
 pub mod globals;
+pub mod help_xml;
 pub mod histo;
 pub mod log;
 pub mod machine;

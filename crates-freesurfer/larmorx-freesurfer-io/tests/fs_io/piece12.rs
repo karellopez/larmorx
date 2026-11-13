@@ -3,7 +3,9 @@
 // 2026 Karel Lopez Vilaret.
 //! The fs.io probe's piece-12 cases (relay 21): `mgi` (`mri_read` of GIFTI files: MRIread's GIFTI
 //! branch), `mwr` (`MRIwrite` of one or several volumes: its GIFTI branch, the names it refuses),
-//! `lps` (`loadfsPointSet` on JSON files). The GIFTI files are built here from the format (data
+//! `lps` (`loadfsPointSet` on JSON files), `hlp` (`outputHelpXml`, FreeSurfer's XML help renderer, on
+//! help texts built as the programs' `.help.xml` files are: sections, kinds of arguments, references,
+//! CDATA, comments, long words, both encodings, now and then broken). The GIFTI files are built here from the format (data
 //! arrays of every intent, type, encoding, byte order and shape, label tables, `TimeStep`), whole
 //! or broken; written GIFTI files are printed with their `UserName` value as `U` and each payload
 //! decoded and inflated (fs-surfio's `gii_normal`).
@@ -26,7 +28,7 @@ use super::piece11::{f32_of, fnv, obytes, opoint, ostr};
 use super::{Gen, Out, Work, enc, hex};
 
 /// The piece-12 commands.
-pub const KINDS: [&str; 3] = ["mgi", "mwr", "lps"];
+pub const KINDS: [&str; 4] = ["mgi", "mwr", "lps", "hlp"];
 
 // ---------------------------------------------------------------- generation
 
@@ -367,6 +369,221 @@ fn point_set_json(g: &mut Gen) -> Vec<u8> {
     s.into_bytes()
 }
 
+/// Words of a help text: plain, with entity and character references, tabs, line ends, the word
+/// separators `_` and `/`, long words around a line's width, non-ASCII letters.
+fn help_word(g: &mut Gen, latin1: bool) -> Vec<u8> {
+    match g.below(30) {
+        0 => b"&lt;in&gt;".to_vec(),
+        1 => b"&amp;".to_vec(),
+        2 => g
+            .pick(&[
+                &b"&#38;"[..],
+                b"&#62;",
+                b"&#09;",
+                b"&quot;",
+                b"&apos;",
+                b"&#x41;",
+            ])
+            .to_vec(),
+        3 => b"\n".to_vec(),
+        4 => b"\t".to_vec(),
+        5 => g
+            .pick(&[
+                &b"a_b"[..],
+                b"/usr/local/freesurfer",
+                b"--opt-name",
+                b"x/y_z",
+                b"_",
+                b"/",
+            ])
+            .to_vec(),
+        6 => {
+            let n = g.int(55, 80) as usize;
+            (0..n).map(|k| b"abcdefghij"[k % 10]).collect()
+        }
+        7 => {
+            if latin1 {
+                vec![b'r', 0xE9, b's']
+            } else {
+                "r\u{e9}sum\u{e9}".as_bytes().to_vec()
+            }
+        }
+        8 => b"<![CDATA[x < y & z]]>".to_vec(),
+        9 => b"<!-- note -->".to_vec(),
+        10 => b"<b>bold</b>".to_vec(),
+        11 => b" ".to_vec(),
+        _ => g
+            .pick(&[
+                &b"the"[..],
+                b"input",
+                b"volume",
+                b"file",
+                b"is",
+                b"written",
+                b"to",
+                b"output",
+                b"with",
+                b"default",
+                b"surface",
+                b"mri_convert",
+                b"--i",
+                b"1",
+                b"(see",
+                b"below)",
+            ])
+            .to_vec(),
+    }
+}
+
+fn help_text(g: &mut Gen, latin1: bool, max: i64) -> Vec<u8> {
+    let mut t = Vec::new();
+    if g.chance(6) {
+        t.push(b' ');
+    }
+    let n = if g.chance(30) {
+        0
+    } else {
+        g.int(1, max.max(1))
+    };
+    for k in 0..n {
+        if k > 0 {
+            t.push(if g.chance(12) { b'\n' } else { b' ' });
+        }
+        t.extend(help_word(g, latin1));
+    }
+    t
+}
+
+fn help_tag(g: &mut Gen, name: &str) -> String {
+    match g.below(12) {
+        0 => name.to_ascii_uppercase(),
+        1 => {
+            let mut c = name.as_bytes().to_vec();
+            c[0] = c[0].to_ascii_uppercase();
+            String::from_utf8(c).unwrap()
+        }
+        _ => name.to_owned(),
+    }
+}
+
+fn help_elem(g: &mut Gen, name: &str, latin1: bool, max: i64, out: &mut Vec<u8>) {
+    let tag = help_tag(g, name);
+    if g.chance(150) {
+        out.extend_from_slice(format!("<{tag}/>").as_bytes());
+        return;
+    }
+    let attr = if g.chance(15) {
+        " id=\"a &amp; b\""
+    } else {
+        ""
+    };
+    out.extend_from_slice(format!("<{tag}{attr}>").as_bytes());
+    out.extend(help_text(g, latin1, max));
+    out.extend_from_slice(format!("</{tag}>").as_bytes());
+}
+
+fn blank(g: &mut Gen) -> &'static [u8] {
+    g.pick(&[&b"\n"[..], b"\n  ", b"", b"\r\n", b"\n\t"])
+}
+
+/// A program's help text as FreeSurfer's `.help.xml` files write it, now and then broken.
+fn help_doc(g: &mut Gen) -> Vec<u8> {
+    let latin1 = g.chance(2);
+    let mut d = Vec::new();
+    if g.chance(4) {
+        d.extend_from_slice(if latin1 {
+            b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n"
+        } else {
+            b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        });
+        d.extend_from_slice(b"<!DOCTYPE help [\n<!ENTITY lt \"#38;#60;\">\n<!ENTITY gt \"&#62;\">\n<!ENTITY amp \"&#38;#38;\">\n]>\n");
+    } else if latin1 {
+        d.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n");
+    }
+    if g.chance(10) {
+        d.extend_from_slice(b"<!-- a comment -->\n");
+    }
+    let root = match g.below(20) {
+        0 => "other",
+        1 => "HELP",
+        _ => "help",
+    };
+    d.extend_from_slice(format!("<{root}>").as_bytes());
+    for _ in 0..g.int(0, 7) {
+        d.extend_from_slice(blank(g));
+        let s = g.pick(&[
+            "name",
+            "synopsis",
+            "description",
+            "arguments",
+            "arguments",
+            "outputs",
+            "example",
+            "example",
+            "bugs",
+            "reporting",
+            "see-also",
+            "references",
+            "text",
+            "cost_function",
+            "mutually-exclusive",
+            "usage",
+        ]);
+        if s == "arguments" {
+            let at = help_tag(g, s);
+            d.extend_from_slice(format!("<{at}>").as_bytes());
+            for _ in 0..g.int(0, 3) {
+                d.extend_from_slice(blank(g));
+                if g.chance(25) {
+                    d.extend_from_slice(g.pick(&[&b"<!-- c -->"[..], b"<?pi x?>"]));
+                    continue;
+                }
+                let kind = g.pick(&[
+                    "required-flagged",
+                    "optional-flagged",
+                    "positional",
+                    "required",
+                    "optional",
+                    "text",
+                ]);
+                let kt = help_tag(g, kind);
+                d.extend_from_slice(format!("<{kt}>").as_bytes());
+                if g.chance(4) {
+                    help_elem(g, "intro", latin1, 12, &mut d);
+                }
+                for _ in 0..g.int(0, 3) {
+                    d.extend_from_slice(blank(g));
+                    help_elem(g, "argument", latin1, 4, &mut d);
+                    d.extend_from_slice(blank(g));
+                    help_elem(g, "explanation", latin1, 30, &mut d);
+                }
+                d.extend_from_slice(format!("</{kt}>").as_bytes());
+            }
+            d.extend_from_slice(format!("</{at}>").as_bytes());
+        } else if s == "outputs" {
+            d.extend_from_slice(b"<outputs>");
+            if g.chance(3) {
+                help_elem(g, "intro", latin1, 10, &mut d);
+            }
+            for _ in 0..g.int(0, 3) {
+                d.extend_from_slice(blank(g));
+                help_elem(g, "output", latin1, 4, &mut d);
+                help_elem(g, "explanation", latin1, 20, &mut d);
+            }
+            d.extend_from_slice(b"</outputs>");
+        } else {
+            help_elem(g, s, latin1, 40, &mut d);
+        }
+    }
+    d.extend_from_slice(blank(g));
+    d.extend_from_slice(format!("</{root}>\n").as_bytes());
+    if g.chance(15) {
+        let cut = g.int(0, d.len() as i64) as usize;
+        d.truncate(cut);
+    }
+    d
+}
+
 pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     let mut t = vec![kind.to_owned()];
     match kind {
@@ -418,6 +635,13 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
                 volume(g, &mut t, nv > 1);
             }
             t.push(enc(Some(name.as_bytes())));
+        }
+        "hlp" => {
+            if g.chance(30) {
+                t.push("N".into());
+            } else {
+                t.push(enc(Some(&help_doc(g))));
+            }
         }
         _ => {
             let name = g.pick(&["w/p.json", "w/p.json", "w/p.json", "w/none.json", "w"]);
@@ -596,8 +820,11 @@ pub fn run(
     let text = s.0.borrow().clone();
     let _ = out.write_all(&text);
     let _ = err;
-    // writers not ported yet
-    if text.windows(15).any(|x| x == b"is not ported y") {
+    // writers not ported yet; help texts the port does not read as libxml2 does
+    if find(&text, b"is not ported yet", 0).is_some()
+        || find(&text, b"libxml2's messages are not reproduced", 0).is_some()
+        || find(&text, b"XML the port does not read", 0).is_some()
+    {
         extra.push("SKIP");
     }
     for n in g.notices.as_slice() {
@@ -624,6 +851,7 @@ pub fn run(
                 | "FS-392"
                 | "FS-53"
                 | "FS-521"
+                | "FS-434"
         ) {
             extra.push("SKIP");
         }
@@ -662,6 +890,12 @@ fn answer(
             super::piece6::print_mri(o, w, m.as_ref());
             print_table(o, m.as_ref().and_then(|m| m.ct.as_ref()), false, false);
             o.i(i64::from(g.errno));
+        }
+        "hlp" => {
+            let text = super::dec(tk.next());
+            let r =
+                larmorx_freesurfer_core::help_xml::output_help_xml(g, out, err, text.as_deref());
+            o.i(i64::from(r));
         }
         "mwr" => {
             g.gdiag = u64::from_str_radix(tk.next(), 16).unwrap();

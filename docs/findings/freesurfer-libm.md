@@ -170,6 +170,24 @@ So on this head **only glibc's `tanhf` decides results**, in `mri_watershed`'s s
 change no file; the correctly rounded `acos` (up to 438 million calls, 760,000 of them different) and
 `atan2` gave FreeSurfer's files on every step.
 
+### A second head: ds000228 sub-pixar008 (a 3.5-year-old)
+
+The recording `ds000228-sub-pixar008-classic-1thread`, steps 1 to 61 but `mri_ca_register` (which
+calls none of the shim's functions on the first head), replayed with **every function of the shim
+but `tanhf` correctly rounded** (2026-11-13): **60 of 60 reproduced**, while the correctly rounded
+values differed from glibc's in 1,503,766 of 578,903,915 `acos` calls (`mris_sphere`, four steps),
+1,185,646 of 860,266,817 (`mris_curvature`), 8,259 and 8,544 of 5,048,820 (`mris_place_surface`,
+`mris_remesh`), 166 of 66,324 and 7,300,512 of 128,506,184 `acosf` calls (`mris_fix_topology`); the
+`asin` of `mri_cc` (2 calls) and `atan2`'s table as on the first head. Then `tanhf` alone:
+
+| Step | Correctly rounded | Result |
+|---|---|---|
+| `mri_watershed` (12; 307,260 `tanhf` calls, 10,236 differing) | `tanhf` | **DIFFERS**: `brainmask.auto.mgz`, 21 of 16,777,216 voxels, by at most 65 |
+| `mris_fix_topology` (37, 38; 8,576,175 and 9,197,675 calls, 217,529 and 214,342 differing) | `tanhf` | REPRODUCED |
+
+So the second head confirms the first: glibc's `tanhf` decides `mri_watershed`'s mask (fewer voxels
+on this smaller head), and nothing else measured needs glibc's bits.
+
 ### fMRIPrep's calls
 
 The programs fMRIPrep and sMRIPrep run outside recon-all (`docs/freesurfer/programs.toml`, stream

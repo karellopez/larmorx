@@ -1379,6 +1379,8 @@ defects! {
         "MRIcopy of a tensor volume copies every row from the source's first voxel onto the destination's first voxel: only the destination's first row changes, and it becomes the source's first row";
     FS_261 = "FS-261", "FreeSurfer", true,
         "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
+    FS_262 = "FS-262", "FreeSurfer", true,
+        "retired: the same defect as FS-176 (the byte-order swap of a 64-bit integer, swapLong64, rounded to a double's 53 significant bits); kept only until the fs.core clean room names FS-176";
     FS_263 = "FS-263", "FreeSurfer", true,
         "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
     FS_264 = "FS-264", "FreeSurfer", true,

@@ -2035,7 +2035,7 @@ TEXTS = [
     (r"\(D13's rule\)", "(the rule of the corrections by default)"),
     (r"\bits default checked by D13's rule\b", "its `fix` checked by the rule of the corrections by "
      "default"),
-    (r"\bthe default by D13's rule\b", "the default by the rule of the corrections by default"),
+    (r"\bthe default by D13's rule\b", "`fix` as the rule of the corrections expects"),
     (r"\(the record's D13 list\)", "(the record's list of what `fix` changed)"),
     (r"\bthe original's solver is its own\b", "the clean room's solver is its own"),
     (r"\bthose whose default mode named\b", "those whose `fix` named"),
@@ -2222,7 +2222,7 @@ COLUMNS = {
     "Replica vs tedana 26.0.3": "replica, reproduce, against tedana 26.0.3",
     "Default vs reproduce": "replica, fix against reproduce",
     "vs larmorx's default": "against the replica's fix",
-    "larmorx's default": "the replica's fix",
+    "larmorx's default": "both ports' fix",
     "replica − tedana 26.0.3": "replica − tedana 26.0.3",
     "14 − 1 thread": "replica: 14 − 1 thread",
     "default − reproduce": "replica: fix − reproduce",

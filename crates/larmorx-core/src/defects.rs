@@ -1061,6 +1061,8 @@ defects! {
         "vnl_symmetric_eigensystem never returns on many matrices with an infinite or NaN entry: EISPACK's pythag loops for ever when its second argument is NaN or both are infinite (its iteration starts from a NaN ratio and never meets its stopping test), and tql2 makes such calls, once after reading and writing one element past its arrays (when a NaN is left at the end of the subdiagonal)";
     ITK_116 = "ITK-116", "VXL", true,
         "vnl_svd (LINPACK's svdc) can loop for ever on a matrix with an infinite or NaN entry: its deflation and splitting steps do not count towards the iteration limit, and they can come back to the same singular values and superdiagonal again and again";
+    ITK_117 = "ITK-117", "VXL", true,
+        "vnl_real_eigensystem takes an eigenvalue whose imaginary part is not 0 for the first of a complex pair; when the last eigenvalue's imaginary part is NaN it reads the eigenvector's imaginary part from one row past its eigenvector matrix and writes the conjugate one element past its eigenvalues: memory contents, and the program can crash";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,

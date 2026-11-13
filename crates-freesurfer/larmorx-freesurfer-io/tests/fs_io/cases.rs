@@ -25,6 +25,9 @@ use larmorx_freesurfer_io::fio;
 use larmorx_freesurfer_io::mriio_old;
 use larmorx_io::znz::ZnzFile;
 
+#[path = "piece2.rs"]
+mod piece2;
+
 /// The cases' random numbers.
 pub struct Gen(u64);
 
@@ -228,17 +231,22 @@ const FORMATS: [&str; 20] = [
 pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     let mut g = Gen::new(seed);
     let mut lines = Vec::with_capacity(n);
-    let kinds: &[&str] = if portable {
-        &[
+    let mut kinds: Vec<&str> = if portable {
+        vec![
             "rd", "zr", "wr", "zw", "dirname", "basename", "ext", "tsv", "swap", "calloc",
         ]
     } else {
-        &[
+        vec![
             "rd", "zr", "wr", "zw", "dirname", "basename", "ext", "fsx", "tsv", "swap", "calloc",
         ]
     };
+    kinds.extend(piece2::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
+        if piece2::KINDS.contains(&kind) {
+            lines.push(piece2::generate(&mut g, kind).join(" "));
+            continue;
+        }
         let mut t: Vec<String> = vec![kind.into()];
         match kind {
             "rd" => {
@@ -534,6 +542,11 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
     let mut o = Out::default();
     let mut extra: Vec<&'static str> = Vec::new();
     let res: Result<(), u8> = (|| {
+        if piece2::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece2::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -837,12 +850,25 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
         let id = n.defect.id;
         // FS-172: where the port refuses the table (FreeSurfer reads for ever there) or where
         // FreeSurfer stores memory contents (always the first FS-172 of a read)
-        let skip = matches!(id, "FS-169" | "FS-173" | "FS-175")
-            || (id == "FS-172" && (refused_tsv || n.detail.contains("memory contents")));
+        let skip = matches!(
+            id,
+            "FS-169"
+                | "FS-173"
+                | "FS-175"
+                | "FS-179"
+                | "FS-181"
+                | "FS-183"
+                | "FS-185"
+                | "FS-189"
+                | "FS-191"
+        ) || (id == "FS-172" && (refused_tsv || n.detail.contains("memory contents")))
+            || (id == "FS-188" && n.detail.contains("past the entry"));
         if skip {
             extra.push("SKIP");
         }
-        if matches!(id, "FS-168" | "FS-170") {
+        // piece 2: FreeSurfer's numbers or names from memory contents
+        let memory = piece2::KINDS.contains(&t[0]) && matches!(id, "FS-49" | "FS-167");
+        if memory || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187" | "FS-192") {
             extra.push("VARY");
         }
     }

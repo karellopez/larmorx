@@ -23,11 +23,17 @@ use larmorx_io::znz::ZnzFile;
 use crate::cfile::CFile;
 use crate::fio;
 
-/// The largest entry count larmorx reads (FS-191: FreeSurfer allocates 8 bytes per entry, and in
-/// the first version a 1,064-byte entry for each, before reading; beyond what the machine can
-/// allocate its outcome depends on the machine). No FreeSurfer table comes near: the largest
-/// structure number of `FreeSurferColorLUT.txt` is 14,175.
+/// The largest entry count larmorx reads in the second version (FS-191: FreeSurfer allocates 8
+/// bytes per entry before reading; beyond what the machine can allocate its outcome depends on
+/// the machine). No FreeSurfer table comes near: the largest structure number of
+/// `FreeSurferColorLUT.txt` is 14,175.
 pub const MAX_ENTRIES: i32 = 1 << 24;
+
+/// The largest entry count larmorx reads in the first version, which allocates and reads a
+/// 1,064-byte entry for every count (1 GiB at this count); above [`NOTE_ENTRIES_V1`] FS-191 is
+/// noted (FreeSurfer's outcome depends on the machine's memory).
+pub const MAX_ENTRIES_V1: i32 = 1 << 20;
+const NOTE_ENTRIES_V1: i32 = 1 << 16;
 
 /// A name length above which FreeSurfer's allocation of the length plus one, made before the
 /// read, may fail on a machine with little memory (FS-191's note where the file holds fewer).
@@ -281,11 +287,18 @@ fn ended(
 
 /// The table of `nentries` empty places, or the reader's allocation error (FS-191).
 fn table(g: &mut Globals, err: &mut dyn Write, v: u32, nentries: i32) -> Option<ColorTable> {
-    if nentries > MAX_ENTRIES {
+    let cap = if v == 1 { MAX_ENTRIES_V1 } else { MAX_ENTRIES };
+    if v == 1 && nentries > NOTE_ENTRIES_V1 && nentries <= cap {
+        g.notices.add(
+            &FS_191,
+            format!("CTABreadFromBinaryV1: {nentries} entries of 1064 bytes allocated by FreeSurfer before reading"),
+        );
+    }
+    if nentries > cap {
         g.notices.add(
             &FS_191,
             format!(
-                "CTABreadFromBinaryV{v}: an entry count of {nentries}, above larmorx's {MAX_ENTRIES}, refused"
+                "CTABreadFromBinaryV{v}: an entry count of {nentries}, above larmorx's {cap}, refused"
             ),
         );
         log::error_printf(
@@ -344,9 +357,14 @@ fn read_v1(
             return None;
         }
         if len >= 1024 {
+            let place = if len >= 1064 {
+                "past the entry (another object's memory)"
+            } else {
+                "inside the entry's later fields"
+            };
             g.notices.add(
                 &FS_188,
-                format!("{W}: a name length of {len}: FreeSurfer writes a NUL byte {len} bytes into a 1024-byte name (not written here)"),
+                format!("{W}: a name length of {len}: FreeSurfer writes a NUL byte {len} bytes into a 1024-byte name, {place} (not written here)"),
             );
         }
         let name = read_name(g, err, fp, W, len, Copy::StrncpyEntryCut);

@@ -34,6 +34,11 @@
 #include <vector>
 
 #include "bfileio.h"
+#include "colortab.h"
+#include "fstagsio.h"
+#include "matrix.h"
+#include "mri.h"
+#include "tags.h"
 #include "diag.h"
 #include "error.h"
 #include "fio.h"
@@ -142,6 +147,489 @@ std::vector<unsigned char> read_znz(const std::string &name, int gz)
   while (znzread(&c, 1, 1, z) == 1) b.push_back(c);
   znzclose(z);
   return b;
+}
+
+
+// ---- piece 2: tags, FStagsIO, VOL_GEOM, binary colour tables ----
+float getf() { uint32_t u = getx32(); float f; memcpy(&f, &u, 4); return f; }
+double getd() { uint64_t u = strtoull(next(), NULL, 16); double d; memcpy(&d, &u, 8); return d; }
+void of(float f) { ox(&f, 4); }
+void od(double d) { ox(&d, 8); }
+// the bytes of a char[STRLEN] buffer up to its last non-zero byte
+void obuf(const char *b)
+{
+  size_t n = STRLEN;
+  while (n > 0 && b[n - 1] == 0) n--;
+  out += "x";
+  obytes(std::vector<unsigned char>(b, b + n));
+  if (n == 0) { out.pop_back(); out.pop_back(); out += " "; }
+}
+// a C string of at most STRLEN bytes
+void ocs(const char *s)
+{
+  size_t n = strnlen(s, STRLEN);
+  out += "x";
+  obytes(std::vector<unsigned char>(s, s + n));
+  if (n == 0) { out.pop_back(); out.pop_back(); out += " "; }
+}
+// two names strcpy'd one after the other into a buffer
+void names_into(char *buf)
+{
+  bool n1, n2;
+  std::string a = getstr(&n1), b = getstr(&n2);
+  strcpy(buf, a.c_str());
+  strcpy(buf, b.c_str());
+}
+void read_vg(VOL_GEOM &v)
+{
+  v.valid = (int)geti(); v.width = (int)geti(); v.height = (int)geti(); v.depth = (int)geti();
+  float *f[] = {&v.xsize, &v.ysize, &v.zsize, &v.x_r, &v.x_a, &v.x_s, &v.y_r, &v.y_a, &v.y_s,
+                &v.z_r, &v.z_a, &v.z_s, &v.c_r, &v.c_a, &v.c_s, &v.s_r, &v.s_a, &v.s_s};
+  for (float *p : f) *p = getf();
+  names_into(v.fname);
+}
+void print_vg(const VOL_GEOM &v)
+{
+  oi(v.valid); oi(v.width); oi(v.height); oi(v.depth);
+  const float f[] = {v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s,
+                     v.z_r, v.z_a, v.z_s, v.c_r, v.c_a, v.c_s, v.s_r, v.s_a, v.s_s};
+  for (float x : f) of(x);
+  obuf(v.fname);
+}
+MATRIX *read_mat()
+{
+  int k = (int)geti();
+  if (k == 0) return NULL;
+  MATRIX *m = MatrixAlloc(k, k, MATRIX_REAL);
+  for (int r = 1; r <= k; r++)
+    for (int c = 1; c <= k; c++) m->rptr[r][c] = getf();
+  return m;
+}
+void print_mat(const MATRIX *m)
+{
+  if (!m) { out += "N "; return; }
+  oi(m->rows);
+  for (int r = 1; r <= m->rows; r++)
+    for (int c = 1; c <= m->cols; c++) of(m->rptr[r][c]);
+}
+COLOR_TABLE *read_ct()
+{
+  COLOR_TABLE *ct = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+  ct->version = (int)geti();
+  ct->nentries = (int)geti();
+  bool n;
+  std::string fn = getstr(&n);
+  strcpy(ct->fname, fn.c_str());
+  ct->entries = (COLOR_TABLE_ENTRY **)calloc(ct->nentries > 0 ? ct->nentries : 1, sizeof(CTE *));
+  for (int i = 0; i < ct->nentries; i++) {
+    if (geti() == 0) continue;
+    CTE *e = (CTE *)calloc(1, sizeof(CTE));
+    std::string nm = getstr(&n);
+    strcpy(e->name, nm.c_str());
+    e->ri = (int)geti(); e->gi = (int)geti(); e->bi = (int)geti(); e->ai = (int)geti();
+    ct->entries[i] = e;
+  }
+  return ct;
+}
+void print_ct(const COLOR_TABLE *ct)
+{
+  if (!ct) { out += "N "; return; }
+  oi(ct->nentries); oi(ct->version); ocs(ct->fname);
+  for (int i = 0; i < ct->nentries; i++) {
+    const CTE *e = ct->entries[i];
+    if (!e) { out += "- "; continue; }
+    ocs(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+    of(e->rf); of(e->gf); of(e->bf); of(e->af);
+  }
+}
+void read_frame(MRI_FRAME *f)
+{
+  f->type = (int)geti();
+  f->TE = getf(); f->TR = getf(); f->flip = getf(); f->TI = getf(); f->TD = getf();
+  f->TM = getd();
+  f->sequence_type = (int)geti();
+  f->echo_spacing = getf(); f->echo_train_len = getf();
+  for (int i = 0; i < 3; i++) f->read_dir[i] = getf();
+  for (int i = 0; i < 3; i++) f->pe_dir[i] = getf();
+  for (int i = 0; i < 3; i++) f->slice_dir[i] = getf();
+  f->label = (int)geti();
+  names_into(f->name);
+  f->dof = (int)geti();
+  if (f->m_ras2vox) MatrixFree(&f->m_ras2vox);
+  f->m_ras2vox = read_mat();
+  f->thresh = getf();
+  f->units = (int)geti();
+  f->DX = getd(); f->DY = getd(); f->DZ = getd(); f->DR = getd(); f->DP = getd(); f->DS = getd();
+  f->bvalue = getd();
+  long *ramp[] = {&f->D1_ramp, &f->D2_ramp, &f->D3_ramp, &f->D4_ramp};
+  long *flat[] = {&f->D1_flat, &f->D2_flat, &f->D3_flat, &f->D4_flat};
+  double *amp[] = {&f->D1_amp, &f->D2_amp, &f->D3_amp, &f->D4_amp};
+  for (int i = 0; i < 4; i++) { *ramp[i] = strtoll(next(), NULL, 10); *flat[i] = strtoll(next(), NULL, 10); *amp[i] = getd(); }
+}
+void print_frame(const MRI_FRAME *f)
+{
+  oi(f->type); of(f->TE); of(f->TR); of(f->flip); of(f->TI); of(f->TD); od(f->TM);
+  oi(f->sequence_type); of(f->echo_spacing); of(f->echo_train_len);
+  for (int i = 0; i < 3; i++) of(f->read_dir[i]);
+  for (int i = 0; i < 3; i++) of(f->pe_dir[i]);
+  for (int i = 0; i < 3; i++) of(f->slice_dir[i]);
+  oi(f->label); obuf(f->name); oi(f->dof); print_mat(f->m_ras2vox); of(f->thresh); oi(f->units);
+  od(f->DX); od(f->DY); od(f->DZ); od(f->DR); od(f->DP); od(f->DS); od(f->bvalue);
+  const long ramp[] = {f->D1_ramp, f->D2_ramp, f->D3_ramp, f->D4_ramp};
+  const long flat[] = {f->D1_flat, f->D2_flat, f->D3_flat, f->D4_flat};
+  const double amp[] = {f->D1_amp, f->D2_amp, f->D3_amp, f->D4_amp};
+  for (int i = 0; i < 4; i++) { oi(ramp[i]); oi(flat[i]); od(amp[i]); }
+}
+// the data file in mode 0 (plain), 1 (compressed) or 2 (plain, opened as compressed)
+znzFile data_znz(int mode, const std::vector<unsigned char> &b)
+{
+  if (mode == 1) {
+    znzFile w = znzopen(dat.c_str(), "wb", 1);
+    if (znz_isnull(w)) fail("cannot write the data file");
+    if (!b.empty()) znzwrite((void *)b.data(), 1, b.size(), w);
+    znzclose(w);
+  } else {
+    write_file(b);
+  }
+  znzFile z = znzopen(dat.c_str(), "rb", mode != 0);
+  if (znz_isnull(z)) fail("cannot open the data file");
+  return z;
+}
+int ***labels_alloc(int x0, int y0, int z0)
+{
+  int ***l = (int ***)calloc(x0 > 0 ? x0 : 1, sizeof(int **));
+  for (int x = 0; x < x0; x++) {
+    l[x] = (int **)calloc(y0 > 0 ? y0 : 1, sizeof(int *));
+    for (int y = 0; y < y0; y++) {
+      l[x][y] = (int *)calloc(z0 > 0 ? z0 : 1, sizeof(int));
+      for (int z = 0; z < z0; z++) l[x][y][z] = -1;
+    }
+  }
+  return l;
+}
+bool more() { return pos < toks.size(); }
+
+void run_piece2(const std::string &cmd)
+{
+  if (cmd == "vgw") {
+    int gz = (int)geti(), nifti = (int)geti(), shearless = (int)geti();
+    VOL_GEOM v;
+    read_vg(v);
+    znzFile z = znzopen(dat.c_str(), "wb", gz);
+    v.write(z, nifti, shearless);
+    znzclose(z);
+    obytes(read_znz(dat, gz));
+  } else if (cmd == "vgr") {
+    int mode = (int)geti(), nifti = (int)geti(), shearless = (int)geti();
+    Gdiag_no = (int)geti();
+    VOL_GEOM v;
+    read_vg(v);
+    znzFile z = data_znz(mode, unhex(next()));
+    v.read(z, nifti, shearless);
+    print_vg(v);
+    oi(znzeof(z) != 0);
+    oi(znztell(z));
+    znzclose(z);
+  } else if (cmd == "fsw") {
+    std::string op = next();
+    int gz = (int)geti(), nifti = (int)geti();
+    Gdiag = (int)geti();
+    znzFile z = znzopen(dat.c_str(), "wb", gz);
+    FStagsIO io(z, nifti);
+    int r = 0;
+    if (op == "tag") {
+      int tag = (int)geti();
+      std::vector<unsigned char> d = unhex(next());
+      long long dlen = geti();
+      d.resize(d.size() + 8, 0);
+      r = io.write_tag(tag, d.data(), dlen);
+    } else if (op == "mat") {
+      int tag = (int)geti();
+      MATRIX *m = read_mat();
+      r = io.write_matrix(m, tag);
+    } else if (op == "ctab") {
+      r = io.write_old_colortable(read_ct());
+    } else if (op == "frames") {
+      int nf = (int)geti();
+      MRI *mri = MRIallocHeader(1, 1, 1, MRI_UCHAR, nf);
+      for (int i = 0; i < nf; i++) read_frame(&mri->frames[i]);
+      r = io.write_mri_frames(mri);
+    } else if (op == "geom") {
+      int shearless = (int)geti();
+      VOL_GEOM a, b;
+      read_vg(a);
+      read_vg(b);
+      r = io.write_gcamorph_geom(&a, &b, shearless);
+    } else if (op == "meta") {
+      int a = (int)geti(), b = (int)geti();
+      r = io.write_gcamorph_meta(a, b, getd());
+    } else if (op == "labels") {
+      int x0 = (int)geti(), y0 = (int)geti(), z0 = (int)geti();
+      int ***l = labels_alloc(x0, y0, z0);
+      for (int x = 0; x < x0; x++)
+        for (int y = 0; y < y0; y++)
+          for (int zz = 0; zz < z0; zz++) l[x][y][zz] = (int)geti();
+      r = io.write_gcamorph_labels(x0, y0, z0, l);
+    } else if (op == "dof") {
+      r = io.write_dof((int)geti());
+    } else if (op == "scan") {
+      MRI *mri = MRIallocHeader(1, 1, 1, MRI_UCHAR, 1);
+      mri->te = getf(); mri->ti = getf(); mri->flip_angle = getd(); mri->FieldStrength = getf();
+      bool n;
+      std::string pe = getstr(&n);
+      if (!n) mri->pedir = strdup(pe.c_str());
+      r = io.write_scan_parameters(mri);
+    } else if (op == "ras" || op == "rasx") {
+      VOL_GEOM v;
+      read_vg(v);
+      r = op == "ras" ? io.write_ras_xform(&v) : io.write_ras_xform_extra(&v);
+    } else if (op == "end") {
+      r = io.write_endtag();
+    } else fail("unknown writer");
+    znzclose(z);
+    oi(r);
+    obytes(read_znz(dat, gz));
+  } else if (cmd == "fsr") {
+    int mode = (int)geti(), nifti = (int)geti();
+    Gdiag = (int)geti();
+    Gdiag_no = (int)geti();
+    znzFile z = data_znz(mode, unhex(next()));
+    FStagsIO io(z, nifti);
+    while (more()) {
+      std::string op = next();
+      out += op + ": ";
+      if (op == "t") {
+        int zl = (int)geti();
+        long long len = -7777;
+        oi(io.read_tagid_len(&len, zl));
+        oi(len);
+      } else if (op == "d") {
+        long long n = geti();
+        std::vector<unsigned char> b((size_t)n + 1, 0xee);
+        oi(io.read_data(b.data(), n));
+        b.resize((size_t)n);
+        obytes(b);
+      } else if (op == "m") {
+        errno = 0;
+        MATRIX *m = io.read_matrix();
+        int e = errno;
+        print_mat(m);
+        oi(e);
+      } else if (op == "c") {
+        print_ct(io.read_old_colortable());
+      } else if (op == "f") {
+        int nf = (int)geti();
+        long long len = geti();
+        MRI *mri = MRIallocHeader(1, 1, 1, MRI_UCHAR, nf);
+        oi(io.read_mri_frames(mri, len));
+        for (int i = 0; i < nf; i++) print_frame(&mri->frames[i]);
+      } else if (op == "g") {
+        int shearless = (int)geti();
+        VOL_GEOM a, b;
+        read_vg(a);
+        read_vg(b);
+        oi(io.read_gcamorph_geom(&a, &b, shearless));
+        print_vg(a);
+        print_vg(b);
+      } else if (op == "e") {
+        int a = 0, b = 0;
+        double c = 0;
+        oi(io.read_gcamorph_meta(&a, &b, &c));
+        oi(a); oi(b); od(c);
+      } else if (op == "l") {
+        int x0 = (int)geti(), y0 = (int)geti(), z0 = (int)geti();
+        int ***l = labels_alloc(x0, y0, z0);
+        oi(io.read_gcamorph_labels(x0, y0, z0, l));
+        for (int x = 0; x < x0; x++)
+          for (int y = 0; y < y0; y++)
+            for (int zz = 0; zz < z0; zz++) oi(l[x][y][zz]);
+      } else if (op == "o") {
+        int d = 0;
+        oi(io.read_dof(&d));
+        oi(d);
+      } else if (op == "s") {
+        long long dlen = geti();
+        MRI *mri = MRIallocHeader(1, 1, 1, MRI_UCHAR, 1);
+        oi(io.read_scan_parameters(mri, dlen));
+        of(mri->te); of(mri->ti); od(mri->flip_angle); of(mri->FieldStrength);
+        if (mri->pedir) ocs(mri->pedir); else out += "N ";
+      } else if (op == "r" || op == "x") {
+        VOL_GEOM v;  // C++ leaves these four unset (memory contents): the probe sets them
+        v.valid = v.width = v.height = v.depth = 0;
+        oi(op == "r" ? io.read_ras_xform(&v) : io.read_ras_xform_extra(&v));
+        print_vg(v);
+      } else if (op == "k") {
+        int tag = (int)geti();
+        long long len = geti();
+        oi(io.skip_tag(tag, len));
+      } else fail("unknown reader");
+    }
+    oi(znzeof(z) != 0);
+    oi(znztell(z));
+    znzclose(z);
+  } else if (cmd == "fsl") {
+    std::string op = next();
+    long long r = 0;
+    if (op == "tag") {
+      int tag = (int)geti(); long long len = geti(); int n = (int)geti(), a = (int)geti();
+      r = FStagsIO::getlen_tag(tag, len, n, a);
+    } else if (op == "mat") {
+      int n = (int)geti(), a = (int)geti();
+      r = FStagsIO::getlen_matrix(n, a);
+    } else if (op == "ctab") {
+      int n = (int)geti(), a = (int)geti();
+      r = FStagsIO::getlen_old_colortable(read_ct(), n, a);
+    } else if (op == "frames") {
+      int nf = (int)geti(), n = (int)geti(), a = (int)geti();
+      MRI *mri = MRIallocHeader(1, 1, 1, MRI_UCHAR, nf);
+      r = FStagsIO::getlen_mri_frames(mri, n, a);
+    } else if (op == "geom") {
+      bool n1, n2;
+      std::string s = getstr(&n1), t = getstr(&n2);
+      int n = (int)geti(), a = (int)geti(), sh = (int)geti();
+      r = FStagsIO::getlen_gcamorph_geom(s.c_str(), t.c_str(), n, a, sh);
+    } else if (op == "meta") {
+      r = FStagsIO::getlen_gcamorph_meta((int)geti());
+    } else if (op == "labels") {
+      int x = (int)geti(), y = (int)geti(), zz = (int)geti(), l = (int)geti(), n = (int)geti(), a = (int)geti();
+      r = FStagsIO::getlen_gcamorph_labels(x, y, zz, l, n, a);
+    } else if (op == "dof") {
+      r = FStagsIO::getlen_dof(0, (int)geti());
+    } else if (op == "scan") {
+      int a = (int)geti();
+      bool n;
+      std::string pe = getstr(&n);
+      MRI *mri = MRIallocHeader(1, 1, 1, MRI_UCHAR, 1);
+      if (!n) mri->pedir = strdup(pe.c_str());
+      r = FStagsIO::getlen_scan_parameters(mri, a);
+    } else if (op == "ras") {
+      VOL_GEOM v;
+      r = FStagsIO::getlen_ras_xform(&v, (int)geti());
+    } else if (op == "rasx") {
+      VOL_GEOM v;
+      r = FStagsIO::getlen_ras_xform_extra(&v, (int)geti());
+    } else if (op == "end") {
+      r = FStagsIO::getlen_endtag((int)geti());
+    } else if (op == "sizeof") {
+      r = (long long)sizeof(MRI_FRAME) * 1000000 + (long long)sizeof(CTE);
+    } else fail("unknown length");
+    oi(r);
+  } else if (cmd == "ctw") {
+    int stream = (int)geti(), gz = (int)geti();
+    Gdiag = (int)geti();
+    COLOR_TABLE *ct = read_ct();
+    int r;
+    if (stream == 0) {
+      FILE *fp = fopen(dat.c_str(), "wb");
+      r = CTABwriteIntoBinary(ct, fp);
+      fclose(fp);
+      oi(r);
+      obytes(read_file(dat));
+    } else {
+      znzFile z = znzopen(dat.c_str(), "wb", gz);
+      r = znzCTABwriteIntoBinary(ct, z);
+      znzclose(z);
+      oi(r);
+      obytes(read_znz(dat, gz));
+    }
+  } else if (cmd == "ctr") {
+    int stream = (int)geti(), mode = (int)geti();
+    Gdiag = (int)geti();
+    Gdiag_no = (int)geti();
+    std::vector<unsigned char> b = unhex(next());
+    if (stream == 0) {
+      write_file(b);
+      FILE *fp = fopen(dat.c_str(), "rb");
+      print_ct(CTABreadFromBinary(fp));
+      oi(feof(fp) != 0);
+      oi(ftell(fp));
+      fclose(fp);
+    } else {
+      znzFile z = data_znz(mode, b);
+      print_ct(znzCTABreadFromBinary(z));
+      oi(znzeof(z) != 0);
+      oi(znztell(z));
+      znzclose(z);
+    }
+  } else if (cmd == "tw" || cmd == "ztw") {
+    bool zn = cmd == "ztw";
+    int gz = zn ? (int)geti() : 0;
+    FILE *fp = NULL;
+    znzFile z = NULL;
+    if (zn) z = znzopen(dat.c_str(), "wb", gz); else fp = fopen(dat.c_str(), "wb");
+    while (more()) {
+      std::string op = next();
+      out += op + ": ";
+      if (op == "s") {
+        int tag = (int)geti(); long long len = geti(), here = -7777;
+        oi(zn ? znzTAGwriteStart(z, tag, &here, len) : TAGwriteStart(fp, tag, &here, len));
+        oi(here);
+      } else if (op == "w") {
+        int tag = (int)geti();
+        std::vector<unsigned char> d = unhex(next());
+        long long len = geti();
+        d.resize(d.size() + 8, 0);
+        oi(TAGwrite(fp, tag, d.data(), len));
+      } else if (op == "m") {
+        int tag = (int)geti();
+        MATRIX *m = read_mat();
+        oi(zn ? znzWriteMatrix(z, m, tag) : TAGwriteMatrix(fp, m, tag));
+      } else if (op == "e") {
+        oi(zn ? znzTAGwriteEnd(z, 0) : TAGwriteEnd(fp, 0));
+      } else fail("unknown tag writer");
+    }
+    if (zn) znzclose(z); else fclose(fp);
+    obytes(zn ? read_znz(dat, gz) : read_file(dat));
+  } else if (cmd == "tr" || cmd == "ztr") {
+    bool zn = cmd == "ztr";
+    int mode = zn ? (int)geti() : 0;
+    Gdiag_no = (int)geti();
+    std::vector<unsigned char> b = unhex(next());
+    FILE *fp = NULL;
+    znzFile z = NULL;
+    if (zn) z = data_znz(mode, b);
+    else { write_file(b); fp = fopen(dat.c_str(), "rb"); }
+    while (more()) {
+      std::string op = next();
+      out += op + ": ";
+      if (op == "t") {
+        long long len = -7777;
+        if (zn) { int zl = (int)geti(); oi(znzTAGreadStart(z, &len, zl)); }
+        else oi(TAGreadStart(fp, &len));
+        oi(len);
+      } else if (op == "k") {
+        int tag = (int)geti();
+        long long len = geti();
+        oi(TAGskip(fp, tag, len));
+      } else if (op == "d") {
+        long long n = geti();
+        std::vector<unsigned char> d((size_t)n + 1, 0xee);
+        oi(TAGread(fp, d.data(), n));
+        d.resize((size_t)n);
+        obytes(d);
+      } else if (op == "m") {
+        errno = 0;
+        MATRIX *m = zn ? znzReadMatrix(z) : TAGreadMatrix(fp);
+        int e = errno;
+        print_mat(m);
+        oi(e);
+      } else fail("unknown tag reader");
+    }
+    if (zn) { oi(znzeof(z) != 0); oi(znztell(z)); znzclose(z); }
+    else { oi(feof(fp) != 0); oi(ftell(fp)); fclose(fp); }
+  } else if (cmd == "cmdl") {
+    std::vector<std::string> args;
+    while (more()) { bool n; args.push_back(getstr(&n)); }
+    std::vector<char *> argv;
+    for (std::string &a : args) argv.push_back((char *)a.c_str());
+    static char line[1 << 16];
+    oi(TAGmakeCommandLineString((int)argv.size(), argv.data(), line));
+    out += "x";
+    obytes(std::vector<unsigned char>(line, line + strlen(line)));
+    if (!line[0]) { out.pop_back(); out.pop_back(); out += " "; }
+  } else {
+    fail("unknown command");
+  }
 }
 
 void run_case()
@@ -331,7 +819,7 @@ void run_case()
     oi(nonzero);
     free(p);
   } else {
-    fail("unknown command");
+    run_piece2(cmd);
   }
 }
 

@@ -479,7 +479,7 @@ command = "larmorx fsl fslmaths"
 python = "lx.fsl.fslmaths"
 does = "An image calculator: a chain of operations applied from left to right (maths, thresholds, masks, filters, reductions, statistics, TFCE)."
 api = "docs/api/fsl-maths.md"
-evidence = "/tools/fsl-maths/"
+evidence = "/evidence/fsl-maths/"
 records = { replica = ["fsl-maths-replica"], clean-room = ["fsl-maths"] }
 
 [[program]]
@@ -489,7 +489,7 @@ command = "larmorx fsl fslstats"
 python = "lx.fsl.fslstats"
 does = "Prints statistics of an image, per volume, per label and as JSON."
 api = "docs/api/fsl-stats.md"
-evidence = "/tools/fsl-stats/"
+evidence = "/evidence/fsl-stats/"
 records = { replica = ["fsl-stats-replica"], clean-room = ["fsl-stats"] }
 
 [[program]]

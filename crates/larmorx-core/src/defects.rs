@@ -1495,12 +1495,26 @@ defects! {
         "MatlabWrite of a complex matrix writes its real and imaginary parts interleaved as the first half of a real matrix";
     FS_248 = "FS-248", "FreeSurfer", true,
         "ReadMatlabFileContents of a file of more than 1,000 variables writes past its lists (a crash or corruption)";
+    FS_249 = "FS-249", "FreeSurfer", true,
+        "reading a volume (mri_read, MRIreadHeader) whose name is 1,024 bytes or more once the working directory is put before it writes past FreeSurfer's name buffers: the result is undefined and the program can crash";
     FS_250 = "FS-250", "FreeSurfer", true,
         "MatFileRead goes on after a header it could not read, with the sizes read so far (or 0)";
     FS_251 = "FS-251", "FreeSurfer", true,
         "the .mat readers take a byte 0xff for the end of the file: a version 5 file with 0xff in its first four bytes is refused, a version 4 variable whose first byte is 0xff ends the reading";
     FS_252 = "FS-252", "FreeSurfer", true,
         "MRIcopyHeader crashes when the source volume's voxel-to-RAS matrix has not been computed (FreeSurfer's own volumes always have it)";
+    FS_253 = "FS-253", "FreeSurfer", true,
+        "reading an MGH or MGZ volume that holds the NIfTI header extension's RAS-transform tag (tag 9) crashes";
+    FS_254 = "FS-254", "FreeSurfer", true,
+        "reading an MGH or MGZ volume whose talairach-transform tag holds 1,024 bytes or more, or whose folder's name is 975 bytes or more, writes past FreeSurfer's name buffers: the transform's name and the volume after it are undefined and the program can crash";
+    FS_255 = "FS-255", "FreeSurfer", true,
+        "reading only the header of a float volume (MRIreadHeader, MRIreadInfo) with a frame list (name#0) crashes";
+    FS_256 = "FS-256", "FreeSurfer", true,
+        "with FS_MGZIO_USEVOXELBUFREAD set, reading one frame after the first of an MGH volume writes past the one-frame volume FreeSurfer makes for it";
+    FS_257 = "FS-257", "FreeSurfer", true,
+        "an MGH volume's command-line or phase-encoding tag whose length is negative or larger than the machine can allocate crashes FreeSurfer or corrupts its memory";
+    FS_258 = "FS-258", "FreeSurfer", true,
+        "regio_read_register writes past its buffer for a subject or method name of 1,000 bytes or more in a register.dat, and gives sizes from memory contents for an .lta without transforms";
 }
 
 /// The register entry with ID `id`.

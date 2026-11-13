@@ -620,6 +620,16 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push(g.int(-1, 2).to_string());
                 }
             }
+            "avg" => {
+                let s = vol(&mut g, &mut t);
+                let mode = g.pick(&[0, 1, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                t.push(g.pick(&[0, 1, 2, 7, -1, -2, 2147483647]).to_string());
+            }
             "dsign" => {
                 t.push(dx(g.pick(&[1.0, -1.0, 0.0, 2.5, f64::NAN, 1e300, -0.0, 0.1])));
             }
@@ -757,7 +767,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 46] = [
+pub const COMMANDS: [&str; 47] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -795,6 +805,7 @@ pub const COMMANDS: [&str; 46] = [
     "lrange",
     "extract",
     "cras",
+    "avg",
     "dsign",
     "sras",
     "spt",
@@ -1322,6 +1333,16 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             o.d(ss);
             o.am(src.vg.i_to_r.as_ref());
             o.m(src.vg.r_to_i.as_ref());
+        }
+        "avg" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let dof = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let r = ar::mri_average(g, a, b, p, dof)?;
+            let given = if mode == 2 { Some(&src) } else { dst.as_ref() };
+            o.ret(&r, given);
         }
         "dsign" => {
             let v = t.d();

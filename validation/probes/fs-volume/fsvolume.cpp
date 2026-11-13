@@ -429,6 +429,13 @@ void run_case()
     od(r); od(a); od(s);
     oam(src->i_to_r__);
     om(src->r_to_i__);
+  } else if (cmd == "avg") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    int dof = geti();
+    MRI *r = MRIaverage(src, dof, dst);
+    oi(r != NULL && r == dst);
+    put_vol(r);
   } else if (cmd == "dsign") {
     od(MRIsetSampleVolumeDerivativeSign(getd()));
   } else if (cmd == "sras") {

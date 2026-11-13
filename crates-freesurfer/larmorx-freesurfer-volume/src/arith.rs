@@ -23,7 +23,7 @@ use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::ret::Ret;
-use larmorx_freesurfer_core::sse::{add, div64, mul, sub};
+use larmorx_freesurfer_core::sse::{add, add64, div64, mul, mul64, sub};
 use larmorx_freesurfer_core::utils::nint;
 use larmorx_freesurfer_mri::ctab::ctab_deep_copy;
 use larmorx_freesurfer_mri::mri::{
@@ -1684,8 +1684,9 @@ pub fn mri_extract_into(
             g.notices.add(&FS_295, "MRIextractInto: the new volume's start and end with the voxel sizes truncated to integers");
         }
         let reproduce = g.notices.reproduce();
+        // an integral voxel size gives FreeSurfer's product in both modes (its zero signs too)
         let step = |k: i32, si: i32, sf: f32| -> f32 {
-            if reproduce {
+            if reproduce || si as f32 == sf {
                 k.wrapping_mul(si) as f32
             } else {
                 mul(k as f32, sf)
@@ -1788,4 +1789,98 @@ pub fn mri_extract_into(
         Some(n) => Ret::New(n),
         None => Ret::Given,
     })
+}
+
+/// `MRIsampleVolumeFrameType(mri, x, y, z, frame, SAMPLE_NEAREST, &val)` at a voxel's integer
+/// coordinates (the case every caller here takes: whole coordinates always sample the nearest
+/// voxel): `outside_val` for a point unambiguously outside, else the voxel of `frame` at the
+/// coordinates (clamped to the volume) as a `float`, read through the row pointers (a frame the
+/// volume does not have reads memory it does not own: FS-289, FS-290); another type gives 0 and
+/// the error `MRIsampleVolumeFrameType: unsupported volume type <t>` (`ERROR_UNSUPPORTED`).
+#[allow(clippy::too_many_arguments)]
+pub fn sample_volume_frame_nearest(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mri: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    frame: i32,
+) -> (i32, f64) {
+    let (xd, yd, zd) = (f64::from(x), f64::from(y), f64::from(z));
+    if crate::coords::index_not_in_volume(mri, xd, yd, zd) == 1 {
+        return (NO_ERROR, mri.outside_val);
+    }
+    let clamp = |v: i32, n: i32| {
+        let v = if v < 0 { 0 } else { v };
+        if v >= n { n - 1 } else { v }
+    };
+    let xv = clamp(nint(g, xd), mri.vg.width);
+    let yv = clamp(nint(g, yd), mri.vg.height);
+    let zv = clamp(nint(g, zd), mri.vg.depth);
+    let ty = mri.mtype;
+    if !matches!(ty, MRI_UCHAR | MRI_SHORT | MRI_USHRT | MRI_INT | MRI_FLOAT) {
+        log::error_printf(
+            g,
+            err,
+            ERROR_UNSUPPORTED,
+            &format!("MRIsampleVolumeFrameType: unsupported volume type {ty}"),
+        );
+        return (ERROR_UNSUPPORTED, 0.0);
+    }
+    let sl = i64::from(zv) + i64::from(frame) * i64::from(mri.vg.depth);
+    let v = rows::read(
+        g,
+        "MRIsampleVolumeFrameType",
+        mri,
+        sl,
+        i64::from(yv),
+        i64::from(xv),
+        ty,
+    );
+    (NO_ERROR, f64::from(v.f()))
+}
+
+/// `MRIaverage(mri_src, dof, mri_dst)`: without a destination a new one-frame volume of the
+/// source's extent and type (`MRIalloc`) with its header; a destination whose extent differs from
+/// the source's gives the error `MRIaverage: incompatible volume dimensions` and `NULL`. Then for
+/// each frame of the destination and each voxel (x innermost) the running average `(dof * dst +
+/// src) / (dof + 1)` in `double` (both voxels sampled nearest, [`sample_volume_frame_nearest`];
+/// the product taken `dof` first, as the official build does; `dof + 1` in `int`), stored with
+/// `MRIsetVoxVal`; the destination's `dof` incremented.
+pub fn mri_average(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    p: Pair,
+    dof: i32,
+) -> Result<Ret<Mri>, Fatal> {
+    let (mut v, _) = Vols::of_pair(p);
+    alloc_like(g, out, err, &mut v, 1, None, false)?;
+    if mri_check_size(v.a(), Some(v.dref()), 0, 0, 0) == 0 {
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            "MRIaverage: incompatible volume dimensions",
+        );
+        return Ok(v.null());
+    }
+    let (w, h, d) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth);
+    let n = f64::from(dof);
+    let n1 = f64::from(dof.wrapping_add(1));
+    for f in 0..v.dref().nframes {
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    let (_, s) = sample_volume_frame_nearest(g, err, v.a(), x, y, z, f);
+                    let (_, t) = sample_volume_frame_nearest(g, err, v.dref(), x, y, z, f);
+                    let val = div64(add64(mul64(n, t), s), n1) as f32;
+                    setv(g, err, &mut v, x, y, z, f, val)?;
+                }
+            }
+        }
+    }
+    v.d().dof = v.d().dof.wrapping_add(1);
+    Ok(v.done())
 }

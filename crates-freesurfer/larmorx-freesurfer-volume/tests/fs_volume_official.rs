@@ -14,11 +14,12 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-13 (46 commands: transform.cpp's VOL_GEOM functions, 3.1-35's voxel
-/// arithmetic, coordinates and geometry): 920 cases, 862 lines identical, 58 hashed as `SKIP`.
-const N: usize = 920;
-const OFFICIAL_SHA256: &str = "772e44de139a4686eb3a943a5964efe8d8031a860511d70ddfaeae65b9bd0f93";
-const SKIPPED: usize = 58;
+/// Recorded 2026-11-13 (47 commands: transform.cpp's VOL_GEOM functions, 3.1-35's voxel
+/// arithmetic, coordinates and geometry, `MRIaverage`): 940 cases, 886 lines identical, 54 hashed
+/// as `SKIP`.
+const N: usize = 940;
+const OFFICIAL_SHA256: &str = "2b37ea96a0d3665073c7c7b2fc0563aa984f9826fc4d736a8f2c8a702114b30b";
+const SKIPPED: usize = 54;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 10] = [
@@ -52,4 +53,19 @@ fn fix_differs_only_with_a_notice() {
         let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
         assert!(r == f || !ids.is_empty(), "{line}");
     }
+}
+
+/// `MRIextractInto` with an integral (negative) voxel size: the default gives FreeSurfer's start and
+/// end, the sign of a zero included (found at seed 7: `-0 + 0 * -1` is +0 in FreeSurfer's integer
+/// product, -0 in a float one).
+#[test]
+fn fix_keeps_freesurfers_start_for_integral_voxel_sizes() {
+    let line = "extract 1 1 1 3 1 0 182 1 2 4 4 40000000 bf800000 bf800000 1 bf19999a 3dcccccd \
+        3f7eb852 3f4ccccd 3f7eb852 bf800000 bf4ccccd bf800000 bf800000 c1a60000 c0e00000 c1f50000 \
+        be99999a 37a7c5ac 00000000 - 0 2 c2878000 c2310000 425a0000 c22a0000 80000000 41a00000 \
+        00000000 00000000 44fa0000 3a83126f 00000000 3ff8000000000000 3 1 0 0 -1 0 2 1 2 2 -1 1";
+    let (r, _) = cases::run_line(line, UpstreamDefects::Reproduce);
+    let (f, ids) = cases::run_line(line, UpstreamDefects::Fix);
+    assert!(ids.is_empty(), "{ids:?}");
+    assert_eq!(r, f);
 }

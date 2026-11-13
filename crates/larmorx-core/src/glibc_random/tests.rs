@@ -36,6 +36,48 @@ fn first(seed: u32, n: usize) -> Vec<u32> {
     (0..n).map(|_| g.next_u31()).collect()
 }
 
+/// The spec's §2 and §3 taken literally, term after term (the sequential congruence, the copies,
+/// the recurrence over a growing list): the reference for the faster seeding of `GlibcRandom`.
+fn literal(seed: u32, n: usize) -> Vec<u32> {
+    let s = if seed == 0 { 1 } else { seed };
+    let mut r: Vec<i64> = vec![i64::from(s as i32)];
+    for i in 1..31 {
+        r.push((16_807 * r[i - 1]).rem_euclid(2_147_483_647));
+    }
+    let mut w: Vec<u32> = r.iter().map(|&v| v as u32).collect();
+    for i in 31..34 {
+        w.push(w[i - 31]);
+    }
+    while w.len() < 344 + n {
+        let k = w.len();
+        w.push(w[k - 31].wrapping_add(w[k - 3]));
+    }
+    w[344..].iter().map(|&v| v >> 1).collect()
+}
+
+#[test]
+fn seeding_as_the_spec_says() {
+    // The seeding by powers of 16807 and a flat buffer against the spec's steps one by one: the
+    // edges of the signed reading and of the modulus, and 20,000 seeds spread over 2³².
+    let mut seeds: Vec<u32> = vec![
+        0,
+        1,
+        2,
+        16_807,
+        127_773,
+        2_147_483_646,
+        2_147_483_647,
+        2_147_483_648,
+        2_147_483_649,
+        4_294_967_294,
+        4_294_967_295,
+    ];
+    seeds.extend((0..20_000u64).map(|k| (k * 214_748_367 + 12_345) as u32));
+    for s in seeds {
+        assert_eq!(first(s, 70), literal(s, 70), "seed {s}");
+    }
+}
+
 #[test]
 fn seeding_words() {
     // §2: seed 1's words, and the non-negative residue of a negative product.

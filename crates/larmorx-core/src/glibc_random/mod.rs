@@ -34,6 +34,8 @@ const SHORT_LAG: usize = 3;
 const FIRST_TERM: usize = 34;
 /// The terms seeding computes and never delivers (ten times the state, §2 step 6).
 const DISCARDED: usize = 310;
+/// The terms that exist after seeding, r₀ … r₃₄₃: the first value delivered is ⌊r₃₄₄ / 2⌋.
+const SEEDED: usize = FIRST_TERM + DISCARDED;
 /// Park and Miller's modulus, 2³¹ − 1.
 const MODULUS: i64 = 2_147_483_647;
 /// Park and Miller's multiplier, 7⁵.
@@ -68,18 +70,47 @@ impl GlibcRandom {
 
     /// The state `srand(seed)` or `srandom(seed)` leaves (§2), for a seed of C's `unsigned int`.
     pub const fn seeded(seed: u32) -> Self {
-        // r₃₁, r₃₂, r₃₃ are copies of r₀, r₁, r₂, which `ring[j mod 31]` already holds.
-        let mut state = GlibcRandom {
-            ring: initial_words(seed),
-            long: FIRST_TERM % WORDS,
-            short: (FIRST_TERM - SHORT_LAG) % WORDS,
-        };
-        let mut k = 0;
-        while k < DISCARDED {
-            state.step();
-            k += 1;
+        // r₀ … r₃₃₃ in a flat buffer (no ring arithmetic in the loop: its only dependency is the
+        // short lag's); the last 31 go into the ring at their places j mod 31.
+        let mut t = [0u32; SEEDED];
+        let words = initial_words(seed);
+        let mut n = 0;
+        while n < WORDS {
+            t[n] = words[n];
+            n += 1;
         }
-        state
+        // r₃₁, r₃₂, r₃₃: copies of r₀, r₁, r₂.
+        while n < FIRST_TERM {
+            t[n] = t[n - WORDS];
+            n += 1;
+        }
+        // The recurrence as three interleaved chains (rₙ needs rₙ₋₃, the chain's previous term),
+        // each kept in a register: 310 = 3 · 103 + 1 terms.
+        let (mut a, mut b, mut c) = (t[n - 3], t[n - 2], t[n - 1]);
+        while n + 3 <= SEEDED {
+            a = a.wrapping_add(t[n - WORDS]);
+            t[n] = a;
+            b = b.wrapping_add(t[n + 1 - WORDS]);
+            t[n + 1] = b;
+            c = c.wrapping_add(t[n + 2 - WORDS]);
+            t[n + 2] = c;
+            n += 3;
+        }
+        while n < SEEDED {
+            t[n] = t[n - WORDS].wrapping_add(t[n - SHORT_LAG]);
+            n += 1;
+        }
+        let mut ring = [0u32; WORDS];
+        let mut j = SEEDED - WORDS;
+        while j < SEEDED {
+            ring[j % WORDS] = t[j];
+            j += 1;
+        }
+        GlibcRandom {
+            ring,
+            long: SEEDED % WORDS,
+            short: (SEEDED - SHORT_LAG) % WORDS,
+        }
     }
 
     /// `srand(seed)` and `srandom(seed)` (one function, §2): replaces the state by seed `seed`'s.
@@ -123,7 +154,7 @@ impl GlibcRandom {
 
     /// The recurrence's next term `rₙ = rₙ₋₃₁ + rₙ₋₃ mod 2³²`, which replaces `rₙ₋₃₁`.
     #[inline]
-    const fn step(&mut self) -> u32 {
+    fn step(&mut self) -> u32 {
         let term = self.ring[self.long].wrapping_add(self.ring[self.short]);
         self.ring[self.long] = term;
         self.long = if self.long + 1 == WORDS {
@@ -140,18 +171,30 @@ impl GlibcRandom {
     }
 }
 
-/// The 31 words Park and Miller's congruence makes from a seed (§2 steps 1 to 4): `r₀` the seed
-/// (0 replaced by 1) read as a signed 32-bit integer, `rᵢ = 16807 · rᵢ₋₁ mod (2³¹ − 1)` (the
-/// non-negative residue, also of a negative product), every one taken as a 32-bit word.
-const fn initial_words(seed: u32) -> [u32; WORDS] {
-    let seed = if seed == 0 { 1 } else { seed };
-    let mut words = [0u32; WORDS];
-    words[0] = seed;
-    let mut r = seed as i32 as i64;
+/// `16807ⁱ mod (2³¹ − 1)` for `i` = 0 … 30.
+const POWERS: [u64; WORDS] = {
+    let mut p = [1u64; WORDS];
     let mut i = 1;
     while i < WORDS {
-        r = (MULTIPLIER * r).rem_euclid(MODULUS);
-        words[i] = r as u32;
+        p[i] = p[i - 1] * MULTIPLIER as u64 % MODULUS as u64;
+        i += 1;
+    }
+    p
+};
+
+/// The 31 words Park and Miller's congruence makes from a seed (§2 steps 1 to 4): `r₀` the seed
+/// (0 replaced by 1) read as a signed 32-bit integer, `rᵢ = 16807 · rᵢ₋₁ mod (2³¹ − 1)` (the
+/// non-negative residue, also of a negative product), every one taken as a 32-bit word. Computed
+/// as `rᵢ = (16807ⁱ mod (2³¹ − 1)) · (r₀ mod (2³¹ − 1)) mod (2³¹ − 1)`, the same residue (the
+/// congruence is a multiplication modulo 2³¹ − 1), so the 30 words do not wait for each other.
+const fn initial_words(seed: u32) -> [u32; WORDS] {
+    let seed = if seed == 0 { 1 } else { seed };
+    let r0 = (seed as i32 as i64).rem_euclid(MODULUS) as u64;
+    let mut words = [0u32; WORDS];
+    words[0] = seed;
+    let mut i = 1;
+    while i < WORDS {
+        words[i] = (POWERS[i] * r0 % MODULUS as u64) as u32;
         i += 1;
     }
     words

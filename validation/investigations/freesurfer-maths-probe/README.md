@@ -248,4 +248,13 @@ each allowed kind, and the IDs the candidate noted on the allowed lines.
 
 ## Results (2026-11-13, the reference machine: glibc 2.35, Linux 6.8, x86-64)
 
-The reference hashes per group are in the spec's §23 (observed with the prebuilt probe).
+- `refs`, seed 7, the prebuilt probe (commit 9d8409f9) and guard allocator (commit b43077c4): the
+  hashes quoted in the spec's §23.2 (26,707 calls; 1,327 memory or crashed lines, 41 that end the
+  program, 172 where FreeSurfer never returns); identical through the oracle-output cache (cold),
+  from it (warm) and without it, in separate processes, which also classify every line alike.
+- `compare` with the probe as its own candidate, `--mode reproduce`: no unexplained difference;
+  26,610 lines identical, 71 memory lines whose contents changed from process to process, 26 where
+  the probe crashed in one process and not in the other (`svd`'s `mpinverse` with a given output
+  FreeSurfer frees).
+- About 40 minutes for a cold `refs` on the reference machine (most of it the guard runs of `eigen`
+  and `svd`), seconds warm; `compare` about 10 minutes more (the candidate's runs).

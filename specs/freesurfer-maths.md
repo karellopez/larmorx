@@ -257,7 +257,9 @@ The layout of §2.1 with doubles, real only.
 practice), `bins[b]` (a float value per bin, its position), `counts[b]` (a float count per bin),
 `bin_size`, `min`, `max` (floats). A new histogram of n bins: `max_bins = nbins = n`, zeros
 everywhere. n negative: the program ends, code -2, `HISTOalloc(<n>): could not allocate
-histogram` (reallocation: `HISTOrealloc(<n>): ...`). Freeing sets the caller's histogram to none and
+histogram` (reallocation: `HISTOrealloc(<n>): ...`; **(observed)** `halloc -1`: exit status 254,
+standard error `error: Cannot allocate memory` + `\n` + `error: HISTOalloc(-1): could not allocate
+histogram` + NUL + `\n`, the C-style error of `specs/freesurfer-core.md` §2 after the system's message). Freeing sets the caller's histogram to none and
 returns 0 (none given: 0 too, **(observed)** `hfree null`). "The histogram's bins" below are `0..nbins-1`.
 Reading bin b with b < 0 or b ≥ the allocation is **FS-22** (§1's out-of-range rule).
 
@@ -1135,3 +1137,114 @@ signs with and without payloads and on infinities among the counts, the bin valu
 
 In §23 (the histogram groups carry non-finite values among the counts, the bin values, the header and
 the scalar inputs).
+
+## 23. Validation plan (black box)
+
+### 23.1 The probe
+
+The open probe folder `validation/investigations/freesurfer-maths-probe/` holds the probe's source
+(calls of the functions of §0 by name), a guard allocator and the comparison loop; its README lists
+every command, its arguments and what it prints, the encodings (every float and double as its bits)
+and the four test costs of the minimizers. The implementer runs the prebuilt probe
+`<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_maths_probe` (FreeSurfer 8.2.0's library as the
+official build compiles it: the unit oracle, GCC 8.4.0 and FreeSurfer's flags) with
+`guard_malloc.so` beside it, and never builds them. Each call runs in a child process of its own with
+an alarm: its line is the printed result, or `EXIT <status>` where FreeSurfer's error functions end
+the program, `CRASH <signal>`, `TIMEOUT` where FreeSurfer never returns; then its standard output
+and standard error.
+
+### 23.2 The groups and their reference hashes
+
+`compare.py refs` (seed 7) runs each group's batch on the probe four times: plainly, plainly again in
+another process (the stack below each call zeroed), and in the two guard runs (the guard allocator
+with an inaccessible page right after each allocation, fill byte 90, then right before it, fill byte
+165). A line whose four results are not the same depends on memory FreeSurfer does not own (a
+**memory** line: a read past an array's end or before its start crashes in one guard run and reads
+the fill byte in the other; memory never written or freed, contents that follow the process's
+addresses, the stack's fill where nothing wrote). The hash is the
+SHA-256 of the group's plain lines, each memory line and each line where FreeSurfer crashed as
+`<memory>` (such a line may be either from one run to the next), the clock's digits masked. **(observed)** on
+the reference machine (glibc 2.35, Linux 6.8, x86-64), through the oracle-output cache and without
+it, and again from the cache:
+
+| Group | § | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
+|---|---|---|---|---|---|---|
+| `hmake` | 5.1, 5.2 | 632 | 38 | 3 | 0 | `f0f701cd2f25ee6a1d531c5a50ae3b0b06ca75b6b1fe39e136a7c4d2404146a7` |
+| `harith` | 5.3, 21 | 4,364 | 34 | 28 | 0 | `9dd8b0231e076d6d842ab058965e65c3dc7bfde90d4b47401f20f0bcb839eb8e` |
+| `hsmooth` | 5.4 | 450 | 0 | 0 | 0 | `6849da4e3bca2b357f0279e90cdb6b2a39879aa6fe321eced7411f5253a47ed9` |
+| `hsearch` | 5.5 | 3,360 | 249 | 0 | 0 | `d56865eae1fc05166fffc44424405f680c10f6502bbf975232cb9dcb63d28e8e` |
+| `hstats` | 5.6 | 1,651 | 48 | 1 | 0 | `b967819d9feb9a0d3e22e29d8a9fc596ad1cac8278a8a25f9fb8e2598b375689` |
+| `hrobust` | 5.7 | 74 | 29 | 2 | 2 | `0d5172c5fb31984cf4de204efdfe496a890bba4ae89b2fc85d35573b55d38830` |
+| `hfiles` | 5.8 | 62 | 0 | 0 | 0 | `8ae7f99741fe6f2fb95a5de15cf1e6ef3a680fd4e12cf0bec60d4ed2a1145b3f` |
+| `mmake` | 2.2 to 2.4 | 356 | 2 | 2 | 0 | `06cedef9465553f35894e0a276e548f627648f42b7737682b15189924b474d15` |
+| `mproduct` | 2.5, 8.1, 16 | 1,202 | 20 | 2 | 0 | `4f285237bdaa014c350f7011104306f2b6f55ade4b4867700d4d17db05d65c5d` |
+| `affine` | 3 | 243 | 2 | 0 | 0 | `514bd8d32cd528c6ed8a062d5ba38f1797a8c218b3940d1dfe902cb239198cfb` |
+| `dmatrix` | 4, 12 | 2,904 | 8 | 1 | 1 | `719f4ea4e5bf36174a84e21120f0c7dd87fb4a1086981864ab7daf8acfc040b4` |
+| `melements` | 8.2 | 3,500 | 31 | 0 | 0 | `e60f3eb349c7fed12395e0f494d8d38a4f6789ad19f1ed782f5cecb7717c68c0` |
+| `mregions` | 8.3 | 880 | 83 | 0 | 0 | `c50b1b9f577cc67267a4d837f5e912d4f777409d8237b05c0a1ed9bbfb500742` |
+| `mvectors` | 8.4, 8.5 | 1,602 | 172 | 0 | 0 | `22123ebdb26ee3c5817014a14a633a0eca6b2b81ec32d38d2dd48d0a159435eb` |
+| `mprint` | 8.6, 8.7 | 363 | 0 | 1 | 0 | `99f11898d09954688429163f63a6dae14d07aaeb034ee8620dbe0c59efa72127` |
+| `minverse` | 8.8 | 862 | 10 | 1 | 0 | `f17057e0444970110a0051cfe1638031987eb2b9fbf05a6b31fdc8ea6f0b5935` |
+| `primes` | 9 | 215 | 2 | 0 | 0 | `7161c5f85f0251b95dcb00423c7ea90119bd46deff0750af6a77ff640cf5859c` |
+| `draws` | 10 | 6 | 0 | 0 | 0 | `01ada774a50680e6d429d614299f85e24c0306153fa7e0a361735f51ffe275a4` |
+| `minimizers` | 13 | 181 | 11 | 0 | 0 | `cbea1be24fc233c0f353a05041189aee308c5501359f6fad0e016c9135ffd2e4` |
+| `nr` | 14 | 5 | 0 | 0 | 0 | `ba8b8aea531d281110a5a52a4a2455fe313fc4e8b3a5a4ce6b1e1cc19eaad69d` |
+| `eigen` | 17.1 to 17.3 | 1,224 | 252 | 0 | 67 | `412ed24373f176563833ec5949aa291bc2841571bcc1bc5a94aabb82e0266a4c` |
+| `svd` | 17.4, 17.5 | 1,920 | 335 | 0 | 102 | `ca9b948a736de0a31ca64713426304fdbac223254054dfe40d3e785321cae86d` |
+| `mfiles` | 18 | 635 | 1 | 0 | 0 | `e8ab918477d85396d2d7c0f8e040499d134ecc8d49200dcde7300b11718ac045` |
+| `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
+| all | | 26,707 | 1,327 | 41 | 172 | |
+
+### 23.3 The comparison
+
+`compare.py compare --candidate <program> --mode reproduce` (then `--mode fix`) runs every case on
+the clean room's program, which takes the probe's commands and prints the same lines, with
+`LARMORX_UPSTREAM_DEFECTS` set to the mode; its defect notices (`upstream defect <ID> ...` on
+standard error) are taken out and their IDs kept. Every line must be identical, byte for byte, but:
+
+- a line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`): the candidate's line must not be
+  one (the defects of those cases say what the clean room gives: FS-13, FS-22, FS-24, FS-31, FS-33,
+  FS-34, FS-37, FS-41, FS-44 to FS-48, FS-51, ITK-112);
+- a **memory** line (FreeSurfer reads what it does not own, among others FS-16, FS-21, FS-22, FS-27,
+  FS-31 to FS-33, FS-40, FS-42, FS-49, ITK-106, ITK-110, ITK-111; the clean room reads 0 there, §1);
+- in `--mode fix`, a line where the candidate noted a defect (the corrected result).
+
+The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
+the allowed lines; exit status 1 for any other difference.
+
+**(observed)** with the probe as its own candidate (`--candidate` the prebuilt probe, `--mode
+reproduce`): no unexplained difference; 26,610 of the 26,707 lines identical, 71 memory lines whose
+contents changed from process to process and 26 where FreeSurfer crashed in one process and not in
+the other (all in `svd`: a pseudo-inverse's freed output, FS-45). Two runs of `refs` in separate
+processes classify every line alike.
+
+### 23.4 Beyond the probe
+
+- **The replays** of the programs that use these functions (`mri_normalize`, `mri_segment`,
+  `mris_make_surfaces`, `mri_ca_register`, `mri_em_register`, `mri_segreg`/`bbregister`) with
+  `reproduce`, on the recorded heads, when they are ported.
+- **Every platform:** the clean room's own golden checks (its results on the other five platforms
+  are its Linux results; a NaN's bits as x86-64 gives them, §7).
+
+## 24. The defects (index)
+
+Where each defect of this module is specified (its two modes there):
+
+| Defect | § | Defect | § | Defect | § |
+|---|---|---|---|---|---|
+| FS-13 | 2.2 | FS-26 | 8.3 | FS-39 | 13.6 |
+| FS-14 | 2.4 | FS-27 | 8.3 | FS-40 | 17.5 |
+| FS-15 | 2.5 | FS-28 | 7 | FS-41 | 17.2 |
+| FS-16 | 2.5 | FS-29 | 10 | FS-42 | 17.1 |
+| FS-17 | 1 | FS-30 | 10 | FS-43 | 17.5 |
+| FS-18 | 5.2 | FS-31 | 8.5 | FS-44 | 17.5 |
+| FS-19 | 5.6 | FS-32 | 9 | FS-45 | 17.5 |
+| FS-20 | 5.6 | FS-33 | 8.8 | FS-46 | 17.5 |
+| FS-21 | 5.2 | FS-34 | 13.4 | FS-47 | 17.1 |
+| FS-22 | 5.1 | FS-35 | 13.2 | FS-48 | 17.4 |
+| FS-23 | 5.3 | FS-36 | 13.4 | FS-49 | 18.2 |
+| FS-24 | 5.7 | FS-37 | 13.3 | FS-50 | 5.3 |
+| FS-25 | 7 | FS-38 | 13.6 | FS-51 | 5.7 |
+
+VNL's own (the main package's ports carry them): ITK-106 (§13.3), ITK-110, ITK-111, ITK-112 (§17.2).
+FS-12 (`nint`) is `specs/freesurfer-core.md`'s.

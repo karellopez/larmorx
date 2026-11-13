@@ -309,7 +309,7 @@ command = "larmorx fsl flirt"
 python = "lx.fsl.flirt"
 does = "Linear (affine) registration, with every cost function and boundary-based registration (BBR)."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -319,7 +319,7 @@ command = "larmorx fsl convert_xfm"
 python = "lx.fsl.convert_xfm"
 does = "FLIRT's matrix tool: inverts a 4 × 4 matrix (`-inverse`), composes two (`-concat`), and the rest of its options."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -329,7 +329,7 @@ command = "larmorx fsl avscale"
 python = "lx.fsl.avscale"
 does = "A matrix taken apart: its rotation and translation, angles, scales, skews, determinant and half transforms."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -339,7 +339,7 @@ command = "larmorx fsl img2imgcoord"
 python = "lx.fsl.img2imgcoord"
 does = "Coordinates carried from one image to another through a matrix (voxels by default)."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -349,7 +349,7 @@ command = "larmorx fsl std2imgcoord"
 python = "lx.fsl.std2imgcoord"
 does = "Coordinates carried from a standard image to an image (millimetres by default), the matrix inverted."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -359,7 +359,7 @@ command = "larmorx fsl img2stdcoord"
 python = "lx.fsl.img2stdcoord"
 does = "Coordinates carried from an image to a standard image's millimetres (input voxels by default)."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -369,7 +369,7 @@ command = "larmorx fsl rmsdiff"
 python = "lx.fsl.rmsdiff"
 does = "The RMS deviation between two matrices over 80 mm about the reference's centre of gravity, or over a mask."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -379,7 +379,7 @@ command = "larmorx fsl makerot"
 python = "lx.fsl.makerot"
 does = "A rotation matrix: an angle in degrees about an axis through a centre."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -389,7 +389,7 @@ command = "larmorx fsl midtrans"
 python = "lx.fsl.midtrans"
 does = "The transform from a template space to the middle of several transforms."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -399,7 +399,7 @@ command = "larmorx fsl pointflirt"
 python = "lx.fsl.pointflirt"
 does = "The least-squares affine matrix that maps one set of points onto another."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -409,7 +409,7 @@ command = "larmorx fsl applyxfm4D"
 python = "lx.fsl.applyxfm4d"
 does = "Each volume of a series resampled onto a reference's grid, through one matrix or one per volume."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -419,7 +419,7 @@ command = "larmorx fsl pairreg"
 python = "lx.fsl.pairreg"
 does = "A script: brain-to-brain registration refined with the skulls, in three FLIRT runs."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -429,7 +429,7 @@ command = "larmorx fsl extracttxt"
 python = "lx.fsl.extracttxt"
 does = "A script: the lines of a text file from the first match of a word."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]
@@ -439,7 +439,7 @@ command = "larmorx fsl aff2rigid"
 python = "lx.fsl.aff2rigid"
 does = "A script: the 6-parameter matrix that keeps the anterior commissure, the AC-PC line and the mid-sagittal plane of an input-to-standard matrix."
 api = "docs/api/fsl-flirt.md"
-evidence = "/tools/fsl-flirt/"
+evidence = "/evidence/fsl-flirt/"
 records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
 
 [[program]]

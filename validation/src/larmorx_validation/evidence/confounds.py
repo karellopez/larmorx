@@ -30,6 +30,8 @@ fMRIPrep's BOLD mask dilated by three voxels (the crown lies within two): no fac
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import shlex
 import shutil
@@ -37,8 +39,11 @@ import subprocess
 import time
 from pathlib import Path
 
+import numpy as np
+
 from larmorx_validation.evidence import common, core
 from larmorx_validation.figures import cache as fcache
+from larmorx_validation.figures import records
 
 TOOL = "confounds"
 #: The records of the part: name, suite, tier.
@@ -357,6 +362,1422 @@ def memory_entry(ctx: core.Context) -> fcache.Entry:
 
 def entries(ctx: core.Context) -> list[fcache.Entry]:
     return [workflows_entry(ctx), gaussian_entry(ctx), memory_entry(ctx)]
+
+
+# --------------------------------------------------------------------------- the files
+
+
+def _stats(ctx: core.Context) -> dict[str, dict]:
+    """Each workflow's ``stats.json`` (``confounds_run``), by its tag ``<run>/<bold_wf>``."""
+    e = workflows_entry(ctx)
+    out = {}
+    for rel in workflows():
+        p = e.dir / _label(rel) / "stats.json"
+        out[_tag(rel)] = json.loads(p.read_text(encoding="utf-8"))
+    return out
+
+
+def _wf(s: dict) -> Path:
+    return _runs_dir() / s["workflow"]
+
+
+def _node_input(wf: Path, node: str, key: str) -> str:
+    """An input fMRIPrep gave a node (its ``_report/report.rst``), as a path on this machine."""
+    text = (wf / node / "_report" / "report.rst").read_text(encoding="utf-8")
+    block = text.split("Execution Inputs", 1)[1].split("Execution Outputs", 1)[0]
+    m = re.search(rf"^\* {key} : (.*)$", block, re.M)
+    if m is None:
+        raise KeyError(f"{node}.{key}")
+    return _host(wf.relative_to(_runs_dir()).parts[0], m.group(1).strip())
+
+
+#: The numbered columns' families (``a_comp_cor_00`` .. ``a_comp_cor_55``: ``a_comp_cor_XX``).
+NUMBERED = re.compile(
+    r"^(a_comp_cor|t_comp_cor|c_comp_cor|w_comp_cor|edge_comp|cosine|non_steady_state_outlier|"
+    r"motion_outlier)(_?)(\d+)$"
+)
+
+
+def family(name: str) -> str:
+    m = NUMBERED.match(name)
+    return f"{m.group(1)}{m.group(2)}XX" if m else name
+
+
+def group(fam: str) -> str:
+    """What computes a column: the five groups whose reasons the findings give."""
+    if fam.startswith(("trans_", "rot_")):
+        return "motion"
+    if fam in ("framewise_displacement", "rmsd") or fam.startswith("motion_outlier"):
+        return "motion-derived"
+    if fam in ("dvars", "std_dvars"):
+        return "dvars"
+    if fam.endswith(("comp_cor_XX", "comp_XX")):
+        return "compcor"
+    if fam.startswith(("cosine", "non_steady_state")):
+        return "prefilter"
+    return "signals"
+
+
+#: The groups' sources (fMRIPrep's nodes), for the tables.
+GROUPS = {
+    "motion": "fMRIPrep's FSLMotionParams (the head-motion matrices) and niworkflows' expansion",
+    "motion-derived": "fMRIPrep's FramewiseDisplacement, FSLRMSDeviation and niworkflows' spikes",
+    "dvars": "nipype's ComputeDVARS",
+    "compcor": "nipype's ACompCor and TCompCor (niworkflows' robust wrappers)",
+    "prefilter": "tCompCor's pre-filter file (the cosine basis, the dummy scans)",
+    "signals": "niworkflows' SignalExtraction and its expansion",
+}
+#: Why ``reproduce`` with fMRIPrep 25.2.6's releases differs from fMRIPrep's own file (only the
+#: motion chain may: decision D4).
+D4 = (
+    "glibc's atan2 (SciPy's Rotation.as_euler calls the C library's) rounds these angles "
+    "otherwise than LARMORX's correctly rounded atan2, in both modes (decision D4: glibc's code "
+    "is LGPL, never translated; a D13 gap of reproduce, GLIBC-07's row in the register): with "
+    "fMRIPrep's own motion table in place of LARMORX's, every column of the file is fMRIPrep's"
+)
+#: The originals' own step (fMRIPrep 25.2.6's releases to the newest), by group
+#: (docs/findings/confounds-workflow.md, "The step to the newest libraries").
+STEP = {
+    "motion": "fMRIPrep 25.2.7's FSLMotionParams (the centre of gravity of the reference minus "
+    "its minimum, the matrix not transposed, the angles negated: confounds-motion.md)",
+    "motion-derived": "follows the motion parameters of fMRIPrep 25.2.7 (FD, the RMS deviation's "
+    "inputs, the spikes)",
+    "dvars": "SciPy 1.18's FFT (ducc0 for pocketfft) and numpy 2.5's sums (confounds-dvars.md)",
+    "compcor": "numpy 2.5.4's SVD under LAPACK 3.12.1 (DGESDD's reflectors: the components' "
+    "last digits, and the sign of a vector whose sign the SVD leaves free: confounds-blas.md)",
+    "prefilter": "unchanged by the step",
+    "signals": "unchanged by the step",
+}
+#: The default's corrections (``fix`` against ``reproduce``, both with the newest releases).
+FIX = {
+    "compcor": "GLIBC-07: the default's cosine basis takes the correctly rounded cos (CLAUDE.md "
+    "rule 5; reproduce glibc's cos_glibc), whose last bits decide the sign of an SVD vector "
+    "(arbitrary in itself) and the 10th decimal of a few values; a column and its negative "
+    "remove the same signal, so a model gives the same cleaned data (confounds-compcor.md)",
+    "other": "PD-01, rule A: the default reads the intermediate tables' numbers correctly "
+    "rounded where pandas' parser is not (its last bit; confounds-pandas.md), so a value "
+    "computed from them can move by its last bits",
+}
+
+
+def _fam_rows(s: dict) -> dict[str, dict]:
+    """One run's columns by family: columns, cells, and per comparison the cells that differ,
+    the largest |Δ|, the sign-flipped columns and the columns of the default's 10th decimal."""
+    out: dict[str, dict] = {}
+
+    def add(key: str, comp: dict | None) -> None:
+        if comp is None:
+            return
+        for name, c in comp["columns"].items():
+            r = out.setdefault(family(name), {"columns": set(), "cells": 0})
+            r["columns"].add(name)
+            if key == "e3":
+                r["cells"] += c["cells"]
+            d = r.setdefault(key, {"differ": 0, "max_abs": 0.0, "max_rel": 0.0, "sign": [],
+                                   "decimal": [], "cols": []})  # fmt: skip
+            if c["differ"]:
+                d["differ"] += c["differ"]
+                d["cols"].append(name)
+                d["max_abs"] = max(d["max_abs"], c.get("max_abs") or 0.0)
+                d["max_rel"] = max(d["max_rel"], c.get("max_rel") or 0.0)
+                if c.get("sign"):
+                    d["sign"].append(name)
+                elif (c.get("max_abs") or 0) <= 1.0000001e-10:
+                    d["decimal"].append(name)
+
+    add("e3", s["e3_vs_fmriprep"])
+    add("sp", s.get("sp_vs_fmriprep"))
+    add("step", s["new_vs_e3"])
+    add("fix", s["fix_vs_new"])
+    return out
+
+
+def _differ(s: dict, key: str) -> int:
+    c = s.get(key)
+    return sum(x["differ"] for x in c["columns"].values()) if c else 0
+
+
+def _file_verdict(s: dict) -> tuple[str, str]:
+    """A file's verdict: LARMORX (reproduce, fMRIPrep 25.2.6's releases) against fMRIPrep's file."""
+    e3 = s["e3_vs_fmriprep"]
+    if e3["only_a"] or e3["only_b"]:
+        return "open", f"columns in one file only: {e3['only_a'] + e3['only_b']}"
+    n = _differ(s, "e3_vs_fmriprep")
+    js = e3["json"]["bytes_same"]
+    if n == 0 and js:
+        return "bit-identical", (
+            "Every column of fMRIPrep's file, cell for cell as text (matched by name: the order "
+            "of niworkflows' set, PIPE-43, is never reproduced), and its JSON byte for byte."
+        )
+    fams = sorted({family(c) for c, x in e3["columns"].items() if x["differ"]})
+    if (
+        js
+        and _differ(s, "sp_vs_fmriprep") == 0
+        and all(group(f) in ("motion", "motion-derived") for f in fams)
+    ):
+        return "divergence", common.clip(
+            f"{n:,} cells of the motion chain ({', '.join(fams)}): {D4}. The JSON byte for byte.",
+            600,
+        )
+    return "open", f"{n:,} cells differ ({', '.join(fams)})"
+
+
+def _files_table(st: dict[str, dict]) -> dict:
+    rows = []
+    tot = {k: 0 for k in ("files", "cells", "e3", "same", "d4", "step", "fix", "sign", "json")}
+    for tag, s in st.items():
+        e3 = s["e3_vs_fmriprep"]
+        cells = sum(c["cells"] for c in e3["columns"].values())
+        n_e3, n_sp = _differ(s, "e3_vs_fmriprep"), _differ(s, "sp_vs_fmriprep")
+        n_step, n_fix = _differ(s, "new_vs_e3"), _differ(s, "fix_vs_new")
+        signs = sum(bool(c.get("sign")) for c in s["fix_vs_new"]["columns"].values() if c["differ"])
+        v, why = _file_verdict(s)
+        shape = s["bold"]["shape"]
+        tot["files"] += 1
+        tot["cells"] += cells
+        tot["e3"] += n_e3
+        tot["same"] += n_e3 == 0
+        tot["d4"] += v == "divergence"
+        tot["step"] += n_step
+        tot["fix"] += n_fix
+        tot["sign"] += signs
+        tot["json"] += e3["json"]["bytes_same"]
+        rows.append({
+            "head": f"`{tag}`",
+            "cells": [
+                common.cell(" × ".join(map(str, shape))),
+                common.cell(len(e3["columns"]), "count"),
+                common.cell(cells, "count"),
+                common.cell(n_e3, "count"),
+                common.cell("–" if not n_e3 else f"{n_sp:,}"),
+                common.cell("yes" if e3["json"]["bytes_same"] else "no"),
+                common.cell(n_step, "count"),
+                common.cell(n_fix, "count"),
+                common.cell(signs, "count"),
+            ],
+            "verdict": v,
+            "sub": why if v != "bit-identical" else "",
+        })  # fmt: skip
+    rows.insert(0, {
+        "head": f"the {tot['files']} files",
+        "cells": [common.cell("–"), common.cell("–"), common.cell(tot["cells"], "count"),
+                  common.cell(tot["e3"], "count"), common.cell("–"),
+                  common.cell(f"{tot['json']} of {tot['files']}"),
+                  common.cell(tot["step"], "count"), common.cell(tot["fix"], "count"),
+                  common.cell(tot["sign"], "count")],
+        "sub": f"{tot['same']} files identical column by column, {tot['d4']} once glibc's atan2 "
+        "(D4) is taken from fMRIPrep's own motion table",
+    })  # fmt: skip
+    return common.table(
+        "files",
+        "fMRIPrep's own confounds files, column by column: every one of the 36 confounds "
+        "workflows of fMRIPrep 25.2.6's runs",
+        [
+            "Workflow (fMRIPrep's run / BOLD run)",
+            "BOLD series",
+            {"label": "Columns", "num": True},
+            {"label": "Cells", "num": True},
+            {"label": "≠ fMRIPrep's file", "num": True},
+            {"label": "≠ with its motion table", "num": True},
+            "JSON byte for byte",
+            {"label": "The step: cells changed", "num": True},
+            {"label": "The default: cells changed", "num": True},
+            {"label": "The default: columns negated", "num": True},
+        ],
+        rows,
+        note="The cache entry `confounds/workflows` (confounds_run.py): each workflow run end to "
+        "end by LARMORX's `bold_confounds` from its own inputs (its nodes' pickled inputs), in "
+        "reproduce with fMRIPrep 25.2.6's releases (fMRIPrep 25.2.6, niworkflows 1.15.2, numpy "
+        "2.2.6, SciPy 1.15.2, pandas 2.2.3), its `desc-confounds_timeseries.tsv` compared with "
+        "the run's own file cell by cell as text, the columns matched by name (their order is "
+        "niworkflows' set order, which changes from process to process: PIPE-43, never "
+        "reproduced). Where a cell differs, the run is made again with fMRIPrep's own motion "
+        "table in place of LARMORX's (glibc's atan2, D4). The step: LARMORX in reproduce with "
+        "the newest releases (fMRIPrep 25.2.7, niworkflows 1.15.4, numpy 2.5.4, SciPy 1.18.1, "
+        "pandas 3.0.6) against fMRIPrep 25.2.6's: the originals' own step (each node of it the "
+        "newest originals' bit for bit: the records). The default: LARMORX's corrections "
+        "(newest releases) against reproduce; a column negated: GLIBC-07's cosine (expected).",
+    )
+
+
+def _families_table(st: dict[str, dict]) -> dict:
+    agg: dict[str, dict] = {}
+    for s in st.values():
+        for fam, r in _fam_rows(s).items():
+            a = agg.setdefault(fam, {"files": 0, "columns": 0, "cells": 0, "e3": 0, "sp": 0,
+                                     "step": 0, "fix": 0, "sign": 0, "decimal": 0,
+                                     "max_fix_rel": 0.0, "max_step": 0.0})  # fmt: skip
+            a["files"] += 1
+            a["columns"] += len(r["columns"])
+            a["cells"] += r["cells"]
+            for k in ("e3", "sp", "step", "fix"):
+                a[k] += r.get(k, {}).get("differ", 0)
+            a["sign"] += len(r.get("fix", {}).get("sign", []))
+            a["decimal"] += len(r.get("fix", {}).get("decimal", []))
+            a["max_fix_rel"] = max(a["max_fix_rel"], r.get("fix", {}).get("max_rel", 0.0))
+            a["max_step"] = max(a["max_step"], r.get("step", {}).get("max_abs", 0.0))
+    order = list(GROUPS)
+    rows = []
+    for fam in sorted(agg, key=lambda f: (order.index(group(f)), f)):
+        a = agg[fam]
+        g = group(fam)
+        if a["e3"] == 0:
+            v, why = "bit-identical", "fMRIPrep's cells, as text, in every file that has the column"
+        elif a["sp"] == 0 and g in ("motion", "motion-derived"):
+            v, why = "divergence", D4
+        else:
+            v, why = "open", "cells differ that the motion table does not explain"
+        fix = ""
+        if a["fix"]:
+            fix = (FIX["compcor"] if g == "compcor" else FIX["other"]) + (
+                f" ({a['sign']} columns negated, {a['decimal']} by one unit in the 10th decimal)"
+                if g == "compcor"
+                else f" (at most {a['max_fix_rel']:.2g} of the column's largest value)"
+            )
+        sub = f"{GROUPS[g]}. reproduce: {why}."
+        if a["step"]:
+            sub += f" The step: {STEP[g]}."
+        if fix:
+            sub += f" The default: {fix}."
+        rows.append({
+            "head": f"`{fam}`",
+            "cells": [common.cell(a["files"], "count"), common.cell(a["columns"], "count"),
+                      common.cell(a["cells"], "count"), common.cell(a["e3"], "count"),
+                      common.cell(a["step"], "count"), common.cell(a["fix"], "count"),
+                      common.cell(a["sign"], "count")],
+            "verdict": v,
+            "sub": common.clip(sub, 900),
+        })  # fmt: skip
+    return common.table(
+        "families",
+        "Every column of the 36 files, by name (numbered columns by family)",
+        [
+            "Column",
+            {"label": "Files", "num": True},
+            {"label": "Columns", "num": True},
+            {"label": "Cells", "num": True},
+            {"label": "≠ fMRIPrep's file", "num": True},
+            {"label": "The step: changed", "num": True},
+            {"label": "The default: changed", "num": True},
+            {"label": "The default: negated", "num": True},
+        ],
+        rows,
+        note="The same runs as the table above, summed by column. The verdict is the port's "
+        "(reproduce with fMRIPrep 25.2.6's releases against fMRIPrep's own files); the step is "
+        "the originals' own change from fMRIPrep 25.2.6's releases to the newest (a yardstick, "
+        "no verdict); the default's changes are the D13 corrections named with each run "
+        "(PD-01 and GLIBC-07 in the tables; PIPE-41 adds the five signals' entries to each JSON).",
+    )
+
+
+def _nodes_table(st: dict[str, dict]) -> dict:
+    counts: dict[str, list[int]] = {}
+    info: dict[str, dict[str, int]] = {}
+    for s in st.values():
+        for k, (i, d) in s["nodes"]["counts"].items():
+            c = counts.setdefault(k, [0, 0])
+            c[0] += i
+            c[1] += d
+        for k, v in s["nodes"]["info"].items():
+            t = info.setdefault(k, {})
+            for kk, vv in v.items():
+                t[kk] = t.get(kk, 0) + vv
+    rows = []
+    for k, (i, d) in counts.items():
+        rows.append({"head": k.removeprefix("real: "),
+                     "cells": [common.cell(i + d, "count"), common.cell(i, "count"),
+                               common.cell(d, "count")],
+                     "verdict": "bit-identical" if d == 0 and "Gaussian" not in k else (
+                         "identical-cr" if d == 0 else "open")})  # fmt: skip
+    for k, v in info.items():
+        rows.append({"head": k.removeprefix("real: "),
+                     "cells": [common.cell(", ".join(f"{a} {b:,}" for a, b in sorted(v.items()))),
+                               common.cell("–"), common.cell("–")]})  # fmt: skip
+    return common.table(
+        "nodes",
+        "Every node file of the 36 workflows (reproduce, fMRIPrep 25.2.6's releases) against "
+        "fMRIPrep's node folders",
+        ["Check", "Files", {"label": "Equal", "num": True}, {"label": "Differ", "num": True}],
+        rows,
+        note="check_workflow.py's compare_nodes and compare_dicts on each run: every file "
+        "LARMORX writes against the file of the same name in fMRIPrep's node folder "
+        "(decompressed; the motion chain's tables cell by cell by column name). The aCompCor "
+        "masks after `-n Gaussian` hold other values where vnl's erf goes through glibc's exp "
+        "and log in fMRIPrep's ANTs and correctly rounded ones in LARMORX's ANTs port (the "
+        "Gaussian example below: ANTs 2.6.5 with CORE-MATH gives LARMORX's bytes); no voxel "
+        "crosses the masks' 0.5 and 0.99, so aCompCor reads the same masks. nipype deletes the "
+        "files of outputs nothing reads; LARMORX keeps them.",
+    )
+
+
+# ------------------------------------------------------------------------- the examples
+
+#: The CompCor masks of an example: output id, node file (glob, relative to the workflow's
+#: folder), label.
+MASKS = [
+    ("csf", "acc_msk_bin/mapflow/_acc_msk_bin0/*_masked_masked.nii.gz", "aCompCor: CSF mask"),
+    ("wm", "acc_msk_bin/mapflow/_acc_msk_bin1/*_masked_masked.nii.gz", "aCompCor: WM mask"),
+    ("combined", "acc_msk_bin/mapflow/_acc_msk_bin2/*_masked_masked.nii.gz",
+     "aCompCor: CSF + WM mask"),
+    ("tcompcor", "tcompcor/mask_000.nii.gz", "tCompCor: the 2 % most variable voxels"),
+    ("crown", "subtract_mask/subtracted_mask.nii.gz", "crownCompCor: the crown"),
+]  # fmt: skip
+#: The Gaussian example's outputs (``acc_msk_tfm``'s three items).
+PROBS = [
+    ("csf-p", "acc_msk_tfm/mapflow/_acc_msk_tfm0/*.nii.gz", "CSF probability in BOLD space"),
+    ("wm-p", "acc_msk_tfm/mapflow/_acc_msk_tfm1/*.nii.gz", "WM probability in BOLD space"),
+    ("combined-p", "acc_msk_tfm/mapflow/_acc_msk_tfm2/*.nii.gz",
+     "CSF + WM probability in BOLD space"),
+]  # fmt: skip
+#: The time series an example draws: column, panel label.
+SERIES = [
+    ("framewise_displacement", "Framewise displacement (mm)"),
+    ("std_dvars", "Standardised DVARS"),
+    ("dvars", "DVARS"),
+    ("rmsd", "RMS deviation (mm)"),
+    ("global_signal", "Global signal"),
+    ("csf", "CSF signal"),
+    ("white_matter", "White-matter signal"),
+    ("trans_x", "Translation x (mm)"),
+    ("rot_y", "Rotation y (rad)"),
+    ("a_comp_cor_00", "aCompCor (CSF + WM), first component"),
+    ("c_comp_cor_00", "aCompCor (CSF), first component"),
+    ("w_comp_cor_00", "aCompCor (WM), first component"),
+    ("t_comp_cor_00", "tCompCor, first component"),
+    ("edge_comp_00", "crownCompCor, first component"),
+]
+#: The datasets of the shown runs (their catalog licences; credits come from the catalog).
+DATA = {
+    "ds000005-sub-01-noreconall": {**common.DS000005, "what": "an adult, 3 T, single-band"},
+    "ds000256-sub-CTS203-noreconall": {
+        "dataset": "OpenNeuro ds000256 (Greene et al., 2018)",
+        "subject": "sub-CTS203",
+        "licence": "PDDL-1.0",
+        "what": "a 7.5-year-old's rest run with strong head motion, 3 T",
+    },
+    "ds004958-sub-fsm64ps-noreconall": {
+        "dataset": "OpenNeuro ds004958",
+        "subject": "sub-fsm64ps",
+        "licence": "CC0-1.0",
+        "what": "multiband 8, 600 volumes",
+    },
+}
+
+
+def _one(base: Path, pattern: str) -> Path:
+    hits = sorted(base.glob(pattern))
+    if len(hits) != 1:
+        raise FileNotFoundError(f"{base}/{pattern}: {len(hits)} files")
+    return hits[0]
+
+
+def _show(*arrays: np.ndarray, bold_mask: np.ndarray, iterations: int = 3) -> np.ndarray:
+    from scipy import ndimage
+
+    show = ndimage.binary_dilation(bold_mask != 0, iterations=iterations)
+    for a in arrays:
+        show |= a != 0
+    return show
+
+
+def _window(ex, pid: str) -> list[float]:
+    from larmorx_validation.evidence import example as exm
+
+    v = ex.values(ex.key(pid, "all"))
+    w = exm.windows(v[ex.m])[0]
+    return [w["lo"], w["hi"]]
+
+
+def _mask_verdicts(diffs: list[dict], same: dict[str, bool]) -> None:
+    for x in diffs:
+        x.setdefault("links", [])
+        if same[x["id"]]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = {
+                "lx-fmriprep": "Every mask fMRIPrep's run wrote, voxel for voxel and header for "
+                "header (the masks' values above 0.99 kept, as fMRIPrep's Binarize keeps them).",
+                "fix-fmriprep": "LARMORX's default (the newest releases, its corrections) gives "
+                "the same masks: no correction reaches them on this run.",
+                "fix-lx": "No correction of the register changes a mask here: both modes give "
+                "the same bytes.",
+                "fix1-fix": "LARMORX's result does not depend on its thread count: the same bytes "
+                "at 1 and 8 threads (every file of the run, the confounds table included).",
+            }.get(x["id"], "The same bytes.")
+        else:
+            x["verdict"] = "open"
+            x["reason"] = "The masks differ (not expected: the record's checks hold them equal)."
+
+
+def _lines(theirs: Path, e3: Path, fix: Path, s: dict) -> dict:
+    """The confounds' time series of fMRIPrep's file, LARMORX's reproduce and its default."""
+    cw = _check_workflow()
+    _h, ct = cw.table(theirs)
+    _h, ce = cw.table(e3)
+    _h, cf = cw.table(fix)
+
+    def ys(col: list[str]) -> list[float | None]:
+        return [None if v in ("n/a", "") else float(v) for v in col]
+
+    panels = []
+    for col, label in SERIES:
+        if col not in ct:
+            continue
+        panels.append({
+            "label": label,
+            "column": col,
+            "series": [
+                {"label": "fMRIPrep 25.2.6's own file", "mark": "original", "y": ys(ct[col])},
+                {"label": "larmorx (port), reproduce, fMRIPrep 25.2.6's releases",
+                 "mark": "larmorx", "y": ys(ce[col])},
+                {"label": "larmorx (port), default, the newest releases", "mark": "larmorx-open",
+                 "y": ys(cf[col])},
+            ],
+        })  # fmt: skip
+    # the cells that differ from fMRIPrep's file, as differences (D4's motion chain)
+    diff_cols = [c for c, x in s["e3_vs_fmriprep"]["columns"].items() if x["differ"]]
+    if diff_cols:
+        panels.append({
+            "label": "larmorx (reproduce) − fMRIPrep's file, the columns that differ (D4)",
+            "series": [
+                {"label": c, "mark": "larmorx",
+                 "y": [None if a is None or b is None else a - b
+                       for a, b in zip(ys(ce[c]), ys(ct[c]), strict=True)]}
+                for c in diff_cols[:8]
+            ],
+        })  # fmt: skip
+    # a component the default negates (GLIBC-07), where the run has one
+    negated = [c for c, x in s["fix_vs_new"]["columns"].items() if x["differ"] and x.get("sign")]
+    if negated:
+        c = negated[0]
+        panels.append({
+            "label": f"{c}: the default negates it (GLIBC-07, expected)",
+            "column": c,
+            "series": [
+                {"label": "fMRIPrep 25.2.6's own file", "mark": "original", "y": ys(ct[c])},
+                {"label": "larmorx (port), default", "mark": "larmorx-open", "y": ys(cf[c])},
+            ],
+        })  # fmt: skip
+    n = len(next(iter(ct.values())))
+    outliers = sorted(c for c in ct if c.startswith("motion_outlier"))
+    return {
+        "title": f"The confounds' time series over the {n} volumes",
+        "x_label": "volume",
+        "x": list(range(n)),
+        "key": [
+            {"label": "fMRIPrep 25.2.6's own file", "mark": "original"},
+            {"label": "larmorx (port), reproduce", "mark": "larmorx"},
+            {"label": "larmorx (port), default", "mark": "larmorx-open"},
+        ],
+        "panels": panels,
+        "note": f"Each panel one column of the confounds table (`n/a` cells, the first volume of "
+        f"FD and DVARS, left out). The file holds {len(ct)} columns; {len(outliers)} "
+        "motion-outlier columns (one per volume over the FD or standardised-DVARS threshold). "
+        "The lines of fMRIPrep's file and of LARMORX's reproduce coincide; the table below "
+        "counts every cell.",
+    }
+
+
+def _check_workflow():
+    import sys
+
+    from larmorx_validation.evidence.confounds_run import SCRIPTS
+
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    import check_workflow as cw
+
+    return cw
+
+
+def _example_table(s: dict) -> dict:
+    rows = []
+    order = list(GROUPS)
+    fams = _fam_rows(s)
+    for fam in sorted(fams, key=lambda f: (order.index(group(f)), f)):
+        r = fams[fam]
+        g = group(fam)
+        e3, sp = r.get("e3", {}), r.get("sp", {})
+        st, fx = r.get("step", {}), r.get("fix", {})
+        if not e3.get("differ"):
+            v, why = "bit-identical", ""
+        elif sp.get("differ") == 0 and g in ("motion", "motion-derived"):
+            v, why = "divergence", f"reproduce: {', '.join(e3['cols'])}: {D4}."
+        else:
+            v, why = "open", "reproduce: cells differ that the motion table does not explain."
+        sub = why
+        if fx.get("differ"):
+            if g == "compcor":
+                sub += (f" The default: {len(fx['sign'])} columns negated, {len(fx['decimal'])} "
+                        "by one unit in the 10th decimal (GLIBC-07, expected).")  # fmt: skip
+            else:
+                sub += f" The default: PD-01's correctly rounded reading (≤ {fx['max_rel']:.2g} "
+                sub += "of the column's largest value)."
+        rows.append({
+            "head": f"`{fam}`",
+            "cells": [common.cell(len(r["columns"]), "count"), common.cell(r["cells"], "count"),
+                      common.cell(e3.get("differ", 0), "count"),
+                      common.cell(e3.get("max_abs", 0.0) if e3.get("differ") else None, "sig"),
+                      common.cell(st.get("differ", 0), "count"),
+                      common.cell(st.get("max_abs", 0.0) if st.get("differ") else None, "sig"),
+                      common.cell(fx.get("differ", 0), "count"),
+                      common.cell(fx.get("max_abs", 0.0) if fx.get("differ") else None, "sig")],
+            "verdict": v,
+            **({"sub": common.clip(sub.strip(), 700)} if sub.strip() else {}),
+        })  # fmt: skip
+    return common.table(
+        "columns",
+        "This file's every column (numbered columns by family): LARMORX against fMRIPrep's file, "
+        "the originals' step, the default",
+        [
+            "Column",
+            {"label": "Columns", "num": True},
+            {"label": "Cells", "num": True},
+            {"label": "≠ fMRIPrep's", "num": True},
+            {"label": "largest |Δ|", "num": True},
+            {"label": "The step: changed", "num": True},
+            {"label": "largest |Δ|", "num": True},
+            {"label": "The default: changed", "num": True},
+            {"label": "largest |Δ|", "num": True},
+        ],
+        rows,
+        note="Cells compared as text (the 10 decimals pandas and numpy write), the columns by "
+        "name. ≠ fMRIPrep's: LARMORX in reproduce with fMRIPrep 25.2.6's releases against the "
+        "run's own file; the step: reproduce with the newest releases against fMRIPrep 25.2.6's "
+        "(the originals' own change, no verdict); the default: LARMORX's corrections against "
+        "reproduce, both with the newest releases.",
+    )
+
+
+def _example_run(ctx: core.Context, st: dict[str, dict], run: str, bold_run: str) -> dict:
+    import nibabel as nib
+
+    from larmorx_validation.evidence import example as exm
+
+    tag = f"{run}/{bold_run}"
+    s = st[tag]
+    wf = _wf(s)
+    ent = workflows_entry(ctx)
+    d = ent.dir / _label(s["workflow"])
+    ref_path = Path(_node_input(wf, "motion_params", "boldref_file"))
+    mask_path = Path(_node_input(wf, "dvars", "in_mask"))
+    img = nib.load(str(ref_path))
+    bold_mask = common.load(str(mask_path))
+    files = {
+        "fmriprep": wf,
+        "larmorx": d / "e3" / "bold_confounds_wf",
+        "larmorx-fix": d / "fix" / "bold_confounds_wf",
+        "larmorx-fix-1": d / "fix-1" / "bold_confounds_wf",
+    }
+    arrays = {
+        pid: {oid: common.load(str(_one(base, pat))) for oid, pat, _l in MASKS}
+        for pid, base in files.items()
+    }
+    for pid, a in arrays.items():
+        for oid, v in a.items():
+            if v.shape != img.shape[:3]:
+                raise ValueError(f"{tag} {pid} {oid}: {v.shape} is not the reference's grid")
+    show = _show(*arrays["fmriprep"].values(), bold_mask=bold_mask)
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show)
+    data = DATA[run]
+    ex.add(exm.Panel("boldref", "input", f"{run.split('-')[0]} {data['subject']} BOLD reference",
+                     "the head-motion reference fMRIPrep computed (bold_fit_wf), "
+                     f"{img.get_data_dtype()}", {"all": np.asanyarray(img.dataobj)}))  # fmt: skip
+    over = {oid: {"on": "boldref", "window": _window(ex, "boldref")} for oid, _p, _l in MASKS}
+    panels = [
+        ("fmriprep", "fmriprep", "fMRIPrep 25.2.6's own files",
+         "the run's node folders (fMRIPrep 25.2.6 in its image)"),
+        ("larmorx", "larmorx", "larmorx (port), 8 threads",
+         "reproduce mode, fMRIPrep 25.2.6's releases"),
+        ("larmorx-fix", "larmorx", "larmorx (port), 8 threads", "default mode, the newest releases"),
+    ]  # fmt: skip
+    for pid, role, label, sub in panels:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
+    dd = common.d
+    diffs = [
+        dd("lx-fmriprep", "larmorx", "fmriprep", "main",
+           "larmorx (reproduce) − fMRIPrep 25.2.6's own file", common.ROLE_LX),
+        dd("fix-fmriprep", "larmorx-fix", "fmriprep", "fmriprep",
+           "larmorx (default) − fMRIPrep 25.2.6's own file", common.ROLE_FMRIPREP),
+        dd("fix-lx", "larmorx-fix", "larmorx", "check", "larmorx: default − reproduce mode",
+           common.ROLE_SELF),
+        dd("fix1-fix", "larmorx-fix-1", "larmorx-fix", "check",
+           "larmorx: 1 thread − 8 threads (default)", common.ROLE_SELF),
+    ]  # fmt: skip
+    outputs = [{"id": oid, "label": label, "unit": ""} for oid, _p, label in MASKS]
+    common.compare_all(ex, diffs, outputs, full={"larmorx-fix-1": arrays["larmorx-fix-1"]})
+    same = common.identical(diffs)
+    if "fix1_vs_fix" in s:  # every file of the run, not only the masks
+        same["fix1-fix"] = same["fix1-fix"] and not s["fix1_vs_fix"]["differ"]
+    _mask_verdicts(diffs, same)
+    at, _k = common.centre_view(ex)
+    default = {
+        "output": "combined",
+        "plane": "axial",
+        "voxel": at,
+        "panels": ["boldref", "fmriprep", "larmorx", "larmorx-fix"],
+        "diffs": ["lx-fmriprep", "fix-lx"],
+        "compare": {"a": "fmriprep", "b": "larmorx"},
+    }
+    out = common.finish(ctx, ex, diffs, outputs, default=default, window_panel="fmriprep",
+                        caption="the masks drawn over the BOLD reference.")  # fmt: skip
+    theirs = _runs_dir() / run / s["fmriprep"]["tsv"]
+    lines = _lines(theirs, d / "e3" / s["modes"]["e3"]["tsv"],
+                   d / "fix" / s["modes"]["fix"]["tsv"], s)  # fmt: skip
+    lines["stats"] = _example_table(s)
+    v, why = _file_verdict(s)
+    e3 = s["e3_vs_fmriprep"]
+    n_cells = sum(c["cells"] for c in e3["columns"].values())
+    notes = {m: ", ".join(f"{k} {n}" for k, n in x["notices"].items())
+             for m, x in s["modes"].items()}  # fmt: skip
+    info = ent.info()
+    sh = s["bold"]["shape"]
+    return {
+        "id": f"confounds-{run.split('-')[0]}",
+        "title": f"fMRIPrep's confounds of a real BOLD run: {data['what']}",
+        "summary": (
+            f"fMRIPrep 25.2.6's confounds workflow (`{bold_run}` of {data['dataset']} "
+            f"{data['subject']}) run end to end by LARMORX from the workflow's own inputs: in "
+            "reproduce with fMRIPrep 25.2.6's releases, compared with the run's own files (its "
+            "CompCor masks drawn over the BOLD reference, and its confounds table column by "
+            "column), with the newest releases (the originals' own step) and by default (the "
+            "corrections), at 8 threads and, by default, at 1."
+        ),
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{data['dataset']}, {data['subject']} ({data['licence']}); "
+                "shown inside fMRIPrep's BOLD mask, dilated by three voxels",
+            },
+            {
+                "label": "Workflow",
+                "text": f"fMRIPrep 25.2.6, `{bold_run}/bold_confounds_wf` "
+                f"(and `ds_confounds`): {sh[0]} × {sh[1]} × {sh[2]} voxels of "
+                f"{' × '.join(f'{z:.3g}' for z in s['bold']['zooms'][:3])} mm, {sh[3]} volumes "
+                f"({s['bold']['dtype']}), TR {s['metadata'].get('RepetitionTime', 'from the header')} "
+                f"s, {s['skip_vols']} dummy scan(s)",
+            },
+            {
+                "label": "Confounds file",
+                "text": f"`{Path(s['fmriprep']['tsv']).name}`: "
+                f"{len(e3['columns'])} columns, {n_cells:,} cells; LARMORX's file has fMRIPrep's "
+                f"name ({'yes' if s['fmriprep']['name_same'] else 'no'}) and "
+                f"{'the same' if e3['order_same'] else 'another'} column order (PIPE-43); its JSON "
+                f"{'byte for byte' if e3['json']['bytes_same'] else 'differs'}",
+            },
+            {"label": "Verdict of the file", "text": f"{v}: {why}"},
+            {
+                "label": "Programs",
+                "text": f"larmorx {s['larmorx']} (`bold_confounds`, "
+                f"experimental) at commit `{info['larmorx_commit'][:12]}`, in "
+                f"{VERSIONS['e1']}; fMRIPrep's files from its run ({VERSIONS['fmriprep']})",
+            },
+            {"label": "Notices", "text": "; ".join(f"{m}: {t}" for m, t in notes.items())},
+            {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+        ],
+        **out,
+        "lines": {"confounds": lines},
+        "metrics_note": (
+            "Δ is A − B over every voxel of the masks' files (float64 masks: the probabilities "
+            "above 0.99 kept, as fMRIPrep's Binarize writes them; uint8 for tCompCor's and the "
+            "crown). The confounds table is compared cell by cell as text in the table below."
+        ),
+        "provenance": common.provenance(
+            info, f"{TOOL}/workflows", [data], [f"Workflow: `{s['workflow']}`"]
+        ),
+    }
+
+
+def _example_gaussian(ctx: core.Context, st: dict[str, dict]) -> dict:
+    """The aCompCor masks' Gaussian resampling on the first shown run, with the chain of causes."""
+    import nibabel as nib
+
+    from larmorx_validation.evidence import example as exm
+
+    run, bold_run = SHOWN[0]
+    s = st[f"{run}/{bold_run}"]
+    wf = _wf(s)
+    ent, gent = workflows_entry(ctx), gaussian_entry(ctx)
+    d = ent.dir / _label(s["workflow"])
+    key = run.split("-")[0]
+    ref_path = Path(_node_input(wf, "motion_params", "boldref_file"))
+    img = nib.load(str(ref_path))
+    bold_mask = common.load(str(Path(_node_input(wf, "dvars", "in_mask"))))
+    arrays: dict[str, dict[str, np.ndarray]] = {
+        "fmriprep": {}, "larmorx": {}, "larmorx-fix": {}, "ants-cr": {}, "ants-glibc": {},
+        "ants-image": {},
+    }  # fmt: skip
+    for i, (oid, pat, _l) in enumerate(PROBS):
+        arrays["fmriprep"][oid] = common.load(str(_one(wf, pat)))
+        arrays["larmorx"][oid] = common.load(str(_one(d / "e3" / "bold_confounds_wf", pat)))
+        arrays["larmorx-fix"][oid] = common.load(str(_one(d / "fix" / "bold_confounds_wf", pat)))
+        g = gent.dir / f"{key}-{i}"
+        for pid, prefix in (("ants-cr", "cr-"), ("ants-glibc", "glibc-"),
+                            ("ants-image", "fmriprep-")):  # fmt: skip
+            arrays[pid][oid] = common.load(str(_one(g, f"{prefix}*.nii.gz")))
+    show = _show(*arrays["fmriprep"].values(), bold_mask=bold_mask)
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show)
+    data = DATA[run]
+    ex.add(exm.Panel("boldref", "input", f"{key} {data['subject']} BOLD reference",
+                     "the grid the masks are resampled onto", {"all": np.asanyarray(img.dataobj)}))  # fmt: skip
+    panels = [
+        ("fmriprep", "fmriprep", "fMRIPrep 25.2.6's own files",
+         "its acc_msk_tfm node (its ANTs: glibc's exp and log)"),
+        ("ants-cr", "original", "ANTs 2.6.5, antsApplyTransforms, 1 thread",
+         "CORE-MATH preloaded (correctly rounded exp and log)"),
+        ("larmorx", "larmorx", "larmorx (port), 8 threads", "reproduce mode"),
+        ("larmorx-fix", "larmorx", "larmorx (port), 8 threads", "default mode"),
+    ]  # fmt: skip
+    for pid, role, label, sub in panels:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid]))
+    dd = common.d
+    diffs = [
+        dd("lx-fmriprep", "larmorx", "fmriprep", "main",
+           "larmorx (reproduce) − fMRIPrep 25.2.6's own file", common.ROLE_LX),
+        dd("lx-antscr", "larmorx", "ants-cr", "check",
+           "larmorx − ANTs 2.6.5 with correctly rounded maths", common.ROLE_LX),
+        dd("antscr-fmriprep", "ants-cr", "fmriprep", "variability",
+           "ANTs 2.6.5: correctly rounded maths − fMRIPrep's file", common.ROLE_ORIG),
+        dd("glibc-fmriprep", "ants-glibc", "fmriprep", "variability",
+           "ANTs 2.6.5 as built (glibc's maths) − fMRIPrep's file", common.ROLE_ORIG),
+        dd("image-fmriprep", "ants-image", "fmriprep", "variability",
+           "fMRIPrep's image's ANTs, run again − its file", common.ROLE_ORIG),
+        dd("fix-lx", "larmorx-fix", "larmorx", "check", "larmorx: default − reproduce mode",
+           common.ROLE_SELF),
+    ]  # fmt: skip
+    outputs = [{"id": oid, "label": label, "unit": ""} for oid, _p, label in PROBS]
+    common.compare_all(
+        ex, diffs, outputs, full={k: arrays[k] for k in ("ants-glibc", "ants-image")}
+    )
+    same = common.identical(diffs)
+    chain = same["lx-antscr"] and same["glibc-fmriprep"] and same["image-fmriprep"]
+    n = sum(x["metrics"][o]["differ"] for x in diffs if x["id"] == "lx-fmriprep"
+            for o in x["metrics"])  # fmt: skip
+    for x in diffs:
+        i = x["id"]
+        x.setdefault("links", [])
+        if x["kind"] == "variability":
+            x["verdict"] = None
+            x["reason"] = {
+                "antscr-fmriprep": "The same ANTs program with correctly rounded exp and log: "
+                "where vnl's erf, under the Gaussian kernel, reaches glibc's last bits.",
+                "glibc-fmriprep": "ANTs 2.6.5 as the repository builds it, with glibc's maths, "
+                "gives fMRIPrep's bytes: fMRIPrep's ANTs computes the same on this call."
+                if same[i]
+                else "ANTs 2.6.5 as built differs from fMRIPrep's ANTs on this call.",
+                "image-fmriprep": "fMRIPrep's own antsApplyTransforms, run again in its image, "
+                "gives its file's bytes: the node is deterministic."
+                if same[i]
+                else "fMRIPrep's ANTs, run again, gives other bytes.",
+            }[i]
+        elif i == "lx-fmriprep":
+            if same[i]:
+                x["verdict"], x["reason"] = "bit-identical", "fMRIPrep's bytes."
+            elif chain:
+                x["verdict"] = "identical-cr"
+                x["reason"] = (
+                    f"{n:,} voxels differ in their last bits, where vnl's erf goes through "
+                    "glibc's exp and log in fMRIPrep's ANTs and through correctly rounded ones in "
+                    "LARMORX's ANTs port (CLAUDE.md rule 5, both modes): ANTs 2.6.5 with "
+                    "CORE-MATH preloaded gives LARMORX's bytes, as built fMRIPrep's. No voxel "
+                    "crosses ApplyMask's 0.5 or Binarize's 0.99: aCompCor reads the same masks."
+                )
+            else:
+                x["verdict"], x["reason"] = "open", "Not explained by the maths library alone."
+        elif same[i]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = {
+                "lx-antscr": "ANTs 2.6.5's bytes when its exp and log are correctly rounded.",
+                "fix-lx": "Both modes compute the resampling with correctly rounded maths.",
+            }[i]
+        else:
+            x["verdict"], x["reason"] = "open", "The bytes differ."
+    by = {x["id"]: x for x in diffs}
+    m = by["lx-fmriprep"]["metrics"]["csf-p"]
+    at = m.get("at_display") if not m["identical"] else None
+    if at is None:
+        at, _k = common.centre_view(ex)
+    default = {
+        "output": "csf-p",
+        "plane": "axial",
+        "voxel": [int(v) for v in at[:3]],
+        "panels": ["boldref", "fmriprep", "ants-cr", "larmorx"],
+        "diffs": ["lx-fmriprep", "lx-antscr", "antscr-fmriprep"],
+        "compare": {"a": "fmriprep", "b": "larmorx"},
+    }
+    out = common.finish(ctx, ex, diffs, outputs, default=default, window_panel="fmriprep",
+                        caption="the crosshair where LARMORX and fMRIPrep's file differ most.")  # fmt: skip
+    gi = gent.info()
+    items = _gaussian_items(run, bold_run)
+    cmd = " ".join(items[0][2].split())
+    rows = []
+    for oid, _p, label in PROBS:
+        f, lx_ = arrays["fmriprep"][oid], arrays["larmorx"][oid]
+        rows.append({
+            "head": label,
+            "cells": [common.cell(int(np.count_nonzero(f)), "count"),
+                      common.cell(int(np.count_nonzero(f != lx_)), "count"),
+                      common.cell(float(np.max(np.abs(f - lx_))), "sig"),
+                      common.cell(int(np.count_nonzero((f > 0.99) != (lx_ > 0.99))), "count"),
+                      common.cell(int(np.count_nonzero((f >= 0.5) != (lx_ >= 0.5))), "count"),
+                      common.cell("yes" if np.array_equal(lx_, arrays["ants-cr"][oid]) else "no")],
+        })  # fmt: skip
+    return {
+        "id": f"confounds-gaussian-{key}",
+        "title": "The aCompCor masks' Gaussian resampling, and why its last bits differ",
+        "summary": (
+            "fMRIPrep resamples the T1w's CSF, WM and CSF + WM probability maps onto the BOLD "
+            "reference with antsApplyTransforms' Gaussian interpolation (its `acc_msk_tfm` node), "
+            "then keeps the brain (0.5) and binarizes (0.99). Its three items on "
+            f"{data['dataset']} {data['subject']}: fMRIPrep's files, ANTs 2.6.5 as built and with "
+            "correctly rounded maths, fMRIPrep's own ANTs run again in its image, and LARMORX's "
+            "ANTs port as the workflow runs it."
+        ),
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{data['dataset']}, {data['subject']} ({data['licence']}); "
+                "shown inside fMRIPrep's BOLD mask, dilated by three voxels",
+            },
+            {
+                "label": "Node",
+                "text": f"fMRIPrep 25.2.6, `{bold_run}/bold_confounds_wf/"
+                "acc_msk_tfm` (three items)",
+            },
+            {
+                "label": "Command",
+                "text": f"`{cmd}` (the first item; /out is the run's output folder)",
+            },
+            {
+                "label": "Programs",
+                "text": f"{gi.get('versions', {}).get('ants', 'ANTs 2.6.5')}, "
+                "one thread, as built and with CORE-MATH preloaded; fMRIPrep 25.2.6's image's "
+                f"antsApplyTransforms; larmorx at commit `{ent.info()['larmorx_commit'][:12]}`",
+            },
+            {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+        ],
+        **out,
+        "tables": [
+            common.table(
+                "gaussian",
+                "The three items: LARMORX (reproduce) against fMRIPrep's files",
+                [
+                    "Map",
+                    {"label": "Voxels above 0", "num": True},
+                    {"label": "Voxels that differ", "num": True},
+                    {"label": "largest |Δ|", "num": True},
+                    {"label": "Crossing 0.99", "num": True},
+                    {"label": "Crossing 0.5", "num": True},
+                    "= ANTs with CORE-MATH",
+                ],
+                rows,
+                note="The masks aCompCor reads keep the values above 0.99 inside the brain (0.5): "
+                "no voxel crosses either threshold, so the components are computed from the same "
+                "voxels. The shown runs' other items (ds000256, ds004958) in the cache entry "
+                "`confounds/gaussian` give the same picture.",
+            )
+        ],
+        "metrics_note": "Δ is A − B over every voxel of the files (float64 probabilities).",
+        "provenance": common.provenance(
+            gi, f"{TOOL}/gaussian", [data], [f"LARMORX's runs: `{TOOL}/workflows`"]
+        ),
+    }
+
+
+def _gaussian_table(ctx: core.Context, st: dict[str, dict]) -> dict:
+    gent = gaussian_entry(ctx)
+    ent = workflows_entry(ctx)
+    rows = []
+    for run, bold_run in SHOWN:
+        s = st[f"{run}/{bold_run}"]
+        wf, d = _wf(s), ent.dir / _label(s["workflow"])
+        key = run.split("-")[0]
+        for i, (_oid, pat, label) in enumerate(PROBS):
+            g = gent.dir / f"{key}-{i}"
+            f = common.load(str(_one(wf, pat)))
+            lx_ = common.load(str(_one(d / "e3" / "bold_confounds_wf", pat)))
+            cr = common.load(str(_one(g, "cr-*.nii.gz")))
+            gl = common.load(str(_one(g, "glibc-*.nii.gz")))
+            im = common.load(str(_one(g, "fmriprep-*.nii.gz")))
+            ok = np.array_equal(lx_, cr) and np.array_equal(gl, f) and np.array_equal(im, f)
+            rows.append({
+                "head": f"{key}: {label}",
+                "cells": [common.cell(int(np.count_nonzero(f != lx_)), "count"),
+                          common.cell("yes" if np.array_equal(gl, f) else "no"),
+                          common.cell("yes" if np.array_equal(im, f) else "no"),
+                          common.cell("yes" if np.array_equal(lx_, cr) else "no"),
+                          common.cell(int(np.count_nonzero((f > 0.99) != (lx_ > 0.99))
+                                          + np.count_nonzero((f >= 0.5) != (lx_ >= 0.5))),
+                                      "count")],
+                "verdict": "identical-cr" if ok else "open",
+            })  # fmt: skip
+    return common.table(
+        "gaussian-runs",
+        "The aCompCor masks' Gaussian resampling on the three shown runs: the chain of causes",
+        ["Item", {"label": "Voxels ≠ fMRIPrep's", "num": True}, "ANTs 2.6.5 as built = fMRIPrep's",
+         "fMRIPrep's ANTs again = its file", "LARMORX = ANTs with CORE-MATH",
+         {"label": "Threshold crossings", "num": True}],
+        rows,
+        note="The cache entry `confounds/gaussian`: each acc_msk_tfm item's command (its "
+        "command.txt and inputs) run by ANTs 2.6.5 (the repository's GCC 14.3 build) at one "
+        "thread, as built and with CORE-MATH's correctly rounded exp and log preloaded, and by "
+        "fMRIPrep 25.2.6's own antsApplyTransforms in its image; LARMORX's file from the "
+        "workflow's reproduce run. Identical with correctly rounded maths: LARMORX gives ANTs' "
+        "bytes when ANTs' maths are correctly rounded, and ANTs as built gives fMRIPrep's.",
+    )  # fmt: skip
+
+
+# ----------------------------------------------------------------------- the page tables
+
+
+def _records(ctx: core.Context) -> list[tuple[records.Record, str, str]]:
+    return [(records.load(ctx.repo, n), suite, tier) for n, suite, tier in RECORDS]
+
+
+def _records_table(recs) -> dict:
+    rows = []
+    for rec, suite, tier in recs:
+        s = rec.summary
+        rows.append({
+            "head": f"[{rec.name}](repo:docs/validation/{rec.name}.md)",
+            "cells": [common.cell(suite), common.cell(tier),
+                      common.cell(len(rec.results), "count"), common.cell(s.get("pass", 0), "count"),
+                      common.cell(sum(r["checks_total"] for r in rec.results), "count"),
+                      common.cell(f"`{rec.commit[:12]}`")],
+            "verdict": "bit-identical" if s.get("pass", 0) == len(rec.results) else "open",
+        })  # fmt: skip
+    return common.table(
+        "records",
+        "The records of the part: every case passes",
+        ["Record", "Suite", "Tier", {"label": "Cases", "num": True}, {"label": "Pass", "num": True},
+         {"label": "Checks", "num": True}, "From commit"],
+        rows,
+        note="Each record runs the investigation's check scripts (validation/investigations/"
+        "confounds) as separate processes in the environment each case names, from a clean "
+        "commit: e1 numpy 2.5.4 / OpenBLAS 0.3.34 with OPENBLAS_L2_SIZE=512, SciPy 1.18.1, pandas "
+        "3.0.6 (and e1-zen, this machine's GEMM_Q 512); e2 numpy 2.3.5 / OpenBLAS 0.3.30, SciPy "
+        "1.15.3; e3 fMRIPrep 25.2.6's image (numpy 2.2.6, SciPy 1.15.2, pandas 2.2.3). One check "
+        "per summary line a script prints, its final line and its exit status; the negative "
+        "controls pass when the releases are told apart. The full tiers: fMRIPrep's 108 real "
+        "CompCor nodes in every environment, the linear algebra's every size class.",
+    )  # fmt: skip
+
+
+#: The part's findings files, in the order an entry's home is sought.
+FINDINGS = (
+    "confounds-compcor", "confounds-dvars", "confounds-masks", "confounds-model",
+    "confounds-motion", "confounds-pandas", "confounds-workflow", "confounds-nipype-cli",
+    "confounds-blas", "confounds-numpy", "confounds-fft",
+)  # fmt: skip
+PART_ID = re.compile(r"\b(PIPE-(?:4[1-9]|[5-7]\d|8[0-3])|PD-0[1-3]|NP-(?:09|10)|SCI-41|GLIBC-07)\b")
+
+
+def _sentence(text: str) -> str:
+    """A definition's first sentence (to its first full stop before a capital letter)."""
+    m = re.search(r"^(.*?[.:])\s+(?=[A-Z*(`])", text)
+    return (m.group(1) if m else text).rstrip(":").strip()
+
+
+def _defects(ctx: core.Context) -> dict[str, dict]:
+    """The part's register entries as its findings describe them: id -> file, section anchor,
+    rule (the words the findings give it), what (the defining sentence), and the default where
+    a table states it. A bullet or table row that defines the entry wins over a heading that
+    names it."""
+    out: dict[str, dict] = {}
+    heads: dict[str, dict] = {}
+    for name in FINDINGS:
+        path = f"docs/findings/{name}.md"
+        head = ""
+        lines = (ctx.repo / path).read_text(encoding="utf-8").splitlines()
+        for n, line in enumerate(lines):
+            if line.startswith("## "):
+                head = line[3:].strip()
+                for m in PART_ID.finditer(head):
+                    i = m.group(1)
+                    if i in heads or (i == "GLIBC-07" and "cosine" not in head):
+                        continue
+                    pars = re.findall(r"\(([^()]*)\)", head)
+                    par = next((x for x in pars if i in x), pars[-1] if pars else "")
+                    rule = re.sub(rf"{i}[,;:]?\s*", "", par).strip()
+                    what = re.sub(r"\s*\([^()]*\)\s*$", "", head)
+                    what = re.sub(rf"^{i}:\s*", "", what)
+                    heads[i] = {"file": path, "anchor": core.github_anchor(head), "rule": rule,
+                                "what": what}  # fmt: skip
+                continue
+            m = re.match(r"^(?:- )?\*\*(\S+)(?: \(([^)]*)\))?\*\*(?: \(([^)]*)\))?:?\s*(.*)$", line)
+            t = re.match(r"^\| (\S+) \| ([^|]*) \| ([^|]*) \| ([^|]*) \|", line)
+            if m and PART_ID.fullmatch(m.group(1)) and m.group(1) not in out:
+                text = m.group(4)
+                bullet = line.startswith("- ")
+                for cont in lines[n + 1 :]:
+                    if not cont.strip() or cont.lstrip().startswith(("- ", "#", "|")):
+                        break
+                    if bullet and not cont.startswith("  "):
+                        break
+                    text += " " + cont.strip()
+                out[m.group(1)] = {"file": path, "anchor": core.github_anchor(head),
+                                   "rule": (m.group(2) or m.group(3) or "").strip(),
+                                   "what": _sentence(text)}  # fmt: skip
+            elif t and PART_ID.fullmatch(t.group(1)) and t.group(1) not in out:
+                out[t.group(1)] = {"file": path, "anchor": core.github_anchor(head),
+                                   "rule": f"rule {t.group(2).strip()}",
+                                   "what": t.group(3).strip(), "default": t.group(4).strip()}  # fmt: skip
+    for i, h in heads.items():
+        out.setdefault(i, h)
+    for x in out.values():
+        rule = re.sub(r"\s*and no entry in `larmorx_core::defects`", "", x["rule"])
+        x["rule"] = re.sub(r";?\s*`larmorx_core::defects`", "", rule).strip()
+    return out
+
+
+def _plain(s: str) -> str:
+    return s.replace("**", "").replace("`", "")
+
+
+def _corrections_table(ctx: core.Context) -> dict:
+    from larmorx._defects import defects
+
+    switch = {d.id for d in defects()}
+    found = _defects(ctx)
+
+    def key(i: str) -> tuple:
+        p, n = i.split("-")
+        return (["PIPE", "PD", "NP", "SCI", "GLIBC"].index(p), int(n))
+
+    rows = []
+    for i in sorted(found, key=key):
+        f = found[i]
+        rows.append({
+            "head": f"[{i}](repo:{f['file']}#{f['anchor']})",
+            "cells": [common.cell(_plain(f["rule"]) or "–"),
+                      common.cell(common.clip(_plain(f["what"]), 420)),
+                      common.cell(common.clip(_plain(f.get("default", "")), 300) or "–"),
+                      common.cell("yes" if i in switch else "–")],
+        })  # fmt: skip
+    return common.table(
+        "corrections",
+        "The originals' defects found by the part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, "
+        "NP-10, SCI-41) and GLIBC-07's cosine",
+        ["Entry", "Rule", "What the original does (the findings' words)", "LARMORX by default",
+         "Switch"],
+        rows,
+        note="Each decided by rules A to D (A: corrected by default; B: a clear error; C: kept "
+        "and documented; D: measured first), with `upstream_defects='reproduce'` "
+        "(LARMORX_UPSTREAM_DEFECTS=reproduce) giving the original's behaviour where LARMORX has "
+        "a switch (larmorx_core::defects, the Switch column); crashes (NP-09) and "
+        "nondeterminism (PIPE-43's column order) are never reproduced. Each entry links the "
+        "findings' section that describes it; the register's rows come with the part's merge.",
+    )  # fmt: skip
+
+
+def _memory_table(ctx: core.Context) -> dict:
+    e = memory_entry(ctx)
+    peaks = e.info()["peaks_mib"]
+    rows = []
+    for name, call, run in MEMORY_CALLS:
+        p = peaks[name]
+        o = p["original"]
+        worst = max(v for k, v in p.items() if k != "original")
+        rows.append({
+            "head": f"{call}, {run.split('-')[0]}",
+            "cells": [common.cell(round(o), "count"), common.cell(round(p["larmorx-reproduce-1"]), "count"),
+                      common.cell(round(p["larmorx-fix-1"]), "count"),
+                      common.cell(round(p["larmorx-fix-8"]), "count"),
+                      common.cell(worst / o, "sig")],
+            "verdict": "bit-identical" if worst <= 1.1 * o + 8 else "open",
+        })  # fmt: skip
+    return common.table(
+        "memory",
+        "Peak memory (MiB): the memory rule's calls of the part",
+        ["Call (fMRIPrep's node)", {"label": "The original", "num": True},
+         {"label": "LARMORX, reproduce, 1 thread", "num": True},
+         {"label": "LARMORX, default, 1 thread", "num": True},
+         {"label": "LARMORX, default, 8 threads", "num": True},
+         {"label": "LARMORX ÷ the original", "num": True}],
+        rows,
+        note="Each call in a process of its own (validation/investigations/confounds/"
+        "memory_call.py, the calls of tests/parity/test_memory_peak.py: fMRIPrep's acompcor, "
+        "tcompcor, dvars and signals nodes with their own inputs), its peak resident memory from "
+        "/usr/bin/time -v, in the newest environment. The rule: at most 10 % above the "
+        "original's peak plus 8 MiB (the verdict column: the rule met).",
+    )  # fmt: skip
+
+
+def _bench(ctx: core.Context) -> dict:
+    return json.loads((ctx.repo / BENCH).read_text(encoding="utf-8"))
+
+
+def _speed(ctx: core.Context) -> dict | None:
+    b = _bench(ctx)
+    return _speed_from(b)
+
+
+def trial(ctx: core.Context) -> tuple[list[dict], list[dict]]:
+    """Random testing's trial and checks of the part, and the triage: two tables."""
+    import tomllib
+
+    data, prov = [], []
+    for t in TRIALS:
+        path = common.oracles() / "difftest" / t / "summary.json"
+        raw = path.read_bytes()
+        data.append(json.loads(raw))
+        prov.append({"trial": f"oracles/difftest/{t}/summary.json",
+                     "sha256": hashlib.sha256(raw).hexdigest()})  # fmt: skip
+    rows = []
+
+    def row(label, fn):
+        rows.append({"head": label, "cells": [fn(s) for s in data]})
+
+    row(
+        "Random cases, each compared with the original",
+        lambda s: common.cell(int(s["cases"]), "count"),
+    )
+    for tool in TRIAL_TOOLS:
+
+        def cell(s, tool=tool):
+            t = s["tools"].get(tool)
+            if t is None:
+                return common.cell("–")
+            im = t.get("implementations", {}).get("port", {})
+            text = f"{t.get('cases', 0):,} cases: {im.get('agree', 0):,} agree"
+            for k in ("differ", "notice", "skipped", "timeout"):
+                if im.get(k):
+                    text += f", {im[k]:,} {k}"
+            return common.cell(text + f"; {t.get('options_covered', 0)} options drawn")
+
+        row(tool, cell)
+    row("length (minutes)", lambda s: common.cell(round(s["elapsed_s"] / 60, 1), "sig"))
+    row("seed, LARMORX build", lambda s: common.cell(f"{s['seed']}, {s['larmorx_commit']}"))
+    table = common.table(
+        "trial",
+        "Random testing: the part's trial and the checks of the final build",
+        ["", *TRIALS],
+        rows,
+        note="Differential random testing (docs/validation/difftest.md): one tool per suite "
+        "(the linear algebra; nipype's DVARS, CompCor, TSNR, non-steady-state detector and "
+        "framewise displacement; fMRIPrep's and niworkflows' table, model, motion, mask and "
+        "signal steps), each case a random call of the original in-process (numpy, SciPy, "
+        "nitime, nipype 1.12.0, niworkflows, pandas, fMRIPrep 25.2.7's and 25.2.6's interfaces) "
+        "against LARMORX in reproduce bit for bit, then its default checked by D13's rule; 3 GiB "
+        "a case, one thread. `notice`: a default that named a correction where the rule "
+        "expected none (triaged below). `skipped`: ExpandModel's powers above 2 while numpy's "
+        "pow is SVML's (AVX-512); the third run turns those kernels off and compares them.",
+    )
+    tri = tomllib.loads(
+        (ctx.repo / "validation" / "difftest" / "triage.toml").read_text(encoding="utf-8")
+    )
+    trows = []
+    for x in tri.get("difference", []):
+        if x.get("tool") not in TRIAL_TOOLS:
+            continue
+        trows.append({"head": x.get("status", ""),
+                      "cells": [common.cell(x.get("tool", "")),
+                                common.cell(common.clip(x.get("explanation", ""), 480)),
+                                common.cell(x.get("defect") or "–")],
+                      "sub": x.get("link", "")})  # fmt: skip
+    from larmorx_validation.difftest import permanent
+
+    n_perm = sum(len(permanent.load(t)) for t in TRIAL_TOOLS)
+    triage = common.table(
+        "triage",
+        "Random testing: every difference of the part's runs, triaged",
+        ["Status", "Tool", "What it was", "Register"],
+        trows,
+        note="validation/difftest/triage.toml (the confounds, 2026-11-12): each difference of "
+        "the probes before the trial and of the trial, a LARMORX mistake fixed with a permanent "
+        f"case ({n_perm} in all, validation/difftest/cases/confounds-*/, run by the records), a "
+        "harness mistake, or a defect of the original explained by the register.",
+    )
+    return [table, triage], prov
+
+
+#: The benchmark's nodes on the speed chart (the heavy ones; every node is in the report).
+SPEED_NODES = ("dvars", "acompcor", "crowncompcor", "tcompcor", "signals", "acc_masks",
+               "motion_params")  # fmt: skip
+
+
+def _speed_from(b: dict) -> dict | None:
+    series = [
+        {"id": "original|1", "label": "the original, 1 thread (in-process)", "mark": "original"},
+        {"id": "larmorx|1", "label": "LARMORX (port), 1 thread", "mark": "larmorx"},
+        {"id": "larmorx|8", "label": "LARMORX (port), 8 threads", "mark": "larmorx-open"},
+    ]
+    rows = []
+    for r in b["workflow"]["rows"]:
+        run = r["workflow"].split("-")[0]
+        rows.append({"label": f"the whole workflow (bold_confounds), {run}", "input": r["workflow"],
+                     "seconds": {"larmorx|1": r["larmorx_1"], "larmorx|8": r["larmorx_8"]},
+                     "speedup": None})  # fmt: skip
+    for r in b["nodes"]["rows"]:
+        if r["node"] not in SPEED_NODES:
+            continue
+        run = r["workflow"].split("-")[0]
+        sec = {
+            "original|1": r["original"],
+            "larmorx|1": r["larmorx_1"],
+            "larmorx|8": r["larmorx_8"],
+        }
+        rows.append({"label": f"{r['node']}, {run}", "input": f"{r['workflow']}/{r['node']}",
+                     "seconds": sec, "speedup": r["original"] / r["larmorx_1"]})  # fmt: skip
+    for r in b["linalg"]["rows"]:
+        sec = {"original|1": r["original"], "larmorx|1": r["larmorx_1"]}
+        if r.get("larmorx_8") is not None:
+            sec["larmorx|8"] = r["larmorx_8"]
+        rows.append({"label": r["call"], "input": r["call"], "seconds": sec,
+                     "speedup": r["original"] / r["larmorx_1"]})  # fmt: skip
+    axis, ticks = common.ticks_log([v for row in rows for v in row["seconds"].values()], " s")
+    m = b["nodes"]["machine"]
+    rec = {r["workflow"].split("-")[0]: r["fmriprep_recorded"] for r in b["workflow"]["rows"]}
+    return {
+        "title": "Seconds per call (the best of 3), log scale; the factor is the original's time "
+        "÷ LARMORX's at one thread",
+        "axis": axis,
+        "ticks": ticks,
+        "series": series,
+        "rows": rows,
+        "note": f"From the benchmark report `{BENCH}` ({m.get('cpus', '?')} logical CPUs, the "
+        "newest environment, numpy's OpenBLAS at one thread as fMRIPrep's nodes; a machine "
+        "shared with other work; every result identical: each node's files byte for byte in "
+        "reproduce). The originals: nipype's, niworkflows' and fMRIPrep's interfaces in-process "
+        "on fMRIPrep's own node inputs; the linear algebra: numpy's and SciPy's own calls. The "
+        "whole workflow has no original in-process; fMRIPrep's runs recorded "
+        + ", ".join(f"{k} {v:.1f} s" for k, v in rec.items())
+        + " for its nodes (fMRIPrep 25.2.6 on another machine, the old laptop). The linear "
+        "algebra's routines are slower than numpy's and SciPy's (their level-1 and level-2 "
+        "kernels without FMA dispatch, one thread): a speed item of the handoff "
+        '(docs/benchmarks/confounds.md, "Where the time goes").',
+    }
+
+
+# --------------------------------------------------------------------------- the cases
+
+
+def _cases(ctx: core.Context, recs) -> list[dict]:
+    from larmorx_validation.difftest import permanent
+    from larmorx_validation.parity.confounds_scripts import ENVIRONMENTS, SUITES
+
+    perm = {}
+    for t in TRIAL_TOOLS:
+        for p in permanent.load(t):
+            perm[f"difftest/{p['id']}"] = p
+    out = []
+    for rec, suite, _tier in recs:
+        for r in rec.results:
+            spec = SUITES.get(suite, {}).get(r["case"])
+            v = common.outcome_verdict(r)
+            rep = r.get("reported") or {}
+            if v is None:
+                extra = ""
+                if spec is not None and spec.control:
+                    extra = " A negative control: told the other library release, LARMORX's "
+                    extra += "results differ from the original's, as they must."
+                elif r["case"].startswith("difftest/"):
+                    p = perm.get(r["case"], {})
+                    extra = " A permanent case of random testing" + (
+                        f" ({p['defect']})." if p.get("defect") else " (a LARMORX mistake, fixed)."
+                    )
+                v = ("bit-identical", common.clip(
+                    f"Every one of its {r['checks_total']} checks: the originals' outputs bit "
+                    "for bit (numbers, files, messages and exit statuses), or fMRIPrep's own "
+                    "node files and confounds files of its runs." + extra, 420))  # fmt: skip
+            command = ""
+            desc = ""
+            if spec is not None:
+                command = "python -P validation/investigations/confounds/" + " ".join(
+                    [spec.script, *spec.args]
+                )
+                desc = spec.description
+            elif r["case"] in perm:
+                desc = perm[r["case"]].get("description", "")
+            env = rep.get("the library environment")
+            out.append({
+                "id": f"{suite}/{r['case']}",
+                "category": r["category"],
+                "description": desc + (f" [{ENVIRONMENTS[env][1]}]" if env in ENVIRONMENTS
+                                       and not spec else ""),
+                "command": command,
+                "results": {"port": {"outcome": r["status"], "verdict": v[0],
+                                     "checks": f"{r['checks_passed']}/{r['checks_total']}",
+                                     "reason": v[1]}},
+            })  # fmt: skip
+    return out
+
+
+# -------------------------------------------------------------------------------- export
+
+
+def _check_default(ex: dict) -> None:
+    """Every panel and comparison the default view names exists and can be drawn."""
+    panels = {p["id"] for p in ex["panels"]}
+    drawn = {x["id"] for x in ex["diffs"] if x.get("display")}
+    d = ex["default"]
+    bad = [p for p in d["panels"] if p not in panels] + [x for x in d["diffs"] if x not in drawn]
+    bad += [v for v in (d["compare"]["a"], d["compare"]["b"]) if v not in panels]
+    if bad:
+        raise ValueError(f"{ex['id']}: the default view names what the viewer cannot draw: {bad}")
+    for x in ex["diffs"]:
+        if x.get("verdict") not in (*core.VERDICTS, None):
+            raise ValueError(f"{ex['id']}: {x['id']} has no verdict")
+
+
+def export(ctx: core.Context) -> dict:
+    recs = _records(ctx)
+    ents = entries(ctx)
+    st = _stats(ctx)
+    cases = _cases(ctx, recs)
+    examples = [_example_run(ctx, st, run, bold_run) for run, bold_run in SHOWN]
+    examples.insert(1, _example_gaussian(ctx, st))
+    for ex in examples:
+        _check_default(ex)
+    trial_tables, tprov = trial(ctx)
+    tables = [
+        _records_table(recs),
+        _files_table(st),
+        _families_table(st),
+        _nodes_table(st),
+        _gaussian_table(ctx, st),
+        _corrections_table(ctx),
+        _memory_table(ctx),
+        *trial_tables,
+    ]
+    bench = ctx.repo / BENCH
+    return {
+        "schema": 1,
+        "tool": TOOL,
+        "title": "fMRIPrep's confounds: the workflow, nipype's CompCor, DVARS and framewise "
+        "displacement, niworkflows' and fMRIPrep's steps",
+        "provenance": {
+            "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
+            "records": [x for rec, *_ in recs for x in rec.source()],
+            "benchmarks": [
+                {
+                    "path": BENCH,
+                    "sha256": hashlib.sha256(bench.read_bytes()).hexdigest(),
+                    "larmorx_commit": _bench(ctx)["nodes"]["machine"].get("commit"),
+                }
+            ],
+            "cache": [fcache.provenance(x) for x in ents],
+            "difftest": tprov,
+            "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
+        },
+        "implementations": [
+            common.implementation(
+                cases,
+                "port",
+                "LARMORX (port), against nipype 1.12.0, niworkflows 1.15.4, fMRIPrep 25.2.7, "
+                "numpy, SciPy, pandas and fMRIPrep 25.2.6's own files",
+                "port",
+                "docs/validation/confounds-fmriprep.md",
+                "experimental",
+            )
+        ],
+        "cases": cases,
+        "cases_total": len(cases),
+        "speed": _speed(ctx),
+        "tables": tables,
+        "examples": examples,
+    }
 
 
 if __name__ == "__main__":  # compute the cache entries only

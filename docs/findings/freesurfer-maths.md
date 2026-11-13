@@ -821,3 +821,15 @@ underneath, the casts), are kept here verbatim; the sections above give their ev
   marked `MEM49` (not compared); the others are compared.
 - The fs-maths probe's recorded hash: seed 1, 770 cases, 748 identical (one more than before: an
   FS-49 line now compared), 22 `SKIP`.
+
+## GLIBC-07 at the C library's sites (relay 17)
+
+The fs-maths probe's seed-7 run (15,400 cases) showed 3 `mrot` lines whose default (`fix`) output
+differed from the official one by one unit in the last place of `cosf` or `sinf` without a notice:
+the correctly rounded default against glibc 2.35's bits, which `reproduce` gives. fs.core now notes
+GLIBC-07 in both modes wherever the two choices give another value on an argument it evaluated
+(`cstd::note_glibc07` with `Libm::new`'s witness), as the clean room does: `MatrixReallocRotation`
+(`cosf`, `sinf`), `GaussianMatrix` (`expf`), `HISTOsmooth`'s kernel (`exp`, `pow`),
+`HISTOrobustGaussianFit` (`exp`), `HISTOgetEntropy` (`log`), `PDFgaussian` (`log`). Measured: seed 7,
+15,400 cases: `reproduce` identical on 15,064, 0 different; `fix` differs without a notice on none
+(the 3 `mrot` lines carry GLIBC-07); the recorded seed-1 hash unchanged (fba798ad...).

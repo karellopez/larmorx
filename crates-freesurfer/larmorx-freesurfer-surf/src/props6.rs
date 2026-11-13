@@ -183,7 +183,8 @@ pub fn compute_second_fundamental_form_thresholded(
                 let z = add(add(mul(nrm[0], y[0]), mul(nrm[1], y[1])), mul(nrm[2], y[2]));
                 v_z.set_relt(n + 1, 1, z);
                 let rsq = add64(vv, uu) as f32;
-                if !(rsq < f32::EPSILON) && f64::from(rsq) > rsq_thresh {
+                // FZERO(rsq) is false for a NaN
+                if (rsq >= f32::EPSILON || rsq.is_nan()) && f64::from(rsq) > rsq_thresh {
                     let k = div(z, rsq);
                     if k > kmax {
                         kmax = k;
@@ -575,7 +576,7 @@ pub fn compute_second_fundamental_form_at_vertex(
         let z = add(add(mul(nrm[0], y[0]), mul(nrm[1], y[1])), mul(nrm[2], y[2]));
         v_z.set_relt(n + 1, 1, z);
         let rsq = add64(vv, uu) as f32;
-        if !(rsq < f32::EPSILON) {
+        if rsq >= f32::EPSILON || rsq.is_nan() {
             let k = div(z, rsq);
             if k > kmax {
                 kmax = k;

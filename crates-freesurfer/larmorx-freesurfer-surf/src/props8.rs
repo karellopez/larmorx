@@ -214,11 +214,11 @@ pub fn mark_orientation_changes(mris: &mut Mris, io: &mut Io) -> i32 {
         let vnum = usize::try_from(vt.vnum).unwrap_or(0);
         let nbrs: Vec<i32> = vt.v.as_deref().unwrap_or(&[])[..vnum].to_vec();
         if vt.vnum == 0 {
-            let _ = write!(io.err, "vertex {vn0} without neighbors ! \n");
+            let _ = writeln!(io.err, "vertex {vn0} without neighbors ! ");
             mris.vertex_mut(vn0).curv = -5.0;
         }
         if mris.topology(vn0).num == 0 {
-            let _ = write!(io.err, "vertex {vn0} without faces ! \n");
+            let _ = writeln!(io.err, "vertex {vn0} without faces ! ");
         }
         let v0 = vn0 as i32;
         for &vn1 in &nbrs {

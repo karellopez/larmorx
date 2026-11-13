@@ -59,7 +59,7 @@ to the **quicksort order** (§5), which needs none, when it cannot have that arr
 - `T = n · s` for `s ≤ 32`; `T = 16 n + s` for `s > 32` (two 8-byte pointers per element and one
   spare element: larger elements are sorted through pointers, which changes neither the arrangement nor
   the call sequence, §4) **(observed**: the probe's allocator sees exactly one request of `T` bytes
-  during every sort with `T ≥ 1024`, and none for `T < 1024`, §9 group 4**)**.
+  during every sort with `T ≥ 1024`, and none for `T < 1024`, §9 groups 1 to 5**)**.
 - `T < 1024`: the merge order, with the temporary array on the stack (no allocation).
 - `T ≥ 1024`: let `P` be the page size and `Φ` the number of physical pages, as the operating system
   reports them (`sysconf`; read once per process, at its first sort with `T ≥ 1024`; when the system
@@ -177,11 +177,11 @@ answers alike). glibc releases after 2.35 changed `qsort` (this spec is 2.35's).
 ## 7. FreeSurfer's calls (what the replicas pass)
 
 About 30 functions on the default paths of FreeSurfer 8.2.0's programs (recon-all's two streams and
-fMRIPrep's calls) call `qsort` (none of them `qsort_r`), with elements of 1 to 104 bytes. Their
+fMRIPrep's calls) call `qsort` (none of them `qsort_r`), with elements of 4 to 104 bytes. Their
 comparators are of these kinds; each is a black box to this spec, and the replicas pass FreeSurfer's
 own:
 
-- **three-way on numbers** (`x < y → −1`, `x > y → +1`, else 0) over floats, doubles, bytes and
+- **three-way on numbers** (`x < y → −1`, `x > y → +1`, else 0) over floats, doubles and
   integers: median filters and percentiles of surfaces and volumes, normalisation of curvatures,
   sorted lists of vertex and face numbers, prime factors. With floats the order of `+0.0` and `−0.0`,
   and of NaNs (equal to everything under this comparator), follows §4: a median can be `−0.0` or

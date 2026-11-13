@@ -67,6 +67,17 @@ bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
 
+Measured 2026-11-13 (relay 14, 34 commands): `tri` alone, seeds 7 (1,000 cases), 13 (1,000) and 17
+(2,000): every comparable case identical with `reproduce` (36, 54 and 80 counted, not compared), the
+default different only with notices. After fs.core's `cscan::Scanf` and `fnv` replaced the crate's own
+copies: seed 7, 13,600 cases: 13,408 identical with `reproduce`, 192 counted, not compared (74 `mprop`,
+40 `stl`, 35 `sread`, 24 `sfile`, 12 `tri`, 7 `cfile`), 0 different; `fix` differs only with notices or
+the correctly rounded maths (11 `posn`, 3 `surf`). Seed 1, 1,020 cases: 1,006 identical, 14 `SKIP`, hash
+`2f2c8b35e113ed57bd95020d54b261cce294d85550d1894bc5805c06ed2072f1` (the test), passing in debug and
+release with the emulation (1,779 and 17,035 flips); `tri` and `sread` seed 7 identical under the
+emulation in both modes. Logs `oracles/logs/fs-surfio-relay14-seed1.log`, `-seed7-switch.log`,
+`-nantrap.log`.
+
 Measured 2026-11-13 (relay 13, 33 commands): seed 7, 66,000 cases: 65,018 identical with `reproduce`,
 982 counted, not compared (435 `mprop`, 198 `stl`, 151 `sread`, 115 `sfile`, 81 `cfile`, 2 `metric`);
 `fix` differs only with notices or the correctly rounded maths (65 `posn`, 7 `surf`); the port's outputs

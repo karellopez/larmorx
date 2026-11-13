@@ -47,6 +47,22 @@ fn assert_at(g: &mut Globals, io: &mut Io, file: &str, line: i32, tst: &str) -> 
     diag::assert_failed(g, io.out, io.err, file, line, tst)
 }
 
+/// `vt->v[i]`; past the list's end (only after FS-357's reproduced reading, which can leave a
+/// count above the list FreeSurfer reallocated) 0, a deterministic stand-in for the memory there.
+fn v_at(mris: &Mris, vno: usize, i: usize) -> i32 {
+    mris.topology(vno)
+        .v
+        .as_ref()
+        .and_then(|v| v.get(i).copied())
+        .unwrap_or(0)
+}
+
+/// The first `vnum` entries of a vertex's neighbour list ([`v_at`] past its end).
+fn first_ring(mris: &Mris, vno: usize) -> Vec<i32> {
+    let k = i32::from(mris.topology(vno).vnum).max(0) as usize;
+    (0..k).map(|i| v_at(mris, vno, i)).collect()
+}
+
 fn nverts(mris: &Mris) -> usize {
     usize::try_from(mris.nvertices).unwrap_or(0)
 }
@@ -489,7 +505,7 @@ pub fn find_neighbors_at_vertex(
     };
     if nlinks < 4 {
         for i in 0..result_new.max(0) as usize {
-            let x = mris.topology(vno).v.as_ref().expect("the neighbour list")[i];
+            let x = v_at(mris, vno, i);
             if x < 0 || x >= mris.nvertices {
                 let _ = writeln!(
                     io.out,
@@ -663,7 +679,7 @@ fn find_new_wkr(
         let (begin, end) = (vnums[r - 1], vnums[r]);
         let mut ripped = false;
         for n in begin.max(0)..end.max(0) {
-            let cand = mris.topology(vno).v.as_ref().expect("the neighbour list")[n as usize];
+            let cand = v_at(mris, vno, n as usize);
             if mris.vertex(cand as usize).ripflag != 0 {
                 nsize = r;
                 ripped = true;
@@ -712,11 +728,7 @@ fn find_new_wkr(
                 // only after FS-357's reproduced reading of entries never filled
                 return Err(Fatal::Exit(139));
             }
-            let ring_v: Vec<i32> = {
-                let t = mris.topology(vno_ring as usize);
-                let k = i32::from(t.vnum).max(0) as usize;
-                t.v.as_deref().map_or_else(Vec::new, |v| v[..k].to_vec())
-            };
+            let ring_v = first_ring(mris, vno_ring as usize);
             for cand in ring_v {
                 if mris.vertex(cand as usize).ripflag != 0 {
                     continue;
@@ -876,7 +888,7 @@ fn find_old(
         )
     };
     for n in 0..vtotal0.max(0) {
-        let x = mris.topology(vno).v.as_ref().expect("the neighbour list")[n as usize];
+        let x = v_at(mris, vno, n as usize);
         put_old(g, io, &mut lists.vlist, n as usize, x)?;
         mris.vertex_mut(x as usize).marked = if n < vnum {
             1
@@ -918,11 +930,7 @@ fn find_old(
                 if mris.vertex(vn).ripflag != 0 {
                     continue;
                 }
-                let ring_v: Vec<i32> = {
-                    let t = mris.topology(vn);
-                    let k = i32::from(t.vnum).max(0) as usize;
-                    t.v.as_deref().map_or_else(Vec::new, |v| v[..k].to_vec())
-                };
+                let ring_v = first_ring(mris, vn);
                 for w in ring_v {
                     if mris.vertex(w as usize).marked == 0 {
                         put_old(g, io, &mut lists.vlist, (vtotal + ring_total) as usize, w)?;

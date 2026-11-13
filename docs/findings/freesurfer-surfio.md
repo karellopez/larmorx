@@ -967,3 +967,117 @@ note at the end of a file (c117b9ea: `trifile.rs`'s local `tag_start` of §16 re
   path): a descriptor leak only; larmorx closes it. Its test `if (!mriss->nvertices)` (line 5285)
   checks the count, not the allocation: 0 vertices gives `could not allocate surface`. The old format
   (no magic number) is read as floats, as `__MRISreadQuadrangleFile` reads it (§16).
+
+## 18. Queue item 3.1-48: `MRISread` (relay 16)
+
+What was ported (`src/readwrite.rs`, `src/nbhd.rs`, `src/ico.rs`, `metric::average_radius`,
+`coords::scanner2tkr` and `tkr2scanner`; spec part 13, §85-91): `utils/mrisurf_io.cpp`
+3519-3791 (`MRISreadOverAlloc`, `MRISreadOverAlloc_new`), 4214-4277 (`MRISfastRead`, `MRISread`),
+4617-4750 (`mrisReadTransform`, `MRISreadTransform`, up to its file test); fs.surf's pieces taken
+early (decided 2026-11-13): `utils/mrisurf_topology.cpp` 33-176 (`shouldReportWkr`,
+`mrisCheckVertexVertexTopologyWkr`), 360-410 (`mrisAddEdgeWkr`, `mrisAddEdge`), 818-875
+(`MRIS_setNsizeCur`, `resizeVertexV`), 953-992 (`MRISresetNeighborhoodSize`), 1088-1488
+(`MRISfindNeighborsAtVertex` with `_new`, `_newWkr` and `_old`), 1850-1883
+(`mrisCountAttachedFaces`, `mrisCanAttachFaceToVertices`), 2093-2157 (`mrisAddFaceToVertex`,
+`mrisAttachFaceWkr`, `setFaceAttachmentDeferred`, `mrisAttachFaceToEdges`,
+`mrisAttachFaceToVertices`), 2522-2662 (`mrisCompleteTopology` with `_new` and `_old`);
+`utils/mrisurf_metricProperties.cpp` 4249-4347 (`MRISsetNeighborhoodSize`,
+`MRISsetNeighborhoodSizeAndDist` and their worker), 11485-11535 (`MRISaverageRadius`);
+`utils/icosahedron.cpp` 1715-1845, 1866-1938 (`ICOtoMRIS`, `ICOtoScaledMRIS`, `ICOreadOverAlloc`,
+`ICOread`, `read_icosahedron`); `utils/mrisutils.cpp` 2375-2418 (`MRIStkr2Scanner`,
+`MRISscanner2Tkr`). `mrisCheckVertexFaceTopology` is `returnTrue()` (`include/mrisurf.h` 2199).
+
+Waiting outside the track (placeholders that stop with a message): `LTAreadEx` and `MRIreadHeader`
+(track C, fs.volume's 3.1-39 and 3.1-28) for `mrisReadTransform` when
+`<surface folder>/../mri/transforms/talairach.xfm` exists; `MRIread` and `MRIScopyMRI` (track A)
+when `<surface>.avg.area.mgh` is readable; `mrisReadGIFTIfile` on an existing file (this track's
+gifti.cpp 213-2857). A GIFTI name that cannot be opened is ported (gifticlib's `** failed to open
+GIFTI XML file '<file>'` and `mrisReadGIFTIdanum: ERROR reading gifti <file>`, both on standard
+error): `MRISread` of any missing binary surface name reaches it (`__MRISapplyFSGIIread` makes the
+name `<name>.gii`).
+
+- **The old reader** (`MRISreadOverAlloc_old`, lines 3793-4212) sits behind `useOldBehaviour =
+  false` (as `MRISwrite_old`, §17): not reachable, not ported.
+- **An icosahedron name returns early** (lines 3559-3567): the surface `ICOreadOverAlloc` made is
+  returned before the name, hemisphere, face-list rebuild, `mrisCompleteTopology`, box, distances,
+  normals, Talairach transform, radius and stored positions: such a surface has an empty name,
+  FreeSurfer's default hemisphere and no stored positions. Rule C (kept, no ID): FreeSurfer's
+  programs read their `ic<n>.tri` files with `ICOread`, which does the same.
+- **FS-359, the old format** (version 0, no magic number): `__MRISreadQuadrangleFile` keeps each
+  vertex's face list from the file and adds the faces it reads to the same one-byte count (lines
+  6376-6386 and 6437), and `MRISreadOverAlloc_new` rebuilds the lists only for `version < 0` (line
+  3686): the place loop and `mrisCompleteTopology_old` then read `f[]` past its end (the old reader
+  did the same). Rule A: by default the lists are rebuilt from the faces as for every other
+  format; `reproduce` keeps the file's lists, the entries past them zeros (deterministic stand-in;
+  counted, not compared).
+- **FS-360**: after a reader whose one-byte face count wrapped (FS-147 reproduced), the rebuild's
+  `calloc(num)` is too small and `f[num++] = fno` writes past it (lines 3686-3716). Modelled as a
+  growing list (counted, not compared). By default FS-147 refuses such files first.
+- **FS-351 then a segmentation fault**: a quadrangle face vertex at or above the vertex count
+  (within the room) has no face list (`f` stays `NULL` past `nvertices`), so the rebuild faults;
+  observed as `CRASH 11`. `reproduce` ends with exit status 139 (FS-351 noted); the default refuses
+  the file in the quadrangle reader.
+- **A surface without edges fails an assertion**: with no faces (or no vertex with a neighbour),
+  `mrisComputeVertexDistances` makes no distance array, `dist_alloced_flags` stays 0 while
+  `dist_nsize` becomes 3, and `MRISsetNeighborhoodSizeAndOptionallyDist`'s check (line 4260,
+  `mris->dist_nsize == 0`) fails: observed for ASCII, quadrangle, triangle, STL and movie.byu files
+  without faces. FS-03's rule (status 1 by default, the fault with `reproduce`); no new ID.
+- **Ripped vertices** (the ASCII format's fourth number): the 3-hop search asserts `!v->ripflag`
+  (line 1246) at the first ripped vertex in vertex order. Before it, FS-357: a vertex with a ripped
+  vertex among its cached neighbours sets `nsize = ringLinks` but keeps `vnums[ring]` at the cached
+  count (lines 1286-1296, 1314-1345), so the next ring scans `vlist` entries this call never wrote
+  (the caller's stack array: the previous vertex's list in practice), and the cache keeps `vnum`
+  while `v[]` is reallocated shorter. Rule A: by default the ring ends where it was filled;
+  `reproduce` reads the caller's list as the previous vertex left it (zeros at first) and list
+  entries past a reallocation as 0 (counted, not compared).
+- **`mrisCompleteTopology_new`** (set by the environment variable of that name, read once): it
+  attaches every face again with `mrisAttachFaceToVertices`, whose
+  `cheapAssert(mrisCanAttachFaceToVertices(...))` (line 2111) fails as soon as an edge already has
+  two faces: every closed surface fails; observed. A face with a repeated vertex fails line 1873
+  first. Ported as written.
+- **`MRISfindNeighborsAtVertex_old`** (set by the environment variable): prints `<file>:1426
+  checking marks initially clear` once, checks every vertex's mark on every call (quadratic), and
+  for `nlinks` beyond `mris->nsize` returns the rings without filling the cache, so
+  `MRISresetNeighborhoodSize(mris, 3)` then fails `MRIS_setNsizeCur`'s assertion (line 821) on the
+  first unripped vertex; observed. Its `nlinks == 3` case within the size sets `vt->vtotal` and
+  returns 0 (line 1449: `vt->vtotal = vt->v3num` where `vtotal = ...` was meant), leaving marks
+  set; FS-358 for its unchecked writes past the caller's 1,024 entries (not reached by the probe).
+  With both variables set the two are compared (`Testing MRISfindNeighborsAtVertex`).
+- **More than 1,024 vertices within 3 hops** (the probe's tree of 1,321 vertices): the new search
+  prints `MRISfindNeighborsAtVertex: vno:0 has 1320 neighbours, but listCapacity is 1024`, searches
+  again printing every vertex found, runs `mrisCheckVertexVertexTopologyWkr(..., true)` and fails
+  `cheapAssert(false)` (line 1409); observed identical. The search's set (`tempForEachThread[0]`,
+  a static per thread) is cleared only for the listed entries, so vertices found past the capacity
+  stay marked into the second search: modelled (`SurfGlobals::find_nbrs_status`).
+- **`MRISaverageRadius`'s operand order** (the unit oracle's object code): the box with
+  `minsd`/`maxsd` (the same answers as the C comparisons, NaNs included), the centre
+  `(lo + hi) * 0.5` (GCC's multiplication for `/ 2.0f`), each distance `sqrt((x·x + y·y) + z·z)`
+  with `x·x` the destination, `radius += d`, then `radius / n`; 0 / 0 (the default NaN) without
+  vertices.
+- **The icosahedron reader** (`read_icosahedron`): FS-362 for its numbers: a vertex count or face
+  count `sscanf` cannot read (the variable stays uninitialised; at the end of the file `line` still
+  holds the line read before, so the face count may be a vertex line's first number), a vertex or
+  face number outside the count (written outside `calloc`'s array), an unread or zero face vertex
+  (`f->v[n] = -1`: `vertices_topology[-1]`). Rule B: refused by default
+  (`read_icosahedron(<file>): ...`, then `ICOreadOverAlloc`'s `could not open file`); `reproduce`
+  skips the write, or ends as a segmentation fault (status 139) for a face vertex beyond the room
+  (counted, not compared). A negative count fails `calloc` (`read_ico: could not allocate vertex
+  list`, with `errno` ENOMEM: `error: Cannot allocate memory` first; the face count's message is the
+  same text). FS-361 for `ICOtoScaledMRIS`: the neighbour list is sized `vnum / 2` with `vnum`
+  counted 2 per face, so a vertex with more neighbours than faces (any surface that is not closed,
+  or one with a repeated face vertex) writes past it (line 1788); the one-byte `num` wraps past
+  255 faces (line 1756). Rule A for the lists (they grow, in both modes, noted); a vertex of more
+  than 255 faces is refused by default (`ICOread: vertex <v> is in more than 255 faces`).
+- **`mrisReadTransform`**: `FileNamePath(mris_fname, fpref)` into `char fpref[300]` (line 4620):
+  an unchecked `strcpy` of the whole name (`utils/utils.cpp` 792), so a surface name of 300 bytes
+  or more writes past it: FS-356 extended (the name is taken whole in both modes; observed
+  crashes counted, not compared). `FileExists` opens the file (a folder of that name counts).
+- **`MRISread`'s statics** (`mrisCompleteTopology`'s `use_new`, `MRISfindNeighborsAtVertex`'s
+  `use_new`/`use_old` and call count, `_old`'s first-call line, the search's set, `modVnum`'s and
+  `mrisAddEdgeWkr`'s largest counts, the vertex-vertex check's two variables) live in
+  `SurfGlobals`, so two reads in one process behave as FreeSurfer's (the probe's cases with two
+  reads). `MRISsetNeighborhoodSizeAndOptionallyDist`'s `static int count, limit` never prints
+  (`limit` is 0), `MRISfindNeighborsAtVertex`'s `interestingLaterTime` likewise.
+- **Timeouts**: with `TRIANGULARSURFACE_NOEXTRA_READ` set, a triangle file that has its creator's
+  line gives counts of billions read from its text; the official probe then runs past its 5-second
+  alarm (FS-354's family, as `tri` found): `srd` does not set that variable.

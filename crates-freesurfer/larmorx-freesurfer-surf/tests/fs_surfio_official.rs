@@ -19,9 +19,10 @@ use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
-const SKIP: [&str; 16] = [
+const SKIP: [&str; 22] = [
     "FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144", "FS-151", "FS-154",
-    "FS-157", "FS-158", "FS-160", "FS-346", "FS-352", "FS-354", "FS-356",
+    "FS-157", "FS-158", "FS-160", "FS-346", "FS-352", "FS-354", "FS-356", "FS-357", "FS-358",
+    "FS-359", "FS-360", "FS-361", "FS-362",
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
@@ -30,7 +31,7 @@ const OFFICIAL_SHA256: &str = "c2ea12117f4b024167aed9c765687f2ca1a6c4ee4155f6c55
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    for line in cases::generate(1, 1080) {
+    for line in cases::generate(1, 1110) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let refused = out.starts_with("EXIT ");
         let skip = ids.iter().any(|x| SKIP.contains(x))

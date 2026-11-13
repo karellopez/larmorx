@@ -21,7 +21,7 @@ correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordi
 ``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1020 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1110 [--json out.json]
 """
 
 from __future__ import annotations
@@ -49,7 +49,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # `sfile` and `cfile` readers; a decimation count that cannot be read, FS-140; a first VTK vertex
 # that cannot be read, FS-144; a command line read into a block of no bytes, FS-346; a quadrangle
 # vertex beyond the surface's room, FS-352; counts read from text after a long creator line, whose
-# allocations the machine's memory decides, FS-354): counted, never compared
+# allocations the machine's memory decides, FS-354; a name past a buffer, FS-356; MRISread's
+# neighbour lists past their end, FS-357 to FS-360; the icosahedron reader's writes outside its
+# arrays, FS-361, FS-362): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -67,6 +69,12 @@ SKIP: tuple[str, ...] = (
     "FS-352",
     "FS-354",
     "FS-356",
+    "FS-357",
+    "FS-358",
+    "FS-359",
+    "FS-360",
+    "FS-361",
+    "FS-362",
 )
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 

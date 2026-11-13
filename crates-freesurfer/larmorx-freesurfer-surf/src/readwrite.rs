@@ -414,7 +414,20 @@ fn read_by_type(
         MRIS_VTK_FILE => formats::read_vtk(g, sg, io, dir, None, fname, None)?
             .into_new()
             .map(|m| (m, -3)),
-        MRIS_GIFTI_FILE => gifti_pending("MRISread"),
+        MRIS_GIFTI_FILE => {
+            // `mrisReadGIFTIfile(fname, NULL)`: gifticlib's reader; a file it cannot open gives
+            // its message and FreeSurfer's, `None`; an existing file needs gifti.cpp's surface
+            // part (not yet ported)
+            match open(dir, fname, "r") {
+                Ok(_) => gifti_pending("MRISread"),
+                Err(e) => {
+                    g.errno = e;
+                    let _ = writeln!(io.err, "** failed to open GIFTI XML file '{fname}'");
+                    let _ = writeln!(io.err, "mrisReadGIFTIdanum: ERROR reading gifti {fname}");
+                    None
+                }
+            }
+        }
         MRI_MGH_FILE | NII_FILE => {
             log::error_exit(
                 g,
@@ -548,6 +561,16 @@ pub fn read_over_alloc(
                 if n.len() < num {
                     n.resize(num, 0);
                 }
+            }
+            // a face number from the file outside the faces: FreeSurfer reads outside its face
+            // arrays from here on (modelled as the segmentation fault it can end with)
+            let bad = (0..nv).any(|v| {
+                let vt = mris.topology(v);
+                let f = vt.f.as_deref().unwrap_or(&[]);
+                f[..usize::from(vt.num)].iter().any(|&x| x < 0 || x as usize >= nf)
+            });
+            if bad {
+                return Err(Fatal::Exit(139));
             }
         } else {
             rebuild = true;

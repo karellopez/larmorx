@@ -137,7 +137,7 @@ fn e15(x: f32) -> String {
 }
 
 /// `writeVolGeom`'s text block of `vg`, now and then with a line missing or a blank line.
-fn vg_text(g: &mut Gen, vg: &VolGeom) -> Vec<u8> {
+pub(super) fn vg_text(g: &mut Gen, vg: &VolGeom) -> Vec<u8> {
     let mut lines = vec![
         if vg.valid == 0 {
             format!("valid = {}  # volume info invalid\n", vg.valid)
@@ -197,7 +197,7 @@ fn cmdline_tag(g: &mut Gen, b: &mut Vec<u8>, last: bool) {
 /// The tags after a surface: the real-RAS flag, the volume geometry, the group-average area,
 /// command lines, the three space tags, an unknown tag; in any order, each now and then; the last
 /// now and then of an odd length, or a partial tag number.
-fn tags(g: &mut Gen, b: &mut Vec<u8>) {
+pub(super) fn tags(g: &mut Gen, b: &mut Vec<u8>) {
     let n = g.int(0, 6);
     for i in 0..n {
         let last = i == n - 1;

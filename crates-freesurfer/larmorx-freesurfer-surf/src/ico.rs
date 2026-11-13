@@ -117,6 +117,8 @@ fn bad_file(g: &mut Globals, io: &mut Io, fname: &str, what: &str) -> bool {
 /// vertex list`, the fatal error `ERROR_NOMEMORY`, for the faces too).
 fn checked_count(g: &mut Globals, io: &mut Io, n: i32) -> Result<usize, Fatal> {
     if n < 0 {
+        // calloc's failure: ENOMEM
+        g.errno = 12;
         log::error_exit(
             g,
             io.err,
@@ -403,6 +405,7 @@ pub fn ico_to_scaled_mris(
     for vno in 0..nv.max(0) as usize {
         let half = i32::from(mris.topology(vno).vnum) / 2;
         if half < 0 {
+            g.errno = 12;
             log::error_exit(
                 g,
                 io.err,

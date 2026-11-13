@@ -279,7 +279,8 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     command = str(meta.get("command", f"larmorx {p.group} {p.name}"))
 
     fn = code.function(repo, str(meta["python"]))
-    cl = code.command_line(repo, str(meta["command-line"]), p.name, command)
+    parser = str(meta["parser"]) if meta.get("parser") else None
+    cl = code.command_line(repo, str(meta["command-line"]), p.name, command, parser)
     ref.sources = sorted(
         {
             page.path.as_posix(),

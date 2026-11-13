@@ -102,6 +102,8 @@ def usage_options(usage: str) -> list[Option]:
         s = line.strip()
         if "\t" in s:
             head, _, desc = s.partition("\t")
+        elif re.match(rf"{_SPELLING}(?: <[^>]*>)?\s+: ", s):  # ``  -ssref <ref_image> : ...``
+            head, _, desc = s.partition(" : ")
         else:
             parts = re.split(r"\s{2,}", s, maxsplit=1)
             head, desc = parts[0], parts[1] if len(parts) > 1 else ""
@@ -235,13 +237,18 @@ def _commanded(lines: list[str], names: tuple[str, ...], command: str) -> list[s
     return out
 
 
-def command_line(repo: Path, rel: str, program: str, command: str | None = None) -> CommandLine:
+def command_line(
+    repo: Path, rel: str, program: str, command: str | None = None, parser: str | None = None
+) -> CommandLine:
     """A program's command line from its code, read by the reader of its family: a Python
     program's argparse parser (sdcflows' BIDS app), tedana's argparse parser in Rust, ANTs'
     tables of options, AFNI's and ``mri hmc``'s usage texts and parsers, else (FSL's programs)
-    the usage text (``USAGE``) with the options of the table of specs and of the parser's arms,
-    merged where they share a spelling. ``command`` is what the reader types for the program
-    (``larmorx fsl bet``); the synopsis lines start with it."""
+    the usage text (``USAGE``, a string or a file it includes) with the options of the table of
+    specs, of a table of tuples (``const OPTIONS``) and of the parser's arms, merged where they
+    share a spelling. ``command`` is what the reader types for the program (``larmorx fsl
+    bet``); the synopsis lines start with it. ``parser`` names the function whose body holds the
+    parser, where the file matches other words too (``standard_space_roi``'s ``fn parse``, beside
+    its reading of bash's ``test``)."""
     family = rel.split("/")[1] if rel.startswith("crates/") else ""
     command = command or f"larmorx {program}"
     if rel.endswith(".py"):
@@ -256,13 +263,21 @@ def command_line(repo: Path, rel: str, program: str, command: str | None = None)
         text = (repo / rel).read_text(encoding="utf-8").split("\n#[cfg(test)]", 1)[0]
         usage, extra = rust_string(text, "USAGE"), []
         if usage is None:
+            usage, extra = included_usage(repo, rel, text)
+        if usage is None:
             usage, extra = formatted_usage(repo, rel, text, program)
-        parser = specs_options(text) + match_options(text) + tuple_arms(text, program)
-        parser += listed_options(text)
+        body = text
+        if parser is not None:
+            m = re.search(rf"\bfn {re.escape(parser)}\(", text)
+            if m is None:
+                raise ValueError(f"{rel}: no fn {parser}")
+            body = _brace_body(text, m.end())
+        found = specs_options(body) + match_options(body) + tuple_arms(body, program)
+        found += listed_options(body) + table_options(text)
         listed = (usage_options(usage) or spaced_usage_options(usage)) if usage else []
-        merged = _merge(listed + parser)
+        merged = _merge(listed + found)
         synopsis = usage_synopsis(usage, program) if usage else []
-        parsed = {s for o in parser for s in o.spellings}
+        parsed = {s for o in found for s in o.spellings}
         synopsis = [command + s[len(program) :] for s in synopsis]
         cl = CommandLine(rel, usage, synopsis, merged, parsed, extra=extra)
     cl.port = _port_of(rel)
@@ -285,6 +300,35 @@ def listed_options(text: str) -> list[Option]:
             for w in re.findall(r'"(\w+)"', m.group(1)):
                 out.append(Option([f"-{w}", f"--{w}"]))
     return out
+
+
+def table_options(text: str) -> list[Option]:
+    """The options of a table of tuples (``const OPTIONS: &[(&str, ...)] = &[...];``): an entry
+    that starts with a short spelling and a long name (``("-i", "imain", ...)``: ``-i``,
+    ``--imain``), or with a long name alone (``("imain", Kind::Text, ...)``: ``--imain``)."""
+    m = re.search(r"\bconst OPTIONS: &\[\(&str[^\]]*\] = &\[(.*?)\n\];", text, re.S)
+    if not m:
+        return []
+    out = []
+    for entry in _top_level(re.sub(r"//[^\n]*", "", m.group(1))):
+        words = re.findall(r'"((?:[^"\\]|\\.)*)"', entry)
+        if not words:
+            continue
+        if words[0].startswith("-") and len(words) > 1 and re.fullmatch(r"[\w-]+", words[1]):
+            out.append(Option([words[0], "--" + words[1]]))
+        elif re.fullmatch(r"[A-Za-z][\w-]*", words[0]):
+            out.append(Option(["--" + words[0]]))
+    return out
+
+
+def included_usage(repo: Path, rel: str, text: str) -> tuple[str | None, list[str]]:
+    """A usage text kept in a file of its own (``const USAGE: &str =
+    include_str!("fslmaths_usage.txt");``), and that file, for the page's sources."""
+    m = re.search(r'\bconst USAGE: &str\s*=\s*include_str!\("([^"]+)"\)\s*;', text)
+    if not m:
+        return None, []
+    path = Path(rel).parent / m.group(1)
+    return (repo / path).read_text(encoding="utf-8"), [path.as_posix()]
 
 
 def _variant_names(text: str) -> dict[str, str]:
@@ -348,9 +392,10 @@ def formatted_usage(repo: Path, rel: str, text: str, program: str) -> tuple[str 
     o.bins) }``; for a file of several programs, the arm of ``program``), its values filled in:
     the program's name, and a field of the options (``o.bins``) with its default (the crate's
     ``impl Default for Options``); and the files read for the defaults."""
-    m = re.search(r"fn usage\([^)]*\) -> String", text)
+    m = re.search(r"fn usage\(([^)]*)\) -> String", text)
     if not m:
         return None, []
+    params = set(re.findall(r"(\w+):\s*&str", m.group(1)))
     body = _brace_body(text, m.end())
     names = _variant_names(text)
     calls = list(re.finditer(r"(?:(\w+::\w+) => )?format!\(", body))
@@ -371,6 +416,8 @@ def formatted_usage(repo: Path, rel: str, text: str, program: str) -> tuple[str 
             extra.append(where)
         elif re.search(rf"let {name} = self\.name\(\);", body):
             values[name] = program
+        elif name in params:  # ``fn usage(fsldir: &str)``: the variable's value, ``${FSLDIR}``
+            values[name] = "${" + name.upper() + "}"
         else:
             return None, []
     return _rust_format(fmt, values), sorted(set(extra))

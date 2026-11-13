@@ -436,10 +436,10 @@ def test_validated_before_lists_the_earlier_ports(monkeypatch):
 # ANTs, AFNI, tedana, sdcflows and `mri hmc` are written from them)
 
 
-def _cl(rel: str, program: str, command: str):
+def _cl(rel: str, program: str, command: str, parser: str | None = None):
     from larmorx_validation.reference import code
 
-    cl = code.command_line(REPO, rel, program, command)
+    cl = code.command_line(REPO, rel, program, command, parser)
     by = {s: o for o in cl.options for s in o.spellings}
     assert {s for o in cl.options for s in o.spellings} <= cl.parsed
     return cl, by
@@ -506,6 +506,47 @@ def test_mri_hmc_as_mcflirt():
     assert {"-in", "-rmsrel", "-gdt", "-help"} <= set(by)
 
 
+def test_fsl_script_parser_in_its_function_standard_space_roi():
+    """A script's parser read in its own function (`standard_space_roi`'s `fn parse`, beside the
+    file's reading of bash's `test`, whose `-eq`, `-z`, ... are no options of the script); its
+    usage formatted with a parameter (`${FSLDIR}`); descriptions after a colon."""
+    rel = "crates/larmorx-fsl/src/cli/ssroi.rs"
+    cl, by = _cl(rel, "standard_space_roi", "larmorx fsl standard_space_roi", "parse")
+    assert cl.synopsis == [
+        "larmorx fsl standard_space_roi <input> <output> [options] [flirt options]"
+    ]
+    assert set(by) == {
+        "-maskFOV", "-maskMASK", "-maskNONE", "-roiFOV", "-roiMASK", "-roiNONE",
+        "-ssref", "-altinput", "-d", "-b",
+    }  # fmt: skip
+    assert (by["-ssref"].arg, by["-maskNONE"].help) == ("<ref_image>", "do not mask output")
+    assert "${FSLDIR}/data/standard/MNI152_T1_2mm_brain_mask_dil" in by["-b"].help
+    from larmorx_validation.reference import code
+
+    whole = code.command_line(REPO, rel, "standard_space_roi")
+    assert {"-eq", "-z"} <= {s for o in whole.options for s in o.spellings}
+
+
+def test_fsl_tables_of_tuples_topup_applytopup():
+    """FSL's option tables of tuples: long names alone (`topup`'s `("imain", Kind::Text, ...)`,
+    its hidden options included) and a short spelling with a long name (`applytopup`'s
+    `("-i", "imain", ...)`), joined with the usage's lines."""
+    cl, by = _cl("crates/larmorx-fsl/src/cli/topup.rs", "topup", "larmorx fsl topup")
+    assert by["--imain"].help == "name of 4D file with images"
+    assert by["-v"].spellings == ["-v", "--verbose"]
+    assert {"--dfout", "--rbmout", "--jacout"} <= set(by)
+    assert cl.synopsis[0].startswith("larmorx fsl topup --imain=<some 4D image>")
+    cl, by = _cl("crates/larmorx-fsl/src/cli/applytopup.rs", "applytopup", "larmorx fsl applytopup")
+    assert by["-x"].spellings == ["-x", "--inindex"] and len(cl.options) == 10
+
+
+def test_fsl_usage_in_a_file_fslstats():
+    """A usage text kept in a file of its own (`include_str!`), which joins the page's sources."""
+    cl, _ = _cl("crates/larmorx-fsl/src/cli/fslstats.rs", "fslstats", "larmorx fsl fslstats")
+    assert cl.extra == ["crates/larmorx-fsl/src/cli/fslstats_usage.txt"]
+    assert cl.synopsis == ["larmorx fsl fslstats [preoptions] <input> [options]"]
+
+
 def test_tedana_argparse_in_rust_t2smap():
     """tedana's parser in Rust: the synopsis as Python's argparse formats it in 80 columns,
     every option string, tedana's help, a hidden option, argparse's own help for -h and -v."""
@@ -542,8 +583,8 @@ def test_port_words_are_named_as_the_ports(monkeypatch):
 
     real = code.command_line
 
-    def own_words(repo, rel, program, command=None):
-        cl = real(repo, rel, program, command)
+    def own_words(repo, rel, program, command=None, parser=None):
+        cl = real(repo, rel, program, command, parser)
         cl.words, cl.port = "port", "clean room"
         return cl
 

@@ -88,8 +88,8 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
 
 /// The `FS-48h` key (`cases::fs48_hangs`) on a matrix on which LINPACK's `ssvdc` never returns
 /// (`larmorx_core::vnl_svd_f32::vnl_svd_f32_full` names it):
-/// `OpenSvdcmp` in both modes notes FS-48 and the key finds the hang; on a finite matrix it does
-/// not. A change of fs.core's FS-48 text that loses the marker fails here, by name.
+/// `OpenSvdcmp` in both modes notes FS-48 with ITK-116 and the key finds the hang; on a finite
+/// matrix it does not. A change of fs.core's notices that loses ITK-116 fails here, by name.
 #[test]
 fn fs48_hang_key_holds() {
     use larmorx_core::vnl_svd_f32::vnl_svd_f32_full;

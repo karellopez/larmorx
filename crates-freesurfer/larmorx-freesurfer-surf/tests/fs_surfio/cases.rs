@@ -2740,22 +2740,15 @@ fn escape(b: &[u8]) -> String {
     s
 }
 
-/// FS-48's hang (`FS-48h`): an FS-48 notice together with the hang marker, VNL's own "never
-/// returns" notice (ITK-116: `larmorx_core::vnl_svd_f32`'s `never_returns`) once fs.core passes it
-/// on, or until then [`HANG_MARK`] in the FS-48 notice. Keyed on the defect IDs, so a change of
-/// FS-48's wording cannot drop the mark unseen: `fs48_hang_key_holds` (the hash test's file) runs
+/// FS-48's hang (`FS-48h`): an FS-48 notice together with VNL's own "never returns" notice
+/// (ITK-116: `larmorx_core::vnl_svd_f32`'s `never_returns`), which fs.core's `OpenSvdcmp` notes
+/// beside FS-48 where FreeSurfer hangs (track A's ae30327b). Keyed on the defect IDs only, so a
+/// change of FS-48's wording cannot drop the mark: `fs48_hang_key_holds` (the hash test's file) runs
 /// one matrix on which `ssvdc` never returns through `OpenSvdcmp` and fails when the key misses it.
 pub fn fs48_hangs(notices: &[Notice]) -> bool {
-    let fs48 = notices.iter().any(|n| n.defect.id == "FS-48");
-    fs48 && (notices.iter().any(|n| n.defect.id == "ITK-116")
-        || notices
-            .iter()
-            .any(|n| n.defect.id == "FS-48" && n.detail.contains(HANG_MARK)))
+    notices.iter().any(|n| n.defect.id == "FS-48")
+        && notices.iter().any(|n| n.defect.id == "ITK-116")
 }
-
-/// The hang marker in fs.core's FS-47 and FS-48 notices (`OpenEigenSystem`, `OpenSvdcmp`) until
-/// they pass VNL's ITK-115/ITK-116 notices on.
-pub const HANG_MARK: &str = "FreeSurfer hangs";
 
 /// The port's line for a case line, and the defects it noted.
 pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>) {

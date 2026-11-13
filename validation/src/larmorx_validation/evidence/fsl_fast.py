@@ -2464,6 +2464,7 @@ def present(doc: dict) -> dict:
     )
     if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
         doc["speed"]["note"] = present_.text(PAGE, note, port="both")
+    fsl_pages.replica_threshold(doc)  # the reviewer's round 18, minor 2
     for ex in doc["examples"]:
         for t in ex.get("tables") or []:
             kind = t["id"].rsplit("-", 1)[1]

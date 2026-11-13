@@ -130,3 +130,21 @@ def present(
     )
     present_.random_testing(charts or pg, doc, dict(PORTS))
     return present_.finish(pg, doc, {**CATEGORIES, **(categories or {})}, pages=tables, ports=PORTS)
+
+
+#: A metrics note that gives the replica's record's threshold, then the clean room's record's.
+_ONE_RECORD = "The record's threshold: every file FSL writes bit-identical"
+
+
+def replica_threshold(doc: dict) -> None:
+    """Each example's metrics note names the replica's record where it gives its threshold before
+    the clean room's record's ("The record's threshold: ... The clean room's record (fsl-fast)
+    holds it to ... instead"), as FLIRT's and 3dvolreg's notes name both records (the reviewer's
+    round 18, minor 2); refuses a note without those two sentences."""
+    for ex in doc["examples"]:
+        n = ex.get("metrics_note") or ""
+        if _ONE_RECORD not in n or "The clean room's record (" not in n:
+            raise ValueError(f"{ex['id']}: the metrics note's two thresholds changed")
+        ex["metrics_note"] = n.replace(
+            "The record's threshold:", "The replica's record's threshold:", 1
+        )

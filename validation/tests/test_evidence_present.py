@@ -1013,3 +1013,21 @@ def test_topups_page_names_applytopups_calls_and_says_what_the_clean_rooms_defau
     gone["summary"] = gone["summary"].replace("which makes the same correction", "which corrects")
     with pytest.raises(ValueError, match="the summary's last words changed"):
         fsl_topup._clean_sentence(gone)
+
+
+def test_a_metrics_note_names_the_replicas_record():
+    """Round 18, minor 2: FAST's and topup's notes give the replica's record's threshold and then
+    the clean room's record's; "the record" is named the replica's, and a note without the two
+    sentences is refused."""
+    from larmorx_validation.evidence import fsl_pages
+
+    doc = {"examples": [{"id": "ex", "metrics_note": (
+        "Δ is A − B. The record's threshold: every file FSL writes bit-identical. The clean "
+        "room's record (fsl-fast) holds it to specs/fast.md §11's thresholds instead."
+    )}]}  # fmt: skip
+    fsl_pages.replica_threshold(doc)
+    assert doc["examples"][0]["metrics_note"].startswith(
+        "Δ is A − B. The replica's record's threshold: every file FSL writes bit-identical."
+    )
+    with pytest.raises(ValueError, match="the metrics note's two thresholds changed"):
+        fsl_pages.replica_threshold(doc)

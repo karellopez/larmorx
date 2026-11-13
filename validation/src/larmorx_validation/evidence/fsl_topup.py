@@ -2896,6 +2896,7 @@ def present(doc: dict) -> dict:
     )  # fmt: skip
     if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
         doc["speed"]["note"] = present_.text(PAGE, note, port="both")
+    fsl_pages.replica_threshold(doc)  # the reviewer's round 18, minor 2
     for ex in doc["examples"]:
         program = "applytopup" if ex["id"] in APPLY_EXAMPLES else "topup"
         threads = "" if program == "applytopup" else " on one thread"

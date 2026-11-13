@@ -757,6 +757,85 @@ void run_case()
     unlink((subj + "/stats/brainvol.stats").c_str());
     rmdir((subj + "/stats").c_str());
     rmdir(subj.c_str());
+  } else if (cmd == "setres") {
+    MRI *m = get_vol();
+    float a = getf(), b = getf(), c = getf();
+    oi(MRIsetResolution(m, a, b, c));
+    put_vol(m);
+  } else if (cmd == "vfill") {
+    MRI *m = get_vol();
+    oi(MRIvalueFill(m, getf()));
+    put_vol(m);
+  } else if (cmd == "fillfg") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    int sx = geti(), sy = geti(), sz = geti(), th = geti(), fv = geti();
+    int npix = -7;
+    MRI *r = MRIfillFG(src, dst, sx, sy, sz, th, fv, &npix);
+    oi(npix);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "explane") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    int o = geti(), w = geti();
+    MRI *r = MRIextractPlane(src, dst, o, w);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "fillplane") {
+    MRI *mask = get_vol();
+    MRI *dst = get_vol();
+    int o = geti(), w = geti(), fv = geti();
+    MRI *r = MRIfillPlane(mask, dst, o, w, fv);
+    oi(r == dst);
+    put_vol(dst);
+  } else if (cmd == "ups") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    int k = geti(), n = geti();
+    fflush(stdout);
+    MRI *r = k == 0 ? MRIupsampleN(src, dst, n) : k == 1 ? MRIupsample2(src, dst) : MRIupsampleNConserve(src, dst, n);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "dns2" || cmd == "dnsn") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    MRI *r;
+    if (cmd == "dns2") {
+      r = MRIdownsample2(src, dst);
+    } else {
+      float fc = getf(), fr = getf(), fs = getf();
+      int keep = geti();
+      fflush(stdout);
+      r = MRIdownsampleN(src, dst, fc, fr, fs, keep);
+      fflush(stdout);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "mft") {
+    MRI *m = get_vol();
+    int f = geti();
+    float th = getf();
+    od(MRImeanFrameThresh(m, f, th));
+  } else if (cmd == "lim") {
+    MRI *m = get_vol();
+    float a = getf(), b = getf();
+    oi(MRIlimits(m, &a, &b));
+    of(a);
+    of(b);
+  } else if (cmd == "chtype") {
+    MRI *m = get_vol();
+    int seq = geti(), dt = geti();
+    float lo = getf(), hi = getf();
+    int ns = geti();
+    if (geti()) setenv("FS_FORCE_BIN_CHECK", "1", 1);
+    else unsetenv("FS_FORCE_BIN_CHECK");
+    fflush(stdout);
+    MRI *r = seq ? MRISeqchangeType(m, dt, lo, hi, ns) : MRIchangeType(m, dt, lo, hi, ns);
+    fflush(stdout);
+    put_vol(r);
+    put_vol(m);
   } else {
     fail("unknown command");
   }

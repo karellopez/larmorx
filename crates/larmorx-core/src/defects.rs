@@ -1503,6 +1503,14 @@ defects! {
         "reading the cached brain volume statistics (stats/brainvol.stats) aborts on a line that names a measure, holds no number and ends in white space";
     FS_315 = "FS-315", "FreeSurfer", true,
         "the left-right swap of a segmentation by label lists reads the lists past their end when they hold fewer numbers than rows";
+    FS_316 = "FS-316", "FreeSurfer", true,
+        "the flood fill of a byte volume from a seed clamps a seed row or slice at or past the volume's height or depth to the volume's width minus one";
+    FS_317 = "FS-317", "FreeSurfer", true,
+        "downsampling by factors and the change of a volume's type with rescaling convert a number beyond the 32-bit integer range, or NaN, to the integer -2147483648 (the extent, the windows, the histogram's bins and counts)";
+    FS_318 = "FS-318", "FreeSurfer", true,
+        "the mean of a frame's voxels above a threshold is the mean of frame 0's whatever the frame asked for";
+    FS_319 = "FS-319", "FreeSurfer", true,
+        "upsampling with the sum conserved of a volume whose change to floats fails (a robust range that is empty after the histogram) goes on with no volume and crashes";
 }
 
 /// The register entry with ID `id`.

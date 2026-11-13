@@ -56,3 +56,12 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   ends in white space gives no number (FS-314, an error under `reproduce`); label lists read past
   their numbers an error (FS-315). `USE_AVERAGE305` comes from `ltaread::LtaIo::env` (the program's
   environment), not the process's.
+- `src/resize.rs` (3.1-36; relay 16): `utils/mri.cpp` `MRIsetResolution`, `MRIvalueFill`, `MRIfillFG`,
+  `MRIextractPlane`, `MRIfillPlane`, `MRIupsampleN`, `MRIupsample2`, `MRIupsampleNConserve`,
+  `MRIdownsample2`, `MRIdownsampleN`, `MRImeanFrameThresh`, `MRIchangeType`, `MRISeqchangeType` and (from
+  3.1-37) `MRIlimits`; `include/macros.h`'s `MAX`; the official build's operand orders from the unit
+  oracle's `mri.cpp.o` (`docs/findings/freesurfer-volume.md` §9). Changes: FS-316 (the fill's seed clamped
+  by its own axis), FS-318 (the frame's mean of the frame asked for), rule A; FS-317 (out-of-range
+  conversions clamped, D13); FS-319 (an error, both modes); the fill keeps the bytes written where the
+  destination holds no voxel and reads them back (FreeSurfer reads back the memory it wrote).
+

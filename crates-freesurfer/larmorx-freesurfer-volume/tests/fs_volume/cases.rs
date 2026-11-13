@@ -27,6 +27,7 @@ use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
 use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::ltaread as lr;
+use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
 use larmorx_freesurfer_volume::sample as sm;
 use larmorx_freesurfer_volume::skull as sk;
@@ -1045,6 +1046,164 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 t.push("1".to_owned());
                 t.push(hex(&brainvol_text(&mut g)));
             }
+            "setres" => {
+                vol(&mut g, &mut t);
+                for _ in 0..3 {
+                    t.push(fx(size(&mut g)));
+                }
+            }
+            "vfill" => {
+                vol(&mut g, &mut t);
+                t.push(fx(fval(&mut g)));
+            }
+            "fillfg" => {
+                let mut s = shape(&mut g);
+                if !g.chance(4) {
+                    s.ty = 0;
+                }
+                if !g.chance(8) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let mode = g.pick(&[0, 0, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                for k in [s.w, s.h, s.d] {
+                    t.push(g.int(-1, k).to_string());
+                }
+                t.push(g.pick(&[0, 1, 50, 128, 200, 256, -1]).to_string());
+                t.push(g.pick(&[0, 1, 128, 255, 255, 256, -1, 300]).to_string());
+            }
+            "explane" => {
+                let s = vol(&mut g, &mut t);
+                if g.chance(3) {
+                    t.push("1".into());
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                t.push(g.pick(&[0, 1, 2, 0, 1, 2, 3, -1]).to_string());
+                t.push(g.int(-1, 4).to_string());
+            }
+            "fillplane" => {
+                let s = vol(&mut g, &mut t);
+                let o = like(&mut g, s);
+                vol_of(&mut g, &mut t, o);
+                t.push(g.pick(&[0, 1, 2, 0, 1, 2, 3, -1]).to_string());
+                t.push(g.int(-1, 4).to_string());
+                t.push(g.pick(&[0, 1, 255, -5, 70000]).to_string());
+            }
+            "ups" => {
+                let mut s = shape(&mut g);
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let k = g.int(0, 2);
+                let n = if g.chance(12) {
+                    g.pick(&[0, -1])
+                } else {
+                    g.pick(&[1, 2, 2, 3])
+                };
+                if g.chance(4) {
+                    t.push("1".into());
+                    let mut o = like(&mut g, s);
+                    if g.chance(2) {
+                        let f = if k == 1 { 2 } else { n.max(1) };
+                        o.w = s.w * f;
+                        o.h = s.h * f;
+                        o.d = s.d * f;
+                    }
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                t.push(k.to_string());
+                t.push(n.to_string());
+            }
+            "dns2" | "dnsn" => {
+                let mut s = shape(&mut g);
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                // a NaN factor makes FreeSurfer's extent -2147483648 with reproduce (FS-317), whose
+                // allocation error fs.mri does not model yet (told track A): not drawn
+                let fs: [f32; 3] = if cmd == "dnsn" {
+                    let f = |g: &mut Gen| -> f32 {
+                        if g.chance(30) {
+                            -1.0
+                        } else {
+                            g.pick(&[1.0, 2.0, 2.0, 3.0, 0.5, 1.5, 2.5, 4.0])
+                        }
+                    };
+                    [f(&mut g), f(&mut g), f(&mut g)]
+                } else {
+                    [2.0; 3]
+                };
+                // extents the factors divide, mostly (FreeSurfer's windows read past the source
+                // otherwise: FS-52, FS-53)
+                let ext = |g: &mut Gen, f: f32, hi: i64| -> i64 {
+                    if f >= 1.0 && f.fract() == 0.0 && !g.chance(3) {
+                        f as i64 * g.int(1, 2)
+                    } else {
+                        g.int(1, hi)
+                    }
+                };
+                s.w = ext(&mut g, fs[0], 5);
+                s.h = ext(&mut g, fs[1], 5);
+                s.d = ext(&mut g, fs[2], 4);
+                vol_of(&mut g, &mut t, s);
+                if g.chance(4) {
+                    t.push("1".into());
+                    let mut o = like(&mut g, s);
+                    if g.chance(2) {
+                        let e = |n: i64, f: f32| ((n as f32 / f).ceil() as i64).max(0);
+                        o.w = e(s.w, fs[0]);
+                        o.h = e(s.h, fs[1]);
+                        o.d = e(s.d, fs[2]);
+                        o.nf = s.nf;
+                        if cmd == "dns2" && !g.chance(5) {
+                            o.ty = s.ty;
+                        }
+                    }
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                if cmd == "dnsn" {
+                    for f in fs {
+                        t.push(fx(f));
+                    }
+                    t.push(g.int(0, 1).to_string());
+                }
+            }
+            "mft" => {
+                let s = vol(&mut g, &mut t);
+                t.push(frame_of(&mut g, s).to_string());
+                t.push(fx(fval(&mut g)));
+            }
+            "lim" => {
+                vol(&mut g, &mut t);
+                t.push(fx(fval(&mut g)));
+                t.push(fx(fval(&mut g)));
+            }
+            "chtype" => {
+                let mut s = shape(&mut g);
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                t.push(g.int(0, 1).to_string());
+                t.push(g.pick(&[0, 0, 1, 2, 3, 3, 4, 10]).to_string());
+                t.push(fx(g.pick(&[0.0, 0.0, 0.01, 0.1, 0.5, 1.0, 2.0, f32::NAN])));
+                t.push(fx(g.pick(&[0.0, 0.999, 0.9, 1.0, 0.5, 1.5])));
+                t.push(g.pick(&[0, 0, 0, 1, 2]).to_string());
+                t.push(g.int(0, 1).to_string());
+            }
             "coef" | "hsinc" => {
                 let n = 6;
                 t.push(n.to_string());
@@ -1336,7 +1495,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 73] = [
+pub const COMMANDS: [&str; 84] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -1410,6 +1569,17 @@ pub const COMMANDS: [&str; 73] = [
     "ohe",
     "bvc",
     "bvr",
+    "setres",
+    "vfill",
+    "fillfg",
+    "explane",
+    "fillplane",
+    "ups",
+    "dns2",
+    "dnsn",
+    "mft",
+    "lim",
+    "chtype",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -2249,6 +2419,120 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             };
             let _ = std::fs::remove_dir_all(&dir);
             r?;
+        }
+        "setres" => {
+            let mut m = get_vol(cx, t)?;
+            let (x, y, z) = (t.f(), t.f(), t.f());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            o.i(i64::from(rs::mri_set_resolution(g, a, b, &mut m, x, y, z)?));
+            o.vol(Some(&m));
+        }
+        "vfill" => {
+            let mut m = get_vol(cx, t)?;
+            let v = t.f();
+            o.i(i64::from(rs::mri_value_fill(
+                &mut cx.g, &mut cx.b, &mut m, v,
+            )?));
+            o.vol(Some(&m));
+        }
+        "fillfg" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (sx, sy, sz, th, fv) = (t.i(), t.i(), t.i(), t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let (r, npix) = rs::mri_fill_fg(g, a, b, p, sx, sy, sz, th, fv)?;
+            o.i(i64::from(npix));
+            let given = match mode {
+                1 => dst.as_ref(),
+                2 => Some(&src),
+                _ => None,
+            };
+            o.ret(&r, given);
+        }
+        "explane" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (or, at) = (t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = rs::mri_extract_plane(g, a, b, &src, dst.as_mut(), or, at)?;
+            o.ret(&r, dst.as_ref());
+        }
+        "fillplane" => {
+            let mask = get_vol(cx, t)?;
+            let mut dst = get_vol(cx, t)?;
+            let (or, at, fv) = (t.i(), t.i(), t.i());
+            rs::mri_fill_plane(&mut cx.g, &mut cx.b, &mask, &mut dst, or, at, fv)?;
+            o.i(1);
+            o.vol(Some(&dst));
+        }
+        "ups" => {
+            let mut src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (k, n) = (t.i(), t.i());
+            let env = Environment::default();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match k {
+                0 => rs::mri_upsample_n(g, a, b, &src, dst.as_mut(), n)?,
+                1 => rs::mri_upsample2(g, a, b, &src, dst.as_mut())?,
+                _ => rs::mri_upsample_n_conserve(g, a, b, &env, &mut src, dst.as_mut(), n)?,
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        "dns2" | "dnsn" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if cmd == "dns2" {
+                rs::mri_downsample2(g, a, b, &src, dst.as_mut())?
+            } else {
+                let (fc, fr, fs, keep) = (t.f(), t.f(), t.f(), t.i());
+                rs::mri_downsample_n(g, a, b, &src, dst.as_mut(), fc, fr, fs, keep)?
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        "mft" => {
+            let m = get_vol(cx, t)?;
+            let (f, th) = (t.i(), t.f());
+            o.d(rs::mri_mean_frame_thresh(&mut cx.g, &mut cx.b, &m, f, th));
+        }
+        "lim" => {
+            let m = get_vol(cx, t)?;
+            let (mut lo, mut hi) = (t.f(), t.f());
+            o.i(i64::from(rs::mri_limits(
+                &mut cx.g, &mut cx.b, &m, &mut lo, &mut hi,
+            )?));
+            o.f(lo);
+            o.f(hi);
+        }
+        "chtype" => {
+            let mut m = get_vol(cx, t)?;
+            let (seq, dt, lo, hi, ns) = (t.i(), t.i(), t.f(), t.f(), t.i());
+            let env = if t.i() != 0 {
+                Environment::from_pairs([("FS_FORCE_BIN_CHECK", "1")])
+            } else {
+                Environment::default()
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if seq != 0 {
+                rs::mri_seq_change_type(g, a, b, &env, &mut m, dt, lo, hi, ns)?
+            } else {
+                rs::mri_change_type(g, a, b, &env, &m, dt, lo, hi, ns)?
+            };
+            o.vol(r.as_ref());
+            o.vol(Some(&m));
         }
         "coef" | "hsinc" => {
             let n = t.i();

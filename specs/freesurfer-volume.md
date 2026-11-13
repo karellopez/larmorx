@@ -651,3 +651,113 @@ rows, `n x 1`, `n x 2` and `n x 0`, different row counts), `ohe` (lists of 0 to 
 lines with numbers in other forms, lines missing, doubled, without a number, white space and carriage
 returns at their ends). Expected: identical with `reproduce` but where FreeSurfer reads memory it does
 not own or crashes (FS-314, FS-315, and the volumes' FS-53, FS-58), counted and not compared.
+
+## 25. Resolution, planes, fills, resampling by whole factors and changes of type (3.1-36)
+Where two NaNs meet in an operation below, the result keeps the first operand's NaN as written here
+(quieted), as x86-64's SSE does; one NaN is kept whichever side it is on.
+- **`MRIsetResolution(mri, xres, yres, zres)`**: the voxel sizes become the three values; `ps` is
+  `((xres + yres) + zres) / 3` in `float`; the starts and ends are multiplied by their axis' value in
+  `float` (the NaN kept: the value's for `xstart`, `xend`, `ystart`, `zstart`; the field's for `yend` and
+  `zend`); `thick` is `MAX(MAX(xres, yres), zres)` with `MAX(a, b) = a >= b ? a : b` (+0 over -0 when first; a NaN
+  second operand wins, a NaN first operand loses); the cached matrices are recomputed. Returns 0.
+- **`MRIvalueFill(mri, value)`**: every voxel of every frame becomes `value`: bytes, shorts, unsigned
+  shorts and ints `nint(value)` cast to the type (low bits), floats the float itself (its bits kept,
+  signalling NaNs included); other types are left as they are. A volume without voxels (and a type it
+  writes) crashes FreeSurfer: an error here (FS-58). Returns 0.
+- **`MRIfillFG(src, dst, seed_x, seed_y, seed_z, threshold, fill_val, &npix)`**: a flood fill on
+  frame 0's first byte of each voxel position (bytes whatever the type: a float volume's row is read as
+  bytes, `x` the byte offset). Without `dst`, a clone of `src` (zero voxels, the header). The seed is
+  clamped into the volume; a row or slice at or past the height or depth is clamped to `width - 1` by
+  FreeSurfer (FS-316; by default to `height - 1`, `depth - 1`). Every byte of `dst` equal to `fill_val`
+  becomes `fill_val - 1` (mod 256), the seed becomes `fill_val` (mod 256); then sweeps of a box (first
+  the seed's 3 x 3 x 3 neighbourhood, clamped) set every voxel whose source byte is at least `threshold`,
+  whose `dst` byte is not `fill_val` and that has a face neighbour (within the volume) whose `dst` byte
+  is `fill_val`; the box grows by one voxel past each newly filled voxel on its edge (clamped); sweeps
+  stop when one fills nothing. `npix` is 1 plus the number filled. `fill_val` outside 0..255 never
+  matches a byte. Returns `dst`.
+- **`MRIextractPlane(src, dst, orientation, where)`**: `MRI_CORONAL` (0, and any unknown value): slice
+  `where` (x by y); `MRI_HORIZONTAL` (2): row `where` (x by z); `MRI_SAGITTAL` (1): column `where` (z by
+  y, the source's z as the plane's x). Without `dst`, a new one-slice volume of the plane's extent and the
+  source's type, the source's header, `zstart = where`, `zend = where + 1`, `imnr0 = 0`, `imnr1 = 1`.
+  The source's frame 0 is copied voxel by voxel (`MRIgetVoxVal`, `MRIsetVoxVal`) over the source's
+  extent (outside a given `dst`: as those functions do).
+- **`MRIfillPlane(mask, dst, orientation, where, fillval)`**: over `dst`'s extent, every voxel of the
+  mask's slice 0 that is not 0 (NaN counts as not 0) sets `dst`'s voxel in plane `where` of frame 0 to
+  `fillval` (as a float, stored by `MRIsetVoxVal`): coronal (x, y, where) from the mask's (x, y),
+  horizontal (x, where, z) from (x, z), sagittal (where, y, z) from (z, y). Returns `dst`.
+- **`MRIupsampleN(src, dst, N)`** (`MRIupsample2` is N = 2): the extent is N times the source's (32-bit
+  products); without `dst`, a new one of the source's type and frames with its header. The voxel sizes are
+  the source's divided by N (in `float`), the direction cosines, starts, ends and `imnr0` the source's,
+  `imnr1 = imnr0 + depth - 1` (`dst`'s depth); the centre is placed (`MRIp0ToCRAS`) at the source's
+  vox2ras applied to `(c, c, c, 1)`, `c = -0.5 + 1 / (2N)` (`double`, stored as `float`). Voxel (x, y,
+  z) of each source frame is the source's (x / N, y / N, z / N) (integer division), copied by
+  `MRIgetVoxVal`/`MRIsetVoxVal` over N times the source's extent. The cached matrices are recomputed.
+- **`MRIupsampleNConserve(src, dst, N)`**: a source that is not float is first changed to floats
+  (`MRISeqchangeType(src, MRI_FLOAT, 0, 0, 0)`); upsampled; every voxel of the result is then divided
+  by `N * N * N` (a 32-bit product, in `double`, stored as `float`). A change of type that fails leaves
+  FreeSurfer with no volume: it crashes (FS-319: an error here).
+- **`MRIdownsample2(src, dst)`**: a given `dst` of another type: `MRIdownsample2: source and dst must be
+  same type` (`ERROR_UNSUPPORTED`), `NULL`. The extent is half the source's (rounded down); without
+  `dst`, a new one of the source's type with its header. `dst` is cleared; each 2 x 2 x 2 block of frame
+  0 is summed in `float` (z, then y, then x; the sum the first operand), times 1/8 (floats stored as
+  they are; bytes, shorts and unsigned shorts `nint` and cast). A type other than those four:
+  `MRIdownsample2: unsupported input type <t>` and `NULL` when the first block is summed. Then `imnr0`
+  the source's, `imnr1 = imnr0 + depth - 1`, the voxel sizes, `thick` and `ps` doubled, the centre the
+  source's vox2ras applied to `(w / 2 + 0.5, h / 2 + 0.5, d / 2 + 0.5, 1)` (integer halves), the cached
+  matrices recomputed.
+- **`MRIdownsampleN(src, dst, Fc, Fr, Fs, KeepType)`**: the extent `(int) ceilf(width / Fc)` (and the
+  rows', slices'; a quotient beyond the `int` range or NaN: FS-317). Without `dst`: a new one of floats
+  (or the source's type with `KeepType`), the source's frames and header, `imnr0` the source's, `imnr1 =
+  imnr0 + depth - 1`, voxel sizes `xsize * Fc`, `Fr * ysize` (the NaN kept as written), `zsize * Fs`,
+  `thick * Fs`, `ps * Fc`, the centre placed at the source's vox2ras applied to `(Fc / 2 - 0.5, Fr / 2 -
+  0.5, Fs / 2 - 0.5, 1)`, the cached matrices recomputed. A `dst` whose extent or frames differ:
+  `ERROR: MRIdownsampleN: dimension mismatch` (standard output), `NULL`. Voxel (c, r, s) of frame f:
+  the `double` sum of the source's voxels at columns from `(int)(c * Fc)` while `(float) c0 < (c + 1) *
+  Fc` (in `float`), likewise rows and slices (slices innermost; each new voxel the first operand of the
+  sum), divided by `(Fc * Fr) * Fs` (in `float`); a factor that does not divide the extent reads past
+  the source's end (`MRIgetVoxVal`'s FS-52, FS-53).
+- **`MRImeanFrameThresh(mri, frame, thresh)`**: `frame >= nframes`: `MRImeanFrame: frame <f> out of
+  bounds (<n>)` (`ERROR_BADPARM`), 0. Else the nearest-voxel samples at every whole position of frame 0
+  (FS-318; by default of `frame`) that are not below `thresh` (NaN included) are summed in `double`
+  (the sample the first operand) and divided by their count (none: `0 / 0`, x86's default NaN).
+- **`MRIlimits(mri, &min, &max)`**: a volume without voxels leaves both as they were; else both start at
+  voxel (0, 0, 0) of frame 0 and every voxel smaller (larger) replaces them (C's comparisons: a NaN
+  start stays). Returns 0.
+- **`MRIchangeType(src, type, f_low, f_high, no_scale)`**: the same type: a copy. Bytes to shorts, ints,
+  longs or floats; shorts and unsigned shorts to ints, longs or floats; longs to ints or floats; ints to
+  longs or floats: the values as `MRIgetVoxVal`/`MRIsetVoxVal` convert them. Otherwise `MRIlimits`;
+  `no_scale > 1`: the values; `no_scale == 1`: the values, after `******* WARNING - forcing scaling of
+  values to prevent cropping of input [<min>, <max>]` and `***** DISABLING forcing and not doing scaling
+  ********` (standard output; `%2.0f`) when the range does not fit the type (bytes [0, 255], shorts
+  [-32768, 32767] in `double`; ints and longs against their limits as `float`s; other types never fit).
+  `no_scale == 0`: `MRIchangeType: Building histogram <min> <max> 1000, flo=<f_low>, fhi=<f_high>,
+  dest_type=<type>` (standard output, `%g`); bin size `(max - min) / 1000` (`float`); with the
+  environment variable `FS_FORCE_BIN_CHECK` set, the mean of frame 0's voxels not below 1e-7 (as
+  `MRImeanFrameThresh`) gives `bin = (int)((mean - min) / size)` in `double`, and when `(float) bin <
+  200` the size becomes `(mean - min) / 200` (`double`, stored as `float`) after `MRIchangeType: original
+  bin size <%2.2f> (max <%2.1f>) too big for mean/min <%2.2f>/<%2.2f>, scaling down to <%2.2f>`. Every
+  voxel (frames, x, y, z) counts as non-zero unless `fabs(v) < 1e-15` (NaN counts), and goes to bin
+  `(int)((v - min) / size)` (`float`; FS-317 beyond the `int` range or NaN) clamped to [0, 999]. The low
+  end: bins are added from 0 while their total is below `(int)(((w * f_low) * h) * d)` (`float`), and
+  `min = min + bin * size`; the high end: from 999 down while below `(int)(non-zero * (1 - f_high))`
+  (`double`), `max = bin * size + min` (the product the first operand). `min > max`: `MRIchangeType():
+  after hist: src_min = <g>, src_max = <g> (f_low = <g>, f_high = <g>)` (`ERROR_BADPARM`), `NULL`. The
+  destination range: bytes [0, 255], shorts [-32768, 32767], unsigned shorts [0, 65535], ints and longs
+  their limits as `float`s, floats [0, 0]; `scale = (dmax - dmin) / (max - min)` (1 when equal); each
+  voxel `((v - min) * scale) + dmin` in `float`, stored by `MRIsetVoxVal`.
+- **`MRISeqchangeType(vol, ...)`**: `MRIchangeType` of the volume seen as one frame of `depth x nframes`
+  slices (its extent restored afterwards), the result given back the depth and frames (and new frame
+  records); a failure: `ERROR: MRISeqchangeType: MRIchangeType` on standard error, `NULL`.
+
+## 26. Validation plan (3.1-36's resolution, planes, fills, resampling and changes of type)
+The probe's commands `setres` (voxel sizes with NaNs, infinities, 0 and negatives), `vfill` (values from
+the float table: NaNs, signalling NaNs, 1e10), `fillfg` (byte volumes mostly, other types too; no, a
+given or the same destination; seeds from -1 to the extent; thresholds and fill values outside 0..255),
+`explane` and `fillplane` (every orientation and unknown ones, planes from -1 to 4, destinations of other
+extents), `ups` (`MRIupsampleN`, `MRIupsample2`, `MRIupsampleNConserve` of every type, N from -1 to 3,
+given destinations of the right and wrong extents), `dns2` and `dnsn` (extents the factors divide and
+not, factors 0.5 to 4 and -1, given destinations), `mft`, `lim`, `chtype` (`MRIchangeType` and
+`MRISeqchangeType` of every type to every type, `f_low`, `f_high` and `no_scale` values,
+`FS_FORCE_BIN_CHECK` set or not). Expected: identical with `reproduce` but where FreeSurfer reads memory
+it does not own or crashes (FS-53, FS-58, FS-290 of the voxel access), counted and not compared; the
+default differs only with a notice.

@@ -249,3 +249,60 @@ waits for `MRIsampleVolumeFrameType` (9434, 3.1-36).
   (`mri_brainvol_stats`, version 2), `ReadCachedBrainVolumeStats` (`mri_segstats`,
   `mris_anatomical_stats`), `MRIasegContraLatLabel` (`gca.cpp`) and `insert_ribbon_into_aseg`
   (`mris_volmask`).
+
+## 9. Resolution, planes, fills, resampling by whole factors and changes of type (3.1-36; `MRIlimits` 3.1-37)
+
+Ported in `larmorx_freesurfer_volume::resize`. The official build's operand orders where two NaNs can
+meet (read from the unit oracle's `mri.cpp.o`, `objdump -dr`):
+- `MRIsetResolution`: `ps = ((xres + yres) + zres) / 3.0f` (the sum's first operand kept); `xstart`,
+  `ystart`, `zstart` and `xend` in one `mulps` with the resolutions as the destination (`xres * xstart`
+  ...); `yend` and `zend` scalar with the field as the destination (`yend * yres`); the struct's order
+  is `xstart, ystart, zstart, xend, yend, zend` (offsets 0x4b0..0x4c4). `thick = MAX(MAX(xres, yres),
+  zres)` with `macros.h`'s `MAX(a, b) = ((a) >= (b) ? (a) : (b))` (the first try took C's usual `a > b`:
+  +0 and -0 differed at seed 13; fixed).
+- `MRIdownsample2`: the float sum `val += *pfsrc++` keeps `val` as the destination (`addss (%r9),%xmm0`);
+  `val / 8.0f` is `mulss 0.125` (the same values); the header's doublings are `x + x`. The integer types'
+  sums are exact in `float`.
+- `MRIdownsampleN`: `val += MRIgetVoxVal(...)` is `cvtss2sd; addsd 0x8(%rsp),%xmm0`: the voxel first; the
+  divisor `(Fc * Fr) * Fs` in `float` (Fc first), `val / divisor` (val first); the header `xsize * Fc`,
+  `Fr * ysize` (Fr first), `zsize * Fs`, `thick * Fs`, `ps * Fc`; `(int)ceil(width / Fc)` is inlined as
+  `cvttss2si`, back to `float`, `+1` when below: the same as `ceilf` then x86's conversion (INT_MIN
+  beyond the range and for NaN: FS-317). The windows' starts `(int)((float)c * Fc)` and bounds `(float)(c
+  + 1) * Fc` compared with `(float)c0`.
+- `MRImeanFrameThresh`: `mean += val` is `addsd (%rsp),%xmm0` with the sample in `%xmm0`: the sample
+  first; `NaN < thresh` is false (`comisd`, `ja`), so NaN voxels are summed.
+- `MRIchangeType`: bin size `(max - min) / 1000.0f`; bins `(val - min) / size` (val first, then the
+  difference); the low count `((float)w * f_low) * h * d` (the width first: same values); `min = min +
+  (float)bin * size` (min first), `max = (float)bin * size + min` (the product first); `scale = (dmax -
+  dmin) / (max - min)`; voxels `((val - min) * scale) + dmin`. The `FS_FORCE_BIN_CHECK` branch in
+  `double`; its threshold `static float bin_threshold = 1000 / 5.0`.
+- `MRIinterpolateIntoVolumeFrame` (next relay): the float voxel's `+=` adds the product first (`addsd
+  %xmm6,%xmm1` with the product in `%xmm1`). `MRIsampleSeqVolume` (next relay): the eight terms summed
+  left to right with the running sum as the destination.
+
+Defects (rules of the porting guide; register rows in the handoff):
+- **FS-316** (rule A): `MRIfillFG` clamps `seed_y >= height` and `seed_z >= depth` to `width - 1` (a
+  copy-paste of the x line). The default clamps to `height - 1` / `depth - 1`; `reproduce` follows
+  FreeSurfer (whose seed then lands outside the volume when the width exceeds the height or depth:
+  FS-289, FS-290 of the byte access).
+- **FS-317** (D13): `MRIdownsampleN`'s extent and window starts and `MRIchangeType`'s bins, the
+  `FS_FORCE_BIN_CHECK` mean bin and the two counts convert out-of-range floats to `int` (undefined; x86's
+  `INT_MIN`). Default: clamped (NaN to 0); `reproduce`: `INT_MIN`. A huge positive bin is thus bin 999 by
+  default and bin 0 in FreeSurfer.
+- **FS-318** (rule A): `MRImeanFrameThresh` calls `MRIsampleVolumeType`, which has no frame: frame 0
+  always. Its callers in the reached code pass frame 0 (`MRIchangeType`), so recon-all is not affected.
+- **FS-319** (crash): `MRIupsampleNConserve` passes `MRISeqchangeType`'s `NULL` to `MRIupsampleN`.
+- **Kept (rule C)**: `MRIfillFG` reads and writes bytes (`MRIvox`) whatever the volume's type (a byte
+  function; its callers pass byte volumes); `MRIdownsampleN`'s windows read past the source when a factor
+  does not divide the extent (the source's own comment: "some secret rounding"; `MRIgetVoxVal`'s FS-52
+  and FS-53 say so); `MRIlimits` keeps a NaN first voxel; `MRIchangeType` scales to floats with the range
+  [0, 0] (every voxel 0 + 0 x ...: no caller in the reached code asks for floats with scaling).
+- **The port's fill** keeps the bytes FreeSurfer writes where the destination holds no voxel (FS-289's
+  default, FS-290) and reads them back, as FreeSurfer reads back the memory it wrote: without that, a
+  destination smaller than the source made the fill loop for ever (the first probe run).
+- **For track A (fs.mri)**: `Mri::new` of an extent of -2147483648 (FS-317's `reproduce` with a NaN
+  factor): FreeSurfer's chunk `calloc` fails, each slice's `calloc(width * height * bytes_per_vox, 1)`
+  wraps to 0 bytes and succeeds, and the error comes from the index arrays: `MRI::Shape::Shape(): volume
+  size must be greater than 0 in every dimension`, `error: Cannot allocate memory`, `error: could not
+  allocate -2147482648 elt index array` (status 254); the port reports `could not allocate memory for
+  slice 1 out of 4` (status 1). The probe draws no NaN factor until fs.mri models the 32-bit product.

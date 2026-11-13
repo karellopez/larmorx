@@ -15,13 +15,14 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-13 (73 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
+/// Recorded 2026-11-13 (84 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
 /// `USE_AVERAGE305` unset, `true` or empty, 3.1-35's voxel arithmetic, coordinates and geometry,
-/// moves and head box, `MRIaverage`, 3.1-36's samplers, the CMA labels and segmentation functions):
-/// 1,460 cases, 1,365 lines identical, 95 hashed as `SKIP`.
-const N: usize = 1460;
-const OFFICIAL_SHA256: &str = "dfb6450d2777761356d5587e0e2c2b8bd737ed1d1e1b82352d58a8e59b6ac530";
-const SKIPPED: usize = 95;
+/// moves and head box, `MRIaverage`, 3.1-36's samplers, resolution, planes, fills, resampling by whole
+/// factors and changes of type, the CMA labels and segmentation functions): 1,680 cases, 1,546 lines
+/// identical, 134 hashed as `SKIP`.
+const N: usize = 1680;
+const OFFICIAL_SHA256: &str = "919eb356853935742497415be1a6e96cc024dc5e7efdff0dd7499caf1638bf6e";
+const SKIPPED: usize = 134;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 22] = [
@@ -90,5 +91,36 @@ fn sinc_with_more_than_128_weights_is_an_error() {
         let r = sinc_sample_volume(&mut g, &mut err, &m, 150.5, 0.0, 0.0, 65, &mut v);
         assert!(r.is_err());
         assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-302"));
+    }
+}
+
+/// `MRIfillFG` into a destination smaller than the source ends in both modes: the bytes FreeSurfer
+/// writes where the destination holds no voxel are read back (the first probe run looped for ever).
+#[test]
+fn fill_into_a_smaller_destination_ends() {
+    use larmorx_freesurfer_core::globals::Globals;
+    use larmorx_freesurfer_mri::mri::{MRI_UCHAR, mri_alloc};
+    use larmorx_freesurfer_volume::arith::Pair;
+    use larmorx_freesurfer_volume::resize::mri_fill_fg;
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut src = mri_alloc(&mut g, &mut out, &mut err, 4, 3, 2, MRI_UCHAR).unwrap();
+        src.chunk.as_mut().unwrap().fill(200);
+        let mut dst = mri_alloc(&mut g, &mut out, &mut err, 2, 1, 1, MRI_UCHAR).unwrap();
+        let (_, npix) = mri_fill_fg(
+            &mut g,
+            &mut out,
+            &mut err,
+            Pair::Given(&src, &mut dst),
+            0,
+            0,
+            0,
+            100,
+            1,
+        )
+        .unwrap();
+        assert_eq!(npix, 24);
+        assert_eq!(dst.chunk.as_ref().unwrap()[..2], [1, 1]);
     }
 }

@@ -16,6 +16,7 @@ pub mod arith;
 pub mod cma;
 pub mod coords;
 pub mod ltaread;
+pub mod resize;
 pub mod rotate;
 mod rows;
 pub mod sample;

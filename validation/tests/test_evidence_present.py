@@ -1273,3 +1273,92 @@ def test_the_head_motion_tables_rows_go_in_the_guides_order_with_their_cells():
     )
     with pytest.raises(ValueError, match="holds other rows"):
         mri_hmc._stats({"rows": [{"head": "another"}], "note": ""})
+
+
+def _t2smap_example() -> dict:
+    """A maps example of t2smap's page as its module exports it: the replica's and the clean
+    room's comparisons with their verdicts and reasons (the numbers of ds000258's call)."""
+
+    def d(i: str, verdict: str | None, reason: str) -> dict:
+        return {"id": i, "verdict": verdict, "reason": reason}
+
+    checked = "{} of {} compared values identical; the curve fit's (b)/\\(c) share {}"
+    return {
+        "id": "maps-ds000258",
+        "diffs": [
+            d("rep-ted", "bit-identical", "Every value of the maps shown is tedana 26.0.3's "
+              "(737,280 values): ..."),
+            d("rep14-rep", "bit-identical", "The same bytes at 1 and 14 threads."),
+            d("fix-rep", "d13", "The default corrects TED-08, TED-05, NP-03, GLIBC-07 and names "
+              "each where it changes a written value: 2,000 of 737,280 values change."),
+            d("rep-fmriprep", "within-variability", "... to 26.0.3 (852 of 122,880 values): ..."),
+            d("t25-fmriprep", None, "...: every one of the 122,880 values is the same."),
+            d("t25off-fmriprep", None, "...: 629 of 122,880 values differ."),
+            d("cr-ted", "within-variability", "specs/t2smap.md §17.3 by its check.py, over the "
+              "run's files: " + checked.format("7,311,090", "7,342,822", "0.124%") + " of the fit "
+              "voxels (...)"),
+            d("cr1-cr", "bit-identical", "The same bits at 1 and 8 threads."),
+            d("crfix-cr", "d13", "The default's corrections, each named by its notice: TED-05 (...); "
+              "TED-08 (...): 110 of 737,280 values change."),
+            d("crfix-rfix", "within-variability", "The two ports' defaults by §17.3 (check.py), "
+              "over the run's files: 7,312,250 of 7,342,822 compared values identical; the "
+              "(b)/\\(c) share 0.076%."),
+            d("crfix-fmriprep", "d13", "... (TED-05, TED-08) ...: 731 of 122,880 values differ."),
+        ],
+    }  # fmt: skip
+
+
+def test_t2smaps_examples_say_both_ports_from_their_reasons():
+    """S12 and chunk T: a worked example of t2smap's page says what both ports give from its own
+    verdicts and reasons (the clean room's check.py counts, the corrections each names, the run
+    of tedana 25.0.1 that gives fMRIPrep's file), one verdict chip per port, and refuses a verdict
+    it does not say."""
+    from larmorx_validation.evidence import tedana_t2smap
+
+    ex = _t2smap_example()
+    line, verdicts = tedana_t2smap.SHOWS["maps-ds000258"](ex)
+    assert "7,311,090 of the 7,342,822 values of the run's files are identical" in line
+    assert "0.124% of the curve fit's voxels are judged by the fit's own objective" in line
+    assert "both correct TED-05 and TED-08" in line
+    assert "the replica also the maths entries NP-03 and GLIBC-07" in line
+    assert "(7,312,250 of 7,342,822 values identical, 0.076%)" in line
+    assert "in 852 of its 122,880 values" in line
+    assert "numpy's AVX-512 kernels on, as in fMRIPrep's run" in line
+    assert verdicts == ["rep-ted", "cr-ted"]
+    ex["diffs"][6]["verdict"] = "open"
+    with pytest.raises(ValueError, match="cr-ted is open, not within-variability"):
+        tedana_t2smap.SHOWS["maps-ds000258"](ex)
+    ex = _t2smap_example()
+    ex["diffs"][8]["reason"] = "The default's corrections, each named by its notice: TED-09 (...)."
+    with pytest.raises(ValueError, match="the clean room's corrections"):
+        tedana_t2smap.SHOWS["maps-ds000258"](ex)
+
+
+def test_t2smaps_check_reads_tedanas_files_with_its_empty_figures_folder(tmp_path, monkeypatch):
+    """Chunk T: the clean room's check against tedana's run of a call's entry reads tedana's
+    stored files from a folder that links each of them and holds the empty ``figures`` folder
+    tedana writes, which the entry's stored run leaves out; a run that has it is read as it is."""
+    from larmorx_validation.evidence import tedana_t2smap, tedana_t2smap_clean_room
+
+    seen = []
+
+    def check(ref, other):
+        out = ref / "out"
+        seen.append((sorted(p.name for p in out.iterdir()), (out / "figures").is_dir(),
+                     (out / "T2starmap.nii.gz").read_text(encoding="utf-8")))  # fmt: skip
+        return True, "13 rows pass", (1, 1)
+
+    monkeypatch.setattr(tedana_t2smap_clean_room, "_check", check)
+    entry = tmp_path / "entry"
+    (entry / "tedana" / "out").mkdir(parents=True)
+    (entry / "tedana" / "out" / "T2starmap.nii.gz").write_text("tedana's", encoding="utf-8")
+
+    class E:
+        dir = entry
+
+    assert tedana_t2smap._check_tedana(E, tmp_path / "other") == (True, "13 rows pass", (1, 1))
+    assert seen[-1] == (["T2starmap.nii.gz", "figures"], True, "tedana's")
+    assert not (entry / "tedana" / "out" / "figures").exists()  # the cache entry untouched
+    (entry / "tedana" / "out" / "figures").mkdir()
+    tedana_t2smap._check_tedana(E, tmp_path / "other")
+    assert seen[-1][1] is True

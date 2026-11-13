@@ -447,11 +447,14 @@ pub fn sample_volume_nearest(
     (NO_ERROR, f64::from(v.f()))
 }
 
+/// A voxel's value at `(x, y, z)` as a sampler reads it.
+type VoxelReader<'a> = dyn FnMut(&mut Globals, i32, i32, i32) -> Result<f64, Fatal> + 'a;
+
 /// The weighted mean position of the voxels above `threshold` (`MRIcenterOfMass` and the first
 /// pass of `MRIprincipleComponents`): `x * val` with `x` a `float`, sums in `double` in the voxel
 /// order; zeros when the weight is not positive.
 fn weighted_mean(
-    vals: &mut dyn FnMut(&mut Globals, i32, i32, i32) -> Result<f64, Fatal>,
+    vals: &mut VoxelReader,
     g: &mut Globals,
     mri: &Mri,
     threshold: u8,

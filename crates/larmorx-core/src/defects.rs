@@ -1465,6 +1465,14 @@ defects! {
         "MRIscalarMulFrame stores a NaN product into a byte volume by C's conversion, which is undefined for NaN";
     FS_297 = "FS-297", "FreeSurfer", true,
         "MRIextractInto of a volume of 64-bit integers (long) copies each row of the box from half its first column in the source to half its first column in the destination: the box's voxels come from the wrong place, half voxels included";
+    FS_298 = "FS-298", "FreeSurfer", true,
+        "the trilinear, cubic and sinc samplers read a volume of 64-bit integers (long) as 32-bit integers at the voxel's index: they sample halves of other voxels";
+    FS_299 = "FS-299", "FreeSurfer", true,
+        "MRIcubicSampleVolume (cubic sampling) divides its weighted sum by the number of points it added (64 inside the volume) where its weights sum to 8: a constant volume samples to an eighth of its value, other volumes likewise too dark";
+    FS_300 = "FS-300", "FreeSurfer", true,
+        "MRIcubicSampleVolumeFrame (cubic sampling of a frame) near the volume's edge adds window points it never read: memory contents";
+    FS_302 = "FS-302", "FreeSurfer", true,
+        "the sinc samplers with a half-width whose window holds more than 128 voxels on an axis write past their weight arrays: memory corruption or a crash";
 }
 
 /// The register entry with ID `id`.

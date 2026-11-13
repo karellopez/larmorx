@@ -113,6 +113,14 @@ impl Num {
             Num::F(v) => v,
         }
     }
+
+    /// `(double)` of the value (an integer rounded to nearest, a float exactly).
+    pub(crate) fn f64(self) -> f64 {
+        match self {
+            Num::I(v) => v as f64,
+            Num::F(v) => f64::from(v),
+        }
+    }
 }
 
 fn decode(chunk: &[u8], o: usize, ty: i32) -> Num {

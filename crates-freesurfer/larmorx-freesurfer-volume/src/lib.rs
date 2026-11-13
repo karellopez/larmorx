@@ -15,4 +15,5 @@
 pub mod arith;
 pub mod coords;
 mod rows;
+pub mod sample;
 pub mod vgeom;

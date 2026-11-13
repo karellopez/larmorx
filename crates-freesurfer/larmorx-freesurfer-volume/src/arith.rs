@@ -1807,38 +1807,15 @@ pub fn sample_volume_frame_nearest(
     z: i32,
     frame: i32,
 ) -> (i32, f64) {
-    let (xd, yd, zd) = (f64::from(x), f64::from(y), f64::from(z));
-    if crate::coords::index_not_in_volume(mri, xd, yd, zd) == 1 {
-        return (NO_ERROR, mri.outside_val);
-    }
-    let clamp = |v: i32, n: i32| {
-        let v = if v < 0 { 0 } else { v };
-        if v >= n { n - 1 } else { v }
-    };
-    let xv = clamp(nint(g, xd), mri.vg.width);
-    let yv = clamp(nint(g, yd), mri.vg.height);
-    let zv = clamp(nint(g, zd), mri.vg.depth);
-    let ty = mri.mtype;
-    if !matches!(ty, MRI_UCHAR | MRI_SHORT | MRI_USHRT | MRI_INT | MRI_FLOAT) {
-        log::error_printf(
-            g,
-            err,
-            ERROR_UNSUPPORTED,
-            &format!("MRIsampleVolumeFrameType: unsupported volume type {ty}"),
-        );
-        return (ERROR_UNSUPPORTED, 0.0);
-    }
-    let sl = i64::from(zv) + i64::from(frame) * i64::from(mri.vg.depth);
-    let v = rows::read(
+    crate::sample::sample_volume_frame_nearest(
         g,
-        "MRIsampleVolumeFrameType",
+        err,
         mri,
-        sl,
-        i64::from(yv),
-        i64::from(xv),
-        ty,
-    );
-    (NO_ERROR, f64::from(v.f()))
+        f64::from(x),
+        f64::from(y),
+        f64::from(z),
+        frame,
+    )
 }
 
 /// `MRIaverage(mri_src, dof, mri_dst)`: without a destination a new one-frame volume of the

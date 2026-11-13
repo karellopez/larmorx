@@ -51,6 +51,8 @@ SKIP = (
     "ITK-112",
     "ITK-115",
     "ITK-116",
+    "FS-300",
+    "FS-302",
 )
 
 
@@ -91,6 +93,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
     ap.add_argument("--show", type=int, default=5, help="differing cases to print")
+    ap.add_argument(
+        "--only", help="comma-separated commands to keep (a check while porting; no official hash)"
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -99,10 +104,14 @@ def main(argv: list[str] | None = None) -> int:
     port = port_binary(a.jobs)
     inputs = ws / "oracles" / "inputs" / "fs-volume"
     inputs.mkdir(parents=True, exist_ok=True)
-    cases_path = inputs / f"cases-{a.seed}-{a.n}.txt"
+    tag = f"-{a.only.replace(',', '_')}" if a.only else ""
+    cases_path = inputs / f"cases-{a.seed}-{a.n}{tag}.txt"
     text = subprocess.run(
         [str(port), "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
     ).stdout
+    if a.only:
+        keep = set(a.only.split(","))
+        text = "".join(line for line in text.splitlines(True) if line.split()[0] in keep)
     cases_path.write_text(text, encoding="utf-8")
     cases = text.splitlines()
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}

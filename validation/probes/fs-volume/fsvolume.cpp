@@ -35,6 +35,10 @@
 #include "utils.h"
 
 extern double vg_isEqual_Threshold;
+// defined in mri.cpp, not declared in its headers
+double ham_sinc(double x, double fullwidth);
+int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
+int MRIsincSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, int hw, double *pval);
 
 const char *Progname = "fsvolume";
 
@@ -522,6 +526,34 @@ void run_case()
     fflush(stdout);
     oi(MRIdump(m, stdout));
     fflush(stdout);
+  } else if (cmd == "stri" || cmd == "styp" || cmd == "sfrm" || cmd == "sfty" || cmd == "scub" ||
+             cmd == "scubf" || cmd == "ssinc" || cmd == "ssincf") {
+    MRI *m = get_vol();
+    m->outside_val = getd();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int frame = geti(), aux = geti();
+      double val = -7;
+      int r;
+      if (cmd == "stri") r = MRIsampleVolume(m, x, y, z, &val);
+      else if (cmd == "styp") r = MRIsampleVolumeType(m, x, y, z, &val, aux);
+      else if (cmd == "sfrm") r = MRIsampleVolumeFrame(m, x, y, z, frame, &val);
+      else if (cmd == "sfty") r = MRIsampleVolumeFrameType(m, x, y, z, frame, aux, &val);
+      else if (cmd == "scub") r = MRIcubicSampleVolume(m, x, y, z, &val);
+      else if (cmd == "scubf") r = MRIcubicSampleVolumeFrame(m, x, y, z, frame, &val);
+      else if (cmd == "ssinc") r = MRIsincSampleVolume(m, x, y, z, aux, &val);
+      else r = MRIsincSampleVolumeFrame(m, x, y, z, frame, aux, &val);
+      oi(r);
+      od(val);
+    }
+  } else if (cmd == "coef" || cmd == "hsinc") {
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd();
+      if (cmd == "coef") od(MRIcubicCoeff(x, geti()));
+      else od(ham_sinc(x, getd()));
+    }
   } else {
     fail("unknown command");
   }

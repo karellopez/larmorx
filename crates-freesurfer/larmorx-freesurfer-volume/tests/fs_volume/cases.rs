@@ -24,6 +24,7 @@ use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
 use larmorx_freesurfer_volume::coords as co;
+use larmorx_freesurfer_volume::sample as sm;
 use larmorx_freesurfer_volume::vgeom;
 
 /// The cases' random numbers.
@@ -722,11 +723,87 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "stri" | "styp" | "sfrm" | "sfty" | "scub" | "scubf" | "ssinc" | "ssincf" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(4) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                t.push(dx(g.pick(&[
+                    0.0,
+                    0.0,
+                    0.0,
+                    -5.5,
+                    f64::from_bits(0x7ff8_0000_0000_1234),
+                    1e300,
+                ])));
+                let n = 4;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    for k in [s.w, s.h, s.d] {
+                        t.push(dx(scoord(&mut g, k)));
+                    }
+                    t.push(frame_of(&mut g, s).to_string());
+                    let aux = if cmd.starts_with("ssinc") {
+                        if g.chance(40) {
+                            g.pick(&[70, 1000, -1])
+                        } else {
+                            g.int(0, 6)
+                        }
+                    } else {
+                        g.int(-1, 7)
+                    };
+                    t.push(aux.to_string());
+                }
+            }
+            "coef" | "hsinc" => {
+                let n = 6;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    let x = if g.chance(8) {
+                        g.pick(&[f64::NAN, f64::INFINITY, 1e-6, -1e-6, 0.0, -0.0, 1e300])
+                    } else {
+                        g.int(-40, 40) as f64 / g.pick(&[1.0, 4.0, 7.0, 10.0, 3.0])
+                            + g.pick(&[0.0, 0.0, 1e-9, 0.123456789])
+                    };
+                    t.push(dx(x));
+                    if cmd == "coef" {
+                        t.push(g.int(-1, 4).to_string());
+                    } else {
+                        t.push(dx(g.pick(&[10.0, 10.0, 2.0, 0.0, 1.0, 12.0, -4.0])));
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
     }
     lines
+}
+
+/// A sampler's coordinate on an axis of `n` voxels: inside, at the edges, whole or within
+/// `FLT_EPSILON` of whole, outside, NaN and infinite.
+fn scoord(g: &mut Gen, n: i64) -> f64 {
+    if g.chance(25) {
+        return g.pick(&[f64::NAN, f64::INFINITY, -f64::INFINITY, 1e10, -0.0, 3e9]);
+    }
+    let k = g.int(-1, n) as f64;
+    if g.chance(6) {
+        return k;
+    }
+    if g.chance(10) {
+        return k + g.pick(&[1e-8, -1e-8, 1e-7, 1.25e-7, -3e-7]);
+    }
+    if g.chance(5) {
+        return n as f64 - 1.0 + g.pick(&[0.2, 0.4, 0.49, 0.5, 0.51, 0.6, 0.75]);
+    }
+    if g.chance(8) {
+        return g.pick(&[-0.3, -0.49, -0.5, -0.51, -0.75]);
+    }
+    k + g.pick(&[0.5, 0.25, 0.75, 0.1, 0.9, 0.3, 0.6, 0.45, 0.55, 0.999])
 }
 
 /// A point's coordinate in the cases.
@@ -776,7 +853,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 47] = [
+pub const COMMANDS: [&str; 57] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -824,6 +901,16 @@ pub const COMMANDS: [&str; 47] = [
     "pca",
     "cmph",
     "dump",
+    "stri",
+    "styp",
+    "sfrm",
+    "sfty",
+    "scub",
+    "scubf",
+    "ssinc",
+    "ssincf",
+    "coef",
+    "hsinc",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -1353,6 +1440,23 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let given = if mode == 2 { Some(&src) } else { dst.as_ref() };
             o.ret(&r, given);
         }
+        "stri" | "styp" | "sfrm" | "sfty" | "scub" | "scubf" | "ssinc" | "ssincf" => {
+            samplers(cx, t, o, cmd)?;
+        }
+        "coef" | "hsinc" => {
+            let n = t.i();
+            let libm = larmorx_core::math::Libm::quiet(g.mode());
+            for _ in 0..n {
+                let x = t.d();
+                if cmd == "coef" {
+                    let it = t.i();
+                    o.d(sm::cubic_coeff(g, b, x, it));
+                } else {
+                    let fw = t.d();
+                    o.d(sm::ham_sinc(&libm, x, fw));
+                }
+            }
+        }
         "dsign" => {
             let v = t.d();
             o.d(co::set_sample_volume_derivative_sign(g, a, v));
@@ -1490,6 +1594,32 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
 }
 
 /// `cmph`'s header fields beyond the volume's tokens.
+/// The samplers' commands: each point's result and value.
+fn samplers(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut m = get_vol(cx, t)?;
+    m.outside_val = t.d();
+    let n = t.i();
+    let (g, b) = (&mut cx.g, &mut cx.b);
+    for _ in 0..n {
+        let (x, y, z) = (t.d(), t.d(), t.d());
+        let (frame, aux) = (t.i(), t.i());
+        let mut val = -7.0f64;
+        let r = match cmd {
+            "stri" => sm::sample_volume(g, b, &m, x, y, z, &mut val),
+            "styp" => sm::sample_volume_type(g, b, &m, x, y, z, &mut val, aux)?,
+            "sfrm" => sm::sample_volume_frame(g, b, &m, x, y, z, frame, &mut val),
+            "sfty" => sm::sample_volume_frame_type(g, b, &m, x, y, z, frame, aux, &mut val),
+            "scub" => sm::cubic_sample_volume(g, b, &m, x, y, z, &mut val),
+            "scubf" => sm::cubic_sample_volume_frame(g, b, &m, x, y, z, frame, &mut val),
+            "ssinc" => sm::sinc_sample_volume(g, b, &m, x, y, z, aux, &mut val)?,
+            _ => sm::sinc_sample_volume_frame(g, b, &m, x, y, z, frame, aux, &mut val)?,
+        };
+        o.i(i64::from(r));
+        o.d(val);
+    }
+    Ok(())
+}
+
 fn hdr_fields(t: &mut Toks, m: &mut Mri) {
     m.fov = t.f();
     m.location = t.f();

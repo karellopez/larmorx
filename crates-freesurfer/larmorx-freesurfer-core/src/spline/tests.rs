@@ -143,6 +143,32 @@ fn the_probes_systems() {
     assert_eq!(d3_np_fs(&mut [], &[]), Some(Vec::new()));
 }
 
+/// NaNs made from numbers are SSE's default NaN (sign set) on every platform (the probe's lines:
+/// `d3` of a system whose elimination divides 0 by 0, `cases` with infinite values).
+#[test]
+fn default_nans() {
+    let mut a = [0.0, 1.0, 1.0, 1.0, 1.0, 0.0];
+    let x = d3_np_fs(&mut a, &[1.0, 1.0]).unwrap();
+    assert_eq!(bits(&x), [0xffc0_0000, 0xffc0_0000]);
+    let (t, y) = ([0.0, 1.0, 2.0], [f32::INFINITY, f32::NEG_INFINITY, 1.0]);
+    let m = set(&t, &y, (1, 1), (0.0, 0.0), FIX).unwrap();
+    assert_eq!(bits(&m), [0xff80_0000, 0x7f80_0000, 0xff80_0000]);
+    let got: Vec<u32> = [1.5f32, 0.5, f32::NAN]
+        .iter()
+        .flat_map(|&x| {
+            let (v, d1, d2) = value(&t, &y, &m, x);
+            [v.to_bits(), d1.unwrap().to_bits(), d2.unwrap().to_bits()]
+        })
+        .collect();
+    assert_eq!(
+        got,
+        [0xffc0_0000; 6]
+            .into_iter()
+            .chain([0x7fc0_0000; 3])
+            .collect::<Vec<_>>()
+    );
+}
+
 /// FreeSurfer's five messages (the probe's `set1`: standard output byte for byte, exit status 1).
 #[test]
 fn messages() {

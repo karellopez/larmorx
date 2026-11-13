@@ -5,12 +5,15 @@
 //! translated from FreeSurfer 8.2.0's `utils/numerics.cpp`: the conversions between NR's 1-based
 //! `float` arrays and VNL's `double` ones (69-110), `OpenDFPMin` (846-926), `OpenPowell`
 //! (980-1019), `OpenPowell2` (1037-1089), `OpenLUMatrixInverse` (1091-1153),
-//! `OpenQRdecomposition` (1155-1196), `OpenMatrixDeterminant` (1198-1219) and Numerical Recipes'
-//! allocators `vector` and `matrix` (1685-1727: [`NrVector`], [`NrMatrix`]; `free_vector` and
-//! `free_matrix` are their drop). The VXL routines they call are the main package's ports of ITK
-//! 4.13.2's VNL (`larmorx_core::vnl_fixed`: `vnl_det`, `vnl_inverse`, `vnl_determinant`;
-//! `larmorx_core::vnl_qr::Qr<f32>`: `vnl_qr<float>`; `larmorx_core::vnl_minimize` and
-//! `vnl_lbfgs` under [`crate::fs_vnl`]), queue item 3.1-07; this crate contains no VXL code.
+//! `OpenQRdecomposition` (1155-1196), `OpenMatrixDeterminant` (1198-1219), `OpenEigenSystem`
+//! (930-943), `OpenNonSymmetricEigenSystem` (948-978), `OpenSvdcmp` (1225-1248) and Numerical
+//! Recipes' allocators `vector` and `matrix` (1685-1727: [`NrVector`], [`NrMatrix`]; `free_vector`
+//! and `free_matrix` are their drop). The VXL routines they call are the main package's ports of
+//! ITK 4.13.2's VNL (`larmorx_core::vnl_fixed`: `vnl_det`, `vnl_inverse`, `vnl_determinant`;
+//! `larmorx_core::vnl_qr::Qr<f32>`: `vnl_qr<float>`; `larmorx_core::vnl_eigen`:
+//! `vnl_symmetric_eigensystem<float>`, `vnl_real_eigensystem`; `larmorx_core::vnl_svd_f32`:
+//! `vnl_svd<float>`; `larmorx_core::vnl_minimize` and `vnl_lbfgs` under [`crate::fs_vnl`]), queue
+//! item 3.1-07; this crate contains no VXL code.
 //!
 //! `numerics.cpp`'s GSL functions (`sc_*`) are queue item 3.1-53 (`larmorx-gpl`) and never come
 //! here; Burkardt's spline (`SplineCubicSet`, `SplineCubicValue`, `d3_np_fs`) is item 3.1-54.
@@ -19,20 +22,21 @@
 //! matrix (see [`open_lu_matrix_inverse`] and [`open_matrix_determinant`]); **FS-34**, the
 //! directions written through `NULL` ([`open_powell`], [`open_powell2`]); **FS-35** and **FS-36**
 //! (kept), the Powell wrappers' return codes and tolerance; **FS-38** and **FS-39**,
-//! [`open_dfp_min`]'s passes and its evaluation limit.
+//! [`open_dfp_min`]'s passes and its evaluation limit; **FS-41**, [`open_non_symmetric_eigen_system`]'s
+//! copy on the stack; **FS-42**, [`open_eigen_system`]'s ignored failure.
 
 use std::io::Write;
 use std::ops::{Index, IndexMut};
 
-use larmorx_core::defects::{FS_33, FS_34, FS_38, FS_39};
-use larmorx_core::vnl_fixed;
+use larmorx_core::defects::{FS_33, FS_34, FS_38, FS_39, FS_41, FS_42, ITK_112};
 use larmorx_core::vnl_minimize::ReturnCode;
 use larmorx_core::vnl_qr::{Qr, RANK_DEFICIENT};
+use larmorx_core::{vnl_eigen, vnl_fixed, vnl_svd_f32};
 
 use crate::fs_vnl::{FsCostFunction, FsFunctions, FsLbfgs, FsLbfgsObserver, FsPowell};
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
-use crate::matrix::Matrix;
+use crate::matrix::{self, Matrix};
 
 /// Numerical Recipes' `NR_END`: the one extra float `vector` and `matrix` allocate.
 const NR_END: i64 = 1;
@@ -589,6 +593,223 @@ pub fn open_matrix_determinant(g: &mut Globals, i_matrix: &Matrix) -> f32 {
     }
     let a = vnl_of(i_matrix);
     vnl_fixed::determinant::<f32>(&a, n)
+}
+
+/// The root of the ITK 4.13.2 source tree the official FreeSurfer 8.2.0 binaries were built from,
+/// as VNL's `__FILE__` prints it in its messages (`strings` of the official `mri_ca_register`).
+pub const ITK_ROOT: &str = "/home/rd521/4.13.2_ubuntu20/itk/4.13.2/src/ITK";
+
+/// `vnl_svd.hxx`'s `__FILE__` in the official build.
+pub fn vnl_svd_hxx() -> String {
+    format!("{ITK_ROOT}/Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_svd.hxx")
+}
+
+/// `vnl_matlab_print_scalar(float, buf, vnl_matlab_print_format_long)`: `"%8d "` of 0 for an exact
+/// zero (either sign), else `"%8.5f "` of the float as a `double`, glibc's `nan`, `-nan`, `inf`
+/// and `-inf` included.
+pub fn matlab_long_f32(v: f32) -> String {
+    if v == 0.0 {
+        return format!("{:>8} ", 0);
+    }
+    format!("{} ", crate::cstd::fmt_f(f64::from(v), 8, 5))
+}
+
+/// The lines `vnl_svd<float>` prints on standard error when LINPACK's `ssvdc` does not converge
+/// (ITK 4.13.2's `vnl_svd.hxx` 69-72): the return value `info`, the matrix's size, and the matrix
+/// by `vnl_matlab_print(std::cerr, M, "M", vnl_matlab_print_format_long)` (`m` row-major).
+pub fn suspicious_svdc_f32(m: &[f32], rows: usize, cols: usize, info: usize) -> String {
+    let file = vnl_svd_hxx();
+    let mut s = format!(
+        "{file}: suspicious return value ({info}) from SVDC\n{file}: M is {rows}x{cols}\nM = [ ...\n"
+    );
+    if rows == 0 {
+        s.push_str("];\n");
+        return s;
+    }
+    for i in 0..rows {
+        for j in 0..cols {
+            s.push_str(&matlab_long_f32(m[i * cols + j]));
+        }
+        if i + 1 == rows {
+            s.push_str(" ]");
+        }
+        s.push('\n');
+    }
+    s
+}
+
+/// `copy_out(o->data)` through the C pointer: `v` into `o`'s numbers from `data[0]`, a float past
+/// the array dropped (FS-16: FreeSurfer writes memory it does not own there).
+fn copy_out_checked(g: &mut Globals, o: &mut Matrix, v: &[f32]) {
+    for (k, &x) in v.iter().enumerate() {
+        matrix::write_at(g, o, 2 + k as isize, x);
+    }
+}
+
+/// `OpenEigenSystem(iaData, icData, oEigenValues, oEigenVectors)`: the eigenvalues (ascending)
+/// and eigenvectors (the columns of `oEigenVectors`, row by row) of the symmetric `n` x `n`
+/// matrix `ia_data` (row by row), as `vnl_symmetric_eigensystem<float>` computes them (EISPACK's
+/// `rs` in `double`, rounded to `float`). `o_values` must hold `n` floats and `o_vectors` `n * n`.
+///
+/// **FS-42:** when EISPACK's `tql2` does not converge (a matrix with NaN entries), VNL prints
+/// `vnl_symmetric_eigensystem: ierr = <i>` on standard error, keeps the eigenvalues as `rs` left
+/// them and never writes the eigenvectors; FreeSurfer copies them (memory contents) and returns
+/// `NO_ERROR`. By default the eigenvalues are written, the eigenvectors are not, and the error
+/// `OpenEigenSystem: the eigensystem did not converge (ierr <i>)` gives `ERROR_BADPARM`; with
+/// `reproduce` the eigenvectors are 0 (the memory VNL never wrote, filled) and `NO_ERROR` is
+/// returned. A matrix of no rows: nothing is written, `NO_ERROR`.
+pub fn open_eigen_system(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    ia_data: &[f32],
+    n: usize,
+    o_values: &mut [f32],
+    o_vectors: &mut [f32],
+) -> i32 {
+    if n == 0 {
+        return NO_ERROR;
+    }
+    let (values, vectors, ierr) = vnl_eigen::symmetric_eigensystem_f32(&ia_data[..n * n], n);
+    if ierr != 0 {
+        let _ = writeln!(err, "vnl_symmetric_eigensystem: ierr = {ierr}");
+        o_values[..n].copy_from_slice(&values);
+        if g.notices.reproduce() {
+            g.notices.add(
+                &FS_42,
+                format!("OpenEigenSystem: tql2 failed (ierr {ierr}): the eigenvectors VNL never wrote are 0"),
+            );
+            o_vectors[..n * n].fill(0.0);
+            return NO_ERROR;
+        }
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("OpenEigenSystem: the eigensystem did not converge (ierr {ierr})\n"),
+        );
+        g.notices.add(
+            &FS_42,
+            format!("OpenEigenSystem: tql2 failed (ierr {ierr}): an error, no eigenvectors"),
+        );
+        return ERROR_BADPARM;
+    }
+    o_vectors[..n * n].copy_from_slice(&vectors);
+    o_values[..n].copy_from_slice(&values);
+    NO_ERROR
+}
+
+/// The stack FreeSurfer's programs run with by default (8 MiB): `OpenNonSymmetricEigenSystem`'s
+/// copy of a larger matrix overflows it (FS-41).
+const DEFAULT_STACK: usize = 8 << 20;
+
+/// `OpenNonSymmetricEigenSystem(iaData, icData, oEigenValues, oEigenVectors)`: the `n` x `n`
+/// matrix converted to `double`, `vnl_real_eigensystem` of it (EISPACK's `rg`): the eigenvalues'
+/// real parts into `o_values` and `Vreal` (row by row) into `o_vectors`, in `float`. VNL's own
+/// defects come through: the columns of a complex eigenvalue pair are 0 (ITK-110), the eigenvalues
+/// `hqr2` did not find are 0 (ITK-111, after VNL's ` *** vnl_real_eigensystem: Failed on <i>th
+/// eigenvalue` and the matrix on standard error). Returns `NO_ERROR`.
+///
+/// **ITK-112:** EISPACK's `balanc` never returns on a matrix with an infinite or NaN entry (or one
+/// whose scaled sums overflow): FreeSurfer hangs. Both modes give the error
+/// `OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or
+/// NaN entry)` and `ERROR_BADPARM`, nothing written. **FS-41:** FreeSurfer copies the matrix into
+/// a variable-length array on the stack; one of more than 8 MiB (about 1,024 rows) overflows the
+/// default stack, a crash. Both modes compute it (FS-41 noted).
+pub fn open_non_symmetric_eigen_system(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    ia_data: &[f32],
+    n: usize,
+    o_values: &mut [f32],
+    o_vectors: &mut [f32],
+) -> i32 {
+    if n == 0 {
+        return NO_ERROR;
+    }
+    if n * n * 8 >= DEFAULT_STACK {
+        g.notices.add(
+            &FS_41,
+            format!("OpenNonSymmetricEigenSystem: a {n} x {n} matrix copied to the stack (FreeSurfer overflows its 8 MiB stack): computed"),
+        );
+    }
+    let data: Vec<f64> = ia_data[..n * n].iter().map(|&v| f64::from(v)).collect();
+    let es = match vnl_eigen::real_eigensystem(&data, n) {
+        Ok(es) => es,
+        Err(vnl_eigen::BalancNeverReturns) => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_BADPARM,
+                "OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)\n",
+            );
+            g.notices.add(
+                &ITK_112,
+                "OpenNonSymmetricEigenSystem: balanc would never return (FreeSurfer hangs): an error",
+            );
+            return ERROR_BADPARM;
+        }
+    };
+    if es.ierr != 0 {
+        let _ = err
+            .write_all(vnl_eigen::real_eigensystem_failure_message(&data, n, es.ierr).as_bytes());
+    }
+    for nt in &es.notices {
+        g.notices.add(nt.defect, nt.detail.clone());
+    }
+    for (o, &v) in o_vectors[..n * n].iter_mut().zip(&es.vreal) {
+        *o = v as f32;
+    }
+    for (o, &v) in o_values[..n].iter_mut().zip(&es.d_re) {
+        *o = v as f32;
+    }
+    NO_ERROR
+}
+
+/// `OpenSvdcmp(ioA, oW, oV)`: the singular value decomposition of `ioA` (rows x cols, rows >=
+/// cols) by `vnl_svd<float>` (LINPACK's `ssvdc`, economy size): `U` (rows x cols) into `ioA`'s
+/// numbers, the `cols` singular values into `oW`'s, `V` (cols x cols) into `oV`'s, each row by row
+/// from the first number whatever the outputs' sizes (a float past an output's array: FS-16).
+/// Returns `NO_ERROR`; `ERROR_BADPARM` with nothing written for fewer rows than columns, and when
+/// `ssvdc` does not converge (a matrix with NaN or infinite entries), after VNL's lines on standard
+/// error ([`suspicious_svdc_f32`]). A matrix without columns: nothing written, `NO_ERROR`.
+pub fn open_svdcmp(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    io_a: &mut Matrix,
+    o_w: &mut Matrix,
+    o_v: &mut Matrix,
+) -> i32 {
+    if io_a.rows < io_a.cols {
+        return ERROR_BADPARM;
+    }
+    let (rows, cols) = (io_a.rows.max(0) as usize, io_a.cols.max(0) as usize);
+    if cols == 0 {
+        return NO_ERROR;
+    }
+    let a = vnl_of(io_a);
+    let Some((u_cm, w, v_cm)) = vnl_svd_f32::vnl_svd_f32(&a, rows, cols) else {
+        // LINPACK's info: measured as min(rows + 1, cols) on every failing case (the fs-maths
+        // probe's msvd); larmorx_core's float SVD does not return it.
+        let info = (rows + 1).min(cols);
+        let _ = err.write_all(suspicious_svdc_f32(&a, rows, cols, info).as_bytes());
+        return ERROR_BADPARM;
+    };
+    let mut u = vec![0.0f32; rows * cols];
+    for i in 0..rows {
+        for j in 0..cols {
+            u[i * cols + j] = u_cm[j * rows + i];
+        }
+    }
+    let mut v = vec![0.0f32; cols * cols];
+    for i in 0..cols {
+        for j in 0..cols {
+            v[i * cols + j] = v_cm[j * cols + i];
+        }
+    }
+    copy_out(io_a, &u);
+    copy_out_checked(g, o_w, &w);
+    copy_out_checked(g, o_v, &v);
+    NO_ERROR
 }
 
 #[cfg(test)]

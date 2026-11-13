@@ -45,6 +45,7 @@ pub mod histo;
 pub mod log;
 pub mod machine;
 pub mod matrix;
+pub mod matrix_decomp;
 pub mod matrix_ops;
 pub mod numerics;
 pub mod pdf;

@@ -1102,7 +1102,7 @@ defects! {
     FS_12 = "FS-12", "FreeSurfer", true,
         "nint and nint2 (FreeSurfer's rounding to an integer) give -2147483648 for values beyond the 32-bit integer range and for NaN";
     FS_13 = "FS-13", "FreeSurfer", true,
-        "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file, or exits";
+        "MatrixAlloc of a negative size, or of more numbers than an int holds: for some negative sizes an empty matrix (whose stored numbers can show the matrix's own record, two memory addresses included), for the others a crash, or (with the old allocator) a message that it uses an mmap'd file and an exit";
     FS_14 = "FS-14", "FreeSurfer", true,
         "MatrixCopy of a complex matrix copies, of each row, only as many floats as the row has columns, starting one float before the row's first pair, into the same places of the copy: half the values are missing and the rest are misplaced";
     FS_15 = "FS-15", "FreeSurfer", true,
@@ -1386,7 +1386,7 @@ defects! {
     FS_264 = "FS-264", "FreeSurfer", true,
         "the 4 x 4 matrix helpers (MRImatrixOfDirectionCosines, MRImatrixOfVoxelSizes, MRImatrixOfTranslations, a geometry's toMatrix and RASFromSurfaceRAS_ given a matrix to fill; MRIsetVox2RASFromMatrix given its matrix) given a matrix with fewer than 4 rows or columns write or read past its elements: a crash, memory contents, or other elements of the matrix changed";
     FS_331 = "FS-331", "FreeSurfer", true,
-        "RASFromSurfaceRAS_ given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, and one of more than 4 rows gives nothing after a size-mismatch error";
+        "RASFromSurfaceRAS_ (and VGtkreg2RAS) given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, the program ends when one of the matrix's first 4 x 4 numbers left unwritten is not finite, and one of more than 4 rows gives nothing after a size-mismatch error";
     FS_167 = "FS-167", "FreeSurfer", true,
         "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
     FS_168 = "FS-168", "FreeSurfer", true,

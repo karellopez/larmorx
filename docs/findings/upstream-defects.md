@@ -5038,8 +5038,9 @@ it links).
 - **D13 / gap:** decided 2026-10-23 (decision log): larmorx's behaviour kept (the safer one). Was: **decide** (item 5).
 
 ### NIB-04 qform precision depends on the platform — (d)
-- **What:** nibabel computes the qform in `numpy.longdouble`: 80-bit on Linux x86-64, 64-bit
-  elsewhere.
+- **What:** nibabel computes the qform in `numpy.longdouble`: 80-bit on Linux x86-64 and on Intel
+  macOS, IEEE quad precision (128-bit) on Linux aarch64, 64-bit on macOS on Apple silicon and on
+  Windows (numpy's documentation of `numpy.longdouble`; the record measured Linux x86-64).
 - **Evidence:** validated (within 1e-9 mm).
 - **fMRIPrep:** none.
 - **larmorx:** f64 everywhere (`lx.load`). `lx.io.load_nibabel` and `lx.io.nibabel_affine`

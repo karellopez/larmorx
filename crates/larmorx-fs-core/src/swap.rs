@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Byte order (spec §6): one value's bytes reversed (bit patterns kept, NaNs included), the
-//! 64-bit integer swap (FS-262) and the buffer swap (FS-261).
+//! 64-bit integer swap (FS-176) and the buffer swap (FS-261).
 
-use larmorx_core::defects::{FS_261, FS_262};
+use larmorx_core::defects::{FS_176, FS_261};
 
 use crate::process::Process;
 
@@ -49,17 +49,17 @@ fn swap_i64_through_double(v: i64) -> i64 {
 }
 
 impl Process {
-    /// `swapLong64` (FS-262): `fix` gives the exact reversal, `reproduce` FreeSurfer's rounding
+    /// `swapLong64` (FS-176): `fix` gives the exact reversal, `reproduce` FreeSurfer's rounding
     /// through a double; noted when they differ.
     pub fn swap_i64(&mut self, v: i64) -> i64 {
         let exact = v.swap_bytes();
         let rounded = swap_i64_through_double(v);
         if exact != rounded {
             if self.mode.reproduce() {
-                self.note(&FS_262, "a 64-bit integer's swap rounded through a double");
+                self.note(&FS_176, "a 64-bit integer's swap rounded through a double");
             } else {
                 self.note(
-                    &FS_262,
+                    &FS_176,
                     "a 64-bit integer's swap exact (FreeSurfer rounds it through a double)",
                 );
             }

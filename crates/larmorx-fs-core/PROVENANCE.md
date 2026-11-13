@@ -22,3 +22,17 @@ Python), or `docs/parts/`. Its only inputs were:
 | Black-box runs of the C library through the probe's `gmtime`, `localtime`, `strftimec` and `atan2f` commands (`tz_cases.py`) | the `TZ` readings the documents leave open (§14's notes in `clib/time.rs`), and `atan2f`'s NaN of two |
 | RFC 8536's format and the system's zone files (read as data) | the zone-file reader |
 | larmorx's own Apache-2.0 code: `larmorx_core::vnl_random` (VXL's generator, a permissive port), `larmorx_core::glibc_random` (a clean room), `larmorx_core::x87`, `larmorx_core::cscan`, `larmorx_core::cfmt`, `larmorx_core::math`, `larmorx_core::defects` | the generators, the extended arithmetic, the C library's readings and number formats, the correctly rounded `atan2`, the defect register's entries |
+
+## Clean-room implementation from specs/freesurfer-maths.md
+
+`src/maths/` (FreeSurfer 8.2.0's mathematics, `fs.maths`, queue item C3.1-02) and `src/clib/printf.rs`
+were written by the same clean-room implementers, under the same restrictions as above, from
+[`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) as of commit `a59c9d0e` (2026-11-13),
+never from Numerical Recipes' code. Its inputs:
+
+| Input | What it gave |
+|---|---|
+| [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) | the behaviour of every function of its §0: the float and double matrices, the 4 x 4 affine helpers, the histograms, the element-wise operations, regions, vectors, rotations, printing, Gaussian matrices, the inverse, determinant and QR factors, primes, the Gaussian draws and the time-of-day seed, the minimizers, Numerical Recipes' 1-based arrays, the eigensystems and the SVD, the matrix files, the random-field specifications; the defects FS-13 to FS-51 with their corrections and `reproduce` (§24) |
+| The standards and papers the spec cites (IEEE 754-2008, C11, POSIX's `drand48`, Powell 1964, Brent 1973, Nocedal 1980, Liu and Nocedal 1989, LINPACK's and EISPACK's guides) | the C library's documented behaviour, the methods' definitions |
+| The open probe folder [`validation/investigations/freesurfer-maths-probe/`](../../validation/investigations/freesurfer-maths-probe/README.md) (its README, `compare.py`, and `fs_maths_probe.cpp`'s calls and test costs) and black-box runs of the prebuilt probe `fs_maths_probe` (FreeSurfer 8.2.0's compiled mathematics, with the guard allocator beside it) | the comparisons of the spec's §23 (`validation/investigations/freesurfer-cleanroom-maths/`), the operand orders measured where the spec gives none (`docs/findings/fs-maths-clean-room.md`) |
+| larmorx's own Apache-2.0 code: `larmorx_core::vnl_minimize`, `vnl_lbfgs`, `vnl_fixed`, `vnl_qr`, `vnl_eigen`, `vnl_svd_f32` (VXL's routines, permissive ports), `larmorx_core::ranlux` (a clean room), `larmorx_core::drand48`, `x87`, `cscan`, `cfmt`, `math`, `defects` | VNL's bracketing, Brent minimizer, L-BFGS and decompositions as the spec names them, the random fields' generator, the C library's generator, the extended arithmetic, the number readings and formats, the elementary functions, the defect register's entries |

@@ -645,3 +645,35 @@ hashes; **every one of the 2³² seeds**, the first 4 values of each; the offici
 `rand` per value, 11 times per seeding. The unit tests check the spec's numbers and hashes, the
 fast seeding against the spec's steps taken literally (20,011 seeds) and 6 golden checksums recorded
 from the C library's output, on every platform.
+
+## The C library's `qsort` and `qsort_r` (`src/glibc_qsort/`; FreeSurfer's foundations, the GNU family, 2026-11-13)
+
+**Clean-room implementation from [`specs/glibc-qsort.md`](../../specs/glibc-qsort.md)** (Apache-2.0;
+the spec at commit `4c0febc6`, SHA-256 `d8e5b0940932…`), by the implementer of `src/ranlux/`,
+`src/cubic_spline/` and `src/glibc_random/`, who never opened the GNU C Library's source (any release
+or copy, among others its `stdlib/`), its disassembly, the spec writer's model
+(`validation/investigations/glibc-qsort-spec-check/`), `crates-gpl/`, `crates-nc/`, FreeSurfer's
+source, the documents written from it or `docs/parts/`. Its inputs: the spec alone (the textbook
+methods it cites, Knuth's merge sort and Sedgewick's quicksort, were not needed beyond the spec's
+text); black-box runs of the C library's functions through `glibc_qsort_probe` (its source in
+`validation/investigations/glibc-qsort-probe/`, calls of `qsort` and `qsort_r` by name and an allocator
+that forwards to the C library's, read, built with `cc -O2` and run as the spec allows) and through
+`qsort_bench.c` (`validation/investigations/freesurfer-cleanroom-random-spline/`: a plain program
+that calls `qsort`, for the speed).
+
+The merge order (§4) is a top-down merge sort whose array and copy take turns as source and
+destination; elements above 32 bytes are ordered through references and moved once, cycle by cycle;
+the byte functions sort the common sizes as arrays. The quicksort order (§5) works in place with
+signed positions and stops before a call that would leave the array. §3's choice is a function of the
+caller's `Machine`. Index arithmetic only: no threads, no global state, no unsafe code.
+
+**Identical to the C library** (`docs/findings/glibc-qsort-clean-room.md`,
+`validation/investigations/freesurfer-cleanroom-random-spline/compare_glibc_qsort.py`, 2026-11-13
+from `5c9faa6e`, glibc 2.35-0ubuntu3.15): the spec's 15 reference lines and 72,996 cases of its five
+groups (small arrays of every comparator kind and size, the stack limit, arrays up to 10⁶ elements,
+the fallback, elements of 33 to 160 bytes with `qsort` and `qsort_r`), through the typed and the byte
+functions: every call sequence, arrangement and allocation request; in the 1,473 cases where glibc's
+fallback leaves the array, the same calls before the same stopping point. As fast as glibc's `qsort`
+(glibc's time over the clean room's: 0.83 to 1.38 on 10⁵ to 10⁷ elements). The unit tests check the reference
+lines, the spec's examples and 18 golden checksums on every platform.
+

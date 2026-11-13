@@ -113,7 +113,6 @@ group = "ants"
 name = "antsApplyTransforms"
 command = "larmorx ants antsApplyTransforms"
 python = "lx.ants.apply_transforms"
-does = "Resampling through ITK transforms, in double and with `--float 1`; transform outputs."
 api = "docs/api/ants-apply-transforms.md"
 evidence = "/evidence/ants-apply-transforms/"
 records = { replica = ["ants-apply-transforms"] }

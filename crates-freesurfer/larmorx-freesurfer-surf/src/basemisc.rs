@@ -32,6 +32,9 @@ use crate::mris::Mris;
 pub const G_LC: usize = 50;
 pub const G_RC: usize = 30;
 
+/// `ENOMEM` (Linux's errno for an allocation that failed).
+const ENOMEM: i32 = 12;
+
 fn nonneg(n: i32) -> usize {
     usize::try_from(n).unwrap_or(0)
 }
@@ -223,8 +226,8 @@ pub fn set_registration_sigmas(sg: &mut SurfGlobals, sigmas: Option<&[f32]>, nsi
 
 /// `MRISallocExtraGradients(mris)`: three zeroed arrays of one float per in-use vertex (`dx2`,
 /// `dy2`, `dz2`), unless `dx2` exists already. A negative vertex count makes the allocations fail:
-/// `MRISallocExtraGradients: could allocate gradient vectors` and the end of the program
-/// (`ErrorExit`, `ERROR_NO_MEMORY`). Returns `NO_ERROR`.
+/// `Cannot allocate memory` (the failed allocation's `errno`), `MRISallocExtraGradients: could
+/// allocate gradient vectors` and the end of the program (`ErrorExit`, `ERROR_NO_MEMORY`). Returns `NO_ERROR`.
 pub fn alloc_extra_gradients(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -234,6 +237,8 @@ pub fn alloc_extra_gradients(
         return Ok(NO_ERROR);
     }
     if mris.nvertices < 0 {
+        // calloc's failure sets errno, which ErrorExit reports first
+        g.errno = ENOMEM;
         log::error_exit(
             g,
             err,

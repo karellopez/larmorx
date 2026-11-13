@@ -12,7 +12,7 @@ use std::io::Write;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use larmorx_core::defects::{FS_03, FS_111, FS_116, UpstreamDefects};
+use larmorx_core::defects::{FS_03, FS_111, FS_116, FS_118, FS_119, UpstreamDefects};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -27,6 +27,9 @@ use larmorx_freesurfer_surf::surfbase::{self, MrisTempAssigned};
 use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
 use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
+
+#[path = "life.rs"]
+mod life;
 
 pub struct Gen(u64);
 
@@ -101,10 +104,10 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 24] = [
+const COMMANDS: [&str; 28] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
-    "names", "surf", "metric", "posn",
+    "names", "surf", "metric", "posn", "life", "meta", "misc", "edges",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -972,6 +975,10 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "surf" => surf_tokens(&mut t, &mut g),
             "metric" => metric_tokens(&mut t, &mut g),
             "posn" => posn_tokens(&mut t, &mut g),
+            "life" => life::life_tokens(&mut t, &mut g),
+            "meta" => life::meta_tokens(&mut t, &mut g),
+            "misc" => life::misc_tokens(&mut t, &mut g),
+            "edges" => life::edges_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2621,6 +2628,10 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "surf" => surf_case(cx, t, o)?,
         "metric" => metric_case(cx, t, o)?,
         "posn" => posn_case(cx, t, o)?,
+        "life" => life::life_case(cx, t, o)?,
+        "meta" => life::meta_case(cx, t, o)?,
+        "misc" => life::misc_case(cx, t, o)?,
+        "edges" => life::edges_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2685,9 +2696,16 @@ pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>
         {
             "CRASH 11".to_owned()
         }
-        // FS-111 reproduced: the official build's buffer check aborts (signal 6)
-        Err(Fatal::Exit(134)) if mode.reproduce() && cx.g.notices.contains(&FS_111) => {
+        // FS-111 and FS-119 reproduced: the official build's buffer check aborts (signal 6)
+        Err(Fatal::Exit(134))
+            if mode.reproduce()
+                && (cx.g.notices.contains(&FS_111) || cx.g.notices.contains(&FS_119)) =>
+        {
             "CRASH 6".to_owned()
+        }
+        // FS-118 reproduced: the progress bar's modulo by 0 (signal 8)
+        Err(Fatal::Exit(136)) if mode.reproduce() && cx.g.notices.contains(&FS_118) => {
+            "CRASH 8".to_owned()
         }
         Err(f) => format!("EXIT {}", f.status()),
     };

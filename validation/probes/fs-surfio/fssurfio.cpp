@@ -32,6 +32,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -46,11 +47,15 @@
 #include "mrisurf_sphere_interp.h"
 #include "matrix.h"
 #include "mrisutils.h"
+#include "transform.h"
+#include "topo_parms.h"
 
 // declared in utils/ only (mrisurf_deform.h) or nowhere (the MRIS_MP overload), defined in libutils
 int mrisFlipPatch(MRIS *mris);
 void MRISrotate(MRIS_MP *mris, float alpha, float beta, float gamma);
 int mrisCountCompressed(MRIS *mris, double min_dist);
+void mrisDumpVertex(FILE *file, MRIS const *mris, int vno);
+int signum_eval(float af);
 
 const char *Progname = "fssurfio";
 
@@ -762,6 +767,397 @@ void posn_case()
   dump_posn(m);
 }
 
+// `life` (relay 9, 3.1-47 part a): a surface from MRISalloc or MRISoverAlloc, a sequence of its
+// reallocations, counts, settings, rip-flag operations, arrays and dumps, then its state and
+// MRISfree. An operation that would read or write past what the surface has allocated prints `G`
+// and is skipped (the port applies the same test).
+std::map<const void *, int> lens;  // the lengths of the topology arrays the case gave
+
+bool life_has_vertices(MRIS *m)
+{
+  return m->vertices && m->vertices_topology && m->dist_storage && m->dist_orig_storage;
+}
+
+// mrisDumpVertex's reads stay inside what the case allocated
+bool dump_ok(MRIS *m, int vno)
+{
+  if (vno < 0 || vno >= m->nvertices || !life_has_vertices(m)) return false;
+  VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+  VERTEX *v = &m->vertices[vno];
+  int vs = mrisVertexVSize(m, vno);
+  if (vs > 0) {
+    if (!vt->v || lens[vt->v] < vs) return false;
+    if (v->dist && v->dist_capacity < vs) return false;
+    if (v->dist_orig && v->dist_orig_capacity < vs) return false;
+  }
+  if (vt->num > 0 && (!vt->f || !vt->n || lens[vt->f] < vt->num)) return false;
+  return true;
+}
+
+void dump_life(MRIS *m)
+{
+  oi(m->nvertices); oi(m->max_vertices); oi(m->nfaces); oi(m->max_faces);
+  oi(m->nverticesFrozen); oi(m->nsize); oi(m->max_nsize); oi(m->dist_alloced_flags);
+  oi(m->vertices != NULL); oi(m->vertices_topology != NULL); oi(m->dist_storage != NULL);
+  oi(m->dist_orig_storage != NULL); oi(m->faces != NULL); oi(m->faceNormCacheEntries != NULL);
+  oi(m->faceNormDeferredEntries != NULL);
+  oi(m->dx2 != NULL); oi(m->dy2 != NULL); oi(m->dz2 != NULL);
+  if (life_has_vertices(m)) {
+    for (int vno = 0; vno < m->max_vertices; vno++) {
+      VERTEX *v = &m->vertices[vno];
+      VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+      of(v->x); of(v->y); of(v->z); of(v->odx); of(v->dz);
+      oi(v->ripflag); oi(v->oripflag); oi(v->marked);
+      oi(vt->vnum); oi(vt->vtotal); oi(vt->nsizeMax); oi(vt->nsizeCur); oi(vt->num);
+      oi(vt->v != NULL); oi(vt->f != NULL);
+      for (int o = 0; o < 2; o++) {
+        float *d = o ? v->dist_orig : v->dist;
+        int cap = o ? v->dist_orig_capacity : v->dist_capacity;
+        void *st = o ? m->dist_orig_storage[vno] : m->dist_storage[vno];
+        oi(d != NULL); oi(st != NULL); oi(cap);
+        if (d) for (int k = 0; k < cap; k++) of(d[k]);
+      }
+    }
+  }
+  if (m->faces && m->faceNormCacheEntries && m->faceNormDeferredEntries) {
+    for (int fno = 0; fno < m->max_faces; fno++) {
+      FACE *f = &m->faces[fno];
+      oi(f->v[0]); oi(f->v[1]); oi(f->v[2]); oi(f->ripflag); oi(f->oripflag); oi(f->marked);
+      FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+      of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+      oi(m->faceNormDeferredEntries[fno].deferred);
+    }
+  }
+}
+
+void print_flags(char *p, int n)
+{
+  if (!p) { out += "NULL "; return; }
+  for (int k = 0; k < n; k++) oi(p[k]);
+  free(p);
+}
+
+void life_case()
+{
+  MRIS *m;
+  std::string init = next();
+  if (init == "A") {
+    int nv = geti(), nf = geti();
+    m = MRISalloc(nv, nf);
+  } else {
+    int mv = geti(), mf = geti(), nv = geti(), nf = geti();
+    m = MRISoverAlloc(mv, mf, nv, nf);
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "rv") {
+      int a = geti(), b = geti();
+      if (m->nvertices < 0) { out += "G "; continue; }
+      oi(MRISreallocVertices(m, a, b));
+    } else if (op == "rf") {
+      int a = geti(), b = geti();
+      if (m->nfaces < 0) { out += "G "; continue; }
+      oi(MRISreallocFaces(m, a, b));
+    } else if (op == "af") {
+      int a = geti();
+      if (m->nfaces < 0) { out += "G "; continue; }
+      oi(MRISallocateFaces(m, a));
+    } else if (op == "ov") {
+      int a = geti(), b = geti(), c = geti(), d = geti();
+      if (m->nvertices < 0 || m->nfaces < 0) { out += "G "; continue; }
+      MRISoverAllocVerticesAndFaces(m, a, b, c, d);
+    } else if (op == "ra") {
+      int a = geti(), b = geti();
+      if (m->nvertices < 0 || m->nfaces < 0) { out += "G "; continue; }
+      MRISreallocVerticesAndFaces(m, a, b);
+    } else if (op == "gv") { MRISgrowNVertices(m, geti());
+    } else if (op == "tv") { MRIStruncateNVertices(m, geti());
+    } else if (op == "xv") { MRISremovedVertices(m, geti());
+    } else if (op == "gf") { MRISgrowNFaces(m, geti());
+    } else if (op == "tf") { MRIStruncateNFaces(m, geti());
+    } else if (op == "xf") { MRISremovedFaces(m, geti());
+    } else if (op == "fz") { MRISacquireNverticesFrozen(m);
+    } else if (op == "fr") { MRISreleaseNverticesFrozen(m);
+    } else if (op == "sv") {
+      int vno = geti();
+      float c[8];
+      for (float &x : c) x = getf();
+      int rip = geti(), marked = geti();
+      if (vno >= m->max_vertices || !life_has_vertices(m)) { out += "G "; continue; }
+      VERTEX *v = &m->vertices[vno];
+      v->x = c[0]; v->y = c[1]; v->z = c[2];
+      v->odx = c[3]; v->ody = c[4]; v->odz = c[5]; v->dx = c[6]; v->dy = c[7];
+      v->dz = c[0]; v->nx = c[1]; v->ny = c[2]; v->nz = c[3];
+      v->ripflag = (char)rip; v->marked = marked;
+    } else if (op == "st") {
+      int vno = geti(), vnum = geti(), vtotal = geti(), smax = geti(), scur = geti(), num = geti();
+      std::vector<int> nb(vtotal > 0 ? vtotal : 0), fs(num), ns(num);
+      for (int &x : nb) x = geti();
+      for (int &x : fs) x = geti();
+      for (int &x : ns) x = geti();
+      if (vno >= m->max_vertices || !life_has_vertices(m)) { out += "G "; continue; }
+      VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+      vt->vnum = (short)vnum; vt->vtotal = (short)vtotal;
+      vt->nsizeMax = (uchar)smax; vt->nsizeCur = (uchar)scur; vt->num = (uchar)num;
+      vt->v = (int *)malloc(nb.size() * sizeof(int) + 1);
+      memcpy(vt->v, nb.data(), nb.size() * sizeof(int));
+      lens[vt->v] = (int)nb.size();
+      vt->f = (int *)malloc(num * sizeof(int) + 1);
+      memcpy(vt->f, fs.data(), num * sizeof(int));
+      lens[vt->f] = num;
+      vt->n = (uchar *)malloc(num + 1);
+      for (int i = 0; i < num; i++) vt->n[i] = (uchar)ns[i];
+    } else if (op == "sd") {
+      int vno = geti();
+      if (vno >= m->nvertices || !life_has_vertices(m)) { out += "G "; continue; }
+      MRISmakeDist(m, vno);
+      VERTEX *v = &m->vertices[vno];
+      for (int i = 0; i < v->dist_capacity; i++) v->dist[i] = (float)(i + 1 + 10 * vno);
+    } else if (op == "sf") {
+      int fno = geti(), a = geti(), b = geti(), c = geti(), rip = geti(), marked = geti();
+      float n[4];
+      for (float &x : n) x = getf();
+      int deferred = geti();
+      if (fno >= m->max_faces || !m->faces) { out += "G "; continue; }
+      FACE *f = &m->faces[fno];
+      f->v[0] = a; f->v[1] = b; f->v[2] = c; f->ripflag = (char)rip; f->marked = marked;
+      FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+      e->nx = n[0]; e->ny = n[1]; e->nz = n[2]; e->orig_area = n[3];
+      m->faceNormDeferredEntries[fno].deferred = (char)deferred;
+    } else if (op == "ex") {
+      if (m->nfaces > 0 && !m->faces) { out += "G "; continue; }
+      if (m->nvertices > 0 && !m->vertices) { out += "G "; continue; }
+      print_flags(MRISexportFaceRipflags(m), m->nfaces);
+      print_flags(MRISexportVertexRipflags(m), m->nvertices);
+    } else if (op == "im") {
+      int s = geti();
+      if ((m->nfaces > 0 && !m->faces) || (m->nvertices > 0 && !m->vertices)) { out += "G "; continue; }
+      std::vector<char> ff(m->nfaces > 0 ? m->nfaces : 0), vf(m->nvertices > 0 ? m->nvertices : 0);
+      for (size_t i = 0; i < ff.size(); i++) ff[i] = (char)(((int)i * 7 + s) % 3 - 1);
+      for (size_t i = 0; i < vf.size(); i++) vf[i] = (char)(((int)i * 5 + s) % 3 - 1);
+      MRISimportFaceRipflags(m, ff.data());
+      MRISimportVertexRipflags(m, vf.data());
+    } else if (op == "cr") {
+      if (m->nvertices > 0 && !m->vertices) { out += "G "; continue; }
+      oi(MRIScountRipped(m));
+    } else if (op == "so" || op == "re" || op == "ur") {
+      if ((m->nfaces > 0 && !m->faces) || (m->nvertices > 0 && !m->vertices)) { out += "G "; continue; }
+      oi(op == "so" ? MRISstoreRipFlags(m) : op == "re" ? MRISrestoreRipFlags(m) : MRISunrip(m));
+    } else if (op == "ga") {
+      if ((m->nfaces > 0 && !m->faces) || (m->nvertices > 0 && !m->vertices) ||
+          m->nvertices < 0 || m->nfaces < 0) { out += "G "; continue; }
+      float *a = MRISgetVertexArray(m);
+      for (int i = 0; i < 3 * m->nvertices; i++) of(a[i]);
+      delete[] a;
+      float *b = MRISgetVertexNormalArray(m);
+      for (int i = 0; i < 3 * m->nvertices; i++) of(b[i]);
+      delete[] b;
+      int *c = MRISgetFaceArray(m);
+      for (int i = 0; i < 3 * m->nfaces; i++) oi(c[i]);
+      delete[] c;
+    } else if (op == "gn") {
+      bool ok = m->nfaces >= 0 && (m->nfaces == 0 || (m->faces && life_has_vertices(m)));
+      for (int fno = 0; ok && fno < m->nfaces; fno++)
+        for (int i = 0; i < 3; i++)
+          if (m->faces[fno].v[i] < 0 || m->faces[fno].v[i] >= m->max_vertices) ok = false;
+      if (!ok) { out += "G "; continue; }
+      float *a = MRISgetFaceNormalArray(m);
+      for (int i = 0; i < 3 * m->nfaces; i++) of(a[i]);
+      delete[] a;
+    } else if (op == "eg") {
+      oi(MRISallocExtraGradients(m));
+    } else if (op == "cn") {
+      if (m->nvertices > 0 && !m->vertices) { out += "G "; continue; }
+      MRIScheckForNans(m);
+    } else if (op == "dv") {
+      int vno = geti();
+      if (!dump_ok(m, vno)) { out += "G "; continue; }
+      mrisDumpVertex(stdout, m, vno);
+    } else if (op == "df") {
+      int fno = geti();
+      if (fno < 0 || fno >= m->nfaces || !m->faces) { out += "G "; continue; }
+      mrisDumpFace(m, fno, stdout);
+    } else if (op == "ds") {
+      bool ok = true;
+      for (int vno = 0; vno < std::min(10, m->nvertices); vno++) ok = ok && dump_ok(m, vno);
+      if (m->nfaces > 0 && !m->faces) ok = false;
+      if (!ok) { out += "G "; continue; }
+      mrisDumpShape(stdout, m);
+    } else {
+      fail("life op");
+    }
+  }
+  out += "| ";
+  dump_life(m);
+  MRISfree(&m);
+  oi(m == NULL);
+}
+
+// `meta` (relay 9): MRIScopyMetadata from a surface with a type, status, hemisphere, volume
+// geometry, transform array and Talairach matrices into a new surface or a given one.
+void set_vg(VOL_GEOM *vg)
+{
+  vg->valid = geti(); vg->width = geti(); vg->height = geti(); vg->depth = geti();
+  vg->xsize = getf(); vg->ysize = getf(); vg->zsize = getf(); vg->ras_good_flag = geti();
+  float *f[15] = {&vg->x_r, &vg->x_a, &vg->x_s, &vg->y_r, &vg->y_a, &vg->y_s, &vg->z_r, &vg->z_a,
+                  &vg->z_s, &vg->c_r, &vg->c_a, &vg->c_s, &vg->s_r, &vg->s_a, &vg->s_s};
+  for (float *p : f) *p = getf();
+  std::string name = geth();
+  snprintf(vg->fname, sizeof vg->fname, "%s", name.c_str());
+}
+
+void dump_vg(VOL_GEOM *vg)
+{
+  oi(vg->valid); oi(vg->width); oi(vg->height); oi(vg->depth);
+  of(vg->xsize); of(vg->ysize); of(vg->zsize); oi(vg->ras_good_flag);
+  float f[15] = {vg->x_r, vg->x_a, vg->x_s, vg->y_r, vg->y_a, vg->y_s, vg->z_r, vg->z_a,
+                 vg->z_s, vg->c_r, vg->c_a, vg->c_s, vg->s_r, vg->s_a, vg->s_s};
+  for (float x : f) of(x);
+  oh(vg->fname);
+  oi(vg->i_to_r__ != NULL); oi(vg->r_to_i__ != NULL);
+}
+
+void set_meta(MRIS *m)
+{
+  m->type = geti(); m->status = (MRIS_Status)geti(); m->hemisphere = geti();
+  m->free_transform = geti();
+  set_vg(&m->vg);
+  int nx = geti();
+  if (nx > 0) {
+    m->lta = LTAalloc(nx, NULL);
+    m->lta->type = geti();
+  }
+  for (int k = 0; k < 2; k++) {
+    if (!geti()) continue;
+    MATRIX *mt = MatrixAlloc(4, 4, MATRIX_REAL);
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) *MATRIX_RELT(mt, r, c) = getf();
+    if (k) m->TalSRASToSRAS_ = mt; else m->SRASToTalSRAS_ = mt;
+  }
+}
+
+void dump_meta(MRIS *m)
+{
+  oi(m->nvertices); oi(m->nfaces); oi(m->type); oi(m->status); oi(m->hemisphere);
+  oi(m->free_transform);
+  dump_vg(&m->vg);
+  if (m->lta) { oi(m->lta->num_xforms); oi(m->lta->type); } else out += "NULL ";
+  for (MATRIX *mt : {m->SRASToTalSRAS_, m->TalSRASToSRAS_}) {
+    if (!mt) { out += "NULL "; continue; }
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) of(*MATRIX_RELT(mt, r, c));
+  }
+}
+
+void meta_case()
+{
+  int nv = geti(), nf = geti();
+  MRIS *src = MRISalloc(nv, nf);
+  set_meta(src);
+  MRIS *dst = NULL;
+  if (geti()) {
+    int nv2 = geti(), nf2 = geti();
+    dst = MRISalloc(nv2, nf2);
+    set_meta(dst);
+  }
+  MRIS *r = MRIScopyMetadata(src, dst);
+  oi(r == dst);
+  out += "| ";
+  dump_meta(r);
+  MRISfree(&src);
+  MRISfree(&r);
+}
+
+// `misc` (relay 9): the curvature names, the registration's scales, the column printing, the
+// progress bar, the vector searches, signum_eval and the two sort comparisons.
+std::vector<std::vector<float>> keepf;
+
+void misc_case()
+{
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "cn") {
+      int nth = geti();
+      keep.push_back(geth());
+      oi(MRISsetCurvatureName(nth, keep.back().c_str()));
+    } else if (op == "pc") {
+      oi(MRISprintCurvatureNames(stdout));
+    } else if (op == "ss") {
+      int n = geti();
+      if (n < 0) {
+        oi(MRISsetRegistrationSigmas(NULL, 0));
+      } else {
+        int len = geti();
+        keepf.emplace_back(len + 1);  // never empty: an empty vector's data() may be NULL
+        for (int i = 0; i < len; i++) keepf.back()[i] = getf();
+        oi(MRISsetRegistrationSigmas(keepf.back().data(), n));
+      }
+      od(nsigmas);
+      for (int i = 0; i < (int)nsigmas; i++) of(sigmas[i]);
+    } else if (op == "cs") {
+      std::string l = geth(), r = geth();
+      cprints(l.c_str(), r.c_str());
+    } else if (op == "cd") {
+      std::string l = geth();
+      cprintd(l.c_str(), geti());
+    } else if (op == "cf") {
+      std::string l = geth();
+      cprintf(l.c_str(), getf());
+    } else if (op == "vp") {
+      int nv = geti(), from = geti(), to = geti(), hasmsg = geti();
+      std::string msg = geth();
+      MRIS *m = MRISalloc(nv, 0);
+      for (int v = from; v <= to; v++) oi(MRIS_vertexProgress_print(m, v, hasmsg ? msg.c_str() : NULL));
+      MRISfree(&m);
+    } else if (op == "ve") {
+      int rows = geti();
+      MATRIX *v = MatrixAlloc(rows, 1, MATRIX_REAL);
+      for (int r = 1; r <= rows; r++) *MATRIX_RELT(v, r, 1) = getf();
+      float t = getf();
+      oi(VECTOR_elementIndex_findNotEqual(v, t));
+      oi(VECTOR_elementIndex_find(v, t));
+      MatrixFree(&v);
+    } else if (op == "sg") {
+      oi(signum_eval(getf()));
+    } else if (op == "vc") {
+      VERTEX_SORT a, b;
+      a.vtxno = geti(); a.x = getf(); a.y = getf(); a.z = getf();
+      b.vtxno = geti(); b.x = getf(); b.y = getf(); b.z = getf();
+      oi(CompareVertexCoords(&a, &b)); oi(CompareVertexCoords(&b, &a));
+    } else if (op == "fc") {
+      FACE_SORT a, b;
+      a.faceno = geti(); a.v0 = geti(); a.v1 = geti(); a.v2 = geti();
+      b.faceno = geti(); b.v0 = geti(); b.v1 = geti(); b.v2 = geti();
+      oi(CompareFaceVertices(&a, &b)); oi(CompareFaceVertices(&b, &a));
+    } else {
+      fail("misc op");
+    }
+  }
+}
+
+// `edges` (relay 9): edgesIntersect on pairs of edges of a surface whose canonical coordinates
+// the case gives.
+void edges_case()
+{
+  int nv = geti();
+  MRIS *m = MRISalloc(nv, 0);
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->cx = getf(); v->cy = getf(); v->cz = getf();
+  }
+  int n = geti();
+  for (int k = 0; k < n; k++) {
+    EDGE a, b;
+    memset(&a, 0, sizeof a);
+    memset(&b, 0, sizeof b);
+    a.vno1 = geti(); a.vno2 = geti(); b.vno1 = geti(); b.vno2 = geti();
+    oi(edgesIntersect(m, &a, &b));
+  }
+  MRISfree(&m);
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -962,6 +1358,14 @@ void run_case()
     metric_case();
   } else if (cmd == "posn") {
     posn_case();
+  } else if (cmd == "life") {
+    life_case();
+  } else if (cmd == "meta") {
+    meta_case();
+  } else if (cmd == "misc") {
+    misc_case();
+  } else if (cmd == "edges") {
+    edges_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

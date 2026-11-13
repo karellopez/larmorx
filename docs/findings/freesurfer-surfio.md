@@ -1204,9 +1204,10 @@ and calls with their targets):
   `FACES_angleNormal_find` call `acos` (or `acosf`) of a `float`; the object code calls `acosf` in all
   three (C++'s `acos(float)` overload). glibc's `acosf` differs from the correctly rounded one on
   0.25 % of floats (`docs/findings/freesurfer-libm.md` §3): `reproduce` takes
-  `larmorx_core::math::acosf_glibc`, the default the correctly rounded `acosf_cr`, which is CORE-MATH's
+  `larmorx_core::math::acosf_glibc`, the default the correctly rounded `larmorx_core::math::acosf`
+  (CORE-MATH's `cr_acosf`, through `Libm::acosf`, since relay 21; until then `acosf_cr`: CORE-MATH's
   `acos` in double rounded to float except at the two midpoints `validation/investigations/acosf-
-  double-rounding/` found. The probe's default differs from the official build only there (with
+  double-rounding/` found, equal to `cr_acosf` on every float in [-1, 1]). The probe's default differs from the official build only there (with
   glibc's `acosf` put into the default by hand: 0 of 1,000 seed-7 `mpd` cases differ).
 - **`MAX`/`MIN` in the pseudo-normal.** `MAX(0.0, MIN(1.0, F_DOT(v1, v2) / NORM3(v1) / NORM3(v2)))`
   takes `macros.h`'s `MAX(a, b) ((a) >= (b) ? (a) : (b))` (included before `mrisurf_base.h`, whose
@@ -1252,3 +1253,257 @@ and calls with their targets):
   determine type`. `mghRead`'s `Could not find the direction cosine information ... please provide the
   information in <absolute path>` names the work folder: both probes write it `<w>` (`fssurfio.cpp`'s
   parent replaces its `workdir`; the port's `Ctx::work`).
+
+## 22. Queue item 3.1-51's rest: curvature choices, the second fundamental form, the gradients' averaging, the surface bookkeeping (relay 20)
+
+Ported: `src/props5.rs` to `src/props8.rs` (PROVENANCE rows `props5` to `props8`); behaviour in
+`specs/freesurfer-surfio.md` §102-107. Operand orders read from the unit oracle's
+`mrisurf_metricProperties.cpp.o` (`<scratch>/D/relay20/fr.sh`, `fx.sh`; the OpenMP-outlined loops
+`MRISaverageGradients(MRIS*, int) [clone ._omp_fn.29]` and `mrisAverageSignedGradients ... ._omp_fn.34`):
+
+- **`MRIScomputeMeanCurvature`**: `u = (e1x yx + e1y yy) + e1z yz` with `e1`'s element the
+  destination (`mulss` into the matrix value), likewise `v`; `rsq = u u + v v`; `z = vz nz + (vy ny +
+  vx nx)` (the offset's element the destination, the sum from the end); `H += q`; `0.5f H / N` as
+  `H * 0.5`, then `/ (float)N`; the extremes by `minss`/`maxss` with C's semantics. `FZERO(rsq)`
+  compiled as `eps > rsq` (the `fabs` dropped: a sum of squares).
+- **The curvature indices**: `ici = K area + ici`, `fi = (area |k1|) (|k1| - |k2|) + fi` (glibc's
+  `fabs` called, -fno-builtin), then `/ (4 pi)` folded.
+- **`MRISmaxRadius`**: `(lo + hi) * 0.5` (the `/ 2.0f` folded), squares `(x² + y²) + z²`, libm's
+  `sqrt`; the bounding box by `minsd`/`maxsd`.
+- **`MRIScomputeAverageCurvature`**: `total_sq + d²`, `total + d`; glibc's `sqrt` (a negative
+  variance: `EDOM`, the default NaN).
+- **`MRISuseAreaErrors`** divides by `n`, never incremented: `(float)0` (FS-374, rule A: by the face
+  count). `MRISuseK1Curvature`, `MRISuseK2Curvature`, `MRISusePrincipalCurvatureFunction` start the
+  extremes at `vertices[0].curv` (FS-375, rule A; with no vertices a read past the array, FS-376).
+- **`MRIScomputeSecondFundamentalFormThresholded`**: per neighbour the row is written at `n + 1`
+  before the validity test, so the last rejected neighbour after the last accepted one stays in the
+  fit (the full `vtotal` x 3 matrix, zeros elsewhere: ported as is). `u = (e1x yx + e1y yy) + e1z yz`,
+  `v = (yy e2y + yx e2x) + yz e2z` (the offset the destination), `z = (nx yx + ny yy) + nz yz`;
+  `2 u v` as `(u + u) v`; `rsq = (float)(v v + u u)`; `rsq_thresh *= 0.25` as `0.25 * thresh`;
+  `MIN(vmean * .25, 1.0)` as `vmean * 0.25 < 1 ? .. : 1` (a NaN gives 1). The Hessian's `2 c` as `c +
+  c`; `K = k1 k2`, `H = (k1 + k2) * 0.5` in every branch; `Ktotal = (k1 k2) area + Ktotal` (`double`);
+  the tangent planes `e1x = e2x a21 + e1x a11`, `e1y = e1y a11 + e2y a21`, `e1z = a21 e2z + a11 e1z`,
+  `e2x = e1x a12 + e2x a22`, `e2y = e1y a12 + e2y a22`, `e2z = a12 e1z + a22 e2z`. The outlier
+  removal: bins `nint((k - min) scale)`, counts `1 + count`, the bins' values `bin / scale + min`
+  (vectorised `divpd`/`addpd`, the same numbers), the totals `total + count`, `thresh = total *
+  pct`; the clamps compare against the `float` bin values. A bin outside the histogram writes far
+  outside it (FS-377: a segmentation fault, reproduced as `CRASH 11` by the probe's runner); with no
+  unripped vertex the peak is -1 and the loops read one place before (FS-378; no vertex to clip).
+  `MatrixConditionNumber` on a matrix with NaN or infinite entries can hang in LINPACK's `ssvdc`
+  (FS-48, track A's: `vnl_svd_f32_full(..).never_returns()`); the probe's alarm ends the official
+  build there, and the runner marks those cases `FS-48h` (counted, not compared).
+- **`MRIScomputeSecondFundamentalFormAtVertex`** (no caller): its own compiled orders differ:
+  `Ktotal = (k2 k1) area + Ktotal`, `e1z = a11 e1z + e2z a21`, `e2z = a12 e1z + e2z a22`; its
+  matrices are function statics: a singular fit leaves the eigenvectors of the last successful call
+  (zeros before the first), modelled by `SurfGlobals::sff_at_vertex_eigen`.
+- **`MRISaverageGradients`**: under `HAVE_OPENMP` the fast path is never taken (`UFSS = "0"`). The
+  indexed algorithm: `dx + nb.dx` in the neighbours' order, `inv = 1.0f / (k + 1)`, `dx * inv` (a
+  multiplication by the reciprocal, not a division: its rounding differs from
+  `MRISaverageGradientsFast`'s `sum / n`). The optimisation for more than 150 passes only permutes
+  the work (the same numbers) and reads `FREESURFER_MRISaverageGradients_optimize_suppress` once per
+  program (message when set). The vertex table counts every unripped neighbour but lists only those
+  with an index, so an asymmetric neighbour list reads other vertices' entries and, for the last,
+  past the list (FS-379, both modes average with the left-out neighbour's unchanged gradient). The
+  `Gdiag_no` lines: before `(dx nx + dy ny) + dz nz`, after `(nx dx + ny dy) + nz dz`.
+- **`mrisAverageSignedGradients`**: `dot = (v.dx vn.dx + v.dy vn.dy) + v.dz vn.dz` (`float`, the
+  vertex's own value the destination), the sums in `double` (`dx + vn.dx`), `/ (double)(float)num`.
+- **`MRISrescaleMetricProperties`**: `scale²` once; `area * s²`, `dist * scale`, `total_area * s²` in
+  `double`; `avg_vertex_dist = scale * avg`, `avg_vertex_area = s² * avg`, `std = std * scale`.
+- **`MRISextendedNeighbors`**: `(int) val2bak` by `cvttss2si` (x86: `INT_MIN` out of range);
+  `DotProd = (cy ty + tx cx) + tz cz`, `fabs` in `double`; the squared distance from `float`
+  differences.
+- **`MRISprintVertexStats`**: `d = sqrtf(dz² + (dx² + dy²))`, `mn = d + mn`. **`MRISprintVertexInfo`**
+  loops over `num` (faces) but indexes the neighbour list: a vertex with more faces than room in its
+  list reads past it (FS-380); the edges are printed with `printf` whatever `fp` is.
+- **`MRISclone`** shares the transform pointer (`free_transform = 0`); the port copies the LTA
+  (`LTAcopy`, silent). Fields not copied (`origx`, `val`, `k1`, ...) are the new surface's zeros.
+- **Not ported** (waiting): `mrisFindMiddleOfGray` (needs `mrisurf_vals.cpp`'s `MRISaverageCurvatures`,
+  fs.surf), `mrisMarkIntersections` (MHT), `MRISprintSurfQualityStats`,
+  `MRISprettyPrintSurfQualityStats` (the edge and corner statistics), the MRI users
+  (`MRISbinarizeVolume`, `MRISarN`, `MRISsmoothKernel`, `MRISar1`, `MRIScrsLUT`, `MRISmarkEdge`,
+  `MRIcomputeLaminarVolumeFractions`, `MRISmaxEdgeStatToOverlay`, `mriSurfaceRASToVoxel`), the label
+  users (`MRISmaskLabel`, `MRISmaskNotLabel`) and `MRISaverageGradientsFastCheck` (a self-test on
+  `fsaverage`'s `lh.white` with `drand48`; no program calls it).
+- **Probe**: the 41st command `mpe` (tests/fs_surfio/mpe.rs; fssurfio.cpp `mpe_case`), the files
+  `DIAG_WRITE` writes (`curv.dat`, `k1.plt`, `k2.plt`) compared by length and FNV-1a hash.
+
+## 23. The GIFTI surface reader (gifti.cpp 338-1222 and 2857-3006; relay 21)
+
+Ported: `src/gifti.rs` (PROVENANCE row `gifti`); behaviour in `specs/freesurfer-surfio.md` §107-108.
+`readLabelTable` (2857-3006) lies past the range the orchestrator gave (213-2857) but its callers are
+this reader and `MRISreadGiftiAsMRI` (both in this file), so it is ported here; `gifti_set_DA_value_2D` (213-336) is the
+writers' and comes with them. `include/gifti.h` declares `mrisReadGIFTIdanum` with four parameters
+(no `ctab`), the definition has five; every caller goes through `mrisReadGIFTIfile`, so nothing
+depends on it. The mechanisms behind the defects:
+
+- **FS-395**: line 436 `if (!strcmp(image->version, "1"))`: gifticlib leaves `version` `NULL` when the
+  `GIFTI` element has no `Version` attribute; the crash is in `strcmp` (`__strcmp_evex`, gdb on the
+  probe's case: `<scratch>/D/relay21/one.txt`). FreeSurfer's own gifticlib change (the version
+  compared as a float, `packages/gifti/gifti_io.c` 4238-4247) accepts such a file, so by default the
+  file is read on.
+- **FS-382**: lines 686-687 `while (toskip) gifti_get_meta_value(&coords->meta, "TAG_CMDLINE");`:
+  `toskip` never changes (and the name has no `#<k>`), an endless loop for `NUM_TAG_CMDLINE` above
+  `MAX_CMDS`. Both modes read `TAG_CMDLINE#<toskip>` to `#<n - 1>`, the message's "last 1000".
+- **FS-381**: line 640 `memcpy(mris->vg.fname, stmp, sizeof(mris->vg.fname))` copies 1,024 bytes from
+  gifticlib's `strdup`ed value: past a shorter value it reads the heap; those bytes stay in the
+  name's buffer after its NUL and the surface writers write the buffer whole (fs.core's `CName`).
+- **FS-383**: lines 723-727: `mris->vertices_topology[vertex_index].num++` with the file's number
+  unchecked. **FS-147** applies too (`num` is a `uchar`).
+- **FS-384**: the sparse loops (the shape, label and statistics branches) index `mris->vertices[vno]` with the node index's
+  number unchecked.
+- **FS-385**: line 981 `unsigned int *label_data = (unsigned int *)darray->data;` whatever
+  `darray->datatype` is.
+- **FS-386**: lines 1018-1025 index `mris->ct->entries[table_key]` by the key (not the label's place):
+  right for `readLabelTable`'s table (places by key), outside or `NULL` for a caller's `ctab` or a
+  table `makeColorTable` made from a colour array earlier in the file (places 0 to n - 1).
+- **FS-387**: lines 730-733 `strcmp(coords->coordsys[idx]->dataspace, ...)` and `xformspace`, `NULL`
+  when the file has no `DataSpace` / `TransformedSpace` element.
+- **FS-388**: lines 798-804: `daNum` is not checked against `image->numDA` before
+  `image->darray[numDA]`.
+- **FS-389**: line 2943 `ct->entries[labelkey]` with a negative key reads the allocator's chunk
+  header before the array as an entry pointer.
+- **FS-390**: line 873 compares every non-index array's rows with `mris->nvertices`, so the sparse
+  storage the comments describe (arrays of `num_index_nodes` rows) is refused unless the index lists
+  every vertex. Rule C: no program larmorx serves writes sparse GIFTI files, and the refusal is a
+  clear message.
+- **FS-391**: line 952 `OverlayInfoStruct overlayInfo;` on the stack, `__shapedatatype` written only
+  by `strcpy` when the metadata exists (stack contents otherwise; an overflow past 256 bytes for a
+  longer value).
+- **FS-392**: line 943 `memcpy(shapename, metashapename, sizeof(shapename))` (1,024 bytes) then
+  `basename` (`libgen.h`: POSIX's) and `strrchr` on a buffer with no NUL when the name is 1,024 bytes
+  or more.
+- **FS-393**: line 1108 stores `new float[3]` per annotation; `makeColorTable` (line 390)
+  reads `rgba[3]`. The probe's official runs show heap leftovers there (e.g. `0x00006118`,
+  `0x00007268`); the probe prints no alpha for a colour array's table.
+- **FS-394**: lines 1140-1186: `statInfo` is pushed only when the intent changes, so the last run is
+  never added; each array allocates its own `overlayMRI`, only the run's first is kept in `statInfo`;
+  the dense branch passes `nStatIntentFrame` as the slice, the sparse one as the frame, into a
+  one-frame volume of depth 1 (outside from the run's third array). Rule D: `MRISurfOverlay`'s
+  readers (mris_convert's `--merge-gifti` and the overlay tools) are its only users; measured when
+  they are ported.
+- **FS-396**: line 981 `label_data` is `darray->data`, `NULL` when gifticlib could not decode the
+  values (its `** decode_ascii cannot decode type 768` for ASCII `UINT32`); `*(label_data + da_index)`
+  crashes (gdb: the load in `mrisReadGIFTIdanum`, `<scratch>/D/relay21/c1.txt`).
+- **Operand order and conversions**: the colour components `floor(c * 256)` are `float` products
+  (`floor` of a `float` exact either way); `(int)` conversions of the values are x86-64's `cvttsd2si`
+  (FS-17's `INT_MIN`).
+
+Observed (relay 21): `gii` at seed 7, 200 cases: 176 compared, 0 differing in either mode (0 without
+notices in the default); see the probe README for the other seeds.
+
+## 24. The GIFTI writers and GIFTI volumes (gifti.cpp 213-336, 1231-2856; relay 22)
+
+Ported: `src/gifti_write.rs` and `src/gifti_vol.rs` (PROVENANCE rows `gifti_write`, `gifti_vol`);
+behaviour in `specs/freesurfer-surfio.md` §109-111. `MRISwrite_new`'s GIFTI branch (mrisurf_io.cpp
+4439-4441) is wired (`readwrite::write` and `write_vertex_locations` now take the surface library's
+globals, which hold gifticlib's state). `MRIread`'s and `MRIwrite`'s GIFTI branches (mriio.cpp 783-784,
+1214-1215) belong to fs.io (track A): `larmorx-freesurfer-io` cannot depend on this crate, so they
+need a hook or the two functions moved (HANDOFF). **Relay 23:** moved: `larmorx-freesurfer-io`'s
+`gifti_vol.rs` (the two functions need no surface type), with the shared pieces of `gifti.cpp`
+(`gifti_set_DA_value_2D`, `insertCommonMetaData`, `readLabelTable`, `FsGifti`, the read/check and
+check/write/free steps) in its `gifti_common.rs`; gifticlib's state (`G`, `GXD`) became fs.core's
+`Globals::gifti`, one per run as in FreeSurfer (the surface crate's `SurfGlobals::gifti` before), and
+`readwrite::write`/`write_vertex_locations` no longer take the surface library's globals. The
+mechanisms behind the defects:
+
+- **FS-397**: lines 1840-1841 count `NULL != mris->ct->entries[i]` for `labeltable.length`, lines
+  1869-1886 fill only entries with `strlen(name) != 0`; the unfilled places keep `calloc`'s zeros
+  (key 0, label `NULL`, colours 0), and `gifti_valid_LabelTable` refuses a `NULL` label. (The
+  allocations use `sizeof(int *)` and `4 * sizeof(float *)` per label: larger than needed, harmless.)
+- **FS-398**: line 1840 `mris->ct->nentries` with `mris->ct == NULL`.
+- **FS-399**: lines 2643-2650 and 2720-2729: `gifti_set_DA_value_2D(shape, c, 0, curv)` inside the
+  `s`, `r`, `c` loops (the commented-out per-vertex loop below them was the old form).
+- **FS-400**: line 2672 allocates one `giiDataArray` before `for (int f = 0; f < mri->nframes; f++)` (2679);
+  each frame resets the attributes, replaces `Intent_code` and `calloc`s a new `data` (the previous
+  frame's leaked). With no frames the array keeps `gifti_add_empty_darray`'s cleared fields.
+- **FS-521**: lines 1270-1326: the do/while (1272-1322) leaves with a non-`NULL` `scalars` only when `++da_num >=
+  image->numDA` after a found array, i.e. when the occurrence count reaches `numDA` (every array of
+  that intent); otherwise `scalars` is `NULL`, `intent_code_idx` runs to 5 and `frame_count` sums the
+  arrays of every intent. `intent_code[5]` is the 4 bytes after the array: in the unit oracle's
+  object code the array is at `0x40(%rsp)`..`0x53(%rsp)` and `0x54(%rsp)` (below the stack guard at
+  `0x58`) is never written by the function (`<scratch>/D/relay22/readasmri.asm`). The probe's
+  official runs (seeds 7, 13, 17: 221 cases) always gave a value no array had, printed as
+  `NIFTI_INTENT_NONE` (gifticlib's name for codes not in its table) with every voxel 0; `gifti_find_DA`
+  checks the intent with `gifti_intent_is_valid`, which accepts every code (track C's finding), so no
+  message. larmorx's `reproduce` uses -1 (the same output); the cases are counted, not compared.
+- **FS-522**: lines 1548 and 1575-1578: `scalars->dims[0] = mri->width` and the copy loop over `mri->width`
+  with row 0, slice 0.
+- **FS-523**: line 2498 takes `(*poverlays)[n].__overlaymri` unchecked; `MRISwriteGIFTIShape`
+  dereferences it at line 2647 (after its array's attributes, `gifti_darray_nvals`' messages and
+  metadata), `MRISwriteGIFTIStats` at line 2679 (the loop's bound, right after adding the array).
+- **FS-524**: line 2501 `MRISurfOverlay::getGIFTIIntent(overlaytype)` (MRISurfOverlay.cpp 225-284)
+  maps only the specific types; `mrisReadGIFTIdanum` gives statistics overlays the generic
+  `FS_MRISURFOVERLAY_STATS` (gifti.cpp 1180) and keeps the real intent in `__giftiIntent`, which the
+  combined writer does not read.
+- **The surface writer's `exit(1)`** (lines 2160-2164, `couldn't obtain MatrixData`) is not reached:
+  a singular geometry fails earlier, in `MatrixMultiply` with the `NULL` inverse (fs.core's
+  `ErrorExit`, status 252), and every other branch either has a matrix or two equal spaces.
+- **gifticlib's `find_DA` without arrays**: with `numDA` 0 `gim->darray` is `NULL` and `gifti_find_DA`
+  returns `NULL` silently (no "bad inputs" message: that is only for a `NULL` image or a negative
+  index).
+- **fs.io's FS-214** shows in the probe: `gifti_get_DA_value_2D`'s message for a label array without
+  data prints the array's address (`data=%p` with `da`); `check.py` writes it `(nil)` as the port
+  does.
+- **`UserName`**: `getpwuid(geteuid())->pw_name` (line 1418); larmorx reads `/proc/self/status` and
+  `/etc/passwd`, then `USER`/`USERNAME` where they cannot be read (macOS, Windows), none when nothing
+  gives one. A name served only by NSS (LDAP) is not found from `/etc/passwd`: the entry is then the
+  environment's user or absent. The probe prints the value as `U`.
+- **Compressed bytes**: gifticlib's `GZipBase64Binary` uses zlib 1.2.11 `compress2` at level
+  `GZ_DEFAULT_COMPRESSION`; the port's (track C's) uses zlib-rs, so the probe compares each payload
+  decoded and inflated.
+- **Operand order and conversions**: the colour components `(float) r / 255.0` are a `float`
+  promoted to `double` and divided in `double`, stored as `float` (one rounding of the exact
+  quotient's double); the volume reader's `(float) gifti_get_DA_value_2D(...)` is inlined as direct
+  `cvtsi2ss` / `cvtsd2ss` conversions (one rounding either way, the same `float`).
+
+## 25. Queue item 3.1-51's leftovers: the vertex-to-voxel table, the autocorrelations, the kernel smoothing, surface RAS to voxel (relay 23)
+
+Ported: `src/props9.rs` (PROVENANCE row `props9`); behaviour in `specs/freesurfer-surfio.md`
+§112-114. `mrisurf_metricProperties.cpp` 11683-11766 (`VoxelFromSRASmatrix`, `mriSurfaceRASToVoxel`,
+under `MATRIX_ALLOCATION`, 1 in `mrisurf_base.h` 271), 12508-12604 (`MRISarN`), 12610-12758
+(`MRISsmoothKernel`), 12765-12850 (`MRISar1`), 12857-12895 (`MRIScrsLUT`, `MRIScrsLUTFree`);
+fs.surf's `mrisurf_vals.cpp` 3134-3220 (`SetSurfHopListAlloc`, `SurfHopListFree`, `SetSurfHopList`)
+taken early. Callers: `mri_glmfit` (`MRISar1` 1832, 2033; `MRISarN` 2054; `MRIScrsLUT` 4101),
+`mrisurf_mri.cpp` 5322 (`MRIScrsLUT`); `MRISsmoothKernel` and `mriSurfaceRASToVoxel` have none, and
+nothing assigns `VoxelFromSRASmatrix`. Neither recon-all nor fMRIPrep reaches them.
+
+- **Serial loops**: `MRISarN`'s and `MRISsmoothKernel`'s loops are `#pragma omp parallel for
+  if_ROMP(experimental)`; `ROMP_if_parallel1(ROMP_level_experimental)` is `1 >= romp_level` and
+  `romp_level` starts at `ROMP_level_assume_reproducible` (3): always serial, so the hop lists'
+  `undefval` writes have no race.
+- **Operand orders** (the unit oracle's object code, sections `.text._Z7MRISar1...`,
+  `..._Z7MRISarN..._omp_fn.37`, `..._Z16MRISsmoothKernel..._omp_fn.39`, `..._Z20mriSurfaceRASToVoxel...`):
+  `sumsqvtx += valvtx * valvtx` (`addsd` into the sum); the neighbour's value loaded first,
+  `sumsqnbr += valnbr * valnbr`, `sumsqx += valvtx * valnbr` (`valvtx` the destination); `sqrt(vtxvar
+  * nbrvar)` compiled `nbrvar * vtxvar` (`mulsd 0x80(%rsp),%xmm0` with `nbrvar` in `xmm0`); `arsum +=
+  term` compiled `term + arsum` (`addsd 0x50(%rsp),%xmm3`); `sqrt` called (glibc's wrapper: no
+  `errno`, its argument never below 0); the kernel's `kvsum += vtxval * kern[h]` compiled
+  `vtxval * kern + kvsum`, `ksum += fabs(kern[h])` compiled `fabs(kern) + ksum` (`fabs` called);
+  `mriSurfaceRASToVoxel`'s new way left to right with each element the destination of its product;
+  `closeEnough`'s `maxss` (the second operand when the first is not greater) and its comparisons in
+  `double`.
+- **FS-525 / FS-534**: `MRIFseq_vox` is `((float *) mri->slices[s + f depth][r])[c]`: the row pointer
+  steps by the volume's own voxel size, the column by 4 bytes. A `MRI_UCHAR`, `MRI_SHORT` or `MRI_INT`
+  volume read so gives floats made of other voxels' bytes; for a type smaller than a float the later
+  columns land past the volume's chunk (FS-534: heap contents read, heap corrupted by the writes; the
+  probe's official runs crash in some such cases). The port's reproduce reads the bytes inside the
+  chunk and gives 0 outside; the probe counts FS-534's cases.
+- **FS-526**: line 12728 `kvsum += (vtxval * kern[nthhop])` and 12730 `ksum += fabs(kern[nthhop])`
+  use `kern` (allocated by `calloc` at 12649, filled only from `globkern`) where `vkern` (12705-12706)
+  holds the vertex's weights; the object code loads `kern` (`movsd (%rax,%rsi,8),%xmm0` from the
+  pointer at `0x40(%rsp)`).
+- **FS-527**: line 12751 `MRIFseq_vox(out, 1031, 0, 0, 0)`, a debugging print left in.
+- **FS-528**: 12860 allocates `crslut` before the size check at 12863; the early return leaks it.
+- **FS-529**: the `// Zero the output` comment at 12642 has no code under it. Kept (rule C): no
+  caller passes an output, and a caller that did would see its values where nothing is computed.
+- **FS-530**: `SetSurfHopListAlloc` (3134) with `nHops` 0 allocates zero-length arrays and
+  `SetSurfHopList` writes `nperhop[0]` and `vtxlist[0][0]` (3181-3182): `vtxlist` is a zeroed
+  zero-length allocation, so `vtxlist[0]` is `NULL` and the write faults; a negative count makes
+  `calloc` fail and the first write faults. `MRISarN` with `N` 0 first writes frame 0 of a volume of
+  no frames (12559).
+- **FS-531**: 11754-11757: `if (closeEnough(ox,nx) || ...) { fprintf(stderr, "%s:%d not same
+  answer\n", ...); *(int*)-1 = 0; }`: the condition is the negation of the intended one.
+- **FS-532**: `VoxelFromSRASmatrix` is defined `NULL` at 11685 and never assigned; with the new way
+  tried, `VoxelFromSRASmatrix->type` (11706) faults; with the old way alone, `MatrixMultiply(NULL,
+  ...)` prints `MatrixMultiply(): m1 is null` and its break line and `ErrorExit`s (status 252,
+  `ERROR_BADPARM`); a refused product returns `NULL` and `V3_X(vv)` (11746) faults.

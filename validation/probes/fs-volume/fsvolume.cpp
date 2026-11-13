@@ -961,6 +961,31 @@ void run_case()
     MATRIX *m = MRIgetResampleMatrix(src, tmpl);
     fflush(stdout);
     om(m);
+  } else if (cmd == "rsfill") {
+    MRI *src = get_vol();
+    MRI *tmpl = get_vol();
+    int type = geti();
+    float fill = getf();
+    int plain = geti();
+    if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+    fflush(stdout);
+    MRI *r = plain ? MRIresample(src, tmpl, type) : MRIresampleFill(src, tmpl, type, fill);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "repval") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    MRI *r;
+    if (geti()) {
+      int a = geti(), b = geti();
+      r = MRIreplaceValuesUchar(src, dst, (BUFTYPE)a, (BUFTYPE)b);
+    } else {
+      float a = getf(), b = getf();
+      r = MRIreplaceValues(src, dst, a, b);
+    }
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
   } else {
     fail("unknown command");
   }

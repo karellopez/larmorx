@@ -28,8 +28,6 @@
 // The loops index as FreeSurfer's C does (one vertex number for several arrays).
 #![allow(clippy::needless_range_loop)]
 
-use std::io::Write;
-
 use larmorx_core::defects::FS_113;
 use larmorx_core::math::{self, Libm};
 use larmorx_freesurfer_core::diag;
@@ -37,7 +35,6 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::matrix::{self, Matrix};
 use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
-use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_core::utils::cope_with_logic_problem2;
 use larmorx_freesurfer_volume::vgeom::{tkr_vox2ras_from_vol_geom, vg_i_to_r};
@@ -61,12 +58,9 @@ fn topology_cpp() -> String {
     format!("{}/utils/mrisurf_topology.cpp", diag::BUILD_ROOT)
 }
 
-/// The places a function writes to: standard output and error, the environment it reads.
-pub struct Io<'a> {
-    pub out: &'a mut dyn Write,
-    pub err: &'a mut dyn Write,
-    pub env: &'a Environment,
-}
+/// The places a function writes to: standard output and error, the environment it reads (fs.io's
+/// [`larmorx_freesurfer_io::streams::Io`], which the GIFTI volume functions there take too).
+pub use larmorx_freesurfer_io::streams::Io;
 
 fn nverts(mris: &Mris) -> usize {
     usize::try_from(mris.nvertices).unwrap_or(0)

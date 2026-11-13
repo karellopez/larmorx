@@ -8,11 +8,11 @@
 //! Each expression is evaluated as C++ evaluates it (left to right, no fused multiply-adds),
 //! so the numbers are bit-identical to vnl's on every platform. **NaNs too:** where two NaNs
 //! meet, x86-64 passes on the first operand's, and which operand of a `+` or `*` comes first is
-//! the compiler's choice. [`sse`] holds the expressions with the operands in the order GCC 8.4.0
-//! gives ITK 4.13.2's instances (read from their object code), each operation through
-//! [`ItkReal::sse_add`] and its kin, so NaN results carry x86-64's signs and payloads on every
-//! platform. The `float` and `double` instances share the determinants' and the 3 x 3 inverse's
-//! order; the 2 x 2 and 4 x 4 inverses have one each ([`ItkReal::vnl_inverse2`]).
+//! the compiler's choice. The private module `sse` holds the expressions with the operands in
+//! the order GCC 8.4.0 gives ITK 4.13.2's instances (read from their object code), each operation
+//! through [`ItkReal::sse_add`] and its kin, so NaN results carry x86-64's signs and payloads on
+//! every platform. The `float` and `double` instances share the determinants' and the 3 x 3
+//! inverse's order; the 2 x 2 and 4 x 4 inverses have one each ([`ItkReal::vnl_inverse2`]).
 //!
 //! The functions are generic over `float` and `double` ([`ItkReal`]), as `vnl_matrix_fixed<T, n,
 //! n>` is; each operation is in that type (ITK 4.13.2's `vnl_det.hxx` and `vnl_inverse.h`, the

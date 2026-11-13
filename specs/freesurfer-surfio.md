@@ -8,9 +8,12 @@ cited standards only.
 
 Status: **part 1** (queue items 3.1-45 and the record of 3.1-46): what a surface holds, the
 coordinate sets and their selector, the kinds of surface, the neighbour counts, the small geometric
-helpers every surface computation shares. Later parts: reading and writing surfaces, curvatures,
-patches and overlays (3.1-47, 3.1-48), the metric properties every read computes (3.1-49 to
-3.1-52).
+helpers every surface computation shares; **part 2** (the rest of 3.1-46 that needs no volume,
+§8-13): command lines, the neighbourhood checksum, the simple surface comparison, borrowed marks,
+per-vertex scratch arrays and the integrator's file names. Later parts: reading and writing
+surfaces, curvatures, patches and overlays (3.1-47, 3.1-48), the metric properties every read
+computes (3.1-49 to 3.1-52); the midline marking, the label normal and the coordinate copy (they
+need the volume structure).
 
 ## 1. Conventions
 
@@ -185,3 +188,104 @@ verbose diagnostic bit), and goes on.
 - **The replays** of the first programs that use these functions (every program that reads a
   surface, from `mris_info` and `mris_convert` on), with `reproduce`, on the recorded heads (the
   programs' items).
+
+## 8. Command lines
+
+A surface keeps up to 1,000 command lines (the programs that made it), in order. **Adding one**
+stores its bytes before the first NUL as the next line and returns 0. When the surface already
+holds 1,000 (or more), the line is not stored: standard error gets `error: can't add cmd to surface
+since max cmds (<count>) has been reached`, and the count stays (**FS-112**: FreeSurfer stores the
+line past the end of its list, over the count of lines, which then holds a memory address; larmorx
+keeps 1,000 lines in both modes, with FS-112's notice).
+
+## 9. The neighbourhood checksum
+
+A vertex's checksum is a 64-bit unsigned number: start from `2166136261` (`0x811c9dc5`); for each
+byte `b` of the sequence below, `h = (h XOR b) · 16777619`, modulo 2^64 (FNV-1a's step with the
+32-bit prime, kept in 64 bits). The sequence, little-endian:
+
+1. the 1-hop, 1-2-hop and 1-3-hop neighbour counts and the count in use (`vnum`, `v2num`, `v3num`,
+   `vtotal`: 2 bytes each, signed), then the neighbourhood size filled, the current size and the
+   number of faces (1 byte each); the clock copy (`nsizeMaxClock`) does not enter;
+2. when the vertex has a neighbour list: its first `s` entries (4 bytes each), where `s`, the size
+   in use, is the count at the filled size's hops (`vnum`, `v2num`, `v3num` for size 1, 2, 3; 0 for
+   any other size) or `vtotal` when that is larger;
+3. when the vertex has a face list: its `num` face numbers (4 bytes each), then the `num`
+   positions of the vertex in those faces (1 byte each);
+4. when the vertex has distances: the first `s` (4-byte floats, their bits); then likewise its
+   original distances.
+
+No coordinate, value, flag or mark of the vertex enters the checksum. FreeSurfer's topology fixer
+saves it with a vertex's state and checks it when the state is restored (a mismatch is a failed
+assertion). Lists shorter than what the sequence reads are outside the behaviour (FreeSurfer reads
+memory it does not own).
+
+## 10. Comparing two surfaces
+
+The simple comparison of surfaces 1 and 2 with a tolerance count `ndiffmin`, a distance threshold
+and a verbosity writes to standard output (numbers of `%g` form are C's `%g`) and returns:
+
+1. `Entering MRISdiffSimple(): ndiffmin=<n>, rmsthresh=<%g>, verbosity=<n>`;
+2. different vertex counts: `Surfaces differ in the number of vertices <n1> <n2>`, returns 1;
+   different face counts: `Surfaces differ in the number of faces <n1> <n2>`, returns 2;
+3. the vertices whose 1-hop counts differ, counted (with verbosity > 0 each writes `<k> Surfaces
+   differ in number of neighbors at vertex <vno>   <n1> <n2>`, `k` the count before it, three
+   blanks before the counts); more than `ndiffmin`: `Surfaces differ in number of neighbors at a
+   vertex ndiff=<k>`, returns 3;
+4. the vertices whose rip flags differ, counted; more than `ndiffmin`: `Surfaces differ in ripflags
+   ndiff=<k>`, returns 4;
+5. for each vertex unripped in both: the distance `sqrt((dx·dx + dy·dy) + dz·dz)` in double, each
+   difference taken in float (surface 1's coordinate minus surface 2's) and widened; it is stored
+   as surface 1's `val` (rounded to float); the vertex numbered `Gdiag_no` writes `vtxno <vno>
+   [<x1>,<y1>,<z1>] [<x2>,<y2>,<z2>] <distance>` (two blanks after the number); the largest
+   distance (a strictly larger one replaces it, so NaN never does; starting at 0) and its vertex
+   (0 at start) are kept, and the distances summed in vertex order; a distance above the threshold
+   counts (with verbosity > 0: `<k> Surfaces differ in xyz at vertex <vno>  rms=<d> (<x1>,<y1>,<z1>)
+   (<x2>,<y2>,<z2>)`);
+6. more than `ndiffmin` counted: `Surfaces differ in vertex xyz ndiff=<k>, rmsmax = <max> at <vno>,
+   rmsmean = <sum / number of vertices compared>` (0 compared gives C's NaN, printed `-nan`),
+   returns 4;
+7. else, when the largest distance is above 0, `rmsmax = <max>`; then `surfaces do not differ`;
+   returns 0.
+
+## 11. Borrowed marks, per-vertex scratch arrays, a frozen vertex count
+
+- A surface records which of two vertex marks (`marked` = 0, `marked2` = 1; 2 is the list's end)
+  a function has **borrowed**, as bits of an integer (bit `1 << n`). Borrowing returns 123 and
+  sets the bit; borrowing one already set is a failed assertion,
+  `<BUILD_ROOT>/utils/mrisurf_base.cpp:83 !(bits & *tc)`. **Checking** a borrow (the 123 is not
+  looked at) asserts the bit is set (`...:92 (bits & *tc)`); **returning** it asserts the same
+  (`...:99 (bits & *tc)`) and clears the bit.
+- **A per-vertex scratch array** of `nvertices` floats raises the surface's frozen-vertex counter
+  by one (while it is above 0 the vertex count may not change); FreeSurfer leaves the values
+  undefined (larmorx gives 0); a negative vertex count gives no array (the allocation fails).
+  **Freeing** it empties the caller's reference and lowers the counter by one. The counter is a
+  plain `int` (no check: it may go negative).
+
+## 12. The integrator's file names
+
+Three surface names (initially `inflated`, `smoothwm`, `smoothwm`) and three curvature file names
+(`inflated.H`, `sulc`, none) tell the surface integrator what to read (its own part).
+
+- **Setting the inflated name** to `n` makes the first surface name `n` and the first curvature
+  name `n.H`; returns 0. A name of 1,022 bytes or more (before a NUL) ends the official program
+  with `*** buffer overflow detected ***: terminated` on standard error and signal 6 (exit status
+  134) (**FS-111**; observed: 1,021 bytes work, 1,022 abort). larmorx takes any length, with
+  FS-111's notice; `reproduce` gives the original's end.
+- **Setting the sulcal name** makes the second curvature name; **setting the original name** makes
+  the second and third surface names; both return 0. Names are bytes before a NUL.
+- The negative-area weight of the surface integrator starts at 10.0 (a double).
+
+## 13. Validation plan, part 2
+
+The probe of §7 gains six commands (21 in all): command lines (counts from 0 to 1,003, lines with
+NULs and high bytes), the checksum with its size in use (every filled size 0 to 3, 4 and 255,
+negative counts, absent lists, lists longer than read, random values outside the neighbourhood),
+the comparison (equal and different vertex and face counts, differing 1-hop counts and rip flags,
+NaN and infinite coordinates, `Gdiag_no` on and off, negative `ndiffmin`, verbosity 0 and 1), the
+borrowed marks (every order of borrow, check and return over the three values, from any starting
+bits), the scratch arrays (negative, zero and positive vertex counts, frozen counters from -2) and
+the file names (sequences of the three settings, NULs, high bytes, inflated names of 1,019 to 2,100
+bytes). Measured 2026-11-13: seed 1, 630 cases, all identical with `reproduce` (the port's test
+checks their SHA-256 on every platform); the default differs only with the notices of FS-01, FS-03,
+FS-12 and FS-111 (FS-112's cases give the same output in both modes).

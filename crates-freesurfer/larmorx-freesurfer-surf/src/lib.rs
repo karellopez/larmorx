@@ -22,11 +22,16 @@
 //! - [`topology`]: the neighbour counts (`modVnum` and its wrappers, `VERTEXvnum`,
 //!   `mrisVertexNeighborIndex`, `vertexNeighbor`).
 //! - [`base`]: `mrisurf_base.h`'s helpers and `Vec3`.
+//! - [`surfbase`]: `mrisurf_base.cpp`'s borrowed temporaries, per-vertex floats and the
+//!   integrator's file names (FS-111).
+//! - [`mrisurf`]: `mrisurf.cpp`'s command lines (FS-112), the vertex hash, `MRISdiffSimple`.
 #![forbid(unsafe_code)]
 
 pub mod aaa;
 pub mod base;
 pub mod mris;
 pub mod mris_mp;
+pub mod mrisurf;
+pub mod surfbase;
 pub mod topology;
 pub mod views;

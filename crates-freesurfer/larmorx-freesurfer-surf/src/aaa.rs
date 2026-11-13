@@ -333,6 +333,15 @@ pub struct SurfGlobals {
     pub active_realm_trees_size: i32,
     /// `modVnum`'s `static short maxVnumSeen` (30).
     pub max_vnum_seen: i16,
+    /// `NEG_AREA_K` (10.0, `mrisurf_base.cpp`).
+    pub neg_area_k: f64,
+    /// `mrisurf_surface_names[3]` (`"inflated"`, `"smoothwm"`, `"smoothwm"`): the surfaces whose
+    /// curvatures are computed when [`SurfGlobals::curvature_names`] has none
+    /// (`mrisurf_base.cpp` line 937).
+    pub surface_names: [Option<Vec<u8>>; 3],
+    /// `curvature_names[3]` (`"inflated.H"`, `"sulc"`, `NULL`): the curvature files read instead
+    /// (line 938).
+    pub curvature_names: [Option<Vec<u8>>; 3],
 }
 
 impl Default for SurfGlobals {
@@ -343,6 +352,13 @@ impl Default for SurfGlobals {
             fix_vertex_area: 1,
             active_realm_trees_size: 0,
             max_vnum_seen: 30,
+            neg_area_k: 10.0,
+            surface_names: [
+                Some(b"inflated".to_vec()),
+                Some(b"smoothwm".to_vec()),
+                Some(b"smoothwm".to_vec()),
+            ],
+            curvature_names: [Some(b"inflated.H".to_vec()), Some(b"sulc".to_vec()), None],
         }
     }
 }

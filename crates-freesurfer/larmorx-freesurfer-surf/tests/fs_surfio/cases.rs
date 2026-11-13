@@ -12,7 +12,7 @@ use std::io::Write;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use larmorx_core::defects::{FS_03, UpstreamDefects};
+use larmorx_core::defects::{FS_03, FS_111, UpstreamDefects};
 use larmorx_freesurfer_core::diag::DIAG_VERBOSE;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -20,6 +20,8 @@ use larmorx_freesurfer_surf::aaa::{self, MrisStatus, SurfGlobals};
 use larmorx_freesurfer_surf::base;
 use larmorx_freesurfer_surf::mris::{Face, Mris, Vertex, VertexTopology};
 use larmorx_freesurfer_surf::mris_mp::MrisMp;
+use larmorx_freesurfer_surf::mrisurf;
+use larmorx_freesurfer_surf::surfbase::{self, MrisTempAssigned};
 use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
 
@@ -96,10 +98,33 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 15] = [
+const COMMANDS: [&str; 21] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
-    "angles", "split", "vec3", "view", "fixarea",
+    "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
+    "names",
 ];
+
+/// A byte string's token: `h` and the bytes in hex.
+fn hx(t: &mut Vec<String>, b: &[u8]) {
+    let mut s = String::from("h");
+    for c in b {
+        s += &format!("{c:02x}");
+    }
+    t.push(s);
+}
+
+/// Random bytes, `len` of them: printable mostly, a NUL or a high byte now and then.
+fn bytes(g: &mut Gen, len: usize) -> Vec<u8> {
+    (0..len)
+        .map(|_| {
+            if g.chance(30) {
+                g.pick(&[0u8, 0xff, 0x80, b'\\', b'%'])
+            } else {
+                g.int(0x21, 0x7e) as u8
+            }
+        })
+        .collect()
+}
 
 fn coords(t: &mut Vec<String>, g: &mut Gen) {
     for _ in 0..45 {
@@ -327,6 +352,153 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             }
             "view" => view_tokens(&mut t, &mut g),
             "fixarea" => ix(&mut t, g.int(-2, 3)),
+            "addcmd" => {
+                let n0 = if g.chance(5) {
+                    g.int(1000, 1003)
+                } else if g.chance(4) {
+                    g.int(990, 999)
+                } else {
+                    g.int(0, 999)
+                };
+                ix(&mut t, n0);
+                let len = g.int(0, 40) as usize;
+                let b = bytes(&mut g, len);
+                hx(&mut t, &b);
+            }
+            "vhash" => {
+                ix(&mut t, g.int(0, 1));
+                let (vnum, v2num, v3num) = (g.int(-3, 12), g.int(-3, 12), g.int(-3, 12));
+                let vtotal = g.int(0, 12);
+                let nsize_max = g.pick(&[0, 1, 2, 3, 4, 255]);
+                let num = g.int(0, 8);
+                for v in [
+                    vnum,
+                    v2num,
+                    v3num,
+                    vtotal,
+                    g.int(-5, 5),
+                    nsize_max,
+                    g.int(0, 3),
+                    num,
+                ] {
+                    ix(&mut t, v);
+                }
+                let count = match nsize_max {
+                    1 => vnum,
+                    2 => v2num,
+                    3 => v3num,
+                    _ => 0,
+                };
+                let vsize = count.max(vtotal);
+                let nv = if g.chance(5) { -1 } else { vsize + g.int(0, 2) };
+                ix(&mut t, nv);
+                for _ in 0..nv.max(0) {
+                    let x = if g.chance(8) {
+                        g.next() as i32 as i64
+                    } else {
+                        g.int(-5, 1000)
+                    };
+                    ix(&mut t, x);
+                }
+                let nf = if g.chance(5) { -1 } else { num + g.int(0, 2) };
+                ix(&mut t, nf);
+                for _ in 0..nf.max(0) {
+                    let x = if g.chance(8) {
+                        g.next() as i32 as i64
+                    } else {
+                        g.int(-1, 2000)
+                    };
+                    ix(&mut t, x);
+                    ix(&mut t, g.int(0, 255));
+                }
+                for _ in 0..2 {
+                    let nd = if g.chance(4) { -1 } else { vsize + g.int(0, 2) };
+                    ix(&mut t, nd);
+                    for _ in 0..nd.max(0) {
+                        fx(&mut t, &mut g);
+                    }
+                }
+                coords(&mut t, &mut g);
+                fx(&mut t, &mut g);
+                fx(&mut t, &mut g);
+                ix(&mut t, g.int(-1, 1));
+                ix(&mut t, g.int(0, 3));
+            }
+            "diff" => {
+                ix(&mut t, if g.chance(2) { -1 } else { g.int(0, 5) });
+                let nv1 = g.int(1, 5);
+                let nv2 = if g.chance(8) { g.int(1, 5) } else { nv1 };
+                let nf1 = g.int(0, 3);
+                let nf2 = if g.chance(8) { g.int(0, 3) } else { nf1 };
+                for v in [nv1, nv2, nf1, nf2] {
+                    ix(&mut t, v);
+                }
+                for _ in 0..nv1.min(nv2) {
+                    let vnum = g.int(0, 6);
+                    let rip = i64::from(g.chance(6));
+                    let a: [u32; 3] = [f32bits(&mut g), f32bits(&mut g), f32bits(&mut g)];
+                    ix(&mut t, vnum);
+                    ix(&mut t, rip);
+                    for x in a {
+                        t.push(format!("{x:08x}"));
+                    }
+                    fx(&mut t, &mut g);
+                    ix(&mut t, if g.chance(8) { g.int(0, 6) } else { vnum });
+                    ix(&mut t, if g.chance(8) { 1 - rip } else { rip });
+                    for x in a {
+                        let b = if g.chance(3) {
+                            x
+                        } else if g.chance(2) {
+                            (f32::from_bits(x) + g.int(-8, 8) as f32 / 16.0).to_bits()
+                        } else {
+                            f32bits(&mut g)
+                        };
+                        t.push(format!("{b:08x}"));
+                    }
+                    fx(&mut t, &mut g);
+                }
+                ix(&mut t, g.int(-1, 3));
+                if g.chance(3) {
+                    t.push(format!(
+                        "{:016x}",
+                        g.pick(&[0.0f64, 0.25, 0.5, 1.0]).to_bits()
+                    ));
+                } else {
+                    dx(&mut t, &mut g);
+                }
+                ix(&mut t, g.int(0, 1));
+            }
+            "temps" => {
+                ix(&mut t, g.int(0, 7));
+                let n = g.int(1, 6);
+                ix(&mut t, n);
+                for _ in 0..n {
+                    t.push(g.pick(&["A", "C", "R"]).to_owned());
+                    ix(&mut t, g.int(0, 2));
+                }
+            }
+            "fpv" => {
+                ix(&mut t, g.int(-3, 50));
+                ix(&mut t, g.int(-2, 3));
+                ix(&mut t, g.int(0, 4));
+            }
+            "names" => {
+                let n = g.int(1, 5);
+                ix(&mut t, n);
+                for _ in 0..n {
+                    let op = g.pick(&["I", "S", "O"]);
+                    t.push(op.to_owned());
+                    // long names printable only (a NUL would end them early)
+                    let b = if op == "I" && g.chance(3) {
+                        let len = g.pick(&[1019, 1020, 1021, 1022, 1023, 1024, 1025, 1500, 2100]);
+                        (0..len).map(|_| g.int(0x21, 0x7e) as u8).collect()
+                    } else {
+                        let len = g.int(0, 30) as usize;
+                        bytes(&mut g, len)
+                    };
+                    hx(&mut t, &b);
+                }
+            }
             _ => unreachable!(),
         }
         lines.push(t.join(" "));
@@ -355,6 +527,13 @@ impl<'a> Toks<'a> {
     fn d(&mut self) -> f64 {
         f64::from_bits(u64::from_str_radix(self.next(), 16).expect("double"))
     }
+    /// A byte token (`h` and hex).
+    fn h(&mut self) -> Vec<u8> {
+        let t = self.next().strip_prefix('h').expect("a byte token");
+        (0..t.len() / 2)
+            .map(|i| u8::from_str_radix(&t[2 * i..2 * i + 2], 16).expect("hex"))
+            .collect()
+    }
 }
 
 #[derive(Default)]
@@ -373,6 +552,19 @@ impl Out {
     fn s(&mut self, v: &str) {
         self.0 += v;
         self.0 += " ";
+    }
+    /// A C string as the probe prints it: `NULL`, or `h` and its bytes before a NUL in hex.
+    fn h(&mut self, v: Option<&[u8]>) {
+        match v {
+            None => self.0 += "NULL ",
+            Some(b) => {
+                self.0 += "h";
+                for c in b.iter().take_while(|&&c| c != 0) {
+                    self.0 += &format!("{c:02x}");
+                }
+                self.0 += " ";
+            }
+        }
     }
 }
 
@@ -922,6 +1114,157 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             o.i(i64::from(aaa::set_fix_vertex_area_value(&mut cx.sg, v)));
             o.i(i64::from(aaa::get_fix_vertex_area_value(&cx.sg)));
         }
+        "addcmd" => {
+            let mut m = mris_alloc(1, 0);
+            let n0 = t.i();
+            let line = t.h();
+            m.ncmds = n0;
+            let r = mrisurf::add_command_line(&mut cx.g, &mut cx.b, &mut m, &line);
+            o.i(i64::from(r));
+            if n0 < aaa::MAX_CMDS as i32 {
+                o.i(i64::from(m.ncmds));
+                o.h(m.cmdlines[n0 as usize].as_deref());
+            }
+        }
+        "vhash" => {
+            let mut m = mris_alloc(2, 0);
+            let vno = t.i() as usize;
+            {
+                let vt = m.topology_mut(vno);
+                vt.vnum = t.i() as i16;
+                vt.v2num = t.i() as i16;
+                vt.v3num = t.i() as i16;
+                vt.vtotal = t.i() as i16;
+                vt.nsizeMaxClock = t.i() as i16;
+                vt.nsizeMax = t.i() as u8;
+                vt.nsizeCur = t.i() as u8;
+                vt.num = t.i() as u8;
+                let nv = t.i();
+                vt.v = (nv >= 0).then(|| (0..nv).map(|_| t.i()).collect());
+                let nf = t.i();
+                if nf >= 0 {
+                    let (mut f, mut n) = (Vec::new(), Vec::new());
+                    for _ in 0..nf {
+                        f.push(t.i());
+                        n.push(t.i() as u8);
+                    }
+                    vt.f = Some(f);
+                    vt.n = Some(n);
+                }
+            }
+            let v = m.vertex_mut(vno);
+            for k in 0..2 {
+                let nd = t.i();
+                let d = (nd >= 0).then(|| (0..nd).map(|_| t.f()).collect());
+                if k == 0 {
+                    v.dist = d;
+                } else {
+                    v.dist_orig = d;
+                }
+            }
+            set_coords(t, v);
+            v.val = t.f();
+            v.curv = t.f();
+            v.ripflag = t.i() as i8;
+            v.marked = t.i() as i16;
+            o.i(i64::from(topology::vertex_vsize(&m, vno)));
+            // the hash, an unsigned long, printed in decimal
+            o.0 += &format!("{} ", mrisurf::vertex_hash(&m, vno).hash);
+        }
+        "diff" => {
+            cx.g.gdiag_no = t.i();
+            let (nv1, nv2, nf1, nf2) = (t.i(), t.i(), t.i(), t.i());
+            let mut a = mris_alloc(nv1 as usize, nf1 as usize);
+            let mut b = mris_alloc(nv2 as usize, nf2 as usize);
+            let nv = nv1.min(nv2) as usize;
+            for k in 0..nv {
+                for m in [&mut a, &mut b] {
+                    m.topology_mut(k).vnum = t.i() as i16;
+                    let v = m.vertex_mut(k);
+                    v.ripflag = t.i() as i8;
+                    v.x = t.f();
+                    v.y = t.f();
+                    v.z = t.f();
+                    v.val = t.f();
+                }
+            }
+            let ndiffmin = t.i();
+            let rmsthresh = t.d();
+            let verbosity = t.i();
+            let r =
+                mrisurf::diff_simple(&cx.g, &mut cx.a, &mut a, &b, ndiffmin, rmsthresh, verbosity);
+            o.i(i64::from(r));
+            for k in 0..nv {
+                o.f(a.vertex(k).val);
+            }
+        }
+        "temps" => {
+            let mut m = mris_alloc(1, 0);
+            m.tempsAssigned = t.i();
+            let n = t.i();
+            for _ in 0..n {
+                let op = t.next();
+                let temp = match t.i() {
+                    0 => MrisTempAssigned::VertexMarked,
+                    1 => MrisTempAssigned::VertexMarked2,
+                    2 => MrisTempAssigned::End,
+                    x => panic!("temp {x}"),
+                };
+                match op {
+                    "A" => {
+                        let r =
+                            surfbase::acquire_temp(&mut cx.g, &mut cx.a, &mut cx.b, &mut m, temp)?;
+                        o.i(i64::from(r));
+                    }
+                    "C" => surfbase::check_acquired_temp(
+                        &mut cx.g, &mut cx.a, &mut cx.b, &m, temp, 123,
+                    )?,
+                    "R" => {
+                        surfbase::release_temp(&mut cx.g, &mut cx.a, &mut cx.b, &mut m, temp, 123)?
+                    }
+                    _ => panic!("temps op"),
+                }
+                o.i(i64::from(m.tempsAssigned));
+            }
+        }
+        "fpv" => {
+            let mut m = mris_alloc(1, 0);
+            m.nvertices = t.i();
+            m.nverticesFrozen = t.i();
+            let n = t.i();
+            let mut ps = Vec::new();
+            for _ in 0..n {
+                ps.push(surfbase::make_float_per_vertex(&mut m));
+                o.i(i64::from(ps.last().expect("one").is_some()));
+                o.i(i64::from(m.nverticesFrozen));
+            }
+            for p in &mut ps {
+                surfbase::free_float_per_vertex(&mut m, p);
+                o.i(i64::from(p.is_some()));
+                o.i(i64::from(m.nverticesFrozen));
+            }
+        }
+        "names" => {
+            let n = t.i();
+            for _ in 0..n {
+                let op = t.next();
+                let name = t.h();
+                let r = match op {
+                    "I" => {
+                        surfbase::set_inflated_file_name(&mut cx.g, &mut cx.sg, &mut cx.b, &name)?
+                    }
+                    "S" => surfbase::set_sulc_file_name(&mut cx.sg, &name),
+                    "O" => surfbase::set_original_file_name(&mut cx.sg, &name),
+                    _ => panic!("names op"),
+                };
+                o.i(i64::from(r));
+            }
+            for k in 0..3 {
+                o.h(cx.sg.surface_names[k].as_deref());
+                o.h(cx.sg.curvature_names[k].as_deref());
+            }
+            o.d(cx.sg.neg_area_k);
+        }
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -960,6 +1303,10 @@ pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>
         // FS-03 reproduced: FreeSurfer's failed assertion faults on purpose (signal 11)
         Err(Fatal::Exit(139)) if mode.reproduce() && cx.g.notices.contains(&FS_03) => {
             "CRASH 11".to_owned()
+        }
+        // FS-111 reproduced: the official build's buffer check aborts (signal 6)
+        Err(Fatal::Exit(134)) if mode.reproduce() && cx.g.notices.contains(&FS_111) => {
+            "CRASH 6".to_owned()
         }
         Err(f) => format!("EXIT {}", f.status()),
     };

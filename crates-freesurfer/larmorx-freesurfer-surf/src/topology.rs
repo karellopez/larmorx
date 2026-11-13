@@ -5,7 +5,8 @@
 //! and 3.1-46), translated from FreeSurfer 8.2.0's `include/mrisurf.h` (`setVnum`, `clearVnum`,
 //! `vnumAdd`, `addVnum`, `VERTEXvnum`, `mrisVertexNeighborIndex`, `mrisVerticesAreNeighbors`,
 //! `returnTrue`), `include/mrisurf_topology.h` (`vertexNeighbor`) and the function they call,
-//! `modVnum` (`utils/mrisurf_topology.cpp` lines 360-372).
+//! `modVnum` (`utils/mrisurf_topology.cpp` lines 360-372), and `mrisVertexVSize` (lines 907-918),
+//! which the vertex hash uses.
 
 use std::io::Write;
 
@@ -180,6 +181,20 @@ pub fn vertex_neighbor(mris: &Mris, vno1: usize, vno2: i32) -> i32 {
     }
     let v = vt.v.as_ref().expect("VERTEX_TOPOLOGY::v is NULL");
     i32::from(v[..n].contains(&vno2))
+}
+
+/// `mrisVertexVSize(mris, vno)`: the size of the vertex's neighbour and distance arrays in use:
+/// the count at `nsizeMax` hops (`vnum`, `v2num`, `v3num` for 1, 2, 3; 0 for any other), or
+/// `vtotal` when that is larger.
+pub fn vertex_vsize(mris: &Mris, vno: usize) -> i32 {
+    let v = mris.topology(vno);
+    let c = match v.nsizeMax {
+        1 => v.vnum,
+        2 => v.v2num,
+        3 => v.v3num,
+        _ => 0,
+    };
+    i32::from(c.max(v.vtotal))
 }
 
 /// `returnTrue()`: what `mrisCheckVertexFaceTopology` and `mrisCheckVertexVertexTopology`

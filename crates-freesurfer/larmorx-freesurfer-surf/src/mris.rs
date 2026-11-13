@@ -299,8 +299,8 @@ pub struct Mris {
     pub dz2: Option<Vec<f32>>,
     pub orig_xyzspace: i32,
     pub useRealRAS: i32,
-    /// `cmdlines[MAX_CMDS]` (`char *` each).
-    pub cmdlines: Vec<Option<String>>,
+    /// `cmdlines[MAX_CMDS]` (`char *` each: the bytes before the NUL).
+    pub cmdlines: Vec<Option<Vec<u8>>>,
     pub ncmds: i32,
     pub group_avg_surface_area: f32,
     pub group_avg_vtxarea_loaded: i32,

@@ -13,7 +13,7 @@ every case (``SKIP`` lists the defects whose cases are counted, not compared: no
 differ only where a defect it corrects changed the result (its notices). Prints the counts and the
 hash the port's recorded test checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 450 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 630 [--json out.json]
 """
 
 from __future__ import annotations
@@ -34,10 +34,8 @@ sys.path.insert(0, str(REPO / "validation" / "src"))
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
-SKIP = ("FS-53", "FS-58", "FS-165")
-# FS-163 (MRIcopy into a smaller destination) is skipped where the port refuses the copy (FreeSurfer
-# writes outside the destination there); where both stay inside it the lines are compared
-SKIP_WHEN_REFUSED = ("FS-163",)
+SKIP: tuple[str, ...] = ()
+SKIP_WHEN_REFUSED: tuple[str, ...] = ()
 
 
 def probe_binary(ws: Path) -> Path:

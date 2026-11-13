@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // fs.surfio's probe: FreeSurfer 8.2.0's surface structure helpers (mrisurf_aaa.h, mrisurf.h,
 // mrisurf_base.h, mrisurf_topology.h, mrisurf_sphere_interp.h, mrisurf_base.cpp's status texts,
-// modVnum, MRISvertexCoord2XYZ_float/_double) and the MRIS and MRIS_MP views' accessors, called
-// case by case, linked with the unit oracle's libutils as the official programs are (build.sh).
+// modVnum, MRISvertexCoord2XYZ_float/_double) and the MRIS and MRIS_MP views' accessors; since
+// relay 6 also mrisurf.cpp's MRISaddCommandLine, mrisVertexHash (with mrisVertexVSize) and
+// MRISdiffSimple, and mrisurf_base.cpp's temporaries, per-vertex floats and file-name setters;
+// called case by case, linked with the unit oracle's libutils as the official programs are
+// (build.sh).
 // CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: it names FreeSurfer's functions (running it is a
 // black-box run of FreeSurfer's code).
 //
@@ -89,6 +92,31 @@ void od(double d)
   snprintf(b, sizeof b, "%016" PRIx64 " ", u);
   out += b;
 }
+
+// A byte string from a token: `h` and its bytes in hex (`h` alone is the empty string).
+std::string geth()
+{
+  const char *t = next();
+  if (t[0] != 'h') fail("a byte token starts with h");
+  std::string r;
+  for (const char *p = t + 1; p[0] && p[1]; p += 2) {
+    char b[3] = {p[0], p[1], 0};
+    r += (char)strtoul(b, NULL, 16);
+  }
+  return r;
+}
+void oh(const char *p)
+{
+  if (!p) { out += "NULL "; return; }
+  char b[4];
+  out += "h";
+  for (const unsigned char *q = (const unsigned char *)p; *q; q++) {
+    snprintf(b, sizeof b, "%02x", *q);
+    out += b;
+  }
+  out += " ";
+}
+std::vector<std::string> keep;  // names whose pointers FreeSurfer keeps
 
 // The 15 coordinate sets of a VERTEX, in the order the cases give them.
 void set_coords(VERTEX *v)
@@ -382,6 +410,97 @@ void run_case()
     oi(MRISgetFixVertexAreaValue());
     oi(MRISsetFixVertexAreaValue(geti()));
     oi(MRISgetFixVertexAreaValue());
+  } else if (cmd == "addcmd") {
+    // ncmds set to n0 (the earlier lines left NULL), then one MRISaddCommandLine
+    MRIS *m = MRISalloc(1, 0);
+    int n0 = geti();
+    std::string line = geth();
+    m->ncmds = n0;
+    int r = MRISaddCommandLine(m, line);
+    oi(r);
+    if (n0 < MAX_CMDS) { oi(m->ncmds); oh(m->cmdlines[n0]); }
+  } else if (cmd == "vhash") {
+    MRIS *m = MRISalloc(2, 0);
+    int vno = geti();
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    VERTEX *v = &m->vertices[vno];
+    free(vt->v); vt->v = NULL; free(vt->f); vt->f = NULL; free(vt->n); vt->n = NULL;
+    vt->vnum = (short)geti(); vt->v2num = (short)geti(); vt->v3num = (short)geti();
+    vt->vtotal = (short)geti(); vt->nsizeMaxClock = (short)geti();
+    vt->nsizeMax = (uchar)geti(); vt->nsizeCur = (uchar)geti(); vt->num = (uchar)geti();
+    int nv = geti();
+    if (nv >= 0) { vt->v = arr<int>(nv); for (int k = 0; k < nv; k++) vt->v[k] = geti(); }
+    int nf = geti();
+    if (nf >= 0) {
+      vt->f = arr<int>(nf); vt->n = arr<uchar>(nf);
+      for (int k = 0; k < nf; k++) { vt->f[k] = geti(); vt->n[k] = (uchar)geti(); }
+    }
+    for (float **d : {&v->dist, &v->dist_orig}) {
+      int nd = geti();
+      if (nd >= 0) { *d = arr<float>(nd); for (int k = 0; k < nd; k++) (*d)[k] = getf(); }
+      else *d = NULL;
+    }
+    // values outside the neighbourhood, which do not enter the hash
+    set_coords(v);
+    v->val = getf(); v->curv = getf(); v->ripflag = (char)geti(); v->marked = (short)geti();
+    oi(mrisVertexVSize(m, vno));
+    MRIS_HASH h;
+    mrisVertexHash(&h, m, vno);
+    out += std::to_string((unsigned long)h.hash) + " ";
+  } else if (cmd == "diff") {
+    Gdiag_no = geti();
+    int nv1 = geti(), nv2 = geti(), nf1 = geti(), nf2 = geti();
+    MRIS *a = MRISalloc(nv1, nf1), *b = MRISalloc(nv2, nf2);
+    int nv = nv1 < nv2 ? nv1 : nv2;
+    for (int k = 0; k < nv; k++) {
+      for (MRIS *m : {a, b}) {
+        m->vertices_topology[k].vnum = (short)geti();
+        VERTEX *v = &m->vertices[k];
+        v->ripflag = (char)geti();
+        v->x = getf(); v->y = getf(); v->z = getf();
+        v->val = getf();
+      }
+    }
+    int ndiffmin = geti();
+    double rmsthresh = getd();
+    int verbosity = geti();
+    oi(MRISdiffSimple(a, b, ndiffmin, rmsthresh, verbosity));
+    for (int k = 0; k < nv; k++) of(a->vertices[k].val);
+  } else if (cmd == "temps") {
+    MRIS *m = MRISalloc(1, 0);
+    m->tempsAssigned = geti();
+    int n = geti();
+    for (int k = 0; k < n; k++) {
+      std::string op = next();
+      MRIS_TempAssigned t = (MRIS_TempAssigned)geti();
+      if (op == "A") oi(MRIS_acquireTemp(m, t));
+      else if (op == "C") MRIS_checkAcquiredTemp(m, t, 123);
+      else if (op == "R") MRIS_releaseTemp(m, t, 123);
+      else fail("temps op");
+      oi(m->tempsAssigned);
+    }
+  } else if (cmd == "fpv") {
+    MRIS *m = MRISalloc(1, 0);
+    m->nvertices = geti();
+    m->nverticesFrozen = geti();
+    int n = geti();
+    std::vector<float *> ps;
+    for (int k = 0; k < n; k++) { ps.push_back(MRISmakeFloatPerVertex(m)); oi(ps.back() != NULL); oi(m->nverticesFrozen); }
+    for (float *&p : ps) { MRISfreeFloatPerVertex(m, &p); oi(p != NULL); oi(m->nverticesFrozen); }
+  } else if (cmd == "names") {
+    int n = geti();
+    keep.reserve(n);
+    for (int k = 0; k < n; k++) {
+      std::string op = next();
+      keep.push_back(geth());
+      char *p = &keep.back()[0];
+      if (op == "I") oi(MRISsetInflatedFileName(p));
+      else if (op == "S") oi(MRISsetSulcFileName(p));
+      else if (op == "O") oi(MRISsetOriginalFileName(p));
+      else fail("names op");
+    }
+    for (int k = 0; k < 3; k++) { oh(mrisurf_surface_names[k]); oh(curvature_names[k]); }
+    od(NEG_AREA_K);
   } else {
     fail("unknown command");
   }

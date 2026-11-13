@@ -2,7 +2,8 @@
 
 **Closed to FreeSurfer clean-room implementers** (it names FreeSurfer's files, functions and lines;
 the behaviour is `specs/freesurfer-surfio.md`). Queue items 3.1-45 and 3.1-46's structure, replica in
-`crates-freesurfer/larmorx-freesurfer-surf` (track D, relay 5, 2026-11-13).
+`crates-freesurfer/larmorx-freesurfer-surf` (track D, relay 5, 2026-11-13); §7 the rest of 3.1-46
+without a volume (relay 6).
 
 ## 1. The generated views are storage maps
 
@@ -108,3 +109,52 @@ first). The probe reads them into locals first.
 - The `MRIS` fields waiting for other items: `lta` (`LTA *`, fs.volume 3.1-40), `ct`
   (`COLOR_TABLE *`) and `vg` (`VOL_GEOM`) (fs.mri 3.1-55), `mri_sras2vox` (`MRI *`, fs.mri). The
   surface readers (3.1-47) need `vg` and `ct`.
+
+## 7. The rest of 3.1-46 (relay 6): `mrisurf.cpp` and `mrisurf_base.cpp` without a volume
+
+- **`mrisVertexHash`** (`utils/mrisurf.cpp` 113-201, 270-273) hashes `LIST_OF_VERTEX_TOPOLOGY_ELTS`'
+  `ELTT` members (`vnum`, `v2num`, `v3num`, `vtotal`, `nsizeMax`, `nsizeCur`, `num`; `nsizeMaxClock`
+  is `ELTX`, the pointers `ELTP`), then `v` (`mrisVertexVSize` ints), `f` and `n` (`num` each),
+  `dist` and `dist_orig` (`mrisVertexVSize` floats). The second `ELTT` macro (lines 138-152, the
+  `VERTEX` members) is defined and undefined **without** `LIST_OF_VERTEX_ELTS` between: no vertex
+  scalar enters the hash. `showHashCalc` (a `static size_t` raised only by `mris_print_hash`'s
+  `showHash`, which needs `++showHashCount == showHashLimit` with the limit 0) is 0 in every run, so
+  the hash writes nothing. Its only reached caller is `utils/mrisurf_defect.cpp` (lines 289, 371:
+  the topology fixer's vertex-state save, every `limit`-th one as `count` passes it, and the
+  `cheapAssert(hash.hash == vs->hash.hash)` at restore). `fnv_init`/`fnv_add` are
+  `include/fnv_hash.h`'s (queue item 3.1-18 puts them in larmorx-core; until then the crate has its
+  own 8 lines).
+- **Unreached hashing.** `mris_hash_init`, `mris_hash_add`, `mris_hash_print`, `mris_print_hash`,
+  `mris_print_diff` (lines 229-317): every caller in `utils/` is behind `debugNonDeterminism`
+  (`include/mrisurf_base.h` line 27: `static const int debugNonDeterminism = 0`), `if (0)`
+  (`mrisurf_integrate.cpp` 2888, 2890) or in `utils/test/topology_test.c`. `mris_print_hash` would
+  also print a pointer (`%p` of `avg_vertex_dist`'s bits), not reproducible. Not translated.
+- **FS-111.** `MRISsetInflatedFileName` (`utils/mrisurf_base.cpp` 133-143) does `sprintf(fname,
+  "%s.H", inflated_name)` into `char fname[STRLEN]` (`STRLEN` = `STR_LEN` = 1,024,
+  `include/const.h` 51-52). The official build compiles it to `__sprintf_chk(fname, 1, 0x400, ...)`
+  (`objdump` of the unit oracle's `mrisurf_base.cpp.o`: `mov $0x400,%edx; mov $0x1,%esi`):
+  `_FORTIFY_SOURCE` level 2, so 1,022 bytes or more abort in `__chk_fail` (glibc 2.35 writes `***
+  buffer overflow detected ***: terminated` to standard error, then `abort`); the probe shows 1,021
+  bytes set the names and 1,022 abort (signal 6). `mrisurf_surface_names[0]` is already set when it
+  aborts (the store precedes the call) but the process ends. Reached from `mris_register -inflated
+  <name>` (`mris_register.cpp` 913, 503); recon-all does not pass `-inflated`.
+- **FS-112.** `MRISaddCommandLine` (`utils/mrisurf.cpp` 98-108): `fs::error()` only prints (its
+  destructor writes and logs, `include/log.h` 56-61; no exit), then `int i = mris->ncmds++;
+  mris->cmdlines[i] = calloc(...)`. `MRIS_cmdlines_t` is `FixedSizeArray<char *, MAX_CMDS>`
+  (`include/mrisurf_aaa.h` 55; `include/base.h` 144-156: no bounds check), and `ncmds` is the next
+  member (`include/mrisurf_FACE_VERTEX_MRIS_generated.h` 252-254): at 1,000 the new pointer's 8 bytes
+  overwrite `ncmds` and `group_avg_surface_area`. The probe prints only the message for such cases.
+  Callers: every program that writes a surface; `gifti.cpp` 702 (one per `NUM_TAG_CMDLINE` line of a
+  GIFTI file); the surface readers have their own `ncmds > MAX_CMDS` checks (`mrisurf_io.cpp` 4049:
+  off by one, 3.1-48's).
+- **Unreached, translated anyway** (small, in the item): `MRIS_acquireTemp`, `MRIS_checkAcquiredTemp`,
+  `MRIS_releaseTemp`, `MRISmakeFloatPerVertex`, `MRISfreeFloatPerVertex` (no caller in 8.2.0);
+  `MRISdiffSimple` (`mris_diff` only). `MRISsetSulcFileName` is reached from `mris_register`'s,
+  `mris_left_right_register`'s and `mris_congeal`'s options, `MRISsetOriginalFileName` from
+  `mris_register` on every run (`mris_register.cpp` 500).
+- **`MRISdiffSimple`'s NaN.** `rmssum/nhits` with no vertex compared is `0.0/0.0`, SSE's default NaN
+  with the sign set: `%g` prints `-nan` (AArch64's default NaN would print `nan`: the replica uses
+  fs.core's `sse` helpers for every operation that can make or pass a NaN).
+- **Waiting for fs.mri:** `MRISripMidline` (358-807), `MRIcomputeLabelNormal` (809-878),
+  `MRIScopyCoords` (888-922, it copies `vg`); the realm-tree list (`mrisurf_base.cpp` 159-195) with
+  fs.surf's `RealmTree`.

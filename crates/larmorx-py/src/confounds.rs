@@ -24,11 +24,17 @@ use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
+mod compcor;
 mod dvars;
+mod expansion;
 mod fft;
 mod gelsd;
 mod gesvd;
+mod motion;
+mod nipy;
+mod pandas;
 mod reductions;
+mod signals;
 mod svd;
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
@@ -1149,5 +1155,11 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     reductions::register(m)?;
     fft::register(m)?;
     dvars::register(m)?;
+    compcor::register(m)?;
+    nipy::register(m)?;
+    pandas::register(m)?;
+    expansion::register(m)?;
+    motion::register(m)?;
+    signals::register(m)?;
     Ok(())
 }

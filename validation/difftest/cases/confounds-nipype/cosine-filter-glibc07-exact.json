@@ -1,0 +1,76 @@
+{
+ "defect": null,
+ "description": "cosine_filter whose glibc and correctly rounded cosines differ only before the product with sqrt(2 / T) rounds them to one value (the trial's notice verdicts): GLIBC-07 fired with the basis unchanged. Fixed: the witness compares the basis values.",
+ "expect": "pass",
+ "found": {
+  "detail": "cosine_filter whose glibc and correctly rounded cosines differ only before the product with sqrt(2 / T) rounds them to one value (the trial's notice verdicts): GLIBC-07 fired with the basis unchanged. Fixed: the witness compares the basis values.",
+  "n": 12587,
+  "seed": "confounds-trial",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "cosine-filter-glibc07-exact",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "cosine_filter",
+   "data": {
+    "dtype": "float64",
+    "kind": "smooth",
+    "layout": "F",
+    "seed": 1946580271,
+    "t": 178,
+    "voxels": 19
+   },
+   "failure_mode": "error",
+   "period_cut": 30.0,
+   "remove_mean": true,
+   "threads": 1,
+   "timestep": 0.5
+  },
+  "features": {
+   "call": "cosine_filter",
+   "dtype": "float64",
+   "extreme": false,
+   "failure_mode": "error",
+   "layout": "F",
+   "no voxel": false,
+   "period_cut": 30.0,
+   "remove_mean": true,
+   "threads": 1,
+   "timestep": 0.5,
+   "values": "smooth",
+   "volumes": 178,
+   "voxels": 19
+  },
+  "groups": [
+   {
+    "args": [
+     "cosine_filter"
+    ],
+    "name": "cosine_filter",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 12587,
+  "options": [
+   "cosine_filter",
+   "float64",
+   "period_cut 30.0",
+   "smooth"
+  ],
+  "seed": "confounds-trial",
+  "tool": "confounds-nipype"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-nipype",
+ "tier": "smoke",
+ "tool": "confounds-nipype"
+}

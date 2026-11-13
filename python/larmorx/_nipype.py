@@ -39,6 +39,7 @@ from __future__ import annotations
 import ntpath
 import os
 import shlex
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
@@ -64,6 +65,7 @@ __all__ = [
     "split_filename",
     "topup",
     "volreg",
+    "words",
 ]
 
 
@@ -267,22 +269,43 @@ class Command:
     #: ``{path: text}``.
     files: Mapping[str, str] = field(default_factory=dict)
     #: ``args`` with the output names nipype gives relative to the node directory made
-    #: absolute (for programs that run in this process, whose directory is not the node's);
-    #: ``None``: the same as ``args``.
+    #: absolute (for programs that run in this process, whose directory is not the node's;
+    #: quoted for the shell, so that a node directory with a blank stays one word, as nipype's
+    #: relative name is); ``None``: the same as ``args``.
     run_args: tuple[str, ...] | None = None
+    #: ``args`` with every file name nipype writes unquoted quoted for the shell (PIPE-80's
+    #: correction); ``None``: the same as ``args`` (no file name needs quoting).
+    quoted_args: tuple[str, ...] | None = None
+    #: ``run_args`` quoted so (PIPE-80); ``None``: the same as ``run_args``.
+    quoted_run_args: tuple[str, ...] | None = None
 
     @property
     def cmdline(self) -> str:
+        """The line nipype writes (``command.txt``), file names unquoted where nipype leaves
+        them so (PIPE-80)."""
         return " ".join([self.program, *self.args])
 
-    def argv(self) -> list[str]:
-        """The program's arguments as the shell splits nipype's line (``shlex``: words, quotes
-        removed; on Windows a backslash is a path's separator, :func:`_split_line`)."""
-        return _split_line(" ".join(self.args))
+    @property
+    def quoted_cmdline(self) -> str:
+        """:attr:`cmdline` with every file name quoted for the shell (PIPE-80's correction:
+        the same text when no file name holds a blank or a quote)."""
+        return " ".join(
+            [self.program, *(self.args if self.quoted_args is None else self.quoted_args)]
+        )
 
-    def run_argv(self) -> list[str]:
+    def argv(self, quoted: bool = False) -> list[str]:
+        """The program's arguments as the shell splits nipype's line (``shlex``: words, quotes
+        removed; on Windows a backslash is a path's separator, :func:`_split_line`); ``quoted``:
+        of :attr:`quoted_cmdline` (PIPE-80's correction)."""
+        args = self.quoted_args if quoted and self.quoted_args is not None else self.args
+        return _split_line(" ".join(args))
+
+    def run_argv(self, quoted: bool = False) -> list[str]:
         """:meth:`argv` with the node directory's output names absolute."""
-        return _split_line(" ".join(self.args if self.run_args is None else self.run_args))
+        args = self.args if self.run_args is None else self.run_args
+        if quoted and self.quoted_run_args is not None:
+            args = self.quoted_run_args
+        return _split_line(" ".join(args))
 
 
 def _split_line(line: str, windows: bool = os.name == "nt") -> list[str]:
@@ -298,11 +321,95 @@ def _split_line(line: str, windows: bool = os.name == "nt") -> list[str]:
     return list(lex)
 
 
-def _bet_relpath(path: str, start: str, windows: bool = os.name == "nt") -> str:
+def _quote(text: str, windows: bool = os.name == "nt") -> str:
+    """A file name quoted for nipype's line, where nipype writes it unquoted (PIPE-80's
+    correction; larmorx's absolute output names): ``shlex.quote``, so a blank, a quote or any
+    other character a POSIX shell reads specially is inside quotes. On Windows a backslash is a
+    path's separator, no escape (:func:`_split_line`): a name whose only such characters are
+    backslashes (``C:\\data\\x.nii``) needs no quotes and stays as nipype writes it, so a line
+    with no blank in its names is nipype's line on every platform."""
+    if windows:
+        bare = text.replace("\\", "/")
+        if shlex.quote(bare) == bare:
+            return text
+    return shlex.quote(text)
+
+
+#: The split names the PIPE-80 notice lists, each whole (the rest counted).
+_NOTICE_NAMES = 3
+
+
+def _split_names(fixed: list[str], nipype: list[str] | None) -> list[str]:
+    """The words of the quoted line that nipype's line does not give the program whole (in
+    order; a bracketed argument's trailing comma dropped). ``nipype`` ``None`` (the shell
+    cannot split its line): every word with a blank or a quote."""
+    if nipype is None:
+        split = [w for w in fixed if any(c.isspace() or c in "'\"" for c in w)]
+    else:
+        left = Counter(nipype)
+        split = []
+        for w in fixed:
+            if left[w] > 0:
+                left[w] -= 1
+            else:
+                split.append(w)
+    return [w[:-1] if w.endswith(",") and len(w) > 1 else w for w in split]
+
+
+def words(cmd: Command, upstream_defects: str, *, run: bool = False) -> list[str]:
+    """The words ``cmd``'s program gets in ``upstream_defects``' mode: nipype's line as the
+    shell splits it (``reproduce``) or the line with every file name quoted (``fix``, PIPE-80:
+    nipype writes some file names unquoted, so a name with a blank or a quote is split and the
+    program gets other names). ``run``: :meth:`Command.run_argv` (output names absolute).
+    Raises the PIPE-80 notice when the two differ; under ``reproduce`` a line the shell cannot
+    split (an unbalanced quote) fails as the shell does, with :class:`RuntimeError`."""
+    from larmorx import _defects
+
+    _defects.check(upstream_defects)  # type: ignore[arg-type]
+    pick = cmd.run_argv if run else cmd.argv
+    fixed = pick(quoted=True)
+    try:
+        nipype = pick(quoted=False)
+    except ValueError as exc:
+        nipype = None
+        why = f"the shell cannot split it ({exc})"
+    else:
+        why = "the shell splits it at the blank"
+    if nipype != fixed:
+        names = _split_names(fixed, nipype)
+        shown = ", ".join(names[:_NOTICE_NAMES])
+        if len(names) > _NOTICE_NAMES:
+            shown += f" and {len(names) - _NOTICE_NAMES} more"
+        detail = f"{cmd.program}: nipype writes file names unquoted ({shown}): "
+        if upstream_defects == "fix":
+            detail += f"quoted, so the program gets them whole ({why} in nipype's line)"
+        else:
+            detail += f"nipype's line kept: {why}, so the program gets other file names"
+        _defects.warn([("PIPE-80", "nipype command lines", upstream_defects, detail)], stacklevel=3)
+    if upstream_defects == "fix":
+        return fixed
+    if nipype is None:
+        raise RuntimeError(f"{cmd.program} failed: {why}")
+    return nipype
+
+
+def _bet_relpath(
+    path: str, start: str, windows: bool = os.name == "nt", unquote: bool = False
+) -> str:
     """nipype's BET makes its input and output names relative to the node's folder
     (``os.path.relpath``: BET fails with long paths). On Windows nipype's quotes around a path
     (``shlex.quote`` quotes a backslash) are kept around the relative path, and a path on
-    another drive than the folder stays as it is (no relative path joins two drives)."""
+    another drive than the folder stays as it is (no relative path joins two drives).
+
+    nipype makes the input's name relative after quoting it: a name that needs quotes (a blank,
+    a quote) is then taken as relative to the process's folder, and BET gets another file
+    (PIPE-80). ``unquote`` (PIPE-80's correction): the quoted name's path made relative, then
+    quoted again."""
+    if unquote and not windows:
+        quoted = path[:1] in ("'", '"')
+        inner = shlex.split(path)[0] if quoted else path
+        rel = os.path.relpath(inner, start=start)
+        return shlex.quote(rel) if quoted else rel
     if not windows:
         return os.path.relpath(path, start=start)
     quoted = len(path) > 1 and path[0] == path[-1] == "'"
@@ -336,6 +443,10 @@ class _Trait:
     requires: tuple[str, ...] = ()
 
 
+class _Abs(str):
+    """An output name made absolute in the node directory (:meth:`_Interface.in_cwd`)."""
+
+
 class _Interface:
     """A nipype command-line interface: its traits with a command-line form, the defaults of
     its other inputs, and nipype's ``_parse_inputs`` over them."""
@@ -357,13 +468,26 @@ class _Interface:
         self._trait = {t.name: t for t in self.traits}
         #: Whether output names are written absolute (:attr:`Command.run_args`).
         self.absolute = False
+        #: Whether the file names nipype writes unquoted are quoted (PIPE-80's correction,
+        #: :attr:`Command.quoted_args`).
+        self.quote = False
 
     def in_cwd(self, name: Any) -> Any:
         """An output name as the command line gives it: relative as nipype writes it, or in the
-        node directory when :attr:`absolute`."""
+        node directory when :attr:`absolute` (an :class:`_Abs`, which :meth:`w` quotes)."""
         if self.absolute and name and isdefined(name) and not os.path.isabs(os.fspath(name)):
-            return os.path.join(self.cwd, os.fspath(name))
+            return _Abs(os.path.join(self.cwd, os.fspath(name)))
         return name
+
+    def w(self, value: Any) -> Any:
+        """A file name nipype writes into an argument unquoted: as nipype writes it, or quoted
+        for the shell when :attr:`quote` (PIPE-80) or when it is larmorx's absolute form of a
+        name nipype writes relative (:meth:`in_cwd`: one word, as nipype's)."""
+        if isinstance(value, (str, os.PathLike)) and (self.quote or isinstance(value, _Abs)):
+            text = os.fspath(value)
+            if text:
+                return _quote(text)
+        return value
 
     def reset(self) -> None:
         """Clear the formatting state before the line is formatted again."""
@@ -383,6 +507,8 @@ class _Interface:
 
     # nipype's base formatting
     def format_arg(self, t: _Trait, value: Any) -> str | None:
+        if t.kind == "value" and (t.name_source or t.genfile) and isinstance(value, str):
+            value = self.w(value)  # an output name nipype writes unquoted
         return _format_default(t, value)
 
     def gen_filename(self, name: str) -> Any:
@@ -478,12 +604,15 @@ class _Interface:
         return {}
 
     def command(self) -> Command:
-        args = tuple(self.parse_inputs())
-        self.reset()
-        self.absolute = True
-        run_args = tuple(self.parse_inputs())
-        self.absolute = False
-        self.reset()
+        forms = {}
+        for quote in (False, True):
+            for absolute in (False, True):
+                self.quote, self.absolute = quote, absolute
+                forms[quote, absolute] = tuple(self.parse_inputs())
+                self.reset()
+        self.quote = self.absolute = False
+        args, run_args = forms[False, False], forms[False, True]
+        quoted, quoted_run = forms[True, False], forms[True, True]
         return Command(
             self.program,
             args,
@@ -492,6 +621,8 @@ class _Interface:
             self.environ(),
             self.files(),
             None if run_args == args else run_args,
+            None if quoted == args else quoted,
+            None if quoted_run == run_args else quoted_run,
         )
 
 
@@ -698,8 +829,8 @@ class _Registration(_AntsCommand):
     def _format_metric(self, index: int) -> list[str]:
         name_input = self.get("metric")[index]
         stage: dict[str, Any] = {
-            "fixed_image": self.get("fixed_image")[0],
-            "moving_image": self.get("moving_image")[0],
+            "fixed_image": self.w(self.get("fixed_image")[0]),
+            "moving_image": self.w(self.get("moving_image")[0]),
             "metric": name_input,
             "weight": self.get("metric_weight")[index],
             "radius_or_bins": self.get("radius_or_number_of_bins")[index],
@@ -720,8 +851,8 @@ class _Registration(_AntsCommand):
             fixed, moving = self.get("fixed_image"), self.get("moving_image")
             for i in range(len(name_input)):
                 temp = {k: v[i] for k, v in stage.items()}
-                temp["fixed_image"] = fixed[0] if len(fixed) == 1 else fixed[i]
-                temp["moving_image"] = moving[0] if len(moving) == 1 else moving[i]
+                temp["fixed_image"] = self.w(fixed[0] if len(fixed) == 1 else fixed[i])
+                temp["moving_image"] = self.w(moving[0] if len(moving) == 1 else moving[i])
                 specs.append(temp)
         else:
             specs = [stage]
@@ -790,7 +921,7 @@ class _Registration(_AntsCommand):
                     moving_mask = mm[ii if len(mm) > 1 else 0]
                 else:
                     moving_mask = "NULL"
-                out.append(f"--masks [ {fixed_mask}, {moving_mask} ]")
+                out.append(f"--masks [ {self.w(fixed_mask)}, {self.w(moving_mask)} ]")
         return " ".join(out)
 
     def _outputfilename(self, inverse: bool = False) -> str | None:
@@ -827,12 +958,12 @@ class _Registration(_AntsCommand):
                         "should have the same length."
                     )
                 flags = list(inv)
-            items = ["[ %s, %d ]" % (x, int(f)) for x, f in zip(value, flags, strict=False)]
+            items = ["[ %s, %d ]" % (self.w(x), int(f)) for x, f in zip(value, flags, strict=False)]
             return " ".join(["--initial-moving-transform", *items])
         if name == "initial_moving_transform_com":
             return "--initial-moving-transform [ %s, %s, %d ]" % (
-                self.get("fixed_image")[0],
-                self.get("moving_image")[0],
+                self.w(self.get("fixed_image")[0]),
+                self.w(self.get("moving_image")[0]),
                 value,
             )
         if name == "interpolation":
@@ -842,7 +973,7 @@ class _Registration(_AntsCommand):
             return f"--interpolation {value}"
         if name == "output_transform_prefix":
             out, inv = self._outputfilename(False), self._outputfilename(True)
-            value, out, inv = self.in_cwd(value), self.in_cwd(out), self.in_cwd(inv)
+            value, out, inv = (self.w(self.in_cwd(x)) for x in (value, out, inv))
             if out and inv:
                 return f"--output [ {value}, {out}, {inv} ]"
             if out:
@@ -1012,7 +1143,7 @@ class _ApplyTransforms(_AntsCommand):
     def format_arg(self, t: _Trait, value: Any) -> str | None:
         if t.name == "output_image":
             composite = self.get("print_out_composite_warp_file")
-            output = self.in_cwd(self.gen_filename("output_image"))
+            output = self.w(self.in_cwd(self.gen_filename("output_image")))
             if isdefined(composite):
                 return "--output [ %s, %d ]" % (output, int(composite))
             return f"--output {output}"
@@ -1026,7 +1157,7 @@ class _ApplyTransforms(_AntsCommand):
                     "of entries as the transforms list."
                 )
             return " ".join(
-                f"--transform [ {x}, 1 ]" if f else f"--transform {x}"
+                f"--transform [ {self.w(x)}, 1 ]" if f else f"--transform {self.w(x)}"
                 for x, f in zip(value, flags, strict=True)
             )
         if t.name == "interpolation":
@@ -1096,7 +1227,7 @@ class _N4(_AntsCommand):
 
     def format_arg(self, t: _Trait, value: Any) -> str | None:
         if t.name == "output_image" and self._bias:
-            return t.argstr % f"[ {value}, {self.in_cwd(self._bias)} ]"
+            return t.argstr % f"[ {self.w(value)}, {self.w(self.in_cwd(self._bias))} ]"
         if t.name == "bspline_fitting_distance":
             if self.defined("bspline_order"):
                 return t.argstr % ("[ %g, %d ]" % (value, self.get("bspline_order")))
@@ -1211,8 +1342,8 @@ class _DenoiseImage(_AntsCommand):
     def format_arg(self, t: _Trait, value: Any) -> str | None:
         if t.name == "output_image" and (self.get("save_noise") or self.defined("noise_image")):
             newval = "[ {}, {} ]".format(
-                self.in_cwd(self.filename_from_source("output_image")),
-                self.in_cwd(self.filename_from_source("noise_image")),
+                self.w(self.in_cwd(self.filename_from_source("output_image"))),
+                self.w(self.in_cwd(self.filename_from_source("noise_image"))),
             )
             return t.argstr % newval
         return super().format_arg(t, value)
@@ -1339,7 +1470,7 @@ class _Bet(_FslCommand):
     def format_arg(self, t: _Trait, value: Any) -> str | None:
         formatted = super().format_arg(t, value)
         if t.name == "in_file" and formatted is not None:
-            return _bet_relpath(formatted, self.cwd)
+            return _bet_relpath(formatted, self.cwd, unquote=self.quote)
         return formatted
 
     def list_outputs(self) -> dict[str, Any]:
@@ -1393,7 +1524,7 @@ class _MultiImageMaths(_FslCommand):
 
     def format_arg(self, t: _Trait, value: Any) -> str | None:
         if t.name == "op_string":
-            return value % tuple(os.fspath(p) for p in self.get("operand_files"))
+            return value % tuple(self.w(os.fspath(p)) for p in self.get("operand_files"))
         return super().format_arg(t, value)
 
     def list_outputs(self) -> dict[str, Any]:
@@ -1515,7 +1646,7 @@ class _Topup(_FslCommand):
 
     def format_arg(self, t: _Trait, value: Any) -> str | None:
         if t.name == "encoding_direction":
-            return t.argstr % self._encfilename()
+            return t.argstr % self.w(self._encfilename())
         if t.name == "out_base":
             path, _, _ = split_filename(value)
             if path != "" and not os.path.exists(path):
@@ -1730,13 +1861,14 @@ def run(
 
     program = cmd.program
     if program == "antsApplyTransforms":
-        code, out, err = _core.ants_file_program(program, cmd.run_argv(), threads, upstream_defects)
+        argv = words(cmd, upstream_defects, run=True)
+        code, out, err = _core.ants_file_program(program, argv, threads, upstream_defects)
         warn_lines(err)
         if code != 0:
             raise RuntimeError(f"{program} failed (exit {code}): {err.strip()[-2000:]}")
         return cmd
     if program in _ANTS_PROGRAMS:
-        argv = cmd.run_argv()
+        argv = words(cmd, upstream_defects, run=True)
         seeded = ants_random_seed is not None and program == "antsRegistration"
         if seeded and "--random-seed" not in argv:
             argv += ["--random-seed", str(int(ants_random_seed))]
@@ -1747,6 +1879,7 @@ def run(
         return cmd
     if program in ("bet", "fslmaths", "topup"):
         tool = program
+        argv = words(cmd, upstream_defects)
         env = {"FSLOUTPUTTYPE": cmd.environ.get("FSLOUTPUTTYPE", "NIFTI_GZ"), "PATH": cmd.cwd}
         selected = _replica.select("fsl", tool, implementation)
         if selected is None:
@@ -1755,7 +1888,7 @@ def run(
                 (_defects.ENV, upstream_defects),
                 ("OMP_NUM_THREADS", str(threads)),
             ]
-            code, out, err = _core.fsl_run_original(tool, cmd.argv(), pairs, cmd.cwd)
+            code, out, err = _core.fsl_run_original(tool, argv, pairs, cmd.cwd)
             warn_lines(err)
             if code != 0:
                 raise RuntimeError(
@@ -1765,7 +1898,7 @@ def run(
             return cmd
         process = _replica.run(
             selected,
-            cmd.argv(),
+            argv,
             cwd=cmd.cwd,
             n_threads=threads,
             upstream_defects=upstream_defects,
@@ -1787,7 +1920,7 @@ def run(
         assert selected is not None
         _common.run_replica(
             selected,
-            cmd.argv(),
+            words(cmd, upstream_defects),
             cmd.cwd,
             n_threads=threads,
             upstream_defects=upstream_defects,

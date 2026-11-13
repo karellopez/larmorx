@@ -42,7 +42,7 @@ starts no other agent.
 
 | # | Step | State |
 |---|---|---|
-| 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | in progress: the first half merged 2026-11-12; relays 2g, 2h, 3a/3b, 2i, 4, 5 left |
+| 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | **done** 2026-11-13 (the first half merged 2026-11-12); its site page from its export with the documentation revision |
 | 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | starting |
 | 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`; the queue `docs/freesurfer/queue.md`, replica side) | 3.0 done 2026-11-12 (the inventory, the queue, the replay tool); 3.1 in progress |
 | 4 | **Surfaces**: Workbench-compatible tools (a replica in `larmorx-gpl`, a clean room in `larmorx`), MSM (a clean room only, after a patent check) | planned |
@@ -194,10 +194,15 @@ at a time:
    TED-46, both implementations; the replica's gaps closed (ANALYZE and MGH inputs, chained tracebacks, two
    warnings) and its record re-made (102: 62 bit-identical, 40 refused by both alike); follow-ups below);
    (9) the confounds (nipype's CompCor, DVARS, framewise displacement, the non-steady-state detector; fMRIPrep's
-   confound steps: nothing from FreeSurfer; **in progress**: its first half merged 2026-11-12, numpy's and SciPy's
-   linear algebra (OpenBLAS's level 1 to 3 and LAPACK's SVD and least-squares paths), SciPy's FFTs and DVARS, every
-   real call bit-identical in numpy 2.5.4, 2.3.5 and fMRIPrep's 2.2.6; CompCor, TSNR, the non-steady-state
-   detector and framewise displacement since done in its branch); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
+   confound steps: nothing from FreeSurfer; **done** 2026-11-13: numpy's and SciPy's linear algebra (OpenBLAS's level
+   1 to 3 and LAPACK's SVD and least-squares paths), SciPy's FFTs, nipype's confounds module complete (CompCor,
+   DVARS, TSNR, the non-steady-state detector, framewise displacement with nipy's `NIPY` source), fMRIPrep's and
+   niworkflows' confound steps (the masks and signals, the motion parameters and RMS deviation, the tables, the
+   model expansion and spikes) and fMRIPrep's confounds workflow (`larmorx.pipelines.larmorprepx.confounds`), and
+   `larmorx nipype run`; every case of its five records bit-identical (88), fMRIPrep's 36 confounds files of 21
+   oracle runs column by column and their JSON byte for byte under `reproduce`; PIPE-41 to PIPE-83, PD-01 to
+   PD-03, NP-09, NP-10, SCI-41; 16 golden cases; its site page with the documentation revision; follow-ups
+   below); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
    then `mri_coreg`, `lta_convert`, `mri_robust_template`, which fMRIPrep runs without `recon-all`), surfaces
    (item 8); larmorprepx (item 9). **After FreeSurfer, in one block, before the final validation phase** (the user,
    2026-11-06 and 11-11; decision log): a clean-room original of every program, the permissive ports included
@@ -824,6 +829,11 @@ The items below keep their history.
     At a quiet boundary: set it in `scripts/orchestration/env.sh` for every agent, add it to the oracle-output cache's
     key for numpy runs, and re-check every earlier record made in the newest environment on this machine whose calls
     reach products deeper than 256 (t2smap's replica record, sdcflows' fit, `numpy_linalg`'s tall matrices).
+    The exact proposal (the confounds' part, 2026-11-13): `export OPENBLAS_L2_SIZE=512` (any value other than 1024
+    switches the block off; the part's checks and records used 512: `docs/findings/confounds-blas.md`), the variable
+    in the oracle cache's environment family of numpy runs (SciPy's own OpenBLAS builds, 0.3.28 and 0.3.31-22, have
+    no such block: unchanged by it); the records to re-check are those whose numpy 2.5.4 calls reach a product with
+    a depth over 256 and 24 or more columns (NP-09's class: a crash, or results from memory numpy never wrote).
   - *The oracle-output cache does not record empty directories:* a replay cannot show a directory the original made
     without files in it (tedana's output directory after a failed `--exclude`, 2026-11-11, first taken for a
     difference). Record directories too, or state the limit in `docs/validation/oracle-cache.md` and have suites
@@ -848,6 +858,51 @@ The items below keep their history.
     (2026-11-11, `52de0470`; fixed in `9abcd41a`). Run `cargo test` and the Python gates in `verify-merge.sh` with
     `FSLDIR` unset as CI does (the orchestrator did by hand from 2026-11-12), with `LARMORX_GPL_BIN` at the merged
     tree's `crates-gpl` build (`t2smap`'s follow-up below).
+- **From the confounds' part (2026-11-11 to 13; 31 relay agents; [confounds-workflow.md](findings/confounds-workflow.md)
+  and the files it links, `docs/parts/` keeps its notes).** Left:
+  - *Its site page:* the documentation revision's writer adds `present()` and the page in the new layout
+    (`/evidence/confounds/`) from the part's export (`larmorx_validation.evidence.confounds` and `confounds_run`; the
+    cache entries in `oracles/figures-cache/confounds/`, from clean commits: `python -m larmorx_validation evidence
+    confounds --site <site> --no-compute`), the page's `summary.py` row and `validation/tools.toml`'s `page`; what the
+    page must show is in the part's handoff (the agreement of the 88 cases, the five worked examples with their mask
+    viewers and time series, the 36 files column by column, the Gaussian masks' chain of causes, the defects, memory,
+    random testing, speed, and every explained difference: D4's 15 rotation cells, GLIBC-07's negated CompCor columns,
+    the Gaussian masks' last bits, PIPE-43's order, PIPE-41's JSON entries, PIPE-79 open).
+  - *PIPE-79, measured:* fMRIPrep 25.2.6 with `recon-all` on three heads (the lab's server, planned): the aCompCor masks
+    and columns of fMRIPrep's aseg path fed FAST's maps against the masks a corrected path gives, then rule A or C.
+  - *PIPE-42 and the reportlets* with larmorprepx's reports (`rois_plot`, `compcor_plot`, `conf_corr_plot`, the carpet
+    plot): `bold_confounds` returns their inputs.
+  - *Speed, the bits unchanged* ([benchmarks/confounds.md](benchmarks/confounds.md)): the port's `svd`, `lstsq` and
+    `gesvd` run at 0.22 to 0.42 of numpy's and SciPy's speed (the level-1 and level-2 kernels without FMA dispatch,
+    the column splitting, `VT` computed where CompCor does not use it, finer `dgemm` tiles for small outputs), so
+    crownCompCor runs at 0.72 to 0.78 of nipype's; DVARS' fused products and the FFT passes' buffers; the table
+    steps' Python loops (0.6 to 1.0).
+  - *Refused with a clear error, to port when a caller needs them:* LAPACK's `DLASQ1` (`svd(compute_uv=False)`,
+    `DLASDA` without vectors for 2 to 25 values, `DBDSQR` without vectors), numpy's single-precision `sgesdd` (PIPE-57's
+    `reproduce` of a float32 series), `fallback_svd(full_matrices=True)`, SciPy's FFTs of lengths that are not powers
+    of two and ducc0's Bailey algorithm (series of more than 32,768 volumes), nitime's `AR_est_YW` above order 1 and of
+    float64 series, nitransforms' `.mat`, `.h5` and LTA readers (`FSLMotionParams`); a documented gap: SciPy 1.15.2's
+    conda-forge LAPACK in fMRIPrep's image for `fallback_svd` (reached only when numpy's SVD fails on finite data).
+  - *`larmorx nipype run`:* `IntraModalMerge` and `RobustAverage` (nipype relays mcflirt's and 3dvolreg's messages
+    through its log; 3dvolreg's `-1Dfile` and `-maxdisp1D` files differed in one trial), and nipypecli's other
+    commands (`crash`, `search`, `show`, `convert`).
+  - *Notices:* PD-01 named per step only where the step's output changes (`ExpandModel`, fMRIPrep's
+    `FramewiseDisplacement`, `SpikeRegressors`); importing fMRIPrep replaces `warnings.warn` and silences larmorx's
+    `UpstreamDefectWarning`s in that process (`fmriprep/_warnings.py`): larmorx's notices should not depend on it, or
+    the documentation says so.
+  - *Upstream reports* (`docs/upstream-reports/`, drafts for the user to file): PIPE-41 (every confounds JSON misses
+    the tissue signals' entries), PIPE-80 (nipype's unquoted file names), PIPE-81 and PIPE-82 (`nipypecli run`),
+    PD-01 (pandas' float parser), NP-09 (OpenBLAS's Zen 4/5 block with the Haswell kernels).
+  - *The other parts' records re-made with the `DBDSQR` correction* (relay 3b, every result unchanged): main's
+    `sdcflows-estimation` and `niworkflows-helpers` records could be re-made to show the permanent cases added since
+    (19 to 27 and 5 to 7 cases); optional.
+  - *The confounds' clean room* (step 6): the clean-room audit's restriction table needs a confounds family before
+    its implementer starts: `docs/findings/confounds-*.md`, `crates/larmorx-confounds/`, `python/larmorx/confounds/`,
+    `python/larmorx/nipype/`, the confound modules of `python/larmorx/niworkflows/` (`confounds.py`, `morphology.py`,
+    `utility.py`, `patches.py`, `images.py`' `signal_extraction`), `python/larmorx/pipelines/larmorprepx/confounds.py`,
+    the confounds' modules of `larmorx_transform::openblas` and `numpy_linalg`, `validation/investigations/confounds/`,
+    `validation/src/larmorx_validation/parity/confounds_*.py`, `difftest/tools/confounds.py`, `evidence/confounds*.py`
+    and the part's `docs/parts/` folder.
 - **From FreeSurfer's preparation (step 3.0, 2026-11-12; nine replica-side relays; the inventory
   `docs/freesurfer/`, the queue `docs/freesurfer/queue.md` and the cards, closed to FreeSurfer clean-room
   implementers; the replay tool's proof [freesurfer-replay.md](validation/freesurfer-replay.md)).** Left:

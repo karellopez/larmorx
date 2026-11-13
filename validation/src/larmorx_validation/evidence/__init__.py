@@ -42,6 +42,7 @@ TOOLS: dict[str, str] = {
     "tedana-t2smap": "tedana_t2smap",
     "sdcflows-estimation": "sdcflows_estimation",
     "nifti-io": "nifti_io",
+    "confounds": "confounds",
 }
 
 

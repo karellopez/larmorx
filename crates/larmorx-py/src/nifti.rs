@@ -251,15 +251,17 @@ fn data_type_from_name(name: &str) -> PyResult<DataType> {
 // ------------------------------------------------------------------------------------------------
 // Functions
 
-/// Reads a NIfTI file. `scaling` is "auto", "raw", "float32" or "float64". Returns
-/// `(data, affine, header, fixes, scaled)`.
+/// Reads a NIfTI file. `scaling` is "auto", "raw", "float32" or "float64"; `volumes` keeps the
+/// first volumes along the fourth axis only (nibabel's `dataobj[:, :, :, :volumes]`, the header's
+/// shape set to the data's). Returns `(data, affine, header, fixes, scaled)`.
 #[pyfunction]
-#[pyo3(signature = (path, scaling = "auto", n_threads = 1))]
+#[pyo3(signature = (path, scaling = "auto", n_threads = 1, volumes = None))]
 pub fn nifti_read<'py>(
     py: Python<'py>,
     path: std::path::PathBuf,
     scaling: &str,
     n_threads: usize,
+    volumes: Option<usize>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let scaling = match scaling {
         "auto" => Scaling::Auto,
@@ -269,7 +271,13 @@ pub fn nifti_read<'py>(
         s => return Err(PyValueError::new_err(format!("unknown scaling {s:?}"))),
     };
     let image = py
-        .detach(|| nifti::read(&path, &ReadOptions { scaling, n_threads }))
+        .detach(|| {
+            let options = ReadOptions { scaling, n_threads };
+            match volumes {
+                Some(k) => nifti::read_first_volumes(&path, &options, k),
+                None => nifti::read(&path, &options),
+            }
+        })
         .map_err(to_py_err)?;
     let affine = affine_to_py(py, &image.affine().map_err(header_err)?).into_any();
     let data: Bound<'py, PyAny> = larmorx_core::dispatch_dyn_array!(image.data, a => PyArray::from_owned_array(py, a).into_any());

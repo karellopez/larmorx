@@ -2522,3 +2522,43 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   also gains the recorder (`validation/investigations/freesurfer-oracle/`, run-only the same way), recon-all's
   configuration wherever a subject directory or a recording's blobs hold it, and the two crates above (FreeSurfer's
   family, not their workspaces').
+
+## 2026-11-11 to 13: the confounds' part (the orchestrator's decisions and the rules)
+
+The part's decisions, from its notes ("FROM THE ORCHESTRATOR", 2026-11-11 to 13; `docs/parts/` keeps them whole):
+- **The design (relay 1's D1 to D10, 2026-11-11):** the Rust numerics in `larmorx_transform::numpy_linalg` and
+  `openblas` and `larmorx_core::numpy` and `math`, a new crate `crates/larmorx-confounds`, the Python in `lx.confounds`
+  (nipype's and fMRIPrep's interfaces), `lx.niworkflows` (its pieces) and `larmorx.pipelines.larmorprepx.confounds`
+  (the workflow) (D1); pandas' defects a family of their own, PD- (D2); pandas' text round trips and ujson's rounding
+  by rule A: exact round trips and correctly rounded 10-decimal values by default, `reproduce` pandas' parse and
+  ujson's text at every node boundary of fMRIPrep's chain, which gives fMRIPrep's bytes (D3, PD-01, PD-02); glibc's
+  maths: `cos` correctly rounded by default and glibc's under `reproduce` (GLIBC-07), `atan2` and `hypot` correctly
+  rounded in both modes, a spec-writer and clean-room micro-part only where the real files show a change (D4: `atan2`
+  does, 15 of 22,293 rotation cells in 12 of the 36 files, so `atan2_glibc` is in next-steps; `hypot` does not);
+  PIPE-43's column order canonical in both modes, comparisons by name (D5: nondeterminism is never reproduced); the
+  newest releases by default with fMRIPrep 25.2.6's for the step, new tags with their checksums, no new Python
+  environment (D6, D7); `larmorx nipype run` mirroring `nipypecli run`, after the easy command line (D8); full
+  completeness, `DGELSD` of every size included (D9, D10).
+- **OpenBLAS on AMD Zen 4/5 (2026-11-11):** larmorx's products block their depth by 256, a real Haswell's and every
+  oracle's; numpy 2.5.4's 512 on this machine is reached with `gemm_q=512` for validation only; NP-09, a crash, is
+  never reproduced; the part's numpy 2.5.4 checks and records set `OPENBLAS_L2_SIZE=512` themselves (not in `env.sh`
+  while other parts ran: the change for everyone is a follow-up at a quiet boundary).
+- **The rules' outcomes:** 49 entries, PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 (27 rule A, PIPE-47
+  rule D measured then A, 12 rule B, PIPE-74 and PIPE-76 clamped as undefined conversions, PIPE-43 one order, PIPE-48,
+  PIPE-49 and PIPE-83 rule C, PIPE-79 rule D pending its measurement on fMRIPrep runs with FreeSurfer, PIPE-42 with
+  larmorprepx's reports, NP-09 and NP-10 never reproduced); NP-10 (numpy 2.3.5's hang on an infinite matrix) rule B in
+  both modes, its garbage results not reproduced either (the same undefined input class); PIPE-80 (nipype's unquoted
+  file names) rule A, which changes the field maps' `_nipype.py` too (their checks re-run, unchanged); DVARS' masked
+  median of 0 and `_full_rank`'s zero sign closed without an ID, as measured; `DLASQ1`, `sgesdd`,
+  `svd(compute_uv=False)`, `fallback_svd(full_matrices=True)`, SciPy's FFTs of other lengths and nitransforms' other
+  readers refused with a clear error (follow-ups).
+- **The correctly rounded `cos` by default stays** (CLAUDE.md rule 5): on fMRIPrep's real CompCor files it flips the
+  sign of 88 component columns in 20 of 108 files and moves 44 by one unit in the 10th decimal; the regressors are
+  equivalent, and the site shows it as an expected difference with its reason.
+- **A larmorx mistake found by random testing, fixed before the records** (2026-11-12): the `DBDSQR` tolerance
+  constant of the field maps' `numpy_linalg` code (finding 54131: no fMRIPrep call reaches it, but a replica is exact
+  for every valid input); every record the fix can reach re-made and compared (no result changed), main's records
+  kept.
+- **The records `experimental`** (since 2026-11-12 `validated` needs the final validation phase's extensive
+  evidence); **the site page from the export only** (2026-11-13: the documentation revision rebuilds every page in a
+  new layout; its writer adds the confounds' page after the merge).

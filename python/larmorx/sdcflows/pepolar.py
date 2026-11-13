@@ -616,7 +616,7 @@ def topup_node(
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
     enc = cmd.outputs["out_enc_file"]
-    args = cmd.argv()
+    args = _nipype.words(cmd, upstream_defects)
     selected = _replica.select("fsl", "topup", implementation)
     env = {
         "FSLOUTPUTTYPE": "NIFTI_GZ",

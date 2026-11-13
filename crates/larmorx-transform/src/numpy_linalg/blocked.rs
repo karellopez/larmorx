@@ -3774,7 +3774,10 @@ mod tests {
     fn generated_q_is_orthonormal_and_rebuilds_the_matrix() {
         for release in [LapackRelease::V3_12_0, LapackRelease::V3_12_1] {
             let lp = Lapack::new(release);
-            for &(m, n) in &[(300, 170), (170, 300), (200, 161)] {
+            // k = 161: two blocked panels (KI = 32) and the unblocked rest; k = 129: one panel,
+            // just above NX = 128; k = 40: the unblocked routine alone (the smallest sizes, for
+            // CI's budget).
+            for &(m, n) in &[(200, 161), (140, 129), (60, 40)] {
                 for lq in [false, true] {
                     let (rows, cols) = if lq {
                         (m.min(n), n.max(m))

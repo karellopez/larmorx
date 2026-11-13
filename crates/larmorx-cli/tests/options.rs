@@ -744,6 +744,24 @@ fn parse_globals_reads_the_options_before_the_family() {
     assert_eq!(p.args, a(&["bids", "out", "participant"]));
     assert_eq!(p.environment, [("OMP_NUM_THREADS", None)]);
     assert!(larmorx_cli::python_program(&a(&["larmorx", "sdcflows", "other"])).is_none());
+    // nipype's interface runner, the same way
+    let p = larmorx_cli::python_program(&a(&[
+        "lx",
+        "--upstream-defects",
+        "reproduce",
+        "nipype",
+        "run",
+        "--list",
+        "nipype.algorithms.confounds",
+    ]))
+    .unwrap();
+    assert_eq!((p.family.as_str(), p.tool.as_str()), ("nipype", "run"));
+    assert_eq!(p.args, a(&["--list", "nipype.algorithms.confounds"]));
+    assert_eq!(
+        p.environment,
+        [("LARMORX_UPSTREAM_DEFECTS", Some("reproduce".to_owned()))]
+    );
+    assert!(larmorx_cli::python_program(&a(&["larmorx", "nipype", "crash"])).is_none());
     assert!(
         larmorx_cli::python_program(&a(&["larmorx", "--n-threads", "x", "sdcflows", "sdcflows"]))
             .is_none()

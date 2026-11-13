@@ -1,0 +1,16 @@
+[package]
+name = "fs-json"
+description = "larmorx-core's JSON reader and writer (nlohmann/json 3.2.0's lexer, parser, accessors, serializer and Grisu2) against nlohmann/json 3.2.0 and FreeSurfer 8.2.0's json.h, both compiled by the unit oracle's GCC 8.4.0"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build.
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

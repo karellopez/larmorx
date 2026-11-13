@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-freesurfer-batch-6",
+ "dossier": "2026-11-13-confounds-fixci",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 382381,
-  "agents": 395,
+  "accesses": 394530,
+  "agents": 410,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 562,
-  "archived_files": 562,
+  "archive_checksums_matched": 598,
+  "archived_files": 598,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -203,6 +203,14 @@
     "files": 24,
     "sha256": "270fabe579ae46ec980c98fa1944da5c901164127803af20dc15e52efe4767ba"
    },
+   "2026-11-13-session-transcripts-confounds": {
+    "files": 22,
+    "sha256": "d20e0b06f397b65362f35631d5de63401e138de2a0084f9b93b736f9c39092c5"
+   },
+   "2026-11-13-session-transcripts-confounds-fixci": {
+    "files": 34,
+    "sha256": "71732783988b11556a8b19e8ad72cd911b22646a6be36ea9789fc43ffe4654e7"
+   },
    "2026-11-13-session-transcripts-freesurfer-batch-3": {
     "files": 15,
     "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
@@ -219,6 +227,10 @@
     "files": 37,
     "sha256": "60f0beb2d5f9b3ccc43928b7f13d6c40751f27cee2c61e1be65ccce96fef7f21"
    },
+   "2026-11-13-session-transcripts-freesurfer-batch-7": {
+    "files": 31,
+    "sha256": "229b613b3729b39b0651f2e3ab73d28ff09148cdd004a2627b59ae8f09f73e79"
+   },
    "2026-11-13-session-transcripts-freesurfer-cleanroom-1-relay-1": {
     "files": 43,
     "sha256": "d9deda02c9c0a21b4c19d92cfbec7330ef631d30857aa81e49c22bacf3c1580a"
@@ -228,30 +240,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3679,
-  "distinct_transcripts": 399,
+  "commits_printed": 3780,
+  "distinct_transcripts": 414,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 292,
+   "agents_without_worktree": 306,
    "bad_lines": 0,
-   "calls_without_result": 62,
-   "compaction_parent_missing": 8,
+   "calls_without_result": 71,
+   "compaction_parent_missing": 9,
    "compactions": 78,
-   "refused_calls": 1675,
-   "refused_calls_restricted_accesses": 740,
+   "refused_calls": 1687,
+   "refused_calls_restricted_accesses": 741,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 8543
+   "unresolved_paths": 8762
   },
-  "last_record": "2026-11-13 08:46 UTC",
-  "live_files": 399,
-  "live_files_also_archived": 396,
+  "last_record": "2026-11-13 11:48 UTC",
+  "live_files": 414,
+  "live_files_also_archived": 411,
   "sessions": 4,
-  "tool_calls": 109731,
+  "tool_calls": 112752,
   "tool_calls_by_tool": [
    [
     "Agent",
-    397
+    412
    ],
    [
     "Artifact",
@@ -263,7 +275,7 @@
    ],
    [
     "Bash",
-    94112
+    96934
    ],
    [
     "CronCreate",
@@ -275,7 +287,7 @@
    ],
    [
     "Edit",
-    4483
+    4497
    ],
    [
     "EnterWorktree",
@@ -287,7 +299,7 @@
    ],
    [
     "Read",
-    2780
+    2841
    ],
    [
     "ReadNotifications",
@@ -295,7 +307,7 @@
    ],
    [
     "SendMessage",
-    129
+    132
    ],
    [
     "SendUserFile",
@@ -307,7 +319,7 @@
    ],
    [
     "SubagentHandback",
-    420
+    437
    ],
    [
     "TaskOutput",
@@ -315,11 +327,11 @@
    ],
    [
     "TaskStop",
-    296
+    301
    ],
    [
     "ToolSearch",
-    229
+    231
    ],
    [
     "WebFetch",
@@ -331,12 +343,12 @@
    ],
    [
     "Write",
-    6550
+    6632
    ]
   ],
-  "transcript_bytes": 11401774586,
-  "transcript_files": 961,
-  "unique_paths": 78558
+  "transcript_bytes": 12219471974,
+  "transcript_files": 1012,
+  "unique_paths": 80733
  },
  "levels": [
   [
@@ -417,7 +429,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "bd71286b"
+  "verdicts_repository": "8292d908"
  },
  "overview": {
   "agents_by_role": [
@@ -427,11 +439,11 @@
    ],
    [
     "clean-room implementer",
-    90
+    92
    ],
    [
     "documentation",
-    29
+    33
    ],
    [
     "integration",
@@ -439,15 +451,15 @@
    ],
    [
     "other",
-    128
+    129
    ],
    [
     "replica author",
-    117
+    124
    ],
    [
     "spec writer",
-    26
+    27
    ]
   ],
   "attributed_by": [
@@ -475,7 +487,7 @@
     3
    ]
   ],
-  "implementers": 90,
+  "implementers": 92,
   "register_restricted_lines": 1489,
   "single_file_scopes": {
    "checked": 70,

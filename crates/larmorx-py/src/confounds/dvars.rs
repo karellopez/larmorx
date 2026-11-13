@@ -35,7 +35,7 @@ fn scipy_release(v: &str) -> PyResult<(FftLibrary, SolveRelease)> {
 }
 
 /// numpy `version`'s percentile arithmetic, summation order and LAPACK.
-fn numpy_settings(v: &str) -> PyResult<(NumpyRelease, SumOrder, Lapack)> {
+pub(super) fn numpy_settings(v: &str) -> PyResult<(NumpyRelease, SumOrder, Lapack)> {
     let bad = || PyValueError::new_err(format!("numpy must be a 2.x release, got {v:?}"));
     let release = NumpyRelease::from_version(v).ok_or_else(bad)?;
     let order = SumOrder::from_version(v).ok_or_else(bad)?;

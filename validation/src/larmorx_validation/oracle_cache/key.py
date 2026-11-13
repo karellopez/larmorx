@@ -75,6 +75,42 @@ ENV_FAMILIES = {
     # FreeSurfer's programs (larmorx_validation.freesurfer, 2026-11-12): all in FAMILY_ONLY_ENV
     "freesurfer": (),
 }
+#: The variables FreeSurfer 8.2.0's compiled programs and libraries read besides those its family
+#: names below (since 2026-11-13): every name a ``getenv`` call of its C and C++ source spells
+#: out (``validation/investigations/oracle-cache/freesurfer_env.py`` lists them again from the
+#: source): its diagnostic settings (``DIAG*`` and ``diag``, ``DIAG_NO``, the debugging voxel
+#: ``DIAGX`` ..., ``VDIAG1``), ``PROFILE``, ``IMAGE_SIZE``, ``XDEBUG``, its behaviour switches and
+#: the temporary directory (``TMPDIR``, and ``TMP``, ``TEMP``, ``TEMPDIR``, which its choice of a
+#: temporary folder reads after it). Left out: the user's, the machine's and the network's
+#: (``USER``, ``LOGNAME``, ``USERNAME``, ``HOST``, ``HOSTNAME``, ``HOME``, ``PWD``, ``TERM``, the
+#: proxies), which FreeSurfer writes only into provenance lines and logs the comparison leaves
+#: out, or reads in code it does not compile. Like every variable of the key, each counts by its
+#: value where it is set and is absent where it is not, so a run that sets none keeps its key.
+_FREESURFER_READS = """
+    DIAG* diag TMPDIR TMP TEMP TEMPDIR PROFILE IMAGE_SIZE XDEBUG VDIAG1 VDIAG2
+    ATROPHY_SIMULATOR BEVIN_TESTING_dumpFacesAroundVertex BFILE_LITTLE_ENDIAN BRIGHTNESS
+    BUILD_GCA_HISTO cpolv DCM2NIIXFSWRAPPER_DEBUG DEBUG DEBUG_BRAIN DEBUG_MRM DONT_COMPRESS DT
+    E_CURV E_DIFFUSION EXIT_AFTER_INT FCURV flushing FREESUREFER_MRISPblur_old FV_SPHERE_IGNORE_VG
+    GCA_LOG GCA_WRITE_CLASS GCAM_CHECK GCAM_WRITE_LABELS GCAM_WRITE_MEAN GCAM_WRITE_SAMPLES
+    GCAM_YGRAD GCAM_YGRAD_AFTER GE_EVEN GE_ODD GLUT_VIDEO_RESIZE_CHANNEL GRADUNWARP_PRN_DEBUG
+    GRADUNWARP_PRN_GRADCOEFF_ONLY GRADUNWARP_PRN_GRADCOEFF_READ GRADUNWARP_PRN_LEGENDRE
+    GRADUNWARP_PRN_LEGENDRE_NORMFACT GRADUNWARP_PRN_SIEMENS_B GRADUNWARP_USE_GRADFILE
+    IGNORE_FRAME_COUNT_CHECK JPEGMEM KILLIANY_SWAP logging MAG_POW MAG_SCALE MESA_PRIVATE_CMAP
+    MESA_SWAP_HACK MGH_DCMUNPACK_IMAGELIST MGH_TAL MIN_GRAY MRI_DIR MRIS_check_vertexNeighbours
+    MRIS_READVAL_FRAME MRIS_REGISTER_NEW_BEHAVIOR MRIS_SPHERE_NEW_BEHAVIOR mrisCompleteTopology_new
+    MRISfindNeighborsAtVertex_new MRISfindNeighborsAtVertex_old MRISP_DEBUG
+    MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT NCOLS_OVERRIDE NII_RESCALE_OFF NO_AVERAGE305 NO_SPHERE
+    NROWS_OVERRIDE NSLICES_OVERRIDE ONLY_TRANSLATION QDEC_DONT_USE_HISTOGRAM_EDITOR
+    QDEC_SKIP_WMPARC_STAT QDEC_WORKING_DIR RAN READ_NORMALS READ_VOLS REAL_RAS RF_WRITE_TRAINING
+    SDCM_ISMOSAIC_OVERRIDE SHOW_NEG SIGMA SKIP_MRISHASH_TEST SOAP_STATS SPM_START_FRAME
+    TAG_RAS_XFORM_DEBUG THIN_LINES TRIANGULARSURFACE_NOEXTRA_READ TRIANGULARSURFACE_NOEXTRA_WRITE
+    UNPACK_MGH_DTI USE_AVERAGE305 USE_CACHED_CPOLV USE_FAST_SURF_SMOOTHER
+    USE_GA_TOPOLOGY_CORRECTION USE_LAPLACE_GRAD USE_PARTIAL_VOLUME_STUFF
+    USE_RANDOM_TOPOLOGY_CORRECTION USE_SIEMENSASCIITAG VOL_GEOM_THRESH VOLUME_IO_DEST_ORDER
+    VOLUME_IO_SRC_ORDER WRITE_CONTROL_POINTS WRITE_ITER XML_CATALOG_FILES XML_DEBUG_CATALOG
+    XML_MEM_BREAKPOINT XML_MEM_TRACE
+"""
+FREESURFER_READS = tuple(_FREESURFER_READS.split())
 #: Variables in the key of a program of one family only, not of a run that names no family:
 #: OpenBLAS's variables choose the kernels of FSL 6.0.7.23's matrix arithmetic
 #: (``OPENBLAS_CORETYPE``: the last bits of its inverses and solves;
@@ -90,7 +126,8 @@ FAMILY_ONLY_ENV = {
     "python": ("NPY_", "OPENBLAS_", "OMP_", "MKL_", "PYTHON*", "COLUMNS", "TQDM_"),
     # FreeSurfer's own variables (``FS_*``, ``FREESURFER_HOME``, ``SUBJECTS_DIR``: a place, by its
     # role), the MNI tools' its scripts may call, OpenMP's and ITK's threads, and ``PATH``: its tcsh
-    # and Python scripts find the programs they run by it (since 2026-11-12, the replay tool).
+    # and Python scripts find the programs they run by it (since 2026-11-12, the replay tool); the
+    # other variables its programs read (FREESURFER_READS, since 2026-11-13).
     "freesurfer": (
         "FS*",
         "FREESURFER*",
@@ -106,6 +143,7 @@ FAMILY_ONLY_ENV = {
         "ITK_",
         "PATH",
         "PYTHON*",
+        *FREESURFER_READS,
     ),
 }
 

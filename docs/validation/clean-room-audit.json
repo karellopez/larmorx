@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-freesurfer-batch-3",
+ "dossier": "2026-11-13-freesurfer-batch-4",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 369165,
-  "agents": 376,
+  "accesses": 374560,
+  "agents": 384,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 521,
-  "archived_files": 521,
+  "archive_checksums_matched": 536,
+  "archived_files": 536,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -207,6 +207,10 @@
     "files": 15,
     "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
    },
+   "2026-11-13-session-transcripts-freesurfer-batch-4": {
+    "files": 33,
+    "sha256": "88f446ddfec25efeb4ea61b8ed5f94c02ba1215164e1d49ab69ee52ecd2d42f5"
+   },
    "2026-11-13-session-transcripts-freesurfer-cleanroom-1-relay-1": {
     "files": 43,
     "sha256": "d9deda02c9c0a21b4c19d92cfbec7330ef631d30857aa81e49c22bacf3c1580a"
@@ -216,30 +220,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3538,
-  "distinct_transcripts": 380,
+  "commits_printed": 3582,
+  "distinct_transcripts": 388,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 274,
+   "agents_without_worktree": 282,
    "bad_lines": 0,
-   "calls_without_result": 53,
-   "compaction_parent_missing": 5,
+   "calls_without_result": 56,
+   "compaction_parent_missing": 6,
    "compactions": 78,
-   "refused_calls": 1660,
-   "refused_calls_restricted_accesses": 734,
+   "refused_calls": 1662,
+   "refused_calls_restricted_accesses": 735,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 8478
+   "unresolved_paths": 8493
   },
-  "last_record": "2026-11-13 04:37 UTC",
-  "live_files": 380,
-  "live_files_also_archived": 377,
+  "last_record": "2026-11-13 06:18 UTC",
+  "live_files": 388,
+  "live_files_also_archived": 384,
   "sessions": 4,
-  "tool_calls": 106207,
+  "tool_calls": 107624,
   "tool_calls_by_tool": [
    [
     "Agent",
-    378
+    386
    ],
    [
     "Artifact",
@@ -251,7 +255,7 @@
    ],
    [
     "Bash",
-    90818
+    92141
    ],
    [
     "CronCreate",
@@ -263,7 +267,7 @@
    ],
    [
     "Edit",
-    4466
+    4467
    ],
    [
     "EnterWorktree",
@@ -275,7 +279,7 @@
    ],
    [
     "Read",
-    2725
+    2747
    ],
    [
     "ReadNotifications",
@@ -283,7 +287,7 @@
    ],
    [
     "SendMessage",
-    123
+    125
    ],
    [
     "SendUserFile",
@@ -295,7 +299,7 @@
    ],
    [
     "SubagentHandback",
-    399
+    408
    ],
    [
     "TaskOutput",
@@ -303,7 +307,7 @@
    ],
    [
     "TaskStop",
-    287
+    288
    ],
    [
     "ToolSearch",
@@ -319,12 +323,12 @@
    ],
    [
     "Write",
-    6450
+    6501
    ]
   ],
-  "transcript_bytes": 10412017552,
-  "transcript_files": 901,
-  "unique_paths": 76570
+  "transcript_bytes": 10753657775,
+  "transcript_files": 924,
+  "unique_paths": 77445
  },
  "levels": [
   [
@@ -405,7 +409,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "1e90a76c"
+  "verdicts_repository": "803018db"
  },
  "overview": {
   "agents_by_role": [
@@ -419,7 +423,7 @@
    ],
    [
     "documentation",
-    26
+    27
    ],
    [
     "integration",
@@ -427,11 +431,11 @@
    ],
    [
     "other",
-    125
+    126
    ],
    [
     "replica author",
-    106
+    112
    ],
    [
     "spec writer",
@@ -10691,16 +10695,16 @@
      "written": 7
     },
     {
-     "group": "permissive upstream source (ANTs, ITK, nibabel, CORE-MATH, numpy, SciPy, ...)",
-     "run": 0,
-     "seen": 4,
-     "written": 0
-    },
-    {
      "group": "the agent's own scratch notes, task outputs and memory",
      "run": 57,
      "seen": 10,
      "written": 3
+    },
+    {
+     "group": "restricted material (by rule and kind below)",
+     "run": 0,
+     "seen": 4,
+     "written": 0
     }
    ],
    "cannot_see": {
@@ -10732,11 +10736,20 @@
    "last": "2026-11-13",
    "name": "rand, srand, random and srandom with glibc 2.35's streams (larmorx-core)",
    "other_roles": [],
-   "restricted": [],
+   "restricted": [
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 4,
+     "level": "names",
+     "rule": "R14",
+     "scope": "another family"
+    }
+   ],
    "similarity": null,
    "slips": [],
    "verdict": {
-    "status": "clean",
+    "status": "clean, with notes",
     "words": "clean: written from specs/glibc-random.md and black-box runs of the C library; two slips declared by the implementer, neither of restricted content (four file names of another family's probe folder printed by git diff --stat; FreeSurfer 6.0.0's help text from a program an unquoted heredoc ran)"
    }
   },

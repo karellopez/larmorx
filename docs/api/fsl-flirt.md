@@ -7,8 +7,9 @@ boundary-based registration (BBR), and its matrix tool. Also FLIRT's other progr
 `applyxfm4D` and the scripts `pairreg`, `extracttxt`, `aff2rigid` (`lx.fsl.avscale`, ...
 below), with every schedule command (`alignpaxes` and any parameter-subset mask) and `-debug`.
 
-The ports come first. One section per program follows: `flirt` and `convert_xfm` here, then
-FLIRT's other programs in their tables. Each program's section is the source of its reference
+The ports come first. One section per program follows: `flirt`, `convert_xfm`, `avscale`, the
+three coordinate programs, `rmsdiff` and `makerot`, then the other programs and scripts in their
+table. Each program's section is the source of its reference
 page on the documentation site (`python -m larmorx_validation reference`), with its options table
 checked against the code. What the programs share comes after them, and the page's dates are in
 its [History](#history).
@@ -194,36 +195,324 @@ Both ports are complete. The replica is translated from FSL 6.0.7.23's source, b
 clean room, `convert_xfm`'s messages are FSL's, and `-fixscaleskew` aborts where its decomposition
 does not solve (a zero scale or a non-finite entry), as `avscale` does.
 
-## FLIRT's other programs (part 2)
+## `avscale`
 
-Each has the replica of FSL 6.0.7.23's program (every option, message, exit status and failure,
-`specs/flirt.md` §15), run as a separate program, and since part 2 of the original (2026-11-02)
-its clean-room original, run in this process (below); its Python function returns what the program
-prints, parsed (FSL prints 6 decimals or 6 significant digits, and so do these).
+<!-- reference
+program: avscale
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.avscale
+command-line: crates/larmorx-fsl/src/cli/avscale.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
 
-```python
-m = np.loadtxt("bold2t1.mat")
-d = lx.fsl.avscale(m, "boldref.nii.gz", all_params=True)    # avscale --allparams
+`avscale` decomposes a FLIRT matrix. It prints the rotation-and-translation matrix, the angles
+and translations (about the volume's centre of gravity), the scales, skews and their average,
+the determinant and left-right order, the half transforms (the matrix's square root) and, with
+`--inverteddies`, the eddy-current inversion's matrices.
+
+### Python (`avscale`)
+
+`lx.fsl.avscale(matrix, volume=None, *, all_params=False, inverted_eddies=False, implementation="auto")`
+
+`matrix` is a 4 × 4 array or a matrix file, `volume` a path or an `lx.Image`. The result, an
+`AvscaleResult`, holds what the program prints, parsed (FSL prints 6 decimals or 6 significant
+digits, and so does it).
+
+### Options of `avscale`
+
+| `avscale` option | Python | Notes |
+|---|---|---|
+| `matrixfile` `[non-reference-volume]` | `matrix`, `volume` | |
+| `--allparams` | `all_params=True` | also the rotation angles and translations |
+| `--inverteddies` | `inverted_eddies=True` | the eddy-current inversion; exclusive with `--allparams` |
+
+### Examples of `avscale`
+
+<!-- inputs: bold2t1.mat=matrix boldref.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+d = lx.fsl.avscale("bold2t1.mat", "boldref.nii.gz", all_params=True)
 d.scales, d.rotations, d.determinant, d.forward_half
-xyz = lx.fsl.img2imgcoord([[10, 20, 30]], "boldref.nii.gz", "T1w.nii.gz", xfm=m)   # voxels
-mm = lx.fsl.img2stdcoord(xyz, "T1w.nii.gz", "MNI152_T1_2mm.nii.gz", xfm=t1_to_mni, mm=False)
-lx.fsl.rmsdiff(m, np.eye(4), "boldref.nii.gz")               # mm, 80 mm about its centre
-r = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6))      # 4 x 4, 30 degrees
 ```
 
-| Program | Command line | `lx.fsl` | Notes |
-|---|---|---|---|
-| `avscale [--allparams/--inverteddies] matrix [volume]` | `larmorx fsl avscale` | `avscale(matrix, volume=None, *, all_params, inverted_eddies)` → `AvscaleResult` | the rotation-and-translation matrix, angles and translations (about the volume's centre of gravity), scales, skews, their average, the determinant and left-right order, the half transforms (the matrix's square root), `--inverteddies`' matrices |
-| `img2imgcoord -src -dest [-xfm/-premat] [-vox/-mm] [-v] coords` | `larmorx fsl img2imgcoord` | `img2imgcoord(coords, src, dest, *, xfm, mm)` → N × 3 | voxels by default; `-` or no file: standard input (refused at a terminal, as FSL) |
-| `std2imgcoord -img [-std] [-xfm] [-mm/-vox] [-v/-verbose] coords` | `larmorx fsl std2imgcoord` | `std2imgcoord(coords, img, std=None, *, xfm, vox)` → N × 3 | millimetres by default; the matrix inverted |
-| `img2stdcoord -img [-std] [-xfm] [-vox/-mm] [-v/-verbose] coords` | `larmorx fsl img2stdcoord` | `img2stdcoord(coords, img, std=None, *, xfm, mm)` → N × 3 | input voxels by default; output in the standard image's mm |
-| `rmsdiff m1 m2 refvol [mask]` | `larmorx fsl rmsdiff` | `rmsdiff(m1, m2, ref, mask=None)` → float or (largest, rms) | the RMS deviation over 80 mm about the reference's centre of gravity; with a mask, the largest and RMS displacement over it |
-| `makerot -t angle [-a ax,ay,az] [-c cx,cy,cz] [--cov=image] [-o file]` | `larmorx fsl makerot` | `makerot(theta, axis=None, centre=None, *, cov=None)` → 4 × 4 | a rotation by `theta` degrees about the axis through the centre (or the image's centre); the axis divided by its length (FSL by its square root: **FSL-76**, corrected by default); an axis or centre of other than three values refused (**FSL-77**) |
+```bash example
+larmorx fsl avscale --allparams bold2t1.mat boldref.nii.gz
+```
 
-The coordinate programs' `-warp` (a FNIRT warp field) is refused until FNIRT is ported (an
-unreadable file, or an image of other than three volumes, gives FSL's messages and exit status 1,
-as FSL: `specs/flirt.md` §15.2); matrices other than 4 × 4 where
-FSL would invert them beyond 4 × 4 are refused (FSL prints part of its output, then aborts).
+### Ports of `avscale`
+
+Both ports are complete: every option, usage, message, exit status and failure case of
+`specs/flirt.md` §15.1 to §15.4 (where FSL aborts, the same lines and exit status 1). The clean
+room's record holds 66 cases of `avscale`, the coordinate programs, `rmsdiff` and `makerot`: 39
+identical to FSL in every byte of text and file, 27 more where both refuse or abort alike. One
+more matrix of the findings (a reflection's `--inverteddies` check) differs in the sign of a 1e-10
+residual. A matrix of 4 rows that is not 4 × 4, where FSL aborts at a determinant, an inverse or a
+product, is refused (FSL prints part of its output first).
+
+## `img2imgcoord`
+
+<!-- reference
+program: img2imgcoord
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.img2imgcoord
+command-line: crates/larmorx-fsl/src/cli/coords.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`img2imgcoord` maps coordinates from one image to another through a FLIRT matrix: voxels by
+default, millimetres with `-mm`.
+
+### Python (`img2imgcoord`)
+
+`lx.fsl.img2imgcoord(coords, src, dest, *, xfm=None, mm=False, implementation="auto")`
+
+`coords` is N × 3, or a file of rows `x y z`, in `src`'s voxels (NIfTI's), or millimetres with
+`mm`; `xfm` is FLIRT's matrix from `src` to `dest` (the identity without one). The result is N × 3.
+
+### Options of `img2imgcoord`
+
+| `img2imgcoord` option | Python | Notes |
+|---|---|---|
+| `<filename containing coordinates>` | `coords` | `-` or no file: standard input (refused at a terminal, as FSL) |
+| `-src`, `-dest` | `src`, `dest` | |
+| `-xfm`, `-premat` | `xfm` | |
+| `-vox`, `-mm` | `mm` | voxels by default |
+| `-warp` | command line only | FNIRT's warp fields: refused until FNIRT is ported (below) |
+| `-v`, `-help`, `-flirt` | command line only | `-flirt` accepted and ignored |
+
+### Examples of `img2imgcoord`
+
+<!-- inputs: boldref.nii.gz=head T1w.nii.gz=head bold2t1.mat=matrix coords.txt=coords -->
+
+```python example
+import larmorx as lx
+
+xyz = lx.fsl.img2imgcoord([[10, 20, 30]], "boldref.nii.gz", "T1w.nii.gz", xfm="bold2t1.mat")
+xyz.shape  # -> (1, 3)
+```
+
+```bash example
+larmorx fsl img2imgcoord -src boldref.nii.gz -dest T1w.nii.gz -xfm bold2t1.mat coords.txt
+```
+
+### Ports of `img2imgcoord`
+
+Both ports are complete, as for `avscale` (above), standard input included (the prompts and the
+refusal at a terminal). The coordinate programs' `-warp` (a FNIRT warp field) is refused until
+FNIRT is ported: an unreadable file, or an image of other than three volumes, gives FSL's messages
+and exit status 1, as FSL (`specs/flirt.md` §15.2). Matrices other than 4 × 4 where FSL would
+invert them beyond 4 × 4 are refused (FSL prints part of its output, then aborts).
+
+## `std2imgcoord`
+
+<!-- reference
+program: std2imgcoord
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.std2imgcoord
+command-line: crates/larmorx-fsl/src/cli/coords.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`std2imgcoord` maps coordinates from a standard image to an image through the inverse of a FLIRT
+matrix: millimetres by default, the image's voxels with `-vox`.
+
+### Python (`std2imgcoord`)
+
+`lx.fsl.std2imgcoord(coords, img, std=None, *, xfm=None, vox=False, implementation="auto")`
+
+`coords` is N × 3, or a file, in `std`'s millimetres (its sform or qform; without `std`, the
+voxel sizes of a 1 mm grid); `xfm` is FLIRT's matrix from `img` to `std`, which the program
+inverts. The result is N × 3, in `img`'s millimetres, or its NIfTI voxels with `vox`.
+
+### Options of `std2imgcoord`
+
+| `std2imgcoord` option | Python | Notes |
+|---|---|---|
+| `<filename containing coordinates>` | `coords` | `-` or no file: standard input (refused at a terminal, as FSL) |
+| `-img`, `-std` | `img`, `std` | |
+| `-xfm`, `-premat` | `xfm` | the matrix inverted |
+| `-mm`, `-vox` | `vox` | millimetres by default |
+| `-warp` | command line only | FNIRT's warp fields: refused until FNIRT is ported |
+| `-v`, `-verbose`, `-help`, `-flirt` | command line only | `-flirt` gives FSL's warning about outdated options |
+
+### Examples of `std2imgcoord`
+
+<!-- inputs: boldref.nii.gz=head std.nii.gz=head bold2std.mat=matrix coords.txt=coords -->
+
+```python example
+import larmorx as lx
+
+ijk = lx.fsl.std2imgcoord([[0, 0, 0]], "boldref.nii.gz", "std.nii.gz", xfm="bold2std.mat", vox=True)
+ijk.shape  # -> (1, 3)
+```
+
+```bash example
+larmorx fsl std2imgcoord -img boldref.nii.gz -std std.nii.gz -xfm bold2std.mat coords.txt
+```
+
+### Ports of `std2imgcoord`
+
+Both ports are complete, as for `avscale` and `img2imgcoord` (above), with standard input's
+repeated-triple end.
+
+## `img2stdcoord`
+
+<!-- reference
+program: img2stdcoord
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.img2stdcoord
+command-line: crates/larmorx-fsl/src/cli/coords.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`img2stdcoord` maps coordinates from an image to a standard image through a FLIRT matrix: input
+voxels by default, output in the standard image's millimetres.
+
+### Python (`img2stdcoord`)
+
+`lx.fsl.img2stdcoord(coords, img, std=None, *, xfm=None, mm=False, implementation="auto")`
+
+`coords` is N × 3, or a file, in `img`'s NIfTI voxels, or its millimetres with `mm`; `xfm` is
+FLIRT's matrix from `img` to `std`. The result is N × 3, in `std`'s millimetres.
+
+### Options of `img2stdcoord`
+
+| `img2stdcoord` option | Python | Notes |
+|---|---|---|
+| `<filename containing coordinates>` | `coords` | `-` or no file: standard input (refused at a terminal, as FSL) |
+| `-img`, `-std` | `img`, `std` | |
+| `-xfm`, `-premat` | `xfm` | |
+| `-vox`, `-mm` | `mm` | input voxels by default |
+| `-warp` | command line only | FNIRT's warp fields: refused until FNIRT is ported |
+| `-v`, `-verbose`, `-help`, `-flirt` | command line only | `-flirt` gives FSL's warning about outdated options |
+
+### Examples of `img2stdcoord`
+
+<!-- inputs: T1w.nii.gz=head std.nii.gz=head t1_to_std.mat=matrix coords.txt=coords -->
+
+```python example
+import larmorx as lx
+
+mm = lx.fsl.img2stdcoord([[10, 20, 30]], "T1w.nii.gz", "std.nii.gz", xfm="t1_to_std.mat")
+mm.shape  # -> (1, 3)
+```
+
+```bash example
+larmorx fsl img2stdcoord -img T1w.nii.gz -std std.nii.gz -xfm t1_to_std.mat coords.txt
+```
+
+### Ports of `img2stdcoord`
+
+Both ports are complete, as for `avscale` and `img2imgcoord` (above).
+
+## `rmsdiff`
+
+<!-- reference
+program: rmsdiff
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.rmsdiff
+command-line: crates/larmorx-fsl/src/cli/rmsdiff.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`rmsdiff` measures how far apart two FLIRT matrices are: the RMS deviation in millimetres over 80
+mm about the reference's centre of gravity or, with a mask, the largest and the RMS displacement
+over the mask's voxels.
+
+### Python (`rmsdiff`)
+
+`lx.fsl.rmsdiff(matrix1, matrix2, ref, mask=None, *, implementation="auto")`
+
+The matrices are 4 × 4 arrays or files. The result is a float, or `(largest, rms)` with a mask.
+
+### Options of `rmsdiff`
+
+| `rmsdiff` arguments | Python | Notes |
+|---|---|---|
+| `matrixfile1` `matrixfile2` `refvol` `[mask]` | `matrix1`, `matrix2`, `ref`, `mask` | |
+
+### Examples of `rmsdiff`
+
+<!-- inputs: a.mat=matrix b.mat=matrix boldref.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+d = lx.fsl.rmsdiff("a.mat", "b.mat", "boldref.nii.gz")
+```
+
+```bash example
+larmorx fsl rmsdiff a.mat b.mat boldref.nii.gz
+```
+
+### Ports of `rmsdiff`
+
+Both ports are complete, as for `avscale` (above).
+
+## `makerot`
+
+<!-- reference
+program: makerot
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.makerot
+command-line: crates/larmorx-fsl/src/cli/makerot.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`makerot` writes the 4 × 4 matrix of a rotation by `theta` degrees about an axis through a centre
+(or through the centre of an image).
+
+### Python (`makerot`)
+
+`lx.fsl.makerot(theta, axis=None, centre=None, *, cov=None, upstream_defects="fix", implementation="auto")`
+
+The result is a 4 × 4 array.
+
+### Options of `makerot`
+
+| `makerot` option | Python | Notes |
+|---|---|---|
+| `-t`, `--theta` | `theta` | degrees |
+| `-a`, `--axis` | `axis` | three values; divided by its length (FSL by its square root: **FSL-76**, corrected by default) |
+| `-c`, `--centre` | `centre` | three values |
+| `--cov` | `cov` | an image: the rotation's centre is its centre |
+| `-o`, `--out` | the result | |
+| `-v`, `--verbose`, `-h`, `--help` | command line only | |
+
+An axis or centre of other than three values is refused (**FSL-77**).
+
+### Examples of `makerot`
+
+```python example
+import larmorx as lx
+
+r = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6))
+r.shape  # -> (4, 4)
+```
+
+```bash example
+larmorx fsl makerot -t 30 -a 1,2,3 -c 4,5,6 -o rot.mat
+```
+
+### Ports of `makerot`
+
+Both ports are complete, as for `avscale` (above): FSL-76 corrected by default (FSL's matrix with
+`reproduce`, named), FSL-77 refused by default (FSL's reading with `reproduce`, named in both
+modes).
 
 ## FLIRT's other programs and scripts (part 3)
 

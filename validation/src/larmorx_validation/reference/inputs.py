@@ -62,10 +62,15 @@ def _make_matrix(path: Path) -> None:
     path.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n", encoding="utf-8")
 
 
+def _make_coords(path: Path) -> None:
+    path.write_text("10 20 30\n5 6 7\n", encoding="utf-8")
+
+
 KINDS: dict[str, Kind] = {
     "head": Kind("a synthetic head of 40 × 48 × 40 voxels of 4 mm", _make_head),
     "head4d": Kind("a synthetic series of 4 such heads", _make_head4d),
     "matrix": Kind("the identity as a 4 × 4 text matrix", _make_matrix),
+    "coords": Kind("two coordinates, one `x y z` per line", _make_coords),
 }
 
 

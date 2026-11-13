@@ -21,7 +21,6 @@ Timing runs are never cached (they measure the programs); both run with one thre
 from __future__ import annotations
 
 import argparse
-import os
 import random
 import struct
 import subprocess
@@ -57,7 +56,10 @@ def batches(r: random.Random) -> dict[str, tuple[list[str], list[str]]]:
         lines, base = [], []
         for _ in range(k):
             seed = r.randrange(256)
-            sets = " ".join(f"{r.randrange(n)} {r.randrange(n)} {r.randrange(n)} 0 {f32(1000.0)}" for _ in range(3))
+            sets = " ".join(
+                f"{r.randrange(n)} {r.randrange(n)} {r.randrange(n)} 0 {f32(1000.0)}"
+                for _ in range(3)
+            )
             lines.append(f"@60 bbox {n} {n} {n} {kind} 1 0 {seed} 3 {sets} 70")
             base.append(f"@60 bbox {n} {n} {n} 9 1 0 {seed} 3 {sets} 70")
         out[f"bbox {name} {n}^3"] = (lines, base)

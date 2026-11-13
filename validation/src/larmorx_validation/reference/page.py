@@ -551,11 +551,23 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append("### LARMORX's own options {#larmorx-options}\n")
     if released:
         body.append(_not_yet(own, released) + "\n")
+    present = [f"`{o.python}`" for o in own if fn.param(o.python) is not None]
+    if len(present) == len(own):
+        python_words = f" and are arguments of `{fn.public}`"
+    elif present:
+        rest = len(own) - len(present)
+        python_words = (
+            f"; `{fn.public}` takes {' and '.join(present)} as "
+            + ("an argument" if len(present) == 1 else "arguments")
+            + (", and the other is" if rest == 1 else ", and the others are")
+            + " the command line's only"
+        )
+    else:
+        python_words = f"; `{fn.public}` takes none of them"
     body.append(
         f"They stand between `larmorx` and `{p.group}` on the command line "
-        f"(`larmorx --n-threads 4 {command.split(' ', 1)[1]} ...`) and are arguments of "
-        f"`{fn.public}`. Each one given wins over its environment variable, which keeps "
-        "working.\n"
+        f"(`larmorx --n-threads 4 {command.split(' ', 1)[1]} ...`){python_words}. Each one "
+        "given wins over its environment variable, which keeps working.\n"
     )
     body.append("| Command line, then Python | What it does |\n|---|---|")
     for o in own:

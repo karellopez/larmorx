@@ -553,3 +553,16 @@ def test_port_words_are_named_as_the_ports(monkeypatch):
     assert "in the clean room's own words" in md
     assert "The clean room's usage: “" in md and "FSL: “" not in md
     assert "usage text, as the clean room prints it" in md
+
+
+def test_an_absent_own_argument_is_the_command_lines_only():
+    """A function without one of LARMORX's own arguments (convert_xfm takes no `n_threads` and
+    no `upstream_defects`): its row names the option as the command line's only."""
+    page = apipage.read(REPO, "docs/api/fsl-flirt.md")
+    p = next(p for p in page.programs if p.name == "convert_xfm")
+    from larmorx_validation.reference.page import build
+
+    ref = build(REPO, p)
+    assert ref.problems == []
+    assert 'takes no <code><span class="nw">n&#95;threads</span></code>' in ref.markdown
+    assert "(no Python argument)" in ref.markdown

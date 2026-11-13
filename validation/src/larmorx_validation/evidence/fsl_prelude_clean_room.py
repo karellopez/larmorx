@@ -863,7 +863,23 @@ def export(ctx: core.Context) -> dict:
     prov["original_exporter"] = core.tree_hash(
         ctx.repo, "validation/src/larmorx_validation/evidence/fsl_prelude_clean_room.py"
     )
-    return doc
+    return present(doc)
+
+
+def present(doc: dict) -> dict:
+    """The page in the writing guide's words (the replica's module, :mod:`fsl_prelude`, as a
+    black box: texts, ports and order only). A shape the presenter refuses, or any other failure
+    of it, is reported without its message or traceback, which may quote a label or a line of
+    the replica's module (the reviewer's rounds 16 and 17): a documentation agent runs
+    ``fsl_prelude.present`` itself to see it."""
+    from larmorx_validation.evidence import fsl_prelude
+
+    try:
+        return fsl_prelude.present(doc)
+    except Exception:
+        raise RuntimeError(
+            "prelude's page: the presenter refused a shape; a documentation agent must look"
+        ) from None
 
 
 if __name__ == "__main__":  # the original's cache entries only (``refresh WHY``: refresh)

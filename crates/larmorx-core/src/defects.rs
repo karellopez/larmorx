@@ -1659,6 +1659,12 @@ defects! {
         "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) given no intensity volume reads the first border voxel's intensity from no volume: the program crashes";
     FS_471 = "FS-471", "FreeSurfer", true,
         "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) sets aside three tables of the label limit's size on the stack at every voxel it counts: a negative limit, or one whose tables pass the stack (about 699,000 labels with Linux's default 8 MiB stack), crashes the program";
+    FS_472 = "FS-472", "FreeSurfer", true,
+        "a constant fill (MRIconst) or a normalisation of each voxel's frames (MRInormalizeSequence) of a byte, short or unsigned short volume stores a value past the type's range as the low bits of its integer: it wraps";
+    FS_473 = "FS-473", "FreeSurfer", true,
+        "the reversal of a volume's slices (MRIreverseSliceOrder) copies one b-value and b-vector per frame from tables of fewer rows than frames past their rows: a crash or memory contents";
+    FS_474 = "FS-474", "FreeSurfer", true,
+        "the order of a volume's voxels by value (MRIorderIndices) keeps each voxel's coordinates and value in bytes: a coordinate past 255 wraps, and a value outside 0 to 255 or NaN becomes the low byte of its 32-bit truncation";
 }
 
 /// The register entry with ID `id`.

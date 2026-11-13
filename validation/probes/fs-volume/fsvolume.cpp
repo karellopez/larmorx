@@ -1299,6 +1299,107 @@ void run_case()
     of(r);
     put_vol(mix);
     put_vol(nbr);
+  } else if (cmd == "randn" || cmd == "const") {
+    int dims[4];
+    for (int &d : dims) d = geti();
+    float a = getf(), b = getf();
+    long seed = geti();
+    MRI *m = geti() ? get_vol() : NULL;
+    setRandomSeed(seed);
+    fflush(stdout);
+    MRI *r = cmd == "randn" ? MRIrandn(dims[0], dims[1], dims[2], dims[3], a, b, m)
+                            : MRIconst(dims[0], dims[1], dims[2], dims[3], a, m);
+    fflush(stdout);
+    oi(r != NULL && r == m);
+    put_vol(r);
+  } else if (cmd == "nseq" || cmd == "nfr") {
+    MRI *m = get_vol();
+    fill_paint(m);
+    int which = geti();
+    float target = getf();
+    fflush(stdout);
+    int r = cmd == "nseq" ? MRInormalizeSequence(m, target)
+            : which == 0  ? MRInormalizeFrames(m)
+            : which == 1  ? MRInormalizeFramesMean(m)
+                          : MRInormalizeFramesFirst(m);
+    fflush(stdout);
+    oi(r);
+    put_vol(m);
+  } else if (cmd == "sort") {
+    MRI *in = get_vol();
+    fill_paint(in);
+    MRI *mask = geti() ? get_vol() : NULL;
+    if (mask) fill_paint(mask);
+    MRI *s = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRIsort(in, mask, s);
+    fflush(stdout);
+    oi(r != NULL && r == s);
+    put_vol(r);
+  } else if (cmd == "revsl") {
+    MRI *in = get_vol();
+    fill_paint(in);
+    if (geti()) in->bvals = get_list();
+    if (geti()) in->bvecs = get_list();
+    in->bvec_space = geti();
+    MRI *o = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRIreverseSliceOrder(in, o);
+    fflush(stdout);
+    oi(r != NULL && r == o);
+    put_vol(r);
+    if (r) {
+      om(r->bvals);
+      om(r->bvecs);
+      oi(r->bvec_space);
+    }
+  } else if (cmd == "cdtype") {
+    MRI *in = get_vol();
+    int type = geti();
+    fflush(stdout);
+    MRI *r = MRIcloneDifferentType(in, type);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "nonmax") {
+    MRI *in = get_vol();
+    fill_paint(in);
+    MRI *s = geti() ? get_vol() : NULL;
+    float thresh = getf();
+    int dir = geti();
+    fflush(stdout);
+    MRI *r = MRInonMaxSuppress(in, s, thresh, dir);
+    fflush(stdout);
+    oi(r != NULL && r == s);
+    put_vol(r);
+  } else if (cmd == "xrpad") {
+    MRI *in = get_vol();
+    fill_paint(in);
+    MRI_REGION reg;
+    int hr = geti();
+    if (hr) {
+      reg.x = geti(); reg.y = geti(); reg.z = geti();
+      reg.dx = geti(); reg.dy = geti(); reg.dz = geti();
+    }
+    int pad = geti();
+    fflush(stdout);
+    MRI *r = MRIextractRegionAndPad(in, NULL, hr ? &reg : NULL, pad);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "ordidx" || cmd == "vperm") {
+    MRI *in = get_vol();
+    fill_paint(in);
+    long seed = geti();
+    int n = in->width * in->height * in->depth;
+    std::vector<short> xs(n > 0 ? n : 0, -7), ys(n > 0 ? n : 0, -7), zs(n > 0 ? n : 0, -7);
+    setRandomSeed(seed);
+    fflush(stdout);
+    int r = cmd == "ordidx" ? MRIorderIndices(in, xs.data(), ys.data(), zs.data())
+                            : MRIcomputeVoxelPermutation(in, xs.data(), ys.data(), zs.data());
+    fflush(stdout);
+    oi(r);
+    for (short v : xs) oi(v);
+    for (short v : ys) oi(v);
+    for (short v : zs) oi(v);
   } else {
     fail("unknown command");
   }

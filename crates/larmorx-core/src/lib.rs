@@ -18,6 +18,8 @@
 //!   subtract-with-borrow random numbers (FreeSurfer's `-seed` generator).
 //! - [`cscan`]: C's `sscanf` conversions `%lf` and `%d` and `strtod`, as the C library reads them.
 //! - [`drand48`]: POSIX's 48-bit random numbers, as the C library gives them.
+//! - [`glibc_random`]: the C library's `rand`, `srand`, `random` and `srandom`, as glibc 2.35
+//!   gives them (a clean room of `specs/glibc-random.md`).
 //! - [`cubic_spline`]: the cubic spline of FreeSurfer's intensity normalisation (a clean room of
 //!   `specs/burkardt-spline.md`).
 //! - [`ranlux`]: RANLUX389 and the random distributions FreeSurfer draws from (a clean room of
@@ -43,6 +45,7 @@ pub mod defects;
 pub mod drand48;
 pub mod eigen_sym;
 pub mod element;
+pub mod glibc_random;
 pub mod grid;
 pub mod image;
 pub mod itk_real;

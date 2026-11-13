@@ -596,3 +596,32 @@ low 32 bits of `strtol`. Decimal strings through Rust's correctly rounded parser
 rounded here, ties to even, subnormals included. `validation/probes/fs-minc-nifti` (family `scan`)
 compares it with glibc's `sscanf("%lf")`, `sscanf("%d")` and `strtod`: 400,000 generated strings of
 each, 0 differences (scale 1, 2026-11-13; `docs/findings/minc-xfm.md`).
+
+## The C library's `rand`, `srand`, `random` and `srandom` (`src/glibc_random/`; FreeSurfer's foundations, item 3.1-04's glibc part, 2026-11-13)
+
+**Clean-room implementation from [`specs/glibc-random.md`](../../specs/glibc-random.md)** (Apache-2.0;
+the spec at commit `ee1188d1`, SHA-256 `9cb0ad1371ca…`), by the implementer of `src/ranlux/` and
+`src/cubic_spline/`, who never opened the GNU C Library's source (any release or copy, its
+disassembly), the spec writer's model (`validation/investigations/glibc-random-spec-check/`),
+`crates-gpl/`, `crates-nc/`, FreeSurfer's source, the documents written from it or `docs/parts/`.
+Its inputs: the spec alone (the publications it cites in §11 were not needed); black-box runs of the
+C library's functions through `glibc_random_probe` (its source in
+`validation/investigations/glibc-random-probe/`, calls of `srand`, `rand`, `srandom` and `random`
+only, built with `cc -O2`, read and run as the spec allows) and of FreeSurfer 8.2.0's official
+`mri_robust_template` and `mri_volsynth`; the probe folder's README and `robust_template_tp.sh`.
+
+The state is 31 words of the additive recurrence in a ring and two indices, a value the caller owns
+(no global state, no lock, no allocation). Seeding computes Park and Miller's words as products with
+a table of the powers of 16807 modulo 2³¹ − 1 (the same residues as the spec's step-by-step
+congruence) and the 310 discarded terms in a flat buffer; a draw is one addition and a shift. Integer
+arithmetic only.
+
+**Identical to the C library** (`docs/findings/glibc-random-clean-room.md`,
+`validation/investigations/freesurfer-cleanroom-random-spline/compare_glibc_random.py`, 2026-11-13
+from `1071fcd1`, glibc 2.35-0ubuntu3.15): the unseeded stream; 33 edge and `long` seeds and 180
+random seeds, 10,000 values each through `rand` and `random`; the shared state on 20 seeds; §6's
+hashes; **every one of the 2³² seeds**, the first 4 values of each; the official
+`mri_robust_template`'s random first time point in 28 of 28 cases. 4.6 times faster than glibc's
+`rand` per value, 11 times per seeding. The unit tests check the spec's numbers and hashes, the
+fast seeding against the spec's steps taken literally (20,011 seeds) and 6 golden checksums recorded
+from the C library's output, on every platform.

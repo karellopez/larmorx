@@ -1563,6 +1563,8 @@ defects! {
         "a text colour table whose largest structure number (or tissue-type number) is beyond the machine's memory, or a table of random colours of such a count, gives an error message, a crash or a table depending on the machine's memory";
     FS_421 = "FS-421", "FreeSurfer", true,
         "reading an MGH volume whose talairach tag's text has no NUL byte (and fewer than 1,024 bytes) takes the transform's name on past the text from memory never written: a garbled name, so the transform is not found or another file is read";
+    FS_422 = "FS-422", "FreeSurfer", true,
+        "reading an MNI transform file (regio_read_mincxfm) whose first line is not MNI Transform File leaves the file open: a program that reads many runs out of file descriptors";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

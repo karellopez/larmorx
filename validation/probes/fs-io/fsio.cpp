@@ -831,6 +831,47 @@ void run_piece10(const std::string &cmd)
     COLOR_TABLE *m = read_ct10();
     oi(CTABmerge(ct, m));
     print_ct10(ct, false, false);
+  } else if (cmd == "rpr" || cmd == "rwr") {
+    // regio_print_register / regio_write_register
+    bool n;
+    std::string subj = getstr(&n);
+    float ip = getf(), bp = getf(), in = getf();
+    MATRIX *R = read_mat();
+    int f2i = (int)geti();
+    if (cmd == "rpr") {
+      oi(regio_print_register(stdout, n ? NULL : subj.c_str(), ip, bp, in, R, f2i));
+    } else {
+      setup(next());
+      errno = 0;
+      std::string fn = name10();
+      oi(regio_write_register(fn.c_str(), n ? NULL : subj.c_str(), ip, bp, in, R, f2i));
+      obytes(read_file(fn));
+    }
+  } else if (cmd == "rrx") {
+    int want = (int)geti();
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    MATRIX *R = NULL;
+    char *info = NULL;
+    oi(regio_read_mincxfm(fn.c_str(), &R, want ? &info : NULL));
+    print_mat(R);
+    if (info) ocs(info); else out += "N ";
+  } else if (cmd == "rwx") {
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "Thu Jan  1 00:00:00 2026", 1);
+    MATRIX *R = read_mat();
+    bool n;
+    std::string info = getstr(&n);
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    oi(regio_write_mincxfm(fn.c_str(), R, n ? NULL : info.c_str()));
+    obytes(read_file(fn));
+  } else if (cmd == "rrm") {
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    print_mat(regio_read_registermat(fn.c_str()));
   } else {
     fail("unknown command");
   }
@@ -839,7 +880,8 @@ void run_piece10(const std::string &cmd)
 
 bool piece10_cmd(const std::string &cmd)
 {
-  static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme"};
+  static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme",
+                            "rpr", "rwr", "rrx", "rwx", "rrm"};
   for (const char *c : k)
     if (cmd == c) return true;
   return false;

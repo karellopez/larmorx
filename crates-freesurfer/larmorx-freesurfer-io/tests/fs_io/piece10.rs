@@ -17,17 +17,20 @@
 use std::io::Write;
 
 use larmorx_freesurfer_core::globals::Globals;
+use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc};
 use larmorx_freesurfer_core::random;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_io::colortab;
+use larmorx_freesurfer_io::registerio;
 use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry};
 
 use super::piece4::{file_entry, setup};
 use super::{Gen, Out, Work, dec, enc, hex};
 
 /// The piece-10 commands.
-pub const KINDS: [&str; 11] = [
-    "cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme",
+pub const KINDS: [&str; 16] = [
+    "cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme", "rpr", "rwr",
+    "rrx", "rwx", "rrm",
 ];
 
 // ---------------------------------------------------------------- generation
@@ -331,6 +334,99 @@ fn lut_setup(g: &mut Gen, file: &str) -> String {
     file_entry(file, &lut(g))
 }
 
+/// A float's bits in hex: ordinary numbers mostly, sometimes -0, subnormal, huge, infinite, NaN.
+fn fbits(g: &mut Gen) -> String {
+    let v: f32 = match g.below(14) {
+        0 => f32::NAN,
+        1 => f32::INFINITY,
+        2 => -0.0,
+        3 => 1e-40,
+        4 => 3.4e38,
+        5 => -1.0 / 3.0,
+        _ => (g.int(-4000, 4000) as f32) / 16.0,
+    };
+    format!("{:08x}", v.to_bits())
+}
+
+fn matrix4(g: &mut Gen) -> Vec<String> {
+    let mut t = vec!["4".to_string()];
+    for _ in 0..16 {
+        t.push(fbits(g));
+    }
+    t
+}
+
+fn num_text(g: &mut Gen) -> String {
+    match g.below(16) {
+        0 => g
+            .pick(&["nan", "-inf", "1e40", "1e-50", "0x1p3", "abc", "+.5", "-0"])
+            .into(),
+        _ => format!("{}", (g.int(-40000, 40000) as f64) / 64.0),
+    }
+}
+
+/// An MNI `.xfm` file: whole mostly, with comments, blank lines, indentation, CR LF, a wrong first
+/// line, fewer lines, numbers that do not read.
+fn xfm_text(g: &mut Gen) -> Vec<u8> {
+    let mut s = Vec::new();
+    match g.below(12) {
+        0 => s.extend_from_slice(b"  MNI Transform File\n"),
+        1 => s.extend_from_slice(b"Not a transform\n"),
+        2 => {}
+        3 => s.extend_from_slice(b"# a comment\n\nMNI Transform File # x\n"),
+        _ => s.extend_from_slice(b"MNI Transform File\n"),
+    }
+    if !g.chance(6) {
+        s.extend_from_slice(g.pick(&[
+            b"% avg152T1.mnc\n".as_slice(),
+            b"%Mon Jan  1 00:00:00 2026>>> mritotal -center 0 0 0 a.mnc\n",
+            b"\n",
+            b"  % indented # with a hash\n",
+        ]));
+    }
+    s.extend_from_slice(b"\nTransform_Type = Linear;\nLinear_Transform =\n");
+    let rows = if g.chance(8) { g.int(1, 2) } else { 3 };
+    let eol: &[u8] = if g.chance(6) { b"\r\n" } else { b"\n" };
+    for r in 0..rows {
+        let mut l = Vec::new();
+        if g.chance(4) {
+            l.extend_from_slice(b" ");
+        }
+        for c in 0..4 {
+            if c > 0 {
+                l.extend_from_slice(b" ");
+            }
+            l.extend_from_slice(num_text(g).as_bytes());
+        }
+        if r == rows - 1 {
+            l.push(b';');
+        }
+        l.extend_from_slice(eol);
+        s.extend_from_slice(&l);
+    }
+    if g.chance(8) {
+        s.extend_from_slice(g.pick(&[b"\n".as_slice(), b"\n\n", b"   \n"]));
+    }
+    s
+}
+
+/// A tkregister `register.dat`.
+fn reg_text(g: &mut Gen) -> Vec<u8> {
+    let mut s = Vec::new();
+    s.extend_from_slice(g.pick(&[b"bert\n".as_slice(), b"subject-unknown\n", b"\n"]));
+    for _ in 0..3 {
+        s.extend_from_slice(num_text(g).as_bytes());
+        s.push(b'\n');
+    }
+    let k = if g.chance(10) { g.int(10, 15) } else { 16 };
+    for i in 0..k {
+        s.extend_from_slice(num_text(g).as_bytes());
+        s.push(if i % 4 == 3 { b'\n' } else { b' ' });
+    }
+    s.extend_from_slice(g.pick(&[b"round\n".as_slice(), b"tkregister\n", b"", b"bogus\n"]));
+    s
+}
+
 /// One piece-10 case.
 pub fn generate(g: &mut Gen, kind: &str, portable: bool) -> Vec<String> {
     let mut t = vec![kind.to_string()];
@@ -491,6 +587,50 @@ pub fn generate(g: &mut Gen, kind: &str, portable: bool) -> Vec<String> {
                 t.extend(tb);
             }
         }
+        "rpr" | "rwr" => {
+            t.push(
+                g.pick(&["N", "x", "x62657274", "x61206220", "x7375626a656374"])
+                    .into(),
+            );
+            for _ in 0..3 {
+                t.push(fbits(g));
+            }
+            t.extend(matrix4(g));
+            t.push(g.pick(&[0i64, 1, 2, 2, 5, -1]).to_string());
+            if kind == "rwr" {
+                let out = if portable {
+                    g.pick(&["w/reg.dat", "w/reg.dat", "w/no/reg.dat"])
+                } else {
+                    g.pick(&["w/reg.dat", "w/reg.dat", "w/no/reg.dat", "d"])
+                };
+                t.push("-".into());
+                t.push(enc(Some(out.as_bytes())));
+            }
+        }
+        "rrx" => {
+            t.push(g.pick(&["0", "1"]).into());
+            if g.chance(15) {
+                t.push("-".into());
+            } else {
+                t.push(file_entry("w/t.xfm", &xfm_text(g)));
+            }
+            t.push(enc(Some(b"w/t.xfm")));
+        }
+        "rwx" => {
+            t.extend(matrix4(g));
+            t.push(g.pick(&["N", "x", "x617667313532543120"]).into());
+            t.push("-".into());
+            let out = g.pick(&["w/o.xfm", "w/o.xfm", "w/no/o.xfm"]);
+            t.push(enc(Some(out.as_bytes())));
+        }
+        "rrm" => {
+            if g.chance(15) {
+                t.push("-".into());
+            } else {
+                t.push(file_entry("w/register.dat", &reg_text(g)));
+            }
+            t.push(enc(Some(b"w/register.dat")));
+        }
         _ => {
             let a = table(g, true);
             let mut b = table(g, true);
@@ -629,6 +769,46 @@ fn print_table(o: &mut Out, ct: Option<&ColorTable>, alloc: bool, sub_alloc: boo
     }
     o.0.push_str("T ");
     print_table(o, ct.ctab_tissue_type.as_deref(), sub_alloc, false);
+}
+
+fn alloc4(k: i32) -> Matrix {
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    let mut g = Globals::new(larmorx_core::defects::UpstreamDefects::Reproduce);
+    matrix_alloc(&mut g, &mut a, &mut b, k, k, MATRIX_REAL)
+        .ok()
+        .flatten()
+        .expect("a matrix")
+}
+
+fn read_mat(tk: &mut Toks) -> Option<Matrix> {
+    let k = tk.int() as i32;
+    if k == 0 {
+        return None;
+    }
+    let mut m = alloc4(k);
+    for r in 1..=k {
+        for c in 1..=k {
+            m.set_relt(
+                r,
+                c,
+                f32::from_bits(u32::from_str_radix(tk.next(), 16).unwrap()),
+            );
+        }
+    }
+    Some(m)
+}
+
+fn print_mat(o: &mut Out, m: Option<&Matrix>) {
+    let Some(m) = m else {
+        o.0.push_str("N ");
+        return;
+    };
+    o.i(i64::from(m.rows));
+    for r in 1..=m.rows {
+        for c in 1..=m.cols {
+            of(o, m.relt(r, c));
+        }
+    }
 }
 
 fn env3_of(tk: &mut Toks) -> Environment {
@@ -858,6 +1038,83 @@ fn answer(
             let r =
                 colortab::tissue_type_schema(g, &env, out, err, dir, ct, &schema).map_err(fatal)?;
             print_table(o, r.as_ref(), false, true);
+        }
+        "rpr" | "rwr" => {
+            let subj = dec(tk.next());
+            let f = |tk: &mut Toks| f32::from_bits(u32::from_str_radix(tk.next(), 16).unwrap());
+            let (ip, bp, inten) = (f(&mut tk), f(&mut tk), f(&mut tk));
+            let r = read_mat(&mut tk).expect("a matrix");
+            let f2i = tk.int() as i32;
+            if tk.t[0] == "rpr" {
+                let mut text = Vec::new();
+                let mut msg = Vec::new();
+                let st = registerio::regio_print_register(
+                    &mut text,
+                    &mut msg,
+                    subj.as_deref(),
+                    ip,
+                    bp,
+                    inten,
+                    &r,
+                    f2i,
+                );
+                let _ = out.write_all(&text);
+                let _ = out.write_all(&msg);
+                o.i(i64::from(st));
+            } else {
+                setup(w, tk.next());
+                let name = tk.string();
+                let st = registerio::regio_write_register(
+                    g,
+                    out,
+                    err,
+                    dir,
+                    &name,
+                    subj.as_deref(),
+                    ip,
+                    bp,
+                    inten,
+                    &r,
+                    f2i,
+                );
+                o.i(i64::from(st));
+                o.bytes(&std::fs::read(w.fix.join(&name)).unwrap_or_default());
+            }
+        }
+        "rrx" => {
+            let want = tk.int() != 0;
+            setup(w, tk.next());
+            let name = tk.string();
+            let r = registerio::regio_read_mincxfm(g, out, err, dir, &name, want).map_err(fatal)?;
+            o.i(i64::from(r.status));
+            print_mat(o, r.r.as_ref());
+            match &r.fileinfo {
+                Some(f) => ostr(o, f),
+                None => o.0.push_str("N "),
+            }
+        }
+        "rwx" => {
+            let env = Environment::from_pairs([(
+                "FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING",
+                "Thu Jan  1 00:00:00 2026",
+            )]);
+            g.progname = "fsio".into();
+            let r = read_mat(&mut tk).expect("a matrix");
+            let info = dec(tk.next());
+            setup(w, tk.next());
+            let name = tk.string();
+            let st =
+                registerio::regio_write_mincxfm(g, &env, out, err, dir, &name, &r, info.as_deref());
+            o.i(i64::from(st));
+            o.bytes(&std::fs::read(w.fix.join(&name)).unwrap_or_default());
+        }
+        "rrm" => {
+            setup(w, tk.next());
+            let name = tk.string();
+            let m =
+                registerio::regio_read_registermat(g, out, err, dir, &name, &mut registerio::NoLta)
+                    .map_err(fatal)?;
+            print_mat(o, m.as_ref());
         }
         _ => {
             let mut ct = read_table(&mut tk);

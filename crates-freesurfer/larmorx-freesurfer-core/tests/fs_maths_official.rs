@@ -2,11 +2,12 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.maths against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (670 cases, ten of each of the
-//! 67 commands), recorded by `validation/probes/fs-maths/check.py --seed 1 --n 670` on Linux x64
-//! from the unit oracle's build (2026-11-13: 657 lines identical, 13 where FreeSurfer reads memory
-//! it does not own, FS-22, FS-16 or ITK-106, hashed as `SKIP`), against the port's output with
-//! `reproduce`.
+//! official build's output lines for the probe's cases of seed 1 (750 cases, ten of each of the
+//! 75 commands), recorded by `validation/probes/fs-maths/check.py --seed 1 --n 750` on Linux x64
+//! from the unit oracle's build (2026-11-13: 723 lines identical, 27 hashed as `SKIP`: where
+//! FreeSurfer reads memory it does not own or never wrote, FS-22, FS-16, FS-42, FS-49, ITK-106,
+//! ITK-110, ITK-111, and the non-finite matrices the port refuses, FS-47, FS-48), against the
+//! port's output with `reproduce`.
 
 #[path = "fs_maths/cases.rs"]
 mod cases;
@@ -14,7 +15,12 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "642c41982a861dcf793433c0d73274d9672611a0e36612a0312a31cd2c71c3b9";
+const OFFICIAL_SHA256: &str = "6cebc7a8e9a749ae619547d19bba0d991eb2c10efbbaf1cf46b65f5c0d5a6470";
+
+/// `check.py`'s `SKIP`.
+const SKIP: [&str; 9] = [
+    "FS-22", "FS-16", "ITK-106", "FS-42", "ITK-110", "ITK-111", "FS-47", "FS-48", "FS-49",
+];
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
@@ -22,9 +28,9 @@ fn reproduce_gives_the_official_outputs() {
     let tmp = dir.path().join("plot.tmp");
     let mut h = Sha256::new();
     let mut skipped = 0;
-    for line in cases::generate(1, 670) {
+    for line in cases::generate(1, 750) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce, &tmp);
-        if ids.contains(&"FS-22") || ids.contains(&"FS-16") || ids.contains(&"ITK-106") {
+        if ids.iter().any(|x| SKIP.contains(x)) {
             skipped += 1;
             h.update(b"SKIP\n");
         } else {
@@ -32,7 +38,7 @@ fn reproduce_gives_the_official_outputs() {
             h.update(b"\n");
         }
     }
-    assert_eq!(skipped, 13);
+    assert_eq!(skipped, 27);
     let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
     assert_eq!(hex, OFFICIAL_SHA256);
 }

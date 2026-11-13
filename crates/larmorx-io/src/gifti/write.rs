@@ -62,6 +62,8 @@ struct W<'a> {
     dstore: bool,
     depth: i32,
     f: Vec<u8>,
+    /// `GXD.zlen`: the last compression buffer's size.
+    zlen: i64,
 }
 
 fn pad(n: i32) -> String {
@@ -374,6 +376,15 @@ impl W<'_> {
                     } else {
                         self.lib.zlevel as u32
                     };
+                    // update_partial_buffer(&zdata, &zlen, blen, 1): compress2's buffer
+                    let blen = (nbytes as f64 * 1.01 + 12.0) as u64 as i64;
+                    if self.lib.xml_verb > 2 {
+                        self.out.err(&format!(
+                            "++ UPB, alloc {} bytes (from {blen}, 1) for buff\n",
+                            blen as i32
+                        ));
+                    }
+                    self.zlen = blen as i32 as i64;
                     let mut e = ZlibEncoder::new(Vec::new(), Compression::new(level));
                     let _ = e.write_all(&data[..nbytes]);
                     let z = e.finish().unwrap_or_default();
@@ -540,11 +551,20 @@ impl Gifti {
             out.err(&s);
         }
         if verb > 2 {
-            out.err(&format!(
+            let mut s = format!(
                 "-- user opts: gxml_data :\n   verb        : {}\n   dstore      : {}\n   indent      : {}\n   buf_size    : {}\n   b64_check   : {}\n   zlevel      : {}\n   da_len      : 0\n",
                 self.xml_verb, self.dstore, self.indent, self.buf_size, self.b64_check, self.zlevel
-            ));
+            );
+            if verb > 3 {
+                s += "   da_list     : (nil)\n";
+                s += &self.gxd.lines(0);
+            }
+            out.err(&s);
         }
+        self.gxd = GxdState {
+            gim: true,
+            ..GxdState::default()
+        };
         self.dstore = write_data as i32;
         if self.update_ok != 0 {
             if verb > 2 {
@@ -577,9 +597,12 @@ impl Gifti {
             dstore: write_data,
             depth: 0,
             f: Vec::new(),
+            zlen: 0,
         };
         w.write_gifti(gim);
         let _ = file.write_all(&w.f);
+        let zlen = w.zlen;
+        self.gxd.zlen = zlen;
         0
     }
 
@@ -602,6 +625,7 @@ impl Gifti {
             dstore: write_data,
             depth: 0,
             f: Vec::new(),
+            zlen: 0,
         };
         w.write_gifti(gim);
         w.f

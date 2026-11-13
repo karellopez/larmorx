@@ -1018,7 +1018,7 @@ defects! {
     FS_79 = "FS-79", "MINC volume_io", true,
         "a backslash in a file name is an escape that expand_filename drops, and only '/' separates directories: a Windows path (C:\\Users\\...) loses its separators, its directory, base name and extension are misread, and a file next to it is never found";
     FS_80 = "FS-80", "gifticlib", true,
-        "a label table whose Labels carry colours for some labels only leaves holes in its colour array (or makes it shorter than the table): the writer, the validity check and the display read memory never written";
+        "a label table whose Labels carry colours for some labels only leaves holes in its colour array (or makes it shorter than the table), and a Label whose Key attribute is missing or wrong is given no key: the writer, the validity check and the display read memory never written";
     FS_81 = "FS-81", "gifticlib", true,
         "Base64 data whose character data hold characters outside the alphabet (skipped and counted, the default) take the bytes carried to the next piece from the wrong place when a group of four is cut at the piece's end: the values after it are decoded from earlier text or from memory never written";
     FS_82 = "FS-82", "gifticlib", true,
@@ -1029,6 +1029,8 @@ defects! {
         "a metadata entry without a name (an MD whose Name has no text) is compared through a null pointer by gifti_get_meta_value and, at verbosity 2 and below, gifti_add_to_meta: the program crashes";
     FS_85 = "FS-85", "gifticlib", true,
         "a GIFTI element outside the element it belongs to (Data, MatrixData, a coordinate system outside a DataArray, a Name or Value outside an MD, a dimension past Dim7 when writing) is read or written through a null or out-of-range pointer: the program crashes or reads memory it never wrote";
+    FS_86 = "FS-86", "gifticlib", true,
+        "character data (white space included) after a CDATA section or a child element inside a GIFTI Name, Value, Label, DataSpace or TransformedSpace is written through a null pointer: the program crashes";
 }
 
 /// The register entry with ID `id`.

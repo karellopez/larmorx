@@ -13,7 +13,7 @@
 //! check of [`Gifti::valid_gifti_image`] and the coordinate-system intent check of the reader);
 //! [`Gifticlib`] is gifticlib's own behaviour. A replica of such a program supplies its own.
 //!
-//! D13's corrections of gifticlib's defects are named in [`defects`] (FS-80 to FS-84); the
+//! D13's corrections of gifticlib's defects are named in [`defects`] (FS-80 to FS-86); the
 //! source is `gifti_io.c` and `gifti_xml.c` of gifticlib's history at version 1.12
 //! (`PROVENANCE.md`).
 
@@ -31,9 +31,10 @@ use larmorx_core::defects::{self as d, Notices};
 /// D13 defects of gifticlib 1.12 that larmorx corrects (`docs/findings/gifti.md`; their register
 /// entries are `larmorx_core::defects::FS_80` to `FS_84`).
 pub mod defects {
-    /// A label table whose `Label`s carry colours for some labels only: the colour array is
-    /// shorter than the table or has holes, and the writer, the checks and the display read
-    /// memory never written. Both modes: those colours read as 0, with a notice.
+    /// A label table whose `Label`s carry colours for some labels only (the colour array is
+    /// shorter than the table or has holes), or a `Label` whose `Key` is missing or wrong (its
+    /// key is never set): the writer, the checks and the display read memory never written.
+    /// Both modes: those colours and keys read as 0, with a notice.
     pub const LABEL_RGBA_HOLES: &str = "FS-80";
     /// Base64 text holding characters outside the alphabet (skipped, b64_check's default) whose
     /// last group of four is cut at the end of a piece of character data: the bytes carried to
@@ -51,6 +52,11 @@ pub mod defects {
     /// pointer by `gifti_get_meta_value` and `gifti_add_to_meta`: the program crashes. Both
     /// modes: the entry does not match, with a notice.
     pub const META_NULL_NAME: &str = "FS-84";
+    /// Character data (white space included) after a CDATA section or a child element inside a
+    /// `Name`, `Value`, `Label`, `DataSpace` or `TransformedSpace`: gifticlib writes it through a
+    /// null pointer (the program crashes). Both modes: the text is appended to the element's, as
+    /// it is without the CDATA section, with a notice.
+    pub const TEXT_AFTER_CDATA: &str = "FS-86";
 }
 
 // NIfTI-1's codes (nifti1.h).
@@ -353,6 +359,54 @@ pub struct Gifti {
     pub(crate) mod_prev_xform: i32,
     /// `decode_ascii`'s `static piece` for COMPLEX64, RGB24 and COMPLEX128 (FS-83).
     pub(crate) piece: [i32; 3],
+    /// What the last read or write left in `GXD`'s other fields (shown at verbosity 4 and above
+    /// by the next read's or write's `disp_gxml_data`).
+    pub(crate) gxd: GxdState,
+}
+
+/// `GXD`'s fields a read or write leaves behind (its buffers are always freed by then).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct GxdState {
+    pub ele_da: i32,
+    pub exp_da: i32,
+    pub b64_errors: i32,
+    pub errors: i32,
+    pub skip: i32,
+    pub depth: i32,
+    pub dind: i64,
+    pub clen: i64,
+    pub doff: i64,
+    pub zlen: i64,
+    pub cdata: bool,
+    pub gim: bool,
+}
+
+impl GxdState {
+    /// The `show_all` lines of `disp_gxml_data` after `da_list` (pointers as placeholders).
+    pub(crate) fn lines(&self, da_ind: i64) -> String {
+        let p = |set: bool, name: &str| {
+            if set {
+                format!("<{name}>")
+            } else {
+                "(nil)".to_owned()
+            }
+        };
+        format!(
+            "   da_ind      : {da_ind}\n   eleDA       : {}\n   expDA       : {}\n   b64_errors  : {}\n   errors      : {}\n   skip        : {}\n   depth       : {}\n   dind        : {}\n   clen        : {}\n   doff        : {}\n   zlen        : {}\n   cdata       : {}\n   xdata       : (nil)\n   ddata       : (nil)\n   zdata       : (nil)\n   gim         : {}\n",
+            self.ele_da,
+            self.exp_da,
+            self.b64_errors,
+            self.errors,
+            self.skip,
+            self.depth,
+            self.dind,
+            self.clen,
+            self.doff,
+            self.zlen,
+            p(self.cdata, "cdata"),
+            p(self.gim, "gim")
+        )
+    }
 }
 
 impl Default for Gifti {
@@ -369,6 +423,7 @@ impl Default for Gifti {
             mod_prev_data: 0,
             mod_prev_xform: 0,
             piece: [0; 3],
+            gxd: GxdState::default(),
         }
     }
 }
@@ -698,7 +753,8 @@ impl Gifti {
             }
             if t.rgba.is_some() {
                 let v = rgba_of(t, c, notices);
-                if v.iter().any(|&x| !(0.0..=1.0).contains(&x)) {
+                // C's `rgba < 0.0 || rgba > 1.0`: a NaN passes
+                if v.iter().any(|&x| x < 0.0 || x > 1.0) {
                     if self.verb > 3 || whine {
                         out.err(&format!("** RGBA values out of [0.0,1,0] at Label[{c}]\n"));
                     }
@@ -1418,6 +1474,79 @@ impl Gifti {
             self.disp_nvpairs(Some("darray->ex_atrs"), &p.ex_atrs, out);
         }
         out.err("--------------------------------------------------\n");
+    }
+
+    /// The messages of `gifti_free_image` (at `G.verb` 3 and above), which frees `p`.
+    pub fn free_image(&self, p: GiftiImage, out: &mut dyn Streams) {
+        let v = self.verb;
+        if v > 2 {
+            out.err("-- freeing gifti_image\n");
+        }
+        self.free_nvpairs_messages(&p.meta, out);
+        if v > 3 {
+            out.err(&format!(
+                "-- freeing {} giiLabelTable entries\n",
+                p.labeltable.len()
+            ));
+        }
+        self.free_darray_list_messages(&p.darray, p.num_da, out);
+        self.free_nvpairs_messages(&p.ex_atrs, out);
+    }
+
+    fn free_nvpairs_messages(&self, p: &NvPairs, out: &mut dyn Streams) {
+        if self.verb > 3 {
+            out.err(&format!("-- freeing {} nvpairs\n", p.len()));
+        }
+    }
+
+    /// `gifti_free_DataArray_list`'s messages: a list never allocated (no array was ever added)
+    /// is C's null list; a null entry stops the loop.
+    fn free_darray_list_messages(
+        &self,
+        list: &[Option<DataArray>],
+        num_da: i32,
+        out: &mut dyn Streams,
+    ) {
+        let v = self.verb;
+        if list.is_empty() {
+            if v > 3 {
+                out.err("** GFDA: free NULL darray list\n");
+            }
+            return;
+        }
+        if v > 3 {
+            out.err(&format!("-- freeing {num_da} giiDataArrays\n"));
+        }
+        if num_da < 0 {
+            return;
+        }
+        for c in 0..num_da as usize {
+            match list.get(c).and_then(|d| d.as_ref()) {
+                None => {
+                    if v > 3 {
+                        out.err("** tried to free NULL darray ptr\n");
+                    }
+                    return;
+                }
+                Some(da) => {
+                    if v > 3 {
+                        out.err("-- freeing giiDataArray\n");
+                    }
+                    self.free_nvpairs_messages(&da.meta, out);
+                    if v > 3 {
+                        out.err("-- freeing giiCoordSystem list\n");
+                        if da.num_cs() > 0 {
+                            for cs in &da.coordsys {
+                                if cs.is_some() {
+                                    out.err("-- freeing giiCoordSystem\n");
+                                }
+                            }
+                        }
+                    }
+                    self.free_nvpairs_messages(&da.ex_atrs, out);
+                }
+            }
+        }
     }
 
     /// `gifti_disp_gifti_image`.

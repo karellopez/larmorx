@@ -96,12 +96,16 @@ struct Reader<'a> {
     ele_da: i32,
     exp_da: i32,
     b64_errors: i32,
+    /// `xd->errors`: the element stack's depth errors.
+    errors: i32,
     skip: i32,
     depth: i32,
     stack: [usize; 11],
     dind: i64,
     clen: usize,
     cdata: Target,
+    /// The depth and target of a text element whose child just ended (FS-86).
+    cdata_parent: Option<(i32, Target)>,
     dlen: usize,
     doff: usize,
     ddata: Vec<u8>,
@@ -221,12 +225,14 @@ impl Gifti {
             ele_da: 0,
             exp_da: 0,
             b64_errors: 0,
+            errors: 0,
             skip: 0,
             depth: 0,
             stack: [0; 11],
             dind: 0,
             clen: 0,
             cdata: Target::None,
+            cdata_parent: None,
             dlen: 0,
             doff: 0,
             ddata: Vec::new(),
@@ -287,6 +293,11 @@ impl Gifti {
                 break;
             }
         }
+        r.save_state(ok);
+        if !ok {
+            let gim = std::mem::take(&mut r.gim);
+            r.lib.free_image(gim, r.out);
+        }
         if r.verb > 1 {
             if ok {
                 let mb = r.lib.gim_da_size(&r.gim, true, r.out);
@@ -305,6 +316,9 @@ impl Gifti {
             && r.apply_da_list_order(orig) != 0
         {
             r.out.err("** failed apply_da_list_order\n");
+            r.lib.gxd.gim = false;
+            let gim = std::mem::take(&mut r.gim);
+            r.lib.free_image(gim, r.out);
             return None;
         }
         Some(r.gim)
@@ -351,16 +365,36 @@ impl Reader<'_> {
             );
             if self.verb > 3 {
                 s += &format!(
-                    "   da_list     : {}\n   da_ind      : 0\n   eleDA       : 0\n   expDA       : 0\n   b64_errors  : 0\n   errors      : 0\n   skip        : 0\n   depth       : 0\n   dind        : 0\n   clen        : 0\n   doff        : 0\n   zlen        : 0\n   cdata       : (nil)\n   xdata       : (nil)\n   ddata       : (nil)\n   zdata       : (nil)\n   gim         : (nil)\n",
+                    "   da_list     : {}\n",
                     if self.da_list.is_some() {
                         "<set>"
                     } else {
                         "(nil)"
                     }
                 );
+                s += &self.lib.gxd.lines(0);
             }
             self.out.err(&s);
         }
+        self.lib.gxd = GxdState::default();
+    }
+
+    /// What this read leaves in `GXD` (its buffers freed; `gim` set unless it failed).
+    fn save_state(&mut self, gim: bool) {
+        self.lib.gxd = GxdState {
+            ele_da: self.ele_da,
+            exp_da: self.exp_da,
+            b64_errors: self.b64_errors,
+            errors: self.errors,
+            skip: self.skip,
+            depth: self.depth,
+            dind: self.dind,
+            clen: self.clen as i64,
+            doff: self.doff as i64,
+            zlen: self.zdata.len() as i64,
+            cdata: self.cdata != Target::None,
+            gim,
+        };
     }
 
     fn reset_xml_buf(&mut self, bsize: &mut i32) {
@@ -438,11 +472,14 @@ impl Reader<'_> {
     }
 
     fn epush(&mut self, etype: usize, ename: &[u8], attr: &[(Vec<u8>, Vec<u8>)]) -> i32 {
+        // a forgotten text target applies only until the next element starts
+        self.cdata_parent = None;
         if self.depth < 0 || self.depth > MAX_DEPTH {
             self.out.err(&format!(
                 "** push: stack depth {} out of [0,{MAX_DEPTH}] range\n",
                 self.depth
             ));
+            self.errors += 1;
             return 1;
         }
         if self.verb > 4 {
@@ -670,13 +707,23 @@ impl Reader<'_> {
         lt.label.push(None);
         let n = lt.len();
         if attr.is_empty() {
-            // expat always passes an attribute list (perhaps empty): get_label_attrs returns 0.
+            // expat always passes an attribute list (perhaps empty): get_label_attrs returns 0,
+            // and the key is never set.
+            self.notices.add(
+                &d::FS_80,
+                "a Label without attributes: its key is memory gifticlib never writes (0 here)",
+            );
         } else {
             let mut key = 0;
             let mut rgba = [0f32; 4];
             let rv = self.get_label_attrs(attr, &mut key, &mut rgba);
             if rv == 1 || rv == 2 {
                 self.gim.labeltable.key[n - 1] = key;
+            } else {
+                self.notices.add(
+                    &d::FS_80,
+                    "a Label whose Key attribute is missing or wrong: its key is memory gifticlib never writes (0 here)",
+                );
             }
             if rv == 2 {
                 self.add_label_rgba(rgba);
@@ -849,7 +896,7 @@ impl Reader<'_> {
         };
         if bytes <= 0 {
             self.out
-                .err(&format!("** UPB: bad params (<buf>,<len>,{bytes})\n"));
+                .err(&format!("** UPB: bad params (<buf>,<blen>,{bytes})\n"));
             return 1;
         }
         let (buf_empty, len) = if which_z {
@@ -1006,6 +1053,11 @@ impl Reader<'_> {
     }
 
     fn epop(&mut self, etype: usize, ename: &[u8]) -> i32 {
+        // gifticlib forgets where text goes; text that still follows inside the same element
+        // is written through that null pointer (FS-86): kept here to append it instead.
+        if self.cdata != Target::None {
+            self.cdata_parent = Some((self.depth - 1, self.cdata));
+        }
         self.cdata = Target::None;
         self.clen = 0;
         if self.skip == self.depth {
@@ -1022,6 +1074,14 @@ impl Reader<'_> {
                 E_DATA => {
                     if self.verb > 3 {
                         self.out.err(&format!("-- data dind = {}\n", self.dind));
+                    }
+                    if self.cur_da().is_none() {
+                        // the end of a Data inside an array a da_list leaves out, before any
+                        // array is stored: gifticlib reads its array list at index -1
+                        self.notices.add(
+                            &d::FS_85,
+                            "a Data element of an array left out by the DataArray list, before any array is stored: gifticlib reads through an unset pointer (a crash)",
+                        );
                     }
                     if let Some(i) = self.cur_da()
                         && self.da(i).data.is_some()
@@ -1082,6 +1142,7 @@ impl Reader<'_> {
                 "** pop: stack depth {} out of [0,{MAX_DEPTH}] range\n",
                 self.depth
             ));
+            self.errors += 1;
             return -1;
         }
         0
@@ -1192,6 +1253,32 @@ impl Reader<'_> {
     }
 
     fn append_to_cdata(&mut self, s: &[u8]) -> i32 {
+        if self.cdata == Target::None {
+            // gifticlib writes through its null text pointer here (a crash; FS-86). The text of
+            // an element whose target was forgotten when a child of it ended (a CDATA section,
+            // an element) is appended to it; text with no target at all is dropped.
+            let top = if self.depth > 0 {
+                self.stack[(self.depth - 1) as usize]
+            } else {
+                0
+            };
+            let at = |d: i32| d == self.depth || (d + 1 == self.depth && top == E_CDATA);
+            let saved = self.cdata_parent.filter(|(d, _)| at(*d));
+            self.notices.add(
+                &d::FS_86,
+                "text where gifticlib has no place for it (after a CDATA section or a child element inside a text element, or inside a misplaced one): gifticlib writes it through a null pointer (a crash)",
+            );
+            match saved {
+                Some((_, t)) => {
+                    self.cdata = t;
+                    self.clen = self
+                        .target_slot(t)
+                        .and_then(|v| v.as_ref())
+                        .map_or(0, |v| v.len() + 1);
+                }
+                None => return 1,
+            }
+        }
         let t = self.cdata;
         let verb = self.verb;
         if s.is_empty() {

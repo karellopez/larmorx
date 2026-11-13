@@ -17,7 +17,7 @@ from larmorx_validation.evidence import present as present_
 REPLICA = "larmorx, Apache-2.0 with CC BY 4.0's attribution"
 
 #: The old texts' words for the two ports, applied before the guide's: "the original" on these
-#: pages is the clean room (AFNI is named "AFNI"), "the larmorx replica" the replica; two
+#: pages is the clean room (AFNI is named "AFNI"), "the larmorx replica" the replica; the
 #: sentences written before both ports' records followed AFNI 26.3.05 (their records' reference
 #: since 2026-10-30: docs/validation/afni-*.md, "Reference") say what the records say now.
 TEXTS = [
@@ -35,7 +35,7 @@ TEXTS = [
     (r"\(next rows\)", "(the rows on the usual encoding)"),
     (
         r"\bthe GPL replicas?'s? reference since 2026-10-29\b",
-        "the replica's reference since 2026-10-29",
+        "both ports' reference since 2026-10-29",
     ),
     (
         r"\(compared with AFNI 25\.2\.09, its reference until it follows 26\.3\.05\)",

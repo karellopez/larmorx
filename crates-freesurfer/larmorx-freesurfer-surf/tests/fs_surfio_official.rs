@@ -83,3 +83,42 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
     );
     eprintln!("FS-120 on request: {cases} mprop cases, {noted} noted, {changed} changed");
 }
+
+/// The `FS-48h` key (`cases::fs48_hangs`) on a matrix on which LINPACK's `ssvdc` never returns
+/// (`larmorx_core::vnl_svd_f32::vnl_svd_f32_full` names it):
+/// `OpenSvdcmp` in both modes notes FS-48 and the key finds the hang; on a finite matrix it does
+/// not. A change of fs.core's FS-48 text that loses the marker fails here, by name.
+#[test]
+fn fs48_hang_key_holds() {
+    use larmorx_core::vnl_svd_f32::vnl_svd_f32_full;
+    use larmorx_freesurfer_core::globals::Globals;
+    use larmorx_freesurfer_core::matrix::{MATRIX_REAL, matrix_alloc};
+    use larmorx_freesurfer_core::numerics::open_svdcmp;
+    // a 7 x 6 matrix with one infinite entry on which ssvdc never returns (found by a seeded
+    // search over small integer matrices with infinite or NaN entries, relay 21)
+    let inf = f32::INFINITY;
+    #[rustfmt::skip]
+    let hanging: (usize, usize, Vec<f32>) = (7, 6, vec![
+        4.0, 2.0, 3.0, -3.0, -4.0, 1.0, -3.0, 2.0, 2.0, inf, -2.0, 2.0, -4.0, -1.0, 2.0, 1.0,
+        -4.0, -3.0, 4.0, -2.0, 3.0, 4.0, -1.0, -2.0, 1.0, -2.0, 1.0, -2.0, 1.0, -2.0, 2.0, -3.0,
+        3.0, -1.0, 0.0, -1.0, -4.0, -2.0, -2.0, -2.0, 3.0, 2.0,
+    ]);
+    assert!(vnl_svd_f32_full(&hanging.2, 7, 6).never_returns());
+    let run = |rows: usize, cols: usize, a: &[f32], mode: UpstreamDefects| {
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut alloc = |r: usize, c: usize| {
+            matrix_alloc(&mut g, &mut out, &mut err, r as i32, c as i32, MATRIX_REAL)
+                .unwrap()
+                .unwrap()
+        };
+        let (mut m, mut w, mut v) = (alloc(rows, cols), alloc(cols, 1), alloc(cols, cols));
+        m.data_mut()[..rows * cols].copy_from_slice(a);
+        let _ = open_svdcmp(&mut g, &mut err, &mut m, &mut w, &mut v);
+        cases::fs48_hangs(g.notices.as_slice())
+    };
+    for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+        assert!(run(hanging.0, hanging.1, &hanging.2, mode), "{mode:?}");
+        assert!(!run(2, 2, &[1.0, 2.0, 3.0, 4.0], mode), "{mode:?}");
+    }
+}

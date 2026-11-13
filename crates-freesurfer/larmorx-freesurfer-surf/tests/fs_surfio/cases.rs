@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
-    FS_350, FS_351, FS_364, FS_377, UpstreamDefects,
+    FS_350, FS_351, FS_364, FS_377, Notice, UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -2731,6 +2731,23 @@ fn escape(b: &[u8]) -> String {
     s
 }
 
+/// FS-48's hang (`FS-48h`): an FS-48 notice together with the hang marker, VNL's own "never
+/// returns" notice (ITK-116: `larmorx_core::vnl_svd_f32`'s `never_returns`) once fs.core passes it
+/// on, or until then [`HANG_MARK`] in the FS-48 notice. Keyed on the defect IDs, so a change of
+/// FS-48's wording cannot drop the mark unseen: `fs48_hang_key_holds` (the hash test's file) runs
+/// one matrix on which `ssvdc` never returns through `OpenSvdcmp` and fails when the key misses it.
+pub fn fs48_hangs(notices: &[Notice]) -> bool {
+    let fs48 = notices.iter().any(|n| n.defect.id == "FS-48");
+    fs48 && (notices.iter().any(|n| n.defect.id == "ITK-116")
+        || notices
+            .iter()
+            .any(|n| n.defect.id == "FS-48" && n.detail.contains(HANG_MARK)))
+}
+
+/// The hang marker in fs.core's FS-47 and FS-48 notices (`OpenEigenSystem`, `OpenSvdcmp`) until
+/// they pass VNL's ITK-115/ITK-116 notices on.
+pub const HANG_MARK: &str = "FreeSurfer hangs";
+
 /// The port's line for a case line, and the defects it noted.
 pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>) {
     run_line_with(line, mode, SurfGlobals::default())
@@ -2822,13 +2839,7 @@ pub fn run_line_with(
             .collect();
     // relay 20: FS-48's matrices on which LINPACK's ssvdc never returns, so FreeSurfer hangs (the
     // probe's alarm ends it after 5 seconds): marked apart from FS-48's other cases, which compare
-    if cx
-        .g
-        .notices
-        .as_slice()
-        .iter()
-        .any(|n| n.defect.id == "FS-48" && n.detail.contains("on which FreeSurfer hangs"))
-    {
+    if fs48_hangs(cx.g.notices.as_slice()) {
         ids.push("FS-48h");
     }
     ids.sort_unstable();

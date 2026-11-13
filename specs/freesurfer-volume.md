@@ -875,3 +875,102 @@ functions, no or a given destination, methods 0 to 4, identity, scaling, singula
 matrices, no matrix), `rsmat` (with and without the diagnostic bits). Expected: identical with
 `reproduce` but where FreeSurfer reads memory it does not own, never returns or crashes (FS-53, FS-58,
 FS-290, FS-322 to FS-325), counted and not compared; the default differs only with a notice.
+
+## 31. Resampling onto a template's grid (3.1-37) and replacing a value (3.1-38)
+- `MRIreplaceValues(src, dst, in_val, out_val)`: without a destination, a clone of the source (its
+  extent, type, frames, header; voxels 0); a destination of another height, width or depth ends the program
+  (status 1 by `ErrorExit`, `ERROR: <Progname>-MRIcheckVolDims: volume1 height=<h1> != volume2
+  height=<h2>.`, checked in the order height, width, depth). When source and destination are both byte
+  volumes it is `MRIreplaceValuesUchar` with `nint` of both values (as `(unsigned char)` of the `int`: its
+  low byte). Otherwise every voxel (slices outermost, then rows, columns, frames) is read with
+  `MRIgetVoxVal`, replaced by `out_val` when `|v - in_val| < FLT_EPSILON` in `float`, and written with
+  `MRIsetVoxVal` (the destination's clipping and rounding). Returns the destination.
+- `MRIreplaceValuesUchar(src, dst, in_byte, out_byte)`: the same checks and clone; a source or
+  destination that is not bytes goes to `MRIreplaceValues` with the bytes as floats. Otherwise each byte
+  of frame 0 equal to `in_byte` becomes `out_byte` and the others are copied. FS-461: FreeSurfer touches
+  frame 0 only (the destination's other frames as they were: zeros for a new one); the default does every
+  frame.
+- `MRIresample(src, template, type)`: `MRIresampleFill(..., 0)`.
+- `MRIresampleFill(src, template, type, fill)`, in order:
+  1. a source with `ras_good_flag` 0 prints `MRIresample(): WARNING: ras_good_flag is not set, changing
+     orientation\nto default.` on standard output;
+  2. `M = MRIgetResampleMatrix(src, template)` (§29; NULL: return NULL); with `Gdiag`'s show and verbose
+     bits `MRIresample() matrix is:` and `M` on standard output (a second time: §29 printed it once);
+  3. the destination: the template's extent, the source's type, `min(source frames, template frames)`
+     frames; `MRIreplaceValues(dest, dest, 0, fill)`; the template's header (`MRIcopyHeader`), the source's
+     pulse parameters;
+  4. `SAMPLE_CUBIC_BSPLINE` (5) needs `fs.bspline` (wave 3.2);
+  5. the sampling (below); 6. the geometry (below); returns the destination.
+- **Sampling** (every type but the vote): for each frame `f` below the destination's frames, template
+  column `di`, row `dj`, slice `dk` (the slice innermost), the point `(si', sj', sk') = M (di, dj, dk, 1)`
+  (single-precision matrix product, the indices as floats); `si = (int) floor(si')` (x86-64's
+  `-2147483648` for NaN and values beyond `int`), `si_f = si' - (float) si` in `float`, likewise j, k.
+  - `SAMPLE_SINC` (2): §18's `MRIsincSampleVolumeFrame` at the point (as doubles), frame `f`, half-width
+    5; `SAMPLE_CUBIC` (3): `MRIcubicSampleVolumeFrame`; the value is the sample as a `float`. A sampler
+    that fails leaves the previous sample (a source type it refuses, whose destination nothing is stored
+    into).
+  - Otherwise the eight corners `val[a][b][c]` (column `si + a`, row `sj + b`, slice `sk + c`, frame `f`)
+    are read from the source for a byte, short, unsigned short, int, long or float source: 0 where the
+    corner's column, row or slice is outside the source, else the voxel converted to `float` (a long voxel
+    read as FreeSurfer reads 64-bit volumes, FS-298; a float voxel as it is, a signalling NaN kept). For
+    another source type the corners stay 0.
+  - `SAMPLE_TRILINEAR` (1): `s = (1-si)(1-sj)(1-sk) v000 + (1-si)(1-sj) sk v001 + (1-si) sj (1-sk) v010 +
+    (1-si) sj sk v011 + si (1-sj)(1-sk) v100 + si (1-sj) sk v101 + si sj (1-sk) v110 + si sj sk v111`
+    (`si` short for `si_f`), the first seven terms in `double` and the last in `float` (C's types), summed
+    left to right in `double`, the sum rounded to `float`. Where NaNs meet, the official build keeps: in
+    `(1-si)(1-sj)`, `(1-si)`'s; the first two terms `((1-si)(1-sj))` then `(1-sk)` or `sk`, then the voxel;
+    the third and fourth terms build `sj (1-si)` first (`sj`'s NaN kept), then `(1-sk)` times that, or that
+    times `sk`; the fifth and sixth `(1-sj) si` first, then `(1-sk)` times it, or `sk` times it; the
+    seventh `sj si` in `float` (`sj`'s NaN), then `(1-sk)` times it; the eighth `(sj si) sk` then the voxel
+    in `float`; every product's left operand as written here is the one whose NaN is kept, and each sum
+    keeps the running sum's NaN; a NaN made from numbers is the default NaN with the sign bit set.
+  - `SAMPLE_NEAREST` (0): the corner whose each digit is 0 when its fraction is below 0.5 (a NaN fraction
+    takes 1); the value is the corner as it is.
+  - `SAMPLE_WEIGHTED` (4): with `f2 = f f` (`float`), `ii = (float)(1.0 / (1 - 2 f + f2))` (the
+    denominator in `float`, the division in `double`) and `is = 1 / f2` (`float`) for each axis, each
+    corner weighs the sum (left to right, `float`) of its axes' `ii` (digit 0) or `is` (digit 1); each corner
+    whose value equals an earlier corner's (as floats; NaN never equal) gives its weight to the first such
+    corner; the weights are added in corner order; the corner with the largest total (the first on ties;
+    comparisons with NaN false) gives the value.
+  - Another type (and the vote's absence here): the value stays as it was (0 at first).
+  - **Storing** in the destination's type: bytes clipped to [0, 255] (`< 0.0` in `double`, `> 255` in
+    `float`), shorts to [-32768, 32767] (in `double`), unsigned shorts to [0, 65535], ints to [-2^31, 2^31]
+    (the limits as floats: 2^31 rounds to `-2147483648` by `nint`, FS-12), longs to [-2^63, 2^63] (as
+    floats); then `nint` (§6) and the type's low bits; a float as it is. FS-328: FreeSurfer writes a long
+    voxel as a 32-bit integer at the voxel's index (bytes `4 x` to `4 x + 3` of the row); the default writes
+    the voxel. Other types are not written (the fill shows there).
+- **The vote** (`SAMPLE_VOTE`, 6): prints `resampling using voting...` on standard output; a byte volume of
+  the template's extent with 256 frames holds the counts; `A = MRIgetResampleMatrix(template, src)` with
+  0.5 added to its three translations (in `double`, stored as `float`). FS-327: a NULL `A` (the template's
+  orientation unknown, its matrix singular): FreeSurfer crashes; an error in both modes. For each source
+  frame, column, row, slice (the slice innermost): `(di, dj, dk) = floor(A (si, sj, sk, 1))`; outside the
+  template's extent the voxel does not vote; else its label `nint(MRIgetVoxVal(src))` clipped to [0, 255]
+  gets one more vote at `(di, dj, dk)` (`MRIsetVoxVal` of the count plus one: a byte, so it stops at 255,
+  FS-326; the default counts every vote). Then for each frame of the template (not only the destination's:
+  frames past the destination's are `MRIsetVoxVal` writes past its voxels: `specs/freesurfer-mri.md`'s rules), column, row, slice:
+  the label with the most votes over all source frames (the lowest on ties; 0 when none) is set with
+  `MRIsetVoxVal`.
+- **Geometry** of the destination (after the sampling): `V = i_to_r(src) M`; `x_r, x_a, x_s` = `V`'s first
+  column divided by the destination's `xsize` (`float`), `y_*` the second by `ysize`, `z_*` the third by
+  `zsize`; the centre `(c_r, c_a, c_s)` = the first three elements of `i_to_r(src) (M (width/2, height/2,
+  depth/2, 1))` (the halves in `double`, stored as floats; single-precision products); `ras_good_flag` 1.
+  The cached matrices are not recomputed (they are the template's, from `MRIcopyHeader`). With `Gdiag`'s
+  show and verbose bits: `old RAS (0,0,0) -> (%2.0f, %2.0f, %2.0f)` and `new RAS ...`, the voxel
+  coordinates of RAS (0, 0, 0) by `inverse(i_to_r(src))` and `inverse(i_to_r(dest))` (the vector
+  `(0, 0, 0, w)` with `w` the centre vector's fourth element; a matrix that does not invert:
+  `MatrixMultiply`'s errors).
+- Kept (rule C): the fill replaces the destination's zeros before the sampling, which then writes every
+  voxel of the six sampled types; the fill shows only in a destination of another type.
+
+## 32. Validation plan (section 31)
+The probe's commands `rsfill` (the source on random geometries, and in two cases of three the template
+on the source's grid with its voxels scaled by 1, 2, 0.5 or 1.5 and its centre moved, mostly with a good
+RAS and usable voxel sizes; types 0 to 4, 6 and 7; fill values with NaNs and special floats;
+`MRIresample` one case in five; the diagnostic bits one in twelve; one case in twelve an 8 x 8 x 8 source
+voting into one template voxel that holds it all, so that counts pass 255) and `repval` (`MRIreplaceValues`
+and `MRIreplaceValuesUchar`, a new, given or the same destination, destinations of another extent, the
+source's first byte or table floats as the value to replace). Expected: identical with `reproduce` but
+where FreeSurfer reads memory it does not own or crashes (FS-53, FS-58, FS-290, FS-300, FS-327), counted
+and not compared; the default differs only with a notice. FS-326 and FS-461 are checked by the port's
+tests (`vote_counts_past_255`, `byte_replacement_in_every_frame`): 280 votes for one label and 320 for
+another in one voxel; a two-frame byte volume.

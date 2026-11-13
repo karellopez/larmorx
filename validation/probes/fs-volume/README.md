@@ -107,3 +107,14 @@ not comparable, 0 different; `fix` different only with notices. Seed 1, 1,860 ca
 not comparable, hash `718b2164c1606fdac499763c22925f59159265321405289580253ec012eefa7c`, passing with
 AArch64's NaN emulated in debug and release (`oracles/logs/fs-found-c-r17-trap-volume.log`). The port's
 debug and release builds agree on 42,460 cases (seeds 1, 7 and 13).
+
+Measured 2026-11-13 (part 8, relay 18: 3.1-37's resampling onto a template `rsfill` (`MRIresampleFill`,
+`MRIresample`; types nearest, trilinear, sinc, cubic, weighted, vote and an unknown one; one case in twelve
+an 8 x 8 x 8 source voting into one voxel) and 3.1-38's `repval` (`MRIreplaceValues`,
+`MRIreplaceValuesUchar`); 95 commands; logs `oracles/logs/fs-found-c-r18-*.log`): seed 7, 400 cases: 392
+identical with `reproduce`, 8 not comparable, 0 different; seed 13, 4,000 cases (the generator's later form:
+most templates on the source's grid): 3,888 identical, 112 not comparable (FS-53, FS-58, FS-290, FS-300,
+FS-327), 0 different; `fix` different only with notices. Seed 1, 1,900 cases: 1,745 identical, 155 not
+comparable, hash `0b5f671441495eed2d7a7aa8001aa5317d3c1cf986fe06d3c1bf0a911498246b`, passing with
+AArch64's NaN emulated in debug and release (`oracles/logs/fs-found-c-r18-trap-volume.log`). The port's
+debug and release builds agree on the 4,000 cases of seed 13 in both modes.

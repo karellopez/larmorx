@@ -53,7 +53,7 @@ The probe's reference hashes (`compare.py refs`) are the spec's §20.2 for all 2
 
 | Group | Runs (calls) | `reproduce` | `fix` |
 |---|---|---|---|
-| swaps | 3 (833) | identical | 1 identical, 2 corrected (FS-261, FS-262: the byte reversal, checked by the loop) |
+| swaps | 3 (833) | identical | 1 identical, 2 corrected (FS-261, FS-176: the byte reversal, checked by the loop) |
 | cmdargs | 1 (230) | identical | identical |
 | strings | 1 (4,670) | identical | identical |
 | fgetl | 1 (300) | identical | identical |

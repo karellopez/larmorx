@@ -439,8 +439,10 @@ pub fn mri_extract_plane(
         }
     };
     let mut copy = |g: &mut Globals, sx: i32, sy: i32, sz: i32, dx: i32, dy: i32| {
-        let val = f64::from(mri_get_vox_val(g, err, src, sx, sy, sz, 0, 0)?);
-        mri_set_vox_val(g, err, d, dx, dy, 0, 0, val as f32, 0).map(|_| ())
+        // the official build stores the float it read (no round trip through `double`: a
+        // signalling NaN stays signalling)
+        let val = mri_get_vox_val(g, err, src, sx, sy, sz, 0, 0)?;
+        mri_set_vox_val(g, err, d, dx, dy, 0, 0, val, 0).map(|_| ())
     };
     match orientation {
         MRI_HORIZONTAL => {

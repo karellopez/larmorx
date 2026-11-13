@@ -91,6 +91,11 @@ Where FreeSurfer calls them (the call sites the cards name):
   `mri_vol2vol`, `mris_make_surfaces`, `mri_ca_register`, `mri_normalize`, `mri_segstats`, `mris_sphere`), the `double`
   ones in 1 (`orders.py --official`). The programs' own objects (not in the unit oracle) may inline these templates in
   other orders: each program's replica checks its own NaNs.
+- The QR's NaNs (relay 10, 2026-11-13; vnl-netlib.md F-VNLN-5): `OpenLUMatrixInverse` and `OpenMatrixDeterminant` above 4 x 4
+  (`vnl_qr<float>`'s inverse and `vnl_determinant<float>`), `OpenQRdecomposition` (`Q()`, `R()`) and `mri.cpp.o`'s
+  `vnl_determinant<double>` above 4 rows now give the official build's NaN bits (libitkvnl_algo's `vnl_qr` instances and
+  libitkv3p_netlib's kernels, the ones FreeSurfer's programs link): track A's probe cases of these functions may draw
+  non-finite matrices.
 - The unit oracle's VNL (`validation/probes/fs-vnl`) is ITK 4.13.2 built with ITK's Release flags
   (`-O3 -DNDEBUG -msse2 -mfpmath=sse`, FreeSurfer's ITK configuration); `shim.cxx` is compiled with
   FreeSurfer's own flags for `utils/numerics.cpp`.

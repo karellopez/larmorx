@@ -13,8 +13,8 @@
 // `ln` -> f, `dln` -> d, `bad` -> nowhere); its standard output and error go to a scratch file;
 // the parent prints `<result> | <text>`, the text C-escaped (\xHH for bytes outside printable
 // ASCII and for the backslash), or `EXIT <status> | <text>` / `CRASH <signal> | <text>` when
-// FreeSurfer's code ended the child (each child is limited to 1 GiB of address space and 5
-// seconds). Numbers read are printed as their bytes in hex; strings as `N` (NULL) or `x<hex>`.
+// FreeSurfer's code ended the child (each child is limited to 1 GiB of address space, 64 MiB of
+// output and 5 seconds; text beyond 1 MiB is shown as `BIGTEXT <bytes>`). Numbers read are printed as their bytes in hex; strings as `N` (NULL) or `x<hex>`.
 
 #include <fcntl.h>
 #include <ftw.h>
@@ -235,9 +235,11 @@ void print_ct(const COLOR_TABLE *ct)
 {
   if (!ct) { out += "N "; return; }
   oi(ct->nentries); oi(ct->version); ocs(ct->fname);
+  // the non-empty entries, each after its index (a table can have millions of empty places)
   for (int i = 0; i < ct->nentries; i++) {
     const CTE *e = ct->entries[i];
-    if (!e) { out += "- "; continue; }
+    if (!e) continue;
+    out += "@" + std::to_string(i) + " ";
     ocs(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
     of(e->rf); of(e->gf); of(e->bf); of(e->af);
   }
@@ -902,6 +904,9 @@ int main(int argc, char *argv[])
       // a case that reads for ever (TSV::read, FS-172) stops at 1 GiB of memory or 5 seconds
       struct rlimit rl = {1ul << 30, 1ul << 30};
       setrlimit(RLIMIT_AS, &rl);
+      // and at most 64 MiB of messages (a reader that prints for each of millions of entries)
+      struct rlimit fl = {64ul << 20, 64ul << 20};
+      setrlimit(RLIMIT_FSIZE, &fl);
       alarm(5);
       memcpy(buf, line.c_str(), line.size() + 1);
       toks.clear();
@@ -938,6 +943,8 @@ int main(int argc, char *argv[])
     } else {
       result = "EXIT " + std::to_string(WEXITSTATUS(status));
     }
+    // messages beyond 1 MiB are shown by their length (the port does the same)
+    if (text.size() > (1u << 20)) text = "BIGTEXT " + std::to_string(text.size());
     printf("%s | %s\n", result.c_str(), escape(text).c_str());
   }
   unlink(scratch.c_str());

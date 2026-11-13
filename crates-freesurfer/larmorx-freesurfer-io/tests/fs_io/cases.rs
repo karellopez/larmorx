@@ -840,7 +840,14 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
         .borrow()
         .windows(32)
         .any(|w| w == b"has an entry that is not a numbe");
-    let text = escape(&shared.0.borrow());
+    let raw = shared.0.borrow();
+    // as fsio: messages beyond 1 MiB shown by their length
+    let text = if raw.len() > 1 << 20 {
+        format!("BIGTEXT {}", raw.len())
+    } else {
+        escape(&raw)
+    };
+    drop(raw);
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
         Err(status) => format!("EXIT {status}"),

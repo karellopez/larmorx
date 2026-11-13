@@ -1161,10 +1161,12 @@ impl Out {
         self.i(i64::from(ct.nentries()));
         self.i(i64::from(ct.version));
         self.cs(&ct.fname);
-        for e in &ct.entries {
+        // the non-empty entries, each after its index (as fsio prints them)
+        for (i, e) in ct.entries.iter().enumerate() {
             match e {
-                None => self.0.push_str("- "),
+                None => {}
                 Some(e) => {
+                    self.0.push_str(&format!("@{i} "));
                     self.cs(&e.name);
                     for x in [e.ri, e.gi, e.bi, e.ai] {
                         self.i(i64::from(x));

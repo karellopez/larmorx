@@ -20,7 +20,7 @@ use std::path::Path;
 use flate2::{Decompress, FlushDecompress, Status};
 use larmorx_core::defects::{
     FS_230, FS_231, FS_232, FS_233, FS_234, FS_235, FS_236, FS_237, FS_238, FS_239, FS_240, FS_241,
-    FS_243, FS_244, FS_246, FS_247, FS_248,
+    FS_243, FS_244, FS_245, FS_246, FS_247, FS_248,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE, diag_printf};
 use larmorx_freesurfer_core::globals::Globals;
@@ -220,11 +220,21 @@ fn different_endian(g: &mut Globals, mf: &MatFile) -> bool {
     right
 }
 
+/// FS-245: this result of FreeSurfer's depends on memory contents (`what`); the cause is noted
+/// with its own defect as well.
+fn memory(g: &mut Globals, what: &str) {
+    g.notices.add(&FS_245, what.to_owned());
+}
+
 /// A field's value; one FreeSurfer holds in memory never written is noted and read as 0.
 fn known(g: &mut Globals, mf: &MatFile, bit: u32, v: i32) -> i32 {
     if mf.unknown & bit != 0 {
         g.notices.add(
             &FS_241,
+            "a .mat header field read from memory never written (FreeSurfer's value is memory contents; larmorx's 0)",
+        );
+        memory(
+            g,
             "a .mat header field read from memory never written (FreeSurfer's value is memory contents; larmorx's 0)",
         );
         return 0;
@@ -493,6 +503,10 @@ fn note_element(g: &mut Globals, ty: i32, size: usize, other_order: bool, imag: 
     }
     if imag && ty != MAT_DOUBLE && size > 0 {
         g.notices.add(&FS_235, "the imaginary part of a matrix that is not of doubles (FreeSurfer's: memory contents or ones)");
+        memory(
+            g,
+            "the imaginary part of a matrix that is not of doubles (FreeSurfer's: memory contents or ones)",
+        );
     }
 }
 
@@ -596,6 +610,7 @@ fn official_numbers(
                             &FS_231,
                             "a 16-bit number's second byte from memory never written",
                         );
+                        memory(g, "a 16-bit number's second byte from memory never written");
                     }
                     sval = i16::from_le_bytes(b);
                     sval_known = true;
@@ -660,6 +675,7 @@ fn official_numbers(
                 if !dval_known {
                     g.notices
                         .add(&FS_235, "an imaginary number from memory never written");
+                    memory(g, "an imaginary number from memory never written");
                 }
                 if different_endian(g, mf) {
                     dval = f64::from_bits(dval.to_bits().swap_bytes());
@@ -783,6 +799,7 @@ fn name_shown<'a>(g: &mut Globals, bytes: &'a [u8], n: i64) -> &'a [u8] {
     if !bytes.contains(&0) && usable(n) <= bytes.len() as i64 {
         g.notices
             .add(&FS_239, "a name printed past its end (memory contents)");
+        memory(g, "a name printed past its end (memory contents)");
     }
     cstr(bytes)
 }
@@ -930,6 +947,10 @@ fn read_local(g: &mut Globals, pb: &mut Pb, err: &mut dyn Write, msg: &str) -> i
         }
         g.notices.add(
             &FS_241,
+            "a .mat header number read from memory never written (FreeSurfer's value is memory contents; larmorx's 0)",
+        );
+        memory(
+            g,
             "a .mat header number read from memory never written (FreeSurfer's value is memory contents; larmorx's 0)",
         );
     }
@@ -1120,6 +1141,10 @@ fn short_header(g: &mut Globals, err: &mut dyn Write) -> Result<(Option<Vec<u8>>
         &FS_241,
         "the file ends in a version 5 variable's header (FreeSurfer goes on with memory contents)",
     );
+    memory(
+        g,
+        "the file ends in a version 5 variable's header (FreeSurfer goes on with memory contents)",
+    );
     badfile(g, err, "matfile: the file ends in the variable's header\n");
     Ok((None, false))
 }
@@ -1242,8 +1267,9 @@ fn v5_fixed(
 // ------------------------------------------------------------------ compressed variables
 
 /// zlib's `uncompress(dest, &destLen, source, sourceLen)` (zlib 1.2.11, as FreeSurfer links it):
-/// the bytes written to `dest` and zlib's result (`Z_OK` 0, `Z_BUF_ERROR` -5, `Z_DATA_ERROR` -3).
-fn uncompress(dest_len: usize, source: &[u8]) -> (Vec<u8>, i32) {
+/// the bytes written to `dest`, zlib's result (`Z_OK` 0, `Z_BUF_ERROR` -5, `Z_DATA_ERROR` -3) and the
+/// bytes of `source` it read.
+fn uncompress(dest_len: usize, source: &[u8]) -> (Vec<u8>, i32, usize) {
     let mut z = Decompress::new(true);
     let mut dest = vec![0u8; dest_len];
     // zlib's own one-byte buffer when destLen is 0: nothing reaches dest
@@ -1262,7 +1288,8 @@ fn uncompress(dest_len: usize, source: &[u8]) -> (Vec<u8>, i32) {
             Err(_) => break -3,
         }
     };
-    (dest, r)
+    let used = z.total_in() as usize;
+    (dest, r, used)
 }
 
 /// The decompressed element FreeSurfer reads with `memmove` from `unbuff`: bytes past it are
@@ -1281,6 +1308,10 @@ impl Unbuff {
             if i < 0 || i as usize >= self.usable {
                 g.notices.add(
                     &FS_240,
+                    "a compressed variable read past its buffer (memory contents)",
+                );
+                memory(
+                    g,
                     "a compressed variable read past its buffer (memory contents)",
                 );
             } else if (i as usize) < self.bytes.len() {
@@ -1335,16 +1366,18 @@ fn znz_official(
         );
         return None;
     }
-    let (bytes, isitok) = uncompress(size_unbuff as usize, &buff);
-    if got < size as usize {
-        // zlib read past the file's bytes into malloc's memory when the stream needed them
-        let (_, again) = uncompress(size_unbuff as usize, &buff[..got]);
-        if again != isitok {
-            g.notices.add(
-                &FS_240,
-                "a compressed variable cut by the file's end (FreeSurfer decodes memory contents)",
-            );
-        }
+    let (bytes, isitok, _) = uncompress(size_unbuff as usize, &buff);
+    // past the file's bytes FreeSurfer's buffer holds memory contents (larmorx's zeros): noted where
+    // the file's bytes alone do not decode to the stream's end (zlib then reads on)
+    if got < size as usize && uncompress(size_unbuff as usize, &buff[..got]).1 == -3 {
+        g.notices.add(
+            &FS_240,
+            "a compressed variable cut by the file's end (FreeSurfer decodes memory contents)",
+        );
+        memory(
+            g,
+            "a compressed variable cut by the file's end (FreeSurfer decodes memory contents)",
+        );
     }
     if isitok != 0 {
         let _ = writeln!(out, "ERROR: in uncompressing");
@@ -1493,6 +1526,10 @@ fn znz_numbers(
                     &FS_240,
                     "a compressed variable read past its buffer (memory contents)",
                 );
+                memory(
+                    g,
+                    "a compressed variable read past its buffer (memory contents)",
+                );
                 break 'real;
             }
             let at = i64::from(off(row, col));
@@ -1542,6 +1579,10 @@ fn znz_numbers(
                     if beyond(at) {
                         g.notices.add(
                             &FS_240,
+                            "a compressed variable read past its buffer (memory contents)",
+                        );
+                        memory(
+                            g,
                             "a compressed variable read past its buffer (memory contents)",
                         );
                         break 'imag;
@@ -2038,10 +2079,10 @@ pub fn matlab_install_printf() -> i32 {
 /// The defects of this module whose notices the probe counts as FreeSurfer's results depending
 /// on memory (`VARY`) or not comparable (`SKIP`).
 pub fn probe_class(id: &str, detail: &str) -> Option<&'static str> {
-    let memory = detail.contains("memory never written") || detail.contains("memory contents");
+    let _ = detail;
     match id {
         "FS-243" | "FS-248" => Some("SKIP"),
-        "FS-231" | "FS-235" | "FS-239" | "FS-240" | "FS-241" if memory => Some("VARY"),
+        "FS-245" => Some("VARY"),
         _ => None,
     }
 }

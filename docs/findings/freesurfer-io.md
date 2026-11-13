@@ -494,8 +494,11 @@ FreeSurfer's copy has them) for that element only.
 
 **Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
 relay 15. The behaviour is in `specs/freesurfer-io.md` §34-39; the defect texts (behaviour only) in
-`larmorx_core::defects` (FS-229 to FS-244, FS-246 to FS-248, FS-250, FS-251; FS-245 and FS-249 were
-not used). Ported: `utils/mosaic.cpp` whole, `utils/matfile.cpp` whole.
+`larmorx_core::defects` (FS-229 to FS-248, FS-250, FS-251; FS-249 was not used). FS-245 marks every
+result that depends on memory contents (the cause noted with its own defect as well): larmorx keeps
+one notice per defect, so a "memory" detail of a defect already noted for another reason was lost
+and such lines were compared (one in the seed-7 run: a compressed stream cut by the file's end, which
+FreeSurfer decodes on into its uninitialised buffer). Ported: `utils/mosaic.cpp` whole, `utils/matfile.cpp` whole.
 
 ### Code generation
 
@@ -573,7 +576,8 @@ reproduced); FS-230 to FS-238 and FS-240 A (the default reads MATLAB's formats b
 definition); FS-239 A (messages: the whole name); FS-241 B (a clear error, `NULL`); FS-242
 resource leak (both modes close; no answer changes, no notice); FS-243 crash or machine-dependent
 (not reproduced; larmorx refuses above 256 MiB of numbers as a failed allocation, both modes);
-FS-244 A (saturation, the rule of FS-02); FS-246 B; FS-247 A; FS-248 A (all kept); FS-250 C (no
+FS-244 A (saturation, the rule of FS-02); FS-245 memory contents (both modes 0, never
+compared); FS-246 B; FS-247 A; FS-248 A (all kept); FS-250 C (no
 caller; kept in both modes); FS-251 C (no valid file holds 0xff there; kept in both modes).
 
 ### Who calls these
@@ -593,6 +597,13 @@ known. The mosaic functions serve the Siemens DICOM reader (fs.dicomread, 3.7).
   (memory contents); `fix` differs only with notices. Seed 1, 4,300 portable cases of the 43
   commands: 3,836 identical, 464 hashed as `SKIP` (`e8e6a116...`, `tests/fs_io_official.rs`, passing
   in debug and release and under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`).
+- Seed 7, 86,000 cases of the 43 commands: `reproduce` identical on 76,947 of 76,949 comparable lines
+  (1,699 with memory digits); 4,496 not compared, 4,555 compared apart. The two others are a
+  `VOL_GEOM::read` and an `FStagsIO` case of piece 2 where the official build was stopped by the
+  probe's 5-second alarm (`CRASH 14`) while this relay built and tested beside the run; run again
+  alone they are identical (the oracle-output cache keeps the timed-out lines). Piece 5's 14,000
+  cases: 11,902 compared, all identical, 1,276 not compared, 822 compared apart; `fix` differs only
+  with notices.
 - SciPy's files (`matfile_scipy.py`, 400 matrices: version 4, version 5, compressed; doubles, singles,
   signed and unsigned 8- to 32-bit integers, complex): FreeSurfer reads 51 of 136 version 4 matrices
   right (the little-endian doubles, and the big-endian ones), 33 of 136 version 5 and 0 of 128

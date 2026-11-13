@@ -1487,6 +1487,8 @@ defects! {
         "the .mat readers allocate whatever sizes a file states before reading it: a negative or huge size crashes the program or depends on the machine's memory";
     FS_244 = "FS-244", "FreeSurfer", true,
         "MatFileRead's bytes of numbers outside -128 to 127 wrap (300 gives 44), and of numbers beyond the 32-bit range or NaN are 0";
+    FS_245 = "FS-245", "FreeSurfer", true,
+        "the .mat readers' results depend on memory contents for some files (a 16-bit number cut by the file's end, the imaginary part of a matrix that is not of doubles, a compressed variable, a version 5 header cut by the file's end, a name printed past its end): values taken from memory never written or read past their buffers";
     FS_246 = "FS-246", "FreeSurfer", true,
         "MatlabRead, given a version 5 array of three or more dimensions, reads its name and type from the third dimension's place: wrong results";
     FS_247 = "FS-247", "FreeSurfer", true,

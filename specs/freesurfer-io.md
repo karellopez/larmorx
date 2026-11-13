@@ -915,7 +915,8 @@ and MATLAB `.mat` files (`MatlabWrite`, `MatFileWrite`, `MatlabRead`, `MatlabRea
 FS-01's byte) as in §1. A **`long32`** is a 32-bit signed integer; FreeSurfer prints one with `%ld`
 as the unsigned value of its 32 bits (-1 prints `4294967295`). **`errno`** is part of every result,
 as in §25: an allocation that fails sets 12. "Memory never written" and "memory contents" mark values
-FreeSurfer takes from memory; larmorx uses 0 there in both modes and notes the defect named.
+FreeSurfer takes from memory; larmorx uses 0 there in both modes and notes the defect named and
+FS-245 (the result depends on memory contents: never compared).
 
 ## 35. Mosaics
 
@@ -1086,11 +1087,14 @@ than the machine allows: FS-243 (larmorx refuses above 256 MiB of numbers as suc
   levels 1 to 9 and one decoding to more than 100 times its size; each cut at a random byte, with
   bytes changed or a first byte 0xff; `Gdiag` 0, `DIAG_VERBOSE`, `DIAG_SHOW` and both; `Gdiag_no`
   -1, 0, 1. Lines where FreeSurfer crashes or its outcome depends on the machine (FS-13, FS-229,
-  FS-243, FS-248) are counted, not compared; those where it reads memory (FS-231, FS-235, FS-239 to
-  FS-241 "memory", the addresses of `DIAG_SHOW` with `DIAG_VERBOSE`) are compared apart.
+  FS-243, FS-248) are counted, not compared; those where it reads memory (FS-245, the addresses of
+  `DIAG_SHOW` with `DIAG_VERBOSE`) are compared apart.
 - Measured on the replica (2026-11-13): seed 9, 3,500 cases of the seven commands (500 each):
   `reproduce` identical on 2,990 of 2,990 comparable lines (308 not compared, 202 compared apart);
   `fix` differs only with a notice. Seed 1, 4,300 portable cases of the 43 commands: 3,836
   identical, 464 not compared. `matfile_scipy.py`: the default reads 400 of 400 matrices SciPy wrote
   (version 4: 136, version 5: 136, compressed: 128) as written; FreeSurfer's reading gets 51, 33 and
-  0 of them right.
+  0 of them right. Seed 7, 86,000 cases of the 43 commands (2,000 each): `reproduce` identical on
+  76,947 of 76,949 comparable lines (the two others: the official build stopped by the probe's
+  5-second alarm under load, identical when run again alone); piece 5's 14,000: 11,902 compared, all
+  identical, 1,276 not compared, 822 compared apart.

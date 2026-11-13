@@ -59,8 +59,8 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   dimensions, zlib-compressed, one compressing more than 100 to 1), cut or changed. A matrix of more
   than 65,536 numbers prints as `fnv<FNV-1a 64 of its floats' bytes>`. `SKIP` where FreeSurfer crashes,
   its outcome depends on the machine's memory or it passes the 5 seconds printing (FS-13, FS-229,
-  FS-243, FS-248); `VARY` where it reads memory (FS-231, FS-235, FS-239, FS-240, FS-241 "memory", the
-  addresses printed with `DIAG_SHOW` and `DIAG_VERBOSE`).
+  FS-243, FS-248); `VARY` where it reads memory (FS-245, the addresses printed with `DIAG_SHOW` and
+  `DIAG_VERBOSE`).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

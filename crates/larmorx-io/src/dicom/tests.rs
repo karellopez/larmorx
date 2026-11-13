@@ -312,6 +312,62 @@ fn a_part10_file_switches_to_its_transfer_syntax() {
 }
 
 #[test]
+fn a_name_given_apart_from_the_path_shows_in_messages_and_the_object() {
+    let d = scratch("named");
+    let mut ds = Vec::new();
+    el(&mut ds, 0x0008_0018, None, 4, b"1.2\0", false);
+    let f = d.join("a.dcm");
+    std::fs::write(&f, part10(&ds, b"1.2.840.10008.1.2\0")).unwrap();
+    let named = |path: &Path, name: &[u8], options: u64| {
+        let mut r = Run {
+            cond: 0,
+            object: None,
+            stack: CondStack::new(),
+            out: Captured::default(),
+            notices: Notices::new(UpstreamDefects::Fix),
+        };
+        r.cond = open_file_named(
+            path,
+            name,
+            options,
+            &mut r.object,
+            &Ctn,
+            &mut r.stack,
+            &mut r.out,
+            &mut r.notices,
+        )
+        .unwrap();
+        r
+    };
+    // read: the object keeps the name given
+    let r = named(&f, b"sub/a.dcm", opt::PART10FILE);
+    assert_eq!(r.cond, DCM_NORMAL);
+    assert_eq!(r.object.as_ref().unwrap().file_name, b"sub/a.dcm");
+    // a failure while reading names it in CTN's last message
+    let r = named(&f, b"sub/a.dcm", opt::ORDERLITTLEENDIAN);
+    assert_eq!(r.cond, DCM_FILEOPENFAILED);
+    assert_eq!(
+        r.stack.entries().last().unwrap().1,
+        b"DCM failed to open file: sub/a.dcm in DCM_OpenFile"
+    );
+    // a file that cannot be opened: the name given, errno from the path
+    let r = named(&d.join("none"), b"none", opt::PART10FILE);
+    assert_eq!(r.cond, DCM_FILEOPENFAILED);
+    assert_eq!(
+        r.stack.entries()[0].1,
+        b"DCM failed to open file: none in DCM_OpenFile"
+    );
+    assert_eq!(r.stack.errno, 2);
+    // open_file is open_file_named with the path's own bytes
+    let a = open(&f, opt::ORDERLITTLEENDIAN, UpstreamDefects::Fix, &Ctn);
+    let p = f.to_string_lossy().into_owned();
+    let b = named(&f, p.as_bytes(), opt::ORDERLITTLEENDIAN);
+    assert_eq!(a.stack.entries(), b.stack.entries());
+    assert_eq!(a.object, b.object);
+    std::fs::remove_dir_all(&d).ok();
+}
+
+#[test]
 fn the_format_probe_sequence_on_a_nifti_header() {
     let d = scratch("nii");
     let mut h = vec![0u8; 352];

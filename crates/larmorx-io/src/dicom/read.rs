@@ -162,6 +162,35 @@ pub fn open_file(
     notices: &mut Notices,
 ) -> Result<Condition, Unsupported> {
     let name_bytes = path_bytes(name);
+    open_file_named(
+        name,
+        &name_bytes,
+        options,
+        object,
+        dialect,
+        stack,
+        out,
+        notices,
+    )
+}
+
+/// [`open_file`] on the file at `path` for a caller that gave CTN the name `name` (the bytes C
+/// received): CTN's messages and the object's file name show `name`, and the file opened is
+/// `path`. For a program that runs in process with its own working directory (it joins its
+/// directory and the name it was given; CTN, in that program's own process, shows the name as
+/// given). `open_file(p, ...)` is `open_file_named(p, <p's bytes>, ...)`.
+#[allow(clippy::too_many_arguments)]
+pub fn open_file_named(
+    path: &Path,
+    name: &[u8],
+    options: u64,
+    object: &mut Option<DcmObject>,
+    dialect: &dyn Dialect,
+    stack: &mut CondStack,
+    out: &mut dyn Streams,
+    notices: &mut Notices,
+) -> Result<Condition, Unsupported> {
+    let name_bytes = name;
     if (options & (opt::ORDERMASK | opt::FILEFORMATMASK)) == 0 {
         let m = dialect.message(DCM_ILLEGALOPTION);
         return Ok(stack.push(
@@ -189,7 +218,7 @@ pub fn open_file(
     if (options & opt::CONVERTMASK) == opt::FORMATCONVERSION {
         return Err(Unsupported("DCM_FORMATCONVERSION with a byte order"));
     }
-    let file = match File::open(name) {
+    let file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
             stack.errno = errno_of(&e);
@@ -197,7 +226,7 @@ pub fn open_file(
             return Ok(stack.push(
                 DCM_FILEOPENFAILED,
                 m,
-                &[Arg::Str(&name_bytes), Arg::Str(b"DCM_OpenFile")],
+                &[Arg::Str(name_bytes), Arg::Str(b"DCM_OpenFile")],
                 out,
                 notices,
             ));
@@ -213,7 +242,7 @@ pub fn open_file(
     }
     let fd = stack.open_fd();
     let mut r = Reader {
-        name: &name_bytes,
+        name: name_bytes,
         file,
         fd,
         dialect,

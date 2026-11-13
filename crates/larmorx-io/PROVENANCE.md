@@ -256,7 +256,9 @@ FreeSurfer's clean-room implementers).
   `DCM_NOGROUPLENGTH` and `DCM_ACCEPTVRMISMATCH`; `DCM_FORMATCONVERSION` without a byte order
   (CTN refuses it: "illegal stream option"). The options no caller reaches (`DCM_DELETEONCLOSE`,
   `DCM_USELENGTHTOEND`, `DCM_ALLOWREPEATELEMENTS` / `DCM_TRYFILENAMECHANGE`, `DCM_EFILM`, a format
-  conversion with a byte order) return `read::Unsupported`; streams (`DCM_ReadStream`) and the
+  conversion with a byte order) return `read::Unsupported`; `open_file_named` opens one path and
+  shows another name (the bytes the C caller passed) in the messages and the object, for programs
+  run in process with their own working directory; streams (`DCM_ReadStream`) and the
   element access functions are not ported here (item 3.1-56 reads elements on this reader).
 - CTN's global state is a value (`CondStack`): the condition stack, and `errno` and the
   descriptors as CTN's calls leave them (a read with a negative count, a descriptor closed twice,

@@ -18,7 +18,12 @@ pub mod affine;
 pub mod dmatrix;
 pub mod elements;
 pub mod histo;
+pub mod inverse;
 pub mod matrix;
+pub mod nr;
+pub mod pdf;
+pub mod primes;
+pub mod rfields;
 
 use larmorx_core::defects::{FS_17, GLIBC_07};
 use larmorx_core::drand48::Drand48;

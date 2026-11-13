@@ -4,6 +4,7 @@
 use larmorx_fs_core::maths::affine::{self, AffineVector};
 use larmorx_fs_core::maths::dmatrix::{DMatrix, StreamSel};
 use larmorx_fs_core::maths::elements::{self, Region};
+use larmorx_fs_core::maths::rfields;
 use larmorx_fs_core::maths::matrix::Matrix;
 use larmorx_fs_core::maths::{Output, Returned};
 use larmorx_fs_core::numbers::ListStats;
@@ -366,6 +367,111 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let norm = l.geti();
             let o = l.getm_out(p)?;
             mout(l, None, None, o, |o| p.gaussian_matrix2(n, s1, s2, w1, norm, o))?;
+        }
+        // -- §8.8
+        "minverse" => {
+            let a = l.getm(p)?;
+            let o = l.getm_out(p)?;
+            mout(l, a.as_ref(), None, o, |o| p.matrix_inverse(a.as_ref(), o))?;
+        }
+        "mdet" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let v = p.matrix_determinant(&a);
+            l.putf(v);
+        }
+        "mqr" => {
+            let a = l.getm(p)?;
+            let mut q = l.getm(p)?;
+            let mut r = l.getm(p)?;
+            let v = p.matrix_qr_decomposition(a.as_ref(), q.as_mut(), r.as_mut());
+            l.puti(i64::from(v));
+            l.putm(q.as_ref());
+            l.putm(r.as_ref());
+        }
+        // -- §9, §10
+        "primes" | "pfactors" => {
+            let n = l.geti();
+            let v = if c == "primes" { p.get_primes(n) } else { p.get_prime_factors(n) };
+            match v {
+                None => l.out("null"),
+                Some(v) => {
+                    l.puti(v.len() as i64);
+                    for x in v {
+                        l.puti(i64::from(x));
+                    }
+                }
+            }
+        }
+        "pclosest" | "pclosestless" => {
+            let (n, q) = (l.geti(), l.geti());
+            match p.get_closest_prime_factor(n, q, c == "pclosestless") {
+                Some(v) => l.puti(i64::from(v)),
+                None => l.out("crash"),
+            }
+        }
+        "gaussdraws" => {
+            let seed = l.getl();
+            let k = l.geti();
+            p.srand48(seed);
+            for _ in 0..k.max(0) {
+                let v = p.pdf_gaussian();
+                l.putd(v);
+            }
+        }
+        "todseed" => {
+            let v = p.pdf_tod_seed();
+            l.puti(v as i64);
+        }
+        // -- §14
+        "nrvector" => {
+            let (nl, nh) = (l.getl(), l.getl());
+            let mut v = p.nr_vector(nl, nh)?;
+            for i in nl..=nh {
+                v.set(i, i as f32);
+            }
+            for i in nl..=nh {
+                l.putf(v.get(i));
+            }
+        }
+        "nrmatrix" => {
+            let (r0, r1, c0, c1) = (l.getl(), l.getl(), l.getl(), l.getl());
+            let mut m = p.nr_matrix(r0, r1, c0, c1)?;
+            for r in r0..=r1 {
+                for k in c0..=c1 {
+                    m.set(r, k, (r * 100 + k) as f32);
+                }
+            }
+            for r in r0..=r1 {
+                for k in c0..=c1 {
+                    l.putf(m.get(r, k));
+                }
+            }
+        }
+        // -- §19
+        "rfname" => {
+            let name = l.getx();
+            let mut r = p.rf_spec_init(1);
+            r.name = Some(name);
+            let v = rfields::rf_name_to_code(&mut r);
+            l.puti(i64::from(v));
+            l.puti(i64::from(r.code));
+        }
+        "rfinit" => {
+            let seed = crate::args::strtoul10(l.tok());
+            let mut r = p.rf_spec_init(seed);
+            match &r.name {
+                Some(n) => l.out(crate::hexbytes(n)),
+                None => l.out("null"),
+            }
+            l.puti(i64::from(r.code));
+            l.puti(i64::from(r.nparams));
+            l.putd(r.mean);
+            l.putd(r.stddev);
+            l.puti(r.seed as i64);
+            let s2 = crate::args::strtoul10(l.tok());
+            let v = p.rf_spec_set_seed(&mut r, s2);
+            l.puti(i64::from(v));
+            l.puti(r.seed as i64);
         }
         // -- §3
         "affine" => {

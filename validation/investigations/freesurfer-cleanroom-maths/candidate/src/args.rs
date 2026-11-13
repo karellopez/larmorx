@@ -45,6 +45,12 @@ pub fn strtol(s: &str) -> i64 {
     if neg { -v } else { v }
 }
 
+/// C's `strtoul(s, NULL, 10)` (a minus sign negates, modulo 2^64).
+pub fn strtoul10(s: &str) -> u64 {
+    let v = strtol(s);
+    v as u64
+}
+
 /// C's `strtoull(s, NULL, 16)`.
 pub fn strtoul16(s: &str) -> u64 {
     let d: String = s.chars().take_while(char::is_ascii_hexdigit).collect();

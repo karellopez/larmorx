@@ -23,9 +23,14 @@ printing and progress bar, the vector searches and sort comparisons, whether two
 **part 7** (queue items 3.1-51 and 3.1-52, §38-46): the metric properties every read computes;
 **part 8** (queue item 3.1-47's part b, §47-55): the small file readers and writers (the read
 frame, the triangle-property files, the distance, area-error, angle-error and curvature files, the
-backup and imaginary value readers, the marks, the ASCII and VTK formats). Later parts: reading and
-writing surfaces, curvatures, patches, overlays and value files (3.1-47's part c, 3.1-48); the
-midline marking, the label normal and the coordinate copy (they need the volume structure).
+backup and imaginary value readers, the marks, the ASCII and VTK formats); **part 9** (queue item
+3.1-48's part a, §56-65): one `scanf` call, the curvature, float, area and decimation files, file
+names and `FS_GII`, the VTK reader, the movie.byu and icosahedron writers, the Talairach matrix,
+the MATLAB plots; **part 10** (queue items 3.1-48's part b and 3.1-49's STL, §66-72): the raw ASCII,
+movie.byu and triangle-file readers, the quadrangle of two triangles, STL read and written. Later
+parts: reading and writing surfaces through their format's identification, curvatures, patches,
+overlays and value files (3.1-47's part c, 3.1-48's rest); the midline marking, the label normal and
+the coordinate copy (they need the volume structure).
 
 ## 1. Conventions
 
@@ -1701,3 +1706,203 @@ with `FS_GII` set and a name of 1,020 bytes or more (FS-149), `MRISwriteGeo` wit
 of a ripped vertex (FS-141). Cases noted with FS-49, FS-140, FS-144 or FS-167 (memory contents in
 FreeSurfer) are counted, not compared. Observed (relay 12): seeds 7, 13 and 17, 2,000 `cfile` cases
 each: every comparable case identical with `reproduce` (253 counted, not compared).
+
+# Part 10 (relay 13, queue items 3.1-48 part b and 3.1-49's STL): the raw surface readers, STL
+
+Part 9's conventions hold (the error codes, `errno` before a message, one `scanf` call §56, `fgetl`
+lines). The readers below build a raw surface (`MRISalloc(nvertices, nfaces)`, §31): its counts,
+coordinates, rip flags, faces and (STL) neighbour lists; completing it (the topology, the metric
+properties) is the caller's work (`MRISreadOverAlloc`, later). A "free-format number" is one
+`fscanf` conversion of the file's next item, any white space (newlines included) before it.
+**Unreadable values (FS-151, FS-152)**: where a reader's call cannot convert a number (the file ends,
+or holds something else there), FreeSurfer keeps the value its variable had: the one the same
+variable got from the call before (FS-152), or, where no call assigned it yet, memory contents
+(FS-151). larmorx refuses such a file by default with the message given below (an error, the
+reader's failure result); `reproduce` keeps the values read before (FS-152) and uses 0 where
+FreeSurfer has memory contents (FS-151), with the notices.
+
+## 66. The ASCII surface (`mrisReadAsciiFile(fname)`)
+
+The file: a first line (`fgetl` of up to 1,023 bytes, §56) `<nvertices> <nfaces>` (two `%d`), then
+per vertex four free-format numbers `x y z rip` (`%f %f %f %d`), per face four `a b c rip`. A file
+that cannot be opened: `MRISreadAsciiFile: could not open file <file>` (`ERROR_NOFILE`, `NULL`). A
+file with no line (empty, or only blank and comment lines): **FS-150**, FreeSurfer ends with a
+segmentation fault (signal 11); larmorx: `mrisReadAsciiFile(<file>): the file holds no line`
+(`ERROR_BADFILE`, `NULL`); `reproduce` exits with status 139. Counts that cannot be read: FS-151
+(`mrisReadAsciiFile(<file>): could not read the counts`). The surface: type
+`MRIS_TRIANGULAR_SURFACE` (3); a negative count fails `MRISalloc`'s check (FS-03, §31). Each vertex:
+its coordinates set as `MRISsetXYZ` does (§14); its rip flag the `int` read, kept in one signed byte
+(`256` gives 0, `255` gives -1); any nonzero rip flag makes the surface a patch (`patch` 1, status
+`MRIS_PLANE`, 2). The variables of the three coordinates and the rip flag keep their values from
+vertex to vertex, and the rip flag's from the last vertex into the faces: a vertex whose numbers
+cannot be read takes the previous vertex's (FS-152; the first vertex's: FS-151; message `... could
+not read vertex <v>`). Each face: three `%d ` calls into its vertices (a vertex number that cannot
+be read stays 0, as `MRISalloc` gave it: FS-152, `... could not read face <f>`); a vertex number
+below 0 or not below the vertex count ends the program: `<program>: face <f> vertex <n>: <v> --
+out of range!!! Should be in [0 <nvertices - 1>]` (`ERROR_BADPARM`, exit status 252); each corner
+adds 1 to its vertex's face count in one byte (**FS-147**: past 255 it wraps; larmorx refuses,
+`... vertex <v> is in more than 255 faces`; `reproduce` wraps); then its rip flag (`%d\n`, kept from
+the call before when it cannot be read: FS-152; never read before: FS-151), in one signed byte.
+Returns the surface.
+
+## 67. The movie.byu surface and its positions
+
+**The header** (both readers): a first line (`fgetl` of up to 99 bytes) read as `%*d %d %d %d`
+(the parts, unused; the vertex, face and edge counts). No line: FS-150 (signal 11; larmorx
+`mrisReadGeoFile(<file>): the file holds no line`). Fewer than three counts: `mrisReadGeoFile(<file>):
+could not scan dimensions from '<line>'` (the line from its first character that is not white
+space; `ERROR_BADFILE`). A face count of 0, or -1 with an edge count of -2^31: **FS-153**, FreeSurfer
+ends with an arithmetic exception (signal 8, the integer division); larmorx
+`mrisReadGeoFile(<file>): unsupported vertices/face: <e> edges for <f> faces.`, `reproduce` exits
+with status 136. Edges divided by faces (C's integer division) other than 3:
+`mrisReadGeoFile(<file>): unsupported vertices/face <n>.` (`ERROR_BADFILE`). Then a second line
+(`fgetl` of up to 199 bytes: the face count again, unused). Opening failures: `mrisReadGeoFile:
+could not open file <file>` (`ERROR_NOFILE`).
+
+**The coordinates**: per vertex three free-format numbers (`%e %e %e`; a vertex of an odd number
+also skips the white space after it: `fscanf(fp, "\n")`); the variables keep their values from
+vertex to vertex (FS-152, FS-151; larmorx `... could not read vertex <v>`, the message's reader name
+`mrisReadGeoFile` or `mrisReadGeoFilePositions`).
+
+**`mrisReadGeoFile(fname)`**: a new surface of the header's counts, type `MRIS_GEO_TRIANGLE_FILE`
+(2), the coordinates as above, then per face `%d ` twice and `-%d\n` (the last vertex written
+negative, its `-` a format character that must match), each number minus 1 (the file counts from
+1); a number that cannot be read stays 0 before the subtraction (FS-152). A face vertex that is not
+one of the surface's (below 0 or not below the vertex count after the subtraction, including an
+unreadable one and a last vertex not written negative): **FS-154**, FreeSurfer counts the face in
+memory outside the surface's arrays (a crash, or corrupted memory later); larmorx
+`mrisReadGeoFile(<file>): face <f> vertex <n>: <v> is not a vertex of the surface`, `NULL`;
+`reproduce` keeps the number and counts nothing. Each valid corner adds 1 to its vertex's face
+count (FS-147 as §66). Then the face's second and third vertices are swapped. The rip flags stay 0.
+Returns the surface.
+
+**`mrisReadGeoFilePositions(mris, fname)`**: the header, then the coordinates of `mris`'s own
+vertex count (not the file's), set as `MRISsetXYZ` does (the surface's distances not freed: §14's
+logic message when they are marked allocated). **FS-155**: FreeSurfer does not compare the file's
+counts with the surface's; larmorx refuses a file of other counts:
+`mrisReadGeoFilePositions(<file>): the file holds <n> vertices and <m> faces, the surface <n'> and
+<m'>` (`ERROR_BADFILE`); `reproduce` reads as FreeSurfer. Returns `NO_ERROR`, `ERROR_NOFILE` or
+`ERROR_BADFILE`.
+
+## 68. The binary triangle file's positions
+
+Both readers open the file (`mrisReadTriangleFile(<file>): could not open file`, `ERROR_NOFILE`),
+read 3 bytes (the magic number, not checked), one line (`fgets` of up to 199 bytes), skip white
+space (`fscanf(fp, "\n")`: also bytes of the counts that happen to be white space), then the vertex
+and face counts (`freadInt`, big-endian; FS-49 at the file's end). Verbose: `surface <file>: <n>
+vertices and <m> faces.` on standard output. Coordinates are big-endian floats (`freadFloat`,
+FS-167 at the end).
+
+**`mrisReadTriangleFileVertexPositionsOnly(fname)`**: a vertex count of 0: `MRISreadVerticesOnly:
+could not allocate surface` (`ERROR_NO_MEMORY`, `NULL`). A negative count: **FS-156**, its
+allocation fails (`errno` `ENOMEM`, 12) and FreeSurfer returns a surface of that count with no
+vertices; larmorx gives the message above (`Cannot allocate memory` first), `reproduce` returns that
+surface. Otherwise per vertex three floats; after each vertex's three, a coordinate whose size is
+beyond 10000, or that is not finite, ends the program: `<program>: vertex <v> x coordinate
+<value>!` (`y`, `z`; `%f`; `ERROR_BADFILE`, exit status 251), the first such coordinate in x, y, z
+order. Returns the positions (the small surface of §11's `SMALL_SURFACE`).
+
+**`mrisReadTriangleFilePositions(mris, fname)`**: counts other than the surface's: `mrisReadTriangleFile
+opened <file> okay but surface doesn't match <surface's file name>.  nvertices:<n> !=
+mris->nvertices:<n'> || nfaces:<m> != mris->nfaces:<m'>` and its newline (`ERROR_BADPARM`; the file
+stays open). Verbose message; the surface's distances freed (`MRISfreeDistsButNotOrig`, §8); then per
+vertex three floats set as `MRISsetXYZ` does. Returns `NO_ERROR`.
+
+## 69. Two triangles' quadrangle (`quadCombine(quad, vA, vB)`)
+
+Goes through `vA`'s three vertices in order; each is appended to `quad` (when four are already
+there: returns false); after it, the vertices of `vB` are searched in order for one equal to it:
+the first equal one whose predecessor in `vB` (cyclically: the one before position 0 is position 2)
+is `vA`'s next vertex (cyclically) appends `vB`'s vertex after it (cyclically; when four are
+already there: returns false); an equal one whose predecessor is not `vA`'s next vertex ends the
+search. Returns whether exactly four were appended. `quad`'s places are written as they are
+appended, also when it returns false (the others keep what they held). So two triangles sharing
+one edge in opposite directions give `vA`'s vertices with `vB`'s third inserted after the shared
+edge (observed: `0 1 2` and `2 1 4` give true and `0 1 4 2`; `0 1 2` and `2 1 0`, two shared
+edges, false and `0 2 1 0`; `0 1 2` and `3 4 5` false and `0 1 2`, the fourth place untouched).
+
+## 70. STL surfaces, read (`mrisReadSTL(filename)`)
+
+A file that cannot be opened: `NULL`, no message. **Binary or text**: the file is binary when its
+size equals `84 + 50 n`, computed in 32 unsigned bits, for the `n` its bytes 80 to 83 give
+(little-endian); a file of fewer than 84 bytes is never binary (observed: its size reads as
+2^32 - 1). **FS-160**: a count whose product with 50 wraps around 2^32 to the file's size makes
+FreeSurfer read the triangles past the file's end (memory contents); larmorx refuses it: `error:
+STL file <file>: <n> triangles do not fit in its <size> bytes`, `NULL`; `reproduce` reads them as 0.
+
+**Binary**: after the 80-byte header (unused) and the count, per triangle the normal and three
+corners (12 little-endian floats) and 2 bytes (unused).
+
+**Text**: lines (`fgetl` of up to 1,023 bytes) told apart by their first character that is not
+white space: `v`: `vertex %f %f %f` (`sscanf`), a corner; `f`: `facet normal %f %f %f`, a new facet
+with this normal; `s`: a solid, the second one an error: `error: STL file <file> contains multiple
+solids!`, `NULL`; `e`, `o`: passed over (any line starting so); any other: `error: ASCII STL file
+<file> contains unrecognized line: <line>` (the line with its leading white space, cut at a `#`),
+`NULL`. The three numbers of the vertex and facet lines go into the same three variables: a number
+a line cannot read keeps the one the line before (vertex or facet) gave (FS-152; never given: FS-151;
+larmorx `error: ASCII STL file <file>: could not read the numbers of line <line>`, `NULL`).
+
+**The vertices**: two corners are one vertex when their three coordinates compare equal as floats
+(`-0` equals `+0`; a NaN equals nothing, so every corner with a NaN is a vertex of its own); vertices
+are numbered in the order of their first corner and keep that corner's coordinates. A corner
+before the first facet, or a fourth corner of a facet, ends the program: `error: STL file does not
+appear to represent a triangular mesh` (exit status 1). **FS-158**: FreeSurfer finds earlier corners
+through a table indexed by a hash of the coordinates that is negative for most corners with one or
+three NaN or infinite coordinates (observed: the index is `h % 2^20` with
+`h = H(x)·2017 ^ H(y)·1029 ^ H(z)·1159` in 32-bit wrapping arithmetic, `H(c) = (int)(1000 ·
+logf(|c| + 1))` in float, glibc's `logf`, a NaN or out-of-range float converting to -2^31; the
+index only decides where a corner is looked up, never which vertex it is), and then reads memory
+before the table (a crash or a wrong vertex); larmorx looks such corners up as any other, noted.
+**FS-159**: a facet of fewer than three corners: FreeSurfer ends with a segmentation fault (signal
+11) once the file is read; larmorx `error: STL file <file>: facet <k> has fewer than three
+vertices` (the first such facet, from 0), `NULL`; `reproduce` exits with status 139.
+
+**The surface**: `MRISalloc(vertices, facets)`, type `MRIS_TRIANGULAR_SURFACE` (3); each face's
+cached normal is its facet's (`setFaceNorm`: not deferred), its vertices the corners' vertices,
+each vertex's coordinates its first corner's (set as `MRISsetXYZ` does). Then for each face in
+order and each corner: the vertex's face count `num` plus 1 (one byte; **FS-157**: a vertex of more
+than 255 faces makes FreeSurfer write its face lists past their allocation; larmorx `error: STL
+file <file>: vertex <v> is in more than 255 faces`, `NULL`; `reproduce` gives the whole lists and
+the wrapped count) and its neighbour count `vnum` plus 2 (`modVnum`, §11: the debug message when it
+passes the largest seen). Each vertex's neighbour list gets `vnum` places and `vnum` becomes 0;
+then for each face in order and each corner, the face's other two vertices in order are appended
+to the corner's vertex's list unless already in it (a vertex can be its own neighbour, when a facet
+names it twice). Each vertex's face list `f` and positions `n` get `num` places; `num` becomes 0,
+`vtotal` becomes `vnum`; then for each face in order and each corner `k`, the corner's vertex
+appends the face number to `f` and `k` to `n`. The rip flags stay 0; nothing else is computed.
+
+## 71. STL surfaces, written (`mrisWriteSTL(mris, filename)`)
+
+A binary STL file: 80 bytes (`freesurfer mesh` and zeros), the face count (32-bit little-endian),
+per face its cached normal (`getFaceNorm`, §28: a deferred one computed first) and its three
+vertices' coordinates (little-endian floats), then the two bytes `0` (0x30) and 0. Returns true;
+false, with no message, when the file cannot be created.
+
+## 72. Validation plan, part 10
+
+The probe's `sread` and `stl` commands (`validation/probes/fs-surfio/`): as `cfile` (§65), each case
+in an empty work folder with `d`. `sread`: `FREESURFER_reportLogicErrors` set one case in two;
+`DIAG_SHOW`/`DIAG_VERBOSE` each one in two; a case surface of 0 to 6 vertices (coordinates, rip
+flags one in six) and, with 3 or more, 0 to 4 faces, its distances' flags and size 0 to 3; 1 to 3
+operations: the ASCII reader on files of 0 to 6 vertices (a comment line or blank lines first one
+in three; the header `x y`, one count, or a negative count now and then; coordinates in decimal,
+fixed, exponent and special forms, `nan`, `inf`, `1e40`, `x`; rip flags 0, 1, 2, -1, 255, 256, 512,
+1000; a face vertex out of range one face in fifteen; 255 to 257 faces on one vertex one file in
+25; a file with no line one in 30; cut by 1 to 6 bytes one in nine); the movie.byu reader and the
+positions reader on files of the case's counts or others (edges of 4 per face or one too many, a
+face count of 0, a header of two numbers, vertex numbers 0, the count plus one or -2, a last vertex
+not negative, cut files, files with no line); the two triangle-file readers on files with a creator
+line of 210 bytes now and then, or without the blank line, or with extra white space; counts of the
+case's or others, -1 or -7 or 0; coordinates beyond 10000 or not finite now and then; cut files;
+`quadCombine` on triangles of vertices 0 to 5, half of them sharing an edge reversed. `stl`: Gdiag
+as above; 1 to 3 operations, the reader (four in five) on text or binary files of 0 to 5 facets of
+points from a pool of 3 to 6 (their zeros made `-0` one point in ten; a NaN or infinity one in 40),
+fans of 16 to 20 facets on one point one file in twelve (a sixth of them 256), text files with
+comments, numbers that cannot be read, facets of 2 or 4 corners, a corner before the first facet, a
+second solid, an unrecognized line, `SOLID`; binary files whose header starts with `solid` one in
+three and one byte too long one in 15; and the writer on a case surface of 0 to 6 vertices and 0 to 4
+faces with cached normals (deferred one in five). Then the case surface's state and every file in
+the folder. Cases noted with FS-151, FS-154, FS-157, FS-158 or FS-160 (and fs.io's FS-49, FS-167)
+are counted, not compared. Observed (relay 13): `sread` seed 7, 1,000 cases and seed 13, 2,000;
+`stl` seed 7, 1,000: every comparable case identical with `reproduce` (92, 156 and 105 counted, not
+compared), the default different only with notices.

@@ -29,9 +29,9 @@ records: {replica: [ants-denoise]}
 evidence: ants-denoise
 -->
 
-`DenoiseImage` denoises an image by adaptive non-local means (Manjón et al., *Adaptive non-local
-means denoising of MR images with spatially varying noise levels*, JMRI 31:192-203, 2010).
-sMRIPrep runs it on every T1w (`-n Rician`, ANTs' other defaults).
+`DenoiseImage` denoises an image by adaptive non-local means. The method is Manjón et al.'s
+(*Adaptive non-local means denoising of MR images with spatially varying noise levels*, JMRI
+31:192-203, 2010); sMRIPrep runs it on every T1w (`-n Rician`, ANTs' other defaults).
 
 ### Python (`DenoiseImage`)
 

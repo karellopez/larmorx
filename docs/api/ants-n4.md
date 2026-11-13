@@ -33,9 +33,9 @@ records: {replica: [ants-n4]}
 evidence: ants-n4
 -->
 
-`N4BiasFieldCorrection` removes a smooth bias field from an image by N4 (Tustison et al.,
-*N4ITK: Improved N3 Bias Correction*, IEEE TMI 29(6), 2010). fMRIPrep, sMRIPrep and sdcflows run
-it on BOLD references, T1w images and field maps' magnitudes.
+`N4BiasFieldCorrection` removes a smooth intensity bias field from an image. The method is N4
+(Tustison et al., *N4ITK: Improved N3 Bias Correction*, IEEE TMI 29(6), 2010); fMRIPrep, sMRIPrep
+and sdcflows run it on BOLD references, T1w images and field maps' magnitudes.
 
 ### Python (`N4BiasFieldCorrection`)
 

@@ -18,11 +18,13 @@ use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix as mx;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
+use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::ltaread as lr;
 use larmorx_freesurfer_volume::rotate as rt;
@@ -948,6 +950,100 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 t.push(hex(ext.as_bytes()));
                 t.push(hex(&bytes));
                 t.push(i64::from(kind < 3 && !g.chance(30)).to_string());
+                // USE_AVERAGE305: 0 unset, 1 `true`, 2 set and empty
+                t.push(g.below(3).to_string());
+            }
+            "cmalab" => {
+                let n = 8;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    let v = if g.chance(4) {
+                        g.int(-3, 300)
+                    } else {
+                        g.pick(&CMA_LABELS)
+                    };
+                    t.push(v.to_string());
+                    let f = if g.chance(3) {
+                        fval(&mut g)
+                    } else {
+                        v as f32 + g.pick(&[0.0, 0.0, 0.5, -0.25, 1e-3])
+                    };
+                    t.push(fx(f));
+                }
+            }
+            "cmavol" | "fixrib" => {
+                let s = seg_vol(&mut g, &mut t);
+                let o = like(&mut g, s);
+                let o = Shape {
+                    hdr: o.hdr && g.chance(4),
+                    ..o
+                };
+                vol_of(&mut g, &mut t, o);
+                paint(
+                    &mut g,
+                    &mut t,
+                    o,
+                    &[0.0, 3.0, 42.0, 2.0, 41.0, 1.0, 255.0, -1.0, 0.5],
+                );
+                if cmd == "cmavol" {
+                    t.push(g.pick(&[1, 2, 1, 2, 0, 3]).to_string());
+                } else {
+                    let mode = g.pick(&[0, 1]);
+                    t.push(mode.to_string());
+                    if mode == 1 {
+                        // MRIcopy's destination: the segmentation's shape (another one is
+                        // MRIcopy's FS-163, where FreeSurfer writes outside it)
+                        vol_of(&mut g, &mut t, Shape { hdr: false, ..s });
+                    }
+                }
+            }
+            "lrswap" => {
+                seg_vol(&mut g, &mut t);
+            }
+            "lrseg" => {
+                seg_vol(&mut g, &mut t);
+                let rows = g.pick(&[1, 2, 3, 3, 4]);
+                let rows2 = if g.chance(8) { rows + 1 } else { rows };
+                for r in [rows, rows2] {
+                    let cols = if g.chance(5) { g.pick(&[0, 2]) } else { 1 };
+                    t.push(r.to_string());
+                    t.push(cols.to_string());
+                    for _ in 0..r * cols {
+                        t.push(fx(if g.chance(10) {
+                            fval(&mut g)
+                        } else {
+                            g.pick(&CMA_LABELS) as f32
+                        }));
+                    }
+                }
+            }
+            "ohe" => {
+                seg_vol(&mut g, &mut t);
+                let n = g.pick(&[0, 1, 2, 3, 4]);
+                t.push(n.to_string());
+                for _ in 0..n {
+                    t.push(g.pick(&CMA_LABELS[..12]).to_string());
+                }
+                t.push(g.pick(&[0, 1, 1, 2]).to_string());
+            }
+            "bvc" => {
+                t.push(i64::from(!g.chance(10)).to_string());
+                for _ in 0..16 {
+                    t.push(dx(if g.chance(10) {
+                        f64::from_bits(g.pick(&[
+                            0x7ff8_0000_0000_0000,
+                            0xfff8_0000_0000_0000,
+                            0x7ff0_0000_0000_0000,
+                            0x8000_0000_0000_0000,
+                        ]))
+                    } else {
+                        g.int(-1000, 2_000_000) as f64 / g.pick(&[1.0, 3.0, 7.0, 1e6, 0.001])
+                    }));
+                }
+            }
+            "bvr" => {
+                t.push("1".to_owned());
+                t.push(hex(&brainvol_text(&mut g)));
             }
             "coef" | "hsinc" => {
                 let n = 6;
@@ -972,6 +1068,95 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
         lines.push(t.join(" "));
     }
     lines
+}
+
+/// Labels the segmentation cases draw from: cma.h's (left and right), the parcellations', a few
+/// unknown ones.
+const CMA_LABELS: [i64; 48] = [
+    0, 2, 3, 41, 42, 4, 43, 10, 49, 17, 53, 30, 62, 5, 7, 8, 11, 12, 13, 14, 15, 16, 18, 24, 26,
+    28, 31, 46, 47, 50, 51, 52, 54, 58, 60, 63, 72, 77, 78, 79, 80, 85, 251, 255, 1001, 2035, 5001,
+    9999,
+];
+
+/// A segmentation's voxels painted: `n`, then `x y z value` of frame 0 (values from `vals`, or
+/// odd ones).
+fn paint(g: &mut Gen, t: &mut Vec<String>, s: Shape, vals: &[f32]) {
+    let n = g.int(0, (s.w * s.h * s.d).min(24));
+    t.push(n.to_string());
+    for _ in 0..n {
+        t.push(g.int(0, s.w - 1).to_string());
+        t.push(g.int(0, s.h - 1).to_string());
+        t.push(g.int(0, s.d - 1).to_string());
+        t.push(fx(if g.chance(12) { fval(g) } else { g.pick(vals) }));
+    }
+}
+
+/// A segmentation volume (rarely header only) painted with labels.
+fn seg_vol(g: &mut Gen, t: &mut Vec<String>) -> Shape {
+    let s = shape(g);
+    let s = Shape {
+        hdr: s.hdr && g.chance(4),
+        ..s
+    };
+    vol_of(g, t, s);
+    let vals: Vec<f32> = CMA_LABELS.iter().map(|&l| l as f32).collect();
+    paint(g, t, s, &vals);
+    s
+}
+
+/// A `brainvol.stats` text: `CacheBrainVolumeStats`'s lines, some changed (numbers in other forms,
+/// words missing, lines dropped or doubled, white space at the ends, CR line ends).
+fn brainvol_text(g: &mut Gen) -> Vec<u8> {
+    let names = [
+        "BrainSeg, BrainSegVol",
+        "BrainSegNotVent, BrainSegVolNotVent",
+        "SupraTentorial, SupraTentorialVol",
+        "SupraTentorialNotVent, SupraTentorialVolNotVent",
+        "SubCortGray, SubCortGrayVol",
+        "lhCortex, lhCortexVol",
+        "rhCortex, rhCortexVol",
+        "Cortex, CortexVol",
+        "TotalGray, TotalGrayVol",
+        "lhCerebralWhiteMatter, lhCerebralWhiteMatterVol",
+        "rhCerebralWhiteMatter, rhCerebralWhiteMatterVol",
+        "CerebralWhiteMatter, CerebralWhiteMatterVol",
+        "Mask, MaskVol",
+        "SupraTentorialNotVentVox, SupraTentorialVolNotVentVox",
+        "BrainSegNotVentSurf, BrainSegVolNotVentSurf",
+        "VentricleChoroidVol, VentricleChoroidVol",
+    ];
+    let mut s = String::new();
+    for name in names {
+        if g.chance(30) {
+            continue;
+        }
+        let num = if g.chance(4) {
+            g.pick(&[
+                "1e5", "-3.5", "+7", ".5", "5.", "0x10", "1e", "1e+", "1e400", "1e-400", "abc", "",
+                "007.25", "1.5.3", "inf", "nan", "4e2x", "-", "12",
+            ])
+            .to_owned()
+        } else {
+            format!("{:.12}", g.int(0, 2_000_000) as f64 / 7.0)
+        };
+        let mut line = format!("# Measure {name}, a description, {num}, mm^3");
+        if g.chance(8) {
+            line = format!("# Measure {name}, no number here");
+        }
+        if g.chance(15) {
+            line += g.pick(&[" ", "\r", "\t ", "  "]);
+        }
+        s += &line;
+        s += "\n";
+        if g.chance(20) {
+            s += &line;
+            s += "\n";
+        }
+    }
+    if g.chance(10) {
+        s.pop();
+    }
+    s.into_bytes()
 }
 
 /// A row of four numbers as a transform file writes them (sometimes odd).
@@ -1151,7 +1336,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 65] = [
+pub const COMMANDS: [&str; 73] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -1217,6 +1402,14 @@ pub const COMMANDS: [&str; 65] = [
     "skull",
     "tftype",
     "ltaread",
+    "cmalab",
+    "cmavol",
+    "lrswap",
+    "fixrib",
+    "lrseg",
+    "ohe",
+    "bvc",
+    "bvr",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -1476,6 +1669,87 @@ impl Out {
 }
 
 /// The destination of `f(src, dst, ...)`: 0 `NULL`, 1 a volume of the case, 2 the source.
+/// A volume of the case with its painted voxels (`fsvolume.cpp`'s `paint`).
+fn painted(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+    let mut m = get_vol(cx, t)?;
+    let n = t.i();
+    for _ in 0..n {
+        let (x, y, z, v) = (t.i(), t.i(), t.i(), t.f());
+        larmorx_freesurfer_mri::voxel::mri_set_vox_val(
+            &mut cx.g, &mut cx.b, &mut m, x, y, z, 0, v, 0,
+        )?;
+    }
+    Ok(m)
+}
+
+/// A label list of the case: rows, cols, the numbers row by row (`fsvolume.cpp`'s `get_list`).
+fn get_list(t: &mut Toks) -> Matrix {
+    let (rows, cols) = (t.i(), t.i());
+    let mut m = Matrix::real(rows, cols);
+    for r in 1..=rows {
+        for c in 1..=cols {
+            let v = t.f();
+            m.set_relt(r, c, v);
+        }
+    }
+    m
+}
+
+/// `cma.h`'s `IS_*` tests of a label as 0/1 characters, in its order (`fsvolume.cpp`'s `cma_bits`).
+fn cma_bits<T: cm::Label>(v: T) -> String {
+    let mut b: String = [
+        cm::is_future_wmsa(v),
+        cm::is_lh_layer(v),
+        cm::is_cc(v),
+        cm::is_rh_layer(v),
+        cm::is_layer(v),
+        cm::is_unknown(v),
+        cm::is_brain(v),
+        cm::is_wm(v),
+        cm::is_cerebral_wm(v),
+        cm::is_hypo(v),
+        cm::is_wmsa(v),
+        cm::is_wmh(v),
+        cm::is_thalamus(v),
+        cm::is_gm(v),
+        cm::is_ventral_dc(v),
+        cm::is_cerebellar_wm(v),
+        cm::is_cerebellar_gm(v),
+        cm::is_cerebellum(v),
+        cm::is_choroid(v),
+        cm::is_hippo(v),
+        cm::is_amygdala(v),
+        cm::is_mtl(v),
+        cm::is_cortex(v),
+        cm::is_lat_vent(v),
+        cm::is_csf(v),
+        cm::is_inf_lat_vent(v),
+        cm::is_ventricle(v),
+        cm::is_caudate(v),
+        cm::is_putamen(v),
+        cm::is_claustrum(v),
+        cm::is_accumbens(v),
+        cm::is_pallidum(v),
+        cm::label_with_no_topology_constraint(v),
+        cm::is_fimbria(v),
+        cm::is_gray_matter(v),
+        cm::is_white_matter(v),
+        cm::is_fluid(v),
+        cm::is_lh_class(v),
+        cm::is_rh_class(v),
+        cm::is_gray_class(v),
+        cm::is_white_class(v),
+        cm::is_csf_class(v),
+    ]
+    .iter()
+    .map(|&x| if x { '1' } else { '0' })
+    .collect();
+    for c in [cm::CSF_CLASS, cm::GM_CLASS, cm::WM_CLASS, cm::OTHER_CLASS] {
+        b.push(if cm::is_class(v, c) { '1' } else { '0' });
+    }
+    b
+}
+
 fn dst_mode(cx: &mut Ctx, t: &mut Toks) -> Result<(i32, Option<Mri>), Fatal> {
     let mode = t.i();
     let d = if mode == 1 {
@@ -1840,8 +2114,16 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let ext = String::from_utf8(t.hex()).expect("an ASCII name");
             let bytes = t.hex();
             let have = t.i() != 0;
-            let dir =
-                std::env::temp_dir().join(format!("larmorx-fsvol-lta-{}", std::process::id()));
+            let env = match t.i() {
+                0 => Environment::default(),
+                1 => Environment::from_pairs([("USE_AVERAGE305", "true")]),
+                _ => Environment::from_pairs([("USE_AVERAGE305", "")]),
+            };
+            // a folder of its own per call: the tests run cases in several threads at once
+            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let dir = std::env::temp_dir()
+                .join(format!("larmorx-fsvol-lta-{}-{call}", std::process::id()));
             std::fs::create_dir_all(&dir).expect("a scratch folder");
             let name = format!("fsvol-lta{ext}");
             let path = dir.join(&name);
@@ -1850,10 +2132,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 std::fs::write(&path, &bytes).expect("the case's file");
             }
             g.errno = 0;
-            let r = lr::lta_read_ex(g, a, b, Some(&dir), &name, &mut NoIo);
-            if have {
-                let _ = std::fs::remove_file(&path);
-            }
+            let r = lr::lta_read_ex(g, a, b, Some(&dir), &name, &mut NoIo(env));
+            let _ = std::fs::remove_dir_all(&dir);
             let r = r?;
             o.i(i64::from(g.errno));
             match r {
@@ -1874,6 +2154,101 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                     o.f(lta.fscale);
                 }
             }
+        }
+        "cmalab" => {
+            let n = t.i();
+            for _ in 0..n {
+                let v = t.i();
+                let f = t.f();
+                o.0 += &format!(
+                    "{} {} {} ",
+                    cma_bits(v),
+                    cma_bits(f),
+                    cma_bits(f64::from(f))
+                );
+                o.i(i64::from(cm::is_sub_cortical_gray(v)));
+                o.i(i64::from(cm::mri_aseg_contra_lat_label(&mut cx.a, v)));
+            }
+        }
+        "cmavol" => {
+            let aseg = painted(cx, t)?;
+            let ribbon = painted(cx, t)?;
+            let hemi = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            o.d(cm::supra_tentorial_vol_correction(g, b, &aseg, &ribbon)?);
+            o.d(cm::cortical_gm_vol_correction(
+                g, a, b, &aseg, &ribbon, hemi,
+            )?);
+        }
+        "lrswap" => {
+            let aseg = painted(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_lrswap_aseg(g, a, b, &aseg)?;
+            o.vol(r.as_ref());
+        }
+        "fixrib" => {
+            let aseg = painted(cx, t)?;
+            let ribbon = painted(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_fix_aseg_with_ribbon(g, a, b, &aseg, &ribbon, dst.as_mut())?;
+            let _ = mode;
+            o.ret(&r, dst.as_ref());
+        }
+        "lrseg" => {
+            let seg = painted(cx, t)?;
+            let lh = get_list(t);
+            let rh = get_list(t);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_lrswap_seg(g, a, b, &seg, &lh, &rh)?;
+            o.vol(r.as_ref());
+        }
+        "ohe" => {
+            let seg = painted(cx, t)?;
+            let n = t.i();
+            let list: Vec<i32> = (0..n).map(|_| t.i()).collect();
+            let force1 = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_one_hot_encode(g, a, b, &seg, &list, force1)?;
+            o.vol(r.as_ref());
+        }
+        "bvc" | "bvr" => {
+            // a folder of its own per call: the tests run cases in several threads at once
+            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let dir = std::env::temp_dir()
+                .join(format!("larmorx-fsvol-bv-{}-{call}", std::process::id()));
+            let subj = "fsvol-subj";
+            let stats_dir = dir.join(subj).join("stats");
+            let _ = std::fs::remove_dir_all(dir.join(subj));
+            if t.i() != 0 {
+                std::fs::create_dir_all(&stats_dir).expect("the subject's stats folder");
+            }
+            std::fs::create_dir_all(&dir).expect("a scratch folder");
+            let file = stats_dir.join("brainvol.stats");
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if cmd == "bvc" {
+                let mut stats = [0.0f64; 16];
+                for v in &mut stats {
+                    *v = t.d();
+                }
+                cm::cache_brain_volume_stats(g, b, Some(&dir), &stats, subj, ".").map(|()| {
+                    o.hex(&std::fs::read(&file).unwrap_or_default());
+                })
+            } else {
+                std::fs::write(&file, t.hex()).expect("the case's file");
+                let mut compute = |_: &mut Globals, _: &mut dyn Write, _: &mut dyn Write| {
+                    panic!("ComputeBrainVolumeStats is not reached by the cases")
+                };
+                cm::read_cached_brain_volume_stats(g, a, b, Some(&dir), subj, ".", &mut compute)
+                    .map(|stats| {
+                        for v in stats {
+                            o.d(v);
+                        }
+                    })
+            };
+            let _ = std::fs::remove_dir_all(&dir);
+            r?;
         }
         "coef" | "hsinc" => {
             let n = t.i();
@@ -2027,10 +2402,13 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
 
 /// `cmph`'s header fields beyond the volume's tokens.
 /// fs.io's functions for the transform readers: never reached by the cases (they name no volume
-/// that exists and no `register.dat`).
-struct NoIo;
+/// that exists and no `register.dat`); the case's environment.
+struct NoIo(Environment);
 
 impl lr::LtaIo for NoIo {
+    fn env(&self) -> &Environment {
+        &self.0
+    }
     fn read_header(
         &mut self,
         _: &mut Globals,

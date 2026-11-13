@@ -352,6 +352,10 @@ struct FsLtaIo<'e> {
 }
 
 impl LtaIo for FsLtaIo<'_> {
+    fn env(&self) -> &Environment {
+        self.env
+    }
+
     fn read_header(
         &mut self,
         g: &mut Globals,

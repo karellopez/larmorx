@@ -73,6 +73,8 @@
     clippy::mut_range_bound
 )]
 
+use crate::itk_real::ItkReal;
+
 /// A Fortran array of `n × n` doubles, column-major, indexed from 1.
 struct Fortran {
     n: usize,
@@ -566,11 +568,11 @@ fn balanc(a: &mut Fortran) -> (usize, usize) {
             g = 1.0 / f;
             noconv = true;
             for j in k..=n {
-                let v = a.at(i, j) * g;
+                let v = a.at(i, j).sse_mul(g);
                 a.set(i, j, v);
             }
             for j in 1..=l {
-                let v = a.at(j, i) * f;
+                let v = a.at(j, i).sse_mul(f);
                 a.set(j, i, v);
             }
         }
@@ -620,15 +622,16 @@ fn elmhes(a: &mut Fortran, low: usize, igh: usize) {
             if y == 0.0 {
                 continue;
             }
-            y /= x;
+            y = y.sse_div(x);
             a.set(i, mm1, y);
             for j in m..=n {
-                let v = a.at(i, j) - y * a.at(m, j);
+                let v = a.at(i, j).sse_sub(mul(124, y, a.at(m, j)));
                 a.set(i, j, v);
             }
             for j in 1..=igh {
-                let v = a.at(j, m) + y * a.at(j, i);
-                a.set(j, m, v);
+                let v = vpos(j - 1, igh);
+                let w = add(125 + v, a.at(j, m), mul(128 + v, y, a.at(j, i)));
+                a.set(j, m, w);
             }
         }
     }
@@ -919,6 +922,194 @@ fn min_m(a: f64, b: f64) -> f64 {
     if a <= b { a } else { b }
 }
 
+// The NaNs of the real eigensystem. `balanc` balances only a part without infinite or NaN entries
+// (it never returns otherwise, ITK-112), but the rows above that part and the columns right of it
+// (where EISPACK's isolated eigenvalues live) can hold any value, and `elmhes`, `hqr2`'s sweeps
+// and two-root steps, its back-substitution and `cdiv` combine them. Every such operation is an
+// SSE one (`ItkReal::sse_*`: of two NaN operands the first source's is passed on, a NaN made from
+// numbers is the default NaN with the sign bit set, on every platform), in the operand order of
+// the official build (ITK 4.13.2's netlib compiled by GCC 8.4.0 at `-O3`); where GCC chose it per
+// statement, the order is a numbered site in [`ORDER`]. Loops GCC vectorized (two doubles at a
+// time) can order the elements of the vector body and the one left over differently: their sites
+// come in three ([`vpos`]). The operations of the balanced part alone stay plain: its values are
+// finite.
+
+/// The number of operand-order sites.
+const SITES: usize = 206;
+
+/// The official build's choice at each site: for `add` and `mul`, 0 the source's left operand
+/// first, 1 the right one; for `neg_div`, 0 `(-a) / b`, 1 `-(a / b)`, 2 `a / (-b)`. Read from the
+/// object code's behaviour on NaNs with distinct payloads (validation/probes/fs-vnl, family
+/// `eignan`); a site never seen deciding a NaN keeps the source's order.
+static ORDER: [u8; SITES] = {
+    let mut o = [0u8; SITES];
+    // cdiv: `bis * ars`
+    o[9] = 1;
+    // the two-root step: `d_sign(zz, p) + p`; its row loop (one by one, two at a time, the one
+    // left over) and column loop (every element alike)
+    o[13] = 1;
+    let row: [(usize, [u8; 5]); 3] = [
+        (19, [1, 0, 0, 1, 0]),
+        (196, [1, 0, 1, 1, 1]),
+        (201, [1, 0, 1, 1, 0]),
+    ];
+    let mut r = 0;
+    while r < 3 {
+        let mut k = 0;
+        while k < 5 {
+            o[row[r].0 + k] = row[r].1[k];
+            k += 1;
+        }
+        r += 1;
+    }
+    // the column loop and the transformations' loop of the two-root step, every element alike
+    let mut v = 0;
+    while v < 3 {
+        o[24 + v] = 1;
+        o[30 + v] = 1;
+        o[33 + v] = 1;
+        o[148 + v] = 1;
+        o[154 + v] = 1;
+        o[157 + v] = 1;
+        v += 1;
+    }
+    // `w + p * p`
+    o[145] = 1;
+    // the complex back-substitution: `h(j, na) * h(i, j)`, `(...) * norm`, `r * x`, `ra * zz`,
+    // `s * x`, `h(i, en) * q`
+    o[85] = 1;
+    o[93] = 1;
+    o[99] = 1;
+    o[100] = 1;
+    o[102] = 1;
+    o[107] = 1;
+    // the real one: `r * zz`
+    o[119] = 1;
+    // elmhes: `a(m, j) * y`; `a(j, i) * y + a(j, m)` (vectorized and alone), `y * a(j, i) + a(j, m)`
+    // for the one left over
+    o[124] = 1;
+    o[125] = 1;
+    o[126] = 1;
+    o[127] = 1;
+    o[128] = 1;
+    o[130] = 1;
+    // the sweep's column loops over two and three columns (the vector body; the one left over),
+    // and the same loops over the transformations
+    let two: [[u8; 4]; 2] = [[1, 1, 1, 1], [0, 0, 1, 1]];
+    let three: [[u8; 7]; 2] = [[0, 1, 1, 1, 1, 0, 0], [0, 1, 0, 1, 1, 1, 1]];
+    let mut v = 0;
+    while v < 2 {
+        let mut k = 0;
+        while k < 4 {
+            o[43 + 3 * k + v] = two[v][k];
+            o[163 + 3 * k + v] = two[v][k];
+            k += 1;
+        }
+        let mut k = 0;
+        while k < 7 {
+            o[62 + 3 * k + v] = three[v][k];
+            o[175 + 3 * k + v] = three[v][k];
+            k += 1;
+        }
+        v += 1;
+    }
+    // the transformations' loops order their one left over otherwise
+    o[164] = 1;
+    o[167] = 0;
+    o[170] = 0;
+    o[173] = 1;
+    o[176] = 0;
+    o[179] = 1;
+    o[182] = 0;
+    o[185] = 0;
+    o[188] = 0;
+    o[191] = 1;
+    o[194] = 1;
+    // the loops' one-by-one versions (a single element): as the vector body over two columns, as the
+    // one left over over three
+    let mut k = 0;
+    while k < 4 {
+        o[43 + 3 * k + 2] = two[0][k];
+        o[163 + 3 * k + 2] = two[0][k];
+        k += 1;
+    }
+    let mut k = 0;
+    while k < 7 {
+        o[62 + 3 * k + 2] = three[1][k];
+        o[175 + 3 * k + 2] = three[1][k];
+        k += 1;
+    }
+    // the sweep's row loops: `q * h(k + 1, j) + h(k, j)`; `(q * h(k + 1, j) + h(k, j)) +
+    // h(k + 2, j) * r`, `zz * p`
+    o[39] = 1;
+    o[56] = 1;
+    o[58] = 1;
+    o[61] = 1;
+    o
+};
+
+#[inline(always)]
+fn order(site: usize) -> u8 {
+    ORDER[site]
+}
+
+/// `a + b` at a site.
+#[inline(always)]
+fn add(site: usize, a: f64, b: f64) -> f64 {
+    if order(site) == 0 {
+        a.sse_add(b)
+    } else {
+        b.sse_add(a)
+    }
+}
+
+/// `a * b` at a site.
+#[inline(always)]
+fn mul(site: usize, a: f64, b: f64) -> f64 {
+    if order(site) == 0 {
+        a.sse_mul(b)
+    } else {
+        b.sse_mul(a)
+    }
+}
+
+/// `-a * b` at a site (where GCC puts the negation, and which operand comes first): 0 `(-a) * b`,
+/// 1 `b * (-a)`, 2 `-(a * b)`, 3 `-(b * a)`, 4 `a * (-b)`, 5 `(-b) * a`.
+#[inline(always)]
+fn neg_mul(site: usize, a: f64, b: f64) -> f64 {
+    match order(site) {
+        0 => (-a).sse_mul(b),
+        1 => b.sse_mul(-a),
+        2 => -(a.sse_mul(b)),
+        3 => -(b.sse_mul(a)),
+        4 => a.sse_mul(-b),
+        _ => (-b).sse_mul(a),
+    }
+}
+
+/// `-a / b` at a site (where GCC puts the negation).
+#[inline(always)]
+fn neg_div(site: usize, a: f64, b: f64) -> f64 {
+    match order(site) {
+        0 => (-a).sse_div(b),
+        1 => -(a.sse_div(b)),
+        _ => a.sse_div(-b),
+    }
+}
+
+/// The class of element `index` of a loop of `count` elements GCC vectorized two at a time: 0 in
+/// the vector body, 1 the one left over, 2 a loop too short for the vector code.
+#[inline(always)]
+fn vpos(index: usize, count: usize) -> usize {
+    if count < 2 {
+        2
+    } else if index < count - count % 2 {
+        0
+    } else {
+        1
+    }
+}
+
 /// `vnl_real_eigensystem(M)`: `D` (complex eigenvalues, as `(re, im)`), `V` (complex
 /// eigenvectors as columns, row-major) and `Vreal` (the real eigenvectors' columns, row-major).
 #[derive(Clone, Debug, PartialEq)]
@@ -956,7 +1147,7 @@ pub struct BalancNeverReturns;
 /// [`RealEigensystem`] of the `n × n` matrix `m` (row-major), or [`BalancNeverReturns`] where
 /// VNL's `balanc` loops for ever.
 pub fn real_eigensystem(m: &[f64], n: usize) -> Result<RealEigensystem, BalancNeverReturns> {
-    use crate::defects::{ITK_110, ITK_111, Notice, UpstreamDefects, push_once};
+    use crate::defects::{ITK_110, ITK_111, ITK_117, Notice, UpstreamDefects, push_once};
     assert!(n >= 1 && m.len() == n * n, "not an n × n matrix");
     let mut a = Fortran {
         n,
@@ -1023,6 +1214,22 @@ pub fn real_eigensystem(m: &[f64], n: usize) -> Result<RealEigensystem, BalancNe
                 ),
             );
             c += 1;
+        } else if wi[c + 1] != 0.0 {
+            // The last eigenvalue with an imaginary part that is not 0 (only a NaN): VNL reads V's
+            // imaginary parts past its eigenvector matrix and writes the conjugate past D (ITK-117);
+            // here they are 0, and Vreal's column stays unwritten, as VNL leaves it.
+            for r in 0..n {
+                v_re[r * n + c] = z.at(r + 1, c + 1);
+                v_im[r * n + c] = 0.0;
+            }
+            push_once(
+                &mut notices,
+                Notice::new(
+                    &ITK_117,
+                    UpstreamDefects::Fix,
+                    "the last eigenvalue's imaginary part is NaN: V's imaginary parts in its column (read past VNL's arrays: memory contents) are 0",
+                ),
+            );
         } else {
             for r in 0..n {
                 v_re[r * n + c] = z.at(r + 1, c + 1);
@@ -1164,11 +1371,11 @@ fn balanc_full(a: &mut Fortran, scale: &mut [f64]) -> Result<(usize, usize), Bal
             scale[i] *= f;
             noconv = true;
             for j in k..=n {
-                let v = a.at(i, j) * g;
+                let v = a.at(i, j).sse_mul(g);
                 a.set(i, j, v);
             }
             for j in 1..=l {
-                let v = a.at(j, i) * f;
+                let v = a.at(j, i).sse_mul(f);
                 a.set(j, i, v);
             }
         }
@@ -1219,15 +1426,16 @@ fn elmhes_full(a: &mut Fortran, low: usize, igh: usize, int: &mut [usize]) {
             if y == 0.0 {
                 continue;
             }
-            y /= x;
+            y = y.sse_div(x);
             a.set(i, mm1, y);
             for j in m..=n {
-                let v = a.at(i, j) - y * a.at(m, j);
+                let v = a.at(i, j).sse_sub(mul(124, y, a.at(m, j)));
                 a.set(i, j, v);
             }
             for j in 1..=igh {
-                let v = a.at(j, m) + y * a.at(j, i);
-                a.set(j, m, v);
+                let v = vpos(j - 1, igh);
+                let w = add(125 + v, a.at(j, m), mul(128 + v, y, a.at(j, i)));
+                a.set(j, m, w);
             }
         }
     }
@@ -1265,13 +1473,16 @@ fn eltran(a: &Fortran, low: usize, igh: usize, int: &[usize], z: &mut Fortran) {
 
 /// `cdiv`: the complex quotient `(ar + i·ai) / (br + i·bi)`.
 fn cdiv(ar: f64, ai: f64, br: f64, bi: f64) -> (f64, f64) {
-    let s = abs_m(br) + abs_m(bi);
-    let ars = ar / s;
-    let ais = ai / s;
-    let brs = br / s;
-    let bis = bi / s;
-    let s = brs * brs + bis * bis;
-    ((ars * brs + ais * bis) / s, (ais * brs - ars * bis) / s)
+    let s = add(1, abs_m(br), abs_m(bi));
+    let ars = ar.sse_div(s);
+    let ais = ai.sse_div(s);
+    let brs = br.sse_div(s);
+    let bis = bi.sse_div(s);
+    let s = add(2, mul(3, brs, brs), mul(4, bis, bis));
+    (
+        add(5, mul(6, ars, brs), mul(7, ais, bis)).sse_div(s),
+        mul(8, ais, brs).sse_sub(mul(9, ars, bis)).sse_div(s),
+    )
 }
 
 /// f2c's `d_sign(a, b)`: `|a|` with the sign of `b`.
@@ -1298,7 +1509,7 @@ fn hqr2_full(
     let mut k = 1usize;
     for i in 1..=n {
         for j in k..=n {
-            norm += abs_m(h.at(i, j));
+            norm = add(0, norm, abs_m(h.at(i, j)));
         }
         k = i;
         if i >= low && i <= igh {
@@ -1347,7 +1558,7 @@ fn hqr2_full(
             x = h.at(enu, enu);
             if l == enu {
                 // L270.
-                h.set(enu, enu, x + t);
+                h.set(enu, enu, add(144, x, t));
                 wr[enu] = h.at(enu, enu);
                 wi[enu] = 0.0;
                 found[enu] = true;
@@ -1355,51 +1566,86 @@ fn hqr2_full(
                 break;
             }
             y = h.at(na, na);
-            w = h.at(enu, na) * h.at(na, enu);
+            w = mul(131, h.at(enu, na), h.at(na, enu));
             if l == na {
                 // L280.
-                p = (y - x) / 2.0;
-                q = p * p + w;
+                p = y.sse_sub(x).sse_mul(0.5);
+                q = add(145, mul(10, p, p), w);
                 zz = abs_m(q).sqrt();
-                h.set(enu, enu, x + t);
+                h.set(enu, enu, add(146, x, t));
                 x = h.at(enu, enu);
-                h.set(na, na, y + t);
+                h.set(na, na, add(147, y, t));
                 if q < 0.0 {
                     // L320.
-                    wr[na] = x + p;
-                    wr[enu] = x + p;
+                    wr[na] = add(11, x, p);
+                    wr[enu] = add(12, x, p);
                     wi[na] = zz;
                     wi[enu] = -zz;
                 } else {
-                    zz = p + d_sign_f(zz, p);
-                    wr[na] = x + zz;
+                    zz = add(13, p, d_sign_f(zz, p));
+                    wr[na] = add(14, x, zz);
                     wr[enu] = wr[na];
                     if zz != 0.0 {
-                        wr[enu] = x - w / zz;
+                        wr[enu] = x.sse_sub(w.sse_div(zz));
                     }
                     wi[na] = 0.0;
                     wi[enu] = 0.0;
                     x = h.at(enu, na);
-                    s = abs_m(x) + abs_m(zz);
-                    p = x / s;
-                    q = zz / s;
-                    r = (p * p + q * q).sqrt();
-                    p /= r;
-                    q /= r;
+                    s = add(15, abs_m(x), abs_m(zz));
+                    p = x.sse_div(s);
+                    q = zz.sse_div(s);
+                    r = add(16, mul(17, p, p), mul(18, q, q)).sqrt();
+                    p = p.sse_div(r);
+                    q = q.sse_div(r);
+                    // more than 16 columns: two at a time (then the one left over), else one by one
+                    let count = n + 1 - na;
                     for j in na..=n {
                         zz = h.at(na, j);
-                        h.set(na, j, q * zz + p * h.at(enu, j));
-                        h.set(enu, j, q * h.at(enu, j) - p * zz);
+                        let b = if count <= 16 {
+                            19
+                        } else if j - na < count - count % 2 {
+                            196
+                        } else {
+                            201
+                        };
+                        h.set(
+                            na,
+                            j,
+                            add(b, mul(b + 1, q, zz), mul(b + 2, p, h.at(enu, j))),
+                        );
+                        h.set(
+                            enu,
+                            j,
+                            mul(b + 3, q, h.at(enu, j)).sse_sub(mul(b + 4, p, zz)),
+                        );
                     }
                     for i in 1..=enu {
                         zz = h.at(i, na);
-                        h.set(i, na, q * zz + p * h.at(i, enu));
-                        h.set(i, enu, q * h.at(i, enu) - p * zz);
+                        let v = vpos(i - 1, enu);
+                        h.set(
+                            i,
+                            na,
+                            add(24 + v, mul(27 + v, q, zz), mul(30 + v, p, h.at(i, enu))),
+                        );
+                        h.set(
+                            i,
+                            enu,
+                            mul(33 + v, q, h.at(i, enu)).sse_sub(mul(36 + v, p, zz)),
+                        );
                     }
                     for i in low..=igh {
                         zz = z.at(i, na);
-                        z.set(i, na, q * zz + p * z.at(i, enu));
-                        z.set(i, enu, q * z.at(i, enu) - p * zz);
+                        let v = vpos(i - low, igh + 1 - low);
+                        z.set(
+                            i,
+                            na,
+                            add(148 + v, mul(151 + v, q, zz), mul(154 + v, p, z.at(i, enu))),
+                        );
+                        z.set(
+                            i,
+                            enu,
+                            mul(157 + v, q, z.at(i, enu)).sse_sub(mul(160 + v, p, zz)),
+                        );
                     }
                 }
                 found[na] = true;
@@ -1413,15 +1659,15 @@ fn hqr2_full(
                 return enu;
             }
             if its == 10 || its == 20 {
-                t += x;
+                t = add(132, t, x);
                 for i in low..=enu {
-                    let v = h.at(i, i) - x;
+                    let v = h.at(i, i).sse_sub(x);
                     h.set(i, i, v);
                 }
-                s = abs_m(h.at(enu, na)) + abs_m(h.at(na, enm2 as usize));
-                x = s * 0.75;
+                s = add(133, abs_m(h.at(enu, na)), abs_m(h.at(na, enm2 as usize)));
+                x = s.sse_mul(0.75);
                 y = x;
-                w = s * -0.4375 * s;
+                w = s.sse_mul(-0.4375).sse_mul(s);
             }
             // L130.
             its += 1;
@@ -1432,15 +1678,19 @@ fn hqr2_full(
             while mm <= enm2u {
                 m = enm2u + l - mm;
                 zz = h.at(m, m);
-                r = x - zz;
-                s = y - zz;
-                p = (r * s - w) / h.at(m + 1, m) + h.at(m, m + 1);
-                q = h.at(m + 1, m + 1) - zz - r - s;
+                r = x.sse_sub(zz);
+                s = y.sse_sub(zz);
+                p = add(
+                    134,
+                    mul(135, r, s).sse_sub(w).sse_div(h.at(m + 1, m)),
+                    h.at(m, m + 1),
+                );
+                q = h.at(m + 1, m + 1).sse_sub(zz).sse_sub(r).sse_sub(s);
                 r = h.at(m + 2, m + 1);
-                s = abs_m(p) + abs_m(q) + abs_m(r);
-                p /= s;
-                q /= s;
-                r /= s;
+                s = add(136, add(137, abs_m(p), abs_m(q)), abs_m(r));
+                p = p.sse_div(s);
+                q = q.sse_div(s);
+                r = r.sse_div(s);
                 if m == l {
                     break;
                 }
@@ -1470,64 +1720,99 @@ fn hqr2_full(
                     if notlas {
                         r = h.at(k + 2, k - 1);
                     }
-                    x = abs_m(p) + abs_m(q) + abs_m(r);
+                    x = add(138, add(139, abs_m(p), abs_m(q)), abs_m(r));
                     if x == 0.0 {
                         continue;
                     }
-                    p /= x;
-                    q /= x;
-                    r /= x;
+                    p = p.sse_div(x);
+                    q = q.sse_div(x);
+                    r = r.sse_div(x);
                 }
                 // L170.
-                s = d_sign_f((p * p + q * q + r * r).sqrt(), p);
+                s = d_sign_f(
+                    add(140, add(141, p.sse_mul(p), q.sse_mul(q)), r.sse_mul(r)).sqrt(),
+                    p,
+                );
                 if k != m {
-                    h.set(k, k - 1, -s * x);
+                    h.set(k, k - 1, neg_mul(142, s, x));
                 } else if l != m {
                     let v = -h.at(k, k - 1);
                     h.set(k, k - 1, v);
                 }
                 // L190.
-                p += s;
-                x = p / s;
-                y = q / s;
-                zz = r / s;
-                q /= p;
-                r /= p;
+                p = add(143, p, s);
+                x = p.sse_div(s);
+                y = q.sse_div(s);
+                zz = r.sse_div(s);
+                q = q.sse_div(p);
+                r = r.sse_div(p);
                 let jmax = enu.min(k + 3);
                 if !notlas {
                     for j in k..=n {
-                        p = h.at(k, j) + q * h.at(k + 1, j);
-                        h.set(k, j, h.at(k, j) - p * x);
-                        h.set(k + 1, j, h.at(k + 1, j) - p * y);
+                        p = add(39, h.at(k, j), mul(40, q, h.at(k + 1, j)));
+                        h.set(k, j, h.at(k, j).sse_sub(mul(41, p, x)));
+                        h.set(k + 1, j, h.at(k + 1, j).sse_sub(mul(42, p, y)));
                     }
                     for i in 1..=jmax {
-                        p = x * h.at(i, k) + y * h.at(i, k + 1);
-                        h.set(i, k, h.at(i, k) - p);
-                        h.set(i, k + 1, h.at(i, k + 1) - p * q);
+                        let v = vpos(i - 1, jmax);
+                        p = add(
+                            43 + v,
+                            mul(46 + v, x, h.at(i, k)),
+                            mul(49 + v, y, h.at(i, k + 1)),
+                        );
+                        h.set(i, k, h.at(i, k).sse_sub(p));
+                        h.set(i, k + 1, h.at(i, k + 1).sse_sub(mul(52 + v, p, q)));
                     }
                     for i in low..=igh {
-                        p = x * z.at(i, k) + y * z.at(i, k + 1);
-                        z.set(i, k, z.at(i, k) - p);
-                        z.set(i, k + 1, z.at(i, k + 1) - p * q);
+                        let v = vpos(i - low, igh + 1 - low);
+                        p = add(
+                            163 + v,
+                            mul(166 + v, x, z.at(i, k)),
+                            mul(169 + v, y, z.at(i, k + 1)),
+                        );
+                        z.set(i, k, z.at(i, k).sse_sub(p));
+                        z.set(i, k + 1, z.at(i, k + 1).sse_sub(mul(172 + v, p, q)));
                     }
                 } else {
                     for j in k..=n {
-                        p = h.at(k, j) + q * h.at(k + 1, j) + r * h.at(k + 2, j);
-                        h.set(k, j, h.at(k, j) - p * x);
-                        h.set(k + 1, j, h.at(k + 1, j) - p * y);
-                        h.set(k + 2, j, h.at(k + 2, j) - p * zz);
+                        p = add(
+                            55,
+                            add(56, h.at(k, j), mul(57, q, h.at(k + 1, j))),
+                            mul(58, r, h.at(k + 2, j)),
+                        );
+                        h.set(k, j, h.at(k, j).sse_sub(mul(59, p, x)));
+                        h.set(k + 1, j, h.at(k + 1, j).sse_sub(mul(60, p, y)));
+                        h.set(k + 2, j, h.at(k + 2, j).sse_sub(mul(61, p, zz)));
                     }
                     for i in 1..=jmax {
-                        p = x * h.at(i, k) + y * h.at(i, k + 1) + zz * h.at(i, k + 2);
-                        h.set(i, k, h.at(i, k) - p);
-                        h.set(i, k + 1, h.at(i, k + 1) - p * q);
-                        h.set(i, k + 2, h.at(i, k + 2) - p * r);
+                        let v = vpos(i - 1, jmax);
+                        p = add(
+                            62 + v,
+                            add(
+                                65 + v,
+                                mul(68 + v, x, h.at(i, k)),
+                                mul(71 + v, y, h.at(i, k + 1)),
+                            ),
+                            mul(74 + v, zz, h.at(i, k + 2)),
+                        );
+                        h.set(i, k, h.at(i, k).sse_sub(p));
+                        h.set(i, k + 1, h.at(i, k + 1).sse_sub(mul(77 + v, p, q)));
+                        h.set(i, k + 2, h.at(i, k + 2).sse_sub(mul(80 + v, p, r)));
                     }
                     for i in low..=igh {
-                        p = x * z.at(i, k) + y * z.at(i, k + 1) + zz * z.at(i, k + 2);
-                        z.set(i, k, z.at(i, k) - p);
-                        z.set(i, k + 1, z.at(i, k + 1) - p * q);
-                        z.set(i, k + 2, z.at(i, k + 2) - p * r);
+                        let v = vpos(i - low, igh + 1 - low);
+                        p = add(
+                            175 + v,
+                            add(
+                                178 + v,
+                                mul(181 + v, x, z.at(i, k)),
+                                mul(184 + v, y, z.at(i, k + 1)),
+                            ),
+                            mul(187 + v, zz, z.at(i, k + 2)),
+                        );
+                        z.set(i, k, z.at(i, k).sse_sub(p));
+                        z.set(i, k + 1, z.at(i, k + 1).sse_sub(mul(190 + v, p, q)));
+                        z.set(i, k + 2, z.at(i, k + 2).sse_sub(mul(193 + v, p, r)));
                     }
                 }
             }
@@ -1549,12 +1834,12 @@ fn hqr2_full(
             m = nau;
             if abs_m(h.at(en, nau)) <= abs_m(h.at(nau, en)) {
                 // L720.
-                let (cr, ci) = cdiv(0.0, -h.at(nau, en), h.at(nau, nau) - p, q);
+                let (cr, ci) = cdiv(0.0, -h.at(nau, en), h.at(nau, nau).sse_sub(p), q);
                 h.set(nau, nau, cr);
                 h.set(nau, en, ci);
             } else {
-                h.set(nau, nau, q / h.at(en, nau));
-                h.set(nau, en, -(h.at(en, en) - p) / h.at(en, nau));
+                h.set(nau, nau, q.sse_div(h.at(en, nau)));
+                h.set(nau, en, neg_div(83, h.at(en, en).sse_sub(p), h.at(en, nau)));
             }
             // L730.
             h.set(en, nau, 0.0);
@@ -1565,12 +1850,12 @@ fn hqr2_full(
             }
             for ii in 1..=enm2 as usize {
                 let i = nau - ii;
-                w = h.at(i, i) - p;
+                w = h.at(i, i).sse_sub(p);
                 let mut ra = 0.0f64;
                 let mut sa = 0.0f64;
                 for j in m..=en {
-                    ra += h.at(i, j) * h.at(j, nau);
-                    sa += h.at(i, j) * h.at(j, en);
+                    ra = add(84, ra, mul(85, h.at(i, j), h.at(j, nau)));
+                    sa = add(86, sa, mul(87, h.at(i, j), h.at(j, en)));
                 }
                 if wi[i] < 0.0 {
                     zz = w;
@@ -1588,13 +1873,23 @@ fn hqr2_full(
                     // L780.
                     x = h.at(i, i + 1);
                     y = h.at(i + 1, i);
-                    let mut vr = (wr[i] - p) * (wr[i] - p) + wi[i] * wi[i] - q * q;
-                    let vi = (wr[i] - p) * 2.0 * q;
+                    let wp = wr[i].sse_sub(p);
+                    let mut vr = add(88, mul(89, wp, wr[i].sse_sub(p)), mul(90, wi[i], wi[i]))
+                        .sse_sub(mul(91, q, q));
+                    let vi = mul(92, wr[i].sse_sub(p).sse_mul(2.0), q);
                     if !(vr != 0.0 || vi != 0.0) {
-                        let tst1 = norm * (abs_m(w) + abs_m(q) + abs_m(x) + abs_m(y) + abs_m(zz));
+                        let tst1 = mul(
+                            93,
+                            norm,
+                            add(
+                                94,
+                                add(95, add(96, add(97, abs_m(w), abs_m(q)), abs_m(x)), abs_m(y)),
+                                abs_m(zz),
+                            ),
+                        );
                         vr = tst1;
                         loop {
-                            vr *= 0.01;
+                            vr = vr.sse_mul(0.01);
                             let tst2 = tst1 + vr;
                             if !(tst2 > tst1) {
                                 break;
@@ -1602,18 +1897,36 @@ fn hqr2_full(
                         }
                     }
                     // L784.
-                    let d1 = x * r - zz * ra + q * sa;
-                    let d2 = x * s - zz * sa - q * ra;
+                    let d1 = add(98, mul(99, x, r).sse_sub(mul(100, zz, ra)), mul(101, q, sa));
+                    let d2 = mul(102, x, s)
+                        .sse_sub(mul(103, zz, sa))
+                        .sse_sub(mul(104, q, ra));
                     let (cr, ci) = cdiv(d1, d2, vr, vi);
                     h.set(i, nau, cr);
                     h.set(i, en, ci);
                     if abs_m(x) > abs_m(zz) + abs_m(q) {
-                        h.set(i + 1, nau, (-ra - w * h.at(i, nau) + q * h.at(i, en)) / x);
-                        h.set(i + 1, en, (-sa - w * h.at(i, en) - q * h.at(i, nau)) / x);
+                        h.set(
+                            i + 1,
+                            nau,
+                            add(
+                                105,
+                                (-ra).sse_sub(mul(106, w, h.at(i, nau))),
+                                mul(107, q, h.at(i, en)),
+                            )
+                            .sse_div(x),
+                        );
+                        h.set(
+                            i + 1,
+                            en,
+                            (-sa)
+                                .sse_sub(mul(108, w, h.at(i, en)))
+                                .sse_sub(mul(109, q, h.at(i, nau)))
+                                .sse_div(x),
+                        );
                     } else {
                         // L785.
-                        let d1 = -r - y * h.at(i, nau);
-                        let d2 = -s - y * h.at(i, en);
+                        let d1 = (-r).sse_sub(mul(110, y, h.at(i, nau)));
+                        let d2 = (-s).sse_sub(mul(111, y, h.at(i, en)));
                         let (cr, ci) = cdiv(d1, d2, zz, q);
                         h.set(i + 1, nau, cr);
                         h.set(i + 1, en, ci);
@@ -1630,8 +1943,8 @@ fn hqr2_full(
                     continue;
                 }
                 for j in i..=en {
-                    h.set(j, nau, h.at(j, nau) / t);
-                    h.set(j, en, h.at(j, en) / t);
+                    h.set(j, nau, h.at(j, nau).sse_div(t));
+                    h.set(j, en, h.at(j, en).sse_div(t));
                 }
             }
         } else if q == 0.0 {
@@ -1643,10 +1956,10 @@ fn hqr2_full(
             }
             for ii in 1..=na as usize {
                 let i = en - ii;
-                w = h.at(i, i) - p;
+                w = h.at(i, i).sse_sub(p);
                 r = 0.0;
                 for j in m..=en {
-                    r += h.at(i, j) * h.at(j, en);
+                    r = add(112, r, mul(113, h.at(i, j), h.at(j, en)));
                 }
                 if wi[i] < 0.0 {
                     zz = w;
@@ -1661,7 +1974,7 @@ fn hqr2_full(
                         let tst1 = norm;
                         t = tst1;
                         loop {
-                            t *= 0.01;
+                            t = t.sse_mul(0.01);
                             let tst2 = norm + t;
                             if !(tst2 > tst1) {
                                 break;
@@ -1669,18 +1982,19 @@ fn hqr2_full(
                         }
                     }
                     // L635.
-                    h.set(i, en, -r / t);
+                    h.set(i, en, neg_div(114, r, t));
                 } else {
                     // L640.
                     x = h.at(i, i + 1);
                     y = h.at(i + 1, i);
-                    q = (wr[i] - p) * (wr[i] - p) + wi[i] * wi[i];
-                    t = (x * s - zz * r) / q;
+                    let wp = wr[i].sse_sub(p);
+                    q = add(115, mul(116, wp, wr[i].sse_sub(p)), mul(117, wi[i], wi[i]));
+                    t = mul(118, x, s).sse_sub(mul(119, zz, r)).sse_div(q);
                     h.set(i, en, t);
                     if abs_m(x) <= abs_m(zz) {
-                        h.set(i + 1, en, (-s - y * t) / zz);
+                        h.set(i + 1, en, (-s).sse_sub(mul(120, y, t)).sse_div(zz));
                     } else {
-                        h.set(i + 1, en, (-r - w * t) / x);
+                        h.set(i + 1, en, (-r).sse_sub(mul(121, w, t)).sse_div(x));
                     }
                 }
                 // L680: overflow control.
@@ -1694,7 +2008,7 @@ fn hqr2_full(
                     continue;
                 }
                 for j in i..=en {
-                    h.set(j, en, h.at(j, en) / t);
+                    h.set(j, en, h.at(j, en).sse_div(t));
                 }
             }
         }
@@ -1716,7 +2030,7 @@ fn hqr2_full(
         for i in low..=igh {
             zz = 0.0;
             for k in low..=mm {
-                zz += z.at(i, k) * h.at(k, j);
+                zz = add(122, zz, mul(123, z.at(i, k), h.at(k, j)));
             }
             z.set(i, j, zz);
         }
@@ -1733,7 +2047,7 @@ fn balbak(n: usize, low: usize, igh: usize, scale: &[f64], m: usize, z: &mut For
         for i in low..=igh {
             let s = scale[i];
             for j in 1..=m {
-                let v = z.at(i, j) * s;
+                let v = z.at(i, j).sse_mul(s);
                 z.set(i, j, v);
             }
         }
@@ -1800,6 +2114,104 @@ pub fn symmetric_eigensystem_f32_full(a: &[f32], n: usize) -> SymmetricEigenF32 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The NaNs' bits (signs and payloads) of `real_eigensystem` on a matrix with a NaN on its
+    /// diagonal (fs.maths' clean room's reproducer: before, larmorx's debug and release builds
+    /// gave different signs) and on seeded matrices whose balanced part is finite off its diagonal
+    /// (NaNs of both signs with payloads, infinities, extreme numbers elsewhere), recorded on Linux
+    /// x86-64. Every operation that can meet a NaN is explicit, so debug, release and AArch64
+    /// agree; the official build's bits are matched where the probe (validation/probes/fs-vnl,
+    /// family `eignan`) says so (docs/findings/vnl-netlib.md, F-VNLN-5: not yet everywhere).
+    #[test]
+    fn real_eigensystem_nan_bits_are_x86_64s() {
+        use crate::vnl_fixed::cases;
+        use crate::x87::cases::SplitMix64;
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        let mut word = |w: u64| {
+            for b in w.to_le_bytes() {
+                h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        let run = |m: &[f64], n: usize, word: &mut dyn FnMut(u64)| {
+            let Ok(es) = real_eigensystem(m, n) else {
+                word(u64::MAX);
+                return;
+            };
+            word(es.ierr as u64);
+            for v in es
+                .d_re
+                .iter()
+                .chain(&es.d_im)
+                .chain(&es.v_re)
+                .chain(&es.v_im)
+            {
+                word(v.to_bits());
+            }
+            for c in 0..n {
+                if es.vreal_written[c] {
+                    (0..n).for_each(|r| word(es.vreal[r * n + c].to_bits()));
+                }
+            }
+        };
+        let f = |b: u32| f64::from(f32::from_bits(b));
+        let rep: Vec<f64> = [
+            0x4170_0000,
+            0x3f80_0000,
+            0x4106_db6e,
+            0x4275_2492,
+            0x40a0_0000,
+            0x40e0_0000,
+            0xc0dc_0000,
+            0x42b8_db6e,
+            0x4120_0000,
+            0x4120_0000,
+            0x7fc0_0000,
+            0x4040_0000,
+            0x4198_0000,
+            0xc274_0000,
+            0x41a0_0000,
+            0x3f80_0000,
+        ]
+        .into_iter()
+        .map(f)
+        .collect();
+        run(&rep, 4, &mut word);
+        let mut rng = SplitMix64::new(0xe16e_7e57);
+        for _ in 0..1500 {
+            let n = 1 + rng.below(6) as usize;
+            let low = 1 + rng.below(n as u64) as usize;
+            let igh = low + rng.below((n - low + 1) as u64) as usize;
+            let mut a = vec![0.0f64; n * n];
+            for i in 1..=n {
+                for j in 1..=n {
+                    let in_block = |k: usize| k >= low && k <= igh;
+                    let ordinary = |rng: &mut SplitMix64| rng.range(-4096, 4096) as f64 / 256.0;
+                    a[(i - 1) * n + j - 1] = if in_block(i) && in_block(j) {
+                        if i == j && rng.below(3) == 0 {
+                            cases::special_f64(&mut rng)
+                        } else {
+                            ordinary(&mut rng)
+                        }
+                    } else if ((i < low || i > igh) && j >= i) || (in_block(i) && j > igh) {
+                        if rng.below(2) == 0 {
+                            cases::special_f64(&mut rng)
+                        } else {
+                            ordinary(&mut rng)
+                        }
+                    } else {
+                        0.0
+                    };
+                }
+            }
+            run(&a, n, &mut word);
+        }
+        if std::env::var_os("LARMORX_PRINT_DIGESTS").is_some() {
+            println!("REAL_EIGEN_NAN_BITS = {h:#018x}");
+        }
+        assert_eq!(h, REAL_EIGEN_NAN_BITS);
+    }
+
+    const REAL_EIGEN_NAN_BITS: u64 = 0x49f7_e86e_5e22_5ffe;
 
     #[test]
     fn pythag_is_the_hypotenuse() {

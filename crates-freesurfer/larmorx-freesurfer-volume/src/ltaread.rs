@@ -9,7 +9,9 @@
 //!
 //! A relative name is opened in `dir`, the program's working directory, when given (`CFile::open`'s
 //! rule). Two functions of fs.io are the caller's ([`LtaIo`]): `MRIreadHeader` (for a volume an `.xfm`
-//! names that exists) and `regio_read_register` (`registerio.cpp`, item 3.1-34).
+//! names that exists) and `regio_read_register` (`registerio.cpp`, item 3.1-34); so is the
+//! environment `USE_AVERAGE305` is looked up in ([`LtaIo::env`], the program's
+//! [`Settings`](larmorx_freesurfer_core::run::Settings)`::env`, never the process's).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-volume.md` §7):
 //! - **FS-306** (memory): `TransformFileNameType` copies the name into 500 bytes: a longer name
@@ -29,7 +31,7 @@ use std::io::{BufRead, Read, Write};
 use std::path::Path;
 
 use larmorx_core::defects::{FS_306, FS_307, FS_308, FS_309, FS_310};
-use larmorx_freesurfer_core::cscan::{Bytes, Call, Stream, skip_space};
+use larmorx_freesurfer_core::cscan::{Bytes, Call, ERANGE, Scan, Stream, scan_f32, skip_space};
 use larmorx_freesurfer_core::cstd::is_space;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -38,6 +40,7 @@ use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy};
 use larmorx_freesurfer_core::matrix_io::matrix_ascii_read_from;
 use larmorx_freesurfer_core::matrix_ops::matrix_identity;
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::utils::file_name_only;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::lta::{
@@ -62,8 +65,13 @@ pub struct RegisterDat {
     pub float2int: i32,
 }
 
-/// fs.io's functions the readers call (track A's `mriio.cpp` and `registerio.cpp`).
+/// What the readers take from the program: fs.io's functions they call (track A's `mriio.cpp` and
+/// `registerio.cpp`) and the program's environment.
 pub trait LtaIo {
+    /// The environment the original's `getenv` would read (`USE_AVERAGE305`): the program's
+    /// [`Settings`](larmorx_freesurfer_core::run::Settings)`::env`, so that a program run in
+    /// `recon-all`'s replica, or a probe, sets it per call.
+    fn env(&self) -> &Environment;
     /// `MRIreadHeader(name, MRI_VOLUME_TYPE_UNKNOWN)`: the volume's geometry, or `None` for `NULL`
     /// (its messages written as it writes them).
     fn read_header(
@@ -550,8 +558,8 @@ pub fn minc_get_volume_info(
 
 /// `mincGetVolInfo(infoline, infoline2, vgSrc, vgDst)`: [`minc_find_volume`]'s volumes through
 /// [`minc_get_volume_info`]; a destination without a valid geometry takes `average_305`'s when the
-/// environment has `USE_AVERAGE305` (`INFO: using average_305 info, since ` and `INFO: environment
-/// var USE_AVERAGE305 set` on standard error).
+/// program's environment ([`LtaIo::env`]) has `USE_AVERAGE305`, whatever its value (`INFO: using
+/// average_305 info, since ` and `INFO: environment var USE_AVERAGE305 set` on standard error).
 #[allow(clippy::too_many_arguments)]
 pub fn minc_get_vol_info(
     g: &mut Globals,
@@ -567,7 +575,7 @@ pub fn minc_get_vol_info(
     let (_, s, d) = minc_find_volume(g, out, err, info, info2)?;
     minc_get_volume_info(g, out, err, dir, s.as_deref(), src, io)?;
     minc_get_volume_info(g, out, err, dir, d.as_deref(), dst, io)?;
-    if dst.valid == 0 && std::env::var_os("USE_AVERAGE305").is_some() {
+    if dst.valid == 0 && io.env().get("USE_AVERAGE305").is_some() {
         let _ = err.write_all(b"INFO: using average_305 info, since \n");
         let _ = err.write_all(b"INFO: environment var USE_AVERAGE305 set\n");
         average_305(dst);
@@ -590,14 +598,59 @@ fn lit(st: &mut dyn Stream, text: &[u8]) -> bool {
     true
 }
 
-/// `sscanf`'s `%s`: skips white space, then the word (`None` at the end of the input).
-fn word<'a>(b: &mut Bytes<'a>) -> Option<&'a [u8]> {
-    skip_space(b);
-    let s = b.i;
-    while b.peek().is_some_and(|c| !is_space(c)) {
-        b.bump();
+/// One `sscanf` call of `%s` (or `%*s`) and `%f` conversions (`"%*s %s"`, `"%*s %f"`) with the C
+/// library's `errno` rule at the end of the input, as `cscan::Call` has it for numbers (measured on
+/// glibc 2.35: `validation/probes/fs-volume/scanf_word_errno.c`): a conversion that meets the end
+/// of the string before its item's first character sets `errno` to 0, or, when an earlier item of
+/// the same call ended at the end, to the value `errno` had then; `%f`'s `ERANGE` as `Call`'s.
+#[derive(Default)]
+struct WordCall {
+    /// `errno` when an item first met the end of the input.
+    latched: Option<i32>,
+}
+
+impl WordCall {
+    /// `%s`: skips white space, then the word (`None` at the end of the input).
+    fn word<'a>(&mut self, b: &mut Bytes<'a>, errno: &mut i32) -> Option<&'a [u8]> {
+        skip_space(b);
+        if b.peek().is_none() {
+            *errno = self.latched.unwrap_or(0);
+            return None;
+        }
+        let s = b.i;
+        while b.peek().is_some_and(|c| !is_space(c)) {
+            b.bump();
+        }
+        if self.latched.is_none() && b.hit_end() {
+            self.latched = Some(*errno);
+        }
+        Some(&b.s[s..b.i])
     }
-    (b.i > s).then(|| &b.s[s..b.i])
+
+    /// `%f`.
+    fn f32(&mut self, b: &mut Bytes, errno: &mut i32) -> Option<f32> {
+        match scan_f32(b) {
+            Scan::Value(v, erange) => {
+                if self.latched.is_none() && b.hit_end() {
+                    self.latched = Some(*errno);
+                }
+                if erange {
+                    *errno = ERANGE;
+                }
+                Some(v)
+            }
+            Scan::Fail => {
+                if self.latched.is_none() && b.hit_end() {
+                    self.latched = Some(*errno);
+                }
+                None
+            }
+            Scan::Eof => {
+                *errno = self.latched.unwrap_or(0);
+                None
+            }
+        }
+    }
 }
 
 /// `%d` after a literal (`sscanf(cp, "<text> %d\n", &v)`).
@@ -751,16 +804,16 @@ pub fn lta_read_file_ex(
     while let Some(l) = fp.fgets(STRLEN - 1) {
         let l = c_str(&l).to_vec();
         if l.starts_with(b"subject") {
-            let mut b = Bytes::new(&l);
-            if word(&mut b).is_some()
-                && let Some(s) = word(&mut b)
+            let (mut b, mut call) = (Bytes::new(&l), WordCall::default());
+            if call.word(&mut b, &mut g.errno).is_some()
+                && let Some(s) = call.word(&mut b, &mut g.errno)
             {
                 lta.subject.strcpy_bytes(s);
             }
         } else if l.starts_with(b"fscale") {
-            let mut b = Bytes::new(&l);
-            if word(&mut b).is_some()
-                && let Some(x) = Call::new().f32(&mut b, &mut g.errno)
+            let (mut b, mut call) = (Bytes::new(&l), WordCall::default());
+            if call.word(&mut b, &mut g.errno).is_some()
+                && let Some(x) = call.f32(&mut b, &mut g.errno)
             {
                 lta.fscale = x;
             }
@@ -804,4 +857,66 @@ pub fn lta_read_register_dat(
     (dst.xsize, dst.ysize, dst.zsize) = (1.0, 1.0, 1.0);
     lta.ltype = REGISTER_DAT;
     Ok(Some(lta))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// glibc 2.35's `sscanf(input, "%*s %s")` and `sscanf(input, "%*s %f")` with `errno` 7 before
+    /// (validation/probes/fs-volume/scanf_word_errno.c): the count (-1 for `EOF`) and `errno`.
+    #[test]
+    fn word_calls_set_errno_as_glibc() {
+        for (input, s_ret, s_errno, f_ret, f_errno) in [
+            ("fscale", -1, 7, -1, 7),
+            ("fscale ", -1, 0, -1, 0),
+            ("fscale\n", -1, 0, -1, 0),
+            ("fscale 1e40", 1, 7, 1, 34),
+            ("fscale 1e40\n", 1, 7, 1, 34),
+            ("subject", -1, 7, -1, 7),
+            ("subject ", -1, 0, -1, 0),
+            ("subject x", 1, 7, 0, 7),
+            ("subject x\n", 1, 7, 0, 7),
+            ("", -1, 0, -1, 0),
+            (" ", -1, 0, -1, 0),
+            ("fscale x", 1, 7, 0, 7),
+            ("fscale 1e40 ", 1, 7, 1, 34),
+            ("1e40", -1, 7, -1, 7),
+            ("1e40 ", -1, 0, -1, 0),
+            ("1e-50 3", 1, 7, 1, 7),
+        ] {
+            let ret = |first: bool, second: bool, at_end: bool| match (first, second) {
+                (true, true) => 1,
+                (true, false) if !at_end => 0,
+                _ => -1,
+            };
+            let (mut b, mut call, mut errno) =
+                (Bytes::new(input.as_bytes()), WordCall::default(), 7);
+            let first = call.word(&mut b, &mut errno).is_some();
+            let second = first && call.word(&mut b, &mut errno).is_some();
+            let at_end = b.peek().is_none();
+            assert_eq!(
+                (ret(first, second, at_end), errno),
+                (s_ret, s_errno),
+                "{input:?} %s"
+            );
+            let (mut b, mut call, mut errno) =
+                (Bytes::new(input.as_bytes()), WordCall::default(), 7);
+            let first = call.word(&mut b, &mut errno).is_some();
+            let before = b.i;
+            let second = first && call.f32(&mut b, &mut errno).is_some();
+            let failed_at_end = first && !second && {
+                let mut c = Bytes::new(input.as_bytes());
+                c.i = before;
+                skip_space(&mut c);
+                c.peek().is_none()
+            };
+            let r = match (first, second) {
+                (true, true) => 1,
+                (true, false) if !failed_at_end => 0,
+                _ => -1,
+            };
+            assert_eq!((r, errno), (f_ret, f_errno), "{input:?} %f");
+        }
+    }
 }

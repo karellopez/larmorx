@@ -1061,6 +1061,8 @@ defects! {
         "vnl_symmetric_eigensystem never returns on many matrices with an infinite or NaN entry: EISPACK's pythag loops for ever when its second argument is NaN or both are infinite (its iteration starts from a NaN ratio and never meets its stopping test), and tql2 makes such calls, once after reading and writing one element past its arrays (when a NaN is left at the end of the subdiagonal)";
     ITK_116 = "ITK-116", "VXL", true,
         "vnl_svd (LINPACK's svdc) can loop for ever on a matrix with an infinite or NaN entry: its deflation and splitting steps do not count towards the iteration limit, and they can come back to the same singular values and superdiagonal again and again";
+    ITK_117 = "ITK-117", "VXL", true,
+        "vnl_real_eigensystem takes an eigenvalue whose imaginary part is not 0 for the first of a complex pair; when the last eigenvalue's imaginary part is NaN it reads the eigenvector's imaginary part from one row past its eigenvector matrix and writes the conjugate one element past its eigenvalues: memory contents, and the program can crash";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -1669,6 +1671,16 @@ defects! {
         "an MGH volume's command-line or phase-encoding tag whose length is negative or larger than the machine can allocate crashes FreeSurfer or corrupts its memory";
     FS_258 = "FS-258", "FreeSurfer", true,
         "regio_read_register writes past its buffer for a subject or method name of 1,000 bytes or more in a register.dat, and gives sizes from memory contents for an .lta without transforms";
+    FS_311 = "FS-311", "FreeSurfer", true,
+        "the segmentation functions (left-right label swaps, the ribbon fix, one-hot encoding, the brain volume corrections) turn a voxel value or a label list entry that is NaN or beyond the 32-bit integer range into the label -2147483648";
+    FS_312 = "FS-312", "FreeSurfer", true,
+        "the supratentorial and cortical gray matter volume corrections count each thalamus voxel twice (the thalamus labels are tested twice since two of their names became one label)";
+    FS_313 = "FS-313", "FreeSurfer", true,
+        "the cortical gray matter volume correction subtracts the left vessel label's voxels in the ribbon but not the right vessel label's";
+    FS_314 = "FS-314", "FreeSurfer", true,
+        "reading the cached brain volume statistics (stats/brainvol.stats) aborts on a line that names a measure, holds no number and ends in white space";
+    FS_315 = "FS-315", "FreeSurfer", true,
+        "the left-right swap of a segmentation by label lists reads the lists past their end when they hold fewer numbers than rows";
 }
 
 /// The register entry with ID `id`.

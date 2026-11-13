@@ -41,12 +41,19 @@ where
     // each half sorted into `src` (the roles swap one level down), the left one first
     split_merge(dst, src, lo, mid, gt);
     split_merge(dst, src, mid, hi, gt);
-    merge(src, dst, lo, mid, hi, gt);
+    S::merge_halves(src, dst, lo, mid, hi, gt);
 }
 
-/// Merges the sorted `src[lo..mid]` and `src[mid..hi]` into `dst[lo..hi]`.
-fn merge<S, F>(src: &S, dst: &mut S, lo: usize, mid: usize, hi: usize, gt: &mut F)
-where
+/// Merges the sorted `src[lo..mid]` and `src[mid..hi]` into `dst[lo..hi]`: the element-by-element
+/// merge any store can make ([`Copyable::merge_halves`]'s default).
+pub(super) fn merge_by_element<S, F>(
+    src: &S,
+    dst: &mut S,
+    lo: usize,
+    mid: usize,
+    hi: usize,
+    gt: &mut F,
+) where
     S: Copyable + ?Sized,
     F: FnMut(&S::Elem, &S::Elem) -> bool,
 {
@@ -69,6 +76,32 @@ where
     }
 }
 
+/// The same merge on slices of `Copy` elements (the same calls in the same order: one per output
+/// element until a part runs out).
+pub(super) fn merge_slices<T: Copy, F: FnMut(&T, &T) -> bool>(
+    left: &[T],
+    right: &[T],
+    out: &mut [T],
+    gt: &mut F,
+) {
+    let (mut i, mut j, mut k) = (0, 0, 0);
+    while i < left.len() && j < right.len() {
+        if gt(&left[i], &right[j]) {
+            out[k] = right[j];
+            j += 1;
+        } else {
+            out[k] = left[i];
+            i += 1;
+        }
+        k += 1;
+    }
+    if i < left.len() {
+        out[k..].copy_from_slice(&left[i..]);
+    } else {
+        out[k..].copy_from_slice(&right[j..]);
+    }
+}
+
 /// The merge order of `store`'s `n` elements through their positions (glibc's pointers for
 /// elements of more than 32 bytes): the same calls, the elements left in place; returns, for
 /// each position, the position of the element that goes there.
@@ -83,4 +116,24 @@ where
         gt(store.elem(x), store.elem(y))
     });
     a
+}
+
+/// The merge order of `v` through references to its elements (glibc's pointers for elements of
+/// more than 32 bytes): the same calls, the elements left in place; returns, for each position,
+/// the position of the element that goes there. Two references per element at the peak, as
+/// glibc's two pointers.
+pub(super) fn through_references<T: Copy, F: FnMut(&T, &T) -> bool>(
+    v: &[T],
+    gt: &mut F,
+) -> Vec<usize> {
+    let n = v.len();
+    let mut a: Vec<&T> = v.iter().collect();
+    let mut b = a.clone();
+    sort(&mut a[..], &mut b[..], n, &mut |x: &&T, y: &&T| gt(x, y));
+    drop(b);
+    // a reference's position from its address (`size_of::<T>()` is above 32 here)
+    let base = v.as_ptr().addr();
+    a.iter()
+        .map(|r| (std::ptr::from_ref::<T>(r).addr() - base) / size_of::<T>())
+        .collect()
 }

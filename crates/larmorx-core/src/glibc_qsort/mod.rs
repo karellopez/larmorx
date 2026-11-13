@@ -247,6 +247,17 @@ trait Copyable: Blocks {
     /// Rearranges the elements so that position `k` receives the element that was in
     /// `perm[k]` (`perm` a permutation; it is overwritten).
     fn permute(&mut self, perm: &mut [usize]);
+    /// Merges the sorted `src[lo..mid]` and `src[mid..hi]` into `dst[lo..hi]` (§4's merge).
+    fn merge_halves<F: FnMut(&Self::Elem, &Self::Elem) -> bool>(
+        src: &Self,
+        dst: &mut Self,
+        lo: usize,
+        mid: usize,
+        hi: usize,
+        gt: &mut F,
+    ) {
+        merge::merge_by_element(src, dst, lo, mid, hi, gt);
+    }
 }
 
 impl<T> Blocks for [T] {
@@ -269,6 +280,16 @@ impl<T> Blocks for [T] {
 const PLACED: usize = usize::MAX;
 
 impl<T: Copy> Copyable for [T] {
+    fn merge_halves<F: FnMut(&T, &T) -> bool>(
+        src: &Self,
+        dst: &mut Self,
+        lo: usize,
+        mid: usize,
+        hi: usize,
+        gt: &mut F,
+    ) {
+        merge::merge_slices(&src[lo..mid], &src[mid..hi], &mut dst[lo..hi], gt);
+    }
     fn put(&mut self, i: usize, from: &Self, j: usize) {
         self[i] = from[j];
     }
@@ -365,7 +386,7 @@ pub fn merge_order<T: Copy, R: Comparison>(v: &mut [T], mut cmp: impl FnMut(&T, 
         let mut copy = v.to_vec();
         merge::sort(v, &mut copy[..], n, &mut gt);
     } else {
-        let mut perm = merge::through_positions(&*v, n, &mut gt);
+        let mut perm = merge::through_references(v, &mut gt);
         v.permute(&mut perm);
     }
 }
@@ -384,6 +405,19 @@ pub fn merge_order_bytes<R: Comparison>(
     if n < 2 {
         return;
     }
+    // the common sizes as arrays (the same calls on the same bytes, the typed loops)
+    macro_rules! as_arrays {
+        ($($s:literal)*) => {
+            match size {
+                $($s => {
+                    let (chunks, _) = blocks.data.as_chunks_mut::<$s>();
+                    return merge_order(chunks, |x: &[u8; $s], y: &[u8; $s]| cmp(x, y));
+                })*
+                _ => {}
+            }
+        };
+    }
+    as_arrays!(1 2 4 8 12 16 24 32);
     let mut gt = |x: &[u8], y: &[u8]| cmp(x, y).ordering() == Ordering::Greater;
     if size <= DIRECT_LIMIT {
         let mut copy = blocks.data.to_vec();
@@ -424,6 +458,18 @@ pub fn quick_order_bytes<R: Comparison>(
     mut cmp: impl FnMut(&[u8], &[u8]) -> R,
 ) -> Result<(), QuickOrderError> {
     let mut blocks = ByteBlocks::new(data, size);
+    macro_rules! as_arrays {
+        ($($s:literal)*) => {
+            match size {
+                $($s => {
+                    let (chunks, _) = blocks.data.as_chunks_mut::<$s>();
+                    return quick_order(chunks, |x: &[u8; $s], y: &[u8; $s]| cmp(x, y));
+                })*
+                _ => {}
+            }
+        };
+    }
+    as_arrays!(1 2 4 8 12 16 24 32);
     quick::sort(&mut blocks, &mut |x: &[u8], y: &[u8]| {
         cmp(x, y).ordering() == Ordering::Less
     })

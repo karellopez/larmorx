@@ -457,8 +457,9 @@ fn qsort_r_context() {
     assert!(seen > 0);
 }
 
-/// The typed functions make the byte functions' calls and leave their arrangement, the direct
-/// path and the one through positions (more than 32 bytes).
+/// The typed functions make the byte functions' calls and leave their arrangement: the direct
+/// path, the one through references (typed) and through positions (bytes) above 32 bytes, and
+/// the byte functions' element-by-element path (5 and 20 bytes).
 #[test]
 fn typed_equals_bytes() {
     fn check<const S: usize>(kind: Kind, n: usize, seed: u64, keyrange: u64) {
@@ -489,6 +490,9 @@ fn typed_equals_bytes() {
         }
     }
     check::<1>(Kind::ThreeWay, 300, 1, 4);
+    // sizes the byte functions sort element by element (not as arrays)
+    check::<5>(Kind::TieMinus, 300, 8, 5);
+    check::<20>(Kind::Hash, 300, 9, 3);
     check::<4>(Kind::F3, 300, 2, 12);
     check::<8>(Kind::Hash, 300, 3, 3);
     check::<12>(Kind::TiePlus, 300, 4, 5);

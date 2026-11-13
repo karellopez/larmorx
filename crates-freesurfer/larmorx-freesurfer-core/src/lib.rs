@@ -53,6 +53,7 @@ pub mod numerics;
 pub mod pdf;
 pub mod prime;
 pub mod random;
+pub mod randomfields;
 pub mod ret;
 pub mod romp;
 pub mod run;

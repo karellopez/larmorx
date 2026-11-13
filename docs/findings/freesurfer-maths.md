@@ -3,7 +3,8 @@
 **Closed to FreeSurfer clean-room implementers** (source-derived: it names FreeSurfer's files and
 lines; the behaviour is in `specs/freesurfer-maths.md`). Written by the replica author of queue
 items 3.1-23 and 3.1-24 (FreeSurfer's foundations, track A). Defect IDs FS-13 to FS-24 (this
-part 1) and FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), decided by rules A to D (CLAUDE.md, D13); the
+part 1), FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), FS-34 to FS-39 (part 3) and FS-40 to
+FS-49 (part 4, the rest of item 3.1-24), decided by rules A to D (CLAUDE.md, D13); the
 register's entries are in the orchestrator's handoff. Every claim below is from the source of the 8.2.0 tag and, where a number is given, from
 the probe `validation/probes/fs-maths/` (FreeSurfer's own functions from the unit oracle's build).
 
@@ -422,3 +423,167 @@ and the code 9 is returned, which `mrimorph.cpp` ignores ("retval is not to be t
   function differ in their NaN bits (an earlier version of the probe's absolute-value cost, with
   cross terms, showed it in 17 Powell cases; the results were the same). FreeSurfer's costs are
   bounded; noted only.
+
+# Part 4: the decompositions, the matrix files and the random-field specifications (item 3.1-24)
+
+Defect IDs FS-40 to FS-49. The probe's eight new commands (`meig`, `msvd`, `msvdinv`, `mpinv`,
+`mrdtxt`, `mrdasc`, `mrdbin`, `mwr`; `validation/probes/fs-maths/`) and the C library's conversions
+(`validation/probes/fs-maths/scanf/`).
+
+## The measurement, part 4
+
+`check.py --seed 7 --n 75000` (2026-11-13): 75,000 cases of 75 commands (the eight new ones 1,000
+each). The port with `reproduce`: **73,122 of 73,122 comparable lines identical**; 1,878 not compared
+(`msvd` 464, `startpeak` 308, `robust` 278, `meig` 194, `nextpeak` 153, `dfpmin` 125, `mrdbin` 119,
+`msvdinv` 74, `mpinv` 67, ...): FreeSurfer's reads of memory it does not own or never wrote (FS-22,
+FS-16, FS-42, FS-49, ITK-106, ITK-110, ITK-111) and 313 matrices with infinite or NaN entries the
+port refuses (FS-47, FS-48): on 97 of them FreeSurfer never returned (the probe's `TIMEOUT`), on 174
+its line equals the port's all the same (the SVD's failure lines), on 42 FreeSurfer finished with
+results the port does not compute. The default differs from FreeSurfer only with a defect's notice
+(FS-43 381, FS-46 151, FS-44 95, FS-45 54 among the new ones), but for 8 rotations, 1 Gaussian draw
+and 10 entropies (the correctly rounded `sinf`, `cosf`, `log`). FreeSurfer's crashes are the lines
+`CRASH`, matched by the port's `reproduce` (FS-44: every tall `MatrixSVDInverse` whose decomposition
+succeeds; FS-45, FS-46). Seed 1, 750 cases: 723 identical, 27 not compared, hash `6cebc7a8...`
+(`tests/fs_maths_official.rs`), passing with AArch64's NaN emulated in debug and release builds.
+
+## The float product's NaN operands (measured; a porting trap, not a defect)
+
+`MatrixMultiply_wkr`'s real loop (`matrix.cpp` 760-770, `val += *r1++ * *r2`) is vectorised by
+GCC 8.4.0 for 4 or more terms (the unit oracle's `matrix.cpp.o`): `mulps` with `m2`'s gathered
+column as the destination (each product `b × a`), then the four lanes summed as `val + p0`,
+`p1 + val`, `p2 + val`, `val + p3`; the terms after the last block, and all of 3 or fewer, as
+`val + (b × a)`. The values are the same in any order, but of two NaNs SSE keeps the first
+operand's, so a NaN sum's sign followed `m2` and the lane order: the probe's `MatrixNSConditionNumber`
+of matrices with NaNs and infinities printed `nan` where the port's earlier `val + (a × b)` printed
+`-nan` (the products of `inf × 0` make x86's default NaN, negative). Ported as measured
+(`matrix::dot_float`). The double product (`MatrixMultiplyD`) is not vectorised: `(a × b)` then
+`val + p`, as the port had it.
+
+## FS-40: the singular values read to the row count (rule A)
+
+`matrix.cpp` 1810-1824 (`MatrixSVDEigenValues`) and 2481-2486 (`MatrixConditionNumber`) loop
+`for (row = 2; row <= rows; ...)` and `i < nevalues` (`nevalues = m->rows`) over `v_w`, a 1 x cols
+vector: for more rows than columns they read past its numbers (the allocation's rounding: memory
+`bzero` never cleared, `matrix.cpp` 1188-1189's `MatrixAlloc_new`). Where that memory holds 0, the
+condition number is 1e8 ("something big") for every tall matrix, and the extra eigenvalues are
+whatever it holds. Rule A: the cols values; the extra eigenvalues 0 (the `memset` before). Callers:
+`mrisurf_metricProperties.cpp` 10607 and 11009, `mrisurf_defect.cpp` 1018 (`m_Q`: square 3 x 3
+there), `mris_compute_layer_intensities` through `MatrixNSConditionNumber` (square products): no
+tall matrix on a default path known. `MatrixConditionNumber` of fewer rows than columns fails the
+decomposition and gives 1e8 (kept, rule C: the "something big" the callers test against a limit;
+`MatrixNSConditionNumber` is the function for such matrices).
+
+## FS-41: `OpenNonSymmetricEigenSystem`'s copy on the stack (a crash, never reproduced)
+
+`numerics.cpp` 951: `double data[icData * icData]`, a variable-length array: above the default
+8 MiB stack (about 1,024 rows) the program crashes. The callers' non-symmetric matrices are small
+(3 x 3 covariances that are not exactly symmetric); both modes compute, noted.
+
+## FS-42: `OpenEigenSystem` ignores VNL's failure (memory contents)
+
+`numerics.cpp` 930-943 constructs `vnl_symmetric_eigensystem<float>` and copies `V` and `D`;
+ITK 4.13.2's `vnl_symmetric_eigensystem_compute` (`vnl_symmetric_eigensystem.hxx` 114-118) writes
+`ierr = <i>` and returns before filling `V` when EISPACK's `tql2` does not converge, and the
+constructor ignores it: `V` is a fresh, uninitialised `vnl_matrix`. Rule B: an error by default
+(`MatrixEigenSystem` returns `NULL`, its documented failure); `reproduce` fills the vectors with 0.
+Not reached by finite matrices in the probe (FS-47 refuses the non-finite ones first).
+
+## FS-47: VNL's symmetric eigensystem never returns on non-finite matrices (a hang, never reproduced)
+
+EISPACK's `pythag` (`v3p/netlib/eispack/pythag.c`, VNL) iterates `t = r + 4` until `t == 4`: with
+`p = max(|a|, |b|)` NaN (f2c's `max` keeps the second argument when the comparison fails: `pythag(x,
+NaN)` and `pythag(NaN, NaN)`, or two infinities, `r = inf / inf`) it never ends. `tql2` calls it on
+the tridiagonal matrix of any matrix with infinite or NaN entries in the triangle `tred2` reads, so
+FreeSurfer's `MatrixEigenSystem` of a symmetric matrix with infinities (a NaN fails the exact
+symmetry test and goes to the non-symmetric path, which hangs in `balanc`, ITK-112) never returns.
+Measured: of the probe's symmetric-path cases with infinities or NaNs, most never returned (the
+probe's 2-second alarm, `TIMEOUT`); some did (a NaN only on the diagonal of a 2 x 2: `pythag(NaN, 1)`
+returns, f2c's `max(NaN, 1)` being 1). Both modes refuse every such matrix with an error (rule B;
+the hang never reproduced), so the matrices FreeSurfer does finish are not reproduced: they wait for
+the main package's eigensystem to report a loop that never ends (below).
+
+## FS-48: VNL's SVD never returns on some non-finite matrices (a hang, never reproduced)
+
+LINPACK's `ssvdc` (VNL's `vnl_svd<float>`) loops for ever on some matrices with infinite and NaN
+entries (probe case `mpinv 4 3 3 80000000 ff800000 3f800000 80000000 7fc00000 7f800000 80000000
+7fc00000 7fc00000`: `MatrixSVDPseudoInverse` and `msvd` of the same matrix never return, FreeSurfer
+and the main package's port alike); on most it fails to converge (VNL's `suspicious return value`
+lines, `info` = min(rows + 1, cols) on every measured case) and on a few it succeeds (a 1 x 1
+infinity). `OpenSvdcmp` hands any matrix to it. Both modes give the failure lines and
+`ERROR_BADPARM` for every matrix with an infinite or NaN entry without decomposing it (rule B). The
+callers' matrices are finite (Jacobians, covariances, design matrices).
+
+## FS-43: `MatrixSVD`'s V and its ignored failure (rule A, rule B)
+
+`matrix.cpp` 1779-1788: `mV = MatrixAlloc(mA->rows, mA->rows, ...)` where `vnl_svd`'s V is cols x
+cols (`OpenSvdcmp` copies its cols² numbers into the first floats of the rows x rows matrix, so for
+a tall matrix V's rows are misplaced), and `OpenSvdcmp`'s `ERROR_BADPARM` (fewer rows than columns,
+or LINPACK's failure) is not checked: V comes back unchanged, mA and v_z too, with no message. The
+function's own comment says V is cols x cols. Rule A (cols x cols) and rule B (an error). Callers on
+default paths: `mri2.cpp` 1673 (`MRIpca`: the square temporal covariance matrix), `lta_convert` 1043 (a
+given V): square or given; no change known on fMRIPrep's paths.
+
+## FS-44: `MatrixSVDInverse` of a tall matrix (rule A; a crash, never reproduced)
+
+`matrix.cpp` 1880-1912: `m_Ut = MatrixAlloc2(cols, cols, ...)` (its comment says cols x rows), the
+loops `for (row = 1; row <= rows; ...)` over `v_w` (cols numbers) and `m_w->rptr[row][row]` (a cols x
+cols matrix): for more rows than columns the row pointers past the last row are 0 (`bzero` of the
+pointer block's padding) and the write crashes; measured: every tall case whose decomposition
+succeeded gave `CRASH`. Rule A: the decomposition's sizes, which give the pseudo-inverse. Callers'
+matrices are square (`MatrixPseudoInverse`'s `mᵀm`, covariances, `rbf.cpp`'s `GᵀG`).
+
+## FS-45: `MatrixPseudoInverse` of a wide matrix with an output (rule A; crashes, never reproduced)
+
+`matrix.cpp` 2796-2804: for fewer rows than columns the caller's `m_pseudo_inv` (cols x rows, the
+result's shape) is passed to the pseudo-inverse of the transpose (rows x cols): `MatrixMultiply`
+refuses it (`m3 dim mismatch`, `NULL`) and `MatrixTranspose(NULL, NULL)` crashes; an output of the
+inner shape is filled, then freed by `MatrixFree(&mT)` (the caller's pointer dangles) and a new
+matrix is returned. The same crash for a wide zero matrix with no output (its inner pseudo-inverse is
+`NULL`). Callers passing an output (`mri_cnr`, `mri_train`, `mri_ms_fitparms`,
+`mris_intensity_profile`) pass tall design matrices; no default path known.
+
+## FS-46: `MatrixSVDPseudoInverse`'s output, failure and empty inner result (rule A, rule B; a crash never reproduced)
+
+`matrix.cpp` 3613-3658: `m_pseudo_inv = MatrixMultiply(m_tmp, m_Ur, NULL)` ignores the caller's
+matrix; `OpenSvdcmp`'s return is not checked (the singular values stay 0: `0 / 0` keeps every one,
+`1 / 0` inverts them to infinities); for a wide zero matrix the inner `NULL` is transposed (a crash).
+Every caller passes `NULL` (`mri_vol2surf` 2431, `class_array.cpp` 777, `gcamorph.cpp` 12350 and
+12784). Rule A (the output written) and rule B (an error for the failure).
+
+## FS-49: `freadInt` and `freadDouble` at the end of the file (memory contents)
+
+`fio.cpp` 169-193: `fread` of a missing item leaves the local `d` or `i` as the stack held it (a
+partial item keeps the bytes it read); `freadDouble` prints `freadDouble: fread failed`, `freadInt`
+tests `fread(...) < 0`, which a `size_t` never is, and prints nothing. `MatrixReadFrom` of a short
+file therefore takes its type, sizes or elements from the stack (the probe's cut files: memory
+contents, counted and not compared; a garbage size can end the program, FS-13, so `mrdbin` runs in a
+child process). Rule B: an error by default; `reproduce` reads the missing bytes as 0. The
+readers that use them come with `fs.io` (item 3.1-26), where the same applies.
+
+## The C library's `%f` (measured; larmorx's own reader)
+
+glibc 2.35's `scanf` departs from C11's "longest prefix of a matching sequence" (7.21.6.2 ¶9)
+in measured ways the readers depend on: `1e` and `1e+` read 1 (the marker and sign consumed, no
+failure), so `100ergs` reads 100; `0x` without digits fails unless a point follows (`0x.` reads 0
+and leaves a following `p`); `inf` stops before a non-`i` letter, an unfinished `infinity` fails and
+consumes the letter that broke it (as an unfinished `inf` or `nan` does; numbers leave it unread);
+`nan(...)` is never read beyond `nan`; underflow sets `ERANGE` after rounding (`0x1.fffffep-127` sets
+it, `0x1.ffffffp-127` does not), and so does any inexact subnormal result, exactly representable
+ones not; a conversion that meets the end of the input before its item sets `errno` to 0 (unless an
+earlier item of the same call ended there), which is why `MatrixReadTxt`'s `could not scan value`
+after an `ERANGE` read prints no `Numerical result out of range` when the file simply ended.
+`cscan.rs` reproduces each; `scanf_probe.c` and its companions are the measurements.
+
+## For the main package's VNL (track C), found here, part 4
+
+- **EISPACK's `pythag` with NaN** (`larmorx_core::vnl_eigen::pythag`): it uses Rust's `f64::max` and
+  `min`, which ignore a NaN, where f2c's `max(a, b)` is `a >= b ? a : b` (the second argument when
+  the comparison fails) and `abs` keeps NaN: `pythag(x, NaN)` returns about `x √2` in the port and
+  never returns in VNL; and the port's `pythag` too loops for ever on `pythag(NaN, NaN)` and two
+  infinities, so `symmetric_eigensystem` hangs on such input (ImageMomentsCalculator, antsAI would as
+  well). A version that follows f2c's macros and reports the loop (as `BalancNeverReturns` does for
+  `balanc`) would let FS-47's matrices that FreeSurfer finishes be reproduced; a VXL defect ID is
+  track C's.
+- **LINPACK's `ssvdc` never returning** (`larmorx_core::vnl_svd_f32`): the port loops on the matrix
+  above as VNL does. A report of the loop, and the `info` of a failure (`vnl_svd_f32` returns `None`
+  without it; the double version has `vnl_svd_info`), would let FS-48 follow VNL exactly.

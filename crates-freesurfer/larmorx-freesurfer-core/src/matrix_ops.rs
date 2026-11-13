@@ -12,9 +12,9 @@
 //! `XYZ_NORMALIZED_LOAD`, `XYZApproxAngle_knownLength`, `MatrixCheck`, `MatrixReshape`,
 //! `MatrixTrace`, `MatrixConstVal`, `MatrixZero`, `MatrixSumElts`, `MatrixNormalizeColScale`,
 //! `MatrixNormalizeCol`, `MatrixSimilarityTransform`, `GaussianMatrix2`, `GaussianMatrix`) and
-//! the `MatrixClone` macro. The product (`MatrixMultiply`) is in [`crate::matrix`]; the functions
-//! that call VXL (determinant, eigensystems, SVD, inverses) come with the main package's `float`
-//! VNL routines.
+//! the `MatrixClone` macro. The product (`MatrixMultiply`) is in [`crate::matrix`]; the eigensystems,
+//! SVD, condition numbers and pseudo-inverses in [`crate::matrix_decomp`] (the determinant, inverse
+//! and QR factors are here).
 //!
 //! Every expression keeps C's types: `float` sums stay `float` (each step rounded), `double`
 //! ones `double`; elements are addressed as the C macros address them (`rptr[r][c]`), so where a

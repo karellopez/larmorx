@@ -21,7 +21,14 @@ default differs only where a defect it corrects changed the result (`docs/findin
   float costs passed as C function pointers, with the iteration callback, the step function and
   the user callback; every evaluation and callback hashed; standard output and error captured
   while FreeSurfer runs and hex-encoded into the line; `OpenDFPMin` in a child process, its line
-  `CRASH` when FreeSurfer dies of a signal, FS-37; `robust` likewise).
+  `CRASH` when FreeSurfer dies of a signal, FS-37; `robust` likewise); since item 3.1-24's last
+  piece `meig`, `msvd`, `msvdinv`, `mpinv` (the eigensystems, the SVD and the functions over it,
+  each in a child process with a 2-second alarm: `TIMEOUT` where VNL never returns on a non-finite
+  matrix, FS-47, FS-48, ITK-112; `CRASH` for FS-44 to FS-46) and `mrdtxt`, `mrdasc`, `mrdbin`, `mwr`
+  (the matrix files: generated files written to `fsmaths-file.tmp` in the cases' directory, which
+  `fsmaths` makes its working directory, so the messages name the same file; `errno` and the bytes
+  read are part of the line). VNL's messages name their source file: the unit oracle's ITK path is
+  written as the official build's (`official_itk`).
 - `variation.py <cases> [--runs N]`: the official code's own variation on a case file (runs `fsmaths`
   N times, never cached: crashes and the commands whose lines differ between runs).
 - `build.sh [<workspace>]`: compiles it with the unit oracle's compiler and flags and links it with
@@ -39,6 +46,9 @@ default differs only where a defect it corrects changed the result (`docs/findin
   cases where FreeSurfer reads outside its arrays (FS-22: the port notes it; not comparable),
   lines where the default differs and the defects noted there; and `official_sha256_skip`, the
   hash `tests/fs_maths_official.rs` records (seed 1, 490 cases).
+
+- `scanf/`: black-box measurements of glibc 2.35's `%f` and `%d` (its README), the behaviour the
+  port's `cscan` follows.
 
 Run (the unit oracle built):
 
@@ -77,3 +87,11 @@ emulated (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, `NAN_TRAP_ARM
 `NAN_TRAP_DIR` set: without it the trap is not armed) in debug and release builds. The official code
 varies between runs only in FS-22 cases (`robust`, heap-dependent reads; one of 8 runs crashed in
 one): `robust` and `dfpmin` run in a child process.
+
+Measured 2026-11-13 (item 3.1-24's last piece: the decompositions and the files): seed 7, 75,000 cases of 75
+commands: 73,122 of 73,122 comparable lines identical with `reproduce`, 1,878 not comparable (memory
+FreeSurfer does not own or never wrote, and 313 non-finite matrices the port refuses: 97 of them
+`TIMEOUT` in FreeSurfer, 174 equal all the same, 42 that FreeSurfer finishes); the default differs
+only with a defect's notice but for 8 rotations, 1 Gaussian draw and 10 entropies. Seed 1, 750 cases:
+723 identical, 27 not comparable, hash `6cebc7a8e9a749ae619547d19bba0d991eb2c10efbbaf1cf46b65f5c0d5a6470`,
+checked with AArch64's NaN emulated in debug and release builds.

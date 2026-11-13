@@ -38,6 +38,11 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `numerics` | `utils/numerics.cpp` 1091-1219 | `OpenLUMatrixInverse`, `OpenQRdecomposition`, `OpenMatrixDeterminant` (on the main package's `float` VNL: `larmorx_core::vnl_fixed`, `larmorx_core::vnl_qr::Qr<f32>`, item 3.1-07); FS-33 |
 | `numerics` (3.1-23, 3.1-24) | `utils/numerics.cpp` 69-110, 846-926, 980-1089, 1683-1727; `include/numerics.h` | `ConvertFromFloatToVNLDouble`, `ConvertFromVNLDoubleToFloat` (vector and matrix forms), `OpenDFPMin`, `OpenPowell`, `OpenPowell2`, `vector`, `matrix`, `free_vector`, `free_matrix` (`NrVector`, `NrMatrix`; the frees are their drop), `NR_END`; FS-34, FS-35, FS-36, FS-38, FS-39 |
 | `fs_vnl` (3.1-23) | `utils/fs_cost_function.cpp`, `utils/fs_powell.cpp`, `utils/fs_lbfgs.cpp`, `utils/fs_lbfgs_subject.cpp`, `utils/fs_lbfgs_observer.cpp`; `include/fs_vnl/*.h` | `fs_cost_function` (both constructors, `f`, `gradf`, `copyFromVNLToFloat`; `compute` as VNL's base class has it), `fs_powell` (`minimize` with `fs_powell_1dfun`, `set_linmin_xtol`, `set_initial_step`, `pub_report_eval`), the global `powell_iteration_func` (as `FsFunctions::powell_iteration`), `fs_lbfgs` (`init_parameters`, `minimize`), `fs_lbfgs_subject` (its one observer), `fs_lbfgs_observer` (`update`, the step function and user callback as `FsFunctions` methods, `getNumberOfOptimalUpdates`); on the main package's VNL (`larmorx_core::vnl_minimize`, `larmorx_core::vnl_lbfgs`, item 3.1-07): this crate contains no VXL code; FS-35, FS-37 |
+| `matrix_decomp` (3.1-24) | `utils/matrix.cpp` 1611-1697, 1779-1919, 2464-2524, 2792-2825, 3613-3658 | `compare_evalues` (with `qsort` as a stable merge sort), `EIGEN_VALUE`, `MatrixCalculateEigenSystemHelper`, `MatrixEigenSystem`, `MatrixSVD`, `MatrixSVDEigenValues`, `MatrixSVDInverse` (`TOO_SMALL`), `MatrixConditionNumber`, `MatrixNSConditionNumber`, `MatrixPseudoInverse`, `MatrixSVDPseudoInverse`; FS-40, FS-43 to FS-46 |
+| `numerics` (3.1-24) | `utils/numerics.cpp` 930-978, 1225-1248 | `OpenEigenSystem`, `OpenNonSymmetricEigenSystem`, `OpenSvdcmp` (on `larmorx_core::vnl_eigen` and `larmorx_core::vnl_svd_f32`; VNL's `vnl_svd.hxx` failure lines with the official build's ITK path); FS-41, FS-42, FS-47, FS-48 |
+| `matrix_io` (3.1-24) | `utils/matrix.cpp` 991-1050, 2179-2287, 2775-2790; `utils/fio.cpp` 169-193 | `MatrixReadTxt`, `MatrixAsciiWriteInto`, `MatrixAsciiReadFrom`, `MatrixReadFrom`, `MatrixWriteTxt`; `freadInt`, `freadDouble` (as `MatrixReadFrom` reads; `fio.cpp`'s other readers come with item 3.1-26); FS-49 |
+| `randomfields` (3.1-24) | `include/randomfields.h`; `utils/randomfields.cpp` 34-45, 73-87, 100-108 | `RFS`, `RF_UNIFORM` ... `RF_CHI2`, `RFname2Code`, `RFspecInit`, `RFspecSetSeed` (the generator through `RfGenerator`: GSL's code never comes here) |
+| `cscan` | none (larmorx's own) | the C library's `scanf` conversions `%f` and `%d` as glibc 2.35 behaves, written from the C standard and black-box measurements (`validation/probes/fs-maths/scanf/`), no glibc code |
 | `prime` | `utils/prime.cpp` 20-235 | `GetPrimes`, `GetPrimeFactors`, `CompareFactors` (as a sort of integers), `GetClosestPrimeFactor`, `GetClosestPrimeFactorLess`; FS-32 |
 | `pdf` | `utils/pdf.cpp` 26-61 | `PDFtodSeed`, `PDFgaussian`; FS-29, FS-30 |
 | `sse` | none (larmorx's own) | SSE2's NaN rules for the official build's arithmetic (the porting guide's "NaN bits are part of the output") |
@@ -85,14 +90,17 @@ statistics, ...).
   ported (queue item 3.1-08).
 - (`fs.maths`, 3.1-24) The float matrices' arithmetic follows SSE2's NaN rules on every platform
   (`sse`); `PDFgaussian` draws from the C library's 48-bit generator through
-  `larmorx_core::drand48` (POSIX's definition, `Globals::drand48`). Item 3.1-24 is in progress: still
-  to come are `matrix.cpp`'s decompositions and the functions over them (the
-  eigensystems, `MatrixSVD*`, `MatrixConditionNumber`, `MatrixNSConditionNumber`,
-  `MatrixPseudoInverse`, `MatrixSVDPseudoInverse`), its text and binary files (`MatrixReadTxt`,
-  `MatrixAsciiWriteInto`, `MatrixAsciiReadFrom`, `MatrixReadFrom`, `MatrixWriteTxt`),
-  `numerics.cpp`'s other VNL wrappers (`OpenEigenSystem`, `OpenNonSymmetricEigenSystem`,
-  `OpenSvdcmp`, `OpenSpline`, `OpenSplint`; without its GSL functions, item 3.1-53 in `larmorx-gpl`,
-  and Burkardt's spline, item 3.1-54) and `randomfields.cpp`.
+  `larmorx_core::drand48` (POSIX's definition, `Globals::drand48`). Item 3.1-24's remaining
+  pieces: `OpenSpline` and `OpenSplint` (they call Burkardt's spline, item 3.1-54),
+  `numerics.cpp`'s GSL functions (item 3.1-53 in `larmorx-gpl`, never here), `randomfields.cpp`'s
+  `RFsynth` and `RFdrawVal` (GSL's distributions: items 3.1-05 and 3.1-53) and `RFglobalStats`
+  (`MRI` volumes: `fs.volume`).
+- (`fs.maths`, 3.1-24) `MatrixMultiply`'s float sums keep the official build's operand order where
+  two NaNs meet (`m2`'s element first in each product; blocks of four sums `val + p0`, `p1 + val`,
+  `p2 + val`, `val + p3`: GCC 8.4.0's vectorised loop, from the unit oracle's `matrix.cpp.o`).
+- (`fs.maths`, 3.1-24) The eigensystems and the SVD refuse matrices with infinite or NaN entries in
+  both modes (FS-47, FS-48; ITK-112 for the non-symmetric one): VNL never returns on many of them,
+  and the main package's ports cannot yet tell such a loop from a failure.
 - (`fs.maths`) Not translated: the unreached functions of these files (static reach: `HISTOdump`,
   `HISTOcrunch`, `HISTOinvert`, `HISTOnormalize`, `HISTOcompose*`, `HISTOfillZeros`, `HISTOmul`,
   `HISTO*PeakRelative`, `HISTOfindFirstPeakInRegion`, `HISTOcountPeaksInRegion`,

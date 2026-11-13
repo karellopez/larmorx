@@ -544,7 +544,7 @@ command = "larmorx sdcflows sdcflows"
 python = "lx.sdcflows.run_app"
 does = "sdcflows' BIDS app: the field maps of a BIDS dataset, PEPOLAR, direct and fieldmap-less (SyN), with their derivatives."
 api = "docs/api/sdcflows-fieldmap.md"
-evidence = "/tools/sdcflows-estimation/"
+evidence = "/evidence/sdcflows-estimation/"
 records = { replica = ["sdcflows-estimation", "sdcflows-estimation-full", "sdcflows-estimation-app-shared"] }
 ports = ["replica"]
 
@@ -554,7 +554,7 @@ name = "fieldmap"
 python = "lx.sdcflows"
 does = "sdcflows' B-spline field fit, the field evaluated and applied, and the phase-difference preparation."
 api = "docs/api/sdcflows-fieldmap.md"
-evidence = "/tools/sdcflows-fieldmap/"
+evidence = "/evidence/sdcflows-fieldmap/"
 records = { replica = ["sdcflows-fieldmap"] }
 
 [[program]]
@@ -563,7 +563,7 @@ name = "niworkflows-helpers"
 python = "lx.niworkflows"
 does = "The interfaces of niworkflows that sdcflows' and fMRIPrep's field-map steps run."
 api = "docs/api/niworkflows-helpers.md"
-evidence = "/tools/sdcflows-estimation/"
+evidence = "/evidence/sdcflows-estimation/"
 records = { replica = ["niworkflows-helpers"] }
 original = "niworkflows 1.15.4"
 
@@ -573,7 +573,7 @@ name = "bids"
 python = "lx.bids"
 does = "A BIDS dataset's index, as pybids' `BIDSLayout` gives it, in memory, without its database."
 api = "docs/api/bids.md"
-evidence = "/tools/sdcflows-estimation/"
+evidence = "/evidence/sdcflows-estimation/"
 records = { replica = ["sdcflows-estimation"] }
 original = "pybids 0.22.0"
 
@@ -595,7 +595,7 @@ name = "fieldmap-steps"
 python = "lx.transforms.reconstruct_fieldmap"
 does = "fMRIPrep's steps between sdcflows' field-map estimators and the one-shot resampler: the field map evaluated on a reference's grid, and the distortion parameters."
 api = "docs/api/fmriprep-fieldmap-steps.md"
-evidence = "/tools/sdcflows-estimation/"
+evidence = "/evidence/sdcflows-estimation/"
 records = { replica = [] }
 original = "fMRIPrep 25.2.7"
 
@@ -615,7 +615,7 @@ name = "ndimage-filters"
 python = "lx.ndimage"
 does = "SciPy's ndimage filters, morphology, labelling and watershed, under sdcflows' and fMRIPrep's steps."
 api = "docs/api/ndimage-filters.md"
-evidence = "/tools/sdcflows-estimation/"
+evidence = "/evidence/sdcflows-estimation/"
 records = { replica = ["ndimage-skimage", "ndimage-skimage-full"] }
 original = "SciPy 1.18.1"
 
@@ -625,7 +625,7 @@ name = "skimage"
 python = "lx.skimage"
 does = "scikit-image's ball, Otsu threshold, random walker and histogram matching, under sdcflows' brain mask."
 api = "docs/api/skimage.md"
-evidence = "/tools/sdcflows-estimation/"
+evidence = "/evidence/sdcflows-estimation/"
 records = { replica = ["ndimage-skimage"] }
 original = "scikit-image 0.26.0"
 

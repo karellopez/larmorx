@@ -116,6 +116,21 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   the file's bytes), `rrx` (`regio_read_mincxfm` with or without the file information), `rwx` (`regio_write_mincxfm`,
   `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` set, `Progname` `fsio`), `rrm` (`regio_read_registermat`); the
   matrices as `4` and 16 float bits. Seed 13, 710 such cases: identical in both modes.
+- Piece 11 (relay 20): fs.labels' labels, control points, annotation tables and point sets. `lrd` (`LabelRead` with or
+  without a subject; `SUBJECTS_DIR` given, unset or wrong; label files built by `tests/fs_io/piece11.rs` with every
+  first-line, count and point-line form, and the subject's `talairach.xfm`), `lwr` (`LabelWrite` of a given label, then
+  every file under `w` with its bytes), `lal` (`LabelAlloc`), `lre` (`LabelRealloc`), `lcp` (`LabelCopy`), `ldu`
+  (`LabelRemoveDuplicates` with `Gdiag`), `lhv` (`LabelHasVertex`), `crd` (`MRIreadControlPoints` of control-point and
+  `.label` files; count and `useRealRAS` preset to -7), `cwr` (`MRIwriteControlPoints`, the creation time fixed by
+  `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`, the user's name shown as `U`), `cfp` (`MRIfillPoints` on a small
+  volume given by its extent, type, voxel sizes, axes, centre and voxels; its voxels as FNV-1a 64), `atr` (the
+  annotation table from files, `FREESURFER_HOME` and `annotation_table_file` given, then `R`/`N` reads and the
+  lookups `i n a m` and printers `p c`), `ats` (`set_atable_from_ctable` of a piece-10 table, then the same), `pss`
+  (an `fsPointSet` built, then `save`, `save_as_ctrlpoint`, `print`, `printCoords`, `writeCoords`,
+  `writeCentroidTable`, `get`, `set`, `add`, `remove`, `clear`; the files under `w`). A label is printed as its fields,
+  places (FNV-1a 64 beyond 2,000 characters), vertex indices and transforms. `SKIP` for FS-423, FS-424, FS-426,
+  FS-427, FS-429, FS-430, FS-431 and FS-11. Seed 13, 2,678 piece-11 cases: `reproduce` identical on 2,594, 0
+  different; seed 7, 8,034: identical on 7,783, 0 different.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

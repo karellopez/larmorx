@@ -922,3 +922,72 @@ reach: `mri_vol2vol`, `mri_surf2surf`, `bbregister`'s helpers, `mri_coreg`, `tkr
 - Measured: seed 13, 710 piece-10 registration cases (142 of each): `reproduce` and `fix` identical
   on all; seed 1's light set with them: 4,797 cases, 4,217 identical, 0 different, 580 SKIP or VARY
   (`5e19ca25...`), the NaN trap passes in debug (4,084 flips) and release (3,954).
+
+## Part 10: fs.labels' labels, control points, annotation tables and point sets (3.1-33's second piece, relay 20 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/label.cpp`: `LabelReadFrom` 54, `LabelRead` 120,
+`LabelFree` 215, `LabelWriteInto` 534, `LabelWrite` 580, `LabelAlloc` 804, `labelLoadTransform` 1121,
+`LabelCopy` 1246, `LabelRemoveDuplicates` 1276, `LabelHasVertex` 2543, `LabelRealloc` 2557;
+`include/label.h` 35-63 (`LABEL_VERTEX`, `LABEL`), `include/mri.h` 86-89 (`FS_COORDS_*`);
+`utils/ctrpoints.cpp`: `MRIreadControlPoints` 37, `MRIwriteControlPoints` 128, `MRIfillPoints` 495;
+`utils/annotation.cpp`: the statics `atable`/`num_entries` 51-52, `read_named_annotation_table` 115,
+`read_annotation_table` 171, the lookups 224-316, `set_atable_from_ctable` 524, the printers 62-89;
+`include/annotation.h` (`annotation_table_file`); `include/pointset.h` (the class, its inline
+members), `utils/pointset.cpp` (`save` 17, `save_as_ctrlpoint` 57, `loadfsPointSet` 74,
+`writeCentroidTable` 103). Not ported here: `LabelToScannerRAS` 3111, `LabelToSurfaceRAS` 3150,
+`LabelToVoxel` 3198 and `LabelVoxelToSurfaceRAS` 3285 (they need `RASFromSurfaceRAS_`,
+`voxelFromSurfaceRAS_`, `MRIvoxelToSurfaceRAS`: fs.volume, a crate above fs.io), the functions on
+surfaces (fs.surf), `loadfsPointSet` (nlohmann/json: `larmorx_core::json`, not yet on this branch).
+Callers in the reach: `mri_label2vol`, `mri_label2label`, `mri_cor2label`, `mris_ca_label`,
+`mris_label2annot`, `mri_segstats` (labels); `mri_normalize`, `mri_segment` and the control-point
+options (`MRIreadControlPoints`; `MRIfillPoints` from `mri_edit_wm_with_aseg`'s path option);
+`mris_anatomical_stats`, `mri_aparc2aseg` (annotation tables); `mri_segcentroids` (point sets).
+
+### Mechanisms
+- FS-423: `sprintf(area->space, "%s", str + strlen("vox2ras="))` into `char space[100]`; the bytes
+  past it overwrite `avg_stat`, `vertex_label_ind`, `mri_template`, `mht`, `mris` (a text of about
+  120 bytes or more makes `vertex_label_ind` a wild pointer that `LabelFree` passes to `free`).
+- FS-424: `calloc(0, sizeof(LV))` returns glibc's minimum chunk; the loop's `nlines == n_points`
+  never holds, so every line is stored at `lv[nlines]` past the chunk (measured: `malloc(): unsorted
+  double linked list corrupted`, signal 6, when the next allocation meets the damaged heap).
+- FS-425: the places are `calloc`'d for the count; the loop ends at the end of the file with
+  `n_points` unchanged.
+- FS-426: `calloc(n_points, sizeof(LV))` (and `LabelAlloc`'s, `LabelRealloc`'s `realloc`) of a count
+  the machine cannot hold: `NULL` (an exit with the messages of §77/§78) or, under Linux's
+  overcommit, a label that touches every page (`LabelAlloc`'s loop of `vno = -1`).
+- FS-427: `char label_name0[STRLEN]` (`sprintf`), `lname[STRLEN]`, `subjects_dir[STRLEN]`
+  (`strcpy`; `LabelReadFrom`'s `strncpy(subjects_dir, cp, STRLEN - 1)` leaves no NUL for 1,023 bytes
+  or more), `LabelAlloc`'s `strcpy(area->subject_name, subject_name)`.
+- FS-428: `LabelWriteInto` calls `fclose(fp)` before each `return (1)`; `LabelWrite` then calls
+  `fclose(fp)` on the same stream (glibc: a double free of the `FILE`).
+- FS-429: `LabelCopy`'s `memmove(adst->lv, asrc->lv, asrc->n_points * sizeof(LABEL_VERTEX))` into a
+  given `adst` of fewer places.
+- FS-430: `sscanf(cp, "%d %s %d %d %d %*d", ..., atable[i].name, ...)` into `char name[100]` (the
+  bytes past it go into the next entry's `index`, `r`, `g`, `b`, `annotation`, which its own line
+  then overwrites, or past the array for the last entry); `CTABcopyName(pct, i, atable[i].name,
+  100)` is a `strncpy` that leaves no NUL for 100 bytes or more (the name then runs into the next
+  entry's integers); `sprintf(fname, "%s/%s", ...)` into `char fname[STRLEN]`.
+- FS-431: `points.erase(points.begin() + index)` with an index outside the vector.
+- `LabelVoxelToSurfaceRAS` (not ported yet) converts with `MRISsurfaceRASToVoxel` when the label
+  has a surface, the opposite direction of its name: to be decided with fs.volume's part.
+
+### Behaviours kept (rule C, both modes; no ID)
+- `LabelAlloc` with a subject name exits when `SUBJECTS_DIR` is not set although it does not use
+  it; `LabelCopy` into a new label passes the source's subject (always a string, perhaps empty), so
+  it exits likewise.
+- `LabelReadFrom` returns `NULL` without freeing the label on its error paths (memory only);
+  `LabelRead` prints `errno`'s text twice when the file does not open (`perror(NULL)`, then
+  `ErrorPrintf`'s own).
+- `LabelRemoveDuplicates` counts a point marked by two earlier points twice in its message.
+- `read_annotation_table` and `read_named_annotation_table` leave the file open; a table of no
+  entries is read again (with its message) by every lookup.
+- `MRIreadControlPoints`' `ErrorReturn(NULL, (ERROR_BADPARM, "cannot open control point file",
+  fname))` prints no name (the format has no `%s`).
+- `fsPointSet::print` prints its row number `i`, which is never incremented: 0 on every row.
+- `MRIwriteControlPoints`' format `... but %d\n` gives a blank line after the message.
+
+### Measured (piece 11, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+- Seed 13, 2,678 piece-11 cases: `reproduce` identical on 2,594, 0 different (84 SKIP: FS-429 43,
+  FS-430 19, FS-431 15, FS-423 3, FS-424 3, FS-426 2). Seed 7, 8,034: identical on 7,783, 0 different
+  (251 SKIP). `fix` differs only where a defect is noted (FS-01's NUL byte, FS-12's clamped `nint`
+  in `MRIfillPoints`, FS-425's short labels).

@@ -42,6 +42,12 @@ pub trait Stream {
     fn peek(&mut self) -> Option<u8>;
     /// Reads the byte [`Stream::peek`] gave.
     fn bump(&mut self);
+    /// Whether the conversion just made met the end of the input. By default a look at the next
+    /// byte; a C stream says whether a read already found the end, since glibc does not read on
+    /// after a complete `nan` or `inf` (its end-of-file flag stays clear: measured).
+    fn hit_end(&mut self) -> bool {
+        self.peek().is_none()
+    }
 }
 
 /// A `FILE *` over a reader.
@@ -576,13 +582,13 @@ impl Call {
                 if erange {
                     *errno = ERANGE;
                 }
-                if st.peek().is_none() {
+                if st.hit_end() {
                     self.latched = true;
                 }
                 Some(v)
             }
             Scan::Fail => {
-                if st.peek().is_none() {
+                if st.hit_end() {
                     self.latched = true;
                 }
                 None

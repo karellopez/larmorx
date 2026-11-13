@@ -14,6 +14,7 @@ use std::io::Write;
 use larmorx_core::cfmt;
 use larmorx_core::defects::FS_59;
 use larmorx_freesurfer_core::affine::{AffineMatrix, float_to_int, set_affine_matrix};
+use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
@@ -56,8 +57,9 @@ pub struct VolGeom {
     pub s_r: f32,
     pub s_a: f32,
     pub s_s: f32,
-    /// `fname` (a `STRLEN` buffer in C).
-    pub fname: String,
+    /// `fname`: a `STRLEN` buffer with C's semantics (the bytes after the name reach files:
+    /// `VOL_GEOM::write`).
+    pub fname: CName,
     /// `i_to_r__`: the cached voxel-to-RAS matrix.
     pub i_to_r: Option<AffineMatrix>,
     /// `r_to_i__`: the cached RAS-to-voxel matrix (`NULL` when the inverse failed).
@@ -91,7 +93,7 @@ impl Default for VolGeom {
             s_r: 0.0,
             s_a: 0.0,
             s_s: 0.0,
-            fname: String::new(),
+            fname: CName::default(),
             i_to_r: None,
             r_to_i: None,
             register_mat: None,
@@ -137,7 +139,7 @@ impl VolGeom {
         self.s_r = o.s_r;
         self.s_a = o.s_a;
         self.s_s = o.s_s;
-        self.fname = o.fname.clone();
+        self.fname.strcpy(&o.fname);
     }
 
     /// C++'s copy assignment (`*this = other`): every field; the cached matrices the source has,
@@ -181,6 +183,33 @@ impl VolGeom {
             }
         }
     }
+}
+
+/// `initVolGeom(vg)` (`utils/transform.cpp`): not valid, 256 voxels in each direction of 1 mm,
+/// the coronal direction cosines, the centre at 0 and the name `unknown` (copied over the old
+/// name: the bytes after it stay); `ras_good_flag`, the shears and the cached matrices are left
+/// as they are.
+pub fn init_vol_geom(vg: &mut VolGeom) {
+    vg.valid = 0;
+    vg.width = 256;
+    vg.height = 256;
+    vg.depth = 256;
+    vg.xsize = 1.0;
+    vg.ysize = 1.0;
+    vg.zsize = 1.0;
+    vg.x_r = -1.0;
+    vg.x_a = 0.0;
+    vg.x_s = 0.0;
+    vg.y_r = 0.0;
+    vg.y_a = 0.0;
+    vg.y_s = -1.0;
+    vg.z_r = 0.0;
+    vg.z_a = 1.0;
+    vg.z_s = 0.0;
+    vg.c_r = 0.0;
+    vg.c_a = 0.0;
+    vg.c_s = 0.0;
+    vg.fname.strcpy_bytes(b"unknown");
 }
 
 /// `MatrixPrint(stdout, m)` (precision 5): the matrix on standard output.
@@ -532,7 +561,9 @@ pub fn vgprint(out: &mut dyn Write, vg: &VolGeom, nocheck: bool) {
         ] {
             let _ = writeln!(out, "{name}: ({}, {}, {})", f(a), f(b), f(c));
         }
-        let _ = writeln!(out, "file    : {}", vg.fname);
+        let _ = out.write_all(b"file    : ");
+        let _ = out.write_all(vg.fname.c_bytes());
+        let _ = out.write_all(b"\n");
     } else {
         let _ = out.write_all(b"volume geometry: info is either not contained or not valid.\n");
     }

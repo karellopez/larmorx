@@ -4,13 +4,16 @@
 //! `utils/fio.cpp` of FreeSurfer 8.2.0 as its reached functions use it (queue item 3.1-25):
 //!
 //! - the big-endian readers and writers of one number on a C stream (`fread1`, `fread2`,
-//!   `fread3`, `freadDouble`, `freadInt`, `freadLong`, `freadIntEx`, `freadFloat`, `fwrite2`,
-//!   `fwrite3`, `fwriteInt`, `fwriteLong`, `fwriteFloat`) and on a znzlib file (`znzread1`,
+//!   `fread3`, `fread4`, `getf`, `freadDouble`, `freadInt`, `freadLong`, `freadShort`,
+//!   `freadIntEx`, `freadFloatEx`, `freadDoubleEx`, `freadShortEx`, `freadFloat`, `fwrite1`,
+//!   `fwrite2`, `fwrite3`, `fwrite4`, `putf`, `fwriteShort`, `fwriteInt`, `fwriteLong`,
+//!   `fwriteFloat`, `fwriteDouble`) and on a znzlib file (`znzread1` to `znzread4`,
 //!   `znzreadShort`, `znzreadInt`, `znzreadLong`, `znzreadFloat`, `znzreadDouble`,
-//!   `znzreadIntEx`, `znzreadFloatEx`, `znzwriteShort`, `znzwriteUShort`, `znzwriteInt`,
-//!   `znzwriteLong`, `znzwriteFloat`, `znzwriteDouble`): the number's bytes as x86-64's memory
-//!   holds them, reversed; a read the file cannot complete keeps the bytes it got (FS-49 and
-//!   FS-167: the others are memory contents in FreeSurfer, 0 here);
+//!   `znzreadIntEx`, `znzreadFloatEx`, `znzreadDoubleEx`, `znzreadShortEx`, `znzwrite1` to
+//!   `znzwrite4`, `znzwriteShort`, `znzwriteUShort`, `znzwriteInt`, `znzwriteLong`,
+//!   `znzwriteFloat`, `znzwriteDouble`): the number's bytes as x86-64's memory holds them,
+//!   reversed; a read the file cannot complete keeps the bytes it got (FS-49 and FS-167: the
+//!   others are memory contents in FreeSurfer, 0 here);
 //! - the name helpers `fio_dirname`, `fio_basename`, `fio_extension` (FS-168) and the file tests
 //!   `fio_DirIsWritable` (FS-169), `fio_FileExistsReadable`, `fio_IsDirectory`;
 //! - `TSV::read`, `TSV::print`, `TSV::write` (FS-170 to FS-173) on
@@ -78,6 +81,63 @@ pub fn fread3(fp: &mut CFile) -> (i32, i32) {
     (ret, ((i >> 8) & 0xff_ffff) as i32)
 }
 
+/// `fread4(&v, fp)`: a big-endian `float`; the count read (1 or 0) and the value (FS-167: the
+/// missing bytes of a short read).
+pub fn fread4(g: &mut Globals, fp: &mut CFile) -> (i32, f32) {
+    let (ret, b, got) = fread_n(fp, [0u8; 4]);
+    if got < 4 {
+        memory(g, &FS_167, "fread4", got, 4);
+    }
+    (ret, f32::from_be_bytes(b))
+}
+
+/// `getf(fp)`: a big-endian `float`; `getf: fread failed` (an error) when the file does not hold
+/// it (FS-167).
+pub fn getf(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile) -> f32 {
+    let (ret, b, got) = fread_n(fp, [0u8; 4]);
+    if ret != 1 {
+        log::error_printf(g, err, ERROR_BADFILE, "getf: fread failed");
+    }
+    if got < 4 {
+        memory(g, &FS_167, "getf", got, 4);
+    }
+    f32::from_be_bytes(b)
+}
+
+/// `freadShort(fp)`: a big-endian `short`; `freadShort: fread failed` (an error) when the file
+/// does not hold it (FS-167).
+pub fn fread_short(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile) -> i16 {
+    let (ret, b, got) = fread_n(fp, [0u8; 2]);
+    if ret != 1 {
+        log::error_printf(g, err, ERROR_BADFILE, "freadShort: fread failed");
+    }
+    if got < 2 {
+        memory(g, &FS_167, "freadShort", got, 2);
+    }
+    i16::from_be_bytes(b)
+}
+
+/// `freadFloatEx(&f, fp)`: as [`fread_int_ex`] for a `float` (its bits are only moved).
+pub fn fread_float_ex(fp: &mut CFile, pf: &mut f32) -> i32 {
+    let (ret, b, _) = fread_n(fp, pf.to_le_bytes());
+    *pf = f32::from_be_bytes(b);
+    ret
+}
+
+/// `freadDoubleEx(&d, fp)`: as [`fread_int_ex`] for a `double`.
+pub fn fread_double_ex(fp: &mut CFile, pd: &mut f64) -> i32 {
+    let (ret, b, _) = fread_n(fp, pd.to_le_bytes());
+    *pd = f64::from_be_bytes(b);
+    ret
+}
+
+/// `freadShortEx(&s, fp)`: as [`fread_int_ex`] for a `short`.
+pub fn fread_short_ex(fp: &mut CFile, ps: &mut i16) -> i32 {
+    let (ret, b, _) = fread_n(fp, ps.to_le_bytes());
+    *ps = i16::from_be_bytes(b);
+    ret
+}
+
 /// `freadDouble(fp)`: a big-endian `double`; `freadDouble: fread failed` (an error) when the file
 /// does not hold it (FS-49: its missing bytes).
 pub fn fread_double(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile) -> f64 {
@@ -136,6 +196,11 @@ pub fn fread_float(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile) -> f32 
     f32::from_be_bytes(b)
 }
 
+/// `fwrite1(v, fp)`: the low byte of `v`; the count written.
+pub fn fwrite1(fp: &mut CFile, v: i32) -> i32 {
+    fp.fwrite(&[v as u8], 1, 1) as i32
+}
+
 /// `fwrite2(v, fp)`: `v` clamped to [-32767, 32767] as a big-endian `short`; the count written.
 pub fn fwrite2(fp: &mut CFile, v: i32) -> i32 {
     let s = v.clamp(-0x7fff, 0x7fff) as i16;
@@ -146,6 +211,21 @@ pub fn fwrite2(fp: &mut CFile, v: i32) -> i32 {
 pub fn fwrite3(fp: &mut CFile, v: i32) -> i32 {
     let b = [(v >> 16) as u8, (v >> 8) as u8, v as u8];
     fp.fwrite(&b, 3, 1) as i32
+}
+
+/// `fwrite4(v, fp)`: a big-endian `int` (as `fwriteInt`).
+pub fn fwrite4(fp: &mut CFile, v: i32) -> i32 {
+    fp.fwrite(&v.to_be_bytes(), 4, 1) as i32
+}
+
+/// `putf(f, fp)`: a big-endian `float` (its bits are only moved); the count written.
+pub fn putf(fp: &mut CFile, f: f32) -> i32 {
+    fp.fwrite(&f.to_be_bytes(), 4, 1) as i32
+}
+
+/// `fwriteShort(s, fp)`: a big-endian `short`.
+pub fn fwrite_short(fp: &mut CFile, s: i16) -> i32 {
+    fp.fwrite(&s.to_be_bytes(), 2, 1) as i32
 }
 
 /// `fwriteInt(v, fp)`: a big-endian `int`.
@@ -161,6 +241,11 @@ pub fn fwrite_long(g: &mut Globals, fp: &mut CFile, v: i64) -> i32 {
 /// `fwriteFloat(f, fp)`: a big-endian `float`.
 pub fn fwrite_float(fp: &mut CFile, f: f32) -> i32 {
     fp.fwrite(&f.to_be_bytes(), 4, 1) as i32
+}
+
+/// `fwriteDouble(d, fp)`: a big-endian `double`.
+pub fn fwrite_double(fp: &mut CFile, d: f64) -> i32 {
+    fp.fwrite(&d.to_be_bytes(), 8, 1) as i32
 }
 
 /// `znzread(buf, size, nmemb, fp)` as FreeSurfer's own copy of znzlib (`packages/nifti/znzlib.c`,
@@ -249,6 +334,33 @@ pub fn znzread1(g: &mut Globals, fp: &mut ZnzFile) -> (i32, i32) {
     (ret, i32::from(b[0]))
 }
 
+/// `znzread2(&v, fp)`: a big-endian `short`, widened with its sign; the count read (-1 for
+/// zlib's error) and the value (FS-167).
+pub fn znzread2(g: &mut Globals, fp: &mut ZnzFile) -> (i32, i32) {
+    let (ret, b, got) = znzread_n(fp, [0u8; 2]);
+    if got < 2 {
+        memory(g, &FS_167, "znzread2", got, 2);
+    }
+    (ret, i32::from(i16::from_be_bytes(b)))
+}
+
+/// `znzread3(&v, fp)`: a big-endian 3-byte unsigned number (a short read's missing bytes are 0:
+/// FreeSurfer clears the number first).
+pub fn znzread3(fp: &mut ZnzFile) -> (i32, i32) {
+    let (ret, b, _) = znzread_n(fp, [0u8; 3]);
+    let i = u32::from_be_bytes([b[0], b[1], b[2], 0]);
+    (ret, ((i >> 8) & 0xff_ffff) as i32)
+}
+
+/// `znzread4(&v, fp)`: a big-endian `float` (FS-167).
+pub fn znzread4(g: &mut Globals, fp: &mut ZnzFile) -> (i32, f32) {
+    let (ret, b, got) = znzread_n(fp, [0u8; 4]);
+    if got < 4 {
+        memory(g, &FS_167, "znzread4", got, 4);
+    }
+    (ret, f32::from_be_bytes(b))
+}
+
 /// `znzreadDouble(fp)`: a big-endian `double` (`znzreadDouble: znzread failed`: see
 /// [`znz_failed`]; FS-167).
 pub fn znz_read_double(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> f64 {
@@ -298,6 +410,20 @@ pub fn znz_read_float_ex(fp: &mut ZnzFile, pf: &mut f32) -> i32 {
     ret
 }
 
+/// `znzreadDoubleEx(&d, fp)`: as [`znz_read_float_ex`] for a `double`.
+pub fn znz_read_double_ex(fp: &mut ZnzFile, pd: &mut f64) -> i32 {
+    let (ret, b, _) = znzread_n(fp, pd.to_le_bytes());
+    *pd = f64::from_be_bytes(b);
+    ret
+}
+
+/// `znzreadShortEx(&s, fp)`: as [`znz_read_float_ex`] for a `short`.
+pub fn znz_read_short_ex(fp: &mut ZnzFile, ps: &mut i16) -> i32 {
+    let (ret, b, _) = znzread_n(fp, ps.to_le_bytes());
+    *ps = i16::from_be_bytes(b);
+    ret
+}
+
 /// `znzreadIntEx(&i, fp)`: as [`znz_read_float_ex`] for an `int`.
 pub fn znz_read_int_ex(fp: &mut ZnzFile, pi: &mut i32) -> i32 {
     let (ret, b, _) = znzread_n(fp, pi.to_le_bytes());
@@ -320,6 +446,26 @@ pub fn znz_read_float(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) ->
 
 fn znzwrite_bytes(fp: &mut ZnzFile, b: &[u8]) -> i32 {
     fs_znzwrite(fp, b, b.len(), 1) as i32
+}
+
+/// `znzwrite1(v, fp)`: the low byte of `v`; the count written.
+pub fn znzwrite1(fp: &mut ZnzFile, v: i32) -> i32 {
+    znzwrite_bytes(fp, &[v as u8])
+}
+
+/// `znzwrite2(v, fp)`: `v` clamped to [-32767, 32767] as a big-endian `short`.
+pub fn znzwrite2(fp: &mut ZnzFile, v: i32) -> i32 {
+    znzwrite_bytes(fp, &(v.clamp(-0x7fff, 0x7fff) as i16).to_be_bytes())
+}
+
+/// `znzwrite3(v, fp)`: the low 24 bits of `v`, big-endian.
+pub fn znzwrite3(fp: &mut ZnzFile, v: i32) -> i32 {
+    znzwrite_bytes(fp, &[(v >> 16) as u8, (v >> 8) as u8, v as u8])
+}
+
+/// `znzwrite4(v, fp)`: a big-endian `int`.
+pub fn znzwrite4(fp: &mut ZnzFile, v: i32) -> i32 {
+    znzwrite_bytes(fp, &v.to_be_bytes())
 }
 
 /// `znzwriteShort(s, fp)`: a big-endian `short`; the count written.
@@ -853,6 +999,49 @@ mod tests {
             f.into_bytes(),
             vec![
                 0x7f, 0xff, 0x80, 0x01, 0xff, 0xff, 0xff, 1, 2, 3, 4, 0x3f, 0x80, 0, 0
+            ]
+        );
+    }
+
+    #[test]
+    fn surface_readers_and_writers() {
+        let mut gl = g(UpstreamDefects::Fix);
+        let mut e = Vec::new();
+        // a signalling NaN's bits come through unchanged (the bytes are only moved)
+        let mut f = CFile::from_bytes(vec![
+            0x7f, 0x80, 0, 1, 0x40, 0x49, 0x0f, 0xdb, 0x12, 0x34, 0xab,
+        ]);
+        let (r, v) = fread4(&mut gl, &mut f);
+        assert_eq!((r, v.to_bits()), (1, 0x7f80_0001));
+        assert_eq!(getf(&mut gl, &mut e, &mut f).to_bits(), 0x4049_0fdb);
+        assert_eq!(fread_short(&mut gl, &mut e, &mut f), 0x1234);
+        assert!(e.is_empty() && gl.notices.as_slice().is_empty());
+        let (r, v) = fread4(&mut gl, &mut f);
+        assert_eq!((r, v.to_bits()), (0, 0xab00_0000));
+        assert!(gl.notices.contains(&FS_167));
+        let mut f = CFile::from_bytes(vec![0x01]);
+        assert_eq!(fread_short(&mut gl, &mut e, &mut f), 0x0100);
+        assert!(String::from_utf8_lossy(&e).contains("freadShort: fread failed"));
+        // the Ex readers keep the caller's bytes where the file ended
+        let mut f = CFile::from_bytes(vec![0xaa]);
+        let mut s: i16 = 0x1122;
+        assert_eq!(fread_short_ex(&mut f, &mut s), 0);
+        assert_eq!(s as u16, 0xaa11);
+        let mut f = CFile::from_bytes(vec![0x3f, 0xf0, 0, 0, 0, 0, 0, 0]);
+        let mut d = 0.0f64;
+        assert_eq!(fread_double_ex(&mut f, &mut d), 1);
+        assert_eq!(d, 1.0);
+        let mut w = CFile::memory_writer();
+        assert_eq!(fwrite1(&mut w, 0x1ff), 1);
+        assert_eq!(fwrite4(&mut w, -2), 1);
+        assert_eq!(putf(&mut w, f32::from_bits(0x7f80_0001)), 1);
+        assert_eq!(fwrite_short(&mut w, -2), 1);
+        assert_eq!(fwrite_double(&mut w, -2.0), 1);
+        assert_eq!(
+            w.into_bytes(),
+            vec![
+                0xff, 0xff, 0xff, 0xff, 0xfe, 0x7f, 0x80, 0, 1, 0xff, 0xfe, 0xc0, 0, 0, 0, 0, 0, 0,
+                0
             ]
         );
     }

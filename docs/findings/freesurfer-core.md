@@ -177,6 +177,42 @@ no range check; beyond the `int` range or NaN `cvttsd2si` gives `INT_MIN`. Defau
   `TZ` rule to the UTC year and, before 1970, uses 1970's change times (northern rules never in
   daylight time, southern ones always).
 
+## FS-261 to FS-263 (track E relay 1's report; the replica's side, track A relay 12)
+
+From track E's handoff (the source and its open probe `validation/investigations/freesurfer-core-probe/`,
+whose prebuilt `fs_core_probe` this relay ran as a black box for the unit tests' numbers):
+
+- **FS-261** (rule A). `utils/machine.cpp` 240-317: `ByteSwap2`, `ByteSwap4`, `ByteSwap8` loop
+  `for (n = 0; n < nitems; n += k)` while moving the pointer one item per pass, so they swap
+  `ceil(nitems / k)` items; `ByteSwapBuf` (215-234) passes the item count. Callers: `utils/imautils.cpp`
+  77 (`imaLoadVal`, one item: correct) and 623 (`imaReadPixelData`, `npixels` shorts: only the first
+  half of the pixels swapped). The replica (`machine::byte_swap_buf`, `byte_swap2/4/8`): every item by
+  default, FreeSurfer's first `ceil(n / k)` with `reproduce`, noted where they differ (more than one
+  item); items beyond the buffer are never touched (FreeSurfer would write past it). Measured with
+  `fs_core_probe batch` (2026-11-13): `byteswapbuf 2 4 0102030405060708` gives `0201040305060708`,
+  `4 3` of 12 bytes swaps the first item only, `8 2` the first, `2 5` the first three; `k = 3` prints
+  `ERROR: ByteSwapBuf: nBytesPerItem = 3 not supported` and returns 1; counts 0 and -1 swap nothing:
+  the unit test `machine::tests::fs261_a_buffer_swap` holds these lines.
+- **FS-262 is FS-176.** `swapLong64` (37-53) stores the reversed 64-bit integer in a `double` before
+  returning it; the replica has had it since relay 10 (`machine::swap_long64`, with FS-176's switch and
+  notice, the readers' and writers' defect: `freadLong`, `fwriteLong`, `znzreadLong`, `znzwriteLong`
+  are its only callers). Track E's FS-262 describes the same behaviour from the function's side (its
+  branch predated relay 10's merge): one ID should be retired (recommendation: keep FS-176, which the
+  register's handoff of relay 10 and the replica's notices already use; FS-262's text could become
+  FS-176's). The replica keeps noting FS-176.
+- **FS-263** (rule A). `include/log.h` 45-54: `fs::fatal`'s destructor calls `detail::errorExit`
+  (`utils/log.cpp` 99-106), which with exceptions on throws the code; a destructor is `noexcept` in
+  C++11, so `std::terminate` runs: libstdc++'s verbose handler prints `terminate called after throwing
+  an instance of 'int'` on standard error and aborts (status 134). `ErrorExit` ends through
+  `fs::fatal` too, so both paths abort. Code 0 neither throws nor exits. The replica
+  (`log::error_exit_code`): by default `Fatal::Throw(code)` reaches the program's handler; `reproduce`
+  writes the terminate line and ends with 134 (`Fatal::Exit(134)`, as FS-03's 139). Measured with
+  `fs_core_probe` (2026-11-13): `fatal 7 f7 throw` gives `error: f7`, the terminate line, status 134;
+  `errorexit 2 3 bad throw` gives `error: No such file or directory`, `error: bad` with FS-01's NUL,
+  the terminate line, 134; `fatal 0 f7 throw` returns (`error: f7`, status 0). Programs that switch
+  exceptions on: `mri_ca_train` (its `catch(...)` writes the done file) and the Python bindings; none on
+  recon-all's or fMRIPrep's default paths.
+
 ## The register's texts before the open-files rewrite (2026-11-13)
 
 The orchestrator's rule of 2026-11-13 ("open files carry behaviour only", the foundations' brief):

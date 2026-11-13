@@ -427,6 +427,7 @@ const COMMANDS: &[&str] = &[
     "powell",
     "powell2",
     "dfpmin",
+    "xyzang",
 ];
 
 /// The minimizers' problems (`fsmaths.cpp`'s `Problem`, the same float expressions): 0 a
@@ -1112,6 +1113,27 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             s.push(fx(g.f(-7, 7, 4096)));
             s.push(g.int(0, 3).to_string());
             put_mat(&mut s, g, n, n, false);
+        }
+        "xyzang" => {
+            // a unit vector and a vector of known length, NaNs of several payloads and both signs
+            // meeting in the products (the official build's operand order decides which comes out)
+            const NANS: [u32; 6] = [
+                0x7fc0_0001,
+                0xffc0_0002,
+                0x7f80_0003,
+                0xff81_2345,
+                0x7fc1_2345,
+                0xffd0_0001,
+            ];
+            for k in 0..7 {
+                let v = match g.below(6) {
+                    0 | 1 => f32::from_bits(g.pick(&NANS)),
+                    2 => g.pick(&[f32::INFINITY, f32::NEG_INFINITY, 0.0, -0.0]),
+                    _ if k == 6 => g.pick(&[1.0f32, 0.5, 2.0, 1e-30]),
+                    _ => g.f(-64, 64, 16),
+                };
+                s.push(fx(v));
+            }
         }
         "mvec" => {
             let n = g.int(3, 6);
@@ -2146,6 +2168,15 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             let v1 = t.m(g, MATRIX_REAL);
             let v2 = t.m(g, MATRIX_REAL);
             o.d(mo::vector3_angle(g, &mut se, &v1, &v2));
+        }
+        "xyzang" => {
+            let n = mo::Xyz {
+                x: t.f(),
+                y: t.f(),
+                z: t.f(),
+            };
+            let (x2, y2, z2, norm) = (t.f(), t.f(), t.f(), t.f());
+            o.f(mo::xyz_approx_angle_known_length(&n, x2, y2, z2, norm));
         }
         "mgauss" => {
             let len = t.i();

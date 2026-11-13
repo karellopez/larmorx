@@ -16,16 +16,33 @@ code: none in these files (FreeSurfer's own: Bruce Fischl, Douglas Greve).
 
 | file (FreeSurfer 8.2.0) | functions (lines) | module |
 |---|---|---|
-| `utils/fio.cpp` | `fread1` (73), `fread2` (83), `fread3` (96), `fwrite2` (129), `fwrite3` (144), `freadDouble` (169), `freadInt` (182), `freadLong` (194), `freadIntEx` (249), `fwriteInt` (270), `fwriteLong` (278), `freadFloat` (287), `fwriteFloat` (306), `znzread1` (334), `znzwriteShort` (423), `znzwriteUShort` (431), `znzreadDouble` (439), `znzreadInt` (455), `znzreadLong` (469), `znzreadShort` (484), `znzreadFloatEx` (512), `znzreadIntEx` (532), `znzwriteInt` (553), `znzwriteLong` (561), `znzreadFloat` (570), `znzwriteFloat` (589), `znzwriteDouble` (603), `fio_dirname` (616), `fio_basename` (674), `fio_extension` (728), `fio_DirIsWritable` (762), `fio_FileExistsReadable` (783), `fio_IsDirectory` (797), `TSV::read` (1034), `TSV::print` (1103), `TSV::write` (1119) | `fio` |
+| `utils/fio.cpp` | `putf` (52), `getf` (60), `fread1` (73), `fread2` (83), `fread3` (96), `fread4` (109), `fwrite1` (122), `fwrite2` (129), `fwrite3` (144), `fwrite4` (154), `fwriteShort` (162), `freadDouble` (169), `freadInt` (182), `freadLong` (194), `freadShort` (207), `freadFloatEx` (229), `freadDoubleEx` (239), `freadIntEx` (249), `freadShortEx` (259), `fwriteInt` (270), `fwriteLong` (278), `freadFloat` (287), `fwriteFloat` (306), `fwriteDouble` (320), `znzread1` (334), `znzread2` (344), `znzread3` (357), `znzread4` (370), `znzwrite1` (383), `znzwrite2` (390), `znzwrite3` (405), `znzwrite4` (415), `znzwriteShort` (423), `znzwriteUShort` (431), `znzreadDouble` (439), `znzreadInt` (455), `znzreadLong` (469), `znzreadShort` (484), `znzreadFloatEx` (512), `znzreadDoubleEx` (522), `znzreadIntEx` (532), `znzreadShortEx` (542), `znzwriteInt` (553), `znzwriteLong` (561), `znzreadFloat` (570), `znzwriteFloat` (589), `znzwriteDouble` (603), `fio_dirname` (616), `fio_basename` (674), `fio_extension` (728), `fio_DirIsWritable` (762), `fio_FileExistsReadable` (783), `fio_IsDirectory` (797), `TSV::read` (1034), `TSV::print` (1103), `TSV::write` (1119) | `fio` |
 | `packages/nifti/znzlib.c` (FreeSurfer's copy of znzlib, public domain) | `znzread`, `znzwrite` (the compressed branch: one `gzread`/`gzwrite`, the count over the member size) | `fio::fs_znzread`, `fs_znzwrite`, on `larmorx_io::znz`'s zlib layer |
 | `utils/bfileio.cpp` | `byteswapbufdouble` (51), `byteswapbuffloat` (81), `byteswapbufshort` (103) | `bfileio` |
 | `utils/MRIio_old.cpp` | `MGHprint_error` (29), `lcalloc` (44) | `mriio_old` |
 | (larmorx's own) | C's `FILE` as these functions use it: `fopen`'s modes and `errno`, `fread`/`fwrite` of members, `getc`, `fgets`, `feof`, `ferror`, `fclose`, `scanf`'s input; written from ISO C 7.21 and glibc 2.35's measured behaviour | `cfile` |
 
-Not reached by any default-path program, so not translated: `MGHopen_file`, `putf`, `getf`,
-`fread4`, `fwrite1`, `fwrite4`, `fwriteShort`, `freadShort`, `freadFloatEx`, `freadDoubleEx`,
-`freadShortEx`, `fwriteDouble`, `znzread2/3/4`, `znzwrite1/2/3/4`, `znzreadDoubleEx`,
-`znzreadShortEx`, `fio_NLines`, `fio_pushd`, `fio_popd`, `fio_fullpath`, `fio_mkdirp`,
+Queue item 3.1-25, piece 2 (track A, relay 11), with tags.cpp (3.1-30) and colortab.cpp's binary
+tables (3.1-33) taken early (the orchestrator's decision of 2026-11-13). Audited for third-party
+code: none (FreeSurfer's own: tags.cpp and mri.h by Bruce Fischl, colortab.cpp by Kevin Teich and Bruce Fischl, fstagsio.cpp without an author line; the General Hospital Corporation's copyright).
+
+| file (FreeSurfer 8.2.0) | functions (lines) | module |
+|---|---|---|
+| `utils/tags.cpp` | `TAGskip` (35), `TAGreadStart` (51), `TAGread` (75), `TAGwriteStart` (86), `TAGwrite` (99), `TAGwriteEnd` (109), `TAGmakeCommandLineString` (124), `TAGreadMatrix` (179), `TAGwriteMatrix` (195), `znzTAGreadStart` (250), `znzTAGwriteStart` (298), `znzTAGwriteEnd` (325), `znzWriteMatrix` (349), `znzReadMatrix` (405); `include/tags.h`'s tag numbers and `MATRIX_STRLEN` | `tags` |
+| `utils/fstagsio.cpp` | `FStagsIO`'s 43 functions (22-1195: the `getlen_*`, `write_*`, `read_*`, `skip_tag`, the NIfTI extension's matrix and frame forms) | `fstagsio` |
+| `include/mri.h` | `VOL_GEOM::write` (512), `VOL_GEOM::read` (562) | `fstagsio::vol_geom_write`, `vol_geom_read` |
+| `utils/colortab.cpp` | `CTABreadFromBinary` (352), `CTABwriteIntoBinary` (390), `CTABreadFromBinaryV1` (573), `CTABwriteIntoBinaryV1` (668), `CTABreadFromBinaryV2` (707), `CTABwriteIntoBinaryV2` (825), `znzCTABreadFromBinary` (889), `znzCTABwriteIntoBinary` (927), `znzCTABreadFromBinaryV1` (951), `znzCTABwriteIntoBinaryV1` (1042), `znzCTABreadFromBinaryV2` (1081), `znzCTABwriteIntoBinaryV2` (1195) | `colortab_bin` |
+
+Not translated from tags.cpp (unreached): `TAGwriteCommandLine`, `TAGwriteAutoAlign`, `znzTAGskip`
+(`FStagsIO::skip_tag` is its reached copy), `znzTAGwrite`, `znzTAGwriteCommandLine`, `znzTAGreadFloat`,
+`znzWriteAutoAlignMatrix`, `znzReadAutoAlignMatrix`.
+
+The one-number readers and writers the inventory does not list as reached (`putf`, `getf`, `fread4`,
+`fwrite1`, `fwrite4`, `fwriteShort`, `freadShort`, the other `Ex` readers, `fwriteDouble`, `znzread2/3/4`,
+`znzwrite1/2/3/4`, `znzreadDoubleEx`, `znzreadShortEx`) are translated all the same (relay 12): the
+surface files' readers and writers (`fs.surfio`, `mrisurf_io.cpp`) and `vlabels.cpp` call them.
+
+Not reached by any default-path program, so not translated: `MGHopen_file`, `fio_NLines`, `fio_pushd`, `fio_popd`, `fio_fullpath`, `fio_mkdirp`,
 `fio_FileHasCarriageReturn`, `makelocallink`, `TSV::IsTSVExt` (`mri_glmfit` only); `lmalloc`,
 `file_name`, `buffer_to_image`, `image_to_buffer`; `bfileio.cpp`'s bfile readers.
 
@@ -43,5 +60,12 @@ Not reached by any default-path program, so not translated: `MGHopen_file`, `put
   `std::string`s hold them.
 - `TSV::print`'s formats are printed by `larmorx-freesurfer-core::cstd::format_double` (`%f`, `%e`,
   `%g` and their flags, as glibc; `%a` refused).
+- Piece 2: FS-177 to FS-194 (`docs/findings/freesurfer-io.md` Part 2). The skippers and the colour
+  table readers never allocate a length or a count before reading: they read what the file holds
+  (FS-178, FS-191), with the impossible lengths' exit kept and counts above 2^20 (version 1) or 2^24
+  (version 2) refused. `TAGread`, `read_data` take the caller's buffer as a slice: bytes beyond it are
+  read and dropped. `FStagsIO` holds the znz file it writes (`FsTagsIo { fp, niftiheaderext }`); the
+  frames' matrix and the labels are Rust values (`Matrix`, `labels[(x * y0 + y) * z0 + z]`).
+- `CFile::tell` (`ftell`) for `TAGwriteStart`'s position.
 - `lcalloc` returns a vector of the caller's element type (`nmemb` elements; the C `size` is checked
   for the product's overflow).

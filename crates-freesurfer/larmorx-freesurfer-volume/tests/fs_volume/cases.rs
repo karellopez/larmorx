@@ -28,6 +28,7 @@ use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::deriv as dv;
 use larmorx_freesurfer_volume::ltaread as lr;
+use larmorx_freesurfer_volume::resample as rsm;
 use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
 use larmorx_freesurfer_volume::sample as sm;
@@ -1383,6 +1384,117 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "rsfill" => {
+                // 1 case in 12: an 8 x 8 x 8 source voting into one template voxel that holds it
+                // all (counts past 255)
+                let special = g.chance(12);
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(10) {
+                    s.hdr = false;
+                }
+                if special {
+                    s = Shape {
+                        w: 8,
+                        h: 8,
+                        d: 8,
+                        ty: g.pick(&[3, 3, 0]),
+                        nf: g.int(1, 2),
+                        hdr: false,
+                        drop: false,
+                    };
+                }
+                let at = t.len();
+                vol_of(&mut g, &mut t, s);
+                let mut o = like(&mut g, s);
+                o.hdr = g.chance(5);
+                if g.chance(4) {
+                    o.nf = g.int(0, 3);
+                }
+                if special {
+                    (o.w, o.h, o.d, o.nf) = (1, 1, 1, 1);
+                }
+                let at2 = t.len();
+                vol_of(&mut g, &mut t, o);
+                // the geometries' tokens (after w h d type frames hdr seed): 4-6 the voxel sizes,
+                // 7 ras_good_flag, 8-16 the cosines, 17-19 the centre, 20-22 s_ras
+                let (gs, gt) = (at + 7, at2 + 7);
+                let tf = |tok: &str| f32::from_bits(u32::from_str_radix(tok, 16).expect("a float"));
+                if special {
+                    for (base, size, c) in [(gs, 1.0f32, 0.0f32), (gt, 8.0, 4.0)] {
+                        for k in 4..=6 {
+                            t[base + k] = fx(size);
+                        }
+                        t[base + 7] = "1".into();
+                        for k in 0..9 {
+                            t[base + 8 + k] = fx(if k % 4 == 0 { 1.0 } else { 0.0 });
+                        }
+                        for k in 17..=19 {
+                            t[base + k] = fx(c);
+                        }
+                    }
+                } else if !g.chance(3) {
+                    // the template on the source's grid, its voxels scaled and its centre moved
+                    for k in 4..=22 {
+                        t[gt + k] = t[gs + k].clone();
+                    }
+                    let f = g.pick(&[1.0f32, 1.0, 2.0, 0.5, 1.5]);
+                    for k in 4..=6 {
+                        t[gt + k] = fx(tf(&t[gs + k]) * f);
+                    }
+                    for k in 17..=19 {
+                        t[gt + k] = fx(tf(&t[gs + k]) + g.pick(&[0.0f32, 0.0, 0.5, -1.0, 2.25]));
+                    }
+                }
+                let ty = if special {
+                    6
+                } else {
+                    g.pick(&[0, 1, 1, 1, 2, 3, 4, 6, 6, 7])
+                };
+                t.push(ty.to_string());
+                t.push(fx(fval(&mut g)));
+                t.push(i64::from(g.chance(5)).to_string());
+                t.push(i64::from(g.chance(12)).to_string());
+            }
+            "repval" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 0;
+                }
+                if !g.chance(8) {
+                    s.hdr = false;
+                }
+                let at = t.len();
+                vol_of(&mut g, &mut t, s);
+                let mode = g.pick(&[0, 0, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                if g.chance(3) {
+                    // MRIreplaceValuesUchar: often the source's first byte
+                    t.push("1".into());
+                    let seed: u64 = t[at + 6].parse().expect("a seed");
+                    let first = (seed * 101) & 0xff;
+                    t.push(
+                        g.pick(&[first as i64, first as i64, 0, 7, 255, 300, -1])
+                            .to_string(),
+                    );
+                    t.push(g.pick(&[0i64, 1, 128, 255, 256, -5]).to_string());
+                } else {
+                    t.push("0".into());
+                    let v = if g.chance(2) {
+                        f32::from_bits(g.pick(&FTAB))
+                    } else {
+                        fval(&mut g)
+                    };
+                    t.push(fx(v));
+                    t.push(fx(fval(&mut g)));
+                }
+            }
             "lxf" | "rsmat" => {
                 let mut s = shape(&mut g);
                 if g.chance(3) {
@@ -1716,7 +1828,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 93] = [
+pub const COMMANDS: [&str; 95] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -1810,6 +1922,8 @@ pub const COMMANDS: [&str; 93] = [
     "nbrs",
     "lxf",
     "rsmat",
+    "rsfill",
+    "repval",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -3058,6 +3172,42 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             };
             o.ret(&r, dst.as_ref());
         }
+        "rsfill" => {
+            let src = get_vol(cx, t)?;
+            let tmpl = get_vol(cx, t)?;
+            let (ty, fill, plain) = (t.i(), t.f(), t.i());
+            if t.i() != 0 {
+                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW
+                    | larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if plain != 0 {
+                rsm::mri_resample(g, a, b, &src, &tmpl, ty as i32)?
+            } else {
+                rsm::mri_resample_fill(g, a, b, &src, &tmpl, ty as i32, fill)?
+            };
+            o.vol(r.as_ref());
+        }
+        "repval" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let uchar = t.i() != 0;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let r = if uchar {
+                let (x, y) = (t.i() as u8, t.i() as u8);
+                ar::mri_replace_values_uchar(g, a, b, p, x, y)?
+            } else {
+                let (x, y) = (t.f(), t.f());
+                ar::mri_replace_values(g, a, b, p, x, y)?
+            };
+            let given = match mode {
+                1 => dst.as_ref(),
+                2 => Some(&src),
+                _ => None,
+            };
+            o.ret(&r, given);
+        }
         "rsmat" => {
             let src = get_vol(cx, t)?;
             let tmpl = get_vol(cx, t)?;
@@ -3157,6 +3307,8 @@ pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>
         a: shared.clone(),
         b: shared.clone(),
     };
+    // fsvolume's Progname
+    cx.g.progname = "fsvolume".to_owned();
     let mut t = Toks {
         t: line.split_whitespace().collect(),
         i: 0,

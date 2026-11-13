@@ -9,7 +9,7 @@ filled from the source as behaviour (§0, §3, §5.1, §18.2, §19), the defects
 `larmorx_core::defects` checked. Amended by its relay 4 (2026-11-13), from the clean room's
 black-box runs: §17.1, §17.2 and §17.4 (which matrices with infinite or NaN entries make FreeSurfer
 hang and which it finishes, with their results under `reproduce`), §18.2 (the bytes of a file cut
-short under `reproduce`). What black-box runs confirmed is marked
+short under `reproduce`), §8.8 (the ports' NaNs). What black-box runs confirmed is marked
 **(observed)**, with the probe command or the comparison group behind it.
 
 **Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
@@ -680,7 +680,10 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
 
 The decompositions are ITK 4.13.2's VNL in **float** (the main package's ports, `larmorx_core::vnl_fixed`
 and `larmorx_core::vnl_qr`: `vnl_det` and `vnl_inverse` of 2 to 4 rows, `vnl_determinant`,
-`vnl_qr<float>`), on the matrix's numbers row by row.
+`vnl_qr<float>`), on the matrix's numbers row by row. Their NaNs are the official build's (x86-64's
+rules in the operand order GCC 8.4.0 gave VNL: the ports carry it): **(observed)** every line of §23's
+`minverse` group with an infinite or NaN input whose numbers are printed (20 inverses of 2 to 7 rows
+into a given matrix, 20 determinants, 22 QR factorizations) holds the ports' bits.
 
 - **Determinant** (m): 0 when not square; one element: itself; 2 to 4 rows: VNL's closed-form
   determinant in float; more: VNL's QR determinant in float. **FS-33:** a 0 x 0 matrix: FreeSurfer

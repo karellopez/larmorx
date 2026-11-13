@@ -176,7 +176,8 @@ two columns of one array). `larmorx_core::vnl_qr`'s generic kernels (`dot_t`, `a
 the QR's `Q`, `R`, determinant, `QᵀB`, solution (and its message) and inverse of matrices of 1 to
 12 rows and columns with special entries, and `vnl_determinant` of 5 to 12 rows; every value bit
 for bit. Scale 1: 80,600 cases, 13,685,621 values, 0 differences (36 one-row solves of a zero
-entry, never written by VNL: ITK-113, not compared); the same with the port computing as on
+entry, never written by VNL: ITK-113, not compared); scale 20 (log
+`oracles/logs/fs-found-c-r10-qrnan-20b.log`): 1,600,600 cases, 260,340,238 values, 0 differences; the same with the port computing as on
 AArch64 (`NAN_TRAP_ARM=exe`, 310,960 NaNs given AArch64's sign): 0 differences; one product
 pattern of `sdot`'s second lone block changed: 153 differences (the check sees the order). The unit
 test `vnl_qr::tests::nan_bits_are_x86_64s` (a digest of kernel calls and QRs on NaNs) passes

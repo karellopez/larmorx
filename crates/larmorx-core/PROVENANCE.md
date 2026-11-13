@@ -519,7 +519,7 @@ Nocedal's L-BFGS from netlib as VXL distributes them, f2c-translated; every file
   and `/` of `Qr<T>` and its kernels in the operand order of the unit oracle's build (GCC 8.4.0,
   `-O3`), read from its object code by running the kernels on NaNs with distinct payloads, with
   x86-64's NaNs (`ItkReal::sse_*`): `fs-vnl`'s family `qrnan`, 0 differences in 13,685,621 values
-  at scale 1 (kernel NaN orders for every length to 300, QRs of 1 to 12 rows and columns with
+  at scale 1 and 260,340,238 at scale 20 (kernel NaN orders for every length to 300, QRs of 1 to 12 rows and columns with
   special entries, `vnl_determinant` of 5 to 12 rows), also with the port computing as on AArch64;
   `vnl_qr::tests::nan_bits_are_x86_64s` under `NAN_TRAP_ARM=1`, debug and release (F-VNLN-5);
 - `src/vnl_fixed.rs` (for `float`, and `determinant_balanced`): `core/vnl/vnl_det.hxx`

@@ -19,7 +19,15 @@
   (`MRISdiffSimple`), `temps` (`MRIS_acquireTemp` & co), `fpv` (`MRISmakeFloatPerVertex`),
   `names` (the integrator's file names, `NEG_AREA_K`) and `surf` (a surface from the case, 1 to 5
   of 34 operations: `mrisurf_metricProperties.cpp`'s coordinate operations, the distances' storage
-  of `mrisurf_base.cpp`, `MRISreverseFaceOrder`; then the surface's whole state). 22 commands.
+  of `mrisurf_base.cpp`, `MRISreverseFaceOrder`; then the surface's whole state). 22 commands;
+  since relay 7 `metric` (a surface from the case, 1 to 6 of 33 operations: the averaging and
+  smoothing, `MRIScenterSphere`, the neighbour distances' computation and checks, the percent
+  distance error, the areas, the triangle corners and coordinate sets, the curvature operations,
+  the saved coordinates; an operation that would read or write past what the case allocated
+  prints `G` and is skipped on both sides), 23 commands. `build.sh` also builds
+  `fssurfio-mpstub`: the same probe with a stub `MRIScomputeMetricProperties` (it writes `MP`),
+  linked first with `--allow-multiple-definition` so the library's own call (`MRISsmoothSurface`'s
+  last step) reaches it; `check.py` runs `metric`'s cases through it.
 - The port's side: `crates-freesurfer/larmorx-freesurfer-surf/examples/fs_surfio_probe.rs` (`cases
   <seed> <n>`, `run <cases> fix|reproduce`; the generator and the answers in
   `tests/fs_surfio/cases.rs`, shared with the hash test `tests/fs_surfio_official.rs`).
@@ -27,6 +35,17 @@
   cache at one thread, the port in both modes, the comparison (`reproduce` identical; `fix`
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+
+Measured 2026-11-13 (relay 7, 23 commands): seed 7, 46,000 cases: 45,997 identical with
+`reproduce`, 3 counted, not compared (FS-114: FreeSurfer's `MRIScenterSphere` never returns on a
+surface with no vertex, ended by the probe's 5-second alarm, `CRASH 14`, against larmorx's
+refusal); `fix` differs only with the notices of FS-01, FS-03, FS-12, FS-111 and FS-113 and in 4
+`surf` cases that rotate; the port's outputs byte-identical with and without AArch64's NaN
+emulated (3,033 NaNs flipped), both modes. Seed 1, 690 cases: all identical, hash
+`c46c6b80bd514c2b850e54fadeadae38f056c31954a9bed6a97d93ed8e04fefe` (the test), with the
+emulation too, debug and release. Before the official operand orders were read from the object
+code (`docs/findings/freesurfer-surfio.md` §9), 31 of 2,000 NaN-heavy `metric` cases of seed 13
+and 1 of 10,000 of seed 17 differed; after, none.
 
 Measured 2026-11-13 (relay 6, 22 commands): seed 7, 44,000 cases: all identical with `reproduce`;
 `fix` differs only with the notices of FS-01, FS-03, FS-12, FS-111 and FS-113 and in 3 `surf` cases
@@ -49,5 +68,5 @@ operand order is each caller's compiled code (`docs/findings/freesurfer-surfio.m
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>
-scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-surfio/check.py --seed 7 --n 44000
+scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-surfio/check.py --seed 7 --n 46000
 ```

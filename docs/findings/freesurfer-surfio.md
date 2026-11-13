@@ -225,3 +225,89 @@ first). The probe reads them into locals first.
 - **Waiting:** `MRIStalairachTransform` (needs `MRISclone` and the `LTA`), `MRISrotate(src, NULL,
   ...)` and `MRISprojectOntoTranslatedSphere` (`MRISclone`, 3.1-51's lines; the latter also
   `MRISupdateEllipsoidSurface`), `mrisDisturbVertices` (`MRIScomputeMetricProperties`).
+
+## 9. Queue item 3.1-49, parts b and c: averaging, the sphere's centre, distances, areas, curvatures (relay 7)
+
+- **The stub for `MRIScomputeMetricProperties`.** `MRISsmoothSurface` ends with
+  `MRIScomputeMetricProperties(mris)` (queue items 3.1-51 and 3.1-52, not ported yet). The call in
+  `mrisurf_metricProperties.cpp.o` is an `R_X86_64_PLT32` relocation against the global symbol, so
+  the probe's second build, `fssurfio-mpstub` (`-DPROBE_MP_STUB`, linked with
+  `-Wl,--allow-multiple-definition`, the probe's object first), resolves the library's own call to
+  the probe's stub (it writes `MP` and computes nothing): the averaging is compared alone. The same
+  binary runs nothing else differently (no other command reaches the function); `check.py` sends
+  only `metric`'s cases to it.
+- **GCC 8.4's operand orders** (`objdump -dr -C` of the unit oracle's object; probe: seed 13, 31 of
+  2,000 NaN-heavy cases differed before, 0 after):
+  - `MRIScenterSphere_old` (inlined into `MRIScenterSphere`): each inlined `estimateNRG` sums
+    `(dy² + dx²) + dz²` (the `y` square first), each `estimateSquaredRadius` and `computeGradient`
+    `(dx² + dy²) + dz²`; the gradient's terms are `dx*e`, `dy*e` and `e*dz`; the trial centre
+    `x + epsilon*dx` is `dx*epsilon + x` (and the accepted centre the same values); `epsilon /= 2.0`
+    is `epsilon * 0.5`; the final move `cx + scale*(x - x0)` is `(x - x0)*scale + cx`; the two
+    rescalings onto radius 100 sum `(y² + x²) + z²` in float. `(xlo + xhi) / 2.0f` is `* 0.5`.
+  - The smoothing step of `MRISaverageVertexPositionsWkr_part1` (inlined into `MRISsmoothSurface`):
+    `p + scale*(x - p)` is `(x - p)*scale + p`.
+  - **The averaging's undivided store** (inlined into `MRISaverageVertexPositions`, `scale == 1`,
+    `includeCenter` true): for a ripped vertex or one with `vnum <= 0` GCC stores the vertex's own
+    position without the division by the count 1 (it knows the count), so a signalling NaN stays
+    signalling there; with neighbours (even all ripped) it divides, which quiets it.
+  - `mrisComputeVertexDistancesWkr`'s plane formula (`._omp_fn.5`): the storing path sums
+    `zd² + (yd² + xd²)`, the checking path `zd² + (xd² + yd²)`; the square root is `sqrtss`
+    (`std::sqrt(float)`), with `sqrtf`'s call only on the negative-argument branch (errno). The
+    sphere's formula (`._omp_fn.7`): `fabs(angle) * radius`.
+  - `XYZApproxAngle_knownLength` (`matrix.cpp.o`): the dot product's third product is `z2*n.z`
+    (`mulsd %xmm1,%xmm2`, the neighbour's coordinate in the destination), the first two `n.x*x2`,
+    `n.y*y2`. fs.core's `xyz_approx_angle_known_length` takes `n.z*z2`: one probe case (seed 17: a
+    NaN unit vector, from an infinite position, against a signalling NaN neighbour) differed.
+    `larmorx-freesurfer-surf`'s `metric.rs` keeps its own copy with the official order; fs.core's
+    owner is told (HANDOFF).
+  - `MRISpercentDistanceError`: `dist_scale = sqrt(orig_area / total_area)` is computed in float
+    (`sqrtss`, then widened: a different number from the double square root of the widened
+    quotient: seed 13's one numeric difference, `40a2a871fbf4fb4f` against `40a2a871fde6e735`);
+    `mean_error += fabs(...)` is `fabs(...) + mean_error` (the call's result in `xmm0`, the
+    destination); the `pct += fabs(dist - odist) / odist` of the loop is dead code (`pct` is
+    overwritten after the loop) and is not compiled; `FZERO` calls the library's `fabs`
+    (`-fno-builtin`).
+  - `mrisComputeArea`: `d1 = -v1[1]*v0[2] + v0[1]*v1[2]` is `v0[1]*v1[2] - v1[1]*v0[2]` (no negation:
+    a NaN's sign differs from the C expression's), likewise `d3`; `d2`'s products are swapped
+    (`v0[2]*v1[0] - v1[2]*v0[0]`); the dot product is `x*d1 + d2*y + d3*z`; `sqrtss`; `-sqrt` by
+    `xorps`.
+  - `MRISscaleCurvatures` tracks the old range with `minsd`/`maxsd` (the same as the C comparisons:
+    a NaN curvature leaves the end); `MRISsmoothCurvatures` computes `vertex->H * 0.4f` and the norm
+    `(vnum*0.25f + 0.4f) + (v2num - vnum)*0.05f` (equal to the C order: no NaN can enter);
+    `MRISscaleDistances` is vectorised (`mulps`, the distances first).
+  - With no unripped vertex, `MRISzeroMeanCurvature`, `MRISnormalizeCurvature` and
+    `MRISnormalizeCurvatureVariance` compute the mean as `0.0 / 0.0` directly (`divsd %xmm2,%xmm2`):
+    the default NaN, as the C gives.
+- **FS-114** (rule B). `MRIScenterSphere_old` on a surface with no vertex: `estimateNRG` returns
+  0, `estimateSquaredRadius` and `computeGradient` divide by 0 (`0 / 0`: NaN). The outer loop
+  starts (`0 < 0 + 1`), the step search `while (NRG >= last_NRG)` keeps `NRG = 0 >= 0` true, and its
+  exit test `epsilon * d < 1e-11` is false for ever (`d` is NaN). The official build spins until
+  the probe's 5-second alarm (`CRASH 14`, seed 7: 3 cases). Only an empty surface does it: with any
+  vertex, a NaN gradient makes the energy NaN, which ends the search. Callers:
+  `MRIScorrectTopology` (`mrisurf_defect.cpp` 7873: `mris_fix_topology`, recon-all's topology
+  fix, on the canonical sphere), `MRISrecenter` (`mrisurf_metricProperties.cpp` 1504; called by
+  `mri_transform` only) and `mris_topo_fixer` (324); no recon-all step centres an empty surface.
+  larmorx refuses it in both modes (`MRIScenterSphere: the surface has no vertex, so it has no
+  centre`, code -4); a never-ending loop is never reproduced (D13).
+- **`mrisComputeOriginalVertexDistancesIfNecessaryWkr`** computes the original distances and then,
+  unless `FREESURFER_fix_missing_dist_orig` is set, zeroes them (the comment: "the old code did not
+  compute this distance ... the default is to zero the values after computing them"). Kept (rule
+  C: the default the pipelines ran with).
+- **Probe-only notes.** `MRIS_Status` is an enum whose storage is an `unsigned int` (GCC's
+  underlying type without negative enumerators): a case's -1 prints as 4294967295 from the probe;
+  the port's side prints the field's bits the same way. `cheapAssert`'s text is the stringified
+  test, whose internal blank runs the preprocessor folds to one blank (`mris->orig_area > 0.0`,
+  where the source has two blanks).
+- **Not ported yet** (each with its reason): `MRIScomputeMetricProperties` (the fast and slow
+  headers, 3.1-51/52) and so `MRISsmoothSurface`'s last step, `MRISrecenter` (also the saved vertex
+  positions, 3.1-50's `MRISsaveVertexPositions`/`MRISrestoreVertexPositions`) and
+  `MRISscaleBrainArea` (also `MRISscaleBrain`, 3.1-51's lines); `MRIScomputeOrigArea`,
+  `MRISsetOrigArea`, `MRISstoreMetricProperties`, `MRISrestoreMetricProperties` (the face-normal
+  cache's `getFaceNorm`, `setFaceOrigArea`, `getFaceOrigArea`, 3.1-50's lines 7740-7800, whose
+  deferred entries compute `computeDefectFaceNormal_calculate`); `MRISrestoreOldPositions`,
+  `MRISstoreCurrentPositions` (the saved positions); `MRISltaMultiply`, `MRIStransform` (an `LTA`, a
+  `TRANSFORM`: fs.volume); `MRISnonmaxSuppress` (`MRIStoParameterization`, `MRISPblur`: fs.surf);
+  `mrisurf_io_stl.cpp` and `mrisurf_io.cpp` 6314-6921 (the readers' `MRISalloc` and file I/O, 3.1-47).
+  `MRIScenterSphere_new` is a failed assertion, never called. Brought forward from 3.1-50:
+  `mrisComputeCurvatureMinMax` (9113-9136); from `mrisurf_vals.cpp`: `MRISextractCurvatureVector`
+  (677-685).

@@ -1641,6 +1641,18 @@ defects! {
         "the corner-angle statistics use the edges' directions from the last edge measurement, not from the surface's current coordinates: after the vertices move they describe the old surface, and before any edge measurement every corner reads 90 degrees";
     FS_538 = "FS-538", "FreeSurfer", true,
         "the edge statistics (lengths, hinge dot products and angles) and the one-line surface-quality summary use the triangles' normals from their last computation: after the vertices move the hinge values describe the old surface, and with no normals computed yet the program crashes";
+    FS_539 = "FS-539", "FreeSurfer", true,
+        "the fast-marching distance maps (MRIextractDistanceMap, MRIdistanceTransform) of a volume one voxel wide take the voxel that follows in memory (the first voxel of the next row) as each voxel's neighbour beyond the edge, so the distances depend on the next row's labels";
+    FS_540 = "FS-540", "FreeSurfer", true,
+        "the fast-marching distance maps of a volume one voxel high or deep, and of the last voxel of a volume one voxel wide, read memory outside the volume as a neighbour beyond the edge: the distances depend on memory contents, or the program crashes";
+    FS_541 = "FS-541", "FreeSurfer", true,
+        "with a mask, the fast-marching distance maps first set the masked voxels from a distance limit not yet set (memory never written): the values are replaced before the map is returned, but in a volume one voxel wide (FS-539) a neighbour's distance can be read from them";
+    FS_542 = "FS-542", "FreeSurfer", true,
+        "the fast-marching distance maps turn a label-volume or mask value that is NaN or beyond the 32-bit integer range into -2147483648: such voxels never match the label, and the mask never excludes them";
+    FS_543 = "FS-543", "FreeSurfer", true,
+        "MRIdistanceTransform with DTRANS_MODE_INSIDE computes the unsigned distances on both sides of the label (DTRANS_MODE_UNSIGNED's map) instead of the distances inside it";
+    FS_544 = "FS-544", "FreeSurfer", true,
+        "the fast-marching distance maps given a mode they do not know (MRIextractDistanceMap's 1 to 4, MRIdistanceTransform's DTRANS_MODE_* 1 to 4, mris_distance_to_label's -mode) return a map of zeros without a message";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

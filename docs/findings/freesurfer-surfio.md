@@ -1507,3 +1507,64 @@ nothing assigns `VoxelFromSRASmatrix`. Neither recon-all nor fMRIPrep reaches th
   tried, `VoxelFromSRASmatrix->type` (11706) faults; with the old way alone, `MatrixMultiply(NULL,
   ...)` prints `MatrixMultiply(): m1 is null` and its break line and `ErrorExit`s (status 252,
   `ERROR_BADPARM`); a refused product returns `NULL` and `V3_X(vv)` (11746) faults.
+
+## 26. Queue item 3.1-51's leftovers, second group: edges, corners, their metrics, the quality statistics (relay 24)
+
+Ported: `src/props10.rs` (PROVENANCE row `props10`); behaviour in `specs/freesurfer-surfio.md`
+§115-117. Sources: `mrisurf_topology.cpp` 491-506 (`MRIScountEdges`), 605-726 (`MRISedges`), 736-804
+(`MRIScorners`); `surfgrad.cpp` 45-110 (`MRISfaceMetric`, `MRISedgeMetric`, `MRIScornerMetric`,
+`if_ROMP(assume_reproducible)`: parallel in FreeSurfer, each iteration writing only its element),
+120-213 (`MRISfaceNormalFace`, globals `MRISfaceNormalFace_AddDeltaVertex` = -1 and
+`MRISfaceNormalFace_AddDelta[3]` defined in `include/surfgrad.h` 54-57 under `_SURFGRAD_SRC`),
+425-473 (`MRISedgeMetricEdge`), 2157-2200 (`SurfGradUnitVector`, `long double` though its
+prototype comment says `double`), 2289-2300 (`MRIScornerMetricCorner`), 2347-2387
+(`MRIScornerStats`); `mrisutils.cpp` 3515-3541, 3552-3590; `mrisurf_metricProperties.cpp` 5801-5807,
+13200-13222, 13544-13650; `mrisurf_vals.cpp` 1953-1987. Callers: `mris_place_surface.cpp` 454, 1574,
+1589, 1591 (`MRISprettyPrintSurfQualityStats`: recon-all's `Area`/`Corner`/`Edge`/`Hinge` lines),
+623, 1577 (`MRISedgeStats(surf, 0, ...)`); `mris_make_surfaces.cpp` 704; `mrisFindMiddleOfGray`:
+`mris_refine_surfaces`, `mris_mef_surfaces`, `mris_exvivo_surfaces` (none in recon-all's default
+steps). In the recorded runs the `Corner` mean is 60.00000 (the edges' unit vectors were current).
+
+- **Operand orders** (unit oracle objects `surfgrad.cpp.o`, `mrisurf_metricProperties.cpp.o`,
+  `mrisurf_vals.cpp.o`; listings `<scratch>/D/relay24/*.asm`): `MRISfaceNormalFace`: `flds v1.x;
+  fld; fsubs v0.x` and `fsubrs v2.x` (v0, v2 memory operands), the cross product and `cx*cx + cy*cy
+  + cz*cz` in source order, `fsqrt` with the `sqrtl` call only for a negative argument (same value),
+  `fstl` of `cL` into `*pcL` before the matrix, the norm `fdiv` then `fstpl`; `SurfGradUnitVector`:
+  `fldl v0; fsubrl v1`, `L = 0 + w0^2` (`fldz`, `fadd`), `fsqrt` (the call only for a NaN result),
+  `fucomi` with 0; `MRISedgeMetricEdge`: `comiss` of the two float areas, `DVectorDot`, `fabs` called,
+  `acos` called, `mulsd .LC85` (180) then `divsd .LC86` (`M_PI`); `MRIScornerMetricCorner`: x and y
+  `(u1 d0) * (u2 d1)` with the e1 term the destination, z `(d1 u2) * (d0 u1)` (e2's term first),
+  each `addsd` with the product as destination, the first sum `+ .LC1` (0.0); `mrisFindMiddleOfGray`:
+  `0.5f * curv` (`mulss curv, 0.5`), `t * nx`, `ny * t`, `nz * t`, each `+ orig` with the product as
+  destination, `MRISsetXYZwkr(..., 13221 = 0x33a5, &laterTime)`; `MRISaverageCurvatures`: `curv +
+  vn->curv`, `num + 1.0f`, `curv / num`.
+- **glibc's double `acos`** (GLIBC-07): FreeSurfer's hinge angles differed in the last bit on 3 to 5
+  of 888 `mpg` cases per seed; checked on three of them with glibc 2.35 (`acos_t.c`: glibc's
+  `acos(0x3fef6a924fd0fa48) * 180 / M_PI` = `0x4025ebaa034949ab`, the official value; the correctly
+  rounded `acos` gives `...ac`). The port keeps the correctly rounded `acos` in both modes (the user's
+  decision of 2026-11-04 for glibc's `tan`, `asin`, `acos`, `atan`); the check counts such lines apart.
+  An argument beyond 1 gives glibc's `(x - x) / (x - x)`-style default NaN (sign set), which the
+  port reproduces (CORE-MATH's returns a positive NaN).
+- **FS-535**: `MRISedges` returns 1 before `vt->e` is allocated; `MRIScorners` ignores it and reads
+  `v->e[k]` (NULL) at the first corner whose vertex has the neighbour: SIGSEGV. Every open surface
+  (a boundary edge has one face) and every non-manifold edge reaches it; the probe's grids and
+  meshes do. Rule B for the corners (no edge numbers: no corner table, an error); the zero edges the
+  stopped table leaves are kept in both modes (rule C: `MRISedges` printed its error; the edge
+  statistics and the overlay count them as FreeSurfer does).
+- **FS-536**: `DListStats` returns NULL for an empty list; the printers index `astats[1]` etc.
+  without a check: the crash comes at the first NULL group's `fprintf`, after the earlier groups'
+  text (the probe's partial lines show them). Rule B.
+- **FS-537**: `MRIScornerStats` never calls `MRISedgeMetric`; `MRIScornerMetricCorner` reads
+  `e->u`. On a fresh edge table (calloc) `u` is 0, so `dot` = 0 and every angle 90; after the
+  vertices move the angles are the old surface's. Rule A (the probe's fix runs note it on 320 of
+  888 seed-7 cases).
+- **FS-538**: `MRISedgeStats` and `MRISprintSurfQualityStats` never call `MRISfaceMetric`;
+  `MRISedgeMetricEdge` reads `f->norm`: stale normals give the old surface's hinges; a NULL normal
+  gives `DVectorDot`'s error and -10e10, then the third `printf` dereferences the NULL norm:
+  SIGSEGV. `MRISprettyPrintSurfQualityStats`, `MRISmaxEdgeStatToOverlay` and `MRISmarkEdge` call the
+  face metric first. Rule A.
+- **Not ported yet** (3.1-51's rest): `MRISbinarizeVolume` (fs.mri's `MRIalloc` only; next),
+  `MRISmaskLabel`/`MRISmaskNotLabel` (track A's `LABEL`, after its merge), `mrisMarkIntersections`
+  and `MRISmarkEdge` (fs.surf's MHT and `sclustMapSurfClusters`, `MRISfillHoles`),
+  `MRIcomputeLaminarVolumeFractions` (fs.filter's `MRISfillInterior`, fs.volume's `mriset.cpp`
+  functions and `MRIcomputeVolumeFractions`).

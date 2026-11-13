@@ -183,7 +183,6 @@ group = "ants"
 name = "antsAI"
 command = "larmorx ants antsAI"
 python = "lx.ants.ai"
-does = "The linear transform that best aligns two images: an initial alignment, then a multi-start search over rotations and translations."
 api = "docs/api/ants-ai.md"
 evidence = "/evidence/ants-ai/"
 records = { replica = ["ants-ai"] }

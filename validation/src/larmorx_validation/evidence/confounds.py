@@ -251,9 +251,10 @@ def _compute_gaussian(e: fcache.Entry) -> None:
             e.run(f"{key}-ants-cr",
                   [str(b / "antsApplyTransforms"), *_ants_argv(command, run, str(d / f"cr-{name}"))],
                   env={**th, "LD_PRELOAD": str(lib)}, unset=common.CLEAN_ENV)  # fmt: skip
-            # fMRIPrep's own ANTs, in its image, on its own paths (its out folder at /out)
+            # fMRIPrep's own ANTs, in its image, on its own paths (its folders at /out and /work)
             e.run(f"{key}-ants-fmriprep",
                   [apptainer, "exec", "--cleanenv", "-B", f"{_runs_dir() / run / 'out'}:/out:ro",
+                   "-B", f"{_runs_dir() / run / 'work'}:/work:ro",
                    "-B", f"{d}:/evidence", str(image), "antsApplyTransforms",
                    *_ants_argv(command, run, f"/evidence/fmriprep-{name}", host=False)],
                   env={"APPTAINERENV_ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1"},

@@ -2169,6 +2169,13 @@ TEXTS = [
     (r"\bLARMORX's port of it\b", "LARMORX's replica of it"),
     (r"\bby LARMORX's port\b", "by the replica"),
     (r"\ba LARMORX mistake\b", "a mistake of the replica's"),
+    # the rows named by what they compare: the guide's order moves them
+    (r"\bLARMORX follows both \(the first two rows\)", "the replica follows both (its rows "
+     "against the original and against fMRIPrep's output)"),
+    (r"\bLARMORX follows both \(the row above\)", "the replica follows both (its row against "
+     "fMRIPrep's output)"),
+    (r"\(the first row\)", "(its row against the original)"),
+    (r"; the reference rows below\)", "; the original's rows against itself)"),
     (r"\bLARMORX reproduce ([\d,]+), default ([\d,]+)", r"the replica in `reproduce` \1, in `fix` \2"),
     (r"\bits own oracle run\b", "its own run"),
     (r"\bsdcflows' own oracle runs\b", "sdcflows' own runs"),

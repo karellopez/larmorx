@@ -582,8 +582,14 @@ def _classify_repo(rel: str, op: str) -> Class:
         or re.match(r"^docs/findings/freesurfer-[^/]+\.md$", rel)
     ) and not rel.endswith("-clean-room.md"):
         return restricted("R11", "FreeSurfer", op, rel)
-    # the spec writer's model of specs/glibc-random.md (track D, 2026-11-12; it read glibc's random.c): closed
-    if rel.startswith("validation/investigations/glibc-random-spec-check/"):
+    # the spec writer's models of specs/glibc-random.md and glibc-qsort.md (track D, 2026-11-12 and 13; it read glibc's
+    # random.c and msort.c): closed
+    if rel.startswith(
+        (
+            "validation/investigations/glibc-random-spec-check/",
+            "validation/investigations/glibc-qsort-spec-check/",
+        )
+    ):
         return restricted("R11", "GNU", op, rel)
     m = re.match(r"^docs/findings/((?:fsl|afni)-[^/]+\.md)$", rel)
     # a clean room's own findings: "-original.md", renamed "-clean-room.md" by the documentation revision (2026-11-12)

@@ -57,6 +57,7 @@ CORE_DIRS = {
     "crates/larmorx-core/src/ranlux/": ("FreeSurfer", "ranlux"),
     "crates/larmorx-core/src/cubic_spline/": ("FreeSurfer", "cubic_spline"),
     "crates/larmorx-core/src/glibc_random/": ("GNU", "glibc_random"),
+    "crates/larmorx-core/src/glibc_qsort/": ("GNU", "glibc_qsort"),
 }
 CLEANROOM_PATHS = (
     "crates/larmorx-afni",
@@ -114,6 +115,10 @@ TOOL_NAMES = {
         "GNU",
         "glibc_random",
     ): "rand, srand, random and srandom with glibc 2.35's streams (larmorx-core)",
+    (
+        "GNU",
+        "glibc_qsort",
+    ): "qsort and qsort_r with glibc 2.35's order of comparisons (larmorx-core)",
 }
 
 

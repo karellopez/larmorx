@@ -55,3 +55,62 @@ probe's observations; seed 7, 2,000 cases: every `errno` identical.
 centre (no shears), unlike `VOL_GEOM::isNotEqualThresh` (`mri.h`), which `operator==` uses:
 `vg_isEqual` and `==` can disagree on geometries with shears. `TkrRAS2VoxfromVolGeom` (557) is not
 reached by any recorded program (the inventory's core view): not ported.
+
+## 3. The voxel arithmetic (`utils/mri.cpp`, 3.1-35 piece 1): FS-289 to FS-297
+
+Functions: `MRImatch` 1966, `MRImatchDimensions` 1973, `MRIlinearScale` 1979, `MRIscalarMul` 2038,
+`MRIscalarMulFrame` 2097, `MRIlabelValRange` 2145, `MRIvalRange` 2179, `MRIvalRangeFrame` 2308,
+`MRIvalRangeRegion` 2388, `MRIcheckSize` 3128, `MRIextract` 3863, `MRIcopyFrames` 3867,
+`MRIextractRegion` 3903, `MRIextractInto` 3966, `MRIclear` 4315, `MRIthreshold` 4696,
+`MRIupperthresholdAllFrames` 4766, `MRIinvertContrast` 4913, `MRIbinarize` 4992, `MRIsubtract` 5033,
+`MRIabs` 5223, `MRIpos` 5254, `MRIneg` 5286, `MRIadd` 5317, `MRImultiply` 5597,
+`MRIscaleAndMultiply` 5630, `MRIdivide` 5664, `MRIclone` 5724, `MRIcloneBySpace` 5747; taken early:
+`MRIcopyFrame` 11600 (3.1-36), `MRIcalcCRASforExtractedVolume` 14858 (3.1-37). `MRIaverage` (5557)
+waits for `MRIsampleVolumeFrameType` (9434, 3.1-36).
+
+- **Direct paths** (`slices[z + f depth][y]`, the element type from the code): `MRIsubtract` and
+  `MRIadd` walk `mri2` and `mri_dst` with `mri1`'s extent and frames through a running slice counter
+  `s`; `MRIscalarMulFrame`, `MRIvalRangeFrame` take a frame they never check; `MRIextractInto`'s rows
+  of the source frames into the destination's (a destination with fewer frames). FS-289 (another
+  voxel of the buffer: `reproduce` follows) and FS-290 (a row pointer past `slices`' `depth *
+  nframes` entries, or past the buffer: FreeSurfer reads its own heap, crashes or not: never
+  compared). `rows.rs` models the row pointers (`At::In`, `Wrapped`, `Outside`).
+- **FS-291** (rule B): `MRIinvertContrast` and `MRIscaleAndMultiply` use `MRIvox` (bytes) whatever
+  the type; the first `width` bytes of a row of a wider type are taken as voxels (`reproduce`).
+- **FS-292** (rule A): `MRIdivide`'s `uchar` loop, `if (!*p2) { *pdst = ...; p2++; }` without `pdst++`
+  and `p1++`.
+- **FS-293** (memory): `MRIextractInto`'s `MRIfree(&mri_dst)` on a type mismatch frees the caller's
+  volume.
+- **FS-294** (crash): `bytes = dx * sizeof(type)` in an `int`, `memmove(..., bytes)` with a negative
+  `dx` (a start at or past the extent): a `size_t` near 2^64. Observed: glibc 2.35's `memmove` on this
+  machine returned without copying (no crash), so the outcome depends on the C library's dispatch;
+  both modes end the program, never compared.
+- **FS-295** (rule A): `int xsize = mri_src->xsize` (and `ysize`, `zsize`): the new volume's
+  `xstart += x0 * xsize` and `xend = xstart + dx * xsize` use truncated sizes.
+- **FS-296**: `*pdst++ = dval` (`float` to `unsigned char`) for a NaN product (`cvttss2si` gives
+  0x80000000, whose low byte is 0: the default's 0 too).
+- **FS-297** (rule A): `MRILseq_vox` is `((long32 *) row)[x]` (`machine.h`: `typedef int long32`), so
+  `MRIextractInto`'s `MRI_LONG` `memmove` starts at byte `4 x0` of the source row and `4 x1` of the
+  destination's, copying `8 dx` bytes. `MRIsubtract` and `MRIadd` cast the row to `long *`: not
+  affected. Observed: the probe's three such cases identical with `reproduce`.
+- **Kept (rule C, no register entry)**: the direct paths' conversions to the destination type wrap
+  (`(BUFTYPE)nint(v)`, `(short)(a + b)`: C's conversions), where the voxel paths clip
+  (`MRIsetVoxVal`); FreeSurfer's own comment says it ("the code below does not check for
+  over/underflow!"). `MRIsubtract`'s difference is kept from the previous voxel for a source type
+  without a direct path. `MRIclone` deep-copies the colour table twice (`MRIclone`, then
+  `MRIcopyHeader`): no effect.
+- **Operand orders** (NaN payloads; `objdump -dr` of the unit oracle's `mri.cpp.o`): `MRImultiply`
+  computes `f2 * f1` (`mulss 0xc(%rsp),%xmm0` after the second `MRIgetVoxVal`); `MRIadd`'s voxel path
+  `v2 + v1`; `MRIscalarMulFrame`'s `float` rows are vectorised (`mulps`, unaligned, when the rows are
+  at least 16 bytes apart and `width >= 4`) with the leftover voxels peeled one by one, the third of
+  three computed as `scalar * v` (`mulss 0x8(%rdx),%xmm6`); in place (the same rows) the scalar loop,
+  `v * scalar`. `MRIcalcCRASforExtractedVolume`'s inlined `AffineMV`: `((x c0 + y c1) + z c2) + c3`,
+  the coordinate in the destination register of each product (`mulps 0x10(%rax),%xmm1`, ...), the
+  fourth column added without the multiply. `larmorx-freesurfer-core`'s `affine_mv` computes `c0 x`
+  (the column first) with plain Rust arithmetic: its NaNs take AArch64's sign under the ARM emulation
+  (for track A).
+- **For track A (fs.mri)**: `MRIcopyHeader` (`mri.cpp` 6277) does `mri_dst->i_to_r__ =
+  AffineMatrixCopy(mri_src->i_to_r__, mri_dst->i_to_r__)`, whose `memcpy` reads `src->mat` without a
+  check: a source without a cached voxel-to-RAS matrix crashes the official build (observed:
+  `SIGSEGV` at `MRIcopyHeader+0x39c`, `movdqu (%r12)` with `r12 = 0`); the port copies `None`. The
+  probe avoids such sources except for `cras`.

@@ -14,6 +14,9 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | FreeSurfer file | What | Item | Here |
 |---|---|---|---|
 | `utils/transform.cpp` 285-603 | `vg_print`, `getVolGeom`, `copyVolGeom`, `writeVolGeom`, `readVolGeom`, `vg_i_to_r`, `vg_r_to_i`, `TkrVox2RASfromVolGeom`, `vg_isEqual`, `vg_isNotEqualThresh` (taken first from 3.1-39 for the surface readers) | 3.1-39 | `vgeom.rs` |
+| `utils/mri.cpp` 1966-2450, 3128, 3863-4090, 4315-4360, 4696-4800, 4913-5555, 5597-5760 | `MRImatch`, `MRImatchDimensions`, `MRIlinearScale`, `MRIscalarMul`, `MRIscalarMulFrame`, `MRIlabelValRange`, `MRIvalRange`, `MRIvalRangeFrame`, `MRIvalRangeRegion`, `MRIcheckSize`, `MRIextract`, `MRIcopyFrames`, `MRIextractRegion`, `MRIextractInto`, `MRIclear`, `MRIthreshold`, `MRIupperthresholdAllFrames`, `MRIinvertContrast`, `MRIbinarize`, `MRIsubtract`, `MRIabs`, `MRIpos`, `MRIneg`, `MRIadd`, `MRImultiply`, `MRIscaleAndMultiply`, `MRIdivide`, `MRIclone`, `MRIcloneBySpace` (the row-pointer macros of `include/mri.h`: `MRIvox`, `MRIseq_vox`, `MRIFseq_vox`, `MRISseq_vox`, `MRIUSseq_vox`, `MRIIseq_vox`, `MRILseq_vox` with `machine.h`'s `long32`) | 3.1-35 | `arith.rs`, `rows.rs` |
+| `utils/mri.cpp` 11600 | `MRIcopyFrame` (taken early for `MRIcopyFrames`) | 3.1-36 | `arith.rs` |
+| `utils/mri.cpp` 14858 | `MRIcalcCRASforExtractedVolume` (taken early for `MRIextractInto`; `affine.h`'s `AffineMV` as the official build inlines it) | 3.1-37 | `arith.rs` |
 
 No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). `readVolGeom`'s
 `sscanf` calls are modelled on glibc 2.35's behaviour measured as a black box (the open
@@ -26,3 +29,9 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   (FS-285, FS-286; `reproduce` compares what the official build compares after FS-286's overflow);
   a line with no word is neither counted nor read by default (FS-287); before any word, no key in
   both modes (FS-288).
+- The voxel arithmetic: FS-289 to FS-297 (`docs/findings/freesurfer-volume.md` §3): accesses outside
+  a smaller volume (FS-289 other voxels, `reproduce` follows; FS-290 memory, never made); the byte-only
+  functions on other types an error (FS-291); `MRIdivide`'s byte loop moves on (FS-292); a destination
+  of another type kept (FS-293); a negative row length an error (FS-294); the new volume's start and
+  end with the float voxel sizes (FS-295); a NaN stored as 0 (FS-296); 64-bit rows copied from their
+  column (FS-297).

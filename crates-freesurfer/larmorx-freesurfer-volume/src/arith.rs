@@ -1308,6 +1308,14 @@ pub fn mri_subtract(
                     }
                 }
                 let yy = i64::from(y);
+                // the row pointers FreeSurfer takes for this row (each type with a direct path)
+                if elem_size(dty) > 0 {
+                    rows::touch(g, WHAT, v.dref(), s, yy);
+                }
+                if elem_size(v.a().mtype) > 0 {
+                    rows::touch(g, WHAT, v.a(), s, yy);
+                    rows::touch(g, WHAT, v.b(), s, yy);
+                }
                 for x in 0..i64::from(w) {
                     if let Some(a) = row_val(g, WHAT, v.a(), s, yy, x) {
                         let b = row_val(g, WHAT, v.b(), s, yy, x).expect("one type");
@@ -1385,6 +1393,14 @@ pub fn mri_add(
                     }
                 }
                 let yy = i64::from(y);
+                // the row pointers FreeSurfer takes for this row (each type with a direct path)
+                if elem_size(dty) > 0 {
+                    rows::touch(g, WHAT, v.dref(), s, yy);
+                }
+                if elem_size(sty) > 0 {
+                    rows::touch(g, WHAT, v.a(), s, yy);
+                    rows::touch(g, WHAT, v.b(), s, yy);
+                }
                 for x in 0..i64::from(w) {
                     if elem_size(dty) == 0 || elem_size(sty) == 0 {
                         continue;

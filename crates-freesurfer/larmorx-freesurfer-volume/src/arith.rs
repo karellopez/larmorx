@@ -1986,7 +1986,8 @@ fn replace_values_uchar(
             for y in 0..h {
                 let sl = i64::from(z) + i64::from(f) * i64::from(d);
                 for x in 0..w {
-                    let Num::I(b) = rows::read(g, W, v.a(), sl, i64::from(y), i64::from(x), MRI_UCHAR)
+                    let Num::I(b) =
+                        rows::read(g, W, v.a(), sl, i64::from(y), i64::from(x), MRI_UCHAR)
                     else {
                         unreachable!("a byte")
                     };

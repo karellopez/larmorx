@@ -58,8 +58,8 @@ use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use crate::arith::{Pair, mri_replace_values};
 use crate::rows::{self, Num};
 use crate::sample::{
-    SAMPLE_CUBIC, SAMPLE_CUBIC_BSPLINE, SAMPLE_NEAREST, SAMPLE_SINC, SAMPLE_TRILINEAR,
-    SAMPLE_VOTE, SAMPLE_WEIGHTED, cubic_sample_volume_frame, cvtt, sinc_sample_volume_frame,
+    SAMPLE_CUBIC, SAMPLE_CUBIC_BSPLINE, SAMPLE_NEAREST, SAMPLE_SINC, SAMPLE_TRILINEAR, SAMPLE_VOTE,
+    SAMPLE_WEIGHTED, cubic_sample_volume_frame, cvtt, sinc_sample_volume_frame,
 };
 use crate::xform::mri_get_resample_matrix;
 
@@ -309,10 +309,7 @@ fn trilinear(si_f: f32, sj_f: f32, sk_f: f32, c: &Corners) -> f32 {
     let p01 = mul64(a0, a1);
     let x5 = mul64(d1, a0);
     let x7 = mul64(a1, d0);
-    let mut acc = add64(
-        mul64(mul64(p01, a2), v(0)),
-        mul64(mul64(p01, d2), v(1)),
-    );
+    let mut acc = add64(mul64(mul64(p01, a2), v(0)), mul64(mul64(p01, d2), v(1)));
     acc = add64(acc, mul64(mul64(a2, x5), v(2)));
     acc = add64(acc, mul64(mul64(x5, d2), v(3)));
     acc = add64(acc, mul64(mul64(a2, x7), v(4)));
@@ -601,24 +598,11 @@ fn header(
             v.set_relt(3, 1, 0.0);
         }
         for (which, r2v) in [("old", &old_r2v), ("new", &new_r2v)] {
-            matrix_multiply(
-                g,
-                out,
-                err,
-                r2v.as_ref(),
-                v_ras.as_ref(),
-                Some(&mut v_vox),
-            )?;
+            matrix_multiply(g, out, err, r2v.as_ref(), v_ras.as_ref(), Some(&mut v_vox))?;
             let f = |i: i32| {
                 larmorx_core::cfmt::pad(&larmorx_core::cfmt::f(f64::from(v_vox.relt(i, 1)), 0), 2)
             };
-            let _ = writeln!(
-                out,
-                "{which} RAS (0,0,0) -> ({}, {}, {})",
-                f(1),
-                f(2),
-                f(3)
-            );
+            let _ = writeln!(out, "{which} RAS (0,0,0) -> ({}, {}, {})", f(1), f(2), f(3));
         }
     }
     Ok(())

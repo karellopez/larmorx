@@ -585,7 +585,7 @@ name = "resample-series"
 python = "lx.transforms.resample_series"
 does = "fMRIPrep's one-shot resampler: head motion, susceptibility distortion and the transforms to a target space applied to a BOLD series in one cubic interpolation."
 api = "docs/api/resample-series.md"
-evidence = "/tools/resample-series/"
+evidence = "/evidence/resample-series/"
 records = { replica = ["resample-series"] }
 original = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.18.1"
 
@@ -637,6 +637,6 @@ name = "io"
 python = "lx.load"
 does = "NIfTI-1 and NIfTI-2 images read and written (`lx.load`, `lx.save`, `lx.Image`), compared with nibabel."
 api = "docs/api/io.md"
-evidence = "/tools/nifti-io/"
+evidence = "/evidence/nifti-io/"
 records = { own = ["nifti-io"] }
 ports = ["own"]

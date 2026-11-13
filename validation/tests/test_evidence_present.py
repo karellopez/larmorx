@@ -1484,3 +1484,122 @@ def test_sdcflows_pages_say_what_their_examples_show_from_their_reasons():
     ex["diffs"][1]["reason"] = "The default corrects SciPy's watershed."
     with pytest.raises(ValueError, match="fix-lx's reason without"):
         est.SHOWS["epi-mask-ds003592"](ex)
+
+
+def _jacobian_like() -> dict:
+    """The resampler's PIPE-03 example as its module exports it: the factor on the BOLD's own grid
+    (role ``reference``, computed another way), the replica's fix, and its reproduce run that
+    gives fMRIPrep's factor (role ``fmriprep``)."""
+
+    def panel(i, role, label, sub=""):
+        return {"id": i, "role": role, "label": label, "sub": sub, "arrays": {"all": {"blob": i}}}
+
+    def diff(i, a, b, kind, verdict, label, rl, reason=""):
+        return {
+            "id": i, "a": a, "b": b, "kind": kind, "label": label, "role_label": rl,
+            "metrics": {"m": {"identical": verdict == "bit-identical", "max_abs": 0.5}},
+            "verdict": verdict, "reason": reason,
+        }  # fmt: skip
+
+    return {
+        "id": "pipe-03", "title": "PIPE-03", "summary": "fMRIPrep's and larmorx's factors.",
+        "facts": [], "metrics_note": "", "provenance": [],
+        "panels": [
+            panel("reference", "reference", "The factor on the BOLD's own grid, carried here"),
+            panel("fix", "larmorx", "larmorx's Jacobian (default mode)"),
+            panel("reproduce", "fmriprep", "fMRIPrep's Jacobian (larmorx, reproduce mode)"),
+        ],
+        "diffs": [
+            diff("fix-ref", "fix", "reference", "reference", None,
+                 "larmorx's factor − the reference", "against the reference",
+                 "larmorx's factor stays at the reference."),
+            diff("repro-ref", "reproduce", "reference", "reference", None,
+                 "fMRIPrep's factor − the reference", "against the reference"),
+            diff("fix-repro", "fix", "reproduce", "main", "d13",
+                 "larmorx's factor − fMRIPrep's (PIPE-03)", "larmorx's correction"),
+        ],
+        "default": {"panels": ["reference", "reproduce", "fix"],
+                    "diffs": ["repro-ref", "fix-ref", "fix-repro"]},
+    }  # fmt: skip
+
+
+def test_a_panels_port_where_its_role_says_another_and_a_computed_reference():
+    """S14: ``panel_ports`` gives a panel the port its role does not say (the replica's run in
+    reproduce that gives fMRIPrep's factor, role ``fmriprep``), with its name from ``panels``;
+    a comparison with a reference computed another way has a group of its own."""
+    from larmorx_validation.evidence import resample_series as rs
+
+    page = rs._page()
+    ex = present.example(
+        page, _jacobian_like(), shows="x", verdicts=["fix-repro"], panels=rs.PANELS["pipe-03"],
+        panel_ports=rs.PANEL_PORTS["pipe-03"], diffs=rs.DIFFS["pipe-03"], known=("reference",),
+    )  # fmt: skip
+    ports = {p["id"]: p["port"] for p in ex["panels"]}
+    assert ports == {"reference": "input", "fix": "replica", "reproduce": "replica"}
+    assert [t for t, _ in ex["order"]["groups"]] == [
+        "The replica against a reference computed another way",
+        "The replica against itself: fix and reproduce",
+    ]
+    assert ex["order"]["panels"] == ["reference", "fix", "reproduce"]
+    assert next(d for d in ex["diffs"] if d["id"] == "fix-ref")["reason"] == (
+        "The replica's factor stays at the reference."
+    )
+    with pytest.raises(ValueError, match="the port of reproduce without its panel and its name"):
+        present.example(page, _jacobian_like(), shows="x", verdicts=["fix-repro"],
+                        panel_ports={"reproduce": "replica"}, diffs=rs.DIFFS["pipe-03"])  # fmt: skip
+
+
+def test_the_resamplers_and_nifti_ios_pages_in_the_guides_words():
+    """S14: the resampler's "What this shows" lines from its examples' reasons, refusing a verdict
+    they do not say; NIfTI I/O named LARMORX's own against nibabel, never a port or "the
+    original"."""
+    from larmorx_validation.evidence import nifti_io
+    from larmorx_validation.evidence import resample_series as rs
+
+    ex = _jacobian_like()
+    ex["diffs"][0]["reason"] = (
+        "larmorx's factor stays at the reference: a median 0.00508 (99th "
+        "percentile 0.063), the size of the interpolation."
+    )
+    ex["diffs"][1]["reason"] = "fMRIPrep's factor departs from the reference by a median 0.0124 " \
+        "(99th percentile 0.101) in the brain: ..."  # fmt: skip
+    line, verdicts = rs.SHOWS["pipe-03"](ex)
+    assert "by a median 0.0124 in the brain (0.101 at the 99th percentile)" in line
+    assert "within a median 0.00508 of it (0.063 at the 99th percentile)" in line
+    assert verdicts == ["fix-repro"]
+    ex["diffs"][2]["verdict"] = "open"
+    with pytest.raises(ValueError, match="fix-repro is open, not d13"):
+        rs.SHOWS["pipe-03"](ex)
+    doc = {
+        "implementations": [{"id": "port", "label": "larmorx (own implementation)"}],
+        "tables": [{
+            "id": "file-0", "columns": [{"label": "Field"}, {"label": "larmorx"}],
+            "title": "a BOLD run: every header field and the data, as nibabel 5.4.2 and larmorx "
+                     "read them",
+            "note": "larmorx in double everywhere.",
+            "rows": [{"head": "larmorx writes the image; nibabel reads it",
+                      "cells": [{"text": "the same data"}]}],
+        }],
+        "cases": [{"id": "c", "category": "synthetic/dtypes", "description": "larmorx detects it",
+                   "results": {"port": {"reason": "its matrices are larmorx's (NIB-04)"}}}],
+        "speed": {"series": [{"id": k, "label": k, "mark": "larmorx"} for k in nifti_io.SPEED],
+                  "note": ""},
+    }  # fmt: skip
+    out = nifti_io.present(doc)
+    im = out["implementations"][0]
+    assert im["title"] == "Agreement, LARMORX's own reader and writer against nibabel 5.4.2"
+    assert (im["short"], im["port"]) == ("LARMORX's own", "own")
+    t = out["tables"][0]
+    assert t["title"] == (
+        "Every header field and the data, LARMORX's own reader against nibabel 5.4.2: a BOLD run"
+    )
+    assert [c["label"] for c in t["columns"]] == ["Field", "LARMORX's own"]
+    assert t["note"] == "LARMORX in double everywhere."
+    assert t["rows"][0]["head"] == "LARMORX writes the image; nibabel reads it"
+    c = out["cases"][0]
+    assert c["description"] == "LARMORX detects it"
+    assert c["results"]["port"]["reason"] == "its matrices are LARMORX's (NIB-04)"
+    assert out["category_labels"] == {"synthetic/dtypes": "synthetic: data types"}
+    assert {s["mark"] for s in out["speed"]["series"]} == {"original", "own", "own-open",
+                                                           "original-open"}  # fmt: skip
+    assert out["random_testing"]["names"] == {"port": "LARMORX's own"}

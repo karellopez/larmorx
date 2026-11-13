@@ -580,6 +580,7 @@ def example(
     known: tuple[str, ...] = (),
     split: bool = False,
     errors: list[str] | None = None,
+    panel_ports: dict[str, str] | None = None,
 ) -> dict:
     """One worked example of ``page`` in the guide's words and order. ``shows`` and
     ``verdicts`` as :func:`words.example`; ``title`` the example's new title; ``runs`` the
@@ -593,7 +594,10 @@ def example(
     page's old metrics tables showed them apart. ``errors``: a dry run that lists every shape it
     cannot name (each panel's, run's and comparison's) instead of stopping at the first, and
     then returns ``ex`` unchanged but for the page's own rewordings
-    (``validation/investigations/docs-revision/probe_present.py``)."""
+    (``validation/investigations/docs-revision/probe_present.py``). ``panel_ports``: a panel's
+    port where its role says another (fMRIPrep's resampler run again here, role ``fmriprep``,
+    is the original; the replica's run in ``reproduce`` that gives fMRIPrep's factor is the
+    replica): with ``panels``, which then names it."""
 
     def attempt(fn, *args, fallback=None):
         if errors is None:
@@ -648,9 +652,14 @@ def example(
             originals[pid] = "fMRIPrep's output"
             info[pid] = {"name": "fMRIPrep's output", "role": "fmriprep"}
     versions = {i["version"] for k, i in info.items() if i.get("version") and rank.get(k) == 0.0}
+    for pid, port in (panel_ports or {}).items():
+        if pid not in by_id or pid not in (panels or {}):
+            raise ValueError(f"{ex['id']}: the port of {pid} without its panel and its name")
+        ports[pid] = port
     for pid, p in by_id.items():
         if p["role"] == "larmorx":
-            ports[pid] = attempt(port_of_label, page, p["label"], fallback=page.port)
+            if pid not in (panel_ports or {}):
+                ports[pid] = attempt(port_of_label, page, p["label"], fallback=page.port)
             if pid in (panels or {}):  # a panel the page names itself (its label has no mode)
                 continue
             # what it is compared with: the version it follows where a panel says so, else the
@@ -715,8 +724,8 @@ def example(
     order = {p: (words.PORT_ORDER.index(port_of(p)), rank.get(p, 0.0), i)
              for i, p in enumerate(by_id)}  # fmt: skip
     targets = [
-        "the original", "fMRIPrep's output", "the known answer", "its starting point", "itself",
-        "the replica",
+        "the original", "fMRIPrep's output", "the known answer", "a reference computed another way",
+        "its starting point", "itself", "the replica",
     ]  # fmt: skip
 
     def place(pid: str) -> tuple:
@@ -737,8 +746,10 @@ def example(
             # point, then against itself
             for t, title_ in (
                 ("the known answer", "The original against the known answer"),
+                ("a reference computed another way",
+                 "The original against a reference computed another way"),
                 ("its starting point", "The original against its starting point"),
-            ):
+            ):  # fmt: skip
                 ids = [d["id"] for d in ds if target[d["id"]] == t]
                 if ids:
                     groups.append((title_, ids))
@@ -748,7 +759,7 @@ def example(
                 groups.append(("The original against itself: the defect", defect))
             rest = [
                 d["id"] for d in ds if d["id"] not in defect and target[d["id"]] not in (
-                    "the known answer", "its starting point")
+                    "the known answer", "a reference computed another way", "its starting point")
             ]  # fmt: skip
             if rest:
                 groups.append(("The original against itself: the yardstick", rest))

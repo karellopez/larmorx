@@ -18,7 +18,7 @@
 id = "nifti-io"
 title = "NIfTI-1/2 I/O"
 eco = "larmorx"
-page = "/tools/nifti-io/"
+page = "/evidence/nifti-io/"
 use = ["lx.load", "lx.save", "lx.Image"]
 how = "LARMORX's own"
 validation = "[{nifti-io.cases} files](record:nifti-io), data bit-identical to nibabel; [4–8× faster](repo:docs/benchmarks/nifti-io.md) on compressed writes with threads"
@@ -110,7 +110,7 @@ validation = "[{ants-atropos.cases} cases](record:ants-atropos): {ants-atropos.i
 id = "resample-series"
 title = "fMRIPrep's one-shot BOLD resampler"
 eco = "fmriprep"
-page = "/tools/resample-series/"
+page = "/evidence/resample-series/"
 use = ["lx.transforms.resample_series"]
 how = "replica (fMRIPrep, nitransforms, SciPy)"
 validation = "[{resample-series.cases} cases](record:resample-series): {resample-series.pass} of {resample-series.pass} compared bit-identical"

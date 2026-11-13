@@ -90,32 +90,31 @@ fn face_count_bits(g: &mut Gen, nf: i64, maxf: i64) -> u32 {
 /// cut now and then (FS-167: FreeSurfer reads memory then).
 fn triangle_file(g: &mut Gen, nv: i64, nf: i64, maxf: i64, per: usize) -> Vec<u8> {
     let mut b = Vec::new();
-    let entries;
-    match g.below(4) {
+    let entries = match g.below(4) {
         0 => {
             b.extend_from_slice(&(nv as i32).to_be_bytes());
             b.extend_from_slice(&(nf as i32).to_be_bytes());
-            entries = nf.max(0) as usize;
+            nf.max(0) as usize
         }
         1 => {
             let v = if g.chance(5) { nv + 1 } else { nv };
             b.extend_from_slice(&(v as f32).to_bits().to_be_bytes());
             let c = face_count_bits(g, nf, maxf);
             b.extend_from_slice(&c.to_be_bytes());
-            entries = float_count(c).clamp(0, maxf) as usize;
+            float_count(c).clamp(0, maxf) as usize
         }
         2 => {
             b.extend_from_slice(&(nv as i32).to_be_bytes());
             let c = (g.int(-1, maxf + 2) as i32).to_be_bytes();
             b.extend_from_slice(&c);
-            entries = g.int(0, maxf) as usize;
+            g.int(0, maxf) as usize
         }
         _ => {
             b.extend_from_slice(&(nv as f32).to_bits().to_be_bytes());
             b.extend_from_slice(&(nf as f32).to_bits().to_be_bytes());
-            entries = nf.max(0) as usize;
+            nf.max(0) as usize
         }
-    }
+    };
     for _ in 0..entries * per {
         let heavy = g.chance(4);
         b.extend_from_slice(&smallish(g, heavy).to_be_bytes());
@@ -207,20 +206,20 @@ pub(super) fn sfile_tokens(t: &mut Vec<String>, g: &mut Gen) {
             "gf" | "ca" | "mm" => {}
             _ => {
                 let n = name(g, k);
-                if op == "rt" && !g.chance(4) {
-                    if let Some((path, hemi)) = triangle_paths(&n)
-                        && (path == "." || path == "d")
-                    {
+                if op == "rt"
+                    && !g.chance(4)
+                    && let Some((path, hemi)) = triangle_paths(&n)
+                    && (path == "." || path == "d")
+                {
+                    inputs.push((
+                        format!("{path}/{hemi}.triangle_area"),
+                        triangle_file(g, nv, nf, maxf, 1),
+                    ));
+                    if !g.chance(4) {
                         inputs.push((
-                            format!("{path}/{hemi}.triangle_area"),
-                            triangle_file(g, nv, nf, maxf, 1),
+                            format!("{path}/{hemi}.triangle_angle"),
+                            triangle_file(g, nv, nf, maxf, 3),
                         ));
-                        if !g.chance(4) {
-                            inputs.push((
-                                format!("{path}/{hemi}.triangle_angle"),
-                                triangle_file(g, nv, nf, maxf, 3),
-                            ));
-                        }
                     }
                 }
                 if (op == "rb" || op == "ri") && !g.chance(5) && creatable(&n) {

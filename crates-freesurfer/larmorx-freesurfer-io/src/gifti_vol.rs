@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! `utils/gifti.cpp`'s GIFTI files as volumes (queue item 3.1-26; relay 22 of track D):
-//! `MRISreadGiftiAsMRI` (1231-1411), which fs.io's `MRIread` calls for a `.gii` name, and
-//! `mriWriteGifti` (1506-1609), which `MRIwrite` calls. A surface's per-vertex values are a volume
-//! of one column per vertex, one row, one slice, one frame per data array.
+//! `utils/gifti.cpp`'s GIFTI files as volumes (queue item 3.1-26; relay 22 of track D, moved here
+//! from larmorx-freesurfer-surf in relay 23): `MRISreadGiftiAsMRI` (1231-1411), which fs.io's
+//! `MRIread` calls for a `.gii` name, and `mriWriteGifti` (1506-1609), which `MRIwrite` calls. A
+//! surface's per-vertex values are a volume of one column per vertex, one row, one slice, one frame
+//! per data array. Neither needs a surface: they use gifticlib's state of the run
+//! (`Globals::gifti`) and the pieces of `gifti.cpp` in [`crate::gifti_common`].
 //!
 //! The defects (`larmorx_core::defects`; mechanisms in `docs/findings/freesurfer-surfio.md` §24):
 //! FS-521 (a file mixing intents), FS-522 (a volume of more than one row or slice written), FS-395
@@ -22,15 +24,12 @@ use larmorx_io::gifti::{
     GiftiImage, NIFTI_INTENT_NONE, NIFTI_INTENT_TIME_SERIES, NIFTI_TYPE_FLOAT32, intent_to_string,
 };
 
-use crate::aaa::SurfGlobals;
-use crate::coords::Io;
-use crate::gifti::{
-    NIFTI_INTENT_LABEL, NIFTI_INTENT_SHAPE, meta, read_label_table, scan_f, value, vertices_cols,
+use crate::gifti_common::{
+    NIFTI_INTENT_LABEL, NIFTI_INTENT_SHAPE, add_array, alloc_data, free, gifti_set_da_value_2d,
+    meta, new_image, read_label_table, read_valid, scan_f, set_attributes, set_sizes,
+    validate_and_write, value, vertices_cols,
 };
-use crate::gifti_write::{
-    add_array, alloc_data, free, gifti_set_da_value_2d, new_image, read_valid, set_attributes,
-    set_sizes, validate_and_write,
-};
+use crate::streams::Io;
 
 /// `NIFTI_INTENT_NORMAL` (`nifti1.h`).
 const NIFTI_INTENT_NORMAL: i32 = 11;
@@ -70,12 +69,10 @@ struct Found {
 /// counted; with `reproduce` the counts go on and the intent is [`FS521_UNWRITTEN_INTENT`].
 fn search(
     g: &mut Globals,
-    sg: &SurfGlobals,
     io: &mut Io,
     image: &GiftiImage,
     fname: &str,
 ) -> Result<Option<Found>, Fatal> {
-    let gx = &sg.gifti;
     let num_da = image.num_da;
     let mut frames = 0;
     let mut num_vertices: i64 = -1;
@@ -89,12 +86,12 @@ fn search(
                     out: &mut *io.out,
                     err: &mut *io.err,
                 };
-                gx.find_da(image, intent, da_num, &mut w)
+                g.gifti.find_da(image, intent, da_num, &mut w)
             };
             let Some(da) = da else { break };
             frames += 1;
             found_here += 1;
-            let (nv, nc) = vertices_cols(gx, io, da);
+            let (nv, nc) = vertices_cols(&g.gifti, io, da);
             if num_vertices == -1 {
                 num_vertices = nv;
                 num_cols = nc;
@@ -160,17 +157,16 @@ fn search(
 /// first array's `TimeStep` (`%f`). FS-521, FS-395.
 pub fn mris_read_gifti_as_mri(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     fname: &str,
     read_volume: bool,
 ) -> Result<Option<Mri>, Fatal> {
-    let Some(mut image) = read_valid(g, sg, io, dir, fname, "MRISreadGiftiAsMRI")? else {
+    let Some(mut image) = read_valid(g, io, dir, fname, "MRISreadGiftiAsMRI")? else {
         return Ok(None);
     };
-    let Some(found) = search(g, sg, io, &image, fname)? else {
-        free(&sg.gifti, io, image);
+    let Some(found) = search(g, io, &image, fname)? else {
+        free(&g.gifti, io, image);
         return Ok(None);
     };
     if found.frames == 0 {
@@ -178,7 +174,7 @@ pub fn mris_read_gifti_as_mri(
             io.err,
             "MRISreadGiftiAsMRI: no overlay data found in file {fname}"
         );
-        free(&sg.gifti, io, image);
+        free(&g.gifti, io, image);
         return Ok(None);
     }
     let chosen = found.intent;
@@ -190,7 +186,7 @@ pub fn mris_read_gifti_as_mri(
         intent = MGZ_INTENT_LABEL;
         version = ((intent & 0xffff) << 8) | MGH_VERSION;
         dtype = MRI_INT;
-        ct = read_label_table(g, sg, io, &mut image, fname)?;
+        ct = read_label_table(g, io, &mut image, fname)?;
     } else if chosen == NIFTI_INTENT_SHAPE {
         intent = MGZ_INTENT_SHAPE;
         version = ((intent & 0xffff) << 8) | MGH_VERSION;
@@ -207,7 +203,7 @@ pub fn mris_read_gifti_as_mri(
     let width = found.num_vertices as i32;
     let time_step = |g: &mut Globals, io: &mut Io, image: &GiftiImage| -> Option<Vec<u8>> {
         let da = image.darray.first().and_then(|d| d.as_ref())?;
-        meta(&sg.gifti, io, &mut g.notices, &da.meta, "TimeStep")
+        meta(&g.gifti, io, &mut g.notices, &da.meta, "TimeStep")
     };
     if !read_volume {
         let mut mri = mri_alloc_header(g, io.out, io.err, width, 1, 1, MRI_FLOAT, found.frames)?;
@@ -235,7 +231,7 @@ pub fn mris_read_gifti_as_mri(
                 out: &mut *io.out,
                 err: &mut *io.err,
             };
-            sg.gifti.find_da(&image, chosen, da_num, &mut w)
+            g.gifti.find_da(&image, chosen, da_num, &mut w)
         };
         let Some(da) = da else { continue };
         for vno in 0..found.num_vertices.max(0) {
@@ -253,7 +249,7 @@ pub fn mris_read_gifti_as_mri(
     {
         mri.tr = tr;
     }
-    free(&sg.gifti, io, image);
+    free(&g.gifti, io, image);
     Ok(Some(mri))
 }
 
@@ -266,13 +262,12 @@ pub fn mris_read_gifti_as_mri(
 /// column, row by row, slice by slice (`reproduce`: the first row).
 pub fn mri_write_gifti(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mri: &Mri,
     out_fname: &str,
 ) -> Result<i32, Fatal> {
-    let mut image = new_image(&sg.gifti, io, &mut g.notices);
+    let mut image = new_image(&g.gifti, io, &mut g.notices);
     let rows = mri.height > 1 || mri.depth > 1;
     if rows {
         g.notices.add(
@@ -293,11 +288,11 @@ pub fn mri_write_gifti(
     let n = i32::try_from(n).unwrap_or(i32::MAX);
     let fix = g.notices.fix();
     for frame in 0..mri.nframes.max(0) {
-        let Some(k) = add_array(&sg.gifti, io, &mut image) else {
+        let Some(k) = add_array(&g.gifti, io, &mut image) else {
             let _ = io
                 .err
                 .write_all(b"mriWriteGifti: couldn't allocate giiDataArray\n");
-            free(&sg.gifti, io, image);
+            free(&g.gifti, io, image);
             return Ok(ERROR_NOMEMORY);
         };
         let da = image.darray[k].as_mut().expect("an added data array");
@@ -313,7 +308,7 @@ pub fn mri_write_gifti(
                 out: &mut *io.out,
                 err: &mut *io.err,
             };
-            sg.gifti.add_to_meta(
+            g.gifti.add_to_meta(
                 &mut da.meta,
                 b"TimeStep",
                 tr.as_bytes(),
@@ -323,7 +318,7 @@ pub fn mri_write_gifti(
             );
         }
         set_attributes(da, intent, NIFTI_TYPE_FLOAT32, 1, n, 0);
-        set_sizes(&sg.gifti, io, fix, da);
+        set_sizes(&g.gifti, io, fix, da);
         alloc_data(da);
         let mut i = 0;
         for s in 0..depth {
@@ -338,7 +333,6 @@ pub fn mri_write_gifti(
     }
     Ok(validate_and_write(
         g,
-        &mut sg.gifti,
         io,
         dir,
         image,

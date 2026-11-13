@@ -199,3 +199,24 @@ leaves its buffer at the end); `stricmp` on bytes (FS-11 noted for 1,024 bytes o
 (a bad `#ctTType` line an error), FS-417 (empty places skipped), FS-418 (the table grown) and the
 caps of FS-420 (2^24 places, 2^20 random entries) are larmorx's own; FS-415 closes the file (no
 notice), FS-416 returns no table.
+
+
+## FreeSurfer files and functions translated (track D's GIFTI volumes, moved here in its relay 23)
+
+Written by track D (the surface track) in its relays 21 and 22 in `larmorx-freesurfer-surf` and
+moved here in its relay 23, so that `MRIread` and `MRIwrite` (this crate) reach the GIFTI volume
+functions without the surface crate (the orchestrator's decision: they need no surface type).
+Behaviour: `specs/freesurfer-surfio.md` §107-111; mechanisms: `docs/findings/freesurfer-surfio.md`
+§23-24.
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/gifti.cpp` 1231-1411, 1506-1609; `include/mri.h` 677-683 (`MGZ_INTENT_*`) | `MRISreadGiftiAsMRI`, `mriWriteGifti` (FS-521, FS-522, FS-395) | `gifti_vol.rs` |
+| `utils/gifti.cpp` 213-336, 1416-1424, 2857-3006 | `gifti_set_DA_value_2D` (FS-17), `insertCommonMetaData` (the user name from `/proc` and `/etc/passwd` as `getpwuid`, else `USER`/`USERNAME`; `Date` by `currentDateTime`), `readLabelTable` (FS-389, FS-80) with the colour entries it builds | `gifti_common.rs` |
+| `utils/gifti.cpp` (the steps its readers and writers repeat) | `gifti_read_image` with a version "1" made "1.0" and gifticlib's check (FS-395), the writers' end (`gifti_valid_gifti_image`, `gifti_write_image`, `gifti_free_image`), `gifti_get_meta_value`, `gifti_DA_rows_cols` as the readers count vertices, the arrays' attributes and sizes | `gifti_common.rs` |
+| `packages/gifti/gifti_io.c` 4232-4250, `gifti_xml.c` 1236-1252 | FreeSurfer's two changes to gifticlib 1.12 (`FsGifti`, over `larmorx_io::gifti`) | `gifti_common.rs` |
+| (larmorx's own) | `streams::Io`: standard output, standard error and the environment passed together (moved from the surface crate's `coords`) | `streams.rs` |
+
+Changes for this part: gifticlib's settings and persistent state (its globals `G` and `GXD`) are
+fs.core's `Globals::gifti`, one per run as in FreeSurfer, which the volume and the surface functions
+share (before relay 23 they were the surface crate's `SurfGlobals::gifti`).

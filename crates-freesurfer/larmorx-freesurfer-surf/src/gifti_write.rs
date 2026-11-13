@@ -2,13 +2,14 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! `utils/gifti.cpp`'s GIFTI writers (queue item 3.1-26, its surface part; relay 22 of track D):
-//! `gifti_set_DA_value_2D` (213-336, file-local), `insertCommonMetaData` (1416-1424),
 //! `MRISwriteGIFTI` (1443-1495), `MRISwriteGIFTIIntent` and its intent writers `Shape`, `Stats`,
 //! `Label`, `RGBAVector`, `Surface` (1612-2416), the overloads that take their values from a
 //! volume (`MRISwriteGIFTI` 2419-2465, `MRISwriteGIFTIIntent`, `Shape`, `Stats` 2536-2744), the
 //! combined writer `MRISwriteGIFTICombined` (2470-2532) and `getShapeStatIntentCount` (2746-2855),
 //! over gifticlib 1.12 (`larmorx_io::gifti`, track C's port) with FreeSurfer's two changes to it
-//! ([`FsGifti`]). `MRISurfOverlay::getGIFTIIntent` (`utils/MRISurfOverlay.cpp` 225-284) is taken
+//! (`FsGifti`) and the pieces of `gifti.cpp` the writers share with the GIFTI volume functions
+//! (`gifti_set_DA_value_2D` 213-336, `insertCommonMetaData` 1416-1424, the check/write/free end:
+//! larmorx-freesurfer-io's `gifti_common` since relay 23). `MRISurfOverlay::getGIFTIIntent` (`utils/MRISurfOverlay.cpp` 225-284) is taken
 //! early, as the writers call it; `colortab.cpp`'s `CTABfindAnnotation` is fs.labels'
 //! (`larmorx_freesurfer_io::colortab`).
 //!
@@ -25,39 +26,34 @@
 //! (an overlay without its volume), FS-524 (statistics overlays of the generic type dropped by the
 //! combined writer); FS-395 (a file without a Version, read by `getShapeStatIntentCount`), FS-17.
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use larmorx_core::cfmt::{self, Writers};
-use larmorx_core::defects::{FS_395, FS_397, FS_398, FS_399, FS_400, FS_523, FS_524, Notices};
-use larmorx_freesurfer_core::affine::float_to_int;
+use larmorx_core::defects::{FS_397, FS_398, FS_399, FS_400, FS_523, FS_524, Notices};
 use larmorx_freesurfer_core::diag::DIAG_VERBOSE;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{
-    ERROR_BADFILE, ERROR_BADPARM, ERROR_NOMEMORY, ERROR_NONE, Fatal, NO_ERROR,
-};
+use larmorx_freesurfer_core::log::{ERROR_BADFILE, ERROR_BADPARM, ERROR_NOMEMORY, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::{matrix_identity, matrix_inverse};
-use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::timer::current_date_time;
 use larmorx_freesurfer_io::colortab::ctab_find_annotation;
-use larmorx_freesurfer_io::gifti::gifti_alloc_and_add_darray;
 use larmorx_freesurfer_mri::mri::Mri;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 use larmorx_freesurfer_volume::vgeom::{tkr_vox2ras_from_vol_geom, vg_i_to_r};
 use larmorx_io::gifti::{
-    DataArray, GIFTI_ENCODING_B64GZ, GIFTI_ENDIAN_LITTLE, GIFTI_IND_ORD_ROW_MAJOR,
-    GIFTI_XML_VERSION, Gifti, GiftiImage, LabelTable, NIFTI_INTENT_NONE, NIFTI_INTENT_POINTSET,
-    NIFTI_INTENT_TRIANGLE, NIFTI_TYPE_FLOAT32, NIFTI_TYPE_INT8, NIFTI_TYPE_INT16, NIFTI_TYPE_INT32,
-    NIFTI_TYPE_UINT8, NIFTI_TYPE_UINT16, NIFTI_TYPE_UINT32, NvPairs, intent_to_string,
+    DataArray, Gifti, GiftiImage, LabelTable, NIFTI_INTENT_NONE, NIFTI_INTENT_POINTSET,
+    NIFTI_INTENT_TRIANGLE, NIFTI_TYPE_FLOAT32, NIFTI_TYPE_INT32, NvPairs, intent_to_string,
 };
 
-use crate::aaa::SurfGlobals;
+pub use larmorx_freesurfer_io::gifti_common::gifti_set_da_value_2d;
+use larmorx_freesurfer_io::gifti_common::{
+    add_array, add_meta, alloc_data, free, new_image, read_valid, set_attributes, set_sizes,
+    validate_and_write, vertices_cols,
+};
+
 use crate::coords::Io;
 use crate::gifti::{
-    FS_MRISURFOVERLAY_STATS, FsGifti, NIFTI_INTENT_GENMATRIX, NIFTI_INTENT_LABEL,
-    NIFTI_INTENT_RGB_VECTOR, NIFTI_INTENT_RGBA_VECTOR, NIFTI_INTENT_SHAPE, NIFTI_INTENT_VECTOR,
-    OverlayInfo, Renamed, vertices_cols,
+    FS_MRISURFOVERLAY_STATS, NIFTI_INTENT_GENMATRIX, NIFTI_INTENT_LABEL, NIFTI_INTENT_RGB_VECTOR,
+    NIFTI_INTENT_RGBA_VECTOR, NIFTI_INTENT_SHAPE, NIFTI_INTENT_VECTOR, OverlayInfo,
 };
 use crate::mris::Mris;
 use crate::readwrite::read_transform;
@@ -87,236 +83,8 @@ pub fn get_gifti_intent(overlaytype: i32) -> i32 {
     }
 }
 
-/// `(T) value` for an integer type of 8, 16 or 32 bits as x86-64 converts a `double`: through a
-/// 32-bit `int` (`cvttsd2si`, FS-17 beyond its range), its low bits kept.
-fn to_int_bits(g: &mut Globals, value: f64) -> i32 {
-    float_to_int(g, value, "gifti_set_DA_value_2D")
-}
-
-/// `(unsigned int) value` as x86-64 converts a `double`: through a 64-bit integer
-/// (`cvttsd2si` with a 64-bit result: beyond its range or NaN `INT64_MIN`), its low 32 bits.
-fn to_uint32_bits(g: &mut Globals, value: f64) -> u32 {
-    // 2^63: the 64-bit conversion's range
-    let lim = (1u64 << 63) as f64;
-    if value.is_nan() || value >= lim || value < -lim {
-        g.notices.add(
-            &larmorx_core::defects::FS_17,
-            format!("gifti_set_DA_value_2D: (unsigned int) {value}, outside the range: an undefined conversion"),
-        );
-        if g.notices.reproduce() {
-            return 0;
-        }
-        return if value > 0.0 { u32::MAX } else { 0 };
-    }
-    let v = value.trunc() as i64;
-    if !(0..=i64::from(u32::MAX)).contains(&v) {
-        g.notices.add(
-            &larmorx_core::defects::FS_17,
-            format!("gifti_set_DA_value_2D: (unsigned int) {value}, outside the range: an undefined conversion"),
-        );
-        if !g.notices.reproduce() {
-            return if v > 0 { u32::MAX } else { 0 };
-        }
-    }
-    v as u32
-}
-
-/// `gifti_set_DA_value_2D(da, row, col, value)`: `value` stored as the array's data type at row
-/// `row`, column `col` (a 1-D array: column 0 only, the row its element). A 1-D array with another
-/// column, or an array of another dimensionality, ends the program after its message (exit 1); an
-/// element outside the dimensions is refused with `** gifti_set_DA_value_2D, invalid params:
-/// dim0_index=<i> (max=<n>), dim1_index=<j> (max=<m>)` on standard error; a data type other than
-/// the integers of 8 to 32 bits and FLOAT32 with `** gifti_set_DA_value_2D, unsupported type
-/// <t>-unknown, or can't convert to double`. An array without data ends the program (never met:
-/// every writer allocates the data first).
-pub fn gifti_set_da_value_2d(
-    g: &mut Globals,
-    err: &mut dyn Write,
-    da: &mut DataArray,
-    row: i32,
-    col: i32,
-    value: f64,
-) -> Result<(), Fatal> {
-    if da.data.is_none() {
-        let _ = err.write_all(b"** gifti_set_DA_value_2D, invalid params: data=(nil)\n");
-        return Err(Fatal::Exit(1));
-    }
-    let (dims_0, dims_1) = if da.num_dim == 1 {
-        if col != 0 {
-            let _ = writeln!(
-                err,
-                "** gifti_set_DA_value_2D, array dim is 1 but trying to access 2D data element (col={col})"
-            );
-            return Err(Fatal::Exit(1));
-        }
-        (da.dims[0], 1)
-    } else if da.num_dim != 2 {
-        let _ = writeln!(err, "** gifti_set_DA_value_2D, array dim is {}", da.num_dim);
-        return Err(Fatal::Exit(1));
-    } else {
-        (da.dims[0], da.dims[1])
-    };
-    let row_major = da.ind_ord == GIFTI_IND_ORD_ROW_MAJOR;
-    let (dim0_index, dim1_index) = if row_major || da.num_dim == 1 {
-        (row, col)
-    } else {
-        (col, row)
-    };
-    if dim0_index < 0 || dim0_index >= dims_0 || dim1_index < 0 || dim1_index >= dims_1 {
-        let _ = writeln!(
-            err,
-            "** gifti_set_DA_value_2D, invalid params: dim0_index={dim0_index} (max={dims_0}), dim1_index={dim1_index} (max={dims_1})"
-        );
-        return Ok(());
-    }
-    // C's int arithmetic of the element's place (the dimensions are small enough for it)
-    let k = if row_major {
-        i64::from(dim0_index) * i64::from(dims_1) + i64::from(dim1_index)
-    } else {
-        i64::from(dim0_index) + i64::from(dim1_index) * i64::from(dims_0)
-    } as usize;
-    let bytes: Vec<u8> = match da.datatype {
-        NIFTI_TYPE_UINT8 => vec![to_int_bits(g, value) as u8],
-        NIFTI_TYPE_INT16 => (to_int_bits(g, value) as i16).to_le_bytes().to_vec(),
-        NIFTI_TYPE_INT32 => to_int_bits(g, value).to_le_bytes().to_vec(),
-        NIFTI_TYPE_FLOAT32 => (value as f32).to_le_bytes().to_vec(),
-        NIFTI_TYPE_INT8 => vec![to_int_bits(g, value) as i8 as u8],
-        NIFTI_TYPE_UINT16 => (to_int_bits(g, value) as u16).to_le_bytes().to_vec(),
-        NIFTI_TYPE_UINT32 => to_uint32_bits(g, value).to_le_bytes().to_vec(),
-        t => {
-            let _ = writeln!(
-                err,
-                "** gifti_set_DA_value_2D, unsupported type {t}-unknown, or can't convert to double"
-            );
-            return Ok(());
-        }
-    };
-    let data = da.data.as_mut().expect("checked above");
-    let at = k * bytes.len();
-    if let Some(dst) = data.get_mut(at..at + bytes.len()) {
-        dst.copy_from_slice(&bytes);
-    }
-    Ok(())
-}
-
-/// The effective user's name as `getpwuid(geteuid())` gives it: on Linux from `/proc/self/status`
-/// and `/etc/passwd`; elsewhere (or when they cannot be read) `USER`, then `USERNAME`; `None`
-/// when nothing gives one.
-fn passwd_user_name(env: &Environment) -> Option<String> {
-    let from_passwd = || -> Option<String> {
-        let status = std::fs::read_to_string("/proc/self/status").ok()?;
-        let euid = status
-            .lines()
-            .find_map(|l| l.strip_prefix("Uid:"))?
-            .split_ascii_whitespace()
-            .nth(1)?
-            .to_owned();
-        let passwd = std::fs::read_to_string("/etc/passwd").ok()?;
-        passwd.lines().find_map(|l| {
-            let f: Vec<&str> = l.split(':').collect();
-            (f.len() > 2 && f[2] == euid).then(|| f[0].to_owned())
-        })
-    };
-    from_passwd().or_else(|| {
-        ["USER", "USERNAME"].iter().find_map(|n| {
-            env.get(n)
-                .map(|v| v.to_string_lossy().into_owned())
-                .filter(|v| !v.is_empty())
-        })
-    })
-}
-
-/// `gifti_add_to_meta(md, name, value, 1)`; a `NULL` value adds nothing (gifticlib returns 1).
-pub(crate) fn add_meta(
-    gx: &Gifti,
-    io: &mut Io,
-    notices: &mut Notices,
-    md: &mut NvPairs,
-    name: &str,
-    value: Option<&[u8]>,
-) {
-    let Some(value) = value else { return };
-    let mut w = Writers {
-        out: &mut *io.out,
-        err: &mut *io.err,
-    };
-    gx.add_to_meta(md, name.as_bytes(), value, true, &mut w, notices);
-}
-
-/// `insertCommonMetaData(md)`: `UserName` (when the password database gives one) and `Date`
-/// (`currentDateTime()`).
-fn insert_common_meta_data(gx: &Gifti, io: &mut Io, notices: &mut Notices, md: &mut NvPairs) {
-    if let Some(user) = passwd_user_name(io.env) {
-        add_meta(gx, io, notices, md, "UserName", Some(user.as_bytes()));
-    }
-    let date = current_date_time(io.env, true);
-    add_meta(gx, io, notices, md, "Date", Some(date.as_bytes()));
-}
-
-/// A new image: version "1.0", the common metadata.
-pub(crate) fn new_image(gx: &Gifti, io: &mut Io, notices: &mut Notices) -> GiftiImage {
-    let mut image = GiftiImage {
-        version: Some(GIFTI_XML_VERSION.as_bytes().to_vec()),
-        ..GiftiImage::default()
-    };
-    let mut md = std::mem::take(&mut image.meta);
-    insert_common_meta_data(gx, io, notices, &mut md);
-    image.meta = md;
-    image
-}
-
-/// A new data array at the end of `image` (`gifti_alloc_and_add_darray`): its index, or `None`.
-pub(crate) fn add_array(gx: &Gifti, io: &mut Io, image: &mut GiftiImage) -> Option<usize> {
-    let mut w = Writers {
-        out: &mut *io.out,
-        err: &mut *io.err,
-    };
-    gifti_alloc_and_add_darray(gx, Some(image), &mut w)?;
-    Some(image.num_da as usize - 1)
-}
-
 fn array(image: &mut GiftiImage, k: usize) -> &mut DataArray {
     image.darray[k].as_mut().expect("an added data array")
-}
-
-/// The attributes every FreeSurfer writer gives an array: the intent and type, row-major order,
-/// the dimensions, GZipBase64Binary, little-endian, no coordinate system.
-pub(crate) fn set_attributes(
-    da: &mut DataArray,
-    intent: i32,
-    datatype: i32,
-    num_dim: i32,
-    d0: i32,
-    d1: i32,
-) {
-    da.intent = intent;
-    da.datatype = datatype;
-    da.ind_ord = GIFTI_IND_ORD_ROW_MAJOR;
-    da.num_dim = num_dim;
-    da.dims[0] = d0;
-    da.dims[1] = d1;
-    da.encoding = GIFTI_ENCODING_B64GZ;
-    da.endian = GIFTI_ENDIAN_LITTLE;
-    da.coordsys = Vec::new();
-}
-
-/// `da->nvals = gifti_darray_nvals(da)` and `gifti_datatype_sizes(da->datatype, &da->nbyper,
-/// NULL)`.
-pub(crate) fn set_sizes(gx: &Gifti, io: &mut Io, fix: bool, da: &mut DataArray) {
-    let mut w = Writers {
-        out: &mut *io.out,
-        err: &mut *io.err,
-    };
-    da.nvals = gx.darray_nvals(da, &mut w);
-    if let Some((n, _)) = gx.datatype_sizes(da.datatype, fix, &mut w) {
-        da.nbyper = n;
-    }
-}
-
-/// `da->data = calloc(da->nvals, da->nbyper)`.
-pub(crate) fn alloc_data(da: &mut DataArray) {
-    let n = (da.nvals.max(0) as usize).saturating_mul(da.nbyper.max(0) as usize);
-    da.data = Some(vec![0; n]);
 }
 
 /// The C string's bytes of a name (before its first NUL).
@@ -350,13 +118,12 @@ fn stats_meta(gx: &Gifti, io: &mut Io, notices: &mut Notices, md: &mut NvPairs, 
 /// contains).
 fn write_shape(
     g: &mut Globals,
-    gx: &Gifti,
     io: &mut Io,
     mris: &Mris,
     image: &mut GiftiImage,
     curv_fname: Option<&str>,
 ) -> Result<i32, Fatal> {
-    let Some(k) = add_array(gx, io, image) else {
+    let Some(k) = add_array(&g.gifti, io, image) else {
         let _ = io
             .err
             .write_all(b"MRISwriteGIFTIShape: couldn't allocate giiDataArray\n");
@@ -372,10 +139,10 @@ fn write_shape(
         mris.nvertices,
         0,
     );
-    set_sizes(gx, io, fix, shape);
+    set_sizes(&g.gifti, io, fix, shape);
     if let Some(name) = curv_fname {
         add_meta(
-            gx,
+            &g.gifti,
             io,
             &mut g.notices,
             &mut shape.meta,
@@ -397,7 +164,7 @@ fn write_shape(
         }
         if let Some(m) = meta {
             add_meta(
-                gx,
+                &g.gifti,
                 io,
                 &mut g.notices,
                 &mut shape.meta,
@@ -418,13 +185,12 @@ fn write_shape(
 /// one value per vertex (its `stat`), with `Intent_code` (and the uniform distribution's range).
 fn write_stats(
     g: &mut Globals,
-    gx: &Gifti,
     io: &mut Io,
     mris: &Mris,
     image: &mut GiftiImage,
     intent: i32,
 ) -> Result<i32, Fatal> {
-    let Some(k) = add_array(gx, io, image) else {
+    let Some(k) = add_array(&g.gifti, io, image) else {
         let _ = io
             .err
             .write_all(b"MRISwriteGIFTIStats: couldn't allocate giiDataArray\n");
@@ -433,8 +199,8 @@ fn write_stats(
     let fix = g.notices.fix();
     let stats = array(image, k);
     set_attributes(stats, intent, NIFTI_TYPE_FLOAT32, 1, mris.nvertices, 0);
-    set_sizes(gx, io, fix, stats);
-    stats_meta(gx, io, &mut g.notices, &mut stats.meta, intent);
+    set_sizes(&g.gifti, io, fix, stats);
+    stats_meta(&g.gifti, io, &mut g.notices, &mut stats.meta, intent);
     alloc_data(stats);
     for vno in 0..mris.nvertices.max(0) {
         let v = f64::from(mris.vertex(vno as usize).stat);
@@ -456,7 +222,6 @@ fn write_stats(
 /// `ERROR_BADPARM`); `reproduce` crashes as FreeSurfer does.
 fn write_label(
     g: &mut Globals,
-    gx: &Gifti,
     io: &mut Io,
     mris: &Mris,
     image: &mut GiftiImage,
@@ -535,7 +300,7 @@ fn write_label(
     }
     let second = (length == 2).then(|| lt.label[1].clone()).flatten();
     image.labeltable = lt;
-    let Some(k) = add_array(gx, io, image) else {
+    let Some(k) = add_array(&g.gifti, io, image) else {
         let _ = io
             .err
             .write_all(b"MRISwriteGIFTILabel: couldn't allocate giiDataArray\n");
@@ -551,9 +316,9 @@ fn write_label(
         mris.nvertices,
         0,
     );
-    set_sizes(gx, io, fix, labels);
+    set_sizes(&g.gifti, io, fix, labels);
     add_meta(
-        gx,
+        &g.gifti,
         io,
         &mut g.notices,
         &mut labels.meta,
@@ -562,7 +327,7 @@ fn write_label(
     );
     if length == 2 {
         add_meta(
-            gx,
+            &g.gifti,
             io,
             &mut g.notices,
             &mut labels.meta,
@@ -586,12 +351,11 @@ fn write_label(
 /// / 255.0` stored as `float`) and 1.
 fn write_rgba(
     g: &mut Globals,
-    gx: &Gifti,
     io: &mut Io,
     mris: &Mris,
     image: &mut GiftiImage,
 ) -> Result<i32, Fatal> {
-    let Some(k) = add_array(gx, io, image) else {
+    let Some(k) = add_array(&g.gifti, io, image) else {
         let _ = io
             .err
             .write_all(b"MRISwriteGIFTIRGBAVector(): couldn't allocate giiDataArray\n");
@@ -607,7 +371,7 @@ fn write_rgba(
         mris.nvertices,
         4,
     );
-    set_sizes(gx, io, fix, rgba);
+    set_sizes(&g.gifti, io, fix, rgba);
     alloc_data(rgba);
     for vno in 0..mris.nvertices.max(0) {
         let annot = mris.vertex(vno as usize).annotation;
@@ -699,14 +463,13 @@ fn surface_xform(
 /// each at most 1,023 bytes).
 fn write_surface(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
     image: &mut GiftiImage,
     out_fname: &str,
 ) -> Result<i32, Fatal> {
-    let gx_add = add_array(&sg.gifti, io, image);
+    let gx_add = add_array(&g.gifti, io, image);
     let Some(ck) = gx_add else {
         let _ = io
             .err
@@ -734,7 +497,6 @@ fn write_surface(
             new_or_null(matrix_identity(g, io.out, io.err, 4, None)?).expect("a 4 x 4 identity")
         }
     };
-    let gx = &sg.gifti;
     let fix = g.notices.fix();
     {
         let coords = array(image, ck);
@@ -744,7 +506,7 @@ fn write_surface(
                 out: &mut *io.out,
                 err: &mut *io.err,
             };
-            gx.add_empty_cs(coords, &mut w);
+            g.gifti.add_empty_cs(coords, &mut w);
         }
         let cs = coords
             .coordsys
@@ -758,7 +520,7 @@ fn write_surface(
                 cs.xform[r - 1][c - 1] = f64::from(xform.relt(r as i32, c as i32));
             }
         }
-        set_sizes(gx, io, fix, coords);
+        set_sizes(&g.gifti, io, fix, coords);
         alloc_data(coords);
         for vno in 0..mris.nvertices.max(0) {
             let v = mris.vertex(vno as usize);
@@ -768,7 +530,7 @@ fn write_surface(
             gifti_set_da_value_2d(g, io.err, coords, vno, 2, z)?;
         }
     }
-    let Some(fk) = add_array(gx, io, image) else {
+    let Some(fk) = add_array(&g.gifti, io, image) else {
         let _ = io
             .err
             .write_all(b"MRISwriteGIFTISurface: couldn't allocate giiDataArray\n");
@@ -784,7 +546,7 @@ fn write_surface(
             mris.nfaces,
             3,
         );
-        set_sizes(gx, io, fix, faces);
+        set_sizes(&g.gifti, io, fix, faces);
         alloc_data(faces);
         for fno in 0..mris.nfaces.max(0) {
             let f = mris.face(fno as usize).v;
@@ -837,7 +599,7 @@ fn write_surface(
         let n = &mut g.notices;
         if let Some(p) = primary {
             add_meta(
-                gx,
+                &g.gifti,
                 io,
                 n,
                 &mut array(image, ck).meta,
@@ -847,7 +609,7 @@ fn write_surface(
         }
         if let Some(s) = secondary {
             add_meta(
-                gx,
+                &g.gifti,
                 io,
                 n,
                 &mut array(image, ck).meta,
@@ -857,7 +619,7 @@ fn write_surface(
         }
         if let Some(t) = geotype {
             add_meta(
-                gx,
+                &g.gifti,
                 io,
                 n,
                 &mut array(image, ck).meta,
@@ -866,27 +628,48 @@ fn write_surface(
             );
         }
         add_meta(
-            gx,
+            &g.gifti,
             io,
             n,
             &mut array(image, fk).meta,
             "TopologicalType",
             Some(topotype),
         );
-        add_meta(gx, io, n, &mut array(image, ck).meta, "Name", Some(&name));
-        add_meta(gx, io, n, &mut array(image, fk).meta, "Name", Some(&name));
+        add_meta(
+            &g.gifti,
+            io,
+            n,
+            &mut array(image, ck).meta,
+            "Name",
+            Some(&name),
+        );
+        add_meta(
+            &g.gifti,
+            io,
+            n,
+            &mut array(image, fk).meta,
+            "Name",
+            Some(&name),
+        );
     }
     let n = &mut g.notices;
     let md = &mut array(image, ck).meta;
     if mris.vg.valid != 0 {
         let vg = &mris.vg;
-        add_meta(gx, io, n, md, "VolGeomFname", Some(vg.fname.c_bytes()));
+        add_meta(
+            &g.gifti,
+            io,
+            n,
+            md,
+            "VolGeomFname",
+            Some(vg.fname.c_bytes()),
+        );
         for (k, v) in [
             ("VolGeomWidth", vg.width),
             ("VolGeomHeight", vg.height),
             ("VolGeomDepth", vg.depth),
         ] {
-            add_meta(gx, io, n, md, k, Some(v.to_string().as_bytes()));
+            add_meta(&g.gifti, io, n, md, k, Some(v.to_string().as_bytes()));
         }
         for (k, v) in [
             ("VolGeomXsize", vg.xsize),
@@ -908,7 +691,14 @@ fn write_surface(
             ("SurfaceCenterY", mris.yctr),
             ("SurfaceCenterZ", mris.zctr),
         ] {
-            add_meta(gx, io, n, md, k, Some(cfmt::f(f64::from(v), 6).as_bytes()));
+            add_meta(
+                &g.gifti,
+                io,
+                n,
+                md,
+                k,
+                Some(cfmt::f(f64::from(v), 6).as_bytes()),
+            );
         }
     }
     // FZERO: |x| < FLT_EPSILON
@@ -917,7 +707,7 @@ fn write_surface(
     if !fzero {
         let s = cfmt::f(f64::from(area), 20);
         add_meta(
-            gx,
+            &g.gifti,
             io,
             n,
             md,
@@ -927,7 +717,7 @@ fn write_surface(
     }
     if mris.ncmds > 0 {
         add_meta(
-            gx,
+            &g.gifti,
             io,
             n,
             md,
@@ -941,7 +731,7 @@ fn write_surface(
                 None => b"(null)".to_vec(),
             };
             let c = &c[..c.len().min(TAG_CMDLINE_LEN - 1)];
-            add_meta(gx, io, n, md, &format!("TAG_CMDLINE#{k}"), Some(c));
+            add_meta(&g.gifti, io, n, md, &format!("TAG_CMDLINE#{k}"), Some(c));
         }
     }
     Ok(NO_ERROR)
@@ -955,7 +745,6 @@ fn write_surface(
 #[allow(clippy::too_many_arguments)]
 pub fn mris_write_gifti_intent(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -965,32 +754,31 @@ pub fn mris_write_gifti_intent(
     curv_fname: Option<&str>,
 ) -> Result<i32, Fatal> {
     if intent == NIFTI_INTENT_POINTSET || intent == NIFTI_INTENT_TRIANGLE {
-        let e = write_surface(g, sg, io, dir, mris, image, out_fname)?;
+        let e = write_surface(g, io, dir, mris, image, out_fname)?;
         if e != NO_ERROR {
             return Ok(e);
         }
     }
-    let gx = &sg.gifti;
     if intent == NIFTI_INTENT_SHAPE {
-        let e = write_shape(g, gx, io, mris, image, curv_fname)?;
+        let e = write_shape(g, io, mris, image, curv_fname)?;
         if e != NO_ERROR {
             return Ok(e);
         }
     }
     if intent == NIFTI_INTENT_LABEL {
-        let e = write_label(g, gx, io, mris, image)?;
+        let e = write_label(g, io, mris, image)?;
         if e != NO_ERROR {
             return Ok(e);
         }
     }
     if intent == NIFTI_INTENT_RGBA_VECTOR {
-        let e = write_rgba(g, gx, io, mris, image)?;
+        let e = write_rgba(g, io, mris, image)?;
         if e != NO_ERROR {
             return Ok(e);
         }
     }
     if is_stats_intent(intent) {
-        let e = write_stats(g, gx, io, mris, image, intent)?;
+        let e = write_stats(g, io, mris, image, intent)?;
         if e != NO_ERROR {
             return Ok(e);
         }
@@ -998,71 +786,13 @@ pub fn mris_write_gifti_intent(
     Ok(NO_ERROR)
 }
 
-/// The end every writer shares: a version "1" made "1.0", gifticlib's validity check (its
-/// messages, then `<who>: GIFTI file <name> is invalid!`, `ERROR_BADFILE`), `gifti_write_image`
-/// with the data (`<who>: couldn't write image`, `ERROR_BADFILE`), the image freed (gifticlib's
-/// messages at its verbosity 3 and above).
-pub(crate) fn validate_and_write(
-    g: &mut Globals,
-    gx: &mut Gifti,
-    io: &mut Io,
-    dir: Option<&Path>,
-    mut image: GiftiImage,
-    out_fname: &str,
-    who: &str,
-) -> i32 {
-    if image.version.as_deref() == Some(b"1") {
-        image.version = Some(GIFTI_XML_VERSION.as_bytes().to_vec());
-    }
-    let fix = g.notices.fix();
-    let valid = {
-        let mut w = Writers {
-            out: &mut *io.out,
-            err: &mut *io.err,
-        };
-        gx.valid_gifti_image(Some(&image), true, &FsGifti, fix, &mut w, &mut g.notices)
-    };
-    if !valid {
-        let _ = writeln!(io.err, "{who}: GIFTI file {out_fname} is invalid!");
-        free(gx, io, image);
-        return ERROR_BADFILE;
-    }
-    let path = dir.map_or_else(|| PathBuf::from(out_fname), |d| d.join(out_fname));
-    let rc = {
-        let mut w = Renamed {
-            w: Writers {
-                out: &mut *io.out,
-                err: &mut *io.err,
-            },
-            from: path.to_string_lossy().into_owned(),
-            to: out_fname.to_owned(),
-        };
-        gx.write_image(&mut image, &path, true, &mut w, &mut g.notices)
-    };
-    if rc != 0 {
-        let _ = writeln!(io.err, "{who}: couldn't write image");
-        free(gx, io, image);
-        return ERROR_BADFILE;
-    }
-    free(gx, io, image);
-    ERROR_NONE
-}
-
-pub(crate) fn free(gx: &Gifti, io: &mut Io, image: GiftiImage) {
-    let mut w = Writers {
-        out: &mut *io.out,
-        err: &mut *io.err,
-    };
-    gx.free_image(image, &mut w);
-}
-
 /// A new image with the common metadata and, for a surface with a subject, `SubjectID`.
-fn surface_image(g: &mut Globals, gx: &Gifti, io: &mut Io, mris: &Mris) -> GiftiImage {
-    let mut image = new_image(gx, io, &mut g.notices);
+fn surface_image(g: &mut Globals, io: &mut Io, mris: &Mris) -> GiftiImage {
+    let mut image = new_image(&g.gifti, io, &mut g.notices);
     if !mris.subject_name.is_empty() {
         let mut md = std::mem::take(&mut image.meta);
         add_meta(
-            gx,
+            &g.gifti,
             io,
             &mut g.notices,
             &mut md,
@@ -1082,7 +812,6 @@ fn surface_image(g: &mut Globals, gx: &Gifti, io: &mut Io, mris: &Mris) -> Gifti
 #[allow(clippy::too_many_arguments)]
 pub fn mris_write_gifti(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -1090,16 +819,13 @@ pub fn mris_write_gifti(
     out_fname: &str,
     curv_fname: Option<&str>,
 ) -> Result<i32, Fatal> {
-    let mut image = surface_image(g, &sg.gifti, io, mris);
-    let e = mris_write_gifti_intent(
-        g, sg, io, dir, mris, intent, &mut image, out_fname, curv_fname,
-    )?;
+    let mut image = surface_image(g, io, mris);
+    let e = mris_write_gifti_intent(g, io, dir, mris, intent, &mut image, out_fname, curv_fname)?;
     if e != NO_ERROR {
         return Ok(e);
     }
     Ok(validate_and_write(
         g,
-        &mut sg.gifti,
         io,
         dir,
         image,
@@ -1158,7 +884,6 @@ fn copy_frame(
 #[allow(clippy::too_many_arguments)]
 fn write_shape_mri(
     g: &mut Globals,
-    gx: &Gifti,
     io: &mut Io,
     mris: &Mris,
     mri: Option<&Mri>,
@@ -1166,7 +891,7 @@ fn write_shape_mri(
     curv_fname: Option<&[u8]>,
     shapedatatype: Option<&[u8]>,
 ) -> Result<i32, Fatal> {
-    let Some(k) = add_array(gx, io, image) else {
+    let Some(k) = add_array(&g.gifti, io, image) else {
         let _ = io
             .err
             .write_all(b"MRISwriteGIFTIShape: couldn't allocate giiDataArray\n");
@@ -1182,9 +907,9 @@ fn write_shape_mri(
         mris.nvertices,
         0,
     );
-    set_sizes(gx, io, fix, shape);
+    set_sizes(&g.gifti, io, fix, shape);
     add_meta(
-        gx,
+        &g.gifti,
         io,
         &mut g.notices,
         &mut shape.meta,
@@ -1193,7 +918,7 @@ fn write_shape_mri(
     );
     if let Some(t) = shapedatatype {
         add_meta(
-            gx,
+            &g.gifti,
             io,
             &mut g.notices,
             &mut shape.meta,
@@ -1219,14 +944,13 @@ fn write_shape_mri(
 #[allow(clippy::too_many_arguments)]
 fn write_stats_mri(
     g: &mut Globals,
-    gx: &Gifti,
     io: &mut Io,
     mris: &Mris,
     mri: Option<&Mri>,
     image: &mut GiftiImage,
     intent: i32,
 ) -> Result<i32, Fatal> {
-    let Some(mut k) = add_array(gx, io, image) else {
+    let Some(mut k) = add_array(&g.gifti, io, image) else {
         let _ = io
             .err
             .write_all(b"MRISwriteGIFTIStats: couldn't allocate giiDataArray\n");
@@ -1255,7 +979,7 @@ fn write_stats_mri(
     let fix = g.notices.fix();
     for f in 0..mri.nframes.max(0) {
         if f > 0 && !reproduce {
-            let Some(kk) = add_array(gx, io, image) else {
+            let Some(kk) = add_array(&g.gifti, io, image) else {
                 let _ = io
                     .err
                     .write_all(b"MRISwriteGIFTIStats: couldn't allocate giiDataArray\n");
@@ -1265,8 +989,8 @@ fn write_stats_mri(
         }
         let stats = array(image, k);
         set_attributes(stats, intent, NIFTI_TYPE_FLOAT32, 1, mris.nvertices, 0);
-        set_sizes(gx, io, fix, stats);
-        stats_meta(gx, io, &mut g.notices, &mut stats.meta, intent);
+        set_sizes(&g.gifti, io, fix, stats);
+        stats_meta(&g.gifti, io, &mut g.notices, &mut stats.meta, intent);
         alloc_data(stats);
         if f == 0 {
             note_fs399(g, mri, "MRISwriteGIFTIStats");
@@ -1285,7 +1009,6 @@ fn write_stats_mri(
 #[allow(clippy::too_many_arguments)]
 pub fn mris_write_gifti_intent_mri(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -1297,10 +1020,10 @@ pub fn mris_write_gifti_intent_mri(
     datatype: Option<&[u8]>,
 ) -> Result<i32, Fatal> {
     if intent == NIFTI_INTENT_POINTSET || intent == NIFTI_INTENT_TRIANGLE {
-        return write_surface(g, sg, io, dir, mris, image, out_fname);
+        return write_surface(g, io, dir, mris, image, out_fname);
     }
     if intent == NIFTI_INTENT_LABEL {
-        return write_label(g, &sg.gifti, io, mris, image);
+        return write_label(g, io, mris, image);
     }
     let shape = intent == NIFTI_INTENT_SHAPE;
     if !shape && !is_stats_intent(intent) {
@@ -1319,9 +1042,9 @@ pub fn mris_write_gifti_intent_mri(
         }
     }
     if shape {
-        write_shape_mri(g, &sg.gifti, io, mris, mri, image, curv_fname, datatype)
+        write_shape_mri(g, io, mris, mri, image, curv_fname, datatype)
     } else {
-        write_stats_mri(g, &sg.gifti, io, mris, mri, image, intent)
+        write_stats_mri(g, io, mris, mri, image, intent)
     }
 }
 
@@ -1330,7 +1053,6 @@ pub fn mris_write_gifti_intent_mri(
 #[allow(clippy::too_many_arguments)]
 pub fn mris_write_gifti_mri(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -1340,10 +1062,9 @@ pub fn mris_write_gifti_mri(
     curv_fname: Option<&[u8]>,
     datatype: Option<&[u8]>,
 ) -> Result<i32, Fatal> {
-    let mut image = surface_image(g, &sg.gifti, io, mris);
+    let mut image = surface_image(g, io, mris);
     let e = mris_write_gifti_intent_mri(
         g,
-        sg,
         io,
         dir,
         mris,
@@ -1359,7 +1080,6 @@ pub fn mris_write_gifti_mri(
     }
     Ok(validate_and_write(
         g,
-        &mut sg.gifti,
         io,
         dir,
         image,
@@ -1393,15 +1113,14 @@ fn overlay_intent(g: &mut Globals, ov: &OverlayInfo) -> i32 {
 /// file, as [`mris_write_gifti`]. FS-523, FS-524.
 pub fn mris_write_gifti_combined(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
     overlays: &[OverlayInfo],
     out_fname: &str,
 ) -> Result<i32, Fatal> {
-    let mut image = surface_image(g, &sg.gifti, io, mris);
-    let e = write_surface(g, sg, io, dir, mris, &mut image, out_fname)?;
+    let mut image = surface_image(g, io, mris);
+    let e = write_surface(g, io, dir, mris, &mut image, out_fname)?;
     if e != NO_ERROR {
         return Ok(e);
     }
@@ -1409,7 +1128,6 @@ pub fn mris_write_gifti_combined(
         let intent = overlay_intent(g, ov);
         let e = mris_write_gifti_intent_mri(
             g,
-            sg,
             io,
             dir,
             mris,
@@ -1426,7 +1144,6 @@ pub fn mris_write_gifti_combined(
     }
     Ok(validate_and_write(
         g,
-        &mut sg.gifti,
         io,
         dir,
         image,
@@ -1444,24 +1161,22 @@ pub fn mris_write_gifti_combined(
 /// num_cols=<c>`, `... malformed faces ...`). FS-395.
 pub fn get_shape_stat_intent_count(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     fgifti: &str,
     n_vertices: &mut i32,
     n_faces: &mut i32,
 ) -> Result<i32, Fatal> {
-    let Some(image) = read_valid(g, sg, io, dir, fgifti, "getShapeStatIntentCount()")? else {
+    let Some(image) = read_valid(g, io, dir, fgifti, "getShapeStatIntentCount()")? else {
         return Ok(0);
     };
-    let gx = &sg.gifti;
     let mut count = 0;
     for k in 0..image.num_da.max(0) as usize {
         let Some(da) = image.darray.get(k).and_then(|d| d.as_ref()) else {
             continue;
         };
         if da.intent == NIFTI_INTENT_POINTSET || da.intent == NIFTI_INTENT_TRIANGLE {
-            let (rows, cols) = vertices_cols(gx, io, da);
+            let (rows, cols) = vertices_cols(&g.gifti, io, da);
             let what = if da.intent == NIFTI_INTENT_POINTSET {
                 ("coords", "num_vertices")
             } else {
@@ -1473,7 +1188,7 @@ pub fn get_shape_stat_intent_count(
                     "getShapeStatIntentCount(): malformed {} data array in file {fgifti}: {}={} num_cols={}",
                     what.0, what.1, rows as i32, cols as i32
                 );
-                free(gx, io, image);
+                free(&g.gifti, io, image);
                 return Ok(0);
             }
             if da.intent == NIFTI_INTENT_POINTSET {
@@ -1496,65 +1211,6 @@ pub fn get_shape_stat_intent_count(
         }
         count += 1;
     }
-    free(gx, io, image);
+    free(&g.gifti, io, image);
     Ok(count)
-}
-
-/// `gifti_read_image(fname, 1)`, a version "1" made "1.0" (FS-395: a file without a Version
-/// crashes FreeSurfer; by default read on, as gifticlib accepts it), and gifticlib's check: the
-/// image, or `None` after `<who>: gifti_read_image() returned NULL` or `<who>: GIFTI file <f> is
-/// invalid!` (standard error).
-pub(crate) fn read_valid(
-    g: &mut Globals,
-    sg: &mut SurfGlobals,
-    io: &mut Io,
-    dir: Option<&Path>,
-    fname: &str,
-    who: &str,
-) -> Result<Option<GiftiImage>, Fatal> {
-    let path = dir.map_or_else(|| PathBuf::from(fname), |d| d.join(fname));
-    let image = {
-        let mut w = Renamed {
-            w: Writers {
-                out: &mut *io.out,
-                err: &mut *io.err,
-            },
-            from: path.to_string_lossy().into_owned(),
-            to: fname.to_owned(),
-        };
-        sg.gifti
-            .read_image(&path, true, &FsGifti, &mut w, &mut g.notices)
-    };
-    let Some(mut image) = image else {
-        let _ = writeln!(io.err, "{who}: gifti_read_image() returned NULL");
-        return Ok(None);
-    };
-    match image.version.as_deref() {
-        Some(b"1") => image.version = Some(GIFTI_XML_VERSION.as_bytes().to_vec()),
-        Some(_) => {}
-        None => {
-            g.notices.add(
-                &FS_395,
-                format!("{fname}: a GIFTI file without a Version (FreeSurfer compares it through a null pointer)"),
-            );
-            if g.notices.reproduce() {
-                return Err(Fatal::Exit(139));
-            }
-        }
-    }
-    let fix = g.notices.fix();
-    let valid = {
-        let mut w = Writers {
-            out: &mut *io.out,
-            err: &mut *io.err,
-        };
-        sg.gifti
-            .valid_gifti_image(Some(&image), true, &FsGifti, fix, &mut w, &mut g.notices)
-    };
-    if !valid {
-        let _ = writeln!(io.err, "{who}: GIFTI file {fname} is invalid!");
-        free(&sg.gifti, io, image);
-        return Ok(None);
-    }
-    Ok(Some(image))
 }

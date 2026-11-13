@@ -88,7 +88,6 @@ fn named_type(t: i32) -> bool {
 /// new behaviour (`MRISwrite_new`); the licence check (`chklc`) passes.
 pub fn write(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -100,13 +99,12 @@ pub fn write(
     if !named_type(ty) {
         apply_fsgii_write(g, io, dir, &mut surf_to_write, name, &mut ty)?;
     }
-    write_new(g, sg, io, dir, mris, &surf_to_write)
+    write_new(g, io, dir, mris, &surf_to_write)
 }
 
 /// `MRISwrite_new(mris, name)`.
 fn write_new(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -120,16 +118,9 @@ fn write_new(
         MRIS_GEO_TRIANGLE_FILE => formats::write_geo(g, io, dir, mris, &fname),
         MRIS_ICO_FILE => formats::write_ico(g, io, dir, mris, &fname),
         MRIS_STL_FILE => i32::from(stl::write_stl(g, dir, mris, &fname)),
-        MRIS_GIFTI_FILE => gifti_write::mris_write_gifti(
-            g,
-            sg,
-            io,
-            dir,
-            mris,
-            NIFTI_INTENT_POINTSET,
-            &fname,
-            None,
-        )?,
+        MRIS_GIFTI_FILE => {
+            gifti_write::mris_write_gifti(g, io, dir, mris, NIFTI_INTENT_POINTSET, &fname, None)?
+        }
         _ if mris.r#type == MRIS_TRIANGULAR_SURFACE => {
             trifile::write_triangular_surface(g, io, dir, mris, &fname)?
         }
@@ -142,7 +133,6 @@ fn write_new(
 /// put back (its distances freed: `MRISimportVertexCoords`). Returns `MRISwrite`'s answer.
 pub fn write_vertex_locations(
     g: &mut Globals,
-    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -153,7 +143,7 @@ pub fn write_vertex_locations(
     let mut coords3: [Vec<f32>; 3] = [vec![0.0; n], vec![0.0; n], vec![0.0; n]];
     metric::extract_vertex_coords(g, io, mris, &mut coords3, CURRENT_VERTICES)?;
     positions::restore_vertex_positions(g, io, mris, which_vertices)?;
-    let retval = write(g, sg, io, dir, mris, fname)?;
+    let retval = write(g, io, dir, mris, fname)?;
     let [x, y, z] = &coords3;
     coords::import_vertex_coords(g, io, mris, [x, y, z], CURRENT_VERTICES)?;
     Ok(retval)

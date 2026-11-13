@@ -20,12 +20,13 @@ use std::io::Read;
 
 use flate2::read::ZlibDecoder;
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, matrix_alloc};
+use larmorx_freesurfer_io::gifti_vol;
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry};
 use larmorx_freesurfer_mri::mri::{Mri, mri_alloc_sequence};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_surf::gifti::OverlayInfo;
-use larmorx_freesurfer_surf::{alloc, gifti_vol, gifti_write, readwrite};
+use larmorx_freesurfer_surf::{alloc, gifti_write, readwrite};
 
 const STATS: [i64; 6] = [2, 3, 5, 16, 24, 1001];
 
@@ -602,7 +603,6 @@ pub(super) fn gwr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             env: &env,
         };
         let g = &mut cx.g;
-        let sg = &mut cx.sg;
         let name_of = |b: Vec<u8>| -> String { utf8(b) };
         let lossy = |b: Option<Vec<u8>>| b.map(|b| String::from_utf8_lossy(&b).into_owned());
         match op {
@@ -612,7 +612,6 @@ pub(super) fn gwr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 let cf = lossy(opt(t));
                 let r = gifti_write::mris_write_gifti(
                     g,
-                    sg,
                     &mut io,
                     d,
                     &mut m,
@@ -630,7 +629,6 @@ pub(super) fn gwr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 let dt = opt(t);
                 let r = gifti_write::mris_write_gifti_mri(
                     g,
-                    sg,
                     &mut io,
                     d,
                     &mut m,
@@ -673,29 +671,28 @@ pub(super) fn gwr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                         n_vals_per_vertex: 1,
                     });
                 }
-                let r = gifti_write::mris_write_gifti_combined(g, sg, &mut io, d, &mut m, &ov, &n)?;
+                let r = gifti_write::mris_write_gifti_combined(g, &mut io, d, &mut m, &ov, &n)?;
                 o.i(i64::from(r));
                 dump_gii_file(dir, &n, o);
             }
             "mw" => {
                 let vol = t.i();
                 let n = name_of(t.h());
-                let r = gifti_vol::mri_write_gifti(g, sg, &mut io, d, &vols[vol as usize], &n)?;
+                let r = gifti_vol::mri_write_gifti(g, &mut io, d, &vols[vol as usize], &n)?;
                 o.i(i64::from(r));
                 dump_gii_file(dir, &n, o);
             }
             "sw" => {
                 let n = name_of(t.h());
-                let r = readwrite::write(g, sg, &mut io, d, &mut m, &n)?;
+                let r = readwrite::write(g, &mut io, d, &mut m, &n)?;
                 o.i(i64::from(r));
                 dump_gii_file(dir, &n, o);
             }
             "n" => {
                 let n = name_of(t.h());
                 let (mut a, mut b) = (7, 7);
-                let r = gifti_write::get_shape_stat_intent_count(
-                    g, sg, &mut io, d, &n, &mut a, &mut b,
-                )?;
+                let r =
+                    gifti_write::get_shape_stat_intent_count(g, &mut io, d, &n, &mut a, &mut b)?;
                 o.i(i64::from(r));
                 o.i(i64::from(a));
                 o.i(i64::from(b));
@@ -703,7 +700,7 @@ pub(super) fn gwr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "r" => {
                 let n = name_of(t.h());
                 let rv = t.i() != 0;
-                let r = gifti_vol::mris_read_gifti_as_mri(g, sg, &mut io, d, &n, rv)?;
+                let r = gifti_vol::mris_read_gifti_as_mri(g, &mut io, d, &n, rv)?;
                 match r {
                     None => o.s("NULL"),
                     Some(v) => dump_mri(cx, &v, rv, o)?,

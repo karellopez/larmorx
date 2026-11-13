@@ -1398,7 +1398,13 @@ behaviour in `specs/freesurfer-surfio.md` §109-111. `MRISwrite_new`'s GIFTI bra
 4439-4441) is wired (`readwrite::write` and `write_vertex_locations` now take the surface library's
 globals, which hold gifticlib's state). `MRIread`'s and `MRIwrite`'s GIFTI branches (mriio.cpp 783-784,
 1214-1215) belong to fs.io (track A): `larmorx-freesurfer-io` cannot depend on this crate, so they
-need a hook or the two functions moved (HANDOFF). The mechanisms behind the defects:
+need a hook or the two functions moved (HANDOFF). **Relay 23:** moved: `larmorx-freesurfer-io`'s
+`gifti_vol.rs` (the two functions need no surface type), with the shared pieces of `gifti.cpp`
+(`gifti_set_DA_value_2D`, `insertCommonMetaData`, `readLabelTable`, `FsGifti`, the read/check and
+check/write/free steps) in its `gifti_common.rs`; gifticlib's state (`G`, `GXD`) became fs.core's
+`Globals::gifti`, one per run as in FreeSurfer (the surface crate's `SurfGlobals::gifti` before), and
+`readwrite::write`/`write_vertex_locations` no longer take the surface library's globals. The
+mechanisms behind the defects:
 
 - **FS-397**: lines 1840-1841 count `NULL != mris->ct->entries[i]` for `labeltable.length`, lines
   1869-1886 fill only entries with `strlen(name) != 0`; the unfilled places keep `calloc`'s zeros

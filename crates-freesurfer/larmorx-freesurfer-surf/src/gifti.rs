@@ -2,14 +2,16 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! `utils/gifti.cpp`'s GIFTI surface reader (queue item 3.1-26, its surface part; relay 21 of
-//! track D): `mrisReadGIFTIdanum` (424-1203) and `mrisReadGIFTIfile` (1217-1222), with the two
-//! colour-table builders they use, `makeColorTable` (338-410, file-local) and `readLabelTable`
-//! (2857-3006), over gifticlib 1.12 (`larmorx_io::gifti`, track C's port) with FreeSurfer's two
+//! track D): `mrisReadGIFTIdanum` (424-1203) and `mrisReadGIFTIfile` (1217-1222), with the
+//! colour-table builder of colour arrays, `makeColorTable` (338-410, file-local; `readLabelTable`,
+//! 2857-3006, is fs.io's `gifti_common` since relay 23), over gifticlib 1.12 (`larmorx_io::gifti`, track C's port) with FreeSurfer's two
 //! changes to it ([`FsGifti`]) and fs.io's helper `gifti_get_DA_value_2D` (track A's). The reader's
 //! three functions of `utils/colortab.cpp` (`CTABgetNumberOfValidEntries`,
 //! `CTABfindDuplicateNames`, `CTABrgb2Annotation`) are fs.labels' (`larmorx_freesurfer_io::colortab`).
 //!
-//! gifticlib's settings and persistent state are the run's ([`SurfGlobals::gifti`]); messages go
+//! gifticlib's settings and persistent state are the run's (fs.core's `Globals::gifti`); the pieces
+//! of `gifti.cpp` the volume functions share (`readLabelTable`, [`FsGifti`], the metadata and value
+//! steps) are larmorx-freesurfer-io's `gifti_common` (relay 23); messages go
 //! to standard output and error as FreeSurfer prints them.
 //!
 //! The defects (`larmorx_core::defects`; mechanisms in `docs/findings/freesurfer-surfio.md` §23):
@@ -26,10 +28,10 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use larmorx_core::cfmt::{Streams, Writers};
+use larmorx_core::cfmt::Writers;
 use larmorx_core::defects::{
-    FS_80, FS_356, FS_381, FS_382, FS_383, FS_384, FS_385, FS_386, FS_387, FS_388, FS_389, FS_390,
-    FS_391, FS_392, FS_393, FS_394, FS_395, FS_396, Notices,
+    FS_356, FS_381, FS_382, FS_383, FS_384, FS_385, FS_386, FS_387, FS_388, FS_390, FS_391, FS_392,
+    FS_393, FS_394, FS_395, FS_396,
 };
 use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::cscan::Bytes;
@@ -37,19 +39,25 @@ use larmorx_freesurfer_core::diag::{self, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, matrix_alloc};
-use larmorx_freesurfer_core::random::{random_number, set_random_seed};
 use larmorx_freesurfer_io::colortab::{
     CTAB_VERSION_TO_WRITE, ctab_find_duplicate_names, ctab_get_number_of_valid_entries,
     ctab_rgb2_annotation,
 };
-use larmorx_freesurfer_io::gifti::gifti_get_da_value_2d;
-use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry};
+use larmorx_freesurfer_mri::ctab::ColorTable;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri};
 use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
 use larmorx_io::gifti::{
-    DataArray, Dialect, GIFTI_IND_ORD_ROW_MAJOR, GIFTI_XML_VERSION, Gifti, GiftiImage, LabelTable,
-    NIFTI_INTENT_POINTSET, NIFTI_INTENT_TIME_SERIES, NIFTI_INTENT_TRIANGLE, NIFTI_TYPE_INT32,
-    NIFTI_TYPE_UINT32, NvPairs, intent_to_string,
+    DataArray, GIFTI_XML_VERSION, NIFTI_INTENT_POINTSET, NIFTI_INTENT_TRIANGLE, NIFTI_TYPE_INT32,
+    NIFTI_TYPE_UINT32, intent_to_string,
+};
+
+pub use larmorx_freesurfer_io::gifti_common::{
+    FsGifti, NIFTI_INTENT_GENMATRIX, NIFTI_INTENT_LABEL, NIFTI_INTENT_NODE_INDEX,
+    NIFTI_INTENT_RGB_VECTOR, NIFTI_INTENT_RGBA_VECTOR, NIFTI_INTENT_SHAPE, NIFTI_INTENT_VECTOR,
+    read_label_table,
+};
+use larmorx_freesurfer_io::gifti_common::{
+    Renamed, STRLEN, entry, meta, name_bytes, scan_f, value, vertices_cols,
 };
 
 use crate::aaa::{MAX_CMDS, SurfGlobals, VERTICES_PER_FACE};
@@ -64,14 +72,6 @@ use crate::surfread::count_face;
 
 /// `LEFT_HEMISPHERE` (`mrisurf.h` line 1068).
 pub const LEFT_HEMISPHERE: i32 = 0;
-/// NIfTI-1's intent codes the reader distinguishes (`nifti1.h`).
-pub const NIFTI_INTENT_LABEL: i32 = 1002;
-pub const NIFTI_INTENT_GENMATRIX: i32 = 1004;
-pub const NIFTI_INTENT_VECTOR: i32 = 1007;
-pub const NIFTI_INTENT_NODE_INDEX: i32 = 2002;
-pub const NIFTI_INTENT_RGB_VECTOR: i32 = 2003;
-pub const NIFTI_INTENT_RGBA_VECTOR: i32 = 2004;
-pub const NIFTI_INTENT_SHAPE: i32 = 2005;
 /// `FS_MRISURFOVERLAY_SHAPE`, `FS_MRISURFOVERLAY_STATS` (`MRISurfOverlay.h`).
 pub const FS_MRISURFOVERLAY_SHAPE: i32 = 100;
 pub const FS_MRISURFOVERLAY_STATS: i32 = 200;
@@ -79,51 +79,6 @@ pub const FS_MRISURFOVERLAY_STATS: i32 = 200;
 pub const GIFTI_FILE: i32 = 27;
 /// `NUM_VOLGEOM_META` (`gifti.cpp` line 40): the volume geometry's metadata entries.
 const NUM_VOLGEOM_META: i32 = 19;
-/// `STRLEN`: the size of the surface's, the volume geometry's and a colour entry's names.
-const STRLEN: usize = 1024;
-
-/// FreeSurfer 8.2.0's two changes to gifticlib 1.12 (its `packages/gifti`): an image's version
-/// is valid when `sscanf("%f")` reads the same `float` from it as from "1.0" (an absent version
-/// reads 0, as "1.0" then does: valid), and a coordinate system is accepted under a
-/// `NIFTI_INTENT_TIME_SERIES` array too.
-pub struct FsGifti;
-
-impl Dialect for FsGifti {
-    fn check_version(&self, gim: &GiftiImage, whine: bool, out: &mut dyn Streams) -> i32 {
-        let (mut v, mut x) = (0.0f32, 0.0f32);
-        if let Some(s) = &gim.version {
-            let mut errno = 0;
-            if let Some(f) = scan_f32_errno(&mut errno, s) {
-                v = f;
-            }
-            if let Some(f) = scan_f32_errno(&mut errno, GIFTI_XML_VERSION.as_bytes()) {
-                x = f;
-            }
-        }
-        if v != x {
-            if whine {
-                out.err(&format!(
-                    "** invalid: gim version = {}, expected {}\n",
-                    larmorx_core::cfmt::f(f64::from(v), 6),
-                    larmorx_core::cfmt::f(f64::from(x), 6)
-                ));
-            }
-            return 1;
-        }
-        0
-    }
-
-    fn coordsys_intent_message(&self, da_index: i32, intent: i32) -> Option<String> {
-        (intent != NIFTI_INTENT_POINTSET && intent != NIFTI_INTENT_TIME_SERIES).then(|| {
-            format!(
-                "** DA[{da_index}] has coordsys with intent {} (should be {} or {})\n",
-                intent_to_string(intent),
-                intent_to_string(NIFTI_INTENT_POINTSET),
-                intent_to_string(NIFTI_INTENT_TIME_SERIES)
-            )
-        })
-    }
-}
 
 /// `OverlayInfoStruct` (`MRISurfOverlay.h`): one overlay the reader found (a shape array, or a
 /// run of statistics arrays of one intent), with its values in a one-frame `MRI_FLOAT` volume of
@@ -158,35 +113,8 @@ pub enum GiftiRead {
     New(Box<Mris>),
 }
 
-/// [`Streams`] that names a file as its caller did: `from` (the path the reader opened) written as
-/// `to` (the name given).
-pub(crate) struct Renamed<'a> {
-    pub(crate) w: Writers<'a>,
-    pub(crate) from: String,
-    pub(crate) to: String,
-}
-
-impl Streams for Renamed<'_> {
-    fn out(&mut self, text: &str) {
-        let t = text.replace(&self.from, &self.to);
-        self.w.out(&t);
-    }
-    fn err(&mut self, text: &str) {
-        let t = text.replace(&self.from, &self.to);
-        self.w.err(&t);
-    }
-}
-
 fn gifti_cpp() -> String {
     format!("{}/utils/gifti.cpp", diag::BUILD_ROOT)
-}
-
-fn scan_f32_errno(errno: &mut i32, s: &[u8]) -> Option<f32> {
-    let mut b = Bytes::new(s);
-    let mut sc = Scanf::new(&mut b);
-    let v = sc.f(errno, true);
-    sc.finish(errno);
-    v
 }
 
 /// `sscanf(s, "%d", &x) == 1`: the value, or `None`.
@@ -196,104 +124,6 @@ fn scan_d(g: &mut Globals, s: &[u8]) -> Option<i32> {
     let v = sc.d(&mut g.errno, true);
     sc.finish(&mut g.errno);
     v
-}
-
-/// `sscanf(s, "%f", &x) == 1`: the value, or `None`.
-pub(crate) fn scan_f(g: &mut Globals, s: &[u8]) -> Option<f32> {
-    scan_f32_errno(&mut g.errno, s)
-}
-
-/// `gifti_get_meta_value(nvp, name)`: the value's bytes, or `None` (`NULL`: no such entry, or an
-/// entry without a value).
-pub(crate) fn meta(
-    gx: &Gifti,
-    io: &mut Io,
-    notices: &mut Notices,
-    nvp: &NvPairs,
-    name: &str,
-) -> Option<Vec<u8>> {
-    let mut w = Writers {
-        out: &mut *io.out,
-        err: &mut *io.err,
-    };
-    gx.get_meta_value(nvp, name.as_bytes(), &mut w, notices)
-        .and_then(|v| v.clone())
-}
-
-/// `gifti_DA_rows_cols(da, &rows, &cols)`: (rows, cols); a failure leaves `dims[0]` and 1.
-fn rows_cols(gx: &Gifti, io: &mut Io, da: &DataArray) -> (i64, i64) {
-    let mut w = Writers {
-        out: &mut *io.out,
-        err: &mut *io.err,
-    };
-    let (r, c, _) = gx.da_rows_cols(da, &mut w);
-    (r, c)
-}
-
-/// The rows and columns of an array as the reader counts them: (rows, cols) for row-major order,
-/// (cols, rows) swapped for column-major (`gifti_DA_rows_cols` called with its outputs exchanged).
-pub(crate) fn vertices_cols(gx: &Gifti, io: &mut Io, da: &DataArray) -> (i64, i64) {
-    let (r, c) = rows_cols(gx, io, da);
-    if da.ind_ord == GIFTI_IND_ORD_ROW_MAJOR {
-        (r, c)
-    } else {
-        (c, r)
-    }
-}
-
-/// `gifti_get_DA_value_2D(da, row, col)` (fs.io's).
-pub(crate) fn value(
-    g: &mut Globals,
-    io: &mut Io,
-    da: &DataArray,
-    row: i32,
-    col: i32,
-) -> Result<f64, Fatal> {
-    let mut w = Writers {
-        out: &mut *io.out,
-        err: &mut *io.err,
-    };
-    gifti_get_da_value_2d(g, &mut w, Some(da), row, col)
-}
-
-/// C's `strncpy(dst, src, STRLEN - 1)` into a zeroed buffer: the name up to its first NUL, at most
-/// 1,023 bytes.
-pub(crate) fn name_bytes(s: &[u8]) -> Vec<u8> {
-    s.iter()
-        .copied()
-        .take_while(|&b| b != 0)
-        .take(STRLEN - 1)
-        .collect()
-}
-
-/// A colour component as the builders store it: the float, and `floor(c * 256)` made an `int`
-/// (FS-17 beyond `int`), at most 255.
-fn component(g: &mut Globals, c: f32, what: &str) -> (f32, i32) {
-    let mut i = float_to_int(g, f64::from((c * 256.0).floor()), what);
-    if i > 255 {
-        i = 255;
-    }
-    (c, i)
-}
-
-fn entry(g: &mut Globals, name: Vec<u8>, rgba: [f32; 4], what: &str) -> ColorTableEntry {
-    let (rf, ri) = component(g, rgba[0], what);
-    let (gf, gi) = component(g, rgba[1], what);
-    let (bf, bi) = component(g, rgba[2], what);
-    let (af, ai) = component(g, rgba[3], what);
-    ColorTableEntry {
-        name,
-        ri,
-        gi,
-        bi,
-        ai,
-        rf,
-        gf,
-        bf,
-        af,
-        tissue_type: 0,
-        count: 0,
-    }
 }
 
 /// `makeColorTable(unique_annot_map, fname)`: a colour table of one entry per distinct annotation
@@ -337,135 +167,6 @@ fn make_color_table(
     }
     ctab_find_duplicate_names(io.out, &ct);
     ct
-}
-
-/// The four colour components of the `k`-th colour set of a label table (gifticlib keeps the
-/// colours of the labels that had them in order; a hole, memory gifticlib never wrote, reads 0
-/// with FS-80's notice, as gifticlib's port reads it).
-fn rgba_at(t: &LabelTable, k: usize, notices: &mut Notices) -> [f32; 4] {
-    let mut v = [0.0f32; 4];
-    let Some(rgba) = &t.rgba else { return v };
-    let mut hole = false;
-    for (i, x) in v.iter_mut().enumerate() {
-        match rgba.get(4 * k + i).copied().flatten() {
-            Some(c) => *x = c,
-            None => hole = true,
-        }
-    }
-    if hole {
-        notices.add(
-            &FS_80,
-            "a label's colours that the file did not give read as 0 (memory never written)",
-        );
-    }
-    v
-}
-
-/// `readLabelTable(image, fname)`: the image's label table as a colour table, `None` for a table
-/// of no labels, or after `readLabelTable(<file>): invalid labeltable found` (gifticlib's check of
-/// the table, its messages included). The table has one place per key from 0 to the largest key,
-/// each label in the place of its key, empty places between; its name and colours (each
-/// component `floor(c * 256)` at most 255 as the integers). A table without colours gets random
-/// ones: the random generator seeded with 12 (`setRandomSeed`), three draws per label in [0, 1]
-/// for red, green and blue, alpha 1. A key met again keeps its first label (`readLabelTable(<file>):
-/// Duplicate labelkey <k>:<label>, was <name>` on standard output) and the colours that follow are
-/// taken one set earlier (the colours advance with each new place only). With `Gdiag`'s
-/// `DIAG_VERBOSE` the counts and each new place are printed (`[DEBUG] ...`). Then
-/// [`ctab_find_duplicate_names`]. A negative key (FS-389): refused by default (`readLabelTable(<file>):
-/// label key <k> is negative` on standard error, `None`); with `reproduce` a segmentation fault
-/// (FreeSurfer reads the allocator's bookkeeping before the table as an entry).
-pub fn read_label_table(
-    g: &mut Globals,
-    sg: &SurfGlobals,
-    io: &mut Io,
-    image: &mut GiftiImage,
-    fname: &str,
-) -> Result<Option<ColorTable>, Fatal> {
-    if image.labeltable.is_empty() {
-        return Ok(None);
-    }
-    let valid = {
-        let mut w = Writers {
-            out: &mut *io.out,
-            err: &mut *io.err,
-        };
-        sg.gifti
-            .valid_label_table(&image.labeltable, true, &mut w, &mut g.notices)
-    };
-    if !valid {
-        let _ = writeln!(io.err, "readLabelTable({fname}): invalid labeltable found");
-        return Ok(None);
-    }
-    let n = image.labeltable.len();
-    let maxkey = image.labeltable.key.iter().fold(-1, |m, &k| m.max(k));
-    let mut ct = ColorTable {
-        entries: vec![None; (maxkey + 1).max(0) as usize],
-        fname: name_bytes(fname.as_bytes()),
-        version: CTAB_VERSION_TO_WRITE,
-        ..ColorTable::default()
-    };
-    if image.labeltable.rgba.is_none() {
-        // random colours, the generator seeded with 12
-        set_random_seed(g, 12);
-        let mut rgba = Vec::with_capacity(4 * n);
-        for _ in 0..n {
-            for _ in 0..3 {
-                let r = random_number(g, io.env, io.out, io.err, 0.0, 1.0)?;
-                rgba.push(Some(r as f32));
-            }
-            rgba.push(Some(1.0f32));
-        }
-        image.labeltable.rgba = Some(rgba);
-    }
-    if g.gdiag & DIAG_VERBOSE != 0 {
-        let _ = writeln!(
-            io.out,
-            "[DEBUG] readLabelTable({fname}): ct->nentries={}, num_entries_to_read={n}",
-            maxkey + 1
-        );
-    }
-    let mut set = 0usize;
-    for li in 0..n {
-        let key = image.labeltable.key[li];
-        let label = image.labeltable.label[li].clone().unwrap_or_default();
-        if key < 0 {
-            g.notices.add(
-                &FS_389,
-                format!("{fname}: label key {key} is negative (FreeSurfer writes its entry before the colour table)"),
-            );
-            if g.notices.reproduce() {
-                // the place before the table holds the allocator's bookkeeping, read as an entry
-                return Err(Fatal::Exit(139));
-            }
-            let _ = writeln!(
-                io.err,
-                "readLabelTable({fname}): label key {key} is negative"
-            );
-            return Ok(None);
-        }
-        let place = key as usize;
-        if let Some(e) = &ct.entries[place] {
-            let _ = writeln!(
-                io.out,
-                "readLabelTable({fname}): Duplicate labelkey {key}:{}, was {}",
-                String::from_utf8_lossy(&label),
-                String::from_utf8_lossy(&e.name)
-            );
-        } else {
-            if g.gdiag & DIAG_VERBOSE != 0 {
-                let _ = writeln!(
-                    io.out,
-                    "[DEBUG] readLabelTable({fname}): created ct->entries[{key}]"
-                );
-            }
-            let rgba = rgba_at(&image.labeltable, set, &mut g.notices);
-            let e = entry(g, name_bytes(&label), rgba, "readLabelTable");
-            ct.entries[place] = Some(Box::new(e));
-            set += 1;
-        }
-    }
-    ctab_find_duplicate_names(io.out, &ct);
-    Ok(Some(ct))
 }
 
 /// POSIX's `basename` (glibc's `__xpg_basename`, `<libgen.h>`) of a name: the last component
@@ -580,7 +281,7 @@ pub fn mris_read_gifti_danum(
             from: path.to_string_lossy().into_owned(),
             to: fname.to_owned(),
         };
-        sg.gifti
+        g.gifti
             .read_image(&path, true, &FsGifti, &mut w, &mut g.notices)
     };
     let Some(mut image) = image else {
@@ -608,7 +309,7 @@ pub fn mris_read_gifti_danum(
             out: &mut *io.out,
             err: &mut *io.err,
         };
-        sg.gifti
+        g.gifti
             .valid_gifti_image(Some(&image), true, &FsGifti, fix, &mut w, &mut g.notices)
     };
     if !valid {
@@ -619,7 +320,7 @@ pub fn mris_read_gifti_danum(
     }
     let mut ct = None;
     if !image.labeltable.is_empty() {
-        ct = read_label_table(g, sg, io, &mut image, fname)?;
+        ct = read_label_table(g, io, &mut image, fname)?;
         if ct.is_none() {
             return Ok(GiftiRead::Null);
         }
@@ -645,7 +346,7 @@ pub fn mris_read_gifti_danum(
     if let (Some(ck), Some(fk)) = (coords, faces) {
         let coords = da(ck);
         let faces = da(fk);
-        let (num_vertices, num_cols) = vertices_cols(&sg.gifti, io, coords);
+        let (num_vertices, num_cols) = vertices_cols(&g.gifti, io, coords);
         if num_vertices <= 0 || num_cols != 3 {
             return fail(
                 io,
@@ -655,7 +356,7 @@ pub fn mris_read_gifti_danum(
                 ),
             );
         }
-        let (num_faces, num_cols) = vertices_cols(&sg.gifti, io, faces);
+        let (num_faces, num_cols) = vertices_cols(&g.gifti, io, faces);
         if num_faces <= 0 || num_cols != 3 {
             return fail(
                 io,
@@ -675,7 +376,7 @@ pub fn mris_read_gifti_danum(
         mris.fname = fname.to_owned();
         mris.r#type = MRIS_TRIANGULAR_SURFACE;
         let hemi = meta(
-            &sg.gifti,
+            &g.gifti,
             io,
             &mut g.notices,
             &coords.meta,
@@ -687,9 +388,9 @@ pub fn mris_read_gifti_danum(
             _ => NO_HEMISPHERE,
         };
         mris.useRealRAS = 0;
-        read_vol_geom(g, sg, io, coords, &mut mris, fname);
+        read_vol_geom(g, io, coords, &mut mris, fname);
         if let Some(s) = meta(
-            &sg.gifti,
+            &g.gifti,
             io,
             &mut g.notices,
             &coords.meta,
@@ -698,7 +399,7 @@ pub fn mris_read_gifti_danum(
         {
             mris.group_avg_surface_area = v;
         }
-        read_command_lines(g, sg, io, coords, &mut mris, fname);
+        read_command_lines(g, io, coords, &mut mris, fname);
         let file = gifti_cpp();
         for vno in 0..num_vertices as i32 {
             mris.topology_mut(vno as usize).num = 0;
@@ -858,7 +559,7 @@ pub fn mris_read_gifti_danum(
                     ),
                 );
             }
-            let (rows, cols) = vertices_cols(&sg.gifti, io, darray);
+            let (rows, cols) = vertices_cols(&g.gifti, io, darray);
             num_index_nodes = rows;
             if rows <= 0 || rows > i64::from(target.nvertices) || cols > 1 {
                 return fail(
@@ -878,7 +579,7 @@ pub fn mris_read_gifti_danum(
             NIFTI_INTENT_GENMATRIX => 9,
             _ => 1,
         };
-        let (nv, cols) = vertices_cols(&sg.gifti, io, darray);
+        let (nv, cols) = vertices_cols(&g.gifti, io, darray);
         if nv <= 0 || nv != i64::from(target.nvertices) || cols > expected {
             if node_index.is_some() && nv == num_index_nodes {
                 g.notices.add(
@@ -945,7 +646,7 @@ pub fn mris_read_gifti_danum(
             let Some(list) = overlays.as_deref_mut() else {
                 continue;
             };
-            let base = meta(&sg.gifti, io, &mut g.notices, &darray.meta, "Name").map(|name| {
+            let base = meta(&g.gifti, io, &mut g.notices, &darray.meta, "Name").map(|name| {
                 let mut copy = name.clone();
                 if copy.len() >= STRLEN {
                     g.notices.add(
@@ -961,7 +662,7 @@ pub fn mris_read_gifti_danum(
                     }
                 b
             });
-            let sdt = meta(&sg.gifti, io, &mut g.notices, &darray.meta, "ShapeDataType");
+            let sdt = meta(&g.gifti, io, &mut g.notices, &darray.meta, "ShapeDataType");
             let shapedatatype = match sdt {
                 Some(mut s) => {
                     if s.len() >= 256 {
@@ -1221,17 +922,10 @@ fn sparse_vno(
 /// `sscanf`'s `%d` and `%f`, `VolGeomFname` copied), valid when all 19 are read; then
 /// `SurfaceCenterX/Y/Z`. FS-381: the name is copied as 1,024 bytes; both modes copy the name and
 /// zeros after it (memory outside the metadata in FreeSurfer), its first 1,024 bytes when longer.
-fn read_vol_geom(
-    g: &mut Globals,
-    sg: &SurfGlobals,
-    io: &mut Io,
-    coords: &DataArray,
-    mris: &mut Mris,
-    fname: &str,
-) {
+fn read_vol_geom(g: &mut Globals, io: &mut Io, coords: &DataArray, mris: &mut Mris, fname: &str) {
     let mut n = 0;
     let get = |g: &mut Globals, io: &mut Io, name: &str| {
-        meta(&sg.gifti, io, &mut g.notices, &coords.meta, name)
+        meta(&g.gifti, io, &mut g.notices, &coords.meta, name)
     };
     for (name, slot) in [
         ("VolGeomWidth", &mut mris.vg.width),
@@ -1304,7 +998,6 @@ fn read_vol_geom(
 /// which FreeSurfer never returns (FS-382): both modes read the last 1,000 as the message says.
 fn read_command_lines(
     g: &mut Globals,
-    sg: &SurfGlobals,
     io: &mut Io,
     coords: &DataArray,
     mris: &mut Mris,
@@ -1312,7 +1005,7 @@ fn read_command_lines(
 ) {
     let mut numcmds = 0;
     if let Some(s) = meta(
-        &sg.gifti,
+        &g.gifti,
         io,
         &mut g.notices,
         &coords.meta,
@@ -1339,7 +1032,7 @@ fn read_command_lines(
     }
     for k in toskip..numcmds {
         let tag = format!("TAG_CMDLINE#{k}");
-        let Some(cmd) = meta(&sg.gifti, io, &mut g.notices, &coords.meta, &tag) else {
+        let Some(cmd) = meta(&g.gifti, io, &mut g.notices, &coords.meta, &tag) else {
             let _ = writeln!(
                 io.out,
                 "[ERROR] TAG_CMDLINE out of sync! No value found for {tag}"

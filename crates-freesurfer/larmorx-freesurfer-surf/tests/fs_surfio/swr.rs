@@ -209,14 +209,10 @@ pub(super) fn swr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         };
         let g = &mut cx.g;
         match op {
-            "w" => o.i(i64::from(readwrite::write(
-                g, &mut cx.sg, &mut io, d, &mut m, &n,
-            )?)),
+            "w" => o.i(i64::from(readwrite::write(g, &mut io, d, &mut m, &n)?)),
             "wl" => {
                 let which = t.i();
-                let r = readwrite::write_vertex_locations(
-                    g, &mut cx.sg, &mut io, d, &mut m, &n, which,
-                )?;
+                let r = readwrite::write_vertex_locations(g, &mut io, d, &mut m, &n, which)?;
                 o.i(i64::from(r));
             }
             "wp" => o.i(i64::from(readwrite::write_patch_ascii(

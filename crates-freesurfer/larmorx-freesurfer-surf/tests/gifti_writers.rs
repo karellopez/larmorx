@@ -9,13 +9,13 @@ use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{ERROR_BADFILE, ERROR_BADPARM, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_io::gifti_vol::{mri_write_gifti, mris_read_gifti_as_mri};
 use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry};
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc_sequence};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use larmorx_freesurfer_surf::coords::Io;
 use larmorx_freesurfer_surf::gifti::{FS_MRISURFOVERLAY_STATS, GIFTI_FILE, OverlayInfo};
-use larmorx_freesurfer_surf::gifti_vol::{mri_write_gifti, mris_read_gifti_as_mri};
 use larmorx_freesurfer_surf::gifti_write::{
     get_shape_stat_intent_count, mris_write_gifti, mris_write_gifti_combined, mris_write_gifti_mri,
 };
@@ -94,7 +94,7 @@ impl Run {
         v
     }
 
-    fn io(&mut self) -> (Io<'_>, &mut Globals, &mut SurfGlobals, &std::path::Path) {
+    fn io(&mut self) -> (Io<'_>, &mut Globals, &std::path::Path) {
         (
             Io {
                 out: &mut self.out,
@@ -102,21 +102,19 @@ impl Run {
                 env: &self.env,
             },
             &mut self.g,
-            &mut self.sg,
             self.dir.path(),
         )
     }
 
     fn read(&mut self, name: &str) -> Option<Mri> {
-        let (mut io, g, sg, dir) = self.io();
-        mris_read_gifti_as_mri(g, sg, &mut io, Some(dir), name, true).expect("a read")
+        let (mut io, g, dir) = self.io();
+        mris_read_gifti_as_mri(g, &mut io, Some(dir), name, true).expect("a read")
     }
 
     fn count(&mut self, name: &str) -> i32 {
-        let (mut io, g, sg, dir) = self.io();
+        let (mut io, g, dir) = self.io();
         let (mut a, mut b) = (0, 0);
-        get_shape_stat_intent_count(g, sg, &mut io, Some(dir), name, &mut a, &mut b)
-            .expect("a count")
+        get_shape_stat_intent_count(g, &mut io, Some(dir), name, &mut a, &mut b).expect("a count")
     }
 
     fn values(&mut self, m: &Mri) -> Vec<Vec<f32>> {
@@ -176,9 +174,9 @@ fn fs397_unnamed_colour_entries() {
             ],
             ..ColorTable::default()
         });
-        let (mut io, g, sg, dir) = r.io();
-        let e = mris_write_gifti(g, sg, &mut io, Some(dir), &mut m, LABEL, "l.gii", None)
-            .expect("a write");
+        let (mut io, g, dir) = r.io();
+        let e =
+            mris_write_gifti(g, &mut io, Some(dir), &mut m, LABEL, "l.gii", None).expect("a write");
         assert_eq!(e, rc, "{mode:?}");
         assert!(r.ids().contains(&"FS-397"));
         if rc == NO_ERROR {
@@ -198,8 +196,8 @@ fn fs397_unnamed_colour_entries() {
 fn fs398_fs523_refused_by_default() {
     let mut r = Run::new(UpstreamDefects::Fix);
     let mut m = r.surface(3, &[]);
-    let (mut io, g, sg, dir) = r.io();
-    let e = mris_write_gifti(g, sg, &mut io, Some(dir), &mut m, LABEL, "l.gii", None).unwrap();
+    let (mut io, g, dir) = r.io();
+    let e = mris_write_gifti(g, &mut io, Some(dir), &mut m, LABEL, "l.gii", None).unwrap();
     assert_eq!(e, ERROR_BADPARM);
     let ov = OverlayInfo {
         foverlay: None,
@@ -210,12 +208,12 @@ fn fs398_fs523_refused_by_default() {
         overlaymri: None,
         n_vals_per_vertex: 1,
     };
-    let e = mris_write_gifti_combined(g, sg, &mut io, Some(dir), &mut m, &[ov], "c.gii").unwrap();
+    let e = mris_write_gifti_combined(g, &mut io, Some(dir), &mut m, &[ov], "c.gii").unwrap();
     assert_eq!(e, ERROR_BADPARM);
     let mut r = Run::new(UpstreamDefects::Reproduce);
     let mut m = r.surface(3, &[]);
-    let (mut io, g, sg, dir) = r.io();
-    let e = mris_write_gifti(g, sg, &mut io, Some(dir), &mut m, LABEL, "l.gii", None);
+    let (mut io, g, dir) = r.io();
+    let e = mris_write_gifti(g, &mut io, Some(dir), &mut m, LABEL, "l.gii", None);
     assert!(matches!(e, Err(Fatal::Exit(139))));
 }
 
@@ -228,10 +226,9 @@ fn fs399_fs400_volume_overlays() {
         let mut r = Run::new(mode);
         let mut m = r.surface(4, &[]);
         let vol = r.volume(2, 2, 1, 2);
-        let (mut io, g, sg, dir) = r.io();
+        let (mut io, g, dir) = r.io();
         let e = mris_write_gifti_mri(
             g,
-            sg,
             &mut io,
             Some(dir),
             &mut m,
@@ -263,9 +260,9 @@ fn fs522_volume_rows() {
     for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
         let mut r = Run::new(mode);
         let vol = r.volume(3, 2, 1, 1);
-        let (mut io, g, sg, dir) = r.io();
+        let (mut io, g, dir) = r.io();
         assert_eq!(
-            mri_write_gifti(g, sg, &mut io, Some(dir), &vol, "v.gii").unwrap(),
+            mri_write_gifti(g, &mut io, Some(dir), &vol, "v.gii").unwrap(),
             NO_ERROR
         );
         let back = r.read("v.gii").expect("read back");
@@ -309,8 +306,8 @@ fn fs521_fs524_combined_and_mixed_intents() {
                 n_vals_per_vertex: 1,
             },
         ];
-        let (mut io, g, sg, dir) = r.io();
-        let e = mris_write_gifti_combined(g, sg, &mut io, Some(dir), &mut m, &ov, "c.gii").unwrap();
+        let (mut io, g, dir) = r.io();
+        let e = mris_write_gifti_combined(g, &mut io, Some(dir), &mut m, &ov, "c.gii").unwrap();
         assert_eq!(e, NO_ERROR);
         assert_eq!(r.count("c.gii"), if mode.reproduce() { 1 } else { 2 });
         let back = r.read("c.gii").expect("read back");

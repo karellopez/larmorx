@@ -2202,9 +2202,8 @@ TEXTS = [
     (r"\bits default mode checked by D13's rule\b", "its default, `fix`, checked by the rule of "
      "the corrections by default"),
     (r"\bD13's rule: clamped\b", "the rule of the corrections by default: clamped"),
-    (r"^the part's contract: ", "the contract of every program: "),
-    (r"\bevery public function of the part's families\b", "every public function of these "
-     "families"),
+    (r"^the part's contract: ", "the per-program contract for these families: "),
+    (r"\bevery public function of the part's families\b", "every public function"),
     (r"\(the field maps' part B, (\d{4}-\d\d-\d\d)\)", r"(\1)"),
     (r"\bthe part's runs\b", "the runs"),
     (r"\bthe short runs before the trials and of the trials themselves\b", "the short runs before "
@@ -2361,7 +2360,7 @@ CATEGORIES = {
     "check_merge": "niworkflows' IntraModalMerge",
     "check_masker_steps": "the brain masker's steps",
     "check_workflows": "the field-map workflows",
-    "relay22/audit_contract": "the per-program contract",
+    "relay22/audit_contract": "the per-program contract (these families)",
     "check_qwarp_steps": "3dQwarp's Python steps",
     "check_fmap_stage": "fMRIPrep's field-map stage",
     "check_unwarp": "the unwarping",
@@ -2371,7 +2370,10 @@ CATEGORIES = {
     "check_nipype": "nipype's command lines",
 }
 #: The originals the page compares with, in titles.
-ORIGINALS = "sdcflows 2.17.1, niworkflows 1.15.4, SciPy, scikit-image and numpy"
+#: The originals the records ran: niworkflows 1.15.3, the environments' release (its Reference line in
+#: docs/validation/niworkflows-helpers.md); the replica is translated from 1.15.4, whose code is 1.15.3's
+#: on these paths.
+ORIGINALS = "sdcflows 2.17.1, niworkflows 1.15.3 (1.15.4's code on these paths), SciPy, scikit-image and numpy"
 #: The tables' titles by the guide's pattern.
 TABLE_TITLES = {
     "records": "The replica's records against the originals: " + ORIGINALS + " (every case passes)",

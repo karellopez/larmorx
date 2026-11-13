@@ -169,13 +169,13 @@ Brain Imaging Centre, Montreal Neurological Institute, McGill University; MNI's 
 The numbers are read with `larmorx_core::cscan` (C's `sscanf("%lf")`, from the C standard and
 glibc's behaviour) and written with `larmorx_core::cfmt` (`%.15g`). Decompression is in memory
 (flate2 for gzip, the `bzip2` crate's pure-Rust backend for bzip2) where volume_io runs `gunzip`
-and `bunzip2` (FS-71). FreeSurfer's copy (`packages/minc`) was not read: its changes are measured
-by the probe and kept out of this crate (`Dialect`; `docs/findings/minc-xfm.md`). Defects FS-71 to
-FS-75 (`larmorx_core::defects`).
+and `bunzip2` (FS-71). A program's own variant of volume_io plugs in through `Dialect` (no such
+variant is in this crate; FreeSurfer's copy was not read, and what it changes is described in a
+file closed to FreeSurfer's clean-room implementers, `docs/findings/freesurfer-permissive.md`).
+Defects FS-71 to FS-75 (`larmorx_core::defects`).
 
-**Identical to MINC 1.5.1** (its files built from the tarball with GCC 8.4.0 and FreeSurfer's flags)
-and, through a dialect holding FreeSurfer's changes, **to FreeSurfer 8.2.0's `libminc.a`** as the
-unit oracle built it: `validation/probes/fs-minc-nifti` (families `xfm`, `ops`, `write`), numbers in
+**Identical to MINC 1.5.1** (its files built from the tarball with GCC 8.4.0 at `-O3`):
+`validation/probes/fs-minc-nifti` (families `xfm`, `ops`, `write`), numbers in
 `docs/findings/minc-xfm.md`.
 
 ## nifticlib's file names and znzlib (`src/nifti/niftilib.rs`, `src/znz.rs`; item 3.1-15, 2026-11-13)
@@ -197,7 +197,8 @@ zlib-rs through flate2):
 | `znz::StdioFile` | C's `fopen`, `fread`, `fwrite`, `fseek`, `ftell`, `feof`, `fgetc` by their description (ISO C 7.21) and glibc's behaviour (no glibc code) |
 
 The decompressed bytes are zlib's; the compressed bytes a writer makes are zlib-rs's (a deflate
-with zlib's own bytes is FreeSurfer's item P-17). Defects FS-76 and FS-77 (nifticlib; FS-77 with
-its `reproduce`) and FS-78 (zlib 1.2.11), `larmorx_core::defects`. FreeSurfer's copy differs by
-behaviour in the extensions (`NiftiOptions`) and in its znzlib (one `gzread` per call; the probe's
-`Flavour::FreeSurfer`), measured, not ported here (`docs/findings/nifti-znz.md`).
+with zlib's own bytes is not ported). Defects FS-76 and FS-77 (nifticlib; FS-77 with its
+`reproduce`) and FS-78 (zlib 1.2.11), `larmorx_core::defects`. `NiftiOptions` holds nifticlib's
+settings a program can change (`allow_upper_fext` and the compressed extensions); the variants of
+other programs' copies are not in this crate (`docs/findings/freesurfer-permissive.md`, closed to
+FreeSurfer's clean-room implementers).

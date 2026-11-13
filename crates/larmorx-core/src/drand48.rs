@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //! POSIX's 48-bit random numbers: `drand48`, `erand48`, `lrand48`, `nrand48`, `mrand48`,
-//! `jrand48`, `srand48`, `seed48` and `lcong48`, as the C library gives them (FreeSurfer's
-//! `AntsN4BiasFieldCorrectionFs` seeds them with `srand48(53)`; its noise options and
-//! `MRIfixTkReg` draw from them).
+//! `jrand48`, `srand48`, `seed48` and `lcong48`, as the C library gives them.
 //!
 //! Written from POSIX's definition (IEEE Std 1003.1, *drand48*), which fixes every bit: the linear
 //! congruential generator `X(n+1) = (a·X(n) + c) mod 2^48` with `a = 0x5DEECE66D` and `c = 0xB`

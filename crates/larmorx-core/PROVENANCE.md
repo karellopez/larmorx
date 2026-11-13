@@ -96,6 +96,8 @@ They are for `reproduce` and the replicas only; the defaults stay the correctly 
 | `math/log_glibc.rs` | Arm `math/log.c`, `log_data.c` | `glibc_double.rs` | as `exp_glibc` |
 | `math/pow_glibc.rs` | Arm `math/pow.c`, `pow_log_data.c` | `glibc_double.rs` | 1,073,741,824 sampled pairs in eight families (BET's exponents, x near 1 with large y, negative bases, the limits, subnormal x, tiny and huge y, random bits) and every pair of 174 special values: 0 differ |
 | `math/atanf_glibc.rs` (`atanf_glibc`, `atan2f_glibc`) | glibc 2.35's fdlibm copies `sysdeps/ieee754/flt-32/s_atanf.c`, `e_atan2f.c` (Sun's notice only) | `larmorx-nc-core` `fdlibm.rs` | `atanf` all 2^32 inputs, `atan2f` 1,342,177,280 sampled pairs in five families (rotation-like, exponent differences beyond 60, `x = ±1`, ...) and every pair of special values: 0 differ |
+| `math/tanhf_glibc.rs` (`tanhf_glibc`, `expm1f_glibc`; 2026-11-13) | glibc 2.35's fdlibm copies `sysdeps/ieee754/flt-32/s_tanhf.c`, `s_expm1f.c` (Sun's notice only; SHA-256 `dacb3c557d21…`, `b3b864ad6abe…`) | `larmorx-afni-replica` `fdlibm.rs` (still its own) | all 2^32 inputs of each against glibc 2.35 and against the AFNI replica's translation: 0 differ, NaN bits included (16,777,214 NaN results each) |
+| `math/acosf_glibc.rs` (`acosf_glibc`; 2026-11-13) | glibc 2.35's fdlibm copy `sysdeps/ieee754/flt-32/e_acosf.c` (Sun's notice only; `60a8c9b2d144…`); for `\|x\| > 1` the result of glibc's SVID wrapper (`acosf@@GLIBC_2.2.5`), measured as a black box, not translated | – (new) | all 2^32 inputs against glibc 2.35's `acosf`: 0 differ, NaN bits included (2,164,260,862 NaN results) |
 
 The tool, its sample families and its results: `validation/investigations/glibc-maths/`; the
 check against the replica core's translations: `crates-nc/larmorx-nc-core/tools/glibc-float-verify
@@ -411,8 +413,7 @@ x87's NaN propagation (a quiet NaN before a signalling one, then the larger sign
 positive sign), canonical results (pseudo-denormals read as exponent 1, never written); the
 conversions GCC emits (`fld`, `fild`, `fst`, `fistp` under truncation with the integer indefinite,
 GCC 8.4.0's sequences for `unsigned long` and `unsigned int`), `llrintl`'s rounding, and IEEE 754's
-comparisons. FreeSurfer 8.2.0 computes in `long double` in 12 reached functions
-(`docs/freesurfer/variation.md` §1).
+comparisons.
 
 **Bit-identical to the machine's x87** (AMD Ryzen 9 7945HX, Zen 4; glibc 2.35;
 `validation/probes/x87-extended`, log `oracles/logs/fs-found-c-x87-probe-24.log`, 2026-11-12):
@@ -425,11 +426,11 @@ products and quotients in the denormal range and near overflow, denormals and ps
 exact `double`s, `float`s and integers, special values, the boundaries of `double`, `float` and the
 integer types), every pair of 42 special values (unsupported encodings and NaN payloads included),
 2^24 inputs of each conversion from `double`, `float`, `long`, `int`, `unsigned long`, `unsigned
-int` (every bit pattern), and 2^20 cases of six arithmetic patterns of FreeSurfer's `long double`
-functions (sums of `double` products, a mean, variance and standard deviation, cross products of
-`float` edge vectors and their length, a unit vector and its gradient, `float` kernel weights over
-their sum, squared length differences) written as plain C++ loops and compiled by GCC 8.4.0 with
-FreeSurfer's C++ flags; computed in `double` instead, 1.8 % to 71 % of each pattern's outputs
+int` (every bit pattern), and 2^20 cases of six arithmetic patterns of `long double` code (sums of
+`double` products, a mean, variance and standard deviation, cross products of `float` vectors and
+their length, a unit vector and its gradient, `float` weights over their sum, squared length
+differences) written as plain C++ loops and compiled by GCC 8.4.0 at `-O3`; computed in `double`
+instead, 1.8 % to 71 % of each pattern's outputs
 differ (55 % of the dot products, 71 % of the statistics, 5.3 % of the cross products, 60 % of the
 unit vectors and gradients, 3.0 % of the normalised weights, 1.8 % of the edge costs: the control
 that the patterns depend on the extended precision). Among the results: 7.8 million denormal
@@ -444,23 +445,21 @@ every platform.
 **Ported** from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries
 link (BSD-3-Clause; the file's SPDX header is `Apache-2.0 AND BSD-3-Clause`):
 `core/vnl/vnl_random.h` (SHA-256 `373697ca2304…`) and `vnl_random.cxx` (`75550ff547df…`), identical in
-ITK 5.4.5 apart from the default constructor's initialisers (`docs/freesurfer/third-party.md` §8):
+ITK 5.4.5 apart from the default constructor's initialisers:
 the linear congruential seeding (`x · 1664525 + 1 mod 2^32`, 1,000 warm-up draws), Marsaglia and
 Zaman's subtract-with-borrow on 37 words, `lrand32` and its two ranged forms, `drand32`, `drand64`
-(the first of its two draws divided by `0xffffffff`, as GCC 8.4.0 compiles it and as every official
-binary does: `docs/freesurfer/variation.md` §3), `normal` and `normal64` (Marsaglia's polar method;
+(the first of its two draws divided by `0xffffffff`, as GCC 8.4.0 compiles it), `normal` and `normal64` (Marsaglia's polar method;
 the caller passes the logarithm: `math::log_glibc` for the original's bits), `restart` and both
-reseeds. Left out: the time-seeded constructor and `reseed()`. Two VXL defects not reproduced (not
-reached by FreeSurfer, whose generator is never copied and never draws a range): a copy keeps the
+reseeds. Left out: the time-seeded constructor and `reseed()`. Two VXL defects not reproduced: a
+copy keeps the
 cached normal number (the C++ copy constructor and assignment leave it uninitialised), and
 `lrand32(lower, upper)` computes its range in 64 bits (the C++'s `int` overflows beyond `2^31 - 1`:
 a division by zero at `2^32`, no return from `2^31` to `2^32 - 1`); `lower > upper` panics.
 
-**Bit-identical to ITK 4.13.2's own `vnl_random.cxx`** compiled by GCC 8.4.0 with FreeSurfer's C++
-flags and glibc 2.35's logarithm (`validation/probes/fs-random`, log
-`oracles/logs/fs-found-c-random-probe.log`, 2026-11-12): 4,000,005 calls, 0 differences (2,000
-seeds, FreeSurfer's 1234 and 53 among them, 2,000 randomly chosen calls each, FreeSurfer's
-`(float) drand64(0.0, 1.0)` included). With the correctly rounded `math::log`, 125 of about 667,000
+**Bit-identical to ITK 4.13.2's own `vnl_random.cxx`** compiled by GCC 8.4.0 at `-O3` with glibc
+2.35's logarithm (`validation/probes/fs-random`, log `oracles/logs/fs-found-c-random-probe.log`,
+2026-11-12): 4,000,005 calls, 0 differences (2,000 seeds, 2,000 randomly chosen calls each,
+`drand64` rounded to `float` included). With the correctly rounded `math::log`, 125 of about 667,000
 normal numbers change. The unit tests check the original's hashes of a fixed sequence for five
 seeds on every platform.
 
@@ -472,19 +471,18 @@ function returns); glibc's code is never used (LGPL-2.1, CLAUDE.md rule 2). What
 was measured on glibc 2.35 as a black box: the state before any seeding is `X = 0`.
 
 **Identical to the machine's C library** (glibc 2.35; `validation/probes/fs-random`, 2026-11-12):
-12,002,016 calls, 0 differences (16 calls before any seeding; 2,000 seeds of `srand48`, 53 first,
-`AntsN4BiasFieldCorrectionFs`'s, each followed by 1,000 randomly chosen calls of the nine
+12,002,016 calls, 0 differences (16 calls before any seeding; 2,000 seeds of `srand48`, each
+followed by 1,000 randomly chosen calls of the nine
 functions, then `seed48` (its returned previous state compared) and `lcong48` with random
 parameters, each followed by 1,000 more). The unit tests check the C library's hashes of a fixed
 sequence for five seeds on every platform.
 
-## vnl's and netlib's routines for FreeSurfer (FreeSurfer's foundations, item 3.1-07, 2026-11-12)
+## vnl's and netlib's routines (FreeSurfer's foundations, item 3.1-07, 2026-11-12)
 
 **Ported** from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries
 link (`<workspace>/tags/ITK-v4.13.2`; BSD-3-Clause; LINPACK, EISPACK, the reference BLAS and
 Nocedal's L-BFGS from netlib as VXL distributes them, f2c-translated; every file's SPDX header is
-`Apache-2.0 AND BSD-3-Clause`), the same code as 5.4.5's but for `nullptr` and export macros
-(`docs/freesurfer/third-party.md` §10). SHA-256 prefixes of the files read, under
+`Apache-2.0 AND BSD-3-Clause`), the same code as 5.4.5's but for `nullptr` and export macros. SHA-256 prefixes of the files read, under
 `Modules/ThirdParty/VNL/src/vxl/`:
 - `src/vnl_minimize.rs`: `core/vnl/algo/vnl_bracket_minimum.cxx` (`4edba4c5d1f1…`),
   `vnl_fit_parabola.h` (`9519af2d7eb2…`), `vnl_brent_minimizer.cxx` (`1f36978fdea3…`),
@@ -510,8 +508,8 @@ Nocedal's L-BFGS from netlib as VXL distributes them, f2c-translated; every file
 - `src/cfmt.rs` (not ported: written from the C standard's description of `printf`'s conversions);
 - `src/vnl_digests.rs` (tests only).
 
-FreeSurfer's call sites (`utils/numerics.cpp`, `mri_robust_register/`, `AntsN4BiasFieldCorrectionFs`)
-were read for which routines, types and modes it calls; no FreeSurfer code is in these files.
+No FreeSurfer code is in these files (which routines, types and modes FreeSurfer calls:
+`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
 Eleven VNL defects (ITK-103 to ITK-113, `docs/findings/vnl-netlib.md`) have their switch or their
 deterministic fill.
 
@@ -523,7 +521,7 @@ differences. C's `printf` 155,485,224 conversions; the minimizers 1,420,803,455 
 cases); L-BFGS 4,482,647,023 values (600,000 problems, 28,923,878 calls in lock step); the linear
 algebra 1,563,979,512 values (4,000,000 cases); the FFT 32,704,000 values. At scale 1: C's `printf` 777,393
 conversions; the minimizers 4,481,262 values (6,000 cases: brackets, the four Brent entry points,
-`fs_powell`'s `vnl_brent` step, `vnl_brent::minimize`, `vnl_powell` in 1 to 6 dimensions with its
+`vnl_brent`'s step from `(0, step, 0)`, `vnl_brent::minimize`, `vnl_powell` in 1 to 6 dimensions with its
 verbose lines; every evaluated point in order); L-BFGS 22,998,582 values (3,000 problems, 148,167
 calls in lock step: `x`, `diag`, `w`, `iflag`, the whole state and the printed text, `reproduce`);
 the linear algebra 7,764,649 values (20,000 cases: fixed determinants and inverses in float and
@@ -532,10 +530,31 @@ double, `vnl_determinant` to 10 × 10 plain and balanced, `vnl_qr<float/double>`
 in its three modes; messages included; a NaN compared as a NaN); `vnl_fft_1d<double>` 163,520
 values (2 to 512 points); 0 differences. Not compared: memory VNL never writes (ITK-107, ITK-110,
 ITK-113, counted). The existing ports `vnl_svd_f32`, `vnl_svd::vnl_inverse`,
-`vnl_eigen::symmetric_eigensystem` and `vnl_qr::VnlQr` were re-checked at FreeSurfer's call sites
-in the same run. `vnl_digests.rs` checks digests of the ports' outputs on seeded inputs, recorded on
+`vnl_eigen::symmetric_eigensystem` and `vnl_qr::VnlQr` were re-checked in the same run. `vnl_digests.rs` checks digests of the ports' outputs on seeded inputs, recorded on
 Linux x86-64, on every platform (debug and release alike; a NaN hashed as one value).
 
+**Costs that fall without end** (2026-11-13): `vnl_minimize` computes every stored value with
+SSE's NaN rules (`math::x86_nan`), so the NaNs the minimizers make from infinities are x86-64's on
+every platform, and stops a Brent loop that comes back to an earlier state (VNL never returns
+there: ITK-114) with a notice. `validation/probes/fs-vnl`'s `unbounded` family at scale 1 (2,000
+cases; costs that fall linearly, quadratically, cubically or exponentially, or jump to infinities
+or NaNs of their own; starting points at infinities, NaNs of both signs and with payloads, near
+overflow; NaNs compared bit for bit): 74,668 values, 0 differences (17,000 minimizations, 662
+stopped by ITK-114, VNL not called for them; 2,554 NaN results, 5,068,524 points with a NaN
+coordinate); with the port computing as on AArch64 (`nan_trap.c`, `NAN_TRAP_ARM=exe`) against VNL
+on x86 and each cost capped at 10^6 calls, 74,492 values, 0 differences (the port's former plain
+arithmetic: 104). `vnl_digests.rs`'s `UNBOUNDED` digest hashes the NaN bits exactly.
+
+**Infinities and NaNs in the eigensystems and the float SVD** (2026-11-13): `vnl_eigen::pythag`
+follows f2c's `abs`, `max` and `min` macros (it had used Rust's NaN-dropping `max` and `min`) and
+returns `None` where VXL's loop never ends; `symmetric_eigensystem` stops there (ITK-115, and the
+path that runs past the arrays) with a notice; `vnl_svd_f32` follows LINPACK's two tests on the
+sign and the order of a singular value as written (a NaN takes the other branch), stops the
+deflation steps' endless loops (ITK-116) and, through `vnl_svd_f32_full`, returns `info` with
+`U`, `W`, `V`. `validation/probes/fs-vnl`'s `nonfinite` family (VNL in a child process with a time
+limit): 93,205 values, 0 differences; every call the port says never returns (222 sampled
+`pythag` pairs, 2,001 eigensystems, 129 SVDs) still computing in VNL at the limit. The `linalg`
+family's numbers are unchanged (20,000 cases, 7,764,649 values, 0 differences).
 
 ## RANLUX389 and FreeSurfer's random distributions (`src/ranlux/`; FreeSurfer's foundations, item 3.1-05, 2026-11-13)
 
@@ -587,7 +606,7 @@ systems, the five messages byte for byte with their exit status, FS-103's 500 Na
 `reproduce`. The unit tests check the probe's values and messages and 12 golden checksums (each
 pair of end conditions, two knots with conditions 0 and 0, 80 knots; every evaluation branch).
 
-## C's `sscanf` conversions and `strtod` (`src/cscan.rs`; FreeSurfer's foundations, item 3.1-14, 2026-11-12)
+## C's `sscanf` conversions and `strtod` (`src/cscan.rs`; item 3.1-14, 2026-11-12)
 
 **Original implementation**, written from the C standard's description (ISO C 7.21.6.2, 7.22.1.3,
 7.22.1.4); where the standard leaves room, glibc 2.35's choices measured as a black box (no glibc

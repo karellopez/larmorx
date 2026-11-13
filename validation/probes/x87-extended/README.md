@@ -1,5 +1,8 @@
 # x87-extended
 
+**Closed to FreeSurfer's clean-room implementers** (it names FreeSurfer's call sites, flags, seeds or
+patterns; `docs/findings/freesurfer-permissive.md`, 2026-11-13).
+
 The check of `larmorx_core::x87::F80` (the x87's 80-bit extended arithmetic in software,
 `crates/larmorx-core/src/x87/`) against the machine's x87, for FreeSurfer 8.2.0's replicas: the
 functions that compute in `long double` (`docs/freesurfer/variation.md` §1) are compiled by GCC

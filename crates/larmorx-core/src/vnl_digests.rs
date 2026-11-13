@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Cross-platform checks of the VNL and netlib ports of FreeSurfer's foundations (item 3.1-07):
+//! Cross-platform checks of the VNL and netlib ports (item 3.1-07 of the FreeSurfer foundations):
 //! digests of their outputs on seeded inputs, recorded on Linux x86-64 (where
 //! `validation/probes/fs-vnl` proves the ports bit-identical to ITK 4.13.2's VNL built by GCC
 //! 8.4.0), checked on every platform by `cargo test`. Inputs are SplitMix64 streams and integer
@@ -162,6 +162,176 @@ fn digest_minimizers() -> u64 {
         h.text(&out.text(Stream::Err));
     }
     h.0
+}
+
+/// A cost that falls without end (linear, quadratic, cubic), or jumps to an infinity or to NaNs
+/// of its own beyond a threshold, its own arithmetic with SSE's NaNs (`math::x86_nan`), NaN after
+/// 20,000 calls (a search that overflows can creep through 10^8 points); records every point's
+/// bits, NaNs included.
+struct Falling {
+    kind: u64,
+    dir: Vec<f64>,
+    centre: f64,
+    scale: f64,
+    threshold: f64,
+    calls: u64,
+    trace: Vec<u64>,
+}
+
+impl Falling {
+    fn new(rng: &mut SplitMix64, n: usize) -> Falling {
+        Falling {
+            kind: rng.below(7),
+            dir: (0..n)
+                .map(|i| if i == 0 { 1.0 } else { (unit(rng) - 0.5) * 0.8 })
+                .collect(),
+            centre: (unit(rng) - 0.5) * ten_to(rng.range(-2, 3)),
+            scale: ten_to(rng.range(-3, 4))
+                * (0.5 + unit(rng))
+                * if rng.below(2) == 0 { 1.0 } else { -1.0 },
+            threshold: ten_to(rng.range(0, 40)),
+            calls: 0,
+            trace: Vec::new(),
+        }
+    }
+
+    fn eval(&mut self, x: &[f64]) -> f64 {
+        use math::x86_nan::{add_f64 as add, mul_f64 as mul, sub_f64 as sub};
+        self.calls += 1;
+        self.trace.extend(x.iter().map(|v| v.to_bits()));
+        if self.calls > 20_000 {
+            return f64::NAN;
+        }
+        let mut y = 0.0;
+        for (xi, di) in x.iter().zip(&self.dir) {
+            y = add(y, mul(*xi, *di));
+        }
+        let d = sub(y, self.centre);
+        let s = self.scale;
+        let own_nan = f64::from_bits(
+            0x7ff8_0000_0000_0000
+                | (self.calls & 0xffff)
+                | if self.calls & 1 == 1 { 1 << 63 } else { 0 },
+        );
+        let beyond = d.abs() > self.threshold;
+        match self.kind {
+            0 => mul(-s, d),
+            1 => mul(mul(-s.abs(), d), d),
+            2 => mul(mul(mul(s, d), d), d),
+            3 if beyond => f64::NEG_INFINITY,
+            4 if beyond => own_nan,
+            5 if beyond => f64::INFINITY,
+            5 => mul(mul(-s.abs(), d), d),
+            _ => mul(-s, d),
+        }
+    }
+}
+
+/// An infinity, a NaN (either sign, with or without a payload) or a value near overflow.
+fn special(rng: &mut SplitMix64) -> f64 {
+    const S: [u64; 8] = [
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff8_0000_0000_0000,
+        0xfff8_0000_0000_0000,
+        0x7ff8_0000_0000_0042,
+        0xfff8_0000_0000_0777,
+        0x7fe0_0000_0000_0000,
+        0xffe1_0000_0000_0000,
+    ];
+    f64::from_bits(S[rng.below(8) as usize])
+}
+
+/// The minimizers on [`Falling`] costs: every point and result bit for bit, NaNs included (the
+/// minimizers' NaNs are SSE's on every platform), and the ITK-114 stops. Returns the digest, the
+/// NaN points and results met, and the stops.
+fn digest_unbounded() -> (u64, u64, u64) {
+    let mut h = Digest(FNV0);
+    let (mut nan_values, mut stops) = (0u64, 0u64);
+    let is_nan = |w: &u64| f64::from_bits(*w).is_nan();
+    let mut rng = SplitMix64::new(0x5eed_0399);
+    let nans = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<u64>>();
+    for _ in 0..150 {
+        let seed = rng.next_u64();
+        let mut a = rng.range(-4000, 4000) as f64 / 1000.0 * ten_to(rng.range(0, 6));
+        let mut b = if rng.below(8) == 0 {
+            a
+        } else {
+            a + rng.range(-3000, 3000) as f64 / 997.0
+        };
+        if rng.below(5) == 0 {
+            a = special(&mut rng);
+        }
+        if rng.below(5) == 0 {
+            b = special(&mut rng);
+        }
+        let xtol = [1e-6, 1e-4, 1e-8][rng.below(3) as usize];
+        let fresh = |n: usize| Falling::new(&mut SplitMix64::new(seed), n);
+        let mut p = fresh(1);
+        let br = bracket_minimum(&mut |x: &[f64]| p.eval(x), a, b);
+        let mut bm = BrentMinimizer::new();
+        bm.xtol = xtol;
+        let x0 = bm.minimize_given_bounds_and_all_f(
+            &mut |x: &[f64]| p.eval(x),
+            br.a,
+            br.b,
+            br.c,
+            br.fa,
+            br.fb,
+            br.fc,
+        );
+        let x1 = BrentMinimizer::new().minimize(&mut |x: &[f64]| p.eval(x), a);
+        let mut brent = Brent::new();
+        let x2 = brent.minimize(&mut |x: &[f64]| p.eval(x), a);
+        let results = nans(&[
+            br.a,
+            br.b,
+            br.c,
+            br.fa,
+            br.fb,
+            br.fc,
+            x0,
+            x1,
+            x2,
+            bm.f_at_last_minimum,
+        ]);
+        nan_values += results.iter().filter(|w| is_nan(w)).count() as u64;
+        for w in results {
+            h.word(w);
+        }
+        h.word(bm.notices.len() as u64 + 2 * brent.inner.notices.len() as u64);
+        stops += (bm.notices.len() + brent.inner.notices.len()) as u64;
+        nan_values += p.trace.iter().filter(|w| is_nan(w)).count() as u64;
+        for &w in &p.trace {
+            h.word(w);
+        }
+        let n = 1 + rng.below(3) as usize;
+        let mut q = fresh(n);
+        let mut pt: Vec<f64> = (0..n)
+            .map(|_| rng.range(-2000, 2000) as f64 / 1000.0)
+            .collect();
+        if rng.below(4) == 0 {
+            pt[0] = special(&mut rng);
+        }
+        let mut pw = Powell::new();
+        pw.base.maxfev = [3, 10, 40][rng.below(3) as usize];
+        let code = pw.minimize(&mut |x: &[f64]| q.eval(x), &mut pt, &mut Silent);
+        for w in nans(&pt) {
+            h.word(w);
+        }
+        for w in nans(&[pw.base.start_error, pw.base.end_error]) {
+            h.word(w);
+        }
+        h.word(code.value() as u64);
+        h.word(pw.base.num_evaluations as u64);
+        h.word(pw.notices.len() as u64);
+        stops += pw.notices.len() as u64;
+        nan_values += q.trace.iter().filter(|w| is_nan(w)).count() as u64;
+        for &w in &q.trace {
+            h.word(w);
+        }
+    }
+    (h.0, nan_values, stops)
 }
 
 fn digest_lbfgs() -> u64 {
@@ -378,4 +548,21 @@ fn the_ports_give_linux_x86_64s_bits() {
         );
     }
     assert_eq!(got, [MINIMIZERS, LBFGS, LINALG]);
+}
+
+/// The minimizers on costs that fall without end, NaNs compared bit for bit (recorded on Linux
+/// x86-64, 2026-11-13; the probe's `unbounded` family proved the port's points and results
+/// identical to ITK 4.13.2's VNL there, NaNs included, and identical under `nan_trap.c`'s AArch64
+/// emulation of the port).
+const UNBOUNDED: u64 = 0x0191_bc98_6239_7c69;
+
+#[test]
+fn the_unbounded_minimizers_give_x86_64s_nans() {
+    let (got, nan_values, stops) = digest_unbounded();
+    if std::env::var_os("LARMORX_PRINT_DIGESTS").is_some() {
+        println!("UNBOUNDED = {got:#018x} ({nan_values} NaN values, {stops} ITK-114 stops)");
+    }
+    assert_eq!(got, UNBOUNDED);
+    // What the digest covers (14,039 NaN values, 15 stops when recorded).
+    assert!(nan_values > 10_000 && stops > 10, "{nan_values} {stops}");
 }

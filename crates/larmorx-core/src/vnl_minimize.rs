@@ -1,27 +1,42 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
-//! vnl's derivative-free minimizers, as FreeSurfer 8.2.0 calls them through ITK 4.13.2's VNL:
+//! vnl's derivative-free minimizers, as ITK 4.13.2's VNL computes them:
 //!
 //! - [`fit_parabola`], [`bracket_minimum`]: Tim Cootes' bracketing of a 1-D minimum
 //!   (`vnl_bracket_minimum`, with `vnl_fit_parabola`'s parabolic step);
 //! - [`BrentMinimizer`]: Brent's 1-D minimization on a bracket (`vnl_brent_minimizer`:
 //!   `minimize_given_bounds`, `minimize_given_bounds_and_one_f`, `minimize_given_bounds_and_all_f`,
-//!   `minimize`), and [`Brent`], the deprecated `vnl_brent` wrapper that FreeSurfer's
-//!   `fs_powell` uses (`bracket_minimum` with its reversed arguments, `minimize_given_bounds`
-//!   with a tolerance);
+//!   `minimize`), and [`Brent`], the deprecated `vnl_brent` wrapper (`bracket_minimum` with its
+//!   reversed arguments, `minimize_given_bounds` with a tolerance, `minimize`);
 //! - [`NonlinearMinimizer`]: the state and counters of `vnl_nonlinear_minimizer` (tolerances,
 //!   evaluation and iteration counts, `report_eval`, `report_iter` with its verbose line) and its
 //!   [`ReturnCode`]s;
 //! - [`Powell`]: `vnl_powell::minimize` (Powell's direction-set method on the new Brent
-//!   minimizer), as `mri_robust_register`'s Powell registration calls it.
+//!   minimizer).
 //!
-//! Every expression is evaluated in double precision in the C++ order (no fused multiply-add:
-//! the official binaries are built for baseline x86-64), so the evaluated points and the result
-//! are bit-identical to VNL's on every platform; `validation/probes/fs-vnl` compares them with
-//! ITK 4.13.2's own VNL built by GCC 8.4.0 with FreeSurfer's flags. The cost function is the
+//! Every expression is evaluated in double precision in the C++ order (no fused multiply-add: a
+//! build for baseline x86-64 has none), so the evaluated points and the result are bit-identical
+//! to VNL's on every platform; `validation/probes/fs-vnl` compares them with ITK 4.13.2's own VNL
+//! built by GCC 8.4.0 with ITK's Release flags. The cost function is the
 //! caller's (`vnl_cost_function::f`); it receives the same points in the same order.
 //!
+//! On costs that fall without end the minimizers reach infinities and make NaNs of them
+//! (`inf - inf`, `0 · inf`, `inf / inf`): every operation whose result is stored is evaluated with
+//! SSE's NaN rules (`math::x86_nan`: x86-64's default NaN, the first operand's NaN where two meet),
+//! so the points handed to the cost function and the results carry x86-64's NaNs on every
+//! platform (AArch64's default NaN has the other sign; the probe's `unbounded` family compares
+//! them bit for bit). Results that are only compared keep plain arithmetic: a comparison does not
+//! see a NaN's bits.
+//!
+//! **ITK-114:** `vnl_brent_minimizer`'s loop never ends once its state comes back to one it had
+//! been in: a bracket with an infinite end where the cost is NaN or not lower (the golden-section
+//! step lands on that end again and again), or ends so large that their sum overflows (the
+//! midpoint is infinite, so the stopping test never passes, and two points take turns). The port
+//! finds the repetition (Brent's cycle detection on the loop's state) and stops there, in both
+//! modes (a hang is never reproduced), returning the best point found, with a notice in the
+//! minimizer's `notices`.
+//!
 //! Ported from VXL as bundled with ITK v4.13.2 (BSD licence; the same code in v5.4.5 but for
-//! `nullptr` and export macros, `docs/freesurfer/third-party.md` §10):
+//! `nullptr` and export macros):
 //! `core/vnl/algo/vnl_bracket_minimum.cxx`, `vnl_fit_parabola.h`, `vnl_brent_minimizer.cxx`,
 //! `vnl_brent.cxx`, `vnl_powell.{h,cxx}`, `core/vnl/vnl_nonlinear_minimizer.{h,cxx}`.
 
@@ -59,8 +74,10 @@
 //   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 //   OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// The expressions are kept as the C writes them (`-1.0 * x` is not `-x` for a NaN; the
-// constants are VXL's spellings; the negated comparisons are the f2c loops' NaN behaviour).
+// The expressions are kept as the C writes them (`-1.0 * x` is not `-x` for a NaN: through
+// `math::x86_nan` it stays a multiplication, which plain Rust arithmetic would not guarantee, as
+// LLVM folds it into a negation in release builds; the constants are VXL's spellings; the negated
+// comparisons are the f2c loops' NaN behaviour).
 #![allow(
     clippy::neg_multiply,
     clippy::manual_range_contains,
@@ -74,6 +91,8 @@
 )]
 
 use crate::cfmt::{self, Streams};
+use crate::defects::{ITK_114, Notice, UpstreamDefects, push_once};
+use crate::math::x86_nan::{add_f64 as add, div_f64 as div, mul_f64 as mul, sub_f64 as sub};
 
 /// `vnl_cost_function::f`: the function a minimizer evaluates, at a point of its dimension.
 pub trait CostFunction {
@@ -115,12 +134,12 @@ impl ReturnCode {
 /// its turning point at `xb + p / q`. Returns `(p, q)`.
 #[inline]
 pub fn fit_parabola(xa: f64, xb: f64, xc: f64, fa: f64, fb: f64, fc: f64) -> (f64, f64) {
-    let x1 = xa - xb;
-    let f1 = fa - fb;
-    let x2 = xc - xb;
-    let f2 = fc - fb;
-    let p = x2 * x2 * f1 - x1 * x1 * f2;
-    let q = 2.0 * (x2 * f1 - x1 * f2);
+    let x1 = sub(xa, xb);
+    let f1 = sub(fa, fb);
+    let x2 = sub(xc, xb);
+    let f2 = sub(fc, fb);
+    let p = sub(mul(mul(x2, x2), f1), mul(mul(x1, x1), f2));
+    let q = mul(2.0, sub(mul(x2, f1), mul(x1, f2)));
     (p, q)
 }
 
@@ -149,7 +168,7 @@ pub fn bracket_minimum(f: &mut dyn CostFunction, a: f64, b: f64) -> Bracket {
     let mut eval = |x: f64| f.f(&[x]);
     let (mut a, mut b) = (a, b);
     if b == a {
-        b = a + 1.0;
+        b = add(a, 1.0);
     }
     let mut fa = eval(a);
     let mut fb = eval(b);
@@ -158,7 +177,7 @@ pub fn bracket_minimum(f: &mut dyn CostFunction, a: f64, b: f64) -> Bracket {
         std::mem::swap(&mut a, &mut b);
         std::mem::swap(&mut fa, &mut fb);
     }
-    let mut c = b + GOLDEN_RATIO * (b - a);
+    let mut c = add(b, mul(GOLDEN_RATIO, sub(b, a)));
     let mut fc = eval(c);
     let finish = |mut br: Bracket| {
         if br.a > br.c {
@@ -174,20 +193,20 @@ pub fn bracket_minimum(f: &mut dyn CostFunction, a: f64, b: f64) -> Bracket {
         } else if q < 0.0 && q + EPS_SQR > 0.0 {
             q = -1.0 * EPS_SQR;
         }
-        let mut du = p / q;
-        let tol = EPS * (1.0 + cpp_max(b.abs(), c.abs()));
+        let mut du = div(p, q);
+        let tol = mul(EPS, add(1.0, cpp_max(b.abs(), c.abs())));
         if du >= 0.0 && du < tol {
             du = tol;
         } else if du < 0.0 && du + tol > 0.0 {
-            du = -1.0 * tol;
+            du = mul(-1.0, tol);
         }
-        let mut u = b + du;
+        let mut u = add(b, du);
         if (u - c) < tol && (u - c) >= 0.0 {
-            u += tol;
+            u = add(u, tol);
         } else if (c - u) < tol && (c - u) >= 0.0 {
-            u -= tol;
+            u = sub(u, tol);
         }
-        let u_limit = b + 100.0 * (c - b);
+        let u_limit = add(b, mul(100.0, sub(c, b)));
         let fu;
         if (u - b) * (c - u) > 0.0 {
             let fu1 = eval(u);
@@ -212,7 +231,7 @@ pub fn bracket_minimum(f: &mut dyn CostFunction, a: f64, b: f64) -> Bracket {
                     fc: fu1,
                 });
             }
-            u = c + GOLDEN_RATIO * (c - b);
+            u = add(c, mul(GOLDEN_RATIO, sub(c, b)));
             fu = eval(u);
         } else if (u - c) * (u_limit - u) > 0.0 {
             let fu1 = eval(u);
@@ -232,7 +251,7 @@ pub fn bracket_minimum(f: &mut dyn CostFunction, a: f64, b: f64) -> Bracket {
             u = u_limit;
             fu = eval(u);
         } else {
-            u = c + GOLDEN_RATIO * (c - b);
+            u = add(c, mul(GOLDEN_RATIO, sub(c, b)));
             fu = eval(u);
         }
         a = b;
@@ -272,6 +291,8 @@ pub struct BrentMinimizer {
     pub xtol: f64,
     /// `f_at_last_minimum()`.
     pub f_at_last_minimum: f64,
+    /// larmorx's own: the defects met (ITK-114, a loop VNL never leaves), once each.
+    pub notices: Vec<Notice>,
 }
 
 impl Default for BrentMinimizer {
@@ -287,6 +308,7 @@ impl BrentMinimizer {
         BrentMinimizer {
             xtol: 1e-6,
             f_at_last_minimum: 0.0,
+            notices: Vec::new(),
         }
     }
 
@@ -337,8 +359,8 @@ impl BrentMinimizer {
         } else {
             (cx, fc, ax, fa)
         };
-        let d = cpp_min(bx - ax, cx - bx);
-        let e = cpp_max(bx - ax, cx - bx);
+        let d = cpp_min(sub(bx, ax), sub(cx, bx));
+        let e = cpp_max(sub(bx, ax), sub(cx, bx));
         self.brent_loop(f, ax, cx, bx, fb, w, fw, v, fv, d, e)
     }
 
@@ -346,7 +368,7 @@ impl BrentMinimizer {
     /// the bracket's third point, which the bracketing overwrites), then
     /// [`BrentMinimizer::minimize_given_bounds_and_all_f`].
     pub fn minimize(&mut self, f: &mut dyn CostFunction, x: f64) -> f64 {
-        let br = bracket_minimum(f, x - 1.0, x);
+        let br = bracket_minimum(f, sub(x, 1.0), x);
         self.minimize_given_bounds_and_all_f(f, br.a, br.b, br.c, br.fa, br.fb, br.fc)
     }
 
@@ -368,43 +390,63 @@ impl BrentMinimizer {
     ) -> f64 {
         const EPS: f64 = 1e-8;
         let xtol = self.xtol;
-        let mut m = 0.5 * (ax + cx);
-        let mut tol = EPS * x.abs() + xtol;
-        let mut tol2 = 2.0 * tol;
+        let mut m = mul(0.5, add(ax, cx));
+        let mut tol = add(mul(EPS, x.abs()), xtol);
+        let mut tol2 = mul(2.0, tol);
+        // The loop's state (every value the next iteration reads; a NaN counted as one, as its
+        // bits decide nothing here). A state that comes back would come back for ever (ITK-114):
+        // Brent's cycle detection compares each state with one saved at the powers of two.
+        let state = |ax: f64, cx: f64, x: f64, w: f64, v: f64, d: f64, e: f64, f: [f64; 3]| {
+            let b = |y: f64| if y.is_nan() { u64::MAX } else { y.to_bits() };
+            [
+                b(ax),
+                b(cx),
+                b(x),
+                b(w),
+                b(v),
+                b(d),
+                b(e),
+                b(f[0]),
+                b(f[1]),
+                b(f[2]),
+            ]
+        };
+        let mut saved = state(ax, cx, x, w, v, d, e, [fx, fw, fv]);
+        let (mut power, mut steps) = (1u64, 0u64);
         while (x - m).abs() > (tol2 - 0.5 * (cx - ax)) {
             let (mut p, mut q, mut r) = (0.0f64, 0.0f64, 0.0f64);
             if e.abs() > tol {
                 // Fit a parabola.
-                r = (x - w) * (fx - fv);
-                q = (x - v) * (fx - fw);
-                p = (x - v) * q - (x - w) * r;
-                q = 2.0 * (q - r);
+                r = mul(sub(x, w), sub(fx, fv));
+                q = mul(sub(x, v), sub(fx, fw));
+                p = sub(mul(sub(x, v), q), mul(sub(x, w), r));
+                q = mul(2.0, sub(q, r));
                 if q > 0.0 {
-                    p *= -1.0;
+                    p = mul(p, -1.0);
                 } else {
-                    q *= -1.0;
+                    q = mul(q, -1.0);
                 }
                 r = e;
                 e = d;
             }
             if p.abs() < (0.5 * q * r).abs() && p > (q * (ax - x)) && p < (q * (cx - x)) {
                 // Parabolic interpolation.
-                d = p / q;
-                let u = x + d;
+                d = div(p, q);
+                let u = add(x, d);
                 if u - ax < tol2 || cx - u < tol2 {
                     d = if x < m { tol } else { -tol };
                 }
             } else {
                 // Golden section step.
-                e = (if x < m { cx } else { ax }) - x;
-                d = COMPL_GOLD * e;
+                e = sub(if x < m { cx } else { ax }, x);
+                d = mul(COMPL_GOLD, e);
             }
             let u = if d.abs() >= tol {
-                x + d
+                add(x, d)
             } else if d > 0.0 {
-                x + tol
+                add(x, tol)
             } else {
-                x - tol
+                sub(x, tol)
             };
             let fu = f.f(&[u]);
             if fu <= fx {
@@ -435,17 +477,36 @@ impl BrentMinimizer {
                     fv = fu;
                 }
             }
-            m = 0.5 * (ax + cx);
-            tol = EPS * x.abs() + xtol;
-            tol2 = 2.0 * tol;
+            m = mul(0.5, add(ax, cx));
+            tol = add(mul(EPS, x.abs()), xtol);
+            tol2 = mul(2.0, tol);
+            let now = state(ax, cx, x, w, v, d, e, [fx, fw, fv]);
+            if now == saved {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &ITK_114,
+                        UpstreamDefects::Fix,
+                        format!(
+                            "vnl_brent_minimizer's loop came back to a state it had been in (bracket [{ax:e}, {cx:e}], x {x:e}, f {fx:e}): VNL never returns; stopped at the best point"
+                        ),
+                    ),
+                );
+                break;
+            }
+            steps += 1;
+            if steps == power {
+                saved = now;
+                power = power.saturating_mul(2);
+                steps = 0;
+            }
         }
         self.f_at_last_minimum = fx;
         x
     }
 }
 
-/// `vnl_brent` (deprecated in VNL, a wrapper of [`BrentMinimizer`]), as FreeSurfer's `fs_powell`
-/// calls it.
+/// `vnl_brent` (deprecated in VNL, a wrapper of [`BrentMinimizer`]).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Brent {
     pub inner: BrentMinimizer,
@@ -514,7 +575,7 @@ impl Brent {
     /// [`Brent::minimize_given_bounds`] on `(cx, bx, ax)` with the tolerance `ftol`. Returns the
     /// minimum's `x`.
     pub fn minimize(&mut self, f: &mut dyn CostFunction, x: f64) -> f64 {
-        let ((ax, xx, bx), _) = self.bracket_minimum(f, x - 1.0, x + 1.0, 0.0);
+        let ((ax, xx, bx), _) = self.bracket_minimum(f, sub(x, 1.0), add(x, 1.0), 0.0);
         let ftol = self.ftol;
         self.minimize_given_bounds(f, bx, xx, ax, ftol).1
     }
@@ -625,6 +686,8 @@ pub struct Powell {
     pub linmin_xtol: f64,
     /// `initial_step_` (default 1.0).
     pub initial_step: f64,
+    /// larmorx's own: the defects its line minimizations met (ITK-114), once each.
+    pub notices: Vec<Notice>,
 }
 
 impl Default for Powell {
@@ -639,6 +702,7 @@ impl Powell {
             base: NonlinearMinimizer::new(),
             linmin_xtol: 1e-4,
             initial_step: 1.0,
+            notices: Vec::new(),
         }
     }
 
@@ -675,10 +739,10 @@ impl Powell {
                 fret = fr;
                 for (k, pk) in p.iter_mut().enumerate() {
                     // f1d.uninit(xx, p) with the x0 of this line (p before the update).
-                    *pk += xx * xit[k];
+                    *pk = add(*pk, mul(xx, xit[k]));
                 }
                 if (fptt - fret).abs() > del {
-                    del = (fptt - fret).abs();
+                    del = sub(fptt, fret).abs();
                     ibig = i;
                 }
             }
@@ -689,8 +753,8 @@ impl Powell {
                 return ReturnCode::FailedTooManyIterations;
             }
             for j in 0..n {
-                ptt[j] = 2.0 * p[j] - pt[j];
-                xit[j] = p[j] - pt[j];
+                ptt[j] = sub(mul(2.0, p[j]), pt[j]);
+                xit[j] = sub(p[j], pt[j]);
                 pt[j] = p[j];
             }
             let fptt = functor.f(&ptt);
@@ -702,7 +766,7 @@ impl Powell {
                     let (xx, fr) = self.line_minimize(functor, p, &xit, 1.0);
                     fret = fr;
                     for (k, pk) in p.iter_mut().enumerate() {
-                        *pk += xx * xit[k];
+                        *pk = add(*pk, mul(xx, xit[k]));
                     }
                     for j in 0..n {
                         xi[j * n + ibig] = xi[j * n + n - 1];
@@ -734,7 +798,7 @@ impl Powell {
         let mut f1d = |x: &[f64]| {
             let lambda = x[0];
             for i in 0..n {
-                tmpx[i] = x0[i] + lambda * dx[i];
+                tmpx[i] = add(x0[i], mul(lambda, dx[i]));
             }
             let e = functor.f(&tmpx);
             base.report_eval(e);
@@ -744,6 +808,9 @@ impl Powell {
         let mut brent = BrentMinimizer::new();
         brent.xtol = linmin_xtol;
         let xx = brent.minimize_given_bounds(&mut f1d, br.a, br.b, br.c);
+        for notice in brent.notices {
+            push_once(&mut self.notices, notice);
+        }
         (xx, brent.f_at_last_minimum)
     }
 }
@@ -767,6 +834,75 @@ mod tests {
         let x = b.minimize_given_bounds(&mut f, br.a, br.b, br.c);
         assert!((x - 0.3).abs() < 1e-5);
         assert_eq!(b.f_at_last_minimum, f(&[x]));
+    }
+
+    /// A NaN made from numbers is x86-64's (SSE's default NaN, sign set) on every platform:
+    /// from two infinite starting points VNL's third point is `inf + φ·(inf - inf)`.
+    #[test]
+    fn nans_made_from_infinities_are_x86_64s() {
+        let mut trace = Vec::new();
+        // The cost with SSE's NaN rules too (LLVM folds a plain `-1.0 * x` into a negation in
+        // release builds, which flips a NaN's sign).
+        let mut f = |x: &[f64]| {
+            trace.push(x[0].to_bits());
+            mul(-1.0, x[0])
+        };
+        let br = bracket_minimum(&mut f, f64::INFINITY, f64::INFINITY);
+        let (inf, nan) = (f64::INFINITY.to_bits(), 0xfff8_0000_0000_0000u64);
+        assert_eq!(trace, [inf, inf, nan]);
+        let got = [br.a, br.b, br.c, br.fa, br.fb, br.fc].map(f64::to_bits);
+        let ninf = f64::NEG_INFINITY.to_bits();
+        assert_eq!(got, [inf, inf, nan, ninf, ninf, nan]);
+        // The parabola through an infinite point: inf - inf in p, then in q.
+        let (p, q) = fit_parabola(0.0, 1.0, f64::INFINITY, 1.0, 0.0, f64::INFINITY);
+        assert_eq!((p.to_bits(), q.to_bits()), (nan, inf));
+        let (p, q) = fit_parabola(0.0, 1.0, f64::INFINITY, 1.0, 0.0, f64::NEG_INFINITY);
+        assert_eq!((p.to_bits(), q.to_bits()), (inf, nan));
+    }
+
+    /// ITK-114: where VNL's Brent loop comes back to a state it had been in (and so never
+    /// returns), the port stops at the best point with a notice.
+    #[test]
+    fn brent_stops_where_vnl_never_returns() {
+        let is_114 = |n: &[Notice]| n.len() == 1 && n[0].defect.id == "ITK-114";
+        // An infinite end whose cost is NaN: the golden-section step lands on it again and again.
+        let mut calls = 0u32;
+        let mut f = |x: &[f64]| {
+            calls += 1;
+            if x[0].is_finite() {
+                (x[0] - 1.0) * (x[0] - 1.0)
+            } else {
+                f64::NAN
+            }
+        };
+        let mut bm = BrentMinimizer::new();
+        let x = bm.minimize_given_bounds(&mut f, 0.0, 1.0, f64::INFINITY);
+        assert_eq!((x, bm.f_at_last_minimum), (1.0, 0.0));
+        assert!(is_114(&bm.notices), "{:?}", bm.notices);
+        assert!(calls < 10, "{calls}");
+        // Ends whose sum overflows: the midpoint is infinite and two points take turns.
+        let mut g = |_: &[f64]| f64::INFINITY;
+        let mut bm = BrentMinimizer::new();
+        let x = bm.minimize_given_bounds_and_one_f(&mut g, 1e308, 1.2e308, 1.5e308, f64::INFINITY);
+        assert!(x.is_finite() && x > 1.2e308, "{x:e}");
+        assert!(is_114(&bm.notices), "{:?}", bm.notices);
+        // A bounded cost meets no such loop.
+        let mut h = |x: &[f64]| (x[0] - 0.3) * (x[0] - 0.3);
+        let mut bm = BrentMinimizer::new();
+        bm.minimize(&mut h, 0.0);
+        assert!(bm.notices.is_empty());
+        // Powell along a cost that falls without end: its line searches meet the loop.
+        let mut fall = |x: &[f64]| {
+            if x.iter().any(|v| v.is_nan()) {
+                f64::NAN
+            } else {
+                -1.0 * x[0] - 0.5 * x[1]
+            }
+        };
+        let mut pw = Powell::new();
+        let mut p = [0.5, 0.25];
+        pw.minimize(&mut fall, &mut p, &mut Silent);
+        assert!(is_114(&pw.notices), "{:?}", pw.notices);
     }
 
     #[test]

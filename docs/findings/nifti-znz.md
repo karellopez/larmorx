@@ -1,24 +1,20 @@
-# nifticlib 2.0.0's file names and znzlib, zlib 1.2.11's file layer, and FreeSurfer 8.2.0's copy
+# nifticlib 2.0.0's file names and znzlib, and zlib 1.2.11's file layer
 
 **Source-derived from nifticlib 2.0.0** (public domain) **and zlib 1.2.11** (the zlib licence):
-closed to the implementer of a future clean room of these routines (porting guide §1). The
-**FreeSurfer** sections describe FreeSurfer's copy by its behaviour only (black-box runs of the unit
-oracle's `libnifti.a`; FreeSurfer's `packages/nifti` was not read). Found while porting the
-FreeSurfer foundations' item 3.1-15 (`docs/freesurfer/queue.md`) into `larmorx-io`
-(`nifti::niftilib`, `znz`), 2026-11-13. The check: `validation/probes/fs-minc-nifti` (families
-`nifti`, `znz`).
+closed to the implementer of a future clean room of these routines (porting guide §1). Found while
+porting item 3.1-15 of larmorx's FreeSurfer foundations into `larmorx-io` (`nifti::niftilib`, `znz`),
+2026-11-13. The check: `validation/probes/fs-minc-nifti` (families `nifti`, `znz`). FreeSurfer's
+copy (what it reaches, how it differs, measured as a black box):
+`docs/findings/freesurfer-permissive.md` (closed to FreeSurfer's clean-room implementers; this file
+describes nifticlib 2.0.0 and zlib 1.2.11 only, 2026-11-13).
 
 ## The upstream
 
-FreeSurfer's `nifti1_io.c` matches nifticlib 2.0.0 in 95.1 % of its tokens (comments and layout
-ignored; 94.6 % for nifti_clib 3.0.1, 94.9 % for ITK 4.13.2's copy), its `znzlib.c` in 97.2 % (the
-same as ITK 4.13.2's; 97.0 % for 3.0.1): counted without reading FreeSurfer's files (numbers only).
-What FreeSurfer reaches (the core view): `nifti_findhdrname`, `is_nifti_file` and the helpers they
-call, and every `znz*` function its MGZ and NIfTI code uses (`znzopen`, `znzread`, `znzwrite`,
-`znzseek`, `znztell`, `znzeof`, `znzgetc`, `znzclose`). znzlib is a thin layer over C's stdio and
-zlib's `gz*` functions, so their behaviour is the module's: the port translates zlib 1.2.11's file
-layer (`gzlib.c`, `gzread.c`, `gzwrite.c`: its 8 KiB input and 16 KiB output buffers and its
-states), the version Ubuntu 22.04 ships and FreeSurfer's official binaries load at run time
+The port follows nifticlib 2.0.0 (`<workspace>/tags/nifticlib-2.0.0`): `niftilib/nifti1_io.c`'s
+file-name functions and `is_nifti_file`, and `znzlib/znzlib.c` (ITK 4.13.2's copy of `znzlib.c` is
+the same). znzlib is a thin layer over C's stdio and zlib's `gz*` functions, so their behaviour is
+the module's: the port translates zlib 1.2.11's file layer (`gzlib.c`, `gzread.c`, `gzwrite.c`: its
+8 KiB input and 16 KiB output buffers and its states), the version Ubuntu 22.04 ships
 (`libz.so.1`), with zlib-rs's inflate and deflate.
 
 ## What the port keeps
@@ -46,37 +42,23 @@ states), the version Ubuntu 22.04 ships and FreeSurfer's official binaries load 
 | ID | What the original does | larmorx |
 |---|---|---|
 | FS-76 (nifticlib) | `znzread`/`znzwrite` on a compressed file with a member size of 0 compute `nmemb - remain/size`, `0/0` (a crash, or whatever the compiled code makes of it) | 0, with a notice |
-| FS-77 (nifticlib) | a compressed read that ends inside a member counts that member as read (`nmemb - remain/size`); the `** znzread: read short by N bytes` warning only when less than one member is missing | the complete members (FreeSurfer's copy counts them so too); `reproduce` gives nifticlib's count; the warning kept |
+| FS-77 (nifticlib) | a compressed read that ends inside a member counts that member as read (`nmemb - remain/size`); the `** znzread: read short by N bytes` warning only when less than one member is missing | the complete members; `reproduce` gives nifticlib's count; the warning kept |
 | FS-78 (zlib 1.2.11) | `gzseek` forward before the first write, then `gzputc`, `gzflush` or `gzclose`, fills the gap with memory zlib never set (`gz_zero` clears its buffer once, before allocating it); `gzwrite` first allocates, so it writes zeros | zeros, with a notice (memory contents are never reproduced) |
-
-## FreeSurfer 8.2.0's changes (by behaviour; for `larmorx-freesurfer`, track A)
-
-Measured with the probe's FreeSurfer model (0 differences: 6,000 name cases, 3,000 read scripts,
-2,000 write scripts at scale 1):
-
-1. No upper-case extensions (`allow_upper_fext` off), `nifti_is_gzfile` takes `.gz` only (2.0.0
-   also `.GZ`), and `.nia.gz` is a compressed extension (`NiftiOptions { allow_upper_fext: false,
-   upper_case_gz: false, nia_gz: true }`).
-2. Its `znzread` on a compressed file is one `gzread` of `size * nmemb` bytes divided by `size`:
-   the complete members, no "short" warning, and zlib's -1 becomes `SIZE_MAX / size`
-   (2305843009213693951 for 8-byte members); `znzwrite` likewise; `znzrewind` is `gzrewind` (2.0.0:
-   `gzseek(0, SEEK_SET)`, which keeps `gzeof`'s flag after the end of an empty file).
 
 ## The numbers (the probe at scale 1, 2026-11-13)
 
 `nifti`: 6,000 cases (random files of five header kinds, short and gzipped, under 24 extensions
 and 7 base names; every name function and `is_nifti_file`, their messages), 0 differences against
-nifticlib 2.0.0 and against FreeSurfer's copy. `znz` reading: 3,000 scripts of up to 14 operations
+nifticlib 2.0.0. `znz` reading: 3,000 scripts of up to 14 operations
 (reads of 1 to 8-byte members, seeks of every kind, `znztell`, `znzeof`, `znzgetc`, `znzrewind`)
 on plain, empty, gzip (levels 1, 6, 9), two-member, trailing, truncated and damaged files, in five
-modes, with and without compression: 0 differences against both (nifticlib under `reproduce`,
-FreeSurfer under the correction). `znz` writing: 2,000 scripts in seven modes (`wb`, `wb1/6/9`,
+modes, with and without compression: 0 differences against nifticlib (under `reproduce`). `znz` writing: 2,000 scripts in seven modes (`wb`, `wb1/6/9`,
 `ab`, `w`, `wT`), every result and the decompressed content identical; 77 files with an FS-78
 gap not compared.
 
 ## Not the same bytes
 
-The compressed bytes of a written `.gz` (an `.mgz`) are zlib-rs's: 208 of 1,241 compressed files
+The compressed bytes of a written `.gz` are zlib-rs's: 208 of 1,241 compressed files
 of the probe's scale-1 run were byte-identical to zlib 1.2.11's at the same level, every one
-decompressing to the same content. Byte-identical MGZ outputs need a port of zlib's deflate
-(FreeSurfer's item P-17; the decision log's `.h5` precedent compares such files by content).
+decompressing to the same content. Byte-identical outputs need a port of zlib's deflate (the
+decision log's `.h5` precedent compares such files by content).

@@ -10,8 +10,8 @@
 //!   and are not computed; every update of the Hessenberg matrix `hqr2` makes is, over the
 //!   ranges `hqr2` uses.
 //!
-//! - [`real_eigensystem`]: `vnl_real_eigensystem` with its eigenvectors (`D`, `V`, `Vreal`), as
-//!   FreeSurfer 8.2.0's `OpenNonSymmetricEigenSystem` reads them (ITK 4.13.2: `rg` with
+//! - [`real_eigensystem`]: `vnl_real_eigensystem` with its eigenvectors (`D`, `V`, `Vreal`; ITK
+//!   4.13.2: `rg` with
 //!   `balanc`, `elmhes`, `eltran`, `hqr2` and `balbak`, written again with the f2c macros `abs`,
 //!   `max` in their C semantics; three defects of VNL's, ITK-110 to ITK-112, are documented
 //!   there).
@@ -102,18 +102,29 @@ fn d_sign(a: f64, b: f64) -> f64 {
     if b >= 0.0 { x } else { -x }
 }
 
-/// EISPACK's `pythag(a, b)`: `sqrt(a² + b²)` by Moler and Morrison's iteration.
-pub fn pythag(a: f64, b: f64) -> f64 {
-    let mut p = a.abs().max(b.abs());
+/// EISPACK's `pythag(a, b)`: `sqrt(a² + b²)` by Moler and Morrison's iteration, with f2c's
+/// `abs`, `max` and `min` macros as VXL's C has them (`x >= 0 ? x : -x`, `a >= b ? a : b`,
+/// `a <= b ? a : b`): of a NaN and a number, `max` and `min` give the number when the NaN is
+/// `a` and the NaN when it is `b`, so `pythag(NaN, x)` is `pythag(x, x)` and `pythag(NaN, 0)` is 0;
+/// `abs` keeps `-0`, so `pythag(-0, ±0)` is `-0`.
+///
+/// `None` where VXL's loop never ends (ITK-115): the smaller magnitude over the larger is NaN (a
+/// NaN `b`, or two infinities), and `4 + r` never equals 4 again.
+pub fn pythag(a: f64, b: f64) -> Option<f64> {
+    let (aa, ab) = (abs_m(a), abs_m(b));
+    let mut p = max_m(aa, ab);
     if p == 0.0 {
-        return p;
+        return Some(p);
     }
-    let d = a.abs().min(b.abs()) / p;
+    let d = min_m(aa, ab) / p;
     let mut r = d * d;
+    if r.is_nan() {
+        return None;
+    }
     loop {
         let t = r + 4.0;
         if t == 4.0 {
-            return p;
+            return Some(p);
         }
         let s = r / t;
         let u = s * 2.0 + 1.0;
@@ -133,6 +144,17 @@ pub struct SymmetricEigen {
     /// `V(r, c)` at `vectors[r * n + c]`.
     pub vectors: Vec<f64>,
     pub ierr: usize,
+    /// larmorx's own: ITK-115 when VNL would never return (`pythag` looping for ever inside
+    /// `tql2`, on a matrix with an infinite or NaN entry). `ierr` is then the eigenvalue `tql2`
+    /// was working on, and the values and vectors are those reached there.
+    pub notices: Vec<crate::defects::Notice>,
+}
+
+impl SymmetricEigen {
+    /// Whether VNL's eigensystem would never return on this matrix (ITK-115).
+    pub fn never_returns(&self) -> bool {
+        self.notices.iter().any(|n| n.defect.id == "ITK-115")
+    }
 }
 
 /// [`SymmetricEigen`] of the `n × n` matrix `a` (row-major). vnl passes its row-major data
@@ -152,7 +174,17 @@ pub fn symmetric_eigensystem(a: &[f64], n: usize) -> SymmetricEigen {
     let mut d = vec![0.0f64; n + 1];
     let mut e = vec![0.0f64; n + 1];
     tred2(&a, &mut d, &mut e, &mut z);
-    let ierr = tql2(n, &mut d, &mut e, &mut z);
+    let (ierr, never_returns) = tql2(n, &mut d, &mut e, &mut z);
+    let mut notices = Vec::new();
+    if never_returns {
+        notices.push(crate::defects::Notice::new(
+            &crate::defects::ITK_115,
+            crate::defects::UpstreamDefects::Fix,
+            format!(
+                "EISPACK's pythag loops for ever on eigenvalue {ierr} (a NaN or two infinities): VNL never returns; stopped there"
+            ),
+        ));
+    }
     let mut vectors = vec![0.0f64; n * n];
     for c in 0..n {
         for r in 0..n {
@@ -163,6 +195,7 @@ pub fn symmetric_eigensystem(a: &[f64], n: usize) -> SymmetricEigen {
         values: d[1..].to_vec(),
         vectors,
         ierr,
+        notices,
     }
 }
 
@@ -185,7 +218,7 @@ fn tred2(a: &Fortran, d: &mut [f64], e: &mut [f64], z: &mut Fortran) {
             let mut skip = l < 2;
             if !skip {
                 for k in 1..=l {
-                    scale += d[k].abs();
+                    scale += abs_m(d[k]);
                 }
                 skip = scale == 0.0;
             }
@@ -281,10 +314,11 @@ fn tred2(a: &Fortran, d: &mut [f64], e: &mut [f64], z: &mut Fortran) {
 }
 
 /// EISPACK's `tql2`: the eigenvalues and eigenvectors of the tridiagonal matrix by the QL
-/// method, sorted ascending. Returns `ierr`.
-fn tql2(n: usize, d: &mut [f64], e: &mut [f64], z: &mut Fortran) -> usize {
+/// method, sorted ascending. Returns `ierr` and whether VNL would never return (ITK-115: `pythag`
+/// loops for ever; `ierr` is then the eigenvalue it was working on, nothing sorted).
+fn tql2(n: usize, d: &mut [f64], e: &mut [f64], z: &mut Fortran) -> (usize, bool) {
     if n == 1 {
-        return 0;
+        return (0, false);
     }
     for i in 2..=n {
         e[i - 1] = e[i];
@@ -309,21 +343,27 @@ fn tql2(n: usize, d: &mut [f64], e: &mut [f64], z: &mut Fortran) -> usize {
             m += 1;
         }
         if m > n {
-            // Only with NaN or infinite values, where the f2c code reads past the arrays.
-            return l;
+            // e[n] is 0 at the start, but an earlier QL step leaves `0 · inf` there, a NaN,
+            // where pythag returned an infinity: the search then runs past n (tst1 is never
+            // NaN). The f2c code goes on with m = n + 1: it reads (and writes) d[n + 1], past
+            // the array, and then calls pythag(p, e[n]) with that NaN as its second argument,
+            // which never returns (ITK-115).
+            return (l, true);
         }
         if m != l {
             loop {
                 // L130
                 if j == 30 {
-                    return l;
+                    return (l, false);
                 }
                 j += 1;
                 let l1 = l + 1;
                 let l2 = l1 + 1;
                 let mut g = d[l];
                 let mut p = (d[l1] - g) / (e[l] * 2.0);
-                let mut r = pythag(p, 1.0);
+                let Some(mut r) = pythag(p, 1.0) else {
+                    return (l, true);
+                };
                 d[l] = e[l] / (p + d_sign(r, p));
                 d[l1] = e[l] * (p + d_sign(r, p));
                 let dl1 = d[l1];
@@ -350,7 +390,10 @@ fn tql2(n: usize, d: &mut [f64], e: &mut [f64], z: &mut Fortran) -> usize {
                     let i = m - ii;
                     g = c * e[i];
                     h = c * p;
-                    r = pythag(p, e[i]);
+                    let Some(ri) = pythag(p, e[i]) else {
+                        return (l, true);
+                    };
+                    r = ri;
                     e[i + 1] = s * r;
                     s = e[i] / r;
                     c = p / r;
@@ -395,7 +438,7 @@ fn tql2(n: usize, d: &mut [f64], e: &mut [f64], z: &mut Fortran) -> usize {
             }
         }
     }
-    0
+    (0, false)
 }
 
 /// The eigenvalues of `vnl_real_eigensystem(M)` for the `n × n` matrix `m` (row-major):
@@ -854,7 +897,7 @@ pub fn real_eigenvalue_product(m: &[f64], n: usize) -> Option<(f64, f64)> {
 }
 
 // ------------------------------------------------------------------------------------------------
-// vnl_real_eigensystem with its eigenvectors (FreeSurfer's OpenNonSymmetricEigenSystem), ITK
+// vnl_real_eigensystem with its eigenvectors (D, V, Vreal), ITK
 // 4.13.2: rg with matz = 1 (balanc, elmhes, eltran, hqr2, balbak), statement by statement, the f2c
 // macros abs, min and max with their C semantics.
 
@@ -868,6 +911,12 @@ fn abs_m(x: f64) -> f64 {
 #[inline]
 fn max_m(a: f64, b: f64) -> f64 {
     if a >= b { a } else { b }
+}
+
+/// f2c's `min(a, b)`: `a <= b ? a : b`.
+#[inline]
+fn min_m(a: f64, b: f64) -> f64 {
+    if a <= b { a } else { b }
 }
 
 /// `vnl_real_eigensystem(M)`: `D` (complex eigenvalues, as `(re, im)`), `V` (complex
@@ -1709,17 +1758,43 @@ fn balbak(n: usize, low: usize, igh: usize, scale: &[f64], m: usize, z: &mut For
     }
 }
 
-/// `vnl_symmetric_eigensystem<float>(A)` as FreeSurfer's `OpenEigenSystem` reads it: EISPACK's
+/// `vnl_symmetric_eigensystem<float>(A)`, its eigenvalues and eigenvectors: EISPACK's
 /// `rs` in double on the matrix converted to double ([`symmetric_eigensystem`]), the eigenvalues
 /// and eigenvectors rounded to float. `ierr` as in [`SymmetricEigen`] (VNL then prints
 /// `vnl_symmetric_eigensystem: ierr = …` and leaves `V` unset: memory contents, here the double
 /// vectors as computed).
 pub fn symmetric_eigensystem_f32(a: &[f32], n: usize) -> (Vec<f32>, Vec<f32>, usize) {
+    let e = symmetric_eigensystem_f32_full(a, n);
+    (e.values, e.vectors, e.ierr)
+}
+
+/// [`symmetric_eigensystem_f32`] with the notices (ITK-115: where VNL would never return).
+#[derive(Clone, Debug, PartialEq)]
+pub struct SymmetricEigenF32 {
+    pub values: Vec<f32>,
+    /// `V(r, c)` at `vectors[r * n + c]`.
+    pub vectors: Vec<f32>,
+    pub ierr: usize,
+    pub notices: Vec<crate::defects::Notice>,
+}
+
+impl SymmetricEigenF32 {
+    /// Whether VNL's eigensystem would never return on this matrix (ITK-115).
+    pub fn never_returns(&self) -> bool {
+        self.notices.iter().any(|n| n.defect.id == "ITK-115")
+    }
+}
+
+/// [`symmetric_eigensystem_f32`] with its notices.
+pub fn symmetric_eigensystem_f32_full(a: &[f32], n: usize) -> SymmetricEigenF32 {
     let ad: Vec<f64> = a.iter().map(|&v| f64::from(v)).collect();
     let e = symmetric_eigensystem(&ad, n);
-    let values = e.values.iter().map(|&v| v as f32).collect();
-    let vectors = e.vectors.iter().map(|&v| v as f32).collect();
-    (values, vectors, e.ierr)
+    SymmetricEigenF32 {
+        values: e.values.iter().map(|&v| v as f32).collect(),
+        vectors: e.vectors.iter().map(|&v| v as f32).collect(),
+        ierr: e.ierr,
+        notices: e.notices,
+    }
 }
 
 #[cfg(test)]
@@ -1728,9 +1803,59 @@ mod tests {
 
     #[test]
     fn pythag_is_the_hypotenuse() {
-        assert!((pythag(3.0, 4.0) - 5.0).abs() < 1e-15);
-        assert_eq!(pythag(0.0, 0.0), 0.0);
-        assert!((pythag(1e-3, 1.0) - (1.0f64 + 1e-6).sqrt()).abs() < 1e-15);
+        assert!((pythag(3.0, 4.0).unwrap() - 5.0).abs() < 1e-15);
+        assert_eq!(pythag(0.0, 0.0), Some(0.0));
+        assert!((pythag(1e-3, 1.0).unwrap() - (1.0f64 + 1e-6).sqrt()).abs() < 1e-15);
+    }
+
+    /// VXL's C on NaNs, infinities and signed zeros (f2c's `abs`, `max`, `min` macros; ITK-115),
+    /// the values ITK 4.13.2's `pythag_` gives (`validation/probes/fs-vnl`, family `nonfinite`).
+    #[test]
+    fn pythag_keeps_vxls_nans() {
+        let (nan, inf) = (f64::NAN, f64::INFINITY);
+        // A NaN first gives the second's magnitude twice: pythag(|x|, |x|).
+        assert_eq!(pythag(nan, 3.0), pythag(3.0, 3.0));
+        assert_eq!(pythag(-nan, -2.0), pythag(2.0, 2.0));
+        assert_eq!(pythag(nan, 0.0), Some(0.0));
+        // A NaN second, two NaNs, two infinities: VXL loops for ever.
+        assert_eq!(pythag(3.0, nan), None);
+        assert_eq!(pythag(0.0, nan), None);
+        assert_eq!(pythag(nan, nan), None);
+        assert_eq!(pythag(inf, -inf), None);
+        assert_eq!(pythag(nan, inf), None);
+        // One infinity: the infinity.
+        assert_eq!(pythag(inf, 2.0), Some(inf));
+        assert_eq!(pythag(-7.0, -inf), Some(inf));
+        assert_eq!(pythag(inf, nan), None);
+        // f2c's abs keeps -0.
+        assert_eq!(
+            pythag(-0.0, -0.0).map(f64::to_bits),
+            Some((-0.0f64).to_bits())
+        );
+        assert_eq!(
+            pythag(-0.0, 0.0).map(f64::to_bits),
+            Some((-0.0f64).to_bits())
+        );
+        assert_eq!(pythag(0.0, -0.0).map(f64::to_bits), Some(0.0f64.to_bits()));
+    }
+
+    /// ITK-115: a NaN in the tridiagonal form reaches pythag as its second argument.
+    #[test]
+    fn symmetric_eigensystems_where_vnl_never_returns() {
+        let nan = f64::NAN;
+        let e = symmetric_eigensystem(&[1.0, nan, nan, 2.0], 2);
+        assert!(e.never_returns(), "{e:?}");
+        assert_eq!(e.ierr, 1);
+        // An infinite diagonal entry of an otherwise zero row returns.
+        let e = symmetric_eigensystem(&[f64::INFINITY, 0.0, 0.0, 2.0], 2);
+        assert!(!e.never_returns() && e.ierr == 0, "{e:?}");
+        let f = symmetric_eigensystem_f32_full(&[1.0, f32::NAN, f32::NAN, 2.0], 2);
+        assert!(f.never_returns());
+        assert!(
+            symmetric_eigensystem(&[4.0, 1.0, 1.0, 3.0], 2)
+                .notices
+                .is_empty()
+        );
     }
 
     #[test]

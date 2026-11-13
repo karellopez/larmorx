@@ -1,0 +1,15 @@
+[package]
+name = "larmorx-fs-core"
+description = "Clean-room FreeSurfer-compatible core services for larmorx (messages, exit statuses, diagnostics, byte order, random numbers, strings, numbers, the fast arctangent, version stamps, times, temporary files), written from specs/freesurfer-core.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+# the reproducible sums' pieces on several threads (§19)
+rayon.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true

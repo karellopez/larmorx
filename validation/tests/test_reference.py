@@ -554,6 +554,55 @@ def test_fsl_usage_in_a_file_fslstats():
     assert cl.synopsis == ["larmorx fsl fslstats [preoptions] <input> [options]"]
 
 
+def test_fsl_usage_at_the_start_of_lines_fslstats():
+    """FSL's image utilities list their options at the start of the line (`-l <lthresh> : ...`)
+    and their preoptions after the word `preoption`, with or without a colon."""
+    _, by = _cl("crates/larmorx-fsl/src/cli/fslstats.rs", "fslstats", "larmorx fsl fslstats")
+    assert (by["-l"].arg, by["-l"].help) == ("<lthresh>", "set lower threshold")
+    assert (by["-H"].arg, by["-M"].help) == (
+        "<nbins> <min> <max>",
+        "output mean (for nonzero voxels)",
+    )
+    assert by["-json"].help == "output in JSON format to standard out"
+    assert by["-t"].help.startswith("will give a separate output line for each 3D volume")
+    assert (by["-K"].arg, by["-K"].help[:31]) == (
+        "< indexMask >",
+        "will generate seperate n submas",
+    )
+    assert by["-D"].help == ""  # hidden: no line of the usage
+
+
+def test_fsl_operation_tables_fslmaths():
+    """fslmaths' operations looked up in tables of its crate (`Binary::of(op)`, `Unary::of(op)`,
+    `Morph::of(op)`; the reductions' axis letter and statistic), which join the page's sources;
+    its usage's values before a colon, a word before them (`-kernel box <size> : ...`, one option
+    of every `-kernel` line) and a description without a colon (`-dt sets ...`)."""
+    cl, by = _cl("crates/larmorx-fsl/src/cli/fslmaths.rs", "fslmaths", "larmorx fsl fslmaths")
+    assert {"-add", "-exp", "-nanm", "-dilM", "-fmedian", "-Tar1"} <= cl.parsed
+    assert by["-Tmean"].spellings == ["-Tmean", "-Xmean", "-Ymean", "-Zmean"]
+    assert by["-Tmean"].help == "mean across time"
+    assert "crates/larmorx-fsl/src/maths/ops.rs" in cl.extra
+    assert (by["-add"].arg, by["-add"].help) == (
+        "<number> | <image>",
+        "add following input to current image",
+    )
+    assert by["-ranknorm"].help == "Transform to Normal dist via ranks"
+    assert by["-tfce"].arg == "<H> <E> <connectivity>"
+    kernel = by["-kernel"].help
+    assert kernel.startswith("3D: 3x3x3 box centered on target voxel (set as default kernel); 2D:")
+    assert "; boxv3 <X> <Y> <Z>: all voxels in a cuboid" in kernel
+    assert by["-dt"].help.startswith("sets the datatype used internally for calculations")
+
+
+def test_python_varargs_fslmaths():
+    """A function's `*operations`, in its signature and as a parameter the options table names."""
+    from larmorx_validation.reference import code
+
+    fn = code.function(REPO, "larmorx.fsl.fslmaths")
+    assert fn.signature().startswith("lx.fsl.fslmaths(image, *operations, dt=None, odt=None")
+    assert fn.param("operations").kind == "varargs"
+
+
 def test_tedana_argparse_in_rust_t2smap():
     """tedana's parser in Rust: the synopsis as Python's argparse formats it in 80 columns,
     every option string, tedana's help, a hidden option, argparse's own help for -h and -v."""

@@ -92,18 +92,38 @@ class CommandLine:
     glued: set[str] = field(default_factory=set)
 
 
+#: Values before a description in FSL's usage texts: ``<number> | <image>``, ``[4Dnoiseonly]``,
+#: ``< indexMask >``.
+_COLON_VALUES = r"(?:\s*(?:<[^>]*>|\[[^\]]*\]|\{[^}]*\}|\|))*"
+
+
 def usage_options(usage: str) -> list[Option]:
     """The options a usage text lists: lines like ``\\t-o,--outline\\tgenerate ...``,
-    ``\\t-f <f>\\t\\tfractional ...`` and ``  -A2 <T2>    as with -A ...``."""
-    out = []
+    ``\\t-f <f>\\t\\tfractional ...`` and ``  -A2 <T2>    as with -A ...``; FSL's image
+    utilities' lines, at the start of the line too, with their values before a colon (``-add
+    <number> | <image> : add ...``, ``-tfce <H> <E> <connectivity>: ...``, ``-ranknorm: ...``),
+    a word before them (``-kernel box <size> : ...``), or their description after the values
+    without one (``-dt sets the datatype ...``, ``preoption -K < indexMask > will ...``). An
+    option listed on several lines in a row (``-kernel 3D``, ``-kernel 2D``, ...) is one option,
+    its lines' words joined."""
+    out: list[Option] = []
     for line in usage.split("\n"):
-        if not re.match(r"^(\t| {1,4})-", line):
+        if not re.match(r"^(\t| {1,4}|)(preoption )?-", line):
             continue
         s = line.strip()
+        s = s.removeprefix("preoption ")
+        word = ""
+        colon = re.match(rf"({_SPELLING}){_COLON_VALUES}\s*:\s", s)
+        worded = re.match(rf"({_SPELLING}) ([A-Za-z0-9]\w*)((?:\s*<[^>]*>)*)\s*:\s", s)
         if "\t" in s:
             head, _, desc = s.partition("\t")
         elif re.match(rf"{_SPELLING}(?: <[^>]*>)?\s+: ", s):  # ``  -ssref <ref_image> : ...``
             head, _, desc = s.partition(" : ")
+        elif colon:  # ``-add <number> | <image> : ...``
+            head, desc = s[: colon.end()].rstrip().rstrip(":"), s[colon.end() :]
+        elif worded:  # ``-kernel box    <size>     : ...``: the word names a form of the option
+            word = " ".join([worded.group(2), *re.findall(r"<[^>]*>", worded.group(3))])
+            head, desc = worded.group(1), s[worded.end() :]
         else:
             parts = re.split(r"\s{2,}", s, maxsplit=1)
             head, desc = parts[0], parts[1] if len(parts) > 1 else ""
@@ -111,7 +131,20 @@ def usage_options(usage: str) -> list[Option]:
         if not m:
             continue
         spellings = re.split(r",\s*", m.group(1))
-        out.append(Option(spellings, m.group(2).strip(), desc.strip().lstrip("-").strip()))
+        arg = m.group(2).strip()
+        if not desc and arg and line[:1] != "\t" and not line.startswith(" " * 2):
+            # FSL's image utilities: ``-dt sets the datatype ...``, ``-K < indexMask > will ...``
+            v = re.match(rf"({_COLON_VALUES})\s*(.*)$", arg)
+            if v and v.group(2) and not re.match(r"[<\[{|]", v.group(2)):
+                arg, desc = v.group(1).strip(), v.group(2)
+        desc = " ".join(desc.split()).lstrip("-").strip()
+        if word:
+            desc = f"{word}: {desc}"
+        last = out[-1] if out else None
+        if word and last is not None and last.spellings == spellings:
+            last.help = f"{last.help}; {desc}"
+            continue
+        out.append(Option(spellings, word or arg, desc))
     return out
 
 
@@ -274,6 +307,9 @@ def command_line(
             body = _brace_body(text, m.end())
         found = specs_options(body) + match_options(body) + tuple_arms(body, program)
         found += listed_options(body) + table_options(text)
+        tables, files = operation_tables(repo, rel, body)
+        found += tables
+        extra += [f for f in files if f not in extra]
         listed = (usage_options(usage) or spaced_usage_options(usage)) if usage else []
         merged = _merge(listed + found)
         synopsis = usage_synopsis(usage, program) if usage else []
@@ -360,6 +396,45 @@ def tuple_arms(text: str, program: str) -> list[Option]:
                     seen.add(w)
                     out.append(Option([w]))
     return out
+
+
+def _crate_function(repo: Path, rel: str, pattern: str) -> tuple[str, str] | None:
+    """The body of the first function of ``rel``'s crate whose head matches ``pattern`` (a
+    regular expression ending before the body's brace), and the file that holds it."""
+    parts = Path(rel).parts
+    src = repo / Path(*parts[: parts.index("src") + 1])
+    for f in sorted(src.rglob("*.rs")):
+        text = f.read_text(encoding="utf-8")
+        m = re.search(pattern, text)
+        if m:
+            return _brace_body(text, m.end()), f.relative_to(repo).as_posix()
+    return None
+
+
+def operation_tables(repo: Path, rel: str, text: str) -> tuple[list[Option], list[str]]:
+    """The options a parser looks up in tables of its crate (fslmaths' operations): the arms of
+    each ``fn of(op: &str) -> Option<Name>`` it calls as ``Name::of(op)`` (``"-add" =>
+    Binary::Add``), and the words made of an axis letter and a statistic where it reads them
+    with ``axis_of(op.as_bytes()[1])`` and ``Stat::of(rest)`` (``-Tmean``: the letters of
+    ``fn axis_of``'s arms, ``b'T' =>``, the words of ``Stat``'s, ``"mean" =>``; one option per
+    statistic, its axes its spellings). The files read, for the page's sources."""
+    out: list[Option] = []
+    files: list[str] = []
+    for name in dict.fromkeys(re.findall(r"\b([A-Z]\w*)::of\(op\)", text)):
+        found = _crate_function(repo, rel, rf"\bfn of\(\w+: &str\) -> Option<{name}>\s*")
+        if found is not None:
+            out += match_options(found[0])
+            files.append(found[1])
+    stat = re.search(r"\b([A-Z]\w*)::of\(rest\)", text)
+    if stat and re.search(r"\baxis_of\(op\.as_bytes\(\)\[1\]\)", text):
+        axes = _crate_function(repo, rel, r"\bfn axis_of\(\w+: u8\) -> Option<usize>\s*")
+        words = _crate_function(repo, rel, rf"\bfn of\(\w+: &str\) -> Option<{stat.group(1)}>\s*")
+        if axes is not None and words is not None:
+            letters = re.findall(r"b'([A-Z])' =>", axes[0])
+            for w in re.findall(r'"(\w+)" =>', words[0]):
+                out.append(Option([f"-{a}{w}" for a in letters]))
+            files += [axes[1], words[1]]
+    return out, list(dict.fromkeys(files))
 
 
 def _brace_body(text: str, start: int) -> str:
@@ -889,7 +964,7 @@ def _literal(node: ast.AST | None):
 @dataclass
 class Param:
     name: str
-    kind: str  # "positional", "keyword"
+    kind: str  # "positional", "varargs" (``*options``), "keyword"
     annotation: str
     default: str | None  # source text; None without a default
     doc: str = ""
@@ -919,6 +994,8 @@ class Function:
                 parts.append("*")
                 star = True
             s = p.name
+            if p.kind == "varargs":  # ``*options``: the keyword arguments follow it
+                s, star = "*" + p.name, True
             if annotations and p.annotation:
                 s += f": {p.annotation}"
             if p.default is not None:
@@ -995,7 +1072,7 @@ def numpydoc(doc: str) -> tuple[str, dict[str, list[tuple[list[str], str]]]]:
             i += 2
             continue
         if current and line and not line.startswith(" "):
-            names = [n.strip() for n in line.split(":")[0].split(",")]
+            names = [n.strip().lstrip("*") for n in line.split(":")[0].split(",")]
             sections[current].append((names, ""))
         elif current and line.startswith(" ") and sections[current]:
             names, text = sections[current][-1]
@@ -1016,6 +1093,8 @@ def function(repo: Path, dotted: str) -> Function:
     pdefaults = [None] * (len(positional) - len(a.defaults)) + list(a.defaults)
     for arg, d in zip(positional, pdefaults, strict=True):
         params.append(Param(arg.arg, "positional", _seg(src, arg.annotation), _seg(src, d)))
+    if a.vararg is not None:
+        params.append(Param(a.vararg.arg, "varargs", _seg(src, a.vararg.annotation), None))
     for arg, d in zip(a.kwonlyargs, a.kw_defaults, strict=True):
         params.append(Param(arg.arg, "keyword", _seg(src, arg.annotation), _seg(src, d)))
     summary, sections = numpydoc(ast.get_docstring(node) or "")

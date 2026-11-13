@@ -158,3 +158,158 @@ failing move back sets `errno` as `fseek` does.
   default differs only where it notes a defect.
 - Then the replays of the first programs that read these blocks (the LTA readers, the surface
   readers) on the recorded heads.
+
+## 6. Voxel arithmetic: conventions (part 2)
+
+Part 2 (§6-12) is 3.1-35's first piece: the voxel arithmetic of `mri.cpp`, with `MRIcopyFrame` and
+`MRIcalcCRASforExtractedVolume` (from 3.1-36 and 3.1-37).
+
+- **Destinations.** `f(src, dst, ...)` writes into `dst`, or into a new volume when `dst` is `NULL`,
+  and returns it; `dst` may be `src` itself (and, for two sources, either source). Each function
+  says what a new volume is. *A clone* is `MRIclone(src, NULL)`: a new volume of the source's
+  extent, type and frames (voxels zero), the source's colour table deep-copied when it has one,
+  then the source's header (`MRIcopyHeader`, `specs/freesurfer-mri.md` §6).
+- **Voxel access.** "Read" and "written" are `MRIgetVoxVal` and `MRIsetVoxVal`
+  (`specs/freesurfer-mri.md` §5: the value as a float, written with the type's clipping and
+  `nint`). *Direct* access, where said, goes through the volume's row pointers with an element type
+  fixed by the function (not by the volume): the row of slice `z + f * depth`, row `y`, element
+  `x`; a volume walked with another volume's extent or frames, or a frame it does not have, is read
+  and written at other voxels of its buffer (FS-289: `reproduce` does so; by default such reads give
+  0 and such writes are dropped) or outside its buffer (FS-290: reads 0, writes dropped, in both
+  modes; FreeSurfer reads and writes memory it does not own). A volume without voxels walked
+  directly ends the program here (FreeSurfer crashes: FS-58).
+- **Arithmetic** in `float` (single precision, x86-64's NaN rules, `specs/freesurfer-maths.md` §1)
+  unless said otherwise; `nint(x)` is `(int)(x + 0.5)` (`x - 0.5` below 0) in double with FS-12's
+  rule outside `int`. Storing an integer into a narrower integer type keeps its low bits.
+- **Errors**: "an error" is FreeSurfer's error line (`ErrorPrintf`); "the program ends" an exit with
+  the status given.
+
+## 7. Clones, clearing, size checks, frame copies
+
+- `MRIclone(src, dst)`: a given `dst` takes the colour table (when the source has one) and the
+  header; else a clone.
+- `MRIcloneBySpace(src, type, nframes)`: a new volume of the source's extent, `type` and `nframes`
+  (the source's when negative), the source's header and pulse parameters (TR, TE, TI, flip angle).
+- `MRIclear(mri)`: every voxel's bytes set to 0 (types `uchar`, `short`, `ushort`, `int`, `long`,
+  `float`); another type: the error `MRIclear: unsupported input type <type>`, returns
+  `ERROR_UNSUPPORTED` (-3); else 0.
+- `MRImatch(a, b)`: 1 when width, height, depth and type are equal. `MRImatchDimensions(a, b)`: 1
+  when the extents are equal and each voxel size differs by less than `FLT_EPSILON` (the float
+  difference, absolute). `MRIcheckSize(src, check, w, h, d)`: 0 without `check`; else 1 when
+  `check`'s extent is `w x h x d`, a 0 taken from `src`.
+- `MRIcopyFrame(src, dst, sf, df)`: without `dst`, a new volume of the source's extent and type with
+  `df + 1` frames, the source's header and pulse parameters. When `df` is not below `dst`'s frame
+  count: the error `MRIcopyFrame: dst frame #<df> out of range (nframes=<n>)` and `NULL`. Else, for
+  every voxel of the source's extent (slices, then rows, then columns), the voxel of frame `sf` is
+  read and written into frame `df`.
+- `MRIcopyFrames(src, dst, s0, s1, d0)`: without `dst`, a new volume of `s1 - s0 + 1` frames with the
+  source's header; when the two do not `MRImatch`, the program ends (status `ERROR_BADPARM`, -4)
+  with `MRIcopyFrames(<s0>, <s1>, <d0>): src (<w>, <h>, <d>) doesn't match destimation (<w>, <h>,
+  <d>)`; then `MRIcopyFrame` of frames `s0 .. s1` into `d0 ..`, `NULL` at the first failure.
+
+## 8. Value ranges
+
+The range starts at min 10000 and max -10000; each value read replaces min when it is smaller and
+max when it is larger (a NaN never does), so a volume whose values all lie above 10000 reports min
+10000. Values are read as `MRIgetVoxVal` reads them.
+
+- `MRIvalRange(mri)`: all frames; returns 0.
+- `MRIvalRangeFrame(mri, frame)`: one frame, for types `float`, `int`, `short`, `ushort`, `uchar`
+  (direct); another type: the error `MRIvalRange: unsupported type <type>`, `ERROR_UNSUPPORTED`, the
+  range not set.
+- `MRIvalRangeRegion(mri, region)`: frame 0 over the region, its start raised to 0 and its end
+  (`x + dx`, ...) lowered to the extent; returns 0.
+- `MRIlabelValRange(mri, labeled, label)`: the voxels (all frames) whose `nint` of the labelled
+  volume's value at the same place and frame is `label`; the first such voxel sets both min and max.
+
+## 9. Scaling, thresholds, binarising, signs
+
+All map each voxel of each frame of the source's extent into the destination (a clone without one).
+
+- `MRIlinearScale(src, dst, scale, offset, only_nonzero)`: `v * scale + offset` (for every voxel, or
+  only those with `|v| >= 1e-15` when `only_nonzero`), clipped to [0, 255] for a `uchar` destination.
+- `MRIscalarMul(src, dst, s)`: `v * s`.
+- `MRIscalarMulFrame(src, dst, s, frame)`: one frame, direct by the source's type: `uchar`
+  `v * s` clipped to [0, 255] and truncated (a NaN stored as 0: FS-296); `float` the product;
+  `short`, `ushort` `nint(v * s)` in the type's bits. Another type: the error `MRIscalarMulFrame:
+  unsupported type <type>` and `NULL` (only when the volume has a voxel).
+- `MRIthreshold(src, dst, t)`: `v < t` becomes 0.
+- `MRIupperthresholdAllFrames(src, dst, t)`: a voxel above `t` in any frame becomes 0 in every
+  frame; the others are copied.
+- `MRIbinarize(src, dst, t, low, high)`: `low` where `v < t` (in double), else `high` (NaN: `high`).
+- `MRIinvertContrast(src, dst, t)`: frame 0, `uchar` voxels (direct): `v > t` becomes `255 - v`.
+  FS-291: on another type FreeSurfer takes the first `width` bytes of each row as voxels;
+  `reproduce` does so, the default ends the program with `MRIinvertContrast: unsupported type <t>
+  (uchar volumes only)`.
+- `MRIabs`, `MRIpos`, `MRIneg(src, dst)`: without `dst` a new volume of the source's extent, type
+  and frames with its header; frames innermost (for each voxel, its frames in order); `|v|`, a
+  negative `v` set to 0, a positive `v` set to 0.
+
+## 10. Two volumes: products, differences, sums, quotients
+
+The second volume is walked with the first's extent and frames.
+
+- `MRImultiply(a, b, dst)`: without `dst` a one-frame volume of `a`'s extent and type with its
+  header; frame 0: `va * vb`.
+- `MRIsubtract(a, b, dst)`: frames = `a`'s (1 when 0); without `dst` a new volume of `a`'s extent,
+  type and those frames with its header. Types differ: `va - vb` read and written. One type: direct,
+  `(float) va - (float) vb`, stored as `nint` in an integer destination's bits (wrapping: a
+  `uchar` destination stores `-1` as 255) or as the float; a source type without direct access
+  (`RGB`, complex) leaves the previous difference (0 at first); a destination of such a type is not
+  written.
+- `MRIadd(a, b, dst)`: as `MRIsubtract`, and: when `a` is `uchar` or the types differ, `va + vb` read,
+  clipped to [0, 255] for a `uchar` destination, written; otherwise direct, the sum in the source
+  type's C arithmetic (`short`, `ushort` as `int`; `int` wrapping in 32 bits, except into a `long`
+  destination, where it is a 64-bit sum; `long` wrapping in 64 bits; `float` in float), then stored:
+  into an integer destination its low bits (a `float` sum `nint`-ed first), into a `float`
+  destination the first value as float plus the second converted to float.
+- `MRIdivide(a, b, dst)`: without `dst` a one-frame `float` volume of `a`'s extent with `a`'s header.
+  Unless all three are `uchar`: frame 0, `va / vb` in double (0 when `|vb| < FLT_EPSILON`), written.
+  All `uchar` (direct, frame 0): the integer quotient; where `vb` is 0: 0 when `va` is 0, else 255.
+  FS-292: after a zero divisor FreeSurfer stays at the same place in `a` and the destination while
+  moving on in `b`, so the rest of the row divides the wrong voxels and writes one place early
+  (`reproduce`); the default moves on in all three.
+- `MRIscaleAndMultiply(a, s, b, dst)`: without `dst` a one-frame volume of `a`'s extent and type with
+  its header; frame 0, `uchar` (direct): `nint(va * (vb / s))` clipped to [0, 255]. FS-291 as
+  `MRIinvertContrast`.
+
+## 11. Extracting a region
+
+- `MRIextract(src, dst, x0, y0, z0, dx, dy, dz)` = `MRIextractInto` with `(x1, y1, z1) = (0, 0, 0)`;
+  `MRIextractRegion(src, dst, region)` the same with the region (the whole volume without one).
+- `MRIextractInto(src, dst, x0, y0, z0, dx, dy, dz, x1, y1, z1)`, in order:
+  1. A start at or past the source's extent (`x0 >= width`, ...): the error `MRIextractInto: bad src
+     location (<x0>, <y0>, <z0>)`; it goes on.
+  2. Without `dst`: a new volume of `dx x dy x dz`, the source's type and frames, its header, then
+     `imnr0 = z0 + src.imnr0 - z1`, `imnr1 = imnr0 + dz - 1`.
+  3. A destination of another type: the error `MRIextractInto: src and dst types must match` and
+     `NULL` (FS-293: FreeSurfer frees the caller's destination; kept here).
+  4. Starts below 0 become 0; `dx` is cut to `width - x0` and then to `dst.width - x1` (the same for
+     `y`, `z`).
+  5. A new destination: `xstart += x0 * xsize`, `xend = xstart + dx * xsize` (and `y`, `z`) with the
+     voxel sizes truncated to integers (FS-295: `reproduce`; by default the float sizes).
+  6. A source type other than `uchar`, `short`, `ushort`, `int`, `long`, `float`: the program ends
+     (`MRIextractInto: unsupported source type <t>`, status -3).
+  7. For every frame, slice and row of the box, `dx` voxels copied (a negative `dx`: FS-294, the
+     program ends here; FreeSurfer crashes).
+  8. The destination takes the source's voxel sizes, `thick`, `ps` and pulse parameters, its centre
+     from `MRIcalcCRASforExtractedVolume`, recomputed cached matrices and a deep copy of the
+     source's colour table when it has one.
+- `MRIcalcCRASforExtractedVolume(src, dst, x0, y0, z0, x1, y1, z1)`: the point `(x0 + dst.width / 2.0
+  - x1, ...)` in double, rounded to float, times the source's cached voxel-to-RAS matrix in float
+  (`specs/freesurfer-mri.md` §10's product), the three floats widened to double. A source without
+  a cached matrix gets both cached matrices computed and kept first. With `Gdiag` showing and
+  verbose, `c_ras for sample volume is (<r>, <a>, <s>) compared with the src (<c_r>, <c_a>, <c_s>)`
+  (`%f`) on standard error.
+
+## 12. Validation plan (part 2)
+
+The probe's commands `clone`, `clonesp`, `clear`, `match`, `cpframe`, `cpframes`, `linscale`,
+`smul`, `smulf`, `thresh`, `uthresh`, `invc`, `binz`, `abs`, `pos`, `neg`, `mul2`, `sub2`, `add2`,
+`div2`, `sam`, `vrange`, `vrangef`, `vrangereg`, `lrange`, `extract`, `cras` on generated volumes of
+up to 4 x 4 x 3 voxels and 0 to 3 frames of every type (headers only too), float voxels from a table
+of special values (zeros of both signs, halves, 255.5, 1e10, the largest float, a subnormal,
+infinities, NaNs of both signs and with payloads), the destination new, given (of the same or
+another shape and type) or a source, cached matrices kept stale, recomputed or dropped. Expected:
+identical with `reproduce` but where FreeSurfer reads or writes memory it does not own or crashes
+(FS-53, FS-58, FS-290, FS-294; FS-288 for part 1), which are counted, not compared.

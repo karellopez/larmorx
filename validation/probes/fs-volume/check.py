@@ -38,7 +38,7 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # memory FreeSurfer does not own: FS-288 (a buffer never written compared with the keys). FS-285
 # and FS-286 (words written past their buffers) are compared: the official build's layout makes
 # them deterministic, and reproduce follows it
-SKIP = ("FS-288",)
+SKIP = ("FS-288", "FS-53", "FS-58", "FS-290", "FS-294")
 
 
 def probe_binary(ws: Path) -> Path:

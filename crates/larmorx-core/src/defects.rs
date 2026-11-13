@@ -1447,6 +1447,24 @@ defects! {
         "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
     FS_288 = "FS-288", "FreeSurfer", true,
         "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
+    FS_289 = "FS-289", "FreeSurfer", true,
+        "the volume operations that walk a second volume (or the destination, or a frame they are given) with the first volume's extent and frames read and write other voxels of a smaller volume";
+    FS_290 = "FS-290", "FreeSurfer", true,
+        "the same operations read and write memory outside a volume whose extent or frames are smaller than the first's, or outside a frame it does not have";
+    FS_291 = "FS-291", "FreeSurfer", true,
+        "MRIinvertContrast and MRIscaleAndMultiply, written for volumes of bytes, take the first bytes of each row of a volume of another type as byte voxels: meaningless values";
+    FS_292 = "FS-292", "FreeSurfer", true,
+        "MRIdivide of three byte volumes does not move on in the first volume and the destination after a voxel whose divisor is 0: the rest of the row is divided with the wrong voxels and written one place early";
+    FS_293 = "FS-293", "FreeSurfer", true,
+        "MRIextractInto given a destination of another type than the source frees the caller's volume, which the caller then still uses";
+    FS_294 = "FS-294", "FreeSurfer", true,
+        "MRIextractInto with a start at or past the source's extent copies rows of a negative length (a huge size): the program crashes";
+    FS_295 = "FS-295", "FreeSurfer", true,
+        "MRIextractInto sets a new volume's start and end positions (xstart, xend and the others) with the voxel sizes truncated to integers: sub-millimetre voxels give 0, 1.5 mm voxels 1";
+    FS_296 = "FS-296", "FreeSurfer", true,
+        "MRIscalarMulFrame stores a NaN product into a byte volume by C's conversion, which is undefined for NaN";
+    FS_297 = "FS-297", "FreeSurfer", true,
+        "MRIextractInto of a volume of 64-bit integers (long) copies each row of the box from half its first column in the source to half its first column in the destination: the box's voxels come from the wrong place, half voxels included";
 }
 
 /// The register entry with ID `id`.

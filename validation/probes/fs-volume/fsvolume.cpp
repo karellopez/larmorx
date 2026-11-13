@@ -133,9 +133,10 @@ void set_geom(VOL_GEOM *v)
   strcpy(v->fname, f.c_str());
 }
 // the fields the VOL_GEOM functions here read or write (not the cached matrices)
-void put_geom(const VOL_GEOM *v)
+// with_valid: an MRI's `valid` is never set by its constructors (memory contents): not printed
+void put_geom(const VOL_GEOM *v, bool with_valid = true)
 {
-  oi(v->valid);
+  if (with_valid) oi(v->valid);
   oi(v->width); oi(v->height); oi(v->depth);
   of(v->xsize); of(v->ysize); of(v->zsize);
   oi(v->ras_good_flag);
@@ -145,6 +146,88 @@ void put_geom(const VOL_GEOM *v)
   of(v->c_r); of(v->c_a); of(v->c_s);
   of(v->s_r); of(v->s_a); of(v->s_s);
   ohex(std::string(v->fname));
+}
+
+
+// the float voxels the cases draw from (FTAB in tests/fs_volume/cases.rs)
+const uint32_t FTAB[] = {
+  0x00000000u, 0x80000000u, 0x3f800000u, 0xbf800000u, 0x3f000000u, 0x3fc00000u, 0x40200000u,
+  0xc0200000u, 0x437f0000u, 0x437f8000u, 0x43800000u, 0xc3962000u, 0x477fff9au, 0x501502f9u,
+  0xd01502f9u, 0x7f7fc99eu, 0x000116c2u, 0x7f800000u, 0xff800000u, 0x7fc00000u, 0x7fa12345u,
+  0xffc00001u, 0x40490fd0u, 0x24e69595u, 0x42fecccdu, 0x3dcccccdu, 0x41200000u, 0xc1a00000u};
+const size_t NF = sizeof FTAB / sizeof FTAB[0];
+
+// a volume of the case: w h d type nframes hdr seed, then its geometry, its header fields and
+// what to do with its cached matrices (0 keep, 1 MRIreInitCache, 2 drop them)
+MRI *get_vol()
+{
+  int w = geti(), h = geti(), d = geti(), type = geti(), nf = geti(), hdr = geti();
+  unsigned seed = (unsigned)geti();
+  MRI *m = hdr ? MRIallocHeader(w, h, d, type, nf) : MRIallocSequence(w, h, d, type, nf);
+  if (m->chunk && m->ischunked) {
+    unsigned char *b = (unsigned char *)m->chunk;
+    if (type == MRI_FLOAT) {
+      for (size_t i = 0; i < m->bytes_total / 4; i++) memcpy(b + 4 * i, &FTAB[(i * 7 + seed) % NF], 4);
+    } else {
+      for (size_t k = 0; k < m->bytes_total; k++)
+        b[k] = (unsigned char)((k * 37u + seed * 101u + (k >> 3) * 13u) & 0xffu);
+    }
+  }
+  set_geom(m);
+  // the geometry's fields but its extent (the volume's own)
+  m->width = w; m->height = h; m->depth = d;
+  m->imnr0 = geti(); m->imnr1 = geti();
+  m->xstart = getf(); m->xend = getf(); m->ystart = getf(); m->yend = getf();
+  m->zstart = getf(); m->zend = getf();
+  m->thick = getf(); m->ps = getf();
+  m->tr = getf(); m->te = getf(); m->ti = getf(); m->flip_angle = getd();
+  m->dof = geti();
+  int cache = geti();
+  if (cache == 1) MRIreInitCache(m);
+  else if (cache == 2) { AffineMatrixFree(&m->i_to_r__); MatrixFree(&m->r_to_i__); }
+  return m;
+}
+
+void oam(const AffineMatrix *am)
+{
+  if (!am) { out += "NULL "; return; }
+  for (int i = 0; i < 16; i++) of(am->mat[i]);
+}
+
+void put_vol(const MRI *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
+  oi(m->imnr0); oi(m->imnr1);
+  of(m->xstart); of(m->xend); of(m->ystart); of(m->yend); of(m->zstart); of(m->zend);
+  of(m->thick); of(m->ps); of(m->tr); of(m->te); of(m->ti); od(m->flip_angle); oi(m->dof);
+  put_geom(m, false);
+  oam(m->i_to_r__);
+  om(m->r_to_i__);
+  if (m->chunk && m->ischunked) {
+    std::string b((const char *)m->chunk, m->bytes_total);
+    ohex(b);
+  } else {
+    out += "nochunk ";
+  }
+}
+
+// the destination of f(src, dst, ...): 0 NULL, 1 a volume of the case, 2 the source itself
+MRI *get_dst(MRI *src)
+{
+  int mode = geti();
+  if (mode == 1) return get_vol();
+  if (mode == 2) return src;
+  return NULL;
+}
+// of f(mri1, mri2, dst): 0 NULL, 1 a volume, 2 mri1, 3 mri2
+MRI *get_dst2(MRI *a, MRI *b)
+{
+  int mode = geti();
+  if (mode == 1) return get_vol();
+  if (mode == 2) return a;
+  if (mode == 3) return b;
+  return NULL;
 }
 
 std::string slurp(const std::string &path)
@@ -227,6 +310,125 @@ void run_case()
     vg_isEqual_Threshold = getd();
     oi(vg_isNotEqualThresh(&a, &b, thresh));
     oi(vg_isEqual(&a, &b));
+  } else if (cmd == "clone") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    MRI *r = MRIclone(src, dst);
+    oi(dst != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "clonesp") {
+    MRI *src = get_vol();
+    int t = geti(), nf = geti();
+    put_vol(MRIcloneBySpace(src, t, nf));
+  } else if (cmd == "clear") {
+    MRI *m = get_vol();
+    oi(MRIclear(m));
+    put_vol(m);
+  } else if (cmd == "match") {
+    MRI *a = get_vol();
+    MRI *b = get_vol();
+    int w = geti(), h = geti(), d = geti(), nocheck = geti();
+    oi(MRImatch(a, b));
+    oi(MRImatchDimensions(a, b));
+    oi(MRIcheckSize(a, nocheck ? NULL : b, w, h, d));
+  } else if (cmd == "cpframe" || cmd == "cpframes") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    MRI *r;
+    if (cmd == "cpframe") {
+      int sf = geti(), df = geti();
+      r = MRIcopyFrame(src, dst, sf, df);
+    } else {
+      int s0 = geti(), s1 = geti(), d0 = geti();
+      r = MRIcopyFrames(src, dst, s0, s1, d0);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "linscale" || cmd == "smul" || cmd == "smulf" || cmd == "thresh" || cmd == "uthresh" ||
+             cmd == "invc" || cmd == "binz" || cmd == "abs" || cmd == "pos" || cmd == "neg") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    MRI *r = NULL;
+    if (cmd == "linscale") {
+      float sc = getf(), off = getf();
+      int nz = geti();
+      r = MRIlinearScale(src, dst, sc, off, nz);
+    } else if (cmd == "smul") {
+      r = MRIscalarMul(src, dst, getf());
+    } else if (cmd == "smulf") {
+      float sc = getf();
+      r = MRIscalarMulFrame(src, dst, sc, geti());
+    } else if (cmd == "thresh") {
+      r = MRIthreshold(src, dst, getf());
+    } else if (cmd == "uthresh") {
+      r = MRIupperthresholdAllFrames(src, dst, getf());
+    } else if (cmd == "invc") {
+      r = MRIinvertContrast(src, dst, getf());
+    } else if (cmd == "binz") {
+      float t = getf(), lo = getf(), hi = getf();
+      r = MRIbinarize(src, dst, t, lo, hi);
+    } else if (cmd == "abs") {
+      r = MRIabs(src, dst);
+    } else if (cmd == "pos") {
+      r = MRIpos(src, dst);
+    } else {
+      r = MRIneg(src, dst);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "mul2" || cmd == "sub2" || cmd == "add2" || cmd == "div2" || cmd == "sam") {
+    MRI *a = get_vol();
+    MRI *b = get_vol();
+    MRI *dst = get_dst2(a, b);
+    MRI *r;
+    if (cmd == "mul2") r = MRImultiply(a, b, dst);
+    else if (cmd == "sub2") r = MRIsubtract(a, b, dst);
+    else if (cmd == "add2") r = MRIadd(a, b, dst);
+    else if (cmd == "div2") r = MRIdivide(a, b, dst);
+    else r = MRIscaleAndMultiply(a, getf(), b, dst);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "vrange") {
+    MRI *m = get_vol();
+    float lo = -7, hi = -7;
+    oi(MRIvalRange(m, &lo, &hi));
+    of(lo); of(hi);
+  } else if (cmd == "vrangef") {
+    MRI *m = get_vol();
+    float lo = -7, hi = -7;
+    oi(MRIvalRangeFrame(m, &lo, &hi, geti()));
+    of(lo); of(hi);
+  } else if (cmd == "vrangereg") {
+    MRI *m = get_vol();
+    MRI_REGION r;
+    r.x = geti(); r.y = geti(); r.z = geti(); r.dx = geti(); r.dy = geti(); r.dz = geti();
+    float lo = -7, hi = -7;
+    oi(MRIvalRangeRegion(m, &lo, &hi, &r));
+    of(lo); of(hi);
+  } else if (cmd == "lrange") {
+    MRI *m = get_vol();
+    MRI *l = get_vol();
+    float lo = -7, hi = -7;
+    oi(MRIlabelValRange(m, l, geti(), &lo, &hi));
+    of(lo); of(hi);
+  } else if (cmd == "extract") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    int x0 = geti(), y0 = geti(), z0 = geti(), dx = geti(), dy = geti(), dz = geti();
+    int x1 = geti(), y1 = geti(), z1 = geti();
+    MRI *r = MRIextractInto(src, dst, x0, y0, z0, dx, dy, dz, x1, y1, z1);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+    oam(src->i_to_r__);
+  } else if (cmd == "cras") {
+    MRI *src = get_vol();
+    MRI *dst = get_vol();
+    int x0 = geti(), y0 = geti(), z0 = geti(), x1 = geti(), y1 = geti(), z1 = geti();
+    double r, a, s;
+    MRIcalcCRASforExtractedVolume(src, dst, x0, y0, z0, x1, y1, z1, &r, &a, &s);
+    od(r); od(a); od(s);
+    oam(src->i_to_r__);
+    om(src->r_to_i__);
   } else {
     fail("unknown command");
   }

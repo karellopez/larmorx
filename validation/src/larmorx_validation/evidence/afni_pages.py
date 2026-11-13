@@ -51,11 +51,13 @@ TEXTS = [
     (r"\bgive the oracle's bytes\b", "give the bytes of the repository's build"),
     (r"\bAFNI's oracle output\b", "the output of the repository's AFNI build"),
     # not the original in a quoted phrase: "*the original against itself*" (the metrics
-    # table's rows of AFNI's own variability) and "'Memory similar to the original's'" (a title)
+    # table's rows of AFNI's own variability) and "'Memory similar to the original's'" (a title),
+    # nor in "the cache of the original's runs" (the guide's words for the oracle-output cache,
+    # where a text is reworded twice)
     (r"(?<!\*)\bThe original's\b(?!')", "The clean room's"),
-    (r"(?<!\*)\bthe original's\b(?!')", "the clean room's"),
+    (r"(?<!\*)(?<!cache of )\bthe original's\b(?!')", "the clean room's"),
     (r"(?<!\*)\bThe original\b(?! against itself\*)", "The clean room"),
-    (r"(?<!\*)\bthe original\b(?! against itself\*|'s')", "the clean room"),
+    (r"(?<!\*)(?<!cache of )\bthe original\b(?! against itself\*|'s')", "the clean room"),
 ]
 
 #: The categories of the records' cases as the pages name them.

@@ -6,7 +6,9 @@
 //! `vnumAdd`, `addVnum`, `VERTEXvnum`, `mrisVertexNeighborIndex`, `mrisVerticesAreNeighbors`,
 //! `returnTrue`), `include/mrisurf_topology.h` (`vertexNeighbor`) and the function they call,
 //! `modVnum` (`utils/mrisurf_topology.cpp` lines 360-372), and `mrisVertexVSize` (lines 907-918),
-//! which the vertex hash uses.
+//! which the vertex hash uses; `MRISvalidVertices` (lines 306-316) and `mrisValidFaces` (lines
+//! 1836-1846), fs.surf's (queue items 3.4-02 and 3.4-03), taken early for the surface writers of
+//! queue item 3.1-48.
 
 use std::io::Write;
 
@@ -201,4 +203,18 @@ pub fn vertex_vsize(mris: &Mris, vno: usize) -> i32 {
 /// expand to (their checks are switched off in the source).
 pub fn return_true() -> bool {
     true
+}
+
+/// `MRISvalidVertices(mris)` (`utils/mrisurf_topology.cpp` lines 306-316, fs.surf's queue item
+/// 3.4-02, taken early for the surface writers of 3.1-48): the vertices that are not ripped.
+pub fn valid_vertices(mris: &Mris) -> i32 {
+    let n = usize::try_from(mris.nvertices).unwrap_or(0);
+    (0..n).filter(|&v| mris.vertex(v).ripflag == 0).count() as i32
+}
+
+/// `mrisValidFaces(mris)` (`utils/mrisurf_topology.cpp` lines 1836-1846, fs.surf's queue item
+/// 3.4-03, taken early): the faces that are not ripped.
+pub fn valid_faces(mris: &Mris) -> i32 {
+    let n = usize::try_from(mris.nfaces).unwrap_or(0);
+    (0..n).filter(|&f| mris.face(f).ripflag == 0).count() as i32
 }

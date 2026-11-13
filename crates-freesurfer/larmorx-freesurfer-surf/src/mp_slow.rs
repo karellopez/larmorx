@@ -25,7 +25,7 @@ use crate::coords::{self, Io};
 use crate::facenorm;
 use crate::metric;
 use crate::mp::{
-    Instance, RAN, avg_dist, face_area_normal, fnv_hash, nbrs, orients_as_ellipsoid,
+    Instance, RAN, avg_dist, corners, face_area_normal, fnv_hash, nbrs, orients_as_ellipsoid,
     points_inwards, reports_degenerate, romp_partials, romp_total, sphere_area, takes_sphere_area,
     triangle_props, vertex_area_share, vertex_face_area, vertex_normal, vface, vix,
 };
@@ -351,4 +351,31 @@ pub fn compute_metric_properties_wkr(
         mris.total_area = sphere_area(mris.radius);
     }
     Ok(())
+}
+
+/// `mrisNormalFace(mris, fno, n, norm)` (`mrisurf_metricProperties_slow.h` lines 115-166) as the
+/// official build compiles its own copy (the one `MatlabPlotFace` calls; the copies inlined into
+/// `MRIScomputeNormals` are [`crate::mp`]'s): the corners `n - 1`, `n + 1` and `n` of face `fno`,
+/// the edges `p2 - p0` and `p1 - p2` made unit length (`mrisNormalize`), their cross product with
+/// its second component as `v0[2] v1[0] - v1[2] v0[0]` (the source's `v1[0] v0[2] - v0[0]
+/// v1[2]` with each product's operands the other way round: only a NaN's sign or payload can
+/// differ), made unit length when `UnitizeNormalFace` is set.
+pub fn normal_face(sg: &SurfGlobals, mris: &Mris, fno: usize, n: usize) -> [f32; 3] {
+    use crate::base::mris_normalize;
+    use larmorx_freesurfer_core::sse::mul;
+    let (a, b, c) = corners(&mris.face(fno).v, n);
+    let (p0, p1, p2) = (xyz(mris, a), xyz(mris, b), xyz(mris, c));
+    let mut v0 = [sub(p2[0], p0[0]), sub(p2[1], p0[1]), sub(p2[2], p0[2])];
+    let mut v1 = [sub(p1[0], p2[0]), sub(p1[1], p2[1]), sub(p1[2], p2[2])];
+    mris_normalize(&mut v0);
+    mris_normalize(&mut v1);
+    let mut norm = [
+        sub(mul(v0[1], v1[2]), mul(v1[1], v0[2])),
+        sub(mul(v0[2], v1[0]), mul(v1[2], v0[0])),
+        sub(mul(v0[0], v1[1]), mul(v1[0], v0[1])),
+    ];
+    if sg.unitize_normal_face != 0 {
+        mris_normalize(&mut norm);
+    }
+    norm
 }

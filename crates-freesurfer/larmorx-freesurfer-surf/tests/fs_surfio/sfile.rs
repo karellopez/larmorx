@@ -17,7 +17,7 @@ const OPS: [&str; 16] = [
 ];
 
 /// A name of about `n` bytes whose parts stay under 256 bytes, in a folder that does not exist.
-fn long_name(g: &mut Gen, n: usize) -> String {
+pub(super) fn long_name(g: &mut Gen, n: usize) -> String {
     let mut s = String::from(if g.chance(2) { "nodir/" } else { "d/" });
     while s.len() + 205 < n {
         s.push_str(&"a".repeat(200));
@@ -35,7 +35,7 @@ fn long_name(g: &mut Gen, n: usize) -> String {
 /// with and without a dot, with the dot first or second (FS-129); with seeds other than 1, now and
 /// then one of about 1,024 bytes (FS-126, FS-134: kept out of seed 1's platform-independent set,
 /// as file systems differ on such names).
-fn name(g: &mut Gen, k: usize) -> String {
+pub(super) fn name(g: &mut Gen, k: usize) -> String {
     if g.1 && g.chance(25) {
         let n = g.int(1015, 1032) as usize;
         return long_name(g, n);
@@ -151,7 +151,7 @@ fn w_file(g: &mut Gen, nv: i64) -> Vec<u8> {
 }
 
 /// Whether an input file of this name can be made: in the work folder or in `d`.
-fn creatable(n: &str) -> bool {
+pub(super) fn creatable(n: &str) -> bool {
     match n.rfind('/') {
         None => true,
         Some(i) => &n[..i] == "d",
@@ -312,7 +312,7 @@ pub(super) fn sfile_tokens(t: &mut Vec<String>, g: &mut Gen) {
 }
 
 /// Every regular file under `dir`, by its relative name ('/' between parts), sorted.
-fn list_files(dir: &std::path::Path, rel: &str, files: &mut Vec<String>) {
+pub(super) fn list_files(dir: &std::path::Path, rel: &str, files: &mut Vec<String>) {
     let Ok(rd) = std::fs::read_dir(dir) else {
         return;
     };
@@ -334,7 +334,7 @@ fn list_files(dir: &std::path::Path, rel: &str, files: &mut Vec<String>) {
     }
 }
 
-fn utf8(b: Vec<u8>) -> String {
+pub(super) fn utf8(b: Vec<u8>) -> String {
     String::from_utf8(b).expect("a probe name is UTF-8")
 }
 

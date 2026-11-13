@@ -7,7 +7,8 @@
 // and (`surf`) mrisurf_metricProperties.cpp's coordinate operations with the distances' storage
 // (mrisurf_base.cpp) and MRISreverseFaceOrder; since relay 7 (`metric`) the averaging, the
 // sphere's centre, the neighbour distances, the areas and the curvature operations of
-// mrisurf_metricProperties.cpp; called case by case, linked with the unit oracle's libutils as
+// mrisurf_metricProperties.cpp; since relay 8 (`posn`) the saved vertex positions and normals, the
+// canonical coordinates and the face-normal cache; called case by case, linked with the unit oracle's libutils as
 // the official programs are (build.sh; `fssurfio-mpstub`, built with PROBE_MP_STUB, replaces
 // MRIScomputeMetricProperties by a stub that writes `MP`, for MRISsmoothSurface).
 // CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: it names FreeSurfer's functions (running it is a
@@ -623,6 +624,144 @@ void metric_case()
   dump_metric(m);
 }
 
+// `posn` (relay 8): an MRIS from the case (15 coordinate sets, k1, k2, areas, angles, rip
+// flags, neighbour counts, distances with their storage, faces with their face-normal cache),
+// a sequence of the saved positions and normals, the canonical coordinates and the face-normal
+// cache's operations (mrisurf_metricProperties.cpp's 3.1-50 part a, with the 3.1-49 functions
+// that wait for it), then its state. `sm` and `rm` print `G` and are skipped where their reads
+// or writes would leave what the case allocated (the port applies the same test).
+bool posn_guard(MRIS *m, const std::string &op)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    if (v->ripflag) continue;
+    int vs = mrisVertexVSize(m, vno);
+    if (vs <= 0) continue;
+    if (op == "sm" && v->dist &&
+        (v->dist_capacity < vs || (v->dist_orig && v->dist_orig_capacity < vs))) return false;
+    if (op == "rm" && (!v->dist || v->dist_capacity < vs || !v->dist_orig ||
+        v->dist_orig_capacity < vs)) return false;
+  }
+  return true;
+}
+
+void dump_posn(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    float c[45] = {v->x, v->y, v->z, v->origx, v->origy, v->origz, v->tx, v->ty, v->tz,
+                   v->cx, v->cy, v->cz, v->infx, v->infy, v->infz, v->pialx, v->pialy, v->pialz,
+                   v->t2x, v->t2y, v->t2z, v->fx, v->fy, v->fz, v->whitex, v->whitey, v->whitez,
+                   v->nx, v->ny, v->nz, v->pnx, v->pny, v->pnz, v->wnx, v->wny, v->wnz,
+                   v->targx, v->targy, v->targz, v->l4x, v->l4y, v->l4z, v->dx, v->dy, v->dz};
+    for (float x : c) of(x);
+    of(v->theta); of(v->phi); of(v->area); of(v->origarea);
+    for (int o = 0; o < 2; o++) {
+      float *d = o ? v->dist_orig : v->dist;
+      int cap = o ? v->dist_orig_capacity : v->dist_capacity;
+      void *st = o ? m->dist_orig_storage[vno] : m->dist_storage[vno];
+      oi(d != NULL); oi(st != NULL); oi(cap);
+      if (d) for (int k = 0; k < cap; k++) of(d[k]);
+    }
+  }
+  for (int fno = 0; fno < m->nfaces; fno++) {
+    FACE *f = &m->faces[fno];
+    of(f->area);
+    for (int k = 0; k < 3; k++) of(f->angle[k]);
+    for (int k = 0; k < 3; k++) of(f->orig_angle[k]);
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+    oi(m->faceNormDeferredEntries[fno].deferred);
+  }
+  od(m->radius); of(m->total_area); of(m->orig_area);
+  oi(m->status); oi(m->origxyz_status); oi(m->dist_nsize); oi(m->dist_orig_nsize);
+  oi(m->dist_alloced_flags);
+  of(m->xlo); of(m->ylo); of(m->zlo); of(m->xhi); of(m->yhi); of(m->zhi);
+  of(m->xctr); of(m->yctr); of(m->zctr);
+}
+
+void posn_case()
+{
+  if (geti()) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  m->status = (MRIS_Status)geti();
+  m->origxyz_status = (MRIS_Status)geti();
+  m->dist_alloced_flags = (char)geti();
+  m->dist_nsize = (char)geti();
+  m->dist_orig_nsize = (char)geti();
+  m->radius = getd();
+  m->total_area = getf(); m->orig_area = getf();
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    set_coords(v);
+    v->k1 = getf(); v->k2 = getf(); v->area = getf(); v->origarea = getf();
+    v->theta = getf(); v->phi = getf();
+    v->ripflag = (char)geti();
+    vt->vnum = (short)geti(); vt->v2num = (short)geti(); vt->v3num = (short)geti();
+    vt->vtotal = (short)geti(); vt->nsizeMax = (uchar)geti();
+    for (int o = 0; o < 2; o++) {
+      int blen = geti();
+      float *buf = NULL;
+      int cap = 0, valid = 0;
+      if (blen >= 0) {
+        buf = arr<float>(blen);
+        cap = geti(); valid = geti();
+        for (int k = 0; k < blen; k++) buf[k] = getf();
+      }
+      void **st = o ? &m->dist_orig_storage[vno] : &m->dist_storage[vno];
+      *st = buf;
+      *(float **)(o ? &v->dist_orig : &v->dist) = valid ? buf : NULL;
+      *(int *)(o ? &v->dist_orig_capacity : &v->dist_capacity) = valid ? cap : 0;
+    }
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    FACE *f = &m->faces[fno];
+    for (int k = 0; k < 3; k++) f->v[k] = geti();
+    f->area = getf();
+    for (int k = 0; k < 3; k++) f->angle[k] = getf();
+    for (int k = 0; k < 3; k++) f->orig_angle[k] = getf();
+    f->ripflag = (char)geti();
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    e->nx = getf(); e->ny = getf(); e->nz = getf(); e->orig_area = getf();
+    m->faceNormDeferredEntries[fno].deferred = (char)geti();
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if ((op == "sm" || op == "rm") && !posn_guard(m, op)) { out += "G "; continue; }
+    if (op == "sv") oi(MRISsaveVertexPositions(m, geti()));
+    else if (op == "rv") oi(MRISrestoreVertexPositions(m, geti()));
+    else if (op == "sn") oi(MRISsaveNormals(m, geti()));
+    else if (op == "rn") oi(MRISrestoreNormals(m, geti()));
+    else if (op == "cc") oi(MRIScomputeCanonicalCoordinates(m));
+    else if (op == "ar") od(MRISaverageCanonicalRadius(m));
+    else if (op == "fo") od(MRIScomputeFolding(m));
+    else if (op == "gn") {
+      FaceNormCacheEntry const *e = getFaceNorm(m, geti());
+      of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+    }
+    else if (op == "sf") { int f = geti(); float a = getf(), b = getf(), c = getf(); setFaceNorm(m, f, a, b, c); }
+    else if (op == "so") { int f = geti(); setFaceOrigArea(m, f, getf()); }
+    else if (op == "go") of(getFaceOrigArea(m, geti()));
+    else if (op == "cn") computeDefectFaceNormal(m, geti());
+    else if (op == "df") mrisurf_deferSetFaceNorms(m);
+    else if (op == "rf") mrisurf_recomputeFaceNorms(m);
+    else if (op == "uf") mrisurf_undeferSetFaceNorms(m);
+    else if (op == "oa") of(MRIScomputeOrigArea(m));
+    else if (op == "sa") MRISsetOrigArea(m);
+    else if (op == "sm") oi(MRISstoreMetricProperties(m));
+    else if (op == "rm") oi(MRISrestoreMetricProperties(m));
+    else if (op == "ro") oi(MRISrestoreOldPositions(m));
+    else if (op == "st") oi(MRISstoreCurrentPositions(m));
+    else fail("posn op");
+  }
+  out += "| ";
+  dump_posn(m);
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -821,6 +960,8 @@ void run_case()
     surf_case();
   } else if (cmd == "metric") {
     metric_case();
+  } else if (cmd == "posn") {
+    posn_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

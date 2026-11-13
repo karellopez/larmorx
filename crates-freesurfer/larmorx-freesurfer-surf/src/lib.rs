@@ -29,17 +29,22 @@
 //! - [`coords`]: the coordinate operations (`mrisurf_metricProperties.cpp`'s first part: setting,
 //!   importing, copying, reversing, scaling (FS-113), moving, rotating, the bounding box).
 //! - [`metric`]: averaging and smoothing the positions, the sphere's centre, the neighbour
-//!   distances, the areas, the curvature operations, the saved coordinates.
+//!   distances, the areas, the curvature operations, the saved coordinates; the original area,
+//!   storing and restoring the metric properties.
+//! - [`positions`]: the saved vertex positions and normals (FS-115), the canonical coordinates.
+//! - [`facenorm`]: the face-normal cache (FS-116).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
 pub mod base;
 pub mod coords;
 pub mod dist;
+pub mod facenorm;
 pub mod metric;
 pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;
+pub mod positions;
 pub mod surfbase;
 pub mod topology;
 pub mod views;

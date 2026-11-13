@@ -12,12 +12,13 @@ the port on the same cases with ``--upstream-defects`` ``reproduce`` and ``fix``
 lines (the result and the text FreeSurfer's code printed): ``reproduce`` must give FreeSurfer's on
 every case (``SKIP`` lists the defects whose cases are counted, not compared: none); ``fix`` may
 differ only where a defect it corrects changed the result (its notices), or where the default's
-correctly rounded ``sinf``/``cosf`` replace glibc's (a ``surf`` case that rotates, ``Z``: the
-rotation names nothing, as every FreeSurfer computation that takes ``larmorx_core::math::Libm``'s
-quiet choice; counted as ``fix_libm``). Prints the counts and the hash the port's recorded test
+correctly rounded ``sinf``/``cosf`` replace glibc's (a ``surf`` case that rotates, ``Z``) or its
+correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordinates' angles,
+``cc`` or ``sv 3``): these name nothing, as every FreeSurfer computation that takes
+``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 690 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 720 [--json out.json]
 """
 
 from __future__ import annotations
@@ -44,6 +45,17 @@ SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 # the commands whose cases run on fssurfio-mpstub (MRIScomputeMetricProperties a stub)
 STUB_COMMANDS = ("metric",)
+
+
+def libm_case(cmd: str, toks: list[str]) -> bool:
+    """Whether the case runs a function whose default takes correctly rounded maths where
+    FreeSurfer's binary takes glibc's: a `surf` rotation (`Z`: `sinf`, `cosf`), a `posn`
+    canonical-coordinates step (`cc`, or `sv 3`: `atan2f`)."""
+    if cmd == "surf":
+        return "Z" in toks
+    if cmd == "posn":
+        return "cc" in toks or any(a == "sv" and b == "3" for a, b in zip(toks, toks[1:]))
+    return False
 
 
 def probe_binary(ws: Path, name: str = "fssurfio") -> Path:
@@ -158,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
                 first_differ.append(case[:200])
         if f != c:
             fix_differ[cmd] += 1
-            if not fids and cmd == "surf" and "Z" in case.split():
+            if not fids and libm_case(cmd, case.split()):
                 fix_libm[cmd] += 1
             elif not fids:
                 fix_unexplained[cmd] += 1

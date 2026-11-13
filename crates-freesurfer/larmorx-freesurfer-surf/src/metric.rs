@@ -18,7 +18,10 @@
 //! `MRISnormalizeCurvatureVariance`, `mrisCountCompressed`, `MRISstoreMeanCurvature`,
 //! `MRISsaveXYZ`, `MRISloadXYZ`, `MRISfreeXYZ`, `MRISpopXYZ`; with `mrisComputeCurvatureMinMax`
 //! (lines 9113-9136, queue item 3.1-50's) and `utils/mrisurf_vals.cpp`'s
-//! `MRISextractCurvatureVector` (lines 677-685).
+//! `MRISextractCurvatureVector` (lines 677-685); since 3.1-50's part a also `MRIScomputeOrigArea`,
+//! `MRISsetOrigArea`, `MRISrestoreOldPositions`, `MRISstoreCurrentPositions`,
+//! `MRISstoreMetricProperties` and `MRISrestoreMetricProperties`, which wait for the face-normal
+//! cache ([`facenorm`]) and the saved vertex positions ([`positions`]).
 //!
 //! Every floating-point operation that can make a NaN, or meet two, goes through fs.core's
 //! [`sse`] helpers in the official build's operand order (read from the unit oracle's object
@@ -27,10 +30,7 @@
 //!
 //! Not here yet: `MRIScomputeMetricProperties` (it runs `utils/mrisurf_metricProperties_fast.h`
 //! and `_slow.h`, queue items 3.1-51 and 3.1-52), so `MRISsmoothSurface`'s last step,
-//! `MRISrecenter` and `MRISscaleBrainArea`; `MRIScomputeOrigArea`, `MRISsetOrigArea`,
-//! `MRISstoreMetricProperties` and `MRISrestoreMetricProperties` (the face-normal cache, 3.1-50);
-//! `MRISrestoreOldPositions`, `MRISstoreCurrentPositions` (the saved vertex positions, 3.1-50);
-//! `MRISltaMultiply`, `MRIStransform` (an `LTA`, a `TRANSFORM`: fs.volume); `MRISnonmaxSuppress`
+//! `MRISrecenter` and `MRISscaleBrainArea`; `MRISltaMultiply`, `MRIStransform` (an `LTA`, a `TRANSFORM`: fs.volume); `MRISnonmaxSuppress`
 //! (a spherical parameterization: fs.surf).
 
 // The loops index as FreeSurfer's C does (one vertex number for several arrays).
@@ -47,7 +47,9 @@ use larmorx_freesurfer_core::utils::{LogicProblemResponse, cope_with_logic_probl
 use crate::aaa::{self, DistanceFormula, mris_sort_compare_float};
 use crate::coords::{self, Io, Xyz, metric_properties_cpp};
 use crate::dist;
+use crate::facenorm;
 use crate::mris::Mris;
+use crate::positions;
 use crate::topology;
 use crate::views::{
     CANONICAL_VERTICES, CURRENT_VERTICES, FLATTENED_VERTICES, INFLATED_VERTICES, LAYERIV_VERTICES,
@@ -967,6 +969,25 @@ pub fn zero_negative_areas(mris: &mut Mris) -> i32 {
     0
 }
 
+/// `MRIScomputeOrigArea(mris)`: the sum (in float) of the unripped faces' original areas from
+/// the face-normal cache ([`facenorm::get_face_norm`]: a deferred entry is computed first).
+pub fn compute_orig_area(mris: &mut Mris) -> f32 {
+    let mut orig_area = 0.0f32;
+    for fno in 0..nfaces(mris) {
+        if mris.face(fno).ripflag != 0 {
+            continue;
+        }
+        let e = facenorm::get_face_norm(mris, fno);
+        orig_area = sse::add(orig_area, e.orig_area);
+    }
+    orig_area
+}
+
+/// `MRISsetOrigArea(mris)`: the surface's `orig_area` becomes [`compute_orig_area`].
+pub fn set_orig_area(mris: &mut Mris) {
+    mris.orig_area = compute_orig_area(mris);
+}
+
 // ---- triangle corners and coordinate sets ------------------------------------------------------
 
 /// `load_orig_triangle_vertices(mris, fno, U0, U1, U2)`: the face's three corners' original
@@ -1374,6 +1395,107 @@ pub fn store_mean_curvature(mris: &mut Mris) -> i32 {
         }
     }
     0
+}
+
+// ---- storing and restoring the metric properties ---------------------------------------------
+
+/// `MRISrestoreOldPositions(mris)`: [`positions::restore_vertex_positions`] of the temporary
+/// set.
+pub fn restore_old_positions(g: &mut Globals, io: &mut Io, mris: &mut Mris) -> Result<i32, Fatal> {
+    positions::restore_vertex_positions(g, io, mris, TMP_VERTICES)
+}
+
+/// `MRISstoreCurrentPositions(mris)`: [`positions::save_vertex_positions`] into the temporary
+/// set.
+pub fn store_current_positions(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &mut Mris,
+) -> Result<i32, Fatal> {
+    positions::save_vertex_positions(g, io, mris, TMP_VERTICES)
+}
+
+/// `MRISstoreMetricProperties(mris)`: every unripped vertex's `origarea` its `area` and, when it
+/// has distances, its original distances (made, zeroed, when `NULL`: `MRISmakeDistOrig`) the
+/// distances in use (`mrisVertexVSize` of them); every unripped face's cached original area its
+/// `area` ([`facenorm::set_face_orig_area`]) and its original angles its angles; the surface's
+/// `orig_area` its `total_area`. Returns `NO_ERROR`. Reading or writing past a buffer is
+/// FreeSurfer's invalid access: a panic.
+pub fn store_metric_properties(mris: &mut Mris) -> i32 {
+    for vno in 0..nverts(mris) {
+        if mris.vertex(vno).ripflag != 0 {
+            continue;
+        }
+        {
+            let v = mris.vertex_mut(vno);
+            v.origarea = v.area;
+        }
+        if mris.vertex(vno).dist.is_none() {
+            continue;
+        }
+        if mris.vertex(vno).dist_orig.is_none() {
+            dist::make_dist_orig(mris, vno);
+        }
+        let vsize = usize::try_from(topology::vertex_vsize(mris, vno)).unwrap_or(0);
+        if vsize == 0 {
+            continue;
+        }
+        let v = mris.vertex_mut(vno);
+        let src = v.dist.as_ref().expect("VERTEX::dist is NULL");
+        let dst = v.dist_orig.as_mut().expect("VERTEX::dist_orig is NULL");
+        dst[..vsize].copy_from_slice(&src[..vsize]);
+    }
+    for fno in 0..nfaces(mris) {
+        if mris.face(fno).ripflag != 0 {
+            continue;
+        }
+        let area = mris.face(fno).area;
+        facenorm::set_face_orig_area(mris, fno, area);
+        let f = mris.face_mut(fno);
+        let angle = f.angle;
+        aaa::copy_angles_per_triangle(&mut f.orig_angle, &angle);
+    }
+    mris.orig_area = mris.total_area;
+    0
+}
+
+/// `MRISrestoreMetricProperties(mris)`: every unripped vertex's `area` its `origarea` and its
+/// distances in use its original distances; every unripped face's `area` its cached original area
+/// ([`facenorm::get_face_orig_area`], FS-116) and its angles its original angles; the surface's
+/// `total_area` its `orig_area`. Returns `NO_ERROR`. FreeSurfer writes the distances without
+/// checking that they exist: a vertex in use with no distance or original-distance buffer (or a
+/// short one) is its invalid access, a panic.
+pub fn restore_metric_properties(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &mut Mris,
+) -> Result<i32, Fatal> {
+    for vno in 0..nverts(mris) {
+        if mris.vertex(vno).ripflag != 0 {
+            continue;
+        }
+        let vsize = usize::try_from(topology::vertex_vsize(mris, vno)).unwrap_or(0);
+        let v = mris.vertex_mut(vno);
+        v.area = v.origarea;
+        if vsize == 0 {
+            continue;
+        }
+        let src = v.dist_orig.as_ref().expect("VERTEX::dist_orig is NULL");
+        let dst = v.dist.as_mut().expect("VERTEX::dist is NULL");
+        dst[..vsize].copy_from_slice(&src[..vsize]);
+    }
+    for fno in 0..nfaces(mris) {
+        if mris.face(fno).ripflag != 0 {
+            continue;
+        }
+        let area = facenorm::get_face_orig_area(g, io, mris, fno)?;
+        let f = mris.face_mut(fno);
+        f.area = area;
+        let orig = f.orig_angle;
+        aaa::copy_angles_per_triangle(&mut f.angle, &orig);
+    }
+    mris.total_area = mris.orig_area;
+    Ok(0)
 }
 
 // ---- saved coordinates -------------------------------------------------------------------------

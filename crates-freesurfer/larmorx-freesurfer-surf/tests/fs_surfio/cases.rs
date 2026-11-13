@@ -12,7 +12,7 @@ use std::io::Write;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use larmorx_core::defects::{FS_03, FS_111, UpstreamDefects};
+use larmorx_core::defects::{FS_03, FS_111, FS_116, UpstreamDefects};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -26,7 +26,7 @@ use larmorx_freesurfer_surf::mrisurf;
 use larmorx_freesurfer_surf::surfbase::{self, MrisTempAssigned};
 use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
-use larmorx_freesurfer_surf::{coords, dist, metric};
+use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 
 pub struct Gen(u64);
 
@@ -101,10 +101,10 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 23] = [
+const COMMANDS: [&str; 24] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
-    "names", "surf", "metric",
+    "names", "surf", "metric", "posn",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -584,6 +584,137 @@ fn metric_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
 }
 
+/// `posn`'s case: the surface (15 coordinate sets, `k1`, `k2`, areas, angles, rip flags,
+/// neighbour counts, distances with their storage, faces with their face-normal cache), then 1 to
+/// 6 operations. One case in four has original coordinates of 2^-14 steps, so that a face's first
+/// cross product is shorter than `FLT_EPSILON` and its second (the edges scaled by 100) is not.
+fn posn_tokens(t: &mut Vec<String>, g: &mut Gen) {
+    let heavy = g.chance(3);
+    let tiny = g.chance(4);
+    ix(t, i64::from(g.chance(3)));
+    ix(t, i64::from(g.chance(4)));
+    let nv = g.int(0, 6);
+    let nf = if nv == 0 { 0 } else { g.int(0, 4) };
+    ix(t, nv);
+    ix(t, nf);
+    for _ in 0..2 {
+        let st = if g.chance(3) {
+            7
+        } else if g.chance(12) {
+            g.pick(&[10, -1])
+        } else {
+            g.int(0, 9)
+        };
+        ix(t, st);
+    }
+    ix(t, g.int(0, 3));
+    for _ in 0..2 {
+        ix(t, g.pick(&[0, 1, 2, 3, 1, 2, 1, -1, 4]));
+    }
+    dx(t, g);
+    for _ in 0..2 {
+        t.push(format!("{:08x}", smallish(g, heavy)));
+    }
+    for _ in 0..nv {
+        for k in 0..45 {
+            // the original coordinates are the 4th to 6th
+            let b = if tiny && (3..6).contains(&k) && !g.chance(8) {
+                (g.int(-6, 6) as f32 / 16384.0).to_bits()
+            } else {
+                smallish(g, heavy)
+            };
+            t.push(format!("{b:08x}"));
+        }
+        for _ in 0..6 {
+            t.push(format!("{:08x}", smallish(g, heavy)));
+        }
+        ix(t, i64::from(g.chance(6)));
+        let hi = nv.min(5);
+        let (vnum, v2num, v3num, vtotal) = (
+            g.int(0, hi),
+            g.int(0, hi + 2),
+            g.int(0, hi + 3),
+            g.int(0, hi + 1),
+        );
+        let nsize_max = g.int(0, 3);
+        for v in [vnum, v2num, v3num, vtotal, nsize_max] {
+            ix(t, v);
+        }
+        let count = match nsize_max {
+            1 => vnum,
+            2 => v2num,
+            3 => v3num,
+            _ => 0,
+        };
+        let vsize = count.max(vtotal);
+        for _ in 0..2 {
+            if g.chance(5) {
+                ix(t, -1);
+                continue;
+            }
+            let blen = (vsize + g.int(-1, 3)).max(0);
+            ix(t, blen);
+            ix(t, if g.chance(3) { blen } else { g.int(0, blen) });
+            ix(t, i64::from(!g.chance(4)));
+            for _ in 0..blen {
+                t.push(format!("{:08x}", small(g)));
+            }
+        }
+    }
+    for _ in 0..nf {
+        // now and then two corners the same vertex (a face with no area)
+        let v0 = g.int(0, nv - 1);
+        let v1 = if g.chance(6) { v0 } else { g.int(0, nv - 1) };
+        ix(t, v0);
+        ix(t, v1);
+        ix(t, g.int(0, nv - 1));
+        for _ in 0..7 {
+            t.push(format!("{:08x}", smallish(g, heavy)));
+        }
+        ix(t, i64::from(g.chance(5)));
+        for _ in 0..4 {
+            t.push(format!("{:08x}", smallish(g, heavy)));
+        }
+        ix(t, g.pick(&[0, 1, 2, 3, 3, 0, 0, 4, -1, 6]));
+    }
+    let nops = g.int(1, 6);
+    ix(t, nops);
+    let mut ops: Vec<&str> = vec![
+        "sv", "rv", "sn", "rn", "cc", "ar", "fo", "df", "rf", "uf", "oa", "sa", "sm", "rm", "ro",
+        "st", "sv", "rv", "rv",
+    ];
+    if nf > 0 {
+        ops.extend(["gn", "sf", "so", "go", "cn", "gn", "go"]);
+    }
+    for _ in 0..nops {
+        let op = g.pick(&ops);
+        t.push(op.to_owned());
+        match op {
+            "sv" | "rv" => {
+                let w = if g.chance(10) {
+                    g.pick(&[4, 1, 12, -1])
+                } else {
+                    g.pick(&[0, 2, 3, 5, 6, 7, 8, 9, 10, 11, 10, 11, 3, 0])
+                };
+                ix(t, w);
+            }
+            "sn" | "rn" => ix(t, g.pick(&[2, 8, 7, 9, 2, 8, 7, 0, 3, 5])),
+            "gn" | "go" | "cn" => ix(t, g.int(0, nf - 1)),
+            "sf" => {
+                ix(t, g.int(0, nf - 1));
+                for _ in 0..3 {
+                    t.push(format!("{:08x}", smallish(g, heavy)));
+                }
+            }
+            "so" => {
+                ix(t, g.int(0, nf - 1));
+                t.push(format!("{:08x}", smallish(g, heavy)));
+            }
+            _ => {}
+        }
+    }
+}
+
 /// `n` case lines from `seed`, the commands in turn.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
@@ -840,6 +971,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             }
             "surf" => surf_tokens(&mut t, &mut g),
             "metric" => metric_tokens(&mut t, &mut g),
+            "posn" => posn_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -1920,6 +2052,279 @@ fn metric_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     Ok(())
 }
 
+/// The probe's `G` test for `posn`'s `sm` and `rm`.
+fn posn_guard(m: &Mris, op: &str) -> bool {
+    for vno in 0..m.nvertices.max(0) as usize {
+        let v = m.vertex(vno);
+        if v.ripflag != 0 {
+            continue;
+        }
+        let vs = topology::vertex_vsize(m, vno);
+        if vs <= 0 {
+            continue;
+        }
+        if op == "sm"
+            && v.dist.is_some()
+            && (v.dist_capacity < vs || (v.dist_orig.is_some() && v.dist_orig_capacity < vs))
+        {
+            return false;
+        }
+        if op == "rm"
+            && (v.dist.is_none()
+                || v.dist_capacity < vs
+                || v.dist_orig.is_none()
+                || v.dist_orig_capacity < vs)
+        {
+            return false;
+        }
+    }
+    true
+}
+
+fn dump_dists(m: &Mris, vno: usize, o: &mut Out) {
+    let v = m.vertex(vno);
+    for k in 0..2 {
+        let (d, cap, st) = if k == 1 {
+            (
+                &v.dist_orig,
+                v.dist_orig_capacity,
+                &m.dist_orig_storage.as_ref().unwrap()[vno],
+            )
+        } else {
+            (
+                &v.dist,
+                v.dist_capacity,
+                &m.dist_storage.as_ref().unwrap()[vno],
+            )
+        };
+        o.i(i64::from(d.is_some()));
+        o.i(i64::from(d.is_some() || st.is_some()));
+        o.i(i64::from(cap));
+        if let Some(d) = d {
+            for x in &d[..cap as usize] {
+                o.f(*x);
+            }
+        }
+    }
+}
+
+fn dump_posn(m: &Mris, o: &mut Out) {
+    for vno in 0..m.nvertices.max(0) as usize {
+        let v = m.vertex(vno);
+        for x in [
+            v.x, v.y, v.z, v.origx, v.origy, v.origz, v.tx, v.ty, v.tz, v.cx, v.cy, v.cz, v.infx,
+            v.infy, v.infz, v.pialx, v.pialy, v.pialz, v.t2x, v.t2y, v.t2z, v.fx, v.fy, v.fz,
+            v.whitex, v.whitey, v.whitez, v.nx, v.ny, v.nz, v.pnx, v.pny, v.pnz, v.wnx, v.wny,
+            v.wnz, v.targx, v.targy, v.targz, v.l4x, v.l4y, v.l4z, v.dx, v.dy, v.dz, v.theta,
+            v.phi, v.area, v.origarea,
+        ] {
+            o.f(x);
+        }
+        dump_dists(m, vno, o);
+    }
+    for fno in 0..m.nfaces.max(0) as usize {
+        let f = m.face(fno);
+        o.f(f.area);
+        for x in f.angle.iter().chain(f.orig_angle.iter()) {
+            o.f(*x);
+        }
+        let e = m.faceNormCacheEntries.as_ref().unwrap()[fno];
+        for x in [e.nx, e.ny, e.nz, e.orig_area] {
+            o.f(x);
+        }
+        o.i(i64::from(
+            m.faceNormDeferredEntries.as_ref().unwrap()[fno].deferred,
+        ));
+    }
+    o.d(m.radius);
+    o.f(m.total_area);
+    o.f(m.orig_area);
+    for x in [
+        i64::from(m.status.0 as u32),
+        i64::from(m.origxyz_status.0 as u32),
+        i64::from(m.dist_nsize),
+        i64::from(m.dist_orig_nsize),
+        i64::from(m.dist_alloced_flags),
+    ] {
+        o.i(x);
+    }
+    for x in [
+        m.xlo, m.ylo, m.zlo, m.xhi, m.yhi, m.zhi, m.xctr, m.yctr, m.zctr,
+    ] {
+        o.f(x);
+    }
+}
+
+fn posn_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let mut pairs: Vec<(&str, &str)> = Vec::new();
+    if t.i() != 0 {
+        pairs.push(("FREESURFER_reportLogicErrors", "1"));
+    }
+    let env = Environment::from_pairs(pairs);
+    if t.i() != 0 {
+        cx.g.gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+    }
+    let (nv, nf) = (t.i(), t.i());
+    let mut m = mris_alloc(nv as usize, nf as usize);
+    m.faceNormCacheEntries = Some(vec![aaa::FaceNormCacheEntry::default(); nf as usize]);
+    m.faceNormDeferredEntries = Some(vec![aaa::FaceNormDeferredEntry::default(); nf as usize]);
+    m.status = MrisStatus(t.i());
+    m.origxyz_status = MrisStatus(t.i());
+    m.dist_alloced_flags = t.i() as i8;
+    m.dist_nsize = t.i() as i8;
+    m.dist_orig_nsize = t.i() as i8;
+    m.radius = t.d();
+    (m.total_area, m.orig_area) = (t.f(), t.f());
+    for vno in 0..nv as usize {
+        {
+            let v = m.vertex_mut(vno);
+            set_coords(t, v);
+            (v.k1, v.k2, v.area, v.origarea, v.theta, v.phi) =
+                (t.f(), t.f(), t.f(), t.f(), t.f(), t.f());
+            v.ripflag = t.i() as i8;
+        }
+        {
+            let vt = m.topology_mut(vno);
+            vt.vnum = t.i() as i16;
+            vt.v2num = t.i() as i16;
+            vt.v3num = t.i() as i16;
+            vt.vtotal = t.i() as i16;
+            vt.nsizeMax = t.i() as u8;
+        }
+        for k in 0..2 {
+            let len = t.i();
+            if len < 0 {
+                continue;
+            }
+            let (cap, valid) = (t.i(), t.i() != 0);
+            let buf: Vec<f32> = (0..len).map(|_| t.f()).collect();
+            let v = m.vertex_mut(vno);
+            let (d, c) = if k == 1 {
+                (&mut v.dist_orig, &mut v.dist_orig_capacity)
+            } else {
+                (&mut v.dist, &mut v.dist_capacity)
+            };
+            if valid {
+                *d = Some(buf);
+                *c = cap;
+            } else {
+                let st = if k == 1 {
+                    &mut m.dist_orig_storage
+                } else {
+                    &mut m.dist_storage
+                };
+                st.as_mut().unwrap()[vno] = Some(buf);
+            }
+        }
+    }
+    for fno in 0..nf as usize {
+        {
+            let f = m.face_mut(fno);
+            for k in 0..3 {
+                f.v[k] = t.i();
+            }
+            f.area = t.f();
+            for k in 0..3 {
+                f.angle[k] = t.f();
+            }
+            for k in 0..3 {
+                f.orig_angle[k] = t.f();
+            }
+            f.ripflag = t.i() as i8;
+        }
+        let e = &mut m.faceNormCacheEntries.as_mut().unwrap()[fno];
+        (e.nx, e.ny, e.nz, e.orig_area) = (t.f(), t.f(), t.f(), t.f());
+        m.faceNormDeferredEntries.as_mut().unwrap()[fno].deferred = t.i() as i8;
+    }
+    let nops = t.i();
+    let g = &mut cx.g;
+    let mut io = coords::Io {
+        out: &mut cx.a,
+        err: &mut cx.b,
+        env: &env,
+    };
+    for _ in 0..nops {
+        let op = t.next();
+        if matches!(op, "sm" | "rm") && !posn_guard(&m, op) {
+            o.s("G");
+            continue;
+        }
+        match op {
+            "sv" => {
+                let w = t.i();
+                o.i(i64::from(positions::save_vertex_positions(
+                    g, &mut io, &mut m, w,
+                )?));
+            }
+            "rv" => {
+                let w = t.i();
+                o.i(i64::from(positions::restore_vertex_positions(
+                    g, &mut io, &mut m, w,
+                )?));
+            }
+            "sn" => {
+                let w = t.i();
+                o.i(i64::from(positions::save_normals(g, &mut io, &mut m, w)?));
+            }
+            "rn" => {
+                let w = t.i();
+                o.i(i64::from(positions::restore_normals(
+                    g, &mut io, &mut m, w,
+                )?));
+            }
+            "cc" => o.i(i64::from(positions::compute_canonical_coordinates(
+                g, &mut m,
+            ))),
+            "ar" => o.d(positions::average_canonical_radius(&m)),
+            "fo" => o.d(positions::compute_folding(&m)),
+            "gn" => {
+                let fno = t.i() as usize;
+                let e = facenorm::get_face_norm(&mut m, fno);
+                for x in [e.nx, e.ny, e.nz, e.orig_area] {
+                    o.f(x);
+                }
+            }
+            "sf" => {
+                let fno = t.i() as usize;
+                let (a, b, c) = (t.f(), t.f(), t.f());
+                facenorm::set_face_norm(&mut m, fno, a, b, c);
+            }
+            "so" => {
+                let fno = t.i() as usize;
+                let a = t.f();
+                facenorm::set_face_orig_area(&mut m, fno, a);
+            }
+            "go" => {
+                let fno = t.i() as usize;
+                o.f(facenorm::get_face_orig_area(g, &mut io, &mut m, fno)?);
+            }
+            "cn" => {
+                let fno = t.i() as usize;
+                facenorm::compute_defect_face_normal(&mut m, fno);
+            }
+            "df" => facenorm::defer_set_face_norms(&mut m),
+            "rf" => facenorm::recompute_face_norms(&mut m),
+            "uf" => facenorm::undefer_set_face_norms(&mut m),
+            "oa" => o.f(metric::compute_orig_area(&mut m)),
+            "sa" => metric::set_orig_area(&mut m),
+            "sm" => o.i(i64::from(metric::store_metric_properties(&mut m))),
+            "rm" => o.i(i64::from(metric::restore_metric_properties(
+                g, &mut io, &mut m,
+            )?)),
+            "ro" => o.i(i64::from(metric::restore_old_positions(
+                g, &mut io, &mut m,
+            )?)),
+            "st" => o.i(i64::from(metric::store_current_positions(
+                g, &mut io, &mut m,
+            )?)),
+            op => panic!("posn op {op}"),
+        }
+    }
+    o.0 += "| ";
+    dump_posn(&m, o);
+    Ok(())
+}
+
 fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     let cmd = t.next();
     match cmd {
@@ -2215,6 +2620,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "surf" => surf_case(cx, t, o)?,
         "metric" => metric_case(cx, t, o)?,
+        "posn" => posn_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2272,7 +2678,11 @@ pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
         // FS-03 reproduced: FreeSurfer's failed assertion faults on purpose (signal 11)
-        Err(Fatal::Exit(139)) if mode.reproduce() && cx.g.notices.contains(&FS_03) => {
+        // FS-116 reproduced likewise: reading a deferred face's original area faults on purpose
+        Err(Fatal::Exit(139))
+            if mode.reproduce()
+                && (cx.g.notices.contains(&FS_03) || cx.g.notices.contains(&FS_116)) =>
+        {
             "CRASH 11".to_owned()
         }
         // FS-111 reproduced: the official build's buffer check aborts (signal 6)

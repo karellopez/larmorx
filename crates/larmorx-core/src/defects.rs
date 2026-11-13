@@ -1127,6 +1127,10 @@ defects! {
         "scaling a surface by a negative factor (and the scale-then-translate operation with a negative factor) leaves its bounding box upside down: the low end above the high end";
     FS_114 = "FS-114", "FreeSurfer", true,
         "centring a spherical surface that has no vertex never returns: the search for its centre keeps halving its step without end";
+    FS_115 = "FS-115", "FreeSurfer", true,
+        "restoring the target or layer-IV coordinates of a spherical patch sets its canonical coordinates to the temporary coordinates, not to the restored ones";
+    FS_116 = "FS-116", "FreeSurfer", true,
+        "reading a face's original area while it is still marked to be computed later prints NYI and crashes the program on purpose (a segmentation fault)";
 }
 
 /// The register entry with ID `id`.

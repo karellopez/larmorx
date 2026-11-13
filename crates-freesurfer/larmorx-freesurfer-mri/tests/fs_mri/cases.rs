@@ -12,6 +12,7 @@ use std::rc::Rc;
 
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::affine::AffineMatrix;
+use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::Matrix;
@@ -799,7 +800,7 @@ impl Out {
         ] {
             self.f(x);
         }
-        self.s(&v.fname);
+        self.s(&v.fname.to_string_lossy());
         self.am(v.i_to_r.as_ref());
         self.m(v.r_to_i.as_ref());
         self.m(v.register_mat.as_ref());
@@ -950,7 +951,7 @@ impl Ctx {
         v.s_r = t.f();
         v.s_a = t.f();
         v.s_s = t.f();
-        v.fname = t.s();
+        v.fname = CName::new(t.s().as_bytes());
     }
     fn mri(&mut self, t: &mut Toks) -> Result<Mri, Fatal> {
         let (w, h, d, ty, nf, hdr) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
@@ -1032,7 +1033,7 @@ impl Ctx {
         x.tr = t.f();
         x.te = t.f();
         x.ti = t.f();
-        x.vg.fname = t.s();
+        x.vg.fname = CName::new(t.s().as_bytes());
         let v = &mut x.vg;
         v.x_r = t.f();
         v.x_a = t.f();

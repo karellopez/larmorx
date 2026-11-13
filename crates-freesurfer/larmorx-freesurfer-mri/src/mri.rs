@@ -17,6 +17,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{FS_55, FS_56, FS_60};
+use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_NO_MEMORY, Fatal, NO_ERROR};
@@ -136,7 +137,8 @@ pub struct MriFrame {
     pub pe_dir: [f32; 3],
     pub slice_dir: [f32; 3],
     pub label: i32,
-    pub name: String,
+    /// `name[STRLEN]` (written whole by the `.mgz` writer: C's buffer semantics).
+    pub name: CName,
     pub dof: i32,
     pub m_ras2vox: Option<Matrix>,
     pub thresh: f32,
@@ -715,7 +717,7 @@ impl Mri {
         )?;
         m.vg.ras_good_flag = 1;
         m.copy_geometry_from(vg);
-        m.vg.fname = vg.fname.clone();
+        m.vg.fname.strcpy(&vg.fname);
         fill_cache(g, out, err, &mut m.vg)?;
         Ok(m)
     }
@@ -831,7 +833,7 @@ pub fn use_vol_geom_to_mri(
     dst.c_r = src.c_r;
     dst.c_a = src.c_a;
     dst.c_s = src.c_s;
-    dst.fname = src.fname.clone();
+    dst.fname.strcpy(&src.fname);
     fill_cache(g, out, err, dst)
 }
 
@@ -888,7 +890,7 @@ pub fn mri_copy_vol_geom_from_mri(mri: &Mri, vg: &mut VolGeom) -> i32 {
     vg.height = s.height;
     vg.depth = s.depth;
     vg.valid = s.ras_good_flag;
-    vg.fname = s.fname.clone();
+    vg.fname.strcpy(&s.fname);
     NO_ERROR
 }
 
@@ -987,7 +989,7 @@ pub fn mri_copy_header(
     d.tr = src.tr;
     d.te = src.te;
     d.ti = src.ti;
-    d.vg.fname = src.fname.clone();
+    d.vg.fname.strcpy(&src.fname);
     {
         let (s, v) = (&src.vg, &mut d.vg);
         v.x_r = s.x_r;

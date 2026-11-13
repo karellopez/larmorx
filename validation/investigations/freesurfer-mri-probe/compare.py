@@ -835,7 +835,11 @@ def write_batch(scratch: Path, b: Batch) -> Path:
     d = scratch / "batch"
     d.mkdir(parents=True, exist_ok=True)
     p = d / f"{b.name}.txt"
-    p.write_text("".join(ln + "\n" for ln in b.lines), encoding="latin-1")
+    # every call gets 10 seconds (the probe's own alarm is 2): the guard runs' allocations are slow,
+    # and a call that ran out of time in one run only would count as memory
+    p.write_text(
+        "".join(f"@10 {ln}\n" if ln[:1] != "@" else ln + "\n" for ln in b.lines), encoding="latin-1"
+    )
     return p
 
 

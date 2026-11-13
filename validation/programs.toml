@@ -237,7 +237,6 @@ group = "afni"
 name = "3dAutomask"
 command = "larmorx afni 3dAutomask"
 python = "lx.afni.automask"
-does = "A brain mask from an EPI series or a skull-stripped anatomical image."
 api = "docs/api/afni-automask.md"
 evidence = "/evidence/afni-automask/"
 records = { replica = ["afni-automask-replica"], clean-room = ["afni-automask"] }

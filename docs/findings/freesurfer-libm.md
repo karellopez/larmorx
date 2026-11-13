@@ -200,3 +200,38 @@ build's `_FORTIFY_SOURCE` turns the overflow into an abort. **Measured** with th
 recon-all's `defect2seg` (both streams) therefore fails when `<SUBJECTS_DIR>/<subject>/surf/lh.defect_labels`
 reaches 215 bytes (a subjects directory of about 185 characters for a subject named `sub-01`). A crash: never
 reproduced (D13); the DICOM item (3.1-16) decides the text (rule A: any path length).
+
+## 7. The C library's sort: `qsort` (and `std::sort`, `bsearch`)
+
+FreeSurfer's results depend on the **order** in which glibc 2.35's `qsort` leaves equal elements and
+on how it treats inconsistent comparators, not only on the sort being correct; `specs/glibc-qsort.md`
+describes that order (the merge order, and the quicksort fallback glibc takes only when it cannot
+have a temporary array) for a clean room, checked on 16,544 cases against glibc.
+
+**The callers** (2026-11-13; the call graph's core view scanned for `qsort`, `qsort_r`, `bsearch` and
+the C++ sorts, `inv/scan.py`'s pattern; element sizes from the objects' relocations): 32 reached
+functions call `qsort` (none `qsort_r`; `MRISedgeSort`'s `qsort_r`, 160-byte elements, is not
+reached), one `bsearch`, two `std::sort`.
+
+| Kind of comparator | Functions (programs) | Element | Does glibc's order decide bits? |
+|---|---|---|---|
+| three-way on floats or doubles (`<` −1, `>` +1, else 0; NaN equal to all) | `MRIgetPercentile` (`mri_coreg`), `MRISnormalizeCurvature` (6), `MRISmedianFilterVals`, `...Val2s`, `...Val2baks` (`mris_fix_topology`), `MRIcpolvMedianAtVoxel` (`mri_segment`), `MRIsegStatsRobust` (`mri_segstats`), `MRIsort` (`mri_concat`), `MRIpercentThresh` (`mri_binarize`) | 4 or 8 bytes | only through `+0.0`/`−0.0` and NaNs (the sign of a median or percentile; NaN placement) |
+| the same with `==` (NaN → +1) | `histogram_create` (`mris_curvature_stats`), `fdr2vwth` (`mri_binarize`) | 4, 8 | as above |
+| three-way on integers | `short_sorted_da_list` (GIFTI writer, 67), `nunqiue_int_list` (5), `GetPrimeFactors` (`mri_surf2surf`, `mri_vol2surf`), `MRIScomputeNormals`, `MRISMP_computeNormals` (39), `mrisAsynchronousTimeStep_optionalDxDyDzUpdate` (3) | 4 | no (equal integers are identical) |
+| three-way on one field, ties between different elements | `GCAapplyRenormalization`, `GCAmapRenormalize`, `GCAmapRenormalizeByClass`, `GCAcomputeTopNProbabilities`, `GCArankSamples` (label probabilities: `mri_ca_label`, `mri_ca_register`, `mri_em_register`, `mri_ca_normalize`), `MRIorderIndices` (voxels by value, `mri_ca_label`), `MRIaseg2vol` (`mri_label2vol`), `SortSurfClusterSum` (104-byte elements: the pointer path; 7), `clustSortClusterList` (`mri_binarize`, `mri_ca_label`), `VLSTsort` (32 bytes; `mri_ca_register`, `mri_vol2vol`), `matrixStatsExitHandler` (diagnostics) | 8 to 104 | **yes**: the order of tied elements (labels of equal probability, voxels of equal value) |
+| never 0 (ties → −1 for both orders) | `MatrixCalculateEigenSystemHelper`, `MatrixSVDEigenValues` (eigenvalues by magnitude, 17 and 16 programs), `mrisTessellateDefect_wkr` (edges of equal length and equal first vertex, `mris_fix_topology`) | 8, 16 | **yes** (and in glibc's fallback this kind reads before the array: the spec's §5) |
+| several keys, `ErrorFlag` first | `SortSDCMFileInfo` (DICOM input only) | 8 | yes, off the default paths |
+
+**The sizes:** the largest default-path sorts hold one volume: `MRIgetPercentile` (`mri_coreg`'s
+reference, 256³ floats, 64 MiB) and `MRIpercentThresh` (up to 256³ doubles, 128 MiB). glibc takes
+its quicksort fallback only when the temporary array exceeds a quarter of the physical memory
+(here 31.2 GiB) or cannot be allocated, so FreeSurfer's sorts take the merge order on any machine
+that runs its programs: the replicas use it (spec §3).
+
+**`std::sort`** (libstdc++'s introsort, compiled into the programs): `MyMRI::get3Dcorrection` sorts
+4 unsigned integers (`mri_robust_register`), `MyMatrix::swapping` sorts `(double, int)` pairs whose
+integers are distinct and whose doubles are never NaN (the block numbers of `MyMatrix::blocking` are
+contiguous, so no block is empty: no `0/0`), `mri_robust_template`. Both are strict total orders on
+distinguishable keys: every correct sort gives the same arrangement, and no spec of libstdc++'s sort
+is needed (unlike FSL-22's). **`bsearch`** (`mrisComputeDefectMRILogUnlikelihood_wkr`) only tests
+whether a face number is in a sorted list: any correct binary search.

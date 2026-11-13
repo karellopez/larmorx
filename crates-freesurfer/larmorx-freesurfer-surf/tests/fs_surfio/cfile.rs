@@ -59,7 +59,9 @@ fn value_target(fname: &str, hemi: i64, sname: &str) -> Option<String> {
 fn num_text(g: &mut Gen) -> String {
     if g.chance(14) {
         return g
-            .pick(&["nan", "-inf", "inf", "1e40", "-1e-50", "0x1p3", "1e", "-0", "+.5", "x"])
+            .pick(&[
+                "nan", "-inf", "inf", "1e40", "-1e-50", "0x1p3", "1e", "-0", "+.5", "x",
+            ])
             .to_owned();
     }
     clean_num(g)
@@ -69,7 +71,9 @@ fn num_text(g: &mut Gen) -> String {
 /// then).
 fn vtk_num(g: &mut Gen) -> String {
     if g.chance(20) {
-        return g.pick(&["nan", "-inf", "inf", "1e40", "-1e-50", "-0", "+.5"]).to_owned();
+        return g
+            .pick(&["nan", "-inf", "inf", "1e40", "-1e-50", "-0", "+.5"])
+            .to_owned();
     }
     clean_num(g)
 }
@@ -125,8 +129,8 @@ fn new_curv(g: &mut Gen, n: i64) -> Vec<u8> {
     let vnum = near(g, n);
     b.extend_from_slice(&(vnum as i32).to_be_bytes());
     b.extend_from_slice(&(g.int(0, 9) as i32).to_be_bytes());
-    let per = if g.chance(8) { 2 } else { 1 };
-    b.extend_from_slice(&(per as i32).to_be_bytes());
+    let per: i32 = if g.chance(8) { 2 } else { 1 };
+    b.extend_from_slice(&per.to_be_bytes());
     for _ in 0..vnum {
         let heavy = g.chance(4);
         b.extend_from_slice(&smallish(g, heavy).to_be_bytes());
@@ -136,7 +140,11 @@ fn new_curv(g: &mut Gen, n: i64) -> Vec<u8> {
 }
 
 fn curv_file(g: &mut Gen, n: i64) -> Vec<u8> {
-    if g.chance(2) { old_curv(g, n) } else { new_curv(g, n) }
+    if g.chance(2) {
+        old_curv(g, n)
+    } else {
+        new_curv(g, n)
+    }
 }
 
 /// A float file (the vertex and face counts as `int`s, then `float`s).
@@ -319,7 +327,11 @@ fn vtk(g: &mut Gen, nv: i64, faces: &[[i64; 3]]) -> Vec<u8> {
         s += &format!("{fname} 1 {cnt} float\n");
         let m = if g.chance(10) { g.int(0, nv) } else { nv };
         for j in 0..m {
-            s += &if g.chance(40) { num_text(g) } else { vtk_num(g) };
+            s += &if g.chance(40) {
+                num_text(g)
+            } else {
+                vtk_num(g)
+            };
             s += if (j + k) % 3 == 2 { "\n" } else { " " };
         }
         s.push('\n');
@@ -653,7 +665,9 @@ pub(super) fn cfile_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
             }
             "wa" => {
                 let n = utf8(t.h());
-                o.i(i64::from(curvio::write_ascii_curvature_file(g, &mut io, d, &m, &n)?));
+                o.i(i64::from(curvio::write_ascii_curvature_file(
+                    g, &mut io, d, &m, &n,
+                )?));
             }
             "cv" | "nv" => {
                 let n = utf8(t.h());
@@ -677,11 +691,15 @@ pub(super) fn cfile_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
             }
             "rf" => {
                 let n = utf8(t.h());
-                o.i(i64::from(curvio::read_float_file(g, &mut io, d, &mut m, &n)?));
+                o.i(i64::from(curvio::read_float_file(
+                    g, &mut io, d, &mut m, &n,
+                )?));
             }
             "rr" => {
                 let n = utf8(t.h());
-                o.i(i64::from(curvio::read_binary_areas(g, &mut io, d, &mut m, &n)?));
+                o.i(i64::from(curvio::read_binary_areas(
+                    g, &mut io, d, &mut m, &n,
+                )?));
             }
             "bf" => {
                 let n = utf8(t.h());
@@ -699,12 +717,16 @@ pub(super) fn cfile_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
             }
             "rd" => {
                 let n = utf8(t.h());
-                o.i(i64::from(curvio::read_decimation(g, &mut io, d, &mut m, &n)));
+                o.i(i64::from(curvio::read_decimation(
+                    g, &mut io, d, &mut m, &n,
+                )));
             }
             "gr" | "gw" => {
                 let n = utf8(t.h());
                 let mut ty = t.i();
-                let gii = env.get("FS_GII").is_some_and(|v| v.as_encoded_bytes() == b".gii");
+                let gii = env
+                    .get("FS_GII")
+                    .is_some_and(|v| v.as_encoded_bytes() == b".gii");
                 if op == "gw" && gii && n.len() + 5 > 1024 {
                     o.s("G");
                     continue;
@@ -807,7 +829,9 @@ pub(super) fn cfile_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
     o.0 += "| ";
     for vno in 0..nv as usize {
         let v = m.vertex(vno);
-        for x in [v.x, v.y, v.z, v.nx, v.ny, v.nz, v.d, v.curv, v.val, v.origarea] {
+        for x in [
+            v.x, v.y, v.z, v.nx, v.ny, v.nz, v.d, v.curv, v.val, v.origarea,
+        ] {
             o.f(x);
         }
         o.i(i64::from(v.undefval));

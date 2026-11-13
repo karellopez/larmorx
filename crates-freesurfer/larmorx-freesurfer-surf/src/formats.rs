@@ -15,6 +15,9 @@
 //! Not here: `MRISwritePatchAscii` (it asks fs.io's format identification, `mri_identify`, track
 //! A's 3.1-27, for the name's type) and `MatlabPlotVertexNbhd` (fs.surf's hop lists, 3.4).
 
+// The loops index as FreeSurfer's C does (one vertex number for several arrays).
+#![allow(clippy::needless_range_loop)]
+
 use std::path::Path;
 
 use larmorx_core::defects::{FS_141, FS_142, FS_143, FS_144, FS_145, FS_146, FS_147};
@@ -22,7 +25,9 @@ use larmorx_freesurfer_core::cscan::Bytes;
 use larmorx_freesurfer_core::cstd::{fmt_f, format_double};
 use larmorx_freesurfer_core::diag;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_NO_MEMORY, ERROR_NOFILE, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BADPARM, ERROR_NO_MEMORY, ERROR_NOFILE, Fatal, NO_ERROR,
+};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::matrix_identity;
 use larmorx_freesurfer_core::ret::Ret;
@@ -125,7 +130,11 @@ pub fn read_vtk(
         Ok(f) => f,
         Err(e) => {
             g.errno = e;
-            return Ok(vtk_error(g, io, &format!("MRISreadVTK: could not open file {fname}\n")));
+            return Ok(vtk_error(
+                g,
+                io,
+                &format!("MRISreadVTK: could not open file {fname}\n"),
+            ));
         }
     };
     let mut checks = 0;
@@ -153,7 +162,11 @@ pub fn read_vtk(
     }
     if !found {
         fp.close();
-        return Ok(vtk_error(g, io, &format!("MRISreadVTK: error reading file {fname}\n")));
+        return Ok(vtk_error(
+            g,
+            io,
+            &format!("MRISreadVTK: error reading file {fname}\n"),
+        ));
     }
     let Some((line, at)) = fgetl_line(&mut fp, STRLEN) else {
         fp.close();
@@ -602,7 +615,13 @@ fn e12_5(x: f32) -> String {
 /// default, `ERROR_BADPARM` for an unripped face of a ripped vertex (FS-141: FreeSurfer writes a
 /// number from memory contents for it, `reproduce` 1; and its 300,000-entry buffer of numbers,
 /// which a larger surface overruns: larmorx's holds every vertex in both modes).
-pub fn write_geo(g: &mut Globals, io: &mut Io, dir: Option<&Path>, mris: &Mris, fname: &str) -> i32 {
+pub fn write_geo(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &Mris,
+    fname: &str,
+) -> i32 {
     const F: &str = "MRISwriteGeo";
     let fname = c_str(fname);
     let nfaces = topology::valid_faces(mris);
@@ -674,7 +693,13 @@ pub fn write_geo(g: &mut Globals, io: &mut Io, dir: Option<&Path>, mris: &Mris, 
 /// ripped; larmorx writes the numbers it gave them (`reproduce`: FreeSurfer's). FS-141 (rule B):
 /// an unripped face of a ripped vertex is refused by default. Returns `NO_ERROR`, `ERROR_NOFILE`
 /// (`MRISwriteICO: could not open file <file>`) or `ERROR_BADPARM`.
-pub fn write_ico(g: &mut Globals, io: &mut Io, dir: Option<&Path>, mris: &Mris, fname: &str) -> i32 {
+pub fn write_ico(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &Mris,
+    fname: &str,
+) -> i32 {
     const F: &str = "MRISwriteICO";
     let fname = c_str(fname);
     let nfaces = topology::valid_faces(mris);
@@ -724,7 +749,11 @@ pub fn write_ico(g: &mut Globals, io: &mut Io, dir: Option<&Path>, mris: &Mris, 
         if (0..3).any(|k| theirs(k) != ours(k)) {
             renumbered = true;
         }
-        let n: &dyn Fn(usize) -> i32 = if g.notices.reproduce() { &theirs } else { &ours };
+        let n: &dyn Fn(usize) -> i32 = if g.notices.reproduce() {
+            &theirs
+        } else {
+            &ours
+        };
         s += &format!("{afno:8} {:8} {:8} {:8}\n", n(0), n(2), n(1));
         afno += 1;
     }
@@ -761,7 +790,8 @@ pub fn get_sras_to_tal_sras(
     sras_from_ras.set_relt(1, 4, -lt.dst.c_r);
     sras_from_ras.set_relt(2, 4, -lt.dst.c_a);
     sras_from_ras.set_relt(3, 4, -lt.dst.c_s);
-    let Some(tmp) = matrix_multiply(g, out, err, lt.m_l.as_ref(), Some(&ras_from_sras), None)?.into_new()
+    let Some(tmp) =
+        matrix_multiply(g, out, err, lt.m_l.as_ref(), Some(&ras_from_sras), None)?.into_new()
     else {
         return Ok(None);
     };
@@ -821,7 +851,12 @@ pub fn matlab_plot_face(
     cy = div64(cy, 3.0);
     cz = div64(cz, 3.0);
     s += ");\n";
-    s += &format!("h=text({},{},{},'F{faceno}');\n", f6_4(cx), f6_4(cy), f6_4(cz));
+    s += &format!(
+        "h=text({},{},{},'F{faceno}');\n",
+        f6_4(cx),
+        f6_4(cy),
+        f6_4(cz)
+    );
     s += "set(h,'fontsize',7,'color','";
     b.extend_from_slice(s.as_bytes());
     b.push(color);
@@ -871,7 +906,9 @@ pub fn matlab_plot_vertex(
     let mut b = format!("plot3([{}],[{}],[{}],'", f6_4(x), f6_4(y), f6_4(z)).into_bytes();
     b.push(color);
     b.extend_from_slice(b"*')\n");
-    b.extend_from_slice(format!("h=text({},{},{},'V{vno}');\n", f6_4(x), f6_4(y), f6_4(z)).as_bytes());
+    b.extend_from_slice(
+        format!("h=text({},{},{},'V{vno}');\n", f6_4(x), f6_4(y), f6_4(z)).as_bytes(),
+    );
     b.extend_from_slice(b"set(h,'fontsize',7,'color','");
     b.push(color);
     b.extend_from_slice(b"');\n");
@@ -896,4 +933,3 @@ pub fn matlab_plot_vertex(
     fp.put_bytes(&b);
     0
 }
-

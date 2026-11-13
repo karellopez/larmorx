@@ -308,16 +308,25 @@ mod tests {
         assert_eq!(run("curv", &named), (1, 5));
         assert_eq!(run("curv 1", &named), (2, 5));
         assert_eq!(run("curv 1 2", &named), (3, 5));
-        assert_eq!(run("", &|sc, e| {
-            sc.d(e, true);
-        }), (-1, 0));
-        assert_eq!(run("", &|sc, e| {
-            sc.text(e, b"x");
-            sc.d(e, true);
-        }), (-1, 5));
-        assert_eq!(run(" ", &|sc, e| {
-            sc.s(e, usize::MAX, false);
-        }), (-1, 0));
+        assert_eq!(
+            run("", &|sc, e| {
+                sc.d(e, true);
+            }),
+            (-1, 0)
+        );
+        assert_eq!(
+            run("", &|sc, e| {
+                sc.text(e, b"x");
+                sc.d(e, true);
+            }),
+            (-1, 5)
+        );
+        assert_eq!(
+            run(" ", &|sc, e| {
+                sc.s(e, usize::MAX, false);
+            }),
+            (-1, 0)
+        );
         let fd = |sc: &mut Scanf, e: &mut i32| {
             sc.f(e, true);
             sc.text(e, b" ");
@@ -333,14 +342,20 @@ mod tests {
         assert_eq!(run("1", &fd), (1, 5));
         assert_eq!(run("nan(1", &fd), (1, 5));
         assert_eq!(run("in", &fd), (0, 5));
-        assert_eq!(run("1e99", &|sc, e| {
-            sc.f(e, true);
-            sc.text(e, b" x");
-        }), (1, 5));
-        assert_eq!(run("1e99", &|sc, e| {
-            sc.f(e, true);
-            sc.text(e, b"\n");
-        }), (1, 5));
+        assert_eq!(
+            run("1e99", &|sc, e| {
+                sc.f(e, true);
+                sc.text(e, b" x");
+            }),
+            (1, 5)
+        );
+        assert_eq!(
+            run("1e99", &|sc, e| {
+                sc.f(e, true);
+                sc.text(e, b"\n");
+            }),
+            (1, 5)
+        );
         let fff = |sc: &mut Scanf, e: &mut i32| {
             for k in 0..3 {
                 if k > 0 {

@@ -82,7 +82,13 @@ pub(crate) fn cut(name: &str, n: usize) -> String {
 /// `snprintf(buf, STRLEN, ...)` of a name, then `if (req >= STRLEN) std::cerr << func <<
 /// ": Truncation on line " << line`: FS-126 (rule A): larmorx keeps the whole name; `reproduce`
 /// prints the line and cuts the name to 1,023 bytes, as FreeSurfer does.
-pub(crate) fn snprintf_name(g: &mut Globals, io: &mut Io, name: String, func: &str, line: u32) -> String {
+pub(crate) fn snprintf_name(
+    g: &mut Globals,
+    io: &mut Io,
+    name: String,
+    func: &str,
+    line: u32,
+) -> String {
     if name.len() < STRLEN {
         return name;
     }
@@ -103,7 +109,12 @@ pub(crate) fn snprintf_name(g: &mut Globals, io: &mut Io, name: String, func: &s
 /// `strcpy(fname, name)` into a `char[STRLEN]` the official build checks (`_FORTIFY_SOURCE`):
 /// FS-126 (rule A): a name of 1,024 bytes or more is taken whole; `reproduce` ends the program as
 /// FreeSurfer's does (`*** buffer overflow detected ***: terminated`, signal 6: exit status 134).
-pub(crate) fn strcpy_checked(g: &mut Globals, io: &mut Io, name: &str, func: &str) -> Result<String, Fatal> {
+pub(crate) fn strcpy_checked(
+    g: &mut Globals,
+    io: &mut Io,
+    name: &str,
+    func: &str,
+) -> Result<String, Fatal> {
     if name.len() >= STRLEN {
         g.notices.add(
             &FS_126,
@@ -133,7 +144,13 @@ pub(crate) fn file_name_path_buf(g: &mut Globals, fname: &str, func: &str) -> St
 }
 
 /// `ErrorReturn(code, (code, message))` after a failed `fopen` (its `errno` printed first).
-pub(crate) fn open_failed(g: &mut Globals, io: &mut Io, errno: i32, code: i32, message: &str) -> i32 {
+pub(crate) fn open_failed(
+    g: &mut Globals,
+    io: &mut Io,
+    errno: i32,
+    code: i32,
+    message: &str,
+) -> i32 {
     g.errno = errno;
     log::error_printf(g, io.err, code, message);
     code

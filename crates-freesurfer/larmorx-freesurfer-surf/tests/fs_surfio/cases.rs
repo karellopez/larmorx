@@ -30,14 +30,14 @@ use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
 use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 
+#[path = "cfile.rs"]
+mod cfile;
 #[path = "life.rs"]
 mod life;
 #[path = "mprop.rs"]
 mod mprop;
 #[path = "sfile.rs"]
 mod sfile;
-#[path = "cfile.rs"]
-mod cfile;
 
 /// The generator's state, and whether it may make names of about 1,024 bytes (not with seed 1,
 /// the platform-independent set: file systems differ on such names).

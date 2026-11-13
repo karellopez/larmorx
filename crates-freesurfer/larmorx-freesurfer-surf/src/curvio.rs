@@ -25,10 +25,15 @@
 //! `__mrisreadcurvmri`, `MRISreadNewCurvatureFile`, `MRISreadMarked` (the format identification
 //! `mri_identify`, fs.io 3.1-27, and `MRIread`, 3.1-28).
 
+// The loops index as FreeSurfer's C does (one vertex number for several arrays).
+#![allow(clippy::needless_range_loop)]
+
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_01, FS_126, FS_136, FS_137, FS_138, FS_139, FS_140, FS_148, FS_149};
+use larmorx_core::defects::{
+    FS_01, FS_126, FS_136, FS_137, FS_138, FS_139, FS_140, FS_148, FS_149,
+};
 use larmorx_freesurfer_core::cscan::Bytes;
 use larmorx_freesurfer_core::cstd::{fmt_f, is_space};
 use larmorx_freesurfer_core::diag::{self, DIAG_SHOW};
@@ -67,8 +72,8 @@ const ENOMEM: i32 = 12;
 /// what its open-failure message prints for its own name (FS-136; observed in the unit oracle's
 /// `mrisurf_io.cpp.o` and the probe).
 const ASCII_CURV_CODE: [u8; 25] = [
-    0xf3, 0x0f, 0x1e, 0xfa, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x55, 0x53, 0x48,
-    0x89, 0xfb, 0x48, 0x89, 0xf7, 0x48, 0x81, 0xec, 0x38, 0x04,
+    0xf3, 0x0f, 0x1e, 0xfa, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x55, 0x53, 0x48, 0x89,
+    0xfb, 0x48, 0x89, 0xf7, 0x48, 0x81, 0xec, 0x38, 0x04,
 ];
 
 /// `ErrorPrintf(code, ...)` of a message that holds bytes that are not text (a file's own
@@ -204,8 +209,10 @@ pub fn read_ascii_curvature_file(
         let curv = sc.f(e, true);
         sc.text(e, b"\n");
         if sc.finish(e) != 1 {
-            let mut m = format!("mrisReadAsciiCurvatureFile({fname}): could not scan curvature from line '")
-                .into_bytes();
+            let mut m = format!(
+                "mrisReadAsciiCurvatureFile({fname}): could not scan curvature from line '"
+            )
+            .into_bytes();
             m.extend_from_slice(&line);
             m.push(b'\'');
             error_printf_bytes(g, io.err, ERROR_BADFILE, &m);
@@ -450,7 +457,12 @@ pub fn read_new_curvature_into_array(
                 }
                 return Err(Fatal::Exit(139));
             }
-            log::error_printf(g, io.err, ERROR_BADFILE, &format!("{F}({sname}): fopen failed"));
+            log::error_printf(
+                g,
+                io.err,
+                ERROR_BADFILE,
+                &format!("{F}({sname}): fopen failed"),
+            );
             return Ok((ERROR_BADFILE, None));
         }
     };
@@ -504,7 +516,14 @@ pub fn read_new_curvature_vector(
     sname: &str,
 ) -> Result<Option<Vec<f32>>, Fatal> {
     let sname = c_str(sname);
-    let fname = value_file_name(g, io, mris, sname, "MRISreadNewCurvatureVector", (5882, 5889))?;
+    let fname = value_file_name(
+        g,
+        io,
+        mris,
+        sname,
+        "MRISreadNewCurvatureVector",
+        (5882, 5889),
+    )?;
     let (code, cvec) = read_new_curvature_into_array(g, io, dir, &fname, mris.nvertices)?;
     Ok(if code == NO_ERROR { cvec } else { None })
 }
@@ -648,7 +667,9 @@ pub fn build_file_name_read(
             if dot == 0 || (dot == 1 && b[0] == b'h') {
                 g.notices.add(
                     &FS_148,
-                    format!("{F}: {sname}: the bytes before the name are taken as no hemisphere letters"),
+                    format!(
+                        "{F}: {sname}: the bytes before the name are taken as no hemisphere letters"
+                    ),
                 );
             }
             before(1) == b'h' && (before(2) == b'l' || before(2) == b'r')
@@ -837,7 +858,10 @@ fn gii_name(g: &mut Globals, io: &mut Io, fname: &str, func: &str) -> Result<Str
     if gii.len() >= STRLEN {
         g.notices.add(
             &FS_126,
-            format!("{func}: a name of {} bytes with .gii is taken whole (FreeSurfer aborts)", gii.len()),
+            format!(
+                "{func}: a name of {} bytes with .gii is taken whole (FreeSurfer aborts)",
+                gii.len()
+            ),
         );
         if g.notices.reproduce() {
             let _ = io

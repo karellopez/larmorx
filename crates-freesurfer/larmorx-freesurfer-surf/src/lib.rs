@@ -40,6 +40,11 @@
 //!   extra gradients, the NaN check, the column printing (FS-119), the vector searches, the
 //!   progress bar (FS-118), the sort comparisons.
 //! - [`edges`]: whether two edges cross on the sphere.
+//! - [`mp`]: `MRIScomputeMetricProperties` and its default computation on the `MRIS_MP` copy
+//!   (FS-120..122), the reproducible sums.
+//! - [`mp_slow`]: the computation on the surface itself (`MRIScomputeNormals`,
+//!   `MRIScomputeTriangleProperties`, `MRIScomputeAvgInterVertexDist`, the orientations).
+//! - [`mp_faster`]: the faster computation `FS_FASTER_MP` selects (FS-123, FS-124).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -52,6 +57,9 @@ pub mod edges;
 pub mod facenorm;
 pub mod lta;
 pub mod metric;
+pub mod mp;
+pub mod mp_faster;
+pub mod mp_slow;
 pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;

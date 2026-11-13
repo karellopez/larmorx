@@ -465,7 +465,7 @@ pub fn scale_distances(mris: &mut Mris, scale: f32) -> i32 {
 /// [`larmorx_freesurfer_core::matrix_ops::xyz_approx_angle_known_length`] takes as `n.z*z2`: the
 /// two differ only where both are NaNs (HANDOFF for fs.core's owner; until it changes this copy
 /// keeps the distances' NaNs the official build's).
-fn approx_angle(
+pub(crate) fn approx_angle(
     n: &larmorx_freesurfer_core::matrix_ops::Xyz,
     x2: f32,
     y2: f32,

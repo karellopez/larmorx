@@ -347,6 +347,13 @@ pub struct SurfGlobals {
     pub sigmas: Vec<f32>,
     /// `nsigmas` (a `double`, line 970): their count.
     pub nsigmas: f64,
+    /// `count_MRIScomputeMetricProperties_calls` (`mrisurf_metricProperties.cpp` line 1839): the
+    /// calls of `MRIScomputeMetricProperties` so far (not those `FS_FASTER_MP` sends elsewhere),
+    /// which `MRISMP_unload`'s comparison lines print.
+    pub mp_calls: i32,
+    /// `comparisonWkr`'s `static int count` (`mrisurf_metricProperties_fast.h` line 333): the
+    /// comparison lines printed so far (the first also prints `b <file>:335  needed`).
+    pub mp_comparisons: i32,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -369,6 +376,8 @@ impl Default for SurfGlobals {
             curvature_names: [Some(b"inflated.H".to_vec()), Some(b"sulc".to_vec()), None],
             sigmas: SIGMAS_DEFAULT.to_vec(),
             nsigmas: SIGMAS_DEFAULT.len() as f64,
+            mp_calls: 0,
+            mp_comparisons: 0,
         }
     }
 }

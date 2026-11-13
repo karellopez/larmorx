@@ -174,7 +174,7 @@ impl Dims {
 }
 
 /// `0.5f * (float)((double)lo + (double)hi)`.
-fn centre(lo: f32, hi: f32) -> f32 {
+pub(crate) fn centre(lo: f32, hi: f32) -> f32 {
     sse::mul(0.5, sse::add64(f64::from(lo), f64::from(hi)) as f32)
 }
 

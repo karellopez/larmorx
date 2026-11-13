@@ -327,6 +327,7 @@ def convert_xfm(
     concat: Any = None,
     fix_scale_skew: Any = None,
     inverse: bool = False,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
 ) -> np.ndarray:
     """FSL's ``convert_xfm``: ``matrix`` (4 x 4 array or file) with ``fix_scale_skew``'s scales and
@@ -335,10 +336,14 @@ def convert_xfm(
 
     Parameters
     ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
     implementation
         ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     """
+    n_threads = _threads(n_threads)
     selected = _replica.select("fsl", "convert_xfm", implementation)
     with tempfile.TemporaryDirectory(prefix="larmorx-xfm-") as tmp:
         args = ["-omat", "out.mat"]
@@ -349,7 +354,7 @@ def convert_xfm(
         if inverse:
             args.append("-inverse")
         args.append(_matrix_file(matrix, tmp, "in"))
-        p = _run(selected, args, tmp, 1, "fix", program="convert_xfm")
+        p = _run(selected, args, tmp, n_threads, "fix", program="convert_xfm")
         mat = os.path.join(tmp, "out.mat")
         if not os.path.isfile(mat):
             tail = "\n".join(p.stderr.strip().splitlines()[-20:])

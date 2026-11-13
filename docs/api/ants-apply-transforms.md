@@ -206,12 +206,13 @@ Validated against antsApplyTransforms: the record's `transform-output` cases, ev
 byte for byte (text, MATLAB), header and vectors bit for bit (NIfTI) or dataset for dataset
 (HDF5, whose bytes differ only as [transforms-hdf5.md](transforms-hdf5.md) describes).
 
-## `lx.ants.apply_transforms_to_points(points, transforms=(), *, invert=None, coordinates="lps")`
+## `lx.ants.apply_transforms_to_points(points, transforms=(), *, invert=None, coordinates="lps", n_threads=1)`
 
 Maps an `(n, 3+)` array of points (extra columns kept) through the transforms, like
 `antsApplyTransformsToPoints`. ANTs works in LPS millimetres; `coordinates="ras"` takes and
 returns RAS+. To move points from the moving image to the fixed one, give the inverse
-transforms, as with ANTs.
+transforms, as with ANTs. The points are mapped on one thread; `n_threads` (0 = all) is taken as
+by every other call, and the result does not depend on it.
 
 ## `lx.ants.combine_transforms(transforms=(), *, invert=None, output="composite", ...)`
 

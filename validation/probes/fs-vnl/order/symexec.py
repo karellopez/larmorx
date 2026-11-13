@@ -105,6 +105,7 @@ class Obj:
     path: str
     funcs: dict[str, list[Insn]] = field(default_factory=dict)
     consts: dict[str, bytes] = field(default_factory=dict)  # symbol -> bytes from its address
+    const_size: dict[str, int] = field(default_factory=dict)  # symbol -> its section's entry size
 
 
 def split_ops(s: str) -> list[str]:
@@ -172,6 +173,7 @@ def load(path: str) -> Obj:
         if m:
             off, sec, sym = int(m.group(1), 16), m.group(2), m.group(3)
             o.consts[sym] = secs.get(sec, b"")[off:]
+            o.const_size[sym] = {".rodata.cst4": 4, ".rodata.cst8": 8, ".rodata.cst16": 16}.get(sec, 16)
     return o
 
 

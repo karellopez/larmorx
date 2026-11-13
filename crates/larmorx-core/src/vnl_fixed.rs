@@ -23,6 +23,8 @@
 //! uninitialised `vnl_matrix_fixed` (its assertion is compiled out): memory contents, given here
 //! as the zero matrix (ITK-107).
 
+#[doc(hidden)]
+pub mod cases;
 pub(crate) mod sse;
 
 /// `vnl_det(row0, row1)`.
@@ -198,4 +200,72 @@ mod tests {
         assert_eq!(det3(&m3), determinant(&m3.concat(), 3));
         assert_eq!(det4(&m4), determinant(&m4.concat(), 4));
     }
+
+    /// Where two NaNs meet, the result is the first operand's: `[[A, 1], [1, B]]` has the
+    /// determinant `A·B - 1 = A`, and its inverse's first entry is `m(1,1) · (1/det)` in the
+    /// `float` instance (`B`) and `(1/det) · m(1,1)` in the `double` one (`A`).
+    #[test]
+    fn the_float_and_double_inverses_take_their_own_operand_order() {
+        let (a, b) = (f32::from_bits(0x7fc0_0001), f32::from_bits(0xffc0_0002));
+        let i = inverse2(&[[a, 1.0], [1.0, b]]);
+        assert_eq!(det2(&[[a, 1.0], [1.0, b]]).to_bits(), 0x7fc0_0001);
+        assert_eq!(
+            i.concat().iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            [0xffc0_0002, 0x7fc0_0001, 0x7fc0_0001, 0x7fc0_0001]
+        );
+        let (a, b) = (
+            f64::from_bits(0x7ff8_0000_0000_0001),
+            f64::from_bits(0xfff8_0000_0000_0002),
+        );
+        let i = inverse2(&[[a, 1.0], [1.0, b]]);
+        assert_eq!(i[0][0].to_bits(), 0x7ff8_0000_0000_0001);
+        // a NaN made from numbers is x86-64's (sign set), not AArch64's
+        let inf = f32::INFINITY;
+        assert_eq!(det2(&[[inf, inf], [1.0, 1.0]]).to_bits(), 0xffc0_0000);
+    }
+
+    /// The closed forms' NaNs, bit for bit, on every platform: a digest of the determinants and
+    /// inverses of `cases`' matrices (NaN signs and payloads hashed exactly), recorded on Linux
+    /// x86-64, where the probe `validation/probes/fs-vnl` (family `order`) shows every value
+    /// identical to VNL's own instances. `LARMORX_PRINT_DIGESTS=1` prints it.
+    #[test]
+    fn nan_bits_are_x86_64s() {
+        use crate::x87::cases::SplitMix64;
+        let mut rng = SplitMix64::new(0x0de7_0bad_5eed);
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        let mut word = |w: u64| {
+            for b in w.to_le_bytes() {
+                h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        let mut nans = 0;
+        for n in 1..=4 {
+            for _ in 0..2000 {
+                let m = cases::matrix_f32(&mut rng, n);
+                let d = determinant(&m, n);
+                word(u64::from(d.to_bits()));
+                if d != 0.0 {
+                    for x in inverse(&m, n) {
+                        nans += usize::from(x.is_nan());
+                        word(u64::from(x.to_bits()));
+                    }
+                }
+                let m = cases::matrix_f64(&mut rng, n);
+                let d = determinant(&m, n);
+                word(d.to_bits());
+                if d != 0.0 {
+                    for x in inverse(&m, n) {
+                        nans += usize::from(x.is_nan());
+                        word(x.to_bits());
+                    }
+                }
+            }
+        }
+        if std::env::var_os("LARMORX_PRINT_DIGESTS").is_some() {
+            println!("NAN_BITS = {h:#018x} ({nans} NaN entries of inverses)");
+        }
+        assert_eq!(h, NAN_BITS);
+    }
+
+    const NAN_BITS: u64 = 0x39ff_7891_bbbd_e925;
 }

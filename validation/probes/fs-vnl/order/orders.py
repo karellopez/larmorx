@@ -313,6 +313,71 @@ def write_rust(path: Path, dets: dict, invs: dict, provenance: str):
     path.write_text("\n".join(lines))
 
 
+# --- the bytes ----------------------------------------------------------------------------------
+def section(path: Path, name: str) -> tuple[bytes, list[tuple[int, str, str]]]:
+    """A section's bytes and its relocations ``(offset, type, target)``, a ``.LC`` target as the
+    16 bytes at its address (the constant, not the label's number)."""
+    out = run(["readelf", "-S", "-W", str(path)]).stdout
+    data = None
+    for line in out.splitlines():
+        mt = re.match(r"\s*\[\s*\d+\]\s+(\S+)\s+\S+\s+[0-9a-f]+\s+([0-9a-f]+)\s+([0-9a-f]+)", line)
+        if mt and mt.group(1) == name:
+            off, size = int(mt.group(2), 16), int(mt.group(3), 16)
+            data = path.read_bytes()[off : off + size]
+    if data is None:
+        raise KeyError(f"{name} in {path}")
+    o = sx.obj(str(path))
+    consts, sizes = o.consts, o.const_size
+    rel = run(["readelf", "-r", "-W", str(path)]).stdout
+    relocs, cur = [], None
+    for line in rel.splitlines():
+        mt = re.match(r"^Relocation section '(\S+)'", line)
+        if mt:
+            cur = mt.group(1)
+            continue
+        if cur != ".rela" + name:
+            continue
+        mt = re.match(r"^([0-9a-f]+)\s+[0-9a-f]+\s+(\S+)\s+[0-9a-f]+\s+(\S+)\s*([+-]\s*[0-9a-f]+)?", line)
+        if mt:
+            target = mt.group(3)
+            add = int(mt.group(4).replace(" ", ""), 16) if mt.group(4) else 0
+            if target.startswith(".LC"):
+                target = "const:" + consts[target][add + 4 : add + 4 + sizes[target]].hex()
+            else:
+                target = f"{target}{add:+d}"
+            relocs.append((int(mt.group(1), 16), mt.group(2), target))
+    return data, relocs
+
+
+def search_official(bindir: Path, programs: list[str], pieces: dict[str, tuple[bytes, list]]):
+    """How many of the official programs hold each function's bytes (relocated fields as
+    wildcards)."""
+    pats = {}
+    for label, (data, relocs) in pieces.items():
+        holes = {o for o, _, _ in relocs}
+        rx, i = b"", 0
+        while i < len(data):
+            if i in holes:
+                rx += b"...."
+                i += 4
+            else:
+                rx += re.escape(data[i : i + 1])
+                i += 1
+        pats[label] = re.compile(rx, re.S)
+    found = {label: 0 for label in pieces}
+    seen = 0
+    for name in programs:
+        f = bindir / name
+        if not f.is_file():
+            continue
+        seen += 1
+        blob = f.read_bytes()
+        for label, rx in pats.items():
+            if rx.search(blob):
+                found[label] += 1
+    return seen, found
+
+
 # --- main ----------------------------------------------------------------------------------------
 def run(cmd, **kw):
     return subprocess.run(cmd, check=True, capture_output=True, text=True, **kw)
@@ -328,6 +393,7 @@ def main() -> int:
     p.add_argument("--tag", default=str(ws / "tags/ITK-v4.13.2"))
     p.add_argument("--ants", default=None, help="the ANTs oracle's ITK lib directory")
     p.add_argument("--rust", default=None)
+    p.add_argument("--official", default=None, help="the official FreeSurfer 8.2.0 bin directory")
     a = p.parse_args()
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -432,6 +498,27 @@ def main() -> int:
     for t, e, tn, n in official:
         same(f"vnl_inverse<{tn}> {n}x{n} libutils", f"vnl_inverse<{tn}> {n}x{n} stand-alone")
     same("vnl_inverse<float> 2x2 inlined in OpenLUMatrixInverse", "vnl_inverse<float> 2x2 stand-alone")
+
+    # the stand-alone instances the probe calls are the libutils ones byte for byte
+    for t, e, tn, n in official:
+        sym = ".text." + mangle_inv(t, n)
+        x, y = section(out / "numerics.cpp.o", sym), section(out / "inst.o", sym)
+        if x != y:
+            fail.append(f"vnl_inverse<{tn}> {n}x{n}: inst.o's bytes or relocations are not libutils'")
+        else:
+            print(f"SAME-BYTES vnl_inverse<{tn}> {n}x{n}: inst.o == libutils ({len(x[0])} bytes, {len(x[1])} relocations)")
+    if a.official:
+        programs = ["mri_robust_register", "mri_coreg", "mri_convert", "mri_info", "mri_vol2vol",
+                    "mris_make_surfaces", "mri_ca_register", "mri_normalize", "mri_segstats", "mris_sphere"]
+        pieces = {}
+        for t, e, tn in (("f", 4, "float"), ("d", 8, "double")):
+            for n in (2, 3, 4):
+                pieces[f"vnl_det<{tn}> {n} rows"] = section(out / f"vnl_det+{tn}-.cxx.o", ".text." + mangle_det("vnl_det", t, n))
+        for t, e, tn, n in official:
+            pieces[f"vnl_inverse<{tn}> {n}x{n}"] = section(out / "numerics.cpp.o", ".text." + mangle_inv(t, n))
+        seen, found = search_official(Path(a.official), programs, pieces)
+        for label, k in found.items():
+            print(f"OFFICIAL {label}: in {k} of {seen} official programs")
 
     if a.rust and not fail:
         dets = {n: trees[f"vnl_det<float> {n} rows"][0] for n in (2, 3, 4)}

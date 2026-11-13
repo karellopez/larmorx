@@ -249,6 +249,17 @@ different; `fix` different only with notices and correctly rounded maths (`mpd` 
 release, plain and under the AArch64 NaN emulation (1,886 and 59,460 flips); the port's seed-7
 `gwr`, `gii` and `srd` outputs identical with and without the emulation in both modes.
 
+Measured 2026-11-14 (relay 23, 44 commands): `mpf` alone, seeds 7, 13 and 17 (909 cases each):
+every comparable case identical with `reproduce` (FS-534's cases, memory past a volume, counted, not
+compared), `fix` different only with notices. The whole probe at seed 7, 8,800 cases: 8,528
+identical with `reproduce`, 272 counted, not compared, 0 different; `fix` different only with notices
+and correctly rounded maths (`mpd` 15, `posn` 6). Seed 1, 1,320 cases: 1,282 identical, 38 `SKIP`,
+hash `d09e84accbd867aaf99fcb4d8d0516924b60bf0d7f3ae04d851b083b1009ad2f` (the test), passing in debug
+and release, plain and under the AArch64 NaN emulation (2,344 and 92,611 flips); the port's seed-7
+`mpf`, `gwr` and `gii` outputs identical with and without the emulation in both modes. The GIFTI
+volume functions' move to `larmorx-freesurfer-io` (relay 23) changed no output: relay 22's seed-7
+`gwr`, `gii` and `srd` outputs identical in both modes (2,790 cases).
+
 ```
 validation/probes/fs-surfio/build.sh <workspace>
 scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 66000

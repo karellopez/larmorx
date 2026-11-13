@@ -243,9 +243,9 @@ pub fn fmt_f(x: f64, width: usize, prec: usize) -> String {
     format!("{body:>width$}")
 }
 
-/// `printf(fmt, x)` for a format with one `double` conversion `%[-+ 0#][width][.prec][l]f`
-/// (or `F`) and any text and `%%` around it, as glibc writes it; `None` for any other format
-/// (FreeSurfer's callers of these helpers pass `%f` formats only).
+/// `printf(fmt, x)` for a format with at most one `double` conversion
+/// `%[-+ 0#][width][.prec][l]f` (or `F`, `e`, `E`, `g`, `G`) and any text and `%%` around it, as
+/// glibc writes it (a format without a conversion prints its text); `None` for any other format.
 pub fn format_double(fmt: &str, x: f64) -> Option<String> {
     let b = fmt.as_bytes();
     let mut out = String::new();
@@ -299,9 +299,13 @@ pub fn format_double(fmt: &str, x: f64) -> Option<String> {
         if matches!(b.get(i), Some(b'l') | Some(b'L')) {
             i += 1;
         }
-        let upper = match b.get(i) {
-            Some(b'f') => false,
-            Some(b'F') => true,
+        let (conv, upper) = match b.get(i) {
+            Some(b'f') => (b'f', false),
+            Some(b'F') => (b'f', true),
+            Some(b'e') => (b'e', false),
+            Some(b'E') => (b'e', true),
+            Some(b'g') => (b'g', false),
+            Some(b'G') => (b'g', true),
             _ => return None,
         };
         i += 1;
@@ -312,11 +316,17 @@ pub fn format_double(fmt: &str, x: f64) -> Option<String> {
         } else if x.is_infinite() {
             "inf".to_owned()
         } else {
-            let mut d = format!("{:.prec$}", x.abs());
-            if alt && prec == 0 {
-                d.push('.');
+            match conv {
+                b'f' => {
+                    let mut d = format!("{:.prec$}", x.abs());
+                    if alt && prec == 0 {
+                        d.push('.');
+                    }
+                    d
+                }
+                b'e' => exp_digits(x.abs(), prec, alt),
+                _ => g_digits(x.abs(), prec, alt),
             }
-            d
         };
         if upper {
             digits = digits.to_uppercase();
@@ -349,6 +359,56 @@ pub fn format_double(fmt: &str, x: f64) -> Option<String> {
         }
     }
     Some(out)
+}
+
+/// `%.<prec>e` of a finite non-negative `v`: one digit, the point (unless the precision is 0 and
+/// `#` is not given), `prec` digits, `e`, the exponent's sign and at least two digits.
+fn exp_digits(v: f64, prec: usize, alt: bool) -> String {
+    let s = format!("{v:.prec$e}");
+    let (mant, exp) = s.split_once('e').expect("an exponent");
+    let x: i32 = exp.parse().expect("an exponent");
+    let mut m = mant.to_owned();
+    if alt && prec == 0 {
+        m.push('.');
+    }
+    format!("{m}e{}{:02}", if x < 0 { '-' } else { '+' }, x.abs())
+}
+
+/// `%.<prec>g` of a finite non-negative `v` (C's rule: `P` significant digits, 0 counting as 1;
+/// `%e` when the exponent X after rounding is below -4 or at least `P`, else `%f` with `P - 1 - X`
+/// decimals; without `#`, trailing zeros and a trailing point removed).
+fn g_digits(v: f64, prec: usize, alt: bool) -> String {
+    let p = prec.max(1);
+    let x = if v == 0.0 {
+        0
+    } else {
+        let s = format!("{:.*e}", p - 1, v);
+        let (_, exp) = s.split_once('e').expect("an exponent");
+        exp.parse::<i64>().expect("an exponent")
+    };
+    let text = if x < -4 || x >= p as i64 {
+        exp_digits(v, p - 1, alt)
+    } else {
+        let decimals = (p as i64 - 1 - x).max(0) as usize;
+        let mut d = format!("{v:.decimals$}");
+        if alt && decimals == 0 {
+            d.push('.');
+        }
+        d
+    };
+    if alt {
+        return text;
+    }
+    let (mant, exp) = match text.find('e') {
+        Some(k) => (&text[..k], &text[k..]),
+        None => (text.as_str(), ""),
+    };
+    let mant = if mant.contains('.') {
+        mant.trim_end_matches('0').trim_end_matches('.')
+    } else {
+        mant
+    };
+    format!("{mant}{exp}")
 }
 
 #[cfg(test)]
@@ -418,5 +478,31 @@ mod tests {
         );
         assert_eq!(format_double("%#.0f", 2.0).as_deref(), Some("2."));
         assert_eq!(format_double("%d", 2.0), None);
+        assert_eq!(
+            format_double("%e", 12345.678).as_deref(),
+            Some("1.234568e+04")
+        );
+        assert_eq!(format_double("%.0E", 0.5).as_deref(), Some("5E-01"));
+        assert_eq!(format_double("%#.0e", 3.0).as_deref(), Some("3.e+00"));
+        assert_eq!(format_double("%g", 0.0001).as_deref(), Some("0.0001"));
+        assert_eq!(format_double("%g", 0.00001).as_deref(), Some("1e-05"));
+        assert_eq!(
+            format_double("%g", 123456789.0).as_deref(),
+            Some("1.23457e+08")
+        );
+        assert_eq!(format_double("%.3g", 99.96).as_deref(), Some("100"));
+        assert_eq!(format_double("%#g", 1.5).as_deref(), Some("1.50000"));
+        assert_eq!(format_double("%G", -0.0).as_deref(), Some("-0"));
+        assert_eq!(
+            format_double("%010.3e", -1.0).as_deref(),
+            Some("-1.000e+00")
+        );
+        assert_eq!(
+            format_double("%012.3e", -1.0).as_deref(),
+            Some("-001.000e+00")
+        );
+        assert_eq!(format_double("%g", 1e300).as_deref(), Some("1e+300"));
+        assert_eq!(format_double("x", 1.0).as_deref(), Some("x"));
+        assert_eq!(format_double("%f%f", 1.0), None);
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! The C library's `scanf` conversions `%f` and `%d` as FreeSurfer's readers meet them (`fscanf`,
+//! The C library's `scanf` conversions `%f`, `%lf` and `%d` as FreeSurfer's readers meet them (`fscanf`,
 //! `sscanf`), larmorx's own code written from the C standard (C11 7.21.6.2, 7.22.1.3) and glibc
 //! 2.35's behaviour **measured** as a black box (`validation/probes/fs-maths/scanf_probe.c`: what
 //! each input returns, assigns, sets `errno` to and leaves unread), no glibc code.
@@ -150,33 +150,53 @@ fn exponent(st: &mut dyn Stream) -> i64 {
     if neg { -e } else { e }
 }
 
-/// `%f` into a `float`.
-pub fn scan_f32(st: &mut dyn Stream) -> Scan<f32> {
+/// A number's text as `%f` and `%lf` read it (glibc's rules; both conversions read the same
+/// characters, only the final rounding differs).
+enum Text {
+    Inf(bool),
+    Nan(bool),
+    /// `0x.` with no digit: 0 (the exponent is not read).
+    HexZero(bool),
+    Hex {
+        neg: bool,
+        int: Vec<u8>,
+        frac: Vec<u8>,
+        e: i64,
+    },
+    Dec {
+        neg: bool,
+        int: Vec<u8>,
+        frac: Vec<u8>,
+        e: i64,
+    },
+    Fail,
+    Eof,
+}
+
+fn scan_text(st: &mut dyn Stream) -> Text {
     skip_space(st);
     let Some(first) = st.peek() else {
-        return Scan::Eof;
+        return Text::Eof;
     };
     let neg = first == b'-';
     if first == b'-' || first == b'+' {
         st.bump();
     }
-    let signed = |v: f32| if neg { -v } else { v };
     match st.peek().map(|c| c.to_ascii_lowercase()) {
         Some(b'i') => {
             if !take_word(st, b"inf") {
-                return Scan::Fail;
+                return Text::Fail;
             }
             if st.peek().map(|c| c.to_ascii_lowercase()) == Some(b'i') && !take_word(st, b"inity") {
-                return Scan::Fail;
+                return Text::Fail;
             }
-            return Scan::Value(signed(f32::INFINITY), false);
+            return Text::Inf(neg);
         }
         Some(b'n') => {
             if !take_word(st, b"nan") {
-                return Scan::Fail;
+                return Text::Fail;
             }
-            let bits = if neg { 0xffc0_0000 } else { 0x7fc0_0000 };
-            return Scan::Value(f32::from_bits(bits), false);
+            return Text::Nan(neg);
         }
         _ => {}
     }
@@ -185,7 +205,7 @@ pub fn scan_f32(st: &mut dyn Stream) -> Scan<f32> {
         st.bump();
         if matches!(st.peek(), Some(b'x' | b'X')) {
             st.bump();
-            return scan_hex(st, neg);
+            return scan_hex_text(st, neg);
         }
         int.push(b'0');
     }
@@ -196,18 +216,17 @@ pub fn scan_f32(st: &mut dyn Stream) -> Scan<f32> {
         digits(st, false, &mut frac);
     }
     if int.is_empty() && frac.is_empty() {
-        return Scan::Fail;
+        return Text::Fail;
     }
     let mut e = 0;
     if matches!(st.peek(), Some(b'e' | b'E')) {
         st.bump();
         e = exponent(st);
     }
-    let (v, erange) = decimal_to_f32(&int, &frac, e);
-    Scan::Value(signed(v), erange)
+    Text::Dec { neg, int, frac, e }
 }
 
-fn scan_hex(st: &mut dyn Stream, neg: bool) -> Scan<f32> {
+fn scan_hex_text(st: &mut dyn Stream, neg: bool) -> Text {
     let mut int = Vec::new();
     digits(st, true, &mut int);
     let mut frac = Vec::new();
@@ -217,25 +236,98 @@ fn scan_hex(st: &mut dyn Stream, neg: bool) -> Scan<f32> {
         dot = true;
         digits(st, true, &mut frac);
     }
-    let signed = |v: f32| if neg { -v } else { v };
     if int.is_empty() && frac.is_empty() {
-        return if dot {
-            Scan::Value(signed(0.0), false)
-        } else {
-            Scan::Fail
-        };
+        return if dot { Text::HexZero(neg) } else { Text::Fail };
     }
     let mut e = 0;
     if matches!(st.peek(), Some(b'p' | b'P')) {
         st.bump();
         e = exponent(st);
     }
+    Text::Hex { neg, int, frac, e }
+}
+
+/// A binary format's parameters: significand bits (with the leading one), the smallest normal
+/// exponent, the largest exponent.
+#[derive(Clone, Copy)]
+struct Format {
+    p: i64,
+    emin: i64,
+    emax: i64,
+}
+
+const F32: Format = Format {
+    p: 24,
+    emin: -126,
+    emax: 127,
+};
+const F64: Format = Format {
+    p: 53,
+    emin: -1022,
+    emax: 1023,
+};
+
+/// `%f` into a `float`.
+pub fn scan_f32(st: &mut dyn Stream) -> Scan<f32> {
+    let signed = |neg: bool, v: f32| if neg { -v } else { v };
+    match scan_text(st) {
+        Text::Eof => Scan::Eof,
+        Text::Fail => Scan::Fail,
+        Text::Inf(neg) => Scan::Value(signed(neg, f32::INFINITY), false),
+        Text::Nan(neg) => {
+            let bits = if neg { 0xffc0_0000 } else { 0x7fc0_0000 };
+            Scan::Value(f32::from_bits(bits), false)
+        }
+        Text::HexZero(neg) => Scan::Value(signed(neg, 0.0), false),
+        Text::Hex { neg, int, frac, e } => {
+            let (bits, erange) = hex_bits(&int, &frac, e, F32);
+            Scan::Value(signed(neg, f32::from_bits(bits as u32)), erange)
+        }
+        Text::Dec { neg, int, frac, e } => {
+            let (v, erange) = decimal_to_f32(&int, &frac, e);
+            Scan::Value(signed(neg, v), erange)
+        }
+    }
+}
+
+/// `%lf` into a `double`: the same characters as `%f` (glibc's scanner is shared), rounded to
+/// 53 bits; `ERANGE` on overflow and on an inexact result that is tiny after rounding (below
+/// `DBL_MIN` when rounded to 53 bits with an unbounded exponent).
+pub fn scan_f64(st: &mut dyn Stream) -> Scan<f64> {
+    let signed = |neg: bool, v: f64| if neg { -v } else { v };
+    match scan_text(st) {
+        Text::Eof => Scan::Eof,
+        Text::Fail => Scan::Fail,
+        Text::Inf(neg) => Scan::Value(signed(neg, f64::INFINITY), false),
+        Text::Nan(neg) => {
+            let bits = if neg {
+                0xfff8_0000_0000_0000
+            } else {
+                0x7ff8_0000_0000_0000
+            };
+            Scan::Value(f64::from_bits(bits), false)
+        }
+        Text::HexZero(neg) => Scan::Value(signed(neg, 0.0), false),
+        Text::Hex { neg, int, frac, e } => {
+            let (bits, erange) = hex_bits(&int, &frac, e, F64);
+            Scan::Value(signed(neg, f64::from_bits(bits)), erange)
+        }
+        Text::Dec { neg, int, frac, e } => {
+            let (v, erange) = decimal_to_f64(&int, &frac, e);
+            Scan::Value(signed(neg, v), erange)
+        }
+    }
+}
+
+/// A hexadecimal significand's digits and binary exponent, rounded in `f` (ties to even): the
+/// bits and whether glibc sets `ERANGE`.
+fn hex_bits(int: &[u8], frac: &[u8], e: i64, f: Format) -> (u64, bool) {
     // The significant hexadecimal digits: the first 30 exactly (120 bits), the rest as a sticky bit.
     let all: Vec<u8> = int.iter().chain(frac.iter()).copied().collect();
     let start = all.iter().position(|&c| c != b'0').unwrap_or(all.len());
     let sig = &all[start..];
     if sig.is_empty() {
-        return Scan::Value(signed(0.0), false);
+        return (0, false);
     }
     let keep = sig.len().min(30);
     let mut mant: u128 = 0;
@@ -247,25 +339,26 @@ fn scan_hex(st: &mut dyn Stream, neg: bool) -> Scan<f32> {
     let after_point = frac.len() as i64;
     let dropped = (sig.len() - keep) as i64;
     let exp2 = e.saturating_add(4 * (dropped - after_point));
-    let (v, inexact, tiny, overflow) = round_binary(mant, exp2, sticky);
-    Scan::Value(signed(v), overflow || (inexact && tiny))
+    let (bits, inexact, tiny, overflow) = round_binary(mant, exp2, sticky, f);
+    (bits, overflow || (inexact && tiny))
 }
 
 /// `mant` x 2^`exp2` (with `sticky` set when more nonzero bits follow `mant`'s last one), rounded
-/// to the nearest `float` (ties to even): the value, whether it is inexact, whether its magnitude
-/// rounded to 24 bits with an unbounded exponent is below `FLT_MIN` (glibc's tininess), and
-/// whether it overflowed.
-fn round_binary(mant: u128, exp2: i64, sticky: bool) -> (f32, bool, bool, bool) {
+/// to the nearest number of format `f` (ties to even): its bits, whether it is inexact, whether its
+/// magnitude rounded to `p` bits with an unbounded exponent is below the smallest normal number
+/// (glibc's tininess), and whether it overflowed.
+fn round_binary(mant: u128, exp2: i64, sticky: bool, f: Format) -> (u64, bool, bool, bool) {
+    let inf_bits = ((2 * f.emax + 1) as u64) << (f.p - 1);
     if mant == 0 {
-        return (0.0, false, false, false);
+        return (0, false, false, false);
     }
     let nbits = 128 - i64::from(mant.leading_zeros());
     let lead = nbits - 1 + exp2; // the value is in [2^lead, 2^(lead + 1))
-    if lead > 200 {
-        return (f32::INFINITY, true, false, true);
+    if lead > f.emax + 73 {
+        return (inf_bits, true, false, true);
     }
-    if lead < -200 {
-        return (0.0, true, true, false);
+    if lead < f.emin - (f.p - 1) - 51 {
+        return (0, true, true, false);
     }
     // Round to an integer number of 2^q units, ties to even.
     let round_at = |q: i64| -> (u128, bool) {
@@ -284,32 +377,32 @@ fn round_binary(mant: u128, exp2: i64, sticky: bool) -> (f32, bool, bool, bool) 
         let up = rem > half || (rem == half && (sticky || kept & 1 == 1));
         (kept + u128::from(up), inexact)
     };
-    // Tininess: 24 bits with an unbounded exponent.
-    let (m24, _) = round_at(lead - 23);
-    let lead24 = if m24 >> 24 != 0 { lead + 1 } else { lead };
-    let tiny = lead24 < -126;
-    if lead >= -126 {
-        let (m, inexact) = round_at(lead - 23);
-        let (m, lead) = if m >> 24 != 0 {
+    // Tininess: p bits with an unbounded exponent.
+    let (mp, _) = round_at(lead - (f.p - 1));
+    let leadp = if mp >> f.p != 0 { lead + 1 } else { lead };
+    let tiny = leadp < f.emin;
+    if lead >= f.emin {
+        let (m, inexact) = round_at(lead - (f.p - 1));
+        let (m, lead) = if m >> f.p != 0 {
             (m >> 1, lead + 1)
         } else {
             (m, lead)
         };
-        if lead > 127 {
-            return (f32::INFINITY, true, tiny, true);
+        if lead > f.emax {
+            return (inf_bits, true, tiny, true);
         }
-        let bits = (((lead + 127) as u32) << 23) | (m as u32 & 0x7f_ffff);
-        return (f32::from_bits(bits), inexact, tiny, false);
+        let frac_mask = (1u64 << (f.p - 1)) - 1;
+        let bits = (((lead + f.emax) as u64) << (f.p - 1)) | (m as u64 & frac_mask);
+        return (bits, inexact, tiny, false);
     }
-    let (k, inexact) = round_at(-149);
-    // k <= 2^23: 2^23 is FLT_MIN, which the bits give as well
-    (f32::from_bits(k as u32), inexact, tiny, false)
+    let (k, inexact) = round_at(f.emin - (f.p - 1));
+    // k <= 2^(p-1): 2^(p-1) is the smallest normal number, which the bits give as well
+    (k as u64, inexact, tiny, false)
 }
 
-/// A decimal `int.frac` x 10^`e` as a `float`: correctly rounded (the standard library's parser
-/// is), and whether glibc sets `ERANGE` (overflow, or an inexact result that is tiny after
-/// rounding: decided exactly with integers).
-fn decimal_to_f32(int: &[u8], frac: &[u8], e: i64) -> (f32, bool) {
+/// A decimal number's significant digits and exponent: `value = sig x 10^e10`, with
+/// `10^lead10` above it; `None` for zero.
+fn decimal_parts(int: &[u8], frac: &[u8], e: i64) -> Option<(Vec<u8>, i64, i64)> {
     let all: Vec<u8> = int.iter().chain(frac.iter()).copied().collect();
     let start = all.iter().position(|&c| c != b'0').unwrap_or(all.len());
     let end = all
@@ -317,19 +410,39 @@ fn decimal_to_f32(int: &[u8], frac: &[u8], e: i64) -> (f32, bool) {
         .rposition(|&c| c != b'0')
         .map_or(start, |p| p + 1);
     if start >= end {
-        return (0.0, false);
+        return None;
     }
-    let sig = &all[start..end];
-    // value = sig x 10^e10
+    let sig = all[start..end].to_vec();
     let e10 = e - frac.len() as i64 + (all.len() - end) as i64;
-    let lead10 = e10 + sig.len() as i64; // the value is below 10^lead10
+    let lead10 = e10 + sig.len() as i64;
+    Some((sig, e10, lead10))
+}
+
+/// Exact comparison of `sig x 10^e10 x 2^s` with `k x 10^0` (`Ordering` of the first).
+fn cmp_exact(sig: &[u8], e10: i64, s: u32, k: u64) -> Ordering {
+    let (a, b) = (e10.max(0) as u32, (-e10).max(0) as u32);
+    let mut l = Big::from_digits(sig);
+    l.mul_pow10(a);
+    l.shl(s);
+    let mut r = Big::from_u64(k);
+    r.mul_pow10(b);
+    l.cmp(&r)
+}
+
+/// A decimal `int.frac` x 10^`e` as a `float`: correctly rounded (the standard library's parser
+/// is), and whether glibc sets `ERANGE` (overflow, or an inexact result that is tiny after
+/// rounding: decided exactly with integers).
+fn decimal_to_f32(int: &[u8], frac: &[u8], e: i64) -> (f32, bool) {
+    let Some((sig, e10, lead10)) = decimal_parts(int, frac, e) else {
+        return (0.0, false);
+    };
     if lead10 > 50 {
         return (f32::INFINITY, true);
     }
     if lead10 < -60 {
         return (0.0, true);
     }
-    let text = format!("{}e{}", std::str::from_utf8(sig).unwrap(), e10);
+    let text = format!("{}e{}", std::str::from_utf8(&sig).unwrap(), e10);
     let v: f32 = text.parse().expect("a decimal number");
     if v.is_infinite() {
         return (v, true);
@@ -337,21 +450,36 @@ fn decimal_to_f32(int: &[u8], frac: &[u8], e: i64) -> (f32, bool) {
     if v != 0.0 && v.abs() > f32::MIN_POSITIVE {
         return (v, false);
     }
-    // Exact comparisons with integers: value' = sig x 10^a x 2^s against K x 10^b.
-    let (a, b) = (e10.max(0) as u32, (-e10).max(0) as u32);
-    let cmp_with = |k: u64, s: u32| -> Ordering {
-        let mut l = Big::from_digits(sig);
-        l.mul_pow10(a);
-        l.shl(s);
-        let mut r = Big::from_u64(k);
-        r.mul_pow10(b);
-        l.cmp(&r)
-    };
     // exact when value == v (v = k x 2^-149, a subnormal, 0 or FLT_MIN)
     let k = u64::from(v.to_bits());
-    let exact = cmp_with(k, 149) == Ordering::Equal;
+    let exact = cmp_exact(&sig, e10, 149, k) == Ordering::Equal;
     // tiny when value < T = (2^25 - 1) x 2^-151
-    let tiny = cmp_with((1 << 25) - 1, 151) == Ordering::Less;
+    let tiny = cmp_exact(&sig, e10, 151, (1 << 25) - 1) == Ordering::Less;
+    (v, !exact && tiny)
+}
+
+/// [`decimal_to_f32`] for a `double`: tiny below `(2^54 - 1) x 2^-1076`.
+fn decimal_to_f64(int: &[u8], frac: &[u8], e: i64) -> (f64, bool) {
+    let Some((sig, e10, lead10)) = decimal_parts(int, frac, e) else {
+        return (0.0, false);
+    };
+    if lead10 > 330 {
+        return (f64::INFINITY, true);
+    }
+    if lead10 < -345 {
+        return (0.0, true);
+    }
+    let text = format!("{}e{}", std::str::from_utf8(&sig).unwrap(), e10);
+    let v: f64 = text.parse().expect("a decimal number");
+    if v.is_infinite() {
+        return (v, true);
+    }
+    if v != 0.0 && v.abs() > f64::MIN_POSITIVE {
+        return (v, false);
+    }
+    let k = v.to_bits();
+    let exact = cmp_exact(&sig, e10, 1074, k) == Ordering::Equal;
+    let tiny = cmp_exact(&sig, e10, 1076, (1 << 54) - 1) == Ordering::Less;
     (v, !exact && tiny)
 }
 
@@ -471,6 +599,12 @@ impl Call {
     /// A `%f` of this call: its value, or `None` for a matching or input failure (the call stops).
     pub fn f32(&mut self, st: &mut dyn Stream, errno: &mut i32) -> Option<f32> {
         let r = scan_f32(st);
+        self.after(st, r, errno)
+    }
+
+    /// A `%lf` of this call.
+    pub fn f64(&mut self, st: &mut dyn Stream, errno: &mut i32) -> Option<f64> {
+        let r = scan_f64(st);
         self.after(st, r, errno)
     }
 
@@ -635,6 +769,67 @@ mod tests {
                 assert_eq!((got, e), (n, errno), "{input:?} int {int}");
             }
         }
+    }
+
+    fn lf(s: &str) -> (Scan<f64>, usize) {
+        let mut b = Bytes::new(s.as_bytes());
+        let r = scan_f64(&mut b);
+        (r, b.i)
+    }
+
+    /// `%lf` measured on glibc 2.35 (`validation/probes/fs-io/scanf_lf.c`): bits, `ERANGE`,
+    /// bytes read.
+    #[test]
+    fn glibc_measurements_double() {
+        let cases: &[(&str, u64, bool, usize)] = &[
+            ("1", 0x3ff0_0000_0000_0000, false, 1),
+            ("0.1", 0x3fb9_9999_9999_999a, false, 3),
+            ("-2.5e-3", 0xbf64_7ae1_47ae_147b, false, 7),
+            ("1e", 0x3ff0_0000_0000_0000, false, 2),
+            ("1e+", 0x3ff0_0000_0000_0000, false, 3),
+            ("100ergs", 0x4059_0000_0000_0000, false, 4),
+            ("1e400", 0x7ff0_0000_0000_0000, true, 5),
+            ("1e-400", 0, true, 6),
+            ("4.9e-324", 1, true, 8),
+            ("2.2250738585072014e-308", 0x0010_0000_0000_0000, false, 23),
+            ("2.2250738585072009e-308", 0x000f_ffff_ffff_ffff, true, 23),
+            ("1.7976931348623157e308", 0x7fef_ffff_ffff_ffff, false, 22),
+            ("1.7976931348623159e308", 0x7ff0_0000_0000_0000, true, 22),
+            ("0x1p-1074", 1, false, 9),
+            ("0x1p-1075", 0, true, 9),
+            ("0x1.8p-1074", 2, true, 11),
+            ("0x1.fffffffffffff8p-1023", 0x0010_0000_0000_0000, false, 24),
+            ("0x1.fffffffffffffp1023", 0x7fef_ffff_ffff_ffff, false, 22),
+            ("0x1.fffffffffffff8p1023", 0x7ff0_0000_0000_0000, true, 23),
+            ("0x.p1", 0, false, 3),
+            ("infx", 0x7ff0_0000_0000_0000, false, 3),
+            ("-nan", 0xfff8_0000_0000_0000, false, 4),
+            ("nan(1)", 0x7ff8_0000_0000_0000, false, 3),
+            ("-0", 0x8000_0000_0000_0000, false, 2),
+            (
+                "123456789012345678901234567890",
+                0x45f8_ee90_ff6c_373e,
+                false,
+                30,
+            ),
+        ];
+        for &(s, b, e, n) in cases {
+            match lf(s) {
+                (Scan::Value(v, er), i) => assert_eq!((v.to_bits(), er, i), (b, e, n), "{s}"),
+                other => panic!("{s}: {other:?}"),
+            }
+        }
+        for (s, n) in [
+            (".", 1),
+            ("-", 1),
+            ("0x", 2),
+            ("infin", 5),
+            ("nax", 3),
+            ("e5", 0),
+        ] {
+            assert_eq!(lf(s), (Scan::Fail, n), "{s}");
+        }
+        assert_eq!(lf(" ").0, Scan::Eof);
     }
 
     #[test]

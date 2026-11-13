@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! fs.mri's defects (`specs/freesurfer-mri.md` §24) in both modes, against the spec's text: the
 //! cases the probe cannot show (§23.1: FreeSurfer crashes or reads memory there, or larmorx
-//! defines both modes: FS-53, FS-58, FS-165, FS-197, FS-198, FS-264) and one case of each other
+//! defines both modes: FS-53, FS-58, FS-165, FS-197, FS-198, FS-252, FS-264) and one case of each other
 //! defect with its notice.
 
 use larmorx_core::defects::UpstreamDefects::{self, Fix, Reproduce};
@@ -413,4 +413,33 @@ fn fs331_tkregister_matrix_into_a_larger_one() {
         Returned::Output
     );
     assert!(noted(&p, "FS-331"));
+    // reproduce: an element (r, c <= 4) the inverse leaves as given and not finite: the inverse
+    // fails and the program ends in the product (`m2 is null`); by default it is overwritten
+    let mut odd = Matrix::zeros(4, 5, MATRIX_REAL);
+    odd.set(4, 3, f32::NAN);
+    assert_eq!(
+        p.tkreg_to_scanner(&g, Some(&mut odd.clone())),
+        Err(Stop::Exit(252))
+    );
+    let mut p = proc(Fix);
+    assert_eq!(
+        p.tkreg_to_scanner(&g, Some(&mut odd)).unwrap(),
+        Returned::Output
+    );
+    assert!(odd.at(4, 3).is_finite());
+}
+
+#[test]
+fn fs252_header_copy_without_the_voxel_to_ras_matrix_both_modes() {
+    for mode in [Fix, Reproduce] {
+        let mut p = proc(mode);
+        let mut src = p.mri_alloc_sequence(2, 2, 2, types::UCHAR, 1).unwrap();
+        src.geom.i_to_r = None;
+        src.geom.r_to_i = None;
+        let mut dst = p.mri_alloc_sequence(2, 2, 2, types::UCHAR, 1).unwrap();
+        assert!(dst.geom.i_to_r.is_some());
+        assert!(p.mri_copy_header(&src, Some(&mut dst)).is_ok());
+        assert!(dst.geom.i_to_r.is_none() && dst.geom.r_to_i.is_none());
+        assert!(noted(&p, "FS-252"));
+    }
 }

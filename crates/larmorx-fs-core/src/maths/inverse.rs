@@ -211,9 +211,16 @@ impl Process {
             let Some(inv) = self.real_inverse(&numbers_rm(&src), n) else {
                 return Ok(Returned::Nothing);
             };
-            let ok = inv.iter().all(|v| v.is_finite());
             write_numbers(o, &inv);
-            ok
+            // The result's elements (r, c), r, c <= n, read through the output's own rows and
+            // columns (an output larger than n x n, FS-28: its numbers laid out flat, the
+            // elements it kept read too; specs/freesurfer-mri.md FS-331).
+            let (ni, big) = (n as i32, o.rows >= n as i32 && o.cols >= n as i32);
+            if big {
+                (1..=ni).all(|r| (1..=ni).all(|c| o.at(r, c).is_finite()))
+            } else {
+                inv.iter().all(|v| v.is_finite())
+            }
         };
         if !finite {
             return Ok(Returned::Nothing);

@@ -25,11 +25,11 @@ use sha2::{Digest, Sha256};
 const GOLDEN: &[(&str, &str)] = &[
     (
         "decomp.fix",
-        "6ae2acb902a47fe15d2a43187416900c0e1f741503704d595c123e25a4049729",
+        "fc91cc7ff0bd22143b153f39bc4458cd583b018fe8977065e74a09e396ba838c",
     ),
     (
         "decomp.reproduce",
-        "d2dc663d60ef80a0adad995c3251754ddb10e5d2d630851bf1503ec0444a56cd",
+        "6738c38c222a62e96a98865bb7811d9f6b6431e3d699fe5a48e6de431ee33cde",
     ),
     (
         "dmatrix.fix",
@@ -49,27 +49,27 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "matrix-old.fix",
-        "4aa79716a27e9671f8e445c1a9594454beee82b48c539064b3c602fda3752973",
+        "a6ec15f5a237af47f497e1de94dd1273edce4c6492a51001861705b653d77fca",
     ),
     (
         "matrix-old.reproduce",
-        "15a6f20dfbb5e2ed9b67a49f53af9644d90b7badffdb93d8dcaadd9e73d7e05b",
+        "4f761779959f857d35f59b3923c2f98a9e78e79a1460cbd16a8d47e4482956d6",
     ),
     (
         "matrix.fix",
-        "fe42ec3eee73032bd32c6e39d5ddc886ffb4daf41918995b854e00498a7ef6e3",
+        "f6621db09c4d9337ada82d0c37491327c770d9379e4319754953f0d7b79d55fc",
     ),
     (
         "matrix.reproduce",
-        "6c74b2cefcde834a48540f40cdf06bd5fcf568043abc6749f685e91c0487964c",
+        "2ffc7d39ba68f615262ec5550d4c37665616bcaf39c07b2dc8991344536f64ec",
     ),
     (
         "mfiles.fix",
-        "8f69297b98f48496c00a7068c9d094d2fa72f99a722d0fe7d442ed4a48d1dc40",
+        "54b8a0036792e89591f2fca46a4fb8bab07aaaa28ca10d6268a13805fbd3a033",
     ),
     (
         "mfiles.reproduce",
-        "179d3575838bdd149ff97aed98c5272853f86ae59c769d0a25849a9c42b92d29",
+        "e26b8f03f984aa3321ac79b088c58b59067bcd1af1d2bf53ad0c270845b00d22",
     ),
     (
         "minimizers.fix",
@@ -519,6 +519,11 @@ const MATRIX: &[(&str, Make)] = &[
     ("malloc2", |g| {
         format!("{} {} {}", g.int(0, 4), g.int(0, 4), g.int(1, 2))
     }),
+    // FS-13's negative sizes (§2.2): the matrices FreeSurfer makes, the record under rows -9 to
+    // -16, the buffer's block modulo 2^64, the refusals, an unknown type
+    ("malloc2", |g| {
+        format!("{} {} {}", g.int(-17, 2), g.int(-6, 2), g.int(1, 3))
+    }),
     ("mfree", |g| g.m(true)),
     ("mcopy", |g| format!("{} {}", g.m(true), g.om(true))),
     ("mmuld", |g| {
@@ -866,7 +871,7 @@ fn matrices() {
     // The old allocator chosen from the environment (§2.2).
     let mut env = Environment::new();
     env.set(b"FREESURFER_MatrixAlloc_old", b"1");
-    group("matrix-old", &MATRIX[..6], 6, &env);
+    group("matrix-old", &MATRIX[..7], 6, &env);
 }
 
 #[test]
@@ -933,6 +938,35 @@ fn matrix_files() {
                     out.push(b'\n');
                 }
             }
+        }
+        // §18.1: `errno` at the end of the input (7 before each read): an overflow or underflow
+        // meeting the end, followed by a new line or a blank, the end met by a conversion's skip.
+        for text in [
+            "1 1 1\n1e40",
+            "1 1 1\n1e40\n",
+            "1 1 1\n1e40 ",
+            "1 2 1\n1e40 3",
+            "1 2 1\n1e-50 3",
+            "1 1 2\n1e40",
+            "2 1 1\n-1 1e40",
+            "2 1 1\n1 1e40\n",
+            "1 1 99999999999999999999\n",
+            "1 1 1\n-inf",
+            "1 1 1\nnan",
+            "1 1 1\n",
+        ] {
+            let mut s = CStream::new(text.as_bytes().to_vec());
+            p.errno = 7;
+            let r = p.matrix_ascii_read_from(&mut s, None);
+            let mut l = maths_cmd::Line::new(Vec::new());
+            match r {
+                Ok(r) => l.putm_res(&r, None),
+                Err(e) => l.out(format!("EXIT {}", e.status())),
+            }
+            l.puti(i64::from(p.errno));
+            l.puti(s.pos as i64);
+            out.extend_from_slice(l.result().as_bytes());
+            out.push(b'\n');
         }
         for n in p.take_notices().as_slice() {
             out.extend_from_slice(n.line().as_bytes());

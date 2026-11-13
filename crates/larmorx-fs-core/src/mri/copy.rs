@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! The header copy (spec §6) with the volume's MINC transform (§14), and the full copy (§13).
 
-use larmorx_core::defects::{FS_56, FS_58, FS_60, FS_161, FS_162, FS_163, FS_166};
+use larmorx_core::defects::{FS_56, FS_58, FS_60, FS_161, FS_162, FS_163, FS_166, FS_252};
 
 use super::geom::{DIAG_SHOW, VolGeom};
 use super::volume::Mri;
@@ -75,6 +75,15 @@ impl Process {
         d.path_to_t1 = src.path_to_t1.clone();
         d.fname_format = src.fname_format.clone();
         d.gdf_image_stem = src.gdf_image_stem.clone();
+        // The cached matrices: the voxel-to-RAS matrix's 16 floats; FS-252: a source without it
+        // (FreeSurfer's header copy crashes) copies none in both modes. The RAS-to-voxel matrix by
+        // the matrix copy (none when the source has none).
+        if src.geom.i_to_r.is_none() {
+            self.note(
+                &FS_252,
+                "a header copy from a source without its voxel-to-RAS matrix: none copied (FreeSurfer crashes)",
+            );
+        }
         d.geom.i_to_r = src.geom.i_to_r;
         d.geom.r_to_i = src.geom.r_to_i.clone();
         if src.auto_align.is_some() {

@@ -578,6 +578,7 @@ def example(
     panels: dict[str, tuple[str, str | None]] | None = None,
     diffs: dict[str, tuple[str, str]] | None = None,
     known: tuple[str, ...] = (),
+    split: bool = False,
     errors: list[str] | None = None,
 ) -> dict:
     """One worked example of ``page`` in the guide's words and order. ``shows`` and
@@ -587,7 +588,9 @@ def example(
     ``diffs`` override what the shapes give; ``known``: the panels that hold the known answer
     (sdcflows' exact field, computed another way: the role ``reference`` holds it beside the
     original's runs), shown in the input's grey (the guide's section 5) and compared as "the
-    known answer". ``errors``: a dry run that lists every shape it
+    known answer"; ``split``: each port's comparisons with the others in one group per target
+    ("The replica against the original", "The replica against fMRIPrep's output"), where the
+    page's old metrics tables showed them apart. ``errors``: a dry run that lists every shape it
     cannot name (each panel's, run's and comparison's) instead of stopping at the first, and
     then returns ``ex`` unchanged but for the page's own rewordings
     (``validation/investigations/docs-revision/probe_present.py``)."""
@@ -756,10 +759,15 @@ def example(
             itself = [d for d in ds if target[d["id"]] == "itself"]
             if others:
                 seen = list(dict.fromkeys(target[d["id"]] for d in others))
-                title_ = f"The {who} against " + (
-                    seen[0] if len(seen) == 1 else ", ".join(seen[:-1]) + " and " + seen[-1]
-                )
-                groups.append((title_, [d["id"] for d in others]))
+                if split:
+                    for t in seen:
+                        ids = [d["id"] for d in others if target[d["id"]] == t]
+                        groups.append((f"The {who} against {t}", ids))
+                else:
+                    title_ = f"The {who} against " + (
+                        seen[0] if len(seen) == 1 else ", ".join(seen[:-1]) + " and " + seen[-1]
+                    )
+                    groups.append((title_, [d["id"] for d in others]))
             if itself:
                 whats = [out[d["id"]][1].split("against itself: ", 1)[-1] for d in itself]
                 kinds = {

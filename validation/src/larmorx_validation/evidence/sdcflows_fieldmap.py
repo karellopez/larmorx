@@ -2093,7 +2093,7 @@ def present(doc: dict) -> dict:
             panels=SDC10_PANELS if ex["id"] == "sdc10-ds002603" else None,
             diffs={k: v for k, v in DIFFS.items() if any(d["id"] == k for d in ex["diffs"])}
             or None,
-            known=("exact",) if "exact" in shown else (),
+            known=("exact",) if "exact" in shown else (), split=True,
         )  # fmt: skip
         note = ex.get("metrics_note") or ""
         if THRESHOLD in note:

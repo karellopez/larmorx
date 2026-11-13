@@ -2434,7 +2434,8 @@ def present(doc: dict) -> dict:
         program, software, version = PAGES.get(ex["id"], ("", "sdcflows", "2.17.1"))
         own = _page(program, software, version)
         _labels(ex)
-        present_.example(own, ex, shows=line, verdicts=verdicts, diffs=DIFFS.get(ex["id"]))
+        present_.example(own, ex, shows=line, verdicts=verdicts, diffs=DIFFS.get(ex["id"]),
+                         split=True)
         note = ex.get("metrics_note") or ""
         if THRESHOLD in note:
             raise ValueError(f"{ex['id']}: the threshold is in its note already")

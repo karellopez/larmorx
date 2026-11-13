@@ -56,7 +56,7 @@ re-exports (`4d223de`); afterwards both sides are the same function.
 | `result-2026-11-04.json` | `verify` at larmorx `4d223de` (the copy beside the earlier translations): 49 checks, 63,082,423,336 comparisons | 0 differ; 29.1 s |
 | `copy-2026-11-04.txt` | `glibc-float-verify copy` at `4d223de`: 44 checks against the FSL replica core | 0 differ |
 | `sse2-2026-11-04.json` | `sse2` (glibc's SSE2 builds forced) | 0 differ; the builds differ on 34 inputs (12 `sinf`, 22 `cosf`) |
-| `result-float-2026-11-13.json` | `verify float` at larmorx `1d2d69dc` (with `tanhf`, `expm1f`, `acosf`; 6 threads): 16 checks, 68,719,476,736 comparisons | 0 differ; 64.2 s |
+| `result-float-2026-11-13.json` | `verify float` at larmorx `d4862a00` (with `tanhf`, `expm1f`, `acosf`, and the AFNI replica's `tanhf` and `expm1f`; 6 threads): 18 checks, 77,309,411,328 comparisons | 0 differ; 71.0 s |
 
 Per function (identical of compared; NaN results identical of NaN results):
 
@@ -65,7 +65,7 @@ Per function (identical of compared; NaN results identical of NaN results):
 | `sinf_glibc`, `cosf_glibc`, `sincosf_glibc` | 4,294,967,296 each (16,777,216 NaN) | FSL core: all 2^32; AFNI: all 2^32 (and the SSE2 builds) |
 | `logf_glibc` | 4,294,967,296 (2,155,872,254 NaN: negatives and NaNs) | all 2^32 (and `logf_compat` over it) |
 | `expf_glibc`, `atanf_glibc` | 4,294,967,296 each | all 2^32 (`atanf` also with fdlibm's comment value of `aT[0]`) |
-| `tanhf_glibc`, `expm1f_glibc` | 4,294,967,296 each (16,777,214 NaN each) | – (new, 2026-11-13) |
+| `tanhf_glibc`, `expm1f_glibc` | 4,294,967,296 each (16,777,214 NaN each) | AFNI replica's `fdlibm::tanhf`, `expm1f` (3dUnifize's): all 2^32 (2026-11-13) |
 | `acosf_glibc` | 4,294,967,296 (2,164,260,862 NaN: `\|x\| > 1` and NaNs) | – (new, 2026-11-13) |
 | `powf_glibc` | 1,610,612,736 sampled + 30,276 special pairs | the same |
 | `atan2f_glibc` | 1,342,177,280 sampled + 30,276 special pairs | the same |

@@ -1,10 +1,10 @@
 {
-  "larmorx_commit": "1d2d69dc",
+  "larmorx_commit": "d4862a00",
   "libc": "glibc 2.35",
   "machine": "x86_64",
   "cpu_has_fma_and_avx2": true,
   "threads": 6,
-  "seconds": 64.2,
+  "seconds": 71.0,
   "checks": [
     {"function": "sinf_glibc", "reference": "glibc sinf", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},
     {"function": "cosf_glibc", "reference": "glibc cosf", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},
@@ -16,6 +16,8 @@
     {"function": "tanhf_glibc", "reference": "glibc tanhf", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777214, "nan_identical": 16777214, "first_mismatches": []},
     {"function": "expm1f_glibc", "reference": "glibc expm1f", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777214, "nan_identical": 16777214, "first_mismatches": []},
     {"function": "acosf_glibc", "reference": "glibc acosf (acosf@@GLIBC_2.2.5, its SVID wrapper)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 2164260862, "nan_identical": 2164260862, "first_mismatches": []},
+    {"function": "tanhf_glibc", "reference": "larmorx-afni-replica fdlibm::tanhf (the earlier translation)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777214, "nan_identical": 16777214, "first_mismatches": []},
+    {"function": "expm1f_glibc", "reference": "larmorx-afni-replica fdlibm::expm1f (the earlier translation)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777214, "nan_identical": 16777214, "first_mismatches": []},
     {"function": "sinf_glibc", "reference": "larmorx-afni-replica sincosf::sinf (the earlier translation)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},
     {"function": "cosf_glibc", "reference": "larmorx-afni-replica sincosf::cosf (the earlier translation)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},
     {"function": "sinf_glibc_sse2", "reference": "larmorx-afni-replica sincosf::sse2::sinf (the earlier translation)", "inputs": "all 2^32 floats", "n": 4294967296, "identical": 4294967296, "differing": 0, "nan_results": 16777216, "nan_identical": 16777216, "first_mismatches": []},

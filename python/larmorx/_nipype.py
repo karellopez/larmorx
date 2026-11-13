@@ -39,6 +39,7 @@ from __future__ import annotations
 import ntpath
 import os
 import shlex
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
@@ -320,6 +321,41 @@ def _split_line(line: str, windows: bool = os.name == "nt") -> list[str]:
     return list(lex)
 
 
+def _quote(text: str, windows: bool = os.name == "nt") -> str:
+    """A file name quoted for nipype's line, where nipype writes it unquoted (PIPE-80's
+    correction; larmorx's absolute output names): ``shlex.quote``, so a blank, a quote or any
+    other character a POSIX shell reads specially is inside quotes. On Windows a backslash is a
+    path's separator, no escape (:func:`_split_line`): a name whose only such characters are
+    backslashes (``C:\\data\\x.nii``) needs no quotes and stays as nipype writes it, so a line
+    with no blank in its names is nipype's line on every platform."""
+    if windows:
+        bare = text.replace("\\", "/")
+        if shlex.quote(bare) == bare:
+            return text
+    return shlex.quote(text)
+
+
+#: The split names the PIPE-80 notice lists, each whole (the rest counted).
+_NOTICE_NAMES = 3
+
+
+def _split_names(fixed: list[str], nipype: list[str] | None) -> list[str]:
+    """The words of the quoted line that nipype's line does not give the program whole (in
+    order; a bracketed argument's trailing comma dropped). ``nipype`` ``None`` (the shell
+    cannot split its line): every word with a blank or a quote."""
+    if nipype is None:
+        split = [w for w in fixed if any(c.isspace() or c in "'\"" for c in w)]
+    else:
+        left = Counter(nipype)
+        split = []
+        for w in fixed:
+            if left[w] > 0:
+                left[w] -= 1
+            else:
+                split.append(w)
+    return [w[:-1] if w.endswith(",") and len(w) > 1 else w for w in split]
+
+
 def words(cmd: Command, upstream_defects: str, *, run: bool = False) -> list[str]:
     """The words ``cmd``'s program gets in ``upstream_defects``' mode: nipype's line as the
     shell splits it (``reproduce``) or the line with every file name quoted (``fix``, PIPE-80:
@@ -340,8 +376,11 @@ def words(cmd: Command, upstream_defects: str, *, run: bool = False) -> list[str
     else:
         why = "the shell splits it at the blank"
     if nipype != fixed:
-        names = [w for w in fixed if any(c.isspace() or c in "'\"" for c in w)]
-        detail = f"{cmd.program}: nipype writes file names unquoted ({', '.join(names)[:300]}): "
+        names = _split_names(fixed, nipype)
+        shown = ", ".join(names[:_NOTICE_NAMES])
+        if len(names) > _NOTICE_NAMES:
+            shown += f" and {len(names) - _NOTICE_NAMES} more"
+        detail = f"{cmd.program}: nipype writes file names unquoted ({shown}): "
         if upstream_defects == "fix":
             detail += f"quoted, so the program gets them whole ({why} in nipype's line)"
         else:
@@ -447,7 +486,7 @@ class _Interface:
         if isinstance(value, (str, os.PathLike)) and (self.quote or isinstance(value, _Abs)):
             text = os.fspath(value)
             if text:
-                return shlex.quote(text)
+                return _quote(text)
         return value
 
     def reset(self) -> None:

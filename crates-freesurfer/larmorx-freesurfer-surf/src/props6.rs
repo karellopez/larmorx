@@ -516,3 +516,176 @@ fn remove_outliers(
     }
     Ok(())
 }
+
+/// `MRIScomputeSecondFundamentalFormAtVertex(mris, vno, vertices, vnum)` (no FreeSurfer program
+/// calls it): the fit of [`compute_second_fundamental_form_thresholded`] at one vertex over the
+/// given neighbours, without thresholds: every unripped neighbour's row taken (its `height / (u² +
+/// v²)` kept for the extremes when `u² + v²` is `FLT_EPSILON` or more). 0 (nothing) for a plane;
+/// -4 (`ERROR_BADPARM`) for a ripped vertex or `vnum` 0 or less; a singular `Uᵀ U` gives curvatures
+/// 0 with the tangent plane turned by the eigenvectors of the last call that found them (the
+/// function's own matrix: zeros before; `DIAG_SHOW`: `1 ill-conditioned points`); a condition
+/// number of 500000 or more gives `k1 = kmax`, `k2 = kmin` and `K`, `H` the surface's `Kmin`,
+/// `Hmin` when `k1 k2 < 0`, else `Kmax`, `Hmax`, and -4; an eigensystem that fails gives the
+/// singular values' curvatures and -4. The operand orders of its own compiled code (`k2 k1 area`
+/// for `Ktotal`, the `z` components of `e1` and `e2`).
+pub fn compute_second_fundamental_form_at_vertex(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    mris: &mut Mris,
+    vno: usize,
+    vertices: &[i32],
+) -> Result<i32, Fatal> {
+    const ERROR_BADPARM: i32 = -4;
+    if mris.status == MrisStatus::PLANE {
+        return Ok(NO_ERROR);
+    }
+    let mut eigen = sg.sff_at_vertex_eigen.unwrap_or([0.0; 4]);
+    sg.sff_at_vertex_eigen = Some(eigen);
+    if mris.vertex(vno).ripflag != 0 {
+        return Ok(ERROR_BADPARM);
+    }
+    let v = mris.vertex(vno);
+    let nrm = [v.nx, v.ny, v.nz];
+    let e1 = [v.e1x, v.e1y, v.e1z];
+    let e2 = [v.e2x, v.e2y, v.e2z];
+    let p = [v.x, v.y, v.z];
+    let vnum = i32::try_from(vertices.len()).unwrap_or(i32::MAX);
+    if vnum <= 0 {
+        return Ok(ERROR_BADPARM);
+    }
+    let mut m_u = alloc(g, io, vnum, 3)?;
+    let mut v_z = alloc(g, io, vnum, 1)?;
+    let (mut kmin, mut kmax) = (10000.0f32, -10000.0f32);
+    let mut n = 0i32;
+    for &nb in vertices {
+        let vn = mris.vertex(nb as usize);
+        if vn.ripflag != 0 {
+            continue;
+        }
+        let y = [sub(vn.x, p[0]), sub(vn.y, p[1]), sub(vn.z, p[2])];
+        let uf = add(add(mul(e1[0], y[0]), mul(e1[1], y[1])), mul(e1[2], y[2]));
+        let vf = add(add(mul(y[1], e2[1]), mul(y[0], e2[0])), mul(y[2], e2[2]));
+        let (ui, vi) = (f64::from(uf), f64::from(vf));
+        let uu = mul64(ui, ui);
+        let vv = mul64(vi, vi);
+        m_u.set_relt(n + 1, 1, uu as f32);
+        m_u.set_relt(n + 1, 2, mul64(add64(ui, ui), vi) as f32);
+        m_u.set_relt(n + 1, 3, vv as f32);
+        let z = add(add(mul(nrm[0], y[0]), mul(nrm[1], y[1])), mul(nrm[2], y[2]));
+        v_z.set_relt(n + 1, 1, z);
+        let rsq = add64(vv, uu) as f32;
+        if !(rsq < f32::EPSILON) {
+            let k = div(z, rsq);
+            if k > kmax {
+                kmax = k;
+            }
+            if k < kmin {
+                kmin = k;
+            }
+        }
+        n += 1;
+    }
+    let m_ut = matrix_transpose(g, io.out, io.err, &m_u, None)?.unwrap_new();
+    let m_tmp2 = matrix_multiply(g, io.out, io.err, Some(&m_ut), Some(&m_u), None)?.unwrap_new();
+    let cond_no = matrix_condition_number(g, io.out, io.err, &m_tmp2)?;
+    let inv = matrix_svd_inverse(g, io.out, io.err, &m_tmp2, None)?;
+    let mut nbad = 0;
+    let mut evalues = [0.0f32; 3];
+    match inv.into_new() {
+        None => nbad += 1,
+        Some(m_inverse) => {
+            let m_tmp1 =
+                matrix_multiply(g, io.out, io.err, Some(&m_ut), Some(&v_z), None)?.unwrap_new();
+            let mut v_c = alloc(g, io, 3, 1)?;
+            matrix_multiply(
+                g,
+                io.out,
+                io.err,
+                Some(&m_inverse),
+                Some(&m_tmp1),
+                Some(&mut v_c),
+            )?;
+            let mut m_q = alloc(g, io, 2, 2)?;
+            let (c1, c2, c3) = (v_c.relt(1, 1), v_c.relt(2, 1), v_c.relt(3, 1));
+            m_q.set_relt(1, 1, add(c1, c1));
+            let q12 = add(c2, c2);
+            m_q.set_relt(2, 1, q12);
+            m_q.set_relt(1, 2, q12);
+            m_q.set_relt(2, 2, add(c3, c3));
+            if cond_no >= ILL_CONDITIONED {
+                let (kmn, kmx, hmn, hmx) = (mris.Kmin, mris.Kmax, mris.Hmin, mris.Hmax);
+                let v = mris.vertex_mut(vno);
+                v.k1 = kmax;
+                v.k2 = kmin;
+                if mul(kmin, kmax) < 0.0 {
+                    v.K = kmn;
+                    v.H = hmn;
+                } else {
+                    v.K = kmx;
+                    v.H = hmx;
+                }
+                return Ok(ERROR_BADPARM);
+            }
+            let mut m_eigen = alloc(g, io, 2, 2)?;
+            for (k, x) in eigen.iter().enumerate() {
+                m_eigen.set_relt(k as i32 / 2 + 1, k as i32 % 2 + 1, *x);
+            }
+            let r = matrix_eigen_system(g, io.out, io.err, &m_q, &mut evalues, Some(&mut m_eigen))?;
+            eigen = [
+                m_eigen.relt(1, 1),
+                m_eigen.relt(1, 2),
+                m_eigen.relt(2, 1),
+                m_eigen.relt(2, 2),
+            ];
+            sg.sff_at_vertex_eigen = Some(eigen);
+            if r.is_null() {
+                matrix_svd_eigen_values(g, io.out, io.err, &m_q, &mut evalues)?;
+                set_curvatures(mris, vno, evalues[0], evalues[1]);
+                return Ok(ERROR_BADPARM);
+            }
+        }
+    }
+    let (k1, k2) = (evalues[0], evalues[1]);
+    set_curvatures(mris, vno, k1, k2);
+    let v = mris.vertex(vno);
+    let (kk, hh, area) = (v.K, v.H, v.area);
+    if i64::try_from(vno).ok() == Some(i64::from(g.gdiag_no)) && g.gdiag & DIAG_SHOW != 0 {
+        let _ = writeln!(
+            io.out,
+            "v {vno}: k1={}, k2={}, K={}, H={}",
+            fmt_f(f64::from(k1), 2, 3),
+            fmt_f(f64::from(k2), 2, 3),
+            fmt_f(f64::from(kk), 2, 3),
+            fmt_f(f64::from(hh), 2, 3)
+        );
+    }
+    if kk < mris.Kmin {
+        mris.Kmin = kk;
+    }
+    if hh < mris.Hmin {
+        mris.Hmin = hh;
+    }
+    if kk > mris.Kmax {
+        mris.Kmax = kk;
+    }
+    if hh > mris.Hmax {
+        mris.Hmax = hh;
+    }
+    mris.Ktotal = add64(
+        mul64(mul64(f64::from(k2), f64::from(k1)), f64::from(area)),
+        mris.Ktotal,
+    );
+    let [a11, a12, a21, a22] = eigen;
+    let v = mris.vertex_mut(vno);
+    v.e1x = add(mul(e2[0], a21), mul(e1[0], a11));
+    v.e1y = add(mul(e1[1], a11), mul(e2[1], a21));
+    v.e1z = add(mul(a11, e1[2]), mul(e2[2], a21));
+    v.e2x = add(mul(e1[0], a12), mul(e2[0], a22));
+    v.e2y = add(mul(e1[1], a12), mul(e2[1], a22));
+    v.e2z = add(mul(a12, e1[2]), mul(e2[2], a22));
+    if g.gdiag & DIAG_SHOW != 0 && nbad > 0 {
+        let _ = writeln!(io.out, "{nbad} ill-conditioned points");
+    }
+    Ok(NO_ERROR)
+}

@@ -17,7 +17,7 @@ use super::*;
 
 use larmorx_freesurfer_core::diag::DIAG_WRITE;
 use larmorx_freesurfer_core::sse;
-use larmorx_freesurfer_surf::{facenorm, props5, props6, readwrite};
+use larmorx_freesurfer_surf::{facenorm, props, props5, props6, readwrite};
 
 fn fh(t: &mut Vec<String>, g: &mut Gen, heavy: bool) {
     t.push(format!("{:08x}", smallish(g, heavy)));
@@ -159,7 +159,7 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
         let op = g.pick(&[
             "ssn", "ssn", "cbn", "cmc", "cmc", "cmc", "uae", "uae", "ugc", "umc", "upc", "uk1",
             "uk1", "uk2", "upf", "upf", "cci", "cci", "mxr", "mxr", "cac", "cac", "mnv", "rnv",
-            "sff", "sff", "sff", "sff", "sff", "sff",
+            "sff", "sff", "sff", "sff", "sff", "sff", "sfa", "sfa", "sfa",
         ]);
         t.push(op.to_owned());
         match op {
@@ -174,6 +174,37 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
                     g.pick(&[0.999, 0.99, 0.9, 0.5, 0.0, 1.0, 0.75, f64::NAN])
                 };
                 t.push(format!("{:016x}", f64::to_bits(pct)));
+            }
+            "sfa" => {
+                // the tangent planes first or not, then 1 to 3 calls: a vertex and its neighbours
+                // (mostly the mesh's own, as a fan of its faces; now and then none or any)
+                ix(t, i64::from(g.chance(4)));
+                let calls = g.int(1, 3);
+                ix(t, calls);
+                for _ in 0..calls {
+                    let vno = g.int(0, nv - 1);
+                    ix(t, vno);
+                    let mut nb: Vec<i64> = Vec::new();
+                    for f in &m.f {
+                        if f.contains(&vno) {
+                            for &x in f {
+                                if x != vno && !nb.contains(&x) {
+                                    nb.push(x);
+                                }
+                            }
+                        }
+                    }
+                    if g.chance(8) {
+                        nb.clear();
+                    } else if g.chance(8) {
+                        let k = g.int(1, 8);
+                        nb = (0..k).map(|_| g.int(0, nv - 1)).collect();
+                    }
+                    ix(t, nb.len() as i64);
+                    for x in nb {
+                        ix(t, x);
+                    }
+                }
             }
             _ => {}
         }
@@ -411,6 +442,30 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 }
                 for name in ["curv.dat", "k1.plt", "k2.plt"] {
                     file_hash(o, &dir.join(name));
+                }
+            }
+            "sfa" => {
+                if t.i() != 0 {
+                    o.i(i64::from(props::compute_tangent_planes(g, &mut io, &mut s)));
+                }
+                for _ in 0..t.i() {
+                    let vno = t.i() as usize;
+                    let nb: Vec<i32> = (0..t.i()).map(|_| t.i()).collect();
+                    o.i(i64::from(
+                        props6::compute_second_fundamental_form_at_vertex(
+                            g, sg, &mut io, &mut s, vno, &nb,
+                        )?,
+                    ));
+                    for x in [s.Kmin, s.Kmax, s.Hmin, s.Hmax] {
+                        o.f(x);
+                    }
+                    o.d(s.Ktotal);
+                    let v = s.vertex(vno);
+                    for x in [
+                        v.k1, v.k2, v.K, v.H, v.e1x, v.e1y, v.e1z, v.e2x, v.e2y, v.e2z,
+                    ] {
+                        o.f(x);
+                    }
                 }
             }
             _ => panic!("mpe op {op}"),

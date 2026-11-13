@@ -2924,6 +2924,19 @@ void mpe_case()
         for (float x : c) of(x);
       }
       for (const char *name : {"curv.dat", "k1.plt", "k2.plt"}) file_hash(name);
+    } else if (op == "sfa") {
+      if (geti()) oi(mrisComputeTangentPlanes(s));
+      int calls = geti();
+      for (int c = 0; c < calls; c++) {
+        int vno = geti(), n = geti();
+        std::vector<int> nb(n > 0 ? n : 1);
+        for (int j = 0; j < n; j++) nb[j] = geti();
+        oi(MRIScomputeSecondFundamentalFormAtVertex(s, vno, nb.data(), n));
+        of(s->Kmin); of(s->Kmax); of(s->Hmin); of(s->Hmax); od(s->Ktotal);
+        VERTEX *v = &s->vertices[vno];
+        float x[10] = {v->k1, v->k2, v->K, v->H, v->e1x, v->e1y, v->e1z, v->e2x, v->e2y, v->e2z};
+        for (float y : x) of(y);
+      }
     } else fail("mpe op");
   }
 }

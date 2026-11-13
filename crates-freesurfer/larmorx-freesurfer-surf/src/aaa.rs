@@ -395,6 +395,9 @@ pub struct SurfGlobals {
     /// call at which `BEVIN_TESTING_dumpFacesAroundVertex` dumps the faces).
     pub around_vertex_count: u64,
     pub around_vertex_limit: u64,
+    /// `MRIScomputeSecondFundamentalFormAtVertex`'s static eigenvector matrix `m_eigen` (row by
+    /// row), `None` before its first call allocates it (zeros).
+    pub sff_at_vertex_eigen: Option<[f32; 4]>,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -434,6 +437,7 @@ impl Default for SurfGlobals {
             hcurv_sign_calls: 0,
             around_vertex_count: 0,
             around_vertex_limit: 1,
+            sff_at_vertex_eigen: None,
         }
     }
 }

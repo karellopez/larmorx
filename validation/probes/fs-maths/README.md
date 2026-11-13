@@ -29,6 +29,15 @@ default differs only where a defect it corrects changed the result (`docs/findin
   `fsmaths` makes its working directory, so the messages name the same file; `errno` and the bytes
   read are part of the line). VNL's messages name their source file: the unit oracle's ITK path is
   written as the official build's (`official_itk`).
+- Since 2026-11-13 (track A's relay 7) about a third of the histograms carry NaNs and infinities
+  (counts, bin values, the header, the scalar inputs: `specs/freesurfer-maths.md` §22), and every
+  histogram command runs in a child process with a 2-second alarm: `CRASH` where FreeSurfer's bin
+  number from a NaN (-2147483648, FS-17) addresses unmapped memory (FS-22: not compared), `TIMEOUT`
+  where it never returns (FS-51), `EXIT <status>` where its code ends the program (FS-50's failed
+  allocation). `fsmaths` reads every case before the first child: a child that FreeSurfer's code
+  ends with `exit()` flushes the stdio streams it inherited, and glibc's flush of an input stream
+  moves the file offset it shares with the parent back to that stream's position, so the parent read
+  the following cases again (one line repeated after every `EXIT`: found here, fixed in `fsmaths`).
 - `variation.py <cases> [--runs N]`: the official code's own variation on a case file (runs `fsmaths`
   N times, never cached: crashes and the commands whose lines differ between runs).
 - `build.sh [<workspace>]`: compiles it with the unit oracle's compiler and flags and links it with

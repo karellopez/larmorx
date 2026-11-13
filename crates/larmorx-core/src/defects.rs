@@ -1091,6 +1091,10 @@ defects! {
         "OpenSvdcmp passes a matrix with infinite or NaN entries to VNL's singular value decomposition, whose LINPACK ssvdc can loop for ever on such a matrix: the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) hang on some of them";
     FS_49 = "FS-49", "FreeSurfer", true,
         "freadInt and freadDouble at the end of the file return a value they never read (the stack's contents; freadInt prints nothing): MatrixReadFrom of a short file fills the matrix's type, sizes or elements with memory contents";
+    FS_50 = "FS-50", "FreeSurfer", true,
+        "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, asks for a number of bins outside the int range: the undefined conversion gives -2147483648 on x86-64, the allocation fails and the program ends with 'could not allocate histogram' (a saturated conversion would ask for 2^31 bins)";
+    FS_51 = "FS-51", "FreeSurfer", true,
+        "HISTOrobustGaussianFit never returns when its search over sigma cannot advance: an infinite bin size (the search starts at infinity, below an infinite limit), or one so small that a tenth of it rounds to 0";
 }
 
 /// The register entry with ID `id`.

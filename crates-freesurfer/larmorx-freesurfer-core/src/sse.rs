@@ -80,6 +80,25 @@ pub fn sqrt64(x: f64) -> f64 {
     if r.is_nan() { nan64(x, x) } else { r }
 }
 
+/// A `float` sum `val += x[i]` over `x` as GCC 8.4.0 vectorises it (the official build's NaN
+/// operands): with four or more terms, blocks of four from the first, term `k` of a block added
+/// as `val + x` where `val_first[k]` and as `x + val` elsewhere; the rest (or all of fewer than
+/// four terms) one by one as `val + x`. Each function's loop has its own order (its disassembly:
+/// `shufps` and `unpckhps` lanes added with `addss`).
+pub fn sum_blocks(mut val: f32, x: &[f32], val_first: [bool; 4]) -> f32 {
+    let blocks = if x.len() >= 4 { x.len() / 4 } else { 0 };
+    for k in 0..blocks {
+        for (l, &first) in val_first.iter().enumerate() {
+            let v = x[4 * k + l];
+            val = if first { add(val, v) } else { add(v, val) };
+        }
+    }
+    for &v in &x[4 * blocks..] {
+        val = add(val, v);
+    }
+    val
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,5 +115,26 @@ mod tests {
         assert_eq!(sub64(0.0, f64::NAN).to_bits(), f64::NAN.to_bits());
         assert_eq!(div64(0.0, 0.0).to_bits(), 0xfff8_0000_0000_0000);
         assert_eq!(add(1.0, 2.0), 3.0);
+    }
+
+    #[test]
+    fn blocked_sums() {
+        let (p, q) = (f32::from_bits(0x7fc0_0001), f32::from_bits(0xffc0_0002));
+        // val + p, then q + val: q's NaN
+        assert_eq!(
+            sum_blocks(0.0, &[p, 1.0, q, 2.0], [true, true, false, true]).to_bits(),
+            0xffc0_0002
+        );
+        // val first throughout: p's
+        assert_eq!(
+            sum_blocks(0.0, &[p, 1.0, q, 2.0], [true; 4]).to_bits(),
+            0x7fc0_0001
+        );
+        // fewer than four: one by one, val first
+        assert_eq!(sum_blocks(0.0, &[p, q], [false; 4]).to_bits(), 0x7fc0_0001);
+        assert_eq!(
+            sum_blocks(1.0, &[2.0, 3.0, 4.0, 5.0, 6.0], [false; 4]),
+            21.0
+        );
     }
 }

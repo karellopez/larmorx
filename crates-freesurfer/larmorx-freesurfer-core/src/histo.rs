@@ -19,10 +19,15 @@
 //! `HISTOcomputeFWHM`, `HISTOwriteTxt`, `HISTOsumNorm`, `HISTOcumsum`.
 //!
 //! Every expression keeps C's types: `float` sums stay `float` (each step rounded), `double`
-//! ones `double`; the divisions that can make a NaN from numbers (`0 / 0` of an empty histogram, a
-//! histogram of one bin, a zero count) follow SSE2's NaN rules on every platform (`crate::sse`); a `float` compared with an `int` converts the `int`; the C library's `exp`,
+//! ones `double`; a `float` compared with an `int` converts the `int`; the C library's `exp`,
 //! `log` and `pow` are larmorx's correctly rounded ones by default and glibc 2.35's with
-//! `reproduce` (`larmorx_core::math::Libm`).
+//! `reproduce` (`larmorx_core::math::Libm`). Where a NaN can reach an output (NaN and infinite
+//! counts, bin values, bin sizes and samples), the arithmetic follows SSE2's NaN rules on every
+//! platform (`crate::sse`: a NaN made from numbers is the default NaN with the sign set; of two
+//! NaNs the first operand's) with the official build's operand order, read from the disassembly
+//! of the unit oracle's `histo.cpp.o` and measured by the fs-maths probe (GCC 8.4.0 swaps some
+//! commutative operands and vectorises some sums: `sse::sum_blocks`; `specs/freesurfer-maths.md`
+//! §21).
 //!
 //! A [`Histogram`] keeps FreeSurfer's two sizes: `max_bins`, what was allocated (the arrays'
 //! length), and `nbins`, how many are in use (`HISTOcopy` sets it to the source's). A bin that
@@ -61,6 +66,14 @@
 //! - **FS-24** (both modes defined): `HISTOrobustGaussianFit` of a histogram of one bin never
 //!   returns (its search window cannot grow). Both modes stop widening the window when it covers
 //!   the whole histogram, with FS-24 noted.
+//! - **FS-50** (corrected by default, rule B): `HISTOabs` asks for a bin count outside the `int`
+//!   range when the absolute values span an infinite range or the bin size is 0 or NaN:
+//!   FreeSurfer's conversion gives -2147483648, its allocation fails and the program ends
+//!   (`could not allocate histogram`, status 254). The default ends it with an error that names
+//!   the cause (status 252) instead of the saturated conversion's 2^31-bin allocation.
+//! - **FS-51** (both modes defined): `HISTOrobustGaussianFit` never returns when its search over
+//!   sigma cannot advance (an infinite bin size, or one whose tenth rounds to 0). Both modes report
+//!   the error and return `ERROR_BADPARM` (the offset set, sigma not), with FS-51 noted.
 //!
 //! Kept as FreeSurfer has them (rule C, documented in the findings): `HISTOinit` does not set
 //! `nbins` on a histogram it is given (its callers set it); `HISTOfindEndOfPeak` returns the last
@@ -69,10 +82,11 @@
 //! `HISTOfindBin` with a bin size of exactly 1 returns `(int)((int)val - bins[0])` without
 //! looking at the bins.
 
+use std::cmp::Ordering;
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_18, FS_19, FS_20, FS_21, FS_22, FS_23, FS_24};
+use larmorx_core::defects::{FS_18, FS_19, FS_20, FS_21, FS_22, FS_23, FS_24, FS_50, FS_51};
 use larmorx_core::math::Libm;
 
 use crate::affine::float_to_int;
@@ -98,6 +112,11 @@ const NSTEPS: f64 = 1000.0;
 const M_E: f64 = std::f64::consts::E;
 /// glibc's `FLT_EPSILON`, as `FZERO` compares with it.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
+/// `HISTOtotalInRegion`'s vectorised sum (`sse::sum_blocks`): `t + c0`, `t + c1`, `c2 + t`,
+/// `c3 + t` (the disassembly of the unit oracle's `histo.cpp.o`).
+const TOTAL_ORDER: [bool; 4] = [true, true, false, false];
+/// `HISTOmakePDF`'s: `c0 + t`, `t + c1`, `c2 + t`, `t + c3`.
+const PDF_ORDER: [bool; 4] = [false, true, false, true];
 
 /// A FreeSurfer `HISTOGRAM` (`HISTO`).
 #[derive(Clone, Debug, PartialEq)]
@@ -363,8 +382,10 @@ pub fn histo_clear_counts_in_place(g: &mut Globals, h: &mut Histogram) {
 
 /// `HISTOadd(h1, h2, dst)`: `counts = h1 + h2` over `h1`'s bins. With no output, a new one with
 /// `h1`'s bins, `min`, `max` and `bin_size`, and `h2` may be `None` (it is then the new, zero,
-/// output); with one, its `nbins` becomes `h1`'s. To add into `h1` (or `h2`), pass a copy of it
-/// as the input. FS-21; a missing `h2` with an output (a crash in FreeSurfer) adds zeros (FS-22).
+/// output); with one, its `nbins` becomes `h1`'s. To add into `h1` or `h2` (an output that is an
+/// input), use [`histo_add_into_first`] or [`histo_add_into_second`]: the official build adds
+/// those one bin at a time, a separate output four bins at a time (the NaN a sum keeps differs).
+/// FS-21; a missing `h2` with an output (a crash in FreeSurfer) adds zeros (FS-22).
 pub fn histo_add(
     g: &mut Globals,
     h1: &Histogram,
@@ -390,6 +411,7 @@ pub fn histo_add(
         }
     };
     let zeros;
+    let has_h2 = h2.is_some();
     let h2 = match h2 {
         Some(h2) => h2,
         None => {
@@ -403,13 +425,47 @@ pub fn histo_add(
             &zeros
         }
     };
-    for b in 0..h1.nbins {
-        let v = h1.counts[b as usize] + cnt(g, h2, b, "HISTOadd");
-        d.counts[b as usize] = v;
+    // the official build's operands: four bins at a time `h1 + h2`, then the rest: `h2 + h1`,
+    // `h2 + h1`, `h1 + h2`; one bin at a time `h1 + h2` (3 bins or fewer, or `h2` the new output)
+    let n = h1.nbins;
+    let vector = n > 3 && !zeros_added(given, has_h2);
+    let full = if vector { n / 4 * 4 } else { n };
+    for b in 0..n {
+        let (x, y) = (h1.counts[b as usize], cnt(g, h2, b, "HISTOadd"));
+        d.counts[b as usize] = if b >= full && b - full < 2 {
+            sse::add(y, x)
+        } else {
+            sse::add(x, y)
+        };
     }
     match fresh {
         Some(d) => Ret::New(d),
         None => Ret::Given,
+    }
+}
+
+/// Whether `HISTOadd` adds the new output's own zeros (`h2` missing): its arrays then overlap
+/// the output's and the official build adds one bin at a time.
+fn zeros_added(given: bool, has_h2: bool) -> bool {
+    !given && !has_h2
+}
+
+/// `HISTOadd(h1, h2, h1)`: `h1`'s counts become `h1 + h2` (one bin at a time, `h1 + h2`).
+pub fn histo_add_into_first(g: &mut Globals, h1: &mut Histogram, h2: &Histogram) {
+    for b in 0..h1.nbins {
+        let v = sse::add(h1.counts[b as usize], cnt(g, h2, b, "HISTOadd"));
+        h1.counts[b as usize] = v;
+    }
+}
+
+/// `HISTOadd(h1, h2, h2)`: `h2`'s counts become `h1 + h2` over `h1`'s bins and its `nbins`
+/// `h1`'s (one bin at a time, `h1 + h2`; FS-21 when `h2` has fewer bins allocated).
+pub fn histo_add_into_second(g: &mut Globals, h1: &Histogram, h2: &mut Histogram) {
+    h2.grow(g, h1.n(), "HISTOadd");
+    h2.nbins = h1.nbins;
+    for b in 0..h1.nbins {
+        let v = sse::add(h1.counts[b as usize], h2.counts[b as usize]);
+        h2.counts[b as usize] = v;
     }
 }
 
@@ -431,7 +487,7 @@ pub fn histo_subtract(
         }
     };
     for b in 0..h1.nbins {
-        let v = h1.counts[b as usize] - cnt(g, h2, b, "HISTOsubtract");
+        let v = sse::sub(h1.counts[b as usize], cnt(g, h2, b, "HISTOsubtract"));
         d.counts[b as usize] = v;
     }
     match fresh {
@@ -544,8 +600,9 @@ pub fn histo_smooth(
             if b1 >= nbins || b1 < 0 {
                 continue;
             }
-            norm += k;
-            total += k * src.counts[b1 as usize];
+            // the official build's operands (scalar: `norm + k`, `k * count`, `total + product`)
+            norm = sse::add(norm, k);
+            total = sse::add(total, sse::mul(k, src.counts[b1 as usize]));
         }
         d.counts[b as usize] = sse::div(total, norm);
         d.bins[b as usize] = src.bins[b as usize];
@@ -569,8 +626,8 @@ pub fn histo_smooth_in_place(g: &mut Globals, h: &mut Histogram, sigma: f32) {
             if b1 >= nbins || b1 < 0 {
                 continue;
             }
-            norm += k;
-            total += k * h.counts[b1 as usize];
+            norm = sse::add(norm, k);
+            total = sse::add(total, sse::mul(k, h.counts[b1 as usize]));
         }
         h.counts[b as usize] = sse::div(total, norm);
     }
@@ -1072,7 +1129,8 @@ pub fn histo_find_current_peak(h: &Histogram, b0: i32, wsize: i32, min_pct: f32)
         while b >= 0 {
             if b < nbins {
                 let center = h.counts[b as usize];
-                if center >= min_count {
+                // C's `if (center_val < min_count) continue;`: a NaN count is a candidate
+                if center.partial_cmp(&min_count) != Some(Ordering::Less) {
                     let mut is_peak = true;
                     for bw in b - whalf..=b + whalf {
                         if bw < 0 || bw >= nbins {
@@ -1114,7 +1172,8 @@ pub fn histo_fill_holes(g: &mut Globals, h: &mut Histogram) -> i32 {
         for b in min_b..=max_b {
             if !filled[b as usize] {
                 let u = b as usize;
-                let new_val = f64::from((h.counts[u - 1] + h.counts[u + 1]) / 2.0f32);
+                // `counts[b - 1] + counts[b + 1]` (the left operand first), then `* 0.5f`
+                let new_val = f64::from(sse::mul(sse::add(h.counts[u - 1], h.counts[u + 1]), 0.5));
                 let change = if h.counts[u] == 0.0 {
                     1.0
                 } else {
@@ -1148,13 +1207,14 @@ pub fn histo_fill_holes(g: &mut Globals, h: &mut Histogram) -> i32 {
 
 /// `HISTOtotalInRegion(h, b0, b1)`: the `float` sum of the counts of `[b0, b1]` (FS-22 outside).
 pub fn histo_total_in_region(g: &mut Globals, h: &Histogram, b0: i32, b1: i32) -> f32 {
-    let mut total = 0.0f32;
+    let mut x = Vec::new();
     let mut b = b0;
     while b <= b1 {
-        total += cnt(g, h, b, "HISTOtotalInRegion");
+        x.push(cnt(g, h, b, "HISTOtotalInRegion"));
         b += 1;
     }
-    total
+    // the official build's vectorised sum: `t + c0`, `t + c1`, `c2 + t`, `c3 + t` per block
+    sse::sum_blocks(0.0, &x, TOTAL_ORDER)
 }
 
 /// `HISTOtotal(h)`: [`histo_total_in_region`] over every bin in use.
@@ -1248,9 +1308,11 @@ pub fn histo_correlate(
             f64::from(h2.counts[b2 as usize])
         };
         let c1 = f64::from(h1.counts[b1 as usize]);
-        corr += c1 * c2;
-        norm1 += c1 * c1;
-        norm2 += c2 * c2;
+        // the official build's operands: `(c2 * c1) + correlation`, `(c1 * c1) + norm1`,
+        // `(c2 * c2) + norm2` (the products in the destination)
+        corr = sse::add64(sse::mul64(c2, c1), corr);
+        norm1 = sse::add64(sse::mul64(c1, c1), norm1);
+        norm2 = sse::add64(sse::mul64(c2, c2), norm2);
     }
     if norm1.abs() < FLT_EPSILON {
         norm1 = 1.0;
@@ -1258,7 +1320,8 @@ pub fn histo_correlate(
     if norm2.abs() < FLT_EPSILON {
         norm2 = 1.0;
     }
-    corr /= norm1.sqrt() * norm2.sqrt();
+    // `correlation / (sqrt(norm2) * sqrt(norm1))`
+    corr = sse::div64(corr, sse::mul64(sse::sqrt64(norm2), sse::sqrt64(norm1)));
     Ok(corr)
 }
 
@@ -1279,7 +1342,8 @@ pub fn histo_compute_linear_fit_correlation(
         } else {
             f64::from(h2.counts[b2 as usize])
         };
-        corr += f64::from(h1.counts[b1 as usize]) * c2;
+        // `(c1 * c2) + correlation` (the official build's operands)
+        corr = sse::add64(sse::mul64(f64::from(h1.counts[b1 as usize]), c2), corr);
     }
     for b2 in 0..h2.nbins {
         let b1 = nint(g, sse::div64(f64::from(b2) - b, a));
@@ -1288,7 +1352,8 @@ pub fn histo_compute_linear_fit_correlation(
         } else {
             f64::from(h1.counts[b1 as usize])
         };
-        corr += c1 * f64::from(h2.counts[b2 as usize]);
+        // `(c2 * c1) + correlation`
+        corr = sse::add64(sse::mul64(f64::from(h2.counts[b2 as usize]), c1), corr);
     }
     corr
 }
@@ -1360,13 +1425,15 @@ pub fn histo_linear_scale_in_place(h: &mut Histogram, scale: f32, offset: f32) {
     scale_into(&src, h, scale, offset);
 }
 
+/// The official build's operands: `(bin * scale) + offset` and `(min * scale) + offset`, but
+/// `offset + (max * scale)` and `scale * bin_size`.
 fn scale_into(src: &Histogram, d: &mut Histogram, scale: f32, offset: f32) {
     for b in 0..d.n() {
-        d.bins[b] = d.bins[b] * scale + offset;
+        d.bins[b] = sse::add(sse::mul(d.bins[b], scale), offset);
     }
-    d.min = src.min * scale + offset;
-    d.max = src.max * scale + offset;
-    d.bin_size = src.bin_size * scale;
+    d.min = sse::add(sse::mul(src.min, scale), offset);
+    d.max = sse::add(offset, sse::mul(src.max, scale));
+    d.bin_size = sse::mul(scale, src.bin_size);
 }
 
 /// `HISTOthreshSum(h_mask, h_src, m_thresh)`: the `float` sum of `h_src`'s counts at the bins
@@ -1380,7 +1447,7 @@ pub fn histo_thresh_sum(
     let mut total = 0.0f32;
     for b in 0..h_mask.nbins {
         if h_mask.counts[b as usize] > m_thresh {
-            total += cnt(g, h_src, b, "HISTOthreshSum");
+            total = sse::add(total, cnt(g, h_src, b, "HISTOthreshSum"));
         }
     }
     total
@@ -1422,10 +1489,7 @@ pub fn histo_make_pdf(
 /// `HISTOmakePDF(h, h)`.
 pub fn histo_make_pdf_in_place(h: &mut Histogram) {
     let n = h.n();
-    let mut total = 0.0f32;
-    for &c in &h.counts[..n] {
-        total += c;
-    }
+    let total = sse::sum_blocks(0.0, &h.counts[..n], PDF_ORDER);
     if total > 0.0 {
         for c in &mut h.counts[..n] {
             *c = sse::div(*c, total);
@@ -1448,7 +1512,8 @@ pub fn histo_bins(
     let mut h = histo_alloc(g, err, nbins)?;
     h.bin_size = sse::div64(max - min, f64::from(nbins - 1)) as f32;
     for n in 0..h.n() {
-        h.bins[n] = (min + f64::from(h.bin_size * n as f32)) as f32;
+        // `0 * inf` (one bin: an infinite bin size) is the default NaN
+        h.bins[n] = sse::add64(f64::from(sse::mul(h.bin_size, n as f32)), min) as f32;
     }
     h.min = min as f32;
     h.max = max as f32;
@@ -1526,7 +1591,7 @@ pub fn histo_init(
         h.bin_size = 1.0;
     }
     for b in 0..nbins.max(0) {
-        let v = (mn + f64::from(h.bin_size * b as f32)) as f32;
+        let v = sse::add64(f64::from(sse::mul(h.bin_size, b as f32)), mn) as f32;
         if let Some(p) = h.bins.get_mut(b as usize) {
             *p = v;
         }
@@ -1599,7 +1664,7 @@ fn make_cdf(
             for b2 in inner {
                 let a = habs.bins[b2 as usize].abs();
                 if (reverse && a >= bv) || (!reverse && a <= bv) {
-                    total += f64::from(habs.counts[b2 as usize]);
+                    total = sse::add64(total, f64::from(habs.counts[b2 as usize]));
                 }
             }
             d.counts[b as usize] = total as f32;
@@ -1726,6 +1791,25 @@ pub fn histo_robust_gaussian_fit(
     let mut best_sse = -1.0f64;
     let mut best_sigma = 0.0f64;
     let mut sigma = delta_sigma;
+    if sigma <= max_sigma && (sigma + delta_sigma).partial_cmp(&sigma) != Some(Ordering::Greater) {
+        // FS-51 (both modes): the search over sigma cannot advance (an infinite bin size, or one
+        // so small that a tenth of it is 0): FreeSurfer never returns
+        g.notices.add(
+            &FS_51,
+            format!("HISTOrobustGaussianFit: sigma from {sigma} by {delta_sigma}: FreeSurfer never returns"),
+        );
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!(
+                "HISTOrobustGaussianFit: the bin size {} gives no search over sigma (steps of {})",
+                fmt_f(f64::from(h.bin_size), 0, 6),
+                fmt_f(delta_sigma, 0, 6)
+            ),
+        );
+        return Ok((ERROR_BADPARM, Some(offset), None));
+    }
     while sigma <= max_sigma {
         let mut scale = 0.0f64;
         let mut n = 0i32;
@@ -1800,7 +1884,27 @@ pub fn histo_abs(
     if mn >= mx {
         mn = mx * 0.9;
     }
-    let nb = nint(g, ((mx - mn) / f64::from(h.bin_size)).ceil() + 1.0);
+    let span = ((mx - mn) / f64::from(h.bin_size)).ceil() + 1.0;
+    if !g.notices.reproduce() && !(span + 0.5 < 2147483648.0 && span - 0.5 > -2147483649.0) {
+        // FS-50 (rule B): FreeSurfer's conversion gives INT_MIN and its allocation fails
+        g.notices.add(
+            &FS_50,
+            format!("HISTOabs: {span} bins (an undefined conversion): no histogram"),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!(
+                "HISTOabs: absolute values from {} to {} in bins of {} need {span} bins: outside the int range (an infinite range, or a bin size of 0 or NaN)",
+                fmt_f(mn, 0, 6),
+                fmt_f(mx, 0, 6),
+                fmt_f(f64::from(h.bin_size), 0, 6),
+            ),
+        )?;
+        return Ok(Ret::Null);
+    }
+    let nb = nint(g, span);
     let mut fresh = None;
     let a: &mut Histogram = match habs {
         None => fresh.insert(histo_alloc(g, err, nb)?),
@@ -1813,11 +1917,12 @@ pub fn histo_abs(
     a.min = mn as f32;
     a.max = mx as f32;
     for b in 0..a.n() {
-        a.bins[b] = (f64::from(b as f32 * a.bin_size) + mn) as f32;
+        // `0 * inf` (an infinite bin size) is the default NaN
+        a.bins[b] = sse::add64(f64::from(sse::mul(b as f32, a.bin_size)), mn) as f32;
     }
     for b in 0..h.n() {
         let pbin = histo_find_bin(g, a, h.bins[b].abs());
-        let v = cnt(g, a, pbin, "HISTOabs") + h.counts[b];
+        let v = sse::add(cnt(g, a, pbin, "HISTOabs"), h.counts[b]);
         set_cnt(g, a, pbin, v, "HISTOabs");
     }
     Ok(match fresh {
@@ -1834,8 +1939,8 @@ pub fn histo_get_entropy(g: &mut Globals, h: &Histogram) -> f64 {
     let mut entropy = 0.0f64;
     for &c in &h.counts[..h.n()] {
         if c > 0.0 {
-            let p = f64::from(c) / total;
-            entropy -= p * libm.log(p);
+            let p = sse::div64(f64::from(c), total);
+            entropy = sse::sub64(entropy, sse::mul64(p, libm.log(p)));
         }
     }
     entropy
@@ -1869,12 +1974,16 @@ pub fn histo_soap_bubble_zeros(
             } else {
                 let bi = b as i32;
                 let c = |g: &mut Globals, k: i32| cnt(g, d, k, "HISTOsoapBubbleZeros");
+                // the official build's operands: `(c[b] + c[b + 1]) * 0.5f`,
+                // `(c[b] + c[b - 1]) * 0.5f`, `((c[b] + c[b + 1]) + c[b - 1]) / 3`
+                let (cb, add) = (c(g, bi), sse::add);
                 f64::from(if bi == 0 {
-                    (c(g, bi) + c(g, bi + 1)) / 2.0f32
+                    sse::mul(add(cb, c(g, bi + 1)), 0.5)
                 } else if bi == last {
-                    (c(g, bi) + c(g, bi - 1)) / 2.0f32
+                    sse::mul(add(cb, c(g, bi - 1)), 0.5)
                 } else {
-                    (c(g, bi + 1) + c(g, bi) + c(g, bi - 1)) / 3.0f32
+                    let up = c(g, bi + 1);
+                    sse::div(add(add(cb, up), c(g, bi - 1)), 3.0)
                 })
             };
         }
@@ -1989,7 +2098,7 @@ pub fn histo_sum_norm(h: &mut Histogram) -> i32 {
     let n = h.n();
     let mut sum = 0.0f64;
     for &c in &h.counts[..n] {
-        sum += f64::from(c);
+        sum = sse::add64(sum, f64::from(c));
     }
     if sum != 0.0 {
         for c in &mut h.counts[..n] {
@@ -2016,7 +2125,7 @@ pub fn histo_cumsum(
     };
     let mut sum = 0.0f64;
     for n in 0..h.n() {
-        sum += f64::from(h.counts[n]);
+        sum = sse::add64(sum, f64::from(h.counts[n]));
         d.counts[n] = sum as f32;
     }
     match fresh {
@@ -2029,7 +2138,7 @@ pub fn histo_cumsum(
 pub fn histo_cumsum_in_place(h: &mut Histogram) {
     let mut sum = 0.0f64;
     for n in 0..h.n() {
-        sum += f64::from(h.counts[n]);
+        sum = sse::add64(sum, f64::from(h.counts[n]));
         h.counts[n] = sum as f32;
     }
 }

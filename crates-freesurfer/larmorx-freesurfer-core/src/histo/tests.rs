@@ -137,3 +137,78 @@ fn copy_into_smaller_fs21_and_make_pdf_fs23() {
     assert_eq!(other.counts[2], 0.5);
     assert_eq!(other.counts[0], 0.25);
 }
+
+#[test]
+fn abs_of_an_infinite_range_fs50() {
+    let h = hist(&[0.0, f32::INFINITY, 2.0], &[1.0, 2.0, 3.0]);
+    for (mode, status) in [
+        (UpstreamDefects::Reproduce, 254u8),
+        (UpstreamDefects::Fix, 252),
+    ] {
+        let mut gm = g(mode);
+        let mut err = Vec::new();
+        let r = histo_abs(&mut gm, &mut err, &h, None);
+        assert_eq!(r.err().map(Fatal::status), Some(status));
+        assert_eq!(gm.notices.contains(&FS_50), mode == UpstreamDefects::Fix);
+        let text = String::from_utf8_lossy(&err).into_owned();
+        if mode == UpstreamDefects::Fix {
+            assert!(
+                text.contains("HISTOabs: absolute values from 0.000000 to inf"),
+                "{text}"
+            );
+        } else {
+            assert!(
+                text.contains("HISTOalloc(-2147483648): could not allocate histogram"),
+                "{text}"
+            );
+        }
+    }
+}
+
+#[test]
+fn robust_fit_with_an_infinite_bin_size_fs51() {
+    for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+        let mut h = hist(&[0.0, 1.0, 2.0, 3.0], &[1.0, 5.0, 2.0, 1.0]);
+        h.bin_size = f32::INFINITY;
+        let mut gm = g(mode);
+        let mut err = Vec::new();
+        let (status, offset, sigma) =
+            histo_robust_gaussian_fit(&mut gm, &mut err, None, &mut h, 0.5).unwrap();
+        assert_eq!((status, sigma), (ERROR_BADPARM, None));
+        assert!(offset.is_some());
+        assert!(gm.notices.contains(&FS_51));
+    }
+}
+
+#[test]
+fn add_operand_orders() {
+    // two NaNs meet: the official build keeps h1's in blocks of four and one bin at a time, h2's in
+    // the first two bins after the last block
+    let (p, q) = (f32::from_bits(0x7fc0_0001), f32::from_bits(0xffc0_0002));
+    let h1 = hist(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0], &[p; 6]);
+    let h2 = hist(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0], &[q; 6]);
+    let mut gm = g(UpstreamDefects::Reproduce);
+    let sum = histo_add(&mut gm, &h1, Some(&h2), None).unwrap_new();
+    let bits: Vec<u32> = sum.counts.iter().map(|c| c.to_bits()).collect();
+    assert_eq!(
+        bits,
+        [
+            0x7fc0_0001,
+            0x7fc0_0001,
+            0x7fc0_0001,
+            0x7fc0_0001,
+            0xffc0_0002,
+            0xffc0_0002
+        ]
+    );
+    let mut a = h1.clone();
+    histo_add_into_first(&mut gm, &mut a, &h2);
+    assert!(a.counts.iter().all(|c| c.to_bits() == 0x7fc0_0001));
+    let mut b = h2.clone();
+    histo_add_into_second(&mut gm, &h1, &mut b);
+    assert!(b.counts.iter().all(|c| c.to_bits() == 0x7fc0_0001));
+    // inf - inf is the default NaN (sign set) on every platform
+    let i = hist(&[0.0], &[f32::INFINITY]);
+    let d = histo_subtract(&mut gm, &i, &i, None).unwrap_new();
+    assert_eq!(d.counts[0].to_bits(), 0xffc0_0000);
+}

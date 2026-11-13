@@ -173,7 +173,7 @@ class Gen:
         if special and n > 2 and r.random() < special / 2:
             bins[r.randrange(1, n - 1)] = f"{r.choice(NONFINITE):08x}"
         if special and r.random() < special / 6:
-            hdr[r.randrange(3)] = f"{r.choice(NONFINITE + [0, 0x80000000]):08x}"
+            hdr[r.randrange(3)] = f"{r.choice([*NONFINITE, 0, 0x80000000]):08x}"
         alloc = n if alloc is None else alloc
         return " ".join([str(alloc), str(n), *hdr, *bins, *counts])
 
@@ -212,7 +212,13 @@ class Gen:
                 if c == "hcopy" and m > 1:
                     L.append(f"{c} {h} {self.hist(r, max(1, m // 2))}")  # fewer bins (FS-21)
         L += ["hrealloc null 4", "hfree null"]
-        for n, lo, hi in [(5, 0.0, 4.0), (10, -3.5, 7.25), (1, 0.0, 1.0), (4, 2.0, 2.0), (6, 9.0, 1.0)]:
+        for n, lo, hi in [
+            (5, 0.0, 4.0),
+            (10, -3.5, 7.25),
+            (1, 0.0, 1.0),
+            (4, 2.0, 2.0),
+            (6, 9.0, 1.0),
+        ]:
             L.append(f"hinit new {n} {f64(lo)} {f64(hi)}")
             L.append(f"hbins {n} {f64(lo)} {f64(hi)}")
             L.append(f"hinit {self.hist(r, 8)} {n} {f64(lo)} {f64(hi)}")
@@ -332,7 +338,9 @@ class Gen:
         for i in range(70):
             n = r.randint(2, 60)
             size = r.choice([1.0, 2.0, 0.5, 4.0, 0.0, -1.0])
-            h = self.hist(r, n, size=size, shape=r.choice(["gauss", "peaks"]), special=0.2 * (i % 2))
+            h = self.hist(
+                r, n, size=size, shape=r.choice(["gauss", "peaks"]), special=0.2 * (i % 2)
+            )
             q = f64(r.choice([0.5, 0.9, 0.99, 0.2]))
             L.append(f"hrobust {h} {q}")
         L.append(f"hrobust {self.hist(r, 1)} {f64(0.9)}")  # one bin (FS-24)
@@ -390,7 +398,9 @@ class Gen:
                 L.append(f"{c} {a} {b} new")
                 tg = 2 if 2 in (t1, t2) else 1
                 L.append(f"{c} {a} {b} {self.mat(r, n1, n3, tg, values=None)}")
-                L.append(f"{c} {a} {b} {self.mat(r, n1, n3, tg, values=['00000000'] * (n1 * n3 * tg))}")
+                L.append(
+                    f"{c} {a} {b} {self.mat(r, n1, n3, tg, values=['00000000'] * (n1 * n3 * tg))}"
+                )
                 if n1 == n2:
                     L.append(f"{c} {a} {b} self")
                 if n2 == n3:
@@ -411,10 +421,15 @@ class Gen:
             a, b = self.mat(r, 4, 4, special=sp), self.mat(r, 4, 4, special=sp)
             v = [self.fv(r, sp) for _ in range(4)]
             L.append(f"affine {a} {b} {' '.join(v)}")
-            L.append(f"affineget {self.mat(r, 4, 4)} " + " ".join(self.fv(r, sp) for _ in range(16)))
+            L.append(
+                f"affineget {self.mat(r, 4, 4)} " + " ".join(self.fv(r, sp) for _ in range(16))
+            )
         zeros = " ".join(["80000000"] * 16)
         L.append(f"affine 1 4 4 {zeros} 1 4 4 {zeros} 80000000 80000000 80000000 80000000")
-        L += [f"affineset {self.mat(r, 3, 4)}", f"affineget {self.mat(r, 4, 3)} " + " ".join(["3f800000"] * 16)]
+        L += [
+            f"affineset {self.mat(r, 3, 4)}",
+            f"affineget {self.mat(r, 4, 3)} " + " ".join(["3f800000"] * 16),
+        ]
         return [Batch("affine", "affine", L)]
 
     def dmatrix(self) -> list[Batch]:
@@ -440,7 +455,10 @@ class Gen:
             L += [f"daddmul {a} {b} new {v1} {v2}", f"daddmul {a} null new {v1} {v2}"]
             L += [f"daddmul {a} {b} self {v1} {v2}", f"dadd {a} {b} new", f"dsub {a} {b} other"]
             L += [f"dscale {a} new {v1}", f"dcopy {a} new", f"dtranspose {a} new", f"dmaxabs {a}"]
-            L += [f"dcopy {a} {self.dmat(r, rows, cols)}", f"dtranspose {a} {self.dmat(r, cols, rows)}"]
+            L += [
+                f"dcopy {a} {self.dmat(r, rows, cols)}",
+                f"dtranspose {a} {self.dmat(r, cols, rows)}",
+            ]
             c = self.dmat(r, cols, k, special=sp)
             L += [f"dmul {a} {c} new", f"dmul {a} {c} {self.dmat(r, rows, k)}"]
             u, w = self.dmat(r, rows, 1, special=sp), self.dmat(r, rows, 1, special=sp)
@@ -450,12 +468,27 @@ class Gen:
             n = r.randint(0, 12)
             L.append(f"dliststats {n} " + " ".join(self.dv(r, sp) for _ in range(n)))
             if i % 10 == 0:
-                L += [f"dprint {xs('')} {a}", f"dprint {xs('%10.3lf')} {a}", f"dprint {xs('%g')} {a}"]
+                L += [
+                    f"dprint {xs('')} {a}",
+                    f"dprint {xs('%10.3lf')} {a}",
+                    f"dprint {xs('%g')} {a}",
+                ]
                 L += [f"dconst {v2} {rows} {cols} new", f"dzero {rows} {cols} {a}"]
                 L += [f"dadd {a} {self.dmat(r, rows + 1, cols)} new", f"dtranspose {a} self"]
-                L += [f"dmul {a} {self.dmat(r, cols + 1, k)} new", f"dmul {a} {c} {self.dmat(r, rows + 1, k)}"]
-                L += [f"ddot {u} {self.dmat(r, rows + 1, 1)}", f"dcmpf {self.mat(r, rows + 1, cols)} {a}"]
-        L += ["dcopy null new", "dmaxabs null", f"dprint {xs('')} null", f"dcmpf null {self.dmat(r, 1, 1)}"]
+                L += [
+                    f"dmul {a} {self.dmat(r, cols + 1, k)} new",
+                    f"dmul {a} {c} {self.dmat(r, rows + 1, k)}",
+                ]
+                L += [
+                    f"ddot {u} {self.dmat(r, rows + 1, 1)}",
+                    f"dcmpf {self.mat(r, rows + 1, cols)} {a}",
+                ]
+        L += [
+            "dcopy null new",
+            "dmaxabs null",
+            f"dprint {xs('')} null",
+            f"dcmpf null {self.dmat(r, 1, 1)}",
+        ]
         L += ["dcopyf null new", f"dcmpf {self.mat(r, 1, 1)} null"]
         return [Batch("dmatrix", "dmatrix", L)]
 
@@ -474,14 +507,37 @@ class Gen:
             L += [f"mtranspose {a} new", f"msquare {a} new", f"mdiag {a} new", f"mclone {a}"]
             L += [f"madd {a} {b} new", f"msub {a} {b} self", f"mscale {a} new {self.fv(r, sp)}"]
             L += [f"mclear {a}", f"msymmetric {a}", f"miszero {a}", f"mcheck {a}", f"mtrace {a}"]
-            L += [f"msum {a}", f"mconst {self.fv(r, sp)} {rows} {cols} new", f"mzero {rows} {cols} {a}"]
-            L += [f"mreshape {a} new {cols} {rows}", f"mreshape {a} {self.mat(r, r.randint(1, 4), r.randint(1, 4))} 0 0"]
-            L += [f"mcolscale {a} new", f"mnormcol {a} new new", f"mnormcol {a} new {self.mat(r, 1, cols)}"]
+            L += [
+                f"msum {a}",
+                f"mconst {self.fv(r, sp)} {rows} {cols} new",
+                f"mzero {rows} {cols} {a}",
+            ]
+            L += [
+                f"mreshape {a} new {cols} {rows}",
+                f"mreshape {a} {self.mat(r, r.randint(1, 4), r.randint(1, 4))} 0 0",
+            ]
+            L += [
+                f"mcolscale {a} new",
+                f"mnormcol {a} new new",
+                f"mnormcol {a} new {self.mat(r, 1, cols)}",
+            ]
             if i % 6 == 0:
-                L += [f"madd {a} {self.mat(r, rows + 1, cols, typ)} new", f"madd {a} {b} {self.mat(r, rows, cols + 1, typ)}"]
-                L += [f"mtranspose {a} {self.mat(r, rows, cols + 1, typ)}", f"mdiag {a} {self.mat(r, rows, rows)}"]
-                L += [f"mscale {a} {self.mat(r, rows + 1, cols, typ)} {self.fv(r)}", f"midentity {rows + 2} {self.mat(r, rows, rows)}"]
-                L += [f"mnormcol {a} {self.mat(r, rows + 1, cols)} new", f"mcolscale {a} {self.mat(r, 1, max(1, cols - 1))}"]
+                L += [
+                    f"madd {a} {self.mat(r, rows + 1, cols, typ)} new",
+                    f"madd {a} {b} {self.mat(r, rows, cols + 1, typ)}",
+                ]
+                L += [
+                    f"mtranspose {a} {self.mat(r, rows, cols + 1, typ)}",
+                    f"mdiag {a} {self.mat(r, rows, rows)}",
+                ]
+                L += [
+                    f"mscale {a} {self.mat(r, rows + 1, cols, typ)} {self.fv(r)}",
+                    f"midentity {rows + 2} {self.mat(r, rows, rows)}",
+                ]
+                L += [
+                    f"mnormcol {a} {self.mat(r, rows + 1, cols)} new",
+                    f"mcolscale {a} {self.mat(r, 1, max(1, cols - 1))}",
+                ]
         return [Batch("melements", "melements", L)]
 
     def mregions(self) -> list[Batch]:
@@ -497,7 +553,10 @@ class Gen:
             dst = r.choice(["new", self.mat(r, r.randint(1, 6), r.randint(1, 6), td)])
             for c in ("mregion", "mrealregion", "mimagregion"):
                 L.append(f"{c} {src} {dst} {sr} {sc} {nr} {nc} {dr} {dc}")
-            re, im = self.mat(r, rs, cs, r.choice([1, 1, 2])), self.mat(r, rs, cs - r.randint(0, 1) or 1)
+            re, im = (
+                self.mat(r, rs, cs, r.choice([1, 1, 2])),
+                self.mat(r, rs, cs - r.randint(0, 1) or 1),
+            )
             L.append(f"mr2c {re} {im} " + r.choice(["new", self.mat(r, rs, cs, r.choice([1, 2]))]))
         return [Batch("mregions", "mregions", L)]
 
@@ -509,7 +568,10 @@ class Gen:
             n = r.choice([3, 4, 3, 3, 4, 3, 3, 2])
             ang = self.fv(r, sp) if i % 2 else f32(r.uniform(-7, 7))
             which = r.randint(0, 3)
-            L += [f"mrotation {n} {ang} {which} new", f"mrotation {n} {ang} {which} {self.mat(r, n, n)}"]
+            L += [
+                f"mrotation {n} {ang} {which} new",
+                f"mrotation {n} {ang} {which} {self.mat(r, n, n)}",
+            ]
             k = r.choice([3, 3, 3, 3, 3, 1, 2, 4])
             shape = r.choice([(k, 1)] * 6 + [(1, k), (k, 2)])
             v1, v2, v3 = (self.mat(r, *shape, special=sp) for _ in range(3))
@@ -518,8 +580,14 @@ class Gen:
             L += [f"vlen {v1}", f"vdot {v1} {v2s}", f"vdist {v1} {v2s}", f"vcross {v1} {v2} new"]
             L += [f"vtriple {v1} {v2} {v3}", f"v3angle {v1} {v2}"]
             x, y, z = (self.fv(r, sp) for _ in range(3))
-            L += [f"xyznorm {x} {y} {z}", f"xyzangle {x} {y} {z} {' '.join(self.fv(r, sp) for _ in range(4))}"]
-        L += ["xyznorm 00000000 80000000 00000000", f"v3angle {self.mat(r, 3, 1, values=['0'] * 3)} {self.mat(r, 3, 1)}"]
+            L += [
+                f"xyznorm {x} {y} {z}",
+                f"xyzangle {x} {y} {z} {' '.join(self.fv(r, sp) for _ in range(4))}",
+            ]
+        L += [
+            "xyznorm 00000000 80000000 00000000",
+            f"v3angle {self.mat(r, 3, 1, values=['0'] * 3)} {self.mat(r, 3, 1)}",
+        ]
         return [Batch("mvectors", "mvectors", L)]
 
     def mprint(self) -> list[Batch]:
@@ -529,17 +597,25 @@ class Gen:
             typ = 2 if i % 4 == 0 else 1
             a = self.mat(r, r.randint(1, 4), r.randint(1, 4), typ, special=0.2)
             p = r.choice([5, 0, 3, 9, -1, 12])
-            L += [f"mprint {r.choice(['out', 'err'])} {a} {p}", f"mprintfmt {xs(r.choice(['%10f', '%g', '%5.2f']))} {a}"]
+            L += [
+                f"mprint {r.choice(['out', 'err'])} {a} {p}",
+                f"mprintfmt {xs(r.choice(['%10f', '%g', '%5.2f']))} {a}",
+            ]
         L += [f"mprint null {self.mat(r, 2, 2)} 5", "mprint out null 5"]
-        for i in range(80):
+        for _ in range(80):
             n = r.randint(1, 4)
             s, m = self.mat(r, n, n, special=0.1), self.mat(r, r.randint(1, 4), n, special=0.1)
             L.append(f"msimilarity {s} {m} new")
             ln = r.randint(1, 9)
             sd = f32(r.choice([0.5, 1.0, 2.5, 0.01, 10.0]))
             norm = r.choice([0, 1, 2])
-            L.append(f"mgaussian {ln} {sd} {norm} " + r.choice(["new", self.mat(r, ln, ln), self.mat(r, ln + 1, ln)]))
-            L.append(f"mgaussian2 {ln} {sd} {f32(r.choice([1.0, 3.0]))} {f32(r.choice([0.3, 0.5, 1.0]))} {norm} new")
+            L.append(
+                f"mgaussian {ln} {sd} {norm} "
+                + r.choice(["new", self.mat(r, ln, ln), self.mat(r, ln + 1, ln)])
+            )
+            L.append(
+                f"mgaussian2 {ln} {sd} {f32(r.choice([1.0, 3.0]))} {f32(r.choice([0.3, 0.5, 1.0]))} {norm} new"
+            )
         L.append(f"msimilarity {self.mat(r, 2, 2)} {self.mat(r, 2, 3)} new")
         return [Batch("mprint", "mprint", L)]
 
@@ -553,20 +629,36 @@ class Gen:
             vals = None
             if i % 7 == 0:  # singular: a repeated row
                 row = [self.fv(r, 0, True) for _ in range(n)]
-                vals = (row * 2 + [self.fv(r, 0, True) for _ in range(n * (n - 2))])[: n * n] if n > 1 else ["0"]
+                vals = (
+                    (row * 2 + [self.fv(r, 0, True) for _ in range(n * (n - 2))])[: n * n]
+                    if n > 1
+                    else ["0"]
+                )
                 typ = 1
             a = self.mat(r, n, n, typ, special=sp, ints=i % 2 == 0, values=vals)
             L += [f"minverse {a} new", f"minverse {a} {self.mat(r, n, n, typ)}", f"mdet {a}"]
             if i % 8 == 0:
-                L += [f"minverse {a} {self.mat(r, n + 1, n + 1, typ)}", f"minverse {self.mat(r, n, n + 1)} new"]
+                L += [
+                    f"minverse {a} {self.mat(r, n + 1, n + 1, typ)}",
+                    f"minverse {self.mat(r, n, n + 1)} new",
+                ]
             rows, cols = r.randint(1, 5), r.randint(1, 5)
             q = self.mat(r, rows, cols, special=sp)
             L.append(f"mqr {q} {self.mat(r, rows, rows)} {self.mat(r, rows, cols)}")
         L += ["minverse 1 0 0 new", "mdet 1 0 0", f"mdet {self.mat(r, 2, 3)}"]
         q = self.mat(r, 3, 2)
-        L += [f"mqr null {self.mat(r, 3, 3)} {self.mat(r, 3, 2)}", f"mqr {q} null {self.mat(r, 3, 2)}"]
-        L += [f"mqr {q} {self.mat(r, 3, 3)} null", f"mqr {q} {self.mat(r, 2, 3)} {self.mat(r, 3, 2)}"]
-        L += [f"mqr {q} {self.mat(r, 3, 2)} {self.mat(r, 3, 2)}", f"mqr {q} {self.mat(r, 3, 3)} {self.mat(r, 2, 2)}"]
+        L += [
+            f"mqr null {self.mat(r, 3, 3)} {self.mat(r, 3, 2)}",
+            f"mqr {q} null {self.mat(r, 3, 2)}",
+        ]
+        L += [
+            f"mqr {q} {self.mat(r, 3, 3)} null",
+            f"mqr {q} {self.mat(r, 2, 3)} {self.mat(r, 3, 2)}",
+        ]
+        L += [
+            f"mqr {q} {self.mat(r, 3, 2)} {self.mat(r, 3, 2)}",
+            f"mqr {q} {self.mat(r, 3, 3)} {self.mat(r, 2, 2)}",
+        ]
         L += [f"mqr {q} {self.mat(r, 3, 3)} {self.mat(r, 3, 3)}", "mqr 1 2 0 1 2 2 0 0 0 0 1 2 0"]
         L.append("minverse null new")
         return [Batch("minverse", "minverse", L)]
@@ -574,7 +666,9 @@ class Gen:
     def primes(self) -> list[Batch]:
         r = self.rng("primes")
         L = [f"primes {n}" for n in (-1, 0, 1, 2, 3, 10, 100, 1000, 7919)]
-        for n in [-1, 0, 1, 2, 12, 360, 7919, 1024, 2 * 3 * 5 * 7 * 11 * 13, 65536 * 3] + [r.randint(2, 100000) for _ in range(60)]:
+        for n in [-1, 0, 1, 2, 12, 360, 7919, 1024, 2 * 3 * 5 * 7 * 11 * 13, 65536 * 3] + [
+            r.randint(2, 100000) for _ in range(60)
+        ]:
             L.append(f"pfactors {n}")
             if n >= 1:
                 p = r.randint(-3, 50)
@@ -583,7 +677,10 @@ class Gen:
 
     def draws(self) -> list[Batch]:
         L = [f"gaussdraws {s} {k}" for s, k in [(0, 5), (1, 20), (12345, 50), (-7, 10), (2**40, 5)]]
-        return [Batch("draws", "draws", L), Batch("draws", "draws-clock", ["todseed"], never="the clock", mask_digits=True)]
+        return [
+            Batch("draws", "draws", L),
+            Batch("draws", "draws-clock", ["todseed"], never="the clock", mask_digits=True),
+        ]
 
     def minimizers(self) -> list[Batch]:
         r = self.rng("minimizers")
@@ -618,18 +715,30 @@ class Gen:
             L.append(f"@60 powell {' '.join(cost(n) + p)} 1 {' '.join(dirs(n))} {tol} {i % 2}")
             ftol, lin = f32(r.choice([1e-8, 1e-4, 1e-2])), f32(r.choice([1e-4, 1e-2]))
             maxit, gno = r.choice([36, 4, 1, 100]), r.choice([0, 0, 1])
-            L.append(f"@60 powell2 {' '.join(cost(n) + p)} 1 {' '.join(dirs(n))} {ftol} {lin} {maxit} {gno} {i % 3 == 0:d}")
+            L.append(
+                f"@60 powell2 {' '.join(cost(n) + p)} 1 {' '.join(dirs(n))} {ftol} {lin} {maxit} {gno} {i % 3 == 0:d}"
+            )
         for i in range(60):
             n = r.randint(2, 12)
             p = [f32(r.uniform(-3, 3)) for _ in range(n)]
             tol = f32(r.choice([1e-3, 1e-5, 0.1]))
             fret = r.choice(["00000000", f32(1e6), f32(-1.0), f32(50.0)])
-            L.append(f"@60 dfpmin {' '.join(cost(n) + p)} {tol} {fret} {int(i % 7 == 0)} {i % 2} {int(i % 3 == 0)}")
-        L.append(f"@60 powell {' '.join(cost(2))} 3f800000 3f800000 0 3a83126f 0")  # no directions (FS-34)
+            L.append(
+                f"@60 dfpmin {' '.join(cost(n) + p)} {tol} {fret} {int(i % 7 == 0)} {i % 2} {int(i % 3 == 0)}"
+            )
+        L.append(
+            f"@60 powell {' '.join(cost(2))} 3f800000 3f800000 0 3a83126f 0"
+        )  # no directions (FS-34)
         return [Batch("minimizers", "minimizers", L)]
 
     def nr(self) -> list[Batch]:
-        L = ["nrvector 1 5", "nrvector 0 0", "nrvector -2 3", "nrmatrix 1 3 1 4", "nrmatrix 0 1 -1 1"]
+        L = [
+            "nrvector 1 5",
+            "nrvector 0 0",
+            "nrvector -2 3",
+            "nrmatrix 1 3 1 4",
+            "nrmatrix 0 1 -1 1",
+        ]
         return [Batch("nr", "nr", L)]
 
     def eigen(self) -> list[Batch]:
@@ -653,7 +762,10 @@ class Gen:
                 L += [f"{at}meigen {m} new", f"{at}meigen {m} {self.mat(r, n, n)}"]
                 L += [f"{at}meigenhelper {m} 1 new", f"{at}meigenhelper {m} 0 new"]
             if i % 10 == 0:
-                L += [f"meigen {self.mat(r, n, n + 1)} new", f"meigen {self.mat(r, n, n)} {self.mat(r, max(1, n - 1), n)}"]
+                L += [
+                    f"meigen {self.mat(r, n, n + 1)} new",
+                    f"meigen {self.mat(r, n, n)} {self.mat(r, max(1, n - 1), n)}",
+                ]
         return [Batch("eigen", "eigen", L)]
 
     def svd(self) -> list[Batch]:
@@ -665,7 +777,10 @@ class Gen:
             vals = ["00000000"] * (rows * cols) if i % 11 == 0 else None
             a = self.mat(r, rows, cols, special=sp, values=vals)
             at = "@1 " if sp else ""  # non-finite entries: LINPACK may never return (FS-48)
-            L += [f"{at}msvd {a} {self.mat(r, cols, 1)} new", f"msvd {a} {self.mat(r, cols, 1)} {self.mat(r, cols, cols)}"]
+            L += [
+                f"{at}msvd {a} {self.mat(r, cols, 1)} new",
+                f"msvd {a} {self.mat(r, cols, 1)} {self.mat(r, cols, cols)}",
+            ]
             L += [f"{at}msvdvalues {a} {rows}", f"{at}mcond {a}", f"{at}mnscond {a}"]
             L += [f"{at}msvdinverse {a} new", f"{at}msvdinverse {a} {self.mat(r, cols, rows)}"]
             L += [f"{at}mpinverse {a} new", f"{at}mpinverse {a} {self.mat(r, cols, rows)}"]
@@ -676,28 +791,85 @@ class Gen:
     def mfiles(self) -> list[Batch]:
         r = self.rng("mfiles")
         L = []
-        nums = ["1", "-2.5", "+3e2", "1e-50", "1e50", "inf", "-INF", "infinity", "Infx", "nan", "-nan", "NaN(1)", "0x1.8p1", "0x", "0x.", ".5", "-.e3", "1.e", "100ergs", "--1", "+", "7", "0.1", "3.4028236e38", "1.17549e-38", "1e-45"]
+        nums = [
+            "1",
+            "-2.5",
+            "+3e2",
+            "1e-50",
+            "1e50",
+            "inf",
+            "-INF",
+            "infinity",
+            "Infx",
+            "nan",
+            "-nan",
+            "NaN(1)",
+            "0x1.8p1",
+            "0x",
+            "0x.",
+            ".5",
+            "-.e3",
+            "1.e",
+            "100ergs",
+            "--1",
+            "+",
+            "7",
+            "0.1",
+            "3.4028236e38",
+            "1.17549e-38",
+            "1e-45",
+        ]
         for i in range(150):
             rows, cols = r.randint(1, 4), r.randint(1, 4)
-            lines = [" ".join(r.choice(nums) if r.random() < 0.3 else f"{r.uniform(-9, 9):.6g}" for _ in range(cols)) for _ in range(rows)]
+            lines = [
+                " ".join(
+                    r.choice(nums) if r.random() < 0.3 else f"{r.uniform(-9, 9):.6g}"
+                    for _ in range(cols)
+                )
+                for _ in range(rows)
+            ]
             body = "\n".join(lines) + r.choice(["\n", "", "\n\n"])
             if i % 9 == 0:
                 body = "  " + body.replace(" ", "\t ")
             L.append(f"mreadtxt {xs('m.txt')} {xs(body)}")
-        L += [f"mreadtxt {xs('m.txt')} {xs('')}", f"mreadtxt {xs('m.txt')} {xs(chr(10) + '1 2')}", f"mreadtxt {xs('m.txt')} {xs('1 ' * 600 + chr(10))}"]
+        L += [
+            f"mreadtxt {xs('m.txt')} {xs('')}",
+            f"mreadtxt {xs('m.txt')} {xs(chr(10) + '1 2')}",
+            f"mreadtxt {xs('m.txt')} {xs('1 ' * 600 + chr(10))}",
+        ]
         L.append(f"mreadtxtmissing {xs('missing.txt')}")
         for i in range(150):
             typ = r.choice([1, 1, 2, 3])
             rows, cols = r.randint(0, 3), r.randint(1, 3)
             per = 2 if typ == 2 else 1
-            hdr = r.choice([f"{typ} {rows} {cols}", f"# a comment\n\n{typ} {rows} {cols} trailing", f"{typ} {rows}", "   \n#\n"])
-            els = [r.choice(nums) if r.random() < 0.2 else f"{r.uniform(-9, 9):+f}" for _ in range(rows * cols * per)]
+            hdr = r.choice(
+                [
+                    f"{typ} {rows} {cols}",
+                    f"# a comment\n\n{typ} {rows} {cols} trailing",
+                    f"{typ} {rows}",
+                    "   \n#\n",
+                ]
+            )
+            els = [
+                r.choice(nums) if r.random() < 0.2 else f"{r.uniform(-9, 9):+f}"
+                for _ in range(rows * cols * per)
+            ]
             if i % 7 == 0 and els:
                 els = els[: r.randrange(len(els))]
-            body = hdr + "\n" + "\n".join(" ".join(els[k : k + cols * per]) for k in range(0, len(els), max(1, cols * per))) + "\n"
+            body = (
+                hdr
+                + "\n"
+                + "\n".join(
+                    " ".join(els[k : k + cols * per])
+                    for k in range(0, len(els), max(1, cols * per))
+                )
+                + "\n"
+            )
             given = r.choice(["new", "new", self.mat(r, rows or 1, cols, 1 if typ == 3 else typ)])
             L.append(f"mreadasc {xs(body)} {given}")
-            b = struct.pack(">iii", typ, rows, cols) + b"".join(struct.pack(">d", r.uniform(-9, 9)) for _ in range(rows * cols * per))
+            b = struct.pack(">iii", typ, rows, cols) + b"".join(
+                struct.pack(">d", r.uniform(-9, 9)) for _ in range(rows * cols * per)
+            )
             if i % 6 == 0:
                 b = b[: r.randrange(len(b) + 1)]
             L.append(f"mreadbin {xs(b)} {given}")
@@ -710,10 +882,18 @@ class Gen:
 
     def rfields(self) -> list[Batch]:
         names = ["uniform", "gaussian", "z", "t", "F", "chi2", "f", "Gaussian", "", "normal", "chi"]
-        L = [f"rfname {xs(n)}" for n in names] + [f"rfinit {s} {t}" for s, t in [(1, 2), (12345, 7), (4294967295, 1)]]
+        L = [f"rfname {xs(n)}" for n in names] + [
+            f"rfinit {s} {t}" for s, t in [(1, 2), (12345, 7), (4294967295, 1)]
+        ]
         return [
             Batch("rfields", "rfields", L),
-            Batch("rfields", "rfields-clock", ["rfinit 0 5", "rfinit 3 0"], never="the clock", mask_digits=True),
+            Batch(
+                "rfields",
+                "rfields-clock",
+                ["rfinit 0 5", "rfinit 3 0"],
+                never="the clock",
+                mask_digits=True,
+            ),
         ]
 
 
@@ -761,7 +941,11 @@ def decode(line: bytes) -> tuple[bytes, bytes, bytes]:
     res, _, streams = line.rpartition(b" | ")
     parts = streams.split(b" ")
     o = bytes.fromhex(parts[0][1:].decode()) if parts and parts[0].startswith(b"x") else b""
-    e = bytes.fromhex(parts[1][1:].decode()) if len(parts) > 1 and parts[1].startswith(b"x") else b""
+    e = (
+        bytes.fromhex(parts[1][1:].decode())
+        if len(parts) > 1 and parts[1].startswith(b"x")
+        else b""
+    )
     return res, o, e
 
 
@@ -778,16 +962,23 @@ class Runner:
 
                 self.cache = oracle_cache
             except ImportError:
-                print("note: larmorx_validation not importable: the probe runs without the cache", file=sys.stderr)
+                print(
+                    "note: larmorx_validation not importable: the probe runs without the cache",
+                    file=sys.stderr,
+                )
 
     def _run(self, argv: list[str], env: dict[str, str], never: str, runner: str) -> bytes:
         if self.cache is not None:
             pol = self.cache.Policy(threads=1, family="freesurfer", never=never)
-            c = self.cache.run(argv, env=env, cwd=self.work, policy=pol, timeout=7200, runner=runner)
+            c = self.cache.run(
+                argv, env=env, cwd=self.work, policy=pol, timeout=7200, runner=runner
+            )
             if c.returncode != 0:
                 raise SystemExit(f"{argv[0]} failed ({c.returncode}): {c.stderr[-2000:]}")
             return c.stdout_bytes
-        p = subprocess.run(argv, env=env, cwd=self.work, capture_output=True, timeout=7200, check=False)
+        p = subprocess.run(
+            argv, env=env, cwd=self.work, capture_output=True, timeout=7200, check=False
+        )
         if p.returncode != 0:
             raise SystemExit(f"{argv[0]} failed ({p.returncode}): {p.stderr[-2000:]!r}")
         return p.stdout
@@ -795,18 +986,38 @@ class Runner:
     def probe_runs(self, b: Batch, path: Path) -> tuple[list[bytes], list[bool]]:
         """The probe's lines, and which of them depend on memory FreeSurfer does not own."""
         env = dict(BASE_ENV, **b.env)
-        plain = parse(self._run([str(self.probe), "batch", str(path)], env, b.never, "freesurfer-maths-probe"))
+        plain = parse(
+            self._run([str(self.probe), "batch", str(path)], env, b.never, "freesurfer-maths-probe")
+        )
         guarded = []
         for fill in GUARDS:
             genv = dict(env, LD_PRELOAD=str(self.guard), MALLOC_PERTURB_=fill)
-            guarded.append(parse(self._run([str(self.probe), "batch", str(path)], genv, b.never, "freesurfer-maths-probe")))
+            guarded.append(
+                parse(
+                    self._run(
+                        [str(self.probe), "batch", str(path)],
+                        genv,
+                        b.never,
+                        "freesurfer-maths-probe",
+                    )
+                )
+            )
         g0, g1 = guarded
-        memory = [not (mask(b, plain[i]) == mask(b, g0[i]) == mask(b, g1[i])) for i in range(len(plain))]
+        memory = [
+            not (mask(b, plain[i]) == mask(b, g0[i]) == mask(b, g1[i])) for i in range(len(plain))
+        ]
         return plain, memory
 
     def candidate_run(self, cand: Path, b: Batch, path: Path, mode: str) -> list[bytes]:
         env = dict(BASE_ENV, **b.env, LARMORX_UPSTREAM_DEFECTS=mode)
-        p = subprocess.run([str(cand), "batch", str(path)], env=env, cwd=self.work, capture_output=True, timeout=7200, check=False)
+        p = subprocess.run(
+            [str(cand), "batch", str(path)],
+            env=env,
+            cwd=self.work,
+            capture_output=True,
+            timeout=7200,
+            check=False,
+        )
         return parse(p.stdout)
 
 
@@ -832,7 +1043,9 @@ def write_batch(scratch: Path, b: Batch) -> Path:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("command", choices=["list", "refs", "compare"])
     ap.add_argument("--probe", type=Path)
     ap.add_argument("--candidate", type=Path)
@@ -881,7 +1094,9 @@ def main() -> int:
                 a.dump.mkdir(parents=True, exist_ok=True)
                 with (a.dump / f"{b.group}.txt").open("ab") as f:
                     for src, ln, mem in zip(b.lines, plain, memory, strict=True):
-                        f.write(f"== {src[:300]}{'  [memory]' if mem else ''}\n".encode() + ln + b"\n")
+                        f.write(
+                            f"== {src[:300]}{'  [memory]' if mem else ''}\n".encode() + ln + b"\n"
+                        )
         for g in groups:
             c = counts[g]
             print(
@@ -932,7 +1147,9 @@ def main() -> int:
             if t["unexplained"] <= 3:
                 print(f"DIFFERS: {b.group}: {src[:160]}")
                 print(f"    probe     {p[:200]!r}\n    candidate {q[:200]!r}")
-    print(f"mode {a.mode}: group, calls: identical, FreeSurfer did not finish, memory, defect corrected, unexplained")
+    print(
+        f"mode {a.mode}: group, calls: identical, FreeSurfer did not finish, memory, defect corrected, unexplained"
+    )
     for g in groups:
         t = tally.get(g, Counter())
         print(
@@ -940,7 +1157,10 @@ def main() -> int:
             f"{t['memory']:5d} {t['defect corrected']:5d} {t['unexplained']:5d}"
         )
     if noted:
-        print("defects the candidate noted on the allowed lines: " + ", ".join(f"{k} {v}" for k, v in sorted(noted.items())))
+        print(
+            "defects the candidate noted on the allowed lines: "
+            + ", ".join(f"{k} {v}" for k, v in sorted(noted.items()))
+        )
     return 1 if bad else 0
 
 

@@ -547,6 +547,55 @@ void run_case()
       oi(r);
       od(val);
     }
+  } else if (cmd == "trans" || cmd == "rot") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    MRI *r;
+    if (cmd == "trans") {
+      double dx = getd(), dy = getd(), dz = getd();
+      r = MRItranslate(src, dst, dx, dy, dz);
+    } else {
+      MATRIX *mR = MatrixAlloc(3, 3, MATRIX_REAL);
+      for (int i = 1; i <= 3; i++)
+        for (int j = 1; j <= 3; j++) mR->rptr[i][j] = getf();
+      MATRIX *mO = NULL;
+      if (geti()) {
+        mO = MatrixAlloc(3, 1, MATRIX_REAL);
+        for (int i = 1; i <= 3; i++) mO->rptr[i][1] = getf();
+      }
+      r = MRIrotate_I(src, dst, mR, mO);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "rotx" || cmd == "roty" || cmd == "rotz") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    float angle = getf();
+    MRI *r;
+    if (cmd == "rotx") r = MRIrotateX_I(src, dst, angle);
+    else if (cmd == "roty") r = MRIrotateY_I(src, dst, angle);
+    else r = MRIrotateZ_I(src, dst, angle);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+    put_vol(dst);
+  } else if (cmd == "skull") {
+    MRI *m = get_vol();
+    int nb = geti();
+    for (int b = 0; b < nb; b++) {
+      int x0 = geti(), y0 = geti(), z0 = geti(), x1 = geti(), y1 = geti(), z1 = geti();
+      float v = getf();
+      for (int z = z0; z <= z1; z++)
+        for (int y = y0; y <= y1; y++)
+          for (int x = x0; x <= x1; x++) MRIsetVoxVal(m, x, y, z, 0, v);
+    }
+    int th = geti();
+    MRI_REGION box;
+    box.x = box.y = box.z = box.dx = box.dy = box.dz = -7;
+    fflush(stdout);
+    int r = MRIfindApproximateSkullBoundingBox(m, th, &box);
+    fflush(stdout);
+    oi(r);
+    oi(box.x); oi(box.y); oi(box.z); oi(box.dx); oi(box.dy); oi(box.dz);
   } else if (cmd == "coef" || cmd == "hsinc") {
     int n = geti();
     for (int i = 0; i < n; i++) {

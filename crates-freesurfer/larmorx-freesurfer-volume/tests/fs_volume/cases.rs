@@ -24,7 +24,9 @@ use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
 use larmorx_freesurfer_volume::coords as co;
+use larmorx_freesurfer_volume::rotate as rt;
 use larmorx_freesurfer_volume::sample as sm;
+use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::vgeom;
 
 /// The cases' random numbers.
@@ -759,6 +761,132 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push(aux.to_string());
                 }
             }
+            "trans" | "rot" => {
+                let mut s = shape(&mut g);
+                if g.chance(2) {
+                    s.ty = 0;
+                }
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let mode = g.pick(&[0, 0, 0, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                if cmd == "trans" {
+                    for _ in 0..3 {
+                        t.push(dx(g.pick(&[
+                            0.0,
+                            1.0,
+                            -1.0,
+                            0.5,
+                            -0.5,
+                            1.25,
+                            2.0,
+                            -2.75,
+                            0.3,
+                            1e-8,
+                            f64::NAN,
+                            1e10,
+                        ])));
+                    }
+                } else {
+                    let a = g.pick(&[0.0f32, 0.3, -0.7, 1.5707964, 3.1415927, 0.05, 2.0]);
+                    let (c, sn) = (a.cos(), a.sin());
+                    let base = match g.below(4) {
+                        0 => [1.0, 0.0, 0.0, 0.0, c, sn, 0.0, -sn, c],
+                        1 => [c, 0.0, -sn, 0.0, 1.0, 0.0, sn, 0.0, c],
+                        2 => [c, sn, 0.0, -sn, c, 0.0, 0.0, 0.0, 1.0],
+                        _ => {
+                            let mut m = [0.0f32; 9];
+                            for v in m.iter_mut() {
+                                *v = g.pick(&[0.0, 1.0, -1.0, 0.5, 2.0, 0.25]);
+                            }
+                            m
+                        }
+                    };
+                    for v in base {
+                        t.push(fx(if g.chance(60) { f32::NAN } else { v }));
+                    }
+                    let o = g.chance(2);
+                    t.push(i64::from(o).to_string());
+                    if o {
+                        for _ in 0..3 {
+                            t.push(fx(g.pick(&[0.0, 1.0, 1.5, 2.0, -1.0, 0.75])));
+                        }
+                    }
+                }
+            }
+            "rotx" | "roty" | "rotz" => {
+                let mut s = shape(&mut g);
+                if g.chance(2) {
+                    s.ty = 0;
+                }
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let d = g.chance(4);
+                t.push(i64::from(d).to_string());
+                if d {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                t.push(fx(g.pick(&[
+                    0.0f32,
+                    0.1,
+                    0.5,
+                    1.5707964,
+                    3.1415927,
+                    -0.7,
+                    1e-6,
+                    f32::NAN,
+                    f32::INFINITY,
+                ])));
+            }
+            "skull" => {
+                let s = Shape {
+                    w: g.int(6, 48),
+                    h: g.int(6, 48),
+                    d: g.int(1, 14),
+                    ty: g.pick(&[0, 0, 0, 3, 4, 1]),
+                    nf: 1,
+                    hdr: false,
+                    drop: false,
+                };
+                vol_of(&mut g, &mut t, s);
+                let nb = g.int(0, 3);
+                t.push(nb.to_string());
+                for b in 0..nb {
+                    let (w, h, d) = (s.w, s.h, s.d);
+                    let full = b == 0 && g.chance(2);
+                    let (x0, y0, z0) = if full {
+                        (0, 0, 0)
+                    } else {
+                        (g.int(0, w - 1), g.int(0, h - 1), g.int(0, d - 1))
+                    };
+                    let (x1, y1, z1) = if full {
+                        (w - 1, h - 1, d - 1)
+                    } else {
+                        (g.int(x0, w - 1), g.int(y0, h - 1), g.int(z0, d - 1))
+                    };
+                    for v in [x0, y0, z0, x1, y1, z1] {
+                        t.push(v.to_string());
+                    }
+                    let v = if full {
+                        g.pick(&[0.0f32, 0.0, 5.0, 2.0])
+                    } else if g.chance(20) {
+                        g.pick(&[f32::INFINITY, f32::NAN, 1e30])
+                    } else {
+                        g.pick(&[100.0f32, 200.0, 255.0, 60.0, 0.0, 30.0])
+                    };
+                    t.push(fx(v));
+                }
+                t.push(g.pick(&[0, 10, 50, 100, 128, 300, -5, 20]).to_string());
+            }
             "coef" | "hsinc" => {
                 let n = 6;
                 t.push(n.to_string());
@@ -853,7 +981,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 57] = [
+pub const COMMANDS: [&str; 63] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -911,6 +1039,12 @@ pub const COMMANDS: [&str; 57] = [
     "ssincf",
     "coef",
     "hsinc",
+    "trans",
+    "rot",
+    "rotx",
+    "roty",
+    "rotz",
+    "skull",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -1442,6 +1576,86 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "stri" | "styp" | "sfrm" | "sfty" | "scub" | "scubf" | "ssinc" | "ssincf" => {
             samplers(cx, t, o, cmd)?;
+        }
+        "trans" | "rot" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if cmd == "trans" {
+                let (dx, dy, dz) = (t.d(), t.d(), t.d());
+                let p = pair(mode, &mut src, &mut dst);
+                rt::mri_translate(g, a, b, p, dx, dy, dz)?
+            } else {
+                let mut mr = mx::matrix_alloc(g, a, b, 3, 3, mx::MATRIX_REAL)?.expect("3 x 3");
+                for i in 1..=3 {
+                    for j in 1..=3 {
+                        mr.set_relt(i, j, t.f());
+                    }
+                }
+                let mo = if t.i() != 0 {
+                    let mut m = mx::matrix_alloc(g, a, b, 3, 1, mx::MATRIX_REAL)?.expect("3 x 1");
+                    for i in 1..=3 {
+                        m.set_relt(i, 1, t.f());
+                    }
+                    Some(m)
+                } else {
+                    None
+                };
+                let p = pair(mode, &mut src, &mut dst);
+                rt::mri_rotate_i(g, a, b, p, &mr, mo.as_ref())?
+            };
+            let given = if mode == 2 { Some(&src) } else { dst.as_ref() };
+            o.ret(&r, given);
+        }
+        "rotx" | "roty" | "rotz" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let angle = t.f();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match cmd {
+                "rotx" => rt::mri_rotate_x_i(g, a, b, &src, dst.as_mut(), angle)?,
+                "roty" => rt::mri_rotate_y_i(g, a, b, &src, dst.as_mut(), angle)?,
+                _ => rt::mri_rotate_z_i(g, a, b, &src, dst.as_mut(), angle)?,
+            };
+            o.i(0);
+            o.vol(r.as_ref());
+            o.vol(dst.as_ref());
+        }
+        "skull" => {
+            let mut m = get_vol(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let nb = t.i();
+            for _ in 0..nb {
+                let (x0, y0, z0, x1, y1, z1) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+                let v = t.f();
+                for z in z0..=z1 {
+                    for y in y0..=y1 {
+                        for x in x0..=x1 {
+                            larmorx_freesurfer_mri::voxel::mri_set_vox_val(
+                                g, b, &mut m, x, y, z, 0, v, 0,
+                            )?;
+                        }
+                    }
+                }
+            }
+            let th = t.i();
+            let mut bx = MriRegion {
+                x: -7,
+                y: -7,
+                z: -7,
+                dx: -7,
+                dy: -7,
+                dz: -7,
+            };
+            let r = sk::find_approximate_skull_bounding_box(g, a, b, &m, th, &mut bx)?;
+            o.i(i64::from(r));
+            for v in [bx.x, bx.y, bx.z, bx.dx, bx.dy, bx.dz] {
+                o.i(i64::from(v));
+            }
         }
         "coef" | "hsinc" => {
             let n = t.i();

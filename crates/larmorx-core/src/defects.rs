@@ -1471,6 +1471,14 @@ defects! {
         "MRIcubicSampleVolume (cubic sampling) divides its weighted sum by the number of points it added (64 inside the volume) where its weights sum to 8: a constant volume samples to an eighth of its value, other volumes likewise too dark";
     FS_300 = "FS-300", "FreeSurfer", true,
         "MRIcubicSampleVolumeFrame (cubic sampling of a frame) near the volume's edge adds window points it never read: memory contents";
+    FS_301 = "FS-301", "FreeSurfer", true,
+        "MRItranslate and MRIrotate_I (and the rotations about an axis) write each sample as a byte at the voxel's byte place whatever the volume's type: a volume of another type gets bytes inside its voxels";
+    FS_303 = "FS-303", "FreeSurfer", true,
+        "MRItranslate and MRIrotate_I on a volume of a type the trilinear sampler refuses store a value never set (memory contents) or the sample before";
+    FS_304 = "FS-304", "FreeSurfer", true,
+        "MRIrotateX_I, MRIrotateY_I and MRIrotateZ_I with an angle whose rotation cannot be inverted (NaN, infinite) crash after the error message";
+    FS_305 = "FS-305", "FreeSurfer", true,
+        "MRIfindApproximateSkullBoundingBox of a volume whose centre of mass is not a number (infinite voxels) walks about two billion voxels outside the volume and, when its first box is narrow, never returns";
     FS_302 = "FS-302", "FreeSurfer", true,
         "the sinc samplers with a half-width whose window holds more than 128 voxels on an axis write past their weight arrays: memory corruption or a crash";
 }

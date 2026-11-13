@@ -155,7 +155,7 @@ validation = "replica: [{afni-tshift-replica.identical} of {afni-tshift-replica.
 id = "afni-automask"
 title = "3dAutomask (brain mask)"
 eco = "afni"
-page = "/tools/afni-automask/"
+page = "/evidence/afni-automask/"
 use = ["larmorx afni 3dAutomask", "lx.afni.automask"]
 how = "replica and clean room, both in larmorx (the replica with CC BY 4.0's attribution)"
 # "92 of 106" and "85 of 85" are the records' own statements (their JSON keeps no per-case
@@ -166,7 +166,7 @@ validation = "replica: [{afni-automask-replica.identical} of {afni-automask-repl
 id = "afni-unifize"
 title = "3dUnifize (intensity uniformization)"
 eco = "afni"
-page = "/tools/afni-unifize/"
+page = "/evidence/afni-unifize/"
 use = ["larmorx afni 3dUnifize", "lx.afni.unifize"]
 how = "replica and clean room, both in larmorx (the replica with CC BY 4.0's attribution)"
 validation = "replica: [{afni-unifize-replica.identical} of {afni-unifize-replica.written}](record:afni-unifize-replica) compared cases that write outputs bit-identical at 1, 2 and 6 threads; clean room: [{afni-unifize.cases} cases](record:afni-unifize), none failing: {afni-unifize.identical} of {afni-unifize.written} compared cases that write outputs bit-identical to AFNI, the other {afni-unifize.with_crmath} within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call in every fMRIPrep run included; 4 to 25 times faster than AFNI (informal timings)"

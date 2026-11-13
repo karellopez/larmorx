@@ -23,6 +23,8 @@ REPLICA = "larmorx, Apache-2.0 with CC BY 4.0's attribution"
 TEXTS = [
     (r"\bthe larmorx replica\b", "the replica"),
     (r"\bboth LARMORX implementations\b", "both ports"),
+    (r"\bThe two implementations\b", "The two ports"),
+    (r"\bReproduce mode\b", "`reproduce`"),
     (
         r"\b(?:in|each in) (?:its|their) default and reproduce modes?\b",
         "in `fix` and in `reproduce`",

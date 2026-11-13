@@ -247,6 +247,17 @@ NIPYPE = (
         control_envs=("e1", "e3"),
         extra=(("nipy-avx512-off", ("--sections", "nipy"), ("e1", "e3"), True, "full"),),
     ),
+    Script(
+        "cli",
+        "check_nipype_cli.py",
+        "larmorx nipype run against nipype's own nipypecli run: the click layer, the 61 helps, "
+        "argparse's and traits' errors, the 37 interfaces larmorx runs with their options, "
+        "PIPE-81 and PIPE-82 against nipype's Python API, fMRIPrep's real confounds nodes of "
+        "three oracle runs (full tier)",
+        envs=("e1",),
+        gib=20,
+        tag_envs=("e1",),
+    ),
 )
 FMRIPREP = (
     Script(
@@ -377,11 +388,12 @@ ABOUT = {
     ),
     "confounds-nipype": (
         "nipype's confound algorithms (DVARS, CompCor, TSNR, the non-steady-state detector, "
-        "framewise displacement)",
+        "framewise displacement) and nipype's interface runner (larmorx nipype run)",
         "`lx.confounds` (`crates/larmorx-confounds`), niworkflows' `robust_acompcor` and "
-        "`robust_tcompcor`",
+        "`robust_tcompcor`, `lx.nipype`",
         "nipype 1.12.0 and nitime in-process in the newest and the shared library releases and "
-        "in fMRIPrep 25.2.6's image, and fMRIPrep 25.2.6's own node files of 21 oracle runs",
+        "in fMRIPrep 25.2.6's image, fMRIPrep 25.2.6's own node files of 21 oracle runs, and "
+        "nipype 1.12.0's own nipypecli run with niworkflows 1.15.4 and fMRIPrep 25.2.7",
     ),
     "confounds-fmriprep": (
         "fMRIPrep's and niworkflows' confound steps and fMRIPrep's confounds workflow",

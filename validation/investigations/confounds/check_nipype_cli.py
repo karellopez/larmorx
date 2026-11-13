@@ -29,7 +29,10 @@ Run it in the newest environment with the worktree's extension::
         <workspace>/oracles/python-sdcflows-2.17/bin/python -P check_nipype_cli.py \\
         [--tier quick|full] [--cases PATTERN]
 
-(``LARMORX_WORKSPACE``: the workspace, for the oracle runs.) Exit status 1 when a case differs.
+(``LARMORX_WORKSPACE``: the workspace, for the oracle runs.) It prints a line per kind of case
+(``<kind> <k> of <n> identical``), what it reports (``INFO``) and ``CHECK PASS: 0 cases differ``
+(the parity suite ``confounds-nipype`` runs it as its cases ``cli-quick-e1`` and ``cli-full-e1``).
+Exit status 1 when a case differs.
 """
 
 from __future__ import annotations
@@ -49,6 +52,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+os.environ.setdefault("NIPYPE_NO_ET", "1")  # nipype's version check over the network: off
 sys.path.append(str(Path(__file__).resolve().parent))
 from check_nipype_cli_cases import WORKSPACE, WORKTREE, Case, cases, make_inputs
 
@@ -184,6 +188,8 @@ def compare(a: Result, b: Result, what: str, by_name: bool = False) -> list[str]
 
 #: files equal by column name only (PIPE-43), as ``what: file``
 BY_NAME: list[str] = []
+#: cases nipype's command line refuses where larmorx's default corrects PIPE-81 or PIPE-82
+REFUSED: list[str] = []
 CLI_DEFECTS = ("PIPE-81", "PIPE-82")
 
 
@@ -208,7 +214,7 @@ def check(case: Case, tmp: Path) -> tuple[bool, str]:
     problems: list[str] = []
     if case.expect == "larmorx":
         ok = rep.code == 1 and fix.code == 1 and rep.err.startswith("error: ")
-        return ok, f"nipype exit {nip.code}, larmorx exit {rep.code}: {rep.err.strip()}"
+        return ok, f"nipype exit {nip.code}, larmorx exit {rep.code} with its own message"
     problems += compare(nip, rep, "reproduce", case.by_name)
     expect = case.expect
     entries = _entries(fix.notices)
@@ -229,6 +235,7 @@ def check(case: Case, tmp: Path) -> tuple[bool, str]:
             problems.append(f"fix: exit {fix.code} vs {nip.code}")
     else:
         wanted = set(expect.split(":", 1)[1].split("|"))
+        REFUSED.append(case.name)
         if not wanted & entries:
             problems.append(f"fix: no {'/'.join(sorted(wanted))} notice ({fix.notices})")
         if nip.code == 0 and case.api is not None:
@@ -275,30 +282,34 @@ def main() -> int:
         make_inputs(INPUTS)
         todo = [c for c in cases(a.tier, INPUTS) if fnmatch.fnmatch(c.name, a.cases)]
         failed = 0
-        counts: dict[str, int] = {}
+        counts: dict[str, list[int]] = {}
         corrected: dict[str, int] = {}
         with ThreadPoolExecutor(a.jobs) as pool:
             results = pool.map(lambda c: (c, *check(c, tmp)), todo)
             for c, ok, detail in results:
                 kind = c.name.split("/", 1)[0]
-                counts[kind] = counts.get(kind, 0) + 1
+                tally = counts.setdefault(kind, [0, 0])
+                tally[0] += ok
+                tally[1] += 1
                 if not ok:
                     failed += 1
                     print(f"FAIL {c.name}\n{detail}\n", flush=True)
                 elif c.expect == "larmorx":
-                    print(f"DOC  {c.name}: {detail}", flush=True)
+                    print(f"INFO documented difference {c.name}: {detail}", flush=True)
                 elif detail:
                     for e in detail.split(": ", 1)[1].split(", "):
                         corrected[e] = corrected.get(e, 0) + 1
-        print("cases:", ", ".join(f"{k} {v}" for k, v in counts.items()))
+        for kind, (ok, n) in counts.items():
+            print(f"{kind} {ok} of {n} identical")
         print(
-            "fix mode, the interfaces' own defects corrected (reproduce identical):",
-            ", ".join(f"{k} in {v}" for k, v in sorted(corrected.items())) or "none",
+            "INFO fix mode, the interfaces' own defects corrected (reproduce identical): "
+            + (", ".join(f"{k} in {v}" for k, v in sorted(corrected.items())) or "none")
         )
-        print(f"tables equal by column name only (PIPE-43): {len(BY_NAME)}")
+        print(f"INFO tables equal by column name only (PIPE-43): {len(BY_NAME)}")
         print(
-            f"CHECK {'PASS' if not failed else 'FAIL'}: {len(todo) - failed} of {len(todo)} cases"
+            f"INFO cases nipype's command line refuses, corrected (PIPE-81, PIPE-82): {len(REFUSED)}"
         )
+        print(f"CHECK {'PASS' if not failed else 'DIFFER'}: {failed} cases differ")
         return 1 if failed else 0
 
 

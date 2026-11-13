@@ -16,6 +16,8 @@ names its licence on one of its first lines (after a shebang):
   (`crates-gpl/larmorx-gpl-tedana/`, translated from tedana's LGPL-2.1-only code under its
   section 3) it is `GPL-3.0-only`.
 - `crates-nc/`: the expression must contain `LicenseRef-FSL`.
+- `crates-freesurfer/`: the expression must contain `LicenseRef-FreeSurfer` (FreeSurfer's licence,
+  since 2026-11-12).
 
 Usage:
     python scripts/check_spdx.py          # report files without a correct header; exit 1 if any
@@ -132,6 +134,8 @@ def family(rel: Path) -> str | None:
         return "gpl"
     if top == "crates-nc":
         return "nc"
+    if top == "crates-freesurfer":
+        return "freesurfer"
     return None
 
 
@@ -153,6 +157,8 @@ def problem(fam: str, expr: str | None) -> str | None:
         return f"'{expr}' does not start with GPL-3.0-or-later"
     if fam == "nc" and "LicenseRef-FSL" not in expr:
         return f"'{expr}' does not name LicenseRef-FSL"
+    if fam == "freesurfer" and "LicenseRef-FreeSurfer" not in expr:
+        return f"'{expr}' does not name LicenseRef-FreeSurfer"
     return None
 
 

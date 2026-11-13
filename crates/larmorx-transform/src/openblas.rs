@@ -271,6 +271,19 @@ pub fn lu_sign_and_diagonal3(m: &[[f64; 3]; 3]) -> Option<(f64, [f64; 3])> {
     Some((sign, [a[0][0], a[1][1], a[2][2]]))
 }
 
+/// [`lu_sign_and_diagonal3`] of a 4×4 matrix (numpy's `det` of an affine: nitransforms'
+/// `np.linalg.det(affine) > 0`).
+pub fn lu_sign_and_diagonal4(m: &Mat4) -> Option<(f64, [f64; 4])> {
+    let mut a: [[f64; 4]; 4] = std::array::from_fn(|c| std::array::from_fn(|r| m[r][c]));
+    let mut ipiv = [0usize; 4];
+    if getf2(&mut a, &mut ipiv) != 0 {
+        return None;
+    }
+    let swaps = ipiv.iter().enumerate().filter(|(i, p)| *i != **p).count();
+    let sign = if swaps % 2 == 1 { -1.0 } else { 1.0 };
+    Some((sign, [a[0][0], a[1][1], a[2][2], a[3][3]]))
+}
+
 /// `getf2_k` (OpenBLAS's left-looking LU with partial pivoting) on a column-major 4×4 matrix,
 /// in place: `a[c][r]`. Fills `ipiv` (0-based) and returns LAPACK's `info` (0, or one more than
 /// the first column with an exactly zero pivot). Only for 3×3 and 4×4: then every `dgemv_n`

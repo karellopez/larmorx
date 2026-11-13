@@ -1,0 +1,17 @@
+[package]
+name = "larmorx-gpl-gsl"
+description = "GSL 1.8's RANLUX389 generator and random distributions as FreeSurfer 8.2.0's utils/numerics.cpp transcribes them (the sc_* functions), translated exactly to Rust, bit for bit with FreeSurfer's official build; the bit-exact reference of larmorx's clean room (larmorx_core::ranlux); GPL-3.0-or-later, as GSL 1.8's GPL-2.0-or-later allows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "GPL-3.0-or-later"
+repository.workspace = true
+publish = false
+
+[dependencies]
+# glibc 2.35's log and exp (log_glibc, exp_glibc), the correctly rounded tan, D13's defects (FS-100, FS-101)
+larmorx-core.workspace = true
+
+[dev-dependencies]
+# the golden tests' and the reference streams' checksums
+sha2.workspace = true

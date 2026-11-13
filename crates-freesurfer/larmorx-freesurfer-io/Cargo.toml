@@ -1,0 +1,18 @@
+[package]
+name = "larmorx-freesurfer-io"
+description = "FreeSurfer 8.2.0's replica for larmorx: the volume formats (MRIread/MRIwrite: MGH/MGZ, NIfTI, ANALYZE, the format probe, the other readers; FreeSurfer's tags, .mat, .npy, GIFTI volumes), FreeSurfer's changes to MINC's files, and colour tables, annotations, labels, register.dat, control points, point sets and CSV (fs.labels) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-mri.workspace = true
+larmorx-io.workspace = true
+larmorx-core.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true
+tempfile.workspace = true

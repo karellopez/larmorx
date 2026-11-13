@@ -15,6 +15,7 @@
 | Runs | - |
 | How it runs in the reference runs | bare |
 | Stages (programs.md §3) | fmriprep |
+| Why this wave | -tmap_std's random map uses the clean-room RANLUX (3.1-05) |
 
 ## The calls recon-all and fMRIPrep make
 
@@ -39,7 +40,8 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `N`, `O`, `R`, `S
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,596), `packages/expat/xmlparse.c` (4,342), `utils/mri.cpp` (4,050), `utils/mrisurf_io.cpp` (3,688), `utils/DICOMRead.cpp` (3,473), `utils/mrisurf_metricProperties.cpp` (3,442), `utils/mrisurf_compute_dxyz.cpp` (2,966), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `utils/gifti.cpp` (2,645), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923)
-- Reach per module (waves.md §3): fs.io 16,468, fs.surfio 15,116, perm.gifti 10,365, fs.deform 7,165, fs.volume 7,111, fs.gca 6,014, fs.surf 4,372, perm.dicom 4,371, fs.maths 2,569, perm.minc 1,625, perm.json 1,579, perm.misc 1,431, fs.core 1,410, fs.labels 1,294, fs.filter 834, fs.bspline 785, own 424, perm.nifti 335, fs.defect 1
+- Reach per module (waves.md §3): fs.surfio 15,116, fs.io 13,359, perm.gifti 10,365, fs.deform 7,165, fs.gca 6,014, fs.volume 5,337, fs.surf 4,372, perm.dicom 4,371, fs.dicomread 3,218, fs.maths 2,288, fs.mri 1,747, perm.minc 1,625, perm.json 1,579, perm.misc 1,431, fs.core 1,410, fs.labels 1,212, fs.filter 834, fs.bspline 785, own 424, perm.nifti 335, gpl.gsl 281, fs.defect 1
+- Option paths that wait for a later module: fs.dicomread (3,218 lines)
 - Its queue item brings 445 lines (the functions only it reaches)
   - 3.5-24: mris_expand (445 lines)
 
@@ -47,7 +49,7 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `N`, `O`, `R`, `S
 
 - TP-01: OpenRan1, setRandomSeed and randomNumber draw from VXL's vnl_random (BSD-3-Clause (VXL); portable-with-notice)
 - TP-02: The Open* wrappers of numerics.cpp call VNL's linear algebra and optimisers (BSD-3-Clause (VXL); the netlib parts through v3p; portable-with-notice)
-- TP-03: numerics.cpp's 'GSL library replacement': RANLUX389 and the random distributions (GSL is GPL-2.0-or-later (1.8; GPL-3.0-or-later since 1.12); the file carries FreeSurfer's notice only; question)
+- TP-03: numerics.cpp's 'GSL library replacement': RANLUX389 and the random distributions (GSL is GPL-2.0-or-later (1.8; GPL-3.0-or-later since 1.12); the file carries FreeSurfer's notice only; gpl-alone)
 - TP-05: The B-spline interpolation and pyramids of mriBSpline.cpp follow EPFL's code (the file carries FreeSurfer's notice; EPFL's code states no terms; Unser's 1992 filters were written at NIH; portable-with-notice)
 - TP-06: Numerical Recipes' nrutil allocators (Numerical Recipes' terms (not checked: nothing of it is ported); nothing-to-port)
 - TP-13: Small permissive pieces (MIT, BSD-3-Clause, BSL-1.0, public domain; portable-with-notice)
@@ -55,7 +57,7 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `N`, `O`, `R`, `S
 - P-01 (VXL's VNL as ITK 4.13.2 bundles it: linear algebra, optimisers, vnl_random, vnl_fft): its replica in larmorx; larmorx-freesurfer uses the replica (larmorx's VNL ports, at ITK 4.13.2's version: section 10 finds no change of arithmetic in the VNL routines FreeSurfer calls)
 - P-02 (netlib through VXL's v3p: LINPACK, EISPACK, LAPACK, BLAS, libf2c, Nocedal's L-BFGS): its replica in larmorx; larmorx-freesurfer uses the replica
 - P-06 (small permissive pieces: nlohmann/json (with Grisu2 and Hoehrmann's UTF-8 decoder), Bristow's argparse, Geometric Tools' distances, the FNV hash, Devillard's quickselect): its replica in larmorx (argparse's FreeSurfer changes in larmorx-freesurfer); larmorx-freesurfer uses the replica
-- P-08 (GSL 1.8's RANLUX389 and random distributions, as numerics.cpp transcribes them): its replica in larmorx-gpl (as GPL-3.0-or-later); larmorx-freesurfer uses the clean-room piece (larmorx, Apache-2.0): RANLUX389 and the distributions written from Luescher (1994), James (1994), Knuth and Marsaglia and a spec of the exact expressions FreeSurfer evaluates, by an agent that has read neither GSL nor FreeSurfer's transcription; bit-exact, because the algorithms define every operation
+- P-08 (GSL 1.8's RANLUX389 and random distributions, as numerics.cpp transcribes them): its replica in larmorx-gpl, alone (GPL-3.0-or-later, as GSL 1.8's 'or (at your option) any later version' allows): the crate larmorx-gpl-gsl in crates-gpl/, which no FreeSurfer program links; larmorx-freesurfer uses the clean-room piece (larmorx, Apache-2.0): RANLUX389 and the distributions written from Luescher (1994), James (1994), Knuth and Marsaglia and a spec of the exact expressions FreeSurfer evaluates, by an agent that has read neither GSL nor FreeSurfer's transcription; bit-exact, because the algorithms define every operation
 - P-10 (EPFL's cubic B-spline coefficients and Unser's 1992 NIH pyramid filters, in Reuter's 3D code): its replica in larmorx-freesurfer, like FreeSurfer's other files, crediting EPFL (the paper, and the 2D example code whose routine names it keeps: ConvertToInterpolationCoefficients, InitialCausalCoefficient, InitialAntiCausalCoefficient) in the crate's PROVENANCE.md and NOTICE; larmorx-freesurfer uses the replica (mriBSpline.cpp translated, its own queue item in wave 3.2 with mri_robust_template)
 - P-14 (Numerical Recipes' nrutil allocators): its replica in none: nothing to port (Rust's own vectors); larmorx-freesurfer uses Rust allocation
 - P-15 (the C library's behaviours: drand48/srand48, rand/srand/srandom (random_r), qsort, the libm functions): its replica in larmorx, from definitions and behaviour specs (drand48 from POSIX; random_r, qsort and the libm functions not yet covered by larmorx_core::math from specs); larmorx-freesurfer uses the spec-written functions (larmorx_core::math's *_glibc and its specs)

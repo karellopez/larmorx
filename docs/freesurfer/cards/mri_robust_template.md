@@ -39,8 +39,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: liblapack.a, libblas.a, libgfortran.a, libquadmath.a, z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,848), `packages/expat/xmlparse.c` (4,342), `utils/mri.cpp` (4,299), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `utils/transform.cpp` (2,346), `packages/dicom/dcm.c` (2,191), `utils/mriBSpline.cpp` (1,946), `utils/gcamorph.cpp` (1,923), `packages/gifti/gifti_io.c` (1,712), `utils/matrix.cpp` (1,376)
-- Reach per module (waves.md §3): fs.io 14,223, perm.gifti 10,365, fs.robust 8,391, fs.volume 7,992, fs.gca 6,014, perm.dicom 4,371, fs.bspline 1,946, fs.maths 1,709, perm.minc 1,625, fs.filter 1,551, perm.misc 1,411, fs.labels 1,150, fs.core 1,135, own 797, perm.nifti 335, fs.surfio 108, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines), fs.gca (6,014 lines)
+- Reach per module (waves.md §3): fs.io 11,114, perm.gifti 10,365, fs.robust 8,391, fs.volume 6,218, fs.gca 6,014, perm.dicom 4,371, fs.dicomread 3,218, fs.bspline 1,946, fs.mri 1,747, fs.maths 1,709, perm.minc 1,625, fs.filter 1,551, perm.misc 1,411, fs.core 1,135, fs.labels 1,068, own 797, perm.nifti 335, fs.surfio 108, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (6,014 lines)
 - Its queue item brings 5,159 lines (the functions only it reaches)
   - 3.2-14: mri_robust_template (1 of 3): MultiRegistration.h, MultiRegistration.cpp, MyMatrix.cpp (lines 286-454), MyMRI.cpp, mrisurf_SurfaceFromMRIS_generated_suffix.h, mrisurf_SurfaceFromMRISPV_generated_suffix.h (2,427 lines)
   - 3.2-15: mri_robust_template (2 of 3): Quaternion.h, RobustGaussian.cpp, mri_robust_template.cpp, Registration.h, MyMatrix.cpp (lines 509-2984), mri.cpp, Registration.cpp (2,443 lines)
@@ -66,6 +66,10 @@ Every option its parser compares, as written in its own source (older parsers co
 
 - initialXforms' centroid summed in an OpenMP critical block: run-to-run nondeterministic with four or more inputs and more than one thread, only for an unbiased template (with --fixtp, recon-all's and sMRIPrep's default, never used; measured)
 - glibc rand() for a random first time point (only without --inittp)
+
+## Findings for the defect register (rules A to D when ported)
+
+- initialXforms' centroid summed in an OpenMP critical block: run-to-run nondeterministic for an unbiased template with four or more inputs and more than one thread (larmorx: the sum in input order; relay 5)
 
 ## Checks
 

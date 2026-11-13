@@ -39,8 +39,8 @@ Single-letter options of its `switch (toupper(*option))`: `B`, `H`, `N`, `P`, `T
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,606), `packages/expat/xmlparse.c` (4,342), `utils/mri.cpp` (4,192), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923), `packages/gifti/gifti_io.c` (1,712), `utils/mrifilter.cpp` (1,497), `packages/dcm2niix/miniz.c` (1,348), `utils/matrix.cpp` (1,272)
-- Reach per module (waves.md §3): fs.io 13,992, perm.gifti 10,365, fs.volume 7,646, fs.gca 6,014, perm.dicom 4,371, fs.filter 4,020, fs.maths 2,185, perm.minc 1,676, perm.misc 1,411, fs.core 1,284, own 1,163, fs.labels 968, fs.bspline 785, perm.nifti 335, fs.surfio 198, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines), fs.gca (6,014 lines)
+- Reach per module (waves.md §3): fs.io 10,883, perm.gifti 10,365, fs.gca 6,014, fs.volume 5,842, perm.dicom 4,371, fs.filter 4,020, fs.dicomread 3,218, fs.maths 2,185, fs.mri 1,777, perm.minc 1,676, perm.misc 1,411, fs.core 1,284, own 1,163, fs.labels 886, fs.bspline 785, perm.nifti 335, fs.surfio 198, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (6,014 lines)
 - Its queue item brings 3,233 lines (the functions only it reaches)
   - 3.2-31: mri_segment (3,233 lines)
 
@@ -66,7 +66,7 @@ Single-letter options of its `switch (toupper(*option))`: `B`, `H`, `N`, `P`, `T
 
 ## Checks
 
-- replay: 11 recorded steps in 11 runs
+- replay: 12 recorded steps in 12 runs
 
 ## Notes
 

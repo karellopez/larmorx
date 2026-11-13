@@ -1,0 +1,182 @@
+{
+ "defect": null,
+ "description": "compute_dvars of an all-zero series with remove_zerovariance=False (the trial's notice verdicts): PIPE-50's and PIPE-46's corrections leave every output NaN, as nipype's, yet their notices fired. Fixed: named only where the corrected series differ from nipype's.",
+ "expect": "pass",
+ "found": {
+  "detail": "compute_dvars of an all-zero series with remove_zerovariance=False (the trial's notice verdicts): PIPE-50's and PIPE-46's corrections leave every output NaN, as nipype's, yet their notices fired. Fixed: named only where the corrected series differ from nipype's.",
+  "n": 105,
+  "seed": "confounds-trial",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "dvars-constant-series-notices",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "dvars",
+   "kw": {
+    "intensity_normalization": 0.0,
+    "remove_zerovariance": false,
+    "variance_tol": 0.0
+   },
+   "threads": 1
+  },
+  "features": {
+   "call": "dvars",
+   "content": "sparse",
+   "dtype": "uint8",
+   "extreme": false,
+   "intensity_normalization": 0.0,
+   "mask 4-D": false,
+   "mask binary": true,
+   "mask dtype": "int16",
+   "mask other grid": false,
+   "mask suffix": ".nii.gz",
+   "orientation": "plumb",
+   "origin0": 29.25,
+   "origin1": 1.25,
+   "origin2": 13.25,
+   "qfac": 1,
+   "qform_code": 3,
+   "range": "plain",
+   "remove_zerovariance": false,
+   "series dtype": "float64",
+   "series suffix": ".nii.gz",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "8x6x13x38",
+   "signal": false,
+   "slice_code": 6,
+   "spacing0": 0.8,
+   "spacing1": 2.0,
+   "spacing2": 0.5,
+   "sparse": 0.05,
+   "threads": 1,
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "unknown",
+   "variance_tol": 0.0
+  },
+  "groups": [
+   {
+    "args": [
+     "dvars"
+    ],
+    "name": "dvars",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "mask": {
+    "content": {
+     "fraction": 0.05,
+     "seed": 2007918471,
+     "type": "sparse"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      29.25,
+      1.25,
+      13.25
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      2.0,
+      0.5
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     8,
+     6,
+     13
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   },
+   "series": {
+    "content": {
+     "seed": 934210372,
+     "type": "zeros"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      29.25,
+      1.25,
+      13.25
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      2.0,
+      0.5
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     8,
+     6,
+     13,
+     38
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 6,
+     "slice_duration": 0.0385,
+     "slice_end": 12,
+     "slice_start": 0,
+     "tr": 0.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 105,
+  "options": [
+   "dvars",
+   "intensity_normalization 0.0",
+   "remove_zerovariance False",
+   "variance_tol 0.0"
+  ],
+  "seed": "confounds-trial",
+  "tool": "confounds-nipype"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-nipype",
+ "tier": "smoke",
+ "tool": "confounds-nipype"
+}

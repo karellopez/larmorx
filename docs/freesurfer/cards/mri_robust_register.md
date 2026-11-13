@@ -37,8 +37,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: liblapack.a, libblas.a, libgfortran.a, libquadmath.a, z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,848), `utils/mri.cpp` (4,379), `packages/expat/xmlparse.c` (4,342), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `utils/transform.cpp` (2,342), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923), `packages/gifti/gifti_io.c` (1,712), `utils/mriBSpline.cpp` (1,657), `utils/matrix.cpp` (1,376)
-- Reach per module (waves.md §3): fs.io 14,223, perm.gifti 10,365, fs.volume 8,173, fs.gca 6,014, fs.robust 5,160, perm.dicom 4,371, fs.filter 1,951, fs.maths 1,709, fs.bspline 1,657, perm.minc 1,625, own 1,582, perm.misc 1,411, fs.labels 1,150, fs.core 1,135, perm.nifti 335, fs.surfio 156, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines), fs.gca (6,014 lines)
+- Reach per module (waves.md §3): fs.io 11,114, perm.gifti 10,365, fs.volume 6,399, fs.gca 6,014, fs.robust 5,160, perm.dicom 4,371, fs.dicomread 3,218, fs.filter 1,951, fs.mri 1,747, fs.maths 1,709, fs.bspline 1,657, perm.minc 1,625, own 1,582, perm.misc 1,411, fs.core 1,135, fs.labels 1,068, perm.nifti 335, fs.surfio 156, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (6,014 lines)
 - Its queue item brings 2,412 lines (the functions only it reaches)
   - 3.2-13: mri_robust_register (2,412 lines)
 

@@ -47,7 +47,7 @@ A SHA-256 over the parts below, kept readable in every entry (`parts`).
 | The arguments | as given, with every path replaced: a file that exists is an **input**, `{in0}`, `{in1}`, ...; a directory the run writes in is a **place**, `{cwd}`, `{out0}`, `{d0}`, ..., with the path below it kept. A path with blanks in it is one path (`/tmp/x/with blank/in.nii`); files named by a printf pattern (Atropos' `prior%02d.nii.gz`) are inputs, by their content and number (`series`); the text a program reads in a path (`policy.path_text`) is kept where a replaced path holds it (`text`; below) | the inputs count by their content, never by their directory or name; the outputs by their role |
 | The inputs | each input's content (for `.gz` files the decompressed stream: the gzip header's time and the compression level do not count), its suffix (`.nii.gz`, `.mat`, `+orig.HEAD`: programs choose a reader by it), the files read beside it (`.img` beside `.hdr`, `.BRIK` beside `.HEAD`), and the shape of a path not written normally (`a/sub/../x`, which the program prints); files a program reads that its arguments do not name as files, when the suite names them (`inputs=`: FSL's images named without their extension, `bet in out` reading `in.nii.gz`), count by their content alike | the result depends on the bytes a program reads |
 | The directories | the directories that exist inside the places along the arguments' paths | writing into a missing directory is not writing into one that exists |
-| The environment | the variables the program's family reads: ITK and ANTs (`ITK_*`, `ANTS_*`, `NSLOTS`, the variables `ITK_NUMBER_OF_THREADS_ENV_LIST` names), AFNI (`AFNI_*`, `NIML_*`, `OMP_*`, `GOMP_*`: its OpenMP runtime is GNU libgomp; `HOME` by its contents), FSL (`FSL*`, `OMP_*`), a Python program (the family `python`, 2026-11-08: tedana's `t2smap`; numpy's `NPY_*` (its CPU dispatch), `OPENBLAS_*`, `OMP_*`, `MKL_*`, `PYTHON*`, argparse's `COLUMNS` and tqdm's `TQDM_*`, in the key of that family's runs only); for every program `LD_PRELOAD` (by its files' content: the CORE-MATH preload), `LD_LIBRARY_PATH`, `GLIBC_TUNABLES`, `MALLOC_*`, the locale (`LANG`, `LC_*`) and `TZ` | thread counts, seeds, the maths library and the program's own settings change results |
+| The environment | the variables the program's family reads: ITK and ANTs (`ITK_*`, `ANTS_*`, `NSLOTS`, the variables `ITK_NUMBER_OF_THREADS_ENV_LIST` names), AFNI (`AFNI_*`, `NIML_*`, `OMP_*`, `GOMP_*`: its OpenMP runtime is GNU libgomp; `HOME` by its contents), FSL (`FSL*`, `OMP_*`), a Python program (the family `python`, 2026-11-08: tedana's `t2smap`; numpy's `NPY_*` (its CPU dispatch), `OPENBLAS_*`, `OMP_*`, `MKL_*`, `PYTHON*`, argparse's `COLUMNS` and tqdm's `TQDM_*`, in the key of that family's runs only), FreeSurfer's programs (the family `freesurfer`, 2026-11-12: the replay tool; `FS*` (`FS_LICENSE` by its content), `FREESURFER*`, `SUBJECTS_DIR` (a place, by its role), `MNI_*`, `MINC_*`, `PERL5LIB`, `FUNCTIONALS_DIR`, `LOCAL_DIR`, `FIX_VERTEX_AREA`, `OMP_*`, `GOMP_*`, `ITK_*`, `PYTHON*` and `PATH` (FreeSurfer's tcsh and Python scripts find the programs they run by it), and since 2026-11-13 every other variable its compiled code reads (`key.FREESURFER_READS`, below), in the key of that family's runs only); for every program `LD_PRELOAD` (by its files' content: the CORE-MATH preload), `LD_LIBRARY_PATH`, `GLIBC_TUNABLES`, `MALLOC_*`, the locale (`LANG`, `LC_*`) and `TZ` | thread counts, seeds, the maths library and the program's own settings change results |
 | The machine | the architecture, the CPU's model and flags (glibc picks its maths kernels by them); the number of CPUs when the run sets no thread count | the same binary on another CPU may compute differently |
 
 Left out on purpose: the larmorx commit (the original does not depend on it), directory and
@@ -83,6 +83,39 @@ entry itself cannot show is named in `rerun.SUPERSEDED`). The counts come from
 (`copy_entries.py`): 45 identical (the 38 Apptainer runs, the 6 NIfTI-2 runs, BET's crash), 44
 skipped with their reason (22 Atropos priors, 3 paths with a blank, mcflirt's `out.mat`, 15
 ANTS-82, 2 ANTS-07, 1 ANTS-28).
+
+## Keyed since 2026-11-13: the other variables FreeSurfer reads
+
+FreeSurfer's programs read variables the family `freesurfer` left out: its diagnostic settings
+(`DIAG`, `diag`, `DIAG_NO`, `DIAG_VERBOSE`, the debugging voxel `DIAGX` ... `DIAGVZ`), `PROFILE`,
+`IMAGE_SIZE`, `XDEBUG`, the temporary directory (`TMPDIR`, then `TMP`, `TEMP`, `TEMPDIR`) and about
+a hundred behaviour switches (`USE_AVERAGE305`, `DONT_COMPRESS`, ...). Two runs that differed only
+by them shared an entry: the fs.core probe's `init` with `DIAG_NO`, `IMAGE_SIZE` and `DIAGX` to
+`DIAGZ` set was compared with the stored `init` without them, and the cache disputed the entry
+(`2a11deee10d4b795`, 2026-11-13; the probe has never cached such runs since). The family's key now
+holds every name a `getenv` call of FreeSurfer 8.2.0's C and C++ source spells out (212 names in
+2,816 files; `key.FREESURFER_READS` for those its prefixes did not already cover), each by its value
+where it is set and absent where it is not, except the user's, the machine's and the network's
+(`USER`, `LOGNAME`, `USERNAME`, `HOST`, `HOSTNAME`, `HOME`, `PWD`, `TERM`, the proxies: written only
+into provenance lines and logs the comparison leaves out, or read by code FreeSurfer does not
+compile). The names stay in that family's key alone: no other run's key changes.
+
+**No entry's key changed** (`validation/investigations/oracle-cache/freesurfer_env.py`; the unit
+tests `test_freesurfer_reads_*` show that a run setting none of the new names keeps its key):
+
+| Check | Result |
+|---|---|
+| `names <FreeSurfer 8.2.0's source>`: every name its code reads, keyed or left out on purpose | 212 names: 197 keyed, 15 left out, 0 neither |
+| `entries`: the cache's 8,286 entries of the family, by their 12 runners; each key the SHA-256 of its stored parts; no key holding a new name; every runner one whose environment is closed (it sets the variables it names, none of the session's) | 0 problems |
+| `recordings`: the replay tool's environment of every step of the 18 recordings (3,492 steps), at one thread and at the recording's | 0 set a new name |
+| `oracle-cache verify` of the 401 entries of the one runner whose cases set the new names (the fs.core probe): the run again without them | the 200 of the probe's current build identical; 201 of earlier builds skipped (their program is gone, so their keys are never reached) |
+| the probe's reference hashes (`specs/freesurfer-core.md` §20.2) through the new key, cold and warm | all 22 groups unchanged |
+
+The dispute is resolved (`oracle-cache resolve`, its reason logged in the entry and
+`findings.jsonl`): with the probe's current build the two runs now have keys of their own
+(`89a1118232186998` without the variables, the stored line; `fe31b8c9d3c59549` with them, the
+fresh line). It could not be run again first (`--check`): the entry's build, an earlier source of
+the probe, is gone.
 
 ## The address-space limit
 
@@ -141,6 +174,7 @@ hold the run's path.
 | `fsl-mcflirt-replica` | `fsl_mcflirt_replica.run_oracle` (FSL in `~/fsl`) | 1 (mcflirt is single-threaded) | crashes (FSL-21's `corratio` abort); every file it writes is in its working directory (`outputs=[cwd]`), and every file there before the run is an input (`inputs=`, since 2026-10-28) |
 | `fsl-bet` | `fsl_bet.oracle_run` (FSL in `~/fsl`; fMRIPrep's FSL through its image) | 1 (FSL's BET is single-threaded) | FSL-43 and FSL-53 (memory FSL never wrote), FSL-46 (the cache replays no removal), crashes; images named without their extension through `inputs=` |
 | `tedana-t2smap-replica` | `tedana_t2smap_replica.run_tedana` (a launcher per environment, `oracles/inputs/tedana-t2smap-replica/launcher-<env>/t2smap` with the environment's `ENVIRONMENT.txt` as its build's identity: the interpreter and every distribution's RECORD); `run_fmriprep_tedana` (tedana 25.0.1 in fMRIPrep's image) | 1 (the spread's `--n-threads 4`: after 3 runs) | a command run twice (`--overwrite`), random testing's runs (inputs under TMPDIR: never stored) |
+| `freesurfer-replay` | `larmorx_validation.freesurfer.replay.run_freesurfer` (a launcher per program, `oracles/inputs/freesurfer-replay/launchers/<tree>/<program>/`, beside a `PACKAGE.json` naming the whole installation: its build stamp, the package's SHA-256 and the SHA-256 of a manifest of its 70,117 files) | 1 by default (`--threads recorded`: the recording's 4, served after 3 identical runs) | every file of the rebuilt subject directory an input, the subjects directory the place; `Policy.formats = "freesurfer"`; a step FreeSurfer varies in (`defect2seg`'s colour table) never cached |
 | `nifti-io`, `resample-series`, `numpy-linalg`, `itk-geometry` | none | – | their references run in-process (nibabel, fMRIPrep's Python, numpy, ANTsPy) |
 
 Not through the cache: `pipeline-stages` (it keeps its own runs in `oracles/compare` and reuses
@@ -191,8 +225,10 @@ key misses something (a fix here). What is compared: the exit status, the stream
 addresses and elapsed times masked (`Elapsed time`, AFNI's `Elapsed = ... sec`, the times in
 antsRegistration's `DIAGNOSTIC` lines, a shell's process ID in its report of a crash), the set of files written, and every file's bytes (`.gz`
 files decompressed; HDF5 files by their datasets and attributes, as ITK stamps objects with
-times, ITK-09; variable-length strings by their contents). What is served is always the stored
-bytes.
+times, ITK-09; variable-length strings by their contents; FreeSurfer's files by
+`larmorx_validation.freesurfer.files.same_result` where `Policy.formats` is `freesurfer`, since 2026-11-12: their
+provenance records left out, the command line, time, user and machine, a surface's stamp, the run's directories, the
+header lines of LTA and statistics files). What is served is always the stored bytes.
 
 ## No duplicate runs
 
@@ -275,6 +311,9 @@ twice, and two runs that start in the same second get the same seed from ITK's c
 - An input a program reads without its path in the arguments (a file named inside another
   file) counts by the path written there, not its content, unless the suite names it
   (`inputs=`) or a printf pattern in the arguments names it; `verify` catches a change.
+- FreeSurfer's variables are the names its C and C++ code spells out: one it builds at run time,
+  or one its tcsh and Python scripts read, counts only where the family's prefixes (`FS*`,
+  `FREESURFER*`, ...) cover it; the runners of the family pass closed environments.
 - A path's text counts only where `policy.path_text` says a program reads it; a blank above the
   folder that holds an input (`/tmp/a b/x/in.nii`) is not made again by `verify`.
 - The cache grows: blobs are shared, nothing is deleted (it is regenerable; archive it rather

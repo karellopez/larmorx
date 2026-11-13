@@ -4444,3 +4444,99 @@ implementation = "original"
 signature = ["(B) values (§N.N)"]
 status = "harness"
 explanation = "Trial 2026-11-11-t2smap-original-2: 1 case outside check.py's model (TED-01's NaN mean stops the model as it stops tedana; finding 1449) whose confounds table, compared as text, differed in its last digits; now number by number within 1e-5 (relay 3c, 2026-11-11)."
+
+# ---------------------------------------------------------------- the confounds (2026-11-12)
+# The descriptor's probes before the trial (seeds probe to probe4, in-process) and the trial
+# oracles/difftest/2026-11-12-confounds-trial (seed confounds-trial, 30 minutes, 5 jobs on 8 CPUs,
+# 3 GiB a case: 334,124 cases; 332,076 agree, 528 notices, 28 differ, 1,492 skipped: ExpandModel's
+# powers above 2 while numpy's pow is AVX-512's SVML). Every one rerun with the final build; then two checks
+# of the final build: oracles/difftest/2026-11-12-confounds-check (seed confounds-check, 10 minutes, the three
+# tools: 140,003 cases, every one agrees, 645 skipped) and -check-noavx512 (seed confounds-check-noavx512, 5
+# minutes of confounds-fmriprep with numpy's AVX-512 kernels off, powers above 2 included: 40,567, every one agrees).
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["compcor: every output bit-identical"]
+status = "fixed"
+explanation = "Before the trial (probe 148): CompCor's refused inputs raised larmorx's own messages ('regress_poly_degree must be at least 1, ...'); every one now raises traits' TraitError text (as ValueError) or nipype's OSError of two exclusive inputs and its ValueError of a missing mask_files, checked against nipype for the three interfaces (relay 3a-iii, 2026-11-12)."
+link = "validation/difftest/cases/confounds-nipype/tcompcor-refused-degree-text.json"
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["compcor: every output bit-identical"]
+status = "harness"
+explanation = "Trial 2026-11-12-confounds-trial: 20 cases with two refused inputs at once (regress_poly_degree 0 beside a refused criterion or mask_index; findings 2721, 4721, 22868, 70178, ...): nipype names the first refused input its caller set, an order a function with keyword parameters does not know (a finding's recipe, written with its keys sorted, changes nipype's choice: 10 of the 20 agree on replay). The descriptor draws one refused input at a time since (relay 3a-iii)."
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["DN fix pass", "compcor: every output bit-identical"]
+status = "fixed"
+explanation = "Trial 2026-11-12-confounds-trial: 7 cases. (1) No volume left (ignore_initial_volumes at least the series' length; findings 3005, 31312): nipype's pre-filters reshape a mask's rows to (-1, 0), numpy's 'cannot reshape array of size 0 into shape (0)', unless the mask is empty and failure_mode is not 'error', in nipype's mask order (its loop stops at a mask that gives no component); larmorx skipped the reshape. (2) A mask of another shape after one that gives no component (findings 31615, 56232, 61169, 97887, 101169): the default goes on past it (PIPE-44) and meets the shape error, which did not name PIPE-44. Both fixed in larmorx_confounds::compcor (NoVolume; PIPE-44 in both errors); probe_zero_volumes.py 224 of 224 (relay 3a-iii, 2026-11-12)."
+link = "validation/difftest/cases/confounds-nipype/compcor-no-volume-left.json"
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["regress_poly: every output bit-identical"]
+status = "fixed"
+explanation = "Before the trial (probe3 485): regress_poly of Fortran-ordered rows (a 2-D array, or a nibabel-like array whose reshape is a view) with degree 0: numpy's pinv(X).dot(data.T) takes gemv on a C-ordered data.T for the one row of pinv(X), whose sums run in another order; larmorx summed as for C rows (one or two ulps). Fixed: regress_poly_layout; probe_regress_layout.py 264 of 264 (relay 3a-iii)."
+link = "validation/difftest/cases/confounds-nipype/regress-poly-fortran-rows.json"
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["notice: GLIBC-07"]
+status = "fixed"
+explanation = "Trial 2026-11-12-confounds-trial: 128 cosine_filter cases whose glibc and correctly rounded cosines differ only before the product with sqrt(2 / T) rounds them to one value: GLIBC-07 named with the basis unchanged. The witness now compares the basis values (relay 3a-iii); every one agrees on replay."
+link = "validation/difftest/cases/confounds-nipype/cosine-filter-glibc07-exact.json"
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["notice: PIPE-50, PIPE-46"]
+status = "fixed"
+explanation = "Trial 2026-11-12-confounds-trial: 206 compute_dvars and ComputeDVARS cases of constant or all-zero series with remove_zerovariance=False (111 + 95): PIPE-50's and PIPE-46's corrections leave every output NaN, as nipype's (SciPy 1.15), yet were named. The default now names PIPE-46, -47 and -50 only where its series differ from nipype's (larmorx.confounds.dvars; SciPy 1.18's LinAlgError and nipype's RuntimeWarning count as different); every one agrees on replay (relay 3a-iii)."
+link = "validation/difftest/cases/confounds-nipype/dvars-constant-series-notices.json"
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["notice: PIPE-44"]
+status = "fixed"
+explanation = "Trial 2026-11-12-confounds-trial: 5 ACompCor cases whose masks after the one that gives no component give none either: the default goes on with them (PIPE-44) to the same result, yet named it. Named now where a later mask adds components or changes the pre-filter's basis (relay 3a-iii); every one agrees on replay."
+link = "validation/difftest/cases/confounds-nipype/compcor-pipe44-later-masks-add-nothing.json"
+
+[[difference]]
+tool = "confounds-nipype"
+implementation = "port"
+signature = ["cosine_filter: every output bit-identical"]
+status = "fixed"
+explanation = "Trial 2026-11-12-confounds-trial, finding 54131: cosine_filter with a cut-off of 5 s at a TR of 3 s on 370 volumes (a cosine basis of 444 columns, more than the volumes): larmorx's lstsq differed from numpy 2.3.5's LAPACK by 1 to 4 ulps in a cluster of near-equal singular values (141,010 of 179,080 residuals, at most 6e-14). Found (relay 3a-iv): the whole DBDSDC is one subproblem at DBDSQR's real epsilon (2^-53; relay 3a-iii's splits used numpy's 2^-52), whose DLASD0 differs in one DLASDQ leaf (21 rows, nearly equal diagonals, superdiagonals at the convergence tolerance); its DBDSQR, emulated in Python from dbdsqr.f with the library's own DLARTG, DLAS2 and DLASV2, equals the library and not larmorx: larmorx's TOLMUL constant was 0x4058ACDBEF8F9B61 (98.70092381500355) instead of glibc's pow(2^-53, -0.125) = 2^6.625 = 98.70149282610821 (0x4058ACE5422AA0DB), so TOL was 5.8e-6 too small and one superdiagonal converged a sweep later. Fixed in numpy_linalg (DBDSQR_TOLMUL, a unit test against larmorx_core::math::pow and pow_glibc); the finding agrees on replay; scan_drift_svd.py 744 of 744 and the wide scan (T 300 to 470, svd and lstsq) 4,104 of 4,104 identical in numpy 2.3.5 and 2.5.4."
+link = "validation/difftest/cases/confounds-nipype/cosine-filter-wide-basis-dbdsqr-tolerance.json"
+
+[[difference]]
+tool = "confounds-fmriprep"
+implementation = "port"
+signature = ["rename_acompcor: every output bit-identical"]
+status = "fixed"
+explanation = "Before the trial (probe 140): RenameACompCor (and FilterDropped) with a text 'retained' column: pandas' KeyError prints the values' Index with line breaks at width 80, larmorx printed one line. Fixed: _index_repr follows pandas' format_object_summary (both pandas releases); probe_index_repr.py 260 of 260 in pandas 3.0.6 and 2.2.3 (relay 3a-iii)."
+link = "validation/difftest/cases/confounds-fmriprep/rename-acompcor-text-retained.json"
+
+[[difference]]
+tool = "confounds-fmriprep"
+implementation = "port"
+signature = ["notice: PIPE-67", "notice: PD-01, PIPE-67"]
+status = "fixed"
+explanation = "Trial 2026-11-12-confounds-trial: 22 SpikeRegressors cases with several lags and minimum_contiguous: the filling of short runs made both lag rules flag the same volumes, yet PIPE-67 was named. Named now where the flagged volumes differ after the filling (larmorx.niworkflows.confounds); every one agrees on replay (relay 3a-iii)."
+link = "validation/difftest/cases/confounds-fmriprep/spikes-pipe67-after-filling.json"
+
+[[difference]]
+tool = "confounds-fmriprep"
+implementation = "port"
+signature = ["notice: PD-01"]
+status = "explained"
+defect = "PD-01"
+explanation = "Trial 2026-11-12-confounds-trial: 167 cases (155 ExpandModel, 12 fMRIPrep's FramewiseDisplacement) and the probes' SpikeRegressors without concatenate: PD-01 names the table read's correction, whose values change, while the step's output may not show it (the expansion writes the columns its formula takes, the displacement's sums of differences round a value read one bit off to the same number, the thresholded flags do not move). The runner counts PD-01 as a condition notice in these steps; a follow-up names it per step where its output changes (relay 3a-iii)."

@@ -1,0 +1,13 @@
+[package]
+name = "larmorx-freesurfer-classic"
+description = "FreeSurfer 8.2.0's replica for larmorx: the classic stream's own programs (mri_watershed, talairach_afd, mri_matrix_multiply, fs_temp_dir, the scripts of the Talairach chain; Washington University's 4dfp tools have a clean room only, in the main package) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-filter.workspace = true
+larmorx-freesurfer-surf.workspace = true

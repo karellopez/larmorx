@@ -45,6 +45,10 @@ Every option its parser compares, as written in its own source (older parsers co
 
 - nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's libm, drand64 left to right)
 
+## Findings for the defect register (rules A to D when ported)
+
+- receives the previous step's $xopts (recon-all 2241; harmless without expert options; relay 1)
+
 ## Checks
 
 - synthetic cases and a recorded call of its own (no default step runs it)

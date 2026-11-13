@@ -38,8 +38,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,606), `packages/expat/xmlparse.c` (4,342), `utils/mri.cpp` (4,053), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923), `packages/gifti/gifti_io.c` (1,712), `packages/dcm2niix/miniz.c` (1,348), `utils/matrix.cpp` (1,272), `packages/expat/xmlrole.c` (1,125)
-- Reach per module (waves.md §3): fs.io 13,981, perm.gifti 10,365, fs.volume 6,344, fs.gca 6,014, perm.dicom 4,371, perm.minc 1,625, fs.maths 1,605, perm.misc 1,411, own 1,343, fs.core 1,049, fs.labels 968, fs.filter 833, fs.bspline 785, perm.nifti 335, fs.surfio 156, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines), fs.gca (6,014 lines)
+- Reach per module (waves.md §3): fs.io 10,872, perm.gifti 10,365, fs.gca 6,014, fs.volume 4,570, perm.dicom 4,371, fs.dicomread 3,218, fs.mri 1,747, perm.minc 1,625, fs.maths 1,605, perm.misc 1,411, own 1,343, fs.core 1,049, fs.labels 886, fs.filter 833, fs.bspline 785, perm.nifti 335, fs.surfio 156, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (6,014 lines)
 - Its queue item brings 1,343 lines (the functions only it reaches)
   - 3.2-33: mri_pretess (1,343 lines)
 
@@ -64,4 +64,4 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 33 recorded steps in 11 runs
+- replay: 36 recorded steps in 12 runs

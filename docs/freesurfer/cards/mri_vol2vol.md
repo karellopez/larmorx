@@ -44,8 +44,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/gcamorph.cpp` (9,190), `utils/mriio.cpp` (5,596), `utils/mri.cpp` (4,864), `packages/expat/xmlparse.c` (4,342), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (3,145), `packages/gifti/gifti_xml.c` (2,678), `utils/transform.cpp` (2,547), `packages/dicom/dcm.c` (2,191), `packages/gifti/gifti_io.c` (1,712), `packages/dcm2niix/miniz.c` (1,348), `utils/matrix.cpp` (1,309)
-- Reach per module (waves.md §3): fs.io 14,004, fs.gca 13,641, perm.gifti 10,365, fs.volume 10,111, perm.dicom 4,371, own 2,237, fs.filter 2,136, fs.maths 1,664, perm.minc 1,625, perm.misc 1,411, fs.core 1,273, fs.labels 1,235, fs.bspline 896, perm.nifti 335, fs.surfio 294, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines), fs.gca (13,641 lines)
+- Reach per module (waves.md §3): fs.gca 13,641, fs.io 10,895, perm.gifti 10,365, fs.volume 8,220, perm.dicom 4,371, fs.dicomread 3,218, own 2,237, fs.filter 2,136, fs.mri 1,864, fs.maths 1,664, perm.minc 1,625, perm.misc 1,411, fs.core 1,273, fs.labels 1,153, fs.bspline 896, perm.nifti 335, fs.surfio 294, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (13,641 lines)
 - Its queue item brings 2,951 lines (the functions only it reaches)
   - 3.2-38: mri_vol2vol (2,951 lines)
 
@@ -70,4 +70,4 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through fs-synthmorph-reg's recorded steps (5); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)
+- through fs-synthmorph-reg's recorded steps (6); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)

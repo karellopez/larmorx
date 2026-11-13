@@ -399,6 +399,10 @@ judgement = "plumbing in larmorx's own words, nothing AFNI-derived; the only edi
 "GNU/cbrtf_glibc" = "clean"
 "GNU/sincos_glibc" = "clean"
 "GNU/tanh_glibc" = "clean (a declared port of fdlibm's permissive code; glibc's source never opened)"
+"GNU/glibc_random" = "clean: written from specs/glibc-random.md and black-box runs of the C library; two slips declared by the implementer, neither of restricted content (four file names of another family's probe folder printed by git diff --stat; FreeSurfer 6.0.0's help text from a program an unquoted heredoc ran)"
+"GNU/glibc_qsort" = "clean: written from specs/glibc-qsort.md and black-box runs of the C library; no restricted material seen (the build log's crate names only)"
+"FreeSurfer/ranlux" = "clean: written from specs/ranlux.md and black-box runs of FreeSurfer's functions and mri_volsynth; the replica workspace's file names and build caches seen in build output only; a slip declared by the implementer (larmorx-core's provenance lines on VXL's generator and POSIX's drand48, which name how FreeSurfer calls them) unrelated to RANLUX"
+"FreeSurfer/cubic_spline" = "clean: written from specs/burkardt-spline.md and black-box runs of FreeSurfer's spline; the replica workspace's file names and build caches seen in build output only"
 "tedana/t2smap" = "clean: seven clean relays wrote it from specs/t2smap.md and black-box runs of tedana; no content of tedana's source or of the replica seen before or during the work (names, builds, black-box runs of the replica program and licence files only; one declared slip of another family: the header bytes of the PyPI larmorx-nc program); its shared runs with the replica (23.5 % of tokens, read at the merge of 2026-11-12) are tedana's observable texts (messages, log locations, the help, dataset_description.json) written through the same main-package APIs (argparse, the defect notices, PyError)"
 
 # ------------------------------------------------- what the evidence cannot see

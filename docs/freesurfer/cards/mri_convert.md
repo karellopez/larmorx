@@ -44,8 +44,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (6,717), `utils/mri.cpp` (5,395), `packages/expat/xmlparse.c` (4,342), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,855), `packages/gifti/gifti_xml.c` (2,678), `utils/gcamorph.cpp` (2,464), `utils/transform.cpp` (2,381), `packages/dicom/dcm.c` (2,191), `packages/gifti/gifti_io.c` (1,712), `utils/matrix.cpp` (1,437), `packages/dcm2niix/miniz.c` (1,348)
-- Reach per module (waves.md §3): fs.io 15,183, perm.gifti 10,365, fs.volume 10,329, fs.gca 6,622, perm.dicom 4,371, own 3,920, fs.maths 2,139, fs.filter 2,134, perm.minc 1,625, perm.misc 1,411, fs.core 1,302, fs.labels 1,162, fs.bspline 896, perm.nifti 335, fs.surfio 156, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines), fs.gca (6,622 lines)
+- Reach per module (waves.md §3): fs.io 12,074, perm.gifti 10,365, fs.volume 8,527, fs.gca 6,622, perm.dicom 4,371, own 3,920, fs.dicomread 3,218, fs.maths 2,139, fs.filter 2,134, fs.mri 1,775, perm.minc 1,625, perm.misc 1,411, fs.core 1,302, fs.labels 1,080, fs.bspline 896, perm.nifti 335, fs.surfio 156, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (6,622 lines)
 - Its queue item brings 7,131 lines (the functions only it reaches)
   - 3.2-04: mri_convert (1 of 4): csv.h, mri_convert.cpp (lines 57-73), affine.h (83 lines)
   - 3.2-05: mri_convert (2 of 4): mri_convert.cpp (lines 79-79) (3,771 lines)
@@ -70,6 +70,10 @@ Every option its parser compares, as written in its own source (older parsers co
 ## Variation
 
 - MRIgaussianSmoothNI (smoothing options): long double, thread-partitioned
+
+## Findings for the defect register (rules A to D when ported)
+
+- --conform prints 'valid   : <number>' from vgprint(true) on MRIconformedTemplate's header (mri_convert.cpp 2927-2928), whose valid field nothing sets: memory content, different in every run (measured: rawavg to orig in both streams, mri_nu_correct.mni's --like call in classic; relay 7 found it black box); a message only (D13: a defined value, a warning where reproduce cannot give memory)
 
 ## Checks
 

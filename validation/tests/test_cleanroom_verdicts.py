@@ -38,6 +38,11 @@ WT = f"{WS}/larmorx/.claude/worktrees/agent-a1"
         ("crates-gpl/larmorx-gpl-tedana/src/decay.rs", None),
         ("crates/larmorx-core/src/math/sincos_glibc_tables.rs", ("GNU", "sincos_glibc")),
         ("crates/larmorx-core/src/math/sincosf_glibc.rs", None),  # Arm's MIT code, a replica
+        ("crates/larmorx-core/src/ranlux/mod.rs", ("FreeSurfer", "ranlux")),
+        ("crates/larmorx-core/src/cubic_spline/solve.rs", ("FreeSurfer", "cubic_spline")),
+        ("crates/larmorx-core/src/glibc_random/mod.rs", ("GNU", "glibc_random")),
+        ("crates/larmorx-core/src/glibc_qsort/merge.rs", ("GNU", "glibc_qsort")),
+        ("crates/larmorx-core/src/ranlux.rs", None),  # the module must be a folder of its own
         ("crates/larmorx-afni-replica/src/tshift.rs", None),
         ("crates-nc/larmorx-nc-bet/src/lib.rs", None),
     ],
@@ -75,6 +80,9 @@ def test_every_clean_room_crate_is_audited():
         ),
         ("3dTshift globals: -overwrite, -D (replica+spec)", "", "replica author"),
         ("glibc maths part 1, relay 2 (spec)", "", "spec writer"),
+        ("Docs revision writer relay 11 (restart)", "clean-room implementers ...", "documentation"),
+        ("Docs revision critical reviewer round 1", "", "documentation"),
+        ("Cross-part coherence review (reviewer)", "", "documentation"),
         ('implementation="auto": run the GPL replica', "", "integration"),
         (
             "glibc maths part 2, relay 1",

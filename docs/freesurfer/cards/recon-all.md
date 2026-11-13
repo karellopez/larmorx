@@ -57,6 +57,12 @@ Every option its parser compares, as written in its own source (older parsers co
 
 - nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's libm, drand64 left to right)
 
+## Findings for the defect register (rules A to D when ported)
+
+- line 4220 `if($XOptsFile)` (fixed by the 2026-06-25 update: follow it, the newest version; relay 5, variation.md §4)
+- the v8 options key T1PialSurf never matches PlaceT1PialSurf (line 4521): mrisps.pial.mgz is never written (confirmed on the six v8 reference runs: only mrisps.wpa.mgz and mrisps.white.mgz exist; relay 1, relay 9)
+- the v8 mri_ca_label options apply in no stream (relay 1, programs.md §1)
+
 ## Checks
 
 - synthetic cases and a recorded call of its own (no default step runs it)

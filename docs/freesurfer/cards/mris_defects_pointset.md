@@ -38,7 +38,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,596), `packages/expat/xmlparse.c` (4,342), `utils/mri.cpp` (4,091), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `packages/dicom/dcm.c` (2,191), `include/json.h` (1,959), `utils/gcamorph.cpp` (1,923), `utils/mrisurf_io.cpp` (1,742), `utils/transform.cpp` (1,735), `packages/gifti/gifti_io.c` (1,712)
-- Reach per module (waves.md §3): fs.io 14,996, perm.gifti 10,365, fs.surfio 7,161, fs.volume 7,152, fs.gca 6,014, perm.dicom 4,371, perm.json 1,959, fs.surf 1,831, fs.maths 1,755, perm.minc 1,625, perm.misc 1,441, fs.labels 1,332, fs.core 1,240, fs.filter 833, fs.bspline 785, perm.argparse 396, perm.nifti 335, own 142, fs.deform 13
+- Reach per module (waves.md §3): fs.io 11,887, perm.gifti 10,365, fs.surfio 7,161, fs.gca 6,014, fs.volume 5,378, perm.dicom 4,371, fs.dicomread 3,218, perm.json 1,959, fs.surf 1,831, fs.maths 1,755, fs.mri 1,747, perm.minc 1,625, perm.misc 1,441, fs.labels 1,250, fs.core 1,240, fs.filter 833, fs.bspline 785, perm.argparse 396, perm.nifti 335, own 142, fs.deform 13
+- Option paths that wait for a later module: fs.dicomread (3,218 lines)
 - Its queue item brings 157 lines (the functions only it reaches)
   - 3.4-30: mris_defects_pointset (157 lines)
 
@@ -63,4 +64,4 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through defect2seg's recorded steps (10)
+- through defect2seg's recorded steps (12)

@@ -1,0 +1,268 @@
+{
+ "date": "2026-11-13",
+ "machine": "x86_64",
+ "larmorx_commit": "v0.1.0rc1-387-g5c9faa6e94e1",
+ "sha256": {
+  "glibc_qsort_probe": "bd9ba0854b35627f6923cd62ac53e4eb4658ef5d314d43b8e13b7d13a9008570",
+  "cleanroom-probe": "3782c613ca9034d4c6d9693965cb11431044709cf93175bb382fc3374f2953af",
+  "qsort_bench": "d52f396ac1ed70b20cbf4cba2d28da8a39f38c6c8e4415547e0ac4a04c4d869f"
+ },
+ "libc": "ldd (Ubuntu GLIBC 2.35-0ubuntu3.15) 2.35",
+ "reference": {
+  "cases": 15,
+  "identical": 15,
+  "rows": [
+   {
+    "case": "4 1000 3way 1 10 qsort 0",
+    "spec": "8504 22b3708447d84162 985da63e885ae5b7 1 1",
+    "probe": "8504 22b3708447d84162 985da63e885ae5b7 1 1",
+    "typed": "8504 22b3708447d84162 985da63e885ae5b7 1 1",
+    "bytes": "8504 22b3708447d84162 985da63e885ae5b7 1 1"
+   },
+   {
+    "case": "4 1000 3way 1 10 qsort 1",
+    "spec": "9540 1b768952e1c84670 985da63e885ae5b7 1 1",
+    "probe": "9540 1b768952e1c84670 985da63e885ae5b7 1 1",
+    "typed": "9540 1b768952e1c84670 985da63e885ae5b7 1 1",
+    "bytes": "9540 1b768952e1c84670 985da63e885ae5b7 1 1"
+   },
+   {
+    "case": "12 1000 3way 2 10 qsort 0",
+    "spec": "8465 cd3c5a72a7733a84 1331cd34ebdbf954 1 1",
+    "probe": "8465 cd3c5a72a7733a84 1331cd34ebdbf954 1 1",
+    "typed": "8465 cd3c5a72a7733a84 1331cd34ebdbf954 1 1",
+    "bytes": "8465 cd3c5a72a7733a84 1331cd34ebdbf954 1 1"
+   },
+   {
+    "case": "12 1000 tie+ 2 10 qsort 0",
+    "spec": "8494 4bcd1b66e61a1fa1 3c92d2e1fd018aac 1 1",
+    "probe": "8494 4bcd1b66e61a1fa1 3c92d2e1fd018aac 1 1",
+    "typed": "8494 4bcd1b66e61a1fa1 3c92d2e1fd018aac 1 1",
+    "bytes": "8494 4bcd1b66e61a1fa1 3c92d2e1fd018aac 1 1"
+   },
+   {
+    "case": "16 1000 tie- 3 10 qsort 0",
+    "spec": "8544 c4bcc9a6525d3b2e 31c543dbc89ca695 1 1",
+    "probe": "8544 c4bcc9a6525d3b2e 31c543dbc89ca695 1 1",
+    "typed": "8544 c4bcc9a6525d3b2e 31c543dbc89ca695 1 1",
+    "bytes": "8544 c4bcc9a6525d3b2e 31c543dbc89ca695 1 1"
+   },
+   {
+    "case": "40 1000 hash 4 3 qsort 0",
+    "spec": "6916 f672409666b84a2b 25ec899552189d77 1 1",
+    "probe": "6916 f672409666b84a2b 25ec899552189d77 1 1",
+    "typed": "6916 f672409666b84a2b 25ec899552189d77 1 1",
+    "bytes": "6916 f672409666b84a2b 25ec899552189d77 1 1"
+   },
+   {
+    "case": "40 1000 hash 4 3 qsort_r 0",
+    "spec": "6916 f672409666b84a2b 25ec899552189d77 1 1",
+    "probe": "6916 f672409666b84a2b 25ec899552189d77 1 1",
+    "typed": "6916 f672409666b84a2b 25ec899552189d77 1 1",
+    "bytes": "6916 f672409666b84a2b 25ec899552189d77 1 1"
+   },
+   {
+    "case": "40 1000 hash 4 3 qsort 1",
+    "spec": "9621 2ea5d1118facf2b7 2b1e1211fa2aad7f 1 1",
+    "probe": "9621 2ea5d1118facf2b7 2b1e1211fa2aad7f 1 1",
+    "typed": "9621 2ea5d1118facf2b7 2b1e1211fa2aad7f 1 1",
+    "bytes": "9621 2ea5d1118facf2b7 2b1e1211fa2aad7f 1 1"
+   },
+   {
+    "case": "4 1000 f3 5 12 qsort 0",
+    "spec": "5997 a8107a0175eee3f5 563fcc1dcef7a859 1 1",
+    "probe": "5997 a8107a0175eee3f5 563fcc1dcef7a859 1 1",
+    "typed": "5997 a8107a0175eee3f5 563fcc1dcef7a859 1 1",
+    "bytes": "5997 a8107a0175eee3f5 563fcc1dcef7a859 1 1"
+   },
+   {
+    "case": "4 1000 f2 5 12 qsort 0",
+    "spec": "6127 5669dc3121f908a8 62a8788fd4a06369 1 1",
+    "probe": "6127 5669dc3121f908a8 62a8788fd4a06369 1 1",
+    "typed": "6127 5669dc3121f908a8 62a8788fd4a06369 1 1",
+    "bytes": "6127 5669dc3121f908a8 62a8788fd4a06369 1 1"
+   },
+   {
+    "case": "8 1000 d3 6 12 qsort 0",
+    "spec": "5879 8cc18a31990e2485 edf4496b7e528b61 1 1",
+    "probe": "5879 8cc18a31990e2485 edf4496b7e528b61 1 1",
+    "typed": "5879 8cc18a31990e2485 edf4496b7e528b61 1 1",
+    "bytes": "5879 8cc18a31990e2485 edf4496b7e528b61 1 1"
+   },
+   {
+    "case": "8 1000 d2 6 12 qsort 1",
+    "spec": "9262 c90bb93c4a7bba71 d7f7923ba5e9ce51 1 1",
+    "probe": "9262 c90bb93c4a7bba71 d7f7923ba5e9ce51 1 1",
+    "typed": "9262 c90bb93c4a7bba71 d7f7923ba5e9ce51 1 1",
+    "bytes": "9262 c90bb93c4a7bba71 d7f7923ba5e9ce51 1 1"
+   },
+   {
+    "case": "104 100 3way 7 5 qsort 0",
+    "spec": "531 0461360aad912fdb 84af1b838617c27b 1 1",
+    "probe": "531 0461360aad912fdb 84af1b838617c27b 1 1",
+    "typed": "531 0461360aad912fdb 84af1b838617c27b 1 1",
+    "bytes": "531 0461360aad912fdb 84af1b838617c27b 1 1"
+   },
+   {
+    "case": "1 255 3way 8 4 qsort 0",
+    "spec": "1612 5923cd99459aacc0 d1fe3ddfe7376da5 0 1",
+    "probe": "1612 5923cd99459aacc0 d1fe3ddfe7376da5 0 1",
+    "typed": "1612 5923cd99459aacc0 d1fe3ddfe7376da5 0 1",
+    "bytes": "1612 5923cd99459aacc0 d1fe3ddfe7376da5 0 1"
+   },
+   {
+    "case": "4 100000 3way 9 1000 qsort 0",
+    "spec": "1536229 8bdb84d427f725aa cd915035a4583feb 1 1",
+    "probe": "1536229 8bdb84d427f725aa cd915035a4583feb 1 1",
+    "typed": "1536229 8bdb84d427f725aa cd915035a4583feb 1 1",
+    "bytes": "1536229 8bdb84d427f725aa cd915035a4583feb 1 1"
+   }
+  ],
+  "ok": true,
+  "seconds": 0.0
+ },
+ "small": {
+  "cases": 55900,
+  "identical_typed": 55900,
+  "identical_bytes": 55900,
+  "outside": 631,
+  "outside_at_a_position": 605,
+  "outside_at_a_reversed_range": 26,
+  "with_a_request": 5401,
+  "failures": [],
+  "ok": true,
+  "seconds": 0.4
+ },
+ "stack_limit": {
+  "cases": 1760,
+  "identical_typed": 1760,
+  "identical_bytes": 1760,
+  "outside": 199,
+  "outside_at_a_position": 194,
+  "outside_at_a_reversed_range": 5,
+  "with_a_request": 1153,
+  "failures": [],
+  "ok": true,
+  "seconds": 0.1
+ },
+ "large": {
+  "cases": 70,
+  "identical_typed": 70,
+  "identical_bytes": 70,
+  "outside": 0,
+  "outside_at_a_position": 0,
+  "outside_at_a_reversed_range": 0,
+  "with_a_request": 70,
+  "failures": [],
+  "ok": true,
+  "seconds": 8.3
+ },
+ "fallback": {
+  "cases": 4546,
+  "identical_typed": 4546,
+  "identical_bytes": 4546,
+  "outside": 467,
+  "outside_at_a_position": 436,
+  "outside_at_a_reversed_range": 31,
+  "with_a_request": 3567,
+  "failures": [],
+  "ok": true,
+  "seconds": 0.4
+ },
+ "big_elements": {
+  "cases": 10720,
+  "identical_typed": 10720,
+  "identical_bytes": 10720,
+  "outside": 176,
+  "outside_at_a_position": 172,
+  "outside_at_a_reversed_range": 4,
+  "with_a_request": 1072,
+  "failures": [],
+  "ok": true,
+  "seconds": 0.2
+ },
+ "speed": {
+  "rows": [
+   {
+    "case": "4 1000000 3way 9 1000 qsort 0",
+    "probe_s": 0.1501,
+    "cleanroom_s": 0.1609,
+    "glibc_sort_s": 0.0796,
+    "cleanroom_typed_sort_s": 0.0805,
+    "cleanroom_bytes_sort_s": 0.0828,
+    "same_arrangement": true,
+    "glibc_over_typed": 0.99
+   },
+   {
+    "case": "4 1000000 f3 9 12 qsort 0",
+    "probe_s": 0.0914,
+    "cleanroom_s": 0.1085,
+    "glibc_sort_s": 0.0448,
+    "cleanroom_typed_sort_s": 0.0506,
+    "cleanroom_bytes_sort_s": 0.0511,
+    "same_arrangement": true,
+    "glibc_over_typed": 0.89
+   },
+   {
+    "case": "8 1000000 d2 9 12 qsort 0",
+    "probe_s": 0.173,
+    "cleanroom_s": 0.1944,
+    "glibc_sort_s": 0.0388,
+    "cleanroom_typed_sort_s": 0.0426,
+    "cleanroom_bytes_sort_s": 0.044,
+    "same_arrangement": true,
+    "glibc_over_typed": 0.91
+   },
+   {
+    "case": "12 1000000 tie+ 9 1000 qsort 0",
+    "probe_s": 0.2897,
+    "cleanroom_s": 0.3155,
+    "glibc_sort_s": 0.1109,
+    "cleanroom_typed_sort_s": 0.0802,
+    "cleanroom_bytes_sort_s": 0.0801,
+    "same_arrangement": true,
+    "glibc_over_typed": 1.38
+   },
+   {
+    "case": "40 1000000 hash 9 3 qsort 0",
+    "probe_s": 0.4916,
+    "cleanroom_s": 0.4664,
+    "glibc_sort_s": 0.1874,
+    "cleanroom_typed_sort_s": 0.2261,
+    "cleanroom_bytes_sort_s": 0.2747,
+    "same_arrangement": true,
+    "glibc_over_typed": 0.83
+   },
+   {
+    "case": "104 100000 3way 9 1000 qsort 0",
+    "probe_s": 0.0426,
+    "cleanroom_s": 0.0541,
+    "glibc_sort_s": 0.0097,
+    "cleanroom_typed_sort_s": 0.0113,
+    "cleanroom_bytes_sort_s": 0.0143,
+    "same_arrangement": true,
+    "glibc_over_typed": 0.86
+   },
+   {
+    "case": "4 10000000 3way 9 1000 qsort 0",
+    "probe_s": 1.7678,
+    "cleanroom_s": 1.9863,
+    "glibc_sort_s": 0.9646,
+    "cleanroom_typed_sort_s": 0.9833,
+    "cleanroom_bytes_sort_s": 1.003,
+    "same_arrangement": true,
+    "glibc_over_typed": 0.98
+   },
+   {
+    "case": "4 100000 3way 9 1000 qsort 1",
+    "probe_s": 0.014,
+    "cleanroom_s": 0.0165
+   }
+  ],
+  "ok": true
+ },
+ "original_runs": {
+  "runs": 22,
+  "from_the_cache": 20
+ }
+}

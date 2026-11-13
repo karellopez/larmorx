@@ -73,6 +73,9 @@ PARITY_MODULES = {
     "fsl-bet": "fsl_bet",
     "tedana-t2smap-replica": "tedana_t2smap_replica",
     "tedana-t2smap-original": "tedana_t2smap_original",
+    "confounds-linalg": "confounds_linalg",
+    "confounds-nipype": "confounds_nipype",
+    "confounds-fmriprep": "confounds_fmriprep",
 }
 PARITY_SUITES = tuple(PARITY_MODULES)
 #: Benchmark suites: name -> module in ``larmorx_validation.bench`` (each has ``main(args)``).

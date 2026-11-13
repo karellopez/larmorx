@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: LicenseRef-FreeSurfer
+# The FreeSurfer replica workspace (`larmorx-freesurfer`, docs/licensing.md, docs/freesurfer-plan.md):
+# Rust translations of FreeSurfer 8.2.0's source, written to give its output bit for bit, distributed
+# under FreeSurfer's licence (LICENSE: the FreeSurfer Software License with its required preface;
+# research use only, as-is, notices kept, modifications marked).
+#
+# It is a separate Cargo workspace, so the Apache-2.0 workspace at the repository root never builds it
+# and no Apache crate can depend on it. Its crates use the Apache crates by path (Apache-2.0 code may be
+# included in this work, with its notices: LICENSES/). It never links the GPL workspace (crates-gpl/) or
+# the FSL workspace (crates-nc/). The third-party pieces inside FreeSurfer are placed by their own
+# licences (docs/freesurfer/third-party.md section 9, the decision log of 2026-11-12): the permissive
+# ones are the main package's crates, used here by path.
+#
+# The layout (docs/freesurfer/waves.md section 4): library crates in layers, each depending only on the
+# ones above it; then one crate of programs per wave; then the program `larmorx-freesurfer`.
+[workspace]
+resolver = "3"
+members = [
+    "larmorx-freesurfer-core",
+    "larmorx-freesurfer-mri",
+    "larmorx-freesurfer-io",
+    "larmorx-freesurfer-volume",
+    "larmorx-freesurfer-filter",
+    "larmorx-freesurfer-surf",
+    "larmorx-freesurfer-deform",
+    "larmorx-freesurfer-defect",
+    "larmorx-freesurfer-gca",
+    "larmorx-freesurfer-robust",
+    "larmorx-freesurfer-volumes",
+    "larmorx-freesurfer-atlas",
+    "larmorx-freesurfer-topology",
+    "larmorx-freesurfer-cortex",
+    "larmorx-freesurfer-classic",
+    "larmorx-freesurfer-networks",
+    "larmorx-freesurfer-recon",
+    "larmorx-freesurfer-cli",
+]
+
+[workspace.package]
+# One version for larmorx and its companions: scripts/release/set_version.py sets it.
+version = "0.1.0-rc.1"
+edition = "2024"
+# The compiler a build from source needs at least: the one rust-toolchain.toml pins.
+rust-version = "1.99"
+license = "LicenseRef-FreeSurfer"
+repository = "https://github.com/karellopez/larmorx"
+
+# Pure-Rust dependencies only (CLAUDE.md rule 5): no C, C++, Fortran or HDF5 libraries.
+[workspace.dependencies]
+larmorx-core = { path = "../crates/larmorx-core", version = "0.1.0-rc.1" }
+larmorx-io = { path = "../crates/larmorx-io", version = "0.1.0-rc.1" }
+larmorx-freesurfer-core = { path = "larmorx-freesurfer-core", version = "0.1.0-rc.1" }
+larmorx-freesurfer-mri = { path = "larmorx-freesurfer-mri", version = "0.1.0-rc.1" }
+larmorx-freesurfer-io = { path = "larmorx-freesurfer-io", version = "0.1.0-rc.1" }
+larmorx-freesurfer-volume = { path = "larmorx-freesurfer-volume", version = "0.1.0-rc.1" }
+larmorx-freesurfer-filter = { path = "larmorx-freesurfer-filter", version = "0.1.0-rc.1" }
+larmorx-freesurfer-surf = { path = "larmorx-freesurfer-surf", version = "0.1.0-rc.1" }
+larmorx-freesurfer-deform = { path = "larmorx-freesurfer-deform", version = "0.1.0-rc.1" }
+larmorx-freesurfer-defect = { path = "larmorx-freesurfer-defect", version = "0.1.0-rc.1" }
+larmorx-freesurfer-gca = { path = "larmorx-freesurfer-gca", version = "0.1.0-rc.1" }
+larmorx-freesurfer-robust = { path = "larmorx-freesurfer-robust", version = "0.1.0-rc.1" }
+larmorx-freesurfer-volumes = { path = "larmorx-freesurfer-volumes", version = "0.1.0-rc.1" }
+larmorx-freesurfer-atlas = { path = "larmorx-freesurfer-atlas", version = "0.1.0-rc.1" }
+larmorx-freesurfer-topology = { path = "larmorx-freesurfer-topology", version = "0.1.0-rc.1" }
+larmorx-freesurfer-cortex = { path = "larmorx-freesurfer-cortex", version = "0.1.0-rc.1" }
+larmorx-freesurfer-classic = { path = "larmorx-freesurfer-classic", version = "0.1.0-rc.1" }
+larmorx-freesurfer-networks = { path = "larmorx-freesurfer-networks", version = "0.1.0-rc.1" }
+larmorx-freesurfer-recon = { path = "larmorx-freesurfer-recon", version = "0.1.0-rc.1" }
+sha2 = { version = "0.11.0", default-features = false }
+tempfile = "3.27.0"
+
+# The released files' profile (`maturin build --profile dist`, `cargo build --profile dist`): the
+# release profile with the whole program optimised as one unit (fat LTO, one codegen unit) and the
+# symbols stripped, for smaller files (docs/next-steps.md, "Releases on PyPI": "Size"). The same
+# bits as `release` (no fast-math, the same opt-level). Everyday builds, CI, verify-merge and the
+# agents keep `release`: fat LTO adds minutes of single-threaded linking.
+[profile.dist]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"

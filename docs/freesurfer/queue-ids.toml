@@ -1,0 +1,1488 @@
+# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (docs/freesurfer/README.md). The queue's item
+# numbers, kept stable: waves.py reads and rewrites this file (--ids). An item keeps its
+# number while its key is generated; a new item takes the next free number of its wave;
+# a number whose item is gone is marked retired (why, by hand) and never given again.
+# Keys: extra:<name> (written by hand in waves.py), mod:<module>:<piece>, w3:<module>:<part>,
+# paths:<module>, prog:<program>[:<piece>], split:<program>:<part>, script:<program>:<part>,
+# clean:mod:<module>, clean:prog:<program>, clean:extra:<name>, cp:<piece>.
+
+schema = 1
+
+[[id]]
+id = "3.1-01"
+key = "extra:workspace"
+
+[[id]]
+id = "3.1-02"
+key = "extra:unit-oracle"
+
+[[id]]
+id = "3.1-03"
+key = "extra:x87"
+
+[[id]]
+id = "3.1-04"
+key = "extra:random"
+
+[[id]]
+id = "3.1-05"
+key = "extra:ranlux"
+
+[[id]]
+id = "3.1-06"
+key = "extra:spline-clean"
+
+[[id]]
+id = "3.1-07"
+key = "extra:vnl"
+
+[[id]]
+id = "3.1-08"
+key = "extra:libc"
+
+[[id]]
+id = "3.1-09"
+key = "w3:perm.gifti:xml"
+
+[[id]]
+id = "3.1-10"
+key = "w3:perm.gifti:read-xml"
+
+[[id]]
+id = "3.1-11"
+key = "w3:perm.gifti:read-io"
+
+[[id]]
+id = "3.1-12"
+key = "w3:perm.gifti:write"
+
+[[id]]
+id = "3.1-13"
+key = "mod:perm.gifti:5"
+retired = "W3 (relay 8, the orchestrator's decision after relay 6): GIFTI's items regrouped by role into 3.1-09 to 3.1-12"
+
+[[id]]
+id = "3.1-14"
+key = "mod:perm.minc:1"
+
+[[id]]
+id = "3.1-15"
+key = "mod:perm.nifti:1"
+
+[[id]]
+id = "3.1-16"
+key = "w3:perm.dicom:probe"
+
+[[id]]
+id = "3.1-17"
+key = "mod:perm.dicom:2"
+retired = "W3 (relay 8): the DICOM probe is one item, 3.1-16 (no port of CTN's library)"
+
+[[id]]
+id = "3.1-18"
+key = "mod:perm.misc:1"
+
+[[id]]
+id = "3.1-19"
+key = "w3:perm.json:parse"
+
+[[id]]
+id = "3.1-20"
+key = "w3:perm.json:write"
+
+[[id]]
+id = "3.1-21"
+key = "mod:perm.argparse:1"
+
+[[id]]
+id = "3.1-22"
+key = "mod:fs.core:1"
+
+[[id]]
+id = "3.1-23"
+key = "mod:fs.maths:1"
+
+[[id]]
+id = "3.1-24"
+key = "mod:fs.maths:2"
+
+[[id]]
+id = "3.1-25"
+key = "mod:fs.io:1"
+
+[[id]]
+id = "3.1-26"
+key = "mod:fs.io:2"
+
+[[id]]
+id = "3.1-27"
+key = "mod:fs.io:3"
+
+[[id]]
+id = "3.1-28"
+key = "mod:fs.io:4"
+
+[[id]]
+id = "3.1-29"
+key = "mod:fs.io:5"
+
+[[id]]
+id = "3.1-30"
+key = "mod:fs.io:6"
+
+[[id]]
+id = "3.1-31"
+key = "mod:fs.io:7"
+retired = "the orchestrator's decision on 3.1-25 (2026-11-13): DICOM input left fs.io for the completeness items (fs.dicomread, 3.7) and the MRI structure became 3.1-55, so fs.io is six pieces (3.1-25 to 3.1-30 hold what remains, in the same file order)"
+
+[[id]]
+id = "3.1-32"
+key = "mod:fs.io:8"
+retired = "the orchestrator's decision on 3.1-25 (2026-11-13): DICOM input left fs.io for the completeness items (fs.dicomread, 3.7) and the MRI structure became 3.1-55, so fs.io is six pieces (3.1-25 to 3.1-30 hold what remains, in the same file order)"
+
+[[id]]
+id = "3.1-33"
+key = "mod:fs.labels:1"
+
+[[id]]
+id = "3.1-34"
+key = "mod:fs.labels:2"
+
+[[id]]
+id = "3.1-35"
+key = "mod:fs.volume:1"
+
+[[id]]
+id = "3.1-36"
+key = "mod:fs.volume:2"
+
+[[id]]
+id = "3.1-37"
+key = "mod:fs.volume:3"
+
+[[id]]
+id = "3.1-38"
+key = "mod:fs.volume:4"
+
+[[id]]
+id = "3.1-39"
+key = "mod:fs.volume:5"
+
+[[id]]
+id = "3.1-40"
+key = "mod:fs.volume:6"
+
+[[id]]
+id = "3.1-41"
+key = "mod:fs.volume:7"
+retired = "the orchestrator's decision on 3.1-25 (2026-11-13): the MRI structure, its allocation, free, header copies and geometry left fs.volume for 3.1-55 (fs.mri, the crate larmorx-freesurfer-mri below fs.io), so fs.volume is six pieces (3.1-35 to 3.1-40 hold the rest, in the same file order)"
+
+[[id]]
+id = "3.1-42"
+key = "mod:fs.filter:1"
+
+[[id]]
+id = "3.1-43"
+key = "mod:fs.filter:2"
+
+[[id]]
+id = "3.1-44"
+key = "mod:fs.filter:3"
+
+[[id]]
+id = "3.1-45"
+key = "mod:fs.surfio:1"
+
+[[id]]
+id = "3.1-46"
+key = "mod:fs.surfio:2"
+
+[[id]]
+id = "3.1-47"
+key = "mod:fs.surfio:3"
+
+[[id]]
+id = "3.1-48"
+key = "mod:fs.surfio:4"
+
+[[id]]
+id = "3.1-49"
+key = "mod:fs.surfio:5"
+
+[[id]]
+id = "3.1-50"
+key = "mod:fs.surfio:6"
+
+[[id]]
+id = "3.1-51"
+key = "mod:fs.surfio:7"
+
+[[id]]
+id = "3.1-52"
+key = "mod:fs.surfio:8"
+
+[[id]]
+id = "3.1-53"
+key = "mod:gpl.gsl:1"
+
+[[id]]
+id = "3.1-54"
+key = "mod:fs.spline:1"
+
+[[id]]
+id = "3.1-55"
+key = "mod:fs.mri:1"
+
+[[id]]
+id = "3.1-56"
+key = "w3:perm.dicom:elements"
+
+[[id]]
+id = "3.2-01"
+key = "mod:fs.bspline:1"
+
+[[id]]
+id = "3.2-02"
+key = "mod:fs.robust:1"
+
+[[id]]
+id = "3.2-03"
+key = "mod:fs.robust:2"
+
+[[id]]
+id = "3.2-04"
+key = "prog:mri_convert:1"
+
+[[id]]
+id = "3.2-05"
+key = "prog:mri_convert:2"
+
+[[id]]
+id = "3.2-06"
+key = "prog:mri_convert:3"
+
+[[id]]
+id = "3.2-07"
+key = "prog:mri_convert:4"
+
+[[id]]
+id = "3.2-08"
+key = "prog:mri_info"
+
+[[id]]
+id = "3.2-09"
+key = "prog:lta_convert"
+
+[[id]]
+id = "3.2-10"
+key = "prog:mri_add_xform_to_header"
+
+[[id]]
+id = "3.2-11"
+key = "prog:fs_temp_file"
+
+[[id]]
+id = "3.2-12"
+key = "prog:getfullpath"
+
+[[id]]
+id = "3.2-13"
+key = "prog:mri_robust_register"
+
+[[id]]
+id = "3.2-14"
+key = "prog:mri_robust_template:1"
+
+[[id]]
+id = "3.2-15"
+key = "prog:mri_robust_template:2"
+
+[[id]]
+id = "3.2-16"
+key = "prog:mri_robust_template:3"
+
+[[id]]
+id = "3.2-17"
+key = "prog:mri_coreg"
+
+[[id]]
+id = "3.2-18"
+key = "prog:AntsN4BiasFieldCorrectionFs"
+
+[[id]]
+id = "3.2-19"
+key = "prog:mri_binarize"
+
+[[id]]
+id = "3.2-20"
+key = "prog:mri_segstats"
+
+[[id]]
+id = "3.2-21"
+key = "prog:mris_calc"
+
+[[id]]
+id = "3.2-22"
+key = "prog:mri_make_uchar"
+
+[[id]]
+id = "3.2-23"
+key = "prog:mri_nu_correct.mni"
+
+[[id]]
+id = "3.2-24"
+key = "prog:mri_normalize:1"
+
+[[id]]
+id = "3.2-25"
+key = "prog:mri_normalize:2"
+
+[[id]]
+id = "3.2-26"
+key = "prog:mri_mask"
+
+[[id]]
+id = "3.2-27"
+key = "prog:mri_cc"
+
+[[id]]
+id = "3.2-28"
+key = "prog:seg2cc"
+
+[[id]]
+id = "3.2-29"
+key = "prog:mergeseg"
+
+[[id]]
+id = "3.2-30"
+key = "prog:AntsDenoiseImageFs"
+
+[[id]]
+id = "3.2-31"
+key = "prog:mri_segment"
+
+[[id]]
+id = "3.2-32"
+key = "prog:mri_edit_wm_with_aseg"
+
+[[id]]
+id = "3.2-33"
+key = "prog:mri_pretess"
+
+[[id]]
+id = "3.2-34"
+key = "prog:mri_fill:1"
+
+[[id]]
+id = "3.2-35"
+key = "prog:mri_fill:2"
+
+[[id]]
+id = "3.2-36"
+key = "prog:mri_fill:3"
+
+[[id]]
+id = "3.2-37"
+key = "prog:mri_fill:4"
+
+[[id]]
+id = "3.2-38"
+key = "prog:mri_vol2vol"
+
+[[id]]
+id = "3.2-39"
+key = "prog:mri_concat"
+
+[[id]]
+id = "3.2-40"
+key = "prog:mri_label2vol"
+
+[[id]]
+id = "3.2-41"
+key = "extra:main-plumbing"
+
+[[id]]
+id = "3.3-01"
+key = "mod:fs.gca:1"
+
+[[id]]
+id = "3.3-02"
+key = "mod:fs.gca:2"
+
+[[id]]
+id = "3.3-03"
+key = "mod:fs.gca:3"
+
+[[id]]
+id = "3.3-04"
+key = "mod:fs.gca:4"
+
+[[id]]
+id = "3.3-05"
+key = "mod:fs.gca:5"
+
+[[id]]
+id = "3.3-06"
+key = "mod:fs.gca:6"
+
+[[id]]
+id = "3.3-07"
+key = "mod:fs.gca:7"
+
+[[id]]
+id = "3.3-08"
+key = "mod:fs.gca:8"
+
+[[id]]
+id = "3.3-09"
+key = "mod:fs.gca:9"
+
+[[id]]
+id = "3.3-10"
+key = "paths:fs.gca"
+
+[[id]]
+id = "3.3-11"
+key = "prog:mri_em_register:1"
+
+[[id]]
+id = "3.3-12"
+key = "prog:mri_em_register:2"
+
+[[id]]
+id = "3.3-13"
+key = "prog:mri_em_register:3"
+
+[[id]]
+id = "3.3-14"
+key = "prog:mri_ca_normalize"
+
+[[id]]
+id = "3.3-15"
+key = "prog:mri_ca_register:1"
+
+[[id]]
+id = "3.3-16"
+key = "prog:mri_ca_register:2"
+
+[[id]]
+id = "3.3-17"
+key = "prog:mri_ca_register:3"
+
+[[id]]
+id = "N-01"
+key = "extra:nn"
+
+[[id]]
+id = "N-02"
+key = "prog:mri_synthstrip"
+
+[[id]]
+id = "N-03"
+key = "prog:mri_synthseg"
+
+[[id]]
+id = "N-04"
+key = "prog:csvprint"
+
+[[id]]
+id = "N-05"
+key = "prog:mri_sclimbic_seg"
+
+[[id]]
+id = "N-06"
+key = "prog:mri_synthmorph"
+
+[[id]]
+id = "N-07"
+key = "prog:mri_concatenate_lta"
+
+[[id]]
+id = "N-08"
+key = "prog:mri_warp_convert"
+
+[[id]]
+id = "N-09"
+key = "prog:mri_diff"
+
+[[id]]
+id = "N-10"
+key = "prog:fs-synthmorph-reg"
+
+[[id]]
+id = "N-11"
+key = "prog:rca-talairach"
+
+[[id]]
+id = "N-12"
+key = "prog:mri_mcadura_seg"
+
+[[id]]
+id = "N-13"
+key = "prog:mri_vsinus_seg"
+
+[[id]]
+id = "N-14"
+key = "prog:mri_compute_seg_overlap"
+
+[[id]]
+id = "N-15"
+key = "prog:mri_entowm_seg"
+
+[[id]]
+id = "3.4-01"
+key = "mod:fs.surf:1"
+
+[[id]]
+id = "3.4-02"
+key = "mod:fs.surf:2"
+
+[[id]]
+id = "3.4-03"
+key = "mod:fs.surf:3"
+
+[[id]]
+id = "3.4-04"
+key = "mod:fs.surf:4"
+
+[[id]]
+id = "3.4-05"
+key = "mod:fs.deform:1"
+
+[[id]]
+id = "3.4-06"
+key = "mod:fs.deform:2"
+
+[[id]]
+id = "3.4-07"
+key = "mod:fs.deform:3"
+
+[[id]]
+id = "3.4-08"
+key = "mod:fs.deform:4"
+
+[[id]]
+id = "3.4-09"
+key = "mod:fs.defect:1"
+
+[[id]]
+id = "3.4-10"
+key = "paths:fs.surf"
+
+[[id]]
+id = "3.4-11"
+key = "paths:fs.deform"
+
+[[id]]
+id = "3.4-12"
+key = "paths:fs.defect"
+
+[[id]]
+id = "3.4-13"
+key = "prog:mri_tessellate"
+
+[[id]]
+id = "3.4-14"
+key = "prog:mris_extract_main_component"
+
+[[id]]
+id = "3.4-15"
+key = "prog:mris_smooth"
+
+[[id]]
+id = "3.4-16"
+key = "prog:mris_inflate"
+
+[[id]]
+id = "3.4-17"
+key = "prog:mris_sphere"
+
+[[id]]
+id = "3.4-18"
+key = "prog:mris_fix_topology:1"
+
+[[id]]
+id = "3.4-19"
+key = "prog:mris_fix_topology:2"
+
+[[id]]
+id = "3.4-20"
+key = "prog:mris_fix_topology:3"
+
+[[id]]
+id = "3.4-21"
+key = "prog:mris_fix_topology:4"
+
+[[id]]
+id = "3.4-22"
+key = "prog:mris_fix_topology:5"
+
+[[id]]
+id = "3.4-23"
+key = "prog:mris_fix_topology:6"
+
+[[id]]
+id = "3.4-24"
+key = "prog:mris_fix_topology:7"
+
+[[id]]
+id = "3.4-25"
+key = "prog:mris_euler_number"
+
+[[id]]
+id = "3.4-26"
+key = "prog:mris_topo_fixer:1"
+
+[[id]]
+id = "3.4-27"
+key = "prog:mris_topo_fixer:2"
+
+[[id]]
+id = "3.4-28"
+key = "prog:mris_topo_fixer:3"
+
+[[id]]
+id = "3.4-29"
+key = "prog:mri_label2label"
+
+[[id]]
+id = "3.4-30"
+key = "prog:mris_defects_pointset"
+
+[[id]]
+id = "3.4-31"
+key = "prog:defect2seg"
+
+[[id]]
+id = "3.4-32"
+key = "prog:mris_remesh"
+
+[[id]]
+id = "3.4-33"
+key = "prog:mris_remove_intersection"
+
+[[id]]
+id = "3.5-01"
+key = "prog:mri_relabel_hypointensities"
+
+[[id]]
+id = "3.5-02"
+key = "prog:mri_surf2volseg"
+
+[[id]]
+id = "3.5-03"
+key = "prog:mri_brainvol_stats"
+
+[[id]]
+id = "3.5-04"
+key = "prog:mri_vol2surf"
+
+[[id]]
+id = "3.5-05"
+key = "prog:mri_cor2label"
+
+[[id]]
+id = "3.5-06"
+key = "prog:mris_autodet_gwstats"
+
+[[id]]
+id = "3.5-07"
+key = "prog:mris_place_surface:1"
+
+[[id]]
+id = "3.5-08"
+key = "prog:mris_place_surface:2"
+
+[[id]]
+id = "3.5-09"
+key = "prog:mris_place_surface:3"
+
+[[id]]
+id = "3.5-10"
+key = "prog:mris_place_surface:4"
+
+[[id]]
+id = "3.5-11"
+key = "prog:mris_place_surface:5"
+
+[[id]]
+id = "3.5-12"
+key = "prog:mris_curvature"
+
+[[id]]
+id = "3.5-13"
+key = "prog:mris_register:1"
+
+[[id]]
+id = "3.5-14"
+key = "prog:mris_register:2"
+
+[[id]]
+id = "3.5-15"
+key = "prog:mris_jacobian"
+
+[[id]]
+id = "3.5-16"
+key = "prog:mrisp_paint"
+
+[[id]]
+id = "3.5-17"
+key = "prog:mris_ca_label"
+
+[[id]]
+id = "3.5-18"
+key = "prog:mris_curvature_stats"
+
+[[id]]
+id = "3.5-19"
+key = "prog:mris_volmask"
+
+[[id]]
+id = "3.5-20"
+key = "prog:mris_anatomical_stats"
+
+[[id]]
+id = "3.5-21"
+key = "prog:mris_label2annot"
+
+[[id]]
+id = "3.5-22"
+key = "prog:mris_convert"
+
+[[id]]
+id = "3.5-23"
+key = "prog:mri_surf2surf"
+
+[[id]]
+id = "3.5-24"
+key = "prog:mris_expand"
+
+[[id]]
+id = "3.5-25"
+key = "prog:mri_segreg"
+
+[[id]]
+id = "3.5-26"
+key = "prog:tkregister2_cmdl:1"
+
+[[id]]
+id = "3.5-27"
+key = "prog:tkregister2_cmdl:2"
+
+[[id]]
+id = "3.5-28"
+key = "prog:label-cortex"
+
+[[id]]
+id = "3.5-29"
+key = "prog:fscalc"
+
+[[id]]
+id = "3.5-30"
+key = "prog:mri_mergelabels"
+
+[[id]]
+id = "3.5-31"
+key = "prog:rca-surfreg"
+
+[[id]]
+id = "3.5-32"
+key = "prog:vertexvol"
+
+[[id]]
+id = "3.5-33"
+key = "prog:pctsurfcon"
+
+[[id]]
+id = "3.5-34"
+key = "prog:bbregister"
+
+[[id]]
+id = "3.5-35"
+key = "prog:fsr-getxopts"
+
+[[id]]
+id = "3.5-36"
+key = "split:mri_segstats:b"
+
+[[id]]
+id = "3.5-37"
+key = "split:mris_calc:b"
+
+[[id]]
+id = "3.6-01"
+key = "mod:cr.4dfp:1"
+
+[[id]]
+id = "3.6-02"
+key = "prog:mri_watershed:1"
+
+[[id]]
+id = "3.6-03"
+key = "prog:mri_watershed:2"
+
+[[id]]
+id = "3.6-04"
+key = "prog:mri_watershed:3"
+
+[[id]]
+id = "3.6-05"
+key = "prog:mri_watershed:4"
+
+[[id]]
+id = "3.6-06"
+key = "prog:mri_watershed:5"
+
+[[id]]
+id = "3.6-07"
+key = "prog:mri_ca_label:1"
+
+[[id]]
+id = "3.6-08"
+key = "prog:mri_ca_label:2"
+
+[[id]]
+id = "3.6-09"
+key = "prog:mri_ca_label:3"
+
+[[id]]
+id = "3.6-10"
+key = "prog:mri_ca_label:4"
+
+[[id]]
+id = "3.6-11"
+key = "prog:talairach_afd"
+
+[[id]]
+id = "3.6-12"
+key = "prog:mri_matrix_multiply"
+
+[[id]]
+id = "3.6-13"
+key = "prog:fs_temp_dir"
+
+[[id]]
+id = "3.6-14"
+key = "prog:analyzeto4dfp"
+
+[[id]]
+id = "3.6-15"
+key = "prog:gauss_4dfp"
+
+[[id]]
+id = "3.6-16"
+key = "prog:imgreg_4dfp"
+
+[[id]]
+id = "3.6-17"
+key = "prog:compute_vox2vox"
+
+[[id]]
+id = "3.6-18"
+key = "prog:talairach_avi"
+
+[[id]]
+id = "3.6-19"
+key = "prog:mpr2mni305"
+
+[[id]]
+id = "3.6-20"
+key = "prog:avi2talxfm"
+
+[[id]]
+id = "3.6-21"
+key = "prog:extract_talairach_avi_QA.awk"
+
+[[id]]
+id = "3.7-01"
+key = "script:recon-all:1"
+
+[[id]]
+id = "3.7-02"
+key = "script:recon-all:2"
+
+[[id]]
+id = "3.7-03"
+key = "script:recon-all:3"
+
+[[id]]
+id = "3.7-04"
+key = "script:recon-all:4"
+
+[[id]]
+id = "3.7-05"
+key = "script:recon-all:5"
+
+[[id]]
+id = "3.7-06"
+key = "script:recon-all:6"
+
+[[id]]
+id = "3.7-07"
+key = "prog:mri_seg_diff"
+
+[[id]]
+id = "3.7-08"
+key = "prog:rca-config"
+
+[[id]]
+id = "3.7-09"
+key = "prog:rca-config2csh"
+
+[[id]]
+id = "3.7-10"
+key = "prog:fsr-checkxopts"
+
+[[id]]
+id = "3.7-11"
+key = "prog:UpdateNeeded"
+
+[[id]]
+id = "3.7-12"
+key = "prog:fs-check-version"
+
+[[id]]
+id = "3.7-13"
+key = "prog:fs-check-os"
+
+[[id]]
+id = "3.7-14"
+key = "mod:fs.dicomread:1"
+
+[[id]]
+id = "3.7-15"
+key = "mod:fs.dicomread:2"
+
+[[id]]
+id = "3.7-16"
+key = "paths:fs.dicomread"
+
+[[id]]
+id = "C3.1-00"
+key = "clean:extra:crates"
+
+[[id]]
+id = "C3.1-01"
+key = "clean:mod:fs.core"
+
+[[id]]
+id = "C3.1-02"
+key = "clean:mod:fs.maths"
+
+[[id]]
+id = "C3.1-03"
+key = "clean:mod:fs.io"
+
+[[id]]
+id = "C3.1-04"
+key = "clean:mod:fs.labels"
+
+[[id]]
+id = "C3.1-05"
+key = "clean:mod:fs.volume"
+
+[[id]]
+id = "C3.1-06"
+key = "clean:mod:fs.filter"
+
+[[id]]
+id = "C3.1-07"
+key = "clean:mod:fs.surfio"
+
+[[id]]
+id = "C3.2-01"
+key = "clean:mod:fs.bspline"
+
+[[id]]
+id = "C3.2-02"
+key = "clean:mod:fs.robust"
+
+[[id]]
+id = "C3.2-03"
+key = "clean:prog:mri_convert"
+
+[[id]]
+id = "C3.2-04"
+key = "clean:prog:mri_info"
+
+[[id]]
+id = "C3.2-05"
+key = "clean:prog:lta_convert"
+
+[[id]]
+id = "C3.2-06"
+key = "clean:prog:mri_add_xform_to_header"
+
+[[id]]
+id = "C3.2-07"
+key = "clean:prog:fs_temp_file"
+
+[[id]]
+id = "C3.2-08"
+key = "clean:prog:getfullpath"
+
+[[id]]
+id = "C3.2-09"
+key = "clean:prog:mri_robust_register"
+
+[[id]]
+id = "C3.2-10"
+key = "clean:prog:mri_robust_template"
+
+[[id]]
+id = "C3.2-11"
+key = "clean:prog:mri_coreg"
+
+[[id]]
+id = "C3.2-12"
+key = "clean:prog:AntsN4BiasFieldCorrectionFs"
+
+[[id]]
+id = "C3.2-13"
+key = "clean:prog:mri_binarize"
+
+[[id]]
+id = "C3.2-14"
+key = "clean:prog:mri_segstats"
+
+[[id]]
+id = "C3.2-15"
+key = "clean:prog:mris_calc"
+
+[[id]]
+id = "C3.2-16"
+key = "clean:prog:mri_make_uchar"
+
+[[id]]
+id = "C3.2-17"
+key = "clean:prog:mri_nu_correct.mni"
+
+[[id]]
+id = "C3.2-18"
+key = "clean:prog:mri_normalize"
+
+[[id]]
+id = "C3.2-19"
+key = "clean:prog:mri_mask"
+
+[[id]]
+id = "C3.2-20"
+key = "clean:prog:mri_cc"
+
+[[id]]
+id = "C3.2-21"
+key = "clean:prog:seg2cc"
+
+[[id]]
+id = "C3.2-22"
+key = "clean:prog:mergeseg"
+
+[[id]]
+id = "C3.2-23"
+key = "clean:prog:AntsDenoiseImageFs"
+
+[[id]]
+id = "C3.2-24"
+key = "clean:prog:mri_segment"
+
+[[id]]
+id = "C3.2-25"
+key = "clean:prog:mri_edit_wm_with_aseg"
+
+[[id]]
+id = "C3.2-26"
+key = "clean:prog:mri_pretess"
+
+[[id]]
+id = "C3.2-27"
+key = "clean:prog:mri_fill"
+
+[[id]]
+id = "C3.2-28"
+key = "clean:prog:mri_vol2vol"
+
+[[id]]
+id = "C3.2-29"
+key = "clean:prog:mri_concat"
+
+[[id]]
+id = "C3.2-30"
+key = "clean:prog:mri_label2vol"
+
+[[id]]
+id = "C3.3-01"
+key = "clean:mod:fs.gca"
+
+[[id]]
+id = "C3.3-02"
+key = "clean:prog:mri_em_register"
+
+[[id]]
+id = "C3.3-03"
+key = "clean:prog:mri_ca_normalize"
+
+[[id]]
+id = "C3.3-04"
+key = "clean:prog:mri_ca_register"
+
+[[id]]
+id = "CN-01"
+key = "clean:prog:mri_synthstrip"
+
+[[id]]
+id = "CN-02"
+key = "clean:prog:mri_synthseg"
+
+[[id]]
+id = "CN-03"
+key = "clean:prog:csvprint"
+
+[[id]]
+id = "CN-04"
+key = "clean:prog:mri_sclimbic_seg"
+
+[[id]]
+id = "CN-05"
+key = "clean:prog:mri_synthmorph"
+
+[[id]]
+id = "CN-06"
+key = "clean:prog:mri_concatenate_lta"
+
+[[id]]
+id = "CN-07"
+key = "clean:prog:mri_warp_convert"
+
+[[id]]
+id = "CN-08"
+key = "clean:prog:mri_diff"
+
+[[id]]
+id = "CN-09"
+key = "clean:prog:fs-synthmorph-reg"
+
+[[id]]
+id = "CN-10"
+key = "clean:prog:rca-talairach"
+
+[[id]]
+id = "CN-11"
+key = "clean:prog:mri_mcadura_seg"
+
+[[id]]
+id = "CN-12"
+key = "clean:prog:mri_vsinus_seg"
+
+[[id]]
+id = "CN-13"
+key = "clean:prog:mri_compute_seg_overlap"
+
+[[id]]
+id = "CN-14"
+key = "clean:prog:mri_entowm_seg"
+
+[[id]]
+id = "C3.4-01"
+key = "clean:mod:fs.surf"
+
+[[id]]
+id = "C3.4-02"
+key = "clean:mod:fs.deform"
+
+[[id]]
+id = "C3.4-03"
+key = "clean:mod:fs.defect"
+
+[[id]]
+id = "C3.4-04"
+key = "clean:prog:mri_tessellate"
+
+[[id]]
+id = "C3.4-05"
+key = "clean:prog:mris_extract_main_component"
+
+[[id]]
+id = "C3.4-06"
+key = "clean:prog:mris_smooth"
+
+[[id]]
+id = "C3.4-07"
+key = "clean:prog:mris_inflate"
+
+[[id]]
+id = "C3.4-08"
+key = "clean:prog:mris_sphere"
+
+[[id]]
+id = "C3.4-09"
+key = "clean:prog:mris_fix_topology"
+
+[[id]]
+id = "C3.4-10"
+key = "clean:prog:mris_euler_number"
+
+[[id]]
+id = "C3.4-11"
+key = "clean:prog:mris_topo_fixer"
+
+[[id]]
+id = "C3.4-12"
+key = "clean:prog:mri_label2label"
+
+[[id]]
+id = "C3.4-13"
+key = "clean:prog:mris_defects_pointset"
+
+[[id]]
+id = "C3.4-14"
+key = "clean:prog:defect2seg"
+
+[[id]]
+id = "C3.4-15"
+key = "clean:prog:mris_remesh"
+
+[[id]]
+id = "C3.4-16"
+key = "clean:prog:mris_remove_intersection"
+
+[[id]]
+id = "C3.5-01"
+key = "clean:prog:mri_relabel_hypointensities"
+
+[[id]]
+id = "C3.5-02"
+key = "clean:prog:mri_surf2volseg"
+
+[[id]]
+id = "C3.5-03"
+key = "clean:prog:mri_brainvol_stats"
+
+[[id]]
+id = "C3.5-04"
+key = "clean:prog:mri_vol2surf"
+
+[[id]]
+id = "C3.5-05"
+key = "clean:prog:mri_cor2label"
+
+[[id]]
+id = "C3.5-06"
+key = "clean:prog:mris_autodet_gwstats"
+
+[[id]]
+id = "C3.5-07"
+key = "clean:prog:mris_place_surface"
+
+[[id]]
+id = "C3.5-08"
+key = "clean:prog:mris_curvature"
+
+[[id]]
+id = "C3.5-09"
+key = "clean:prog:mris_register"
+
+[[id]]
+id = "C3.5-10"
+key = "clean:prog:mris_jacobian"
+
+[[id]]
+id = "C3.5-11"
+key = "clean:prog:mrisp_paint"
+
+[[id]]
+id = "C3.5-12"
+key = "clean:prog:mris_ca_label"
+
+[[id]]
+id = "C3.5-13"
+key = "clean:prog:mris_curvature_stats"
+
+[[id]]
+id = "C3.5-14"
+key = "clean:prog:mris_volmask"
+
+[[id]]
+id = "C3.5-15"
+key = "clean:prog:mris_anatomical_stats"
+
+[[id]]
+id = "C3.5-16"
+key = "clean:prog:mris_label2annot"
+
+[[id]]
+id = "C3.5-17"
+key = "clean:prog:mris_convert"
+
+[[id]]
+id = "C3.5-18"
+key = "clean:prog:mri_surf2surf"
+
+[[id]]
+id = "C3.5-19"
+key = "clean:prog:mris_expand"
+
+[[id]]
+id = "C3.5-20"
+key = "clean:prog:mri_segreg"
+
+[[id]]
+id = "C3.5-21"
+key = "clean:prog:tkregister2_cmdl"
+
+[[id]]
+id = "C3.5-22"
+key = "clean:prog:label-cortex"
+
+[[id]]
+id = "C3.5-23"
+key = "clean:prog:fscalc"
+
+[[id]]
+id = "C3.5-24"
+key = "clean:prog:mri_mergelabels"
+
+[[id]]
+id = "C3.5-25"
+key = "clean:prog:rca-surfreg"
+
+[[id]]
+id = "C3.5-26"
+key = "clean:prog:vertexvol"
+
+[[id]]
+id = "C3.5-27"
+key = "clean:prog:pctsurfcon"
+
+[[id]]
+id = "C3.5-28"
+key = "clean:prog:bbregister"
+
+[[id]]
+id = "C3.5-29"
+key = "clean:prog:fsr-getxopts"
+
+[[id]]
+id = "C3.6-01"
+key = "clean:prog:mri_watershed"
+
+[[id]]
+id = "C3.6-02"
+key = "clean:prog:mri_ca_label"
+
+[[id]]
+id = "C3.6-03"
+key = "clean:prog:talairach_afd"
+
+[[id]]
+id = "C3.6-04"
+key = "clean:prog:mri_matrix_multiply"
+
+[[id]]
+id = "C3.6-05"
+key = "clean:prog:fs_temp_dir"
+
+[[id]]
+id = "C3.6-06"
+key = "clean:prog:talairach_avi"
+retired = "the user, 2026-11-12: Washington University's Talairach tools a clean room only; talairach_avi's own item (3.6) is its clean room"
+
+[[id]]
+id = "C3.6-07"
+key = "clean:prog:mpr2mni305"
+retired = "the user, 2026-11-12: a clean room only (Washington University's notice); mpr2mni305's own item (3.6) is its clean room"
+
+[[id]]
+id = "C3.6-08"
+key = "clean:prog:avi2talxfm"
+
+[[id]]
+id = "C3.6-09"
+key = "clean:prog:extract_talairach_avi_QA.awk"
+
+[[id]]
+id = "C3.7-01"
+key = "clean:prog:recon-all"
+
+[[id]]
+id = "C3.7-02"
+key = "clean:prog:mri_seg_diff"
+
+[[id]]
+id = "C3.7-03"
+key = "clean:prog:rca-config"
+
+[[id]]
+id = "C3.7-04"
+key = "clean:prog:rca-config2csh"
+
+[[id]]
+id = "C3.7-05"
+key = "clean:prog:fsr-checkxopts"
+
+[[id]]
+id = "C3.7-06"
+key = "clean:prog:UpdateNeeded"
+
+[[id]]
+id = "C3.7-07"
+key = "clean:prog:fs-check-version"
+
+[[id]]
+id = "C3.7-08"
+key = "clean:prog:fs-check-os"
+
+[[id]]
+id = "C3.7-09"
+key = "clean:mod:fs.dicomread"
+
+[[id]]
+id = "CP-01"
+key = "cp:mod:perm.gifti"
+
+[[id]]
+id = "CP-02"
+key = "cp:mod:perm.minc"
+
+[[id]]
+id = "CP-03"
+key = "cp:mod:perm.nifti"
+
+[[id]]
+id = "CP-04"
+key = "cp:mod:perm.dicom"
+
+[[id]]
+id = "CP-05"
+key = "cp:mod:perm.misc"
+
+[[id]]
+id = "CP-06"
+key = "cp:mod:perm.json"
+
+[[id]]
+id = "CP-07"
+key = "cp:mod:perm.geomtools"
+
+[[id]]
+id = "CP-08"
+key = "cp:mod:perm.argparse"
+
+[[id]]
+id = "CP-09"
+key = "cp:extra:x87"
+
+[[id]]
+id = "CP-10"
+key = "cp:extra:random"
+
+[[id]]
+id = "CP-11"
+key = "cp:extra:vnl"
+
+[[id]]
+id = "CP-12"
+key = "cp:itk"
+
+[[id]]
+id = "CP-13"
+key = "cp:extra:nn"

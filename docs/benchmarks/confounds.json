@@ -1,0 +1,2650 @@
+{
+ "generated_by": "validation/investigations/confounds/bench.py",
+ "nodes": {
+  "machine": {
+   "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64",
+   "cpus": 32,
+   "load_average_at_start": [
+    5.14,
+    6.08,
+    7.66
+   ],
+   "releases": {
+    "nipype": "1.12.0",
+    "niworkflows": "1.15.4",
+    "nitime": "0.12.1",
+    "scipy": "1.18.1",
+    "numpy": "2.5.4",
+    "pandas": "3.0.6",
+    "nibabel": "5.4.2",
+    "fmriprep": "25.2.7"
+   },
+   "OPENBLAS_CORETYPE": "Haswell",
+   "OPENBLAS_NUM_THREADS": "1",
+   "OPENBLAS_L2_SIZE": "512",
+   "commit": "v0.1.0rc1-205-gb08c2a2a88f4"
+  },
+  "part": "nodes",
+  "repeats": 3,
+  "rows": [
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "union_mask",
+    "interface": "fmriprep.workflows.bold.confounds._binary_union",
+    "items": 1,
+    "original": 0.020967658841982484,
+    "original_runs": [
+     0.021032952005043626,
+     0.020952579798176885,
+     0.020967658841982484
+    ],
+    "fmriprep_recorded": 0.01047,
+    "larmorx_1": 0.0009081249590963125,
+    "larmorx_1_runs": [
+     0.0011724750511348248,
+     0.0009081249590963125,
+     0.0007527519483119249
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0008502060081809759,
+    "larmorx_8_runs": [
+     0.0009700530208647251,
+     0.0008502060081809759,
+     0.0008118529804050922
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "dilated_mask",
+    "interface": "niworkflows.interfaces.morphology.BinaryDilation",
+    "items": 1,
+    "original": 0.0048588779754936695,
+    "original_runs": [
+     0.0048588779754936695,
+     0.0047193949576467276,
+     0.005051401909440756
+    ],
+    "fmriprep_recorded": 0.017048,
+    "larmorx_1": 0.005995816085487604,
+    "larmorx_1_runs": [
+     0.005995816085487604,
+     0.00744112697429955,
+     0.005911546992138028
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.003629055107012391,
+    "larmorx_8_runs": [
+     0.003859661053866148,
+     0.0035622790455818176,
+     0.003629055107012391
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "subtract_mask",
+    "interface": "niworkflows.interfaces.morphology.BinarySubtraction",
+    "items": 1,
+    "original": 0.0038187140598893166,
+    "original_runs": [
+     0.003695129882544279,
+     0.0038187140598893166,
+     0.004009875003248453
+    ],
+    "fmriprep_recorded": 0.009152,
+    "larmorx_1": 0.0005129689816385508,
+    "larmorx_1_runs": [
+     0.0006139499600976706,
+     0.0005129689816385508,
+     0.0004913380835205317
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.000556612154468894,
+    "larmorx_8_runs": [
+     0.000556612154468894,
+     0.0005635851994156837,
+     0.000529048964381218
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "dvars",
+    "interface": "nipype.algorithms.confounds.ComputeDVARS",
+    "items": 1,
+    "original": 2.4921872799750417,
+    "original_runs": [
+     2.4921872799750417,
+     2.419560665031895,
+     2.58887984091416
+    ],
+    "fmriprep_recorded": 7.750921,
+    "larmorx_1": 1.181446093833074,
+    "larmorx_1_runs": [
+     1.1803204689640552,
+     1.26683109998703,
+     1.181446093833074
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.6385429948568344,
+    "larmorx_8_runs": [
+     0.6385429948568344,
+     0.6673622948583215,
+     0.6009148939047009
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "motion_params",
+    "interface": "fmriprep.interfaces.confounds.FSLMotionParams",
+    "items": 1,
+    "original": 0.04134836792945862,
+    "original_runs": [
+     0.04150318098254502,
+     0.04134836792945862,
+     0.0413430780172348
+    ],
+    "fmriprep_recorded": 0.259273,
+    "larmorx_1": 0.027968622976914048,
+    "larmorx_1_runs": [
+     0.08230766095221043,
+     0.02640660316683352,
+     0.027968622976914048
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.02579982695169747,
+    "larmorx_8_runs": [
+     0.02579982695169747,
+     0.02552834409289062,
+     0.02646213793195784
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "fdisp",
+    "interface": "fmriprep.interfaces.confounds.FramewiseDisplacement",
+    "items": 1,
+    "original": 0.003081070026382804,
+    "original_runs": [
+     0.0035878669004887342,
+     0.002906561130657792,
+     0.003081070026382804
+    ],
+    "fmriprep_recorded": 0.01066,
+    "larmorx_1": 0.0012825732119381428,
+    "larmorx_1_runs": [
+     0.0013380579184740782,
+     0.0012825732119381428,
+     0.0012764509301632643
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.001204335130751133,
+    "larmorx_8_runs": [
+     0.001191471004858613,
+     0.0012350829783827066,
+     0.001204335130751133
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "rmsd",
+    "interface": "fmriprep.interfaces.confounds.FSLRMSDeviation",
+    "items": 1,
+    "original": 0.03893883712589741,
+    "original_runs": [
+     0.03893883712589741,
+     0.04262861702591181,
+     0.037310810992494226
+    ],
+    "fmriprep_recorded": 0.129784,
+    "larmorx_1": 0.020863943034783006,
+    "larmorx_1_runs": [
+     0.020863943034783006,
+     0.020835469011217356,
+     0.020864192862063646
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.020771228009834886,
+    "larmorx_8_runs": [
+     0.020870734937489033,
+     0.020410595927387476,
+     0.020771228009834886
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "acc_masks",
+    "interface": "fmriprep.interfaces.confounds.aCompCorMasks",
+    "items": 1,
+    "original": 0.6506180441938341,
+    "original_runs": [
+     0.5888313881587237,
+     0.6506180441938341,
+     0.6561987658496946
+    ],
+    "fmriprep_recorded": 1.145634,
+    "larmorx_1": 0.561454851878807,
+    "larmorx_1_runs": [
+     0.6003919949289411,
+     0.4942629151046276,
+     0.561454851878807
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.1480558509938419,
+    "larmorx_8_runs": [
+     0.1480558509938419,
+     0.14230410591699183,
+     0.2079241629689932
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "acc_msk_brain",
+    "interface": "niworkflows.interfaces.nibabel.ApplyMask",
+    "items": 3,
+    "original": 0.031067176954820752,
+    "original_runs": [
+     0.031067176954820752,
+     0.031080791959539056,
+     0.030808357056230307
+    ],
+    "fmriprep_recorded": 0.059368000000000004,
+    "larmorx_1": 0.005449383985251188,
+    "larmorx_1_runs": [
+     0.0056872430723160505,
+     0.005449383985251188,
+     0.005050129955634475
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.00439540296792984,
+    "larmorx_8_runs": [
+     0.0041739249136298895,
+     0.004444514866918325,
+     0.00439540296792984
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "acc_msk_bin",
+    "interface": "niworkflows.interfaces.nibabel.Binarize",
+    "items": 3,
+    "original": 0.024193842196837068,
+    "original_runs": [
+     0.02250889898277819,
+     0.024193842196837068,
+     0.025961663108319044
+    ],
+    "fmriprep_recorded": 0.050598000000000004,
+    "larmorx_1": 0.004760663025081158,
+    "larmorx_1_runs": [
+     0.004760663025081158,
+     0.004875119077041745,
+     0.004456156864762306
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.004171029198914766,
+    "larmorx_8_runs": [
+     0.0041747260838747025,
+     0.004015706013888121,
+     0.004171029198914766
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "acompcor",
+    "interface": "niworkflows.interfaces.patches.RobustACompCor",
+    "items": 1,
+    "original": 0.9172226351220161,
+    "original_runs": [
+     0.9115266760345548,
+     0.9172226351220161,
+     0.9362525520846248
+    ],
+    "fmriprep_recorded": 1.413814,
+    "larmorx_1": 0.631053444929421,
+    "larmorx_1_runs": [
+     0.631053444929421,
+     0.6337392178829759,
+     0.5548015520907938
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.6207324569113553,
+    "larmorx_8_runs": [
+     0.5503812520764768,
+     0.6207324569113553,
+     0.6229091978166252
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "crowncompcor",
+    "interface": "niworkflows.interfaces.patches.RobustACompCor",
+    "items": 1,
+    "original": 1.2197123800870031,
+    "original_runs": [
+     1.3154834350571036,
+     1.1760232509113848,
+     1.2197123800870031
+    ],
+    "fmriprep_recorded": 1.88965,
+    "larmorx_1": 1.6860616500489414,
+    "larmorx_1_runs": [
+     1.8185395640321076,
+     1.6860616500489414,
+     1.6370206400752068
+    ],
+    "result_1": "identical",
+    "larmorx_8": 1.7011092298198491,
+    "larmorx_8_runs": [
+     1.793424477102235,
+     1.6810599979944527,
+     1.7011092298198491
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "tcompcor",
+    "interface": "niworkflows.interfaces.patches.RobustTCompCor",
+    "items": 1,
+    "original": 1.0360754400026053,
+    "original_runs": [
+     1.029812120134011,
+     1.0360754400026053,
+     1.0484505570493639
+    ],
+    "fmriprep_recorded": 1.621295,
+    "larmorx_1": 0.7213459010235965,
+    "larmorx_1_runs": [
+     0.7213459010235965,
+     0.6744530198629946,
+     0.7534964941442013
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.7542666080407798,
+    "larmorx_8_runs": [
+     0.6297121541574597,
+     0.7542666080407798,
+     0.7615158818662167
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "rename_acompcor",
+    "interface": "fmriprep.interfaces.confounds.RenameACompCor",
+    "items": 1,
+    "original": 0.03054888709448278,
+    "original_runs": [
+     0.02926442981697619,
+     0.03054888709448278,
+     0.03312442312017083
+    ],
+    "fmriprep_recorded": 0.073682,
+    "larmorx_1": 0.04637567396275699,
+    "larmorx_1_runs": [
+     0.039019658928737044,
+     0.04637567396275699,
+     0.04842097801156342
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.04551700199954212,
+    "larmorx_8_runs": [
+     0.04551700199954212,
+     0.035820113960653543,
+     0.051472621969878674
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "signals",
+    "interface": "niworkflows.interfaces.images.SignalExtraction",
+    "items": 1,
+    "original": 0.7300454331561923,
+    "original_runs": [
+     0.734991837060079,
+     0.7300454331561923,
+     0.6563594990875572
+    ],
+    "fmriprep_recorded": 0.858705,
+    "larmorx_1": 0.40086917486041784,
+    "larmorx_1_runs": [
+     0.40086917486041784,
+     0.451917135855183,
+     0.382844417123124
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.4345764690078795,
+    "larmorx_8_runs": [
+     0.4345764690078795,
+     0.3644126190338284,
+     0.43820069497451186
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "add_dvars_header",
+    "interface": "niworkflows.interfaces.utility.AddTSVHeader",
+    "items": 1,
+    "original": 0.0007779698353260756,
+    "original_runs": [
+     0.000855686841532588,
+     0.0007779698353260756,
+     0.0007565990090370178
+    ],
+    "fmriprep_recorded": 0.001162,
+    "larmorx_1": 0.0004577450454235077,
+    "larmorx_1_runs": [
+     0.0004577450454235077,
+     0.00045883702114224434,
+     0.000439029885455966
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0004420848563313484,
+    "larmorx_8_runs": [
+     0.0004358838777989149,
+     0.0004420848563313484,
+     0.000447375001385808
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "add_std_dvars_header",
+    "interface": "niworkflows.interfaces.utility.AddTSVHeader",
+    "items": 1,
+    "original": 0.0007663979195058346,
+    "original_runs": [
+     0.0007711169309914112,
+     0.0007663979195058346,
+     0.000747231999412179
+    ],
+    "fmriprep_recorded": 0.001392,
+    "larmorx_1": 0.0004492681473493576,
+    "larmorx_1_runs": [
+     0.00046216300688683987,
+     0.0004420250188559294,
+     0.0004492681473493576
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0004428571555763483,
+    "larmorx_8_runs": [
+     0.0004428571555763483,
+     0.0004445489030331373,
+     0.0004381081089377403
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "concat",
+    "interface": "fmriprep.interfaces.confounds.GatherConfounds",
+    "items": 1,
+    "original": 0.06291709118522704,
+    "original_runs": [
+     0.06291709118522704,
+     0.06030037789605558,
+     0.06593837798573077
+    ],
+    "fmriprep_recorded": 0.258555,
+    "larmorx_1": 0.06805651006288826,
+    "larmorx_1_runs": [
+     0.06292056804522872,
+     0.06805651006288826,
+     0.07033207779750228
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.06833909288980067,
+    "larmorx_8_runs": [
+     0.06374908285215497,
+     0.07386507093906403,
+     0.06833909288980067
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "tcc_metadata_filter",
+    "interface": "fmriprep.interfaces.confounds.FilterDropped",
+    "items": 1,
+    "original": 0.0013774819672107697,
+    "original_runs": [
+     0.0015984789934009314,
+     0.0013774819672107697,
+     0.0011286719236522913
+    ],
+    "fmriprep_recorded": 0.005412,
+    "larmorx_1": 0.0005467829760164022,
+    "larmorx_1_runs": [
+     0.0005467829760164022,
+     0.0005510710179805756,
+     0.000535330967977643
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0005370350554585457,
+    "larmorx_8_runs": [
+     0.0005510309711098671,
+     0.0005370350554585457,
+     0.0005365631077438593
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "acc_metadata_filter",
+    "interface": "fmriprep.interfaces.confounds.FilterDropped",
+    "items": 1,
+    "original": 0.006554971914738417,
+    "original_runs": [
+     0.006321341032162309,
+     0.00676607177592814,
+     0.006554971914738417
+    ],
+    "fmriprep_recorded": 0.004103,
+    "larmorx_1": 0.006724843988195062,
+    "larmorx_1_runs": [
+     0.0014285990037024021,
+     0.007285603089258075,
+     0.006724843988195062
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.006442861165851355,
+    "larmorx_8_runs": [
+     0.0066399420611560345,
+     0.006442861165851355,
+     0.0014347101096063852
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "tcc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.005756503902375698,
+    "original_runs": [
+     0.0012866000179201365,
+     0.00590301095508039,
+     0.005756503902375698
+    ],
+    "fmriprep_recorded": 0.005502,
+    "larmorx_1": 0.0001943269744515419,
+    "larmorx_1_runs": [
+     0.0001943269744515419,
+     0.00020611914806067944,
+     0.00018542003817856312
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.00018276507034897804,
+    "larmorx_8_runs": [
+     0.00018276507034897804,
+     0.00019562896341085434,
+     0.00017944909632205963
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "acc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.00258729699999094,
+    "original_runs": [
+     0.00258729699999094,
+     0.0025923470966517925,
+     0.0025311310309916735
+    ],
+    "fmriprep_recorded": 0.006784,
+    "larmorx_1": 0.0020530179608613253,
+    "larmorx_1_runs": [
+     0.0020697300788015127,
+     0.0020530179608613253,
+     0.001985721057280898
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0019482411444187164,
+    "larmorx_8_runs": [
+     0.0020472470205277205,
+     0.0019482411444187164,
+     0.0019355060067027807
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "crowncc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.0027418900281190872,
+    "original_runs": [
+     0.002887704875320196,
+     0.0027418900281190872,
+     0.002622604137286544
+    ],
+    "fmriprep_recorded": 0.003551,
+    "larmorx_1": 0.0023815890308469534,
+    "larmorx_1_runs": [
+     0.002467472106218338,
+     0.0023815890308469534,
+     0.0023247108329087496
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.002326203975826502,
+    "larmorx_8_runs": [
+     0.002326203975826502,
+     0.00236000819131732,
+     0.002288944087922573
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "merge_confound_metadata2",
+    "interface": "niworkflows.interfaces.utility.DictMerge",
+    "items": 1,
+    "original": 0.0016098408959805965,
+    "original_runs": [
+     0.0017459080554544926,
+     0.0016098408959805965,
+     0.0015869180206209421
+    ],
+    "fmriprep_recorded": 0.002357,
+    "larmorx_1": 1.5309080481529236e-05,
+    "larmorx_1_runs": [
+     2.763187512755394e-05,
+     1.5309080481529236e-05,
+     1.4376826584339142e-05
+    ],
+    "result_1": "identical",
+    "larmorx_8": 1.5228986740112305e-05,
+    "larmorx_8_runs": [
+     1.8766149878501892e-05,
+     1.5228986740112305e-05,
+     1.350603997707367e-05
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "model_expansion",
+    "interface": "niworkflows.interfaces.confounds.ExpandModel",
+    "items": 1,
+    "original": 0.05383573588915169,
+    "original_runs": [
+     0.05383573588915169,
+     0.05212842207401991,
+     0.05640827585011721
+    ],
+    "fmriprep_recorded": 0.264695,
+    "larmorx_1": 0.05956075107678771,
+    "larmorx_1_runs": [
+     0.0556260880548507,
+     0.05956075107678771,
+     0.06680361297912896
+    ],
+    "result_1": "identical by name (PIPE-43: the columns' order)",
+    "larmorx_8": 0.0700306580401957,
+    "larmorx_8_runs": [
+     0.04938585986383259,
+     0.0700306580401957,
+     0.07326671108603477
+    ],
+    "result_8": "identical by name (PIPE-43: the columns' order)"
+   },
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "node": "spike_regressors",
+    "interface": "niworkflows.interfaces.confounds.SpikeRegressors",
+    "items": 1,
+    "original": 0.09467816702090204,
+    "original_runs": [
+     0.04629813809879124,
+     0.09467816702090204,
+     0.19985024887137115
+    ],
+    "fmriprep_recorded": 0.207465,
+    "larmorx_1": 0.05631452891975641,
+    "larmorx_1_runs": [
+     0.05198583099991083,
+     0.05631452891975641,
+     0.060458876891061664
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0618598039727658,
+    "larmorx_8_runs": [
+     0.06369627290405333,
+     0.058610606007277966,
+     0.0618598039727658
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "union_mask",
+    "interface": "fmriprep.workflows.bold.confounds._binary_union",
+    "items": 1,
+    "original": 0.022511955117806792,
+    "original_runs": [
+     0.021822032053023577,
+     0.022511955117806792,
+     0.023196989903226495
+    ],
+    "fmriprep_recorded": 0.059505,
+    "larmorx_1": 0.00268668495118618,
+    "larmorx_1_runs": [
+     0.00268668495118618,
+     0.002648723078891635,
+     0.0027527499478310347
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0026287559885531664,
+    "larmorx_8_runs": [
+     0.0027116420678794384,
+     0.0026287559885531664,
+     0.002616181969642639
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "dilated_mask",
+    "interface": "niworkflows.interfaces.morphology.BinaryDilation",
+    "items": 1,
+    "original": 0.019745277939364314,
+    "original_runs": [
+     0.019558405969291925,
+     0.019745277939364314,
+     0.025646084919571877
+    ],
+    "fmriprep_recorded": 0.214652,
+    "larmorx_1": 0.03084400505758822,
+    "larmorx_1_runs": [
+     0.03071267600171268,
+     0.03084400505758822,
+     0.034901819890365005
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.017201503971591592,
+    "larmorx_8_runs": [
+     0.017849538009613752,
+     0.016995714977383614,
+     0.017201503971591592
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "subtract_mask",
+    "interface": "niworkflows.interfaces.morphology.BinarySubtraction",
+    "items": 1,
+    "original": 0.010096813086420298,
+    "original_runs": [
+     0.010212370892986655,
+     0.009930168045684695,
+     0.010096813086420298
+    ],
+    "fmriprep_recorded": 0.026672,
+    "larmorx_1": 0.0015339881647378206,
+    "larmorx_1_runs": [
+     0.0016218640375882387,
+     0.0015339881647378206,
+     0.0014134100638329983
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0015108641237020493,
+    "larmorx_8_runs": [
+     0.0017667082138359547,
+     0.0015108641237020493,
+     0.00114295887760818
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "dvars",
+    "interface": "nipype.algorithms.confounds.ComputeDVARS",
+    "items": 1,
+    "original": 22.342158681945875,
+    "original_runs": [
+     23.215939254965633,
+     21.828871332108974,
+     22.342158681945875
+    ],
+    "fmriprep_recorded": 77.101011,
+    "larmorx_1": 22.63825055095367,
+    "larmorx_1_runs": [
+     22.539929535938427,
+     22.63825055095367,
+     22.75923542212695
+    ],
+    "result_1": "identical",
+    "larmorx_8": 9.764574665110558,
+    "larmorx_8_runs": [
+     9.764574665110558,
+     9.766170724062249,
+     9.695838381070644
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "motion_params",
+    "interface": "fmriprep.interfaces.confounds.FSLMotionParams",
+    "items": 1,
+    "original": 0.12356616999022663,
+    "original_runs": [
+     0.12289412994869053,
+     0.12356616999022663,
+     0.19643642706796527
+    ],
+    "fmriprep_recorded": 0.384911,
+    "larmorx_1": 0.0740860749501735,
+    "larmorx_1_runs": [
+     0.0740860749501735,
+     0.07409739610739052,
+     0.07340660109184682
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.07643330795690417,
+    "larmorx_8_runs": [
+     0.07572278589941561,
+     0.07670142385177314,
+     0.07643330795690417
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "fdisp",
+    "interface": "fmriprep.interfaces.confounds.FramewiseDisplacement",
+    "items": 1,
+    "original": 0.0029704109765589237,
+    "original_runs": [
+     0.0031670029275119305,
+     0.0029255158733576536,
+     0.0029704109765589237
+    ],
+    "fmriprep_recorded": 0.033236,
+    "larmorx_1": 0.0032299021258950233,
+    "larmorx_1_runs": [
+     0.0033757060300558805,
+     0.0032299021258950233,
+     0.003037316957488656
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.003012229921296239,
+    "larmorx_8_runs": [
+     0.003012229921296239,
+     0.003019483992829919,
+     0.002868056995794177
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "rmsd",
+    "interface": "fmriprep.interfaces.confounds.FSLRMSDeviation",
+    "items": 1,
+    "original": 0.12740508001297712,
+    "original_runs": [
+     0.12740508001297712,
+     0.13639435195364058,
+     0.09632257791236043
+    ],
+    "fmriprep_recorded": 0.485062,
+    "larmorx_1": 0.04855689103715122,
+    "larmorx_1_runs": [
+     0.04813118698075414,
+     0.04855689103715122,
+     0.049277782905846834
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.050080078886821866,
+    "larmorx_8_runs": [
+     0.05008730199187994,
+     0.050080078886821866,
+     0.04885344090871513
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "acc_masks",
+    "interface": "fmriprep.interfaces.confounds.aCompCorMasks",
+    "items": 1,
+    "original": 1.4432111459318548,
+    "original_runs": [
+     1.4512441009283066,
+     1.357014334993437,
+     1.4432111459318548
+    ],
+    "fmriprep_recorded": 4.195935,
+    "larmorx_1": 1.3238634439185262,
+    "larmorx_1_runs": [
+     1.3238634439185262,
+     1.354000189108774,
+     1.2771571970079094
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.29901269800029695,
+    "larmorx_8_runs": [
+     0.29901269800029695,
+     0.2850032451096922,
+     0.35143501101993024
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "acc_msk_brain",
+    "interface": "niworkflows.interfaces.nibabel.ApplyMask",
+    "items": 3,
+    "original": 0.10894097294658422,
+    "original_runs": [
+     0.17934152600355446,
+     0.10894097294658422,
+     0.10598194389604032
+    ],
+    "fmriprep_recorded": 0.247666,
+    "larmorx_1": 0.025204600067809224,
+    "larmorx_1_runs": [
+     0.025204600067809224,
+     0.024721527006477118,
+     0.027168500004336238
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.015110461972653866,
+    "larmorx_8_runs": [
+     0.01626711804419756,
+     0.014760351972654462,
+     0.015110461972653866
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "acc_msk_bin",
+    "interface": "niworkflows.interfaces.nibabel.Binarize",
+    "items": 3,
+    "original": 0.08498638402670622,
+    "original_runs": [
+     0.08421630994416773,
+     0.08498638402670622,
+     0.15610282006673515
+    ],
+    "fmriprep_recorded": 0.195597,
+    "larmorx_1": 0.021299754036590457,
+    "larmorx_1_runs": [
+     0.021299754036590457,
+     0.021244097966700792,
+     0.022060140036046505
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.017776007065549493,
+    "larmorx_8_runs": [
+     0.020367653807625175,
+     0.017596469027921557,
+     0.017776007065549493
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "acompcor",
+    "interface": "niworkflows.interfaces.patches.RobustACompCor",
+    "items": 1,
+    "original": 12.839346713153645,
+    "original_runs": [
+     12.77952583716251,
+     12.839346713153645,
+     12.884824730921537
+    ],
+    "fmriprep_recorded": 25.07355,
+    "larmorx_1": 8.911242559086531,
+    "larmorx_1_runs": [
+     8.911242559086531,
+     8.943429803941399,
+     8.831694829976186
+    ],
+    "result_1": "identical",
+    "larmorx_8": 8.517722274875268,
+    "larmorx_8_runs": [
+     8.517722274875268,
+     8.637343598064035,
+     8.501866661012173
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "crowncompcor",
+    "interface": "niworkflows.interfaces.patches.RobustACompCor",
+    "items": 1,
+    "original": 16.429340143920854,
+    "original_runs": [
+     16.174458826892078,
+     16.429340143920854,
+     16.482437124941498
+    ],
+    "fmriprep_recorded": 23.908663,
+    "larmorx_1": 20.966043944004923,
+    "larmorx_1_runs": [
+     21.465787603985518,
+     20.966043944004923,
+     20.31960667297244
+    ],
+    "result_1": "identical",
+    "larmorx_8": 15.950633698841557,
+    "larmorx_8_runs": [
+     17.54807743197307,
+     15.950633698841557,
+     15.756225442979485
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "tcompcor",
+    "interface": "niworkflows.interfaces.patches.RobustTCompCor",
+    "items": 1,
+    "original": 14.220069354167208,
+    "original_runs": [
+     14.699013022938743,
+     14.220069354167208,
+     14.163152224151418
+    ],
+    "fmriprep_recorded": 29.669557,
+    "larmorx_1": 9.98259120597504,
+    "larmorx_1_runs": [
+     9.98259120597504,
+     10.060596091905609,
+     9.924081139964983
+    ],
+    "result_1": "identical",
+    "larmorx_8": 9.327431068057194,
+    "larmorx_8_runs": [
+     9.327431068057194,
+     9.694729787064716,
+     9.27411302481778
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "rename_acompcor",
+    "interface": "fmriprep.interfaces.confounds.RenameACompCor",
+    "items": 1,
+    "original": 0.17708576703444123,
+    "original_runs": [
+     0.17708576703444123,
+     0.17687041801400483,
+     0.18220219295471907
+    ],
+    "fmriprep_recorded": 0.485028,
+    "larmorx_1": 0.2554651980753988,
+    "larmorx_1_runs": [
+     0.2554651980753988,
+     0.2703733469825238,
+     0.23162161209620535
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.25221923901699483,
+    "larmorx_8_runs": [
+     0.2735571980010718,
+     0.24050633888691664,
+     0.25221923901699483
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "signals",
+    "interface": "niworkflows.interfaces.images.SignalExtraction",
+    "items": 1,
+    "original": 9.337653753813356,
+    "original_runs": [
+     9.661003476008773,
+     9.337653753813356,
+     9.22429532604292
+    ],
+    "fmriprep_recorded": 17.586198,
+    "larmorx_1": 5.740753346122801,
+    "larmorx_1_runs": [
+     5.60405632504262,
+     5.740753346122801,
+     5.913651563227177
+    ],
+    "result_1": "identical",
+    "larmorx_8": 5.507038526935503,
+    "larmorx_8_runs": [
+     5.429204412968829,
+     5.622550377855077,
+     5.507038526935503
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "add_dvars_header",
+    "interface": "niworkflows.interfaces.utility.AddTSVHeader",
+    "items": 1,
+    "original": 0.0011315981391817331,
+    "original_runs": [
+     0.001189087051898241,
+     0.0011315981391817331,
+     0.0010914620943367481
+    ],
+    "fmriprep_recorded": 0.004859,
+    "larmorx_1": 0.0008202861063182354,
+    "larmorx_1_runs": [
+     0.0008390620350837708,
+     0.0008202861063182354,
+     0.0007928949780762196
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0008142660371959209,
+    "larmorx_8_runs": [
+     0.0008036349900066853,
+     0.0008638089057058096,
+     0.0008142660371959209
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "add_std_dvars_header",
+    "interface": "niworkflows.interfaces.utility.AddTSVHeader",
+    "items": 1,
+    "original": 0.0010783260222524405,
+    "original_runs": [
+     0.001096941065043211,
+     0.0010783260222524405,
+     0.0010518059134483337
+    ],
+    "fmriprep_recorded": 0.001894,
+    "larmorx_1": 0.0008156278636306524,
+    "larmorx_1_runs": [
+     0.000828583026304841,
+     0.0008156278636306524,
+     0.0008151971269398928
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0009488610085099936,
+    "larmorx_8_runs": [
+     0.0008192751556634903,
+     0.001199195859953761,
+     0.0009488610085099936
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "concat",
+    "interface": "fmriprep.interfaces.confounds.GatherConfounds",
+    "items": 1,
+    "original": 0.22733811289072037,
+    "original_runs": [
+     0.30189950903877616,
+     0.22733811289072037,
+     0.22080285102128983
+    ],
+    "fmriprep_recorded": 0.737114,
+    "larmorx_1": 0.3265512869693339,
+    "larmorx_1_runs": [
+     0.3265512869693339,
+     0.3254059839528054,
+     0.39857468102127314
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.358203497948125,
+    "larmorx_8_runs": [
+     0.358203497948125,
+     0.4308805719483644,
+     0.3435095399618149
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "tcc_metadata_filter",
+    "interface": "fmriprep.interfaces.confounds.FilterDropped",
+    "items": 1,
+    "original": 0.0014261770993471146,
+    "original_runs": [
+     0.001505556982010603,
+     0.0014261770993471146,
+     0.0013033030554652214
+    ],
+    "fmriprep_recorded": 0.052516,
+    "larmorx_1": 0.0012034340761601925,
+    "larmorx_1_runs": [
+     0.0012034340761601925,
+     0.001184927998110652,
+     0.0012193340808153152
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0011874630581587553,
+    "larmorx_8_runs": [
+     0.0011874630581587553,
+     0.001125185051932931,
+     0.001244070939719677
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "acc_metadata_filter",
+    "interface": "fmriprep.interfaces.confounds.FilterDropped",
+    "items": 1,
+    "original": 0.002722436096519232,
+    "original_runs": [
+     0.0030735530890524387,
+     0.0026752958074212074,
+     0.002722436096519232
+    ],
+    "fmriprep_recorded": 0.018777,
+    "larmorx_1": 0.003910129889845848,
+    "larmorx_1_runs": [
+     0.003910129889845848,
+     0.0038623090367764235,
+     0.003937080968171358
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.004252169048413634,
+    "larmorx_8_runs": [
+     0.003844605991616845,
+     0.004252169048413634,
+     0.005032750079408288
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "tcc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.0017050858587026596,
+    "original_runs": [
+     0.0017050858587026596,
+     0.0017838848289102316,
+     0.0015978622250258923
+    ],
+    "fmriprep_recorded": 0.010362,
+    "larmorx_1": 0.0001812439877539873,
+    "larmorx_1_runs": [
+     0.0001812439877539873,
+     0.00017311912961304188,
+     0.0001838388852775097
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.00018221605569124222,
+    "larmorx_8_runs": [
+     0.00018221605569124222,
+     0.00017047394067049026,
+     0.0001840598415583372
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "acc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.005537739023566246,
+    "original_runs": [
+     0.006645791931077838,
+     0.005379759008064866,
+     0.005537739023566246
+    ],
+    "fmriprep_recorded": 0.013287,
+    "larmorx_1": 0.005737869068980217,
+    "larmorx_1_runs": [
+     0.005784928100183606,
+     0.0056295429822057486,
+     0.005737869068980217
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0053029740229249,
+    "larmorx_8_runs": [
+     0.005562435835599899,
+     0.0053029740229249,
+     0.005134392995387316
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "crowncc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.003387589007616043,
+    "original_runs": [
+     0.0037265720311552286,
+     0.003387589007616043,
+     0.0033099609427154064
+    ],
+    "fmriprep_recorded": 0.03832,
+    "larmorx_1": 0.00523330201394856,
+    "larmorx_1_runs": [
+     0.005392143037170172,
+     0.00519061996601522,
+     0.00523330201394856
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0052307958249002695,
+    "larmorx_8_runs": [
+     0.0052307958249002695,
+     0.005234042881056666,
+     0.005208003101870418
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "merge_confound_metadata2",
+    "interface": "niworkflows.interfaces.utility.DictMerge",
+    "items": 1,
+    "original": 0.0030817280057817698,
+    "original_runs": [
+     0.0031379051506519318,
+     0.0030766581185162067,
+     0.0030817280057817698
+    ],
+    "fmriprep_recorded": 0.004528,
+    "larmorx_1": 2.5880057364702225e-05,
+    "larmorx_1_runs": [
+     3.1610019505023956e-05,
+     2.5880057364702225e-05,
+     2.4246051907539368e-05
+    ],
+    "result_1": "identical",
+    "larmorx_8": 2.6249093934893608e-05,
+    "larmorx_8_runs": [
+     2.38961074501276e-05,
+     2.6249093934893608e-05,
+     2.7131987735629082e-05
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "model_expansion",
+    "interface": "niworkflows.interfaces.confounds.ExpandModel",
+    "items": 1,
+    "original": 0.2344948430545628,
+    "original_runs": [
+     0.2344948430545628,
+     0.21934718685224652,
+     0.3030612461734563
+    ],
+    "fmriprep_recorded": 0.601221,
+    "larmorx_1": 0.2752496770117432,
+    "larmorx_1_runs": [
+     0.2500405409373343,
+     0.2752496770117432,
+     0.34484342904761434
+    ],
+    "result_1": "identical by name (PIPE-43: the columns' order)",
+    "larmorx_8": 0.3584555780980736,
+    "larmorx_8_runs": [
+     0.3584555780980736,
+     0.31932586105540395,
+     0.4320122089702636
+    ],
+    "result_8": "identical by name (PIPE-43: the columns' order)"
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "node": "spike_regressors",
+    "interface": "niworkflows.interfaces.confounds.SpikeRegressors",
+    "items": 1,
+    "original": 0.16966825490817428,
+    "original_runs": [
+     0.16966825490817428,
+     0.17822161712683737,
+     0.1667186978738755
+    ],
+    "fmriprep_recorded": 0.456751,
+    "larmorx_1": 0.2664437349885702,
+    "larmorx_1_runs": [
+     0.32705275691114366,
+     0.26485540089197457,
+     0.2664437349885702
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.2729414920322597,
+    "larmorx_8_runs": [
+     0.2729414920322597,
+     0.26728977682068944,
+     0.28368814289569855
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "union_mask",
+    "interface": "fmriprep.workflows.bold.confounds._binary_union",
+    "items": 1,
+    "original": 0.040311864810064435,
+    "original_runs": [
+     0.10612779716029763,
+     0.040311864810064435,
+     0.03899606806226075
+    ],
+    "fmriprep_recorded": 0.133508,
+    "larmorx_1": 0.00900631002150476,
+    "larmorx_1_runs": [
+     0.010146453976631165,
+     0.00900631002150476,
+     0.008946095826104283
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.00970510602928698,
+    "larmorx_8_runs": [
+     0.006916995858773589,
+     0.010035444051027298,
+     0.00970510602928698
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "dilated_mask",
+    "interface": "niworkflows.interfaces.morphology.BinaryDilation",
+    "items": 1,
+    "original": 0.06086402386426926,
+    "original_runs": [
+     0.06090685608796775,
+     0.060550669906660914,
+     0.06086402386426926
+    ],
+    "fmriprep_recorded": 0.16299,
+    "larmorx_1": 0.08976769214496017,
+    "larmorx_1_runs": [
+     0.08976769214496017,
+     0.0914363379124552,
+     0.08785702590830624
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.06654160819016397,
+    "larmorx_8_runs": [
+     0.047763654962182045,
+     0.09747142903506756,
+     0.06654160819016397
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "subtract_mask",
+    "interface": "niworkflows.interfaces.morphology.BinarySubtraction",
+    "items": 1,
+    "original": 0.02077517192810774,
+    "original_runs": [
+     0.02077517192810774,
+     0.021398065146058798,
+     0.020679370034486055
+    ],
+    "fmriprep_recorded": 0.037458,
+    "larmorx_1": 0.0029777009040117264,
+    "larmorx_1_runs": [
+     0.0029777009040117264,
+     0.0029475828632712364,
+     0.00299494294449687
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.002661258913576603,
+    "larmorx_8_runs": [
+     0.0027203320059925318,
+     0.002602678956463933,
+     0.002661258913576603
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "dvars",
+    "interface": "nipype.algorithms.confounds.ComputeDVARS",
+    "items": 1,
+    "original": 38.131281200796366,
+    "original_runs": [
+     38.4005357848946,
+     38.131281200796366,
+     38.12831408600323
+    ],
+    "fmriprep_recorded": 88.043269,
+    "larmorx_1": 28.905669886851683,
+    "larmorx_1_runs": [
+     28.905669886851683,
+     28.881473190151155,
+     30.01291178097017
+    ],
+    "result_1": "identical",
+    "larmorx_8": 13.556638614973053,
+    "larmorx_8_runs": [
+     13.591620658989996,
+     13.515396292787045,
+     13.556638614973053
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "motion_params",
+    "interface": "fmriprep.interfaces.confounds.FSLMotionParams",
+    "items": 1,
+    "original": 0.10684716515243053,
+    "original_runs": [
+     0.10701886005699635,
+     0.1067021710332483,
+     0.10684716515243053
+    ],
+    "fmriprep_recorded": 0.30177,
+    "larmorx_1": 0.07549404888413846,
+    "larmorx_1_runs": [
+     0.07612146809697151,
+     0.07549404888413846,
+     0.07526302197948098
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.07441854104399681,
+    "larmorx_8_runs": [
+     0.07442302978597581,
+     0.07441854104399681,
+     0.07431883201934397
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "fdisp",
+    "interface": "fmriprep.interfaces.confounds.FramewiseDisplacement",
+    "items": 1,
+    "original": 0.0021390828769654036,
+    "original_runs": [
+     0.002279699081555009,
+     0.0021390828769654036,
+     0.0021096370182931423
+    ],
+    "fmriprep_recorded": 0.028556,
+    "larmorx_1": 0.0012532249093055725,
+    "larmorx_1_runs": [
+     0.001262272009626031,
+     0.0012532249093055725,
+     0.0012386459857225418
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0012525829952210188,
+    "larmorx_8_runs": [
+     0.0012525829952210188,
+     0.0012510609813034534,
+     0.0012539958115667105
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "rmsd",
+    "interface": "fmriprep.interfaces.confounds.FSLRMSDeviation",
+    "items": 1,
+    "original": 0.05863592796958983,
+    "original_runs": [
+     0.05914485198445618,
+     0.058626529993489385,
+     0.05863592796958983
+    ],
+    "fmriprep_recorded": 0.188377,
+    "larmorx_1": 0.022572197951376438,
+    "larmorx_1_runs": [
+     0.022650737082585692,
+     0.022572197951376438,
+     0.02251438796520233
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.022394941886886954,
+    "larmorx_8_runs": [
+     0.02242282498627901,
+     0.022394941886886954,
+     0.02238656603731215
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "acc_masks",
+    "interface": "fmriprep.interfaces.confounds.aCompCorMasks",
+    "items": 1,
+    "original": 1.7140816319733858,
+    "original_runs": [
+     1.7140816319733858,
+     1.6481079761870205,
+     1.7257582291495055
+    ],
+    "fmriprep_recorded": 3.404064,
+    "larmorx_1": 1.5586515779141337,
+    "larmorx_1_runs": [
+     1.5586515779141337,
+     1.625530491117388,
+     1.5431573509704322
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.47703422303311527,
+    "larmorx_8_runs": [
+     0.47509828791953623,
+     0.5393644750583917,
+     0.47703422303311527
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "acc_msk_brain",
+    "interface": "niworkflows.interfaces.nibabel.ApplyMask",
+    "items": 3,
+    "original": 0.22508786106482148,
+    "original_runs": [
+     0.22211984801106155,
+     0.22508786106482148,
+     0.22643805900588632
+    ],
+    "fmriprep_recorded": 0.393865,
+    "larmorx_1": 0.06903774780221283,
+    "larmorx_1_runs": [
+     0.06801126385107636,
+     0.1398563499096781,
+     0.06903774780221283
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.04433401511050761,
+    "larmorx_8_runs": [
+     0.04433401511050761,
+     0.044491813983768225,
+     0.04416525503620505
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "acc_msk_bin",
+    "interface": "niworkflows.interfaces.nibabel.Binarize",
+    "items": 3,
+    "original": 0.16504546208307147,
+    "original_runs": [
+     0.16504546208307147,
+     0.16213747300207615,
+     0.16668719286099076
+    ],
+    "fmriprep_recorded": 0.478023,
+    "larmorx_1": 0.05854298500344157,
+    "larmorx_1_runs": [
+     0.06022143503651023,
+     0.05854298500344157,
+     0.05847094813361764
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.049284873995929956,
+    "larmorx_8_runs": [
+     0.049284873995929956,
+     0.049217947060242295,
+     0.05036929901689291
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "acompcor",
+    "interface": "niworkflows.interfaces.patches.RobustACompCor",
+    "items": 1,
+    "original": 10.02786204405129,
+    "original_runs": [
+     10.025069047231227,
+     10.02786204405129,
+     10.482457182835788
+    ],
+    "fmriprep_recorded": 23.909399,
+    "larmorx_1": 11.65063083008863,
+    "larmorx_1_runs": [
+     11.497375183971599,
+     11.65063083008863,
+     11.884404993150383
+    ],
+    "result_1": "identical",
+    "larmorx_8": 11.35984795098193,
+    "larmorx_8_runs": [
+     11.578321635955945,
+     11.35984795098193,
+     11.065402188105509
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "crowncompcor",
+    "interface": "niworkflows.interfaces.patches.RobustACompCor",
+    "items": 1,
+    "original": 12.42323402618058,
+    "original_runs": [
+     12.480686774011701,
+     12.42323402618058,
+     12.399037522030994
+    ],
+    "fmriprep_recorded": 20.711066,
+    "larmorx_1": 17.265929623041302,
+    "larmorx_1_runs": [
+     17.138751555001363,
+     17.265929623041302,
+     17.40847467095591
+    ],
+    "result_1": "identical",
+    "larmorx_8": 16.685910725034773,
+    "larmorx_8_runs": [
+     16.6580575350672,
+     16.685910725034773,
+     16.849218131043017
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "tcompcor",
+    "interface": "niworkflows.interfaces.patches.RobustTCompCor",
+    "items": 1,
+    "original": 21.09899911400862,
+    "original_runs": [
+     21.09899911400862,
+     20.95848156698048,
+     21.111458025174215
+    ],
+    "fmriprep_recorded": 27.954057,
+    "larmorx_1": 13.050723573891446,
+    "larmorx_1_runs": [
+     13.098399315029383,
+     13.028091256972402,
+     13.050723573891446
+    ],
+    "result_1": "identical",
+    "larmorx_8": 12.183072238927707,
+    "larmorx_8_runs": [
+     12.240327717969194,
+     12.180403691018,
+     12.183072238927707
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "rename_acompcor",
+    "interface": "fmriprep.interfaces.confounds.RenameACompCor",
+    "items": 1,
+    "original": 0.04638440883718431,
+    "original_runs": [
+     0.04498673393391073,
+     0.0466775840613991,
+     0.04638440883718431
+    ],
+    "fmriprep_recorded": 0.159989,
+    "larmorx_1": 0.05945592909120023,
+    "larmorx_1_runs": [
+     0.12958130100741982,
+     0.05945104896090925,
+     0.05945592909120023
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.05880021816119552,
+    "larmorx_8_runs": [
+     0.05944097996689379,
+     0.05880021816119552,
+     0.05857155588455498
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "signals",
+    "interface": "niworkflows.interfaces.images.SignalExtraction",
+    "items": 1,
+    "original": 11.853702389867976,
+    "original_runs": [
+     11.877470984123647,
+     11.853702389867976,
+     11.838825128041208
+    ],
+    "fmriprep_recorded": 22.822555,
+    "larmorx_1": 8.058671710081398,
+    "larmorx_1_runs": [
+     8.058671710081398,
+     8.166395157109946,
+     8.051154298009351
+    ],
+    "result_1": "identical",
+    "larmorx_8": 7.587723053991795,
+    "larmorx_8_runs": [
+     7.5283843039069325,
+     7.699817644199356,
+     7.587723053991795
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "add_dvars_header",
+    "interface": "niworkflows.interfaces.utility.AddTSVHeader",
+    "items": 1,
+    "original": 0.0007753369864076376,
+    "original_runs": [
+     0.0008606389164924622,
+     0.0007753369864076376,
+     0.0007680938579142094
+    ],
+    "fmriprep_recorded": 0.001492,
+    "larmorx_1": 0.00046413810923695564,
+    "larmorx_1_runs": [
+     0.005646014120429754,
+     0.00046413810923695564,
+     0.00046235485933721066
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.00046769483014941216,
+    "larmorx_8_runs": [
+     0.00046769483014941216,
+     0.00047385692596435547,
+     0.00045280694030225277
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "add_std_dvars_header",
+    "interface": "niworkflows.interfaces.utility.AddTSVHeader",
+    "items": 1,
+    "original": 0.0054971331264823675,
+    "original_runs": [
+     0.0054971331264823675,
+     0.0007627231534570456,
+     0.005910766078159213
+    ],
+    "fmriprep_recorded": 0.000887,
+    "larmorx_1": 0.00046921800822019577,
+    "larmorx_1_runs": [
+     0.00046921800822019577,
+     0.0004541301168501377,
+     0.00047607114538550377
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0004753300454467535,
+    "larmorx_8_runs": [
+     0.0004753300454467535,
+     0.0006141129415482283,
+     0.00047026993706822395
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "concat",
+    "interface": "fmriprep.interfaces.confounds.GatherConfounds",
+    "items": 1,
+    "original": 0.09370603086426854,
+    "original_runs": [
+     0.09310288983397186,
+     0.09378502098843455,
+     0.09370603086426854
+    ],
+    "fmriprep_recorded": 0.21755,
+    "larmorx_1": 0.1136823850683868,
+    "larmorx_1_runs": [
+     0.1136823850683868,
+     0.10486938711255789,
+     0.11416143202222884
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.12705540214665234,
+    "larmorx_8_runs": [
+     0.12705540214665234,
+     0.12211906001903117,
+     0.13233620510436594
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "tcc_metadata_filter",
+    "interface": "fmriprep.interfaces.confounds.FilterDropped",
+    "items": 1,
+    "original": 0.0011278039310127497,
+    "original_runs": [
+     0.001174593111500144,
+     0.0011278039310127497,
+     0.0011029480956494808
+    ],
+    "fmriprep_recorded": 0.005537,
+    "larmorx_1": 0.0006382779683917761,
+    "larmorx_1_runs": [
+     0.0006481569726020098,
+     0.0006382779683917761,
+     0.0006223178934305906
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.000632937066257,
+    "larmorx_8_runs": [
+     0.0006487881764769554,
+     0.000632937066257,
+     0.0006229090504348278
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "acc_metadata_filter",
+    "interface": "fmriprep.interfaces.confounds.FilterDropped",
+    "items": 1,
+    "original": 0.0018183309584856033,
+    "original_runs": [
+     0.0018525950144976377,
+     0.0018183309584856033,
+     0.0017687368672341108
+    ],
+    "fmriprep_recorded": 0.010096,
+    "larmorx_1": 0.0018786350265145302,
+    "larmorx_1_runs": [
+     0.0019224979914724827,
+     0.0018786350265145302,
+     0.00187835399992764
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0019234800711274147,
+    "larmorx_8_runs": [
+     0.0019234800711274147,
+     0.001886109123006463,
+     0.0019478260073810816
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "tcc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.0012908130884170532,
+    "original_runs": [
+     0.0013519390486180782,
+     0.0012908130884170532,
+     0.0012816048692911863
+    ],
+    "fmriprep_recorded": 0.003769,
+    "larmorx_1": 0.0002394330222159624,
+    "larmorx_1_runs": [
+     0.000241065863519907,
+     0.00023076706565916538,
+     0.0002394330222159624
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.00022712978534400463,
+    "larmorx_8_runs": [
+     0.00022712978534400463,
+     0.00022191018797457218,
+     0.0002281020861119032
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "acc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.003121868008747697,
+    "original_runs": [
+     0.003201158018782735,
+     0.0030522961169481277,
+     0.003121868008747697
+    ],
+    "fmriprep_recorded": 0.007443,
+    "larmorx_1": 0.003380225971341133,
+    "larmorx_1_runs": [
+     0.003439930034801364,
+     0.0033612309489399195,
+     0.003380225971341133
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0033561510499566793,
+    "larmorx_8_runs": [
+     0.0033561510499566793,
+     0.0033996040001511574,
+     0.003331204876303673
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "crowncc_metadata_fmt",
+    "interface": "niworkflows.interfaces.utility.TSV2JSON",
+    "items": 1,
+    "original": 0.002142565092071891,
+    "original_runs": [
+     0.0022678421810269356,
+     0.002142565092071891,
+     0.0021408910397440195
+    ],
+    "fmriprep_recorded": 0.005873,
+    "larmorx_1": 0.0025280839763581753,
+    "larmorx_1_runs": [
+     0.0025401869788765907,
+     0.0025186860002577305,
+     0.0025280839763581753
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.0025032470002770424,
+    "larmorx_8_runs": [
+     0.0025032470002770424,
+     0.0025175949558615685,
+     0.0024990690872073174
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "merge_confound_metadata2",
+    "interface": "niworkflows.interfaces.utility.DictMerge",
+    "items": 1,
+    "original": 0.0018468350172042847,
+    "original_runs": [
+     0.0018468350172042847,
+     0.0018489488866180182,
+     0.0018293019384145737
+    ],
+    "fmriprep_recorded": 0.002842,
+    "larmorx_1": 1.8134014680981636e-05,
+    "larmorx_1_runs": [
+     2.0388048142194748e-05,
+     1.689186319708824e-05,
+     1.8134014680981636e-05
+    ],
+    "result_1": "identical",
+    "larmorx_8": 1.6120029613375664e-05,
+    "larmorx_8_runs": [
+     1.872517168521881e-05,
+     1.6120029613375664e-05,
+     1.5618978068232536e-05
+    ],
+    "result_8": "identical"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "model_expansion",
+    "interface": "niworkflows.interfaces.confounds.ExpandModel",
+    "items": 1,
+    "original": 0.09863125090487301,
+    "original_runs": [
+     0.09267555107362568,
+     0.31632533902302384,
+     0.09863125090487301
+    ],
+    "fmriprep_recorded": 0.246962,
+    "larmorx_1": 0.1001522799488157,
+    "larmorx_1_runs": [
+     0.1001522799488157,
+     0.0966048869304359,
+     0.11883199005387723
+    ],
+    "result_1": "identical by name (PIPE-43: the columns' order)",
+    "larmorx_8": 0.13552723405882716,
+    "larmorx_8_runs": [
+     0.09785713604651392,
+     0.13552723405882716,
+     0.171403125859797
+    ],
+    "result_8": "identical by name (PIPE-43: the columns' order)"
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "node": "spike_regressors",
+    "interface": "niworkflows.interfaces.confounds.SpikeRegressors",
+    "items": 1,
+    "original": 0.06840081186965108,
+    "original_runs": [
+     0.06840081186965108,
+     0.06773204798810184,
+     0.08583094808273017
+    ],
+    "fmriprep_recorded": 0.164567,
+    "larmorx_1": 0.09839521395042539,
+    "larmorx_1_runs": [
+     0.0914171589538455,
+     0.09839521395042539,
+     0.11171053210273385
+    ],
+    "result_1": "identical",
+    "larmorx_8": 0.10957237589173019,
+    "larmorx_8_runs": [
+     0.16631422494538128,
+     0.10736979800276458,
+     0.10957237589173019
+    ],
+    "result_8": "identical"
+   }
+  ],
+  "load_average_at_end": [
+   2.51,
+   2.71,
+   3.98
+  ]
+ },
+ "workflow": {
+  "machine": {
+   "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64",
+   "cpus": 32,
+   "load_average_at_start": [
+    2.51,
+    2.71,
+    3.98
+   ],
+   "releases": {
+    "nipype": "1.12.0",
+    "niworkflows": "1.15.4",
+    "nitime": "0.12.1",
+    "scipy": "1.18.1",
+    "numpy": "2.5.4",
+    "pandas": "3.0.6",
+    "nibabel": "5.4.2",
+    "fmriprep": "25.2.7"
+   },
+   "OPENBLAS_CORETYPE": "Haswell",
+   "OPENBLAS_NUM_THREADS": "1",
+   "OPENBLAS_L2_SIZE": "512",
+   "commit": "v0.1.0rc1-212-g117c91ab62e2"
+  },
+  "part": "workflow",
+  "repeats": 3,
+  "rows": [
+   {
+    "workflow": "ds000005-sub-01-noreconall/bold_task_mixedgamblestask_run_01_wf",
+    "fmriprep_recorded": 18.298282,
+    "fmriprep_recorded_nodes": {
+     "t1w_mask_tfm": 0.962488,
+     "acc_msk_tfm": 1.272767,
+     "union_mask": 0.01047,
+     "dilated_mask": 0.017048,
+     "subtract_mask": 0.009152,
+     "dvars": 7.750921,
+     "motion_params": 0.259273,
+     "fdisp": 0.01066,
+     "rmsd": 0.129784,
+     "acc_masks": 1.145634,
+     "acc_msk_brain": 0.059368000000000004,
+     "acc_msk_bin": 0.050598000000000004,
+     "acompcor": 1.413814,
+     "crowncompcor": 1.88965,
+     "tcompcor": 1.621295,
+     "rename_acompcor": 0.073682,
+     "signals": 0.858705,
+     "add_dvars_header": 0.001162,
+     "add_std_dvars_header": 0.001392,
+     "concat": 0.258555,
+     "tcc_metadata_filter": 0.005412,
+     "acc_metadata_filter": 0.004103,
+     "tcc_metadata_fmt": 0.005502,
+     "acc_metadata_fmt": 0.006784,
+     "crowncc_metadata_fmt": 0.003551,
+     "merge_confound_metadata2": 0.002357,
+     "model_expansion": 0.264695,
+     "spike_regressors": 0.207465,
+     "merge_rois": 0.000134,
+     "merge_confound_metadata": 0.001861
+    },
+    "larmorx_1": 5.862108230125159,
+    "larmorx_1_runs": [
+     5.816387715050951,
+     5.978752566035837,
+     5.862108230125159
+    ],
+    "larmorx_1_nodes": {
+     "acc_masks": 0.48992935102432966,
+     "acc_metadata_filter": 0.0016331409569829702,
+     "acc_metadata_fmt": 0.002010324038565159,
+     "acc_msk_bin": 0.004196301102638245,
+     "acc_msk_brain": 0.005683736177161336,
+     "acc_msk_tfm": 0.3361411918886006,
+     "acompcor": 0.5525851540733129,
+     "add_dvars_header": 0.0005702089983969927,
+     "add_std_dvars_header": 0.00045515201054513454,
+     "concat": 0.07672500284388661,
+     "crowncc_metadata_fmt": 0.002306876005604863,
+     "crowncompcor": 1.4594351018313318,
+     "dilated_mask": 0.005561514990404248,
+     "dvars": 1.1791491168551147,
+     "fdisp": 0.0013986569829285145,
+     "model_expansion": 0.07592757302336395,
+     "motion_params": 0.03377298102714121,
+     "rename_acompcor": 0.04197079408913851,
+     "rmsd": 0.022143103880807757,
+     "signals": 0.4508330780081451,
+     "spike_regressors": 0.06712223193608224,
+     "subtract_mask": 0.00057002785615623,
+     "t1w_mask_tfm": 0.36174286901950836,
+     "tcc_metadata_filter": 0.000700606033205986,
+     "tcc_metadata_fmt": 0.00023279013112187386,
+     "tcompcor": 0.6972074939403683,
+     "union_mask": 0.0007371851243078709
+    },
+    "larmorx_8": 4.313764991937205,
+    "larmorx_8_runs": [
+     4.2387220449745655,
+     4.313764991937205,
+     4.555855791084468
+    ],
+    "larmorx_8_nodes": {
+     "acc_masks": 0.12230220902711153,
+     "acc_metadata_filter": 0.0018417451065033674,
+     "acc_metadata_fmt": 0.0020147720351815224,
+     "acc_msk_bin": 0.0038333251141011715,
+     "acc_msk_brain": 0.00392189109697938,
+     "acc_msk_tfm": 0.05388813582248986,
+     "acompcor": 0.5914804199710488,
+     "add_dvars_header": 0.0005312550347298384,
+     "add_std_dvars_header": 0.0004368869122117758,
+     "concat": 0.0898324130102992,
+     "crowncc_metadata_fmt": 0.00229409197345376,
+     "crowncompcor": 1.3791907450649887,
+     "dilated_mask": 0.003501637140288949,
+     "dvars": 0.5960636539384723,
+     "fdisp": 0.0014291040133684874,
+     "model_expansion": 0.07014501886442304,
+     "motion_params": 0.029657964129000902,
+     "rename_acompcor": 0.05222802306525409,
+     "rmsd": 0.02200527209788561,
+     "signals": 0.3540607891045511,
+     "spike_regressors": 0.06755365384742618,
+     "subtract_mask": 0.000565399881452322,
+     "t1w_mask_tfm": 0.05102951591834426,
+     "tcc_metadata_filter": 0.000782861839979887,
+     "tcc_metadata_fmt": 0.000248549971729517,
+     "tcompcor": 0.7113953630905598,
+     "union_mask": 0.0007619219832122326
+    }
+   },
+   {
+    "workflow": "ds004958-sub-fsm64ps-noreconall/bold_task_rest_wf",
+    "fmriprep_recorded": 191.210637,
+    "fmriprep_recorded_nodes": {
+     "t1w_mask_tfm": 4.86555,
+     "acc_msk_tfm": 4.73431,
+     "union_mask": 0.059505,
+     "dilated_mask": 0.214652,
+     "subtract_mask": 0.026672,
+     "dvars": 77.101011,
+     "motion_params": 0.384911,
+     "fdisp": 0.033236,
+     "rmsd": 0.485062,
+     "acc_masks": 4.195935,
+     "acc_msk_brain": 0.247666,
+     "acc_msk_bin": 0.195597,
+     "acompcor": 25.07355,
+     "crowncompcor": 23.908663,
+     "tcompcor": 29.669557,
+     "rename_acompcor": 0.485028,
+     "signals": 17.586198,
+     "add_dvars_header": 0.004859,
+     "add_std_dvars_header": 0.001894,
+     "concat": 0.737114,
+     "tcc_metadata_filter": 0.052516,
+     "acc_metadata_filter": 0.018777,
+     "tcc_metadata_fmt": 0.010362,
+     "acc_metadata_fmt": 0.013287,
+     "crowncc_metadata_fmt": 0.03832,
+     "merge_confound_metadata2": 0.004528,
+     "model_expansion": 0.601221,
+     "spike_regressors": 0.456751,
+     "merge_rois": 0.000153,
+     "merge_confound_metadata": 0.003752
+    },
+    "larmorx_1": 66.2717846990563,
+    "larmorx_1_runs": [
+     66.2717846990563,
+     66.3192670061253,
+     65.7900824979879
+    ],
+    "larmorx_1_nodes": {
+     "acc_masks": 1.0941919079050422,
+     "acc_metadata_filter": 0.003912623040378094,
+     "acc_metadata_fmt": 0.005103165982291102,
+     "acc_msk_bin": 0.0185888831038028,
+     "acc_msk_brain": 0.023138169897720218,
+     "acc_msk_tfm": 1.6612055553123355,
+     "acompcor": 8.489028621930629,
+     "add_dvars_header": 0.0009914960246533155,
+     "add_std_dvars_header": 0.0008422739338129759,
+     "concat": 0.39057168224826455,
+     "crowncc_metadata_fmt": 0.005348470062017441,
+     "crowncompcor": 14.420871319016442,
+     "dilated_mask": 0.027247634017840028,
+     "dvars": 21.47474059695378,
+     "fdisp": 0.003362030955031514,
+     "model_expansion": 0.3204989549703896,
+     "motion_params": 0.07848353986628354,
+     "rename_acompcor": 0.23827786417677999,
+     "rmsd": 0.053556600119918585,
+     "signals": 5.601948666153476,
+     "spike_regressors": 0.369141957256943,
+     "subtract_mask": 0.0012405768502503633,
+     "t1w_mask_tfm": 2.284516423009336,
+     "tcc_metadata_filter": 0.0013661249540746212,
+     "tcc_metadata_fmt": 0.00021290313452482224,
+     "tcompcor": 9.473129504127428,
+     "union_mask": 0.0022202308755367994
+    },
+    "larmorx_8": 49.663182290038094,
+    "larmorx_8_runs": [
+     47.74715769989416,
+     50.12184203811921,
+     49.663182290038094
+    ],
+    "larmorx_8_nodes": {
+     "acc_masks": 0.3239516899921,
+     "acc_metadata_filter": 0.00419356394559145,
+     "acc_metadata_fmt": 0.005307540996000171,
+     "acc_msk_bin": 0.01712541002780199,
+     "acc_msk_brain": 0.013796350918710232,
+     "acc_msk_tfm": 0.25851303385570645,
+     "acompcor": 8.132437568157911,
+     "add_dvars_header": 0.0009814470540732145,
+     "add_std_dvars_header": 0.0008534640073776245,
+     "concat": 0.4261936009861529,
+     "crowncc_metadata_fmt": 0.0056851760018616915,
+     "crowncompcor": 13.749973352067173,
+     "dilated_mask": 0.01608300907537341,
+     "dvars": 9.441571566974744,
+     "fdisp": 0.0035077370703220367,
+     "model_expansion": 0.41059412993490696,
+     "motion_params": 0.07935188594274223,
+     "rename_acompcor": 0.31387765891849995,
+     "rmsd": 0.053273069905117154,
+     "signals": 5.696282275952399,
+     "spike_regressors": 0.3462154178414494,
+     "subtract_mask": 0.001177468104287982,
+     "t1w_mask_tfm": 0.34370341221801937,
+     "tcc_metadata_filter": 0.0014113800134509802,
+     "tcc_metadata_fmt": 0.0002276401501148939,
+     "tcompcor": 9.263345168204978,
+     "union_mask": 0.0024299270007759333
+    }
+   },
+   {
+    "workflow": "ds005454-sub-16-noreconall/bold_task_rest_wf",
+    "fmriprep_recorded": 212.048991,
+    "fmriprep_recorded_nodes": {
+     "t1w_mask_tfm": 13.083855,
+     "acc_msk_tfm": 9.566408,
+     "union_mask": 0.133508,
+     "dilated_mask": 0.16299,
+     "subtract_mask": 0.037458,
+     "dvars": 88.043269,
+     "motion_params": 0.30177,
+     "fdisp": 0.028556,
+     "rmsd": 0.188377,
+     "acc_masks": 3.404064,
+     "acc_msk_brain": 0.393865,
+     "acc_msk_bin": 0.478023,
+     "acompcor": 23.909399,
+     "crowncompcor": 20.711066,
+     "tcompcor": 27.954057,
+     "rename_acompcor": 0.159989,
+     "signals": 22.822555,
+     "add_dvars_header": 0.001492,
+     "add_std_dvars_header": 0.000887,
+     "concat": 0.21755,
+     "tcc_metadata_filter": 0.005537,
+     "acc_metadata_filter": 0.010096,
+     "tcc_metadata_fmt": 0.003769,
+     "acc_metadata_fmt": 0.007443,
+     "crowncc_metadata_fmt": 0.005873,
+     "merge_confound_metadata2": 0.002842,
+     "model_expansion": 0.246962,
+     "spike_regressors": 0.164567,
+     "merge_rois": 0.000276,
+     "merge_confound_metadata": 0.002488
+    },
+    "larmorx_1": 96.4890747659374,
+    "larmorx_1_runs": [
+     94.01691125985235,
+     103.48537532798946,
+     96.4890747659374
+    ],
+    "larmorx_1_nodes": {
+     "acc_masks": 1.7884798820596188,
+     "acc_metadata_filter": 0.0023151179775595665,
+     "acc_metadata_fmt": 0.0036251291166990995,
+     "acc_msk_bin": 0.07586915697902441,
+     "acc_msk_brain": 0.07155913207679987,
+     "acc_msk_tfm": 4.6070737421978265,
+     "acompcor": 11.686636545928195,
+     "add_dvars_header": 0.0006172708235681057,
+     "add_std_dvars_header": 0.000496990978717804,
+     "concat": 0.14493823377415538,
+     "crowncc_metadata_fmt": 0.0027776919305324554,
+     "crowncompcor": 19.06710037891753,
+     "dilated_mask": 0.09803394717164338,
+     "dvars": 30.19775248807855,
+     "fdisp": 0.0018943040631711483,
+     "model_expansion": 0.12710704398341477,
+     "motion_params": 0.10708684497512877,
+     "rename_acompcor": 0.08911814307793975,
+     "rmsd": 0.027035343926399946,
+     "signals": 8.524403722025454,
+     "spike_regressors": 0.12160060415044427,
+     "subtract_mask": 0.0033266590908169746,
+     "t1w_mask_tfm": 6.348863220075145,
+     "tcc_metadata_filter": 0.00081027508713305,
+     "tcc_metadata_fmt": 0.0002784500829875469,
+     "tcompcor": 13.485928911948577,
+     "union_mask": 0.009842750150710344
+    },
+    "larmorx_8": 68.53077887487598,
+    "larmorx_8_runs": [
+     68.42088271304965,
+     68.53077887487598,
+     69.9146261040587
+    ],
+    "larmorx_8_nodes": {
+     "acc_masks": 0.5661709699779749,
+     "acc_metadata_filter": 0.002519944915547967,
+     "acc_metadata_fmt": 0.003765275003388524,
+     "acc_msk_bin": 0.04948705225251615,
+     "acc_msk_brain": 0.041403249837458134,
+     "acc_msk_tfm": 0.8042064090259373,
+     "acompcor": 11.735154015012085,
+     "add_dvars_header": 0.0006152251735329628,
+     "add_std_dvars_header": 0.0005023819394409657,
+     "concat": 0.15100259915925562,
+     "crowncc_metadata_fmt": 0.0029513451736420393,
+     "crowncompcor": 18.801520559936762,
+     "dilated_mask": 0.053313972195610404,
+     "dvars": 14.050336223095655,
+     "fdisp": 0.001872805180028081,
+     "model_expansion": 0.1360806031152606,
+     "motion_params": 0.09195323195308447,
+     "rename_acompcor": 0.09690745593979955,
+     "rmsd": 0.026638539973646402,
+     "signals": 8.15125901508145,
+     "spike_regressors": 0.13277758634649217,
+     "subtract_mask": 0.0033858069218695164,
+     "t1w_mask_tfm": 0.8480994859710336,
+     "tcc_metadata_filter": 0.0008274419233202934,
+     "tcc_metadata_fmt": 0.0002769399434328079,
+     "tcompcor": 13.009739735163748,
+     "union_mask": 0.007176305167376995
+    }
+   }
+  ],
+  "load_average_at_end": [
+   9.1,
+   8.46,
+   6.47
+  ]
+ },
+ "linalg": {
+  "machine": {
+   "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64",
+   "cpus": 32,
+   "load_average_at_start": [
+    9.1,
+    8.46,
+    6.47
+   ],
+   "releases": {
+    "nipype": "1.12.0",
+    "niworkflows": "1.15.4",
+    "nitime": "0.12.1",
+    "scipy": "1.18.1",
+    "numpy": "2.5.4",
+    "pandas": "3.0.6",
+    "nibabel": "5.4.2",
+    "fmriprep": "25.2.7"
+   },
+   "OPENBLAS_CORETYPE": "Haswell",
+   "OPENBLAS_NUM_THREADS": "1",
+   "OPENBLAS_L2_SIZE": "512",
+   "commit": "v0.1.0rc1-212-g117c91ab62e2"
+  },
+  "part": "linalg",
+  "repeats": 3,
+  "rows": [
+   {
+    "call": "numpy svd 280 x 60968",
+    "original": 3.4600704349577427,
+    "original_runs": [
+     3.5820315161254257,
+     3.3732688820455223,
+     3.4600704349577427
+    ],
+    "larmorx_1": 11.686620028922334,
+    "larmorx_1_runs": [
+     11.011610263958573,
+     11.803131018066779,
+     11.686620028922334
+    ],
+    "identical_1": true,
+    "larmorx_8": 10.45216492912732,
+    "larmorx_8_runs": [
+     10.205565493088216,
+     11.176821772009134,
+     10.45216492912732
+    ],
+    "identical_8": true
+   },
+   {
+    "call": "numpy svd 597 x 30453",
+    "original": 3.4968242638278753,
+    "original_runs": [
+     3.2646918680984527,
+     3.4968242638278753,
+     3.532907997025177
+    ],
+    "larmorx_1": 10.991238790098578,
+    "larmorx_1_runs": [
+     10.991238790098578,
+     11.067931178025901,
+     10.670953181106597
+    ],
+    "identical_1": true,
+    "larmorx_8": 8.475607059895992,
+    "larmorx_8_runs": [
+     9.17078678891994,
+     8.475607059895992,
+     8.392245191847906
+    ],
+    "identical_8": true
+   },
+   {
+    "call": "numpy lstsq 600 x 7, 60968 voxels",
+    "original_runs": [
+     0.61,
+     0.535
+    ],
+    "larmorx_1": 2.403,
+    "identical_1": true,
+    "larmorx_8": 1.979,
+    "identical_8": true,
+    "original": 0.5725
+   },
+   {
+    "call": "numpy lstsq 280 x 8, 60968 voxels",
+    "original_runs": [
+     0.24,
+     0.247
+    ],
+    "larmorx_1": 1.016,
+    "identical_1": true,
+    "larmorx_8": 0.989,
+    "identical_8": true,
+    "original": 0.2435
+   },
+   {
+    "call": "numpy lstsq 600 x 25, 30453 voxels",
+    "original_runs": [
+     0.495,
+     0.631
+    ],
+    "larmorx_1": 2.348,
+    "identical_1": true,
+    "larmorx_8": 2.299,
+    "identical_8": true,
+    "original": 0.563
+   },
+   {
+    "call": "numpy lstsq 600 x 26, 60968 voxels",
+    "original_runs": [
+     1.133,
+     1.12
+    ],
+    "larmorx_1": 5.149,
+    "identical_1": true,
+    "larmorx_8": 5.052,
+    "identical_8": true,
+    "original": 1.1265
+   },
+   {
+    "call": "SciPy gesvd 280 x 60968",
+    "original_runs": [
+     4.098,
+     3.081
+    ],
+    "larmorx_1": 11.295,
+    "identical_1": true,
+    "larmorx_8": 11.199,
+    "identical_8": true,
+    "original": 3.5895
+   },
+   {
+    "call": "SciPy gesvd 597 x 30453",
+    "original_runs": [
+     3.423,
+     3.37
+    ],
+    "larmorx_1": 10.324,
+    "identical_1": true,
+    "larmorx_8": 8.118,
+    "identical_8": true,
+    "original": 3.3965
+   }
+  ],
+  "load_average_at_end": [
+   8.84,
+   8.98,
+   7.16
+  ]
+ }
+}

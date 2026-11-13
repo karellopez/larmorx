@@ -44,14 +44,17 @@ pub use random_walker::{
 use crate::Footprint;
 
 /// `skimage.morphology.ball(radius, strict_radius=strict_radius)` (no decomposition) as a
-/// footprint: `n = int(2 r + 1)` points per axis from `-r` to `r` (numpy's `mgrid` with a
+/// footprint: `n = int(abs(2 r + 1))` points per axis from `-r` to `r` (numpy's `mgrid` with a
 /// complex step: `k * step - r`, `step = 2 r / (n - 1)` in `float64`), true where `x² + y² + z²
 /// <= r²` (`(r + 0.5)²` with `strict_radius=False`), the sum in `float64` as `X**2 + Y**2 +
-/// Z**2` with `X` the last axis. A radius below `-0.5` gives an empty footprint (numpy's
-/// `mgrid` with no points).
+/// Z**2` with `X` the last axis. A negative radius is scikit-image's too: a radius in `(-1, 0)`
+/// gives an empty footprint (no points), `-1` one false element, `-2` the 3 × 3 × 3 cross of
+/// radius 1 (the points run from `-r` down to `r`).
 pub fn ball(radius: f64, strict_radius: bool) -> Footprint {
+    // numpy's `ogrid[-r:r:num * 1j]` takes `int(abs(num))` points, so a negative radius
+    // gives points from `-r` (positive) down to `r` (`ball(-2)` is 3 x 3 x 3).
     let num = 2.0 * radius + 1.0;
-    let n = if num >= 1.0 { num as usize } else { 0 };
+    let n = num.abs() as usize;
     let coords: Vec<f64> = (0..n)
         .map(|k| {
             let step = if n != 1 {
@@ -90,6 +93,12 @@ mod tests {
         assert_eq!(ball(3.0, true).count(), 123);
         assert_eq!(ball(5.0, true).count(), 515);
         assert_eq!(ball(0.0, true).count(), 1);
+        // skimage's negative radii (numpy's `int(abs(2r + 1))` points from -r down to r).
+        assert_eq!(ball(-1.0, true).shape, vec![1, 1, 1]);
+        assert_eq!(ball(-1.0, true).count(), 0);
+        assert_eq!(ball(-2.0, true).shape, vec![3, 3, 3]);
+        assert_eq!(ball(-2.0, true).count(), 7);
+        assert_eq!(ball(-0.5, true).shape, vec![0, 0, 0]);
         assert_eq!(ball(1.0, false).count(), 19);
     }
 }

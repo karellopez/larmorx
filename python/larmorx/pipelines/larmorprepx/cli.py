@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """The ``larmorprepx`` command: a preview, not ready yet (only ``--version`` and ``--help`` work).
 
-In larmorx 0.1 the pipeline's field-map stages exist as Python functions
-(:mod:`larmorx.pipelines.larmorprepx.fieldmaps`); the anatomical (FreeSurfer) and BOLD stages, the
-confounds and the final validation against fMRIPrep come in later releases (:data:`ROADMAP`).
+In larmorx 0.1 the pipeline's field-map stages and its confounds exist as Python functions
+(:mod:`larmorx.pipelines.larmorprepx.fieldmaps`, :mod:`larmorx.pipelines.larmorprepx.confounds`);
+the anatomical (FreeSurfer) and other BOLD stages and the final validation against fMRIPrep come in
+later releases (:data:`ROADMAP`).
 """
 
 import argparse
@@ -18,9 +19,10 @@ ROADMAP = "https://github.com/karellopez/larmorx/blob/main/docs/next-steps.md"
 
 #: What the command says it is (its help and its message).
 NOT_READY = (
-    f"larmorprepx is not ready yet in larmorx {__version__}: its field-map stages exist as "
-    "Python functions (larmorx.pipelines.larmorprepx.fieldmaps); the anatomical (FreeSurfer) and "
-    f"BOLD stages, the confounds and the final validation come in later releases ({ROADMAP})."
+    f"larmorprepx is not ready yet in larmorx {__version__}: its field-map stages and its "
+    "confounds exist as Python functions (larmorx.pipelines.larmorprepx.fieldmaps, .confounds); "
+    "the anatomical (FreeSurfer) and other BOLD stages and the final validation come in later "
+    f"releases ({ROADMAP})."
 )
 
 #: Top-level modules provided by the ``[prep]`` extra (PLAN.md §2.2).

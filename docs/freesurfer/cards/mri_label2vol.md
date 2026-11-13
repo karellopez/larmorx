@@ -39,8 +39,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,606), `utils/mri.cpp` (4,464), `packages/expat/xmlparse.c` (4,342), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `utils/mrisurf_io.cpp` (2,207), `packages/dicom/dcm.c` (2,191), `utils/transform.cpp` (2,058), `utils/gcamorph.cpp` (1,923), `packages/gifti/gifti_io.c` (1,712), `utils/gifti.cpp` (1,574)
-- Reach per module (waves.md §3): fs.io 15,006, perm.gifti 10,365, fs.volume 8,811, fs.surfio 7,679, fs.gca 6,038, perm.dicom 4,371, fs.labels 2,244, fs.surf 2,080, fs.maths 1,755, perm.minc 1,625, perm.misc 1,431, fs.core 1,387, own 1,267, fs.filter 833, fs.bspline 785, perm.nifti 335, fs.defect 89, fs.deform 13
-- Option paths that wait for a later module: fs.defect (89 lines), fs.deform (13 lines), fs.gca (6,038 lines), fs.surf (2,080 lines)
+- Reach per module (waves.md §3): fs.io 11,897, perm.gifti 10,365, fs.surfio 7,679, fs.volume 7,027, fs.gca 6,038, perm.dicom 4,371, fs.dicomread 3,218, fs.labels 2,162, fs.surf 2,080, fs.mri 1,757, fs.maths 1,755, perm.minc 1,625, perm.misc 1,431, fs.core 1,387, own 1,267, fs.filter 833, fs.bspline 785, perm.nifti 335, fs.defect 89, fs.deform 13
+- Option paths that wait for a later module: fs.defect (89 lines), fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (6,038 lines), fs.surf (2,080 lines)
 - Its queue item brings 2,666 lines (the functions only it reaches)
   - 3.2-40: mri_label2vol (2,666 lines)
 
@@ -61,8 +61,12 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Variation
 
-- nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's libm, drand64 left to right)
+- --defects (defect2seg, both streams): a clock seed (randomNumber unseeded, no FREESURFER_SEED) colours the embedded colour table; the voxels do not depend on it (variation.md §3, measured on the 12 reference runs)
+
+## Findings for the defect register (rules A to D when ported)
+
+- --defects: MRISdefects2Seg (utils/mrisurf_defect.cpp 15443) gives the output a colour table of random colours (CTABunique over CTABrandom, colortab.cpp 495, 552) from randomNumber's clock seed: the colours change from run to run (nondeterminism: never reproduced by default, D13; a fixed seed by default, the clock with reproduce)
 
 ## Checks
 
-- through defect2seg, seg2cc's recorded steps (21)
+- through defect2seg, seg2cc's recorded steps (24)

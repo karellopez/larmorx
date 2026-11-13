@@ -2479,3 +2479,86 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
 - **Burkardt's 2006 spline routines: a replica and a clean room, published normally** (the user, 2026-11-12: "the
   second the replica and clean room"): the replica in `larmorx-freesurfer` with his credit, pushed like the rest; no
   local-only branch remains for any borrowed piece.
+
+## 2026-11-12: FreeSurfer's preparation (the orchestrator's decisions within the user's rules)
+- **Data files** (after the inventory's list, `docs/freesurfer/data-files.md`): **D1** FreeSurfer's public git-annex
+  remote is the first-use fetch address: the owner's own source, each object named by its SHA-256 (its git-annex
+  key); all 32 objects the default paths need and the four tarballs answered; it rate-limits hard, so a fetch goes
+  slowly and backs off (HTTP 429); a local installation (`FREESURFER_HOME`) serves instead. **D2** the MNI-derived
+  templates (`mni305.cor*.mgz`, the ICBM 2009c registration targets) follow rule 2, as FreeSurfer's derivation (the
+  cautious reading). **D3** the newest 8.2.0 update archive (`patch_data_20260625.tgz`, 23.5 MB) downloaded and
+  listed: it changes only how `recon-all` and `rca-surfreg` read expert-option files, and no data file; the reference
+  runs stay on the package as released. **D4** FreeSurfer's files up to 2 MB may ship in `larmorx-freesurfer`; larger
+  ones are fetched.
+- **GCC 8.4.0 for the measurements:** conda-forge's, user-level (`oracles/toolchains/gcc-8.4`, 756 MB), to test GCC
+  bug 110182 on N4's fit as the official programs' compiler builds it (it keeps the roundings); the unit oracle then
+  used Ubuntu's own `gcc-8` 8.4.0-3ubuntu2 (`oracles/toolchains/gcc-8.4-ubuntu`), the compiler every official program
+  names. **x87 80-bit arithmetic** is a foundation item (an exact `long double` for the replicas, `larmorx_core::x87`).
+- **The waves** (W1 to W6, after the inventory's waves, `docs/freesurfer/waves.md` §6; the user heard the size, about
+  309,000 lines as an upper bound): **W1** fMRIPrep's programs outside `recon-all` come with the shared programs, early
+  (3.2, 3.5); **W2** the crate names `larmorx-freesurfer-*` (replicas), `larmorx-fs-*` (clean rooms), `larmorx-nn` (the
+  networks' inference core); **W3** the bundled parsers (expat under GIFTI, the DICOM probe, nlohmann's JSON reader)
+  become pure-Rust parsers that give the same values and the same failure messages on every path `recon-all` and
+  fMRIPrep reach, proved by differential tests against the originals, with the writers' number formatting ported
+  exactly (no full ports of those parsers); **W4** the unit oracle is a 3.1 item (done: `oracles/freesurfer-8.2.0-unit/`);
+  **W5** `recon-all` is wave 3.7, the classic-only programs taking 3.6; **W6** a coverage build to size the default
+  paths exactly: later, a lab-server extra (the sizes stay static upper bounds meanwhile).
+- **The borrowed pieces' crates in the other companions:** `crates-gpl/larmorx-gpl-gsl` (GSL's generators, alone in
+  `larmorx-gpl`; no FreeSurfer program links it: `mri_coreg`'s and `mris_expand`'s replicas use the clean-room
+  generator) and `crates-nc/larmorx-nc-tkregister2` (`tkregister2_cmdl`, its own program in `larmorx-nc`), as the
+  existing names go (`larmorx-gpl-tedana`, `larmorx-nc-*`). The permissive pieces' clean rooms (queue CP-01 to CP-13)
+  come with the roadmap's step 6, their crates decided then.
+- **The Talairach scope:** the user's "a clean room only" for Washington University's Talairach tools covers
+  `talairach_avi`, `mpr2mni305` (which carries Washington University's notice too) and the four 4dfp programs;
+  FreeSurfer's own `avi2talxfm`, `mri_matrix_multiply`, `fs_temp_dir` and the QA check get a replica and a clean room.
+- **Who creates what:** the clean rooms' crates are created, empty, by the first FreeSurfer clean-room relay from a
+  clean brief (queue C3.1-00), never by an agent that read FreeSurfer's material; the main package's plumbing
+  (`replica.rs`, the `freesurfer` family, `lx.freesurfer`) is queue item 3.2-41, best by such an agent too. The
+  queue's item numbers are stable (`docs/freesurfer/queue-ids.toml`): an item keeps its number, a new one takes the
+  next free number of its wave, a retired one is never reused.
+- **The replay tool and the audit (Q7):** the replay tool (`larmorx_validation.freesurfer`) and the unit oracle's
+  harness (`freesurfer_unit.py`) stay in the restriction table (R11): a FreeSurfer clean-room implementer runs them as
+  a black box and never reads them (their authors read source-derived notes). At the preparation's merge the table
+  also gains the recorder (`validation/investigations/freesurfer-oracle/`, run-only the same way), recon-all's
+  configuration wherever a subject directory or a recording's blobs hold it, and the two crates above (FreeSurfer's
+  family, not their workspaces').
+
+## 2026-11-11 to 13: the confounds' part (the orchestrator's decisions and the rules)
+
+The part's decisions, from its notes ("FROM THE ORCHESTRATOR", 2026-11-11 to 13; `docs/parts/` keeps them whole):
+- **The design (relay 1's D1 to D10, 2026-11-11):** the Rust numerics in `larmorx_transform::numpy_linalg` and
+  `openblas` and `larmorx_core::numpy` and `math`, a new crate `crates/larmorx-confounds`, the Python in `lx.confounds`
+  (nipype's and fMRIPrep's interfaces), `lx.niworkflows` (its pieces) and `larmorx.pipelines.larmorprepx.confounds`
+  (the workflow) (D1); pandas' defects a family of their own, PD- (D2); pandas' text round trips and ujson's rounding
+  by rule A: exact round trips and correctly rounded 10-decimal values by default, `reproduce` pandas' parse and
+  ujson's text at every node boundary of fMRIPrep's chain, which gives fMRIPrep's bytes (D3, PD-01, PD-02); glibc's
+  maths: `cos` correctly rounded by default and glibc's under `reproduce` (GLIBC-07), `atan2` and `hypot` correctly
+  rounded in both modes, a spec-writer and clean-room micro-part only where the real files show a change (D4: `atan2`
+  does, 15 of 22,293 rotation cells in 12 of the 36 files, so `atan2_glibc` is in next-steps; `hypot` does not);
+  PIPE-43's column order canonical in both modes, comparisons by name (D5: nondeterminism is never reproduced); the
+  newest releases by default with fMRIPrep 25.2.6's for the step, new tags with their checksums, no new Python
+  environment (D6, D7); `larmorx nipype run` mirroring `nipypecli run`, after the easy command line (D8); full
+  completeness, `DGELSD` of every size included (D9, D10).
+- **OpenBLAS on AMD Zen 4/5 (2026-11-11):** larmorx's products block their depth by 256, a real Haswell's and every
+  oracle's; numpy 2.5.4's 512 on this machine is reached with `gemm_q=512` for validation only; NP-09, a crash, is
+  never reproduced; the part's numpy 2.5.4 checks and records set `OPENBLAS_L2_SIZE=512` themselves (not in `env.sh`
+  while other parts ran: the change for everyone is a follow-up at a quiet boundary).
+- **The rules' outcomes:** 49 entries, PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 (27 rule A, PIPE-47
+  rule D measured then A, 12 rule B, PIPE-74 and PIPE-76 clamped as undefined conversions, PIPE-43 one order, PIPE-48,
+  PIPE-49 and PIPE-83 rule C, PIPE-79 rule D pending its measurement on fMRIPrep runs with FreeSurfer, PIPE-42 with
+  larmorprepx's reports, NP-09 and NP-10 never reproduced); NP-10 (numpy 2.3.5's hang on an infinite matrix) rule B in
+  both modes, its garbage results not reproduced either (the same undefined input class); PIPE-80 (nipype's unquoted
+  file names) rule A, which changes the field maps' `_nipype.py` too (their checks re-run, unchanged); DVARS' masked
+  median of 0 and `_full_rank`'s zero sign closed without an ID, as measured; `DLASQ1`, `sgesdd`,
+  `svd(compute_uv=False)`, `fallback_svd(full_matrices=True)`, SciPy's FFTs of other lengths and nitransforms' other
+  readers refused with a clear error (follow-ups).
+- **The correctly rounded `cos` by default stays** (CLAUDE.md rule 5): on fMRIPrep's real CompCor files it flips the
+  sign of 88 component columns in 20 of 108 files and moves 44 by one unit in the 10th decimal; the regressors are
+  equivalent, and the site shows it as an expected difference with its reason.
+- **A larmorx mistake found by random testing, fixed before the records** (2026-11-12): the `DBDSQR` tolerance
+  constant of the field maps' `numpy_linalg` code (finding 54131: no fMRIPrep call reaches it, but a replica is exact
+  for every valid input); every record the fix can reach re-made and compared (no result changed), main's records
+  kept.
+- **The records `experimental`** (since 2026-11-12 `validated` needs the final validation phase's extensive
+  evidence); **the site page from the export only** (2026-11-13: the documentation revision rebuilds every page in a
+  new layout; its writer adds the confounds' page after the merge).

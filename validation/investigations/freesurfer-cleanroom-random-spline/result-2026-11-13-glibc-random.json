@@ -1,0 +1,372 @@
+{
+ "date": "2026-11-13",
+ "machine": "x86_64",
+ "larmorx_commit": "v0.1.0rc1-297-g1071fcd1352a",
+ "sha256": {
+  "glibc_random_probe": "ad890bf551ccfa55b71a1acc891e4ec54a0ad18e216342788d7608fbc2662a5e",
+  "cleanroom-probe": "59ba5444b2d8b84be146e57b8d809c8e673e2e7e95bf0138ba9d74d50933c1cb",
+  "mri_robust_template": "9c5672e1fe4a7fd905fe6d0215284ebfdb8f0b34047aef96e19081f9b30caa07"
+ },
+ "libc": "ldd (Ubuntu GLIBC 2.35-0ubuntu3.15) 2.35",
+ "default": {
+  "commands": 1,
+  "values": 100000,
+  "identical": 1,
+  "different": [],
+  "ok": true,
+  "seconds": 0.0
+ },
+ "edge": {
+  "commands": 66,
+  "values": 660000,
+  "identical": 66,
+  "different": [],
+  "ok": true,
+  "seeds": 33,
+  "seconds": 0.1
+ },
+ "random": {
+  "commands": 240,
+  "values": 2400000,
+  "identical": 240,
+  "different": [],
+  "ok": true,
+  "seeds": 180,
+  "seconds": 0.2
+ },
+ "shared": {
+  "commands": 20,
+  "values": 60000,
+  "identical": 20,
+  "different": [],
+  "ok": true,
+  "three_blocks_alike": 20,
+  "seconds": 0.1
+ },
+ "long": {
+  "commands": 6,
+  "values": 6,
+  "identical": 6,
+  "different": [],
+  "ok": true,
+  "spec_numbers_identical": 6,
+  "seconds": 0.3
+ },
+ "every": {
+  "seeds": 4294967296,
+  "values_per_seed": 4,
+  "blocks": 256,
+  "identical_blocks": 256,
+  "different_blocks": [],
+  "cleanroom_seconds": 130.7,
+  "probe_seconds": 1420.4,
+  "ok": true,
+  "seconds": 1551.1
+ },
+ "robust": {
+  "cases": [
+   {
+    "inputs": 2,
+    "seed": 1,
+    "program_tp": 2,
+    "program_seed": 1,
+    "cleanroom_tp": 2,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 2,
+    "seed": 2,
+    "program_tp": 1,
+    "program_seed": 2,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 2,
+    "seed": 53,
+    "program_tp": 1,
+    "program_seed": 53,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 2,
+    "seed": 1234,
+    "program_tp": 1,
+    "program_seed": 1234,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 2,
+    "seed": 99991,
+    "program_tp": 2,
+    "program_seed": 99991,
+    "cleanroom_tp": 2,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 2,
+    "seed": 2147483647,
+    "program_tp": 1,
+    "program_seed": 2147483647,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 2,
+    "seed": -1,
+    "program_tp": 2,
+    "program_seed": 4294967295,
+    "cleanroom_tp": 2,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 3,
+    "seed": 1,
+    "program_tp": 2,
+    "program_seed": 1,
+    "cleanroom_tp": 2,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 3,
+    "seed": 2,
+    "program_tp": 1,
+    "program_seed": 2,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 3,
+    "seed": 53,
+    "program_tp": 2,
+    "program_seed": 53,
+    "cleanroom_tp": 2,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 3,
+    "seed": 1234,
+    "program_tp": 1,
+    "program_seed": 1234,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 3,
+    "seed": 99991,
+    "program_tp": 3,
+    "program_seed": 99991,
+    "cleanroom_tp": 3,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 3,
+    "seed": 2147483647,
+    "program_tp": 2,
+    "program_seed": 2147483647,
+    "cleanroom_tp": 2,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 3,
+    "seed": -1,
+    "program_tp": 1,
+    "program_seed": 4294967295,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 5,
+    "seed": 1,
+    "program_tp": 4,
+    "program_seed": 1,
+    "cleanroom_tp": 4,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 5,
+    "seed": 2,
+    "program_tp": 1,
+    "program_seed": 2,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 5,
+    "seed": 53,
+    "program_tp": 4,
+    "program_seed": 53,
+    "cleanroom_tp": 4,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 5,
+    "seed": 1234,
+    "program_tp": 5,
+    "program_seed": 1234,
+    "cleanroom_tp": 5,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 5,
+    "seed": 99991,
+    "program_tp": 4,
+    "program_seed": 99991,
+    "cleanroom_tp": 4,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 5,
+    "seed": 2147483647,
+    "program_tp": 3,
+    "program_seed": 2147483647,
+    "cleanroom_tp": 3,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 5,
+    "seed": -1,
+    "program_tp": 3,
+    "program_seed": 4294967295,
+    "cleanroom_tp": 3,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 7,
+    "seed": 1,
+    "program_tp": 2,
+    "program_seed": 1,
+    "cleanroom_tp": 2,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 7,
+    "seed": 2,
+    "program_tp": 5,
+    "program_seed": 2,
+    "cleanroom_tp": 5,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 7,
+    "seed": 53,
+    "program_tp": 1,
+    "program_seed": 53,
+    "cleanroom_tp": 1,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 7,
+    "seed": 1234,
+    "program_tp": 3,
+    "program_seed": 1234,
+    "cleanroom_tp": 3,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 7,
+    "seed": 99991,
+    "program_tp": 7,
+    "program_seed": 99991,
+    "cleanroom_tp": 7,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 7,
+    "seed": 2147483647,
+    "program_tp": 5,
+    "program_seed": 2147483647,
+    "cleanroom_tp": 5,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   },
+   {
+    "inputs": 7,
+    "seed": -1,
+    "program_tp": 6,
+    "program_seed": 4294967295,
+    "cleanroom_tp": 6,
+    "status": 1,
+    "seconds": 0.0,
+    "identical": true
+   }
+  ],
+  "identical": 28,
+  "total": 28,
+  "ok": true,
+  "seconds": 0.1
+ },
+ "speed": {
+  "draw_1e8": {
+   "probe_s": 0.435,
+   "cleanroom_s": 0.094,
+   "ratio": 4.63
+  },
+  "seed_2e20": {
+   "probe_s": 1.231,
+   "cleanroom_s": 0.11,
+   "ratio": 11.19
+  },
+  "ok": true,
+  "seconds": 9.8
+ },
+ "original_runs": {
+  "total": 644,
+  "from_cache": 366
+ }
+}

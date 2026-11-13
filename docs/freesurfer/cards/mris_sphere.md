@@ -40,8 +40,8 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `B`, `D`, `H`, `I
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,596), `packages/expat/xmlparse.c` (4,342), `utils/mrisurf_metricProperties.cpp` (4,244), `utils/mri.cpp` (4,168), `utils/DICOMRead.cpp` (3,473), `utils/mrisurf_io.cpp` (3,424), `utils/mrisurf_compute_dxyz.cpp` (3,122), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `utils/gifti.cpp` (2,645), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923)
-- Reach per module (waves.md §3): fs.io 16,468, fs.surfio 15,798, perm.gifti 10,365, fs.deform 8,054, fs.volume 7,229, fs.gca 6,014, fs.surf 5,060, perm.dicom 4,371, fs.maths 2,241, perm.minc 1,625, perm.json 1,579, perm.misc 1,431, fs.core 1,410, fs.labels 1,177, fs.filter 834, own 795, fs.bspline 785, perm.nifti 335, fs.mars 328, fs.defect 1
-- Option paths that wait for a later module: fs.mars (328 lines)
+- Reach per module (waves.md §3): fs.surfio 15,798, fs.io 13,359, perm.gifti 10,365, fs.deform 8,054, fs.gca 6,014, fs.volume 5,455, fs.surf 5,060, perm.dicom 4,371, fs.dicomread 3,218, fs.maths 2,241, fs.mri 1,747, perm.minc 1,625, perm.json 1,579, perm.misc 1,431, fs.core 1,410, fs.labels 1,095, fs.filter 834, own 795, fs.bspline 785, perm.nifti 335, fs.mars 328, fs.defect 1
+- Option paths that wait for a later module: fs.dicomread (3,218 lines), fs.mars (328 lines)
 - Its queue item brings 1,725 lines (the functions only it reaches)
   - 3.4-17: mris_sphere (1,725 lines)
 
@@ -52,13 +52,13 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `B`, `D`, `H`, `I
 - TP-05: The B-spline interpolation and pyramids of mriBSpline.cpp follow EPFL's code (the file carries FreeSurfer's notice; EPFL's code states no terms; Unser's 1992 filters were written at NIH; portable-with-notice)
 - TP-06: Numerical Recipes' nrutil allocators (Numerical Recipes' terms (not checked: nothing of it is ported); nothing-to-port)
 - TP-13: Small permissive pieces (MIT, BSD-3-Clause, BSL-1.0, public domain; portable-with-notice)
-- TP-14: MIT CSAIL's MARS distance transform (a copyright line, no licence terms; question)
+- TP-14: MIT CSAIL's MARS distance transform (a copyright line, no licence terms; later)
 - TP-15: The C library's generators (not FreeSurfer's code) (drand48: a published definition; glibc: LGPL-2.1-or-later, never copied (a behaviour spec, as specs/glibc-dbl.md); published-description)
 - P-01 (VXL's VNL as ITK 4.13.2 bundles it: linear algebra, optimisers, vnl_random, vnl_fft): its replica in larmorx; larmorx-freesurfer uses the replica (larmorx's VNL ports, at ITK 4.13.2's version: section 10 finds no change of arithmetic in the VNL routines FreeSurfer calls)
 - P-02 (netlib through VXL's v3p: LINPACK, EISPACK, LAPACK, BLAS, libf2c, Nocedal's L-BFGS): its replica in larmorx; larmorx-freesurfer uses the replica
 - P-06 (small permissive pieces: nlohmann/json (with Grisu2 and Hoehrmann's UTF-8 decoder), Bristow's argparse, Geometric Tools' distances, the FNV hash, Devillard's quickselect): its replica in larmorx (argparse's FreeSurfer changes in larmorx-freesurfer); larmorx-freesurfer uses the replica
 - P-10 (EPFL's cubic B-spline coefficients and Unser's 1992 NIH pyramid filters, in Reuter's 3D code): its replica in larmorx-freesurfer, like FreeSurfer's other files, crediting EPFL (the paper, and the 2D example code whose routine names it keeps: ConvertToInterpolationCoefficients, InitialCausalCoefficient, InitialAntiCausalCoefficient) in the crate's PROVENANCE.md and NOTICE; larmorx-freesurfer uses the replica (mriBSpline.cpp translated, its own queue item in wave 3.2 with mri_robust_template)
-- P-13 (MIT CSAIL's MARS distance transform): its replica in none until permission, or until FreeSurfer (MGH) confirms the files were contributed under Part A (A.4 licenses contributions to MGH with the right to sublicense); larmorx-freesurfer uses nothing now (later, the user's decision)
+- P-13 (MIT CSAIL's MARS distance transform): its replica in later (the user, 2026-11-12: MARS on no default path); its package is placed when a program needs it (whether Part A covers the files, A.4, is not recorded); larmorx-freesurfer uses nothing now (later, the user's decision)
 - P-14 (Numerical Recipes' nrutil allocators): its replica in none: nothing to port (Rust's own vectors); larmorx-freesurfer uses Rust allocation
 - P-15 (the C library's behaviours: drand48/srand48, rand/srand/srandom (random_r), qsort, the libm functions): its replica in larmorx, from definitions and behaviour specs (drand48 from POSIX; random_r, qsort and the libm functions not yet covered by larmorx_core::math from specs); larmorx-freesurfer uses the spec-written functions (larmorx_core::math's *_glibc and its specs)
 
@@ -68,7 +68,7 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `B`, `D`, `H`, `I
 
 ## Checks
 
-- replay: 42 recorded steps in 11 runs
+- replay: 48 recorded steps in 12 runs
 
 ## Notes
 

@@ -38,7 +38,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,596), `packages/expat/xmlparse.c` (4,342), `utils/mri.cpp` (4,014), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `packages/dicom/dcm.c` (2,191), `include/json.h` (1,959), `utils/gcamorph.cpp` (1,923), `utils/transform.cpp` (1,763), `utils/mrisurf_io.cpp` (1,742), `packages/gifti/gifti_io.c` (1,712)
-- Reach per module (waves.md §3): fs.io 14,996, perm.gifti 10,365, fs.volume 7,650, fs.surfio 7,062, fs.gca 6,014, perm.dicom 4,371, perm.json 1,959, fs.surf 1,860, fs.maths 1,755, perm.minc 1,625, perm.misc 1,431, fs.core 1,206, fs.labels 1,107, fs.filter 833, fs.bspline 785, perm.argparse 390, perm.nifti 335, own 30, fs.deform 13
+- Reach per module (waves.md §3): fs.io 11,887, perm.gifti 10,365, fs.surfio 7,062, fs.gca 6,014, fs.volume 5,876, perm.dicom 4,371, fs.dicomread 3,218, perm.json 1,959, fs.surf 1,860, fs.maths 1,755, fs.mri 1,747, perm.minc 1,625, perm.misc 1,431, fs.core 1,206, fs.labels 1,025, fs.filter 833, fs.bspline 785, perm.argparse 390, perm.nifti 335, own 30, fs.deform 13
+- Option paths that wait for a later module: fs.dicomread (3,218 lines)
 - Its queue item brings 250 lines (the functions only it reaches)
   - 3.5-03: mri_brainvol_stats (250 lines)
 
@@ -61,6 +62,10 @@ Every option its parser compares, as written in its own source (older parsers co
 
 - ComputeBrainVolumeStats2 sums VoxelVol in parallel: exact for 1 mm voxels, thread-count dependent for non-integer voxel volumes
 
+## Findings for the defect register (rules A to D when ported)
+
+- ComputeBrainVolumeStats2's parallel VoxelVol sums for non-integer voxel volumes (larmorx: one fixed order; relay 5)
+
 ## Checks
 
-- replay: 10 recorded steps in 10 runs
+- replay: 12 recorded steps in 12 runs

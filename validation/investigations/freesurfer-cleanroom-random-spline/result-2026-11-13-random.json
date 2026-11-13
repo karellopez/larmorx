@@ -1,0 +1,5205 @@
+{
+ "date": "2026-11-13",
+ "machine": "x86_64",
+ "larmorx_commit": "v0.1.0rc1-293-g84a2044d3c8d",
+ "sha256": {
+  "fs_rng_probe": "64b85eb28619909c14a56286b675a0c52c98515140d097d43bdce7324956c0f8",
+  "cleanroom-probe": "d34309c49a9ba060256c74736ab9129baca8e56206890bbd6b6a6b75c01073c9",
+  "mri_volsynth": "6b23b86ea7a733e03644bd51dfcd7b6e2fec76f6e39860301908e204955cb574"
+ },
+ "raw": {
+  "seeds": 2022,
+  "identical": 2022,
+  "different": [],
+  "table_hashes": {
+   "53": "b40812f1162500bca3938e3148b47358a9300d4c7be994cd7e03163e9115541d",
+   "0": "12d4f2cdf218304041625d02416dc679eba7d14bf3ca30ff282fadce55a1e3b7",
+   "1": "391c821d14bb056db5e2302e22202721e758206eb7ebe90f8a74ca38c0c20ead",
+   "2": "87c0b8ce736a3e5633677ec80d807728a0fa62f9fed7d39bc7f2378be831979d",
+   "1234": "edb3efc9bd60f606ead133110dc82c15ead6deb1360cb9c113b9c5fa6fd08338",
+   "2147483562": "fdde7d836524bd89f00fde457d8039ac5012b5ebbba15e295ababb6db9e2a2d5",
+   "4294967295": "cd8cf49f25873643013cc8df819c2571be182e31330a7e99c6c41c5ec6f3ece5",
+   "4294967296": "22483b9dba48de1a1fa4d18e2325de2ec38abc68e0f1551a53d915c6ffa99f46",
+   "9223372036854775807": "6a65e3a99aed14c45fd3ff53bf5c59c3f0b8609eb81f0408447c659723ce3621",
+   "9223372036854775808": "17809d02bbe72bcdf755d5315c47475de9cfb6c14080ab911cbbd9c7b64e8749",
+   "-53": "bae173cae0f216f7e3af02218d6c93aa33f7078757e2646ba1fb99101af16f67"
+  },
+  "zero_seeds": [
+   {
+    "seed": "2147483563",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "4294967126",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "6442450689",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "8589934252",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "10737417815",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "12884901378",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "15032384941",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "17179868504",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "-2147483563",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "-4294967126",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "-6442450689",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   },
+   {
+    "seed": "-8589934252",
+    "probe_all_zero": true,
+    "reproduce_same": true,
+    "reproduce_notice": true,
+    "fix_head_is_spec": true,
+    "fix_notice": true,
+    "fix_nonzero": true
+   }
+  ],
+  "ok": true,
+  "seconds": 5.5
+ },
+ "dist": {
+  "cases": 421,
+  "draws": 8382003,
+  "identical": 8381462,
+  "expected_tan_differences": 541,
+  "draws_meeting_a_differing_tangent": 10613,
+  "failures": [],
+  "with_tan": [
+   {
+    "case": "dist gamma 53 20000 12 1",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 12 2",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 12 0.5",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 12 -1",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 12.5 1",
+    "draws": 20000,
+    "identical": 19990,
+    "tan_draws": 85,
+    "expected_tan_differences": 10,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 12.5 2",
+    "draws": 20000,
+    "identical": 19990,
+    "tan_draws": 85,
+    "expected_tan_differences": 10,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 12.5 0.5",
+    "draws": 20000,
+    "identical": 19990,
+    "tan_draws": 85,
+    "expected_tan_differences": 10,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 12.5 -1",
+    "draws": 20000,
+    "identical": 19990,
+    "tan_draws": 85,
+    "expected_tan_differences": 10,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 25 1",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 107,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 25 2",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 107,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 25 0.5",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 107,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 25 -1",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 107,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 31.6 1",
+    "draws": 20000,
+    "identical": 19988,
+    "tan_draws": 86,
+    "expected_tan_differences": 12,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 31.6 2",
+    "draws": 20000,
+    "identical": 19988,
+    "tan_draws": 86,
+    "expected_tan_differences": 12,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 31.6 0.5",
+    "draws": 20000,
+    "identical": 19988,
+    "tan_draws": 86,
+    "expected_tan_differences": 12,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 31.6 -1",
+    "draws": 20000,
+    "identical": 19988,
+    "tan_draws": 86,
+    "expected_tan_differences": 12,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1000.25 1",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 84,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1000.25 2",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 84,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1000.25 0.5",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 84,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1000.25 -1",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 84,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1e6 1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1e6 2",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1e6 0.5",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 1e6 -1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 4294967295.5 1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 87,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 4294967295.5 2",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 87,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 4294967295.5 0.5",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 87,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 53 20000 4294967295.5 -1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 87,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_int 53 20000 12",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_int 53 20000 40",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 99,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 53 20000 12",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 53 20000 12.5",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 53 20000 31.6",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 53 20000 1000.25",
+    "draws": 20000,
+    "identical": 19997,
+    "tan_draws": 106,
+    "expected_tan_differences": 3,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 53 20000 24",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 53 20000 25",
+    "draws": 20000,
+    "identical": 19990,
+    "tan_draws": 85,
+    "expected_tan_differences": 10,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 53 20000 30",
+    "draws": 20000,
+    "identical": 19988,
+    "tan_draws": 94,
+    "expected_tan_differences": 12,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 53 20000 1000",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 98,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist 53 20000 3 25",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 95,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist 53 20000 30 50",
+    "draws": 20000,
+    "identical": 19986,
+    "tan_draws": 195,
+    "expected_tan_differences": 14,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12 1",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 95,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12 2",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 95,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12 0.5",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 95,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12 -1",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 95,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12.5 1",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 77,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12.5 2",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 77,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12.5 0.5",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 77,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 12.5 -1",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 77,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 25 1",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 96,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 25 2",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 96,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 25 0.5",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 96,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 25 -1",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 96,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 31.6 1",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 77,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 31.6 2",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 77,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 31.6 0.5",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 77,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 31.6 -1",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 77,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1000.25 1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 64,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1000.25 2",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 64,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1000.25 0.5",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 64,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1000.25 -1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 64,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1e6 1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1e6 2",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1e6 0.5",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 1e6 -1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 94,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 4294967295.5 1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 67,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 4294967295.5 2",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 67,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 4294967295.5 0.5",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 67,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 1 20000 4294967295.5 -1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 67,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_int 1 20000 12",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 95,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_int 1 20000 40",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 97,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 1 20000 12",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 95,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 1 20000 12.5",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 97,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 1 20000 31.6",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 96,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 1 20000 1000.25",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 100,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 1 20000 24",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 95,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 1 20000 25",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 77,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 1 20000 30",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 97,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 1 20000 1000",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 96,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist 1 20000 3 25",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 82,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist 1 20000 30 50",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 172,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12 1",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 74,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12 2",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 74,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12 0.5",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 74,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12 -1",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 74,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12.5 1",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 78,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12.5 2",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 78,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12.5 0.5",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 78,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 12.5 -1",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 78,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 25 1",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 84,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 25 2",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 84,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 25 0.5",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 84,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 25 -1",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 84,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 31.6 1",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 85,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 31.6 2",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 85,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 31.6 0.5",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 85,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 31.6 -1",
+    "draws": 20000,
+    "identical": 19996,
+    "tan_draws": 85,
+    "expected_tan_differences": 4,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1000.25 1",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 78,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1000.25 2",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 78,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1000.25 0.5",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 78,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1000.25 -1",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 78,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1e6 1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 81,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1e6 2",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 81,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1e6 0.5",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 81,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 1e6 -1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 81,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 4294967295.5 1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 79,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 4294967295.5 2",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 79,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 4294967295.5 0.5",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 79,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 4294967296 20000 4294967295.5 -1",
+    "draws": 20000,
+    "identical": 20000,
+    "tan_draws": 79,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_int 4294967296 20000 12",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 74,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_int 4294967296 20000 40",
+    "draws": 20000,
+    "identical": 19993,
+    "tan_draws": 91,
+    "expected_tan_differences": 7,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 4294967296 20000 12",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 74,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 4294967296 20000 12.5",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 76,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 4294967296 20000 31.6",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 88,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 4294967296 20000 1000.25",
+    "draws": 20000,
+    "identical": 19999,
+    "tan_draws": 84,
+    "expected_tan_differences": 1,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 4294967296 20000 24",
+    "draws": 20000,
+    "identical": 19995,
+    "tan_draws": 74,
+    "expected_tan_differences": 5,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 4294967296 20000 25",
+    "draws": 20000,
+    "identical": 19992,
+    "tan_draws": 78,
+    "expected_tan_differences": 8,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 4294967296 20000 30",
+    "draws": 20000,
+    "identical": 19998,
+    "tan_draws": 76,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 4294967296 20000 1000",
+    "draws": 20000,
+    "identical": 19997,
+    "tan_draws": 83,
+    "expected_tan_differences": 3,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist 4294967296 20000 3 25",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 95,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist 4294967296 20000 30 50",
+    "draws": 20000,
+    "identical": 19994,
+    "tan_draws": 155,
+    "expected_tan_differences": 6,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "mixed 53 14000",
+    "draws": 14000,
+    "identical": 13998,
+    "tan_draws": 17,
+    "expected_tan_differences": 2,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "mixed 1 14000",
+    "draws": 14000,
+    "identical": 14000,
+    "tan_draws": 7,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "mixed 4294967296 14000",
+    "draws": 14000,
+    "identical": 14000,
+    "tan_draws": 9,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   }
+  ],
+  "per_case": [
+   [
+    "dist uni 53 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist uni_pos 53 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 0 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 -3.5 7.25",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 5 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 2 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 -0 -0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 nan 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 1 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 nan nan(0x123)",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 inf 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 53 20000 0 inf",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 2.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 1e-300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 1e300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 53 20000 inf",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist ugauss 53 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 53 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 53 20000 0.75",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 53 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 53 20000 -2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 53 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1e-300 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1e-300 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1e-300 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1e-300 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.001 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.001 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.001 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.001 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.4 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.4 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.4 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.4 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.999 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.999 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.999 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 0.999 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 1 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 2.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 7.3 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 7.3 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 7.3 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 7.3 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 11.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 53 20000 12 1",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma 53 20000 12 2",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma 53 20000 12 0.5",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma 53 20000 12 -1",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma 53 20000 12.5 1",
+    20000,
+    19990,
+    85
+   ],
+   [
+    "dist gamma 53 20000 12.5 2",
+    20000,
+    19990,
+    85
+   ],
+   [
+    "dist gamma 53 20000 12.5 0.5",
+    20000,
+    19990,
+    85
+   ],
+   [
+    "dist gamma 53 20000 12.5 -1",
+    20000,
+    19990,
+    85
+   ],
+   [
+    "dist gamma 53 20000 25 1",
+    20000,
+    19994,
+    107
+   ],
+   [
+    "dist gamma 53 20000 25 2",
+    20000,
+    19994,
+    107
+   ],
+   [
+    "dist gamma 53 20000 25 0.5",
+    20000,
+    19994,
+    107
+   ],
+   [
+    "dist gamma 53 20000 25 -1",
+    20000,
+    19994,
+    107
+   ],
+   [
+    "dist gamma 53 20000 31.6 1",
+    20000,
+    19988,
+    86
+   ],
+   [
+    "dist gamma 53 20000 31.6 2",
+    20000,
+    19988,
+    86
+   ],
+   [
+    "dist gamma 53 20000 31.6 0.5",
+    20000,
+    19988,
+    86
+   ],
+   [
+    "dist gamma 53 20000 31.6 -1",
+    20000,
+    19988,
+    86
+   ],
+   [
+    "dist gamma 53 20000 1000.25 1",
+    20000,
+    19998,
+    84
+   ],
+   [
+    "dist gamma 53 20000 1000.25 2",
+    20000,
+    19998,
+    84
+   ],
+   [
+    "dist gamma 53 20000 1000.25 0.5",
+    20000,
+    19998,
+    84
+   ],
+   [
+    "dist gamma 53 20000 1000.25 -1",
+    20000,
+    19998,
+    84
+   ],
+   [
+    "dist gamma 53 20000 1e6 1",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 53 20000 1e6 2",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 53 20000 1e6 0.5",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 53 20000 1e6 -1",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 53 20000 4294967295.5 1",
+    20000,
+    20000,
+    87
+   ],
+   [
+    "dist gamma 53 20000 4294967295.5 2",
+    20000,
+    20000,
+    87
+   ],
+   [
+    "dist gamma 53 20000 4294967295.5 0.5",
+    20000,
+    20000,
+    87
+   ],
+   [
+    "dist gamma 53 20000 4294967295.5 -1",
+    20000,
+    20000,
+    87
+   ],
+   [
+    "dist gamma_int 53 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 53 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 53 20000 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 53 20000 11",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 53 20000 12",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma_int 53 20000 40",
+    20000,
+    19992,
+    99
+   ],
+   [
+    "dist gamma_large 53 20000 12",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma_large 53 20000 12.5",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma_large 53 20000 31.6",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma_large 53 20000 1000.25",
+    20000,
+    19997,
+    106
+   ],
+   [
+    "dist gamma_frac 53 20000 1e-300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 53 20000 0.001",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 53 20000 0.4",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 53 20000 0.999",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 53 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 53 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 53 20000 3",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 53 20000 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 53 20000 24",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist chisq 53 20000 25",
+    20000,
+    19990,
+    85
+   ],
+   [
+    "dist chisq 53 20000 30",
+    20000,
+    19988,
+    94
+   ],
+   [
+    "dist chisq 53 20000 1000",
+    20000,
+    19998,
+    98
+   ],
+   [
+    "dist fdist 53 20000 4 9",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist fdist 53 20000 3 25",
+    20000,
+    19995,
+    95
+   ],
+   [
+    "dist fdist 53 20000 1 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist fdist 53 20000 30 50",
+    20000,
+    19986,
+    195
+   ],
+   [
+    "dist tdist 53 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 1.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 2.25",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 3",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 7",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 30",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 1000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 53 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist uni 1 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist uni_pos 1 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 0 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 -3.5 7.25",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 5 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 2 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 -0 -0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 nan 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 1 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 nan nan(0x123)",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 inf 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 1 20000 0 inf",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 2.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 1e-300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 1e300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 1 20000 inf",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist ugauss 1 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 1 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 1 20000 0.75",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 1 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 1 20000 -2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 1 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1e-300 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1e-300 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1e-300 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1e-300 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.001 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.001 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.001 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.001 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.4 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.4 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.4 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.4 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.999 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.999 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.999 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 0.999 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 1 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 2.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 7.3 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 7.3 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 7.3 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 7.3 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 11.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 1 20000 12 1",
+    20000,
+    19996,
+    95
+   ],
+   [
+    "dist gamma 1 20000 12 2",
+    20000,
+    19996,
+    95
+   ],
+   [
+    "dist gamma 1 20000 12 0.5",
+    20000,
+    19996,
+    95
+   ],
+   [
+    "dist gamma 1 20000 12 -1",
+    20000,
+    19996,
+    95
+   ],
+   [
+    "dist gamma 1 20000 12.5 1",
+    20000,
+    19992,
+    77
+   ],
+   [
+    "dist gamma 1 20000 12.5 2",
+    20000,
+    19992,
+    77
+   ],
+   [
+    "dist gamma 1 20000 12.5 0.5",
+    20000,
+    19992,
+    77
+   ],
+   [
+    "dist gamma 1 20000 12.5 -1",
+    20000,
+    19992,
+    77
+   ],
+   [
+    "dist gamma 1 20000 25 1",
+    20000,
+    19995,
+    96
+   ],
+   [
+    "dist gamma 1 20000 25 2",
+    20000,
+    19995,
+    96
+   ],
+   [
+    "dist gamma 1 20000 25 0.5",
+    20000,
+    19995,
+    96
+   ],
+   [
+    "dist gamma 1 20000 25 -1",
+    20000,
+    19995,
+    96
+   ],
+   [
+    "dist gamma 1 20000 31.6 1",
+    20000,
+    19996,
+    77
+   ],
+   [
+    "dist gamma 1 20000 31.6 2",
+    20000,
+    19996,
+    77
+   ],
+   [
+    "dist gamma 1 20000 31.6 0.5",
+    20000,
+    19996,
+    77
+   ],
+   [
+    "dist gamma 1 20000 31.6 -1",
+    20000,
+    19996,
+    77
+   ],
+   [
+    "dist gamma 1 20000 1000.25 1",
+    20000,
+    20000,
+    64
+   ],
+   [
+    "dist gamma 1 20000 1000.25 2",
+    20000,
+    20000,
+    64
+   ],
+   [
+    "dist gamma 1 20000 1000.25 0.5",
+    20000,
+    20000,
+    64
+   ],
+   [
+    "dist gamma 1 20000 1000.25 -1",
+    20000,
+    20000,
+    64
+   ],
+   [
+    "dist gamma 1 20000 1e6 1",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 1 20000 1e6 2",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 1 20000 1e6 0.5",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 1 20000 1e6 -1",
+    20000,
+    20000,
+    94
+   ],
+   [
+    "dist gamma 1 20000 4294967295.5 1",
+    20000,
+    20000,
+    67
+   ],
+   [
+    "dist gamma 1 20000 4294967295.5 2",
+    20000,
+    20000,
+    67
+   ],
+   [
+    "dist gamma 1 20000 4294967295.5 0.5",
+    20000,
+    20000,
+    67
+   ],
+   [
+    "dist gamma 1 20000 4294967295.5 -1",
+    20000,
+    20000,
+    67
+   ],
+   [
+    "dist gamma_int 1 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 1 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 1 20000 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 1 20000 11",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 1 20000 12",
+    20000,
+    19996,
+    95
+   ],
+   [
+    "dist gamma_int 1 20000 40",
+    20000,
+    19993,
+    97
+   ],
+   [
+    "dist gamma_large 1 20000 12",
+    20000,
+    19996,
+    95
+   ],
+   [
+    "dist gamma_large 1 20000 12.5",
+    20000,
+    19996,
+    97
+   ],
+   [
+    "dist gamma_large 1 20000 31.6",
+    20000,
+    19995,
+    96
+   ],
+   [
+    "dist gamma_large 1 20000 1000.25",
+    20000,
+    19998,
+    100
+   ],
+   [
+    "dist gamma_frac 1 20000 1e-300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 1 20000 0.001",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 1 20000 0.4",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 1 20000 0.999",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 1 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 1 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 1 20000 3",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 1 20000 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 1 20000 24",
+    20000,
+    19996,
+    95
+   ],
+   [
+    "dist chisq 1 20000 25",
+    20000,
+    19992,
+    77
+   ],
+   [
+    "dist chisq 1 20000 30",
+    20000,
+    19995,
+    97
+   ],
+   [
+    "dist chisq 1 20000 1000",
+    20000,
+    20000,
+    96
+   ],
+   [
+    "dist fdist 1 20000 4 9",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist fdist 1 20000 3 25",
+    20000,
+    19996,
+    82
+   ],
+   [
+    "dist fdist 1 20000 1 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist fdist 1 20000 30 50",
+    20000,
+    19993,
+    172
+   ],
+   [
+    "dist tdist 1 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 1.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 2.25",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 3",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 7",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 30",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 1000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 1 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist uni 4294967296 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist uni_pos 4294967296 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 0 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 -3.5 7.25",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 5 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 2 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 -0 -0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 nan 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 1 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 nan nan(0x123)",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 inf 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist flat 4294967296 20000 0 inf",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 2.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 1e-300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 1e300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gaussian 4294967296 20000 inf",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist ugauss 4294967296 20000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 4294967296 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 4294967296 20000 0.75",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 4294967296 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 4294967296 20000 -2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist exponential 4294967296 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1e-300 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1e-300 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1e-300 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1e-300 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.001 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.001 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.001 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.001 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.4 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.4 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.4 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.4 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.999 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.999 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.999 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 0.999 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 1 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 2.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 7.3 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 7.3 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 7.3 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 7.3 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11.5 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11.5 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11.5 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 11.5 -1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma 4294967296 20000 12 1",
+    20000,
+    19995,
+    74
+   ],
+   [
+    "dist gamma 4294967296 20000 12 2",
+    20000,
+    19995,
+    74
+   ],
+   [
+    "dist gamma 4294967296 20000 12 0.5",
+    20000,
+    19995,
+    74
+   ],
+   [
+    "dist gamma 4294967296 20000 12 -1",
+    20000,
+    19995,
+    74
+   ],
+   [
+    "dist gamma 4294967296 20000 12.5 1",
+    20000,
+    19992,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 12.5 2",
+    20000,
+    19992,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 12.5 0.5",
+    20000,
+    19992,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 12.5 -1",
+    20000,
+    19992,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 25 1",
+    20000,
+    19994,
+    84
+   ],
+   [
+    "dist gamma 4294967296 20000 25 2",
+    20000,
+    19994,
+    84
+   ],
+   [
+    "dist gamma 4294967296 20000 25 0.5",
+    20000,
+    19994,
+    84
+   ],
+   [
+    "dist gamma 4294967296 20000 25 -1",
+    20000,
+    19994,
+    84
+   ],
+   [
+    "dist gamma 4294967296 20000 31.6 1",
+    20000,
+    19996,
+    85
+   ],
+   [
+    "dist gamma 4294967296 20000 31.6 2",
+    20000,
+    19996,
+    85
+   ],
+   [
+    "dist gamma 4294967296 20000 31.6 0.5",
+    20000,
+    19996,
+    85
+   ],
+   [
+    "dist gamma 4294967296 20000 31.6 -1",
+    20000,
+    19996,
+    85
+   ],
+   [
+    "dist gamma 4294967296 20000 1000.25 1",
+    20000,
+    19998,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 1000.25 2",
+    20000,
+    19998,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 1000.25 0.5",
+    20000,
+    19998,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 1000.25 -1",
+    20000,
+    19998,
+    78
+   ],
+   [
+    "dist gamma 4294967296 20000 1e6 1",
+    20000,
+    20000,
+    81
+   ],
+   [
+    "dist gamma 4294967296 20000 1e6 2",
+    20000,
+    20000,
+    81
+   ],
+   [
+    "dist gamma 4294967296 20000 1e6 0.5",
+    20000,
+    20000,
+    81
+   ],
+   [
+    "dist gamma 4294967296 20000 1e6 -1",
+    20000,
+    20000,
+    81
+   ],
+   [
+    "dist gamma 4294967296 20000 4294967295.5 1",
+    20000,
+    20000,
+    79
+   ],
+   [
+    "dist gamma 4294967296 20000 4294967295.5 2",
+    20000,
+    20000,
+    79
+   ],
+   [
+    "dist gamma 4294967296 20000 4294967295.5 0.5",
+    20000,
+    20000,
+    79
+   ],
+   [
+    "dist gamma 4294967296 20000 4294967295.5 -1",
+    20000,
+    20000,
+    79
+   ],
+   [
+    "dist gamma_int 4294967296 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 4294967296 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 4294967296 20000 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 4294967296 20000 11",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_int 4294967296 20000 12",
+    20000,
+    19995,
+    74
+   ],
+   [
+    "dist gamma_int 4294967296 20000 40",
+    20000,
+    19993,
+    91
+   ],
+   [
+    "dist gamma_large 4294967296 20000 12",
+    20000,
+    19995,
+    74
+   ],
+   [
+    "dist gamma_large 4294967296 20000 12.5",
+    20000,
+    19992,
+    76
+   ],
+   [
+    "dist gamma_large 4294967296 20000 31.6",
+    20000,
+    19992,
+    88
+   ],
+   [
+    "dist gamma_large 4294967296 20000 1000.25",
+    20000,
+    19999,
+    84
+   ],
+   [
+    "dist gamma_frac 4294967296 20000 1e-300",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 4294967296 20000 0.001",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 4294967296 20000 0.4",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist gamma_frac 4294967296 20000 0.999",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 4294967296 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 4294967296 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 4294967296 20000 3",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 4294967296 20000 5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist chisq 4294967296 20000 24",
+    20000,
+    19995,
+    74
+   ],
+   [
+    "dist chisq 4294967296 20000 25",
+    20000,
+    19992,
+    78
+   ],
+   [
+    "dist chisq 4294967296 20000 30",
+    20000,
+    19998,
+    76
+   ],
+   [
+    "dist chisq 4294967296 20000 1000",
+    20000,
+    19997,
+    83
+   ],
+   [
+    "dist fdist 4294967296 20000 4 9",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist fdist 4294967296 20000 3 25",
+    20000,
+    19994,
+    95
+   ],
+   [
+    "dist fdist 4294967296 20000 1 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist fdist 4294967296 20000 30 50",
+    20000,
+    19994,
+    155
+   ],
+   [
+    "dist tdist 4294967296 20000 0",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 0.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 1",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 1.5",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 2",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 2.25",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 3",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 7",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 30",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 1000",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "dist tdist 4294967296 20000 nan",
+    20000,
+    20000,
+    0
+   ],
+   [
+    "mixed 53 14000",
+    14000,
+    13998,
+    17
+   ],
+   [
+    "mixed 1 14000",
+    14000,
+    14000,
+    7
+   ],
+   [
+    "mixed 4294967296 14000",
+    14000,
+    14000,
+    9
+   ],
+   [
+    "dist tdist 53 3 0x1.0000000000001p+1",
+    3,
+    3,
+    0
+   ]
+  ],
+  "ok": true,
+  "seconds": 5.5
+ },
+ "defects": {
+  "fs100": [
+   {
+    "case": "dist gamma 53 2000 4294967296.5 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 4294967296.5 to 32 bits (0) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 1 2000 4294967296.5 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 4294967296.5 to 32 bits (0) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 4294967296 2000 4294967296.5 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 4294967296.5 to 32 bits (0) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 53 2000 4294967308.25 1",
+    "draws": 2000,
+    "identical": 1997,
+    "tan_draws": 10,
+    "expected_tan_differences": 3,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 4294967308.25 to 32 bits (12) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 1 2000 4294967308.25 1",
+    "draws": 2000,
+    "identical": 1999,
+    "tan_draws": 7,
+    "expected_tan_differences": 1,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 4294967308.25 to 32 bits (12) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 4294967296 2000 4294967308.25 1",
+    "draws": 2000,
+    "identical": 1999,
+    "tan_draws": 8,
+    "expected_tan_differences": 1,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 4294967308.25 to 32 bits (12) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 53 2000 8589934600 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 8589934600 to 32 bits (8) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 1 2000 8589934600 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 8589934600 to 32 bits (8) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 4294967296 2000 8589934600 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 8589934600 to 32 bits (8) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 53 2000 1e300 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 1e300 to 32 bits (0) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 1 2000 1e300 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 1e300 to 32 bits (0) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 4294967296 2000 1e300 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 0,
+     "message": "larmorx: upstream defect FS-100 (FreeSurfer) corrected: FreeSurfer's gamma draw truncates the shape 1e300 to 32 bits (0) and gives a value of the wrong size; larmorx uses the whole shape [LARMORX_UPSTREAM_DEFECTS=reproduce gives FreeSurfer's result]"
+    }
+   },
+   {
+    "case": "dist gamma 53 2000 nan 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 1,
+     "message": "FS-100: the gamma shape NaN is not a finite number"
+    }
+   },
+   {
+    "case": "dist gamma 1 2000 nan 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 1,
+     "message": "FS-100: the gamma shape NaN is not a finite number"
+    }
+   },
+   {
+    "case": "dist gamma 4294967296 2000 nan 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 1,
+     "message": "FS-100: the gamma shape NaN is not a finite number"
+    }
+   },
+   {
+    "case": "dist gamma 53 2000 inf 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 1,
+     "message": "FS-100: the gamma shape inf is not a finite number"
+    }
+   },
+   {
+    "case": "dist gamma 1 2000 inf 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 1,
+     "message": "FS-100: the gamma shape inf is not a finite number"
+    }
+   },
+   {
+    "case": "dist gamma 4294967296 2000 inf 1",
+    "draws": 2000,
+    "identical": 2000,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ],
+    "default": {
+     "status": 1,
+     "message": "FS-100: the gamma shape inf is not a finite number"
+    }
+   }
+  ],
+  "fs100_hangs": [
+   {
+    "shape": "-1.5",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-100: the gamma shape -1.5 is negative"
+    ],
+    "fix": [
+     1,
+     "FS-100: the gamma shape -1.5 is negative"
+    ]
+   },
+   {
+    "shape": "-inf",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-100: the gamma shape -inf is not a finite number"
+    ],
+    "fix": [
+     1,
+     "FS-100: the gamma shape -inf is not a finite number"
+    ]
+   }
+  ],
+  "fs101": [
+   {
+    "case": "dist uni 2147483563 100",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist flat 2147483563 100 3 5",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist flat 2147483563 100 -2.5 inf",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 2147483563 100 0 1",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 2147483563 100 12 1",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma 2147483563 100 25 0.5",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large 2147483563 100 30",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 2147483563 100 0",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq 2147483563 100 24",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist 2147483563 100 24 24",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist uni_pos 2147483563 1 ",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's positive uniform draw never returns"
+    ]
+   },
+   {
+    "case": "dist gaussian 2147483563 1 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's Gaussian draw never returns"
+    ]
+   },
+   {
+    "case": "dist ugauss 2147483563 1 ",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's unit Gaussian draw never returns"
+    ]
+   },
+   {
+    "case": "dist exponential 2147483563 1 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's exponential draw never returns"
+    ]
+   },
+   {
+    "case": "dist gamma 2147483563 1 0.4 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's gamma draw never returns"
+    ]
+   },
+   {
+    "case": "dist gamma 2147483563 1 3 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's gamma draw never returns"
+    ]
+   },
+   {
+    "case": "dist gamma 2147483563 1 12.5 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's gamma draw never returns"
+    ]
+   },
+   {
+    "case": "dist chisq 2147483563 1 5",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's chi-squared draw never returns"
+    ]
+   },
+   {
+    "case": "dist fdist 2147483563 1 4 9",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's F draw never returns"
+    ]
+   },
+   {
+    "case": "dist tdist 2147483563 1 1.5",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's t draw never returns"
+    ]
+   },
+   {
+    "case": "dist tdist 2147483563 1 7",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 2147483563 FreeSurfer's t draw never returns"
+    ]
+   },
+   {
+    "case": "dist uni -2147483563 100",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist flat -2147483563 100 3 5",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist flat -2147483563 100 -2.5 inf",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma -2147483563 100 0 1",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma -2147483563 100 12 1",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma -2147483563 100 25 0.5",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist gamma_large -2147483563 100 30",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq -2147483563 100 0",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist chisq -2147483563 100 24",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist fdist -2147483563 100 24 24",
+    "draws": 100,
+    "identical": 100,
+    "tan_draws": 0,
+    "expected_tan_differences": 0,
+    "unexpected": [],
+    "system_tan_identical": true,
+    "status": [
+     0,
+     0
+    ]
+   },
+   {
+    "case": "dist uni_pos -2147483563 1 ",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's positive uniform draw never returns"
+    ]
+   },
+   {
+    "case": "dist gaussian -2147483563 1 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's Gaussian draw never returns"
+    ]
+   },
+   {
+    "case": "dist ugauss -2147483563 1 ",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's unit Gaussian draw never returns"
+    ]
+   },
+   {
+    "case": "dist exponential -2147483563 1 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's exponential draw never returns"
+    ]
+   },
+   {
+    "case": "dist gamma -2147483563 1 0.4 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's gamma draw never returns"
+    ]
+   },
+   {
+    "case": "dist gamma -2147483563 1 3 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's gamma draw never returns"
+    ]
+   },
+   {
+    "case": "dist gamma -2147483563 1 12.5 1",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's gamma draw never returns"
+    ]
+   },
+   {
+    "case": "dist chisq -2147483563 1 5",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's chi-squared draw never returns"
+    ]
+   },
+   {
+    "case": "dist fdist -2147483563 1 4 9",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's F draw never returns"
+    ]
+   },
+   {
+    "case": "dist tdist -2147483563 1 1.5",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's t draw never returns"
+    ]
+   },
+   {
+    "case": "dist tdist -2147483563 1 7",
+    "probe_timed_out": true,
+    "reproduce": [
+     1,
+     "FS-101: with seed 18446744071562068053 FreeSurfer's t draw never returns"
+    ]
+   }
+  ],
+  "ok": true,
+  "seconds": 123.3
+ },
+ "volsynth": {
+  "cases": [
+   {
+    "command": "--pdf z --seed 53",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    }
+   },
+   {
+    "command": "--pdf z --seed 1234",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    }
+   },
+   {
+    "command": "--pdf chi2 --dof 30 --seed 7",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 4
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 4
+    }
+   },
+   {
+    "command": "--pdf chi2 --dof 3 --seed 7",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    }
+   },
+   {
+    "command": "--pdf chi2 --dof 24 --seed 5",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 2
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 2
+    }
+   },
+   {
+    "command": "--pdf t --dof 9 --seed 7",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    }
+   },
+   {
+    "command": "--pdf t --dof 2 --seed 13",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    }
+   },
+   {
+    "command": "--pdf t --dof 1 --seed 3",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 0
+    }
+   },
+   {
+    "command": "--pdf F --dof-num 3 --dof-den 25 --seed 11",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 5
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 5
+    }
+   },
+   {
+    "command": "--pdf F --dof-num 30 --dof-den 50 --seed 2",
+    "status": 0,
+    "voxels": 1008,
+    "cr_tan": {
+     "identical": 1008,
+     "tan_draws": 10
+    },
+    "system_tan": {
+     "identical": 1008,
+     "tan_draws": 10
+    }
+   }
+  ],
+  "ok": true,
+  "seconds": 0.6
+ },
+ "tan": {
+  "differing_arguments": 41708,
+  "below_2_23": 20360,
+  "sha256_of_list": "ad594509f44edbdb11e6d395262d0fd363a27153ac43b3a18a6184a0954fa9b0",
+  "ok": true,
+  "seconds": 0.4
+ },
+ "speed": {
+  "probe_raw_20M_printed_s": 2.321,
+  "cleanroom_raw_20M_printed_s": 0.581,
+  "cleanroom_generation_only": "20000000 integers: fill_u24 0.213 s, next_u24 0.225 s (sum 167766009141452)",
+  "ok": true,
+  "seconds": 9.3
+ }
+}

@@ -5,7 +5,7 @@ reproduces: ANTs and ITK, AFNI, FSL, fMRIPrep and its libraries (nipype, niworkf
 sMRIPrep, sdcflows, nitransforms, pybids; sdcflows' field-map estimation, ported bit for bit in
 the field maps' parts A and B, has its own family, SDC-; tedana's `t2smap`, translated bit for bit in the
 `larmorx-gpl` replica, has the family TED-), SciPy, scikit-image (SKI-, since the field maps' part B),
-numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
+pandas (PD-, since the confounds' part), numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
 each: the evidence, what it does to fMRIPrep users, what larmorx does today, and what decision
 D13 ("correct by default, faithful on request", CLAUDE.md) requires. Collected 2026-10-11 from
 the other files in `docs/findings/`, the specs, the validation records and `docs/analysis/`.
@@ -218,6 +218,53 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | ITK-98 | ITK `BSplineInterpolateImageFunction` | the mirror boundary is applied once: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) a support index stays outside the axis and the coefficient image is read outside its buffer (memory it never wrote) | a | none (fMRIPrep's images have no such axis) | the mirror repeated by default (the decomposition's whole-sample mirror, the exact continuation); `reproduce` keeps ITK's single mirror with those reads as 0; named in both modes in ResampleImage and antsApplyTransforms (2026-10-25) | notice in antsRegistration's warped outputs and the N-D resampler |
 | ITK-99 | the same as ITK-97 | the same with a linear offset before or past the derivative array: written outside it (memory it does not own) | a | none | dropped in both modes, named | – |
 | ITK-100 | ITK `MattesMutualInformationImageToImageMetricv4` (antsRegistration, antsAI) | the threader's joint histogram images are created at a stage's first evaluation and kept: a later level whose analysis region has one intensity (a bin size of 0) never reaches `ImageBase::SetSpacing`'s exception, which the first level gives; the bin size is used silently, the bin indices NaN or infinite and clamped, the metric 0 | e (rule B, 2026-10-25) | none (fMRIPrep's masks hold more than one intensity) | an error by default, as the first level gives, named; `reproduce` uses it as ITK does (the metric 0), named | – |
+| ITK-103 | VXL's L-BFGS (`lbfgs.c`) | the line search's first stage steps from the unmodified function values where Nocedal's Fortran passes the modified ones (`FXM`, `FYM`), then rebuilds them from stale ones | c (rule D then C, 2026-11-12) | none | VXL's kept in both modes (no run of 200,000 changed); Nocedal's on request (`LbfgsGlobal::nocedal_first_stage`), named | – |
+| ITK-104 | VXL's L-BFGS | `ys` reset to 0 on every call (saved in the Fortran): a caller's diagonal (`DIAGCO`) gets an infinite `1/ys` | c (rule A, 2026-11-12) | none | kept between calls; `reproduce` resets it, named | – |
+| ITK-105 | VXL's L-BFGS (`write50`) | printed vectors scaled from a signed value that last exceeded the running maximum; a zero vector divided by 0 | f | none | scaled by the largest magnitude, a zero vector unscaled; `reproduce` VXL's text, named | – |
+| ITK-106 | VXL's L-BFGS (`lb1_`) | the printed vectors start at the double before each array (memory it does not own) and drop the last element | a | none | the vectors; `reproduce` VXL's window with that value as 0, named | – |
+| ITK-107 | VXL `vnl_inverse` (2 × 2 to 4 × 4) | a zero determinant returns an uninitialised `vnl_matrix_fixed`: memory | a | none | the zero matrix | – |
+| ITK-108 | VXL `vnl_cholesky` | `rcond_` uninitialised and unset for a matrix that is not positive definite: `rcond()` and its message give memory | a | none | `None`, the message prints 0, named | – |
+| ITK-109 | VXL `vnl_cholesky::determinant` (LINPACK `dpodi`) | the mantissa's loops never end when it is not finite (a non-finite factor, or a square that overflows) | a | none | the non-finite mantissa, or the square in two steps; both modes, named | – |
+| ITK-110 | VXL `vnl_real_eigensystem` | `Vreal`'s columns of a complex pair are never written: memory | a | none | 0, flagged and named | – |
+| ITK-111 | VXL `vnl_real_eigensystem` | after a failed `hqr2`, `D` and `V` are built from eigenvalues never found: memory | a | none | 0, named | – |
+| ITK-112 | EISPACK `balanc` (`vnl_real_eigensystem`) | never returns on an infinite or NaN off-diagonal entry, or an overflowing row or column sum, in the part it balances | a | none | an error (rule B); both modes | – |
+| ITK-113 | VXL `vnl_qr::solve` (LINPACK `xqrsl`) | one row whose entry is 0: the solution is never written (memory) | a | none | 0, `info` 1 | – |
+| ITK-114 | VXL `vnl_brent_minimizer` (and `vnl_brent`, `vnl_powell`) | the loop can come back to a state it had been in and repeat for ever: a bracket with an infinite end where the cost is NaN or not lower, or ends whose sum overflows (an infinite midpoint, two points taking turns) | a | none | stopped at the best point (cycle detection on the loop's state), named; both modes | – |
+| ITK-115 | EISPACK `pythag` (`vnl_symmetric_eigensystem`'s `tql2`) | never returns on a NaN second argument or two infinities, which a matrix with an infinite or NaN entry usually gives it (once after `tql2` reads and writes one element past its arrays) | a | none | stopped, `ierr` the eigenvalue being worked on, named; both modes | – |
+| ITK-116 | LINPACK `ssvdc` (`vnl_svd<float>`) | the deflation and splitting steps do not count towards the iteration limit and can repeat for ever on a matrix with an infinite entry | a | none | stopped with `info` = m, as at the limit, named; both modes | – |
+| FS-71 | MINC volume_io `open_file` | a compressed input is decompressed by `system("gunzip -c <name> > <tmp>")` (then `bunzip2`) with the name unquoted: a blank or shell syntax fails, reads other files or runs commands | a | none | gzip and bzip2 in memory, a notice for a name the shell would split; never reproduced | – |
+| FS-72 | MINC volume_io `mni_input_reals` | a thin-plate spline's list that reaches the end of the file after white space without its `;` is read forever | a | none | `Expected ';', found end of file.`, named | – |
+| FS-73 | MINC volume_io `input_one_transform` | `Number_Dimensions = 0` divides by zero; a negative one sizes arrays negatively | a | none | an error message (rule B), named | – |
+| FS-74 | MINC volume_io `input_one_transform`, `output_one_transform` | an empty `Points` list frees a pointer never set; the writer writes such a list without its `;` | a | none | a spline with no points; the writer writes the `;`, named | – |
+| FS-75 | MINC volume_io `expand_filename` | a name that starts with a `$VAR` (or `~`) whose value is empty writes through a null pointer | a | none | expands to nothing, named | – |
+| FS-76 | nifticlib `znzread`, `znzwrite` | a member size of 0 on a compressed file computes `0/0` | a | none | 0, named | – |
+| FS-77 | nifticlib `znzread` | a compressed read that ends inside a member counts that member as read (`nmemb - remain/size`) | c (rule A, 2026-11-13) | none | the complete members; `reproduce` nifticlib's count, named | – |
+| FS-78 | zlib 1.2.11 `gz_zero` (`gzseek` then `gzputc`, `gzflush`, `gzclose`) | a forward seek before the first write fills the gap with memory zlib never set instead of zeros | a | none | zeros, named; never reproduced (memory) | – |
+| FS-79 | MINC volume_io `expand_filename` (and `remove_directories_from_filename`, `extract_directory`, the default suffix's extension test, grid volume names) | a backslash is an escape that is dropped and only `/` separates directories: a Windows path (`C:\Users\RUNNER~1\...`) loses its separators, so its directory, base name and extension are misread and the file beside it is not found | c (rule A, 2026-11-13) | none (FreeSurfer runs on Linux and macOS) | on Windows a backslash separates directories (`\` and a drive letter start an absolute name); elsewhere volume_io's rules; `reproduce` keeps the escape, named | – |
+| FS-80 | gifticlib 1.12 label tables | colours given for some `Label`s only leave holes in the colour array (or make it short); a `Label` without a valid `Key` gets no key: the writer, the validity check and the display read memory never written | a | none | 0, named (both modes) | – |
+| FS-81 | gifticlib 1.12 Base64 decoding | after skipped characters outside the alphabet, the bytes carried to the next piece of character data are taken from the wrong place | c (rule A, 2026-11-13) | none (FreeSurfer writes clean Base64) | the real remainder; `reproduce` the wrong bytes (never-written ones as 0), named | – |
+| FS-82 | gifticlib 1.12 type table | `NIFTI_TYPE_FLOAT128` is 6 bytes (a `long double` takes 16): arrays are sized and decoded with 6 bytes a value | c (rule A, 2026-11-13) | none | 16; `reproduce` 6, named | – |
+| FS-83 | gifticlib 1.12 ASCII decoding | the counters of a value's pieces (COMPLEX64, COMPLEX128, RGB24) persist from one array, or file, to the next: an incomplete last value shifts the next array | c (rule A, 2026-11-13) | none | reset for each `Data`; `reproduce` kept, named | – |
+| FS-84 | gifticlib 1.12 metadata | an `MD` without a `Name` text is compared through a null pointer (`gifti_get_meta_value`, `gifti_add_to_meta`): a crash | a | none | no match, named (both modes) | – |
+| FS-85 | gifticlib 1.12 element stack and writer | an element outside its parent (`Data`, `MatrixData`, a coordinate system outside a `DataArray`, `Name` or `Value` outside an `MD`), the end of a `Data` of an array a `DataArray` list leaves out before any array is stored, a dimension past `Dim7` or values past the data when writing: a null or out-of-range pointer (a crash or memory never written) | a | none | skipped or zeros, named (both modes) | – |
+| FS-86 | gifticlib 1.12 text elements | character data (white space included) after a CDATA section or a child element inside `Name`, `Value`, `Label`, `DataSpace` or `TransformedSpace`, or inside one of them outside its parent, is written through a null pointer: `<Name> <![CDATA[x]]> </Name>` crashes | a | none | appended to the element's text (dropped where it has none), named (both modes) | – |
+| FS-87 | gifticlib 1.12 messages | at verbosity 6 and 7 the `MatrixData` reader's buffer messages show the `Data` element's buffer and length, partly memory never written | f | none | the matrix buffer's; `reproduce` the `Data` buffer's (never-written bytes from zeros), named | – |
+| FS-88 | expat 2.0.1 | a UTF-16 document of an odd length whose last token is cut by its odd byte (white space, a name, a literal or `]` at the end of the prolog or the content) is converted past its end: a crash or a hang | a | none | the odd byte dropped, named (both modes) | – |
+| FS-89 | expat 2.0.1 `XML_GetCurrentLineNumber` | an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: a crash | a | none | the lines before it, named (both modes) | – |
+| FS-90 | CTN 3.0.6 conditions and objects | a condition message of 1,024 bytes or more (a long file name in it) overflows the buffer it is formatted in; a file name of 1,024 bytes or more overflows the object's copy: a crash or memory corrupted | a | none | the message kept to 256 bytes, the name to 1,023, named (both modes) | – |
+| FS-91 | CTN 3.0.6 `readData` | an element of undefined length that is neither a sequence nor pixel data is read with a count of -1, which fails and is taken for complete: the element keeps a value never written, the remaining length grows by one, the value's bytes are read as the next elements (an item delimiter there ends the data set early) | c (rule A, 2026-11-13) | none on its default paths (no default path reads DICOM) | read as a sequence (delimiter tags excepted); `reproduce` CTN's reading, the value marked unread, named | – |
+| FS-92 | CTN 3.0.6 `updateSpecialElements` | Bits Allocated, Pixel Representation, the file meta group's length, the transfer syntax and the Waveform Data Representation are read from their values whatever their length and representation: a shorter value, a sequence, a UID without its zero byte is read past its end, from memory never written | a | none | the bytes past the value read as zero, named (both modes) | – |
+| FS-93 | CTN 3.0.6 `readFile1`, `updateSpecialElements` | a group length element shorter than 4 bytes is given the group's 4-byte length; a Waveform Data Representation longer than 16 bytes is copied into a 17-byte field: both write past their memory (a crash at the next free, often) | a | none | the value's own bytes only; 16 bytes kept; named (both modes) | – |
+| FS-94 | FreeSurfer 8.2.0's copy of CTN, `swapInPlace` | the 4-byte integers (UL, SL) of big-endian data are swapped in 2-byte pairs instead of reversed: every such value read from a big-endian file is wrong | c (rule A, 2026-11-13) | none (big-endian DICOM is retired; no default path reads DICOM) | reversed; `reproduce` the pairs (`dicom::Dialect`'s switch, FreeSurfer's replica), named | – |
+| FS-95 | CTN 3.0.6 `swapInPlace` | a UL or SL value of big-endian data whose length is not a multiple of 4 is swapped 4 bytes at a time past its end, its 32-bit count wrapping: a crash | a | none (FreeSurfer's copy swaps in pairs: FS-94) | whole 4-byte units reversed, the last 2 bytes swapped as a pair, named | – |
+| FS-96 | CTN 3.0.6 `swapInPlace` | FD and FL values of big-endian data are left in the file's byte order: every such value read from a big-endian file is wrong | c (rule A, 2026-11-13) | none | reversed; `reproduce` left, named | – |
+| FS-97 | CTN 3.0.6 `readFile1`, `readSequence` | sequences are read by recursion, one level per nesting: nesting deep enough exhausts the stack (CTN reads 2,000 levels within 8 MiB) | a | none | an error past 128 levels ("DCM Failed to read stream in readSequence"), named | – |
+| FS-98 | CTN 3.0.6 `scanCompressedPixels`, `readData` | a fragment of encapsulated pixel data with an odd length (or one past the count) closes the object, and the reader then writes through the closed object: a crash | a | none | the open fails with the fragment's condition, named | – |
+| FS-99 | nlohmann/json 3.2.0 `serializer::dump`, `basic_json`'s destructor | the pretty printer's 512-character indent string is doubled with spaces whenever an indent passes it (a tab indent past 512 characters becomes spaces; an indent step larger than the doubled string reads past its memory); the writer and the destructor recurse once per nesting level (a value nested deeply enough exhausts the stack) | c (rule A, 2026-11-13) for the padding; a for the rest | none (FreeSurfer writes its JSON with an indent of 4 and nests 3 levels) | the indent character kept (`reproduce`: spaces); no read past, no recursion; named | – |
+| FS-281 | miniz 1.15 `tinfl_decompress` (`TINFL_GET_BYTE`) | with no more input to come (`MZ_FINISH`, `mz_uncompress`) a deflate stream that ends early is padded with zero bytes, decoded as the stream's: a truncated stream can be accepted with bytes it never held | b (rule B, 2026-11-13) | none (FreeSurfer inflates only through `MZ_SYNC_FLUSH`, on one DICOM path) | the stream fails where the first missing byte is needed; `reproduce` the zeros, named | – |
+| FS-282 | miniz 1.15 `tinfl_decompress` | the length symbols 286, 287 and distance symbols 30, 31 (undefined by deflate) are accepted: a length of 0 copies 3 bytes and moves the output by 3 (past the buffer when fewer than 3 remain), a distance of 0 copies the byte under the cursor | b (rule B, 2026-11-13) | none | the stream fails; `reproduce` the copies within the buffer (past it: fails, named) | – |
+| FS-283 | miniz 1.15 `tinfl_decompress` | a Huffman code with no codes or one code of any length is accepted, and a bit pattern without a code decodes as symbol 0, taking no bits | b (rule B, 2026-11-13) | none | decoding such a pattern fails (a single code's own pattern decodes); `reproduce` symbol 0, named | – |
+| FS-284 | miniz 1.15 `mz_inflate` (its dictionary) | through the 32 KiB dictionary, a distance farther back than the output so far reads dictionary memory never written | a | none | the stream fails; `reproduce` zeros, named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -226,7 +273,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | PIPE-05 | nitransforms | no displacement beyond a field's last nodes | c? | 2.9 % of MNI points | reproduces | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-06 | nitransforms, fMRIPrep | float32 roundings at every step | d | every run | reproduces | – (D11) |
 | PIPE-07 | nitransforms | a one-transform head-motion file applied in world space | c? | one-volume runs | reproduces | later (decided 2026-10-23: when larmorprepx is built) |
-| PIPE-08 | fMRIPrep confounds | motion parameters about another centre than mcflirt's | c? | every run | not ported | later (decided 2026-10-23: when larmorprepx is built) |
+| PIPE-08 | fMRIPrep confounds | motion parameters about another centre than mcflirt's | c? | every run | ported (`lx.confounds.fsl_motion_params`, both fMRIPrep releases' forms; the confounds' part, 2026-11-12): fMRIPrep's centre in both modes | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-09 | fMRIPrep, niworkflows | wrong dtype log lines; a deprecated argument; float64 masks | f | every run | – | – |
 | PIPE-10 | fMRIPrep, nipype | options that do nothing | e | their users | – | – |
 | PIPE-11 | sMRIPrep | a registration fallback leaves the composite undefined | a | after a failed attempt | – | – |
@@ -241,7 +288,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | PIPE-20 | fMRIPrep `DistortionParameters` | a missing readout time or phase-encoding direction becomes undefined outputs: the run is resampled without its field map, the report still names the correction | c | BOLD runs without readout metadata whose estimator has it | the interface: rule C (its documented design) with a warning; larmorprepx's pipeline: rule B, fMRIPrep's own "Missing readout time information" error; `reproduce` the silent skip with a warning (2026-11-09) | – |
 | PIPE-21 | fMRIPrep `ReconstructFieldmap` | the field on the target projected into the field map's space and made positive (a LAS target's voxels reversed), while the resampler reads it on the target's grid: up to 159 Hz on a synthetic LAS target | c | direct field maps on LAS targets (the SyN runs' path) | rule A: the values on the target's grid; `reproduce` fMRIPrep's image (2026-11-09) | – |
 | PIPE-22 | nitransforms (fMRIPrep's `itk_mat2txt`) | the `desc-fmap_xfm` parameters written with `"%g"`, read back by every later `ReconstructFieldmap` | c? | every run with a field map (corners within 7.9e-05 mm) | rule C: kept (a correction measured to bring no gain) (2026-11-09) | – |
-| PIPE-23 | nipype `is_outlier` (`NonsteadyStatesDetector`) | a median absolute deviation of 0 makes the values at the median 0/0, NaN outliers: every leading volume non-steady | c | none in the oracle runs (a constant or padded series) | rule A: a z-score of 0 at the median; `reproduce` nipype's (2026-11-09) | – |
+| PIPE-23 | nipype `is_outlier` (`NonsteadyStatesDetector`) | a median absolute deviation of 0 makes the values at the median 0/0, NaN outliers: every leading volume non-steady | c | none in the oracle runs (a constant or padded series) | rule A: a z-score of 0 at the median; `reproduce` nipype's (2026-11-09); nipype's own `NonSteadyStateDetector` the same (`lx.confounds.nonsteady_state_detector`, the confounds' part, 2026-11-12) | – |
 | PIPE-24 | niworkflows `ValidateImage` | nibabel's `get_xyzt_units` raises `KeyError` for a spatial unit code 4 to 7 | c | none | rule A: the translation reported in mm; `reproduce` the `KeyError` (2026-11-09) | – |
 | PIPE-25 | fMRIPrep `get_estimator` | with several `B0FieldIdentifier` values on the sources, the estimator is named after one in a set's order; a run whose `B0FieldSource` is another gets none | c | datasets with aliases (sdcflows' own test data) | rule A: the alias reaches its estimator, with a warning; `reproduce` fMRIPrep's (2026-11-09) | – |
 | PIPE-26 | niworkflows `DerivativesDataSink` | with two or more list-valued entity inputs the files are matched to the names in a Python `set`'s order | b | none (fMRIPrep's field-map sinks have one) | the entities' sorted order, with a warning (nondeterminism is never reproduced) (2026-11-09) | – |
@@ -259,6 +306,49 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | PIPE-38 | nipype `DenoiseImage` (`CommandLine._list_outputs`) | nipype lists every `name_source` input's file name, so `noise_image` (`<in>_noise`) is among the outputs without `save_noise` or `noise_image`, a file the program never writes | c | none (fMRIPrep and sdcflows use `output_image` only) | rule C: nipype's listing kept (`larmorx._nipype.denoise_image`; nothing larmorx runs reads it) (2026-11-09) | – |
 | PIPE-39 | nipype `BaseInterface.aggregate_outputs` | the outputs are set (and checked by traits) in the order of `set(predicted_outputs)`, which follows the process's string hashes (`PYTHONHASHSEED`): with several invalid outputs the `TraitError` names any of them, from process to process (`GetReadoutTime` of `PhaseEncodingDirection` `'j+'`: `pe_direction` or `pe_dir_fsl`; with a string readout time also `readout_time`) | b | none (a message of a failing run) | the outputs checked in their declared order, traits' `TraitError` and message (`GetReadoutTime`, `DistortionParameters`); not reproduced (nondeterministic) (2026-11-09) | – |
 | PIPE-40 | niworkflows `IntraModalMerge` | with `to_ras` the inputs are reoriented to RAS but `in_mask` is not, so `grand_mean_scaling` indexes the RAS series with the mask on the input's grid: numpy's `IndexError` when the shapes differ, a mirrored or permuted mask when they agree (its indexing fails anyway for two or more volumes: PIPE-18) | a | none (fMRIPrep's `IntraModalMerge` calls have no grand-mean scaling) | rule A: the mask reoriented with the series, with a notice; `reproduce` niworkflows' (2026-11-09) | – |
+| PIPE-41 | fMRIPrep `init_bold_confs_wf` | `merge_confound_metadata`'s third input is set to the tissue signals' metadata (`{"Method": "Mean"}` for `global_signal`, `csf`, `white_matter`, `csf_wm` and `tcompcor`) and then connected to the crown's metadata, which replaces it: the confounds' JSON never describes those five columns | c | every run (all 36 oracle files lack the five entries) | rule A: the five entries kept (`[tcc, acc, signals, crown, motion]` into `DictMerge`), named with every run; `reproduce` fMRIPrep's four inputs (the confounds' part, 2026-11-12) | – |
+| PIPE-42 | fMRIPrep `init_bold_confs_wf` | `merge_compcor_metadata` is a `Merge(2)` with the crown's metadata wired to `in3`, an input it does not have: the CompCor variance reportlet never shows crownCompCor | c | every run's report (the CompCor variance plot) | rule A, with larmorprepx's reports: the workflow returns the three CompCor metadata files; nothing is drawn yet (the confounds' part, 2026-11-12) | later (with larmorprepx's reports) |
+| PIPE-43 | niworkflows `parse_formula` (`ExpandModel`) | the variables of each group of a model formula, and the columns `others` stands for, are ordered as a Python `set` of strings, whose order follows the process's hash seed: `ExpandModel` writes a variable's expansion columns in another order from one run to the next (`x_power2` before `x_derivative1_power2` in 169 groups of the 36 oracle files, after it in 155); the values do not depend on it | b | every run's `desc-confounds_timeseries.tsv` (the column order only) | one order in both modes, the first occurrence's (decision D5), never the hash-seeded one (nondeterminism is never reproduced); a notice where another set order would change the result; comparisons by column name (the confounds' part, 2026-11-12) | – |
+| PIPE-44 | nipype `compute_noise_components` | a mask that gives no component (an empty mask with `components_criterion='all'`) ends the loop over the masks (`break`): the masks after it are skipped, their components and metadata lost, and when no component was found `failure_mode='NaN'` stops with `ValueError: need at least one array to concatenate` instead of returning | c | none in the 36 runs (fMRIPrep asks for `'all'` only with `--return-all-components`; an empty CSF mask would then skip the WM and combined masks) | rule A: the loop goes on with the next mask; no component and empty metadata when none is found, named where a later mask adds components or changes the basis; `reproduce` nipype's (the confounds' part, 2026-11-12) | – |
+| PIPE-45 | nipype `compute_noise_components` | only the voxels whose float sum over time is NaN are zeroed: a voxel holding an infinity (and no NaN) reaches the pre-filter and the SVD, which then fails (every component of the mask NaN with `failure_mode='NaN'`, or `ValueError: array must not contain infs or NaNs`), while a finite voxel whose float32 sum overflows both ways is zeroed | c | none (fMRIPrep's series are finite) | rule A: exactly the voxels holding a non-finite value are zeroed; `reproduce` nipype's (the confounds' part, 2026-11-12) | – |
+| PIPE-46 | nipype `compute_dvars` | the voxel-wise standardisation, which runs whatever DVARS the caller asked for, turns numpy's floating-point warnings into errors: a voxel whose predicted difference SD is 0 (every series of two volumes; a robust SD of 0 kept by `remove_zerovariance=False`; an AR(1) estimate of exactly 1) stops the whole computation with `RuntimeWarning: divide by zero encountered in divide` (or `invalid value`), and every DVARS series is lost | c | none in the 36 real calls (fMRIPrep's `remove_zerovariance=True` reaches it only through an AR(1) estimate of exactly 1; the largest of the real calls 0.98958) | rule A, after measuring how it is reached: the voxels whose predicted SD is 0 left out of the voxel-wise mean (NaN when none is left), named where the series change; `reproduce` nipype's `RuntimeWarning` in numpy's order of the checks (the confounds' part, 2026-11-11) | – |
+| PIPE-47 | nipype `compute_dvars` | an AR(1) estimate above 1, which the float32 FFT's rounding gives for a series whose lag-1 autocorrelation is just below 1 (the exact Yule-Walker estimate of the biased autocorrelation is below 1), makes the predicted difference SD the square root of a negative number: every standardised and voxel-wise DVARS value is NaN, without an error | c | none (BOLD-like series: at most 0.99986 of 4,000 structured series; the 36 real calls at most 0.98958) | rule D measured, then A: the estimate clamped at 1 (a predicted SD of 0: PIPE-46's exclusion); `reproduce` NaN (the confounds' part, 2026-11-11) | – |
+| PIPE-48 | niworkflows `RobustACompCor`, `RobustTCompCor` | fMRIPrep's three CompCor nodes retry a failed decomposition (a workaround for a random MKL failure): the loop catches `LinAlgError` only and sleeps `randint(10 f - 6, 10 f)` seconds before each of 10 retries, then raises the same error (measured: 11 attempts, 520 s of sleeps) | c? | none on the results (up to about 9 minutes before the same error; with fMRIPrep's `failure_mode='NaN'` the SVD's errors never reach the loop) | rule C: kept and documented, no switch: larmorx's computation is deterministic, so a retry would give the same error, and it raises at once (the confounds' part, 2026-11-12) | – |
+| PIPE-49 | fMRIPrep `init_bold_confs_wf` | the crown's metadata are not filtered (`FilterDropped` runs on the tCompCor and aCompCor metadata only), so the confounds' JSON lists the crown's components not retained as `dropped_<k>` | c? | every run's JSON (ds005454: 256 `dropped_` entries of the crown) | rule C: kept, as fMRIPrep's documentation describes the `dropped` entries (`docs/outputs.rst`), so users may rely on them; no switch (the confounds' part, 2026-11-12) | – |
+| PIPE-50 | nipype `compute_dvars` | a voxel whose demeaned series is all zeros (an all-zero voxel, or a constant one whose `regress_poly(0)` residual rounds to exactly 0, kept by `remove_zerovariance=False`, nipype's function default) has the Yule-Walker equation `0 · a = 0`: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it stops with `LinAlgError: A singular matrix detected.` | c | none (fMRIPrep's `remove_zerovariance=True` drops such voxels) | rule A: the minimum-norm solution 0 (the predicted SD 0, as its robust SD), then PIPE-46's exclusion; `reproduce` the SciPy release's NaN or error (the confounds' part, 2026-11-11) | – |
+| PIPE-51 | nipype `TSNR` | the maps of a series stored as integers (tSNR, mean, standard deviation, the detrended series) are written in that integer type, quantized by nibabel's scaling (256 levels for uint8, 65,536 for int16): the check meant to switch the header to float32 for integer data never fires, as the data are float32 by then | c | none in the oracle runs (fMRIPrep's report runs `TSNR` on its float32 preprocessed series) | rule A: written as float32 (the check's intent); `reproduce` nipype's quantized integer maps (the confounds' part, 2026-11-12) | – |
+| PIPE-52 | nipype `regress_poly` | the non-constant regressors it returns (CompCor's Legendre pre-filter file) are `X[:, :-1]`, the constant and every polynomial but the highest, not the polynomials of degree 1 to `d` | c | none (fMRIPrep's pre-filter is the cosine basis) | rule A: the polynomials of degree 1 to `d`; `reproduce` nipype's columns (the confounds' part, 2026-11-12) | – |
+| PIPE-53 | nipype `regress_poly`, `cosine_filter` | an `axis` other than the last takes that axis' length as the series' length but reshapes the data in memory order to rows of that length, so the series regressed are runs of consecutive values across voxels and volumes, without an error | c | none (fMRIPrep's calls use the last axis) | rule B: `ValueError`; `reproduce` nipype's regression of the reshaped values (the confounds' part, 2026-11-12) | – |
+| PIPE-54 | nipype `compute_noise_components` | a `components_criterion` of 0 ends the loop over the masks at the first one, and a negative one other than -1 (`'all'`) slices columns off the end of each mask's components (`u[:, :-2]`) while marking none retained in the metadata; a count given as a float (6.0) stops with `TypeError` when an SVD fails with `failure_mode='NaN'` | e | none (fMRIPrep passes 0.5, 24 or `'all'`) | rule B: 0 and the negative criteria other than -1 refused (`ValueError` naming PIPE-54); rule A: a float count taken by its integer part; `reproduce` nipype's (the confounds' part, 2026-11-12) | – |
+| PIPE-55 | nipype `compute_noise_components` | an empty mask with a `failure_mode` other than `'error'` returns an empty pre-filter basis, so when it is the last mask the cosine or polynomial basis is lost (CompCor's pre-filter file then holds no basis column) | c | none (tCompCor's mask is never empty; aCompCor's pre-filter file is not used) | rule A: the basis kept; `reproduce` nipype's (the confounds' part, 2026-11-12) | – |
+| PIPE-56 | nipype `CompCor` | the repetition time read from the header is converted from milliseconds but not from microseconds (`xyzt_units` usec): it is taken as that many seconds, which gives a cosine basis of millions of columns | c | none (fMRIPrep passes the metadata's repetition time) | rule A: microseconds converted; `reproduce` nipype's seconds (the confounds' part, 2026-11-12) | – |
+| PIPE-57 | nipype `compute_noise_components` | a `filter_type` other than `'cosine'`, `'polynomial'` and `False` silently filters nothing, not even the mean, and a float32 series is then decomposed in single precision | e | none (fMRIPrep's `'cosine'`) | rule B: `ValueError`; `reproduce` nipype's on a float64 series (a float32 series refused: numpy's single-precision SVD, `sgesdd`, is not ported) (the confounds' part, 2026-11-12) | **reproduce** (a float32 series: `sgesdd`) |
+| PIPE-58 | nipype `compute_noise_components` | `mask_names` shorter than the masks silently drops the masks without a name (`zip`): their components and metadata are not computed | e | none (fMRIPrep names every mask) | rule B: `ValueError`; `reproduce` nipype's (the confounds' part, 2026-11-12) | – |
+| PIPE-59 | nipype `compute_noise_components` | an SVD that fails with `failure_mode='NaN'` is replaced by `T` NaN singular values whatever the decomposition's size `min(T, N)`, and with `components_criterion='all'` by one NaN component while all `T` values are marked retained (CompCor's metadata then names every one after the first component) | c | none (no SVD fails on fMRIPrep's finite series) | rule A: the decomposition's size `min(T, N)`; `reproduce` nipype's (the confounds' part, 2026-11-12) | – |
+| PIPE-60 | nipy `rotation_vec2mat` (nipype `normalize_mc_params(..., 'NIPY')`) | the angle of a rotation vector given as integers is the square root of its sum of squares computed in the vector's own type, which wraps around silently (a component of an int8 vector from 12, int16 from 182, int32 from 46,341; an int64 vector when the sum passes 2^63), so `normalize_mc_params(params, 'NIPY')` of such a row is another rotation or numpy's `LinAlgError` | c | none (no nipype path passes integers: `FramewiseDisplacement` reads float64) | rule A: the angle from the exact sum of squares; `reproduce` nipy's wrapped arithmetic, named exactly where the squares wrap (the confounds' part, 2026-11-12) | – |
+| PIPE-61 | niworkflows `AddTSVHeader` | numpy's `loadtxt` squeezes a table of one row to a vector, which `savetxt` writes as one column (the row's values one under the other), and a table of one value to a scalar, which `savetxt` refuses (`ValueError: Expected 1D or 2D array, got 0D array instead`) | c | none in the oracle runs | rule A: the table's shape kept (read again with `ndmin=2`); `reproduce` niworkflows' (the confounds' part, 2026-11-12) | – |
+| PIPE-62 | niworkflows `AddTSVHeader` | a header with another number of names than the table's columns is written as given, so the file's header and rows disagree | e | none (fMRIPrep's headers match) | rule B: `ValueError`; `reproduce` the file written, with a notice (the confounds' part, 2026-11-12) | – |
+| PIPE-63 | fMRIPrep `GatherConfounds` | a shorter table is aligned with the last rows (its missing rows first), but pandas' `concat(axis=1)` joins the row labels without sorting them: when an earlier table is the shorter one (no `signals` table, a DVARS table of `T - 1` rows first), the first volume's row is written last and every other row one volume early | c | none (fMRIPrep's full-length `signals` table comes first: the 36 real `concat` nodes are identical) | rule A: the rows in volume order (the labels sorted), named when the order changes; `reproduce` pandas' order (the confounds' part, 2026-11-12) | – |
+| PIPE-64 | niworkflows `parse_formula` | the shorthands (`wm`, `gsr`, `rps`, `fd`, `acc`, `tcc`, `dv`, `dvall`, `nss`, `spikes`, `others`) are replaced as text, anywhere and again inside every group: a name that holds one is rewritten (`std_dvars` becomes `std_std_dvarsars`, `csf_wm` becomes `csf_white_matter`), `dvall` becomes `std_dvarsall` (`dv` is replaced first), a shorthand that matches no column leaves an empty term (`IndexError: string index out of range`), and the names `others` leaves out lose every `d<digits>` and `^<digits>` in them | e | none for fMRIPrep's own formula (`(others)^2` on fMRIPrep's table fails with `KeyError`) | rule A: the shorthands and `others` replaced where they are whole words, once at the top level, one that matches nothing a term without columns, named where niworkflows' text would differ; `reproduce` niworkflows' (the confounds' part, 2026-11-12) | – |
+| PIPE-65 | niworkflows `parse_formula` | a term's operators are read with regular expressions over the whole term: text around a group other than a derivative before it and an exponent after it is ignored (`foo(a)`, `(a)b` and `d1x(a)` give `a`'s columns), an exponent after a group that holds another single-caret exponent fails with `TypeError` (`((a)^2)^3`), and a name that starts like a derivative or ends like an exponent (`d1a`, `a^2`) is taken for an operator without its group (`TypeError`) | e | none (fMRIPrep's formula) | rule B for the ignored text (`ValueError`), rule A for the rest (the exponent read after the group only: `((x)^2)^3` is `x_power2_power3`; a term without a complete group is a name); `reproduce` niworkflows' (the confounds' part, 2026-11-12) | – |
+| PIPE-66 | niworkflows `parse_formula`, `ExpandModel` | a variable reached by two terms of the formula (`a + (a)^^2`) is repeated: twice in `parse_formula`'s table and four times in `ExpandModel`'s file (pandas selects every column of a repeated name each time it is named), and a group that repeats one fails with pandas' `ValueError` (`Shape of passed values ...`) | e | none (fMRIPrep's formula) | rule A: each name once (its first column); `reproduce` niworkflows' (the confounds' part, 2026-11-12) | – |
+| PIPE-67 | niworkflows `spike_regressors` | each lag is added to the volumes the earlier lags flagged, so lags `[1, 2]` (or `[0, 1, 2]`) flag the third volume after a spike too | c | none (fMRIPrep's `SpikeRegressors` uses no lags) | rule A: the union of the flagged volumes and each lag added to them, named after `minimum_contiguous`'s filling; `reproduce` niworkflows' (the confounds' part, 2026-11-12) | – |
+| PIPE-68 | niworkflows `spike_regressors` | `minimum_contiguous` counts the last run of unflagged volumes one volume longer than it is (its end is taken one past the table), so a final run one volume shorter than the minimum is not flagged | c | none (fMRIPrep passes no `minimum_contiguous`) | rule A: the run's true length; `reproduce` niworkflows' (the confounds' part, 2026-11-12) | – |
+| PIPE-69 | niworkflows `spike_regressors` | a criterion other than `'<'` and `'>'` is skipped without an error (when every criterion is: `TypeError: reduce() of empty iterable with no initial value`) | e | none (the interface always passes `'>'`) | rule B: `ValueError` (the function only); `reproduce` niworkflows' (the confounds' part, 2026-11-12) | – |
+| PIPE-70 | niworkflows `NormalizeMotionParams` | numpy's `loadtxt` squeezes a table of one row to a vector, which numpy's `apply_along_axis` refuses (`AxisError: axis 1 is out of bounds for array of dimension 1`) | c | none (a one-volume run) | rule A: the row kept; `reproduce` numpy's `AxisError` (the confounds' part, 2026-11-12) | – |
+| PIPE-71 | nitransforms `linear.load` (fMRIPrep `FSLMotionParams`, `FSLRMSDeviation`) | a transform file of one transform is loaded as one `Affine`, whose 4 × 4 matrix fMRIPrep's `FSLMotionParams` and `FSLRMSDeviation` then take as a series of four (its rows): a one-volume series stops with numpy's `AxisError` | c | a one-volume BOLD run stops the confounds workflow | rule A: a series of one (the motion parameters one row, `rmsd` one `n/a`), named in both modes; `reproduce` numpy's `AxisError` (the confounds' part, 2026-11-12) | – |
+| PIPE-72 | fMRIPrep `FSLMotionParams` | a reference image whose centre of gravity is undefined (under 25.2.7 a constant image, whose weights `value - min` are all zero; under 25.2.6 a sum of zero; in either a NaN or infinite voxel) gives NaN or infinite translations in every row without an error, which `FramewiseDisplacement` turns into `n/a` everywhere | c | none in the oracle runs (a degenerate reference: no FD spike at all) | rule B: `ValueError` naming PIPE-72; `reproduce` fMRIPrep's values, with the notice (the confounds' part, 2026-11-12) | – |
+| PIPE-73 | nitransforms `ITKLinearTransform` | every ITK text transform is read in single precision (numpy's `genfromtxt` with `dtype="f4"`), the double-precision ones (`AffineTransform_double_3_3`) too, so their parameters are rounded to float32 | c | none (fMRIPrep's head-motion files are `AffineTransform_float_3_3`) | rule A: a type named `_double_` read in float64, named with the values the rounding changes; `reproduce` float32 (the confounds' part, 2026-11-12) | – |
+| PIPE-74 | fMRIPrep `_binary_union` | the masks are cast to int64 with numpy's cast, undefined in C for NaN, infinities and values beyond int64's range: on x86-64 they become the most negative int64, so a voxel of +inf or 1e19 (or a uint64 value from 2^63) is outside the union | a | none (its inputs are uint8 and `MultiLabel` masks) | D13's rule for undefined conversions: clamped (+inf and values from 2^63 inside; NaN and -inf outside in both modes), named with the voxels at or above 2^63; `reproduce` x86-64's casts (the confounds' part, 2026-11-12) | – |
+| PIPE-75 | fMRIPrep `_binary_union` | masks of different shapes are broadcast without an error (a mask of shape `(X, Y, 1)` is taken for every slice of an `(X, Y, Z)` one) | c | none (the masks share the BOLD grid) | rule B: `ValueError` (also for shapes numpy cannot broadcast); `reproduce` numpy's broadcasting or its `ValueError` (the confounds' part, 2026-11-12) | – |
+| PIPE-76 | fMRIPrep `acompcor_masks` | with `is_aseg` the grey-matter map is cast to uint8 with numpy's cast before the test `> 0`: integers wrap (-1 is 255, inside; 256 is 0, outside), and floats out of int32's range or NaN are undefined in C (on x86-64 0, outside; a float in range keeps its truncated int32's low byte: 300.0 is 44) | a | only with FreeSurfer's path on grey-matter maps outside [0, 255]: none on FAST's maps | D13's rule (rule A for the integer wrap): clamped to [0, 255] first (grey matter is the voxels at or above 1), named with the voxels the two put differently; `reproduce` numpy's x86-64 cast (the confounds' part, 2026-11-12) | – |
+| PIPE-77 | niworkflows `BinaryDilation` | a negative radius (`traits.Int` takes it) dilates with scikit-image's ball of that radius, an arbitrary footprint: -1 is one false element, so the dilated mask is empty; -2 the cross of radius 1 | e | none (fMRIPrep's radius 2) | rule B: `ValueError`; `reproduce` niworkflows' (with the ball of negative radii as scikit-image computes it) (the confounds' part, 2026-11-12) | – |
+| PIPE-78 | niworkflows `SignalExtraction` | a class label holding a tab or a line break is written as it is, which breaks the table's columns or rows | c | none (fMRIPrep's labels) | rule B: `ValueError`; `reproduce` the file, with a notice (the confounds' part, 2026-11-12) | – |
+| PIPE-79 | fMRIPrep `init_bold_confs_wf` (`aCompCorMasks`) | fMRIPrep passes `is_aseg=freesurfer` (`run_reconall`, its default), but its tissue maps are always FAST's partial-volume maps (sMRIPrep's `fast2bids`): with FreeSurfer the aseg path smooths partial volumes again (`mask2vf`) and its grey matter is only the voxels whose fraction is exactly 1 (the uint8 truncation), dilated by `ball(3)` (ds005454's own FAST maps: CSF 243,706 → 33,031 voxels, WM 156,468 → 182,036) | c? | every run with FreeSurfer (fMRIPrep's default): its aCompCor masks | rule D: to be measured on fMRIPrep runs with FreeSurfer (planned on the lab's server); fMRIPrep's wiring kept in both modes until then, documented (the confounds' part, 2026-11-12) | **measure** (fMRIPrep's runs with FreeSurfer) |
+| PIPE-80 | nipype `CommandLine` (ANTs, FSL, AFNI interfaces) | some file names are written into the command line unquoted (the files inside ANTs' bracketed arguments: `ApplyTransforms`' `--transform [ f, 1 ]` and `--output`, `Registration`'s `--metric`, `--masks`, `--initial-moving-transform` and `--output`, `N4BiasFieldCorrection`'s and `DenoiseImage`'s `[ out, extra ]`; `ApplyTransforms`' `--transform f`, `MultiImageMaths`' operands, `TOPUP`'s `--datain` file), and the line runs through the shell, so a file name with a blank is split into several words (one with a quote breaks the line); `BET` makes its input's name relative after quoting it: the program gets other file names and fails | e | none on the oracle runs (no blank in their paths); a dataset, working directory or output folder whose path holds a blank or a quote makes fMRIPrep's ANTs, TOPUP and BET nodes fail | rule A: the program gets the quoted line's words, nipype's line kept as `command.txt` holds it; `reproduce` nipype's line and its failure; the notice in both modes where the two differ (the confounds' part, 2026-11-12) | – |
+| PIPE-81 | nipype `nipypecli run` | `nipypecli run` gives an input of a compound trait (`traits.Either`) the argparse type of the input before it in name order, a variable left from the loop's previous iteration (CompCor's `num_components` reads text, so a number of components is refused; `save_pre_filter` and `save_metadata` read a float, so a file name or `True` is refused), and cannot build the parser of an interface whose first input is compound (`UnboundLocalError`: niworkflows' `TSV2JSON`) or that has a list of compound items (`AttributeError`: niworkflows' `DictMerge`, fMRIPrep's `FMRISummary`) | e | anyone running fMRIPrep's confounds nodes through nipype's command line (the 9 CompCor calls of the 51 real calls of three oracle runs refused) | rule A: a compound input read by its trait's alternatives, the first that takes it; every parser built; `reproduce` nipype's (the confounds' part, 2026-11-13) | – |
+| PIPE-82 | nipype `nipypecli run` | `nipypecli run` reads an input's text by the type of its default value, not by its trait: a float input whose default is an integer reads only integers (CompCor's `high_pass_cutoff`, so fMRIPrep's own `128.0` is refused; `FramewiseDisplacement`'s `radius`), and the texts of a tuple (`aCompCorMasks`' `bold_zooms`, `RegridToZooms`' `zooms`, the plots' `figsize`), an optional dictionary or an enumeration's values that are not text (CompCor's `pre_filter False`, `GenerateSamplingReference`'s `xform_code`) reach the trait unconverted and are refused whatever is given; a list of booleans reads every text but the empty one as true | e | anyone running fMRIPrep's confounds nodes through nipype's command line (the 3 `fdisp` and 3 `acc_masks` calls of the 51 real calls refused) | rule A: each text read by its trait (a float as a float, a tuple as a Python literal, a dictionary as JSON, an enumeration's value by its text, a boolean from `True`/`1` or `False`/`0`); `reproduce` nipype's (the confounds' part, 2026-11-13) | – |
+| PIPE-83 | nipype `nipypecli run` | a boolean input whose default is true is a `store_true` flag, which cannot be turned off (`ComputeDVARS`' `remove_zerovariance` and `save_std`, `IntraModalMerge`'s `hmc`), and two variable-length positional inputs are split by argparse's greedy matching (niworkflows' `SignalExtraction` given fMRIPrep's five labels and five files takes nine values as labels: `ValueError: Number of masks must match number of labels`) | e | anyone running these interfaces through nipype's command line | rule C: kept (nipype's design), the same in both modes; no switch (the confounds' part, 2026-11-13) | – |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
 | SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes (SciPy up to 1.17) | c | none | fixed in SciPy 1.18, whose initialisation larmorx follows in both modes since 2026-10-29 (corrected by default from 2026-10-11 until then) | – |
@@ -291,10 +381,13 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SCI-30 | SciPy `sum_labels`, `sum`, `center_of_mass` (`_stats`) | with a 0-d index array SciPy indexes its sums with it (a numpy scalar) and assigns into it (`TypeError: 'numpy.int64' object does not support item assignment`); an empty input with a sequence index fails in `labels.min()` (`ValueError: zero-size array to reduction operation minimum which has no identity`) or, for `uint64` labels, in numpy's `IndexError` | f | none | rule A: the 0-d index's one sum as a scalar, the empty input's zero counts and sums of the index's shape, with a notice (one per `center_of_mass` call); `reproduce` SciPy's errors (2026-11-09) | – |
 | SCI-31 | SciPy `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing`, `binary_propagation` (`NI_BinaryErosion2`) | the propagation strategy (iterations other than 1, the structure's centre true, no `brute_force`) casts the mask with `np.asarray(mask, dtype=np.int8)`, which returns the caller's own `int8` array, and uses it as its scratch: the mask is left `-1` where it was true and the first pass's output (its first byte) where it was false; `binary_closing`'s erosion then reads the overwritten mask, so its result differs (456 of 589 closings with an `int8` mask and more than one pass) | a | none (sdcflows' and niworkflows' masks are boolean) | rule A: the caller's mask left as given, with a notice; `reproduce` writes SciPy's values into it (a read-only one where numpy lets its flag be lifted) (2026-11-09) | – |
 | SCI-32 | SciPy `binary_dilation`, `binary_propagation`, `binary_fill_holes`, the dilations of `binary_opening` and `binary_closing` (`NI_BinaryErosion2`) | with a valid non-zero origin and the propagation strategy (iterations other than 1, no `brute_force`) the result sometimes differs from SciPy's own brute force, and the process sometimes dies (heap corruption: `malloc(): unsorted double linked list corrupted`, aborts and segmentation faults, at the call or at exit); a zero origin, the brute force and the erosion are unaffected | a | none (sdcflows' and niworkflows' binary morphology has no origin) | the brute force's result in both modes (memory is never reproduced) (2026-11-09) | – |
+| SCI-41 | SciPy `linalg.solve` (nitime's AR(1) in nipype's DVARS) | SciPy 1.15 solves a diagonal system (every 1 × 1 one) by dividing, so a singular one gives inf or NaN with `RuntimeWarning`s only (its general path raises `LinAlgError: Matrix is singular.`), and checks only the matrix for infinities and NaNs, not the right-hand side; SciPy 1.18 raises `LinAlgError: A singular matrix detected.` and checks both | c | none (a finite `r0` bounds `r1` in DVARS; the zero case is PIPE-50's) | rule B: DVARS takes SciPy 1.18's checks with every release; `_core.scipy_solve_1x1` gives each release's exact behaviour (the confounds' part, 2026-11-11) | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD (`lx.transforms`); numpy's own SVD, as x86-64 Linux computes it, in `lx.sdcflows`' orientation decisions (2026-11-08) | – |
 | NP-03 | numpy float32 `log` | on x86-64 CPUs with AVX2 and FMA3 or AVX-512 numpy's own kernel, not correctly rounded (10,947,841 of the 201,326,593 floats in [1, 2^24] up to 3 units in the last place from the exact value; 78.4 million of all positive floats, up to 4), the C library's `logf` on other CPUs: results depend on the CPU | d | every multi-echo run's T2* and S0 (tedana's log-linear fit and the curve fit's start: 32,950 values of fMRIPrep's ds003592 call) | correctly rounded by default, named exactly where a written value or printed line changes; `reproduce` numpy's kernel (`larmorx_core::math::logf_numpy`, numpy's on all 2^32 inputs; the t2smap replica, 2026-11-08) | – |
-| NP-04 | numpy float64 `exp` and `log` on AVX-512 | on x86-64 CPUs with AVX-512 numpy's own (SVML) kernels, which differ from the C library's (`exp` on 4.1 % of the arguments in [−800, 0], `log` on 0.10 % in [0, 10]); the C library's elsewhere: results depend on the CPU | d | multi-echo runs on AVX-512 machines (22,899 values of fMRIPrep's ds003592 call differ from the AVX2 path) | the non-AVX-512 path is the reference (the C library's functions, GLIBC-07; the oracles run with `NPY_DISABLE_CPU_FEATURES`); the AVX-512 kernels not reproduced, their spread measured in the t2smap replica's record (2026-11-08) | – (decided 2026-11-08) |
+| NP-04 | numpy float64 `exp`, `log` and `power` on AVX-512 | on x86-64 CPUs with AVX-512 numpy's own (SVML) kernels, which differ from the C library's (`exp` on 4.1 % of the arguments in [−800, 0], `log` on 0.10 % in [0, 10]; `power` on 2.6 % of cubes, niworkflows' `exponential_terms`: the confounds' part, 2026-11-12); the C library's elsewhere: results depend on the CPU | d | multi-echo runs on AVX-512 machines (22,899 values of fMRIPrep's ds003592 call differ from the AVX2 path) | the non-AVX-512 path is the reference (the C library's functions, GLIBC-07; the oracles run with `NPY_DISABLE_CPU_FEATURES`); the AVX-512 kernels not reproduced, their spread measured in the t2smap replica's record (2026-11-08) | – (decided 2026-11-08) |
+| NP-09 | numpy 2.5.4 (OpenBLAS 0.3.34's Haswell kernels on AMD Zen 4/5) | OpenBLAS from 0.3.31 sets the products' depth block (`GEMM_Q`) to 512 for every core's table on AMD CPUs with an L2 of 1 MiB, an L3 a multiple of 32 MiB and AVX-512; with it the Haswell kernel's 12-column paths overflow their stack buffer on depth blocks above 298 steps: `a @ b` with about 25 rows or more and an inner dimension of 384 to 512, 700, 768, 1,024, ... crashes (SIGSEGV) or hangs, and so do LAPACK's blocked QR, LQ, bidiagonal and divide-and-conquer paths (numpy's `svd` and `qr` at CompCor's sizes); the results of that class that do not crash follow memory numpy never wrote (they change from run to run: 83 to 96 of 92 to 96 identical in four runs) | a | none (fMRIPrep's image runs numpy 2.2.6 on OpenBLAS 0.3.30, without the block); a user of numpy 2.5.4 with `OPENBLAS_CORETYPE=Haswell` on such a CPU | never reproduced (a crash): larmorx's depth block is 256, a real Haswell's and every oracle's (`gemm_q=512` exists for validation only); the confounds' numpy 2.5.4 checks and records run with `OPENBLAS_L2_SIZE=512`, which keeps 256; the suites report the class's tallies as values (the confounds' part, 2026-11-11) | – |
+| NP-10 | numpy 2.3.5 and 2.2.6 `svd`, `pinv`, `lstsq` | numpy's `svd` (so `pinv`, nipype's `fallback_svd` and SciPy's `Rotation.from_matrix`) and `lstsq` hand a matrix holding ±inf to LAPACK, whose scaling turns it into NaN: of 28 `svd` probe cases 7 hang (an infinite loop), 9 return infinite or NaN values without an error (most after three `DLASCL` "parameter number 5 had an illegal value" messages), 12 raise `LinAlgError`; of 40 `lstsq` cases 6 hang and 34 raise; numpy 2.5.4 raises `LinAlgError` on all 68 (numpy issue 32591) | a | none (fMRIPrep's series are finite, and CompCor zeroes non-finite voxels first) | rule B: numpy 2.5.4's `LinAlgError` for every release in both modes; the hang never reproduced, nor the garbage results (the same undefined input class) (the confounds' part, 2026-11-11) | – (never reproduced) |
 | NIB-01 | nibabel | compression decided by the file name | e | none | decided by content | – (decided 2026-10-23: larmorx's behaviour kept) |
 | NIB-02 | nibabel | `vox_offset` 0: header read as data | c | none | refuses | – (decided 2026-10-23: larmorx's behaviour kept) |
 | NIB-03 | nibabel | complex data: imaginary part dropped | c | none | raises | – (decided 2026-10-23: larmorx's behaviour kept) |
@@ -305,7 +398,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | GLIBC-04 | glibc 2.35 | `pow` not correctly rounded for 5 filter-pole powers | d | none | exact | – |
 | GLIBC-05 | glibc 2.35 | `cbrtf` not correctly rounded (one unit in the last place on 10.6 % of float inputs): 3dUnifize `-EPI`'s radius (18.3 mm over the cube root of the voxel volume) changes its ball of neighbours or its printed radius on some voxel sizes (11.969702 mm³: radius 8 with glibc's, 7.9999995 correctly rounded) | d | none (fMRIPrep does not call `-EPI`) | correctly rounded by default (`larmorx_core::math::cbrtf`), named where glibc's last bit changes the ball within the grid or the printed radius; `reproduce` uses glibc 2.35's bits (`larmorx_core::math::cbrtf_glibc`, clean-room from `specs/cbrtf.md`, proved on all 2^32 inputs) in both implementations (2026-10-30: the clean-room original, then the replica, whose last-bit warning is gone) | – |
 | GLIBC-06 | glibc 2.35 | `tanh` (double) not correctly rounded: one unit (rarely two) in the last place on 21.3 % of 805 million random arguments and on 22,506 of CORE-MATH's 62,880 worst cases; FSL's `bet2` takes its smoothness weight from it at every vertex of every iteration, and the reruns of a surface whose first pass self-intersects amplify that last bit into another surface and mask (`specs/bet.md` §4.5, §8.1) | d | every BET run's surface (measured on the standard tier's 13 real images: the same outputs on 9; other masks on the three rerun cases, Dice 0.9959, 0.9848, 0.9920, and ds000005's BOLD first volume, 0.9966) | glibc's bits in both modes for now (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to glibc 2.35's on 12.9 billion arguments); the correctly rounded `larmorx_core::math::tanh` (CORE-MATH) ported and verified, its notice wired (2026-10-30, BET's clean-room part 2a). BET's default keeps glibc's bits (the user, 2026-10-31, rule C: the correctly rounded surface is another surface, not a more accurate one, and its exact notice would make a run 1.9 times slower); the correctly rounded `tanh` on request | – (decided 2026-10-31: glibc's bits kept by default) |
-| GLIBC-07 | glibc 2.35 | the double-precision `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and `pow` are not correctly rounded (on image intensities, of 6.7 × 10^7 arguments each, one unit in the last place on: `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 %, `acos` 0.071 %, `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 %), nor is `sincos` (0.148 % of the FFT's twiddle angles), which gives the twiddle factors of fslmaths' FFT convolution through `cexp` (of the transform lengths 1 to 256, 80 hold a factor one unit away from the exact one): fslmaths' `-sin` ... `-pow` of a double image (`-dt double`; no float result differs) and a few voxels of an FFT convolution (random testing met it once in 114,906 fslmaths cases); in FSL's and AFNI's programs the single-precision `sinf`, `cosf`, `atan2f`, `expf`, `logf` and `powf` too (the functions themselves: GLIBC-02, GLIBC-03), whose last bits reach fslmaths' kernels, `-bptf`, `-tfce` and `-roc`, fslstats' `-e` and `-E`, 3dTshift's `-wsinc5` and `-wsinc9` weights (about 1 % of them), and the paths of the iterative programs (FLIRT and its programs, mcflirt's mutual information, FAST, topup's smoothing, bet2's powers, betsurf's blurring). glibc chooses an FMA build of each of the nine functions at run time on x86-64 CPUs with FMA (every one since 2013, the oracle machines too), and the two builds differ from each other: FSL's own double results depend on the CPU; "glibc's bits" here means the FMA build's (the orchestrator's decision, 2026-11-03); `sincos` has one build; and numpy's float64 `exp` and `log` (the C library's on x86-64 CPUs without AVX-512) and SciPy's powers (C's `pow`), which tedana's `t2smap` takes for its S0, the curve fit's model, the T2* floor, the RMSE and the combination's weights | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums); every multi-echo run's last bits through tedana (810 values of fMRIPrep's ds003592 call) | correctly rounded by default (CORE-MATH, its `tan` ported 2026-11-03); `reproduce` gives glibc's bits (the FMA build's) through `larmorx_core::math`'s `*_glibc` functions: `exp`, `log`, `pow` and the single-precision ones translated from the permissive code glibc carries (Arm's Optimized Routines, fdlibm), and `sin`, `cos` and `sincos` (IBM's Accurate Mathematical Library in glibc, LGPL, never copied or translated) written by a clean-room implementer from a behaviour spec (`specs/glibc-dbl.md`; its table of sines and cosines from a definition, no glibc data; 768 of 768 blocks and 184 special arguments of the black-box record, 1.18 × 10^10 fresh arguments per function against the system's glibc, 0 differ, 2026-11-04); `tan`, `asin`, `acos` and `atan` correctly rounded in both modes (the user's decision of 2026-11-04: glibc's tables for them are searched and fitted data that no definition reproduces), the record's `fn/double-tan` an expected divergence. The clean-room originals' `reproduce` uses them since 2026-11-04 (fslmaths' double functions, kernels, `-bptf`, `-tfce`, `-roc`; fslstats' `-e`, `-E`; FLIRT and its programs; mcflirt's mutual information; FAST; topup's smoothing; bet2's powers; betsurf's blurring; 3dTshift's weighted sinc; since 2026-11-06 prelude's `-c` arctangent, `atan2f`): FAST's fMRIPrep calls and 41 FLIRT cases, the default registration among them, now give FSL's bytes; named in both modes only where a value differs exactly (fslmaths' voxelwise functions, fslstats, avscale, makerot, `convert_xfm -fixscaleskew`, 3dTshift, prelude's `-c` phases), never by the iterative programs or fslmaths' filters (the user's decision of 2026-11-04); fslmaths' clean-room FFT none (a direct sum). The replicas: `exp`, `log`, `pow` (fslmaths' replica 2026-11-03); `sin`, `cos`, `sincos` since 2026-11-04 (step (b), BET's `-S`/`-B`/`-A`/`-A2` part, relay 1), wherever FSL's and AFNI's sources call them: fslmaths' double `-sin` and `-cos` (named exactly where a voxel changes), the FFT convolution's twiddle factors (Armadillo's 65,792 factors of the lengths 1 to 256 and their transforms bit for bit; `difftest/fft-twiddles-glibc-sincos` a pass; a filter, named nothing), the sinc kernels' windows (FLIRT, applyxfm4D, mcflirt; the same float kernels in both modes at every width from 1 to 1001), avscale's half transforms (named where its report changes), and the AFNI replicas' FFT tables and 3dTshift's Fourier phase factors (AFNI's build calls `sincos`; the same floats in both modes on every table length and every float argument). tedana's `t2smap` replica (2026-11-08): numpy's float64 `exp`, `log` and C's `pow` correctly rounded by default, glibc 2.35's bits with `reproduce` (`exp_glibc`, `log_glibc`, numpy's negative `log` as C's +NaN), named exactly where a written value or printed line changes (a second pass, writing nothing); its clean-room original names it in one pass where a written log-linear S0 would differ (`specs/t2smap.md` §15.2) | none for `sin`, `cos` and `sincos` (2026-11-04); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (decided) |
+| GLIBC-07 | glibc 2.35 | the double-precision `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log` and `pow` are not correctly rounded (on image intensities, of 6.7 × 10^7 arguments each, one unit in the last place on: `sin` 0.12 %, `cos` 0.085 %, `tan` 0.21 %, `asin` 0.16 %, `acos` 0.071 %, `atan` 0.083 %, `exp` 0.076 %, `log` 0.021 %, `pow` 0.083 %), nor is `sincos` (0.148 % of the FFT's twiddle angles), which gives the twiddle factors of fslmaths' FFT convolution through `cexp` (of the transform lengths 1 to 256, 80 hold a factor one unit away from the exact one): fslmaths' `-sin` ... `-pow` of a double image (`-dt double`; no float result differs) and a few voxels of an FFT convolution (random testing met it once in 114,906 fslmaths cases); in FSL's and AFNI's programs the single-precision `sinf`, `cosf`, `atan2f`, `expf`, `logf` and `powf` too (the functions themselves: GLIBC-02, GLIBC-03), whose last bits reach fslmaths' kernels, `-bptf`, `-tfce` and `-roc`, fslstats' `-e` and `-E`, 3dTshift's `-wsinc5` and `-wsinc9` weights (about 1 % of them), and the paths of the iterative programs (FLIRT and its programs, mcflirt's mutual information, FAST, topup's smoothing, bet2's powers, betsurf's blurring). glibc chooses an FMA build of each of the nine functions at run time on x86-64 CPUs with FMA (every one since 2013, the oracle machines too), and the two builds differ from each other: FSL's own double results depend on the CPU; "glibc's bits" here means the FMA build's (the orchestrator's decision, 2026-11-03); `sincos` has one build; and numpy's float64 `exp` and `log` (the C library's on x86-64 CPUs without AVX-512) and SciPy's powers (C's `pow`), which tedana's `t2smap` takes for its S0, the curve fit's model, the T2* floor, the RMSE and the combination's weights | d | none (fMRIPrep's fslmaths calls compute in float, and its `-s` convolves by separable sums); every multi-echo run's last bits through tedana (810 values of fMRIPrep's ds003592 call) | correctly rounded by default (CORE-MATH, its `tan` ported 2026-11-03); `reproduce` gives glibc's bits (the FMA build's) through `larmorx_core::math`'s `*_glibc` functions: `exp`, `log`, `pow` and the single-precision ones translated from the permissive code glibc carries (Arm's Optimized Routines, fdlibm), and `sin`, `cos` and `sincos` (IBM's Accurate Mathematical Library in glibc, LGPL, never copied or translated) written by a clean-room implementer from a behaviour spec (`specs/glibc-dbl.md`; its table of sines and cosines from a definition, no glibc data; 768 of 768 blocks and 184 special arguments of the black-box record, 1.18 × 10^10 fresh arguments per function against the system's glibc, 0 differ, 2026-11-04); `tan`, `asin`, `acos` and `atan` correctly rounded in both modes (the user's decision of 2026-11-04: glibc's tables for them are searched and fitted data that no definition reproduces), the record's `fn/double-tan` an expected divergence. The clean-room originals' `reproduce` uses them since 2026-11-04 (fslmaths' double functions, kernels, `-bptf`, `-tfce`, `-roc`; fslstats' `-e`, `-E`; FLIRT and its programs; mcflirt's mutual information; FAST; topup's smoothing; bet2's powers; betsurf's blurring; 3dTshift's weighted sinc; since 2026-11-06 prelude's `-c` arctangent, `atan2f`): FAST's fMRIPrep calls and 41 FLIRT cases, the default registration among them, now give FSL's bytes; named in both modes only where a value differs exactly (fslmaths' voxelwise functions, fslstats, avscale, makerot, `convert_xfm -fixscaleskew`, 3dTshift, prelude's `-c` phases), never by the iterative programs or fslmaths' filters (the user's decision of 2026-11-04); fslmaths' clean-room FFT none (a direct sum). The replicas: `exp`, `log`, `pow` (fslmaths' replica 2026-11-03); `sin`, `cos`, `sincos` since 2026-11-04 (step (b), BET's `-S`/`-B`/`-A`/`-A2` part, relay 1), wherever FSL's and AFNI's sources call them: fslmaths' double `-sin` and `-cos` (named exactly where a voxel changes), the FFT convolution's twiddle factors (Armadillo's 65,792 factors of the lengths 1 to 256 and their transforms bit for bit; `difftest/fft-twiddles-glibc-sincos` a pass; a filter, named nothing), the sinc kernels' windows (FLIRT, applyxfm4D, mcflirt; the same float kernels in both modes at every width from 1 to 1001), avscale's half transforms (named where its report changes), and the AFNI replicas' FFT tables and 3dTshift's Fourier phase factors (AFNI's build calls `sincos`; the same floats in both modes on every table length and every float argument). tedana's `t2smap` replica (2026-11-08): numpy's float64 `exp`, `log` and C's `pow` correctly rounded by default, glibc 2.35's bits with `reproduce` (`exp_glibc`, `log_glibc`, numpy's negative `log` as C's +NaN), named exactly where a written value or printed line changes (a second pass, writing nothing); its clean-room original names it in one pass where a written log-linear S0 would differ (`specs/t2smap.md` §15.2). The confounds (2026-11-12): numpy's float64 `cos` in nipype's cosine basis (the default flips the sign of 88 CompCor columns in 20 of fMRIPrep's 108 real components files, their magnitudes the same, and moves 44 by one unit in the 10th decimal: an expected difference, the regressors equivalent), nipy's `sin` and `cos`, niworkflows' powers and `exp` likewise, named exactly where a value changes; SciPy's `as_euler` takes `atan2` and `hypot` correctly rounded in both modes (`atan2` changes 15 of the 22,293 rotation cells of the 36 real files under `reproduce`, `hypot` none) | none for `sin`, `cos` and `sincos` (2026-11-04); `tan`, `asin`, `acos`, `atan` correctly rounded in both modes (decided); **reproduce** for `atan2` in SciPy's `as_euler` (the confounds' motion parameters: a clean-room `atan2_glibc`, next-steps) |
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
@@ -359,6 +452,9 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SKI-02 | scikit-image `match_histograms` | an unsigned image's reference counted with `bincount`: a float or negative reference, or a `uint64` image, refused | c | none (no workflow calls it) | rule A: counted with `unique`, scikit-image's result wherever it gives one; `reproduce` its error (2026-11-09) | – |
 | SKI-03 | scikit-image `random_walker` | labels that are not consecutive come back as their consecutive renumbering (3 and 7 as 1 and 2) | c | none (`brain_masker`'s labels are 1 and 2) | rule A: the labels given, with a warning; `reproduce` scikit-image's (2026-11-09) | – |
 | SKI-04 | scikit-image `random_walker` | `return_full_prob` with no pixel to segment returns the seeds' boolean masks along the last axis, not `(nlabels, ...)` probabilities | c | none | rule A: the documented probabilities, with a warning; `reproduce` scikit-image's (2026-11-09) | – |
+| PD-01 | pandas `read_csv` (3.0.6 and 2.2.3) | the default float parser (`precise_xstrtod`) keeps at most 17 digit characters, the leading zeros of `0.00...` included, accumulates them in a double and divides by one power of ten, so most values `to_csv` writes (their shortest `repr`, up to 17 significant digits) are read back as another double, one or more units in the last place off (186,107 of 200,000 motion-like values) | d | every run: most motion, FD, RMSD, signal and expansion values of the confounds file are pandas-perturbed (the default changes 90,043 of 1,862,699 cells of the 36 final tables) | rule A (decision D3): the correctly rounded value of the same text; `reproduce` pandas' parse at every node boundary of fMRIPrep's chain, which gives fMRIPrep's bytes (the confounds' part, 2026-11-12) | – |
+| PD-02 | pandas `to_json` (ujson) | the 10-decimal formatting of doubles (ujson's `Buffer_AppendDoubleUnchecked`) multiplies the fraction by 1e10 in floating point, truncates it and rounds the remainder, ties of an even last digit down and of a last digit 0 up, so some values are written with another 10th decimal than the correctly rounded one (1,642 of 200,028) | d | none on fMRIPrep's metadata (nipype's `%.10f` texts: the two agree) | rule A (decision D3): correctly rounded 10-decimal values; `reproduce` ujson's text (the confounds' part, 2026-11-12) | – |
+| PD-03 | pandas `read_csv` | an integer column with missing values marks them with int64's minimum before turning them into NaN, so a value equal to -9223372036854775808 in it is read as NaN | c | none | rule A: the value kept (as a float); `reproduce` pandas' (the confounds' part, 2026-11-12) | – |
 | TED-01 † | tedana `t2smap` (adaptive mask) | a NaN among the first echo's temporal means (a NaN sample, or no volume left) makes the dropout method's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | c | none | rule A: the percentile and the reference voxels from the means that are not NaN (an infinite mean kept, as tedana keeps it: since 2026-11-12, it was left out with the NaN ones before); none left: a clear error, named; `reproduce` tedana's error (the t2smap replica, 2026-11-08; the clean-room original, 2026-11-11) | – |
 | TED-02 † | tedana `t2smap --exclude` | an index equal to the number of volumes is accepted, then numpy's `IndexError` | e | none | rule B: refused with the check's own message, as a larger index is; `reproduce` tedana's error (2026-11-08) | – |
 | TED-03 † | tedana `t2smap` without `--mask` | when nilearn's `compute_epi_mask` finds no voxel (its `MaskWarning`) the run goes on and fails with `IndexError: index -1 is out of bounds for axis 0 with size 0`; with too few voxels for the adaptive mask's threshold, the argmax `ValueError` | c | none (fMRIPrep passes its BOLD mask) | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
@@ -601,24 +697,24 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (543 entries, recounted from the table on 2026-11-12, after `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
+**Counts** (639 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 7 and 8 (FS-90 to FS-99 and FS-281 to FS-284 new); before it the confounds' part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 new; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused); before it FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 119 | |
-| (b) race, nondeterminism | 17 | |
-| (c) deterministic bug that changes results | 272 | 14 |
-| (d) imprecision | 27 | |
-| (e) command-line or parsing quirk | 79 | |
-| (f) documentation or message only | 27 | |
+| (a) crash, undefined behaviour, out of bounds | 154 | |
+| (b) race, nondeterminism | 21 | |
+| (c) deterministic bug that changes results | 312 | 17 |
+| (d) imprecision | 29 | |
+| (e) command-line or parsing quirk | 92 | |
+| (f) documentation or message only | 29 | |
 | explained, not a defect | 2 | |
 
-The gap column today (2026-11-10): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
+The gap column today (2026-11-13): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
 kept, rule C); one rule 8; **switch** for SDC-03 (with the FreeSurfer part: `CheckRegister`'s
 registration branch is not ported yet), SDC-23 (with AFNI's `3dQwarp`), SDC-42 (with larmorprepx's reports) and PIPE-36 (with
-larmorprepx's BOLD stages); **measure** for PIPE-35 (rule D, with the anatomical brain extraction's port); no **original** (3dvolreg's clean-room original closed AFNI-86 to AFNI-99's thirteen, AFNI-91 unused, on 2026-11-08; PRELUDE's clean-room original FSL-261 to FSL-273's on 2026-11-07); **replica** for FSL-191 to FSL-193, FSL-241 and FSL-242.
+larmorprepx's BOLD stages); **measure** for PIPE-35 (rule D, with the anatomical brain extraction's port) and PIPE-79 (rule D, on fMRIPrep's runs with FreeSurfer); **reproduce** for PIPE-57 (a float32 series: numpy's single-precision SVD) and GLIBC-07's `atan2` (SciPy's `as_euler` in the confounds' motion parameters); PIPE-42 later (with larmorprepx's reports); no **original** (3dvolreg's clean-room original closed AFNI-86 to AFNI-99's thirteen, AFNI-91 unused, on 2026-11-08; PRELUDE's clean-room original FSL-261 to FSL-273's on 2026-11-07); **replica** for FSL-191 to FSL-193, FSL-241 and FSL-242.
 
 Sixteen entries have a second class: ANTS-12, FSL-03 and SDC-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134,
 FSL-135, FSL-159, FSL-268 and FSL-269 (a), FSL-08 and AFNI-90 (e), FSL-171, FSL-174 and FSL-179 (c). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
@@ -1026,6 +1122,8 @@ port), the switches of SDC-23 (with AFNI's `3dQwarp`), SDC-42 (with larmorprepx'
 SDC-45, PIPE-36, SCI-21 (with SCI-22 and SCI-23) and SCI-25, comments for the open issues sdcflows#455
 (PIPE-32, SDC-36) and SciPy#24502 (SCI-29); PIPE-37 is fixed on pybids' master (#1273, not yet released),
 SCI-26 on SciPy's main (#25646, for 2.0.0).
+
+**The confounds' part** (`lx.confounds`, the confound steps of `lx.niworkflows`, `lx.nipype` and `larmorx nipype run`, larmorprepx's `bold_confounds`, `crates/larmorx-confounds`, and numpy's and SciPy's linear algebra and FFTs in `larmorx_transform::openblas`, `numpy_linalg` and `larmorx_core::numpy`, 2026-11-11 to 13; fMRIPrep 25.2.7 (25.2.6 for the step), nipype 1.12.0, niworkflows 1.15.4, nitime 0.12.1, nipy 0.6.1, pandas 3.0.6 (2.2.3), numpy 2.5.4 (2.3.5, 2.2.6) and SciPy 1.18.1 (1.15.3) with their OpenBLAS and LAPACK; [confounds-workflow.md](confounds-workflow.md) and the files it links): PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 (49 entries; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused), 41 with `reproduce` (the original's result, messages and exit status bit for bit; `larmorx_core::defects`): corrected by default PIPE-41, PIPE-44, PIPE-45, PIPE-46, PIPE-50, PIPE-51, PIPE-52, PIPE-55, PIPE-56, PIPE-59, PIPE-60, PIPE-61, PIPE-63, PIPE-64, PIPE-66, PIPE-67, PIPE-68, PIPE-70, PIPE-71, PIPE-73, PIPE-80, PIPE-81, PIPE-82, PD-01, PD-02 and PD-03 (rule A) and PIPE-47 (rule D measured, then A); a clear error by default PIPE-53, PIPE-57, PIPE-58, PIPE-62, PIPE-69, PIPE-72, PIPE-75, PIPE-77, PIPE-78 and SCI-41 (rule B), PIPE-54 and PIPE-65 (rule B, rule A for a float count and for the rest of a term); undefined conversions clamped with a notice (D13's rule) PIPE-74 and PIPE-76; one order in both modes (nondeterminism, never reproduced) PIPE-43; kept and documented PIPE-48, PIPE-49 and PIPE-83 (rule C, no switch); never reproduced NP-09 (a crash: larmorx blocks the products' depth by 256) and NP-10 (rule B in both modes: a hang, and garbage from the same undefined input class). Open: PIPE-79 (rule D: measured on fMRIPrep runs with FreeSurfer), PIPE-42 (with larmorprepx's reports), PIPE-57's `reproduce` of a float32 series (numpy's `sgesdd`). The libraries' existing entries: GLIBC-07 (numpy's float64 `cos` in nipype's cosine basis, nipy's `sin` and `cos`, niworkflows' powers, `exp`: correctly rounded by default, glibc's with `reproduce`; SciPy's `atan2` and `hypot` correctly rounded in both modes, `atan2` a D13 gap until a clean-room `atan2_glibc` (15 of 22,293 rotation cells of the 36 real files), `hypot` none (no real cell)), NP-04 (numpy's AVX-512 `power` too), PIPE-23 (nipype's own `NonSteadyStateDetector` too) and PIPE-08 (the motion parameters ported; fMRIPrep's centre kept in both modes, decided with larmorprepx). Found on the way and corrected: larmorx's own `DBDSQR` tolerance (`TOLMUL`, now 2^6.625 correctly rounded) in the field maps' `numpy_linalg` code; every record it reaches re-made from one clean commit, no result changed ([confounds-workflow.md](confounds-workflow.md)). Upstream: no report drafted yet (a follow-up).
 
 **Random testing's gaps** (2026-10-25, open; found by differential random testing,
 [validation/difftest.md](../validation/difftest.md); every default is already correct, these are
@@ -3462,6 +3560,385 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   `a_later_level_zero_bin_size_is_used_as_itk_uses_it`). Decided by rule B on 2026-10-25.
 - **D13 / gap:** none.
 
+### ITK-101 A copy of `vnl_random` returns uninitialised memory from `normal()` — (a)
+- **What:** `vnl_random`'s copy constructor and `operator=` (`core/vnl/vnl_random.cxx` 29-54 in ITK
+  4.13.2, the same in 5.4.5) copy `mz_previous_normal_flag` but not `mz_previous_normal`, so a copy
+  made between the two halves of a polar pair returns uninitialised memory from its next `normal()`
+  or `normal64()`.
+- **Evidence:** read (`docs/findings/vnl-random.md`, F-VNLR-2).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** `larmorx_core::vnl_random::VnlRandom`'s `Clone` copies the cached number; no
+  `reproduce` switch (memory contents are never reproduced, D13). Found 2026-11-12 (FreeSurfer's
+  foundations, item 3.1-04).
+- **D13 / gap:** none.
+
+### ITK-102 `vnl_random::lrand32(lower, upper)` overflows `int` — (a)
+- **What:** the range is `upper - lower + 1` computed in `int` (`vnl_random.cxx` 179-191 in ITK
+  4.13.2, the same in 5.4.5): beyond `2^31 - 1` it overflows (undefined behaviour; with GCC a range
+  of `2^32` divides by zero, and one from `2^31` to `2^32 - 1` makes the rejection loop never end),
+  and `lower > upper`
+  (the assertion is off under `NDEBUG`) divides by zero or never returns.
+- **Evidence:** read (`docs/findings/vnl-random.md`, F-VNLR-3).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** `VnlRandom::lrand32_range` computes the range in 64 bits, accepts every draw for the
+  full range of `int`, and refuses `lower > upper` (a panic, as the assertion); no `reproduce`
+  switch (a division by zero and a loop without end are never reproduced, D13). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-103 VXL's L-BFGS line search drops Nocedal's modified function values — (c)
+- **What:** in `mcsrch_`'s first stage, when the function decreased but not enough (`stage1 && f
+  <= fx && f > ftest1`), Nocedal's Fortran calls `MCSTEP(STX, FXM, DGXM, STY, FYM, DGYM, STP, FM,
+  DGM, ...)`; VXL's edited translation (`v3p/netlib/opt/lbfgs.c`, ITK 4.13.2 and 5.4.5) keeps the
+  state in a struct and its `mcstep_` reads the struct's `fx`, `fy` (the unmodified values) and
+  writes the new ones there, after which `fx = fxm + stx·dgtest` is rebuilt from the stale `fxm`.
+- **Evidence:** read (`docs/findings/vnl-netlib.md`, F-VNLN-2); measured on the port, which
+  reproduces VXL bit for bit (`validation/probes/fs-vnl`): 200,000 smooth problems at memory 7,
+  line-search accuracy 0.1 and `xtol` 1e-16, and at VNL's defaults, Nocedal's first stage changed
+  no run (the same
+  12,952,884 evaluations, final values and line-search failures); in the probe's 600,000 mixed
+  problems (some with wrong gradients) it changed 137 runs: more evaluations in 114, fewer in none,
+  a lower final value in 13 and a higher one in 11, the same 176,646 line-search failures.
+- **fMRIPrep:** none. **FreeSurfer:** its L-BFGS minimizations (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** rule D, then C (a correction measured to bring no gain): VXL's behaviour in both
+  modes; Nocedal's on request (`larmorx_core::vnl_lbfgs::LbfgsGlobal::nocedal_first_stage` with
+  `fix`), named where it changes the search's state. Found 2026-11-12 (FreeSurfer's foundations,
+  item 3.1-07).
+- **D13 / gap:** – (decided 2026-11-12 by the rules: VXL's kept, Nocedal's opt-in).
+
+### ITK-104 VXL's L-BFGS resets `ys` on every call — (c)
+- **What:** `v3p/netlib/opt/lbfgs.c` (ITK 4.13.2, the same in 5.4.5) declares `ys` a local
+  initialised to 0; Nocedal's Fortran `SAVE`s it. With `DIAGCO` true the routine returns
+  `IFLAG = 2` for the caller's diagonal and resumes at `L100`, which computes `1/ys`: infinite.
+- **Evidence:** read (`docs/findings/vnl-netlib.md`, F-VNLN-3); `validation/probes/fs-vnl` reaches
+  it with a caller's diagonal (bit-identical under `reproduce`).
+- **fMRIPrep:** none. **FreeSurfer:** none (it never supplies the diagonal, as `vnl_lbfgs` does not).
+- **larmorx:** `larmorx_core::vnl_lbfgs::lbfgs` keeps `ys` between calls (rule A); `reproduce`
+  resets it, both named. Found 2026-11-12 (FreeSurfer's foundations, item 3.1-07).
+- **D13 / gap:** none.
+
+### ITK-105 VXL's L-BFGS scales its printed vectors from a signed value — (f)
+- **What:** `write50` (`lbfgs.c`) keeps the value that last exceeded the running maximum in
+  magnitude with its sign (`if (fabs(v[i]) > vmax) vmax = v[i]`), so a negative one makes later
+  smaller magnitudes "larger"; a vector of zeros gives `log(0)`, a scale of 0 and `-nan` values.
+  Printed text only (`IPRINT(2) >= 1`).
+- **Evidence:** read (F-VNLN-4); the probe compares the text under `reproduce`.
+- **fMRIPrep:** none. **FreeSurfer:** a diagnostic print only (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** the scale from the largest magnitude, a zero vector unscaled (rule A); `reproduce`
+  VXL's, named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-106 VXL's L-BFGS prints its vectors from the double before each array — (a)
+- **What:** `lb1_` decrements `x` and `g` for Fortran's indexing and passes the decremented
+  pointers to `write50`, which indexes from 0: "VECTOR X=", "GRADIENT VECTOR G=" and "FINAL POINT
+  X=" start with the double before each array (memory the routine does not own) and drop the last
+  element.
+- **Evidence:** verified (`validation/probes/fs-vnl`: VXL printed `0.00000` and once
+  `9.881313e-323 x` there; F-VNLN-4).
+- **fMRIPrep:** none. **FreeSurfer:** a diagnostic print only.
+- **larmorx:** prints the vectors (rule A); `reproduce` prints VXL's window with the value before
+  the array as 0 (memory contents are never reproduced, D13), named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-107 `vnl_inverse` of a singular fixed matrix returns memory — (a)
+- **What:** `vnl_inverse(vnl_matrix_fixed<T, n, n>)` for n = 2, 3, 4 (`core/vnl/vnl_inverse.h`)
+  returns `vnl_matrix_fixed<T, n, n>()` when the determinant is 0 (its assertion is compiled out by
+  `NDEBUG`), and that constructor initialises nothing.
+- **Evidence:** read (F-VNLN-6).
+- **fMRIPrep:** none. **FreeSurfer:** a matrix square root of a singular 3 × 3 block (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** `larmorx_core::vnl_fixed::inverse*` give the zero matrix (as before for double);
+  no `reproduce` (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-108 `vnl_cholesky::rcond()` of a matrix that is not positive definite is memory — (a)
+- **What:** `rcond_` is never initialised; `dpoco` sets it only when the factorization succeeds,
+  so `rcond()` and the `estimate_condition` mode's message (`vnl_cholesky: rcond=... so N
+  dimensions of non-posdeffness`) give memory contents otherwise.
+- **Evidence:** read (F-VNLN-6); the probe compares the message up to the value.
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** `rcond()` is `None` there and the message prints 0, with a notice; no `reproduce`
+  (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-109 `vnl_cholesky::determinant()` never returns on a non-finite mantissa — (a)
+- **What:** LINPACK's `dpodi` (job 10) keeps `det[0]` in [1, 10) with `goto` loops on
+  `det[0] >= 1` and `det[0] < 10`: an infinite or NaN diagonal entry of the factor, or one whose
+  square times the mantissa overflows (above about 1.3e154 from finite numbers), never leaves them.
+- **Evidence:** read (F-VNLN-7).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** stops there: the non-finite mantissa itself, or for a finite factor the square in
+  two steps (the true value); both modes (a loop without end is never reproduced, D13), named.
+  Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-110 `vnl_real_eigensystem` never writes `Vreal`'s complex columns — (a)
+- **What:** `Vreal` is allocated uninitialised and written only for real eigenvalues
+  (`vnl_real_eigensystem.cxx` 54-69): the two columns of a complex pair are memory contents.
+- **Evidence:** read; verified (the probe skips 35,808 such columns at scale 1, F-VNLN-6).
+- **fMRIPrep:** none. **FreeSurfer:** a non-symmetric eigensystem with complex eigenvalues (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** those columns are 0, flagged (`vreal_written`) and named; no `reproduce` (memory).
+  Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-111 A failed `hqr2` leaves `vnl_real_eigensystem` reading unwritten eigenvalues — (a)
+- **What:** when EISPACK's `hqr2` fails after 30·n iterations it returns `ierr` without the
+  eigenvalues it has not found; `vnl_real_eigensystem` prints its message and builds `D` and `V`
+  from `wr`, `wi` anyway, vectors allocated uninitialised.
+- **Evidence:** read (F-VNLN-6).
+- **fMRIPrep:** none. **FreeSurfer:** none known (non-converging matrices).
+- **larmorx:** those eigenvalues are 0, named; the message as VNL prints it; no `reproduce`
+  (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-112 EISPACK's `balanc` never returns on non-finite entries — (a)
+- **What:** `balanc`'s scaling loops (`L210`, `L230`: `goto` loops on `c >= g` and `c < g`) never
+  end when a row or column sum of the part it balances is infinite or NaN (an infinite or NaN
+  off-diagonal entry, or entries near the largest double): every `vnl_real_eigensystem` hangs.
+- **Evidence:** read (F-VNLN-7).
+- **fMRIPrep:** none. **FreeSurfer:** a non-symmetric eigensystem of such a matrix.
+- **larmorx:** `vnl_eigen::real_eigensystem` returns an error (rule B: the input makes no sense);
+  both modes (a loop without end is never reproduced, D13). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-113 `vnl_qr::solve` of one row with a zero entry returns memory — (a)
+- **What:** LINPACK's `xqrsl` with `ju = 0` (one row) returns `info = 1` without writing the
+  solution when the entry is 0; `vnl_qr::solve` (and `inverse`) return their uninitialised vector.
+- **Evidence:** read; verified (the probe skips 64 such solutions at scale 1).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** the solution is 0, `info` 1; no `reproduce` (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-114 `vnl_brent_minimizer` can loop for ever — (a)
+- **What:** the loop ends only when the point is within the tolerance of the bracket's midpoint.
+  On a bracket with an infinite end where the cost is NaN or not lower than at the best point, the
+  golden-section step lands on that end again and nothing changes; on a bracket whose ends sum
+  beyond the double range the midpoint is infinite and two points a tolerance apart take turns.
+  `vnl_powell` on a cost that falls without end makes such brackets. Either way the loop's state
+  comes back and repeats for ever.
+- **Evidence:** verified (`validation/probes/fs-vnl`, family `unbounded`: 662 of 17,000
+  minimizations on falling costs; VNL is not called for them).
+- **fMRIPrep:** none. **FreeSurfer:** none on the costs its programs minimize (bounded).
+- **larmorx:** the port keeps the loop's state and finds the repetition (Brent's cycle detection);
+  it stops at the best point with a notice, in both modes (a hang is never reproduced, D13).
+  Found 2026-11-13.
+- **D13 / gap:** none.
+
+### ITK-115 EISPACK's `pythag` never returns on NaNs and two infinities — (a)
+- **What:** `pythag(a, b)` iterates on `r = (min/max)^2` (f2c's macros) until `4 + r == 4`; a NaN
+  `b`, two NaNs or two infinities make `r` NaN and the loop never ends. `vnl_symmetric_eigensystem`
+  passes it the subdiagonal entries of the matrix's tridiagonal form, so a matrix with an infinite
+  or NaN entry usually hangs it; when an earlier step leaves a NaN at the end of the subdiagonal,
+  `tql2` first reads and writes one element past its arrays and then makes such a call.
+- **Evidence:** verified (`validation/probes/fs-vnl`, family `nonfinite`: every one of 2,001
+  eigensystems and 222 sampled `pythag` pairs the port says never return was still computing in
+  VNL at the time limit).
+- **fMRIPrep:** none. **FreeSurfer:** a symmetric eigensystem of such a matrix (none on its
+  default paths).
+- **larmorx:** `pythag` returns nothing there and the eigensystem stops, `ierr` the eigenvalue it
+  was working on, with a notice (`never_returns`), in both modes. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### ITK-116 LINPACK's `ssvdc` can loop for ever on infinite entries — (a)
+- **What:** only the QR steps count towards the limit of 1,000 iterations; the deflation and
+  splitting steps do not, and on a matrix with an infinite entry they can come back to the same
+  singular values and superdiagonal again and again.
+- **Evidence:** verified (`validation/probes/fs-vnl`, family `nonfinite`: 129 of 2,003 matrices,
+  all still computing in VNL at the time limit).
+- **fMRIPrep:** none. **FreeSurfer:** a float SVD of such a matrix (none on its default paths).
+- **larmorx:** the port finds the repetition and stops with `info` set to the current `m`, as at
+  the iteration limit, with a notice, in both modes. Found 2026-11-13.
+- **D13 / gap:** none.
+
+## FreeSurfer's bundled libraries: MINC's volume_io, nifticlib, zlib
+
+Found in FreeSurfer's foundations, items 3.1-14 and 3.1-15 (2026-11-12/13), in the upstreams the
+permissive ports follow (MINC 1.5.1, nifticlib 2.0.0, zlib 1.2.11); FreeSurfer's own copies, measured
+by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
+`validation/probes/fs-minc-nifti`.
+
+### FS-71 Compressed inputs through the shell — (a)
+- **What:** `open_file` (volume_io `Prog_utils/files.c`) decompresses a name ending in `.z`, `.Z` or
+  `.gz` (or a missing name whose compressed file exists) with `system("gunzip -c %s > %s")`, then
+  `bunzip2 -c`, into a temporary file, the name unquoted.
+- **Evidence:** read.
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** gzip and bzip2 decompressed in memory (`compress`'s `.Z` and `pack`'s `.z` are not
+  decoded: the failure message); a notice when the name holds a character the shell would split or
+  interpret. Not reproduced (it depends on the shell and on other files). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-72 A spline's number list read forever — (a)
+- **What:** `mni_input_reals` loops until `mni_input_real` returns `ERROR`; at the end of the file
+  after white space it returns `END_OF_FILE` each time (the white space pushed back and read again),
+  so the list grows until memory runs out.
+- **Evidence:** read; verified (the probe never runs MINC on such files: 390 of 20,000, with FS-73
+  and FS-74).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** the list stops there, `Expected ';', found end of file.`, named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-73 `Number_Dimensions` of 0 or less — (a)
+- **What:** `input_one_transform` divides the number of values read by `Number_Dimensions` (a crash
+  at 0) and sizes its arrays with it (negative sizes below 0).
+- **Evidence:** read.
+- **fMRIPrep:** none. **FreeSurfer:** none.
+- **larmorx:** `input_transform(): Number_Dimensions must be positive (it is <n>).` (rule B), named.
+  Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-74 An empty `Points` list — (a)
+- **What:** reading frees `points_1d`, never set when the list is empty; writing a spline with no
+  points writes no `;` after `Points =`, so the file cannot be read back.
+- **Evidence:** read.
+- **fMRIPrep:** none. **FreeSurfer:** none.
+- **larmorx:** a spline with no points (its affine part, which the format allows: rule A); the
+  writer writes the `;` on a line of its own; named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-75 An empty expansion at the start of a file name — (a)
+- **What:** `expand_filename` grows its result only for characters it copies; a `$VAR` (or `~`)
+  whose value is empty, first in the name, `strcpy`s into a result never allocated.
+- **Evidence:** verified (MINC 1.5.1 built from its tarball crashes; 327 of 40,000 generated names).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** expands to nothing, named. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-76 A member size of 0 in znzlib — (a)
+- **What:** `znzread`/`znzwrite` on a compressed file return `nmemb - remain/size` with `size` 0.
+- **Evidence:** verified (the probe's first run stopped with SIGFPE).
+- **fMRIPrep:** none. **FreeSurfer:** none.
+- **larmorx:** 0, named. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-77 A partly read member counted as read — (c)
+- **What:** `znzread` on a compressed file returns `nmemb - remain/size`: with 7 bytes left, 4
+  members of 2 bytes come back as 4 (and the warning `** znzread: read short by 1 bytes`); with
+  more than one member missing the count is still one too many whenever the shortfall is not a
+  whole number of members.
+- **Evidence:** verified (nifticlib 2.0.0 built from its tarball).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** the complete members (rule A), named; `reproduce` gives nifticlib's count. Found
+  2026-11-13.
+- **D13 / gap:** none.
+
+### FS-78 zlib 1.2.11 writes unset memory for a gap before the first write — (a)
+- **What:** `gz_zero` clears its input buffer once, on its first pass, which comes before
+  `gz_comp` allocates the buffer when nothing was written yet; every later pass sends the buffer's
+  unset contents (`gzseek` forward, then `gzputc`, `gzflush` or `gzclose`; `gzwrite` allocates
+  first, so it writes zeros).
+- **Evidence:** verified (the system's zlib 1.2.11: 77 of 2,000 write scripts in the probe's
+  scale-1 run).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** zeros, named; never reproduced (memory contents). Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-79 MINC volume_io drops a Windows path's backslashes — (c, rule A)
+- **What:** `expand_filename` takes a backslash as an escape (it drops it and keeps the next
+  character), and the file-name helpers split directories at `/` only; a Windows path such as
+  `C:\Users\RUNNER~1\AppData\Local\Temp\...\t1` becomes one name with a `.` in it, so the
+  default `.xfm` suffix is not added and the file is not found.
+- **Evidence:** verified (CI's Windows x64 and arm64 jobs on main f43acf5b:
+  `xfm::tests::files_compressed_defaults_and_dialects`; the rules checked on every platform by
+  `expansion_of_names`).
+- **fMRIPrep:** none. **FreeSurfer:** none (it does not run on Windows).
+- **larmorx:** on Windows a backslash separates directories (never an escape; a `$NAME` ends at
+  it; `\` and a drive letter with `:` start an absolute name); elsewhere volume_io's rules;
+  `reproduce` keeps the escape on Windows too; a notice in both modes. A `~` not at the start of
+  a name (`RUNNER~1`) and blanks were already kept as volume_io keeps them. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-80 to FS-87 gifticlib 1.12: GIFTI files read through memory never written, null pointers and a 6-byte FLOAT128
+- **What:** gifticlib 1.12's reader and writer, as `docs/findings/gifti.md` describes them (its
+  table): label colours and keys never written (FS-80); the Base64 bytes carried across a piece
+  from the wrong place after skipped characters (FS-81); `NIFTI_TYPE_FLOAT128` sized as 6 bytes
+  (FS-82); the ASCII decoder's piece counters persisting across arrays (FS-83); a nameless `MD`
+  compared through a null pointer (FS-84); elements outside their parents, a left-out array's
+  `Data` before any stored one, writing past `Dim7` or past the data (FS-85); text after a CDATA
+  section or a child element inside a text element written through a null pointer (FS-86, which
+  crashes on `<Name> <![CDATA[x]]> </Name>`, a well-formed file); the `MatrixData` messages at
+  verbosity 6 and 7 showing the `Data` buffer (FS-87).
+- **Evidence:** verified (`validation/probes/fs-gifti`: gifticlib 1.12 from its commit 8ec2a95
+  and FreeSurfer 8.2.0's copy, generated files in forked children; the crashes reproduced under
+  gdb).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (it writes its GIFTI files
+  itself; `docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** corrected by default where the input makes sense (FS-81 to FS-83, FS-87, rule A),
+  with `reproduce` giving gifticlib's results; crashes and memory never written are never
+  reproduced (FS-80, FS-84 to FS-86: zeros, skipped elements or the text appended, named). Found
+  2026-11-13.
+- **D13 / gap:** none.
+
+### FS-88, FS-89 expat 2.0.1 reads past the document — (a)
+- **What:** FS-88: in a UTF-16 document of an odd length, a token cut by the odd byte at the end
+  (white space, a name, a literal, `]`) is passed on with the odd end, and expat's UTF-16
+  conversion loops step over it and read past the buffer (a crash or a hang). FS-89: an XML
+  declaration's error reported inside a multibyte character (expat 2.0.1's one-byte `toAscii`
+  stops in the middle of a non-ASCII character of a pseudo-attribute's name) makes
+  `XML_GetCurrentLineNumber`'s count step over the error position and read past the buffer (a
+  crash).
+- **Evidence:** verified (`validation/probes/fs-gifti`: expat 2.0.1 from its tag and FreeSurfer's
+  copy, both crash; gdb in `normal_updatePosition` and the conversion loops).
+- **fMRIPrep:** none. **FreeSurfer:** none (its GIFTI files are UTF-8 with an ASCII declaration).
+- **larmorx:** the odd byte dropped (FS-88), the lines counted up to the character (FS-89), named,
+  in both modes. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-90 to FS-98 CTN 3.0.6: DICOM files read past their values, through closed objects, and big-endian values swapped wrong
+- **What:** CTN 3.0.6's `DCM_OpenFile`, as `docs/findings/ctn-dicom.md` describes it (its table):
+  long messages and file names overflow fixed buffers (FS-90); an element of undefined length that
+  is no sequence is read with a count of -1, taken for complete, and its value's bytes are read as
+  the next elements (FS-91); the special elements read past short values (FS-92) and a short group
+  length or a long Waveform Data Representation written past their memory (FS-93); FreeSurfer's
+  copy swaps big-endian UL and SL in 2-byte pairs (FS-94); CTN 3.0.6 swaps a UL or SL of a length
+  not a multiple of 4 past its end (FS-95) and leaves big-endian FD and FL unswapped (FS-96);
+  nesting exhausts the stack (FS-97); an odd encapsulated fragment closes the object the reader
+  then writes through (FS-98).
+- **Evidence:** verified (`validation/probes/fs-dicom`: CTN 3.0.6 built from its source and
+  FreeSurfer 8.2.0's copy, 10,030 generated files opened 11 times each in forked children; the
+  crashes are the children's signals).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (no default path reads DICOM; its
+  volume readers ask CTN only whether a file is DICOM; `docs/findings/freesurfer-permissive.md`,
+  closed to FreeSurfer's clean-room implementers).
+- **larmorx:** corrected by default where the input makes sense (FS-91, FS-94, FS-96, rule A), with
+  `reproduce` giving the original's results; crashes and memory never written are never reproduced
+  (FS-90, FS-92, FS-93, FS-95, FS-97, FS-98: the defined part kept, zeros or an error, named).
+  Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-99 nlohmann/json 3.2.0's writer: the indent string's growth and its recursion — (c, rule A; a)
+- **What:** the serializer's indent string starts with 512 copies of the indent character and,
+  each time a level's indent passes its length, is doubled with spaces (`resize(2 * size, ' ')`):
+  a tab-indented document nested past 512 characters of indent gets spaces; an indent step larger
+  than the doubled string (`dump(2000)`) is written from past the string's memory. The writer and
+  `basic_json`'s destructor recurse once per nesting level, so a value nested deeply enough
+  exhausts the stack (the parser itself does not recurse).
+- **Evidence:** verified (`validation/probes/fs-json`: nlohmann/json 3.2.0 and FreeSurfer 8.2.0's
+  copy, documents nested 130 and 300 levels with indents 4 and a tab: the spaces reproduced).
+- **fMRIPrep:** none. **FreeSurfer:** none (`mri_seg_overlap` writes with an indent of 4, three
+  levels deep).
+- **larmorx:** the indent character kept past 512 (rule A; `reproduce` the spaces, named); the
+  string extended rather than read past; the writer and the values without recursion (nesting of
+  10,000 levels or more named). Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-281 to FS-284 miniz 1.15's inflater: zeros past the end, undefined symbols, uncovered patterns, distances past the output — (b, rule B; a)
+- **What:** miniz 1.15 r4's `tinfl_decompress` and `mz_inflate`, as `docs/findings/miniz-inflate.md`
+  describes them: with no more input to come, a stream that ends early is padded with zero bytes
+  and decoded on (FS-281); the undefined length symbols 286 and 287 copy 3 bytes as a length of 0
+  (past the buffer within 3 bytes of its end) and the undefined distance symbols 30 and 31 copy
+  the byte under the cursor (FS-282); an incomplete code (none, or one code of any length) is
+  accepted and a pattern without a code decodes as symbol 0 (FS-283); through the stream API's
+  dictionary, a distance farther back than the output so far reads memory never written (FS-284).
+- **Evidence:** verified (`validation/probes/fs-misc`: miniz 1.15 r4 and FreeSurfer 8.2.0's copy
+  built by GCC 8.4.0, generated streams with these symbols, patterns and distances; the
+  dictionary allocated zeroed to make FS-284 comparable).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (only dcm2niix's reading of GE
+  DICOM protocol data inflates, through `MZ_SYNC_FLUSH`; `docs/findings/freesurfer-permissive.md`,
+  closed to FreeSurfer's clean-room implementers).
+- **larmorx:** the stream fails at the defect (FS-281 to FS-283 rule B, FS-284 memory never
+  written); `reproduce` gives miniz's bytes where they are defined (the zeros, the copies within
+  the buffer, symbol 0, zeros for the dictionary never written), named. Found 2026-11-13.
+- **D13 / gap:** none.
+
 ## fMRIPrep and its libraries
 
 fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.2, sdcflows
@@ -3470,7 +3947,11 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to SCI-32
 ([sdcflows-estimation.md](sdcflows-estimation.md), [scipy-ndimage-filters.md](scipy-ndimage-filters.md)). Details in [fmriprep-oracle.md](fmriprep-oracle.md),
 [fmriprep-resampling.md](fmriprep-resampling.md), [scipy-ndimage.md](scipy-ndimage.md) and
-`docs/analysis/01-04`.
+`docs/analysis/01-04`. The confounds' part (2026-11-11 to 13) ported fMRIPrep 25.2.7's confound estimation (25.2.6's for
+the step), nipype 1.12.0's confounds module and command line, niworkflows 1.15.4's confound
+interfaces and the pandas, nitime, nipy, numpy and SciPy code under them: PIPE-41 to PIPE-83,
+PD-01 to PD-03, NP-09, NP-10 and SCI-41 ([confounds-workflow.md](confounds-workflow.md) and the files
+it links).
 
 ### PIPE-01 nipype drops `shrink_factor` — (c)
 - **What:** niworkflows passes `shrink_factor=2` to `pe.Node(...)` instead of the N4
@@ -3607,7 +4088,10 @@ ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to S
 - **Evidence:** read: `fmriprep/interfaces/confounds.py:102-229`; the mcflirt rule in
   `specs/mcflirt.md` §2, §10.3.
 - **fMRIPrep:** every run's motion confounds.
-- **larmorx:** the confounds are not ported yet.
+- **larmorx:** the confounds are ported (`lx.confounds.fsl_motion_params`, the confounds' part,
+  2026-11-12): fMRIPrep's centre (25.2.6's and 25.2.7's forms) in both modes, bit for bit
+  ([confounds-motion.md](confounds-motion.md)); which centre larmorprepx uses by default is
+  decided when larmorprepx is built.
 - **D13 / gap:** decided 2026-10-23 (decision log): decided when larmorprepx is built, by the usual rule (the intended behaviour by default, fMRIPrep's on request). Was: **decide** for larmorprepx.
 
 ### PIPE-09 Misleading log lines and wasted space — (f)
@@ -3880,6 +4364,307 @@ ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to S
 - **larmorx:** rule A: the mask reoriented with the series, with a notice; `reproduce` niworkflows' (field maps part B, 2026-11-09).
 - **D13 / gap:** done.
 
+### PIPE-41 The confounds' JSON never describes the tissue signals — (c)
+- **What:** fMRIPrep `init_bold_confs_wf`: `merge_confound_metadata`'s third input is set to the tissue signals' metadata (`{"Method": "Mean"}` for `global_signal`, `csf`, `white_matter`, `csf_wm` and `tcompcor`) and then connected to the crown's metadata, which replaces it: the confounds' JSON never describes those five columns.
+- **Evidence:** validated (`check_workflow.py`: nipype's graph of fMRIPrep 25.2.7's workflow for eight option sets; the 36 oracle workflows: the default adds exactly the five keys and changes no other entry); [confounds-workflow.md](confounds-workflow.md).
+- **fMRIPrep:** every run (all 36 oracle files lack the five entries).
+- **larmorx:** rule A: the five entries kept (`[tcc, acc, signals, crown, motion]` into `DictMerge`), named with every run; `reproduce` fMRIPrep's four inputs (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-42 The CompCor variance reportlet never shows crownCompCor — (c)
+- **What:** fMRIPrep `init_bold_confs_wf`: `merge_compcor_metadata` is a `Merge(2)` with the crown's metadata wired to `in3`, an input it does not have: the CompCor variance reportlet never shows crownCompCor.
+- **Evidence:** read; validated as a graph (`check_workflow.py`); [confounds-workflow.md](confounds-workflow.md).
+- **fMRIPrep:** every run's report (the CompCor variance plot).
+- **larmorx:** rule A, with larmorprepx's reports: the workflow returns the three CompCor metadata files; nothing is drawn yet (the confounds' part, 2026-11-12).
+- **D13 / gap:** later, with larmorprepx's reports (the reportlet is not drawn yet).
+
+### PIPE-43 The expansion's column order changes between fMRIPrep processes — (b)
+- **What:** niworkflows `parse_formula` (`ExpandModel`): the variables of each group of a model formula, and the columns `others` stands for, are ordered as a Python `set` of strings, whose order follows the process's hash seed: `ExpandModel` writes a variable's expansion columns in another order from one run to the next (`x_power2` before `x_derivative1_power2` in 169 groups of the 36 oracle files, after it in 155); the values do not depend on it.
+- **Evidence:** measured (`survey_column_order.py`: every one of the 36 files' orders is one niworkflows can produce); validated (`check_model.py`: niworkflows with an insertion-ordered `set` gives larmorx's bytes); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** every run's `desc-confounds_timeseries.tsv` (the column order only).
+- **larmorx:** one order in both modes, the first occurrence's (decision D5), never the hash-seeded one (nondeterminism is never reproduced); a notice where another set order would change the result; comparisons by column name (the confounds' part, 2026-11-12).
+- **D13 / gap:** never reproduced (nondeterminism); no gap.
+
+### PIPE-44 A mask without components ends CompCor's loop — (c)
+- **What:** nipype `compute_noise_components`: a mask that gives no component (an empty mask with `components_criterion='all'`) ends the loop over the masks (`break`): the masks after it are skipped, their components and metadata lost, and when no component was found `failure_mode='NaN'` stops with `ValueError: need at least one array to concatenate` instead of returning.
+- **Evidence:** validated (`check_compcor.py`; random testing's permanent cases `compcor-pipe44-*`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none in the 36 runs (fMRIPrep asks for `'all'` only with `--return-all-components`; an empty CSF mask would then skip the WM and combined masks).
+- **larmorx:** rule A: the loop goes on with the next mask; no component and empty metadata when none is found, named where a later mask adds components or changes the basis; `reproduce` nipype's (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-45 CompCor zeroes only the voxels whose sum is NaN — (c)
+- **What:** nipype `compute_noise_components`: only the voxels whose float sum over time is NaN are zeroed: a voxel holding an infinity (and no NaN) reaches the pre-filter and the SVD, which then fails (every component of the mask NaN with `failure_mode='NaN'`, or `ValueError: array must not contain infs or NaNs`), while a finite voxel whose float32 sum overflows both ways is zeroed.
+- **Evidence:** validated (`check_compcor.py`, `probe_compcor_defects.py`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (fMRIPrep's series are finite).
+- **larmorx:** rule A: exactly the voxels holding a non-finite value are zeroed; `reproduce` nipype's (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-46 One voxel with a zero predicted spread stops DVARS — (c)
+- **What:** nipype `compute_dvars`: the voxel-wise standardisation, which runs whatever DVARS the caller asked for, turns numpy's floating-point warnings into errors: a voxel whose predicted difference SD is 0 (every series of two volumes; a robust SD of 0 kept by `remove_zerovariance=False`; an AR(1) estimate of exactly 1) stops the whole computation with `RuntimeWarning: divide by zero encountered in divide` (or `invalid value`), and every DVARS series is lost.
+- **Evidence:** validated (`check_dvars.py`; `probe_ar1_above_one.py`: 22 of 64 smooth full-period sines of 20,000 to 40,000 volumes reach an estimate of exactly 1); [confounds-dvars.md](confounds-dvars.md).
+- **fMRIPrep:** none in the 36 real calls (fMRIPrep's `remove_zerovariance=True` reaches it only through an AR(1) estimate of exactly 1; the largest of the real calls 0.98958).
+- **larmorx:** rule A, after measuring how it is reached: the voxels whose predicted SD is 0 left out of the voxel-wise mean (NaN when none is left), named where the series change; `reproduce` nipype's `RuntimeWarning` in numpy's order of the checks (the confounds' part, 2026-11-11).
+- **D13 / gap:** done.
+
+### PIPE-47 An AR(1) estimate above 1 makes DVARS NaN — (c)
+- **What:** nipype `compute_dvars`: an AR(1) estimate above 1, which the float32 FFT's rounding gives for a series whose lag-1 autocorrelation is just below 1 (the exact Yule-Walker estimate of the biased autocorrelation is below 1), makes the predicted difference SD the square root of a negative number: every standardised and voxel-wise DVARS value is NaN, without an error.
+- **Evidence:** measured (`probe_ar1_above_one.py`: 2 of the 64 full-period sines, 30,000 and 40,000 volumes, give 1.0000001); validated (`check_dvars.py`); [confounds-dvars.md](confounds-dvars.md).
+- **fMRIPrep:** none (BOLD-like series: at most 0.99986 of 4,000 structured series; the 36 real calls at most 0.98958).
+- **larmorx:** rule D measured, then A: the estimate clamped at 1 (a predicted SD of 0: PIPE-46's exclusion); `reproduce` NaN (the confounds' part, 2026-11-11).
+- **D13 / gap:** done.
+
+### PIPE-48 The robust CompCor nodes sleep before retrying — (c?)
+- **What:** niworkflows `RobustACompCor`, `RobustTCompCor`: fMRIPrep's three CompCor nodes retry a failed decomposition (a workaround for a random MKL failure): the loop catches `LinAlgError` only and sleeps `randint(10 f - 6, 10 f)` seconds before each of 10 retries, then raises the same error (measured: 11 attempts, 520 s of sleeps).
+- **Evidence:** measured (niworkflows' `sleep` replaced, nipype's CompCor made to raise: `check_nipype_misc.py`'s robust wrappers); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none on the results (up to about 9 minutes before the same error; with fMRIPrep's `failure_mode='NaN'` the SVD's errors never reach the loop).
+- **larmorx:** rule C: kept and documented, no switch: larmorx's computation is deterministic, so a retry would give the same error, and it raises at once (the confounds' part, 2026-11-12).
+- **D13 / gap:** kept (rule C), no switch; no gap.
+
+### PIPE-49 The crown's components not retained stay in the JSON — (c?)
+- **What:** fMRIPrep `init_bold_confs_wf`: the crown's metadata are not filtered (`FilterDropped` runs on the tCompCor and aCompCor metadata only), so the confounds' JSON lists the crown's components not retained as `dropped_<k>`.
+- **Evidence:** read; validated (`check_workflow.py`: the 36 JSON files byte for byte); [confounds-workflow.md](confounds-workflow.md).
+- **fMRIPrep:** every run's JSON (ds005454: 256 `dropped_` entries of the crown).
+- **larmorx:** rule C: kept, as fMRIPrep's documentation describes the `dropped` entries (`docs/outputs.rst`), so users may rely on them; no switch (the confounds' part, 2026-11-12).
+- **D13 / gap:** kept (rule C), no switch; no gap.
+
+### PIPE-50 A zero series makes DVARS NaN or stops it — (c)
+- **What:** nipype `compute_dvars`: a voxel whose demeaned series is all zeros (an all-zero voxel, or a constant one whose `regress_poly(0)` residual rounds to exactly 0, kept by `remove_zerovariance=False`, nipype's function default) has the Yule-Walker equation `0 · a = 0`: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it stops with `LinAlgError: A singular matrix detected.`.
+- **Evidence:** validated (`check_dvars.py` in both SciPy releases); [confounds-dvars.md](confounds-dvars.md).
+- **fMRIPrep:** none (fMRIPrep's `remove_zerovariance=True` drops such voxels).
+- **larmorx:** rule A: the minimum-norm solution 0 (the predicted SD 0, as its robust SD), then PIPE-46's exclusion; `reproduce` the SciPy release's NaN or error (the confounds' part, 2026-11-11).
+- **D13 / gap:** done.
+
+### PIPE-51 `TSNR` writes integer series' maps as integers — (c)
+- **What:** nipype `TSNR`: the maps of a series stored as integers (tSNR, mean, standard deviation, the detrended series) are written in that integer type, quantized by nibabel's scaling (256 levels for uint8, 65,536 for int16): the check meant to switch the header to float32 for integer data never fires, as the data are float32 by then.
+- **Evidence:** validated (`check_nipype_misc.py`: nine stored types; 28 runs on the oracle runs' raw BOLD series); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none in the oracle runs (fMRIPrep's report runs `TSNR` on its float32 preprocessed series).
+- **larmorx:** rule A: written as float32 (the check's intent); `reproduce` nipype's quantized integer maps (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-52 `regress_poly` returns the wrong regressors — (c)
+- **What:** nipype `regress_poly`: the non-constant regressors it returns (CompCor's Legendre pre-filter file) are `X[:, :-1]`, the constant and every polynomial but the highest, not the polynomials of degree 1 to `d`.
+- **Evidence:** validated (`check_compcor.py`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (fMRIPrep's pre-filter is the cosine basis).
+- **larmorx:** rule A: the polynomials of degree 1 to `d`; `reproduce` nipype's columns (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-53 An axis other than the last regresses the wrong values — (c)
+- **What:** nipype `regress_poly`, `cosine_filter`: an `axis` other than the last takes that axis' length as the series' length but reshapes the data in memory order to rows of that length, so the series regressed are runs of consecutive values across voxels and volumes, without an error.
+- **Evidence:** validated (`check_compcor.py`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (fMRIPrep's calls use the last axis).
+- **larmorx:** rule B: `ValueError`; `reproduce` nipype's regression of the reshaped values (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-54 `components_criterion` of 0, below -1 or a float — (e)
+- **What:** nipype `compute_noise_components`: a `components_criterion` of 0 ends the loop over the masks at the first one, and a negative one other than -1 (`'all'`) slices columns off the end of each mask's components (`u[:, :-2]`) while marking none retained in the metadata; a count given as a float (6.0) stops with `TypeError` when an SVD fails with `failure_mode='NaN'`.
+- **Evidence:** validated (`check_compcor.py`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (fMRIPrep passes 0.5, 24 or `'all'`).
+- **larmorx:** rule B: 0 and the negative criteria other than -1 refused (`ValueError` naming PIPE-54); rule A: a float count taken by its integer part; `reproduce` nipype's (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-55 An empty last mask loses CompCor's pre-filter basis — (c)
+- **What:** nipype `compute_noise_components`: an empty mask with a `failure_mode` other than `'error'` returns an empty pre-filter basis, so when it is the last mask the cosine or polynomial basis is lost (CompCor's pre-filter file then holds no basis column).
+- **Evidence:** validated (`check_compcor.py`; the golden case `py.confounds.compcor`'s empty masks with `merge_method="none"`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (tCompCor's mask is never empty; aCompCor's pre-filter file is not used).
+- **larmorx:** rule A: the basis kept; `reproduce` nipype's (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-56 A repetition time in microseconds is taken as seconds — (c)
+- **What:** nipype `CompCor`: the repetition time read from the header is converted from milliseconds but not from microseconds (`xyzt_units` usec): it is taken as that many seconds, which gives a cosine basis of millions of columns.
+- **Evidence:** validated (`check_compcor.py`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (fMRIPrep passes the metadata's repetition time).
+- **larmorx:** rule A: microseconds converted; `reproduce` nipype's seconds (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-57 An unknown `filter_type` filters nothing — (e)
+- **What:** nipype `compute_noise_components`: a `filter_type` other than `'cosine'`, `'polynomial'` and `False` silently filters nothing, not even the mean, and a float32 series is then decomposed in single precision.
+- **Evidence:** validated (`check_compcor.py`: 4 cases refused for `sgesdd`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (fMRIPrep's `'cosine'`).
+- **larmorx:** rule B: `ValueError`; `reproduce` nipype's on a float64 series (a float32 series refused: numpy's single-precision SVD, `sgesdd`, is not ported) (the confounds' part, 2026-11-12).
+- **D13 / gap:** **reproduce** for a float32 series (numpy's single-precision SVD, `sgesdd`, a follow-up); done otherwise.
+
+### PIPE-58 `mask_names` shorter than the masks drops masks — (e)
+- **What:** nipype `compute_noise_components`: `mask_names` shorter than the masks silently drops the masks without a name (`zip`): their components and metadata are not computed.
+- **Evidence:** validated (`check_compcor.py`); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (fMRIPrep names every mask).
+- **larmorx:** rule B: `ValueError`; `reproduce` nipype's (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-59 A failed SVD's NaN components have the wrong size — (c)
+- **What:** nipype `compute_noise_components`: an SVD that fails with `failure_mode='NaN'` is replaced by `T` NaN singular values whatever the decomposition's size `min(T, N)`, and with `components_criterion='all'` by one NaN component while all `T` values are marked retained (CompCor's metadata then names every one after the first component).
+- **Evidence:** validated (`check_compcor.py`, forced failures); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (no SVD fails on fMRIPrep's finite series).
+- **larmorx:** rule A: the decomposition's size `min(T, N)`; `reproduce` nipype's (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-60 An integer rotation vector's squares wrap around — (c)
+- **What:** nipy `rotation_vec2mat` (nipype `normalize_mc_params(..., 'NIPY')`): the angle of a rotation vector given as integers is the square root of its sum of squares computed in the vector's own type, which wraps around silently (a component of an int8 vector from 12, int16 from 182, int32 from 46,341; an int64 vector when the sum passes 2^63), so `normalize_mc_params(params, 'NIPY')` of such a row is another rotation or numpy's `LinAlgError`.
+- **Evidence:** validated (`check_nipype_misc.py`'s `nipy` section, nipy 0.6.1 injected: 3,477 rows per mode); [confounds-compcor.md](confounds-compcor.md).
+- **fMRIPrep:** none (no nipype path passes integers: `FramewiseDisplacement` reads float64).
+- **larmorx:** rule A: the angle from the exact sum of squares; `reproduce` nipy's wrapped arithmetic, named exactly where the squares wrap (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-61 `AddTSVHeader` of one row or one value — (c)
+- **What:** niworkflows `AddTSVHeader`: numpy's `loadtxt` squeezes a table of one row to a vector, which `savetxt` writes as one column (the row's values one under the other), and a table of one value to a scalar, which `savetxt` refuses (`ValueError: Expected 1D or 2D array, got 0D array instead`).
+- **Evidence:** validated (`check_tables.py`); [confounds-pandas.md](confounds-pandas.md).
+- **fMRIPrep:** none in the oracle runs.
+- **larmorx:** rule A: the table's shape kept (read again with `ndmin=2`); `reproduce` niworkflows' (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-62 A header of another width is written as given — (e)
+- **What:** niworkflows `AddTSVHeader`: a header with another number of names than the table's columns is written as given, so the file's header and rows disagree.
+- **Evidence:** validated (`check_tables.py`); [confounds-pandas.md](confounds-pandas.md).
+- **fMRIPrep:** none (fMRIPrep's headers match).
+- **larmorx:** rule B: `ValueError`; `reproduce` the file written, with a notice (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-63 A shorter table first shifts every row — (c)
+- **What:** fMRIPrep `GatherConfounds`: a shorter table is aligned with the last rows (its missing rows first), but pandas' `concat(axis=1)` joins the row labels without sorting them: when an earlier table is the shorter one (no `signals` table, a DVARS table of `T - 1` rows first), the first volume's row is written last and every other row one volume early.
+- **Evidence:** validated (`check_tables.py`, pandas 3.0.6 and 2.2.3); [confounds-pandas.md](confounds-pandas.md).
+- **fMRIPrep:** none (fMRIPrep's full-length `signals` table comes first: the 36 real `concat` nodes are identical).
+- **larmorx:** rule A: the rows in volume order (the labels sorted), named when the order changes; `reproduce` pandas' order (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-64 The formula's shorthands are replaced as text — (e)
+- **What:** niworkflows `parse_formula`: the shorthands (`wm`, `gsr`, `rps`, `fd`, `acc`, `tcc`, `dv`, `dvall`, `nss`, `spikes`, `others`) are replaced as text, anywhere and again inside every group: a name that holds one is rewritten (`std_dvars` becomes `std_std_dvarsars`, `csf_wm` becomes `csf_white_matter`), `dvall` becomes `std_dvarsall` (`dv` is replaced first), a shorthand that matches no column leaves an empty term (`IndexError: string index out of range`), and the names `others` leaves out lose every `d<digits>` and `^<digits>` in them.
+- **Evidence:** validated (`check_model.py`); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** none for fMRIPrep's own formula (`(others)^2` on fMRIPrep's table fails with `KeyError`).
+- **larmorx:** rule A: the shorthands and `others` replaced where they are whole words, once at the top level, one that matches nothing a term without columns, named where niworkflows' text would differ; `reproduce` niworkflows' (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-65 A term's operators are found anywhere in it — (e)
+- **What:** niworkflows `parse_formula`: a term's operators are read with regular expressions over the whole term: text around a group other than a derivative before it and an exponent after it is ignored (`foo(a)`, `(a)b` and `d1x(a)` give `a`'s columns), an exponent after a group that holds another single-caret exponent fails with `TypeError` (`((a)^2)^3`), and a name that starts like a derivative or ends like an exponent (`d1a`, `a^2`) is taken for an operator without its group (`TypeError`).
+- **Evidence:** validated (`check_model.py`); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** none (fMRIPrep's formula).
+- **larmorx:** rule B for the ignored text (`ValueError`), rule A for the rest (the exponent read after the group only: `((x)^2)^3` is `x_power2_power3`; a term without a complete group is a name); `reproduce` niworkflows' (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-66 A variable reached by two terms is repeated — (e)
+- **What:** niworkflows `parse_formula`, `ExpandModel`: a variable reached by two terms of the formula (`a + (a)^^2`) is repeated: twice in `parse_formula`'s table and four times in `ExpandModel`'s file (pandas selects every column of a repeated name each time it is named), and a group that repeats one fails with pandas' `ValueError` (`Shape of passed values ...`).
+- **Evidence:** validated (`check_model.py`, pandas 3.0.6 and 2.2.3); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** none (fMRIPrep's formula).
+- **larmorx:** rule A: each name once (its first column); `reproduce` niworkflows' (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-67 The spike regressors' lags compound — (c)
+- **What:** niworkflows `spike_regressors`: each lag is added to the volumes the earlier lags flagged, so lags `[1, 2]` (or `[0, 1, 2]`) flag the third volume after a spike too.
+- **Evidence:** validated (`check_model.py`; random testing's permanent case `spikes-pipe67-after-filling`); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** none (fMRIPrep's `SpikeRegressors` uses no lags).
+- **larmorx:** rule A: the union of the flagged volumes and each lag added to them, named after `minimum_contiguous`'s filling; `reproduce` niworkflows' (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-68 `minimum_contiguous` counts the last run one volume longer — (c)
+- **What:** niworkflows `spike_regressors`: `minimum_contiguous` counts the last run of unflagged volumes one volume longer than it is (its end is taken one past the table), so a final run one volume shorter than the minimum is not flagged.
+- **Evidence:** validated (`check_model.py`); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** none (fMRIPrep passes no `minimum_contiguous`).
+- **larmorx:** rule A: the run's true length; `reproduce` niworkflows' (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-69 An unknown criterion is skipped — (e)
+- **What:** niworkflows `spike_regressors`: a criterion other than `'<'` and `'>'` is skipped without an error (when every criterion is: `TypeError: reduce() of empty iterable with no initial value`).
+- **Evidence:** validated (`check_model.py`); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** none (the interface always passes `'>'`).
+- **larmorx:** rule B: `ValueError` (the function only); `reproduce` niworkflows' (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-70 `NormalizeMotionParams` of one row — (c)
+- **What:** niworkflows `NormalizeMotionParams`: numpy's `loadtxt` squeezes a table of one row to a vector, which numpy's `apply_along_axis` refuses (`AxisError: axis 1 is out of bounds for array of dimension 1`).
+- **Evidence:** validated (`check_model.py`); [confounds-model.md](confounds-model.md).
+- **fMRIPrep:** none (a one-volume run).
+- **larmorx:** rule A: the row kept; `reproduce` numpy's `AxisError` (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-71 One transform is read as a series of four — (c)
+- **What:** nitransforms `linear.load` (fMRIPrep `FSLMotionParams`, `FSLRMSDeviation`): a transform file of one transform is loaded as one `Affine`, whose 4 × 4 matrix fMRIPrep's `FSLMotionParams` and `FSLRMSDeviation` then take as a series of four (its rows): a one-volume series stops with numpy's `AxisError`.
+- **Evidence:** validated (`check_motion.py`); [confounds-motion.md](confounds-motion.md).
+- **fMRIPrep:** a one-volume BOLD run stops the confounds workflow.
+- **larmorx:** rule A: a series of one (the motion parameters one row, `rmsd` one `n/a`), named in both modes; `reproduce` numpy's `AxisError` (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-72 An undefined centre of gravity gives NaN translations — (c)
+- **What:** fMRIPrep `FSLMotionParams`: a reference image whose centre of gravity is undefined (under 25.2.7 a constant image, whose weights `value - min` are all zero; under 25.2.6 a sum of zero; in either a NaN or infinite voxel) gives NaN or infinite translations in every row without an error, which `FramewiseDisplacement` turns into `n/a` everywhere.
+- **Evidence:** validated (`check_motion.py`, both fMRIPrep releases' forms); [confounds-motion.md](confounds-motion.md).
+- **fMRIPrep:** none in the oracle runs (a degenerate reference: no FD spike at all).
+- **larmorx:** rule B: `ValueError` naming PIPE-72; `reproduce` fMRIPrep's values, with the notice (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-73 Double-precision ITK text transforms read in float32 — (c)
+- **What:** nitransforms `ITKLinearTransform`: every ITK text transform is read in single precision (numpy's `genfromtxt` with `dtype="f4"`), the double-precision ones (`AffineTransform_double_3_3`) too, so their parameters are rounded to float32.
+- **Evidence:** validated (`check_motion.py` against `nitransforms.linear.load`); [confounds-motion.md](confounds-motion.md).
+- **fMRIPrep:** none (fMRIPrep's head-motion files are `AffineTransform_float_3_3`).
+- **larmorx:** rule A: a type named `_double_` read in float64, named with the values the rounding changes; `reproduce` float32 (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-74 The masks' union casts with an undefined conversion — (a)
+- **What:** fMRIPrep `_binary_union`: the masks are cast to int64 with numpy's cast, undefined in C for NaN, infinities and values beyond int64's range: on x86-64 they become the most negative int64, so a voxel of +inf or 1e19 (or a uint64 value from 2^63) is outside the union.
+- **Evidence:** measured (`probe_mask_casts.py`, the same in numpy 2.5.4, 2.3.5 and 2.2.6); validated (`check_masks.py`); [confounds-masks.md](confounds-masks.md).
+- **fMRIPrep:** none (its inputs are uint8 and `MultiLabel` masks).
+- **larmorx:** D13's rule for undefined conversions: clamped (+inf and values from 2^63 inside; NaN and -inf outside in both modes), named with the voxels at or above 2^63; `reproduce` x86-64's casts (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-75 Masks of different shapes are broadcast — (c)
+- **What:** fMRIPrep `_binary_union`: masks of different shapes are broadcast without an error (a mask of shape `(X, Y, 1)` is taken for every slice of an `(X, Y, Z)` one).
+- **Evidence:** validated (`check_masks.py`); [confounds-masks.md](confounds-masks.md).
+- **fMRIPrep:** none (the masks share the BOLD grid).
+- **larmorx:** rule B: `ValueError` (also for shapes numpy cannot broadcast); `reproduce` numpy's broadcasting or its `ValueError` (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-76 The aseg path casts the grey-matter map to uint8 — (a)
+- **What:** fMRIPrep `acompcor_masks`: with `is_aseg` the grey-matter map is cast to uint8 with numpy's cast before the test `> 0`: integers wrap (-1 is 255, inside; 256 is 0, outside), and floats out of int32's range or NaN are undefined in C (on x86-64 0, outside; a float in range keeps its truncated int32's low byte: 300.0 is 44).
+- **Evidence:** measured (`probe_mask_casts.py`); validated (`check_masks.py`); [confounds-masks.md](confounds-masks.md).
+- **fMRIPrep:** only with FreeSurfer's path on grey-matter maps outside [0, 255]: none on FAST's maps.
+- **larmorx:** D13's rule (rule A for the integer wrap): clamped to [0, 255] first (grey matter is the voxels at or above 1), named with the voxels the two put differently; `reproduce` numpy's x86-64 cast (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-77 A negative dilation radius — (e)
+- **What:** niworkflows `BinaryDilation`: a negative radius (`traits.Int` takes it) dilates with scikit-image's ball of that radius, an arbitrary footprint: -1 is one false element, so the dilated mask is empty; -2 the cross of radius 1.
+- **Evidence:** validated (`check_masks.py`); [confounds-masks.md](confounds-masks.md).
+- **fMRIPrep:** none (fMRIPrep's radius 2).
+- **larmorx:** rule B: `ValueError`; `reproduce` niworkflows' (with the ball of negative radii as scikit-image computes it) (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-78 A class label with a tab or a line break breaks the table — (c)
+- **What:** niworkflows `SignalExtraction`: a class label holding a tab or a line break is written as it is, which breaks the table's columns or rows.
+- **Evidence:** validated (`check_masks.py`); [confounds-masks.md](confounds-masks.md).
+- **fMRIPrep:** none (fMRIPrep's labels).
+- **larmorx:** rule B: `ValueError`; `reproduce` the file, with a notice (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-79 With FreeSurfer the aseg path is fed FAST's maps — (c?)
+- **What:** fMRIPrep `init_bold_confs_wf` (`aCompCorMasks`): fMRIPrep passes `is_aseg=freesurfer` (`run_reconall`, its default), but its tissue maps are always FAST's partial-volume maps (sMRIPrep's `fast2bids`): with FreeSurfer the aseg path smooths partial volumes again (`mask2vf`) and its grey matter is only the voxels whose fraction is exactly 1 (the uint8 truncation), dilated by `ball(3)` (ds005454's own FAST maps: CSF 243,706 → 33,031 voxels, WM 156,468 → 182,036).
+- **Evidence:** measured on the oracle runs' own FAST maps (none of the oracle runs has FreeSurfer); validated as a graph (`check_workflow.py`'s FreeSurfer option set); [confounds-masks.md](confounds-masks.md).
+- **fMRIPrep:** every run with FreeSurfer (fMRIPrep's default): its aCompCor masks.
+- **larmorx:** rule D: to be measured on fMRIPrep runs with FreeSurfer (planned on the lab's server); fMRIPrep's wiring kept in both modes until then, documented (the confounds' part, 2026-11-12).
+- **D13 / gap:** **measure** (rule D: fMRIPrep's runs with FreeSurfer, planned on the lab's server); then rule A or C.
+
+### PIPE-80 File names with a blank split nipype's command lines — (e)
+- **What:** nipype `CommandLine` (ANTs, FSL, AFNI interfaces): some file names are written into the command line unquoted (the files inside ANTs' bracketed arguments: `ApplyTransforms`' `--transform [ f, 1 ]` and `--output`, `Registration`'s `--metric`, `--masks`, `--initial-moving-transform` and `--output`, `N4BiasFieldCorrection`'s and `DenoiseImage`'s `[ out, extra ]`; `ApplyTransforms`' `--transform f`, `MultiImageMaths`' operands, `TOPUP`'s `--datain` file), and the line runs through the shell, so a file name with a blank is split into several words (one with a quote breaks the line); `BET` makes its input's name relative after quoting it: the program gets other file names and fails.
+- **Evidence:** verified (antsApplyTransforms below a folder named `a b`); validated (`tests/python/test_nipype_paths.py`, the golden cases below `a b/`, the field maps' command-line checks re-run); [confounds-workflow.md](confounds-workflow.md).
+- **fMRIPrep:** none on the oracle runs (no blank in their paths); a dataset, working directory or output folder whose path holds a blank or a quote makes fMRIPrep's ANTs, TOPUP and BET nodes fail.
+- **larmorx:** rule A: the program gets the quoted line's words, nipype's line kept as `command.txt` holds it; `reproduce` nipype's line and its failure; the notice in both modes where the two differ (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PIPE-81 A compound input gets the previous input's type — (e)
+- **What:** nipype `nipypecli run`: `nipypecli run` gives an input of a compound trait (`traits.Either`) the argparse type of the input before it in name order, a variable left from the loop's previous iteration (CompCor's `num_components` reads text, so a number of components is refused; `save_pre_filter` and `save_metadata` read a float, so a file name or `True` is refused), and cannot build the parser of an interface whose first input is compound (`UnboundLocalError`: niworkflows' `TSV2JSON`) or that has a list of compound items (`AttributeError`: niworkflows' `DictMerge`, fMRIPrep's `FMRISummary`).
+- **Evidence:** validated (`check_nipype_cli.py`: 226 of 226 cases against `nipypecli`, the 51 real calls included); [confounds-nipype-cli.md](confounds-nipype-cli.md).
+- **fMRIPrep:** anyone running fMRIPrep's confounds nodes through nipype's command line (the 9 CompCor calls of the 51 real calls of three oracle runs refused).
+- **larmorx:** rule A: a compound input read by its trait's alternatives, the first that takes it; every parser built; `reproduce` nipype's (the confounds' part, 2026-11-13).
+- **D13 / gap:** done.
+
+### PIPE-82 Texts read by the default value's type, not the trait — (e)
+- **What:** nipype `nipypecli run`: `nipypecli run` reads an input's text by the type of its default value, not by its trait: a float input whose default is an integer reads only integers (CompCor's `high_pass_cutoff`, so fMRIPrep's own `128.0` is refused; `FramewiseDisplacement`'s `radius`), and the texts of a tuple (`aCompCorMasks`' `bold_zooms`, `RegridToZooms`' `zooms`, the plots' `figsize`), an optional dictionary or an enumeration's values that are not text (CompCor's `pre_filter False`, `GenerateSamplingReference`'s `xform_code`) reach the trait unconverted and are refused whatever is given; a list of booleans reads every text but the empty one as true.
+- **Evidence:** validated (`check_nipype_cli.py`); [confounds-nipype-cli.md](confounds-nipype-cli.md).
+- **fMRIPrep:** anyone running fMRIPrep's confounds nodes through nipype's command line (the 3 `fdisp` and 3 `acc_masks` calls of the 51 real calls refused).
+- **larmorx:** rule A: each text read by its trait (a float as a float, a tuple as a Python literal, a dictionary as JSON, an enumeration's value by its text, a boolean from `True`/`1` or `False`/`0`); `reproduce` nipype's (the confounds' part, 2026-11-13).
+- **D13 / gap:** done.
+
+### PIPE-83 The command line's limits: flags that stay true, greedy positionals — (e)
+- **What:** nipype `nipypecli run`: a boolean input whose default is true is a `store_true` flag, which cannot be turned off (`ComputeDVARS`' `remove_zerovariance` and `save_std`, `IntraModalMerge`'s `hmc`), and two variable-length positional inputs are split by argparse's greedy matching (niworkflows' `SignalExtraction` given fMRIPrep's five labels and five files takes nine values as labels: `ValueError: Number of masks must match number of labels`).
+- **Evidence:** validated (`check_nipype_cli.py`); [confounds-nipype-cli.md](confounds-nipype-cli.md).
+- **fMRIPrep:** anyone running these interfaces through nipype's command line.
+- **larmorx:** rule C: kept (nipype's design), the same in both modes; no switch (the confounds' part, 2026-11-13).
+- **D13 / gap:** kept (rule C), no switch; no gap.
+
 ### SCI-01 `map_coordinates` reads outside its array — (a)
 - **What:** coordinates go through `(npy_intp)floor(cc)`, undefined for NaN and beyond ±2^63; on
   x86-64 the start index wraps, the edge test is skipped, and SciPy reads memory outside its
@@ -4139,6 +4924,13 @@ ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to S
 - **larmorx:** the brute force's result in both modes (memory is never reproduced) (field maps part B, 2026-11-09).
 - **D13 / gap:** done.
 
+### SCI-41 SciPy 1.15 solves a singular diagonal system silently — (c)
+- **What:** SciPy `linalg.solve` (nitime's AR(1) in nipype's DVARS): SciPy 1.15 solves a diagonal system (every 1 × 1 one) by dividing, so a singular one gives inf or NaN with `RuntimeWarning`s only (its general path raises `LinAlgError: Matrix is singular.`), and checks only the matrix for infinities and NaNs, not the right-hand side; SciPy 1.18 raises `LinAlgError: A singular matrix detected.` and checks both.
+- **Evidence:** validated (`check_dvars.py` in both SciPy releases); [confounds-dvars.md](confounds-dvars.md).
+- **fMRIPrep:** none (a finite `r0` bounds `r1` in DVARS; the zero case is PIPE-50's).
+- **larmorx:** rule B: DVARS takes SciPy 1.18's checks with every release; `_core.scipy_solve_1x1` gives each release's exact behaviour (the confounds' part, 2026-11-11).
+- **D13 / gap:** done.
+
 ### NP-01 numpy's matrices depend on the CPU — (d)
 - **What:** numpy's 4×4 products and inverses run in BLAS and LAPACK kernels chosen at run time:
   OpenBLAS's Haswell, SkylakeX, SandyBridge, Nehalem or Prescott kernels on x86-64, others on
@@ -4185,7 +4977,7 @@ ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to S
   it (`specs/t2smap.md` §15.2: the one-pass rule).
 - **D13 / gap:** not D13 (class d); the switch and the notice are in place.
 
-### NP-04 numpy's float64 `exp` and `log` on AVX-512 CPUs — (d)
+### NP-04 numpy's float64 `exp`, `log` and `power` on AVX-512 CPUs — (d)
 - **What:** on x86-64 CPUs with AVX-512, numpy's float64 `exp` and `log` are numpy's own (SVML)
   kernels, which differ from the C library's (`exp` on 4.1 % of the arguments in [−800, 0],
   tedana's `exp(−TE/T2*)`; `log` on 0.10 % in [0, 10]); on other CPUs they are the C library's
@@ -4199,7 +4991,28 @@ ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to S
   the replica's `reproduce` follows the C library's functions (`larmorx_core::math`'s
   `exp_glibc`, `log_glibc`), and its records run numpy with `NPY_DISABLE_CPU_FEATURES` naming the
   AVX-512 features; the AVX-512 kernels are not reproduced (the record measures their spread).
+- **The confounds** (2026-11-12): numpy's float64 `power` (exponents other than -1, 0, 0.5, 1 and 2:
+  niworkflows' `exponential_terms`) is SVML's on AVX-512 CPUs too, and differs from glibc's `pow` on
+  3,669 of 140,011 cubes (2.6 %) and 2,730 to 3,376 of the other exponents; nipy's `exp` of the
+  log-scales (FramewiseDisplacement's `NIPY` source, 12 or more values) likewise. Not followed: the
+  default is the correctly rounded `pow`, `reproduce` glibc's (GLIBC-07); random testing compares
+  powers above 2 only with numpy's AVX-512 kernels off ([confounds-model.md](confounds-model.md)).
+  fMRIPrep's formula only squares (exact).
 - **D13 / gap:** not D13 (class d); no switch (decided 2026-11-08).
+
+### NP-09 numpy 2.5.4 crashes on AMD Zen 4/5 CPUs under the Haswell kernels — (a)
+- **What:** numpy 2.5.4 (OpenBLAS 0.3.34's Haswell kernels on AMD Zen 4/5): OpenBLAS from 0.3.31 sets the products' depth block (`GEMM_Q`) to 512 for every core's table on AMD CPUs with an L2 of 1 MiB, an L3 a multiple of 32 MiB and AVX-512; with it the Haswell kernel's 12-column paths overflow their stack buffer on depth blocks above 298 steps: `a @ b` with about 25 rows or more and an inner dimension of 384 to 512, 700, 768, 1,024, ... crashes (SIGSEGV) or hangs, and so do LAPACK's blocked QR, LQ, bidiagonal and divide-and-conquer paths (numpy's `svd` and `qr` at CompCor's sizes); the results of that class that do not crash follow memory numpy never wrote (they change from run to run: 83 to 96 of 92 to 96 identical in four runs).
+- **Evidence:** verified (`probe_haswell_crash.py`: 16 of 144 shapes crash at one thread, 14 at eight, none with the CPU's own core, none in numpy 2.3.5, none with `OPENBLAS_L2_SIZE=512`); every crash and hang of the checks in the predicted class; [confounds-blas.md](confounds-blas.md).
+- **fMRIPrep:** none (fMRIPrep's image runs numpy 2.2.6 on OpenBLAS 0.3.30, without the block); a user of numpy 2.5.4 with `OPENBLAS_CORETYPE=Haswell` on such a CPU.
+- **larmorx:** never reproduced (a crash): larmorx's depth block is 256, a real Haswell's and every oracle's (`gemm_q=512` exists for validation only); the confounds' numpy 2.5.4 checks and records run with `OPENBLAS_L2_SIZE=512`, which keeps 256; the suites report the class's tallies as values (the confounds' part, 2026-11-11).
+- **D13 / gap:** never reproduced (a crash); no gap.
+
+### NP-10 numpy's SVD and least squares of a matrix with an infinity hang or return garbage — (a)
+- **What:** numpy 2.3.5 and 2.2.6 `svd`, `pinv`, `lstsq`: numpy's `svd` (so `pinv`, nipype's `fallback_svd` and SciPy's `Rotation.from_matrix`) and `lstsq` hand a matrix holding ±inf to LAPACK, whose scaling turns it into NaN: of 28 `svd` probe cases 7 hang (an infinite loop), 9 return infinite or NaN values without an error (most after three `DLASCL` "parameter number 5 had an illegal value" messages), 12 raise `LinAlgError`; of 40 `lstsq` cases 6 hang and 34 raise; numpy 2.5.4 raises `LinAlgError` on all 68 (numpy issue 32591).
+- **Evidence:** verified (`probe_svd_inf.py`, `probe_lstsq_inf.py`); validated (`check_gesdd.py`, `check_gelsd.py`, `check_motion.py`); [confounds-blas.md](confounds-blas.md).
+- **fMRIPrep:** none (fMRIPrep's series are finite, and CompCor zeroes non-finite voxels first).
+- **larmorx:** rule B: numpy 2.5.4's `LinAlgError` for every release in both modes; the hang never reproduced, nor the garbage results (the same undefined input class) (the confounds' part, 2026-11-11).
+- **D13 / gap:** never reproduced (a hang, and garbage from the same undefined input class); no gap.
 
 ### NIB-01 Compression decided by the file name — (e)
 - **What:** nibabel 5.4 decides gzip from the name: a gzipped file named `.nii` fails, an
@@ -4381,11 +5194,28 @@ ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to S
   values of fMRIPrep's ds003592 call. Its clean-room original names it in one pass, only where a
   written log-linear S0 would differ (`specs/t2smap.md` §15.2, the orchestrator's decision of
   2026-11-08 after the user's of 2026-11-04).
+- **The confounds** (2026-11-12): numpy's float64 `cos` in nipype's cosine basis (`_cosine_drift`,
+  the CompCor pre-filter) is glibc's: the default's correctly rounded `cos` changes the basis' last
+  bits in 81 of fMRIPrep's 108 real CompCor nodes, which flips the sign of 88 component columns in
+  20 nodes' components files (an SVD vector's sign follows those bits; the 10-decimal magnitudes are
+  the same) and moves 44 columns by one unit in the 10th decimal; the pre-filter files and metadata
+  never change, and a model fitted with a column or its negative removes the same signal: an
+  expected difference, shown on the site with its reason; `reproduce` (`cos_glibc`) gives fMRIPrep's
+  bytes ([confounds-compcor.md](confounds-compcor.md)). nipy's `sin` and `cos` (the `NIPY` motion
+  source), niworkflows' powers (`pow`) and the log-scales' `exp` the same way, named exactly per row
+  or file. SciPy's `Rotation.as_euler` (fMRIPrep's `rot_*` columns) takes C's `atan2` and `hypot`:
+  larmorx's are correctly rounded in both modes (decision D4, as `atan`), so under `reproduce` 15 of
+  the 22,293 rotation cells of the 36 real files (12 files) differ by glibc's `atan2`, none by
+  `hypot` (glibc 2.35's `hypot` is not correctly rounded on about 0.6 % of unit-quaternion-like
+  pairs; CORE-MATH's `cr_hypot` is in `larmorx_core::math`): a clean-room `atan2_glibc` from a
+  behaviour spec makes `reproduce` exact there (next-steps); `hypot` needs none
+  ([confounds-motion.md](confounds-motion.md)).
 - **D13 / gap:** **reproduce** for the replicas' `sin`, `cos` and `sincos` (step (b), the first
   relay of the BET part: fslmaths' replica's double `-sin` and `-cos` and its FFT's twiddle
   factors on `larmorx_core::math`'s `sin_glibc`, `cos_glibc`, `sincos_glibc`). None for the
   clean-room originals; none for `tan`, `asin`, `acos` and `atan` (decided: correctly rounded in
-  both modes).
+  both modes); **reproduce** for `atan2` in SciPy's `as_euler` (the confounds' motion parameters,
+  until a clean-room `atan2_glibc`).
 
 ### ANTSPY-01 `ants.apply_transforms` inverts unasked — (c?)
 - **What:** when given exactly two transforms, the first a `.mat` and the second not,
@@ -4862,6 +5692,34 @@ arithmetic in 0.25.2, fMRIPrep 25.2.6's), ported bit for bit in `lx.skimage`
 - **Evidence:** validated (`tests/python/test_fmap_defects.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
 - **fMRIPrep:** none.
 - **larmorx:** rule A: the documented probabilities, with a warning; `reproduce` scikit-image's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+## pandas (PD-)
+
+pandas 3.0.6 (the newest) and 2.2.3 (fMRIPrep 25.2.6's image), BSD-3-Clause: the tables fMRIPrep's
+confound steps read and write four to five times in a row, ported in the confounds' part (2026-11-12;
+`crates/larmorx-confounds/src/pandas.rs`, `python/larmorx/confounds/_tables.py`;
+[confounds-pandas.md](confounds-pandas.md)). The two releases' steps (no ID) are in the findings.
+
+### PD-01 pandas' float parser is not correctly rounded — (d)
+- **What:** pandas `read_csv` (3.0.6 and 2.2.3): the default float parser (`precise_xstrtod`) keeps at most 17 digit characters, the leading zeros of `0.00...` included, accumulates them in a double and divides by one power of ten, so most values `to_csv` writes (their shortest `repr`, up to 17 significant digits) are read back as another double, one or more units in the last place off (186,107 of 200,000 motion-like values).
+- **Evidence:** validated (`check_tables.py`'s `parse` section, 160,000 texts per format; the 36 real workflows); [confounds-pandas.md](confounds-pandas.md).
+- **fMRIPrep:** every run: most motion, FD, RMSD, signal and expansion values of the confounds file are pandas-perturbed (the default changes 90,043 of 1,862,699 cells of the 36 final tables).
+- **larmorx:** rule A (decision D3): the correctly rounded value of the same text; `reproduce` pandas' parse at every node boundary of fMRIPrep's chain, which gives fMRIPrep's bytes (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PD-02 ujson's 10-decimal formatting is not correctly rounded — (d)
+- **What:** pandas `to_json` (ujson): the 10-decimal formatting of doubles (ujson's `Buffer_AppendDoubleUnchecked`) multiplies the fraction by 1e10 in floating point, truncates it and rounds the remainder, ties of an even last digit down and of a last digit 0 up, so some values are written with another 10th decimal than the correctly rounded one (1,642 of 200,028).
+- **Evidence:** validated (`check_tables.py`); [confounds-pandas.md](confounds-pandas.md).
+- **fMRIPrep:** none on fMRIPrep's metadata (nipype's `%.10f` texts: the two agree).
+- **larmorx:** rule A (decision D3): correctly rounded 10-decimal values; `reproduce` ujson's text (the confounds' part, 2026-11-12).
+- **D13 / gap:** done.
+
+### PD-03 An integer column's minimum value is read as missing — (c)
+- **What:** pandas `read_csv`: an integer column with missing values marks them with int64's minimum before turning them into NaN, so a value equal to -9223372036854775808 in it is read as NaN.
+- **Evidence:** validated (`check_tables.py`); [confounds-pandas.md](confounds-pandas.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: the value kept (as a float); `reproduce` pandas' (the confounds' part, 2026-11-12).
 - **D13 / gap:** done.
 
 ## FSL: black-box findings (open to everyone)

@@ -1,0 +1,11 @@
+[package]
+name = "larmorx-freesurfer-robust"
+description = "FreeSurfer 8.2.0's replica for larmorx: Reuter's robust registration library (mri_robust_register's shared files): the robust and Powell registrations, the cost functions, its image and matrix helpers, the multi-image registration and quaternions (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-volume.workspace = true

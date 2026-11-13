@@ -415,7 +415,10 @@ For the handoff (`docs/freesurfer-plan.md`, its waves; the final relay writes th
 Script behaviours worth a finding when the recordings confirm them (rules A-D apply when ported):
 the v8 `T1PialSurf` key that never matches, so `mrisps.pial.mgz` is never written (§1); the v8
 `mri_ca_label` options that no stream applies (§1); `mri_vsinus_seg` receiving the previous step's
-expert options (§4).
+expert options (§4). **Confirmed** (relay 9, the six finished v8 reference runs): each subject's
+`mri/` holds `mrisps.wpa.mgz` and `mrisps.white.mgz` and no `mrisps.pial.mgz`, and no command in
+recon-all.log names `--outvol mrisps.pial.mgz`. The three are in the cards of `recon-all` and
+`mri_vsinus_seg` (their "Findings for the defect register").
 
 Open questions (also in the relay notes):
 
@@ -425,3 +428,6 @@ Open questions (also in the relay notes):
   `mri_mask T1 synthstrip brainmask` step is under `DoSkullStrip`, so `-noskullstrip` skips it and
   the injected mask stays; to be confirmed by a run).
 - Which stream is ported first is the user's choice (decision log); the inventory covers both.
+  *Decided* (the user, 2026-11-12): the programs both streams share first, then the classic-only
+  ones, the v8 networks as a parallel track (waves.md §1). Which stream larmorprepx runs by default
+  stays open until larmorprepx (next-steps, follow-ups).

@@ -46,7 +46,7 @@ No option comparisons found in its own files (read its parser).
 
 ## Checks
 
-- through label-cortex, rca-surfreg's recorded steps (30)
+- through label-cortex, rca-surfreg's recorded steps (36)
 
 ## Notes
 

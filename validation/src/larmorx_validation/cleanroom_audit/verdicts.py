@@ -50,12 +50,22 @@ CORE_FILES = {
     "crates/larmorx-core/src/math/sincos_glibc_tables.rs": ("GNU", "sincos_glibc"),
     "crates/larmorx-core/src/math/tanh_glibc.rs": ("GNU", "tanh_glibc"),
 }
+#: Clean-room module folders of crates that are not clean-room crates (2026-11-13: FreeSurfer's borrowed pieces and
+#: glibc's random numbers, each a module folder with its own mod.rs, from specs/ranlux.md, specs/burkardt-spline.md and
+#: specs/glibc-random.md). GSL's and Burkardt's sources are FreeSurfer's family (R19), as FreeSurfer's copy of them is.
+CORE_DIRS = {
+    "crates/larmorx-core/src/ranlux/": ("FreeSurfer", "ranlux"),
+    "crates/larmorx-core/src/cubic_spline/": ("FreeSurfer", "cubic_spline"),
+    "crates/larmorx-core/src/glibc_random/": ("GNU", "glibc_random"),
+    "crates/larmorx-core/src/glibc_qsort/": ("GNU", "glibc_qsort"),
+}
 CLEANROOM_PATHS = (
     "crates/larmorx-afni",
     "crates/larmorx-mri",
     "crates/larmorx-fsl",
     "crates/larmorx-tedana",
     *CORE_FILES,
+    *(d.rstrip("/") for d in CORE_DIRS),
 )
 #: larmorx-fsl's modules and programs by tool (the first match wins; the rest is shared code).
 FSL_TOOLS = (
@@ -93,6 +103,22 @@ TOOL_NAMES = {
     ("GNU", "cbrtf_glibc"): "cbrtf with glibc 2.35's bits (larmorx-core)",
     ("GNU", "sincos_glibc"): "sin, cos, sincos with glibc 2.35's bits (larmorx-core)",
     ("GNU", "tanh_glibc"): "tanh with glibc 2.35's bits (larmorx-core, from fdlibm)",
+    (
+        "FreeSurfer",
+        "ranlux",
+    ): "RANLUX389 and the random distributions FreeSurfer uses (larmorx-core)",
+    (
+        "FreeSurfer",
+        "cubic_spline",
+    ): "the cubic spline FreeSurfer's mri_normalize uses (larmorx-core)",
+    (
+        "GNU",
+        "glibc_random",
+    ): "rand, srand, random and srandom with glibc 2.35's streams (larmorx-core)",
+    (
+        "GNU",
+        "glibc_qsort",
+    ): "qsort and qsort_r with glibc 2.35's order of comparisons (larmorx-core)",
 }
 
 
@@ -100,6 +126,9 @@ def tool_of(rel: str) -> tuple[str, str] | None:
     """The (family, tool) a repository path's clean-room code belongs to, or None."""
     if rel in CORE_FILES:
         return CORE_FILES[rel]
+    for d, tool in CORE_DIRS.items():
+        if rel.startswith(d):
+            return tool
     m = re.match(r"^crates/larmorx-(afni|mri|fsl|tedana)(?:/(.*))?$", rel)
     if not m:
         return None
@@ -125,6 +154,9 @@ def tool_of(rel: str) -> tuple[str, str] | None:
 ROLE_BY_WORDS = (
     ("orchestrator", r"^ORCHESTRATOR$"),
     ("audit", r"[Cc]lean-room audit"),
+    # the documentation revision's writer and critical reviewer, and the cross-part coherence reviewer (2026-11-12):
+    # they may read every document, replica material included, and never edit clean-room code
+    ("documentation", r"^Docs revision (writer|critical reviewer)|^Cross-part coherence review"),
     ("spec writer", r"\(spec\)|spec answers|behaviour spec|[Ss]pec writer"),
     ("replica author", r"[Rr]eplica|^Port (AFNI|FSL)"),
     ("clean-room implementer", r"[Cc]lean-room|[Cc]lean room"),
@@ -838,8 +870,8 @@ def run(scan: Path, repo: Path) -> dict:
                 if w == key or wrole == "clean-room implementer":
                     continue  # a clean-room part's own case
                 if w is None and (
-                    rel.rsplit("/", 1)[-1].startswith("original-")
-                    or re.match(r"^validation/difftest/cases/[^/]+-original(/|$)", rel)
+                    rel.rsplit("/", 1)[-1].startswith(("original-", "clean-room-"))
+                    or re.match(r"^validation/difftest/cases/[^/]+-(original|clean-room)(/|$)", rel)
                 ):
                     continue  # named for the clean-room original that differed: its own case
                 kind = f"R15: a permanent case added by a {wrole}"

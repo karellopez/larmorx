@@ -28,6 +28,22 @@ and scikit-image arithmetic under them.
   ``_copy_any``.
 - :func:`collect_participants`: the participants of a BIDS dataset to process (with
   :class:`BIDSError` and :class:`BIDSWarning`).
+- :func:`robust_acompcor`, :func:`robust_tcompcor`: ``RobustACompCor`` and ``RobustTCompCor``,
+  nipype's ``ACompCor`` and ``TCompCor`` (:mod:`larmorx.confounds`) without niworkflows' retries
+  (PIPE-48).
+- :func:`add_tsv_header`, :func:`dict_merge`, :func:`tsv2json`: ``AddTSVHeader``,
+  ``DictMerge`` and ``TSV2JSON`` (PIPE-61, PIPE-62; PD-01, PD-02).
+- :func:`binary_dilation`, :func:`binary_subtraction`, :func:`image_binary_dilation`
+  (``BinaryDilation``, ``BinarySubtraction``; PIPE-77) and :func:`signal_extraction`
+  (``SignalExtraction``; PIPE-78): the confounds' crown mask and tissue signals.
+- :func:`expand_model` (with :func:`parse_formula`, :func:`temporal_derivatives`,
+  :func:`exponential_terms`, :class:`ConfoundTable`, :class:`ModelTerms`),
+  :func:`spike_regressors_node` (with :func:`spike_regressors`) and
+  :func:`normalize_motion_params`: ``ExpandModel``, ``SpikeRegressors`` and
+  ``NormalizeMotionParams`` (PIPE-43, PIPE-64 to PIPE-70); :func:`fsl_motion_params`,
+  :func:`fsl_rms_deviation` and :func:`framewise_displacement`, niworkflows' copies of
+  fMRIPrep's ``FSLMotionParams``, ``FSLRMSDeviation`` and ``FramewiseDisplacement``
+  (:mod:`larmorx.niworkflows.confounds`).
 """
 
 from larmorx.niworkflows.bids import (
@@ -39,6 +55,21 @@ from larmorx.niworkflows.bids import (
     get_tf_resolution,
 )
 from larmorx.niworkflows.bold import NonsteadyStatesResult, is_outlier, nonsteady_states_detector
+from larmorx.niworkflows.confounds import (
+    DEFAULT_FORMULA,
+    ConfoundTable,
+    ModelTerms,
+    expand_model,
+    exponential_terms,
+    framewise_displacement,
+    fsl_motion_params,
+    fsl_rms_deviation,
+    normalize_motion_params,
+    parse_formula,
+    spike_regressors,
+    spike_regressors_node,
+    temporal_derivatives,
+)
 from larmorx.niworkflows.header import (
     SkullstripBoldResult,
     ValidateImageResult,
@@ -58,7 +89,13 @@ from larmorx.niworkflows.images import (
     intra_modal_merge,
     reorient,
     robust_average,
+    signal_extraction,
     squeeze_image,
+)
+from larmorx.niworkflows.morphology import (
+    binary_dilation,
+    binary_subtraction,
+    image_binary_dilation,
 )
 from larmorx.niworkflows.nibabel import (
     BinarizeResult,
@@ -74,6 +111,7 @@ from larmorx.niworkflows.nibabel import (
 )
 from larmorx.niworkflows.nitransforms import ConcatenateXfmsResult, concatenate_xfms
 from larmorx.niworkflows.participants import BIDSError, BIDSWarning, collect_participants
+from larmorx.niworkflows.patches import robust_acompcor, robust_tcompcor
 from larmorx.niworkflows.refmap import EpiReferenceResult, epi_reference_workflow
 from larmorx.niworkflows.regrid import RegridToZoomsResult, regrid_to_zooms, resample_by_spacing
 from larmorx.niworkflows.sampling import (
@@ -81,55 +119,78 @@ from larmorx.niworkflows.sampling import (
     generate_sampling_reference,
     resample_img_nearest,
 )
+from larmorx.niworkflows.utility import add_tsv_header, dict_merge, tsv2json
 
 __all__ = [
     "DEFAULT_DTYPES",
+    "DEFAULT_FORMULA",
     "STANDARD_SPACES",
     "BIDSError",
     "BIDSWarning",
     "BinarizeResult",
     "BoundingBoxError",
     "ConcatenateXfmsResult",
+    "ConfoundTable",
     "DerivativesDataSinkResult",
     "EpiReferenceResult",
     "IntensityClipResult",
     "IntraModalMergeResult",
+    "ModelTerms",
     "NonsteadyStatesResult",
     "RegridToZoomsResult",
     "RobustAverageResult",
     "SkullstripBoldResult",
     "ValidateImageResult",
+    "add_tsv_header",
     "aff2axcodes",
     "apply_mask",
     "as_closest_canonical",
     "as_reoriented",
     "axcodes2ornt",
     "binarize",
+    "binary_dilation",
+    "binary_subtraction",
     "collect_participants",
     "concatenate_xfms",
     "copy_any",
     "copy_header",
     "copy_xform",
     "derivatives_data_sink",
+    "dict_merge",
     "epi_reference_workflow",
+    "expand_model",
+    "exponential_terms",
     "four_to_three",
+    "framewise_displacement",
+    "fsl_motion_params",
+    "fsl_rms_deviation",
     "generate_sampling_reference",
     "get_tf_resolution",
+    "image_binary_dilation",
     "intensity_clip",
     "intra_modal_merge",
     "is_outlier",
     "key_select",
     "merge_series",
     "nonsteady_states_detector",
+    "normalize_motion_params",
     "ornt_transform",
+    "parse_formula",
     "regrid_to_zooms",
     "reorient",
     "reorient_file",
     "reorient_image",
     "resample_by_spacing",
     "resample_img_nearest",
+    "robust_acompcor",
     "robust_average",
+    "robust_tcompcor",
+    "signal_extraction",
     "skullstrip_bold_workflow",
+    "spike_regressors",
+    "spike_regressors_node",
     "squeeze_image",
+    "temporal_derivatives",
+    "tsv2json",
     "validate_image",
 ]

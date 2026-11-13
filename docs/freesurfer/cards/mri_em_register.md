@@ -40,8 +40,8 @@ Every option its parser compares, as written in its own source (older parsers co
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/gca.cpp` (7,275), `utils/mri.cpp` (5,874), `utils/mriio.cpp` (5,610), `packages/expat/xmlparse.c` (4,342), `utils/DICOMRead.cpp` (3,473), `packages/gifti/gifti_xml.c` (2,678), `utils/transform.cpp` (2,300), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923), `packages/gifti/gifti_io.c` (1,712), `utils/matrix.cpp` (1,399), `packages/dcm2niix/miniz.c` (1,348)
-- Reach per module (waves.md §3): fs.io 14,424, fs.gca 11,338, fs.volume 10,402, perm.gifti 10,365, perm.dicom 4,371, fs.maths 2,847, own 2,693, fs.filter 2,348, perm.minc 1,625, fs.labels 1,448, perm.misc 1,437, fs.core 1,390, fs.bspline 785, perm.nifti 335, fs.surfio 204, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines)
+- Reach per module (waves.md §3): fs.gca 11,338, fs.io 11,315, perm.gifti 10,365, fs.volume 8,585, perm.dicom 4,371, fs.dicomread 3,218, fs.maths 2,847, own 2,693, fs.filter 2,348, fs.mri 1,790, perm.minc 1,625, perm.misc 1,437, fs.core 1,390, fs.labels 1,366, fs.bspline 785, perm.nifti 335, fs.surfio 204, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines)
 - Its queue item brings 5,201 lines (the functions only it reaches)
   - 3.3-11: mri_em_register (1 of 3): emregisterutils.cpp, mri_em_register.cpp (lines 54-1658), findtranslation.cpp (2,406 lines)
   - 3.3-12: mri_em_register (2 of 3): fs_lbfgs_subject.cpp, fs_lbfgs_observer.cpp, fs_lbfgs.cpp, mrimorph.cpp (lines 114-5671), gca.cpp, mri_em_register.cpp (lines 2222-2484), matrix.cpp, mri.cpp (2,403 lines)
@@ -70,7 +70,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 17 recorded steps in 11 runs
+- replay: 18 recorded steps in 12 runs
 
 ## Notes
 

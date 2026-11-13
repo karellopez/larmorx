@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0 AND MIT
 """niworkflows' ``interfaces/images.py`` (niworkflows 1.15.4, the same in 1.15.2):
 ``IntraModalMerge`` and its ``reorient``, with nibabel's (5.4.2, MIT) ``squeeze_image``,
-``four_to_three``, ``concat_images`` and ``as_closest_canonical``.
+``four_to_three``, ``concat_images`` and ``as_closest_canonical``; and ``SignalExtraction``
+(:func:`signal_extraction`: the mean of a series over each region, as fMRIPrep's confounds take
+the global, CSF, white-matter and tCompCor signals; PIPE-78).
 
 ``IntraModalMerge`` merges images of one modality into a series and averages it: sdcflows
 averages a field map's magnitude images with it (``magmrg``) and its direct field maps
@@ -58,6 +60,7 @@ __all__ = [
     "intra_modal_merge",
     "reorient",
     "robust_average",
+    "signal_extraction",
     "squeeze_image",
 ]
 
@@ -500,11 +503,11 @@ def _volreg_nipype(
     threads = 1 if num_threads is None else max(int(num_threads), 1)
     if selected is None:
         # in this process: the output names in the node's folder
-        _run_original(cmd.run_argv(), threads, upstream_defects, {})
+        _run_original(_nipype.words(cmd, upstream_defects, run=True), threads, upstream_defects, {})
     else:
         _common.run_replica(
             selected,
-            cmd.argv(),
+            _nipype.words(cmd, upstream_defects),
             cwd,
             n_threads=threads,
             upstream_defects=upstream_defects,
@@ -661,3 +664,143 @@ def robust_average(
             kept(out_hmc),
             kept(out_hmc_volumes),
         )
+
+
+# --- SignalExtraction --------------------------------------------------------------------------
+
+
+def _region_means(data: np.ndarray, mask: np.ndarray, numpy_version: str, n_threads: int):
+    """``data[mask, :].mean(axis=0)`` of nibabel's ``get_fdata()`` (``data``: the values
+    ``dataobj`` gives, widened to ``float64`` as ``get_fdata()`` does: exactly), with numpy's
+    errors for a mask of another shape or more axes. A 4-D series and a 3-D mask stream through
+    :func:`larmorx._core.niworkflows_signal_means` (no masked copy); other shapes gather the
+    voxels as numpy does and take numpy ``numpy_version``'s mean of the copy."""
+    if mask.ndim + 1 > data.ndim:
+        raise IndexError(
+            f"too many indices for array: array is {data.ndim}-dimensional, but "
+            f"{mask.ndim + 1} were indexed"
+        )
+    for i, (a, b) in enumerate(zip(data.shape, mask.shape, strict=False)):
+        if a != b:
+            raise IndexError(
+                f"boolean index did not match indexed array along axis {i}; size of axis is "
+                f"{a} but size of corresponding boolean axis is {b}"
+            )
+    if data.ndim == 4 and mask.ndim == 3:
+        if data.dtype not in (np.float32, np.float64) or not data.dtype.isnative:
+            data = data.astype(np.float64)
+        if not (data.flags.c_contiguous or data.flags.f_contiguous):
+            data = np.asfortranarray(data)
+        return np.asarray(
+            _core.niworkflows_signal_means(
+                data, np.ascontiguousarray(mask), numpy_version, n_threads
+            )
+        )
+    gathered = np.ascontiguousarray(data[mask, ...], dtype=np.float64)
+    return np.asarray(_core.numpy_reduce(gathered, "mean", 0, numpy_version))
+
+
+def signal_extraction(
+    in_file: os.PathLike[str] | str,
+    label_files: os.PathLike[str] | str | Sequence[os.PathLike[str] | str],
+    class_labels: Sequence[Any],
+    *,
+    prob_thres: float = 0.5,
+    out_file: os.PathLike[str] | str = "signals.tsv",
+    out_dir: os.PathLike[str] | str = ".",
+    numpy_version: str = NUMPY_NEWEST,
+    n_threads: int = 1,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> str:
+    """niworkflows' ``SignalExtraction`` interface: the mean of the series ``in_file`` over each
+    region of ``label_files`` per volume, as a table (``class_labels`` as the header, numpy's
+    ``repr`` of each mean, tabs between, ``\\n`` line ends, UTF-8) at ``out_file`` (relative
+    to ``out_dir``). Several files (or one 4-D file of several volumes) are probability maps
+    (the voxels ``>= prob_thres`` in each map's stored type); one 3-D file is a label image
+    (one region per non-zero value, in ascending order). The means are numpy's
+    ``data[mask, :].mean(axis=0)`` of ``get_fdata()`` (in the mask's C order, numpy
+    ``numpy_version``'s summation; NaN for an empty region). niworkflows' errors are kept: the
+    first map's shape against the series' (``NotImplementedError``), the number of regions
+    against the labels (``ValueError``), numpy's for the other maps. A label holding a tab or a
+    line break raises ``ValueError`` (PIPE-78; ``reproduce``: written as it is). Its path."""
+    mode = _defects.check(upstream_defects)
+    spec = "_SignalExtractionInputSpec"
+
+    from larmorx.confounds.masks import _nibabel_data, _trait_file
+
+    in_path = _trait_file(spec, "in_file", in_file)
+    files = [label_files] if isinstance(label_files, (str, os.PathLike)) else list(label_files)
+    if not files:
+        raise ValueError(
+            "SignalExtraction requires a value for input 'label_files'. For a list of required "
+            "inputs, see SignalExtraction.help()"
+        )
+    files = [_trait_file(spec, "label_files", f, element=True) for f in files]
+    if not isinstance(prob_thres, (int, float, np.integer, np.floating)):
+        raise ValueError(
+            f"The 'prob_thres' trait of a {spec} instance must be 0.0 <= a floating point "
+            f"number <= 1.0, but a value of {prob_thres!r} {type(prob_thres)!r} was specified."
+        )
+    if not 0.0 <= float(prob_thres) <= 1.0:
+        raise ValueError(
+            f"The 'prob_thres' trait of a {spec} instance must be 0.0 <= a floating point "
+            f"number <= 1.0, but a value of {prob_thres!r} {type(prob_thres)!r} was specified."
+        )
+    labels = list(class_labels)
+    from larmorx.io.nifti import read_header
+
+    shape = tuple(int(s) for s in read_header(in_path).shape)
+    mask_arrays = [_nibabel_data(load_nibabel(f, n_threads=n_threads)) for f in files]
+    if len(mask_arrays) == 1 and mask_arrays[0].ndim == 4:
+        four = mask_arrays[0]
+        mask_arrays = [four[..., i] for i in range(four.shape[3])]
+    if not mask_arrays:
+        raise IndexError("list index out of range")
+    # This check assumes all input masks have same dimensions
+    if shape[:3] != tuple(mask_arrays[0].shape[:3]):
+        raise NotImplementedError(
+            "Input image and mask should be of same dimensions before running SignalExtraction"
+        )
+    if len(mask_arrays) > 1:
+        threshold = float(prob_thres)  # traits' float: a Python number (numpy's weak scalar)
+        masks = [m >= threshold for m in mask_arrays]
+    else:
+        labelsmap = mask_arrays[0]
+        values = np.unique(labelsmap)
+        values = values[values != 0]
+        masks = [labelsmap == v for v in values]
+    if len(masks) != len(labels):
+        raise ValueError("Number of masks must match number of labels")
+    if len(shape) < 4:
+        raise IndexError("tuple index out of range")
+    series = np.zeros((shape[3], len(masks)))
+    data = _nibabel_data(load_nibabel(in_path, n_threads=n_threads))
+    for j, mask in enumerate(masks):
+        series[:, j] = _region_means(data, mask, numpy_version, n_threads)
+    del data
+    output = np.vstack((labels, series.astype(str)))
+    broken = [str(s) for s in output[0] if any(c in str(s) for c in "\t\n\r")]
+    if broken:
+        if mode == "fix":
+            raise ValueError(
+                f"the class labels {broken!r} hold a tab or a line break, which breaks the "
+                "table (PIPE-78: niworkflows writes them as they are; "
+                "upstream_defects='reproduce' does too)"
+            )
+        _defects.warn(
+            [
+                (
+                    "PIPE-78",
+                    "niworkflows SignalExtraction",
+                    mode,
+                    f"the class labels {broken!r} hold a tab or a line break, written as they are",
+                )
+            ],
+            stacklevel=2,
+        )
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(os.path.abspath(os.fspath(out_dir)), os.fspath(out_file))
+    with open(path, "wb") as fh:  # numpy's savetxt: a text file in UTF-8 (Linux's), "\n"
+        for row in output:
+            fh.write(("\t".join(str(v) for v in row) + "\n").encode("utf-8"))
+    return path

@@ -741,9 +741,11 @@ mod tests {
 
     #[test]
     fn an_ar1_estimate_above_one() {
-        // One full period of a sine over 30,000 or 40,000 volumes: the float32 FFT's rounding
-        // gives some phases and amplitudes an AR(1) estimate above 1
-        // (validation/investigations/confounds/probe_ar1_above_one.py measures nitime's).
+        // One full period of a sine over 40,000 volumes, amplitude 3: the float32 FFT's rounding
+        // gives it an AR(1) estimate of 1.0000001 (found once by a sweep of 60 sines of 30,000
+        // and 40,000 volumes, amplitudes 1 to 1000 and phases 0 to 0.1, which also finds
+        // (40,000, 10, 0.01); the sweep is validation/investigations/confounds/
+        // probe_ar1_above_one.py's, which measures nitime's).
         let o = DvarsOptions {
             fft: FftLibrary::Pocketfft,
             solve: SolveRelease::V1_15,
@@ -751,45 +753,33 @@ mod tests {
             n_threads: 2,
             ..DvarsOptions::default()
         };
-        let mut found = 0;
-        for (t, amp, phase) in [30_000usize, 40_000]
-            .into_iter()
-            .flat_map(|t| [1.0f64, 3.0, 10.0, 30.0, 100.0, 1000.0].map(|a| (t, a)))
-            .flat_map(|(t, a)| [0.0f64, 0.01, 0.02, 0.05, 0.1].map(|p| (t, a, p)))
-        {
-            // the sine first, then three BOLD-like voxels (a mean predicted SD above 0)
-            let mut x: Vec<f32> = (0..t)
-                .map(|i| {
-                    let a = 2.0 * std::f64::consts::PI * i as f64 / t as f64 + phase;
-                    (1000.0 + amp * larmorx_core::math::sin(a)) as f32
-                })
-                .collect();
-            x.extend(series(3, t, 11));
-            // an estimate of exactly 1 stops nipype (PIPE-46); above 1 it gives NaN
-            let Ok(r) = compute_dvars(x.clone(), 4, t, &o) else {
-                continue;
-            };
-            if r.ar1[0] <= 1.0 {
-                continue;
-            }
-            found += 1;
-            assert!(r.std.iter().all(|v| v.is_nan()), "nipype's NaN");
-            let f = compute_dvars(
-                x,
-                4,
-                t,
-                &DvarsOptions {
-                    defects: UpstreamDefects::Fix,
-                    ..o
-                },
-            )
-            .unwrap();
-            assert_eq!(f.ar1[0], 1.0);
-            let ids: Vec<&str> = f.notices.iter().map(|n| n.defect.id).collect();
-            assert_eq!(ids, ["PIPE-47", "PIPE-46"]);
-            assert!(f.std.iter().all(|v| v.is_finite()));
-            assert!(f.vxstd.iter().all(|v| v.is_finite()));
-        }
-        assert!(found > 0, "no series of the scan passes 1");
+        let (t, amp, phase) = (40_000usize, 3.0f64, 0.0f64);
+        // the sine first, then three BOLD-like voxels (a mean predicted SD above 0)
+        let mut x: Vec<f32> = (0..t)
+            .map(|i| {
+                let a = 2.0 * std::f64::consts::PI * i as f64 / t as f64 + phase;
+                (1000.0 + amp * larmorx_core::math::sin(a)) as f32
+            })
+            .collect();
+        x.extend(series(3, t, 11));
+        // above 1, nipype's predicted SD is NaN (an estimate of exactly 1 stops it: PIPE-46)
+        let r = compute_dvars(x.clone(), 4, t, &o).unwrap();
+        assert!(r.ar1[0] > 1.0, "{}", r.ar1[0]);
+        assert!(r.std.iter().all(|v| v.is_nan()), "nipype's NaN");
+        let f = compute_dvars(
+            x,
+            4,
+            t,
+            &DvarsOptions {
+                defects: UpstreamDefects::Fix,
+                ..o
+            },
+        )
+        .unwrap();
+        assert_eq!(f.ar1[0], 1.0);
+        let ids: Vec<&str> = f.notices.iter().map(|n| n.defect.id).collect();
+        assert_eq!(ids, ["PIPE-47", "PIPE-46"]);
+        assert!(f.std.iter().all(|v| v.is_finite()));
+        assert!(f.vxstd.iter().all(|v| v.is_finite()));
     }
 }

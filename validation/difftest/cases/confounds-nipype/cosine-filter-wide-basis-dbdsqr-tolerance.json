@@ -1,0 +1,76 @@
+{
+ "defect": null,
+ "description": "cosine_filter with a cut-off of 5 s at a TR of 3 s on 370 volumes: a cosine basis of 444 columns, wider than the series, whose lstsq (DGELSD) and svd (DGESDD, DBDSDC's lower-bidiagonal path) reach DLASDQ leaves with nearly equal diagonals and superdiagonals at DBDSQR's convergence tolerance (random-testing finding 54131: 1 to 4 ulps). Fixed: DBDSQR's TOLMUL is glibc's pow(2^-53, -0.125) = 2^6.625 correctly rounded (the constant was 5.8e-6 off).",
+ "expect": "pass",
+ "found": {
+  "detail": "cosine_filter: every output bit-identical: [0] 141010 of 179080 elements differ (first at 0: np.float64(4.973799150320701e-14) / np.float64(5.684341886080802e-14))",
+  "n": 54131,
+  "seed": "confounds-trial",
+  "shrink_moves": [],
+  "signature": [
+   "cosine_filter: every output bit-identical"
+  ]
+ },
+ "id": "cosine-filter-wide-basis-dbdsqr-tolerance",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "cosine_filter",
+   "data": {
+    "dtype": "float32",
+    "kind": "smooth",
+    "layout": "C",
+    "seed": 490004985,
+    "t": 370,
+    "voxels": 484
+   },
+   "failure_mode": "NaN",
+   "period_cut": 5.0,
+   "remove_mean": true,
+   "threads": 1,
+   "timestep": 3.0
+  },
+  "features": {
+   "call": "cosine_filter",
+   "dtype": "float32",
+   "extreme": false,
+   "failure_mode": "NaN",
+   "layout": "C",
+   "no voxel": false,
+   "period_cut": 5.0,
+   "remove_mean": true,
+   "threads": 1,
+   "timestep": 3.0,
+   "values": "smooth",
+   "volumes": 370,
+   "voxels": 484
+  },
+  "groups": [
+   {
+    "args": [
+     "cosine_filter"
+    ],
+    "name": "cosine_filter",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 54131,
+  "options": [
+   "cosine_filter",
+   "float32",
+   "period_cut 5.0",
+   "smooth"
+  ],
+  "seed": "confounds-trial",
+  "tool": "confounds-nipype"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-nipype",
+ "tier": "smoke",
+ "tool": "confounds-nipype"
+}

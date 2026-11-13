@@ -33,6 +33,8 @@ and lives in the main package.
 | CPython 3.12.16 (`argparse`, `textwrap`, `json`'s encoder, Python's number parsing and printing: a ported Python program's command line and messages) | PSF License Version 2 | ✓ main package since 2026-11-08 (`larmorx_core::python`, re-expressed in Rust; the licence and the summary of changes its clause 3 asks for in `NOTICE`) | not needed |
 | CORE-MATH, nibabel | MIT | ✓ main package | not needed |
 | sdcflows (the NiPreps developers; its field-map estimation) | Apache-2.0 | ✓ main package since 2026-11-08 (`crates/larmorx-sdcflows`, `lx.sdcflows`: an exact port of sdcflows 2.17.1, the field maps' part A; the notice in `NOTICE`) | not needed for the licence; a later clean-room original of every program (the user, 2026-11-06), in another crate; part B (2026-11-09 and 10): the rest of sdcflows 2.17.1 with niworkflows 1.15.4's helpers (`lx.niworkflows`), nipype 1.12.0's command lines (`larmorx._nipype`), fMRIPrep 25.2.7's field-map steps (`larmorx.transforms.fieldmap`, larmorprepx) and its shipped data files (ANTs settings, `b02b0.cnf`), all Apache-2.0 |
+| nipype, niworkflows, fMRIPrep (the confound estimation: nipype's `algorithms/confounds.py` and `nipypecli run`, niworkflows' confound interfaces, fMRIPrep's confound interfaces and workflow) | Apache-2.0 | ✓ main package since 2026-11-11 (`crates/larmorx-confounds`, `lx.confounds`, `lx.niworkflows`, `lx.nipype`, larmorprepx's `confounds`: an exact port, the confounds' part; the notices in `NOTICE`) | not needed for the licence; a later clean room (the user, 2026-11-06), in another crate |
+| pandas (the float parser, the text and JSON writers), nitime (the AR(1) estimate), nipy (the `NIPY` motion source), pocketfft and ducc0 (SciPy's FFTs), traits and click (nipype's command line's messages); OpenBLAS 0.3.34-106, 0.3.31-22 and 0.3.28 with LAPACK 3.12.1 and 3.12.0 (the confounds' SVD and least-squares paths) | BSD-3-Clause (LAPACK: modified BSD) | ✓ main package since 2026-11-11 (`crates/larmorx-confounds`, `larmorx.confounds._tables`, `_nipy`, `larmorx.nipype`, `larmorx_transform::openblas`, `numpy_linalg`; the notices in each file and `NOTICE`) | not needed |
 | scikit-learn, SciPy, numpy, OpenBLAS and the reference LAPACK OpenBLAS bundles (their arithmetic on the paths the ports reach: `Ridge`'s `sparse_cg`, `cg`, `BSpline`, sparse products, `ndimage`, numpy's reductions, `sdot`, `svd`, `eigh`, `det`; since 2026-11-08 for tedana's replica numpy's percentiles, float32 `log`, float printing and `lstsq`, SciPy's `curve_fit` and `scoreatpercentile`) | BSD-3-Clause (LAPACK: modified BSD) | ✓ main package (followed operation by operation in `larmorx_sdcflows`, `larmorx_transform::openblas` and `numpy_linalg`, `larmorx_interp::ndimage`, `larmorx_core::numpy`, `larmorx-optim`; the notices in `NOTICE`) | not needed; since 2026-11-09 (the field maps' part B) SciPy's `ndimage` filters, morphology and measurements (`crates/larmorx-ndimage`), its 4 × 4 `inv` (`larmorx_transform::scipy_linalg`), numpy's linear percentiles, float32 `exp`, dot products and histograms |
 | Arm's Optimized Routines (v19.11: the `sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf` and double `exp`, `log`, `pow` glibc 2.35 ships) | MIT | ✓ main package since 2026-11-04 (`larmorx_core::math`'s `*_glibc`, `LICENSES/MIT-arm-optimized-routines.txt`): one translation for `reproduce`, the AFNI replicas and the FSL replicas' core (the AFNI replicas' `sincosf.rs` from 2026-10-29) | not needed |
 | fdlibm (as glibc 2.35 carries it: `atanf`, `atan2f`, `tanhf`, `expm1f`; netlib's fdlibm 5.3: `tanh`) | Sun's notice (`LicenseRef-fdlibm`) | ✓ main package (`larmorx_core::math`'s `atanf_glibc`, `atan2f_glibc` since 2026-11-04 and `tanh_glibc`; the AFNI replicas' `tanhf`, `expm1f`) | not needed |
@@ -44,8 +46,9 @@ and lives in the main package.
 Each licence family is a separate set of crates, a separate Python wheel and a separate
 command-line binary. Code from different families is never linked into one binary; one wheel may hold separate
 programs of compatible families side by side (since 2026-11-12: `larmorx-nc` also holds CorTechs' non-commercial
-`tkregister2_cmdl` as its own program, with no FSL code; `larmorx-gpl` holds GSL's generators alone; the user,
-decision log "No waiting for permissions").
+`tkregister2_cmdl` as its own program, with no FSL code, `crates-nc/larmorx-nc-tkregister2`; `larmorx-gpl` holds
+GSL's generators alone, `crates-gpl/larmorx-gpl-gsl`, which no FreeSurfer program links: `mri_coreg`'s replica uses
+the clean-room generator; the user, decision log "No waiting for permissions").
 
 | Package | Licence | Contents | Depends on |
 |---|---|---|---|
@@ -278,7 +281,10 @@ decision log "No waiting for permissions").
   way to settle it: ask Washington University (A. Z. Snyder's group) for written permission to
   port the code and ship the atlases. **Decided 2026-11-12 (the user, "No waiting for permissions"):** first a replica and a
   clean room; then, the same day, **a clean room only** (the user: "make a clean room of the first one to avoid the
-  problems"): no replica unless Washington University gives written permission; the atlases are fetched at first use. `mni305.cor.mgz` is
+  problems"): no replica unless Washington University gives written permission; the atlases are fetched at first use.
+  The clean room covers the chain's Washington University programs, `talairach_avi`, `mpr2mni305` (which carries its
+  notice too) and the four 4dfp programs; FreeSurfer's own `avi2talxfm`, `mri_matrix_multiply`, `fs_temp_dir` and the
+  QA check get a replica and a clean room (the orchestrator, 2026-11-12). `mni305.cor.mgz` is
   derived from MNI's MINC average (MNI's terms are permissive).
 - **Eigen (MPL-2.0), one file in `larmorx-core`** (decided by the user, 2026-10-23: kept).
   `crates/larmorx-core/src/eigen_sym.rs` translates Eigen 3.4.90's self-adjoint eigensolver (as

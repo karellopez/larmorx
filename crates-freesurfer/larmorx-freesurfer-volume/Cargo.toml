@@ -1,0 +1,13 @@
+[package]
+name = "larmorx-freesurfer-volume"
+description = "FreeSurfer 8.2.0's replica for larmorx: voxels and frames on the MRI structure (larmorx-freesurfer-mri), conforming, regions, voxel lists, resampling, transforms (LTA, .xfm, FSL matrices), the Talairach helpers, warp fields and CMA labels (fs.volume); EPFL's B-splines as Reuter's mriBSpline.cpp writes them, crediting EPFL (fs.bspline) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-mri.workspace = true
+larmorx-freesurfer-io.workspace = true

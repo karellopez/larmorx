@@ -39,8 +39,8 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `D`, `F`, `H`, `M
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mriio.cpp` (5,596), `utils/mri.cpp` (4,716), `packages/expat/xmlparse.c` (4,342), `utils/DICOMRead.cpp` (3,473), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923), `utils/transform.cpp` (1,915), `packages/gifti/gifti_io.c` (1,712), `utils/matrix.cpp` (1,427), `packages/dcm2niix/miniz.c` (1,348)
-- Reach per module (waves.md §3): fs.io 13,971, perm.gifti 10,365, fs.volume 8,676, fs.gca 6,014, perm.dicom 4,371, own 2,531, fs.maths 1,805, perm.minc 1,625, perm.misc 1,437, fs.filter 1,311, fs.core 1,215, fs.labels 1,150, fs.bspline 785, perm.nifti 335, fs.surfio 78, fs.deform 13
-- Option paths that wait for a later module: fs.deform (13 lines), fs.gca (6,014 lines)
+- Reach per module (waves.md §3): fs.io 10,862, perm.gifti 10,365, fs.volume 6,829, fs.gca 6,014, perm.dicom 4,371, fs.dicomread 3,218, own 2,531, fs.mri 1,820, fs.maths 1,805, perm.minc 1,625, perm.misc 1,437, fs.filter 1,311, fs.core 1,215, fs.labels 1,068, fs.bspline 785, perm.nifti 335, fs.surfio 78, fs.deform 13
+- Option paths that wait for a later module: fs.deform (13 lines), fs.dicomread (3,218 lines), fs.gca (6,014 lines)
 - Its queue item brings 2,807 lines (the functions only it reaches)
   - 3.2-27: mri_cc (2,807 lines)
 
@@ -65,7 +65,7 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `D`, `F`, `H`, `M
 
 ## Checks
 
-- through seg2cc's recorded steps (11)
+- through seg2cc's recorded steps (12)
 
 ## Notes
 

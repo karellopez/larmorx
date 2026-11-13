@@ -109,6 +109,9 @@ SUITES: dict[str, tuple[str, str]] = {
             "ndimage-skimage",
             "niworkflows-helpers",
             "sdcflows-estimation",
+            "confounds-linalg",
+            "confounds-nipype",
+            "confounds-fmriprep",
         )
     },
     "itk-hdf5": ("itk-transforms", "port"),

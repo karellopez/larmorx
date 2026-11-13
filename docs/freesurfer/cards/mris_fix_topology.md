@@ -40,7 +40,8 @@ Single-letter options of its `switch (toupper(*option))`: `H`, `S`, `U`, `V`
 - Libraries: utils, jpeg, tiff, xml2, minc, netcdf, nrrdio, dicom, cephes, nifti, dcm2niixfs, gifti, expat; external: z, OpenMP::OpenMP_CXX, crypt, rt
 - Built with `-fopenmp -fno-builtin -Wall -Wextra -Werror -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 -DNDEBUG` (C++), `-fopenmp -O3 -DNDEBUG` (C)
 - Library files it reaches most (lines of their functions, core view): `utils/mrisurf_defect.cpp` (12,094), `utils/mriio.cpp` (5,596), `packages/expat/xmlparse.c` (4,342), `utils/mri.cpp` (4,146), `utils/DICOMRead.cpp` (3,473), `utils/mrisurf_io.cpp` (3,149), `utils/mrisurf_metricProperties.cpp` (3,006), `utils/gca.cpp` (2,788), `packages/gifti/gifti_xml.c` (2,678), `utils/gifti.cpp` (2,645), `packages/dicom/dcm.c` (2,191), `utils/gcamorph.cpp` (1,923)
-- Reach per module (waves.md §3): fs.io 16,184, fs.defect 12,104, fs.surfio 11,843, perm.gifti 10,365, fs.volume 7,207, fs.gca 6,014, fs.surf 4,696, perm.dicom 4,371, fs.maths 2,178, perm.minc 1,625, perm.misc 1,431, fs.core 1,406, fs.labels 1,346, fs.filter 848, own 805, fs.bspline 785, fs.deform 465, perm.nifti 335
+- Reach per module (waves.md §3): fs.io 13,075, fs.defect 12,104, fs.surfio 11,843, perm.gifti 10,365, fs.gca 6,014, fs.volume 5,433, fs.surf 4,696, perm.dicom 4,371, fs.dicomread 3,218, fs.maths 2,178, fs.mri 1,747, perm.minc 1,625, perm.misc 1,431, fs.core 1,406, fs.labels 1,264, fs.filter 848, own 805, fs.bspline 785, fs.deform 465, perm.nifti 335
+- Option paths that wait for a later module: fs.dicomread (3,218 lines)
 - Its queue item brings 13,518 lines (the functions only it reaches)
   - 3.4-18: mris_fix_topology (1 of 7): mrisurf_defect.cpp (lines 30-1811), mris_fix_topology.cpp, mrisurf_metricProperties.h, mrisurf_base.cpp, mrisurf.cpp, mrisurf_SurfaceFromMRIS_generated_suffix.h, mrisurf_SurfaceFromMRISPV_generated_suffix.h (1,498 lines)
   - 3.4-19: mris_fix_topology (2 of 7): mrisurf_defect.cpp (lines 1838-5139) (2,424 lines)
@@ -72,7 +73,7 @@ Single-letter options of its `switch (toupper(*option))`: `H`, `S`, `U`, `V`
 
 ## Checks
 
-- replay: 21 recorded steps in 11 runs
+- replay: 24 recorded steps in 12 runs
 
 ## Notes
 

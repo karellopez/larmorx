@@ -1,0 +1,12 @@
+[package]
+name = "larmorx-freesurfer-atlas"
+description = "FreeSurfer 8.2.0's replica for larmorx: the atlas programs (mri_em_register, mri_ca_normalize, mri_ca_register, mri_ca_label) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-gca.workspace = true

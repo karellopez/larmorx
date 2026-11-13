@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-12-t2smap-clean-room",
+ "dossier": "2026-11-13-confounds-fixci",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 323375,
-  "agents": 311,
+  "accesses": 394530,
+  "agents": 410,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 407,
-  "archived_files": 407,
+  "archive_checksums_matched": 598,
+  "archived_files": 598,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -179,35 +179,91 @@
     "files": 25,
     "sha256": "549db515e64d62cd95a2b6d2900e8ec55ff99a34591bba63adab212147df0d10"
    },
+   "2026-11-12-session-transcripts-freesurfer-foundations-ac": {
+    "files": 20,
+    "sha256": "4bb7b39280e436488181ebb786bcac61d06e7d5b6e336183449bc275ef0fed06"
+   },
+   "2026-11-12-session-transcripts-freesurfer-foundations-ac2": {
+    "files": 25,
+    "sha256": "08b774e709eb066f348d5b5d37e19ae561be50389c679c6e92046e86c86a36d7"
+   },
+   "2026-11-12-session-transcripts-freesurfer-foundations-b": {
+    "files": 108,
+    "sha256": "288dfd5c5be533f9f1e81af035b0da00ad1d25ab562f25c99057a293cd5de079"
+   },
+   "2026-11-12-session-transcripts-freesurfer-foundations-d1": {
+    "files": 6,
+    "sha256": "db4f3837913af0782b3703968ff88bd789a02b129db72578860c0a0405319de2"
+   },
+   "2026-11-12-session-transcripts-freesurfer-preparation": {
+    "files": 8,
+    "sha256": "9f829e9c3abd74e10e29c36458ba0bcfbd5d41700f763894f3b262211b8612db"
+   },
    "2026-11-12-session-transcripts-t2smap-clean-room": {
     "files": 24,
     "sha256": "270fabe579ae46ec980c98fa1944da5c901164127803af20dc15e52efe4767ba"
+   },
+   "2026-11-13-session-transcripts-confounds": {
+    "files": 22,
+    "sha256": "d20e0b06f397b65362f35631d5de63401e138de2a0084f9b93b736f9c39092c5"
+   },
+   "2026-11-13-session-transcripts-confounds-fixci": {
+    "files": 34,
+    "sha256": "71732783988b11556a8b19e8ad72cd911b22646a6be36ea9789fc43ffe4654e7"
+   },
+   "2026-11-13-session-transcripts-freesurfer-batch-3": {
+    "files": 15,
+    "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
+   },
+   "2026-11-13-session-transcripts-freesurfer-batch-4": {
+    "files": 33,
+    "sha256": "88f446ddfec25efeb4ea61b8ed5f94c02ba1215164e1d49ab69ee52ecd2d42f5"
+   },
+   "2026-11-13-session-transcripts-freesurfer-batch-5": {
+    "files": 23,
+    "sha256": "aca91b1a27b32c813b93d07a95ee48bb0ba3568cea9c31bd8b2c9a9966f52b79"
+   },
+   "2026-11-13-session-transcripts-freesurfer-batch-6": {
+    "files": 37,
+    "sha256": "60f0beb2d5f9b3ccc43928b7f13d6c40751f27cee2c61e1be65ccce96fef7f21"
+   },
+   "2026-11-13-session-transcripts-freesurfer-batch-7": {
+    "files": 31,
+    "sha256": "229b613b3729b39b0651f2e3ab73d28ff09148cdd004a2627b59ae8f09f73e79"
+   },
+   "2026-11-13-session-transcripts-freesurfer-cleanroom-1-relay-1": {
+    "files": 43,
+    "sha256": "d9deda02c9c0a21b4c19d92cfbec7330ef631d30857aa81e49c22bacf3c1580a"
+   },
+   "2026-11-13-session-transcripts-freesurfer-foundations-arm": {
+    "files": 23,
+    "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3108,
-  "distinct_transcripts": 315,
+  "commits_printed": 3780,
+  "distinct_transcripts": 414,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 216,
+   "agents_without_worktree": 306,
    "bad_lines": 0,
-   "calls_without_result": 22,
-   "compaction_parent_missing": 2,
-   "compactions": 75,
-   "refused_calls": 1579,
-   "refused_calls_restricted_accesses": 686,
+   "calls_without_result": 71,
+   "compaction_parent_missing": 9,
+   "compactions": 78,
+   "refused_calls": 1687,
+   "refused_calls_restricted_accesses": 741,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 7675
+   "unresolved_paths": 8762
   },
-  "last_record": "2026-11-12 07:31 UTC",
-  "live_files": 315,
-  "live_files_also_archived": 315,
+  "last_record": "2026-11-13 11:48 UTC",
+  "live_files": 414,
+  "live_files_also_archived": 411,
   "sessions": 4,
-  "tool_calls": 93824,
+  "tool_calls": 112752,
   "tool_calls_by_tool": [
    [
     "Agent",
-    313
+    412
    ],
    [
     "Artifact",
@@ -219,7 +275,7 @@
    ],
    [
     "Bash",
-    79710
+    96934
    ],
    [
     "CronCreate",
@@ -231,7 +287,7 @@
    ],
    [
     "Edit",
-    4255
+    4497
    ],
    [
     "EnterWorktree",
@@ -239,11 +295,11 @@
    ],
    [
     "Monitor",
-    178
+    206
    ],
    [
     "Read",
-    2351
+    2841
    ],
    [
     "ReadNotifications",
@@ -251,7 +307,11 @@
    ],
    [
     "SendMessage",
-    95
+    132
+   ],
+   [
+    "SendUserFile",
+    4
    ],
    [
     "Skill",
@@ -259,7 +319,7 @@
    ],
    [
     "SubagentHandback",
-    323
+    437
    ],
    [
     "TaskOutput",
@@ -267,28 +327,28 @@
    ],
    [
     "TaskStop",
-    247
+    301
    ],
    [
     "ToolSearch",
-    200
+    231
    ],
    [
     "WebFetch",
-    62
+    64
    ],
    [
     "WebSearch",
-    5
+    6
    ],
    [
     "Write",
-    6030
+    6632
    ]
   ],
-  "transcript_bytes": 7893769553,
-  "transcript_files": 722,
-  "unique_paths": 67601
+  "transcript_bytes": 12219471974,
+  "transcript_files": 1012,
+  "unique_paths": 80733
  },
  "levels": [
   [
@@ -369,7 +429,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "6e18b57d"
+  "verdicts_repository": "8292d908"
  },
  "overview": {
   "agents_by_role": [
@@ -379,11 +439,11 @@
    ],
    [
     "clean-room implementer",
-    87
+    92
    ],
    [
     "documentation",
-    1
+    33
    ],
    [
     "integration",
@@ -391,32 +451,32 @@
    ],
    [
     "other",
-    111
+    129
    ],
    [
     "replica author",
-    85
+    124
    ],
    [
     "spec writer",
-    22
+    27
    ]
   ],
   "attributed_by": [
    [
     "printed",
-    258
+    268
    ],
    [
     "subject",
     13
    ]
   ],
-  "commits": 271,
+  "commits": 281,
   "commits_by_role": [
    [
     "clean-room implementer",
-    267
+    277
    ],
    [
     "integration",
@@ -427,8 +487,8 @@
     3
    ]
   ],
-  "implementers": 87,
-  "register_restricted_lines": 1476,
+  "implementers": 92,
+  "register_restricted_lines": 1489,
   "single_file_scopes": {
    "checked": 70,
    "shown": 3
@@ -10418,6 +10478,372 @@
    "verdict": {
     "status": "reviewed (every finding judged)",
     "words": "clean (names of restricted files, harness lines and a traceback's call lines of the replica suite, declared; the implementer's stand-in script named after the replica's program, a false match of the replica rule on its name)"
+   }
+  },
+  {
+   "accesses": [
+    {
+     "group": "the behaviour specs (specs/)",
+     "run": 0,
+     "seen": 16,
+     "written": 0
+    },
+    {
+     "group": "the clean-room code",
+     "run": 0,
+     "seen": 2,
+     "written": 0
+    },
+    {
+     "group": "larmorx's other files (records, documents, tests, permissive ports)",
+     "run": 48,
+     "seen": 194,
+     "written": 24
+    },
+    {
+     "group": "the original programs, run or named as black boxes",
+     "run": 38,
+     "seen": 0,
+     "written": 0
+    },
+    {
+     "group": "the originals' installations besides their source (data, packages)",
+     "run": 0,
+     "seen": 4,
+     "written": 0
+    },
+    {
+     "group": "oracle outputs and inputs",
+     "run": 0,
+     "seen": 5,
+     "written": 2
+    },
+    {
+     "group": "the agent's own scratch notes, task outputs and memory",
+     "run": 74,
+     "seen": 32,
+     "written": 33
+    },
+    {
+     "group": "the system, the home directory, the workspace and the archive",
+     "run": 1,
+     "seen": 7,
+     "written": 0
+    },
+    {
+     "group": "restricted material (by rule and kind below)",
+     "run": 0,
+     "seen": 3,
+     "written": 0
+    }
+   ],
+   "cannot_see": {
+    "compactions": 0,
+    "listings": 24,
+    "program_runs": 126,
+    "without_worktree": 1
+   },
+   "commits": 3,
+   "commits_by_role": [
+    [
+     "clean-room implementer",
+     3
+    ]
+   ],
+   "family": "FreeSurfer",
+   "findings": [],
+   "first": "2026-11-13",
+   "id": "FreeSurfer/cubic_spline",
+   "implementers": [
+    {
+     "agent": "a9d83a0d549afd300",
+     "commits": 2,
+     "description": "FreeSurfer clean room 1 (RANLUX, cubic spline)",
+     "first": "2026-11-13",
+     "last": "2026-11-13"
+    },
+    {
+     "agent": "a9df9e0a700df3b51",
+     "commits": 1,
+     "description": "FreeSurfer clean room 1 relay 3 (spline fix, glibc qsort)",
+     "first": "2026-11-13",
+     "last": "2026-11-13"
+    }
+   ],
+   "last": "2026-11-13",
+   "name": "the cubic spline FreeSurfer's mri_normalize uses (larmorx-core)",
+   "other_roles": [],
+   "restricted": [
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 1,
+     "level": "names",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 2,
+     "level": "build-cache",
+     "rule": "R10",
+     "scope": "this family"
+    }
+   ],
+   "similarity": null,
+   "slips": [],
+   "verdict": {
+    "status": "clean, with notes",
+    "words": "clean: written from specs/burkardt-spline.md and black-box runs of FreeSurfer's spline; the replica workspace's file names and build caches seen in build output only"
+   }
+  },
+  {
+   "accesses": [
+    {
+     "group": "the behaviour specs (specs/)",
+     "run": 0,
+     "seen": 9,
+     "written": 0
+    },
+    {
+     "group": "the clean-room code",
+     "run": 0,
+     "seen": 2,
+     "written": 0
+    },
+    {
+     "group": "larmorx's other files (records, documents, tests, permissive ports)",
+     "run": 44,
+     "seen": 163,
+     "written": 21
+    },
+    {
+     "group": "the original programs, run or named as black boxes",
+     "run": 38,
+     "seen": 0,
+     "written": 0
+    },
+    {
+     "group": "the originals' installations besides their source (data, packages)",
+     "run": 0,
+     "seen": 4,
+     "written": 0
+    },
+    {
+     "group": "oracle outputs and inputs",
+     "run": 0,
+     "seen": 4,
+     "written": 1
+    },
+    {
+     "group": "the agent's own scratch notes, task outputs and memory",
+     "run": 69,
+     "seen": 23,
+     "written": 33
+    },
+    {
+     "group": "the system, the home directory, the workspace and the archive",
+     "run": 1,
+     "seen": 7,
+     "written": 0
+    },
+    {
+     "group": "restricted material (by rule and kind below)",
+     "run": 0,
+     "seen": 3,
+     "written": 0
+    }
+   ],
+   "cannot_see": {
+    "compactions": 0,
+    "listings": 18,
+    "program_runs": 120
+   },
+   "commits": 4,
+   "commits_by_role": [
+    [
+     "clean-room implementer",
+     4
+    ]
+   ],
+   "family": "FreeSurfer",
+   "findings": [],
+   "first": "2026-11-13",
+   "id": "FreeSurfer/ranlux",
+   "implementers": [
+    {
+     "agent": "a9d83a0d549afd300",
+     "commits": 4,
+     "description": "FreeSurfer clean room 1 (RANLUX, cubic spline)",
+     "first": "2026-11-13",
+     "last": "2026-11-13"
+    }
+   ],
+   "last": "2026-11-13",
+   "name": "RANLUX389 and the random distributions FreeSurfer uses (larmorx-core)",
+   "other_roles": [],
+   "restricted": [
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 1,
+     "level": "names",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 2,
+     "level": "build-cache",
+     "rule": "R10",
+     "scope": "this family"
+    }
+   ],
+   "similarity": null,
+   "slips": [],
+   "verdict": {
+    "status": "clean, with notes",
+    "words": "clean: written from specs/ranlux.md and black-box runs of FreeSurfer's functions and mri_volsynth; the replica workspace's file names and build caches seen in build output only; a slip declared by the implementer (larmorx-core's provenance lines on VXL's generator and POSIX's drand48, which name how FreeSurfer calls them) unrelated to RANLUX"
+   }
+  },
+  {
+   "accesses": [
+    {
+     "group": "the behaviour specs (specs/)",
+     "run": 0,
+     "seen": 12,
+     "written": 0
+    },
+    {
+     "group": "larmorx's other files (records, documents, tests, permissive ports)",
+     "run": 38,
+     "seen": 95,
+     "written": 13
+    },
+    {
+     "group": "oracle outputs and inputs",
+     "run": 0,
+     "seen": 5,
+     "written": 4
+    },
+    {
+     "group": "the agent's own scratch notes, task outputs and memory",
+     "run": 104,
+     "seen": 29,
+     "written": 11
+    }
+   ],
+   "cannot_see": {
+    "compactions": 0,
+    "listings": 8,
+    "program_runs": 122,
+    "unresolved": 1,
+    "without_worktree": 1
+   },
+   "commits": 2,
+   "commits_by_role": [
+    [
+     "clean-room implementer",
+     2
+    ]
+   ],
+   "family": "GNU",
+   "findings": [],
+   "first": "2026-11-13",
+   "id": "GNU/glibc_qsort",
+   "implementers": [
+    {
+     "agent": "a9df9e0a700df3b51",
+     "commits": 2,
+     "description": "FreeSurfer clean room 1 relay 3 (spline fix, glibc qsort)",
+     "first": "2026-11-13",
+     "last": "2026-11-13"
+    }
+   ],
+   "last": "2026-11-13",
+   "name": "qsort and qsort_r with glibc 2.35's order of comparisons (larmorx-core)",
+   "other_roles": [],
+   "restricted": [],
+   "similarity": null,
+   "slips": [],
+   "verdict": {
+    "status": "clean",
+    "words": "clean: written from specs/glibc-qsort.md and black-box runs of the C library; no restricted material seen (the build log's crate names only)"
+   }
+  },
+  {
+   "accesses": [
+    {
+     "group": "the behaviour specs (specs/)",
+     "run": 0,
+     "seen": 2,
+     "written": 0
+    },
+    {
+     "group": "larmorx's other files (records, documents, tests, permissive ports)",
+     "run": 11,
+     "seen": 78,
+     "written": 7
+    },
+    {
+     "group": "the agent's own scratch notes, task outputs and memory",
+     "run": 57,
+     "seen": 10,
+     "written": 3
+    },
+    {
+     "group": "restricted material (by rule and kind below)",
+     "run": 0,
+     "seen": 4,
+     "written": 0
+    }
+   ],
+   "cannot_see": {
+    "compactions": 0,
+    "listings": 13,
+    "program_runs": 68,
+    "without_worktree": 1
+   },
+   "commits": 2,
+   "commits_by_role": [
+    [
+     "clean-room implementer",
+     2
+    ]
+   ],
+   "family": "GNU",
+   "findings": [],
+   "first": "2026-11-13",
+   "id": "GNU/glibc_random",
+   "implementers": [
+    {
+     "agent": "ad6edf741d079a009",
+     "commits": 2,
+     "description": "FreeSurfer clean room 1 relay 2 (glibc random)",
+     "first": "2026-11-13",
+     "last": "2026-11-13"
+    }
+   ],
+   "last": "2026-11-13",
+   "name": "rand, srand, random and srandom with glibc 2.35's streams (larmorx-core)",
+   "other_roles": [],
+   "restricted": [
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 4,
+     "level": "names",
+     "rule": "R14",
+     "scope": "another family"
+    }
+   ],
+   "similarity": null,
+   "slips": [],
+   "verdict": {
+    "status": "clean, with notes",
+    "words": "clean: written from specs/glibc-random.md and black-box runs of the C library; two slips declared by the implementer, neither of restricted content (four file names of another family's probe folder printed by git diff --stat; FreeSurfer 6.0.0's help text from a program an unquoted heredoc ran)"
    }
   },
   {

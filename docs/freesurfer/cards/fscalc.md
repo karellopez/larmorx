@@ -48,7 +48,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through label-cortex's recorded steps (20)
+- through label-cortex's recorded steps (24)
 
 ## Notes
 

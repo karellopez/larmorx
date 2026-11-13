@@ -50,9 +50,18 @@ _DTYPES = ("char", "short", "int", "float", "double")
 
 @dataclass(frozen=True)
 class FlirtResult:
-    """What ``flirt`` computed: the 4 x 4 matrix (input FSL mm to reference FSL mm), the input
-    resampled onto the reference's grid (``None`` unless ``out`` was asked for), and FLIRT's
-    standard output (its verbose lines, a schedule's ``print``)."""
+    """What ``flirt`` computed.
+
+    Attributes
+    ----------
+    matrix
+        The 4 x 4 matrix from the input's FSL millimetres to the reference's, as ``-omat``
+        writes it.
+    image
+        The input resampled onto the reference's grid; ``None`` unless ``out``.
+    stdout
+        FLIRT's standard output: its verbose lines and a schedule's ``print``.
+    """
 
     matrix: np.ndarray
     image: Image | None
@@ -205,7 +214,7 @@ def flirt(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-flirt.md``, "Upstream defects").
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
     """
     n_threads = _threads(n_threads)
     _choice("cost", cost, COSTS)

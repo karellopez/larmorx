@@ -57,12 +57,39 @@ def _coords_file(coords: Any, tmp: str) -> str:
 
 @dataclass(frozen=True)
 class AvscaleResult:
-    """``avscale``'s decomposition of ``matrix`` (``matrix = rotation * skew * scale``, the
-    rotation's angles about x, y, z in radians and the translation about ``centre``), as it
-    prints them (6 decimals): the rotation-and-translation matrix, the angles and translations
-    (``all_params``), scales, skews, their average, the determinant, whether the left-right
-    order is kept, and the two half transforms; with ``inverted_eddies`` the check matrix and
-    the inverted eddy-current matrix. ``stdout`` is the program's text."""
+    """``avscale``'s decomposition of ``matrix`` (``matrix = rotation * skew * scale``), as it
+    prints them (6 decimals, or 6 significant digits where FSL prints those).
+
+    Attributes
+    ----------
+    rotation_translation
+        The rotation-and-translation matrix (4 x 4).
+    rotations
+        The rotation's angles about x, y and z, in radians (``all_params``; else ``None``).
+    translations
+        The translation about the centre of gravity of ``volume``, or about the origin without
+        one (``all_params``; else ``None``).
+    scales
+        The scales along x, y and z.
+    skews
+        The skews.
+    average_scale
+        The scales' average.
+    determinant
+        The matrix's determinant.
+    left_right_preserved
+        Whether the left-right order is kept.
+    forward_half
+        The forward half transform (the matrix's square root).
+    backward_half
+        The backward half transform.
+    matrix_check
+        The check matrix (``inverted_eddies``; else ``None``).
+    inverted_eddy
+        The inverted eddy-current matrix (``inverted_eddies``; else ``None``).
+    stdout
+        The program's text.
+    """
 
     rotation_translation: np.ndarray
     rotations: np.ndarray | None
@@ -318,7 +345,7 @@ def makerot(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-flirt.md``, "Upstream defects").
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
     """
     selected = _replica.select("fsl", "makerot", implementation)
 

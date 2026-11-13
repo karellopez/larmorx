@@ -26,8 +26,8 @@ package holds):
 - **The clean room** is written from [`specs/flirt.md`](../../specs/flirt.md) by an implementer who
   never read FSL's source or the replica. It is part of `larmorx`, under Apache-2.0
   (`crates/larmorx-fsl`, with its [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md), section
-  "FLIRT"), and runs on the main package's clean-room registration engine, shared with
-  `lx.mri.hmc`.
+  "FLIRT"), and runs on LARMORX's clean-room registration engine, the head-motion correction's
+  (`lx.mri.hmc`).
 
 `implementation="auto"` runs the replica when `larmorx-nc` is installed, and the clean room
 otherwise. `"replica"` and `"clean-room"` choose one (`"original"`, 0.1.0rc1's spelling of
@@ -107,7 +107,7 @@ r.image      # the BOLD reference on the T1w's grid
 | `-noresample`, `-noclamp`, `-noresampblur`, `-forcescaling` | `no_resample`, `no_clamp`, `no_resample_blur`, `force_scaling` | |
 | `-minsampling`, `-basescale` | `min_sampling`, `base_scale` | |
 | `-2D` | `two_d` | |
-| `-v`, `-verbose`, `-printinit`, `-displayinit`, `-debugsave`, `-debug`, `-i`, `-help`, `-version`, `-anglerep`, `-applynonisoxfm`, `-nosave` | command line only | `-anglerep quaternion` since part 2 |
+| `-v`, `-verbose`, `-printinit`, `-displayinit`, `-debugsave`, `-debug`, `-i`, `-help`, `-version`, `-anglerep`, `-applynonisoxfm`, `-nosave` | command line only | `-anglerep quaternion` since 2026-11-02 |
 | `OMP_NUM_THREADS` | `n_threads` | the results do not depend on it |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` |
 
@@ -133,15 +133,16 @@ larmorx fsl flirt -in epi.nii.gz -ref T1w.nii.gz -omat epi2t1.mat -out epi2t1.ni
 
 ### Ports of `flirt`
 
-The replica's record, against FSL 6.0.7.23 itself on the standard tier, holds fMRIPrep's
-boundary-based calls on three oracle runs (ds005040, ds003592, ds000228), bit-identical, their
+The replica's record, against FSL 6.0.7.23 itself in its standard comparison, holds fMRIPrep's
+boundary-based calls in three of fMRIPrep's runs (ds005040, ds003592, ds000228), bit-identical, their
 matrices also identical as text to fMRIPrep's own (its container's FSL); every cost function,
 search option, schedule FSL ships, `-applyxfm` 3D and 4D with every interpolation and data type,
-the BBR variants and the command line's errors. The clean room is within the thresholds in 238 of the 240
-compared cases of its record, which holds FLIRT's fourteen programs; the 2 it misses are two
-weighted registrations whose paths part at their costs' last bits. fMRIPrep's three boundary-based
-calls are within 0.1 mm of FSL's matrices at the 95th percentile over the brain (0.053, 0.011 and
-0.030 mm), their images' correlation with FSL's 0.9993 to 0.99996.
+the BBR variants and the command line's errors. The clean room is within the thresholds in 239 of
+its 240 compared cases, out of 339 (its record of 2026-11-07), which holds FLIRT's fourteen
+programs. The one it misses is a weighted `woods` registration (`real/weights-woods`): its matrix
+passes, but its standard error holds FSL's warning `Woods is not implemented with cost function
+weighting` where FSL's has ended. fMRIPrep's three boundary-based calls are within 0.0113 mm of
+FSL's matrices at the 95th percentile of the brain.
 
 ## `convert_xfm`
 
@@ -163,9 +164,6 @@ the result (`-omat`).
 ### Python (`convert_xfm`)
 
 `lx.fsl.convert_xfm(matrix, *, concat=None, fix_scale_skew=None, inverse=False, implementation="auto")`
-
-`matrix`, `concat` and `fix_scale_skew` are 4 × 4 arrays or matrix files. The result is a 4 × 4
-array, as FSL writes it (10 significant digits).
 
 ### Options of `convert_xfm`
 
@@ -196,7 +194,8 @@ larmorx fsl convert_xfm -omat t12epi.mat -inverse epi2t1.mat
 
 ### Ports of `convert_xfm`
 
-Both ports are complete. The replica is translated from FSL 6.0.7.23's source, bit-exact. In the
+Both ports are complete. The replica is translated from FSL 6.0.7.23's source, giving FSL's results
+byte for byte. In the
 clean room, `convert_xfm`'s messages are FSL's, and `-fixscaleskew` aborts where its decomposition
 does not solve (a zero scale or a non-finite entry), as `avscale` does.
 
@@ -212,18 +211,15 @@ records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
 evidence: fsl-flirt
 -->
 
-`avscale` decomposes a FLIRT matrix. It prints the rotation-and-translation matrix, the angles
-and translations (about the volume's centre of gravity), the scales, skews and their average,
-the determinant and left-right order, the half transforms (the matrix's square root) and, with
-`--inverteddies`, the eddy-current inversion's matrices.
+`avscale` takes a FLIRT matrix apart: its rotation and translation, angles, scales, skews,
+determinant and half transforms. The angles and translations are about the volume's centre of
+gravity, the half transforms are the matrix's square root, and the scales' average and the
+left-right order come with them; with `--inverteddies` it also prints the eddy-current
+inversion's matrices.
 
 ### Python (`avscale`)
 
 `lx.fsl.avscale(matrix, volume=None, *, all_params=False, inverted_eddies=False, implementation="auto")`
-
-`matrix` is a 4 × 4 array or a matrix file, `volume` a path or an `lx.Image`. The result, an
-`AvscaleResult`, holds what the program prints, parsed (FSL prints 6 decimals or 6 significant
-digits, and so does it).
 
 ### Options of `avscale`
 
@@ -250,13 +246,14 @@ larmorx fsl avscale --allparams bold2t1.mat boldref.nii.gz
 
 ### Ports of `avscale`
 
-Both ports are complete: every option, usage, message, exit status and failure case of
-`specs/flirt.md` §15.1 to §15.4 (where FSL aborts, the same lines and exit status 1). The clean
-room's record holds 66 cases of `avscale`, the coordinate programs, `rmsdiff` and `makerot`: 39
-identical to FSL in every byte of text and file, 27 more where both refuse or abort alike. One
-more matrix of the findings (a reflection's `--inverteddies` check) differs in the sign of a 1e-10
-residual. A matrix of 4 rows that is not 4 × 4, where FSL aborts at a determinant, an inverse or a
-product, is refused (FSL prints part of its output first).
+Both ports are complete (`specs/flirt.md` §15.1); where FSL aborts, they print the same lines and
+exit with status 1. A matrix of 4 rows that is not 4 × 4, where FSL aborts at a determinant, an
+inverse or a product, is refused (FSL prints part of its output first). One more matrix, from
+random testing (a reflection's `--inverteddies` check), differs in the sign of a 1e-10 residual.
+
+The replica's record holds 9 cases of `avscale`: 5 identical to FSL, 4 where both refuse or abort
+alike. The clean room's holds 9: 5 identical to FSL in every byte of text and file, 4 where both
+refuse or abort alike.
 
 ## `img2imgcoord`
 
@@ -277,9 +274,6 @@ default, millimetres with `-mm`.
 
 `lx.fsl.img2imgcoord(coords, src, dest, *, xfm=None, mm=False, implementation="auto")`
 
-`coords` is N × 3, or a file of rows `x y z`, in `src`'s voxels (NIfTI's), or millimetres with
-`mm`; `xfm` is FLIRT's matrix from `src` to `dest` (the identity without one). The result is N × 3.
-
 ### Options of `img2imgcoord`
 
 | `img2imgcoord` option | Python | Notes |
@@ -288,7 +282,7 @@ default, millimetres with `-mm`.
 | `-src`, `-dest` | `src`, `dest` | |
 | `-xfm`, `-premat` | `xfm` | |
 | `-vox`, `-mm` | `mm` | voxels by default |
-| `-warp` | command line only | FNIRT's warp fields: refused until FNIRT is ported (below) |
+| `-warp` | command line only | FNIRT's warp fields: refused until FNIRT is ported |
 | `-v`, `-help`, `-flirt` | command line only | `-flirt` accepted and ignored |
 
 ### Examples of `img2imgcoord`
@@ -308,11 +302,16 @@ larmorx fsl img2imgcoord -src boldref.nii.gz -dest T1w.nii.gz -xfm bold2t1.mat c
 
 ### Ports of `img2imgcoord`
 
-Both ports are complete, as for `avscale` (above), standard input included (the prompts and the
-refusal at a terminal). The coordinate programs' `-warp` (a FNIRT warp field) is refused until
-FNIRT is ported: an unreadable file, or an image of other than three volumes, gives FSL's messages
-and exit status 1, as FSL (`specs/flirt.md` §15.2). Matrices other than 4 × 4 where FSL would
-invert them beyond 4 × 4 are refused (FSL prints part of its output, then aborts).
+Both ports are complete (`specs/flirt.md` §15.2), standard input included (the prompts and the
+refusal at a terminal); where FSL aborts, they print the same lines and exit with status 1. The
+coordinate programs' `-warp` (a FNIRT warp field) is refused until FNIRT is ported: an unreadable
+file, or an image of other than three volumes, gives FSL's messages and exit status 1, as FSL.
+Matrices other than 4 × 4 where FSL would invert them beyond 4 × 4 are refused (FSL prints part
+of its output, then aborts).
+
+The replica's record holds 11 cases of `img2imgcoord`: 7 identical to FSL, 4 where both refuse or
+abort alike. The clean room's holds 12: 7 identical to FSL in every byte of text and file, 5
+where both refuse or abort alike.
 
 ## `std2imgcoord`
 
@@ -332,10 +331,6 @@ matrix: millimetres by default, the image's voxels with `-vox`.
 ### Python (`std2imgcoord`)
 
 `lx.fsl.std2imgcoord(coords, img, std=None, *, xfm=None, vox=False, implementation="auto")`
-
-`coords` is N × 3, or a file, in `std`'s millimetres (its sform or qform; without `std`, the
-voxel sizes of a 1 mm grid); `xfm` is FLIRT's matrix from `img` to `std`, which the program
-inverts. The result is N × 3, in `img`'s millimetres, or its NIfTI voxels with `vox`.
 
 ### Options of `std2imgcoord`
 
@@ -365,8 +360,14 @@ larmorx fsl std2imgcoord -img boldref.nii.gz -std std.nii.gz -xfm bold2std.mat c
 
 ### Ports of `std2imgcoord`
 
-Both ports are complete, as for `avscale` and `img2imgcoord` (above), with standard input's
-repeated-triple end.
+Both ports are complete (`specs/flirt.md` §15.2), standard input included (the prompts and the
+refusal at a terminal): there the list also ends at a coordinate equal to the one before it,
+which is not printed. Where FSL aborts, they print the same lines and exit with status 1; `-warp`
+is refused until FNIRT is ported.
+
+The replica's record holds 13 cases of `std2imgcoord`: 8 identical to FSL, 5 where both refuse or
+abort alike. The clean room's holds 14: 8 identical to FSL in every byte of text and file, 6
+where both refuse or abort alike.
 
 ## `img2stdcoord`
 
@@ -386,9 +387,6 @@ voxels by default, output in the standard image's millimetres.
 ### Python (`img2stdcoord`)
 
 `lx.fsl.img2stdcoord(coords, img, std=None, *, xfm=None, mm=False, implementation="auto")`
-
-`coords` is N × 3, or a file, in `img`'s NIfTI voxels, or its millimetres with `mm`; `xfm` is
-FLIRT's matrix from `img` to `std`. The result is N × 3, in `std`'s millimetres.
 
 ### Options of `img2stdcoord`
 
@@ -418,7 +416,13 @@ larmorx fsl img2stdcoord -img T1w.nii.gz -std std.nii.gz -xfm t1_to_std.mat coor
 
 ### Ports of `img2stdcoord`
 
-Both ports are complete, as for `avscale` and `img2imgcoord` (above).
+Both ports are complete (`specs/flirt.md` §15.2), standard input included (the prompts and the
+refusal at a terminal). Where FSL aborts, they print the same lines and exit with status 1;
+`-warp` is refused until FNIRT is ported.
+
+The replica's record holds 12 cases of `img2stdcoord`: 7 identical to FSL, 5 where both refuse or
+abort alike. The clean room's holds 12: 7 identical to FSL in every byte of text and file, 5
+where both refuse or abort alike.
 
 ## `rmsdiff`
 
@@ -439,8 +443,6 @@ over the mask's voxels.
 ### Python (`rmsdiff`)
 
 `lx.fsl.rmsdiff(matrix1, matrix2, ref, mask=None, *, implementation="auto")`
-
-The matrices are 4 × 4 arrays or files. The result is a float, or `(largest, rms)` with a mask.
 
 ### Options of `rmsdiff`
 
@@ -464,7 +466,12 @@ larmorx fsl rmsdiff a.mat b.mat boldref.nii.gz
 
 ### Ports of `rmsdiff`
 
-Both ports are complete, as for `avscale` (above).
+Both ports are complete (`specs/flirt.md` §15.3). Where FSL aborts, they print the same lines and
+exit with status 1.
+
+The replica's record holds 7 cases of `rmsdiff`: 4 identical to FSL, 3 where both refuse or abort
+alike. The clean room's holds 7: 4 identical to FSL in every byte of text and file, 3 where both
+refuse or abort alike.
 
 ## `makerot`
 
@@ -513,11 +520,18 @@ r.shape  # -> (4, 4)
 larmorx fsl makerot -t 30 -a 1,2,3 -c 4,5,6 -o rot.mat
 ```
 
+The axis (1, 2, 3) is not of length 1, so LARMORX corrects FSL-76 and says so; `reproduce` gives
+FSL's matrix.
+
 ### Ports of `makerot`
 
-Both ports are complete, as for `avscale` (above): FSL-76 corrected by default (FSL's matrix with
+Both ports are complete (`specs/flirt.md` §15.4): FSL-76 corrected by default (FSL's matrix with
 `reproduce`, named), FSL-77 refused by default (FSL's reading with `reproduce`, named in both
-modes).
+modes). Where FSL aborts, they print the same lines and exit with status 1.
+
+The replica's record holds 14 cases of `makerot`: 8 identical to FSL, 6 where both refuse or abort
+alike. The clean room's holds 14: 8 identical to FSL in every byte of text and file, 6 where both
+refuse or abort alike.
 
 ## `midtrans`
 
@@ -540,8 +554,7 @@ composed with it is written too.
 
 `lx.fsl.midtrans(transforms, *, template=None, separate=None, implementation="auto", upstream_defects="fix")`
 
-`transforms` are 4 × 4 arrays or matrix files, at least two; `template` is a path or an `lx.Image`.
-The result is the 4 × 4 transform from the template space to the middle.
+`template` is a path or an `lx.Image`.
 
 ### Options of `midtrans`
 
@@ -570,8 +583,7 @@ larmorx fsl midtrans -o temp2mid.mat A2temp.mat B2temp.mat C2temp.mat
 
 ### Ports of `midtrans`
 
-Both ports are complete: every option, usage, message, exit status and failure case of
-`specs/flirt.md` §15.5, with every stage that `-v` and `--debug` print. An error after the
+Both ports are complete (`specs/flirt.md` §15.5), with every stage that `-v` and `--debug` print. An error after the
 arguments exits with status 1 (FSL exits 0: **FSL-78**, corrected by default and named). The clean
 room uses a transform whose determinant is not finite (FSL's test is `|det| < 1e-6`), and refuses
 transforms whose averages reach beyond double precision, such as a scale of 1e200 or a translation
@@ -602,9 +614,8 @@ three points is read with one point per column, as FSL reads it.
 
 `lx.fsl.pointflirt(in_points, ref_points, *, in_image=None, ref_image=None, implementation="auto")`
 
-`in_points` and `ref_points` are N × 3 arrays or text files of rows `x y z`, as many points in
-each; `in_image` and `ref_image` are paths or `lx.Image` objects, given both or neither. The
-result is the 4 × 4 matrix.
+The two sets hold as many points; `in_image` and `ref_image` are paths or `lx.Image` objects,
+given both or neither.
 
 ### Options of `pointflirt`
 
@@ -634,8 +645,8 @@ larmorx fsl pointflirt -i in.txt -r ref.txt -o in2ref.mat
 
 ### Ports of `pointflirt`
 
-Both ports are complete: every option, usage, message, exit status and failure case of
-`specs/flirt.md` §15.6, with its transposition rule, `--vox` and the nullspace warning. Two
+Both ports are complete (`specs/flirt.md` §15.6), with its transposition rule, `--vox` and the
+nullspace warning. Two
 coordinate files both empty or missing are refused in both modes (**FSL-204**: FSL crashes after
 its `Could not open matrix file` lines): `larmorx-nc: error: pointflirt: no points in the
 coordinate files (FSL-204)`, exit status 1, the clean room after `-v`'s headings, as FSL prints
@@ -668,8 +679,7 @@ default), trilinear, nearest neighbour or spline, and the output keeps the input
 
 `lx.fsl.applyxfm4d(in_image, ref_image, out_image, transforms, *, single_matrix=False, four_digit=False, user_prefix=None, interp="sinc", three_d=False, implementation="auto", upstream_defects="fix")`
 
-The images and `transforms` are paths. The output's extension chooses its format (`.nii.gz`,
-`.nii`, `.hdr` or `.img`; none: `.nii.gz`). The result is the path written.
+The images and `transforms` are paths.
 
 ### Options of `applyxfm4D`
 
@@ -702,8 +712,7 @@ larmorx fsl applyxfm4D bold.nii.gz boldref.nii.gz bold_on_ref.nii.gz bold2ref.ma
 
 ### Ports of `applyxfm4D`
 
-Both ports are complete: every option, usage, message, exit status and failure case of
-`specs/flirt.md` §15.7, on FLIRT's shared resampling (no blur, as FSL). FSL's defects are corrected
+Both ports are complete (`specs/flirt.md` §15.7), on FLIRT's shared resampling (no blur, as FSL). FSL's defects are corrected
 by default, and FSL's behaviour comes with `upstream_defects="reproduce"`:
 
 - **FSL-09**: integer outputs are rounded to the nearest and clamped (FSL truncates).
@@ -771,8 +780,7 @@ larmorx fsl pairreg b1_brain.nii.gz b2_brain.nii.gz b1.nii.gz b2.nii.gz b2_to_b1
 
 ### Ports of `pairreg`
 
-Both ports are complete: every usage, message, exit status and failure case of `specs/flirt.md`
-§15.8. The clean room runs its own `flirt` three times and one `convert_xfm -fixscaleskew`, in
+Both ports are complete (`specs/flirt.md` §15.8). The clean room runs its own `flirt` three times and one `convert_xfm -fixscaleskew`, in
 this process, and carries FSL's three schedules itself: it needs no `$FSLDIR`. `-v` echoes FSL's
 lines, and a step that aborts is followed by the shell's `Aborted` line. Arguments that the
 script's shell would split or expand are refused.
@@ -830,8 +838,7 @@ larmorx fsl extracttxt value log.txt 3 -1
 
 ### Ports of `extracttxt`
 
-Both ports are complete: every usage, message, exit status and failure case of `specs/flirt.md`
-§15.8. The clean room has its own POSIX basic regular expressions (with GNU grep's extensions) and
+Both ports are complete (`specs/flirt.md` §15.8). The clean room has its own POSIX basic regular expressions (with GNU grep's extensions) and
 the script's dc and sed arithmetic, messages included. GNU sed's usage text, which a range read as
 sed's options prints, is not reproduced: one LARMORX line takes its place. Refused, as the spec
 says: arguments that the script's shell would split or expand, counts and starts that are not
@@ -859,8 +866,6 @@ anterior commissure, the AC-PC line and the mid-sagittal plane.
 ### Python (`aff2rigid`)
 
 `lx.fsl.aff2rigid(matrix, *, implementation="auto", upstream_defects="fix")`
-
-`matrix` is a 4 × 4 array or a matrix file. The result is the 4 × 4 rigid matrix.
 
 ### Options of `aff2rigid`
 
@@ -1059,7 +1064,7 @@ registration at its cost's last bits ([findings](../findings/fsl-flirt-clean-roo
 `-debug` and NaN centres"; the weighted `normcorr` FSL's matrix as text since 2026-11-07, its
 count's running total taking each point's weight as the point is visited).
 
-## Upstream defects (D13)
+## Defects of the original, corrected by default
 
 Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
 ([register](../findings/upstream-defects.md)):

@@ -216,7 +216,7 @@ own copy (`crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/`, installed by i
 refuses likewise (`larmorx-nc: error: standard_space_roi: FSL's data image
 standard/MNI152_T1_2mm was not found: ...`, exit 1).
 
-## Upstream defects (D13)
+## Defects of the original, corrected by default
 
 Corrected by default; `upstream_defects="reproduce"` (the command line's `--upstream-defects
 reproduce`, or `LARMORX_UPSTREAM_DEFECTS=reproduce`) gives FSL's behaviour.

@@ -204,6 +204,13 @@ DRIFTS = [
         "usage-only names `-m`",
     ),
     (
+        "a section that points above, at another program's section",
+        API,
+        "alone or inside one of seven variations (below).",
+        "alone or inside one of seven variations, as for `bet2` (above).",
+        "points by place",
+    ),
+    (
         "a link to a replica crate",
         API,
         "[licensing](../licensing.md)",

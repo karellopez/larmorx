@@ -120,7 +120,7 @@ def fslroi(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-roi.md``, "Upstream defects").
+        (``docs/api/fsl-roi.md``, "Defects of the original, corrected by default").
     """
     spatial = (x, y, z)
     if t is None and all(a is None for a in spatial):
@@ -184,7 +184,7 @@ def standard_space_roi(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-roi.md``, "Upstream defects").
+        (``docs/api/fsl-roi.md``, "Defects of the original, corrected by default").
     """
     args: list[str] = []
     with tempfile.TemporaryDirectory(prefix="larmorx-ssroi-") as tmp:

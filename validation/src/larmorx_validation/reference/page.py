@@ -15,6 +15,9 @@ test_reference.py``):
   as ``bet``'s ``-h``);
 - the call written in the API page's Python section is the function's signature;
 - the records named exist, and the ports named are the ones the replica registry lists;
+- no text of a program's section (or the shared Ports section) points at the API page's other
+  sections by place ("(above)", "as for `avscale` (above)", a link "[below](...)"): each section
+  is a page of its own;
 - the page links no restricted file (a replica crate, a source-derived finding, ``docs/parts/``,
   the probes, the files the clean-room briefs forbid): a reference page is readable material
   (the writing guide, section 1).
@@ -297,6 +300,19 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     params = {q.name for q in fn.params}
     own = code.own_options(repo)
     released = next_release(repo, [o.option for o in own])
+
+    # A section is a page of its own: it cannot point at the API page's other sections by place.
+    ports = page.section("ports")
+    for where_text in (p.section.text(), ports.text() if ports is not None else ""):
+        # "(below)" may point further down the same page (bet's variations, in its options); a
+        # link "below" leaves the page, and "above" names what the page does not hold
+        for m in re.finditer(
+            r"\((?:see |as for [^)]*)?above\b[^)]*\)|\[(?:above|below)\]\(", where_text
+        ):
+            problems.append(
+                f"{where}: {m.group(0)!r} points by place, which its reference page cannot "
+                "follow: name or link what it means"
+            )
 
     # The Python section: the call written there is the signature.
     py = p.child("python")

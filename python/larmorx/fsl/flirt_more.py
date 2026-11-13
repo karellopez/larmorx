@@ -99,7 +99,7 @@ def midtrans(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-flirt.md``, "Upstream defects").
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
     """
     if len(transforms) < 2:
         raise ValueError("midtrans needs at least 2 transforms")
@@ -182,7 +182,7 @@ def applyxfm4d(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-flirt.md``, "Upstream defects").
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
     """
     selected = _replica.select("fsl", "applyxfm4D", implementation)
     with tempfile.TemporaryDirectory(prefix="larmorx-applyxfm4d-") as tmp:
@@ -246,7 +246,7 @@ def pairreg(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-flirt.md``, "Upstream defects").
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
     """
     with tempfile.TemporaryDirectory(prefix="larmorx-pairreg-") as tmp:
         out = os.path.join(tmp, "pair.mat")
@@ -306,7 +306,7 @@ def aff2rigid(
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
-        (``docs/api/fsl-flirt.md``, "Upstream defects").
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
     """
     with tempfile.TemporaryDirectory(prefix="larmorx-aff2rigid-") as tmp:
         out = os.path.join(tmp, "rigid.mat")

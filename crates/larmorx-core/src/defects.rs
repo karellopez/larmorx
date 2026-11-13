@@ -1061,6 +1061,8 @@ defects! {
         "vnl_symmetric_eigensystem never returns on many matrices with an infinite or NaN entry: EISPACK's pythag loops for ever when its second argument is NaN or both are infinite (its iteration starts from a NaN ratio and never meets its stopping test), and tql2 makes such calls, once after reading and writing one element past its arrays (when a NaN is left at the end of the subdiagonal)";
     ITK_116 = "ITK-116", "VXL", true,
         "vnl_svd (LINPACK's svdc) can loop for ever on a matrix with an infinite or NaN entry: its deflation and splitting steps do not count towards the iteration limit, and they can come back to the same singular values and superdiagonal again and again";
+    ITK_117 = "ITK-117", "VXL", true,
+        "vnl_real_eigensystem takes an eigenvalue whose imaginary part is not 0 for the first of a complex pair; when the last eigenvalue's imaginary part is NaN it reads the eigenvector's imaginary part from one row past its eigenvector matrix and writes the conjugate one element past its eigenvalues: memory contents, and the program can crash";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -1509,6 +1511,58 @@ defects! {
         "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
     FS_228 = "FS-228", "FreeSurfer", true,
         "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
+    FS_285 = "FS-285", "FreeSurfer", true,
+        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
+    FS_286 = "FS-286", "FreeSurfer", true,
+        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes the word past its 2-byte buffer: memory corruption, a crash or wrong values";
+    FS_287 = "FS-287", "FreeSurfer", true,
+        "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
+    FS_288 = "FS-288", "FreeSurfer", true,
+        "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
+    FS_289 = "FS-289", "FreeSurfer", true,
+        "the volume operations that walk a second volume (or the destination, or a frame they are given) with the first volume's extent and frames read and write other voxels of a smaller volume";
+    FS_290 = "FS-290", "FreeSurfer", true,
+        "the same operations read and write memory outside a volume whose extent or frames are smaller than the first's, or outside a frame it does not have";
+    FS_291 = "FS-291", "FreeSurfer", true,
+        "MRIinvertContrast and MRIscaleAndMultiply, written for volumes of bytes, take the first bytes of each row of a volume of another type as byte voxels: meaningless values";
+    FS_292 = "FS-292", "FreeSurfer", true,
+        "MRIdivide of three byte volumes does not move on in the first volume and the destination after a voxel whose divisor is 0: the rest of the row is divided with the wrong voxels and written one place early";
+    FS_293 = "FS-293", "FreeSurfer", true,
+        "MRIextractInto given a destination of another type than the source frees the caller's volume, which the caller then still uses";
+    FS_294 = "FS-294", "FreeSurfer", true,
+        "MRIextractInto with a start at or past the source's extent copies rows of a negative length (a huge size): the program crashes";
+    FS_295 = "FS-295", "FreeSurfer", true,
+        "MRIextractInto sets a new volume's start and end positions (xstart, xend and the others) with the voxel sizes truncated to integers: sub-millimetre voxels give 0, 1.5 mm voxels 1";
+    FS_296 = "FS-296", "FreeSurfer", true,
+        "MRIscalarMulFrame stores a NaN product into a byte volume by C's conversion, which is undefined for NaN";
+    FS_297 = "FS-297", "FreeSurfer", true,
+        "MRIextractInto of a volume of 64-bit integers (long) copies each row of the box from half its first column in the source to half its first column in the destination: the box's voxels come from the wrong place, half voxels included";
+    FS_298 = "FS-298", "FreeSurfer", true,
+        "the trilinear, cubic and sinc samplers read a volume of 64-bit integers (long) as 32-bit integers at the voxel's index: they sample halves of other voxels";
+    FS_299 = "FS-299", "FreeSurfer", true,
+        "MRIcubicSampleVolume (cubic sampling) divides its weighted sum by the number of points it added (64 inside the volume) where its weights sum to 8: a constant volume samples to an eighth of its value, other volumes likewise too dark";
+    FS_300 = "FS-300", "FreeSurfer", true,
+        "MRIcubicSampleVolumeFrame (cubic sampling of a frame) near the volume's edge adds window points it never read: memory contents";
+    FS_301 = "FS-301", "FreeSurfer", true,
+        "MRItranslate and MRIrotate_I (and the rotations about an axis) write each sample as a byte at the voxel's byte place whatever the volume's type: a volume of another type gets bytes inside its voxels";
+    FS_303 = "FS-303", "FreeSurfer", true,
+        "MRItranslate and MRIrotate_I on a volume of a type the trilinear sampler refuses store a value never set (memory contents) or the sample before";
+    FS_304 = "FS-304", "FreeSurfer", true,
+        "MRIrotateX_I, MRIrotateY_I and MRIrotateZ_I with an angle whose rotation cannot be inverted (NaN, infinite) crash after the error message";
+    FS_305 = "FS-305", "FreeSurfer", true,
+        "MRIfindApproximateSkullBoundingBox of a volume whose centre of mass is not a number (infinite voxels) walks about two billion voxels outside the volume and, when its first box is narrow, never returns";
+    FS_306 = "FS-306", "FreeSurfer", true,
+        "reading a transform whose file name has 500 bytes or more overflows the buffer the name is classified in (memory corruption)";
+    FS_307 = "FS-307", "FreeSurfer", true,
+        "reading a MINC transform (.xfm) whose last line starts with % after a second % comment line never returns";
+    FS_308 = "FS-308", "FreeSurfer", true,
+        "reading an .lta whose first two lines are not type = <n> and nxforms = <n> takes the type or the number of transforms from memory contents";
+    FS_309 = "FS-309", "FreeSurfer", true,
+        "reading an .lta of a single line crashes";
+    FS_310 = "FS-310", "FreeSurfer", true,
+        "reading a MINC transform (.xfm) whose %Generated by comment ends with a word containing src or dst crashes";
+    FS_302 = "FS-302", "FreeSurfer", true,
+        "the sinc samplers with a half-width whose window holds more than 128 voxels on an axis write past their weight arrays: memory corruption or a crash";
 }
 
 /// The register entry with ID `id`.

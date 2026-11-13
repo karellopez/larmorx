@@ -8,10 +8,13 @@ that takes the same commands (README.md beside this file), compared line by line
     python -P compare.py compare --probe P --candidate C --scratch DIR [--mode reproduce|fix]
 
 ``--groups a,b`` limits the groups; ``--seed`` (default 7) chooses the generated cases. Each group's
-batch runs three times on the probe: plainly, and twice under the guard allocator
-(``guard_malloc.so`` beside the probe, ``LD_PRELOAD``) with two fill bytes (``MALLOC_PERTURB_`` 90
-and 165): a line whose three results are not the same depends on memory FreeSurfer does not own
-(**memory**, README.md). The probe's runs go through the oracle-output cache (``oracle_cache.run``,
+batches run four times on the probe: plainly, plainly again in another process (the stack below each
+call zeroed), and twice under the guard allocator (``guard_malloc.so`` beside the probe,
+``LD_PRELOAD``: a guard page after, then before, each allocation, fill bytes ``MALLOC_PERTURB_`` 90
+and 165): a line whose four results are not the same depends on memory FreeSurfer does not own
+(**memory**, README.md). A batch may require the spec's refusal where FreeSurfer never returns
+(``refusal``) and allow differences in NaNs' bits only on lines with infinite or NaN inputs
+(``nanbits``). The probe's runs go through the oracle-output cache (``oracle_cache.run``,
 one thread, the family ``freesurfer``) when the validation package is importable
 (``PYTHONPATH=validation/src``), else directly (``--no-cache``). The candidate runs with
 ``LARMORX_UPSTREAM_DEFECTS`` set to the mode. Exit status 1 when a difference is not explained
@@ -40,6 +43,33 @@ WORKSPACE_GUESS = HERE.parents[3]
 
 def f32(v: float) -> str:
     return struct.pack(">f", v).hex()
+
+
+def nonfinite_input(src: str) -> bool:
+    """Whether a case's line holds an infinite or NaN float (an 8-digit hexadecimal token whose
+    exponent bits are all ones; integers are decimal, strings start with ``x``)."""
+    for t in src.split():
+        if (
+            len(t) == 8
+            and re.fullmatch(r"[0-9a-f]{8}", t)
+            and int(t, 16) & 0x7F800000 == 0x7F800000
+        ):
+            return True
+    return False
+
+
+def nan_masked(line: bytes) -> bytes:
+    """The line with every float NaN (8 hexadecimal digits, exponent all ones, a significand) as
+    ``NaN``, in the result and in the streams' printed text (``nan``, ``-nan``)."""
+    res, o, e = decode(line)
+
+    def tok(m: re.Match[bytes]) -> bytes:
+        v = int(m.group(0), 16)
+        return b"NaN" if v & 0x7F800000 == 0x7F800000 and v & 0x7FFFFF else m.group(0)
+
+    res = re.sub(rb"\b[0-9a-f]{8}\b", tok, res)
+    o, e = (re.sub(rb"-?nan", b"nan", x) for x in (o, e))
+    return res + b" | " + o + b" | " + e
 
 
 def f64(v: float) -> str:
@@ -97,6 +127,12 @@ class Batch:
     env: dict[str, str] = field(default_factory=dict)
     never: str = ""  # why the probe's runs are never cached
     mask_digits: bool = False  # the clock's numbers (the time-of-day seeds)
+    #: where FreeSurfer never returns (``TIMEOUT``), the candidate's standard error must match this
+    #: (the spec's refusal in both modes); empty: any line that is not TIMEOUT or CRASH
+    refusal: bytes = b""
+    #: why a line with an infinite or NaN input may differ from the probe's in its NaNs' bits only
+    #: (their signs and payloads; README.md, "What may differ"); empty: never
+    nanbits: str = ""
 
 
 class Gen:
@@ -381,10 +417,30 @@ class Gen:
             L.append(f"mcopy {a} {self.mat(r, max(1, rows - 1), cols, t1)}")
         L += ["mcopy null new", "mfree null"]
         old = [ln for ln in L if ln.startswith(("malloc ", "mcopy"))][:40]
+        sizes = self.mmake_sizes()
         return [
             Batch("mmake", "mmake", L),
             Batch("mmake", "mmake-old", old, env={"FREESURFER_MatrixAlloc_old": "1"}),
+            Batch("mmake", "mmake-sizes", sizes),
+            Batch("mmake", "mmake-sizes-old", sizes, env={"FREESURFER_MatrixAlloc_old": "1"}),
         ]
+
+    @staticmethod
+    def mmake_sizes() -> list[str]:
+        """FS-13 (§2.2, fixed cases): negative row and column counts around the limits of the
+        matrices FreeSurfer makes (rows -16 and -17, -8 and -9, the products -2 and -3, the caller's
+        buffer's 192 bytes), real, complex and an unknown type, through both allocation forms."""
+        rows = [-17, -16, -12, -9, -8, -3, -2, -1, 0, 1, 2]
+        cols = [-17, -6, -5, -3, -2, -1, 0, 1, 2]
+        L = []
+        for cmd in ("malloc", "malloc2"):
+            for t in (1, 2):
+                L += [f"{cmd} {r} {c} {t}" for r in rows for c in cols if r < 0 or c < 0]
+            L += [
+                f"{cmd} {r} {c} 3"
+                for r, c in ((-1, 2), (1, -2), (-3, -4), (-20, -1), (0, -1), (-12, -1))
+            ]
+        return L
 
     def mproduct(self) -> list[Batch]:
         r = self.rng("mproduct")
@@ -430,7 +486,41 @@ class Gen:
             f"affineset {self.mat(r, 3, 4)}",
             f"affineget {self.mat(r, 4, 3)} " + " ".join(["3f800000"] * 16),
         ]
-        return [Batch("affine", "affine", L)]
+        return [Batch("affine", "affine", L), Batch("affine", "affine-nan", self.affine_nan())]
+
+    @staticmethod
+    def affine_nan() -> list[str]:
+        """§3's operand order (fixed cases): two NaNs of different payloads meeting in one product
+        (the matrix's column j against the vector's number j, and against the second matrix's row j)
+        and in each sum (the running sum against the next product), with quiet, signalling and mixed
+        NaNs; and a NaN made from numbers (0 times infinity) meeting a NaN operand."""
+        one = "3f800000"
+
+        def mat(cols: dict[int, str], rows: dict[int, str] | None = None) -> str:
+            m = [[cols.get(c, one) for c in range(4)] for _ in range(4)]
+            for rr, v in (rows or {}).items():
+                m[rr] = [v] * 4
+            return "1 4 4 " + " ".join(x for row in m for x in row)
+
+        L = []
+        for p1, p2 in (
+            ("7fc00001", "ffc00002"),
+            ("7f800003", "ff800004"),
+            ("ffc00005", "7f800006"),
+        ):
+            for j in range(4):
+                v = [one] * 4
+                v[j] = p2
+                L.append(f"affine {mat({j: p1})} {mat({}, {j: p2})} {' '.join(v)}")
+            for k in (1, 2, 3):
+                L.append(f"affine {mat({0: p1, k: p2})} {mat({})} {' '.join([one] * 4)}")
+            for k in (2, 3):
+                L.append(f"affine {mat({k - 1: p1, k: p2})} {mat({})} {' '.join([one] * 4)}")
+            for k in (0, 3):
+                v = [one] * 4
+                v[k] = "00000000"
+                L.append(f"affine {mat({k: '7f800000', 2: p2})} {mat({})} {' '.join(v)}")
+        return L
 
     def dmatrix(self) -> list[Batch]:
         r = self.rng("dmatrix")
@@ -766,7 +856,64 @@ class Gen:
                     f"meigen {self.mat(r, n, n + 1)} new",
                     f"meigen {self.mat(r, n, n)} {self.mat(r, max(1, n - 1), n)}",
                 ]
-        return [Batch("eigen", "eigen", L)]
+        never = rb"never returns on this matrix"
+        return [Batch("eigen", "eigen", L, refusal=never), self.eigen_nonfinite(never)]
+
+    def eigen_nonfinite(self, never: bytes) -> Batch:
+        """FS-47's two kinds (spec §17.1): symmetric matrices with infinite or NaN entries, some on
+        which FreeSurfer's eigensystem never returns, the others it finishes. Its own generator, so
+        the batch above keeps its cases."""
+        r = self.rng("eigen-nonfinite")
+        inf, nan, z = "7f800000", "7fc00000", "00000000"
+        picked = [  # n, the numbers row by row
+            (2, [inf, "c0800000", "c0800000", "41000000"]),
+            (2, [nan, "3f800000", "3f800000", "40000000"]),
+            (2, ["3f800000", "40000000", "40000000", nan]),
+            (2, ["3f800000", nan, nan, "40000000"]),
+            (2, [inf, z, z, inf]),
+            (2, [z, inf, inf, z]),
+            (2, ["ff800000", z, z, "3f800000"]),
+            (3, [z, z, z, z, inf, z, z, z, z]),
+            (3, ["3f800000", z, z, z, nan, z, z, z, "40000000"]),
+            (1, [inf]),
+            (1, ["ffd00001"]),
+        ]
+        cases = list(picked)
+        for _ in range(100):
+            n = r.randint(1, 5)
+            base = r.choice(["zeros", "diag", "dense", "sparse"])
+            a = [[z] * n for _ in range(n)]
+            for x in range(n):
+                for y in range(x, n):
+                    v = 0.0
+                    on = (base == "diag" and x == y) or base == "dense"
+                    if on or (base == "sparse" and r.random() < 0.4):
+                        v = float(r.randint(-9, 9))
+                    a[x][y] = a[y][x] = f32(v)
+            place = r.choice(["mirror", "mirror", "upper", "diagonal", "lower"])
+            for _ in range(r.randint(1, 3)):
+                x, y = sorted((r.randrange(n), r.randrange(n)))
+                v = f"{r.choice(NONFINITE):08x}"
+                if place == "diagonal":
+                    a[x][x] = v
+                elif place == "upper":
+                    a[x][y] = v
+                elif place == "lower" and n > 1:  # below the diagonal: the routine never reads it
+                    row = r.randrange(1, n)
+                    a[row][r.randrange(row)] = v
+                else:
+                    a[x][y] = a[y][x] = v
+            cases.append((n, [a[x][y] for x in range(n) for y in range(n)]))
+        L = []
+        for n, nums in cases:
+            m = f"1 {n} {n} {' '.join(nums)}"
+            L += [f"@1 oeigen {n} {' '.join(nums)}", f"@1 meigenhelper {m} 1 new"]
+            sym = all(nums[x * n + y] == nums[y * n + x] for x in range(n) for y in range(n))
+            if sym and not any(
+                int(v, 16) & 0x7FFFFF and int(v, 16) & 0x7F800000 == 0x7F800000 for v in nums
+            ):
+                L.append(f"@1 meigen {m} new")  # no NaN: the symmetric path (§17.3)
+        return Batch("eigen", "eigen-nonfinite", L, refusal=never)
 
     def svd(self) -> list[Batch]:
         r = self.rng("svd")
@@ -786,7 +933,59 @@ class Gen:
             L += [f"{at}mpinverse {a} new", f"{at}mpinverse {a} {self.mat(r, cols, rows)}"]
             L += [f"{at}mpinverse {a} {self.mat(r, rows, cols)}"]
             L += [f"{at}msvdpinverse {a} new", f"{at}msvdpinverse {a} {self.mat(r, cols, rows)}"]
-        return [Batch("svd", "svd", L)]
+        return [
+            Batch("svd", "svd", L, refusal=SVD_REFUSAL, nanbits=SVD_NANBITS),
+            self.svd_nonfinite(),
+        ]
+
+    def svd_nonfinite(self) -> Batch:
+        """FS-48's two kinds (spec §17.4): matrices with infinite or NaN entries on which LINPACK
+        never returns, and those it finishes (a failure or a decomposition); finite matrices whose
+        products overflow. Its own generator."""
+        r = self.rng("svd-nonfinite")
+        inf, nan, z = "7f800000", "7fc00000", "00000000"
+        cases = [
+            (1, 1, [inf]),
+            (1, 1, ["ff800000"]),
+            (1, 1, [nan]),
+            (2, 1, [inf, z]),
+            (2, 2, [inf, z, z, "3f800000"]),
+            (
+                3,
+                3,
+                ["80000000", "ff800000", "3f800000", "80000000", nan, inf, "80000000", nan, nan],
+            ),
+        ]
+        for _ in range(80):
+            c = r.randint(1, 5)
+            rows = r.randint(c, 6)
+            base = r.choice(["zeros", "diag", "dense", "sparse"])
+            a = []
+            for x in range(rows):
+                for y in range(c):
+                    v = 0.0
+                    on = (base == "diag" and x == y) or base == "dense"
+                    if on or (base == "sparse" and r.random() < 0.4):
+                        v = float(r.randint(-9, 9))
+                    a.append(f32(v))
+            pool = r.choice([NONFINITE[:2], NONFINITE[2:], NONFINITE])
+            for _ in range(r.randint(1, 3)):
+                a[r.randrange(rows * c)] = f"{r.choice(pool):08x}"
+            cases.append((rows, c, a))
+        L = []
+        for rows, c, a in cases:
+            m = f"1 {rows} {c} {' '.join(a)}"
+            L += [
+                f"@1 msvd {m} 1 {c} 1 {' '.join([z] * c)} new",
+                f"@1 msvdvalues {m} {rows}",
+                f"@1 mcond {m}",
+                f"@1 msvdpinverse {m} new",
+            ]
+        for _ in range(8):  # finite, but the products the condition numbers decompose overflow
+            k = r.randint(2, 5)
+            big = [f32(r.choice([1e20, -3e25, 7e30, 2e19])) for _ in range(k)]
+            L += [f"@1 mnscond 1 1 {k} {' '.join(big)}", f"@1 mnscond 1 {k} 1 {' '.join(big)}"]
+        return Batch("svd", "svd-nonfinite", L, refusal=SVD_REFUSAL, nanbits=SVD_NANBITS)
 
     def mfiles(self) -> list[Batch]:
         r = self.rng("mfiles")
@@ -878,7 +1077,62 @@ class Gen:
             a = self.mat(r, r.randint(1, 4), r.randint(1, 4), typ, special=0.2)
             L += [f"mwriteasc {a}", f"mwritebin {a}", f"mwritetxt {xs('w.txt')} {a}"]
         L.append(f"mwritetxt {xs('no/such/w.txt')} {self.mat(r, 2, 2)}")
-        return [Batch("mfiles", "mfiles", L)]
+        return [Batch("mfiles", "mfiles", L), self.mfiles_cut(), self.mfiles_end()]
+
+    @staticmethod
+    def mfiles_end() -> Batch:
+        """§18.1's errno at the end of the input (fixed cases): text and ASCII matrix files whose
+        last number overflows or underflows at the very end of the file or just before it, real and
+        complex, with and without the white space after it."""
+        asc = [
+            "1 1 1\n1e40",
+            "1 1 1\n1e40\n",
+            "1 1 1\n1e40 ",
+            "1 1 1\n-1e40",
+            "1 1 1\n1e-50",
+            "1 1 2\n1 1e40",
+            "1 1 2\n1e40 1",
+            "1 1 2\n1e-50 1e40",
+            "1 2 1\n1e40\n1",
+            "2 1 1\n1e40",
+            "2 1 1\n1e40 ",
+            "2 1 1\n5",
+            "2 1 1\n1e-50",
+            "2 1 1\n1e-50 2",
+            "2 1 1\n1e40 1e-50",
+            "2 1 2\n1e40 1 1e-50",
+            "2 1 2\n1 2 3 1e40",
+            "2 1 2\n1 2 3 4",
+        ]
+        txt = ["1e40", "1 1e40", "1e-50\n", "1 2\n3 1e40", "1e40 2", "1e-50 1e40"]
+        L = [f"mreadasc {xs(a)} new" for a in asc]
+        L += [f"mreadtxt {xs('fs-maths-probe.txt')} {xs(t)}" for t in txt]
+        return Batch("mfiles", "mfiles-end", L)
+
+    @staticmethod
+    def mfiles_cut() -> Batch:
+        """FS-49 (spec §18.2): binary matrix files cut short at every byte of the header, of the
+        first element (FreeSurfer's matrix and a given one), of a later element and of a complex
+        element's two parts."""
+        hdr = lambda t, n, c: struct.pack(">iii", t, n, c)  # noqa: E731
+        d = lambda v: struct.pack(">d", v)  # noqa: E731
+        L = []
+        for k in range(8):
+            L.append(f"mreadbin x{(hdr(1, 1, 2) + d(3.25)[:k]).hex()} new")
+            L.append(f"mreadbin x{(hdr(1, 1, 2) + d(3.25)[:k]).hex()} 1 1 2 3f800000 40000000")
+        for k in range(12):
+            L.append(f"mreadbin x{hdr(1, 1, 1)[:k].hex()} 1 1 1 3f800000")
+            L.append(f"mreadbin x{hdr(1, 1, 1)[:k].hex()} new")
+        full = hdr(2, 1, 2) + d(-1.5) + d(2.75)
+        for k in range(8, 16):
+            L.append(f"mreadbin x{full[: 12 + k].hex()} 2 1 2 3f800000 40000000 40400000 40800000")
+        for k in range(8):
+            L.append(
+                f"mreadbin x{(hdr(1, 1, 3) + d(1.0e10) + d(-7.5)[:k]).hex()} 1 1 3 3f800000 40000000 40400000"
+            )
+        for k in range(8):  # after the end, each element the previous one's bytes reversed
+            L.append(f"mreadbin x{(hdr(1, 2, 3) + d(0.1) + d(-2.0e-3)[:k]).hex()} new")
+        return Batch("mfiles", "mfiles-cut", L)
 
     def rfields(self) -> list[Batch]:
         names = ["uniform", "gaussian", "z", "t", "F", "chi2", "f", "Gaussian", "", "normal", "chi"]
@@ -896,6 +1150,14 @@ class Gen:
             ),
         ]
 
+
+#: FS-48 (spec §17.4): where LINPACK never returns, both modes give VNL's failure lines.
+SVD_REFUSAL = rb"suspicious return value \(\d+\) from SVDC"
+#: Why the SVD's lines of matrices with infinite or NaN entries may differ in NaNs' bits only.
+SVD_NANBITS = (
+    "LINPACK's ssvdc as the official build compiled it passes NaNs on in an operand order the main "
+    "package's vnl_svd_f32 does not follow yet (spec §17.4)"
+)
 
 GROUPS = [
     "hmake",
@@ -1136,7 +1398,19 @@ def main() -> int:
             phead = pres.split(b" ", 1)[0]
             qhead = res.split(b" ", 1)[0]
             if phead in (b"TIMEOUT", b"CRASH") and qhead not in (b"TIMEOUT", b"CRASH"):
+                if phead == b"TIMEOUT" and b.refusal and not re.search(b.refusal, e):
+                    t["unexplained"] += 1
+                    bad += 1
+                    print(
+                        f"DIFFERS: {b.group}: FreeSurfer never returns, the spec's refusal expected: {src[:120]}"
+                    )
+                    continue
                 t["FreeSurfer did not finish"] += 1
+                noted.update(ids)
+                continue
+            cand_line = res + b" | x" + o.hex().encode() + b" x" + e.hex().encode()
+            if b.nanbits and nonfinite_input(src) and nan_masked(p) == nan_masked(cand_line):
+                t["NaN bits only"] += 1
                 noted.update(ids)
                 continue
             if mem:
@@ -1153,13 +1427,14 @@ def main() -> int:
                 print(f"DIFFERS: {b.group}: {src[:160]}")
                 print(f"    probe     {p[:200]!r}\n    candidate {q[:200]!r}")
     print(
-        f"mode {a.mode}: group, calls: identical, FreeSurfer did not finish, memory, defect corrected, unexplained"
+        f"mode {a.mode}: group, calls: identical, FreeSurfer did not finish, NaN bits only, memory, "
+        "defect corrected, unexplained"
     )
     for g in groups:
         t = tally.get(g, Counter())
         print(
             f"  {g:10s} {t['calls']:6d}: {t['identical']:6d} {t['FreeSurfer did not finish']:4d} "
-            f"{t['memory']:5d} {t['defect corrected']:5d} {t['unexplained']:5d}"
+            f"{t['NaN bits only']:4d} {t['memory']:5d} {t['defect corrected']:5d} {t['unexplained']:5d}"
         )
     if noted:
         print(

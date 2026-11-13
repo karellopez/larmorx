@@ -1,58 +1,45 @@
 # antsAffineInitializer
 
-`lx.ants.affine_initializer` (command line `larmorx ants antsAffineInitializer`; Rust
-`larmorx_ants::affine_initializer` and the crate `larmorx-registration`). A replica of ANTs
-2.6.5's `antsAffineInitializer` on ITK 5.4.5 (Apache-2.0): an affine transform that aligns two
-images' centres of mass (and, optionally, their principal axes), then the best start point of a
+`lx.ants.affine_initializer` (command line `larmorx ants antsAffineInitializer`): an affine
+transform that aligns two images, as ANTs 2.6.5's `antsAffineInitializer` finds it.
+
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then memory and speed, and ANTs' and ITK's defects as the port corrects them.
+
+## Ports
+
+`antsAffineInitializer` has one port, in `pip install larmorx`: **the replica**
+(`crates/larmorx-ants`, `crates/larmorx-registration`; Apache-2.0; Rust
+`larmorx_ants::affine_initializer`), translated from ANTs 2.6.5's `antsAffineInitializer` on ITK
+5.4.5 (Apache-2.0). **Results do not depend on threads**: larmorx gives ANTs' one-thread result
+at any thread count.
+
+## `antsAffineInitializer`
+
+<!-- reference
+program: antsAffineInitializer
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.affine_initializer
+command-line: crates/larmorx-ants/src/cli/affine_initializer.rs
+records: {replica: [ants-affine-initializer]}
+evidence: ants-ai
+-->
+
+`antsAffineInitializer` finds an affine transform that aligns two images. It aligns their
+centres of mass (and, optionally, their principal axes), then takes the best start point of a
 multi-start search over rotations about the fixed image's principal axes, each refined by
 conjugate-gradient iterations of Mattes mutual information on every 10th voxel (as many as the
 eighth argument says, by default 20; ANTs always runs 20); in 2D, 3D and 4D (in 4D the initial
-alignment only). niworkflows' `RobustMNINormalization` runs it when it is
-given no initial transform (fMRIPrep's template registration).
+alignment only). niworkflows' `RobustMNINormalization` runs it when it is given no initial
+transform (fMRIPrep's template registration).
 
-**Status: `validated`** against `antsAffineInitializer` itself (the
-[validation record](../validation/ants-affine-initializer.md), standard tier): every compared
-case identical to ANTs 2.6.5 at one thread (exit status, both streams, the transform file byte
-for byte), including the usage, every abort and its messages, 2D, 3D and 4D, masks, oblique
-grids and real images (the MNI template and fMRIPrep's preprocessed T1w; full tier: fMRIPrep's own call in the template registration of all five oracle runs, on stand-ins for the masked images nipype did not keep).
+### Python (`antsAffineInitializer`)
 
-| Tier | Cases | Identical to the unmodified ANTs | Rejected by both | Expected divergences | Failures |
-|---|---|---|---|---|---|
-| standard | 41 | 26 | 13 | 2 | 0 |
-| full ([record](../validation/ants-affine-initializer-full.md)) | 46 | 31 | 13 | 2 | 0 |
+`lx.ants.affine_initializer(fixed, moving, *, search_factor=10.0, radian_fraction=0.25, principal_axes=False, local_search_iterations=20, fixed_mask=None, dimension=None, n_threads=1, upstream_defects="fix")`
 
-"Rejected by both" includes the aborts (everything ANTs printed before it stopped is
-identical); the expected divergences are the two search factors whose loop never ends in ANTs.
-**ANTs' own thread band** (4 cases): up to 1.3e-6 in a parameter on the MNI template,
-1e-15 on the phantoms; larmorx gives the one-thread result at any thread count. The
-comparison runs larmorx with ANTs' defects reproduced (`reproduce`); every case also runs in
-larmorx's default mode, where ANTS-54 and ITK-21 (below) are named exactly where they change
-the transform (the fix pass of each case).
-
-**On the data panel** ([record](../validation/ants-affine-initializer-panel.md), 2026-10-26):
-fMRIPrep's own call in the template registration of all fourteen finished oracle runs (no node
-of its own: niworkflows runs it inside `register_template_wf/.../registration`, with nipype's
-`15 0.1 0 10`), on the masked images remade exactly from each node's recorded inputs
-(`larmorx_validation.parity.niworkflows_inputs`; the 3.5-year-old, the glioma, the stroke, the
-7 T MP2RAGE, the 1.5 T MPRAGE, the 82-year-old among them): **14 of
-14 identical to the unmodified ANTs 2.6.5 at one thread**, ANTs' own band at 2 and 3 threads
-6.5e-9 in a parameter. fMRIPrep did not keep the transform it made (at the node's six or eight
-threads); its effect is in the registration's record.
-
-**Results do not depend on threads.** larmorx gives ANTs' one-thread result at any thread
-count.
-
-**Memory and speed** (2026-10-28, [benchmark](../benchmarks/ants-ai.md)): the images are kept
-in float, as ANTs keeps them, so the peak is ANTs' (90 MiB against 90 on a 128 × 128 × 96
-head, 676 against 688 on the 7 T MP2RAGE and the 1 mm MNI template). In `reproduce`, at one
-thread, larmorx takes ANTs' time on the 7 T and 1.2 times it on the head (its search takes 0.6
-of ANTs' time, but the ITK-21 notice needs a second search); in the default mode, which runs
-the iterations the call asks for (niworkflows: 10; ANTs always 20, ANTS-54), half ANTs' time
-or less; at more threads the two searches run at once (eight threads: 3.9 to 4.9 times as fast
-as ANTs at one in `reproduce`, 7 to 9.7 in the default mode). The
-[findings](../findings/ants-ai.md), "Memory and speed (2026-10-28)", say where the time goes.
-
-## Quick start
+Returns the transform as an `ItkTransform` (the search's best, fixed to moving).
 
 ```python
 import larmorx as lx
@@ -64,17 +51,13 @@ t = lx.ants.affine_initializer(
 t                        # ItkTransform('AffineTransform_double_3_3', 12 parameters, 3 fixed)
 ```
 
-```bash
-larmorx ants antsAffineInitializer 3 fixed.nii.gz moving.nii.gz transform.mat 15 0.1 0 10
-```
+### Options of `antsAffineInitializer`
 
-## Option mapping
-
-| antsAffineInitializer (positional) | Python | Notes |
+| ANTs argument (positional) | Python | Notes |
 |---|---|---|
 | 1 `ImageDimension` | `dimension` | default: the fixed image's; `std::stoi`; any number but 2, 3, 4 runs as 2D in ANTs (ANTS-56; corrected, an error) |
 | 2, 3 `Image1`, `Image2` | `fixed`, `moving` | read as float images; a missing image, or one whose values sum to 0, aborts (` zero image1 error `) |
-| 4 `TransformOutput` | the returned `ItkTransform` | written twice: the initial alignment, then the search's best (`.mat`, `.txt`, `.tfm`, HDF5) |
+| 4 `TransformOutput` | the result | the returned `ItkTransform`; written twice: the initial alignment, then the search's best (`.mat`, `.txt`, `.tfm`, HDF5) |
 | 5 `SearchFactor` | `search_factor` | degrees (×0.0174532925), `atof`; default 10 |
 | 6 `Radian-Fraction` | `radian_fraction` | `atof`, clamped to `[0.01, 1]`; the angles run over `[−π·f, π·f + step]`; default 0.25 (`π/4`) |
 | 7 `UsePrincipalAxes` | `principal_axes` | `std::stoi`, non-zero is true; default false |
@@ -86,6 +69,68 @@ larmorx ants antsAffineInitializer 3 fixed.nii.gz moving.nii.gz transform.mat 15
 
 Standard error carries ANTs' ` bad det ...` lines when the principal axes' rotation has a
 negative determinant (they are printed whatever `principal_axes` says) and ITK's warnings.
+
+### Examples of `antsAffineInitializer`
+
+<!-- inputs: fixed.nii.gz=head moving.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# niworkflows' call (15 0.1 0 10), with the local search's iterations as asked.
+t = lx.ants.affine_initializer("fixed.nii.gz", "moving.nii.gz", search_factor=15,
+                               radian_fraction=0.1, local_search_iterations=10)
+t.name  # -> 'AffineTransform_double_3_3'
+```
+
+```bash example
+larmorx ants antsAffineInitializer 3 fixed.nii.gz moving.nii.gz transform.mat 15 0.1 0 10
+```
+
+### Ports of `antsAffineInitializer`
+
+**The replica: status `validated`** against `antsAffineInitializer` itself (its
+[record](../validation/ants-affine-initializer.md), 2026-10-28, standard tier): every compared
+case identical to ANTs 2.6.5 at one thread (exit status, both streams, the transform file byte
+for byte), including the usage, every abort and its messages, 2D, 3D and 4D, masks, oblique
+grids and real images (the MNI template and fMRIPrep's preprocessed T1w; full tier: fMRIPrep's
+own call in the template registration of all five oracle runs, on stand-ins for the masked
+images nipype did not keep).
+
+| Tier | Cases | Identical to the unmodified ANTs | Rejected by both | Expected divergences | Failures |
+|---|---|---|---|---|---|
+| standard | 41 | 26 | 13 | 2 | 0 |
+| full ([record](../validation/ants-affine-initializer-full.md)) | 46 | 31 | 13 | 2 | 0 |
+
+"Rejected by both" includes the aborts (everything ANTs printed before it stopped is
+identical); the expected divergences are the two search factors whose loop never ends in ANTs.
+**ANTs' own thread band** (4 cases): up to 1.3e-6 in a parameter on the MNI template,
+1e-15 on the phantoms; larmorx gives the one-thread result at any thread count. The
+comparison runs larmorx with ANTs' defects reproduced (`reproduce`); every case also runs in
+larmorx's default mode, where ANTS-54 and ITK-21 ([Upstream defects](#upstream-defects-d13))
+are named exactly where they change the transform (the fix pass of each case).
+
+**On the data panel** ([record](../validation/ants-affine-initializer-panel.md), 2026-10-26):
+fMRIPrep's own call in the template registration of all fourteen finished oracle runs (no node
+of its own: niworkflows runs it inside `register_template_wf/.../registration`, with nipype's
+`15 0.1 0 10`), on the masked images remade exactly from each node's recorded inputs
+(`larmorx_validation.parity.niworkflows_inputs`; the 3.5-year-old, the glioma, the stroke, the
+7 T MP2RAGE, the 1.5 T MPRAGE, the 82-year-old among them): **14 of
+14 identical to the unmodified ANTs 2.6.5 at one thread**, ANTs' own band at 2 and 3 threads
+6.5e-9 in a parameter. fMRIPrep did not keep the transform it made (at the node's six or eight
+threads); its effect is in the registration's record.
+
+## Memory and speed
+
+From the [benchmark](../benchmarks/ants-ai.md) (2026-10-28): the images are kept in float, as
+ANTs keeps them, so the peak is ANTs' (90 MiB against 90 on a 128 × 128 × 96 head, 676 against
+688 on the 7 T MP2RAGE and the 1 mm MNI template). In `reproduce`, at one thread, larmorx takes
+ANTs' time on the 7 T and 1.2 times it on the head (its search takes 0.6 of ANTs' time, but the
+ITK-21 notice needs a second search); in the default mode, which runs the iterations the call
+asks for (niworkflows: 10; ANTs always 20, ANTS-54), half ANTs' time or less; at more threads
+the two searches run at once (eight threads: 3.9 to 4.9 times as fast as ANTs at one in
+`reproduce`, 7 to 9.7 in the default mode). The [findings](../findings/ants-ai.md), "Memory and
+speed (2026-10-28)", say where the time goes.
 
 ## Upstream defects (D13)
 

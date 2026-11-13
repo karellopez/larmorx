@@ -1,0 +1,15 @@
+[package]
+name = "larmorx-fs-core"
+description = "Clean-room FreeSurfer-compatible core services, mathematics and volume structure for larmorx (messages, exit statuses, diagnostics, byte order, random numbers, strings, numbers, times, temporary files; matrices, histograms, minimizers; the geometry, the volume, its voxels, copies, tkregister and FSL matrices, linear transform arrays), written from specs/freesurfer-core.md, specs/freesurfer-maths.md and specs/freesurfer-mri.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+# the reproducible sums' pieces on several threads (§19)
+rayon.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true

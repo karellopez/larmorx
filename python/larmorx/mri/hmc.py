@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``hmc``: head-motion correction, compatible with FSL's ``mcflirt`` (clean-room original, or
-the bit-exact replica from ``larmorx-nc``, run as a separate program).
+"""``hmc``: head-motion correction, compatible with FSL's ``mcflirt`` (the clean room, or the
+bit-exact replica from ``larmorx-nc``, run as a separate program).
 
 Every volume of a 4D series is registered to a reference volume with a rigid-body transform,
 by the schedule of line searches ``mcflirt`` uses (8 mm, 4 mm, 4 mm with a tighter tolerance),
-and the series is resampled with those transforms. The clean-room original's numbers follow
+and the series is resampled with those transforms. The clean room's numbers follow
 ``mcflirt`` (FSL 6.0.7.23) closely; the replica (``implementation="replica"``, or ``"auto"`` when
 ``larmorx-nc`` is installed) gives ``mcflirt``'s files bit for bit. See ``docs/api/mri-hmc.md``
 and the validation records ``docs/validation/mri-hmc.md`` and ``fsl-mcflirt-replica.md``.
@@ -85,7 +85,7 @@ class HmcResult:
     mean
         The mean volume of ``mean=True`` (the first pass's corrected mean), else ``None``.
     implementation
-        The implementation that computed the result: larmorx's clean-room original, or the
+        The implementation that computed the result: larmorx's clean room, or the
         ``larmorx-nc`` replica with its version (:class:`larmorx.Implementation`).
     """
 
@@ -258,12 +258,13 @@ def hmc(
     implementation
         ``"auto"`` (default): the bit-exact replica when the ``larmorx-nc`` package is
         installed (FSL Licence: non-commercial use only; ``pip install larmorx-nc``), else the
-        clean-room original; ``"replica"`` or ``"clean-room"`` force one. The replica runs
+        clean room; ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling,
+        still works) force one. The replica runs
         ``mcflirt``'s command line as a separate program on files in a temporary directory and
         returns ``mcflirt``'s outputs as written (the matrices with 6 decimals, the parameters
         and RMS values with 6 significant digits, the corrected series as float32 from the file
         in the input's data type). Options with no command-line equivalent
-        (``in_plane="never"``, ``normcorr_count="weights"``) run the original under ``"auto"``
+        (``in_plane="never"``, ``normcorr_count="weights"``) run the clean room under ``"auto"``
         and are an error with ``"replica"``. ``resample=False`` saves no time with the replica
         (``mcflirt`` always resamples); the series is then not returned.
 
@@ -279,7 +280,7 @@ def hmc(
     larmorx.ReplicaNotFoundError
         ``implementation="replica"`` without ``larmorx-nc`` installed.
     larmorx.ReplicaError
-        The replica was found but failed. larmorx does not fall back to the original then.
+        The replica was found but failed. larmorx does not fall back to the clean room then.
     """
     if cost not in COSTS:
         raise ValueError(f"unknown cost {cost!r}; use one of {', '.join(COSTS)}")

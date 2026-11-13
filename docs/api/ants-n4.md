@@ -1,49 +1,50 @@
 # N4BiasFieldCorrection
 
-`lx.ants.n4_bias_field_correction` (command line `larmorx ants N4BiasFieldCorrection`; Rust
-`larmorx_ants::n4_bias_field_correction`, `larmorx_image::n4`). A replica of ANTs 2.6.5's
-`N4BiasFieldCorrection` on ITK 5.4.5's `N4BiasFieldCorrectionImageFilter` (Apache-2.0): N4
-bias field correction (Tustison et al., *N4ITK: Improved N3 Bias Correction*, IEEE TMI 29(6),
-2010).
+`lx.ants.n4_bias_field_correction` (command line `larmorx ants N4BiasFieldCorrection`): N4 bias
+field correction, as ANTs 2.6.5's `N4BiasFieldCorrection` computes it.
 
-**Status: `validated`** against N4BiasFieldCorrection itself (see the
-[validation record](../validation/ants-n4.md)), on every command line fMRIPrep, sMRIPrep and
-sdcflows give it (standard tier: 45 compared cases, 54 outputs, in 2, 3 and 4 dimensions):
-- against the **unmodified ANTs 2.6.5 binary** at one thread: 29 of 45 cases (35 of 54
-  outputs) bit-identical. The others differ only because glibc's `expf`, `logf` and `exp` are
-  not always correctly rounded and larmorx's are; the differences are smaller than ANTs' own
-  difference between thread counts in 14 of the 16 cases, up to 4.2 times that in two, and
-  NCC is at least 0.9999999 (corrected images) and 0.9999998 (bias fields);
-- against the **same binary run with glibc's `expf`, `logf`, `exp`, `log`, `sin`, `cos` and
-  `sincos` replaced by CORE-MATH's correctly rounded ones** (`LD_PRELOAD`,
-  `scripts/build_crmath_preload.sh`), which is the arithmetic larmorx uses: **54 of 54 outputs
-  bit-identical**. ANTs' own code is not changed; only those C-library functions are;
-- the same against **fMRIPrep 25.2.6's own ANTs (2.6.2)**: 45 of 45 cases bit-identical with
-  CORE-MATH, 29 of 45 as built.
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then the speed, the behaviour worth knowing, ANTs' and ITK's defects as the
+port corrects them, the differences by design and the Rust API.
+
+## Ports
+
+`N4BiasFieldCorrection` has one port, in `pip install larmorx`: **the replica**
+(`crates/larmorx-ants`, `crates/larmorx-image`; Apache-2.0; Rust
+`larmorx_ants::n4_bias_field_correction`, `larmorx_image::n4`), translated from ANTs 2.6.5's
+`N4BiasFieldCorrection` on ITK 5.4.5's `N4BiasFieldCorrectionImageFilter` (Apache-2.0). Its
+result does not depend on the thread count: it is always ANTs' one-thread result.
 
 larmorx computes what ITK's C++ source defines. ANTs built by GCC 11.4 at `-O3` (Ubuntu
 22.04's compiler) does not: GCC bug 110182 drops two float roundings of the B-spline fit, so
 such a build gives slightly different N4 results
 ([findings](../findings/ants-n4.md), "GCC 11 miscompiles the fit").
 
-**On the data panel** ([record](../validation/ants-n4-panel.md), 2026-10-26): all 64 N4 nodes of
-the fourteen finished fMRIPrep oracle runs (the BOLD references, the brain extraction's and the
-final anatomical corrections, the field maps' magnitudes; the 3.5-year-old, the glioma, the
-stroke, strong motion, 1.5 T, 7 T, multiband-8 and multi-echo among them), each replayed from its
-node with its inputs, and sMRIPrep's final options on five images fMRIPrep never corrects (the
-7 T MP2RAGE, a 3 T MP2RAGE UNIT1, the 82-year-old's FLAIR, a glioma's T2w of 6 mm slices, the
-stroke's T2w fitted outside its lesion): **69 of 69 bit-identical with CORE-MATH** (20 to the
-unmodified ANTs; the others within 0.042 of ANTs' own difference between one thread and two or
-three). The panel also checked the input-geometry check: a mask written from the T2w's affine
-(2e-6 mm off) is refused by both.
+## `N4BiasFieldCorrection`
 
-**Speed** ([benchmark](../benchmarks/ants-n4.md)): sMRIPrep's N4 before the anatomical template (ANTs'
-defaults) on a raw T1w (160×192×192) takes 8.7 s on one thread and 2.4 s on 12, against
-55.2 s and 10.7 s for ANTs; fMRIPrep's BOLD reference 135 ms against 1.00 s. On the six
-command lines measured, larmorx is 6.4–7.4× faster than ANTs on one thread, and 4.2–6.3×
-faster than ANTs on 12 threads when both use 12.
+<!-- reference
+program: N4BiasFieldCorrection
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.n4_bias_field_correction
+command-line: crates/larmorx-ants/src/cli/n4_bias_field_correction.rs
+records: {replica: [ants-n4]}
+evidence: ants-n4
+-->
 
-## Quick start
+`N4BiasFieldCorrection` removes a smooth intensity bias field from an image. The method is N4
+(Tustison et al., *N4ITK: Improved N3 Bias Correction*, IEEE TMI 29(6), 2010); fMRIPrep, sMRIPrep
+and sdcflows run it on BOLD references, T1w images and field maps' magnitudes.
+
+### Python (`N4BiasFieldCorrection`)
+
+`lx.ants.n4_bias_field_correction(image, mask=None, weight=None, *, shrink_factor=4, convergence=((50, 50, 50, 50), 0.0), bspline_fitting=None, spline_order=3, histogram_sharpening=(0.15, 0.01, 200), rescale_intensities=False, dimension=None, n_threads=1, upstream_defects="fix")`
+
+Returns an `N4Result`: `corrected` and `bias_field`, float32 images on the input's grid (the
+bias field is always returned), and `iterations`, every iteration as `N4Iteration(level,
+iteration, convergence)`. `image` is a path, an `lx.Image`, a nibabel image or `(array,
+affine)`, read as `float`.
 
 ```python
 import larmorx as lx
@@ -63,31 +64,82 @@ res = lx.ants.n4_bias_field_correction(boldref, mask=brain_mask, bspline_fitting
                                        rescale_intensities=True)
 ```
 
-```bash
-larmorx ants N4BiasFieldCorrection -d 3 -i sub-01_T1w.nii.gz -o n4.nii.gz
-larmorx ants N4BiasFieldCorrection -d 3 -b [ 200 ] -c [ 50x50x50x50x50, 1e-07 ] -s 4 -r \
-    -w wm.nii.gz -i t1w.nii.gz -o [ corrected.nii.gz, bias.nii.gz ]
-```
+### Options of `N4BiasFieldCorrection`
 
-## Option mapping
-
-| N4BiasFieldCorrection | Python | Notes |
+| ANTs option | Python | Notes |
 |---|---|---|
-| `-d 2/3/4` | `dimension` (default: the image's) | a 4D file read with `-d 3` gives its first volume; in 4D the time axis is not shrunk but gets a spline too |
-| `-i image` | `image` | path, `lx.Image`, nibabel image or `(array, affine)`; read as `float` |
-| `-x mask` | `mask` | N4 uses the voxels where the mask is not 0; outside it the output keeps the input's values |
-| `-w weight` | `weight` | the fit weights each voxel by it; voxels with weight ≤ 0 are not used |
-| `-s 4` | `shrink_factor=4` | `ShrinkImageFilter` along the spatial axes; 0 acts as 1 |
-| `-c [50x50x50x50,0.0]` | `convergence=((50, 50, 50, 50), 0.0)` | iterations per level (one level per entry) and the threshold that ends a level |
-| `-b [200]` | `bspline_fitting=200.0` | a spline distance in mm: the image is padded so that whole spans of 200 mm cover it |
+| `-d 2/3/4`, `--image-dimensionality` | `dimension` | default: the image's; a 4D file read with `-d 3` gives its first volume; in 4D the time axis is not shrunk but gets a spline too |
+| `-i image`, `--input-image` | `image` | path, `lx.Image`, nibabel image or `(array, affine)`; read as `float` |
+| `-x mask`, `--mask-image` | `mask` | N4 uses the voxels where the mask is not 0; outside it the output keeps the input's values |
+| `-w weight`, `--weight-image` | `weight` | the fit weights each voxel by it; voxels with weight ≤ 0 are not used |
+| `-s 4`, `--shrink-factor` | `shrink_factor=4` | `ShrinkImageFilter` along the spatial axes; 0 acts as 1 |
+| `-c [50x50x50x50,0.0]`, `--convergence` | `convergence=((50, 50, 50, 50), 0.0)` | iterations per level (one level per entry) and the threshold that ends a level |
+| `-b [200]`, `--bspline-fitting` | `bspline_fitting=200.0` | a spline distance in mm: the image is padded so that whole spans of 200 mm cover it |
 | `-b [2x2x3]` | `bspline_fitting=(2, 2, 3)` | mesh elements per axis (control points = elements + order) |
 | `-b [...,3]` | `spline_order=3` | |
 | no `-b` | `bspline_fitting=None` | one element per axis (4 control points for cubic splines) |
-| `-t [0.15,0.01,200]` | `histogram_sharpening=(0.15, 0.01, 200)` | the Gaussian's FWHM, the Wiener noise, the number of bins |
-| `-r 0/(1)` | `rescale_intensities=False` | **different default**: the command line rescales whenever a mask is given unless `-r 0`; Python rescales only when asked (as ANTsPy). Without a mask it never applies |
-| `-o out` / `-o [out,bias]` | `N4Result.corrected`, `N4Result.bias_field` | float32 images on the input's grid; the bias field is always returned |
-| `-v 1` | `N4Result.iterations` | ANTs' progress lines; Python returns every iteration as `N4Iteration(level, iteration, convergence)` |
+| `-t [0.15,0.01,200]`, `--histogram-sharpening` | `histogram_sharpening=(0.15, 0.01, 200)` | the Gaussian's FWHM, the Wiener noise, the number of bins |
+| `-r 0/(1)`, `--rescale-intensities` | `rescale_intensities=False` | **different default**: the command line rescales whenever a mask is given unless `-r 0`; Python rescales only when asked (as ANTsPy). Without a mask it never applies |
+| `-o out` / `-o [out,bias]`, `--output` | the result | its `corrected` and `bias_field`, float32 images on the input's grid |
+| `-v 1`, `--verbose` | the result | ANTs' progress lines; Python returns every iteration in the result's `iterations` |
+| `--version` | (command line only) | the version line |
+| `-h`, `--help` | (command line only) | ANTs' short and long help |
 | `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | **ANTs' result depends on it; larmorx's does not**: it always gives ANTs' one-thread result |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` ([Upstream defects](#upstream-defects-d13)) |
+
+### Examples of `N4BiasFieldCorrection`
+
+<!-- inputs: t1w.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# ANTs' defaults: four levels of 50 iterations, shrink factor 4.
+res = lx.ants.n4_bias_field_correction("t1w.nii.gz")
+res.corrected.data.dtype  # -> dtype('float32')
+```
+
+```bash example
+larmorx ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o [ corrected.nii.gz, bias.nii.gz ]
+```
+
+### Ports of `N4BiasFieldCorrection`
+
+**The replica: status `validated`** against N4BiasFieldCorrection itself (its
+[record](../validation/ants-n4.md), 2026-10-24, standard tier: 52 cases, 47 pass, 5 rejected by
+both alike; 46 compared cases, in 2, 3 and 4 dimensions), on every command line fMRIPrep,
+sMRIPrep and sdcflows give it:
+- against the **unmodified ANTs 2.6.5 binary** at one thread: 29 of 46 cases bit-identical.
+  The others differ only because glibc's `expf`, `logf`, `exp` and `sincos` are not always
+  correctly rounded and larmorx's are; the differences are smaller than ANTs' own difference
+  between thread counts in 14 of the 17 cases, up to 5.3 times that in three, and NCC is at
+  least 0.9999999 (corrected images) and 0.9999998 (bias fields);
+- against the **same binary run with glibc's `expf`, `logf`, `exp`, `log`, `sin`, `cos` and
+  `sincos` replaced by CORE-MATH's correctly rounded ones** (`LD_PRELOAD`,
+  `scripts/build_crmath_preload.sh`), which is the arithmetic larmorx uses: **46 of 46 cases
+  bit-identical**. ANTs' own code is not changed; only those C-library functions are;
+- the same against **fMRIPrep 25.2.6's own ANTs (2.6.2)**, on the 45 cases of the record before
+  it: 45 of 45 bit-identical with CORE-MATH, 29 of 45 as built
+  ([findings](../findings/ants-n4.md)).
+
+**On the data panel** ([record](../validation/ants-n4-panel.md), 2026-10-26): all 64 N4 nodes of
+the fourteen finished fMRIPrep oracle runs (the BOLD references, the brain extraction's and the
+final anatomical corrections, the field maps' magnitudes; the 3.5-year-old, the glioma, the
+stroke, strong motion, 1.5 T, 7 T, multiband-8 and multi-echo among them), each replayed from its
+node with its inputs, and sMRIPrep's final options on five images fMRIPrep never corrects (the
+7 T MP2RAGE, a 3 T MP2RAGE UNIT1, the 82-year-old's FLAIR, a glioma's T2w of 6 mm slices, the
+stroke's T2w fitted outside its lesion): **69 of 69 bit-identical with CORE-MATH** (20 to the
+unmodified ANTs; the others within 0.042 of ANTs' own difference between one thread and two or
+three). The panel also checked the input-geometry check: a mask written from the T2w's affine
+(2e-6 mm off) is refused by both.
+
+## Speed
+
+From the [benchmark](../benchmarks/ants-n4.md): sMRIPrep's N4 before the anatomical template
+(ANTs' defaults) on a raw T1w (160×192×192) takes 8.7 s on one thread and 2.4 s on 12, against
+55.2 s and 10.7 s for ANTs; fMRIPrep's BOLD reference 135 ms against 1.00 s. On the six command
+lines measured, larmorx is 6.4–7.4× faster than ANTs on one thread, and 4.2–6.3× faster than ANTs
+on 12 threads when both use 12.
 
 ## Behaviour worth knowing
 

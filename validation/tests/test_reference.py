@@ -1,0 +1,727 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The programs' reference pages (larmorx_validation.reference): every API page that holds a
+program's section agrees with the code, and every example of every reference page runs.
+
+The examples run as a reader would run them: each program's examples in a new folder where the
+inputs its section names are made first (``<!-- inputs: name=kind -->``,
+:mod:`larmorx_validation.reference.inputs`), the Python blocks in one namespace, in order, and
+each line of a shell block as a command (``larmorx ...`` through ``python -m larmorx``, so the
+package under test runs). A shell block holds only ``larmorx`` (or ``lx``) commands, one per
+line, so that it runs the same in bash, zsh, PowerShell and the Command Prompt. A Python block
+runs statement by statement: a comment after an expression shows its output, ``# -> <repr>``,
+and the run must give it; a description goes on a line of its own. They need the built
+extension (``larmorx._core``); without it they are skipped, and the checks still run.
+"""
+
+from __future__ import annotations
+
+import ast
+import io
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tokenize
+import tomllib
+from pathlib import Path
+
+import pytest
+from larmorx_validation import reference
+from larmorx_validation.reference import apipage, inputs
+
+REPO = reference.REPO
+PAGES = reference.api_pages(REPO)
+
+
+def _programs() -> list[apipage.Program]:
+    return [p for page in PAGES for p in apipage.read(REPO, page).programs]
+
+
+def test_some_api_page_has_reference_sections():
+    assert PAGES, "no API page holds a program's reference section"
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_api_page_matches_the_code(page):
+    problems = [x for r in reference.references(page, REPO) for x in r.problems]
+    assert not problems, "\n".join(problems)
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_export_is_deterministic(page):
+    first = [r.markdown for r in reference.references(page, REPO)]
+    assert first == [r.markdown for r in reference.references(page, REPO)]
+
+
+def _core_available() -> bool:
+    try:
+        import larmorx._core  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+#: An output shown after an expression of a Python example.
+SHOWN = re.compile(r"^#\s*->\s*(?P<repr>.+?)\s*$")
+
+
+def _shown(text: str) -> dict[int, str | None]:
+    """The comments that follow code on their line, by line (1-based): the output shown
+    (``# -> <repr>``), or ``None`` for any other comment."""
+    out: dict[int, str | None] = {}
+    lines = text.split("\n")
+    for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+        if tok.type == tokenize.COMMENT:
+            row, col = tok.start
+            if lines[row - 1][:col].strip():
+                m = SHOWN.match(tok.string)
+                out[row] = m.group("repr") if m else None
+    return out
+
+
+def run_python(text: str, where: str, namespace: dict) -> None:
+    """A Python example, statement by statement: an expression with ``# -> <repr>`` after it
+    must give that ``repr``; any other comment after code is refused (a description goes on a
+    line of its own)."""
+    shown = _shown(text)
+    tree = ast.parse(text, where)
+    for stmt in tree.body:
+        row = stmt.end_lineno or stmt.lineno
+        if row in shown and shown[row] is None:
+            raise AssertionError(
+                f"{where}, line {row}: a comment after code shows an output (# -> <repr>); a "
+                "description goes on a line of its own"
+            )
+        if isinstance(stmt, ast.Expr):
+            value = eval(compile(ast.Expression(stmt.value), where, "eval"), namespace)
+            if row in shown and repr(value) != shown[row]:
+                raise AssertionError(
+                    f"{where}, line {row}: the example shows {shown[row]}, the run gives {value!r}"
+                )
+        else:
+            if row in shown:
+                raise AssertionError(f"{where}, line {row}: an output shown after a statement")
+            exec(compile(ast.Module([stmt], type_ignores=[]), where, "exec"), namespace)
+
+
+def _commands(code: apipage.Code) -> list[list[str]]:
+    out = []
+    for line in code.text.split("\n"):
+        if not line.strip():
+            continue
+        words = shlex.split(line)
+        assert words[0] in ("larmorx", "lx"), (
+            f"line {code.line}: a shell example runs larmorx only, one command per line: {line!r}"
+        )
+        assert not any(w in ("|", "&&", "||", ";", ">", "<") for w in words), (
+            f"line {code.line}: no pipes, chains or redirections in a shell example: {line!r}"
+        )
+        out.append(words[1:])
+    return out
+
+
+@pytest.mark.skipif(not _core_available(), reason="needs the built extension (larmorx._core)")
+@pytest.mark.parametrize("program", _programs(), ids=lambda p: f"{p.page.path.stem}:{p.name}")
+def test_examples_run(program, tmp_path, monkeypatch):
+    section = program.child("examples")
+    assert section is not None, f"{program.page.path}: {program.name} has no examples"
+    text = section.text()
+    inputs.make(tmp_path, apipage.inputs(text))
+    monkeypatch.chdir(tmp_path)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(p for p in sys.path if p)
+    namespace: dict = {"__name__": "__example__"}
+    blocks = [c for c in apipage.code_blocks(text) if c.example]
+    assert blocks
+    for c in blocks:
+        where = f"{program.page.path}:{c.line}"
+        if c.lang == "python":
+            run_python(c.text, where, namespace)
+        elif c.lang in ("bash", "sh", "shell", "zsh", "console", "powershell"):
+            for args in _commands(c):
+                p = subprocess.run(
+                    [sys.executable, "-m", "larmorx", *args],
+                    cwd=tmp_path,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=300,
+                )
+                assert p.returncode == 0, f"{where}: larmorx {shlex.join(args)}\n{p.stderr[-2000:]}"
+        else:
+            pytest.fail(f"{where}: an example in {c.lang!r}: python or a shell")
+
+
+API = "docs/api/fsl-bet.md"
+BET_RS = "crates/larmorx-fsl/src/cli/bet.rs"
+
+#: Drifts the checks must catch, in bet's API page or in the code it is checked against: (what
+#: changes, the file, the text, its replacement, a part of the problem expected).
+DRIFTS = [
+    (
+        "a missing row",
+        API,
+        "| `-d` | (command line only) | keeps the temporary files |\n",
+        "",
+        "`-d`",
+    ),
+    (
+        "an option the program does not take",
+        API,
+        "| `-m` | `mask=True` | |",
+        "| `-m`, `--mask` | `mask=True` | |",
+        "`--mask`",
+    ),
+    (
+        "an argument the function does not take",
+        API,
+        "| `-t` | `threshold=True` |",
+        "| `-t` | `thresh=True` |",
+        "`thresh`",
+    ),
+    (
+        "a stale signature",
+        API,
+        'upstream_defects="fix")`\n\n`image` is a path',
+        'upstream_defects="reproduce")`\n\n`image` is a path',
+        "signature",
+    ),
+    (
+        "the parser drops an option its usage text still lists",
+        BET_RS,
+        '"-o" | "-m" | "-s" | "-n" | "-t" | "-e" =>',
+        '"-o" | "-m" | "-s" | "-n" | "-e" =>',
+        "`-t` is in the usage text",
+    ),
+    (
+        "a usage-only spelling the parser accepts",
+        API,
+        'usage-only: ["-h"]',
+        'usage-only: ["-h", "-m"]',
+        "usage-only names `-m`",
+    ),
+    (
+        "a section that points above, at another program's section",
+        API,
+        "alone or inside one of seven variations (below).",
+        "alone or inside one of seven variations, as for `bet2` (above).",
+        "points by place",
+    ),
+    (
+        "a link to a replica crate",
+        API,
+        "[licensing](../licensing.md)",
+        "[licensing](../../crates-nc/larmorx-nc-bet/PROVENANCE.md)",
+        "restricted for clean-room implementers",
+    ),
+]
+
+
+def _mirror(tmp: Path, rel: str, old: str, new: str) -> Path:
+    """A copy of every file the exporter reads for bet's API page (its sources, the records it
+    names, the package's Python), with ``old`` replaced by ``new`` in ``rel``."""
+    from larmorx_validation.reference.page import build
+
+    api = apipage.read(REPO, API)
+    files = {s for p in api.programs for s in build(REPO, p).sources}
+    for p in api.programs:
+        for ids in (p.meta.get("records") or {}).values():
+            files |= {f"docs/validation/{i}.md" for i in ids}
+    for f in files:
+        (tmp / f).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(REPO / f, tmp / f)
+    shutil.copytree(
+        REPO / "python/larmorx",
+        tmp / "python/larmorx",
+        ignore=shutil.ignore_patterns("*.so", "*.pyd", "__pycache__"),
+        dirs_exist_ok=True,
+    )
+    text = (tmp / rel).read_text(encoding="utf-8")
+    assert old in text, f"the drift's text is no longer in {rel}: update DRIFTS"
+    (tmp / rel).write_text(text.replace(old, new, 1), encoding="utf-8")
+    return tmp
+
+
+@pytest.mark.parametrize("drift", DRIFTS, ids=[d[0] for d in DRIFTS])
+def test_checks_catch_drift(drift, tmp_path):
+    from larmorx_validation.reference.page import build
+
+    _, rel, old, new, expected = drift
+    repo = _mirror(tmp_path, rel, old, new)
+    api = apipage.read(repo, API)
+    problems = [x for p in api.programs for x in build(repo, p).problems]
+    assert any(expected in x for x in problems), problems
+
+
+def test_the_mirror_has_no_drift(tmp_path):
+    """The copy the drift tests mutate passes the checks unmutated."""
+    from larmorx_validation.reference.page import build
+
+    repo = _mirror(tmp_path, API, "", "")
+    api = apipage.read(repo, API)
+    assert [x for p in api.programs for x in build(repo, p).problems] == []
+
+
+@pytest.mark.parametrize(
+    ("text", "fails"),
+    [
+        ("x = 2\nx + 1  # -> 3\n", None),
+        ("x = 2\nx + 1  # -> 4\n", "the example shows 4, the run gives 3"),
+        ("x = 2\nx + 1  # three\n", "a description goes on a line of its own"),
+        ("# three, on its own line\nx = 2\nx + 1\n", None),
+        ("'a' + 'b'  # -> 'ab'\n", None),
+    ],
+)
+def test_shown_outputs_are_checked(text, fails):
+    """An output an example shows after an expression is what the run gives."""
+    if fails is None:
+        run_python(text, "example", {})
+    else:
+        with pytest.raises(AssertionError, match=re.escape(fails)):
+            run_python(text, "example", {})
+
+
+def test_next_release_marks_the_options_until_a_release_has_them(tmp_path):
+    """LARMORX's own options are marked "from the next release" while CHANGELOG.md's Unreleased
+    section names their synopsis and no released one does."""
+    from larmorx_validation.reference.page import next_release
+
+    options = ["--n-threads", "--implementation", "--upstream-defects"]
+    synopsis = "- `larmorx [--n-threads N] [--implementation ...] <family> <tool> ...`\n\n"
+    log = tmp_path / "CHANGELOG.md"
+    log.write_text(
+        "# Changelog\n\n## [Unreleased]\n\n" + synopsis + "## [0.1.0rc1] - 2026-11-11\n\n- one\n",
+        encoding="utf-8",
+    )
+    assert next_release(tmp_path, options) == "0.1.0rc1"
+    log.write_text(
+        "# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2027-01-01\n\n"
+        + synopsis
+        + "## [0.1.0rc1] - 2026-11-11\n\n- one\n",
+        encoding="utf-8",
+    )
+    assert next_release(tmp_path, options) is None
+
+
+def test_programs_page_data_matches_the_code():
+    """validation/programs.toml names every command of larmorx once, ports the replica registry
+    lists, records, API pages and Python names that exist (the Programs page's data)."""
+    from larmorx_validation.reference import programs
+
+    groups, progs, problems = programs.build(reference.REPO, None)
+    assert problems == []
+    assert {p.group for p in progs} <= set(groups)
+    text = programs.render(groups, progs)
+    assert text == programs.render(*programs.build(reference.REPO, None)[:2])
+    assert all(x.status for p in progs for x in p.ports)
+
+
+def test_programs_check_catches_a_missing_command(tmp_path, monkeypatch):
+    """A command of larmorx without an entry is a problem."""
+    from larmorx_validation.reference import programs
+
+    real = programs.commands
+    monkeypatch.setattr(programs, "commands", lambda repo: [*real(repo), ("fsl", "fnirt")])
+    _, _, problems = programs.build(reference.REPO, None)
+    assert any("larmorx fsl fnirt" in p for p in problems)
+
+
+def test_programs_what_it_does_has_one_source(monkeypatch):
+    """Where an API page holds a program's reference block, the Programs page takes what the
+    program does from it, and an entry that also gives its own `does` is a problem."""
+    from larmorx_validation.reference import programs
+
+    _, progs, _ = programs.build(reference.REPO, None)
+    bet = next(p for p in progs if p.name == "bet")
+    page = apipage.read(REPO, API)
+    first = next(p for p in page.programs if p.name == "bet").description.split("\n\n")[0]
+    assert bet.does == programs.first_sentence(first)
+    # an entry that still gives its own `does` (its API page has no reference block yet)
+    entries = tomllib.loads((REPO / "validation/programs.toml").read_text(encoding="utf-8"))
+    e = next(x for x in entries["program"] if "does" in x and "api" in x)
+    real = programs._api_does
+    monkeypatch.setattr(
+        programs,
+        "_api_does",
+        lambda repo, api: {e["name"]: "It does."} if api == e["api"] else real(repo, api),
+    )
+    _, _, problems = programs.build(reference.REPO, None)
+    assert any(f"{e['name']}: `does` given" in p for p in problems), problems
+
+
+def test_programs_check_catches_an_api_page_without_an_entry(monkeypatch):
+    """Every API page but the register's is some entry's `api`."""
+    from larmorx_validation.reference import programs
+
+    monkeypatch.setattr(programs, "NOT_PROGRAMS", set())
+    _, _, problems = programs.build(reference.REPO, None)
+    assert problems == [
+        "validation/programs.toml: no entry names docs/api/upstream-defects.md as its `api`"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "first"),
+    [
+        ("`bet` finds the brain.\nIt writes it.", "`bet` finds the brain."),
+        ("FSL 6.0.7.23 runs it. Then", "FSL 6.0.7.23 runs it."),
+        ("No full stop", "No full stop"),
+    ],
+)
+def test_first_sentence(text, first):
+    from larmorx_validation.reference import programs
+
+    assert programs.first_sentence(text) == first
+
+
+@pytest.mark.parametrize(
+    ("text", "lede", "section"),
+    [
+        (
+            "`bet` finds the brain\nin a head.  It writes it.\n\nMore.",
+            "`bet` finds the brain in a head.",
+            "It writes it.\n\nMore.",
+        ),
+        ("`bet` finds the brain.\n\nIt writes it.", "`bet` finds the brain.", "It writes it."),
+        ("`betsurf` finds the skull.", "", "`betsurf` finds the skull."),
+    ],
+)
+def test_lede_is_not_repeated(text, lede, section):
+    """A reference page's lede is its first sentence, which "What it does" then leaves out; one
+    sentence gives no lede."""
+    from larmorx_validation.reference.page import _lede
+
+    assert _lede(text) == (lede, section)
+
+
+def test_bet_pages_say_their_first_sentence_once():
+    """bet's and bet2's pages show their first sentence as the lede only; betsurf's, one
+    sentence, has no lede."""
+    ledes = {}
+    for ref in reference.references(API, REPO):
+        front, _, body = ref.markdown.partition("\n---\n")
+        what = body.split("## What it does {#what-it-does}\n", 1)[1].split("\n## ", 1)[0]
+        m = re.search(r'^lede: "(.*)"$', front, re.M)
+        ledes[ref.program.name] = m.group(1) if m else ""
+        if m:
+            assert m.group(1) not in " ".join(what.split())
+    assert ledes["bet"] == "`bet` finds the brain in a head image."
+    assert ledes["bet2"].startswith("`bet2` is FSL's brain extraction")
+    assert ledes["betsurf"] == ""
+
+
+def test_validated_before_lists_the_earlier_ports(monkeypatch):
+    """The ports marked validated before the statuses' definition are listed by software from the
+    frozen VALIDATED_BEFORE; a port validated later is not, and a frozen record that disappears is
+    a problem."""
+    from larmorx_validation.reference import programs
+
+    groups, progs, problems = programs.build(reference.REPO, None)
+    assert problems == []
+    listed = {gid: text for gid, _, text in programs.validated_before(groups, progs)}
+    assert "the replica of `3dvolreg`" in listed["afni"]
+    assert "`bet`" in listed["fsl"] and "`flirt`" not in listed["fsl"]
+    assert "tedana" not in listed
+    earlier = {r for r in programs.VALIDATED_BEFORE}
+    monkeypatch.setattr(programs, "VALIDATED_BEFORE", frozenset(earlier - {"afni-volreg-replica"}))
+    groups, progs, _ = programs.build(reference.REPO, None)
+    listed = {gid: text for gid, _, text in programs.validated_before(groups, progs)}
+    assert "3dvolreg" not in listed["afni"]
+    monkeypatch.setattr(programs, "VALIDATED_BEFORE", frozenset(earlier | {"gone-record"}))
+    _, _, problems = programs.build(reference.REPO, None)
+    assert problems == [
+        "programs.py: VALIDATED_BEFORE names 'gone-record', which validation/tools.toml no longer has"
+    ]
+
+
+# ------------------------------------------------------------------------------------------------
+# The command-line readers of the other families, one program each (the reference pages of
+# ANTs, AFNI, tedana, sdcflows and `mri hmc` are written from them)
+
+
+def _cl(rel: str, program: str, command: str, parser: str | None = None):
+    from larmorx_validation.reference import code
+
+    cl = code.command_line(REPO, rel, program, command, parser)
+    by = {s: o for o in cl.options for s in o.spellings}
+    assert {s for o in cl.options for s in o.spellings} <= cl.parsed
+    return cl, by
+
+
+def test_ants_table_of_options_denoise_image():
+    """ANTs' `opt("long", Some('s'))` table: both spellings, the values of the usage text (its
+    lines under an option give its other forms), the module's synopsis; the replica's words."""
+    cl, by = _cl(
+        "crates/larmorx-ants/src/cli/denoise_image.rs", "DenoiseImage", "larmorx ants DenoiseImage"
+    )
+    assert (cl.port, cl.words) == ("replica", "original")
+    assert by["-d"].spellings == ["-d", "--image-dimensionality"]
+    assert by["-d"].arg == "2/3/4"
+    assert by["--patch-radius"].arg == "1 | 1x1x1"
+    assert by["-h"].spellings == ["-h"] and by["--help"].spellings == ["--help"]
+    assert len(cl.options) == 12
+    assert cl.synopsis[0].startswith("larmorx ants DenoiseImage [-d 2/3/4] -i input")
+    assert cl.usage and cl.usage.startswith("COMMAND:")
+
+
+def test_ants_help_menu_registration():
+    """ANTs' help menu (`MenuOption`): ANTs' description of each option, its usages (a usage
+    may hold brackets), `-h` without a long name."""
+    cl, by = _cl(
+        "crates/larmorx-ants/src/cli/registration.rs",
+        "antsRegistration",
+        "larmorx ants antsRegistration",
+    )
+    assert by["--dimensionality"].help.startswith("This option forces the image")
+    assert by["-m"].arg.startswith("CC[fixedImage,movingImage,metricWeight,radius,")
+    assert " | MI[fixedImage" in by["-m"].arg
+    assert by["-x"].arg == "[fixedImageMask,movingImageMask]"
+    assert by["-h"].spellings == ["-h"]
+    assert cl.synopsis == [] and cl.usage is None
+
+
+def test_afni_usage_in_columns_tshift():
+    """An AFNI clean room's usage text in its own words: one option per line, several on one
+    line with their description under them, a description continued; AFNI's global options
+    (`-D` glued to its value); a spelling accepted through the prefix the parser compares."""
+    cl, by = _cl("crates/larmorx-afni/src/cli/tshift.rs", "3dTshift", "larmorx afni 3dTshift")
+    assert (cl.port, cl.words) == ("clean room", "port")
+    assert cl.synopsis == ["larmorx afni 3dTshift [options] dataset"]
+    assert (by["-TR"].arg, by["-TR"].help[:17]) == ("ddd", "use ddd as the TR")
+    assert by["-prefix"].help.endswith("unless -overwrite or AFNI_DECONFLICT says otherwise")
+    for m in ("-Fourier", "-linear", "-cubic", "-quintic", "-heptic", "-wsinc5", "-wsinc9"):
+        assert by[m].help == "interpolation method (default -Fourier)"
+    assert {"-overwrite", "-ok_1D_text", "-skip_afnirc", "-D"} <= set(by)
+    assert cl.glued == {"-D"} and cl.extra == ["crates/larmorx-afni/src/settings.rs"]
+    assert "-voxshift" in by  # refused by the parser, so a row must say so
+    assert "-verbose" in cl.parsed  # `-verb`, the prefix the parser compares
+
+
+def test_afni_usage_names_another_spelling_unifize():
+    """A usage line's "(also -oink)" names another spelling of its option, which the parser
+    accepts."""
+    _, by = _cl("crates/larmorx-afni/src/cli/unifize.rs", "3dUnifize", "larmorx afni 3dUnifize")
+    assert by["-oink"].spellings == ["-nosquash", "-oink"]
+
+
+def test_afni_usage_heads_volreg():
+    """3dvolreg's usage heads: alternatives after `/`, other values after `|`, several options
+    with values on one line (their description on the next), a value glued after `=`; the
+    spellings its parser compares one by one (`arg == "-wtrim"`)."""
+    cl, by = _cl("crates/larmorx-afni/src/cli/volreg.rs", "3dvolreg", "larmorx afni 3dvolreg")
+    assert (
+        by["-noclip"].help
+        == by["-clipit"].help
+        == "clip each output to its input's range (default on)"
+    )
+    assert (by["-base"].arg, by["-edging"].arg, by["-source"].arg) == (
+        "n | dset",
+        "ee | ee%",
+        "dset",
+    )
+    assert by["-base"].help.startswith("the n'th sub-brick of the input")
+    assert (by["-x_thresh"].arg, by["-params"].arg, by["-x_thresh"].help) == ("x", "m x r d", "")
+    assert by["-coarse"].help == "two passes: a coarse search on blurred bricks first"
+    assert by["-D"].help == "set AFNI's environment variable 'name' for this run"
+    assert {"-wtrim", "-SAVEDISP"} <= set(by) and {"-wtrim", "-SAVEDISP"} <= cl.parsed
+
+
+def test_click_command_nipype_run():
+    """`larmorx nipype run`, a click command emulated in Python: the flags its `_click_args`
+    compares, `-h` read letter by letter joined to `--help`, the synopsis from `run`'s
+    docstring; its page's address with a hyphen for the blank of `nipypecli run`."""
+    from larmorx_validation import reference
+
+    cl, by = _cl("python/larmorx/nipype/_run.py", "nipypecli run", "larmorx nipype run")
+    assert set(by) == {"--list", "-h", "--help"} and by["-h"].spellings == ["-h", "--help"]
+    assert cl.synopsis == ["larmorx nipype run [--list] <module> [<Interface> [inputs]]"]
+    (ref,) = reference.references("nipype-run")
+    assert (ref.url, ref.path) == (
+        "/programs/fmriprep/nipypecli-run/",
+        "content/programs/fmriprep/nipypecli-run.md",
+    )
+    assert "measured against nipype, case by case" in ref.markdown
+
+
+def test_mri_hmc_as_mcflirt():
+    """`mri hmc`'s usage, read for mcflirt's page: spellings separated by commas, values in
+    brackets, the parser's lists of options; the synopsis with mcflirt's command."""
+    cl, by = _cl("crates/larmorx-mri/src/cli/hmc.rs", "mcflirt", "larmorx fsl mcflirt")
+    assert (cl.port, cl.words) == ("clean room", "port")
+    assert cl.synopsis == ["larmorx fsl mcflirt -in <infile> [options]"]
+    assert by["-out"].spellings == ["-o", "-out"] and by["-o"].arg == "<outfile>"
+    assert (by["-dof"].arg, by["-dof"].help) == ("<number of transform dofs>", "(default is 6)")
+    assert by["-cost"].arg.startswith("{mutualinfo,woods,")
+    assert {"-in", "-rmsrel", "-gdt", "-help"} <= set(by)
+
+
+def test_fsl_script_parser_in_its_function_standard_space_roi():
+    """A script's parser read in its own function (`standard_space_roi`'s `fn parse`, beside the
+    file's reading of bash's `test`, whose `-eq`, `-z`, ... are no options of the script); its
+    usage formatted with a parameter (`${FSLDIR}`); descriptions after a colon."""
+    rel = "crates/larmorx-fsl/src/cli/ssroi.rs"
+    cl, by = _cl(rel, "standard_space_roi", "larmorx fsl standard_space_roi", "parse")
+    assert cl.synopsis == [
+        "larmorx fsl standard_space_roi <input> <output> [options] [flirt options]"
+    ]
+    assert set(by) == {
+        "-maskFOV", "-maskMASK", "-maskNONE", "-roiFOV", "-roiMASK", "-roiNONE",
+        "-ssref", "-altinput", "-d", "-b",
+    }  # fmt: skip
+    assert (by["-ssref"].arg, by["-maskNONE"].help) == ("<ref_image>", "do not mask output")
+    assert "${FSLDIR}/data/standard/MNI152_T1_2mm_brain_mask_dil" in by["-b"].help
+    from larmorx_validation.reference import code
+
+    whole = code.command_line(REPO, rel, "standard_space_roi")
+    assert {"-eq", "-z"} <= {s for o in whole.options for s in o.spellings}
+
+
+def test_fsl_tables_of_tuples_topup_applytopup():
+    """FSL's option tables of tuples: long names alone (`topup`'s `("imain", Kind::Text, ...)`,
+    its hidden options included) and a short spelling with a long name (`applytopup`'s
+    `("-i", "imain", ...)`), joined with the usage's lines."""
+    cl, by = _cl("crates/larmorx-fsl/src/cli/topup.rs", "topup", "larmorx fsl topup")
+    assert by["--imain"].help == "name of 4D file with images"
+    assert by["-v"].spellings == ["-v", "--verbose"]
+    assert {"--dfout", "--rbmout", "--jacout"} <= set(by)
+    assert cl.synopsis[0].startswith("larmorx fsl topup --imain=<some 4D image>")
+    cl, by = _cl("crates/larmorx-fsl/src/cli/applytopup.rs", "applytopup", "larmorx fsl applytopup")
+    assert by["-x"].spellings == ["-x", "--inindex"] and len(cl.options) == 10
+
+
+def test_fsl_usage_in_a_file_fslstats():
+    """A usage text kept in a file of its own (`include_str!`), which joins the page's sources."""
+    cl, _ = _cl("crates/larmorx-fsl/src/cli/fslstats.rs", "fslstats", "larmorx fsl fslstats")
+    assert cl.extra == ["crates/larmorx-fsl/src/cli/fslstats_usage.txt"]
+    assert cl.synopsis == ["larmorx fsl fslstats [preoptions] <input> [options]"]
+
+
+def test_fsl_usage_at_the_start_of_lines_fslstats():
+    """FSL's image utilities list their options at the start of the line (`-l <lthresh> : ...`)
+    and their preoptions after the word `preoption`, with or without a colon."""
+    _, by = _cl("crates/larmorx-fsl/src/cli/fslstats.rs", "fslstats", "larmorx fsl fslstats")
+    assert (by["-l"].arg, by["-l"].help) == ("<lthresh>", "set lower threshold")
+    assert (by["-H"].arg, by["-M"].help) == (
+        "<nbins> <min> <max>",
+        "output mean (for nonzero voxels)",
+    )
+    assert by["-json"].help == "output in JSON format to standard out"
+    assert by["-t"].help.startswith("will give a separate output line for each 3D volume")
+    assert (by["-K"].arg, by["-K"].help[:31]) == (
+        "< indexMask >",
+        "will generate seperate n submas",
+    )
+    assert by["-D"].help == ""  # hidden: no line of the usage
+
+
+def test_fsl_operation_tables_fslmaths():
+    """fslmaths' operations looked up in tables of its crate (`Binary::of(op)`, `Unary::of(op)`,
+    `Morph::of(op)`; the reductions' axis letter and statistic), which join the page's sources;
+    its usage's values before a colon, a word before them (`-kernel box <size> : ...`, one option
+    of every `-kernel` line) and a description without a colon (`-dt sets ...`)."""
+    cl, by = _cl("crates/larmorx-fsl/src/cli/fslmaths.rs", "fslmaths", "larmorx fsl fslmaths")
+    assert {"-add", "-exp", "-nanm", "-dilM", "-fmedian", "-Tar1"} <= cl.parsed
+    assert by["-Tmean"].spellings == ["-Tmean", "-Xmean", "-Ymean", "-Zmean"]
+    assert by["-Tmean"].help == "mean across time"
+    assert "crates/larmorx-fsl/src/maths/ops.rs" in cl.extra
+    assert (by["-add"].arg, by["-add"].help) == (
+        "<number> | <image>",
+        "add following input to current image",
+    )
+    assert by["-ranknorm"].help == "Transform to Normal dist via ranks"
+    assert by["-tfce"].arg == "<H> <E> <connectivity>"
+    kernel = by["-kernel"].help
+    assert kernel.startswith("3D: 3x3x3 box centered on target voxel (set as default kernel); 2D:")
+    assert "; boxv3 <X> <Y> <Z>: all voxels in a cuboid" in kernel
+    assert by["-dt"].help.startswith("sets the datatype used internally for calculations")
+
+
+def test_python_varargs_fslmaths():
+    """A function's `*operations`, in its signature and as a parameter the options table names."""
+    from larmorx_validation.reference import code
+
+    fn = code.function(REPO, "larmorx.fsl.fslmaths")
+    assert fn.signature().startswith("lx.fsl.fslmaths(image, *operations, dt=None, odt=None")
+    assert fn.param("operations").kind == "varargs"
+
+
+def test_tedana_argparse_in_rust_t2smap():
+    """tedana's parser in Rust: the synopsis as Python's argparse formats it in 80 columns,
+    every option string, tedana's help, a hidden option, argparse's own help for -h and -v."""
+    cl, by = _cl("crates/larmorx-tedana/src/cli.rs", "t2smap", "larmorx tedana t2smap")
+    assert (cl.port, cl.words) == ("clean room", "original")
+    lines = cl.synopsis[0].split("\n")
+    assert lines[0] == "larmorx tedana t2smap [-h] -d FILE [FILE ...] -e TE [TE ...]"
+    # argparse breaks between parts only: a part longer than the line stands on its own
+    assert all(len(x) <= 78 or x.strip().count(" [") <= 1 for x in lines)
+    assert all(x.startswith(" " * len("larmorx tedana t2smap ")) for x in lines[1:])
+    assert by["--overwrite"].spellings == ["-f", "--overwrite"]
+    assert by["--masktype"].arg.startswith("{dropout,decay,none}")
+    assert by["--quiet"].help == "" and "--quiet" not in cl.synopsis[0]
+    assert by["-h"].help == "show this help message and exit"
+    assert by["--version"].help == "show program's version number and exit"
+
+
+def test_python_argparse_sdcflows():
+    """A Python program's argparse parser (sdcflows' BIDS app), read from its source: groups,
+    positionals at the synopsis' end, custom actions as values."""
+    cl, by = _cl("python/larmorx/sdcflows/app.py", "sdcflows", "larmorx sdcflows sdcflows")
+    assert (cl.port, cl.words) == ("replica", "original")
+    usage = " ".join(cl.synopsis[0].split())
+    assert usage.startswith("larmorx sdcflows sdcflows [-h] [-v]")
+    assert "bids_dir output_dir {participant,group}" in usage
+    assert by["-w"].spellings == ["-w", "--work-dir"] and by["-w"].arg == "WORK_DIR"
+    assert by["--participant-label"].arg.startswith("PARTICIPANT_LABEL [PARTICIPANT_LABEL")
+
+
+def test_port_words_are_named_as_the_ports(monkeypatch):
+    """A usage text in the port's own words is credited to the port, never to the original's
+    software; the usage block names the port that prints it."""
+    from larmorx_validation.reference import code, page
+
+    real = code.command_line
+
+    def own_words(repo, rel, program, command=None, parser=None):
+        cl = real(repo, rel, program, command, parser)
+        cl.words, cl.port = "port", "clean room"
+        return cl
+
+    monkeypatch.setattr(code, "command_line", own_words)
+    bet = next(p for p in apipage.read(REPO, API).programs if p.name == "bet")
+    md = page.build(REPO, bet).markdown
+    assert "in the clean room's own words" in md
+    assert "The clean room's usage: “" in md and "FSL: “" not in md
+    assert "usage text, as the clean room prints it" in md
+
+
+def test_an_absent_own_argument_is_the_command_lines_only():
+    """A function without one of LARMORX's own arguments (convert_xfm takes no
+    `upstream_defects`): its row names the option as the command line's only, and an argument it
+    takes (`n_threads`, since the documentation revision's step 2) has its Python cell."""
+    page = apipage.read(REPO, "docs/api/fsl-flirt.md")
+    p = next(p for p in page.programs if p.name == "convert_xfm")
+    from larmorx_validation.reference.page import build
+
+    ref = build(REPO, p)
+    assert ref.problems == []
+    assert 'takes no <code><span class="nw">upstream&#95;defects</span></code>' in ref.markdown
+    assert 'takes no <code><span class="nw">n&#95;threads</span></code>' not in ref.markdown
+    assert "(no Python argument)" in ref.markdown
+
+
+def test_a_restricted_record_is_named_not_linked():
+    """t2smap's replica's record is closed to its clean-room implementers (their briefs): the
+    Ports table of its reference page names it; the clean room's record stays a link."""
+    page = apipage.read(REPO, "docs/api/tedana-t2smap.md")
+    p = next(p for p in page.programs if p.name == "t2smap")
+    from larmorx_validation.reference.page import build
+
+    ref = build(REPO, p)
+    assert ref.problems == []
+    assert "`tedana-t2smap-replica`" in ref.markdown
+    assert "repo:docs/validation/tedana-t2smap-replica.md" not in ref.markdown
+    assert "(repo:docs/validation/tedana-t2smap-original.md)" in ref.markdown

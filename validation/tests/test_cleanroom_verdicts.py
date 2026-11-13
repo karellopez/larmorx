@@ -35,6 +35,7 @@ WT = f"{WS}/larmorx/.claude/worktrees/agent-a1"
         ("crates/larmorx-fsl/src/cli/fslroi.rs", ("FSL", "fslroi")),
         ("crates/larmorx-fsl/src/data.rs", ("FSL", "fsl-shared")),
         ("crates/larmorx-tedana/src/curvefit.rs", ("tedana", "t2smap")),
+        ("crates/larmorx-fs-core/src/swap.rs", ("FreeSurfer", "fs-core")),
         ("crates-gpl/larmorx-gpl-tedana/src/decay.rs", None),
         ("crates/larmorx-core/src/math/sincos_glibc_tables.rs", ("GNU", "sincos_glibc")),
         ("crates/larmorx-core/src/math/sincosf_glibc.rs", None),  # Arm's MIT code, a replica

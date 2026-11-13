@@ -53,7 +53,6 @@ use crate::mp_faster;
 use crate::mp_slow;
 use crate::mris::Mris;
 use crate::mris_mp::MrisMp;
-use crate::mrisurf::{FNV_INIT, fnv_add};
 use crate::topology::vertex_vsize;
 
 /// `ROMP_DISTRIBUTOR_PARTIAL_CAPACITY` (`include/romp_support.h`).
@@ -84,19 +83,9 @@ pub fn romp_total(start: f64, partials: &[f64]) -> f64 {
     partials.iter().fold(start, |s, &p| add64(s, p))
 }
 
-/// `fnv_hash(i, k, &random_counter, lo, hi)` (`include/fnv_hash.h`): the FNV hash of the three
-/// `unsigned int`s `i`, `k` and the counter (then incremented), its low 32 bits as a fraction of
-/// `0xffffffff`, mapped to `lo..hi` in double and rounded to `float`.
-pub fn fnv_hash(i: i32, k: i32, counter: &mut i32, lo: f64, hi: f64) -> f32 {
-    let mut b = [0u8; 12];
-    b[0..4].copy_from_slice(&(i as u32).to_le_bytes());
-    b[4..8].copy_from_slice(&(k as u32).to_le_bytes());
-    b[8..12].copy_from_slice(&(*counter as u32).to_le_bytes());
-    *counter = counter.wrapping_add(1);
-    let hash = fnv_add(FNV_INIT, &b);
-    let f = (hash & 0xffff_ffff) as f64 / f64::from(0xffff_ffffu32);
-    ((hi - lo) * f + lo) as f32
-}
+/// `fnv_hash(i, k, &random_counter, lo, hi)` (`include/fnv_hash.h`): fs.core's
+/// ([`larmorx_freesurfer_core::fnv::fnv_hash`]).
+pub use larmorx_freesurfer_core::fnv::fnv_hash;
 
 /// `RAN` (`MRIScomputeNormals`): the random moves' range, a thousandth of a millimetre.
 pub const RAN: f64 = 0.001;
@@ -1404,6 +1393,7 @@ fn mp_compute_triangle_properties(
 /// `MRIScomputeAvgInterVertexDist` sums them (reproducible sums of `d`, `d²` and the count, in
 /// double) and computes them: `Sum / N`, `sqrt(N (Sum2 / N - Avg²) / (N - 1))`.
 pub(crate) fn avg_dist(
+    errno: &mut i32,
     mris: &Mris,
     ripped: &dyn Fn(usize) -> bool,
     dist: &dyn Fn(usize, usize) -> f32,
@@ -1435,19 +1425,28 @@ pub(crate) fn avg_dist(
     let sum2 = romp_total(0.0, &s2);
     let n = romp_total(0.0, &c);
     let avg = div64(sum, n);
-    let std = sqrt64(div64(
+    let arg = div64(
         mul64(n, sub64(div64(sum2, n), mul64(avg, avg))),
         sub64(n, 1.0),
-    ));
-    (avg, std)
+    );
+    (avg, sqrt64_errno(errno, arg))
+}
+
+/// glibc's `sqrt` of a `double` (the compiled `sqrtsd` falls back on it for a NaN result): `errno`
+/// `EDOM` for an argument below 0 (a variance that rounding made negative, or one divided by 0).
+pub(crate) fn sqrt64_errno(errno: &mut i32, x: f64) -> f64 {
+    if x < 0.0 {
+        *errno = 33;
+    }
+    sqrt64(x)
 }
 
 /// `MRISMP_computeAvgInterVertexDist(mp, &mp->std_vertex_dist)`.
-fn mp_compute_avg_inter_vertex_dist(mp: &mut MrisMp, mris: &Mris) {
+fn mp_compute_avg_inter_vertex_dist(errno: &mut i32, mp: &mut MrisMp, mris: &Mris) {
     let (avg, std) = {
         let rip = shared(&mp.v_ripflag, "v_ripflag");
         let d = arr(&mp.v_dist, "v_dist");
-        avg_dist(mris, &|v| rip[v] != 0, &|v, m| {
+        avg_dist(errno, mris, &|v| rip[v] != 0, &|v, m| {
             d[v].as_ref().expect("the copy's distances are NULL")[m]
         })
     };
@@ -1633,7 +1632,7 @@ pub fn compute_metric_properties_mp(
     mp.dist_nsize = mp.nsize;
     mp_compute_triangle_properties(g, sg, io, mp, mris);
     mp.avg_vertex_area = f64::from(div(mp.total_area, mp.nvertices as f32));
-    mp_compute_avg_inter_vertex_dist(mp, mris);
+    mp_compute_avg_inter_vertex_dist(&mut g.errno, mp, mris);
     mp_orient_surface(g, sg, mp, mris);
     if takes_sphere_area(mp.status) {
         mp.total_area = sphere_area(mp.radius);

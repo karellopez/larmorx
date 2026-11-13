@@ -8,6 +8,7 @@ decided by the tool's module from these metrics (``finish(..., verdict=...)``)."
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Iterable
 from functools import cache
@@ -374,6 +375,21 @@ def finish(
     }
 
 
+def computed(info: dict) -> str:
+    """When a figures cache entry's runs were made: "computed <time>", and where some were made
+    again (``rerun``, :func:`larmorx_validation.figures.cache.rerun`) how many and when last, so
+    the commit that follows ("with larmorx <commit>", the last run's) is read with its date (the
+    reviewer's round 17, finding 7)."""
+    out = f"computed {info.get('computed')}"
+    again = info.get("rerun") or []
+    if not again:
+        return out
+    runs = [r.get("label") for r in info.get("runs", [])]
+    made = {x for r in again for x in r.get("labels", [])}
+    which = "its runs" if made >= set(runs) else f"{len(made & set(runs))} of its {len(runs)} runs"
+    return f"{out}; {which} made again since, last on {again[-1]['computed']},"
+
+
 def provenance(info: dict, entry: str, data: Iterable[dict], extra: Iterable[str] = ()) -> list:
     vers = info.get("versions", {})
     sha = {
@@ -391,7 +407,7 @@ def provenance(info: dict, entry: str, data: Iterable[dict], extra: Iterable[str
     if sha:
         out.append("Inputs: " + "; ".join(f"{k} (sha256 {v}…)" for k, v in sha.items()))
     out.append(
-        f"Runs: figures cache entry `{entry}`, computed {info['computed']} with larmorx "
+        f"Runs: figures cache entry `{entry}`, {computed(info)} with larmorx "
         f"`{info['larmorx_commit'][:12]}`"
         + (f"; {'; '.join(str(v) for v in vers.values())}" if vers else "")
         + "; every command, its environment, threads and exit status are in its `RUN_INFO.json`"
@@ -615,3 +631,17 @@ def command_text(program: str, args: Iterable[str], subs: Callable[[str], str]) 
 
     parts = [program, *(subs(a) for a in args)]
     return " ".join(shlex.quote(p) if re.search(r"\s", p) else p for p in parts)
+
+
+def difftest_descriptions(repo: Path, cases: list[dict], tool: str, prefix: str = "") -> None:
+    """Random testing's permanent cases (category ``difftest``), in place: each one's
+    description from its case file (``validation/difftest/cases/<tool>/<name>.json``) where
+    the record gives none; ``prefix`` the program's part of a case id ("antsAI/")."""
+    for c in cases:
+        if c["category"] != "difftest" or c.get("description"):
+            continue
+        name = c["id"].removeprefix(prefix).removeprefix("difftest/")
+        f = repo / "validation" / "difftest" / "cases" / tool / f"{name}.json"
+        if f.is_file():
+            text = json.loads(f.read_text(encoding="utf-8"))["description"]
+            c["description"] = "random testing's permanent case: " + text

@@ -18,63 +18,63 @@
 id = "nifti-io"
 title = "NIfTI-1/2 I/O"
 eco = "larmorx"
-page = "/tools/nifti-io/"
+page = "/evidence/nifti-io/"
 use = ["lx.load", "lx.save", "lx.Image"]
-how = "own implementation"
+how = "LARMORX's own"
 validation = "[{nifti-io.cases} files](record:nifti-io), data bit-identical to nibabel; [4–8× faster](repo:docs/benchmarks/nifti-io.md) on compressed writes with threads"
 
 [[tool]]
 id = "ants-apply-transforms"
 title = "antsApplyTransforms"
 eco = "ants"
-page = "/tools/ants-apply-transforms/"
+page = "/evidence/ants-apply-transforms/"
 use = ["larmorx ants antsApplyTransforms", "lx.ants.apply_transforms"]
-how = "port (ANTs/ITK)"
-validation = "[{ants-apply-transforms.cases} cases](record:ants-apply-transforms): {ants-apply-transforms.identical} of {ants-apply-transforms.compared} compared bit-identical to ANTs, the rest differ only through glibc's maths; B-spline transforms included; data panel: [{ants-apply-transforms-panel.identical} of {ants-apply-transforms-panel.compared}](record:ants-apply-transforms-panel) as built, all with correctly rounded maths (fMRIPrep's 421 calls on the fourteen oracle runs)"
+how = "replica (ANTs/ITK)"
+validation = "[{ants-apply-transforms.cases} cases](record:ants-apply-transforms): {ants-apply-transforms.identical} of {ants-apply-transforms.compared} compared bit-identical to ANTs, the rest differ only through glibc's maths; B-spline transforms included; data panel: [{ants-apply-transforms-panel.identical} of {ants-apply-transforms-panel.compared}](record:ants-apply-transforms-panel) as built, all with correctly rounded maths (fMRIPrep's 421 calls in fMRIPrep's fourteen runs)"
 
 [[tool]]
 id = "itk-hdf5"
 title = "ITK transform files (`.mat`, `.txt`, `.h5`)"
 eco = "ants"
-page = "/tools/itk-hdf5/"
+page = "/evidence/itk-hdf5/"
 use = ["lx.transforms"]
-how = "port (ITK, HDF5)"
+how = "replica (ITK, HDF5)"
 validation = "[{itk-hdf5.cases} cases](record:itk-hdf5), {itk-hdf5.fail} failures; HDF5 read and written in pure Rust"
 
 [[tool]]
 id = "ants-n4"
 title = "N4BiasFieldCorrection"
 eco = "ants"
-page = "/tools/ants-n4/"
+page = "/evidence/ants-n4/"
 use = ["larmorx ants N4BiasFieldCorrection", "lx.ants.n4_bias_field_correction"]
-how = "port"
+how = "replica"
 validation = "[{ants-n4.identical} of {ants-n4.compared}](record:ants-n4) bit-identical to ANTs, {ants-n4.compared} of {ants-n4.compared} with correctly rounded maths; ANTS-40 corrected by default; data panel: [{ants-n4-panel.identical} of {ants-n4-panel.compared}](record:ants-n4-panel) as built, {ants-n4-panel.compared} of {ants-n4-panel.compared} with correctly rounded maths"
 
 [[tool]]
 id = "ants-denoise"
 title = "DenoiseImage"
 eco = "ants"
-page = "/tools/ants-denoise/"
+page = "/evidence/ants-denoise/"
 use = ["larmorx ants DenoiseImage", "lx.ants.denoise_image"]
-how = "port"
+how = "replica"
 validation = "[{ants-denoise.identical} of {ants-denoise.compared}](record:ants-denoise) bit-identical to ANTs, {ants-denoise.compared} of {ants-denoise.compared} with correctly rounded maths; ANTS-43 and ANTS-44 corrected by default; data panel: [{ants-denoise-panel.identical} of {ants-denoise-panel.compared}](record:ants-denoise-panel) as built, {ants-denoise-panel.compared} of {ants-denoise-panel.compared} with correctly rounded maths"
 
 [[tool]]
 id = "ants-image-math"
 title = "ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call)"
 eco = "ants"
-page = "/tools/ants-programs/"
+page = "/evidence/ants-programs/"
 use = ["larmorx ants ImageMath", "lx.ants.image_math"]
-how = "port"
+how = "replica"
 validation = "[{ants-image-math.cases} cases](record:ants-image-math): values bit-identical in {ants-image-math.identical} of {ants-image-math.compared}, headers in {ants-image-math.headers} of {ants-image-math.compared}; ANTS-17, -22 and -23 corrected, checked against known results; data panel: [{ants-image-math-panel.identical} of {ants-image-math-panel.compared}](record:ants-image-math-panel) bit-identical"
 
 [[tool]]
 id = "ants-programs"
 title = "ThresholdImage, MultiplyImages, SmoothImage, ResampleImage, ResampleImageBySpacing"
 eco = "ants"
-page = "/tools/ants-programs/"
+page = "/evidence/ants-programs/"
 use = ["larmorx ants ..."]
-how = "port"
+how = "replica"
 # The records of the first four predate the reported values in their JSON: "bit-identical"
 # is their records' own statement (their Markdown highlights), kept here.
 validation = "bit-identical in every compared case ([threshold](record:ants-threshold-image), [multiply](record:ants-multiply-images), [smooth](record:ants-smooth-image), [resample](record:ants-resample-image), [by spacing](record:ants-resample-image-by-spacing)); data panel: [threshold](record:ants-threshold-image-panel), [multiply](record:ants-multiply-images-panel), [smooth](record:ants-smooth-image-panel), [resample](record:ants-resample-image-panel), [by spacing](record:ants-resample-image-by-spacing-panel), every compared case bit-identical"
@@ -83,69 +83,70 @@ validation = "bit-identical in every compared case ([threshold](record:ants-thre
 id = "ants-registration"
 title = "antsRegistration (every stage: linear, SyN, B-spline SyN, B-spline, displacement-field, exponential and time-varying velocity-field; image and point-set metrics)"
 eco = "ants"
-page = "/tools/ants-registration/"
+page = "/evidence/ants-registration/"
 use = ["larmorx ants antsRegistration", "lx.ants.registration"]
-how = "port"
+how = "replica"
 validation = "[{ants-registration.cases} cases](record:ants-registration): {ants-registration.as_built} of {ants-registration.compared} compared identical to ANTs (outputs and messages), {ants-registration.with_crmath} more with correctly rounded maths; [the corrections' effects](record:ants-registration-corrections); data panel: [{ants-registration-panel.compared} compared](record:ants-registration-panel), {ants-registration-panel.as_built} identical as built, {ants-registration-panel.with_crmath} more with correctly rounded maths, and [the {ants-registration-panel-template.compared} whole template registrations](record:ants-registration-panel-template) at full size, {ants-registration-panel-template.with_crmath} of {ants-registration-panel-template.compared} identical with correctly rounded maths"
 
 [[tool]]
 id = "ants-ai"
 title = "antsAI, antsAffineInitializer"
 eco = "ants"
-page = "/tools/ants-ai/"
+page = "/evidence/ants-ai/"
 use = ["larmorx ants antsAI", "larmorx ants antsAffineInitializer"]
-how = "port"
+how = "replica"
 validation = "[antsAI](record:ants-ai): {ants-ai.compared} of {ants-ai.compared} compared identical ({ants-ai.as_built} as built, {ants-ai.with_crmath} with correctly rounded maths), the blob alignment (`-b`) included (its corrections, ANTS-116 among them, by default); [antsAffineInitializer](record:ants-affine-initializer): {ants-affine-initializer.compared} of {ants-affine-initializer.compared}; data panel: [antsAI](record:ants-ai-panel) {ants-ai-panel.compared} of {ants-ai-panel.compared}, [antsAffineInitializer](record:ants-affine-initializer-panel) {ants-affine-initializer-panel.compared} of {ants-affine-initializer-panel.compared}"
 
 [[tool]]
 id = "ants-atropos"
 title = "Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option)"
 eco = "ants"
-page = "/tools/ants-atropos/"
+page = "/evidence/ants-atropos/"
 use = ["larmorx ants Atropos", "lx.ants.atropos"]
-how = "port"
-validation = "[{ants-atropos.cases} cases](record:ants-atropos): {ants-atropos.identical} of {ants-atropos.compared} compared bit-identical to ANTs, {ants-atropos.compared} of {ants-atropos.compared} with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106); data panel: [{ants-atropos-panel.identical} of {ants-atropos-panel.compared}](record:ants-atropos-panel) as built, {ants-atropos-panel.compared} of {ants-atropos-panel.compared} with correctly rounded maths, the classes identical in all"
+how = "replica"
+validation = "[{ants-atropos.cases} cases](record:ants-atropos): {ants-atropos.identical} of {ants-atropos.compared} compared bit-identical to ANTs, {ants-atropos.compared} of {ants-atropos.compared} with correctly rounded maths, sMRIPrep's call in five of fMRIPrep's runs included; partial-volume classes with the MRF corrected (ANTS-106); data panel: [{ants-atropos-panel.identical} of {ants-atropos-panel.compared}](record:ants-atropos-panel) as built, {ants-atropos-panel.compared} of {ants-atropos-panel.compared} with correctly rounded maths, the classes identical in all"
 
 [[tool]]
 id = "resample-series"
 title = "fMRIPrep's one-shot BOLD resampler"
-eco = "larmorx"
-page = "/tools/resample-series/"
+eco = "fmriprep"
+page = "/evidence/resample-series/"
 use = ["lx.transforms.resample_series"]
-how = "port (fMRIPrep, nitransforms, SciPy)"
+how = "replica (fMRIPrep, nitransforms, SciPy)"
 validation = "[{resample-series.cases} cases](record:resample-series): {resample-series.pass} of {resample-series.pass} compared bit-identical"
 
 [[tool]]
 id = "sdcflows-fieldmap"
 title = "sdcflows' field-map estimation (the B-spline field fit, the field evaluated and applied, the phase-difference preparation)"
-eco = "larmorx"
-page = "/tools/sdcflows-fieldmap/"
+eco = "sdcflows"
+page = "/evidence/sdcflows-fieldmap/"
 use = ["lx.sdcflows.bspline_approx", "lx.sdcflows.B0FieldTransform", "lx.sdcflows.apply_coeffs_field", "lx.sdcflows.phdiff_workflow", "lx.io.save_nibabel"]
-how = "port (sdcflows 2.17.1, with scikit-learn's, SciPy's, numpy's and nibabel's arithmetic)"
+how = "replica (sdcflows 2.17.1, with scikit-learn's, SciPy's, numpy's and nibabel's arithmetic)"
 validation = "[{sdcflows-fieldmap.cases} cases](record:sdcflows-fieldmap): {sdcflows-fieldmap.pass} of {sdcflows-fieldmap.pass} bit-identical to sdcflows 2.17.1 (every array, file, header, warning and message), fMRIPrep's seven phase-difference estimators and their B-spline fits included (also fMRIPrep's own files); SDC-01, -02 and -04 to -11 corrected by default or refused, each with `reproduce`; the fit [6.5 to 7.8 times faster](repo:docs/benchmarks/sdcflows-fieldmap.md) than scikit-learn's at 14 threads, with 22 to 32 % of sdcflows' peak memory at one"
 
 [[tool]]
 id = "sdcflows-estimation"
 title = "sdcflows' PEPOLAR, direct and fieldmap-less estimation (the masks, the estimators of a BIDS dataset, the derivatives, the BIDS app; niworkflows' helpers; fMRIPrep's own field-map steps)"
-eco = "larmorx"
-page = "/tools/sdcflows-estimation/"
+eco = "sdcflows"
+page = "/evidence/sdcflows-estimation/"
 use = ["larmorx sdcflows sdcflows", "lx.sdcflows.topup_workflow", "lx.sdcflows.fmap_workflow", "lx.sdcflows.syn_sdc_workflow", "lx.sdcflows.brain_masker", "lx.sdcflows.run_app", "lx.niworkflows", "lx.bids", "lx.ndimage", "lx.skimage"]
-how = "port (sdcflows 2.17.1 with 2.15.2's estimator search, niworkflows 1.15.4, nipype 1.12.0's command lines, pybids 0.22.0's index, fMRIPrep 25.2.7's field-map steps; SciPy's, scikit-image's and numpy's arithmetic in Rust)"
-validation = "[{sdcflows-estimation.cases}](record:sdcflows-estimation), [{sdcflows-estimation-full.cases}](record:sdcflows-estimation-full) and [{sdcflows-estimation-app-shared.cases}](record:sdcflows-estimation-app-shared) cases of the estimation, [{niworkflows-helpers.cases}](record:niworkflows-helpers) of niworkflows' helpers and [{ndimage-skimage.cases}](record:ndimage-skimage) and [{ndimage-skimage-full.cases}](record:ndimage-skimage-full) of SciPy's, scikit-image's and numpy's arithmetic, every one bit-identical to the originals (every array, file, header, warning, message and command line): sdcflows' BIDS app whole on its eight oracle datasets in both library environments, fMRIPrep's own field-map derivatives from LARMORX's stage run as fMRIPrep ran it, the fieldmap-less (SyN) registration ANTs' one-thread warp byte for byte; SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04: 42 corrected by default and 15 refused, 61 with `reproduce`; the BIDS app [1.2 to 5.3 times faster](repo:docs/benchmarks/sdcflows-estimation.md) than sdcflows at one thread, with 16 to 72 % of the originals' peak memory"
+how = "replica (sdcflows 2.17.1 with 2.15.2's estimator search, niworkflows 1.15.4, nipype 1.12.0's command lines, pybids 0.22.0's index, fMRIPrep 25.2.7's field-map steps; SciPy's, scikit-image's and numpy's arithmetic in Rust)"
+validation = "[{sdcflows-estimation.cases}](record:sdcflows-estimation), [{sdcflows-estimation-full.cases}](record:sdcflows-estimation-full) and [{sdcflows-estimation-app-shared.cases}](record:sdcflows-estimation-app-shared) cases of the estimation, [{niworkflows-helpers.cases}](record:niworkflows-helpers) of niworkflows' helpers and [{ndimage-skimage.cases}](record:ndimage-skimage) and [{ndimage-skimage-full.cases}](record:ndimage-skimage-full) of SciPy's, scikit-image's and numpy's arithmetic, every one bit-identical to the originals (every array, file, header, warning, message and command line): sdcflows' BIDS app whole on the eight datasets of sdcflows' own runs in both library environments, fMRIPrep's own field-map derivatives from LARMORX's stage run as fMRIPrep ran it, the fieldmap-less (SyN) registration ANTs' one-thread warp byte for byte; SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04: 42 corrected by default and 15 refused, 61 with `reproduce`; the BIDS app [1.2 to 5.3 times faster](repo:docs/benchmarks/sdcflows-estimation.md) than sdcflows at one thread, with 16 to 72 % of the originals' peak memory"
 
 [[tool]]
 id = "tedana-t2smap"
 title = "tedana's t2smap (the T2* and S0 maps of multi-echo fMRI and the echoes' optimal combination)"
-eco = "larmorx"
-page = "/tools/tedana-t2smap/"
+eco = "tedana"
+page = "/evidence/tedana-t2smap/"
 use = ["larmorx tedana t2smap", "larmorx-gpl tedana t2smap", "lx.tedana.t2smap"]
-how = "clean-room original, `experimental` (2026-11-12: every option, message, exit status and failure case of `specs/t2smap.md`, TED-01 to TED-18, TED-31 and TED-46 corrected by default or refused, each with `reproduce` (the fitted numbers its own solvers', within §17.3's thresholds), but TED-06, kept; the log-linear fit in closed form, the curve fit a trust-region solver on the echoes' means, deterministic threads: fMRIPrep's curve-fit calls 10 to 15 times tedana's speed at one thread and 19 to 30 at eight, with a quarter of its memory); exact replica in `larmorx-gpl` (GNU GPL version 3, converted from tedana's LGPL-2.1 under its section 3), `experimental` (2026-11-08: every option, message, output and failure case of tedana 26.0.3, with numpy's, SciPy's, nibabel's and nilearn's arithmetic; TED-01 to TED-18, TED-31 and TED-46 corrected by default or refused, each with `reproduce`, but TED-06, kept; ANALYZE and MGH inputs since 2026-11-12)"
-validation = "original: [{tedana-t2smap-original.pass} of {tedana-t2smap-original.compared}](record:tedana-t2smap-original) compared cases within `specs/t2smap.md` §17.3's thresholds against tedana 26.0.3 (`reproduce`: exit status, messages and files tedana's) and the replica's default (by default): fMRIPrep's {tedana-t2smap-original.fmriprep} multi-echo calls on three oracle runs, every option, data type, image format and failure, threads; {tedana-t2smap-original.expected} expected divergence (a chaotic curve fit of noise voxels); 25 % of tedana's peak memory; replica: [{tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared}](record:tedana-t2smap-replica) compared cases bit-identical to tedana 26.0.3 in both kept library environments (every file, message and exit status): fMRIPrep's {tedana-t2smap-replica.fmriprep} multi-echo calls on three oracle runs (also against fMRIPrep's own files), every option, data type and failure; {tedana-t2smap-replica.both} more rejected by both alike; 44 % of tedana's peak memory on fMRIPrep's calls, [3.0 to 4.2 times its speed](repo:docs/benchmarks/tedana-t2smap.md) at 14 threads on fMRIPrep's curve-fit calls"
+how = "replica in `larmorx-gpl` (GNU GPL version 3, converted from tedana's LGPL-2.1 under its section 3), `experimental` (2026-11-08: every option, message, output and failure case of tedana 26.0.3, with numpy's, SciPy's, nibabel's and nilearn's arithmetic; TED-01 to TED-18, TED-31 and TED-46 corrected by default or refused, each with `reproduce`, but TED-06, kept; ANALYZE and MGH inputs since 2026-11-12); clean room, `experimental` (2026-11-12: every option, message, exit status and failure case of `specs/t2smap.md`, TED-01 to TED-18, TED-31 and TED-46 corrected by default or refused, each with `reproduce` (the fitted numbers its own solvers', within §17.3's thresholds), but TED-06, kept; the log-linear fit in closed form, the curve fit a trust-region solver on the echoes' means, deterministic threads: fMRIPrep's curve-fit calls 10 to 15 times tedana's speed at one thread and 19 to 30 at eight, with a quarter of its memory)"
+validation = "replica: [{tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared}](record:tedana-t2smap-replica) compared cases bit-identical to tedana 26.0.3 in both kept library environments (every file, message and exit status): fMRIPrep's {tedana-t2smap-replica.fmriprep} multi-echo calls in three of fMRIPrep's runs (also against fMRIPrep's own files), every option, data type and failure; {tedana-t2smap-replica.both} more rejected by both alike; 44 % of tedana's peak memory on fMRIPrep's calls, [3.0 to 4.2 times its speed](repo:docs/benchmarks/tedana-t2smap.md) at 14 threads on fMRIPrep's curve-fit calls; clean room: [{tedana-t2smap-original.pass} of {tedana-t2smap-original.compared}](record:tedana-t2smap-original) compared cases within `specs/t2smap.md` §17.3's thresholds against tedana 26.0.3 (`reproduce`: exit status, messages and files tedana's) and the replica's default (by default): fMRIPrep's {tedana-t2smap-original.fmriprep} multi-echo calls in three of fMRIPrep's runs, every option, data type, image format and failure, threads; {tedana-t2smap-original.expected} expected divergence (a chaotic curve fit of noise voxels); 25 % of tedana's peak memory"
 
 [[tool]]
 id = "confounds"
 title = "fMRIPrep's confound estimation (CompCor, DVARS, framewise displacement, the motion parameters and RMS deviation, the masks and tissue signals, the confounds table and its JSON; nipype's confounds module and `nipypecli run`; numpy's and SciPy's linear algebra and FFTs under them)"
-eco = "larmorx"
+eco = "fmriprep"
+page = "/evidence/confounds/"
 use = ["larmorx nipype run", "lx.confounds", "lx.niworkflows", "lx.nipype.run", "larmorx.pipelines.larmorprepx.confounds.bold_confounds"]
 how = "port (fMRIPrep 25.2.7's confounds workflow and interfaces, with 25.2.6's for the step; nipype 1.12.0's `algorithms/confounds.py` and command line; niworkflows 1.15.4's confound interfaces; nitime 0.12.1, nipy 0.6.1, pandas 3.0.6 and 2.2.3; numpy 2.5.4, 2.3.5 and 2.2.6's and SciPy 1.18.1 and 1.15's linear algebra (OpenBLAS's level 1 to 3 kernels, LAPACK 3.12.1's and 3.12.0's SVD and least-squares paths) and single-precision FFTs, in Rust)"
 validation = "[{confounds-linalg.cases}](record:confounds-linalg) and [{confounds-linalg-full.cases}](record:confounds-linalg-full) cases of numpy's and SciPy's linear algebra, [{confounds-nipype.cases}](record:confounds-nipype) and [{confounds-nipype-full.cases}](record:confounds-nipype-full) of nipype's confounds module and command line, [{confounds-fmriprep.cases}](record:confounds-fmriprep) of fMRIPrep's and niworkflows' steps and the workflow, every one bit-identical to the originals (every array, file, table cell, header, warning, message and exit status) in numpy 2.5.4, 2.3.5 and fMRIPrep 25.2.6's 2.2.6: fMRIPrep's 36 confounds files of 21 oracle runs column by column and their JSON byte for byte, from LARMORX's workflow run as fMRIPrep ran it; PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41: 29 corrected by default (two undefined conversions clamped) and 12 refused, 41 with `reproduce`; the 26 Python nodes [1.1 to 1.4 times as fast](repo:docs/benchmarks/confounds.md) as fMRIPrep's at one thread and 1.5 to 1.6 at eight on three oracle runs (numpy's SVD and least squares, ported, still slower: a speed item), at most 0.96 of the originals' peak memory"
@@ -154,107 +155,107 @@ validation = "[{confounds-linalg.cases}](record:confounds-linalg) and [{confound
 id = "afni-tshift"
 title = "3dTshift (slice timing)"
 eco = "afni"
-page = "/tools/afni-tshift/"
+page = "/evidence/afni-tshift/"
 use = ["larmorx afni 3dTshift", "lx.afni.tshift"]
-how = "clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution)"
-validation = "original: [{afni-tshift.compared} of {afni-tshift.compared}](record:afni-tshift) compared agree, {afni-tshift.identical} bit-identical, [2–6× faster](repo:docs/benchmarks/afni-tshift.md); replica: [{afni-tshift-replica.identical} of {afni-tshift-replica.compared}](record:afni-tshift-replica) bit-identical"
+how = "replica and clean room, both in larmorx (the replica with CC BY 4.0's attribution)"
+validation = "replica: [{afni-tshift-replica.identical} of {afni-tshift-replica.compared}](record:afni-tshift-replica) bit-identical; clean room: [{afni-tshift.compared} of {afni-tshift.compared}](record:afni-tshift) compared agree, {afni-tshift.identical} bit-identical, [2–6× faster](repo:docs/benchmarks/afni-tshift.md)"
 
 [[tool]]
 id = "afni-automask"
 title = "3dAutomask (brain mask)"
 eco = "afni"
-page = "/tools/afni-automask/"
+page = "/evidence/afni-automask/"
 use = ["larmorx afni 3dAutomask", "lx.afni.automask"]
-how = "clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution)"
+how = "replica and clean room, both in larmorx (the replica with CC BY 4.0's attribution)"
 # "92 of 106" and "85 of 85" are the records' own statements (their JSON keeps no per-case
 # identity for this suite).
-validation = "original: [{afni-automask.cases} cases](record:afni-automask), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [{afni-automask-replica.identical} of {afni-automask-replica.written}](record:afni-automask-replica) compared cases that write outputs bit-identical"
+validation = "replica: [{afni-automask-replica.identical} of {afni-automask-replica.written}](record:afni-automask-replica) compared cases that write outputs bit-identical; clean room: [{afni-automask.cases} cases](record:afni-automask), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on the BOLD reference of every fMRIPrep run included, the data panel's too"
 
 [[tool]]
 id = "afni-unifize"
 title = "3dUnifize (intensity uniformization)"
 eco = "afni"
-page = "/tools/afni-unifize/"
+page = "/evidence/afni-unifize/"
 use = ["larmorx afni 3dUnifize", "lx.afni.unifize"]
-how = "clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution)"
-validation = "original: [{afni-unifize.cases} cases](record:afni-unifize), none failing: {afni-unifize.identical} of {afni-unifize.written} compared cases that write outputs bit-identical to AFNI, the other {afni-unifize.with_crmath} within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [{afni-unifize-replica.identical} of {afni-unifize-replica.written}](record:afni-unifize-replica) compared cases that write outputs bit-identical at 1, 2 and 6 threads"
+how = "replica and clean room, both in larmorx (the replica with CC BY 4.0's attribution)"
+validation = "replica: [{afni-unifize-replica.identical} of {afni-unifize-replica.written}](record:afni-unifize-replica) compared cases that write outputs bit-identical at 1, 2 and 6 threads; clean room: [{afni-unifize.cases} cases](record:afni-unifize), none failing: {afni-unifize.identical} of {afni-unifize.written} compared cases that write outputs bit-identical to AFNI, the other {afni-unifize.with_crmath} within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call in every fMRIPrep run included; 4 to 25 times faster than AFNI (informal timings)"
 [[tool]]
 id = "afni-volreg"
 title = "3dvolreg (rigid-body registration of a series)"
 eco = "afni"
-page = "/tools/afni-volreg/"
+page = "/evidence/afni-volreg/"
 use = ["larmorx afni 3dvolreg", "lx.afni.volreg"]
-how = "clean-room original, `experimental` (2026-11-08: every option, message and failure case of `specs/3dvolreg.md`, AFNI-86 to AFNI-99 handled as the replica handles them, each with `reproduce`; built for speed: fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count); exact replica in larmorx (with CC BY 4.0's attribution; 2026-11-07: every option, message and failure case; AFNI-86 to AFNI-99 corrected or refused by default, AFNI's behaviour with `reproduce` where it is defined)"
-validation = "original: [{afni-volreg-original.pass} of {afni-volreg-original.compared}](record:afni-volreg-original) compared cases within `specs/3dvolreg.md` §14.3's limits against AFNI 26.3.05, its default within them of the replica's default (exit statuses, messages, files written and headers exact; the numbers that the shear decomposition's ties decide within limits measured from AFNI's own spread under those ties): fMRIPrep's {afni-volreg-original.fmriprep} RobustAverage and PEPOLAR calls (their medians at most 0.115 of their limits from fMRIPrep's own outputs), every option, data type, message and failure case; {afni-volreg-original.both} more rejected by both alike; [2.8 to 5.2 times faster than AFNI](repo:docs/benchmarks/afni-volreg.md) on one thread, 9 to 15 times on 14; replica: [{afni-volreg-replica.identical} of {afni-volreg-replica.written}](record:afni-volreg-replica) compared cases that write outputs bit-identical to AFNI 26.3.05 (every file written, the messages, the exit status), fMRIPrep's RobustAverage calls on six oracle runs' BOLD references and sdcflows' PEPOLAR reference averages on two included (their medians fMRIPrep's own outputs byte for byte); {afni-volreg-replica.both} more rejected by both alike; 2.2 to 3.1 times faster than AFNI (informal timings)"
+how = "replica in larmorx (with CC BY 4.0's attribution; 2026-11-07: every option, message and failure case; AFNI-86 to AFNI-99 corrected or refused by default, AFNI's behaviour with `reproduce` where it is defined); clean room, `experimental` (2026-11-08: every option, message and failure case of `specs/3dvolreg.md`, AFNI-86 to AFNI-99 handled as the replica handles them, each with `reproduce`; built for speed: fMRIPrep's calls 2.8 to 5.2 times AFNI's speed and 1.5 to 1.9 times the replica's on one thread, the same bits at any thread count)"
+validation = "replica: [{afni-volreg-replica.identical} of {afni-volreg-replica.written}](record:afni-volreg-replica) compared cases that write outputs bit-identical to AFNI 26.3.05 (every file written, the messages, the exit status), fMRIPrep's RobustAverage calls on the BOLD references of six of fMRIPrep's runs and sdcflows' PEPOLAR reference averages on two included (their medians fMRIPrep's own outputs byte for byte); {afni-volreg-replica.both} more rejected by both alike; 2.2 to 3.1 times faster than AFNI (informal timings); clean room: [{afni-volreg-original.pass} of {afni-volreg-original.compared}](record:afni-volreg-original) compared cases within `specs/3dvolreg.md` §14.3's limits against AFNI 26.3.05, its default within them of the replica's default (exit statuses, messages, files written and headers exact; the numbers that the shear decomposition's ties decide within limits measured from AFNI's own spread under those ties): fMRIPrep's {afni-volreg-original.fmriprep} RobustAverage and PEPOLAR calls (their medians at most 0.115 of their limits from fMRIPrep's own outputs), every option, data type, message and failure case; {afni-volreg-original.both} more rejected by both alike; [2.8 to 5.2 times faster than AFNI](repo:docs/benchmarks/afni-volreg.md) on one thread, 9 to 15 times on 14"
 
 [[tool]]
 id = "mri-hmc"
 title = "Head-motion correction (mcflirt)"
 eco = "fsl"
-page = "/tools/mri-hmc/"
+page = "/evidence/mri-hmc/"
 use = ["larmorx mri hmc", "larmorx fsl mcflirt", "lx.mri.hmc"]
-how = "clean-room original, `experimental` (2026-11-07: the `normcorr` count's running total taking each point's weight as the point is visited, and `leastsquares` as FLIRT's `leastsq`, the spec answers of 2026-11-06); exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
-validation = "original: [compared with FSL's mcflirt](record:mri-hmc): {mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads; replica: [{fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared}](record:fsl-mcflirt-replica) compared cases bit-identical to mcflirt as built, FSL 6.0.7.23 (the recorded runs, fMRIPrep's calls on every oracle run with BOLD runs, the data panel's included, and the edge cases; {fsl-mcflirt-replica.both} more rejected by both, alike; [{fsl-mcflirt-replica-full.pass} of {fsl-mcflirt-replica-full.compared}](record:fsl-mcflirt-replica-full) in the full tier against FSL 6.0.7.17), fMRIPrep's own matrices identical"
+how = "replica in `larmorx-nc` (FSL Licence, non-commercial); clean room, `experimental` (2026-11-07: the `normcorr` count's running total taking each point's weight as the point is visited, and `leastsquares` as FLIRT's `leastsq`, the spec answers of 2026-11-06)"
+validation = "replica: [{fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared}](record:fsl-mcflirt-replica) compared cases bit-identical to mcflirt as built, FSL 6.0.7.23 (the recorded runs, fMRIPrep's calls in every fMRIPrep run with BOLD runs, the data panel's included, and the edge cases; {fsl-mcflirt-replica.both} more rejected by both, alike; [{fsl-mcflirt-replica-full.pass} of {fsl-mcflirt-replica-full.compared}](record:fsl-mcflirt-replica-full) in the full comparison against FSL 6.0.7.17), fMRIPrep's own matrices identical; clean room: [compared with FSL's mcflirt](record:mri-hmc): {mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads"
 
 [[tool]]
 id = "fsl-bet"
 title = "BET (brain extraction; the skull and scalp surfaces)"
 eco = "fsl"
-page = "/tools/fsl-bet/"
+page = "/evidence/fsl-bet/"
 use = ["larmorx fsl bet", "larmorx fsl bet2", "larmorx fsl betsurf", "larmorx fsl standard_space_roi", "larmorx fsl fslroi", "lx.fsl.bet", "lx.fsl.betsurf", "lx.fsl.standard_space_roi", "lx.fsl.fslroi"]
-how = "clean-room original (`bet2`, the `bet` script with every variation (`-S`, `-B`, `-A`, `-A2` since 2026-11-05) and `betsurf`; `standard_space_roi` and `fslroi` since 2026-11-05, FSL's standard images found where the user has them or fetched once), `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial), with `standard_space_roi` and `fslroi` (since 2026-11-04)"
-validation = "original: [{fsl-bet.pass} of {fsl-bet.compared}](record:fsl-bet) compared cases within thresholds against FSL 6.0.7.23, fMRIPrep's {fsl-bet.fmriprep} BET calls on every oracle run with BOLD runs bit-identical; bet2's and bet's brains, masks, outlines, meshes and skulls FSL's bit for bit, the surfaces that rerun after a self-intersecting first pass included; betsurf's profiles decided as FSL's, its masks within its thresholds on 4 of 5 real heads (Dice 0.9907 to 0.9997); [2.5 to 3.6 times faster than FSL on one thread, 6.5 to 13.5 times on 24, betsurf included](repo:docs/benchmarks/fsl-bet.md); replica: [{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2`, `standard_space_roi` and `fslroi` in the replica since 2026-11-04 (FSL's standard images shipped in `larmorx-nc`); the original's `standard_space_roi` and `fslroi` since 2026-11-05 (every case of the two FSL's bit for bit, the six real heads included), and its `-S`, `-B`, `-A`, `-A2` (`-S` and `-B` FSL's bit for bit on every case but a 3.5-year-old's `-B`, bet2's `-c` on a neurologically stored image; `-A` and `-A2` with betsurf's masks within its thresholds)"
+how = "replica in `larmorx-nc` (FSL Licence, non-commercial), with `standard_space_roi` and `fslroi` (since 2026-11-04); clean room (`bet2`, the `bet` script with every variation (`-S`, `-B`, `-A`, `-A2` since 2026-11-05) and `betsurf`; `standard_space_roi` and `fslroi` since 2026-11-05, FSL's standard images found where the user has them or fetched once), `experimental`"
+validation = "replica: [{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full comparison against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls in every fMRIPrep run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2`, `standard_space_roi` and `fslroi` in the replica since 2026-11-04 (FSL's standard images shipped in `larmorx-nc`); the clean room's `standard_space_roi` and `fslroi` since 2026-11-05 (every case of the two FSL's bit for bit, the six real heads included), and its `-S`, `-B`, `-A`, `-A2` (`-S` and `-B` FSL's bit for bit on every case but a 3.5-year-old's `-B`, bet2's `-c` on a neurologically stored image; `-A` and `-A2` with betsurf's masks within its thresholds); clean room: [{fsl-bet.pass} of {fsl-bet.compared}](record:fsl-bet) compared cases within thresholds against FSL 6.0.7.23, fMRIPrep's {fsl-bet.fmriprep} BET calls in every fMRIPrep run with BOLD runs bit-identical; bet2's and bet's brains, masks, outlines, meshes and skulls FSL's bit for bit, the surfaces that rerun after a self-intersecting first pass included; betsurf's profiles decided as FSL's, its masks within its thresholds on 4 of 5 real heads (Dice 0.9907 to 0.9997); [2.5 to 3.6 times faster than FSL on one thread, 6.5 to 13.5 times on 24, betsurf included](repo:docs/benchmarks/fsl-bet.md)"
 
 [[tool]]
 id = "fsl-flirt"
 title = "FLIRT (affine registration, boundary-based registration; convert_xfm and FLIRT's other programs)"
 eco = "fsl"
-page = "/tools/fsl-flirt/"
+page = "/evidence/fsl-flirt/"
 use = ["larmorx fsl flirt", "larmorx fsl convert_xfm", "larmorx fsl avscale", "larmorx fsl img2imgcoord", "larmorx fsl std2imgcoord", "larmorx fsl img2stdcoord", "larmorx fsl rmsdiff", "larmorx fsl makerot", "larmorx fsl midtrans", "larmorx fsl pointflirt", "larmorx fsl applyxfm4D", "larmorx fsl pairreg", "larmorx fsl extracttxt", "larmorx fsl aff2rigid", "lx.fsl.flirt", "lx.fsl.convert_xfm", "lx.fsl.avscale", "lx.fsl.img2imgcoord", "lx.fsl.std2imgcoord", "lx.fsl.img2stdcoord", "lx.fsl.rmsdiff", "lx.fsl.makerot", "lx.fsl.midtrans", "lx.fsl.pointflirt", "lx.fsl.applyxfm4d", "lx.fsl.pairreg", "lx.fsl.extracttxt", "lx.fsl.aff2rigid"]
-how = "clean-room original of every program, `experimental` (parts 1 and 2: `flirt` with `-debug` and every verbose level, `convert_xfm`, avscale, the coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D and the scripts pairreg, extracttxt, aff2rigid; 2026-11-05: the spec answers of 2026-11-03, FSL-204 and FSL-241 refused in both modes, NaN centres run as FSL runs them with `reproduce`; 2026-11-07: the weighted `normcorr`'s count per point, the spec answer of 2026-11-06; fMRIPrep's BBR call 12 to 14 times FSL's speed on 14 threads); exact replica of every program in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (parts 1 to 3); both: every program and script of fsl-flirt but `-warp`, `flirt_average` and `epi_reg` (`standard_space_roi`: the replica's since 2026-11-04, the original's since 2026-11-05, its cases in BET's records)"
-validation = "original: [{fsl-flirt.pass} of {fsl-flirt.compared}](record:fsl-flirt) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's three boundary-based calls within 0.012 mm at the 95th percentile of the brain with `reproduce` (glibc's maths functions, as FSL is built), `-applyxfm` FSL's images bit for bit with trilinear and nearest neighbour, applyxfm4D's spline FSL's values, the other programs' printed results and files FSL's, every verbose level and `-debug`, the schedules' and the command line's messages FSL's), {fsl-flirt.both} more rejected by both alike, {fsl-flirt.expected} where FLIRT crashes or never finishes, or writes results the spec cannot define (FSL-241, refused); the {fsl-flirt.fail} it misses is in its record (the weighted `woods` registration, whose path parts at its cost's last bits; since 2026-11-05 the search orders its starting points of equal cost as FSL does, with libstdc++'s `std::sort`; since 2026-11-07 the weighted `normcorr`'s count takes each point's weight as the point is visited, its matrix FSL's as text); replica: [{fsl-flirt-replica.pass} of {fsl-flirt-replica.compared}](record:fsl-flirt-replica) compared cases bit-identical to FSL 6.0.7.23 (matrices, images, printed results, exit status and messages): fMRIPrep's boundary-based calls on three oracle runs (their matrices also identical as text to fMRIPrep's own), every cost function, the search options, every shipped schedule and every schedule command (`alignpaxes`, any parameter-subset mask), `-anglerep quaternion`, `-debug`, `-applyxfm` 3D and 4D with every interpolation and data type, BBR with its types, coordinates and a field map, avscale, the coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D in every data type and interpolation, pairreg, extracttxt and aff2rigid; {fsl-flirt-replica.both} more rejected by both, alike; {fsl-flirt-replica.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75, FSL-93)"
+how = "replica of every program in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (parts 1 to 3); clean room of every program, `experimental` (parts 1 and 2: `flirt` with `-debug` and every verbose level, `convert_xfm`, avscale, the coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D and the scripts pairreg, extracttxt, aff2rigid; 2026-11-05: the spec answers of 2026-11-03, FSL-204 and FSL-241 refused in both modes, NaN centres run as FSL runs them with `reproduce`; 2026-11-07: the weighted `normcorr`'s count per point, the spec answer of 2026-11-06; fMRIPrep's BBR call 12 to 14 times FSL's speed on 14 threads); both: every program and script of fsl-flirt but `-warp`, `flirt_average` and `epi_reg` (`standard_space_roi`: the replica's since 2026-11-04, the clean room's since 2026-11-05, its cases in BET's records)"
+validation = "replica: [{fsl-flirt-replica.pass} of {fsl-flirt-replica.compared}](record:fsl-flirt-replica) compared cases bit-identical to FSL 6.0.7.23 (matrices, images, printed results, exit status and messages): fMRIPrep's boundary-based calls in three of fMRIPrep's runs (their matrices also identical as text to fMRIPrep's own), every cost function, the search options, every shipped schedule and every schedule command (`alignpaxes`, any parameter-subset mask), `-anglerep quaternion`, `-debug`, `-applyxfm` 3D and 4D with every interpolation and data type, BBR with its types, coordinates and a field map, avscale, the coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D in every data type and interpolation, pairreg, extracttxt and aff2rigid; {fsl-flirt-replica.both} more rejected by both, alike; {fsl-flirt-replica.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75, FSL-93); clean room: [{fsl-flirt.pass} of {fsl-flirt.compared}](record:fsl-flirt) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's three boundary-based calls within 0.012 mm at the 95th percentile of the brain with `reproduce` (glibc's maths functions, as FSL is built), `-applyxfm` FSL's images bit for bit with trilinear and nearest neighbour, applyxfm4D's spline FSL's values, the other programs' printed results and files FSL's, every verbose level and `-debug`, the schedules' and the command line's messages FSL's), {fsl-flirt.both} more rejected by both alike, {fsl-flirt.expected} where FLIRT crashes or never finishes, or writes results the spec cannot define (FSL-241, refused); the {fsl-flirt.fail} it misses is in its record (the weighted `woods` registration, whose path parts at its cost's last bits; since 2026-11-05 the search orders its starting points of equal cost as FSL does, with libstdc++'s `std::sort`; since 2026-11-07 the weighted `normcorr`'s count takes each point's weight as the point is visited, its matrix FSL's as text)"
 
 [[tool]]
 id = "fsl-fast"
 title = "FAST (tissue segmentation: classes, partial volumes, bias field)"
 eco = "fsl"
-page = "/tools/fsl-fast/"
+page = "/evidence/fsl-fast/"
 use = ["larmorx fsl fast", "lx.fsl.fast"]
-how = "clean-room original, `experimental` (2026-11-03: every option, message and failure case, one channel or any number of them, FSL's tissue priors registered by FLIRT's clean-room original in the same process; 2026-11-05: the spec answers of 2026-11-03, FSL-202 and FSL-203 in both modes, standard output as FAST buffers it at an abort; fMRIPrep's call 9 to 11 times FSL's speed on one thread, 47 to 67 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental`"
-validation = "original: [{fsl-fast.pass} of {fsl-fast.compared}](record:fsl-fast) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call on {fsl-fast.fmriprep} oracle runs and every single-channel case FSL's values bit for bit with `reproduce` (glibc's maths functions, as FSL is built), two to eight channels FSL's segmentations with their partial volumes FSL's or within 1.3e-7 on average; its default held to the replica's default, bit for bit with glibc's functions on every single-channel case), {fsl-fast.both} more rejected by both alike, {fsl-fast.expected} expected divergences (FSL-104, refused; two channels' defaults that both correct FSL-98's cycle, the correctly rounded functions' band); the {fsl-fast.fail} it misses is in its record (five channels with nearly singular covariances, decided by the matrix arithmetic's last bits); replica: [{fsl-fast-replica.pass} of {fsl-fast-replica.compared}](record:fsl-fast-replica) compared cases bit-identical to FSL 6.0.7.23 (every image written, the printed messages, the exit status): fMRIPrep's call on {fsl-fast-replica.fmriprep} oracle runs (an adult, a 3.5-year-old, a glioma), every option, one to eight channels, FSL's tissue priors registered by FLIRT's replica, the image types, 2D images; {fsl-fast-replica.both} more rejected by both alike; {fsl-fast-replica.expected} where FSL reads and writes past the smaller of channels of different sizes (FSL-104, refused)"
+how = "replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental`; clean room, `experimental` (2026-11-03: every option, message and failure case, one channel or any number of them, FSL's tissue priors registered by FLIRT's clean room in the same process; 2026-11-05: the spec answers of 2026-11-03, FSL-202 and FSL-203 in both modes, standard output as FAST buffers it at an abort; fMRIPrep's call 9 to 11 times FSL's speed on one thread, 47 to 67 times on 14, the same bits at any thread count)"
+validation = "replica: [{fsl-fast-replica.pass} of {fsl-fast-replica.compared}](record:fsl-fast-replica) compared cases bit-identical to FSL 6.0.7.23 (every image written, the printed messages, the exit status): fMRIPrep's call in {fsl-fast-replica.fmriprep} of its runs (an adult, a 3.5-year-old, a glioma), every option, one to eight channels, FSL's tissue priors registered by FLIRT's replica, the image types, 2D images; {fsl-fast-replica.both} more rejected by both alike; {fsl-fast-replica.expected} where FSL reads and writes past the smaller of channels of different sizes (FSL-104, refused); clean room: [{fsl-fast.pass} of {fsl-fast.compared}](record:fsl-fast) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call in {fsl-fast.fmriprep} of its runs and every single-channel case FSL's values bit for bit with `reproduce` (glibc's maths functions, as FSL is built), two to eight channels FSL's segmentations with their partial volumes FSL's or within 1.3e-7 on average; its default held to the replica's default, bit for bit with glibc's functions on every single-channel case), {fsl-fast.both} more rejected by both alike, {fsl-fast.expected} expected divergences (FSL-104, refused; two channels' defaults that both correct FSL-98's cycle, the correctly rounded functions' band); the {fsl-fast.fail} it misses is in its record (five channels with nearly singular covariances, decided by the matrix arithmetic's last bits)"
 [[tool]]
 id = "fsl-topup"
 title = "topup and applytopup (the susceptibility field from reversed phase encodings, and its correction)"
 eco = "fsl"
-page = "/tools/fsl-topup/"
+page = "/evidence/fsl-topup/"
 use = ["larmorx fsl topup", "larmorx fsl applytopup", "lx.fsl.topup", "lx.fsl.applytopup"]
-how = "clean-room original, `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included; 2026-11-04: the spec answers of 2026-11-03, FSL-133, FSL-134, FSL-145 and FSL-201 reproduced with `reproduce`; 2026-11-05: the scaled conjugate gradients' `--miter` count, FSL-242 corrected by default; 2026-11-07: FSL-273 with a coefficient field corrected by default (the Jacobian of the displacement applied), FSL's scales with `reproduce`; fMRIPrep's call 10 to 12 times FSL's speed on one thread, 39 to 41 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods; 2026-11-06: FSL-273, applytopup's Jacobian with a field of other voxel sizes, corrected by default)"
-validation = "original: [{fsl-topup.pass} of {fsl-topup.compared}](record:fsl-topup) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call on {fsl-topup.fmriprep} oracle runs: ds001600 within FSL's own thread band in every metric, ds005040 in every one but the field's correlation, 0.999958 against FSL's own 0.999966), {fsl-topup.both} more rejected by both alike, {fsl-topup.expected} expected divergences, each with its reason (estimated movements that do not converge, where FSL-201's forward differences make FSL's own path depend on its inputs' last bits, FSL's measured spread beside the original's; FSL-143's diverging iterations, reproduced; vb2D's transients; FSL-126; inputs refused for FSL-124 and FSL-134); replica: [{fsl-topup-replica.pass} of {fsl-topup-replica.compared}](record:fsl-topup-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's call on {fsl-topup-replica.fmriprep} oracle runs, every option, FSL's configurations, applytopup's five methods; {fsl-topup-replica.both} more rejected by both alike; {fsl-topup-replica.expected} refused where FSL needs more memory than any machine holds (a negative --warpres, FSL-124) or reads a field on another grid past its lines (FSL-134)"
+how = "replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: the same programs, options and methods; 2026-11-06: FSL-273, applytopup's Jacobian with a field of other voxel sizes, corrected by default); clean room, `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included; 2026-11-04: the spec answers of 2026-11-03, FSL-133, FSL-134, FSL-145 and FSL-201 reproduced with `reproduce`; 2026-11-05: the scaled conjugate gradients' `--miter` count, FSL-242 corrected by default; 2026-11-07: FSL-273 with a coefficient field corrected by default (the Jacobian of the displacement applied), FSL's scales with `reproduce`; fMRIPrep's call 10 to 12 times FSL's speed on one thread, 39 to 41 times on 14, the same bits at any thread count)"
+validation = "replica: [{fsl-topup-replica.pass} of {fsl-topup-replica.compared}](record:fsl-topup-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's call in {fsl-topup-replica.fmriprep} of its runs, every option, FSL's configurations, applytopup's five methods; {fsl-topup-replica.both} more rejected by both alike; {fsl-topup-replica.expected} refused where FSL needs more memory than any machine holds (a negative --warpres, FSL-124) or reads a field on another grid past its lines (FSL-134); clean room: [{fsl-topup.pass} of {fsl-topup.compared}](record:fsl-topup) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's call in {fsl-topup.fmriprep} of its runs: ds001600 within FSL's own thread band in every metric, ds005040 in every one but the field's correlation, 0.999958 against FSL's own 0.999966), {fsl-topup.both} more rejected by both alike, {fsl-topup.expected} expected divergences, each with its reason (estimated movements that do not converge, where FSL-201's forward differences make FSL's own path depend on its inputs' last bits, FSL's measured spread beside the clean room's; FSL-143's diverging iterations, reproduced; vb2D's transients; FSL-126; inputs refused for FSL-124 and FSL-134)"
 [[tool]]
 id = "fsl-maths"
 title = "fslmaths (image arithmetic, thresholds, filters, reductions, statistics, TFCE)"
 eco = "fsl"
-page = "/tools/fsl-maths/"
+page = "/evidence/fsl-maths/"
 use = ["larmorx fsl fslmaths", "lx.fsl.fslmaths", "lx.fsl.smooth", "lx.fsl.threshold"]
-how = "clean-room original, `experimental` (2026-11-04: every operation, option, data type, message and failure case, FSL-191 to FSL-193 found by its black-box runs; 1.8 to 28 times FSL's speed on one thread, up to 268 times on 14, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every operation, option, data type, message and failure case)"
-validation = "original: [{fsl-maths.pass} of {fsl-maths.compared}](record:fsl-maths) compared cases within thresholds against FSL 6.0.7.23, {fsl-maths.identical} of them FSL's values in every file (fMRIPrep's {fsl-maths.fmriprep} calls included; the others: FSL's FFT path, `-subsamp2` under the floating types, the last bits of Φ, the eigenvectors' signs, GLIBC-07), {fsl-maths.both} more rejected by both alike, {fsl-maths.expected} expected divergences (FSL's FFT convolution against the original's direct sum, `-subsamp2offc`'s means); replica: [{fsl-maths-replica.pass} of {fsl-maths-replica.compared}](record:fsl-maths-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-maths-replica.fmriprep} calls (combine_masks on three oracle runs, the goodvoxels mask's fourteen), every operation in every data type; {fsl-maths-replica.both} more rejected by both alike; {fsl-maths-replica.expected} one unit in the last place where FSL's glibc 2.35 is not correctly rounded and the replica is (GLIBC-07: `-dt double -tan`; glibc's `sin`, `cos` and the FFT's `sincos` are the replica's `reproduce` bits since 2026-11-04)"
+how = "replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every operation, option, data type, message and failure case); clean room, `experimental` (2026-11-04: every operation, option, data type, message and failure case, FSL-191 to FSL-193 found by its black-box runs; 1.8 to 28 times FSL's speed on one thread, up to 268 times on 14, the same bits at any thread count)"
+validation = "replica: [{fsl-maths-replica.pass} of {fsl-maths-replica.compared}](record:fsl-maths-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-maths-replica.fmriprep} calls (combine_masks in three of fMRIPrep's runs, the goodvoxels mask's fourteen), every operation in every data type; {fsl-maths-replica.both} more rejected by both alike; {fsl-maths-replica.expected} one unit in the last place where FSL's glibc 2.35 is not correctly rounded and the replica is (GLIBC-07: `-dt double -tan`; glibc's `sin`, `cos` and the FFT's `sincos` are the replica's `reproduce` bits since 2026-11-04); clean room: [{fsl-maths.pass} of {fsl-maths.compared}](record:fsl-maths) compared cases within thresholds against FSL 6.0.7.23, {fsl-maths.identical} of them FSL's values in every file (fMRIPrep's {fsl-maths.fmriprep} calls included; the others: FSL's FFT path, `-subsamp2` under the floating types, the last bits of Φ, the eigenvectors' signs, GLIBC-07), {fsl-maths.both} more rejected by both alike, {fsl-maths.expected} expected divergences (FSL's FFT convolution against the clean room's direct sum, `-subsamp2offc`'s means)"
 
 [[tool]]
 id = "fsl-stats"
 title = "fslstats (image statistics: means, extremes, percentiles, histograms, per volume and label, JSON)"
 eco = "fsl"
-page = "/tools/fsl-stats/"
+page = "/evidence/fsl-stats/"
 use = ["larmorx fsl fslstats", "lx.fsl.fslstats", "lx.fsl.image_mean", "lx.fsl.image_std"]
-how = "clean-room original, `experimental` (2026-11-04: every option, `-t`, `-K` and `-json`, every message and failure case); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every option, `-t`, `-K` and `-json`, every message and failure case; BET's replica runs it)"
-validation = "original: [{fsl-stats.pass} of {fsl-stats.compared}](record:fsl-stats) compared cases within thresholds against FSL 6.0.7.23, {fsl-stats.identical} of them FSL's numbers (fMRIPrep's {fsl-stats.fmriprep} goodvoxels calls included; BET's call within 6e-8 relative), {fsl-stats.both} more rejected by both alike; replica: [{fsl-stats-replica.pass} of {fsl-stats-replica.compared}](record:fsl-stats-replica) compared cases printing FSL 6.0.7.23's text byte for byte (with its messages and exit status): fMRIPrep's {fsl-stats-replica.fmriprep} goodvoxels calls, BET's call, FSL's own tests, every option; {fsl-stats-replica.both} more rejected by both alike"
+how = "replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every option, `-t`, `-K` and `-json`, every message and failure case; BET's replica runs it); clean room, `experimental` (2026-11-04: every option, `-t`, `-K` and `-json`, every message and failure case)"
+validation = "replica: [{fsl-stats-replica.pass} of {fsl-stats-replica.compared}](record:fsl-stats-replica) compared cases printing FSL 6.0.7.23's text byte for byte (with its messages and exit status): fMRIPrep's {fsl-stats-replica.fmriprep} goodvoxels calls, BET's call, FSL's own tests, every option; {fsl-stats-replica.both} more rejected by both alike; clean room: [{fsl-stats.pass} of {fsl-stats.compared}](record:fsl-stats) compared cases within thresholds against FSL 6.0.7.23, {fsl-stats.identical} of them FSL's numbers (fMRIPrep's {fsl-stats.fmriprep} goodvoxels calls included; BET's call within 6e-8 relative), {fsl-stats.both} more rejected by both alike"
 [[tool]]
 id = "fsl-prelude"
 title = "prelude (phase unwrapping of field maps' phase differences and complex images)"
 eco = "fsl"
-page = "/tools/fsl-prelude/"
+page = "/evidence/fsl-prelude/"
 use = ["larmorx fsl prelude", "larmorx-nc fsl prelude", "lx.fsl.prelude"]
-how = "clean-room original, `experimental` (2026-11-06: every option, message and failure case of `specs/prelude.md`, FSL-261 to FSL-272 corrected by default or refused, each with `reproduce`; the regions merged through an indexed heap and a weighted union-find: fMRIPrep's two large calls 97 and 211 times FSL's speed and 2.5 to 2.8 times the replica's on one thread, the same bits at any thread count); exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-06: every option, message and failure case, FSL-261 to FSL-272 corrected by default or refused, each with `reproduce`)"
-validation = "original: [{fsl-prelude.pass} of {fsl-prelude.compared}](record:fsl-prelude) compared cases within thresholds against FSL 6.0.7.23 (with `reproduce` every file bit-identical to FSL's; by default bit-identical to the replica's but the phases of complex images, GLIBC-07, which keep FSL's whole turns): the replica suite's cases with the original standing in, fMRIPrep's {fsl-prelude.fmriprep} calls (also against fMRIPrep's own outputs), every option, image type, NaN input, failure and output type; {fsl-prelude.both} more rejected by both alike; replica: [{fsl-prelude-replica.pass} of {fsl-prelude-replica.compared}](record:fsl-prelude-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-prelude-replica.fmriprep} calls on four oracle runs, the data panel's two other phase-difference maps, every option, complex and phase-and-magnitude inputs, series, NaN values (in a complex128 image's case, FSL-265, the values FSL takes from memory it never wrote are reported, not compared); {fsl-prelude-replica.both} more rejected by both alike"
+how = "replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-06: every option, message and failure case, FSL-261 to FSL-272 corrected by default or refused, each with `reproduce`); clean room, `experimental` (2026-11-06: every option, message and failure case of `specs/prelude.md`, FSL-261 to FSL-272 corrected by default or refused, each with `reproduce`; the regions merged through an indexed heap and a weighted union-find: fMRIPrep's two large calls 97 and 211 times FSL's speed and 2.5 to 2.8 times the replica's on one thread, the same bits at any thread count)"
+validation = "replica: [{fsl-prelude-replica.pass} of {fsl-prelude-replica.compared}](record:fsl-prelude-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's {fsl-prelude-replica.fmriprep} calls in four of fMRIPrep's runs, the data panel's two other phase-difference maps, every option, complex and phase-and-magnitude inputs, series, NaN values (in a complex128 image's case, FSL-265, the values FSL takes from memory it never wrote are reported, not compared); {fsl-prelude-replica.both} more rejected by both alike; clean room: [{fsl-prelude.pass} of {fsl-prelude.compared}](record:fsl-prelude) compared cases within thresholds against FSL 6.0.7.23 (with `reproduce` every file bit-identical to FSL's; by default bit-identical to the replica's but the phases of complex images, GLIBC-07, which keep FSL's whole turns): the replica suite's cases with the clean room standing in, fMRIPrep's {fsl-prelude.fmriprep} calls (also against fMRIPrep's own outputs), every option, image type, NaN input, failure and output type; {fsl-prelude.both} more rejected by both alike"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -539,7 +540,7 @@ status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full);
 id = "mri-hmc"
 larmorx = "`lx.mri.hmc`, `larmorx mri hmc` (clean-room)"
 reference = "mcflirt (FSL 6.0.7.23 since 2026-10-29, on OpenBLAS's Haswell kernels: the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`, and FSL-20, -21, -65, -66's cases run live)"
-status = "`experimental` ({mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds, {mri-hmc.fail} missing them; {mri-hmc.expected} expected divergences, each with its reason in the record: since 2026-11-07 two synthetic runs whose search paths part from mcflirt's within mcflirt's own spread, docs/findings/mri-hmc-original.md)"
+status = "`experimental` ({mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds, {mri-hmc.fail} missing them; {mri-hmc.expected} expected divergences, each with its reason in the record: since 2026-11-07 two synthetic runs whose search paths part from mcflirt's within mcflirt's own spread, docs/findings/mri-hmc-clean-room.md)"
 
 [[record]]
 id = "fsl-mcflirt-replica"
@@ -575,7 +576,7 @@ status = "`validated` ({fsl-bet-replica-full.pass} of {fsl-bet-replica-full.comp
 id = "fsl-flirt"
 larmorx = "`lx.fsl.flirt(implementation=\"original\")` and FLIRT's other programs' functions (`convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4d`, `pairreg`, `extracttxt`, `aff2rigid`), `larmorx fsl <program>` (clean-room, `crates/larmorx-fsl`)"
 reference = "flirt, convert_xfm and FLIRT's other programs and scripts (FSL 6.0.7.23); the replica suite's cases, the original's own verbose, `-debug` and schedule cases and its permanent cases"
-status = "`experimental` (the clean-room catch-up of 2026-11-05: {fsl-flirt.pass} of {fsl-flirt.compared} compared cases within thresholds, fMRIPrep's three calls included; {fsl-flirt.fail} miss them (listed in the record, explained in docs/findings/fsl-flirt-original.md: the weighted `woods` registration; the weighted `normcorr` FSL's since 2026-11-07); {fsl-flirt.both} rejected by both, with the same messages and status; {fsl-flirt.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75, FSL-93, FSL-204) or writes what the spec cannot define (FSL-241), refused or named)"
+status = "`experimental` (the clean-room catch-up of 2026-11-05: {fsl-flirt.pass} of {fsl-flirt.compared} compared cases within thresholds, fMRIPrep's three calls included; {fsl-flirt.fail} miss them (listed in the record, explained in docs/findings/fsl-flirt-clean-room.md: the weighted `woods` registration; the weighted `normcorr` FSL's since 2026-11-07); {fsl-flirt.both} rejected by both, with the same messages and status; {fsl-flirt.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75, FSL-93, FSL-204) or writes what the spec cannot define (FSL-241), refused or named)"
 
 [[record]]
 id = "fsl-flirt-replica"
@@ -587,7 +588,7 @@ status = "`experimental` (part 3: {fsl-flirt-replica.pass} of {fsl-flirt-replica
 id = "fsl-fast"
 larmorx = "`lx.fsl.fast(implementation=\"original\")`, `larmorx fsl fast` (clean-room, `crates/larmorx-fsl`)"
 reference = "fast (FSL 6.0.7.23, fsl-fast4 2111.3), with correctly rounded maths (the CORE-MATH preload) where a check fails against FSL as built; the default against the replica's default (`larmorx-nc`, the same corrections); the replica suite's cases, the original's own cases and its permanent cases"
-status = "`experimental` ({fsl-fast.pass} of {fsl-fast.compared} compared cases within thresholds, fMRIPrep's {fsl-fast.fmriprep} calls included; {fsl-fast.fail} misses them (listed in the record: five channels, explained in docs/findings/fsl-fast-original.md); {fsl-fast.both} rejected by both, with the same messages, standard output and status; {fsl-fast.expected} expected divergences: channels of different sizes, refused in both modes, FSL-104; two channels whose defaults both correct FSL-98's cycle, the correctly rounded functions' band)"
+status = "`experimental` ({fsl-fast.pass} of {fsl-fast.compared} compared cases within thresholds, fMRIPrep's {fsl-fast.fmriprep} calls included; {fsl-fast.fail} misses them (listed in the record: five channels, explained in docs/findings/fsl-fast-clean-room.md); {fsl-fast.both} rejected by both, with the same messages, standard output and status; {fsl-fast.expected} expected divergences: channels of different sizes, refused in both modes, FSL-104; two channels whose defaults both correct FSL-98's cycle, the correctly rounded functions' band)"
 
 [[record]]
 id = "fsl-fast-replica"

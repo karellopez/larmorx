@@ -1,0 +1,41 @@
+# The documentation revision, step 2: the handoff of the shared documents (relay 33).
+# Apply from the repository checkout: python -P scripts/orchestration/apply_handoff.py <this file>
+
+# D2 (reduced, the orchestrator's 2026-11-13 ~17:15 entry): the per-tool contract names the writing
+# guide, the reference block and present() as the way a new tool's API page and site pages are made.
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = """How the code is laid out, and how to add an ImageMath group or a replica:
+[architecture.md](architecture.md)."""
+new = """**The API page and the site's pages** (the documentation revision, 2026-11-13): a new tool's API
+page (item 5) and its pages on the documentation site (item 13) are written in the words and the
+layout of [the writing guide](writing-guide.md): its four words (original, port, replica, clean
+room) and its tone (§1, §2); on the API page one section per program, opened by its reference block
+(`<!-- reference ... -->`), with the Python call, the options table, examples the tests run and
+the ports, from which `python -m larmorx_validation reference` writes the program's reference page
+and checks the table against the code (`validation/src/larmorx_validation/reference/apipage.py`
+says how the page is written; [api/afni-automask.md](api/afni-automask.md) is the model); and the
+evidence page, whose texts the tool's evidence module gives through `present()` in the guide's
+words ([figures.md](figures.md), "Add a tool").
+
+How the code is laid out, and how to add an ImageMath group or a replica:
+[architecture.md](architecture.md)."""
+
+[[op]]
+do = "edit"
+file = "docs/figures.md"
+old = """   figures from `static/figures/<tool>/`. Export, build (0 problems), run the number check, and
+   look at every component: desktop and phone, light and dark, several slices and compare modes."""
+new = """   figures from `static/figures/<tool>/`. Export, build (0 problems), run the number check, and
+   look at every component: desktop and phone, light and dark, several slices and compare modes.
+
+**In the writing guide's words and layout** (the documentation revision, 2026-11-13): the evidence
+page is now `content/evidence/<tool>.md` (an older page's `content/tools/<tool>.md` stays as a
+redirect), laid out as `bet`'s, and the module's `present()` (`evidence/present.py`; the model
+`evidence/ants_n4.py`) gives every text the words of [the writing guide](writing-guide.md): its
+four words (§1), each figure titled by what it compares ("what against what: program, version",
+§4), the original, the replica and the clean room side by side in each worked example with its
+"What this shows" line and its verdict, the colours of §5. The program's reference page comes
+from its API page's reference block (`python -m larmorx_validation reference`;
+[porting-guide.md](porting-guide.md) §11)."""

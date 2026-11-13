@@ -1,54 +1,56 @@
 # FAST (`fast`: tissue-type segmentation)
 
-`lx.fsl.fast` (command line `larmorx fsl fast`): FSL 6.0.7.23's FAST4, the segmentation of a
-skull-stripped brain image into tissue classes (by default CSF, grey matter and white matter)
-with a hidden Markov random field fitted by expectation-maximisation, a bias field, and the
-partial volume of each class in each voxel; on one image or 2 to 8 co-registered channels, with
-FSL's tissue priors if asked.
+`lx.fsl.fast` (command line `larmorx fsl fast`): FSL 6.0.7.23's FAST4, the tissue-type
+segmentation.
 
-**Two implementations.** FSL is distributed under the FSL Licence (non-commercial use only), so
-larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the bit-exact
-**replica**, `larmorx-nc fsl fast` (package `larmorx-nc`, `crates-nc/larmorx-nc-fast`, under the
-FSL Licence's terms; translated from FSL's source:
-[PROVENANCE](../../crates-nc/larmorx-nc-fast/PROVENANCE.md)), done (2026-11-02), and the
-clean-room **original** in the main package (crate `larmorx-fsl`, module `fast`, Apache-2.0),
-written from [`specs/fast.md`](../../specs/fast.md), the FAST paper, FSL's documentation and
-black-box runs of FSL's program ([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), done
-(2026-11-03): it segments one channel and several (any number: `-S 9` and more
-too, which the replica refuses), with the tissue priors (`-a` registered by larmorx's own FLIRT in
-this process, `-A`, `-P`), every option, message and failure case and FSL-96 to FSL-104,
-FSL-202 and FSL-203 in both modes (the last two since 2026-11-05; fMRIPrep's call within the
-thresholds of `specs/fast.md` §11 on its oracle runs).
-`implementation="auto"` (the default) runs the replica when `larmorx-nc` is installed,
-else the original; `"replica"` needs `larmorx-nc` (`pip install larmorx-nc`; otherwise
-`ReplicaNotFoundError`); `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the clean-room original. The command
-line chooses alike (`--implementation` before the family, or `LARMORX_IMPLEMENTATION`).
+The ports come first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then FSL's defects as both ports correct them, the clean room's design and what
+is not done yet. The page's dates are in its [History](#history).
 
-**Status: `experimental`**: the replica against FSL 6.0.7.23 itself
-([record](../validation/fsl-fast-replica.md), standard tier): fMRIPrep's call bit-identical on
-three oracle runs (ds000005, an adult; ds000228, a 3.5-year-old; ds005003, a glioma), every file
-FAST writes, its standard output and error; every option, 2 to 8 channels, the priors, the odd
-inputs and every message, exit status and failure case of the command line: 59 of 59 compared
-cases bit-identical, 26 rejected by both alike, 1 refused where FSL reads past a smaller channel
-(FSL-104). The original against FSL 6.0.7.23 ([record](../validation/fsl-fast.md), standard
-tier, `specs/fast.md` §11's thresholds, 2026-11-05): 64 of 65 compared cases within the
-thresholds, fMRIPrep's three calls included (with `reproduce`, as FSL is built with glibc's
-functions, fMRIPrep's calls and every single-channel case FSL's values bit for bit, two to eight
-channels FSL's segmentations); 35 rejected by both alike (every abort and message of FSL's,
-the lines of standard output an abort loses among them), 2 expected divergences (FSL-104's
-refusal; below); the one outside, `multi/s5`, is explained (five channels with nearly singular
-covariances, decided by the matrix arithmetic's last bits). Its default is held to the replica's
-default (the same corrections): with glibc's functions it is the replica's default bit for bit on
-every single-channel case, and with its correctly rounded functions it stays within the narrow
-band of FSL-202's corrected variance on one channel (fMRIPrep's calls: the same labels as the
-replica's default); several channels have no FSL-202, so there the two defaults lie FSL's own
-last-bit band apart (`multi/s3`, `multi/s2-n4`: to every digit FSL against FSL with correctly
-rounded maths), and `multi/s2-manualseg-cycle`, whose defaults both correct FSL-98's cycle, is
-the expected divergence measured in [the findings](../findings/fsl-fast-original.md). The evidence (fMRIPrep's call on three
-T1w brains in an image viewer with both implementations, the bias field, the priors, three
-channels, every case with its verdict, the speed) is FAST's page on the documentation site.
+## Ports
 
-## Quick start
+FSL is distributed under the FSL Licence (non-commercial use only), so `fast` has two ports, a
+replica and a clean room, in different packages ([licensing](../licensing.md)):
+
+- **The replica** is bit-exact: `larmorx-nc fsl fast`, in the package `larmorx-nc`
+  (`crates-nc/larmorx-nc-fast`), under the FSL Licence's terms, translated from FSL's source.
+- **The clean room** is in the main package (crate `larmorx-fsl`, module `fast`, Apache-2.0),
+  written from [`specs/fast.md`](../../specs/fast.md), the FAST paper, FSL's documentation and
+  black-box runs of FSL's program ([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)). It
+  segments one channel and several (any number: `-S 9` and more too, which the replica refuses),
+  with the tissue priors (`-a` registered by LARMORX's own FLIRT in this process, `-A`, `-P`).
+
+`implementation="auto"` (the default) runs the replica when `larmorx-nc` is installed, else the
+clean room; `"replica"` needs `larmorx-nc` (`pip install larmorx-nc`; otherwise
+`ReplicaNotFoundError`); `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the
+clean room. The command line chooses alike (`--implementation` before the family, or
+`LARMORX_IMPLEMENTATION`).
+
+## `fast`
+
+<!-- reference
+program: fast
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.fast
+command-line: crates/larmorx-fsl/src/cli/fast.rs
+records: {replica: [fsl-fast-replica], clean-room: [fsl-fast]}
+evidence: fsl-fast
+-->
+
+`fast` segments a skull-stripped brain image into tissue classes (by default CSF, grey matter and
+white matter) with a hidden Markov random field fitted by expectation-maximisation. It also
+estimates a bias field and the partial volume of each class in each voxel, on one image or 2 to 8
+co-registered channels, with FSL's tissue priors if asked.
+
+### Python (`fast`)
+
+`lx.fsl.fast(images, *, n_classes=3, image_type="T1", bias_iterations=4, bias_lowpass=20.0, no_bias=False, fixed_iterations=4, init_iterations=15, initial_smoothness=0.02, smoothness=0.1, mixel_smoothness=0.3, pve=True, segments=False, probabilities=False, restored=False, bias_field=False, manual_means=None, priors_matrix=None, priors=None, priors_throughout=False, fsldir=None, verbose=False, n_threads=1, implementation="auto", upstream_defects="fix")`
+
+FSL's settings are the call's (CLAUDE.md rule 6): the outputs are NIfTI-1 read back, and no FSL
+variable of the process reaches the program. Invalid arguments raise `ValueError` before anything
+runs (also the values FAST would use without meaning: FSL-99).
 
 ```python
 import larmorx as lx
@@ -65,65 +67,97 @@ r = lx.fsl.fast("T1w_brain.nii.gz", bias_field=True, restored=True)
 r2 = lx.fsl.fast(["T1w_brain.nii.gz", "T2w_brain.nii.gz"], restored=True)
 ```
 
-From the command line, FAST's own arguments:
+### Options of `fast`
 
-```
-larmorx fsl fast -I 0 -N -p -g -S 1 T1w_brain.nii.gz
-larmorx fsl fast -S 2 -B -o out T2w_brain.nii.gz T1w_brain.nii.gz
-```
-
-(in the second, channel 1 is the last word.)
-
-## Options
-
-| `lx.fsl.fast` | `fast` | Default | Meaning |
-|---|---|---|---|
-| `images` | the last word(s) | | one image (path or `lx.Image`), or a list of channels, channel 1 first (the command line names channel 1 **last**) |
-| `n_classes` | `-n` | 3 | tissue classes |
-| `image_type` | `-t` | `"T1"` | `"T1"`, `"T2"` (reverses the class order: brightest first), `"PD"` |
-| `bias_iterations` | `-I` | 4 | main-loop iterations with the bias field |
-| `bias_lowpass` | `-l` | 20 | the bias field's smoothing (FWHM, mm) |
-| `no_bias` | `-N` | `False` | no bias field |
-| `fixed_iterations` | `-O` | 4 | main-loop iterations after the bias field (also added to the initialisation's iterations) |
-| `init_iterations` | `-W` | 15 | initialisation iterations |
-| `initial_smoothness` | `-f` | 0.02 | the MRF weight while the bias field is estimated |
-| `smoothness` | `-H` | 0.1 | the MRF weight afterwards |
-| `mixel_smoothness` | `-R` | 0.3 | the MRF weight of the mixel types (partial volumes) |
-| `pve=False` | `--nopve` | `True` | no partial volumes |
-| `segments` | `-g` | `False` | one binary image per class |
-| `probabilities` | `-p` | `False` | each class's posterior probability |
-| `restored` | `-B` | `False` | the bias-corrected image(s) |
-| `bias_field` | `-b` | `False` | the bias field(s) |
-| `manual_means` | `-s` | | the initial class intensities: a file, or `n_classes` numbers (several channels: `n_channels` rows of `n_classes`) |
-| `priors_matrix` | `-a` | | the standard-to-input FLIRT matrix (4 x 4 array or file): initialise from tissue priors registered with it |
-| `priors` | `-A` | | the CSF, grey- and white-matter priors in standard space (three images); without them FSL's standard priors from `fsldir` |
-| `priors_throughout` | `-P` | `False` | use the priors in every iteration (needs `priors_matrix`) |
-| `fsldir` | `FSLDIR` | | the FSL installation whose `data/standard/tissuepriors` the standard priors come from (needed only for `priors_matrix` without `priors`) |
-| `verbose` | `-v` | `False` | FAST's diagnostic messages (in `FastResult.stdout`) |
-| `n_threads` | `OMP_NUM_THREADS` | 1 | threads (0: all); the results do not depend on it (the original's: the same bits on any count) |
-| `implementation` | `--implementation` (before the family), `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"clean-room"` (the clean-room original: any number of channels) |
-| `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
-
-`lx.fsl.fast` returns a `FastResult`: `segmentation` (`_seg`), `segments` (`_seg_<i>`),
-`probabilities` (`_prob_<i>`), `partial_volumes` (`_pve_<i>`), `pve_segmentation` (`_pveseg`),
-`mixeltype` (`_mixeltype`), `restored` (`_restore`, `_restore_<c>`), `bias_fields` (`_bias`,
-`_bias_<c>`), each an `lx.Image` (or a tuple of them; `None` when not asked for), and `stdout`.
-FSL's settings are the call's (CLAUDE.md rule 6): the outputs are NIfTI-1 read back, and no FSL
-variable of the process reaches the program. Invalid arguments raise `ValueError` before anything
-runs (also the values FAST would use without meaning: see FSL-99).
+| `fast` option | Python | Notes |
+|---|---|---|
+| the last word(s) | `images` | one image (path or `lx.Image`), or a list of channels, channel 1 first (the command line names channel 1 **last**: `larmorx fsl fast -S 2 -B -o out T2w_brain.nii.gz T1w_brain.nii.gz`) |
+| `-S`, `--channels` | `images` | the number of channels (default 1): the list's length |
+| `-n`, `--class` | `n_classes` | tissue classes |
+| `-t`, `--type` | `image_type` | `"T1"`, `"T2"` (reverses the class order: brightest first), `"PD"`; 1, 2, 3 on the command line |
+| `-I`, `--iter` | `bias_iterations` | main-loop iterations with the bias field |
+| `-l`, `--lowpass` | `bias_lowpass` | the bias field's smoothing (FWHM, mm) |
+| `-N`, `--nobias` | `no_bias=True` | no bias field |
+| `-O`, `--fixed` | `fixed_iterations` | main-loop iterations after the bias field (also added to the initialisation's iterations) |
+| `-W`, `--init` | `init_iterations` | initialisation iterations |
+| `-f`, `--fHard` | `initial_smoothness` | the MRF weight while the bias field is estimated |
+| `-H`, `--Hyper` | `smoothness` | the MRF weight afterwards |
+| `-R`, `--mixel` | `mixel_smoothness` | the MRF weight of the mixel types (partial volumes) |
+| `--nopve` | `pve=False` | no partial volumes |
+| `-g`, `--segments` | `segments=True` | one binary image per class |
+| `-p` | `probabilities=True` | each class's posterior probability |
+| `-B` | `restored=True` | the bias-corrected image(s) |
+| `-b` | `bias_field=True` | the bias field(s) |
+| `-s`, `--manualseg` | `manual_means` | the initial class intensities: a file, or `n_classes` numbers (several channels: `n_channels` rows of `n_classes`) |
+| `-a` | `priors_matrix` | the standard-to-input FLIRT matrix (4 x 4 array or file): initialise from tissue priors registered with it |
+| `-A` | `priors` | the CSF, grey- and white-matter priors in standard space (three images); without them FSL's standard priors from `fsldir` |
+| `-P`, `--Prior` | `priors_throughout=True` | use the priors in every iteration (needs `priors_matrix`) |
+| `-o`, `--out` | the result | the outputs' basename |
+| `-v`, `--verbose` | `verbose=True` | FAST's diagnostic messages (in the result's `stdout`) |
+| `-h`, `--help` | command line only | |
+| `FSLDIR` | `fsldir` | the FSL installation whose `data/standard/tissuepriors` the standard priors come from (needed only for `priors_matrix` without `priors`) |
+| `OMP_NUM_THREADS` | `n_threads` | threads (0: all); the results do not depend on it (the clean room's: the same bits on any count) |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `"reproduce"`: FSL's defects as FSL has them |
 
 The command line takes every option of FAST's own (`specs/fast.md` §2), its messages and exit
-statuses; with `-a`, FSL's FLIRT is the replica's own, run in the same process (no FSL
-installation needed when `-A` names the priors).
+statuses.
 
-## Upstream defects (D13)
+### Examples of `fast`
+
+<!-- inputs: T1w_brain.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# fMRIPrep's call: fast -I 0 -N -p -g -S 1 <T1w brain>
+r = lx.fsl.fast(
+    "T1w_brain.nii.gz", bias_iterations=0, no_bias=True, probabilities=True, segments=True
+)
+len(r.partial_volumes)  # -> 3
+```
+
+```bash example
+larmorx fsl fast -I 0 -N -p -g -S 1 T1w_brain.nii.gz
+```
+
+### Ports of `fast`
+
+**The replica** against FSL 6.0.7.23 itself ([its record](../validation/fsl-fast-replica.md), the
+standard comparison): fMRIPrep's call bit-identical in three of fMRIPrep's runs (ds000005, an
+adult; ds000228, a 3.5-year-old; ds005003, a glioma), every file FAST writes, its standard output
+and error; every option, 2 to 8 channels, the priors, the odd inputs and every message, exit
+status and failure case of the command line: 59 of 59 compared cases bit-identical, 27 rejected
+by both alike, 1 refused where FSL reads past a smaller channel (FSL-104). With `-a`, FSL's FLIRT
+is the replica's own, run in the same process (no FSL installation needed when `-A` names the
+priors).
+
+**The clean room** against FSL 6.0.7.23 ([its record](../validation/fsl-fast.md), the standard
+comparison, `specs/fast.md` §11's thresholds, 2026-11-05): 64 of 65 compared cases within the
+thresholds, fMRIPrep's three calls included (with `reproduce`, as FSL is built with glibc's
+functions, fMRIPrep's calls and every single-channel case FSL's values bit for bit, two to eight
+channels FSL's segmentations); 35 rejected by both alike (every abort and message of FSL's,
+the lines of standard output an abort loses among them), 2 expected divergences (FSL-104's
+refusal, and `multi/s2-manualseg-cycle`, below); the one outside, `multi/s5`, is explained (five
+channels with nearly singular covariances, decided by the matrix arithmetic's last bits). Its
+default is held to the replica's default (the same corrections): with glibc's functions it is the
+replica's default bit for bit on every single-channel case, and with its correctly rounded
+functions it stays within the narrow band of FSL-202's corrected variance on one channel
+(fMRIPrep's calls: the same labels as the replica's default); several channels have no FSL-202,
+so there the two defaults lie FSL's own last-bit band apart (`multi/s3`, `multi/s2-n4`: to every
+digit FSL against FSL with correctly rounded maths), and `multi/s2-manualseg-cycle`, whose
+defaults both correct FSL-98's cycle, is the expected divergence measured in
+[the findings](../findings/fsl-fast-clean-room.md). It is built for speed: fMRIPrep's call on the
+standard comparison's three T1w brains takes 2.4 to 5.2 s on one thread, 0.4 to 0.9 s on 14 (FSL
+22 to 60 s, the replica 15 to 31 s).
+
+## Defects of the original, corrected by default
 
 FAST's defects are corrected by default and reproduced with `upstream_defects="reproduce"`
 (`LARMORX_UPSTREAM_DEFECTS=reproduce`); each correction that changes a result is named on standard
 error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
 
 - **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's FAST stops with FSL's message at its first image
-  (exit 1). Both implementations, the clean-room original and the replica, write the images as
+  (exit 1). Both ports, the clean room and the replica, write the images as
   `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one line per
   command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce` stops as FSL
   does. Command line only: the Python functions set the type themselves.
@@ -147,26 +181,26 @@ error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
 - **FSL-202**: with one channel, each class's variance subtracts the single-precision square of
   the single-precision mean, which cancels most of its digits in the log domain (up to about
   0.3 % off on white matter): the mean's square in double precision by default (the replica since
-  2026-11-03, the clean-room original since 2026-11-05: with glibc's functions the two defaults
+  2026-11-03, the clean room since 2026-11-05: with glibc's functions the two defaults
   are the same bits). fMRIPrep's FAST call is affected:
   its default labels move towards those of the exactly computed statistics (ds000005: 54 `_seg`
   and 112 `_mixeltype` voxels); `reproduce` gives FSL's.
 - **FSL-203**: an input whose first voxel is NaN has NaN extrema: FAST keeps its negative values
   and, with one channel, its mask is empty (exit 255): the extrema of the values that are not NaN
-  by default (the replica since 2026-11-03, the clean-room original since 2026-11-05).
+  by default (the replica since 2026-11-03, the clean room since 2026-11-05).
 
 ### glibc's maths functions (GLIBC-07)
 
 FSL's FAST calls glibc 2.35's `exp`, `log`, `expf` and `logf` (the class likelihoods, the Markov
 random field, the bias field and the partial volumes; `specs/fast.md` §8), which are not correctly
-rounded. The clean-room original computes them correctly rounded by default and takes glibc's with
+rounded. The clean room computes them correctly rounded by default and takes glibc's with
 `upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit for bit
 against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only). The
 segmentation is an iterative fit: one function value's last bit can move a probability's or the bias
 field's last bits, rarely a voxel's class, and FAST cannot tell without segmenting twice, so neither
 mode names GLIBC-07: the default's correctly rounded functions can move a segmentation's last bits.
 
-## The clean-room original
+## The clean room
 
 `larmorx --implementation clean-room fsl fast` (`implementation="clean-room"`, and
 `"auto"` without `larmorx-nc`): FAST's command line, usage, messages and exit statuses, the
@@ -183,42 +217,49 @@ library buffers it: where FAST aborts, the lines it had not flushed (the k-means
 partial-volume heading) are lost there too (`specs/fast.md` §7). It is compared with FSL by its
 own parity suite (`fsl-fast`, the replica suite's cases and its own, `specs/fast.md` §11's
 thresholds), and its default with the replica's default; the observations of FSL's behaviour
-that the spec does not state are in [the findings](../findings/fsl-fast-original.md). Built for
+that the spec does not state are in [the findings](../findings/fsl-fast-clean-room.md). Built for
 speed (`specs/fast.md` §10; [the benchmark](../benchmarks/fsl-fast.md)): every per-voxel quantity
 is kept for the brain mask's voxels only; the steps where voxels are independent run in parallel
 (`n_threads`); the MRF sweeps and the mixel sweep keep FAST's in-place order and run as a pipeline
 of planes with exactly the serial result; FSL's blocked sums run block by block, their order
 kept; the partial volumes' `exp` runs four values at a time (vectorised, the same bits). The
-results are the same bits on any thread count. fMRIPrep's call on the standard tier's three T1w
-brains: 2.4 to 5.2 s on one thread, 0.4 to 0.9 s on 14 (FSL 22 to 60 s, the replica 15 to 31 s).
+results are the same bits on any thread count. fMRIPrep's call on the standard comparison's three
+T1w brains: 2.4 to 5.2 s on one thread, 0.4 to 0.9 s on 14 (FSL 22 to 60 s, the replica 15 to 31 s).
 
-More than 8 channels: the original segments them (rules A-D: FSL segments them too, and the
-original's thresholds do not need OpenBLAS's bits, so there is nothing to refuse); the replica
+More than 8 channels: the clean room segments them (rules A-D: FSL segments them too, and the
+clean room's thresholds do not need OpenBLAS's bits, so there is nothing to refuse); the replica
 refuses them. Channels that are nearly a combination of others (an ill-conditioned covariance,
 `multi/s5` of the suite) are decided by the last bits of the matrix arithmetic: there the
-original lands as far from FSL as from itself with one rounding changed (the findings, "Five
+clean room lands as far from FSL as from itself with one rounding changed (the findings, "Five
 channels").
 
 Its record ([fsl-fast](../validation/fsl-fast.md)), golden cases (`cli.fsl.fast`, `.bias`,
 `.multi`, `.priors`, `.reproduce`, `py.fsl.fast`), memory test (fMRIPrep's call at 152 MiB
 against FSL's 707) and thread test are in place; its random-testing trial (25 minutes, 9,005
-realistic cases) is triaged in [the findings](../findings/fsl-fast-original.md).
+realistic cases) is triaged in [the findings](../findings/fsl-fast-clean-room.md).
 
 ## Not yet
 
 - **More than 8 channels** (`-S 9` and more), by the replica: refused in both modes (the
-  clean-room original segments them, above), with a clear message
+  clean room segments them), with a clear message
   (`larmorx-nc: error: fast: -S 9: more than 8 channels are not replicated ...`, exit 1): FSL's
   results there follow OpenBLAS's kernels for larger matrices (its aligned `iamax` path, the 8-way
   dot products, LAPACK's blocked LU), which larmorx does not reproduce.
 - The full tier (fMRIPrep's call on every oracle run), the data panel's other images and long
-  random testing: in the final validation phase, for both implementations. The standard tier,
+  random testing: in the final validation phase, for both ports. The standard comparison,
   one random-testing trial each (the replica: half an hour, 17,497 realistic cases, its four
-  differences, all FSL-101, fixed in `reproduce` and kept as cases of the record; the original:
+  differences, all FSL-101, fixed in `reproduce` and kept as cases of the record; the clean room:
   25 minutes, 9,005 cases, triaged in its findings) and the site's page (fMRIPrep's call on three
-  oracle runs, the bias field, the priors, three channels, every case, both implementations) are
+  of fMRIPrep's runs, the bias field, the priors, three channels, every case, both ports) are
   done.
 - Two behaviours of the multi-channel segmentation are kept as FAST's until they are measured on
   real T1w and T2w pairs (rule D): its initialisation (each channel's classes started in the order
   of that channel's own intensities, so channels of opposite contrast can start from empty classes)
   and its bias field ([spec](../../specs/fast.md) §9.2).
+
+## History
+
+- **The replica** (2026-11-02): [PROVENANCE](../../crates-nc/larmorx-nc-fast/PROVENANCE.md).
+- **The clean room** (2026-11-03); FSL-202 and FSL-203 in both modes since 2026-11-05, when its
+  record was made again.
+- **Status: `experimental`.**

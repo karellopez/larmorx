@@ -340,11 +340,25 @@ hand (the stage comparison re-renders from its JSON with `--render`). The model 
   next to larmorx's distance from them; where it fails silently (ANTS-45), the statuses must
   agree and larmorx must explain.
 
-**Status** (PLAN.md §4): `experimental` while any case fails its threshold, `validated` when
-every case of the oracle set passes, `stable` once the API is also frozen. One failing case
-keeps a tool `experimental`, however small the miss: `lx.mri.hmc` misses one FD-correlation
-threshold by 0.0008 and is `experimental`. Make no equivalence claim that the record's
-numbers do not show (rule 8).
+**Status** (PLAN.md §4, read with the user's decision on testing depth of 2026-10-28: each part
+tests every code path once, and the extensive evidence comes in one final validation phase;
+CLAUDE.md, "Every part, in full"):
+
+- `experimental`: the part's tests pass, but the final validation phase's evidence for the port
+  (the data panel, the long random-testing runs, the full tier) is still to come; or a case of
+  its record fails its threshold;
+- `validated`: every case of the record passes, and that evidence exists;
+- `stable`: validated, and the API frozen.
+
+So a part leaves a new port `experimental` even where every case passes, and the final
+validation phase makes it `validated`. One failing case keeps a tool `experimental`, however
+small the miss: `lx.mri.hmc` misses one FD-correlation threshold by 0.0008 and is
+`experimental`. The ports marked `validated` before this definition (2026-11-12) keep their
+status: ANTs' programs have their data panel (2026-10-27), and the others get the rest of the
+evidence in the final validation phase. Their records are listed in `VALIDATED_BEFORE`
+(`validation/src/larmorx_validation/reference/programs.py`), and the site's Validation page names
+their ports. Make no equivalence claim that the record's numbers do
+not show (rule 8).
 
 ## 8. Improvements and defects: D11 and D13
 
@@ -665,6 +679,17 @@ Mandatory for every tool (PLAN.md §4, rule 7). Copy the models.
 | 13 | Figures and the tool's page on the documentation site | `validation/.../figures/<tool>.py`; the site's `static/figures/<tool>/`, `content/tools/<tool>.md` | [figures.md](figures.md); `figures/ants_n4.py` |
 | 14 | Random testing: a difftest descriptor (option grammar, input generators, implementations, exact checks) and a short trial night (`difftest --tools <tool> --budget 0.5`, boxed) before the gates; every difference triaged in `validation/difftest/triage.toml` (2026-10-25) | `validation/src/larmorx_validation/difftest/tools/` | [validation/difftest.md](validation/difftest.md) |
 | 15 | Memory: the tool's peak memory on a mid-size call at most the original's (plus the interpreter's few MiB), a case in `tests/parity/test_memory_peak.py` (user, 2026-10-25) | `tests/parity/test_memory_peak.py` | `validation/investigations/difftest/memory_pair.py` |
+
+**The API page and the site's pages** (the documentation revision, 2026-11-13): a new tool's API
+page (item 5) and its pages on the documentation site (item 13) are written in the words and the
+layout of [the writing guide](writing-guide.md): its four words (original, port, replica, clean
+room) and its tone (§1, §2); on the API page one section per program, opened by its reference block
+(`<!-- reference ... -->`), with the Python call, the options table, examples the tests run and
+the ports, from which `python -m larmorx_validation reference` writes the program's reference page
+and checks the table against the code (`validation/src/larmorx_validation/reference/apipage.py`
+says how the page is written; [api/afni-automask.md](api/afni-automask.md) is the model); and the
+evidence page, whose texts the tool's evidence module gives through `present()` in the guide's
+words ([figures.md](figures.md), "Add a tool").
 
 How the code is laid out, and how to add an ImageMath group or a replica:
 [architecture.md](architecture.md).

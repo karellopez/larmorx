@@ -64,6 +64,7 @@ CLEANROOM_PATHS = (
     "crates/larmorx-mri",
     "crates/larmorx-fsl",
     "crates/larmorx-tedana",
+    "crates/larmorx-fs-core",
     *CORE_FILES,
     *(d.rstrip("/") for d in CORE_DIRS),
 )
@@ -100,6 +101,7 @@ TOOL_NAMES = {
     ("FSL", "prelude"): "prelude (phase unwrapping)",
     ("FSL", "fsl-shared"): "larmorx-fsl's shared code (images, options, messages, data)",
     ("tedana", "t2smap"): "t2smap (tedana's T2* and S0 maps, larmorx-tedana)",
+    ("FreeSurfer", "fs-core"): "FreeSurfer's core services (larmorx-fs-core)",
     ("GNU", "cbrtf_glibc"): "cbrtf with glibc 2.35's bits (larmorx-core)",
     ("GNU", "sincos_glibc"): "sin, cos, sincos with glibc 2.35's bits (larmorx-core)",
     ("GNU", "tanh_glibc"): "tanh with glibc 2.35's bits (larmorx-core, from fdlibm)",
@@ -129,6 +131,8 @@ def tool_of(rel: str) -> tuple[str, str] | None:
     for d, tool in CORE_DIRS.items():
         if rel.startswith(d):
             return tool
+    if rel == "crates/larmorx-fs-core" or rel.startswith("crates/larmorx-fs-core/"):
+        return ("FreeSurfer", "fs-core")
     m = re.match(r"^crates/larmorx-(afni|mri|fsl|tedana)(?:/(.*))?$", rel)
     if not m:
         return None

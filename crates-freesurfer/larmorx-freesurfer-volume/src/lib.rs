@@ -15,9 +15,13 @@
 pub mod arith;
 pub mod cma;
 pub mod coords;
+pub mod deriv;
 pub mod ltaread;
+pub mod resize;
 pub mod rotate;
 mod rows;
 pub mod sample;
+pub mod seq;
 pub mod skull;
 pub mod vgeom;
+pub mod xform;

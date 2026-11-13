@@ -15,5 +15,6 @@ larmorx-freesurfer-mri.workspace = true
 larmorx-freesurfer-volume.workspace = true
 
 [dev-dependencies]
+flate2.workspace = true
 sha2.workspace = true
 tempfile.workspace = true

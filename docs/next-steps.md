@@ -43,27 +43,43 @@ starts no other agent.
 | # | Step | State |
 |---|---|---|
 | 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | **done** 2026-11-13 (the first half merged 2026-11-12); its site page from its export with the documentation revision |
-| 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | starting |
+| 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | step 1 published 2026-11-13; step 2 reduced to what the site's readers see (the user, 2026-11-13), in progress; its other items in the final validation phase |
 | 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`; the queue `docs/freesurfer/queue.md`, replica side) | 3.0 done 2026-11-12 (the inventory, the queue, the replay tool); 3.1 in progress |
 | 4 | **Surfaces**: Workbench-compatible tools (a replica in `larmorx-gpl`, a clean room in `larmorx`), MSM (a clean room only, after a patent check) | planned |
 | 5 | **larmorprepx**, the pipeline, with the MNI-template steps (TemplateFlow; niworkflows' `init_enhance_and_skullstrip_bold_wf`, the data sink's `template_metadata`) | planned |
 | 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps; FreeSurfer's permissive pieces, queue CP-01 to CP-13: the bundled readers, the small pieces, x87 arithmetic, the random numbers, VNL and netlib, ITK 4.13.2's filters, the networks' inference core) | after FreeSurfer |
 | 7 | **The completeness parts**: FSL's FNIRT, `applywarp`, `convertwarp`, `fugue` (each a replica and a clean room), then the FLIRT pieces that wait for them; ANTs' missing operations; FreeSurfer's optional streams | after FreeSurfer |
-| 8 | **The final validation phase** (item 5), then the stage-by-stage and end-to-end comparisons with fMRIPrep | planned |
+| 8 | **The final validation phase** (item 5), with the documentation revision's deferred items (the repository's other documents, the findings', the code's and the tests' words, `programs.py`'s rule for `validated`, the clean rooms' printed lines in the old words, the site's small layout items, `n_threads` in the function libraries: `lx.sdcflows`' helpers, `lx.niworkflows`, `lx.confounds`), then the stage-by-stage and end-to-end comparisons with fMRIPrep | planned |
 | 9 | **Release 0.1.0**, once the full pipeline exists (the user, 2026-11-11) | planned |
 
 **"The templates" part is folded into others** (the user, 2026-11-12): its page template and generated
 option tables into the documentation revision, its replay harness into FreeSurfer's preparation (3.0), the
 MNI-template steps into larmorprepx.
 
-**Side by side.** During a **burst** (a fresh weekly usage window the user opens): about six agents on
-separate files: FreeSurfer two to three (the inventory, then the foundations' modules, then wave 3.2's
-replicas with their specs), the confounds one (its slot then moves to FreeSurfer), the documentation two
-(the writer and the critical reviewer); the orchestrator merges in batches about twice a day and runs the
-reference runs. In a **normal week**: one agent at a time on the queue (`docs/freesurfer/queue.md`, from
-the inventory): the next wave's replicas and the previous wave's clean rooms. Usage limits: the user
-lifted the self-imposed ones on 2026-11-12 until they say otherwise (they reset the weekly window
-themselves).
+**Side by side, then one agent at a time (the user, 2026-11-13).** Until the weekly reset of Saturday
+2026-11-14 23:00 the chains already running continue, and no new parallel chain starts: FreeSurfer's three
+replica tracks (A, C, D), the spec finisher (E), the second clean-room chain (fs.maths, then fs.mri) and the
+documentation writer (no separate reviewer: the writer checks each chunk with the automated checks). From the
+reset on, **one agent at a time**, to save usage:
+- **Before the reset:** each running relay ends at a clean boundary (committed, its NOTES current with the next
+  relay's plan), and the orchestrator merges what passed in one batch, so the one-at-a-time work starts from a
+  published, CI-green main.
+- **The order of relays:** (1) the documentation's reduced step 2, if not yet published (a few relays, then its
+  merge); (2) FreeSurfer's replica wave 3.1 to its end, by its critical path: first what another chain waits for
+  (the "For track X" announcements in the chains' NOTES), then the module nearest completion; the chains A
+  (fs.io, fs.labels), C (fs.volume, then fs.filter) and D (fs.surfio) take turns, each relay continuing its own
+  chain from its NOTES, a blocked chain skipped; (3) after each replica module completes, its spec made ready
+  (track E) and its clean room (the clean-room chain) follow, so the clean rooms trail by about one module. From
+  wave 3.2 on the same rhythm: the next wave's replicas and the previous wave's clean rooms, about two replica
+  relays per clean-room relay, the clean rooms catching up whenever a replica chain is blocked.
+- **Merges:** a batch every two or three relays (or once a day), verified while the next relay works (machine
+  time, not usage); main CI-green before a relay that depends on the batch starts.
+- **Usage:** the pace line again (30 % at the weekly reset plus 10 % a day; `usage.py check` before every
+  relay). A relay costs about 0.5 to 0.7 % of the week, so about 14 relays a day at most; the orchestrator starts
+  a fresh session at clean stops (its long context is the costliest actor).
+- **Continuity:** every chain's brief, NOTES and handoffs are in the orchestrator session's scratch folder
+  (named in the workspace's ORCHESTRATOR-STATE.md), mirrored hourly into `<workspace>/archive/orchestration-notes/`
+  and the USB disk (the scratch folder is cleared at boot); each worktree stays until its part is merged.
 
 **Machines** (the user, 2026-11-12): everything that development depends on runs on the main machine;
 the old laptop runs nothing development-dependent (too slow); the lab's server only adds information
@@ -344,7 +360,7 @@ The items below keep their history.
    T1w images whose first pass reruns); built for speed (benchmark [fsl-bet](benchmarks/fsl-bet.md):
    2.6 to 3 times FSL's speed on one thread, 6 to 11 times on 24); memory within the rule (`tests/parity/test_memory_peak.py`: bet2 and `bet -F` below FSL's, `bet -R` 117 MiB against 103 plus the interpreter's 13). **Part 2:** betsurf's original (spec §6), the site page's
    clean-room panels, and — after the spec writer answers — the reruns and the skull search.
-   **Spec questions** (for the spec writer, from [findings/fsl-bet-original.md](findings/fsl-bet-original.md)):
+   **Spec questions** (for the spec writer, from [findings/fsl-bet-clean-room.md](findings/fsl-bet-clean-room.md)):
    (1) the rerun's smoothness rule (§4.5: FSL's first rerun differs from the rule as written though
    its factor 100 and its 1000 iterations are right; the three standard-tier cases that rerun miss
    the thresholds, Dice 0.980 to 0.995); (2) the skull search's details (§4.7: Dice about 0.9);
@@ -403,7 +419,7 @@ The items below keep their history.
    times FSL's speed on one thread, 6.5 to 13.5 on 24); random testing's trial (1,846 cases): two
    corrections of the original (`-c 0 0 0`, `bet -F`'s float64 `_tmp`), four permanent cases.
    **Open, for the spec writer (BET's questions,
-   [findings/fsl-bet-original.md](findings/fsl-bet-original.md)):** (1) the centre's conversion
+   [findings/fsl-bet-clean-room.md](findings/fsl-bet-clean-room.md)):** (1) the centre's conversion
    on a neurologically stored image (cases 622 and 677, and now 17 of the trial's `bet`/`bet2`
    cases: `bet -R`, `-c`); (2) betsurf's deformation where few profiles vote: the inner skull's (up to
    11 mm on a few vertices of a skull base) explained by step 5's rules (relay 7 of the clean-room
@@ -535,14 +551,14 @@ The items below keep their history.
    its part 2, its suite `fsl_flirt.py` needing `Run.hang_fixed` for `edge/zero-voxel-size`). Follow-up for `lx.mri.hmc` (its
    own part; not changed here, its record stays identical): the correlation ratio's sparse-bin rule
    found here (a reference bin with at most two points is left out of the counts, the sums and the
-   total variance; `docs/findings/fsl-flirt-original.md`, "The costs") probably holds for mcflirt's
+   total variance; `docs/findings/fsl-flirt-clean-room.md`, "The costs") probably holds for mcflirt's
    `-cost corratio` too (`specs/mcflirt.md` appendix A leaves the sparse bins in the total); and the
    search findings (a subset's convergence test over its own tolerances) for its schedule-free
    optimiser if it uses subsets. Answered (spec writer, 2026-11-02, `specs/mcflirt.md` appendix A):
    mcflirt's `-cost corratio` and `woods` are FLIRT's two costs, the sparse bins left out of the
    counts, sums and total variance, and Woods' `n_b²σ_b/S_b` (`n_b²σ_b` when `S_b ≤ 0`). Done in FLIRT's clean-room part 2 (relay 4, 2026-11-02): `lx.mri.hmc`'s
    `corratio` and `woods` are FLIRT's (one implementation in `larmorx-mri`), its record re-made: the
-   same statuses, four cases closer to mcflirt (`docs/findings/mri-hmc-original.md`). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
+   same statuses, four cases closer to mcflirt (`docs/findings/mri-hmc-clean-room.md`). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
    `fugue`/`applywarp` for field maps, `convert_xfm`, `flirt`), `standard_space_roi` (`flirt`,
    `fslmaths`, `fslroi`), `aff2rigid` (`avscale`), `flirt_average` (`flirt`, `fslmaths`,
    `convert_xfm`), `pairreg` (`flirt` with `pairreg*.sch`, `bet`).
@@ -935,7 +951,7 @@ The items below keep their history.
   - *A flaky test:* `validation/tests/test_oracle_cache.py::test_above_one_thread_a_run_is_served_after_three_identical_runs`
     fails about one run in two under `pytest -n 3` and passes serially (seen at the preparation's base commit too).
 - **From `t2smap`'s clean-room part (2026-11-11 and 12; 15 agents: nine clean relays, two replica-side spec
-  writers, four replica-side relays; [findings](findings/tedana-t2smap-original.md), record
+  writers, four replica-side relays; [findings](findings/tedana-t2smap-clean-room.md), record
   [tedana-t2smap-original](validation/tedana-t2smap-original.md), [benchmarks](benchmarks/tedana-t2smap.md),
   [API](api/tedana-t2smap.md), [spec](../specs/t2smap.md)).** Left:
   - *verify-merge and the original's (B):* the original's suite compares its default with the replica's only when
@@ -979,7 +995,7 @@ The items below keep their history.
     every suite's records run again to see what changes (a clean-role harness change).
   - *The register's FSL-11 section* (inside "Restricted: FSL mcflirt", closed to the clean role) still
     describes mcflirt and flirt: a replica-side agent widens it to every FSL tool as its summary row now
-    says (the evidence: `tests/parity/test_fsl_output_types_original.py` and
+    says (the evidence: `tests/parity/test_fsl_output_types_clean_room.py` and
     `test_fsl_output_types_replica.py`, every FSL tool against FSL 6.0.7.23's own runs).
   - *Windows' execution policy:* the advice when PowerShell refuses `Activate.ps1`
     (`Set-ExecutionPolicy -Scope Process RemoteSigned`, the README and the site) is untested: the Windows
@@ -1009,7 +1025,7 @@ The items below keep their history.
     in larmorx-core's PROVENANCE instead); a one-line fix (`|/tests/` in its `GLUE`) for whoever owns
     the field maps' part B's contract audit (`test_sdcflows_estimation_parity[contract-audit]`).
   - *The 3dvolreg suite's workspace fallback:* without `LARMORX_WORKSPACE`,
-    `parity/afni_volreg_original.workspace()` takes `Path(__file__).parents[5]`, which in an agent's
+    `parity/afni_volreg_clean_room.workspace()` takes `Path(__file__).parents[5]`, which in an agent's
     worktree is `larmorx/.claude/worktrees`, and makes `oracles/inputs/` there; from then on every
     suite takes that folder for the workspace (an empty cache, no AFNI oracles: 162 AFNI cases failed
     in relay 2a's second smoke run). The fallback should be `oracle_cache.store.workspace()` (or
@@ -1190,7 +1206,7 @@ The items below keep their history.
     (`validation/investigations/sdcflows-fieldmap/site_checks.sh`'s `drawn`: every viewer loaded and no
     canvas left at the browser's default 300 × 150).
 - **From 3dvolreg's clean-room original part (2026-11-08; six relays and two spec-writer steps;
-  [findings](findings/afni-volreg-original.md), record [afni-volreg-original](validation/afni-volreg-original.md),
+  [findings](findings/afni-volreg-clean-room.md), record [afni-volreg-original](validation/afni-volreg-original.md),
   [benchmarks](benchmarks/afni-volreg.md)).** Done in the part besides the original: output names of
   228 to 255 bytes in every AFNI clean-room original (the replica part's report, below); the spec
   writer's eight answers (step 2) and five (step 3: the limits measured from AFNI's own spread under
@@ -1255,7 +1271,7 @@ The items below keep their history.
     FSL-271 reproduced with `-s` and a magnitude of more slices and fewer rows than the phase.
   - *The questions for a spec writer, gathered (PRELUDE's clean-room original part; the black-box
     observations in `docs/findings/fsl-prelude-original.md`, `fsl-maths-original.md` finding 32 and
-    `mri-hmc-original.md`):*
+    `mri-hmc-clean-room.md`):*
     - `specs/fslmaths.md` §19 and §10.2: the FFT twiddles with glibc's `sincos` in `reproduce` do not
       apply as stated: the clean-room original has no FFT (a direct sum in double precision rounded
       once, finding 31), so §19's GLIBC-07 row ("the original's twiddles are still correctly
@@ -1289,7 +1305,7 @@ The items below keep their history.
     `validation/investigations/afni-volreg/`, the probe `validation/probes/afni-volreg-trace/` and
     the replica's suite, random-testing descriptor and evidence modules (`afni_volreg.py` in
     `parity/`, `difftest/tools/`, `evidence/`) are closed to the implementer, who runs them as black
-    boxes. The site page's clean-room panels: done (`evidence.afni_volreg_original`, which calls
+    boxes. The site page's clean-room panels: done (`evidence.afni_volreg_clean_room`, which calls
     `evidence.afni_volreg` as a black box and extends its page).
   - *3dTshift's clean-room original:* `specs/3dTshift.md` §5.2's open point is answered (the
     quintic and heptic weights' last bits: `f²` a float32 product, the rest double in the factored
@@ -1318,7 +1334,7 @@ The items below keep their history.
   - *PRELUDE's clean-room original:* **done** 2026-11-07 (PRELUDE's clean-room original part,
     above), from `specs/prelude.md`, the spec writer's probe and model run as black boxes and FSL's
     runs; the site page shows the original's panels beside FSL's and the replica's
-    (`larmorx_validation.evidence.fsl_prelude_original`).
+    (`larmorx_validation.evidence.fsl_prelude_clean_room`).
   - *For the clean-room originals, from the spec writer's answers:* **done** 2026-11-07
     (PRELUDE's clean-room original part, relay 3; each tool's `docs/findings/<tool>-original.md`):
     FLIRT's `normcorr` count per point (`specs/flirt.md` §6.4: each point's weight added as it is
@@ -1353,8 +1369,8 @@ The items below keep their history.
   clean-room parts when they start; the audit's `verdicts.tool_of` learns each new clean-room
   crate or module (a new tool's code is otherwise counted as its crate's shared code).
 - **From the clean-room catch-up's random-testing trials (2026-11-05, relay 8; the findings'
-  sections "The catch-up's random-testing trial" in `docs/findings/fsl-topup-original.md`
-  (findings 45 to 47), `fsl-flirt-original.md`, `fsl-fast-original.md`, `fsl-bet-original.md`; every
+  sections "The catch-up's random-testing trial" in `docs/findings/fsl-topup-clean-room.md`
+  (findings 45 to 47), `fsl-flirt-clean-room.md`, `fsl-fast-clean-room.md`, `fsl-bet-clean-room.md`; every
   difference in `validation/difftest/triage.toml`; the trials in `oracles/difftest/2026-11-05-catchup-<tool>`).**
   Fixed: FSL-242 (new, topup) and the scaled conjugate gradients' `--miter` count; FLIRT's
   fallback minimum on its `Cost minima` line only, `-out`'s negative zeros of a sform completed
@@ -1448,7 +1464,7 @@ The items below keep their history.
       writer, 2026-11-06: `-edge` exactly; `reproduce`'s glibc functions exp, log, pow, sin and cos,
       and the replica's FFT twiddles with glibc's `sincos`); FLIRT §3 and §8.1 step 9's skews
       answered as above (the third skew's parting still open); BET's open questions in
-      `docs/findings/fsl-bet-original.md` still open.
+      `docs/findings/fsl-bet-clean-room.md` still open.
     - Still open after PRELUDE's replica part (2026-11-06), four groups for a later spec writer:
       BET's (§6.5's scalp phase, `-p` on a collapsed mesh, `-R` and `-c` on neurologically stored
       images; the replica author's starting point in the part's notes, `docs/parts/`); FAST's
@@ -1469,7 +1485,7 @@ The items below keep their history.
     `validation/src/larmorx_validation/parity/fsl_bet.py`, `REPLICA_ONLY_BET_CASES` in
     `tests/parity/test_memory_peak.py`; the original's differences in the part's random-testing
     trial (176 cases: betsurf on tiny heads; `oracles/difftest/2026-11-04-bet-options-6b`): **judged
-    again in the clean-room catch-up (relay 7, 2026-11-05; `docs/findings/fsl-bet-original.md`, "The
+    again in the clean-room catch-up (relay 7, 2026-11-05; `docs/findings/fsl-bet-clean-room.md`, "The
     BET part's random-testing differences"):** four readings of `specs/bet.md` §6.4 were the
     original's mistakes and are corrected (single profiles probed one at a time, 5,290 profiles of 11
     images: the backward searches and the T1-only scan never read a profile's first sample; step 5's
@@ -1480,7 +1496,7 @@ The items below keep their history.
     deformation, a collapsed mesh's retessellation, `-R`/`-c` on neurologically stored images: for
     the spec writer); five permanent cases `original-betsurf-*`, `original-bet-Z-d-float64-tmp`. **`standard_space_roi`,
     `fslroi` and the data search done (2026-11-05, the clean-room catch-up's relay 5;
-    `docs/findings/fsl-bet-original.md`, "standard_space_roi and fslroi"):** both programs as clean-room
+    `docs/findings/fsl-bet-clean-room.md`, "standard_space_roi and fslroi"):** both programs as clean-room
     originals (`larmorx_fsl::cli::ssroi`, `::fslroi`; `original: true`; `lx.fsl.standard_space_roi`,
     `lx.fsl.fslroi` with `implementation="original"` and `"auto"`), FSL-211 to FSL-215 and fslroi's
     FSL-217 in both modes; FSL's standard images found as §5.4 says (`larmorx_fsl::data`: the named
@@ -1494,7 +1510,7 @@ The items below keep their history.
     `ORIGINAL_PENDING_CASES` (bet `-F`/`-Z` of int8, FSL-217 inside bet) and the `-S`, `-B`, `-A`, `-A2`
     cases stay for relay 6. Found on the way: FLIRT's `-out` display range is 0 and 0 in FSL (corrected
     in FLIRT's original; FLIRT's suite case `out/display-range`). **`bet -S`, `-B`, `-A`, `-A2` and
-    FSL-217 inside `bet` done (2026-11-05, relay 6; `docs/findings/fsl-bet-original.md`, "bet -S, -B,
+    FSL-217 inside `bet` done (2026-11-05, relay 6; `docs/findings/fsl-bet-clean-room.md`, "bet -S, -B,
     -A, -A2"):** each variation the script's sequence of the original's own programs in one process
     (`larmorx_fsl::cli::bet_script`: bet2, `standard_space_roi`, FLIRT, `fslmaths`, `fslstats`, FAST
     with its streams discarded, betsurf, the script itself for `-B`'s robust run), FSL's standard images
@@ -1630,7 +1646,7 @@ The items below keep their history.
 
 - **mcflirt's FSL-20, FSL-21, FSL-65 and FSL-66 in the clean-room original: done** (2026-10-30, from
   `specs/mcflirt.md` §10.6, §12.1; the 33 cases of §14.1 in the mri-hmc suite, `failures/<case>`,
-  mcflirt live; golden `cli.mri.hmc.unwritable` and `cli.mri.hmc.bins`; `docs/findings/mri-hmc-original.md`).
+  mcflirt live; golden `cli.mri.hmc.unwritable` and `cli.mri.hmc.bins`; `docs/findings/mri-hmc-clean-room.md`).
 - **The mcflirt replica's FSL-65 and FSL-66: done** (2026-10-30, `specs/mcflirt.md` §10.6 and
   §12.1; the 33 cases of §14.1 in the replica's suite, mcflirt 6.0.7.23 live: 24 pass, 9 rejected
   by both, the replica's matrices mcflirt's as text wherever both run to the end; a command-line
@@ -1658,7 +1674,7 @@ The items below keep their history.
   making `normcorr` FSL's; FSL-91's and FSL-92's `reproduce` runs pass with
   the search's order of equal costs). **For a spec writer
   (2026-11-05, the catch-up's relay 4; black-box observations in
-  `docs/findings/fsl-flirt-original.md`):** (a) §3/§8.1 step 9 (no record case depends on it
+  `docs/findings/fsl-flirt-clean-room.md`):** (a) §3/§8.1 step 9 (no record case depends on it
   since relay 10): where the sign of a zero third
   skew comes from under gimbal lock (FSL-91's trace, line 66,125: FSL `-0.000000`, the original
   `0.000000`; 50 gimbal-lock angle triples through `setrowparams` and `measurecost` print FSL's
@@ -1707,7 +1723,7 @@ The items below keep their history.
   `edge/one-voxel-input`) follow FSL's trace once `atan2f` is the C library's and the sign of a
   near-zero skew (printed `-0.000000` by FSL, `0.000000` by the original, in one trace) is found
   in the original's own composition and decomposition. **Items 1 to 8 closed by the clean-room
-  catch-up (2026-11-05, relay 3; `docs/findings/fsl-flirt-original.md`, "The clean-room catch-up:
+  catch-up (2026-11-05, relay 3; `docs/findings/fsl-flirt-clean-room.md`, "The clean-room catch-up:
   programs and messages"):** (1) confirmed, the code already right (`verbose/5`, `verbose/7`);
   (2) an invalid quaternion start (and every composition outside the unit ball) keeps only its
   scales and skews, composed once; each start's composition, dof message and optimisation follow
@@ -1778,7 +1794,7 @@ The items below keep their history.
   the totals after every max(1000, ⌊√N⌋) + 1 voxels; a denominator below 1e-5 in magnitude counts
   1, with `WARNING::in calculating COG, total = 0.0` on standard error). **Done in
   the clean-room `lx.mri.hmc`** (2026-11-05, the clean-room catch-up's relay 7;
-  `docs/findings/mri-hmc-original.md`, "The centres of mass as mcflirt's blocked sums"): both centres
+  `docs/findings/mri-hmc-clean-room.md`, "The centres of mass as mcflirt's blocked sums"): both centres
   blocked, and mcflirt's COG warning printed as often as mcflirt prints it (black box: once per
   registration of a constant test volume, once per `.par` line of a constant reference; 8 of 8 probe
   calls alike). Measured: the record's inputs are integer images (and synthetic series) whose
@@ -1830,7 +1846,7 @@ The items below keep their history.
   coefficient file of either count by default, as the replica's; (8) to check: whether its
   FSL-146 trigger leaves out a volume encoded along an axis whose read-out time is 0 (FSL's
   gradient leaves out only the volumes whose encoding along the axis is 0). **Closed by the
-  clean-room catch-up (2026-11-04, relay 1; `docs/findings/fsl-topup-original.md`, findings 37
+  clean-room catch-up (2026-11-04, relay 1; `docs/findings/fsl-topup-clean-room.md`, findings 37
   to 44):** (1) FSL-201's `reproduce` (FSL's single-precision matrices and forward differences;
   the first gradients FSL's to 2e-5 and 1e-6): 7 of the 9 cases pass, and FSL's own path is not
   determined beyond its inputs' last bits (`fsl201_spread.py`), so 6 movement cases (`opt/int16`,
@@ -1981,7 +1997,7 @@ The items below keep their history.
   near ties of the partial volumes are decided by the statistics' last bits: expected, the
   thresholds unchanged (§11); the noise-free and rank-deficient random cases stay explained
   (§8.6), `multi/s5` stays (ill-conditioned). **Closed by the clean-room catch-up (2026-11-05,
-  relay 2; `docs/findings/fsl-fast-original.md`, "The catch-up of 2026-11-05"):** (1) FSL-202 and
+  relay 2; `docs/findings/fsl-fast-clean-room.md`, "The catch-up of 2026-11-05"):** (1) FSL-202 and
   FSL-203 corrected by default and named, `reproduce` FSL's (`opt/nan-first` rejected by both
   alike, its default naming FSL-203); with glibc's functions the original's default is the
   replica's default bit for bit on every single-channel case (`glibc_default.py`), and the record
@@ -2131,6 +2147,32 @@ The items below keep their history.
   against h5py and ANTs; the velocity-field stages; informally, sMRIPrep's registration with
   `BSpline[0.1,26]` (about a million parameters at the last level): ANTs at 4 threads unfinished
   after 3 h 50 min, larmorx 38 s at one thread.
+- **Benchmark reports and figures-cache entries made from a modified checkout** (`larmorx_commit` ending in
+  `-dirty`; found by the documentation revision, 2026-11-13; decided by the orchestrator: re-measured and
+  re-drawn from a clean commit in the final validation phase, where every benchmark is measured again on a quiet
+  machine, as benchmarks need one; the site's pages show what they show meanwhile, the commit's first 12
+  characters without the mark). The records themselves are clean. Seven benchmark reports:
+  `docs/benchmarks/afni-tshift.json` (`3b3f69caabcb-dirty`), `ants-denoise.json` (`77bb3c657378-dirty`),
+  `ants-n4.json` (`1f345c61c340-dirty`), `ants-programs.json` (`2960b32a61f4-dirty`), `ants-gaussian.json`
+  (`30959407505d-dirty`), `ants-morphology.json` (`57245bee1dee-dirty`), `mri-hmc.json` (`fc392f579ce7-dirty`).
+  34 figures-cache entries (`<workspace>/oracles/figures-cache`), by the commit their provenance records:
+  `ca2145f7951e-dirty`: `afni-unifize/fmriprep-ds005040-clip-1-original`, `afni-unifize/ds000005-t1w-original`;
+  `042d70d5a17c-dirty`: `ants-n4/panel-fmriprep-boldref-mb8`; `9b0d0e68ffaf-dirty`:
+  `ants-programs/panel-multiply-stroke`; `73451f78a400-dirty`: `fsl-bet/options-older-82y-B`,
+  `fsl-bet/options-child-7y-A2`, `fsl-maths/fmriprep-combine-masks`, `fsl-maths/fmriprep-goodvoxels`,
+  `fsl-maths/families`, `fsl-maths/glibc-double`, `fsl-maths/cases-default-mode`; `6bd495946451-dirty`:
+  `fsl-bet/options-child-7y-A2-original`, `fsl-bet/options-ssroi-child-b-original`; `301fab7dfc56-dirty`:
+  `fsl-flirt/fmriprep-ds005040-sub-002-noreconall`, `fsl-flirt/fmriprep-ds003592-sub-280-noreconall`,
+  `fsl-flirt/fmriprep-ds000228-sub-pixar008-noreconall`, `fsl-flirt/real-default`, `fsl-flirt/real-applyxfm-4d`;
+  `80cc208fa4a3-dirty`: `fsl-flirt/fmriprep-ds000228-sub-pixar008-noreconall-original`,
+  `fsl-flirt/real-default-original`, `fsl-flirt/real-applyxfm-4d-original`,
+  `fsl-maths/original-fmriprep-combine-masks`, `fsl-maths/original-fmriprep-goodvoxels`,
+  `fsl-maths/original-families`, `fsl-maths/original-glibc-double`, `fsl-maths/original-cases-default-mode`,
+  `fsl-topup/original-fmriprep-ds005040-sub-002-noreconall`, `fsl-topup/original-fmriprep-ds001600-sub-1-noreconall`,
+  `fsl-topup/original-opt-membrane-lm`, `fsl-topup/original-opt-levels`, `fsl-topup/original-at-lsr-y`,
+  `fsl-topup/original-at-jac-y`, `fsl-topup/original-at-vb3d-y`, `fsl-topup/cases-original`. The list is the
+  site's evidence files' provenance on 2026-11-13 (`validation/investigations/docs-revision/dirty_provenance.py
+  <site>` lists them again); the pages not yet exported in the revision's words may name more once exported.
 - **Figures:** every new part brings its tool's figures (`docs/figures.md`); the site's pages
   for antsRegistration and the HDF5 files say their benchmark is pending until the
   reports above exist. The figures take about 12 MB of the site's repository (four SVGs each,
@@ -2284,7 +2326,7 @@ results and `cbrtf_glibc`'s alike.
   run meets the mixed case). Measure with the probes (`validation/probes/fsl-mcflirt-affine-trace`)
   if a real case ever does.
 - **The spec's in-plane centre and the clean-room original's remaining last bits** (found
-  2026-10-29, `docs/findings/mri-hmc-original.md`): in the in-plane mode mcflirt rotates about the
+  2026-10-29, `docs/findings/mri-hmc-clean-room.md`): in the in-plane mode mcflirt rotates about the
   padded test volume's centre of mass (observed with `-verbose 20` traces; the original does so
   since 2026-10-29): the spec writer adds it to `specs/mcflirt.md` §12. With `-fudge -stages 1`
   8 of 30 random phantoms still part from mcflirt's evaluated matrices after 19 to 224

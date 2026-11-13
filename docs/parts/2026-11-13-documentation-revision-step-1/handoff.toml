@@ -1,0 +1,250 @@
+# The documentation revision's handoff (begun by relay 17; relay M completes it).
+# docs/next-steps.md: the renamed files' new names (chunk R; renames.py --handoff, 24 ops for 28 references).
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "   **Spec questions** (for the spec writer, from [findings/fsl-bet-original.md](findings/fsl-bet-original.md)):"
+new = "   **Spec questions** (for the spec writer, from [findings/fsl-bet-clean-room.md](findings/fsl-bet-clean-room.md)):"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "   [findings/fsl-bet-original.md](findings/fsl-bet-original.md)):** (1) the centre's conversion"
+new = "   [findings/fsl-bet-clean-room.md](findings/fsl-bet-clean-room.md)):** (1) the centre's conversion"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "   total variance; `docs/findings/fsl-flirt-original.md`, \"The costs\") probably holds for mcflirt's"
+new = "   total variance; `docs/findings/fsl-flirt-clean-room.md`, \"The costs\") probably holds for mcflirt's"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "   same statuses, four cases closer to mcflirt (`docs/findings/mri-hmc-original.md`). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,"
+new = "   same statuses, four cases closer to mcflirt (`docs/findings/mri-hmc-clean-room.md`). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  writers, four replica-side relays; [findings](findings/tedana-t2smap-original.md), record"
+new = "  writers, four replica-side relays; [findings](findings/tedana-t2smap-clean-room.md), record"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    says (the evidence: `tests/parity/test_fsl_output_types_original.py` and"
+new = "    says (the evidence: `tests/parity/test_fsl_output_types_clean_room.py` and"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    `parity/afni_volreg_original.workspace()` takes `Path(__file__).parents[5]`, which in an agent's"
+new = "    `parity/afni_volreg_clean_room.workspace()` takes `Path(__file__).parents[5]`, which in an agent's"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  [findings](findings/afni-volreg-original.md), record [afni-volreg-original](validation/afni-volreg-original.md),"
+new = "  [findings](findings/afni-volreg-clean-room.md), record [afni-volreg-original](validation/afni-volreg-original.md),"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    `mri-hmc-original.md`):*"
+new = "    `mri-hmc-clean-room.md`):*"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    boxes. The site page's clean-room panels: done (`evidence.afni_volreg_original`, which calls"
+new = "    boxes. The site page's clean-room panels: done (`evidence.afni_volreg_clean_room`, which calls"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    (`larmorx_validation.evidence.fsl_prelude_original`)."
+new = "    (`larmorx_validation.evidence.fsl_prelude_clean_room`)."
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  sections \"The catch-up's random-testing trial\" in `docs/findings/fsl-topup-original.md`"
+new = "  sections \"The catch-up's random-testing trial\" in `docs/findings/fsl-topup-clean-room.md`"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  (findings 45 to 47), `fsl-flirt-original.md`, `fsl-fast-original.md`, `fsl-bet-original.md`; every"
+new = "  (findings 45 to 47), `fsl-flirt-clean-room.md`, `fsl-fast-clean-room.md`, `fsl-bet-clean-room.md`; every"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "      `docs/findings/fsl-bet-original.md` still open."
+new = "      `docs/findings/fsl-bet-clean-room.md` still open."
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    again in the clean-room catch-up (relay 7, 2026-11-05; `docs/findings/fsl-bet-original.md`, \"The"
+new = "    again in the clean-room catch-up (relay 7, 2026-11-05; `docs/findings/fsl-bet-clean-room.md`, \"The"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    `docs/findings/fsl-bet-original.md`, \"standard_space_roi and fslroi\"):** both programs as clean-room"
+new = "    `docs/findings/fsl-bet-clean-room.md`, \"standard_space_roi and fslroi\"):** both programs as clean-room"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "    FSL-217 inside `bet` done (2026-11-05, relay 6; `docs/findings/fsl-bet-original.md`, \"bet -S, -B,"
+new = "    FSL-217 inside `bet` done (2026-11-05, relay 6; `docs/findings/fsl-bet-clean-room.md`, \"bet -S, -B,"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  mcflirt live; golden `cli.mri.hmc.unwritable` and `cli.mri.hmc.bins`; `docs/findings/mri-hmc-original.md`)."
+new = "  mcflirt live; golden `cli.mri.hmc.unwritable` and `cli.mri.hmc.bins`; `docs/findings/mri-hmc-clean-room.md`)."
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  `docs/findings/fsl-flirt-original.md`):** (a) §3/§8.1 step 9 (no record case depends on it"
+new = "  `docs/findings/fsl-flirt-clean-room.md`):** (a) §3/§8.1 step 9 (no record case depends on it"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  catch-up (2026-11-05, relay 3; `docs/findings/fsl-flirt-original.md`, \"The clean-room catch-up:"
+new = "  catch-up (2026-11-05, relay 3; `docs/findings/fsl-flirt-clean-room.md`, \"The clean-room catch-up:"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  `docs/findings/mri-hmc-original.md`, \"The centres of mass as mcflirt's blocked sums\"): both centres"
+new = "  `docs/findings/mri-hmc-clean-room.md`, \"The centres of mass as mcflirt's blocked sums\"): both centres"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  clean-room catch-up (2026-11-04, relay 1; `docs/findings/fsl-topup-original.md`, findings 37"
+new = "  clean-room catch-up (2026-11-04, relay 1; `docs/findings/fsl-topup-clean-room.md`, findings 37"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  relay 2; `docs/findings/fsl-fast-original.md`, \"The catch-up of 2026-11-05\"):** (1) FSL-202 and"
+new = "  relay 2; `docs/findings/fsl-fast-clean-room.md`, \"The catch-up of 2026-11-05\"):** (1) FSL-202 and"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  2026-10-29, `docs/findings/mri-hmc-original.md`): in the in-plane mode mcflirt rotates about the"
+new = "  2026-10-29, `docs/findings/mri-hmc-clean-room.md`): in the in-plane mode mcflirt rotates about the"
+
+# docs/next-steps.md: the -dirty benchmark reports and figures-cache entries the site cites (relay 21, from relay 20's
+# list; the orchestrator's decision of 2026-11-13: re-measured and re-drawn in the final validation phase).
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "  after 3 h 50 min, larmorx 38 s at one thread.\n"
+new = """  after 3 h 50 min, larmorx 38 s at one thread.
+- **Benchmark reports and figures-cache entries made from a modified checkout** (`larmorx_commit` ending in
+  `-dirty`; found by the documentation revision, 2026-11-13; decided by the orchestrator: re-measured and
+  re-drawn from a clean commit in the final validation phase, where every benchmark is measured again on a quiet
+  machine, as benchmarks need one; the site's pages show what they show meanwhile, the commit's first 12
+  characters without the mark). The records themselves are clean. Seven benchmark reports:
+  `docs/benchmarks/afni-tshift.json` (`3b3f69caabcb-dirty`), `ants-denoise.json` (`77bb3c657378-dirty`),
+  `ants-n4.json` (`1f345c61c340-dirty`), `ants-programs.json` (`2960b32a61f4-dirty`), `ants-gaussian.json`
+  (`30959407505d-dirty`), `ants-morphology.json` (`57245bee1dee-dirty`), `mri-hmc.json` (`fc392f579ce7-dirty`).
+  34 figures-cache entries (`<workspace>/oracles/figures-cache`), by the commit their provenance records:
+  `ca2145f7951e-dirty`: `afni-unifize/fmriprep-ds005040-clip-1-original`, `afni-unifize/ds000005-t1w-original`;
+  `042d70d5a17c-dirty`: `ants-n4/panel-fmriprep-boldref-mb8`; `9b0d0e68ffaf-dirty`:
+  `ants-programs/panel-multiply-stroke`; `73451f78a400-dirty`: `fsl-bet/options-older-82y-B`,
+  `fsl-bet/options-child-7y-A2`, `fsl-maths/fmriprep-combine-masks`, `fsl-maths/fmriprep-goodvoxels`,
+  `fsl-maths/families`, `fsl-maths/glibc-double`, `fsl-maths/cases-default-mode`; `6bd495946451-dirty`:
+  `fsl-bet/options-child-7y-A2-original`, `fsl-bet/options-ssroi-child-b-original`; `301fab7dfc56-dirty`:
+  `fsl-flirt/fmriprep-ds005040-sub-002-noreconall`, `fsl-flirt/fmriprep-ds003592-sub-280-noreconall`,
+  `fsl-flirt/fmriprep-ds000228-sub-pixar008-noreconall`, `fsl-flirt/real-default`, `fsl-flirt/real-applyxfm-4d`;
+  `80cc208fa4a3-dirty`: `fsl-flirt/fmriprep-ds000228-sub-pixar008-noreconall-original`,
+  `fsl-flirt/real-default-original`, `fsl-flirt/real-applyxfm-4d-original`,
+  `fsl-maths/original-fmriprep-combine-masks`, `fsl-maths/original-fmriprep-goodvoxels`,
+  `fsl-maths/original-families`, `fsl-maths/original-glibc-double`, `fsl-maths/original-cases-default-mode`,
+  `fsl-topup/original-fmriprep-ds005040-sub-002-noreconall`, `fsl-topup/original-fmriprep-ds001600-sub-1-noreconall`,
+  `fsl-topup/original-opt-membrane-lm`, `fsl-topup/original-opt-levels`, `fsl-topup/original-at-lsr-y`,
+  `fsl-topup/original-at-jac-y`, `fsl-topup/original-at-vb3d-y`, `fsl-topup/cases-original`. The list is the
+  site's evidence files' provenance on 2026-11-13 (`validation/investigations/docs-revision/dirty_provenance.py
+  <site>` lists them again); the pages not yet exported in the revision's words may name more once exported.
+"""
+
+# validation/programs.toml (the revision's own file, on main only after the merge): main's confounds part added
+# the command `larmorx nipype run` (docs/api/nipype-run.md) and the confounds' five records; the Programs page's
+# check (validation/tests/test_reference.py::test_programs_page_data_matches_the_code) fails on the merged tree
+# until both are named (relay 28, checked on a trial merge of main 1c38fb27 into the branch).
+[[op]]
+do = "edit"
+file = "validation/programs.toml"
+old = """api = "docs/api/confounds.md"
+records = { replica = [] }
+original = "nipype 1.12.0, niworkflows 1.15.4 and fMRIPrep 25.2.7"
+next_release = ["replica"]
+"""
+new = """api = "docs/api/confounds.md"
+records = { replica = ["confounds-fmriprep", "confounds-nipype", "confounds-nipype-full", "confounds-linalg", "confounds-linalg-full"] }
+original = "nipype 1.12.0, niworkflows 1.15.4 and fMRIPrep 25.2.7"
+next_release = ["replica"]
+
+[[program]]
+group = "fmriprep"
+name = "nipypecli run"
+command = "larmorx nipype run"
+python = "lx.nipype.run"
+does = "nipype's `nipypecli run` for the 37 interfaces of fMRIPrep's confound estimation that LARMORX ports: it lists a module's interfaces, prints an interface's help and runs one from the shell, without nipype."
+api = "docs/api/nipype-run.md"
+records = { replica = ["confounds-nipype"] }
+ports = ["replica"]
+original = "nipype 1.12.0"
+next_release = ["replica"]
+"""
+
+# docs/findings/upstream-defects.md: NIB-04's platforms (relay 27, the reviewer's round 24, minor 11; numpy's
+# documentation of numpy.longdouble). Wording of the register's own fact; NIfTI I/O's page says the same since relay 27.
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = """- **What:** nibabel computes the qform in `numpy.longdouble`: 80-bit on Linux x86-64, 64-bit
+  elsewhere."""
+new = """- **What:** nibabel computes the qform in `numpy.longdouble`: 80-bit on Linux x86-64 and on Intel
+  macOS, IEEE quad precision (128-bit) on Linux aarch64, 64-bit on macOS on Apple silicon and on
+  Windows (numpy's documentation of `numpy.longdouble`; the record measured Linux x86-64)."""
+
+# docs/decision-log.md: the user's decision of 2026-11-13 (the documentation revision in two steps).
+[[op]]
+do = "append"
+file = "docs/decision-log.md"
+text = """## 2026-11-13: the documentation revision published in two steps (the user)
+- **The user's decision** ("Yes let's follow the recommendation", 2026-11-13, on the orchestrator's recommendation):
+  the documentation revision ([documentation-plan.md](documentation-plan.md)) is published in two steps instead of
+  once at its end.
+- **Step 1 (2026-11-13):** on the documentation site, every evidence page in the writing guide's words and layout
+  at its new address (`/evidence/<page>/`; each old `/tools/<page>/` a redirect that keeps every anchor), t2smap's
+  clean room in its three worked examples, the Programs page with BET's three reference pages, the home page,
+  Getting started (the old Installation), Concepts with Why Rust and Python under it, About, the header,
+  Validation reorganised with the data panel under it, the roadmap in the new words, the 404 page, the random-testing
+  tables brought up to date, and no machine's folder names in any published file; in this repository the writing
+  guide ([writing-guide.md](writing-guide.md)), the evidence modules' shared presenter, and the files named
+  `*-original*` that hold a clean room renamed `*-clean-room*` (a pointer file at each old name; history and the
+  records keep their names until they are made again).
+- **Step 2 (the next day):** a reference page for every program, the repository's documents, API pages and the
+  wrappers' printed lines in the new words, `programs.py`'s rule for `validated`, the list of the clean rooms'
+  printed lines in the old words (for a clean-room agent), the confounds' evidence and reference pages (after the
+  confounds part's merge), and its merge material.
+- **Between the steps** the pages not yet rewritten keep their form and stay reachable, and nothing the site shows
+  gets worse: step 1's inventory against the published site (b768293a) keeps every page's shown numbers, tables,
+  figures, viewers, images and links, each moved page paired with its new address; the only numbers that changed
+  are those of the three records made again since (3dTshift's replica, antsRegistration, antsAI), which the pages
+  show as their records now say.
+"""

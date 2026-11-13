@@ -12,6 +12,7 @@ what is missing and reuses the rest.
 from __future__ import annotations
 
 import datetime as dt
+import functools
 import json
 import os
 import re
@@ -322,22 +323,75 @@ def checkout_paths(text: str) -> str:
 _SCRATCH = re.compile(r"/tmp/claude-\d+/[^/\s\"']+/[0-9a-f-]{36}/scratchpad")
 
 
+#: A worktree's folder in any form a text may hold it (absolute, under ``~``, or after the
+#: ``<workspace>`` placeholder of an earlier export): a larmorx checkout, whatever follows it.
+_WORKTREE = re.compile(
+    r"(?:<workspace>|~|(?<![\w.~<>-]))(?:/[^\s,\[\]\"'=@:;/]+)*?/\.claude/worktrees/[^/\s,\[\]\"'=@:;]+"
+)
+#: A home directory other than a container's own (fMRIPrep's image runs as ``/home/fmriprep``).
+_HOME = re.compile(r"/home/(?!fmriprep(?![\w.-]))[^/\s,\[\]\"'=@:;]+")
+
+
+@functools.cache
+def _machine() -> tuple[str, list[tuple[re.Pattern[str], str]], re.Pattern[str] | None]:
+    """This machine's home, the workspace's forms (absolute and under ``~``) with their
+    placeholder, and its name (the user's and the machine's names are never published)."""
+    import socket
+
+    home = str(Path.home())
+    forms: list[tuple[re.Pattern[str], str]] = []
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "oracles").is_dir():
+            ws = str(parent)
+            names = [ws, *(["~" + ws[len(home) :]] if ws.startswith(home + "/") else [])]
+            for name in names:
+                forms.append((re.compile(re.escape(name) + "/"), "<workspace>/"))
+                forms.append((re.compile(re.escape(name) + r"(?![\w.-])"), "<workspace>"))
+            break
+    host = socket.gethostname()
+    hostrx = re.compile(r"(?<![\w-])" + re.escape(host) + r"(?![\w-])") if len(host) > 2 else None
+    return home, forms, hostrx
+
+
+def machine_paths(text: str) -> str:
+    """``text`` with every machine-specific path replaced (exports are published): a larmorx
+    checkout or worktree by ``<larmorx>``, an agent's scratch directory by ``<scratch>``, the
+    workspace, absolute or under ``~``, by ``<workspace>``, the test data's folders by their
+    placeholders, any other home directory by ``~``, and the machine's name by ``<host>``.
+    Applied to every string of an exported page (``evidence.core.write_tool``), so a text
+    quoted from a record or a run (an original's error message, an environment variable) is
+    covered as an argument is.
+
+    >>> machine_paths("PYTHONPATH=<workspace>/larmorx/.claude/worktrees/agent-a1/python:x")
+    'PYTHONPATH=<larmorx>/python:x'
+    >>> machine_paths("/home/u/w/larmorx/.claude/worktrees/a1/python")
+    '<larmorx>/python'
+    >>> machine_paths("-v /home/fmriprep/.cache")
+    '-v /home/fmriprep/.cache'
+    """
+    from larmorx_validation.report import redact
+
+    if "/" not in text and "~" not in text and "<" not in text:
+        home, forms, hostrx = _machine()
+        return hostrx.sub("<host>", text) if hostrx is not None else text
+    home, forms, hostrx = _machine()
+    out = _SCRATCH.sub("<scratch>", checkout_paths(text))
+    out = _WORKTREE.sub("<larmorx>", out)
+    # the workspace before the home directory (``redact`` replaces that by ``~``)
+    for rx, placeholder in forms:
+        out = rx.sub(placeholder, out)
+    out = redact(out).replace(home, "~")
+    out = _HOME.sub("~", out)
+    return hostrx.sub("<host>", out) if hostrx is not None else out
+
+
 def _short(arg: str) -> str:
     """A path with the machine-specific part replaced (provenance is published).
 
     >>> _short("/tmp/claude-1000/-home-u-w/0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b/scratchpad/p/x.nii")
     '<scratch>/p/x.nii'
     """
-    from larmorx_validation.report import redact
-
-    home = str(Path.home())
-    out = _SCRATCH.sub("<scratch>", checkout_paths(arg))
-    # the workspace before the home directory (``redact`` replaces that by ``~``)
-    for parent in Path(__file__).resolve().parents:
-        if (parent / "oracles").is_dir():
-            out = out.replace(str(parent) + "/", "<workspace>/")
-            break
-    return redact(out).replace(home, "~")
+    return machine_paths(arg)
 
 
 def larmorx_cli(*args: str) -> list[str]:

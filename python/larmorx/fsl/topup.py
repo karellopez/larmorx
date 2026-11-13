@@ -8,18 +8,18 @@ images, each displaced along its own phase encoding and modulated by the displac
 agree with their mean; ``applytopup`` corrects images with the result, by Jacobian modulation of
 each image or by least-squares restoration of pairs with opposite phase encodings.
 
-Two implementations of each (``docs/licensing.md``): the bit-exact replica from
-``larmorx-nc``, run as a separate program, and the clean-room original of this package
-(Apache-2.0, written from ``specs/topup.md``, run in this process); ``implementation="auto"``
-runs the replica when ``larmorx-nc`` is installed, else the original (every option of both
+Two ports of each (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``, run as a
+separate program, and the clean room of this package (Apache-2.0, written from
+``specs/topup.md``, run in this process); ``implementation="auto"`` runs the replica when
+``larmorx-nc`` is installed, else the clean room (every option of both
 programs, applytopup's undocumented ``vb2D``, ``vb3D`` and ``vb4D`` too). FSL's deterministic
-defects are corrected by default (D13,
-``docs/api/upstream-defects.md``); ``upstream_defects="reproduce"`` gives FSL's results. FSL's
+defects are corrected by default
+(``docs/api/upstream-defects.md``); ``upstream_defects="reproduce"`` gives FSL's results. FSL's
 environment variables are settings of the call, never read from the process environment
 (CLAUDE.md rule 6): ``fsldir`` names the FSL installation whose shipped configurations
 (``$FSLDIR/etc/flirtsch/b02b0.cnf``, ...) a ``config`` name refers to. The six FSL ships by name
 (``b02b0``, ``b02b0_1``, ``b02b0_2``, ``b02b0_4``, ``b02b0_7T``, ``test_acqp``) need no FSL:
-the original carries their settings (clean-room, ``specs/topup.md`` §2.5) and the replica a copy
+the clean room carries their settings (``specs/topup.md`` §2.5) and the replica a copy
 of FSL's files."""
 
 from __future__ import annotations
@@ -100,8 +100,15 @@ class TopupResult:
 
 @dataclass(frozen=True)
 class ApplytopupResult:
-    """What ``applytopup`` wrote: the corrected image (``--out``) and its standard output (the
-    ``vb*`` methods print their iterations)."""
+    """What ``applytopup`` wrote.
+
+    Attributes
+    ----------
+    corrected
+        The corrected image (``--out``).
+    stdout
+        applytopup's standard output (the ``vb*`` methods print their iterations).
+    """
 
     corrected: Image
     stdout: str
@@ -148,8 +155,8 @@ def _levels(name: str, value: Any, kind: type) -> str:
     return ",".join(out)
 
 
-#: The configurations FSL ships by name, whose settings larmorx carries itself (the clean-room
-#: original's, ``specs/topup.md`` §2.5; larmorx-nc's copy of FSL's files for the replica), so a
+#: The configurations FSL ships by name, whose settings larmorx carries itself (the clean
+#: room's, ``specs/topup.md`` §2.5; larmorx-nc's copy of FSL's files for the replica), so a
 #: ``config`` of one of these names needs no FSL installation.
 OWN_SETTINGS = ("b02b0", "b02b0_1", "b02b0_2", "b02b0_4", "b02b0_7T", "test_acqp")
 
@@ -178,7 +185,7 @@ def _run_original(
     upstream_defects: str,
     tool: str = "topup",
 ) -> str:
-    """The clean-room original of ``tool`` in this process, in ``tmp``, with FSL's settings of
+    """The clean room of ``tool`` in this process, in ``tmp``, with FSL's settings of
     this call; its notices become Python warnings; a failure raises ``RuntimeError`` with the
     program's message. Its standard output."""
     env = [*settings.items(), (_defects.ENV, upstream_defects)]
@@ -189,7 +196,7 @@ def _run_original(
     if code != 0:
         tail = "\n".join((out + err).strip().splitlines()[-20:])
         raise RuntimeError(
-            f"larmorx fsl {tool} (the clean-room original) failed with exit code {code}:\n{tail}"
+            f"larmorx fsl {tool} (the clean room) failed with exit code {code}:\n{tail}"
         )
     return out
 
@@ -240,7 +247,7 @@ def topup(
     ``--fout``, ``corrected`` ``--iout``, ``feat`` ``--featout``, ``displacement_fields``
     ``--dfout``, ``rigid_body_matrices`` ``--rbmout``, ``jacobians`` ``--jacout``. ``n_threads``
     is topup's ``--nthr``: the results are FSL's one-thread results whatever it is (FSL-116),
-    the replica's bit for bit, the original's within the validated thresholds
+    the replica's bit for bit, the clean room's within the validated thresholds
     (``docs/validation/fsl-topup.md``).
 
     fMRIPrep's call, ``topup --config=b02b0.cnf --datain=<file> --imain=<pair> --out=<base>
@@ -249,9 +256,20 @@ def topup(
     rigid_body_matrices=True, displacement_fields=True)``.
 
     Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
-    fails (its message is in the error), ``RuntimeError`` when the clean-room original fails (its
+    fails (its message is in the error), ``RuntimeError`` when the clean room fails (its
     message likewise), and :class:`larmorx.ReplicaNotFoundError` for ``implementation="replica"``
     without ``larmorx-nc``.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all); the results do not depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-topup.md``, "Defects of the original, corrected by default").
     """
     n_threads = _threads(n_threads)
     settings: list[tuple[str, Any, type]] = [
@@ -405,13 +423,21 @@ def applytopup(
     ``"vb3D"`` and ``"vb4D"``; ``interp`` ``--interp``; ``datatype`` ``--datatype`` (the output's
     type; float when ``None``); ``verbose`` ``-v``.
 
-    ``implementation``: ``"auto"`` (the replica when ``larmorx-nc`` is installed, else the
-    clean-room original), ``"replica"`` or ``"clean-room"``.
-
     Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
-    fails, ``RuntimeError`` (applytopup's message) when the original does, and
+    fails, ``RuntimeError`` (applytopup's message) when the clean room does, and
     :class:`larmorx.ReplicaNotFoundError` for ``implementation="replica"`` without
     ``larmorx-nc``.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all); the results do not depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-topup.md``, "Defects of the original, corrected by default").
     """
     n_threads = _threads(n_threads)
     many = isinstance(images, (list, tuple))

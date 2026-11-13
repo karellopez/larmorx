@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from larmorx_validation.evidence import confounds as c
 from larmorx_validation.evidence import confounds_run as cr
 from larmorx_validation.evidence import core
@@ -53,3 +54,34 @@ def test_every_entry_of_the_part_is_read_from_its_findings():
     for i, f in found.items():
         assert (REPO / f["file"]).is_file(), i
         assert f["what"], i
+
+
+def _run_example(verdict: str, threads: bool = True) -> dict:
+    ids = ["lx-fmriprep", "fix-fmriprep", "fix-lx"] + (["fix1-fix"] if threads else [])
+    return {
+        "id": "confounds-x",
+        "diffs": [{"id": i, "verdict": "bit-identical", "reason": ""} for i in ids],
+        "facts": [{"label": "Verdict of the file", "text": verdict}],
+    }
+
+
+def test_what_a_run_example_shows_from_its_verdicts():
+    from larmorx_validation.evidence.confounds import _shows_run
+
+    line, verdicts = _shows_run(_run_example("bit-identical: Every column of fMRIPrep's file"))
+    assert verdicts == ["lx-fmriprep"]
+    assert "its JSON byte for byte" in line and "at 1 and 8 threads alike" in line
+    line, _ = _shows_run(
+        _run_example(
+            "divergence: 5 cells of the motion chain (framewise_displacement, rot_y): glibc's "
+            "atan2 (SciPy's Rotation.as_euler calls the C library's) rounds",
+            threads=False,
+        )
+    )
+    assert "but 5 cells of the motion chain" in line and "threads alike" not in line
+    with pytest.raises(ValueError, match="another shape"):
+        _shows_run(_run_example("open: 3 cells differ"))
+    bad = _run_example("bit-identical: x")
+    bad["diffs"][0]["verdict"] = "within-variability"
+    with pytest.raises(ValueError, match="lx-fmriprep is within-variability"):
+        _shows_run(bad)

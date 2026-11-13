@@ -20,6 +20,7 @@ pub mod elements;
 pub mod histo;
 pub mod inverse;
 pub mod matrix;
+pub mod mfiles;
 pub mod nr;
 pub mod pdf;
 pub mod primes;

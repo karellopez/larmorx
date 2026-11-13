@@ -4,6 +4,7 @@
 use larmorx_fs_core::maths::affine::{self, AffineVector};
 use larmorx_fs_core::maths::dmatrix::{DMatrix, StreamSel};
 use larmorx_fs_core::maths::elements::{self, Region};
+use larmorx_fs_core::maths::mfiles::CStream;
 use larmorx_fs_core::maths::rfields;
 use larmorx_fs_core::maths::matrix::Matrix;
 use larmorx_fs_core::maths::{Output, Returned};
@@ -446,6 +447,69 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
                     l.putf(m.get(r, k));
                 }
             }
+        }
+        // -- §18
+        "mreadtxt" | "mreadtxtmissing" => {
+            let name = l.getx();
+            let path = String::from_utf8_lossy(&name).into_owned();
+            if c == "mreadtxt" {
+                let bytes = l.getx();
+                let _ = std::fs::write(&path, &bytes);
+            } else {
+                let _ = std::fs::remove_file(&path);
+            }
+            p.errno = 0;
+            let m = p.matrix_read_txt(&name)?;
+            l.putm(m.as_ref());
+            l.puti(i64::from(p.errno));
+            if c == "mreadtxt" {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+        "mreadasc" | "mreadbin" => {
+            let bytes = l.getx();
+            let o = l.getm_out(p)?;
+            let mut s = CStream::new(bytes);
+            p.errno = 0;
+            match o {
+                Out::Obj(Some(mut d)) => {
+                    let r = if c == "mreadasc" {
+                        p.matrix_ascii_read_from(&mut s, Some(&mut d))?
+                    } else {
+                        p.matrix_read_from(&mut s, Some(&mut d))?
+                    };
+                    l.putm_res(&r, Some(&d));
+                }
+                _ => {
+                    let r = if c == "mreadasc" {
+                        p.matrix_ascii_read_from(&mut s, None)?
+                    } else {
+                        p.matrix_read_from(&mut s, None)?
+                    };
+                    l.putm_res(&r, None);
+                }
+            }
+            l.puti(i64::from(p.errno));
+            l.puti(s.pos as i64);
+        }
+        "mwriteasc" | "mwritebin" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = if c == "mwriteasc" { p.matrix_ascii_write(&a) } else { p.matrix_write_into(&a) };
+            l.puti(0);
+            l.out(crate::hexbytes(&b));
+        }
+        "mwritetxt" => {
+            let name = l.getx();
+            let a = l.getm(p)?.expect("a matrix");
+            let path = String::from_utf8_lossy(&name).into_owned();
+            let _ = std::fs::remove_file(&path);
+            let v = p.matrix_write_txt(&name, &a);
+            l.puti(i64::from(v));
+            match std::fs::read(&path) {
+                Ok(b) => l.out(crate::hexbytes(&b)),
+                Err(_) => l.out("nofile"),
+            }
+            let _ = std::fs::remove_file(&path);
         }
         // -- §19
         "rfname" => {

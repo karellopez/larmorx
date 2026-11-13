@@ -416,6 +416,7 @@ def present(doc: dict) -> dict:
     if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
         doc["speed"]["note"] = present_.text(PAGE, note, port="both")
     fm.present_tables(doc, "fslstats")
+    fm.present_cases(doc)
     for t in doc["tables"]:
         if t["id"] in TITLES:
             t["title"] = TITLES[t["id"]]

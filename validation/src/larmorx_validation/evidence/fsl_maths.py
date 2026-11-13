@@ -1635,6 +1635,7 @@ TEXTS = [
     (r"\bsince relay 6's kernel correction\b", "since the Gaussian kernel's correction of findings 23"),
     (r"\(relay 7's check, below; at relay 5 ", "(checked again on 2026-11-04; on 2026-11-03 "),
     (r", the user's decision of (\d{4}-\d\d-\d\d)\)", r", as decided on \1)"),
+    (r"\bglibc's bits with reproduce\b", "glibc's bits in `reproduce`"),
     (r"\bthe original finishes and names it \(rule A\)",
      "the clean room finishes and names it, correcting it by default"),
     (r"\btakes glibc's sincos from LARMORX's clean-room implementation of its behavioural "
@@ -1857,6 +1858,21 @@ SPEED_LABELS = {
 }
 
 
+#: A case's synthetic input of the clean room's own suite, in its command: the old placeholder's
+#: "original" is the clean room.
+_SYNTHETIC = (
+    "a synthetic input of the original's suite>",
+    "a synthetic input of the clean room's suite>",
+)
+
+
+def present_cases(doc: dict) -> None:
+    """The cases' commands: the clean room's own synthetic inputs named by its port."""
+    for c in doc.get("cases", []):
+        if c.get("command"):
+            c["command"] = c["command"].replace(*_SYNTHETIC)
+
+
 def present_tables(doc: dict, program: str) -> None:
     """The page's tables (``program``: fslmaths or fslstats) by the guide's pattern: titles,
     columns, and each random-testing run's length (from its row) and date (from its title)."""
@@ -1905,6 +1921,7 @@ def present(doc: dict) -> dict:
         doc["speed"]["note"] = present_.text(PAGE, note, port="both")
     fsl_pages.replica_threshold(doc)  # the reviewer's round 18, minor 2
     present_tables(doc, "fslmaths")
+    present_cases(doc)
     return doc
 
 

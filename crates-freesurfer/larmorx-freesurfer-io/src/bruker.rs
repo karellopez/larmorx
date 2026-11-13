@@ -13,7 +13,11 @@ use larmorx_freesurfer_core::globals::Globals;
 use crate::identify::c_stat;
 
 /// A study file's part of the name, its message, and where its name goes.
-type Part = (&'static str, &'static str, fn(&mut BrukerFiles) -> &mut String);
+type Part = (
+    &'static str,
+    &'static str,
+    fn(&mut BrukerFiles) -> &mut String,
+);
 
 /// The bytes of each file name `is_bruker` builds (`char methodFile[512]` and the others).
 const BRUKER_NAME: usize = 512;

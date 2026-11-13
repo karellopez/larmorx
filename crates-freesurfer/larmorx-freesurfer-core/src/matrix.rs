@@ -703,6 +703,30 @@ impl Acc {
 
 /// The four branches of `MatrixMultiply` (`acc` `Float`) and `MatrixMultiplyD` (`Double`) on
 /// `m3` (`given`: the caller's, which FS-15 concerns).
+/// `MatrixMultiply_wkr`'s real sum `val += *r1++ * *r2` (`a` the row of `m1`, `b` the column of
+/// `m2`) as the official build computes it, which decides which NaN a sum of two NaNs keeps (the
+/// values are the same in any order): each product is `b * a` (m2's element the first operand);
+/// for 4 or more terms GCC 8.4.0 adds them in blocks of four, `val + p0`, `p1 + val`, `p2 + val`,
+/// `val + p3`, and the rest (or all of fewer than 4) as `val + p` (the disassembly of the unit
+/// oracle's `matrix.cpp.o`: `mulps`, `addss` after `shufps` and `unpckhps`).
+fn dot_float(a: &[f32], b: &[f32]) -> f32 {
+    let n = a.len();
+    let blocks = if n >= 4 { n / 4 } else { 0 };
+    let mut val = 0.0f32;
+    for k in 0..blocks {
+        let i = 4 * k;
+        let p: [f32; 4] = std::array::from_fn(|l| sse::mul(b[i + l], a[i + l]));
+        val = sse::add(val, p[0]);
+        val = sse::add(p[1], val);
+        val = sse::add(p[2], val);
+        val = sse::add(val, p[3]);
+    }
+    for i in 4 * blocks..n {
+        val = sse::add(val, sse::mul(b[i], a[i]));
+    }
+    val
+}
+
 pub(crate) fn multiply(
     g: &mut Globals,
     m1: &Matrix,
@@ -731,11 +755,9 @@ pub(crate) fn multiply(
                             val as f32
                         }
                         Acc::Float => {
-                            let mut val = 0.0f32;
-                            for i in 1..=m1_cols {
-                                val = sse::add(val, sse::mul(m1.relt(row, i), m2.relt(i, col)));
-                            }
-                            val
+                            let a: Vec<f32> = (1..=m1_cols).map(|i| m1.relt(row, i)).collect();
+                            let b: Vec<f32> = (1..=m1_cols).map(|i| m2.relt(i, col)).collect();
+                            dot_float(&a, &b)
                         }
                     };
                     m3.set_relt(row, col, v);
@@ -748,18 +770,22 @@ pub(crate) fn multiply(
             for col in 1..=cols {
                 let r1 = rptr(m1, row) + 1;
                 let r2 = rptr(m2, 1) + col as isize;
-                let (mut vd, mut vf) = (0.0f64, 0.0f32);
+                let mut vd = 0.0f64;
+                let (mut av, mut bv) = (Vec::new(), Vec::new());
                 for i in 0..m1_cols as isize {
                     let a = read_at(g, m1, r1 + i);
                     let b = read_at(g, m2, r2 + i * cols as isize);
                     match acc {
                         Acc::Double => vd = sse::add64(vd, sse::mul64(f64::from(a), f64::from(b))),
-                        Acc::Float => vf = sse::add(vf, sse::mul(a, b)),
+                        Acc::Float => {
+                            av.push(a);
+                            bv.push(b);
+                        }
                     }
                 }
                 let v = match acc {
                     Acc::Double => vd as f32,
-                    Acc::Float => vf,
+                    Acc::Float => dot_float(&av, &bv),
                 };
                 write_at(g, m3, r3 + col as isize - 1, v);
             }

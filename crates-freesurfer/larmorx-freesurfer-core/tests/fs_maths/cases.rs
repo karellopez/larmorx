@@ -25,6 +25,8 @@ use larmorx_freesurfer_core::fs_vnl::FsFunctions;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{self as h, Histogram};
 use larmorx_freesurfer_core::matrix::{self as m, MATRIX_COMPLEX, MATRIX_REAL, Matrix};
+use larmorx_freesurfer_core::matrix_decomp as md;
+use larmorx_freesurfer_core::matrix_io as mio;
 use larmorx_freesurfer_core::matrix_ops::{self as mo, Region};
 use larmorx_freesurfer_core::numerics::{self as nu, NrMatrix, NrVector};
 use larmorx_freesurfer_core::ret::Ret;
@@ -331,6 +333,14 @@ const COMMANDS: &[&str] = &[
     "pdfg",
     "minv",
     "mqr",
+    "meig",
+    "msvd",
+    "msvdinv",
+    "mpinv",
+    "mrdtxt",
+    "mrdasc",
+    "mrdbin",
+    "mwr",
     "powell",
     "powell2",
     "dfpmin",
@@ -579,6 +589,71 @@ const SPECIAL64: [f64; 6] = [
 ];
 
 /// One case line of command `cmd`.
+/// A number as text, in one of the forms FreeSurfer's files hold or a reader may meet: integers,
+/// fixed and exponent forms, `%+4.5f`'s, and (rarely) the C library's special and edge forms.
+fn num_token(g: &mut Gen) -> String {
+    match g.below(40) {
+        0 => g
+            .pick(&[
+                "inf",
+                "-inf",
+                "nan",
+                "-nan",
+                "INFINITY",
+                "1e40",
+                "-1e40",
+                "1e-40",
+                "1e-50",
+                "0x1p-149",
+                "0x1.8p3",
+                "1e",
+                "100ergs",
+                "5.",
+                ".5",
+                "+.5",
+                "1.17549435e-38",
+                "3.40282357e38",
+                "0x.",
+                "1e+",
+            ])
+            .to_owned(),
+        1 => g
+            .pick(&["abc", ".", "-", "1,5", "nan(1)", "infin", "0x", "e5"])
+            .to_owned(),
+        k => {
+            let v = g.f(-1000, 1000, 64);
+            match k % 4 {
+                0 => g.int(-1000, 1000).to_string(),
+                1 => format!("{v:.3}"),
+                2 => format!("{v:+.5}"),
+                _ => format!("{v:e}"),
+            }
+        }
+    }
+}
+
+fn hex_text(t: &[u8]) -> String {
+    if t.is_empty() {
+        return "-".to_owned();
+    }
+    t.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// A matrix text file: rows of numbers with varied separators and line ends.
+fn matrix_text(g: &mut Gen, rows: i64, cols: i64) -> String {
+    let mut text = String::new();
+    for _ in 0..rows {
+        for c in 0..cols {
+            if c > 0 || g.below(6) == 0 {
+                text.push_str(g.pick(&[" ", "  ", "\t", " \t "]));
+            }
+            text.push_str(&num_token(g));
+        }
+        text.push_str(g.pick(&["\n", "\n", "\r\n", " \n", "\n\n"]));
+    }
+    text
+}
+
 fn case(g: &mut Gen, cmd: &str) -> String {
     let mut s = vec![cmd.to_owned()];
     let nb = nbins(g);
@@ -1048,6 +1123,162 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             let (r, c) = (g.int(1, 6), g.int(1, 6));
             put_mat(&mut s, g, r, c, false);
         }
+        "meig" => {
+            // 0, 1 symmetric; 2 symmetric but one element (FreeSurfer's exact test: the
+            // non-symmetric path); 3 any; 4 symmetric with infinities and NaNs (only the helper's
+            // symmetric path: a NaN fails the symmetry test, and the non-symmetric path never
+            // returns on such a matrix, ITK-112); 5 upper triangular (real eigenvalues)
+            let n = g.int(1, 6) as usize;
+            let kind = g.below(6);
+            let cols = if g.below(10) == 0 { n + 1 } else { n };
+            let mut a = vec![0.0f32; n * cols];
+            for v in a.iter_mut() {
+                *v = if g.below(8) == 0 {
+                    0.0
+                } else {
+                    g.f(-1000, 1000, 64)
+                };
+            }
+            if kind == 4 {
+                for v in a.iter_mut() {
+                    if g.below(3) == 0 {
+                        *v = g.pick(&[f32::INFINITY, -f32::INFINITY, f32::NAN, 1.0, -0.0]);
+                    }
+                }
+            }
+            if cols == n {
+                for i in 0..n {
+                    for j in 0..i {
+                        match kind {
+                            3 => {}
+                            5 => a[i * n + j] = 0.0,
+                            _ => a[i * n + j] = a[j * n + i],
+                        }
+                    }
+                }
+                if kind == 2 && n > 1 {
+                    a[n - 1] += 1.0 / 64.0;
+                }
+            }
+            s.push(i64::from(kind != 4).to_string());
+            s.push(n.to_string());
+            s.push(cols.to_string());
+            s.extend(a.iter().map(|&v| fx(v)));
+        }
+        "msvd" => {
+            let (r, c) = (g.int(1, 6), g.int(1, 6));
+            put_mat_kind(&mut s, g, r, c, false);
+        }
+        "msvdinv" | "mpinv" => {
+            if cmd == "mpinv" {
+                s.push(g.int(0, 4).to_string());
+            }
+            let (r, c) = if g.below(3) != 0 {
+                let n = g.int(1, 5);
+                (n, n)
+            } else {
+                (g.int(1, 5), g.int(1, 5))
+            };
+            let at = s.len();
+            put_mat_kind(&mut s, g, r, c, false);
+            // sometimes singular: the second row a copy of the first
+            if r > 1 && g.below(4) == 0 {
+                for j in 0..c as usize {
+                    s[at + 2 + c as usize + j] = s[at + 2 + j].clone();
+                }
+            }
+        }
+        "mrdtxt" => {
+            let (r, c) = (g.int(1, 5), g.int(1, 5));
+            let mut text = matrix_text(g, r, c);
+            match g.below(10) {
+                0 => text = String::new(),
+                1 => text = format!("  \t\n{text}"),
+                2 => {
+                    while text.ends_with('\n') {
+                        text.pop();
+                    }
+                }
+                3 => {
+                    // a first line longer than fgets' 998 bytes
+                    let long: String = (0..250).map(|i| format!("{} ", i % 10)).collect();
+                    text = format!("{long}\n{text}");
+                }
+                _ => {}
+            }
+            s.push(hex_text(text.as_bytes()));
+        }
+        "mrdasc" => {
+            let t = g.pick(&[1, 1, 1, 2, 2, 3]);
+            let (r, c) = (g.int(0, 4), g.int(0, 4));
+            let given = i64::from(g.below(3) == 0);
+            let (gt, gr, gc) = if g.below(4) == 0 {
+                (g.pick(&[1, 2]), g.int(0, 4), g.int(0, 4))
+            } else {
+                (t, r, c)
+            };
+            let mut text = String::new();
+            for _ in 0..g.below(3) {
+                text.push_str(g.pick(&["# a comment\n", "\n", "   \n", "  # x 1 2\n"]));
+            }
+            text.push_str(&match g.below(12) {
+                0 => "1 2\n".to_owned(),
+                1 => "x 1 1\n".to_owned(),
+                2 => format!("{t} {r} {c} 9 # trailing\n"),
+                _ => format!("{t}{}{r} {c}\n", g.pick(&[" ", "\t", "  "])),
+            });
+            let per = if t == 2 { 2 } else { 1 };
+            text.push_str(&matrix_text(g, r, c * per));
+            if g.below(8) == 0 {
+                // the file ends early
+                let cut = g.below(text.len() as u64 + 1) as usize;
+                text.truncate(cut);
+            }
+            s.extend([given, gt, gr, gc].iter().map(i64::to_string));
+            s.push(hex_text(text.as_bytes()));
+        }
+        "mrdbin" => {
+            let t = g.pick(&[1, 1, 1, 2, 2, 3]);
+            let (r, c) = (g.int(0, 4), g.int(0, 4));
+            let given = i64::from(g.below(3) == 0);
+            let (gt, gr, gc) = if g.below(4) == 0 {
+                (g.pick(&[1, 2]), g.int(0, 4), g.int(0, 4))
+            } else {
+                (t, r, c)
+            };
+            let mut b = Vec::new();
+            for v in [t, r, c] {
+                b.extend_from_slice(&(v as i32).to_be_bytes());
+            }
+            let per = if t == 2 { 2 } else { 1 };
+            for _ in 0..r * c * per {
+                let v = if g.below(10) == 0 {
+                    g.pick(&[
+                        f64::INFINITY,
+                        f64::NAN,
+                        1e300,
+                        1e-300,
+                        -0.0,
+                        3.4028235677973366e38,
+                    ])
+                } else {
+                    g.d(-1000, 1000, 64)
+                };
+                b.extend_from_slice(&v.to_be_bytes());
+            }
+            if g.below(8) == 0 {
+                let cut = g.below(b.len() as u64 + 1) as usize;
+                b.truncate(cut);
+            }
+            s.extend([given, gt, gr, gc].iter().map(i64::to_string));
+            s.push(hex_text(&b));
+        }
+        "mwr" => {
+            let t = if g.below(4) == 0 { 2 } else { 1 };
+            s.push(t.to_string());
+            let (r, c) = (g.int(0, 4), g.int(0, 4));
+            put_mat_kind(&mut s, g, r, c, t == 2);
+        }
         "powell" | "powell2" | "dfpmin" => return minimizer_case(g, cmd),
         _ => unreachable!("{cmd}"),
     }
@@ -1250,6 +1481,15 @@ fn new_h(r: Ret<Histogram>) -> Histogram {
 
 /// The port's output line for `line` in `mode`, and the IDs of the defects it noted. `tmp`: a
 /// scratch file for the commands that write files.
+/// Whether FreeSurfer's code crashes on this case (`reproduce` notes it, and the probe's line is
+/// `CRASH`): FS-44, FS-45, FS-46.
+fn crashed(g: &Globals, mode: UpstreamDefects) -> bool {
+    mode == UpstreamDefects::Reproduce
+        && g.notices.as_slice().iter().any(|x| {
+            matches!(x.defect.id, "FS-44" | "FS-45" | "FS-46") && x.detail.contains("crashes")
+        })
+}
+
 pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&'static str>) {
     let mut t = Toks {
         t: line.split_whitespace().collect(),
@@ -1878,6 +2118,202 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             ));
             o.mraw(&q);
             o.mraw(&r);
+        }
+        "meig" => {
+            let full = t.i();
+            let a = t.m(g, MATRIX_REAL);
+            let n = a.rows.max(1) as usize;
+            let mut ev = vec![7.0f32; n];
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            if full != 0 {
+                let r = md::matrix_eigen_system(g, &mut co, &mut ce, &a, &mut ev, None).unwrap();
+                o.mn(&r, None);
+                ev.iter().for_each(|&x| o.f(x));
+                let mut out = Matrix::real(a.rows, a.rows);
+                ev.fill(7.0);
+                let r = md::matrix_eigen_system(g, &mut co, &mut ce, &a, &mut ev, Some(&mut out))
+                    .unwrap();
+                o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+                o.mraw(&out);
+                ev.iter().for_each(|&x| o.f(x));
+                ev.fill(7.0);
+                let r = md::matrix_calculate_eigen_system_helper(
+                    g, &mut co, &mut ce, &a, &mut ev, None, false,
+                )
+                .unwrap();
+                o.mn(&r, None);
+                ev.iter().for_each(|&x| o.f(x));
+            }
+            ev.fill(7.0);
+            let r = md::matrix_calculate_eigen_system_helper(
+                g, &mut co, &mut ce, &a, &mut ev, None, true,
+            )
+            .unwrap();
+            o.mn(&r, None);
+            ev.iter().for_each(|&x| o.f(x));
+            o.cap(&co);
+            o.cap(&ce);
+            // FreeSurfer never returns (the probe's child is stopped by its alarm)
+            if mode == UpstreamDefects::Reproduce
+                && g.notices.contains(&larmorx_core::defects::ITK_112)
+            {
+                o.0 = vec!["TIMEOUT".to_owned()];
+            }
+        }
+        "msvd" => {
+            let a = t.m(g, MATRIX_REAL);
+            let (rows, cols) = (a.rows, a.cols);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            let mut ev = vec![7.0f32; rows.max(1) as usize];
+            o.f(md::matrix_svd_eigen_values(g, &mut co, &mut ce, &a, &mut ev).unwrap());
+            ev[..rows as usize].iter().for_each(|&x| o.f(x));
+            o.f(md::matrix_condition_number(g, &mut co, &mut ce, &a).unwrap());
+            o.f(md::matrix_ns_condition_number(g, &mut co, &mut ce, &a).unwrap());
+            let mut u = m::matrix_copy(g, &mut co, &mut ce, Some(&a), None)
+                .unwrap()
+                .unwrap_new();
+            let mut z = Matrix::real(cols, 1);
+            let r = md::matrix_svd(g, &mut co, &mut ce, &mut u, &mut z, None).unwrap();
+            o.mn(&r, None);
+            o.mraw(&u);
+            o.mraw(&z);
+            let mut u2 = m::matrix_copy(g, &mut co, &mut ce, Some(&a), None)
+                .unwrap()
+                .unwrap_new();
+            let mut z2 = Matrix::real(cols, 1);
+            let mut v2 = Matrix::real(cols, cols);
+            let r = md::matrix_svd(g, &mut co, &mut ce, &mut u2, &mut z2, Some(&mut v2)).unwrap();
+            o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+            o.mraw(&v2);
+            o.mraw(&u2);
+            o.mraw(&z2);
+            o.cap(&co);
+            o.cap(&ce);
+        }
+        "msvdinv" => {
+            let a = t.m(g, MATRIX_REAL);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            let r = md::matrix_svd_inverse(g, &mut co, &mut ce, &a, None).unwrap();
+            if crashed(g, mode) {
+                o.0.push("CRASH".to_owned());
+            } else {
+                o.mn(&r, None);
+                let mut out = Matrix::real(a.cols, a.rows);
+                let r = md::matrix_svd_inverse(g, &mut co, &mut ce, &a, Some(&mut out)).unwrap();
+                o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+                o.mraw(&out);
+                o.cap(&co);
+                o.cap(&ce);
+            }
+        }
+        "mpinv" => {
+            let which = t.i();
+            let a = t.m(g, MATRIX_REAL);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            let mut out = match which {
+                1 | 4 => Some(Matrix::real(a.cols, a.rows)),
+                2 => Some(Matrix::real(a.rows, a.cols)),
+                _ => None,
+            };
+            let r = if which < 3 {
+                md::matrix_pseudo_inverse(g, &mut co, &mut ce, &a, out.as_mut()).unwrap()
+            } else {
+                md::matrix_svd_pseudo_inverse(g, &mut co, &mut ce, &a, out.as_mut()).unwrap()
+            };
+            if crashed(g, mode) {
+                o.0.push("CRASH".to_owned());
+            } else {
+                match r {
+                    Ret::Given => {
+                        o.0.push("GIVEN".to_owned());
+                        o.mraw(out.as_ref().unwrap());
+                    }
+                    r => {
+                        o.mn(&r, None);
+                        if let Some(x) = out.as_ref().filter(|_| which != 2) {
+                            o.mraw(x);
+                        }
+                    }
+                }
+                o.cap(&co);
+                o.cap(&ce);
+            }
+        }
+        "mrdtxt" | "mrdasc" | "mrdbin" => {
+            let dir = tmp.parent().unwrap_or(Path::new("."));
+            let file = dir.join("fsmaths-file.tmp");
+            let (mut given, mut gt, mut gr, mut gc) = (0, 1, 0, 0);
+            if cmd != "mrdtxt" {
+                (given, gt, gr, gc) = (t.i(), t.i(), t.i(), t.i());
+            }
+            let hex = t.next();
+            let bytes: Vec<u8> = if hex == "-" {
+                Vec::new()
+            } else {
+                (0..hex.len() / 2)
+                    .map(|i| u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).unwrap())
+                    .collect()
+            };
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            if cmd == "mrdtxt" {
+                std::fs::write(&file, &bytes).unwrap();
+                let r = mio::matrix_read_txt(g, &mut co, &mut ce, Some(dir), "fsmaths-file.tmp")
+                    .unwrap();
+                o.mn(&r, None);
+                o.i(g.errno);
+                let _ = std::fs::remove_file(&file);
+            } else {
+                let mut om = if given != 0 {
+                    m::matrix_alloc(g, &mut co, &mut ce, gr, gc, gt as i16).unwrap()
+                } else {
+                    None
+                };
+                g.errno = 0;
+                let mut rd: &[u8] = &bytes;
+                let r = if cmd == "mrdasc" {
+                    mio::matrix_ascii_read_from(g, &mut co, &mut ce, &mut rd, om.as_mut()).unwrap()
+                } else {
+                    mio::matrix_read_from(g, &mut co, &mut ce, &mut rd, om.as_mut()).unwrap()
+                };
+                match r {
+                    Ret::Given => {
+                        o.0.push("GIVEN".to_owned());
+                        o.mraw(om.as_ref().unwrap());
+                    }
+                    r => {
+                        o.mn(&r, None);
+                        if let Some(x) = om.as_ref() {
+                            o.mraw(x);
+                        }
+                    }
+                }
+                o.i(g.errno);
+                o.i((bytes.len() - rd.len()) as i32);
+            }
+            o.cap(&co);
+            o.cap(&ce);
+        }
+        "mwr" => {
+            let a = o.mt(g, &mut t);
+            let dir = tmp.parent().unwrap_or(Path::new("."));
+            let file = dir.join("fsmaths-file.tmp");
+            let mut buf = Vec::new();
+            o.i(mio::matrix_ascii_write_into(g, &mut buf, &a));
+            std::fs::write(&file, &buf).unwrap();
+            o.file(&file);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            o.i(mio::matrix_write_txt(
+                g,
+                &mut ce,
+                Some(dir),
+                "fsmaths-file.tmp",
+                &a,
+            ));
+            o.cap(&co);
+            co.clear();
+            o.cap(&ce);
+            o.file(&file);
+            let _ = std::fs::remove_file(&file);
         }
         "powell" | "powell2" | "dfpmin" => {
             let mut pr = t.problem();

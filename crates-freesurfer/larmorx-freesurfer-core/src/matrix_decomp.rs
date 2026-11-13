@@ -394,8 +394,8 @@ pub fn matrix_svd_eigen_values(
 /// a given `m_inverse` of another size.
 ///
 /// **FS-44:** for more rows than columns FreeSurfer allocates `Uᵀ` cols x cols, reads the singular
-/// values and writes their inverses up to the row count, past their vectors (crashing on the row
-/// pointers of the cols x cols matrix beyond its last row). By default the sizes are the
+/// values and writes their inverses up to the row count, past their vectors: after a successful
+/// decomposition it crashes on the row pointers of the cols x cols matrix beyond its last row. By default the sizes are the
 /// decomposition's (the pseudo-inverse, cols x rows); `reproduce` gives `Null` (the crash is
 /// never reproduced). FS-25.
 pub fn matrix_svd_inverse(
@@ -412,6 +412,13 @@ pub fn matrix_svd_inverse(
         return Ok(Ret::Null);
     }
     let (rows, cols) = (m.rows, m.cols);
+    let mut u = real(g, out, err, rows, cols, true)?;
+    matrix_copy(g, out, err, Some(m), Some(&mut u))?;
+    let mut v = real(g, out, err, cols, cols, true)?;
+    let mut w = real(g, out, err, 1, cols, true)?;
+    if numerics::open_svdcmp(g, err, &mut u, &mut w, &mut v) != NO_ERROR {
+        return Ok(Ret::Null);
+    }
     if rows > cols {
         if reproduce(g) {
             g.notices.add(
@@ -426,13 +433,6 @@ pub fn matrix_svd_inverse(
                 "MatrixSVDInverse of a {rows} x {cols} matrix: the pseudo-inverse with the decomposition's sizes"
             ),
         );
-    }
-    let mut u = real(g, out, err, rows, cols, true)?;
-    matrix_copy(g, out, err, Some(m), Some(&mut u))?;
-    let mut v = real(g, out, err, cols, cols, true)?;
-    let mut w = real(g, out, err, 1, cols, true)?;
-    if numerics::open_svdcmp(g, err, &mut u, &mut w, &mut v) != NO_ERROR {
-        return Ok(Ret::Null);
     }
     let mut mw = real(g, out, err, cols, cols, true)?;
     let nw = rows.min(cols);

@@ -41,10 +41,11 @@ impl Process {
     pub fn zone(&mut self) -> Arc<Zone> {
         let tz = self.env.get("TZ").map(<[u8]>::to_vec);
         let tzdir = self.env.get("TZDIR").map(<[u8]>::to_vec);
-        if let Some(c) = &self.zone {
-            if c.tz == tz && c.tzdir == tzdir {
-                return Arc::clone(&c.zone);
-            }
+        if let Some(c) = &self.zone
+            && c.tz == tz
+            && c.tzdir == tzdir
+        {
+            return Arc::clone(&c.zone);
         }
         let zone = Arc::new(Zone::from_tz(tz.as_deref(), tzdir.as_deref()));
         self.zone = Some(ZoneCache {
@@ -74,10 +75,8 @@ impl Process {
     /// value when it is set and allowed (an empty value gives the empty string), else the local
     /// time in the C locale's `%c` form.
     pub fn current_date_time(&mut self, allow_override: bool) -> Vec<u8> {
-        if allow_override {
-            if let Some(v) = self.env.get(DATE_OVERRIDE) {
-                return v.to_vec();
-            }
+        if allow_override && let Some(v) = self.env.get(DATE_OVERRIDE) {
+            return v.to_vec();
         }
         let now = self.now();
         self.local_c_string(now).unwrap_or_default()

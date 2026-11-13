@@ -101,7 +101,7 @@ def main() -> int:
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "OMP_NUM_THREADS": "1"}
     cenv = dict(env, LARMORX_UPSTREAM_DEFECTS="reproduce")
     head = ("batch", "lines", "probe s", "cand. s", "probe ns/call", "cand. ns/call")
-    print("%-18s %7s %9s %9s %14s %14s" % head)
+    print(f"{head[0]:18s} {head[1]:>7s} {head[2]:>9s} {head[3]:>9s} {head[4]:>14s} {head[5]:>14s}")
     for name, (lines, base) in batches(random.Random(7)).items():
         f = a.scratch / f"{name}.txt"
         g = a.scratch / f"{name}-base.txt"
@@ -114,7 +114,7 @@ def main() -> int:
         n = len(lines)
         per_p = max(tp - tpb, 0) / n * 1e9
         per_c = max(tc - tcb, 0) / n * 1e9
-        print("%-18s %7d %9.3f %9.3f %14.1f %14.1f" % (name, n, tp, tc, per_p, per_c))
+        print(f"{name:18s} {n:7d} {tp:9.3f} {tc:9.3f} {per_p:14.1f} {per_c:14.1f}")
     print("the candidate's library in process:")
     for op, n in BENCH:
         r = subprocess.run(

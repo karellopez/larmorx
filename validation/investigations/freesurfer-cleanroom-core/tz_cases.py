@@ -153,8 +153,10 @@ def main() -> int:
         cenv = dict(env, LARMORX_UPSTREAM_DEFECTS="reproduce")
         got = subprocess.run([str(a.candidate), *argv], env=cenv, capture_output=True).stdout
         same = want == got
-        n = sum(1 for x, y in zip(want.split(b"\n"), got.split(b"\n")) if x != y)
-        tag = "identical" if same else ("differs (partial rule, expected)" if partial else "DIFFERS")
+        n = sum(1 for x, y in zip(want.split(b"\n"), got.split(b"\n"), strict=False) if x != y)
+        tag = (
+            "identical" if same else ("differs (partial rule, expected)" if partial else "DIFFERS")
+        )
         label = f"TZ={tz!r}" + (" TZDIR=<posixrules=Paris>" if own_dir else "")
         print(f"{label:52s} {tag}{'' if same else f' ({n} of {len(times()) * 3} results)'}")
         if not same and not partial:

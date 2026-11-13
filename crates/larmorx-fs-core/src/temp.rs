@@ -113,10 +113,10 @@ impl Process {
     /// <dir>` and the end of the program with status 1.
     pub fn base_temp_dir(&mut self) -> Result<Vec<u8>, Stop> {
         for v in TEMP_VARIABLES {
-            if let Some(d) = self.env.non_empty(v) {
-                if directory_is_writable(d) {
-                    return Ok(d.to_vec());
-                }
+            if let Some(d) = self.env.non_empty(v)
+                && directory_is_writable(d)
+            {
+                return Ok(d.to_vec());
             }
         }
         let dir = self

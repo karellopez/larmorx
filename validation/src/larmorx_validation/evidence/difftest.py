@@ -290,7 +290,7 @@ _TRIAL = [
 #: ``DIFFTEST_CHECKS``): "DN" marks the checks of the defects' notices, and the harness calls the
 #: clean room "original".
 CHECK_WORDS = {
-    "DN defaults: replica = original": "the defaults: the replica's equals the clean room's",
+    "DN defaults: replica = original": "the replica's default equal to the clean room's",
     "DN fix pass": "the `fix` pass",
     "DN notices in both modes": "the notices in `fix` and in `reproduce`",
     "larmorx panicked": "LARMORX stopped with an internal error",

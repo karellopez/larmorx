@@ -52,6 +52,8 @@
 //!   files, the file names, the decimation files, `FS_GII`; FS-136..FS-140, FS-148, FS-149).
 //! - [`formats`]: the VTK reader, the movie.byu and icosahedron writers, the Talairach matrix, the
 //!   MATLAB plots (FS-141..FS-147).
+//! - [`readwrite`]: a surface written in the format its name says, a patch in ASCII, a surface
+//!   file's vertex positions only.
 //! - [`scanf`]: one C `scanf` call (fs.core's `cscan::Scanf`, re-exported).
 //! - [`stl`]: STL surfaces, read (binary or text) and written (FS-151, FS-152, FS-157..FS-160).
 //! - [`surfread`]: the file-local surface readers (ASCII, movie.byu and its positions, the
@@ -82,6 +84,7 @@ pub mod mris_mp;
 pub mod mrisurf;
 pub mod names;
 pub mod positions;
+pub mod readwrite;
 pub mod scanf;
 pub mod sfile;
 pub mod stl;

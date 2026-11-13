@@ -912,3 +912,58 @@ decided, from `utils/mrisurf_io.cpp` 5319-5385 (`MRISwriteTriangularSurface`), 5
   are singular; `MatrixInverse` returns `NULL`, `MatrixMultiply(T, NULL)` prints its message and
   returns `NULL`, and the writer exits 1 after `[ERROR] ... couldn't obtain MatrixData` (observed
   identical, 40 cases at seed 17).
+
+## 17. Queue item 3.1-48: the file names and the writer by name (relay 15)
+
+What was ported (`src/names.rs`, `src/readwrite.rs`; spec part 12, §79-83), from
+`utils/mrisurf_io.cpp` 2551-2616 (`MRISfileNameType`), 3276-3340 (`MRISwritePatchAscii`), 4279-4340
+and 4414-4451 (`MRISwriteVertexLocations`, `MRISwrite`, `MRISwrite_new`), 5226-5317
+(`MRISreadVerticesOnly`) and 6690-7000 (the four `_getfilename` functions), on track A's
+`mri_identify` and `IDextensionFromName` (merged at cf5c23ba) and `TAGreadStart` without its FS-49
+note at the end of a file (c117b9ea: `trifile.rs`'s local `tag_start` of §16 removed).
+
+- **`MRISfileNameType`'s `@`** (lines 2570-2574): `FileNameOnly` already cut the name at its last `@`
+  (`utils/utils.cpp` 428-431), so `strrchr(str, '@')` finds one only in a part that held two
+  (`a@b@vtk` gives `b`); the comment's "forces the type of the file" never happens, and `*dot = 0`
+  changes only the local copy. Rule C (kept, no ID): the readers open the name with its `@`, and no
+  program of recon-all or fMRIPrep passes one.
+- **`MRISreadCurvatureFile_getfilename`'s `strncmp(cp - 2, ...)`** (line 6801) reads two bytes
+  before the name when its first dot is its first byte, one when it is its second (and always the
+  first of them: unlike `MRISbuildFileName_read`'s test, `strncmp` starts at `cp - 2`): FS-148's
+  text extended. The probe's names have two zero bytes before them (`name_tok`), so the official
+  answer is "no hemisphere", as larmorx's in both modes.
+- **The curvature writer's and reader's hemisphere tests differ** (lines 6715 and 6801): the writer
+  takes a name as naming the hemisphere only when its first dot is its third byte (`lh.x`), the
+  reader whenever the two bytes before the first dot are `lh` or `rh` (`xlh.curv`, `white.lh` not:
+  first dot). Rule C (kept, no ID): only names with letters before `lh.` differ, which no program
+  writes.
+- **FS-355** (`MRISreadAnnotation_getfilename`, line 6934): `stricmp(fname_no_path, "lh")` compares
+  the whole name, where the writer (line 6856) uses `strncmp(..., 2)`. A name such as
+  `lh.aparc.annot` without a folder becomes `<folder>/../label/lh.lh.aparc.annot`, not found; the
+  fallbacks then try `<that>.mgz` and the name in the program's folder, and otherwise the reader
+  fails on `lh.lh.aparc.annot.annot`. Rule A: the default uses the writer's test (the first two
+  letters, case matters); `reproduce` FreeSurfer's (with fs.core's `stricmp`, FS-11 for long names).
+  A name of exactly `LH` (or `Lh`) is the one case where the default adds a hemisphere FreeSurfer
+  does not.
+- **FS-356**: `FileNameOnly` and `FileNamePath` copy into the callers' `char[STRLEN]` with an
+  unchecked `strcpy` (`utils/utils.cpp` 416-418, 792; the destination is a pointer there, so
+  `_FORTIFY_SOURCE` cannot check it): a part of 1,024 bytes or more writes past the buffer on the
+  caller's stack. Observed: crashes (counted, not compared). larmorx takes the part whole in both
+  modes (as FS-134 for the triangle-property files).
+- **FS-126's checked copies**: `strcpy(fname, sname)` into a local `char[STRLEN]` (lines 6819,
+  6896, 6953) and `strcat(fname, ".annot")` (lines 6908, 6978) are checked by the official build
+  (`__strcpy_chk`, `__strcat_chk`): `*** buffer overflow detected ***: terminated`, signal 6, as
+  FS-126's other copies; the `.mgz` fallback's `strcpy(fname, tmpstr)` (line 6964) likewise. The
+  snprintf truncation messages carry the lines of the `std::cerr` statements (6720 ... 6969).
+- **`MRISwrite`'s old behaviour** (`MRISwrite_old`, lines 4453-4573) sits behind `useOldBehaviour =
+  false` with no way to set it: not reachable, not ported (likewise `MRISreadOverAlloc_old`).
+  `chklc()` is the licence check (fs.core's `chklc`: no key needed); the probe sets
+  `SURFER_SIDEDOOR` so the official build skips it.
+- **GIFTI**: `MRISwrite_new`'s type 7 calls `MRISwriteGIFTI` (gifti.cpp, the surface part of queue
+  item 3.1-26, this track's next piece); until it is ported the branch panics with a message. A
+  binary surface name with `FS_GII=.gii` reaches it too (the name gains `.gii`), so the probe's
+  `swr` command sets no `FS_GII` and writes no `.gii` name.
+- **`MRISreadVerticesOnly`** never closes a quadrangle file (lines 5263-5314: no `fclose` on that
+  path): a descriptor leak only; larmorx closes it. Its test `if (!mriss->nvertices)` (line 5285)
+  checks the count, not the allocation: 0 vertices gives `could not allocate surface`. The old format
+  (no magic number) is read as floats, as `__MRISreadQuadrangleFile` reads it (§16).

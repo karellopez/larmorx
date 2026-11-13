@@ -2,14 +2,13 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (1,020 cases, thirty of each of
-//! the 34 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1020` on Linux x64 from the unit
-//! oracle's build (2026-11-13, relay 14: 1,006 lines identical, 4 `mprop` cases, 3 `stl`, 3
-//! `sread`, 2 `sfile`, 1 `cfile` and 1 `tri` case counted, not compared, where FreeSurfer reads
-//! memory it never wrote or does not own: `SKIP`),
+//! official build's output lines for the probe's cases of seed 1 (1,080 cases, thirty of each of
+//! the 36 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1080` on Linux x64 from the unit
+//! oracle's build (2026-11-13, relay 15: 1,064 lines identical, 16 counted, not compared, where
+//! FreeSurfer reads memory it never wrote or does not own, or writes past a buffer: `SKIP`),
 //! against the port's output with `reproduce` (a case the port marks with one of those defects
-//! hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`, `stl` and `tri` cases run in a
+//! hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`, `stl`, `tri`, `fnam` and `swr` cases run in a
 //! temporary folder of their own.
 
 #[path = "fs_surfio/cases.rs"]
@@ -26,12 +25,12 @@ const SKIP: [&str; 16] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "2f2c8b35e113ed57bd95020d54b261cce294d85550d1894bc5805c06ed2072f1";
+const OFFICIAL_SHA256: &str = "c2ea12117f4b024167aed9c765687f2ca1a6c4ee4155f6c5538f657b82d33eca";
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    for line in cases::generate(1, 1020) {
+    for line in cases::generate(1, 1080) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let refused = out.starts_with("EXIT ");
         let skip = ids.iter().any(|x| SKIP.contains(x))

@@ -29,7 +29,10 @@ names and `FS_GII`, the VTK reader, the movie.byu and icosahedron writers, the T
 the MATLAB plots; **part 10** (queue items 3.1-48's part b and 3.1-49's STL, §66-72): the raw ASCII,
 movie.byu and triangle-file readers, the quadrangle of two triangles, STL read and written; **part
 11** (queue item 3.1-48, §73-78): the binary triangle and quadrangle surface files, read and written,
-with their tags. Later parts: reading and writing surfaces through their format's identification, curvatures, patches,
+with their tags; **part 12** (queue item 3.1-48, §79-84): a surface file's type from its name, the
+curvature and annotation file names, a surface written in the format its name says, the ASCII patch,
+a surface file's vertex positions only. Later parts: reading surfaces through their format's identification (with the
+GIFTI surfaces of 3.1-26), curvatures, patches,
 overlays and value files (3.1-47's part c, 3.1-48's rest); the midline marking, the label normal and
 the coordinate copy (they need the volume structure).
 
@@ -2089,3 +2092,143 @@ lines and a count one too large one in 30. Then every file in the folder. Cases 
 FS-352 or FS-354 (and fs.io's FS-49, FS-167) are counted, not compared. Observed (relay 14): seeds 7
 (1,000 cases), 13 (1,000) and 17 (2,000): every comparable case identical with `reproduce` (36, 54 and
 80 counted, not compared), the default different only with notices.
+
+## 79. A surface file's type from its name (`MRISfileNameType(fname)`)
+
+A name the volume probe takes as a volume by its ending (`nii`, `mgz`, `mgh`, `img`, `bhdr`,
+`nii.gz`, `_000.bfloat`, `_000.bshort`: `specs/freesurfer-io.md`'s `IDextensionFromName`, with its
+FS-226) is type 9 (`MRIS_VOLUME_FILE`). Otherwise the type comes from the name's last part (after
+its last `/`, cut at its last `#`, then at its last `@`): the text after an `@` still in it (only a
+part that held two can have one), else after its last `.`, else nothing; in upper case: `ASC` 1
+(ASCII triangles), `GEO` 2 (movie.byu), `TRI` or `ICO` 4 (icosahedron), `VTK` 5, `STL` 6, `GII` 7
+(GIFTI), `MGH` or `MGZ` 3 (a volume in a surface's place: only names the volume test did not take,
+such as `x.MGH`), `ANNOT` 8, `LABEL` 10, anything else 0 (the binary quadrangle or triangle file).
+So the `@<type>` suffix the source's comments describe never forces a type: the part after the last
+`@` is gone before the test (kept and documented, rule C: the readers open the name with its `@`
+anyway). **FS-356:** a last part of 1,024 bytes or more overruns FreeSurfer's buffer (undefined:
+observed crashes); larmorx takes it whole in both modes.
+
+## 80. The curvature file names
+
+`MRISwriteCurvature_getfilename(mris, sname, out)` returns a type and writes the chosen name into
+`out`:
+- A name without a `/`: in the folder of the surface's own name (everything before its last `/`, or
+  `.` without one), or in `.` when `FS_POSIX` is set (any value): `<folder>/<sname>` when the name's
+  first dot is its third byte and the two before it are `lh` or `rh`, else `<folder>/<hemi>.<sname>`,
+  `<hemi>` `lh`, `rh`, `both` or `unknown` for the surface's hemisphere 0, 1, 3 or any other value.
+- A name with a `/`: its folder (before its last `/`) and its last part (cut at its last `#` and
+  `@`), joined with or without `<hemi>.` by the same test on the last part.
+- Each built name longer than 1,023 bytes is cut to 1,023 with `MRISwriteCurvature_getfilename:
+  Truncation on line <n>` on standard error, `<n>` 6720, 6726 (`FS_POSIX`, `/` added hemisphere
+  and no hemisphere: 6720 and 6735; the surface's folder: 6726 and 6741; a name with a `/`: 6753
+  with the hemisphere added, 6759 without) (**FS-126**: larmorx keeps the name whole; `reproduce`
+  cuts it with the message). **FS-356** for a surface name, a folder or a last part of 1,024 bytes
+  or more.
+- The type: the volume probe's answer for the name (`mri_identify`), replaced by 35 (`ASCII_FILE`)
+  when §79 gives type 1; then any type but 3 (MGH), 24 (NIfTI), 27 (GIFTI), 35 and 28 (VTK) becomes
+  -1; for -1 the GIFTI rule for writers applies (§60's `__MRISapplyFSGIIwrite`: with `FS_GII=.gii`
+  the name gains `.gii` and the type is 27, and so on, with its messages and exits).
+
+`MRISreadCurvatureFile_getfilename(mris, sname, out)`:
+- A name without a `/`: `./<sname>` when `FS_POSIX` is set (cut as above, line 6795); else in the
+  surface's folder, `<folder>/<sname>` when the two bytes before the name's first dot are `lh` or
+  `rh` (line 6804), else `<folder>/lh.<sname>` for a left surface (hemisphere 0) and
+  `<folder>/rh.<sname>` for any other (line 6812). **FS-148:** a first dot at the name's first or
+  second byte makes FreeSurfer compare one or two bytes before the name; larmorx takes them as no
+  hemisphere letters in both modes (the hemisphere is added).
+- A name with a `/`: as it is; 1,024 bytes or more end FreeSurfer with `*** buffer overflow
+  detected ***: terminated` (signal 6) (**FS-126**: larmorx takes it whole; `reproduce` ends so,
+  exit status 134).
+- The type as the writer's, but 25 (a new-format curvature: the file starts with `0xffffff`) is
+  kept too; for 25 and -1 the GIFTI rule for readers applies (§60's `__MRISapplyFSGIIread`).
+
+## 81. The annotation file names
+
+`MRISwriteAnnotation_getfilename(mris, sname, out)`:
+- A name without a `/`: its last part (cut at its last `#` and `@`) in `<folder>/../label/`
+  (`<folder>` the surface's, as in §80), or in `./` when `FS_POSIX` is set; after `lh.` (a left
+  surface) or `rh.` (any other) unless the name starts with those two letters (case matters). Cut
+  at 1,023 bytes with the truncation message (lines 6865 and 6872 without the hemisphere added,
+  `FS_POSIX` first; 6882 and 6890 with it) (**FS-126**).
+- A name with a `/`: as it is (FS-126's abort at 1,024 bytes, as in §80).
+- Then the volume probe's answer for that name; unless 3, 24, 27 or 33 (an annotation), `.annot` is
+  added (1,024 bytes or more after it: FS-126's abort) and the type is 33; for 33 the GIFTI rule for
+  writers applies.
+
+`MRISreadAnnotation_getfilename(mris, sname, out)` (the surface may be absent):
+- A name without a `/` with a surface: its last part in `<folder>/../label/`, after `lh.`/`rh.` as
+  for the writer (lines 6940 without, 6948 with; `FS_POSIX` plays no part here). **FS-355:**
+  FreeSurfer adds the hemisphere unless the last part is exactly `lh` (left surface) or `rh` (any
+  other), in any case: `lh.aparc.annot` becomes `label/lh.lh.aparc.annot`, a file the writer never
+  wrote for that name (rule A: larmorx uses the writer's test, the name starting with the two
+  letters, case matters; `reproduce` FreeSurfer's).
+- A name with a `/`, or no surface: as it is (FS-126's abort at 1,024 bytes).
+- When that file is not readable: `<name>.mgz` when it is readable (FS-126's abort if that name has
+  1,024 bytes or more), else `sname` itself (relative to the program's folder) when it is readable
+  (cut at 1,023 bytes with the message of line 6969).
+- Then as the writer: the volume probe's answer, `.annot` and type 33 unless 3, 24, 27 or 33; for 33
+  the GIFTI rule for readers applies.
+
+## 82. A surface written in the format its name says (`MRISwrite(mris, name)`)
+
+The name (1,024 bytes or more: FS-126's abort) gives a type (§79). Types 1, 4, 2, 6, 5 and 7 are
+taken as they are; for any other the GIFTI rule for writers applies first (it may make the name a
+`.gii` name, or end the program when the other form of the name exists: §60). Then the (possibly
+changed) name's type decides: 1 the ASCII writer (§54's `MRISwriteAscii`), 5 the VTK writer
+(§54's `MRISwriteVTK`), 2 the movie.byu writer (§63), 4 the icosahedron writer (§63), 6 the STL writer
+(§71; the answer 1 when written, 0 when not), 7 the GIFTI writer (with queue item 3.1-26's surface
+part); any other: the triangle file (§76) when the surface's type is 3 (a triangular surface, as the
+triangle reader marks it), else the quadrangle file (§77). The answer is the writer's. (FreeSurfer
+8.2.0 keeps an older behaviour behind a switch that is never on: not reachable.)
+
+`MRISwriteVertexLocations(mris, fname, which)`: the surface's current coordinates are kept, the set
+`which` is restored as the current one (§25's restore, with its rules), the surface is written
+(`MRISwrite`), then the kept coordinates are put back as the current ones (the distances freed, as
+§16's import does). Returns `MRISwrite`'s answer.
+
+## 83. The ASCII patch and a surface file's vertex positions
+
+`MRISwritePatchAscii(mris, fname)`: creates the file (`MRISwritePatchAscii: could not open file
+<file>`, -1); writes `#!ascii version of patch <surface name>. The 1st index is not a vertex number`,
+the numbers of unripped vertices and unripped faces (`<n> <m>`); on standard output
+`nvertices=<n> (valid=<the number of valid vertices: not ripped, `MRISvalidVertices`>) nfaces=<m>`; per unripped vertex `<i>
+vno=<vno>` (`<i>` = `vno + 1`, negated for a border vertex) and `<x>  <y>  <z>` (`%f`); per unripped
+face its number and its three vertex numbers each followed by a space. Returns 0.
+
+`MRISreadVerticesOnly(fname)`: names of type 1, 4 or 2 are refused (`MRISreadVerticesOnly: file type
+<t> not supported`, -3, nothing returned); a file that cannot be opened: `MRISread(<file>): could
+not open file` (-1). The first 3 bytes decide: `0xffffff` (shorts), `0xfffffd` (floats), `0xfffffe`
+(the triangle file: §68's positions reader; when it fails, `mrisReadTriangleFile failed.` with its
+code), anything else the old format (read again from the start: floats). Then the 3-byte vertex and
+quadrangle counts (with Gdiag's show and verbose bits, `reading <n> vertices and <2q> faces.`;
+`new surface file format` and `surfer: old surface file format` likewise for those formats); 0
+vertices: `MRISreadVerticesOnly: could not allocate surface` (-2), nothing returned; else per vertex
+three big-endian shorts divided by 100 (the division in double, the result as float) or three
+big-endian floats; fs.io's rules at the end of the file hold (FS-167). FreeSurfer leaves the file
+open (larmorx closes it; nothing a caller sees differs).
+
+## 84. Validation plan, part 12
+
+The probe's `fnam` command: each case in an empty work folder with `d`, `d/s` and `label`;
+`FS_POSIX` one case in four, `FS_GII=.gii` one in four, `FS_GII=x` one in eight; up to 5 of 16
+files (new-format curvatures, curvature, GIFTI and annotation files in `d`, `label` and the work
+folder); the surface's hemisphere 0, 1, 2, 3, -1 or 7 and name (`d/lh.white`, `lh.white`, empty,
+`d/`, `/x`, ...); 1 to 4 operations among the type test and the five name builders (the annotation
+reader with and without a surface) on names made of a folder (none, `d/`, `label/`, a missing
+folder, `./`, `d/s/../`), a prefix (`lh.`, `LH.`, `Lh`, `xlh.`, `.`, `h.`, `lh`, ...), a base and an
+extension (each one of §79's, the volume endings, `@ASC`, `#3`, `mgz` without a dot, `@x@vtk`, ...),
+one in 30 a name of 990 to 1,060 bytes; each answer and chosen name. Observed (relay 15): seeds 7
+(1,000 cases), 13 and 17 (2,000 each): every comparable case identical with `reproduce` (14, 37 and
+40 counted, not compared: FS-356), the default different only with notices.
+
+The probe's `swr` command: an empty work folder with `d`; Gdiag's two bits;
+`TRIANGULARSURFACE_NOEXTRA_WRITE` one in four, `USER` one in three, the creation time's replacement
+and FreeSurfer's licence check's side door always; a surface of 1 to 6 vertices (none one in ten) and
+0 to 6 faces, per vertex current, white and pial coordinates (as `tri`'s), ripped one in five, a
+border one in four, faces ripped one in six, of type 0 or 3, a real-RAS flag, a volume geometry and
+a name; 1 to 3 operations: the writer (three in six) on names of every §79 type but GIFTI and the
+volume names (`x.mgz` is written as a surface file), the vertex-locations writer with sets 4, 9, 7,
+2, 0, the patch writer, the vertex-positions reader on the files the case wrote or on generated
+files (each quadrangle form, the old format, a triangle file; cut now and then); the other form of
+a name (`<name>.gii`) there before a write one in ten. Then the surface's current coordinates and
+every file in the folder.

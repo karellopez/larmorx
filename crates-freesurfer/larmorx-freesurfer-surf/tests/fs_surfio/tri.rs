@@ -19,7 +19,7 @@ use larmorx_freesurfer_surf::{alloc, trifile};
 
 const OPS: [&str; 4] = ["rt", "rq", "wt", "wq"];
 
-fn printable(g: &mut Gen, lo: i64, hi: i64) -> Vec<u8> {
+pub(super) fn printable(g: &mut Gen, lo: i64, hi: i64) -> Vec<u8> {
     let n = g.int(lo, hi) as usize;
     (0..n).map(|_| g.int(0x21, 0x7e) as u8).collect()
 }
@@ -48,7 +48,7 @@ fn be8(b: &mut Vec<u8>, v: i64) {
 }
 
 /// A coordinate: mostly small, now and then beyond 10000 or not finite.
-fn coord(g: &mut Gen, heavy: bool) -> f32 {
+pub(super) fn coord(g: &mut Gen, heavy: bool) -> f32 {
     if g.chance(40) {
         return f32::from_bits(g.pick(&[
             0x7fc0_0000,
@@ -67,7 +67,7 @@ fn coord(g: &mut Gen, heavy: bool) -> f32 {
 /// A volume geometry's values (as `set_vg` reads them): valid or not, a plausible extent and
 /// voxel size (now and then a zero size, a singular geometry), axis-aligned direction cosines
 /// with signs (now and then any), a centre, a name.
-fn vg_values(g: &mut Gen) -> VolGeom {
+pub(super) fn vg_values(g: &mut Gen) -> VolGeom {
     // (the fields in the order the generator draws them)
     let mut vg = VolGeom {
         valid: if g.chance(4) { 0 } else { 1 },
@@ -115,7 +115,7 @@ fn vg_values(g: &mut Gen) -> VolGeom {
     vg
 }
 
-fn vg_tokens(t: &mut Vec<String>, vg: &VolGeom) {
+pub(super) fn vg_tokens(t: &mut Vec<String>, vg: &VolGeom) {
     for x in [vg.valid, vg.width, vg.height, vg.depth] {
         ix(t, i64::from(x));
     }
@@ -259,7 +259,7 @@ fn tags(g: &mut Gen, b: &mut Vec<u8>) {
 
 /// Faces of `nv` vertices in strips (consecutive faces that share an edge in opposite directions,
 /// as `quadCombine` joins them), now and then any vertices.
-fn faces(g: &mut Gen, nv: i64, nf: i64) -> Vec<[i64; 3]> {
+pub(super) fn faces(g: &mut Gen, nv: i64, nf: i64) -> Vec<[i64; 3]> {
     let mut f = Vec::new();
     while (f.len() as i64) < nf {
         let pick = |g: &mut Gen| g.int(0, (nv - 1).max(0));
@@ -279,7 +279,7 @@ fn faces(g: &mut Gen, nv: i64, nf: i64) -> Vec<[i64; 3]> {
 /// A binary triangle file: the magic number, the creator's line and its blank line (unless the
 /// case reads without them), the counts (now and then negative), the vertices, the faces (now and
 /// then a vertex out of range), the tags; cut now and then.
-fn triangle_file(g: &mut Gen, noextra: bool, heavy: bool) -> (Vec<u8>, bool) {
+pub(super) fn triangle_file(g: &mut Gen, noextra: bool, heavy: bool) -> (Vec<u8>, bool) {
     let mut b = vec![0xff, 0xff, 0xfe];
     if !noextra {
         // a line of more than 199 bytes (FS-354) not with seed 1: FreeSurfer then reads text as
@@ -325,7 +325,7 @@ fn triangle_file(g: &mut Gen, noextra: bool, heavy: bool) -> (Vec<u8>, bool) {
 /// quadrangles), the vertices, the quadrangles (now and then degenerate, as the writer stores a
 /// lone triangle; now and then a vertex outside the surface or its room), the tags; cut now and
 /// then. Also the vertices' face counts of the old format (for the dump: none when cut).
-fn quad_file(g: &mut Gen, heavy: bool) -> (Vec<u8>, Vec<i64>) {
+pub(super) fn quad_file(g: &mut Gen, heavy: bool) -> (Vec<u8>, Vec<i64>) {
     let kind = g.below(4);
     let mut b = Vec::new();
     match kind {

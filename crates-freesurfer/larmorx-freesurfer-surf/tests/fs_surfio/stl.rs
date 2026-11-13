@@ -331,7 +331,7 @@ pub(super) fn stl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 let r = stl::read_stl(&mut cx.g, &mut cx.sg, &mut io, d, &n)?;
                 dump_stl_surface(o, r.as_ref());
             }
-            "ws" => o.i(i64::from(stl::write_stl(d, &mut m, &n))),
+            "ws" => o.i(i64::from(stl::write_stl(&mut cx.g, d, &mut m, &n))),
             _ => panic!("stl op {op}"),
         }
     }

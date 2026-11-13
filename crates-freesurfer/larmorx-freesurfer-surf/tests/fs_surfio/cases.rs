@@ -45,6 +45,8 @@ mod sfile;
 mod sread;
 #[path = "stl.rs"]
 mod stl;
+#[path = "swr.rs"]
+mod swr;
 #[path = "tri.rs"]
 mod tri;
 
@@ -123,11 +125,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 35] = [
+const COMMANDS: [&str; 36] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
-    "sread", "stl", "tri", "fnam",
+    "sread", "stl", "tri", "fnam", "swr",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1006,6 +1008,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "stl" => stl::stl_tokens(&mut t, &mut g),
             "tri" => tri::tri_tokens(&mut t, &mut g),
             "fnam" => fnam::fnam_tokens(&mut t, &mut g),
+            "swr" => swr::swr_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2666,6 +2669,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "stl" => stl::stl_case(cx, t, o)?,
         "tri" => tri::tri_case(cx, t, o)?,
         "fnam" => fnam::fnam_case(cx, t, o)?,
+        "swr" => swr::swr_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {

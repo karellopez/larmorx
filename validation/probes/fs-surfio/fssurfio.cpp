@@ -1926,6 +1926,93 @@ void dump_tri_surface(MRIS *s, const std::vector<int> &nf)
   for (int i = 0; i < s->ncmds && i < MAX_CMDS; i++) oh(s->cmdlines[i]);
 }
 
+// relay 15: MRISwrite in every format its name chooses (GIFTI excepted: it comes with gifti.cpp's
+// surface part), MRISwriteVertexLocations, MRISwritePatchAscii and MRISreadVerticesOnly, in an
+// empty work folder (with a subfolder d): Gdiag's bits, the environment (a mask:
+// TRIANGULARSURFACE_NOEXTRA_WRITE, USER; the creation time's replacement and the licence check's
+// side door always set), the case's input files, a surface from MRISalloc (per vertex the current,
+// white and pial coordinates, rip flag and border; per face its vertices and rip flag; its type,
+// useRealRAS, volume geometry and name), 1 to 3 operations, the surface's current coordinates,
+// then every file in the folder
+void swr_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int env = geti();
+  std::string user = geth(), date = geth();
+  if (env & 1) setenv("TRIANGULARSURFACE_NOEXTRA_WRITE", "1", 1);
+  if (env & 2) setenv("USER", user.c_str(), 1);
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", date.c_str(), 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->whitex = getf(); v->whitey = getf(); v->whitez = getf();
+    v->pialx = getf(); v->pialy = getf(); v->pialz = getf();
+    v->ripflag = geti();
+    v->border = geti();
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+    m->faces[fno].ripflag = geti();
+  }
+  m->type = geti();
+  m->useRealRAS = geti();
+  set_vg(&m->vg);
+  std::string sf = geth();
+  if (sf.size() >= STRLEN) fail("a surface name longer than the surface's buffer");
+  strcpy(m->fname, sf.c_str());
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    char *nm = (char *)name_tok();
+    if (op == "w") oi(MRISwrite(m, nm));
+    else if (op == "wl") { int which = geti(); oi(MRISwriteVertexLocations(m, nm, which)); }
+    else if (op == "wp") oi(MRISwritePatchAscii(m, nm));
+    else if (op == "rv") {
+      SMALL_SURFACE *ss = MRISreadVerticesOnly(nm);
+      if (!ss) { out += "NULL "; continue; }
+      oi(ss->nvertices);
+      for (int vno = 0; vno < ss->nvertices; vno++) {
+        of(ss->vertices[vno].x); of(ss->vertices[vno].y); of(ss->vertices[vno].z);
+      }
+      MRISSfree(&ss);
+    }
+    else fail("swr op");
+  }
+  for (int vno = 0; vno < nv; vno++) { of(m->vertices[vno].x); of(m->vertices[vno].y); of(m->vertices[vno].z); }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *fp = fopen(name.c_str(), "rb");
+    if (!fp) { out += "NOFILE "; continue; }
+    std::string b;
+    int ch;
+    while ((ch = fgetc(fp)) != EOF) b += (char)ch;
+    fclose(fp);
+    ox(b);
+  }
+}
+
 // relay 15: the surface library's file names: MRISfileNameType and the curvature and annotation
 // name builders (MRISwriteCurvature_getfilename, MRISreadCurvatureFile_getfilename,
 // MRISwriteAnnotation_getfilename, MRISreadAnnotation_getfilename, with and without a surface),
@@ -2278,6 +2365,8 @@ void run_case()
     tri_case();
   } else if (cmd == "fnam") {
     fnam_case();
+  } else if (cmd == "swr") {
+    swr_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

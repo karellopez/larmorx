@@ -57,6 +57,9 @@ pub const MATRIX_STRLEN: usize = 1600;
 /// The bytes the skippers read at a time (FreeSurfer allocates the whole length: FS-178).
 const CHUNK: usize = 1 << 16;
 
+/// `errno`'s `ENOMEM` on Linux.
+const ENOMEM: i32 = 12;
+
 /// A 4 x 4 real matrix of zeros (`MatrixAlloc(4, 4, MATRIX_REAL)`, which cannot fail).
 pub(crate) fn m44(g: &mut Globals) -> Matrix {
     let mut sink = Vec::new();
@@ -194,6 +197,8 @@ pub(crate) fn skip_by_alloc(
             );
         }
         let text = msg(shown);
+        // the failed calloc leaves errno ENOMEM, which ErrorExit prints first
+        g.errno = ENOMEM;
         log::error_exit(g, err, ERROR_NOMEMORY, &text)?;
         return Ok(0);
     }

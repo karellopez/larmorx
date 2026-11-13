@@ -295,9 +295,7 @@ def _run_clean_room(
             warnings.warn(_defects.parse_line(text) or text, stacklevel=4)
     if code != 0:
         errors = [ln for ln in stderr.splitlines() if ln.startswith("**")]
-        raise ValueError(
-            "3dvolreg (clean room) failed: " + (" ".join(errors) or stderr.strip())
-        )
+        raise ValueError("3dvolreg (clean room) failed: " + (" ".join(errors) or stderr.strip()))
 
 
 def fmriprep_volreg_options() -> dict[str, Any]:

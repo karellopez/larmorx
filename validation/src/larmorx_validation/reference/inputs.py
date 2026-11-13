@@ -128,7 +128,9 @@ def _make_log(path: Path) -> None:
 KINDS: dict[str, Kind] = {
     "head": Kind("a synthetic head of 40 × 48 × 40 voxels of 4 mm", _make_head),
     "head4d": Kind("a synthetic series of 4 such heads", _make_head4d),
-    "head-mask": Kind("the synthetic head's brain as a mask (1 inside, 0 outside)", _make_head_mask),
+    "head-mask": Kind(
+        "the synthetic head's brain as a mask (1 inside, 0 outside)", _make_head_mask
+    ),
     "bold": Kind("a synthetic series of 8 heads of 40 × 48 × 40 voxels of 4 mm", _make_bold),
     "slice-timing": Kind(
         "the times of 40 slices acquired interleaved within 2 s, on one line, as fMRIPrep writes "

@@ -376,7 +376,7 @@ def _run_original(
     if code != 0:
         tail = "\n".join(err.strip().splitlines()[-20:])
         raise RuntimeError(
-            f"larmorx tedana t2smap (the clean-room original) failed with exit code {code}:\n{tail}"
+            f"larmorx tedana t2smap (the clean room) failed with exit code {code}:\n{tail}"
         )
     return subprocess.CompletedProcess(["larmorx", "tedana", "t2smap", *args], code, out, err)
 

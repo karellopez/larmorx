@@ -121,7 +121,6 @@ group = "ants"
 name = "ImageMath"
 command = "larmorx ants ImageMath"
 python = "lx.ants.image_math"
-does = "Image arithmetic, morphology, filters and the other operations of `ImageMath` that fMRIPrep, sMRIPrep and sdcflows call."
 api = "docs/api/ants-image-math.md"
 evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-image-math"] }

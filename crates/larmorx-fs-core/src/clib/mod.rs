@@ -99,7 +99,7 @@ pub fn scan_d(s: &[u8]) -> (i32, Option<i32>) {
 /// (beyond 64 bits: all ones), a minus negating modulo 2^64. The count it returns (1, 0, or -1
 /// at the end of the input before the conversion) and the value.
 pub fn scan_0x_lx(s: &[u8]) -> (i32, Option<u64>) {
-    for (i, want) in [b'0', b'x'].into_iter().enumerate() {
+    for (i, want) in b"0x".iter().copied().enumerate() {
         match s.get(i) {
             None => return (-1, None),
             Some(&c) if c == want => {}

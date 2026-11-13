@@ -80,14 +80,14 @@ fn bracket(p: &[u8], i: usize, c: u8) -> Option<(bool, usize)> {
             return Some((matched != negate, j + 1));
         }
         first = false;
-        if b == b'[' && p.get(j + 1) == Some(&b':') {
-            if let Some(len) = p[j + 2..].windows(2).position(|w| w == b":]") {
-                if let Some(m) = class(&p[j + 2..j + 2 + len], c) {
-                    matched |= m;
-                    j += 2 + len + 2;
-                    continue;
-                }
-            }
+        if b == b'['
+            && p.get(j + 1) == Some(&b':')
+            && let Some(len) = p[j + 2..].windows(2).position(|w| w == b":]")
+            && let Some(m) = class(&p[j + 2..j + 2 + len], c)
+        {
+            matched |= m;
+            j += 2 + len + 2;
+            continue;
         }
         let (lo, next) = if b == b'\\' && j + 1 < p.len() {
             (p[j + 1], j + 2)
@@ -196,9 +196,14 @@ fn exists(p: &[u8]) -> bool {
 fn expand(pattern: &[u8]) -> Vec<Vec<u8>> {
     if !has_magic(pattern) {
         let u = unescape(pattern);
-        return if !u.is_empty() && exists(&u) { vec![u] } else { Vec::new() };
+        return if !u.is_empty() && exists(&u) {
+            vec![u]
+        } else {
+            Vec::new()
+        };
     }
-    let (dirs, base): (Vec<Option<Vec<u8>>>, &[u8]) = match pattern.iter().rposition(|&c| c == b'/') {
+    let (dirs, base): (Vec<Option<Vec<u8>>>, &[u8]) = match pattern.iter().rposition(|&c| c == b'/')
+    {
         None => (vec![None], pattern),
         Some(i) => {
             let d = &pattern[..i];

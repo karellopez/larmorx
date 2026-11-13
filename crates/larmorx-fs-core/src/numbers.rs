@@ -234,13 +234,13 @@ pub fn quick_select(a: &mut [f32], k: usize) -> f32 {
         loop {
             loop {
                 ll += 1;
-                if !(a[low] > a[ll]) {
+                if a[low].partial_cmp(&a[ll]) != Some(std::cmp::Ordering::Greater) {
                     break;
                 }
             }
             loop {
                 hh -= 1;
-                if !(a[hh] > a[low]) {
+                if a[hh].partial_cmp(&a[low]) != Some(std::cmp::Ordering::Greater) {
                     break;
                 }
             }

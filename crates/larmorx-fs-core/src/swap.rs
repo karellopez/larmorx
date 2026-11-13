@@ -113,16 +113,21 @@ impl Process {
 /// Reverses the bytes of every `k`-byte item of `buffer` (k = 2, 4 or 8; the length a multiple).
 pub fn swap_items(buffer: &mut [u8], k: usize) {
     match k {
-        2 => buffer.chunks_exact_mut(2).for_each(|c| c.swap(0, 1)),
-        4 => buffer.chunks_exact_mut(4).for_each(|c| {
-            let v = u32::from_ne_bytes([c[0], c[1], c[2], c[3]]).swap_bytes();
-            c.copy_from_slice(&v.to_ne_bytes());
-        }),
-        8 => buffer.chunks_exact_mut(8).for_each(|c| {
-            let mut a = [0u8; 8];
-            a.copy_from_slice(c);
-            c.copy_from_slice(&u64::from_ne_bytes(a).swap_bytes().to_ne_bytes());
-        }),
+        2 => buffer
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .for_each(|c| c.swap(0, 1)),
+        4 => buffer
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .for_each(|c| *c = u32::from_ne_bytes(*c).swap_bytes().to_ne_bytes()),
+        8 => buffer
+            .as_chunks_mut::<8>()
+            .0
+            .iter_mut()
+            .for_each(|c| *c = u64::from_ne_bytes(*c).swap_bytes().to_ne_bytes()),
         _ => {}
     }
 }

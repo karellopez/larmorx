@@ -284,6 +284,7 @@ name = "larmorx-fs-core"
 version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
+ "rayon",
  "sha2",
 ]
 

@@ -1251,6 +1251,50 @@ defects! {
         "freeing no linear transform array (LTAfree of a null array) crashes";
     FS_198 = "FS-198", "FreeSurfer", true,
         "copying a linear transform array from one whose transforms lack a matrix onto one that has it leaves the destination's matrix unusable: using or freeing the copy later crashes or reads garbage";
+    FS_199 = "FS-199", "FreeSurfer", true,
+        "npy2mri (reading a NumPy .npy file) reads the header length of a file of format version 3.0 from 3 bytes instead of NumPy's 4: the header text starts a byte early and lacks its last byte, and the reading runs on past it (a crash or a header from memory contents); versions 3.1 and later crash";
+    FS_200 = "FS-200", "FreeSurfer", true,
+        "npy2mri of a .npy file of format version 0 or 4 to 255 takes the size of its header length from memory outside the format's table: a crash or a header read from memory contents";
+    FS_201 = "FS-201", "FreeSurfer", true,
+        "npy2mri of a .npy file whose header length exceeds the program's stack (8 MiB by default; version 2 headers may give up to 4 GiB) crashes";
+    FS_202 = "FS-202", "FreeSurfer", true,
+        "npy2mri of a .npy file that ends inside its header takes the header's missing bytes from memory contents";
+    FS_203 = "FS-203", "FreeSurfer", true,
+        "npy2mri reads past a .npy header that has no newline, or whose descr, fortran_order or shape value or a key without a colon runs to its end: memory contents beyond the header (a crash, or a type, order or shape read from memory)";
+    FS_204 = "FS-204", "FreeSurfer", true,
+        "npy2mri crashes on a shape with an empty element: every one-dimensional array as NumPy writes it, (3,), and shapes such as (3, ) or (3,,4)";
+    FS_205 = "FS-205", "FreeSurfer", true,
+        "npy2mri crashes on an array whose extents are all 1 (a single value of any number of dimensions) or that has none";
+    FS_206 = "FS-206", "FreeSurfer", true,
+        "a volume made from a list of fewer than 3 extents (a two- or one-dimensional .npy array, or one whose leading or trailing extents of 1 npy2mri drops) takes each missing extent from memory past the list: an extent the list held before (an array of shape (1, 3, 4, 1) becomes a volume of 3 x 4 x 4 voxels, (1, 1, 2) one of 2 x 2 x 2) or memory contents (often 0: a volume without voxels)";
+    FS_207 = "FS-207", "FreeSurfer", true,
+        "npy2mri of a .npy header without a descr or a fortran_order entry takes the data type or the order from memory contents, and of one without a shape entry crashes";
+    FS_208 = "FS-208", "FreeSurfer", true,
+        "npy2mri reverses the bytes of a big-endian array of 8-byte integers in 4-byte halves: every value is wrong";
+    FS_209 = "FS-209", "FreeSurfer", true,
+        "npy2mri's verbose output for a C-order array prints memory addresses, which differ from run to run";
+    FS_210 = "FS-210", "FreeSurfer", true,
+        "npy2mri takes any fortran_order value other than False (such as 0, false or a misspelling) as True: the voxels are placed transposed";
+    FS_211 = "FS-211", "FreeSurfer", true,
+        "npy2mri computes a slice's byte count in 32 bits: a slice of 2 GiB or more is read wrongly or written past the volume's memory";
+    FS_212 = "FS-212", "FreeSurfer", true,
+        "npy2mri of a .npy file shorter than its array leaves the missing voxels 0 without a message";
+    FS_213 = "FS-213", "FreeSurfer", true,
+        "npy2mri of a .npy header whose length does not make the data start at a multiple of 16 bytes skips the bytes up to the next multiple: the voxels are shifted by those bytes (NumPy reads the data right after the header)";
+    FS_214 = "FS-214", "FreeSurfer", true,
+        "gifti_get_DA_value_2D's message for a GIFTI data array without data prints the array's memory address as data= (it differs from run to run), not the data's (nil)";
+    FS_215 = "FS-215", "FreeSurfer", true,
+        "gifti_get_DA_value_2D reads a COMPLEX64 array's values as 8-byte doubles: each value is a meaningless number made of a value's real and imaginary parts";
+    FS_216 = "FS-216", "FreeSurfer", true,
+        "gifti_get_DA_value_2D computes an element's place in 32 bits: in an array of more than 2^31 values elements beyond that are read from the wrong place";
+    FS_217 = "FS-217", "FreeSurfer", true,
+        "DTIwriteBValues and DTIwriteBVectors given no matrix create (or empty) the file and crash";
+    FS_218 = "FS-218", "FreeSurfer", true,
+        "DTIwriteBVectors of a matrix with fewer than 3 columns, and DTIwriteBValues of one without columns, write the next rows' numbers in each row's missing columns and, past the matrix's last number, memory contents";
+    FS_219 = "FS-219", "FreeSurfer", true,
+        "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
+    FS_220 = "FS-220", "FreeSurfer", true,
+        "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
 }
 
 /// The register entry with ID `id`.

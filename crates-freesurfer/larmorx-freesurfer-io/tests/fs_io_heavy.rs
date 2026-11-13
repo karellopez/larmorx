@@ -10,6 +10,7 @@
 #[path = "fs_io/cases.rs"]
 mod cases;
 
+#[cfg(target_os = "linux")]
 use larmorx_core::defects::UpstreamDefects;
 
 /// This thread's CPU time in seconds (`/proc/thread-self/schedstat`'s first field).

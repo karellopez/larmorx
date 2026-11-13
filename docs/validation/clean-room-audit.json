@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-docs-revision-step-2",
+ "dossier": "2026-11-13-freesurfer-batch-11",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 419353,
-  "agents": 444,
+  "accesses": 422799,
+  "agents": 447,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 667,
-  "archived_files": 667,
+  "archive_checksums_matched": 676,
+  "archived_files": 676,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -227,6 +227,10 @@
     "files": 26,
     "sha256": "1720b7b7202669fa893392fac2a783869ac6affee5e26652a17ef1b6f7d9014a"
    },
+   "2026-11-13-session-transcripts-freesurfer-batch-11": {
+    "files": 15,
+    "sha256": "57d6e3c51d744b148b75637126cd57d7678d5b5bae2868a9704003cf245e7732"
+   },
    "2026-11-13-session-transcripts-freesurfer-batch-3": {
     "files": 15,
     "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
@@ -264,30 +268,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 4073,
-  "distinct_transcripts": 448,
+  "commits_printed": 4109,
+  "distinct_transcripts": 451,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 340,
+   "agents_without_worktree": 343,
    "bad_lines": 0,
-   "calls_without_result": 81,
+   "calls_without_result": 82,
    "compaction_parent_missing": 9,
    "compactions": 79,
-   "refused_calls": 1701,
+   "refused_calls": 1704,
    "refused_calls_restricted_accesses": 742,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 9110
+   "unresolved_paths": 9118
   },
-  "last_record": "2026-11-13 19:37 UTC",
-  "live_files": 448,
-  "live_files_also_archived": 446,
+  "last_record": "2026-11-13 21:06 UTC",
+  "live_files": 451,
+  "live_files_also_archived": 450,
   "sessions": 4,
-  "tool_calls": 119723,
+  "tool_calls": 120680,
   "tool_calls_by_tool": [
    [
     "Agent",
-    446
+    449
    ],
    [
     "Artifact",
@@ -299,7 +303,7 @@
    ],
    [
     "Bash",
-    103540
+    104460
    ],
    [
     "CronCreate",
@@ -311,7 +315,7 @@
    ],
    [
     "Edit",
-    4526
+    4527
    ],
    [
     "EnterWorktree",
@@ -319,11 +323,11 @@
    ],
    [
     "Monitor",
-    209
+    210
    ],
    [
     "Read",
-    2925
+    2929
    ],
    [
     "ReadNotifications",
@@ -331,7 +335,7 @@
    ],
    [
     "SendMessage",
-    156
+    157
    ],
    [
     "SendUserFile",
@@ -343,7 +347,7 @@
    ],
    [
     "SubagentHandback",
-    473
+    478
    ],
    [
     "TaskOutput",
@@ -351,11 +355,11 @@
    ],
    [
     "TaskStop",
-    320
+    325
    ],
    [
     "ToolSearch",
-    242
+    245
    ],
    [
     "WebFetch",
@@ -367,12 +371,12 @@
    ],
    [
     "Write",
-    6757
+    6771
    ]
   ],
-  "transcript_bytes": 13659340666,
-  "transcript_files": 1115,
-  "unique_paths": 83635
+  "transcript_bytes": 13892407980,
+  "transcript_files": 1127,
+  "unique_paths": 84021
  },
  "levels": [
   [
@@ -453,7 +457,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "a388353b"
+  "verdicts_repository": "e76aec4d"
  },
  "overview": {
   "agents_by_role": [
@@ -479,11 +483,11 @@
    ],
    [
     "replica author",
-    137
+    138
    ],
    [
     "spec writer",
-    37
+    39
    ]
   ],
   "attributed_by": [
@@ -493,14 +497,14 @@
    ],
    [
     "subject",
-    25
+    27
    ]
   ],
-  "commits": 316,
+  "commits": 318,
   "commits_by_role": [
    [
     "clean-room implementer",
-    312
+    314
    ],
    [
     "integration",
@@ -10723,20 +10727,20 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 71,
+     "seen": 76,
      "written": 0
     },
     {
      "group": "the clean-room code",
-     "run": 15,
-     "seen": 519,
+     "run": 19,
+     "seen": 587,
      "written": 119
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
      "run": 310,
-     "seen": 605,
-     "written": 99
+     "seen": 642,
+     "written": 101
     },
     {
      "group": "the original programs, run or named as black boxes",
@@ -10747,14 +10751,14 @@
     {
      "group": "oracle outputs and inputs",
      "run": 0,
-     "seen": 54,
-     "written": 18
+     "seen": 55,
+     "written": 21
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 492,
-     "seen": 300,
-     "written": 80
+     "run": 569,
+     "seen": 327,
+     "written": 95
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
@@ -10771,16 +10775,16 @@
    ],
    "cannot_see": {
     "compactions": 0,
-    "listings": 112,
-    "program_runs": 718,
+    "listings": 115,
+    "program_runs": 769,
     "unresolved": 259,
     "without_worktree": 5
    },
-   "commits": 35,
+   "commits": 37,
    "commits_by_role": [
     [
      "clean-room implementer",
-     35
+     37
     ]
    ],
    "family": "FreeSurfer",
@@ -10849,7 +10853,7 @@
     },
     {
      "agent": "a58fc6c5f0a2f3bda",
-     "commits": 1,
+     "commits": 3,
      "description": "FreeSurfer clean room 2 relay 6 (spec amendments)",
      "first": "2026-11-13",
      "last": "2026-11-13"
@@ -10884,16 +10888,16 @@
      "scope": "this family"
     },
     {
-     "after": 0,
-     "agents": 1,
+     "after": 1,
+     "agents": 2,
      "before": 1,
      "level": "names",
      "rule": "R10",
      "scope": "this family"
     },
     {
-     "after": 4,
-     "agents": 3,
+     "after": 8,
+     "agents": 4,
      "before": 4,
      "level": "names",
      "rule": "R10",
@@ -10933,7 +10937,7 @@
    ],
    "verdict": {
     "status": "reviewed (every finding judged)",
-    "words": "clean: written from specs/freesurfer-core.md and black-box runs of FreeSurfer's compiled functions (the prebuilt fs_core_probe), FreeSurfer 8.2.0's official programs and the C library; no content of FreeSurfer's source, the replica or a document written from the source seen; reads beyond the brief only of another family's generic C (the AArch64 NaN emulation's build line and two README rows in FSL's mcflirt probe folder), judged no contamination"
+    "words": "clean: FreeSurfer's core services, mathematics and volume structure, written from specs/freesurfer-core.md, specs/freesurfer-maths.md and specs/freesurfer-mri.md and black-box runs of FreeSurfer's compiled functions (the prebuilt probes), FreeSurfer 8.2.0's official programs and the C library; no content of FreeSurfer's source, the replica or a document written from the source seen; reads beyond the briefs only of another family's generic C (the AArch64 NaN emulation's build line and two README rows in FSL's mcflirt probe folder) and a count of the maths probe folder's lines, judged no contamination; one scanner false positive (its own files)"
    }
   },
   {

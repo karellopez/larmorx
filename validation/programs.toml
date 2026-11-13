@@ -95,7 +95,6 @@ group = "ants"
 name = "N4BiasFieldCorrection"
 command = "larmorx ants N4BiasFieldCorrection"
 python = "lx.ants.n4_bias_field_correction"
-does = "Bias-field correction (N4), as fMRIPrep, sMRIPrep and sdcflows call it."
 api = "docs/api/ants-n4.md"
 evidence = "/evidence/ants-n4/"
 records = { replica = ["ants-n4"] }

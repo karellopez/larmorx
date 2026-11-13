@@ -711,3 +711,17 @@ def test_an_absent_own_argument_is_the_command_lines_only():
     assert 'takes no <code><span class="nw">upstream&#95;defects</span></code>' in ref.markdown
     assert 'takes no <code><span class="nw">n&#95;threads</span></code>' not in ref.markdown
     assert "(no Python argument)" in ref.markdown
+
+
+def test_a_restricted_record_is_named_not_linked():
+    """t2smap's replica's record is closed to its clean-room implementers (their briefs): the
+    Ports table of its reference page names it; the clean room's record stays a link."""
+    page = apipage.read(REPO, "docs/api/tedana-t2smap.md")
+    p = next(p for p in page.programs if p.name == "t2smap")
+    from larmorx_validation.reference.page import build
+
+    ref = build(REPO, p)
+    assert ref.problems == []
+    assert "`tedana-t2smap-replica`" in ref.markdown
+    assert "repo:docs/validation/tedana-t2smap-replica.md" not in ref.markdown
+    assert "(repo:docs/validation/tedana-t2smap-original.md)" in ref.markdown

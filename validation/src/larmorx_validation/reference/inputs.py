@@ -68,6 +68,13 @@ def _make_bold(path: Path) -> None:
     _save(path, *_head((40, 48, 40, 8)))
 
 
+def _make_echo(path: Path, factor: float) -> None:
+    """One echo of a multi-echo series: the 8-volume series times ``factor``, the decay since the
+    first echo (0.6 per echo spacing: a T2* of about 29 ms for echoes 15 ms apart)."""
+    data, affine = _head((40, 48, 40, 8))
+    _save(path, (data * np.float32(factor)).astype(np.float32), affine)
+
+
 def _make_slice_timing(path: Path) -> None:
     """The times of 40 slices acquired interleaved (even slices first) within 2 s, 0.05 s apart,
     on one line separated by tabs, as fMRIPrep writes a ``-tpattern`` file."""
@@ -132,6 +139,12 @@ KINDS: dict[str, Kind] = {
         "the synthetic head's brain as a mask (1 inside, 0 outside)", _make_head_mask
     ),
     "bold": Kind("a synthetic series of 8 heads of 40 × 48 × 40 voxels of 4 mm", _make_bold),
+    "echo-1": Kind(
+        "the first echo of a synthetic multi-echo series: 8 heads of 40 × 48 × 40 voxels of 4 mm",
+        lambda path: _make_echo(path, 1.0),
+    ),
+    "echo-2": Kind("the second echo: the first times 0.6", lambda path: _make_echo(path, 0.6)),
+    "echo-3": Kind("the third echo: the first times 0.36", lambda path: _make_echo(path, 0.36)),
     "slice-timing": Kind(
         "the times of 40 slices acquired interleaved within 2 s, on one line, as fMRIPrep writes "
         "them",

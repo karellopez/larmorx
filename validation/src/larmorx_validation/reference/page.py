@@ -645,7 +645,14 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append("| Port | Package | Licence | Status | Records |\n|---|---|---|---|---|")
     for x in reg:
         ids = port_records.get(x.kind) or []
-        recs = ", ".join(f"[{i}](repo:docs/validation/{i}.md)" for i in ids)
+        # a record the clean-room briefs forbid (t2smap's replica's) is named, not linked: a
+        # reference page is readable material (the writing guide, section 1)
+        recs = ", ".join(
+            f"`{i}`"
+            if restricted(f"docs/validation/{i}.md")
+            else f"[{i}](repo:docs/validation/{i}.md)"
+            for i in ids
+        )
         rid = ids[0] if ids else None
         where_pkg = f"`{x.package}`" + (" (built in)" if x.built_in and x.kind == "replica" else "")
         body.append(

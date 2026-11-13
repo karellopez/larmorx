@@ -489,7 +489,6 @@ group = "tedana"
 name = "t2smap"
 command = "larmorx tedana t2smap"
 python = "lx.tedana.t2smap"
-does = "T2* and S0 maps of multi-echo fMRI, voxel by voxel, and the echoes' optimal combination."
 api = "docs/api/tedana-t2smap.md"
 evidence = "/evidence/tedana-t2smap/"
 records = { replica = ["tedana-t2smap-replica"], clean-room = ["tedana-t2smap-original"] }

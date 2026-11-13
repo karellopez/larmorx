@@ -1,0 +1,16 @@
+[package]
+name = "cleanroom-probe"
+description = "larmorx's clean rooms of FreeSurfer's random numbers and cubic spline, with the commands of the black-box probes fs_rng_probe and fs_spline_probe, for comparing them"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a validation tool, never part of larmorx's build.
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

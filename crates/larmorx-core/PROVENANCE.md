@@ -535,3 +535,54 @@ ITK-113, counted). The existing ports `vnl_svd_f32`, `vnl_svd::vnl_inverse`,
 `vnl_eigen::symmetric_eigensystem` and `vnl_qr::VnlQr` were re-checked at FreeSurfer's call sites
 in the same run. `vnl_digests.rs` checks digests of the ports' outputs on seeded inputs, recorded on
 Linux x86-64, on every platform (debug and release alike; a NaN hashed as one value).
+
+
+## RANLUX389 and FreeSurfer's random distributions (`src/ranlux/`; FreeSurfer's foundations, item 3.1-05, 2026-11-13)
+
+**Clean-room implementation from [`specs/ranlux.md`](../../specs/ranlux.md)** (Apache-2.0; the spec
+at commit `6b052bda`, SHA-256 `f623cdac8bd3…`), by an implementer who never opened GSL's source (any
+release or copy), FreeSurfer's source, the GSL replica, the documents written from FreeSurfer's
+source (`docs/freesurfer/`, `docs/findings/freesurfer-*.md`), the spec writer's check, the probes'
+sources and build script, or `docs/parts/`. Its inputs: the spec; the papers it cites as background
+(Lüscher 1994, James 1994, L'Ecuyer 1988, Schrage 1979, Knuth's vol. 2 §3.4.1, Marsaglia and Bray
+1964, Marsaglia 1980); `larmorx_core::math` (glibc 2.35's `log` and `exp` as `log_glibc` and
+`exp_glibc`, the correctly rounded `tan`, `x86_nan`'s SSE rules) and `larmorx_core::defects`;
+black-box runs of FreeSurfer's compiled functions through the prebuilt probe `fs_rng_probe`, of
+FreeSurfer 8.2.0's official `mri_volsynth`, and of the system's `tan` (through Rust's `f64::tan`);
+the probe folder's README, `refs.sh`, `run_zero.sh` and `volsynth_compare.py` (calls only).
+
+The generator keeps the 24 values before each group of 389 and the group in one buffer, computes the
+group in one loop (the borrow from the sign of each difference) and delivers its first 24 values;
+seeding is Schrage's evaluation of the spec's congruential generator. The distributions are methods of
+the generator, operation by operation as the spec writes them; the large-shape gamma's tangent is
+`math::tan` (replaceable only for validation, `set_tan`, hidden). FS-100 and FS-101 follow the
+generator's `UpstreamDefects` mode; draws that give no number are `DrawError`s; the notices are
+collected per generator (`notices`, `take_notices`). `src/ranlux/sha256.rs` is SHA-256 (FIPS 180-4),
+for the tests' golden checksums only.
+
+**Bit-identical to FreeSurfer's functions** on everything but the tangent's 41,708 arguments
+(`docs/findings/ranlux-clean-room.md`, `validation/investigations/freesurfer-cleanroom-random-spline/`,
+2026-11-13 from `84a2044d`): 2,022 seeds × 100,000 values; 8,381,462 of 8,382,003 draws (421 cases),
+the 541 others large-shape gamma draws that met a differing tangent, and all 8,382,003 with the
+system's `tan` in its place; FS-100 and FS-101 under `reproduce`; the official `mri_volsynth`'s
+10,080 voxels. The unit tests check the spec's streams and hashes (§2.5, §10.2), FS-100's and
+FS-101's values and messages, and 28 golden checksums of the clean room's own outputs (one per path)
+on every platform.
+
+## The cubic spline of FreeSurfer's intensity normalisation (`src/cubic_spline/`; FreeSurfer's foundations, item 3.1-06, 2026-11-13)
+
+**Clean-room implementation from [`specs/burkardt-spline.md`](../../specs/burkardt-spline.md)**
+(Apache-2.0; the spec at commit `ca340f58`, SHA-256 `8cccc1e10680…`), by the same implementer, who
+never opened John Burkardt's spline routines (any release or copy), FreeSurfer's source, the replica,
+the documents written from FreeSurfer's source, the spec writer's check, the probe's source or
+`docs/parts/`. Its inputs: the spec; textbook material on cubic splines with first-derivative ends and
+tridiagonal elimination (de Boor, *A Practical Guide to Splines*, ch. IV; Burden and Faires,
+*Numerical Analysis*, §3.5); `larmorx_core::cfmt::g` (C's `%g`), `x86_nan`'s SSE rules and
+`larmorx_core::defects`; black-box runs of FreeSurfer's compiled functions through the prebuilt probe
+`fs_spline_probe` (its input forms read from its outputs).
+
+**Bit-identical to FreeSurfer's functions** (`docs/findings/cubic-spline-clean-room.md`, 2026-11-13
+from `84a2044d`): 20,000 cases (296,786 evaluation points, every output line), 1,000 tridiagonal
+systems, the five messages byte for byte with their exit status, FS-103's 500 NaN-knot cases under
+`reproduce`. The unit tests check the probe's values and messages and 12 golden checksums (each
+pair of end conditions, two knots with conditions 0 and 0, 80 knots; every evaluation branch).

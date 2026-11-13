@@ -9,16 +9,15 @@ neighbours: the result is the unwrapped phase in radians (the regions' offsets d
 multiples of 2 pi; outside the mask the phase is 0). sdcflows (fMRIPrep) runs it on the phase
 difference of a phase-difference field map: ``prelude(phase, magnitude, mask=mask)``.
 
-PRELUDE has two implementations: its bit-exact replica (``larmorx-nc``, FSL Licence, run as a
-separate program) and the clean-room original of this package (``larmorx_fsl::prelude``,
-written from ``specs/prelude.md``, run in this process: the same files bit for bit, its
-default's ``-c`` phases from the correctly rounded arctangent). ``implementation="auto"`` runs
-the replica when ``larmorx-nc`` is installed, else the original; ``"replica"`` or
-``"clean-room"`` choose. FSL's deterministic defects are corrected by default (D13,
+PRELUDE has two ports: its bit-exact replica (``larmorx-nc``, FSL Licence, run as a separate
+program) and the clean room of this package (``larmorx_fsl::prelude``, written from
+``specs/prelude.md``, run in this process: the same files bit for bit, its default's ``-c``
+phases from the correctly rounded arctangent). ``implementation="auto"`` runs the replica when
+``larmorx-nc`` is installed, else the clean room; ``"replica"`` or ``"clean-room"`` choose. FSL's deterministic defects are corrected by default (D13,
 ``docs/api/upstream-defects.md``: FSL-261 to FSL-272); ``upstream_defects="reproduce"`` gives
 FSL's results bit for bit. FSL's environment variables are never read from the process
 environment (CLAUDE.md rule 6). A run that fails raises :class:`larmorx._replica.ReplicaError`
-(a :class:`RuntimeError`) with FSL's messages, or, for the original, a :class:`RuntimeError`
+(a :class:`RuntimeError`) with FSL's messages, or, for the clean room, a :class:`RuntimeError`
 with the same messages."""
 
 from __future__ import annotations
@@ -71,7 +70,7 @@ class PreludeResult:
 
 @dataclass(frozen=True)
 class _Run:
-    """The original's run: its exit status and output streams."""
+    """The clean room's run: its exit status and output streams."""
 
     returncode: int
     stdout: str
@@ -141,7 +140,20 @@ def prelude(
     the linear phase ramps before unwrapping and restores them after. ``save_mask``,
     ``save_labels``, ``save_raw_phase`` and ``verbose`` (``--savemask``, ``-l``, ``-r``, ``-v``)
     return what they write (:class:`PreludeResult`). Paths or in-memory images (an
-    :class:`~larmorx.image.Image`, a nibabel image, ``(array, affine)``)."""
+    :class:`~larmorx.image.Image`, a nibabel image, ``(array, affine)``).
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-prelude.md``, "Defects of the original, corrected by default").
+    n_threads
+        Threads (0 = all): the replica's for reading and writing the images, the clean room's
+        also for the mask, the regions, the ramps and the slices; the same bits at any count.
+    """
     if complex_image is not None and (phase is not None or magnitude is not None):
         raise ValueError("prelude takes complex_image, or phase and magnitude, not both")
     if complex_image is None and (phase is None or magnitude is None):
@@ -189,7 +201,7 @@ def prelude(
         if verbose:
             args.append("-v")
         if selected is None:
-            # the clean-room original, in this process, with FSL's settings of this call
+            # the clean room, in this process, with FSL's settings of this call
             env = [("FSLOUTPUTTYPE", "NIFTI"), ("PATH", tmp), (_defects.ENV, upstream_defects)]
             if n > 0:
                 env.append(("OMP_NUM_THREADS", str(n)))

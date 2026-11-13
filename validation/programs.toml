@@ -501,7 +501,6 @@ group = "fsl"
 name = "prelude"
 command = "larmorx fsl prelude"
 python = "lx.fsl.prelude"
-does = "Unwraps a phase image inside a mask (PRELUDE)."
 api = "docs/api/fsl-prelude.md"
 evidence = "/evidence/fsl-prelude/"
 records = { replica = ["fsl-prelude-replica"], clean-room = ["fsl-prelude"] }

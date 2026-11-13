@@ -53,9 +53,8 @@ phase-difference field map before converting it to a field in Hz: `prelude
 
 Inputs are paths or in-memory images (an `lx.Image`, a nibabel image, an `(array, affine)`
 pair); in-memory images are written to a temporary directory in their own type (uint8, int16,
-int32, float32, float64; other types as float32; a complex array as complex64). The result is a
-`PreludeResult`: `unwrapped`, and `mask`, `labels`, `raw_phase` (or `None`), `stdout` (the
-messages of `verbose=True`). A run that fails raises `ReplicaError` (a `RuntimeError`) with
+int32, float32, float64; other types as float32; a complex array as complex64). A run that fails
+raises `ReplicaError` (a `RuntimeError`) with
 prelude's messages. The function checks its arguments before running anything (`ValueError`):
 `complex_image` or `phase` and `magnitude` together, `num_phase_split` of at least 2, `start` and
 `end` not negative.
@@ -151,9 +150,9 @@ ds002603's 0.135 s against FSL's 28.4 s; a 256 x 256 x 160 map of 153,000 region
 replica 9.4 s), with the same bits at every thread count
 ([benchmarks](../benchmarks/fsl-prelude.md)).
 
-## Upstream defects
+## Defects of the original, corrected by default
 
-Corrected by default (D13; [the register](upstream-defects.md)), each with a notice where the
+Corrected by default ([the register](upstream-defects.md)), each with a notice where the
 correction changed the result, and reproduced with `upstream_defects="reproduce"`
 (`LARMORX_UPSTREAM_DEFECTS=reproduce`):
 

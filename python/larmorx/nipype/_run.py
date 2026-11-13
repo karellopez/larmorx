@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 """``larmorx nipype run``: nipype 1.12.0's ``nipypecli run`` without nipype, click or traits.
 
 Ported from nipype 1.12.0 (Apache-2.0, the nipype developers): ``scripts/cli.py`` (``run``: the
@@ -156,7 +156,9 @@ def _type_name(t: type) -> str:
 
 def _traceback(name: str, message: str) -> str:
     """A traceback's first and last lines, as larmorx's Python programs print nipype's."""
-    return "Traceback (most recent call last):\n" + (f"{name}: {message}" if message else name) + "\n"
+    return (
+        "Traceback (most recent call last):\n" + (f"{name}: {message}" if message else name) + "\n"
+    )
 
 
 # --- traits' validation ------------------------------------------------------------------------
@@ -307,9 +309,11 @@ def _validate_path(d: Mapping[str, Any], value: Any) -> str:
         p = Path(value)
     except TypeError:
         raise _Invalid(info, str(value)) from None
-    if d["exists"]:
-        if not p.exists() or (d["is_file"] and not p.is_file()) or (d["is_dir"] and not p.is_dir()):
-            raise _Invalid(info, str(p))
+    missing = (
+        not p.exists() or (d["is_file"] and not p.is_file()) or (d["is_dir"] and not p.is_dir())
+    )
+    if d["exists"] and missing:
+        raise _Invalid(info, str(p))
     if d["resolve"]:
         p = p.resolve(strict=d["exists"]) if p.is_absolute() else (Path.cwd() / p).resolve()
     return str(p)
@@ -383,9 +387,7 @@ class _Inputs:
 
     def __init__(self, spec: Mapping[str, Any]) -> None:
         self.spec = spec
-        self.values: dict[str, Any] = {
-            n: _literal(s["default"]) for n, s in spec["inputs"].items()
-        }
+        self.values: dict[str, Any] = {n: _literal(s["default"]) for n, s in spec["inputs"].items()}
 
     def get(self, name: str) -> Any:
         """The input's value, or ``None`` when undefined."""
@@ -497,6 +499,8 @@ def _outputs_text(spec: Mapping[str, Any], outputs: Mapping[str, Any]) -> str:
         v = outputs.get(name, UNDEFINED)
         if v is None:
             v = UNDEFINED
+        elif isinstance(v, tuple) and d["k"] in ("list", "multi"):
+            v = list(v)  # larmorx's results hold tuples where nipype's hold lists
         try:
             values[name] = _validate(d, v)
         except _Invalid as e:
@@ -569,7 +573,9 @@ _TYPES: dict[str | None, Callable[[str], Any] | None] = {
 }
 
 
-def _parser(prog: str, interface: str, calls: Sequence[Mapping[str, Any]]) -> argparse.ArgumentParser:
+def _parser(
+    prog: str, interface: str, calls: Sequence[Mapping[str, Any]]
+) -> argparse.ArgumentParser:
     """nipype's interface parser: ``add_args_options``' ``add_argument`` calls."""
     parser = argparse.ArgumentParser(description=f"Run {interface}", prog=prog)
     for c in calls:
@@ -627,7 +633,7 @@ def run(
         return 1
     except SystemExit as e:
         return e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
-    except Exception as e:  # noqa: BLE001 (an interface's error: nipype's traceback ends so)
+    except Exception as e:
         sys.stdout.flush()
         sys.stderr.write(_traceback(_type_name(type(e)), str(e)))
         return 1
@@ -672,8 +678,9 @@ def _main(argv: list[str], prog: str, mode: str, n_threads: int) -> int:
                 )
             ]
         )
+    texts: dict[str, str | None] = {}
     if corrected:
-        calls = spec["calls_corrected"]
+        calls, texts = _text_calls(spec)
     elif "calls" in spec:
         calls = spec["calls"]
     else:
@@ -682,10 +689,8 @@ def _main(argv: list[str], prog: str, mode: str, n_threads: int) -> int:
     if not extra:
         try:
             parser.print_help()
-        except Exception:  # noqa: BLE001 (nipype's bare except)
-            print(
-                "An error occurred when trying to print the fullcommand help, printing usage."
-            )
+        except Exception:
+            print("An error occurred when trying to print the fullcommand help, printing usage.")
         finally:
             parser.print_usage()
         return 0
@@ -700,7 +705,7 @@ def _main(argv: list[str], prog: str, mode: str, n_threads: int) -> int:
             "lx.nipype.ported_interfaces())\n"
         )
         return 1
-    inputs = _set_inputs(spec, options, mode, corrected)
+    inputs = _set_inputs(spec, parser, options, mode, texts)
     print(inputs)
     inputs.check_mandatory()
     outputs = adapter(inputs, _Context(os.getcwd(), mode, n_threads))
@@ -708,21 +713,30 @@ def _main(argv: list[str], prog: str, mode: str, n_threads: int) -> int:
     return 0
 
 
-def _set_inputs(spec: Mapping[str, Any], options: argparse.Namespace, mode: str, corrected: bool) -> _Inputs:
+def _set_inputs(
+    spec: Mapping[str, Any],
+    parser: argparse.ArgumentParser,
+    options: argparse.Namespace,
+    mode: str,
+    texts: Mapping[str, str | None],
+) -> _Inputs:
     """nipype's ``run_instance`` up to the printing of the inputs: each parsed value set on the
-    inputs in name order (a value nipype's ``ValueError`` refuses is reported and skipped)."""
+    inputs in name order (a value nipype's ``ValueError`` refuses is reported and skipped).
+    ``texts``: the inputs parsed as text (PIPE-81, PIPE-82), with the argparse type of the
+    corrected parser, read here."""
+    if mode == "fix":  # the texts read first: a text argparse would refuse is its error
+        for name in spec["items"]:
+            value = getattr(options, name, None)
+            if value is not None:
+                setattr(options, name, _corrected_value(spec, parser, name, value, texts))
     print("setting function inputs")
     inputs = _Inputs(spec)
-    nipype_types = {c["args"][0].lstrip("-"): c.get("type") for c in spec.get("calls", [])}
-    fixed_types = {c["args"][0].lstrip("-"): c.get("type") for c in spec.get("calls_corrected", [])}
     for name in spec["items"]:
         if not hasattr(options, name):
             raise _Raised("AttributeError", f"'Namespace' object has no attribute '{name}'")
         value = getattr(options, name)
         if value is None:
             continue
-        if mode == "fix":
-            value = _corrected_value(spec, name, value, nipype_types, fixed_types, corrected)
         try:
             inputs.set(name, value)
         except ValueError as e:  # nipype catches these only (traits' errors are not ValueErrors)
@@ -730,47 +744,104 @@ def _set_inputs(spec: Mapping[str, Any], options: argparse.Namespace, mode: str,
     return inputs
 
 
+def _types(calls: Sequence[Mapping[str, Any]]) -> dict[str, str | None]:
+    return {c["args"][0].lstrip("-"): c.get("type") for c in calls}
+
+
+def _text_calls(spec: Mapping[str, Any]) -> tuple[list[dict[str, Any]], dict[str, str | None]]:
+    """The corrected parser's calls, with no argparse type where its type differs from nipype's
+    (or nipype has no parser): those inputs are parsed as text, and read by
+    :func:`_corrected_value`; the corrected types of those inputs."""
+    nipype = _types(spec.get("calls", []))
+    calls, texts = [], {}
+    for c in spec["calls_corrected"]:
+        name = c["args"][0].lstrip("-")
+        if "calls" not in spec or nipype.get(name) != c.get("type"):
+            texts[name] = c.get("type")
+            c = {k: v for k, v in c.items() if k != "type"}
+        calls.append(dict(c))
+    return calls, texts
+
+
+def _convert(type_name: str | None, value: Any) -> Any:
+    """argparse's conversion of the text(s) ``value`` by ``type_name`` (``ValueError``)."""
+    convert = _TYPES[type_name]
+    if convert is None:
+        return value
+    if isinstance(value, list):
+        return [convert(v) for v in value]
+    return convert(value)
+
+
 def _corrected_value(
     spec: Mapping[str, Any],
+    parser: argparse.ArgumentParser,
     name: str,
     value: Any,
-    nipype_types: Mapping[str, str | None],
-    fixed_types: Mapping[str, str | None],
-    corrected: bool,
+    texts: Mapping[str, str | None],
 ) -> Any:
-    """PIPE-81 and PIPE-82: ``value`` read by its trait, with a notice where nipype's command
-    line would have given the trait another value (or refused it)."""
+    """PIPE-81 and PIPE-82: ``value`` read as its trait reads it, with a notice where nipype's
+    command line would have given the trait another value, or refused it."""
     from larmorx import _defects
 
     d = spec["inputs"][name]["validate"]
-    read = _from_text(d, value)
-    pipe81 = name in fixed_types and (
-        "calls" not in spec or nipype_types.get(name) != fixed_types.get(name)
-    )
+    pipe81 = False
+    if name in texts:
+        wanted = texts[name]
+        try:
+            converted = _convert(wanted, value)
+        except (ValueError, TypeError):
+            bad = value
+            if isinstance(value, list):
+                bad = next(v for v in value if _fails(wanted, v))
+            option = name if spec["inputs"][name]["mandatory"] else f"--{name}"
+            parser.error(f"argument {option}: invalid {wanted} value: {bad!r}")
+        read = _from_text(d, converted)
+        nipype_type = _types(spec.get("calls", [])).get(name)
+        pipe81 = spec["inputs"][name]["validate"]["k"] == "either" or (
+            spec["inputs"][name]["validate"]["k"] in ("list", "multi")
+            and spec["inputs"][name]["validate"]["of"]["k"] == "either"
+        )
+    else:
+        read = _from_text(d, value)
+        nipype_type = None
+        if read is value or _same(read, value):
+            return value
     try:
         ours = _validate(d, read)
     except _Invalid:
         return read  # refused by larmorx too: the trait's error follows
     if "calls" not in spec:
-        return read  # the parser's error was reported when it was built
-    nipype = _nipype_value(d, value, nipype_types.get(name), pipe81)
+        return read  # nipype has no parser: said when larmorx built it
+    try:
+        nipype = _validate(d, _convert(nipype_type, value))
+    except (ValueError, TypeError, _Invalid):
+        nipype = None
     if nipype is not None and _same(nipype, ours):
         return read
     if pipe81:
+        entry = "PIPE-81"
         detail = (
             f"{spec['class']}: nipype's command line reads {name!r} as "
-            f"{nipype_types.get(name) or 'text'} (the type of the input before it); larmorx "
+            f"{nipype_type or 'text'} (the type of the input before it in name order); larmorx "
             "reads it by its trait"
         )
-        entry = "PIPE-81"
     else:
-        detail = (
-            f"{spec['class']}: nipype's command line passes {name!r} as text, which its trait "
-            "does not read as nipype's command line gives it; larmorx reads it by its trait"
-        )
         entry = "PIPE-82"
+        detail = (
+            f"{spec['class']}: nipype's command line reads {name!r} as "
+            f"{nipype_type or 'text'}, not as its trait reads it; larmorx reads it by its trait"
+        )
     _defects.warn([(entry, "nipype command line", "fix", detail)], stacklevel=3)
     return read
+
+
+def _fails(type_name: str | None, text: Any) -> bool:
+    try:
+        _convert(type_name, text)
+    except (ValueError, TypeError):
+        return True
+    return False
 
 
 def _same(a: Any, b: Any) -> bool:
@@ -778,20 +849,6 @@ def _same(a: Any, b: Any) -> bool:
     if isinstance(a, list | tuple) and isinstance(b, list | tuple):
         return type(a) is type(b) and len(a) == len(b) and all(map(_same, a, b))
     return type(a) is type(b) and a == b
-
-
-def _nipype_value(d: Mapping[str, Any], value: Any, nipype_type: str | None, pipe81: bool) -> Any:
-    """What nipype's command line stores for the text(s) ``value``, or ``None`` when it refuses
-    them (argparse's conversion, then the trait's validation)."""
-    convert = _TYPES.get(nipype_type)
-    try:
-        if convert is not None and pipe81:
-            v = [convert(x) for x in value] if isinstance(value, list) else convert(value)
-        else:
-            v = value
-        return _validate(d, v)
-    except (ValueError, TypeError, _Invalid):
-        return None
 
 
 class _Context:

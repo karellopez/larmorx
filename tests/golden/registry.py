@@ -1045,6 +1045,7 @@ NAMESPACES = (
     "lx.skimage",
     "lx.niworkflows",
     "lx.confounds",
+    "lx.nipype",
     "lx.pipelines.larmorprepx.fieldmaps",
     "lx.pipelines.larmorprepx.estimators",
     "lx.pipelines.larmorprepx.confounds",
@@ -8583,6 +8584,88 @@ def _(ctx: Context) -> dict[str, Any]:
          [(w.name, w.function, sorted(w.options.items())) for w in wf.workflows],
          lx.niworkflows.collect_participants(lay)], root,
     )  # fmt: skip
+    return out
+
+
+@case(
+    "cli.nipype.run",
+    covers=(
+        "cli:nipype run",
+        "lx.nipype.run",
+        "lx.nipype.list_interfaces",
+        "lx.nipype.ported_interfaces",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """nipype's interface runner (``larmorx nipype run``, nipype's ``nipypecli run``) on the
+    confounds' 4-volume series: a module's listing, an interface's help at 80 columns, nipype's
+    ``ComputeDVARS`` with every file, ``ACompCor`` with a number of components (PIPE-81's
+    correction: nipype's command line reads it as text) and fMRIPrep's ``aCompCorMasks`` with
+    its zooms (PIPE-82's: a tuple's text), each one's printed inputs and outputs and files; the
+    corrections' refusals under ``reproduce``; the listing and the ported interfaces in Python."""
+    import contextlib
+    import io
+
+    from larmorx.cli import run
+
+    inputs = Path(ctx.file("conf_bold.nii.gz")).parent
+    bold, mask = ctx.file("conf_bold.nii.gz"), ctx.file("conf_bold_mask.nii.gz")
+    tpms = [ctx.file("conf_gm.nii.gz"), ctx.file("conf_wm.nii.gz"), ctx.file("conf_csf.nii.gz")]
+    calls = {
+        "list": ["--list", "fmriprep.interfaces.confounds"],
+        "help": ["nipype.algorithms.confounds", "ComputeDVARS"],
+        "dvars": ["nipype.algorithms.confounds", "ComputeDVARS", bold, mask, "--save_all",
+                  "--save_nstd", "--save_vxstd"],
+        "acompcor": ["nipype.algorithms.confounds", "ACompCor", bold, "--mask_files", mask,
+                     "--num_components", "2", "--pre_filter", "cosine", "--repetition_time", "2"],
+        "masks": ["fmriprep.interfaces.confounds", "aCompCorMasks", "2,2,2.5", "--in_vfs", *tpms],
+    }  # fmt: skip
+    out: dict[str, Any] = {}
+    columns = os.environ.get("COLUMNS")
+    os.environ["COLUMNS"] = "80"
+    try:
+        for mode in ("fix", REPRODUCE):
+            for name, args in calls.items():
+                folder = Path(ctx.out(f"{mode}/{name}"))
+                folder.mkdir(parents=True)
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with (
+                    contextlib.chdir(folder),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                    warnings.catch_warnings(record=True) as caught,
+                ):
+                    warnings.simplefilter("always")
+                    here = os.getcwd()  # the folder as the interfaces see it (Windows' long form)
+                    code = run(["larmorx", "--upstream-defects", mode, "--n-threads", "1",
+                                "nipype", "run", *args])  # fmt: skip
+
+                def text(t: str, folder: Path = folder, here: str = here) -> str:
+                    for d, name in (
+                        (here, "<cwd>"),
+                        (str(folder), "<cwd>"),
+                        (str(inputs), "<inputs>"),
+                    ):
+                        t = t.replace(d, name)
+                    return t.replace("\\", "/")
+
+                key = f"{mode}.{name}"
+                out[f"{key}.code"] = np.array([code])
+                out[f"{key}.stdout"] = text(stdout.getvalue())
+                out[f"{key}.stderr"] = text(stderr.getvalue())
+                out[f"{key}.notices"] = _conf_notices(caught)
+                for f in sorted(folder.rglob("*")):
+                    rel = f.relative_to(folder).as_posix()
+                    out[f"{key}.{rel}"] = (
+                        Nifti(str(f)) if ".nii" in f.name else _text(str(f), folder)
+                    )
+    finally:
+        if columns is None:
+            os.environ.pop("COLUMNS", None)
+        else:
+            os.environ["COLUMNS"] = columns
+    out["list_interfaces"] = "\n".join(lx.nipype.list_interfaces("niworkflows.interfaces.nibabel"))
+    out["ported"] = json.dumps(lx.nipype.ported_interfaces(), sort_keys=True)
     return out
 
 

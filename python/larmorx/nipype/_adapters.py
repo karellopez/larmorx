@@ -148,6 +148,20 @@ ADAPTERS: dict[tuple[str, str], Adapter] = {
     (_NW + "morphology", "BinarySubtraction"): _adapter(_nw("morphology", "binary_subtraction")),
     (_NW + "nibabel", "ApplyMask"): _adapter(_nw("header", "apply_mask")),
     (_NW + "nibabel", "Binarize"): _adapter(_nw("nibabel", "binarize")),
+    (_NW + "nibabel", "IntensityClip"): _adapter(_nw("nibabel", "intensity_clip")),
+    (_NW + "nibabel", "MergeSeries"): _adapter(_nw("nibabel", "merge_series")),
+    (_NW + "nibabel", "ReorientImage"): _adapter(
+        _nw("nibabel", "reorient_file"), rename={"target_orientation": "target_ornt"}
+    ),
+    (_NW + "nibabel", "RegridToZooms"): _adapter(_nw("regrid", "regrid_to_zooms")),
+    (_NW + "nibabel", "GenerateSamplingReference"): _adapter(
+        _nw("sampling", "generate_sampling_reference")
+    ),
+    (_NW + "images", "RegridToZooms"): _adapter(_nw("regrid", "regrid_to_zooms")),
+    # not run here (a follow-up): IntraModalMerge and RobustAverage run FSL's mcflirt and AFNI's
+    # 3dvolreg as programs, whose messages nipype relays through its log; larmorx runs its own
+    # ports of them in this process (lx.niworkflows.intra_modal_merge, robust_average)
+    (_NW + "bold", "NonsteadyStatesDetector"): _adapter(_nw("bold", "nonsteady_states_detector")),
     (_NW + "utility", "AddTSVHeader"): _adapter(_nw("utility", "add_tsv_header")),
     (_NW + "utility", "DictMerge"): _adapter(_nw("utility", "dict_merge")),
     (_NW + "utility", "TSV2JSON"): _adapter(_nw("utility", "tsv2json")),

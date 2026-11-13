@@ -44,12 +44,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent))
-from check_nipype_cli_cases import WORKSPACE, WORKTREE, Case, cases, make_inputs  # noqa: E402
+from check_nipype_cli_cases import WORKSPACE, WORKTREE, Case, cases, make_inputs
 
 NIPYPECLI = Path(sys.executable).with_name("nipypecli")
 LARMORX = (
@@ -126,6 +127,9 @@ def run_program(cmd: list[str], case: Case, cwd: Path) -> Result:
     return Result(p.returncode, norm_out(p.stdout, cwd), err, notices, files(cwd, set(case.copy)))
 
 
+_API_LOCK = threading.Lock()
+
+
 def run_api(case: Case, cwd: Path) -> Result:
     """nipype's interface through its Python API in ``cwd``: the inputs and outputs printed as
     ``run_instance`` prints them, the files."""
@@ -135,7 +139,8 @@ def run_api(case: Case, cwd: Path) -> Result:
     module, iface, inputs = case.api  # type: ignore[misc]
     for c in case.copy:
         shutil.copy(INPUTS / c, cwd / c)
-    with contextlib.chdir(cwd), warnings.catch_warnings():
+    # the folder is the process's: one API run at a time (the programs run with their own)
+    with _API_LOCK, contextlib.chdir(cwd), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         node = getattr(importlib.import_module(module), iface)()
         for k, v in inputs.items():
@@ -205,10 +210,17 @@ def check(case: Case, tmp: Path) -> tuple[bool, str]:
         ok = rep.code == 1 and fix.code == 1 and rep.err.startswith("error: ")
         return ok, f"nipype exit {nip.code}, larmorx exit {rep.code}: {rep.err.strip()}"
     problems += compare(nip, rep, "reproduce", case.by_name)
+    expect = case.expect
     entries = _entries(fix.notices)
+    if expect == "auto":  # nipype's command line refuses it where larmorx corrects a defect
+        refused = nip.code != 0 and bool(entries & set(CLI_DEFECTS))
+        expect = "fix:" + "|".join(CLI_DEFECTS) if refused else "same"
     others = sorted(entries - set(CLI_DEFECTS))
     note = f"corrected by default: {', '.join(others)}" if others else ""
-    if case.expect == "same":
+    if expect == "reproduce":
+        if fix.code != nip.code:
+            problems.append(f"fix: exit {fix.code} vs {nip.code}")
+    elif expect == "same":
         if entries & set(CLI_DEFECTS):
             problems.append(f"fix: unexpected notices {fix.notices}")
         if not others:
@@ -216,9 +228,9 @@ def check(case: Case, tmp: Path) -> tuple[bool, str]:
         elif fix.code != nip.code:
             problems.append(f"fix: exit {fix.code} vs {nip.code}")
     else:
-        entry = case.expect.split(":", 1)[1]
-        if entry not in entries:
-            problems.append(f"fix: no {entry} notice ({fix.notices})")
+        wanted = set(expect.split(":", 1)[1].split("|"))
+        if not wanted & entries:
+            problems.append(f"fix: no {'/'.join(sorted(wanted))} notice ({fix.notices})")
         if nip.code == 0 and case.api is not None:
             problems.append("nipype's command line ran it")
         if case.api is not None:
@@ -284,7 +296,9 @@ def main() -> int:
             ", ".join(f"{k} in {v}" for k, v in sorted(corrected.items())) or "none",
         )
         print(f"tables equal by column name only (PIPE-43): {len(BY_NAME)}")
-        print(f"CHECK {'PASS' if not failed else 'FAIL'}: {len(todo) - failed} of {len(todo)} cases")
+        print(
+            f"CHECK {'PASS' if not failed else 'FAIL'}: {len(todo) - failed} of {len(todo)} cases"
+        )
         return 1 if failed else 0
 
 

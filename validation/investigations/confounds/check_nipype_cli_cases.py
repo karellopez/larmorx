@@ -29,8 +29,10 @@ class Case:
     args: list[str]
     #: "same": larmorx in both modes equals nipype's command line; "fix:<ID>": nipype's
     #: command line refuses it (reproduce equals it), larmorx's default corrects the defect and
-    #: is checked against nipype's Python API (``api``); "larmorx": a documented difference
-    #: (larmorx's own message: a module it does not serve, an interface it has not ported)
+    #: is checked against nipype's Python API (``api``); "auto": "same" where nipype's command
+    #: line runs it, else "fix:" either defect; "reproduce": only ``reproduce`` compared (the
+    #: default's message names a corrected type); "larmorx": a documented difference (larmorx's
+    #: own message: a module it does not serve, an interface it has not ported)
     expect: str = "same"
     columns: int = 80
     copy: list[str] = field(default_factory=list)
@@ -83,7 +85,7 @@ def make_inputs(root: Path) -> None:
         lines += [
             f"#Transform {k}",
             "Transform: AffineTransform_float_3_3",
-            "Parameters: " + " ".join("%g" % np.float32(v) for v in p),
+            "Parameters: " + " ".join("%g" % np.float32(v) for v in p),  # noqa: UP031 (ITK's %g)
             "FixedParameters: 0 0 0",
             "",
         ]
@@ -123,7 +125,9 @@ def make_inputs(root: Path) -> None:
     shutil.copy(out.out_nstd, root / "dvars_nstd.tsv")
     for src, col, dst in (("dvars_std.tsv", "std_dvars", "std_dvars.tsv"),
                           ("dvars_nstd.tsv", "dvars", "dvars.tsv")):  # fmt: skip
-        out = nipype("niworkflows.interfaces.utility", "AddTSVHeader", in_file=r(src), columns=[col])
+        out = nipype(
+            "niworkflows.interfaces.utility", "AddTSVHeader", in_file=r(src), columns=[col]
+        )
         shutil.copy(out.out_file, root / dst)
     fmc = "fmriprep.interfaces.confounds"
     out = nipype(fmc, "FSLMotionParams", xfm_file=r("xfm.txt"), boldref_file=r("boldref.nii.gz"))
@@ -257,17 +261,13 @@ def real_cases() -> list[Case]:
             if args is None:
                 continue
             spec = DATA["modules"][module]["specs"][iface]
-            p81 = any(isinstance(inputs.get(k), bool) for k in ("save_metadata", "save_pre_filter"))
-            p81 = p81 or isinstance(inputs.get("num_components"), int)
-            p82 = isinstance(inputs.get("bold_zooms"), tuple)
             api = {k: v for k, v in inputs.items() if k in spec["inputs"]}
-            expect = "fix:PIPE-81" if p81 else "fix:PIPE-82" if p82 else "same"
             out.append(
                 Case(
                     f"real/{run_name.split('-')[0]}/{node_name}",
                     [module, iface, *args],
-                    expect=expect,
-                    api=(module, iface, api) if expect != "same" else None,
+                    expect="auto",
+                    api=(module, iface, api),
                     by_name=node_name in ("model_expansion", "spike_regressors"),
                 )
             )
@@ -401,6 +401,37 @@ def cases(tier: str, inputs: Path) -> list[Case]:
         Case("run/apply-mask", [nwn, "ApplyMask", i("wm.nii.gz"), k, "--threshold", "0.4"]),
         Case("run/binarize", [nwn, "Binarize", i("wm.nii.gz"), "0.5"]),
         Case("run/add-tsv-header", [nwu, "AddTSVHeader", "std_dvars", i("dvars_std.tsv")]),
+        # the field maps' part's niworkflows interfaces
+        Case("run/nonsteady-states", ["niworkflows.interfaces.bold", "NonsteadyStatesDetector", b]),
+        Case("run/nonsteady-states-options", ["niworkflows.interfaces.bold",
+                                              "NonsteadyStatesDetector", b, "--n_volumes", "10",
+                                              "--zero_dummy_masked", "5"]),
+        Case("run/intensity-clip", [nwn, "IntensityClip", i("boldref.nii.gz")]),
+        Case("run/intensity-clip-options", [nwn, "IntensityClip", i("boldref.nii.gz"), "--p_min",
+                                            "10", "--p_max", "90", "--dtype", "float32",
+                                            "--invert"]),
+        Case("run/merge-series", [nwn, "MergeSeries", "--in_files", i("boldref.nii.gz"),
+                                  i("boldref.nii.gz")]),
+        Case("run/reorient", [nwn, "ReorientImage", i("boldref.nii.gz"), "--target_orientation",
+                              "LPS"]),
+        Case("run/reorient-target", [nwn, "ReorientImage", i("boldref.nii.gz"), "--target_file",
+                                     i("mask.nii.gz")]),
+        Case("run/sampling-reference", [nwn, "GenerateSamplingReference", i("mask.nii.gz"),
+                                        i("boldref.nii.gz")]),
+        Case("fix/sampling-xform", [nwn, "GenerateSamplingReference", i("mask.nii.gz"),
+                                    i("boldref.nii.gz"), "--xform_code", "4"],
+             expect="fix:PIPE-82",
+             api=(nwn, "GenerateSamplingReference", {"fixed_image": i("mask.nii.gz"),
+                                                     "moving_image": i("boldref.nii.gz"),
+                                                     "xform_code": 4})),
+        Case("fix/regrid", [nwn, "RegridToZooms", i("boldref.nii.gz"), "3,3,3"],
+             expect="fix:PIPE-82",
+             api=(nwn, "RegridToZooms", {"in_file": i("boldref.nii.gz"), "zooms": (3.0, 3.0, 3.0)})),
+        Case("fix/regrid-smooth", [nwi, "RegridToZooms", i("boldref.nii.gz"), "3,3,3", "--smooth",
+                                   "True", "--order", "1"],
+             expect="fix:PIPE-82",
+             api=(nwi, "RegridToZooms", {"in_file": i("boldref.nii.gz"), "zooms": (3.0, 3.0, 3.0),
+                                         "smooth": True, "order": 1})),
         # fMRIPrep's confounds
         Case("run/motion", [fmc, "FSLMotionParams", "--xfm_file", i("xfm.txt"), "--boldref_file",
                             i("boldref.nii.gz")]),
@@ -426,6 +457,14 @@ def cases(tier: str, inputs: Path) -> list[Case]:
              api=(nac, "ACompCor", {"realigned_file": b, "mask_files": [k],
                                     "variance_threshold": 0.5, "save_pre_filter": "pre.tsv",
                                     "save_metadata": True})),
+        Case("fix/float-radius", [nac, "FramewiseDisplacement", i("mc.par"), "FSL", "--radius",
+                                  "40.5"],
+             expect="fix:PIPE-82",
+             api=(nac, "FramewiseDisplacement", {"in_file": i("mc.par"),
+                                                 "parameter_source": "FSL", "radius": 40.5})),
+        # argparse's error names the corrected type (float, nipype's int): reproduce compared
+        Case("fix/invalid-float", [nac, "FramewiseDisplacement", i("mc.par"), "FSL", "--radius",
+                                   "x"], expect="reproduce"),
         Case("fix/pre-filter-false", [nac, "TCompCor", b, "--pre_filter", "False",
                                       "--num_components", "all"],
              expect="fix:PIPE-82",

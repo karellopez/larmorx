@@ -612,6 +612,23 @@
        "type": "int"
       }
      ],
+     "calls_corrected": [
+      {
+       "args": [
+        "--in_file"
+       ],
+       "dest": "in_file",
+       "help": " (a pathlike object or string representing an existing file)\n\t\tHead motion transform file"
+      },
+      {
+       "args": [
+        "--radius"
+       ],
+       "dest": "radius",
+       "help": " (a float, nipype default value: 50)\n\t\tRadius of the head in mm",
+       "type": "float"
+      }
+     ],
      "check_mandatory": [],
      "check_requires": [
       "in_file",
@@ -1339,7 +1356,7 @@
        ],
        "dest": "high_pass_cutoff",
        "help": " (a float, nipype default value: 128)\n\t\tCutoff (in seconds) for \"cosine\" pre-filter",
-       "type": "int"
+       "type": "float"
       },
       {
        "args": [
@@ -2022,7 +2039,7 @@
        ],
        "dest": "high_pass_cutoff",
        "help": " (a float, nipype default value: 128)\n\t\tCutoff (in seconds) for \"cosine\" pre-filter",
-       "type": "int"
+       "type": "float"
       },
       {
        "args": [
@@ -2994,6 +3011,88 @@
        "type": "float"
       }
      ],
+     "calls_corrected": [
+      {
+       "args": [
+        "--figdpi"
+       ],
+       "dest": "figdpi",
+       "help": " (an integer, nipype default value: 100)\n\t\toutput dpi for the FD plot",
+       "type": "int"
+      },
+      {
+       "args": [
+        "--figsize"
+       ],
+       "dest": "figsize",
+       "help": " (a tuple of the form: (a float, a float), nipype default\n\t\t  value: (11.7, 2.3))\n\t\toutput figure size"
+      },
+      {
+       "args": [
+        "in_file"
+       ],
+       "help": " (a pathlike object or string representing an existing file)\n\t\tmotion parameters"
+      },
+      {
+       "action": "store_true",
+       "args": [
+        "--normalize"
+       ],
+       "default": false,
+       "default_undefined": false,
+       "dest": "normalize",
+       "help": " (a boolean, nipype default value: False)\n\t\tcalculate FD in mm/s"
+      },
+      {
+       "args": [
+        "--out_figure"
+       ],
+       "dest": "out_figure",
+       "help": " (a pathlike object or string representing a file, nipype\n\t\t  default value: fd_power_2012.pdf)\n\t\toutput figure name",
+       "type": "str"
+      },
+      {
+       "args": [
+        "--out_file"
+       ],
+       "dest": "out_file",
+       "help": " (a pathlike object or string representing a file, nipype\n\t\t  default value: fd_power_2012.txt)\n\t\toutput file name",
+       "type": "str"
+      },
+      {
+       "args": [
+        "parameter_source"
+       ],
+       "help": " ('FSL' or 'AFNI' or 'SPM' or 'FSFAST' or 'NIPY')\n\t\tSource of movement parameters",
+       "type": "str"
+      },
+      {
+       "args": [
+        "--radius"
+       ],
+       "dest": "radius",
+       "help": " (a float, nipype default value: 50)\n\t\tradius in mm to calculate angular FDs, 50mm is the default since it\n\t\tis used in Power et al. 2012",
+       "type": "float"
+      },
+      {
+       "action": "store_true",
+       "args": [
+        "--save_plot"
+       ],
+       "default": false,
+       "default_undefined": false,
+       "dest": "save_plot",
+       "help": " (a boolean, nipype default value: False)\n\t\twrite FD plot"
+      },
+      {
+       "args": [
+        "--series_tr"
+       ],
+       "dest": "series_tr",
+       "help": " (a float)\n\t\trepetition time in sec.",
+       "type": "float"
+      }
+     ],
      "check_mandatory": [
       "in_file",
       "parameter_source"
@@ -3428,7 +3527,7 @@
        ],
        "dest": "high_pass_cutoff",
        "help": " (a float, nipype default value: 128)\n\t\tCutoff (in seconds) for \"cosine\" pre-filter",
-       "type": "int"
+       "type": "float"
       },
       {
        "args": [
@@ -4577,6 +4676,23 @@
        "dest": "radius",
        "help": " (a float, nipype default value: 50)\n\t\tRadius of the head in mm",
        "type": "int"
+      }
+     ],
+     "calls_corrected": [
+      {
+       "args": [
+        "--in_file"
+       ],
+       "dest": "in_file",
+       "help": " (a pathlike object or string representing an existing file)\n\t\tHead motion transform file"
+      },
+      {
+       "args": [
+        "--radius"
+       ],
+       "dest": "radius",
+       "help": " (a float, nipype default value: 50)\n\t\tRadius of the head in mm",
+       "type": "float"
       }
      ],
      "check_mandatory": [],
@@ -6570,6 +6686,30 @@
        "type": "int"
       }
      ],
+     "calls_corrected": [
+      {
+       "args": [
+        "in_file"
+       ],
+       "help": " (a pathlike object or string representing an existing file)\n\t\tbinary file to dilate"
+      },
+      {
+       "args": [
+        "--iterations"
+       ],
+       "dest": "iterations",
+       "help": " (an integer >= 0, nipype default value: 1)\n\t\trepeat dilation",
+       "type": "int"
+      },
+      {
+       "args": [
+        "--radius"
+       ],
+       "dest": "radius",
+       "help": " (a float, nipype default value: 3)\n\t\tstructure element (ball) radius",
+       "type": "float"
+      }
+     ],
      "check_mandatory": [
       "in_file"
      ],
@@ -8517,7 +8657,7 @@
        ],
        "dest": "high_pass_cutoff",
        "help": " (a float, nipype default value: 128)\n\t\tCutoff (in seconds) for \"cosine\" pre-filter",
-       "type": "int"
+       "type": "float"
       },
       {
        "args": [
@@ -9194,7 +9334,7 @@
        ],
        "dest": "high_pass_cutoff",
        "help": " (a float, nipype default value: 128)\n\t\tCutoff (in seconds) for \"cosine\" pre-filter",
-       "type": "int"
+       "type": "float"
       },
       {
        "args": [

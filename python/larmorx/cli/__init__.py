@@ -53,9 +53,7 @@ def run(argv: Sequence[str], *, implementation: str | None = None) -> int:
     program = _core.cli_python_program(argv)
     if program is not None:
         family, tool, args, environment = program
-        return _python_program(
-            family, tool, args, implementation, environment, _program_name(argv)
-        )
+        return _python_program(family, tool, args, implementation, environment, _program_name(argv))
     code, _, _ = _core.cli_main(argv, _search_dirs(), implementation, stream=True)
     return code
 

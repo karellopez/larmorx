@@ -109,13 +109,13 @@ def describe(handler, obj=None, name=None) -> dict:
         exts = getattr(handler, "_exts", None)
         if exts:
             d["exts"] = sorted(exts)
-    elif isinstance(handler, tt.BaseTuple) or isinstance(handler, tt.Tuple):
+    elif isinstance(handler, tt.BaseTuple | tt.Tuple):
         d.update(k="tuple", of=[describe(t.handler) for t in handler.types])
     elif isinstance(handler, tt.BaseRange):
         d.update(
             k="range",
-            int=handler._validate.endswith("int") or isinstance(handler._low, int)
-            and isinstance(handler._high, int | type(None)),
+            int=handler._validate.endswith("int")
+            or (isinstance(handler._low, int) and isinstance(handler._high, int | type(None))),
             low=handler._low,
             high=handler._high,
             exclude_low=bool(handler._exclude_low),
@@ -156,7 +156,9 @@ def add_args_options_corrected(arg_parser, interface):
     it the type of the input before it in name order, a variable left from the loop's previous
     iteration, or fails with ``UnboundLocalError`` or ``AttributeError``), and a list of
     booleans none either (nipype's ``type=bool`` makes every text but the empty one true):
-    larmorx converts these texts by the trait itself. Everything else as nipype's."""
+    larmorx converts these texts by the trait itself; and (PIPE-82) a float input whose default
+    is an integer gets the type float (nipype's ``type(default_value)`` is ``int``: CompCor's
+    ``high_pass_cutoff`` 128 reads only integers). Everything else as nipype's."""
     from nipype.interfaces.base import InputMultiPath, traits
     from nipype.interfaces.base.support import get_trait_desc
 
@@ -175,6 +177,9 @@ def add_args_options_corrected(arg_parser, interface):
         if not spec.inner_traits:
             if not spec.is_trait_type(traits.TraitCompound):
                 trait_type = type(spec.trait_type.default_value)
+                # PIPE-82: a float trait's type is float, whatever its default's
+                if trait_type is int and _float_trait(spec.trait_type):
+                    trait_type = float
             if trait_type in (bytes, str, int, float):
                 if trait_type is bytes:
                     trait_type = str
@@ -188,7 +193,7 @@ def add_args_options_corrected(arg_parser, interface):
             if trait_type in (bytes, str, int, float):
                 args["type"] = trait_type
         else:
-            if len(spec.inner_traits) > 1:
+            if len(spec.inner_traits) > 1:  # noqa: SIM102 (nipype's code as it is)
                 if not spec.is_trait_type(traits.Dict):
                     has_multiple_inner_traits = True
 
@@ -196,9 +201,7 @@ def add_args_options_corrected(arg_parser, interface):
             if spec.is_trait_type(InputMultiPath):
                 args["nargs"] = "+"
             elif spec.is_trait_type(traits.List):
-                if (
-                    spec.trait_type.minlen == spec.trait_type.maxlen
-                ) and spec.trait_type.maxlen:
+                if (spec.trait_type.minlen == spec.trait_type.maxlen) and spec.trait_type.maxlen:
                     args["nargs"] = spec.trait_type.maxlen
                 else:
                     args["nargs"] = "+"
@@ -210,23 +213,32 @@ def add_args_options_corrected(arg_parser, interface):
                     "This interface cannot be used. via the"
                     " command line as multiple inner traits"
                     " are currently not supported for mandatory"
-                    " argument: {}.".format(name)
+                    f" argument: {name}."
                 )
             arg_parser.add_argument(name, help=desc, **args)
         else:
             if spec.is_trait_type(InputMultiPath):
                 args["nargs"] = "*"
             elif spec.is_trait_type(traits.List):
-                if (
-                    spec.trait_type.minlen == spec.trait_type.maxlen
-                ) and spec.trait_type.maxlen:
+                if (spec.trait_type.minlen == spec.trait_type.maxlen) and spec.trait_type.maxlen:
                     args["nargs"] = spec.trait_type.maxlen
                 else:
                     args["nargs"] = "*"
             if not has_multiple_inner_traits:
-                arg_parser.add_argument("--%s" % name, dest=name, help=desc, **args)
+                arg_parser.add_argument("--%s" % name, dest=name, help=desc, **args)  # noqa: UP031
 
     return arg_parser
+
+
+def _float_trait(trait_type) -> bool:
+    from traits import trait_types as tt
+
+    if isinstance(trait_type, tt.BaseFloat):
+        return True
+    return isinstance(trait_type, tt.BaseRange) and not (
+        isinstance(trait_type._low, int | type(None))
+        and isinstance(trait_type._high, int | type(None))
+    )
 
 
 def _recorded(build, node) -> tuple[list[dict], dict | None]:
@@ -254,7 +266,7 @@ def _recorded(build, node) -> tuple[list[dict], dict | None]:
     error = None
     try:
         build(parser, node)
-    except Exception as e:  # noqa: BLE001 (recorded: nipype's command line meets it)
+    except Exception as e:
         error = _exc(e)
     finally:
         argparse.ArgumentParser.add_argument = real  # type: ignore[method-assign]
@@ -270,7 +282,7 @@ def interface_spec(module, iname: str) -> dict:
         warnings.simplefilter("ignore")
         try:
             node = getattr(module, iname)()
-        except Exception as e:  # noqa: BLE001 (recorded: nipype's command line meets it)
+        except Exception as e:
             out["init_error"] = _exc(e)
             return out
     calls, error = _recorded(add_args_options, node)
@@ -368,7 +380,9 @@ def main() -> int:
         return 0 if same else 1
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(text, encoding="utf-8", newline="\n")
-    print(f"wrote {OUT.name}: {sum(len(v['interfaces']) for v in json.loads(text)['modules'].values())} interfaces")
+    print(
+        f"wrote {OUT.name}: {sum(len(v['interfaces']) for v in json.loads(text)['modules'].values())} interfaces"
+    )
     return 0
 
 

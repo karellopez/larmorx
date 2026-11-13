@@ -11,6 +11,7 @@
 
 pub mod args;
 pub mod geo;
+pub mod reg;
 pub mod vol;
 
 use std::io::Write;
@@ -38,7 +39,7 @@ impl Write for Buf {
 /// One call: the command's printed values, or the end of the program.
 fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
     let c = l.tok().to_owned();
-    if vol::call(p, l, &c)? || geo::call(p, l, &c)? {
+    if vol::call(p, l, &c)? || geo::call(p, l, &c)? || reg::call(p, l, &c)? {
         return Ok(());
     }
     args::bad("unknown command");

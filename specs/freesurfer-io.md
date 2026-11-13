@@ -1098,3 +1098,194 @@ than the machine allows: FS-243 (larmorx refuses above 256 MiB of numbers as suc
   76,947 of 76,949 comparable lines (the two others: the official build stopped by the probe's
   5-second alarm under load, identical when run again alone); piece 5's 14,000: 11,902 compared, all
   identical, 1,276 not compared, 822 compared apart.
+
+## 40. Conventions of part 6 (reading volumes and registration files)
+
+Part 6 (relay 16 of track A, 2026-11-13) covers what the surfaces need first: reading a volume's
+header or voxels by name (MGH and MGZ; `.npy` through §20's reader), the tags after an MGH volume's
+data, the talairach transform an MGH volume names, and tkregister's `register.dat`. The other
+formats' readers come with their queue items (3.1-28 to 3.1-30); until then a request for one is
+refused with `larmorx-freesurfer: reading <format> volumes is not ported yet (<name>)` on standard
+error and no volume. Errors are printed as fs.core's `ErrorPrintf` prints them (`error: <text>`,
+with FS-01's NUL byte under `reproduce`).
+
+## 41. A volume's name
+
+- A name holding no `/` gets the working directory and `/` before it. FS-249: a result of 1,024
+  bytes or more is used whole (FreeSurfer writes past its buffers).
+- A null or empty name: `mri_read(): empty fname!` + newline, no volume.
+- The last `@` and the last `#` (the latter only while the frame-list switch is on; programs turn
+  it off with `MRIIO_Strip_Pound`) are both found first; the name ends at the first of them, the
+  text after `@` (up to a `#` after it) names the format, the text after `#` (up to an `@` after
+  it) lists frames.
+- A format named after `@` is one of `string_to_type`'s (§25); another: `mri_read(): unknown type
+  '<text>'` + newline. Without `@`, an unknown type is found by the format probe (§26); none:
+  `mri_read(): couldn't determine type of file <name>` (the name with the directory, no newline).
+- Frames: `<a>:<b>` or `<a>` (C's `strtol` of each piece, base 10; the pieces must be whole
+  numbers: `mri_read(): bad start frame ('<a>')`, `bad end frame ('<b>')`, `bad frame ('<a>')`;
+  `<a>:` alone: `bad frame specification ('<a>:')`; an empty `<a>` is 0); each kept in an `int`
+  (its low 32 bits); a negative one: `mri_read(): frame (<n>) is less than zero`; `<a>` above `<b>`:
+  `mri_read(): the start frame (<a>) is greater than the end frame (<b>)` (each with a newline).
+
+## 42. Reading a volume (`mri_read`)
+
+The format's reader gives the volume (its header only when the voxels are not asked for), or none.
+Then the volume's name becomes the name as given (with any `@` or `#` part), and its cached
+voxel-to-RAS matrix and inverse are computed again from its geometry (fs.mri's cache). Without
+frames the volume is returned. With frames:
+
+- a start frame not below the volume's frame count: `mri_read(): start frame (<a>) is out of range
+  (<n> frames in volume)`; the end frame likewise (`end frame (<b>) ...`); no volume;
+- the header only: a float volume's voxels are checked (below; FS-255: a header has none, so both
+  modes skip the check, noted: FreeSurfer crashes when the volume has voxels in its extent), then a
+  copy of the header (fs.mri's `MRIcopy` of a volume without voxels) with the frame count
+  `b - a + 1`;
+- the voxels, all frames listed: the check, then the volume; some frames: a new volume of those
+  frames (the header copied, `imnr0` the frame count), the frames' voxels copied for the types
+  uchar, short, unsigned short, int, long and float (other types' voxels stay 0), then the check
+  of the whole first volume.
+
+The check (`nan_inf_check`): a float volume with an infinite or NaN voxel (the first found with x
+the outermost loop, then y, z, and the frame innermost) gives `nan_inf_check(): Inf at voxel
+<x>, <y>, <z>, <f>` or `NaN at voxel ...` (an error) and no volume.
+
+`MRIreadHeader(name, type)`: the name gets the working directory as above; an unknown type is found
+by the format probe and, when it finds none, `ERROR: could not find volume <name>.  Does it
+exist?` (the name as given does not exist) or `ERROR: could not determine type of <name>`
+(standard output), no volume; then `mri_read` of that name and type without voxels.
+`MRIreadInfo(name)`: `mri_read` without voxels; `MRIreadType(name, type)`: with them.
+
+## 43. MGH and MGZ (`mghRead`)
+
+The file: `.mgz` and `.mgh.gz` are gzip-compressed (the name's last extension `mgz` in any case,
+or `mgh.gz` anywhere in it), `.mgh` plain; any other name: `mghRead(<name>, <frame>): could not
+open file.` + newline + `Filename extension must be .mgh, .mgh.gz or .mgz` (with `errno`'s text
+first when it is set); a file that does not open: `mghRead(<name>, <frame>): could not open file`.
+All numbers are big-endian. The header: the version (`mghRead(<name>, <frame>): read error` when
+its four bytes are not all there), width, height, depth, frames, type and degrees of freedom
+(`int`s), the RAS flag (`short`), and when the flag is above 0 fifteen floats (the voxel sizes x, y,
+z; the x, y and z direction cosines; the centre); 254 bytes after the flag in all (194 after the
+floats). A tensor volume (type 6) has 9 frames whatever the header says. The intent is
+`(version >> 8) & 0xffff`.
+
+- **The header alone:** a volume without voxels (fs.mri's `MRIallocHeader`; its messages for
+  extents that are not above 0), then the data skipped: `frames x width x height x depth x bytes per
+  voxel` bytes (64-bit arithmetic; an unknown type's size is -1), read in pieces of 1,024 bytes and
+  a last piece in a compressed file (FS-76: a last piece of 0 bytes, a volume without voxels,
+  divides by zero in FreeSurfer: no read, noted), passed over in a plain one.
+- **The voxels:** frame 0 or more reads that frame alone (the data before it passed over), below
+  -1 the first `-frame` frames, -1 all. The bytes per slice are `width x height x bytes per voxel` in
+  a 32-bit `int` (a negative count: `errno` ENOMEM, the C library's failed allocation). Each slice
+  is read whole (`mghRead(<name>): could not read <n> bytes at slice <z>`, no volume) and stored by
+  type: uchar as is; short, unsigned short (2 bytes), int, float, tensor (4 bytes) and float complex
+  (two floats) with each number's bytes reversed; any other type `mghRead: unsupported type <t>`,
+  no volume. A tensor volume's rows all start at the voxels' first byte (fs.mri's structure gives
+  that type no row stride): each row read overwrites the first row, the rest stays 0.
+  `FS_MGZIO_USEVOXELBUFREAD` set (a volume with its voxels in one block): `INFO: Environment
+  variable FS_MGZIO_USEVOXELBUFREAD set` and `mghRead(): read voxel buffer ...`, then the frames
+  read slice after slice into the block from the start frame's place, 2-byte numbers swapped in
+  pairs, 4- and 8-byte numbers in 4-byte groups (`mghRead (FS_MGZIO_USEVOXELBUFREAD): could not
+  read <n> bytes per slice, read only <m> bytes`); FS-256: one frame after the first goes into the
+  volume's only frame (FreeSurfer writes past it). `FS_MGZIO_TIMING` set: `INFO: Environment
+  variable FS_MGZIO_TIMING set` and `Total time (mghRead) = <s>.<ns> seconds` (+ ` (USEVOXELBUF)`).
+- **The geometry:** with the RAS flag the fifteen floats (pixel size and slice thickness the x and
+  z sizes, the RAS flag of the volume 1); without it the coronal orientation (x = (-1, 0, 0),
+  y = (0, 0, -1), z = (0, 1, 0), centre 0; with `DIAG_SHOW` and `DIAG_VERBOSE` a framed message on
+  standard error naming the file).
+- **The scan parameters:** TR, the flip angle (a float, kept as a double), TE, TI and the field of
+  view, each read only after the one before it was read whole (a number cut short keeps its bytes
+  over the earlier value, reversed).
+- **The tags** (§44), then: the start and end of each axis `-n / 2 x size` and `n / 2 x size` (in
+  double, stored as float), the field of view the largest span (float), the volume's name the
+  file's.
+
+## 44. The tags after an MGH volume's data (`MRITAGread`)
+
+Nothing with `FS_SKIP_TAGS` set. Otherwise tags until the end of the file (a tag number of 0, or the
+end met in the number); each tag's length as §17's tag reader gives it (32-bit for the old talairach
+tag, none for the old colour table and the morph's geometry and labels, 64-bit for the others).
+With `DIAG_INFO`, `[DEBUG] MRITAGread(): remaining taglen = <n> (tag = <t>, len = <l>)` before each
+and `... (tag = 0)` at the end. By tag:
+
+- degrees of freedom (7), scan parameters (45), RAS transform (8): only in FreeSurfer's NIfTI header
+  extension; in an MGH file `[WARN] skip unexpected tag TAG_DOF, nifti header extension only` (and
+  `TAG_SCAN_PARAMETERS`, `TAG_RAS_XFORM`) on standard output and the tag skipped; the RAS
+  transform's extra fields (9): FS-253, both modes skip it (FreeSurfer crashes), noted;
+- frames (42): §18's frame reader (`couldn't read frame structure from file` when it fails);
+- the old colour table (1): §19's binary colour table becomes the volume's;
+- the talairach transform (30 and 31): the tag's bytes over the volume's 1,024-byte transform name
+  (bytes past the tag's are what an earlier name left; FS-254: a tag of more than 1,024 bytes, or a
+  folder name of 975 bytes or more, both modes use the whole name, noted); `<the file's folder>/
+  transforms/talairach.xfm` replaces the name when that file exists; when the named file exists it
+  is read as an `.xfm` (§45): the volume's transform and its linear part and inverse, `INFO: loaded
+  talairach xform : <name>` on standard error with `DIAG_VERBOSE`; one that does not read: `error
+  loading transform from <name>` (an error, `errno` cleared first), no transform, the name emptied;
+- command lines (3): the tag's bytes up to their first NUL (FS-257: a length below 0 or above
+  2^31 - 1, both modes keep the bytes the file has, noted); more than 1,000:
+  `MRITAGread(<name>): too many commands (<n>) in file` and the program ends (`ERROR_NOMEMORY`);
+- auto-align (33), original RAS-to-voxel (44), the morph's affine (14): §17's 1,600-byte matrix
+  text (`[DEBUG] MRITAGread() TAG_GCAMORPH_AFFINE` and the matrix with `DIAG_INFO`);
+- phase-encoding direction (41): the tag's bytes up to their first NUL (FS-257 as above);
+- field strength (43): four bytes in the machine's (little-endian) order over the earlier value,
+  whatever the tag's length (a length other than 4 leaves the rest to be read as tags);
+- the morph's metadata (13): two `int`s and a float (`[DEBUG]` lines with `DIAG_INFO`); geometries
+  (10: shearless, no length; 15: with shears): §17's geometry reader into the morph's source and
+  target geometries; labels (12, no length): the volume's extent of `int`s, x slowest;
+- any other tag: skipped (§17's skip, FS-177 and FS-178).
+
+In FreeSurfer's NIfTI extension (part of NIfTI's reader, later) the tag lengths are 64-bit and the
+reading stops when fewer than 12 bytes of the extension's length are left.
+
+## 45. FreeSurfer's `.xfm` reader
+
+MINC 1.5.1's reader (the main package's `larmorx_io::xfm`), as FreeSurfer's copy changes it: only
+`Linear` transforms (another type: `input_transform(): invalid transform type <name>.`); a number
+that does not convert: `<token> is not a valid double` first; a keyword that does not match:
+`Expected "<keyword> =" got str:<token>` (`(null)` at the end of the file); a NUL byte ends a token;
+`~user` is `.`; the inverse of the 4 x 4 matrix by Gaussian elimination with scaled partial
+pivoting: each row scaled by `1 / max |a_ij|` (a row of zeros: `Some row is all zeros`), for the
+first three columns the remaining row whose scaled entry is largest in magnitude (the first on
+ties; none above 0: `Some col is all zeros`) chosen as the pivot and eliminated from the later rows
+(the multiplier `a_ki x (1 / a_ii)`, applied to the matrix's later columns and all of the
+inverse's), a last pivot of 0: `last col all zeros`; then back substitution from the last row (each
+later row's multiple subtracted, then multiplied by `1 / a_ii`); x86-64's double arithmetic and
+NaNs. A failure prints `invert_4x4_matrix failed, <reason>` on standard output and the transform
+is the identity both ways.
+
+## 46. Registration files (`regio_read_register`)
+
+- A name whose last extension is `lta` in any case (FS-11's limits): `regio_read_register: loading
+  lta` (standard output), the linear transform array read (`LTAread`, fs.volume: 1 when it does
+  not read), its subject (`subject-unknown` when empty), its intensity scale, the first transform's
+  source voxel sizes (x in-plane, z between planes; FS-258: an array without transforms, both
+  modes 0, noted), round as the method, and the array's tkregister matrix; 0.
+- Otherwise the file (`regio_read_register(): <errno's text>` and `Could not open <name>` on standard
+  error, 1): the subject (`%s`), the in-plane and between-plane resolutions and the intensity
+  (`%f` each), sixteen `%f` row by row into a new 4 x 4 matrix (§ fs.core's scanning; each failure:
+  `regio_read_register(): <errno's text>` and `Error reading subject from <name>`, `... inplaneres
+  ...`, `... betplaneres ...`, `... intensity ...`, `Error reading R[<r>][<c>] from <name>`, 1; the
+  values read before it kept), then a word: none, tkregister's method (2); `round` or `rint` 0,
+  `floor` 1, a word starting with `tkreg` 2 (any case); another: `ERROR: regio_read_register():
+  float2int method <w> from file <name>, match not found` (standard output), 1. FS-258: a word of
+  1,000 bytes or more is kept whole (FreeSurfer writes past its buffer), noted. Returns 0.
+- `errno`: glibc's `perror` leaves it as it was once standard error has been written to (an
+  unoriented standard error open for writing only gets EINVAL from glibc's internal `fdopen`; the
+  replica follows the first case, the probe orients standard error first).
+
+## 47. Validation plan (part 6)
+
+- The probe's commands: `mrh` (`MRIreadHeader` with a type: unknown, MGH, Bruker, NIfTI, COR),
+  `mri` (`MRIreadInfo`), `mrd` (`mri_read` with voxels), `mgr` (`mghRead` with or without voxels
+  and frames -3 to 2), `rrr` (`regio_read_register`), with `Gdiag` 0, `DIAG_INFO`, `DIAG_SHOW` with
+  `DIAG_VERBOSE`, the frame-list switch on and off, `FS_SKIP_TAGS` and `FS_MGZIO_USEVOXELBUFREAD`.
+  The MGH files are built from the format: extents 1 to 4 (0, -1, 2 or 300 at times), frames 0 to
+  3, every type FreeSurfer names and an unknown one, the RAS flag 1, 0, -1, 2, voxel sizes and
+  cosines with NaNs, infinities and signed zeros, voxels with NaN and infinite floats, 0 to 5 scan
+  parameters, 0 to 4 tags of every kind above (lengths the file does not have, negative ones,
+  talairach names of 990 to 1,100 bytes, `.xfm` files beside them right, cut, singular, of other
+  types, inverted), plain or compressed, whole or cut, the compressed stream cut; names with
+  `#frames` and `@format` in both orders, missing files, names without `/`. `register.dat` files
+  with 0 to 21 values, special numbers and the four method words; `.lta` names (counted, not
+  compared, until fs.volume's `LTAread` is wired). Lines of formats not ported, of crashes (FS-76,
+  FS-249, FS-253 to FS-258) and of skips beyond 256 MiB (FS-178, the probe's memory limit) are
+  counted, not compared; those with numbers from memory (FS-49, FS-167) compared apart.

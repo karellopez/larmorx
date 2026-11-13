@@ -24,8 +24,9 @@
 //! - **FS-255** (crash): `mri_read` without voxels (`MRIreadHeader`, `MRIreadInfo`) of a float
 //!   volume with a frame list (`name#0`) checks voxels it does not have: both modes skip the check,
 //!   noted.
-//! - **FS-256** (memory): with `FS_MGZIO_USEVOXELBUFREAD` set, `mghRead` of one frame after the
-//!   first writes past the one-frame volume it made: both modes read the frame into it, noted.
+//! - **FS-256** (memory, crash): with `FS_MGZIO_USEVOXELBUFREAD` set, `mghRead` of one frame after
+//!   the first writes past the one-frame volume it made, and a volume without slices crashes: both
+//!   modes read the frame into the volume (nothing for no slices), noted.
 //! - **FS-257** (crash or memory): a command-line or phase-encoding tag whose length is negative
 //!   or more than the machine can allocate: both modes keep the bytes the file has (none for a
 //!   negative length), noted.
@@ -33,7 +34,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_249, FS_253, FS_254, FS_255, FS_256, FS_257};
+use larmorx_core::defects::{FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257};
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
@@ -69,6 +70,8 @@ pub const MRI_HORIZONTAL: i32 = 2;
 /// `UNUSED_SPACE_SIZE` (256) and `USED_SPACE_SIZE` (15 floats): an MGH header's reserved bytes.
 const UNUSED_SPACE_SIZE: i32 = 256;
 const USED_SPACE_SIZE: i32 = 60;
+/// `errno`'s `ENOMEM` on Linux (a failed `calloc`).
+const ENOMEM: i32 = 12;
 /// The bytes of a tag's number and length in FreeSurfer's NIfTI header extension.
 const LEN_TAGHEADER: i64 = 12;
 
@@ -334,18 +337,25 @@ pub fn mri_read(
         return Ok(fail0(g, err, ERROR_BADPARM, "mri_read(): empty fname!\n"));
     }
     let mut copy = with_cwd(g, dir, "mri_read", fname);
+    // the last `@` and the last `#`, both found first; each cut at its own place, so the text
+    // after one ends where the other begins
     let at = copy.rfind('@');
-    let mut at_text = None;
-    if let Some(i) = at {
-        at_text = Some(copy[i + 1..].to_owned());
-        copy.truncate(i);
-    }
-    let mut pound_text = None;
-    if g.mriio_strip_pound != 0
-        && let Some(i) = copy.rfind('#')
-    {
-        pound_text = Some(copy[i + 1..].to_owned());
-        copy.truncate(i);
+    let pound = if g.mriio_strip_pound != 0 {
+        copy.rfind('#')
+    } else {
+        None
+    };
+    let piece = |from: usize, other: Option<usize>| -> String {
+        let end = match other {
+            Some(o) if o > from => o,
+            _ => copy.len(),
+        };
+        copy[from + 1..end].to_owned()
+    };
+    let at_text = at.map(|i| piece(i, pound));
+    let pound_text = pound.map(|i| piece(i, at));
+    if let Some(cut) = [at, pound].into_iter().flatten().min() {
+        copy.truncate(cut);
     }
     if let Some(t) = &at_text {
         mtype = identify::string_to_type(g, t);
@@ -662,7 +672,15 @@ pub fn mgh_read(
             }
             if !ended {
                 let rest = total_bytes.wrapping_sub(count);
-                zread(&mut fp, &mut buf, rest as usize, 1);
+                if rest == 0 {
+                    // FreeSurfer's znzread of a member of 0 bytes divides by zero
+                    g.notices.add(
+                        &FS_76,
+                        "mghRead of a compressed volume without voxels: the data's skip of 0 bytes (FreeSurfer divides by zero)",
+                    );
+                } else {
+                    zread(&mut fp, &mut buf, rest as usize, 1);
+                }
             }
         } else {
             fp.seek(total_bytes, Whence::Cur);
@@ -722,6 +740,12 @@ pub fn mgh_read(
                 * m.height.max(0) as usize
                 * m.depth.max(0) as usize
                 * m.bytes_per_vox;
+            if i64::from(m.depth) * i64::from(m.nframes) <= 0 {
+                g.notices.add(
+                    &FS_256,
+                    "mghRead of a volume without slices with FS_MGZIO_USEVOXELBUFREAD: nothing read (FreeSurfer takes the address of a slice it does not have)",
+                );
+            }
             let mut place = if start_frame > 0 {
                 g.notices.add(
                     &FS_256,
@@ -761,6 +785,10 @@ pub fn mgh_read(
                 place += r as usize;
             }
         } else {
+            if bytes < 0 {
+                // calloc of a negative size (as size_t) fails
+                g.errno = ENOMEM;
+            }
             let mut buf = vec![0u8; bytes.max(0) as usize];
             let row = m.vox_per_row as usize;
             for f in start_frame..=end_frame {
@@ -797,7 +825,13 @@ pub fn mgh_read(
                         continue;
                     };
                     for y in 0..height {
-                        let o = (((fr * depth + z) * height + y) as usize * row) * bpvu;
+                        // a tensor volume's rows all point at the voxels' start (MRI::initSlices
+                        // advances no row pointer for that type): each row read overwrites it
+                        let o = if mtype == MRI_TENSOR {
+                            0
+                        } else {
+                            (((fr * depth + z) * height + y) as usize * row) * bpvu
+                        };
                         let s = y as usize * width.max(0) as usize * bpvu;
                         let n = width.max(0) as usize * bpvu;
                         if o + n <= chunk.len() && s + n <= buf.len() {

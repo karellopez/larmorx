@@ -659,12 +659,14 @@ fn copy_out_checked(g: &mut Globals, o: &mut Matrix, v: &[f32]) {
 /// `reproduce` the eigenvectors are 0 (the memory VNL never wrote, filled) and `NO_ERROR` is
 /// returned. A matrix of no rows: nothing is written, `NO_ERROR`.
 ///
-/// **FS-47:** on a matrix with an infinite or NaN entry among those EISPACK's `tred2` reads (the
-/// upper triangle as stored), of two rows or more, VNL's eigensystem usually never returns
-/// (EISPACK's `pythag` loops for ever on a NaN or two infinities): FreeSurfer hangs. Both modes give
-/// the error `OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN
-/// entry)` and `ERROR_BADPARM`, nothing written (the rare such matrices on which FreeSurfer does
-/// return, an infinity on the diagonal of an otherwise zero row, are refused too).
+/// **FS-47:** a matrix of two rows or more with an infinite or NaN entry among those EISPACK's
+/// `tred2` reads (the upper triangle as stored). Where VNL's eigensystem never returns on it
+/// (EISPACK's `pythag` loops for ever on a NaN or two infinities: `larmorx_core`'s
+/// `symmetric_eigensystem_f32_full` names those matrices, ITK-115), FreeSurfer hangs: both modes
+/// give the error `OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or
+/// NaN entry)` and `ERROR_BADPARM`, nothing written. Where it returns, `reproduce` gives
+/// FreeSurfer's result (VNL's values and vectors, FS-42 where `tql2` stops); the default gives the
+/// same error, nothing written, FS-47 noted (rule B: such a matrix has no eigensystem).
 pub fn open_eigen_system(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -676,20 +678,32 @@ pub fn open_eigen_system(
     if n == 0 {
         return NO_ERROR;
     }
+    let full = vnl_eigen::symmetric_eigensystem_f32_full(&ia_data[..n * n], n);
     if n >= 2 && (0..n).any(|i| (i..n).any(|j| !ia_data[i * n + j].is_finite())) {
-        log::error_printf(
-            g,
-            err,
-            ERROR_BADPARM,
-            "OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)\n",
-        );
+        let hangs = full.never_returns();
+        if hangs || !g.notices.reproduce() {
+            log::error_printf(
+                g,
+                err,
+                ERROR_BADPARM,
+                "OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)\n",
+            );
+            g.notices.add(
+                &FS_47,
+                if hangs {
+                    "OpenEigenSystem: an infinite or NaN entry on which FreeSurfer hangs (EISPACK's pythag): an error"
+                } else {
+                    "OpenEigenSystem: an infinite or NaN entry (FreeSurfer computes on it): an error"
+                },
+            );
+            return ERROR_BADPARM;
+        }
         g.notices.add(
             &FS_47,
-            "OpenEigenSystem: an infinite or NaN entry (FreeSurfer hangs in EISPACK's pythag): an error",
+            "OpenEigenSystem: an infinite or NaN entry: FreeSurfer's eigensystem of it",
         );
-        return ERROR_BADPARM;
     }
-    let (values, vectors, ierr) = vnl_eigen::symmetric_eigensystem_f32(&ia_data[..n * n], n);
+    let (values, vectors, ierr) = (full.values, full.vectors, full.ierr);
     if ierr != 0 {
         let _ = writeln!(err, "vnl_symmetric_eigensystem: ierr = {ierr}");
         o_values[..n].copy_from_slice(&values);
@@ -793,11 +807,12 @@ pub fn open_non_symmetric_eigen_system(
 /// `ssvdc` does not converge (a matrix with NaN or infinite entries), after VNL's lines on standard
 /// error ([`suspicious_svdc_f32`]). A matrix without columns: nothing written, `NO_ERROR`.
 ///
-/// **FS-48:** on some matrices with infinite or NaN entries LINPACK's `ssvdc` never returns
-/// (FreeSurfer hangs); on most it does not converge (the lines above, `ERROR_BADPARM`), on a few it
-/// succeeds (a 1 x 1 infinity). Both modes give VNL's lines and `ERROR_BADPARM` for every such
-/// matrix without running the decomposition, FS-48 noted (the main package's SVD does not yet tell
-/// a loop that never ends from a failure).
+/// **FS-48:** a matrix with an infinite or NaN entry. Where LINPACK's `ssvdc` never returns on it
+/// (`larmorx_core`'s `vnl_svd_f32_full` names those matrices, ITK-116), FreeSurfer hangs: both
+/// modes give VNL's lines with `info` min(rows + 1, cols) and `ERROR_BADPARM`, nothing written.
+/// Where it returns, `reproduce` gives FreeSurfer's result (LINPACK's failure with its `info`, or
+/// the decomposition); the default gives the lines with min(rows + 1, cols) without decomposing,
+/// `ERROR_BADPARM`, FS-48 noted (rule B).
 pub fn open_svdcmp(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -813,22 +828,33 @@ pub fn open_svdcmp(
         return NO_ERROR;
     }
     let a = vnl_of(io_a);
+    let full = vnl_svd_f32::vnl_svd_f32_full(&a, rows, cols);
     if a.iter().any(|v| !v.is_finite()) {
-        let info = (rows + 1).min(cols);
-        let _ = err.write_all(suspicious_svdc_f32(&a, rows, cols, info).as_bytes());
+        let hangs = full.never_returns();
+        if hangs || !g.notices.reproduce() {
+            let info = (rows + 1).min(cols);
+            let _ = err.write_all(suspicious_svdc_f32(&a, rows, cols, info).as_bytes());
+            g.notices.add(
+                &FS_48,
+                if hangs {
+                    format!("OpenSvdcmp of a {rows} x {cols} matrix with an infinite or NaN entry on which FreeSurfer hangs: a failed decomposition")
+                } else {
+                    format!("OpenSvdcmp of a {rows} x {cols} matrix with an infinite or NaN entry: refused as a failed decomposition")
+                },
+            );
+            return ERROR_BADPARM;
+        }
         g.notices.add(
             &FS_48,
-            format!("OpenSvdcmp of a {rows} x {cols} matrix with an infinite or NaN entry (FreeSurfer's SVD may never return): refused as a failed decomposition"),
+            format!("OpenSvdcmp of a {rows} x {cols} matrix with an infinite or NaN entry: FreeSurfer's result"),
         );
+    }
+    if full.info != 0 {
+        // LINPACK's info (min(rows + 1, cols) on every failing finite case measured)
+        let _ = err.write_all(suspicious_svdc_f32(&a, rows, cols, full.info).as_bytes());
         return ERROR_BADPARM;
     }
-    let Some((u_cm, w, v_cm)) = vnl_svd_f32::vnl_svd_f32(&a, rows, cols) else {
-        // LINPACK's info: measured as min(rows + 1, cols) on every failing case (the fs-maths
-        // probe's msvd); larmorx_core's float SVD does not return it.
-        let info = (rows + 1).min(cols);
-        let _ = err.write_all(suspicious_svdc_f32(&a, rows, cols, info).as_bytes());
-        return ERROR_BADPARM;
-    };
+    let (u_cm, w, v_cm) = (full.u, full.w, full.v);
     let mut u = vec![0.0f32; rows * cols];
     for i in 0..rows {
         for j in 0..cols {

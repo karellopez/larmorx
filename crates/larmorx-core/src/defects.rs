@@ -1510,7 +1510,7 @@ defects! {
     FS_255 = "FS-255", "FreeSurfer", true,
         "reading only the header of a float volume (MRIreadHeader, MRIreadInfo) with a frame list (name#0) crashes";
     FS_256 = "FS-256", "FreeSurfer", true,
-        "with FS_MGZIO_USEVOXELBUFREAD set, reading one frame after the first of an MGH volume writes past the one-frame volume FreeSurfer makes for it";
+        "with FS_MGZIO_USEVOXELBUFREAD set, reading one frame after the first of an MGH volume writes past the one-frame volume FreeSurfer makes for it, and reading a volume without slices (no frames, or a depth of 0) crashes";
     FS_257 = "FS-257", "FreeSurfer", true,
         "an MGH volume's command-line or phase-encoding tag whose length is negative or larger than the machine can allocate crashes FreeSurfer or corrupts its memory";
     FS_258 = "FS-258", "FreeSurfer", true,

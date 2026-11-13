@@ -57,8 +57,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FS-372, FS-373; an MGH volume header without voxels read for a transform's volume, FS-76, whose
 # division by zero the official build turns into a crash; the principal curvatures' range on a
 # surface without vertices, FS-376; the gradients' averaging over neighbour lists that are not
-# symmetric, FS-379; a matrix on which LINPACK's ssvdc never returns, FS-48h, the runner's mark for
-# FS-48's hanging cases, ended by the probe's alarm): counted, never compared
+# symmetric, FS-379; the vertex report's neighbour lines past the list, FS-380; a matrix on which
+# LINPACK's ssvdc never returns, FS-48h, the runner's mark for FS-48's hanging cases, ended by the
+# probe's alarm): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -90,6 +91,7 @@ SKIP: tuple[str, ...] = (
     "FS-76",
     "FS-376",
     "FS-379",
+    "FS-380",
     "FS-48h",
 )
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)

@@ -1567,6 +1567,8 @@ defects! {
         "the principal curvatures' outlier removal (MRIScomputeSecondFundamentalFormThresholded with a threshold of 0 or more) of a surface with no unripped vertex reads memory before its histograms (no effect on the result)";
     FS_379 = "FS-379", "FreeSurfer", true,
         "the averaging of a surface's gradients (MRISaverageGradients), on a surface whose neighbour lists are not symmetric (an unripped neighbour whose own neighbours are all ripped), averages a vertex with other vertices' neighbours and reads past its list (an undefined result)";
+    FS_380 = "FS-380", "FreeSurfer", true,
+        "the vertex report (MRISprintVertexInfo) lists a vertex's neighbours by its face count, so for a vertex with more faces than room in its neighbour list it reads past the list (undefined numbers or a crash)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

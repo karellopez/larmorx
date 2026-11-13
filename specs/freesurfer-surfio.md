@@ -3043,3 +3043,297 @@ name, and no content test of the volume library recognizes MGH), so its read giv
 not determine type of <name>` and the centre stays 0; FreeSurfer's subjects have `mri/orig` as a
 folder, which is not read. Observed (relay 19): seeds 7, 13 and 17 (2,000 cases each): reproduce
 identical on every compared case; 66 compared outputs carry a geometry read from a volume header.
+
+## 102. Curvature choices and statistics (queue item 3.1-51; relay 20)
+
+Every quantity is a `float` unless said; sums accumulate in order, one term at a time; "the first
+`vnum` neighbours" is the vertex's 1-hop neighbour list. NaN operands follow §14's rule (the left
+operand of each written expression gives its NaN); where the order of a sum's operands differs
+from the formula's as written, the formula below gives the order.
+
+**102.1 Smoothed normals** (`MRISsmoothSurfaceNormals(mris, navgs)`): `navgs` passes; in each, every
+unripped vertex's `tdx, tdy, tdz` become `(n + n1 + ... + nk) / (k + 1)` (its own normal plus its
+unripped first-`vnum` neighbours' normals, `k` their count, the count kept as a `float` incremented by
+1 each time), then every unripped vertex's normal becomes `td / |td|` with `|td| = sqrtf((x x + y y) +
+z z)`; when `|td|` is below `FLT_EPSILON` the normal becomes `td` unchanged. Return 0.
+`mrisComputeBoundaryNormals(mris)`: nothing; 0.
+
+**102.2 The mean curvature** (`MRIScomputeMeanCurvature(mris)`): the tangent planes are recomputed
+(§94's `mrisComputeTangentPlanes`, ripped vertices too); for each unripped vertex with normal `n`
+and tangents `e1`, `e2`, over its unripped first-`vnum` neighbours, with `d` the neighbour's position
+minus the vertex's: `u = (e1x dx + e1y dy) + e1z dz`, `w` likewise with `e2`, `rsq = u u + w w`; a
+neighbour with `rsq` below `FLT_EPSILON` is skipped; else `q = z / rsq` with `z = dz nz + (dy ny + dx
+nx)`, `H = H + q` and the count increases; with `Gdiag` holding both `DIAG_SHOW` and `DIAG_VERBOSE` and
+`|q| > 5`, `<vno> --> <neighbour>: curvature = %2.1f` (q) on standard output. The vertex's `H` is
+`(H * 0.5) / count` (0 with no counted neighbour). The surface's `min_curv`, `max_curv` are the
+smallest and largest `H` (starting at 10000 and -10000; a NaN never replaces). With `DIAG_SHOW`:
+`mean curvature range [%2.3f --> %2.3f]` on standard output. Return 0.
+
+**102.3 Curvature choices.** Each sets every unripped vertex's `curv`:
+- `MRISuseGaussianCurvature`: `K`; extremes `Kmin`, `Kmax`. `MRISuseMeanCurvature`: `H`; extremes
+  `Hmin`, `Hmax`. `MRISusePrincipalCurvature`: `k1`; extremes `Hmin`, `Hmax` (sic). Return 0.
+- `MRISuseAreaErrors`: `(A - A0) / n` with `A` the sum of the areas of the vertex's faces (its face
+  list, in order) and `A0` the sum of their cached original areas (§27; a deferred cache entry is
+  computed first). **FS-374** (class c, rule A): FreeSurfer's `n` is 0, so each value is ±infinity
+  or a NaN (0/0 the default NaN). `reproduce`: as FreeSurfer. Default: `n` the face count, 0 for a
+  vertex without faces; noted when a value differs. Return 0.
+- `MRISusePrincipalCurvatureFunction(mris, f)`: `curv = f(k1, k2)`; `MRISuseK1Curvature` and
+  `MRISuseK2Curvature` are the same with `f` giving `k1` or `k2`. The extremes are kept with `curv <
+  min` and `curv > max` over the unripped vertices in order. **FS-375** (class c, rule A):
+  FreeSurfer starts both extremes at vertex 0's `curv` as it was before the call, so the range can
+  hold a value no vertex has any more (and a NaN there stays). `reproduce`: as FreeSurfer. Default:
+  both start at the first unripped vertex's new value (vertex 0's old one when every vertex is
+  ripped); noted when the extremes differ. **FS-376** (class a, memory): on a surface without
+  vertices FreeSurfer reads a vertex that does not exist; both modes set the extremes to 0, noted.
+  Return 0.
+
+**102.4 Curvature indices** (`MRIScomputeCurvatureIndices(mris, &ici, &fi)`, in `double`): over
+unripped vertices, `ici = (K area) + ici` when `K > 0`, `fi = ((area |k1|) (|k1| - |k2|)) + fi`;
+then each divided by `4 pi`. Without vertices both 0. Return 0.
+
+**102.5 Largest radius** (`MRISmaxRadius(mris)`, `double`): the bounding box of every vertex's
+current position (ripped too; low ends from 10000, high ends from -10000; a NaN never replaces) is
+stored in the surface's `xlo, ylo, zlo, xhi, yhi, zhi` (as `float`); the centre `c = (lo + hi) *
+0.5`; the result is the largest `sqrt((x² + y²) + z²)` over every vertex of its offset from `c` (0
+without vertices; a NaN never replaces).
+
+**102.6 Mean and spread of the curvature** (`MRIScomputeAverageCurvature(mris, psigma)`, `double`):
+over unripped vertices `total_sq = total_sq + c²`, `total = total + c`, `n = n + 1`; `mean = total /
+n`, `var = total_sq / n - mean²` (both 0 when `n` is 0); when `psigma` is given it receives
+`sqrt(var)` (a negative `var`: the default NaN and `errno` `EDOM`). Returns `mean`.
+
+**102.7 Vertices of negative faces.** `MRISmarkNegativeVertices(mris, mark)`: the three vertices of
+every face whose area is below 0 get the mark (16 bits). `MRISripNegativeVertices(mris)`: such
+faces and their three vertices are ripped. Return 0.
+
+## 103. The second fundamental form (queue item 3.1-51; relay 20)
+
+`MRIScomputeSecondFundamentalForm(mris)` is `MRIScomputeSecondFundamentalFormThresholded(mris,
+-1)`. For a plane (`MRIS_PLANE`) nothing happens; return 0.
+
+**103.1 The threshold.** With `pct_thresh` at or above 0: `vmean` is the mean neighbour spacing of
+§94's `MRIScomputeTotalVertexSpacingStats` (it recomputes the metric properties first, §38), `m = vmean *
+0.25`, `m = m < 1 ? m : 1` (a NaN gives 1), `thresh0 = m m`; otherwise `thresh0 = 0`. Then the tangent
+planes are recomputed (§94). `Kmin = Hmin = 10000`, `Kmax = Hmax = -10000`, `Ktotal = 0` (`double`).
+With `DIAG_WRITE` and `DIAG_VERBOSE` the file `curv.dat` is opened for writing.
+
+**103.2 The fit at a vertex.** For each unripped vertex with at least one neighbour in use
+(`vtotal`), with `n`, `e1`, `e2` its normal and tangents (values from the start of this vertex's
+step): a `vtotal` x 3 matrix `U` and a `vtotal`-vector `z`, both zeros. Passes, each starting with
+`kmin = 10000`, `kmax = -10000`, a row counter `r = 0` and `thresh` (`thresh0` at the first pass):
+for each neighbour in use, in order, skipping ripped ones, with `y` its position minus the
+vertex's (`float`): `u = (double)((e1x yx + e1y yy) + e1z yz)`, `v = (double)((yy e2y + yx e2x) + yz
+e2z)`; row `r + 1` of `U` becomes `(float)(u u)`, `(float)((u + u) v)`, `(float)(v v)` and `z`'s
+entry `r + 1` becomes `(nx yx + ny yy) + nz yz` — **written before the test below, so a rejected
+neighbour's values sit in row `r + 1` until an accepted one overwrites them**; `rsq =
+(float)(v v + u u)`; the neighbour is accepted when `rsq` is not below `FLT_EPSILON` and `(double)rsq
+> thresh`: `k = z_entry / rsq` updates `kmax` (`k > kmax`) and `kmin` (`k < kmin`), and `r`
+increases. After the pass `thresh = 0.25 thresh`; the passes end after the 102nd or when `r` is 4 or
+more.
+
+**103.3 The solve.** `Uᵀ` (§fs.maths `MatrixTranspose`), `A = Uᵀ U` (`MatrixMultiply`, `float`),
+`cond = MatrixConditionNumber(A)`, `A⁻¹ = MatrixSVDInverse(A)`. When the inverse fails (singular):
+the eigenvalues are 0, 0 and the eigenvector matrix the identity, and the vertex goes on to 103.4;
+the ill-conditioned count increases. Otherwise `c = A⁻¹ (Uᵀ z)` (two `MatrixMultiply`), the Hessian
+`Q = [[c1 + c1, c2 + c2], [c2 + c2, c3 + c3]]`. When `cond >= 500000` (a NaN is not): `k1 = kmax`,
+`k2 = kmin`, `K = k1 k2`, `H = (k1 + k2) * 0.5`, and nothing else for this vertex. Otherwise
+`MatrixEigenSystem(Q)` gives the eigenvalues and eigenvectors; when it fails, `MatrixSVDEigenValues(Q)`
+gives `k1`, `k2` (its values 0 and 1), with `K` and `H` as above, nothing else for this vertex, and the
+ill-conditioned count increases. **A matrix with a NaN or infinite entry:** see the fs.maths spec's
+FS-48 (`MatrixConditionNumber` and `MatrixSVDInverse` refuse it; on some FreeSurfer hangs).
+
+**103.4 The vertex's curvatures** (eigenvalues `k1`, `k2`, eigenvectors `a11 a12 / a21 a22`): `K = k1
+k2`, `H = (k1 + k2) * 0.5`; with the file open, the line `<vno> %f %f %f %f` (`k1`, `k2`, `K`, `H`);
+when the vertex is `Gdiag_no` and `DIAG_SHOW`: `v %d: k1=%2.3f, k2=%2.3f, K=%2.3f, H=%2.3f` on
+standard output; the extremes (`K < Kmin`, `H < Hmin`, `K > Kmax`, `H > Hmax`); `Ktotal = ((double)k1
+k2) area + Ktotal`; the area summed (`double`); the tangents: `e1x = e2x a21 + e1x a11`, `e1y = e1y
+a11 + e2y a21`, `e1z = a21 e2z + a11 e1z`, `e2x = e1x a12 + e2x a22`, `e2y = e1y a12 + e2y a22`,
+`e2z = a12 e1z + a22 e2z` (the old tangents' values).
+
+**103.5 After the vertices.** The file closed. With `DIAG_SHOW` and `DIAG_VERBOSE`: `max H error=-1.000
+at -1` and `total area = %2.3f`; with `DIAG_SHOW` and an ill-conditioned count above 0: `%d
+ill-conditioned points` (standard output). With `pct_thresh` below 0: return 0.
+
+**103.6 The outlier removal** (`pct_thresh` at or above 0), in `double`: over unripped vertices the
+extremes of `k1` and of `k2` (from 1000 for the lows, -1000 for the highs; a NaN never replaces);
+`scale = 999 / (max - min)` for each; two 1,000-bin histograms with `bin_size = (float)(1 / scale)`;
+for each unripped vertex in order, `k1`'s bin `nint((k1 - min1) scale1)` counted (`1 + count`), then
+`k2`'s. **FS-377** (class a, crash): a bin outside 0..999 (all values equal, so `scale` is infinite;
+a value not finite) makes FreeSurfer write far outside the histogram (a segmentation fault).
+`reproduce` ends the program as that crash (exit status 139); the default leaves that value out,
+noted. Each bin's value `(float)(bin / scale + min)`. `nint((0 - min) scale)` is computed for each and
+discarded (its notice for a NaN, fs.core's). Both histograms become PDFs (fs.core's `HISTOmakePDF` in
+place); with `DIAG_WRITE` and `DIAG_VERBOSE` they are plotted to `k1.plt`, `k2.plt`. The peak of
+each: `HISTOfindHighestPeakInRegion(h, 0, 1000)`. **FS-378** (class a, memory): without unripped
+vertices there is no peak (-1) and FreeSurfer reads one place before the histogram; no vertex is
+clipped, so both modes skip the read (noted) and the result is FreeSurfer's. The limits from a peak
+`z`, for each histogram: `T` the sum of counts from `z` to the end, `t = T pct`; going up from `z`
+(at most to bin 998), summing counts, the first bin where the sum exceeds `t` gives `max` = that bin's
+value; likewise going down from `z` to bin 1 (stopping at 0) gives `min`. Then `Kmin = Hmin = 10000`,
+`Kmax = Hmax = -10000`, and for each unripped vertex: `k1 > max1` → `max1`, `k2 > max2` → `max2`, `k1
+< min1` → `min1`, `k2 < min2` → `min2` (each counted), `K` and `H` recomputed, the extremes updated as
+in 103.4. When any was clipped: `%d vertices thresholded to be in k1 ~ [%2.2f %2.2f], k2 ~ [%2.2f
+%2.2f]` (count, `min1`, `max1`, `min2`, `max2`) on standard error. Return 0.
+
+**103.7 At one vertex** (`MRIScomputeSecondFundamentalFormAtVertex(mris, vno, vertices, vnum)`): 0
+for a plane; -4 (`ERROR_BADPARM`) for a ripped vertex or `vnum` at or below 0. One pass of 103.2 over
+the given vertices without a threshold: every unripped one's row taken (`r` increases for each), its
+`k` kept for the extremes only when `rsq` is not below `FLT_EPSILON`. The solve as 103.3, except: a
+singular `Uᵀ U` gives eigenvalues 0 with the eigenvector matrix **of the last call that computed
+one** (the function keeps it between calls; zeros before the first) and goes on to the vertex's
+curvatures; `cond >= 500000` sets `k1 = kmax`, `k2 = kmin` and `K`, `H` to the surface's `Kmin`, `Hmin`
+when `kmin kmax < 0`, else `Kmax`, `Hmax`, and returns -4; a failed eigensystem gives the singular
+values' curvatures and -4. The vertex's curvatures as 103.4 but `Ktotal = ((double)k2 k1) area +
+Ktotal`, `e1z = a11 e1z + e2z a21`, `e2z = a12 e1z + e2z a22`; no file; with `DIAG_SHOW` and a
+singular fit `1 ill-conditioned points`. Return 0.
+
+## 104. The gradients' averaging (queue item 3.1-51; relay 20)
+
+**104.1 `MRISaverageGradients(mris, num_avgs)`**: with `Gdiag_no` above 0 and `DIAG_VERBOSE`,
+`MRISaverageGradients()` on standard output. Nothing more for `num_avgs` at or below 0. With
+`Gdiag_no` at or above 0 (a vertex of the surface): `before averaging %d times dot = %2.2f ` (the dot
+`(dx nx + dy ny) + dz nz` of that vertex's gradient and normal). The vertices that change are the
+unripped ones with at least one unripped first-`vnum` neighbour (counted with repeats). `num_avgs`
+passes: each such vertex's new gradient is `(d + d1 + ... + dk) * (1.0f / (k + 1))` (its own and its
+unripped neighbours' gradients from the previous pass, summed in order; multiplied by the `float`
+reciprocal, **not** divided); the other vertices keep theirs; `tdx`... are untouched. **FS-379**
+(class a, memory): when a vertex's unripped neighbour has no unripped neighbour of its own (neighbour
+lists that are not symmetric), FreeSurfer counts it but leaves it out of the vertex's list and reads
+other vertices' neighbours (and past its list for the last); both modes average with that
+neighbour's unchanged gradient, noted. With more than 150 passes, the first such call of the program
+reads `FREESURFER_MRISaverageGradients_optimize_suppress` and, when it is set, writes
+`FREESURFER_MRISaverageGradients_optimize_suppress so not optimizing` (standard output); the
+numbers do not change. With `Gdiag_no` at or above 0: ` after dot = %2.2f D = (%2.2f, %2.2f, %2.2f),
+N = (%2.1f, %2.1f, %2.1f)` (the dot `(nx dx + ny dy) + nz dz`, the gradient, the normal). Return 0.
+
+**104.2 `MRISaverageGradientsFast(mris, num_avgs)`**: with `Gdiag_no` above 0 and `DIAG_VERBOSE`,
+`MRISaverageGradientsFast()`. `num_avgs` passes in which each unripped vertex's gradient becomes `(d +
+d1 + ... + dk) / (k + 1)` over its own and its unripped neighbours' previous gradients (a vertex
+without unripped neighbours keeps its own); at the end each unripped vertex's `tdx, tdy, tdz` copy its
+gradient. Return 0.
+
+**104.3 `mrisAverageSignedGradients(mris, num_avgs)`**: nothing for `num_avgs` at or below 0. With
+`Gdiag_no` at or above 0: `before averaging dot = %2.2f ` (as 104.1's). `num_avgs` passes: each
+unripped vertex sums, in `double`, its own gradient and those of its unripped first-`vnum` neighbours
+whose dot product with its own (`(v.dx n.dx + v.dy n.dy) + v.dz n.dz`, `float`) is not below 0 (a NaN
+counts), divides by the count (as a `float`, then `double`) into `tdx, tdy, tdz` (`float`), then every
+unripped vertex's gradient becomes its `td`. With `Gdiag_no` at or above 0: ` after dot = %2.2f
+(%2.3f, %2.3f, %2.3f)`. Return 0.
+
+## 105. Surface bookkeeping (queue item 3.1-51; relay 20)
+
+**105.1 `MRISrescaleMetricProperties(surf)`**: 0 when `group_avg_surface_area` is 0. Else `scale =
+sqrt((double)group_avg_surface_area / total_area)` (a negative ratio: NaN, `errno` `EDOM`), `scale =
+%lf` on standard output, `s2 = scale scale`; each unripped vertex's area `(float)(area s2)` and its
+distance to each unripped first-`vnum` neighbour `(float)(dist scale)`; `total_area = (float)(total_area
+s2)`; `avg_vertex_dist = scale avg`, `std_vertex_dist = std scale`, `avg_vertex_area = s2 avg` (`double`).
+Returns `scale`.
+
+**105.2 `MRISnormalize(mris, dof, which)`**: `dof` at or below 0: `MRISnormalize: invalid dof %d` as
+an error (§2), return -4. Else for each unripped vertex: `which` 2 (`VERTEX_AREA`): `origarea =
+origarea / dof`; 3 (`VERTEX_CURV`): `curv = curv / dof`; anything else: `val = val / dof`; the result is
+`m`; then `val2 = val2 / dof - m m` (`dof` as `float`). Return 0.
+
+**105.3 `MRISupdateSurface(mris)`**: the metric properties (§38), then §103 with -1. Return 0.
+
+**105.4 Orientation changes** (`MRISmarkOrientationChanges(mris)`; messages on standard error): every
+unripped vertex's `curv` 0 (`MRISclearCurvature`, §22); then for each unripped vertex `v0`: `vertex %d
+without neighbors ! ` + newline and `curv -5` when `vnum` is 0; `vertex %d without faces ! ` + newline
+when it has no face; for each first-`vnum` neighbour `v1`: if ripped, `vertex %d connected to ripped
+vertex %d !` + newline + a blank; the faces through the edge: for each other neighbour `v2 != v1` (in
+order) whose triple `(v0, v1, v2)` is a face (a face of `v0` whose three vertices are all among the
+three; the first such face in `v0`'s list), counted, the first one's face number `f1`, the latest
+other one's `f2` (both kept across edges and vertices, 0 at the start). One face: `edge (%d<-->%d) has
+one single face %d !` (`f1`), `curv -2`; none: `edge (%d<-->%d) has no face !`, `curv -3`; more than
+two: `edge (%d<-->%d) has too many faces (at least : %d %d) !`, `curv -4`; two whose orientations agree
+(the orientation of face `f` from `a` to `b`: 1 when its corners 0, 1 are `a, b`, or 1, 2 are `a, b`,
+or `a` is at neither 0 nor 1 and corner 0 is `b`; else -1; the two orientations' product above 0):
+`curv -1`, a newline then `defective orientation at vertex %d(%d) with faces %d and %d`, counted. At
+the end a newline then `%2.3f %% of the vertices (%d vertices) exhibit an orientation change` with
+`100 count / nvertices` (`double`; 0/0 the default NaN). Returns the count.
+
+**105.5 `mrisCheckSurface(mris)`**: for each unripped face, for each of its corners whose vertex's
+face list lacks the face: `mrisCheckSurface: %s: face[%d].v[%d] = %d, but face %d not in vertex %d face
+list` (the surface's file name) on standard output. Return 0.
+
+**105.6 `MRISsubsampleDist(mris, spacing)`** (`float`): every vertex's `d = 10000`, `val = 0`. Forward,
+for each vertex `k`: for each first-`vnum` neighbour `m`, `d_m + 1 < d_k` → `d_k = d_m + 1`; then
+`d_k >= spacing` → `d_k = 0`, `val = 1`, counted; then for each neighbour `d_m > d_k + 1` → `d_m = d_k +
+1`. Backward, for each vertex from the last: for each neighbour both updates in that order. When
+`spacing` is 2: for each vertex with `d > 0`: when at most two neighbours have `d == 0`, it becomes
+`d = 0`, `val = 1`, `fixedval` 1, counted; and its neighbours' `d` lowered as above. Returns the count.
+
+**105.7 `MRISextendedNeighbors(surf, targ, cur, thresh, list, dots, &n, max, type)`** (recursive,
+depth first): returns 0 when `cur`'s `val2bak`, converted to an integer as x86-64 truncates (`INT_MIN`
+for a NaN or out of range), equals `targ`, or when `cur` is ripped. At `cur == targ` the count `n`
+becomes 0. With `type` 1: `p = |(double)((cy ty + tx cx) + tz cz)|` (`float` products and sums of
+the two vertices' current positions), 0 when `p <= thresh` (a NaN goes on); otherwise `p =
+|dx² + dy² + dz²|` (`double` squares of the `float` differences target minus current; `(x² + y²) +
+z²`), 0 when `p >= thresh`. Returns 1 when `n >= max - 1`. Else `cur` and `p` are appended, `n`
+increases, `cur`'s `val2bak = (float)targ`, and each first-`vnum` neighbour of `cur` is searched in
+order; the first non-zero result is returned; else 0.
+
+**105.8 `MRISunion(a, b)`**: when the volume geometries differ (fs.volume's `vg_isEqual`): `ERROR:
+MRISunion() - VolGeom of both surface are not the same!!!` (standard output), no surface; when
+`useRealRAS` differs: `ERROR:  MRISunion() - input surfaces are not in the same space!!!` (two
+blanks), no surface. Else a new surface (`MRISalloc` of both counts) with `a`'s `useRealRAS` and
+volume geometry, `a`'s then `b`'s vertex positions (only the positions, set as §14's `MRISsetXYZ`),
+`a`'s faces then `b`'s with `b`'s vertex numbers plus `a`'s vertex count.
+
+**105.9 `MRISclone(src)`**: a new surface (`MRISalloc`) receiving: type, status, `origxyz_status`,
+`nsize`, `max_nsize`, `vtotalsMightBeTooBig`, `nsizeMaxClock`, hemisphere, centre, bounding box,
+curvature extremes, total and original area, radius, average vertex area, average distance and its
+spread, the transform and its two matrices (FreeSurfer shares them; a copy here), `free_transform` 0,
+the three poles (the same vertex numbers), the volume geometry; per vertex: rip flag, current
+position, normal, canonical position, curvature, face list and its places, `vnum` (§5's counter
+with its maximum message), `v2num`, `v3num`, `nsizeMax`, `nsizeMaxClock`, `nsizeCur` (setting `vtotal`
+as §88's `MRIS_setNsizeCur`), the neighbour list (its whole room), the distances and original
+distances when the source has them, border, area, original area; every face whole (its normal
+matrices copied). Every other field is the new surface's (zero).
+
+**105.10 Vertex reports.** `MRISprintVertexStats(mris, vno, fp, which)` (standard output whatever
+`fp`): nothing for `vno` below 0; `vertex %d spacing for %s surface` (`orig`, `current`, `white` for
+those coordinate sets, else `unknown`); per first-`vnum` neighbour, a ripped one's `nbr %d = %d is
+ripped`, else `\tvn %d: %d = %2.3f mm distant` with `sqrtf(dz² + (dx² + dy²))` of the `which`
+positions' difference (§3's `MRISvertexCoord2XYZ_float`, which refuses some sets); `\tmean = %2.3f`
+(the distances summed as `d + sum` in `double`, divided by the count; 0/0 a NaN). Return 0.
+`MRISprintVertexInfo(fp, surf, vno)`: into `fp`: `vertexno %d`, `xyz  %7.4f %7.4f %7.4f`, `nxyz %7.4f
+%7.4f %7.4f`, `vertex_area %lf`, `neighbors %d %d` (`vnum`, number of faces); then for `n` from 0 to
+the number of faces (sic) `nbr %d  %5d %6.4lf %6.4lf %5d %6.4f`: `n`, the `n`-th entry of the neighbour
+list, `sqrt((dx² + dy²) + dz²)` (`double` of the `float` differences vertex minus neighbour), the
+neighbour's area, the `n`-th face and its area. **FS-380** (class a, memory): a vertex with more
+faces than room in its neighbour list makes FreeSurfer read past the list; both modes stop at its
+end (noted). Then, when the surface has edges, for each edge with the vertex at end 0 or 1: `Edge
+%6d %d  %4d %4d %7.3lf %7.3lf` (edge, end, its two vertices, length, angle) on standard output. Return
+0.
+
+**105.11 Not yet specified here** (their items wait on other modules): `mrisFindMiddleOfGray`,
+`mrisMarkIntersections`, `MRISprintSurfQualityStats`, `MRISprettyPrintSurfQualityStats`, the
+volume users and the label users of `mrisurf_metricProperties.cpp` lines 11687-12041 and 12395-13180,
+`MRISaverageGradientsFastCheck`.
+
+## 106. Validation plan, part 18
+
+The probe's `mpe` command (relay 20): an empty work folder with `d`; `Gdiag`'s show, verbose and
+(one case in six) write bits; a binary triangle file read by `MRISread` (icosahedra subdivided once
+or twice on a sphere of radius 1, 10, 50 or 100, open grids of 2 to 6 by 2 to 6, `srd`'s meshes);
+the status (one case in four), `Kmin`, `Kmax`, `Hmin`, `Hmax` (one in three), `Gdiag_no` (one in five
+a vertex) and `FREESURFER_MRISaverageGradients_optimize_suppress` (one in three) given before the
+read; per vertex a mask (ripped, a mark, position, normal, curvature, `k1 k2`, `K H`, area, original
+position, gradient, `val val2 origarea`), per face (ripped, area, cached original area, cached
+normal), values as `mpd`'s (NaNs and infinities in one case in five); then 1 to 4 operations of
+§102-105: smoothed normals (0 to 3), boundary normals, mean curvature, the curvature choices (three
+functions for `MRISusePrincipalCurvatureFunction`: `k1 + 1`, `k2 * 0.5`, the larger), curvature
+indices, largest radius, mean and spread (with or without the spread), negative faces' marks (-1 to
+3) and rips, the second fundamental form (threshold -1 one in three, else 0.999, 0.99, 0.9, 0.5, 0, 1,
+0.75 or a NaN), at one vertex (1 to 3 calls; the tangent planes first one in four; the neighbours of
+the vertex's faces, none one in eight, random ones one in eight), the three averagings (-1 to 6
+passes, 151 to 156 one in eight), rescaling (the group area 0, 100, 1000, 2.5, 50000 or -4), the
+normalisation (`dof` -1 to 7, `which` 0 to 10), the update, orientation changes, the face-list
+check, subsampling (spacing 0.5 to 4), extended neighbours (`val2bak` reset to -1 one in four; a
+target; type 1 with thresholds 0 to 2500 or type 0 with 0.25 to 10000; at most 1 to 40), the union
+with a clone (equal, `useRealRAS` flipped, the geometry changed), the clone, both vertex reports.
+Each prints its result and what it changes; `DIAG_WRITE`'s files (`curv.dat`, `k1.plt`, `k2.plt`) by
+length and FNV-1a hash. Counted, not compared: FS-376, FS-379, FS-380, and FS-48's matrices on which
+FreeSurfer hangs (the probe's alarm ends it). FS-377's cases compare as FreeSurfer's crash.
+Observed (relay 20): the probe README.

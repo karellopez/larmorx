@@ -17,7 +17,7 @@ use super::*;
 
 use larmorx_freesurfer_core::diag::DIAG_WRITE;
 use larmorx_freesurfer_core::sse;
-use larmorx_freesurfer_surf::{facenorm, props, props5, props6, props7, readwrite};
+use larmorx_freesurfer_surf::{facenorm, props, props5, props6, props7, props8, readwrite};
 
 fn fh(t: &mut Vec<String>, g: &mut Gen, heavy: bool) {
     t.push(format!("{:08x}", smallish(g, heavy)));
@@ -110,6 +110,7 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
             (128, 6),
             (256, 20),
             (512, 3),
+            (1024, 4),
         ] {
             if g.chance(if few { k * 4 } else { k }) {
                 mask |= bit;
@@ -148,6 +149,11 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 fs(t, g, heavy);
             }
         }
+        if mask & 1024 != 0 {
+            for _ in 0..3 {
+                fs(t, g, heavy);
+            }
+        }
     }
     for _ in 0..nf {
         let mut mask = 0;
@@ -176,7 +182,8 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
             "ssn", "ssn", "cbn", "cmc", "cmc", "cmc", "uae", "uae", "ugc", "umc", "upc", "uk1",
             "uk1", "uk2", "upf", "upf", "cci", "cci", "mxr", "mxr", "cac", "cac", "mnv", "rnv",
             "sff", "sff", "sff", "sff", "sff", "sff", "sfa", "sfa", "sfa", "agr", "agr", "agr",
-            "agf", "ags", "ags",
+            "agf", "ags", "ags", "rmp", "nrm", "nrm", "ups", "moc", "moc", "cks", "ssd", "ssd",
+            "xnb", "xnb", "uni", "cln", "cln", "pvs", "pvi", "pvi",
         ]);
         t.push(op.to_owned());
         match op {
@@ -200,6 +207,41 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
                     g.int(-1, 6)
                 },
             ),
+            "rmp" => {
+                let a = if g.chance(5) {
+                    0.0f32
+                } else {
+                    g.pick(&[100.0f32, 1000.0, 2.5, 50000.0, -4.0])
+                };
+                t.push(format!("{:08x}", a.to_bits()));
+            }
+            "nrm" => {
+                ix(t, g.pick(&[1, 2, 3, 0, -1, 7]));
+                ix(t, g.pick(&[2, 3, 10, 1, 0]));
+            }
+            "ssd" => t.push(format!(
+                "{:08x}",
+                g.pick(&[2.0f32, 1.0, 3.0, 1.5, 0.5, 4.0]).to_bits()
+            )),
+            "xnb" => {
+                ix(t, i64::from(g.chance(4)));
+                ix(t, g.int(0, nv - 1));
+                let dist = g.int(0, 1);
+                let th = if dist == 1 {
+                    g.pick(&[0.5, 0.9, 0.0, 0.99, 50.0, 2500.0])
+                } else {
+                    g.pick(&[1.0, 4.0, 100.0, 0.25, 10000.0])
+                };
+                t.push(format!("{:016x}", f64::to_bits(th)));
+                ix(t, g.int(1, 40));
+                ix(t, dist);
+            }
+            "uni" => ix(t, g.int(0, 2)),
+            "pvs" => {
+                ix(t, g.int(-1, nv - 1));
+                ix(t, g.pick(&[0, 2, 7, 9, 0, 3]));
+            }
+            "pvi" => ix(t, g.int(0, nv - 1)),
             "sfa" => {
                 // the tangent planes first or not, then 1 to 3 calls: a vertex and its neighbours
                 // (mostly the mesh's own, as a fan of its faces; now and then none or any)
@@ -241,6 +283,19 @@ fn dump_curv(o: &mut Out, s: &Mris) {
     o.f(s.max_curv);
     for vno in 0..s.nvertices.max(0) as usize {
         o.f(s.vertex(vno).curv);
+    }
+}
+
+/// A vertex's distances to its first `vnum` neighbours, or `N` when it has none.
+fn dump_dist(o: &mut Out, s: &Mris, vno: usize) {
+    match s.vertex(vno).dist.as_deref() {
+        None => o.s("N"),
+        Some(d) => {
+            let n = usize::try_from(s.topology(vno).vnum).unwrap_or(0);
+            for x in &d[..n.min(d.len())] {
+                o.f(*x);
+            }
+        }
     }
 }
 
@@ -357,6 +412,9 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         }
         if m & 512 != 0 {
             [v.dx, v.dy, v.dz] = [t.f(), t.f(), t.f()];
+        }
+        if m & 1024 != 0 {
+            [v.val, v.val2, v.origarea] = [t.f(), t.f(), t.f()];
         }
     }
     for fno in 0..nf as usize {
@@ -492,6 +550,166 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                         o.f(x);
                     }
                 }
+            }
+            "rmp" => {
+                s.group_avg_surface_area = t.f();
+                o.d(props8::rescale_metric_properties(g, &mut io, &mut s));
+                o.f(s.total_area);
+                o.d(s.avg_vertex_dist);
+                o.d(s.std_vertex_dist);
+                o.d(s.avg_vertex_area);
+                for vno in 0..s.nvertices.max(0) as usize {
+                    o.f(s.vertex(vno).area);
+                    dump_dist(o, &s, vno);
+                }
+                o.i(i64::from(g.errno));
+            }
+            "nrm" => {
+                let (dof, which) = (t.i(), t.i());
+                o.i(i64::from(props8::normalize(g, &mut io, &mut s, dof, which)));
+                for vno in 0..s.nvertices.max(0) as usize {
+                    let v = s.vertex(vno);
+                    for x in [v.origarea, v.curv, v.val, v.val2] {
+                        o.f(x);
+                    }
+                }
+            }
+            "ups" => {
+                o.i(i64::from(props8::update_surface(
+                    g, sg, &mut io, d, &mut s,
+                )?));
+                o.f(s.total_area);
+                o.d(s.Ktotal);
+                for vno in 0..s.nvertices.max(0) as usize {
+                    let v = s.vertex(vno);
+                    for x in [v.area, v.nx, v.k1, v.k2, v.K, v.H] {
+                        o.f(x);
+                    }
+                }
+            }
+            "moc" => {
+                o.i(i64::from(props8::mark_orientation_changes(&mut s, &mut io)));
+                for vno in 0..s.nvertices.max(0) as usize {
+                    o.f(s.vertex(vno).curv);
+                }
+            }
+            "cks" => o.i(i64::from(props8::check_surface(&s, &mut io))),
+            "ssd" => {
+                o.i(i64::from(props8::subsample_dist(&mut s, t.f())));
+                for vno in 0..s.nvertices.max(0) as usize {
+                    let v = s.vertex(vno);
+                    o.f(v.d);
+                    o.f(v.val);
+                    o.i(i64::from(v.fixedval));
+                }
+            }
+            "xnb" => {
+                if t.i() != 0 {
+                    for vno in 0..s.nvertices.max(0) as usize {
+                        s.vertex_mut(vno).val2bak = -1.0;
+                    }
+                }
+                let targ = t.i();
+                let th = t.d();
+                let (max, dist) = (t.i(), t.i());
+                // the caller's count as fssurfio.cpp leaves it (-7) until the search sets it
+                let mut found = props8::ExtendedNeighbors {
+                    n: -7,
+                    ..Default::default()
+                };
+                o.i(i64::from(props8::extended_neighbors(
+                    &mut s, targ, targ, th, &mut found, max, dist,
+                )));
+                o.i(i64::from(found.n));
+                for (v, x) in found.vno.iter().zip(&found.dot) {
+                    o.i(i64::from(*v));
+                    o.d(*x);
+                }
+                for vno in 0..s.nvertices.max(0) as usize {
+                    o.f(s.vertex(vno).val2bak);
+                }
+            }
+            "uni" => {
+                let mode = t.i();
+                let mut c = props8::clone(g, sg, &mut io, &s)?;
+                if mode == 1 {
+                    c.useRealRAS = i32::from(s.useRealRAS == 0);
+                } else if mode == 2 {
+                    c.vg.c_r += 1.0;
+                }
+                match props8::union(g, sg, &mut io, &s, &c)? {
+                    None => o.s("NULL"),
+                    Some(u) => {
+                        o.i(i64::from(u.nvertices));
+                        o.i(i64::from(u.nfaces));
+                        o.i(i64::from(u.useRealRAS));
+                        for vno in 0..u.nvertices.max(0) as usize {
+                            let v = u.vertex(vno);
+                            for x in [v.x, v.y, v.z] {
+                                o.f(x);
+                            }
+                        }
+                        for fno in 0..u.nfaces.max(0) as usize {
+                            for x in u.face(fno).v {
+                                o.i(i64::from(x));
+                            }
+                        }
+                    }
+                }
+            }
+            "cln" => {
+                let c = props8::clone(g, sg, &mut io, &s)?;
+                for x in [
+                    c.total_area,
+                    c.orig_area,
+                    c.min_curv,
+                    c.max_curv,
+                    c.xlo,
+                    c.zhi,
+                ] {
+                    o.f(x);
+                }
+                o.i(i64::from(c.status.0));
+                o.d(c.avg_vertex_dist);
+                for vno in 0..c.nvertices.max(0) as usize {
+                    let v = c.vertex(vno);
+                    for x in [
+                        v.x, v.nx, v.cx, v.curv, v.area, v.origarea, v.origx, v.val, v.k1,
+                    ] {
+                        o.f(x);
+                    }
+                    o.i(i64::from(v.ripflag));
+                    let vt = c.topology(vno);
+                    o.i(i64::from(vt.vnum));
+                    o.i(i64::from(vt.vtotal));
+                    o.i(i64::from(vt.num));
+                    let n = usize::try_from(vt.vtotal).unwrap_or(0);
+                    for x in &vt.v.as_deref().unwrap_or(&[])[..n] {
+                        o.i(i64::from(*x));
+                    }
+                    dump_dist(o, &c, vno);
+                }
+                for fno in 0..c.nfaces.max(0) as usize {
+                    let f = c.face(fno);
+                    for x in f.v {
+                        o.i(i64::from(x));
+                    }
+                    o.f(f.area);
+                    o.i(i64::from(f.ripflag));
+                }
+            }
+            "pvs" => {
+                let (vno, which) = (t.i(), t.i());
+                o.i(i64::from(props8::print_vertex_stats(
+                    g, &mut io, &s, vno, which,
+                )?));
+            }
+            "pvi" => {
+                let vno = t.i() as usize;
+                let mut fp = cx.a.clone();
+                o.i(i64::from(props8::print_vertex_info(
+                    g, &mut io, &mut fp, &s, vno,
+                )));
             }
             "sfa" => {
                 if t.i() != 0 {

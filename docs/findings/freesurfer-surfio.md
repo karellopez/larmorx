@@ -1252,3 +1252,76 @@ and calls with their targets):
   determine type`. `mghRead`'s `Could not find the direction cosine information ... please provide the
   information in <absolute path>` names the work folder: both probes write it `<w>` (`fssurfio.cpp`'s
   parent replaces its `workdir`; the port's `Ctx::work`).
+
+## 22. Queue item 3.1-51's rest: curvature choices, the second fundamental form, the gradients' averaging, the surface bookkeeping (relay 20)
+
+Ported: `src/props5.rs` to `src/props8.rs` (PROVENANCE rows `props5` to `props8`); behaviour in
+`specs/freesurfer-surfio.md` §102-107. Operand orders read from the unit oracle's
+`mrisurf_metricProperties.cpp.o` (`<scratch>/D/relay20/fr.sh`, `fx.sh`; the OpenMP-outlined loops
+`MRISaverageGradients(MRIS*, int) [clone ._omp_fn.29]` and `mrisAverageSignedGradients ... ._omp_fn.34`):
+
+- **`MRIScomputeMeanCurvature`**: `u = (e1x yx + e1y yy) + e1z yz` with `e1`'s element the
+  destination (`mulss` into the matrix value), likewise `v`; `rsq = u u + v v`; `z = vz nz + (vy ny +
+  vx nx)` (the offset's element the destination, the sum from the end); `H += q`; `0.5f H / N` as
+  `H * 0.5`, then `/ (float)N`; the extremes by `minss`/`maxss` with C's semantics. `FZERO(rsq)`
+  compiled as `eps > rsq` (the `fabs` dropped: a sum of squares).
+- **The curvature indices**: `ici = K area + ici`, `fi = (area |k1|) (|k1| - |k2|) + fi` (glibc's
+  `fabs` called, -fno-builtin), then `/ (4 pi)` folded.
+- **`MRISmaxRadius`**: `(lo + hi) * 0.5` (the `/ 2.0f` folded), squares `(x² + y²) + z²`, libm's
+  `sqrt`; the bounding box by `minsd`/`maxsd`.
+- **`MRIScomputeAverageCurvature`**: `total_sq + d²`, `total + d`; glibc's `sqrt` (a negative
+  variance: `EDOM`, the default NaN).
+- **`MRISuseAreaErrors`** divides by `n`, never incremented: `(float)0` (FS-374, rule A: by the face
+  count). `MRISuseK1Curvature`, `MRISuseK2Curvature`, `MRISusePrincipalCurvatureFunction` start the
+  extremes at `vertices[0].curv` (FS-375, rule A; with no vertices a read past the array, FS-376).
+- **`MRIScomputeSecondFundamentalFormThresholded`**: per neighbour the row is written at `n + 1`
+  before the validity test, so the last rejected neighbour after the last accepted one stays in the
+  fit (the full `vtotal` x 3 matrix, zeros elsewhere: ported as is). `u = (e1x yx + e1y yy) + e1z yz`,
+  `v = (yy e2y + yx e2x) + yz e2z` (the offset the destination), `z = (nx yx + ny yy) + nz yz`;
+  `2 u v` as `(u + u) v`; `rsq = (float)(v v + u u)`; `rsq_thresh *= 0.25` as `0.25 * thresh`;
+  `MIN(vmean * .25, 1.0)` as `vmean * 0.25 < 1 ? .. : 1` (a NaN gives 1). The Hessian's `2 c` as `c +
+  c`; `K = k1 k2`, `H = (k1 + k2) * 0.5` in every branch; `Ktotal = (k1 k2) area + Ktotal` (`double`);
+  the tangent planes `e1x = e2x a21 + e1x a11`, `e1y = e1y a11 + e2y a21`, `e1z = a21 e2z + a11 e1z`,
+  `e2x = e1x a12 + e2x a22`, `e2y = e1y a12 + e2y a22`, `e2z = a12 e1z + a22 e2z`. The outlier
+  removal: bins `nint((k - min) scale)`, counts `1 + count`, the bins' values `bin / scale + min`
+  (vectorised `divpd`/`addpd`, the same numbers), the totals `total + count`, `thresh = total *
+  pct`; the clamps compare against the `float` bin values. A bin outside the histogram writes far
+  outside it (FS-377: a segmentation fault, reproduced as `CRASH 11` by the probe's runner); with no
+  unripped vertex the peak is -1 and the loops read one place before (FS-378; no vertex to clip).
+  `MatrixConditionNumber` on a matrix with NaN or infinite entries can hang in LINPACK's `ssvdc`
+  (FS-48, track A's: `vnl_svd_f32_full(..).never_returns()`); the probe's alarm ends the official
+  build there, and the runner marks those cases `FS-48h` (counted, not compared).
+- **`MRIScomputeSecondFundamentalFormAtVertex`** (no caller): its own compiled orders differ:
+  `Ktotal = (k2 k1) area + Ktotal`, `e1z = a11 e1z + e2z a21`, `e2z = a12 e1z + e2z a22`; its
+  matrices are function statics: a singular fit leaves the eigenvectors of the last successful call
+  (zeros before the first), modelled by `SurfGlobals::sff_at_vertex_eigen`.
+- **`MRISaverageGradients`**: under `HAVE_OPENMP` the fast path is never taken (`UFSS = "0"`). The
+  indexed algorithm: `dx + nb.dx` in the neighbours' order, `inv = 1.0f / (k + 1)`, `dx * inv` (a
+  multiplication by the reciprocal, not a division: its rounding differs from
+  `MRISaverageGradientsFast`'s `sum / n`). The optimisation for more than 150 passes only permutes
+  the work (the same numbers) and reads `FREESURFER_MRISaverageGradients_optimize_suppress` once per
+  program (message when set). The vertex table counts every unripped neighbour but lists only those
+  with an index, so an asymmetric neighbour list reads other vertices' entries and, for the last,
+  past the list (FS-379, both modes average with the left-out neighbour's unchanged gradient). The
+  `Gdiag_no` lines: before `(dx nx + dy ny) + dz nz`, after `(nx dx + ny dy) + nz dz`.
+- **`mrisAverageSignedGradients`**: `dot = (v.dx vn.dx + v.dy vn.dy) + v.dz vn.dz` (`float`, the
+  vertex's own value the destination), the sums in `double` (`dx + vn.dx`), `/ (double)(float)num`.
+- **`MRISrescaleMetricProperties`**: `scale²` once; `area * s²`, `dist * scale`, `total_area * s²` in
+  `double`; `avg_vertex_dist = scale * avg`, `avg_vertex_area = s² * avg`, `std = std * scale`.
+- **`MRISextendedNeighbors`**: `(int) val2bak` by `cvttss2si` (x86: `INT_MIN` out of range);
+  `DotProd = (cy ty + tx cx) + tz cz`, `fabs` in `double`; the squared distance from `float`
+  differences.
+- **`MRISprintVertexStats`**: `d = sqrtf(dz² + (dx² + dy²))`, `mn = d + mn`. **`MRISprintVertexInfo`**
+  loops over `num` (faces) but indexes the neighbour list: a vertex with more faces than room in its
+  list reads past it (FS-380); the edges are printed with `printf` whatever `fp` is.
+- **`MRISclone`** shares the transform pointer (`free_transform = 0`); the port copies the LTA
+  (`LTAcopy`, silent). Fields not copied (`origx`, `val`, `k1`, ...) are the new surface's zeros.
+- **Not ported** (waiting): `mrisFindMiddleOfGray` (needs `mrisurf_vals.cpp`'s `MRISaverageCurvatures`,
+  fs.surf), `mrisMarkIntersections` (MHT), `MRISprintSurfQualityStats`,
+  `MRISprettyPrintSurfQualityStats` (the edge and corner statistics), the MRI users
+  (`MRISbinarizeVolume`, `MRISarN`, `MRISsmoothKernel`, `MRISar1`, `MRIScrsLUT`, `MRISmarkEdge`,
+  `MRIcomputeLaminarVolumeFractions`, `MRISmaxEdgeStatToOverlay`, `mriSurfaceRASToVoxel`), the label
+  users (`MRISmaskLabel`, `MRISmaskNotLabel`) and `MRISaverageGradientsFastCheck` (a self-test on
+  `fsaverage`'s `lh.white` with `drand48`; no program calls it).
+- **Probe**: the 41st command `mpe` (tests/fs_surfio/mpe.rs; fssurfio.cpp `mpe_case`), the files
+  `DIAG_WRITE` writes (`curv.dat`, `k1.plt`, `k2.plt`) compared by length and FNV-1a hash.

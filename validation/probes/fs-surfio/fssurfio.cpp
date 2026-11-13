@@ -2805,6 +2805,14 @@ void file_hash(const char *name)
   remove(name);
 }
 
+// a vertex's distances to its first vnum neighbours, or N when it has none
+void dump_dist_n(MRIS *s, int vno)
+{
+  VERTEX *v = &s->vertices[vno];
+  if (!v->dist) { out += "N "; return; }
+  for (int k = 0; k < s->vertices_topology[vno].vnum; k++) of(v->dist[k]);
+}
+
 void dump_curv_only(MRIS *s)
 {
   of(s->min_curv); of(s->max_curv);
@@ -2860,6 +2868,7 @@ void mpe_case()
     if (m & 128) v->area = getf();
     if (m & 256) { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
     if (m & 512) { v->dx = getf(); v->dy = getf(); v->dz = getf(); }
+    if (m & 1024) { v->val = getf(); v->val2 = getf(); v->origarea = getf(); }
   }
   for (int fno = 0; fno < nf; fno++) {
     int m = geti();
@@ -2941,6 +2950,83 @@ void mpe_case()
         VERTEX *v = &s->vertices[vno];
         of(v->dx); of(v->dy); of(v->dz); of(v->tdx); of(v->tdy); of(v->tdz);
       }
+    } else if (op == "rmp") {
+      s->group_avg_surface_area = getf();
+      od(MRISrescaleMetricProperties(s));
+      of(s->total_area); od(s->avg_vertex_dist); od(s->std_vertex_dist); od(s->avg_vertex_area);
+      for (int vno = 0; vno < s->nvertices; vno++) { of(s->vertices[vno].area); dump_dist_n(s, vno); }
+      oi(errno);
+    } else if (op == "nrm") {
+      int dof = geti(), which = geti();
+      oi(MRISnormalize(s, dof, which));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->origarea); of(v->curv); of(v->val); of(v->val2);
+      }
+    } else if (op == "ups") {
+      oi(MRISupdateSurface(s));
+      of(s->total_area); od(s->Ktotal);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->area); of(v->nx); of(v->k1); of(v->k2); of(v->K); of(v->H);
+      }
+    } else if (op == "moc") {
+      oi(MRISmarkOrientationChanges(s));
+      for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+    } else if (op == "cks") {
+      oi(mrisCheckSurface(s));
+    } else if (op == "ssd") {
+      oi(MRISsubsampleDist(s, getf()));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->d); of(v->val); oi(v->fixedval);
+      }
+    } else if (op == "xnb") {
+      if (geti()) for (int vno = 0; vno < s->nvertices; vno++) s->vertices[vno].val2bak = -1;
+      int targ = geti();
+      double th = getd();
+      int max = geti(), dist = geti();
+      std::vector<int> nb(max > 0 ? max : 1);
+      std::vector<double> dp(max > 0 ? max : 1);
+      int n = -7;
+      oi(MRISextendedNeighbors(s, targ, targ, th, nb.data(), dp.data(), &n, max, dist));
+      oi(n);
+      for (int k = 0; k < n; k++) { oi(nb[k]); od(dp[k]); }
+      for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].val2bak);
+    } else if (op == "uni") {
+      int mode = geti();
+      MRIS *c = MRISclone(s);
+      if (mode == 1) c->useRealRAS = !s->useRealRAS;
+      else if (mode == 2) c->vg.c_r += 1;
+      MRIS *u = MRISunion(s, c);
+      if (!u) out += "NULL ";
+      else {
+        oi(u->nvertices); oi(u->nfaces); oi(u->useRealRAS);
+        for (int vno = 0; vno < u->nvertices; vno++) { of(u->vertices[vno].x); of(u->vertices[vno].y); of(u->vertices[vno].z); }
+        for (int fno = 0; fno < u->nfaces; fno++) for (int k = 0; k < 3; k++) oi(u->faces[fno].v[k]);
+      }
+    } else if (op == "cln") {
+      MRIS *c = MRISclone(s);
+      of(c->total_area); of(c->orig_area); of(c->min_curv); of(c->max_curv); of(c->xlo); of(c->zhi);
+      oi(c->status); od(c->avg_vertex_dist);
+      for (int vno = 0; vno < c->nvertices; vno++) {
+        VERTEX *v = &c->vertices[vno];
+        VERTEX_TOPOLOGY *vt = &c->vertices_topology[vno];
+        float x[9] = {v->x, v->nx, v->cx, v->curv, v->area, v->origarea, v->origx, v->val, v->k1};
+        for (float y : x) of(y);
+        oi(v->ripflag); oi(vt->vnum); oi(vt->vtotal); oi(vt->num);
+        for (int k = 0; k < vt->vtotal; k++) oi(vt->v[k]);
+        dump_dist_n(c, vno);
+      }
+      for (int fno = 0; fno < c->nfaces; fno++) {
+        FACE *f = &c->faces[fno];
+        oi(f->v[0]); oi(f->v[1]); oi(f->v[2]); of(f->area); oi(f->ripflag);
+      }
+    } else if (op == "pvs") {
+      int vno = geti(), which = geti();
+      oi(MRISprintVertexStats(s, vno, stdout, which));
+    } else if (op == "pvi") {
+      oi(MRISprintVertexInfo(stdout, s, geti()));
     } else if (op == "sfa") {
       if (geti()) oi(mrisComputeTangentPlanes(s));
       int calls = geti();

@@ -5,7 +5,8 @@ differing) by program and function.
     python -P summarize.py <shim log> [--differing]
 
 One line per (program, mode, function): processes, calls, differing; --differing keeps only the
-functions with differing calls (atan2's table, 207 differing doubles per process, is shown apart).
+functions with differing calls (atan2's table, 100,001 calls and 207 differing doubles per table, one
+table per thread, is shown apart).
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ def main() -> int:
             if len(parts) != 6:
                 continue
             prog, _pid, mode, fn, calls, diff = parts
-            if fn == "atan2" and calls == "100001" and diff == "207":
+            k = int(calls) // 100001
+            if fn == "atan2" and k and int(calls) == 100001 * k and int(diff) == 207 * k:
                 table[prog] += 1
                 continue
             a = acc[(prog, mode, fn)]
@@ -40,7 +42,7 @@ def main() -> int:
         )
     if table:
         progs = ", ".join(f"{p} {n}" for p, n in sorted(table.items()))
-        print(f"atan2's table only (100,001 calls, 207 differing doubles, per process): {progs}")
+        print(f"atan2's table only (100,001 calls, 207 differing doubles, per table): {progs}")
     return 0
 
 

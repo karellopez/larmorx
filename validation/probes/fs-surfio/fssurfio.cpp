@@ -21,8 +21,10 @@
 // printable ASCII and for the backslash), or `EXIT <status> | <text>` / `CRASH <signal> | <text>`
 // when FreeSurfer's code ended the child. Floats and doubles in and out are their bits in hex.
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -32,6 +34,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -1314,6 +1317,192 @@ void edges_case()
   MRISfree(&m);
 }
 
+// `sfile` (relay 11, 3.1-47 part b): the surface library's small file readers and writers
+// (mrisurf_io.cpp): MRISsetReadFrame/MRISgetReadFrame, MRISreadTriangleProperties,
+// MRISwriteTriangleProperties, MRISwriteDists, MRISwriteAreaError, MRISwriteAngleError,
+// MRISwriteCurvatureToWFile, MRISreadValuesBak, MRISreadImagValues, MRIScopyMarksToAnnotation,
+// MRISmaxMarked, MRISwriteAscii, MRISwriteNormalsAscii, MRISwriteVTK, MRISwriteCurvVTK. Each case
+// runs in an empty work folder (`<cases>.d`, with a subfolder `d`): the case's input files are
+// written first, then a surface from MRISoverAlloc with the case's vertices, faces (every
+// allocated place) and face-normal cache, then 1 to 3 operations on file names relative to the
+// folder, then the surface's state and every file in the folder (its relative name and bytes,
+// sorted by name). A name argument is passed with two NUL bytes before it (what the hemisphere's
+// scan reads for a dot at index 0 or 1). `G`: an operation that would read or write memory the
+// surface does not own (the port applies the same test).
+std::string workdir;
+
+void clear_dir(const std::string &d, bool top)
+{
+  if (DIR *dp = opendir(d.c_str())) {
+    while (struct dirent *e = readdir(dp)) {
+      std::string n = e->d_name;
+      if (n == "." || n == "..") continue;
+      std::string p = d + "/" + n;
+      struct stat st;
+      if (lstat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) clear_dir(p, false);
+      else unlink(p.c_str());
+    }
+    closedir(dp);
+  }
+  if (!top) rmdir(d.c_str());
+}
+
+const char *name_tok()
+{
+  std::string n = geth();
+  char *p = (char *)calloc(n.size() + 3, 1);
+  memcpy(p + 2, n.data(), n.size());
+  return p + 2;
+}
+
+void ox(const std::string &b)
+{
+  char h[4];
+  out += "x";
+  for (unsigned char c : b) {
+    snprintf(h, sizeof h, "%02x", c);
+    out += h;
+  }
+  out += " ";
+}
+
+// every regular file under the work folder, by its name relative to it ('/' between parts)
+void list_files(const std::string &d, const std::string &rel, std::vector<std::string> &files)
+{
+  if (DIR *dp = opendir(d.c_str())) {
+    while (struct dirent *e = readdir(dp)) {
+      std::string n = e->d_name;
+      if (n == "." || n == "..") continue;
+      std::string p = d + "/" + n, r = rel.empty() ? n : rel + "/" + n;
+      struct stat st;
+      if (lstat(p.c_str(), &st) != 0) continue;
+      if (S_ISDIR(st.st_mode)) list_files(p, r, files);
+      else if (S_ISREG(st.st_mode)) files.push_back(r);
+    }
+    closedir(dp);
+  }
+}
+
+void sfile_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  errno = 0;
+  int envs = geti();
+  if (envs & 1) setenv("FS_POSIX", "1", 1);
+  if (envs & 2) {
+    std::string f = geth();
+    setenv("MRIS_READVAL_FRAME", f.c_str(), 1);
+  }
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  MRISsetFixVertexAreaValue(geti());
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int maxv = geti(), maxf = geti(), nv = geti(), nf = geti();
+  MRIS *m = MRISoverAlloc(maxv, maxf, nv, nf);
+  m->hemisphere = geti();
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->nx = getf(); v->ny = getf(); v->nz = getf();
+    v->d = getf(); v->curv = getf(); v->val = getf(); v->valbak = getf(); v->imag_val = getf();
+    v->area = getf(); v->origarea = getf();
+    v->marked = geti(); v->annotation = geti(); v->ripflag = (char)geti();
+    int num = geti();
+    vt->num = (uchar)num;
+    free(vt->f);
+    free(vt->n);
+    vt->f = arr<int>(num);
+    vt->n = arr<uchar>(num);
+    for (int k = 0; k < num; k++) vt->f[k] = geti();
+    for (int k = 0; k < num; k++) vt->n[k] = (uchar)geti();
+  }
+  for (int fno = 0; fno < maxf; fno++) {
+    FACE *f = &m->faces[fno];
+    for (int k = 0; k < 3; k++) f->v[k] = geti();
+    f->ripflag = (char)geti();
+    f->area = getf();
+    for (int k = 0; k < 3; k++) f->angle[k] = getf();
+    for (int k = 0; k < 3; k++) f->orig_angle[k] = getf();
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    e->nx = getf(); e->ny = getf(); e->nz = getf(); e->orig_area = getf();
+    m->faceNormDeferredEntries[fno].deferred = (char)geti();
+  }
+  m->orig_area = getf();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "sf") MRISsetReadFrame(geti());
+    else if (op == "gf") oi(MRISgetReadFrame());
+    else if (op == "rt" || op == "wt") {
+      // a surface name of 1,024 bytes or more overruns FileNamePath's buffer (FS-134), and the
+      // writer reads the place after the last face past the array when there is none (FS-128)
+      const char *nm = name_tok();
+      if (strlen(nm) >= STRLEN || (op == "wt" && nf > 0 && nf == maxf)) out += "G ";
+      else if (op == "rt") oi(MRISreadTriangleProperties(m, nm));
+      else oi(MRISwriteTriangleProperties(m, nm));
+    }
+    else if (op == "wd") oi(MRISwriteDists(m, name_tok()));
+    else if (op == "wa") oi(MRISwriteAreaError(m, name_tok()));
+    else if (op == "wg") oi(MRISwriteAngleError(m, name_tok()));
+    else if (op == "wc") oi(MRISwriteCurvatureToWFile(m, name_tok()));
+    else if (op == "rb") oi(MRISreadValuesBak(m, name_tok()));
+    else if (op == "ri") oi(MRISreadImagValues(m, name_tok()));
+    else if (op == "ca") oi(MRIScopyMarksToAnnotation(m));
+    else if (op == "mm" && maxv == 0) out += "G ";  // vertex 0 past an empty array (FS-132)
+    else if (op == "mm") oi(MRISmaxMarked(m));
+    else if (op == "wA") oi(MRISwriteAscii(m, name_tok()));
+    else if (op == "wn") oi(MRISwriteNormalsAscii(m, name_tok()));
+    else if (op == "wv") oi(MRISwriteVTK(m, name_tok()));
+    else if (op == "wC") oi(MRISwriteCurvVTK(m, name_tok()));
+    else fail("sfile op");
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    float c[6] = {v->valbak, v->imag_val, v->area, v->origarea, v->nx, v->nz};
+    for (float x : c) of(x);
+    oi(v->annotation);
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    FACE *f = &m->faces[fno];
+    of(f->area);
+    for (int k = 0; k < 3; k++) of(f->angle[k]);
+    for (int k = 0; k < 3; k++) of(f->orig_angle[k]);
+    of(m->faceNormCacheEntries[fno].orig_area);
+    oi(m->faceNormDeferredEntries[fno].deferred);
+  }
+  of(m->orig_area); of(m->total_area);
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *fp = fopen(name.c_str(), "rb");
+    if (!fp) { out += "NOFILE "; continue; }
+    std::string b;
+    int ch;
+    while ((ch = fgetc(fp)) != EOF) b += (char)ch;
+    fclose(fp);
+    ox(b);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -1524,6 +1713,8 @@ void run_case()
     edges_case();
   } else if (cmd == "mprop") {
     mprop_case();
+  } else if (cmd == "sfile") {
+    sfile_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);
@@ -1581,6 +1772,7 @@ int main(int argc, char *argv[])
   }
   if (argv[1][0] != '/') fail("the cases must be given by an absolute path");
   std::string scratch = std::string(argv[1]) + ".out";
+  workdir = std::string(argv[1]) + ".d";
   FILE *fp = fopen(argv[1], "r");
   if (!fp) fail("cannot open the cases");
   std::vector<std::string> lines;
@@ -1638,5 +1830,6 @@ int main(int argc, char *argv[])
     printf("%s | %s\n", result.c_str(), escape(text).c_str());
   }
   unlink(scratch.c_str());
+  clear_dir(workdir, false);
   return 0;
 }

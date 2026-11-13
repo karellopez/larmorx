@@ -360,6 +360,9 @@ pub struct SurfGlobals {
     /// computations do. `false` keeps FreeSurfer's behaviour (rule D: kept until its effect on
     /// `mris_sphere` and `mris_register` is measured with their ports).
     pub fs120_write_face_angles: bool,
+    /// `mris_readval_frame` (`mrisurf_io.cpp` line 64, -1): the frame `MRISreadValues` reads
+    /// from a volume, `MRISsetReadFrame`'s.
+    pub readval_frame: i32,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -385,6 +388,7 @@ impl Default for SurfGlobals {
             mp_calls: 0,
             mp_comparisons: 0,
             fs120_write_face_angles: false,
+            readval_frame: -1,
         }
     }
 }

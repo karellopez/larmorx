@@ -230,6 +230,7 @@ CLEANROOM_CRATES = (
     "crates/larmorx-mri/",
     "crates/larmorx-fsl/",
     "crates/larmorx-tedana/",
+    "crates/larmorx-fs-core/",
 )
 
 #: Workspace folders holding permissively licensed upstream source (allowed; logged).

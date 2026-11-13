@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tokenize
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -339,18 +340,17 @@ def test_programs_what_it_does_has_one_source(monkeypatch):
     page = apipage.read(REPO, API)
     first = next(p for p in page.programs if p.name == "bet").description.split("\n\n")[0]
     assert bet.does == programs.first_sentence(first)
+    # an entry that still gives its own `does` (its API page has no reference block yet)
+    entries = tomllib.loads((REPO / "validation/programs.toml").read_text(encoding="utf-8"))
+    e = next(x for x in entries["program"] if "does" in x and "api" in x)
     real = programs._api_does
     monkeypatch.setattr(
         programs,
         "_api_does",
-        lambda repo, api: (
-            {"antsRegistration": "It registers."}
-            if api == "docs/api/ants-registration.md"
-            else real(repo, api)
-        ),
+        lambda repo, api: {e["name"]: "It does."} if api == e["api"] else real(repo, api),
     )
     _, _, problems = programs.build(reference.REPO, None)
-    assert any("antsRegistration: `does` given" in p for p in problems), problems
+    assert any(f"{e['name']}: `does` given" in p for p in problems), problems
 
 
 def test_programs_check_catches_an_api_page_without_an_entry(monkeypatch):
@@ -528,6 +528,23 @@ def test_afni_usage_heads_volreg():
     assert by["-coarse"].help == "two passes: a coarse search on blurred bricks first"
     assert by["-D"].help == "set AFNI's environment variable 'name' for this run"
     assert {"-wtrim", "-SAVEDISP"} <= set(by) and {"-wtrim", "-SAVEDISP"} <= cl.parsed
+
+
+def test_click_command_nipype_run():
+    """`larmorx nipype run`, a click command emulated in Python: the flags its `_click_args`
+    compares, `-h` read letter by letter joined to `--help`, the synopsis from `run`'s
+    docstring; its page's address with a hyphen for the blank of `nipypecli run`."""
+    from larmorx_validation import reference
+
+    cl, by = _cl("python/larmorx/nipype/_run.py", "nipypecli run", "larmorx nipype run")
+    assert set(by) == {"--list", "-h", "--help"} and by["-h"].spellings == ["-h", "--help"]
+    assert cl.synopsis == ["larmorx nipype run [--list] <module> [<Interface> [inputs]]"]
+    (ref,) = reference.references("nipype-run")
+    assert (ref.url, ref.path) == (
+        "/programs/fmriprep/nipypecli-run/",
+        "content/programs/fmriprep/nipypecli-run.md",
+    )
+    assert "measured against nipype, case by case" in ref.markdown
 
 
 def test_mri_hmc_as_mcflirt():

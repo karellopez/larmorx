@@ -284,7 +284,9 @@ def command_line(
     its reading of bash's ``test``)."""
     family = rel.split("/")[1] if rel.startswith("crates/") else ""
     command = command or f"larmorx {program}"
-    if rel.endswith(".py"):
+    if rel.endswith(".py") and "\ndef _click_args(" in (repo / rel).read_text(encoding="utf-8"):
+        cl = click_command(repo, rel, command)
+    elif rel.endswith(".py"):
         cl = python_argparse(repo, rel, command)
     elif family == "larmorx-tedana":
         cl = rust_argparse(repo, rel, command)
@@ -949,6 +951,30 @@ def rust_argparse(repo: Path, rel: str, command: str) -> CommandLine:
                 a.help = None
         args.append(a)
     return argparse_command_line(rel, args, command)
+
+
+def click_command(repo: Path, rel: str, command: str) -> CommandLine:
+    """A Python program that emulates a click command (``larmorx nipype run``, nipype's
+    ``nipypecli run``): the options its ``_click_args`` compares (``long_opt in ("--list",
+    "--help")``, and a short ``-h`` read letter by letter, ``ch != "h"``), the long and the
+    short help joined; the synopsis from the docstring of its function ``run`` (``with ``argv``
+    (its arguments: ``[--list] <module> ...``)``)."""
+    text = (repo / rel).read_text(encoding="utf-8")
+    m = re.search(r"\ndef _click_args\(.*?(?=\ndef |\Z)", text, re.S)
+    body = m.group(0) if m else ""
+    spellings: list[str] = []
+    for group in re.findall(r"\bin \(([^)]*)\)", body):
+        spellings += [s for s in re.findall(r'"(--?[A-Za-z][\w-]*)"', group) if s not in spellings]
+    shorts = [f"-{c}" for c in re.findall(r'\bch != "(\w)"', body)]
+    options = []
+    for s in spellings:
+        alias = [h for h in shorts if s == "--help" and h == "-h"]
+        options.append(Option([*alias, s]))
+    parsed = {x for o in options for x in o.spellings}
+    doc = re.search(r'\ndef run\(.*?"""(.*?)"""', text, re.S)
+    syn = re.search(r"its arguments: ``(.*?)``", " ".join(doc.group(1).split())) if doc else None
+    synopsis = [f"{command} {syn.group(1)}"] if syn else []
+    return CommandLine(rel, None, synopsis, options, parsed, words="original")
 
 
 def python_argparse(repo: Path, rel: str, command: str) -> CommandLine:

@@ -72,8 +72,13 @@ class Reference:
     sources: list[str] = field(default_factory=list)
 
 
+def slug(name: str) -> str:
+    """A program's name in its page's address: blanks as hyphens (``nipypecli run``)."""
+    return name.replace(" ", "-")
+
+
 def url_of(p: apipage.Program) -> str:
-    return f"/programs/{p.group}/{p.name}/"
+    return f"/programs/{p.group}/{slug(p.name)}/"
 
 
 # ------------------------------------------------------------------------------------------------
@@ -269,13 +274,15 @@ def next_release(repo: Path, options: list[str]) -> str | None:
 
 def build(repo: Path, p: apipage.Program) -> Reference:
     page = p.page
-    ref = Reference(p, url_of(p), f"content/programs/{p.group}/{p.name}.md")
+    ref = Reference(p, url_of(p), f"content/programs/{p.group}/{slug(p.name)}.md")
     problems = ref.problems
     where = f"{page.path} ({p.name})"
     meta = p.meta
     if p.group not in GROUPS:
         problems.append(f"{where}: unknown group {p.group!r} (one of {', '.join(GROUPS)})")
-    software = SOFTWARE.get(p.group, p.group)
+    # a program of another software than its group's (nipype's ``nipypecli run`` among
+    # fMRIPrep's programs) names it in its reference block
+    software = str(meta.get("software") or SOFTWARE.get(p.group, p.group))
     original = str(meta["original"])
     if original not in page.text:
         problems.append(f"{where}: the page never names its original, {original!r}")

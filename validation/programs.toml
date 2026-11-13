@@ -581,7 +581,6 @@ group = "fmriprep"
 name = "nipypecli run"
 command = "larmorx nipype run"
 python = "lx.nipype.run"
-does = "nipype's `nipypecli run` for the 37 interfaces of fMRIPrep's confound estimation that LARMORX ports: it lists a module's interfaces, prints an interface's help and runs one from the shell, without nipype."
 api = "docs/api/nipype-run.md"
 evidence = "/evidence/confounds/"
 records = { replica = ["confounds-nipype"] }

@@ -20,7 +20,8 @@ describes VXL's behaviour only, 2026-11-13).
 value of every family, and every point a minimizer evaluates, in order, identical to ITK 4.13.2's
 VNL; L-BFGS in lock step call by call, its whole state and its printed text included. Not
 compared: values VNL never writes (F-VNLN-6) and NaN signs (F-VNLN-5), except in the closed-form
-determinants and inverses and the minimizers, whose NaNs are compared bit for bit (F-VNLN-5).
+determinants and inverses, the QR and the minimizers, whose NaNs are compared bit for bit
+(F-VNLN-5).
 
 ## F-VNLN-2. VXL's L-BFGS line search drops Nocedal's modified function values (ITK-103, *verified*)
 
@@ -139,8 +140,47 @@ than the default NaN; 126 matrices with a zero determinant, whose inverse VNL le
 ITK-107, not compared); scale 50 (log `oracles/logs/fs-found-c-r9-order-50.log`): 10,000,000
 matrices, 97,476,037 values, 0 differences (67,194,186 NaNs, 52,598,658 of them passed on); the same with the port computing as on AArch64 (`nan_trap.c`'s
 `NAN_TRAP_ARM=exe`, 140,604 NaNs given AArch64's sign); swapping the two operands of the last
-row's `mul` in the 4 x 4 inverse makes 7,500 differences (the check sees the order). Not covered:
-`vnl_qr`'s determinant and inverse (more than 4 rows), whose NaNs keep LLVM's order.
+row's `mul` in the 4 x 4 inverse makes 7,500 differences (the check sees the order).
+
+**LINPACK's QR takes GCC 8.4.0's operand order too** (2026-11-13). `vnl_qr<float>` and
+`vnl_qr<double>` (and so `vnl_determinant` of more than 4 rows, and the QR inverse) compute with
+netlib's `sqrdc`/`dqrdc`, `sqrsl`/`dqrsl` and the reference BLAS; the kernels' loops are unrolled
+(`sdot` by five, `saxpy` by four, `sscal` by five) and GCC vectorizes some of them, choosing per
+statement and per position which operand of a `+` or `*` comes first. The order is read from the
+object code by running it: each kernel on operands that are all NaNs with distinct payloads, the
+NaN that comes out replaced by 1 and the call repeated until none is left, gives the order in
+which the kernel passes NaNs on, and from it each operation's first operand (no reassociation:
+the order is always a left-to-right chain of the source's sums). What it shows:
+- `sdot`: the remainder loop (`n mod 5` products) has its own code per length (products `x·y`
+  except the third of three and all of four, `y·x`; the sums of four alternate); the unrolled
+  loop runs four blocks of five at a time vectorized (products `y·x`, the 20 sums in a fixed
+  pattern of which operand comes first), then up to three blocks alone, each in its own code
+  (products `x·x·x·x·x`, `x·y·y·y·x`, `y·y·y·y·y` in the order of `x·y`; sums: the running sum
+  first for the first three, the product first for the last two). `ddot`: two blocks at a time
+  vectorized, one alone; its own remainder patterns.
+- `saxpy`/`daxpy`: `a·x + y` everywhere (the product first), and `x·a` for the second and third
+  elements of the remainder loop (`n mod 4`); `sscal`/`dscal`: `x·a`, except a remainder loop of
+  four (`n mod 5 = 4`), `a·x` there in `sscal` and for its last two elements in `dscal`.
+- `snrm2`/`dnrm2`: scalar code, `ssq + r·r` and `(r·r)·ssq` (two NaNs never meet in the second);
+  `snrm2` returns its `float` as a `double`, so a one-element norm quiets a signalling NaN.
+- `vnl_qr`'s `determinant()` multiplies the running product by `−R(i, i)`; `Q()` computes
+  `(v[j]·scale)·Q(j, i)` and `w[j]·v[i]`, but its NaNs are only ever default NaNs (a NaN in the
+  reflection vector makes its squared norm NaN, and VNL skips the reflection), so that order is not
+  observable.
+No order depends on the arrays' addresses (the probe calls each kernel at four alignments and on
+two columns of one array). `larmorx_core::vnl_qr`'s generic kernels (`dot_t`, `axpy_t`, `scal_t`,
+`nrm2_t`) and `Qr<T>` follow these tables through `ItkReal::sse_*` (`math::x86_nan`); the `double`
+`VnlQr` that ANTs' landmark initializer uses (ITK 5.4.5 built by GCC 14.3) is unchanged. The check
+(`validation/probes/fs-vnl`, family `qrnan`): the kernels' NaN orders for every length from 1 to
+300, `float` and `double`; the kernels on random vectors of special values (lengths 0 to 300);
+the QR's `Q`, `R`, determinant, `QᵀB`, solution (and its message) and inverse of matrices of 1 to
+12 rows and columns with special entries, and `vnl_determinant` of 5 to 12 rows; every value bit
+for bit. Scale 1: 80,600 cases, 13,685,621 values, 0 differences (36 one-row solves of a zero
+entry, never written by VNL: ITK-113, not compared); the same with the port computing as on
+AArch64 (`NAN_TRAP_ARM=exe`, 310,960 NaNs given AArch64's sign): 0 differences; one product
+pattern of `sdot`'s second lone block changed: 153 differences (the check sees the order). The unit
+test `vnl_qr::tests::nan_bits_are_x86_64s` (a digest of kernel calls and QRs on NaNs) passes
+under `NAN_TRAP_ARM=1`, debug and release.
 
 ## F-VNLN-6. Values VNL never writes (ITK-107, ITK-108, ITK-110, ITK-111, ITK-113, *read*)
 

@@ -196,8 +196,8 @@ log `oracles/logs/fs-found-c-r9-order-50.log`: 97,476,037 values, 67,194,186 NaN
 differences); the unit
 tests `vnl_fixed::tests::nan_bits_are_x86_64s` (a digest of the exact bits) and
 `the_float_and_double_inverses_take_their_own_operand_order` pass under `nan_trap.c`'s
-`NAN_TRAP_ARM=1`, debug and release (`docs/findings/vnl-netlib.md`, F-VNLN-5). Not covered:
-`vnl_qr`'s NaNs (more than 4 rows).
+`NAN_TRAP_ARM=1`, debug and release (`docs/findings/vnl-netlib.md`, F-VNLN-5). `vnl_qr`'s NaNs
+(the QR above 4 rows): the next section.
 
 ## vnl's QR decomposition (`src/vnl_qr.rs`)
 
@@ -515,7 +515,13 @@ Nocedal's L-BFGS from netlib as VXL distributes them, f2c-translated; every file
   dpoco (b53b3853e6ef…)}.c`, `v3p/netlib/blas/dasum.c` (`139d999917e4…`);
 - `src/vnl_qr.rs` (`Qr<T>`): `core/vnl/algo/vnl_qr.hxx` (`cfae1afd8e51…`),
   `v3p/netlib/linpack/{sqrdc (7dbbd9cae762…), sqrsl (dc6289dc71df…)}.c` and their double versions,
-  the single-precision BLAS (`snrm2`, `sdot`, `saxpy`, `sscal`);
+  the single-precision BLAS (`snrm2`, `sdot`, `saxpy`, `sscal`); since 2026-11-13 every `+`, `*`
+  and `/` of `Qr<T>` and its kernels in the operand order of the unit oracle's build (GCC 8.4.0,
+  `-O3`), read from its object code by running the kernels on NaNs with distinct payloads, with
+  x86-64's NaNs (`ItkReal::sse_*`): `fs-vnl`'s family `qrnan`, 0 differences in 13,685,621 values
+  at scale 1 (kernel NaN orders for every length to 300, QRs of 1 to 12 rows and columns with
+  special entries, `vnl_determinant` of 5 to 12 rows), also with the port computing as on AArch64;
+  `vnl_qr::tests::nan_bits_are_x86_64s` under `NAN_TRAP_ARM=1`, debug and release (F-VNLN-5);
 - `src/vnl_fixed.rs` (for `float`, and `determinant_balanced`): `core/vnl/vnl_det.hxx`
   (`833ae550ccfb…`), `core/vnl/vnl_inverse.h` (`bd0d7dc0ab2f…`), `core/vnl/algo/vnl_determinant.hxx`
   (`1140fe95da6f…`), `core/vnl/vnl_c_vector.hxx` (`rms_norm`);

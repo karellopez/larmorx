@@ -18,7 +18,7 @@ use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
-const SKIP: [&str; 4] = ["FS-121", "FS-123", "FS-06", "FS-167"];
+const SKIP: [&str; 7] = ["FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144"];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
 const OFFICIAL_SHA256: &str = "d927ce4b6aebe9a1f899c92080b8c11b8d45a50b15208a50043e8cb464ca45ef";

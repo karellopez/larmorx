@@ -52,20 +52,20 @@ use crate::mp_slow;
 use crate::mris::Mris;
 
 /// `STRLEN`: the size of the name buffers.
-const STRLEN: usize = 1024;
+pub(crate) const STRLEN: usize = 1024;
 
 /// `EDOM` (Linux).
 const EDOM: i32 = 33;
 
 /// `LEFT_HEMISPHERE` (`mrisurf.h`).
-const LEFT_HEMISPHERE: i32 = 0;
+pub(crate) const LEFT_HEMISPHERE: i32 = 0;
 
-fn nonneg(n: i32) -> usize {
+pub(crate) fn nonneg(n: i32) -> usize {
     usize::try_from(n).unwrap_or(0)
 }
 
 /// A name as C's string functions see it: the bytes before the first NUL.
-fn c_str(name: &str) -> &str {
+pub(crate) fn c_str(name: &str) -> &str {
     match name.find('\0') {
         Some(i) => &name[..i],
         None => name,
@@ -74,7 +74,7 @@ fn c_str(name: &str) -> &str {
 
 /// The bytes of a name cut to `n`, as a name again (names are ASCII in practice; a cut inside a
 /// character keeps the bytes as text with replacements).
-fn cut(name: &str, n: usize) -> String {
+pub(crate) fn cut(name: &str, n: usize) -> String {
     let b = name.as_bytes();
     String::from_utf8_lossy(&b[..n.min(b.len())]).into_owned()
 }
@@ -82,7 +82,7 @@ fn cut(name: &str, n: usize) -> String {
 /// `snprintf(buf, STRLEN, ...)` of a name, then `if (req >= STRLEN) std::cerr << func <<
 /// ": Truncation on line " << line`: FS-126 (rule A): larmorx keeps the whole name; `reproduce`
 /// prints the line and cuts the name to 1,023 bytes, as FreeSurfer does.
-fn snprintf_name(g: &mut Globals, io: &mut Io, name: String, func: &str, line: u32) -> String {
+pub(crate) fn snprintf_name(g: &mut Globals, io: &mut Io, name: String, func: &str, line: u32) -> String {
     if name.len() < STRLEN {
         return name;
     }
@@ -103,7 +103,7 @@ fn snprintf_name(g: &mut Globals, io: &mut Io, name: String, func: &str, line: u
 /// `strcpy(fname, name)` into a `char[STRLEN]` the official build checks (`_FORTIFY_SOURCE`):
 /// FS-126 (rule A): a name of 1,024 bytes or more is taken whole; `reproduce` ends the program as
 /// FreeSurfer's does (`*** buffer overflow detected ***: terminated`, signal 6: exit status 134).
-fn strcpy_checked(g: &mut Globals, io: &mut Io, name: &str, func: &str) -> Result<String, Fatal> {
+pub(crate) fn strcpy_checked(g: &mut Globals, io: &mut Io, name: &str, func: &str) -> Result<String, Fatal> {
     if name.len() >= STRLEN {
         g.notices.add(
             &FS_126,
@@ -122,7 +122,7 @@ fn strcpy_checked(g: &mut Globals, io: &mut Io, name: &str, func: &str) -> Resul
 /// `FileNamePath(fname, path)` into a caller's `char[STRLEN]` (an unchecked `strcpy`): FS-134: a
 /// name of 1,024 bytes or more overruns the caller's buffer in FreeSurfer (the stack after it:
 /// what follows depends on the build); larmorx takes the whole name in both modes.
-fn file_name_path_buf(g: &mut Globals, fname: &str, func: &str) -> String {
+pub(crate) fn file_name_path_buf(g: &mut Globals, fname: &str, func: &str) -> String {
     if fname.len() >= STRLEN {
         g.notices.add(
             &FS_134,
@@ -133,13 +133,13 @@ fn file_name_path_buf(g: &mut Globals, fname: &str, func: &str) -> String {
 }
 
 /// `ErrorReturn(code, (code, message))` after a failed `fopen` (its `errno` printed first).
-fn open_failed(g: &mut Globals, io: &mut Io, errno: i32, code: i32, message: &str) -> i32 {
+pub(crate) fn open_failed(g: &mut Globals, io: &mut Io, errno: i32, code: i32, message: &str) -> i32 {
     g.errno = errno;
     log::error_printf(g, io.err, code, message);
     code
 }
 
-fn open(dir: Option<&Path>, name: &str, mode: &str) -> Result<CFile, i32> {
+pub(crate) fn open(dir: Option<&Path>, name: &str, mode: &str) -> Result<CFile, i32> {
     CFile::open(dir, name, mode)
 }
 

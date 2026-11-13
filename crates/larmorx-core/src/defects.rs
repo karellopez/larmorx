@@ -1194,7 +1194,7 @@ defects! {
     FS_125 = "FS-125", "FreeSurfer", true,
         "the faster computation of the metric properties (FS_FASTER_MP set) with several threads sums the faces' areas in an order that depends on the threads' timing, so the total area can change from run to run in its last bits";
     FS_126 = "FS-126", "FreeSurfer", true,
-        "the surface library's distance, area-error and triangle-property files take their names in 1,024-byte buffers: a name of 1,024 bytes or more ends the program with a buffer-overflow abort (signal 6), or is cut to 1,023 bytes after the message '<function>: Truncation on line <n>', so another file is written or read";
+        "the surface library's distance, area-error, triangle-property, curvature, float and area files take their names in 1,024-byte buffers: a name of 1,024 bytes or more (1,020 or more for the GIFTI alternatives of FS_GII) ends the program with a buffer-overflow abort (signal 6), or is cut to 1,023 bytes after the message '<function>: Truncation on line <n>', so another file is written or read";
     FS_127 = "FS-127", "FreeSurfer", true,
         "MRISreadTriangleProperties reads the vertex and face counts at the start of a triangle-property file as floats where MRISwriteTriangleProperties writes them as integers, so it refuses every file the writer wrote (but one of a surface without vertices) with 'incompatible vertex number in file <file>'";
     FS_128 = "FS-128", "FreeSurfer", true,
@@ -1211,6 +1211,34 @@ defects! {
         "MRISreadTriangleProperties reads as many faces as a triangle-property file says, even more than the surface has: they go into its spare face places or past its arrays (memory corruption or a crash)";
     FS_134 = "FS-134", "FreeSurfer", true,
         "MRISreadTriangleProperties and MRISwriteTriangleProperties with a surface name of 1,024 bytes or more write its folder's name past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names)";
+    FS_136 = "FS-136", "FreeSurfer", true,
+        "mrisReadAsciiCurvatureFile, when it cannot open its file, prints 25 bytes of binary data in place of its own name in the message '<name> could not open file <file>.'";
+    FS_137 = "FS-137", "FreeSurfer", true,
+        "mrisReadAsciiCurvatureFile with a file of fewer curvature lines than the surface has unripped vertices stops at the file's end and reports success, the remaining vertices keeping the curvatures they had";
+    FS_138 = "FS-138", "FreeSurfer", true,
+        "MRISreadNewCurvatureIntoArray and MRISreadNewCurvatureVector, when they cannot open their file, end the program with a segmentation fault (signal 11) instead of the message 'MRISreadNewCurvatureIntoArray(<file>): fopen failed'";
+    FS_139 = "FS-139", "FreeSurfer", true,
+        "MRISreadDecimation with a file that ends, or whose numbers stop, before every vertex has its value takes the missing values as decimated (a binary file) or as the last number read (a text file) and reports success";
+    FS_140 = "FS-140", "FreeSurfer", true,
+        "MRISreadDecimation with a text file whose vertex count cannot be read compares memory contents with the surface's vertex count";
+    FS_141 = "FS-141", "FreeSurfer", true,
+        "MRISwriteGeo and MRISwriteICO write an unripped face that has a ripped vertex: MRISwriteGeo writes a vertex number from memory contents for it (and, for a surface of more than 300,000 vertices, writes past a 300,000-entry buffer), MRISwriteICO a number that names another vertex or none";
+    FS_142 = "FS-142", "FreeSurfer", true,
+        "MRISwriteICO numbers the vertices it writes without the ripped ones but writes each face's vertices by their numbers on the surface plus one, so once a vertex is ripped the faces after it name the wrong vertices";
+    FS_143 = "FS-143", "FreeSurfer", true,
+        "MRISreadVTK with a vertex whose three coordinates cannot be read gives it the coordinates read before (those of the vertex before it) and goes on, reporting success when the rest of the file can be read";
+    FS_144 = "FS-144", "FreeSurfer", true,
+        "MRISreadVTK with a first vertex whose coordinates cannot be read gives it coordinates from memory contents";
+    FS_145 = "FS-145", "FreeSurfer", true,
+        "MRISreadVTK with a file that ends after its POINT_DATA line or before all the lines its FIELD line announces ends the program with a segmentation fault (signal 11)";
+    FS_146 = "FS-146", "FreeSurfer", true,
+        "MRISreadVTK with a file that ends before a field's values takes the missing values as 0 and reports success";
+    FS_147 = "FS-147", "FreeSurfer", true,
+        "MRISreadVTK counts a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
+    FS_148 = "FS-148", "FreeSurfer", true,
+        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, reads one or two bytes before the name to decide whether it names a hemisphere";
+    FS_149 = "FS-149", "FreeSurfer", true,
+        "MRISbuildFileName_read (a name with a slash, or without a hemisphere when FS_POSIX is unset) and __MRISapplyFSGIIwrite (FS_GII set to .gii) write a file name of 1,024 bytes or more past their caller's 1,024-byte buffer";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,

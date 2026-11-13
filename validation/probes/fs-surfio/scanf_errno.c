@@ -59,6 +59,12 @@ int main(void)
   t("1e99 ", "%f %d");
   t("1e99 x", "%f %d");
   t("inf", "%f %d");
+  t("nan", "%f %d");
+  t("-nan", "%f %d");
+  t("infinity", "%f %d");
+  t("1", "%f %d");
+  t("nan(1", "%f %d");
+  t("in", "%f %d");
   t3("1e99", "%f %f %f");
   t3("1 2", "%f %f %f");
   // fscanf on a file: each call starts afresh at the end of the file

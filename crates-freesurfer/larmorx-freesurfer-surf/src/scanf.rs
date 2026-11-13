@@ -45,6 +45,9 @@ pub struct Scanf<'a> {
 }
 
 /// The stream as a conversion reads it: the first end it meets is remembered with `errno_now`.
+/// The end counts as met only when the conversion looks past its last character (a number does,
+/// and so does `inf`, which may go on as `infinity`; a complete `nan` or `infinity` does not:
+/// measured, `sscanf("nan", "%f %d")` leaves `errno` 0 and `sscanf("inf", "%f %d")` as it was).
 struct Tracked<'b, 'a> {
     sc: &'b mut Scanf<'a>,
     errno_now: i32,
@@ -145,11 +148,7 @@ impl<'a> Scanf<'a> {
         false
     }
 
-    fn after<T>(&mut self, errno: &mut i32, errno_before: i32, r: Scan<T>, assign: bool) -> Option<T> {
-        if !self.eof && self.st.hit_end() {
-            self.eof = true;
-            self.saved = errno_before;
-        }
+    fn after<T>(&mut self, errno: &mut i32, r: Scan<T>, assign: bool) -> Option<T> {
         match r {
             Scan::Value(v, erange) => {
                 if erange {
@@ -181,7 +180,7 @@ impl<'a> Scanf<'a> {
             sc: self,
             errno_now: before,
         });
-        self.after(errno, before, r, assign)
+        self.after(errno, r, assign)
     }
 
     /// `%f` or `%e` into a `float` (`assign` false: suppressed).
@@ -194,7 +193,7 @@ impl<'a> Scanf<'a> {
             sc: self,
             errno_now: before,
         });
-        self.after(errno, before, r, assign)
+        self.after(errno, r, assign)
     }
 
     /// `%<width>s` (`assign` false: `%*s`): the characters before white space or the end, at most
@@ -328,6 +327,12 @@ mod tests {
         assert_eq!(run("1e99 ", &fd), (1, 0));
         assert_eq!(run("1e99 x", &fd), (1, 34));
         assert_eq!(run("inf", &fd), (1, 5));
+        assert_eq!(run("nan", &fd), (1, 0));
+        assert_eq!(run("-nan", &fd), (1, 0));
+        assert_eq!(run("infinity", &fd), (1, 0));
+        assert_eq!(run("1", &fd), (1, 5));
+        assert_eq!(run("nan(1", &fd), (1, 5));
+        assert_eq!(run("in", &fd), (0, 5));
         assert_eq!(run("1e99", &|sc, e| {
             sc.f(e, true);
             sc.text(e, b" x");

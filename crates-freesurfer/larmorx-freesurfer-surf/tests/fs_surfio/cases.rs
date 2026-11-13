@@ -12,7 +12,9 @@ use std::io::Write;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use larmorx_core::defects::{FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, UpstreamDefects};
+use larmorx_core::defects::{
+    FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, UpstreamDefects,
+};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -34,6 +36,8 @@ mod life;
 mod mprop;
 #[path = "sfile.rs"]
 mod sfile;
+#[path = "cfile.rs"]
+mod cfile;
 
 /// The generator's state, and whether it may make names of about 1,024 bytes (not with seed 1,
 /// the platform-independent set: file systems differ on such names).
@@ -110,10 +114,10 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 30] = [
+const COMMANDS: [&str; 31] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
-    "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile",
+    "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -987,6 +991,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "edges" => life::edges_tokens(&mut t, &mut g),
             "mprop" => mprop::mprop_tokens(&mut t, &mut g),
             "sfile" => sfile::sfile_tokens(&mut t, &mut g),
+            "cfile" => cfile::cfile_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2642,6 +2647,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "edges" => life::edges_case(cx, t, o)?,
         "mprop" => mprop::mprop_case(cx, t, o)?,
         "sfile" => sfile::sfile_case(cx, t, o)?,
+        "cfile" => cfile::cfile_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2712,7 +2718,10 @@ pub fn run_line_with(
         // FS-116 reproduced likewise: reading a deferred face's original area faults on purpose
         Err(Fatal::Exit(139))
             if mode.reproduce()
-                && (cx.g.notices.contains(&FS_03) || cx.g.notices.contains(&FS_116)) =>
+                && (cx.g.notices.contains(&FS_03)
+                    || cx.g.notices.contains(&FS_116)
+                    || cx.g.notices.contains(&FS_138)
+                    || cx.g.notices.contains(&FS_145)) =>
         {
             "CRASH 11".to_owned()
         }

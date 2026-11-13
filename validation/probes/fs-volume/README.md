@@ -51,3 +51,14 @@ notices. FreeSurfer's eigen-systems that never return (`pca` on infinite voxels:
 (47 commands): 4,456 identical, 244 not comparable, 0 different. Seed 1, 940 cases: 886 identical, 54 not
 comparable, hash `2b37ea96a0d3665073c7c7b2fc0563aa984f9826fc4d736a8f2c8a702114b30b`, passing with AArch64's
 NaN emulated in debug and release.
+
+Measured 2026-11-13 (part 4: 3.1-36's samplers `stri`, `styp`, `sfrm`, `sfty`, `scub`, `scubf`, `ssinc`,
+`ssincf`, `coef`, `hsinc`; the moves `trans`, `rot`, `rotx`, `roty`, `rotz`; the head box `skull`; reading
+transforms `tftype`, `ltaread`; 65 commands; `check.py --only <commands>` keeps some commands while
+porting, without the official hash): seed 7, 10,000 sampler cases: 9,444 identical with `reproduce`, 556
+not comparable, 0 different; 6,000 move and head-box cases: 5,110 identical, 890 not comparable, 0
+different (641 of the 1,000 `skull` cases find a box); 2,000 transform-reading cases: 1,839 identical,
+161 not comparable, 0 different; `fix` different only with notices. Seed 1, 1,300 cases (all 65
+commands, log `oracles/logs/fs-found-c-r13-seed1.log`): 1,224 identical, 76 not comparable, hash
+`2499daba233eec8c8278d5d5c3b9be2d32569776f9f5d0d4a7eed9571bf94791`. Not comparable now also: FS-300 (a
+cubic window never read), FS-302 to FS-310 (crashes, hangs, memory never set).

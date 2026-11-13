@@ -54,7 +54,13 @@ TABLE_SEEDS = [
     str(TWO_63),
     "-53",
 ]
-EXTRA_SEEDS = ["2147483564", str(TWO_64 - 1), "314159265", str(-5 * 2147483563), str(9 * 2147483563)]
+EXTRA_SEEDS = [
+    "2147483564",
+    str(TWO_64 - 1),
+    "314159265",
+    str(-5 * 2147483563),
+    str(9 * 2147483563),
+]
 BOUNDARY_SEEDS = [
     str(2**31 - 1),
     str(-(2**31)),
@@ -119,10 +125,7 @@ DIST_CASES: list[tuple[str, list[str]]] = [
     *[("gamma_frac", [f]) for f in ["1e-300", "0.001", "0.4", "0.999"]],
     *[("chisq", [n]) for n in ["0", "1", "3", "5", "24", "25", "30", "1000"]],
     *[("fdist", list(p)) for p in [("4", "9"), ("3", "25"), ("1", "1"), ("30", "50")]],
-    *[
-        ("tdist", [n])
-        for n in ["0", "0.5", "1", "1.5", "2", "2.25", "3", "7", "30", "1000", "nan"]
-    ],
+    *[("tdist", [n]) for n in ["0", "0.5", "1", "1.5", "2", "2.25", "3", "7", "30", "1000", "nan"]],
 ]
 DIST_SEEDS = ["53", "1", "4294967296"]
 
@@ -169,6 +172,18 @@ VOLSYNTH = [
     (["--pdf", "F", "--dof-num", "30", "--dof-den", "50"], ("fdist", ["30", "50"]), 2),
 ]
 VOLSYNTH_DIM = ["8", "7", "6", "3"]
+
+
+def stamp(*programs: Path) -> dict:
+    """The larmorx commit (``-dirty`` when the tree is not clean) and the programs' SHA-256."""
+    commit = subprocess.run(
+        ["git", "-C", str(HERE), "describe", "--always", "--dirty", "--abbrev=12"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    sums = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in programs}
+    return {"larmorx_commit": commit, "sha256": sums}
 
 
 class Context:
@@ -218,7 +233,7 @@ def sha(data: bytes) -> str:
 
 def first_difference(a: bytes, b: bytes) -> int | None:
     la, lb = a.split(b"\n"), b.split(b"\n")
-    for i, (x, y) in enumerate(zip(la, lb)):
+    for i, (x, y) in enumerate(zip(la, lb, strict=False)):
         if x != y:
             return i
     return None if len(la) == len(lb) else min(len(la), len(lb))
@@ -262,7 +277,7 @@ def section_raw(ctx: Context, jobs: int, n_random: int) -> dict:
         o = ctx.original(["raw", seed, count])
         st, out, err, _ = ctx.ours(["raw", seed, count], opts=("--reproduce",))
         all_zero = set(o.stdout_bytes.split()) == {b"0"}
-        stf, outf, errf, _ = ctx.ours(["raw", seed, count])
+        _, outf, errf, _ = ctx.ours(["raw", seed, count])
         head = [int(x) for x in outf.split()[:12]]
         zero_rows.append(
             {
@@ -287,15 +302,13 @@ def section_raw(ctx: Context, jobs: int, n_random: int) -> dict:
     }
 
 
-def compare_draws(
-    ctx: Context, args: list[str], opts: tuple[str, ...] = ()
-) -> dict:
+def compare_draws(ctx: Context, args: list[str], opts: tuple[str, ...] = ()) -> dict:
     """One distribution case: the probe's draws against the clean room's, with both tangents."""
     o = ctx.original(args)
-    st, out, err, hits = ctx.ours(args, opts=opts, hits=True)
+    st, out, _, hits = ctx.ours(args, opts=opts, hits=True)
     st_s, out_s, _, _ = ctx.ours(args, opts=("--system-tan", *opts))
     a, b = o.stdout_bytes.split(), out.split()
-    diff = [i for i, (x, y) in enumerate(zip(a, b)) if x != y]
+    diff = [i for i, (x, y) in enumerate(zip(a, b, strict=False)) if x != y]
     if len(a) != len(b):
         diff.append(min(len(a), len(b)))
     hitset = set(hits)
@@ -314,7 +327,9 @@ def compare_draws(
 
 def section_dist(ctx: Context, jobs: int, count: str) -> dict:
     """§10.2: 20,000 draws per case and seed, bit for bit; and §10.2's mixed stream."""
-    jobs_list = [[ "dist", name, seed, count, *params] for seed in DIST_SEEDS for name, params in DIST_CASES]
+    jobs_list = [
+        ["dist", name, seed, count, *params] for seed in DIST_SEEDS for name, params in DIST_CASES
+    ]
     jobs_list += [["mixed", seed, "14000"] for seed in DIST_SEEDS]
     # Student's t just above 2 (§4.8): slow, 3 draws
     jobs_list += [["dist", "tdist", "53", "3", "0x1.0000000000001p+1"]]
@@ -323,7 +338,11 @@ def section_dist(ctx: Context, jobs: int, count: str) -> dict:
     draws = sum(r["draws"] for r in rows)
     ident = sum(r["identical"] for r in rows)
     expected = sum(r["expected_tan_differences"] for r in rows)
-    bad = [r for r in rows if r["unexpected"] or not r["system_tan_identical"] or r["status"][0] != r["status"][1]]
+    bad = [
+        r
+        for r in rows
+        if r["unexpected"] or not r["system_tan_identical"] or r["status"][0] != r["status"][1]
+    ]
     return {
         "cases": len(rows),
         "draws": draws,
@@ -332,6 +351,7 @@ def section_dist(ctx: Context, jobs: int, count: str) -> dict:
         "draws_meeting_a_differing_tangent": sum(r["tan_draws"] for r in rows),
         "failures": bad,
         "with_tan": [r for r in rows if r["tan_draws"]],
+        "per_case": [[r["case"], r["draws"], r["identical"], r["tan_draws"]] for r in rows],
         "ok": not bad and ident + expected == draws,
     }
 
@@ -365,7 +385,7 @@ def section_defects(ctx: Context) -> dict:
             zero.append(r)
         for name, params in ZERO_HANG:
             o = ctx.original(["dist", name, seed, "1", *params], timeout=TIMEOUT)
-            st, out, err, _ = ctx.ours(["dist", name, seed, "1", *params], opts=("--reproduce",))
+            st, _, err, _ = ctx.ours(["dist", name, seed, "1", *params], opts=("--reproduce",))
             zero.append(
                 {
                     "case": f"dist {name} {seed} 1 {' '.join(params)}",
@@ -374,7 +394,10 @@ def section_defects(ctx: Context) -> dict:
                 }
             )
     ok = (
-        all(not r["unexpected"] and r["system_tan_identical"] and r["default"]["status"] in (0, 1) for r in rows)
+        all(
+            not r["unexpected"] and r["system_tan_identical"] and r["default"]["status"] in (0, 1)
+            for r in rows
+        )
         and all(h["probe_timed_out"] and h["reproduce"][0] == 1 and h["fix"][0] == 1 for h in hangs)
         and all(
             ("unexpected" in z and not z["unexpected"] and z["system_tan_identical"])
@@ -422,7 +445,7 @@ def section_volsynth(ctx: Context) -> dict:
             img = np.asarray(nib.load(vol).dataobj) if o.returncode == 0 else None
         res = {}
         for label, extra in (("cr_tan", ()), ("system_tan", ("--system-tan",))):
-            st, out, _, hits = ctx.ours(
+            _, out, _, hits = ctx.ours(
                 ["dist", name, str(seed), str(n), *params], opts=extra, hits=True
             )
             draws = [struct.unpack(">d", bytes.fromhex(x.decode()))[0] for x in out.split()]
@@ -434,7 +457,11 @@ def section_volsynth(ctx: Context) -> dict:
                         for fr in range(f):
                             v = next(it)
                             ours[c, r, s, fr] = np.float32(v + 0.0 if name == "gaussian" else v)
-            same = 0 if img is None else int(np.sum(ours.view(np.uint32) == img.astype(np.float32).view(np.uint32)))
+            same = (
+                0
+                if img is None
+                else int(np.sum(ours.view(np.uint32) == img.astype(np.float32).view(np.uint32)))
+            )
             res[label] = {"identical": same, "tan_draws": len(hits)}
         rows.append(
             {
@@ -488,7 +515,9 @@ def section_tan(ctx: Context) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--workspace", default=os.environ.get("LARMORX_WORKSPACE", str(HERE.parents[3])))
+    ap.add_argument(
+        "--workspace", default=os.environ.get("LARMORX_WORKSPACE", str(HERE.parents[3]))
+    )
     ap.add_argument("--fs-license", default="/usr/local/freesurfer/license.txt")
     ap.add_argument("--cleanroom", required=True, help="the built cleanroom-probe program")
     ap.add_argument("--scratch", default=tempfile.gettempdir())
@@ -500,6 +529,7 @@ def main() -> int:
     ctx = Context(args)
     sections = args.sections.split(",")
     result: dict = {"date": time.strftime("%Y-%m-%d"), "machine": os.uname().machine}
+    result.update(stamp(ctx.probe, ctx.cleanroom, ctx.fs_home / "bin/mri_volsynth"))
     status = 0
     for name in sections:
         t0 = time.perf_counter()

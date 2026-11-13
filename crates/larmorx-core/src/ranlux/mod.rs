@@ -91,7 +91,10 @@ impl fmt::Display for DrawError {
                 dist::shape_text(*a)
             ),
             DrawError::NeverReturns { seed, draw } => {
-                write!(f, "FS-101: with seed {seed} FreeSurfer's {draw} never returns")
+                write!(
+                    f,
+                    "FS-101: with seed {seed} FreeSurfer's {draw} never returns"
+                )
             }
         }
     }

@@ -31,7 +31,8 @@ fn hex32(s: &str) -> Result<f32, String> {
 }
 
 fn int(s: &str) -> Result<i64, String> {
-    s.parse::<i64>().map_err(|e| format!("bad integer {s}: {e}"))
+    s.parse::<i64>()
+        .map_err(|e| format!("bad integer {s}: {e}"))
 }
 
 fn line(out: &mut impl Write, tag: &str, values: impl IntoIterator<Item = f32>) {
@@ -48,7 +49,11 @@ fn fail(out: &mut impl Write, message: &str) -> Result<(), String> {
     std::process::exit(i32::from(EXIT_STATUS));
 }
 
-pub(crate) fn run(args: &[String], out: &mut impl Write, mode: UpstreamDefects) -> Result<(), String> {
+pub(crate) fn run(
+    args: &[String],
+    out: &mut impl Write,
+    mode: UpstreamDefects,
+) -> Result<(), String> {
     match args[0].as_str() {
         "cases" => {
             for text in std::io::stdin().lock().lines() {
@@ -70,15 +75,20 @@ pub(crate) fn run(args: &[String], out: &mut impl Write, mode: UpstreamDefects) 
                 let (t, rest) = vals.split_at(n);
                 let (y, xs) = rest.split_at(n);
                 let mut notices = Notices::new(mode);
-                let ypp = match second_derivatives(t, y, ibcbeg, ybcbeg, ibcend, ybcend, &mut notices) {
-                    Ok(v) => v,
-                    Err(e) => return fail(out, &e.message()),
-                };
+                let ypp =
+                    match second_derivatives(t, y, ibcbeg, ybcbeg, ibcend, ybcend, &mut notices) {
+                        Ok(v) => v,
+                        Err(e) => return fail(out, &e.message()),
+                    };
                 line(out, "ypp", ypp.iter().copied());
                 for &x in xs {
                     let e = evaluate(t, y, &ypp, x);
                     let s = f32::from_bits(SENTINEL);
-                    line(out, "val", [e.value, e.first.unwrap_or(s), e.second.unwrap_or(s)]);
+                    line(
+                        out,
+                        "val",
+                        [e.value, e.first.unwrap_or(s), e.second.unwrap_or(s)],
+                    );
                 }
                 let w = match open_spline(t, y, ybcbeg, ybcend, &mut notices) {
                     Ok(v) => v,
@@ -101,9 +111,13 @@ pub(crate) fn run(args: &[String], out: &mut impl Write, mode: UpstreamDefects) 
                     .map(|s| hex32(s))
                     .collect::<Result<_, _>>()?;
                 let (a, b) = vals.split_at(3 * n);
-                let u: Vec<f32> = (0..n).map(|j| if j + 1 < n { a[3 * (j + 1)] } else { 0.0 }).collect();
+                let u: Vec<f32> = (0..n)
+                    .map(|j| if j + 1 < n { a[3 * (j + 1)] } else { 0.0 })
+                    .collect();
                 let d: Vec<f32> = (0..n).map(|j| a[3 * j + 1]).collect();
-                let l: Vec<f32> = (0..n).map(|j| if j > 0 { a[3 * (j - 1) + 2] } else { 0.0 }).collect();
+                let l: Vec<f32> = (0..n)
+                    .map(|j| if j > 0 { a[3 * (j - 1) + 2] } else { 0.0 })
+                    .collect();
                 match solve_tridiagonal(&l, &d, &u, b) {
                     Some(x) => line(out, "x", x),
                     None => {
@@ -125,7 +139,15 @@ pub(crate) fn run(args: &[String], out: &mut impl Write, mode: UpstreamDefects) 
                 return Err(format!("set1 needs {} numbers", 2 * n));
             }
             let mut notices = Notices::new(mode);
-            match second_derivatives(&nums[..n], &nums[n..2 * n], ibcbeg, 0.0, ibcend, 0.0, &mut notices) {
+            match second_derivatives(
+                &nums[..n],
+                &nums[n..2 * n],
+                ibcbeg,
+                0.0,
+                ibcend,
+                0.0,
+                &mut notices,
+            ) {
                 Ok(v) => line(out, "ypp", v),
                 Err(e) => return fail(out, &e.message()),
             }

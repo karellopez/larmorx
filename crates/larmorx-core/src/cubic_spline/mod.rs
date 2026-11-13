@@ -106,7 +106,9 @@ impl std::error::Error for SplineError {}
 fn wide(x: f32) -> f64 {
     if x.is_nan() {
         let b = u64::from(x.to_bits());
-        f64::from_bits(((b & 0x8000_0000) << 32) | 0x7ff8_0000_0000_0000 | ((b & 0x003f_ffff) << 29))
+        f64::from_bits(
+            ((b & 0x8000_0000) << 32) | 0x7ff8_0000_0000_0000 | ((b & 0x003f_ffff) << 29),
+        )
     } else {
         f64::from(x)
     }
@@ -140,7 +142,8 @@ pub fn solve_tridiagonal(l: &[f32], d: &[f32], u: &[f32], b: &[f32]) -> Option<V
         l.len() == n && u.len() == n && b.len() == n,
         "the system's arrays must have one length"
     );
-    if d.iter().any(|&v| v == 0.0) {
+    // +0 and -0 compare equal to 0; a NaN does not
+    if d.contains(&0.0) {
         return None;
     }
     let mut x = b.to_vec();

@@ -22,6 +22,8 @@ by their content). Usage: ``python -P compare_spline.py --cleanroom <cleanroom-p
 from __future__ import annotations
 
 import argparse
+import hashlib
+import itertools
 import json
 import os
 import random
@@ -33,7 +35,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-
 from larmorx_validation import oracle_cache
 
 HERE = Path(__file__).resolve().parent
@@ -54,7 +55,7 @@ def f32(v: float) -> np.float32:
 
 
 def increasing(vals: list[np.float32]) -> bool:
-    return all(b > a for a, b in zip(vals, vals[1:]))
+    return all(b > a for a, b in itertools.pairwise(vals))
 
 
 def knots(rng: random.Random, n: int) -> list[np.float32]:
@@ -119,7 +120,7 @@ def case_line(rng: random.Random, k: int, nan_knot: bool = False) -> str:
     xs += ["7fc00000", "ffc00321"]
     xs += [hx(v) for v in t]
     xs.append(hx(float(t[-1]) + 1.0))
-    for a, c in zip(t, t[1:]):
+    for a, c in itertools.pairwise(t):
         xs.append(hx(float(a) + (float(c) - float(a)) * rng.random()))
     rng.shuffle(xs)
     xs = xs[: rng.randint(1, len(xs))]
@@ -137,7 +138,11 @@ def d3_line(rng: random.Random, k: int) -> str:
         elif kind == 1:  # random, not dominant
             a += [rng.uniform(-10, 10) for _ in range(3)]
         else:  # small integers: exact zero pivots during the elimination happen
-            a += [float(rng.randint(-3, 3)), float(rng.choice([-3, -2, -1, 1, 2, 3])), float(rng.randint(-3, 3))]
+            a += [
+                float(rng.randint(-3, 3)),
+                float(rng.choice([-3, -2, -1, 1, 2, 3])),
+                float(rng.randint(-3, 3)),
+            ]
     b = [rng.uniform(-100, 100) for _ in range(n)]
     ab = [hx(v) for v in a]
     if kind == 3:  # a zero diagonal (+0 or -0) before the elimination: refused
@@ -167,6 +172,18 @@ SET1 = [
 ]
 
 
+def stamp(*programs: Path) -> dict:
+    """The larmorx commit (``-dirty`` when the tree is not clean) and the programs' SHA-256."""
+    commit = subprocess.run(
+        ["git", "-C", str(HERE), "describe", "--always", "--dirty", "--abbrev=12"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    sums = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in programs}
+    return {"larmorx_commit": commit, "sha256": sums}
+
+
 class Context:
     def __init__(self, args: argparse.Namespace) -> None:
         workspace = Path(args.workspace)
@@ -189,18 +206,26 @@ class Context:
 
     def original(self, args: list[str]) -> oracle_cache.Completed:
         return oracle_cache.run(
-            [str(self.probe), *args], env=self.env, policy=self.policy, runner="freesurfer-cleanroom-spline"
+            [str(self.probe), *args],
+            env=self.env,
+            policy=self.policy,
+            runner="freesurfer-cleanroom-spline",
         )
 
-    def ours(self, args: list[str], text: str = "", reproduce: bool = False) -> subprocess.CompletedProcess:
+    def ours(
+        self, args: list[str], text: str = "", reproduce: bool = False
+    ) -> subprocess.CompletedProcess:
         opts = ["--reproduce"] if reproduce else []
         return subprocess.run(
-            [str(self.cleanroom), *opts, *args], input=text.encode(), capture_output=True, check=False
+            [str(self.cleanroom), *opts, *args],
+            input=text.encode(),
+            capture_output=True,
+            check=False,
         )
 
 
 def first_diff(a: bytes, b: bytes) -> str:
-    for i, (x, y) in enumerate(zip(a.split(b"\n"), b.split(b"\n"))):
+    for i, (x, y) in enumerate(zip(a.split(b"\n"), b.split(b"\n"), strict=False)):
         if x != y:
             return f"line {i}: {x[:120]!r} vs {y[:120]!r}"
     return "lengths differ"
@@ -220,7 +245,13 @@ def batches(ctx: Context, command: str, lines: list[str], reproduce: bool) -> di
         same_status += ok_st
         out_lines += o.stdout_bytes.count(b"\n")
         if not (ok_out and ok_st):
-            bad.append({"batch": i // BATCH, "status": [o.returncode, c.returncode], "diff": first_diff(o.stdout_bytes, c.stdout)})
+            bad.append(
+                {
+                    "batch": i // BATCH,
+                    "status": [o.returncode, c.returncode],
+                    "diff": first_diff(o.stdout_bytes, c.stdout),
+                }
+            )
     n = (len(lines) + BATCH - 1) // BATCH
     return {
         "inputs": len(lines),
@@ -234,7 +265,9 @@ def batches(ctx: Context, command: str, lines: list[str], reproduce: bool) -> di
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--workspace", default=os.environ.get("LARMORX_WORKSPACE", str(HERE.parents[3])))
+    ap.add_argument(
+        "--workspace", default=os.environ.get("LARMORX_WORKSPACE", str(HERE.parents[3]))
+    )
     ap.add_argument("--cleanroom", required=True)
     ap.add_argument("--scratch", default=tempfile.gettempdir())
     ap.add_argument("--out", required=True)
@@ -244,6 +277,7 @@ def main() -> int:
     ctx = Context(args)
     rng = random.Random(20261113)
     result: dict = {"date": time.strftime("%Y-%m-%d"), "machine": os.uname().machine}
+    result.update(stamp(ctx.probe, ctx.cleanroom))
     status = 0
 
     t0 = time.perf_counter()
@@ -294,7 +328,10 @@ def main() -> int:
         "rows": rows,
         "fs103_default": fix_rows,
         "ok": all(r["same"] for r in rows if "nan" not in r["args"].split())
-        and all(f["default_status"] == 1 and "nan" in f["default_stdout"] and f["reproduce_same"] for f in fix_rows),
+        and all(
+            f["default_status"] == 1 and "nan" in f["default_stdout"] and f["reproduce_same"]
+            for f in fix_rows
+        ),
     }
     # the NaN-knot rows of SET1 compare the probe with the default above: they differ by design
     for r_ in rows:
@@ -308,9 +345,34 @@ def main() -> int:
     result["fs103_reproduce"] = r
     # by default the first such case is refused with E2 (the run ends there)
     c = ctx.ours(["cases"], nan_lines[0] + "\n")
-    result["fs103_default"] = {"status": c.returncode, "stdout_tail": c.stdout.decode()[-200:], "ok": c.returncode == 1}
+    result["fs103_default"] = {
+        "status": c.returncode,
+        "stdout_tail": c.stdout.decode()[-200:],
+        "ok": c.returncode == 1,
+    }
 
-    for name in ("cases", "d3", "set1", "fs103_reproduce", "fs103_default"):
+    # speed: the same cases through each program (outside the cache: it measures time), best of 3
+    with tempfile.TemporaryDirectory(dir=ctx.scratch) as tmp:
+        path = Path(tmp) / "cases.txt"
+        path.write_text("\n".join(lines) + "\n")
+
+        def timed(argv: list[str]) -> float:
+            best = float("inf")
+            for _ in range(3):
+                with path.open("rb") as stdin:
+                    t1 = time.perf_counter()
+                    subprocess.run(argv, stdin=stdin, stdout=subprocess.DEVNULL, check=True)
+                    best = min(best, time.perf_counter() - t1)
+            return round(best, 3)
+
+        result["speed"] = {
+            "cases": len(lines),
+            "probe_s": timed([str(ctx.probe), "cases"]),
+            "cleanroom_s": timed([str(ctx.cleanroom), "cases"]),
+            "ok": True,
+        }
+
+    for name in ("cases", "d3", "set1", "fs103_reproduce", "fs103_default", "speed"):
         r = result[name]
         summary = {k: v for k, v in r.items() if isinstance(v, (int, float, str, bool))}
         print(f"{name}: {json.dumps(summary)}", flush=True)

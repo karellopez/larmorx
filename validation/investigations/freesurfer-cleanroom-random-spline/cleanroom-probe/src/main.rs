@@ -56,7 +56,9 @@ pub(crate) fn parse_f64(s: &str) -> Result<f64, String> {
             if let Some(hex) = inner.strip_prefix("0x") {
                 u64::from_str_radix(hex, 16).map_err(|e| format!("bad number {s}: {e}"))?
             } else {
-                inner.parse::<u64>().map_err(|e| format!("bad number {s}: {e}"))?
+                inner
+                    .parse::<u64>()
+                    .map_err(|e| format!("bad number {s}: {e}"))?
             }
         };
         f64::from_bits(0x7ff8_0000_0000_0000 | (payload & 0x0007_ffff_ffff_ffff))
@@ -287,7 +289,9 @@ fn run(args: &[String]) -> Result<(), String> {
                 return Err(format!("{name} takes {want} parameters"));
             }
             let n: u32 = if name == "gamma_int" {
-                args[4].parse().map_err(|_| "bad integer shape".to_string())?
+                args[4]
+                    .parse()
+                    .map_err(|_| "bad integer shape".to_string())?
             } else {
                 0
             };

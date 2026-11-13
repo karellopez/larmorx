@@ -326,8 +326,7 @@ impl Ranlux {
     /// # Errors
     /// As [`Ranlux::gamma`].
     pub fn fdist(&mut self, nu1: f64, nu2: f64) -> Result<f64, DrawError> {
-        self.fdist_draw(nu1, nu2)
-            .map_err(|e| e.in_draw("F draw"))
+        self.fdist_draw(nu1, nu2).map_err(|e| e.in_draw("F draw"))
     }
 
     fn fdist_draw(&mut self, nu1: f64, nu2: f64) -> Result<f64, DrawError> {

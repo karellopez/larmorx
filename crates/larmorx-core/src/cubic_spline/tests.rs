@@ -46,14 +46,21 @@ fn the_probes_values() {
     let m2 = set(&t2, &y2, (1, 1), (0.0, 0.0), FIX).unwrap();
     assert_eq!(bits(&m2), [0xc010_0000, 0x4010_0000]);
     let below = evaluate(&t2, &y2, &m2, 0.0);
-    assert_eq!((below.value.to_bits(), below.first, below.second), (0x40c0_0000, None, None));
+    assert_eq!(
+        (below.value.to_bits(), below.first, below.second),
+        (0x40c0_0000, None, None)
+    );
     let inside = evaluate(&t2, &y2, &m2, 2.0);
     assert_eq!(inside.value.to_bits(), 0x40a2_0000);
     assert_eq!(inside.first.map(f32::to_bits), Some(0xbfd8_0000));
     assert_eq!(inside.second.map(f32::to_bits), Some(0xbf90_0000));
     let above = evaluate(&t2, &y2, &m2, 6.0);
     assert_eq!(
-        (above.value.to_bits(), above.first.map(f32::to_bits), above.second),
+        (
+            above.value.to_bits(),
+            above.first.map(f32::to_bits),
+            above.second
+        ),
         (0, Some(0), None)
     );
     // the wrappers take the end values as first derivatives: conditions 2 and 2 with (1, 2)
@@ -100,7 +107,9 @@ fn messages() {
     let e1 = set(&[0.0], &[5.0], (0, 0), (0.0, 0.0), FIX).unwrap_err();
     assert_eq!(
         e1.message(),
-        format!("{head}  The number of data points N must be at least 2.\n  The input value is 1.\n")
+        format!(
+            "{head}  The number of data points N must be at least 2.\n  The input value is 1.\n"
+        )
     );
     let e2 = set(&[0.0, 1.0, 1.0], &[5.0, 6.0, 7.0], (1, 1), (0.0, 0.0), FIX).unwrap_err();
     assert_eq!(
@@ -128,7 +137,11 @@ fn messages() {
     assert_eq!(EXIT_STATUS, 1);
     // the knots' numbers as %g
     let e = set(&[f(1), -f(1)], &[0.0, 0.0], (1, 1), (0.0, 0.0), FIX).unwrap_err();
-    assert!(e.message().ends_with("T(0) = 1.4013e-45\n  T(1) = -1.4013e-45\n"), "{e}");
+    assert!(
+        e.message()
+            .ends_with("T(0) = 1.4013e-45\n  T(1) = -1.4013e-45\n"),
+        "{e}"
+    );
     let e = set(&[f32::INFINITY, 0.0], &[0.0, 0.0], (1, 1), (0.0, 0.0), FIX).unwrap_err();
     assert!(e.message().ends_with("T(0) = inf\n  T(1) = 0\n"), "{e}");
 }
@@ -199,7 +212,8 @@ fn case_text(n: usize, ibc: (i32, i32), seed: u64) -> String {
             }
             for x in xs {
                 let ev = evaluate(&t, &y, &m, x);
-                let opt = |v: Option<f32>| v.map_or("-".to_string(), |v| format!("{:08x}", v.to_bits()));
+                let opt =
+                    |v: Option<f32>| v.map_or("-".to_string(), |v| format!("{:08x}", v.to_bits()));
                 s.push_str(&format!(
                     "{:08x} {} {}\n",
                     ev.value.to_bits(),
@@ -219,7 +233,11 @@ fn golden_cases() -> Vec<(String, String)> {
         for ibcend in 0..3 {
             cases.push((
                 format!("n=12 ibc={ibcbeg},{ibcend}"),
-                case_text(12, (ibcbeg, ibcend), 100 + 3 * ibcbeg as u64 + ibcend as u64),
+                case_text(
+                    12,
+                    (ibcbeg, ibcend),
+                    100 + 3 * ibcbeg as u64 + ibcend as u64,
+                ),
             ));
         }
     }
@@ -232,18 +250,54 @@ fn golden_cases() -> Vec<(String, String)> {
 /// The golden checksums, recorded on Linux x86-64 (`cargo test -p larmorx-core cubic_spline`
 /// prints a changed or missing one).
 const GOLDEN: &[(&str, &str)] = &[
-    ("n=12 ibc=0,0", "d30ebb4763f96551043ee44ae505b0c695fc59187fb326e12d2f6999ff71955f"),
-    ("n=12 ibc=0,1", "43b7b42ba593fafea4095c0087456bd931531a0c1d35514d19fffe8f1b4f4013"),
-    ("n=12 ibc=0,2", "3452b6c381dbb965d61a4d2e08599ce421b70058296cb9c8aa2e6d275d31c3bf"),
-    ("n=12 ibc=1,0", "e67bd5429899a339ee78f51d239df9b65f9ac25979997a54c8dd352cbf8f5d0c"),
-    ("n=12 ibc=1,1", "5990565e73128e55446098ec8225aed1b51a805d304cf5485e3c7c72f92bffae"),
-    ("n=12 ibc=1,2", "1d5b4e0e55b46d698ba717bed35ba865d899531abf35547ee878dad906a99ebe"),
-    ("n=12 ibc=2,0", "d2cd3c8198e5c51a95eaf839f4f26e02dfe6c93b091ece728afd222547be31df"),
-    ("n=12 ibc=2,1", "e01c5aa60465181d43131acd833a59a34e4f24069e809b0ff8512db6ea023f18"),
-    ("n=12 ibc=2,2", "088d7c2658061f246a57c876c157d55510a69df54f1b42eeaaf575bb3dd01768"),
-    ("n=2 ibc=0,0", "07c5a2ed9d81c3331655b57736f7393c8832817c611cd1394f9e49890888e188"),
-    ("n=2 ibc=1,1", "65a881d2d1d79f6a24ef9fc625d2b0ee97227e2939c65370e10847b8dcc3b0f9"),
-    ("n=80 ibc=1,1", "41b94224283bbdfe864f75814d93de8a57d80039a3b7c75a26ecce8dede23630"),
+    (
+        "n=12 ibc=0,0",
+        "d30ebb4763f96551043ee44ae505b0c695fc59187fb326e12d2f6999ff71955f",
+    ),
+    (
+        "n=12 ibc=0,1",
+        "43b7b42ba593fafea4095c0087456bd931531a0c1d35514d19fffe8f1b4f4013",
+    ),
+    (
+        "n=12 ibc=0,2",
+        "3452b6c381dbb965d61a4d2e08599ce421b70058296cb9c8aa2e6d275d31c3bf",
+    ),
+    (
+        "n=12 ibc=1,0",
+        "e67bd5429899a339ee78f51d239df9b65f9ac25979997a54c8dd352cbf8f5d0c",
+    ),
+    (
+        "n=12 ibc=1,1",
+        "5990565e73128e55446098ec8225aed1b51a805d304cf5485e3c7c72f92bffae",
+    ),
+    (
+        "n=12 ibc=1,2",
+        "1d5b4e0e55b46d698ba717bed35ba865d899531abf35547ee878dad906a99ebe",
+    ),
+    (
+        "n=12 ibc=2,0",
+        "d2cd3c8198e5c51a95eaf839f4f26e02dfe6c93b091ece728afd222547be31df",
+    ),
+    (
+        "n=12 ibc=2,1",
+        "e01c5aa60465181d43131acd833a59a34e4f24069e809b0ff8512db6ea023f18",
+    ),
+    (
+        "n=12 ibc=2,2",
+        "088d7c2658061f246a57c876c157d55510a69df54f1b42eeaaf575bb3dd01768",
+    ),
+    (
+        "n=2 ibc=0,0",
+        "07c5a2ed9d81c3331655b57736f7393c8832817c611cd1394f9e49890888e188",
+    ),
+    (
+        "n=2 ibc=1,1",
+        "65a881d2d1d79f6a24ef9fc625d2b0ee97227e2939c65370e10847b8dcc3b0f9",
+    ),
+    (
+        "n=80 ibc=1,1",
+        "41b94224283bbdfe864f75814d93de8a57d80039a3b7c75a26ecce8dede23630",
+    ),
 ];
 
 #[test]
@@ -258,6 +312,11 @@ fn golden() {
             _ => bad.push(format!("    (\"{name}\", \"{got}\"),")),
         }
     }
-    assert_eq!(GOLDEN.len(), golden_cases().len(), "cases:\n{}", bad.join("\n"));
+    assert_eq!(
+        GOLDEN.len(),
+        golden_cases().len(),
+        "cases:\n{}",
+        bad.join("\n")
+    );
     assert!(bad.is_empty(), "changed:\n{}", bad.join("\n"));
 }

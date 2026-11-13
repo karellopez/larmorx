@@ -70,7 +70,11 @@ fn the_specs_streams() {
         let v: Vec<u32> = (0..28).map(|_| r.next_u24()).collect();
         assert_eq!(v[..12], first, "seed {seed}");
         assert_eq!(v[24..28], group2, "seed {seed}");
-        assert_eq!(hex(raw_text(seed, FIX, 100_000).as_bytes()), sha, "seed {seed}");
+        assert_eq!(
+            hex(raw_text(seed, FIX, 100_000).as_bytes()),
+            sha,
+            "seed {seed}"
+        );
         assert!(r.notices().is_empty());
     }
 }
@@ -134,18 +138,66 @@ fn the_specs_draws() {
     );
     type Draw = fn(&mut Ranlux) -> Result<f64, DrawError>;
     let cases: [(&str, Draw, &str); 12] = [
-        ("uni", |r| Ok(r.uniform()), "0588698480ad8ec24542f5fe26022bf9111f8b62aacac35c9dba4aa63427f583"),
-        ("flat", |r| Ok(r.flat(-3.5, 7.25)), "269e29edca7cc8250c431f4881377e474b907b096a7f4c42a8a2de89fe9babad"),
-        ("gaussian", |r| r.gaussian(2.5), "dddaf9501cc31f055ae579170575a39dee41feaf306e30c3c7d3529db56dec72"),
-        ("ugauss", Ranlux::ugaussian, "d361b5e25ba5462d3a2c778159eae840620ecbfc7dbab5c8d4c45c95034afd1b"),
-        ("exponential", |r| r.exponential(0.75), "169ea159bfca04c0d46d9778918769faa122a691af010ab112173b1e85d2a7c5"),
-        ("gamma 0.4", |r| r.gamma(0.4, 1.5), "25e6ffbbfd151efb44bb0cb517567551bf6992802bb7c8ecb7f588de6a22fecb"),
-        ("gamma 3", |r| r.gamma(3.0, 2.0), "cb0281404d16edaf9bbda1ca583db153b65c86cbfdf1e71a11a809ff57be5aba"),
-        ("gamma 7.3", |r| r.gamma(7.3, 0.5), "cf37d457abf62138bf99e2238ce112228df0563709a56fce5481d9a4d781d58f"),
-        ("chisq", |r| r.chisq(5.0), "0d3b457e1a84203627d9def14eb2df8fd053ddc524e1dd860f15d0c139c4eb1e"),
-        ("fdist", |r| r.fdist(4.0, 9.0), "8f2606831e0f4ee964814a5638e17f4f005b360c7b90951daeae26b77d038309"),
-        ("tdist 1.5", |r| r.tdist(1.5), "5a3f4a1edc6c8ff7fb422cbc0e1c68fddc7ac74945f4f18846b4c619a26db2ae"),
-        ("tdist 7", |r| r.tdist(7.0), "3b2a14c67236ed124516a79cf768df21d7d89b19b366a5d5a9505bed817db095"),
+        (
+            "uni",
+            |r| Ok(r.uniform()),
+            "0588698480ad8ec24542f5fe26022bf9111f8b62aacac35c9dba4aa63427f583",
+        ),
+        (
+            "flat",
+            |r| Ok(r.flat(-3.5, 7.25)),
+            "269e29edca7cc8250c431f4881377e474b907b096a7f4c42a8a2de89fe9babad",
+        ),
+        (
+            "gaussian",
+            |r| r.gaussian(2.5),
+            "dddaf9501cc31f055ae579170575a39dee41feaf306e30c3c7d3529db56dec72",
+        ),
+        (
+            "ugauss",
+            Ranlux::ugaussian,
+            "d361b5e25ba5462d3a2c778159eae840620ecbfc7dbab5c8d4c45c95034afd1b",
+        ),
+        (
+            "exponential",
+            |r| r.exponential(0.75),
+            "169ea159bfca04c0d46d9778918769faa122a691af010ab112173b1e85d2a7c5",
+        ),
+        (
+            "gamma 0.4",
+            |r| r.gamma(0.4, 1.5),
+            "25e6ffbbfd151efb44bb0cb517567551bf6992802bb7c8ecb7f588de6a22fecb",
+        ),
+        (
+            "gamma 3",
+            |r| r.gamma(3.0, 2.0),
+            "cb0281404d16edaf9bbda1ca583db153b65c86cbfdf1e71a11a809ff57be5aba",
+        ),
+        (
+            "gamma 7.3",
+            |r| r.gamma(7.3, 0.5),
+            "cf37d457abf62138bf99e2238ce112228df0563709a56fce5481d9a4d781d58f",
+        ),
+        (
+            "chisq",
+            |r| r.chisq(5.0),
+            "0d3b457e1a84203627d9def14eb2df8fd053ddc524e1dd860f15d0c139c4eb1e",
+        ),
+        (
+            "fdist",
+            |r| r.fdist(4.0, 9.0),
+            "8f2606831e0f4ee964814a5638e17f4f005b360c7b90951daeae26b77d038309",
+        ),
+        (
+            "tdist 1.5",
+            |r| r.tdist(1.5),
+            "5a3f4a1edc6c8ff7fb422cbc0e1c68fddc7ac74945f4f18846b4c619a26db2ae",
+        ),
+        (
+            "tdist 7",
+            |r| r.tdist(7.0),
+            "3b2a14c67236ed124516a79cf768df21d7d89b19b366a5d5a9505bed817db095",
+        ),
     ];
     for (name, f, sha) in cases {
         assert_eq!(hex(draws(53, FIX, 20_000, f).as_bytes()), sha, "{name}");
@@ -162,7 +214,10 @@ fn special_values() {
     assert_eq!(r.flat(nan(0x123), 1.0).to_bits(), 0x7ff8_0000_0000_0123);
     assert_eq!(r.flat(1.0, nan(0x123)).to_bits(), 0x7ff8_0000_0000_0123);
     assert_eq!(r.flat(nan(5), nan(0x123)).to_bits(), 0x7ff8_0000_0000_0123);
-    assert_eq!(r.flat(f64::INFINITY, 1.0).to_bits(), f64::INFINITY.to_bits());
+    assert_eq!(
+        r.flat(f64::INFINITY, 1.0).to_bits(),
+        f64::INFINITY.to_bits()
+    );
     assert_eq!(bits(r.gaussian(nan(0x77))), 0x7ff8_0000_0000_0077);
     assert_eq!(bits(r.exponential(nan(0x77))), 0xfff8_0000_0000_0077);
     // shape 0 is the point mass at 0, with the sign the arithmetic gives
@@ -193,7 +248,11 @@ fn fs100_gamma_shapes() {
     assert_eq!(r.notices()[0].defect.id, "FS-100");
     assert_eq!(r.notices()[0].mode, REPRODUCE);
     // the default: the whole shape, G_large of its integer part plus G_frac of its fraction
-    for (a, b) in [(4_294_967_296.5, 1.0), (4_294_967_308.25, 2.0), (8_589_934_600.0, 0.5)] {
+    for (a, b) in [
+        (4_294_967_296.5, 1.0),
+        (4_294_967_308.25, 2.0),
+        (8_589_934_600.0, 0.5),
+    ] {
         let mut r = Ranlux::new(53, FIX);
         let got = r.gamma(a, b).unwrap();
         let mut parts = Ranlux::new(53, FIX);
@@ -206,14 +265,34 @@ fn fs100_gamma_shapes() {
         assert!((got / (a * b) - 1.0).abs() < 1e-3, "{a}: {got}");
         let notice = &r.notices()[0];
         assert_eq!(notice.defect.id, "FS-100");
-        assert!(notice.line().contains("uses the whole shape"), "{}", notice.line());
+        assert!(
+            notice.line().contains("uses the whole shape"),
+            "{}",
+            notice.line()
+        );
     }
     // the errors
     for (a, mode, text) in [
-        (f64::NAN, FIX, "FS-100: the gamma shape NaN is not a finite number"),
-        (f64::INFINITY, FIX, "FS-100: the gamma shape inf is not a finite number"),
-        (f64::NEG_INFINITY, FIX, "FS-100: the gamma shape -inf is not a finite number"),
-        (f64::NEG_INFINITY, REPRODUCE, "FS-100: the gamma shape -inf is not a finite number"),
+        (
+            f64::NAN,
+            FIX,
+            "FS-100: the gamma shape NaN is not a finite number",
+        ),
+        (
+            f64::INFINITY,
+            FIX,
+            "FS-100: the gamma shape inf is not a finite number",
+        ),
+        (
+            f64::NEG_INFINITY,
+            FIX,
+            "FS-100: the gamma shape -inf is not a finite number",
+        ),
+        (
+            f64::NEG_INFINITY,
+            REPRODUCE,
+            "FS-100: the gamma shape -inf is not a finite number",
+        ),
         (-1.5, FIX, "FS-100: the gamma shape -1.5 is negative"),
         (-1.5, REPRODUCE, "FS-100: the gamma shape -1.5 is negative"),
         (-1e300, FIX, "FS-100: the gamma shape -1e300 is negative"),
@@ -243,7 +322,11 @@ fn fs101_zero_seeds() {
         let v: Vec<u32> = (0..12).map(|_| r.next_u24()).collect();
         assert_eq!(v, corrected, "{m}");
         assert_eq!(r.notices().len(), 1);
-        assert!(r.notices()[0].line().contains(&format!("seed {seed} makes")));
+        assert!(
+            r.notices()[0]
+                .line()
+                .contains(&format!("seed {seed} makes"))
+        );
         let mut z = Ranlux::new(seed, REPRODUCE);
         assert!((0..10_000).all(|_| z.next_u24() == 0), "{m}");
         assert_eq!(z.notices()[0].defect.id, "FS-101");
@@ -310,7 +393,10 @@ fn golden_cases() -> Vec<(&'static str, String)> {
         ("gamma_frac/0.4", d(53, FIX, |r| r.gamma_frac(0.4))),
         ("gamma/7.3 (int + frac)", d(53, FIX, |r| r.gamma(7.3, 0.5))),
         ("gamma/25 (large)", d(53, FIX, |r| r.gamma(25.0, 1.0))),
-        ("gamma/12.5 (large + frac)", d(53, FIX, |r| r.gamma(12.5, 2.0))),
+        (
+            "gamma/12.5 (large + frac)",
+            d(53, FIX, |r| r.gamma(12.5, 2.0)),
+        ),
         ("chisq", d(53, FIX, |r| r.chisq(5.0))),
         ("fdist", d(53, FIX, |r| r.fdist(30.0, 50.0))),
         ("tdist/1.5 (first branch)", d(53, FIX, |r| r.tdist(1.5))),
@@ -320,44 +406,134 @@ fn golden_cases() -> Vec<(&'static str, String)> {
         ("nan/exponential", d(53, FIX, |r| r.exponential(NAN2))),
         ("nan/tdist", d(53, FIX, |r| r.tdist(NAN2))),
         ("fs100/fix", d(53, FIX, |r| r.gamma(4_294_967_308.25, 1.0))),
-        ("fs100/reproduce", d(53, REPRODUCE, |r| r.gamma(4_294_967_308.25, 1.0))),
+        (
+            "fs100/reproduce",
+            d(53, REPRODUCE, |r| r.gamma(4_294_967_308.25, 1.0)),
+        ),
         ("fs101/fix", raw_text(ZERO_SEED, FIX, 1000)),
         ("fs101/fix gaussian", d(ZERO_SEED, FIX, Ranlux::ugaussian)),
-        ("fs101/reproduce gamma", d(ZERO_SEED, REPRODUCE, |r| r.gamma(12.0, 1.0))),
+        (
+            "fs101/reproduce gamma",
+            d(ZERO_SEED, REPRODUCE, |r| r.gamma(12.0, 1.0)),
+        ),
     ]
 }
 
 /// The golden checksums, recorded on Linux x86-64 (`cargo test -p larmorx-core ranlux` prints a
 /// changed or missing one).
 const GOLDEN: &[(&str, &str)] = &[
-    ("raw/53", "6e986c30a381ee90a0ed6255128612adb3a88b5208ff826e0dcbac76dec7b728"),
-    ("raw/1", "ac0668ed0e64ee8ea08a4f1ce60828ae864c9178ac3438a3d6a2745134a2985a"),
-    ("raw/4294967296", "62e038a5203940f786b9511a6684d12f7f748fa9fce123c207a33e77e3d95cc7"),
-    ("uni", "eab69b0b4ef52f38a184fe77587d22955f51af337a0809598b2da058a55fc251"),
-    ("uni_pos", "eab69b0b4ef52f38a184fe77587d22955f51af337a0809598b2da058a55fc251"),
-    ("flat", "cb1e0a4107eb987866489230a5412c3347b3fe9968052396dce2292355406986"),
-    ("gaussian", "2340c20e335c8df3e977f6ec877d8d1a8725833d1da647583707af33d879616f"),
-    ("ugauss", "135ea8792c68135db32a9b1310fd20018392862b389c2e0e312769511d7494e7"),
-    ("exponential", "5725e7ed5fdc20d88e7641e539a07608a51c774f26b4ab97bf78632074c9b98e"),
-    ("gamma_int/5", "7d22f5026d65a55fcd8bedb4bb2d7308db3dc3dd7d92d34d2cfea1383645ac83"),
-    ("gamma_large/31.6", "23b84b1d692a04dc67531dab75041134990c0a660dcea5e933b5446534549098"),
-    ("gamma_frac/0.4", "ef4d86f9beccd5c2d9cc8c90568d3557f2c102b4e1a3473b458e5aead83c6023"),
-    ("gamma/7.3 (int + frac)", "88f47d7a38081bd5df979f501722a252db2f544b5a2e8adc2a089012ef4e28e0"),
-    ("gamma/25 (large)", "068630285c1d2d7c77ee1b778d641e300fa799b79ead1a7448845113c0d75bec"),
-    ("gamma/12.5 (large + frac)", "a2c3f2a51b8ba30f3cb331d35deb5d6540106524816488d9f46e589a21d69fd5"),
-    ("chisq", "e48944c31d09313c1fb023295f00d986c5000f4653c03a5942a03d1e76988da0"),
-    ("fdist", "f38dab75083df93699a0928128e4ddc8a21d4e5dfcaa0bb98b2eb7938aec646d"),
-    ("tdist/1.5 (first branch)", "469ab7161244b2699048550645ef8e8605e7abfe0c46be407412259efc2d5016"),
-    ("tdist/7 (second branch)", "e72ecf7597a95d7a63f919494b70d8b92581126d300b5c00b585743a83237860"),
-    ("nan/flat", "d7d2b277dc352f48f434df3cbc59247f43b3d2b55f65ce692636d24bc7d2b3a0"),
-    ("nan/gaussian", "d272cffd572b7748080d9f2b9d43df2d9caa30624ae467098da7c8980c1ee4b2"),
-    ("nan/exponential", "11bea01bac460b42a840269812ad107d4241a25ab222ee99182ac965b4f712c8"),
-    ("nan/tdist", "819fd7bf7e19f1815b76ea0825d631bb427e22b53a5ea5a0629ab0849e402bb6"),
-    ("fs100/fix", "2be644fb8fcfcd8ac25701c325db35f84b1e1f48a65c33353e3b01d9f485abb7"),
-    ("fs100/reproduce", "ef664dc0bcab93e9568bfac16cef15754721459446bf9dc9dd1181a57bd08430"),
-    ("fs101/fix", "6709595d3378720316ab9c22bf088fbfa0a4af467e04c4621a1dd90abf3e8b3c"),
-    ("fs101/fix gaussian", "c08baaa6766813f57a582cc2b18801a15328a980e8c2d6e84ad6f158e944fb37"),
-    ("fs101/reproduce gamma", "5a261f328016f2bbea3938ed94bc3a9cf2bc9d4e2840ad3ba3d692f5a24cf94a"),
+    (
+        "raw/53",
+        "6e986c30a381ee90a0ed6255128612adb3a88b5208ff826e0dcbac76dec7b728",
+    ),
+    (
+        "raw/1",
+        "ac0668ed0e64ee8ea08a4f1ce60828ae864c9178ac3438a3d6a2745134a2985a",
+    ),
+    (
+        "raw/4294967296",
+        "62e038a5203940f786b9511a6684d12f7f748fa9fce123c207a33e77e3d95cc7",
+    ),
+    (
+        "uni",
+        "eab69b0b4ef52f38a184fe77587d22955f51af337a0809598b2da058a55fc251",
+    ),
+    (
+        "uni_pos",
+        "eab69b0b4ef52f38a184fe77587d22955f51af337a0809598b2da058a55fc251",
+    ),
+    (
+        "flat",
+        "cb1e0a4107eb987866489230a5412c3347b3fe9968052396dce2292355406986",
+    ),
+    (
+        "gaussian",
+        "2340c20e335c8df3e977f6ec877d8d1a8725833d1da647583707af33d879616f",
+    ),
+    (
+        "ugauss",
+        "135ea8792c68135db32a9b1310fd20018392862b389c2e0e312769511d7494e7",
+    ),
+    (
+        "exponential",
+        "5725e7ed5fdc20d88e7641e539a07608a51c774f26b4ab97bf78632074c9b98e",
+    ),
+    (
+        "gamma_int/5",
+        "7d22f5026d65a55fcd8bedb4bb2d7308db3dc3dd7d92d34d2cfea1383645ac83",
+    ),
+    (
+        "gamma_large/31.6",
+        "23b84b1d692a04dc67531dab75041134990c0a660dcea5e933b5446534549098",
+    ),
+    (
+        "gamma_frac/0.4",
+        "ef4d86f9beccd5c2d9cc8c90568d3557f2c102b4e1a3473b458e5aead83c6023",
+    ),
+    (
+        "gamma/7.3 (int + frac)",
+        "88f47d7a38081bd5df979f501722a252db2f544b5a2e8adc2a089012ef4e28e0",
+    ),
+    (
+        "gamma/25 (large)",
+        "068630285c1d2d7c77ee1b778d641e300fa799b79ead1a7448845113c0d75bec",
+    ),
+    (
+        "gamma/12.5 (large + frac)",
+        "a2c3f2a51b8ba30f3cb331d35deb5d6540106524816488d9f46e589a21d69fd5",
+    ),
+    (
+        "chisq",
+        "e48944c31d09313c1fb023295f00d986c5000f4653c03a5942a03d1e76988da0",
+    ),
+    (
+        "fdist",
+        "f38dab75083df93699a0928128e4ddc8a21d4e5dfcaa0bb98b2eb7938aec646d",
+    ),
+    (
+        "tdist/1.5 (first branch)",
+        "469ab7161244b2699048550645ef8e8605e7abfe0c46be407412259efc2d5016",
+    ),
+    (
+        "tdist/7 (second branch)",
+        "e72ecf7597a95d7a63f919494b70d8b92581126d300b5c00b585743a83237860",
+    ),
+    (
+        "nan/flat",
+        "d7d2b277dc352f48f434df3cbc59247f43b3d2b55f65ce692636d24bc7d2b3a0",
+    ),
+    (
+        "nan/gaussian",
+        "d272cffd572b7748080d9f2b9d43df2d9caa30624ae467098da7c8980c1ee4b2",
+    ),
+    (
+        "nan/exponential",
+        "11bea01bac460b42a840269812ad107d4241a25ab222ee99182ac965b4f712c8",
+    ),
+    (
+        "nan/tdist",
+        "819fd7bf7e19f1815b76ea0825d631bb427e22b53a5ea5a0629ab0849e402bb6",
+    ),
+    (
+        "fs100/fix",
+        "2be644fb8fcfcd8ac25701c325db35f84b1e1f48a65c33353e3b01d9f485abb7",
+    ),
+    (
+        "fs100/reproduce",
+        "ef664dc0bcab93e9568bfac16cef15754721459446bf9dc9dd1181a57bd08430",
+    ),
+    (
+        "fs101/fix",
+        "6709595d3378720316ab9c22bf088fbfa0a4af467e04c4621a1dd90abf3e8b3c",
+    ),
+    (
+        "fs101/fix gaussian",
+        "c08baaa6766813f57a582cc2b18801a15328a980e8c2d6e84ad6f158e944fb37",
+    ),
+    (
+        "fs101/reproduce gamma",
+        "5a261f328016f2bbea3938ed94bc3a9cf2bc9d4e2840ad3ba3d692f5a24cf94a",
+    ),
 ];
 
 #[test]
@@ -372,6 +548,11 @@ fn golden() {
             _ => bad.push(format!("    (\"{name}\", \"{got}\"),")),
         }
     }
-    assert_eq!(GOLDEN.len(), golden_cases().len(), "cases:\n{}", bad.join("\n"));
+    assert_eq!(
+        GOLDEN.len(),
+        golden_cases().len(),
+        "cases:\n{}",
+        bad.join("\n")
+    );
     assert!(bad.is_empty(), "changed:\n{}", bad.join("\n"));
 }

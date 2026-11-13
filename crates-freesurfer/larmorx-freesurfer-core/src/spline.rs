@@ -140,7 +140,7 @@ pub fn spline_cubic_set(
         let fails = if reproduce {
             t[i + 1] <= t[i]
         } else {
-            !(t[i + 1] > t[i])
+            t[i + 1].partial_cmp(&t[i]) != Some(std::cmp::Ordering::Greater)
         };
         if fails {
             return Err(fatal(

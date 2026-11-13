@@ -146,10 +146,13 @@ fn freesurfers_draws() {
     }
 }
 
-/// §10.2's large-shape cases with the C library's `tan` (glibc 2.35 there, as FreeSurfer's): its
-/// bits exactly (only on Linux x86-64 with glibc, where `f64::tan` is glibc's).
+/// §10.2's large-shape cases with the C library's `tan`: FreeSurfer's bits exactly where the C
+/// library is the reference machine's (glibc 2.35 on Linux x86-64, as the official programs run):
+/// a parity check, run by hand there (`cargo test -p larmorx-gpl-gsl -- --ignored`), not on CI's
+/// machines, whose C libraries differ.
 #[cfg(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]
 #[test]
+#[ignore = "the reference machine's glibc 2.35: cargo test -p larmorx-gpl-gsl -- --ignored"]
 fn freesurfers_large_shapes_with_glibcs_tan() {
     let sys = |a: f64| {
         let mut r = ScRng::new(53, FIX);
@@ -243,7 +246,7 @@ fn fs100_gamma_shapes() {
         let n = a.floor();
         let mut g = parts.gamma_large(n).unwrap();
         if a != n {
-            g = parts.gamma_frac(a - n).unwrap() + g;
+            g += parts.gamma_frac(a - n).unwrap();
         }
         assert_eq!(got.to_bits(), (g * b).to_bits(), "{a}");
         assert!((got / (a * b) - 1.0).abs() < 1e-3, "{a}: {got}");

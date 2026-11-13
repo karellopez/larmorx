@@ -172,9 +172,11 @@ impl ScRng {
                 ret = sub(1.0, log(v));
                 q = exp(mul(log(ret), sub(a, 1.0)));
             }
-            if !(self.uni() >= q) {
-                return Ok(ret);
+            // `while (sc_uni(r) >= q)`: a NaN `q` ends the loop
+            if self.uni() >= q {
+                continue;
             }
+            return Ok(ret);
         }
     }
 

@@ -1,16 +1,102 @@
 # DenoiseImage
 
-`lx.ants.denoise_image` (command line `larmorx ants DenoiseImage`; Rust
-`larmorx_ants::denoise_image`, `larmorx_image::adaptive_denoising`). A replica of ANTs 2.6.5's
-`DenoiseImage` on the `AdaptiveNonLocalMeansDenoisingImageFilter` of ITK 5.4.5's remote module
-AdaptiveDenoising (commit `24825c8d`, Apache-2.0): adaptive non-local means denoising (Manjón et
-al., *Adaptive non-local means denoising of MR images with spatially varying noise levels*,
-JMRI 31:192-203, 2010). sMRIPrep runs it on every T1w (`-n Rician`, ANTs' other defaults).
+`lx.ants.denoise_image` (command line `larmorx ants DenoiseImage`): adaptive non-local means
+denoising, as ANTs 2.6.5's `DenoiseImage` computes it.
 
-**Status: `validated`** against DenoiseImage itself (see the
-[validation record](../validation/ants-denoise.md)), on sMRIPrep's command line on real T1w
-images and on every option, in 2, 3 and 4 dimensions (standard tier: 40 compared cases, 52
-outputs):
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then the speed, the behaviour worth knowing, ANTs' and ITK's defects as the
+port corrects them, the differences by design and the Rust API.
+
+## Ports
+
+`DenoiseImage` has one port, in `pip install larmorx`: **the replica** (`crates/larmorx-ants`,
+`crates/larmorx-image`; Apache-2.0; Rust `larmorx_ants::denoise_image`,
+`larmorx_image::adaptive_denoising`), translated from ANTs 2.6.5's `DenoiseImage` on the
+`AdaptiveNonLocalMeansDenoisingImageFilter` of ITK 5.4.5's remote module AdaptiveDenoising
+(commit `24825c8d`, Apache-2.0). Its result does not depend on the thread count: it is always
+ANTs' one-thread result.
+
+## `DenoiseImage`
+
+<!-- reference
+program: DenoiseImage
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.denoise_image
+command-line: crates/larmorx-ants/src/cli/denoise_image.rs
+records: {replica: [ants-denoise]}
+evidence: ants-denoise
+-->
+
+`DenoiseImage` denoises an image by adaptive non-local means (Manjón et al., *Adaptive non-local
+means denoising of MR images with spatially varying noise levels*, JMRI 31:192-203, 2010).
+sMRIPrep runs it on every T1w (`-n Rician`, ANTs' other defaults).
+
+### Python (`DenoiseImage`)
+
+`lx.ants.denoise_image(image, noise_model="Rician", mask=None, shrink_factor=1, patch_radius=1, search_radius=2, *, dimension=None, n_threads=1, upstream_defects="fix")`
+
+Returns a `DenoiseResult`: `denoised` and `noise`, float32 images on the input's grid (the noise
+is always returned). `image` is a path, an `lx.Image`, a nibabel image or `(array, affine)`,
+read as `float`.
+
+```python
+import larmorx as lx
+
+# sMRIPrep's call: Rician noise model, patch radius 1, search radius 2, no shrinking
+res = lx.ants.denoise_image("sub-01_T1w.nii.gz", n_threads=8)
+res.denoised.to_filename("sub-01_desc-denoised_T1w.nii.gz")
+noise = res.noise                       # image − denoised
+
+# the Gaussian model, only inside a mask, larger patches
+res = lx.ants.denoise_image(t1w, "Gaussian", mask=brain_mask, patch_radius=2)
+```
+
+### Options of `DenoiseImage`
+
+| ANTs option | Python | Notes |
+|---|---|---|
+| `-d 2/3/4`, `--image-dimensionality` | `dimension` | default: the image's; a 4D file read with `-d 3` gives its first volume; in 4D, patches and search boxes extend along time too |
+| `-i image`, `--input-image` | `image` | path, `lx.Image`, nibabel image or `(array, affine)`; read as `float` |
+| `-n Rician/(Gaussian)`, `--noise-model` | `noise_model="Rician"` | **different default**: the command line's is Gaussian, Python's is Rician (sMRIPrep's choice). Case does not matter |
+| `-x mask`, `--mask-image` | `mask` | read as `unsigned char` (0.4 → 0; values beyond 0 to 255 clamped, ANTS-06 in [Upstream defects](#upstream-defects-d13)); only voxels where it is not 0 are patch centres. Must be on the grid the filter runs on (the shrunk grid with `-s` above 1) |
+| `-s 1`, `--shrink-factor` | `shrink_factor=1` | `ShrinkImageFilter` along every axis (time too); 0 acts as 1. The noise is resampled linearly onto the full grid |
+| `-p 1` / `-p 1x1x1`, `--patch-radius` | `patch_radius=1` / `(1, 1, 1)` | one value for every axis or one per axis |
+| `-r 2` / `-r 2x2x2`, `--search-radius` | `search_radius=2` / `(2, 2, 2)` | one value for every axis or one per axis |
+| `-o out` / `-o [out,noise]`, `--output` | the result | its `denoised` and `noise`, float32 images on the input's grid |
+| `-v 1`, `--verbose` | (command line only) | ANTs' progress characters and the elapsed time |
+| `--version` | (command line only) | the version line |
+| `-h`, `--help` | (command line only) | ANTs' short and long help |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | **ANTs' result depends on it; larmorx's does not**: it always gives ANTs' one-thread result |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` ([Upstream defects](#upstream-defects-d13)) |
+
+Not exposed by ANTs (fixed as in `DenoiseImage`): local mean and variance radius 1, ε = 1e-5,
+mean threshold 0.95, variance threshold 0.5, smoothing variance 2. The Rust filter
+(`AdaptiveNlmParameters`) takes them all.
+
+### Examples of `DenoiseImage`
+
+<!-- inputs: t1w.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# sMRIPrep's call: the Rician noise model, ANTs' other defaults.
+res = lx.ants.denoise_image("t1w.nii.gz")
+res.denoised.data.dtype  # -> dtype('float32')
+```
+
+```bash example
+larmorx ants DenoiseImage -d 3 -i t1w.nii.gz -n Rician -s 1 -o [ denoised.nii.gz, noise.nii.gz ]
+```
+
+### Ports of `DenoiseImage`
+
+**The replica: status `validated`** against DenoiseImage itself (its
+[record](../validation/ants-denoise.md), 2026-10-24, standard tier: 51 cases, 42 pass, 9
+rejected by both alike; 40 compared cases, 52 outputs), on sMRIPrep's command line on real T1w
+images and on every option, in 2, 3 and 4 dimensions:
 - against the **unmodified ANTs 2.6.5 binary** at one thread: 7 of 40 cases (9 of 52 outputs)
   bit-identical. In the others, glibc's `expf` (or `exp`), which is not always correctly
   rounded, changes a few voxels by a few float units: on sMRIPrep's command, 5,522 of
@@ -34,49 +120,12 @@ MP2RAGE, the 82-year-old's FLAIR, a child's T2w with `-n Rician`, the 1.5 T T1w 
 glibc's `expf` changes voxels in all 21, by at most 0.0015 of ANTs' own difference between one
 thread and two or three, 1 − NCC below 2e-17.
 
-**Speed** ([benchmark](../benchmarks/ants-denoise.md)): sMRIPrep's command on a raw T1w
+## Speed
+
+From the [benchmark](../benchmarks/ants-denoise.md): sMRIPrep's command on a raw T1w
 (160×192×192) takes 13.0 s on one thread and 2.9 s on 12, against 217 s and 45 s for ANTs. On
 the six command lines measured, larmorx is 10.7–17× faster than ANTs on one thread, and
 5.8–16× faster than ANTs on 12 threads when both use 12.
-
-## Quick start
-
-```python
-import larmorx as lx
-
-# sMRIPrep's call: Rician noise model, patch radius 1, search radius 2, no shrinking
-res = lx.ants.denoise_image("sub-01_T1w.nii.gz", n_threads=8)
-res.denoised.to_filename("sub-01_desc-denoised_T1w.nii.gz")
-noise = res.noise                       # image − denoised
-
-# the Gaussian model, only inside a mask, larger patches
-res = lx.ants.denoise_image(t1w, "Gaussian", mask=brain_mask, patch_radius=2)
-```
-
-```bash
-larmorx ants DenoiseImage -i sub-01_T1w.nii.gz -n Rician -o denoised.nii.gz -s 1
-larmorx ants DenoiseImage -d 3 -i t1w.nii.gz -n Rician -x mask.nii.gz \
-    -o [ denoised.nii.gz, noise.nii.gz ]
-```
-
-## Option mapping
-
-| DenoiseImage | Python | Notes |
-|---|---|---|
-| `-d 2/3/4` | `dimension` (default: the image's) | a 4D file read with `-d 3` gives its first volume; in 4D, patches and search boxes extend along time too |
-| `-i image` | `image` | path, `lx.Image`, nibabel image or `(array, affine)`; read as `float` |
-| `-n Rician/(Gaussian)` | `noise_model="Rician"` | **different default**: the command line's is Gaussian, Python's is Rician (sMRIPrep's choice). Case does not matter |
-| `-x mask` | `mask` | read as `unsigned char` (0.4 → 0; values beyond 0 to 255 clamped, ANTS-06 below); only voxels where it is not 0 are patch centres. Must be on the grid the filter runs on (the shrunk grid with `-s` above 1) |
-| `-s 1` | `shrink_factor=1` | `ShrinkImageFilter` along every axis (time too); 0 acts as 1. The noise is resampled linearly onto the full grid |
-| `-p 1` / `-p 1x1x1` | `patch_radius=1` / `(1, 1, 1)` | one value for every axis or one per axis |
-| `-r 2` / `-r 2x2x2` | `search_radius=2` / `(2, 2, 2)` | one value for every axis or one per axis |
-| `-o out` / `-o [out,noise]` | `DenoiseResult.denoised`, `DenoiseResult.noise` | float32 images on the input's grid; the noise is always returned |
-| `-v 1` | – | ANTs' progress characters and the elapsed time |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | **ANTs' result depends on it; larmorx's does not**: it always gives ANTs' one-thread result |
-
-Not exposed by ANTs (fixed as in `DenoiseImage`): local mean and variance radius 1, ε = 1e-5,
-mean threshold 0.95, variance threshold 0.5, smoothing variance 2. The Rust filter
-(`AdaptiveNlmParameters`) takes them all.
 
 ## Behaviour worth knowing
 

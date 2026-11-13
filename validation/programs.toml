@@ -105,7 +105,6 @@ group = "ants"
 name = "DenoiseImage"
 command = "larmorx ants DenoiseImage"
 python = "lx.ants.denoise_image"
-does = "Adaptive non-local means denoising; ANTs' single-thread result at any thread count."
 api = "docs/api/ants-denoise.md"
 evidence = "/evidence/ants-denoise/"
 records = { replica = ["ants-denoise"] }

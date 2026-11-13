@@ -990,11 +990,19 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
                 "text": f"the clean-room original's matrix {o_shift['p95']:.3g} mm from FSL's at "
                 f"the 95th percentile of the brain (at most {o_shift['max']:.3g} mm); FSL's own "
                 f"on a perturbed input {o_band['p95']:.3g} mm (at most {o_band['max']:.3g} mm); "
-                "its runs at 1 thread and in its default mode "
+                # each run said as its comparison finds it (the reviewer's round 17, finding 2:
+                # the 1-thread run is the same, only the default differs)
                 + (
-                    "give the same bytes"
+                    "its runs at 1 thread and in its default mode give the same bytes"
                     if same["orig1-orig"] and same["origfix-orig"]
-                    else "differ (the comparisons below)"
+                    else (
+                        "at 1 thread the same values as at 4"
+                        if same["orig1-orig"]
+                        else "at 1 thread other values than at 4"
+                    )
+                    + "; in its default mode "
+                    + ("the same bytes" if same["origfix-orig"] else "another matrix")
+                    + " (the comparisons below)"
                 ),
             },
             {"label": "Grid", "text": common.describe_grid(ref, grid.shape)},

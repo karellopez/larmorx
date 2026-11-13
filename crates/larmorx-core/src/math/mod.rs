@@ -28,6 +28,7 @@ mod expf_glibc;
 mod expf_numpy;
 mod hypot;
 mod log;
+mod log10_glibc;
 mod log_glibc;
 mod logf;
 mod logf_glibc;
@@ -105,6 +106,11 @@ pub use atanf_glibc::atanf_glibc_with_at0;
 /// `expm1f`, Sun's notice; no fused multiply-adds, one build on x86-64), for `reproduce` where an
 /// original's result depends on glibc's last bits; [`tanhf`] (correctly rounded) is the default.
 pub use tanhf_glibc::{expm1f_glibc, tanhf_glibc};
+
+/// The base-10 logarithm for `f64` with glibc 2.35's bits (fdlibm's `__ieee754_log10`, Sun's
+/// notice, over glibc's FMA-build `log`, behind its SVID wrapper's results for `x <= 0`). larmorx
+/// has no correctly rounded `log10` yet: callers use this one in both modes and say so.
+pub use log10_glibc::log10_glibc;
 
 /// The arc cosine for `f32`, correctly rounded (CORE-MATH's `cr_acosf`; no fused multiply-adds,
 /// so no FMA-compiled copy). The `double` [`acos`] rounded to `f32` differs from it on two floats

@@ -62,6 +62,18 @@ Measured with the probe's FreeSurfer model (0 differences: 6,000 name cases, 3,0
    (2305843009213693951 for 8-byte members); `znzwrite` likewise; `znzrewind` is `gzrewind` (2.0.0:
    `gzseek(0, SEEK_SET)`, which keeps `gzeof`'s flag after the end of an empty file).
 
+## The numbers (the probe at scale 1, 2026-11-13)
+
+`nifti`: 6,000 cases (random files of five header kinds, short and gzipped, under 24 extensions
+and 7 base names; every name function and `is_nifti_file`, their messages), 0 differences against
+nifticlib 2.0.0 and against FreeSurfer's copy. `znz` reading: 3,000 scripts of up to 14 operations
+(reads of 1 to 8-byte members, seeks of every kind, `znztell`, `znzeof`, `znzgetc`, `znzrewind`)
+on plain, empty, gzip (levels 1, 6, 9), two-member, trailing, truncated and damaged files, in five
+modes, with and without compression: 0 differences against both (nifticlib under `reproduce`,
+FreeSurfer under the correction). `znz` writing: 2,000 scripts in seven modes (`wb`, `wb1/6/9`,
+`ab`, `w`, `wT`), every result and the decompressed content identical; 77 files with an FS-78
+gap not compared.
+
 ## Not the same bytes
 
 The compressed bytes of a written `.gz` (an `.mgz`) are zlib-rs's: 208 of 1,241 compressed files

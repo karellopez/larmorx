@@ -80,6 +80,23 @@ give FreeSurfer's results exactly (20,000 files, 40,000 names: 0 differences):
    temporary file goes to `/` (`Unable to create temporary file /minc-XXXXXX`).
 8. An empty `$VAR` at the start of a name expands to nothing (no crash: FS-75 is MINC's).
 
+## The numbers (the probe at scale 1, 2026-11-13, from 78828906's code; the later commits change
+only formatting, documents and lint forms)
+
+| Family | Cases | Against MINC 1.5.1 | Against FreeSurfer 8.2.0 |
+|---|---|---|---|
+| `scan` (`cscan` against glibc) | 400,000 strings each for `%lf`, `strtod`, `%d` | 0 differences (glibc) | – |
+| `xfm` (generated and mutated files) | 20,000 | 0 differences (390 not run: FS-72 to FS-74) | 0 differences (`ProbeFs`) |
+| `ops`: `compute_transform_inverse` | 50,000 matrices | 0 | the measurement above (FreeSurfer's own inverse) |
+| `ops`: `concat_transforms`, `transform_point` | 100,000 each | 0 | 0 |
+| `ops`: `concat_general_transforms` of two files (inverse flags) | 4,000 | 0 | – |
+| `ops`: `expand_filename` | 39,673 names | 0 (327 not run: FS-75) | 0 |
+| `write` (`output_transform_file`), `general_transform_point` | 10,000, 9,845 | 0 | – (FreeSurfer has no MINC writer) |
+
+A scale-5 run was stopped after its `xfm` family (the machine was saturated by other parts' runs:
+three hours for what takes about 30 minutes alone); its log, `oracles/logs/fs-found-c-minc-nifti-
+probe-5.log`, has no counts.
+
 ## Not ported (gaps, each reported)
 
 The displacement volume of a `Grid_Transform` (a MINC file: reading `Dialect::read_grid_volume`,

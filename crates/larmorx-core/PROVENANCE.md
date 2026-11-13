@@ -544,4 +544,4 @@ code read or translated): the run `%lf` reads, `0x` alone failing, `nan(...)` re
 low 32 bits of `strtol`. Decimal strings through Rust's correctly rounded parser; hexadecimal ones
 rounded here, ties to even, subnormals included. `validation/probes/fs-minc-nifti` (family `scan`)
 compares it with glibc's `sscanf("%lf")`, `sscanf("%d")` and `strtod`: 400,000 generated strings of
-each, 0 differences at scale 1 (the scale-5 numbers in `docs/findings/minc-xfm.md`).
+each, 0 differences (scale 1, 2026-11-13; `docs/findings/minc-xfm.md`).

@@ -591,7 +591,8 @@ on every platform.
 ## The cubic spline of FreeSurfer's intensity normalisation (`src/cubic_spline/`; FreeSurfer's foundations, item 3.1-06, 2026-11-13)
 
 **Clean-room implementation from [`specs/burkardt-spline.md`](../../specs/burkardt-spline.md)**
-(Apache-2.0; the spec at commit `ca340f58`, SHA-256 `8cccc1e10680…`), by the same implementer, who
+(Apache-2.0; the spec at commit `ca340f58`, SHA-256 `8cccc1e10680…`; the back substitution's operand
+order from its correction at commit `c9adabb9`, SHA-256 `44ffc6d9cc21…`), by the same implementer, who
 never opened John Burkardt's spline routines (any release or copy), FreeSurfer's source, the replica,
 the documents written from FreeSurfer's source, the spec writer's check, the probe's source or
 `docs/parts/`. Its inputs: the spec; textbook material on cubic splines with first-derivative ends and
@@ -601,8 +602,8 @@ tridiagonal elimination (de Boor, *A Practical Guide to Splines*, ch. IV; Burden
 `fs_spline_probe` (its input forms read from its outputs).
 
 **Bit-identical to FreeSurfer's functions** (`docs/findings/cubic-spline-clean-room.md`, 2026-11-13
-from `84a2044d`): 20,000 cases (296,786 evaluation points, every output line), 1,000 tridiagonal
-systems, the five messages byte for byte with their exit status, FS-103's 500 NaN-knot cases under
+from `541e7aed`): 20,000 cases (296,786 evaluation points, every output line), 1,000 tridiagonal
+systems and 1,000 more with NaNs of six payloads in every band and the right-hand side, the five messages byte for byte with their exit status, FS-103's 500 NaN-knot cases under
 `reproduce`. The unit tests check the probe's values and messages and 12 golden checksums (each
 pair of end conditions, two knots with conditions 0 and 0, 80 knots; every evaluation branch).
 

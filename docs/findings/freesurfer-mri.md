@@ -234,8 +234,8 @@ for "3.1-40", whose lines are 4221-5298: the functions are in 3.1-39) so that tr
 (`MRIS::lta`, `mrisurf_base.cpp` 661's `LTAcopy(source->lta, nullptr)` and `MRISfree`'s `LTAfree`)
 use the real structure: `LTAalloc` (630), `LTAcopy` (160), `LTcopy` (185), `LTAfree` (812),
 `initVolGeom` (305) and `mri.cpp` 3014's `MRIboundingBox`, which `LTAalloc` calls with threshold 70
-when it is given a volume. Spec: `specs/freesurfer-mri-lta.md` (part 3 of fs.mri's, in its own file
-while track E finishes `specs/freesurfer-mri.md`).
+when it is given a volume. Spec: `specs/freesurfer-mri.md` §17-22 (part 3 of fs.mri's, written in its own file
+until track E folded it in, 2026-11-13).
 
 ### The structures as FreeSurfer allocates them
 

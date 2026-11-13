@@ -1194,7 +1194,7 @@ defects! {
     FS_59 = "FS-59", "FreeSurfer", true,
         "assigning a geometry (VOL_GEOM) that has no cached voxel-to-RAS matrices onto one that has them keeps the destination's old matrices, computed from its old geometry";
     FS_60 = "FS-60", "FreeSurfer", true,
-        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform but leaves the destination pointing at it (its use or the volume's end then crashes)";
+        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform yet the destination still shows it as its own: its matrices are then freed memory (using them, or the volume's end, crashes or reads garbage)";
     FS_71 = "FS-71", "MINC volume_io", true,
         "a compressed input (.gz, .Z, .z, or a missing name whose compressed file exists) is decompressed by running gunzip -c, then bunzip2 -c, through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
     FS_72 = "FS-72", "MINC volume_io", true,
@@ -1376,11 +1376,13 @@ defects! {
     FS_165 = "FS-165", "FreeSurfer", true,
         "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
     FS_166 = "FS-166", "FreeSurfer", true,
-        "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
+        "MRIcopy of a tensor volume copies every row from the source's first voxel onto the destination's first voxel: only the destination's first row changes, and it becomes the source's first row";
     FS_261 = "FS-261", "FreeSurfer", true,
         "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
     FS_263 = "FS-263", "FreeSurfer", true,
         "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
+    FS_264 = "FS-264", "FreeSurfer", true,
+        "the 4 x 4 matrix helpers (MRImatrixOfDirectionCosines, MRImatrixOfVoxelSizes, MRImatrixOfTranslations, a geometry's toMatrix and RASFromSurfaceRAS_ given a matrix to fill; MRIsetVox2RASFromMatrix given its matrix) given a matrix with fewer than 4 rows or columns write or read past its elements: a crash, memory contents, or other elements of the matrix changed";
     FS_167 = "FS-167", "FreeSurfer", true,
         "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
     FS_168 = "FS-168", "FreeSurfer", true,

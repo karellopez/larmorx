@@ -51,6 +51,9 @@ struct Libm {
     logf: F32,
     expf: F32,
     atanf: F32,
+    tanhf: F32,
+    expm1f: F32,
+    acosf: F32,
     powf: F32x2,
     atan2f: F32x2,
     exp: F64,
@@ -87,6 +90,9 @@ impl Libm {
                 logf: t::<*mut c_void, F32>(symbol(h, c"logf")),
                 expf: t::<*mut c_void, F32>(symbol(h, c"expf")),
                 atanf: t::<*mut c_void, F32>(symbol(h, c"atanf")),
+                tanhf: t::<*mut c_void, F32>(symbol(h, c"tanhf")),
+                expm1f: t::<*mut c_void, F32>(symbol(h, c"expm1f")),
+                acosf: t::<*mut c_void, F32>(symbol(h, c"acosf")),
                 powf: t::<*mut c_void, F32x2>(symbol(h, c"powf")),
                 atan2f: t::<*mut c_void, F32x2>(symbol(h, c"atan2f")),
                 exp: t::<*mut c_void, F64>(symbol(h, c"exp")),
@@ -309,7 +315,7 @@ fn sse2(m: &Libm, threads: usize, out: Option<&str>) {
 
 /// Every float input of the one-argument float functions.
 fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
-    let names: [(&'static str, &'static str); 13] = [
+    let names: [(&'static str, &'static str); 16] = [
         ("sinf_glibc", "glibc sinf"),
         ("cosf_glibc", "glibc cosf"),
         ("sincosf_glibc (sine)", "glibc sincosf"),
@@ -317,6 +323,12 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
         ("logf_glibc", "glibc logf"),
         ("expf_glibc", "glibc expf"),
         ("atanf_glibc", "glibc atanf"),
+        ("tanhf_glibc", "glibc tanhf"),
+        ("expm1f_glibc", "glibc expm1f"),
+        (
+            "acosf_glibc",
+            "glibc acosf (acosf@@GLIBC_2.2.5, its SVID wrapper)",
+        ),
         (
             "sinf_glibc",
             "larmorx-afni-replica sincosf::sinf (the earlier translation)",
@@ -348,7 +360,7 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
             let x = f32::from_bits(i as u32);
             let what = || format!("{i:#010x}");
             let (gs, gc) = m.sincos(x);
-            let pairs: [(f32, f32); 11] = [
+            let pairs: [(f32, f32); 14] = [
                 ((m.sinf)(x), lx::sinf_glibc(x)),
                 ((m.cosf)(x), lx::cosf_glibc(x)),
                 (gs, lx::sincosf_glibc(x).0),
@@ -356,6 +368,9 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
                 ((m.logf)(x), lx::logf_glibc(x)),
                 ((m.expf)(x), lx::expf_glibc(x)),
                 ((m.atanf)(x), lx::atanf_glibc(x)),
+                ((m.tanhf)(x), lx::tanhf_glibc(x)),
+                ((m.expm1f)(x), lx::expm1f_glibc(x)),
+                ((m.acosf)(x), lx::acosf_glibc(x)),
                 (afni::sinf(x), lx::sinf_glibc(x)),
                 (afni::cosf(x), lx::cosf_glibc(x)),
                 (afni::sse2::sinf(x), lx::sinf_glibc_sse2(x)),
@@ -366,14 +381,14 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
             }
             let (s2, c2) = lx::sincosf_glibc_sse2(x);
             let (rs, rc) = (lx::sinf_glibc_sse2(x), lx::cosf_glibc_sse2(x));
-            v[11].count(
+            v[14].count(
                 b32(rs) << 32 | b32(rc),
                 rs.is_nan(),
                 b32(s2) << 32 | b32(c2),
                 what,
             );
             // Where the SSE2 build differs from the FMA build (a count, not a failure).
-            v[12].count(
+            v[15].count(
                 b32(lx::sinf_glibc(x)) << 32 | b32(lx::cosf_glibc(x)),
                 false,
                 b32(rs) << 32 | b32(rc),
@@ -565,6 +580,23 @@ fn hashes(m: &Libm) {
     println!(
         "stride 4099: sinf {:#018x} cosf {:#018x} logf {:#018x} expf {:#018x} atanf {:#018x} sincosf-cos {:#018x}",
         h[0], h[1], h[2], h[3], h[4], h[5]
+    );
+    // tanhf, expm1f, acosf (2026-11-13), the same stride.
+    let mut h3 = [FNV_START; 3];
+    let mut x = 0u64;
+    while x <= u64::from(u32::MAX) {
+        let y = f32::from_bits(x as u32);
+        for (k, v) in [(m.tanhf)(y), (m.expm1f)(y), (m.acosf)(y)]
+            .into_iter()
+            .enumerate()
+        {
+            h3[k] = fnv(h3[k], b32(v));
+        }
+        x += 4099;
+    }
+    println!(
+        "stride 4099: tanhf {:#018x} expm1f {:#018x} acosf {:#018x}",
+        h3[0], h3[1], h3[2]
     );
     // The SSE2 build cannot be called on a CPU with FMA (glibc picks the FMA build); its hash is
     // larmorx's, which the AFNI replica's earlier translation fixes (`verify float`).

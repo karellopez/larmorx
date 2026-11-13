@@ -24,6 +24,8 @@ pub mod fscnpy;
 pub mod fstagsio;
 pub mod gifti;
 pub mod identify;
+pub mod matfile;
+pub mod mosaic;
 pub mod mriio_old;
 pub mod signa;
 pub mod tags;

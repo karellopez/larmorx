@@ -1455,6 +1455,48 @@ defects! {
         "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
     FS_228 = "FS-228", "FreeSurfer", true,
         "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
+    FS_229 = "FS-229", "FreeSurfer", true,
+        "VolSS2MosSS and MosSS2VolSS (a volume's voxel to a mosaic's pixel and back) crash with a division by zero for an image of no columns or rows, VolSS2MosSS also for a mosaic of no columns, and both for sizes of -2147483648 with -1";
+    FS_230 = "FS-230", "FreeSurfer", true,
+        "the .mat readers take every version 4 matrix that is not of little-endian doubles (the type code not 0) for the other byte order: its sizes and numbers are read byte-swapped (wrong sizes, a failed read or an exit)";
+    FS_231 = "FS-231", "FreeSurfer", true,
+        "the .mat readers fail on every matrix of 16-bit integers (could not read val[0, 0]); a file ending one byte into such a number reads it with its other byte from memory";
+    FS_232 = "FS-232", "FreeSurfer", true,
+        "the .mat readers read 8 bytes for each 32-bit integer: the numbers combine two of the file's (or one byte-swapped), and the read fails half-way";
+    FS_233 = "FS-233", "FreeSurfer", true,
+        "the .mat readers read unsigned 8-, 16- and 32-bit integers as signed: values of 128, 32768 or 2147483648 and above come out negative";
+    FS_234 = "FS-234", "FreeSurfer", true,
+        "the .mat readers convert single-precision numbers of the other byte order to integers before swapping their bytes: the values are wrong";
+    FS_235 = "FS-235", "FreeSurfer", true,
+        "the .mat readers read the imaginary part of a complex matrix only for doubles: for other types it is memory contents (or 1) instead of the file's numbers";
+    FS_236 = "FS-236", "FreeSurfer", true,
+        "MatlabRead never sees the complex flag of a version 5 matrix (it tests another bit): a complex matrix comes back real, and its imaginary part is read without skipping its element's tag";
+    FS_237 = "FS-237", "FreeSurfer", true,
+        "MatlabRead does not recognise numbers MATLAB stores in a version 5 small element (4 bytes or fewer: one single-precision number, one 32-bit integer, up to four bytes): unsupported matlab format and zeros";
+    FS_238 = "FS-238", "FreeSurfer", true,
+        "MatlabRead skips 8 bytes too many after a version 5 variable name whose length is a multiple of 8: the matrix's type and numbers are read from the wrong place";
+    FS_239 = "FS-239", "FreeSurfer", true,
+        "MatlabRead's verbose messages show a version 5 variable name of 4 characters or fewer cut to its first character, and a longer one followed by memory contents";
+    FS_240 = "FS-240", "FreeSurfer", true,
+        "MatlabRead reads compressed (MATLAB 7, the default save format) variables wrongly: the rows, type and complex flag come from the wrong bytes, the byte order from memory never written, numbers from a fixed place and past the variable, and the decoding stops at 100 times the compressed size";
+    FS_241 = "FS-241", "FreeSurfer", true,
+        "MatlabRead, given a version 5 file that ends inside a variable's header, goes on with sizes, type and flags from memory never written";
+    FS_242 = "FS-242", "FreeSurfer", true,
+        "MatlabRead and MatFileRead leave the .mat file open (a compressed one twice): a program reading many files runs out of file descriptors";
+    FS_243 = "FS-243", "FreeSurfer", true,
+        "the .mat readers allocate whatever sizes a file states before reading it: a negative or huge size crashes the program or depends on the machine's memory";
+    FS_244 = "FS-244", "FreeSurfer", true,
+        "MatFileRead's bytes of numbers outside -128 to 127 wrap (300 gives 44), and of numbers beyond the 32-bit range or NaN are 0";
+    FS_246 = "FS-246", "FreeSurfer", true,
+        "MatlabRead, given a version 5 array of three or more dimensions, reads its name and type from the third dimension's place: wrong results";
+    FS_247 = "FS-247", "FreeSurfer", true,
+        "MatlabWrite of a complex matrix writes its real and imaginary parts interleaved as the first half of a real matrix";
+    FS_248 = "FS-248", "FreeSurfer", true,
+        "ReadMatlabFileContents of a file of more than 1,000 variables writes past its lists (a crash or corruption)";
+    FS_250 = "FS-250", "FreeSurfer", true,
+        "MatFileRead goes on after a header it could not read, with the sizes read so far (or 0)";
+    FS_251 = "FS-251", "FreeSurfer", true,
+        "the .mat readers take a byte 0xff for the end of the file: a version 5 file with 0xff in its first four bytes is refused, a version 4 variable whose first byte is 0xff ends the reading";
 }
 
 /// The register entry with ID `id`.

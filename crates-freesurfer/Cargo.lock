@@ -253,6 +253,7 @@ dependencies = [
 name = "larmorx-freesurfer-io"
 version = "0.1.0-rc.1"
 dependencies = [
+ "flate2",
  "larmorx-core",
  "larmorx-freesurfer-core",
  "larmorx-freesurfer-mri",

@@ -67,6 +67,8 @@ larmorx-freesurfer-classic = { path = "larmorx-freesurfer-classic", version = "0
 larmorx-freesurfer-networks = { path = "larmorx-freesurfer-networks", version = "0.1.0-rc.1" }
 larmorx-freesurfer-recon = { path = "larmorx-freesurfer-recon", version = "0.1.0-rc.1" }
 sha2 = { version = "0.11.0", default-features = false }
+# zlib-rs: the pure-Rust zlib (FreeSurfer links the system zlib for .mat files: uncompress)
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
 tempfile = "3.27.0"
 
 # The released files' profile (`maturin build --profile dist`, `cargo build --profile dist`): the

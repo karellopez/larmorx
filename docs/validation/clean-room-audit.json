@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-confounds",
+ "dossier": "2026-11-13-confounds-fixci",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 390243,
-  "agents": 404,
+  "accesses": 394530,
+  "agents": 410,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 585,
-  "archived_files": 585,
+  "archive_checksums_matched": 598,
+  "archived_files": 598,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -207,6 +207,10 @@
     "files": 22,
     "sha256": "d20e0b06f397b65362f35631d5de63401e138de2a0084f9b93b736f9c39092c5"
    },
+   "2026-11-13-session-transcripts-confounds-fixci": {
+    "files": 34,
+    "sha256": "71732783988b11556a8b19e8ad72cd911b22646a6be36ea9789fc43ffe4654e7"
+   },
    "2026-11-13-session-transcripts-freesurfer-batch-3": {
     "files": 15,
     "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
@@ -236,30 +240,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3734,
-  "distinct_transcripts": 408,
+  "commits_printed": 3780,
+  "distinct_transcripts": 414,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 301,
+   "agents_without_worktree": 306,
    "bad_lines": 0,
-   "calls_without_result": 68,
+   "calls_without_result": 71,
    "compaction_parent_missing": 9,
    "compactions": 78,
-   "refused_calls": 1681,
+   "refused_calls": 1687,
    "refused_calls_restricted_accesses": 741,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 8642
+   "unresolved_paths": 8762
   },
-  "last_record": "2026-11-13 10:56 UTC",
-  "live_files": 408,
-  "live_files_also_archived": 404,
+  "last_record": "2026-11-13 11:48 UTC",
+  "live_files": 414,
+  "live_files_also_archived": 411,
   "sessions": 4,
-  "tool_calls": 111682,
+  "tool_calls": 112752,
   "tool_calls_by_tool": [
    [
     "Agent",
-    406
+    412
    ],
    [
     "Artifact",
@@ -271,7 +275,7 @@
    ],
    [
     "Bash",
-    95956
+    96934
    ],
    [
     "CronCreate",
@@ -283,7 +287,7 @@
    ],
    [
     "Edit",
-    4490
+    4497
    ],
    [
     "EnterWorktree",
@@ -295,7 +299,7 @@
    ],
    [
     "Read",
-    2818
+    2841
    ],
    [
     "ReadNotifications",
@@ -303,7 +307,7 @@
    ],
    [
     "SendMessage",
-    130
+    132
    ],
    [
     "SendUserFile",
@@ -315,7 +319,7 @@
    ],
    [
     "SubagentHandback",
-    430
+    437
    ],
    [
     "TaskOutput",
@@ -339,12 +343,12 @@
    ],
    [
     "Write",
-    6585
+    6632
    ]
   ],
-  "transcript_bytes": 11968494949,
-  "transcript_files": 993,
-  "unique_paths": 79870
+  "transcript_bytes": 12219471974,
+  "transcript_files": 1012,
+  "unique_paths": 80733
  },
  "levels": [
   [
@@ -425,7 +429,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "1c970b45"
+  "verdicts_repository": "8292d908"
  },
  "overview": {
   "agents_by_role": [
@@ -435,11 +439,11 @@
    ],
    [
     "clean-room implementer",
-    90
+    92
    ],
    [
     "documentation",
-    32
+    33
    ],
    [
     "integration",
@@ -447,11 +451,11 @@
    ],
    [
     "other",
-    128
+    129
    ],
    [
     "replica author",
-    122
+    124
    ],
    [
     "spec writer",
@@ -483,7 +487,7 @@
     3
    ]
   ],
-  "implementers": 90,
+  "implementers": 92,
   "register_restricted_lines": 1489,
   "single_file_scopes": {
    "checked": 70,

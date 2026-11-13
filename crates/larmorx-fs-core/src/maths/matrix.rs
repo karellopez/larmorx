@@ -567,14 +567,29 @@ fn complex_element(
 fn real_product_d(a: &Matrix, b: &Matrix, out: &mut Matrix) {
     let (n, m) = (a.cols.max(0) as usize, b.cols.max(0) as usize);
     let simple = !out.is_complex() && out.cols == b.cols;
+    // One row at a time, every element's sum in its own order (i ascending), the columns side by
+    // side (vectorised); a NaN is absorbing under + and x, so only a NaN result can depend on
+    // x86-64's NaN rules: those elements are summed again with them.
+    let mut acc = vec![0.0f64; m];
     for r in 1..=a.rows {
         let ra = 2 + (r as usize - 1) * n;
+        acc.iter_mut().for_each(|v| *v = 0.0);
+        for i in 0..n {
+            let x = f64::from(a.data[ra + i]);
+            let row = &b.data[2 + i * m..2 + i * m + m];
+            for (v, &y) in acc.iter_mut().zip(row) {
+                *v += x * f64::from(y);
+            }
+        }
         for c in 1..=b.cols {
-            let mut s = 0.0f64;
-            for i in 0..n {
-                let x = sse::widen(a.data[ra + i]);
-                let y = sse::widen(b.data[2 + i * m + (c as usize - 1)]);
-                s = sse::add64(s, sse::mul64(x, y));
+            let mut s = acc[c as usize - 1];
+            if s.is_nan() {
+                s = 0.0;
+                for i in 0..n {
+                    let x = sse::widen(a.data[ra + i]);
+                    let y = sse::widen(b.data[2 + i * m + (c as usize - 1)]);
+                    s = sse::add64(s, sse::mul64(x, y));
+                }
             }
             if simple {
                 out.data[2 + (r as usize - 1) * m + (c as usize - 1)] = sse::narrow(s);
@@ -591,13 +606,25 @@ fn real_product_d(a: &Matrix, b: &Matrix, out: &mut Matrix) {
 fn real_product_f(a: &Matrix, b: &Matrix, out: &mut Matrix) {
     let (n, m) = (a.cols.max(0) as usize, b.cols.max(0) as usize);
     let simple = !out.is_complex() && out.cols == b.cols;
+    // As `real_product_d`: plain arithmetic in each element's order (an operand order changes
+    // only a NaN's bits), the NaN results summed again with the official build's order.
+    let mut acc = vec![0.0f32; m];
     for r in 1..=a.rows {
         let ra = 2 + (r as usize - 1) * n;
+        acc.iter_mut().for_each(|v| *v = 0.0);
+        for i in 0..n {
+            let x = a.data[ra + i];
+            let row = &b.data[2 + i * m..2 + i * m + m];
+            for (v, &y) in acc.iter_mut().zip(row) {
+                *v += y * x;
+            }
+        }
         for c in 1..=b.cols {
-            let p = |i: usize| sse::mul32(b.data[2 + i * m + (c as usize - 1)], a.data[ra + i]);
-            let mut v = 0.0f32;
-            let mut i = 0;
-            if n >= 4 {
+            let mut v = acc[c as usize - 1];
+            if v.is_nan() {
+                let p = |i: usize| sse::mul32(b.data[2 + i * m + (c as usize - 1)], a.data[ra + i]);
+                v = 0.0f32;
+                let mut i = 0;
                 while i + 4 <= n {
                     v = sse::add32(v, p(i));
                     v = sse::add32(p(i + 1), v);
@@ -605,10 +632,10 @@ fn real_product_f(a: &Matrix, b: &Matrix, out: &mut Matrix) {
                     v = sse::add32(v, p(i + 3));
                     i += 4;
                 }
-            }
-            while i < n {
-                v = sse::add32(v, p(i));
-                i += 1;
+                while i < n {
+                    v = sse::add32(v, p(i));
+                    i += 1;
+                }
             }
             if simple {
                 out.data[2 + (r as usize - 1) * m + (c as usize - 1)] = v;

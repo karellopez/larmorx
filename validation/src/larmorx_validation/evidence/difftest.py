@@ -263,11 +263,19 @@ RUN_NOTES: dict[str, str] = {
 _LARMORX = re.compile(r"(?<![\w`/.-])larmorx(?![\w`/:-]|\.\w)")
 
 
+#: The comparisons' runner by what it is (the writing guide: "parity" on pages users read).
+_RUNNER = re.compile(r"\bthe parity runner\b")
+
+
 def _prose(text: str) -> str:
     """A triage explanation in the guide's words, its code spans kept as they are."""
     parts = re.split(r"(`[^`]*`)", text)
     return "".join(
-        part if i % 2 else _LARMORX.sub("LARMORX", words.reword(part) or "")
+        part
+        if i % 2
+        else _LARMORX.sub(
+            "LARMORX", _RUNNER.sub("the comparison's runner", words.reword(part) or "")
+        )
         for i, part in enumerate(parts)
     )
 

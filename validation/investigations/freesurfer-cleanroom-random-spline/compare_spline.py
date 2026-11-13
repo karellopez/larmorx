@@ -10,6 +10,9 @@ the spec's validation plan §9.1 to §9.3, bit for bit and byte for byte.
   ±0, ±∞, NaN; one case in 50 with NaN values of two payloads and a NaN beginning value, one in
   77 with an infinite value);
 - ``d3``: tridiagonal systems (zero diagonals, diagonals that become 0, dominant and not);
+- ``d3_nan``: systems with NaNs of six payloads in the super-diagonal, sub-diagonal, diagonal and
+  right-hand side, so that the products of the elimination and the back substitution meet two
+  NaNs (the spec's §6 operand order, its example first), with the number of products that meet;
 - ``set1``: the five fatal errors' messages and exit status;
 - FS-103: NaN knots, the probe against the clean room's ``reproduce``, and the default's E2.
 
@@ -152,6 +155,87 @@ def d3_line(rng: random.Random, k: int) -> str:
     return " ".join([str(n), *ab, *[hx(v) for v in b]])
 
 
+# six NaN payloads: quiet and signalling, both signs (a signalling NaN passes on quieted)
+NAN_PAYLOADS = ["7fc00111", "ffc00222", "7fc00333", "ffc00444", "7f800555", "ff800666"]
+# §6's example (observed by the spec writer): U₀ and b₁ NaNs of different payloads
+D3_SPEC_EXAMPLE = "2 00000000 40000000 40400000 7fc00111 40a00000 00000000 40e00000 7fc00222"
+
+
+def d3_nan_line(rng: random.Random) -> str:
+    """A system whose U, L, D and B hold NaNs of the six payloads (also in the two band
+    entries never read), so that the products of §4's steps 3 and 4 meet two NaNs."""
+    n = rng.randint(2, 12)
+    a = []
+    for _ in range(n):
+        a += [
+            hx(float(rng.randint(-4, 4)) + rng.choice([0.0, 0.5, 0.25])),
+            hx(rng.choice([-1, 1]) * (float(rng.randint(1, 9)) + rng.choice([0.0, 0.5]))),
+            hx(float(rng.randint(-4, 4)) + rng.choice([0.0, 0.5, 0.25])),
+        ]
+    b = [hx(float(rng.randint(-50, 50))) for _ in range(n)]
+    p = rng.choice([0.15, 0.3, 0.5])
+    a = [rng.choice(NAN_PAYLOADS) if rng.random() < p else v for v in a]
+    b = [rng.choice(NAN_PAYLOADS) if rng.random() < p else v for v in b]
+    return " ".join([str(n), *a, *b])
+
+
+def _quiet(bits: int) -> int:
+    return bits | 0x0040_0000
+
+
+def _isnan(bits: int) -> bool:
+    return (bits & 0x7F80_0000) == 0x7F80_0000 and (bits & 0x007F_FFFF) != 0
+
+
+def _f(bits: int) -> np.float32:
+    return np.frombuffer(struct.pack("<I", bits), dtype="<f4")[0]
+
+
+def _b(v: np.float32) -> int:
+    return struct.unpack("<I", struct.pack("<f", float(v)))[0] if not np.isnan(v) else 0xFFC0_0000
+
+
+def d3_meetings(line: str) -> tuple[int, int]:
+    """How many of §4's super-diagonal products meet two NaNs of different payloads in this
+    system (step 3, step 4): the cases that decide the operand order. A counting model only
+    (one binary32 operation at a time, x86-64's rule for NaN operands); the bits compared are
+    the probe's and the clean room's."""
+    w = line.split()
+    n = int(w[0])
+    a = [int(v, 16) for v in w[1 : 1 + 3 * n]]
+    x = [int(v, 16) for v in w[1 + 3 * n :]]
+    u = [a[3 * (j + 1)] if j + 1 < n else 0 for j in range(n)]
+    d = [a[3 * j + 1] for j in range(n)]
+    lo = [a[3 * j - 1] if j > 0 else 0 for j in range(n)]
+
+    def op(p: int, q: int, f) -> int:
+        if _isnan(p):
+            return _quiet(p)
+        if _isnan(q):
+            return _quiet(q)
+        with np.errstate(all="ignore"):
+            return _b(np.float32(f(_f(p), _f(q))))
+
+    def meet(p: int, q: int) -> bool:
+        return _isnan(p) and _isnan(q) and _quiet(p) != _quiet(q)
+
+    if any(v & 0x7FFF_FFFF == 0 for v in d):
+        return (0, 0)
+    s3 = s4 = 0
+    dd = list(d)
+    for i in range(1, n):
+        m = op(lo[i], dd[i - 1], lambda p, q: p / q)
+        s3 += meet(u[i - 1], m)
+        dd[i] = op(d[i], op(u[i - 1], m, lambda p, q: p * q), lambda p, q: p - q)
+        x[i] = op(x[i], op(m, x[i - 1], lambda p, q: p * q), lambda p, q: p - q)
+    x[n - 1] = op(x[n - 1], dd[n - 1], lambda p, q: p / q)
+    for i in range(n - 2, -1, -1):
+        s4 += meet(x[i + 1], u[i])
+        t = op(x[i], op(x[i + 1], u[i], lambda p, q: p * q), lambda p, q: p - q)
+        x[i] = op(t, dd[i], lambda p, q: p / q)
+    return (s3, s4)
+
+
 SET1 = [
     ["0", "0", "0"],
     ["1", "0", "0", "0", "5"],
@@ -273,6 +357,7 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--cases", type=int, default=20000)
     ap.add_argument("--systems", type=int, default=1000)
+    ap.add_argument("--nan-systems", type=int, default=1000)
     args = ap.parse_args()
     ctx = Context(args)
     rng = random.Random(20261113)
@@ -294,6 +379,28 @@ def main() -> int:
     r = batches(ctx, "d3", systems, reproduce=False)
     r["seconds"] = round(time.perf_counter() - t0, 1)
     result["d3"] = r
+
+    # §9.2's NaN systems (§6's operand order of the super-diagonal products)
+    t0 = time.perf_counter()
+    # their own generator, so that the inputs after them keep their streams
+    rng_nan = random.Random(20261114)
+    nan_systems = [D3_SPEC_EXAMPLE] + [d3_nan_line(rng_nan) for _ in range(args.nan_systems - 1)]
+    r = batches(ctx, "d3", nan_systems, reproduce=False)
+    meets = [d3_meetings(line) for line in nan_systems]
+    r["systems_meeting_two_nans_step3"] = sum(1 for m in meets if m[0])
+    r["systems_meeting_two_nans_step4"] = sum(1 for m in meets if m[1])
+    r["products_meeting_two_nans_step3"] = sum(m[0] for m in meets)
+    r["products_meeting_two_nans_step4"] = sum(m[1] for m in meets)
+    o = ctx.original_stdin("d3", D3_SPEC_EXAMPLE + "\n")
+    c = ctx.ours(["d3"], D3_SPEC_EXAMPLE + "\n")
+    r["spec_example"] = {
+        "input": D3_SPEC_EXAMPLE,
+        "original": o.stdout_bytes.decode().strip(),
+        "cleanroom": c.stdout.decode().strip(),
+    }
+    r["ok"] = r["ok"] and o.stdout_bytes == c.stdout and o.stdout_bytes == b"x 7fc00222 7fc00222\n"
+    r["seconds"] = round(time.perf_counter() - t0, 1)
+    result["d3_nan"] = r
 
     rows = []
     for a in SET1:
@@ -372,7 +479,7 @@ def main() -> int:
             "ok": True,
         }
 
-    for name in ("cases", "d3", "set1", "fs103_reproduce", "fs103_default", "speed"):
+    for name in ("cases", "d3", "d3_nan", "set1", "fs103_reproduce", "fs103_default", "speed"):
         r = result[name]
         summary = {k: v for k, v in r.items() if isinstance(v, (int, float, str, bool))}
         print(f"{name}: {json.dumps(summary)}", flush=True)

@@ -1184,7 +1184,7 @@ defects! {
     FS_120 = "FS-120", "FreeSurfer", true,
         "after the default computation of a surface's metric properties (at every surface read and every deformation step) the faces' angles are not updated: they keep the values they had before (0 for a new surface), while the older and the faster computations update them";
     FS_121 = "FS-121", "FreeSurfer", true,
-        "the default computation of a surface's metric properties gives a vertex whose normal cannot be computed (its faces' normals sum to no length even after five small random moves, as with NaN or infinite coordinates) a normal of memory contents";
+        "the default computation of a surface's metric properties gives a vertex whose normal cannot be computed (its faces' normals sum to no length even after five small random moves, as with NaN or infinite coordinates) a normal of memory contents, and for a plane adds memory contents to the area of every vertex next to a ripped face";
     FS_122 = "FS-122", "FreeSurfer", true,
         "computing the metric properties of a surface with a NaN white or pial coordinate, a NaN white normal or a NaN radius prints, every time, up to 11 lines such as 'no:<vertex>  v->whitex  nan != nan  during count_MRIScomputeMetricProperties_calls:<n>' (and once 'b <file>:335  needed'), as if the value had changed";
     FS_123 = "FS-123", "FreeSurfer", true,

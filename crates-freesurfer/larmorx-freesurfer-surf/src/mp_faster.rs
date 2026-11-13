@@ -28,7 +28,7 @@ use crate::coords::{Io, centre};
 use crate::dist;
 use crate::facenorm;
 use crate::mp::{
-    RAN, diff3, fnv_hash, nbrs, orients_as_ellipsoid, plane_distance, romp_partials, romp_total,
+    RAN, diff3, fnv_hash, nbrs, orients_as_ellipsoid, romp_partials, romp_total,
     sphere_area, sphere_distance, sphere_info, takes_sphere_area, vface, vix,
 };
 use crate::mris::Mris;
@@ -37,23 +37,25 @@ fn usz(n: i32) -> usize {
     usize::try_from(n).unwrap_or(0)
 }
 
-/// `vec_cross(a, b, c)`: `a1 b2 - a2 b1`, `a2 b0 - a0 b2`, `a0 b1 - a1 b0`.
+/// `vec_cross(a, b, c)`: `a1 b2 - a2 b1`, `a2 b0 - a0 b2`, `a0 b1 - a1 b0`, the second
+/// component's second product compiled as `b2 a0` (both uses).
 fn vec_cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [
         sub(mul(a[1], b[2]), mul(a[2], b[1])),
-        sub(mul(a[2], b[0]), mul(a[0], b[2])),
+        sub(mul(a[2], b[0]), mul(b[2], a[0])),
         sub(mul(a[0], b[1]), mul(a[1], b[0])),
     ]
 }
 
-/// `vec_dot(a, b)`.
-fn vec_dot(a: [f32; 3], b: [f32; 3]) -> f32 {
-    add(add(mul(a[0], b[0]), mul(a[1], b[1])), mul(a[2], b[2]))
+/// `vec_length(v)` of the face normal: `sqrt((x² + y²) + z²)`.
+fn face_length(v: [f32; 3]) -> f32 {
+    sqrt(add(add(mul(v[0], v[0]), mul(v[1], v[1])), mul(v[2], v[2])))
 }
 
-/// `vec_length(v)`: `sqrt` of the `float` sum of squares.
-fn vec_length(v: [f32; 3]) -> f32 {
-    sqrt(vec_dot(v, v))
+/// `vec_length(v)` of a vertex normal and of a distance's difference, as compiled there:
+/// `sqrt(z² + (x² + y²))`.
+fn length_zfirst(v: [f32; 3]) -> f32 {
+    sqrt(add(mul(v[2], v[2]), add(mul(v[0], v[0]), mul(v[1], v[1]))))
 }
 
 /// The calculator's arrays (`MetricPropertiesCalculator`'s members).
@@ -170,14 +172,15 @@ impl Calc {
                 }
                 let [p0, p1, p2] = self.corners(fno);
                 let mut fnorm = vec_cross(diff3(p1, p0), diff3(p2, p0));
-                let mut area = vec_length(fnorm);
+                let mut area = face_length(fnorm);
                 if f64::from(area) > 0.0 {
                     fnorm = [div(fnorm[0], area), div(fnorm[1], area), div(fnorm[2], area)];
                 }
                 area = div64(f64::from(area), 2.0) as f32;
                 self.face_areas[fno] = area;
                 self.face_normals[fno] = fnorm;
-                total_area = add64(total_area, f64::from(area));
+                // `total_area += area` compiled as `area + total`
+                total_area = add64(f64::from(area), total_area);
                 for corner in 0..3 {
                     let (a, b) = match corner {
                         0 => (diff3(p2, p0), diff3(p1, p0)),
@@ -185,8 +188,13 @@ impl Calc {
                         _ => (diff3(p1, p2), diff3(p0, p2)),
                     };
                     let c = vec_cross(b, a);
-                    let d1 = vec_dot(c, fnorm);
-                    let d2 = vec_dot(a, b);
+                    // `vec_dot(c, fnorm)` compiled as `c2 n2 + (c1 n1 + c0 n0)`, `vec_dot(a, b)`
+                    // as `(b1 a1 + a0 b0) + b2 a2`
+                    let d1 = add(
+                        mul(c[2], fnorm[2]),
+                        add(mul(c[1], fnorm[1]), mul(c[0], fnorm[0])),
+                    );
+                    let d2 = add(add(mul(b[1], a[1]), mul(a[0], b[0])), mul(b[2], a[2]));
                     self.face_angles[fno][corner] = fast_approx_atan2f(g, io.env, io.out, d1, d2);
                 }
             }
@@ -223,13 +231,15 @@ impl Calc {
                                 .get(fno + 1)
                                 .map_or(0.0, |a| a[0])
                         };
-                        for k in 0..3 {
-                            norm[k] = add(norm[k], mul(fnrm[k], angle));
-                        }
+                        // `norm[k] += face_norm[k] * angle`, each product first (the third as
+                        // `angle * face_norm[2]`)
+                        norm[0] = add(mul(fnrm[0], angle), norm[0]);
+                        norm[1] = add(mul(fnrm[1], angle), norm[1]);
+                        norm[2] = add(mul(angle, fnrm[2]), norm[2]);
                     }
                 }
                 area = div(area, self.vertex_area_fix_value);
-                let length = vec_length(norm);
+                let length = length_zfirst(norm);
                 if length > 0.0 {
                     norm = [div(norm[0], length), div(norm[1], length), div(norm[2], length)];
                 } else {
@@ -322,7 +332,7 @@ impl Calc {
                     if sphere {
                         sphere_distance(&info[vno], &info[n])
                     } else {
-                        plane_distance(self.vertices[vno], self.vertices[n])
+                        length_zfirst(diff3(self.vertices[vno], self.vertices[n]))
                     }
                 })
                 .collect();
@@ -356,7 +366,7 @@ impl Calc {
                     }
                     let x = f64::from(d.expect("VERTEX::dist is NULL")[m]);
                     sum = add64(sum, x);
-                    sum2 = add64(sum2, mul64(x, x));
+                    sum2 = add64(mul64(x, x), sum2);
                     n = add64(n, 1.0);
                 }
             }
@@ -387,21 +397,24 @@ impl Calc {
                     continue;
                 }
                 if flip(self, fno) {
-                    self.face_areas[fno] = mul(self.face_areas[fno], -1.0);
+                    // `*= -1.0f` compiled as a sign flip
+                    self.face_areas[fno] = -self.face_areas[fno];
                     for x in self.face_normals[fno].iter_mut() {
-                        *x = mul(*x, -1.0);
+                        *x = -*x;
                     }
                     for x in self.face_angles[fno].iter_mut() {
-                        *x = mul(*x, -1.0);
+                        *x = -*x;
                     }
                 }
                 let area = self.face_areas[fno];
+                // `total += area` as `area + partial`, `neg -= area`, `neg_orig += orig` as
+                // `orig + partial`
                 if area >= 0.0 {
-                    t = add64(t, f64::from(area));
+                    t = add64(f64::from(area), t);
                 } else {
                     n = sub64(n, f64::from(area));
                     let e = facenorm::get_face_norm(mris, fno);
-                    o = add64(o, f64::from(e.orig_area));
+                    o = add64(f64::from(e.orig_area), o);
                 }
             }
             ta.push(t);
@@ -424,7 +437,7 @@ impl Calc {
             }
             let vn = &mut self.vertex_normals[vno];
             if vn[2] < 0.0 {
-                vn[2] = mul(vn[2], -1.0);
+                vn[2] = -vn[2];
                 mris.vertex_mut(vno).neg = 1;
             } else {
                 mris.vertex_mut(vno).neg = 0;

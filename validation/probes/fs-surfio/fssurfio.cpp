@@ -56,6 +56,8 @@ void MRISrotate(MRIS_MP *mris, float alpha, float beta, float gamma);
 int mrisCountCompressed(MRIS *mris, double min_dist);
 void mrisDumpVertex(FILE *file, MRIS const *mris, int vno);
 int signum_eval(float af);
+int mrisOrientSurface(MRIS *mris);
+int mrisOrientPlane(MRIS *mris);
 
 const char *Progname = "fssurfio";
 
@@ -767,6 +769,151 @@ void posn_case()
   dump_posn(m);
 }
 
+// `mprop` (relay 10, 3.1-51/52): an MRIS from the case (coordinates, normals, areas, flags, a
+// mesh's topology with each vertex's faces and corners, distances with their storage, faces with
+// their face-normal cache), the environment's switches of MRIScomputeMetricProperties, then 1 to
+// 4 of its operations (MRIScomputeMetricProperties, MRIScomputeTriangleProperties,
+// MRIScomputeNormals, MRIScomputeAvgInterVertexDist, MRISupdateEllipsoidSurface,
+// mrisOrientSurface, mrisOrientPlane, mrisComputeSurfaceDimensions), then its state.
+void dump_mprop(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    float c[10] = {v->x, v->y, v->z, v->nx, v->ny, v->nz, v->area, v->origarea, v->cx, v->curv};
+    for (float x : c) of(x);
+    oi(v->border); oi(v->neg); oi(v->fno);
+    for (int o = 0; o < 2; o++) {
+      float *d = o ? v->dist_orig : v->dist;
+      int cap = o ? v->dist_orig_capacity : v->dist_capacity;
+      void *st = o ? m->dist_orig_storage[vno] : m->dist_storage[vno];
+      oi(d != NULL); oi(d != NULL || st != NULL); oi(cap);
+      if (d) for (int k = 0; k < cap; k++) of(d[k]);
+    }
+  }
+  for (int fno = 0; fno < m->nfaces; fno++) {
+    FACE *f = &m->faces[fno];
+    of(f->area);
+    for (int k = 0; k < 3; k++) of(f->angle[k]);
+    for (int k = 0; k < 3; k++) of(f->orig_angle[k]);
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+    oi(m->faceNormDeferredEntries[fno].deferred);
+  }
+  of(m->xlo); of(m->ylo); of(m->zlo); of(m->xhi); of(m->yhi); of(m->zhi);
+  of(m->xctr); of(m->yctr); of(m->zctr);
+  of(m->total_area); od(m->avg_vertex_area); od(m->avg_vertex_dist); od(m->std_vertex_dist);
+  of(m->neg_area); of(m->neg_orig_area);
+  oi(m->dist_nsize); oi(m->dist_alloced_flags);
+}
+
+// the guard of `ad` and `an`: every unripped vertex with an unripped 1-hop neighbour has room
+// for its 1-hop distances (MRIScomputeAvgInterVertexDist reads them unchecked)
+bool avg_guard(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    if (v->ripflag) continue;
+    bool any = false;
+    for (int k = 0; k < vt->vnum; k++) if (!m->vertices[vt->v[k]].ripflag) any = true;
+    if (any && (!v->dist || v->dist_capacity < vt->vnum)) return false;
+  }
+  return true;
+}
+
+void mprop_case()
+{
+  int envs = geti();
+  if (envs & 1) setenv("FREESURFER_OLD_MRIScomputeMetricProperties", "1", 1);
+  if (envs & 2) setenv("FREESURFER_NEW_MRIScomputeMetricProperties", "1", 1);
+  if (envs & 4) setenv("FS_FASTER_MP", "1", 1);
+  if (envs & 8) setenv("FS_WEIGHTS_NORMS_BY_ANGLE", "1", 1);
+  if (envs & 16) setenv("FREESURFER_fastApproxAtan2f_use_atanf2", "1", 1);
+  if (envs & 32) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+  UnitizeNormalFace = geti();
+  MRISsetFixVertexAreaValue(geti());
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  m->status = (MRIS_Status)geti();
+  m->origxyz_status = (MRIS_Status)geti();
+  m->nsize = (char)geti();
+  m->dist_alloced_flags = (char)geti();
+  m->dist_nsize = (char)geti();
+  m->radius = getd();
+  m->total_area = getf();
+  m->avg_vertex_dist = getd();
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->origx = getf(); v->origy = getf(); v->origz = getf();
+    v->cx = getf(); v->cy = getf(); v->cz = getf();
+    v->whitex = getf(); v->whitey = getf(); v->whitez = getf();
+    v->pialx = getf(); v->pialy = getf(); v->pialz = getf();
+    v->wnx = getf(); v->wny = getf(); v->wnz = getf();
+    v->nx = getf(); v->ny = getf(); v->nz = getf();
+    v->curv = getf(); v->area = getf(); v->origarea = getf();
+    v->border = (char)geti(); v->fno = geti(); v->neg = (char)geti(); v->ripflag = (char)geti();
+    vt->vnum = (short)geti(); vt->v2num = (short)geti(); vt->v3num = (short)geti();
+    vt->vtotal = (short)geti(); vt->nsizeMax = (uchar)geti();
+    int len = geti();
+    free(vt->v);
+    vt->v = arr<int>(len);
+    for (int k = 0; k < len; k++) vt->v[k] = geti();
+    int num = geti();
+    vt->num = (uchar)num;
+    free(vt->f);
+    free(vt->n);
+    vt->f = arr<int>(num);
+    vt->n = arr<uchar>(num);
+    for (int k = 0; k < num; k++) vt->f[k] = geti();
+    for (int k = 0; k < num; k++) vt->n[k] = (uchar)geti();
+    for (int o = 0; o < 2; o++) {
+      int blen = geti();
+      float *buf = NULL;
+      int cap = 0, valid = 0;
+      if (blen >= 0) {
+        buf = arr<float>(blen);
+        cap = geti(); valid = geti();
+        for (int k = 0; k < blen; k++) buf[k] = getf();
+      }
+      void **st = o ? &m->dist_orig_storage[vno] : &m->dist_storage[vno];
+      *st = buf;
+      *(float **)(o ? &v->dist_orig : &v->dist) = valid ? buf : NULL;
+      *(int *)(o ? &v->dist_orig_capacity : &v->dist_capacity) = valid ? cap : 0;
+    }
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    FACE *f = &m->faces[fno];
+    for (int k = 0; k < 3; k++) f->v[k] = geti();
+    f->ripflag = (char)geti();
+    f->area = getf();
+    for (int k = 0; k < 3; k++) f->angle[k] = getf();
+    for (int k = 0; k < 3; k++) f->orig_angle[k] = getf();
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    e->nx = getf(); e->ny = getf(); e->nz = getf(); e->orig_area = getf();
+    m->faceNormDeferredEntries[fno].deferred = (char)geti();
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "mp") oi(MRIScomputeMetricProperties(m));
+    else if (op == "tp") oi(MRIScomputeTriangleProperties(m));
+    else if (op == "cn") oi(MRIScomputeNormals(m));
+    else if ((op == "ad" || op == "an") && !avg_guard(m)) out += "G ";
+    else if (op == "ad") { double sd = 0; MRIScomputeAvgInterVertexDist(m, &sd); od(sd); }
+    else if (op == "an") MRIScomputeAvgInterVertexDist(m, NULL);
+    else if (op == "ue") oi(MRISupdateEllipsoidSurface(m));
+    else if (op == "os") oi(mrisOrientSurface(m));
+    else if (op == "op") oi(mrisOrientPlane(m));
+    else if (op == "sd") oi(mrisComputeSurfaceDimensions(m));
+    else fail("mprop op");
+  }
+  out += "| ";
+  dump_mprop(m);
+}
+
 // `life` (relay 9, 3.1-47 part a): a surface from MRISalloc or MRISoverAlloc, a sequence of its
 // reallocations, counts, settings, rip-flag operations, arrays and dumps, then its state and
 // MRISfree. An operation that would read or write past what the surface has allocated prints `G`
@@ -1366,6 +1513,8 @@ void run_case()
     misc_case();
   } else if (cmd == "edges") {
     edges_case();
+  } else if (cmd == "mprop") {
+    mprop_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

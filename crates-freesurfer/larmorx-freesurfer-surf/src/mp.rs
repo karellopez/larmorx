@@ -372,7 +372,8 @@ pub fn mp_copy(
 /// arrays (0 for a ripped vertex). The copy's `v_neg` exists only for a plane.
 ///
 /// C leaves the outputs it does not load as the allocator's memory; here the vertices' normals
-/// are the surface's (FS-121), their areas and signs and the faces' areas, normals and angles 0.
+/// and the faces' areas are the surface's (FS-121), the vertices' areas and signs and the faces'
+/// normals and angles 0.
 /// The route that loads the outputs (`MRIScomputeSSE_asThoughGradientApplied`'s) is never taken
 /// in FreeSurfer 8.2.0.
 pub fn mp_load(
@@ -487,8 +488,10 @@ pub fn mp_load(
         f_norm_orig_area.push(e.orig_area);
         f_orig_angle.push(f.orig_angle);
         f_ripflag.push(f.ripflag);
+        // FS-121: the copy's face areas start as the surface's (C leaves them as memory contents
+        // where the copy computes none: a ripped face's, which a plane's vertices add)
+        f_area[fno] = f.area;
         if load_outputs {
-            f_area[fno] = f.area;
             f_norm[fno] = match &f.norm {
                 None => FloatXyz::default(),
                 Some(d) => FloatXyz {
@@ -878,12 +881,13 @@ pub(crate) fn diff3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
 
 /// The cross product as `mrisTriangleArea`, `mrisFaceAreaNormal` and `mrisNormalFace` write it, of
 /// the edges `a = p2 - p0` and `b = p1 - p2`: `-b[1] a[2] + a[1] b[2]`, `b[0] a[2] - a[0] b[2]`,
-/// `-b[0] a[1] + a[0] b[1]`.
+/// `-b[0] a[1] + a[0] b[1]`, which the official build computes as `a[1] b[2] - b[1] a[2]`,
+/// `b[0] a[2] - a[0] b[2]`, `a[0] b[1] - b[0] a[1]` (no negation: the NaNs keep their signs).
 pub(crate) fn edges_cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [
-        add(mul(-b[1], a[2]), mul(a[1], b[2])),
+        sub(mul(a[1], b[2]), mul(b[1], a[2])),
         sub(mul(b[0], a[2]), mul(a[0], b[2])),
-        add(mul(-b[0], a[1]), mul(a[0], b[1])),
+        sub(mul(a[0], b[1]), mul(b[0], a[1])),
     ]
 }
 
@@ -1137,10 +1141,11 @@ pub(crate) fn sphere_distance(vi: &SphereInfo, vi2: &SphereInfo) -> f32 {
     mul(angle, vi.length)
 }
 
-/// The plane formula's distance: `sqrt(xd² + yd² + zd²)` in `float`.
+/// The plane formula's distance: `sqrt(xd² + yd² + zd²)` in `float`, summed as the copy's worker
+/// is compiled: `zd² + (yd² + xd²)`.
 pub(crate) fn plane_distance(p: [f32; 3], q: [f32; 3]) -> f32 {
     let (xd, yd, zd) = (sub(p[0], q[0]), sub(p[1], q[1]), sub(p[2], q[2]));
-    sqrt(add(add(mul(xd, xd), mul(yd, yd)), mul(zd, zd)))
+    sqrt(add(mul(zd, zd), add(mul(yd, yd), mul(xd, xd))))
 }
 
 /// `MRISMP_computeVertexDistancesWkr(mp, new_dist_nsize, false)`: as
@@ -1248,10 +1253,10 @@ pub(crate) struct TriangleProps {
 }
 
 /// `V3_CROSS_PRODUCT(a, b, c)` (`include/matrix.h`): `a.y b.z - a.z b.y`, `a.z b.x - a.x b.z`,
-/// `a.x b.y - a.y b.x`.
+/// `a.x b.y - a.y b.x`, the first product compiled as `b.z a.y` (both instances).
 fn v3_cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [
-        sub(mul(a[1], b[2]), mul(a[2], b[1])),
+        sub(mul(b[2], a[1]), mul(a[2], b[1])),
         sub(mul(a[2], b[0]), mul(a[0], b[2])),
         sub(mul(a[0], b[1]), mul(a[1], b[0])),
     ]
@@ -1270,30 +1275,44 @@ fn triple_product(v1: [f32; 3], v2: [f32; 3], v3: [f32; 3]) -> f32 {
     add(total, mul(z3, cross(x1, y2, y1, x2)))
 }
 
-fn v3_len(v: [f32; 3]) -> f32 {
-    sqrt(add(add(mul(v[0], v[0]), mul(v[1], v[1])), mul(v[2], v[2])))
+/// Which instance of `MRIScomputeTriangleProperties_extracted.h`: the surface's
+/// (`MRIScomputeTriangleProperties`) or the copy's (`MRISMP_computeTriangleProperties`), whose
+/// compiled code differ in one product.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Instance {
+    Surface,
+    Copy,
 }
 
 /// A face's area, unit normal and corner angles as `MRIScomputeTriangleProperties` computes them
-/// from its corners: `n = (p1 - p0) x (p2 - p0)` (`V3_CROSS_PRODUCT`), the area half its length,
-/// the normal `n` times `1 / |n|` (`V3_NORMALIZE`: times 1 when the length is below `FLT_EPSILON`);
-/// at corner `k` with the edges `a` and `b` to `(p2, p1)`, `(p0, p2)`, `(p1, p0)` for `k` 0, 1, 2,
-/// the angle `fastApproxAtan2f((b x a) . normal, a . b)`.
+/// from its corners: `n = (p1 - p0) x (p2 - p0)` (`V3_CROSS_PRODUCT`), the area half its length
+/// (`V3_LEN`, compiled as `sqrt(z² + (x² + y²))`), the normal `n` times `s = 1 / |n|`
+/// (`V3_NORMALIZE`: `s` 1 when the length, compiled as `sqrt((y² + x²) + z²)`, is below
+/// `FLT_EPSILON`; the third product `n.z s` for the surface's instance, `s n.z` for the copy's); at
+/// corner `k` with the edges `a` and `b` to `(p2, p1)`, `(p0, p2)`, `(p1, p0)` for `k` 0, 1, 2,
+/// the angle `fastApproxAtan2f((b x a) . normal, a . b)`, the dot product compiled as `a.z b.z +
+/// (a.x b.x + a.y b.y)`.
 pub(crate) fn triangle_props(
     g: &mut Globals,
     io: &mut Io,
     p: [[f32; 3]; 3],
+    instance: Instance,
 ) -> TriangleProps {
     let [p0, p1, p2] = p;
     let n = v3_cross(diff3(p1, p0), diff3(p2, p0));
-    let area = mul(v3_len(n), 0.5);
-    let len = v3_len(n);
-    let len = if len.abs() < f32::EPSILON {
+    let sq = |x: f32| mul(x, x);
+    let area = mul(sqrt(add(sq(n[2]), add(sq(n[0]), sq(n[1])))), 0.5);
+    let len = sqrt(add(add(sq(n[1]), sq(n[0])), sq(n[2])));
+    let s = if len.abs() < f32::EPSILON {
         1.0
     } else {
         div(1.0, len)
     };
-    let norm = [mul(n[0], len), mul(n[1], len), mul(n[2], len)];
+    let nz = match instance {
+        Instance::Surface => mul(n[2], s),
+        Instance::Copy => mul(s, n[2]),
+    };
+    let norm = [mul(n[0], s), mul(n[1], s), nz];
     let mut angle = [0.0f32; 3];
     for ano in 0..3 {
         let (vo, va, vb) = match ano {
@@ -1304,7 +1323,7 @@ pub(crate) fn triangle_props(
         let ea = diff3(va, vo);
         let eb = diff3(vb, vo);
         let cross = triple_product(eb, ea, norm);
-        let dot = add(add(mul(ea[0], eb[0]), mul(ea[1], eb[1])), mul(ea[2], eb[2]));
+        let dot = add(mul(ea[2], eb[2]), add(mul(ea[0], eb[0]), mul(ea[1], eb[1])));
         angle[ano] = fast_approx_atan2f(g, io.env, io.out, cross, dot);
     }
     TriangleProps { area, norm, angle }
@@ -1346,9 +1365,10 @@ fn mp_compute_triangle_properties(
             if shared(&mp.f_ripflag, "f_ripflag")[fno] != 0 {
                 continue;
             }
-            let t = triangle_props(g, io, mp_face_xyz(mp, fno));
+            let t = triangle_props(g, io, mp_face_xyz(mp, fno), Instance::Copy);
             arr_mut(&mut mp.f_area, "f_area")[fno] = t.area;
-            s = add64(s, f64::from(t.area));
+            // `reduction_total_area += area` compiled as `area + partial`
+            s = add64(f64::from(t.area), s);
             mp_set_face_norm(mp, fno, t.norm);
             arr_mut(&mut mp.f_angle, "f_angle")[fno] = t.angle;
         }
@@ -1390,7 +1410,8 @@ pub(crate) fn avg_dist(
                 }
                 let d = f64::from(dist(vno, m));
                 sum = add64(sum, d);
-                sum2 = add64(sum2, mul64(d, d));
+                // `Sum2 += d*d` compiled as `d*d + Sum2`
+                sum2 = add64(mul64(d, d), sum2);
                 n = add64(n, 1.0);
             }
         }
@@ -1444,22 +1465,22 @@ fn mp_orient_ellipsoid(mp: &mut MrisMp) {
             }
             let fnorm = arr(&mp.f_norm, "f_norm")[fno];
             if points_inwards(mp_face_xyz(mp, fno), [fnorm.x, fnorm.y, fnorm.z]) {
+                // `*= -1.0f` compiled as a sign flip
                 let a = &mut arr_mut(&mut mp.f_area, "f_area")[fno];
-                *a = mul(*a, -1.0);
+                *a = -*a;
                 let nn = &mut arr_mut(&mut mp.f_norm, "f_norm")[fno];
-                nn.x = mul(nn.x, -1.0);
-                nn.y = mul(nn.y, -1.0);
-                nn.z = mul(nn.z, -1.0);
+                (nn.x, nn.y, nn.z) = (-nn.x, -nn.y, -nn.z);
                 for x in arr_mut(&mut mp.f_angle, "f_angle")[fno].iter_mut() {
-                    *x = mul(*x, -1.0);
+                    *x = -*x;
                 }
             }
             let a = arr(&mp.f_area, "f_area")[fno];
+            // each term first (`term + partial`)
             if a >= 0.0 {
-                t = add64(t, f64::from(a));
+                t = add64(f64::from(a), t);
             } else {
-                n = add64(n, f64::from(-a));
-                o = add64(o, f64::from(shared(&mp.f_norm_orig_area, "")[fno]));
+                n = add64(f64::from(-a), n);
+                o = add64(f64::from(shared(&mp.f_norm_orig_area, "")[fno]), o);
             }
         }
         ta.push(t);
@@ -1476,8 +1497,10 @@ fn mp_orient_ellipsoid(mp: &mut MrisMp) {
 /// `neg_orig_area` the `float` sums of the non-negative areas, the negated negative ones and their
 /// faces' original areas. Each unripped vertex: a negative normal z negated (times -1) with `neg`
 /// 1, else `neg` 0; its area the `float` sum of all its faces' areas (ripped ones too) divided by
-/// 3 (2 without `fix_vertex_area`).
-fn mp_orient_plane(sg: &SurfGlobals, mp: &mut MrisMp, mris: &Mris) {
+/// 3 (2 without `fix_vertex_area`): a ripped face's area is the copy's never computed one, memory
+/// contents in C, the surface's here (FS-121).
+fn mp_orient_plane(g: &mut Globals, sg: &SurfGlobals, mp: &mut MrisMp, mris: &Mris) {
+    let mut notes: Vec<()> = Vec::new();
     mp.total_area = 0.0;
     mp.neg_orig_area = 0.0;
     mp.neg_area = 0.0;
@@ -1487,22 +1510,24 @@ fn mp_orient_plane(sg: &SurfGlobals, mp: &mut MrisMp, mris: &Mris) {
         }
         let n = arr(&mp.f_norm, "f_norm")[fno];
         if n.z < 0.0 {
+            // `*= -1.0f` compiled as a sign flip
             let a = &mut arr_mut(&mut mp.f_area, "f_area")[fno];
-            *a = mul(*a, -1.0);
+            *a = -*a;
             arr_mut(&mut mp.f_norm, "f_norm")[fno] = FloatXyz {
                 x: -n.x,
                 y: -n.y,
                 z: -n.z,
             };
             for x in arr_mut(&mut mp.f_angle, "f_angle")[fno].iter_mut() {
-                *x = mul(*x, -1.0);
+                *x = -*x;
             }
         }
         let a = arr(&mp.f_area, "f_area")[fno];
+        // `total += area` as `area + total`; `neg += -area` as `neg - area`
         if a >= 0.0 {
-            mp.total_area = add(mp.total_area, a);
+            mp.total_area = add(a, mp.total_area);
         } else {
-            mp.neg_area = add(mp.neg_area, -a);
+            mp.neg_area = sub(mp.neg_area, a);
             let oa = shared(&mp.f_norm_orig_area, "f_norm_orig_area")[fno];
             mp.neg_orig_area = add(mp.neg_orig_area, oa);
         }
@@ -1513,7 +1538,7 @@ fn mp_orient_plane(sg: &SurfGlobals, mp: &mut MrisMp, mris: &Mris) {
         }
         let nz = arr(&mp.v_nz, "v_nz")[vno];
         let neg = if nz < 0.0 {
-            arr_mut(&mut mp.v_nz, "v_nz")[vno] = mul(nz, -1.0);
+            arr_mut(&mut mp.v_nz, "v_nz")[vno] = -nz;
             1
         } else {
             0
@@ -1521,9 +1546,19 @@ fn mp_orient_plane(sg: &SurfGlobals, mp: &mut MrisMp, mris: &Mris) {
         arr_mut(&mut mp.v_neg, "v_neg")[vno] = neg;
         let mut area = 0.0f32;
         for n in 0..usize::from(mris.topology(vno).num) {
-            area = add(area, arr(&mp.f_area, "f_area")[vface(mris, vno, n)]);
+            let fno = vface(mris, vno, n);
+            if shared(&mp.f_ripflag, "f_ripflag")[fno] != 0 {
+                notes.push(());
+            }
+            area = add(area, arr(&mp.f_area, "f_area")[fno]);
         }
         arr_mut(&mut mp.v_area, "v_area")[vno] = vertex_area_share(sg, area);
+    }
+    if !notes.is_empty() {
+        g.notices.add(
+            &FS_121,
+            "a plane's vertex adds its ripped face's area as the surface holds it, not memory contents",
+        );
     }
 }
 
@@ -1539,13 +1574,13 @@ pub(crate) fn orients_as_ellipsoid(s: MrisStatus) -> bool {
 /// `mrismp_OrientSurface(mp)`: a rigid body, sphere (parameterized or not), ellipsoid or
 /// spherical patch oriented as an ellipsoid (`MRISMP_updateEllipsoidSurface`), a plane as a plane,
 /// any other surface left alone.
-fn mp_orient_surface(sg: &SurfGlobals, mp: &mut MrisMp, mris: &Mris) {
+fn mp_orient_surface(g: &mut Globals, sg: &SurfGlobals, mp: &mut MrisMp, mris: &Mris) {
     if orients_as_ellipsoid(mp.status) {
         if mp.status != MrisStatus::UNORIENTED_SPHERE {
             mp_orient_ellipsoid(mp);
         }
     } else if mp.status == MrisStatus::PLANE {
-        mp_orient_plane(sg, mp, mris);
+        mp_orient_plane(g, sg, mp, mris);
     }
 }
 
@@ -1587,7 +1622,7 @@ pub fn compute_metric_properties_mp(
     mp_compute_triangle_properties(g, sg, io, mp, mris);
     mp.avg_vertex_area = f64::from(div(mp.total_area, mp.nvertices as f32));
     mp_compute_avg_inter_vertex_dist(mp, mris);
-    mp_orient_surface(sg, mp, mris);
+    mp_orient_surface(g, sg, mp, mris);
     if takes_sphere_area(mp.status) {
         mp.total_area = sphere_area(mp.radius);
     }

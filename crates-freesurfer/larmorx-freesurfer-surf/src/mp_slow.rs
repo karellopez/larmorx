@@ -19,14 +19,14 @@
 use larmorx_freesurfer_core::diag::{self, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
-use larmorx_freesurfer_core::sse::{add, add64, div, mul};
+use larmorx_freesurfer_core::sse::{add, add64, div, sub};
 
 use crate::aaa::{MrisStatus, SurfGlobals};
 use crate::coords::{self, Io};
 use crate::facenorm;
 use crate::metric;
 use crate::mp::{
-    RAN, avg_dist, face_area_normal, fnv_hash, nbrs, orients_as_ellipsoid, points_inwards,
+    Instance, RAN, avg_dist, face_area_normal, fnv_hash, nbrs, orients_as_ellipsoid, points_inwards,
     reports_degenerate, romp_partials, romp_total, sphere_area, takes_sphere_area,
     triangle_props, vertex_area_share, vertex_face_area, vertex_normal, vface, vix,
 };
@@ -165,9 +165,10 @@ pub fn compute_triangle_properties(
             if mris.face(fno).ripflag != 0 {
                 continue;
             }
-            let t = triangle_props(g, io, face_xyz(mris, fno));
+            let t = triangle_props(g, io, face_xyz(mris, fno), Instance::Surface);
             mris.face_mut(fno).area = t.area;
-            s = add64(s, f64::from(t.area));
+            // `reduction_total_area += area` compiled as `area + partial`
+            s = add64(f64::from(t.area), s);
             facenorm::set_face_norm(mris, fno, t.norm[0], t.norm[1], t.norm[2]);
             mris.face_mut(fno).angle = t.angle;
         }
@@ -212,11 +213,12 @@ fn orient_ellipsoid(mris: &mut Mris) -> i32 {
         }
         let e = facenorm::get_face_norm(mris, fno);
         if points_inwards(face_xyz(mris, fno), [e.nx, e.ny, e.nz]) {
+            // `*= -1.0f` compiled as a sign flip
             let f = mris.face_mut(fno);
-            f.area = mul(f.area, -1.0);
+            f.area = -f.area;
             facenorm::set_face_norm(mris, fno, -e.nx, -e.ny, -e.nz);
             for a in mris.face_mut(fno).angle.iter_mut() {
-                *a = mul(*a, -1.0);
+                *a = -*a;
             }
         }
     }
@@ -231,12 +233,13 @@ fn orient_ellipsoid(mris: &mut Mris) -> i32 {
                 continue;
             }
             let a = mris.face(fno).area;
+            // each term first (`term + partial`)
             if a >= 0.0 {
-                t = add64(t, f64::from(a));
+                t = add64(f64::from(a), t);
             } else {
                 let e = facenorm::get_face_norm(mris, fno);
-                n = add64(n, f64::from(-a));
-                o = add64(o, f64::from(e.orig_area));
+                n = add64(f64::from(-a), n);
+                o = add64(f64::from(e.orig_area), o);
             }
         }
         ta.push(t);
@@ -271,11 +274,12 @@ pub fn orient_plane(sg: &SurfGlobals, mris: &mut Mris) -> i32 {
         }
         let e = facenorm::get_face_norm(mris, fno);
         if e.nz < 0.0 {
+            // `*= -1.0f` compiled as a sign flip
             let f = mris.face_mut(fno);
-            f.area = mul(f.area, -1.0);
+            f.area = -f.area;
             facenorm::set_face_norm(mris, fno, -e.nx, -e.ny, -e.nz);
             for a in mris.face_mut(fno).angle.iter_mut() {
-                *a = mul(*a, -1.0);
+                *a = -*a;
             }
         }
     }
@@ -287,11 +291,12 @@ pub fn orient_plane(sg: &SurfGlobals, mris: &mut Mris) -> i32 {
             continue;
         }
         let a = mris.face(fno).area;
+        // `total += area` as `area + total`; `neg += -area` as `neg - area`
         if a >= 0.0 {
-            mris.total_area = add(mris.total_area, a);
+            mris.total_area = add(a, mris.total_area);
         } else {
             let e = facenorm::get_face_norm(mris, fno);
-            mris.neg_area = add(mris.neg_area, -a);
+            mris.neg_area = sub(mris.neg_area, a);
             mris.neg_orig_area = add(mris.neg_orig_area, e.orig_area);
         }
     }
@@ -301,7 +306,7 @@ pub fn orient_plane(sg: &SurfGlobals, mris: &mut Mris) -> i32 {
         }
         let v = mris.vertex_mut(vno);
         if v.nz < 0.0 {
-            v.nz = mul(v.nz, -1.0);
+            v.nz = -v.nz;
             v.neg = 1;
         } else {
             v.neg = 0;

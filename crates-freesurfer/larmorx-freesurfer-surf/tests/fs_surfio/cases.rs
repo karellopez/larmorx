@@ -30,6 +30,8 @@ use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 
 #[path = "life.rs"]
 mod life;
+#[path = "mprop.rs"]
+mod mprop;
 
 pub struct Gen(u64);
 
@@ -104,10 +106,10 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 28] = [
+const COMMANDS: [&str; 29] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
-    "names", "surf", "metric", "posn", "life", "meta", "misc", "edges",
+    "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -979,6 +981,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "meta" => life::meta_tokens(&mut t, &mut g),
             "misc" => life::misc_tokens(&mut t, &mut g),
             "edges" => life::edges_tokens(&mut t, &mut g),
+            "mprop" => mprop::mprop_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2632,6 +2635,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "meta" => life::meta_case(cx, t, o)?,
         "misc" => life::misc_case(cx, t, o)?,
         "edges" => life::edges_case(cx, t, o)?,
+        "mprop" => mprop::mprop_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {

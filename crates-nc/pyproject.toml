@@ -24,7 +24,7 @@ authors = [
 # NOTICE names (Armadillo, Kiss FFT, OpenBLAS, LAPACK, fslpy, fdlibm, Arm's routines, the SGI STL),
 # the Apache-2.0 crate larmorx-core with the works it translates (LICENSES/NOTICE-larmorx.txt) and
 # the Rust crates it is built with (the wheel's SBOM). scripts/release/licences.py derives it.
-license = "LicenseRef-FSL AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND bzip2-1.0.6 AND HPND-sell-variant AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
+license = "LicenseRef-FSL AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND bzip2-1.0.6 AND HPND-sell-variant AND libtiff AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
 # The FSL Licence (LICENSE); the FSL, Armadillo, fdlibm and Arm notices (NOTICE); the texts and
 # notices of the Apache-2.0 larmorx crate and of Arm's MIT code (LICENSES/); FSL's original
 # source (fsl-source/) and the amended source, the Rust translation (the crates below).

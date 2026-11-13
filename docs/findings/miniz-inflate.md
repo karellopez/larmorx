@@ -72,3 +72,9 @@ all 24,000; `reproduce` identical to miniz in 23,960 (the other 40: FS-282's wri
 buffer, never reproduced); `fix` identical to miniz in the 19,576 runs where it named no defect
 (the others named FS-281 903, FS-282 1,278, FS-283 1,032, FS-284 1,211 times); `mz_uncompress`
 1,000 runs identical.
+
+Scale 5 (`<workspace>/oracles/logs/fs-found-c-r8-misc-probe-5.log`, VERIFY-PASS): 30,000 streams,
+120,000 inflate runs per implementation: miniz 1.15 r4 = FreeSurfer's copy in all 120,000;
+`reproduce` = miniz in 119,825 (175: FS-282 past the buffer); `fix` = miniz in the 98,067 runs
+naming no defect (FS-281 4,554, FS-282 6,090, FS-283 5,060, FS-284 6,229); `mz_uncompress`
+5,000 runs, 4,997 identical (3: FS-282 past the buffer).

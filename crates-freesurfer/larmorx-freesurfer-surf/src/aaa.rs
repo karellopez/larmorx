@@ -398,6 +398,10 @@ pub struct SurfGlobals {
     /// `MRIScomputeSecondFundamentalFormAtVertex`'s static eigenvector matrix `m_eigen` (row by
     /// row), `None` before its first call allocates it (zeros).
     pub sff_at_vertex_eigen: Option<[f32; 4]>,
+    /// `MRISaverageGradients_optimize`'s `once` and `optimize` (whether
+    /// `FREESURFER_MRISaverageGradients_optimize_suppress` was unset), `None` before its first
+    /// call.
+    pub avg_gradients_optimize: Option<bool>,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -438,6 +442,7 @@ impl Default for SurfGlobals {
             around_vertex_count: 0,
             around_vertex_limit: 1,
             sff_at_vertex_eigen: None,
+            avg_gradients_optimize: None,
         }
     }
 }

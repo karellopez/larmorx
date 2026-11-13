@@ -55,7 +55,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # alarm, FS-367; the closest-vertex searches' and the spherical-triangle test's arrays, FS-370,
 # FS-371; the faces' walk around a vertex and the curvature sign of a face naming a vertex twice,
 # FS-372, FS-373; an MGH volume header without voxels read for a transform's volume, FS-76, whose
-# division by zero the official build turns into a crash): counted, never compared
+# division by zero the official build turns into a crash; the principal curvatures' range on a
+# surface without vertices, FS-376; the gradients' averaging over neighbour lists that are not
+# symmetric, FS-379; a matrix on which LINPACK's ssvdc never returns, FS-48h, the runner's mark for
+# FS-48's hanging cases, ended by the probe's alarm): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -85,6 +88,9 @@ SKIP: tuple[str, ...] = (
     "FS-372",
     "FS-373",
     "FS-76",
+    "FS-376",
+    "FS-379",
+    "FS-48h",
 )
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 

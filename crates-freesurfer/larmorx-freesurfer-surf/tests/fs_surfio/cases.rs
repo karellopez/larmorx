@@ -2820,6 +2820,17 @@ pub fn run_line_with(
             .iter()
             .map(|n| n.defect.id)
             .collect();
+    // relay 20: FS-48's matrices on which LINPACK's ssvdc never returns, so FreeSurfer hangs (the
+    // probe's alarm ends it after 5 seconds): marked apart from FS-48's other cases, which compare
+    if cx
+        .g
+        .notices
+        .as_slice()
+        .iter()
+        .any(|n| n.defect.id == "FS-48" && n.detail.contains("on which FreeSurfer hangs"))
+    {
+        ids.push("FS-48h");
+    }
     ids.sort_unstable();
     ids.dedup();
     (format!("{result} | {text}"), ids)

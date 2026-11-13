@@ -92,6 +92,8 @@ const char *Progname = "fssurfio";
 
 // relay 19: the obsolete H sign has no declaration in FreeSurfer's headers
 int MRIS_Hcurvature_determineSign(MRIS *apmris);
+// relay 20: declared in mrisurf_sseTerms.h (not included here)
+int mrisAverageSignedGradients(MRIS *mris, int num_avgs);
 
 namespace {
 
@@ -2812,8 +2814,10 @@ void dump_curv_only(MRIS *s)
 // mpe: Gdiag's bits (1 show, 2 verbose, 4 write), a surface file read by MRISread (d/lh.s0), the status
 // (-1: the read's), Kmin, Kmax, Hmin, Hmax or not, for each vertex a mask (1 ripped, 2 marked: a
 // number, 4 current position, 8 normal, 16 curv, 32 k1 and k2, 64 K and H, 128 area, 256 original
-// position) with its values, for each face a mask (1 ripped, 2 area, 4 cached original area, 8
-// cached normal) with its values, then the operations, each printing what it gives
+// position, 512 gradient) with its values, for each face a mask (1 ripped, 2 area, 4 cached
+// original area, 8 cached normal) with its values, then the operations, each printing what it
+// gives; the counts, status, extremes, Gdiag_no and FREESURFER_MRISaverageGradients_optimize_suppress
+// come before the read
 void mpe_case()
 {
   mkdir(workdir.c_str(), 0700);
@@ -2826,6 +2830,12 @@ void mpe_case()
   if (gd & 4) Gdiag |= DIAG_WRITE;
   setenv("SURFER_SIDEDOOR", "1", 1);
   std::string bytes = geth();
+  int nv = geti(), nf = geti(), status = geti();
+  bool extremes = geti() != 0;
+  float ext[4] = {0, 0, 0, 0};
+  if (extremes) for (float &x : ext) x = getf();
+  int gdiag_no = geti();
+  if (geti()) setenv("FREESURFER_MRISaverageGradients_optimize_suppress", "1", 1);
   FILE *fp = fopen("d/lh.s0", "wb");
   if (!fp) fail("the surface file");
   fwrite(bytes.data(), 1, bytes.size(), fp);
@@ -2833,11 +2843,10 @@ void mpe_case()
   errno = 0;
   MRIS *s = MRISread("d/lh.s0");
   if (!s) { out += "NULL "; return; }
-  int nv = geti(), nf = geti();
   if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
-  int status = geti();
   if (status >= 0) s->status = (MRIS_Status)status;
-  if (geti()) { s->Kmin = getf(); s->Kmax = getf(); s->Hmin = getf(); s->Hmax = getf(); }
+  if (extremes) { s->Kmin = ext[0]; s->Kmax = ext[1]; s->Hmin = ext[2]; s->Hmax = ext[3]; }
+  Gdiag_no = gdiag_no;
   for (int vno = 0; vno < nv; vno++) {
     VERTEX *v = &s->vertices[vno];
     int m = geti();
@@ -2850,6 +2859,7 @@ void mpe_case()
     if (m & 64) { v->K = getf(); v->H = getf(); }
     if (m & 128) v->area = getf();
     if (m & 256) { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
+    if (m & 512) { v->dx = getf(); v->dy = getf(); v->dz = getf(); }
   }
   for (int fno = 0; fno < nf; fno++) {
     int m = geti();
@@ -2924,6 +2934,13 @@ void mpe_case()
         for (float x : c) of(x);
       }
       for (const char *name : {"curv.dat", "k1.plt", "k2.plt"}) file_hash(name);
+    } else if (op == "agr" || op == "agf" || op == "ags") {
+      int n = geti();
+      oi(op == "agr" ? MRISaverageGradients(s, n) : op == "agf" ? MRISaverageGradientsFast(s, n) : mrisAverageSignedGradients(s, n));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->dx); of(v->dy); of(v->dz); of(v->tdx); of(v->tdy); of(v->tdz);
+      }
     } else if (op == "sfa") {
       if (geti()) oi(mrisComputeTangentPlanes(s));
       int calls = geti();

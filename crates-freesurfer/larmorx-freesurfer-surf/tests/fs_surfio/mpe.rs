@@ -17,7 +17,7 @@ use super::*;
 
 use larmorx_freesurfer_core::diag::DIAG_WRITE;
 use larmorx_freesurfer_core::sse;
-use larmorx_freesurfer_surf::{facenorm, props, props5, props6, readwrite};
+use larmorx_freesurfer_surf::{facenorm, props, props5, props6, props7, readwrite};
 
 fn fh(t: &mut Vec<String>, g: &mut Gen, heavy: bool) {
     t.push(format!("{:08x}", smallish(g, heavy)));
@@ -86,6 +86,16 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
     } else {
         ix(t, 0);
     }
+    // Gdiag_no (-1, or a vertex), FREESURFER_MRISaverageGradients_optimize_suppress or not
+    ix(
+        t,
+        if g.chance(5) && nv > 0 {
+            g.int(0, nv - 1)
+        } else {
+            -1
+        },
+    );
+    ix(t, i64::from(g.chance(3)));
     let few = g.chance(2);
     for _ in 0..nv {
         let mut mask = 0;
@@ -99,6 +109,7 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
             (64, 4),
             (128, 6),
             (256, 20),
+            (512, 3),
         ] {
             if g.chance(if few { k * 4 } else { k }) {
                 mask |= bit;
@@ -132,6 +143,11 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 fh(t, g, heavy);
             }
         }
+        if mask & 512 != 0 {
+            for _ in 0..3 {
+                fs(t, g, heavy);
+            }
+        }
     }
     for _ in 0..nf {
         let mut mask = 0;
@@ -159,7 +175,8 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
         let op = g.pick(&[
             "ssn", "ssn", "cbn", "cmc", "cmc", "cmc", "uae", "uae", "ugc", "umc", "upc", "uk1",
             "uk1", "uk2", "upf", "upf", "cci", "cci", "mxr", "mxr", "cac", "cac", "mnv", "rnv",
-            "sff", "sff", "sff", "sff", "sff", "sff", "sfa", "sfa", "sfa",
+            "sff", "sff", "sff", "sff", "sff", "sff", "sfa", "sfa", "sfa", "agr", "agr", "agr",
+            "agf", "ags", "ags",
         ]);
         t.push(op.to_owned());
         match op {
@@ -175,6 +192,14 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 };
                 t.push(format!("{:016x}", f64::to_bits(pct)));
             }
+            "agr" | "agf" | "ags" => ix(
+                t,
+                if g.chance(8) {
+                    g.int(151, 156)
+                } else {
+                    g.int(-1, 6)
+                },
+            ),
             "sfa" => {
                 // the tangent planes first or not, then 1 to 3 calls: a vertex and its neighbours
                 // (mostly the mesh's own, as a fan of its faces; now and then none or any)
@@ -259,8 +284,19 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     if gd & 4 != 0 {
         cx.g.gdiag |= DIAG_WRITE;
     }
-    let env = Environment::from_pairs(vec![("SURFER_SIDEDOOR".to_owned(), "1".to_owned())]);
-    std::fs::write(dir.join("d/lh.s0"), t.h()).expect("the surface file");
+    let bytes = t.h();
+    let (nv, nf, status) = (t.i(), t.i(), t.i());
+    let extremes = (t.i() != 0).then(|| [t.f(), t.f(), t.f(), t.f()]);
+    let (gdiag_no, suppress) = (t.i(), t.i() != 0);
+    let mut pairs = vec![("SURFER_SIDEDOOR".to_owned(), "1".to_owned())];
+    if suppress {
+        pairs.push((
+            "FREESURFER_MRISaverageGradients_optimize_suppress".to_owned(),
+            "1".to_owned(),
+        ));
+    }
+    let env = Environment::from_pairs(pairs);
+    std::fs::write(dir.join("d/lh.s0"), bytes).expect("the surface file");
     let d = Some(dir);
     let mut io = coords::Io {
         out: &mut cx.a.clone(),
@@ -274,23 +310,19 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         o.s("NULL");
         return Ok(());
     };
-    let (nv, nf) = (t.i(), t.i());
     if nv != s.nvertices || nf != s.nfaces {
         o.i(i64::from(s.nvertices));
         o.i(i64::from(s.nfaces));
         o.s("COUNTS");
         return Ok(());
     }
-    let status = t.i();
     if status >= 0 {
         s.status = MrisStatus(status);
     }
-    if t.i() != 0 {
-        s.Kmin = t.f();
-        s.Kmax = t.f();
-        s.Hmin = t.f();
-        s.Hmax = t.f();
+    if let Some([a, b, c, e]) = extremes {
+        (s.Kmin, s.Kmax, s.Hmin, s.Hmax) = (a, b, c, e);
     }
+    g.gdiag_no = gdiag_no;
     for vno in 0..nv as usize {
         let m = t.i();
         let v = s.vertex_mut(vno);
@@ -322,6 +354,9 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         }
         if m & 256 != 0 {
             [v.origx, v.origy, v.origz] = [t.f(), t.f(), t.f()];
+        }
+        if m & 512 != 0 {
+            [v.dx, v.dy, v.dz] = [t.f(), t.f(), t.f()];
         }
     }
     for fno in 0..nf as usize {
@@ -442,6 +477,20 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 }
                 for name in ["curv.dat", "k1.plt", "k2.plt"] {
                     file_hash(o, &dir.join(name));
+                }
+            }
+            "agr" | "agf" | "ags" => {
+                let n = t.i();
+                o.i(i64::from(match op {
+                    "agr" => props7::average_gradients(g, sg, &mut io, &mut s, n),
+                    "agf" => props7::average_gradients_fast(g, &mut io, &mut s, n),
+                    _ => props7::average_signed_gradients(g, &mut io, &mut s, n),
+                }));
+                for vno in 0..s.nvertices.max(0) as usize {
+                    let v = s.vertex(vno);
+                    for x in [v.dx, v.dy, v.dz, v.tdx, v.tdy, v.tdz] {
+                        o.f(x);
+                    }
                 }
             }
             "sfa" => {

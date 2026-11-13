@@ -456,7 +456,14 @@ fn metric_tokens(t: &mut Vec<String>, g: &mut Gen) {
     ix(t, nf);
     for _ in 0..2 {
         // mostly a valid status (10 kinds), now and then one outside the list
-        ix(t, if g.chance(12) { g.pick(&[10, -1]) } else { g.int(0, 9) });
+        ix(
+            t,
+            if g.chance(12) {
+                g.pick(&[10, -1])
+            } else {
+                g.int(0, 9)
+            },
+        );
     }
     ix(t, g.int(0, 3));
     for _ in 0..2 {
@@ -477,7 +484,12 @@ fn metric_tokens(t: &mut Vec<String>, g: &mut Gen) {
         }
         ix(t, i64::from(g.chance(6)));
         let hi = nv.min(5);
-        let (vnum, v2num, v3num, vtotal) = (g.int(0, hi), g.int(0, hi + 2), g.int(0, hi + 3), g.int(0, hi + 1));
+        let (vnum, v2num, v3num, vtotal) = (
+            g.int(0, hi),
+            g.int(0, hi + 2),
+            g.int(0, hi + 3),
+            g.int(0, hi + 1),
+        );
         let nsize_max = g.int(0, 3);
         for v in [vnum, v2num, v3num, vtotal, nsize_max] {
             ix(t, v);
@@ -537,7 +549,11 @@ fn metric_tokens(t: &mut Vec<String>, g: &mut Gen) {
             "av" | "sh" => ix(t, g.int(-1, 4)),
             "sm" => {
                 ix(t, g.int(-1, 4));
-                let s = if g.chance(2) { g.pick(&[0.5f32, 1.0, 1.5, 0.25]).to_bits() } else { smallish(g, heavy) };
+                let s = if g.chance(2) {
+                    g.pick(&[0.5f32, 1.0, 1.5, 0.25]).to_bits()
+                } else {
+                    smallish(g, heavy)
+                };
                 t.push(format!("{s:08x}"));
             }
             "sc" => t.push(format!("{:08x}", smallish(g, heavy))),
@@ -1649,9 +1665,17 @@ fn dump_metric(m: &Mris, o: &mut Out) {
         }
         for k in 0..2 {
             let (d, cap, st) = if k == 1 {
-                (&v.dist_orig, v.dist_orig_capacity, &m.dist_orig_storage.as_ref().unwrap()[vno])
+                (
+                    &v.dist_orig,
+                    v.dist_orig_capacity,
+                    &m.dist_orig_storage.as_ref().unwrap()[vno],
+                )
             } else {
-                (&v.dist, v.dist_capacity, &m.dist_storage.as_ref().unwrap()[vno])
+                (
+                    &v.dist,
+                    v.dist_capacity,
+                    &m.dist_storage.as_ref().unwrap()[vno],
+                )
             };
             o.i(i64::from(d.is_some()));
             o.i(i64::from(d.is_some() || st.is_some()));
@@ -1713,7 +1737,8 @@ fn metric_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         {
             let v = m.vertex_mut(vno);
             set_coords(t, v);
-            (v.curv, v.H, v.val2, v.d, v.area, v.origarea) = (t.f(), t.f(), t.f(), t.f(), t.f(), t.f());
+            (v.curv, v.H, v.val2, v.d, v.area, v.origarea) =
+                (t.f(), t.f(), t.f(), t.f(), t.f(), t.f());
             v.ripflag = t.i() as i8;
         }
         {
@@ -1781,7 +1806,9 @@ fn metric_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         match op {
             "av" => {
                 let n = t.i();
-                o.i(i64::from(metric::average_vertex_positions(g, &mut io, &mut m, n)?));
+                o.i(i64::from(metric::average_vertex_positions(
+                    g, &mut io, &mut m, n,
+                )?));
             }
             "sm" => {
                 let (n, st) = (t.i(), t.f());
@@ -1797,7 +1824,9 @@ fn metric_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             }
             "kd" => o.i(i64::from(metric::check_dist(g, &mut io, &mut m)?)),
             "ko" => o.i(i64::from(metric::check_dist_orig(g, &mut io, &mut m)?)),
-            "vd" => o.i(i64::from(metric::compute_vertex_distances(g, &mut io, &mut m)?)),
+            "vd" => o.i(i64::from(metric::compute_vertex_distances(
+                g, &mut io, &mut m,
+            )?)),
             "vo" => o.i(i64::from(metric::compute_original_vertex_distances(
                 g, &mut io, &mut m,
             )?)),
@@ -1856,7 +1885,9 @@ fn metric_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 }
                 o.i(i64::from(metric::normalize_curvature(&mut io, &mut m, w)));
             }
-            "nv" => o.i(i64::from(metric::normalize_curvature_variance(g, &mut io, &mut m))),
+            "nv" => o.i(i64::from(metric::normalize_curvature_variance(
+                g, &mut io, &mut m,
+            ))),
             "cp" => {
                 let d = t.d();
                 o.i(i64::from(metric::count_compressed(&m, d)));

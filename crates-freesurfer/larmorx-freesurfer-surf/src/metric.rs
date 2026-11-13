@@ -36,9 +36,9 @@
 // The loops index as FreeSurfer's C does (one vertex number for several arrays).
 #![allow(clippy::needless_range_loop)]
 
+use larmorx_core::defects::FS_114;
 use larmorx_freesurfer_core::diag::{self, DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_core::defects::FS_114;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::matrix_ops::xyz_normalized_load;
 use larmorx_freesurfer_core::sse;
@@ -50,9 +50,8 @@ use crate::dist;
 use crate::mris::Mris;
 use crate::topology;
 use crate::views::{
-    CANONICAL_VERTICES, CURRENT_VERTICES, FLATTENED_VERTICES, INFLATED_VERTICES,
-    LAYERIV_VERTICES, ORIGINAL_VERTICES, PIAL_VERTICES, TARGET_VERTICES, TMP_VERTICES,
-    TMP2_VERTICES, WHITE_VERTICES,
+    CANONICAL_VERTICES, CURRENT_VERTICES, FLATTENED_VERTICES, INFLATED_VERTICES, LAYERIV_VERTICES,
+    ORIGINAL_VERTICES, PIAL_VERTICES, TARGET_VERTICES, TMP_VERTICES, TMP2_VERTICES, WHITE_VERTICES,
 };
 
 /// `NORM_NONE`, `NORM_MEAN`, `NORM_MEDIAN` (`include/mrisurf.h`).
@@ -88,7 +87,11 @@ fn extracted_h() -> String {
 
 /// A neighbour's index as a vertex number (FreeSurfer reads `vertices[vt->v[n]]` unchecked).
 fn nbr(mris: &Mris, vno: usize, n: usize) -> usize {
-    let v = mris.topology(vno).v.as_ref().expect("VERTEX_TOPOLOGY::v is NULL")[n];
+    let v = mris
+        .topology(vno)
+        .v
+        .as_ref()
+        .expect("VERTEX_TOPOLOGY::v is NULL")[n];
     usize::try_from(v).expect("a neighbour index outside the surface")
 }
 
@@ -326,7 +329,14 @@ pub fn center_sphere(g: &mut Globals, io: &mut Io, mris: &mut Mris) -> Result<()
         (x, y, z, r2) = (0.0, 0.0, 0.0, 10000.0);
         nrg = estimate_nrg(mris, x, y, z, r2);
     }
-    if estimate_nrg(mris, 0.0, 0.0, 0.0, estimate_squared_radius(mris, 0.0, 0.0, 0.0)) < nrg {
+    if estimate_nrg(
+        mris,
+        0.0,
+        0.0,
+        0.0,
+        estimate_squared_radius(mris, 0.0, 0.0, 0.0),
+    ) < nrg
+    {
         (x, y, z) = (0.0, 0.0, 0.0);
         r2 = estimate_squared_radius(mris, x, y, z);
         nrg = estimate_nrg(mris, x, y, z, r2);
@@ -453,7 +463,13 @@ pub fn scale_distances(mris: &mut Mris, scale: f32) -> i32 {
 /// [`larmorx_freesurfer_core::matrix_ops::xyz_approx_angle_known_length`] takes as `n.z*z2`: the
 /// two differ only where both are NaNs (HANDOFF for fs.core's owner; until it changes this copy
 /// keeps the distances' NaNs the official build's).
-fn approx_angle(n: &larmorx_freesurfer_core::matrix_ops::Xyz, x2: f32, y2: f32, z2: f32, norm: f32) -> f32 {
+fn approx_angle(
+    n: &larmorx_freesurfer_core::matrix_ops::Xyz,
+    x2: f32,
+    y2: f32,
+    z2: f32,
+    norm: f32,
+) -> f32 {
     let dot = sse::add64(
         sse::add64(
             sse::mul64(f64::from(n.x), f64::from(x2)),
@@ -785,17 +801,21 @@ pub fn compute_original_vertex_distances_if_necessary(
 /// a surface not a patch whose total or original area is not positive fails a `cheapAssert`
 /// (lines 1682, 1683; FS-03); with `DIAG_VERBOSE`, the debug messages `MRISpercentDistanceError
 /// called when all dist zero` and `... all dist_orig zero` when those sums are 0.
-pub fn percent_distance_error(
-    g: &mut Globals,
-    io: &mut Io,
-    mris: &Mris,
-) -> Result<f64, Fatal> {
+pub fn percent_distance_error(g: &mut Globals, io: &mut Io, mris: &Mris) -> Result<f64, Fatal> {
     let dist_scale = if mris.patch != 0 {
         1.0f64
     } else {
         for (ok, line, tst) in [
-            (f64::from(mris.total_area) > 0.0, 1682, "mris->total_area > 0.0"),
-            (f64::from(mris.orig_area) > 0.0, 1683, "mris->orig_area > 0.0"),
+            (
+                f64::from(mris.total_area) > 0.0,
+                1682,
+                "mris->total_area > 0.0",
+            ),
+            (
+                f64::from(mris.orig_area) > 0.0,
+                1683,
+                "mris->orig_area > 0.0",
+            ),
         ] {
             if !ok {
                 return Err(diag::assert_failed(
@@ -840,7 +860,11 @@ pub fn percent_distance_error(
         }
     }
     if mean_dist == 0.0 {
-        log::debug(g, io.err, "MRISpercentDistanceError called when all dist zero");
+        log::debug(
+            g,
+            io.err,
+            "MRISpercentDistanceError called when all dist zero",
+        );
     }
     if mean_odist == 0.0 {
         log::debug(
@@ -1111,10 +1135,7 @@ pub fn scale_curvatures(mris: &mut Mris, min_curv: f32, max_curv: f32) -> i32 {
         if v.ripflag != 0 {
             continue;
         }
-        v.curv = sse::add64(
-            sse::mul64(sse::sub64(f64::from(v.curv), mean), scale),
-            mean,
-        ) as f32;
+        v.curv = sse::add64(sse::mul64(sse::sub64(f64::from(v.curv), mean), scale), mean) as f32;
     }
     0
 }
@@ -1380,7 +1401,12 @@ pub fn save_xyz(mris: &Mris) -> SavedXyz {
 /// `MRISloadXYZ(mris, saved)`: the saved coordinates back, vertex by vertex (`MRISsetXYZ` at
 /// line 3148: its logic problem when the distances are allocated); a surface whose vertex count
 /// changed fails `cheapAssert(nvertices == mris->nvertices)` (line 3145; FS-03).
-pub fn load_xyz(g: &mut Globals, io: &mut Io, mris: &mut Mris, saved: &SavedXyz) -> Result<(), Fatal> {
+pub fn load_xyz(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &mut Mris,
+    saved: &SavedXyz,
+) -> Result<(), Fatal> {
     if saved.nvertices != mris.nvertices {
         return Err(diag::assert_failed(
             g,

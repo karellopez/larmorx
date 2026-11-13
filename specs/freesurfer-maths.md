@@ -977,9 +977,9 @@ returned on the 148 the port names and returned on every other one); FreeSurfer 
 modes:** an error `OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an
 infinite or NaN entry)` + `\n`, code -4, failure. The other matrices with such entries are computed
 in both modes as VNL computes them; the signs of NaNs in their vectors follow the official build's
-operand order, which the port does not follow yet (**(observed)** 39 of the 223 whose QR method
-succeeded differ from the port in NaNs' signs only; on §23's lines of such matrices the port's signs
-are FreeSurfer's). **FS-41:** FreeSurfer copies the matrix to the stack (8 bytes an element): above
+operand order, which the port does not follow yet (**(observed)** of the exploration's 252 that
+FreeSurfer finished, 62 differ from the port in NaNs' bits only, none otherwise; on §23's lines of
+such matrices the port's bits are FreeSurfer's). **FS-41:** FreeSurfer copies the matrix to the stack (8 bytes an element): above
 8 MiB (about 1,024 rows) it crashes; both modes compute it, noted.
 
 ### 17.3 Eigensystem of a matrix (m, values, vectors)

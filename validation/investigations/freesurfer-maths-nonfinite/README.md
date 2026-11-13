@@ -45,4 +45,10 @@ one directory mixed their standard errors in a first trial).
   `mreadbin` (the groups `mfiles` and `mfiles-cut`): every number whose bytes come from the file or
   earlier numbers is §18.2's (128), every memory line takes a byte from memory by §18.2 (28; 12 more
   such lines happen to be stable), 46 files make no matrix.
-- `explore`: see `oracles/logs/fs-maths-nonfinite-explore-2026-11-13.log` (the spec quotes it).
+- `explore` (`oracles/logs/fs-maths-nonfinite-explore-2026-11-13.log`, 5 minutes cold): `oeigen` 154
+  never returned, each where the port says so, 246 finished, each identical to the port; `meigen` 132
+  and 268 likewise; `oeigenns` 148 never returned (the port's `BalancNeverReturns`), 252 finished: 190
+  identical, 62 differing in NaNs' bits only; `msvd` 36 never returned (the port's), 276 failures with
+  the port's `info`, 88 decompositions (20 identical, 68 differing in U's NaNs' bits only); `mcond`
+  and `msvdpinverse` 20 never returned, 364 finished, 16 without a decomposition (every element
+  within 1e-11 of 0). Exit status 0.

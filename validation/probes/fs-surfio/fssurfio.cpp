@@ -39,6 +39,8 @@
 #include <string>
 #include <vector>
 
+#include <zlib.h>
+
 #include "diag.h"
 #include "gifti.h"
 #include "error.h"
@@ -2386,6 +2388,280 @@ void gii_case()
 }
 
 
+// ---- relay 22: gwr, the GIFTI writers and GIFTI files as volumes ---------------------------------
+
+// a written GIFTI file as both sides print it: the UserName's value written U, each <Data>
+// payload Base64-decoded and inflated (zlib), written Z and its bytes in hex (B and the payload
+// itself when it does not inflate): the compressed bytes are zlib 1.2.11's here and zlib-rs's
+// in the port, the values the same
+int b64val(unsigned char c)
+{
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
+  return -1;
+}
+
+std::string gii_normal(const std::string &f)
+{
+  std::string s = f;
+  size_t u = s.find("<![CDATA[UserName]]></Name>");
+  if (u != std::string::npos) {
+    size_t v = s.find("<Value><![CDATA[", u);
+    if (v != std::string::npos) {
+      v += 16;
+      size_t e = s.find("]]>", v);
+      if (e != std::string::npos) s.replace(v, e - v, "U");
+    }
+  }
+  std::string r;
+  size_t p = 0;
+  char h[4];
+  for (;;) {
+    size_t a = s.find("<Data>", p);
+    size_t b = a == std::string::npos ? a : s.find("</Data>", a + 6);
+    if (b == std::string::npos) { r += s.substr(p); break; }
+    a += 6;
+    r += s.substr(p, a - p);
+    std::string pay = s.substr(a, b - a), bin;
+    unsigned acc = 0;
+    int nb = 0;
+    for (unsigned char c : pay) {
+      int v = b64val(c);
+      if (v < 0) continue;
+      acc = (acc << 6) | (unsigned)v;
+      nb += 6;
+      if (nb >= 8) { nb -= 8; bin.push_back((char)((acc >> nb) & 0xff)); }
+    }
+    std::string inf;
+    bool ok = false;
+    z_stream zs;
+    memset(&zs, 0, sizeof zs);
+    if (inflateInit(&zs) == Z_OK) {
+      zs.next_in = (Bytef *)bin.data();
+      zs.avail_in = (uInt)bin.size();
+      unsigned char buf[4096];
+      int ret;
+      do {
+        zs.next_out = buf;
+        zs.avail_out = sizeof buf;
+        ret = inflate(&zs, Z_NO_FLUSH);
+        inf.append((char *)buf, sizeof buf - zs.avail_out);
+      } while (ret == Z_OK);
+      ok = ret == Z_STREAM_END;
+      inflateEnd(&zs);
+    }
+    if (ok) {
+      r += "Z";
+      for (unsigned char c : inf) { snprintf(h, sizeof h, "%02x", c); r += h; }
+    } else {
+      r += "B" + pay;
+    }
+    p = b;
+  }
+  return r;
+}
+
+void dump_gii_file(const char *name)
+{
+  FILE *fp = fopen(name, "rb");
+  if (!fp) { out += "NOFILE "; return; }
+  std::string b;
+  char buf[4096];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, n);
+  fclose(fp);
+  ox(gii_normal(b));
+}
+
+void dump_ctab(COLOR_TABLE *ct)
+{
+  if (!ct) { out += "NULL "; return; }
+  oi(ct->nentries); oi(ct->version); oh(ct->fname);
+  for (int k = 0; k < ct->nentries; k++) {
+    CTE *e = ct->entries[k];
+    if (!e) { out += "- "; continue; }
+    oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+    of(e->rf); of(e->gf); of(e->bf); of(e->af);
+  }
+}
+
+void dump_gwr_mri(MRI *m, int values)
+{
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type); oi(m->intent);
+  oi(m->version); of(m->tr);
+  dump_ctab(m->ct);
+  if (!values) return;
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) of(MRIgetVoxVal(m, c, r, s, f));
+}
+
+const char *opt_name()
+{
+  if (!geti()) return NULL;
+  return name_tok();
+}
+
+// gwr: Gdiag's bits (1 show, 2 verbose), the creation time's replacement, input files (GIFTI
+// files, a subject's talairach.xfm), a surface from MRISalloc (per vertex its coordinates,
+// curvature, stat and annotation; the faces' vertices; its name, subject, patch flag, real RAS,
+// volume geometry, centre, group-average area, command lines, Talairach matrix), a colour table or
+// none, volumes (type, extent, frames, repetition time, values); then 1 to 4 of MRISwriteGIFTI,
+// its volume overload, MRISwriteGIFTICombined, mriWriteGifti, getShapeStatIntentCount,
+// MRISreadGiftiAsMRI and MRISwrite of a .gii name; each writer's file printed (gii_normal)
+void gwr_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  mkdir("mri", 0700);
+  mkdir("mri/transforms", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  std::string date = geth();
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", date.c_str(), 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf(); v->curv = getf(); v->stat = getf();
+    v->annotation = geti();
+  }
+  for (int fno = 0; fno < nf; fno++) for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+  std::string fname = geth(), subj = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  snprintf(m->subject_name.data(), STRLEN, "%s", subj.c_str());
+  m->patch = geti();
+  m->useRealRAS = geti();
+  set_vg(&m->vg);
+  m->xctr = getf(); m->yctr = getf(); m->zctr = getf();
+  m->group_avg_surface_area = getf();
+  int nl = geti();
+  for (int i = 0; i < nl; i++) {
+    std::string l = geth();
+    m->cmdlines[i] = (char *)calloc(l.size() + 1, 1);
+    memcpy(m->cmdlines[i], l.data(), l.size());
+  }
+  m->ncmds = nl;
+  if (geti()) {
+    int rows = geti(), cols = geti();
+    m->SRASToTalSRAS_ = MatrixAlloc(rows, cols, MATRIX_REAL);
+    for (int r = 1; r <= rows; r++) for (int c = 1; c <= cols; c++) *MATRIX_RELT(m->SRASToTalSRAS_, r, c) = getf();
+  }
+  int nct = geti();
+  if (nct >= 0) {
+    COLOR_TABLE *ctab = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+    ctab->nentries = nct;
+    ctab->version = 2;
+    ctab->entries = (COLOR_TABLE_ENTRY **)calloc(nct + 1, sizeof(COLOR_TABLE_ENTRY *));
+    strcpy(ctab->fname, "user.ctab");
+    for (int k = 0; k < nct; k++) {
+      if (!geti()) continue;
+      CTE *e = (CTE *)calloc(1, sizeof(CTE));
+      std::string name = geth();
+      strncpy(e->name, name.c_str(), sizeof(e->name) - 1);
+      e->ri = geti(); e->gi = geti(); e->bi = geti(); e->ai = geti();
+      e->rf = e->ri / 255.0f; e->gf = e->gi / 255.0f; e->bf = e->bi / 255.0f; e->af = e->ai / 255.0f;
+      ctab->entries[k] = e;
+    }
+    m->ct = ctab;
+  }
+  int nvol = geti();
+  std::vector<MRI *> vols;
+  for (int k = 0; k < nvol; k++) {
+    int type = geti(), w = geti(), h = geti(), d = geti(), fr = geti();
+    MRI *v = MRIallocSequence(w, h, d, type, fr);
+    v->tr = getf();
+    for (int f = 0; f < fr; f++)
+      for (int s = 0; s < d; s++)
+        for (int r = 0; r < h; r++)
+          for (int c = 0; c < w; c++) MRIsetVoxVal(v, c, r, s, f, getf());
+    vols.push_back(v);
+  }
+  errno = 0;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "w") {
+      int intent = geti();
+      const char *nm = name_tok();
+      const char *cf = opt_name();
+      oi(MRISwriteGIFTI(m, intent, nm, cf));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "wm") {
+      int intent = geti(), vol = geti();
+      const char *nm = name_tok();
+      const char *cf = opt_name();
+      const char *dt = opt_name();
+      oi(MRISwriteGIFTI(m, vols[vol], intent, nm, cf, dt));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "c") {
+      const char *nm = name_tok();
+      int nov = geti();
+      std::vector<OverlayInfoStruct> ov(nov);
+      for (OverlayInfoStruct &o : ov) {
+        o.__type = geti();
+        o.__giftiIntent = geti();
+        int vol = geti();
+        o.__overlaymri = vol >= 0 ? vols[vol] : NULL;
+        o.__foverlay = (char *)opt_name();
+        std::string sd = geth();
+        memset(o.__shapedatatype, 0, sizeof o.__shapedatatype);
+        snprintf(o.__shapedatatype, sizeof o.__shapedatatype, "%s", sd.c_str());
+        o.__format = GIFTI_FILE;
+      }
+      oi(MRISwriteGIFTICombined(m, &ov, nm));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "mw") {
+      int vol = geti();
+      const char *nm = name_tok();
+      oi(mriWriteGifti(vols[vol], nm));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "sw") {
+      const char *nm = name_tok();
+      oi(MRISwrite(m, nm));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "n") {
+      const char *nm = name_tok();
+      int a = 7, b = 7;
+      oi(getShapeStatIntentCount(nm, &a, &b));
+      oi(a); oi(b);
+    } else if (op == "r") {
+      const char *nm = name_tok();
+      int rv = geti();
+      MRI *v = MRISreadGiftiAsMRI(nm, rv);
+      fflush(stdout);
+      if (!v) out += "NULL ";
+      else dump_gwr_mri(v, rv);
+    } else {
+      fail("gwr op");
+    }
+  }
+}
+
+
 // ---- relay 17: mpb, the metric properties of 3.1-50 part b ----------------------------------------
 
 void dump_mpb_vertices(MRIS *s)
@@ -3395,6 +3671,8 @@ void run_case()
     mpe_case();
   } else if (cmd == "gii") {
     gii_case();
+  } else if (cmd == "gwr") {
+    gwr_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

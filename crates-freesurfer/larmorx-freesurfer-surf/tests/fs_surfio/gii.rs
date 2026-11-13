@@ -412,7 +412,7 @@ const STAT_INTENTS: [&str; 5] = [
 ];
 
 /// A GIFTI file for `gii`: its bytes and the number of vertices its data arrays use.
-fn gii_file(g: &mut Gen, heavy: bool) -> (Vec<u8>, i64, i64) {
+pub(super) fn gii_file(g: &mut Gen, heavy: bool) -> (Vec<u8>, i64, i64) {
     let m = mesh(g, heavy);
     let mut nv = m.v.len() as i64;
     let mut arrs: Vec<Arr> = Vec::new();

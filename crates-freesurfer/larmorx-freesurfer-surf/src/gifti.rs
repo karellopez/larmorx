@@ -158,10 +158,10 @@ pub enum GiftiRead {
 
 /// [`Streams`] that names a file as its caller did: `from` (the path the reader opened) written as
 /// `to` (the name given).
-struct Renamed<'a> {
-    w: Writers<'a>,
-    from: String,
-    to: String,
+pub(crate) struct Renamed<'a> {
+    pub(crate) w: Writers<'a>,
+    pub(crate) from: String,
+    pub(crate) to: String,
 }
 
 impl Streams for Renamed<'_> {
@@ -197,13 +197,13 @@ fn scan_d(g: &mut Globals, s: &[u8]) -> Option<i32> {
 }
 
 /// `sscanf(s, "%f", &x) == 1`: the value, or `None`.
-fn scan_f(g: &mut Globals, s: &[u8]) -> Option<f32> {
+pub(crate) fn scan_f(g: &mut Globals, s: &[u8]) -> Option<f32> {
     scan_f32_errno(&mut g.errno, s)
 }
 
 /// `gifti_get_meta_value(nvp, name)`: the value's bytes, or `None` (`NULL`: no such entry, or an
 /// entry without a value).
-fn meta(
+pub(crate) fn meta(
     gx: &Gifti,
     io: &mut Io,
     notices: &mut Notices,
@@ -230,7 +230,7 @@ fn rows_cols(gx: &Gifti, io: &mut Io, da: &DataArray) -> (i64, i64) {
 
 /// The rows and columns of an array as the reader counts them: (rows, cols) for row-major order,
 /// (cols, rows) swapped for column-major (`gifti_DA_rows_cols` called with its outputs exchanged).
-fn vertices_cols(gx: &Gifti, io: &mut Io, da: &DataArray) -> (i64, i64) {
+pub(crate) fn vertices_cols(gx: &Gifti, io: &mut Io, da: &DataArray) -> (i64, i64) {
     let (r, c) = rows_cols(gx, io, da);
     if da.ind_ord == GIFTI_IND_ORD_ROW_MAJOR {
         (r, c)
@@ -240,7 +240,13 @@ fn vertices_cols(gx: &Gifti, io: &mut Io, da: &DataArray) -> (i64, i64) {
 }
 
 /// `gifti_get_DA_value_2D(da, row, col)` (fs.io's).
-fn value(g: &mut Globals, io: &mut Io, da: &DataArray, row: i32, col: i32) -> Result<f64, Fatal> {
+pub(crate) fn value(
+    g: &mut Globals,
+    io: &mut Io,
+    da: &DataArray,
+    row: i32,
+    col: i32,
+) -> Result<f64, Fatal> {
     let mut w = Writers {
         out: &mut *io.out,
         err: &mut *io.err,
@@ -296,7 +302,7 @@ pub fn ctab_find_duplicate_names(io: &mut Io, ct: &ColorTable) -> i32 {
 
 /// C's `strncpy(dst, src, STRLEN - 1)` into a zeroed buffer: the name up to its first NUL, at most
 /// 1,023 bytes.
-fn name_bytes(s: &[u8]) -> Vec<u8> {
+pub(crate) fn name_bytes(s: &[u8]) -> Vec<u8> {
     s.iter()
         .copied()
         .take_while(|&b| b != 0)

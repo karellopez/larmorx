@@ -1597,6 +1597,22 @@ defects! {
         "the GIFTI reader compares the file's Version with \"1\" without checking that the file gave one: a GIFTI file without a Version attribute crashes the program (gifticlib itself accepts it)";
     FS_396 = "FS-396", "FreeSurfer", true,
         "the GIFTI reader reads a NIFTI_INTENT_LABEL array's values without checking that gifticlib gave it any (an array gifticlib could not decode, such as ASCII UINT32 values): the program crashes";
+    FS_397 = "FS-397", "FreeSurfer", true,
+        "the GIFTI label writer sizes its label table by the colour table's entries but fills it only with the entries that have a name: a colour table with an unnamed entry gives a label table with unnamed places, the file is found invalid and is not written";
+    FS_398 = "FS-398", "FreeSurfer", true,
+        "the GIFTI label writer reads the surface's colour table without checking that it has one: writing labels of a surface without a colour table crashes the program";
+    FS_399 = "FS-399", "FreeSurfer", true,
+        "the GIFTI shape and statistics writers that take their values from a volume place each voxel by its column only: a volume of more than one row or slice has its values overwritten by the last row and slice (and columns past the surface's vertices are refused with a message)";
+    FS_400 = "FS-400", "FreeSurfer", true,
+        "the GIFTI statistics writer that takes its values from a volume writes a single data array whatever the volume's frames: a volume of several frames gives only its last frame, one of no frames an array without attributes (the file is refused as invalid)";
+    FS_521 = "FS-521", "FreeSurfer", true,
+        "the GIFTI reader of volumes (MRIread of a .gii file) chooses the data arrays to read correctly only when every array of the file has the same intent: in a file that mixes intents it counts the arrays of every intent it knows and then reads an intent from memory it never wrote, so the volume's frames, type and values are undefined (usually every value 0)";
+    FS_522 = "FS-522", "FreeSurfer", true,
+        "the GIFTI writer of volumes (MRIwrite to a .gii file) writes the first row of the first slice of each frame only: the other rows and slices of a volume are lost";
+    FS_523 = "FS-523", "FreeSurfer", true,
+        "the combined GIFTI writer (a surface with its overlays) reads each shape or statistics overlay's volume without checking that it has one: an overlay without its values crashes the program";
+    FS_524 = "FS-524", "FreeSurfer", true,
+        "the combined GIFTI writer looks an overlay's GIFTI intent up by its overlay type, and the generic statistics type (the one the GIFTI reader gives its statistics overlays) has none: such overlays are dropped from the file without a message";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

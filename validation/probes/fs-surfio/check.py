@@ -64,7 +64,8 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # face or sparse vertex outside the surface, FS-383, FS-384; a label key outside the colour table,
 # FS-386; a data array number outside the file's, FS-388; a negative label key, FS-389; a shape
 # overlay's data type and name, FS-391, FS-392; an overlay value written outside its volume, fs.mri's
-# FS-53): counted, never compared
+# FS-53; relay 22, the GIFTI volumes: a file mixing intents, whose intent FreeSurfer reads from
+# memory it never wrote, FS-521): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -107,12 +108,16 @@ SKIP: tuple[str, ...] = (
     "FS-391",
     "FS-392",
     "FS-53",
+    "FS-521",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port
 # writes placeholders, the official build addresses
 POINTERS = re.compile(r"\(0x[0-9a-f]+,0x[0-9a-f]+,")
 A2D = re.compile(r"A2D: bad setup \(0x[0-9a-f]+,")
+# fs.io's gifti_get_DA_value_2D prints its array's address for an array without data (FS-214): the
+# port writes (nil)
+GET2D = re.compile(r"gifti_get_DA_value_2D, invalid params: data=0x[0-9a-f]+")
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 
@@ -210,7 +215,11 @@ def main(argv: list[str] | None = None) -> int:
         served.append(done.cached)
 
     official = [
-        A2D.sub("A2D: bad setup (<da>,", POINTERS.sub("(<buf>,<blen>,", x)) for x in official
+        GET2D.sub(
+            "gifti_get_DA_value_2D, invalid params: data=(nil)",
+            A2D.sub("A2D: bad setup (<da>,", POINTERS.sub("(<buf>,<blen>,", x)),
+        )
+        for x in official
     ]
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:

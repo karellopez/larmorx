@@ -634,7 +634,7 @@ pub fn meta_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
 }
 
-fn set_vg(t: &mut Toks, vg: &mut VolGeom) {
+pub(super) fn set_vg(t: &mut Toks, vg: &mut VolGeom) {
     vg.valid = t.i();
     vg.width = t.i();
     vg.height = t.i();

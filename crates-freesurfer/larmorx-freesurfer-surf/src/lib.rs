@@ -80,6 +80,8 @@ pub mod edges;
 pub mod facenorm;
 pub mod formats;
 pub mod gifti;
+pub mod gifti_vol;
+pub mod gifti_write;
 pub mod ico;
 pub mod lta;
 pub mod metric;

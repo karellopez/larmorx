@@ -34,6 +34,7 @@ use larmorx_freesurfer_mri::lta::LINEAR_RAS_TO_RAS;
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_volume::ltaread::{LtaIo, RegisterDat, lta_read_ex};
 use larmorx_freesurfer_volume::vgeom::get_vol_geom;
+use larmorx_io::gifti::NIFTI_INTENT_POINTSET;
 
 use crate::aaa::{SurfGlobals, VERTICES_PER_FACE};
 use crate::alloc;
@@ -41,6 +42,7 @@ use crate::coords::{self, Io};
 use crate::curvio::{apply_fsgii_read, apply_fsgii_write};
 use crate::formats::{self, MRIS_TRIANGULAR_SURFACE};
 use crate::gifti;
+use crate::gifti_write;
 use crate::ico;
 use crate::metric;
 use crate::mp;
@@ -76,21 +78,17 @@ fn named_type(t: i32) -> bool {
     .contains(&t)
 }
 
-/// GIFTI surfaces are written and read by `utils/gifti.cpp` 213-2857 (the surface part of queue
-/// item 3.1-26, this crate's next piece); until it is ported, reaching it is out of range.
-fn gifti_pending(what: &str) -> ! {
-    panic!("{what}: GIFTI surfaces (gifti.cpp's surface part) are not yet ported")
-}
-
 /// `MRISwrite(mris, name)`: the surface written in the format its name says (`MRISfileNameType`):
 /// ASCII, VTK, movie.byu, icosahedron, STL, GIFTI; any other name, after `__MRISapplyFSGIIwrite`
 /// (which may make it a GIFTI name, or end the program when the other form exists), a triangle
 /// file for a surface of type `MRIS_TRIANGULAR_SURFACE`, else a quadrangle file. The name is
 /// copied into a 1,024-byte buffer (FS-126: FreeSurfer's buffer-overflow abort at 1,024 bytes or
-/// more). Returns the writer's answer (STL: 1 written, 0 not). FreeSurfer 8.2.0 always takes the
+/// more). Returns the writer's answer (STL: 1 written, 0 not; GIFTI `MRISwriteGIFTI` with
+/// `NIFTI_INTENT_POINTSET`: [`gifti_write::mris_write_gifti`]). FreeSurfer 8.2.0 always takes the
 /// new behaviour (`MRISwrite_new`); the licence check (`chklc`) passes.
 pub fn write(
     g: &mut Globals,
+    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -102,12 +100,13 @@ pub fn write(
     if !named_type(ty) {
         apply_fsgii_write(g, io, dir, &mut surf_to_write, name, &mut ty)?;
     }
-    write_new(g, io, dir, mris, &surf_to_write)
+    write_new(g, sg, io, dir, mris, &surf_to_write)
 }
 
 /// `MRISwrite_new(mris, name)`.
 fn write_new(
     g: &mut Globals,
+    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -121,7 +120,16 @@ fn write_new(
         MRIS_GEO_TRIANGLE_FILE => formats::write_geo(g, io, dir, mris, &fname),
         MRIS_ICO_FILE => formats::write_ico(g, io, dir, mris, &fname),
         MRIS_STL_FILE => i32::from(stl::write_stl(g, dir, mris, &fname)),
-        MRIS_GIFTI_FILE => gifti_pending("MRISwrite"),
+        MRIS_GIFTI_FILE => gifti_write::mris_write_gifti(
+            g,
+            sg,
+            io,
+            dir,
+            mris,
+            NIFTI_INTENT_POINTSET,
+            &fname,
+            None,
+        )?,
         _ if mris.r#type == MRIS_TRIANGULAR_SURFACE => {
             trifile::write_triangular_surface(g, io, dir, mris, &fname)?
         }
@@ -134,6 +142,7 @@ fn write_new(
 /// put back (its distances freed: `MRISimportVertexCoords`). Returns `MRISwrite`'s answer.
 pub fn write_vertex_locations(
     g: &mut Globals,
+    sg: &mut SurfGlobals,
     io: &mut Io,
     dir: Option<&Path>,
     mris: &mut Mris,
@@ -144,7 +153,7 @@ pub fn write_vertex_locations(
     let mut coords3: [Vec<f32>; 3] = [vec![0.0; n], vec![0.0; n], vec![0.0; n]];
     metric::extract_vertex_coords(g, io, mris, &mut coords3, CURRENT_VERTICES)?;
     positions::restore_vertex_positions(g, io, mris, which_vertices)?;
-    let retval = write(g, io, dir, mris, fname)?;
+    let retval = write(g, sg, io, dir, mris, fname)?;
     let [x, y, z] = &coords3;
     coords::import_vertex_coords(g, io, mris, [x, y, z], CURRENT_VERTICES)?;
     Ok(retval)

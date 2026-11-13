@@ -14,7 +14,8 @@ use std::sync::Arc;
 
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
-    FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, Notice, UpstreamDefects,
+    FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, Notice,
+    UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -37,6 +38,8 @@ mod cfile;
 mod fnam;
 #[path = "gii.rs"]
 mod gii;
+#[path = "gwr.rs"]
+mod gwr;
 #[path = "life.rs"]
 mod life;
 #[path = "mpb.rs"]
@@ -137,11 +140,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 42] = [
+const COMMANDS: [&str; 43] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
-    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii",
+    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1023,6 +1026,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "swr" => swr::swr_tokens(&mut t, &mut g),
             "srd" => srd::srd_tokens(&mut t, &mut g),
             "gii" => gii::gii_tokens(&mut t, &mut g),
+            "gwr" => gwr::gwr_tokens(&mut t, &mut g),
             "mpb" => mpb::mpb_tokens(&mut t, &mut g),
             "mpc" => mpc::mpc_tokens(&mut t, &mut g),
             "mpd" => mpd::mpd_tokens(&mut t, &mut g),
@@ -2693,6 +2697,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "swr" => swr::swr_case(cx, t, o)?,
         "srd" => srd::srd_case(cx, t, o)?,
         "gii" => gii::gii_case(cx, t, o)?,
+        "gwr" => gwr::gwr_case(cx, t, o)?,
         "mpb" => mpb::mpb_case(cx, t, o)?,
         "mpc" => mpc::mpc_case(cx, t, o)?,
         "mpd" => mpd::mpd_case(cx, t, o)?,
@@ -2815,7 +2820,9 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_377)
                     || cx.g.notices.contains(&FS_387)
                     || cx.g.notices.contains(&FS_395)
-                    || cx.g.notices.contains(&FS_396)) =>
+                    || cx.g.notices.contains(&FS_396)
+                    || cx.g.notices.contains(&FS_398)
+                    || cx.g.notices.contains(&FS_523)) =>
         {
             "CRASH 11".to_owned()
         }

@@ -14,7 +14,6 @@
 //! only when that allocation fails, is not kept: a buffer that cannot be allocated ends the run
 //! with the fallback's message.
 
-use std::any::Any;
 use std::io::Write;
 
 use larmorx_core::defects::{FS_55, FS_56, FS_60};
@@ -23,6 +22,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_NO_MEMORY, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc};
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_io::xfm::{GeneralTransform, Transform, TransformData};
 
 use crate::ctab::{ColorTable, ctab_deep_copy, ctab_free};
 use crate::vol_geom::{VolGeom, copy_opt, fill_cache};
@@ -59,26 +59,64 @@ pub const WARPFIELD_DTFMT_UNKNOWN: i32 = -1;
 /// sizes FreeSurfer computes in `size_t` wrap around for negative extents and unknown types).
 const CALLOC_LIMIT: u64 = 1 << 47;
 
-/// MINC's `Transform` (`Real m[4][4]`, row by row).
-pub type Transform4 = [[f64; 4]; 4];
+/// MINC's `Transform` (`Real m[4][4]`, row by row): `larmorx_io::xfm::Transform`.
+pub type Transform4 = Transform;
 
-/// MINC's `General_transform` as an `MRI` carries it (`transform`, with `linear_transform` and
-/// `inverse_linear_transform` pointing into it): implemented by the main package's MINC port
-/// (`larmorx_io`'s `.xfm` reader) where an `MRI` reads one.
-pub trait GeneralTransform: std::fmt::Debug + Send + Sync {
-    /// `copy_general_transform`.
-    fn clone_box(&self) -> Box<dyn GeneralTransform>;
-    /// `get_linear_transform_ptr`: the forward matrix, or `None` (and MINC's internal-error
-    /// report on `err`) when the transform is not linear.
-    fn linear(&self, err: &mut dyn Write) -> Option<Transform4>;
-    /// `get_inverse_linear_transform_ptr`.
-    fn inverse_linear(&self, err: &mut dyn Write) -> Option<Transform4>;
-    fn as_any(&self) -> &dyn Any;
+/// `get_linear_transform_ptr(transform)` as FreeSurfer's copy of volume_io has it
+/// (`packages/minc/minc_volume_io.c`): the matrix that maps forward (the stored inverse when the
+/// inverse flag is set); a transform that is not linear ends the program after
+/// `get_linear_transform_ptr` on standard error (`exit(1)`; FreeSurfer reads only linear
+/// transforms, so no default path meets one).
+pub fn get_linear_transform_ptr(
+    err: &mut dyn Write,
+    t: &GeneralTransform,
+) -> Result<Transform4, Fatal> {
+    match &t.data {
+        TransformData::Linear { forward, inverse } => {
+            Ok(if t.inverse_flag { **inverse } else { **forward })
+        }
+        _ => {
+            let _ = err.write_all(b"get_linear_transform_ptr\n");
+            Err(Fatal::Exit(1))
+        }
+    }
 }
 
-impl Clone for Box<dyn GeneralTransform> {
-    fn clone(&self) -> Self {
-        self.clone_box()
+/// `get_inverse_linear_transform_ptr(transform)`, as [`get_linear_transform_ptr`] (its message
+/// `get_inverse_linear_transform_ptr`).
+pub fn get_inverse_linear_transform_ptr(
+    err: &mut dyn Write,
+    t: &GeneralTransform,
+) -> Result<Transform4, Fatal> {
+    match &t.data {
+        TransformData::Linear { forward, inverse } => {
+            Ok(if t.inverse_flag { **forward } else { **inverse })
+        }
+        _ => {
+            let _ = err.write_all(b"get_inverse_linear_transform_ptr\n");
+            Err(Fatal::Exit(1))
+        }
+    }
+}
+
+/// `copy_general_transform(transform, copy)` as FreeSurfer's copy of volume_io has it: a linear
+/// transform's copy takes the inverse flag into its matrices, a concatenation copies its
+/// transforms (MINC 1.5.1's `copy_and_invert_transform`, `larmorx_io`'s
+/// [`GeneralTransform::copy_and_invert`]); any other kind ends the program after
+/// `copy_and_invert_transform bad kind` on standard error (`exit(1)`: FreeSurfer's copy supports
+/// only these two).
+pub fn copy_general_transform(
+    err: &mut dyn Write,
+    t: &GeneralTransform,
+) -> Result<GeneralTransform, Fatal> {
+    match &t.data {
+        TransformData::Linear { .. } | TransformData::Concatenated(_) => {
+            Ok(t.copy_and_invert(false))
+        }
+        _ => {
+            let _ = err.write_all(b"copy_and_invert_transform bad kind\n");
+            Err(Fatal::Exit(1))
+        }
     }
 }
 
@@ -204,7 +242,8 @@ pub struct Mri {
     pub yi: Option<Vec<i32>>,
     pub zi: Option<Vec<i32>>,
     pub transform_fname: String,
-    pub transform: Option<Box<dyn GeneralTransform>>,
+    /// `transform` (MINC's `General_transform`; `None` before one is read).
+    pub transform: Option<GeneralTransform>,
     /// `linear_transform`: what FreeSurfer's pointer into `transform` points at (`None`: `NULL`).
     pub linear_transform: Option<Transform4>,
     pub inverse_linear_transform: Option<Transform4>,
@@ -804,11 +843,17 @@ pub fn mri_copy_header(
         d.transform = None;
     }
     if src.linear_transform.is_some() {
-        d.transform = src.transform.clone();
-        let (fwd, inv) = match &d.transform {
-            Some(t) => (t.linear(err), t.inverse_linear(err)),
-            None => (None, None),
+        let (copy, fwd, inv) = match &src.transform {
+            Some(t) => {
+                let c = copy_general_transform(err, t)?;
+                let f = get_linear_transform_ptr(err, &c)?;
+                let i = get_inverse_linear_transform_ptr(err, &c)?;
+                (Some(c), Some(f), Some(i))
+            }
+            // a linear transform without its General_transform: not made by FreeSurfer's code
+            None => (None, src.linear_transform, src.inverse_linear_transform),
         };
+        d.transform = copy;
         d.linear_transform = fwd;
         d.inverse_linear_transform = inv;
         d.free_transform = 1;

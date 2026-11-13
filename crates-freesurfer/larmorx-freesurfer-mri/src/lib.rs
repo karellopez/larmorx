@@ -30,13 +30,13 @@ pub const STRLEN: usize = 1024;
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
-    use std::io::Write;
+    use larmorx_core::cfmt::Silent;
+    use larmorx_io::xfm::{GeneralTransform, Mni};
 
     use larmorx_core::defects::{FS_54, FS_58, FS_59, FS_60, UpstreamDefects};
     use larmorx_freesurfer_core::globals::Globals;
 
-    use crate::mri::{self, GeneralTransform, MRI_FLOAT, MRI_LONG, Mri, Transform4};
+    use crate::mri::{self, MRI_FLOAT, MRI_LONG, Mri, Transform4};
     use crate::vol_geom::{self, VolGeom};
     use crate::voxel;
 
@@ -44,22 +44,9 @@ mod tests {
         (Globals::new(mode), Vec::new(), Vec::new())
     }
 
-    #[derive(Debug, Clone)]
-    struct Lin(Transform4);
-
-    impl GeneralTransform for Lin {
-        fn clone_box(&self) -> Box<dyn GeneralTransform> {
-            Box::new(self.clone())
-        }
-        fn linear(&self, _: &mut dyn Write) -> Option<Transform4> {
-            Some(self.0)
-        }
-        fn inverse_linear(&self, _: &mut dyn Write) -> Option<Transform4> {
-            Some(self.0)
-        }
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
+    /// A linear MINC transform of `m` (its inverse computed as volume_io computes it).
+    fn lin(m: Transform4) -> GeneralTransform {
+        GeneralTransform::linear(Some(&m), &Mni, &mut Silent)
     }
 
     fn eye() -> Transform4 {
@@ -155,7 +142,7 @@ mod tests {
     fn fs60_and_the_copied_transform() {
         let (mut g, mut o, mut e) = setup(UpstreamDefects::Reproduce);
         let mut src = mri::mri_alloc_header(&mut g, &mut o, &mut e, 2, 2, 2, MRI_FLOAT, 1).unwrap();
-        src.transform = Some(Box::new(Lin(eye())));
+        src.transform = Some(lin(eye()));
         src.linear_transform = Some(eye());
         let copy = mri::mri_copy_header(&mut g, &mut o, &mut e, &src, None)
             .unwrap()
@@ -171,5 +158,45 @@ mod tests {
         assert!(g.notices.contains(&FS_60));
         assert_eq!((dst.free_transform, dst.linear_transform), (0, None));
         assert!(dst.transform.is_none());
+    }
+
+    #[test]
+    fn an_xfm_inverted_twice_is_copied_with_its_flag_taken_in() {
+        // an inverted .xfm read by larmorx_io (MINC 1.5.1's reader), inverted again, on a header
+        let text = b"MNI Transform File\nTransform_Type = Linear;\nInvert_Flag = True;\nLinear_Transform =\n 2 0 0 1\n 0 4 0 2\n 0 0 8 3;\n";
+        let (mut g, mut o, mut e) = setup(UpstreamDefects::Fix);
+        let mut streams = Silent;
+        let t = larmorx_io::xfm::input_transform_from_bytes(
+            text,
+            Some(b"t.xfm"),
+            &Mni,
+            &mut streams,
+            &mut g.notices,
+        )
+        .expect("a linear transform");
+        // the reader takes the flag into the matrices; a later invert_general_transform sets it
+        assert!(!t.inverse_flag);
+        let mut t = t;
+        t.invert_in_place();
+        let mut src = mri::mri_alloc_header(&mut g, &mut o, &mut e, 2, 2, 2, MRI_FLOAT, 1).unwrap();
+        src.linear_transform = Some(mri::get_linear_transform_ptr(&mut e, &t).unwrap());
+        src.inverse_linear_transform =
+            Some(mri::get_inverse_linear_transform_ptr(&mut e, &t).unwrap());
+        src.transform = Some(t);
+        let copy = mri::mri_copy_header(&mut g, &mut o, &mut e, &src, None)
+            .unwrap()
+            .unwrap_new();
+        let c = copy.transform.as_ref().unwrap();
+        assert!(!c.inverse_flag);
+        // inverted twice: the copy's forward matrix is the file's, its inverse x / 2 - 0.5, ...
+        let f = copy.linear_transform.unwrap();
+        assert_eq!((f[0][0], f[0][3], f[1][1], f[2][3]), (2.0, 1.0, 4.0, 3.0));
+        let i = copy.inverse_linear_transform.unwrap();
+        assert_eq!(
+            (i[0][0], i[0][3], i[1][1], i[2][3]),
+            (0.5, -0.5, 0.25, -0.375)
+        );
+        assert_eq!(copy.free_transform, 1);
+        assert!(e.is_empty());
     }
 }

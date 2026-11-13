@@ -25,9 +25,14 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `utils/transform.cpp` 365, 381 | `MRIallocFromVolGeom`, `useVolGeomToMRI` | `mri.rs` |
 | `include/colortab.h`, `utils/colortab.cpp` 264-350 | `COLOR_TABLE`, `COLOR_TABLE_ENTRY`, `CTABfree`, `CTABdeepCopy` (the structure an `MRI` carries; the rest of the colour tables is `fs.labels`) | `ctab.rs` |
 
-No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`; MINC's
-`General_transform`, which an `MRI` holds, is the main package's MINC port: here only the trait
-`GeneralTransform` it implements).
+No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). MINC's
+`General_transform`, which an `MRI` holds, is the main package's MINC 1.5.1 port
+(`larmorx_io::xfm::GeneralTransform`, track C's 3.1-14); FreeSurfer's own copy of volume_io
+(`packages/minc/minc_volume_io.c`) changes three functions an `MRI` uses, translated in
+`mri.rs`: `get_linear_transform_ptr`, `get_inverse_linear_transform_ptr` (a transform that is not
+linear: their name on standard error and `exit(1)`, where MINC reports an internal error and
+returns `NULL`) and `copy_general_transform` (only linear transforms and concatenations, any other
+kind `copy_and_invert_transform bad kind` and `exit(1)`).
 
 Piece 2 (next): the tkregister and FSL matrices (`MRIxfmCRS2XYZtkreg`, `MRIxfmCRS2XYZfsl`,
 `MRItkReg2Native`, `MRItkRegMtx`, `MRItkRegMtxFromVox2Vox`, `MRIvoxToVoxFromTkRegMtx`,

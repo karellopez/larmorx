@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-freesurfer-core.workspace = true
+larmorx-io.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true

@@ -567,7 +567,9 @@ pub fn read_over_alloc(
             let bad = (0..nv).any(|v| {
                 let vt = mris.topology(v);
                 let f = vt.f.as_deref().unwrap_or(&[]);
-                f[..usize::from(vt.num)].iter().any(|&x| x < 0 || x as usize >= nf)
+                f[..usize::from(vt.num)]
+                    .iter()
+                    .any(|&x| x < 0 || x as usize >= nf)
             });
             if bad {
                 return Err(Fatal::Exit(139));

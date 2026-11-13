@@ -394,11 +394,17 @@ fn write(g: &mut Gen, m: &Mesh, heavy: bool) -> (String, Vec<u8>) {
             (".geo".into(), s.into_bytes())
         }
         6 => {
-            let fs: Vec<[[f32; 3]; 4]> = m
-                .f
-                .iter()
-                .map(|f| [[0.0, 0.0, 1.0], m.v[f[0] as usize], m.v[f[1] as usize], m.v[f[2] as usize]])
-                .collect();
+            let fs: Vec<[[f32; 3]; 4]> =
+                m.f.iter()
+                    .map(|f| {
+                        [
+                            [0.0, 0.0, 1.0],
+                            m.v[f[0] as usize],
+                            m.v[f[1] as usize],
+                            m.v[f[2] as usize],
+                        ]
+                    })
+                    .collect();
             let b = if g.chance(2) {
                 text_stl(g, &fs)
             } else {
@@ -563,7 +569,9 @@ pub(super) fn srd_tokens(t: &mut Vec<String>, g: &mut Gen) {
         let mut n = inputs[g.below(inputs.len() as u64) as usize].0.clone();
         if g.chance(30) {
             n = g
-                .pick(&["s9.asc", "s9.tri", "s.nii", "s.MGH", "s9.stl", "s9.geo", "s9.vtk"])
+                .pick(&[
+                    "s9.asc", "s9.tri", "s.nii", "s.MGH", "s9.stl", "s9.geo", "s9.vtk",
+                ])
                 .to_owned();
         }
         if g.chance(2) {
@@ -582,7 +590,14 @@ fn dump_srd_surface(o: &mut Out, s: Option<&Mris>) {
         o.0 += "NULL ";
         return;
     };
-    for x in [s.nvertices, s.nfaces, s.r#type, s.max_vertices, s.max_faces, s.hemisphere] {
+    for x in [
+        s.nvertices,
+        s.nfaces,
+        s.r#type,
+        s.max_vertices,
+        s.max_faces,
+        s.hemisphere,
+    ] {
         o.i(i64::from(x));
     }
     o.h(Some(s.fname.as_bytes()));
@@ -590,7 +605,13 @@ fn dump_srd_surface(o: &mut Out, s: Option<&Mris>) {
     o.i(i64::from(s.orig_xyzspace));
     o.i(i64::from(s.patch));
     o.i(i64::from(s.status.0));
-    for x in [s.nsize, s.max_nsize, s.dist_nsize, s.dist_orig_nsize, s.dist_alloced_flags] {
+    for x in [
+        s.nsize,
+        s.max_nsize,
+        s.dist_nsize,
+        s.dist_orig_nsize,
+        s.dist_alloced_flags,
+    ] {
         o.i(i64::from(x));
     }
     o.f(s.avg_nbrs);
@@ -600,7 +621,16 @@ fn dump_srd_surface(o: &mut Out, s: Option<&Mris>) {
     o.i(i64::from(s.free_transform));
     super::life::dump_vg(&s.vg, o);
     for x in [
-        s.xlo, s.ylo, s.zlo, s.xhi, s.yhi, s.zhi, s.xctr, s.yctr, s.zctr, s.total_area,
+        s.xlo,
+        s.ylo,
+        s.zlo,
+        s.xhi,
+        s.yhi,
+        s.zhi,
+        s.xctr,
+        s.yctr,
+        s.zctr,
+        s.total_area,
     ] {
         o.f(x);
     }

@@ -1342,8 +1342,8 @@ def _example_gaussian(ctx: core.Context, st: dict[str, dict]) -> dict:
                 rows,
                 note="The masks aCompCor reads keep the values above 0.99 inside the brain (0.5): "
                 "no voxel crosses either threshold, so the components are computed from the same "
-                "voxels. The shown runs' other items (ds000256, ds004958) in the cache entry "
-                "`confounds/gaussian` give the same picture.",
+                "voxels. The other shown runs' items give the same picture (the page's table "
+                "of the Gaussian resampling).",
             )
         ],
         "metrics_note": "Δ is A − B over every voxel of the files (float64 probabilities).",

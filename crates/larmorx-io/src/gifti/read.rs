@@ -297,7 +297,14 @@ impl Gifti {
                 r.out.err(&format!("-- XML_Parse # {pcount}\n"));
             }
             pcount += 1;
-            if parser.parse(&buf[..blen], done, &mut r).is_err() {
+            let st = parser.parse(&buf[..blen], done, &mut r);
+            if parser.read_past_end() {
+                r.notices.add(
+                    &d::FS_88,
+                    "the file is UTF-16 of an odd length: expat reads past its end (a crash); its last byte is dropped",
+                );
+            }
+            if st.is_err() {
                 let code = parser.error_code();
                 r.out.err(&format!(
                     "** {} at line {}\n",

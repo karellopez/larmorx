@@ -493,7 +493,35 @@ impl Gen {
             _ => {}
         }
         s.push_str("</GIFTI>\n");
-        let mut file = s.into_bytes();
+        // now and then the whole file in UTF-16 (either byte order, a byte order mark) or in
+        // ISO-8859-1, as its declaration says: expat converts, in pieces of 1024 bytes
+        let mut file = match self.below(12) {
+            0 | 1 => {
+                let le = self.chance(2);
+                let t = s.replace("encoding=\"UTF-8\"", "encoding=\"UTF-16\"");
+                let mut v: Vec<u8> = if le {
+                    vec![0xFF, 0xFE]
+                } else {
+                    vec![0xFE, 0xFF]
+                };
+                for u in t.encode_utf16() {
+                    v.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
+                }
+                v
+            }
+            2 => s
+                .replace("encoding=\"UTF-8\"", "encoding=\"ISO-8859-1\"")
+                .chars()
+                .map(|c| {
+                    if (c as u32) < 256 {
+                        c as u32 as u8
+                    } else {
+                        b'?'
+                    }
+                })
+                .collect(),
+            _ => s.into_bytes(),
+        };
         match self.below(14) {
             0 => {
                 let n = self.below(file.len() as u64) as usize;

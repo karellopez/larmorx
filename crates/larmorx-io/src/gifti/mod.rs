@@ -13,7 +13,7 @@
 //! check of [`Gifti::valid_gifti_image`] and the coordinate-system intent check of the reader);
 //! [`Gifticlib`] is gifticlib's own behaviour. A replica of such a program supplies its own.
 //!
-//! D13's corrections of gifticlib's defects are named in [`defects`] (FS-80 to FS-87); the
+//! D13's corrections of gifticlib's and expat's defects are named in [`defects`] (FS-80 to FS-88); the
 //! source is `gifti_io.c` and `gifti_xml.c` of gifticlib's history at version 1.12
 //! (`PROVENANCE.md`).
 
@@ -62,6 +62,10 @@ pub mod defects {
     /// new). Corrected: the matrix buffer's; reproduced: the `Data` buffer's, its never-written
     /// bytes from zeros, with a notice.
     pub const XFORM_MESSAGE_BUFFER: &str = "FS-87";
+    /// A file in UTF-16 of an odd length whose last token is cut by the odd byte: expat 2.0.1
+    /// converts it past the end of its buffer (the program crashes or never returns). Both
+    /// modes: the odd byte is dropped, with a notice.
+    pub const EXPAT_ODD_UTF16: &str = "FS-88";
 }
 
 // NIfTI-1's codes (nifti1.h).

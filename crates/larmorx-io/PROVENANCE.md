@@ -203,20 +203,35 @@ settings a program can change (`allow_upper_fext` and the compressed extensions)
 other programs' copies are not in this crate (`docs/findings/freesurfer-permissive.md`, closed to
 FreeSurfer's clean-room implementers).
 
-## GIFTI: gifticlib 1.12 and an XML parser in expat 2.0.1's place
+## GIFTI: gifticlib 1.12 over a translation of expat 2.0.1
 
 | larmorx file | Upstream | Licence |
 |---|---|---|
-| `src/gifti/mod.rs` | gifticlib 1.12 (`gifti_io.c`, `gifti_io.h`, `gifti_xml.h`: the structures, type and intent tables, checks, sizes, metadata, copies, displays) | public domain (Richard Reynolds, NIH/NIMH) |
-| `src/gifti/read.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_read_image`, the element stack and callbacks, the ASCII, Base64Binary and GZipBase64Binary decoders; `gifti_io.c`: `gifti_read_extern_DA_data`, `gifti_check_swap`) | public domain |
+| `src/gifti/mod.rs` | gifticlib 1.12 (`gifti_io.c`, `gifti_io.h`, `gifti_xml.h`: the structures, type and intent tables, checks, sizes, metadata, copies, the free functions' messages, displays) | public domain (Richard Reynolds, NIH/NIMH) |
+| `src/gifti/read.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_read_image`, the element stack and callbacks, the ASCII, Base64Binary and GZipBase64Binary decoders, `gxml_data`'s state between calls; `gifti_io.c`: `gifti_read_extern_DA_data`, `gifti_check_swap`); zlib 1.2.11's `uncompress2` loop (zlib licence) over zlib-rs | public domain; Zlib |
 | `src/gifti/write.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_write_image`, `gxml_write_gifti`, the `ewrite_*` functions, `gxml_disp_b64_data`; `gifti_io.c`: `gifti_write_image`, `gifti_write_extern_DA_data`) | public domain |
-| `src/xml.rs` | not a port: a parser written to give expat 2.0.1's events, chunks and errors (its byte classes, UTF-8 checks, tokenizer rules and error texts as `xmltok_impl.c`, `xmltok.c`, `utf8tab.h`, `asciitab.h` and `xmlparse.c` define them) | expat's MIT licence for the facts taken (the error texts, the byte classes) |
+| `src/xml/tok.rs` | expat 2.0.1 (`xmltok.c`, `xmltok_impl.c`, `xmltok_ns.c`, `asciitab.h`, `iasciitab.h`, `latin1tab.h`, `utf8tab.h`: the built-in encodings, byte types, name checks, UTF-8 conversions, every tokenizer, `getAtts`, `charRefNumber`, `updatePosition`) | MIT (expat's COPYING) |
+| `src/xml/role.rs` | expat 2.0.1 (`xmlrole.c`, `xmlrole.h`: the prolog's state machine for the document entity) | MIT |
+| `src/xml/mod.rs` | expat 2.0.1 (`xmlparse.c`: `XML_Parse`, `XML_ParseBuffer`, `XML_GetCurrentLineNumber`, `XML_ErrorString`, the prolog, content, CDATA and epilog processors, `initScan`, `processXmlDecl`, `doParseXmlDecl`, `storeAtts`, `storeAttributeValue`, `appendAttributeValue`, `storeEntityValue`, `defineAttribute`, the content-model scaffold, `reportDefault`, `normalizeLines`, `normalizePublicId`) for the configuration gifticlib uses | MIT |
+| `src/xml/nametab.rs` | expat 2.0.1 (`nametab.h`, generated from it) | MIT |
 
-- gifticlib 1.12 is the history of github.com/NIFTI-Imaging/gifti_clib at commit 8ec2a95
-  (2012-06-15, "gifti library version 1.12, 15 June, 2012"; the only commit touching the library's
-  files between 1.12 and 1.13's 7d94df8). expat 2.0.1 is libexpat's tag `R_2_0_1` (the GitHub
-  archive's SHA-256 6a26c3fe91d2a05d05fac187c0a092e1602c335ee12b008d9fe4da30788402b9).
-- D13: FS-80 to FS-85 (`gifti::defects`); `Dialect` holds the two points where a program built on
-  gifticlib changes it.
-- Checks: `src/gifti/tests.rs`, `src/xml.rs`'s tests; the differential probe against gifticlib
-  and expat (`validation/probes/fs-gifti`) follows.
+- gifticlib 1.12 is the history of github.com/NIFTI-Imaging/gifti_clib at commit
+  8ec2a95bce6360c3f7f655b36767e4d04c61d77c (2012-06-15, "gifti library version 1.12, 15 June,
+  2012"; the only commit touching the library's files between 1.12 and 1.13's 7d94df8), pinned in
+  `<workspace>/tags/gifticlib-1.12` (GitHub's archive of the commit, SHA-256
+  965406c74a48a0bf1a58d6d556189da120de5e5fbb6209b145805325be9c0416). expat 2.0.1 is libexpat's
+  tag `R_2_0_1`, pinned in `<workspace>/tags/expat-2.0.1` (GitHub's archive, SHA-256
+  6a26c3fe91d2a05d05fac187c0a092e1602c335ee12b008d9fe4da30788402b9), configured as the C build
+  this follows: `XML_DTD`, `XML_NS` (compiled, unused: no namespace processing),
+  `XML_CONTEXT_BYTES` 1024.
+- The parser covers what a parser made by `XML_ParserCreate(NULL)` reaches with gifticlib's
+  handlers: no external entities are read, parameter entities are never expanded (parameter
+  entity parsing is off), internal entities are expanded in attribute values only (references in
+  content reach the default handler). An earlier parser written from expat's behaviour was
+  replaced by this translation (the probe found 49 % of generated documents parsed differently;
+  archived in `<workspace>/archive/2026-11-13-xml-adhoc-parser/`).
+- D13: FS-80 to FS-88 (`gifti::defects`; FS-88 is expat's); `Dialect` holds the two points where
+  a program built on gifticlib changes it.
+- Checks: `src/gifti/tests.rs`, `src/xml/tests.rs`; the differential probe
+  `validation/probes/fs-gifti` against gifticlib 1.12 with expat 2.0.1 and against FreeSurfer
+  8.2.0's copies (its README has the numbers).

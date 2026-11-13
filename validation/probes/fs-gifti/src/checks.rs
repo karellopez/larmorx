@@ -124,7 +124,7 @@ pub fn scan(up: &Lib, work: &Work, n: u64) -> Tally {
 
 // ------------------------------------------------------------------ xml
 
-fn port_events(data: &[u8], pieces: &[i32]) -> D {
+fn port_events(data: &[u8], pieces: &[i32]) -> (D, bool) {
     let mut d = D::default();
     let mut p = xml::Parser::new();
     let mut off = 0usize;
@@ -144,7 +144,7 @@ fn port_events(data: &[u8], pieces: &[i32]) -> D {
         off += n;
         d.c(b'K');
     }
-    d
+    (d, p.read_past_end())
 }
 
 fn c_events(lib: &Lib, work: &Work, data: &[u8], pieces: &[i32]) -> Child {
@@ -175,7 +175,7 @@ pub fn xml(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
         let data = g.bytes();
         let pieces = g.pieces(data.len());
         t.cases += 1;
-        let ours = match std::panic::catch_unwind(|| port_events(&data, &pieces)) {
+        let (ours, past_end) = match std::panic::catch_unwind(|| port_events(&data, &pieces)) {
             Ok(d) => d,
             Err(_) => {
                 t.diff(&|| {
@@ -190,7 +190,18 @@ pub fn xml(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
         for lib in [up, fs] {
             let c = c_events(lib, work, &data, &pieces);
             t.values += 1;
+            if c.end != End::Exit(0) && past_end {
+                t.skipped += 1;
+                continue;
+            }
             if c.end != End::Exit(0) {
+                if std::env::var("LXPROBE_KEEP").is_ok() {
+                    let _ = std::fs::write(work.dir.join(format!("xml-crash-{case}.xml")), &data);
+                    let _ = std::fs::write(
+                        work.dir.join(format!("xml-crash-{case}.pieces")),
+                        format!("{pieces:?}"),
+                    );
+                }
                 t.diff(&|| format!("case {case}: {} ended {:?}", lib.name, c.end));
                 continue;
             }
@@ -387,7 +398,12 @@ fn port_read(
                 dump::gim(&mut d, &gim, notices.contains(&d::FS_80));
                 let fix = notices.fix();
                 let v = g.valid_gifti_image(Some(&gim), true, dialect, fix, &mut cap, &mut notices);
-                d.i(v as i32);
+                if notices.contains(&d::FS_80) {
+                    // the check reads label colours and keys never written (FS-80)
+                    d.wild(4);
+                } else {
+                    d.i(v as i32);
+                }
                 if case.disp {
                     g.disp_gifti_image(Some("probe"), &gim, true, &mut cap, &mut notices);
                 }
@@ -506,8 +522,18 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
         ] {
             t.cases += 1;
             let wname_c = format!("w-{}.gii", lib.name);
+            // every run starts from the case's own files (a writer may append to an external
+            // file, or create one the case names but does not have)
+            let reset = || {
+                for (name, bytes) in &case.ext {
+                    std::fs::write(work.dir.join(name), bytes).unwrap();
+                }
+                let _ = std::fs::remove_file(work.dir.join("missing.bin"));
+            };
+            reset();
             let (c, cw) = c_read(lib, work, &case, wenc, wdata, &wname_c);
             let wname_p = format!("w-port-{}.gii", lib.name);
+            reset();
             let p = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 port_read(
                     &case,
@@ -524,6 +550,7 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
                     continue;
                 }
             };
+            reset();
             if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 port_read(
                     &case,
@@ -540,7 +567,8 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
             }
             let crashy = p.notices.contains(&d::FS_84)
                 || p.notices.contains(&d::FS_85)
-                || p.notices.contains(&d::FS_86);
+                || p.notices.contains(&d::FS_86)
+                || p.notices.contains(&d::FS_88);
             let garbage = crashy || p.notices.contains(&d::FS_80) || p.notices.contains(&d::FS_87);
             match c.end {
                 End::Exit(0) => {}
@@ -571,6 +599,12 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
                     &p.dump.b,
                 );
                 let _ = std::fs::write(work.dir.join(format!("dump-c-{}.bin", lib.name)), &c.dump);
+                let _ = std::fs::write(work.dir.join(format!("err-port-{}.txt", lib.name)), &p.err);
+                let _ = std::fs::write(work.dir.join(format!("err-c-{}.txt", lib.name)), &c.err);
+                println!(
+                    "  case {case_no}: nfiles {} read_data {} dalist {:?} disp {} wenc {wenc} wdata {wdata}",
+                    case.nfiles, case.read_data, case.dalist, case.disp
+                );
             }
             if !p.dump.matches(&c.dump) && std::env::var("LXPROBE_IGNORE_VALUES").is_err() {
                 let a = dump::read_text(&p.dump.filled(&c.dump));

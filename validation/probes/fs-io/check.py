@@ -81,7 +81,7 @@ def matches(official: str, port: str) -> bool:
 
 def masked(official: str, port: str) -> str:
     """The official line with the port's ``?`` digits in place (for the hash)."""
-    if len(official) != len(port):
+    if "?" not in port or len(official) != len(port):
         return official
     return "".join("?" if p == "?" and o in HEX else o for o, p in zip(official, port, strict=True))
 

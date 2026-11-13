@@ -682,6 +682,27 @@ following cases again (each `EXIT` line followed by a repeated one, every later 
 `fsmaths` now reads every case before the first child (the earlier forked commands never ended
 with `exit()`, so their measurements stand).
 
+## `XYZApproxAngle_knownLength`'s third product (a porting mistake, fixed; track A relay 12)
+
+Track D's surfaces (`metric.rs`, relay 7) found that the port multiplied the dot product's third
+term as `n.z * z2` where the official build does `z2 * n.z`: in the unit oracle's `matrix.cpp.o`
+(`objdump -d`) the first two products are `mulsd` with the normal's component as destination
+(`n.x * x2`, `n.y * y2`) but the third has `z2` widened into the destination (`mulsd %xmm1,%xmm2`
+with `%xmm2 = (double)z2`). SSE returns the destination's NaN when both operands are NaNs, so the
+two orders differ only where `n.z` and `z2` are NaNs of different payloads or signs and the first
+two products are not NaN. The rest of the function as the object code does it: the sums left to
+right, `fabs(dot) > norm` as `maxss` (the norm when either is NaN), the float division `dot / norm`,
+the comparison with 0.99 in float (`comiss`: a NaN takes the square-root branch), `2 (1 - x)` as
+`(1 - x) + (1 - x)` (the same bits, NaNs included), glibc's `acos` and `sqrt` called. The port now
+takes `z2` first. The probe's `mvec` command could not see it (its normal comes from
+`XYZ_NORMALIZED_LOAD`, which makes all three components NaN together); the new command `xyzang`
+(an arbitrary normal and vector, NaNs of six payloads) has 18 of its 1,000 seed-7 cases where the
+order decides the bits. Measured: seed 7, `xyzang`, `mvec` and `v3angle`, 3,000 of 3,000 lines
+identical with `reproduce`, the port's lines identical with AArch64's NaN rules emulated (both
+modes); seed 1, 760 cases of 76 commands: 734 identical, 26 not comparable, hash
+`2b67d14767130507cd9f5804c61af52fd736629169f68c74b6beaeb9821d338d` (`tests/fs_maths_official.rs`),
+passing under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug (8,295 flips) and release (8,299).
+
 ## The register's texts before the open-files rewrite (2026-11-13)
 
 The orchestrator's rule of 2026-11-13 ("open files carry behaviour only", the foundations' brief):

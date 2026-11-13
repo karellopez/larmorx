@@ -16,6 +16,14 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   in the port's line is a byte FreeSurfer takes from memory contents (FS-49, FS-167): it matches any
   digit. Lines the port marks `SKIP` (FreeSurfer crashes or reads for ever, or the port refuses:
   FS-169, FS-172, FS-173, FS-175) are counted, `VARY` (FS-168, FS-170) compared apart.
+- Piece 2 (queue item 3.1-25's second piece, relay 11): the commands `vgw`/`vgr` (`VOL_GEOM::write`/`read`,
+  names copied over earlier names), `fsw`/`fsr`/`fsl` (`FStagsIO`'s writers, a reader script over a tag stream,
+  the `getlen_*` lengths; `fsl sizeof` prints `sizeof(MRI_FRAME)` and `sizeof(CTE)`), `ctw`/`ctr` (the binary
+  colour tables on C streams and znz files), `tw`/`tr`/`ztw`/`ztr` (tags.cpp's tag functions), `cmdl`
+  (`TAGmakeCommandLineString`); the port's side in `tests/fs_io/piece2.rs` (the cases' files built from the
+  formats' rules, then cut or changed). The port marks `SKIP` where FreeSurfer crashes or its result depends on
+  the machine (FS-179, FS-181, FS-183, FS-185, FS-188 past the entry, FS-189, FS-191, skips beyond 256 MiB) and
+  `VARY` where it reads memory contents (FS-49 and FS-167 in these commands, FS-180, FS-187, FS-192).
 - `scanf_lf.c`: glibc's `sscanf("%lf")` as a black box (bits, `errno`, bytes read), the measurements
   behind `larmorx-freesurfer-core::cscan`'s `%lf` test.
 

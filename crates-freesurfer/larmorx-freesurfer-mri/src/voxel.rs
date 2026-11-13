@@ -2,7 +2,8 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! Voxel access (`utils/mri.cpp` 1567-1880): `MRIgetVoxVal`, `MRIsetVoxVal` and the derivatives
-//! `MRIgetVoxDx`, `MRIgetVoxDy`, `MRIgetVoxDz`.
+//! `MRIgetVoxDx`, `MRIgetVoxDy`, `MRIgetVoxDz`; and `MRIboundingBox` (3014), which
+//! `LTAalloc` calls.
 //!
 //! FreeSurfer reads the contiguous buffer at the element `c + r vox_per_row + s vox_per_slice + f
 //! vox_per_vol` (in `size_t`) and writes it there and again through the slice and row pointers;
@@ -23,6 +24,7 @@ use larmorx_freesurfer_core::utils::nint;
 
 use crate::mri::{
     MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    MriRegion,
 };
 
 /// `MRI_COMPLEX_REAL`: the real part of a complex voxel.
@@ -495,4 +497,75 @@ pub fn mri_get_vox_dz(
     let ip1 = mri_get_vox_val(g, err, mri, c, r, s.wrapping_add(1), f, MRI_COMPLEX_REAL)?;
     let im1 = mri_get_vox_val(g, err, mri, c, r, s.wrapping_sub(1), f, MRI_COMPLEX_REAL)?;
     Ok(derivative(ip1, im1, mri.vg.zsize))
+}
+
+/// `MRIboundingBox(mri, thresh, &box)`: the smallest box holding every voxel of the first frame
+/// above `thresh` (compared as an `int` for the integer types, as a `float` for `MRI_FLOAT`: a NaN
+/// is never above), as its first corner and its extent; `NO_ERROR`. A volume with no voxel above
+/// gives the corner at the last voxel and the extents `2 - width`, `2 - height`, `2 - depth`.
+/// Types other than `MRI_UCHAR`, `MRI_FLOAT`, `MRI_SHORT`, `MRI_USHRT` and `MRI_INT`: the error
+/// `MRIboundingBox: unsupported type <type>`, `ERROR_UNSUPPORTED` returned and the box left at the
+/// last voxel with the volume's extents. A volume without voxels: FS-58.
+pub fn mri_bounding_box(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mri: &Mri,
+    thresh: i32,
+) -> Result<(i32, MriRegion), Fatal> {
+    let (width, height, depth) = (mri.vg.width, mri.vg.height, mri.vg.depth);
+    let mut b = MriRegion {
+        x: width.wrapping_sub(1),
+        y: height.wrapping_sub(1),
+        z: depth.wrapping_sub(1),
+        dx: width,
+        dy: height,
+        dz: depth,
+    };
+    let size: u64 = match mri.mtype {
+        MRI_UCHAR => 1,
+        MRI_SHORT | MRI_USHRT => 2,
+        MRI_FLOAT | MRI_INT => 4,
+        t => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_UNSUPPORTED,
+                &format!("MRIboundingBox: unsupported type {t}"),
+            );
+            return Ok((ERROR_UNSUPPORTED, b));
+        }
+    };
+    let (mut x1, mut y1, mut z1) = (0i32, 0i32, 0i32);
+    if height > 0 && depth > 0 && mri.chunk.is_none() {
+        // an error exit (FreeSurfer crashes reading the first row)
+        no_voxels(g, err, "MRIboundingBox")?;
+        return Ok((0, b));
+    }
+    for z in 0..depth.max(0) {
+        for y in 0..height.max(0) {
+            let row = (y as u64) * mri.vox_per_row + (z as u64) * mri.vox_per_slice;
+            for x in 0..width.max(0) {
+                let o = (row + x as u64) * size;
+                let above = match mri.mtype {
+                    MRI_UCHAR => i32::from(mri.bytes::<1>(o)[0]) > thresh,
+                    MRI_FLOAT => f32::from_le_bytes(mri.bytes(o)) > thresh as f32,
+                    MRI_SHORT => i32::from(i16::from_le_bytes(mri.bytes(o))) > thresh,
+                    MRI_USHRT => i32::from(u16::from_le_bytes(mri.bytes(o))) > thresh,
+                    _ => i32::from_le_bytes(mri.bytes(o)) > thresh,
+                };
+                if above {
+                    b.x = b.x.min(x);
+                    b.y = b.y.min(y);
+                    b.z = b.z.min(z);
+                    x1 = x1.max(x);
+                    y1 = y1.max(y);
+                    z1 = z1.max(z);
+                }
+            }
+        }
+    }
+    b.dx = x1.wrapping_sub(b.x).wrapping_add(1);
+    b.dy = y1.wrapping_sub(b.y).wrapping_add(1);
+    b.dz = z1.wrapping_sub(b.z).wrapping_add(1);
+    Ok((0, b))
 }

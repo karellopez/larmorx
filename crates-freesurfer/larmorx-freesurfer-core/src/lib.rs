@@ -35,6 +35,7 @@ pub mod base;
 pub mod cglob;
 pub mod chklc;
 pub mod cmdargs;
+pub mod cname;
 pub mod cscan;
 pub mod cstd;
 pub mod ctime;

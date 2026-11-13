@@ -113,3 +113,10 @@ notice but for 8 rotations, 1 Gaussian draw and 9 entropies. Of the 16,968 histo
 NaN or an infinity, 16,575 of 16,575 comparable identical. Seed 1, 750 cases: 723 identical, 27
 not comparable, hash `b6452da0610342e6ff5272ef67167f555327114b533cbaba53ac23a809fd270f`, checked with
 AArch64's NaN emulated in debug and release builds.
+
+Measured 2026-11-13 (track A relay 12: the command `xyzang`, `XYZApproxAngle_knownLength` of an
+arbitrary normal and vector with NaNs of six payloads, after the port's third product was put in the
+official build's order): seed 7, the 3,000 cases of `xyzang`, `mvec` and `v3angle` (a subset of
+`--n 76000`): 3,000 identical with `reproduce`. Seed 1, 760 cases of 76 commands: 734 identical, 26
+not comparable, hash `2b67d14767130507cd9f5804c61af52fd736629169f68c74b6beaeb9821d338d`, checked with
+AArch64's NaN emulated in debug and release builds.

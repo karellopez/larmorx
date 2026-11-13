@@ -14,7 +14,10 @@
 //!   (its reading and writing stay in `fs.labels`).
 //! - [`mri`]: `MRI` itself: its constructors, `MRIalloc*`, `MRIfree`, `MRIsizeof`, `MRIcopyHeader`,
 //!   the geometry copies, the intents.
-//! - [`voxel`]: `MRIgetVoxVal`, `MRIsetVoxVal` and their derivatives.
+//! - [`voxel`]: `MRIgetVoxVal`, `MRIsetVoxVal` and their derivatives; `MRIboundingBox`.
+//! - [`lta`]: the linear transform array (`LTA`, `LINEAR_TRANSFORM`) with `LTAalloc`, `LTAcopy`,
+//!   `LTcopy` and `LTAfree` (taken early from `fs.volume`'s `transform.cpp`, item 3.1-40, for the
+//!   surfaces' `MRIS::lta`).
 //!
 //! Translated from FreeSurfer's source under FreeSurfer's licence (`crates-freesurfer/LICENSE`);
 //! larmorx (Apache-2.0) never links this crate. `PROVENANCE.md` lists what is translated.
@@ -22,6 +25,7 @@
 
 pub mod copy;
 pub mod ctab;
+pub mod lta;
 pub mod mri;
 pub mod tkreg;
 pub mod vol_geom;

@@ -226,3 +226,83 @@ cases: 825 identical, 35 skipped, hash `15997e561786c4ae2ee27ae4468e8dd4c5582533
 (`tests/fs_mri_official.rs`), passing under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug (8,856 NaNs
 flipped) and release (8,486); the port's 43,000 lines identical with and without the emulation in
 both modes (410,392 and 410,360 flips).
+
+## Part 3: the linear transform array and the bounding box (track A relay 12, 2026-11-13)
+
+Taken early from `fs.volume`'s item 3.1-39 (`transform.cpp` 160-3695; the orchestrator's entry asked
+for "3.1-40", whose lines are 4221-5298: the functions are in 3.1-39) so that track D's surfaces
+(`MRIS::lta`, `mrisurf_base.cpp` 661's `LTAcopy(source->lta, nullptr)` and `MRISfree`'s `LTAfree`)
+use the real structure: `LTAalloc` (630), `LTAcopy` (160), `LTcopy` (185), `LTAfree` (812),
+`initVolGeom` (305) and `mri.cpp` 3014's `MRIboundingBox`, which `LTAalloc` calls with threshold 70
+when it is given a volume. Spec: `specs/freesurfer-mri-lta.md` (part 3 of fs.mri's, in its own file
+while track E finishes `specs/freesurfer-mri.md`).
+
+### The structures as FreeSurfer allocates them
+
+`LTAalloc` `calloc`s the array and both transform arrays (C, not C++ `new`): the transforms'
+`VOL_GEOM`s are zero bytes, not the C++ initialisers' values, and `initVolGeom` then sets every field
+but `ras_good_flag`, the shears and the cached matrices, which stay 0 / `NULL`. The result equals a
+default geometry with `initVolGeom` applied (the port builds a zeroed one for clarity). `label` and
+the array's `type`, `fscale`, `subject` stay 0 from `calloc`. `calloc(n, sizeof(LT))` with a negative
+`int` `n` converts it to a huge `size_t`: glibc's overflow check fails with `ENOMEM`, so `ErrorExit`
+prints `Cannot allocate memory` first (errno set), then the message; `n` 0 gives glibc's unique
+non-null pointer (an array of no transforms). The centre `x0 = bbox.x + bbox.dx / 2` is `int`
+arithmetic (division towards zero) stored in a float.
+
+`MRIboundingBox` walks frame 0 through the row pointers (`MRIvox`, `MRISvox`, `MRIUSvox`,
+`MRIIvox`, `MRIFvox`): `*p > thresh` promotes the 8- and 16-bit types to `int`, and for `MRI_FLOAT`
+converts `thresh` to `float` (`cvtsi2ss`, then `ucomiss`: NaN never above). `MRI_LONG`, `MRI_RGB`,
+the tensor and complex types fall to `ErrorReturn(ERROR_UNSUPPORTED, ...)` after the box's first
+assignments (`dx = width`, `x = width - 1`, ...). A header (`MRIallocHeader`) has no slices: the
+first `MRIvox` dereferences them and crashes (FS-58's existing ID and treatment: both modes an error).
+
+### FS-195: `LTcopy` does not copy `type` nor `label` (rule A)
+
+`LTcopy` (185-206) copies `x0`, `y0`, `z0`, `sigma`, the three matrices and the two geometries,
+never `lt->type` nor `lt->label` (fields added to `LINEAR_TRANSFORM` after `LTcopy` was written, by
+their place in the structure). A copy made by `LTAcopy(lta, NULL)` therefore has `type` -1
+(`UNKNOWN`, `LTAalloc`'s) and `label` 0 in every transform; a given destination keeps its own.
+Visible in `LTAdumpLinearTransform` (`type`, `typename`, `label` lines; `lta_convert`/`mri_info`'s
+dumps of a copied array) and in `gca.cpp` 15315 / `gcamorph.cpp` 12085, which match transforms to
+labels by `xforms[i].label`: a copied label-specific array loses its labels. Rule A (the input, a copy
+request, makes sense; the result is not a copy): by default both copied; `reproduce` keeps
+FreeSurfer's, with a notice where they differ. The registration arrays of recon-all's default path
+have one transform of label 0 and their `type` is rewritten by every reader, so the default changes
+no recorded result (to watch in the replays: dumps of copies).
+
+### FS-196 and FS-198: `LTcopy` ignores `MatrixCopy`'s result
+
+`MatrixCopy(lt->m_L, ltcp->m_L)` (and `m_dL`, `m_last_dL`) is called for its effect only:
+
+- destination `NULL`, source present: `MatrixCopy` allocates a new matrix and returns it; `LTcopy`
+  drops it (a leak) and the destination stays `NULL` (FS-196, rule A: by default the copy is kept);
+- destination smaller than the source (rows or columns): `MatrixCopy` returns `NULL` without copying;
+  the destination keeps its old numbers (FS-196, rule A: by default the destination becomes a copy of
+  the source's matrix, its size);
+- source `NULL`, destination present: `MatrixCopy` frees its local copy of the destination pointer
+  (`MatrixFree(&mOut)`) and returns `NULL`; `ltcp->m_X` still points at the freed block (FS-198). The
+  probe printing such a copy read freed memory (`rows 23623 cols 1510904560` in a debug build of the
+  probe) or crashed (SIGSEGV in the probe's matrix printer: 6 of the first 980 seed-1 cases before the
+  generator made missing source matrices rare); a later `LTAfree` would free it twice. Both modes drop
+  the destination's matrix (memory errors are never reproduced), noted.
+
+One notice per defect per run (`Notices::add` keeps the first): the freed case has its own ID so the
+probe can skip it whatever came before (FS-196 alone stays comparable).
+
+### FS-197: `LTAfree(&lta)` with `lta == NULL` (a crash)
+
+`LTAfree` reads `lta->num_xforms` before any check: a null array crashes. Callers guard it (`if (lta)
+LTAfree(&lta)`), so no reached path is known. Both modes free nothing and return 0, noted (the API's
+`Option` makes the case expressible).
+
+### Measured (`validation/probes/fs-mri/`, 49 commands)
+
+Seed 7, 49,000 cases: `reproduce` identical on 46,410 of 46,410 comparable lines (2,590 not
+comparable: `vox` 1,907, `copy` 300, `ltacopy` 210 (FS-198), `bbox` 125 and `ltaalloc` 40 (headers,
+FS-58), `fixtk` 8); the four new commands: 5,625 of 5,625 comparable lines identical (`bbox` 1,875,
+`ltaalloc` 960, `ltacopy` 1,790, `ltcopy0` 1,000); `fix` differs on 10,512 lines, each with a notice
+(FS-195 on 1,274, FS-196 on 709). Seed 1, 980 cases: 922 identical, 58 skipped, hash
+`ecce606b6218d98ab5325c5e7234805bf08d4da20179bd9caaad57cb4a4793e5` (`tests/fs_mri_official.rs`),
+passing under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug (2,806 NaNs flipped) and release (2,354);
+the port's 49,000 seed-7 lines identical with and without the emulation in both modes (198,749
+flips each).

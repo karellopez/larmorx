@@ -40,11 +40,19 @@ def read_right(a: np.ndarray, line: str) -> bool:
     if t[0] in ("N", "EXIT") or len(t) < 3:
         return False
     rows, cols, ty = int(t[0]), int(t[1]), int(t[2])
-    if any(x.startswith("fnv") for x in t[3:4]) or (rows, cols) != a.shape or ty != (2 if np.iscomplexobj(a) else 1):
+    if (
+        any(x.startswith("fnv") for x in t[3:4])
+        or (rows, cols) != a.shape
+        or ty != (2 if np.iscomplexobj(a) else 1)
+    ):
         return False
     vals = [struct.unpack(">f", bytes.fromhex(x))[0] for x in t[3 : 3 + rows * cols * ty]]
     if np.iscomplexobj(a):
-        exp = [v for z in a.astype(np.complex128).ravel() for v in (np.float32(z.real), np.float32(z.imag))]
+        exp = [
+            v
+            for z in a.astype(np.complex128).ravel()
+            for v in (np.float32(z.real), np.float32(z.imag))
+        ]
     else:
         exp = [np.float32(v) for v in a.astype(np.float64).ravel()]
     return len(vals) == len(exp) and all(np.float32(x) == y for x, y in zip(vals, exp, strict=True))
@@ -66,18 +74,29 @@ def main() -> int:
             a = (rng.standard_normal(shape) * 1000).astype(dt)
         if k % 7 == 0 and dt in (np.float64, np.float32):
             a = a + 1j * (rng.standard_normal(shape) * 10).astype(dt)
-        if fmt == "4" and dt not in (np.float64, np.float32, np.int32, np.int16, np.uint16, np.uint8):
+        if fmt == "4" and dt not in (
+            np.float64,
+            np.float32,
+            np.int32,
+            np.int16,
+            np.uint16,
+            np.uint8,
+        ):
             a = a.astype(np.float64)
         name = "v" + "abcdefghijklmnopqrs"[: int(rng.integers(0, 19))]
         buf = io.BytesIO()
-        scipy.io.savemat(buf, {name: a}, format="4" if fmt == "4" else "5", do_compression=fmt == "5z")
+        scipy.io.savemat(
+            buf, {name: a}, format="4" if fmt == "4" else "5", do_compression=fmt == "5z"
+        )
         cases.append(f"mlr 0 -1 x{b'w/m.mat'.hex()} {entry('w/m.mat', buf.getvalue())}")
         want.append(a)
     fmts = [["4", "5", "5z"][k // len(dtypes) % 3] for k in range(len(cases))]
     with tempfile.TemporaryDirectory() as d:
         cp = Path(d) / "cases.txt"
         cp.write_text("\n".join(cases) + "\n", encoding="utf-8")
-        out = subprocess.run([str(port), "run", str(cp), "fix"], check=True, capture_output=True, text=True).stdout
+        out = subprocess.run(
+            [str(port), "run", str(cp), "fix"], check=True, capture_output=True, text=True
+        ).stdout
         rep = subprocess.run(
             [str(port), "run", str(cp), "reproduce"], check=True, capture_output=True, text=True
         ).stdout

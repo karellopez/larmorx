@@ -66,6 +66,8 @@
 //!   neighbourhood sizes, the 2- and 3-hop neighbour search with its distances, the vertex-vertex
 //!   check (FS-357, FS-358).
 //! - [`ico`] (fs.surf, taken for `MRISread`): the icosahedron files (FS-361, FS-362).
+//! - [`gifti`]: the GIFTI surface reader (FS-381..FS-396); [`gifti_write`]: the GIFTI writers
+//!   (FS-397..FS-400, FS-523, FS-524); [`gifti_vol`]: GIFTI files as volumes (FS-521, FS-522).
 #![forbid(unsafe_code)]
 
 pub mod aaa;

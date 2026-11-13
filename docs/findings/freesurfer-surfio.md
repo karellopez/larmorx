@@ -1390,3 +1390,62 @@ depends on it. The mechanisms behind the defects:
 
 Observed (relay 21): `gii` at seed 7, 200 cases: 176 compared, 0 differing in either mode (0 without
 notices in the default); see the probe README for the other seeds.
+
+## 24. The GIFTI writers and GIFTI volumes (gifti.cpp 213-336, 1231-2856; relay 22)
+
+Ported: `src/gifti_write.rs` and `src/gifti_vol.rs` (PROVENANCE rows `gifti_write`, `gifti_vol`);
+behaviour in `specs/freesurfer-surfio.md` §109-111. `MRISwrite_new`'s GIFTI branch (mrisurf_io.cpp
+4439-4441) is wired (`readwrite::write` and `write_vertex_locations` now take the surface library's
+globals, which hold gifticlib's state). `MRIread`'s and `MRIwrite`'s GIFTI branches (mriio.cpp 783-784,
+1214-1215) belong to fs.io (track A): `larmorx-freesurfer-io` cannot depend on this crate, so they
+need a hook or the two functions moved (HANDOFF). The mechanisms behind the defects:
+
+- **FS-397**: lines 1840-1841 count `NULL != mris->ct->entries[i]` for `labeltable.length`, lines
+  1869-1886 fill only entries with `strlen(name) != 0`; the unfilled places keep `calloc`'s zeros
+  (key 0, label `NULL`, colours 0), and `gifti_valid_LabelTable` refuses a `NULL` label. (The
+  allocations use `sizeof(int *)` and `4 * sizeof(float *)` per label: larger than needed, harmless.)
+- **FS-398**: line 1840 `mris->ct->nentries` with `mris->ct == NULL`.
+- **FS-399**: lines 2643-2650 and 2720-2729: `gifti_set_DA_value_2D(shape, c, 0, curv)` inside the
+  `s`, `r`, `c` loops (the commented-out per-vertex loop below them was the old form).
+- **FS-400**: line 2672 allocates one `giiDataArray` before `for (int f = 0; f < mri->nframes; f++)` (2679);
+  each frame resets the attributes, replaces `Intent_code` and `calloc`s a new `data` (the previous
+  frame's leaked). With no frames the array keeps `gifti_add_empty_darray`'s cleared fields.
+- **FS-521**: lines 1270-1326: the do/while (1272-1322) leaves with a non-`NULL` `scalars` only when `++da_num >=
+  image->numDA` after a found array, i.e. when the occurrence count reaches `numDA` (every array of
+  that intent); otherwise `scalars` is `NULL`, `intent_code_idx` runs to 5 and `frame_count` sums the
+  arrays of every intent. `intent_code[5]` is the 4 bytes after the array: in the unit oracle's
+  object code the array is at `0x40(%rsp)`..`0x53(%rsp)` and `0x54(%rsp)` (below the stack guard at
+  `0x58`) is never written by the function (`<scratch>/D/relay22/readasmri.asm`). The probe's
+  official runs (seeds 7, 13, 17: 221 cases) always gave a value no array had, printed as
+  `NIFTI_INTENT_NONE` (gifticlib's name for codes not in its table) with every voxel 0; `gifti_find_DA`
+  checks the intent with `gifti_intent_is_valid`, which accepts every code (track C's finding), so no
+  message. larmorx's `reproduce` uses -1 (the same output); the cases are counted, not compared.
+- **FS-522**: lines 1548 and 1575-1578: `scalars->dims[0] = mri->width` and the copy loop over `mri->width`
+  with row 0, slice 0.
+- **FS-523**: line 2498 takes `(*poverlays)[n].__overlaymri` unchecked; `MRISwriteGIFTIShape`
+  dereferences it at line 2647 (after its array's attributes, `gifti_darray_nvals`' messages and
+  metadata), `MRISwriteGIFTIStats` at line 2679 (the loop's bound, right after adding the array).
+- **FS-524**: line 2501 `MRISurfOverlay::getGIFTIIntent(overlaytype)` (MRISurfOverlay.cpp 225-284)
+  maps only the specific types; `mrisReadGIFTIdanum` gives statistics overlays the generic
+  `FS_MRISURFOVERLAY_STATS` (gifti.cpp 1180) and keeps the real intent in `__giftiIntent`, which the
+  combined writer does not read.
+- **The surface writer's `exit(1)`** (lines 2160-2164, `couldn't obtain MatrixData`) is not reached:
+  a singular geometry fails earlier, in `MatrixMultiply` with the `NULL` inverse (fs.core's
+  `ErrorExit`, status 252), and every other branch either has a matrix or two equal spaces.
+- **gifticlib's `find_DA` without arrays**: with `numDA` 0 `gim->darray` is `NULL` and `gifti_find_DA`
+  returns `NULL` silently (no "bad inputs" message: that is only for a `NULL` image or a negative
+  index).
+- **fs.io's FS-214** shows in the probe: `gifti_get_DA_value_2D`'s message for a label array without
+  data prints the array's address (`data=%p` with `da`); `check.py` writes it `(nil)` as the port
+  does.
+- **`UserName`**: `getpwuid(geteuid())->pw_name` (line 1418); larmorx reads `/proc/self/status` and
+  `/etc/passwd`, then `USER`/`USERNAME` where they cannot be read (macOS, Windows), none when nothing
+  gives one. A name served only by NSS (LDAP) is not found from `/etc/passwd`: the entry is then the
+  environment's user or absent. The probe prints the value as `U`.
+- **Compressed bytes**: gifticlib's `GZipBase64Binary` uses zlib 1.2.11 `compress2` at level
+  `GZ_DEFAULT_COMPRESSION`; the port's (track C's) uses zlib-rs, so the probe compares each payload
+  decoded and inflated.
+- **Operand order and conversions**: the colour components `(float) r / 255.0` are a `float`
+  promoted to `double` and divided in `double`, stored as `float` (one rounding of the exact
+  quotient's double); the volume reader's `(float) gifti_get_DA_value_2D(...)` is inlined as direct
+  `cvtsi2ss` / `cvtsd2ss` conversions (one rounding either way, the same `float`).

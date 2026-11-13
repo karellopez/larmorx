@@ -2176,8 +2176,8 @@ taken as they are; for any other the GIFTI rule for writers applies first (it ma
 `.gii` name, or end the program when the other form of the name exists: §60). Then the (possibly
 changed) name's type decides: 1 the ASCII writer (§54's `MRISwriteAscii`), 5 the VTK writer
 (§54's `MRISwriteVTK`), 2 the movie.byu writer (§63), 4 the icosahedron writer (§63), 6 the STL writer
-(§71; the answer 1 when written, 0 when not), 7 the GIFTI writer (with queue item 3.1-26's surface
-part); any other: the triangle file (§76) when the surface's type is 3 (a triangular surface, as the
+(§71; the answer 1 when written, 0 when not), 7 the GIFTI writer (§109: the surface's coordinates
+and faces, `NIFTI_INTENT_POINTSET`); any other: the triangle file (§76) when the surface's type is 3 (a triangular surface, as the
 triangle reader marks it), else the quadrangle file (§77). The answer is the writer's. (FreeSurfer
 8.2.0 keeps an older behaviour behind a switch that is never on: not reachable.)
 
@@ -3528,3 +3528,192 @@ count; per face its vertices), the kept surface, then the overlays (name, type, 
 format, values per vertex, volume size and first slice). `srd` reads GIFTI surfaces too. Counted, not
 compared: FS-382 to FS-384, FS-386, FS-388, FS-389, FS-391, FS-392, fs.mri's FS-53. FS-387's,
 FS-395's and FS-396's cases compare as FreeSurfer's crash. Observed (relay 21): the probe README.
+
+## 109. The GIFTI writers (queue item 3.1-26, its surface part; relay 22)
+
+**109.1 Every file.** A writer builds a GIFTI image of version `1.0` whose metadata holds, in order,
+`UserName` (the effective user's name from the password database; absent when it has none),
+`Date` (`currentDateTime`: `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` when set, else the local
+time as `specs/freesurfer-core.md` gives it) and, for the surface writers when the surface has a
+subject name, `SubjectID`. The data arrays follow (§109.2-109.6). Then gifticlib's validity check
+with FreeSurfer's version rule (§107.1) and its messages (`whine` on); an invalid image:
+`<writer>: GIFTI file <file> is invalid!` on standard error, `ERROR_BADFILE` (-5), nothing written.
+Then `gifti_write_image` with the data (gifticlib adds `gifticlib-version` to the image's metadata;
+its own messages, e.g. `** failed to open '<file>' for gifti write`); a failure: `<writer>: couldn't
+write image`, `ERROR_BADFILE`. The writer's name is `MRISwriteGIFTI` (both forms),
+`MRISwriteGIFTICombined` or `mriWriteGifti`. A failure of an array writer returns its error with
+nothing written and no further message. Every data array FreeSurfer writes is row-major,
+`GZipBase64Binary`, little-endian, without an external file; `FLOAT32` unless said otherwise; its
+value count is gifticlib's product of the dimensions (a count of 0, e.g. a surface without
+vertices, gives gifticlib's `** bad Dim list in` display and an array the check refuses). The
+compressed bytes are zlib's at gifticlib's level: larmorx's zlib-rs may give other bytes for the
+same values (compare files by their decompressed values).
+
+A value is stored with the two-dimensional setter (`gifti_set_DA_value_2D(array, row, col, value)`,
+`value` a `double`): a one-dimensional array takes column 0 only (another column: `**
+gifti_set_DA_value_2D, array dim is 1 but trying to access 2D data element (col=<c>)`, exit 1); an
+array of another dimensionality than 1 or 2: `** gifti_set_DA_value_2D, array dim is <n>`, exit 1.
+The place: row-major `row * dims[1] + col`, column-major `row + col * dims[0]` (the row and column
+exchanged for the check). A row or column outside the dimensions: `** gifti_set_DA_value_2D,
+invalid params: dim0_index=<i> (max=<n>), dim1_index=<j> (max=<m>)` on standard error, nothing
+stored. The value is converted to the array's type (`FLOAT32` rounded to `float`; the integer types
+by C's conversion, x86-64's results beyond their range, FS-17); another type: `**
+gifti_set_DA_value_2D, unsupported type <t>-unknown, or can't convert to double`, nothing stored.
+
+**109.2 The intents** (`MRISwriteGIFTI(mris, intent, file, curv_name)`): `NIFTI_INTENT_POINTSET` or
+`NIFTI_INTENT_TRIANGLE` write the surface (§109.3), `NIFTI_INTENT_SHAPE` the curvature,
+`NIFTI_INTENT_LABEL` the labels (§109.4), `NIFTI_INTENT_RGBA_VECTOR` the annotation's colours, a
+statistics intent (`NIFTI_INTENT_CORREL` 2 to `NIFTI_INTENT_LOG10PVAL` 24, `NIFTI_INTENT_ESTIMATE`
+1001) the `stat` values; any other intent writes a file with no data array. `MRISwrite` of a name
+whose type is GIFTI (§79: `.gii`) writes the surface this way (`NIFTI_INTENT_POINTSET`).
+- **Curvature**: one array `NIFTI_INTENT_SHAPE`, one dimension of the vertex count, each vertex's
+  curvature. With a curvature file name: `Name` (the name) and `ShapeDataType` from the name, the
+  last of these it contains winning: `.thickness` Thickness, `.curv` CurvatureRadial, `.sulc`
+  SulcalDepth, `.area` Area, `.volume` Volume, `.jacobian` Jacobian (none of them: no entry).
+- **Statistics**: one array of the intent, each vertex's `stat`, with `Intent_code` (gifticlib's name
+  of the intent) and, for `NIFTI_INTENT_UNIFORM` (16), `Intent_p1` 0 and `Intent_p2` 1.
+- **Colours**: one array `NIFTI_INTENT_RGBA_VECTOR` of the vertex count by 4: each vertex's
+  annotation's red (low byte), green and blue bytes, each `(float) b / 255.0` (a `double` division
+  stored as `float`), and 1.
+
+**109.3 The surface.** First an array `NIFTI_INTENT_POINTSET` of the vertex count by 3 with one
+coordinate system, then an array `NIFTI_INTENT_TRIANGLE` (`INT32`) of the face count by 3. The
+coordinate system (`DataSpace`, `MatrixData`, `TransformedSpace`):
+- real-RAS surface with a valid volume geometry: `NIFTI_XFORM_SCANNER_ANAT`, `TkrVox2RAS *
+  inverse(vox2ras)` of the geometry (§76's space-tag matrices; `MatrixInverse` and `MatrixMultiply` as fs.core
+  gives them: a singular geometry ends the program in the multiplication, `MatrixMultiply(): m2 is
+  null` with its break line, `error: MatrixMultiply: m2 is null`, exit 252), `NIFTI_XFORM_UNKNOWN`;
+- real-RAS surface without one: `NIFTI_XFORM_SCANNER_ANAT`, the identity, `NIFTI_XFORM_SCANNER_ANAT`;
+- tkregister surface with a valid geometry: `NIFTI_XFORM_UNKNOWN`, `vox2ras * inverse(TkrVox2RAS)`,
+  `NIFTI_XFORM_SCANNER_ANAT`;
+- tkregister surface without one: the subject's Talairach transform is read for the output file's
+  name (`MRISreadTransform`, §86 and §92: `<output folder>/../mri/transforms/talairach.xfm`, its messages and
+  failures, the surface's Talairach matrices replaced when it reads); when the surface then has a 4 x
+  4 scanner-to-Talairach matrix (read now or before): `NIFTI_XFORM_UNKNOWN`, that matrix,
+  `NIFTI_XFORM_TALAIRACH`; else `NIFTI_XFORM_UNKNOWN`, the identity, `NIFTI_XFORM_UNKNOWN`.
+The matrix's 16 `float`s are stored as `double`s, row by row. The coordinates are the vertices'
+current `x y z`; the faces their three vertex numbers as stored (not checked).
+
+With a surface name (its file name, not empty), whose parts are searched anywhere in it (C's
+`strstr`), the last match winning in each list: `AnatomicalStructurePrimary` (`lh.` CortexLeft,
+`rh.` CortexRight), `AnatomicalStructureSecondary` (`.orig`, `.smoothwm`, `.white` GrayWhite;
+`.graymid` MidThickness; `.gray`, `.pial` Pial; in this order), `GeometricType` (`.orig`, `.smoothwm`
+Reconstruction; `.white`, `.gray`, `.graymid`, `.pial` Anatomical; `.inflated` Inflated; `.sphere`,
+`.qsphere` Spherical; `pial-outer` Hull; in this order) on the coordinates, `TopologicalType` (`Cut`
+for a patch, else `Closed`) on the faces, `Name` (the surface name) on the coordinates and on the
+faces, in that order. With a valid volume geometry, on the coordinates: `VolGeomFname`,
+`VolGeomWidth`, `VolGeomHeight`, `VolGeomDepth` (`%d`), `VolGeomXsize` ... `VolGeomC_S` (`%f`, 15
+entries in the order x, y, z sizes, then x_r x_a x_s y_r y_a y_s z_r z_a z_s c_r c_a c_s) and
+`SurfaceCenterX/Y/Z` (`%f` of the surface's centre). A group-average area not within `FLT_EPSILON` of
+0 (NaN included): `TAG_GROUP_AVG_SURFACE_AREA` (`%.20f`). Command lines: `NUM_TAG_CMDLINE` (`%d`)
+and each `TAG_CMDLINE#<k>` (at most 1,023 bytes; a missing line `(null)`). `UserName`/`Date`: §109.1.
+
+**109.4 The labels.** The surface's colour table becomes the image's label table: one label per
+entry that exists and has a name, in table order: key the entry's place, the name, the entry's
+float colours with alpha 1. With `Gdiag`'s `DIAG_VERBOSE`: `[DEBUG] MRISwriteGIFTILabel():
+mris->ct->entries=<n>, to_write=<m>` and for each label `[DEBUG] MRISwriteGIFTILabel(): idx=<i>,
+name=<name>` on standard output. A table of no labels: `MRISwriteGIFTILabel: colortable is empty!`,
+`ERROR_BADFILE`. Then an array `NIFTI_INTENT_LABEL` (`INT32`, one dimension of the vertex count)
+with `Name` `node label`, replaced by the second label's name when the table has exactly two labels;
+each vertex's value the place of the first entry whose integer colours are its annotation's red,
+green and blue bytes (`CTABfindAnnotation`), -1 when none. FS-397: FreeSurfer sizes the table by
+the entries that exist, so an entry without a name leaves an unnamed place at the end and the image
+is refused (`** invalid nvpair label[<k>]`, then `MRISwriteGIFTI: GIFTI file <file> is invalid!`);
+by default the table holds the named entries only (`reproduce`: FreeSurfer's). FS-398: a surface
+without a colour table crashes FreeSurfer; by default `MRISwriteGIFTILabel: the surface has no colour
+table` on standard error, `ERROR_BADPARM` (-4).
+
+**109.5 Values from a volume** (`MRISwriteGIFTI(mris, mri, intent, file, name, type)`): the surface
+(`NIFTI_INTENT_POINTSET`/`_TRIANGLE`) or the labels as above; `NIFTI_INTENT_SHAPE`: one array of the
+vertex count with `Name` (the given name, when given) and `ShapeDataType` (the given type, when given,
+even empty), the volume's first frame; a statistics intent: arrays with `Intent_code` (and the uniform
+range) of the volume's frames; any other intent (colours included): no array. The voxels are taken
+slice by slice, row by row, column by column. FS-399: FreeSurfer stores each voxel at the vertex of
+its column, so the later rows and slices overwrite the first and a column past the vertex count gives
+the setter's message; by default each voxel goes to the vertex of its place in the volume (`column +
+width * (row + height * slice)`). FS-400: FreeSurfer writes one statistics array whatever the frames,
+holding the last frame (a volume of no frames: one array without attributes, which the check
+refuses); by default one array per frame (none for no frames).
+
+**109.6 The combined file** (`MRISwriteGIFTICombined(mris, overlays, file)`): the surface (§109.3),
+then each overlay with its intent from its overlay type (the shape types 100 to 104
+`NIFTI_INTENT_SHAPE`, 201 to 223 the statistics intents 2 to 24, 224 `NIFTI_INTENT_ESTIMATE`, any
+other `NIFTI_INTENT_NONE`, which writes nothing), written as §109.5 with the overlay's volume, name and
+data type (an empty data type gives an empty `ShapeDataType`). FS-523: an overlay without its volume
+crashes FreeSurfer (after its shape array's attributes and messages; at once for statistics); by
+default `MRISwriteGIFTIIntent: the overlay has no values`, `ERROR_BADPARM`. FS-524: an overlay of the
+generic statistics type 200 (the GIFTI reader's, §107.4) has no intent, so FreeSurfer drops it; by
+default its own GIFTI intent is used when it is a statistics intent.
+
+**109.7 Counting** (`getShapeStatIntentCount(file, &nvertices, &nfaces)`): the file read and checked
+as §110.1's steps 1 to 3 (with `getShapeStatIntentCount()` as the name); 0 on a failure. Each array
+in order: a `NIFTI_INTENT_POINTSET` array (rows and columns as §107.1) must have at least one row and
+3 columns, else `getShapeStatIntentCount(): malformed coords data array in file <file>:
+num_vertices=<n> num_cols=<c>`, 0; its rows go to `nvertices`; a `NIFTI_INTENT_TRIANGLE` array
+likewise (`malformed faces ... num_faces=<n> num_cols=<c>`; `nfaces`); label, general-matrix, vector,
+RGB and RGBA arrays are passed over; every other array counts. The outputs keep their values when no
+array sets them.
+
+## 110. GIFTI files as volumes (queue item 3.1-26; relay 22)
+
+**110.1 Reading** (`MRISreadGiftiAsMRI(file, read_volume)`, `MRIread`'s reader of `.gii` names).
+1. gifticlib's read with the data; a failure: `MRISreadGiftiAsMRI: gifti_read_image() returned
+   NULL` (after gifticlib's messages), `NULL`.
+2. A `Version` of `1` becomes `1.0`; none: FS-395 (§107.1).
+3. gifticlib's check: `MRISreadGiftiAsMRI: GIFTI file <file> is invalid!`, `NULL`.
+4. The intents `NIFTI_INTENT_TIME_SERIES`, `NIFTI_INTENT_SHAPE`, `NIFTI_INTENT_NONE`,
+   `NIFTI_INTENT_NORMAL`, `NIFTI_INTENT_LABEL`, in this order: the arrays of the first one the file
+   has are the volume's frames. The first array's rows (§107.1) are the vertex count; every further
+   array must have that many rows and one column, else `MRISreadGiftiAsMRI: malformed time-series
+   data array in file <file>: nvertices=<rows> ncols=<the first array's columns> expected
+   num_vertices=<n>` (as `int`s), `NULL`. FS-521: FreeSurfer chooses correctly only when every array
+   of the file has that intent; otherwise it counts the arrays of every intent of the list (applying
+   the same size check across them) and then uses an intent read from memory it never wrote (in the
+   probe's runs one no array had: every value 0, the printed name `NIFTI_INTENT_NONE`). By default the
+   first intent found is chosen and only its arrays counted.
+5. No array of these intents: `MRISreadGiftiAsMRI: no overlay data found in file <file>`, `NULL`.
+6. `INFO: Found <frames> <gifticlib's name of the intent> DataArray` on standard output.
+7. The volume: `<vertices>` columns, 1 row, 1 slice, one frame per array; labels: `MRI_INT` voxels,
+   intent `MGZ_INTENT_LABEL` (1), the colour table from the file's label table (§107.3); shapes
+   intent `MGZ_INTENT_SHAPE` (2); time series `MGZ_INTENT_TIME_SERIES` (5); the others
+   `MGZ_INTENT_MRI` (0), `MRI_FLOAT`; the version `(intent << 8) | 1`. Without `read_volume`: the
+   header only (`MRI_FLOAT` whatever the intent, the frames, intent, version, colour table, the
+   repetition time). Else each array of the intent in file order fills the next frame: column `v` the
+   array's row `v`, column 0 (§107.1's accessor, made a `float`; a label value of -1 stored as 0),
+   stored with `MRIsetVoxVal`.
+8. The repetition time: the first array's `TimeStep` read by `sscanf("%f")` (unchanged when absent
+   or unreadable).
+
+**110.2 Writing** (`mriWriteGifti(mri, file)`, `MRIwrite`'s writer of `.gii` names): one array per
+frame, `NIFTI_INTENT_NONE` for a volume of one frame, `NIFTI_INTENT_TIME_SERIES` with `TimeStep`
+(`%f` of the repetition time) for several, one dimension, each voxel's value (`MRIgetVoxVal`, as
+`float`); §109.1's metadata (no `SubjectID`), check and messages with the name `mriWriteGifti`.
+FS-522: FreeSurfer writes the first row of the first slice only (the array's length the width); by
+default every voxel, column by column, row by row, slice by slice.
+
+## 111. Validation plan, part 20
+
+The probe's `gwr` command (relay 22): an empty work folder with `d` and `mri/transforms`; `Gdiag`'s
+show and verbose bits; a creation-time replacement (a date, empty, a word); 0 to 2 generated GIFTI
+files (§108's generator; random bytes one in 20) and a subject's `talairach.xfm` one case in three
+(§93's generator); a surface from `MRISalloc` of 0 to 24 vertices and up to twice as many faces
+(vertex numbers outside the surface in heavy cases), each vertex's coordinates (`tri`'s, §78), curvature,
+`stat` (eighths, NaN and infinities in heavy cases) and annotation (a colour of the case's table or
+any 24-bit value, -1 now and then); the surface's name (`lh.white`, `/s/surf/rh.pial`, `lh.inflated`,
+`lh.orig`, `rh.sphere.reg`, `lh.smoothwm`, `lh.graymid`, `lh.pial-outer-smoothed`, `rh.qsphere.nofix`,
+`x`, empty), subject, patch flag, real RAS, a volume geometry (`tri`'s, §78, singular ones included), centre,
+group-average area (0, 1e-8, NaN, sixteenths), 0 to 3 command lines (1,000 to 1,100 bytes in heavy
+cases), a 4 x 4 or 3 x 4 Talairach matrix one case in three; a colour table three cases in four (0 to
+6 places, some empty, names empty one in eight); 1 to 3 volumes (`MRI_FLOAT`, `MRI_UCHAR`, `MRI_INT`,
+`MRI_SHORT`; the vertex count or 1 to 30 columns, 1 to 3 rows and 1 to 2 slices one in four, 1 to 3
+frames, a repetition time); then 1 to 4 of `MRISwriteGIFTI` (every intent kind, a curvature name or
+none), its volume form, `MRISwriteGIFTICombined` (0 to 3 overlays of shape, generic, specific and
+unknown types, with or without a volume), `mriWriteGifti`, `MRISwrite` of a `.gii` name,
+`getShapeStatIntentCount` and `MRISreadGiftiAsMRI` (with or without the voxels) on the inputs, on the
+files written before, or on a missing file; names in `d`, at the top or in a missing folder. Each
+writer's answer and its file (absent: `NOFILE`) with the `UserName` value written `U` and each
+`<Data>` payload decoded and inflated (the bytes compared, not zlib's stream); the count with both
+outputs; the volume's extent, frames, type, intent, version, repetition time, colour table and
+voxels. Counted, not compared: FS-521 (memory never written). FS-398's and FS-523's cases compare as
+FreeSurfer's crash; fs.io's FS-214 address written `(nil)` on both sides. Observed (relay 22): the
+probe README. The defaults are checked by `tests/gifti_writers.rs` (each against `reproduce`).

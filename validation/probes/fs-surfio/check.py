@@ -54,7 +54,8 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # arrays, FS-361, FS-362; the brute-force triangle distance's endless loop, ended by the probe's
 # alarm, FS-367; the closest-vertex searches' and the spherical-triangle test's arrays, FS-370,
 # FS-371; the faces' walk around a vertex and the curvature sign of a face naming a vertex twice,
-# FS-372, FS-373): counted, never compared
+# FS-372, FS-373; an MGH volume header without voxels read for a transform's volume, FS-76, whose
+# division by zero the official build turns into a crash): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -83,6 +84,7 @@ SKIP: tuple[str, ...] = (
     "FS-371",
     "FS-372",
     "FS-373",
+    "FS-76",
 )
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 

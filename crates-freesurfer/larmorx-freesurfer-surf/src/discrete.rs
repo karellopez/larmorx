@@ -55,7 +55,8 @@ fn topology_cpp() -> String {
 fn faces_of(mris: &Mris, vno: usize) -> Vec<i32> {
     let vt = mris.topology(vno);
     let num = usize::from(vt.num);
-    vt.f.as_deref().map_or_else(Vec::new, |f| f[..num.min(f.len())].to_vec())
+    vt.f.as_deref()
+        .map_or_else(Vec::new, |f| f[..num.min(f.len())].to_vec())
 }
 
 /// `acosf(x)`: glibc 2.35's (fdlibm's, [`acosf_glibc`]) with `reproduce`, the correctly rounded
@@ -245,7 +246,8 @@ fn faces_around_vertex_reorder(
     }
     let count = sg.around_vertex_count;
     sg.around_vertex_count += 1;
-    if count == sg.around_vertex_limit && io.env.get("BEVIN_TESTING_dumpFacesAroundVertex").is_some()
+    if count == sg.around_vertex_limit
+        && io.env.get("BEVIN_TESTING_dumpFacesAroundVertex").is_some()
     {
         sg.around_vertex_limit *= 2;
         dump_faces_around_vertex(io.out, mris, vno);
@@ -410,10 +412,7 @@ pub fn faces_hcurvature_determine_sign(
 pub fn vertex_face_angles_determine(g: &mut Globals, mris: &mut Mris, vno: usize) -> Vec<f32> {
     let v = mris.vertex(vno);
     let a = [v.nx, v.ny, v.nz];
-    let len_a = sqrt(add(
-        mul(a[2], a[2]),
-        add(mul(a[0], a[0]), mul(a[1], a[1])),
-    ));
+    let len_a = sqrt(add(mul(a[2], a[2]), add(mul(a[0], a[0]), mul(a[1], a[1]))));
     let mut angles = Vec::new();
     for fno in faces_of(mris, vno) {
         let n = get_face_norm(mris, fno as usize);
@@ -449,10 +448,7 @@ pub fn faces_angle_normal_find(
 ) -> Result<f32, Fatal> {
     let a = get_face_norm(mris, fi);
     let b = get_face_norm(mris, fj);
-    let len_i = sqrt(add(
-        mul(a.nz, a.nz),
-        add(mul(a.nx, a.nx), mul(a.ny, a.ny)),
-    ));
+    let len_i = sqrt(add(mul(a.nz, a.nz), add(mul(a.nx, a.nx), mul(a.ny, a.ny))));
     let len_j = sqrt(add(add(mul(b.nx, b.nx), mul(b.ny, b.ny)), mul(b.nz, b.nz)));
     if f64::from(len_i) > 1.0001 || f64::from(len_j) > 1.0001 {
         log::error_exit(

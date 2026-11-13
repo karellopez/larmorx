@@ -91,6 +91,23 @@ properties), the default different only with notices; the official build's opera
 `errno` (glibc's `sqrt`/`sqrtf` for a negative variance, the vertex-spacing statistics' discarded
 scale, the metric properties' inter-vertex deviation) were taken from the object code and gdb.
 
+Measured 2026-11-13 (relay 19, 40 commands): `mpd` (the discrete curvatures, the faces' order around
+a vertex, the pseudo-normal), seeds 7 (1,000 cases), 13 and 17 (2,000 each): 0 differ with
+`reproduce` (61, 104 and 113 counted, not compared: FS-372's walks around vertices whose faces are
+not one fan, FS-121 of the read); the default differs from the official build only by the arc
+cosine (`acosf`, correctly rounded by default: 84, 193 and 191 cases, `fix_libm`; with glibc's
+`acosf` put into the default by hand, 0 of the 1,000 seed-7 cases differ). `srd` with the volumes
+a transform names (`orig.mgz`, `t1.mnc.mgz`, `v.mnc.mgh`, MGH files) and a regular `mri/orig`:
+seeds 7, 13 and 17 (2,000 each): 0 differ with `reproduce` (one seed-17 case counted: FS-76, an MGH
+header without voxels, which the official build turns into a crash), 66 compared surfaces with a
+geometry read from a volume header, 67 reads of `mri/orig` that cannot determine its type. The whole
+probe at seed 7 (8,000 cases): 7,803 identical, 197 counted, 0 different (the default: only notices
+and the libm cases, `mpd` 11 and `posn` 8); seed 1 (1,200 cases): 1,161 identical, 39 counted, hash
+`fef1c552...`, passing in debug and release and under AArch64's NaN emulation (3,576 and 43,861 NaNs
+flipped); the seed-7 `srd`, `mpd`, `mpc`, `tri` and `stl` outputs identical under the emulation but
+for relay 18's two `mpc` `dd` cases (fs.core's `randomNumber`, reported). The work folder's absolute
+path is written `<w>` in both probes' outputs (a volume reader's message names it).
+
 Measured 2026-11-13 (relay 18, 39 commands): `mpc`, seeds 7 (1,000 cases), 13 and 17 (2,000 each): 0 differ
 with `reproduce` (34, 59 and 62 counted, not compared: FS-121 of the read, FS-367's endless loops ended by
 the probe's 5-s alarm, FS-370's arrays), the default different only with notices (FS-366, FS-369 and the

@@ -536,7 +536,13 @@ fn mgh_volume(g: &mut Gen, gz: bool) -> Vec<u8> {
     let be = |b: &mut Vec<u8>, v: i32| b.extend_from_slice(&v.to_be_bytes());
     let bf = |b: &mut Vec<u8>, v: f32| b.extend_from_slice(&v.to_bits().to_be_bytes());
     be(&mut b, if g.chance(15) { 2 } else { 1 });
-    let dim = |g: &mut Gen| if g.chance(20) { g.int(-1, 0) as i32 } else { g.int(1, 4) as i32 };
+    let dim = |g: &mut Gen| {
+        if g.chance(20) {
+            g.int(-1, 0) as i32
+        } else {
+            g.int(1, 4) as i32
+        }
+    };
     let (w, h, d) = (dim(g), dim(g), dim(g));
     let ty = g.pick(&[0, 0, 3, 3, 1, 4, 77]);
     for v in [w, h, d, 1, ty, 0] {
@@ -557,7 +563,14 @@ fn mgh_volume(g: &mut Gen, gz: bool) -> Vec<u8> {
             bf(&mut b, odd(g, x));
         }
         // the direction cosines: a signed permutation (rows x, y, z), or any now and then
-        let p = g.pick(&[[0, 1, 2], [0, 2, 1], [1, 0, 2], [2, 0, 1], [1, 2, 0], [2, 1, 0]]);
+        let p = g.pick(&[
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [2, 0, 1],
+            [1, 2, 0],
+            [2, 1, 0],
+        ]);
         let any = g.chance(6);
         for r in 0..3 {
             let s = if g.chance(2) { -1.0 } else { 1.0 };

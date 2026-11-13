@@ -72,7 +72,12 @@ fn grid(g: &mut Gen, w: i64, h: i64) -> Mesh {
     let mut f = Vec::new();
     for j in 0..h - 1 {
         for i in 0..w - 1 {
-            let (a, b, c, d) = (j * w + i, j * w + i + 1, (j + 1) * w + i, (j + 1) * w + i + 1);
+            let (a, b, c, d) = (
+                j * w + i,
+                j * w + i + 1,
+                (j + 1) * w + i,
+                (j + 1) * w + i + 1,
+            );
             if (i + j) % 2 == 0 {
                 f.push([a, b, d]);
                 f.push([a, d, c]);
@@ -92,9 +97,7 @@ fn face_pair(g: &mut Gen, m: &Mesh) -> (i64, i64) {
     if !g.chance(5) {
         let fa = m.f[a as usize];
         let shares: Vec<i64> = (0..nf)
-            .filter(|&b| {
-                b != a && m.f[b as usize].iter().filter(|x| fa.contains(x)).count() == 2
-            })
+            .filter(|&b| b != a && m.f[b as usize].iter().filter(|x| fa.contains(x)).count() == 2)
             .collect();
         if !shares.is_empty() {
             return (a, shares[g.below(shares.len() as u64) as usize]);
@@ -138,7 +141,15 @@ pub(super) fn mpd_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let few = g.chance(2);
     for _ in 0..nv {
         let mut mask = 0;
-        for (bit, k) in [(1, 40), (2, 50), (4, 25), (8, 12), (16, 10), (32, 8), (64, 12)] {
+        for (bit, k) in [
+            (1, 40),
+            (2, 50),
+            (4, 25),
+            (8, 12),
+            (16, 10),
+            (32, 8),
+            (64, 12),
+        ] {
             if g.chance(if few { k * 4 } else { k }) {
                 mask |= bit;
             }
@@ -242,7 +253,10 @@ fn dump_order(o: &mut Out, s: &Mris) {
         o.i(i64::from(s.vertex(vno).marked));
         let vt = s.topology(vno);
         let num = usize::from(vt.num);
-        let (f, n) = (vt.f.as_deref().unwrap_or(&[]), vt.n.as_deref().unwrap_or(&[]));
+        let (f, n) = (
+            vt.f.as_deref().unwrap_or(&[]),
+            vt.n.as_deref().unwrap_or(&[]),
+        );
         for k in 0..num {
             o.i(i64::from(f[k]));
             o.i(i64::from(n[k]));
@@ -412,7 +426,10 @@ pub(super) fn mpd_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "fvi" => {
                 let (fno, vno) = (t.i() as usize, t.i());
-                o.i(i64::from(discrete::face_vertex_index_find(s.face(fno), vno)));
+                o.i(i64::from(discrete::face_vertex_index_find(
+                    s.face(fno),
+                    vno,
+                )));
             }
             "fvm" => {
                 let (a, b) = (t.i() as usize, t.i() as usize);

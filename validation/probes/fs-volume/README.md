@@ -83,3 +83,15 @@ comparable (FS-314: FreeSurfer aborts, `CRASH 6`; FS-315: lists read past their 
 seed 7, 7,300 cases: 6,841 identical, 459 not comparable, 0 different; `fix` different only with
 notices. Seed 1, 1,460 cases: 1,365 identical, 95 not comparable, hash
 `dfb6450d2777761356d5587e0e2c2b8bd737ed1d1e1b82352d58a8e59b6ac530`.
+
+Measured 2026-11-13 (part 6, relay 16: 3.1-36's resolution, planes, fills, resampling by whole factors and
+changes of type `setres`, `vfill`, `fillfg`, `explane`, `fillplane`, `ups`, `dns2`, `dnsn`, `mft`, `lim`,
+`chtype`; 84 commands; logs `oracles/logs/fs-found-c-r16-resize3.log`, `-seed7.log`, `-seed1.log`): seed 13,
+11,000 cases of the new commands: 9,164 identical with `reproduce`, 1,835 not comparable (FS-53, FS-58,
+FS-290 of the voxel access), 1 different (`MRIsetResolution`'s `thick` of +0 and -0: `macros.h`'s `MAX` is
+`a >= b ? a : b`; fixed); `fix` different only with notices. After the fix, all 84 commands at seed 7, 8,400
+cases: 7,746 identical, 654 not comparable, 0 different. Seed 1, 1,680 cases: 1,546 identical, 134 not
+comparable, hash `919eb356853935742497415be1a6e96cc024dc5e7efdff0dd7499caf1638bf6e`, passing with AArch64's
+NaN emulated in debug and release (`oracles/logs/fs-found-c-r16-trap-volume.log`). `dnsn` draws no NaN
+factor: with `reproduce` FreeSurfer's extent is then -2147483648 (FS-317), whose allocation error fs.mri's
+`Mri::new` does not model yet (`docs/findings/freesurfer-volume.md` §9, for track A).

@@ -8,14 +8,16 @@ the probe `validation/probes/fs-filter/`, a black-box run of FreeSurfer's code),
 `specs/freesurfer-mri.md` (the structure these functions work on), `specs/freesurfer-volume.md` (the
 voxel functions they call) and the cited standards.
 
-Status: **parts 1 to 3**. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
+Status: **parts 1 to 4**. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
 and `MRIdistanceTransform`. Part 2 (§9-17): the Gaussian kernel, the one-dimensional and separable
 convolutions, the matrix Gaussian smoothing, the window means and standard deviations, the pyramid
 reductions, the Sobel derivatives, the divergence and Laplacian, the white-matter border
 classification, the connected components and the global Sobel tables `sx`, `sy`. Part 3 (§17-18):
-the frame functions (`fMRI*`, `MRIframe*`, `MRIvol*`, `MRIconjunct`, `ASLinterpMatrix`). Not yet:
-the WM/cortex reclassifications (`MRIreclassifyWMCtxNonPar`, `MRIclassifyAmbiguousNonPar`), 3.1-43
-(but `MRIgaussianSmoothNI`, here), 3.1-44. The 2-D image reductions (`ImageConvolve1d`,
+the frame functions (`fMRI*`, `MRIframe*`, `MRIvol*`, `MRIconjunct`, `ASLinterpMatrix`). Part 4
+(§19-21): the volume clusters (`clust*`, `MRIremoveVolumeIslands`, `MRIremoveVolumeHoles`) and the
+non-parametric white matter and cortex classification (`MRIreclassifyWMCtxNonPar`,
+`MRIclassifyAmbiguousNonPar`). Not yet: 3.1-43's intensity normalisation, segments and flood fill
+(`mrinorm.cpp`, `mrisegment.cpp`, `mriflood.cpp`, `rfa.cpp`'s `csf_labels`). The 2-D image reductions (`ImageConvolve1d`,
 `ImageReduce`, `ImageReduce1d`) are specified with the images in `specs/freesurfer-io.md`.
 
 ## 1. Conventions
@@ -199,6 +201,12 @@ the points leave in the order these exact steps give, which decides the distance
 | FS-567 | a | `fMRItoMatrix` into a given matrix with fewer rows or columns than needed writes into other elements and past it | an error, `NULL` |
 | FS-568 | a | `fMRIfromMatrix` with a mask of no voxel divides by 0 (a crash) | an error (both modes) |
 | FS-569 | a | `fMRIsubSample` whose frames never reach the stop (a negative step, or the frame number past the `int` range) reads without end (a crash) | an error (both modes) |
+| FS-570 | a | cluster members' coordinates never computed (no transform) are memory contents; pruning by distance reads them | 0, noted (both modes) |
+| FS-571 | a | cluster coordinates with a transform that is not 4 x 4 crash after the product's message | an error (both modes) |
+| FS-572 | c | the class histograms end at the smaller maximum; the upper ambiguity threshold is searched from the first bin | kept in both modes (rule D: measured at `mri_segment`'s port) |
+| FS-573 | a | an ambiguity threshold search that finds no bin reads one bin outside the histogram | the edge bin (both modes) |
+| FS-574 | c | the masks' `NdilWM`/`NdilCtx` dilations each restart from the undilated mask (one voxel) | kept in both modes (rule D) |
+| FS-575 | a | a dilation count of 0 or less crashes | an error (both modes) |
 
 ## 9. The Gaussian kernel and the one-dimensional convolutions
 
@@ -551,3 +559,111 @@ Sums are `double` and add in the stated operand order (a NaN's bits: the first o
   or crash (FS-562, FS-564, FS-567, FS-568, FS-569, and FS-53, FS-58); the default differs only where
   a defect it corrects is noted. Observed at seeds 7 (420 frame cases), 13 (2,100) and 17 (4,200): 0
   different in either mode (observed).
+
+## 19. The volume clusters
+
+A *cluster* holds its members' column, row and slice in the order they were added, their
+coordinates (x, y, z; computed only when a transform is given: FS-570), the index of its member
+of the largest value (`maxmember`), that value (`maxval`), the voxel size (`voxsize`) and three
+clusterwise p-values (0 unless a caller sets them).
+
+- **In range** (`clustValueInRange(v, thmin, thmax, thsign)`): `v` taken as `|v|` for `thsign` 0, as
+  `-v` for -1, as itself otherwise; in range when `v >= thmin` and, if `thmax > 0`, `v <= thmax`
+  (single precision; NaN never in range).
+- **The hit map** (`clustInitHitMap`): an int volume of the input's extent (no header copied);
+  columns outermost, a voxel whose mask value (frame `maskframe`) truncates to 0 (`-1 < m < 1`; NaN
+  does not) gets 1; otherwise a voxel of `frame` in range gets 0 and is a *hit* (in that order),
+  every other voxel 1. With no hit the map stays all 0. With `Gdiag_no > 0` it first prints
+  `clustInitHitMap: `, `   thmin  = <%f>`, `   thmax  = <%f>`, `   thsign = <d>`, `   maskframe = <d>`
+  (one line each) and, with no hit, `no hits in hit map`; with `Gdiag_no > 1` `INFO:
+  clustInitHitMap: found <n> hits`.
+- **Growing** (`clustGrow(c, r, s, map, AllowDiag, npassesmax)`): the seed is the first member and
+  marked 1 in the map; the voxel size is the map's `xsize * ysize * zsize` (single precision, in
+  that order). Pass after pass, each member added since the previous pass (in order) adds its
+  neighbours inside the map (column offset outermost, then row, then slice, each -1, 0, +1; only
+  the 6 face neighbours unless `AllowDiag`) whose map value is 0, marking each 1, until a pass adds
+  none or, when `npassesmax > 0`, after `npassesmax + 1` passes.
+- **The largest member** (`clustMaxMember(vc, vol, frame, thsign)`): `maxval` starts at 0; each
+  member's value `v` is compared as `v` (`thsign` 1), `|v|` (0) or `-v` (-1) (another `thsign` keeps
+  the previous comparison value, from 0); when `|maxval|` is below it, `maxval = v` (the signed
+  value) and `maxmember` the member; `maxmember` is otherwise left as it was (0 for a new cluster).
+- **Finding the clusters** (`clustGetClusters(vol, frame, thmin, thmax, thsign, minsize, mask, XFM,
+  AllowDiag)`): the hit map with mask frame 0; each hit whose map value is still 0 seeds a cluster
+  (no pass limit), whose voxel size becomes the volume's `xsize * ysize * zsize`, whose largest
+  member is found with `thsign`, and whose coordinates are computed when `XFM` is given (each
+  member's `XFM * [c, r, s, 1]'` by `MatrixMultiply`, the first three elements; FS-571 for a
+  transform that is not 4 x 4). Clusters whose `nmembers * voxsize` (single precision) is below
+  `minsize` are dropped. The rest are sorted by C's `qsort` (glibc's merge sort: ties keep their
+  order) on: the smaller clusterwise p-value first, then more members, then the larger `|maxval|`.
+  With `Gdiag_no > 0`: `INFO: Found <n> voxels in threhold range`, `INFO: Found <n> clusters that
+  meet threshold criteria`, `INFO: Found <n> clusters that meet size criteria`, `INFO: Found <n>
+  final clusters`.
+- **Pruning by distance** (`clustPruneByDistance(list, d)`): a cluster is dropped when another
+  cluster's largest member lies closer than `d` (single precision: `sqrtf(dx² + dy² + dz²)`, added in
+  that order) to its own and that other cluster's `maxval` is larger; the kept ones in order, or
+  `NULL` when none is kept. **By size**: those whose `nmembers * voxsize >= threshold`.
+- **To a volume** (`clustClusterList2Vol(list, tvol, frame, ValOption)`): a volume of `tvol`'s
+  extent, type and header, with `tvol`'s frames when `ValOption` is not 0, else one frame; zero
+  except at the members: with `ValOption` 1 their values of every frame, otherwise the cluster's
+  number (from 1) in frame 0 (stored as the type stores it: clamped).
+- **`MRIremoveVolumeIslands(mask, thresh, nKeep, out)`**: `nKeep` 0 fails with `ERROR:
+  MRIremoveVolumeIslands(): nKeep==0`; a new output is of the mask's type and one frame (header and
+  pulse parameters); a given one of another extent fails with `ERROR: MRIremoveVolumeIslands():
+  dimension mismatch`. The clusters of frame 0 whose magnitude is at least `thresh` (as a float),
+  faces only, no size limit; their numbers in a volume of the mask's type; prints
+  `MRIremoveVolumeIslands() thresh=<%g>, nKeep=<d>, nclusters = <n>`; each voxel whose number is at
+  most `nKeep` (0 outside clusters) keeps the mask's value, every other voxel 0. The mask may be its
+  own output.
+- **`MRIremoveVolumeHoles(mask, thresh, nKeep, FillVal, out)`**: prints `MRIremoveVolumeHoles()
+  thresh=<%g>, nKeep=<d>` first; the same errors (`MRIremoveVolumeHoles()`); the voxels at or below
+  `thresh` (NaN too) as 1 in an int volume, the others 0; its islands removed as above (at 0.5, with
+  its own line); where that leaves 0 the voxel keeps the mask's value when above `thresh`, else
+  `FillVal` (as a float); elsewhere 0.
+
+## 20. The non-parametric white matter and cortex classification
+
+White matter labels: 2, 41, 251-255; cortex: 3, 42. A class mask is `MRImatchSegs` with the value 1.
+Class statistics are `MRIsegStats` of `norm` (frame 0) over a mask; printed `wmstats  n=<%6d>,
+mean=<%g>, std=<%g>, min=<%g>, max=<%g>` and `ctxstats n=...`; a class with no voxel fails with
+`ERROR: could not find any WM voxels` (`CTX voxels`). The histogram limits are the smaller of the
+two minima and the smaller of the two maxima (single-precision comparisons; FS-572), printed
+`hbminmin = <%g>, hbinmax = <%g>`; each class's histogram is `HISTOseg` with bins of 1 over them,
+divided by its sum (`HISTOsumNorm`). The *crossing* is the first bin of the smallest `|(1 -
+ctxCDF) - wmCDF|` (CDFs: running double sums of the PDFs stored as floats), the threshold that
+bin's value.
+
+- **`MRIreclassifyWMCtxNonPar(norm, seg, nitersmax, newseg)`**: prints `MRIreclassifyWMCtxNonPar():
+  nitersmax = <d> ` (a blank before the newline); `newseg` being `seg` fails with `ERROR: cannot be
+  done in-place`. Statistics and threshold from `seg` (`thresh = <%g>`). Then up to `nitersmax`
+  passes: `newseg` becomes a copy of the current segmentation (`seg` in the first pass, `newseg`
+  itself later); the class masks of the current segmentation; columns outermost, every class voxel
+  with a face neighbour of the other class (neighbours read with `MRIgetVoxVal`; FS-52, FS-53 at the
+  edges) is a border voxel; a border voxel whose `norm` value is above the threshold and whose label
+  is 3 (42) becomes 2 (41), one at or below it labelled 2 (41) becomes 3 (42). Each pass prints
+  `iter <%2d>/<%2d> nborder = <n>, nrecode = <n>`; a pass that recodes nothing ends them. Returns
+  `newseg` (`NULL` when no pass ran and none was given).
+- **`MRIclassifyAmbiguousNonPar(norm, seg, statseg, Qwm, Qctx, NdilWM, NdilCtx)`**: prints
+  `MRIclassifyAmbiguousNonPar(): Qwm=<%g>, Qctx=<%g>, NdilWM=<d>, NdilCtx=<d> `; statistics and
+  histograms from `statseg`; writes the two PDFs as text (`HISTOwriteTxt`) to `wm.pdf.dat` and
+  `ctx.pdf.dat` in the current directory. `thresh` the crossing; `thresh_low`: from the crossing
+  down, the first bin where `ctx / (wm + 1e-6) >= Qctx` (double); `thresh_hi`: from the first bin
+  up, the first where `wm / (ctx + 1e-6) >= Qwm` (FS-572); FS-573 where none; printed `thresh =
+  (<%g>,<%g>,<%g>)`. The class masks of `seg`, each dilated (`MRIdilate`; FS-574, FS-575). A new uchar
+  volume of `seg`'s extent and header: 255 where `seg` is white matter, else 1; then 128 where a
+  dilated mask holds the voxel and `thresh_low < norm < thresh_hi`. Prints `nhits = <n>, nrecode =
+  <n>` (voxels in a dilated mask, voxels set to 128).
+
+## 21. Validation plan (part 4)
+
+- **Probe (black box).** `fsfilter`'s commands `clus` (`clustGetClusters` with every parameter,
+  `Gdiag_no` 0 to 2, then `clustClusterList2Vol`), `cprd` (pruning by distance), `cgrow` (growing
+  with a pass limit, then the hit map), `isl`, `hol` (new, given and in-place outputs), `cvr`
+  (`clustValueInRange` of 8 values), `rwc`, `amb` (with the FNV-1a of the two text files). The
+  cases: blob volumes of every type with NaNs, masks with values about the truncation's edges, 4 x 4
+  transforms, segmentations with a background margin or labels on the faces, intensities by class
+  (integer and fractional), one class missing, dilation counts 0 to 3.
+- **Expected.** Every line identical under `reproduce` but those that touch memory outside a volume
+  or a histogram, or crash (FS-53, FS-570, FS-571, FS-573, FS-575); the default identical but where a
+  noted defect it corrects changed the result. Observed: clusters at seeds 7 (360 cases) and 13
+  (2,400); classification at seeds 7 (120), 13 and 17 (1,200 each): 0 different in either mode
+  (observed).

@@ -131,7 +131,8 @@ grew past its 12 GiB box). `GetLargestCC6`/`18` scan `i` (rows) outermost, then 
 
 `MRIreclassifyWMCtxNonPar` and `MRIclassifyAmbiguousNonPar` (`mrifilter.cpp` 4914, 5093) need
 `mri2.cpp`'s `MRImatchSegs` (5687), `MRIsegStats` (3826), `HISTOseg` (5717) and `mriset.cpp`'s
-`MRIdilate` (1723), which no track has ported yet (track C takes them first, relay 27's notes).
+`MRIdilate` (1723): track C ported them (its relay 22, merged at 01910d99); relay 27 ported the two
+classifiers (§11).
 `filter.cpp`'s image reductions (`ImageConvolve1d` 713, `ImageReduce` 928, `ImageReduce1d` 979) were
 ported with fs.io's images (`larmorx-freesurfer-io/src/image.rs`: `ImageScaleDown` calls them and
 fs.filter's crate sits above fs.io); nothing of them is left here.
@@ -170,3 +171,41 @@ not vectorised: the loops call `MRIgetVoxVal`, or alias their row pointers):
   `|Delta|`) or a caller's volume of 0 frames reaches the endless loop (FS-569).
 - `ASLinterpMatrix(1)`: element (1, 2) of a 1 x 1 matrix is the float after its number, inside the
   64-byte-rounded block of the new allocator (FS-566: nothing visible).
+
+## 11. `volcluster.cpp` and the non-parametric classification (relay 27)
+
+- `clustInitHitMap`'s `int maskval = MRIgetVoxVal(...)` truncates (`cvttss2si`): a mask value of 0.5
+  is outside the mask, NaN and values beyond the `int` range (x86-64's `INT_MIN`) inside. The port
+  tests `-1 < m < 1`, the same set, so no defect is needed.
+- `clustAddMember` reallocs `x`, `y`, `z` without writing the new element; `clustCopyCluster` copies
+  them; only `clustComputeXYZ`/`clustComputeTal` set them (FS-570). `clustGetClusters` never calls
+  `clustPruneByDistance` (its `distthresh` is 0), so the reached programs never read them.
+- `clustFreeClusterList` frees `(*list)[0]` (already freed and set to `NULL` by `clustFreeCluster`:
+  `free(NULL)`) and never the list itself: a leak, no output.
+- `clustGetClusters` sorts the size-pruned list with `qsort` of `clustCompareCluster`; the clusters'
+  p-values are 0 (`calloc`), so the order is by size then `|maxval|`, ties in discovery order
+  (glibc's merge sort: `larmorx_core::glibc_qsort::qsort` on indices).
+- `VolClustFixMNI` is set only by `mri_volcluster` (not reached): `clustComputeTal` is
+  `clustComputeXYZ` in every reached program (`FixMNITal` not ported).
+- `MRIremoveVolumeIslands`' documentation says "binarizes mask > thresh"; the code keeps `|v| >=
+  thresh` (`clustValueInRange` with `thsign` 0). Kept (rule C: `mri_binarize`'s `--remove-islands`
+  relies on it); the spec states the code's behaviour.
+- `MRIreclassifyWMCtxNonPar`/`MRIclassifyAmbiguousNonPar` (`mri_segment.cpp` 311-315, its `-aseg`
+  path): the crossing search stores the signed `d` as its minimum (`min = d`, not `fabs(d)`). The
+  difference `(1 - ctxCDF) - wmCDF` never increases along the bins (both CDFs are running sums of
+  non-negative counts), so the bin found is the argmin of `|d|` either way (proved by cases: before
+  the sign change both versions follow the decreasing positive values; at it the first negative
+  value is taken by both or by neither; after it `|d|` only grows): no defect ID, no notice.
+- `hbinmax = MIN(wmmax, ctxmax)` (the brighter white matter falls into the last bin, clamped by
+  `HISTOseg`) and the upper-threshold loop starting at bin 0 against its comment ("from this
+  minimum, look ahead"): FS-572, rule D (measured at `mri_segment`'s port).
+- `for (n = 0; n < NdilWM; n++) wmmaskdil = MRIdilate(wmmask, wmmaskdil)`: each dilation reads the
+  undilated mask (FS-574, rule D: `mri_segment`'s defaults are 2 and 2, so the documented "within
+  NdilWM voxels" is one voxel in every recorded run). `NdilWM <= 0` leaves `wmmaskdil` `NULL`
+  (FS-575).
+- `MRIclassifyAmbiguousNonPar` writes `wm.pdf.dat` and `ctx.pdf.dat` (`HISTOwriteTxt`) into the
+  program's current directory on every call: `mri_segment -aseg` leaves them in `mri/`. The port
+  writes them where its caller says (`dir`; the program passes its current directory).
+- Operand orders (`relay26/mrifilter.asm`): `MIN` as `minss` (`a < b ? a : b`), `d = (1.0 - ctx) -
+  wm` (`subsd` twice), the ratio `(double) a / ((double) b + 1e-6)`; the reclassification compares
+  `val > thresh` in single precision (`thresh` is a bin value, a float).

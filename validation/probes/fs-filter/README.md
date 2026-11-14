@@ -47,7 +47,18 @@ frame functions.
   <frames>` (the volume or `NULL`); `asl <ntp>` (the matrix); `f2m <src> <0 | 1 matrix>` (`<same>`,
   the result, any other given matrix); `m2f <matrix> <volume> <mask?>` (the return value and the
   volume); `scm <src>` (`fMRIspatialCorMatrix`); `fcum|fnorm <src> <mask?> <dst?>` (`fMRIcumSum`,
-  `MRIframeNorm`).
+  `MRIframeNorm`). Relay 27's cluster and classification commands (`volcluster.cpp`,
+  `mrifilter.cpp`; clusters printed as their count, then each one's `nmembers`, `maxmember`,
+  `maxval`, `voxsize` and members' column, row, slice, with x, y, z when a transform is given): `clus
+  <vol> <frame> <thmin> <thmax> <thsign> <minsize> <mask?> <xfm?> <allowdiag> <Gdiag_no> <valopt>`
+  (`clustGetClusters`, then `clustClusterList2Vol`'s volume); `cprd <vol> <thmin> <thsign> <xfm?>
+  <dist>` (`clustPruneByDistance`); `cgrow <vol> <thmin> <thsign> <c> <r> <s> <allowdiag>
+  <npassesmax>` (`clustGrow` on `clustInitHitMap`'s map; the cluster, the map); `isl|hol <mask>
+  <mode> [<dst>] <thresh> <nkeep> [<fill>]` (`MRIremoveVolumeIslands`, `MRIremoveVolumeHoles`); `cvr
+  <thmin> <thmax> <thsign> <8 values>` (`clustValueInRange`); `rwc <norm> <seg> <mode> [<dst>]
+  <nitersmax>` (`MRIreclassifyWMCtxNonPar`; then the segmentation); `amb <norm> <seg> <0 | 1
+  statseg> <Qwm> <Qctx> <NdilWM> <NdilCtx>` (`MRIclassifyAmbiguousNonPar`, run in `<cases>.out.d/`;
+  then the FNV-1a of the `wm.pdf.dat` and `ctx.pdf.dat` it writes, or `NOFILE`).
 - `build.sh [<workspace>]`: builds `fsfilter` with the unit oracle's compiler, flags and libraries
   (`validation/investigations/freesurfer-unit-oracle`, `build.py all` first) into
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-filter/` (with `BUILD_INFO.txt`). From a worktree,
@@ -97,3 +108,6 @@ Every run on generated inputs inside a memory box:
 - The 21 frame commands at seeds 7 (420 cases), 13 (2,100) and 17 (4,200): 0 different under
   `reproduce` and 0 default differences without a notice (each official run under a second for the
   2,100 cases: they are small).
+- The cluster commands at seeds 7 (360 cases) and 13 (2,400), the classification commands at seeds
+  7 (120), 13 and 17 (1,200 each): 0 different under `reproduce`, 0 default differences without a
+  notice.

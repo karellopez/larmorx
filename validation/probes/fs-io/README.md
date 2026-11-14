@@ -186,6 +186,11 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   of 1,022 bytes, the C library's overflow abort from a name of 1,024 bytes), compared in both modes:
   `python -P validation/probes/fs-io/nifti1_long_names.py` (Linux; prints `PASS` when `reproduce` is identical on
   every case and `fix` differs only with FS-451).
+- `fs49_slot_cases.py` (relay 25 of track A): 16 hand-made `tr` and `ctr` cases where the file cuts a number
+  read right after another (FS-49: `TAGreadStart`'s tag-30 length, the binary colour tables' runs of numbers on
+  C streams), and after an allocation, a name or a print (memory contents), compared with `reproduce`:
+  `python -P validation/probes/fs-io/fs49_slot_cases.py` (prints `PASS` when every line is identical or marked
+  `SKIP`/`VARY` by the port; 13 identical, 3 memory contents, 2026-11-14).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

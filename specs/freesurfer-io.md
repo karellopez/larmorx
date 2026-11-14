@@ -73,7 +73,9 @@ At the end of the file the bytes the file gave are used as the number's first by
   byte-reversed (`0x11223344` becomes `0x44332211`). Kept (rule C: FreeSurfer's loops stop on the
   count and do not use the value).
 - All the others: the missing bytes are memory contents (FS-49 for `freadInt` and `freadDouble`,
-  FS-167 for the rest): a clean room fills them with 0 and notes the defect, in both modes.
+  FS-167 for the rest): a clean room fills them with 0 and notes the defect, in both modes, except
+  FS-49's cases §100 names, where FreeSurfer's missing bytes are those of the number read just before
+  (then `reproduce` gives them).
 
 ## 3. Reading one number from a znz file
 
@@ -260,7 +262,8 @@ A tag is a 32-bit tag number, usually a 64-bit data length, then the data. Tag n
 - **`TAGreadStart(fp, &len)`** (C stream): reads the tag number; when that read sets the stream's
   end-of-file flag, returns 0 and leaves `len`. Tag 30: `len` = a 32-bit number - 1; tags 20, 2, 1:
   `len` = 0 (no length field); any other: `len` = a 64-bit number (§2's `freadLong`, its message at
-  the end of the file). Returns the tag.
+  the end of the file). Returns the tag. Tag 30's length cut by the end of the file takes the tag
+  number's bytes for its missing ones (FS-49, §100: at the very end 30, so `len` 29).
 - **`znzTAGreadStart(fp, &len, tagwithzerolen)`** (znz file): returns 0 (leaving `len`) when the
   file is at its end before the tag number is read, or after it; a `tagwithzerolen` other than 0
   equal to the tag gives `len` 0; tags 10, 11, 12 also have no length field; otherwise as above.
@@ -354,9 +357,11 @@ too. A compressed (znz) version 2 reads at most 1,023 bytes of each name. Defect
   (version 2) in both modes with `CTABreadFromBinaryV<k>: could not allocate <n> entries`
   (`ERROR_NO_MEMORY`), notes version-1 counts above 65,536 and name lengths above 2^24 the file does
   not hold.
-- FS-192: a file that ends inside the table: FreeSurfer's missing numbers are memory contents. Rule
-  B: by default the error `CTABreadFromBinaryV<k>: the file ends inside the colour table`
-  (`ERROR_BADFILE`) and no table; `reproduce` the table with the missing numbers 0.
+- FS-192: a file that ends inside the table: FreeSurfer's missing numbers are memory contents, or on
+  a C stream the earlier number's bytes (FS-49, §100). Rule B: by default the error
+  `CTABreadFromBinaryV<k>: the file ends inside the colour table` (`ERROR_BADFILE`) and no table;
+  `reproduce` the table with the missing numbers FreeSurfer's where §100 gives them, else 0 (noted as
+  memory contents).
 
 ## 14. Tag lengths (`FStagsIO::getlen_*`)
 
@@ -2661,3 +2666,32 @@ type, `NIFTI1_FILE` for pairs). Measured (2026-11-14): seed 13, 5,769 `nrd`, `nr
 readers (`mrd`, `mrh`, `mri`, `mgr`, which now reach the NIfTI readers for `.nii` names and `@nii`):
 identical on 6,919, 0 different (834 SKIP, 322 VARY). `fix` differs only with notices. The
 recorded test `fs_io_official` (4,799 cases: 4,341 identical, 458 counted).
+
+## 100. A number cut by the end of the file after another (FS-49 at fs.io's readers)
+
+`freadInt` and `freadDouble` (§2) read into the same eight bytes of memory for every call one
+reading function makes: `freadDouble` into all eight, `freadInt` into the last four. A number the file
+cuts after `k` of its bytes keeps, for the rest, what that memory held: after a `freadInt`, that
+number's bytes in file order; after a `freadDouble`, its eight bytes in reverse order (least
+significant first). When the reading function did anything else in between (an allocation, a name
+read, a print), the memory holds what that left: memory contents. Where FreeSurfer reads one number
+right after another:
+
+- `TAGreadStart` (C stream): tag 30's 32-bit length right after the tag number (§11): its missing
+  bytes are the tag number's (`00 00 00 1e`): cut at the very end, the length is 30 (`len` 29); after
+  `ab cd`, `0xabcd001e`.
+- The binary colour tables on a C stream (§13): the version and version 2's entry count (a file of
+  only `ff ff ff fe`: the count -2, `CTABreadFromBinaryV2: nentries was -2`); version 2's count of
+  entries to read and its first structure number, when `Gdiag` has no `DIAG_SHOW` (with it the print
+  comes between); each entry's red, green, blue and transparency, and in version 2 the next entry's
+  structure number after the transparency (a duplicate there gives `Duplicate structure <s>`; a
+  number at or past the count FS-189). Every other number cut by the end of the file (after the
+  table's allocation, a name, an entry's allocation) is memory contents. The znz readers (§3, FS-167)
+  are memory contents in larmorx (FreeSurfer's behave the same way; not reproduced).
+
+By default the missing bytes are 0 (noted: FS-49, FS-192); with `reproduce` the earlier number's bytes
+where the rule above gives them (the notice ends "as in FreeSurfer"), 0 elsewhere (noted as memory
+contents). Validation: `validation/probes/fs-io/fs49_slot_cases.py` (16 hand-made cases: `reproduce`
+identical on 13, the 3 others memory contents, observed 2026-11-14); the probe's `ctr` and `tr` cases
+(seed 7, 3,846 cases: identical on 2,697, 0 different; seed 13, 5,770: 4,045, 0 different), lines
+whose notices end "as in FreeSurfer" compared, the others counted apart.

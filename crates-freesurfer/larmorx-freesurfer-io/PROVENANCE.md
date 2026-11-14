@@ -317,3 +317,12 @@ function (`read_voxels`) with their differences as parameters (the count line, t
 `double`s and complex values); `mri_reshape`'s copy is `mriio_write::reshape` (the writer's ico7
 reshape generalised); `nifti1Read`'s cut names (FS-453) are larmorx's own under `reproduce`. The
 fixes of FS-454 to FS-460, FS-643 and FS-644 are larmorx's own.
+
+Changes for relay 25, FS-49 at fs.io's readers (findings Part 16): `fio::Slot49` models the eight
+bytes of memory the official build's `freadInt` (`utils/fio.cpp` 182) and `freadDouble` (169) read
+into for one calling function (from the unit oracle's `fio.cpp.o`, `tags.cpp.o` and `colortab.cpp.o`,
+`objdump`, and glibc 2.35's `feof`); `fread_int_in` / `fread_double_in` read through a caller's slot.
+`tags::tag_read_start` (`utils/tags.cpp` 51-75) keeps one slot for its two reads; the C-stream colour
+table reader (`utils/colortab.cpp` 351-830, both versions inlined into `CTABreadFromBinary` by GCC)
+keeps one for the whole read and forgets it at each other call FreeSurfer makes between two numbers.
+The default's zeros, the notices' texts and FS-192's split notice are larmorx's own.

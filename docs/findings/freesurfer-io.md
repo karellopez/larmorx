@@ -1302,3 +1302,75 @@ See `specs/freesurfer-io.md` §99 and the probe's README (piece 15). The recorde
 ARM NaN emulation (2,939 / 2,845 NaNs flipped) and on Windows x64 (the cross-check tool; the readers'
 unit tests too).
 
+
+## Part 16: FS-49 at fs.io's readers (relay 25 of track A, continued)
+
+FS-49's `reproduce` at the readers of fs.io that call `freadInt` (`TAGreadStart` on a C stream, the
+binary colour tables on a C stream), from the official object code (`objdump -d -r` of the unit
+oracle's `fio.cpp.o`, `tags.cpp.o`, `colortab.cpp.o`; GCC 8.4.0, the official flags) and glibc 2.35's
+`feof`:
+
+### Mechanisms
+- **One memory for every `freadInt` and `freadDouble` of a function.** `freadInt` (fio.cpp 182)
+  takes a 24-byte frame and reads into `0x4(%rsp)`: 28 bytes below its caller's stack pointer.
+  `freadDouble` (169) pushes `rbx`, takes 16 bytes and reads into `(%rsp)`: 32 bytes below the
+  caller's, so `freadInt`'s `int` is the `double`'s bytes 4 to 7 (relay 16's `MatrixReadFrom` slot,
+  the same layout). `fread` writes the bytes it gets and nothing else, so a number the file cuts keeps
+  the rest of that memory: after a `freadInt`, the file's bytes in file order (the swapped value is
+  only returned); after a `freadDouble`, its value least significant byte first (`movsd %xmm0,(%rsp)`
+  stores the swapped number back). Calls made by `freadInt` itself (`fread`, `swapInt`,
+  `ErrorPrintf`) lie below its frame. Any other function the caller calls between two reads can write
+  there (its return address and pushes cover those bytes from the third push on): larmorx treats that
+  memory as unknown after any other call.
+- **`TAGreadStart`** (tags.cpp 51): `freadInt` (the tag), `feof`, then for tag 30
+  (`TAG_OLD_MGH_XFORM`) `freadInt` (the length): both from one frame. glibc 2.35's `feof` (single
+  threaded: the `_IO_FLAGS2_NEED_LOCK` test jumps to a three-instruction tail) uses no stack; locked,
+  it pushes `rbp` and `rbx` (16 and 24 bytes below the caller) and writes 36 bytes below only when
+  the lock is contended: never the four bytes 28 below. A length cut after `k` bytes is therefore the
+  file's `k` bytes, then the tag's last `4 - k` bytes (`00 00 00 1e`): 30 at the very end (so `len`
+  29). A cut tag number sets the end-of-file flag, so `TAGreadStart` returns 0 before any length.
+- **The binary colour tables** (colortab.cpp 351-830): GCC inlines `CTABreadFromBinaryV1` and
+  `CTABreadFromBinaryV2` into `CTABreadFromBinary`: every `freadInt` of a read shares one memory.
+  The calls between them (the object code's order): version 2: `freadInt` (version), `freadInt`
+  (count), `calloc` x 2, `freadInt` (name length), `malloc`, `fread`, [`ErrorPrintf`], `strncpy`,
+  `free`, `freadInt` (count to read), [`__printf_chk` with `DIAG_SHOW`], then per entry `freadInt`
+  (structure), `malloc`, `freadInt` (name length), `malloc`, `fread`, [`ErrorPrintf`], `strncpy`,
+  `freadInt` x 4 (red, green, blue, transparency), the next entry's `freadInt` (structure) with no
+  call between. Version 1: `freadInt` (version, its count), `calloc` x 2, `freadInt` (name length),
+  `malloc`, `fread`, `strncpy`, `free`, then per entry `malloc`, `freadInt` (name length), `malloc`,
+  `fread`, [`ErrorPrintf`], `strncpy`, `freadInt` x 4. So the runs with nothing between are: (version,
+  version 2's count), (count to read, first structure) without `DIAG_SHOW`, (red, green, blue,
+  transparency, next structure) in version 2, (red, green, blue, transparency) in version 1.
+- **After a call, memory contents.** Observed: after an allocation or a name, the official build's
+  missing numbers were `-1721761792` in one run and `-933494784` in another (`0x99600000`,
+  `0xc8600000`: part of an address, which address-space randomisation moves): memory contents, as the
+  port notes them.
+- **znz readers (FS-167, not changed):** `znzreadInt` pushes `rbx`, takes 16 bytes and reads into
+  `0x4(%rsp)`: the same 28 bytes below its caller. The official build's znz colour table reader keeps
+  the earlier number's bytes the same way (fs49_slot_cases.py's last case); larmorx still reads 0 there
+  (FS-167: memory contents in both modes). A later relay can give FS-167's znz readers the same slot.
+
+### What larmorx does
+`larmorx_freesurfer_io::fio::Slot49` holds FreeSurfer's eight bytes with which of them are known;
+`fread_int_in` / `fread_double_in` read through a caller's slot (`fread_int` / `fread_double` use a
+fresh, unknown one: memory contents, as before). `tags::tag_read_start` keeps one slot for its two
+reads; `colortab_bin`'s C-stream reader keeps one for the whole read and forgets it at each call
+FreeSurfer makes between two numbers (the table's allocation, a name, an entry's allocation,
+`DIAG_SHOW`'s print). By default the missing bytes stay 0 (noted, FreeSurfer's being the earlier
+number's or memory contents); with `reproduce` the known bytes are FreeSurfer's and the notice says
+so ("... the others are the earlier number's, as in FreeSurfer"); unknown bytes stay 0 with the
+memory notice. FS-192's `reproduce` notice says "memory contents" only when a number of the read took
+an unknown byte. The probe compares the lines whose notices say "as in FreeSurfer".
+
+### Measured (2026-11-14, the probe, the unit oracle's build)
+- `validation/probes/fs-io/fs49_slot_cases.py`: 16 hand cases (5 tags, 11 colour tables): `reproduce`
+  identical on 13 (the 5 tags; version 1 and 2 tables cut inside a colour, a duplicate structure number
+  that comes from the last colour number, the count read from the version's bytes, `DIAG_SHOW`), the
+  other 3 marked memory contents (`VARY`) by the port; their official numbers are an address's bytes.
+  Its observed values are in `fio::tests::fs49_slot_keeps_the_earlier_numbers_bytes`.
+- Seed 7, 3,846 `ctr` and `tr` cases: `reproduce` identical on 2,697 (2,690 before), 0 different, 663
+  `VARY` (693 before), 486 `SKIP` (463: tables whose next structure number now comes from the last
+  colour number, beyond the table: FS-189, where FreeSurfer reads and writes outside it). Seed 13,
+  5,770 cases: identical on 4,045, 0 different. `fix` differs only with notices.
+- `fs_io_official` unchanged (its seed-1 set holds no such case), passes in debug and release, under
+  the ARM NaN emulation and on Windows x64.

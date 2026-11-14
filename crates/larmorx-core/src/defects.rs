@@ -1174,7 +1174,7 @@ defects! {
     FS_48 = "FS-48", "FreeSurfer", true,
         "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of a file keep, for the bytes they could not read, bytes of the number read before them (memory contents where none was read; freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with them";
+        "freadInt and freadDouble at the end of a file keep, for the bytes they could not read, bytes of the number read before them (memory contents where none was read just before; freadInt prints nothing): MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with them, and so do an old-style transform tag's length and a binary colour table's numbers cut by the end of the file";
     FS_50 = "FS-50", "FreeSurfer", true,
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,

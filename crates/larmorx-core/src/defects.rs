@@ -2095,6 +2095,8 @@ defects! {
         "writing a volume as an image file reports success (0) when the image is not written: the file cannot be opened, the format refuses the image (PGM, PPM, a JPEG or MATLAB name of a volume that is not of bytes), or a HIPS name, which writes nothing";
     FS_732 = "FS-732", "FreeSurfer", true,
         "writing a volume of a type image files do not take (16-bit, 64-bit, RGB and other types, with at least one row) as an image file goes on after MRItoImage's error: a crash (signal 11), or for PGM and PPM names the format's refusal and ImageFree: null pointer";
+    FS_733 = "FS-733", "FreeSurfer", true,
+        "writing a volume 32,768 voxels wide or wider as an ITK warp (a NIfTI displacement field) stores its width in the header's 16-bit field modulo 65,536 (negative, or a smaller width): a file ITK misreads";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

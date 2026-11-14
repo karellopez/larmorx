@@ -10,7 +10,8 @@
 //! name with `@<image type>`), PGM, PPM and PBM files, TIFF and JPEG files (not ported: SKIP),
 //! missing files and folders, with and without `#` frames; `ixw` (piece 17's `vwr`, `how` 31 or
 //! `MRIwrite` by the name) of volumes of every type as SGI, MATLAB (the JPEG writer), PGM, PPM,
-//! PBM, HIPS, TIFF and JPEG names, `#` and folder names, volumes 65,536 pixels wide or tall.
+//! PBM, HIPS, TIFF and JPEG names, `#` and folder names, volumes 65,536 pixels wide or tall; and
+//! of ITK warps (`how` 41: `itkMorphWrite`).
 
 use std::io::Write;
 
@@ -291,6 +292,9 @@ fn plain_volume(t: &mut Vec<String>, w: i64, h: i64, d: i64, ty: i32, nf: i64, v
 /// A write case: piece 17's `vwr` fields, `how` 31 (`MRIwriteType` as an image) or 1 (`MRIwrite`
 /// by the name).
 fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
+    if g.chance(5) {
+        return itk_case(g, t);
+    }
     let name = g.pick(&[
         "w/o.rgb",
         "w/o.rgb",
@@ -361,6 +365,50 @@ fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
     t.push(enc(Some(name.as_bytes())));
     let back = alloc && nf > 0 && g.chance(3);
     t.push(i64::from(back).to_string());
+    t
+}
+
+/// An ITK warp write: piece 17's `vwr` fields, `how` 41 (`MRIwriteType` as `ITK_MORPH`): float
+/// volumes of three frames (now and then another type, frame count or a width of 32,768), plain
+/// or compressed names (a final `z`), a missing folder.
+fn itk_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
+    let name = g.pick(&["w/w.nii", "w/w.nii.gz", "w/w.mgz", "w/no/w.nii", "w/w"]);
+    for v in ["N", "N", "0", "N"] {
+        t.push(v.into());
+    }
+    t.push(g.pick(&["0", "0", "10000040"]).into());
+    t.push("-".into());
+    t.push("0".into());
+    t.push("41".into());
+    match g.below(12) {
+        0 => plain_volume(&mut t, 32768, 1, 1, 3, 3, None),
+        1..=7 => {
+            let ty = if g.chance(8) {
+                g.pick(&[0i32, 1, 4])
+            } else {
+                3
+            };
+            let nf = if g.chance(8) { g.pick(&[1i64, 2]) } else { 3 };
+            let (w, h, d) = (g.int(1, 4), g.int(1, 3), g.int(1, 2));
+            let size = if ty == 0 {
+                1
+            } else if ty == 4 {
+                2
+            } else {
+                4
+            };
+            let n = (w * h * d * nf) as usize * size;
+            let vox: Vec<u8> = (0..n).map(|_| g.below(256) as u8).collect();
+            plain_volume(&mut t, w, h, d, ty, nf, Some(&vox));
+        }
+        _ => {
+            super::piece14::volume14(g, &mut t, false, false);
+        }
+    }
+    t.push("-1".into());
+    t.push(g.pick(&[-1i64, 0, 3]).to_string());
+    t.push(enc(Some(name.as_bytes())));
+    t.push("0".into());
     t
 }
 

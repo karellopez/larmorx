@@ -614,7 +614,6 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
     Some(match mtype {
         MRI_MINC_FILE => "MINC",
         MGH_MORPH => "GCA morph (m3z)",
-        ITK_MORPH => "ITK warp",
         _ => return None,
     })
 }
@@ -854,6 +853,8 @@ pub fn mri_write_type(
         mri_nrrd_write(g, err)
     } else if mtype == IMAGE_FILE {
         crate::imageio::write_from_volume(g, out, err, dir, m, fname)?
+    } else if mtype == ITK_MORPH {
+        crate::mriio_write::itk_morph_write(g, out, err, dir, m, fname)?
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,

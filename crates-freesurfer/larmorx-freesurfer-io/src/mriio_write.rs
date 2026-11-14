@@ -42,7 +42,7 @@ use std::path::Path;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
     FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444, FS_445, FS_446, FS_447, FS_448,
-    FS_449, FS_451, FS_452,
+    FS_449, FS_451, FS_452, FS_733,
 };
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
@@ -1974,4 +1974,160 @@ mod tests {
             assert!(g.notices.contains(&FS_452));
         }
     }
+}
+
+// ------------------------------------------------------------- ITK warps (`itkMorphWrite`)
+
+/// `NIFTI_INTENT_VECTOR`, `NIFTI_XFORM_ALIGNED_ANAT`.
+const NIFTI_INTENT_VECTOR: i16 = 1007;
+const NIFTI_XFORM_ALIGNED_ANAT: i16 = 2;
+
+/// `itkMorphWrite(mri, fname)` (`MRIwriteType` of `ITK_MORPH`, three frames checked before): the
+/// volume as an ITK displacement field, a NIfTI-1 file (compressed when the name ends in `z`):
+/// five dimensions (width, height, depth, 1, frames), the voxel sizes and the other `pixdim`s 0,
+/// floats only (`itkMorphWrite(): unknown data type <t>`, `ERROR_BADPARM`, the program's `errno`
+/// text first when it has one), the vector intent (1007), voxel offset 352, `regular` `r`, millimetres,
+/// the description `FreeSurfer <build date>`, the quaternion with the aligned-anatomy code (2) and
+/// the affine with the scanner code (1) as [`nii_write`]'s; then 4 zero bytes (no extension) and
+/// the voxels frame by frame. The sizes as the NIfTI writers check them (more than 32,768 rows,
+/// slices or frames end the program, FS-449 at 32,768); FS-733: the width is not checked.
+/// `itkMorphWrite(): error opening file <f>`, `error writing header to <f>`, `error writing data to
+/// <f>` (`ERROR_BADFILE`). FreeSurfer does not check the close.
+pub fn itk_morph_write(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    m: &Mri,
+    fname: &str,
+) -> Result<i32, Fatal> {
+    let use_compression = fname.as_bytes().last() == Some(&b'z');
+    if g.gdiag_no > 0 {
+        let _ = writeln!(
+            out,
+            "itkMorphWrite: use_compression = {}",
+            i32::from(use_compression)
+        );
+    }
+    let (w, h, d, nf) = (m.vg.width, m.vg.height, m.vg.depth, m.nframes);
+    if w >= SHORTMAX {
+        g.notices.add(
+            &FS_733,
+            format!(
+                "itkMorphWrite of a volume {w} wide: its 16-bit width holds {}",
+                w as i16
+            ),
+        );
+        if g.notices.fix() {
+            let _ = writeln!(
+                out,
+                "NIFTI FORMAT ERROR: ncols {w} in volume exceeds {}",
+                SHORTMAX - 1
+            );
+            return Err(Fatal::Exit(1));
+        }
+    }
+    nifti_size_checks(g, out, "itkMorphWrite", h, d, nf)?;
+    let mut hdr = NiftiHeader([0u8; 348]);
+    hdr.i32_at(0, 348);
+    for t in 0..8 {
+        hdr.dim(t, 1);
+        hdr.pixdim(t, 0.0);
+    }
+    hdr.dim(0, 5);
+    hdr.dim(1, w as i16);
+    hdr.dim(2, h as i16);
+    hdr.dim(3, d as i16);
+    hdr.dim(4, 1);
+    hdr.dim(5, nf as i16);
+    hdr.pixdim(1, m.vg.xsize);
+    hdr.pixdim(2, m.vg.ysize);
+    hdr.pixdim(3, m.vg.zsize);
+    if m.mtype != MRI_FLOAT {
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("itkMorphWrite(): unknown data type {}", m.mtype),
+        );
+        return Ok(ERROR_BADPARM);
+    }
+    hdr.i16_at(70, DT_FLOAT);
+    hdr.i16_at(72, 32);
+    hdr.i16_at(68, NIFTI_INTENT_VECTOR);
+    hdr.f32_at(108, 352.0);
+    hdr.0[38] = b'r';
+    hdr.0[123] = 2; // NIFTI_UNITS_MM
+    let descrip = format!("FreeSurfer {BUILD_DATE}");
+    hdr.0[148..148 + descrip.len()].copy_from_slice(descrip.as_bytes());
+    let r = mri_to_nifti_qform(g, out, err, m, &mut hdr)?;
+    if r != NO_ERROR {
+        return Ok(r);
+    }
+    hdr.i16_at(252, NIFTI_XFORM_ALIGNED_ANAT);
+    mri_to_nifti_sform(g, out, err, m, &mut hdr)?;
+    hdr.0[344..348].copy_from_slice(b"n+1\0");
+    let path = utils::resolve(dir, fname);
+    let Some(mut file) = ZnzFile::open(path.as_os_str().as_encoded_bytes(), b"w", use_compression)
+    else {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("itkMorphWrite(): error opening file {fname}"),
+        ));
+    };
+    let fp = &mut file;
+    if fio::fs_znzwrite(fp, &hdr.0, 348, 1) != 1 {
+        file.close();
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("itkMorphWrite(): error writing header to {fname}"),
+        ));
+    }
+    if fio::fs_znzwrite(fp, &[0u8; 4], 1, 4) != 4 {
+        file.close();
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("itkMorphWrite(): error writing data to {fname}"),
+        ));
+    }
+    // a volume without voxels: FreeSurfer takes its rows' addresses from slices it does not have
+    // (a crash)
+    if m.chunk.is_none() && i64::from(d.max(0)) * i64::from(nf.max(0)) * i64::from(h.max(0)) > 0 {
+        g.notices.add(
+            &FS_58,
+            "itkMorphWrite of a volume made without voxels".to_string(),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            "itkMorphWrite(): the volume has no voxels (FreeSurfer crashes here)\n",
+        )?;
+    }
+    let n = w.max(0) as usize;
+    for t in 0..nf {
+        for k in 0..d {
+            for j in 0..h {
+                let row = ((t * d + k) * h + j) as usize;
+                let b = nifti_row(g, m, row, 4, false, "itkMorphWrite");
+                if fio::fs_znzwrite(fp, &b, 4, n) != n as i64 {
+                    file.close();
+                    return Ok(fail_code(
+                        g,
+                        err,
+                        ERROR_BADFILE,
+                        &format!("itkMorphWrite(): error writing data to {fname}"),
+                    ));
+                }
+            }
+        }
+    }
+    file.close();
+    Ok(NO_ERROR)
 }

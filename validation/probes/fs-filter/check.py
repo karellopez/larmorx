@@ -44,7 +44,8 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # floats past its memory), FS-549 (a kernel longer than the index tables), FS-550 (a crash), FS-551
 # (a matrix written past its end), FS-552 (a crash), FS-555 (a Sobel filter writing outside its
 # destination), FS-163 (a copy into a volume of fewer frames: FreeSurfer writes past it), FS-559
-# (border labels written outside the destination), FS-560 (a histogram bin before its start)
+# (border labels written outside the destination), FS-560 (a histogram bin before its start), FS-561
+# (a region growing that never ends: the official run's alarm)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -60,6 +61,7 @@ SKIP = (
     "FS-163",
     "FS-559",
     "FS-560",
+    "FS-561",
 )
 
 

@@ -11,8 +11,9 @@
 use std::collections::VecDeque;
 use std::io::Write;
 
+use larmorx_core::defects::FS_561;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_mri::mri::{MRI_INT, MRI_UCHAR, Mri, mri_alloc, mri_copy_header};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
@@ -72,6 +73,10 @@ fn grass_fire(
         max: pt,
     };
     mri_set_vox_val(g, err, labels, pt[0], pt[1], pt[2], 0, label as f32, 0)?;
+    // FS-561: a label stored as 0 marks nothing: a voxel pushed twice means FreeSurfer's queue
+    // never empties (two object voxels push each other for ever)
+    let zero = mri_get_vox_val(g, err, labels, pt[0], pt[1], pt[2], 0, 0)? == 0.0;
+    let mut pushed = std::collections::HashSet::new();
     let mut q = VecDeque::from([pt]);
     while let Some(c) = q.pop_front() {
         r.size += 1;
@@ -85,6 +90,21 @@ fn grass_fire(
                 let l = mri_get_vox_val(g, err, labels, n[0], n[1], n[2], 0, 0)?;
                 if l == 0.0 && mri_get_vox_val(g, err, orivol, n[0], n[1], n[2], 0, 0)? > 0.0 {
                     mri_set_vox_val(g, err, labels, n[0], n[1], n[2], 0, label as f32, 0)?;
+                    if zero && !pushed.insert(n) {
+                        g.notices.add(
+                            &FS_561,
+                            format!("the region growing's label {label} is stored as 0: FreeSurfer never ends"),
+                        );
+                        log::error_exit(
+                            g,
+                            err,
+                            ERROR_BADPARM,
+                            &format!(
+                                "GrassFire: the label {label} is stored as 0 in the label volume: the region growing never ends (FreeSurfer hangs here)\n"
+                            ),
+                        )?;
+                        return Ok(r);
+                    }
                     q.push_back(n);
                 }
             }
@@ -120,6 +140,9 @@ pub fn grass_fire18(
     grass_fire(g, err, orivol, labels, label, pt, &OFF26[..18])
 }
 
+/// FS-561: a label the label volume stores as 0 makes FreeSurfer's growing endless when two object
+/// voxels of the region touch: an error here in both modes.
+///
 /// `RemoveHoles(orivol)`: the background (voxels at or below 0, NaN being object) connected by
 /// faces to the voxels of the first row of the first slice that are background is kept; every
 /// other voxel of the volume is set to 1 (`MRIsetVoxVal`).

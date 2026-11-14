@@ -1683,6 +1683,8 @@ defects! {
         "the border voxel classifier (MRIborderClassifyVoxel, used by MRIreclassify) computes the gray-matter likelihood with the white matter's variance, and when both likelihoods are 0 divides the white one by 0 (its probability NaN, the voxel taken as white)";
     FS_559 = "FS-559", "FreeSurfer", true,
         "MRImarkBorderVoxels of a uchar volume given a destination that is not uchar, or smaller than the source, writes its labels as bytes into other voxels or outside the destination (memory corruption)";
+    FS_561 = "FS-561", "FreeSurfer", true,
+        "the region growing of the connected components (GrassFire6, GrassFire18) given a label that its label volume stores as 0 (0 itself, or a value the volume's type clamps or rounds to 0) never ends when two object voxels of the region touch: the program hangs while its memory grows";
     FS_560 = "FS-560", "FreeSurfer", true,
         "the white and gray class statistics (MRIcomputeClassStatistics) of an intensity volume with negative values or NaNs count them in a histogram bin before its start (memory corruption)";
     FS_221 = "FS-221", "FreeSurfer", true,

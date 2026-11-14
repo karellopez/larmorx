@@ -1138,3 +1138,30 @@ larmorx-freesurfer-io's `mriio_write.rs` (`mgh_write`, `mri_tag_write`), wired i
   ARM NaN emulation (debug and release) and on Windows x64 (the cross-check tool on the Windows
   laptop; seed 1's set compared case by case: only the probe's relative-folder `bvw` artefact).
 
+### NIfTI (`niiWrite`, mriio.cpp 9522-9760; same relay)
+- `niiWrite` reshapes an ico7 overlay with `mri_reshape(mri0, 27307, 1, 6, nframes)` (mri2.cpp 653-735:
+  `MRIallocSequence`, `MRIcopyHeader`, `MRIcopyPulseParameters`, a voxel copy whose `switch` has only
+  uchar, short, ushort, float, int and long) and writes, and changes the intent of, the copy; the
+  port's `reshape_ico7` (mri2.cpp is fs.volume's: written here for this one call).
+- `mriToNiftiQform` (10245-10398) works in `float r11..r33, a, b, c, d, xd, yd, zd, r_det` with
+  `double` literals (`1.0`, `0.5`, `0.25`) and `sqrt` (double): each statement rounds to float at the
+  assignment; `qfac` starts at -100000 and stays there when `r_det == 0.0` (only a printed warning).
+  `extract_i_to_r` gives the offsets; `mriToNiftiSform` (10229) copies `MRIxfmCRS2XYZ(mri, 0)`.
+- `hdr.dim[2..4]` are `short`s: the checks `mri->height > shortmax` (and depth, frames) with
+  `shortmax = (int)pow(2, 15)` let 32,768 through, stored as -32,768 (FS-449). `hdr.dim[1]` for 32,768
+  columns and more is -1 with the count in `glmin` (FreeSurfer's own convention, its reader's).
+- `MRI_LONG` maps to `DT_SIGNED_INT`, `bitpix` 32, and the data loop writes `znzwrite(buf, bitpix / 8,
+  width)` from `&MRIseq_vox(mri, 0, j, k, t)`: the first `4 width` bytes of a row of `8 width` (FS-447).
+- `sprintf(hdr.descrip, "FreeSurfer %s", __DATE__)`: `Mar 14 2026` in the official 8.2.0 binaries
+  (`strings` of `bin/mri_convert`) and in the unit oracle's `libutils.a` alike.
+- `__getMRITAGlength` (12538-12731) mirrors `MRITAGwrite`'s order with `FStagsIO::getlen_*` and the
+  same `frames[0]` test (FS-441); `__writeFSniiextensionHeader` (12865-12899) assigns the `unsigned
+  short` intent to `mri->intent` (an intent of 65,539 becomes 3 there, where `mghWrite` keeps 65,539).
+- `znzclose(fp)`'s result is ignored (FS-448); the header, the extension flag and each row's
+  `znzwrite` are checked (`ErrorReturn` after `znzclose`). The ErrorReturns for the types do not set
+  `errno = 0` first.
+- Measured: seed 13, 3,920 `mgw`/`mwr` cases (788 NIfTI names, 41 ico7, 43 of 32,768 rows): reproduce
+  identical on 3,603, 0 different. Three differences before the FS-58 checks: header-only volumes
+  written as NIfTI (and one reshaped) crash FreeSurfer at the first row (`MRIseq_vox` on `slices`,
+  NULL).
+

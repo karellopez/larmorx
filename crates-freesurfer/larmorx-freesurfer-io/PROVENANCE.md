@@ -269,6 +269,8 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 11247-11518; `include/mri.h` 2027 | `mghWrite` (FS-439 to FS-446, FS-58) | `mriio_write.rs` |
 | `utils/mriio.cpp` 12421-12534 | `MRITAGwrite` (FS-441) | `mriio_write.rs` |
 | `utils/mriio.cpp` 1197-1198 | `MRIwriteType`'s MGH branch | `mriio.rs` |
+| `utils/mriio.cpp` 9522-9760, 10229-10398, 12538-12731, 12865-12899; `utils/mri2.cpp` 653-735 | `niiWrite` (FS-447, FS-448, FS-449, FS-58), `mriToNiftiSform`, `mriToNiftiQform`, `__getMRITAGlength`, `__writeFSniiextensionHeader`, `mri_reshape` as `niiWrite` calls it (the ico7 surface) | `mriio_write.rs` |
+| `utils/mriio.cpp` 1206-1210 | `MRIwriteType`'s NIfTI branch | `mriio.rs` |
 | `utils/utils.cpp` 1551-1556 | `exec_progress_callback` (no callback in the port's programs: nothing) | (not translated) |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
@@ -281,4 +283,7 @@ the writes and the close is larmorx's own (FreeSurfer has none). The tag readers
 the file, which they do not use; `mghRead`'s skip before the file's start sets `errno` EINVAL (glibc's
 `fseek`); `utils::resolve` keeps an empty name empty (`FileExists("")` is false in FreeSurfer: the
 folder opened instead); `minc::input_transform_file` gives volume_io the program's folder with `/`
-on Windows (volume_io's escape, FS-79's `reproduce`, dropped its backslashes).
+on Windows (volume_io's escape, FS-79's `reproduce`, dropped its backslashes). `niiWrite`'s header is built as
+the bytes of `struct nifti_1_header` in x86-64's memory; its data are written one slice per write (each
+row's count was checked; a slice's count is); the warp map's format change (`Warpfield::changeFormat`)
+is not ported yet (a message, -1).

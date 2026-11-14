@@ -18,7 +18,7 @@ Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 
 schemas; §75 (3.1-34): the rest of the registration files; part 10 (§76-82): labels, control points,
 annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; part 12
 (§87-89): a label's coordinates converted, one frame of a volume written; **part 13** (§90-92): MGH and
-MGZ volumes written, the tags written after them.
+MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94).
 
 ## 1. Conventions
 
@@ -2103,7 +2103,8 @@ beside it: `Saving bvals and bvecs` on standard output, `<stem>.bvals` and
 `<stem>.<scanner|voxel|unknown>_space.bvecs` (§ on `DTIwriteBValues`/`DTIwriteBVectors`), the stem the
 name without its volume extension (`IDstemFromName`; none: nothing more written). Not ported yet in
 larmorx (a message, status -1): COR, MINC, image, `.bhdr`, bshort, bfloat, ANALYZE, ANALYZE 4D, BRIK,
-GCA and ITK morphs, GDF, NIfTI-1, NIfTI, NRRD. MGH and MGZ: §90 (`mghWrite(mri, name, -1, intent)`).
+GCA and ITK morphs, GDF, NIfTI-1 (`.img`/`.hdr`), NRRD. MGH and MGZ: §90 (`mghWrite(mri, name, -1,
+intent)`); NIfTI (`.nii`, `.nii.gz`): §93 (`niiWrite(mri, name, intent)`).
 
 ## 85. Reading point sets (`loadfsPointSet`)
 
@@ -2334,3 +2335,86 @@ cases of every command: identical on 10,807, 0 different; piece 13 seed 13, 3,00
 2,930, 0 different; `fix` differs only with notices (FS-01, FS-439, FS-442, FS-443). The recorded
 tests (`tests/fs_io_official.rs`: 4,799 cases, 4,327 identical, 472 counted; `fs_io13_official`: 1,200,
 1,174 identical, 26 counted) on every platform.
+
+## 93. NIfTI written (`niiWrite(mri, name, intent)`, `.nii` and `.nii.gz`)
+
+The file is compressed (gzip) when the name's last character is `z`. With `Gdiag_no` above 0:
+`niiWrite: use_compression = <0|1>` on standard output.
+
+- **The ico7 surface:** a volume of 163,842 x 1 x 1 is written as 27,307 x 1 x 6 (a new volume with
+  the volume's header and pulse parameters; uchar, short, unsigned short, float, int and long voxels
+  copied in the same order, the other types' zeros; a volume made without voxels of those types:
+  FS-58, the program ends). Everything below (the header, the intent's change) uses that new volume;
+  the caller's volume is not changed.
+- **Limits:** more than 32,768 rows, slices or frames: `NIFTI FORMAT ERROR: nrows <n> in volume
+  exceeds 32768`, `NIFTI FORMAT ERROR: nslices <n> ...`, `NIFTI FORMAT ERROR:  nframes <n> ...` (two
+  blanks) on standard output and the program ends with status 1. FS-449: exactly 32,768 passes and is
+  stored as -32,768 in the 16-bit field; `fix` ends the program with the same message and `exceeds
+  32767`, `reproduce` writes FreeSurfer's header (notice). Columns: 32,768 or more are stored as -1 in
+  `dim[1]` and the count in `glmin`.
+- **The header** (348 bytes, the machine's little-endian order): `sizeof_hdr` 348; every `dim` and
+  `pixdim` 1 first; `dim[0]` 3 for one frame, else 4; `dim[1..4]` the extent and the frames;
+  `pixdim[1..3]` the voxel sizes, `pixdim[4]` TR / 1000 (in double, stored as float); type and bits:
+  uchar 2/8, int and long 8/32 (FS-447), float 16/32, float complex 32/64, short 4/16, unsigned short
+  512/16; a bitmap or tensor volume: `niiWrite(): data type MRI_BITMAP unsupported` /
+  `MRI_TENSOR unsupported` (`ERROR_UNSUPPORTED`, -3), another type `niiWrite(): unknown data type <t>`
+  (`ERROR_BADPARM`, -4), nothing written (these errors keep `errno`). `intent_code` 0, `vox_offset`
+  352 (before the extension), `scl_slope` 0, `xyzt_units` 10 (millimetres and seconds), the
+  description `FreeSurfer Mar 14 2026` (the official build's date), the rest 0. A warp map (the
+  volume's intent 3): `intent_code` 1006 (displacement vectors), `dim[0]` 5, `dim[4]` 1, `dim[5]` the
+  frames, `[INFO] niiWrite(): MGZ_INTENT_WARPMAP => NIFTI_INTENT_DISPVECT, intent_code = 1006,
+  dimensions = {<dim[0]>, ..., <dim[7]>}`; a warp-field format other than 3 (RAS displacements) is
+  converted first (`[INFO] niiWrite(): convert displacement from <f> to 3`; not in larmorx yet: a
+  message and -1).
+- **The quaternion** (`qform_code` 1), from the direction cosines `R` (columns x, y, z), in `float`
+  arithmetic with the constants and square roots in `double`: `det(R)` (as `R11 (R22 R33 - R32 R23) -
+  R12 (R21 R33 - R31 R23) + R13 (R21 R32 - R31 R22)`, each product and difference rounded to float in
+  that order); 0: `WARNING: bad orientation matrix (determinant = 0) in nifti1 file ...` and ` ...
+  continuing.` on standard output, `qfac` -100000 (stored in `pixdim[0]`); above 0: `qfac` 1; below 0
+  (or NaN): the third column negated, `qfac` -1. Then `a = R11 + R22 + R33 + 1` (the sum of the three
+  in float, plus 1 in double, stored as float); `a > 0.5`: `a = 0.5 sqrt(a)`, `b = 0.25 (R32 - R23) / a`,
+  `c = 0.25 (R13 - R31) / a`, `d = 0.25 (R21 - R12) / a`; otherwise `xd = 1 + R11 - (R22 + R33)`, `yd = 1
+  + R22 - (R11 + R33)`, `zd = 1 + R33 - (R11 + R22)` (float sums, the rest in double, stored as float):
+  `xd > 1`: `b = 0.5 sqrt(xd)`, `c = 0.25 (R12 + R21) / b`, `d = 0.25 (R13 + R31) / b`, `a = 0.25 (R32 -
+  R23) / b`; else `yd > 1`: `c = 0.5 sqrt(yd)`, `b = 0.25 (R12 + R21) / c`, `d = 0.25 (R23 + R32) / c`, `a
+  = 0.25 (R13 - R31) / c`; else `d = 0.5 sqrt(zd)`, `b = 0.25 (R13 + R31) / d`, `c = 0.25 (R23 + R32) / d`,
+  `a = 0.25 (R21 - R12) / d`; then `a < 0` negates `b`, `c`, `d`. Each step: the float difference or sum,
+  times 0.25 in double, divided by the float in double, stored as float. The offsets: the fourth
+  column of the voxel-to-RAS matrix (`specs/freesurfer-mri.md`'s `MRIxfmCRS2XYZ` with base 0, no
+  shear). **The affine** (`sform_code` 1): its first three rows. The magic `n+1\0`.
+- **The file** (`niiWrite(): error opening file <name>`, `ERROR_BADFILE`, -5, `errno` 0, when it does
+  not open): the extension's length is the tags' (§91's in the extension's form: each tag with its
+  number and 64-bit length; §14's lengths) plus 12, rounded up to a multiple of 16; `vox_offset` grows
+  by it (float). The header (`niiWrite(): error writing header to <name>` when it does not write),
+  the four bytes `1 0 0 0` (`niiWrite(): error writing data to <name>`), the extension's size and code
+  14 (32-bit, little-endian), `>`, the intent (16 bits, big-endian) and the version's low byte (an
+  `intent` other than -1 becomes the volume's intent, truncated to 16 bits, and its version
+  `(intent << 8) | 1` first), the tags (§91 with `niftiheaderext`), zeros to the length; then the
+  voxels as the volume stores them (little-endian), frame by frame, slice by slice, row by row (a row
+  that does not write: `niiWrite(): error writing data to <name>`, -5, the file closed). A volume made
+  without voxels (any row to write): FS-58, the program ends. FS-447: a long volume declares 32-bit
+  numbers and FreeSurfer writes the first half of each row's bytes; `fix` writes each value as a
+  32-bit number, clamped to its range (notice when clamped), `reproduce` FreeSurfer's bytes. FS-448:
+  the close's failure is ignored (status 0); `fix` gives `niiWrite(): error writing data to <name>`
+  (-5). With `DIAG_INFO`: `[DEBUG] __getMRITAGlength(): dlen = 0     ` and a line `[DEBUG]
+  __getMRITAGlength(): +<len %-6lld>, dlen = <%-6lld> (TAG = <%-2d>)` per tag; `[DEBUG] niiWrite():
+  mgztaglen = <l>, esize = <e>` (before the rounding), `[DEBUG] niiWrite(): updated vox_offset = <v>
+  (mgztaglen = <l>, esize = <e>)`; the extension header's three lines (`[DEBUG]
+  __writeFSniiextensionHeader(): intent (user) = ..., mri->intent (orig) = ..., mri->version (orig) =
+  ...`, `... intent swapped byte order (<lo> <hi>) => (<hi> <lo>)`, `... intent = <i>, mgh version = <v>,
+  mri->intent (new) = ..., mri->version (new) = ...`, `... <four bytes %02x>`); the tags' lines (§16,
+  §91); `[DEBUG] niiWrite(): mgztaglen = <l>, esize = <e>, reminder = <r>` and `[DEBUG] niiWrite(): write
+  freesurfer header-extension, mgztaglen = <l>, esize = <e>, ecode = 14`. The status is 0.
+
+## 94. Validation plan (NIfTI)
+
+Piece 14's `mgw` through `MRIwrite` with the names `.nii`, `.nii.gz`, `.NII` and `o.nii.mgz.nii`
+(§92's volumes; the read back gives `mghRead`'s refusal), with the ico7 shape (one case in 16 of
+NIfTI names: 163,842 x 1 x 1, uchar or float, one or two frames) and 32,768 rows (FS-449), the
+volumes' axes FreeSurfer's coronal ones, a signed permutation (one in two) or none (one in 40: the
+determinant's warning), now and then perturbed (non-orthonormal). The files are compared whole
+(inflated when compressed). Measured (2026-11-14): seed 13, 3,920 `mgw` and `mwr` cases (788 with
+NIfTI names, 41 ico7, 43 of 32,768 rows): `reproduce` identical on 3,603, 0 different (301 SKIP, 16
+VARY); `fix` differs only with notices (FS-447, FS-449 among them). The recorded test
+`fs_io_official` (4,798 cases, 4,286 identical, 512 counted).
+

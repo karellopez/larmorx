@@ -163,7 +163,9 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   FS-446 and the read back of files whose header does not match their data (piece 6's rules); `VARY` for FS-49,
   FS-167, FS-421. Seed 7, 588 `mgw` cases: `reproduce` identical on 495, 0 different; seed 13, 10,294 cases of `mgw`,
   `mwr`, `mgr`, `mrd`, `mrh`, `mri`, `mgi`: identical on 8,056, 0 different. Since relay 23 `mgi` prints the GIFTI
-  reader's colour-table entries without their tissue type and count (memory contents in FreeSurfer).
+  reader's colour-table entries without their tissue type and count (memory contents in FreeSurfer). NIfTI (`niiWrite`) through
+  `MRIwrite` with `.nii`, `.nii.gz`, `.NII` names, the ico7 shape and 32,768 rows, axes permuted with signs: seed 13,
+  3,920 `mgw`/`mwr` cases: identical on 3,603, 0 different.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

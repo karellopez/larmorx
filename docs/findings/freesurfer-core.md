@@ -271,3 +271,33 @@ Restricted (FreeSurfer's source lines). `utils/argparse.cpp`, `include/argparse.
     name and `unstrip`'s choice; libstdc++'s order depends on the runtime library's rehash policy.
 - Measured with the fs.io probe's piece 9 (`apa`): seed 13, 2,352 cases, `reproduce` identical on 2,265,
   0 different; 61 counted (an XML help rendered), 26 apart (order or time).
+
+## The XML help renderer (fsPrintHelp.cpp, relay 21 of track A)
+
+Restricted (FreeSurfer's internals). Behaviour: `specs/freesurfer-argparse.md` §7.
+
+- libxml2 is FreeSurfer's bundled 2.7.7 (`packages/xml2/libxml/xmlversion.h`), linked statically
+  into the programs. `xmlParseMemory(text, size)`: no document for size 0 (no message);
+  `parser.c` 7139-7142 and 7328-7331: predefined entities override any declaration, so the help
+  files' `<!ENTITY lt "#38;#60;">` changes nothing (no warning printed: the 86 files' official
+  outputs have no libxml2 text). With `keepBlanks` 1, `areBlanks` returns 0 whenever
+  `ignorableWhitespace == characters`, so the files' `<!ELEMENT>` declarations do not drop blank text.
+  Text nodes are named `xmlStringText` ("text"), comments "comment", processing instructions by their
+  target, CDATA sections have no name (`xmlNewCDataBlock` sets none): `tagNameIs` (`xmlStrcasecmp`)
+  of a NULL name is -1.
+- FS-434: `printContents` calls `strlen` on `xmlNodeListGetString(doc, cur->xmlChildrenNode, 1)`,
+  NULL when the node has no text, CDATA or entity-reference child: `SIGSEGV` (the probe: `CRASH 11`
+  after `\t\t\t\tHelp\n\nNAME`); `printName` of a CDATA node `strlen`s NULL. A comment or PI among
+  `arguments`' children does not crash: its (absent) children are not visited (FS-436).
+- FS-435: in `printContents`' inner `for (; j < FSPRINT_MAX_CHARS - tabNum * 8 + i; j++)` the outer
+  loop's `j++` runs once more before its condition fails, so `i = j` skips the character at the cut.
+  FreeSurfer 8.2.0's `mri_ca_normalize`, `mri_ca_register` and `mri_cal_renormalize_gca` help texts
+  have words longer than 62 or 70 characters (their `--help` drops characters).
+- `printName`'s `malloc` is never freed, `outputHelpDoc` frees the document only on its error paths:
+  leaks, no effect on output.
+- libxml2's error messages (`xmlParserPrintFileContextInternal`: the line around the input position up
+  to 80 bytes and a caret line, after `Entity: line <n>: parser error : `; after a fatal error the
+  parser goes on and later errors are printed too, e.g. one `Premature end of data in tag <t> line <n>`
+  per open element, innermost first) are not reproduced: only malformed texts reach them, and no
+  program's help text is malformed. Following libxml2's error recovery exactly would mean porting most
+  of `parser.c` (13,000 lines); a follow-up if a reachable path ever needs it.

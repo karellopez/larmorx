@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! Registration files (`utils/registerio.cpp`, item 3.1-34, taken early for track D's surfaces:
-//! the orchestrator, 2026-11-13): `regio_read_register`, with `float2int_code` (`utils/resample.cpp`,
-//! the method names it accepts).
+//! Registration files (`utils/registerio.cpp`, item 3.1-34; `regio_read_register` taken early for
+//! track D's surfaces, the orchestrator, 2026-11-13): `regio_read_register` with `float2int_code`
+//! (`utils/resample.cpp`, the method names it accepts), `regio_print_register`,
+//! `regio_write_register`, `regio_read_mincxfm`, `regio_write_mincxfm`, `regio_read_registermat`.
 //!
 //! A name ending in `.lta` (any case) is read as a linear transform array through the caller's
 //! [`RegisterLta`] (`LTAread` and `TransformLTA2RegDat` belong to fs.volume, a crate above this
@@ -271,6 +272,323 @@ pub fn regio_read_register(
         }
     }
     Ok(0)
+}
+
+/// `fgets` into a buffer of `n` bytes, as the C string it leaves (`None` at the end: the buffer
+/// unchanged); a failed read's `errno` kept.
+fn fgets_c(g: &mut Globals, fp: &mut CFile, n: usize) -> Option<Vec<u8>> {
+    let l = fp.fgets(n);
+    if l.is_none()
+        && let Some(e) = fp.read_errno()
+    {
+        g.errno = e;
+    }
+    l.map(|l| {
+        let end = l.iter().position(|&b| b == 0).unwrap_or(l.len());
+        l[..end].to_vec()
+    })
+}
+
+/// `fgetl(buf, n, fp)` with its return value unused: what the caller's buffer holds as a C string
+/// afterwards (its leading white space kept: `fgetl` returns a pointer past it). Lines empty or
+/// starting with `#` after white space are read and skipped; the line returned is cut at its first
+/// `#` and its newline. At the end of the file the buffer holds the last line read, unchanged.
+fn fgetl_into(g: &mut Globals, fp: &mut CFile, buf: &mut Vec<u8>, n: usize) -> bool {
+    loop {
+        let Some(line) = fgets_c(g, fp, n) else {
+            return false;
+        };
+        *buf = line;
+        let start = buf
+            .iter()
+            .position(|&b| !larmorx_freesurfer_core::cstd::is_space(b))
+            .unwrap_or(buf.len());
+        let cp = &buf[start..];
+        if cp.is_empty() || cp[0] == b'#' || cp[0] == b'\n' {
+            continue;
+        }
+        if let Some(h) = buf[start..].iter().position(|&b| b == b'#') {
+            buf.truncate(start + h);
+        }
+        if buf.last() == Some(&b'\n') {
+            buf.pop();
+        }
+        return true;
+    }
+}
+
+/// `printf(fmt, x)` of one `double` (`%f`, `%e`, `%18.15e `).
+fn fmt(f: &str, x: f64) -> String {
+    larmorx_freesurfer_core::cstd::format_double(f, x).expect("a double's format")
+}
+
+/// `regio_print_register(fp, subject, inplaneres, betplaneres, intensity, R, float2int)`: the
+/// subject (`subject-unknown` when none or empty), the three numbers (`%f`), the first three rows
+/// of `R` (each number `%18.15e` and a space, then a newline), `0 0 0 1`, then the method's name
+/// (`tkregister`, `floor`, `round`); 0. Another method: `ERROR: regio_print_register: f2i code =
+/// <code>, unrecoginized` on standard output (FreeSurfer's spelling) after the matrix, no method
+/// line, 1. `R` has at least 3 rows and 4 columns (every caller's 4 x 4).
+#[allow(clippy::too_many_arguments)]
+pub fn regio_print_register(
+    fp: &mut dyn Write,
+    out: &mut dyn Write,
+    subject: Option<&[u8]>,
+    inplaneres: f32,
+    betplaneres: f32,
+    intensity: f32,
+    r: &Matrix,
+    float2int: i32,
+) -> i32 {
+    let mut w: Vec<u8> = Vec::new();
+    match subject.map(|s| &s[..s.iter().position(|&b| b == 0).unwrap_or(s.len())]) {
+        Some(s) if !s.is_empty() => {
+            w.extend_from_slice(s);
+            w.push(b'\n');
+        }
+        _ => w.extend_from_slice(b"subject-unknown\n"),
+    }
+    for v in [inplaneres, betplaneres, intensity] {
+        w.extend_from_slice(fmt("%f\n", f64::from(v)).as_bytes());
+    }
+    for row in 1..=3 {
+        for col in 1..=4 {
+            w.extend_from_slice(fmt("%18.15e ", f64::from(r.relt(row, col))).as_bytes());
+        }
+        w.push(b'\n');
+    }
+    w.extend_from_slice(b"0 0 0 1\n");
+    let method = match float2int {
+        FLT2INT_TKREG => "tkregister",
+        FLT2INT_FLOOR => "floor",
+        FLT2INT_ROUND => "round",
+        _ => {
+            let _ = fp.write_all(&w);
+            let _ = writeln!(
+                out,
+                "ERROR: regio_print_register: f2i code = {float2int}, unrecoginized"
+            );
+            return 1;
+        }
+    };
+    w.extend_from_slice(method.as_bytes());
+    w.push(b'\n');
+    let _ = fp.write_all(&w);
+    0
+}
+
+/// `regio_write_register(regfile, subject, ...)`: [`regio_print_register`] into a new file; 0
+/// (whatever the print returned). A file that does not open: `regio_write_register: <errno's
+/// text>` (standard error), 1.
+#[allow(clippy::too_many_arguments)]
+pub fn regio_write_register(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    regfile: &str,
+    subject: Option<&[u8]>,
+    inplaneres: f32,
+    betplaneres: f32,
+    intensity: f32,
+    r: &Matrix,
+    float2int: i32,
+) -> i32 {
+    let mut fp = match CFile::open(dir, regfile, "w") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            let _ = writeln!(err, "regio_write_register: {}", strerror(e));
+            return 1;
+        }
+    };
+    regio_print_register(
+        &mut fp,
+        out,
+        subject,
+        inplaneres,
+        betplaneres,
+        intensity,
+        r,
+        float2int,
+    );
+    fp.close();
+    0
+}
+
+/// `regio_read_mincxfm(xfmfile, &R, &fileinfo)`'s outcome: the status, `R` (set once allocated,
+/// also when a number does not read) and the file information line (when asked for and read).
+#[derive(Debug, Default)]
+pub struct MincXfm {
+    pub status: i32,
+    pub r: Option<Matrix>,
+    pub fileinfo: Option<Vec<u8>>,
+}
+
+/// `regio_read_mincxfm(xfmfile, &R, fileinfo)`: an MNI `.xfm`'s 3 x 4 transform, read as twelve
+/// `%f` numbers from the start of the file's last three lines (lines counted in pieces of 999
+/// bytes), into a 4 x 4 matrix of zeros with 1 at (4, 4). The first line (by `fgetl`, the
+/// buffer's leading white space included) must start with `MNI Transform File`, else `ERROR:
+/// <name> does not start as 'MNI Transform File'` (no newline) and 1 (FS-422: FreeSurfer leaves
+/// the file open; both modes close it, no notice). The next line read by `fgetl` (the first
+/// line's own text again at the end of the file) is the file information: with `want_fileinfo`
+/// kept and printed as a newline, the line and two newlines; else `Not reading in xfm fileinfo`.
+/// A file that does not open: `regio_read_mincxfm: <errno's text>` (standard error), `ERROR: could
+/// not read <name>` (standard output), 1. A number that does not read: `regio_read_mincxfm():
+/// <errno's text>` and `Error reading R[<r>][<c>] from <name>` (standard error, 0-based), 1, the
+/// matrix read so far given.
+pub fn regio_read_mincxfm(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    xfmfile: &str,
+    want_fileinfo: bool,
+) -> Result<MincXfm, Fatal> {
+    let mut res = MincXfm::default();
+    let mut fp = match CFile::open(dir, xfmfile, "r") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            let _ = writeln!(err, "regio_read_mincxfm: {}", strerror(e));
+            let _ = writeln!(out, "ERROR: could not read {xfmfile}");
+            res.status = 1;
+            return Ok(res);
+        }
+    };
+    let mut buf: Vec<u8> = Vec::new();
+    fgetl_into(g, &mut fp, &mut buf, 900);
+    if buf.len() < 18 || &buf[..18] != b"MNI Transform File" {
+        let _ = write!(
+            out,
+            "ERROR: {xfmfile} does not start as 'MNI Transform File'"
+        );
+        res.status = 1;
+        return Ok(res);
+    }
+    fgetl_into(g, &mut fp, &mut buf, 900);
+    if want_fileinfo {
+        let mut m = b"\n".to_vec();
+        m.extend_from_slice(&buf);
+        m.extend_from_slice(b"\n\n");
+        let _ = out.write_all(&m);
+        res.fileinfo = Some(buf.clone());
+    } else {
+        let _ = out.write_all(b"Not reading in xfm fileinfo\n");
+    }
+    drop(fp);
+    let mut fp = match CFile::open(dir, xfmfile, "r") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            res.status = 1;
+            return Ok(res);
+        }
+    };
+    let mut nlines: i64 = 0;
+    while fgets_c(g, &mut fp, 1000).is_some() {
+        nlines += 1;
+    }
+    fp.rewind();
+    for _ in 0..nlines - 3 {
+        if fgets_c(g, &mut fp, 1000).is_none() {
+            let _ = err.write_all(b"regio_read_mincxfm(): could not read file\n");
+        }
+    }
+    let Some(mut r) = matrix_alloc(g, out, err, 4, 4, MATRIX_REAL)? else {
+        let _ = err.write_all(b"regio_read_mincxfm(): could not alloc R\n");
+        res.status = 1;
+        return Ok(res);
+    };
+    for row in 0..3 {
+        for col in 0..4 {
+            let mut errno = g.errno;
+            let (v, n) = {
+                let mut sc = Scanf::new(&mut fp);
+                let v = sc.f(&mut errno, true);
+                (v, sc.finish(&mut errno))
+            };
+            g.errno = errno;
+            if n != 1 {
+                let _ = writeln!(err, "regio_read_mincxfm(): {}", strerror(g.errno));
+                let _ = writeln!(err, "Error reading R[{row}][{col}] from {xfmfile}");
+                res.status = 1;
+                res.r = Some(r);
+                return Ok(res);
+            }
+            r.set_relt(row + 1, col + 1, v.unwrap_or(0.0));
+        }
+    }
+    r.set_relt(4, 4, 1.0);
+    res.r = Some(r);
+    Ok(res)
+}
+
+/// `regio_write_mincxfm(xfmfile, R, fileinfo)`: `MNI Transform File`, `% <fileinfo>` when given,
+/// `% This file was created by <program>`, `% <currentDateTime()>`, an empty line,
+/// `Transform_Type = Linear;`, `Linear_Transform =`, then `R`'s first three rows, each number `%e`
+/// and a space, the rows ended by a newline, the last by `;` and a newline; 0. A file that does not
+/// open: `regio_write_mincxfm: <errno's text>` (standard error), `Could open <name> for writing`
+/// (standard output, FreeSurfer's words), 1.
+#[allow(clippy::too_many_arguments)]
+pub fn regio_write_mincxfm(
+    g: &mut Globals,
+    env: &larmorx_freesurfer_core::run::Environment,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    xfmfile: &str,
+    r: &Matrix,
+    fileinfo: Option<&[u8]>,
+) -> i32 {
+    let mut fp = match CFile::open(dir, xfmfile, "w") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            let _ = writeln!(err, "regio_write_mincxfm: {}", strerror(e));
+            let _ = writeln!(out, "Could open {xfmfile} for writing");
+            return 1;
+        }
+    };
+    let mut w = b"MNI Transform File\n".to_vec();
+    if let Some(info) = fileinfo {
+        w.extend_from_slice(b"% ");
+        w.extend_from_slice(&info[..info.iter().position(|&b| b == 0).unwrap_or(info.len())]);
+        w.push(b'\n');
+    }
+    w.extend_from_slice(format!("% This file was created by {}\n", g.progname).as_bytes());
+    w.extend_from_slice(
+        format!(
+            "% {}\n",
+            larmorx_freesurfer_core::timer::current_date_time(env, true)
+        )
+        .as_bytes(),
+    );
+    w.extend_from_slice(b"\nTransform_Type = Linear;\nLinear_Transform =\n");
+    for row in 1..=3 {
+        for col in 1..=4 {
+            w.extend_from_slice(fmt("%e ", f64::from(r.relt(row, col))).as_bytes());
+        }
+        w.extend_from_slice(if row != 3 { b"\n" } else { b";\n" });
+    }
+    let _ = fp.write_all(&w);
+    fp.close();
+    0
+}
+
+/// `regio_read_registermat(regfile)`: [`regio_read_register`]'s matrix, `None` when it fails.
+pub fn regio_read_registermat(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    regfile: &str,
+    lta_io: &mut dyn RegisterLta,
+) -> Result<Option<Matrix>, Fatal> {
+    let mut reg = Register::default();
+    if regio_read_register(g, out, err, dir, regfile, &mut reg, lta_io)? != 0 {
+        return Ok(None);
+    }
+    Ok(reg.r)
 }
 
 #[cfg(test)]

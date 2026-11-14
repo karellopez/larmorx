@@ -31,6 +31,7 @@ import hashlib
 import itertools
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -55,7 +56,18 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # alarm, FS-367; the closest-vertex searches' and the spherical-triangle test's arrays, FS-370,
 # FS-371; the faces' walk around a vertex and the curvature sign of a face naming a vertex twice,
 # FS-372, FS-373; an MGH volume header without voxels read for a transform's volume, FS-76, whose
-# division by zero the official build turns into a crash): counted, never compared
+# division by zero the official build turns into a crash; the principal curvatures' range on a
+# surface without vertices, FS-376; the gradients' averaging over neighbour lists that are not
+# symmetric, FS-379; the vertex report's neighbour lines past the list, FS-380; a matrix on which
+# LINPACK's ssvdc never returns, FS-48h, the runner's mark for FS-48's hanging cases, ended by the
+# probe's alarm; relay 21, the GIFTI reader: more than 1,000 command lines (never returns), FS-382; a
+# face or sparse vertex outside the surface, FS-383, FS-384; a label key outside the colour table,
+# FS-386; a data array number outside the file's, FS-388; a negative label key, FS-389; a shape
+# overlay's data type and name, FS-391, FS-392; an overlay value written outside its volume, fs.mri's
+# FS-53; relay 22, the GIFTI volumes: a file mixing intents, whose intent FreeSurfer reads from
+# memory it never wrote, FS-521; relay 23, 3.1-51's leftovers: a volume of a smaller type read and
+# written as floats past its memory, FS-534; hop lists of fewer hops than the kernel, FS-533):
+# counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -85,7 +97,31 @@ SKIP: tuple[str, ...] = (
     "FS-372",
     "FS-373",
     "FS-76",
+    "FS-376",
+    "FS-379",
+    "FS-380",
+    "FS-48h",
+    "FS-382",
+    "FS-383",
+    "FS-384",
+    "FS-386",
+    "FS-388",
+    "FS-389",
+    "FS-391",
+    "FS-392",
+    "FS-53",
+    "FS-521",
+    "FS-533",
+    "FS-534",
 )
+# gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
+# setup (<da>,...`): the port
+# writes placeholders, the official build addresses
+POINTERS = re.compile(r"\(0x[0-9a-f]+,0x[0-9a-f]+,")
+A2D = re.compile(r"A2D: bad setup \(0x[0-9a-f]+,")
+# fs.io's gifti_get_DA_value_2D prints its array's address for an array without data (FS-214): the
+# port writes (nil)
+GET2D = re.compile(r"gifti_get_DA_value_2D, invalid params: data=0x[0-9a-f]+")
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 
@@ -103,6 +139,35 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     if cmd == "posn":
         return "cc" in toks or any(a == "sv" and b == "3" for a, b in itertools.pairwise(toks))
     return cmd == "mpd"
+
+
+#: Commands whose results go through the C library's double ``acos`` (the hinge and corner
+#: angles of ``mpg``): the port takes the correctly rounded one in both modes (the user's decision
+#: of 2026-11-04 for glibc's ``acos``, GLIBC-07), so a line may differ from FreeSurfer's in the
+#: last bits of the numbers that come from it; such lines are counted apart (every differing
+#: number at most two units in the last place away: the angle's two roundings after ``acos``),
+#: and the hash takes the port's line for them.
+ACOS = {"mpg"}
+
+
+def _ulps(a: str, b: str) -> int | None:
+    if len(a) != len(b) or len(a) not in (8, 16):
+        return None
+    try:
+        x, y = int(a, 16), int(b, 16)
+    except ValueError:
+        return None
+    if (x ^ y) >> (4 * len(a) - 1):
+        return None
+    return abs(x - y)
+
+
+def acos_last_bits(official: str, port: str) -> bool:
+    """Whether two lines differ only in numbers at most two units in the last place apart."""
+    a, b = official.split(" "), port.split(" ")
+    if len(a) != len(b) or a == b:
+        return False
+    return all(x == y or (_ulps(x, y) or 99) <= 2 for x, y in zip(a, b, strict=True))
 
 
 def probe_binary(ws: Path, name: str = "fssurfio") -> Path:
@@ -182,6 +247,14 @@ def main(argv: list[str] | None = None) -> int:
             official[i] = line
         served.append(done.cached)
 
+    official = [
+        GET2D.sub(
+            "gifti_get_DA_value_2D, invalid params: data=(nil)",
+            A2D.sub("A2D: bad setup (<da>,", POINTERS.sub("(<buf>,<blen>,", x)),
+        )
+        for x in official
+    ]
+
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(
             [str(port), "run", str(cases_path), mode], check=True, capture_output=True, text=True
@@ -197,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
     equal, differ, skipped = Counter(), Counter(), Counter()
     fix_differ, fix_unexplained, fix_ids, rep_ids = Counter(), Counter(), Counter(), Counter()
     fix_libm = Counter()
+    acos_differ = Counter()
     hashed = hashlib.sha256()
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
@@ -208,16 +282,21 @@ def main(argv: list[str] | None = None) -> int:
             skipped[cmd] += 1
             hashed.update(b"SKIP\n")
             continue
-        hashed.update(c.encode() + b"\n")
+        acos_only = cmd in ACOS and acos_last_bits(c, r)
+        hashed.update((r if acos_only else c).encode() + b"\n")
         if c == r:
             equal[cmd] += 1
+        elif acos_only:
+            acos_differ[cmd] += 1
         else:
             differ[cmd] += 1
             if len(first_differ) < 5:
                 first_differ.append(case[:200])
         if f != c:
             fix_differ[cmd] += 1
-            if not fids and libm_case(cmd, case.split()):
+            if not fids and (
+                libm_case(cmd, case.split()) or (cmd in ACOS and acos_last_bits(c, f))
+            ):
                 fix_libm[cmd] += 1
             elif not fids:
                 fix_unexplained[cmd] += 1
@@ -229,6 +308,7 @@ def main(argv: list[str] | None = None) -> int:
         "served": served,
         "reproduce_equal": sum(equal.values()),
         "reproduce_differ": dict(differ),
+        "reproduce_differ_acos_last_bits": dict(acos_differ),
         "skipped": dict(skipped),
         "reproduce_notices": dict(rep_ids),
         "fix_differ": dict(fix_differ),

@@ -23,4 +23,6 @@ Result (2026-11-13): two midpoints, `0x328885a3` (1.5893255e-08) and `0x39826222
 At both the true arc cosine lies above the midpoint (by 6.1e-17 and 1.0e-17), so the double
 rounded to float (ties to even: `0x3fc90fda`, `0x3fc907b4`) is one unit too low; the correctly
 rounded floats are `0x3fc90fdb` and `0x3fc907b5`. Every other float in [-1, 1] rounds correctly.
-`larmorx-freesurfer-surf`'s `discrete::acosf_cr` uses exactly that (the two exceptions as a table).
+`larmorx-freesurfer-surf`'s `discrete::acosf_cr` used exactly that (the two exceptions as a table) until
+`larmorx_core::math::acosf` (CORE-MATH's `cr_acosf`, `validation/investigations/coremath-acosf/`) arrived;
+the two agree on every float in [-1, 1], and `discrete::acosf` now calls `Libm::acosf`.

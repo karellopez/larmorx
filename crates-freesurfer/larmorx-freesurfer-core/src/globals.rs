@@ -101,6 +101,10 @@ pub struct Globals {
     /// The DICOM format probe's process-wide state: CTN's condition stack and `IsDICOM`'s
     /// `static` answer for the last name it was asked (fs.io's `identify`).
     pub dicom: DicomState,
+    /// gifticlib's settings and persistent state (its globals `G` and `GXD`, `larmorx_io::gifti`),
+    /// one per process as in FreeSurfer: the GIFTI volume functions (fs.io's `gifti_vol`) and the
+    /// GIFTI surface readers and writers (`utils/gifti.cpp`) share it.
+    pub gifti: larmorx_io::gifti::Gifti,
     /// `MRIsampleVolumeDerivativeSign` (`mri.cpp`): the sign the volume derivatives' magnitudes
     /// are multiplied by, 1 until `MRIsetSampleVolumeDerivativeSign` changes it.
     pub sample_volume_derivative_sign: f64,
@@ -164,6 +168,7 @@ impl Globals {
             vg_is_equal_threshold: f64::from(f32::EPSILON),
             mriio_strip_pound: 1,
             dicom: DicomState::default(),
+            gifti: larmorx_io::gifti::Gifti::default(),
             sample_volume_derivative_sign: 1.0,
             minc_find_volume_count: 0,
             notices: Notices::new(mode),

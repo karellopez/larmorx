@@ -20,6 +20,8 @@ pub mod coords;
 pub mod deriv;
 pub mod frames;
 pub mod image;
+pub mod io_frames;
+pub mod label_coords;
 pub mod labels;
 pub mod ltaread;
 pub mod mriset;

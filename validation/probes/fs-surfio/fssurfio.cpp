@@ -39,7 +39,10 @@
 #include <string>
 #include <vector>
 
+#include <zlib.h>
+
 #include "diag.h"
+#include "gifti.h"
 #include "error.h"
 #include "mrisurf_metricProperties.h"
 #include "mrisurf_MRIS.h"
@@ -50,6 +53,7 @@
 #include "mrisurf_sphere_interp.h"
 #include "matrix.h"
 #include "mrisutils.h"
+#include "surfgrad.h"
 #include "transform.h"
 #include "topo_parms.h"
 #include "tritri.h"
@@ -92,6 +96,8 @@ const char *Progname = "fssurfio";
 
 // relay 19: the obsolete H sign has no declaration in FreeSurfer's headers
 int MRIS_Hcurvature_determineSign(MRIS *apmris);
+// relay 20: declared in mrisurf_sseTerms.h (not included here)
+int mrisAverageSignedGradients(MRIS *mris, int num_avgs);
 
 namespace {
 
@@ -2269,6 +2275,394 @@ void srd_case()
 }
 
 
+// ---- relay 21: gii, the GIFTI surface reader (gifti.cpp's mrisReadGIFTIdanum) -------------------
+
+// A surface as gii prints it: counts, type, hemisphere, name, real-RAS flag, volume geometry,
+// centre, group-average area, command lines, the Talairach matrix, the colour table (each entry's
+// name and colours; no alpha for a colour array's table), per vertex its coordinates, curvature, val, stat, annotation, dx dy dz and
+// face count, per face its vertices
+void dump_gii_surface(MRIS *s)
+{
+  oi(s->nvertices); oi(s->nfaces); oi(s->type); oi(s->hemisphere); oh(s->fname.data());
+  oi(s->useRealRAS);
+  dump_vg(&s->vg);
+  of(s->xctr); of(s->yctr); of(s->zctr); of(s->group_avg_surface_area);
+  oi(s->ncmds);
+  for (int k = 0; k < s->ncmds; k++) oh(s->cmdlines[k]);
+  if (!s->SRASToTalSRAS_) out += "NULL ";
+  else
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) of(*MATRIX_RELT(s->SRASToTalSRAS_, r, c));
+  COLOR_TABLE *ct = s->ct;
+  if (!ct) out += "NULL ";
+  else {
+    oi(ct->nentries); oi(ct->version); oh(ct->fname);
+    for (int k = 0; k < ct->nentries; k++) {
+      CTE *e = ct->entries[k];
+      if (!e) { out += "- "; continue; }
+      // a colour array's table (makeColorTable's Unknown_Label_<k>): its alpha is memory
+      // contents (FS-393), not printed
+      bool alpha = strncmp(e->name, "Unknown_Label_", 14) != 0;
+      oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); if (alpha) oi(e->ai);
+      of(e->rf); of(e->gf); of(e->bf); if (alpha) of(e->af);
+    }
+  }
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    float c[9] = {v->x, v->y, v->z, v->curv, v->val, v->stat, v->dx, v->dy, v->dz};
+    for (float x : c) of(x);
+    oi(v->annotation); oi(s->vertices_topology[vno].num);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) {
+    FACE *f = &s->faces[fno];
+    oi(f->v[0]); oi(f->v[1]); oi(f->v[2]);
+  }
+}
+
+// gii: Gdiag's bits; the case's input files; a surface kept for the reads that pass one (made by
+// MRISalloc with <n> vertices and no faces, or none); a colour table for the reads that give one
+// (its entries: present or not, name, r g b a); 1 to 3 reads `<name> <daNum> <flags>` (flags 1:
+// pass the kept surface, 2: ask for the overlays, 4: give the colour table), each printed as
+// NULL, PASSED or NEW with the surface, then the overlays (name, type, intent, shape data type,
+// format, values per vertex, the volume's size and its first slice's values)
+void gii_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  int nkeep = geti();
+  MRIS *keep = nkeep > 0 ? MRISalloc(nkeep, 0) : NULL;
+  int nct = geti();
+  COLOR_TABLE *ctab = NULL;
+  if (nct >= 0) {
+    ctab = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+    ctab->nentries = nct;
+    ctab->version = 2;
+    ctab->entries = (COLOR_TABLE_ENTRY **)calloc(nct + 1, sizeof(COLOR_TABLE_ENTRY *));
+    strcpy(ctab->fname, "user.ctab");
+    for (int k = 0; k < nct; k++) {
+      if (!geti()) continue;
+      CTE *e = (CTE *)calloc(1, sizeof(CTE));
+      std::string name = geth();
+      strncpy(e->name, name.c_str(), sizeof(e->name) - 1);
+      e->ri = geti(); e->gi = geti(); e->bi = geti(); e->ai = geti();
+      e->rf = e->ri / 255.0f; e->gf = e->gi / 255.0f; e->bf = e->bi / 255.0f; e->af = e->ai / 255.0f;
+      ctab->entries[k] = e;
+    }
+  }
+  errno = 0;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    const char *nm = name_tok();
+    int danum = geti();
+    int flags = geti();
+    std::vector<OverlayInfoStruct> ov;
+    MRIS *in = (flags & 1) ? keep : NULL;
+    MRIS *r = mrisReadGIFTIfile(nm, in, (flags & 2) ? &ov : NULL, danum, (flags & 4) ? ctab : NULL);
+    if (!r) out += "NULL ";
+    else if (r == in) { out += "PASSED "; dump_gii_surface(r); }
+    else { out += "NEW "; dump_gii_surface(r); }
+    if (in) { out += "KEPT "; dump_gii_surface(in); }
+    oi((long long)ov.size());
+    for (OverlayInfoStruct &o : ov) {
+      if (o.__foverlay) oh(o.__foverlay); else out += "NULL ";
+      oi(o.__type); oi(o.__giftiIntent); oh(o.__shapedatatype); oi(o.__format);
+      oi(o.__nValsPerVertex);
+      MRI *m = o.__overlaymri;
+      if (!m) { out += "NULL "; continue; }
+      oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes);
+      for (int x = 0; x < m->width; x++) of(MRIgetVoxVal(m, x, 0, 0, 0));
+    }
+  }
+}
+
+
+// ---- relay 22: gwr, the GIFTI writers and GIFTI files as volumes ---------------------------------
+
+// a written GIFTI file as both sides print it: the UserName's value written U, each <Data>
+// payload Base64-decoded and inflated (zlib), written Z and its bytes in hex (B and the payload
+// itself when it does not inflate): the compressed bytes are zlib 1.2.11's here and zlib-rs's
+// in the port, the values the same
+int b64val(unsigned char c)
+{
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
+  return -1;
+}
+
+std::string gii_normal(const std::string &f)
+{
+  std::string s = f;
+  size_t u = s.find("<![CDATA[UserName]]></Name>");
+  if (u != std::string::npos) {
+    size_t v = s.find("<Value><![CDATA[", u);
+    if (v != std::string::npos) {
+      v += 16;
+      size_t e = s.find("]]>", v);
+      if (e != std::string::npos) s.replace(v, e - v, "U");
+    }
+  }
+  std::string r;
+  size_t p = 0;
+  char h[4];
+  for (;;) {
+    size_t a = s.find("<Data>", p);
+    size_t b = a == std::string::npos ? a : s.find("</Data>", a + 6);
+    if (b == std::string::npos) { r += s.substr(p); break; }
+    a += 6;
+    r += s.substr(p, a - p);
+    std::string pay = s.substr(a, b - a), bin;
+    unsigned acc = 0;
+    int nb = 0;
+    for (unsigned char c : pay) {
+      int v = b64val(c);
+      if (v < 0) continue;
+      acc = (acc << 6) | (unsigned)v;
+      nb += 6;
+      if (nb >= 8) { nb -= 8; bin.push_back((char)((acc >> nb) & 0xff)); }
+    }
+    std::string inf;
+    bool ok = false;
+    z_stream zs;
+    memset(&zs, 0, sizeof zs);
+    if (inflateInit(&zs) == Z_OK) {
+      zs.next_in = (Bytef *)bin.data();
+      zs.avail_in = (uInt)bin.size();
+      unsigned char buf[4096];
+      int ret;
+      do {
+        zs.next_out = buf;
+        zs.avail_out = sizeof buf;
+        ret = inflate(&zs, Z_NO_FLUSH);
+        inf.append((char *)buf, sizeof buf - zs.avail_out);
+      } while (ret == Z_OK);
+      ok = ret == Z_STREAM_END;
+      inflateEnd(&zs);
+    }
+    if (ok) {
+      r += "Z";
+      for (unsigned char c : inf) { snprintf(h, sizeof h, "%02x", c); r += h; }
+    } else {
+      r += "B" + pay;
+    }
+    p = b;
+  }
+  return r;
+}
+
+void dump_gii_file(const char *name)
+{
+  FILE *fp = fopen(name, "rb");
+  if (!fp) { out += "NOFILE "; return; }
+  std::string b;
+  char buf[4096];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, n);
+  fclose(fp);
+  ox(gii_normal(b));
+}
+
+void dump_ctab(COLOR_TABLE *ct)
+{
+  if (!ct) { out += "NULL "; return; }
+  oi(ct->nentries); oi(ct->version); oh(ct->fname);
+  for (int k = 0; k < ct->nentries; k++) {
+    CTE *e = ct->entries[k];
+    if (!e) { out += "- "; continue; }
+    oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+    of(e->rf); of(e->gf); of(e->bf); of(e->af);
+  }
+}
+
+void dump_gwr_mri(MRI *m, int values)
+{
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type); oi(m->intent);
+  oi(m->version); of(m->tr);
+  dump_ctab(m->ct);
+  if (!values) return;
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) of(MRIgetVoxVal(m, c, r, s, f));
+}
+
+const char *opt_name()
+{
+  if (!geti()) return NULL;
+  return name_tok();
+}
+
+// gwr: Gdiag's bits (1 show, 2 verbose), the creation time's replacement, input files (GIFTI
+// files, a subject's talairach.xfm), a surface from MRISalloc (per vertex its coordinates,
+// curvature, stat and annotation; the faces' vertices; its name, subject, patch flag, real RAS,
+// volume geometry, centre, group-average area, command lines, Talairach matrix), a colour table or
+// none, volumes (type, extent, frames, repetition time, values); then 1 to 4 of MRISwriteGIFTI,
+// its volume overload, MRISwriteGIFTICombined, mriWriteGifti, getShapeStatIntentCount,
+// MRISreadGiftiAsMRI and MRISwrite of a .gii name; each writer's file printed (gii_normal)
+void gwr_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  mkdir("mri", 0700);
+  mkdir("mri/transforms", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  std::string date = geth();
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", date.c_str(), 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf(); v->curv = getf(); v->stat = getf();
+    v->annotation = geti();
+  }
+  for (int fno = 0; fno < nf; fno++) for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+  std::string fname = geth(), subj = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  snprintf(m->subject_name.data(), STRLEN, "%s", subj.c_str());
+  m->patch = geti();
+  m->useRealRAS = geti();
+  set_vg(&m->vg);
+  m->xctr = getf(); m->yctr = getf(); m->zctr = getf();
+  m->group_avg_surface_area = getf();
+  int nl = geti();
+  for (int i = 0; i < nl; i++) {
+    std::string l = geth();
+    m->cmdlines[i] = (char *)calloc(l.size() + 1, 1);
+    memcpy(m->cmdlines[i], l.data(), l.size());
+  }
+  m->ncmds = nl;
+  if (geti()) {
+    int rows = geti(), cols = geti();
+    m->SRASToTalSRAS_ = MatrixAlloc(rows, cols, MATRIX_REAL);
+    for (int r = 1; r <= rows; r++) for (int c = 1; c <= cols; c++) *MATRIX_RELT(m->SRASToTalSRAS_, r, c) = getf();
+  }
+  int nct = geti();
+  if (nct >= 0) {
+    COLOR_TABLE *ctab = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+    ctab->nentries = nct;
+    ctab->version = 2;
+    ctab->entries = (COLOR_TABLE_ENTRY **)calloc(nct + 1, sizeof(COLOR_TABLE_ENTRY *));
+    strcpy(ctab->fname, "user.ctab");
+    for (int k = 0; k < nct; k++) {
+      if (!geti()) continue;
+      CTE *e = (CTE *)calloc(1, sizeof(CTE));
+      std::string name = geth();
+      strncpy(e->name, name.c_str(), sizeof(e->name) - 1);
+      e->ri = geti(); e->gi = geti(); e->bi = geti(); e->ai = geti();
+      e->rf = e->ri / 255.0f; e->gf = e->gi / 255.0f; e->bf = e->bi / 255.0f; e->af = e->ai / 255.0f;
+      ctab->entries[k] = e;
+    }
+    m->ct = ctab;
+  }
+  int nvol = geti();
+  std::vector<MRI *> vols;
+  for (int k = 0; k < nvol; k++) {
+    int type = geti(), w = geti(), h = geti(), d = geti(), fr = geti();
+    MRI *v = MRIallocSequence(w, h, d, type, fr);
+    v->tr = getf();
+    for (int f = 0; f < fr; f++)
+      for (int s = 0; s < d; s++)
+        for (int r = 0; r < h; r++)
+          for (int c = 0; c < w; c++) MRIsetVoxVal(v, c, r, s, f, getf());
+    vols.push_back(v);
+  }
+  errno = 0;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "w") {
+      int intent = geti();
+      const char *nm = name_tok();
+      const char *cf = opt_name();
+      oi(MRISwriteGIFTI(m, intent, nm, cf));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "wm") {
+      int intent = geti(), vol = geti();
+      const char *nm = name_tok();
+      const char *cf = opt_name();
+      const char *dt = opt_name();
+      oi(MRISwriteGIFTI(m, vols[vol], intent, nm, cf, dt));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "c") {
+      const char *nm = name_tok();
+      int nov = geti();
+      std::vector<OverlayInfoStruct> ov(nov);
+      for (OverlayInfoStruct &o : ov) {
+        o.__type = geti();
+        o.__giftiIntent = geti();
+        int vol = geti();
+        o.__overlaymri = vol >= 0 ? vols[vol] : NULL;
+        o.__foverlay = (char *)opt_name();
+        std::string sd = geth();
+        memset(o.__shapedatatype, 0, sizeof o.__shapedatatype);
+        snprintf(o.__shapedatatype, sizeof o.__shapedatatype, "%s", sd.c_str());
+        o.__format = GIFTI_FILE;
+      }
+      oi(MRISwriteGIFTICombined(m, &ov, nm));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "mw") {
+      int vol = geti();
+      const char *nm = name_tok();
+      oi(mriWriteGifti(vols[vol], nm));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "sw") {
+      const char *nm = name_tok();
+      oi(MRISwrite(m, nm));
+      fflush(stdout);
+      dump_gii_file(nm);
+    } else if (op == "n") {
+      const char *nm = name_tok();
+      int a = 7, b = 7;
+      oi(getShapeStatIntentCount(nm, &a, &b));
+      oi(a); oi(b);
+    } else if (op == "r") {
+      const char *nm = name_tok();
+      int rv = geti();
+      MRI *v = MRISreadGiftiAsMRI(nm, rv);
+      fflush(stdout);
+      if (!v) out += "NULL ";
+      else dump_gwr_mri(v, rv);
+    } else {
+      fail("gwr op");
+    }
+  }
+}
+
+
 // ---- relay 17: mpb, the metric properties of 3.1-50 part b ----------------------------------------
 
 void dump_mpb_vertices(MRIS *s)
@@ -2780,6 +3174,530 @@ void mpd_case()
   }
 }
 
+// ---- relay 20: mpe, the rest of 3.1-51 (mrisurf_metricProperties.cpp 9395-13617) ----------------
+
+// the probe's functions of k1 and k2 for MRISusePrincipalCurvatureFunction
+float upf0(float k1, float k2) { (void)k2; return k1 + 1.0f; }
+float upf1(float k1, float k2) { (void)k1; return k2 * 0.5f; }
+float upf2(float k1, float k2) { return k1 > k2 ? k1 : k2; }
+
+// a file's length and FNV-1a hash (NOFILE when there is none), the file then removed
+void file_hash(const char *name)
+{
+  FILE *f = fopen(name, "rb");
+  if (!f) { out += "NOFILE "; return; }
+  uint64_t h = 14695981039346656037ULL;
+  long n = 0;
+  int c;
+  while ((c = fgetc(f)) != EOF) { h ^= (unsigned char)c; h *= 1099511628211ULL; n++; }
+  fclose(f);
+  char b[48];
+  snprintf(b, sizeof b, "%ld:%016" PRIx64 " ", n, h);
+  out += b;
+  remove(name);
+}
+
+// a vertex's distances to its first vnum neighbours, or N when it has none
+void dump_dist_n(MRIS *s, int vno)
+{
+  VERTEX *v = &s->vertices[vno];
+  if (!v->dist) { out += "N "; return; }
+  for (int k = 0; k < s->vertices_topology[vno].vnum; k++) of(v->dist[k]);
+}
+
+void dump_curv_only(MRIS *s)
+{
+  of(s->min_curv); of(s->max_curv);
+  for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+}
+
+// mpe: Gdiag's bits (1 show, 2 verbose, 4 write), a surface file read by MRISread (d/lh.s0), the status
+// (-1: the read's), Kmin, Kmax, Hmin, Hmax or not, for each vertex a mask (1 ripped, 2 marked: a
+// number, 4 current position, 8 normal, 16 curv, 32 k1 and k2, 64 K and H, 128 area, 256 original
+// position, 512 gradient) with its values, for each face a mask (1 ripped, 2 area, 4 cached
+// original area, 8 cached normal) with its values, then the operations, each printing what it
+// gives; the counts, status, extremes, Gdiag_no and FREESURFER_MRISaverageGradients_optimize_suppress
+// come before the read
+// relay 23: queue item 3.1-51's leftovers (MRIScrsLUT, MRISar1, MRISarN, MRISsmoothKernel,
+// SetSurfHopList, mriSurfaceRASToVoxel) on a surface read by MRISread and volumes of one voxel per
+// vertex; each operation prints its volume (or NULL) and the vertices' undefval
+static void mpf_vol(MRI *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->nframes);
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) of(MRIgetVoxVal(m, c, r, s, f));
+}
+
+static void mpf_undef(MRIS *s)
+{
+  for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].undefval);
+}
+
+void mpf_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int nrip = geti();
+  std::vector<int> rips;
+  for (int k = 0; k < nrip; k++) rips.push_back(geti());
+  int flags = geti();
+  if (flags & 1) setenv("FREESURFER_mriSurfaceRASToVoxel_both", "1", 1);
+  if (flags & 2) setenv("FREESURFER_mriSurfaceRASToVoxel_old", "1", 1);
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno : rips) s->vertices[vno].ripflag = 1;
+  int nvol = geti();
+  std::vector<MRI *> vols;
+  for (int k = 0; k < nvol; k++) {
+    int type = geti(), w = geti(), h = geti(), d = geti(), fr = geti();
+    MRI *v = MRIallocSequence(w, h, d, type, fr);
+    for (int f = 0; f < fr; f++)
+      for (int z = 0; z < d; z++)
+        for (int r = 0; r < h; r++)
+          for (int c = 0; c < w; c++) MRIsetVoxVal(v, c, r, z, f, getf());
+    vols.push_back(v);
+  }
+  SURFHOPLIST **shl = NULL;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "lut") {
+      MRI *v = vols[geti()];
+      int **lut = MRIScrsLUT(s, v);
+      if (!lut) { out += "NULL "; continue; }
+      int n = v->width * v->height * v->depth;
+      for (int i = 0; i < n; i++) { oi(lut[0][i]); oi(lut[1][i]); oi(lut[2][i]); }
+      oi(MRIScrsLUTFree(lut));
+    } else if (op == "ar1") {
+      int vi = geti(), mi = geti();
+      mpf_vol(MRISar1(s, vols[vi], mi >= 0 ? vols[mi] : NULL, NULL));
+    } else if (op == "arn") {
+      int vi = geti(), mi = geti(), n = geti();
+      mpf_vol(MRISarN(s, vols[vi], mi >= 0 ? vols[mi] : NULL, NULL, n));
+      mpf_undef(s);
+    } else if (op == "skn") {
+      int vi = geti(), mi = geti(), kind = geti(), ki = geti();
+      int rows = geti(), cols = geti();
+      MATRIX *gk = MatrixAlloc(rows, cols, MATRIX_REAL);
+      for (int r = 1; r <= rows; r++)
+        for (int c = 1; c <= cols; c++) *MATRIX_RELT(gk, r, c) = getf();
+      int reuse = geti(), ok = geti(), oi_ = geti();
+      if (!reuse) shl = NULL;
+      MRI *outv = ok == 0 ? NULL : ok == 1 ? vols[oi_] : vols[vi];
+      MRI *r = MRISsmoothKernel(s, vols[vi], mi >= 0 ? vols[mi] : NULL, (kind & 1) ? vols[ki] : NULL,
+                                (kind & 2) ? gk : NULL, &shl, outv);
+      mpf_vol(r);
+      mpf_undef(s);
+    } else if (op == "hop") {
+      int vtx = geti(), n = geti();
+      SURFHOPLIST *l = SetSurfHopList(vtx, s, n);
+      oi(l->cvtx);
+      oi(l->nhops);
+      for (int h = 0; h < l->nhops; h++) {
+        oi(l->nperhop[h]);
+        for (int i = 0; i < l->nperhop[h]; i++) oi(l->vtxlist[h][i]);
+      }
+      oi(SurfHopListFree(&l));
+      mpf_undef(s);
+    } else if (op == "sras") {
+      VoxelFromSRASmatrix = NULL;
+      if (geti()) {
+        int rows = geti(), cols = geti();
+        VoxelFromSRASmatrix = MatrixAlloc(rows, cols, MATRIX_REAL);
+        for (int r = 1; r <= rows; r++)
+          for (int c = 1; c <= cols; c++) *MATRIX_RELT(VoxelFromSRASmatrix, r, c) = getf();
+      }
+      int np = geti();
+      for (int i = 0; i < np; i++) {
+        double x = getd(), y = getd(), z = getd(), xv = 0, yv = 0, zv = 0;
+        oi(mriSurfaceRASToVoxel(x, y, z, &xv, &yv, &zv));
+        od(xv); od(yv); od(zv);
+      }
+    } else {
+      fail("mpf op");
+    }
+  }
+}
+
+// relay 24: queue item 3.1-51's leftovers, second group: the edge and corner tables, the face,
+// edge and corner metrics (no gradients), the quality statistics and printers, the overlay of the
+// largest edge statistic, MRISaverageCurvatures and mrisFindMiddleOfGray, on a surface read by
+// MRISread with some vertices ripped, curvatures given or not, a mask of one voxel per vertex (or
+// none) and MRISfaceNormalFace's test delta
+static void mpg_stats(double *st)
+{
+  if (!st) { out += "NULL "; return; }
+  for (int k = 0; k < 5; k++) od(st[k]);
+  free(st);
+}
+
+static void mpg_edges(MRIS *s)
+{
+  oi(s->nedges);
+  if (!s->edges) { out += "N "; return; }
+  for (int e = 0; e < s->nedges; e++) {
+    MRI_EDGE *x = &s->edges[e];
+    for (int k = 0; k < 4; k++) oi(x->vtxno[k]);
+    oi(x->faceno[0]); oi(x->faceno[1]);
+    for (int k = 0; k < 4; k++) { oi(x->corner[k][0]); oi(x->corner[k][1]); }
+  }
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX_TOPOLOGY *vt = &s->vertices_topology[vno];
+    if (!vt->e) { out += "N "; continue; }
+    for (int k = 0; k < vt->vtotal; k++) oi(vt->e[k]);
+  }
+}
+
+void mpg_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int nrip = geti();
+  std::vector<int> rips;
+  for (int k = 0; k < nrip; k++) rips.push_back(geti());
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno : rips) s->vertices[vno].ripflag = 1;
+  if (geti())
+    for (int vno = 0; vno < s->nvertices; vno++) s->vertices[vno].curv = getf();
+  MRI *mask = NULL;
+  int mw = geti();
+  if (mw > 0) {
+    mask = MRIalloc(mw, 1, 1, MRI_FLOAT);
+    for (int c = 0; c < mw; c++) MRIsetVoxVal(mask, c, 0, 0, 0, getf());
+  }
+  MRISfaceNormalFace_AddDeltaVertex = geti();
+  for (int k = 0; k < 3; k++) MRISfaceNormalFace_AddDelta[k] = getd();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "cnt") {
+      oi(MRIScountEdges(s));
+    } else if (op == "edg") {
+      oi(MRISedges(s));
+      mpg_edges(s);
+    } else if (op == "cor") {
+      oi(MRIScorners(s));
+      oi(s->ncorners);
+      for (int c = 0; s->corners && c < s->ncorners; c++) {
+        MRI_CORNER *x = &s->corners[c];
+        oi(x->vtxno[0]); oi(x->vtxno[1]); oi(x->vtxno[2]); oi(x->faceno);
+        oi(x->edgeno[0]); oi(x->edgeno[1]); oi(x->edgedir[0]); oi(x->edgedir[1]);
+      }
+    } else if (op == "fm") {
+      oi(MRISfaceMetric(s, 0));
+      for (int f = 0; f < s->nfaces; f++) {
+        DMATRIX *n = s->faces[f].norm;
+        if (!n) { out += "N "; continue; }
+        od(n->rptr[1][1]); od(n->rptr[2][1]); od(n->rptr[3][1]);
+      }
+    } else if (op == "fnf") {
+      int fno = geti(), want = geti();
+      DMATRIX *c = NULL;
+      double cl = 0;
+      oi(MRISfaceNormalFace(s, fno, (want & 1) ? &c : NULL, (want & 2) ? &cl : NULL));
+      if (c) { od(c->rptr[1][1]); od(c->rptr[2][1]); od(c->rptr[3][1]); }
+      od(cl);
+      if (fno >= 0 && fno < s->nfaces && s->faces[fno].norm) {
+        DMATRIX *n = s->faces[fno].norm;
+        od(n->rptr[1][1]); od(n->rptr[2][1]); od(n->rptr[3][1]);
+      }
+    } else if (op == "em") {
+      if (!s->edges) MRISedges(s);
+      oi(MRISedgeMetric(s, 0));
+      for (int e = 0; e < s->nedges; e++) {
+        MRI_EDGE *x = &s->edges[e];
+        od(x->len); od(x->u[0]); od(x->u[1]); od(x->u[2]);
+        od(x->area[0]); od(x->area[1]); od(x->maxarea); od(x->dot); od(x->angle);
+      }
+    } else if (op == "cm") {
+      oi(MRIScornerMetric(s, 0));
+      for (int c = 0; s->corners && c < s->ncorners; c++) { od(s->corners[c].dot); od(s->corners[c].angle); }
+    } else if (op == "ast") {
+      int m = geti();
+      mpg_stats(MRIStriangleAreaStats(s, m ? mask : NULL, NULL));
+    } else if (op == "est") {
+      int id = geti(), m = geti();
+      mpg_stats(MRISedgeStats(s, id, m ? mask : NULL, NULL));
+    } else if (op == "cst") {
+      int id = geti(), m = geti();
+      mpg_stats(MRIScornerStats(s, id, m ? mask : NULL, NULL));
+    } else if (op == "ovl") {
+      int id = geti(), m = geti();
+      mpf_vol(MRISmaxEdgeStatToOverlay(s, id, m ? mask : NULL));
+    } else if (op == "pq") {
+      oi(MRISprintSurfQualityStats(stdout, s));
+    } else if (op == "ppq") {
+      oi(MRISprettyPrintSurfQualityStats(stdout, s));
+    } else if (op == "avc") {
+      oi(MRISaverageCurvatures(s, geti()));
+      of(s->min_curv); of(s->max_curv);
+      for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+    } else if (op == "mid") {
+      mrisFindMiddleOfGray(s);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->x); of(v->y); of(v->z); of(v->curv);
+      }
+    } else if (op == "mv") {
+      int vno = geti();
+      float x = getf(), y = getf(), z = getf();
+      MRISsetXYZ(s, vno, x, y, z);
+    } else if (op == "mp") {
+      MRIScomputeMetricProperties(s);
+    } else {
+      fail("mpg op");
+    }
+  }
+}
+
+void mpe_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  if (gd & 4) Gdiag |= DIAG_WRITE;
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti(), status = geti();
+  bool extremes = geti() != 0;
+  float ext[4] = {0, 0, 0, 0};
+  if (extremes) for (float &x : ext) x = getf();
+  int gdiag_no = geti();
+  if (geti()) setenv("FREESURFER_MRISaverageGradients_optimize_suppress", "1", 1);
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  if (status >= 0) s->status = (MRIS_Status)status;
+  if (extremes) { s->Kmin = ext[0]; s->Kmax = ext[1]; s->Hmin = ext[2]; s->Hmax = ext[3]; }
+  Gdiag_no = gdiag_no;
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    int m = geti();
+    if (m & 1) v->ripflag = 1;
+    if (m & 2) v->marked = geti();
+    if (m & 4) { v->x = getf(); v->y = getf(); v->z = getf(); }
+    if (m & 8) { v->nx = getf(); v->ny = getf(); v->nz = getf(); }
+    if (m & 16) v->curv = getf();
+    if (m & 32) { v->k1 = getf(); v->k2 = getf(); }
+    if (m & 64) { v->K = getf(); v->H = getf(); }
+    if (m & 128) v->area = getf();
+    if (m & 256) { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
+    if (m & 512) { v->dx = getf(); v->dy = getf(); v->dz = getf(); }
+    if (m & 1024) { v->val = getf(); v->val2 = getf(); v->origarea = getf(); }
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    int m = geti();
+    if (m & 1) s->faces[fno].ripflag = 1;
+    if (m & 2) s->faces[fno].area = getf();
+    if (m & 4) setFaceOrigArea(s, fno, getf());
+    if (m & 8) { float a = getf(), b = getf(), c = getf(); setFaceNorm(s, fno, a, b, c); }
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    if (op == "ssn") {
+      oi(MRISsmoothSurfaceNormals(s, geti()));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->nx); of(v->ny); of(v->nz); of(v->tdx); of(v->tdy); of(v->tdz);
+      }
+    } else if (op == "cbn") {
+      oi(mrisComputeBoundaryNormals(s));
+    } else if (op == "cmc") {
+      oi(MRIScomputeMeanCurvature(s));
+      of(s->min_curv); of(s->max_curv);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->H); of(v->e1x); of(v->e1y); of(v->e1z); of(v->e2x); of(v->e2y); of(v->e2z);
+      }
+    } else if (op == "uae" || op == "ugc" || op == "umc" || op == "upc" || op == "uk1" || op == "uk2" || op == "upf") {
+      int r;
+      if (op == "uae") r = MRISuseAreaErrors(s);
+      else if (op == "ugc") r = MRISuseGaussianCurvature(s);
+      else if (op == "umc") r = MRISuseMeanCurvature(s);
+      else if (op == "upc") r = MRISusePrincipalCurvature(s);
+      else if (op == "uk1") r = MRISuseK1Curvature(s);
+      else if (op == "uk2") r = MRISuseK2Curvature(s);
+      else {
+        int w = geti();
+        r = MRISusePrincipalCurvatureFunction(s, w == 0 ? upf0 : w == 1 ? upf1 : upf2);
+      }
+      oi(r);
+      dump_curv_only(s);
+    } else if (op == "cci") {
+      double ici = 7, fi = 7;
+      MRIScomputeCurvatureIndices(s, &ici, &fi);
+      od(ici); od(fi);
+    } else if (op == "mxr") {
+      od(MRISmaxRadius(s));
+      of(s->xlo); of(s->ylo); of(s->zlo); of(s->xhi); of(s->yhi); of(s->zhi);
+    } else if (op == "cac") {
+      if (geti()) {
+        double sigma = 7;
+        od(MRIScomputeAverageCurvature(s, &sigma));
+        od(sigma);
+      } else {
+        od(MRIScomputeAverageCurvature(s, NULL));
+      }
+      oi(errno);
+    } else if (op == "mnv") {
+      oi(MRISmarkNegativeVertices(s, geti()));
+      for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].marked);
+    } else if (op == "rnv") {
+      oi(MRISripNegativeVertices(s));
+      for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].ripflag);
+      for (int fno = 0; fno < s->nfaces; fno++) oi(s->faces[fno].ripflag);
+    } else if (op == "sff") {
+      double pct = getd();
+      oi(MRIScomputeSecondFundamentalFormThresholded(s, pct));
+      of(s->Kmin); of(s->Kmax); of(s->Hmin); of(s->Hmax); od(s->Ktotal);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        float c[10] = {v->k1, v->k2, v->K, v->H, v->e1x, v->e1y, v->e1z, v->e2x, v->e2y, v->e2z};
+        for (float x : c) of(x);
+      }
+      for (const char *name : {"curv.dat", "k1.plt", "k2.plt"}) file_hash(name);
+    } else if (op == "agr" || op == "agf" || op == "ags") {
+      int n = geti();
+      oi(op == "agr" ? MRISaverageGradients(s, n) : op == "agf" ? MRISaverageGradientsFast(s, n) : mrisAverageSignedGradients(s, n));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->dx); of(v->dy); of(v->dz); of(v->tdx); of(v->tdy); of(v->tdz);
+      }
+    } else if (op == "rmp") {
+      s->group_avg_surface_area = getf();
+      od(MRISrescaleMetricProperties(s));
+      of(s->total_area); od(s->avg_vertex_dist); od(s->std_vertex_dist); od(s->avg_vertex_area);
+      for (int vno = 0; vno < s->nvertices; vno++) { of(s->vertices[vno].area); dump_dist_n(s, vno); }
+      oi(errno);
+    } else if (op == "nrm") {
+      int dof = geti(), which = geti();
+      oi(MRISnormalize(s, dof, which));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->origarea); of(v->curv); of(v->val); of(v->val2);
+      }
+    } else if (op == "ups") {
+      oi(MRISupdateSurface(s));
+      of(s->total_area); od(s->Ktotal);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->area); of(v->nx); of(v->k1); of(v->k2); of(v->K); of(v->H);
+      }
+    } else if (op == "moc") {
+      oi(MRISmarkOrientationChanges(s));
+      for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+    } else if (op == "cks") {
+      oi(mrisCheckSurface(s));
+    } else if (op == "ssd") {
+      oi(MRISsubsampleDist(s, getf()));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->d); of(v->val); oi(v->fixedval);
+      }
+    } else if (op == "xnb") {
+      if (geti()) for (int vno = 0; vno < s->nvertices; vno++) s->vertices[vno].val2bak = -1;
+      int targ = geti();
+      double th = getd();
+      int max = geti(), dist = geti();
+      std::vector<int> nb(max > 0 ? max : 1);
+      std::vector<double> dp(max > 0 ? max : 1);
+      int n = -7;
+      oi(MRISextendedNeighbors(s, targ, targ, th, nb.data(), dp.data(), &n, max, dist));
+      oi(n);
+      for (int k = 0; k < n; k++) { oi(nb[k]); od(dp[k]); }
+      for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].val2bak);
+    } else if (op == "uni") {
+      int mode = geti();
+      MRIS *c = MRISclone(s);
+      if (mode == 1) c->useRealRAS = !s->useRealRAS;
+      else if (mode == 2) c->vg.c_r += 1;
+      MRIS *u = MRISunion(s, c);
+      if (!u) out += "NULL ";
+      else {
+        oi(u->nvertices); oi(u->nfaces); oi(u->useRealRAS);
+        for (int vno = 0; vno < u->nvertices; vno++) { of(u->vertices[vno].x); of(u->vertices[vno].y); of(u->vertices[vno].z); }
+        for (int fno = 0; fno < u->nfaces; fno++) for (int k = 0; k < 3; k++) oi(u->faces[fno].v[k]);
+      }
+    } else if (op == "cln") {
+      MRIS *c = MRISclone(s);
+      of(c->total_area); of(c->orig_area); of(c->min_curv); of(c->max_curv); of(c->xlo); of(c->zhi);
+      oi(c->status); od(c->avg_vertex_dist);
+      for (int vno = 0; vno < c->nvertices; vno++) {
+        VERTEX *v = &c->vertices[vno];
+        VERTEX_TOPOLOGY *vt = &c->vertices_topology[vno];
+        float x[9] = {v->x, v->nx, v->cx, v->curv, v->area, v->origarea, v->origx, v->val, v->k1};
+        for (float y : x) of(y);
+        oi(v->ripflag); oi(vt->vnum); oi(vt->vtotal); oi(vt->num);
+        for (int k = 0; k < vt->vtotal; k++) oi(vt->v[k]);
+        dump_dist_n(c, vno);
+      }
+      for (int fno = 0; fno < c->nfaces; fno++) {
+        FACE *f = &c->faces[fno];
+        oi(f->v[0]); oi(f->v[1]); oi(f->v[2]); of(f->area); oi(f->ripflag);
+      }
+    } else if (op == "pvs") {
+      int vno = geti(), which = geti();
+      oi(MRISprintVertexStats(s, vno, stdout, which));
+    } else if (op == "pvi") {
+      oi(MRISprintVertexInfo(stdout, s, geti()));
+    } else if (op == "sfa") {
+      if (geti()) oi(mrisComputeTangentPlanes(s));
+      int calls = geti();
+      for (int c = 0; c < calls; c++) {
+        int vno = geti(), n = geti();
+        std::vector<int> nb(n > 0 ? n : 1);
+        for (int j = 0; j < n; j++) nb[j] = geti();
+        oi(MRIScomputeSecondFundamentalFormAtVertex(s, vno, nb.data(), n));
+        of(s->Kmin); of(s->Kmax); of(s->Hmin); of(s->Hmax); od(s->Ktotal);
+        VERTEX *v = &s->vertices[vno];
+        float x[10] = {v->k1, v->k2, v->K, v->H, v->e1x, v->e1y, v->e1z, v->e2x, v->e2y, v->e2z};
+        for (float y : x) of(y);
+      }
+    } else fail("mpe op");
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -3012,6 +3930,16 @@ void run_case()
     mpc_case();
   } else if (cmd == "mpd") {
     mpd_case();
+  } else if (cmd == "mpe") {
+    mpe_case();
+  } else if (cmd == "mpf") {
+    mpf_case();
+  } else if (cmd == "mpg") {
+    mpg_case();
+  } else if (cmd == "gii") {
+    gii_case();
+  } else if (cmd == "gwr") {
+    gwr_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);
@@ -3029,6 +3957,38 @@ void run_case()
   } else {
     fail("unknown command");
   }
+}
+
+// relay 23: MRISsmoothKernel's timings ("Done allocating shl <n>, <s> sec", "... t=<s> sec") and its
+// closing value ("vtxval <x>": column 1031 of the output's first row, memory outside a small volume)
+// as <t> and <v>, as the port writes them
+static std::string untime(const std::string &t)
+{
+  std::string r;
+  size_t i = 0;
+  bool first = true;
+  while (true) {
+    size_t j = t.find('\n', i);
+    std::string line = t.substr(i, j == std::string::npos ? std::string::npos : j - i);
+    if (!first) r += '\n';
+    first = false;
+    size_t sec = line.rfind(" sec");
+    if (line.rfind("Done allocating shl ", 0) == 0 && line.rfind(", ") != std::string::npos &&
+        sec != std::string::npos && sec > line.rfind(", ")) {
+      size_t a = line.rfind(", ");
+      line = line.substr(0, a + 2) + "<t>" + line.substr(sec);
+    } else if (line.rfind("Finished loop over ", 0) == 0 && line.rfind("t=") != std::string::npos &&
+               sec != std::string::npos && sec > line.rfind("t=")) {
+      size_t a = line.rfind("t=");
+      line = line.substr(0, a + 2) + "<t>" + line.substr(sec);
+    } else if (line.rfind("vtxval ", 0) == 0) {
+      line = "vtxval <v>";
+    }
+    r += line;
+    if (j == std::string::npos) break;
+    i = j + 1;
+  }
+  return r;
 }
 
 std::string escape(const std::string &s)
@@ -3129,7 +4089,7 @@ int main(int argc, char *argv[])
     for (std::string *t : {&result, &text})
       for (size_t at = t->find(workdir); at != std::string::npos; at = t->find(workdir, at + 3))
         t->replace(at, workdir.size(), "<w>");
-    printf("%s | %s\n", result.c_str(), escape(text).c_str());
+    printf("%s | %s\n", result.c_str(), escape(untime(text)).c_str());
   }
   unlink(scratch.c_str());
   clear_dir(workdir, false);

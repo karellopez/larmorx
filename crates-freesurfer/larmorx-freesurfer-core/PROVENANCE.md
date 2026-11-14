@@ -197,5 +197,15 @@ empty solution). Validation: `validation/investigations/freesurfer-spline-replic
   libstdc++'s hash buckets (the system's C++ library decides them), which only the duplicate-name message and
   `unstrip`'s choice between two names that strip alike depend on (no configuration of the seven programs has two;
   the probe compares those lines apart). `Any`'s held values as `Value`, `castTo`'s `bad_cast` as a type check;
-  `outputHelpXml` passed in (`HelpFn`; `output_help_xml` gives its NULL and empty-text answers, the XML renderer of
-  `utils/fsPrintHelp.cpp` not ported yet); `exit(0)` as `Fatal::Exit(0)`.
+  `outputHelpXml` passed in (`HelpFn`; `output_help_xml` is `help_xml`'s renderer); `exit(0)` as `Fatal::Exit(0)`.
+
+## The XML help renderer (relay 21 of track A): `src/help_xml.rs`
+
+`utils/fsPrintHelp.cpp` (FreeSurfer 8.2.0): `outputHelpDoc`, `outputHelp`, `outputHelpXml`, `printName`,
+`printContents`, `tagNameIs`, `wrdLen`, `toUpperCase`, `replaceUnderscore`, translated. libxml2 2.7.7
+(FreeSurfer's `packages/xml2`, MIT: Daniel Veillard) is not translated: a pure-Rust reader written from its
+behaviour (the tree `xmlParseMemory` builds for a well-formed document: `parser.c`'s entity override,
+SAX2's text and CDATA nodes, `xmlNodeListGetString`, `xmlDocGetRootElement`, the encodings it converts)
+gives the same values; libxml2's error messages for texts that are not well formed are not reproduced
+(a line of larmorx's instead). FS-434 (both modes print nothing), FS-435 and FS-436 (corrected by
+default) are larmorx's choices.

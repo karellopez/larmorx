@@ -14,7 +14,8 @@ use std::sync::Arc;
 
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
-    FS_350, FS_351, FS_364, UpstreamDefects,
+    FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, FS_530, FS_531, FS_532,
+    FS_535, FS_536, FS_538, Notice, UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -35,6 +36,10 @@ use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 mod cfile;
 #[path = "fnam.rs"]
 mod fnam;
+#[path = "gii.rs"]
+mod gii;
+#[path = "gwr.rs"]
+mod gwr;
 #[path = "life.rs"]
 mod life;
 #[path = "mpb.rs"]
@@ -43,6 +48,12 @@ mod mpb;
 mod mpc;
 #[path = "mpd.rs"]
 mod mpd;
+#[path = "mpe.rs"]
+mod mpe;
+#[path = "mpf.rs"]
+mod mpf;
+#[path = "mpg.rs"]
+mod mpg;
 #[path = "mprop.rs"]
 mod mprop;
 #[path = "sfile.rs"]
@@ -133,11 +144,12 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 40] = [
+const COMMANDS: [&str; 45] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
-    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd",
+    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
+    "mpg",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1018,9 +1030,14 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "fnam" => fnam::fnam_tokens(&mut t, &mut g),
             "swr" => swr::swr_tokens(&mut t, &mut g),
             "srd" => srd::srd_tokens(&mut t, &mut g),
+            "gii" => gii::gii_tokens(&mut t, &mut g),
+            "gwr" => gwr::gwr_tokens(&mut t, &mut g),
             "mpb" => mpb::mpb_tokens(&mut t, &mut g),
             "mpc" => mpc::mpc_tokens(&mut t, &mut g),
             "mpd" => mpd::mpd_tokens(&mut t, &mut g),
+            "mpe" => mpe::mpe_tokens(&mut t, &mut g),
+            "mpf" => mpf::mpf_tokens(&mut t, &mut g),
+            "mpg" => mpg::mpg_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2686,9 +2703,14 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "fnam" => fnam::fnam_case(cx, t, o)?,
         "swr" => swr::swr_case(cx, t, o)?,
         "srd" => srd::srd_case(cx, t, o)?,
+        "gii" => gii::gii_case(cx, t, o)?,
+        "gwr" => gwr::gwr_case(cx, t, o)?,
         "mpb" => mpb::mpb_case(cx, t, o)?,
         "mpc" => mpc::mpc_case(cx, t, o)?,
         "mpd" => mpd::mpd_case(cx, t, o)?,
+        "mpe" => mpe::mpe_case(cx, t, o)?,
+        "mpf" => mpf::mpf_case(cx, t, o)?,
+        "mpg" => mpg::mpg_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2715,6 +2737,40 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     Ok(())
 }
 
+/// MRISsmoothKernel's timings (`Done allocating shl <n>, <s> sec`, `... t=<s> sec`) and its
+/// closing value (`vtxval <x>`: column 1031 of the output's first row, memory outside a small
+/// volume) as `<t>` and `<v>`, as `fssurfio.cpp` writes them (relay 23).
+fn untime(b: &[u8]) -> Vec<u8> {
+    let mut r = Vec::with_capacity(b.len());
+    for (k, line) in b.split(|&c| c == b'\n').enumerate() {
+        if k > 0 {
+            r.push(b'\n');
+        }
+        let find = |pat: &[u8]| line.windows(pat.len()).rposition(|w| w == pat);
+        let sec = find(b" sec");
+        if line.starts_with(b"Done allocating shl ")
+            && let (Some(a), Some(e)) = (find(b", "), sec)
+            && e > a
+        {
+            r.extend_from_slice(&line[..a + 2]);
+            r.extend_from_slice(b"<t>");
+            r.extend_from_slice(&line[e..]);
+        } else if line.starts_with(b"Finished loop over ")
+            && let (Some(a), Some(e)) = (find(b"t="), sec)
+            && e > a
+        {
+            r.extend_from_slice(&line[..a + 2]);
+            r.extend_from_slice(b"<t>");
+            r.extend_from_slice(&line[e..]);
+        } else if line.starts_with(b"vtxval ") {
+            r.extend_from_slice(b"vtxval <v>");
+        } else {
+            r.extend_from_slice(line);
+        }
+    }
+    r
+}
+
 fn escape(b: &[u8]) -> String {
     let mut s = String::new();
     for &c in b {
@@ -2725,6 +2781,16 @@ fn escape(b: &[u8]) -> String {
         }
     }
     s
+}
+
+/// FS-48's hang (`FS-48h`): an FS-48 notice together with VNL's own "never returns" notice
+/// (ITK-116: `larmorx_core::vnl_svd_f32`'s `never_returns`), which fs.core's `OpenSvdcmp` notes
+/// beside FS-48 where FreeSurfer hangs (track A's ae30327b). Keyed on the defect IDs only, so a
+/// change of FS-48's wording cannot drop the mark: `fs48_hang_key_holds` (the hash test's file) runs
+/// one matrix on which `ssvdc` never returns through `OpenSvdcmp` and fails when the key misses it.
+pub fn fs48_hangs(notices: &[Notice]) -> bool {
+    notices.iter().any(|n| n.defect.id == "FS-48")
+        && notices.iter().any(|n| n.defect.id == "ITK-116")
 }
 
 /// The port's line for a case line, and the defects it noted.
@@ -2769,7 +2835,7 @@ pub fn run_line_with(
         }
         r
     };
-    let text = escape(&work(&shared.0.borrow()));
+    let text = escape(&untime(&work(&shared.0.borrow())));
     o.0 = String::from_utf8(work(o.0.as_bytes())).expect("the output's text");
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
@@ -2786,7 +2852,19 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_348)
                     || cx.g.notices.contains(&FS_350)
                     || cx.g.notices.contains(&FS_351)
-                    || cx.g.notices.contains(&FS_364)) =>
+                    || cx.g.notices.contains(&FS_364)
+                    || cx.g.notices.contains(&FS_377)
+                    || cx.g.notices.contains(&FS_387)
+                    || cx.g.notices.contains(&FS_395)
+                    || cx.g.notices.contains(&FS_396)
+                    || cx.g.notices.contains(&FS_398)
+                    || cx.g.notices.contains(&FS_523)
+                    || cx.g.notices.contains(&FS_530)
+                    || cx.g.notices.contains(&FS_531)
+                    || cx.g.notices.contains(&FS_532)
+                    || cx.g.notices.contains(&FS_535)
+                    || cx.g.notices.contains(&FS_536)
+                    || cx.g.notices.contains(&FS_538)) =>
         {
             "CRASH 11".to_owned()
         }
@@ -2815,6 +2893,11 @@ pub fn run_line_with(
             .iter()
             .map(|n| n.defect.id)
             .collect();
+    // relay 20: FS-48's matrices on which LINPACK's ssvdc never returns, so FreeSurfer hangs (the
+    // probe's alarm ends it after 5 seconds): marked apart from FS-48's other cases, which compare
+    if fs48_hangs(cx.g.notices.as_slice()) {
+        ids.push("FS-48h");
+    }
     ids.sort_unstable();
     ids.dedup();
     (format!("{result} | {text}"), ids)

@@ -238,7 +238,12 @@ dependencies = [
 name = "larmorx-freesurfer-filter"
 version = "0.1.0-rc.1"
 dependencies = [
+ "larmorx-core",
+ "larmorx-freesurfer-core",
+ "larmorx-freesurfer-io",
+ "larmorx-freesurfer-mri",
  "larmorx-freesurfer-volume",
+ "sha2",
 ]
 
 [[package]]
@@ -310,6 +315,7 @@ dependencies = [
  "larmorx-freesurfer-io",
  "larmorx-freesurfer-mri",
  "larmorx-freesurfer-volume",
+ "larmorx-io",
  "sha2",
  "tempfile",
 ]
@@ -326,11 +332,14 @@ dependencies = [
 name = "larmorx-freesurfer-volume"
 version = "0.1.0-rc.1"
 dependencies = [
+ "flate2",
  "larmorx-core",
  "larmorx-freesurfer-core",
  "larmorx-freesurfer-io",
  "larmorx-freesurfer-mri",
+ "larmorx-io",
  "sha2",
+ "tempfile",
 ]
 
 [[package]]

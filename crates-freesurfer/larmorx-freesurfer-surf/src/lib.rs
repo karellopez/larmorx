@@ -66,6 +66,9 @@
 //!   neighbourhood sizes, the 2- and 3-hop neighbour search with its distances, the vertex-vertex
 //!   check (FS-357, FS-358).
 //! - [`ico`] (fs.surf, taken for `MRISread`): the icosahedron files (FS-361, FS-362).
+//! - [`gifti`]: the GIFTI surface reader (FS-381..FS-396); [`gifti_write`]: the GIFTI writers
+//!   (FS-397..FS-400, FS-523, FS-524); GIFTI files as volumes (FS-521, FS-522) and the pieces of
+//!   `gifti.cpp` they share with these: larmorx-freesurfer-io's `gifti_vol` and `gifti_common`.
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -79,6 +82,9 @@ pub mod dist;
 pub mod edges;
 pub mod facenorm;
 pub mod formats;
+pub mod gifti;
+
+pub mod gifti_write;
 pub mod ico;
 pub mod lta;
 pub mod metric;
@@ -92,9 +98,15 @@ pub mod names;
 pub mod nbhd;
 pub mod positions;
 pub mod props;
+pub mod props10;
 pub mod props2;
 pub mod props3;
 pub mod props4;
+pub mod props5;
+pub mod props6;
+pub mod props7;
+pub mod props8;
+pub mod props9;
 pub mod readwrite;
 pub mod scanf;
 pub mod sfile;

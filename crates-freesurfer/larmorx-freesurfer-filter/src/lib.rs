@@ -8,6 +8,14 @@
 //!
 //! Translated from FreeSurfer's source under FreeSurfer's licence (`crates-freesurfer/LICENSE`);
 //! larmorx (Apache-2.0) never links this crate: it runs the `larmorx-freesurfer` program as a
-//! separate process (`docs/licensing.md`). Empty until its queue items bring the code
-//! (`docs/freesurfer/queue.md`); `PROVENANCE.md` lists what each item translates.
+//! separate process (`docs/licensing.md`). `PROVENANCE.md` lists what each queue item
+//! (`docs/freesurfer/queue.md`) translates.
 #![forbid(unsafe_code)]
+
+pub mod cc;
+pub mod classify;
+pub mod conv;
+pub mod diffuse;
+pub mod fastmarch;
+pub(crate) mod mem;
+pub mod sobel;

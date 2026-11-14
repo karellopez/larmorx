@@ -1340,7 +1340,7 @@ defects! {
     FS_146 = "FS-146", "FreeSurfer", true,
         "MRISreadVTK with a file that ends before a field's values takes the missing values as 0 and reports success";
     FS_147 = "FS-147", "FreeSurfer", true,
-        "MRISreadVTK and the ASCII and movie.byu surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
+        "MRISreadVTK and the ASCII, movie.byu and GIFTI surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
     FS_148 = "FS-148", "FreeSurfer", true,
         "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, and the curvature reader's file-name choice with a name whose first dot is its first or second character, read one or two bytes before the name to decide whether it names a hemisphere";
     FS_149 = "FS-149", "FreeSurfer", true,
@@ -1516,7 +1516,7 @@ defects! {
     FS_355 = "FS-355", "FreeSurfer", true,
         "the surface library's annotation reader, given an annotation name without a folder that starts with the surface's hemisphere letters (lh.aparc.annot for a left surface), adds the hemisphere again (label/lh.lh.aparc.annot), so it does not find the file the annotation writer wrote for the same name; it takes a name as naming the hemisphere only when the name is the two letters alone, in any case";
     FS_356 = "FS-356", "FreeSurfer", true,
-        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names); the surface reader (MRISread), looking for the subject's Talairach transform beside a surface name of 300 bytes or more, writes past a 300-byte buffer";
+        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names); the surface reader (MRISread), looking for the subject's Talairach transform beside a surface name of 300 bytes or more, writes past a 300-byte buffer; the GIFTI surface reader copies a file name of 1,024 bytes or more past the surface's 1,024-byte name";
     FS_357 = "FS-357", "FreeSurfer", true,
         "the surface library's neighbourhood search (the 2- and 3-hop neighbours MRISread and others compute), given a vertex with a ripped vertex among its known neighbours, reads its neighbour list past the part it filled: the vertex's neighbourhood then depends on memory contents (MRISread then ends with a failed assertion at the ripped vertex)";
     FS_358 = "FS-358", "FreeSurfer", true,
@@ -1551,6 +1551,142 @@ defects! {
         "the discrete curvatures (MRIScomputeSecondFundamentalFormDiscrete, mris_curvature's), at a vertex whose faces do not form one fan around it (a vertex on the surface's border, two fans meeting at one vertex), read before the vertex's face list and can write past their own list (an undefined result or a crash) before reporting the vertex";
     FS_373 = "FS-373", "FreeSurfer", true,
         "the discrete curvatures' sign of two faces (FACES_Hcurvature_determineSign), given a face that names one vertex twice, read the vertex before the surface's first (an undefined sign)";
+    FS_374 = "FS-374", "FreeSurfer", true,
+        "the area errors as a surface's curvature (MRISuseAreaErrors) divide each vertex's area change by zero instead of its face count: every vertex's value is infinite or not a number";
+    FS_375 = "FS-375", "FreeSurfer", true,
+        "the principal curvatures and their functions as a surface's curvature (MRISuseK1Curvature, MRISuseK2Curvature, MRISusePrincipalCurvatureFunction; mris_curvature_stats) give a range that includes the first vertex's previous curvature value, which no vertex has any more (a range wider than the values, or not a number)";
+    FS_376 = "FS-376", "FreeSurfer", true,
+        "the principal curvatures and their functions as a surface's curvature (MRISuseK1Curvature, MRISuseK2Curvature, MRISusePrincipalCurvatureFunction), on a surface without vertices, read memory outside the surface (an undefined range)";
+    FS_377 = "FS-377", "FreeSurfer", true,
+        "the principal curvatures' outlier removal (MRIScomputeSecondFundamentalFormThresholded with a threshold of 0 or more; mris_curvature -thresh) of a surface whose unripped principal curvatures k1 (or k2) are all equal, or one of which is not finite (NaN, infinite), writes far outside its 1,000-bin histogram: a segmentation fault";
+    FS_378 = "FS-378", "FreeSurfer", true,
+        "the principal curvatures' outlier removal (MRIScomputeSecondFundamentalFormThresholded with a threshold of 0 or more) of a surface with no unripped vertex reads memory before its histograms (no effect on the result)";
+    FS_379 = "FS-379", "FreeSurfer", true,
+        "the averaging of a surface's gradients (MRISaverageGradients), on a surface whose neighbour lists are not symmetric (an unripped neighbour whose own neighbours are all ripped), averages a vertex with other vertices' neighbours and reads past its list (an undefined result)";
+    FS_380 = "FS-380", "FreeSurfer", true,
+        "the vertex report (MRISprintVertexInfo) lists a vertex's neighbours by its face count, so for a vertex with more faces than room in its neighbour list it reads past the list (undefined numbers or a crash)";
+    FS_381 = "FS-381", "FreeSurfer", true,
+        "the GIFTI surface reader (mrisReadGIFTIfile; MRISread of a .gii surface) copies the coordinates' VolGeomFname metadata into the surface's 1,024-byte volume-geometry name as 1,024 bytes whatever its length: past a shorter name it copies memory outside the metadata (bytes that the surface's writers later write), and a name of 1,024 bytes or more is left without its end";
+    FS_382 = "FS-382", "FreeSurfer", true,
+        "the GIFTI surface reader, given a NUM_TAG_CMDLINE above 1,000 in the coordinates' metadata, says it keeps the last 1,000 command lines and then never returns";
+    FS_383 = "FS-383", "FreeSurfer", true,
+        "the GIFTI surface reader takes the face array's vertex numbers unchecked: a face naming a vertex the surface does not have (negative, or past the coordinates) is counted in memory outside the surface (an undefined result or a crash, then or later)";
+    FS_384 = "FS-384", "FreeSurfer", true,
+        "the GIFTI reader's sparse storage (a NIFTI_INTENT_NODE_INDEX array) takes its vertex numbers unchecked: a number the surface does not have stores the value in memory outside the surface";
+    FS_385 = "FS-385", "FreeSurfer", true,
+        "the GIFTI reader reads a NIFTI_INTENT_LABEL array's values as 32-bit unsigned integers whatever the array's data type: the keys of a FLOAT32 array are its numbers' bit patterns, and an array of 8- or 16-bit integers is read four bytes per value, past its data";
+    FS_386 = "FS-386", "FreeSurfer", true,
+        "the GIFTI reader looks a label array's keys up in the surface's colour table by key: a key the table has no entry for (a table the caller gives, or one made from a colour array read before the labels) is read outside the table or through an empty entry (a crash)";
+    FS_387 = "FS-387", "FreeSurfer", true,
+        "the GIFTI surface reader compares a coordinate system's DataSpace (and, for NIFTI_XFORM_UNKNOWN, its TransformedSpace) without checking that the file gave one: a coordinate system without it crashes the program";
+    FS_388 = "FS-388", "FreeSurfer", true,
+        "the GIFTI reader, asked for one data array by number (an annotation's data array), does not check the number against the file's arrays: a number past them, or negative, reads outside the image's array list (a crash)";
+    FS_389 = "FS-389", "FreeSurfer", true,
+        "the GIFTI label-table reader uses each label's key as its place in the colour table without checking its sign: a negative key writes its entry before the table (the table then holds fewer entries than labels and the reader refuses the file, or the program crashes)";
+    FS_390 = "FS-390", "FreeSurfer", false,
+        "the GIFTI reader's sparse storage (a NIFTI_INTENT_NODE_INDEX array) is refused unless it lists every vertex: the data arrays that follow it must hold one value per vertex of the surface, not one per listed vertex as the GIFTI format's sparse storage has them";
+    FS_391 = "FS-391", "FreeSurfer", true,
+        "the GIFTI reader's shape overlays (NIFTI_INTENT_SHAPE arrays read as overlays) take their data type from the array's ShapeDataType metadata: an array without it gets a data type of memory contents, and one of 256 bytes or more is written past the overlay's 256-byte field";
+    FS_392 = "FS-392", "FreeSurfer", true,
+        "the GIFTI reader's shape overlays copy the array's Name metadata as 1,024 bytes: a name of 1,024 bytes or more is left without its end and read past";
+    FS_393 = "FS-393", "FreeSurfer", true,
+        "the colour table the GIFTI reader makes from a NIFTI_INTENT_RGB_VECTOR or RGBA_VECTOR array takes each colour's alpha from memory past the three components it stored (an undefined alpha)";
+    FS_394 = "FS-394", "FreeSurfer", false,
+        "the GIFTI reader's statistics overlays (data arrays of the other intents read as overlays) keep only the first array of each run of one intent, never add the last run to the overlay list, and write the third and later arrays of a run outside their one-frame volume: a file of statistics arrays gives no statistics overlay, or one with only its first array";
+    FS_395 = "FS-395", "FreeSurfer", true,
+        "the GIFTI readers (of surfaces, of volumes, and the count of a file's overlays) compare the file's Version with \"1\" without checking that the file gave one: a GIFTI file without a Version attribute crashes the program (gifticlib itself accepts it)";
+    FS_396 = "FS-396", "FreeSurfer", true,
+        "the GIFTI reader reads a NIFTI_INTENT_LABEL array's values without checking that gifticlib gave it any (an array gifticlib could not decode, such as ASCII UINT32 values): the program crashes";
+    FS_397 = "FS-397", "FreeSurfer", true,
+        "the GIFTI label writer sizes its label table by the colour table's entries but fills it only with the entries that have a name: a colour table with an unnamed entry gives a label table with unnamed places, the file is found invalid and is not written";
+    FS_398 = "FS-398", "FreeSurfer", true,
+        "the GIFTI label writer reads the surface's colour table without checking that it has one: writing labels of a surface without a colour table crashes the program";
+    FS_399 = "FS-399", "FreeSurfer", true,
+        "the GIFTI shape and statistics writers that take their values from a volume place each voxel by its column only: a volume of more than one row or slice has its values overwritten by the last row and slice (and columns past the surface's vertices are refused with a message)";
+    FS_400 = "FS-400", "FreeSurfer", true,
+        "the GIFTI statistics writer that takes its values from a volume writes a single data array whatever the volume's frames: a volume of several frames gives only its last frame, one of no frames an array without attributes (the file is refused as invalid)";
+    FS_521 = "FS-521", "FreeSurfer", true,
+        "the GIFTI reader of volumes (MRIread of a .gii file) chooses the data arrays to read correctly only when every array of the file has the same intent: in a file that mixes intents it counts the arrays of every intent it knows and then reads an intent from memory it never wrote, so the volume's frames, type and values are undefined (usually every value 0)";
+    FS_522 = "FS-522", "FreeSurfer", true,
+        "the GIFTI writer of volumes (MRIwrite to a .gii file) writes the first row of the first slice of each frame only: the other rows and slices of a volume are lost";
+    FS_523 = "FS-523", "FreeSurfer", true,
+        "the combined GIFTI writer (a surface with its overlays) reads each shape or statistics overlay's volume without checking that it has one: an overlay without its values crashes the program";
+    FS_524 = "FS-524", "FreeSurfer", true,
+        "the combined GIFTI writer looks an overlay's GIFTI intent up by its overlay type, and the generic statistics type (the one the GIFTI reader gives its statistics overlays) has none: such overlays are dropped from the file without a message";
+    FS_525 = "FS-525", "FreeSurfer", true,
+        "the surface autocorrelation and kernel smoothing functions (MRISar1, MRISarN, MRISsmoothKernel) read their input volume's voxels, and write an output volume the caller gives, as 32-bit floats whatever the volume's type: a volume of another type gives values made of other voxels' bytes (or of memory past the volume)";
+    FS_526 = "FS-526", "FreeSurfer", true,
+        "MRISsmoothKernel given a per-vertex kernel volume weighs every neighbour by the global kernel instead, which is then all zeros: every smoothed value is 0/0 (NaN)";
+    FS_527 = "FS-527", "FreeSurfer", true,
+        "MRISsmoothKernel's closing message prints the output's value at column 1031 of its first row whatever the output's size: for a surface of fewer than 1,032 vertices it prints another voxel's value or memory outside the volume";
+    FS_528 = "FS-528", "FreeSurfer", true,
+        "MRIScrsLUT, for a surface whose vertex count differs from the volume's voxels, does not free the table it began (a small memory leak; the result is not changed)";
+    FS_529 = "FS-529", "FreeSurfer", false,
+        "MRISsmoothKernel given an output volume does not clear it: the vertices it skips (ripped, masked, or without neighbours) keep the caller's values";
+    FS_530 = "FS-530", "FreeSurfer", true,
+        "the surface hop lists (SetSurfHopList) and their users MRISarN and MRISsmoothKernel accept fewer than one hop and then write into empty lists: the program crashes at the first vertex they handle";
+    FS_531 = "FS-531", "FreeSurfer", true,
+        "mriSurfaceRASToVoxel with FREESURFER_mriSurfaceRASToVoxel_both set checks its two computations the wrong way round: it reports \"not same answer\" and crashes the program whenever they agree (in any coordinate)";
+    FS_532 = "FS-532", "FreeSurfer", true,
+        "mriSurfaceRASToVoxel uses a surface-RAS-to-voxel matrix that nothing in FreeSurfer sets: called without one, or with one whose product with a point is refused (a matrix of other than four columns) or has fewer than three rows, it crashes the program or reads memory outside the product";
+    FS_533 = "FS-533", "FreeSurfer", true,
+        "MRISsmoothKernel given hop lists made by an earlier call for fewer hops than its kernel has reads past the lists (memory contents)";
+    FS_534 = "FS-534", "FreeSurfer", true,
+        "with FS-525, a volume of a type smaller than a float has its later voxels read and written past the end of its memory: the values read are memory contents, and the writes corrupt the program's memory (it can crash later)";
+    FS_535 = "FS-535", "FreeSurfer", true,
+        "the surface's corner table (used by the corner-angle statistics and the surface-quality summaries) on a surface with an edge not shared by exactly two triangles (an open or non-manifold surface): the edge table stops at that edge with an error, the later edges are left as zero-length edges of vertex 0, and building the corners then crashes the program";
+    FS_536 = "FS-536", "FreeSurfer", true,
+        "the surface-quality summaries (one line, or the Area/Corner/Edge/Hinge table) crash the program when a statistic has nothing to summarise (every vertex ripped, or no triangle, edge or corner left)";
+    FS_537 = "FS-537", "FreeSurfer", true,
+        "the corner-angle statistics use the edges' directions from the last edge measurement, not from the surface's current coordinates: after the vertices move they describe the old surface, and before any edge measurement every corner reads 90 degrees";
+    FS_538 = "FS-538", "FreeSurfer", true,
+        "the edge statistics (lengths, hinge dot products and angles) and the one-line surface-quality summary use the triangles' normals from their last computation: after the vertices move the hinge values describe the old surface, and with no normals computed yet the program crashes";
+    FS_539 = "FS-539", "FreeSurfer", true,
+        "the fast-marching distance maps (MRIextractDistanceMap, MRIdistanceTransform) of a volume one voxel wide take the voxel that follows in memory (the first voxel of the next row) as each voxel's neighbour beyond the edge, so the distances depend on the next row's labels";
+    FS_540 = "FS-540", "FreeSurfer", true,
+        "the fast-marching distance maps of a volume one voxel high or deep, and of the last voxel of a volume one voxel wide, read memory outside the volume as a neighbour beyond the edge: the distances depend on memory contents, or the program crashes";
+    FS_541 = "FS-541", "FreeSurfer", true,
+        "with a mask, the fast-marching distance maps first set the masked voxels from a distance limit not yet set (memory never written): the values are replaced before the map is returned, but in a volume one voxel wide (FS-539) a neighbour's distance can be read from them";
+    FS_542 = "FS-542", "FreeSurfer", true,
+        "the fast-marching distance maps turn a label-volume or mask value that is NaN or beyond the 32-bit integer range into -2147483648: such voxels never match the label, and the mask never excludes them";
+    FS_543 = "FS-543", "FreeSurfer", true,
+        "MRIdistanceTransform with DTRANS_MODE_INSIDE computes the unsigned distances on both sides of the label (DTRANS_MODE_UNSIGNED's map) instead of the distances inside it";
+    FS_544 = "FS-544", "FreeSurfer", true,
+        "the fast-marching distance maps given a mode they do not know (MRIextractDistanceMap's 1 to 4, MRIdistanceTransform's DTRANS_MODE_* 1 to 4, mris_distance_to_label's -mode) return a map of zeros without a message";
+    FS_545 = "FS-545", "FreeSurfer", true,
+        "the one-dimensional convolution (MRIconvolve1d) of a volume of a type other than uchar or float into a float volume takes the volume's outside value before the first voxel of a row and the next row's voxels past its last, where uchar and float volumes (and the integer-typed convolutions) repeat the edge voxel";
+    FS_546 = "FS-546", "FreeSurfer", true,
+        "the one-dimensional convolutions (MRIconvolve1d and its uchar, short and int forms) given a destination smaller than the source, or a source or destination frame the volume does not have, read and write other voxels or memory outside the volumes (a crash, memory corruption or memory contents)";
+    FS_547 = "FS-547", "FreeSurfer", true,
+        "the one-dimensional convolution into a uchar volume reads a float source's memory byte by byte as uchar voxels, and into a short or int volume reads a source of another type as shorts or ints: the values are other voxels' bytes, and for a narrower source type memory past the volume";
+    FS_548 = "FS-548", "FreeSurfer", true,
+        "the separable Gaussian convolution (MRIconvolveGaussian) given a kernel volume that is not float reads its memory as floats: wrong weights, or memory past the kernel";
+    FS_549 = "FS-549", "FreeSurfer", true,
+        "the one-dimensional convolutions with a kernel longer than 1,001 taps read past the volume's boundary index tables near the edges: memory contents as voxel indices (a crash or wrong voxels)";
+    FS_550 = "FS-550", "FreeSurfer", true,
+        "the separable Gaussian convolution (MRIconvolveGaussian) of a volume without frames crashes (an integer division by zero)";
+    FS_551 = "FS-551", "FreeSurfer", true,
+        "the Gaussian smoothing (MRIgaussianSmoothNI, MRIgaussianSmooth, MRImaskedGaussianSmooth) of a volume with an extent of 0 along a smoothed axis writes outside a matrix (memory corruption)";
+    FS_552 = "FS-552", "FreeSurfer", true,
+        "the masked Gaussian smoothing (MRImaskedGaussianSmooth) given a target whose extent or frames differ from the source's prints the smoother's dimension-mismatch error and then crashes";
+    FS_553 = "FS-553", "FreeSurfer", true,
+        "the pyramid reduction (MRIreduce) of a volume of one slice, without a destination, returns a volume of depth 0 (no voxels) instead of the reduced slice";
+    FS_554 = "FS-554", "FreeSurfer", true,
+        "the six-neighbour Laplacian (MRIlaplacian) of a volume of several frames takes the centre voxel of every frame from the first frame";
+    FS_555 = "FS-555", "FreeSurfer", true,
+        "the Sobel derivatives (MRIxSobel, MRIySobel, MRIzSobel, MRIsobel and its gradient magnitude) given a destination smaller than the source or without the frame they write, or, for a source that is not uchar, a destination that is not float, write floats into other voxels' bytes or into memory outside it (memory corruption, a crash), and read a gradient volume without its three frames outside its memory";
+    FS_556 = "FS-556", "FreeSurfer", true,
+        "the divergence (MRIdivergence) ignores the destination it is given: it returns a new volume and leaves the given one unchanged";
+    FS_557 = "FS-557", "FreeSurfer", true,
+        "the white-matter border classification (MRImarkBorderVoxels, MRIborderClassifyVoxel, MRIreclassify, MRIcomputeClassStatistics) turns a voxel value that is NaN or beyond the 32-bit integer range into -2147483648, and squares the neighbourhood's integer values in 32 bits (wrapping beyond 46,340)";
+    FS_558 = "FS-558", "FreeSurfer", false,
+        "the border voxel classifier (MRIborderClassifyVoxel, used by MRIreclassify) computes the gray-matter likelihood with the white matter's variance, and when both likelihoods are 0 divides the white one by 0 (its probability NaN, the voxel taken as white)";
+    FS_559 = "FS-559", "FreeSurfer", true,
+        "MRImarkBorderVoxels of a uchar volume given a destination that is not uchar, or smaller than the source, writes its labels as bytes into other voxels or outside the destination (memory corruption)";
+    FS_561 = "FS-561", "FreeSurfer", true,
+        "the region growing of the connected components (GrassFire6, GrassFire18) given a label that its label volume stores as 0 (0 itself, or a value the volume's type clamps or rounds to 0) never ends when two object voxels of the region touch: the program hangs while its memory grows";
+    FS_560 = "FS-560", "FreeSurfer", true,
+        "the white and gray class statistics (MRIcomputeClassStatistics) of an intensity volume with negative values or NaNs count them in a histogram bin before its start (memory corruption)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,
@@ -1609,6 +1745,58 @@ defects! {
         "a newer-style FreeSurfer program without a help text (mri_brainvol_stats) run without a required input prints, before its error, a help line chosen by memory never written: No xml string passed. when that memory holds 0, otherwise an XML parser's message";
     FS_412 = "FS-412", "FreeSurfer", true,
         "ImageScaleUp, ImageScaleDown and ImageRescale with a scale that makes the image's rows or columns beyond the 32-bit integer range (or NaN) go on with extents of -2147483648: nothing is scaled, or the image cannot be allocated, with no message about the scale";
+    FS_413 = "FS-413", "FreeSurfer", true,
+        "reading a text colour table, an entry line whose structure number is negative, or is the table's largest while its name holds a #, is stored outside the table: memory corruption, a crash or another object's values (a smaller number with a # in its name is read as an entry)";
+    FS_414 = "FS-414", "FreeSurfer", true,
+        "reading a text colour table's tissue-type lines (#ctTType): a line of vertical tabs, form feeds or carriage returns only, or a #ctTType line with nothing after the keyword, crashes FreeSurfer; a #ctTType line whose structure number, name, colour or transparency does not read takes that value from an earlier such line or from memory never written, and one whose structure number is negative or does not read can be stored outside the table";
+    FS_415 = "FS-415", "FreeSurfer", true,
+        "reading a text colour table without tissue-type lines leaves the file open: a program that reads many tables runs out of file descriptors";
+    FS_416 = "FS-416", "FreeSurfer", true,
+        "reading the default colour table (CTABreadDefault), and adding a tissue-type schema without a table, crash when FreeSurfer's environment cannot be read: FREESURFER_HOME not set, its FreeSurferColorLUT.txt missing or unreadable, or a wrong FS_DESIRED_BVEC_SPACE";
+    FS_417 = "FS-417", "FreeSurfer", true,
+        "a table of random colours of no entries (CTABalloc of 0), and drawing new colours for or counting the repeated colours of a table with empty places, crash FreeSurfer";
+    FS_418 = "FS-418", "FreeSurfer", true,
+        "merging a colour table with more places into a smaller one (CTABmerge) writes past the smaller table: memory corruption or a crash";
+    FS_419 = "FS-419", "FreeSurfer", false,
+        "the tissue-type schemas' table of tissue classes keeps the random float colours it was made with: its float colours do not match its integer ones (kept: no FreeSurfer program reads them)";
+    FS_420 = "FS-420", "FreeSurfer", true,
+        "a text colour table whose largest structure number (or tissue-type number) is beyond the machine's memory, or a table of random colours of such a count, gives an error message, a crash or a table depending on the machine's memory";
+    FS_421 = "FS-421", "FreeSurfer", true,
+        "reading an MGH volume whose talairach tag's text has no NUL byte (and fewer than 1,024 bytes) takes the transform's name on past the text from memory never written: a garbled name, so the transform is not found or another file is read";
+    FS_422 = "FS-422", "FreeSurfer", true,
+        "reading an MNI transform file (regio_read_mincxfm) whose first line is not MNI Transform File leaves the file open: a program that reads many runs out of file descriptors";
+    FS_423 = "FS-423", "FreeSurfer", true,
+        "reading a label file whose first line's text after vox2ras= is 100 bytes or more writes the text past the label's coordinate-space field: memory corruption, wrong label fields or a crash when the label is freed";
+    FS_424 = "FS-424", "FreeSurfer", true,
+        "reading a label file whose point count is 0 while point lines follow writes those points outside the label's memory: memory corruption or a crash (the label returned has no points)";
+    FS_425 = "FS-425", "FreeSurfer", true,
+        "reading a label file whose point count is larger than its point lines gives a label whose missing points are vertex 0 at (0, 0, 0) with statistic 0, without a message";
+    FS_426 = "FS-426", "FreeSurfer", true,
+        "a label of more points than the machine's memory holds (a point count read from a file, or a label allocated or enlarged to it) gives an error message, a crash or a label depending on the machine's memory";
+    FS_427 = "FS-427", "FreeSurfer", true,
+        "reading, writing or making a label, a label name, subject name or subjects directory longer than FreeSurfer's 1,024-byte name buffers is written past them, or read on past its end: memory corruption, a garbled name or a crash";
+    FS_428 = "FS-428", "FreeSurfer", true,
+        "writing a label, a write error (a full disk) closes the file twice: a crash or memory corruption after the error message";
+    FS_429 = "FS-429", "FreeSurfer", true,
+        "copying a label into a given label with fewer places than the source's points writes the points past the given label's memory: memory corruption or a crash";
+    FS_430 = "FS-430", "FreeSurfer", true,
+        "the annotation tables (a table file, or one set from a colour table): a name of 100 bytes or more, or a table path of 1,024 bytes or more, is written past its buffer or read on past its end: memory corruption, a garbled name or a crash";
+    FS_431 = "FS-431", "FreeSurfer", true,
+        "removing a point outside a point set (fsPointSet::remove) is undefined behaviour: memory corruption or a crash";
+    FS_433 = "FS-433", "FreeSurfer", true,
+        "loading a point set (a JSON file) that is not JSON, or whose vox2ras, points, coordinates or values have other types, ends the program with an uncaught exception: an abort (status 134) instead of an error message";
+    FS_434 = "FS-434", "FreeSurfer", true,
+        "printing a program's help, an element of the help text without text (an empty section or argument), or a comment, processing instruction or CDATA section between its sections or arguments, crashes the program (a null pointer)";
+    FS_435 = "FS-435", "FreeSurfer", true,
+        "printing a program's help, a word longer than a line (70 characters, 62 in an explanation) is cut at the line's end and its next character is dropped";
+    FS_436 = "FS-436", "FreeSurfer", true,
+        "printing a program's help, a comment or processing instruction among the kinds of arguments is printed as a section of that name in capitals followed by ARGUMENTS";
+    FS_437 = "FS-437", "FreeSurfer", true,
+        "converting a label of a surface from voxel coordinates to tkregister (surface) RAS converts each point the other way, as a tkregister RAS point to a voxel: wrong coordinates";
+    FS_438 = "FS-438", "FreeSurfer", true,
+        "writing one frame of a volume to a file reports success when the file could not be written (an unknown format, a missing folder)";
+    FS_432 = "FS-432", "FreeSurfer", true,
+        "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

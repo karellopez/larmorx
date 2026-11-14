@@ -395,6 +395,25 @@ pub struct SurfGlobals {
     /// call at which `BEVIN_TESTING_dumpFacesAroundVertex` dumps the faces).
     pub around_vertex_count: u64,
     pub around_vertex_limit: u64,
+    /// `MRIScomputeSecondFundamentalFormAtVertex`'s static eigenvector matrix `m_eigen` (row by
+    /// row), `None` before its first call allocates it (zeros).
+    pub sff_at_vertex_eigen: Option<[f32; 4]>,
+    /// `MRISaverageGradients_optimize`'s `once` and `optimize` (whether
+    /// `FREESURFER_MRISaverageGradients_optimize_suppress` was unset), `None` before its first
+    /// call.
+    pub avg_gradients_optimize: Option<bool>,
+    /// `VoxelFromSRASmatrix` (`mrisurf_metricProperties.cpp` line 11685): the surface-RAS-to-voxel
+    /// matrix `mriSurfaceRASToVoxel` uses; nothing in FreeSurfer sets it (`None`, `NULL`).
+    pub voxel_from_sras: Option<larmorx_freesurfer_core::matrix::Matrix>,
+    /// `mriSurfaceRASToVoxel`'s statics `try_new_way` and `try_old_way`, `None` before its first
+    /// call reads `FREESURFER_mriSurfaceRASToVoxel_both` and `_old`.
+    pub sras_ways: Option<(bool, bool)>,
+    /// `MRISfaceNormalFace_AddDeltaVertex` (`surfgrad.cpp`, -1): the face corner (0 to 2) whose
+    /// position `MRISfaceNormalFace` moves by [`SurfGlobals::face_normal_add_delta`] (FreeSurfer's
+    /// test of its derivatives); none below 0.
+    pub face_normal_add_delta_vertex: i32,
+    /// `MRISfaceNormalFace_AddDelta[3]` (`long double`, zeros).
+    pub face_normal_add_delta: [larmorx_core::x87::F80; 3],
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -434,6 +453,12 @@ impl Default for SurfGlobals {
             hcurv_sign_calls: 0,
             around_vertex_count: 0,
             around_vertex_limit: 1,
+            sff_at_vertex_eigen: None,
+            avg_gradients_optimize: None,
+            voxel_from_sras: None,
+            sras_ways: None,
+            face_normal_add_delta_vertex: -1,
+            face_normal_add_delta: [larmorx_core::x87::F80::ZERO; 3],
         }
     }
 }

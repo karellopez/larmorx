@@ -13,11 +13,11 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-14 (the distance maps `MRIextractDistanceMap`, `MRIdistanceTransform`): N
-/// cases, SKIPPED hashed as `SKIP`.
+/// Recorded 2026-11-14 from the clean commit 66a5e65f (the distance maps `MRIextractDistanceMap`,
+/// `MRIdistanceTransform`): 400 cases, 348 lines identical, 52 hashed as `SKIP`.
 const N: usize = 400;
-const OFFICIAL_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
-const SKIPPED: usize = 0;
+const OFFICIAL_SHA256: &str = "aa81ea376da2b51f6f2f0b03df0522542c3ad826072e65d49b82c51f1fc74d13";
+const SKIPPED: usize = 52;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 4] = ["FS-540", "FS-541", "FS-58", "FS-53"];

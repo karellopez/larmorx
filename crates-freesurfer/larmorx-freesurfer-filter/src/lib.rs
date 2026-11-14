@@ -19,5 +19,6 @@ pub mod diffuse;
 pub mod fastmarch;
 pub mod fmri;
 pub(crate) mod mem;
+pub mod nonpar;
 pub mod sobel;
 pub mod volcluster;

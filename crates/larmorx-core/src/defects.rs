@@ -1707,6 +1707,14 @@ defects! {
         "the volume clusters' member coordinates (x, y, z) are left unset (memory contents) unless a transform is given when the clusters are found; pruning the clusters by distance then compares memory contents";
     FS_571 = "FS-571", "FreeSurfer", true,
         "the volume clusters' coordinates computed with a transform that is not 4 x 4 crash after the matrix product's error message (fewer than 3 rows: memory outside the product is read)";
+    FS_572 = "FS-572", "FreeSurfer", false,
+        "the non-parametric white matter and cortex classification (MRIreclassifyWMCtxNonPar, MRIclassifyAmbiguousNonPar, used by mri_segment with a segmentation) ends both class histograms at the smaller of the two classes' maxima (leaving the brighter white matter out of its distribution), and searches the upper ambiguity threshold from the first bin rather than from the classes' crossing";
+    FS_573 = "FS-573", "FreeSurfer", true,
+        "the ambiguity thresholds of MRIclassifyAmbiguousNonPar, when no histogram bin satisfies the probability ratio, are read from one bin before or after the histogram (memory contents)";
+    FS_574 = "FS-574", "FreeSurfer", false,
+        "MRIclassifyAmbiguousNonPar dilates the white matter and cortex masks NdilWM and NdilCtx times, but each dilation starts again from the undilated mask, so any count above 1 dilates by one voxel only";
+    FS_575 = "FS-575", "FreeSurfer", true,
+        "MRIclassifyAmbiguousNonPar with a dilation count of 0 or less crashes (it reads a dilated mask it never made)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

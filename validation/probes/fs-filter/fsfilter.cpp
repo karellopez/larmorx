@@ -13,6 +13,7 @@
 // `v*k` stands for k voxels of the value v.
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -537,6 +538,40 @@ bool clus_case(const std::string &cmd)
     MRI *r = cmd == "isl" ? MRIremoveVolumeIslands(m, th, nk, dst)
                           : MRIremoveVolumeHoles(m, th, nk, getd(), dst);
     put_result(r, dst);
+  } else if (cmd == "rwc") {
+    // rwc <norm> <seg> <dst mode> [<dst>] nitersmax: the result, then the segmentation
+    MRI *norm = get_vol();
+    MRI *seg = get_vol();
+    MRI *dst = get_dst(geti(), seg);
+    int it = geti();
+    put_result(MRIreclassifyWMCtxNonPar(norm, seg, it, dst), dst);
+    put_full(seg);
+  } else if (cmd == "amb") {
+    // amb <norm> <seg> <0 | 1 statseg> Qwm Qctx NdilWM NdilCtx: the result, then the FNV-1a of
+    // the wm.pdf.dat and ctx.pdf.dat it writes into the current directory (<cases>.out.d)
+    MRI *norm = get_vol();
+    MRI *seg = get_vol();
+    MRI *stat = geti() ? get_vol() : seg;
+    double qw = getd(), qc = getd();
+    int nw = geti(), nc = geti();
+    std::string d = scratch + ".d";
+    mkdir(d.c_str(), 0700);
+    if (chdir(d.c_str()) != 0) fail("chdir");
+    unlink("wm.pdf.dat");
+    unlink("ctx.pdf.dat");
+    put_full(MRIclassifyAmbiguousNonPar(norm, seg, stat, qw, qc, nw, nc));
+    for (const char *f : {"wm.pdf.dat", "ctx.pdf.dat"}) {
+      FILE *fp = fopen(f, "rb");
+      if (!fp) { out += "NOFILE "; continue; }
+      uint64_t h = 0xcbf29ce484222325ull;
+      int ch;
+      while ((ch = fgetc(fp)) != EOF) h = (h ^ (unsigned char)ch) * 0x100000001b3ull;
+      fclose(fp);
+      unlink(f);
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
   } else if (cmd == "cvr") {
     float lo = getf(), hi = getf();
     int sign = geti();

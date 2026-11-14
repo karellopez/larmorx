@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! The fs.filter probe's cluster commands (`fsfilter.cpp`'s `clus_case`, `utils/volcluster.cpp`):
-//! their case generators and the port's answers.
+//! The fs.filter probe's cluster commands (`fsfilter.cpp`'s `clus_case`, `utils/volcluster.cpp`)
+//! and the non-parametric white matter and cortex classification (`mrifilter.cpp`): their case
+//! generators and the port's answers.
 
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc};
+use larmorx_freesurfer_filter::nonpar;
 use larmorx_freesurfer_filter::volcluster as vc;
-use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_UCHAR};
+use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_INT, MRI_UCHAR};
 use larmorx_freesurfer_volume::arith::Pair;
 
 use super::conv::{blobs, dbl, dx, full, opt, result, small};
 use super::{Ctx, Gen, Toks, fx, get_vol, rle, token};
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 6] = ["clus", "cprd", "cgrow", "isl", "hol", "cvr"];
+pub const COMMANDS: [&str; 8] = ["clus", "cprd", "cgrow", "isl", "hol", "cvr", "rwc", "amb"];
 
 fn extent(g: &mut Gen) -> [i32; 3] {
     if g.chance(6) {
@@ -83,6 +85,74 @@ fn mask(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
 
 fn thmin(g: &mut Gen) -> f32 {
     g.pick(&[0.5, 0.5, 1.0, 1.0, 7.0, 100.0, -5.0, 0.0, f32::NAN])
+}
+
+/// A white matter and cortex segmentation's labels (white matter 2 and 41, cortex 3 and 42,
+/// background and other labels), mostly in blobs.
+fn seg_labels(g: &mut Gen, e: [i32; 3]) -> Vec<i32> {
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let empty = g.chance(15);
+    // mostly a background margin on the faces (no class voxel then reads a neighbour outside)
+    let margin = !g.chance(3);
+    (0..n)
+        .map(|i| {
+            let (x, y, z) = (
+                i as i32 % e[0],
+                i as i32 / e[0] % e[1],
+                i as i32 / (e[0] * e[1]),
+            );
+            let face =
+                x == 0 || y == 0 || z == 0 || x == e[0] - 1 || y == e[1] - 1 || z == e[2] - 1;
+            if margin && face {
+                0
+            } else if empty {
+                g.pick(&[0, 4, 3])
+            } else {
+                g.pick(&[2, 2, 2, 3, 3, 3, 41, 42, 0, 0, 4, 251])
+            }
+        })
+        .collect()
+}
+
+/// A volume's tokens (one frame, voxel sizes 1) from its values.
+fn vol_of(t: &mut Vec<String>, e: [i32; 3], ty: i32, v: &[f64]) {
+    t.extend(e.map(|x| x.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    for _ in 0..3 {
+        t.push(fx(1.0));
+    }
+    let vals: Vec<String> = v.iter().map(|&x| token(ty, x)).collect();
+    t.extend(rle(&vals));
+}
+
+/// The intensities of a segmentation: white matter bright, cortex darker, the rest dark.
+fn norm_of(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], labels: &[i32]) {
+    let ty = if g.chance(4) { MRI_FLOAT } else { MRI_UCHAR };
+    let v: Vec<f64> = labels
+        .iter()
+        .map(|&l| {
+            let base = match l {
+                2 | 41 | 251 => g.int(92, 122),
+                3 | 42 => g.int(55, 95),
+                _ => g.int(0, 60),
+            } as f64;
+            if ty == MRI_FLOAT && g.chance(3) {
+                base + 0.25
+            } else {
+                base
+            }
+        })
+        .collect();
+    vol_of(t, e, ty, &v);
+}
+
+fn seg_extent(g: &mut Gen) -> [i32; 3] {
+    let mut e = [0; 3];
+    for x in &mut e {
+        *x = if g.chance(10) { 1 } else { g.int(3, 9) as i32 };
+    }
+    e
 }
 
 /// One case of `cmd`.
@@ -170,7 +240,72 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 ])));
             }
         }
+        "rwc" => {
+            // rwc <norm> <seg> <dst mode> [<dst>] nitersmax
+            let e = seg_extent(g);
+            let l = seg_labels(g, e);
+            norm_of(g, t, e, &l);
+            let sty = if g.chance(4) { MRI_INT } else { MRI_UCHAR };
+            vol_of(
+                t,
+                e,
+                sty,
+                &l.iter().map(|&x| f64::from(x)).collect::<Vec<_>>(),
+            );
+            let m = g.pick(&[0, 0, 0, 1, 2]);
+            t.push(m.to_string());
+            if m == 1 {
+                let z = vec![0.0; l.len()];
+                vol_of(t, e, sty, &z);
+            }
+            t.push(g.pick(&[30, 30, 1, 2, 0, 5]).to_string());
+        }
+        "amb" => {
+            // amb <norm> <seg> <0 | 1 statseg> Qwm Qctx NdilWM NdilCtx
+            let e = seg_extent(g);
+            let l = seg_labels(g, e);
+            norm_of(g, t, e, &l);
+            let sty = if g.chance(4) { MRI_INT } else { MRI_UCHAR };
+            vol_of(
+                t,
+                e,
+                sty,
+                &l.iter().map(|&x| f64::from(x)).collect::<Vec<_>>(),
+            );
+            if g.chance(2) {
+                t.push("0".into());
+            } else {
+                t.push("1".into());
+                let l2 = seg_labels(g, e);
+                vol_of(
+                    t,
+                    e,
+                    sty,
+                    &l2.iter().map(|&x| f64::from(x)).collect::<Vec<_>>(),
+                );
+            }
+            t.push(dx(g.pick(&[3.0, 3.0, 1.5, 0.5, 10.0])));
+            t.push(dx(g.pick(&[3.0, 3.0, 1.5, 0.5, 10.0])));
+            t.push(g.pick(&[2, 2, 1, 3, 0]).to_string());
+            t.push(g.pick(&[2, 2, 1, 3]).to_string());
+        }
         c => panic!("unknown command {c}"),
+    }
+}
+
+static AMB_DIRS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// The FNV-1a (64 bits) of a file, `NOFILE` when there is none.
+fn file_hash(path: &std::path::Path) -> String {
+    match std::fs::read(path) {
+        Err(_) => "NOFILE".to_owned(),
+        Ok(b) => {
+            let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+            for x in b {
+                h = (h ^ u64::from(x)).wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            format!("{h:016x}")
+        }
     }
 }
 
@@ -332,6 +467,70 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                 } else {
                     "0 "
                 };
+            }
+        }
+        "rwc" => {
+            let norm = get_vol(cx, t)?;
+            let mut seg = get_vol(cx, t)?;
+            let mode = t.i();
+            let mut dst = if mode == 1 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let it = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = match (mode, dst.as_mut()) {
+                (2, _) => Pair::Same(&mut seg),
+                (_, Some(d)) => Pair::Given(&seg, d),
+                _ => Pair::New(&seg),
+            };
+            let r = nonpar::mri_reclassify_wm_ctx_non_par(g, a, b, &norm, p, it)?;
+            if mode == 2 {
+                *o += "0 NULL ";
+                full(o, Some(&seg));
+            } else {
+                result(o, r, dst.as_ref());
+            }
+            full(o, Some(&seg));
+        }
+        "amb" => {
+            let norm = get_vol(cx, t)?;
+            let seg = get_vol(cx, t)?;
+            let stat = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (qw, qc) = (dbl(t), dbl(t));
+            let (nw, nc) = (t.i(), t.i());
+            let k = AMB_DIRS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let dir =
+                std::env::temp_dir().join(format!("fs-filter-amb-{}-{k}", std::process::id()));
+            std::fs::create_dir_all(&dir).expect("a scratch directory");
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = nonpar::mri_classify_ambiguous_non_par(
+                g,
+                a,
+                b,
+                &norm,
+                &seg,
+                stat.as_ref().unwrap_or(&seg),
+                qw,
+                qc,
+                nw,
+                nc,
+                Some(&dir),
+            );
+            let hashes = [
+                file_hash(&dir.join("wm.pdf.dat")),
+                file_hash(&dir.join("ctx.pdf.dat")),
+            ];
+            let _ = std::fs::remove_dir_all(&dir);
+            full(o, r?.as_ref());
+            for h in hashes {
+                *o += &h;
+                *o += " ";
             }
         }
         _ => return Ok(false),

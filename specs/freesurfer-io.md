@@ -15,7 +15,9 @@ tags, the matrix tags, the binary colour tables, a volume geometry's stored form
 piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and gradient spaces.
 Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 9** (§65-74, queue item
 3.1-33's first piece, fs.labels): text colour tables, their lookups, random colours, tissue-type
-schemas; §75 (3.1-34): the rest of the registration files.
+schemas; §75 (3.1-34): the rest of the registration files; part 10 (§76-82): labels, control points,
+annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; **part 12**
+(§87-89): a label's coordinates converted, one frame of a volume written.
 
 ## 1. Conventions
 
@@ -2132,3 +2134,87 @@ them, with fields missing, reordered or of every other type, points as objects, 
 trailing text, a missing file, a folder). Lines with FS-521, FS-255 and the GIFTI reader's crashes are
 counted, not compared; FS-214's address apart. Measured (2026-11-14): seed 7, 1,800 cases: `reproduce`
 identical on 1,589, 0 different (210 counted, mostly the writers not ported yet).
+
+## 87. A label's coordinates converted (part 12: `LabelToScannerRAS`, `LabelToSurfaceRAS`, `LabelFromScannerRAS`, `LabelToVoxel`, `LabelVoxelToSurfaceRAS`)
+
+A label's coordinates (§76) are tkregister ("surface") RAS (1), scanner RAS (2), voxels of a volume
+(3) or unknown (0). Each conversion takes a label, a volume and a destination: a new label (the
+label copied into a new one, §78's `LabelCopy`, with its messages: a label without a subject needs
+`SUBJECTS_DIR`), the label itself, or a given label (the label copied into it, §78). It converts the
+label's first `n_points` points (the places after them are kept), each point `(x, y, z, 1)` made a
+`float` 4-vector and multiplied by a `float` 4 x 4 matrix in `float` (`specs/freesurfer-maths.md` §2,
+§16), the first three elements of the product the new `x`, `y`, `z`. Vertex numbers, statistics,
+the deleted flags, the name, the subject and the transforms are kept; the converted label is
+returned (the destination).
+
+The matrices (`specs/freesurfer-mri.md` §9, `specs/freesurfer-volume.md` §13): *tkregister to
+scanner* is the volume's vox2ras times the inverse of its tkregister vox2ras; a tkregister vox2ras
+that cannot be inverted (a voxel size of 0) ends the program in the product: `MatrixMultiply(): m2
+is null ` and ` break <file>:<line>` on standard output, then the error `MatrixMultiply: m2 is null`
+(code -4). *Voxels from tkregister* is the inverse of the tkregister vox2ras after the volume's
+cached matrices are filled where missing (with its diagnostic lines); one that cannot be inverted
+ends the program in the first point's product (`m1 is null`).
+
+- **To scanner RAS**: the tkregister-to-scanner matrix is made first (so such a volume ends the
+  program even for a label already in scanner RAS), then the copy. A label in scanner RAS is
+  returned as copied; a label in voxels is first converted to tkregister RAS (below); the matrix is
+  made again and applied to every point; the space becomes `scanner` and the coordinates 2. A label
+  in tkregister RAS or of any other coordinates (0, 4, ...) is converted as tkregister RAS.
+- **To tkregister RAS** (`LabelFromScannerRAS` is the same conversion): the tkregister-to-scanner
+  matrix is made first, then the copy. A label in tkregister RAS is returned as copied; a label in
+  voxels is converted from voxels (below); a label in scanner RAS through the inverse of the matrix
+  (one that cannot be inverted: the inverse's messages, then the product's `m1 is null` ends the
+  program); any other coordinates end the program with the error `LabelToSurfaceRAS: unsupported
+  coords (was <n>)` (`ERROR_UNSUPPORTED`, -3). The space becomes `TkReg` and the coordinates 1.
+- **To voxels**: the copy first; a label in voxels is returned as copied; a label in scanner RAS is
+  first converted to tkregister RAS (above); then every point through the voxels-from-tkregister
+  matrix, and each new coordinate's `nint` (`(int)(v + 0.5)`, `(int)(v - 0.5)` below 0; beyond the
+  `int` range FS-12) is the point's voxel `xv`, `yv`, `zv`. Labels in tkregister RAS or of any other
+  coordinates are converted as tkregister RAS. The space becomes `voxel` and the coordinates 3.
+- **From voxels to tkregister RAS**: the copy first (no matrix before it); each point, a voxel of the
+  volume, through the volume's tkregister vox2ras (made again for each point, with its cache filling
+  and diagnostic lines). The space becomes `TkReg` and the coordinates 1. A label of a surface (one
+  that holds a surface): FS-437, below.
+
+A surface's own conversions (`MRISsurfaceRASToVoxel`, `MRISsurfaceRASFromVoxel`) take the surface's
+volume geometry: when it is valid, the tkregister-to-scanner matrix of a header with the geometry's
+extent, voxel sizes, direction cosines and centre (not its shears), else of the volume; then the
+volume's scanner-to-voxel matrix (the inverse of its vox2ras; one that cannot be inverted ends the
+program in the product, `m1 is null`) times it (a new `float` product): *surface RAS to voxels*.
+`MRISsurfaceRASToVoxel` applies it to the point, `MRISsurfaceRASFromVoxel` its inverse (*voxels to
+surface RAS*).
+
+FS-437: for a label of a surface, FreeSurfer's conversion from voxels converts each point with the
+surface's *surface RAS to voxels*, the wrong direction; `fix` (the default) applies *voxels to
+surface RAS* (`MRISsurfaceRASFromVoxel`), `reproduce` FreeSurfer's. Both print the notice for a
+label of a surface with points.
+
+## 88. One frame of a volume written (`MRIwriteFrame(mri, name, frame)`)
+
+A frame at or beyond the volume's frame count ends the program: the error `MRIwriteFrame(<frame>) -
+frame out of bounds (<frames>)` (`ERROR_BADPARM`, -4). Otherwise a new volume of the same extent and
+type with one frame, the volume's header (`MRIcopyHeader`) and pulse parameters, receives the frame's
+voxels (each read as `MRIgetVoxVal` reads it: a negative frame as that function reads one, with its
+notices) and is written by `MRIwrite(<new volume>, name)` (§84: the name's format; relative names in
+the program's folder). FS-438: FreeSurfer returns `NO_ERROR` (0) whatever the write gave; `fix` (the
+default) returns the write's status (for example `ERROR_BADPARM`, -4, for a name of unknown format; the
+GIFTI writer's `ERROR_BADFILE`, -5, for a missing folder), `reproduce` 0; the notice is printed when the write failed.
+
+## 89. Validation plan (part 12)
+
+The probe's piece 13 (`validation/probes/fs-io/`, its port side in larmorx-freesurfer-volume's
+`tests/fs_io13/piece13.rs`, run with `check.py --package larmorx-freesurfer-volume --example
+fs_io13_probe`): `lcv` (each of the four conversions of labels of 0 to 6 points, sometimes 20 to 40,
+every kind of coordinates 0 to 4, coordinates from NaN, infinities, `-0`, `1 + FLT_EPSILON` and
+halves to +-300 in eighths, with and without vertex indices; volumes of 1 to 12 voxels a side, one
+side sometimes 64, 128 or 256, `uchar` or `float`, voxel sizes 0.5 to 3 and sometimes 0, direction
+cosines that are axis permutations with signs or rotations about an axis, sometimes all 0, centres
+to +-60; into a new label, itself or a given label (some with fewer places than the points: FS-429,
+counted); `SUBJECTS_DIR` unset, missing or set; one label in three with a surface whose geometry is
+valid or not), `mwf` (`MRIwriteFrame` of piece 12's volumes, frames 0, the last, the count and
+beyond, to `.gii` names in any case, a missing folder, an unknown format, `.mgz`). Lines whose
+writer is not ported yet and FS-429's are counted, not compared. Measured (2026-11-14): seed 7,
+1,000 cases: `reproduce` identical on 947, 0 different (53 counted); seed 13, 3,000: identical on
+2,823, 0 different (177 counted); `fix` differs only with notices (FS-437, FS-438, FS-01, FS-12,
+FS-522). The recorded test (`tests/fs_io13_official.rs`): seed 1's first 1,200 cases, 1,145 lines
+identical, 55 counted.

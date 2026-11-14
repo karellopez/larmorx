@@ -141,6 +141,15 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   GIFTI reader's crashes, FS-434 and help texts that are not well formed; `VARY` for FS-214's address. Seed 7, 1,800
   `mgi`/`mwr`/`lps` cases: `reproduce` identical on 1,589, 0 different; FreeSurfer 8.2.0's 86 `.help.xml` files
   (`hlp x<hex of the file>`): identical; seed 13, 594 `hlp` cases: identical on 465, 0 different.
+- Piece 13 (relay 22): `lcv` (`LabelToScannerRAS`, `LabelToSurfaceRAS`, `LabelToVoxel`, `LabelVoxelToSurfaceRAS`
+  of a label given as piece 11's, a volume header as piece 11's `cfp`, into a new label, itself or a given label,
+  optionally with a surface, `MRISalloc(0, 0)` with its volume geometry read as piece 2's; the result printed as
+  piece 11's labels), `mwf` (`MRIwriteFrame` of piece 12's volumes; the status, `errno`, every file under `w` as
+  `mwr`). The port's side is in larmorx-freesurfer-volume (its `tests/fs_io13/piece13.rs`, including fs.io's
+  `cases.rs`; example `fs_io13_probe`): `check.py --package larmorx-freesurfer-volume --example fs_io13_probe`.
+  `SKIP` for the writers not ported yet and FS-429. Seed 7, 1,000 cases: `reproduce` identical on 947, 0 different;
+  seed 13, 3,000: 2,823 identical, 0 different. The recorded test `fs_io13_official` (seed 1's 1,200: `--seed 1
+  --n 1200 --portable --light`).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

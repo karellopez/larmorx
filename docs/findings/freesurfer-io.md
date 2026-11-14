@@ -1039,3 +1039,38 @@ Restricted (FreeSurfer's internals). Behaviour: `specs/freesurfer-io.md` §83-86
   7's, 0 different (210 counted: the writers not ported yet, FS-521's files mixing intents, FS-255);
   `fix` differs only with notices (FS-433, FS-01, FS-522). Track D's `larmorx-freesurfer-surf` tests
   (`fs_surfio_official`, `gifti_writers`) unchanged with the errno changes.
+
+## Part 12: the label coordinate conversions and MRIwriteFrame (relay 22 of track A)
+
+Restricted (FreeSurfer's internals). Behaviour: `specs/freesurfer-io.md` §87-89. The port:
+larmorx-freesurfer-volume's `label_coords.rs` and `io_frames.rs` (track A's modules there: they need
+fs.volume's matrices and `MRIcopyFrame`; the orchestrator's layering of 2026-11-14).
+
+### Mechanisms
+- `LabelToScannerRAS` (label.cpp 3111-3145) initialises `M_surface_to_RAS = RASFromSurfaceRAS_(mri,
+  NULL)` at its declaration, before `LabelCopy`, and assigns it again at 3124 after the voxel step (the
+  first matrix leaks); the loop runs over `lsrc->n_points` reading and writing `ldst->lv[i]`.
+  `LabelToSurfaceRAS` (3150-3193) also makes the matrix at its declaration, before the switch, so a
+  label already in tkregister RAS or in voxels still pays for it (and ends the program on a singular
+  tkregister vox2ras); its `default:` is `ErrorExit(ERROR_UNSUPPORTED, ...)`, so `LABEL_COORDS_NONE`
+  (0) ends the program. `LabelFromScannerRAS` is a macro for `LabelToSurfaceRAS` (label.h 78).
+  `LabelToVoxel` (3198-3236) calls `voxelFromSurfaceRAS_(mri)` after the scanner step and `nint` of
+  each `V3_X(v2)` (float promoted to double). `LabelVoxelToSurfaceRAS` (3285-3305) reads `lsrc->lv[i]`
+  and calls `MRIvoxelToSurfaceRAS` per point (each call makes `surfaceRASFromVoxel_` anew).
+- FS-437: `LabelVoxelToSurfaceRAS` calls `MRISsurfaceRASToVoxel((MRIS *)lsrc->mris, mri, ...)`
+  (mrisurf_mri.cpp 7199-7247) for a label with a surface: that function maps surface RAS to voxels,
+  the opposite of what the caller (voxels to surface RAS) needs; `MRISsurfaceRASFromVoxel`
+  (7473-7530, the same matrices and their inverse) is the intended one. Rule A: the default calls
+  the latter. Both use only `mris->vg` (`MRIallocHeader(vg.width, vg.height, vg.depth, MRI_UCHAR, 1)`
+  + `MRIcopyVolGeomToMRI` when `vg.valid`, else `mri`), so the port takes the surface's `VolGeom`
+  (`Label::mris` is an opaque handle in larmorx-freesurfer-io); their static per-thread vectors
+  change nothing visible.
+- FS-438: `MRIwriteFrame` (mriio.cpp 1297-1308) ignores `MRIwrite`'s return value and returns
+  `NO_ERROR`; callers that test it (mri_cal_normalize.cpp 414) cannot see a failed write. Rule A.
+  A negative frame is not checked: `MRIcopyFrame` reads it through `MRIgetVoxVal` (fs.mri's notices).
+
+### Measured (piece 13, 2026-11-14, the probe `validation/probes/fs-io/`, unit oracle's build)
+- `lcv`, `mwf` seed 7 (1,000 cases): `reproduce` identical on 947, 0 different (53 counted: 30 writers
+  not ported yet, 23 FS-429); seed 13 (3,000): 2,823 identical, 0 different (177 counted); `fix` differs
+  only with notices (FS-437, FS-438, FS-01, FS-12, FS-522). In the fsio harness the surface is
+  `MRISalloc(0, 0)` with its `vg` read from the case.

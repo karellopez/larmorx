@@ -322,7 +322,7 @@ fn npk_case(g: &mut Gen, t: &mut Vec<String>) {
     t.push(fx(g.pick(&[0.0f32, 0.0, 0.5, 2.0, 5.0])));
     t.push(g.int(0, i64::from(nw)).to_string());
     let nb = g.pick(&[48i64, 48, 32, 7]);
-    let mut peak = g.int(20, i64::from(nb as i32) - 5);
+    let mut peak = g.int(if nb > 25 { 20 } else { 2 }, nb - 3);
     for i in 0..nw {
         t.push((g.int(-4, 4) + 5 * i64::from(i)).to_string());
         t.push(g.pick(&[10, 10, 9]).to_string());

@@ -169,3 +169,19 @@ Every run on generated inputs inside a memory box:
 - `real.py --gentle` on the three recorded heads: the gentle normalisation of `nu.mgz` (25, 5,
   sigma 8: `mri_normalize`'s first pass) and of `T1.mgz` (12.5, 5): 6 of 6 identical in both
   modes; 88 s in the official code, 111 s in the port (its Gaussian convolution is the slow part).
+
+## Results (relay 30, 2026-11-14)
+
+- The normalisation's histogram steps (`nrm`, `nfcp`, `n3d`) at seeds 7 and 13 (100 cases of each)
+  and 17 (200 of each): 0 different under `reproduce`, 0 default differences without a notice.
+  FS-597 (bins outside a histogram), FS-598 (a search without end) and FS-600 (peaks never written)
+  are counted (`SKIP`).
+- `real.py --norm3` on the three recorded heads: `MRInormInit` and `MRInormalize` of `nu.mgz` (3
+  of 3 identical), `MRI3dNormalize` of `T1.mgz` in place without and with the grey matter pruning
+  (25, 10, sigma 8): the 6 volumes identical; on two heads the message `gm peak at ..., valley at
+  <v> (-10)` prints a bin outside the histogram, `v` FreeSurfer's memory contents (44 and 3) and 0
+  in the port (FS-597), so 5 of 9 lines are identical in full. 137 s in the official code, 296 s
+  in the port (its control-point growth and 65-tap convolution are the slow parts).
+- The first `real.py --norm3` run found that the port's `MRInormInit` transposed the volume's
+  Talairach transform (the probe's own transform tokens had been transposed the same way, so the
+  generated cases agreed): fixed in f7381d67.

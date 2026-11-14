@@ -1120,7 +1120,8 @@ by name): `nrm` (MRInormalize after MRInormInit, or without an MNI; the windows'
 `nfcp` (MRInormFindControlPoints), `n3d` (MRI3dNormalize, with a separate `orig` or a copy, every
 destination kind, `prune` 0 and 1, `only_file`), and on the recorded heads `nrmf` (MRInormInit and
 MRInormalize of `nu.mgz`) and `n3df` (MRI3dNormalize of `T1.mgz` in place, without and with
-pruning): `real.py --norm3`. Generated cases: head-like ellipsoids tall in y (`nrm`), brain-like
+pruning): `real.py --norm3` (observed: the 3 `nu.mgz` normalisations and the 6 `T1.mgz` volumes
+identical; two heads' `gm peak` line prints a bin outside the histogram, FS-597). Generated cases: head-like ellipsoids tall in y (`nrm`), brain-like
 blocks of 15 to 21 voxels a side (`nfcp`, `n3d`). Results (observed): seeds 7 and 13 (100 cases of
 each command), seed 17 (200 of each): 0 different with `reproduce`, and with the default only
 differences that carry a notice. FS-597, FS-598 and FS-600 cases are counted, not compared

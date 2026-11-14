@@ -30,7 +30,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import check  # noqa: E402
-
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.freesurfer_unit import freesurfer_env  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
@@ -96,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         rows[mode] = ([x.partition("\t") for x in text.splitlines()], time.monotonic() - t0)
     same = differ = fix_same = 0
     bad = []
-    for case, c, (r, _, _), (f, _, fids) in zip(
+    for case, c, (r, _, _), (f, _, _) in zip(
         lines, official, rows["reproduce"][0], rows["fix"][0], strict=True
     ):
         # the outputs only (the text FreeSurfer printed is compared too)

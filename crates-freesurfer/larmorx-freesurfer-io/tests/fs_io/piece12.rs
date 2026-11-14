@@ -774,6 +774,11 @@ pub(crate) fn odir(o: &mut Out, w: &Work) {
         if f.to_ascii_lowercase().ends_with(".gii") {
             b = gii_normal(&b);
         }
+        // piece 23: an SGI image's descriptor and address bytes zeroed (FS-722), as fsio does
+        if b.len() >= 176 && b[0] == 0x01 && b[1] == 0xda {
+            b[108..112].fill(0);
+            b[144..152].fill(0);
+        }
         b = gz_normal(&b);
         if b.len() <= 256 {
             obytes(o, &b);

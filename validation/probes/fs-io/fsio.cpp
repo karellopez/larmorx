@@ -1322,6 +1322,12 @@ void odir12()
     std::vector<unsigned char> b = read_file(f);
     std::string s(b.begin(), b.end());
     if (f.size() > 4 && strcasecmp(f.c_str() + f.size() - 4, ".gii") == 0) s = gii_normal12(s);
+    // piece 23 (track A relay 31): an SGI image's header holds the writer's file descriptor (bytes
+    // 108-111) and a buffer's address (144-151), which change from run to run (FS-722): zeroed
+    if (s.size() >= 176 && (unsigned char)s[0] == 0x01 && (unsigned char)s[1] == 0xda) {
+      for (int k = 108; k < 112; k++) s[k] = 0;
+      for (int k = 144; k < 152; k++) s[k] = 0;
+    }
     s = gz_normal14(s);
     std::vector<unsigned char> c(s.begin(), s.end());
     if (c.size() <= 256) obytes(c);
@@ -1461,7 +1467,7 @@ void run_piece13(const std::string &cmd)
 
 // piece 14 (track A relay 23): mghWrite and MRITAGwrite, directly or through MRIwrite
 // piece 22 (track A relay 30): kwr is vwr (the AFNI and NRRD writers)
-bool piece14_cmd(const std::string &cmd) { return cmd == "mgw" || cmd == "awr" || cmd == "vwr" || cmd == "kwr"; }
+bool piece14_cmd(const std::string &cmd) { return cmd == "mgw" || cmd == "awr" || cmd == "vwr" || cmd == "kwr" || cmd == "ixw"; }
 
 // a volume with every field the MGH writer writes: <w> <h> <d> <type> <frames> <alloc 1 voxels|0
 // header>, the 15 geometry floats, <ras_good_flag>, tr te ti fov (floats), flip (double), the
@@ -1534,7 +1540,8 @@ MRI *read_mri14()
 // asked, mghRead of the name with its voxels (piece 6's printing)
 void run_piece14(const std::string &cmd0)
 {
-  const std::string cmd = cmd0 == "kwr" ? "vwr" : cmd0;
+  // piece 23 (track A relay 31): ixw writes image files as vwr does
+  const std::string cmd = cmd0 == "kwr" || cmd0 == "ixw" ? "vwr" : cmd0;
   fwide(stderr, -1);
   if (cmd == "mgw" || cmd == "awr" || cmd == "vwr") {
     // piece 16 (track A relay 26): awr <Gdiag_no> <N_Zero_Pad_Output> <N_Zero_Pad_Input for the
@@ -1775,13 +1782,15 @@ void run_piece6(const std::string &cmd0)
   // piece 21 (track A relay 29): imd and imh read old Siemens .ima series as mrd and mrh do
   // piece 22 (track A relay 30): afd and afh (AFNI datasets), cud and cuh (curvature files), and and
   // anh (annotations) as mrd and mrh do
+  // piece 23 (track A relay 31): ixd and ixh (image files: MATLAB, SGI, HIPS, PGM/PPM/PBM, TIFF,
+  // JPEG names) as mrd and mrh do
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
-              cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and"
+              cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and" || cmd0 == "ixd"
           ? "mrd"
       : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh" || cmd0 == "imh" ||
-              cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh"
+              cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh" || cmd0 == "ixh"
           ? "mrh"
           : cmd0;
   if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
@@ -2740,7 +2749,7 @@ int main(int argc, char *argv[])
       static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
-                                 "kwr"};
+                                 "kwr", "ixd", "ixh", "ixw"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

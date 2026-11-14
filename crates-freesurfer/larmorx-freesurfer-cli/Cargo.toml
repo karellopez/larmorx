@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 larmorx-core.workspace = true
 larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-volume.workspace = true
 larmorx-freesurfer-volumes.workspace = true
 larmorx-freesurfer-atlas.workspace = true
 larmorx-freesurfer-topology.workspace = true

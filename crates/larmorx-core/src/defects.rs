@@ -2065,6 +2065,36 @@ defects! {
         "an AFNI IDCODE_STRING of 24, 40, 56 ... characters whose last is not '~' is copied one byte past its allocation, over the memory allocator's records: memory corruption";
     FS_717 = "FS-717", "FreeSurfer", true,
         "reading the header of a volume of several frames with a frame list (name#n, without the voxels), as of an AFNI dataset, frees a copy whose frame table has one entry as if it had one per frame: memory contents, a crash or not";
+    FS_718 = "FS-718", "FreeSurfer", true,
+        "reading an image file as a volume (a .mat, .rgb, .pgm, .ppm, .pbm name, or the image type) whose reader fails (the file is missing or unreadable, a MATLAB file that cannot be read, a frame of a HIPS image, any PGM, PPM or PBM file, an SGI image of more than three planes) crashes (signal 11) after the reader's message";
+    FS_719 = "FS-719", "FreeSurfer", true,
+        "reading a complex MATLAB matrix as an image volume writes its numbers past the image's memory (8 bytes a pixel into 1) before the program ends on the complex format: memory corruption or a crash";
+    FS_720 = "FS-720", "FreeSurfer", true,
+        "reading an SGI image (.rgb) whose header is in the big-endian order (SGI's standard and FreeSurfer's own files) converts 8 bytes past the header's memory";
+    FS_721 = "FS-721", "FreeSurfer", true,
+        "reading a run-length SGI image in the little-endian order takes its tables' entries as 8 bytes: the row lengths come from the image data, so rows are wrong, cut or read from elsewhere";
+    FS_722 = "FS-722", "FreeSurfer", true,
+        "writing an SGI image (.rgb) stores the program's file descriptor number and a memory address in the file's header: bytes that change from run to run";
+    FS_723 = "FS-723", "FreeSurfer", true,
+        "reading an SGI image of 2-byte pixels whose rows have 16,384 to 32,767 pixels fails on the first row (getrow: error on read of row, status 1) after reading the rest of the file into the row's buffer";
+    FS_724 = "FS-724", "FreeSurfer", true,
+        "reading an SGI image of 2-byte pixels whose rows have 16,384 to 32,767 pixels, with more of the file left than the row holds, writes the rest of the file past the row's buffer: memory corruption or a crash before the read fails";
+    FS_725 = "FS-725", "FreeSurfer", true,
+        "writing an SGI image (.rgb) that cannot be created prints iopen: can't open output file (null), without the file's name";
+    FS_726 = "FS-726", "FreeSurfer", true,
+        "reading a run-length SGI image whose row is longer than the reader's buffer, or whose runs go past the row's width or the buffer's end, reads and writes past the reader's memory: memory corruption, wrong pixels or a crash";
+    FS_727 = "FS-727", "FreeSurfer", true,
+        "reading an SGI image can leave pixels that no read gave (a run-length row of length -1 or shorter than the width, a row of 32,768 or more 2-byte pixels, runs expanded from bytes no read gave): their values are memory contents";
+    FS_728 = "FS-728", "FreeSurfer", true,
+        "reading an SGI image of 2-byte pixels whose rows have 32,768 pixels or more reads only part of each row; the rest of the row is what the reader's buffer held before";
+    FS_729 = "FS-729", "FreeSurfer", true,
+        "reading a run-length SGI image in the big-endian order (SGI's standard files) converts its tables past their memory: memory corruption, a crash or a hang";
+    FS_730 = "FS-730", "FreeSurfer", true,
+        "writing an image volume as an SGI image (.rgb) wider or taller than 65,535 pixels stores its sizes modulo 65,536: a wrong file, or img_seek: row number out of range (status 1)";
+    FS_731 = "FS-731", "FreeSurfer", true,
+        "writing a volume as an image file reports success (0) when the image is not written: the file cannot be opened, the format refuses the image (PGM, PPM, a JPEG or MATLAB name of a volume that is not of bytes), or a HIPS name, which writes nothing";
+    FS_732 = "FS-732", "FreeSurfer", true,
+        "writing a volume of a type image files do not take (16-bit, 64-bit, RGB and other types, with at least one row) as an image file goes on after MRItoImage's error: a crash (signal 11), or for PGM and PPM names the format's refusal and ImageFree: null pointer";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

@@ -75,6 +75,7 @@ const UNUSED_SPACE_SIZE: i32 = 256;
 const USED_SPACE_SIZE: i32 = 60;
 /// `errno`'s `ENOMEM` on Linux (a failed `calloc`).
 const ENOMEM: i32 = 12;
+const EINVAL: i32 = 22;
 /// The bytes of a tag's number and length in FreeSurfer's NIfTI header extension.
 const LEN_TAGHEADER: i64 = 12;
 
@@ -798,6 +799,14 @@ fn reverse_each(b: &mut [u8], n: usize) {
     }
 }
 
+/// `znzseek(fp, off, SEEK_CUR)` on a plain file: a position before the file's start fails with
+/// `EINVAL` (glibc's `fseek`, which leaves `errno` so).
+fn seek_cur(g: &mut Globals, fp: &mut ZnzFile, off: i64) {
+    if fp.seek(off, Whence::Cur) < 0 {
+        g.errno = EINVAL;
+    }
+}
+
 /// `znzread(buf, size, nmemb, fp)` into a buffer that may be too small: the count.
 fn zread(fp: &mut ZnzFile, buf: &mut [u8], size: usize, nmemb: usize) -> i64 {
     fio::fs_znzread(fp, buf, size, nmemb)
@@ -932,7 +941,7 @@ pub fn mgh_read(
                 }
             }
         } else {
-            fp.seek(total_bytes, Whence::Cur);
+            seek_cur(g, &mut fp, total_bytes);
         }
     } else {
         let (start_frame, end_frame);
@@ -953,7 +962,7 @@ pub fn mgh_read(
                     c += 1;
                 }
             } else {
-                fp.seek(skip, Whence::Cur);
+                seek_cur(g, &mut fp, skip);
             }
             nframes = 1;
         } else {

@@ -1352,7 +1352,8 @@ void run_piece12(const std::string &cmd)
     errno = 0;
     MRI *m = mri_read(name.c_str(), type, vf, -1, -1, NULL);
     print_mri6(m);
-    print_ct10(m ? m->ct : NULL, false, false);
+    // the entries' tissue type and count are never written (memory contents): left out
+    print_ct10(m ? m->ct : NULL, true, false);
     oi(errno);
   } else if (cmd == "mwr") {
     Gdiag = strtoull(next(), NULL, 16);

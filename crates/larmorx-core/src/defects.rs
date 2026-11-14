@@ -1755,6 +1755,8 @@ defects! {
         "writing one chosen frame that the volume does not have to an MGH file reads memory outside the volume";
     FS_445 = "FS-445", "FreeSurfer", true,
         "writing an MGH volume with FS_MGZIO_USEVOXELBUFWRITE set crashes for a volume without slices (a depth or a frame count of 0)";
+    FS_446 = "FS-446", "FreeSurfer", true,
+        "a volume made without voxels (a header read alone) leaves its contiguous-buffer flag unset (memory contents): writing it as an MGH file with FS_MGZIO_USEVOXELBUFWRITE set then crashes or not depending on memory";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

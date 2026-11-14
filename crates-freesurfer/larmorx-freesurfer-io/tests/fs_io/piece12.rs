@@ -907,7 +907,9 @@ fn answer(
             let m =
                 mriio::mri_read(g, out, err, &env, dir, &name, ty, vf, -1, -1).map_err(fatal)?;
             super::piece6::print_mri(o, w, m.as_ref());
-            print_table(o, m.as_ref().and_then(|m| m.ct.as_ref()), false, false);
+            // the GIFTI reader's entries' tissue type and count are never written by FreeSurfer
+            // (memory contents): left out, as for CTABalloc's
+            print_table(o, m.as_ref().and_then(|m| m.ct.as_ref()), true, false);
             o.i(i64::from(g.errno));
         }
         "hlp" => {

@@ -159,7 +159,8 @@ pub fn file_exists(dir: Option<&Path>, fname: &str) -> bool {
 /// A file name as a program in `dir` reads it.
 pub fn resolve(dir: Option<&Path>, fname: &str) -> PathBuf {
     match dir {
-        Some(d) if !Path::new(fname).is_absolute() => d.join(fname),
+        // an empty name stays empty: C's open("") fails (ENOENT), where the folder would open
+        Some(d) if !fname.is_empty() && !Path::new(fname).is_absolute() => d.join(fname),
         _ => PathBuf::from(fname),
     }
 }

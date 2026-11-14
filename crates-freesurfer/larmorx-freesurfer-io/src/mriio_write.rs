@@ -29,13 +29,17 @@
 //!   file is opened; `reproduce` writes zeros for it, noted.
 //! - **FS-445** (crash): with `FS_MGZIO_USEVOXELBUFWRITE`, a volume without slices: both modes
 //!   write no voxels (there are none), noted.
+//! - **FS-446** (memory): a volume made without voxels has its contiguous-buffer flag never
+//!   written: with `FS_MGZIO_USEVOXELBUFWRITE` both modes take it as unset, noted.
 //! - **FS-58**: a volume without voxels (FreeSurfer crashes): the program ends with a message.
 
 use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444, FS_445};
+use larmorx_core::defects::{
+    FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444, FS_445, FS_446,
+};
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
@@ -242,6 +246,12 @@ pub fn mgh_write(
     if timing {
         let _ = out.write_all(b"INFO: Environment variable FS_MGZIO_TIMING set\n");
     }
+    if m.chunk.is_none() && getenv(env, "FS_MGZIO_USEVOXELBUFWRITE") {
+        g.notices.add(
+            &FS_446,
+            "mghWrite with FS_MGZIO_USEVOXELBUFWRITE of a volume made without voxels: its contiguous-buffer flag (memory contents in FreeSurfer) taken as unset",
+        );
+    }
     let usevoxelbuf = m.ischunked && getenv(env, "FS_MGZIO_USEVOXELBUFWRITE");
     // a volume without voxels: FreeSurfer reads its slices (a null pointer) at a byte volume's
     // first row, at another handled type's first voxel
@@ -296,7 +306,24 @@ pub fn mgh_write(
                 .wrapping_mul(height.max(0) as usize)
                 .wrapping_mul(depth.max(0) as usize)
                 .wrapping_mul(m.bytes_per_vox);
-            let mut place = (start_frame.max(0) as usize).wrapping_mul(frame_bytes);
+            // the first slice's first row: a tensor's (and another type the slices' set-up does
+            // not step for) rows all start at the buffer's start
+            let steps = matches!(
+                m.mtype,
+                MRI_UCHAR
+                    | MRI_SHORT
+                    | MRI_USHRT
+                    | MRI_INT
+                    | MRI_FLOAT
+                    | MRI_FLOAT_COMPLEX
+                    | mri::MRI_RGB
+                    | mri::MRI_LONG
+            );
+            let mut place = if steps {
+                (start_frame.max(0) as usize).wrapping_mul(frame_bytes)
+            } else {
+                0
+            };
             let mut left = bytes_to_write;
             let unit = match bpv {
                 2 => 2,

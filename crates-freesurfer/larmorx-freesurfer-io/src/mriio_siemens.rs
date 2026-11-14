@@ -311,7 +311,9 @@ pub fn siemens_read(
                 g,
                 err,
                 ERROR_BADPARM,
-                &format!("siemensRead(): file rows ({rows}) not divisible by image rows ({base_raw_matrix_size})"),
+                &format!(
+                    "siemensRead(): file rows ({rows}) not divisible by image rows ({base_raw_matrix_size})"
+                ),
             ));
         }
         if cols % base_raw_matrix_size != 0 {
@@ -319,7 +321,9 @@ pub fn siemens_read(
                 g,
                 err,
                 ERROR_BADPARM,
-                &format!("siemensRead(): file cols ({cols}) not divisible by image cols ({base_raw_matrix_size})"),
+                &format!(
+                    "siemensRead(): file cols ({cols}) not divisible by image cols ({base_raw_matrix_size})"
+                ),
             ));
         }
         mos_r = rows / base_raw_matrix_size;
@@ -341,7 +345,9 @@ pub fn siemens_read(
                 g,
                 err,
                 ERROR_BADPARM,
-                &format!("siemensRead(): files in volume ({n_files}) not divisible by mosaics per volume ({mosaics_per_volume})"),
+                &format!(
+                    "siemensRead(): files in volume ({n_files}) not divisible by mosaics per volume ({mosaics_per_volume})"
+                ),
             ));
         }
         n_t = n_files / mosaics_per_volume;
@@ -482,7 +488,18 @@ pub fn siemens_read(
 
     if read_volume
         && !read_voxels(
-            g, err, dir, prefix, ima, n_low, n_high, rows, cols, mos_r, mosaic_size, &mut m,
+            g,
+            err,
+            dir,
+            prefix,
+            ima,
+            n_low,
+            n_high,
+            rows,
+            cols,
+            mos_r,
+            mosaic_size,
+            &mut m,
         )?
     {
         return Ok(None);
@@ -753,10 +770,27 @@ mod tests {
         let env = Environment::default();
         let mut g = Globals::new(UpstreamDefects::Reproduce);
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let r = siemens_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "x.ima", false).unwrap();
+        let r = siemens_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            "x.ima",
+            false,
+        )
+        .unwrap();
         assert!(r.is_none());
-        assert!(String::from_utf8(o).unwrap().contains("could not parse x.ima"));
-        assert!(String::from_utf8(e).unwrap().contains("siemensRead(): x.ima"));
+        assert!(
+            String::from_utf8(o)
+                .unwrap()
+                .contains("could not parse x.ima")
+        );
+        assert!(
+            String::from_utf8(e)
+                .unwrap()
+                .contains("siemensRead(): x.ima")
+        );
     }
 
     /// A file name that does not end in `.ima` or `.IMA` is refused.
@@ -767,8 +801,16 @@ mod tests {
         let env = Environment::default();
         let mut g = Globals::new(UpstreamDefects::Reproduce);
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let r =
-            siemens_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "1-2-4.Ima", false).unwrap();
+        let r = siemens_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            "1-2-4.Ima",
+            false,
+        )
+        .unwrap();
         assert!(r.is_none());
         assert!(
             String::from_utf8(e)
@@ -788,7 +830,15 @@ mod tests {
         let env = Environment::default();
         let mut g = Globals::new(UpstreamDefects::Reproduce);
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let _ = siemens_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "1-2-4.ima", false);
+        let _ = siemens_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            "1-2-4.ima",
+            false,
+        );
         assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-688"));
     }
 

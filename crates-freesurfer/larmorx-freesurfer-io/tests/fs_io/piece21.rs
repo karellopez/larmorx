@@ -119,7 +119,11 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
         g.int(1, 6) as i32
     };
     let bad_matrix = !mosaic && g.chance(14);
-    let base = if bad_matrix { brms + g.pick(&[1, -1]) as i32 } else { brms };
+    let base = if bad_matrix {
+        brms + g.pick(&[1, -1]) as i32
+    } else {
+        brms
+    };
     let pix_r = g.pick(&[0.9375, 1.0, 2.0]);
     let pix_c = g.pick(&[0.9375, 1.0, 1.25]);
 

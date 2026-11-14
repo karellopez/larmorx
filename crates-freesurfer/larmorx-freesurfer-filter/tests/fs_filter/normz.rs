@@ -12,6 +12,7 @@ use larmorx_freesurfer_filter::normalize as nz;
 use larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN;
 use larmorx_freesurfer_io::label::{LABEL_COORDS_VOXEL, label_alloc};
 use larmorx_freesurfer_io::mriio::mri_read;
+use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc};
 use larmorx_freesurfer_volume::arith::Pair;
 use larmorx_freesurfer_volume::label_coords::Io as LabelIo;
@@ -20,8 +21,8 @@ use super::conv::{dx, full, get_volc, opt, result, same_result, small, vol};
 use super::{Ctx, Gen, Toks, fx, get_vol, rle, token};
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 10] = [
-    "spl", "ninit", "npk", "gfc", "fcw", "afc", "bbi", "g3d", "abc", "ufc",
+pub const COMMANDS: [&str; 13] = [
+    "spl", "ninit", "npk", "gfc", "fcw", "afc", "bbi", "g3d", "abc", "ufc", "nrm", "nfcp", "n3d",
 ];
 
 /// A volume's header tokens and voxels of type `ty` from `v` (one frame), voxel size `xs`.
@@ -527,6 +528,200 @@ fn ufc_case(g: &mut Gen, t: &mut Vec<String>) {
     t.push(hex(f.as_bytes()));
 }
 
+/// A head-like volume for the one-dimensional normalisation: an ellipsoid of white matter (a level
+/// that drifts along y), grey matter and CSF in a dark background, tall in y; its centre.
+fn nrm_case(g: &mut Gen, t: &mut Vec<String>) {
+    let e = [
+        g.int(14, 24) as i32,
+        g.int(44, 64) as i32,
+        g.int(14, 24) as i32,
+    ];
+    let ys = g.pick(&[3.0f32, 3.0, 3.0, 2.5, 2.0, 1.0]);
+    let ty = if g.chance(4) {
+        g.pick(&[MRI_FLOAT, MRI_SHORT])
+    } else {
+        MRI_UCHAR
+    };
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let c = [
+        f64::from(e[0]) / 2.0,
+        f64::from(e[1]) / 2.0 + g.int(-3, 3) as f64,
+        f64::from(e[2]) / 2.0,
+    ];
+    let r = [
+        f64::from(e[0]) * 0.42,
+        f64::from(e[1]) * 0.42,
+        f64::from(e[2]) * 0.42,
+    ];
+    let slope = g.int(-12, 12) as f64 / 10.0;
+    let wm = g.int(95, 125) as f64;
+    let noise = g.pick(&[2i64, 4, 6]);
+    let v: Vec<f64> = (0..n)
+        .map(|i| {
+            let p = [
+                (i % e[0] as usize) as f64,
+                ((i / e[0] as usize) % e[1] as usize) as f64,
+                (i / (e[0] * e[1]) as usize) as f64,
+            ];
+            let s: f64 = (0..3).map(|k| ((p[k] - c[k]) / r[k]).powi(2)).sum();
+            if s <= 1.0 {
+                let k = g.below(10);
+                let base = if k < 6 {
+                    wm + slope * (p[1] - c[1])
+                } else if k < 9 {
+                    wm - 35.0
+                } else {
+                    wm - 70.0
+                };
+                (base + g.int(-noise, noise) as f64)
+                    .round()
+                    .clamp(0.0, 250.0)
+            } else if g.chance(15) {
+                g.int(0, 40) as f64
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    t.extend(e.map(|x| x.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    t.push(fx(1.0));
+    t.push(fx(ys));
+    t.push(fx(1.0));
+    let vals: Vec<String> = v.iter().map(|&x| token(ty, x)).collect();
+    t.extend(rle(&vals));
+    for _ in 0..3 {
+        t.push(fx(g.int(-10, 10) as f32 * 0.5));
+    }
+    let xm = g.pick(&[0, 0, 0, 1, 2]);
+    t.push(xm.to_string());
+    if xm != 0 {
+        let s = 1.0 + g.int(-10, 10) as f64 / 100.0;
+        for col in 0..4 {
+            for row in 0..4 {
+                let v = if col == row && col < 3 {
+                    s
+                } else if col == 3 && row < 3 {
+                    g.int(-8, 8) as f64 * 0.75
+                } else if col == 3 && row == 3 {
+                    1.0
+                } else {
+                    0.0
+                };
+                t.push(dx(v));
+            }
+        }
+    }
+    t.push(if g.chance(4) { "1" } else { "0" }.into());
+    t.push(g.pick(&[1, 1, 1, 0]).to_string());
+    if xm != 0 {
+        // the probe's transforms have no kind: a clone of the volume (MRIclone) would stop
+        // FreeSurfer (copy_and_invert_transform bad kind), so a given or the same destination
+        let m = g.pick(&[1, 2]);
+        t.push(m.to_string());
+        if m == 1 {
+            vol(g, t, e, ty, 1);
+        }
+    } else {
+        dst_mode(g, t, e, ty, MRI_FLOAT);
+    }
+}
+
+/// A brain-like block for the three-dimensional normalisation: a white matter core about 100 to
+/// 120, a grey matter shell, CSF and background; now and then a stray value (NaN or infinity in
+/// floats).
+fn brain(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, xs: f32) {
+    let n = (e[0] * e[1] * e[2]).max(0) as usize;
+    let wm = g.int(100, 120) as f64;
+    let spread = g.pick(&[1i64, 2, 3, 5, 10]);
+    let c = e.map(|x| f64::from(x - 1) / 2.0);
+    let (w, h) = (e[0].max(1) as usize, e[1].max(1) as usize);
+    let v: Vec<f64> = (0..n)
+        .map(|i| {
+            let p = [(i % w) as f64, ((i / w) % h) as f64, (i / (w * h)) as f64];
+            let r = (0..3)
+                .map(|k| ((p[k] - c[k]) / (c[k] + 0.5)).abs())
+                .fold(0.0f64, f64::max);
+            let x = if r < 0.58 {
+                wm + g.int(-spread, spread) as f64
+            } else if r < 0.75 {
+                wm - 35.0 + g.int(-spread, spread) as f64
+            } else if r < 0.88 {
+                wm - 70.0 + g.int(0, 15) as f64
+            } else if g.chance(5) {
+                g.int(1, 20) as f64
+            } else {
+                0.0
+            };
+            if g.chance(200) {
+                g.pick(&[0.0, 255.0, 300.0, -5.0])
+            } else {
+                x
+            }
+        })
+        .collect();
+    let mut vals: Vec<String> = v.iter().map(|&x| token(ty, x)).collect();
+    if ty == MRI_FLOAT {
+        for s in vals.iter_mut() {
+            if g.chance(300) {
+                *s = fx(g.pick(&[f32::NAN, f32::INFINITY, 110.5]));
+            }
+        }
+    }
+    t.extend(e.map(|x| x.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    t.push(fx(xs));
+    t.push(fx(1.0));
+    t.push(fx(1.0));
+    t.extend(rle(&vals));
+}
+
+fn brain_extent(g: &mut Gen) -> ([i32; 3], i32, f32) {
+    let e = [
+        g.int(15, 21) as i32,
+        g.int(15, 21) as i32,
+        g.int(15, 21) as i32,
+    ];
+    let ty = tissue_type(g);
+    let xs = if g.chance(8) {
+        g.pick(&[0.5f32, 2.0, 0.9375])
+    } else {
+        1.0
+    };
+    (e, ty, xs)
+}
+
+fn nfcp_n3d_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let (e, ty, xs) = brain_extent(g);
+    brain(g, t, e, ty, xs);
+    if cmd == "n3d" {
+        if g.chance(5) {
+            t.push("1".into());
+            brain(g, t, e, ty, xs);
+        } else {
+            t.push("0".into());
+        }
+    }
+    t.push(fx(g.pick(&[0.0f32, 110.0, 110.0, 100.0])));
+    if cmd == "n3d" {
+        dst_mode(g, t, e, ty, MRI_UCHAR);
+    }
+    t.push(fx(g.pick(&[25.0f32, 25.0, 12.5, 40.0])));
+    t.push(fx(g.pick(&[10.0f32, 10.0, 5.0, 20.0])));
+    if cmd == "nfcp" {
+        opt_ctrl(g, t, e, 6);
+        t.push(g.pick(&[2, 2, 1, 0]).to_string());
+    } else {
+        t.push(if g.chance(6) { "1" } else { "0" }.into());
+        t.push(if g.chance(2) { "1" } else { "0" }.into());
+        t.push(fx(g.pick(&[8.0f32, 2.0, 0.0, 1.0])));
+    }
+    opt_not(g, t, e);
+    pts(g, t, e);
+}
+
 pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
     match cmd {
         "spl" => spl_case(g, t),
@@ -538,6 +733,8 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
         "g3d" => g3d_case(g, t),
         "abc" => abc_case(g, t),
         "ufc" => ufc_case(g, t),
+        "nrm" => nrm_case(g, t),
+        "nfcp" | "n3d" => nfcp_n3d_case(g, t, cmd),
         c => panic!("unknown command {c}"),
     }
 }
@@ -975,6 +1172,215 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                     *o += " ";
                 }
             }
+        }
+        "nrm" => {
+            let mut m = get_volc(cx, t)?;
+            let xm = t.i();
+            if xm != 0 {
+                let mut tr = [[0.0f64; 4]; 4];
+                for c in tr.iter_mut() {
+                    for r in c.iter_mut() {
+                        *r = super::conv::dbl(t);
+                    }
+                }
+                if xm == 1 {
+                    m.linear_transform = Some(tr);
+                }
+                m.inverse_linear_transform = Some([[0.0; 4]; 4]);
+            }
+            let env = if t.i() != 0 {
+                Environment::from_pairs([("NO_AVERAGE305", "1")])
+            } else {
+                Environment::default()
+            };
+            let mm = t.i();
+            let mode = t.i();
+            let mut dst = if mode == 1 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let mut mni = nz::Mni::default();
+            set_random_seed(&mut cx.g, 1234);
+            if mm != 0 {
+                let r = nz::mri_norm_init(
+                    &mut cx.g, &mut cx.a, &mut cx.b, &env, &m, &mut mni, 0, 0, 0, 0, 0.0,
+                )?;
+                *o += &format!("{r} ");
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            {
+                let mref = if mm != 0 { Some(&mut mni) } else { None };
+                if mode == 2 {
+                    let r = nz::mri_normalize(g, a, b, &env, Pair::Same(&mut m), mref)?;
+                    same_result(o, r, &m);
+                } else {
+                    let p = match dst.as_mut() {
+                        Some(d) => Pair::Given(&m, d),
+                        None => Pair::New(&m),
+                    };
+                    let r = nz::mri_normalize(g, a, b, &env, p, mref)?;
+                    result(o, r, dst.as_ref());
+                }
+            }
+            if mm != 0 {
+                let nw = mni.windows_above_t0.wrapping_add(mni.windows_below_t0);
+                for i in 0..nw.clamp(0, nz::MAX_SPLINE_POINTS as i32) as usize {
+                    let h = &mni.histograms[i];
+                    *o += &format!(
+                        "{} {} {} {} ",
+                        h.nbins,
+                        fx(h.bin_size),
+                        fx(h.min),
+                        fx(h.max)
+                    );
+                    for b in 0..h.nbins.max(0) as usize {
+                        *o += &fx(h.counts[b]);
+                        *o += " ";
+                    }
+                }
+            }
+        }
+        "nfcp" => {
+            let mut src = get_vol(cx, t)?;
+            let (wm, ab, be) = (t.f(), t.f(), t.f());
+            let mut ctrl = opt(cx, t)?;
+            let which = t.i();
+            let nc = opt(cx, t)?;
+            set_pts(cx, t, &mut st, &mut src)?;
+            let r = nz::mri_norm_find_control_points(
+                &mut cx.g,
+                &mut cx.a,
+                &mut cx.b,
+                None,
+                &mut st,
+                &src,
+                wm,
+                ab,
+                be,
+                ctrl.as_mut(),
+                which,
+                0,
+                nc.as_ref(),
+            )?;
+            result(o, r, ctrl.as_ref());
+        }
+        "n3d" => {
+            let mut src = get_vol(cx, t)?;
+            let orig = if t.i() != 0 {
+                get_vol(cx, t)?
+            } else {
+                mri_copy(&mut cx.g, &mut cx.a, &mut cx.b, &src, None)?.unwrap_new()
+            };
+            let wm = t.f();
+            let mode = t.i();
+            let mut norm = if mode == 1 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (ab, be) = (t.f(), t.f());
+            let of = t.i();
+            let pr = t.i();
+            let sg = t.f();
+            let nc = opt(cx, t)?;
+            set_pts(cx, t, &mut st, &mut src)?;
+            let env = Environment::default();
+            let d = match (mode, norm.as_mut()) {
+                (2, _) => nz::Dst::Same,
+                (_, Some(n)) => nz::Dst::Given(n),
+                _ => nz::Dst::New,
+            };
+            let r = nz::mri_3d_normalize(
+                &mut cx.g,
+                &mut cx.a,
+                &mut cx.b,
+                &env,
+                None,
+                &mut st,
+                &orig,
+                &mut src,
+                wm,
+                d,
+                ab,
+                be,
+                of,
+                pr,
+                sg,
+                0,
+                nc.as_ref(),
+            )?;
+            if mode == 2 {
+                same_result(o, r, &src);
+            } else {
+                result(o, r, norm.as_ref());
+            }
+            full(o, Some(&src));
+        }
+        "nrmf" | "n3df" => {
+            let path = t.next();
+            let env = Environment::default();
+            let mut src = mri_read(
+                &mut cx.g,
+                &mut cx.a,
+                &mut cx.b,
+                &env,
+                None,
+                path,
+                MRI_VOLUME_TYPE_UNKNOWN,
+                true,
+                -1,
+                -1,
+            )?
+            .expect("the volume");
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let made: Option<Mri> = if cmd == "nrmf" {
+                set_random_seed(g, 1234);
+                let mut mni = nz::Mni::default();
+                nz::mri_norm_init(g, a, b, &env, &src, &mut mni, 0, 0, 0, 0, 0.0)?;
+                nz::mri_normalize(g, a, b, &env, Pair::New(&src), Some(&mut mni))?.into_new()
+            } else {
+                let (ab, be) = (t.f(), t.f());
+                let pr = t.i();
+                let sg = t.f();
+                let orig = mri_copy(g, a, b, &src, None)?.unwrap_new();
+                nz::mri_3d_normalize(
+                    g,
+                    a,
+                    b,
+                    &env,
+                    None,
+                    &mut st,
+                    &orig,
+                    &mut src,
+                    110.0,
+                    nz::Dst::Same,
+                    ab,
+                    be,
+                    0,
+                    pr,
+                    sg,
+                    0,
+                    None,
+                )?;
+                None
+            };
+            if cmd == "nrmf" && made.is_none() {
+                *o += "NULL ";
+                return Ok(true);
+            }
+            let (same, r) = match made.as_ref() {
+                Some(m) => (0, m),
+                None => (1, &src),
+            };
+            let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+            for &b in r.chunk.as_ref().expect("voxels") {
+                h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            *o += &format!(
+                "{same} {} {} {} {} {h:016x} ",
+                r.vg.width, r.vg.height, r.vg.depth, r.mtype
+            );
         }
         _ => return Ok(false),
     }

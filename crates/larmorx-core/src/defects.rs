@@ -1752,7 +1752,15 @@ defects! {
     FS_595 = "FS-595", "FreeSurfer", true,
         "MRInormAddFileControlPoints' message on rejected control points prints a number that is not the number of rejected points (whatever the machine holds at that moment)";
     FS_596 = "FS-596", "FreeSurfer", true,
-        "the intensity normalisation uses values never written: the one-dimensional normalisation's peaks past those found, the number in the rejected control points' message, the bias of a bias field whose type the sampler refuses (memory contents)";
+        "the intensity normalisation uses values never written: the number in the rejected control points' message, the bias of a bias field whose type the sampler refuses (memory contents)";
+    FS_597 = "FS-597", "FreeSurfer", true,
+        "the tissue intensities of the three-dimensional normalisation (MRInormFindControlPoints, MRI3dNormalize: mri_normalize's white matter, grey matter and CSF levels) are read from a smoothed histogram bin outside the histogram when a peak or valley is not found (a white matter peak without voxels near the labelled one, a grey matter valley or peak searched below the first bin): the levels, the thresholds made from them and the printed values are memory contents";
+    FS_598 = "FS-598", "FreeSurfer", true,
+        "the three-dimensional normalisation's control-point search (MRInormFindControlPoints) widens its intensity window until one pass finds 10 new control points, without end when fewer than 10 voxels can still become control points (a small or masked volume, a white matter target that is not a number)";
+    FS_600 = "FS-600", "FreeSurfer", true,
+        "the one-dimensional normalisation (MRInormalize, mri_normalize without an aseg) checks its peaks against entries of its peak arrays past the peaks found, which it never wrote (memory contents): it can keep or drop peaks, or find none, by what the memory holds";
+    FS_599 = "FS-599", "FreeSurfer", true,
+        "the three-dimensional normalisation's first control-point search (MRInormFindControlPoints) gives up after its eleventh pass even when that pass found enough control points (the error 'could not find enough control points')";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

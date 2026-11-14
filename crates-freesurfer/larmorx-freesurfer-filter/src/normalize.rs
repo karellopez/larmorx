@@ -19,20 +19,27 @@ use std::path::Path;
 
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
-    FS_587, FS_588, FS_589, FS_590, FS_591, FS_592, FS_593, FS_594, FS_595, FS_596,
+    FS_587, FS_588, FS_589, FS_590, FS_591, FS_592, FS_593, FS_594, FS_595, FS_596, FS_597, FS_598,
+    FS_599, FS_600,
 };
 use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::cstd::atof;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE, DIAG_WRITE};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::histo::{Histogram, histo_find_last_peak_in_region, histo_smooth};
-use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::histo::{
+    Histogram, histo_clear_bins_in_place, histo_clear_zero_bin, histo_find_bin,
+    histo_find_highest_peak_in_region, histo_find_last_peak_in_region, histo_find_previous_peak,
+    histo_find_previous_valley, histo_plot, histo_smooth,
+};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BADFILE, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR,
+};
 use larmorx_freesurfer_core::matrix_ops::matrix_print;
 use larmorx_freesurfer_core::random::random_number;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::spline::{open_spline, open_splint};
-use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sub};
+use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sub, sub64};
 use larmorx_freesurfer_core::utils::{nint, stricmp};
 use larmorx_freesurfer_io::ctrpoints::{
     ControlInfo, mri_read_control_points, mri_write_control_points,
@@ -42,14 +49,21 @@ use larmorx_freesurfer_io::mriio::mri_write;
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, lta_alloc};
 use larmorx_freesurfer_mri::mri::{
-    MAX_INDEX, MRI_SHORT, MRI_UCHAR, Mri, MriRegion, mri_alloc, mri_copy_header,
+    MAX_INDEX, MRI_FLOAT, MRI_SHORT, MRI_UCHAR, Mri, MriRegion, mri_alloc, mri_copy_header,
 };
 use larmorx_freesurfer_mri::vol_geom::world_to_voxel;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_volume::arith::{Pair, mri_binarize, mri_clone, mri_scalar_mul};
+use larmorx_freesurfer_volume::arith::{
+    Pair, Tri, mri_binarize, mri_clear, mri_clone, mri_scalar_mul, mri_subtract,
+};
 use larmorx_freesurfer_volume::coords::surface_ras_to_voxel;
 use larmorx_freesurfer_volume::label_coords::{Io as LabelIo, LabelDst, label_to_voxel};
 use larmorx_freesurfer_volume::labels::mri_mean_in_label;
+use larmorx_freesurfer_volume::mrihisto::{
+    mri_histogram, mri_histogram_label, mri_histogram_region,
+};
+use larmorx_freesurfer_volume::mriset::{mri_erode, mri_voxels_in_label};
+use larmorx_freesurfer_volume::resize::mri_change_type;
 use larmorx_freesurfer_volume::sample::sample_volume;
 use larmorx_freesurfer_volume::skull::find_approximate_skull_bounding_box;
 use larmorx_freesurfer_volume::talairachex::mri_talairach_to_voxel_ex;
@@ -686,12 +700,12 @@ pub fn mri_norm_find_peaks(
 }
 
 /// An entry of a peak array as FreeSurfer reads it: [`NEVER_WRITTEN`] (memory never written)
-/// noted (FS-596) and read as 0.
+/// noted (FS-600) and read as 0.
 fn entry(g: &mut Globals, a: &[f32], i: i32) -> f32 {
     let v = a[i as usize];
     if v.to_bits() == NEVER_WRITTEN {
         g.notices.add(
-            &FS_596,
+            &FS_600,
             format!("MRInormCheckPeaks: entry {i} of a peak array never written (memory contents; read as 0)"),
         );
         return 0.0;
@@ -1835,6 +1849,1216 @@ pub fn mri_apply_bias_correction_same_geometry(
                 mri_set_vox_val(g, err, dst, x, y, z, 0, v as f32, 0)?;
             }
         }
+    }
+    Ok(match fresh {
+        Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
+}
+
+// ---- relay 30: the normalisation's histogram steps ----------------------------------------------
+
+/// `HISTO_BINS` and `BACKGROUND_INTENSITY` (`mrinorm.h`), `TOO_BRIGHT` (`MRInormFillHistograms`).
+const HISTO_BINS: i32 = 0;
+const BACKGROUND_INTENSITY: i32 = 30;
+const TOO_BRIGHT: i32 = 225;
+/// `find_tissue_intensities`' `MIN_PEAK_HALF_WIDTH` and `MIN_GM`.
+const MIN_PEAK_HALF_WIDTH: i32 = 10;
+const MIN_GM: f32 = 40.0;
+/// `MIN_CONTROL_POINTS` of `MRInormFindControlPoints`' 6-connected growth.
+const MIN_CONTROL_POINTS: i32 = 4;
+/// `remove_gray_matter_control_points`' distances to CSF (millimetres).
+const MAX_DISTANCE_TO_CSF: f32 = 7.0;
+const MIN_DISTANCE_TO_CSF: f32 = 4.5;
+/// The largest pass of `MRInormFindControlPoints`' adaptive search whose `5 * pass` is an `int`.
+const LAST_PASS: i32 = i32::MAX / 5;
+
+/// `MRInormFillHistograms(mri, mni)`: each window's histogram (`MRIhistogramRegion` into the
+/// MNI's histogram, `HISTO_BINS` 0: one bin per intensity of the window's range), then the counts
+/// of the bins valued 0 to 30 (background) and 225 to 255 (too bright) cleared. `NO_ERROR`.
+pub fn mri_norm_fill_histograms(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mri: &Mri,
+    mni: &mut Mni,
+) -> Result<i32, Fatal> {
+    const WHAT: &str = "MRInormFillHistograms";
+    let nwindows = mni.windows_above_t0.wrapping_add(mni.windows_below_t0);
+    if nwindows > MAX_SPLINE_POINTS as i32 {
+        g.notices.add(
+            &FS_591,
+            format!("{WHAT}: {nwindows} windows, more than the {MAX_SPLINE_POINTS} an MNI holds"),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!(
+                "{WHAT}: {nwindows} windows, more than the {MAX_SPLINE_POINTS} an MNI holds \
+                 (FreeSurfer writes past its arrays)"
+            ),
+        )?;
+        return Ok(ERROR_BADPARM);
+    }
+    for i in 0..nwindows.max(0) as usize {
+        let reg = mni.regions[i];
+        mri_histogram_region(g, err, mri, HISTO_BINS, Some(&mut mni.histograms[i]), &reg)?;
+        histo_clear_bins_in_place(&mut mni.histograms[i], 0, BACKGROUND_INTENSITY);
+        histo_clear_bins_in_place(&mut mni.histograms[i], TOO_BRIGHT, 255);
+    }
+    Ok(NO_ERROR)
+}
+
+/// `MRInormalize(mri_src, mri_dst, mni)`: the one-dimensional normalisation (`mni` `None`: a
+/// fresh MNI set up by `MRInormInit` with every default). The windows' histograms
+/// ([`mri_norm_fill_histograms`]), their peaks ([`mri_norm_find_peaks`]); no peak:
+/// `ERROR: MRInormalize(): could not find any valid peaks.`, two lines on the Talairach alignment
+/// and an empty error message (`ERROR_BADPARM`), `NULL`; else `MRIsplineNormalize(): npeaks = <n>`,
+/// and with one peak `ERROR: number of peaks must be > 1 for spline` and `NULL`; else
+/// [`mri_spline_normalize`] through the peaks (no bias picture).
+pub fn mri_normalize(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    p: Pair,
+    mni: Option<&mut Mni>,
+) -> Result<Ret<Mri>, Fatal> {
+    let mut own = None;
+    let dealloc = mni.is_none();
+    let mni: &mut Mni = match mni {
+        Some(m) => m,
+        None => own.insert(Mni::default()),
+    };
+    let mut inputs = [f32::from_bits(NEVER_WRITTEN); MAX_SPLINE_POINTS];
+    let mut outputs = [f32::from_bits(NEVER_WRITTEN); MAX_SPLINE_POINTS];
+    let npeaks = {
+        let src: &Mri = match &p {
+            Pair::New(s) | Pair::Given(s, _) => s,
+            Pair::Same(s) => s,
+        };
+        if dealloc {
+            mri_norm_init(g, out, err, env, src, mni, 0, 0, 0, 0, 0.0)?;
+        }
+        mri_norm_fill_histograms(g, err, src, mni)?;
+        let mut pk = Peaks {
+            inputs: &mut inputs,
+            outputs: &mut outputs,
+        };
+        mri_norm_find_peaks(g, err, mni, &mut pk)?
+    };
+    if npeaks == 0 {
+        let _ = writeln!(
+            out,
+            "ERROR: MRInormalize(): could not find any valid peaks."
+        );
+        let _ = writeln!(out, "Make sure the Talairach alignment is correct. See ");
+        let _ = writeln!(
+            out,
+            "http://surfer.nmr.mgh.harvard.edu/fswiki/FsTutorial/Talairach_freeview"
+        );
+        log::error_printf(g, err, ERROR_BADPARM, "");
+        return Ok(Ret::Null);
+    }
+    let _ = writeln!(out, "MRIsplineNormalize(): npeaks = {npeaks}");
+    if npeaks <= 1 {
+        let _ = writeln!(out, "ERROR: number of peaks must be > 1 for spline");
+        return Ok(Ret::Null);
+    }
+    let r = mri_spline_normalize(g, out, err, env, p, None, &inputs, &outputs, npeaks)?;
+    if g.gdiag & DIAG_SHOW != 0 {
+        let _ = writeln!(err, "normalization found {npeaks} peaks:");
+        for i in 0..npeaks as usize {
+            let _ = writeln!(
+                err,
+                "{i}: {} --> {}",
+                ff(f64::from(inputs[i]), 2, 1),
+                ff(f64::from(outputs[i]), 2, 3)
+            );
+        }
+    }
+    Ok(r)
+}
+
+/// `bins[b]` of a histogram where `b` may lie outside it (FS-597: 0, memory contents).
+fn tissue_bin(g: &mut Globals, h: &Histogram, b: i32) -> f32 {
+    if let Some(&v) = usize::try_from(b).ok().and_then(|i| h.bins.get(i)) {
+        return v;
+    }
+    g.notices.add(
+        &FS_597,
+        format!(
+            "find_tissue_intensities: bin {b} read outside the histogram (memory contents; 0 used)"
+        ),
+    );
+    0.0
+}
+
+/// The tissue levels [`find_tissue_intensities`] finds: the CSF threshold it returns, and the
+/// white matter, grey matter and CSF levels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Tissue {
+    pub csf_thresh: f32,
+    pub wm: f32,
+    pub gm: f32,
+    pub csf: f32,
+}
+
+/// FreeSurfer's static `find_tissue_intensities(mri_src, mri_ctrl, &wm, &gm, &csf)`: the white
+/// matter level is the highest peak of the histogram of the control voxels (binarised at 1),
+/// then the highest peak within 20 of it in the whole volume's histogram (every frame; the zero
+/// bin and the bins valued 0 to 5 cleared, smoothed by a Gaussian of sigma 2); the grey matter
+/// peak the previous peak (half-width 10) from 10 bins below, else the bin of 0.75 times the white
+/// matter level, at most 0.8 times the white matter bin (0.7 times it when the peak's value is below
+/// 40); the CSF peak the previous peak below the grey matter valley, at most 0.75 times the grey
+/// matter bin, half of it when no CSF peak or valley lies above bin 0; the threshold the value of
+/// the bin a third of the way from the grey matter to the CSF peak. Bins outside the histogram are
+/// read as 0 (FS-597). Messages: `white matter peak found at <%2.0f>` (twice), `gm peak at ...`,
+/// `csf peak at <v>, setting threshold to <t>`. `dir`: where the diagnostic plots go.
+pub fn find_tissue_intensities(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    src: &Mri,
+    ctrl: &Mri,
+) -> Result<Tissue, Fatal> {
+    const WHAT: &str = "find_tissue_intensities";
+    let bin = mri_binarize(
+        g,
+        out,
+        err,
+        Pair::New(ctrl),
+        1.0,
+        CONTROL_NONE as f32,
+        CONTROL_MARKED as f32,
+    )?
+    .unwrap_new();
+    let hwm = mri_histogram_label(g, err, src, &bin, CONTROL_MARKED, 0)?;
+    let wm_peak = histo_find_highest_peak_in_region(&hwm, 0, hwm.nbins);
+    let wm_val = tissue_bin(g, &hwm, wm_peak);
+    let _ = writeln!(
+        out,
+        "white matter peak found at {}",
+        ff(f64::from(wm_val), 2, 0)
+    );
+    drop(hwm);
+    let mut h = mri_histogram(g, err, src, 0)?;
+    histo_clear_zero_bin(g, &mut h);
+    let verbose = g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0;
+    if verbose {
+        histo_plot(&h, dir, "h0.plt");
+    }
+    histo_clear_bins_in_place(&mut h, 0, 5);
+    let hs = histo_smooth(g, &h, None, 2.0).unwrap_new();
+    if verbose {
+        histo_plot(&h, dir, "h.plt");
+        histo_plot(&hs, dir, "hs.plt");
+    }
+    let lo = float_to_int(g, f64::from(sub(wm_val, 20.0)), WHAT);
+    let hi = float_to_int(g, f64::from(add(wm_val, 20.0)), WHAT);
+    let wm_peak = histo_find_highest_peak_in_region(&hs, lo, hi);
+    let wm_val = tissue_bin(g, &hs, wm_peak);
+    let _ = writeln!(
+        out,
+        "white matter peak found at {}",
+        ff(f64::from(wm_val), 2, 0)
+    );
+    let bs = hs.bin_size;
+    let below = |b: i32, k: f32| -> f32 { sub(b as f32, mul(k, bs)) };
+    let v = below(wm_peak, 5.0);
+    let v = nint(g, f64::from(v));
+    histo_find_previous_valley(g, &hs, v);
+    let v = below(wm_peak, 10.0);
+    let b0 = float_to_int(g, f64::from(v), WHAT);
+    let mut gm_peak = histo_find_previous_peak(g, &hs, b0, MIN_PEAK_HALF_WIDTH);
+    if gm_peak < 0 {
+        gm_peak = histo_find_bin(g, &hs, mul(wm_val, 0.75));
+    }
+    let v = below(gm_peak, 10.0);
+    let b0 = float_to_int(g, f64::from(v), WHAT);
+    let gm_valley = histo_find_previous_valley(g, &hs, b0);
+    let v = below(gm_valley, 10.0);
+    let b0 = float_to_int(g, f64::from(v), WHAT);
+    let mut csf_peak = histo_find_previous_peak(g, &hs, b0, MIN_PEAK_HALF_WIDTH);
+    if csf_peak < 0 {
+        csf_peak = histo_find_bin(g, &hs, (f64::from(gm_peak) * 0.5) as f32);
+    }
+    let t = 0.8 * f64::from(wm_peak);
+    if f64::from(gm_peak) > t {
+        gm_peak = t as i32;
+    }
+    let t = f64::from(gm_peak) * 0.75;
+    if f64::from(csf_peak) > t {
+        csf_peak = t as i32;
+    }
+    if tissue_bin(g, &hs, gm_peak) < MIN_GM {
+        gm_peak = (0.7 * f64::from(wm_peak)) as i32;
+    }
+    if csf_peak <= 0 || gm_valley <= 0 {
+        csf_peak = (f64::from(gm_peak) * 0.5) as i32;
+    }
+    let gm = tissue_bin(g, &hs, gm_peak);
+    let gv = tissue_bin(g, &hs, gm_valley);
+    let _ = writeln!(
+        out,
+        "gm peak at {} ({gm_peak}), valley at {} ({gm_valley})",
+        ff(f64::from(gm), 2, 0),
+        ff(f64::from(gv), 2, 0)
+    );
+    let thresh_bin = gm_peak.wrapping_mul(2).wrapping_add(csf_peak) / 3;
+    let csf_thresh = tissue_bin(g, &hs, thresh_bin);
+    let csf = tissue_bin(g, &hs, csf_peak);
+    let _ = writeln!(
+        out,
+        "csf peak at {}, setting threshold to {}",
+        ff(f64::from(csf), 2, 0),
+        ff(f64::from(csf_thresh), 2, 0)
+    );
+    Ok(Tissue {
+        csf_thresh,
+        wm: wm_val,
+        gm,
+        csf,
+    })
+}
+
+/// `ceilf` of a `float` (the inlined rounding: exact).
+fn ceilf(x: f32) -> f32 {
+    x.ceil()
+}
+
+/// `MRIvox(ctrl, Gx, Gy, Gz) ? "" : "NOT "` of the diagnostic voxel's messages.
+fn gnot(g: &mut Globals, err: &mut dyn Write, what: &str, c: &Mri) -> Result<&'static str, Fatal> {
+    let (gx, gy, gz) = (g.gx, g.gy, g.gz);
+    Ok(if cget(g, err, what, c, gx, gy, gz)? != 0.0 {
+        ""
+    } else {
+        "NOT "
+    })
+}
+
+/// FS-598: after a pass of the adaptive search that found fewer than 10 new control points,
+/// whether FreeSurfer's search can still end: the voxels the widest window of a later pass (the
+/// last whose `5 * pass` is an `int`; FreeSurfer's windows only shrink after it) would still
+/// make control points, counted on a copy (no message, no change).
+#[allow(clippy::too_many_arguments)]
+fn search_can_end(
+    g: &Globals,
+    src: &Mri,
+    c: &Mri,
+    wm_target: f32,
+    a15: f64,
+    b15: f64,
+    not_control: Option<&Mri>,
+) -> Result<bool, Fatal> {
+    let p5 = f64::from(LAST_PASS * 5);
+    let be = add64(b15, p5).ceil() as f32;
+    let ab = add64(p5, a15).ceil() as f32;
+    let mut g2 = g.clone();
+    let mut sink = std::io::sink();
+    let mut c2 = mri_copy(&mut g2, &mut sink, &mut std::io::sink(), c, None)?.unwrap_new();
+    let (_, n) = mri_norm_find_control_points_in_window(
+        &mut g2,
+        &mut std::io::sink(),
+        &mut std::io::sink(),
+        src,
+        wm_target,
+        ab,
+        be,
+        Some(&mut c2),
+        3.0,
+        None,
+        not_control,
+    )?;
+    Ok(n >= 10)
+}
+
+/// The window of half-width `whalf` around voxels: its index tables, made at the first use
+/// (FS-589 checked then).
+fn lazy_idx<'a>(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    what: &str,
+    idx: &'a mut Option<Idx>,
+    m: &Mri,
+    whalf: i32,
+) -> Result<Option<&'a Idx>, Fatal> {
+    if idx.is_none() {
+        if !check_window(g, err, what, whalf)? {
+            return Ok(None);
+        }
+        *idx = Some(Idx::of(m, whalf));
+    }
+    Ok(idx.as_ref())
+}
+
+/// `MRInormFindControlPoints(mri_src, wm_target, intensity_above, intensity_below, mri_ctrl,
+/// which, scan_type, mri_not_control)` (`wm_target` 0: 110): into the given control volume (or a
+/// new byte one with the source's header). The file's control points; then
+/// [`mri_norm_find_control_points_in_window`] (half-width 3 mm) with the window `1.5 above - 5
+/// pass`, `1.5 below + 5 pass` until a pass finds 10 new control points (after the eleventh:
+/// `MRInormFindControlPoints: could not find enough control points`, `ERROR_UNSUPPORTED`, `NULL`;
+/// FS-599), once more at half-width 2 mm; the tissue levels ([`find_tissue_intensities`]); the
+/// volume cleared and searched again (half-width 3 mm, the window `ceil(1.5 above + 5 pass)`,
+/// `ceil(1.5 below + 5 pass)`, until a pass finds 10: FS-598), then at 2 mm between
+/// `max(wm_target - 1.5 below, wm_target - floor((wm - gm) / 3))` and `ceil(above)`; with `which`
+/// 1 or more the voxels in `[wm_target - (wm - gm) / 4, wm_target + above]` whose 3-voxel window
+/// (`ceil(1 / xsize)`) stays strictly inside it and that touch a control point (6-connected) grown
+/// until none is added (128), with `which` 2 or more those with at least 4 control points among
+/// their 26 neighbours and 6 neighbours in the window (low end raised to `wm_target - below`)
+/// likewise; in both, only voxels at least `wm_target` or within `(wm - gm) / 8` below their
+/// control neighbours' mean; `mriRemoveOutliers` (2), the file's control points again (255).
+/// `mri_not_control` voxels above 0 are never control points. `scan_type` is not used.
+#[allow(clippy::too_many_arguments)]
+pub fn mri_norm_find_control_points(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    st: &mut NormState,
+    src: &Mri,
+    wm_target: f32,
+    intensity_above: f32,
+    intensity_below: f32,
+    ctrl: Option<&mut Mri>,
+    which: i32,
+    _scan_type: i32,
+    not_control: Option<&Mri>,
+) -> Result<Ret<Mri>, Fatal> {
+    const WHAT: &str = "MRInormFindControlPoints";
+    let wm_target = if wm_target == 0.0 {
+        DEFAULT_DESIRED_WHITE_MATTER_VALUE as f32
+    } else {
+        wm_target
+    };
+    let (w, h, d) = ext(src);
+    let mut fresh = None;
+    let c: &mut Mri = match ctrl {
+        Some(c) => c,
+        None => {
+            let mut c = mri_alloc(g, out, err, w, h, d, MRI_UCHAR)?;
+            mri_copy_header(g, out, err, src, Some(&mut c))?;
+            fresh.insert(c)
+        }
+    };
+    // FreeSurfer's count of these points and of the first searches is overwritten unused
+    mri_norm_add_file_control_points(g, out, err, st, c, 255, Some(src))?;
+    let a15 = mul64(f64::from(intensity_above), 1.5);
+    let b15 = mul64(f64::from(intensity_below), 1.5);
+    let mut pass = 0i32;
+    loop {
+        let p5 = f64::from(pass * 5);
+        let ab = sub64(a15, p5) as f32;
+        let be = add64(b15, p5) as f32;
+        let (_, n) = mri_norm_find_control_points_in_window(
+            g,
+            out,
+            err,
+            src,
+            wm_target,
+            ab,
+            be,
+            Some(&mut *c),
+            3.0,
+            Some(""),
+            not_control,
+        )?;
+        pass += 1;
+        if pass > 10 {
+            if n >= 10 && !g.notices.reproduce() {
+                g.notices.add(
+                    &FS_599,
+                    "MRInormFindControlPoints: the eleventh pass found enough control points \
+                     (FreeSurfer gives up)",
+                );
+                break;
+            }
+            if n >= 10 {
+                g.notices.add(
+                    &FS_599,
+                    "MRInormFindControlPoints: the eleventh pass found enough control points, \
+                     given up as FreeSurfer does",
+                );
+            }
+            log::error_printf(
+                g,
+                err,
+                ERROR_UNSUPPORTED,
+                "MRInormFindControlPoints: could not find enough control points",
+            );
+            return Ok(Ret::Null);
+        }
+        if n >= 10 {
+            break;
+        }
+    }
+    mri_norm_find_control_points_in_window(
+        g,
+        out,
+        err,
+        src,
+        wm_target,
+        intensity_above,
+        intensity_below,
+        Some(&mut *c),
+        2.0,
+        Some(""),
+        not_control,
+    )?;
+    let ts = find_tissue_intensities(g, out, err, dir, src, c)?;
+    let (wm_val, gm_val) = (ts.wm, ts.gm);
+    mri_clear(g, err, c)?;
+    pass = 0;
+    let mut nctrl;
+    loop {
+        let p5 = f64::from(pass.wrapping_mul(5));
+        let be = add64(b15, p5).ceil() as f32;
+        let ab = add64(p5, a15).ceil() as f32;
+        let (_, n) = mri_norm_find_control_points_in_window(
+            g,
+            out,
+            err,
+            src,
+            wm_target,
+            ab,
+            be,
+            Some(&mut *c),
+            3.0,
+            Some(""),
+            not_control,
+        )?;
+        nctrl = n;
+        pass += 1;
+        if n >= 10 {
+            break;
+        }
+        if !search_can_end(g, src, c, wm_target, a15, b15, not_control)? {
+            g.notices.add(
+                &FS_598,
+                format!(
+                    "{WHAT}: the adaptive control-point search cannot find 10 new control points \
+                     (FreeSurfer never ends)"
+                ),
+            );
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!(
+                    "{WHAT}: fewer than 10 voxels can still become control points after pass \
+                     {pass} (FreeSurfer's search never ends)"
+                ),
+            )?;
+            return Ok(Ret::Null);
+        }
+    }
+    if g.gx >= 0 {
+        let s = gnot(g, err, WHAT, c)?;
+        let _ = writeln!(
+            out,
+            "after 7x7x7 - ({}, {}, {}) is {s}a control point",
+            g.gx, g.gy, g.gz
+        );
+    }
+    let iba = div64(f64::from(sub(wm_val, gm_val)), 3.0).floor() as f32;
+    let mut low = sub(wm_target, iba);
+    let a = sub64(f64::from(wm_target), b15);
+    if a >= f64::from(low) {
+        low = a as f32;
+    }
+    let (_, n) = mri_norm_find_control_points_in_window(
+        g,
+        out,
+        err,
+        src,
+        wm_target,
+        ceilf(intensity_above),
+        ceilf(sub(wm_target, low)),
+        Some(&mut *c),
+        2.0,
+        Some(""),
+        not_control,
+    )?;
+    nctrl += n;
+    if g.gx >= 0 {
+        let s = gnot(g, err, WHAT, c)?;
+        let _ = writeln!(
+            out,
+            "after 5x5x5 - ({}, {}, {}) is {s}a control point",
+            g.gx, g.gy, g.gz
+        );
+    }
+    let low_below = sub(wm_target, intensity_below);
+    let iba = div(sub(wm_val, gm_val), 4.0);
+    let mut low = sub(wm_target, iba);
+    let hi = add(intensity_above, wm_target);
+    let half_iba = div(iba, 2.0);
+    let whalf = float_to_int(g, f64::from(ceilf(div(1.0, src.vg.xsize))), WHAT);
+    let sv = values(g, err, src)?;
+    let at =
+        |x: i32, y: i32, z: i32| ((z as usize * h as usize) + y as usize) * w as usize + x as usize;
+    let mut idx: Option<Idx> = None;
+    let mut tmp = mri_copy(g, out, err, c, None)?.unwrap_new();
+    let mut total_filled = 0;
+    while which >= 1 {
+        let mut nfilled = 0;
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    let val0 = sv[at(x, y, z)];
+                    let mut ctrl = cget(g, err, WHAT, c, x, y, z)?;
+                    if is_not_control(g, err, not_control, x, y, z)? {
+                        continue;
+                    }
+                    if !(val0 >= low && val0 <= hi && ctrl == 0.0) {
+                        continue;
+                    }
+                    let Some(t) = lazy_idx(g, err, WHAT, &mut idx, src, whalf)? else {
+                        return Ok(Ret::Null);
+                    };
+                    let mut n = 0i32;
+                    let mut mean = 0.0f32;
+                    let mut too_low = false;
+                    let mut zk = -whalf;
+                    while zk <= whalf && !too_low {
+                        let zi = t.z(z + zk);
+                        let mut yk = -whalf;
+                        while yk <= whalf && !too_low {
+                            let yi = t.y(y + yk);
+                            let mut xk = -whalf;
+                            while xk <= whalf && !too_low {
+                                let xi = t.x(x + xk);
+                                let val = sv[at(xi, yi, zi)];
+                                if val >= hi || val <= low {
+                                    too_low = true;
+                                    ctrl = 0.0;
+                                    break;
+                                }
+                                if xk.abs() + yk.abs() + zk.abs() <= 1
+                                    && cget(g, err, WHAT, c, xi, yi, zi)? != 0.0
+                                {
+                                    n += 1;
+                                    mean = add(mean, val);
+                                    ctrl = 128.0;
+                                }
+                                xk += 1;
+                            }
+                            yk += 1;
+                        }
+                        zk += 1;
+                    }
+                    mean = div(mean, n as f32);
+                    if val0 >= wm_target || sub(mean, val0) < half_iba {
+                        cset(g, err, WHAT, &mut tmp, x, y, z, ctrl as u8)?;
+                        if ctrl != 0.0 {
+                            nfilled += 1;
+                        }
+                    }
+                }
+            }
+        }
+        mri_copy(g, out, err, &tmp, Some(&mut *c))?;
+        total_filled += nfilled;
+        if nfilled <= 0 {
+            break;
+        }
+    }
+    nctrl += total_filled;
+    let n3 = whalf.wrapping_mul(2).wrapping_add(1);
+    if g.gdiag & DIAG_SHOW != 0 {
+        let _ = writeln!(
+            err,
+            "{total_filled} contiguous {n3}x{n3}x{n3} control points added above {}",
+            ff(f64::from(low), 2, 0)
+        );
+    }
+    if g.gx >= 0 {
+        let s = gnot(g, err, WHAT, c)?;
+        let _ = writeln!(
+            out,
+            "after 3x3x3 - ({}, {}, {}) is {s}a control point",
+            g.gx, g.gy, g.gz
+        );
+    }
+    total_filled = 0;
+    low = cmax(low, low_below);
+    mri_copy(g, out, err, c, Some(&mut tmp))?;
+    while which >= 2 {
+        let mut nfilled = 0;
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    let val0 = sv[at(x, y, z)];
+                    let ctrl = cget(g, err, WHAT, c, x, y, z)?;
+                    if is_not_control(g, err, not_control, x, y, z)? {
+                        continue;
+                    }
+                    if !(val0 >= low && val0 <= hi && ctrl == 0.0) {
+                        continue;
+                    }
+                    let Some(t) = lazy_idx(g, err, WHAT, &mut idx, src, whalf)? else {
+                        return Ok(Ret::Null);
+                    };
+                    let mut n = 0i32;
+                    let mut mean = 0.0f32;
+                    let mut too_low = false;
+                    let mut zk = -whalf;
+                    while zk <= whalf && !too_low {
+                        let zi = t.z(z + zk);
+                        let mut yk = -whalf;
+                        while yk <= whalf && !too_low {
+                            let yi = t.y(y + yk);
+                            let mut xk = -whalf;
+                            while xk <= whalf && !too_low {
+                                let xi = t.x(x + xk);
+                                let val = sv[at(xi, yi, zi)];
+                                if cget(g, err, WHAT, c, xi, yi, zi)? != 0.0
+                                    && xk.abs() <= 1
+                                    && yk.abs() <= 1
+                                    && zk.abs() <= 1
+                                {
+                                    n += 1;
+                                    mean = add(mean, val);
+                                }
+                                if xk.abs() + yk.abs() + zk.abs() <= 1 && (val > hi || val < low) {
+                                    too_low = true;
+                                }
+                                xk += 1;
+                            }
+                            yk += 1;
+                        }
+                        zk += 1;
+                    }
+                    if n >= MIN_CONTROL_POINTS && !too_low {
+                        mean = div(mean, n as f32);
+                        if val0 >= wm_target || sub(mean, val0) < half_iba {
+                            cset(g, err, WHAT, &mut tmp, x, y, z, 128)?;
+                            nfilled += 1;
+                        }
+                    }
+                }
+            }
+        }
+        mri_copy(g, out, err, &tmp, Some(&mut *c))?;
+        total_filled += nfilled;
+        if nfilled <= 0 {
+            break;
+        }
+    }
+    nctrl += total_filled;
+    if g.gdiag & DIAG_SHOW != 0 {
+        let _ = writeln!(
+            err,
+            "{total_filled} contiguous 6-connected control points added above threshold {}",
+            ff(f64::from(low), 2, 0)
+        );
+    }
+    if g.gx >= 0 {
+        let s = gnot(g, err, WHAT, c)?;
+        let _ = writeln!(
+            out,
+            "after 6-connected - ({}, {}, {}) is {s}a control point",
+            g.gx, g.gy, g.gz
+        );
+    }
+    mri_remove_outliers(g, err, c, 2)?;
+    nctrl += mri_norm_add_file_control_points(g, out, err, st, c, 255, Some(src))?;
+    if g.gdiag & DIAG_SHOW != 0 {
+        let _ = writeln!(err, "{nctrl} control points found.");
+    }
+    if g.gx >= 0 && g.gy >= 0 && g.gz >= 0 {
+        let (gx, gy, gz) = (g.gx, g.gy, g.gz);
+        let val = mri_get_vox_val(g, err, src, gx, gy, gz, 0, 0)?;
+        let marked = cget(g, err, WHAT, c, gx, gy, gz)? > 0.0;
+        let _ = writeln!(
+            out,
+            "({gx}, {gy}, {gz}) is{} a control point (T1={})",
+            if marked { "" } else { " NOT" },
+            ff(f64::from(val), 2, 0)
+        );
+    }
+    Ok(match fresh {
+        Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
+}
+
+/// FreeSurfer's static `remove_gray_matter_control_points(mri_ctrl, mri_src, wm_target,
+/// intensity_above, intensity_below, scan_type, mri_not_control)` (`MRI3dNormalize`'s pruning):
+/// the tissue levels of `src` under `ctrl` ([`find_tissue_intensities`]; `using csf threshold
+/// <t> for control point removal`); the control points eroded up to twice (`after <n> erosions,
+/// <k> voxels remaining`; an erosion that leaves 100 or fewer is not kept), the rest of them the
+/// outer ones; the voxels of the source's `[wm_target - below, wm_target + above]` window at 3 mm
+/// ([`mri_norm_find_control_points_in_window`]), binarised and eroded (fewer than 100: the gentle
+/// search into them). Each outer control point (x, then y, then z) within 4.5 mm of a voxel at or
+/// below the CSF threshold ([`csf_in_window`]) is removed; one at or below `(wm + gm) / 2 + 10`
+/// with a control point in its 9-voxel window (`ceil(4 / xsize)`) brighter than itself plus
+/// `2 (wm - gm) / 10` is removed when CSF lies within 7 mm, else kept; the file's control points
+/// set back to 1. `wm standard deviation = <%2.1f> (<n> DOFs), low wm thresh=<%2.3f>` and
+/// `<n> potential gm control points removed (...)`. `NO_ERROR`.
+#[allow(clippy::too_many_arguments)]
+pub fn remove_gray_matter_control_points(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    st: &mut NormState,
+    ctrl: &mut Mri,
+    src: &Mri,
+    wm_target: f32,
+    intensity_above: f32,
+    intensity_below: f32,
+) -> Result<i32, Fatal> {
+    const WHAT: &str = "remove_gray_matter_control_points";
+    st.remove_calls += 1;
+    let ncalls = st.remove_calls;
+    let ts = find_tissue_intensities(g, out, err, dir, src, ctrl)?;
+    let (csf_val, wm_val, gm_val) = (ts.csf_thresh, ts.wm, ts.gm);
+    let _ = writeln!(
+        out,
+        "using csf threshold {} for control point removal",
+        ff(f64::from(csf_val), 2, 0)
+    );
+    let mut inside = mri_copy(g, out, err, ctrl, None)?.unwrap_new();
+    let mut tmp: Option<Mri> = None;
+    for n in 0..2 {
+        let num = mri_voxels_in_label(g, err, &inside, 1)?;
+        let _ = writeln!(out, "after {n} erosions, {num} voxels remaining");
+        let t = match tmp.take() {
+            None => mri_erode(g, out, err, Pair::New(&inside))?.unwrap_new(),
+            Some(mut t) => {
+                mri_erode(g, out, err, Pair::Given(&inside, &mut t))?;
+                t
+            }
+        };
+        let left = mri_voxels_in_label(g, err, &t, 1)?;
+        tmp = Some(t);
+        if left <= 100 {
+            break;
+        }
+        mri_copy(
+            g,
+            out,
+            err,
+            tmp.as_ref().expect("the erosion"),
+            Some(&mut inside),
+        )?;
+    }
+    let outside = mri_subtract(g, out, err, Tri::New(ctrl, &inside))?.unwrap_new();
+    drop(inside);
+    let (r, _) = mri_norm_find_control_points_in_window(
+        g,
+        out,
+        err,
+        src,
+        wm_target,
+        intensity_above,
+        intensity_below,
+        None,
+        3.0,
+        None,
+        None,
+    )?;
+    let Some(mut inside) = r.into_new() else {
+        return Ok(ERROR_BADPARM);
+    };
+    mri_binarize(
+        g,
+        out,
+        err,
+        Pair::Same(&mut inside),
+        1.0,
+        CONTROL_NONE as f32,
+        CONTROL_MARKED as f32,
+    )?;
+    mri_erode(g, out, err, Pair::Same(&mut inside))?;
+    if mri_voxels_in_label(g, err, &inside, CONTROL_MARKED)? < 100 {
+        mri_norm_gently_find_control_points(
+            g,
+            out,
+            err,
+            st,
+            src,
+            wm_target,
+            intensity_above,
+            intensity_below,
+            Some(&mut inside),
+            None,
+        )?;
+    }
+    let whalf = float_to_int(g, f64::from(ceilf(div(4.0, src.vg.xsize))), WHAT);
+    if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        let _ = writeln!(
+            out,
+            "writing control point and src files for call {ncalls}..."
+        );
+        write_vol(g, out, err, env, dir, &outside, &format!("co{ncalls}.mgz"))?;
+        write_vol(g, out, err, env, dir, &inside, &format!("ci{ncalls}.mgz"))?;
+        write_vol(g, out, err, env, dir, ctrl, &format!("cb{ncalls}.mgz"))?;
+        write_vol(g, out, err, env, dir, src, &format!("orig{ncalls}.mgz"))?;
+    }
+    let (gx, gy, gz) = (g.gx, g.gy, g.gz);
+    if gx >= 0 {
+        if cget(g, err, WHAT, ctrl, gx, gy, gz)? == 0.0 {
+            let s = gnot(g, err, WHAT, ctrl)?;
+            let _ = writeln!(out, "({gx}, {gy}, {gz}) is {s}a control point");
+        } else {
+            let s1 = gnot(g, err, WHAT, ctrl)?;
+            let s2 = gnot(g, err, WHAT, &inside)?;
+            let s3 = gnot(g, err, WHAT, &outside)?;
+            let _ = writeln!(
+                out,
+                "({gx}, {gy}, {gz}) is {s1}a control point, is {s2}inside, is {s3}outside"
+            );
+        }
+    }
+    let (w, h, d) = ext(src);
+    let sv = values(g, err, src)?;
+    let at =
+        |x: i32, y: i32, z: i32| ((z as usize * h as usize) + y as usize) * w as usize + x as usize;
+    let mut idx: Option<Idx> = None;
+    let mut n = 0i32;
+    for x in 0..w {
+        for y in 0..h {
+            for z in 0..d {
+                if cget(g, err, WHAT, &inside, x, y, z)? == 0.0 {
+                    continue;
+                }
+                let val0 = sv[at(x, y, z)];
+                let Some(t) = lazy_idx(g, err, WHAT, &mut idx, src, whalf)? else {
+                    return Ok(ERROR_BADPARM);
+                };
+                for xk in -whalf..=whalf {
+                    let xi = t.x(x + xk);
+                    for yk in -whalf..=whalf {
+                        let yi = t.y(y + yk);
+                        for zk in -whalf..=whalf {
+                            let zi = t.z(z + zk);
+                            if cget(g, err, WHAT, &inside, xi, yi, zi)? != 0.0 {
+                                let val = sv[at(xi, yi, zi)];
+                                if val < wm_target && val > val0 {
+                                    // the official build's sum (the square's `double` first)
+                                    n += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // FreeSurfer's sum of squared differences and its square root are overwritten unused
+    let delta_std = f64::from(div(sub(wm_val, gm_val), 10.0));
+    let low_thresh = add(div(add(wm_val, gm_val), 2.0), 10.0);
+    let _ = writeln!(
+        out,
+        "wm standard deviation = {} ({n} DOFs), low wm thresh={}",
+        ff(delta_std, 2, 1),
+        ff(f64::from(low_thresh), 2, 3)
+    );
+    let mut nretained = 0i32;
+    let mut nremoved = 0i32;
+    let mut nclose = 0i32;
+    let mut removed;
+    for x in 0..w {
+        for y in 0..h {
+            for z in 0..d {
+                if cget(g, err, WHAT, &outside, x, y, z)? == 0.0 {
+                    continue;
+                }
+                let at_g = x == g.gx && y == g.gy && z == g.gz;
+                let val0 = sv[at(x, y, z)];
+                let hi_thresh = add64(f64::from(val0), 2.0 * delta_std) as f32;
+                if at_g {
+                    let _ = writeln!(
+                        out,
+                        "({gx}, {gy}, {gz})={}, is ctrl - checking for nbhd vals > {}",
+                        ff(f64::from(val0), 2, 0),
+                        ff(f64::from(hi_thresh), 2, 0)
+                    );
+                }
+                if csf_in_window(g, err, src, x, y, z, MIN_DISTANCE_TO_CSF, csf_val)? != 0.0 {
+                    removed = true;
+                    if at_g {
+                        let _ = writeln!(
+                            out,
+                            "removing voxel ({gx}, {gy}, {gz}) due to csf proximity (< {} mm)",
+                            ff(f64::from(MIN_DISTANCE_TO_CSF), 2, 0)
+                        );
+                    }
+                    cset(g, err, WHAT, ctrl, x, y, z, CONTROL_NONE as u8)?;
+                    nclose += 1;
+                } else {
+                    n = 0;
+                    removed = false;
+                }
+                if val0 > low_thresh {
+                    continue;
+                }
+                if !removed {
+                    let Some(t) = lazy_idx(g, err, WHAT, &mut idx, src, whalf)? else {
+                        return Ok(ERROR_BADPARM);
+                    };
+                    'window: for xk in -whalf..=whalf {
+                        let xi = t.x(x + xk);
+                        for yk in -whalf..=whalf {
+                            let yi = t.y(y + yk);
+                            for zk in -whalf..=whalf {
+                                let zi = t.z(z + zk);
+                                if cget(g, err, WHAT, ctrl, xi, yi, zi)? == 0.0 {
+                                    continue;
+                                }
+                                n += 1;
+                                let val = sv[at(xi, yi, zi)];
+                                if val > hi_thresh {
+                                    removed = true;
+                                    let vs = ff(f64::from(val), 2, 0);
+                                    if csf_in_window(
+                                        g,
+                                        err,
+                                        src,
+                                        x,
+                                        y,
+                                        z,
+                                        MAX_DISTANCE_TO_CSF,
+                                        csf_val,
+                                    )? != 0.0
+                                    {
+                                        nremoved += 1;
+                                        cset(g, err, WHAT, ctrl, x, y, z, CONTROL_NONE as u8)?;
+                                        if at_g {
+                                            let _ = writeln!(
+                                                out,
+                                                "found nbhd val {vs} at ({xi}, {yi}, {zi}) -> removing"
+                                            );
+                                        }
+                                    } else {
+                                        if at_g {
+                                            let _ = writeln!(
+                                                out,
+                                                "found nbhd val {vs} at ({xi}, {yi}, {zi}) -> \
+                                                 retaining due to lack of CSF proximity"
+                                            );
+                                        }
+                                        nretained += 1;
+                                    }
+                                    break 'window;
+                                }
+                            }
+                        }
+                    }
+                }
+                if at_g {
+                    let _ = writeln!(
+                        out,
+                        "{n} voxels examined, ({gx}, {gy}, {gz}) {}removed",
+                        if removed { "" } else { "NOT " }
+                    );
+                }
+            }
+        }
+    }
+    for k in 0..st.ctrl.len() {
+        let [cx, cy, cz] = st.ctrl[k];
+        if cget(g, err, WHAT, ctrl, cx, cy, cz)? == 0.0 {
+            nremoved -= 1;
+            cset(g, err, WHAT, ctrl, cx, cy, cz, CONTROL_MARKED as u8)?;
+        }
+    }
+    if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        write_vol(g, out, err, env, dir, ctrl, &format!("ca{ncalls}.mgz"))?;
+    }
+    let _ = writeln!(
+        out,
+        "{} potential gm control points removed ({nretained} >{} mm from csf retained, {nclose} < {} mm removed)",
+        nclose.wrapping_add(nremoved),
+        MAX_DISTANCE_TO_CSF as i32,
+        ff(f64::from(MIN_DISTANCE_TO_CSF), 2, 1)
+    );
+    Ok(NO_ERROR)
+}
+
+/// `MRI3dNormalize(mri_orig, mri_src, wm_target, mri_norm, intensity_above, intensity_below,
+/// only_file, prune, bias_sigma, scan_type, mri_not_control)` (`wm_target` 0: 110): on a `float`
+/// copy of the source (`MRIchangeType`, values unscaled), the control points
+/// ([`mri_norm_find_control_points`] with `which` 2; `NULL`: `MRInormFindControlPoints failed`
+/// and the program's end), or with `only_file` the file's alone (`only using <n> unique control
+/// points from file...`; `WRITE_CONTROL_POINTS`: `cp.mgz`); written to the control volume's name
+/// when set; binarised; with `prune` above 0 pruned of grey matter in `mri_orig`
+/// ([`remove_gray_matter_control_points`]); the bias field ([`mri_build_bias_image`], written to
+/// the bias name when set); each voxel `wm_target * v / bias` (`float`; `v` where the bias is
+/// within `FLT_EPSILON` of 0), at most 255 in a byte destination. `norm`: a new copy of the
+/// `float` copy, a given volume, or the source itself (`mri_normalize`'s call).
+#[allow(clippy::too_many_arguments)]
+pub fn mri_3d_normalize(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    st: &mut NormState,
+    orig: &Mri,
+    src: &mut Mri,
+    wm_target: f32,
+    norm: Dst,
+    intensity_above: f32,
+    intensity_below: f32,
+    only_file: i32,
+    prune: i32,
+    bias_sigma: f32,
+    scan_type: i32,
+    not_control: Option<&Mri>,
+) -> Result<Ret<Mri>, Fatal> {
+    const WHAT: &str = "MRI3dNormalize";
+    let wm_target = if wm_target == 0.0 {
+        DEFAULT_DESIRED_WHITE_MATTER_VALUE as f32
+    } else {
+        wm_target
+    };
+    let (w, h, d) = ext(src);
+    let Some(mut copy) = mri_change_type(g, out, err, env, src, MRI_FLOAT, 0.0, 255.0, 1)? else {
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("{WHAT}: the source cannot be changed to float (FreeSurfer crashes)"),
+        )?;
+        return Ok(Ret::Null);
+    };
+    let mut fresh = match norm {
+        Dst::New => Some(mri_copy(g, out, err, &copy, None)?.unwrap_new()),
+        _ => None,
+    };
+    let mut given = match norm {
+        Dst::Given(m) => Some(m),
+        _ => None,
+    };
+    for n in 2..3 {
+        let mut ctrl = if only_file == 0 {
+            match mri_norm_find_control_points(
+                g,
+                out,
+                err,
+                dir,
+                st,
+                &copy,
+                wm_target,
+                intensity_above,
+                intensity_below,
+                None,
+                n,
+                scan_type,
+                not_control,
+            )? {
+                Ret::New(c) => c,
+                _ => {
+                    log::error_exit(g, err, ERROR_UNSUPPORTED, "MRInormFindControlPoints failed")?;
+                    return Ok(Ret::Null);
+                }
+            }
+        } else {
+            let mut c = mri_alloc(
+                g,
+                out,
+                err,
+                copy.vg.width,
+                copy.vg.height,
+                copy.vg.depth,
+                MRI_UCHAR,
+            )?;
+            mri_copy_header(g, out, err, &copy, Some(&mut c))?;
+            let nctrl =
+                mri_norm_add_file_control_points(g, out, err, st, &mut c, 255, Some(&copy))?;
+            let _ = writeln!(err, "only using {nctrl} unique control points from file...");
+            if env.get("WRITE_CONTROL_POINTS").is_some() {
+                let _ = writeln!(out, "writing control point volume to cp.mgz");
+                write_vol(g, out, err, env, dir, &c, "cp.mgz")?;
+            }
+            c
+        };
+        if let Some(name) = st.control_volume_fname.clone() {
+            let _ = writeln!(err, "writing control point volume to {name}...");
+            mri_copy_header(g, out, err, &copy, Some(&mut ctrl))?;
+            write_vol(g, out, err, env, dir, &ctrl, &name)?;
+        }
+        mri_binarize(
+            g,
+            out,
+            err,
+            Pair::Same(&mut ctrl),
+            1.0,
+            CONTROL_NONE as f32,
+            CONTROL_MARKED as f32,
+        )?;
+        if prune > 0 {
+            remove_gray_matter_control_points(
+                g,
+                out,
+                err,
+                env,
+                dir,
+                st,
+                &mut ctrl,
+                orig,
+                wm_target,
+                intensity_above,
+                intensity_below,
+            )?;
+        }
+        let bias = mri_build_bias_image(g, out, err, &copy, &mut ctrl, bias_sigma)?;
+        if let Some(name) = st.bias_volume_fname.clone() {
+            let _ = writeln!(err, "writing bias field volume to {name}...");
+            write_vol(g, out, err, env, dir, &bias, &name)?;
+        }
+        if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+            let pass = st.normalize_pass;
+            let _ = writeln!(err, "writing out control and bias volumes...");
+            write_vol(g, out, err, env, dir, &copy, &format!("src{pass}.mgh"))?;
+            write_vol(g, out, err, env, dir, &ctrl, &format!("ctrl{pass}.mgh"))?;
+            write_vol(g, out, err, env, dir, &bias, &format!("bias{pass}.mgh"))?;
+            st.normalize_pass += 1;
+        }
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    let s = mri_get_vox_val(g, err, &copy, x, y, z, 0, 0)?;
+                    let b = mri_get_vox_val(g, err, &bias, x, y, z, 0, 0)?;
+                    let mut v = if fzero(b) {
+                        s
+                    } else {
+                        div(mul(wm_target, s), b)
+                    };
+                    let nv: &mut Mri = match (fresh.as_mut(), given.as_deref_mut()) {
+                        (Some(m), _) | (None, Some(m)) => m,
+                        _ => &mut *src,
+                    };
+                    if v > 255.0 && nv.mtype == MRI_UCHAR {
+                        v = 255.0;
+                    }
+                    mri_set_vox_val(g, err, nv, x, y, z, 0, v, 0)?;
+                    if x == g.gx && y == g.gy && z == g.gz && g.gx >= 0 {
+                        let r = nint(g, f64::from(v));
+                        let _ = writeln!(
+                            out,
+                            "bias at ({x}, {y}, {z}) = {}, T1 {} --> {r}",
+                            ff(f64::from(b), 2, 1),
+                            ff(f64::from(s), 2, 0)
+                        );
+                    }
+                }
+            }
+        }
+        drop(ctrl);
+        if only_file != 0 {
+            break;
+        }
+        let nv: &Mri = match (fresh.as_ref(), given.as_deref()) {
+            (Some(m), _) | (None, Some(m)) => m,
+            _ => &*src,
+        };
+        mri_copy(g, out, err, nv, Some(&mut copy))?;
     }
     Ok(match fresh {
         Some(m) => Ret::New(m),

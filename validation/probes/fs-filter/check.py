@@ -55,7 +55,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # (a destination or control volume smaller than the source, or of another type, written outside)
 # FS-588 (a control volume smaller than the source: memory outside), FS-589 (windows past the
 # index tables), FS-591 (windows past the MNI's arrays), FS-593 (a threshold never written),
-# FS-487 (a Talairach point through a matrix FreeSurfer could not make: a crash)
+# FS-487 (a Talairach point through a matrix FreeSurfer could not make: a crash), FS-597 (tissue
+# levels from bins outside a histogram), FS-598 (a control-point search that never ends), FS-600
+# (peaks never written)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -91,6 +93,9 @@ SKIP = (
     "FS-591",
     "FS-593",
     "FS-487",
+    "FS-597",
+    "FS-598",
+    "FS-600",
 )
 
 # MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000

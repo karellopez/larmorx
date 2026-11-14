@@ -1013,6 +1013,93 @@ bool norm2_case(const std::string &cmd)
       out += " ";
       unlink("control.edited.dat");
     }
+  } else if (cmd == "nrm") {
+    // nrm <volume with centre> xform_mode [16 doubles: m[c][r]] noavg mni_mode <dst mode> [<dst>]:
+    // MRInormalize (mni_mode 1: after MRInormInit(m, mni, 0, 0, 0, 0, 0) as mri_normalize calls
+    // it; 0: no MNI); the result, then with an MNI each window's histogram
+    MRI *m = get_volc();
+    int xm = geti();
+    if (xm) {
+      Transform *t = (Transform *)calloc(1, sizeof(Transform));
+      for (int c = 0; c < 4; c++)
+        for (int r = 0; r < 4; r++) t->m[c][r] = getd();
+      Transform *ti = (Transform *)calloc(1, sizeof(Transform));
+      if (xm == 1) m->linear_transform = t;
+      m->inverse_linear_transform = ti;
+    }
+    if (geti()) setenv("NO_AVERAGE305", "1", 1);
+    int mm = geti();
+    MRI *dst = get_dst(geti(), m);
+    MNI *mni = NULL;
+    setRandomSeed(1234);
+    if (mm) {
+      mni = (MNI *)calloc(1, sizeof(MNI));
+      oi(MRInormInit(m, mni, 0, 0, 0, 0, 0.0f));
+    }
+    put_result(MRInormalize(m, dst, mni), dst);
+    if (mni) {
+      int nw = mni->windows_above_t0 + mni->windows_below_t0;
+      for (int i = 0; i < nw && i < MAX_SPLINE_POINTS; i++) {
+        HISTOGRAM *h = &mni->histograms[i];
+        oi(h->nbins); of(h->bin_size); of(h->min); of(h->max);
+        for (int b = 0; b < h->nbins; b++) of(h->counts[b]);
+      }
+    }
+  } else if (cmd == "nfcp") {
+    // nfcp <src> wm above below <ctrl?> which <not control?> <points>: MRInormFindControlPoints
+    MRI *src = get_vol();
+    float wm = getf(), ab = getf(), be = getf();
+    MRI *ctrl = get_opt();
+    int which = geti();
+    MRI *nc = get_opt();
+    set_pts(src);
+    put_result(MRInormFindControlPoints(src, wm, ab, be, ctrl, which, 0, nc), ctrl);
+  } else if (cmd == "n3d") {
+    // n3d <src> <orig mode> [<orig>] wm <norm mode> [<norm>] above below only_file prune sigma
+    // <not control?> <points>: MRI3dNormalize (orig mode 0: a copy of the source, as
+    // mri_normalize's mri_orig)
+    MRI *src = get_vol();
+    MRI *orig = geti() ? get_vol() : MRIcopy(src, NULL);
+    float wm = getf();
+    MRI *norm = get_dst(geti(), src);
+    float ab = getf(), be = getf();
+    int of_ = geti(), pr = geti();
+    float sg = getf();
+    MRI *nc = get_opt();
+    set_pts(src);
+    put_result(MRI3dNormalize(orig, src, wm, norm, ab, be, of_, pr, sg, 0, nc), norm);
+    put_full(src);
+  } else if (cmd == "nrmf" || cmd == "n3df") {
+    // nrmf <volume file>: MRInormInit then MRInormalize (a new volume), as mri_normalize without an
+    // aseg; n3df <volume file> above below prune sigma: MRI3dNormalize in place with a copy as
+    // mri_orig (wm 110, no control-point file), as mri_normalize's 3d passes; the result's extent,
+    // type and the FNV-1a (64 bits) of its voxels
+    MRI *src = MRIread(next());
+    if (!src) fail("cannot read the volume");
+    MRI *r;
+    if (cmd == "nrmf") {
+      setRandomSeed(1234);
+      MNI *mni = (MNI *)calloc(1, sizeof(MNI));
+      MRInormInit(src, mni, 0, 0, 0, 0, 0.0f);
+      r = MRInormalize(src, NULL, mni);
+    } else {
+      float ab = getf(), be = getf();
+      int pr = geti();
+      float sg = getf();
+      MRI *orig = MRIcopy(src, NULL);
+      r = MRI3dNormalize(orig, src, 110, src, ab, be, 0, pr, sg, 0, NULL);
+    }
+    if (!r) {
+      out += "NULL ";
+    } else {
+      oi(r == src); oi(r->width); oi(r->height); oi(r->depth); oi(r->type);
+      uint64_t h = 0xcbf29ce484222325ull;
+      const unsigned char *b = (const unsigned char *)r->chunk;
+      for (size_t i = 0; i < r->bytes_total; i++) h = (h ^ b[i]) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
   } else {
     return false;
   }
@@ -1091,7 +1178,7 @@ const char *MARK = "\n@@RESULT ";
 bool toks_hint_long(const std::string &line)
 {
   return line.compare(0, 5, "edmf ") == 0 || line.compare(0, 5, "dtrf ") == 0 || line.compare(0, 4, "vsr ") == 0 ||
-         line.compare(0, 5, "g3df ") == 0;
+         line.compare(0, 5, "g3df ") == 0 || line.compare(0, 5, "nrmf ") == 0 || line.compare(0, 5, "n3df ") == 0;
 }
 
 }  // namespace

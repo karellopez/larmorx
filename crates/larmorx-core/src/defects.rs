@@ -1906,7 +1906,7 @@ defects! {
     FS_456 = "FS-456", "FreeSurfer", true,
         "reading an unscaled big-endian NIfTI volume of complex values leaves the values unswapped: wrong values";
     FS_457 = "FS-457", "FreeSurfer", false,
-        "reading an unscaled NIfTI volume of unsigned 32-bit values gives an int volume: values above 2,147,483,647 become negative (kept: FreeSurfer's volume type)";
+        "reading an unscaled NIfTI volume, or an ANALYZE volume, of unsigned 32-bit values gives an int volume: values above 2,147,483,647 become negative (kept: FreeSurfer's volume type)";
     FS_458 = "FS-458", "FreeSurfer", true,
         "reading a NIfTI volume of 1 or 2 dimensions, the header's extents past its number of dimensions are used as the volume's rows or slices instead of 1: an extent of 0 gives an empty volume, a larger one a read past the data";
     FS_459 = "FS-459", "FreeSurfer", true,
@@ -1921,6 +1921,30 @@ defects! {
         "reading a big-endian NIfTI volume whose column count is not positive takes the columns from the header's glmin field without swapping its bytes: a wrong extent";
     FS_644 = "FS-644", "FreeSurfer", true,
         "reading a NIfTI pair (.hdr and .img) of the ico7 surface's shape (163,842 voxels) whose header gives 0 frames prints that the number of elements cannot change and then crashes";
+    FS_645 = "FS-645", "FreeSurfer", true,
+        "reading an ANALYZE file or SPM series with SPM_START_FRAME set to a text that does not start with a number uses memory contents as the first frame's number (the default is 1)";
+    FS_646 = "FS-646", "FreeSurfer", true,
+        "reading or writing ANALYZE files (.img and .hdr, SPM series) under names too long for FreeSurfer's buffers (about 1,000 bytes when reading, 1,024 when writing) ends the program (buffer overflow detected)";
+    FS_647 = "FS-647", "FreeSurfer", true,
+        "reading an ANALYZE header of an unsupported data type prints the type after FreeSurfer has released the header's memory (the number printed is still the header's)";
+    FS_648 = "FS-648", "FreeSurfer", true,
+        "reading an ANALYZE volume without a usable .mat file whose header's orientation code is not one of -1 to 5 prints a line with an unreadable orientation name and then crashes";
+    FS_649 = "FS-649", "FreeSurfer", true,
+        "reading an ANALYZE volume of double values with several frames puts every frame's values into the first frame: the first frame holds the last frame's values and the others stay 0";
+    FS_650 = "FS-650", "FreeSurfer", true,
+        "reading an ANALYZE volume whose .mat file holds a matrix that is not 4 columns wide, or has fewer than 3 rows, prints a matrix error and crashes";
+    FS_651 = "FS-651", "FreeSurfer", true,
+        "reading an SPM series of NIfTI pairs (zero-padded frame names) whose first frame's pair cannot be read as NIfTI crashes after the reader's message";
+    FS_652 = "FS-652", "FreeSurfer", true,
+        "reading a big-endian ANALYZE header, its extents field is byte-swapped as a 16-bit number and dim[5] to dim[7] are not swapped: the header dump prints wrong values";
+    FS_653 = "FS-653", "FreeSurfer", true,
+        "writing an ANALYZE volume with exactly 32,768 columns, rows, slices or frames writes that extent as -32,768 (larger extents are refused)";
+    FS_654 = "FS-654", "FreeSurfer", true,
+        "writing an ANALYZE volume of long (64-bit) values writes 32-bit ints, but from the first half of each row's bytes: the values come out as pieces of the longs";
+    FS_655 = "FS-655", "FreeSurfer", true,
+        "writing ANALYZE files ignores the files' close: files whose last bytes could not be written (a full disk) are reported as written";
+    FS_656 = "FS-656", "FreeSurfer", true,
+        "an ANALYZE voxel offset, or a written volume's smallest and largest value or origin, outside the integer range it is converted to (a NaN included) becomes the lowest int (the offset is then ignored), or wraps around 16 bits for the origin";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

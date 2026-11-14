@@ -173,7 +173,7 @@ fn swap_nifti_1_header(h: &mut NiftiHdr) {
 
 /// A `float` widened to `double` (`cvtss2sd`): a NaN keeps its sign and payload, quieted.
 #[inline]
-fn widen(x: f32) -> f64 {
+pub(crate) fn widen(x: f32) -> f64 {
     if x.is_nan() {
         let b = x.to_bits();
         f64::from_bits(
@@ -189,7 +189,7 @@ fn widen(x: f32) -> f64 {
 /// A `double` stored in a `float` (`cvtsd2ss`): rounded to nearest; a NaN keeps its sign and the
 /// top 22 bits of its payload, quieted.
 #[inline]
-fn narrow(x: f64) -> f32 {
+pub(crate) fn narrow(x: f64) -> f32 {
     if x.is_nan() {
         let b = x.to_bits();
         f32::from_bits(

@@ -290,7 +290,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         GENESIS_FILE => "GE Genesis",
         SIGNA_FILE => "GE Signa",
         GE_LX_FILE => "GE LX",
-        MRI_ANALYZE_FILE | MRI_ANALYZE4D_FILE => "ANALYZE",
         BRIK_FILE => "AFNI BRIK",
         MRI_MINC_FILE => "MINC",
         SDT_FILE => "Varian SDT",
@@ -455,6 +454,8 @@ pub fn mri_read(
         crate::mriio_nifti::nii_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::NIFTI1_FILE {
         crate::mriio_nifti::nifti1_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::MRI_ANALYZE_FILE || mtype == identify::MRI_ANALYZE4D_FILE {
+        crate::mriio_analyze::analyze_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?
@@ -562,8 +563,6 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
         BHDR => "bhdr",
         BSHORT_FILE => "bshort",
         BFLOAT_FILE => "bfloat",
-        MRI_ANALYZE_FILE => "ANALYZE",
-        MRI_ANALYZE4D_FILE => "ANALYZE 4D",
         BRIK_FILE => "AFNI BRIK",
         MGH_MORPH => "GCA morph (m3z)",
         ITK_MORPH => "ITK warp",
@@ -688,6 +687,10 @@ pub fn mri_write_type(
         crate::mriio_write::nii_write(g, out, err, env, dir, m, fname, intent)?
     } else if mtype == NIFTI1_FILE {
         crate::mriio_write::nifti1_write(g, out, err, dir, m, fname)?
+    } else if mtype == MRI_ANALYZE_FILE {
+        crate::mriio_analyze::analyze_write(g, out, err, dir, m, fname)?
+    } else if mtype == MRI_ANALYZE4D_FILE {
+        crate::mriio_analyze::analyze_write4d(g, out, err, dir, m, fname)?
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,

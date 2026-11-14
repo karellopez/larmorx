@@ -918,3 +918,174 @@ fn gelx(
     }
     Ok(Some(m))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    fn put(b: &mut Vec<u8>, at: usize, v: &[u8]) {
+        if b.len() < at + v.len() {
+            b.resize(at + v.len(), 0);
+        }
+        b[at..at + v.len()].copy_from_slice(v);
+    }
+
+    /// A Genesis file of `w` x `h` voxels `base + k`, the image header at 156, `echoes` echoes,
+    /// an axial slice 2 mm thick with 1 x 1.5 mm pixels around (0, 0, z).
+    fn genesis_file(w: i32, h: i32, base: i16, echoes: i16, z: f32) -> Vec<u8> {
+        let ih = 156usize;
+        let pixel = ih + 256;
+        let mut b = vec![0u8; pixel];
+        b[..4].copy_from_slice(b"IMGF");
+        put(&mut b, 4, &(pixel as i32).to_be_bytes());
+        put(&mut b, 8, &w.to_be_bytes());
+        put(&mut b, 12, &h.to_be_bytes());
+        put(&mut b, 148, &(ih as i32).to_be_bytes());
+        put(&mut b, ih + 26, &2.0f32.to_be_bytes());
+        put(&mut b, ih + 50, &1.0f32.to_be_bytes());
+        put(&mut b, ih + 54, &1.5f32.to_be_bytes());
+        // centre, normal, top-left, top-right, bottom-right
+        let v = [
+            0.0f32, 0.0, z, 0.0, 0.0, 2.0, -2.0, 3.0, z, 2.0, 3.0, z, 2.0, -3.0, z,
+        ];
+        for (k, x) in v.iter().enumerate() {
+            put(&mut b, ih + 130 + 4 * k, &x.to_be_bytes());
+        }
+        put(&mut b, ih + 194, &2_000_000i32.to_be_bytes());
+        put(&mut b, ih + 198, &900_000i32.to_be_bytes());
+        put(&mut b, ih + 202, &30_000i32.to_be_bytes());
+        put(&mut b, ih + 210, &echoes.to_be_bytes());
+        put(&mut b, ih + 254, &90i16.to_be_bytes());
+        for k in 0..w * h {
+            b.extend_from_slice(&(base + k as i16).to_be_bytes());
+        }
+        b
+    }
+
+    fn shorts(m: &Mri) -> Vec<i16> {
+        m.chunk
+            .as_ref()
+            .unwrap()
+            .chunks(2)
+            .map(|c| i16::from_le_bytes([c[0], c[1]]))
+            .collect()
+    }
+
+    /// FS-680: `reproduce` prints FreeSurfer's lines and crashes; the default reads the series.
+    #[test]
+    fn a_genesis_series_reads_by_default_and_crashes_as_freesurfer() {
+        let dir = tempfile::tempdir().unwrap();
+        for n in 1..=3 {
+            let f = genesis_file(2, 2, 10 * n as i16, 1, n as f32 * 2.0);
+            std::fs::write(dir.path().join(format!("I.{n:03}")), f).unwrap();
+        }
+        let p = Some(dir.path());
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = genesis_read(&mut g, &mut o, &mut e, &env, p, "I.002", true);
+        assert_eq!(r.unwrap_err(), Fatal::Exit(139));
+        assert_eq!(String::from_utf8(o).unwrap(), "fname_format  : I.%03d\n");
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = genesis_read(&mut g, &mut o, &mut e, &env, p, "I.002", true)
+            .unwrap()
+            .unwrap();
+        assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-680"));
+        assert_eq!(
+            (m.vg.width, m.vg.height, m.vg.depth, m.nframes),
+            (2, 2, 3, 1)
+        );
+        assert_eq!(
+            shorts(&m),
+            vec![10, 11, 12, 13, 20, 21, 22, 23, 30, 31, 32, 33]
+        );
+        assert_eq!((m.vg.xsize, m.vg.ysize, m.vg.zsize), (1.0, 1.5, 2.0));
+        assert_eq!((m.tr, m.ti, m.te), (2000.0, 900.0, 30.0));
+        assert!((m.flip_angle - std::f64::consts::FRAC_PI_2).abs() < 1e-15);
+        // x along the top edge, y down the right edge, z the normal
+        assert_eq!((m.vg.x_r, m.vg.x_a, m.vg.x_s), (1.0, 0.0, 0.0));
+        assert_eq!((m.vg.y_r, m.vg.y_a, m.vg.y_s), (0.0, -1.0, 0.0));
+        assert_eq!((m.vg.z_r, m.vg.z_a, m.vg.z_s), (0.0, 0.0, 1.0));
+        // the first slice's centre plus half the stack: (3 - 1) * 2 mm / 2
+        assert_eq!((m.vg.c_r, m.vg.c_a, m.vg.c_s), (0.0, 0.0, 4.0));
+    }
+
+    /// FS-683: two echoes of two slices; FreeSurfer's volume has 4 slices (2 empty), the
+    /// default's 2.
+    #[test]
+    fn echoes_are_frames_of_the_files_slices() {
+        let dir = tempfile::tempdir().unwrap();
+        for n in 1..=4 {
+            let f = genesis_file(1, 1, n as i16, 2, 0.0);
+            std::fs::write(dir.path().join(format!("s{n}.MR")), f).unwrap();
+        }
+        let p = Some(dir.path());
+        let env = Environment::default();
+        for (mode, depth, voxels) in [
+            (UpstreamDefects::Fix, 2, vec![1, 3, 2, 4]),
+            (UpstreamDefects::Reproduce, 4, vec![1, 3, 0, 0, 2, 4, 0, 0]),
+        ] {
+            let mut g = Globals::new(mode);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let m = genesis_read_as_patched(&mut g, &mut o, &mut e, &env, p, "s1.MR", true)
+                .unwrap()
+                .unwrap();
+            assert_eq!((m.vg.depth, m.nframes), (depth, 2));
+            assert_eq!(shorts(&m), voxels);
+            let ids: Vec<_> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
+            assert!(ids.contains(&"FS-683") && ids.contains(&"FS-685"));
+        }
+    }
+
+    /// A GE LX series: e1s2i<n>, voxels from byte 8,432.
+    #[test]
+    fn a_gelx_series_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        for n in 5..=6 {
+            let mut b = vec![0u8; 8432];
+            put(&mut b, 3228, b"IMGF");
+            put(&mut b, 3236, &3i32.to_be_bytes());
+            put(&mut b, 3240, &1i32.to_be_bytes());
+            put(&mut b, 2184 + 28, &1.0f32.to_be_bytes());
+            put(&mut b, 2184 + 52, &1.0f32.to_be_bytes());
+            put(&mut b, 2184 + 56, &1.0f32.to_be_bytes());
+            let v = [
+                0.0f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0, -1.0, -1.0,
+            ];
+            for (k, x) in v.iter().enumerate() {
+                put(&mut b, 2184 + 136 + 4 * k, &x.to_be_bytes());
+            }
+            for k in 0..3i16 {
+                b.extend_from_slice(&(100 * n + k).to_be_bytes());
+            }
+            std::fs::write(dir.path().join(format!("e1s2i{n}")), b).unwrap();
+        }
+        let p = Some(dir.path());
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = gelx_read(&mut g, &mut o, &mut e, p, "e1s2i6", true);
+        assert_eq!(r.unwrap_err(), Fatal::Exit(139));
+        assert!(o.is_empty() && e.is_empty());
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = gelx_read(&mut g, &mut o, &mut e, p, "e1s2i6", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!((m.vg.width, m.vg.height, m.vg.depth), (3, 1, 2));
+        assert_eq!(shorts(&m), vec![500, 501, 502, 600, 601, 602]);
+        assert_eq!((m.vg.x_r, m.vg.x_a, m.vg.x_s), (0.0, -1.0, 0.0));
+        assert_eq!((m.vg.y_r, m.vg.y_a, m.vg.y_s), (0.0, 0.0, -1.0));
+        std::fs::write(dir.path().join("e1s2x6"), b"x").unwrap();
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        assert!(
+            gelx_read(&mut g, &mut o, &mut e, p, "e1s2x6", true)
+                .unwrap()
+                .is_none()
+        );
+        let text = String::from_utf8(e).unwrap();
+        assert!(text.contains("genesisRead(): can't determine file name format for e1s2x6"));
+    }
+}

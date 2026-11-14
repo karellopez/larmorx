@@ -22,7 +22,8 @@ MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94
 (`.hdr` and `.img`) written (§95-96); **part 15** (§97-99): NIfTI volumes and NIfTI-1 pairs read;
 §100: a number cut after another (FS-49); **part 16** (§101-103): ANALYZE volumes read and written;
 **part 19** (§104-106): COR, bshort, bfloat and bhdr volumes read and written; **part 20** (§107-109): GDF
-volumes read and written, Varian SDT volumes read.
+volumes read and written, Varian SDT volumes read; **part 21** (§110-112): GE Genesis and GE Signa LX
+series read.
 
 ## 1. Conventions
 
@@ -3271,3 +3272,108 @@ voxels of the four types, cut. Piece 17's `vwr` writes GDF (`w/o.gdf`, `w/no/o.g
 stems `w/gi`, `w/no/gi`, `w/o` or none, read back with the type 12. Measured (2026-11-14): seed 13,
 1,428 piece-18 cases: `reproduce` identical on 1,300, 0 different (27 counted: FS-674 and FreeSurfer's
 crashes; 101 compared apart: FS-676, FS-677's memory contents); `fix` differs only with notices.
+
+## 110. GE Genesis series read (`genesisRead`; `mri_read`'s type 4, `mri_identify`'s Genesis files)
+
+A Genesis series is one file per slice: `I.001`, `I.002` ..., or `<stem>1.MR`, `<stem>2.MR` ... (or
+zero-padded, `<stem>001.MR`). **FS-680: FreeSurfer 8.2.0 never reads one.** After the steps up to the
+choice of the series below it crashes (signal 11, status 139 from a shell) every time; the `reproduce`
+mode prints the same lines and ends with status 139. The default reads the series as follows (what
+FreeSurfer's code does once that one fault is removed: the probe's `gfd`/`gfh`, §112).
+
+- `GE_ODD` set: `only using odd # GE files`, only odd numbers; else `GE_EVEN` set: `only using even # GE
+  files`, only even numbers (standard output). The name that does not open: `genesisRead(): error
+  opening file <name>` (`ERROR_BADFILE`, `errno` 0, no volume).
+- The name's folder (through its last `/`) and the rest. The rest starting `I.`: the number is `atoi` of
+  what follows, the series `<folder>I.%03d`. Else, the rest of 3 or more bytes ending `.MR` (case
+  matters): the number is the run of digits before `.MR` (none: 0), the stem what precedes it, two
+  series `<folder><stem>%d.MR` and `<folder><stem>%03d.MR`. Else `genesisRead(): can't determine file
+  name format for <name>` (`ERROR_BADPARM`, `errno` 0). Then on standard output `fname_format  :
+  <first series' text>` and, for `.MR` names, `fname_format2 : <second's>` (the texts with `%d`,
+  `%03d` as written). FS-681: for an `I.` name FreeSurfer's second text is memory never written; it
+  prints the second line from it when that memory does not start with a zero byte (no probe run ever
+  showed one); both modes print none, noted. A series text of 1,024 bytes or more: FreeSurfer prints
+  `genesisRead: Truncation on line <n>` (standard error; n 4093 or 4097 for the stem's texts, 4114 or
+  4122 for the folder's) and cuts it to 1,023 bytes; both modes use the whole name (FS-249). FS-682: a
+  `%` in the folder or the stem is a C conversion in FreeSurfer's names (wrong names, a crash or an
+  abort); larmorx makes the names from the text, noted.
+- The files: from the given number (with `GE_ODD` an even one, or with `GE_EVEN` an odd one, is first
+  raised by 1) step down by 1 (2 with either variable) while `<series>(n)` opens for reading (a folder
+  opens), then up the same way: the lowest and highest numbers. For `.MR` names both series are
+  measured from the same number with step 1; the second is used when its count of steps (highest minus
+  lowest) is larger. Numbers wrap as 32-bit ints. **Here FreeSurfer crashes (FS-680).**
+- The header from the series' lowest file (`genesisRead(): error opening file <f>` with a newline,
+  `ERROR_BADFILE`, `errno` 0): big-endian numbers read with `fread` of 4 bytes (a number the file ends
+  in prints `genesisRead(): could not read file` as an error, `ERROR_BADFILE`; a read of a folder sets
+  `errno` to `EISDIR`, which `ErrorPrintf` prints first): the width at byte 8, the height at 12, the image
+  header's offset `ih` at 148; then, each after a seek to `ih + k` (a negative position fails with
+  `EINVAL` and the read goes on from where the file was): the slice thickness (float, `k` 26; also the
+  slice size), the pixel width and height (floats, 50 and 54; `ps` the width), TR, TI, TE (ints at 194,
+  198, 202, each `/ 1e3` in `double` to milliseconds, stored as float), the flip angle (a short at 254,
+  degrees: `2 * pi * a / 360` in `double`, radians), the echoes (a short at 210, the frames: above 1
+  `multi-echo genesis file detected (<n> echoes)...`; 0: `zero frames specified in file - setting to
+  1`); from 130 fifteen floats: the centre (unused), the normal `n`, the top-left `tl`, top-right `tr`
+  and bottom-right `br` corners (R, A, S each). `freadInt` and `freadShort` (§2) give the ints and
+  shorts (`freadShort: fread failed` when the file ends). FS-167: a number the file ends in has its
+  missing bytes from memory never written (0 here, noted); for the thickness and pixel sizes they are
+  the field's earlier value's (1.0, 1.0, 1.0: `reproduce` keeps them, `fix` 0, noted).
+- The geometry (all `float` unless said; a NaN's bits follow SSE: the left operand's, quieted): `n`
+  divided by its length `sqrt(n_r^2 + n_a^2 + n_s^2)` (squares summed left to right); `KILLIANY_SWAP`
+  set: `WARNING - swapping normal direction!` and `n_a` negated (its sign bit flipped, also a NaN's).
+  `x = tr - tl`, `y = br - tr`, each divided by its length (as above), `z = n / |n|`. The centre `c_k =
+  (double)(n_k * zsize) * (depth - 1.0) * 0.5 + (double)(tl_k + br_k) * 0.5` in `double` (the products'
+  term on the left of the sum), stored as float, `depth` the slice count; `ras_good_flag` 1. The ends
+  `xend = (double)width * xsize * 0.5` (`double`, stored as float), `xstart = -xend`, the same for y
+  (height, ysize) and z (depth, zsize); `fov` the largest of `xend - xstart`, `yend - ystart`, `zend -
+  zstart` by `a > b ? a : b` comparisons (x against y first, the larger against z; NaN loses). `imnr0`
+  1, `imnr1` the depth; the volume's name the given name; type short.
+- FS-683: with several echoes FreeSurfer's depth is the file count, and the files fill slice `k / E`
+  of frame `k % E` only for the first `count / E` slices (file `k` from 0 in reading order, `E` the
+  echoes; with `GE_ODD`/`GE_EVEN` the frame is `(n - lowest) % E`, all files of an even step in frame
+  0 when `E` is 2): the rest of the slices stay 0 and the centre uses the larger depth. `fix`: depth
+  `ceil(count / E)`, file `k` into slice `k / E`, frame `k % E`, the centre with that depth, noted;
+  `reproduce`: FreeSurfer's. FS-685: with several echoes FreeSurfer frees a header whose frame count it
+  raised after allocating one frame and reads past its frame table: a crash (signal 11, or glibc's
+  `free(): invalid pointer` and signal 6) or none, as memory holds; both modes go on, noted.
+- With voxels: for each file in order (`genesisRead(): error opening file <f>`, no volume), the pixel
+  data's offset (an int at byte 4), a seek there, then `height` rows of `width` big-endian shorts
+  (`genesisRead(): error reading from file file <f>` for a row the file cannot complete; no volume).
+  Without voxels: the header alone.
+
+## 111. GE Signa LX series read (`gelxRead`; `mri_read`'s type 5, `mri_identify`'s LX files)
+
+FS-680 again: FreeSurfer 8.2.0 crashes once the series is found (nothing printed before it, unless a
+series text reaches 1,024 bytes: `gelxRead: Truncation on line <n>`, n 4507, 4517, 4521). FS-684: every
+message names `genesisRead` (kept, noted).
+
+- The name that does not open: `genesisRead(): error opening file <name>`. The rest after the folder:
+  only digits and exactly one `e`, one `s` and one `i` (bytes; ASCII digits), else `genesisRead(): can't
+  determine file name format for <name>` (`ERROR_BADPARM`). The number is `atoi` of what follows the
+  `i`, the series `<folder><what precedes the i>i%d`; the files' numbers found as in §110 (step 1).
+- The header from the lowest file (`genesisRead(): error opening file <f>` with a newline): width and
+  height at bytes 3,236 and 3,240, the thickness at 2,212, the pixel width and height at 2,236 and
+  2,240, fifteen floats from 2,320 (centre, normal, three corners), with §110's messages and FS-167. No
+  timing, no flip angle, one frame, `ps` the pixel width.
+- The geometry as §110 without the normal's first normalisation and without `KILLIANY_SWAP`, but for
+  the length of `y`: `sqrt(y_s^2 + (y_r^2 + y_a^2))` (the last square on the left: a NaN's bits).
+- With voxels each file's `height` rows of `width` big-endian shorts from byte 8,432 (`genesisRead():
+  error opening file <f>`, `genesisRead(): error reading from file file <f>`).
+
+## 112. Validation plan (part 21)
+
+Piece 19's commands (`validation/probes/fs-io/`): `grd` and `grh` (`mri_read` with voxels and
+`MRIreadHeader`, the type -1, 4 or 5, after piece 6's environment bits 64 `GE_ODD`, 128 `GE_EVEN`, 256
+`KILLIANY_SWAP`): FreeSurfer's run ends `CRASH 11` after its lines, compared with `reproduce`'s; and
+`gfd`, `gfh` (voxels, header): FreeSurfer's two readers compiled from the 8.2.0 tag with FS-680's one
+line corrected and nothing else changed (`build.sh` generates `ge_fixed.cpp` and compiles it with
+`mriio.cpp`'s own command; its object code equals the official one's but for that line), against the
+readers with FS-680 bypassed (`reproduce` for FreeSurfer's other behaviour). The series: `I.<nnn>`,
+`<stem><n>.MR` and `<stem><nnn>.MR` Genesis files (both `.MR` series side by side now and then) and
+`e<n>s<n>i<n>` LX files, a gap in the numbers, a folder in a file's place, a name past the series;
+headers field by field (extents 0, -1, 1 to 4, 70,000; image header offsets 156, 200, 300, -40,
+100,000; pixel offsets past the file, negative, odd; echoes 0, 1, 2, 3, -1, -30,000; NaN, signalling
+NaN, infinite, subnormal and huge floats in every corner and size), files cut at random or inside the
+header, names of no series form. Measured (2026-11-14): seed 7, 2,068 piece-19 cases: `reproduce`
+identical on 1,924, 0 different (21 counted: files `mri_identify` takes for DICOM, not ported; 123
+compared apart: FS-49, FS-167's memory contents, FS-685); `fix` differs only with notices. The I. names'
+second format line (FS-681) was never printed in these runs.

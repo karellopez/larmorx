@@ -1570,3 +1570,52 @@ bvolumeRead.dis` and `corRead.dis` (from relay 25's `mriio.dis` of the unit orac
 - **FS-678.** `cm` gives `units_factor = 1.0`, `m` 100.0, and the sizes are divided by it.
 - **FS-679.** `(int)min_crop[k]` and `(int)max_crop[k]` of floats from the file (`cvttss2si`).
 - `MRIreadRaw`'s error path leaks the volume and buffer and leaves the file open (no visible effect).
+
+## Part 21: GE Genesis and GE Signa LX series (relay 28 of track A)
+`utils/mriio.cpp` 4014-4444 (`genesisRead`), 4446-4745 (`gelxRead`). The object code read: the unit oracle's
+`mriio.cpp.o` (`objdump -d -r`) and the probe's `ge_fixed.o` (the two functions compiled alone with
+`mriio.cpp`'s command and FS-680's line corrected), whose instructions equal the official ones but for the
+corrected load (and `endbr64`, which the unit oracle's archive lacks and the probe's toolchain adds: no other
+difference; scripts and listings in the relay's scratch `rl28/`: `gen.dis`, `lx.dis`).
+
+### Mechanisms
+- **FS-680.** Both functions declare `MRI *header = nullptr;` and allocate it with
+  `header = MRIallocHeader(1, 1, 1, MRI_SHORT, header->nframes);`: the object code clears the slot at
+  entry (`movq $0x0,0xb8(%rsp)`) and loads `0x478(%rax)` (`nframes`) from it before the call, a read at
+  address 0x478 (signal 11). Everything before it runs: `GE_ODD`/`GE_EVEN`'s lines, the name parsing,
+  the `fname_format` prints (genesisRead), the file searches. The intent is one frame (the
+  `header`'s `nframes` is set from the file later). Both lines are unchanged in FreeSurfer's development
+  branch (the workspace's clone, commit 766ac058 of 2026-10-07: `utils/mriio.cpp` 4188 and 4540). An
+  upstream report draft: `docs/upstream-reports/freesurfer-ge-genesis-null-header.md`.
+- **FS-681.** `fname_format2[STRLEN]` is written only on the `.MR` branch; the `I.` branch tests
+  `strlen(fname_format2) != 0` on the uninitialised stack array (at `0x4c0(%rsp)`) and, when it is not
+  empty, prepends the folder and prints it. Every probe run found a zero byte there.
+- **FS-682.** The folder (`fname_dir`) and stem (`fname_base`) are copied into `fname_format` and used as
+  `sprintf`'s format (`__sprintf_chk` with the buffer's size: `%n` in writable memory aborts, an overlong
+  result aborts, `%s` reads an argument register).
+- **FS-683.** `header->depth = im_high - im_low + 1` (the file count) is set before `nframes` is read;
+  the voxel loop's `frame = (i - im_low) % mri->nframes` and `if (frame != nframes - 1) slice--` place
+  file `k` at slice `k / nframes` only.
+- **FS-684.** gelxRead's `ErrorReturn` texts are genesisRead's, copied.
+- **FS-685.** `header->nframes = freadShort(fp)` on a header allocated with `nframes` frames (1 once
+  FS-680 is corrected): `MRIfree(&header)` runs `~MRI()`, whose `for (i < nframes) if
+  (frames[i].m_ras2vox) MatrixFree(...)` reads past the one-entry `frames` array (heap contents: the
+  probe's patched readers crashed with signal 11 or `free(): invalid pointer`, signal 6, or went on).
+  The same mechanism as FS-671 (Part 19).
+- The `.MR` stem's digit loop `for (c--; isdigit(*c) && c >= fname_base; c--)` reads one byte before
+  `fname_base` (the last byte of `fname_dir` in the frame) when every byte before `.MR` is a digit; the
+  loop ends either way at the same place: no visible effect.
+- The arithmetic (both functions): `sqrtss` with a `sqrtf` call only for a negative argument (never:
+  sums of squares); `n_a *= -1` compiled as a sign flip (`xorps`); the centre `(tl + br) / 2.0 + n *
+  zsize * (depth - 1.0) / 2.0` as `addsd` with the second term in the destination (its NaN wins); `/ 2.0`
+  as `* 0.5`; `xend - xstart` as `xend + xend`; the field of view's `?:` chain as `comiss` then `maxss`.
+  gelxRead's `ylength` sums `y_s^2 + (y_r^2 + y_a^2)` (genesisRead's left to right).
+- `orderFloatBytes` is `swapFloat` (a call: the value's bits are moved, a signalling NaN survives);
+  the header fields `thick`, `xsize`, `ysize` are read in place (`fread(&(header->thick), ...)`), so a
+  cut read keeps the field's earlier bytes (MRIallocHeader's 1.0).
+- gelxRead's header `fopen` failure returns without freeing `header` (a leak, no visible effect).
+- **For the upstream report** (`docs/upstream-reports/freesurfer-ge-genesis-null-header.md`, behaviour
+  only until filed): the cause is FS-680's line in both functions; the fix `header = MRIallocHeader(1, 1, 1,
+  MRI_SHORT, 1);` (the frame count is read from the file later). With it, multi-echo Genesis series meet
+  FS-685 (allocate the header after the echo count is known, or the volume from the count without raising
+  the header's) and FS-683 (depth the file count, only `files / echoes` slices filled).

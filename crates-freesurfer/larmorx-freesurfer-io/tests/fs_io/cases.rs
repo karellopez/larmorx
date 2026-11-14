@@ -49,6 +49,8 @@ mod piece2;
 pub(crate) mod piece20;
 #[path = "piece21.rs"]
 pub(crate) mod piece21;
+#[path = "piece22.rs"]
+pub(crate) mod piece22;
 #[path = "piece3.rs"]
 mod piece3;
 #[path = "piece4.rs"]
@@ -317,6 +319,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece19::KINDS);
     kinds.extend(piece20::KINDS);
     kinds.extend(piece21::KINDS);
+    kinds.extend(piece22::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -389,6 +392,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece21::KINDS.contains(&kind) {
             lines.push(piece21::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece22::KINDS.contains(&kind) {
+            lines.push(piece22::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         if piece16::KINDS.contains(&kind) {
@@ -869,6 +876,11 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece21::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece22::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece22::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1260,6 +1272,9 @@ pub(crate) fn run_line_with(
         Err(134) => "CRASH 6".to_owned(),
         // a crash FreeSurfer has (signal 11) where `reproduce` prints its text first (FS-680)
         Err(139) => "CRASH 11".to_owned(),
+        // a division by zero FreeSurfer makes (SIGFPE) where `reproduce` prints its text first
+        // (FS-707)
+        Err(136) => "CRASH 8".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
     // FSIO_DETAIL set: each notice's detail on standard error (a probe run's diagnosis)

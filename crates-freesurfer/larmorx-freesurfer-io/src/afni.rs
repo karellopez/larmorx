@@ -8,11 +8,10 @@
 //! FreeSurfer 8.2.0 refuses before anything else). Wired into [`crate::mriio::mri_read`] and
 //! [`crate::mriio::mri_write_type`].
 //!
-//! FreeSurfer keeps the header in a structure of 160 bytes (`AF`, on the stack of `afniRead`); two
-//! of its strings are copied in without a length check, so a long `TYPESTRING` or
-//! `BYTEORDER_STRING` runs over the fields after it (FS-702). [`Af`] holds that structure's bytes:
-//! `reproduce` copies the strings as FreeSurfer does; the default keeps them whole beside it and
-//! leaves the other fields alone.
+//! FreeSurfer keeps the header in a structure (`AF`) whose `TYPESTRING` holds 15 characters and
+//! `BYTEORDER_STRING` 9; a longer one ends the program in the C library's overflow check (FS-702:
+//! `*** buffer overflow detected ***: terminated`, signal 6, as the official build has it); the
+//! default keeps them whole.
 //!
 //! Defects (`larmorx_core::defects`; mechanisms in `docs/findings/freesurfer-io.md`, Part 24):
 //! FS-693 (a header that cannot be read is read for ever), FS-694 (the header's last line without
@@ -69,20 +68,17 @@ const AFNI_ALL_REQUIRED: u32 = 0x3f;
 // `AF`'s layout on x86-64 (GCC): the offsets of its fields
 const RANK: usize = 0;
 const DIMS: usize = 8;
-const TYPESTRING: usize = 20;
 const SCENE: usize = 36;
 const ORIENT: usize = 48;
 const ORIGIN: usize = 60;
 const DELTA: usize = 72;
-const BYTEORDER: usize = 100;
 const NUMSTATS: usize = 120;
 const NUMTYPES: usize = 136;
 const NUMFACS: usize = 152;
 const AF_SIZE: usize = 160;
-/// Where `TYPESTRING`'s copy starts overwriting the structure's pointers and counts (the
-/// `IDCODE_STRING` pointer); `BYTEORDER_STRING`'s where it reaches `brick_stats`.
-const TYPESTRING_LIMIT: usize = 88;
-const BYTEORDER_LIMIT: usize = 112;
+/// The two strings' fields: their characters at most (one more for the NUL).
+const TYPESTRING_FIELD: usize = 16;
+const BYTEORDER_FIELD: usize = 10;
 
 /// A defect's notice with its detail.
 fn note(g: &mut Globals, d: &'static Defect, detail: impl Into<String>) {
@@ -116,15 +112,10 @@ fn malloc_usable(n: u64) -> Option<u64> {
 /// Sizes beyond this the machine's memory decides (the probe's limit is 1 GiB).
 const MACHINE_DECIDES: u64 = 1 << 28;
 
-/// FreeSurfer's `AF` header: its bytes as `afniRead`'s stack holds them (`known`: written by
-/// `AFinit` or later), the strings the default keeps whole, and the arrays its pointers hold.
+/// FreeSurfer's `AF` header: its numbers as `afniRead`'s stack holds them (x86-64's layout), its
+/// two strings, and the arrays its pointers hold (`None`: a null pointer).
 struct Af {
     b: [u8; AF_SIZE],
-    known: [bool; AF_SIZE],
-    /// `reproduce`: a string ran over the structure's pointers and counts; FreeSurfer's later
-    /// reads of them are not deterministic.
-    clobbered: bool,
-    /// The default's `TYPESTRING` and `BYTEORDER_STRING`, whole.
     typestring: Vec<u8>,
     byteorder: Vec<u8>,
     idcode: Option<Vec<u8>>,
@@ -134,17 +125,10 @@ struct Af {
 }
 
 impl Af {
-    /// `AFinit`: every field 0 or empty; the padding, `TYPESTRING`'s bytes after its first and
-    /// `BYTEORDER_STRING` never written.
+    /// `AFinit`: every field 0 or empty.
     fn init() -> Af {
-        let mut known = [false; AF_SIZE];
-        for r in [0..21, 36..84, 88..100, 112..124, 128..140, 144..156] {
-            known[r].fill(true);
-        }
         Af {
             b: [0; AF_SIZE],
-            known,
-            clobbered: false,
             typestring: Vec::new(),
             byteorder: Vec::new(),
             idcode: None,
@@ -164,39 +148,6 @@ impl Af {
 
     fn set(&mut self, off: usize, v: [u8; 4]) {
         self.b[off..off + 4].copy_from_slice(&v);
-        self.known[off..off + 4].fill(true);
-    }
-
-    /// `strcpy(field, s)` as FreeSurfer makes it: `s` and its NUL from `off` on, over whatever
-    /// follows; past `limit` the structure's pointers and counts are overwritten.
-    fn strcpy(&mut self, off: usize, s: &[u8], limit: usize) {
-        for (k, &c) in s.iter().chain(std::iter::once(&0)).enumerate() {
-            let p = off + k;
-            if p >= limit {
-                self.clobbered = true;
-            }
-            if p >= AF_SIZE {
-                break;
-            }
-            self.b[p] = c;
-            self.known[p] = true;
-        }
-    }
-
-    /// The C string at `off` as `printf("%s")` reads it, and whether it ran into bytes never
-    /// written (memory contents).
-    fn c_string(&self, off: usize) -> (Vec<u8>, bool) {
-        let mut v = Vec::new();
-        for p in off..AF_SIZE {
-            if !self.known[p] {
-                return (v, true);
-            }
-            if self.b[p] == 0 {
-                return (v, false);
-            }
-            v.push(self.b[p]);
-        }
-        (v, true)
     }
 }
 
@@ -309,7 +260,10 @@ fn get_numbers<T: Copy + Default>(
             &FS_699,
             format!("{}: a negative count ({count}) for {nm}: FreeSurfer's reader fails without a message", kind.who),
         );
-        if !rep {
+        if rep {
+            // malloc's failure leaves errno at ENOMEM
+            g.errno = 12;
+        } else {
             fail0(
                 g,
                 err,
@@ -632,6 +586,32 @@ fn wrong_type(
     Ok(())
 }
 
+/// FS-702: a string longer than its field. FreeSurfer's copy ends the program in the C library's
+/// overflow check (`reproduce`: the message and status 134); the default keeps it whole.
+fn too_long(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    name: &str,
+    len: usize,
+    field: usize,
+) -> Result<(), Fatal> {
+    if len < field {
+        return Ok(());
+    }
+    note(
+        g,
+        &FS_702,
+        format!(
+            "an AFNI {name} of {len} characters kept whole (FreeSurfer's copy into its {field}-byte field ends the program: signal 6)"
+        ),
+    );
+    if g.notices.reproduce() {
+        let _ = err.write_all(b"*** buffer overflow detected ***: terminated\n");
+        return Err(Fatal::Exit(134));
+    }
+    Ok(())
+}
+
 /// A value FreeSurfer reads where its buffer holds memory never written (FS-701): 0 in both modes.
 fn short_of<T: Copy + Default>(g: &mut Globals, v: Option<T>, what: &str) -> T {
     v.unwrap_or_else(|| {
@@ -851,22 +831,8 @@ fn read_afni_header(
                         return Ok(false);
                     };
                     let v = cstr(s);
-                    if v.len() >= 16 {
-                        note(
-                            g,
-                            &FS_702,
-                            if rep {
-                                format!("an AFNI TYPESTRING of {} characters copied over the header's next fields, as in FreeSurfer", v.len())
-                            } else {
-                                format!("an AFNI TYPESTRING of {} characters kept whole (FreeSurfer copies it over the header's next fields)", v.len())
-                            },
-                        );
-                    }
-                    if rep {
-                        af.strcpy(TYPESTRING, v, TYPESTRING_LIMIT);
-                    } else {
-                        af.typestring = v.to_vec();
-                    }
+                    too_long(g, err, "TYPESTRING", v.len(), TYPESTRING_FIELD)?;
+                    af.typestring = v.to_vec();
                 }
                 b"SCENE_DATA" => {
                     let Some(ip) = &ip else {
@@ -968,23 +934,8 @@ fn read_afni_header(
                         return Ok(false);
                     }
                     let v = cstr(s.as_ref().unwrap());
-                    if v.len() >= 10 {
-                        note(
-                            g,
-                            &FS_702,
-                            if rep {
-                                format!("an AFNI BYTEORDER_STRING of {} characters copied over the header's next fields, as in FreeSurfer", v.len())
-                            } else {
-                                format!("an AFNI BYTEORDER_STRING of {} characters kept whole (FreeSurfer copies it over the header's next fields)", v.len())
-                            },
-                        );
-                    }
-                    if rep {
-                        af.strcpy(BYTEORDER, v, BYTEORDER_LIMIT);
-                    } else {
-                        af.byteorder = v.to_vec();
-                        af.known[BYTEORDER..BYTEORDER + 10].fill(true);
-                    }
+                    too_long(g, err, "BYTEORDER_STRING", v.len(), BYTEORDER_FIELD)?;
+                    af.byteorder = v.to_vec();
                     gotten |= BYTEORDER_STRING_FLAG;
                 }
                 b"BRICK_STATS" => {
@@ -1090,7 +1041,6 @@ fn type_name(g: &mut Globals, t: i32) -> Vec<u8> {
 
 /// `printAFNIHeader(&af)`: the header on standard output.
 fn print_afni_header(g: &mut Globals, out: &mut dyn Write, af: &Af) {
-    let rep = g.notices.reproduce();
     let f6 = |v: f32| cfmt::f(widen(v), 6);
     let mut t: Vec<u8> = Vec::new();
     t.extend_from_slice(
@@ -1113,19 +1063,7 @@ fn print_afni_header(g: &mut Globals, out: &mut dyn Write, af: &Af) {
         )
         .as_bytes(),
     );
-    let ts = if rep {
-        let (v, memory) = af.c_string(TYPESTRING);
-        if memory {
-            note(
-                g,
-                &FS_702,
-                "printAFNIHeader: the TYPESTRING printed into the header's bytes never written (FreeSurfer: memory contents)",
-            );
-        }
-        v
-    } else {
-        af.typestring.clone()
-    };
+    let ts = af.typestring.clone();
     t.extend_from_slice(b"TYPESTRING        : ");
     t.extend_from_slice(&ts);
     t.push(b'\n');
@@ -1162,11 +1100,7 @@ fn print_afni_header(g: &mut Globals, out: &mut dyn Write, af: &Af) {
         None => t.extend_from_slice(b"(null)"),
     }
     t.push(b'\n');
-    let bo = if rep {
-        af.c_string(BYTEORDER).0
-    } else {
-        af.byteorder.clone()
-    };
+    let bo = af.byteorder.clone();
     t.extend_from_slice(b"BYTEORDER_STRING  : ");
     t.extend_from_slice(&bo);
     t.push(b'\n');
@@ -1252,14 +1186,6 @@ pub fn afni_read(
     if !read_afni_header(g, err, fp, &mut af)? {
         return Ok(None);
     }
-    if rep && af.clobbered {
-        note(
-            g,
-            &FS_702,
-            "an AFNI header string copied over the header's pointers and counts (FreeSurfer: not deterministic)",
-        );
-        return Ok(None);
-    }
     print_afni_header(g, out, &af);
     let numtypes = af.i32(NUMTYPES);
     if numtypes != 1 {
@@ -1270,11 +1196,7 @@ pub fn afni_read(
             af.i32(RANK + 4)
         );
     }
-    let bo = if rep {
-        af.c_string(BYTEORDER).0
-    } else {
-        af.byteorder.clone()
-    };
+    let bo = af.byteorder.clone();
     let big_endian = match bo.as_slice() {
         b"MSB_FIRST" => true,
         b"LSB_FIRST" => false,
@@ -1301,19 +1223,8 @@ pub fn afni_read(
     let mut header = mri::mri_alloc_header(g, out, err, w, h, d, MRI_UCHAR, nframes)?;
     header.nframes = nframes;
     let o: Vec<i32> = (0..3).map(|k| af.i32(ORIENT + 4 * k)).collect();
-    let Some(dirs) = o
-        .iter()
-        .map(|&k| usize::try_from(k).ok().and_then(|k| ORIENTATIONS.get(k)))
-        .collect::<Option<Vec<_>>>()
-    else {
-        // only after FS-702 (reproduce): the codes overwritten by a string
-        note(
-            g,
-            &FS_702,
-            "the AFNI orientation codes overwritten by a string: FreeSurfer reads past its table (FreeSurfer: not deterministic)",
-        );
-        return Ok(None);
-    };
+    // the codes were checked when read (0 to 5)
+    let dirs: Vec<&[f32; 3]> = o.iter().map(|&k| &ORIENTATIONS[k as usize]).collect();
     {
         let v = &mut header.vg;
         [v.x_r, v.x_a, v.x_s] = *dirs[0];
@@ -1861,21 +1772,6 @@ mod tests {
         assert_eq!(malloc_usable(24), Some(24));
         assert_eq!(malloc_usable(25), Some(40));
         assert_eq!(malloc_usable(40), Some(40));
-    }
-
-    #[test]
-    fn strings_over_the_structure() {
-        let mut a = Af::init();
-        a.strcpy(TYPESTRING, b"0123456789abcdefXY", TYPESTRING_LIMIT);
-        assert!(!a.clobbered);
-        // the NUL and two letters went into scene_data[0]
-        assert_eq!(a.i32(SCENE) & 0xffff, i32::from_le_bytes(*b"XY\0\0"));
-        assert_eq!(a.c_string(TYPESTRING).0, b"0123456789abcdefXY");
-        a.strcpy(TYPESTRING, &[b'a'; 70], TYPESTRING_LIMIT);
-        assert!(a.clobbered);
-        // an empty TYPESTRING's later bytes were never written
-        let b = Af::init();
-        assert_eq!(b.c_string(TYPESTRING), (Vec::new(), false));
     }
 
     #[test]

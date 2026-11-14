@@ -1460,7 +1460,8 @@ void run_piece13(const std::string &cmd)
 }
 
 // piece 14 (track A relay 23): mghWrite and MRITAGwrite, directly or through MRIwrite
-bool piece14_cmd(const std::string &cmd) { return cmd == "mgw" || cmd == "awr" || cmd == "vwr"; }
+// piece 22 (track A relay 30): kwr is vwr (the AFNI and NRRD writers)
+bool piece14_cmd(const std::string &cmd) { return cmd == "mgw" || cmd == "awr" || cmd == "vwr" || cmd == "kwr"; }
 
 // a volume with every field the MGH writer writes: <w> <h> <d> <type> <frames> <alloc 1 voxels|0
 // header>, the 15 geometry floats, <ras_good_flag>, tr te ti fov (floats), flip (double), the
@@ -1531,8 +1532,9 @@ MRI *read_mri14()
 // (read_mri14)> <frame> <intent> <name> <read back 0|1>: the status, errno, the volume's intent,
 // version and voxels after the write (FNV-1a 64), the files under w (an .mgz inflated); then, when
 // asked, mghRead of the name with its voxels (piece 6's printing)
-void run_piece14(const std::string &cmd)
+void run_piece14(const std::string &cmd0)
 {
+  const std::string cmd = cmd0 == "kwr" ? "vwr" : cmd0;
   fwide(stderr, -1);
   if (cmd == "mgw" || cmd == "awr" || cmd == "vwr") {
     // piece 16 (track A relay 26): awr <Gdiag_no> <N_Zero_Pad_Output> <N_Zero_Pad_Input for the
@@ -1771,11 +1773,15 @@ void run_piece6(const std::string &cmd0)
   // gelxReadFixed (type 5) directly
   // piece 20 (track A relay 28): srd and srh read GE Signa and GE XIMG series as mrd and mrh do
   // piece 21 (track A relay 29): imd and imh read old Siemens .ima series as mrd and mrh do
+  // piece 22 (track A relay 30): afd and afh (AFNI datasets), cud and cuh (curvature files), and and
+  // anh (annotations) as mrd and mrh do
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
-      cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd"
+      cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
+              cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and"
           ? "mrd"
-      : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh" || cmd0 == "imh"
+      : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh" || cmd0 == "imh" ||
+              cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh"
           ? "mrh"
           : cmd0;
   if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
@@ -2733,7 +2739,8 @@ int main(int argc, char *argv[])
     {
       static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
-                                 "srd", "srh", "imd", "imh"};
+                                 "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
+                                 "kwr"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

@@ -448,6 +448,9 @@ fn check_extent(g: &mut Globals, err: &mut dyn Write, mri: &Mri, what: &str) -> 
     Ok(())
 }
 
+/// `getMemoryUsed()`: the process's heap usage in kB (its error text written to the stream).
+pub type HeapUsage = dyn FnMut(&mut dyn Write) -> i32;
+
 /// The heap usage message of `MRImaxsegment` (`getMemoryUsed()`, printed when above 0).
 fn print_heap(out: &mut dyn Write, mem: i32) {
     if mem > 0 {
@@ -464,7 +467,7 @@ fn scan(
     mri: &Mri,
     low_val: f32,
     hi_val: f32,
-    mut heap: Option<&mut dyn FnMut(&mut dyn Write) -> i32>,
+    mut heap: Option<&mut HeapUsage>,
 ) -> Result<MriSegmentation, Fatal> {
     let maxseg = heap.is_some();
     let what = if maxseg {
@@ -692,7 +695,7 @@ pub fn mri_max_segment(
     mri: &Mri,
     low_val: f32,
     hi_val: f32,
-    heap: &mut dyn FnMut(&mut dyn Write) -> i32,
+    heap: &mut HeapUsage,
 ) -> Result<MriSegmentation, Fatal> {
     scan(g, out, err, mri, low_val, hi_val, Some(heap))
 }

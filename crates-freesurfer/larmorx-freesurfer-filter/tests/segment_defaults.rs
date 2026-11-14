@@ -91,7 +91,7 @@ fn segments_are_the_components() {
     let mut r: u32 = 12345;
     let m = vol(&mut g, 9, 8, 7, |_, _, _| {
         r = r.wrapping_mul(1_103_515_245).wrapping_add(12345);
-        (r >> 16) % 3 == 0
+        (r >> 16).is_multiple_of(3)
     });
     let (mut o, mut e) = (Vec::new(), Vec::new());
     let s = sg::mri_segment(&mut g, &mut o, &mut e, &m, 1.0, 1.0).unwrap();

@@ -13,13 +13,13 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-14 from the clean commit fb40fe68 (the distance maps, the convolutions,
+/// Recorded 2026-11-14 from the clean commit d4c9fb50 (the distance maps, the convolutions,
 /// smoothing, window statistics, reductions, derivatives, border and non-parametric
 /// classification, connected components, the frame functions, the volume clusters, the connected
 /// segments, flooding, the Voronoi diagram and the soap bubble, the intensity normalisation without
 /// histograms): 1,740 cases, 1,602 lines identical, 138 hashed as `SKIP`.
 const N: usize = 1740;
-const OFFICIAL_SHA256: &str = "bfb27cef059f87f9ce52332defbf34306d23a1f4f53285412fe583575ef5d89c";
+const OFFICIAL_SHA256: &str = "e6434cc1a65dcfa28072048588087484aa8ccc5ebc022a4ce8f16f0796a55e03";
 const SKIPPED: usize = 138;
 
 /// `check.py`'s `SKIP`.

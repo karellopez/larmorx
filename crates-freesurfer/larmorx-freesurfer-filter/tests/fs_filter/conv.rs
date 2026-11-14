@@ -10,7 +10,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_filter::{classify, conv, sobel};
+use larmorx_freesurfer_filter::{cc, classify, conv, sobel};
 use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
 };
@@ -20,11 +20,62 @@ use larmorx_freesurfer_volume::arith::Pair;
 use super::{Ctx, Gen, Toks, fx, get_vol, put_vol, rle, token};
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 27] = [
+pub const COMMANDS: [&str; 32] = [
     "g1d", "cv1", "cvb", "cvs", "cvi", "cvg", "gsn", "gs", "mgs", "mean", "std", "stdnz", "red",
     "red2", "r1d", "rsl", "xsob", "ysob", "zsob", "sob", "sobf", "div", "lap", "mbv", "bcv", "rcl",
-    "ccs",
+    "ccs", "rmh", "lcc6", "lcc18", "gf6", "gf18",
 ];
+
+/// A volume of blobs: random boxes of values above 0 on a background (uchar mostly; float with
+/// negative values and NaNs, or int, now and then).
+fn blobs(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
+    let ty = if g.chance(4) {
+        g.pick(&[MRI_FLOAT, MRI_INT, MRI_SHORT])
+    } else {
+        MRI_UCHAR
+    };
+    t.extend(e.map(|v| v.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    for _ in 0..3 {
+        t.push(fx(1.0));
+    }
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let mut v = vec![0.0f64; n];
+    let fill = g.chance(6);
+    for x in v.iter_mut() {
+        if fill || g.chance(5) {
+            *x = 1.0;
+        }
+    }
+    for _ in 0..g.int(1, 4) {
+        let lo = [0, 1, 2].map(|k| g.int(0, i64::from(e[k]) - 1) as i32);
+        let hi = [0, 1, 2].map(|k| (lo[k] + g.int(0, 4) as i32).min(e[k] - 1));
+        let val = if g.chance(4) {
+            0.0
+        } else {
+            g.pick(&[1.0, 255.0, 7.0])
+        };
+        for z in lo[2]..=hi[2] {
+            for y in lo[1]..=hi[1] {
+                for x in lo[0]..=hi[0] {
+                    v[((z * e[1] + y) * e[0] + x) as usize] = val;
+                }
+            }
+        }
+    }
+    let vals: Vec<String> = v
+        .iter()
+        .map(|&x| {
+            if ty == MRI_FLOAT && g.chance(15) {
+                fx(g.pick(&[f32::NAN, -1.0, 0.5, -0.0]))
+            } else {
+                token(ty, x)
+            }
+        })
+        .collect();
+    t.extend(rle(&vals));
+}
 
 /// A label volume of the border classification: white, not white, ambiguous and other values
 /// (uchar mostly; a float or int one with odd values now and then).
@@ -516,6 +567,29 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 }
             }
         }
+        "rmh" | "lcc6" | "lcc18" => {
+            let e = small(g, 10);
+            blobs(g, t, e);
+        }
+        "gf6" | "gf18" => {
+            let e = small(g, 10);
+            blobs(g, t, e);
+            let lty = g.pick(&[MRI_INT, MRI_INT, MRI_FLOAT, MRI_UCHAR]);
+            t.extend(e.map(|v| v.to_string()));
+            t.extend([lty.to_string(), "1".into()]);
+            for _ in 0..3 {
+                t.push(fx(1.0));
+            }
+            let n = (e[0] * e[1] * e[2]) as usize;
+            let vals: Vec<String> = (0..n)
+                .map(|_| token(lty, if g.chance(8) { 2.0 } else { 0.0 }))
+                .collect();
+            t.extend(rle(&vals));
+            t.push(g.pick(&[1, 3, 300, -1]).to_string());
+            for k in 0..3 {
+                t.push(g.int(0, i64::from(e[k]) - 1).to_string());
+            }
+        }
         _ => {
             // div, lap
             let e = small(g, 7);
@@ -815,6 +889,32 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                 s.mean_gm.to_bits(),
                 s.sigma_gm.to_bits()
             );
+        }
+        "rmh" | "lcc6" | "lcc18" => {
+            let mut v = get_vol(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            match cmd {
+                "rmh" => cc::remove_holes(g, a, b, &mut v)?,
+                "lcc6" => cc::get_largest_cc6(g, a, b, &mut v)?,
+                _ => cc::get_largest_cc18(g, a, b, &mut v)?,
+            }
+            full(o, Some(&v));
+        }
+        "gf6" | "gf18" => {
+            let v = get_vol(cx, t)?;
+            let mut lab = get_vol(cx, t)?;
+            let (label, x, y, z) = (t.i(), t.i(), t.i(), t.i());
+            let f = if cmd == "gf6" {
+                cc::grass_fire6
+            } else {
+                cc::grass_fire18
+            };
+            let r = f(&mut cx.g, &mut cx.b, &v, &mut lab, label, [x, y, z])?;
+            *o += &format!(
+                "{} {} {} {} {} {} {} ",
+                r.size, r.min[0], r.max[0], r.min[1], r.max[1], r.min[2], r.max[2]
+            );
+            full(o, Some(&lab));
         }
         "div" | "lap" => {
             let src = get_vol(cx, t)?;

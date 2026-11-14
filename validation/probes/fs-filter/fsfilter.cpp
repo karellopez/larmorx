@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "connectcomp.h"
 #include "diag.h"
 #include "error.h"
 #include "fastmarching.h"
@@ -335,6 +336,26 @@ bool filter_case(const std::string &cmd)
     of(b);
     of(c);
     of(d);
+  } else if (cmd == "rmh" || cmd == "lcc6" || cmd == "lcc18") {
+    MRI *v = get_vol();
+    if (cmd == "rmh") RemoveHoles(v);
+    else if (cmd == "lcc6") GetLargestCC6(v);
+    else GetLargestCC18(v);
+    put_full(v);
+  } else if (cmd == "gf6" || cmd == "gf18") {
+    // gf6|gf18 <volume> <labels> label x y z: the size and bounds, then the labels
+    MRI *v = get_vol();
+    MRI *lab = get_vol();
+    int label = geti();
+    POINTI p;
+    p.x = geti();
+    p.y = geti();
+    p.z = geti();
+    int sz = -1, a = -1, b = -1, c = -1, d = -1, e = -1, f = -1;
+    if (cmd == "gf6") GrassFire6(v, lab, label, &p, &sz, &a, &b, &c, &d, &e, &f);
+    else GrassFire18(v, lab, label, &p, &sz, &a, &b, &c, &d, &e, &f);
+    oi(sz); oi(a); oi(b); oi(c); oi(d); oi(e); oi(f);
+    put_full(lab);
   } else {
     return false;
   }

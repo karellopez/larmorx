@@ -95,6 +95,61 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `tests/fs_io/piece9.rs`. `SKIP` where an XML help text is rendered (FreeSurfer's help renderer, `fsPrintHelp.cpp`,
   is not ported yet), `VARY` where the answer depends on the name index's order (libstdc++'s hash order: two names
   match) or on the time (`--all-info`). Seed 13, 2,352 cases: `reproduce` identical on 2,265, 0 different.
+- Piece 10 (relay 19): fs.labels' text colour tables and lookups (`colortab.cpp`). `cra` (`CTABreadASCII2` with or
+  without the duplicate-name check; `ctabDuplicates` set to -7 before and printed after), `crt`
+  (`CTABreadASCIIttHeader`), `ctd` (`CTABreadDefault` with `FREESURFER_HOME`, `SUBJECTS_DIR`, `FS_DESIRED_BVEC_SPACE`
+  set or unset: `N` or `x<hex>`), `cal` (`setRandomSeed`, then `CTABalloc`), `cun` (`CTABunique`), `ccr`
+  (`CTABcountRepeats`), `cq` (a list of lookups: `v t e h r n a x y i f F g m d`, each answer after the function's
+  status, outputs preset to -7), `cpw` (`CTABwriteFileASCII` and the file's bytes, `Gdiag` given), `cps`
+  (`CTABprintASCII` to standard output), `cts` (`TissueTypeSchema` of a given table or of the default one), `cme`
+  (`CTABmerge`). A table is given as `<version> <nentries> <idbase> <fname> <k>` and `k` entries `<index> <name> <r>
+  <g> <b> <a> <tissue type> <count>`; printed as its fields, its non-empty entries (float colours as bits; tissue type
+  and count left out for `CTABalloc`'s entries, memory contents in FreeSurfer) and its tissue-type table after `T`;
+  `Gerror` last. Table files are built by `tests/fs_io/piece10.rs` (entry lines with every separator, sign, overflow
+  and stray character; comments, CR LF, long lines, NUL bytes, `#ctTType` lines whole and broken, lines of vertical
+  tabs and form feeds; the default table's first rows). `errno` is set to 0 after each case's files are made (making
+  them leaves `EISDIR`). `SKIP` where FreeSurfer crashes or writes outside its tables (FS-413, FS-414's crashes and
+  outside stores, FS-416, FS-417, FS-418), where the port refuses a size the machine decides (FS-420), or a name
+  overflows `stricmp` (FS-11); `VARY` for FS-414's memory never written. Seed 13, 1,664 piece-10 cases: `reproduce`
+  identical on 1,415, 0 different.
+  Registration files (3.1-34): `rpr` (`regio_print_register` to standard output), `rwr` (`regio_write_register` and
+  the file's bytes), `rrx` (`regio_read_mincxfm` with or without the file information), `rwx` (`regio_write_mincxfm`,
+  `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` set, `Progname` `fsio`), `rrm` (`regio_read_registermat`); the
+  matrices as `4` and 16 float bits. Seed 13, 710 such cases: identical in both modes.
+- Piece 11 (relay 20): fs.labels' labels, control points, annotation tables and point sets. `lrd` (`LabelRead` with or
+  without a subject; `SUBJECTS_DIR` given, unset or wrong; label files built by `tests/fs_io/piece11.rs` with every
+  first-line, count and point-line form, and the subject's `talairach.xfm`), `lwr` (`LabelWrite` of a given label, then
+  every file under `w` with its bytes), `lal` (`LabelAlloc`), `lre` (`LabelRealloc`), `lcp` (`LabelCopy`), `ldu`
+  (`LabelRemoveDuplicates` with `Gdiag`), `lhv` (`LabelHasVertex`), `crd` (`MRIreadControlPoints` of control-point and
+  `.label` files; count and `useRealRAS` preset to -7), `cwr` (`MRIwriteControlPoints`, the creation time fixed by
+  `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`, the user's name shown as `U`), `cfp` (`MRIfillPoints` on a small
+  volume given by its extent, type, voxel sizes, axes, centre and voxels; its voxels as FNV-1a 64), `atr` (the
+  annotation table from files, `FREESURFER_HOME` and `annotation_table_file` given, then `R`/`N` reads and the
+  lookups `i n a m` and printers `p c`), `ats` (`set_atable_from_ctable` of a piece-10 table, then the same), `pss`
+  (an `fsPointSet` built, then `save`, `save_as_ctrlpoint`, `print`, `printCoords`, `writeCoords`,
+  `writeCentroidTable`, `get`, `set`, `add`, `remove`, `clear`; the files under `w`). A label is printed as its fields,
+  places (FNV-1a 64 beyond 2,000 characters), vertex indices and transforms. `SKIP` for FS-423, FS-424, FS-426,
+  FS-427, FS-429, FS-430, FS-431 and FS-11. Seed 13, 2,678 piece-11 cases: `reproduce` identical on 2,594, 0
+  different; seed 7, 8,034: identical on 7,783, 0 different.
+- Piece 12 (relay 21): `mgi` (`mri_read` of generated GIFTI files, as `mrd` with the volume flag; the volume
+  printed as piece 6's with its colour table), `mwr` (`MRIwrite` of one to three volumes given by extent, type,
+  frames, geometry, repetition time, name suffix and voxels, with `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`
+  and `SURFER_SIDEDOOR` set; every file under `w` printed, `.gii` files in any case with fs-surfio's `gii_normal`:
+  the user name `U`, each payload Base64-decoded and inflated), `lps` (`loadfsPointSet`; the set's `vox2ras`, points),
+  `hlp` (`outputHelpXml` of a text or NULL; the text printed and the status). The GIFTI files, point-set files and
+  help texts are built by `tests/fs_io/piece12.rs`. `SKIP` for the writers not ported yet, FS-521, FS-255, the
+  GIFTI reader's crashes, FS-434 and help texts that are not well formed; `VARY` for FS-214's address. Seed 7, 1,800
+  `mgi`/`mwr`/`lps` cases: `reproduce` identical on 1,589, 0 different; FreeSurfer 8.2.0's 86 `.help.xml` files
+  (`hlp x<hex of the file>`): identical; seed 13, 594 `hlp` cases: identical on 465, 0 different.
+- Piece 13 (relay 22): `lcv` (`LabelToScannerRAS`, `LabelToSurfaceRAS`, `LabelToVoxel`, `LabelVoxelToSurfaceRAS`
+  of a label given as piece 11's, a volume header as piece 11's `cfp`, into a new label, itself or a given label,
+  optionally with a surface, `MRISalloc(0, 0)` with its volume geometry read as piece 2's; the result printed as
+  piece 11's labels), `mwf` (`MRIwriteFrame` of piece 12's volumes; the status, `errno`, every file under `w` as
+  `mwr`). The port's side is in larmorx-freesurfer-volume (its `tests/fs_io13/piece13.rs`, including fs.io's
+  `cases.rs`; example `fs_io13_probe`): `check.py --package larmorx-freesurfer-volume --example fs_io13_probe`.
+  `SKIP` for the writers not ported yet and FS-429. Seed 7, 1,000 cases: `reproduce` identical on 947, 0 different;
+  seed 13, 3,000: 2,823 identical, 0 different. The recorded test `fs_io13_official` (seed 1's 1,200: `--seed 1
+  --n 1200 --portable --light`).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

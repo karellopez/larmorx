@@ -2176,8 +2176,8 @@ taken as they are; for any other the GIFTI rule for writers applies first (it ma
 `.gii` name, or end the program when the other form of the name exists: §60). Then the (possibly
 changed) name's type decides: 1 the ASCII writer (§54's `MRISwriteAscii`), 5 the VTK writer
 (§54's `MRISwriteVTK`), 2 the movie.byu writer (§63), 4 the icosahedron writer (§63), 6 the STL writer
-(§71; the answer 1 when written, 0 when not), 7 the GIFTI writer (with queue item 3.1-26's surface
-part); any other: the triangle file (§76) when the surface's type is 3 (a triangular surface, as the
+(§71; the answer 1 when written, 0 when not), 7 the GIFTI writer (§109: the surface's coordinates
+and faces, `NIFTI_INTENT_POINTSET`); any other: the triangle file (§76) when the surface's type is 3 (a triangular surface, as the
 triangle reader marks it), else the quadrangle file (§77). The answer is the writer's. (FreeSurfer
 8.2.0 keeps an older behaviour behind a switch that is never on: not reachable.)
 
@@ -3043,3 +3043,805 @@ name, and no content test of the volume library recognizes MGH), so its read giv
 not determine type of <name>` and the centre stays 0; FreeSurfer's subjects have `mri/orig` as a
 folder, which is not read. Observed (relay 19): seeds 7, 13 and 17 (2,000 cases each): reproduce
 identical on every compared case; 66 compared outputs carry a geometry read from a volume header.
+
+## 102. Curvature choices and statistics (queue item 3.1-51; relay 20)
+
+Every quantity is a `float` unless said; sums accumulate in order, one term at a time; "the first
+`vnum` neighbours" is the vertex's 1-hop neighbour list. NaN operands follow §14's rule (the left
+operand of each written expression gives its NaN); where the order of a sum's operands differs
+from the formula's as written, the formula below gives the order.
+
+**102.1 Smoothed normals** (`MRISsmoothSurfaceNormals(mris, navgs)`): `navgs` passes; in each, every
+unripped vertex's `tdx, tdy, tdz` become `(n + n1 + ... + nk) / (k + 1)` (its own normal plus its
+unripped first-`vnum` neighbours' normals, `k` their count, the count kept as a `float` incremented by
+1 each time), then every unripped vertex's normal becomes `td / |td|` with `|td| = sqrtf((x x + y y) +
+z z)`; when `|td|` is below `FLT_EPSILON` the normal becomes `td` unchanged. Return 0.
+`mrisComputeBoundaryNormals(mris)`: nothing; 0.
+
+**102.2 The mean curvature** (`MRIScomputeMeanCurvature(mris)`): the tangent planes are recomputed
+(§94's `mrisComputeTangentPlanes`, ripped vertices too); for each unripped vertex with normal `n`
+and tangents `e1`, `e2`, over its unripped first-`vnum` neighbours, with `d` the neighbour's position
+minus the vertex's: `u = (e1x dx + e1y dy) + e1z dz`, `w` likewise with `e2`, `rsq = u u + w w`; a
+neighbour with `rsq` below `FLT_EPSILON` is skipped; else `q = z / rsq` with `z = dz nz + (dy ny + dx
+nx)`, `H = H + q` and the count increases; with `Gdiag` holding both `DIAG_SHOW` and `DIAG_VERBOSE` and
+`|q| > 5`, `<vno> --> <neighbour>: curvature = %2.1f` (q) on standard output. The vertex's `H` is
+`(H * 0.5) / count` (0 with no counted neighbour). The surface's `min_curv`, `max_curv` are the
+smallest and largest `H` (starting at 10000 and -10000; a NaN never replaces). With `DIAG_SHOW`:
+`mean curvature range [%2.3f --> %2.3f]` on standard output. Return 0.
+
+**102.3 Curvature choices.** Each sets every unripped vertex's `curv`:
+- `MRISuseGaussianCurvature`: `K`; extremes `Kmin`, `Kmax`. `MRISuseMeanCurvature`: `H`; extremes
+  `Hmin`, `Hmax`. `MRISusePrincipalCurvature`: `k1`; extremes `Hmin`, `Hmax` (sic). Return 0.
+- `MRISuseAreaErrors`: `(A - A0) / n` with `A` the sum of the areas of the vertex's faces (its face
+  list, in order) and `A0` the sum of their cached original areas (§27; a deferred cache entry is
+  computed first). **FS-374** (class c, rule A): FreeSurfer's `n` is 0, so each value is ±infinity
+  or a NaN (0/0 the default NaN). `reproduce`: as FreeSurfer. Default: `n` the face count, 0 for a
+  vertex without faces; noted when a value differs. Return 0.
+- `MRISusePrincipalCurvatureFunction(mris, f)`: `curv = f(k1, k2)`; `MRISuseK1Curvature` and
+  `MRISuseK2Curvature` are the same with `f` giving `k1` or `k2`. The extremes are kept with `curv <
+  min` and `curv > max` over the unripped vertices in order. **FS-375** (class c, rule A):
+  FreeSurfer starts both extremes at vertex 0's `curv` as it was before the call, so the range can
+  hold a value no vertex has any more (and a NaN there stays). `reproduce`: as FreeSurfer. Default:
+  both start at the first unripped vertex's new value (vertex 0's old one when every vertex is
+  ripped); noted when the extremes differ. **FS-376** (class a, memory): on a surface without
+  vertices FreeSurfer reads a vertex that does not exist; both modes set the extremes to 0, noted.
+  Return 0.
+
+**102.4 Curvature indices** (`MRIScomputeCurvatureIndices(mris, &ici, &fi)`, in `double`): over
+unripped vertices, `ici = (K area) + ici` when `K > 0`, `fi = ((area |k1|) (|k1| - |k2|)) + fi`;
+then each divided by `4 pi`. Without vertices both 0. Return 0.
+
+**102.5 Largest radius** (`MRISmaxRadius(mris)`, `double`): the bounding box of every vertex's
+current position (ripped too; low ends from 10000, high ends from -10000; a NaN never replaces) is
+stored in the surface's `xlo, ylo, zlo, xhi, yhi, zhi` (as `float`); the centre `c = (lo + hi) *
+0.5`; the result is the largest `sqrt((x² + y²) + z²)` over every vertex of its offset from `c` (0
+without vertices; a NaN never replaces).
+
+**102.6 Mean and spread of the curvature** (`MRIScomputeAverageCurvature(mris, psigma)`, `double`):
+over unripped vertices `total_sq = total_sq + c²`, `total = total + c`, `n = n + 1`; `mean = total /
+n`, `var = total_sq / n - mean²` (both 0 when `n` is 0); when `psigma` is given it receives
+`sqrt(var)` (a negative `var`: the default NaN and `errno` `EDOM`). Returns `mean`.
+
+**102.7 Vertices of negative faces.** `MRISmarkNegativeVertices(mris, mark)`: the three vertices of
+every face whose area is below 0 get the mark (16 bits). `MRISripNegativeVertices(mris)`: such
+faces and their three vertices are ripped. Return 0.
+
+## 103. The second fundamental form (queue item 3.1-51; relay 20)
+
+`MRIScomputeSecondFundamentalForm(mris)` is `MRIScomputeSecondFundamentalFormThresholded(mris,
+-1)`. For a plane (`MRIS_PLANE`) nothing happens; return 0.
+
+**103.1 The threshold.** With `pct_thresh` at or above 0: `vmean` is the mean neighbour spacing of
+§94's `MRIScomputeTotalVertexSpacingStats` (it recomputes the metric properties first, §38), `m = vmean *
+0.25`, `m = m < 1 ? m : 1` (a NaN gives 1), `thresh0 = m m`; otherwise `thresh0 = 0`. Then the tangent
+planes are recomputed (§94). `Kmin = Hmin = 10000`, `Kmax = Hmax = -10000`, `Ktotal = 0` (`double`).
+With `DIAG_WRITE` and `DIAG_VERBOSE` the file `curv.dat` is opened for writing.
+
+**103.2 The fit at a vertex.** For each unripped vertex with at least one neighbour in use
+(`vtotal`), with `n`, `e1`, `e2` its normal and tangents (values from the start of this vertex's
+step): a `vtotal` x 3 matrix `U` and a `vtotal`-vector `z`, both zeros. Passes, each starting with
+`kmin = 10000`, `kmax = -10000`, a row counter `r = 0` and `thresh` (`thresh0` at the first pass):
+for each neighbour in use, in order, skipping ripped ones, with `y` its position minus the
+vertex's (`float`): `u = (double)((e1x yx + e1y yy) + e1z yz)`, `v = (double)((yy e2y + yx e2x) + yz
+e2z)`; row `r + 1` of `U` becomes `(float)(u u)`, `(float)((u + u) v)`, `(float)(v v)` and `z`'s
+entry `r + 1` becomes `(nx yx + ny yy) + nz yz` — **written before the test below, so a rejected
+neighbour's values sit in row `r + 1` until an accepted one overwrites them**; `rsq =
+(float)(v v + u u)`; the neighbour is accepted when `rsq` is not below `FLT_EPSILON` and `(double)rsq
+> thresh`: `k = z_entry / rsq` updates `kmax` (`k > kmax`) and `kmin` (`k < kmin`), and `r`
+increases. After the pass `thresh = 0.25 thresh`; the passes end after the 102nd or when `r` is 4 or
+more.
+
+**103.3 The solve.** `Uᵀ` (§fs.maths `MatrixTranspose`), `A = Uᵀ U` (`MatrixMultiply`, `float`),
+`cond = MatrixConditionNumber(A)`, `A⁻¹ = MatrixSVDInverse(A)`. When the inverse fails (singular):
+the eigenvalues are 0, 0 and the eigenvector matrix the identity, and the vertex goes on to 103.4;
+the ill-conditioned count increases. Otherwise `c = A⁻¹ (Uᵀ z)` (two `MatrixMultiply`), the Hessian
+`Q = [[c1 + c1, c2 + c2], [c2 + c2, c3 + c3]]`. When `cond >= 500000` (a NaN is not): `k1 = kmax`,
+`k2 = kmin`, `K = k1 k2`, `H = (k1 + k2) * 0.5`, and nothing else for this vertex. Otherwise
+`MatrixEigenSystem(Q)` gives the eigenvalues and eigenvectors; when it fails, `MatrixSVDEigenValues(Q)`
+gives `k1`, `k2` (its first and second values), with `K` and `H` as above, nothing else for this vertex, and the
+ill-conditioned count increases. **A matrix with a NaN or infinite entry:** see the fs.maths spec's
+FS-48 (`MatrixConditionNumber` and `MatrixSVDInverse` refuse it; on some FreeSurfer hangs).
+
+**103.4 The vertex's curvatures** (eigenvalues `k1`, `k2`, eigenvectors `a11 a12 / a21 a22`): `K = k1
+k2`, `H = (k1 + k2) * 0.5`; with the file open, the line `<vno> %f %f %f %f` (`k1`, `k2`, `K`, `H`);
+when the vertex is `Gdiag_no` and `DIAG_SHOW`: `v %d: k1=%2.3f, k2=%2.3f, K=%2.3f, H=%2.3f` on
+standard output; the extremes (`K < Kmin`, `H < Hmin`, `K > Kmax`, `H > Hmax`); `Ktotal = ((double)k1
+k2) area + Ktotal`; the area summed (`double`); the tangents: `e1x = e2x a21 + e1x a11`, `e1y = e1y
+a11 + e2y a21`, `e1z = a21 e2z + a11 e1z`, `e2x = e1x a12 + e2x a22`, `e2y = e1y a12 + e2y a22`,
+`e2z = a12 e1z + a22 e2z` (the old tangents' values).
+
+**103.5 After the vertices.** The file closed. With `DIAG_SHOW` and `DIAG_VERBOSE`: `max H error=-1.000
+at -1` and `total area = %2.3f`; with `DIAG_SHOW` and an ill-conditioned count above 0: `%d
+ill-conditioned points` (standard output). With `pct_thresh` below 0: return 0.
+
+**103.6 The outlier removal** (`pct_thresh` at or above 0), in `double`: over unripped vertices the
+extremes of `k1` and of `k2` (from 1000 for the lows, -1000 for the highs; a NaN never replaces);
+`scale = 999 / (max - min)` for each; two 1,000-bin histograms with `bin_size = (float)(1 / scale)`;
+for each unripped vertex in order, `k1`'s bin `nint((k1 - min1) scale1)` counted (`1 + count`), then
+`k2`'s. **FS-377** (class a, crash): a bin outside 0..999 (all values equal, so `scale` is infinite;
+a value not finite) makes FreeSurfer write far outside the histogram (a segmentation fault).
+`reproduce` ends the program as that crash (exit status 139); the default leaves that value out,
+noted. Each bin's value `(float)(bin / scale + min)`. `nint((0 - min) scale)` is computed for each and
+discarded (its notice for a NaN, fs.core's). Both histograms become PDFs (fs.core's `HISTOmakePDF` in
+place); with `DIAG_WRITE` and `DIAG_VERBOSE` they are plotted to `k1.plt`, `k2.plt`. The peak of
+each: `HISTOfindHighestPeakInRegion(h, 0, 1000)`. **FS-378** (class a, memory): without unripped
+vertices there is no peak (-1) and FreeSurfer reads one place before the histogram; no vertex is
+clipped, so both modes skip the read (noted) and the result is FreeSurfer's. The limits from a peak
+`z`, for each histogram: `T` the sum of counts from `z` to the end, `t = T pct`; going up from `z`
+(at most to bin 998), summing counts, the first bin where the sum exceeds `t` gives `max` = that bin's
+value; likewise going down from `z` to bin 1 (stopping at 0) gives `min`. Then `Kmin = Hmin = 10000`,
+`Kmax = Hmax = -10000`, and for each unripped vertex: `k1 > max1` → `max1`, `k2 > max2` → `max2`, `k1
+< min1` → `min1`, `k2 < min2` → `min2` (each counted), `K` and `H` recomputed, the extremes updated as
+in 103.4. When any was clipped: `%d vertices thresholded to be in k1 ~ [%2.2f %2.2f], k2 ~ [%2.2f
+%2.2f]` (count, `min1`, `max1`, `min2`, `max2`) on standard error. Return 0.
+
+**103.7 At one vertex** (`MRIScomputeSecondFundamentalFormAtVertex(mris, vno, vertices, vnum)`): 0
+for a plane; -4 (`ERROR_BADPARM`) for a ripped vertex or `vnum` at or below 0. One pass of 103.2 over
+the given vertices without a threshold: every unripped one's row taken (`r` increases for each), its
+`k` kept for the extremes only when `rsq` is not below `FLT_EPSILON`. The solve as 103.3, except: a
+singular `Uᵀ U` gives eigenvalues 0 with the eigenvector matrix **of the last call that computed
+one** (the function keeps it between calls; zeros before the first) and goes on to the vertex's
+curvatures; `cond >= 500000` sets `k1 = kmax`, `k2 = kmin` and `K`, `H` to the surface's `Kmin`, `Hmin`
+when `kmin kmax < 0`, else `Kmax`, `Hmax`, and returns -4; a failed eigensystem gives the singular
+values' curvatures and -4. The vertex's curvatures as 103.4 but `Ktotal = ((double)k2 k1) area +
+Ktotal`, `e1z = a11 e1z + e2z a21`, `e2z = a12 e1z + e2z a22`; no file; with `DIAG_SHOW` and a
+singular fit `1 ill-conditioned points`. Return 0.
+
+## 104. The gradients' averaging (queue item 3.1-51; relay 20)
+
+**104.1 `MRISaverageGradients(mris, num_avgs)`**: with `Gdiag_no` above 0 and `DIAG_VERBOSE`,
+`MRISaverageGradients()` on standard output. Nothing more for `num_avgs` at or below 0. With
+`Gdiag_no` at or above 0 (a vertex of the surface): `before averaging %d times dot = %2.2f ` (the dot
+`(dx nx + dy ny) + dz nz` of that vertex's gradient and normal). The vertices that change are the
+unripped ones with at least one unripped first-`vnum` neighbour (counted with repeats). `num_avgs`
+passes: each such vertex's new gradient is `(d + d1 + ... + dk) * (1.0f / (k + 1))` (its own and its
+unripped neighbours' gradients from the previous pass, summed in order; multiplied by the `float`
+reciprocal, **not** divided); the other vertices keep theirs; `tdx`... are untouched. **FS-379**
+(class a, memory): when a vertex's unripped neighbour has no unripped neighbour of its own (neighbour
+lists that are not symmetric), FreeSurfer counts it but leaves it out of the vertex's list and reads
+other vertices' neighbours (and past its list for the last); both modes average with that
+neighbour's unchanged gradient, noted. With more than 150 passes, the first such call of the program
+reads `FREESURFER_MRISaverageGradients_optimize_suppress` and, when it is set, writes
+`FREESURFER_MRISaverageGradients_optimize_suppress so not optimizing` (standard output); the
+numbers do not change. With `Gdiag_no` at or above 0: ` after dot = %2.2f D = (%2.2f, %2.2f, %2.2f),
+N = (%2.1f, %2.1f, %2.1f)` (the dot `(nx dx + ny dy) + nz dz`, the gradient, the normal). Return 0.
+
+**104.2 `MRISaverageGradientsFast(mris, num_avgs)`**: with `Gdiag_no` above 0 and `DIAG_VERBOSE`,
+`MRISaverageGradientsFast()`. `num_avgs` passes in which each unripped vertex's gradient becomes `(d +
+d1 + ... + dk) / (k + 1)` over its own and its unripped neighbours' previous gradients (a vertex
+without unripped neighbours keeps its own); at the end each unripped vertex's `tdx, tdy, tdz` copy its
+gradient. Return 0.
+
+**104.3 `mrisAverageSignedGradients(mris, num_avgs)`**: nothing for `num_avgs` at or below 0. With
+`Gdiag_no` at or above 0: `before averaging dot = %2.2f ` (as 104.1's). `num_avgs` passes: each
+unripped vertex sums, in `double`, its own gradient and those of its unripped first-`vnum` neighbours
+whose dot product with its own (`(v.dx n.dx + v.dy n.dy) + v.dz n.dz`, `float`) is not below 0 (a NaN
+counts), divides by the count (as a `float`, then `double`) into `tdx, tdy, tdz` (`float`), then every
+unripped vertex's gradient becomes its `td`. With `Gdiag_no` at or above 0: ` after dot = %2.2f
+(%2.3f, %2.3f, %2.3f)`. Return 0.
+
+## 105. Surface bookkeeping (queue item 3.1-51; relay 20)
+
+**105.1 `MRISrescaleMetricProperties(surf)`**: 0 when `group_avg_surface_area` is 0. Else `scale =
+sqrt((double)group_avg_surface_area / total_area)` (a negative ratio: NaN, `errno` `EDOM`), `scale =
+%lf` on standard output, `s2 = scale scale`; each unripped vertex's area `(float)(area s2)` and its
+distance to each unripped first-`vnum` neighbour `(float)(dist scale)`; `total_area = (float)(total_area
+s2)`; `avg_vertex_dist = scale avg`, `std_vertex_dist = std scale`, `avg_vertex_area = s2 avg` (`double`).
+Returns `scale`.
+
+**105.2 `MRISnormalize(mris, dof, which)`**: `dof` at or below 0: `MRISnormalize: invalid dof %d` as
+an error (§2), return -4. Else for each unripped vertex: `which` 2 (`VERTEX_AREA`): `origarea =
+origarea / dof`; 3 (`VERTEX_CURV`): `curv = curv / dof`; anything else: `val = val / dof`; the result is
+`m`; then `val2 = val2 / dof - m m` (`dof` as `float`). Return 0.
+
+**105.3 `MRISupdateSurface(mris)`**: the metric properties (§38), then §103 with -1. Return 0.
+
+**105.4 Orientation changes** (`MRISmarkOrientationChanges(mris)`; messages on standard error): every
+unripped vertex's `curv` 0 (`MRISclearCurvature`, §22); then for each unripped vertex `v0`: `vertex %d
+without neighbors ! ` + newline and `curv -5` when `vnum` is 0; `vertex %d without faces ! ` + newline
+when it has no face; for each first-`vnum` neighbour `v1`: if ripped, `vertex %d connected to ripped
+vertex %d !` + newline + a blank; the faces through the edge: for each other neighbour `v2 != v1` (in
+order) whose triple `(v0, v1, v2)` is a face (a face of `v0` whose three vertices are all among the
+three; the first such face in `v0`'s list), counted, the first one's face number `f1`, the latest
+other one's `f2` (both kept across edges and vertices, 0 at the start). One face: `edge (%d<-->%d) has
+one single face %d !` (`f1`), `curv -2`; none: `edge (%d<-->%d) has no face !`, `curv -3`; more than
+two: `edge (%d<-->%d) has too many faces (at least : %d %d) !`, `curv -4`; two whose orientations agree
+(the orientation of face `f` from `a` to `b`: 1 when its corners 0, 1 are `a, b`, or 1, 2 are `a, b`,
+or `a` is at neither 0 nor 1 and corner 0 is `b`; else -1; the two orientations' product above 0):
+`curv -1`, a newline then `defective orientation at vertex %d(%d) with faces %d and %d`, counted. At
+the end a newline then `%2.3f %% of the vertices (%d vertices) exhibit an orientation change` with
+`100 count / nvertices` (`double`; 0/0 the default NaN). Returns the count.
+
+**105.5 `mrisCheckSurface(mris)`**: for each unripped face, for each of its corners whose vertex's
+face list lacks the face: `mrisCheckSurface: %s: face[%d].v[%d] = %d, but face %d not in vertex %d face
+list` (the surface's file name) on standard output. Return 0.
+
+**105.6 `MRISsubsampleDist(mris, spacing)`** (`float`): every vertex's `d = 10000`, `val = 0`. Forward,
+for each vertex `k`: for each first-`vnum` neighbour `m`, `d_m + 1 < d_k` → `d_k = d_m + 1`; then
+`d_k >= spacing` → `d_k = 0`, `val = 1`, counted; then for each neighbour `d_m > d_k + 1` → `d_m = d_k +
+1`. Backward, for each vertex from the last: for each neighbour both updates in that order. When
+`spacing` is 2: for each vertex with `d > 0`: when at most two neighbours have `d == 0`, it becomes
+`d = 0`, `val = 1`, `fixedval` 1, counted; and its neighbours' `d` lowered as above. Returns the count.
+
+**105.7 `MRISextendedNeighbors(surf, targ, cur, thresh, list, dots, &n, max, type)`** (recursive,
+depth first): returns 0 when `cur`'s `val2bak`, converted to an integer as x86-64 truncates (`INT_MIN`
+for a NaN or out of range), equals `targ`, or when `cur` is ripped. At `cur == targ` the count `n`
+becomes 0. With `type` 1: `p = |(double)((cy ty + tx cx) + tz cz)|` (`float` products and sums of
+the two vertices' current positions), 0 when `p <= thresh` (a NaN goes on); otherwise `p =
+|dx² + dy² + dz²|` (`double` squares of the `float` differences target minus current; `(x² + y²) +
+z²`), 0 when `p >= thresh`. Returns 1 when `n >= max - 1`. Else `cur` and `p` are appended, `n`
+increases, `cur`'s `val2bak = (float)targ`, and each first-`vnum` neighbour of `cur` is searched in
+order; the first non-zero result is returned; else 0.
+
+**105.8 `MRISunion(a, b)`**: when the volume geometries differ (fs.volume's `vg_isEqual`): `ERROR:
+MRISunion() - VolGeom of both surface are not the same!!!` (standard output), no surface; when
+`useRealRAS` differs: `ERROR:  MRISunion() - input surfaces are not in the same space!!!` (two
+blanks), no surface. Else a new surface (`MRISalloc` of both counts) with `a`'s `useRealRAS` and
+volume geometry, `a`'s then `b`'s vertex positions (only the positions, set as §14's `MRISsetXYZ`),
+`a`'s faces then `b`'s with `b`'s vertex numbers plus `a`'s vertex count.
+
+**105.9 `MRISclone(src)`**: a new surface (`MRISalloc`) receiving: type, status, `origxyz_status`,
+`nsize`, `max_nsize`, `vtotalsMightBeTooBig`, `nsizeMaxClock`, hemisphere, centre, bounding box,
+curvature extremes, total and original area, radius, average vertex area, average distance and its
+spread, the transform and its two matrices (FreeSurfer shares them; a copy here), `free_transform` 0,
+the three poles (the same vertex numbers), the volume geometry; per vertex: rip flag, current
+position, normal, canonical position, curvature, face list and its places, `vnum` (§5's counter
+with its maximum message), `v2num`, `v3num`, `nsizeMax`, `nsizeMaxClock`, `nsizeCur` (setting `vtotal`
+as §88's `MRIS_setNsizeCur`), the neighbour list (its whole room), the distances and original
+distances when the source has them, border, area, original area; every face whole (its normal
+matrices copied). Every other field is the new surface's (zero).
+
+**105.10 Vertex reports.** `MRISprintVertexStats(mris, vno, fp, which)` (standard output whatever
+`fp`): nothing for `vno` below 0; `vertex %d spacing for %s surface` (`orig`, `current`, `white` for
+those coordinate sets, else `unknown`); per first-`vnum` neighbour, a ripped one's `nbr %d = %d is
+ripped`, else `\tvn %d: %d = %2.3f mm distant` with `sqrtf(dz² + (dx² + dy²))` of the `which`
+positions' difference (§3's `MRISvertexCoord2XYZ_float`, which refuses some sets); `\tmean = %2.3f`
+(the distances summed as `d + sum` in `double`, divided by the count; 0/0 a NaN). Return 0.
+`MRISprintVertexInfo(fp, surf, vno)`: into `fp`: `vertexno %d`, `xyz  %7.4f %7.4f %7.4f`, `nxyz %7.4f
+%7.4f %7.4f`, `vertex_area %lf`, `neighbors %d %d` (`vnum`, number of faces); then for `n` from 0 to
+the number of faces (sic) `nbr %d  %5d %6.4lf %6.4lf %5d %6.4f`: `n`, the `n`-th entry of the neighbour
+list, `sqrt((dx² + dy²) + dz²)` (`double` of the `float` differences vertex minus neighbour), the
+neighbour's area, the `n`-th face and its area. **FS-380** (class a, memory): a vertex with more
+faces than room in its neighbour list makes FreeSurfer read past the list; both modes stop at its
+end (noted). Then, when the surface has edges, for each edge with the vertex at end 0 or 1: `Edge
+%6d %d  %4d %4d %7.3lf %7.3lf` (edge, end, its two vertices, length, angle) on standard output. Return
+0.
+
+**105.11 Not yet specified here** (their items wait on other modules): `mrisFindMiddleOfGray`,
+`mrisMarkIntersections`, `MRISprintSurfQualityStats`, `MRISprettyPrintSurfQualityStats`, the
+volume users and the label users of `mrisurf_metricProperties.cpp` lines 11687-12041 and 12395-13180,
+`MRISaverageGradientsFastCheck`.
+
+## 106. Validation plan, part 18
+
+The probe's `mpe` command (relay 20): an empty work folder with `d`; `Gdiag`'s show, verbose and
+(one case in six) write bits; a binary triangle file read by `MRISread` (icosahedra subdivided once
+or twice on a sphere of radius 1, 10, 50 or 100, open grids of 2 to 6 by 2 to 6, `srd`'s meshes);
+the status (one case in four), `Kmin`, `Kmax`, `Hmin`, `Hmax` (one in three), `Gdiag_no` (one in five
+a vertex) and `FREESURFER_MRISaverageGradients_optimize_suppress` (one in three) given before the
+read; per vertex a mask (ripped, a mark, position, normal, curvature, `k1 k2`, `K H`, area, original
+position, gradient, `val val2 origarea`), per face (ripped, area, cached original area, cached
+normal), values as `mpd`'s (NaNs and infinities in one case in five); then 1 to 4 operations of
+§102-105: smoothed normals (0 to 3), boundary normals, mean curvature, the curvature choices (three
+functions for `MRISusePrincipalCurvatureFunction`: `k1 + 1`, `k2 * 0.5`, the larger), curvature
+indices, largest radius, mean and spread (with or without the spread), negative faces' marks (-1 to
+3) and rips, the second fundamental form (threshold -1 one in three, else 0.999, 0.99, 0.9, 0.5, 0, 1,
+0.75 or a NaN), at one vertex (1 to 3 calls; the tangent planes first one in four; the neighbours of
+the vertex's faces, none one in eight, random ones one in eight), the three averagings (-1 to 6
+passes, 151 to 156 one in eight), rescaling (the group area 0, 100, 1000, 2.5, 50000 or -4), the
+normalisation (`dof` -1 to 7, `which` 0 to 10), the update, orientation changes, the face-list
+check, subsampling (spacing 0.5 to 4), extended neighbours (`val2bak` reset to -1 one in four; a
+target; type 1 with thresholds 0 to 2500 or type 0 with 0.25 to 10000; at most 1 to 40), the union
+with a clone (equal, `useRealRAS` flipped, the geometry changed), the clone, both vertex reports.
+Each prints its result and what it changes; `DIAG_WRITE`'s files (`curv.dat`, `k1.plt`, `k2.plt`) by
+length and FNV-1a hash. Counted, not compared: FS-376, FS-379, FS-380, and FS-48's matrices on which
+FreeSurfer hangs (the probe's alarm ends it). FS-377's cases compare as FreeSurfer's crash.
+Observed (relay 20): the probe README.
+
+## 107. The GIFTI surface reader (queue item 3.1-26, its surface part; relay 21)
+
+**107.1 What it does** (`mrisReadGIFTIfile(fname, mris, overlays, daNum, ctab)`, the same as
+`mrisReadGIFTIdanum(fname, mris, daNum, overlays, ctab)`; `MRISread` calls it with no surface, no
+overlays, every array and no colour table). The file is read with gifticlib 1.12 with its data
+(gifticlib's own messages and failures as `larmorx_io::gifti` gives them, gifticlib's settings and
+persistent state the run's), with FreeSurfer's two changes to gifticlib: an image's `Version` is
+valid when `sscanf("%f")` reads the same `float` from it as from `1.0` (an absent version reads 0
+and so does `1.0` then: valid), and a coordinate system is accepted under a
+`NIFTI_INTENT_TIME_SERIES` array as under a `NIFTI_INTENT_POINTSET` one (gifticlib's message names
+both: `** DA[<k>] has coordsys with intent <intent> (should be NIFTI_INTENT_POINTSET or
+NIFTI_INTENT_TIME_SERIES)`). Messages naming the file name it as the caller did. In order:
+
+1. A file gifticlib cannot read: `mrisReadGIFTIdanum: ERROR reading gifti <file>` on standard error
+   (after gifticlib's own, e.g. `** failed to open GIFTI XML file '<file>'`), `NULL`.
+2. A `Version` of exactly `1` becomes `1.0`. A file without a `Version` (FS-395): FreeSurfer crashes
+   (signal 11); by default it is read on (gifticlib's check accepts it).
+3. gifticlib's validity check with its messages; an invalid image: `mrisReadGIFTIdanum: GIFTI file
+   <file> is invalid!`, `NULL`.
+4. A label table with labels becomes a colour table (§107.3); its failure: `NULL` (no further
+   message).
+5. The last `NIFTI_INTENT_POINTSET` array is the coordinates, the last `NIFTI_INTENT_TRIANGLE` array
+   the faces. With both (§107.2) a new surface is made; the data of the next steps go into it. With
+   either missing they go into the surface the caller passed; without one: `mrisReadGIFTIdanum: mris
+   is NULL! found when parsing file <file>`, `NULL`.
+6. A caller's colour table (`ctab`) becomes the surface's (`mrisReadGIFTIdanum: Use Customized
+   Colortable` on standard output); otherwise the label table's, when there is one. When the file has
+   a label table, the surface's colour table must have as many entries (places not empty) as the file
+   has labels, else `mrisReadGIFTIdanum: ct_entries:<n> != labeltable_entries:<m>`, `NULL`.
+7. The data arrays (§107.4): all of them, or only array `daNum` (`daNum` -1: all). A `daNum` outside
+   the file's arrays (FS-388): FreeSurfer reads outside its list of arrays (a crash); by default
+   `mrisReadGIFTIdanum: data array <daNum> is not in file <file>`, `NULL`.
+8. The surface: the new one, or the caller's (its data read in place). A failure in step 7 returns
+   `NULL` with what was already stored in the caller's surface kept.
+
+The rows and columns of an array are gifticlib's (`gifti_DA_rows_cols`): a one-dimensional array has
+`Dim0` rows and 1 column; a row-major array `Dim0` rows and `nvals / Dim0` columns (1 when `Dim0` is
+0); a column-major one `Dim<last>` rows and `nvals / Dim<last>` columns (1 when not positive). The
+reader takes **rows as the vertex (or face) count and columns as the values per vertex for row-major
+arrays, and the other way round for column-major ones**. A value is read with FreeSurfer's
+two-dimensional accessor (`specs/freesurfer-io.md` §22: its messages; a place outside the array ends
+the program with status 1), as a `double`, then made a `float` (coordinates, values) or an `int`
+(vertex numbers: C's conversion, FS-17 beyond `int`).
+
+**107.2 The new surface.** The coordinates must have at least one vertex and exactly 3 columns, else
+`mrisReadGIFTIdanum: malformed coords data array in file <file>: num_vertices=<n> num_cols=<c>`
+(both as `int`), `NULL`; the faces at least one face and 3 columns, else `mrisReadGIFTIdanum:
+malformed faces data array in file <file>: num_faces=<n> num_cols=<c>`, `NULL`. The surface has
+those counts (`MRISalloc`), the file's name (a name of 1,024 bytes or more: FS-356, kept whole by
+default), type `MRIS_TRIANGULAR_SURFACE`, hemisphere from the coordinates' metadata
+`AnatomicalStructurePrimary` (`CortexRight` right, 1; `CortexLeft` left, 0; anything else or absent
+none, 2; compared exactly), `useRealRAS` 0. From the coordinates' metadata, each read only when the
+entry exists and `sscanf` reads its number (the field keeps its value otherwise): `VolGeomWidth`,
+`VolGeomHeight`, `VolGeomDepth` (`%d`), `VolGeomXsize`, `VolGeomYsize`, `VolGeomZsize`, `VolGeomX_R`,
+`VolGeomX_A`, `VolGeomX_S`, `VolGeomY_R` ... `VolGeomC_S` (`%f`, 15 in all) and `VolGeomFname`
+(copied: the volume geometry's 1,024-byte name gets the value and zeros after it, the first 1,024
+bytes of a longer value: FS-381); the geometry is valid when all 19 were read. Then `SurfaceCenterX`,
+`SurfaceCenterY`, `SurfaceCenterZ` (`%f`, the surface's centre), `TAG_GROUP_AVG_SURFACE_AREA` (`%f`).
+The command lines: `NUM_TAG_CMDLINE` (`%d`, 0 when absent or unreadable); above 1,000 (`MAX_CMDS`):
+`[WARN] mrisReadGIFTIdanum():  too many commands (<n>) in file. Only last 1000 will be saved!` on
+standard output, then FreeSurfer never returns (FS-382); larmorx reads the last 1,000. For each `k`
+from the first kept to `n - 1`, the entry `TAG_CMDLINE#<k>` is added to the surface's command lines
+(`MRISaddCommandLine`, `specs/freesurfer-surfio.md` §8); a missing one (or one without a value) stops
+them: `[ERROR] TAG_CMDLINE out of sync! No value found for TAG_CMDLINE#<k>` on standard output.
+
+Each vertex: its face count 0, its coordinates the coordinate array's three values of its row (as
+`float`). Each face: its three vertex numbers (as `int`); each counts one more face at its vertex (one
+byte: FS-147, a vertex of more than 255 faces, refused by default: `mrisReadGIFTIdanum: vertex <v>
+is in more than 255 faces in file <file>`, `NULL`). A vertex number outside the surface (FS-383):
+FreeSurfer counts it in memory outside the surface; by default `mrisReadGIFTIdanum: face <f> vertex
+<k>: <v> is not a vertex of the surface in file <file>`, `NULL`.
+
+The coordinates' coordinate systems, in order: a `DataSpace` of `NIFTI_XFORM_SCANNER_ANAT` makes
+`useRealRAS` 1; `NIFTI_XFORM_UNKNOWN` with a `TransformedSpace` of `NIFTI_XFORM_TALAIRACH` makes the
+surface's scanner-to-Talairach matrix a new 4 x 4 matrix of the system's sixteen numbers (as `float`,
+row by row; a later one replaces it). A system without a `DataSpace`, or with `NIFTI_XFORM_UNKNOWN` and
+no `TransformedSpace` (FS-387): FreeSurfer crashes; by default the system is passed over.
+
+**107.3 The label table as a colour table.** gifticlib's check of the table (its messages); invalid:
+`readLabelTable(<file>): invalid labeltable found` on standard error, failure. The table has `maxkey
++ 1` places (the largest key; 0 places when every key is negative), all empty, version 2, the file's
+name (at most 1,023 bytes). Without colours in the file, colours are made: the random generator
+seeded with 12 (`setRandomSeed(12)`, `specs/freesurfer-core.md` §9), then for each
+label three draws `randomNumber(0, 1)` (red, green, blue, as `float`) and alpha 1. With `Gdiag`'s
+`DIAG_VERBOSE`: `[DEBUG] readLabelTable(<file>): ct->nentries=<maxkey + 1>, num_entries_to_read=<n>`
+on standard output. Then each label in order: its key is its place. A place already filled keeps its
+entry: `readLabelTable(<file>): Duplicate labelkey <key>:<label>, was <name>` on standard output; the
+colour sets advance only when a place is filled, so the labels after a repeated key take the colours
+one set earlier. A new place (with `DIAG_VERBOSE`: `[DEBUG] readLabelTable(<file>): created
+ct->entries[<key>]`) gets the label's name (at most 1,023 bytes) and the colour set: each component
+`c` kept as a float and as the integer `floor(c * 256)` (C's conversion, FS-17), at most 255. A colour
+the file did not give (gifticlib's FS-80) reads 0. A negative key (FS-389): FreeSurfer writes before
+the table (a crash or a later refusal); by default `readLabelTable(<file>): label key <key> is
+negative` on standard error, failure. Finally the duplicate-name check (§107.5).
+
+**107.4 The data arrays**, in file order (or the one asked for):
+- A coordinate or face array: passed over.
+- A **node index** (`NIFTI_INTENT_NODE_INDEX`, sparse storage): only as the file's first array, else
+  `mrisReadGIFTIdanum: NODE_INDEX data array found but its not the first data array in file <file>`,
+  `NULL`; its row count must be 1 to the surface's vertex count and its columns at most 1, else
+  `mrisReadGIFTIdanum: malformed NODE_INDEX data array in file <file>: num_index_nodes=<n>
+  num_cols=<c> max nvertices=<nv>, num_cols>1`, `NULL`. Its values (as `int`) are the vertices of the
+  following shape, label and statistics arrays' rows.
+- Every other array must have exactly the surface's vertex count of rows (at least 1) and at most
+  the intent's columns (3 for `NIFTI_INTENT_VECTOR` and `NIFTI_INTENT_RGB_VECTOR`, 4 for
+  `NIFTI_INTENT_RGBA_VECTOR`, 9 for `NIFTI_INTENT_GENMATRIX`, 1 otherwise), else
+  `mrisReadGIFTIdanum: malformed data array [<k>] in file <file>: num_vertices=<n> num_cols=<c>
+  expected nvertices=<nv>, num_cols=<e>`, `NULL`. With a node index this holds too: sparse arrays
+  shorter than the surface are refused (FS-390, kept: rule C).
+- **Shape** (`NIFTI_INTENT_SHAPE`): without overlays only the first shape array is read (later ones:
+  `WARNING: a prior data array of shape data has already been read!  Skipping data in array #<k> in
+  file <file>` on standard error); each row's value (as `float`) becomes its vertex's curvature (the
+  node index's vertex, or the row's). With overlays every shape array is read: `INFO:
+  NIFTI_INTENT_SHAPE data in array #<k> in file <file> saved as MRI` on standard error, the values
+  also into a new `MRI_FLOAT` volume of the surface's vertex count by 1 by 1 by 1 frame (column =
+  vertex), and an overlay is added: its name the `Name` metadata's last path component (POSIX
+  `basename`: trailing slashes removed, `.` for an empty name, `/` for slashes only; a name of 1,024
+  bytes or more cut to 1,023, FS-392) without a final `.gii`, no name without the entry; type 100
+  (shape), intent `NIFTI_INTENT_SHAPE`, data type the `ShapeDataType` metadata (empty without it:
+  FS-391, memory contents in FreeSurfer; 255 bytes of a longer one, FS-391), format `GIFTI_FILE`
+  (27), one value per vertex, the volume.
+- **Labels** (`NIFTI_INTENT_LABEL`): `parsing dataarray #<k> (NIFTI_INTENT_LABEL) ...` on standard
+  output; without a colour table on the surface: `mrisReadGIFTIdanum: NULL colortable`, `NULL`; an
+  array gifticlib gave no values (one it could not decode, such as ASCII `UINT32`; FS-396): FreeSurfer
+  crashes, by default `mrisReadGIFTIdanum: label data array [<k>] has no data in file <file>`, `NULL`. For
+  each vertex (or each node-index row, stopping after the last; the loop also stops once a vertex
+  number at or past the vertex count has been visited) the value is the key: FreeSurfer reads the
+  array's bytes as 32-bit unsigned integers whatever its type (FS-385; by default the value by its
+  type made an `int`); a key among the label table's keys finds the colour entry at the place of
+  that key in the surface's colour table, and the annotation is `(b << 16) + (g << 8) + r` of its
+  integer colours (with `DIAG_VERBOSE`: `mrisReadGIFTIdanum(): vno: <v>, tkey: <key>, tidx: <label
+  index>, name: <name>` on standard output); a key not in the label table gives 0. A key whose place
+  the colour table does not have or holds empty (a caller's table, a table made from a colour array
+  before, FS-386): FreeSurfer reads outside the table (a crash or an undefined annotation); by default
+  0.
+- **Vectors** (`NIFTI_INTENT_VECTOR`): each vertex's `dx dy dz` (rows by vertex, the node index not
+  used).
+- **Colours** (`NIFTI_INTENT_RGB_VECTOR`, `NIFTI_INTENT_RGBA_VECTOR`; only the first three columns
+  read): each vertex's red, green and blue (as `float`) become integers: above 1 the value itself (C's
+  conversion), else `floor(c * 256)`, at most 255 (FS-17 beyond `int`); the annotation is `(r & 255) |
+  (g & 255) << 8 | (b & 255) << 16`. Then the surface's colour table is replaced by one made from the
+  distinct annotations (§107.5).
+- **A general matrix** (`NIFTI_INTENT_GENMATRIX`): `WARNING: ignoring unsupported data array
+  NIFTI_INTENT_GENMATRIX in file <file>` on standard error.
+- **Any other intent** (statistics): without overlays only the first such array is read (later ones:
+  `WARNING: a prior data array of stat/val data has already been read!  Skipping data in array #<k>
+  in file <file>`); each value becomes its vertex's `val` and `stat`. With overlays every such array
+  is read (`INFO: <intent> data in array #<k> in file <file> saved as MRI`) into a new one-frame volume
+  as for shapes; the first array of each run of one intent starts an overlay (type 200, the intent,
+  the file's name, an empty data type, `GIFTI_FILE`, its volume), added to the list when an array of
+  another intent starts the next run; the run's later arrays write their values at slice (dense) or
+  frame (sparse) number `j - 1` for the run's `j`-th array of their own new volume, which is not kept,
+  and the last run is never added (FS-394, kept until measured: rule D). A write outside a volume is
+  fs.mri's (`specs/freesurfer-mri.md` §5: `MRIsetVoxVal`, FS-53).
+
+**107.5 The colour table of a colour array; the duplicate names.** One entry per distinct annotation,
+in increasing annotation order, named `Unknown_Label_<k>` (k from 0), its colours the first vertex's
+with that annotation (the components as read, each also as `floor(c * 256)` at most 255); its alpha:
+FreeSurfer reads it past the three stored components (FS-393: memory contents; larmorx 0). Each
+entry printed on standard output: `<k> <name> <annotation> (<r> <g> <b> <a>)`. Version 2, the file's
+name. Then the duplicate-name check: for every ordered pair of different places with equal names,
+`ERROR: label name '<name>' is duplicated!` on standard output; when any, `CTABfindDuplicateNames:
+<pairs / 2> duplicate names found in:` and `  <table's file name>`.
+
+## 108. Validation plan, part 19
+
+The probe's `gii` command (relay 21): an empty work folder with `d`; `Gdiag`'s show and verbose
+bits; 1 or 2 GIFTI files (one in 25 random bytes): `srd`'s meshes as coordinate (`FLOAT32` mostly,
+`FLOAT64`, `INT32`; NaN, infinite, large and -0 values in heavy cases) and face arrays (`INT32`,
+`UINT8`, `FLOAT32`; vertex numbers outside the surface in heavy cases), in either order, one file in
+four without them; ASCII, Base64Binary or GZipBase64Binary; one array in twelve column-major; the
+coordinates' metadata (hemisphere, all or some of the 19 geometry entries with odd numbers in heavy
+cases, centre, group area, 0 to 3 command lines with a wrong count one in five), 0 to 2 coordinate
+systems (spaces missing one in twelve); a node index first one case in twelve (all or some vertices);
+0 to 3 further arrays: shapes (with or without `Name`, `ShapeDataType`), labels (a label table of 1
+to 5 labels, keys repeated or negative now and then, with or without colours; `INT32`, `UINT32`,
+`FLOAT32` arrays; keys outside the table), vectors, colours (RGB or RGBA, in [0, 1] or 0 to 300, NaN
+and large values in heavy cases), general matrices, runs of 1 to 3 statistics arrays; rows one off
+the vertex count now and then; versions `1.0`, `1`, `2.0` or none; cut files in heavy cases. A
+surface kept for the reads that pass one (`MRISalloc` of the first file's vertex count, another
+count, or none), a caller's colour table one case in three (0 to 6 places, some empty); 1 to 3 reads
+(a missing file one in 30; all arrays or one by number, outside the file in heavy cases; flags: pass
+the kept surface, ask for overlays, give the colour table). Each read prints NULL, PASSED or NEW
+with the surface (counts, type, hemisphere, name, real RAS, geometry, centre, group area, command
+lines, Talairach matrix, colour table with each entry's names and colours, but no alpha for a colour
+array's table, FS-393; per vertex coordinates, curvature, `val`, `stat`, `dx dy dz`, annotation, face
+count; per face its vertices), the kept surface, then the overlays (name, type, intent, data type,
+format, values per vertex, volume size and first slice). `srd` reads GIFTI surfaces too. Counted, not
+compared: FS-382 to FS-384, FS-386, FS-388, FS-389, FS-391, FS-392, fs.mri's FS-53. FS-387's,
+FS-395's and FS-396's cases compare as FreeSurfer's crash. Observed (relay 21): the probe README.
+
+## 109. The GIFTI writers (queue item 3.1-26, its surface part; relay 22)
+
+**109.1 Every file.** A writer builds a GIFTI image of version `1.0` whose metadata holds, in order,
+`UserName` (the effective user's name from the password database; absent when it has none),
+`Date` (`currentDateTime`: `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` when set, else the local
+time as `specs/freesurfer-core.md` gives it) and, for the surface writers when the surface has a
+subject name, `SubjectID`. The data arrays follow (§109.2-109.6). Then gifticlib's validity check
+with FreeSurfer's version rule (§107.1) and its messages (`whine` on); an invalid image:
+`<writer>: GIFTI file <file> is invalid!` on standard error, `ERROR_BADFILE` (-5), nothing written.
+Then `gifti_write_image` with the data (gifticlib adds `gifticlib-version` to the image's metadata;
+its own messages, e.g. `** failed to open '<file>' for gifti write`); a failure: `<writer>: couldn't
+write image`, `ERROR_BADFILE`. The writer's name is `MRISwriteGIFTI` (both forms),
+`MRISwriteGIFTICombined` or `mriWriteGifti`. A failure of an array writer returns its error with
+nothing written and no further message. Every data array FreeSurfer writes is row-major,
+`GZipBase64Binary`, little-endian, without an external file; `FLOAT32` unless said otherwise; its
+value count is gifticlib's product of the dimensions (a count of 0, e.g. a surface without
+vertices, gives gifticlib's `** bad Dim list in` display and an array the check refuses). The
+compressed bytes are zlib's at gifticlib's level: larmorx's zlib-rs may give other bytes for the
+same values (compare files by their decompressed values).
+
+A value is stored with the two-dimensional setter (`gifti_set_DA_value_2D(array, row, col, value)`,
+`value` a `double`): a one-dimensional array takes column 0 only (another column: `**
+gifti_set_DA_value_2D, array dim is 1 but trying to access 2D data element (col=<c>)`, exit 1); an
+array of another dimensionality than 1 or 2: `** gifti_set_DA_value_2D, array dim is <n>`, exit 1.
+The place: row-major `row * dims[1] + col`, column-major `row + col * dims[0]` (the row and column
+exchanged for the check). A row or column outside the dimensions: `** gifti_set_DA_value_2D,
+invalid params: dim0_index=<i> (max=<n>), dim1_index=<j> (max=<m>)` on standard error, nothing
+stored. The value is converted to the array's type (`FLOAT32` rounded to `float`; the integer types
+by C's conversion, x86-64's results beyond their range, FS-17); another type: `**
+gifti_set_DA_value_2D, unsupported type <t>-unknown, or can't convert to double`, nothing stored.
+
+**109.2 The intents** (`MRISwriteGIFTI(mris, intent, file, curv_name)`): `NIFTI_INTENT_POINTSET` or
+`NIFTI_INTENT_TRIANGLE` write the surface (§109.3), `NIFTI_INTENT_SHAPE` the curvature,
+`NIFTI_INTENT_LABEL` the labels (§109.4), `NIFTI_INTENT_RGBA_VECTOR` the annotation's colours, a
+statistics intent (`NIFTI_INTENT_CORREL` 2 to `NIFTI_INTENT_LOG10PVAL` 24, `NIFTI_INTENT_ESTIMATE`
+1001) the `stat` values; any other intent writes a file with no data array. `MRISwrite` of a name
+whose type is GIFTI (§79: `.gii`) writes the surface this way (`NIFTI_INTENT_POINTSET`).
+- **Curvature**: one array `NIFTI_INTENT_SHAPE`, one dimension of the vertex count, each vertex's
+  curvature. With a curvature file name: `Name` (the name) and `ShapeDataType` from the name, the
+  last of these it contains winning: `.thickness` Thickness, `.curv` CurvatureRadial, `.sulc`
+  SulcalDepth, `.area` Area, `.volume` Volume, `.jacobian` Jacobian (none of them: no entry).
+- **Statistics**: one array of the intent, each vertex's `stat`, with `Intent_code` (gifticlib's name
+  of the intent) and, for `NIFTI_INTENT_UNIFORM` (16), `Intent_p1` 0 and `Intent_p2` 1.
+- **Colours**: one array `NIFTI_INTENT_RGBA_VECTOR` of the vertex count by 4: each vertex's
+  annotation's red (low byte), green and blue bytes, each `(float) b / 255.0` (a `double` division
+  stored as `float`), and 1.
+
+**109.3 The surface.** First an array `NIFTI_INTENT_POINTSET` of the vertex count by 3 with one
+coordinate system, then an array `NIFTI_INTENT_TRIANGLE` (`INT32`) of the face count by 3. The
+coordinate system (`DataSpace`, `MatrixData`, `TransformedSpace`):
+- real-RAS surface with a valid volume geometry: `NIFTI_XFORM_SCANNER_ANAT`, `TkrVox2RAS *
+  inverse(vox2ras)` of the geometry (§76's space-tag matrices; `MatrixInverse` and `MatrixMultiply` as fs.core
+  gives them: a singular geometry ends the program in the multiplication, `MatrixMultiply(): m2 is
+  null` with its break line, `error: MatrixMultiply: m2 is null`, exit 252), `NIFTI_XFORM_UNKNOWN`;
+- real-RAS surface without one: `NIFTI_XFORM_SCANNER_ANAT`, the identity, `NIFTI_XFORM_SCANNER_ANAT`;
+- tkregister surface with a valid geometry: `NIFTI_XFORM_UNKNOWN`, `vox2ras * inverse(TkrVox2RAS)`,
+  `NIFTI_XFORM_SCANNER_ANAT`;
+- tkregister surface without one: the subject's Talairach transform is read for the output file's
+  name (`MRISreadTransform`, §86 and §92: `<output folder>/../mri/transforms/talairach.xfm`, its messages and
+  failures, the surface's Talairach matrices replaced when it reads); when the surface then has a 4 x
+  4 scanner-to-Talairach matrix (read now or before): `NIFTI_XFORM_UNKNOWN`, that matrix,
+  `NIFTI_XFORM_TALAIRACH`; else `NIFTI_XFORM_UNKNOWN`, the identity, `NIFTI_XFORM_UNKNOWN`.
+The matrix's 16 `float`s are stored as `double`s, row by row. The coordinates are the vertices'
+current `x y z`; the faces their three vertex numbers as stored (not checked).
+
+With a surface name (its file name, not empty), whose parts are searched anywhere in it (C's
+`strstr`), the last match winning in each list: `AnatomicalStructurePrimary` (`lh.` CortexLeft,
+`rh.` CortexRight), `AnatomicalStructureSecondary` (`.orig`, `.smoothwm`, `.white` GrayWhite;
+`.graymid` MidThickness; `.gray`, `.pial` Pial; in this order), `GeometricType` (`.orig`, `.smoothwm`
+Reconstruction; `.white`, `.gray`, `.graymid`, `.pial` Anatomical; `.inflated` Inflated; `.sphere`,
+`.qsphere` Spherical; `pial-outer` Hull; in this order) on the coordinates, `TopologicalType` (`Cut`
+for a patch, else `Closed`) on the faces, `Name` (the surface name) on the coordinates and on the
+faces, in that order. With a valid volume geometry, on the coordinates: `VolGeomFname`,
+`VolGeomWidth`, `VolGeomHeight`, `VolGeomDepth` (`%d`), `VolGeomXsize` ... `VolGeomC_S` (`%f`, 15
+entries in the order x, y, z sizes, then x_r x_a x_s y_r y_a y_s z_r z_a z_s c_r c_a c_s) and
+`SurfaceCenterX/Y/Z` (`%f` of the surface's centre). A group-average area not within `FLT_EPSILON` of
+0 (NaN included): `TAG_GROUP_AVG_SURFACE_AREA` (`%.20f`). Command lines: `NUM_TAG_CMDLINE` (`%d`)
+and each `TAG_CMDLINE#<k>` (at most 1,023 bytes; a missing line `(null)`). `UserName`/`Date`: §109.1.
+
+**109.4 The labels.** The surface's colour table becomes the image's label table: one label per
+entry that exists and has a name, in table order: key the entry's place, the name, the entry's
+float colours with alpha 1. With `Gdiag`'s `DIAG_VERBOSE`: `[DEBUG] MRISwriteGIFTILabel():
+mris->ct->entries=<n>, to_write=<m>` and for each label `[DEBUG] MRISwriteGIFTILabel(): idx=<i>,
+name=<name>` on standard output. A table of no labels: `MRISwriteGIFTILabel: colortable is empty!`,
+`ERROR_BADFILE`. Then an array `NIFTI_INTENT_LABEL` (`INT32`, one dimension of the vertex count)
+with `Name` `node label`, replaced by the second label's name when the table has exactly two labels;
+each vertex's value the place of the first entry whose integer colours are its annotation's red,
+green and blue bytes (`CTABfindAnnotation`), -1 when none. FS-397: FreeSurfer sizes the table by
+the entries that exist, so an entry without a name leaves an unnamed place at the end and the image
+is refused (`** invalid nvpair label[<k>]`, then `MRISwriteGIFTI: GIFTI file <file> is invalid!`);
+by default the table holds the named entries only (`reproduce`: FreeSurfer's). FS-398: a surface
+without a colour table crashes FreeSurfer; by default `MRISwriteGIFTILabel: the surface has no colour
+table` on standard error, `ERROR_BADPARM` (-4).
+
+**109.5 Values from a volume** (`MRISwriteGIFTI(mris, mri, intent, file, name, type)`): the surface
+(`NIFTI_INTENT_POINTSET`/`_TRIANGLE`) or the labels as above; `NIFTI_INTENT_SHAPE`: one array of the
+vertex count with `Name` (the given name, when given) and `ShapeDataType` (the given type, when given,
+even empty), the volume's first frame; a statistics intent: arrays with `Intent_code` (and the uniform
+range) of the volume's frames; any other intent (colours included): no array. The voxels are taken
+slice by slice, row by row, column by column. FS-399: FreeSurfer stores each voxel at the vertex of
+its column, so the later rows and slices overwrite the first and a column past the vertex count gives
+the setter's message; by default each voxel goes to the vertex of its place in the volume (`column +
+width * (row + height * slice)`). FS-400: FreeSurfer writes one statistics array whatever the frames,
+holding the last frame (a volume of no frames: one array without attributes, which the check
+refuses); by default one array per frame (none for no frames).
+
+**109.6 The combined file** (`MRISwriteGIFTICombined(mris, overlays, file)`): the surface (§109.3),
+then each overlay with its intent from its overlay type (the shape types 100 to 104
+`NIFTI_INTENT_SHAPE`, 201 to 223 the statistics intents 2 to 24, 224 `NIFTI_INTENT_ESTIMATE`, any
+other `NIFTI_INTENT_NONE`, which writes nothing), written as §109.5 with the overlay's volume, name and
+data type (an empty data type gives an empty `ShapeDataType`). FS-523: an overlay without its volume
+crashes FreeSurfer (after its shape array's attributes and messages; at once for statistics); by
+default `MRISwriteGIFTIIntent: the overlay has no values`, `ERROR_BADPARM`. FS-524: an overlay of the
+generic statistics type 200 (the GIFTI reader's, §107.4) has no intent, so FreeSurfer drops it; by
+default its own GIFTI intent is used when it is a statistics intent.
+
+**109.7 Counting** (`getShapeStatIntentCount(file, &nvertices, &nfaces)`): the file read and checked
+as §110.1's steps 1 to 3 (with `getShapeStatIntentCount()` as the name); 0 on a failure. Each array
+in order: a `NIFTI_INTENT_POINTSET` array (rows and columns as §107.1) must have at least one row and
+3 columns, else `getShapeStatIntentCount(): malformed coords data array in file <file>:
+num_vertices=<n> num_cols=<c>`, 0; its rows go to `nvertices`; a `NIFTI_INTENT_TRIANGLE` array
+likewise (`malformed faces ... num_faces=<n> num_cols=<c>`; `nfaces`); label, general-matrix, vector,
+RGB and RGBA arrays are passed over; every other array counts. The outputs keep their values when no
+array sets them.
+
+## 110. GIFTI files as volumes (queue item 3.1-26; relay 22)
+
+**110.1 Reading** (`MRISreadGiftiAsMRI(file, read_volume)`, `MRIread`'s reader of `.gii` names).
+1. gifticlib's read with the data; a failure: `MRISreadGiftiAsMRI: gifti_read_image() returned
+   NULL` (after gifticlib's messages), `NULL`.
+2. A `Version` of `1` becomes `1.0`; none: FS-395 (§107.1).
+3. gifticlib's check: `MRISreadGiftiAsMRI: GIFTI file <file> is invalid!`, `NULL`.
+4. The intents `NIFTI_INTENT_TIME_SERIES`, `NIFTI_INTENT_SHAPE`, `NIFTI_INTENT_NONE`,
+   `NIFTI_INTENT_NORMAL`, `NIFTI_INTENT_LABEL`, in this order: the arrays of the first one the file
+   has are the volume's frames. The first array's rows (§107.1) are the vertex count; every further
+   array must have that many rows and one column, else `MRISreadGiftiAsMRI: malformed time-series
+   data array in file <file>: nvertices=<rows> ncols=<the first array's columns> expected
+   num_vertices=<n>` (as `int`s), `NULL`. FS-521: FreeSurfer chooses correctly only when every array
+   of the file has that intent; otherwise it counts the arrays of every intent of the list (applying
+   the same size check across them) and then uses an intent read from memory it never wrote (in the
+   probe's runs one no array had: every value 0, the printed name `NIFTI_INTENT_NONE`). By default the
+   first intent found is chosen and only its arrays counted.
+5. No array of these intents: `MRISreadGiftiAsMRI: no overlay data found in file <file>`, `NULL`.
+6. `INFO: Found <frames> <gifticlib's name of the intent> DataArray` on standard output.
+7. The volume: `<vertices>` columns, 1 row, 1 slice, one frame per array; labels: `MRI_INT` voxels,
+   intent `MGZ_INTENT_LABEL` (1), the colour table from the file's label table (§107.3); shapes
+   intent `MGZ_INTENT_SHAPE` (2); time series `MGZ_INTENT_TIME_SERIES` (5); the others
+   `MGZ_INTENT_MRI` (0), `MRI_FLOAT`; the version `(intent << 8) | 1`. Without `read_volume`: the
+   header only (`MRI_FLOAT` whatever the intent, the frames, intent, version, colour table, the
+   repetition time). Else each array of the intent in file order fills the next frame: column `v` the
+   array's row `v`, column 0 (§107.1's accessor, made a `float`; a label value of -1 stored as 0),
+   stored with `MRIsetVoxVal`.
+8. The repetition time: the first array's `TimeStep` read by `sscanf("%f")` (unchanged when absent
+   or unreadable).
+
+**110.2 Writing** (`mriWriteGifti(mri, file)`, `MRIwrite`'s writer of `.gii` names): one array per
+frame, `NIFTI_INTENT_NONE` for a volume of one frame, `NIFTI_INTENT_TIME_SERIES` with `TimeStep`
+(`%f` of the repetition time) for several, one dimension, each voxel's value (`MRIgetVoxVal`, as
+`float`); §109.1's metadata (no `SubjectID`), check and messages with the name `mriWriteGifti`.
+FS-522: FreeSurfer writes the first row of the first slice only (the array's length the width); by
+default every voxel, column by column, row by row, slice by slice.
+
+## 111. Validation plan, part 20
+
+The probe's `gwr` command (relay 22): an empty work folder with `d` and `mri/transforms`; `Gdiag`'s
+show and verbose bits; a creation-time replacement (a date, empty, a word); 0 to 2 generated GIFTI
+files (§108's generator; random bytes one in 20) and a subject's `talairach.xfm` one case in three
+(§93's generator); a surface from `MRISalloc` of 0 to 24 vertices and up to twice as many faces
+(vertex numbers outside the surface in heavy cases), each vertex's coordinates (`tri`'s, §78), curvature,
+`stat` (eighths, NaN and infinities in heavy cases) and annotation (a colour of the case's table or
+any 24-bit value, -1 now and then); the surface's name (`lh.white`, `/s/surf/rh.pial`, `lh.inflated`,
+`lh.orig`, `rh.sphere.reg`, `lh.smoothwm`, `lh.graymid`, `lh.pial-outer-smoothed`, `rh.qsphere.nofix`,
+`x`, empty), subject, patch flag, real RAS, a volume geometry (`tri`'s, §78, singular ones included), centre,
+group-average area (0, 1e-8, NaN, sixteenths), 0 to 3 command lines (1,000 to 1,100 bytes in heavy
+cases), a 4 x 4 or 3 x 4 Talairach matrix one case in three; a colour table three cases in four (0 to
+6 places, some empty, names empty one in eight); 1 to 3 volumes (`MRI_FLOAT`, `MRI_UCHAR`, `MRI_INT`,
+`MRI_SHORT`; the vertex count or 1 to 30 columns, 1 to 3 rows and 1 to 2 slices one in four, 1 to 3
+frames, a repetition time); then 1 to 4 of `MRISwriteGIFTI` (every intent kind, a curvature name or
+none), its volume form, `MRISwriteGIFTICombined` (0 to 3 overlays of shape, generic, specific and
+unknown types, with or without a volume), `mriWriteGifti`, `MRISwrite` of a `.gii` name,
+`getShapeStatIntentCount` and `MRISreadGiftiAsMRI` (with or without the voxels) on the inputs, on the
+files written before, or on a missing file; names in `d`, at the top or in a missing folder. Each
+writer's answer and its file (absent: `NOFILE`) with the `UserName` value written `U` and each
+`<Data>` payload decoded and inflated (the bytes compared, not zlib's stream); the count with both
+outputs; the volume's extent, frames, type, intent, version, repetition time, colour table and
+voxels. Counted, not compared: FS-521 (memory never written). FS-398's and FS-523's cases compare as
+FreeSurfer's crash; fs.io's FS-214 address written `(nil)` on both sides. Observed (relay 22): the
+probe README. The defaults are checked by `tests/gifti_writers.rs` (each against `reproduce`).
+
+## 112. Volumes of one voxel per vertex: autocorrelation and kernel smoothing (queue item 3.1-51; relay 23)
+
+A volume "of one voxel per vertex" has width x height x depth equal to the surface's vertex count
+(products in `int`); vertex `v` is the voxel at column `v mod width`, row `(v / width) mod height`,
+slice `v / (width height)` (columns fastest). Values are read and written as 32-bit floats at the
+voxel's place (FS-525 below); sums are in `double`, each value made `double` first; NaN operands
+propagate as x86-64 SSE2 does (the first operand's payload, quieted; 0/0 the default NaN with its
+sign bit set), the operand order being the one stated.
+
+**112.1 The vertex-to-voxel table** (`MRIScrsLUT(surf, vol)`): the three lists (column, row, slice)
+of the vertices in that numbering; a volume of another voxel count: `ERROR: MRIScrsLUT: surf/src
+dimension mismatch.` on standard output, no table (FS-528: FreeSurfer leaks the table it began).
+`MRIScrsLUTFree` returns 0.
+
+**112.2 Hop lists** (`SetSurfHopList(centre, surf, n)`): list 0 holds the centre; list `h` (1 to
+`n - 1`) holds, in order, the neighbours (each vertex's first `vnum` neighbours, ripped ones
+included) of the vertices of list `h - 1`, taken in their list order, that no list holds yet. Then
+every listed vertex's `undefval` is set to its list number (the vertices in no list keep theirs).
+`SurfHopListFree` returns 0. FS-530: fewer than one hop: FreeSurfer writes into empty lists and the
+program crashes; by default refused (`SetSurfHopList: <n> hops: at least 1 is needed` on standard
+error, no list).
+
+**112.3 The variance and cross term.** A vertex's sum of squares over the frames,
+`s = s + x * x` frame by frame from 0; a vertex whose sum is exactly 0 is skipped (a NaN sum is
+not). Its variance `s / nframes`. With a neighbour: frame by frame `q = q + y * y` (the neighbour's
+value `y`) and `p = p + x * y`; a neighbour whose `q` is exactly 0 is skipped; otherwise the term
+`(p / nframes) / sqrt(nbrvar * vtxvar)` with `nbrvar = q / nframes` (the product in that order;
+`sqrt` correctly rounded, no `errno`), added as `term + sum`. A vertex or neighbour is also skipped
+when ripped, or when a mask volume is given and its voxel there, frame 0 (`MRIgetVoxVal`, made
+`double`) is below 0.5.
+
+**112.4 `MRISar1(surf, src, mask, ar1)`**: `src` not of one voxel per vertex: `ERROR: MRISar1:
+Surf/Src dimension mismatch.` on standard output, `NULL`. The output: the given volume, else a new
+one-frame `MRI_FLOAT` volume of `src`'s geometry (`MRIcloneBySpace`, zeros). For each vertex in order
+(skipped as §112.3), the mean `sum / count` over its first `vnum` neighbours (skipped as §112.3), in
+`double`, stored as a float at its voxel, frame 0, when the count is not 0.
+
+**112.5 `MRISarN(surf, src, mask, arN, N)`**: the same with `ERROR: MRISarN: Surf/Src dimension
+mismatch.`; the new output has `N` frames. For each vertex (skipped as §112.3): frame 0 set to 1;
+its hop lists (§112.2, `N` hops; their `undefval`s set); for each hop `h` from 1 to `N - 1` the mean
+term over that list's vertices (skipped as §112.3) stored in frame `h` when any counted. FS-530:
+`N` below 1: FreeSurfer crashes at the first vertex not skipped (a new output of `N` frames is made
+first: 0 frames for 0, `src`'s frames for a negative `N`); by default refused (`ERROR: MRISarN: <N>
+hops: at least 1 is needed` on standard output, `NULL`).
+
+**112.6 `MRISsmoothKernel(surf, src, mask, mrikern, globkern, &shl, out)`**:
+1. Both kernels given: `ERROR: MRISsmoothKernel(): cannot spec both mrikern and globkern`, `NULL`.
+2. `src` not of one voxel per vertex: `ERROR: MRISsmoothKernel(): Surf/Src dimension mismatch.`,
+   `NULL`.
+3. No output: a new `MRI_FLOAT` volume of `src`'s geometry and frames; the output `src` itself:
+   `ERROR: MRISsmoothKernel(): cannot run in-place`, `NULL`; a given output is not cleared (FS-529,
+   kept: the vertices skipped keep its values).
+4. `nhops`: the per-vertex kernel's frames, or the global kernel's rows (0 without either);
+   `nhops = <n>`. The weights: the global kernel's first column, rows 1 to `nhops` (as `double`).
+5. FS-530: `nhops` below 1: FreeSurfer crashes making the hop lists (when it makes them); by default
+   refused (`ERROR: MRISsmoothKernel(): <n> hops: at least 1 is needed`, `NULL`).
+6. Without hop lists from an earlier call: `Allocating shl <nv>`, the hop lists of every vertex in
+   order (§112.2, `nhops` hops, setting `undefval`s), kept for the next call; `Done allocating shl
+   <nv>, <s> sec` (`%g` of the elapsed milliseconds / 1000).
+7. `Starting loop over <nv> vertices`. For each vertex not ripped or masked (§112.3), each frame:
+   over the hops `h` and their vertices not ripped or masked, `k = value * w_h + k` and, for frame 0
+   only, `a = |w_h| + a` (`a` kept for the later frames); when any counted, `k / a` stored as a float
+   at the vertex's voxel and frame. FS-526: with a per-vertex kernel FreeSurfer reads each vertex's
+   weights (voxel `(vertex, 0, 0, h)`) but weighs by the global weights, all 0 then: every stored
+   value is 0/0, NaN; by default the vertex's own weights are used. FS-533: hop lists from an earlier
+   call with fewer hops than `nhops`: FreeSurfer reads past them; both modes count the missing hops as
+   empty (noted).
+8. An empty line, `Finished loop over <nv> vertices, <nhops> hops, t=<s> sec`, `vtxval <x>` (`%g` of
+   the output's value at column 1031, row 0, slice 0, frame 0). FS-527: for an output narrower than
+   1,032 columns FreeSurfer prints another voxel's value (the float at that offset from the first
+   row, inside the output's memory) or memory outside it; by default 0 (the other voxel with
+   `reproduce`; outside it 0 in both modes).
+
+**112.7 FS-525 and FS-534.** The functions read `src` and write their output as 32-bit floats at
+the float offset of the voxel's row (rows stepping by the volume's own voxel size): a volume of
+another type gives floats made of other voxels' bytes. By default such a volume is read and written
+by value (`MRIgetVoxVal`, `MRIsetVoxVal`); with `reproduce` the bytes FreeSurfer reads and writes.
+FS-534: for a type smaller than a float the later places lie past the volume's memory: FreeSurfer
+reads memory contents and corrupts memory by writing; with `reproduce` such reads give 0 and such
+writes are dropped (both noted).
+
+## 113. Surface RAS to voxel (`mriSurfaceRASToVoxel`; queue item 3.1-51; relay 23)
+
+A process-wide matrix (`VoxelFromSRASmatrix`, unset in FreeSurfer: no program sets it) maps a
+surface RAS point `(x, y, z)` to voxel coordinates.
+1. At the first call, `FREESURFER_mriSurfaceRASToVoxel_both` set (any value) selects both ways,
+   else `FREESURFER_mriSurfaceRASToVoxel_old` the old way alone, else the new way alone; later calls
+   keep that choice.
+2. The new way applies when chosen and the matrix is real 4 x 4: for rows `i` = 1 to 3,
+   `((m[i][1] x' + m[i][2] y') + m[i][3] z') + m[i][4]` in `double`, with `x' y' z'` the point's
+   coordinates rounded to `float` and the elements made `double`, the sum rounded to `float`.
+3. The old way applies when chosen or when the new way does not: the matrix times the 4 x 1 float
+   vector `(x, y, z, 1)` (`MatrixMultiply`, float arithmetic), its rows 1 to 3.
+4. With both ways: the two are compared coordinate by coordinate (`a` and `b` agree when the larger
+   magnitude is below 1e-6, or when `|a - b|`, in float, is below 1 % of it, compared in `double`).
+   FS-531: FreeSurfer prints `<build folder>/utils/mrisurf_metricProperties.cpp:11755 not same answer`
+   on standard error and crashes when they agree in any coordinate; by default the message is printed
+   when they differ in some coordinate, and the old way's answer returned.
+5. The answer (the old way's when it applied): returns `NO_ERROR` (0) with the three coordinates.
+6. FS-532: no matrix: FreeSurfer crashes (with the old way alone, `MatrixMultiply`'s refusal of the
+   missing matrix ends the program first: `MatrixMultiply(): m1 is null`, its break line, the error,
+   exit status 252); a product `MatrixMultiply` refuses (a matrix of other than four columns: its
+   messages) crashes it; a product of fewer than three rows is read past. By default no matrix gives
+   `mriSurfaceRASToVoxel: no surface RAS to voxel matrix` on standard error and `ERROR_BADPARM`
+   without coordinates, a refused product `ERROR_BADPARM` after `MatrixMultiply`'s messages; missing
+   rows read as 0 in both modes (noted).
+
+## 114. Validation plan, part 21
+
+The probe's `mpf` command (relay 23): a surface read by `MRISread` from a binary triangle file
+(subdivided icosahedra of 42 or 162 vertices on spheres of radius 1, 10 or 100, open grids of 2 to 6
+by 2 to 6 vertices, `srd`'s small meshes), 0 to 3 vertices ripped; one case in three
+`FREESURFER_mriSurfaceRASToVoxel_both`, `_old` or both set; 1 to 3 volumes (`MRI_FLOAT`, one in six
+`MRI_UCHAR`, `MRI_INT` or `MRI_SHORT`) of the vertex count as one column, row or slice, or half
+columns by two rows, one in eight a voxel more or fewer, 1 to 4 frames, values 0 (one in five),
+eighths in [-2, 2], NaNs and infinities in heavy cases; then 1 to 3 of: `MRIScrsLUT` (the lists or
+`NULL`), `MRISar1`, `MRISarN` (1 to 4 hops, 0 or -1 one in eight), `MRISsmoothKernel` (a per-vertex
+kernel volume, a global kernel of 1 to 4 rows and 1 to 2 columns, both, or neither; the earlier
+call's hop lists reused when they have the hops needed; a new output, a volume of the case (written
+in place) or the input itself), `SetSurfHopList` (1 to 5 hops, 0 one in ten), `mriSurfaceRASToVoxel`
+(no matrix one in six, else 4 x 4 or 3 to 5 rows by 3 to 5 columns of such values; 1 to 3 points of
+quarters or any double). Each prints the volume's frames and every voxel's float bits (or `NULL`), the
+lists, the vertices' `undefval`s, the answers and coordinates. `MRISsmoothKernel`'s elapsed times
+and its closing value are written `<t>` and `<v>` on both sides (not compared; FS-527 is checked by
+the defaults' tests). Counted, not compared: FS-534 (memory contents), FS-533 (never generated),
+fs.mri's FS-53. FS-530's, FS-531's and FS-532's cases compare as FreeSurfer's crash. Observed
+(relay 23): the probe README. The defaults are checked by `tests/props9_defaults.rs`.

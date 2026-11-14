@@ -3,17 +3,21 @@
 // 2026 Karel Lopez Vilaret.
 //! fs.io against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the official
 //! build's output lines for the probe's recorded cases (`cases::recorded_cases`: seed 1's 4,800
-//! portable cases, about 87 of each of the 55 commands that behave alike on every platform: piece
+//! portable cases, about 49 of each of the 99 commands that behave alike on every platform: piece
 //! 1's ten, piece 2's twelve, piece 3's six, piece 4's seven (the format probe's file cases made
 //! portable), piece 5's seven (mosaics, MATLAB files), piece 6's five (reading volumes and
-//! registration files) and piece 7's seven (Bruker studies), without those that take seconds in a
-//! debug build, `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by
-//! `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable --light` on Linux x64 from the
-//! unit oracle's build (2026-11-13, track A relay 17, with piece 7: 4,799 cases, 4,192 lines
-//! identical, 81 of them with memory digits; 607 hashed as `SKIP`), against the port's output with
-//! `reproduce`. A `?` digit (a byte FreeSurfer reads from memory contents) is hashed as `?`; the
-//! lines the port marks `SKIP` or `VARY` are hashed as `SKIP` (lines where FreeSurfer crashes,
-//! reads for ever, depends on the machine or on memory contents, and formats not ported yet).
+//! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images), piece 9's
+//! one (fs.core's ArgumentParser), piece 10's sixteen (fs.labels' text colour tables and
+//! lookups, registration files), piece 11's thirteen (labels, control points, annotation tables,
+//! point sets) and piece 12's four (GIFTI volumes read and written, point-set files, the XML help
+//! renderer), without those that take seconds in a debug build,
+//! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
+//! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 21, with piece 12:
+//! 4,798 cases, 4,236 lines identical, 41 of them with memory digits; 562 hashed as `SKIP`),
+//! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
+//! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
+//! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
+//! and formats not ported yet).
 //!
 //! When the hash differs, the assertion names the first case whose output differs from the
 //! recorded per-case digests (`fs_io/official_digests.txt`: the first 48 bits of the SHA-256 of
@@ -30,8 +34,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "93576fdf78cc9d86e46e5d625dc9a240155dead5e835f7bce4b1faeb8552e6d8";
-const SKIPPED: usize = 607;
+const OFFICIAL_SHA256: &str = "0ab4252a25f8c72651f78c40a740717a4d8216bdae0548951562daf0010234c2";
+const SKIPPED: usize = 562;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

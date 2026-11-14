@@ -25,12 +25,18 @@ use larmorx_freesurfer_io::fio;
 use larmorx_freesurfer_io::mriio_old;
 use larmorx_io::znz::ZnzFile;
 
+#[path = "piece10.rs"]
+pub(crate) mod piece10;
+#[path = "piece11.rs"]
+pub(crate) mod piece11;
+#[path = "piece12.rs"]
+pub(crate) mod piece12;
 #[path = "piece2.rs"]
 mod piece2;
 #[path = "piece3.rs"]
 mod piece3;
 #[path = "piece4.rs"]
-mod piece4;
+pub(crate) mod piece4;
 #[path = "piece5.rs"]
 mod piece5;
 #[path = "piece6.rs"]
@@ -49,35 +55,35 @@ impl Gen {
     pub fn new(seed: u64) -> Gen {
         Gen(seed)
     }
-    fn next(&mut self) -> u64 {
+    pub(crate) fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
         z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
         z ^ (z >> 31)
     }
-    fn below(&mut self, n: u64) -> u64 {
+    pub(crate) fn below(&mut self, n: u64) -> u64 {
         self.next() % n
     }
-    fn int(&mut self, lo: i64, hi: i64) -> i64 {
+    pub(crate) fn int(&mut self, lo: i64, hi: i64) -> i64 {
         lo + self.below((hi - lo + 1) as u64) as i64
     }
-    fn pick<T: Copy>(&mut self, xs: &[T]) -> T {
+    pub(crate) fn pick<T: Copy>(&mut self, xs: &[T]) -> T {
         xs[self.below(xs.len() as u64) as usize]
     }
-    fn chance(&mut self, k: u64) -> bool {
+    pub(crate) fn chance(&mut self, k: u64) -> bool {
         self.below(k) == 0
     }
 }
 
-fn hex(b: &[u8]) -> String {
+pub(crate) fn hex(b: &[u8]) -> String {
     if b.is_empty() {
         return "-".into();
     }
     b.iter().map(|c| format!("{c:02x}")).collect()
 }
 
-fn unhex(s: &str) -> Vec<u8> {
+pub(crate) fn unhex(s: &str) -> Vec<u8> {
     if s == "-" {
         return Vec::new();
     }
@@ -87,7 +93,7 @@ fn unhex(s: &str) -> Vec<u8> {
 }
 
 /// `N` or `x<hex>`.
-fn enc(s: Option<&[u8]>) -> String {
+pub(crate) fn enc(s: Option<&[u8]>) -> String {
     match s {
         None => "N".into(),
         Some([]) => "x".into(),
@@ -95,7 +101,7 @@ fn enc(s: Option<&[u8]>) -> String {
     }
 }
 
-fn dec(t: &str) -> Option<Vec<u8>> {
+pub(crate) fn dec(t: &str) -> Option<Vec<u8>> {
     if t.starts_with('N') {
         None
     } else if t.len() == 1 {
@@ -241,12 +247,12 @@ const FORMATS: [&str; 20] = [
 ];
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
-/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-13, track A
-/// relay 18, with pieces 8 and 9: a 100,000-entry colour table and a .mat file whose corrupted
-/// header makes the readers allocate and hash millions of numbers, 1.8 of the 2.8 s). The
-/// recorded test (`fs_io_official.rs`) leaves them to the probe's runs (`check.py --portable`
-/// without `--light`, every seed's full runs), which keep them.
-pub const HEAVY_SEED1: [usize; 2] = [485, 4664];
+/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-14, track A
+/// relay 21, with piece 12's four commands; first 2026-11-13, relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
+/// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
+/// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
+/// them.
+pub const HEAVY_SEED1: [usize; 2] = [1140, 1239];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]
@@ -281,6 +287,9 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece7::KINDS);
     kinds.extend(piece8::KINDS);
     kinds.extend(piece9::KINDS);
+    kinds.extend(piece10::KINDS);
+    kinds.extend(piece11::KINDS);
+    kinds.extend(piece12::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -313,6 +322,18 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece9::KINDS.contains(&kind) {
             lines.push(piece9::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece10::KINDS.contains(&kind) {
+            lines.push(piece10::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece11::KINDS.contains(&kind) {
+            lines.push(piece11::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece12::KINDS.contains(&kind) {
+            lines.push(piece12::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -572,7 +593,7 @@ fn escape(b: &[u8]) -> String {
 
 /// The program's standard output and error, in the order written.
 #[derive(Clone, Default)]
-struct Shared(Rc<RefCell<Vec<u8>>>);
+pub(crate) struct Shared(pub(crate) Rc<RefCell<Vec<u8>>>);
 
 impl Write for Shared {
     fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
@@ -585,7 +606,7 @@ impl Write for Shared {
 }
 
 #[derive(Default)]
-struct Out(String);
+pub(crate) struct Out(pub(crate) String);
 
 impl Out {
     fn i(&mut self, v: i64) {
@@ -656,8 +677,30 @@ fn mem_of(n: usize, got: usize) -> usize {
     got.min(n)
 }
 
+/// A piece of cases a crate that includes this module adds (larmorx-freesurfer-volume's piece 13):
+/// the case's answer, `None` when the line is not one of its.
+pub(crate) type ExtraPiece = fn(
+    &[&str],
+    &mut Globals,
+    &mut dyn Write,
+    &mut dyn Write,
+    &mut Out,
+    &Work,
+    &mut Vec<&'static str>,
+) -> Option<Result<(), u8>>;
+
 /// The port's answer to one case line.
 pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'static str>) {
+    run_line_with(line, mode, w, None)
+}
+
+/// [`run_line`] with the cases of `more` too.
+pub(crate) fn run_line_with(
+    line: &str,
+    mode: UpstreamDefects,
+    w: &Work,
+    more: Option<ExtraPiece>,
+) -> (String, Vec<&'static str>) {
     let shared = Shared::default();
     let mut io = shared.clone();
     let mut g = Globals::new(mode);
@@ -665,6 +708,13 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
     let mut o = Out::default();
     let mut extra: Vec<&'static str> = Vec::new();
     let res: Result<(), u8> = (|| {
+        if let Some(more) = more {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            if let Some(r) = more(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra) {
+                return r;
+            }
+        }
         if piece2::KINDS.contains(&t[0]) {
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
@@ -704,6 +754,21 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece9::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece10::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece10::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece11::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece11::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece12::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece12::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {
@@ -1092,6 +1157,8 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
     };
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
+        // libstdc++'s terminate ends with abort (SIGABRT); the port's status 134 stands for it
+        Err(134) => "CRASH 6".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
     let mut ids: Vec<&'static str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();

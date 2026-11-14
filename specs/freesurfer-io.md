@@ -13,7 +13,11 @@ the zeroed allocation that ends the program. **Part 2** (§10-18, the item's sec
 tags, the matrix tags, the binary colour tables, a volume geometry's stored form, the tags of an
 `.mgz` and of FreeSurfer's NIfTI header extension (`FStagsIO`). **Part 3** (§19-24, the item's third
 piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and gradient spaces.
-Later parts: the volume formats.
+Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 9** (§65-74, queue item
+3.1-33's first piece, fs.labels): text colour tables, their lookups, random colours, tissue-type
+schemas; §75 (3.1-34): the rest of the registration files; part 10 (§76-82): labels, control points,
+annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; **part 12**
+(§87-89): a label's coordinates converted, one frame of a volume written.
 
 ## 1. Conventions
 
@@ -1571,3 +1575,646 @@ counted); `fix` differs only where a defect is noted. FS-412: a scale whose exte
 fails); the default refuses it: `ImageScaleUp`/`ImageScaleDown` print `<function>: scale <s> gives
 extents beyond the int range` + newline and return -1, `ImageRescale` without an output ends the
 program with that message (code -4).
+
+## 65. Conventions of part 9 (fs.labels: text colour tables and lookups)
+
+Queue item 3.1-33's first piece (`fs.labels`). A colour table (§13) has `nentries` places, each
+empty or holding an entry: a name (a C string, at most 1,023 bytes), integer red, green, blue and
+alpha, float red, green, blue and alpha, a tissue type and a voxel count; and the table's file name,
+version, `idbase` (added to the structure numbers when written), a tissue-type schema name and an
+optional tissue-type table (itself a colour table). The place of an entry is its **structure
+number**. An entry's **annotation** packs its colour into one 32-bit `int`: blue × 65,536 + green ×
+256 + red, computed as `(b << 16) + (g << 8) + r` in 32-bit two's complement (wrapping for components
+outside 0 to 255); an annotation's colour is its low three bytes (red the lowest). A float colour is
+the integer one converted to `float`, divided by 255 in `double`, rounded to `float`. Errors that
+"return" print `error: <message>` (FS-01's NUL byte under `reproduce`) after `errno`'s text when
+`errno` is not 0, and set `Gerror` (`specs/freesurfer-core.md` §2). Lines are read as C's `fgets`
+with a 1,024-byte buffer (a longer line is taken in pieces of 1,023 bytes, each a line; a NUL byte
+ends what the line holds), numbers and names with `sscanf` (`%d`, `%s`; `specs/freesurfer-maths.md`
+§18.1 for `errno`). "Standard output" messages are `printf`s. The random colours come from fs.core's
+`randomNumber(0, 255)` rounded by `nint` (`specs/freesurfer-core.md` §9 and §11: the stream
+`setRandomSeed` starts, `FREESURFER_SEED` or the clock when none was set).
+
+## 66. Reading a text colour table (`CTABreadASCII`, `CTABreadASCII2`)
+
+`CTABreadASCII(name)` is `CTABreadASCII2(name, 1)`. A file that does not open: the error
+`CTABreadASCII(<name>): could not open file` (`ERROR_NOFILE`), no table. Otherwise two passes:
+
+1. **The size.** Each line through `fgetl` (`specs/freesurfer-core.md` §10: lines empty or starting
+   with `#` after white space skipped, the rest cut at the first `#`, the newline dropped): when
+   `"%d %s %d %d %d %d"` assigns six values, its first is a candidate; the table's size is the
+   largest candidate plus one (32-bit, wrapping). No candidate above 0 (a table of only structure 0
+   included): the error `CTABreadASCII(<name>): badly formed file` (`ERROR_NOFILE`), no table.
+2. **The entries.** From the start again, every line as it is (`fgets`, comments not cut), numbered
+   from 1 (each piece of a long line counts): `"%d %s %d %d %d %d %d"`; six or seven values make an
+   entry at the first value's place: the name, red, green, blue, alpha 255 minus the sixth value
+   (wrapping), the float colours, the tissue type the seventh value (-1 when there is none), count
+   0. A place already taken: `CTABreadASCII(<name>): Line <n>: Duplicate structure index <s>, was
+   <name> <r> <g> <b> <a>` + newline on standard output (the entry already there), the line
+   dropped, and the global count `ctabDuplicates` (set to 0 before this pass) raised.
+
+Then, when asked (the second argument not 0), the duplicate names (§70); then the tissue-type table
+(§67), which reopens the file. The table's file name is the name given (at most 1,023 bytes),
+version 2, `idbase` 0, schema empty. `errno` is what the reads left (a folder read fails with 21,
+`Is a directory`, printed before a later error; a number beyond `int` leaves 34).
+
+**FS-413:** a second-pass line whose structure number is negative, or is not below the size (the
+largest number's line has a `#` in its name: the first pass cut it as a comment; the second does
+not), is stored outside FreeSurfer's table: memory corruption, a crash, or another object's values.
+Default: a negative number is the error `CTABreadASCII(<name>): Line <n>: negative structure index
+<s>` (`ERROR_BADFILE`), no table (rule B); a larger one grows the table to hold it (rule A: such a
+name is kept when its number is within the table, so it is kept here too). `reproduce`: both lines
+are left out. Both noted. **FS-420:** a size above 2^24 (16,777,216) is refused as FreeSurfer's
+failed allocation: `errno` 12 and `CTABreadASCII(<name>): could not allocate <size> entries`
+(`ERROR_NO_MEMORY`), no table, noted (FreeSurfer's outcome depends on the machine's memory). The
+same for a larger number met in the second pass by default.
+
+## 67. The tissue-type lines (`CTABreadASCIIttHeader`)
+
+The lines `#ctTType <structure> <name> <r> <g> <b> <transparency>` (as `CTABprintASCIItt` writes
+them) describe the tissue classes. A file that does not open: `ERROR: CTABreadASCIItt(): cannot
+open <name>` + newline (standard output), no table. Each line is read whole (`fgets`); the file's
+last line is taken twice (no visible effect). A line counts when it has an item by
+`CountItemsInString` (items separated by spaces and tabs; a newline or carriage return where an
+item would start ends the count) and its first white-space separated item is exactly `#ctTType`.
+First pass: `sscanf("%d")` of the second item gives the largest structure number (`segidmax`, -1
+before any). No such line: no table (FreeSurfer leaves the file open: FS-415; both modes close it,
+no notice). The table has `segidmax + 1` places, no file name, version 0. Second pass:
+`"%*s %d %s  %d %d %d  %d"` of each such line: the entry at the structure's place: the name,
+red, green, blue, alpha 255 minus the transparency, float colours 0, tissue type the structure
+number, count 0.
+
+**FS-414:** (1) a line whose only content is vertical tabs, form feeds or carriage returns among
+spaces and tabs counts as having an item but has no first item: FreeSurfer prints `error: asking
+for item 0, but 0 items in string` and crashes; both modes skip the line (the default without the
+message). (2) A `#ctTType` line without a second item: FreeSurfer prints `error: asking for item 1,
+but 1 items in string` and crashes; both modes give no tissue-type table (the default with the
+message below, `reproduce` with FreeSurfer's). (3) A `#ctTType` line whose structure number, name,
+colour or transparency does not read keeps the value of the last line that read it (memory never
+written before the first), and a structure number outside the table is stored outside it. Default:
+every `#ctTType` line must read six values with a structure number of 0 or more, else `ERROR:
+CTABreadASCIItt(): bad tissue type line in <name>: <the line without its newline>` + newline
+(standard output) and no tissue-type table (rule B). `reproduce`: the earlier lines' values, 0 (and
+an empty name) for memory never written, a structure outside the table left out; noted.
+
+## 68. The default table (`CTABreadDefault`)
+
+`FSENVgetenv` (`specs/freesurfer-core.md` §15, which itself reads
+`$FREESURFER_HOME/FreeSurferColorLUT.txt` with §66 and prints its messages), then §66 of the same
+file again: the default table's messages appear twice (kept). **FS-416:** when `FSENVgetenv` gives
+nothing (`FREESURFER_HOME not defined`, the table unreadable with `ERROR: reading <file>`, a wrong
+`FS_DESIRED_BVEC_SPACE`), FreeSurfer crashes; both modes give no table after those messages, noted.
+
+## 69. Tables of random colours (`CTABalloc`, `CTABunique`, `CTABrandom`, `CTABcountRepeats`)
+
+- `CTABalloc(n)`: a negative `n`: the error `CTABalloc: nentries was <n>` (`ERROR_BADPARM`), no
+  table. Otherwise `n` entries, in order: red, green, blue each `nint(randomNumber(0, 255))`, alpha
+  255, the float colours, name `cluster<i>`; file name `none`, version 2, `idbase` 0; then
+  `CTABunique(table, 100)`. The entries' tissue type and count are memory contents in FreeSurfer
+  that nothing reached reads (0 in both modes, no notice). **FS-420:** above 2^20 entries: `errno`
+  12, `CTABalloc: could not allocate <n> entries` (`ERROR_NO_MEMORY`), no table, noted.
+- `CTABunique(table, nmax)`: up to `nmax` tries (none when `nmax` ≤ 0): `CTABrandom`, then stop when
+  `CTABcountRepeats(table, 1)` is 0. Then entry 0 becomes `unknown`, colour, alpha and float colours
+  0. When the number of tries made equals `nmax` (also when the last try succeeded, and for
+  `nmax` = 0: kept, rule C): `INFO: CTABunique() could not find a unique set in <nmax> tries` +
+  newline (standard output) and -1; else 0.
+- `CTABrandom(table)`: every entry in order gets new red, green, blue (drawn as above), alpha 255
+  and the float colours; 0.
+- `CTABcountRepeats(table, stop)`: for each entry i and each later entry j with the same float red,
+  green and blue, one repeat; with `stop`, only the first such j per i. Returns the count.
+
+**FS-417:** FreeSurfer crashes on an empty place in `CTABrandom`, `CTABcountRepeats` and
+`CTABunique`, and in `CTABunique` (so `CTABalloc(0)`) on a table without entry 0; both modes skip
+empty places (no colours drawn for them) and make no `unknown` entry, noted.
+
+## 70. Counts, tests and lookups
+
+| function | result |
+|---|---|
+| `CTABgetNumberOfValidEntries` | the non-empty places (`NO_ERROR`) |
+| `CTABgetNumberOfTotalEntries` | `nentries` |
+| `CTABisEntryValid(i)` | 1 or 0; outside 0 to `nentries` - 1: error `CTABisEntryValid: index <i> was OOB`, `ERROR_BADPARM`, the answer untouched |
+| `CTABhasEntry(i)` | true for a non-empty place inside the table, false otherwise (no message) |
+| `CTABrgbAtIndexi(i)` | the integer colour; outside: error `CTABrgbAtIndexi: index <i> was OOB`; an empty place: `ERROR_BADPARM` silently, outputs untouched |
+| `CTABcopyName(i, buf, len)` | `strncpy` of the name into `len` bytes (no NUL when the name has `len` bytes or more); outside: `CTABcopyName: index <i> was OOB`; empty: `ERROR_BADPARM` silently |
+| `CTABrgb2Annotation(r, g, b)` | the annotation (§65) |
+| `CTABentryNameToIndex(name)` | the first entry whose name equals `name` ignoring ASCII case (`stricmp`), else -1 |
+| `CTABentryNameToAnnotation(name)` | that entry's annotation, else -1 |
+| `CTABannotationAtIndex(i)` | the annotation; outside: `CTABannotationAtIndex: index <i> was OOB`; empty: `ERROR_BADPARM` silently |
+| `CTABfindAnnotation(a)`, `CTABfindIndexFromAnnotation(a)` | the first entry of the annotation's colour, else -1 (`NO_ERROR`) |
+| `CTABfindRGBi(r, g, b)` | the first entry of that integer colour, else -1; a component outside 0 to 255: error `CTABfindRGBi: rgb was invalid`, `ERROR_BADPARM`, the answer untouched |
+| `CTABfindName(name)` | as `CTABentryNameToIndex` (`NO_ERROR`) |
+| `CTABfindDuplicateNames` | for every ordered pair of non-empty places with equal names (`strcmp`), `ERROR: label name '<name>' is duplicated!` + newline; then, when there was one, `CTABfindDuplicateNames: <pairs / 2> duplicate names found in:` + newline + two spaces + the file name + newline (standard output); returns pairs / 2 |
+
+A name of 1,024 bytes or more in `stricmp` overflows FreeSurfer's buffer (FS-11, noted).
+
+## 71. Writing a text table (`CTABprintASCII`, `CTABwriteFileASCII`)
+
+`CTABprintASCII(table, stream)`: with `Gdiag`'s `DIAG_INFO` (0x10000), first `[DEBUG]
+CTABprintASCII(): fname = '<file name>' (<its length> bytes)` + newline on standard output. Then
+each non-empty place in order as `%3d  %-30s  %3d %3d %3d  %3d` + newline: the structure number
+plus `idbase` (wrapping), the name without its white-space bytes (C's `isspace`), red, green, blue,
+255 minus alpha (wrapping) (`%-30s` pads with spaces to 30 bytes, longer names are kept whole);
+`ERROR_NONE`. `CTABwriteFileASCII(table, name)`: a new file (`fopen` mode `w`); one that does not
+open: the error `CTABwriteFileASCII(<name>): could not open for writing` + newline (`ERROR_NOFILE`,
+so the message has a newline, then FS-01's NUL, then a newline); else §71's lines into it.
+
+## 72. Tissue-type schemas (`TissueTypeSchema`, `TissueTypeSchemaDefault`, `TissueTypeSchemaDefaultHead`)
+
+`TissueTypeSchema(table, schema)`: `default-jan-2014` → `TissueTypeSchemaDefault`;
+`default-jan-2014+head` or `default-apr-2019+head` → `TissueTypeSchemaDefaultHead`; another: `ERROR:
+tissue type schema <schema> unrecognized` + newline (standard output), no table.
+
+Both schemas: `TissueTypeSchemaDefaultHead` first prints `Entering TissueTypeSchemaDefaultHead()`.
+Without a table, `FSENVgetenv` and §66 of `$FREESURFER_HOME/FreeSurferColorLUT.txt` (FS-416: when
+either gives nothing FreeSurfer crashes; both modes no table). The schema name becomes
+`default-jan-2014`, resp. `default-apr-2019+head` (then `schema <name>` printed). The tissue-type
+table is `CTABalloc(5)`, resp. `CTABalloc(6)` (§69: the random draws happen), its first entries then
+renamed and recoloured (integer colours only): `unknown` 0 0 0, `cortex` 205 62 78, `subcort_gm` 230
+148 34, `wm` 0 255 0, `csf` 120 18 134 and (head) `head` 150 150 200; its float colours stay those
+drawn (entry 0's are 0), alpha 255 (entry 0's 0). **FS-419** (kept, rule C): those float colours do
+not match the integer ones; no reached code reads them. Then every non-empty entry's tissue type, by
+its structure number n (-1 where nothing applies):
+
+- unknown (0): n = 0;
+- cortex (1): 3, 42;
+- subcortical grey matter (2): 8, 47, 17, 53, 18, 54, 13, 52, 10, 49, 51, 12, 50, 11, 26, 58, 28, 60,
+  16, 126, 174, 29, 61, 80; with head also 172, 179, 267, 819, 820, 843, 844, 865, 866, 869, 870;
+- white matter (3): 2, 41, 7, 46, 690, 691, 77, 78, 79, 85, 930, 192, 251 to 255, 34, 66; with head
+  also 821, 822, 853;
+- CSF (4): 14, 15, 24, 257, 4, 43, 5, 44, 31, 63, 72, 30, 62, 914; with head also 75, 76;
+- head (5, head schema only): 258, 165, 259, 118 to 124, 127, 129 to 135, 143 to 145, 167, 262, 263,
+  264, 902, 907, 908, 909, 911, 915, 916;
+- otherwise, the ranges checked in this order, a later match winning: 1000-1035 and 2000-2035
+  cortex; 3000-3035 and 4000-4035 white matter; (head) 3201-3207 and 4201-4207 white matter;
+  1100-1181 and 2100-2181 cortex; 3100-3181 and 4100-4181 white matter; 5001, 5002 white matter;
+  11100-11300 and 12100-12300 cortex.
+
+## 73. Merging (`CTABmerge`)
+
+`CTABmerge(table, merge)`: each non-empty place of `merge` is copied whole (name, colours, tissue
+type, count) into the same place of `table`, replacing what was there; returns 0. **FS-418:** a
+`merge` with more places than `table` makes FreeSurfer write past `table`; by default `table` grows
+to hold them (rule A), `reproduce` leaves those entries out; noted.
+
+## 74. Validation plan (part 9)
+
+The probe's commands (`validation/probes/fs-io/`, piece 10): `cra` (`CTABreadASCII2` with and without
+the duplicate-name check, `ctabDuplicates` set to -7 before), `crt` (`CTABreadASCIIttHeader`), `ctd`
+(`CTABreadDefault` with `FREESURFER_HOME`, `SUBJECTS_DIR`, `FS_DESIRED_BVEC_SPACE` set or not) on
+generated table files: entry lines with every separator, signs, numbers beyond `int`, stray
+characters, a seventh column or not, duplicate structure numbers, names with `#`, case variants and
+bytes beyond ASCII; comments, blank lines, CR LF, lines longer than 1,023 bytes, NUL bytes,
+`#ctTType` lines whole and broken, lines of vertical tabs and form feeds; missing files and folders.
+`cal` (`CTABalloc` after `setRandomSeed`), `cun` (`CTABunique`), `ccr` (`CTABcountRepeats`), `cq`
+(every lookup of §70 on generated tables with empty places, out-of-range indices and components,
+names of every case and length), `cpw` (`CTABwriteFileASCII` and the file's bytes, `DIAG_INFO` on
+or off, names deblanked and longer than 30 bytes, `idbase`, places that do not open), `cps`
+(`CTABprintASCII` to standard output), `cts` (`TissueTypeSchema` of a given table with the schemas'
+structure numbers, or of the default table), `cme` (`CTABmerge`). Each table printed with its
+fields, its non-empty entries (float colours as bits; tissue type and count except for `CTABalloc`'s
+entries) and its tissue-type table; `Gerror` last. Lines with FS-413, FS-416, FS-417, FS-418,
+FS-420, FS-11, or FS-414's crashes and stores outside the table are counted, not compared; FS-414's
+memory never written compared apart. Measured (2026-11-13): seed 13, 1,664 piece-10 cases:
+`reproduce` identical on 1,415, 0 different (230 counted, 19 apart); `fix` differs only where a
+defect is noted (FS-414's default error, FS-01).
+
+## 75. Registration files, the rest (`regio_print_register`, `regio_write_register`, `regio_read_mincxfm`, `regio_write_mincxfm`, `regio_read_registermat`)
+
+Queue item 3.1-34 (with §46's reader). Numbers are printed as glibc's `printf` writes them
+(`specs/freesurfer-core.md`'s formatting: correctly rounded, `nan`, `-nan`, `inf`).
+
+- `regio_print_register(stream, subject, inplaneres, betplaneres, intensity, R, method)`: the
+  subject and a newline (`subject-unknown` when none or empty); the three numbers, each `%f` and a
+  newline; `R`'s first three rows, each of its four numbers `%18.15e` followed by a space, then a
+  newline; `0 0 0 1` and a newline; the method's name and a newline: `tkregister` (2), `floor` (1),
+  `round` (0). Another method: after the matrix, `ERROR: regio_print_register: f2i code = <code>,
+  unrecoginized` (FreeSurfer's spelling) + newline on standard output, no method line, 1; else 0.
+- `regio_write_register(name, ...)`: the same into a new file (`fopen` mode `w`); 0 whatever the
+  print returned. A file that does not open: `regio_write_register: <errno's text>` + newline
+  (standard error), 1.
+- `regio_read_mincxfm(name, &R, fileinfo)`: a file that does not open: `regio_read_mincxfm: <errno's
+  text>` + newline (standard error), `ERROR: could not read <name>` + newline (standard output), 1,
+  `R` untouched. Otherwise the first line by `fgetl` with a 900-byte buffer (comment and blank lines
+  skipped; the text compared is the buffer's: the line's leading white space included, cut at its
+  first `#`, without its newline; at the end of the file the buffer holds the last line read):
+  unless its first 18 bytes are `MNI Transform File`, `ERROR: <name> does not start as 'MNI
+  Transform File'` (no newline, standard output) and 1 (FS-422: FreeSurfer leaves the file open;
+  both modes close it, no notice). The next `fgetl` gives the file information (at the end of the
+  file: the buffer as the first read left it): when asked for, it is kept and printed as a newline,
+  the text and two newlines; otherwise `Not reading in xfm fileinfo` + newline. Then the file is
+  read again: its lines counted (`fgets` with 1,000 bytes: a longer line counts as several), all
+  but the last three skipped, and twelve `%f` read from there (each a separate `fscanf`, white space
+  and line ends skipped) into rows 1-3 of a 4 x 4 matrix of zeros, then 1 at (4, 4); 0. A number that
+  does not read: `regio_read_mincxfm(): <errno's text>` and `Error reading R[<r>][<c>] from <name>`
+  (0-based) on standard error, 1, `R` the matrix read so far (no 1 at (4, 4)). Blank lines at the
+  end take the last three lines' places (the read then fails): kept.
+- `regio_write_mincxfm(name, R, fileinfo)`: `MNI Transform File`; `% <fileinfo>` when given; `% This
+  file was created by <program name>`; `% <currentDateTime()>` (`FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`
+  when set); an empty line; `Transform_Type = Linear;`; `Linear_Transform =`; `R`'s first three
+  rows, each number `%e` and a space, the first two rows ended by a newline, the third by `;` and a
+  newline; 0. A file that does not open: `regio_write_mincxfm: <errno's text>` (standard error),
+  `Could open <name> for writing` (standard output, FreeSurfer's words), 1.
+- `regio_read_registermat(name)`: §46's matrix, nothing when §46 gives 1.
+
+Validation: the probe's piece 10 commands `rpr`, `rwr`, `rrx`, `rwx`, `rrm` (subjects absent, empty,
+with spaces; numbers of every kind: NaN, infinities, -0, subnormal, huge; methods 0, 1, 2 and others;
+`.xfm` files whole or with comments, blank lines, indentation, CR LF, a wrong or indented first line,
+fewer rows, numbers that do not read, trailing blank lines; `register.dat` files whole or short, an
+unknown method; files and folders that do not open). Measured (2026-11-13): seed 13, 710 cases:
+`reproduce` and `fix` identical on all.
+
+## 76. Conventions of part 10 (fs.labels: labels, control points, annotation tables, point sets)
+
+Queue item 3.1-33's second piece. A **label** is a list of points: its allocated places
+(`max_points`), its point count (`n_points`), its coordinate system (`coords`: 0 unknown, 1
+tkregister RAS, 2 scanner RAS, 3 voxels), its file name and subject name (C strings of at most
+1,023 bytes), its coordinate-space text (`space`, at most 99 bytes), an average statistic (a
+`double`), an optional table of vertex indices, its subject's Talairach transform (forward and
+inverse 4 x 4 matrices, or none) and handles to a template volume, a surface and a surface hash
+(none here). Each place holds a vertex number (`int`; -1 means none, 0 is a vertex), x, y, z
+(`float`), voxel indices xv, yv, zv (`int`), a deleted flag (a byte) and a statistic (`float`).
+Places after `n_points` keep what their allocation put there. Errors that "return" are §65's
+(`error: <message>`, after `errno`'s text when `errno` is not 0; `Gerror` set); errors that end the
+program exit with their code's low 8 bits. `<Progname>` is the program's name. Lines are read with
+`fgets` (a buffer of 1,024 bytes unless said otherwise) or `fgetl` (§65: lines empty or starting
+with `#` after their leading white space skipped, the line cut at its first `#`, its leading white
+space and newline removed; a line longer than the buffer is taken in pieces, each a line). Numbers
+are read with `sscanf` (`specs/freesurfer-maths.md` §18.1) and printed as glibc's `printf` writes
+them (correctly rounded; `nan`, `-nan`, `inf`).
+
+## 77. Reading a label (`LabelReadFrom`, `LabelRead`)
+
+`LabelReadFrom(subject, stream)`:
+1. The first line (`fgets`, 1,024 bytes): none (an empty stream) gives no label, silently. When it
+   holds `vox2ras=`, the text after it (to the end of the line, its final newline removed) is the
+   space (FS-423: a text of 100 bytes or more is written past FreeSurfer's field; both modes keep it
+   whole, noted). The coordinates are voxels (3) when the space holds `voxel`; else scanner RAS (2)
+   when the whole line holds `scanner`; else tkregister RAS (1).
+2. The next line by `fgetl`: none: `<Progname>: empty label` (`ERROR_BADFILE`), no label. Its first
+   item read with `%d`: when nothing is assigned, an empty line, the line and a newline on standard
+   output, then `<Progname>: could not scan # of lines from label file` (`ERROR_BADFILE`), no label.
+   The count is `n_points` and `max_points`; `n_points` places are allocated, zeroed. A negative
+   count (or one beyond the machine's memory, FS-426: larmorx refuses more than 2^26) ends the
+   program: `<Progname>: LabelReadFrom could not allocate <b>-sized vector` (`ERROR_NOMEMORY`, after
+   `Cannot allocate memory`), where `<b>` is the low 32 bits of 36 × the count (as `size_t`) read
+   as a signed `int`.
+3. Then up to `n_points` lines by `fgetl`, each read with `%d %f %f %f %f` as vertex, x, y, z and
+   statistic into the next place (the other fields 0); a line that does not give five values:
+   `<Progname>: could not parse <k>th line '<line>' in label file` (`k` from 1), no label. A count of
+   0 reads every remaining line (FS-424: FreeSurfer stores them outside the label; both modes store
+   none, noted).
+4. No point line read: `<Progname>: no data in label file` (`ERROR_BADFILE`), no label. Fewer
+   point lines than the count (FS-425): FreeSurfer keeps the count, its missing points vertex 0 at
+   (0, 0, 0), statistic 0 (`reproduce`); the default keeps only the points read (`n_points` the
+   lines read, `max_points` the count), noted.
+5. With a subject name: `SUBJECTS_DIR` must be set (else `<Progname>: no subject's directory
+   specified in environment (SUBJECTS_DIR)`, exit `ERROR_BADPARM`); the label's subject is the name
+   (cut at 1,023 bytes); the file `<SUBJECTS_DIR>/<subject>/mri/transforms/talairach.xfm`, when it
+   exists, is read as an MNI transform (§75's reader of `input_transform_file`, FreeSurfer's MINC
+   dialect): its forward matrix and inverse become the label's; a file that does not read:
+   `<Progname>: could not load transform file '<name>'` (`ERROR_NOFILE`), no transforms.
+
+`LabelRead(subject, name)`: the file is `<SUBJECTS_DIR>/<subject>/label/<n>.label` when a subject
+is given and the name holds no `/` (`<n>`: the name up to its first `.label`; `SUBJECTS_DIR` must be
+set, as above); otherwise the name itself when it holds `.label`, else the name with `.label` added.
+When that file does not open for reading and the name as given does, the name as given. `errno` is
+cleared and the file opened; when the open sets `errno`, its text and a newline on standard error
+(glibc's `perror(NULL)`); a file that does not open: `<Progname>: could not open label file <file>`
+(`ERROR_NOFILE`; its message is preceded by `errno`'s text again), no label. A folder opens: its
+first read fails, no label, silently. Otherwise `LabelReadFrom`'s label, its name the file's name
+(cut at 1,023 bytes). FS-427: names, subject names and `SUBJECTS_DIR` longer than FreeSurfer's
+1,024-byte buffers are kept whole (noted).
+
+## 78. Writing, making and copying labels
+
+- `LabelWriteInto(label, stream)`: `#!ascii label <name> , from subject <subject> vox2ras=<space>`
+  and a newline; the number of points among the first `n_points` whose deleted flag is 0, and a
+  newline; each such point as `%d  %2.3f  %2.3f  %2.3f %10.10f` (vertex, x, y, z, statistic as
+  `double`s) and a newline. 0; a line that does not write: `ERROR: writing to label file <k>` (k 1
+  the header, 2 the count, 3 a point) on standard output and 1 (FS-428: FreeSurfer then closes the
+  caller's stream, which `LabelWrite` closes again; here it is closed once, noted).
+- `LabelWrite(label, name)`: the name loses a final `.<ext>` when `<ext>` is `label` in any case;
+  with no `/` in it and a non-empty subject in the label, the file is
+  `<SUBJECTS_DIR>/<subject>/label/<name>.label` (`SUBJECTS_DIR` must be set, as above); otherwise the
+  name as it now is when it still ends in `.label` (any case), else with `.label` added. A file that
+  does not open (`w`): `<Progname>: could not open label file <file>` after `errno`'s text,
+  `ERROR_NOFILE` (-1); else `LabelWriteInto`'s value.
+- `LabelAlloc(n, subject, name)`: a label of `n` places, each vertex -1 (the rest 0), no points,
+  space `TkReg`, tkregister coordinates, no transforms. With a subject, `SUBJECTS_DIR` must be set
+  (its value is not used) and the subject is copied, the label's name left empty; without one, the
+  name (cut at 1,023 bytes). Places that cannot be allocated (a negative `n`; FS-426): `<Progname>:
+  LabelAlloc(<name>) could not allocate 0-sized vector`, exit `ERROR_NOMEMORY`.
+- `LabelRealloc(label, n)`: no label: `LabelAlloc(n)` without names. `n` not above `max_points`:
+  the label unchanged. Else `n` places, the new ones zeroed (vertex 0); places that cannot be
+  allocated leave the label unchanged.
+- `LabelCopy(src, dst)`: no `dst`: a new label `LabelAlloc(src's max_points, src's subject, src's
+  name)` (so `SUBJECTS_DIR` must be set even when the subject is empty). Then `dst` takes `src`'s
+  handles, coordinate system, space, a copy of its vertex-index table (of `src`'s `max_points`
+  entries) when it has one, its point count, name and subject, and its first `n_points` places;
+  `dst` keeps its other places, its `max_points`, transforms and average statistic. FS-429: a `dst`
+  with fewer places than the points is made larger (FreeSurfer writes past it), noted.
+- `LabelRemoveDuplicates(label)`: for each point not deleted (in order), each later point with the
+  same vertex (both at least 0), or (both below 0) x, y and z each within `FLT_EPSILON` (|a - b| in
+  `float` below 2^-23), is marked deleted, counted each time (a point marked twice counts twice).
+  With `DIAG_SHOW`: `<k> duplicate vertices removed from label <name>.` on standard error. 0.
+- `LabelHasVertex(v, label)`: the first of the first `n_points` places of vertex `v`, or -1.
+- `LabelFree(&label)`: the label released, the pointer cleared; 0.
+
+## 79. Control points (`MRIreadControlPoints`, `MRIwriteControlPoints`, `MRIfillPoints`)
+
+A control point is three `double`s.
+- `MRIreadControlPoints(name, &count, &useRealRAS)`: a name whose extension (after its last `.`) is
+  `label` in any case is read with `LabelRead` (no subject): no label: `MRIreadControlPoints: could
+  not load label file <name>` (`ERROR_NOFILE`), nothing (the outputs untouched); else `count` the
+  label's point count, `useRealRAS` 1 for scanner coordinates (else 0), the points its first
+  `count` places' x, y, z. Any other name: `useRealRAS` 0; with `DIAG_SHOW`, `reading control
+  points from <name>...` (standard error); a file that does not open: `cannot open control point
+  file` (`ERROR_BADPARM`, after `errno`'s text), nothing, `count` untouched. Lines by `fgetl` with a
+  199-byte buffer: each that gives three values to `%f %f %f` is a point; any other whose `%s %d`
+  gives two values with the word `useRealRAS` sets `useRealRAS` to the number (the last such line
+  wins). `Reading <k> control points...` (standard error); `count` = k; the points in file order.
+- `MRIwriteControlPoints(points, count, useRealRAS, name)`: with `DIAG_SHOW`, `Writing control
+  points to <name>...`; a `useRealRAS` other than 0 and 1: `MRIwriteControlPoints useRealRAS must be
+  0 (surfaceRAS) or 1 (scannerRAS) but <n>` and a newline as the message (so a blank line follows),
+  `ERROR_BADPARM`; a file that does not open: `MRIwriteControlPoints(<name>): could not open file`
+  (`ERROR_BADPARM`). The file: each of the first `count` points as `%f %f %f`, then `info`,
+  `numpoints <count>`, `useRealRAS <n>`, `written by <user> on <date>` (the effective user's name,
+  `unknown user` when there is none; `currentDateTime()`, which
+  `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` replaces), each line ended by a newline. 0.
+- `MRIfillPoints(volume, fillval, npoints, useRealRAS, points)`: prints `MRIfillPoints(): npoints <n>
+  useReal <u> fillval <v>  d 0.1`. The volume's vox2ras is the scanner one (`useRealRAS` not 0) or
+  tkregister's, inverted (FreeSurfer's `float` matrices). The fill value is `fillval`; when it is 0:
+  `Autodetecting value to use as fill`, the mean of the points' x (summed in order in `double`,
+  divided by `npoints`; `-nan` for no points, SSE's NaN), 255 when it is below 0, 127 when at or above
+  0 (0 stays for NaN), `  xcentroid <mean %g>`. `fillvaluse <value>`. For each pair of points n < m
+  (in order) and k = 0 to 9: the point `p_n + (k × 0.1) × (p_m - p_n)` per coordinate (in `double`,
+  in that order), stored in a `float` 4 x 1 vector with 1, multiplied by the inverse (`float`
+  matrix product), each of its first three values rounded by `nint` (round half away from zero;
+  FS-12 beyond `int`); a voxel outside the volume is skipped; a voxel whose frame-0 value equals the
+  fill value is skipped; else it is set to the fill value (clipped and rounded to the volume's type)
+  and counted. `nhits = <count>`. 0. A vox2ras that cannot be inverted ends the program in the
+  product (`MatrixMultiply`'s message for a missing matrix).
+
+## 80. The annotation tables
+
+One table per process: a list of entries (index, red, green, blue, annotation, name of at most 99
+bytes), its entry count (0 until a table is read or set) and a table file name (none by default).
+- `read_annotation_table()`: nothing to do (0) when the count is not 0. The file is the table file
+  name when set, else `<FREESURFER_HOME>/Simple_surface_labels2009.txt` (`.` when `FREESURFER_HOME`
+  is not set). A file that does not open: `could not open translation file <file>` and a newline on
+  standard error, `ERROR_NO_FILE` (-1), the count stays 0. Otherwise its lines are counted (`fgetl`,
+  199-byte buffer; the count stops at the end of the file), `read_annotation_table(<file>): <k>
+  entries` on standard output, and each of the k lines (read again from the start) read with `%d %s
+  %d %d %d %*d` into its entry's index, name, red, green, blue (values not assigned stay 0); its
+  annotation `red + (green << 8) + (blue << 16)` in 32-bit wrapping arithmetic. 0. The file stays
+  open.
+- `read_named_annotation_table(name)`: as above, the file `<FREESURFER_HOME or .>/<name>` when the
+  name holds no `/`, else the name; the message `read_named_annotation_table(<name>): <k> entries`
+  shows the name as given.
+- `annotation_to_index(a)`, `index_to_annotation(i)`, `index_to_name(i)`, `annotation_to_name(a,
+  &index)`: each first reads the table (`read_annotation_table`) when the count is 0 or less (so a
+  table of no entries is read again, with its message, at every call); then the first entry with
+  that annotation (or index): its index, annotation, name, or name and index; else -1, -1,
+  `NOT_FOUND`, or `NOT_FOUND` and -1.
+- `set_atable_from_ctable(table)`: no table: `ERROR_BAD_PARM`; a count above 0: 0, nothing done.
+  The count becomes the colour table's number of places; 0 places: `ERROR_BAD_PARM`.
+  `set_atable_from_ctable(): <k> entries` on standard output; each place holding an entry gives its
+  entry the place number as index, the entry's name, integer colour and annotation (§65); empty
+  places give zeros. 0.
+- `print_annotation_table(stream)`: each entry `%3d   %s` (index, name) and a newline;
+  `print_annotation_colortable(stream)`: `%3d   %-40s  %3d %3d %3d  0` (index, name, red, green,
+  blue) and a newline; both read the table first when needed; 0.
+FS-430: a name of 100 bytes or more (in a table file, or in the colour table) or a file name of
+1,024 bytes or more runs past FreeSurfer's buffer; both modes keep it whole (noted).
+
+## 81. Point sets (`fsPointSet`)
+
+A point set is a list of points (x, y, z, value as `double`s; index, count as `int`s; a label name),
+two flags `IncludeZeroCount` and `IncludeZeroIndex` (1 by default) and a space name (`vox2ras`,
+`scanner_ras` by default). A new point has value 1, index and count 0, no name.
+- `add(point)`, `add(x, y, z, value)`: appended; its place. `set(i, x, y, z, value)`: 1 for a place
+  outside, else the four values set and 0. `set(i, point)`: the coordinates, value, count and index
+  (not the name); 1 or 0. `get(i)`: the point, or a new point of count -1 for a place outside.
+  `npoints()`, `clear()`. `remove(i)` removes place i (FS-431: an index outside the set is undefined
+  behaviour in FreeSurfer; both modes do nothing, noted).
+- `save(file)` (always `true`; a file that does not open is not written, silently): the JSON text
+  ```
+  {
+      "data_type": "fs_pointset",
+      "points": [
+          {
+              "coordinates": {
+                  "x": <x>,
+                  "y": <y>,
+                  "z": <z>
+              },
+              "labelname": "<name>",     (only for a non-empty name, written as it is)
+              "index": <index>,
+              "value": <value>,
+              "count": <count>,
+              "legacy_stat": 1
+          },                             ("}" without the comma for the last point)
+      ],
+      "vox2ras": "<space>"
+  }
+  ```
+  (four-space indentation as shown; numbers as `%g`).
+- `save_as_ctrlpoint(file)` (`true`): each point `<x> <y> <z>` (`%g`), then `info`, `numpoints <n>`,
+  `useRealRAS 1`.
+- `print(stream)`: each point except those of count 0 when `IncludeZeroCount` is 0 and those of
+  index 0 when `IncludeZeroIndex` is 0, as `%3d %4d %6d %8.4lf %8.4lf %8.4lf %8.4lf` of 0 (the row
+  number never counts in FreeSurfer: kept), index, count, x, y, z, value; 0.
+  `printCoords(stream)`: the same points as `%4d %8.4lf %8.4lf %8.4lf` (index, x, y, z); 0.
+  `writeCoords(file)`: `printCoords` into the file (`w`); 1 when it does not open, else 0.
+- `writeCentroidTable(file, lta)`: a file that does not open: `could not open writable file at
+  <file>` on standard error, `false`. Else `writing results to <file>` on standard output and the
+  table: `#SegCentroid`; `# Reg <lta>` when `lta` is not empty; the header: `# ID` right-aligned in
+  the index column's width (the longest index's digits, at least 2), then (when a point has a name)
+  four spaces and `StructName` left-aligned in the name column's width (the longest name, at least
+  10), then for R, A, S a space and `<letter>` followed by four spaces right-aligned in 12; `# ` and
+  `idw + 39` dashes (`+ namew + 4` with names); each point: its index right-aligned in the index
+  width, (with names) four spaces and its name left-aligned, then for x, y, z a space and `%12.4f`.
+  `true`.
+
+## 82. Validation plan (part 10)
+
+The probe's piece 11 (`validation/probes/fs-io/`): `lrd` (`LabelRead` with or without a subject,
+`SUBJECTS_DIR` unset, a folder that does not exist or the subjects' folder, names with and without
+`.label` (any case), `/`, a folder, a missing file; label files with every first-line form (with
+and without `vox2ras=`, `scanner`, `voxel`, a space text of 98 to 140 bytes, a first line longer
+than 1,023 bytes), counts that are right, too large, too small, 0, negative, beyond `int`, not a
+number, missing; point lines with tabs, comments, extra or missing fields, numbers of every kind
+(NaN, infinities, beyond `float`, hexadecimal, `x`), CR LF, a last line without a newline; the
+subject's `talairach.xfm` whole, broken or absent), `lwr` (`LabelWrite` of given labels to every
+name form, with and without subjects, `SUBJECTS_DIR`, folders that do not exist; every file under
+the case's folder printed), `lal`, `lre`, `lcp`, `ldu`, `lhv` (labels of up to 90 places with
+deleted flags, vertices -1 to 6, coordinates that differ by `FLT_EPSILON` and half of it, NaN,
+infinities, -0), `crd` (control-point files with points, `info`, `numpoints`, `useRealRAS` lines of
+every form, lines longer than 198 bytes, `.label` files of any case), `cwr` (`MRIwriteControlPoints`
+with `useRealRAS` 0, 1, 2, -1, NaN and large numbers, a folder that does not exist; the user name
+shown as `U`), `cfp` (`MRIfillPoints` on volumes up to 6 x 6 x 6 of four types, voxel sizes of 0
+(no inverse), permuted and flipped axes, fill values 0, 1, 7, 127, 255, NaN points), `atr` and `ats`
+(tables from files under `FREESURFER_HOME`, a table file name, missing files; tables set from colour
+tables with empty places; every lookup, both printers, reads after a table is there), `pss` (point
+sets with every flag, names and numbers of every kind; each writer, `get`, `set`, `add`, `remove`,
+`clear`). Each label printed with its fields, places (FNV-1a 64 beyond 2,000 characters), vertex
+indices and transforms; `Gerror` last. Lines with FS-423, FS-424, FS-426, FS-427, FS-429, FS-430,
+FS-431 or FS-11 are counted, not compared. Measured (2026-11-13): seed 13, 2,678 piece-11 cases:
+`reproduce` identical on 2,594, 0 different (84 counted); seed 7, 8,034: identical on 7,783, 0
+different (251 counted); `fix` differs only where a defect is noted (FS-01, FS-12, FS-425).
+
+## 83. Reading GIFTI files as volumes (part 11, `MRIread`'s GIFTI branch)
+
+A name whose format is GIFTI (`.gii` in any case, or `@gii`) is read by the GIFTI volume reader
+(§107-111 of `specs/freesurfer-surfio.md`: one column per vertex, one frame per data array of the
+first intent found), then as any volume (§§ on `mri_read`): the volume's name is the name as given,
+its cached matrices recomputed, a frame list (`#n`, `#a:b`) applied. A file that does not open leaves
+`errno` at the open's error (2 for a missing file); a file that opens leaves `errno` as the version
+check's two `sscanf("%f")` of the file's version and of `1.0` leave it.
+
+## 84. Writing volumes (`MRIwrite`, `MRIwriteType`)
+
+`MRIwrite(mri, name, several, intent)`: the format from the name (`mri_identify`; none:
+`unknown file type for file (<name>)`, `ERROR_BADPARM`, nothing written). With one volume (or a list
+of at most one) the volume is written by `MRIwriteType`. With several, each volume of the list is
+written in that format under its own name: the stem and the extension are cut at the last dot before
+the first `.gz` (which stays with the extension; no dot: the whole name is the stem and the extension
+is the text `(null)`), and the name is `<stem><suffix>.<extension>`, the suffix the volume's own name
+suffix (set by the readers of multi-echo series) or `_<n>` (its place, from 0) when it has none;
+FS-432: names of 1,024 bytes or more (FreeSurfer overflows its buffer; larmorx writes the whole
+name, noted). The status is the last volume's.
+
+`MRIwriteType(mri, name, type, intent)`: for every type but COR, a name that is an existing folder
+is refused: `MRIwriteType(): <name> is an existing directory. (type=<t>)` and, on a second line
+indented 16 spaces, `A filename should be specified instead.` (`ERROR_BADFILE`). An image file needs
+a depth of 1 (`MRIwriteType(<name>): image files cannnot have depth > 1`, the program ends with
+`ERROR_BADPARM`); a GCA or ITK morph three frames (`MRIwriteType: gcam - input mri must have 3 frames,
+not <n>`, `MRIwriteType: itk warp - input mri must have 3 frames, not <n>`, status -1). Refused with
+`MRIwriteType(): writing of <format> file type not supported` (`ERROR_BADPARM`): GENESIS, GE LX,
+SIEMENS, SDT, OTL, RAW, SIGNA, DICOM, SIEMENS DICOM, BRUKER, XIMG; any other unknown type: `MRIwriteType():
+code inconsistency (file type recognized but not caught)`. GIFTI: §110 of
+`specs/freesurfer-surfio.md` (`mriWriteGifti`); `errno` is 0 after it (the user-name lookup) unless
+the file does not open (its error). After a writer that succeeds, a volume with b-values writes them
+beside it: `Saving bvals and bvecs` on standard output, `<stem>.bvals` and
+`<stem>.<scanner|voxel|unknown>_space.bvecs` (§ on `DTIwriteBValues`/`DTIwriteBVectors`), the stem the
+name without its volume extension (`IDstemFromName`; none: nothing more written). Not ported yet in
+larmorx (a message, status -1): COR, MINC, image, `.bhdr`, bshort, bfloat, ANALYZE, ANALYZE 4D, BRIK,
+GCA and ITK morphs, MGH/MGZ, GDF, NIfTI-1, NIfTI, NRRD.
+
+## 85. Reading point sets (`loadfsPointSet`)
+
+The JSON file (§81's `save` form) read whole (a file that does not open reads as empty): `vox2ras`
+must be a string (missing: null, an error), `points` is visited as nlohmann visits a value (an array's
+elements, an object's values in key order, nothing for null or a missing key, any other value once);
+each point must be an object (or null) whose `coordinates` is an object (or null); of each point
+`legacy_stat`, then the coordinates' `z`, `y` and `x` are read, in that order, as numbers (integers or
+floats; null, booleans, strings, arrays and objects are errors); the point is added with index and
+count 0. FS-433: a text that is not JSON (nlohmann's `parse_error` texts, `[json.exception.parse_error.101]
+parse error at <n>: ...`), a value of another type (`[json.exception.type_error.302] type must be number,
+but is <type>`, `... type must be string, but is <type>`, `[json.exception.type_error.305] cannot use
+operator[] with a string argument with <type>`) or a folder (`basic_filebuf::underflow error reading the
+file: Is a directory`) ends FreeSurfer with `terminate called after throwing an instance of
+'nlohmann::detail::<kind>'` (`'std::__ios_failure'` for the folder), `  what():  <text>` and an abort;
+by default larmorx prints `error: loadfsPointSet(<file>): <text>` and ends with status 1, `reproduce`
+the abort's lines and status 134.
+
+## 86. Validation plan (part 11)
+
+The probe's piece 12 (`validation/probes/fs-io/`): `mgi` (`mri_read` of generated GIFTI files: 0 to 3
+data arrays of every intent, of float, int and byte types, ASCII, Base64 and gzip-Base64 encodings,
+both byte orders, one or two dimensions, both index orders, `TimeStep` metadata, label tables with
+negative keys, counts and lengths that disagree, version `1`, cut files, random bytes; names with
+`#` frames, `@gii`, upper case, missing files; with and without voxels, `Gdiag`, the frame switch),
+`mwr` (`MRIwrite` of one to three volumes of every type, 1 to 6 x 3 x 2 voxels and 3 frames, with
+name suffixes, to `.gii` names in any case, a folder, a missing folder, names of other or unknown
+formats; every file under the case's folder printed, GIFTI files with their user name as `U`, the
+creation time fixed and each payload decoded and inflated), `lps` (point-set files as `save` writes
+them, with fields missing, reordered or of every other type, points as objects, not JSON, a BOM,
+trailing text, a missing file, a folder). Lines with FS-521, FS-255 and the GIFTI reader's crashes are
+counted, not compared; FS-214's address apart. Measured (2026-11-14): seed 7, 1,800 cases: `reproduce`
+identical on 1,589, 0 different (210 counted, mostly the writers not ported yet).
+
+## 87. A label's coordinates converted (part 12: `LabelToScannerRAS`, `LabelToSurfaceRAS`, `LabelFromScannerRAS`, `LabelToVoxel`, `LabelVoxelToSurfaceRAS`)
+
+A label's coordinates (§76) are tkregister ("surface") RAS (1), scanner RAS (2), voxels of a volume
+(3) or unknown (0). Each conversion takes a label, a volume and a destination: a new label (the
+label copied into a new one, §78's `LabelCopy`, with its messages: a label without a subject needs
+`SUBJECTS_DIR`), the label itself, or a given label (the label copied into it, §78). It converts the
+label's first `n_points` points (the places after them are kept), each point `(x, y, z, 1)` made a
+`float` 4-vector and multiplied by a `float` 4 x 4 matrix in `float` (`specs/freesurfer-maths.md` §2,
+§16), the first three elements of the product the new `x`, `y`, `z`. Vertex numbers, statistics,
+the deleted flags, the name, the subject and the transforms are kept; the converted label is
+returned (the destination).
+
+The matrices (`specs/freesurfer-mri.md` §9, `specs/freesurfer-volume.md` §13): *tkregister to
+scanner* is the volume's vox2ras times the inverse of its tkregister vox2ras; a tkregister vox2ras
+that cannot be inverted (a voxel size of 0) ends the program in the product: `MatrixMultiply(): m2
+is null ` and ` break <file>:<line>` on standard output, then the error `MatrixMultiply: m2 is null`
+(code -4). *Voxels from tkregister* is the inverse of the tkregister vox2ras after the volume's
+cached matrices are filled where missing (with its diagnostic lines); one that cannot be inverted
+ends the program in the first point's product (`m1 is null`).
+
+- **To scanner RAS**: the tkregister-to-scanner matrix is made first (so such a volume ends the
+  program even for a label already in scanner RAS), then the copy. A label in scanner RAS is
+  returned as copied; a label in voxels is first converted to tkregister RAS (below); the matrix is
+  made again and applied to every point; the space becomes `scanner` and the coordinates 2. A label
+  in tkregister RAS or of any other coordinates (0, 4, ...) is converted as tkregister RAS.
+- **To tkregister RAS** (`LabelFromScannerRAS` is the same conversion): the tkregister-to-scanner
+  matrix is made first, then the copy. A label in tkregister RAS is returned as copied; a label in
+  voxels is converted from voxels (below); a label in scanner RAS through the inverse of the matrix
+  (one that cannot be inverted: the inverse's messages, then the product's `m1 is null` ends the
+  program); any other coordinates end the program with the error `LabelToSurfaceRAS: unsupported
+  coords (was <n>)` (`ERROR_UNSUPPORTED`, -3). The space becomes `TkReg` and the coordinates 1.
+- **To voxels**: the copy first; a label in voxels is returned as copied; a label in scanner RAS is
+  first converted to tkregister RAS (above); then every point through the voxels-from-tkregister
+  matrix, and each new coordinate's `nint` (`(int)(v + 0.5)`, `(int)(v - 0.5)` below 0; beyond the
+  `int` range FS-12) is the point's voxel `xv`, `yv`, `zv`. Labels in tkregister RAS or of any other
+  coordinates are converted as tkregister RAS. The space becomes `voxel` and the coordinates 3.
+- **From voxels to tkregister RAS**: the copy first (no matrix before it); each point, a voxel of the
+  volume, through the volume's tkregister vox2ras (made again for each point, with its cache filling
+  and diagnostic lines). The space becomes `TkReg` and the coordinates 1. A label of a surface (one
+  that holds a surface): FS-437, below.
+
+A surface's own conversions (`MRISsurfaceRASToVoxel`, `MRISsurfaceRASFromVoxel`) take the surface's
+volume geometry: when it is valid, the tkregister-to-scanner matrix of a header with the geometry's
+extent, voxel sizes, direction cosines and centre (not its shears), else of the volume; then the
+volume's scanner-to-voxel matrix (the inverse of its vox2ras; one that cannot be inverted ends the
+program in the product, `m1 is null`) times it (a new `float` product): *surface RAS to voxels*.
+`MRISsurfaceRASToVoxel` applies it to the point, `MRISsurfaceRASFromVoxel` its inverse (*voxels to
+surface RAS*).
+
+FS-437: for a label of a surface, FreeSurfer's conversion from voxels converts each point with the
+surface's *surface RAS to voxels*, the wrong direction; `fix` (the default) applies *voxels to
+surface RAS* (`MRISsurfaceRASFromVoxel`), `reproduce` FreeSurfer's. Both print the notice for a
+label of a surface with points.
+
+## 88. One frame of a volume written (`MRIwriteFrame(mri, name, frame)`)
+
+A frame at or beyond the volume's frame count ends the program: the error `MRIwriteFrame(<frame>) -
+frame out of bounds (<frames>)` (`ERROR_BADPARM`, -4). Otherwise a new volume of the same extent and
+type with one frame, the volume's header (`MRIcopyHeader`) and pulse parameters, receives the frame's
+voxels (each read as `MRIgetVoxVal` reads it: a negative frame as that function reads one, with its
+notices) and is written by `MRIwrite(<new volume>, name)` (§84: the name's format; relative names in
+the program's folder). FS-438: FreeSurfer returns `NO_ERROR` (0) whatever the write gave; `fix` (the
+default) returns the write's status (for example `ERROR_BADPARM`, -4, for a name of unknown format; the
+GIFTI writer's `ERROR_BADFILE`, -5, for a missing folder), `reproduce` 0; the notice is printed when the write failed.
+
+## 89. Validation plan (part 12)
+
+The probe's piece 13 (`validation/probes/fs-io/`, its port side in larmorx-freesurfer-volume's
+`tests/fs_io13/piece13.rs`, run with `check.py --package larmorx-freesurfer-volume --example
+fs_io13_probe`): `lcv` (each of the four conversions of labels of 0 to 6 points, sometimes 20 to 40,
+every kind of coordinates 0 to 4, coordinates from NaN, infinities, `-0`, `1 + FLT_EPSILON` and
+halves to +-300 in eighths, with and without vertex indices; volumes of 1 to 12 voxels a side, one
+side sometimes 64, 128 or 256, `uchar` or `float`, voxel sizes 0.5 to 3 and sometimes 0, direction
+cosines that are axis permutations with signs or rotations about an axis, sometimes all 0, centres
+to +-60; into a new label, itself or a given label (some with fewer places than the points: FS-429,
+counted); `SUBJECTS_DIR` unset, missing or set; one label in three with a surface whose geometry is
+valid or not), `mwf` (`MRIwriteFrame` of piece 12's volumes, frames 0, the last, the count and
+beyond, to `.gii` names in any case, a missing folder, an unknown format, `.mgz`). Lines whose
+writer is not ported yet and FS-429's are counted, not compared. Measured (2026-11-14): seed 7,
+1,000 cases: `reproduce` identical on 947, 0 different (53 counted); seed 13, 3,000: identical on
+2,823, 0 different (177 counted); `fix` differs only with notices (FS-437, FS-438, FS-01, FS-12,
+FS-522). The recorded test (`tests/fs_io13_official.rs`): seed 1's first 1,200 cases, 1,145 lines
+identical, 55 counted.

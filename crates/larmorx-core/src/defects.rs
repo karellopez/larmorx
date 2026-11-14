@@ -2269,6 +2269,34 @@ defects! {
         "cropping around an RAS point through an LTA (MRIcropAroundRAS) decides the LTA's direction backwards (it inverts the LTA when the volume is its destination, goes on when the volume is neither end, refuses when it is both) and compares the volume's validity flag, which no volume constructor sets";
     FS_517 = "FS-517", "FreeSurfer", true,
         "cropping around a voxel (MRIcropAroundCRS) whose last voxel lies beyond the int range (a centre that is not a number or too far away, with a field of view that overflows) never ends";
+    FS_518 = "FS-518", "NrrdIO", true,
+        "a NRRD space named 3D-left-handed or 3Drighthanded is not recognised (the read fails), 3D-right-handed-time is read as 3D-left-handed and 3D-left-handed-time as 3D-right-handed-time (two names of its table run together)";
+    FS_519 = "FS-519", "NrrdIO", true,
+        "an axis kind given as none resets that axis's centering (the centers field) to unknown instead of the kind";
+    FS_520 = "FS-520", "NrrdIO", true,
+        "a NRRD file with an axis of kind 3-gradient ends the program after reading its data (nrrdKindSize: PANIC: nrrdKind 20 not implemented!, exit status 1)";
+    FS_761 = "FS-761", "NrrdIO", true,
+        "a NRRD comment line holding a character that is neither printable nor white space (a control character, or any byte of 0x80 or above, such as UTF-8 text) makes the reader loop forever";
+    FS_762 = "FS-762", "NrrdIO", true,
+        "an error message longer than 256 bytes (a long file name, a long header line or value) overflows the reader's message buffer: the program aborts instead of printing it";
+    FS_763 = "FS-763", "NrrdIO", true,
+        "the last line of a NRRD header, a data file list or a skipped line that ends at the end of the file without a newline is dropped (a detached header ending in its data file line reads as having none)";
+    FS_764 = "FS-764", "NrrdIO", true,
+        "the message for a space dimension beyond 8 shows the array's dimension instead of the space dimension";
+    FS_765 = "FS-765", "NrrdIO", true,
+        "a sizes line with more than 16 values for a 16-dimensional array is parsed one value past the reader's array (memory beside it is written) before the read fails";
+    FS_766 = "FS-766", "NrrdIO", true,
+        "a data file name template (data file: name%03d.raw ...) holding a second conversion (another %d, %s) formats it from no argument, and one wider than ten digits writes past the name's buffer";
+    FS_767 = "FS-767", "NrrdIO", true,
+        "an ASCII-encoded value longer than 1,024 bytes overflows the reader's token buffer";
+    FS_768 = "FS-768", "NrrdIO", true,
+        "a NRRD whose sample count times sample size passes 2^64 bytes allocates the wrapped size and reads its data past it";
+    FS_769 = "FS-769", "NrrdIO", true,
+        "a byte of 0x80 or above in hex-encoded data is read as the character of its low 7 bits (0xb1 as 1, 0xa0 as a space) instead of ending the read as an invalid character";
+    FS_770 = "FS-770", "NrrdIO", true,
+        "a detached NRRD header in the root directory (/name.nhdr) whose data file name is relative fails (need nio->path for header-relative datafiles)";
+    FS_771 = "FS-771", "NrrdIO", true,
+        "a NRRD header that gives its data file before its dimension reads an axis far outside its array (the program crashes)";
 }
 
 /// The register entry with ID `id`.

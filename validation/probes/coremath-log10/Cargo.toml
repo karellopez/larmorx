@@ -1,0 +1,17 @@
+[package]
+name = "coremath-log10"
+description = "larmorx_core::math::log10 against CORE-MATH's C cr_log10; how often glibc 2.35's log10 is not correctly rounded"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build (it calls the C
+# library's log10 and CORE-MATH's C as black boxes).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

@@ -487,7 +487,10 @@ pub(super) fn gwr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             date,
         ),
         ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
-        ("USER".to_owned(), std::env::var("USER").unwrap_or_default()),
+        // a user name on every platform: FreeSurfer's run (getpwuid on Linux) writes a
+        // `UserName`, which both sides print as `U`; where the port has no password database
+        // (Windows, macOS) it takes `USER`, which Windows' runners do not set
+        ("USER".to_owned(), "U".to_owned()),
     ]);
     let nin = t.i();
     for _ in 0..nin {

@@ -1581,7 +1581,7 @@ fn write_vol(
     err: &mut dyn Write,
     env: &Environment,
     dir: Option<&Path>,
-    m: &Mri,
+    m: &mut Mri,
     fname: &str,
 ) -> Result<(), Fatal> {
     mri_write(g, out, err, env, dir, m, fname, None, 0)?;
@@ -1686,7 +1686,7 @@ pub fn mri_3d_gentle_normalize(
                 mri_scalar_mul(g, out, err, Pair::Same(src), scale as f32)?;
                 if env.get("WRITE_CONTROL_POINTS").is_some() {
                     let _ = writeln!(out, "writing control point volume to c.mgz");
-                    write_vol(g, out, err, env, dir, &c, "c.mgz")?;
+                    write_vol(g, out, err, env, dir, &mut c, "c.mgz")?;
                 }
                 if g.gdiag & DIAG_WRITE != 0 {
                     let _ = writeln!(out, "writing scaled intensity volume to scaled.mgz");
@@ -1696,7 +1696,7 @@ pub fn mri_3d_gentle_normalize(
             };
             if let Some(name) = st.control_volume_fname.clone() {
                 let _ = writeln!(err, "writing control point volume to {name}...");
-                write_vol(g, out, err, env, dir, &ctrl, &name)?;
+                write_vol(g, out, err, env, dir, &mut ctrl, &name)?;
             }
             mri_binarize(
                 g,
@@ -1707,17 +1707,17 @@ pub fn mri_3d_gentle_normalize(
                 CONTROL_NONE as f32,
                 CONTROL_MARKED as f32,
             )?;
-            let b = mri_build_bias_image(g, out, err, src, &mut ctrl, bias_sigma)?;
+            let mut b = mri_build_bias_image(g, out, err, src, &mut ctrl, bias_sigma)?;
             if let Some(name) = st.bias_volume_fname.clone() {
                 let _ = writeln!(err, "writing bias field volume to {name}...");
-                write_vol(g, out, err, env, dir, &b, &name)?;
+                write_vol(g, out, err, env, dir, &mut b, &name)?;
             }
             if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
                 let pass = st.gentle_pass;
                 let _ = writeln!(err, "writing out control and bias volumes...");
                 write_vol(g, out, err, env, dir, src, &format!("src{pass}.mgz"))?;
-                write_vol(g, out, err, env, dir, &ctrl, &format!("ctrl{pass}.mgz"))?;
-                write_vol(g, out, err, env, dir, &b, &format!("bias{pass}.mgz"))?;
+                write_vol(g, out, err, env, dir, &mut ctrl, &format!("ctrl{pass}.mgz"))?;
+                write_vol(g, out, err, env, dir, &mut b, &format!("bias{pass}.mgz"))?;
                 st.gentle_pass += 1;
             }
             made_bias = b;
@@ -2667,7 +2667,7 @@ pub fn remove_gray_matter_control_points(
             Some(&mut inside),
         )?;
     }
-    let outside = mri_subtract(g, out, err, Tri::New(ctrl, &inside))?.unwrap_new();
+    let mut outside = mri_subtract(g, out, err, Tri::New(ctrl, &inside))?.unwrap_new();
     drop(inside);
     let (r, _) = mri_norm_find_control_points_in_window(
         g,
@@ -2715,10 +2715,47 @@ pub fn remove_gray_matter_control_points(
             out,
             "writing control point and src files for call {ncalls}..."
         );
-        write_vol(g, out, err, env, dir, &outside, &format!("co{ncalls}.mgz"))?;
-        write_vol(g, out, err, env, dir, &inside, &format!("ci{ncalls}.mgz"))?;
+        write_vol(
+            g,
+            out,
+            err,
+            env,
+            dir,
+            &mut outside,
+            &format!("co{ncalls}.mgz"),
+        )?;
+        write_vol(
+            g,
+            out,
+            err,
+            env,
+            dir,
+            &mut inside,
+            &format!("ci{ncalls}.mgz"),
+        )?;
         write_vol(g, out, err, env, dir, ctrl, &format!("cb{ncalls}.mgz"))?;
-        write_vol(g, out, err, env, dir, src, &format!("orig{ncalls}.mgz"))?;
+        // FreeSurfer's MRIwrite here sets the intent and version of `mri_src` (MRI3dNormalize's
+        // original volume), which this port holds read-only: a silent copy is written instead
+        // (only with DIAG_WRITE and DIAG_VERBOSE; the batch-13 merge, 2026-11-14; track D's next
+        // relay makes `orig` mutable through MRI3dNormalize for the exact side effect).
+        let mut g2 = g.clone();
+        let mut src_w = mri_copy(
+            &mut g2,
+            &mut std::io::sink(),
+            &mut std::io::sink(),
+            src,
+            None,
+        )?
+        .unwrap_new();
+        write_vol(
+            g,
+            out,
+            err,
+            env,
+            dir,
+            &mut src_w,
+            &format!("orig{ncalls}.mgz"),
+        )?;
     }
     let (gx, gy, gz) = (g.gx, g.gy, g.gz);
     if gx >= 0 {
@@ -2995,14 +3032,14 @@ pub fn mri_3d_normalize(
             let _ = writeln!(err, "only using {nctrl} unique control points from file...");
             if env.get("WRITE_CONTROL_POINTS").is_some() {
                 let _ = writeln!(out, "writing control point volume to cp.mgz");
-                write_vol(g, out, err, env, dir, &c, "cp.mgz")?;
+                write_vol(g, out, err, env, dir, &mut c, "cp.mgz")?;
             }
             c
         };
         if let Some(name) = st.control_volume_fname.clone() {
             let _ = writeln!(err, "writing control point volume to {name}...");
             mri_copy_header(g, out, err, &copy, Some(&mut ctrl))?;
-            write_vol(g, out, err, env, dir, &ctrl, &name)?;
+            write_vol(g, out, err, env, dir, &mut ctrl, &name)?;
         }
         mri_binarize(
             g,
@@ -3028,17 +3065,17 @@ pub fn mri_3d_normalize(
                 intensity_below,
             )?;
         }
-        let bias = mri_build_bias_image(g, out, err, &copy, &mut ctrl, bias_sigma)?;
+        let mut bias = mri_build_bias_image(g, out, err, &copy, &mut ctrl, bias_sigma)?;
         if let Some(name) = st.bias_volume_fname.clone() {
             let _ = writeln!(err, "writing bias field volume to {name}...");
-            write_vol(g, out, err, env, dir, &bias, &name)?;
+            write_vol(g, out, err, env, dir, &mut bias, &name)?;
         }
         if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
             let pass = st.normalize_pass;
             let _ = writeln!(err, "writing out control and bias volumes...");
-            write_vol(g, out, err, env, dir, &copy, &format!("src{pass}.mgh"))?;
-            write_vol(g, out, err, env, dir, &ctrl, &format!("ctrl{pass}.mgh"))?;
-            write_vol(g, out, err, env, dir, &bias, &format!("bias{pass}.mgh"))?;
+            write_vol(g, out, err, env, dir, &mut copy, &format!("src{pass}.mgh"))?;
+            write_vol(g, out, err, env, dir, &mut ctrl, &format!("ctrl{pass}.mgh"))?;
+            write_vol(g, out, err, env, dir, &mut bias, &format!("bias{pass}.mgh"))?;
             st.normalize_pass += 1;
         }
         for z in 0..d {

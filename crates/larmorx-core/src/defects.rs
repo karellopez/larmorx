@@ -1772,7 +1772,7 @@ defects! {
     FS_453 = "FS-453", "FreeSurfer", true,
         "reading a NIfTI pair (.hdr and .img) under a name of 1,020 to 1,023 bytes without the .img or .hdr extension opens files under names cut to 1,023 bytes, with a message";
     FS_454 = "FS-454", "FreeSurfer", true,
-        "reading a scaled NIfTI volume of unsigned 32-bit values (a nonzero slope other than slope 1 with intercept 0) reads its data twice, first as signed numbers, then again after the end of the data: the read fails with 'error reading', or keeps the bytes that follow the data";
+        "reading a scaled NIfTI volume of unsigned 32-bit values (a nonzero slope other than slope 1 with intercept 0) fails with 'error reading' unless the file holds the data twice, and then gives the second copy's values";
     FS_455 = "FS-455", "FreeSurfer", true,
         "reading an unscaled big-endian NIfTI volume of doubles swaps each value's two 4-byte halves separately instead of its 8 bytes: wrong values";
     FS_456 = "FS-456", "FreeSurfer", true,
@@ -1782,9 +1782,9 @@ defects! {
     FS_458 = "FS-458", "FreeSurfer", true,
         "reading a NIfTI volume of 1 or 2 dimensions, the header's extents past its number of dimensions are used as the volume's rows or slices instead of 1: an extent of 0 gives an empty volume, a larger one a read past the data";
     FS_459 = "FS-459", "FreeSurfer", true,
-        "reading a big-endian NIfTI file with header extensions checks each extension's code before swapping its bytes: the extensions, FreeSurfer's own included, are never read, and a warning is printed";
+        "reading a big-endian NIfTI file never reads its header extensions, FreeSurfer's own included, and prints a warning that no valid extension was read";
     FS_460 = "FS-460", "FreeSurfer", true,
-        "reading a NIfTI file whose header extension of another program comes first reads that extension's data as the next extension's size and code: FreeSurfer's extension after it is not found, or other bytes are read as one";
+        "reading a NIfTI file whose first header extension is another program's does not find FreeSurfer's extension after it, and may take other bytes of the file for one";
     FS_641 = "FS-641", "FreeSurfer", true,
         "reading a NIfTI file that ends within 4 bytes after its 348-byte header decides from memory contents whether a header extension follows";
     FS_642 = "FS-642", "FreeSurfer", true,

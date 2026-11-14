@@ -30,8 +30,7 @@ use std::path::Path;
 
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
-    FS_453, FS_454, FS_455, FS_456, FS_457, FS_458, FS_459, FS_460, FS_641, FS_642, FS_643,
-    FS_644,
+    FS_453, FS_454, FS_455, FS_456, FS_457, FS_458, FS_459, FS_460, FS_641, FS_642, FS_643, FS_644,
 };
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
@@ -538,7 +537,7 @@ fn nii_read_header_extension(
         } else {
             ecode
         };
-        let valid = !(check < 0 || check > NIFTI_MAX_ECODE || check & 1 != 0);
+        let valid = (0..=NIFTI_MAX_ECODE).contains(&check) && check & 1 == 0;
         if count != 2 || !valid {
             let _ = out.write_all(
                 b"[WARN] __niiReadHeaderextension(): no valid extension read, rollback bytes read\n",
@@ -701,17 +700,17 @@ fn scaled_values(dt: i16, b: &[u8], out: &mut [f32], as_int: bool) {
             }
         }
         DT_SIGNED_SHORT => {
-            for (o, v) in out.iter_mut().zip(b.chunks_exact(2)) {
+            for (o, v) in out.iter_mut().zip(b.as_chunks::<2>().0) {
                 *o = f32::from(i16::from_le_bytes([v[0], v[1]]));
             }
         }
         DT_UINT16 => {
-            for (o, v) in out.iter_mut().zip(b.chunks_exact(2)) {
+            for (o, v) in out.iter_mut().zip(b.as_chunks::<2>().0) {
                 *o = f32::from(u16::from_le_bytes([v[0], v[1]]));
             }
         }
         DT_SIGNED_INT | DT_UINT32 => {
-            for (o, v) in out.iter_mut().zip(b.chunks_exact(4)) {
+            for (o, v) in out.iter_mut().zip(b.as_chunks::<4>().0) {
                 let u = u32::from_le_bytes([v[0], v[1], v[2], v[3]]);
                 *o = if dt == DT_SIGNED_INT || as_int {
                     u as i32 as f32
@@ -721,12 +720,12 @@ fn scaled_values(dt: i16, b: &[u8], out: &mut [f32], as_int: bool) {
             }
         }
         DT_FLOAT => {
-            for (o, v) in out.iter_mut().zip(b.chunks_exact(4)) {
+            for (o, v) in out.iter_mut().zip(b.as_chunks::<4>().0) {
                 *o = f32::from_le_bytes([v[0], v[1], v[2], v[3]]);
             }
         }
         _ => {
-            for (o, v) in out.iter_mut().zip(b.chunks_exact(8)) {
+            for (o, v) in out.iter_mut().zip(b.as_chunks::<8>().0) {
                 *o = narrow(f64::from_le_bytes([
                     v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
                 ]));
@@ -816,13 +815,25 @@ fn read_voxels(
             }
             if swapped {
                 match bpv {
-                    2 => buf.chunks_exact_mut(2).for_each(|c| c.reverse()),
-                    4 => buf.chunks_exact_mut(4).for_each(|c| c.reverse()),
+                    2 => buf
+                        .as_chunks_mut::<2>()
+                        .0
+                        .iter_mut()
+                        .for_each(|c| c.reverse()),
+                    4 => buf
+                        .as_chunks_mut::<4>()
+                        .0
+                        .iter_mut()
+                        .for_each(|c| c.reverse()),
                     8 if dt == DT_DOUBLE => {
                         let k = if fix { 8 } else { 4 };
                         buf.chunks_exact_mut(k).for_each(|c| c.reverse());
                     }
-                    8 if fix => buf.chunks_exact_mut(4).for_each(|c| c.reverse()),
+                    8 if fix => buf
+                        .as_chunks_mut::<4>()
+                        .0
+                        .iter_mut()
+                        .for_each(|c| c.reverse()),
                     _ => {}
                 }
             }
@@ -831,7 +842,7 @@ fn read_voxels(
             };
             let o = row * row_len;
             if dt == DT_DOUBLE && bpv == 8 {
-                for (i, v) in buf.chunks_exact(8).enumerate() {
+                for (i, v) in buf.as_chunks::<8>().0.iter().enumerate() {
                     let x = narrow(f64::from_le_bytes([
                         v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
                     ]));
@@ -840,7 +851,7 @@ fn read_voxels(
             } else {
                 chunk[o..o + row_len].copy_from_slice(&buf[..row_len]);
                 if dt == DT_UINT32 {
-                    high_uint32 |= buf.chunks_exact(4).any(|c| c[3] & 0x80 != 0);
+                    high_uint32 |= buf.as_chunks::<4>().0.iter().any(|c| c[3] & 0x80 != 0);
                 }
             }
         }
@@ -1343,7 +1354,10 @@ fn ico7(
 ) -> Result<Option<Mri>, Fatal> {
     let nf = m.nframes;
     if nf == 0 {
-        let nv1 = m.vg.width.wrapping_mul(m.vg.height).wrapping_mul(m.vg.depth);
+        let nv1 =
+            m.vg.width
+                .wrapping_mul(m.vg.height)
+                .wrapping_mul(m.vg.depth);
         let _ = writeln!(
             out,
             "ERROR: mri_reshape: number of elements cannot change\n  nv1 = {nv1}, nv1 = 0"
@@ -1676,7 +1690,11 @@ mod tests {
         };
         put(&mut h, 0, &348i32.to_le_bytes());
         for i in 0..8 {
-            put(&mut h, 40 + 2 * i, &dims.get(i).copied().unwrap_or(1).to_le_bytes());
+            put(
+                &mut h,
+                40 + 2 * i,
+                &dims.get(i).copied().unwrap_or(1).to_le_bytes(),
+            );
             put(&mut h, 76 + 4 * i, &1.0f32.to_le_bytes());
         }
         put(&mut h, 70, &dt.to_le_bytes());
@@ -1720,7 +1738,9 @@ mod tests {
         m.chunk
             .as_ref()
             .unwrap()
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect()
     }
@@ -1754,7 +1774,10 @@ mod tests {
         assert_eq!((r, ids.len()), (Ok(()), 0), "{text}");
         let m = m.unwrap();
         assert!(text.contains("INFO: using NIfTI-1 qform (qform_code=1)"));
-        assert_eq!((m.vg.width, m.vg.x_r, m.vg.y_a, m.vg.z_s), (2, 1.0, 1.0, 1.0));
+        assert_eq!(
+            (m.vg.width, m.vg.x_r, m.vg.y_a, m.vg.z_s),
+            (2, 1.0, 1.0, 1.0)
+        );
         // the centre: the first voxel's offset plus half the extent (1 voxel of 1 mm)
         assert_eq!(m.vg.c_r, -9.0);
         let v = floats(&m);
@@ -1807,7 +1830,10 @@ mod tests {
         assert!(ids.contains(&"FS-454"));
         let (m, text, _, _) = read(UpstreamDefects::Reproduce, &files, "a.nii", false);
         assert!(m.is_none());
-        assert!(text.contains("niiRead(): error reading from a.nii"), "{text}");
+        assert!(
+            text.contains("niiRead(): error reading from a.nii"),
+            "{text}"
+        );
     }
 
     #[test]
@@ -1907,7 +1933,10 @@ mod tests {
             h[o + 4 * r..o + 4 * r + 4].copy_from_slice(&2.0f32.to_le_bytes());
             h[80 + 4 * r..84 + 4 * r].copy_from_slice(&2.0f32.to_le_bytes());
         }
-        let img: Vec<u8> = [1i16, -2, 3, 4].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let img: Vec<u8> = [1i16, -2, 3, 4]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
         let files = [("a.hdr", h.clone()), ("a.img", img)];
         let (m, text, ids, r) = read(UpstreamDefects::Fix, &files, "a.img", true);
         assert_eq!((r, ids.len()), (Ok(()), 0), "{text}");
@@ -1920,7 +1949,9 @@ mod tests {
         let files = [("a.hdr", h), ("a.img", Vec::new())];
         let (m, text, ids, r) = read(UpstreamDefects::Fix, &files, "a", true);
         assert!(m.is_none() && r.is_ok() && ids.contains(&"FS-644"));
-        assert!(text.contains("ERROR: mri_reshape: number of elements cannot change\n  nv1 = 163842, nv1 = 0\n"));
+        assert!(text.contains(
+            "ERROR: mri_reshape: number of elements cannot change\n  nv1 = 163842, nv1 = 0\n"
+        ));
         let (_, _, _, r) = read(UpstreamDefects::Reproduce, &files, "a", true);
         assert_eq!(r, Err(139));
     }
@@ -1932,7 +1963,12 @@ mod tests {
         assert!(text.contains(&format!("nifti1Read(): error opening file {stem}.hdr")));
         assert!(ids.contains(&"FS-453"));
         let (_, text, _, _) = read(UpstreamDefects::Reproduce, &[], &stem, true);
-        assert!(text.contains("nifti1Read: Truncation on line 7704\nnifti1Read: Truncation on line 7708\n"));
-        assert!(text.contains(&format!("error opening file {stem}.h\0")) || text.contains(&format!("error opening file {stem}.h")));
+        assert!(text.contains(
+            "nifti1Read: Truncation on line 7704\nnifti1Read: Truncation on line 7708\n"
+        ));
+        assert!(
+            text.contains(&format!("error opening file {stem}.h\0"))
+                || text.contains(&format!("error opening file {stem}.h"))
+        );
     }
 }

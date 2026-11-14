@@ -288,10 +288,8 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         GE_LX_FILE => "GE LX",
         BRIK_FILE => "AFNI BRIK",
         MRI_MINC_FILE => "MINC",
-        SDT_FILE => "Varian SDT",
         MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
-        GDF_FILE => "GDF",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         XIMG_FILE => "GE XIMG",
         NRRD_FILE => "NRRD",
@@ -456,6 +454,10 @@ pub fn mri_read(
         crate::mriio_bvol::bvolume_read(g, out, err, dir, &copy, volume_flag, MRI_SHORT)?
     } else if mtype == identify::BFLOAT_FILE {
         crate::mriio_bvol::bvolume_read(g, out, err, dir, &copy, volume_flag, MRI_FLOAT)?
+    } else if mtype == identify::GDF_FILE {
+        crate::mriio_gdf::gdf_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::SDT_FILE {
+        crate::mriio_gdf::sdt_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::NPY_FILE {
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {
@@ -572,7 +574,6 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
         BRIK_FILE => "AFNI BRIK",
         MGH_MORPH => "GCA morph (m3z)",
         ITK_MORPH => "ITK warp",
-        GDF_FILE => "GDF",
         NRRD_FILE => "NRRD",
         _ => return None,
     })
@@ -716,6 +717,8 @@ pub fn mri_write_type(
             }
         };
         crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, &name, t)?
+    } else if mtype == GDF_FILE {
+        crate::mriio_gdf::gdf_write(g, out, err, dir, m, fname)?
     } else if mtype == BSHORT_FILE {
         crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, fname, MRI_SHORT)?
     } else if mtype == BFLOAT_FILE {

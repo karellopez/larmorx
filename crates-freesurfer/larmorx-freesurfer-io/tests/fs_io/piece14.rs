@@ -564,11 +564,13 @@ fn answer(
         g.n_zero_pad_input = tk.int() as i32;
     }
     // piece 17: vwr <subject name> <SUBJECTS_DIR> <BFILE_LITTLE_ENDIAN 0|1>, then mgw's
-    let (mut subject, mut sd, mut le) = (None, None, false);
+    let (mut subject, mut sd, mut le, mut gdf_stem) = (None, None, false, None);
     if vwr {
         subject = super::dec(tk.next());
         sd = super::dec(tk.next());
         le = tk.int() != 0;
+        // piece 18: the GDF image stem
+        gdf_stem = super::dec(tk.next());
     }
     g.gdiag = u64::from_str_radix(tk.next(), 16).unwrap();
     setup(w, tk.next());
@@ -592,6 +594,9 @@ fn answer(
     let mut m = read_mri14(g, out, err, &mut tk);
     if let Some(s) = subject {
         m.subject_name = String::from_utf8(s).unwrap();
+    }
+    if let Some(s) = gdf_stem {
+        m.gdf_image_stem = String::from_utf8(s).unwrap();
     }
     let frame = tk.int() as i32;
     let intent = tk.int() as i32;

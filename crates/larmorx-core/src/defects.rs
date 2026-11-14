@@ -1977,6 +1977,20 @@ defects! {
         "writing as bshort or bfloat a volume of another type with two or more frames ends by freeing the converted copy as if it had a frame table for every frame (it has one): the program may crash after the files are written";
     FS_672 = "FS-672", "FreeSurfer", true,
         "a volume whose Talairach transform (named by a COR header or an MGH tag) fails to load keeps it marked as the volume's own; freeing the volume then frees a transform that was never written: memory contents, usually ending the program with 'delete_general_transform' and status 1";
+    FS_673 = "FS-673", "FreeSurfer", true,
+        "a Varian SDT volume's header (.spr) whose last line does not end with a newline has that line ignored";
+    FS_674 = "FS-674", "FreeSurfer", true,
+        "an SDT header (.spr) that opens but cannot be read (a folder of that name) is read again for ever, printing an error each time";
+    FS_675 = "FS-675", "FreeSurfer", true,
+        "an SDT volume whose name has no extension but sits in a folder whose name has a '.' (x.d/vol) gets its header's name from the folder's ('x.spr'), not 'x.d/vol.spr'";
+    FS_676 = "FS-676", "FreeSurfer", true,
+        "a GDF header line without its value (IMAGE_FILE_PATH, IP_RES, SL_THICK, UNITS, SIZE, the FS_?_RAS axes, ORIENTATION, MIN_CROP, MAX_CROP alone) counts the field as given and uses memory contents for it";
+    FS_677 = "FS-677", "FreeSurfer", true,
+        "a GDF DATA_TYPE line shorter than 'DATA_TYPE ' takes its type from the characters past its end: an earlier, longer line's or memory contents";
+    FS_678 = "FS-678", "FreeSurfer", true,
+        "a GDF header's units 'cm' leave the voxel sizes as they are and 'm' divides them by 100, where millimetres need them multiplied by 10 and 1,000";
+    FS_679 = "FS-679", "FreeSurfer", true,
+        "a GDF crop box (MIN_CROP, MAX_CROP, with mri_convert's cropping) outside the integer range, or NaN, becomes the lowest integer";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

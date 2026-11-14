@@ -105,6 +105,9 @@ pub struct Globals {
     /// `N_Zero_Pad_Output` (`mri.h`: -1): the zero padding of the frame numbers in the names of the
     /// series `analyzeWriteSeries` writes (`mri_convert --out_nspmzeropad`); below 0 it becomes 3.
     pub n_zero_pad_output: i32,
+    /// `gdf_crop_flag` (`mriio.cpp`, set by `mriio_set_gdf_crop_flag`: `mri_convert
+    /// --gdf_crop`): whether `gdfRead` zeroes the voxels outside the file's crop box.
+    pub gdf_crop_flag: bool,
     /// The DICOM format probe's process-wide state: CTN's condition stack and `IsDICOM`'s
     /// `static` answer for the last name it was asked (fs.io's `identify`).
     pub dicom: DicomState,
@@ -176,6 +179,7 @@ impl Globals {
             mriio_strip_pound: 1,
             n_zero_pad_input: -1,
             n_zero_pad_output: -1,
+            gdf_crop_flag: false,
             dicom: DicomState::default(),
             gifti: larmorx_io::gifti::Gifti::default(),
             sample_volume_derivative_sign: 1.0,

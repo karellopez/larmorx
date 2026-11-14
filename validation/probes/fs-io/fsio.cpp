@@ -1539,12 +1539,16 @@ void run_piece14(const std::string &cmd)
       N_Zero_Pad_Output = (int)geti();
       N_Zero_Pad_Input = (int)geti();
     }
+    std::string gdf_stem;
+    bool no_gdf = true;
     if (cmd == "vwr") {
       subject = getstr(&no_subject);
       bool nsd;
       std::string sd = getstr(&nsd);
       if (!nsd) setenv("SUBJECTS_DIR", sd.c_str(), 1);
       if (geti()) setenv("BFILE_LITTLE_ENDIAN", "1", 1);
+      // piece 18 (track A relay 27): the GDF image stem (N: none)
+      gdf_stem = getstr(&no_gdf);
     }
     Gdiag = strtoull(next(), NULL, 16);
     setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T", 1);
@@ -1555,6 +1559,7 @@ void run_piece14(const std::string &cmd)
     int how = (int)geti();
     MRI *m = read_mri14();
     if (!no_subject) snprintf(m->subject_name, sizeof m->subject_name, "%s", subject.c_str());
+    if (!no_gdf) snprintf(m->gdf_image_stem, sizeof m->gdf_image_stem, "%s", gdf_stem.c_str());
     int frame = (int)geti(), intent = (int)geti();
     std::string fn = name10();
     int back = (int)geti();
@@ -1751,10 +1756,13 @@ void run_piece6(const std::string &cmd0)
   // mrd and mrh do, after a Gdiag_no, N_Zero_Pad_Input and SPM_START_FRAME (N: unset)
   // piece 17 (track A relay 27): vrd and vrh read COR folders and bshort/bfloat volumes as mrd and
   // mrh do
+  // piece 18 (track A relay 27): xrd and xrh read GDF and SDT volumes as mrd and mrh do, after the
+  // GDF crop flag (mriio_set_gdf_crop_flag)
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
-  const std::string cmd = cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd"   ? "mrd"
-                          : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" ? "mrh"
-                                                                             : cmd0;
+  const std::string cmd = cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd"   ? "mrd"
+                          : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" ? "mrh"
+                                                                                              : cmd0;
+  if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
   if (nifti) Gdiag_no = (int)geti();
   if (cmd0 == "ard" || cmd0 == "arh") {
     N_Zero_Pad_Input = (int)geti();
@@ -2706,7 +2714,7 @@ int main(int argc, char *argv[])
     // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
     {
       static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
-                                 "vrd", "vrh", "vwr"};
+                                 "vrd", "vrh", "vwr", "xrd", "xrh"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

@@ -535,7 +535,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
 /// A write case: `vwr` <subject> <SUBJECTS_DIR> <BFILE_LITTLE_ENDIAN> then piece 14's `mgw` tokens
 /// with `how` 10 (COR), 18 (bshort), 19 (bfloat) or 33 (bhdr).
 fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
-    let ty = g.pick(&[0i64, 0, 8, 8, 9, 9, 23]);
+    let ty = g.pick(&[0i64, 0, 8, 8, 9, 9, 23, 12, 12]);
     let name = match ty {
         0 => g.pick(&["w/c", "w/c", "w/c/", "w/new/c", "w/f"]),
         8 => g.pick(&[
@@ -547,6 +547,7 @@ fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
             "w/no/o.bshort",
         ]),
         9 => g.pick(&["w/o_000.bfloat", "w/o.bfloat", "w/o_001.bfloat", "w/o"]),
+        12 => g.pick(&["w/o.gdf", "w/o.gdf", "w/no/o.gdf"]),
         _ => "w/o.bhdr",
     };
     let mut entries = Vec::new();
@@ -557,6 +558,13 @@ fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
     t.push(enc(sn.map(str::as_bytes)));
     t.push(enc(sd.map(str::as_bytes)));
     t.push(if g.chance(4) { "1" } else { "0" }.into());
+    // the GDF image stem (piece 18): GDF writes mostly with one
+    let stem: Option<&[u8]> = if ty == 12 && !g.chance(8) {
+        Some(g.pick(&[b"w/gi".as_slice(), b"w/gi", b"w/no/gi", b"w/o"]))
+    } else {
+        None
+    };
+    t.push(enc(stem));
     t.push(g.pick(&["0", "0", "10000040", "10000000"]).into());
     t.push(if entries.is_empty() {
         "-".into()

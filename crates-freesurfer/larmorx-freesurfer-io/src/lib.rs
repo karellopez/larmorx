@@ -38,6 +38,7 @@ pub mod mriio;
 pub mod mriio_analyze;
 pub mod mriio_bvol;
 pub mod mriio_cor;
+pub mod mriio_gdf;
 pub mod mriio_nifti;
 pub mod mriio_old;
 pub mod mriio_write;

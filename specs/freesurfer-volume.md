@@ -1492,3 +1492,34 @@ transforms of several types (the first one's matrix voxel-to-voxel-like, anythin
 geometry valid or not), `NO_AVERAGE305` set or not, `DIAG_SHOW` and `DIAG_VERBOSE`. Expected: identical with
 `reproduce` but where FreeSurfer crashes or reads memory it does not own (FS-487, FS-488, and the resampling's FS-53,
 FS-325), counted and not compared; the default differs only with a notice.
+
+## 48. Dilation and segment helpers (3.1-38: mriset.cpp's MRIdilate, mri2.cpp's segment functions)
+- `MRIdilateUchar(src, dst)`: without `dst` a clone of `src` (voxels zero); a `dst` of another extent ends the program
+  (`MRIcheckVolDims`'s message); `dst == src`: the dilation goes into a clone, copied back with `MRIcopy` at the end.
+  The bounding box of `src`'s nonzero bytes (frame 0, read as bytes), grown by one voxel and clipped to the volume
+  (starting from `[w-1, 0]` per axis, so an all-zero volume of extent 1 still visits its voxel); in it each voxel of
+  `dst` becomes the largest byte of the 3 x 3 x 3 neighbourhood (coordinates clamped to the volume), written as a byte
+  at the voxel's index of the row (whatever `dst`'s type). Other voxels of `dst` are not touched.
+- `MRIdilate(src, dst)`: a byte `src` is `MRIdilateUchar`. Otherwise the same destination rules; the bounding box of
+  the voxels above 0 in any frame (nearest samples at whole coordinates, `MRIsampleVolumeFrameType`), grown and
+  clipped likewise; for each frame, each voxel in the box becomes the largest of 0 and the 27 neighbourhood samples
+  (a NaN never wins; a type the sampler refuses samples 0 with its error), written with `MRIsetVoxVal`.
+- `MRImatchSegs(seg, list, n, MaskId, mask)`: without `mask` a copy of `seg` (`MRIcopy`). Over `seg`'s extent
+  (columns outermost), frame 0 of `mask` is set to 0, then to `MaskId` (as a `float`) where `(int)` of `seg`'s frame-0
+  value is in the list. FS-489: with `mask == seg` FreeSurfer reads the voxel after clearing it (every voxel matches as
+  label 0); by default the label is read first; `reproduce` as FreeSurfer.
+- `MRIsegStats(seg, segid, mri, frame, ...)`: returns the count of the voxels (over `seg`'s extent, columns outermost)
+  whose `(int)` frame-0 label is `segid`; of `mri`'s `frame` values there: `min` and `max` (`float`, from the first;
+  both 0 when there is none), `range = max - min` (`float`), `mean = (float)(sum / n)` (0 for none) with `sum = sum + v`
+  and `sum2 = v v + sum2` in `double`, and for `n > 1` `std = (float)sqrt(((double)((float)n * mean * mean) - (double)(mean
+  + mean) * sum + sum2) / (n - 1))` (the `float` products left to right; 0 otherwise). Of two NaN operands the left
+  one's survives in each operation as written here.
+- `HISTOseg(seg, segid, vol, bmin, bmax, bdelta)`: `nbins = (int)(round((bmax - bmin) / bdelta) + 1)` (`round` half away
+  from zero), `HISTOinit(NULL, nbins, bmin, bmax)` (a negative count ends the program with `error: Cannot allocate
+  memory` and `HISTOalloc(<n>): could not allocate histogram`); each voxel whose frame-0 label (as a `double`) equals
+  `segid` counts one in bin `(int)(round(v - bmin) / bdelta)` of `vol`'s frame 0, clamped to `[0, nbins - 1]`. FS-490: a
+  count of 0 bins has no bin to count in (FreeSurfer writes before the array); both modes count nowhere.
+- Validation: the probe's `dilate`, `dilu`, `msegs`, `sstat`, `hseg` (every type, header-only volumes, destinations
+  new, given (of the same or another extent) and in place, label lists, bin ranges that give negative, zero and
+  positive counts): identical with `reproduce` but FS-490 and memory the original does not own (FS-53, FS-58, FS-290),
+  the default different only with a notice.

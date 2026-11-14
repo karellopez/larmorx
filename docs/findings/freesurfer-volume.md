@@ -587,3 +587,21 @@ Source: `utils/talairachex.cpp` 33-347. Object code: `talairachex.cpp.o` of the 
 - **FS-488** (a): `MRIfromTalairachEx` calls `MvoxelFromTalVoxel(mri_dst, lta)` (which reads `mri_dst->width`) before
   `if (!mri_dst) ErrorExit(...)`: `CRASH 11` on the probe's runs.
 - Not reached: `MRASFromTalVoxel`, `MRItalairachVoxelToWorldEx` (the inventory's foundations view lists no caller).
+
+## 18. Dilation and segment helpers (3.1-38, taken first for fs.filter; relay 22)
+Source: `utils/mriset.cpp` 1642-1822 (`MRIdilateUchar`, `MRIdilate`); `utils/mri2.cpp` 3826-3877 (`MRIsegStats`),
+5687-5740 (`MRImatchSegs`, `HISTOseg`). Object code: `mri2.cpp.o` (`<scratch>/C/r20/mri2.s`).
+- `MRIsegStats`: `sum2 += val * val` compiles as `(val * val) + sum2` (the product in the destination); the `std`
+  expression: `cvtsi2ss n`, `mulss mean` twice, `addss mean, mean` for `2 * mean`, widened, `mulsd sum`, then `subsd`,
+  `addsd sum2`, `divsd (double)(n - 1)`, `sqrt`; the min/max comparisons are `comiss` on the `float`s.
+- `MRIdilate`'s OpenMP loop over slices writes each voxel once: no order dependence. `MRIdilateUchar` writes through
+  `MRIvox` (a byte pointer) whatever `dst`'s type.
+- **FS-489** (c, rule A): `MRImatchSegs` calls `MRIsetVoxVal(mask, ..., 0)` before `MRIgetVoxVal(seg, ...)`: in place
+  (the documented "can be done in-place") every voxel reads 0. No caller in FreeSurfer 8.2.0 passes the segmentation
+  itself (mri_segment and mrifilter.cpp pass NULL or another mask).
+- **FS-490** (a): `HISTOseg`'s clamp `if (binno >= nbins) binno = nbins - 1` gives -1 for 0 bins (`bmax = bmin -
+  bdelta`): `h->counts[-1]++` writes before the array.
+- For track A (fs.maths): `HISTOalloc` with a negative count fails in `calloc`, which sets `errno` to ENOMEM, so
+  FreeSurfer's message is `error: Cannot allocate memory` then `error: HISTOalloc(<n>): could not allocate histogram`;
+  larmorx-freesurfer-core's `histo_alloc` gives only the second (the probe's `hseg` showed it; `segs::histo_seg` sets
+  `errno` before the call until `histo_alloc` does).

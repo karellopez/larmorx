@@ -155,3 +155,8 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   `MRItoTalairachExInterp` (315-328), `MRItoTalairachEx` (330-343; 3.1-39's), `MRIfromTalairachEx` (347-361; 3.1-39's);
   operand orders from `talairachex.cpp.o`. Changes: FS-487, FS-488 (errors where FreeSurfer crashes; no matrix for a
   transform array without transforms, both modes).
+- `src/mriset.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mriset.cpp` `MRIdilateUchar` (1642-1721),
+  `MRIdilate` (1723-1822). Changes: none.
+- `src/segs.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mri2.cpp` `MRIsegStats` (3826-3877),
+  `MRImatchSegs` (5687-5708), `HISTOseg` (5717-5740); operand orders from `mri2.cpp.o`. Changes: FS-489 (rule A),
+  FS-490 (no count, both modes).

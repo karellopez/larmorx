@@ -171,3 +171,12 @@ release (`oracles/logs/fs-found-c-r22-trap-volume2.log`). `check.py`'s `SKIP` ad
 out `SAMPLE_CUBIC_BSPLINE` (fs.bspline is not ported yet). Relay 22 also measured `fdr` with `log10` now
 correctly rounded by default (seeds 7 and 13, 987 cases each: 958 and 947 identical with `reproduce`, 0 different;
 `fix` different only with notices, GLIBC-07 among them).
+
+Measured 2026-11-14 (part 13, relay 22, for fs.filter: `dilate`, `dilu`, `msegs`, `sstat`, `hseg`; 171 commands): seeds 7
+and 13, 2,000 cases each: 1,878 and 1,882 identical with `reproduce`, the rest not comparable (FS-53, FS-58, FS-290,
+FS-490), 0 different; `fix` different only with notices (FS-489 among them). The port's debug and release builds
+agree on seed 13's 4,000 cases in both modes. Seed 1, 3,420 cases: 3,145 identical, 275 not comparable, hash
+`d67e661fe83e2a5e38001491e6b0b8afd724b5a995ba9a2675034e540593182b`, passing with AArch64's NaN emulated in debug and
+release (`oracles/logs/fs-found-c-r22-trap-volume3.log`) and on Windows x64 (track A's
+`validation/investigations/windows-cross-check/`, the test cross-built and run on the Windows helper). `check.py`'s
+`SKIP` adds FS-490.

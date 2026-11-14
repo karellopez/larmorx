@@ -205,6 +205,13 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `MRIwriteType` as COR 0, bshort 8, bfloat 9 or bhdr 23, the read back with that type). `SKIP` for FS-661, FS-665,
   FS-669, FS-671, FS-672 and FS-660's crash; `VARY` for FS-657, FS-662 and FS-658's memory contents. Seed 13, 2,181
   piece-17 cases: `reproduce` identical on 1,852, 0 different.
+- Piece 18 (track A relay 27): GDF and Varian SDT volumes. `xrd` and `xrh` (piece 6's `mrd` and `mrh` after the GDF
+  crop flag, `mriio_set_gdf_crop_flag`) of GDF headers (every field, missing or without its value, units,
+  orientations, axes, offsets, crop boxes, a bare `DATA_TYPE`) with their slice files (plain or zero-padded numbers,
+  cut, missing), and SDT volumes (`.spr` headers of every line form, a last line without a newline, a folder in its
+  place, a folder name with a `.`; voxels of the four types) built by `tests/fs_io/piece18.rs`; GDF writes through
+  piece 17's `vwr`, whose prefix ends with the GDF image stem (`N`: none). `SKIP` for FS-674, `VARY` for FS-676 and
+  FS-677's memory contents. Seed 13, 1,428 piece-18 cases: `reproduce` identical on 1,300, 0 different.
 - `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
   of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four

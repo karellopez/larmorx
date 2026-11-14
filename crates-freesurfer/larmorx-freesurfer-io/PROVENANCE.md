@@ -282,6 +282,7 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 640-642, 1170-1175 | `mri_read`'s and `MRIwriteType`'s ANALYZE branches (relay 26) | `mriio.rs` |
 | `utils/mriio.cpp` 1362-1903 | the COR header's flags, `corRead`, `corWrite` (FS-657 to FS-660, FS-672, FS-166; relay 27) | `mriio_cor.rs` |
 | `utils/mriio.cpp` 2766-4013; `utils/mri.cpp` 11806-11870 | `bvolumeWrite`, `get_b_info`, `bvolumeRead`, `decompose_b_fname`, `write_bhdr`, `read_bhdr`; the unscaled path of `MRIchangeType` (copied: fs.io cannot call fs.volume) (FS-661 to FS-671, FS-58, FS-249; relay 27) | `mriio_bvol.rs` |
+| `utils/mriio.cpp` 5970-6520, 10566-10870 | `gdfRead` (with `gdf_crop_flag`, larmorx-freesurfer-core's `Globals`), `gdfWrite`, `sdtRead`, `MRIreadRaw` and its buffer copies (FS-673 to FS-679, FS-58; relay 27) | `mriio_gdf.rs` |
 | `utils/mriio.cpp` 516-528, 1116-1160 | `mri_read`'s COR, bhdr, bshort and bfloat branches; `MRIwriteType`'s COR, bhdr (FS-666), bshort and bfloat branches (relay 27) | `mriio.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and

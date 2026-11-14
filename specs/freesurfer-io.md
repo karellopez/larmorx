@@ -21,7 +21,8 @@ annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, poi
 MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94), NIfTI-1 pairs
 (`.hdr` and `.img`) written (§95-96); **part 15** (§97-99): NIfTI volumes and NIfTI-1 pairs read;
 §100: a number cut after another (FS-49); **part 16** (§101-103): ANALYZE volumes read and written;
-**part 19** (§104-106): COR, bshort, bfloat and bhdr volumes read and written.
+**part 19** (§104-106): COR, bshort, bfloat and bhdr volumes read and written; **part 20** (§107-109): GDF
+volumes read and written, Varian SDT volumes read.
 
 ## 1. Conventions
 
@@ -3178,3 +3179,95 @@ past its buffers: FS-661, FS-665, FS-669, FS-671, FS-672, FS-58, FS-53; 101 comp
 FS-658's memory contents, FS-662); `fix` differs only with notices. Unit tests
 (`mriio_bvol::tests`, `mriio_cor::tests`): the stems, a written bvolume read back in both modes
 (FS-664), FS-666, a written COR folder read back, FS-659, FS-660.
+
+## 107. GDF volumes read and written (`gdfRead`, `gdfWrite`; type 12)
+
+A GDF volume is a text header (`mri_identify`: the extension `gdf`) naming one image file per slice.
+
+**Reading:** the header that does not open: `gdfRead(): error opening file <name>` (`ERROR_BADFILE`,
+`errno` 0). Lines of up to 1,023 bytes, the last newline removed, taken by their first characters in
+this order: `IMAGE_FILE_PATH` (a word: the slices' pattern), `IP_RES` (two floats), `SL_THICK` (a
+float), `UNITS` (a word), `SIZE` (two integers), `FS_X_RAS`, `FS_Y_RAS`, `FS_Z_RAS`, `FS_C_RAS` (three
+floats each), `DATA_TYPE` (the text from the line's eleventh character), `ORIENTATION` (a word),
+`FILE_OFFSET` (an integer, 0 unset), `MIN_CROP`, `MAX_CROP` (three floats); each value
+`sscanf("%*s <conversions>")` of the line, a value the line lacks left as it was. FS-676: a field's line
+counts the field as given even without its value, which is then memory contents (0 or empty here,
+noted). FS-677: a `DATA_TYPE` line shorter than ten characters takes the text past its end (a final line
+without a newline: an earlier, longer line's bytes or memory contents; `fix`: empty).
+
+- `IMAGE_FILE_PATH`, `IP_RES`, `SL_THICK` and `SIZE` required: `gdfRead(): missing field(s) from
+  <name>:` then `  IMAGE_FILE_PATH`, `  IP_RES`, `  SL_THICK`, `  SIZE` for those missing (errors,
+  `ERROR_BADPARM`), no volume. No `ORIENTATION`: with the three axes `missing field ORIENTATION in file
+  <name>, but you've got {xyz}_{ras}, so never mind`, else `missing field ORIENTATION in file <name>;
+  assuming 'coronal'`; no `DATA_TYPE`: `missing field DATA_TYPE in file <name>; assuming 'short'`; no
+  `UNITS`: `missing field UNITS in file <name>; assuming 'mm'` (standard output). The three texts in
+  lower case (ASCII).
+- The type: `short`, `float`, `unsigned char`; else `gdfRead(): unknown data type '<t>'`. The
+  orientation: the text after its last blank: starting `cor` coronal, `sag` sagittal, `ax` or `hor`
+  horizontal; else, without the three axes, `gdfRead(): can't determine orientation from string '<as
+  given>'`. The units: `mm` 1, `cm` 1, `m` 100, the sizes divided by that (FS-678: `fix` multiplies
+  centimetres by 10 and metres by 1,000, noted); others `gdfRead(): unknown units '<u>'`.
+- With mri_convert's GDF cropping on (`mriio_set_gdf_crop_flag`, larmorx's `Globals::gdf_crop_flag`)
+  and no `MIN_CROP` or `MAX_CROP`: `gdfRead(): cropping desired but missing MIN_CROP or MAX_CROP`. The
+  path without a `*`: `gdfRead(): file path <p> does not contain '*'`. The slices: `<before *><n><after
+  *>` for n from 1 while such a file exists (opened as named, from the working folder); none: the same
+  with `n` zero-padded to three digits; none again: `gdfRead(): can't find file <before>1<after> or
+  <before>001<after>` (all `ERROR_BADPARM` or `ERROR_BADFILE`, `errno` 0, no volume).
+- The volume: `SIZE`'s two numbers by the slices' count, one frame (voxels or the header alone); the
+  voxel sizes `IP_RES` and `SL_THICK`; the end coordinates `extent x size / 2` (`float` product), the
+  starts their negatives; the three axes given: they and `ras_good_flag` 1; else the orientation's axes
+  and `warning: gdf volume may be incorrectly oriented`; the centre `FS_C_RAS`, else 0 and `warning:
+  gdf volume may be incorrectly centered` (standard output).
+- The voxels: each slice file (`gdfRead(): error opening file <f>`), from `FILE_OFFSET` (`fseek`; a
+  negative offset fails with `EINVAL` and reads from the start), rows of big-endian values
+  (`gdfRead(): error reading from file <f>` for a short row). With cropping: `NOTICE: cropping GDF data`
+  and every voxel outside columns `MIN_CROP[0]..MAX_CROP[0]`, rows `MIN_CROP[2]..MAX_CROP[2]`, slices
+  `MIN_CROP[1] - 1..MAX_CROP[1] - 1` (each bound `(int)`: FS-679, outside the int range or NaN the lowest
+  int; `fix` clamps, NaN 0) set to 0; else `NOTICE: not cropping GDF data`.
+
+**Writing** (`MRIwriteType` as GDF; the volume's GDF image stem is set by mri_convert): no stem: `GDF
+write attempted without GDF image stem`; frames other than 1: `GDF write attempted with <n> frames
+(supported only for 1 frame)`; another type than bytes, floats, shorts: `gdfWrite(): bad data type (<t>)
+for GDF write (only uchar, float, short supported)` (`ERROR_BADPARM`, `errno` 0). `writing GDF image
+files...`, then for each slice `<stem>_<n>.img` (n from 1; `gdfWrite(): error opening file <f>`) its
+rows big-endian; `writing GDF info file...` and the header (`gdfWrite(): error opening file <name>`):
+`GDF FILE VERSION3`, `START MAIN HEADER`, `IMAGE_FILE_PATH <stem>_*.img`, `SIZE <w> <h>`, `IP_RES <%g>
+<%g>`, `SL_THICK <%g>`, with `ras_good_flag` the four `FS_?_RAS` lines (`%f`), `FILE_OFFSET 0`,
+`DATA_TYPE unsigned char|float|short`, `END MAIN HEADER`. A volume without voxels: FS-58.
+
+## 108. Varian SDT volumes read (`sdtRead`; type 10)
+
+The voxels are the name's file; the header its name with what follows the last `.` replaced by `spr`
+(no `.`: `.spr` added; FS-675: the last `.` may be in a folder's name, `x.d/vol` giving `x.spr`; `fix`
+uses `x.d/vol.spr`). The header that does not open: `sdtRead(<name>): could not open header file <h>`.
+Lines of up to 1,023 bytes `name:value` (the part before the first `:` compared whole): `numDim` (3 or 4;
+another value, also an unread one -1: `sdtRead(<name>): only 3 or 4 dimensions supported (numDim = <n>)`,
+`ERROR_UNSUPPORTED`), `dim` (before `numDim`: `sdtRead(<name>): 'dim' before 'numDim' in header file
+<h>`; three integers, or four whose last must be 1: `sdtRead(<name>): nframes != 1 unsupported for sdt
+(dim(4) = <n>)`), `dataType` (after blanks, starting `BYTE` bytes, `WORD` shorts, `LWORD` ints, `REAL`
+floats; `COMPLEX`: `sdtRead(<name>): unsupported data type '<rest of the line>'`; else `sdtRead(<name>):
+unknown data type '<rest>'`, the rest with its newline), `interval` (three floats, four with `numDim`
+other than 3, each then times 10 in `double`: centimetres), `sdtOrient` (after blanks `sag`, `ax`, `cor`;
+else `sdtRead(<name>): unknown orientation <rest>`). FS-673: a last line without a newline is ignored
+(`fix` reads it). FS-674: a header that opens but cannot be read (a folder): `stdRead(<name>): could not
+read file` for ever in FreeSurfer (larmorx once). No type: `sdtRead(<name>): data type undefined`; a
+dimension never given: `sdtRead(<name>): one or more dimensions undefined` (errors, `errno` 0, no
+volume). With voxels: the data file (`sdtRead(<name>): error opening data file <name>`) read by
+`MRIreadRaw`: `dim[2]` slices of `dim[0] x dim[1]` big-endian values, a short slice `<program>: could
+not read <k>th slice (<pixels>)` and no volume. Without: the header with `dim[3]` frames. Then the sizes,
+the orientation's axes, `thick` the slice size, the end coordinates `size x extent / 2`, the starts
+their negatives, `imnr0` 1, `imnr1` `dim[2]`, `ps` 1, TR, TE, TI 0, the volume's name.
+
+## 109. Validation plan (part 20)
+
+Piece 18's commands `xrd` and `xrh` (piece 6's `mrd`, `mrh`) after the GDF crop flag, the type -1, 10 or
+12: GDF headers with every field, one left out, without its value or in another form (NaN, infinity,
+words), units `mm`, `cm`, `m`, `MM`, `in`, none, orientations of every form and none, axes partial or
+whole, offsets 0, 4, 16, -2, crop boxes, a bare `DATA_TYPE` (also as a last line after a long one);
+slice files numbered plainly or zero-padded, with the offset's bytes, cut or missing; SDT headers with
+`numDim` 2 to 5, `dim` before or after it, every data type and two refused, orientations and an unknown
+one, a last line without a newline, a folder in its place, a volume in a folder whose name has a `.`;
+voxels of the four types, cut. Piece 17's `vwr` writes GDF (`w/o.gdf`, `w/no/o.gdf`) with the image
+stems `w/gi`, `w/no/gi`, `w/o` or none, read back with the type 12. Measured (2026-11-14): seed 13,
+1,428 piece-18 cases: `reproduce` identical on 1,300, 0 different (27 counted: FS-674 and FreeSurfer's
+crashes; 101 compared apart: FS-676, FS-677's memory contents); `fix` differs only with notices.

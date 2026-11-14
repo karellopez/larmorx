@@ -1551,3 +1551,22 @@ bvolumeRead.dis` and `corRead.dis` (from relay 25's `mriio.dis` of the unit orac
   probe: corRead's later error frees the volume, EXIT 1). The same holds for `MRITAGread`'s talairach
   tag (fs.io's mghRead path) wherever FreeSurfer later frees that volume (mri_read's frame copies and
   NaN check); not noted there yet.
+
+## Part 20: GDF and Varian SDT volumes (relay 27 of track A)
+`utils/mriio.cpp` 5970-6520 (`gdfRead`, `gdfWrite`), 10566-10870 (`data_size`, `sdtRead`, `MRIreadRaw`, the
+`*_local_buffer_to_image` helpers).
+
+### Mechanisms
+- **FS-673, FS-674.** `sdtRead`'s loop is `read_bhdr`'s (Part 19, FS-661, FS-668): `if (!fgets(...) &&
+  ferror(fp)) ErrorPrintf(...); if (feof(fp)) break;`, its message spelled `stdRead`.
+- **FS-675.** `if ((dot = strrchr(header_fname, '.'))) sprintf(dot + 1, "spr");` over the whole name.
+- **FS-676.** `file_path`, `ipr[2]`, `st`, `units_string`, `size[2]`, the axes, `orientation_string`,
+  `min_crop`, `max_crop` are locals without initial values, their flags set by the line whatever
+  `sscanf` assigns; with the three axes and no `ORIENTATION` line `StrLower(orientation_string)` reads
+  the uninitialised buffer (its orientation is then unused: no visible effect).
+- **FS-677.** `strcpy(data_type_string, &line[10])`: `fgets`' NUL at the line's end (index 10 for
+  `DATA_TYPE\n`, the newline replaced by a NUL at 9) usually ends it; a line of nine characters at the end
+  of the file without a newline has its NUL at 9, so index 10 is an earlier line's byte or never written.
+- **FS-678.** `cm` gives `units_factor = 1.0`, `m` 100.0, and the sizes are divided by it.
+- **FS-679.** `(int)min_crop[k]` and `(int)max_crop[k]` of floats from the file (`cvttss2si`).
+- `MRIreadRaw`'s error path leaks the volume and buffer and leaves the file open (no visible effect).

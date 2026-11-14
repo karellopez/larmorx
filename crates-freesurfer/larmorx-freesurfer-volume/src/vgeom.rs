@@ -88,6 +88,11 @@ pub fn copy_vol_geom(src: &VolGeom, dst: &mut VolGeom) {
 /// comment, `filename = %s`, `volume = %d %d %d`, then the voxel sizes, the three direction
 /// cosines and the centre as `%.15e`).
 pub fn write_vol_geom(fp: &mut CFile, vg: &VolGeom) {
+    fp.put_bytes(&vol_geom_text(vg));
+}
+
+/// The bytes [`write_vol_geom`] writes (for writers into other streams: `LTAprint`).
+pub fn vol_geom_text(vg: &VolGeom) -> Vec<u8> {
     let mut s = Vec::new();
     if vg.valid == 0 {
         s.extend_from_slice(format!("valid = {}  # volume info invalid\n", vg.valid).as_bytes());
@@ -108,7 +113,7 @@ pub fn write_vol_geom(fp: &mut CFile, vg: &VolGeom) {
     ] {
         s.extend_from_slice(format!("{name}{} {} {}\n", e(a), e(b), e(c)).as_bytes());
     }
-    fp.put_bytes(&s);
+    s
 }
 
 /// A line as `sscanf` reads it (its end is the C string's end), noting whether a read found the

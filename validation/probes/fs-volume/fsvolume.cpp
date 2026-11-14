@@ -431,6 +431,70 @@ void get_region(MRI_REGION *r)
   r->dx = geti(); r->dy = geti(); r->dz = geti();
 }
 
+// relay 25, transform.cpp's operations on an LTA. An LTA of the case: its transform count, type,
+// fscale and subject (hex), then for each transform x0 y0 z0 sigma type label, its matrix (16),
+// its source and destination geometries, and a flag: 1, its inverse's matrix and geometries
+// follow (0: LTAalloc's identity and initVolGeom's)
+LTA *get_lta_full()
+{
+  int n = geti();
+  if (n < 0) return NULL;
+  LTA *l = LTAalloc(n, NULL);
+  l->type = geti();
+  l->fscale = getf();
+  std::string s = gethex();
+  strcpy(l->subject, s.c_str());
+  for (int i = 0; i < n; i++) {
+    LINEAR_TRANSFORM *lt = &l->xforms[i];
+    lt->x0 = getf();
+    lt->y0 = getf();
+    lt->z0 = getf();
+    lt->sigma = getf();
+    lt->type = geti();
+    lt->label = geti();
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) lt->m_L->rptr[r][c] = getf();
+    set_geom(&lt->src);
+    set_geom(&lt->dst);
+    if (geti()) {
+      LINEAR_TRANSFORM *iv = &l->inv_xforms[i];
+      for (int r = 1; r <= 4; r++)
+        for (int c = 1; c <= 4; c++) iv->m_L->rptr[r][c] = getf();
+      set_geom(&iv->src);
+      set_geom(&iv->dst);
+    }
+  }
+  return l;
+}
+
+void put_lt(const LINEAR_TRANSFORM *t)
+{
+  of(t->x0); of(t->y0); of(t->z0); of(t->sigma); oi(t->type); oi(t->label);
+  om(t->m_L);
+  put_geom(&t->src);
+  put_geom(&t->dst);
+}
+
+// every transform and inverse transform of an LTA
+void put_lta_full(const LTA *l)
+{
+  if (!l) { out += "NULL "; return; }
+  oi(l->type); oi(l->num_xforms); of(l->fscale); ohex(std::string(l->subject));
+  for (int i = 0; i < l->num_xforms; i++) {
+    put_lt(&l->xforms[i]);
+    put_lt(&l->inv_xforms[i]);
+  }
+}
+
+// FSLOUTPUTTYPE: 0 unset, 1 NIFTI_GZ, 2 NIFTI, 3 ANALYZE, 4 NIFTI_PAIR
+void set_fsltype()
+{
+  int k = geti();
+  const char *v[] = {NULL, "NIFTI_GZ", "NIFTI", "ANALYZE", "NIFTI_PAIR"};
+  if (k > 0 && k < 5) setenv("FSLOUTPUTTYPE", v[k], 1);
+  else unsetenv("FSLOUTPUTTYPE");
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -2298,6 +2362,68 @@ void run_case()
     fflush(stdout);
     oi(r != NULL && r == dst);
     put_vol(r);
+  } else if (cmd == "ltafill") {
+    // relay 25: transform.cpp's LTAfillInverse, LTAinvert, LTAchangeType, LTAconcat, LTAreduce,
+    // LTAmriIsSource/Target, LTAprint
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    LTAfillInverse(l);
+    fflush(stdout);
+    put_lta_full(l);
+  } else if (cmd == "ltainv") {
+    LTA *l = get_lta_full();
+    int mode = geti();
+    LTA *d = mode == 1 ? get_lta_full() : mode == 2 ? l : NULL;
+    fflush(stdout);
+    LTA *r = LTAinvert(l, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_lta_full(r);
+    if (mode != 2) put_lta_full(l);
+  } else if (cmd == "ltachg") {
+    set_fsltype();
+    if (geti()) {
+      Gdiag_no = 1;
+      Gstdout = stdout;
+    }
+    LTA *l = get_lta_full();
+    int type = geti();
+    fflush(stdout);
+    LTA *r = LTAchangeType(l, type);
+    fflush(stdout);
+    oi(r == l);
+    put_lta_full(l);
+  } else if (cmd == "ltacat") {
+    set_fsltype();
+    int n = geti();
+    std::vector<LTA *> v;
+    for (int i = 0; i < n; i++) v.push_back(get_lta_full());
+    int red = geti();
+    fflush(stdout);
+    LTA *r = LTAconcat(v.data(), n, red);
+    fflush(stdout);
+    put_lta_full(r);
+    for (LTA *l : v) put_lta_full(l);
+  } else if (cmd == "ltared") {
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    LTA *r = LTAreduce(l);
+    fflush(stdout);
+    put_lta_full(r);
+    put_lta_full(l);
+  } else if (cmd == "ltasrc") {
+    LTA *l = get_lta_full();
+    MRI *m = get_vol();
+    int tgt = geti();
+    fflush(stdout);
+    int r = tgt ? LTAmriIsTarget(l, m) : LTAmriIsSource(l, m);
+    fflush(stdout);
+    oi(r);
+  } else if (cmd == "ltaprt") {
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    LTAprint(stdout, l);
+    fflush(stdout);
   } else {
     fail("unknown command");
   }

@@ -2021,6 +2021,16 @@ defects! {
         "the histogram segmentation of white matter (MRIhistoSegment) never ends when its search for the gray-matter peak comes back to a peak it has found (a gray-matter limit below -1 with no peak)";
     FS_503 = "FS-503", "FreeSurfer", true,
         "the thresholded region histogram (MRIhistogramRegionWithThreshold) with several threads adds per-thread histograms of fractional counts, whose sums depend on the number of threads";
+    FS_504 = "FS-504", "FreeSurfer", true,
+        "the transform-array functions (LTAconcat, LTAreduce, LTAmriIsSource, LTAmriIsTarget, LTAprint, LTAchangeType's diagnostic print) given no array, an array without transforms or a transform without a 4 x 4 matrix read memory they do not own or crash";
+    FS_505 = "FS-505", "FreeSurfer", true,
+        "filling a transform array's inverses (LTAfillInverse, and every function that calls it) computes the inverse of a transform whose inverse has no matrix and loses it: the inverse stays without a matrix";
+    FS_506 = "FS-506", "FreeSurfer", true,
+        "changing a transform array from physical-voxel to RAS-to-RAS (LTAchangeType, and every change that passes through it) converts the matrix as if it were RAS-to-RAS before scaling it: the result is not the RAS-to-RAS transform";
+    FS_507 = "FS-507", "FreeSurfer", true,
+        "changing a transform array of several transforms from a tkregister registration to RAS-to-RAS (LTAchangeType) converts the first transform once for every transform and leaves the others unconverted";
+    FS_508 = "FS-508", "FreeSurfer", true,
+        "changing a transform array to or from FSL's type (LTAchangeType) when FSL's conversion gives no matrix (a product that cannot be inverted) frees the transform's matrix and goes on using it: memory it no longer owns read";
 }
 
 /// The register entry with ID `id`.

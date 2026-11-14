@@ -21,6 +21,7 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_io::image as im;
+use larmorx_freesurfer_mri::lta::Lta;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
@@ -2536,6 +2537,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R23_SET.contains(&c) => r23_gen_set(&mut g, &mut t, c),
             c if R23_MASK.contains(&c) => r23_gen_mask(&mut g, &mut t, c),
             c if R24_HISTO.contains(&c) => r24_gen_histo(&mut g, &mut t, c),
+            c if R25_LTA.contains(&c) => r25_gen_lta(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3001,7 +3003,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 220] = [
+pub const COMMANDS: [&str; 227] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3222,6 +3224,13 @@ pub const COMMANDS: [&str; 220] = [
     "hlr",
     "hlab",
     "hsegm",
+    "ltafill",
+    "ltainv",
+    "ltachg",
+    "ltacat",
+    "ltared",
+    "ltasrc",
+    "ltaprt",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5549,6 +5558,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "nmask" | "von" | "vinl" | "linv" | "cent" | "pthr" | "cnbhd" => r23_meas(cx, t, o, cmd)?,
         "grow" | "onfg" | "offbg" | "cplab" | "cplv" => r23_multi(cx, t, o, cmd)?,
         c if R24_HISTO.contains(&c) => r24_histo(cx, t, o, cmd)?,
+        c if R25_LTA.contains(&c) => r25_lta(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -7279,4 +7289,424 @@ fn r24_like(g: &mut Gen, s: Shape) -> Shape {
         o.ty = g.pick(&[0, 3, 4, 1]);
     }
     o
+}
+
+/// transform.cpp's operations on an LTA (relay 25).
+const R25_LTA: [&str; 7] = [
+    "ltafill", "ltainv", "ltachg", "ltacat", "ltared", "ltasrc", "ltaprt",
+];
+
+/// A pool of geometries for one case's transforms (`set_geom`'s tokens): scanner-like ones of
+/// small or real extents, one sometimes a slight change of another (`vg_isEqual`'s threshold), one
+/// sometimes not valid.
+fn r25_pool(g: &mut Gen) -> Vec<Vec<String>> {
+    let mut pool: Vec<Vec<String>> = Vec::new();
+    for k in 0..4 {
+        let ext = |g: &mut Gen| {
+            if g.chance(6) {
+                g.pick(&[256, 128, 0, -1])
+            } else {
+                g.int(1, 6)
+            }
+        };
+        let s = Shape {
+            w: ext(g),
+            h: ext(g),
+            d: ext(g),
+            ty: 0,
+            nf: 1,
+            hdr: true,
+            drop: false,
+        };
+        let mut v = real_geom(g, s, false);
+        if k > 0 && g.chance(8) {
+            // a slight change of the previous geometry
+            v = pool[k - 1].clone();
+            let i = g.pick(&[4usize, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+            let x = f32::from_bits(u32::from_str_radix(&v[i], 16).unwrap());
+            v[i] = fx(x + g.pick(&[1e-7f32, 1e-5, 1e-3]));
+        }
+        if g.chance(12) {
+            v[0] = g.pick(&["0", "2"]).to_owned();
+        }
+        pool.push(v);
+    }
+    pool
+}
+
+/// A transform matrix's 16 tokens: mostly a rotation-like part and a translation, sometimes any
+/// numbers (singular ones included).
+fn r25_m44(g: &mut Gen, t: &mut Vec<String>) {
+    let like = !g.chance(6);
+    let zero = g.chance(25);
+    for r in 0..4 {
+        for c in 0..4 {
+            let v = if zero {
+                0.0
+            } else if like {
+                if r == 3 {
+                    if c == 3 { 1.0 } else { 0.0 }
+                } else if c == 3 {
+                    num(g, -64, 64, 8)
+                } else if r == c {
+                    g.pick(&[1.0f32, 1.0, -1.0, 0.9, 1.1, 2.0, 0.5])
+                } else {
+                    g.pick(&[0.0f32, 0.0, 0.0, 0.1, -0.1, 0.25, 0.6])
+                }
+            } else {
+                num(g, -4, 4, 8)
+            };
+            t.push(fx(v));
+        }
+    }
+}
+
+const R25_TYPES: [i64; 9] = [0, 1, 2, 14, 15, 21, 1, 1, 0];
+
+/// `get_lta_full`'s tokens: `n` transforms along the pool's geometries `chain[0] -> chain[1] ->
+/// ...` (each transform's source and destination; `chain` has `n + 1` entries).
+fn r25_lta_toks(g: &mut Gen, t: &mut Vec<String>, pool: &[Vec<String>], chain: &[usize], ty: i64) {
+    let n = chain.len() - 1;
+    t.push(n.to_string());
+    t.push(ty.to_string());
+    t.push(fx(g.pick(&[0.0f32, 0.0, 0.1, 1.0, -1.0, f32::NAN])));
+    t.push(g.pick(&["-", "-", "62657274", "7375622d3031"]).to_owned());
+    for i in 0..n {
+        for _ in 0..3 {
+            t.push(fx(num(g, -10, 10, 2)));
+        }
+        t.push(fx(g.pick(&[10000.0f32, 1.0, 0.5])));
+        t.push(g.pick(&[-1i64, 0, 1, 14]).to_string());
+        t.push(g.pick(&[0i64, 0, 3, -1]).to_string());
+        r25_m44(g, t);
+        t.extend(pool[chain[i]].iter().cloned());
+        t.extend(pool[chain[i + 1]].iter().cloned());
+        if g.chance(4) {
+            t.push("1".into());
+            r25_m44(g, t);
+            t.extend(pool[g.below(pool.len() as u64) as usize].iter().cloned());
+            t.extend(pool[g.below(pool.len() as u64) as usize].iter().cloned());
+        } else {
+            t.push("0".into());
+        }
+    }
+}
+
+/// [`r25_chain`] from a random start.
+fn r25_chain_any(g: &mut Gen, n: usize, np: usize) -> Vec<usize> {
+    let start = g.below(np as u64) as usize;
+    r25_chain(g, start, n, np)
+}
+
+/// A chain of `n + 1` pool indices (`n` transforms), from `start`.
+fn r25_chain(g: &mut Gen, start: usize, n: usize, np: usize) -> Vec<usize> {
+    let mut c = vec![start];
+    for _ in 0..n {
+        c.push(g.below(np as u64) as usize);
+    }
+    c
+}
+
+fn r25_n(g: &mut Gen) -> usize {
+    if g.chance(30) {
+        0
+    } else {
+        g.pick(&[1, 1, 1, 2, 2, 3])
+    }
+}
+
+fn r25_gen_lta(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let pool = r25_pool(g);
+    let np = pool.len();
+    let ty = g.pick(&R25_TYPES);
+    match cmd {
+        "ltafill" | "ltared" | "ltaprt" => {
+            let n = r25_n(g);
+            let start = g.below(np as u64) as usize;
+            let mut chain = r25_chain(g, start, n, np);
+            if cmd == "ltared" && n >= 2 && g.chance(3) {
+                // a link that matches only inverted: transform i's destination is the previous one's
+                let i = g.int(1, n as i64 - 1) as usize;
+                chain.swap(i, i + 1);
+            }
+            r25_lta_toks(g, t, &pool, &chain, ty);
+        }
+        "ltainv" => {
+            let n = r25_n(g);
+            let chain = r25_chain_any(g, n, np);
+            r25_lta_toks(g, t, &pool, &chain, ty);
+            let mode = g.int(0, 2);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let m = if g.chance(6) { r25_n(g) } else { n };
+                let chain = r25_chain_any(g, m, np);
+                let ty2 = g.pick(&R25_TYPES);
+                r25_lta_toks(g, t, &pool, &chain, ty2);
+            }
+        }
+        "ltachg" => {
+            t.push(g.pick(&[1i64, 1, 1, 2, 3, 4, 0]).to_string());
+            t.push(i64::from(g.chance(8)).to_string());
+            let n = if g.chance(20) {
+                0
+            } else {
+                g.pick(&[1, 1, 1, 2, 3])
+            };
+            let chain = r25_chain_any(g, n, np);
+            r25_lta_toks(g, t, &pool, &chain, ty);
+            let to = if g.chance(10) {
+                g.pick(&[10i64, 12, 13, -1, 21, 3])
+            } else {
+                g.pick(&[0i64, 1, 2, 14, 15])
+            };
+            t.push(to.to_string());
+        }
+        "ltacat" => {
+            t.push(g.pick(&[1i64, 1, 1, 2, 0]).to_string());
+            let k = if g.chance(25) {
+                0
+            } else {
+                g.pick(&[1usize, 2, 2, 2, 3])
+            };
+            t.push(k.to_string());
+            let mut end = g.below(np as u64) as usize;
+            for j in 0..k {
+                let n = r25_n(g);
+                let link = g.below(6);
+                let chain = if j > 0 && link == 0 {
+                    // ends where the previous one ended: matches inverted
+                    let mut c = r25_chain_any(g, n, np);
+                    if let Some(l) = c.last_mut() {
+                        *l = end;
+                    }
+                    c
+                } else if j > 0 && link == 1 {
+                    r25_chain_any(g, n, np)
+                } else {
+                    r25_chain(g, end, n, np)
+                };
+                end = *chain.last().unwrap();
+                let tyj = if j == 0 || g.chance(3) {
+                    ty
+                } else {
+                    g.pick(&R25_TYPES)
+                };
+                r25_lta_toks(g, t, &pool, &chain, tyj);
+            }
+            t.push(g.int(0, 1).to_string());
+        }
+        _ => {
+            // ltasrc: the LTA, then a volume header whose geometry is one of the pool's
+            let n = if g.chance(20) { 0 } else { g.pick(&[1, 1, 2]) };
+            let chain = r25_chain_any(g, n, np);
+            r25_lta_toks(g, t, &pool, &chain, ty);
+            let gi = if g.chance(4) {
+                g.below(np as u64) as usize
+            } else if g.chance(2) {
+                chain[0]
+            } else {
+                *chain.last().unwrap()
+            };
+            let geo = &pool[gi];
+            let ext = |k: usize| geo[k].parse::<i64>().unwrap().clamp(1, 6);
+            for v in [ext(1), ext(2), ext(3), 0, 1, 1, g.int(0, 255)] {
+                t.push(v.to_string());
+            }
+            let mut geo = geo.clone();
+            // the volume's extent is its own: the pool's when it is small
+            for k in 1..=3 {
+                geo[k] = ext(k).to_string();
+            }
+            t.extend(geo);
+            t.push("0".into());
+            t.push("0".into());
+            for _ in 0..6 {
+                t.push(fx(0.0));
+            }
+            t.push(fx(1.0));
+            t.push(fx(1.0));
+            for _ in 0..3 {
+                t.push(fx(0.0));
+            }
+            t.push(dx(0.0));
+            t.push("0".into());
+            t.push("0".into());
+            t.push(g.int(0, 1).to_string());
+        }
+    }
+}
+
+/// `fsvolume.cpp`'s `get_lta_full`.
+fn r25_get_lta(cx: &mut Ctx, t: &mut Toks) -> Result<Lta, Fatal> {
+    let n = t.i();
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let mut l = larmorx_freesurfer_mri::lta::lta_alloc(g, a, b, n, None)?;
+    l.ltype = t.i();
+    l.fscale = t.f();
+    l.subject = CName::new(&t.hex());
+    for i in 0..n.max(0) as usize {
+        let lt = &mut l.xforms[i];
+        lt.x0 = t.f();
+        lt.y0 = t.f();
+        lt.z0 = t.f();
+        lt.sigma = t.f();
+        lt.ltype = t.i();
+        lt.label = t.i();
+        let m = lt.m_l.as_mut().expect("LTAalloc's matrix");
+        for r in 1..=4 {
+            for c in 1..=4 {
+                m.set_relt(r, c, t.f());
+            }
+        }
+        set_geom(t, &mut lt.src);
+        set_geom(t, &mut lt.dst);
+        if t.i() != 0 {
+            let iv = &mut l.inv_xforms[i];
+            let m = iv.m_l.as_mut().expect("LTAalloc's matrix");
+            for r in 1..=4 {
+                for c in 1..=4 {
+                    m.set_relt(r, c, t.f());
+                }
+            }
+            set_geom(t, &mut iv.src);
+            set_geom(t, &mut iv.dst);
+        }
+    }
+    Ok(l)
+}
+
+impl Out {
+    fn lt(&mut self, lt: &larmorx_freesurfer_mri::lta::LinearTransform) {
+        for v in [lt.x0, lt.y0, lt.z0, lt.sigma] {
+            self.f(v);
+        }
+        self.i(i64::from(lt.ltype));
+        self.i(i64::from(lt.label));
+        self.m(lt.m_l.as_ref());
+        self.geom(&lt.src);
+        self.geom(&lt.dst);
+    }
+    /// `fsvolume.cpp`'s `put_lta_full`.
+    fn lta_full(&mut self, l: Option<&Lta>) {
+        let Some(l) = l else {
+            self.0 += "NULL ";
+            return;
+        };
+        self.i(i64::from(l.ltype));
+        self.i(i64::from(l.num_xforms));
+        self.f(l.fscale);
+        self.hex(l.subject.c_bytes());
+        for i in 0..l.num_xforms.max(0) as usize {
+            self.lt(&l.xforms[i]);
+            self.lt(&l.inv_xforms[i]);
+        }
+    }
+}
+
+/// `fsvolume.cpp`'s `set_fsltype`.
+fn r25_fsl_env(t: &mut Toks) -> Environment {
+    match t.i() {
+        1 => Environment::from_pairs([("FSLOUTPUTTYPE", "NIFTI_GZ")]),
+        2 => Environment::from_pairs([("FSLOUTPUTTYPE", "NIFTI")]),
+        3 => Environment::from_pairs([("FSLOUTPUTTYPE", "ANALYZE")]),
+        4 => Environment::from_pairs([("FSLOUTPUTTYPE", "NIFTI_PAIR")]),
+        _ => Environment::default(),
+    }
+}
+
+#[inline(never)]
+fn r25_lta(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::ltaops as lo;
+    match cmd {
+        "ltafill" => {
+            let mut l = r25_get_lta(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            lo::lta_fill_inverse(g, a, b, &mut l)?;
+            o.lta_full(Some(&l));
+        }
+        "ltainv" => {
+            let mut l = r25_get_lta(cx, t)?;
+            let mode = t.i();
+            let mut d = if mode == 1 {
+                Some(r25_get_lta(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            match mode {
+                1 => {
+                    let d = d.as_mut().expect("a destination");
+                    let r = lo::lta_invert(g, a, b, lo::InvertInto::Given(&l, d))?;
+                    o.i(i64::from(matches!(r, Ret::Given)));
+                    o.lta_full(if r.is_null() { None } else { Some(d) });
+                    o.lta_full(Some(&l));
+                }
+                2 => {
+                    let r = lo::lta_invert(g, a, b, lo::InvertInto::Same(&mut l))?;
+                    o.i(i64::from(matches!(r, Ret::Given)));
+                    o.lta_full(if r.is_null() { None } else { Some(&l) });
+                }
+                _ => {
+                    let r = lo::lta_invert(g, a, b, lo::InvertInto::New(&l))?;
+                    o.i(0);
+                    let n = r.into_new();
+                    o.lta_full(n.as_ref());
+                    o.lta_full(Some(&l));
+                }
+            }
+        }
+        "ltachg" => {
+            let env = r25_fsl_env(t);
+            if t.i() != 0 {
+                cx.g.gdiag_no = 1;
+            }
+            let mut l = r25_get_lta(cx, t)?;
+            let ty = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            lo::lta_change_type(g, a, b, &env, &mut l, ty)?;
+            o.i(1);
+            o.lta_full(Some(&l));
+        }
+        "ltacat" => {
+            let env = r25_fsl_env(t);
+            let n = t.i();
+            let mut v = Vec::new();
+            for _ in 0..n {
+                v.push(r25_get_lta(cx, t)?);
+            }
+            let red = t.i() != 0;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let mut refs: Vec<&mut Lta> = v.iter_mut().collect();
+            let r = lo::lta_concat(g, a, b, &env, &mut refs, red)?;
+            o.lta_full(r.as_ref());
+            for l in &v {
+                o.lta_full(Some(l));
+            }
+        }
+        "ltared" => {
+            let l = r25_get_lta(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = lo::lta_reduce(g, a, b, &l)?;
+            o.lta_full(r.as_ref());
+            o.lta_full(Some(&l));
+        }
+        "ltasrc" => {
+            let l = r25_get_lta(cx, t)?;
+            let m = get_vol(cx, t)?;
+            let tgt = t.i() != 0;
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let r = if tgt {
+                lo::lta_mri_is_target(g, b, &l, &m)?
+            } else {
+                lo::lta_mri_is_source(g, b, &l, &m)?
+            };
+            o.i(i64::from(r));
+        }
+        _ => {
+            let l = r25_get_lta(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            lo::lta_print(g, b, a, &l)?;
+        }
+    }
+    Ok(())
 }

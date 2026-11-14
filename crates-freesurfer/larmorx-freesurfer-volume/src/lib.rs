@@ -23,6 +23,7 @@ pub mod image;
 pub mod io_frames;
 pub mod label_coords;
 pub mod labels;
+pub mod ltaops;
 pub mod ltaread;
 pub mod mrihisto;
 pub mod mriset;

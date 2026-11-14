@@ -10,7 +10,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_filter::{conv, sobel};
+use larmorx_freesurfer_filter::{classify, conv, sobel};
 use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
 };
@@ -20,10 +20,70 @@ use larmorx_freesurfer_volume::arith::Pair;
 use super::{Ctx, Gen, Toks, fx, get_vol, put_vol, rle, token};
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 23] = [
+pub const COMMANDS: [&str; 27] = [
     "g1d", "cv1", "cvb", "cvs", "cvi", "cvg", "gsn", "gs", "mgs", "mean", "std", "stdnz", "red",
-    "red2", "r1d", "rsl", "xsob", "ysob", "zsob", "sob", "sobf", "div", "lap",
+    "red2", "r1d", "rsl", "xsob", "ysob", "zsob", "sob", "sobf", "div", "lap", "mbv", "bcv", "rcl",
+    "ccs",
 ];
+
+/// A label volume of the border classification: white, not white, ambiguous and other values
+/// (uchar mostly; a float or int one with odd values now and then).
+fn labels(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
+    let ty = if g.chance(5) {
+        g.pick(&[MRI_FLOAT, MRI_INT, MRI_SHORT])
+    } else {
+        MRI_UCHAR
+    };
+    t.extend(e.map(|v| v.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    for _ in 0..3 {
+        t.push(fx(1.0));
+    }
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let white = g.chance(2);
+    let vals: Vec<String> = (0..n)
+        .map(|_| {
+            if ty == MRI_FLOAT && g.chance(12) {
+                return fx(g.pick(&[f32::NAN, 254.6, 1.4, 0.6, 3e9, -1.0]));
+            }
+            let v = if white && g.chance(2) {
+                255.0
+            } else {
+                g.pick(&[0.0, 1.0, 1.0, 255.0, 255.0, 128.0, 0.0, 7.0])
+            };
+            token(ty, v)
+        })
+        .collect();
+    t.extend(rle(&vals));
+}
+
+/// An intensity volume of the classification: uchar 0-255, or float (sometimes negative or NaN).
+fn intensities(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
+    let ty = if g.chance(4) { MRI_FLOAT } else { MRI_UCHAR };
+    t.extend(e.map(|v| v.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    for _ in 0..3 {
+        t.push(fx(1.0));
+    }
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let lo = g.int(0, 120);
+    let vals: Vec<String> = (0..n)
+        .map(|_| {
+            if ty == MRI_FLOAT && g.chance(30) {
+                return fx(g.pick(&[f32::NAN, -3.0, 300.5]));
+            }
+            let v = g.int(lo, lo + 135) as f64;
+            if ty == MRI_FLOAT {
+                fx((v + 0.25 * g.int(0, 3) as f64) as f32)
+            } else {
+                token(ty, v)
+            }
+        })
+        .collect();
+    t.extend(rle(&vals));
+}
 
 fn dx(v: f64) -> String {
     format!("{:016x}", v.to_bits())
@@ -145,7 +205,7 @@ fn kernel(g: &mut Gen, t: &mut Vec<String>) {
         g.pick(&[3, 3, 5, 5, 7, 9, 4, 6])
     };
     t.push(len.to_string());
-    let nan = g.chance(25);
+    let nan = g.chance(6);
     for i in 0..len {
         let w = if nan && i == 1 {
             f32::NAN
@@ -408,6 +468,54 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 t.push(frame(g, nf).to_string());
             }
         }
+        "mbv" => {
+            let e = small(g, 8);
+            labels(g, t, e);
+            if g.chance(3) {
+                t.push("1".into());
+                let mut e2 = e;
+                if g.chance(8) {
+                    e2[0] = (e2[0] - 1).max(1);
+                }
+                let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_FLOAT]);
+                vol(g, t, e2, ty, 1);
+            } else {
+                t.push("0".into());
+            }
+        }
+        "bcv" | "rcl" | "ccs" => {
+            let e = small(g, 8);
+            intensities(g, t, e);
+            labels(g, t, e);
+            match cmd {
+                "bcv" => {
+                    t.push(g.pick(&[3, 5, 7, 11, 1, 0]).to_string());
+                    for k in 0..3 {
+                        t.push(g.int(0, i64::from(e[k]) - 1).to_string());
+                    }
+                }
+                "rcl" => {
+                    let m = g.pick(&[0, 1, 2, 2]);
+                    t.push(m.to_string());
+                    if m == 1 {
+                        vol(g, t, e, MRI_UCHAR, 1);
+                    }
+                    let lo = g.int(20, 100) as f32;
+                    t.push(fx(lo));
+                    t.push(fx(lo + g.int(10, 90) as f32));
+                    t.push(g.pick(&[5, 3, 7, 11]).to_string());
+                }
+                _ => {
+                    let lo = if g.chance(8) {
+                        -1.0
+                    } else {
+                        g.int(10, 60) as f32
+                    };
+                    t.push(fx(lo));
+                    t.push(fx(lo + g.int(20, 120) as f32));
+                }
+            }
+        }
         _ => {
             // div, lap
             let e = small(g, 7);
@@ -659,6 +767,54 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
             if let Some(m) = &mag {
                 full(o, Some(m));
             }
+        }
+        "mbv" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = opt(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = classify::mri_mark_border_voxels(g, a, b, &src, dst.as_mut())?;
+            result(o, r, dst.as_ref());
+        }
+        "bcv" => {
+            let src = get_vol(cx, t)?;
+            let lab = get_vol(cx, t)?;
+            let (ws, x, y, z) = (t.i(), t.i(), t.i(), t.i());
+            let (l, pw, pg) =
+                classify::mri_border_classify_voxel(&mut cx.g, &mut cx.b, &src, &lab, ws, x, y, z)?;
+            *o += &format!("{l} {:08x} {:08x} ", pw.to_bits(), pg.to_bits());
+        }
+        "rcl" => {
+            let src = get_vol(cx, t)?;
+            let mut lab = get_vol(cx, t)?;
+            let m = t.i();
+            let mut dst = if m == 1 { Some(get_vol(cx, t)?) } else { None };
+            let (lo, hi, ws) = (t.f(), t.f(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = match (m, dst.as_mut()) {
+                (2, _) => Pair::Same(&mut lab),
+                (_, Some(d)) => Pair::Given(&lab, d),
+                _ => Pair::New(&lab),
+            };
+            let r = classify::mri_reclassify(g, a, b, &src, p, lo, hi, ws)?;
+            *o += &format!("{r} ");
+            full(o, Some(&lab));
+            if let Some(d) = &dst {
+                full(o, Some(d));
+            }
+        }
+        "ccs" => {
+            let t1 = get_vol(cx, t)?;
+            let lab = get_vol(cx, t)?;
+            let (lo, hi) = (t.f(), t.f());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let s = classify::mri_compute_class_statistics(g, a, b, &t1, &lab, lo, hi)?;
+            *o += &format!(
+                "0 {:08x} {:08x} {:08x} {:08x} ",
+                s.mean_wm.to_bits(),
+                s.sigma_wm.to_bits(),
+                s.mean_gm.to_bits(),
+                s.sigma_gm.to_bits()
+            );
         }
         "div" | "lap" => {
             let src = get_vol(cx, t)?;

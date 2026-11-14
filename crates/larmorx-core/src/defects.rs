@@ -1677,6 +1677,14 @@ defects! {
         "the Sobel derivatives (MRIxSobel, MRIySobel, MRIzSobel, MRIsobel and its gradient magnitude) given a destination smaller than the source or without the frame they write, or, for a source that is not uchar, a destination that is not float, write floats into other voxels' bytes or into memory outside it (memory corruption, a crash), and read a gradient volume without its three frames outside its memory";
     FS_556 = "FS-556", "FreeSurfer", true,
         "the divergence (MRIdivergence) ignores the destination it is given: it returns a new volume and leaves the given one unchanged";
+    FS_557 = "FS-557", "FreeSurfer", true,
+        "the white-matter border classification (MRImarkBorderVoxels, MRIborderClassifyVoxel, MRIreclassify, MRIcomputeClassStatistics) turns a voxel value that is NaN or beyond the 32-bit integer range into -2147483648, and squares the neighbourhood's integer values in 32 bits (wrapping beyond 46,340)";
+    FS_558 = "FS-558", "FreeSurfer", false,
+        "the border voxel classifier (MRIborderClassifyVoxel, used by MRIreclassify) computes the gray-matter likelihood with the white matter's variance, and when both likelihoods are 0 divides the white one by 0 (its probability NaN, the voxel taken as white)";
+    FS_559 = "FS-559", "FreeSurfer", true,
+        "MRImarkBorderVoxels of a uchar volume given a destination that is not uchar, or smaller than the source, writes its labels as bytes into other voxels or outside the destination (memory corruption)";
+    FS_560 = "FS-560", "FreeSurfer", true,
+        "the white and gray class statistics (MRIcomputeClassStatistics) of an intensity volume with negative values or NaNs count them in a histogram bin before its start (memory corruption)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

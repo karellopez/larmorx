@@ -301,6 +301,40 @@ bool filter_case(const std::string &cmd)
     MRI *src = get_vol();
     MRI *dst = get_opt();
     put_result(cmd == "div" ? MRIdivergence(src, dst) : MRIlaplacian(src, dst), dst);
+  } else if (cmd == "mbv") {
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    put_result(MRImarkBorderVoxels(src, dst), dst);
+  } else if (cmd == "bcv") {
+    // bcv <src> <labeled> wsize x y z: the label, then pw and pg (float bits)
+    MRI *src = get_vol();
+    MRI *lab = get_vol();
+    int ws = geti(), x = geti(), y = geti(), z = geti();
+    float pw = -1, pg = -1;
+    oi(MRIborderClassifyVoxel(src, lab, ws, x, y, z, &pw, &pg));
+    of(pw);
+    of(pg);
+  } else if (cmd == "rcl") {
+    // rcl <src> <labeled> <dst mode: 0 none, 1 given, 2 the labels> [<dst>] wm_low gray_hi wsize
+    MRI *src = get_vol();
+    MRI *lab = get_vol();
+    int m = geti();
+    MRI *dst = m == 1 ? get_vol() : m == 2 ? lab : NULL;
+    float lo = getf(), hi = getf();
+    int ws = geti();
+    oi(MRIreclassify(src, lab, dst, lo, hi, ws));
+    put_full(lab);
+    if (dst && dst != lab) put_full(dst);
+  } else if (cmd == "ccs") {
+    MRI *t1 = get_vol();
+    MRI *lab = get_vol();
+    float lo = getf(), hi = getf();
+    float a = -1, b = -1, c = -1, d = -1;
+    oi(MRIcomputeClassStatistics(t1, lab, lo, hi, &a, &b, &c, &d));
+    of(a);
+    of(b);
+    of(c);
+    of(d);
   } else {
     return false;
   }

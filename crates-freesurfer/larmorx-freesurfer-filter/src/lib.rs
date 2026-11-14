@@ -12,6 +12,7 @@
 //! (`docs/freesurfer/queue.md`) translates.
 #![forbid(unsafe_code)]
 
+pub mod classify;
 pub mod conv;
 pub mod fastmarch;
 pub(crate) mod mem;

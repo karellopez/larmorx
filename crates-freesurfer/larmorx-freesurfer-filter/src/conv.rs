@@ -162,7 +162,8 @@ fn long_kernel(g: &mut Globals, what: &str, len: usize) {
 }
 
 /// The convolution of a frame `a` (`[z][y][x]` of `w h d`) with `k` along `axis`, each tap's
-/// voxel the nearest of the axis (the index tables), as `total + k[i] v` from tap 0.
+/// voxel the nearest of the axis (the index tables), as `total + v k[i]` from tap 0 (the official
+/// build multiplies the voxel by the weight and adds the product to the sum: the NaNs' bits).
 fn convolve_plane(a: &[f32], (w, h, d): (i32, i32, i32), k: &[f32], axis: i32) -> Vec<f32> {
     let n = count(w, h, d);
     let mut o = vec![0.0f32; n];
@@ -182,7 +183,7 @@ fn convolve_plane(a: &[f32], (w, h, d): (i32, i32, i32), k: &[f32], axis: i32) -
                         }
                         _ => (clamp_index(z + j, d) as usize * hu + y as usize) * wu + x as usize,
                     };
-                    total = add(total, mul(ki, a[idx]));
+                    total = add(total, mul(a[idx], ki));
                 }
                 o[row + x as usize] = total;
             }
@@ -513,7 +514,7 @@ fn convolve_vox(
                     } else {
                         mri_get_vox_val(g, err, src, xx, yy, zz, frame, 0)?
                     };
-                    total = add(total, mul(ki, v));
+                    total = add(total, mul(v, ki));
                 }
                 o[(z as usize * hu + y as usize) * wu + x as usize] = total;
             }
@@ -1499,7 +1500,7 @@ fn reduce_lines(
                         _ => (2 * x, 2 * y, edge(2 * z + j, sd)),
                     };
                     let val = mri_get_vox_val(g, err, src, xi, yi, zi, 0, 0)?;
-                    total = add(total, mul(ki, val));
+                    total = add(total, mul(val, ki));
                 }
                 mri_set_vox_val(g, err, dst, x, y, z, 0, total, 0)?;
             }

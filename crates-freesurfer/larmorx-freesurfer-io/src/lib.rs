@@ -13,6 +13,7 @@
 //! (`docs/freesurfer/queue.md`); `PROVENANCE.md` lists what each item translates.
 #![forbid(unsafe_code)]
 
+pub mod afni;
 pub mod annotation;
 pub mod bfileio;
 pub mod bruker;

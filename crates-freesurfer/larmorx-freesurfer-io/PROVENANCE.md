@@ -286,6 +286,10 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 4014-4745 | `genesisRead`, `gelxRead` (FS-680: FreeSurfer's crash in `reproduce`, the series read by default; FS-681 to FS-685, FS-167, FS-249; the arithmetic in the operand order of the official object code; relay 28) | `mriio_ge.rs` |
 | `utils/mriio.cpp` 7275-7620; `utils/signa.cpp` 200-322 | `ximgRead` (FS-684, FS-682, FS-167, FS-249), `signaRead` and `orderShortBuffer` (FS-686, FS-687, FS-684; relay 28) | `mriio_ge.rs`, `signa.rs` |
 | `utils/mriio.cpp` 1904-2379; `utils/imautils.cpp` | `siemensRead` with the old-Siemens `.ima` header reader `imaLoadFileInfo` and its helpers (`imaLoadVal`, `imaLoadValFromKey`, the dictionary, `imaParseName`, the file counting), as far as `siemensRead` reaches them (FS-688 the stack-free crash, FS-689 memory, FS-690 the unused-cosine slip, FS-691 the field-of-view swap, FS-692 the transposed raw volume; FS-01; relay 29) | `mriio_siemens.rs` |
+| `utils/afni.cpp`; `include/AFNI.h` | `AFinit`, `AFclean` (Rust's drop), `printAFNIHeader`, `get_afni_int`, `get_afni_float`, `get_afni_string`, `readAFNIHeader`, `findMinMaxByte`, `findMinMaxShort`, `findMinMaxFloat`, `afniRead`, `afniWrite` (its refusal; the rest unreachable) (FS-693 to FS-717, FS-249, FS-01; relay 30) | `afni.rs` |
+| `utils/mriio.cpp` 7631-7673, 9984-9987 | `MRISreadCurvAsMRI` (FS-49, FS-167), `mriNrrdWrite` (relay 30) | `mriio.rs` |
+| `utils/annotation.cpp` 1248-1310 | `ReadAnnotAsMRISeg` (FS-49, FS-53; relay 30) | `annotation.rs` |
+| `utils/mriio.cpp` 643-647, 781-798, 830-925, 1176-1178, 1211-1213 | `mri_read`'s BRIK, curvature and annotation branches and its frees (FS-672, FS-717); `MRIwriteType`'s BRIK and NRRD branches (relay 30) | `mriio.rs` |
 | `utils/mriio.cpp` 516-528, 1116-1160 | `mri_read`'s COR, bhdr, bshort and bfloat branches; `MRIwriteType`'s COR, bhdr (FS-666), bshort and bfloat branches (relay 27) | `mriio.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
@@ -350,3 +354,14 @@ tested with the file system's own calls (`errno` from their errors); the arithme
 buffer is kept between lines so that FS-658's short flip lines read an earlier line's bytes under
 `reproduce`. The defaults of FS-657 to FS-672 (0 for memory contents, the refusals of FS-659, FS-660 and
 FS-666, `<stem>.bhdr` for FS-664, the root folder for FS-670) and their notices are larmorx's own.
+
+Changes for relay 30: `AF` is kept as its numbers' bytes in x86-64's layout and its strings, pointers
+and arrays apart (`afni::Af`); the official build's `__strcpy_chk` of the two strings (findings Part 24)
+is its message and status 134 under `reproduce`. `get_afni_*`'s buffers are modelled by glibc's usable
+size of `malloc(count * 4)` (values written past the count and within it are read where FreeSurfer
+reads past the count). `strtod` and `strtol` are larmorx-core's (`cscan`), `ERANGE` from the same
+characters through larmorx-freesurfer-core's `cscan::scan_f64`. The stores of mixed scale factors
+(FS-706) are written byte by byte at FreeSurfer's offsets under `reproduce`. The defaults of FS-693 to
+FS-717 (the errors of FS-697, FS-699, FS-700, FS-707; the whole strings of FS-702; the float volume of
+FS-706; 0 for memory contents) and their notices are larmorx's own.
+

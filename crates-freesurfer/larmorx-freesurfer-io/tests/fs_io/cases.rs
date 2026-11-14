@@ -49,6 +49,8 @@ mod piece2;
 pub(crate) mod piece20;
 #[path = "piece21.rs"]
 pub(crate) mod piece21;
+#[path = "piece22.rs"]
+pub(crate) mod piece22;
 #[path = "piece3.rs"]
 mod piece3;
 #[path = "piece4.rs"]
@@ -271,7 +273,7 @@ const FORMATS: [&str; 20] = [
 /// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
 /// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
 /// them.
-pub const HEAVY_SEED1: [usize; 2] = [2657, 3967];
+pub const HEAVY_SEED1: [usize; 2] = [1173, 4451];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]
@@ -317,6 +319,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece19::KINDS);
     kinds.extend(piece20::KINDS);
     kinds.extend(piece21::KINDS);
+    kinds.extend(piece22::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -389,6 +392,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece21::KINDS.contains(&kind) {
             lines.push(piece21::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece22::KINDS.contains(&kind) {
+            lines.push(piece22::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         if piece16::KINDS.contains(&kind) {
@@ -869,6 +876,11 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece21::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece22::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece22::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1260,6 +1272,9 @@ pub(crate) fn run_line_with(
         Err(134) => "CRASH 6".to_owned(),
         // a crash FreeSurfer has (signal 11) where `reproduce` prints its text first (FS-680)
         Err(139) => "CRASH 11".to_owned(),
+        // a division by zero FreeSurfer makes (SIGFPE) where `reproduce` prints its text first
+        // (FS-707)
+        Err(136) => "CRASH 8".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
     // FSIO_DETAIL set: each notice's detail on standard error (a probe run's diagnosis)

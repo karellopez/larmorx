@@ -1698,3 +1698,106 @@ and its helpers `imaLoadVal`, `imaLoadValFromKey`, the dictionary, `imaParseName
   field-of-view correction, which only `fix` applies, so `reproduce` still matches the oracle). The
   unit tests in `mriio_siemens.rs` check the geometry and voxels of a structural
   series, the name-parse and bad-extension refusals, and the short-header note.
+
+## Part 24: AFNI datasets, curvature and annotation volumes, the NRRD writer, mri_read's frees (relay 30 of track A)
+`utils/afni.cpp` (`AFinit`, `AFclean`, `printAFNIHeader`, `get_afni_int`, `get_afni_float`,
+`get_afni_string`, `readAFNIHeader`, `findMinMaxByte/Short/Float`, `afniRead`, `afniWrite`),
+`utils/mriio.cpp` 7631-7673 (`MRISreadCurvAsMRI`), 9790-9978 (`mriNrrdRead`, not ported: NrrdIO's
+`nrrdLoad` is permissive third-party code, track C's), 9984 (`mriNrrdWrite`), 820-925 (`mri_read`'s
+frame selection), `utils/annotation.cpp` 1248-1310 (`ReadAnnotAsMRISeg`).
+
+### Mechanisms
+- **The structure.** `AF` (`include/AFNI.h`) on `afniRead`'s stack: `dataset_rank[2]` at 0,
+  `dataset_dimensions[3]` 8, `typestring[16]` 20, `scene_data[3]` 36, `orient_specific[3]` 48,
+  `origin[3]` 60, `delta[3]` 72, `idcode_string` 88, `numchars` 96, `byteorder_string[10]` 100,
+  `brick_stats` 112, `numstats` 120, `brick_types` 128, `numtypes` 136, `brick_float_facs` 144,
+  `numfacs` 152 (160 bytes). `AFinit` sets each field (`typestring` only its first byte, `byteorder_string`
+  never); `numchars` is never set, so `AFclean` never frees `idcode_string`.
+- **FS-702.** `strcpy(pAF->typestring, s)` and `strcpy(pAF->byteorder_string, s)`: the official build
+  (Ubuntu's gcc-8 at `-O3`, `_FORTIFY_SOURCE=2` by default) makes them `__strcpy_chk` with the member's
+  size (16 and 10), so a longer string aborts with `*** buffer overflow detected ***: terminated`
+  (signal 6). Observed in the probe's first run (every `TYPESTRING` of 16 or more characters).
+- **FS-693, FS-694.** `readAFNIHeader`'s loop is `if (!fgets(line, STRLEN, fp) && ferror(fp))
+  ErrorPrintf(...); if (feof(fp)) break;` (as `read_bhdr`, Part 19): a read error (a folder) never sets
+  the end of the file and the stale `line` is processed again for ever; a last line without a newline
+  sets it and is dropped. `get_afni_int`/`get_afni_float` test `feof` right after `fgets`, before the
+  line's numbers, so a numbers line that ends the file is an error.
+- **FS-695.** `char type[STRLEN], name[STRLEN]` have no initial value; a `count` line before any `type=`
+  or `name=` line compares (`strncmp`) and prints stack contents.
+- **FS-696.** `if (strncmp(line2, "count=", 5) == 0) count = atoi(&line2[6]);`: only five characters are
+  compared, and the number is read from the seventh; `line2` keeps an earlier line's bytes past the
+  current NUL, so a line `count` (five characters, its NUL at 5) reads `line2[6]` onwards: an earlier,
+  longer line's characters, or memory never written.
+- **FS-697, FS-698, FS-710.** The parse loop `for (c = line; *c != '\0';) { skip spaces; if (*c) {
+  buf[i] = strtol(c, &e, 10); c = e; i++; } }` has no test of `i < count` inside the line and no test of
+  a failed conversion: a token `strtol`/`strtod` cannot read leaves `c` where it was, so `i` grows and
+  `buf[i]` is written further and further past `malloc(count * 4)` until the write faults (FS-697;
+  `1.5` among integers stops at `.`, `.5` is then unreadable). Extra numbers on the counted lines are
+  written past the count: inside `malloc`'s usable size (a chunk of `max(32, (n + 8 + 15) & ~15)` bytes,
+  8 of them the size field) they stay readable, and `DATASET_RANK`/`SCENE_DATA`, which read `ip[1]`,
+  `ip[2]` without checking `count`, read them (FS-698, deterministic); beyond it they overwrite the
+  next chunk (FS-710).
+- **FS-699, FS-714, FS-715.** `malloc(count * sizeof(int))` with a negative `count` (converted to
+  `size_t`) fails: `get_afni_*` return `NULL` without a message and `errno` stays ENOMEM (12), and
+  `readAFNIHeader` returns 0 (`afniRead` returns `NULL` silently). `get_afni_string`'s `malloc(count +
+  1)`: count -1 gives `malloc(0)`, a chunk of 24 bytes never written whose contents become the string
+  (FS-714; `buf[-1] = '\0'` writes the top byte of the chunk's size field, already 0); count -2 and below
+  (and 2,147,483,647, whose `count + 1` wraps) fail, and after the opening `'` the first byte is written
+  through `NULL` (signal 11). `IDCODE_STRING` then does `malloc(count)` and `strcpy` into it: count -1
+  crashes there. Counts beyond about 2^28 bytes are allocated or not as the machine decides (FS-715).
+- **FS-700.** `DATASET_RANK` (`ip[0]`, `ip[1]`), `SCENE_DATA` (`ip[0..2]`), `TYPESTRING`
+  (`strcpy(..., s)`), `IDCODE_STRING` (`strcpy(idcode_string, s)`), `BRICK_STATS` and
+  `BRICK_FLOAT_FACS` (`f[i]` for `i < count`), `BRICK_TYPES` (`ip[i]`) do not check the attribute's
+  type: the other two pointers are `NULL`, so another type crashes (for the three arrays only with a
+  count above 0).
+- **FS-701.** The same reads past `count`: `DATASET_RANK`'s `ip[1]` with count 1, `SCENE_DATA`'s
+  `ip[1..2]`, `printAFNIHeader`'s `brick_stats[i + 1]` for an odd count, `afniRead`'s
+  `brick_stats[2 * frame]`, `brick_stats[2 * frame + 1]` and `brick_float_facs[frame]` for frames past
+  them, `brick_types[0]` of an empty list: memory contents (malloc's chunk never written, or an earlier
+  chunk's data).
+- **FS-703, FS-716.** `idcode_string = malloc(count); strcpy(idcode_string, s)` where `s` holds `count`
+  bytes and a NUL: without the closing `~` the string has `count` characters and its NUL lands at
+  `[count]`: inside the chunk unless `count` is the usable size (24, 40, 56, ...: FS-716, the next chunk's
+  size field). `__strcpy_chk` cannot know a heap object's size, so there is no abort here.
+- **FS-704, FS-711.** `printAFNIHeader`'s `char types[][8] = {"byte", "short", "float", "complex"}` and
+  `types[pAF->brick_types[i]]`: AFNI's codes are 0 byte, 1 short, 2 int, 3 float, 4 double, 5 complex,
+  6 rgb, 7 rgba (the reader's own message says so); codes 4 and above (and negative ones) index past the
+  32-byte local array (FS-711).
+- **FS-705.** `afniRead` reads `af.brick_float_facs[frame]` for every row and `af.brick_stats[0 + 2 *
+  frame]` after each frame without testing the pointers, which `AFinit` set to 0.
+- **FS-706, FS-712.** The type is decided once: `if (af.numfacs != 0 && af.brick_float_facs[0] != 0.)
+  header->type = MRI_FLOAT` else by the voxel size; the loop then stores by the voxel size and each
+  frame's `scaling` (`MRIseq_vox`/`MRISseq_vox` when `scaling == 1.`, `MRIFseq_vox` otherwise) on the
+  row pointer whatever the volume's type. A byte or short volume whose later frame is scaled gets 4-byte
+  floats at 4 i from each row's start (its row is 1 or 2 bytes a voxel): later rows overwrite earlier
+  spill, and the last rows of the last frame pass the chunk (FS-712); a float volume whose later frame
+  has factor 0 or 1 gets 1- or 2-byte stores at i or 2 i, the rest of each float left 0.
+- **FS-707.** `nvoxels = width * height * depth * nframes` (32-bit `int`, then `long`) and `if
+  (brik_file_length % nvoxels)`: 0 voxels is an integer division by zero (SIGFPE).
+- **FS-708, FS-713.** `ErrorReturn(..., "afniRead(): error opening file %s", header_fname)` for the
+  BRIK; the length and voxel messages pass `long` values for `%d` (the low 32 bits on x86-64), and
+  `"... %d != %d/%d", bytes_per_voxel, brik_file_length / nvoxels` passes two arguments for three
+  conversions: the third is the next argument register's leftover (FS-713).
+- **FS-709.** `fseek(fp, 0, SEEK_END); ftell(fp)` on a folder opened for reading gives the file
+  system's answer (tmpfs refuses the seek, ext4's directory seek gives its hash end).
+- **FS-717.** `afniRead`'s header-only path returns `MRIcopy(header, NULL)`, and `MRIcopy` of a volume
+  without voxels does `MRIallocHeader(..., 1)` then `nframes = src->nframes`: a frame table of one entry.
+  `mri_read`'s frame selection (`name#n`) frees it (`MRIfree` after `MRIcopy`, or on its errors), and
+  `~MRI()`'s `for (i < nframes) if (frames[i].m_ras2vox) MatrixFree(...)` reads past the table (heap
+  contents: the probe saw signal 6 and signal 11 for the same case).
+- **FS-672 at mghRead.** The same frees reach a volume whose `TAG_MGH_XFORM` transform failed to load
+  (`free_transform = 1`, the transform never written): noted at every free of `mri_read` now.
+- `afniWrite` begins with `errno = 0; ErrorReturn(ERROR_UNSUPPORTED, (ERROR_UNSUPPORTED, "AFNI BRIK write
+  unsupported"));` (the rest of the function is unreachable). `mriNrrdWrite` is the same without
+  clearing `errno`.
+- `MRISreadCurvAsMRI` opens the file after `IDisCurv` without testing `fopen`; its three `freadInt` calls
+  share their memory (FS-49), the values are read with `freadFloat` (FS-167). `ReadAnnotAsMRISeg`'s
+  `freadInt` calls share theirs except across `MRIalloc` and `MRIsetVoxVal` (unknown there); `vno < 0` is
+  passed to `MRIsetVoxVal` (FS-53).
+
+### Measurements
+- The fs-io probe's piece 22 (`afd`, `afh`, `cud`, `cuh`, `and`, `anh`, `kwr`): seed 7, 1,099 cases;
+  seeds 13, 21, 99, 2,200 each: `reproduce` identical on every comparable case, 0 different (seed 13:
+  1,932 identical, 101 skipped, 167 compared apart; seed 99: 1,932, 112, 156); `fix` differs only with
+  notices. Seed 1's 4,798 portable cases (the recorded test): 4,340 identical, 458 skipped or compared
+  apart, 0 different.

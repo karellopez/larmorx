@@ -625,6 +625,9 @@ pub fn run_env(
                 | "FS-258"
                 | "FS-13"
                 | "FS-76"
+                // mri_read frees a volume FreeSurfer's memory decides the end of (relay 30)
+                | "FS-672"
+                | "FS-717"
         ) {
             extra.push("SKIP");
         }

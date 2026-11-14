@@ -3,8 +3,8 @@
 **Source-derived from NrrdIO** (Teem's NrrdIO, Gordon Kindlmann and the University of Utah,
 zlib-style terms): closed to the implementer of a future clean room of this reader (porting guide
 §1). Found while porting NrrdIO's reading path into `larmorx-io` (`larmorx_io::nrrd`) for
-FreeSurfer's foundations, track C, 2026-11-14 (FreeSurfer's `mri_read` reads `.nrrd` and `.nhdr`
-files with it). The check: `validation/probes/fs-nrrd-minc`. FreeSurfer's copy:
+FreeSurfer's foundations, track C, 2026-11-14 (FreeSurfer 8.2.0's programs read `.nrrd` and
+`.nhdr` volumes with it). The check: `validation/probes/fs-nrrd-minc`. FreeSurfer's copy:
 `docs/findings/freesurfer-permissive.md` (closed to FreeSurfer's clean-room implementers).
 
 ## The upstream
@@ -13,18 +13,15 @@ NrrdIO has no release tarball of its own: it is generated from Teem's `air`, `bi
 libraries into one directory of Teem's Subversion repository. The port follows
 `https://svn.code.sf.net/p/teem/code/NrrdIO/trunk` at revision 3991 (its last change before
 revision 4426, 2008-11-18; `TEEM_VERSION_STRING "1.9.0"`), fetched file by file
-(`!svn/bc/3991/...`) into `<workspace>/tags/NrrdIO-r3991` with a SHA-256 manifest. FreeSurfer
-8.2.0's `packages/nrrdio` is that revision, token for token, but for compile fixes: `memcpy`
-became `memmove` in eleven places, three variables gained initial values, two `void **` casts
-became a temporary, `NrrdIO.h` drops ITK's symbol-mangling include, `sampleIO.c` and `qnanhibit.c`
-are fenced off, and one iteration macro gained a bounds check (layout differs: FreeSurfer
-reformatted the files). Teem 1.9.0's own `nrrd` library (`teem-1.9.0-src.tar.gz`, SHA-256
+(`!svn/bc/3991/...`) into `<workspace>/tags/NrrdIO-r3991` with a SHA-256 manifest; FreeSurfer
+8.2.0's programs give this revision's results on every probed case (its copy:
+`docs/findings/freesurfer-permissive.md`). Teem 1.9.0's own `nrrd` library (`teem-1.9.0-src.tar.gz`, SHA-256
 `e0b34337...`) is the source NrrdIO was cut from; its other formats (PNM, PNG, VTK, text) are
 stubs in NrrdIO.
 
-FreeSurfer builds it with `TEEM_DIO=0 TEEM_QNANHIBIT=1 TEEM_32BIT=0 TEEM_ENDIAN=1234` and
-**without `TEEM_ZLIB` and `TEEM_BZIP2`**: the `gzip` and `bzip2` encodings are not available
-(`_nrrdEncodingGzip_read: sorry, this nrrd not compiled with gzip enabled`).
+As FreeSurfer 8.2.0's programs behave, the port has NrrdIO configured with the quiet NaN's high
+bit set, no direct I/O and **without zlib and bzip2**: the `gzip` and `bzip2` encodings are not
+available (`_nrrdEncodingGzip_read: sorry, this nrrd not compiled with gzip enabled`).
 
 ## How NrrdIO reads a file (what the port keeps)
 
@@ -69,7 +66,7 @@ FreeSurfer builds it with `TEEM_DIO=0 TEEM_QNANHIBIT=1 TEEM_32BIT=0 TEEM_ENDIAN=
 | FS-519 | `kinds: none` resets the axis's `center` instead of its `kind` (c) | the kind reset (rule A) | the centering reset |
 | FS-520 | `nrrdKindSize`'s switch forgets `nrrdKind3Gradient`: after the data are read, the field check prints `nrrdKindSize: PANIC: nrrdKind 20 not implemented!` and the program exits with status 1 (a) | 3 samples, as `3-vector` and `3-normal` (rule A) | `LoadError::Exit` with that message |
 | FS-761 | `airOneLinify` (on every comment) loops forever once it deletes an unprintable character: its loop runs to the string's first length and finds the NUL it shifted in (a: hang) | the unprintable characters deleted (the routine's intent) | an error (the original never returns) |
-| FS-762 | messages are formatted with `sprintf` into 257-byte buffers: a message longer than 256 bytes overflows; FreeSurfer's build (`_FORTIFY_SOURCE`, stack protector) aborts (a) | the message whole | the message whole (a crash is never reproduced) |
+| FS-762 | messages are formatted with `sprintf` into 257-byte buffers: a message longer than 256 bytes overflows; the probe's builds abort (a) | the message whole | the message whole (a crash is never reproduced) |
 | FS-763 | `airOneLine` drops a last line that ends at the end of the file without a newline: a detached header ending in its `data file` line reads as having none (c) | the line read (rule A) | dropped |
 | FS-764 | the message for a space dimension beyond 8 prints the array's dimension (f) | the space dimension | the array's |
 | FS-765 | the excess checks of `sizes`, `spacings`, `thicknesses`, `axis mins` and `axis maxs` parse one more value than the dimension into an array of 16: with dimension 16 a 17th value is written past it (a; the message that follows is the same) | the message, no write | the same |
@@ -93,8 +90,8 @@ error (`fread got read only ...`). Only a size beyond the address space is `coul
 
 ## The numbers (the probe, 2026-11-14)
 
-`validation/probes/fs-nrrd-minc` (NrrdIO r3991 built as FreeSurfer builds it, and FreeSurfer's
-`libnrrdio.a` from the unit oracle; every call in a forked child): seeds 7, 13 and 17, 4,000
+`validation/probes/fs-nrrd-minc` (NrrdIO r3991 built from its source, and FreeSurfer 8.2.0's copy;
+every call in a forked child): seeds 7, 13 and 17, 4,000
 generated files each (headers of every field in valid and broken forms, the encodings, attached and
 detached data, templates, lists, line and byte skips, `\r\n`, NUL bytes, long lines): every
 comparison of the port with `reproduce` identical to both originals (the whole `Nrrd`: every field,
@@ -106,6 +103,6 @@ comparisons identical (18,586 of them successful reads), 0 differences.
 
 ## Not ported
 
-The writer (`nrrdSave`: FreeSurfer's `mriNrrdWrite` refuses to write NRRD), reading from strings
+The writer (`nrrdSave`: FreeSurfer 8.2.0's programs refuse to write NRRD), reading from strings
 (`nrrdStringRead`), `keepNrrdDataFileOpen`, `skipData`, `nrrdStateGrayscaleImage3D` (an image
 format's option: no image format is available).

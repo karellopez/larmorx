@@ -315,9 +315,13 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
   element count and size (`nrrdElementNumber`, `nrrdElementSize`). `mriNrrdWrite` refuses. These
   are the call sites; track A writes them (`larmorx-freesurfer-io`).
 - Its copy (`packages/nrrdio`) is NrrdIO r3991 (`docs/findings/nrrdio.md`) token for token but
-  for compile fixes (the list there); the build: `TEEM_DIO=0 TEEM_QNANHIBIT=1 TEEM_32BIT=0
+  for compile fixes (`<scratch>`'s `tokdiff.py`, relay 26): `memcpy` became `memmove` in eleven
+  places, three variables gained initial values, two `void **` casts became a temporary, `NrrdIO.h`
+  drops ITK's symbol-mangling include, `sampleIO.c` and `qnanhibit.c` are fenced off, one
+  iteration macro gained a bounds check (FreeSurfer reformatted the files); the build: `TEEM_DIO=0 TEEM_QNANHIBIT=1 TEEM_32BIT=0
   TEEM_ENDIAN=1234`, no `TEEM_ZLIB`, no `TEEM_BZIP2` (its `CMakeLists.txt` and the unit oracle's
-  `compile_commands.json`).
+  `compile_commands.json`); its build has `_FORTIFY_SOURCE` and the stack protector (FS-762's
+  overflows abort).
 - Measured by behaviour (`validation/probes/fs-nrrd-minc`, `libnrrd_fs.so` from the unit oracle's
   `libnrrdio.a`): it gives NrrdIO r3991's results on every case, the undefined ones included (the
   same hangs, aborts and crashes): the port needs no dialect for it.

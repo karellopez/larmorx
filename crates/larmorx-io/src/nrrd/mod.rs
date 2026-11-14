@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 AND Zlib
 //! NRRD files read as NrrdIO reads them (`nrrdLoad`): a port of NrrdIO's reading path (Teem's
 //! NrrdIO, SVN `NrrdIO/trunk` at revision 3991, 2008-11-18, `TEEM_VERSION` 1.9.0; Gordon Kindlmann
-//! and the University of Utah, zlib-style terms, `LICENSES/LicenseRef-NrrdIO.txt`), built as
-//! FreeSurfer 8.2.0 builds it: `TEEM_QNANHIBIT=1`, no `TEEM_ZLIB` and no `TEEM_BZIP2` (the `gzip`
-//! and `bzip2` encodings are not available), `TEEM_DIO=0` (no direct I/O), 64-bit `size_t`.
+//! and the University of Utah, zlib-style terms, the notice in `NOTICE`), configured as FreeSurfer
+//! 8.2.0's programs behave: the quiet NaN's high bit set, the `gzip` and `bzip2` encodings not
+//! available, no direct I/O, 64-bit `size_t`.
 //!
 //! What is ported: `nrrdLoad` and what it calls (`read.c`, `formatNRRD.c`'s reader, every field
 //! parser of `parseNrrd.c`, the field checks of `simple.c`, the `raw`, `ascii` and `hex`

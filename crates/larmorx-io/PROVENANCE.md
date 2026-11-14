@@ -284,7 +284,8 @@ FreeSurfer's clean-room implementers).
 Ported from Teem's NrrdIO, SVN `NrrdIO/trunk` revision 3991 (2008-11-18, `TEEM_VERSION` 1.9.0;
 `<workspace>/tags/NrrdIO-r3991`, its `MANIFEST.sha256`), Gordon Kindlmann and the University of
 Utah, zlib-style terms (the notice in `NOTICE`); SPDX `Apache-2.0 AND Zlib` in each file. As
-FreeSurfer 8.2.0 builds its copy: `TEEM_QNANHIBIT=1`, no `TEEM_ZLIB`/`TEEM_BZIP2`, `TEEM_DIO=0`.
+FreeSurfer 8.2.0's programs behave: the quiet NaN's high bit set, no zlib or bzip2 (the `gzip` and
+`bzip2` encodings unavailable), no direct I/O.
 
 | larmorx | NrrdIO r3991 |
 |---|---|

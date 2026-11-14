@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod arith;
+pub mod aseg2vol;
 pub mod cma;
 pub mod combine;
 pub mod conform;

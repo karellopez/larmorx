@@ -41,6 +41,7 @@
 #include "mri2.h"
 #include "mri_conform.h"
 #include "region.h"
+#include "resample.h"
 #include "talairachex.h"
 #include "transform.h"
 #include "utils.h"
@@ -493,6 +494,28 @@ void set_fsltype()
   const char *v[] = {NULL, "NIFTI_GZ", "NIFTI", "ANALYZE", "NIFTI_PAIR"};
   if (k > 0 && k < 5) setenv("FSLOUTPUTTYPE", v[k], 1);
   else unsetenv("FSLOUTPUTTYPE");
+}
+
+// a colour table for the tissue-type vote (relay 25): its size (-1: NULL), each entry's tissue
+// type and a flag (1: the entry freed, an empty place), then the tissue-type table's size (-1:
+// none)
+COLOR_TABLE *get_ctab()
+{
+  int n = geti();
+  if (n < 0) return NULL;
+  setRandomSeed(1);  // CTABalloc draws random colours
+  COLOR_TABLE *ct = CTABalloc(n);
+  for (int i = 0; i < n; i++) {
+    ct->entries[i]->TissueType = geti();
+    sprintf(ct->entries[i]->name, "s%d", i);
+    if (geti()) {
+      free(ct->entries[i]);
+      ct->entries[i] = NULL;
+    }
+  }
+  int k = geti();
+  ct->ctabTissueType = k >= 0 ? CTABalloc(k) : NULL;
+  return ct;
 }
 
 void run_case()
@@ -2424,6 +2447,55 @@ void run_case()
     fflush(stdout);
     LTAprint(stdout, l);
     fflush(stdout);
+  } else if (cmd == "a2v") {
+    // relay 25: resample.cpp's MRIaseg2vol, MRIaseg2volMU, MRIapplySpmWarp, interpolation_code,
+    // float2int_code
+    MRI *aseg = get_vol();
+    fill_paint(aseg);
+    MATRIX *R = get_m44();
+    MRI *tmp = get_vol();
+    double ft = getd();
+    COLOR_TABLE *ct = get_ctab();
+    int gd = geti();
+    if (gd) Gdiag_no = gd;
+    MRI *hit = NULL;
+    fflush(stdout);
+    MRI *r = MRIaseg2vol(aseg, R, tmp, ft, &hit, ct);
+    fflush(stdout);
+    put_vol(r);
+    put_vol(r ? hit : NULL);
+  } else if (cmd == "a2vmu") {
+    MRI *aseg = get_vol();
+    fill_paint(aseg);
+    LTA *l = get_lta_full();
+    double ft = getd();
+    int usf = geti();
+    COLOR_TABLE *ct = get_ctab();
+    MRI *hit = NULL;
+    fflush(stdout);
+    MRI *r = MRIaseg2volMU(aseg, l, ft, &hit, usf, ct);
+    fflush(stdout);
+    put_vol(r);
+    put_vol(r ? hit : NULL);
+    put_lta_full(l);
+  } else if (cmd == "spmw") {
+    MRI *vol = get_vol();
+    fill_paint(vol);
+    LTA *l = geti() ? get_lta_full() : NULL;
+    MRI *warp = get_vol();
+    fill_paint(warp);
+    int lr = geti(), interp = geti();
+    MRI *o = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRIapplySpmWarp(vol, l, warp, lr, interp, o);
+    fflush(stdout);
+    oi(r != NULL && r == o);
+    put_vol(r);
+    put_lta_full(l);
+  } else if (cmd == "icode") {
+    std::string s = gethex();
+    oi(interpolation_code(s.c_str()));
+    oi(float2int_code(s.c_str()));
   } else {
     fail("unknown command");
   }

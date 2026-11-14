@@ -2031,6 +2031,12 @@ defects! {
         "changing a transform array of several transforms from a tkregister registration to RAS-to-RAS (LTAchangeType) converts the first transform once for every transform and leaves the others unconverted";
     FS_508 = "FS-508", "FreeSurfer", true,
         "changing a transform array to or from FSL's type (LTAchangeType) when FSL's conversion gives no matrix (a product that cannot be inverted) frees the transform's matrix and goes on using it: memory it no longer owns read";
+    FS_509 = "FS-509", "FreeSurfer", true,
+        "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) reads the table at a label it does not hold (outside it or an empty place), and counts tissue types of 100 or more and more than 1,000 labels in one voxel past its arrays";
+    FS_510 = "FS-510", "FreeSurfer", true,
+        "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) decides whether a voxel has a clear winner from the hits of its highest label instead of the label with the most hits, so a label with half or more of the voxel can lose to the tissue-type vote";
+    FS_511 = "FS-511", "FreeSurfer", true,
+        "applying an SPM warp field (MRIapplySpmWarp) stores, where a sample fails before any has succeeded (a trilinear sample of a type it cannot read), a value never written";
 }
 
 /// The register entry with ID `id`.

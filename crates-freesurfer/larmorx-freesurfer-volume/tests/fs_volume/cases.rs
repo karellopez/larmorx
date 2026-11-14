@@ -2538,6 +2538,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R23_MASK.contains(&c) => r23_gen_mask(&mut g, &mut t, c),
             c if R24_HISTO.contains(&c) => r24_gen_histo(&mut g, &mut t, c),
             c if R25_LTA.contains(&c) => r25_gen_lta(&mut g, &mut t, c),
+            c if R25_RES.contains(&c) => r25_gen_res(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3003,7 +3004,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 227] = [
+pub const COMMANDS: [&str; 231] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3231,6 +3232,10 @@ pub const COMMANDS: [&str; 227] = [
     "ltared",
     "ltasrc",
     "ltaprt",
+    "a2v",
+    "a2vmu",
+    "spmw",
+    "icode",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5559,6 +5564,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "grow" | "onfg" | "offbg" | "cplab" | "cplv" => r23_multi(cx, t, o, cmd)?,
         c if R24_HISTO.contains(&c) => r24_histo(cx, t, o, cmd)?,
         c if R25_LTA.contains(&c) => r25_lta(cx, t, o, cmd)?,
+        c if R25_RES.contains(&c) => r25_res(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -7706,6 +7712,323 @@ fn r25_lta(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fat
             let l = r25_get_lta(cx, t)?;
             let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
             lo::lta_print(g, b, a, &l)?;
+        }
+    }
+    Ok(())
+}
+
+/// resample.cpp's volume functions (relay 25).
+const R25_RES: [&str; 4] = ["a2v", "a2vmu", "spmw", "icode"];
+
+/// `get_vol`'s tokens for a volume of shape `s` with the geometry tokens `geo` (its extent
+/// replaced by the volume's) and plain header fields.
+fn r25_vol_geo(g: &mut Gen, t: &mut Vec<String>, s: Shape, geo: &[String]) {
+    for v in [s.w, s.h, s.d, s.ty, s.nf, i64::from(s.hdr), g.int(0, 255)] {
+        t.push(v.to_string());
+    }
+    let mut geo = geo.to_vec();
+    geo[1] = s.w.to_string();
+    geo[2] = s.h.to_string();
+    geo[3] = s.d.to_string();
+    t.extend(geo);
+    t.push("0".into());
+    t.push("0".into());
+    for _ in 0..6 {
+        t.push(fx(0.0));
+    }
+    t.push(fx(1.0));
+    t.push(fx(1.0));
+    for _ in 0..3 {
+        t.push(fx(g.pick(&[0.0, 2000.0, 30.5])));
+    }
+    t.push(dx(0.0));
+    t.push("0".into());
+    t.push("0".into());
+}
+
+fn r25_shape(g: &mut Gen, ty: &[i64], nf: i64, max: i64) -> Shape {
+    Shape {
+        w: g.int(1, max),
+        h: g.int(1, max),
+        d: g.int(1, max.min(4)),
+        ty: g.pick(ty),
+        nf,
+        hdr: false,
+        drop: false,
+    }
+}
+
+/// `get_ctab`'s tokens: none (-1) now and then, otherwise 50 entries (a few freed) of tissue
+/// types mostly 0 to 3, and a tissue-type table of 4 (sometimes none or more than 100).
+fn r25_ctab(g: &mut Gen, t: &mut Vec<String>) {
+    if g.chance(3) {
+        t.push("-1".into());
+        return;
+    }
+    let n = if g.chance(10) { 1001 } else { 50 };
+    t.push(n.to_string());
+    for _ in 0..n {
+        let tt = if g.chance(30) {
+            g.pick(&[100i64, -2])
+        } else {
+            g.pick(&[0i64, 1, 2, 3, 1, 2, -1])
+        };
+        t.push(tt.to_string());
+        t.push(i64::from(g.chance(40)).to_string());
+    }
+    let k = if g.chance(12) {
+        g.pick(&[-1i64, 101])
+    } else {
+        4
+    };
+    t.push(k.to_string());
+}
+
+const R25_LABELS: [f32; 9] = [2.0, 3.0, 4.0, 41.0, 0.0, 17.0, 3.0, 2.0, 1000.0];
+
+fn r25_gen_res(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let pool = r25_pool(g);
+    match cmd {
+        "a2v" => {
+            let s = r25_shape(g, &[0, 1, 3, 1, 1], 1, 6);
+            r25_vol_geo(g, t, s, &pool[0]);
+            fill_paint(g, t, s, &[&[0.0, 2.0, 3.0, 41.0]], &[&R25_LABELS]);
+            if g.chance(25) {
+                t.push("0".into());
+            } else {
+                t.push("1".into());
+                r25_m44(g, t);
+            }
+            let mut s2 = r25_shape(g, &[0, 1, 3], 1, 4);
+            s2.hdr = g.chance(4);
+            r25_vol_geo(g, t, s2, &pool[1]);
+            t.push(dx(g.pick(&[0.0, 0.0, 0.3, 0.5, 0.75, 1.0, f64::NAN])));
+            r25_ctab(g, t);
+            t.push(g.pick(&[0i64, 0, 0, 0, 1, 2]).to_string());
+        }
+        "a2vmu" => {
+            let s = r25_shape(g, &[0, 1, 3, 1], 1, 5);
+            let mut geo = pool[0].clone();
+            geo[0] = "1".into();
+            for (k, v) in [s.w, s.h, s.d].into_iter().enumerate() {
+                geo[k + 1] = v.to_string();
+            }
+            r25_vol_geo(g, t, s, &geo);
+            fill_paint(g, t, s, &[&[0.0, 2.0, 3.0]], &[&R25_LABELS]);
+            // the transform between the segmentation and a small volume, in either direction
+            let mut pool2 = pool.clone();
+            pool2[0] = geo;
+            for k in 1..=3 {
+                pool2[1][k] = g.int(1, 4).to_string();
+            }
+            let chain = match g.below(5) {
+                0 => vec![1, 0],
+                1 => vec![2, 3],
+                _ => vec![0, 1],
+            };
+            let ty = g.pick(&[1i64, 1, 0, 14]);
+            r25_lta_toks(g, t, &pool2, &chain, ty);
+            t.push(dx(g.pick(&[0.0, 0.3, 0.5, 1.0])));
+            t.push(g.pick(&[-1i64, -1, 1, 2]).to_string());
+            r25_ctab(g, t);
+        }
+        "spmw" => {
+            let nf = g.pick(&[1i64, 1, 2]);
+            let s = r25_shape(g, &[0, 3, 1, 3, 3, 2, 9], nf, 5);
+            let mut geo = pool[0].clone();
+            for (k, v) in [s.w, s.h, s.d].into_iter().enumerate() {
+                geo[k + 1] = v.to_string();
+            }
+            geo[0] = "1".into();
+            r25_vol_geo(g, t, s, &geo);
+            fill_paint(g, t, s, &[&[0.0, 7.0, 2.5]], &[&[1.0, 3.0, 100.0, -4.0]]);
+            if g.chance(3) {
+                t.push("1".into());
+                let mut pool2 = pool.clone();
+                pool2[0] = geo;
+                let chain = if g.chance(2) { vec![0, 1] } else { vec![1, 0] };
+                let ty = g.pick(&[0i64, 0, 1]);
+                r25_lta_toks(g, t, &pool2, &chain, ty);
+            } else {
+                t.push("0".into());
+            }
+            let wnf = if g.chance(12) { 2 } else { 3 };
+            let ws = Shape {
+                w: g.int(1, 5),
+                h: g.int(1, 5),
+                d: g.int(1, 5),
+                ty: 3,
+                nf: wnf,
+                hdr: false,
+                drop: false,
+            };
+            r25_vol_geo(g, t, ws, &pool[1]);
+            let ras: &[f32] = &[-2.0, -1.0, 0.0, 0.5, 1.0, 1.5, 2.0, 3.0];
+            fill_paint(g, t, ws, &[ras, ras, ras], &[ras]);
+            t.push(i64::from(g.chance(3)).to_string());
+            t.push(if g.chance(15) { 2 } else { g.int(0, 1) }.to_string());
+            if g.chance(6) {
+                t.push("1".into());
+                let o = Shape { ty: 3, nf, ..ws };
+                r25_vol_geo(g, t, o, &pool[1]);
+            } else {
+                t.push("0".into());
+            }
+        }
+        _ => {
+            let names: &[&[u8]] = &[
+                b"nearest",
+                b"NEA",
+                b"trilinear",
+                b"tli",
+                b"sinc",
+                b"cubic",
+                b"bspline",
+                b"vote",
+                b"round",
+                b"RINT",
+                b"floor",
+                b"tkregister",
+                b"TKREG",
+                b"tkr",
+                b"ne",
+                b"",
+                b"cub",
+                b"interpolate",
+                b"weighted",
+            ];
+            t.push(hex(g.pick(names)));
+        }
+    }
+}
+
+/// `fsvolume.cpp`'s `get_ctab`.
+fn r25_get_ctab(t: &mut Toks) -> Option<larmorx_freesurfer_mri::ctab::ColorTable> {
+    use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry};
+    let n = t.i();
+    if n < 0 {
+        return None;
+    }
+    let mut ct = ColorTable::default();
+    for i in 0..n {
+        let tt = t.i();
+        let freed = t.i() != 0;
+        ct.entries.push(if freed {
+            None
+        } else {
+            Some(Box::new(ColorTableEntry {
+                name: format!("s{i}").into_bytes(),
+                tissue_type: tt,
+                ..ColorTableEntry::default()
+            }))
+        });
+    }
+    let k = t.i();
+    if k >= 0 {
+        let mut tt = ColorTable::default();
+        tt.entries = (0..k).map(|_| Some(Box::default())).collect();
+        ct.ctab_tissue_type = Some(Box::new(tt));
+    }
+    Some(ct)
+}
+
+#[inline(never)]
+fn r25_res(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::aseg2vol as av;
+    match cmd {
+        "a2v" => {
+            let mut aseg = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut aseg)?;
+            let r = get_m44(t);
+            let tmp = get_vol(cx, t)?;
+            let ft = t.d();
+            let ct = r25_get_ctab(t);
+            let gd = t.i();
+            if gd != 0 {
+                cx.g.gdiag_no = gd;
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let res = av::mri_aseg2vol(g, a, b, &aseg, r.as_ref(), &tmp, ft, ct.as_ref())?;
+            match res {
+                Some((v, h)) => {
+                    o.vol(Some(&v));
+                    o.vol(Some(&h));
+                }
+                None => {
+                    o.vol(None);
+                    o.vol(None);
+                }
+            }
+        }
+        "a2vmu" => {
+            let mut aseg = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut aseg)?;
+            let mut l = r25_get_lta(cx, t)?;
+            let ft = t.d();
+            let usf = t.i();
+            let ct = r25_get_ctab(t);
+            let env = Environment::default();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let res = av::mri_aseg2vol_mu(g, a, b, &env, &mut aseg, &mut l, ft, usf, ct.as_ref())?;
+            match res {
+                Some((v, h)) => {
+                    o.vol(Some(&v));
+                    o.vol(Some(&h));
+                }
+                None => {
+                    o.vol(None);
+                    o.vol(None);
+                }
+            }
+            o.lta_full(Some(&l));
+        }
+        "spmw" => {
+            let mut vol = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut vol)?;
+            let mut l = if t.i() != 0 {
+                Some(r25_get_lta(cx, t)?)
+            } else {
+                None
+            };
+            let mut warp = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut warp)?;
+            let (lr, interp) = (t.i() != 0, t.i());
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let env = Environment::default();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = av::mri_apply_spm_warp(
+                g,
+                a,
+                b,
+                &env,
+                &vol,
+                l.as_mut(),
+                &warp,
+                lr,
+                interp,
+                d.as_mut(),
+            )?;
+            o.i(i64::from(matches!(r, Ret::Given)));
+            match r {
+                Ret::New(m) => o.vol(Some(&m)),
+                Ret::Given => o.vol(d.as_ref()),
+                Ret::Null => o.vol(None),
+            }
+            o.lta_full(l.as_ref());
+        }
+        _ => {
+            let s = t.hex();
+            let name = String::from_utf8_lossy(&s).into_owned();
+            o.i(i64::from(larmorx_freesurfer_mri::mri::mri_interp_code(
+                &name,
+            )));
+            o.i(i64::from(
+                larmorx_freesurfer_io::registerio::float2int_code(&s),
+            ));
         }
     }
     Ok(())

@@ -3373,8 +3373,8 @@ readers with FS-680 bypassed (`reproduce` for FreeSurfer's other behaviour). The
 headers field by field (extents 0, -1, 1 to 4, 70,000; image header offsets 156, 200, 300, -40,
 100,000; pixel offsets past the file, negative, odd; echoes 0, 1, 2, 3, -1, -30,000; NaN, signalling
 NaN, infinite, subnormal and huge floats in every corner and size), files cut at random or inside the
-header, names of no series form. Measured (2026-11-14): seed 7, 2,068 piece-19 cases: `reproduce`
-identical on 1,924, 0 different (21 counted: files `mri_identify` takes for DICOM, not ported; 123
+header, names of no series form. Measured (2026-11-14): seed 7, 2,032 piece-19 cases: `reproduce`
+identical on 1,892, 0 different (13 counted: files `mri_identify` takes for DICOM, not ported; 127
 compared apart: FS-49, FS-167's memory contents, FS-685); `fix` differs only with notices. The I. names'
 second format line (FS-681) was never printed in these runs.
 

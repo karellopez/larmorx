@@ -224,7 +224,7 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `genesis_read_as_patched` and `gelx_read_as_patched`. The series built by `tests/fs_io/piece19.rs`:
   `I.<nnn>`, `<stem><n>.MR`, `<stem><nnn>.MR` and `e<n>s<n>i<n>` files, headers field by field, cut,
   folders and gaps. `SKIP` for FS-682 and files taken for DICOM; `VARY` for FS-49, FS-167's memory
-  contents and FS-685. Seed 7, 2,068 piece-19 cases: `reproduce` identical on 1,924, 0 different.
+  contents and FS-685. Seed 7, 2,032 piece-19 cases: `reproduce` identical on 1,892, 0 different.
   `build.sh` must run with a clean `PATH` (no other toolchain's `ld`): `PATH=/usr/bin:/bin`.
 - Piece 20 (track A relay 28): GE Signa and GE XIMG series. `srd` and `srh` (piece 6's `mrd` and `mrh`, the
   type -1, 14 or 19, the environment bits 64, 128, 256) of Signa series built by `tests/fs_io/piece20.rs` (a

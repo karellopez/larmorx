@@ -992,6 +992,7 @@ bool norm2_case(const std::string &cmd)
     FILE *fp = fopen("cp.dat", "wb");
     fwrite(bytes.data(), 1, bytes.size(), fp);
     fclose(fp);
+    errno = 0;  // the probe's own unlink of a file that is not there
     oi(MRI3dUseFileControlPoints(m, "cp.dat"));
     MRI *c = MRIalloc(m->width, m->height, m->depth, MRI_UCHAR);
     oi(MRInormAddFileControlPoints(c, 255, NULL));

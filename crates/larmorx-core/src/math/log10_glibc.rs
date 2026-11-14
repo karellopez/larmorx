@@ -14,8 +14,8 @@
 //! build of Arm's `log.c` ([`super::log_glibc`]). The wrapper (LGPL; not translated: its results
 //! measured) answers for `x <= 0`: `-inf` for a zero of either sign, C's `NAN` (`0x7ff8...`,
 //! positive) for a negative number or `-inf`. A NaN argument gives itself quieted (sign kept); `+inf`
-//! gives `+inf`. Not correctly rounded; larmorx has no correctly rounded `log10` yet (CORE-MATH's
-//! `cr_log10` is not ported), so its callers use this one in both modes and say so. Proved equal
+//! gives `+inf`. Not correctly rounded: [`super::log10`] (CORE-MATH's `cr_log10`) is larmorx's
+//! default, and this one serves `reproduce` ([`super::Libm::log10`] chooses). Proved equal
 //! to the system's `log10` (glibc 2.35, x86-64) on the seeded families and special values of
 //! `validation/investigations/glibc-maths/` (`verify double`).
 

@@ -160,3 +160,73 @@ comparable, hash `f38160d248ccc2da57ad5e1109d8b8e978231de8a9466a4c1693df2b08ee24
 emulated in debug and release (`oracles/logs/fs-found-c-r21-trap-volume.log`); the port's debug and release builds
 agree on 11,000 cases of the new commands in both modes. `check.py`'s `SKIP` adds FS-482, FS-484, FS-485, FS-486.
 `pcast` calls `fflush(NULL)` after `WritePCAStats` (the file it leaves open reaches the disk at the program's end).
+
+Measured 2026-11-14 (part 12, relay 22: 3.1-38's `talairachex.cpp`: `talcras`, `talmat`, `talpt`, `talvol`; 166
+commands; logs in `<scratch>/C/r22/`): seed 7, 2,000 cases: 1,941 identical with `reproduce`, 59 not comparable
+(FS-487, FS-488, FS-53, FS-325; 35 of them identical), 0 different; seed 13, 4,000 cases: 3,859 identical, 141 not
+comparable (84 identical), 0 different; `fix` different only with notices. The port's debug and release builds agree
+on seed 13's 4,000 cases in both modes. Seed 1, 3,320 cases: 3,083 identical, 237 not comparable, hash
+`c3cfc45ecb3faa4cac3084f1f8b08334eab226e31b8e8627585fdd19774571c9`, passing with AArch64's NaN emulated in debug and
+release (`oracles/logs/fs-found-c-r22-trap-volume2.log`). `check.py`'s `SKIP` adds FS-487, FS-488. `talvol` leaves
+out `SAMPLE_CUBIC_BSPLINE` (fs.bspline is not ported yet). Relay 22 also measured `fdr` with `log10` now
+correctly rounded by default (seeds 7 and 13, 987 cases each: 958 and 947 identical with `reproduce`, 0 different;
+`fix` different only with notices, GLIBC-07 among them).
+
+Measured 2026-11-14 (part 13, relay 22, for fs.filter: `dilate`, `dilu`, `msegs`, `sstat`, `hseg`; 171 commands): seeds 7
+and 13, 2,000 cases each: 1,878 and 1,882 identical with `reproduce`, the rest not comparable (FS-53, FS-58, FS-290,
+FS-490), 0 different; `fix` different only with notices (FS-489 among them). The port's debug and release builds
+agree on seed 13's 4,000 cases in both modes. Seed 1, 3,420 cases: 3,145 identical, 275 not comparable, hash
+`d67e661fe83e2a5e38001491e6b0b8afd724b5a995ba9a2675034e540593182b`, passing with AArch64's NaN emulated in debug and
+release (`oracles/logs/fs-found-c-r22-trap-volume3.log`) and on Windows x64 (track A's
+`validation/investigations/windows-cross-check/`, the test cross-built and run on the Windows helper). `check.py`'s
+`SKIP` adds FS-490.
+
+Measured 2026-11-14 (part 14, relay 23: 3.1-38's `mri_conform.cpp` and the rest of `mriset.cpp`; 211 commands; logs in
+`<scratch>/C/r23/`): `conform` (`MRIconform`'s 256^3 result hashed with FNV-1a 64 on both sides): seed 7, 200 cases,
+199 identical with `reproduce`, 1 not comparable, 0 different; seed 13, 400 cases, 392 identical, 8 not comparable, 0
+different. The 39 mriset commands (`union isect mand mxor compl edges erodenn erode erode2d erodeseg dilseg dtl dtli
+dlu dlab openn mopen mclose dil6 rlist rvonly mdiff mmask tmask mnot slv b2c nmask von vinl linv cent pthr cnbhd grow
+onfg offbg cplab cplv`): seed 7, 3,900 cases, 3,659 identical, 241 not comparable, 0 different; seed 13, 7,800 cases,
+7,318 identical, 482 not comparable, 0 different (after FS-497: a complex volume dilated until nothing changes hangs
+FreeSurfer, `CRASH 14`, and hung the port until it was detected); `fix` different only with notices. Seed 1, 4,220
+cases: 3,877 identical, 343 not comparable, 4 `MRIconform` resamplings hashed as `HEAVY` (identical; `check.py`'s
+`heavy`: too slow for the recorded test's debug build), hash
+`551daf3a76aa59b45c0fcbccc1ac8c8ba764416f7367e11dd4f0beae5bb74483`. `check.py`'s `SKIP` adds FS-491, FS-493, FS-496,
+FS-497. The port's `run_line` now runs each case on a thread with a 32 MiB stack (the debug build's frame of `case`
+passed a test thread's 2 MiB).
+
+Measured 2026-11-14 (part 15: 3.1-38's `mrihisto.cpp`, relay 24, 220 commands; logs `oracles/logs/fs-found-c-r24-*`):
+`hreg` (`MRIhistogramRegion`), `hvox` (`MRIhistogramVoxel`, with and without a threshold volume), `hthr`
+(`MRIhistogramRegionWithThreshold`), `hist` (`MRIhistogram`), `geq` (`MRIgetEqualizeHisto`), `heq` (`MRIhistoEqualize`),
+`hlr` (`MRIhistogramLabelRegion`), `hlab` (`MRIhistogramLabel`), `hsegm` (`MRIhistoSegment`, labels of 128, with and
+without `DIAG_SHOW`). Volumes are filled by `fill_pat` (two populations around two levels with a spread, from a seed:
+bimodal histograms, so `MRIhistoSegment` finds peaks and valleys: about 40 % of its comparable cases label voxels
+white and non-white); given histograms (`get_histo`: an allocation, the bins in use, old contents) are printed by
+`put_histo` (the bins in use up to the allocation). The generator keeps to bytes, ints, longs, floats, shorts and
+unsigned shorts and values up to 4096.5 (with NaN and infinities): an RGB volume's values span about 2^30 and a
+histogram of one bin per intensity then takes 7 GB on both sides. Seed 7, 1,800 cases: 1,489 identical with
+`reproduce`, 311 not comparable, 0 different; seed 13, 1,800 cases: 1,513 identical, 287 not comparable, 0 different;
+`fix` different only with notices; debug and release identical on seed 13's 1,800 cases in both modes. Not comparable:
+FS-498 (NaN bins: `CRASH 11`), FS-499 (`free(): corrupted unsorted chunks`, `CRASH 6`), FS-501, FS-502 (`CRASH 14`) and
+the shared FS-53, FS-58, FS-289, FS-290. Seed 1, 4,400 cases: 4,076 identical, 324 not comparable, 3 `MRIconform`
+resamplings hashed as `HEAVY`, hash `57e8624ef07b6982203b2398d1e26004c15d18d0836be0363340247b7e170574`. `check.py`'s
+`SKIP` adds FS-498, FS-499, FS-501, FS-502.
+
+Measured 2026-11-14 (part 16: relay 25, 246 commands; logs `oracles/logs/fs-found-c-r25-*`): transform.cpp's LTA
+operations `ltafill` (`LTAfillInverse`), `ltainv` (`LTAinvert`: new, given and in place), `ltachg` (`LTAchangeType`:
+every pair of types, `FSLOUTPUTTYPE` unset or one of four, `Gdiag_no`), `ltacat` (`LTAconcat`, 0 to 3 arrays, chained,
+inverted and mismatched, with and without `Reduce`), `ltared` (`LTAreduce`), `ltasrc` (`LTAmriIsSource` /
+`LTAmriIsTarget`), `ltaprt` (`LTAprint`); arrays from `get_lta_full` (every transform's centre, spread, type, label,
+matrix, geometries and optionally its inverse) along a pool of four scanner-like geometries per case, printed whole by
+`put_lta_full`. Seeds 7 and 13, 8,400 cases each: 8,191 and 8,198 identical with `reproduce`, the rest not comparable
+(FS-504, FS-508), 0 different. resample.cpp's `a2v` (`MRIaseg2vol`, with colour tables from `get_ctab`: 50 or 1,001
+places, empty places, tissue types -2 to 100, tissue-type tables of 4, 101 or none; `setRandomSeed(1)` before
+`CTABalloc`), `a2vmu` (`MRIaseg2volMU`, `USF` -1, 1, 2), `spmw` (`MRIapplySpmWarp`), `icode` (`interpolation_code`,
+`float2int_code`): seeds 7 and 13, 4,800 cases each, 4,700 and 4,719 identical, 0 different. mri2.cpp's `vvtk`
+(`MRIvol2VolTkRegVSM`, `vvsm`'s tokens), `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`, `zcat`, `aedit`, `shdim`: seed
+7, 2,700 cases, 2,501 identical; seed 13, 5,400, 4,930 identical; 0 different. `fento`, `lacj` (given output), `lacjn`
+(new output with `CTABalloc`'s 7,032 colours), `cfov`, `ccrs`, `crras` (`MRIcropAroundRAS`; `cras` is relay 19's):
+seed 7, 2,400 cases, 2,332 identical; seed 13, 3,600, 3,455 identical; 0 different. `fix` different only with notices
+everywhere. Seed 1, 4,920 cases: 4,552 identical, 368 not comparable, 22 hashed as `HEAVY` (`check.py`'s `heavy`: the
+`MRIconform` resamplings and `lacjn`), hash `1acd334c6204657f39e004854539ea20a8405b3bc252092b59abcbc37450cc2e`.
+`check.py`'s `SKIP` adds FS-504, FS-508, FS-509, FS-511, FS-515, FS-517.

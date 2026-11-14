@@ -15,7 +15,9 @@ use larmorx_freesurfer_core::cscan::{self, Scan, Stream};
 use larmorx_freesurfer_core::cstd::{fmt_f, is_space};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
-use larmorx_freesurfer_core::matrix::Matrix;
+use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
+use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
+use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::STRLEN;
 use larmorx_freesurfer_mri::tkreg::xfm_crs2xyz_tkreg;
@@ -88,6 +90,11 @@ pub fn copy_vol_geom(src: &VolGeom, dst: &mut VolGeom) {
 /// comment, `filename = %s`, `volume = %d %d %d`, then the voxel sizes, the three direction
 /// cosines and the centre as `%.15e`).
 pub fn write_vol_geom(fp: &mut CFile, vg: &VolGeom) {
+    fp.put_bytes(&vol_geom_text(vg));
+}
+
+/// The bytes [`write_vol_geom`] writes (for writers into other streams: `LTAprint`).
+pub fn vol_geom_text(vg: &VolGeom) -> Vec<u8> {
     let mut s = Vec::new();
     if vg.valid == 0 {
         s.extend_from_slice(format!("valid = {}  # volume info invalid\n", vg.valid).as_bytes());
@@ -108,7 +115,7 @@ pub fn write_vol_geom(fp: &mut CFile, vg: &VolGeom) {
     ] {
         s.extend_from_slice(format!("{name}{} {} {}\n", e(a), e(b), e(c)).as_bytes());
     }
-    fp.put_bytes(&s);
+    s
 }
 
 /// A line as `sscanf` reads it (its end is the C string's end), noting whether a read found the
@@ -483,6 +490,59 @@ pub fn vg_r_to_i(
     vg: &VolGeom,
 ) -> Result<Option<Matrix>, Fatal> {
     extract_r_to_i(g, out, err, vg)
+}
+
+/// `VGgetVoxelToRasXform(vg, NULL, base)`: the voxel-to-RAS matrix of the geometry in `float`:
+/// the direction cosines times the voxel sizes, and the translation `centre - M (width / 2 + base,
+/// height / 2 + base, depth / 2 + base)` (the centre voxel in `double`, stored as `float`; the
+/// product `MatrixMultiply`'s).
+pub fn vg_get_voxel_to_ras_xform(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    vg: &VolGeom,
+    base: i32,
+) -> Result<Matrix, Fatal> {
+    let mut m = Matrix::real(4, 4);
+    let cols = [
+        (vg.x_r, vg.x_a, vg.x_s, vg.xsize),
+        (vg.y_r, vg.y_a, vg.y_s, vg.ysize),
+        (vg.z_r, vg.z_a, vg.z_s, vg.zsize),
+    ];
+    for (c, (r, a, s, size)) in cols.into_iter().enumerate() {
+        let c = c as i32 + 1;
+        m.set_relt(1, c, sse::mul(r, size));
+        m.set_relt(2, c, sse::mul(a, size));
+        m.set_relt(3, c, sse::mul(s, size));
+    }
+    m.set_relt(4, 4, 1.0);
+    let mut pcrs = Matrix::real(4, 1);
+    for (k, n) in [vg.width, vg.height, vg.depth].into_iter().enumerate() {
+        pcrs.set_relt(
+            k as i32 + 1,
+            1,
+            (f64::from(n) / 2.0 + f64::from(base)) as f32,
+        );
+    }
+    pcrs.set_relt(4, 1, 1.0);
+    let off = matrix_multiply(g, out, err, Some(&m), Some(&pcrs), None)?.unwrap_new();
+    m.set_relt(1, 4, sse::sub(vg.c_r, off.relt(1, 1)));
+    m.set_relt(2, 4, sse::sub(vg.c_a, off.relt(2, 1)));
+    m.set_relt(3, 4, sse::sub(vg.c_s, off.relt(3, 1)));
+    Ok(m)
+}
+
+/// `VGgetRasToVoxelXform(vg, NULL, base)`: the inverse of [`vg_get_voxel_to_ras_xform`]
+/// (`MatrixInverse`; `None` when it fails).
+pub fn vg_get_ras_to_voxel_xform(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    vg: &VolGeom,
+    base: i32,
+) -> Result<Option<Matrix>, Fatal> {
+    let m = vg_get_voxel_to_ras_xform(g, out, err, vg, base)?;
+    Ok(matrix_inverse(g, out, err, Some(&m), None)?.into_new())
 }
 
 /// `TkrVox2RASfromVolGeom(vg)`: the tkregister voxel-to-RAS matrix (`MRIxfmCRS2XYZtkreg`).

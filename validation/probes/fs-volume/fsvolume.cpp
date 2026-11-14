@@ -33,12 +33,16 @@
 #include "colortab.h"
 #include "diag.h"
 #include "error.h"
+#include "histo.h"
 #include "image.h"
 #include "mri_circulars.h"
 #include "matrix.h"
 #include "mri.h"
 #include "mri2.h"
+#include "mri_conform.h"
 #include "region.h"
+#include "resample.h"
+#include "talairachex.h"
 #include "transform.h"
 #include "utils.h"
 
@@ -208,7 +212,19 @@ void oam(const AffineMatrix *am)
   for (int i = 0; i < 16; i++) of(am->mat[i]);
 }
 
-void put_vol(const MRI *m)
+// FNV-1a (64 bits) of bytes: the voxels of a conformed (256^3) volume
+uint64_t fnv1a(const unsigned char *p, size_t n)
+{
+  uint64_t h = 0xcbf29ce484222325ull;
+  for (size_t i = 0; i < n; i++) {
+    h ^= p[i];
+    h *= 0x100000001b3ull;
+  }
+  return h;
+}
+
+// the volume; with `hash`, its voxels' FNV-1a and byte count instead of their hex
+void put_vol(const MRI *m, bool hash = false)
 {
   if (!m) { out += "NULL "; return; }
   oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
@@ -219,8 +235,15 @@ void put_vol(const MRI *m)
   oam(m->i_to_r__);
   om(m->r_to_i__);
   if (m->chunk && m->ischunked) {
-    std::string b((const char *)m->chunk, m->bytes_total);
-    ohex(b);
+    if (hash) {
+      char b[48];
+      snprintf(b, sizeof b, "fnv %016" PRIx64 " %zu ", fnv1a((const unsigned char *)m->chunk, m->bytes_total),
+               (size_t)m->bytes_total);
+      out += b;
+    } else {
+      std::string b((const char *)m->chunk, m->bytes_total);
+      ohex(b);
+    }
   } else {
     out += "nochunk ";
   }
@@ -359,6 +382,158 @@ void put_lta(const LTA *l)
   om(l->xforms[0].m_L);
   put_geom(&l->xforms[0].src);
   put_geom(&l->xforms[0].dst);
+}
+
+// a histogram of the case or NULL: its allocation (-1: NULL), the bins in use, a seed for its
+// old contents (relay 24)
+HISTOGRAM *get_histo()
+{
+  int k = geti();
+  if (k < 0) return NULL;
+  int nb = geti(), seed = geti();
+  HISTOGRAM *h = HISTOalloc(k);
+  for (int i = 0; i < k; i++) {
+    h->bins[i] = 0.5f * (float)i + (float)seed;
+    h->counts[i] = (float)((i * 7 + seed) % 5);
+  }
+  h->nbins = nb;
+  return h;
+}
+
+void put_histo(const HISTOGRAM *h)
+{
+  if (!h) { out += "NULL "; return; }
+  oi(h->nbins); oi(h->max_bins); of(h->bin_size); of(h->min); of(h->max);
+  int n = h->nbins < h->max_bins ? h->nbins : h->max_bins;
+  for (int i = 0; i < n; i++) { of(h->bins[i]); of(h->counts[i]); }
+}
+
+// every frame's voxels from a pattern of two populations: on, seed, a, b, spread (on 0: nothing)
+void fill_pat(MRI *m)
+{
+  if (!geti()) return;
+  unsigned seed = (unsigned)geti();
+  int a = geti(), b = geti(), sp = geti();
+  for (int f = 0; f < m->nframes; f++)
+    for (int z = 0; z < m->depth; z++)
+      for (int y = 0; y < m->height; y++)
+        for (int x = 0; x < m->width; x++) {
+          unsigned h = ((unsigned)x * 73856093u) ^ ((unsigned)y * 19349663u) ^ ((unsigned)z * 83492791u) ^
+                       ((unsigned)f * 2654435761u) ^ (seed * 97u);
+          h = h * 1103515245u + 12345u;
+          int v = (((h >> 8) & 1u) ? a : b) + (int)((h >> 9) % (unsigned)(2 * sp + 1)) - sp;
+          MRIsetVoxVal(m, x, y, z, f, (float)v);
+        }
+}
+
+void get_region(MRI_REGION *r)
+{
+  r->x = geti(); r->y = geti(); r->z = geti();
+  r->dx = geti(); r->dy = geti(); r->dz = geti();
+}
+
+// relay 25, transform.cpp's operations on an LTA. An LTA of the case: its transform count, type,
+// fscale and subject (hex), then for each transform x0 y0 z0 sigma type label, its matrix (16),
+// its source and destination geometries, and a flag: 1, its inverse's matrix and geometries
+// follow (0: LTAalloc's identity and initVolGeom's)
+LTA *get_lta_full()
+{
+  int n = geti();
+  if (n < 0) return NULL;
+  LTA *l = LTAalloc(n, NULL);
+  l->type = geti();
+  l->fscale = getf();
+  std::string s = gethex();
+  strcpy(l->subject, s.c_str());
+  for (int i = 0; i < n; i++) {
+    LINEAR_TRANSFORM *lt = &l->xforms[i];
+    lt->x0 = getf();
+    lt->y0 = getf();
+    lt->z0 = getf();
+    lt->sigma = getf();
+    lt->type = geti();
+    lt->label = geti();
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) lt->m_L->rptr[r][c] = getf();
+    set_geom(&lt->src);
+    set_geom(&lt->dst);
+    if (geti()) {
+      LINEAR_TRANSFORM *iv = &l->inv_xforms[i];
+      for (int r = 1; r <= 4; r++)
+        for (int c = 1; c <= 4; c++) iv->m_L->rptr[r][c] = getf();
+      set_geom(&iv->src);
+      set_geom(&iv->dst);
+    }
+  }
+  return l;
+}
+
+void put_lt(const LINEAR_TRANSFORM *t)
+{
+  of(t->x0); of(t->y0); of(t->z0); of(t->sigma); oi(t->type); oi(t->label);
+  om(t->m_L);
+  put_geom(&t->src);
+  put_geom(&t->dst);
+}
+
+// every transform and inverse transform of an LTA
+void put_lta_full(const LTA *l)
+{
+  if (!l) { out += "NULL "; return; }
+  oi(l->type); oi(l->num_xforms); of(l->fscale); ohex(std::string(l->subject));
+  for (int i = 0; i < l->num_xforms; i++) {
+    put_lt(&l->xforms[i]);
+    put_lt(&l->inv_xforms[i]);
+  }
+}
+
+// FSLOUTPUTTYPE: 0 unset, 1 NIFTI_GZ, 2 NIFTI, 3 ANALYZE, 4 NIFTI_PAIR
+void set_fsltype()
+{
+  int k = geti();
+  const char *v[] = {NULL, "NIFTI_GZ", "NIFTI", "ANALYZE", "NIFTI_PAIR"};
+  if (k > 0 && k < 5) setenv("FSLOUTPUTTYPE", v[k], 1);
+  else unsetenv("FSLOUTPUTTYPE");
+}
+
+// a colour table for the tissue-type vote (relay 25): its size (-1: NULL), each entry's tissue
+// type and a flag (1: the entry freed, an empty place), then the tissue-type table's size (-1:
+// none)
+COLOR_TABLE *get_ctab()
+{
+  int n = geti();
+  if (n < 0) return NULL;
+  setRandomSeed(1);  // CTABalloc draws random colours
+  COLOR_TABLE *ct = CTABalloc(n);
+  for (int i = 0; i < n; i++) {
+    ct->entries[i]->TissueType = geti();
+    sprintf(ct->entries[i]->name, "s%d", i);
+    if (geti()) {
+      free(ct->entries[i]);
+      ct->entries[i] = NULL;
+    }
+  }
+  int k = geti();
+  ct->ctabTissueType = k >= 0 ? CTABalloc(k) : NULL;
+  return ct;
+}
+
+// LabelAmygalaCortalJunction's colour table (relay 25): its size, its entries, and entries 7030 and
+// 7031's names and colours (their tissue types are memory contents: not printed)
+void put_ct_lacj(const COLOR_TABLE *ct)
+{
+  if (!ct) { out += "NULL "; return; }
+  oi(ct->nentries);
+  int n = 0;
+  for (int i = 0; i < ct->nentries; i++) n += ct->entries[i] != NULL;
+  oi(n);
+  for (int k : {7030, 7031}) {
+    if (k >= ct->nentries || !ct->entries[k]) { out += "- "; continue; }
+    const CTE *e = ct->entries[k];
+    ohex(std::string(e->name));
+    oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+    of(e->rf); of(e->gf); of(e->bf); of(e->af);
+  }
 }
 
 void run_case()
@@ -1654,7 +1829,7 @@ void run_case()
     fflush(stdout);
     oi(r != NULL && r == d);
     put_vol(r);
-  } else if (cmd == "vv" || cmd == "vvsm") {
+  } else if (cmd == "vv" || cmd == "vvsm" || cmd == "vvtk") {
     MRI *src = get_vol();
     fill_paint(src);
     src->outside_val = getd();
@@ -1668,7 +1843,7 @@ void run_case()
     MRI *vsm = NULL;
     LTA *lta = NULL;
     int pedir = 0;
-    if (cmd == "vvsm") {
+    if (cmd != "vv") {
       if (geti()) {
         vsm = get_vol();
         fill_paint(vsm);
@@ -1683,8 +1858,9 @@ void run_case()
       pedir = geti();
     }
     fflush(stdout);
-    int r = cmd == "vv" ? MRIvol2Vol(src, targ, M, interp, param)
-                         : MRIvol2VolVSM(src, targ, M, interp, param, vsm, lta, pedir);
+    int r = cmd == "vv"     ? MRIvol2Vol(src, targ, M, interp, param)
+            : cmd == "vvtk" ? MRIvol2VolTkRegVSM(src, targ, M, interp, param, vsm, lta, pedir)
+                            : MRIvol2VolVSM(src, targ, M, interp, param, vsm, lta, pedir);
     fflush(stdout);
     oi(r);
     put_vol(targ);
@@ -1824,6 +2000,647 @@ void run_case()
       of(MRIvoxelDirection(m, x, y, z, w));
       of(MRIvoxelGradientDir2ndDerivative(m, x, y, z, w));
       fflush(stdout);
+    }
+  } else if (cmd == "talcras" || cmd == "talmat" || cmd == "talpt" || cmd == "talvol") {
+    // talairachex.cpp: kind, then the volume (painted and an optional second volume for
+    // talvol), the transform array, NO_AVERAGE305, DIAG_SHOW, DIAG_VERBOSE; kind 4 of talpt: a
+    // 4 x 4 matrix instead
+    int kind = cmd == "talcras" ? 0 : geti();
+    MATRIX *M = NULL;
+    MRI *m = NULL, *tal = NULL;
+    LTA *lta = NULL;
+    int interp = 0;
+    if (cmd == "talpt" && kind == 4) {
+      M = MatrixAlloc(4, 4, MATRIX_REAL);
+      for (int r = 1; r <= 4; r++)
+        for (int c = 1; c <= 4; c++) M->rptr[r][c] = getf();
+    } else {
+      m = get_vol();
+      if (cmd == "talvol") {
+        fill_paint(m);
+        if (geti()) tal = get_vol();
+      }
+      if (geti()) {
+        int n = geti();
+        lta = LTAalloc(n, NULL);
+        lta->type = geti();
+        if (n >= 1) {
+          for (int r = 1; r <= 4; r++)
+            for (int c = 1; c <= 4; c++) lta->xforms[0].m_L->rptr[r][c] = getf();
+          set_geom(&lta->xforms[0].dst);
+        }
+      }
+      if (geti()) setenv("NO_AVERAGE305", "true", 1);
+      else unsetenv("NO_AVERAGE305");
+      if (geti()) Gdiag |= DIAG_SHOW;
+      if (geti()) Gdiag |= DIAG_VERBOSE;
+      if (cmd == "talvol" && kind == 0) interp = geti();
+    }
+    if (cmd == "talcras") {
+      fflush(stdout);
+      int r = ModifyTalairachCRAS(m, lta);
+      fflush(stdout);
+      oi(r);
+      put_vol(m);
+    } else if (cmd == "talmat") {
+      fflush(stdout);
+      MATRIX *R = kind == 0 ? MtalairachFromVoxel(m, lta)
+                  : kind == 1 ? MtalVoxelFromVoxel(m, lta)
+                  : kind == 2 ? MvoxelFromTalairach(m, lta)
+                              : MvoxelFromTalVoxel(m, lta);
+      fflush(stdout);
+      om(R);
+    } else if (cmd == "talpt") {
+      int n = geti();
+      for (int i = 0; i < n; i++) {
+        double x = getd(), y = getd(), z = getd();
+        double px = -7, py = -7, pz = -7;
+        fflush(stdout);
+        int r = 0;
+        if (kind == 4) TransformWithMatrix(M, x, y, z, &px, &py, &pz);
+        else if (kind == 0) r = MRIvoxelToTalairachEx(m, x, y, z, &px, &py, &pz, lta);
+        else if (kind == 1) r = MRIvoxelToTalairachVoxelEx(m, x, y, z, &px, &py, &pz, lta);
+        else if (kind == 2) r = MRItalairachToVoxelEx(m, x, y, z, &px, &py, &pz, lta);
+        else r = MRItalairachVoxelToVoxelEx(m, x, y, z, &px, &py, &pz, lta);
+        fflush(stdout);
+        oi(r);
+        od(px); od(py); od(pz);
+      }
+    } else {
+      fflush(stdout);
+      MRI *r = kind == 0 ? MRItoTalairachExInterp(m, tal, lta, interp)
+               : kind == 1 ? MRItoTalairachEx(m, tal, lta)
+                           : MRIfromTalairachEx(m, tal, lta);
+      fflush(stdout);
+      oi(r != NULL && r == tal);
+      put_vol(r);
+    }
+  } else if (cmd == "dilate" || cmd == "dilu") {
+    // MRIdilate / MRIdilateUchar (mriset.cpp): the painted source, the destination mode
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *dst = get_dst(src);
+    fflush(stdout);
+    MRI *r = cmd == "dilate" ? MRIdilate(src, dst) : MRIdilateUchar(src, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "msegs") {
+    MRI *seg = get_vol();
+    fill_paint(seg);
+    MRI *dst = get_dst(seg);
+    int n = geti();
+    std::vector<int> list(n + 1);
+    for (int i = 0; i < n; i++) list[i] = geti();
+    int maskid = geti();
+    fflush(stdout);
+    MRI *r = MRImatchSegs(seg, list.data(), n, maskid, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "sstat" || cmd == "hseg") {
+    MRI *seg = get_vol();
+    fill_paint(seg);
+    MRI *vol = get_vol();
+    fill_paint(vol);
+    int segid = geti();
+    if (cmd == "sstat") {
+      int frame = geti();
+      float mn = -7, mx = -7, rg = -7, mean = -7, sd = -7;
+      fflush(stdout);
+      int n = MRIsegStats(seg, segid, vol, frame, &mn, &mx, &rg, &mean, &sd);
+      fflush(stdout);
+      oi(n);
+      of(mn); of(mx); of(rg); of(mean); of(sd);
+    } else {
+      double bmin = getd(), bmax = getd(), bdelta = getd();
+      fflush(stdout);
+      HISTOGRAM *h = HISTOseg(seg, segid, vol, bmin, bmax, bdelta);
+      fflush(stdout);
+      oi(h->nbins);
+      for (int i = 0; i < h->nbins; i++) { of(h->bins[i]); of(h->counts[i]); }
+    }
+  } else if (cmd == "conform") {
+    // mri_conform.cpp: 0 MRIconform (the voxels hashed), 1 MRIconformedTemplate, 2 MRIgetConformMatrix
+    int kind = geti();
+    MRI *m = get_vol();
+    fill_paint(m);
+    if (kind == 0) {
+      fflush(stdout);
+      MRI *r = MRIconform(m);
+      fflush(stdout);
+      put_vol(r, true);
+    } else if (kind == 1) {
+      int cw = geti();
+      double cs = getd();
+      int keep = geti();
+      fflush(stdout);
+      MRI *r = MRIconformedTemplate(m, cw, cs, keep);
+      fflush(stdout);
+      put_vol(r);
+    } else {
+      fflush(stdout);
+      MATRIX *M = MRIgetConformMatrix(m);
+      fflush(stdout);
+      om(M);
+      put_geom(m, false);
+    }
+  } else if (cmd == "union" || cmd == "isect" || cmd == "mand" || cmd == "mxor") {
+    // mriset.cpp's two-volume functions: a, b (each painted), the destination mode, parameters
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *b = get_vol();
+    fill_paint(b);
+    MRI *dst = get_dst2(a, b);
+    int t1 = 0, t2 = 0;
+    if (cmd == "mand") t1 = geti();
+    if (cmd == "mxor") { t1 = geti(); t2 = geti(); }
+    fflush(stdout);
+    MRI *r = cmd == "union" ? MRIunion(a, b, dst)
+             : cmd == "isect" ? MRIintersect(a, b, dst)
+             : cmd == "mand"  ? MRIand(a, b, dst, t1)
+                              : MRIxor(a, b, dst, t1, t2);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "compl" || cmd == "edges" || cmd == "erodenn" || cmd == "erode" || cmd == "erode2d" ||
+             cmd == "erodeseg" || cmd == "dilseg" || cmd == "dtl" || cmd == "dtli" || cmd == "dlu" ||
+             cmd == "dlab" || cmd == "openn" || cmd == "mopen" || cmd == "mclose" || cmd == "dil6") {
+    // mriset.cpp's one-volume functions: the painted source, the destination mode, parameters
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *dst = get_dst(src);
+    MRI *val = NULL, *mask = NULL, *r = NULL;
+    int n = 0;
+    if (cmd == "dtl" || cmd == "dtli") { val = get_vol(); fill_paint(val); }
+    if (cmd == "dilseg" && geti()) { mask = get_vol(); fill_paint(mask); }
+    fflush(stdout);
+    if (cmd == "compl") r = MRIcomplement(src, dst);
+    else if (cmd == "edges") { double sv = getd(); fflush(stdout); r = MRIsetEdges(src, sv, dst); }
+    else if (cmd == "erodenn") { int nn = geti(), ee = geti(); fflush(stdout); r = MRIerodeNN(src, dst, nn, ee); }
+    else if (cmd == "erode") r = MRIerode(src, dst);
+    else if (cmd == "erode2d") r = MRIerode2D(src, dst);
+    else if (cmd == "erodeseg") { int ne = geti(), th = geti(); fflush(stdout); r = MRIerodeSegmentation(src, dst, ne, th); }
+    else if (cmd == "dilseg") {
+      int nd = geti(), mf = geti();
+      double mt = getd();
+      n = -7;
+      fflush(stdout);
+      r = MRIdilateSegmentation(src, dst, nd, mask, mf, mt, &n);
+    }
+    else if (cmd == "dtl" || cmd == "dtli") {
+      int label = geti(), niter = geti(), th = geti();
+      fflush(stdout);
+      r = cmd == "dtl" ? MRIdilateThreshLabel(src, val, dst, label, niter, th)
+                       : MRIdilateInvThreshLabel(src, val, dst, label, niter, th);
+    }
+    else if (cmd == "dlu" || cmd == "dlab") {
+      int label = geti(), niter = geti();
+      fflush(stdout);
+      r = cmd == "dlu" ? MRIdilateLabelUchar(src, dst, label, niter) : MRIdilateLabel(src, dst, label, niter);
+    }
+    else if (cmd == "openn") { int order = geti(); fflush(stdout); r = MRIopenN(src, dst, order); }
+    else if (cmd == "mopen") r = MRIopen(src, dst);
+    else if (cmd == "mclose") r = MRIclose(src, dst);
+    else r = MRIdilate6(src, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    if (cmd == "dilseg") oi(n);
+    put_vol(r);
+  } else if (cmd == "rlist" || cmd == "rvonly" || cmd == "mdiff" || cmd == "mmask" || cmd == "tmask" ||
+             cmd == "mnot" || cmd == "slv" || cmd == "b2c") {
+    // mriset.cpp's masks and replacements: the painted source, the destination mode, a second
+    // painted volume (mask or labels) where the function takes one, parameters
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *dst = get_dst(src);
+    MRI *m2 = NULL, *r = NULL;
+    if (cmd == "mdiff" || cmd == "mmask" || cmd == "tmask" || cmd == "slv" || (cmd == "rlist" && geti())) {
+      m2 = get_vol();
+      fill_paint(m2);
+    }
+    if (cmd == "rlist") {
+      int n = geti();
+      std::vector<int> a(n + 1), b(n + 1);
+      for (int i = 0; i < n; i++) a[i] = geti();
+      for (int i = 0; i < n; i++) b[i] = geti();
+      fflush(stdout);
+      r = MRIreplaceList(src, a.data(), b.data(), n, m2, dst);
+    } else if (cmd == "rvonly") {
+      float iv = getf(), ov = getf();
+      fflush(stdout);
+      r = MRIreplaceValuesOnly(src, dst, iv, ov);
+    } else if (cmd == "mdiff" || cmd == "mmask") {
+      int mk = geti();
+      float ov = getf();
+      fflush(stdout);
+      r = cmd == "mdiff" ? MRImaskDifferentGeometry(src, m2, dst, mk, ov) : MRImask(src, m2, dst, mk, ov);
+    } else if (cmd == "tmask") {
+      float th = getf(), ov = getf();
+      fflush(stdout);
+      r = MRIthresholdMask(src, m2, dst, th, ov);
+    } else if (cmd == "mnot") {
+      fflush(stdout);
+      r = MRInot(src, dst);
+    } else if (cmd == "slv") {
+      int label = geti();
+      float v = getf();
+      fflush(stdout);
+      r = MRIsetLabelValues(src, m2, dst, label, v);
+    } else {
+      fflush(stdout);
+      r = MRIbinMaskToCol(src, dst);
+    }
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "nmask" || cmd == "von" || cmd == "vinl" || cmd == "linv" || cmd == "cent" || cmd == "pthr" ||
+             cmd == "cnbhd") {
+    // mriset.cpp's counts and measures of one painted volume
+    MRI *m = get_vol();
+    fill_paint(m);
+    if (cmd == "nmask") { fflush(stdout); oi(MRInMask(m)); }
+    else if (cmd == "von") { int th = geti(); fflush(stdout); oi(MRItotalVoxelsOn(m, th)); }
+    else if (cmd == "vinl") { int l = geti(); fflush(stdout); oi(MRIvoxelsInLabel(m, l)); }
+    else if (cmd == "linv") { int l = geti(); fflush(stdout); oi(MRIlabelInVolume(m, l)); }
+    else if (cmd == "cent") {
+      double xc = -7, yc = -7, zc = -7;
+      fflush(stdout);
+      oi(MRIcomputeCentroid(m, &xc, &yc, &zc));
+      od(xc); od(yc); od(zc);
+    } else if (cmd == "pthr") {
+      MRI *mask = NULL;
+      if (geti()) { mask = get_vol(); fill_paint(mask); }
+      int frame = geti();
+      double pct = getd();
+      fflush(stdout);
+      od(MRIpercentThresh(m, mask, frame, pct));
+    } else {
+      int ws = geti(), x = geti(), y = geti(), z = geti(), v = geti();
+      fflush(stdout);
+      oi(MRIcountValInNbhd(m, ws, x, y, z, v));
+    }
+    fflush(stdout);
+  } else if (cmd == "grow" || cmd == "onfg" || cmd == "offbg" || cmd == "cplab" || cmd == "cplv") {
+    // mriset.cpp's functions on two or three painted volumes changed in place
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *b = get_vol();
+    fill_paint(b);
+    MRI *c = NULL;
+    if (cmd == "onfg" || cmd == "cplv") { c = get_vol(); fill_paint(c); }
+    int r = 0;
+    if (cmd == "grow") { int il = geti(), ol = geti(); fflush(stdout); r = MRIgrowLabel(a, b, il, ol); }
+    else if (cmd == "onfg") { fflush(stdout); r = MRIturnOnFG(a, b, c); }
+    else if (cmd == "offbg") { fflush(stdout); r = MRIturnOffBG(a, b); }
+    else if (cmd == "cplab") { int l = geti(); fflush(stdout); r = MRIcopyLabel(a, b, l); }
+    else { int l = geti(); fflush(stdout); r = MRIcopyLabeledVoxels(a, b, c, l); }
+    fflush(stdout);
+    oi(r);
+    put_vol(a);
+    put_vol(b);
+    if (c) put_vol(c);
+  } else if (cmd == "hreg" || cmd == "hvox" || cmd == "hthr") {
+    // mrihisto.cpp: MRIhistogramRegion, MRIhistogramVoxel, MRIhistogramRegionWithThreshold
+    MRI *m = get_vol();
+    fill_paint(m);
+    fill_pat(m);
+    int nbins = geti();
+    HISTOGRAM *h = get_histo();
+    HISTOGRAM *r;
+    if (cmd == "hvox") {
+      int x = geti(), y = geti(), z = geti(), ws = geti();
+      MRI *t = NULL;
+      if (geti()) { t = get_vol(); fill_paint(t); fill_pat(t); }
+      float th = getf();
+      fflush(stdout);
+      r = MRIhistogramVoxel(m, nbins, h, x, y, z, ws, t, th);
+    } else {
+      MRI_REGION reg;
+      get_region(&reg);
+      if (cmd == "hreg") {
+        fflush(stdout);
+        r = MRIhistogramRegion(m, nbins, h, &reg);
+      } else {
+        MRI *t = get_vol();
+        fill_paint(t);
+        fill_pat(t);
+        float th = getf();
+        int fr = geti();
+        fflush(stdout);
+        r = MRIhistogramRegionWithThreshold(m, nbins, h, &reg, t, th, fr);
+      }
+    }
+    fflush(stdout);
+    oi(r != NULL && r == h);
+    put_histo(r);
+  } else if (cmd == "hist" || cmd == "geq") {
+    // mrihisto.cpp: MRIhistogram, MRIgetEqualizeHisto
+    MRI *m = get_vol();
+    fill_paint(m);
+    fill_pat(m);
+    if (cmd == "hist") {
+      int nb = geti();
+      fflush(stdout);
+      HISTOGRAM *r = MRIhistogram(m, nb);
+      fflush(stdout);
+      put_histo(r);
+    } else {
+      HISTOGRAM *h = get_histo();
+      int lo = geti(), hi = geti(), norm = geti();
+      fflush(stdout);
+      HISTOGRAM *r = MRIgetEqualizeHisto(m, h, lo, hi, norm);
+      fflush(stdout);
+      oi(r != NULL && r == h);
+      put_histo(r);
+    }
+  } else if (cmd == "heq") {
+    // mrihisto.cpp: MRIhistoEqualize (the template another volume)
+    MRI *src = get_vol();
+    fill_paint(src);
+    fill_pat(src);
+    MRI *tpl = get_vol();
+    fill_paint(tpl);
+    fill_pat(tpl);
+    MRI *dst = get_dst(src);
+    int lo = geti(), hi = geti();
+    fflush(stdout);
+    MRI *r = MRIhistoEqualize(src, tpl, dst, lo, hi);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "hlr" || cmd == "hlab") {
+    // mrihisto.cpp: MRIhistogramLabelRegion, MRIhistogramLabel
+    MRI *m = get_vol();
+    fill_paint(m);
+    fill_pat(m);
+    MRI *l = get_vol();
+    fill_paint(l);
+    int label = geti(), nb = geti();
+    HISTOGRAM *r;
+    if (cmd == "hlr") {
+      MRI_REGION reg;
+      get_region(&reg);
+      fflush(stdout);
+      r = MRIhistogramLabelRegion(m, l, &reg, label, nb);
+    } else {
+      fflush(stdout);
+      r = MRIhistogramLabel(m, l, label, nb);
+    }
+    fflush(stdout);
+    put_histo(r);
+  } else if (cmd == "hsegm") {
+    // mrihisto.cpp: MRIhistoSegment (the labelled volume: NULL, another painted one, the source)
+    MRI *src = get_vol();
+    fill_paint(src);
+    fill_pat(src);
+    MRI *dst = get_dst(src);
+    if (dst && dst != src) fill_paint(dst);
+    int wl = geti(), wh = geti(), gh = geti(), ws = geti();
+    float sg = getf();
+    if (geti()) Gdiag |= DIAG_SHOW;
+    fflush(stdout);
+    MRI *r = MRIhistoSegment(src, dst, wl, wh, gh, ws, sg);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "ltafill") {
+    // relay 25: transform.cpp's LTAfillInverse, LTAinvert, LTAchangeType, LTAconcat, LTAreduce,
+    // LTAmriIsSource/Target, LTAprint
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    LTAfillInverse(l);
+    fflush(stdout);
+    put_lta_full(l);
+  } else if (cmd == "ltainv") {
+    LTA *l = get_lta_full();
+    int mode = geti();
+    LTA *d = mode == 1 ? get_lta_full() : mode == 2 ? l : NULL;
+    fflush(stdout);
+    LTA *r = LTAinvert(l, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_lta_full(r);
+    if (mode != 2) put_lta_full(l);
+  } else if (cmd == "ltachg") {
+    set_fsltype();
+    if (geti()) {
+      Gdiag_no = 1;
+      Gstdout = stdout;
+    }
+    LTA *l = get_lta_full();
+    int type = geti();
+    fflush(stdout);
+    LTA *r = LTAchangeType(l, type);
+    fflush(stdout);
+    oi(r == l);
+    put_lta_full(l);
+  } else if (cmd == "ltacat") {
+    set_fsltype();
+    int n = geti();
+    std::vector<LTA *> v;
+    for (int i = 0; i < n; i++) v.push_back(get_lta_full());
+    int red = geti();
+    fflush(stdout);
+    LTA *r = LTAconcat(v.data(), n, red);
+    fflush(stdout);
+    put_lta_full(r);
+    for (LTA *l : v) put_lta_full(l);
+  } else if (cmd == "ltared") {
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    LTA *r = LTAreduce(l);
+    fflush(stdout);
+    put_lta_full(r);
+    put_lta_full(l);
+  } else if (cmd == "ltasrc") {
+    LTA *l = get_lta_full();
+    MRI *m = get_vol();
+    int tgt = geti();
+    fflush(stdout);
+    int r = tgt ? LTAmriIsTarget(l, m) : LTAmriIsSource(l, m);
+    fflush(stdout);
+    oi(r);
+  } else if (cmd == "ltaprt") {
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    LTAprint(stdout, l);
+    fflush(stdout);
+  } else if (cmd == "a2v") {
+    // relay 25: resample.cpp's MRIaseg2vol, MRIaseg2volMU, MRIapplySpmWarp, interpolation_code,
+    // float2int_code
+    MRI *aseg = get_vol();
+    fill_paint(aseg);
+    MATRIX *R = get_m44();
+    MRI *tmp = get_vol();
+    double ft = getd();
+    COLOR_TABLE *ct = get_ctab();
+    int gd = geti();
+    if (gd) Gdiag_no = gd;
+    MRI *hit = NULL;
+    fflush(stdout);
+    MRI *r = MRIaseg2vol(aseg, R, tmp, ft, &hit, ct);
+    fflush(stdout);
+    put_vol(r);
+    put_vol(r ? hit : NULL);
+  } else if (cmd == "a2vmu") {
+    MRI *aseg = get_vol();
+    fill_paint(aseg);
+    LTA *l = get_lta_full();
+    double ft = getd();
+    int usf = geti();
+    COLOR_TABLE *ct = get_ctab();
+    MRI *hit = NULL;
+    fflush(stdout);
+    MRI *r = MRIaseg2volMU(aseg, l, ft, &hit, usf, ct);
+    fflush(stdout);
+    put_vol(r);
+    put_vol(r ? hit : NULL);
+    put_lta_full(l);
+  } else if (cmd == "spmw") {
+    MRI *vol = get_vol();
+    fill_paint(vol);
+    LTA *l = geti() ? get_lta_full() : NULL;
+    MRI *warp = get_vol();
+    fill_paint(warp);
+    int lr = geti(), interp = geti();
+    MRI *o = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRIapplySpmWarp(vol, l, warp, lr, interp, o);
+    fflush(stdout);
+    oi(r != NULL && r == o);
+    put_vol(r);
+    put_lta_full(l);
+  } else if (cmd == "icode") {
+    std::string s = gethex();
+    oi(interpolation_code(s.c_str()));
+    oi(float2int_code(s.c_str()));
+  } else if (cmd == "sbound" || cmd == "sborder" || cmd == "idxno" || cmd == "ssrob" || cmd == "sfavg" ||
+             cmd == "zcat" || cmd == "aedit" || cmd == "shdim") {
+    // relay 25: mri2.cpp's MRIsegBoundary, MRIsegBorder, MRIindexNo, MRIsegStatsRobust,
+    // MRIsegFrameAvg, MRIzconcat, MRIapplyEdits, MRIshiftDim
+    MRI *seg = get_vol();
+    fill_paint(seg);
+    if (cmd == "sbound") {
+      fflush(stdout);
+      MRI *r = MRIsegBoundary(seg);
+      fflush(stdout);
+      put_vol(r);
+    } else if (cmd == "sborder") {
+      int topo = geti(), ml = -7;
+      fflush(stdout);
+      MRI *r = MRIsegBorder(seg, &ml, topo);
+      fflush(stdout);
+      oi(ml);
+      put_vol(r);
+    } else if (cmd == "idxno") {
+      MRI *d = geti() ? get_vol() : NULL;
+      fflush(stdout);
+      MRI *r = MRIindexNo(seg, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+    } else if (cmd == "ssrob" || cmd == "sfavg") {
+      MRI *m = get_vol();
+      fill_paint(m);
+      int segid = geti();
+      if (cmd == "ssrob") {
+        int frame = geti();
+        float pct = getf();
+        float mn = -7, mx = -7, rg = -7, mean = -7, sd = -7;
+        fflush(stdout);
+        int n = MRIsegStatsRobust(seg, segid, m, frame, &mn, &mx, &rg, &mean, &sd, pct);
+        fflush(stdout);
+        oi(n);
+        of(mn); of(mx); of(rg); of(mean); of(sd);
+      } else {
+        std::vector<double> favg(m->nframes > 0 ? m->nframes : 1, -7.0);
+        fflush(stdout);
+        int n = MRIsegFrameAvg(seg, segid, m, favg.data());
+        fflush(stdout);
+        oi(n);
+        for (int f = 0; f < m->nframes; f++) od(favg[f]);
+      }
+    } else if (cmd == "zcat") {
+      MRI *m2 = get_vol();
+      fill_paint(m2);
+      int nskip = geti();
+      MRI *d = geti() ? get_vol() : NULL;
+      fflush(stdout);
+      MRI *r = MRIzconcat(seg, m2, nskip, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+    } else if (cmd == "aedit") {
+      MRI *old = get_vol();
+      fill_paint(old);
+      MRI *man = get_vol();
+      fill_paint(man);
+      int mode = geti();
+      MRI *d = mode == 1 ? get_vol() : mode == 2 ? seg : NULL;
+      fflush(stdout);
+      MRI *r = MRIapplyEdits(seg, old, man, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+    } else {
+      int dim = geti(), nshift = geti(), wrap = geti();
+      fflush(stdout);
+      MRI *r = MRIshiftDim(seg, dim, nshift, wrap);
+      fflush(stdout);
+      put_vol(r);
+    }
+  } else if (cmd == "fento" || cmd == "lacj" || cmd == "lacjn" || cmd == "cfov" || cmd == "ccrs" || cmd == "crras") {
+    // relay 25: mri2.cpp's MRIfixEntoWM, LabelAmygalaCortalJunction, MRIcropToFoV,
+    // MRIcropAroundCRS, MRIcropAroundRAS
+    MRI *vol = get_vol();
+    fill_paint(vol);
+    if (cmd == "fento") {
+      MRI *e = get_vol();
+      fill_paint(e);
+      int level = geti();
+      double lh = getd(), rh = getd();
+      int acj = geti();
+      fflush(stdout);
+      int n = MRIfixEntoWM(vol, e, level, lh, rh, acj);
+      fflush(stdout);
+      oi(n);
+      put_vol(vol);
+    } else if (cmd == "lacj" || cmd == "lacjn") {
+      // lacjn: a new output, with CTABalloc's 7,032 random colours (seconds: hashed as HEAVY)
+      int topo = geti();
+      MRI *d = cmd == "lacj" ? get_vol() : NULL;
+      setRandomSeed(1);  // CTABalloc draws random colours
+      fflush(stdout);
+      MRI *r = LabelAmygalaCortalJunction(vol, topo, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+      put_ct_lacj(r ? r->ct : NULL);
+    } else if (cmd == "cfov") {
+      int cf = geti(), rf = geti(), sf = geti();
+      double th = getd();
+      fflush(stdout);
+      MRI_REGION *r = MRIcropToFoV(vol, cf, rf, sf, th);
+      fflush(stdout);
+      oi(r->x); oi(r->y); oi(r->z); oi(r->dx); oi(r->dy); oi(r->dz);
+    } else {
+      double ctr[3];
+      for (int k = 0; k < 3; k++) ctr[k] = getd();
+      int fov[3];
+      for (int k = 0; k < 3; k++) fov[k] = geti();
+      int nk = geti();
+      std::vector<int> keep;
+      for (int k = 0; k < nk; k++) keep.push_back(geti());
+      LTA *l = NULL;
+      if (cmd == "crras") {
+        set_fsltype();
+        if (geti()) l = get_lta_full();
+      }
+      fflush(stdout);
+      MRI *r = cmd == "ccrs" ? MRIcropAroundCRS(vol, ctr, fov, keep) : MRIcropAroundRAS(vol, ctr, fov, l, keep);
+      fflush(stdout);
+      put_vol(r);
     }
   } else {
     fail("unknown command");

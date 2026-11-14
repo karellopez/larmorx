@@ -146,6 +146,12 @@ impl Libm {
         self.choose64(|| super::log(x), || super::log_glibc(x))
     }
 
+    /// The base-10 logarithm ([`super::log10`] or [`super::log10_glibc`]).
+    #[inline]
+    pub fn log10(&self, x: f64) -> f64 {
+        self.choose64(|| super::log10(x), || super::log10_glibc(x))
+    }
+
     /// `x^y` ([`super::pow`] or [`super::pow_glibc`]).
     #[inline]
     pub fn pow(&self, x: f64, y: f64) -> f64 {
@@ -248,7 +254,7 @@ mod tests {
         // seeded arguments: every result the chosen function's, and the witness set exactly
         // when the two differ on one of them
         let mut s = 0x243f_6a88_85a3_08d3u64;
-        let mut any = [false; 12];
+        let mut any = [false; 13];
         for _ in 0..20_000 {
             s ^= s << 13;
             s ^= s >> 7;
@@ -257,7 +263,7 @@ mod tests {
             let x = u * 40.0 - 20.0;
             let f = x as f32;
             let p = (u * 3.0) as f32;
-            let pairs64: [(f64, f64, f64, f64); 5] = [
+            let pairs64: [(f64, f64, f64, f64); 6] = [
                 (
                     fix.exp(x),
                     rep.exp(x),
@@ -269,6 +275,12 @@ mod tests {
                     rep.log(u),
                     super::super::log(u),
                     super::super::log_glibc(u),
+                ),
+                (
+                    fix.log10(u),
+                    rep.log10(u),
+                    super::super::log10(u),
+                    super::super::log10_glibc(u),
                 ),
                 (
                     fix.pow(u, x),
@@ -339,11 +351,11 @@ mod tests {
             ];
             for (k, (a, b, c, g)) in pairs32.into_iter().enumerate() {
                 assert_eq!((a.to_bits(), b.to_bits()), (c.to_bits(), g.to_bits()));
-                any[5 + k] |= c.to_bits() != g.to_bits();
+                any[6 + k] |= c.to_bits() != g.to_bits();
             }
         }
         // glibc's differ somewhere on 20,000 arguments for each, so both witnesses saw it
-        assert!(any.iter().filter(|&&a| a).count() >= 9, "{any:?}");
+        assert!(any.iter().filter(|&&a| a).count() >= 10, "{any:?}");
         assert!(fix.differed() && rep.differed());
     }
 
@@ -355,6 +367,7 @@ mod tests {
             let _ = (
                 l.exp(0.0),
                 l.log(1.0),
+                l.log10(1000.0),
                 l.pow(2.0, f64::from(k % 10)),
                 l.sin(0.0),
             );

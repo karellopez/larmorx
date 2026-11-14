@@ -146,7 +146,9 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   FS-482 (0 for a shift never written, both modes); cubic B-splines and `LTAchangeType` port errors until ported.
 - `src/pca.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIfdr2vwth` (1402-1574), `MRIcovarianceMatrix` (1576-1641),
   `MRIpca` (1643-1744), `PrintPCAStats`, `WritePCAStats` (1746-1779); `utils/sig.cpp` `fdr2vwth`, `doublecompar`
-  (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's in both modes.
+  (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's with `reproduce`, CORE-MATH's correctly
+  rounded `larmorx_core::math::log10` by default (relay 22; GLIBC-07 noted where it changes the returned threshold
+  or the debug line's text).
 - `src/region.rs` (3.1-38; relay 21): `utils/region.cpp` `REGIONalloc` (49-57), `REGIONclear`, `REGIONcopy` (116-133),
   `REGIONgetBoundingBoxM` (299-334), `REGIONgetBoundingBox` (344-379), `REGIONgetBoundingBoxEqOdd` (387-492),
   `REGIONprint` (495-499); `FZERO`'s 1e-5 of this file.
@@ -154,3 +156,56 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   `MRIvoxelMean` (174-205), `MRIvoxelDirection` (316-384), `MRIvoxelGradientDir2ndDerivative` (393-433); operand
   orders from `mrivoxel.cpp.o`. Changes: FS-485 (the window not cut by default), FS-486 (0 for a sample never
   written, both modes).
+- `src/talairachex.rs` (3.1-38; relay 22): `utils/talairachex.cpp` `ModifyTalairachCRAS` (33-95),
+  `MtalairachFromVoxel` (111-127), `MtalVoxelFromVoxel` (129-148), `MvoxelFromTalairach` (150-164),
+  `MvoxelFromTalVoxel` (166-184), `TransformWithMatrix` (207-253), `MRIvoxelToTalairachEx` (255-263),
+  `MRIvoxelToTalairachVoxelEx` (267-275), `MRItalairachToVoxelEx` (279-287), `MRItalairachVoxelToVoxelEx` (302-310),
+  `MRItoTalairachExInterp` (315-328), `MRItoTalairachEx` (330-343; 3.1-39's), `MRIfromTalairachEx` (347-361; 3.1-39's);
+  operand orders from `talairachex.cpp.o`. Changes: FS-487, FS-488 (errors where FreeSurfer crashes; no matrix for a
+  transform array without transforms, both modes).
+- `src/mriset.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mriset.cpp` `MRIdilateUchar` (1642-1721),
+  `MRIdilate` (1723-1822). Changes: none.
+- `src/mriset.rs` (3.1-38; relay 23): the rest of `utils/mriset.cpp`'s reached functions: `MRIunion` (108-140),
+  `MRIintersect` (142-169), `MRIcomplement` (171-201), `MRIand` (203-232), `MRIxor` (306-330), `MRIsetEdges`
+  (366-406), `MRIerodeNN` (418-470), `MRIerode` (472-565), `MRIerode2D` (951-1000), `MRIerodeSegmentation`
+  (1002-1066), `MRIdilateSegmentation` (1068-1175), `MRIdilateThreshLabel` (1190-1281), `MRIdilateInvThreshLabel`
+  (1377-1469), `MRIdilateLabelUchar` (1475-1545), `MRIdilateLabel` (1553-1634), `MRIopenN` (1824-1838), `MRIopen`
+  (1844-1854), `MRIclose` (1860-1870), `MRIdilate6` (1929-1991), `MRIreplaceList` (2212-2261),
+  `MRIreplaceValuesOnly` (2301-2336), `MRImaskDifferentGeometry` (2409-2460), `MRImask` (2467-2529), `MRInMask`
+  (2556-2574), `MRIthresholdMask` (2582-2626), `MRIgrowLabel` (2691-2790), `MRIturnOnFG` (2795-2823), `findLabel`
+  (2829-2869), `MRIturnOffBG` (2874-2900), `MRIcopyLabel` (3077-3113), `MRItotalVoxelsOn` (3189-3207),
+  `MRIvoxelsInLabel` (3218-3235), `MRInot` (3237-3256), `MRIcopyLabeledVoxels` (3258-3281), `MRIsetLabelValues`
+  (3283-3298), `MRIlabelInVolume` (3332-3340), `MRIcomputeCentroid` (3541-3568), `MRIbinMaskToCol` (3691-3716),
+  `MRIpercentThresh` (3883-3907), `MRIcountValInNbhd` (3966-3982); `FZERO`'s constant from `mriset.cpp.o`. Changes:
+  FS-493 (an error where FreeSurfer never returns, both modes), FS-494 (rule A), FS-495 (rule A), FS-496 (memory:
+  the largest value by default, 0 with `reproduce`), FS-12 for `(int)` of values.
+- `src/mrihisto.rs` (3.1-38; relay 24): `utils/mrihisto.cpp` `MRIhistogramRegion` (101-187), `mriHistogramRegion`
+  (321-447, as `region_histogram`), `MRIgetEqualizeHisto` (568-601), `MRIhistoEqualize` (643-696), `MRIhistogram`
+  (725-753), `MRIhistogramLabelRegion` (754-830), `MRIhistogramLabel` (831-939), `MRIhistoSegment` (940-1091),
+  `MRIhistogramVoxel` (1194-1230), `MRIhistogramRegionWithThreshold` (1231-1335); operand orders and `FZERO`'s constant
+  from `mrihisto.cpp.o`. Changes: FS-498 (bins kept inside by default), FS-499 (memory: 0 read, writes dropped),
+  FS-500 (rule A), FS-501 and FS-502 (errors), FS-503 (one thread's order).
+- `src/conform.rs` (3.1-38; relay 23): `utils/mri_conform.cpp` `MRIgetConformMatrix` (39-73), `MRIconform` (75-138),
+  `MRIconformedTemplate` (140-256). Changes: FS-491 (memory: an error by default, zeros with `reproduce`), FS-492
+  (rule A).
+- `src/arith.rs`, relay 23: `Vols` (the source/destination resolution), `getv`, `setv`, `clone_into` and `fequal`
+  shared with `mriset.rs`; `Vols::copy_a` (`dst = MRIcopy(src, dst)`) and `Vols::with_pair` added.
+- `src/segs.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mri2.cpp` `MRIsegStats` (3826-3877),
+  `MRImatchSegs` (5687-5708), `HISTOseg` (5717-5740); operand orders from `mri2.cpp.o`. Changes: FS-489 (rule A),
+  FS-490 (no count, both modes).
+- `src/ltaops.rs` (3.1-40; relay 25): `utils/transform.cpp` `LTAprint` (3238-3279), `LTAconcat2` (3378-3385),
+  `LTAconcat` (3396-3461), `LTAreduce` (3469-3521), `LTAinvert` (3530-3560), `LTAfillInverse` (3568-3580), the static
+  `LTAgetV2V` (3646-3668) and `LTAgetR2R` (3672-3694), `LTAchangeType` (3695-4064), `LTAmriIsSource` (4908-4915),
+  `LTAmriIsTarget` (4921-4929). Changes: FS-504 (errors), FS-505, FS-506, FS-507 (rule A), FS-508 (error).
+- `src/vgeom.rs`, relay 25: `utils/transform.cpp` `VGgetVoxelToRasXform` (4340-4398), `VGgetRasToVoxelXform`
+  (4402-4410); `vol_geom_text` (the bytes of `writeVolGeom`, for `LTAprint`).
+- `src/aseg2vol.rs` (3.1-37; relay 25): `utils/resample.cpp` `ASEGVOLINDEX` (87-93), `MRIaseg2vol` (2509-2697),
+  `MRIaseg2volMU` (2699-2742), `MostHitsInVolVox` (2777-2835), `CompareAVIndices` (2845-2864), `MRIapplySpmWarp`
+  (2879-2994). Changes: FS-509 (error), FS-510 (rule A), FS-511 (0 in both modes).
+- `src/segs.rs`, relay 25: `utils/mri2.cpp` `MRIsegBoundary` (3700-3739), `MRIsegStatsRobust` (3886-3958),
+  `MRIsegFrameAvg` (3965-3998), `MRIsegBorder` (8072-8125); `utils/utils.cpp` `compare_floats` (1197-1205).
+- `src/vol2vol.rs`, relay 25: `utils/mri2.cpp` `MRIvol2VolTkRegVSM` (3525-3553).
+- `src/mri2ops.rs` (3.1-37; relay 25): `utils/mri2.cpp` `MRIindexNo` (3771-3789), `MRIzconcat` (6466-6531),
+  `MRIapplyEdits` (7168-7193), `MRIfixEntoWM` (7222-7253), `LabelAmygalaCortalJunction` (7264-7329), `MRIshiftDim`
+  (7338-7401), `MRIcropToFoV` (7480-7547), `MRIcropAroundCRS` (7641-7752), `MRIcropAroundRAS` (7763-7836). Changes:
+  FS-512, FS-513 (rule A), FS-514 (one thread's order), FS-515 (error), FS-516 (rule A), FS-517 (error).

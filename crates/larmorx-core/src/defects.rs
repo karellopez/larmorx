@@ -1987,6 +1987,68 @@ defects! {
         "the gradient-direction measure of a voxel (MRIvoxelDirection) cuts its window at the volume's far faces but reads it back as a full cube: the gradients pair with the wrong offsets and the last entries were never written (memory contents)";
     FS_486 = "FS-486", "FreeSurfer", true,
         "the second derivative along the gradient (MRIvoxelGradientDir2ndDerivative) of a volume whose type the trilinear sampler refuses subtracts a sample never written: memory contents";
+    FS_487 = "FS-487", "FreeSurfer", true,
+        "the Talairach point conversions (MRIvoxelToTalairachEx and its siblings) use a matrix that could not be made (a singular voxel-to-RAS matrix or transform) and crash; and the Talairach-to-voxel matrix of a transform file that holds no transform reads past it: memory contents";
+    FS_488 = "FS-488", "FreeSurfer", true,
+        "the resampling of a volume out of Talairach space (MRIfromTalairachEx) without a target volume uses the target before its own check and crashes";
+    FS_489 = "FS-489", "FreeSurfer", true,
+        "the mask of listed labels (MRImatchSegs) made in the segmentation itself clears each voxel before reading its label: every voxel is matched as label 0";
+    FS_490 = "FS-490", "FreeSurfer", true,
+        "the histogram of a segment's intensities (HISTOseg) with a bin count of 0 counts each matching voxel in the bin before the first: memory it does not own";
+    FS_491 = "FS-491", "FreeSurfer", true,
+        "the conformed template that keeps a volume's direction cosines, for a volume whose orientation has no left-right, inferior-superior or anterior-posterior axis (cosines not good, or two axes along one direction), reads a voxel size and a field of view that are not the volume's: memory contents";
+    FS_492 = "FS-492", "FreeSurfer", true,
+        "the conformed template that keeps a volume's direction cosines converts a field of view beyond the 32-bit integer range, or NaN, to the integer -2147483648, and the difference of two fields of view wraps around";
+    FS_493 = "FS-493", "FreeSurfer", true,
+        "the erosion of a segmentation (MRIerodeSegmentation) with a count of erosions of 0 or below, and its dilation (MRIdilateSegmentation) with a count of 0 or below -1, never end (the count is lowered until it reaches 1)";
+    FS_494 = "FS-494", "FreeSurfer", true,
+        "the threshold mask of byte volumes (MRIthresholdMask) stores a replacement value beyond 0 to 255, or NaN, as the low byte of its truncation to a 32-bit integer";
+    FS_495 = "FS-495", "FreeSurfer", true,
+        "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds to the end of the sorted voxels or past it returns 0 from the unused part of its list, not the largest value";
+    FS_496 = "FS-496", "FreeSurfer", true,
+        "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds past the list's allocation, below 0, or NaN reads memory it does not own";
+    FS_497 = "FS-497", "FreeSurfer", true,
+        "the dilation of a segmentation until it stops changing (MRIdilateSegmentation with -1) never ends when a step's new labels do not reach the next step's copy (a complex volume, whose copy FreeSurfer makes of half of each row): the same changes are counted forever";
+    FS_498 = "FS-498", "FreeSurfer", true,
+        "the histograms of a whole volume (MRIhistogram), of a region of bytes and of a label in a region (MRIhistogramLabelRegion) count a voxel whose bin falls outside the histogram (a NaN voxel or bin size, a rounding past the last bin) in memory they do not own, or crash";
+    FS_499 = "FS-499", "FreeSurfer", true,
+        "the histogram equalisation (MRIgetEqualizeHisto, MRIhistoEqualize) indexes the histograms by intensity from the low to the high limit, outside their bins when the low limit is below 0 or an intensity is beyond the last bin: memory contents read and memory it does not own written";
+    FS_500 = "FS-500", "FreeSurfer", true,
+        "the cumulative histogram for equalisation (MRIgetEqualizeHisto) leaves the values of its bins from the low to the high limit unset (0, or the given histogram's)";
+    FS_501 = "FS-501", "FreeSurfer", true,
+        "the histogram segmentation of white matter (MRIhistoSegment) crashes on a volume of integers or longs (no region histogram to smooth) and on a region whose range needs 2^31 bins or more";
+    FS_502 = "FS-502", "FreeSurfer", true,
+        "the histogram segmentation of white matter (MRIhistoSegment) never ends when its search for the gray-matter peak comes back to a peak it has found (a gray-matter limit below -1 with no peak)";
+    FS_503 = "FS-503", "FreeSurfer", true,
+        "the thresholded region histogram (MRIhistogramRegionWithThreshold) with several threads adds per-thread histograms of fractional counts, whose sums depend on the number of threads";
+    FS_504 = "FS-504", "FreeSurfer", true,
+        "the transform-array functions (LTAconcat, LTAreduce, LTAmriIsSource, LTAmriIsTarget, LTAprint, LTAchangeType's diagnostic print) given no array, an array without transforms or a transform without a 4 x 4 matrix read memory they do not own or crash";
+    FS_505 = "FS-505", "FreeSurfer", true,
+        "filling a transform array's inverses (LTAfillInverse, and every function that calls it) computes the inverse of a transform whose inverse has no matrix and loses it: the inverse stays without a matrix";
+    FS_506 = "FS-506", "FreeSurfer", true,
+        "changing a transform array from physical-voxel to RAS-to-RAS (LTAchangeType, and every change that passes through it) converts the matrix as if it were RAS-to-RAS before scaling it: the result is not the RAS-to-RAS transform";
+    FS_507 = "FS-507", "FreeSurfer", true,
+        "changing a transform array of several transforms from a tkregister registration to RAS-to-RAS (LTAchangeType) converts the first transform once for every transform and leaves the others unconverted";
+    FS_508 = "FS-508", "FreeSurfer", true,
+        "changing a transform array to or from FSL's type (LTAchangeType) when FSL's conversion gives no matrix (a product that cannot be inverted) frees the transform's matrix and goes on using it: memory it no longer owns read";
+    FS_509 = "FS-509", "FreeSurfer", true,
+        "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) reads the table at a label it does not hold (outside it or an empty place), and counts tissue types of 100 or more and more than 1,000 labels in one voxel past its arrays";
+    FS_510 = "FS-510", "FreeSurfer", true,
+        "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) decides whether a voxel has a clear winner from the hits of its highest label instead of the label with the most hits, so a label with half or more of the voxel can lose to the tissue-type vote";
+    FS_511 = "FS-511", "FreeSurfer", true,
+        "applying an SPM warp field (MRIapplySpmWarp) stores, where a sample fails before any has succeeded (a trilinear sample of a type it cannot read), a value never written";
+    FS_512 = "FS-512", "FreeSurfer", true,
+        "concatenating two volumes along the slices (MRIzconcat) copies as many rows as the volumes have columns: rows past the width stay 0, and where the width is larger it reads and writes rows the volumes do not have";
+    FS_513 = "FS-513", "FreeSurfer", true,
+        "shifting a volume along its rows or slices (MRIshiftDim) wraps and drops the shifted indices by the number of columns instead of the number of rows or slices";
+    FS_514 = "FS-514", "FreeSurfer", true,
+        "labelling the amygdala-cortex junction (LabelAmygalaCortalJunction) with several threads writes the left and the right label into a cortex voxel next to both amygdalae in an order that depends on the threads";
+    FS_515 = "FS-515", "FreeSurfer", true,
+        "cropping around an RAS point (MRIcropAroundRAS) of a volume whose orientation names an axis twice, or is unknown, crops to a field of view that is never set: memory contents";
+    FS_516 = "FS-516", "FreeSurfer", true,
+        "cropping around an RAS point through an LTA (MRIcropAroundRAS) decides the LTA's direction backwards (it inverts the LTA when the volume is its destination, goes on when the volume is neither end, refuses when it is both) and compares the volume's validity flag, which no volume constructor sets";
+    FS_517 = "FS-517", "FreeSurfer", true,
+        "cropping around a voxel (MRIcropAroundCRS) whose last voxel lies beyond the int range (a centre that is not a number or too far away, with a field of view that overflows) never ends";
 }
 
 /// The register entry with ID `id`.

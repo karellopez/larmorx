@@ -13,8 +13,10 @@
 #![forbid(unsafe_code)]
 
 pub mod arith;
+pub mod aseg2vol;
 pub mod cma;
 pub mod combine;
+pub mod conform;
 pub mod coords;
 pub mod deriv;
 pub mod frames;
@@ -22,7 +24,11 @@ pub mod image;
 pub mod io_frames;
 pub mod label_coords;
 pub mod labels;
+pub mod ltaops;
 pub mod ltaread;
+pub mod mri2ops;
+pub mod mrihisto;
+pub mod mriset;
 pub mod mrivoxel;
 pub mod order;
 pub mod orient;
@@ -33,9 +39,11 @@ pub mod resize;
 pub mod rotate;
 mod rows;
 pub mod sample;
+pub mod segs;
 pub mod seq;
 pub mod skull;
 pub mod stats;
+pub mod talairachex;
 pub mod vgeom;
 pub mod vol2vol;
 pub mod voxops;

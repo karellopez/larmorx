@@ -1279,9 +1279,11 @@ header, and the extender is read at byte 348 whatever `sizeof_hdr` says.
   FreeSurfer defect; found by piece 15's random tags): `Mri::cmdlines` and `transform_fname` are
   `String`s, filled with `from_utf8_lossy`, so a tag of bytes that are not UTF-8 reads as U+FFFD where
   FreeSurfer keeps the bytes (3 of seed 7's 8,075 cases, through FreeSurfer's NIfTI extension; MGH
-  files likewise). A rewrite of such a volume would change those bytes. Piece 15 now writes ASCII
-  command lines; the fields' change to bytes is for a later relay (they are shared with fs.volume and
-  fs.surf).
+  files likewise). A rewrite of such a volume would change those bytes. Relay 26 (the orchestrator's
+  decision of 2026-11-14) made both fields bytes (`Vec<u8>`, `Vec<Vec<u8>>`: what the file gave, before
+  the NUL), with the transform tag's `[DEBUG]`, `INFO` and error lines printed as bytes; piece 15's
+  extension tags are random bytes again (seed 7, 3,361 cases of pieces 6, 12, 14 and 15's readers and
+  writers: `reproduce` identical on 2,907, 0 different).
 - **The probe's memory limit** (seed 7, one case): a big-endian header with `dim[1]` -1 and `glmin`
   3 reads (FS-643's `reproduce`) 50,331,648 columns; the official build's allocation fails in the
   probe's 1 GiB (`could not allocate memory for slice 7 out of 8`), the port's succeeds and its read

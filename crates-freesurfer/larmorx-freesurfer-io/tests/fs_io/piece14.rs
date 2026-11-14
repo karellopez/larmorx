@@ -415,11 +415,11 @@ pub(crate) fn read_mri14(
         c[..n].copy_from_slice(&b[..n]);
     }
     if let Some(tf) = super::dec(tk.next()) {
-        m.transform_fname = String::from_utf8(tf).unwrap();
+        m.transform_fname = tf;
     }
     m.pedir = super::dec(tk.next());
     let nc = tk.int();
-    m.cmdlines = (0..nc).map(|_| tk.string()).collect();
+    m.cmdlines = (0..nc).map(|_| tk.bytes()).collect();
     let label = tk.int() as i32;
     let thresh = f32_of(tk.next());
     if let Some(fr) = m.frames.first_mut() {

@@ -527,9 +527,9 @@ pub(super) fn print_mri(o: &mut Out, w: &Work, m: Option<&Mri>) {
         o.i(i64::from(x));
     }
     for c in &m.cmdlines {
-        oname(o, w, Some(c.as_bytes()));
+        oname(o, w, Some(c));
     }
-    oname(o, w, Some(m.transform_fname.as_bytes()));
+    oname(o, w, Some(&m.transform_fname));
     o.i(i64::from(m.free_transform));
     for t in [&m.linear_transform, &m.inverse_linear_transform] {
         match t {

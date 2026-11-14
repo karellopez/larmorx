@@ -1005,17 +1005,17 @@ impl Out {
         }
         self.i(x.cmdlines.len() as i64);
         for c in &x.cmdlines {
-            self.s(c);
+            self.s(&String::from_utf8_lossy(c));
         }
         for v in [
             &x.subject_name,
             &x.path_to_t1,
             &x.fname_format,
             &x.gdf_image_stem,
-            &x.transform_fname,
         ] {
             self.s(v);
         }
+        self.s(&String::from_utf8_lossy(&x.transform_fname));
         self.m(x.auto_align.as_ref());
         self.m(x.orig_ras2vox.as_ref());
         self.i(i64::from(x.free_transform));
@@ -1263,9 +1263,9 @@ impl Ctx {
         x.path_to_t1 = t.s();
         x.fname_format = t.s();
         x.gdf_image_stem = t.s();
-        x.transform_fname = t.s();
+        x.transform_fname = t.s().into_bytes();
         let n = t.i();
-        x.cmdlines = (0..n).map(|_| t.s()).collect();
+        x.cmdlines = (0..n).map(|_| t.s().into_bytes()).collect();
         if let Some(r) = self.opt_matrix(t) {
             x.vg.register_mat = Some(r);
         }

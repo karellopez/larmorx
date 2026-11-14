@@ -607,7 +607,7 @@ pub fn mri_tag_write(
         io.write_ras_xform(g, out, &m.vg);
         io.write_ras_xform_extra(g, out, &m.vg);
     }
-    let t = c_bytes(m.transform_fname.as_bytes());
+    let t = c_bytes(&m.transform_fname);
     if !t.is_empty() {
         let mut b = t.to_vec();
         b.push(0);
@@ -650,7 +650,7 @@ pub fn mri_tag_write(
         io.write_old_colortable(g, out, err, ct);
     }
     for c in &m.cmdlines {
-        let mut b = c_bytes(c.as_bytes()).to_vec();
+        let mut b = c_bytes(c).to_vec();
         b.push(0);
         let n = b.len() as i64;
         io.write_tag(g, out, TAG_CMDLINE, &b, n);
@@ -891,7 +891,7 @@ pub fn mri_tag_length(g: &mut Globals, out: &mut dyn Write, m: &Mri, nifti: bool
         let t = fstagsio::getlen_ras_xform_extra(true);
         add(g, out, &mut dlen, t, tags::TAG_RAS_XFORM_EXTRA);
     }
-    let flen = c_bytes(m.transform_fname.as_bytes()).len() as i64;
+    let flen = c_bytes(&m.transform_fname).len() as i64;
     if flen > 0 {
         let t = fstagsio::getlen_tag(TAG_MGH_XFORM, flen + 1, nifti, true);
         add(g, out, &mut dlen, t, TAG_MGH_XFORM);
@@ -940,7 +940,7 @@ pub fn mri_tag_length(g: &mut Globals, out: &mut dyn Write, m: &Mri, nifti: bool
         add(g, out, &mut dlen, t, tags::TAG_OLD_COLORTABLE);
     }
     for c in &m.cmdlines {
-        let n = c_bytes(c.as_bytes()).len() as i64 + 1;
+        let n = c_bytes(c).len() as i64 + 1;
         add(
             g,
             out,

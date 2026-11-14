@@ -1276,7 +1276,7 @@ pub fn mri_tag_read(
     // (FS-421; 0 here), a name copied in has its NUL; `tname_known` bytes are written
     let mut tname = [0u8; STRLEN];
     let n0 = m.transform_fname.len().min(STRLEN);
-    tname[..n0].copy_from_slice(&m.transform_fname.as_bytes()[..n0]);
+    tname[..n0].copy_from_slice(&m.transform_fname[..n0]);
     let mut tname_known = (n0 + 1).min(STRLEN);
     let mut io = FsTagsIo::new(fp, niftiheaderext);
     loop {
@@ -1401,11 +1401,10 @@ pub fn mri_tag_read(
                     );
                 }
                 if info {
-                    let _ = writeln!(
-                        out,
-                        "[DEBUG] MRITAGread() TAG_MGH_XFORM = {} ({len})",
-                        String::from_utf8_lossy(&name)
-                    );
+                    let mut t = b"[DEBUG] MRITAGread() TAG_MGH_XFORM = ".to_vec();
+                    t.extend_from_slice(&name);
+                    t.extend_from_slice(format!(" ({len})\n").as_bytes());
+                    let _ = out.write_all(&t);
                 }
                 if utils::file_exists(dir, &tmpstr) {
                     name = tmpstr.into_bytes();
@@ -1415,7 +1414,7 @@ pub fn mri_tag_read(
                     tname_known = tname_known.max(k + 1);
                 }
                 let lossy = String::from_utf8_lossy(&name).into_owned();
-                m.transform_fname = lossy.clone();
+                m.transform_fname = name.clone();
                 if utils::file_exists(dir, &lossy) {
                     match minc::input_transform_file(g, out, err, dir, &name) {
                         Some(t) => {
@@ -1425,17 +1424,17 @@ pub fn mri_tag_read(
                             m.transform = Some(t);
                             m.free_transform = 1;
                             if diag::verbose_on(g) {
-                                let _ = writeln!(err, "INFO: loaded talairach xform : {lossy}");
+                                let mut t = b"INFO: loaded talairach xform : ".to_vec();
+                                t.extend_from_slice(&name);
+                                t.push(b'\n');
+                                let _ = err.write_all(&t);
                             }
                         }
                         None => {
                             g.errno = 0;
-                            log::error_printf(
-                                g,
-                                err,
-                                ERROR_BAD_FILE,
-                                &format!("error loading transform from {lossy}"),
-                            );
+                            let mut t = b"error loading transform from ".to_vec();
+                            t.extend_from_slice(&name);
+                            log::error_printf_bytes(g, err, ERROR_BAD_FILE, &t);
                             m.linear_transform = None;
                             m.inverse_linear_transform = None;
                             m.free_transform = 1;
@@ -1458,8 +1457,7 @@ pub fn mri_tag_read(
                     )?;
                 }
                 let data = read_tag_text(g, &mut io, len, "command-line")?;
-                m.cmdlines
-                    .push(String::from_utf8_lossy(c_str(&data)).into_owned());
+                m.cmdlines.push(c_str(&data).to_vec());
             }
             TAG_AUTO_ALIGN => {
                 m.auto_align = Some(io.read_matrix(g, out, err));

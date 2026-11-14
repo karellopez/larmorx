@@ -254,7 +254,8 @@ pub struct Mri {
     pub xi: Option<Vec<i32>>,
     pub yi: Option<Vec<i32>>,
     pub zi: Option<Vec<i32>>,
-    pub transform_fname: String,
+    /// `transform_fname` (a C string of 1,024 bytes): its bytes before the NUL, as a file gave them.
+    pub transform_fname: Vec<u8>,
     /// `transform` (MINC's `General_transform`; `None` before one is read).
     pub transform: Option<GeneralTransform>,
     /// `linear_transform`: what FreeSurfer's pointer into `transform` points at (`None`: `NULL`).
@@ -292,8 +293,8 @@ pub struct Mri {
     pub subject_name: String,
     pub path_to_t1: String,
     pub gdf_image_stem: String,
-    /// `cmdlines[0 .. ncmds]`.
-    pub cmdlines: Vec<String>,
+    /// `cmdlines[0 .. ncmds]` (C strings: their bytes before the NUL, as a file gave them).
+    pub cmdlines: Vec<Vec<u8>>,
     pub warp_field_format: i32,
     pub gcamorph_spacing: i32,
     pub gcamorph_exp_k: f64,
@@ -653,7 +654,7 @@ impl Mri {
             xi: None,
             yi: None,
             zi: None,
-            transform_fname: String::new(),
+            transform_fname: Vec::new(),
             transform: None,
             linear_transform: None,
             inverse_linear_transform: None,

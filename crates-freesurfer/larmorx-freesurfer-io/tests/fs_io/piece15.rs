@@ -432,12 +432,8 @@ fn fs_extension(g: &mut Gen, big: bool) -> Vec<u8> {
         body.extend_from_slice(&tag.to_be_bytes());
         body.extend_from_slice(&(len as i64).to_be_bytes());
         for _ in 0..len {
-            // a command line's text in ASCII (the port keeps command lines as text: NOTES, relay 25)
-            body.push(if tag == 3 {
-                b'a' + g.below(26) as u8
-            } else {
-                g.below(256) as u8
-            });
+            // any bytes, command lines included (the port keeps them as bytes since relay 26)
+            body.push(g.below(256) as u8);
         }
     }
     let esize = (8 + body.len()).div_ceil(16) * 16;

@@ -1619,3 +1619,28 @@ difference; scripts and listings in the relay's scratch `rl28/`: `gen.dis`, `lx.
   MRI_SHORT, 1);` (the frame count is read from the file later). With it, multi-echo Genesis series meet
   FS-685 (allocate the header after the echo count is known, or the volume from the count without raising
   the header's) and FS-683 (depth the file count, only `files / echoes` slices filled).
+
+## Part 22: GE Signa and GE XIMG series (relay 28 of track A)
+`utils/signa.cpp` 200-322 (`signaRead`, `orderShortBuffer`), `utils/mriio.cpp` 7275-7620 (`ximgRead`). Object code:
+the unit oracle's `signa.cpp.o` and `mriio.cpp.o` (`rl28/sr.dis`, `rl28/ximg.dis`).
+
+### Mechanisms
+- **FS-686.** `signaRead` allocates `(imnr1 - imnr0) / 2 + 1` slices for any echo count (and `MRIalloc`, one
+  frame, under `GE_ODD`/`GE_EVEN` whatever the echoes), then `frame = (i - imnr0) % num_echoes`,
+  `fread(&MRISseq_vox(mri, 0, 0, slice, frame), ...)` (`slices[slice + frame * depth]`), `if (frame == 0)
+  slice--`: for two echoes every pair goes to one slice; for three, file 2 (frame 2) already goes to slice
+  1, and the entries pass `depth * nframes` (a pointer read past the `calloc`'d table, a write through
+  it). With `GE_ODD` the step of 2 makes every frame 0 for two echoes (all files into slice 0) and frames
+  2 of a one-frame table for three.
+- **FS-687.** `fread`'s count is not checked; `orderShortBuffer` swaps all `x * y` shorts afterwards.
+- **FS-684.** signaRead's `ErrorReturn` texts say `is_signa` and `read_signa` (older names).
+- signaRead's `sprintf(fname, "%s/I.%03d", path, i)` writes the slice names into the caller's buffer
+  (`mri_read`'s `fname_copy`, unused afterwards: no visible effect; a path of about 1,016 bytes or more
+  overflows it: FS-249). The volume is allocated with voxels also when only the header is asked for, and
+  leaked on the slice errors (no visible effect). `if (!mri)` never holds (`MRIalloc` ends the program).
+- The products `1000 * header.strtx` are `float` (`mulss`, the field in the destination except for the
+  thickness: one NaN operand either way).
+- ximgRead: `MRIallocHeader(1, 1, 1, MRI_SHORT, 1)` (no FS-680); the file's two offsets are read, printed,
+  replaced; TI and TE at +198 and +202 next to TR at +200 overlap TR's bytes (unknown whether XIMG files
+  hold them there; no XIMG file was at hand: kept, no defect declared). Its arithmetic is genesisRead's
+  (same operand order).

@@ -1246,6 +1246,47 @@ mod tests {
         }
     }
 
+    /// A GE XIMG series: the file's offsets printed and replaced by XIMG's.
+    #[test]
+    fn an_ximg_series_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        for n in 1..=2 {
+            let ih = 2308usize;
+            let mut b = vec![0u8; 8432];
+            b[..4].copy_from_slice(b"IMGF");
+            put(&mut b, 4, &100i32.to_be_bytes());
+            put(&mut b, 8, &1i32.to_be_bytes());
+            put(&mut b, 12, &2i32.to_be_bytes());
+            put(&mut b, 148, &156i32.to_be_bytes());
+            put(&mut b, ih + 28, &2.0f32.to_be_bytes());
+            put(&mut b, ih + 52, &1.0f32.to_be_bytes());
+            put(&mut b, ih + 56, &1.0f32.to_be_bytes());
+            put(&mut b, ih + 200, &3_000_000i32.to_be_bytes());
+            let v = [
+                0.0f32, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, -1.0, 0.0,
+            ];
+            for (k, x) in v.iter().enumerate() {
+                put(&mut b, ih + 136 + 4 * k, &x.to_be_bytes());
+            }
+            b.extend_from_slice(&(n as i16).to_be_bytes());
+            b.extend_from_slice(&(-n as i16).to_be_bytes());
+            std::fs::write(dir.path().join(format!("{n}.MR")), b).unwrap();
+        }
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = ximg_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "2.MR", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(o).unwrap(),
+            "XIMG: using XIMG header corrections\nXIMG: pixel data offset is 100, using offset 8432\nXIMG: image header offset is 156, using offset 2308\n"
+        );
+        assert_eq!((m.vg.width, m.vg.height, m.vg.depth), (1, 2, 2));
+        assert_eq!(shorts(&m), vec![1, -1, 2, -2]);
+        assert_eq!((m.tr, m.vg.zsize), (3000.0, 2.0));
+    }
+
     /// A GE LX series: e1s2i<n>, voxels from byte 8,432.
     #[test]
     fn a_gelx_series_reads() {

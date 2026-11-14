@@ -23,7 +23,7 @@ MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94
 §100: a number cut after another (FS-49); **part 16** (§101-103): ANALYZE volumes read and written;
 **part 19** (§104-106): COR, bshort, bfloat and bhdr volumes read and written; **part 20** (§107-109): GDF
 volumes read and written, Varian SDT volumes read; **part 21** (§110-112): GE Genesis and GE Signa LX
-series read.
+series read; **part 22** (§113-115): GE Signa and GE XIMG series read.
 
 ## 1. Conventions
 
@@ -3377,3 +3377,71 @@ header, names of no series form. Measured (2026-11-14): seed 7, 2,068 piece-19 c
 identical on 1,924, 0 different (21 counted: files `mri_identify` takes for DICOM, not ported; 123
 compared apart: FS-49, FS-167's memory contents, FS-685); `fix` differs only with notices. The I. names'
 second format line (FS-681) was never printed in these runs.
+
+## 113. GE Signa series read (`signaRead`; `mri_read`'s type 14)
+
+A Signa file is a 14,336-byte header (28 blocks of 256 16-bit words) and one slice of big-endian shorts.
+The header's numbers (§84's `mri_identify` reads the same): 16-bit integers at word offsets (FS-225: as
+FreeSurfer combines the two bytes), Data General floats (§84: divided by 1,000) at word offsets of the
+series block (word 2,048) and the image block (word 2,560): the plane type (series 138), x and y (image
+137, 138), TR, TE, TI (image 82, 86, 88), the start and end of x, y, z (image 52 to 62), the location
+(image 73), the thickness (image 77), the pixel size (image 139), the field of view (series 151), the
+centre R, A, S (series 153, 155, 157), the images allocated (series 202: the last image number, the first
+is 1), the echoes (image 98).
+
+- `GE_ODD` set: `only using odd # GE Signa files`, else `GE_EVEN` set: `only using even # GE Signa files`
+  (standard output). The name that does not open: `is_signa(<name>): could not open file`
+  (`ERROR_NOFILE`, after the C library's text of `errno` as an error); shorter than the header:
+  `is_signa(<name>): could not read 14336 byte header` (`ERROR_BADFILE`). FS-684: the messages name
+  `is_signa` and `read_signa` (kept).
+- The last image number below 0: `WARNING: # of slices=<n> in header - assuming 124...` (standard error)
+  and 124. With `GE_ODD` an even first or last number is lowered by 1; with `GE_EVEN` an odd one raised
+  by 1 (the first is 1: raised to 2).
+- The volume (shorts, x by y): with `GE_ODD`/`GE_EVEN` `span / 2 + 1` slices and one frame (span = last
+  minus first, C's integer division); else with echoes above 1 `SIGNA multi-echo file detected (<n>
+  echoes)` (standard output), `span / 2 + 1` slices of `echoes` frames; else `span + 1` slices.
+  `xstart, xend, ystart, yend, zstart, zend` the six coordinates times 1,000 (`float`), the location
+  and field of view times 1,000, the pixel size times 1,000 for `xsize`, `ysize` and `ps`, the thickness
+  times 1,000 for `zsize` and `thick`, TR, TI, TE as read; the direction cosines: plane type 0 axial
+  (horizontal: x -R, y -A, z +S), 1 sagittal, any other coronal (§107's orientations); then the centre
+  R, S, A from the header (after the cosines, which set it to 0). Without voxels: this volume.
+- The voxels: for the image numbers from the first to the last (every other with `GE_ODD`/`GE_EVEN`)
+  the file `<folder of name>/I.<nnn>` (`%03d`; the folder `.` for a name without `/`) whatever the
+  given name (`read_signa(<f>): could not open file`, after `errno`'s text; no volume), its shorts from
+  byte 14,336, `x * y` of them, byte-swapped. FreeSurfer's places (FS-686): with echoes above 1 the
+  file's frame is `(n - first) % echoes`, its slice a counter that does not advance after a frame-0
+  file (right for two echoes only); with three or more echoes and with `GE_ODD`/`GE_EVEN` the slice
+  table entry `slice + frame * depth` can pass the volume's table (FreeSurfer writes through memory
+  past it: corruption or a crash; larmorx skips that file, noted) or land in another slice. `fix`: depth
+  `ceil(files / echoes)`, `echoes` frames, the k-th file read (from 0) into slice `k / echoes`, frame
+  `k % echoes` (two echoes without `GE_ODD`/`GE_EVEN` are already so), noted. FS-687: a file shorter
+  than its slice: FreeSurfer copies the bytes it holds over the slice's place and swaps the whole slice
+  (the rest is 0, or an earlier file's bytes swapped back), silently; `fix`: `signaRead(<f>): could read
+  <got> of the slice's <n> bytes` (`ERROR_BADFILE`) and no volume, noted.
+
+## 114. GE XIMG series read (`ximgRead`; `mri_read`'s type 19)
+
+`XIMG: using XIMG header corrections` first (standard output). Then §110's steps with these changes: no
+`GE_ODD`/`GE_EVEN`; `.MR` names give one series, `<folder><stem>%d.MR`; no format lines printed (a
+format text of 1,024 bytes: `ximgRead: Truncation on line <n>`, n 7341, 7356, 7360); the messages name
+`genesisRead` (FS-684); the header allocated with one frame (no FS-680, no echoes). The first file:
+the pixel data's offset (an int at byte 4) printed `XIMG: pixel data offset is <n>, ` then `using offset
+8432` (always 8,432), the width and height (bytes 8, 12), the image header's offset (byte 148) printed
+`XIMG: image header offset is <n>, ` and `using offset 2308` (always 2,308); in the image header the
+thickness at +28, the pixel width and height at +52, +56, TR at +200, TI at +198 and TE at +202 (inside
+TR's bytes: kept), the flip angle at +254, the fifteen floats from +136; §110's geometry and
+`KILLIANY_SWAP`. With voxels: each file's `height` rows of `width` big-endian shorts from byte 8,432
+(`genesisRead(): error opening file <f>`, `genesisRead(): error reading from file file <f>`). FS-167 and
+FS-682 as in §110.
+
+## 115. Validation plan (part 22)
+
+Piece 20's commands `srd` and `srh` (piece 6's `mrd`, `mrh`, the type -1, 14 or 19, piece 6's
+environment bits 64, 128, 256): Signa headers with x and y of 1 to 4, 0 or negative, every float field
+as Data General numbers (and raw bytes now and then: infinite and NaN results), image counts equal to
+the files, -1, 0 or past them, echoes 0 to 4 and -1, plane types 0 to 3 and 300; slices `I.001` ... cut
+inside or after the header, folders in their place; a header file by another name; XIMG series of
+`I.<nnn>` and `<stem><n>.MR` files with the offsets as XIMG writes them or not, NaN and infinite fields,
+cut files. Measured (2026-11-14): seed 13, 1,016 piece-20 cases: `reproduce` identical on 994, 0
+different (18 counted: FS-686's writes past the table, formats not ported; 4 compared apart: FS-49,
+FS-167); `fix` differs only with notices.

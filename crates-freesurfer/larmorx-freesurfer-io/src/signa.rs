@@ -544,6 +544,117 @@ mod tests {
         assert_eq!(ghf(&[0x40, 0, 0, 0], 0), 0.5 / 1000.0);
     }
 
+    /// A Data General float for `v` (positive, normal).
+    fn dg(v: f64) -> [u8; 4] {
+        let (mut a, mut e) = (v, 64u32);
+        while a >= 1.0 {
+            a /= 16.0;
+            e += 1;
+        }
+        while a < 1.0 / 16.0 {
+            a *= 16.0;
+            e -= 1;
+        }
+        ((e << 24) | ((a * 16_777_216.0) as u32 & 0x00ff_ffff)).to_be_bytes()
+    }
+
+    /// A Signa header of 2 x 1 voxels, `files` images and `echoes` echoes.
+    fn header(files: i16, echoes: i16) -> Vec<u8> {
+        let mut h = vec![0u8; HLENGTH];
+        let mut w = |word: usize, v: &[u8]| h[2 * word..2 * word + v.len()].copy_from_slice(v);
+        w(IHDR_START + IHDR_X, &2i16.to_be_bytes());
+        w(IHDR_START + IHDR_Y, &1i16.to_be_bytes());
+        w(SEHDR_START + SEHDR_IALLOC, &files.to_be_bytes());
+        w(IHDR_START + IHDR_NECHO, &echoes.to_be_bytes());
+        w(IHDR_START + IHDR_THICK, &dg(3.0).to_vec());
+        w(IHDR_START + IHDR_PIXSIZ, &dg(2.0).to_vec());
+        w(SEHDR_START + SEHDR_PTYPE, &SIGNA_AXIAL.to_be_bytes()[2..]);
+        h
+    }
+
+    fn series(dir: &Path, files: i16, echoes: i16) {
+        for i in 1..=files {
+            let mut b = header(files, echoes);
+            b.extend_from_slice(&(10 * i).to_be_bytes());
+            b.extend_from_slice(&(10 * i + 1).to_be_bytes());
+            std::fs::write(dir.join(format!("I.{i:03}")), b).unwrap();
+        }
+    }
+
+    fn shorts(m: &Mri) -> Vec<i16> {
+        let c = m.chunk.as_ref().unwrap();
+        c.chunks(2).map(|v| i16::from_le_bytes([v[0], v[1]])).collect()
+    }
+
+    #[test]
+    fn a_signa_series_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        series(dir.path(), 3, 1);
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!((m.vg.width, m.vg.height, m.vg.depth, m.nframes), (2, 1, 3, 1));
+        assert_eq!(shorts(&m), vec![10, 11, 20, 21, 30, 31]);
+        // Data General sizes / 1,000 then * 1,000 (float)
+        assert!((m.vg.xsize - 2.0).abs() < 1e-5 && (m.thick - 3.0).abs() < 1e-5);
+        // axial: horizontal direction cosines
+        assert_eq!((m.vg.x_r, m.vg.y_a, m.vg.z_s), (-1.0, -1.0, 1.0));
+    }
+
+    /// FS-686: three echoes of two slices; FreeSurfer's volume has 3 slices of 3 frames.
+    #[test]
+    fn three_echoes() {
+        let dir = tempfile::tempdir().unwrap();
+        series(dir.path(), 6, 3);
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!((m.vg.depth, m.nframes), (2, 3));
+        // file k: slice k / 3, frame k % 3
+        assert_eq!(
+            shorts(&m),
+            vec![10, 11, 40, 41, 20, 21, 50, 51, 30, 31, 60, 61]
+        );
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!((m.vg.depth, m.nframes), (3, 3));
+        let n = g.notices.as_slice();
+        assert!(n.iter().any(|x| x.defect.id == "FS-686" && x.detail.contains("past the table")));
+    }
+
+    /// FS-687: a slice file cut short: refused by default, FreeSurfer's partial slice in
+    /// `reproduce`.
+    #[test]
+    fn a_cut_slice() {
+        let dir = tempfile::tempdir().unwrap();
+        series(dir.path(), 2, 1);
+        let p = dir.path().join("I.002");
+        let b = std::fs::read(&p).unwrap();
+        std::fs::write(&p, &b[..b.len() - 1]).unwrap();
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        assert!(
+            signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
+                .unwrap()
+                .is_none()
+        );
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
+            .unwrap()
+            .unwrap();
+        // 20 whole; 21's first byte (0x00) then the slice's 0, swapped
+        assert_eq!(shorts(&m), vec![10, 11, 20, 0]);
+    }
+
     #[test]
     fn signed_bytes() {
         let mut g = Globals::new(UpstreamDefects::Fix);

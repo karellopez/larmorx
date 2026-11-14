@@ -281,7 +281,6 @@ pub fn mri_read_type(
 fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        SIEMENS_FILE => "Siemens",
         MRI_GCA_FILE => "GCA",
         BRIK_FILE => "AFNI BRIK",
         MRI_MINC_FILE => "MINC",
@@ -462,6 +461,8 @@ pub fn mri_read(
         crate::mriio_ge::ximg_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::SIGNA_FILE {
         crate::signa::signa_read(g, out, err, env, dir, &copy, volume_flag)?
+    } else if mtype == identify::SIEMENS_FILE {
+        crate::mriio_siemens::siemens_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::NPY_FILE {
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {

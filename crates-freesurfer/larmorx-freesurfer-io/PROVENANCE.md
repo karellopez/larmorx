@@ -277,6 +277,9 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 7680-8175 | `nifti1Read` (FS-453, FS-454, FS-457, FS-458, FS-643, FS-644; relay 25) | `mriio_nifti.rs` |
 | `utils/mriio.cpp` 772-777 | `mri_read`'s NIfTI branches (relay 25) | `mriio.rs` |
 | `utils/utils.cpp` 1551-1556 | `exec_progress_callback` (no callback in the port's programs: nothing) | (not translated) |
+| `utils/mriio.cpp` 4746-5970; `include/analyze.h`; `include/mri.h` 2031-2032 | `GetSPMStartFrame`, `CountAnalyzeFiles`, `DumpAnalyzeHeader`, `ReadAnalyzeHeader`, `analyzeRead`, `analyzeWrite`, `printDirCos`, `analyzeWriteFrame`, `analyzeWriteSeries`, `analyzeWrite4D`, `swap_analyze_header`, the `dsr` header, `N_Zero_Pad_Input` and `N_Zero_Pad_Output` (in larmorx-freesurfer-core's `Globals`); `utils/mri.cpp` 11761-11804 and `utils/mri2.cpp` 1866-1887: the path of `MRISeqchangeType` (`MRIchangeType`'s unscaled copy) and `MRImultiplyConst` the scale factor reaches (FS-457, FS-645 to FS-656, FS-58; relay 26) | `mriio_analyze.rs` |
+| `packages/nifti/nifti1_io.c` 2674-2948, 3364-3410 (niftilib, public domain) | `is_nifti_file` as `analyzeRead` calls it, with `nifti_validfilename`, `nifti_find_file_extension`, `nifti_findhdrname`, `nifti_is_gzfile`, `nifti_fileexists` (relay 26) | `mriio_analyze.rs` |
+| `utils/mriio.cpp` 640-642, 1170-1175 | `mri_read`'s and `MRIwriteType`'s ANALYZE branches (relay 26) | `mriio.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
 the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte
@@ -326,3 +329,10 @@ into for one calling function (from the unit oracle's `fio.cpp.o`, `tags.cpp.o` 
 table reader (`utils/colortab.cpp` 351-830, both versions inlined into `CTABreadFromBinary` by GCC)
 keeps one for the whole read and forgets it at each other call FreeSurfer makes between two numbers.
 The default's zeros, the notices' texts and FS-192's split notice are larmorx's own.
+
+Changes for relay 26: the ANALYZE files are C streams (`cfile::CFile`); `lstat`'s length from the file
+system's metadata of the name itself; the scale factor's type change and product are fs.volume's paths
+copied (see the table), the general functions staying in larmorx-freesurfer-volume. niftilib's
+`is_nifti_file` is ported only as `analyzeRead` reaches it (a `.hdr` name; its message at niftilib's
+debug level 1). FS-646's names are whole by default; FS-648, FS-650, FS-651 end the program with
+status 139 under `reproduce`; FS-655's check of the closes is larmorx's own.

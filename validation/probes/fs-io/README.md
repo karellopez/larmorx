@@ -181,6 +181,20 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   (FreeSurfer crashes) and `.img` names (`analyzeRead`, not ported); `VARY` for FS-641 and FS-642 (memory). Seed 13,
   5,769 `nrd`/`nrh`/`mgw` cases: `reproduce` identical on 5,323, 0 different; seed 7, 8,075 with piece 6's readers:
   6,919 identical, 0 different.
+- Piece 16 (track A relay 26): `ard` and `arh` (`mri_read` with voxels and `MRIreadHeader`, as piece 6's `mrd` and
+  `mrh`, after a `Gdiag_no`, `N_Zero_Pad_Input` and `SPM_START_FRAME`, `N` for unset; piece 6's environment bits 16
+  `ATROPHY_SIMULATOR` and 32 `FS_ANALYZE_NO_RESCALE`) of ANALYZE 7.5 pairs and SPM series built by
+  `tests/fs_io/piece16.rs` field by field (both byte orders, `sizeof_hdr` 0, 349 or 540 with big-endian fields, every
+  data type taken and some refused, extents -1 to 4, odd voxel sizes, offsets, scale factors and orientation codes,
+  voxel files cut or longer), `.mat` files (MATLAB version 4 matrices of 4 x 4 and other shapes, piece 5's files),
+  NIfTI-1 headers in the `.hdr` (a pair, a single file, a series of pairs, a `.nii` beside the `.img`) and missing
+  files; `awr` (piece 14's `mgw` after a `Gdiag_no`, `N_Zero_Pad_Output` and the read back's `N_Zero_Pad_Input`, with
+  `how` 3 `MRIwriteType(MRI_ANALYZE_FILE)` and 4 `MRIwriteType(MRI_ANALYZE4D_FILE)`; `N_Zero_Pad_Output` printed after
+  the write; the read back with the writer's type). `SKIP` for FS-646, FS-648, FS-650, FS-651 (FreeSurfer crashes or
+  aborts), piece 5's classes for the `.mat` reader, piece 14's for the writers (FS-58, FS-53); `VARY` for FS-645 and
+  `DIAG_SHOW`'s addresses. Seed 7, 840 piece-16 cases: `reproduce` identical on 758, 0 different; seed 13, 7,569 cases
+  with pieces 6, 14 and 15's readers and writers: 6,692 identical, 0 different. Since relay 26 piece 15's `.img` names
+  reach `analyzeRead` (compared).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four
   nested folders (FS-451: the names cut to 1,023 bytes with FreeSurfer's two messages, one file for both from a stem
   of 1,022 bytes, the C library's overflow abort from a name of 1,024 bytes), compared in both modes:

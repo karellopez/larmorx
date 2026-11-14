@@ -1374,3 +1374,84 @@ an unknown byte. The probe compares the lines whose notices say "as in FreeSurfe
   5,770 cases: identical on 4,045, 0 different. `fix` differs only with notices.
 - `fs_io_official` unchanged (its seed-1 set holds no such case), passes in debug and release, under
   the ARM NaN emulation and on Windows x64.
+
+## Part 17: ANALYZE 7.5 read and written (relay 26 of track A)
+`utils/mriio.cpp` 4746-5970: `GetSPMStartFrame`, `CountAnalyzeFiles`, `DumpAnalyzeHeader`,
+`ReadAnalyzeHeader`, `analyzeRead`, `analyzeWrite`, `printDirCos`, `analyzeWriteFrame`,
+`analyzeWriteSeries`, `analyzeWrite4D`, `swap_analyze_header`; `include/analyze.h` (`dsr`);
+`packages/nifti/nifti1_io.c`'s `is_nifti_file` with `nifti_validfilename`, `nifti_findhdrname`,
+`nifti_find_file_extension`, `nifti_is_gzfile`, `nifti_fileexists` (public domain; niftilib's
+`g_opts.debug` is 1, so `nifti_findhdrname`'s failure prints `** no header file found for '<name>'`).
+The object code read: `<scratch>/A/rl26/analyzeRead_r.dis` and `awf_r.dis` (objdump -dr of the unit
+oracle's `mriio.cpp.o`, relay 25's `mriio_r.dis`).
+
+### Mechanisms
+- **Object code.** `CountAnalyzeFiles` is inlined into `analyzeRead`; its and `analyzeRead`'s name
+  `sprintf`s are `__sprintf_chk` with the 1,000-byte buffers (FS-646), the writers' `strcpy` and
+  `sprintf` `__strcpy_chk`/`__sprintf_chk` with `STRLEN` (1,024). `fabs` of the voxel sizes is `andps`
+  (a signalling NaN stays signalling); the TR `mulss` of 1000.0f by `pixdim[4]`; the direction
+  cosines `divss` (numerator in the destination); the orientation matrix's fourth column
+  `cvtsi2sd(n) * 0.5` (`mulsd`) times `cvtss2sd(size)` (`mulsd`, the size the source), `cvtsd2ss`;
+  the negations `xorps`. `(int)vox_offset` is `cvttss2si` 32-bit. The scale test computes `roi_scale -
+  1.0f` with `subss`, `andps`, `comiss` against `FLT_EPSILON`. The writers' `pixdim[4] = tr / 1000.0`
+  is `divss` by 1000.0f (GCC's exact narrowing of a `double` division of a `float` by a constant);
+  `(short)rint(*MATRIX_RELT(invT, i, 4))` is `rintf` of the `float` inlined (`|x| < 2^23`: `(|x| +
+  2^23) - 2^23` with the sign of `x` OR'ed back) then `cvttss2si` 32-bit, the low 16 bits stored;
+  `(int)min` / `(int)max` `cvttss2si`.
+- **FS-645.** `GetSPMStartFrame`'s `int startframe` is only written by `sscanf`; a value without a
+  leading number leaves it unwritten (its stack slot: whatever the earlier calls left).
+- **FS-646.** Names of 996 bytes or more (stem + `.img`, `.hdr`, `.mat`) overflow `fname[1000]`,
+  `hdrfile[1000]`, `matfile[1000]`, `imgfile[1000]`, `fmt[1000]`: `__sprintf_chk` aborts. A series'
+  format `<stem>%0<pad>d.img` is `stem + 7 + digits(pad)` bytes; the frame names are checked in
+  `CountAnalyzeFiles` before `analyzeRead` builds the same or shorter ones. Writers: `strcpy(hdr_fname,
+  fname)` into 1,024 bytes; `analyzeWriteSeries`' `framename`.
+- **FS-647.** `ReadAnalyzeHeader`'s refusal does `free(hdr)` and then `ErrorReturn(...,
+  hdr->dime.datatype)`: a read of freed memory. glibc 2.35's tcache keeps the chunk's bytes past its
+  first 16 (the `next` pointer and `key`): `datatype` (byte 70) is intact, the number printed right.
+- **FS-648.** The orientation `if` chain covers 0 to 5, then `if (orient == (char)-1) ... else
+  INFO(... direction ...)`: for any other code `direction[64]` is never written and `T` stays NULL; the
+  INFO block prints the uninitialised text, then `T->rptr[1][1]` crashes (signal 11).
+- **FS-649.** The double branch stores `MRIFvox(mri, width, row, slice)` (frame 0) instead of `k`'s
+  slice of frame `frame`.
+- **FS-650.** `T = MatrixMultiply(T1, Q, T)`: `T1` not 4 columns wide makes `MatrixMultiply` print its
+  error and return NULL (then `T->rptr` crashes); fewer than 3 rows reads `T->rptr[3]` past the row
+  pointers (`calloc(rows + 1, sizeof(float*))`): heap memory used as a pointer.
+- **FS-651.** `mritmp = MRIreadHeader(imgfile, NIFTI1_FILE); T = MRIxfmCRS2XYZ(mritmp, 0)` with no
+  check: a failed read passes NULL.
+- **FS-652.** `hdr->hk.extents = swapShort(hdr->hk.extents)` (an `int` through a `short`), and `for (i
+  = 0; i < 5; i++)` over `dim[8]`.
+- **FS-653.** `shortmax = (int)pow(2.0, 15.0)` (32,768) and `if (mri->width > shortmax)`: 32,768 itself
+  is stored in a `short` as -32,768.
+- **FS-654.** `/* --- assuming long and int are identical --- */`: `MRI_LONG` gets `DT_SIGNED_INT` and 4
+  bytes a voxel, and `fwrite(mri->slices[k][j], 4, width)` writes the first `4 x width` of the row's
+  `8 x width` bytes.
+- **FS-655.** Every `fclose` of both writers is unchecked.
+- **FS-656.** The `cvttss2si` conversions above: NaN or out of range gives `0x80000000` (`fseek`
+  then fails with `EINVAL`: the voxels are read from byte 0); for the origin its low 16 bits (0).
+- **FS-58 in the writers.** `MRIlimits` returns early for a volume without slices, leaving `min` and
+  `max` unwritten (memory), and the first row's `fwrite(mri->slices[k][j], ...)` dereferences NULL.
+- **`analyzeWrite4D`'s orientation code** is computed and then overwritten with -1 (dead code), and
+  `INFO: set hdr.hist.orient to -1` is printed before `MatlabWrite`; in `analyzeWriteFrame` the INFO
+  line comes after the `.mat` file.
+- **`MRISeqchangeType` and `MRImultiplyConst`** (fs.volume's) are reached only by the scale factor:
+  the integer types `analyzeRead` makes (uchar, short, ushort, int) all take `MRIchangeType`'s
+  unscaled path; `MRISeqchangeType` replaces the frames' records with zeroed ones. larmorx copies that
+  path in fs.io (`mriio_analyze::seq_to_float`, `multiply_const`); `MRIlimits`, `MRIdump` and
+  `MRIvolumeDeterminant` moved down to larmorx-freesurfer-mri's `info` module (fs.volume re-exports
+  them).
+
+### What larmorx does
+`larmorx_freesurfer_io::mriio_analyze`: `analyze_read`, `analyze_write`, `analyze_write_frame`,
+`analyze_write_series`, `analyze_write4d`, wired into `mri_read` (types 2 and 16) and
+`MRIwriteType`; `Globals::n_zero_pad_input` / `n_zero_pad_output`. Defaults per the register (FS-645
+to FS-656; FS-457's text extended to ANALYZE); `reproduce` gives FreeSurfer's results, the crashes as
+status 139 and the aborts as 134.
+
+### Measured (piece 16, 2026-11-14, the probe, the unit oracle's build)
+- Seed 7, 840 `ard`/`arh`/`awr` cases: `reproduce` identical on 758, 0 different; 69 `SKIP` (all
+  official crashes: FS-648 24, FS-650 13, FS-651 6, FS-58 5, piece 5's `.mat` classes 4; and 11 FS-53
+  writes of empty volumes whose limits are memory), 13 `VARY` (FS-645 9; `DIAG_SHOW` addresses).
+- Seed 13, 7,569 cases of `ard`, `arh`, `awr`, `nrd`, `nrh`, `mrd`, `mrh`, `mgw`, `mri`: identical on
+  6,692, 0 different (682 `SKIP`, 195 `VARY`). `fix` differs only with notices.
+- Found on the way: niftilib prints `** no header file found for '<stem>.hdr'` (its debug level 1)
+  whenever the `.hdr` is missing (first seed-7 run: 26 lines differed until it was ported).

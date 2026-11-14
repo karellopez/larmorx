@@ -62,6 +62,12 @@ Taken early from `fs.volume`'s item 3.1-39 for the surfaces' `MRIS::lta` (the or
 | `utils/transform.cpp` 160, 185, 305, 630, 812 | `LTAcopy`, `LTcopy`, `initVolGeom`, `LTAalloc`, `LTAfree` | `lta.rs`, `vol_geom.rs` (`init_vol_geom`) |
 | `utils/mri.cpp` 3014 | `MRIboundingBox` | `voxel.rs` |
 
+## Moved down from larmorx-freesurfer-volume (track A relay 26)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mri.cpp` 6007-6044, 12658-12677, `MRIvolumeDeterminant` (with `stuff_four_by_four`) | `MRIdump`, `MRIlimits`, `MRIvolumeDeterminant`: ported by fs.volume's replica (track C, `coords.rs` and `resize.rs`, which re-export them), moved unchanged to this crate when fs.io's ANALYZE reader and writers came to call them (waves.md section 4: a callee that only touches the structure moves down) | `info.rs` |
+
 ## Changes from the originals
 
 - The voxels are one contiguous buffer (FreeSurfer's `chunk`); its fallback of separate slices,

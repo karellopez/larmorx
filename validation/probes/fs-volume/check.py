@@ -86,7 +86,19 @@ SKIP = (
     "FS-487",
     "FS-488",
     "FS-490",
+    "FS-491",
+    "FS-493",
+    "FS-496",
+    "FS-497",
 )
+
+
+def heavy(case: str) -> bool:
+    """``MRIconform`` resampling onto its 256^3 grid (every case of the command ``conform`` with kind
+    0 but the grid itself): compared here, hashed as ``HEAVY`` in the recorded test (minutes each in
+    a debug build)."""
+    t = case.split()
+    return t[:2] == ["conform", "0"] and t[2:5] != ["256", "256", "256"]
 
 
 def probe_binary(ws: Path) -> Path:
@@ -174,18 +186,25 @@ def main(argv: list[str] | None = None) -> int:
     equal, differ, skipped, skipped_same = Counter(), Counter(), Counter(), Counter()
     fix_differ, fix_unexplained, fix_ids, rep_ids = Counter(), Counter(), Counter(), Counter()
     hashed = hashlib.sha256()
+    heavies = skipped_hashed = 0
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
         cmd = case.split()[0]
         for x in ids:
             rep_ids[x] += 1
+        if heavy(case):
+            hashed.update(b"HEAVY\n")
+            heavies += 1
+        elif any(x in ids for x in SKIP):
+            hashed.update(b"SKIP\n")
+            skipped_hashed += 1
+        else:
+            hashed.update(c.encode() + b"\n")
         if any(x in ids for x in SKIP):
             skipped[cmd] += 1
             if c == r:
                 skipped_same[cmd] += 1
-            hashed.update(b"SKIP\n")
             continue
-        hashed.update(c.encode() + b"\n")
         if c == r:
             equal[cmd] += 1
         else:
@@ -215,6 +234,8 @@ def main(argv: list[str] | None = None) -> int:
         "fix_notices": dict(fix_ids),
         "official_sha256_skip": hashed.hexdigest(),
         "skipped_total": sum(skipped.values()),
+        "hashed_skip": skipped_hashed,
+        "hashed_heavy": heavies,
         "first_differ": first_differ,
     }
     print(json.dumps(summary, indent=1))

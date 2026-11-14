@@ -2041,6 +2041,20 @@ defects! {
         "the mask of listed labels (MRImatchSegs) made in the segmentation itself clears each voxel before reading its label: every voxel is matched as label 0";
     FS_490 = "FS-490", "FreeSurfer", true,
         "the histogram of a segment's intensities (HISTOseg) with a bin count of 0 counts each matching voxel in the bin before the first: memory it does not own";
+    FS_491 = "FS-491", "FreeSurfer", true,
+        "the conformed template that keeps a volume's direction cosines, for a volume whose orientation has no left-right, inferior-superior or anterior-posterior axis (cosines not good, or two axes along one direction), reads a voxel size and a field of view that are not the volume's: memory contents";
+    FS_492 = "FS-492", "FreeSurfer", true,
+        "the conformed template that keeps a volume's direction cosines converts a field of view beyond the 32-bit integer range, or NaN, to the integer -2147483648, and the difference of two fields of view wraps around";
+    FS_493 = "FS-493", "FreeSurfer", true,
+        "the erosion of a segmentation (MRIerodeSegmentation) with a count of erosions of 0 or below, and its dilation (MRIdilateSegmentation) with a count of 0 or below -1, never end (the count is lowered until it reaches 1)";
+    FS_494 = "FS-494", "FreeSurfer", true,
+        "the threshold mask of byte volumes (MRIthresholdMask) stores a replacement value beyond 0 to 255, or NaN, as the low byte of its truncation to a 32-bit integer";
+    FS_495 = "FS-495", "FreeSurfer", true,
+        "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds to the end of the sorted voxels or past it returns 0 from the unused part of its list, not the largest value";
+    FS_496 = "FS-496", "FreeSurfer", true,
+        "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds past the list's allocation, below 0, or NaN reads memory it does not own";
+    FS_497 = "FS-497", "FreeSurfer", true,
+        "the dilation of a segmentation until it stops changing (MRIdilateSegmentation with -1) never ends when a step's new labels do not reach the next step's copy (a complex volume, whose copy FreeSurfer makes of half of each row): the same changes are counted forever";
 }
 
 /// The register entry with ID `id`.

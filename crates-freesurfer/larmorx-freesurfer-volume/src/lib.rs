@@ -15,6 +15,7 @@
 pub mod arith;
 pub mod cma;
 pub mod combine;
+pub mod conform;
 pub mod coords;
 pub mod deriv;
 pub mod frames;

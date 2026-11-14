@@ -581,32 +581,18 @@ pub fn run(
     };
     for n in g.notices.as_slice() {
         let id = n.defect.id;
-        let afni = matches!(
+        // FreeSurfer reads for ever, writes past its buffers, or depends on the machine or the
+        // file system (FS-53: an annotation's vertex number below 0 written before the volume)
+        if matches!(
             id,
-            "FS-693"
-                | "FS-694"
-                | "FS-695"
-                | "FS-696"
-                | "FS-697"
-                | "FS-698"
-                | "FS-699"
-                | "FS-700"
-                | "FS-701"
-                | "FS-702"
-                | "FS-703"
-                | "FS-704"
-                | "FS-705"
-                | "FS-706"
-                | "FS-707"
-                | "FS-708"
-                | "FS-709"
-        );
-        // FreeSurfer reads for ever, writes past its buffers, or depends on the machine
-        if (afni && n.detail.contains("not deterministic")) || id == "FS-53" {
+            "FS-693" | "FS-697" | "FS-709" | "FS-710" | "FS-712" | "FS-715" | "FS-716" | "FS-53"
+        ) {
             extra.push("SKIP");
         }
         // FreeSurfer's values from memory contents
-        if afni && n.detail.contains("memory contents") && !n.detail.contains("a crash") {
+        if matches!(id, "FS-695" | "FS-701" | "FS-711" | "FS-713" | "FS-714")
+            || (id == "FS-696" && n.detail.contains("memory contents"))
+        {
             extra.push("VARY");
         }
     }

@@ -36,7 +36,7 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
-    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666,
+    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666, FS_672, FS_717,
 };
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
@@ -504,6 +504,7 @@ pub fn mri_read(
     }
     if start_frame >= m.nframes {
         let n = m.nframes;
+        freeing(g, &m);
         return Ok(fail0(
             g,
             err,
@@ -515,6 +516,7 @@ pub fn mri_read(
     }
     if end_frame >= m.nframes {
         let n = m.nframes;
+        freeing(g, &m);
         return Ok(fail0(
             g,
             err,
@@ -532,6 +534,7 @@ pub fn mri_read(
                 );
             }
         } else if nan_inf_check(g, err, &m) != NO_ERROR {
+            freeing(g, &m);
             return Ok(None);
         }
         let Some(mut m2) =
@@ -539,11 +542,13 @@ pub fn mri_read(
         else {
             return Ok(None);
         };
+        freeing(g, &m);
         m2.nframes = end_frame - start_frame + 1;
         return Ok(Some(m2));
     }
     if start_frame == 0 && end_frame == m.nframes - 1 {
         if nan_inf_check(g, err, &m) != NO_ERROR {
+            freeing(g, &m);
             return Ok(None);
         }
         return Ok(Some(m));
@@ -567,10 +572,35 @@ pub fn mri_read(
                 .copy_from_slice(&src[s0..s0 + nf as usize * frame_bytes]);
         }
     }
+    // freed after the check either way
+    freeing(g, &m);
     if nan_inf_check(g, err, &m) != NO_ERROR {
         return Ok(None);
     }
     Ok(Some(m2))
+}
+
+/// `MRIfree(&mri)` of the volume a reader gave `mri_read` (frames chosen, or refused): FS-672 (a
+/// Talairach transform that failed to load, freed as the volume's own: memory contents, usually
+/// the program's end with status 1) and FS-717 (a frame table shorter than the frame count, as a
+/// copied header has it: read past). Both modes free nothing wrongly.
+fn freeing(g: &mut Globals, m: &Mri) {
+    if m.free_transform == 1 && m.transform.is_none() {
+        g.notices.add(
+            &FS_672,
+            "mri_read freed a volume whose Talairach transform failed to load (FreeSurfer frees a transform never written: memory contents, the program may end with status 1)",
+        );
+    }
+    if (m.frames.len() as i64) < i64::from(m.nframes) {
+        g.notices.add(
+            &FS_717,
+            format!(
+                "mri_read freed a volume of {} frames whose frame table holds {} (FreeSurfer reads past the table: a crash or not, as memory holds)",
+                m.nframes,
+                m.frames.len()
+            ),
+        );
+    }
 }
 
 /// The writers [`mri_write_type`] does not have yet: their formats' names.

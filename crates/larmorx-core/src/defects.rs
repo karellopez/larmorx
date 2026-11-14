@@ -2026,9 +2026,9 @@ defects! {
     FS_697 = "FS-697", "FreeSurfer", true,
         "an AFNI header number that does not read as one (a word, a decimal number in an integer attribute, a comma) makes FreeSurfer write numbers past its buffer until it crashes";
     FS_698 = "FS-698", "FreeSurfer", true,
-        "an AFNI header attribute with more numbers than its count has the extra numbers written past its buffer: kept (and read where FreeSurfer reads past the count) while they fit, memory corruption beyond";
+        "an AFNI header attribute with more numbers than its count keeps the extra numbers past the count (read where the reader reads past the count: DATASET_RANK, SCENE_DATA) while they fit its allocation";
     FS_699 = "FS-699", "FreeSurfer", true,
-        "an AFNI header attribute with a negative count fails without a message (numbers), or reads memory contents (a string of count -1) or crashes (a string of count -2 and below, or 2,147,483,647); a count beyond what memory holds fails as the machine decides";
+        "an AFNI header attribute with a negative count fails without a message (numbers; errno ENOMEM), or crashes (a string of count -2 and below, or 2,147,483,647: signal 11)";
     FS_700 = "FS-700", "FreeSurfer", true,
         "an AFNI header attribute DATASET_RANK, TYPESTRING, SCENE_DATA, IDCODE_STRING, BRICK_STATS, BRICK_TYPES or BRICK_FLOAT_FACS given with another type (a string for numbers, numbers of the other kind) crashes the reader (signal 11) instead of an error";
     FS_701 = "FS-701", "FreeSurfer", true,
@@ -2036,19 +2036,35 @@ defects! {
     FS_702 = "FS-702", "FreeSurfer", true,
         "an AFNI TYPESTRING of 16 characters or more, or a BYTEORDER_STRING of 10 or more, is copied over the header's next fields (the scene data, orientation codes, origin and voxel sizes, then the header's other values: wrong values, memory contents or a crash)";
     FS_703 = "FS-703", "FreeSurfer", true,
-        "an AFNI IDCODE_STRING whose last character is not '~' is copied one byte past its buffer (memory corruption where that byte lies outside the allocation)";
+        "an AFNI IDCODE_STRING whose last character is not '~' is copied one byte past its buffer, within its allocation (nothing visible)";
     FS_704 = "FS-704", "FreeSurfer", true,
-        "the AFNI header's printout names the brick types wrongly: type 2 (int) as 'float', type 3 (float) as 'complex', types 4 and above (and negative ones) from memory contents";
+        "the AFNI header's printout names the brick types wrongly: type 2 (int) as 'float', type 3 (float) as 'complex'";
     FS_705 = "FS-705", "FreeSurfer", true,
         "reading the voxels of an AFNI dataset whose header has no BRICK_FLOAT_FACS crashes (signal 11) before the first row; without BRICK_STATS it crashes (signal 11) after the first frame";
     FS_706 = "FS-706", "FreeSurfer", true,
-        "an AFNI dataset whose frames have different scale factors (BRICK_FLOAT_FACS) takes the volume's type from the first frame's factor alone: a scaled frame after an unscaled first is written as floats into a byte or short volume (wrong values, and past the volume's end: memory corruption), an unscaled frame after a scaled first as bytes or shorts into a float volume (wrong values)";
+        "an AFNI dataset whose frames have different scale factors (BRICK_FLOAT_FACS) takes the volume's type from the first frame's factor alone: a scaled frame after an unscaled first is written as floats into a byte or short volume, an unscaled frame (or one of factor 1) after a scaled first as bytes or shorts into a float volume: wrong values";
     FS_707 = "FS-707", "FreeSurfer", true,
         "an AFNI dataset with a dimension or frame count of 0 (or whose voxel count wraps to 0) crashes the reader with a division by zero (signal 8)";
     FS_708 = "FS-708", "FreeSurfer", true,
-        "the AFNI reader's messages name the header when the BRIK cannot be opened, print a number from memory contents in place of the voxel count when the BRIK's size does not match the type, and cut the BRIK's length and voxel count to 32 bits";
+        "the AFNI reader's messages name the header when the BRIK cannot be opened, and cut the BRIK's length and voxel count to 32 bits";
     FS_709 = "FS-709", "FreeSurfer", true,
         "an AFNI dataset with a folder in the BRIK's place takes the folder's length from the file system (tmpfs, ext4 and others answer differently): an error or a read failure as the file system decides";
+    FS_710 = "FS-710", "FreeSurfer", true,
+        "an AFNI header attribute with more numbers than its allocation holds has them written past it: memory corruption or a crash";
+    FS_711 = "FS-711", "FreeSurfer", true,
+        "the AFNI header's printout names brick types 4 and above (and negative ones) with bytes from past its table of names: memory contents";
+    FS_712 = "FS-712", "FreeSurfer", true,
+        "an AFNI dataset whose later frame is scaled while the first is not writes that frame's floats past the end of the byte or short volume: memory corruption or a crash";
+    FS_713 = "FS-713", "FreeSurfer", true,
+        "the AFNI reader's message when the BRIK's size does not match the brick type prints a number from memory contents in place of the voxel count";
+    FS_714 = "FS-714", "FreeSurfer", true,
+        "an AFNI header string attribute of count -1 gives a string of memory contents (and an IDCODE_STRING of count -1 crashes the reader)";
+    FS_715 = "FS-715", "FreeSurfer", true,
+        "an AFNI header attribute with a count beyond what the machine's memory holds (above about 67 million numbers or 268 million characters) fails or crashes as the machine decides";
+    FS_716 = "FS-716", "FreeSurfer", true,
+        "an AFNI IDCODE_STRING of 24, 40, 56 ... characters whose last is not '~' is copied one byte past its allocation, over the memory allocator's records: memory corruption";
+    FS_717 = "FS-717", "FreeSurfer", true,
+        "reading the header of a volume of several frames with a frame list (name#n, without the voxels), as of an AFNI dataset, frees a copy whose frame table has one entry as if it had one per frame: memory contents, a crash or not";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

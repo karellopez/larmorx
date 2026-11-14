@@ -30,7 +30,8 @@ use std::path::Path;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
     Defect, FS_249, FS_693, FS_694, FS_695, FS_696, FS_697, FS_698, FS_699, FS_700, FS_701,
-    FS_702, FS_703, FS_704, FS_705, FS_706, FS_707, FS_708, FS_709,
+    FS_702, FS_703, FS_704, FS_705, FS_706, FS_707, FS_708, FS_709, FS_710, FS_711, FS_712,
+    FS_713, FS_714, FS_715, FS_716,
 };
 use larmorx_freesurfer_core::cscan::{self, Bytes, Scan};
 use larmorx_freesurfer_core::globals::Globals;
@@ -276,7 +277,7 @@ fn get_numbers<T: Copy + Default>(
     if bytes > MACHINE_DECIDES {
         note(
             g,
-            &FS_699,
+            &FS_715,
             format!("{}: a count of {count} for {nm}: whether FreeSurfer's buffer of {bytes} bytes can be had is the machine's (FreeSurfer: not deterministic)", kind.who),
         );
     }
@@ -396,7 +397,7 @@ fn get_numbers<T: Copy + Default>(
                         beyond_noted = true;
                         note(
                             g,
-                            &FS_698,
+                            &FS_710,
                             format!("{}: more numbers than the count ({count}) for {nm}, beyond FreeSurfer's buffer: ignored (FreeSurfer writes them past it: not deterministic)", kind.who),
                         );
                     }
@@ -461,7 +462,7 @@ fn get_string(
     if n >= 0 && n as u64 > MACHINE_DECIDES {
         note(
             g,
-            &FS_699,
+            &FS_715,
             format!("get_afni_string: a count of {count} for {nm}: whether FreeSurfer's buffer can be had is the machine's (FreeSurfer: not deterministic)"),
         );
     }
@@ -488,7 +489,7 @@ fn get_string(
     if rep && count == -1 {
         note(
             g,
-            &FS_699,
+            &FS_714,
             format!("get_afni_string: a count of -1 for {nm}: the string is memory contents (FreeSurfer: memory contents)"),
         );
     }
@@ -916,15 +917,19 @@ fn read_afni_header(
                     // malloc(count) and strcpy: a string of count bytes (no '~') writes its NUL past
                     if count > 0 && v.len() >= count as usize {
                         let usable = malloc_usable(count.max(0) as u64).unwrap_or(0);
-                        note(
-                            g,
-                            &FS_703,
-                            if usable <= count.max(0) as u64 {
-                                "an AFNI IDCODE_STRING without its '~': FreeSurfer's copy writes a byte past its buffer, over the allocator's records (FreeSurfer: not deterministic)"
-                            } else {
-                                "an AFNI IDCODE_STRING without its '~': nothing written past its buffer (FreeSurfer writes a byte past it, within its allocation)"
-                            },
-                        );
+                        if usable <= count as u64 {
+                            note(
+                                g,
+                                &FS_716,
+                                "an AFNI IDCODE_STRING without its '~': nothing written past its buffer (FreeSurfer writes a byte past it, over the allocator's records: not deterministic)",
+                            );
+                        } else {
+                            note(
+                                g,
+                                &FS_703,
+                                "an AFNI IDCODE_STRING without its '~': nothing written past its buffer (FreeSurfer writes a byte past it, within its allocation)",
+                            );
+                        }
                     }
                     af.idcode = Some(v.to_vec());
                 }
@@ -1023,15 +1028,18 @@ fn type_name(g: &mut Globals, t: i32) -> Vec<u8> {
         .ok()
         .and_then(|i| AFNI.get(i).copied())
         .map_or_else(|| format!("unknown ({t})"), str::to_owned);
-    if fs != Some(afni.as_str()) {
-        note(
+    match fs {
+        Some(f) if f != afni => note(
             g,
             &FS_704,
-            match fs {
-                Some(f) => format!("the AFNI brick type {t} printed as {} (FreeSurfer prints {f})", afni),
-                None => format!("the AFNI brick type {t} printed as {afni} (FreeSurfer prints its name table's bytes past its end: memory contents)"),
-            },
-        );
+            format!("the AFNI brick type {t} printed as {afni} (FreeSurfer prints {f})"),
+        ),
+        None => note(
+            g,
+            &FS_711,
+            format!("the AFNI brick type {t} printed as {afni} (FreeSurfer prints its name table's bytes past its end: memory contents)"),
+        ),
+        _ => {}
     }
     if g.notices.reproduce() {
         return fs.unwrap_or("").as_bytes().to_vec();
@@ -1412,11 +1420,11 @@ pub fn afni_read(
     if i64::from(bpv) != length / nvoxels {
         note(
             g,
-            &FS_708,
+            &FS_713,
             if rep {
-                "afniRead: the BRIK's size message prints two numbers for three: the third is memory contents (FreeSurfer: memory contents)"
+                "afniRead: the BRIK's size message prints two numbers for three: the third is memory contents (here 0)"
             } else {
-                "afniRead: the BRIK's size message prints the bytes per voxel, the length and the voxels (FreeSurfer prints the quotient and a number from memory)"
+                "afniRead: the BRIK's size message prints the bytes per voxel, the length and the voxels (FreeSurfer prints the quotient and a number from memory contents)"
             },
         );
         let m = if rep {
@@ -1597,7 +1605,7 @@ pub fn afni_read(
     if past_end {
         note(
             g,
-            &FS_706,
+            &FS_712,
             "AFNI frames scaled differently: FreeSurfer writes past the volume's end (FreeSurfer: not deterministic)",
         );
     }
@@ -1772,6 +1780,157 @@ mod tests {
         assert_eq!(malloc_usable(24), Some(24));
         assert_eq!(malloc_usable(25), Some(40));
         assert_eq!(malloc_usable(40), Some(40));
+    }
+
+    /// An AFNI header of the given attributes' texts (AFNI's spacing).
+    fn head(extra: &str, facs: &str, stats: bool) -> String {
+        let mut h = String::from(
+            "\ntype = integer-attribute\nname = DATASET_RANK\ncount = 8\n 3 2 0 0 0\n 0 0 0\n\
+             \ntype = integer-attribute\nname = DATASET_DIMENSIONS\ncount = 5\n 2 1 1 0 0\n\
+             \ntype = string-attribute\nname = TYPESTRING\ncount = 15\n'3DIM_HEAD_ANAT~\n\
+             \ntype = integer-attribute\nname = ORIENT_SPECIFIC\ncount = 3\n 0 3 4\n\
+             \ntype = float-attribute\nname = ORIGIN\ncount = 3\n -1.5 2 0.5\n\
+             \ntype = float-attribute\nname = DELTA\ncount = 3\n 1 -2 3\n\
+             \ntype = string-attribute\nname = BYTEORDER_STRING\ncount = 10\n'LSB_FIRST~\n\
+             \ntype = integer-attribute\nname = BRICK_TYPES\ncount = 2\n 0 0\n",
+        );
+        if stats {
+            h.push_str("\ntype = float-attribute\nname = BRICK_STATS\ncount = 4\n 0 9 1 8\n");
+        }
+        if !facs.is_empty() {
+            h.push_str(&format!(
+                "\ntype = float-attribute\nname = BRICK_FLOAT_FACS\ncount = 2\n {facs}\n"
+            ));
+        }
+        h.push_str(extra);
+        h
+    }
+
+    fn read(mode: UpstreamDefects, h: &str, brik: &[u8]) -> (Option<Mri>, Globals, String) {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a+orig.HEAD"), h).unwrap();
+        std::fs::write(dir.path().join("a+orig.BRIK"), brik).unwrap();
+        let mut g = Globals::new(mode);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = afni_read(&mut g, &mut o, &mut e, Some(dir.path()), "a+orig.BRIK", true);
+        o.extend_from_slice(&e);
+        let text = String::from_utf8_lossy(&o).into_owned();
+        match r {
+            Ok(m) => (m, g, text),
+            Err(Fatal::Exit(c)) => (None, g, format!("{text}EXIT {c}")),
+            Err(_) => (None, g, text),
+        }
+    }
+
+    fn floats(m: &Mri) -> Vec<f32> {
+        m.chunk
+            .as_ref()
+            .unwrap()
+            .chunks(4)
+            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .collect()
+    }
+
+    /// Two byte frames, unscaled: bytes, the geometry from ORIENT_SPECIFIC, ORIGIN and DELTA.
+    #[test]
+    fn a_byte_dataset_reads() {
+        let (m, _, text) = read(UpstreamDefects::Fix, &head("", "0 0", true), &[1, 2, 3, 4]);
+        let m = m.unwrap();
+        assert_eq!(m.mtype, MRI_UCHAR);
+        assert_eq!(m.chunk.as_deref(), Some(&[1u8, 2, 3, 4][..]));
+        assert_eq!((m.vg.width, m.nframes), (2, 2));
+        assert_eq!((m.vg.x_r, m.vg.y_a, m.vg.z_s), (-1.0, -1.0, 1.0));
+        // sizes made positive after the centre: c_r = -1 * (1 * 1 / 2 - 1.5)
+        assert_eq!((m.vg.xsize, m.vg.ysize, m.vg.zsize), (1.0, 2.0, 3.0));
+        assert_eq!(m.vg.c_r, 1.0);
+        assert!(text.contains("BRICK_STATS max = 9.000000 <--> actual max = 2.000000"));
+        assert!(text.contains("BRICK_TYPES       : byte"));
+    }
+
+    /// FS-706: a scaled second frame after an unscaled first: a float volume by default, each frame
+    /// by its own factor; FreeSurfer keeps bytes and writes the second frame's floats into them.
+    #[test]
+    fn frames_scaled_differently() {
+        let (m, g, _) = read(UpstreamDefects::Fix, &head("", "0 0.5", true), &[1, 2, 3, 4]);
+        let m = m.unwrap();
+        assert_eq!(m.mtype, MRI_FLOAT);
+        assert_eq!(floats(&m), vec![1.0, 2.0, 1.5, 2.0]);
+        assert!(g.notices.contains(&FS_706));
+        let (m, g, _) = read(UpstreamDefects::Reproduce, &head("", "0 0.5", true), &[1, 2, 3, 4]);
+        // the bytes volume of 4 bytes: frame 1's two floats start at byte 2 and pass its end
+        assert!(m.is_some());
+        assert!(g.notices.contains(&FS_712));
+    }
+
+    /// FS-705: without BRICK_FLOAT_FACS the default scales by 1; FreeSurfer crashes.
+    #[test]
+    fn no_factors() {
+        let (m, g, _) = read(UpstreamDefects::Fix, &head("", "", true), &[1, 2, 3, 4]);
+        assert_eq!(m.unwrap().chunk.as_deref(), Some(&[1u8, 2, 3, 4][..]));
+        assert!(g.notices.contains(&FS_705));
+        let (m, _, text) = read(UpstreamDefects::Reproduce, &head("", "", true), &[1, 2, 3, 4]);
+        assert!(m.is_none() && text.ends_with("EXIT 139"));
+        // without BRICK_STATS: no stats lines by default; FreeSurfer crashes after frame 0
+        let (m, _, text) = read(UpstreamDefects::Fix, &head("", "0 0", false), &[1, 2, 3, 4]);
+        assert!(m.is_some() && !text.contains("<-->"));
+        let (_, _, text) = read(UpstreamDefects::Reproduce, &head("", "0 0", false), &[1, 2, 3, 4]);
+        assert!(text.ends_with("EXIT 139"));
+    }
+
+    /// FS-694: a last line of numbers without a newline is read by default; FreeSurfer's reader
+    /// ends there ('hit EOF').
+    #[test]
+    fn a_last_line_without_a_newline() {
+        let mut h = head("", "", true);
+        h.push_str("\ntype = float-attribute\nname = BRICK_FLOAT_FACS\ncount = 2\n 0 0");
+        let (m, g, _) = read(UpstreamDefects::Fix, &h, &[1, 2, 3, 4]);
+        assert!(m.is_some());
+        assert!(g.notices.contains(&FS_694));
+        let (m, _, text) = read(UpstreamDefects::Reproduce, &h, &[1, 2, 3, 4]);
+        assert!(m.is_none());
+        assert!(text.contains("get_afni_float(): hit EOF while reading 2 floats for BRICK_FLOAT_FACS"));
+    }
+
+    /// FS-707: a frame count of 0: an error by default; FreeSurfer divides by zero.
+    #[test]
+    fn no_voxels() {
+        let h = head("", "0 0", true).replacen(" 3 2 0 0 0", " 3 0 0 0 0", 1);
+        let (m, _, text) = read(UpstreamDefects::Fix, &h, &[]);
+        assert!(m.is_none() && text.contains("the volume has no voxels"));
+        let (_, _, text) = read(UpstreamDefects::Reproduce, &h, &[]);
+        assert!(text.ends_with("EXIT 136"));
+    }
+
+    /// FS-702: a TYPESTRING of 16 characters: kept by default; FreeSurfer's copy aborts.
+    #[test]
+    fn a_long_typestring() {
+        let h = head("", "0 0", true).replacen(
+            "count = 15\n'3DIM_HEAD_ANAT~",
+            "count = 17\n'3DIM_HEAD_ANAT_XY~",
+            1,
+        );
+        let (m, _, text) = read(UpstreamDefects::Fix, &h, &[1, 2, 3, 4]);
+        assert!(m.is_some() && text.contains("TYPESTRING        : 3DIM_HEAD_ANAT_XY\n"));
+        let (_, _, text) = read(UpstreamDefects::Reproduce, &h, &[1, 2, 3, 4]);
+        assert!(text.ends_with("*** buffer overflow detected ***: terminated\nEXIT 134"));
+    }
+
+    /// FS-697: a word among the numbers: an error by default.
+    #[test]
+    fn a_word_among_numbers() {
+        let h = head("", "0 0", true).replacen(" 0 3 4\n", " 0 3 x4\n", 1);
+        let (m, _, text) = read(UpstreamDefects::Fix, &h, &[1, 2, 3, 4]);
+        assert!(m.is_none());
+        assert!(text.contains("get_afni_int(): 'x4' is not a number (reading 3 ints for ORIENT_SPECIFIC)"));
+    }
+
+    /// The BRIK writer refuses.
+    #[test]
+    fn writing_is_refused() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut e = Vec::new();
+        assert_eq!(afni_write(&mut g, &mut e), ERROR_UNSUPPORTED);
+        assert!(String::from_utf8_lossy(&e).contains("AFNI BRIK write unsupported"));
     }
 
     #[test]

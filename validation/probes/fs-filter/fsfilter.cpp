@@ -32,6 +32,7 @@
 #include "fastmarching.h"
 #include "fmriutils.h"
 #include "matrix.h"
+#include "volcluster.h"
 #include "mri.h"
 
 MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
@@ -467,10 +468,89 @@ bool fmri_case(const std::string &cmd)
   return true;
 }
 
+// the clusters: the count, then each one's members, largest member, its value and voxel size
+// (float bits), then its members' column, row and slice (and x, y, z when xyz); NULL when NULL
+void put_clusters(VOLCLUSTER **l, int n, int xyz)
+{
+  if (!l) { out += "NULL "; return; }
+  oi(n);
+  for (int i = 0; i < n; i++) {
+    VOLCLUSTER *vc = l[i];
+    oi(vc->nmembers); oi(vc->maxmember); of(vc->maxval); of(vc->voxsize);
+    for (int k = 0; k < vc->nmembers; k++) {
+      oi(vc->col[k]); oi(vc->row[k]); oi(vc->slc[k]);
+      if (xyz) { of(vc->x[k]); of(vc->y[k]); of(vc->z[k]); }
+    }
+  }
+}
+
+MATRIX *get_optmat() { return geti() ? get_mat() : NULL; }
+
+// volcluster.cpp's clusters
+bool clus_case(const std::string &cmd)
+{
+  if (cmd == "clus") {
+    // clus <vol> frame thmin thmax thsign minsize <mask?> <xfm?> allowdiag gdiag valopt: the
+    // clusters, then clustClusterList2Vol's volume
+    MRI *v = get_vol();
+    int frame = geti();
+    float lo = getf(), hi = getf();
+    int sign = geti();
+    float minsize = getf();
+    MRI *mask = get_opt();
+    MATRIX *x = get_optmat();
+    int diag = geti();
+    Gdiag_no = geti();
+    int valopt = geti();
+    int n = -1;
+    VOLCLUSTER **l = clustGetClusters(v, frame, lo, hi, sign, minsize, mask, &n, x, diag);
+    put_clusters(l, n, x != NULL);
+    put_full(clustClusterList2Vol(l, n, v, frame, valopt));
+  } else if (cmd == "cprd") {
+    // cprd <vol> thmin thsign <xfm?> distthresh: the clusters clustPruneByDistance keeps
+    MRI *v = get_vol();
+    float lo = getf();
+    int sign = geti();
+    MATRIX *x = get_optmat();
+    float dist = getf();
+    int n = -1, nkeep = -1;
+    VOLCLUSTER **l = clustGetClusters(v, 0, lo, 0, sign, 0, NULL, &n, x);
+    VOLCLUSTER **p = clustPruneByDistance(l, n, dist, &nkeep);
+    put_clusters(p, nkeep, x != NULL);
+  } else if (cmd == "cgrow") {
+    // cgrow <vol> thmin thsign col row slc allowdiag npassesmax: the grown cluster, the hit map
+    MRI *v = get_vol();
+    float lo = getf();
+    int sign = geti();
+    int c = geti(), r = geti(), s = geti(), diag = geti(), np = geti();
+    int nh = -1, *hc = NULL, *hr = NULL, *hs = NULL;
+    MRI *hm = clustInitHitMap(v, 0, lo, 0, sign, &nh, &hc, &hr, &hs, NULL, 0);
+    VOLCLUSTER *k = clustGrow(c, r, s, hm, diag, np);
+    put_clusters(&k, 1, 0);
+    put_full(hm);
+  } else if (cmd == "isl" || cmd == "hol") {
+    // isl <mask> <dst mode> [<dst>] thresh nkeep; hol ... fill (doubles as their bits)
+    MRI *m = get_vol();
+    MRI *dst = get_dst(geti(), m);
+    double th = getd();
+    int nk = geti();
+    MRI *r = cmd == "isl" ? MRIremoveVolumeIslands(m, th, nk, dst)
+                          : MRIremoveVolumeHoles(m, th, nk, getd(), dst);
+    put_result(r, dst);
+  } else if (cmd == "cvr") {
+    float lo = getf(), hi = getf();
+    int sign = geti();
+    for (int i = 0; i < 8; i++) oi(clustValueInRange(getf(), lo, hi, sign));
+  } else {
+    return false;
+  }
+  return true;
+}
+
 void run_case()
 {
   std::string cmd = next();
-  if (filter_case(cmd) || fmri_case(cmd)) return;
+  if (filter_case(cmd) || fmri_case(cmd) || clus_case(cmd)) return;
   if (cmd == "edm" || cmd == "dtr") {
     // edm|dtr <src> <dst?> label max_distance mode <mask?>
     MRI *src = get_vol();

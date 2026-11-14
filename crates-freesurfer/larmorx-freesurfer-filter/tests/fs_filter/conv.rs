@@ -28,7 +28,7 @@ pub const COMMANDS: [&str; 32] = [
 
 /// A volume of blobs: random boxes of values above 0 on a background (uchar mostly; float with
 /// negative values and NaNs, or int, now and then).
-fn blobs(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
+pub(super) fn blobs(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
     let ty = if g.chance(4) {
         g.pick(&[MRI_FLOAT, MRI_INT, MRI_SHORT])
     } else {
@@ -297,7 +297,7 @@ pub(super) fn opt_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf
 }
 
 /// A destination by mode: 0 none, 1 given (`ty`, sometimes another extent or frames), 2 the source.
-fn mode_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
+pub(super) fn mode_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
     let m = g.pick(&[0, 0, 1, 2]);
     t.push(m.to_string());
     if m == 1 {

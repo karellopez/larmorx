@@ -1703,6 +1703,10 @@ defects! {
         "the matrix-to-volume conversion (fMRIfromMatrix) with a mask that selects no voxel and a matrix with columns crashes (an integer division by zero)";
     FS_569 = "FS-569", "FreeSurfer", true,
         "the frame subsampling (fMRIsubSample) with a negative step from a start below the stop, or a step that carries the frame number past the 32-bit integer range, reads frames before the volume's memory without end (a crash)";
+    FS_570 = "FS-570", "FreeSurfer", true,
+        "the volume clusters' member coordinates (x, y, z) are left unset (memory contents) unless a transform is given when the clusters are found; pruning the clusters by distance then compares memory contents";
+    FS_571 = "FS-571", "FreeSurfer", true,
+        "the volume clusters' coordinates computed with a transform that is not 4 x 4 crash after the matrix product's error message (fewer than 3 rows: memory outside the product is read)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

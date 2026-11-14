@@ -1291,8 +1291,8 @@ pub fn nii_write(
                 let row = ((t * d + k) * h + j) as usize;
                 if as_ints {
                     let b = row_bytes(m, row, w.max(0) as usize * 8);
-                    for v in b.chunks_exact(8) {
-                        let l = i64::from_le_bytes(v.try_into().expect("8 bytes"));
+                    for v in b.as_chunks::<8>().0 {
+                        let l = i64::from_le_bytes(*v);
                         let i = l.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
                         if i64::from(i) != l {
                             g.notices.add(

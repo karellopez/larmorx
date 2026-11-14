@@ -1832,4 +1832,129 @@ mod tests {
             assert_eq!(r, want);
         }
     }
+
+    /// `nifti1Write` of `m` as `name` in a new folder (`sub` made in it first): the status, the
+    /// standard error and the files.
+    fn pair(
+        mode: UpstreamDefects,
+        m: &mut Mri,
+        sub: &str,
+        name: &str,
+    ) -> (Result<i32, Fatal>, Vec<u8>, Vec<(String, Vec<u8>)>, bool) {
+        let dir = tempfile::Builder::new()
+            .prefix("ni1 w ~")
+            .tempdir()
+            .unwrap();
+        if !sub.is_empty() {
+            std::fs::create_dir_all(dir.path().join(sub)).unwrap();
+        }
+        let mut g = Globals::new(mode);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = nifti1_write(&mut g, &mut o, &mut e, Some(dir.path()), m, name);
+        let folder = dir.path().join(sub);
+        let mut files: Vec<(String, Vec<u8>)> = std::fs::read_dir(&folder)
+            .unwrap()
+            .filter_map(|x| x.ok())
+            .filter(|x| x.path().is_file())
+            .map(|x| {
+                (
+                    x.file_name().to_string_lossy().into_owned(),
+                    std::fs::read(x.path()).unwrap(),
+                )
+            })
+            .collect();
+        files.sort();
+        (r, e, files, g.notices.contains(&FS_451))
+    }
+
+    #[test]
+    fn a_nifti1_pair_is_a_header_and_an_image() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut m = volume(&mut g, MRI_SHORT, 2);
+        for name in ["a.img", "a.hdr", "a"] {
+            let (r, e, files, _) = pair(UpstreamDefects::Fix, &mut m, "", name);
+            assert_eq!((r, e.len()), (Ok(0), 0));
+            let names: Vec<&str> = files.iter().map(|f| f.0.as_str()).collect();
+            assert_eq!(names, ["a.hdr", "a.img"]);
+            let h = &files[0].1;
+            assert_eq!(h.len(), 348);
+            assert_eq!(&h[344..348], b"ni1\0");
+            assert_eq!(&h[108..112], &[0, 0, 0, 0]); // the voxel offset
+            assert_eq!(&h[40..42], &4i16.to_le_bytes()); // 4 dimensions: 2 frames
+            assert_eq!(&h[70..74], &[4, 0, 16, 0]); // signed short, 16 bits
+            assert_eq!(&h[148..170], b"FreeSurfer Mar 14 2026");
+            assert_eq!(&files[1].1, m.chunk.as_ref().unwrap());
+        }
+        // `.IMG` is not an extension the writer cuts; a complex volume is an unknown type here
+        let (r, _, files, _) = pair(UpstreamDefects::Fix, &mut m, "", "A.IMG");
+        assert_eq!(r, Ok(0));
+        assert_eq!(files[0].0, "A.IMG.hdr");
+        let mut c = volume(&mut g, MRI_FLOAT_COMPLEX, 1);
+        let (r, e, files, _) = pair(UpstreamDefects::Fix, &mut c, "", "c.img");
+        assert_eq!((r, files.len()), (Ok(ERROR_BADPARM), 0));
+        assert!(String::from_utf8_lossy(&e).contains("nifti1Write(): unknown data type 7"));
+    }
+
+    #[test]
+    fn fs_451_long_names_cut_or_abort_only_with_reproduce() {
+        // four folders of 200 bytes keep every name within the file system's 255 bytes
+        let sub = ["a", "b", "c", "d"].map(|c| c.repeat(200)).join("/");
+        let top = format!("{sub}/");
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut m = volume(&mut g, MRI_UCHAR, 1);
+        for (len, cut) in [(1019usize, false), (1021, true), (1023, true)] {
+            let name = format!("{top}{}", "x".repeat(len - top.len()));
+            let (r, e, files, noted) = pair(UpstreamDefects::Reproduce, &mut m, &sub, &name);
+            assert_eq!((r, noted), (Ok(0), cut));
+            let leaf = &name[top.len()..];
+            let names: Vec<String> = files.iter().map(|f| f.0.clone()).collect();
+            if len == 1019 {
+                assert_eq!(names, [format!("{leaf}.hdr"), format!("{leaf}.img")]);
+            } else if len == 1021 {
+                assert_eq!(names, [format!("{leaf}.h"), format!("{leaf}.i")]);
+                assert_eq!(
+                    e,
+                    b"nifti1Write: Truncation of hdr_fname\nnifti1Write: Truncation of img_fname\n"
+                );
+            } else {
+                // one file: the image written over the header
+                assert_eq!(names, [leaf.to_string()]);
+                assert_eq!(files[0].1, m.chunk.clone().unwrap());
+            }
+            let (r, e, files, noted) = pair(UpstreamDefects::Fix, &mut m, &sub, &name);
+            assert_eq!((r, e.len(), noted), (Ok(0), 0, cut));
+            assert_eq!(
+                files.iter().map(|f| f.0.clone()).collect::<Vec<_>>(),
+                [format!("{leaf}.hdr"), format!("{leaf}.img")]
+            );
+        }
+        let name = format!("{top}{}.img", "y".repeat(1024 - top.len() - 4));
+        let (r, e, files, _) = pair(UpstreamDefects::Reproduce, &mut m, &sub, &name);
+        assert_eq!((r, files.len()), (Err(Fatal::Exit(134)), 0));
+        assert_eq!(e, b"*** buffer overflow detected ***: terminated\n");
+        let (r, _, files, noted) = pair(UpstreamDefects::Fix, &mut m, &sub, &name);
+        assert_eq!((r, files.len(), noted), (Ok(0), 2, true));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fs_452_a_full_disk_is_an_error_by_default() {
+        let dir = tempfile::Builder::new()
+            .prefix("ni1 f ~")
+            .tempdir()
+            .unwrap();
+        std::os::unix::fs::symlink("/dev/full", dir.path().join("a.hdr")).unwrap();
+        for (mode, want) in [
+            (UpstreamDefects::Fix, ERROR_BADFILE),
+            (UpstreamDefects::Reproduce, 0),
+        ] {
+            let mut g = Globals::new(mode);
+            let mut m = volume(&mut g, MRI_FLOAT, 1);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let r =
+                nifti1_write(&mut g, &mut o, &mut e, Some(dir.path()), &mut m, "a.img").unwrap();
+            assert_eq!(r, want);
+            assert!(g.notices.contains(&FS_452));
+        }
+    }
 }

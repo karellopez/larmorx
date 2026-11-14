@@ -383,6 +383,54 @@ void put_lta(const LTA *l)
   put_geom(&l->xforms[0].dst);
 }
 
+// a histogram of the case or NULL: its allocation (-1: NULL), the bins in use, a seed for its
+// old contents (relay 24)
+HISTOGRAM *get_histo()
+{
+  int k = geti();
+  if (k < 0) return NULL;
+  int nb = geti(), seed = geti();
+  HISTOGRAM *h = HISTOalloc(k);
+  for (int i = 0; i < k; i++) {
+    h->bins[i] = 0.5f * (float)i + (float)seed;
+    h->counts[i] = (float)((i * 7 + seed) % 5);
+  }
+  h->nbins = nb;
+  return h;
+}
+
+void put_histo(const HISTOGRAM *h)
+{
+  if (!h) { out += "NULL "; return; }
+  oi(h->nbins); oi(h->max_bins); of(h->bin_size); of(h->min); of(h->max);
+  int n = h->nbins < h->max_bins ? h->nbins : h->max_bins;
+  for (int i = 0; i < n; i++) { of(h->bins[i]); of(h->counts[i]); }
+}
+
+// every frame's voxels from a pattern of two populations: on, seed, a, b, spread (on 0: nothing)
+void fill_pat(MRI *m)
+{
+  if (!geti()) return;
+  unsigned seed = (unsigned)geti();
+  int a = geti(), b = geti(), sp = geti();
+  for (int f = 0; f < m->nframes; f++)
+    for (int z = 0; z < m->depth; z++)
+      for (int y = 0; y < m->height; y++)
+        for (int x = 0; x < m->width; x++) {
+          unsigned h = ((unsigned)x * 73856093u) ^ ((unsigned)y * 19349663u) ^ ((unsigned)z * 83492791u) ^
+                       ((unsigned)f * 2654435761u) ^ (seed * 97u);
+          h = h * 1103515245u + 12345u;
+          int v = (((h >> 8) & 1u) ? a : b) + (int)((h >> 9) % (unsigned)(2 * sp + 1)) - sp;
+          MRIsetVoxVal(m, x, y, z, f, (float)v);
+        }
+}
+
+void get_region(MRI_REGION *r)
+{
+  r->x = geti(); r->y = geti(); r->z = geti();
+  r->dx = geti(); r->dy = geti(); r->dz = geti();
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -2146,6 +2194,110 @@ void run_case()
     put_vol(a);
     put_vol(b);
     if (c) put_vol(c);
+  } else if (cmd == "hreg" || cmd == "hvox" || cmd == "hthr") {
+    // mrihisto.cpp: MRIhistogramRegion, MRIhistogramVoxel, MRIhistogramRegionWithThreshold
+    MRI *m = get_vol();
+    fill_paint(m);
+    fill_pat(m);
+    int nbins = geti();
+    HISTOGRAM *h = get_histo();
+    HISTOGRAM *r;
+    if (cmd == "hvox") {
+      int x = geti(), y = geti(), z = geti(), ws = geti();
+      MRI *t = NULL;
+      if (geti()) { t = get_vol(); fill_paint(t); fill_pat(t); }
+      float th = getf();
+      fflush(stdout);
+      r = MRIhistogramVoxel(m, nbins, h, x, y, z, ws, t, th);
+    } else {
+      MRI_REGION reg;
+      get_region(&reg);
+      if (cmd == "hreg") {
+        fflush(stdout);
+        r = MRIhistogramRegion(m, nbins, h, &reg);
+      } else {
+        MRI *t = get_vol();
+        fill_paint(t);
+        fill_pat(t);
+        float th = getf();
+        int fr = geti();
+        fflush(stdout);
+        r = MRIhistogramRegionWithThreshold(m, nbins, h, &reg, t, th, fr);
+      }
+    }
+    fflush(stdout);
+    oi(r != NULL && r == h);
+    put_histo(r);
+  } else if (cmd == "hist" || cmd == "geq") {
+    // mrihisto.cpp: MRIhistogram, MRIgetEqualizeHisto
+    MRI *m = get_vol();
+    fill_paint(m);
+    fill_pat(m);
+    if (cmd == "hist") {
+      int nb = geti();
+      fflush(stdout);
+      HISTOGRAM *r = MRIhistogram(m, nb);
+      fflush(stdout);
+      put_histo(r);
+    } else {
+      HISTOGRAM *h = get_histo();
+      int lo = geti(), hi = geti(), norm = geti();
+      fflush(stdout);
+      HISTOGRAM *r = MRIgetEqualizeHisto(m, h, lo, hi, norm);
+      fflush(stdout);
+      oi(r != NULL && r == h);
+      put_histo(r);
+    }
+  } else if (cmd == "heq") {
+    // mrihisto.cpp: MRIhistoEqualize (the template another volume)
+    MRI *src = get_vol();
+    fill_paint(src);
+    fill_pat(src);
+    MRI *tpl = get_vol();
+    fill_paint(tpl);
+    fill_pat(tpl);
+    MRI *dst = get_dst(src);
+    int lo = geti(), hi = geti();
+    fflush(stdout);
+    MRI *r = MRIhistoEqualize(src, tpl, dst, lo, hi);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "hlr" || cmd == "hlab") {
+    // mrihisto.cpp: MRIhistogramLabelRegion, MRIhistogramLabel
+    MRI *m = get_vol();
+    fill_paint(m);
+    fill_pat(m);
+    MRI *l = get_vol();
+    fill_paint(l);
+    int label = geti(), nb = geti();
+    HISTOGRAM *r;
+    if (cmd == "hlr") {
+      MRI_REGION reg;
+      get_region(&reg);
+      fflush(stdout);
+      r = MRIhistogramLabelRegion(m, l, &reg, label, nb);
+    } else {
+      fflush(stdout);
+      r = MRIhistogramLabel(m, l, label, nb);
+    }
+    fflush(stdout);
+    put_histo(r);
+  } else if (cmd == "hsegm") {
+    // mrihisto.cpp: MRIhistoSegment (the labelled volume: NULL, another painted one, the source)
+    MRI *src = get_vol();
+    fill_paint(src);
+    fill_pat(src);
+    MRI *dst = get_dst(src);
+    if (dst && dst != src) fill_paint(dst);
+    int wl = geti(), wh = geti(), gh = geti(), ws = geti();
+    float sg = getf();
+    if (geti()) Gdiag |= DIAG_SHOW;
+    fflush(stdout);
+    MRI *r = MRIhistoSegment(src, dst, wl, wh, gh, ws, sg);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
   } else {
     fail("unknown command");
   }

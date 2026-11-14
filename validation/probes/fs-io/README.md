@@ -78,6 +78,23 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   ParaVision's `##$NAME=value` form (most complete; missing, odd, CR LF, overlong and cut lines; unsupported types; 2dseq
   files of the right length, half, a byte more). `SKIP` for FS-259 and FS-403, `VARY` for FS-401 (values never written).
   Seed 13, 3,815 piece-7 cases: `reproduce` identical on 3,221, 0 different.
+- Piece 8 (relay 18): FreeSurfer's 2-D images (`image.cpp`, `filter.cpp`'s pyramid reduction). Each case starts with
+  `Gerror`'s value and ends by printing it: `ial` (`ImageAlloc`), `icp` (`ImageCopy`), `ica` (`ImageClearArea`), `ick`
+  (`ImageCheckSize`), `iss` (`ImageSetSize`), `icf` (`ImageCopyFrames`), `irs` (`ImageRescale`), `isd`/`isu`
+  (`ImageScaleDown`/`ImageScaleUp` called directly), `ird` (`ImageReduce`), `ic1`/`ir1` (`ImageConvolve1d`/
+  `ImageReduce1d` with a given kernel); an image is given as `ImageAlloc`'s arguments, its extents in use (-7: as
+  allocated), its pixel sizes and its bytes (`N`: none), built by `tests/fs_io/piece8.rs` (up to 13 by 13 pixels and 3
+  frames, every format, odd extents, frames and buffers, floats of every kind) and printed as its fields and its bytes
+  (hex up to 128, else FNV-1a 64; the probe keeps the length of the buffers it made and forgets an image FreeSurfer is
+  about to free). `SKIP` for FS-405 (outside the pixels) and FS-409 (an image used after it is freed). Seed 11, 1,068
+  piece-8 cases: `reproduce` identical on 949, 0 different; seed 13, 5,292: identical on 4,605, 0 different.
+- Piece 9 (relay 18): fs.core's `ArgumentParser` (`argparse.cpp`, the newer programs' command lines). `apa`: a
+  configuration (`A1`/`A2` `addArgument`, `H` `addHelp` with an empty or an XML text; the seven programs' own or
+  random ones), a command line (its first word the program's name; made for the configuration half of the time) and
+  `exists`/`retrieve` queries; `parsed` and the answers, or `EXIT` with the messages. Built by
+  `tests/fs_io/piece9.rs`. `SKIP` where an XML help text is rendered (FreeSurfer's help renderer, `fsPrintHelp.cpp`,
+  is not ported yet), `VARY` where the answer depends on the name index's order (libstdc++'s hash order: two names
+  match) or on the time (`--all-info`). Seed 13, 2,352 cases: `reproduce` identical on 2,265, 0 different.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

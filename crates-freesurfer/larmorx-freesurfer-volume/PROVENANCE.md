@@ -81,3 +81,68 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   sampling is a port error until `fs.bspline` (wave 3.2) exists.
 - `src/resize.rs`, relay 17: `MRIextractPlane` stores the float it read (no round trip through `double`, as the
   official build; the debug build quieted signalling NaNs before).
+- `src/resample.rs` (3.1-37; relay 18): `utils/mri.cpp` `MRIresample`, `MRIresampleFill` (12072-12657), the limit
+  macros (75-95); the trilinear sum's operand orders, the nearest path's bit copies and the 4-byte long stores from
+  the unit oracle's `mri.cpp.o` (`docs/findings/freesurfer-volume.md` §11). Changes: FS-326 (every vote counted),
+  FS-328 (64-bit voxels written whole), rule A; FS-327 (an error, both modes); cubic B-spline sampling is a port
+  error until `fs.bspline` (wave 3.2) exists.
+- `src/arith.rs`, relay 18 (3.1-38): `utils/mriset.cpp` `MRIcheckVolDims` (73-98), `MRIreplaceValues` (2263-2297),
+  `MRIreplaceValuesUchar` (2338-2368). Change: FS-461 (every frame replaced), rule A. FreeSurfer's OpenMP loop over
+  the slices writes each voxel once: run in order.
+- `src/stats.rs` (3.1-37; relay 19): `utils/mri.cpp` `MRIprintStats`, `MRIstats` (12681-12828), `MRItype2str`
+  (16535-16558), `MRIcropBoundingBox` (15191-15200), `MRIcalcCRASforSampledVolume` (14776-14842; `affine.h`'s
+  `AffineMV` as in `MRIcalcCRASforExtractedVolume`). Changes: FS-329 (the 64-bit voxels read), rule A; FS-330 (0 for
+  values never written), FS-462 (an error), both modes.
+- `src/orient.rs` (3.1-37; relay 19): `utils/mri.cpp` `stuff_four_by_four` (12863-12908), `MRIvoxelXformToRasXform`
+  (12992-13008), `MRIsetVoxelToRasXform` (13019-13075), `MRIgetVoxelToVoxelXform` (15202-15212),
+  `MRIorientationStringToDircos` (15256-15319), `MRIcheckOrientationString` (15328-15398); `getenv` through the
+  caller's `Environment`. Changes: FS-463 (NUL past the end), FS-464 (an error), both modes.
+- `src/image.rs` (3.1-35's image part; relay 19): `utils/mri.cpp` `MRItoImageView` (6796-7106), `MRItoImage`
+  (7115-7155), `ImageToMRI` (7157-7314), on track A's `larmorx_freesurfer_io::image`. Changes: FS-466 (each RGB frame's
+  own pixels), rule A; FS-465 (only the pixels written and read), both modes.
+- `src/labels.rs` (3.1-37; relay 19): `utils/mri.cpp` `MRIsmoothParcellation` (13124-13186), `MRIeraseBorderPlanes`
+  (13188-13220), `MRImaxInNbhd` (13286-13304), `MRIcountNonzeroInNbhd`, `MRIareNonzeroInNbhd` (13329-13362),
+  `MRIfindNearestNonzeroLocation` (13363-13401), `MRImeanInLabelMultispectral` .. `MRImaxInLabelInRegion` (14108-14246),
+  `MRImakePositive` (14247-14269), `MRImarkLabelBorderVoxels` (14671-14718), `MRIcomputeLabelNbhd` (14720-14765),
+  `MRIlabelsInNbhd`, `MRIlabelsInPlanarNbhd` (15807-15857), `MRIlabelBoundingBox` (16224-16250), `MRIcountThreshInNbhd`,
+  `MRIfillBox` (16373-16404), `MRImaskZero` (16518-16533), `MRIclipBrightWM` (17744-17776); `WM_MIN_VAL`
+  (`include/mri.h`), `DEFAULT_DESIRED_WHITE_MATTER_VALUE` (`include/mrinorm.h`). Changes: FS-468 (clamped bytes), rule
+  A; FS-467 (a bin of its own), both modes; FS-12's rule for the `(int)` truncations.
+- `src/labels.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIvoxelsInLabelWithPartialVolumeEffects` (14346-14583),
+  its label windows kept as sorted maps of the labels met (the same reads and `float` sums as `MRIcomputeLabelNbhd`),
+  operand orders from the official build (`volume += vox_vol`; `vox_vol * pv + volume`). Changes: FS-469 (an own label
+  outside the limit takes its window mean), both modes; FS-470, FS-471 (crashes: errors; tables past the stack counted).
+- `src/frames.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIrandn` (13718-13751), `MRIconst` (13926-13999),
+  `MRInormalizeSequence` (14005-14043), `MRInormalizeFrames`, `MRInormalizeFramesMean`, `MRInormalizeFramesFirst`
+  (15945-16020), `MRIsort`, `CompareDoubles` (16076-16134; the C library's `qsort` through
+  `larmorx_core::glibc_qsort`), `MRIreverseSliceOrder` (15547-15586), `MRIcloneDifferentType` (16406-16416). Changes:
+  FS-472 (clamped narrow stores), rule A; FS-473 (b-table entries past the rows left 0), both modes.
+- `src/order.rs` (3.1-37; relay 20): `utils/mri.cpp` `compare_sort_mri`, `MRIorderIndices` (16441-16480),
+  `MRIcomputeVoxelPermutation` (16482-16516, fs.core's `randomNumber`). Changes: FS-474 (whole coordinates, clamped
+  values), rule A.
+- `src/deriv.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRInonMaxSuppress` (15641-15724).
+- `src/resize.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIextractRegionAndPad` (15726-15769).
+- `src/combine.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIrms` (16643-16675; the official build's operand order in
+  the last frame), `MRIcomputeVolumeFractions` (16690-16774), `MRIcombineDistanceTransforms` (17386-17412),
+  `MRIapplyDiffVect`, `MRIdiff2Vect` (17899-17996), `MRIestimateTIV` (15892-15911); `utils/mri2.cpp` `MRIdimMismatch`
+  (1346-1353). Changes: FS-476, FS-477, FS-478, rule A; FS-475 (label 0 left out), both modes; FS-479 (an error).
+- `src/voxops.rs` (3.1-37; relay 20): `utils/mri2.cpp` `mri_framepower` (417-466; `sqrtf`, `powf`), `mri_binarize`
+  (476-546), `mri_reshape` (653-734), `MRIsqrt`, `MRImax` (1781-1835), `MRImultiplyConst`, `MRIaddConst` (1866-1912),
+  `MRIframeBinarize` (1922-1958), `MRIvote` (2063-2149), `MRIsquare`, `MRIsquareRoot` (2401-2466), `MRIcrop`
+  (2643-2708), `MRIreverseSlices` (2748-2799), `MRIcutEndSlices` (2801-2838), `MRIsegIdListNot0`, `MRIsegIdList`
+  (2873-2928), `MRIhalfCosBias` (3077-3100); operand orders from the official build's object `mri2.cpp.o` (the unit
+  oracle's `libutils.a`). Changes: FS-480, FS-481, rule A.
+- `src/vol2vol.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIvol2Vol` (877-1051), `MRIvol2VolTLKernel` (1233-1302),
+  `MRImaskAndUpsample` (1304-1344), `MRIvol2VolDelta` (2580-2641), `MRIvol2VolVSM` (3102-3266); `utils/transform.cpp`
+  `TransformRegDat2LTA` (4417-4452, 3.1-40 taken early); operand orders from the official `mri2.cpp.o`. Changes:
+  FS-482 (0 for a shift never written, both modes); cubic B-splines and `LTAchangeType` port errors until ported.
+- `src/pca.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIfdr2vwth` (1402-1574), `MRIcovarianceMatrix` (1576-1641),
+  `MRIpca` (1643-1744), `PrintPCAStats`, `WritePCAStats` (1746-1779); `utils/sig.cpp` `fdr2vwth`, `doublecompar`
+  (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's in both modes.
+- `src/region.rs` (3.1-38; relay 21): `utils/region.cpp` `REGIONalloc` (49-57), `REGIONclear`, `REGIONcopy` (116-133),
+  `REGIONgetBoundingBoxM` (299-334), `REGIONgetBoundingBox` (344-379), `REGIONgetBoundingBoxEqOdd` (387-492),
+  `REGIONprint` (495-499); `FZERO`'s 1e-5 of this file.
+- `src/mrivoxel.rs` (3.1-38; relay 21): `utils/mrivoxel.cpp` `MRIvoxelDx`, `MRIvoxelDy`, `MRIvoxelDz` (55-148),
+  `MRIvoxelMean` (174-205), `MRIvoxelDirection` (316-384), `MRIvoxelGradientDir2ndDerivative` (393-433); operand
+  orders from `mrivoxel.cpp.o`. Changes: FS-485 (the window not cut by default), FS-486 (0 for a sample never
+  written, both modes).

@@ -29,19 +29,22 @@ use larmorx_core::defects::{FS_316, FS_317, FS_318, FS_319};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
+use larmorx_freesurfer_core::matrix_ops::matrix_identity;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, sub};
 use larmorx_freesurfer_core::utils::nint;
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriFrame, mri_alloc,
-    mri_alloc_sequence, mri_copy_header,
+    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriFrame, MriRegion,
+    mri_alloc, mri_alloc_sequence, mri_copy_header,
 };
-use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, p0_to_cras, reinit_cache, xfm_crs2xyz};
+use larmorx_freesurfer_mri::vol_geom::{
+    extract_i_to_r, p0_to_cras, reinit_cache, set_vox2ras_from_matrix, xfm_crs2xyz,
+};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
-use crate::arith::{Pair, mri_clear, mri_clone};
+use crate::arith::{Pair, mri_clear, mri_clone, mri_extract_into};
 use crate::coords::sample_volume_nearest;
 use crate::rows::{self, Num, need_voxels};
 use crate::sample::sample_volume_frame_nearest;
@@ -1295,4 +1298,79 @@ pub fn mri_seq_change_type(
         })
         .collect();
     Ok(Some(m))
+}
+
+/// `MRIextractRegionAndPad(mri_src, mri_dst, region, pad)`: a new volume (a given destination is
+/// never used) of the region's extent plus `2 pad` on each axis, the source's type, frames and
+/// header, holding the region (`MRIextractInto` into a volume of its own, then into the new one
+/// at `(pad, pad, pad)`), its voxel-to-RAS matrix the source's (`extract_i_to_r`) times a
+/// translation by `-pad` (`float`; `MRIsetVox2RASFromMatrix`, the cached matrices kept). The
+/// whole source without a region (printing `(box.dx, box.dy, box.dz) = (<dx>, <dy>, <dz>)`); the
+/// region's extent printed twice (`(region->dx, region->dy, region->dz) = (...)`).
+pub fn mri_extract_region_and_pad(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &mut Mri,
+    region: Option<&MriRegion>,
+    pad: i32,
+) -> Result<Mri, Fatal> {
+    let r = match region {
+        Some(r) => *r,
+        None => {
+            let b = MriRegion {
+                x: 0,
+                y: 0,
+                z: 0,
+                dx: src.vg.width,
+                dy: src.vg.height,
+                dz: src.vg.depth,
+            };
+            let _ = writeln!(
+                out,
+                "(box.dx, box.dy, box.dz) = ({}, {}, {})",
+                b.dx, b.dy, b.dz
+            );
+            b
+        }
+    };
+    let line = format!(
+        "(region->dx, region->dy, region->dz) = ({}, {}, {})\n",
+        r.dx, r.dy, r.dz
+    );
+    let _ = out.write_all(line.as_bytes());
+    let p2 = pad.wrapping_mul(2);
+    let mut dst = mri_alloc_sequence(
+        g,
+        out,
+        err,
+        r.dx.wrapping_add(p2),
+        r.dy.wrapping_add(p2),
+        r.dz.wrapping_add(p2),
+        src.mtype,
+        src.nframes,
+    )?;
+    mri_copy_header(g, out, err, src, Some(&mut dst))?;
+    let _ = out.write_all(line.as_bytes());
+    let size = [r.dx, r.dy, r.dz];
+    let mut tmp =
+        mri_extract_into(g, out, err, src, None, [r.x, r.y, r.z], size, [0, 0, 0])?.unwrap_new();
+    mri_extract_into(
+        g,
+        out,
+        err,
+        &mut tmp,
+        Some(&mut dst),
+        [0, 0, 0],
+        size,
+        [pad; 3],
+    )?;
+    let m_src = extract_i_to_r(g, out, err, &src.vg)?;
+    let mut m_trans = matrix_identity(g, out, err, 4, None)?.unwrap_new();
+    for row in 1..=3 {
+        m_trans.set_relt(row, 4, pad.wrapping_neg() as f32);
+    }
+    let m_dst = matrix_multiply(g, out, err, Some(&m_src), Some(&m_trans), None)?.unwrap_new();
+    set_vox2ras_from_matrix(g, out, err, &mut dst.vg, &m_dst)?;
+    Ok(dst)
 }

@@ -29,10 +29,12 @@ use larmorx_core::defects::{FS_322, FS_323, FS_324};
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{add64, div64, mul64, sub64};
 use larmorx_freesurfer_core::utils::nint;
+use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{MAX_INDEX, MRI_UCHAR, Mri};
-use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
+use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
 use crate::coords::index_not_in_volume;
 use crate::rows::{self, need_voxels};
@@ -335,7 +337,7 @@ pub fn sample_volume_gradient_frame(
 
 /// Which index table a neighbour count reads.
 #[derive(Clone, Copy)]
-enum Axis {
+pub(crate) enum Axis {
     X,
     Y,
     Z,
@@ -344,7 +346,7 @@ enum Axis {
 /// `mri->xi[i]` (or `yi`, `zi`): the coordinate `i` clamped to the volume's extent on that axis;
 /// past the table (more than `MAX_INDEX` outside) FreeSurfer reads memory it does not own
 /// (FS-323): an error.
-fn index(
+pub(crate) fn index(
     g: &mut Globals,
     err: &mut dyn Write,
     what: &str,
@@ -607,4 +609,92 @@ pub fn neighbors_off_3x3(
     const WHAT: &str = "MRIneighborsOff3x3";
     let p = window(g, err, WHAT, mri, x, y, z, 1)?;
     Ok(count_bytes_below(g, WHAT, mri, &p, min_val))
+}
+
+/// `MRInonMaxSuppress(mri_src, mri_sup, thresh, thresh_dir)`: a copy of the source (`MRIcopy`) in
+/// which each voxel (frame 0, `double`, times `thresh_dir`) at or below `thresh` becomes 0; for
+/// the others the gradient (`MRIsampleVolumeGradient`) picks, of the directions z, y, x, the first
+/// with the largest `|d . grad|`; the gradient line's intersections with that coordinate plane on
+/// both sides (`u = numer / denom` from the points `p1 = (x, y, z)`, `p2 = p1 + grad`, `p3 = p1 +
+/// n`, in `double` as written; a `denom` below 1e-15 in magnitude leaves the voxel) are sampled
+/// (`MRIsampleVolume`, times `thresh_dir`): a voxel below either becomes 0. A type the sampler
+/// refuses: FS-322 (the gradient), the sample keeps its last value (0 before the first).
+#[allow(clippy::too_many_arguments)]
+pub fn mri_non_max_suppress(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Mri,
+    sup: Option<&mut Mri>,
+    thresh: f32,
+    thresh_dir: i32,
+) -> Result<Ret<Mri>, Fatal> {
+    const DIRS: [[f64; 3]; 3] = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]];
+    let mut fresh = None;
+    let d: &mut Mri = match sup {
+        Some(d) => {
+            if let Ret::Null = mri_copy(g, out, err, src, Some(&mut *d))? {
+                return Ok(Ret::Null);
+            }
+            d
+        }
+        None => match mri_copy(g, out, err, src, None)? {
+            Ret::New(m) => fresh.insert(m),
+            _ => return Ok(Ret::Null),
+        },
+    };
+    let td = f64::from(thresh_dir);
+    // FreeSurfer's `oval` lives across voxels: a type the sampler refuses (FS-322, noted by the
+    // gradient first) keeps the last sample, never written before the first (0 here)
+    let mut oval = 0.0f64;
+    for x in 0..src.vg.width {
+        for y in 0..src.vg.height {
+            for z in 0..src.vg.depth {
+                let v = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
+                let val = mul64(f64::from(v), td);
+                if val <= f64::from(thresh) {
+                    mri_set_vox_val(g, err, d, x, y, z, 0, 0.0, 0)?;
+                    continue;
+                }
+                let (px, py, pz) = (f64::from(x), f64::from(y), f64::from(z));
+                let (mut ix, mut iy, mut iz) = (0.0, 0.0, 0.0);
+                sample_volume_gradient(g, err, src, px, py, pz, &mut ix, &mut iy, &mut iz);
+                let dot = |k: usize| (DIRS[k][0] * ix + DIRS[k][1] * iy + DIRS[k][2] * iz).abs();
+                let mut max_i = 0;
+                let mut max_dot = dot(0);
+                for (i, _) in DIRS.iter().enumerate().skip(1) {
+                    let t = dot(i);
+                    if t > max_dot {
+                        max_i = i;
+                        max_dot = t;
+                    }
+                }
+                let [nx, ny, nz] = DIRS[max_i];
+                let (p2x, p2y, p2z) = (px + ix, py + iy, pz + iz);
+                let (p3x, p3y, p3z) = (px + nx, py + ny, pz + nz);
+                let numer = nx * (p3x - px) + ny * (p3y - py) + nz * (p3z - pz);
+                let denom = nx * (p2x - px) + ny * (p2y - py) + nz * (p2z - pz);
+                if denom.abs() < 1e-15 {
+                    continue;
+                }
+                let u = numer / denom;
+                for sign in [1.0f64, -1.0] {
+                    let (xf, yf, zf) = if sign > 0.0 {
+                        (px + u * ix, py + u * iy, pz + u * iz)
+                    } else {
+                        (px - u * ix, py - u * iy, pz - u * iz)
+                    };
+                    sample_volume(g, err, src, xf, yf, zf, &mut oval);
+                    if mul64(oval, td) > val {
+                        mri_set_vox_val(g, err, d, x, y, z, 0, 0.0, 0)?;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    Ok(match fresh {
+        Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
 }

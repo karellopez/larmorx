@@ -343,3 +343,223 @@ Source: `utils/mri.cpp` 9147-9156 and 9505-9571 (`FASTER_MRI_EM_REGISTER` is def
 - `MRIsampleVolumeDerivativeScale`'s weight for a huge sigma: `-dist * dist` overflows to `-inf`, `2 *
   sigma * sigma` to `inf`, their quotient is SSE's default NaN, which `exp` passes on; the port computes
   it with the SSE helpers (plain Rust arithmetic gave AArch64's positive NaN under the emulation).
+
+## 11. Resampling onto a template (`MRIresampleFill`, `MRIresample`; 3.1-37) and value replacement (3.1-38; relay 18)
+Source: `utils/mri.cpp` 12072-12657 (`MRIresample`, `MRIresampleFill`), 75-95 (the limit macros: `UCHAR_MIN`
+0.0, `SHORT_MIN`/`SHORT_MAX` as doubles; `UCHAR_MAX`, `INT_*`, `LONG_*`, `USHRT_MAX` from `<limits.h>`);
+`utils/mriset.cpp` 73-98 (`MRIcheckVolDims`), 2263-2297 (`MRIreplaceValues`), 2338-2368
+(`MRIreplaceValuesUchar`). Object code: the unit oracle's `mri.cpp.o` (`<scratch>/C/r18/rf.s`, from
+`<scratch>/C/r11/mri_cpp.s` line 59962).
+- **The trilinear sum's operand orders** (offsets 0x1837-0x1964): `si_f`, `sj_f`, `sk_f` in `xmm0`,
+  `xmm1`, `xmm2`; `1 - x` by `subsd x, 1.0`; `p01 = (1-si) * (1-sj)` (`xmm8 = xmm10; mulsd xmm7, xmm8`);
+  `x5 = sj * (1-si)` (`mulsd xmm10, xmm5`); `x7 = (1-sj) * si` (`mulsd xmm9, xmm7`); terms `(p01 (1-sk))
+  v000`, `(p01 sk) v001`, `((1-sk) x5) v010`, `(x5 sk) v011`, `((1-sk) x7) v100`, `(sk x7) v101`, `((1-sk)
+  (double)(sj si)) v110`; the last `((sj si) sk) v111` by `mulss` (C's float types: `(si_f) * (sj_f) *
+  (sk_f) * val111` has no double operand), converted and added last; each `addsd` keeps the running sum
+  in the destination. The corners' stack slots (`0x18` v000, `0x40` v001, `0x1c` v010, `0x30` v011,
+  `0x20` v100, `0x34` v101, `0x14` v110, `0x24` v111) checked against the short source's loads (row and
+  slice pointers).
+- **The nearest path** selects the upper or lower corner with `cmpltss`/`andps`/`andnps`/`orps`: bit
+  copies, a signalling NaN kept; the float store is a `movss`.
+- **The stores**: `MRI_INT` and `MRI_LONG` both end in `mov %eax, (...)` (4 bytes): `MRILseq_vox` is a
+  `long32` element, so a long destination gets 32-bit integers at index `x` (FS-328, as FS-321). Clamping
+  `val > INT_MAX` assigns `(float) INT_MAX` = 2^31, whose `nint` is out of range (FS-12): a positive
+  overflow becomes -2147483648 under `reproduce`.
+- **FS-326**: `count = MRIgetVoxVal(mri_votes, ...); MRIsetVoxVal(mri_votes, ..., count + 1)` on a byte
+  volume: `MRIsetVoxVal` clips 256 to 255. Votes from every source frame go into the same counts, and every
+  template frame gets the same label (kept: a design for single-frame label volumes).
+- **FS-327**: `minv = MRIgetResampleMatrix(template_vol, src); *MATRIX_RELT(minv, 1, 4) += .5;` before
+  `if (minv == NULL)`: a NULL matrix (the template's orientation unknown, or a singular template matrix
+  the first call did not check) is written through. The probe's case: `CRASH 11` after FreeSurfer's
+  `MRIresample(): source volume orientation is unknown`.
+- **The vote's second loop** runs over `template_vol->nframes`, the destination has `min(src->nframes,
+  template_vol->nframes)` frames: `MRIsetVoxVal` past the destination's slices (`fs.mri`'s outside rules).
+- **Unwritten `pval`**: `MRIsincSampleVolumeFrame` and `MRIcubicSampleVolumeFrame` fail without writing
+  `pval` only for a source type they refuse; the destination has the source's type, which the store
+  `if` chain does not write either, so the never-written value is never stored (no defect).
+- **The fill (kept, rule C)**: `MRIreplaceValues(dest, dest, 0.0f, fill_val)` replaces the fresh volume's
+  zeros, then the sampling writes every voxel of every frame of the six types: the fill shows only in a
+  destination of another type. Only `histo_register_block` (not on recon-all's or fMRIPrep's paths) passes
+  a non-zero fill.
+- **FS-461**: `MRIreplaceValuesUchar` walks `&MRIvox(mri_src, 0, y, z)`: frame 0 only. In
+  `MRIresampleFill` it does not show (the sampling writes every frame).
+- **The probe's coverage** (seed 13, 4,000 `rsfill`/`repval` cases after the generator gave most
+  templates the source's grid): trilinear 124 outputs with sampled values (23 float outputs holding
+  NaNs), nearest 32, sinc 17, cubic 34, weighted 19, vote 93, an unknown type 13; every comparable line
+  identical with `reproduce`.
+
+## 12. Statistics, orientation strings, voxel-to-RAS matrices, 2-D images, neighbourhoods and labels (3.1-37 pieces a and b, 3.1-35's image part; relay 19)
+Source: `utils/mri.cpp` 12681-12828 (`MRIprintStats`, `MRIstats`), 12863-12908 (`stuff_four_by_four`),
+12992-13075 (`MRIvoxelXformToRasXform`, `MRIsetVoxelToRasXform`), 13124-13362 (`MRIsmoothParcellation`,
+`MRIeraseBorderPlanes`, `MRImaxInNbhd`, `MRIcountNonzeroInNbhd`, `MRIareNonzeroInNbhd`), 13363-13401
+(`MRIfindNearestNonzeroLocation`), 14108-14269 (the label means, `MRImakePositive`), 14671-14765
+(`MRImarkLabelBorderVoxels`, `MRIcomputeLabelNbhd`), 14776-14842 (`MRIcalcCRASforSampledVolume`), 15191-15212
+(`MRIcropBoundingBox`, `MRIgetVoxelToVoxelXform`), 15256-15398 (`MRIorientationStringToDircos`,
+`MRIcheckOrientationString`), 15807-15857 (`MRIlabelsIn(Planar)Nbhd`), 16224-16250 (`MRIlabelBoundingBox`),
+16373-16404 (`MRIcountThreshInNbhd`, `MRIfillBox`), 16518-16558 (`MRImaskZero`, `MRItype2str`), 17744-17776
+(`MRIclipBrightWM`), 6796-7314 (`MRItoImageView`, `MRItoImage`, `ImageToMRI`); `include/mri_circulars.h`
+declares the image functions; `include/image.h` 297-337 the pixel macros.
+- **FS-329** (c, rule A): `MRIstats`' `MRI_LONG` branch reads with `MRILseq_vox`, a `long32` (`int`)
+  pointer: element `x` of the row is the low or high half of voxel `x / 2`. The default reads the 64-bit
+  voxels; `reproduce` the halves.
+- **FS-330** (a, memory): `MRIprintStats`' `min`, `max`, `n`, `mean`, `std` are locals `MRIstats` writes only
+  for a volume with `slices` and (for `min`, `max`) one of the six types; otherwise their stack contents are
+  printed. Both modes print 0, noted; the probe counts these lines.
+- **FS-462** (a, crash): `src->width / dst->width` with a destination extent of 0 is an integer division by
+  zero (SIGFPE). An error in both modes.
+- **FS-463** (a, memory): `MRIcheckOrientationString` reads `ostr[0..2]` whatever the string's length; the
+  probe saw a one-character string's third byte come from the token's buffer (`e`). Places past the
+  terminator are taken as NUL in both modes. A NUL at place 2 (a two-character string) is defined: the
+  character appended to the `std::string` and the `strncpy` into the 1000-byte buffer cuts the text at it.
+- **FS-464** (a, memory): `MRIsetVoxelToRasXform` reads rows 1-3 and columns 1-4 without a size check. An
+  error in both modes for a smaller matrix.
+- **FS-465** (a, memory): `MRItoImage` copies `width` elements per row into a given image at `yp ocols` of
+  the volume type's element size, whatever the image's format and size; `ImageToMRI` reads `pix_per_frame
+  frame` elements past the first frame with `rows cols` (not `orows ocols`). Both modes write and read only
+  inside the pixels (0 outside), noted; the probe counts these lines (the official build's heap layout made
+  them agree on all 30 of seed 13, not a guarantee).
+- **FS-466** (c, rule A): `ImageToMRI`'s RGB branch adds `frame_offset` (pixels) to `IMAGERGBpix`'s byte
+  pointer, so frame `f` starts `f rows cols` bytes in, not `3 f rows cols`. Default: each frame's own
+  pixels. The 4-byte `int` read of the last pixel reads one byte past the 3-byte pixels; it is masked off
+  (`& 0x00ffffff`), so only the 3 bytes are read here.
+- **FS-467** (a, memory): `MRIsmoothParcellation`'s `int counts[32768]` indexed by a `short` label; a negative
+  label increments and reads stack memory below the array (the probe saw a -1 label written where the port,
+  counting it in its own bin, did not: other locals alias it). Both modes count it in its own bin, noted; the
+  probe counts these lines.
+- **FS-468** (a, undefined conversion): `MRIclipBrightWM` assigns `MRIgetVoxVal`'s float to a `BUFTYPE`; GCC
+  8.4.0 converts with `cvttss2si` to 32 bits and keeps the low byte. `reproduce` gives that; the default
+  clamps to [0, 255] (NaN 0), the D13 rule for undefined conversions. A non-byte T1 loses its fractions in
+  both modes (rule C: FreeSurfer's T1 is a byte volume).
+- `MRItoImageView`'s `(ubyte)` conversion of `255 (val - min) / (max - min)` is always in [0, 255] or NaN: the
+  samples are whole-coordinate nearest voxels, exact `float`s, so `min <= val <= max`; the `float` range
+  `max - min` rounded down by half an ulp gives at most 255.0000152 (255); infinities give 0 or NaN (0, as
+  x86-64's conversion). No defect.
+- The `(int)` truncations of voxel labels (`MRImarkLabelBorderVoxels`, `MRIcomputeLabelNbhd`,
+  `MRIlabelBoundingBox`, `MRImaxInNbhd`'s result) follow FS-12's rule, as `MRIextractInto`'s voxel sizes do.
+- `MRIstats`, `MRIsetVoxelToRasXform`, `MRIcalcCRASforSampledVolume` and `MRIfindNearestNonzeroLocation`
+  give FreeSurfer's NaN bits in the C expressions' operand orders (no object-code reading was needed: the
+  probe's special floats agreed on every case).
+
+## 13. Partial-volume counts, frames, orders, fractions and difference lists (3.1-37 piece c; relay 20)
+Source: `utils/mri.cpp` 14346-14583 (`MRIvoxelsInLabelWithPartialVolumeEffects`), 13718-13751 (`MRIrandn`),
+13926-14043 (`MRIconst`, `MRInormalizeSequence`), 15547-15586 (`MRIreverseSliceOrder`), 15641-15769
+(`MRInonMaxSuppress`, `MRIextractRegionAndPad`), 15892-16020 (`MRIestimateTIV`, `MRInormalizeFrames*`),
+16076-16134 (`MRIsort`, `CompareDoubles`), 16406-16516 (`MRIcloneDifferentType`, `MRIorderIndices`,
+`MRIcomputeVoxelPermutation`), 16643-16774 (`MRIrms`, `MRIcomputeVolumeFractions`), 17386-17412
+(`MRIcombineDistanceTransforms`), 17899-17996 (`MRIapplyDiffVect`, `MRIdiff2Vect`); `utils/mri2.cpp` 1346-1353
+(`MRIdimMismatch`). Operand orders from the official build's disassembly (`mri.cpp.o`).
+- **FS-469** (a, memory): `float mean_label = label_means[vox_label]` with the voxel's own label outside
+  `[0, maxlabels)`: the load (made unconditionally after the two `MRIcomputeLabelNbhd` calls) reads the stack
+  around the VLAs. Both modes take that label's mean over the 15 x 15 x 15 window (the value a larger table would
+  hold), noted; the probe counts these cases.
+- **FS-470** (a, crash): `MRIgetVoxVal(mri_vals, ...)` with `mri_vals == NULL` at the first border voxel weighed.
+- **FS-471** (a, crash): `int nbr_label_counts[maxlabels], label_counts[maxlabels]; float label_means[maxlabels]`
+  are allocated (with stack-clash probes) at every voxel past the label and segborder checks: a negative
+  `maxlabels` probes pages without end (SIGSEGV); tables beyond the stack crash the same way. Negative: an error;
+  large: counted (the port's windows are sparse), noted.
+- The MRIsegBorder path (`segborder`): a border voxel of another label is weighed only when one of frames 1.. holds
+  `label` (`float ==`).
+- **FS-472** (c, rule A): `(BUFTYPE)nint(val)`, `(short)nint(val)`, `(unsigned short)nint(val)` in `MRIconst` and
+  the `MRISseq_vox(...) / norm` stores of `MRInormalizeSequence` keep the `int`'s low bits.
+- **FS-473** (a, memory): `MRIreverseSliceOrder` copies `bvals->rptr[f+1][1]` and `bvecs->rptr[f+1][k+1]` for every
+  frame: a table of fewer rows is read through row pointers past its `rptr` array (the probe saw SIGSEGV).
+- `MRIreverseSliceOrder`'s `double val` between `MRIgetVoxVal` and `MRIsetVoxVal` is dropped by GCC (a signalling
+  NaN stays signalling); `MRIsort`'s `double` array is not (quieted).
+- **FS-474** (c, rule A): `SORT_VOXEL` holds `unsigned char x, y, z, val`.
+- **FS-475** (a, memory): `MRIgetVoxVal(mri_fractions, xs, ys, zs, label - 1)` for label 0 reads frame -1
+  (`slices[z - depth]`); the write corrupts memory (the probe saw SIGSEGV). Both modes leave label 0 out.
+- **FS-476** (c, rule A): the second pass tests `label < mri_fractions->nframes`, the first `<=`.
+- **FS-477** (c, rule A): `c>mri1->width` (not `>=`) in `MRIapplyDiffVect`.
+- **FS-478** (c, rule A): in place (`mri1 == mri2`), `CTABfree(&mri2->ct)` frees `mri1->ct` before
+  `CTABdeepCopy(mri1->ct)`, which then prints `CTABdeepCopy: ct was NULL` and returns NULL.
+- **FS-479** (a, crash): `MatrixDeterminant(atlas_lta->xforms[0].m_L)` of an LTA with no transform.
+- `MRIrms`: GCC splits the frame loop; in the last frame (when it is not the first) the sum is `vout + vin * vin`
+  (`vout` the destination), else `vin * vin + vout`: only the NaN payload of two NaNs shows it.
+- `MRIrandn`: `PDFgaussian() * stddev + avg` (the draw the destination). `MRInormalizeFrames`: `mean += val`,
+  `var += val * val`, `var / n - mean * mean`, `(val - mean) / std`, as written.
+- `MRIdistanceTransform` waits for fs.filter's `MRIextractDistanceMap` (3.1-42).
+- `MRIvoxelsInLabelWithPartialVolumeEffects` writes the border volume to `b.mgz` under `DIAG_VERBOSE_ON` with
+  `DIAG_WRITE`: not modelled (no `MRIwrite` in fs.volume).
+
+## 14. Voxelwise operations of mri2.cpp (3.1-37 piece d, part 1; relay 20)
+Source: `utils/mri2.cpp` 417-734 (`mri_framepower`, `mri_binarize`, `mri_reshape`), 1781-1958 (`MRIsqrt`,
+`MRImax`, `MRImultiplyConst`, `MRIaddConst`, `MRIframeBinarize`), 2063-2149 (`MRIvote`), 2401-2466 (`MRIsquare`,
+`MRIsquareRoot`), 2643-2838 (`MRIcrop`, `MRIreverseSlices`, `MRIcutEndSlices`), 2873-2928 (`MRIsegIdListNot0`,
+`MRIsegIdList`), 3077-3100 (`MRIhalfCosBias`). Operand orders from `mri2.cpp.o` of the unit oracle's `libutils.a`.
+- `mri_framepower`: C++'s `sqrt(float)` and `pow(float, float)` are `sqrtf` and `powf`; the branch meant for a
+  power of 2 tests 0.5 again (dead; `powf(v, 2)` gives the same bits as `v * v`).
+- `MRImax`: `std::max(double, double)` of two floats compiled to `comiss` on the floats (no conversion: a signalling
+  NaN passes).
+- `MRIhalfCosBias`: `w = (cos(pi s / (depth - 1)) * alpha + (2 - alpha)) * 0.5`, the voxel `v * w` (`v` the
+  destination); glibc's `cos`.
+- **FS-480** (c, rule A): `MRIvote`'s last-run check has no `Exclude0` test.
+- **FS-481** (c, rule A): `mri_reshape`'s `MRI_LONG` case uses `MRILseq_vox` (`long32`) on both volumes.
+
+- `MRIsetVoxelToRasXform` (section 12, corrected in relay 20): the centre is `((m11 ci + m12 cj) + m13 ck) + m14`,
+  the sum the destination (the probe's `revs` found it: a NaN direction cosine with an infinite voxel size).
+
+## 15. Volume-to-volume resampling, PCA and the false discovery rate (3.1-37 piece d, parts 2 and 3; relay 21)
+Source: `utils/mri2.cpp` 877-1051 (`MRIvol2Vol`, OpenMP over target columns: one thread here, each voxel
+independent; the progress callback is a no-op without a GUI), 1233-1302 (`MRIvol2VolTLKernel`), 1304-1344
+(`MRImaskAndUpsample`), 1402-1574 (`MRIfdr2vwth`), 1576-1641 (`MRIcovarianceMatrix`), 1643-1779 (`MRIpca`,
+`PrintPCAStats`, `WritePCAStats`), 2580-2641 (`MRIvol2VolDelta`), 3102-3266 (`MRIvol2VolVSM`); `utils/sig.cpp`
+53-110 (`fdr2vwth`, `doublecompar`; sig.cpp has no queue item: reached only through `MRIfdr2vwth`, by one
+program); `utils/region.cpp` 49-57, 344-379, 495-499; `utils/transform.cpp` 4417-4452 (`TransformRegDat2LTA`,
+3.1-40, taken early). Operand orders from `mri2.cpp.o` of the unit oracle's `libutils.a` (`<scratch>/C/r20/mri2.s`).
+- `MRIvol2Vol`'s OpenMP body (`._omp_fn.0`) sums rows 1 and 2 as `(p1 + p2) + p3` and row 3 as `p3 + (p2 + p1)`;
+  `MRIvol2VolTLKernel` (inlined `nint`) rows 1 and 3 as `(p1 + p2) + p3`, row 2 as `p3 + (p1 + p2)`. A NaN
+  coordinate is rounded by `nint` to INT_MIN with `reproduce` (skipped), to 0 by default (FS-12): its payload can
+  reach the trilinear weights only by default, which is why the orders are kept in both modes.
+- `MRIvol2VolTLKernel` writes the kernel into the TARGET and returns `NULL` (its work volume leaks); `mri_vol2vol
+  --kernel` passes an 8-frame target and ignores the result: kept (rule C), documented.
+- `MRIvol2VolVSM`'s `floor(fcs)` is C++'s `floor(float)` (`floorf`, inlined with the 2^23 mask); its shift is
+  `fcs + (FSIGN(pedir) * dvsm)` in `float`. `dvsm` is a function-scope `float` never initialised: **FS-482** (a,
+  memory) for a map of a type `MRIsampleSeqVolume` refuses (RGB, complex): the first voxel's shift is stack
+  contents (the probe saw a nonzero garbage shift reach the "unknown method" exit), later ones the last written.
+- `MRIcovarianceMatrix`: `sum += v1 * v2` compiled as `(v2 * v1) + sum`; one `cvtsd2ss` stored twice. `MRIpca`:
+  `S2 *= nmask` and `sqrt(S2)` in single precision (`mulss`, `sqrtss`, the `sqrtf` call only for negatives),
+  `(double)U / sqrt(S2)` compiled as `divss` (exact: the double quotient of two floats rounds to the float
+  quotient), `sum2 += Fv * Fv` as `(float square) + sum2`, the normalisation `(double)v / sqrt(sum2)`. Its
+  `FLT_EPSILON` is `<float.h>`'s (0x34000000 in `.rodata.cst4`).
+- **FS-483** (c, rule A): both functions count mask voxels `> 0.5` and skip voxels `< 0.5`.
+- **FS-484** (a, rule B): `MRIpca` of a 0-frame volume: `MatrixSVD` of the 0 x 0 covariance crashes in VXL's
+  `v3p_netlib_ssvdc_` (gdb: `ssvdc_ <- vnl_svd<float> <- OpenSvdcmp <- MatrixSVD <- MRIpca`). fs.maths'
+  `matrix_svd` returns normally on 0 x 0 (for track A: `MatrixSVD` itself crashes there).
+- `PrintPCAStats`: `totvar + v`, `vsum + v`, `100 * v` with 100 the first factor, then `/ totvar`. `WritePCAStats`
+  never closes its file: the lines reach it at `exit` (a program ending with `_exit` or a crash loses them; the
+  probe calls `fflush(NULL)` as `exit` would).
+- `MRIfdr2vwth`: `-val` and `fabs` are sign-bit operations; `pow` is `pow@GLIBC_2.29` (the FMA build);
+  `log10` is `log10@@GLIBC_2.2.5`, fdlibm's `__ieee754_log10` over the FMA `__ieee754_log` behind the SVID wrapper
+  (`larmorx_core::math::log10_glibc`, checked by `validation/investigations/glibc-maths/`). A negative frame is not
+  checked: `MRIFseq_vox` reads before the slice array (FS-290's place).
+- `TransformRegDat2LTA`'s `MatrixMultiply(vox2vox, Ttarg, vox2vox)` multiplies into its first operand (FreeSurfer
+  copies it first). `LTAalloc`'s identity `m_L` is overwritten by the copy (a leak).
+
+## 16. Regions and voxel neighbourhood measures (3.1-38; relay 21)
+Source: `utils/region.cpp` 116-133, 299-499 (`REGIONclear`, `REGIONcopy`, `REGIONgetBoundingBoxM`,
+`REGIONgetBoundingBoxEqOdd`); `utils/mrivoxel.cpp` 55-205, 316-433 (`MRIvoxelDx`, `Dy`, `Dz`, `MRIvoxelMean`,
+`MRIvoxelDirection`, `MRIvoxelGradientDir2ndDerivative`). Object code: `ar x` of the unit oracle's `libutils.a`
+(`region.cpp.o`, `mrivoxel.cpp.o`; `<scratch>/C/r21/obj/`).
+- **`FZERO` differs by file.** `macros.h` has `#ifndef FLT_EPSILON / #define FLT_EPSILON 1e-5`; `region.cpp` and
+  `mrivoxel.cpp` include `<math.h>` but not `<float.h>` before it, so their `FZERO`/`iszero` compare with 1e-5
+  (`.rodata.cst8` `0x3ee4f8b588e368f1`, `comisd` after `cvtss2sd`), while `mri2.cpp` gets `<float.h>`'s
+  1.1920929e-7. The probe found it: a complex volume whose voxel read 5.4e-7 was left out of FreeSurfer's bounding
+  box. Kept (rule C: the threshold is what every caller gets); stated per function in the spec.
+- `MRIvoxelDx/Dy/Dz`: `left = 2*v1; left += v2; left += v3` compiled as `v3 + ((v1 + v1) + v2)`; `/ 8.0f` as
+  `* 0.125f`. `MRIvoxelDy` and `MRIvoxelDz` weight the previous column twice (not the face neighbour): as written.
+- `MRIvoxelDirection`: the second loop is vectorised per row of offsets: a row of 4+ (wsize 5 or 7) takes one
+  4-lane block `t1 = (y ody + x odx) + z odz`, `t2 = (dx odx + dy ody) + dz odz`, `t1 * t2`, its lanes added to `dir`
+  in order, then up to three scalar copies with their own orders (`t2 * t1`; `t1 * (dz odz + (dx odx + dy ody))`;
+  `(y ody + x odx) + z odz` and `t1 * t2`); rows of 3 or fewer use the three scalar copies.
+- **FS-485** (a, rule A for the default): the first loop stops at `MIN(extent - 1, c + whalf)` but the second reads
+  `(2 whalf + 1)^3` entries of the uninitialised stack arrays (`dx_win[343]`, ...): near the far faces the offsets
+  pair with other voxels' gradients and the tail is stack contents (the probe saw `0xffffffff`, `0xfffffed0`).
+- `MRIvoxelGradientDir2ndDerivative`: `len` via `sqrtss` (`sqrtf` for negatives); `d2I_dg2 -= val` keeps the first
+  difference in `double` and rounds it when it is reloaded (the same as rounding each step); `d` is a `float`
+  counter compared with `(float)whalf`. **FS-486** (a): `double val` is uninitialised before the first
+  `MRIsampleVolume`, which leaves it for refused types.
+- Layering (for the orchestrator): `cma.cpp`'s `MRIaqueductSeg` calls `clustGetClusters` (`volcluster.cpp`, fs.filter
+  3.1-44) and `CTABreadDefault`; fs.filter sits above fs.volume, so it cannot be ported in this crate (as
+  `MRIdistanceTransform`). `resample.cpp`'s surface functions (`vol2surf_linear`, `MRISapplyReg`, `surf2surf_nnfr`,
+  `surf2surf_nnfr_jac`, `MRIsurf2VolOpt`, `MRIseg2SegPVF`'s surface parts) need the surface structure of
+  larmorx-freesurfer-surf, which depends on this crate: the same question.

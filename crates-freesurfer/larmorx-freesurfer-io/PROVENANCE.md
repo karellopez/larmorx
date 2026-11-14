@@ -157,3 +157,22 @@ to the source's `/ 2.`); the files closed where FreeSurfer leaves them open (FS-
 FS-402 and FS-404 are larmorx's own: the voxels read by their type's size and in `$RECO_byte_order`'s
 order (ParaVision's documented parameter).
 
+
+## FreeSurfer files and functions translated (part 8, relay 18: FreeSurfer's 2-D images)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/image.cpp` 65-145, 384-468, 526-569, 977-1500, 3748-3822; `include/image.h`, `include/hips.h` (the `IMAGE` header, the formats, the pixel macros) | `ImageAlloc` (65, 3.1-26's line), `ImageAllocBuffer`, `ImageFree`, `ImageCopy`, `ImageClearArea`, `ImageCheckSize`, `ImageSetSize`, `ImageCopyFrames`, `ImageRescale`, `ImageScaleDown`, `ImageScaleUp`, `init_header`, `h_copy`, `free_header` (the reached 14 of the file's 73 functions) | `image.rs` |
+| `utils/hips.cpp` 4-5, 42-47 | `hips_cplxtor`, `hips_rtocplx` (fs.core's globals), the conversion stubs `h_tob` ... `h_toi` | `image.rs` |
+| `utils/filter.cpp` 713-1041 | `ImageConvolve1d`, `ImageReduce` with its kernel, `ImageReduce1d` (fs.filter's, here because `ImageScaleDown` calls them and fs.filter's crate sits above fs.io) | `image.rs` |
+| `include/macros.h` 35, 118 | `exp2` as `pow(2.0, f)`, `ISPOW2` (decided exactly: `ispow2`, `nint_log2`) | `image.rs` |
+
+Changes for part 8: the pixels one `Vec<u8>` of the length FreeSurfer allocates, the pointer walks
+(`image += sizeimage` per frame, restored at the end) as byte offsets, every pixel access checked
+(FS-405: both modes skip the write and read 0); floats as their little-endian bytes; the sums in the
+official object's operand order through `larmorx_freesurfer_core::sse`; `ImageReduce`'s `static`
+work image and `ImageConvolve1d`'s `static` index tables made each call (only memory differs);
+`ISPOW2` and `nint(log2(1 / scale))` decided without `log2f`/`log2`/`pow` (exact for the values they
+meet: a power of two's logarithm is exact in glibc, and the count is computed only next to one).
+The defaults of FS-406 (clamped conversions), FS-407 (the destination frame), FS-408 (every frame
+reduced), FS-409 (the copy returned) and FS-410 (`ERROR_NO_MEMORY`) are larmorx's own.

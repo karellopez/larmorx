@@ -737,10 +737,10 @@ pub fn mgh_read(
             let to_read = (bytes as i64 as u64)
                 .wrapping_mul(depth as i64 as u64)
                 .wrapping_mul(nfr as u64) as usize;
-            let frame_bytes = m.vox_per_row as usize
-                * m.height.max(0) as usize
-                * m.depth.max(0) as usize
-                * m.bytes_per_vox;
+            let frame_bytes = (m.vox_per_row as usize)
+                .wrapping_mul(m.height.max(0) as usize)
+                .wrapping_mul(m.depth.max(0) as usize)
+                .wrapping_mul(m.bytes_per_vox);
             if i64::from(m.depth) * i64::from(m.nframes) <= 0 {
                 g.notices.add(
                     &FS_256,
@@ -756,7 +756,7 @@ pub fn mgh_read(
                 );
                 0
             } else {
-                start_frame as usize * frame_bytes
+                (start_frame as usize).wrapping_mul(frame_bytes)
             };
             let mut left = to_read;
             let chunk = m.chunk.as_mut().expect("voxels");

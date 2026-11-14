@@ -14,14 +14,27 @@
 
 pub mod arith;
 pub mod cma;
+pub mod combine;
 pub mod coords;
 pub mod deriv;
+pub mod frames;
+pub mod image;
+pub mod labels;
 pub mod ltaread;
+pub mod mrivoxel;
+pub mod order;
+pub mod orient;
+pub mod pca;
+pub mod region;
+pub mod resample;
 pub mod resize;
 pub mod rotate;
 mod rows;
 pub mod sample;
 pub mod seq;
 pub mod skull;
+pub mod stats;
 pub mod vgeom;
+pub mod vol2vol;
+pub mod voxops;
 pub mod xform;

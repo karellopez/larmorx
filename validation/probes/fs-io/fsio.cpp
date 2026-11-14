@@ -54,6 +54,8 @@
 #include "mosaic.h"
 #include "matfile.h"
 #include "registerio.h"
+#include "image.h"
+#include "argparse.h"
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -556,6 +558,195 @@ void ocstr(const char *s)
   obytes(std::vector<unsigned char>(s, s + strlen(s)));
 }
 
+
+// piece 8: FreeSurfer's 2-D images (image.cpp, filter.cpp's reduction)
+std::vector<std::pair<IMAGE *, unsigned long>> imlens;  // the probe's images and their bytes
+// the bytes the probe knows an image's pixels have (false: an image FreeSurfer made)
+bool img_len(IMAGE *I, unsigned long *len)
+{
+  for (auto &p : imlens)
+    if (p.first == I) { *len = p.second; return true; }
+  return false;
+}
+// an image: ImageAlloc(rows, cols, format, frames, bufsize), its extents (not the stored ones)
+// set when not -7, its pixel sizes, then its bytes from hex
+IMAGE *mkimg()
+{
+  if (strcmp(toks[pos].c_str(), "N") == 0) { pos++; return NULL; }
+  int rows = (int)geti(), cols = (int)geti(), fmt = (int)geti(), nf = (int)geti();
+  unsigned long bs = strtoull(next(), NULL, 10);
+  int sr = (int)geti(), sc = (int)geti();
+  float xs = getf(), ys = getf();
+  std::vector<unsigned char> b = unhex(next());
+  IMAGE *I = ImageAlloc(rows, cols, fmt, nf, bs);
+  unsigned long len = I->image ? (bs ? bs : I->sizeimage * (unsigned long)(long)I->num_frame) : 0;
+  if (sr != -7) I->rows = sr;
+  if (sc != -7) I->cols = sc;
+  I->xsize = xs;
+  I->ysize = ys;
+  if (I->image) memcpy(I->image, b.data(), b.size() < len ? b.size() : len);
+  imlens.push_back({I, len});
+  return I;
+}
+// an image FreeSurfer is about to free (its address may come back for a new image)
+void forget(IMAGE *I)
+{
+  for (auto &p : imlens)
+    if (p.first == I) p.first = NULL;
+}
+void print_img(IMAGE *I)
+{
+  if (!I) { out += "N "; return; }
+  oi(I->num_frame); oi(I->orows); oi(I->ocols); oi(I->rows); oi(I->cols); oi(I->frow); oi(I->fcol);
+  oi(I->pixel_format); oi(I->numcolor); oi((long long)I->numpix); oi(I->sizepix);
+  oi((long long)I->sizeimage); oi(I->imdealloc);
+  if (!I->firstpix) out += "N ";
+  else oi((long long)(I->firstpix - I->image));
+  of(I->xsize); of(I->ysize);
+  if (!I->image) { out += "B- "; return; }
+  unsigned long n = I->sizeimage * (unsigned long)(long)I->num_frame;
+  unsigned long known = 0;
+  if (img_len(I, &known) && known < n) n = known;
+  if (n <= 128) obytes(std::vector<unsigned char>(I->image, I->image + n));
+  else fnv_bytes(I->image, n);
+}
+
+
+// piece 9: FreeSurfer's ArgumentParser (argparse.cpp, fs.core)
+std::string hexstr() { std::vector<unsigned char> b = unhex(next()); return std::string(b.begin(), b.end()); }
+void ostdstr(const std::string &v)
+{
+  out += "x";
+  obytes(std::vector<unsigned char>(v.begin(), v.end()));
+  if (v.empty()) { out.pop_back(); out.pop_back(); out += " "; }
+}
+const unsigned char help9[] = "<help><name>probe</name><synopsis>probe [options]</synopsis></help>";
+
+void run_piece9(const std::string &cmd)
+{
+  if (cmd != "apa") fail("unknown command");
+  fwide(stderr, -1);
+  ArgumentParser parser;
+  int nconf = (int)geti();
+  for (int i = 0; i < nconf; i++) {
+    std::string k = next();
+    if (k == "H") {
+      int mode = (int)geti();
+      if (mode == 1) parser.addHelp(help9, 0);
+      else parser.addHelp(help9, sizeof help9 - 1);
+    } else if (k == "A1") {
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(name, nargs, t, req);
+    } else {
+      std::string sn = hexstr();
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(sn, name, nargs, t, req);
+    }
+  }
+  int nargv = (int)geti();
+  std::vector<std::string> args;
+  for (int i = 0; i < nargv; i++) args.push_back(hexstr());
+  std::vector<char *> av;
+  for (std::string &a : args) av.push_back(&a[0]);
+  av.push_back(NULL);
+  out += "parsed ";
+  fflush(stdout);
+  parser.parse(args.size(), av.data());
+  int nq = (int)geti();
+  for (int i = 0; i < nq; i++) {
+    std::string k = next();
+    std::string name = hexstr();
+    if (k == "E") { oi(parser.exists(name)); continue; }
+    std::string t = next();
+    if (t == "i") oi(parser.retrieve<int>(name));
+    else if (t == "f") of(parser.retrieve<float>(name));
+    else if (t == "b") oi(parser.retrieve<bool>(name));
+    else if (t == "s") ostdstr(parser.retrieve<std::string>(name));
+    else if (t == "I") { std::vector<int> v = parser.retrieve<std::vector<int>>(name); oi((long long)v.size()); for (int x : v) oi(x); }
+    else if (t == "F") { std::vector<float> v = parser.retrieve<std::vector<float>>(name); oi((long long)v.size()); for (float x : v) of(x); }
+    else if (t == "B") { std::vector<bool> v = parser.retrieve<std::vector<bool>>(name); oi((long long)v.size()); for (bool x : v) oi(x); }
+    else { std::vector<std::string> v = parser.retrieve<std::vector<std::string>>(name); oi((long long)v.size()); for (std::string &x : v) ostdstr(x); }
+  }
+}
+
+void run_piece8(const std::string &cmd)
+{
+  if (cmd == "apa") { run_piece9(cmd); return; }
+  fwide(stderr, -1);
+  Gerror = (int)geti();
+  if (cmd == "ial") {
+    int rows = (int)geti(), cols = (int)geti(), fmt = (int)geti(), nf = (int)geti();
+    unsigned long bs = strtoull(next(), NULL, 10);
+    IMAGE *I = ImageAlloc(rows, cols, fmt, nf, bs);
+    imlens.push_back({I, I->image ? (bs ? bs : I->sizeimage * (unsigned long)(long)I->num_frame) : 0});
+    print_img(I);
+  } else if (cmd == "icp") {
+    IMAGE *s = mkimg();
+    IMAGE *d = mkimg();
+    if (d && (d->numpix < s->numpix || d->num_frame < s->num_frame)) forget(d);
+    IMAGE *r = ImageCopy(s, d);
+    print_img(s); print_img(r);
+  } else if (cmd == "ica") {
+    IMAGE *I = mkimg();
+    int r0 = (int)geti(), c0 = (int)geti(), rows = (int)geti(), cols = (int)geti();
+    float val = getf();
+    int frame = (int)geti();
+    oi(ImageClearArea(I, r0, c0, rows, cols, val, frame)); print_img(I);
+  } else if (cmd == "ick") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int rows = (int)geti(), cols = (int)geti(), nf = (int)geti();
+    oi(ImageCheckSize(a, b, rows, cols, nf));
+  } else if (cmd == "iss") {
+    IMAGE *I = mkimg();
+    int rows = (int)geti(), cols = (int)geti();
+    oi(ImageSetSize(I, rows, cols)); print_img(I);
+  } else if (cmd == "icf") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int start = (int)geti(), nf = (int)geti(), dst = (int)geti();
+    oi(ImageCopyFrames(a, b, start, nf, dst)); print_img(b);
+  } else if (cmd == "irs") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    float scale = getf();
+    IMAGE *r = ImageRescale(a, b, scale);
+    print_img(a); print_img(r);
+  } else if (cmd == "isd" || cmd == "isu") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    float scale = getf();
+    int r = cmd == "isd" ? ImageScaleDown(a, b, scale) : ImageScaleUp(a, b, scale);
+    oi(r); print_img(a); print_img(b);
+  } else if (cmd == "ird") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    if (b && !ImageCheckSize(a, b, a->rows / 2, a->cols / 2, 0)) forget(b);
+    IMAGE *r = ImageReduce(a, b);
+    print_img(r);
+  } else if (cmd == "ic1" || cmd == "ir1") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int axis = (int)geti();
+    int len = (int)geti();
+    std::vector<float> k(len);
+    for (float &x : k) x = getf();
+    if (cmd == "ic1") ImageConvolve1d(a, b, k.data(), len, axis);
+    else ImageReduce1d(a, b, k.data(), len, axis);
+    print_img(b);
+  } else {
+    run_piece9(cmd);
+    return;
+  }
+  oi(Gerror);
+}
+
 void run_piece7(const std::string &cmd)
 {
   if (cmd == "bsp") {
@@ -615,7 +806,7 @@ void run_piece7(const std::string &cmd)
     oi(errno);
     Gdiag = 0;
   } else {
-    fail("unknown command");
+    run_piece8(cmd);
   }
 }
 

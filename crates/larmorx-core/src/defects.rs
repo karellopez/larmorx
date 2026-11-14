@@ -1593,6 +1593,22 @@ defects! {
         "reading a Bruker study whose 2dseq file is shorter than the volume crashes (the volume is freed twice)";
     FS_404 = "FS-404", "FreeSurfer", true,
         "reading a Bruker study ignores RECO_byte_order: a big-endian 2dseq is read in the machine's byte order, so its values are wrong";
+    FS_405 = "FS-405", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions (allocating, clearing an area, copying frames, scaling, the pyramid reduction) read and write outside an image's pixels when given a frame, an area, a size or a buffer the image does not have: memory corruption, a crash or memory contents";
+    FS_406 = "FS-406", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions turn a float beyond the target type's range, or NaN, into a pixel byte or a pixel coordinate without a check: a fill value or a float pixel beyond the byte range becomes the low byte of -2147483648 or of its integer part, a coordinate -2147483648";
+    FS_407 = "FS-407", "FreeSurfer", true,
+        "ImageCopyFrames, converting frames (bytes into floats or integers, integers into anything), writes each frame into the output frame of the same number, not into the destination frame it was given";
+    FS_408 = "FS-408", "FreeSurfer", true,
+        "ImageScaleDown of a float image of more than one frame by a power of two (0.5, 0.25, ...) reduces only the first frame: the output's other frames are left as they were";
+    FS_409 = "FS-409", "FreeSurfer", true,
+        "ImageRescale by 1 with a given output smaller than its input returns that output after freeing it, without the copy: memory contents or a crash";
+    FS_410 = "FS-410", "FreeSurfer", true,
+        "ImageAlloc, when the pixels cannot be allocated, ends the program with the code of FreeSurfer's previous error, 0 when there was none: a program that ran out of memory exits with status 0 (success)";
+    FS_411 = "FS-411", "FreeSurfer", true,
+        "a newer-style FreeSurfer program without a help text (mri_brainvol_stats) run without a required input prints, before its error, a help line chosen by memory never written: No xml string passed. when that memory holds 0, otherwise an XML parser's message";
+    FS_412 = "FS-412", "FreeSurfer", true,
+        "ImageScaleUp, ImageScaleDown and ImageRescale with a scale that makes the image's rows or columns beyond the 32-bit integer range (or NaN) go on with extents of -2147483648: nothing is scaled, or the image cannot be allocated, with no message about the scale";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,
@@ -1721,6 +1737,68 @@ defects! {
         "the directional derivative at a scale (MRIsampleVolumeDerivativeScale) with an infinite scale, or one whose double overflows, never returns";
     FS_325 = "FS-325", "FreeSurfer", true,
         "the linear transform of a volume (MRIlinearTransformInterp) stores, where a sample fails (sinc sampling, a type the trilinear sampler refuses), the last sample that succeeded, and before the first a value never written: memory contents";
+    FS_326 = "FS-326", "FreeSurfer", true,
+        "resampling a volume by voting (MRIresample with SAMPLE_VOTE) counts each label's votes for a voxel in a byte, which stops at 255: a label with more votes ties with one of 255 and the lower label wins";
+    FS_327 = "FS-327", "FreeSurfer", true,
+        "resampling a volume by voting onto a template whose orientation is unknown (no good RAS and no principal slice direction) or whose voxel-to-RAS matrix does not invert crashes";
+    FS_328 = "FS-328", "FreeSurfer", true,
+        "resampling a volume of 64-bit integers (long) onto a template writes each voxel as a 32-bit integer at the voxel's index: it changes halves of other voxels";
+    FS_329 = "FS-329", "FreeSurfer", true,
+        "the statistics of a volume of 64-bit integers (MRIstats, MRIprintStats) read 32-bit integers at the voxels' indices: halves of the first voxels instead of the voxels";
+    FS_330 = "FS-330", "FreeSurfer", true,
+        "the printed statistics (MRIprintStats) of a volume without voxels, or of a type the statistics do not read (bitmap, tensor, RGB, complex), are values never written: memory contents";
+    FS_461 = "FS-461", "FreeSurfer", true,
+        "replacing a value in a byte volume (MRIreplaceValues, MRIreplaceValuesUchar) replaces it in the first frame only; the other frames of a new or other destination are not written";
+    FS_462 = "FS-462", "FreeSurfer", true,
+        "the centre of a volume sampled by a whole factor (MRIcalcCRASforSampledVolume) divides by the sampled volume's extent: an extent of 0 ends the program";
+    FS_463 = "FS-463", "FreeSurfer", true,
+        "the check of an orientation string (MRIcheckOrientationString, MRIorientationStringToDircos) reads three characters, past the end of a string of fewer than two: memory contents";
+    FS_464 = "FS-464", "FreeSurfer", true,
+        "setting a volume's geometry from a voxel-to-RAS matrix (MRIsetVoxelToRasXform) reads rows 1 to 3 and columns 1 to 4, past the elements of a smaller matrix: memory contents";
+    FS_465 = "FS-465", "FreeSurfer", true,
+        "the conversions between a volume's slice and a 2-D image (MRItoImage, MRItoImageView, ImageToMRI) write or read past the image's pixels when a given image is smaller than the slice or of a narrower pixel format, or when the image holds fewer frames or pixels than its header counts: memory contents";
+    FS_466 = "FS-466", "FreeSurfer", true,
+        "an RGB image's frames after the first are read into a volume (ImageToMRI) one byte per pixel from the start instead of three: they overlap the first frame";
+    FS_467 = "FS-467", "FreeSurfer", true,
+        "the smoothing of a parcellation (MRIsmoothParcellation) counts its neighbours' labels in an array indexed by the label: a negative label is counted outside the array: memory contents";
+    FS_468 = "FS-468", "FreeSurfer", true,
+        "the clipping of bright white matter (MRIclipBrightWM) stores every voxel through a byte: a value below 0 or above 255, or NaN, becomes the low byte of its 32-bit truncation (0 for NaN and beyond the 32-bit range)";
+    FS_469 = "FS-469", "FreeSurfer", true,
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) weighs a voxel on the label's border whose own label is negative or not below the label limit with a mean taken from memory contents";
+    FS_470 = "FS-470", "FreeSurfer", true,
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) given no intensity volume reads the first border voxel's intensity from no volume: the program crashes";
+    FS_471 = "FS-471", "FreeSurfer", true,
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) crashes the program for a negative label limit, and for a very large one (from about 699,000 labels with Linux's default 8 MiB stack)";
+    FS_472 = "FS-472", "FreeSurfer", true,
+        "a constant fill (MRIconst) or a normalisation of each voxel's frames (MRInormalizeSequence) of a byte, short or unsigned short volume stores a value past the type's range as the low bits of its integer: it wraps";
+    FS_473 = "FS-473", "FreeSurfer", true,
+        "the reversal of a volume's slices (MRIreverseSliceOrder) copies one b-value and b-vector per frame from tables of fewer rows than frames past their rows: a crash or memory contents";
+    FS_474 = "FS-474", "FreeSurfer", true,
+        "the order of a volume's voxels by value (MRIorderIndices) keeps each voxel's coordinates and value in bytes: a coordinate past 255 wraps, and a value outside 0 to 255 or NaN becomes the low byte of its 32-bit truncation";
+    FS_475 = "FS-475", "FreeSurfer", true,
+        "the partial-volume fractions of a segmentation (MRIcomputeVolumeFractions) count a voxel of label 0 into the frame before the first (labels are frame plus 1): FreeSurfer reads and writes outside the volume: a crash or memory contents";
+    FS_476 = "FS-476", "FreeSurfer", true,
+        "the partial-volume fractions of a segmentation (MRIcomputeVolumeFractions) never mark the last label in their second pass (voxels no segmentation voxel reached), which accepts labels below the frame count only";
+    FS_477 = "FS-477", "FreeSurfer", true,
+        "the application of a list of voxel differences (MRIapplyDiffVect) accepts a column, row or slice equal to the volume's extent and writes past the volume";
+    FS_478 = "FS-478", "FreeSurfer", true,
+        "a list of voxel differences applied in place (MRIapplyDiffVect) frees the volume's colour table before copying it: the volume loses it, with the error 'CTABdeepCopy: ct was NULL'";
+    FS_479 = "FS-479", "FreeSurfer", true,
+        "the intracranial volume estimate from a transform file (MRIestimateTIV) reads the first linear transform of a file that holds none: the program crashes";
+    FS_480 = "FS-480", "FreeSurfer", true,
+        "the vote over each voxel's sorted frames (MRIvote) told to exclude zeros still takes a last run of zeros when it is the longest";
+    FS_481 = "FS-481", "FreeSurfer", true,
+        "the reshape of a volume of 64-bit integers (mri_reshape) copies 32-bit integers at the voxels' indices: halves of the first voxels, the rest left 0";
+    FS_482 = "FS-482", "FreeSurfer", true,
+        "the resampling with a voxel-shift map (MRIvol2VolVSM) shifts by the last value the map's sampler wrote; for a map of a type the sampler refuses, at the first voxel a value never written: memory contents";
+    FS_483 = "FS-483", "FreeSurfer", true,
+        "the frame covariance and PCA of a masked volume (MRIcovarianceMatrix, MRIpca) count the mask voxels above 0.5 but sum every voxel not below 0.5: a mask voxel of exactly 0.5 (or NaN) enters the sums and not the count";
+    FS_484 = "FS-484", "FreeSurfer", true,
+        "the frame PCA of a volume without frames (MRIpca) crashes in the singular value decomposition of its empty covariance";
+    FS_485 = "FS-485", "FreeSurfer", true,
+        "the gradient-direction measure of a voxel (MRIvoxelDirection) cuts its window at the volume's far faces but reads it back as a full cube: the gradients pair with the wrong offsets and the last entries were never written (memory contents)";
+    FS_486 = "FS-486", "FreeSurfer", true,
+        "the second derivative along the gradient (MRIvoxelGradientDir2ndDerivative) of a volume whose type the trilinear sampler refuses subtracts a sample never written: memory contents";
 }
 
 /// The register entry with ID `id`.

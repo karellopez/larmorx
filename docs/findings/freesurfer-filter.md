@@ -209,3 +209,49 @@ not vectorised: the loops call `MRIgetVoxVal`, or alias their row pointers):
 - Operand orders (`relay26/mrifilter.asm`): `MIN` as `minss` (`a < b ? a : b`), `d = (1.0 - ctx) -
   wm` (`subsd` twice), the ratio `(double) a / ((double) b + 1e-6)`; the reclassification compares
   `val > thresh` in single precision (`thresh` is a bin value, a float).
+
+## 12. `mrisegment.cpp`, `mriflood.cpp` and `mrinorm.cpp`'s Voronoi diagram and soap bubble (relay 28)
+
+- **The segment table's growth is safe.** `mriSegmentReallocateSegments` copies only the first
+  `nsegments` slots, which would lose a live segment numbered at or above the count; but
+  `mriSegmentNew` calls it only when the count equals the table's length, and the scan keeps the
+  count equal to the number of live segments (a new segment adds one, a merge removes one), so
+  every slot is live then. No defect (FS-576 unused).
+- **FS-577.** `mri_labeled` is `MRI_SHORT`: `MRISvox(mri_labeled, x, y, z) = label` stores the low 16
+  bits; a label of 32,768 or more reads back negative, so a later neighbour does not see it. Reached
+  by a 64 x 64 x 17 checkerboard (34,816 single-voxel segments) under a slab: the slab joins only
+  the singletons numbered below 32,768.
+- **FS-578.** `MRImaxsegment` calls `MRIremoveSmallSegments` (which compacts, renumbering the kept
+  segments) inside its scan and then only clears labels `>= nsegments`; the voxels of a kept
+  segment that moved keep its old number, which is either cleared (its next voxels start a new
+  segment) or another segment's. Reached when the table first grows past 8,800 slots (at 9,680
+  segments) with a segment of at least 100 voxels: a pillar of 8 columns beside a 64 x 64 x 6
+  checkerboard. The default rebuilds the map from the segments.
+- **`MRImaxsegment`'s heap usage** is `getMemoryUsed()` (a `popen` of `grep -i vmdata
+  /proc/<pid>/status | cut -f 2`): the port takes it as a function (the program passes
+  `get_memory_used`, the probe a constant 1000, and `check.py` replaces the official number).
+- **Speed without changing results.** `mriSegmentNew` searches the first empty slot from 0 and
+  `MRIcompactSegments` searches the next live slot from `s + 1` for each empty slot: quadratic in
+  the number of segments (17 s in a debug build for 35,000). The port searches from the first slot
+  that may be empty (a merge lowers it) and resumes the compaction's search: the same slots.
+- **`MRISfloodoutside`** reads `(int)MRIgetVoxVal` (`cvttss2si`); a voxel set to 1 reads back 1 in
+  every type, so the port keeps the `int` values in an array and writes each filled voxel.
+- **`distance`** compiles to `mulss` of each coordinate, `addss` of y² to x², then of z², and
+  `sqrtss` (a call to `sqrtf` only below 0).
+- **The Voronoi diagram, 16-bit:** `if (mri_src->type != MRI_SHORT || mri_dst->type != MRI_SHORT)`
+  runs before `if (!mri_dst) mri_dst = MRIclone(...)`: a `NULL` destination crashes (FS-583, `CRASH
+  11` in the probe). Its marks are read with `MRIvox` (bytes) of the work copy of the control volume,
+  so an `int` control volume's bytes are read (FS-585). The float version reads them with
+  `MRIgetVoxVal` into a `BUFTYPE` (`cvttss2si`, low byte), the byte version into an `int`.
+- **The soap bubble, float:** the first phase's `fabs` is `std::fabs(float)` (`andps`); the passes'
+  `fabs(mean / (3 * 3 * 3.0) - val)` is a double (a call to `fabs` under `-fno-builtin`). The work
+  copy is made from the destination before the first phase, and each pass copies all of it back,
+  so the first phase's values outside the pass's box are replaced by the work copy's (the source's)
+  at the first pass: only the values inside the box survive (kept: FreeSurfer's behaviour, not a
+  defect we can show changes a pipeline result). `#pragma omp parallel for` over the box's slices
+  shares `max_change` without synchronisation (FS-584; the probe runs one thread). The box and
+  `max_change` are not reset between frames, and `max_change` is not reset after the pass that
+  stops a frame.
+- **The soap bubble, 16-bit and other types:** `MRIvox(mri_ctrl, ...)` and `MRIseq_vox(mri_dst,
+  ...)` are byte accesses whatever the volume's type (FS-585); within each row's first `width`
+  bytes they stay inside the volume.

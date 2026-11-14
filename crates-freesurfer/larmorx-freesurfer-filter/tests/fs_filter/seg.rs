@@ -5,12 +5,17 @@
 //! `utils/mrisegment.cpp`, `utils/mriflood.cpp`): their case generators and the port's answers.
 
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_filter::flood;
 use larmorx_freesurfer_filter::norm;
 use larmorx_freesurfer_filter::segment as sg;
+use larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN;
+use larmorx_freesurfer_io::mriio::mri_read;
+use larmorx_freesurfer_mri::mri::mri_copy_header;
 use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence,
 };
+use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_volume::arith::Pair;
 
 use super::conv::{opt, result, same_result, small};
@@ -479,8 +484,76 @@ fn run_flood(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<()
     Ok(())
 }
 
+fn fnv(m: &Mri) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in m.chunk.as_ref().expect("voxels") {
+        h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{h:016x} ")
+}
+
+/// `vsr` (`fsfilter.cpp`): a recorded head's Voronoi diagram and soap bubble.
+fn vsr(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
+    let read = |cx: &mut Ctx, path: &str| -> Result<Mri, Fatal> {
+        Ok(mri_read(
+            &mut cx.g,
+            &mut cx.a,
+            &mut cx.b,
+            &Environment::default(),
+            None,
+            path,
+            MRI_VOLUME_TYPE_UNKNOWN,
+            true,
+            -1,
+            -1,
+        )?
+        .expect("the volume"))
+    };
+    let (sp, lp) = (t.next(), t.next());
+    let mut src = read(cx, sp)?;
+    let lab = read(cx, lp)?;
+    let (label, ty, niter, mc) = (t.i(), t.i(), t.i(), t.f());
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let (w, h, d) = (lab.vg.width, lab.vg.height, lab.vg.depth);
+    let mut ctrl = mri_alloc_sequence(g, a, b, w, h, d, MRI_UCHAR, 1)?;
+    let mut i = 0;
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let v = mri_get_vox_val(g, b, &lab, x, y, z, 0, 0)?;
+                ctrl.chunk.as_mut().expect("voxels")[i] = u8::from(v as i32 == label);
+                i += 1;
+            }
+        }
+    }
+    if ty == MRI_FLOAT {
+        let (w, h, d) = (src.vg.width, src.vg.height, src.vg.depth);
+        let mut f = mri_alloc_sequence(g, a, b, w, h, d, MRI_FLOAT, 1)?;
+        mri_copy_header(g, a, b, &src, Some(&mut f))?;
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    let v = mri_get_vox_val(g, b, &src, x, y, z, 0, 0)?;
+                    mri_set_vox_val(g, b, &mut f, x, y, z, 0, v, 0)?;
+                }
+            }
+        }
+        src = f;
+    }
+    let mut bias = norm::mri_build_voronoi_diagram(g, a, b, &src, &mut ctrl, None)?.unwrap_new();
+    *o += &fnv(&bias);
+    norm::mri_soap_bubble(g, a, b, Pair::Same(&mut bias), &ctrl, niter, mc)?;
+    *o += &fnv(&bias);
+    *o += &fnv(&ctrl);
+    Ok(())
+}
+
 /// The port's answer for one of this module's commands; `false` for another command.
 pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool, Fatal> {
+    if cmd == "vsr" {
+        vsr(cx, t, o)?;
+        return Ok(true);
+    }
     if matches!(cmd, "vor" | "soap") {
         let mut src = get_vol(cx, t)?;
         let mut ctrl = get_vol(cx, t)?;

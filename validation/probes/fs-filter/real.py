@@ -47,6 +47,14 @@ CALLS = (
 )
 
 
+# mri_normalize's bias field (MRIbuildBiasImage's Voronoi diagram, then the soap bubble in place):
+# (volume, label volume, label, type 0 uchar or 3 float, iterations, min_change)
+NORM = (
+    ("nu.mgz", "wm.mgz", 110, 0, 10, 1.0),
+    ("nu.mgz", "ctrl_pts.mgz", 1, 3, 50, 1.0),
+)
+
+
 def fx(v: float) -> str:
     return struct.pack(">f", v).hex()
 
@@ -55,6 +63,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--norm", action="store_true", help="the bias fields (Voronoi, soap bubble) instead"
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -65,11 +76,17 @@ def main(argv: list[str] | None = None) -> int:
     for head in HEADS:
         sub = head.split("-", 1)[1]
         mri = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
+        if a.norm:
+            for vol, lab, label, ty, niter, mc in NORM:
+                lines.append(
+                    f"vsr {mri / 'mri' / vol} {mri / 'mri' / lab} {label} {ty} {niter} {fx(mc)}"
+                )
+            continue
         for cmd, name, label, maxd, mode in CALLS:
             lines.append(f"{cmd} {mri / 'mri' / name} {label} {fx(maxd)} {mode}")
     inputs = ws / "oracles" / "inputs" / "fs-filter"
     inputs.mkdir(parents=True, exist_ok=True)
-    cases_path = inputs / "real-cases.txt"
+    cases_path = inputs / ("real-norm-cases.txt" if a.norm else "real-cases.txt")
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     # MRIread runs FreeSurfer's licence check: FREESURFER_HOME and FS_LICENSE (read in place)
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}

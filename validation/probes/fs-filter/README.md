@@ -58,7 +58,22 @@ frame functions.
   <thmin> <thmax> <thsign> <8 values>` (`clustValueInRange`); `rwc <norm> <seg> <mode> [<dst>]
   <nitersmax>` (`MRIreclassifyWMCtxNonPar`; then the segmentation); `amb <norm> <seg> <0 | 1
   statseg> <Qwm> <Qctx> <NdilWM> <NdilCtx>` (`MRIclassifyAmbiguousNonPar`, run in `<cases>.out.d/`;
-  then the FNV-1a of the `wm.pdf.dat` and `ctx.pdf.dat` it writes, or `NOFILE`).
+  then the FNV-1a of the `wm.pdf.dat` and `ctx.pdf.dat` it writes, or `NOFILE`). Relay 28's
+  commands (`mrisegment.cpp`, `mriflood.cpp`, `mrinorm.cpp`): `seg|mseg <segvol> <low> <hi> <nops>
+  <op>...` (`MRIsegment`, `MRImaxsegment`; `<segvol>` is `0` and a volume or `1 w h d p_lo p_hi
+  zsplit seed`, a pattern of ones: hashed, a checkerboard under a slab for `p_lo` -1, beside a
+  pillar of `zsplit` columns for -2; the operations `D <vol>` dilate, `T <bin> <thr> <lo> <hi>`
+  dilate with a threshold, `R <min>` remove small, `C` compact, `I <s> <dst?>` to image, `V <s>
+  <vol> <val>` set value, `F <s> <dst?> <val>` fill, `M`, `N`, `A` the maxima, `L` clear the
+  ignore flags, `G <s>` set one, `E <min> <vol>` erase; then the segmentation: the count, the
+  table's length and every slot's fields and voxels, or `H<FNV-1a>` above 4,000 characters);
+  `salloc <n> <m>` (`MRIsegmentAlloc`); `flood|acc <src> <mode> [<dst>] [<lo> <hi>]`
+  (`MRISfloodoutside`, `MRISaccentuate`); `dist <x> <y> <z>`; `vor <src> <ctrl> <dst?>`
+  (`MRIbuildVoronoiDiagram`; then the control volume); `soap <src> <ctrl> <mode> [<dst>] <niter>
+  <min_change>` (`MRIsoapBubble`, mode 2 in place); `vsr <volume file> <label file> <label> <type>
+  <niter> <min_change>` (`real.py --norm`: a recorded head's bias field: the FNV-1a of the Voronoi
+  diagram, of the soap bubble in place and of the control volume). `MRImaxsegment` prints the
+  process's heap usage: `check.py` compares it as `1000`, the number the port's probe passes.
 - `build.sh [<workspace>]`: builds `fsfilter` with the unit oracle's compiler, flags and libraries
   (`validation/investigations/freesurfer-unit-oracle`, `build.py all` first) into
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-filter/` (with `BUILD_INFO.txt`). From a worktree,
@@ -71,7 +86,8 @@ frame functions.
   relay 26's FS-546, FS-548, FS-549, FS-550, FS-551, FS-552, FS-555, FS-559, FS-560, FS-561 and
   FS-163 (memory outside a volume, crashes, a hang); relay 27's FS-562, FS-564, FS-567, FS-568,
   FS-569, FS-570, FS-571, FS-573, FS-575 (memory outside a volume, a matrix or a histogram, memory
-  never written, crashes).
+  never written, crashes); relay 28's FS-579, FS-581, FS-582, FS-583, FS-586 (memory outside a
+  segment table, a label map, index tables or a volume; a crash).
 - `real.py [--json out.json]`: the pipeline's maps on three recorded heads
   (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/`): `aseg.mgz` labels 2 and 3 (signed,
   100), `filled.mgz` 255 (signed, 100), `wm.mgz` 110 (unsigned, the default limit), `aseg.mgz` 17
@@ -112,3 +128,13 @@ Every run on generated inputs inside a memory box:
 - The cluster commands at seeds 7 (360 cases) and 13 (2,400), the classification commands at seeds
   7 (120), 13 and 17 (1,200 each): 0 different under `reproduce`, 0 default differences without a
   notice.
+
+## Results (relay 28, 2026-11-14)
+
+- The segment commands at seeds 7 (123 cases), 13 and 17 (333 each; FS-577 and FS-578 reached),
+  the flood commands at 7, 13 and 17 (480 each), the Voronoi and soap-bubble commands at 7, 13 and
+  17 (778 each): 0 different under `reproduce`, 0 default differences without a notice.
+- `real.py --norm` on the three recorded heads: the Voronoi diagram of `nu.mgz` with the white
+  matter (110 in `wm.mgz`) as control points and 10 soap-bubble passes (bytes), and with
+  `ctrl_pts.mgz` as a float bias field with 50 passes and `min_change` 1 (`mri_normalize`'s call):
+  6 of 6 identical in both modes; 46 s in the official code, 32 s in the port.

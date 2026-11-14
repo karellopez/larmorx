@@ -207,6 +207,15 @@ the points leave in the order these exact steps give, which decides the distance
 | FS-573 | a | an ambiguity threshold search that finds no bin reads one bin outside the histogram | the edge bin (both modes) |
 | FS-574 | c | the masks' `NdilWM`/`NdilCtx` dilations each restart from the undilated mask (one voxel) | kept in both modes (rule D) |
 | FS-575 | a | a dilation count of 0 or less crashes | an error (both modes) |
+| FS-577 | c | segment numbers above 32,767 wrap in the scan's 16-bit label map (one region split) | a 32-bit map (`reproduce`: 16 bits) |
+| FS-578 | c | `MRImaxsegment`'s removal during the scan leaves the moved segments' old numbers on the voxels already scanned | the map rebuilt (`reproduce`: as FreeSurfer) |
+| FS-579 | a | `MRIsetSegmentValue` with a segment outside the table reads outside it | an error (both modes) |
+| FS-581 | a | a volume of more than 32,768 columns, rows or slices: 16-bit coordinates wrap | an error (both modes) |
+| FS-582 | a | a dilated segment voxel more than 500 outside the volume reads outside the index tables | an error (both modes) |
+| FS-583 | a | the 16-bit Voronoi diagram without a destination crashes | a clone of the source (`reproduce`: an error) |
+| FS-584 | b | the float soap bubble's passes update the largest change on several threads without synchronisation | one thread's order, always |
+| FS-585 | c | wider control or destination volumes read byte by byte (16-bit Voronoi with an `int` control, the 16-bit soap bubble's control, the soap bubble of other types) | by value (`reproduce`: bytes) |
+| FS-586 | a | a destination or control volume smaller than the source, with fewer frames, or (float, 16-bit soap bubble) of another type: memory outside | an error (both modes) |
 
 ## 9. The Gaussian kernel and the one-dimensional convolutions
 
@@ -667,3 +676,144 @@ bin's value.
   noted defect it corrects changed the result. Observed: clusters at seeds 7 (360 cases) and 13
   (2,400); classification at seeds 7 (120), 13 and 17 (1,200 each): 0 different in either mode
   (observed).
+
+## 22. The connected segments
+
+A *segmentation* is a table of `max_segments` slots and a count `nsegments`; a slot holds an area
+(single precision), its voxels (column, row, slice as 16-bit integers, in the order added), a
+label, a scan flag, a centroid (`cx`, `cy`, `cz`, single precision), bounds (`x0`, `x1`, `y0`, `y1`,
+`z0`, `z1`, 16-bit) and an `ignore` flag. A new table (`MRIsegmentAlloc(n, m)`) has `n` empty slots
+(all fields 0); a negative `n` ends the program with `MRIsegmentAlloc: could not alloc
+mrisegments`, a negative `m` (with slots) with `MRIsegmentAlloc: could not alloc 0th voxel list`
+(both after `Cannot allocate memory`, status `ERROR_NOMEMORY`).
+
+- **The scan** (`MRIsegment(mri, low, hi)`): a table of 8,000 slots; the voxels of frame 0 in
+  slice, row, column order whose value is within `[low, hi]` (single precision; NaN never) are
+  visited. A visited voxel looks at its 6 face neighbours already labelled, in the order slice
+  before, row before, column before, column after, row after, slice after (outside the volume
+  skipped). With none, it starts a segment: when the count equals the table's length the table
+  grows to `(int)(length * 1.1)` slots (4,000 when that adds none and the length is below 4,000,
+  else the length plus 1,024), the count goes up by one, and the segment is the first empty slot
+  (no voxels) among the first `count`. With one distinct neighbour label it joins that segment. With
+  several, the first label in the order above keeps its number and every other distinct one is
+  merged into it (its voxels appended in their order and relabelled, its area added; that slot
+  emptied with area 0; the count goes down by one). The voxel is then appended, the segment's area
+  grows by `xsize * ysize * zsize` (single precision, in that order) and the voxel is labelled. The
+  labels are kept in a 16-bit map (FS-577). At the end the table is **compacted**: each empty slot,
+  in order, receives the area and voxels of the next slot with voxels (whose area and voxels are
+  then cleared); a receiving slot keeps its own label, flags, centroid and bounds. The table is cut
+  at its first empty slot and the count is its length (a table with a count of 0 is left as it is).
+  Then the **statistics** of the first `count` segments: bounds from 10000 and -10000, centroid the
+  coordinates summed in single precision divided by `(float) nvoxels` (an empty segment keeps a
+  centroid of 0).
+- **The largest segment** (`MRImaxsegment(mri, low, hi)`, `mri_watershed`): as the scan with each
+  value truncated toward zero to an `int` first (FS-17 beyond `int`), after a first pass counting
+  the voxels in range. Whenever a new segment is needed and the table is full, the process's heap
+  usage (`getMemoryUsed()`, Linux's `VmData` in kB) is read; when the table is longer than 8,800
+  slots it prints `\n             heap usage = <n> Kbytes.` (when `n > 0`), the largest segment
+  (`MRImaxSegmentArea`) as `\n             current max segment has <n> voxels`, and when the voxels
+  still to visit are fewer than `0.99` times it, `\n             removing small segments (less than
+  1 percent of maxarea).` and **removes small segments** with `(int)(maxarea * 0.01)`; the label
+  map's labels at or above the new count become unlabelled (FS-578). At the end: the heap usage
+  message, the same removal message, the removal with `(int)(0.01 * maxarea)`, then the
+  statistics (no compaction besides the removal's).
+- **Removing small segments** (`MRIremoveSmallSegments(seg, n)`): every slot with fewer than `n`
+  voxels is emptied (its area kept), then the table is compacted. **Erasing**
+  (`MRIeraseSmallSegments(seg, mri, n)`): every frame of the voxels of each slot with fewer than `n`
+  voxels set to 0 in `mri` (`MRIeraseSmallSegments: erasing (<x>, <y> <z>)` at the diagnostic
+  voxel); returns the number of voxels.
+- **Dilating** (`MRIsegmentDilate(seg, mri)`): an image of the segments (a clone of `mri` with
+  `mri`'s frame-0 values at every segment voxel); then each of the first `count` segments in order,
+  for each of its voxels present before it started (in order), looks at its 6 face neighbours
+  (column offset outermost, then row, then slice, -1 before +1; positions clamped to the volume)
+  and appends each whose `mri` value is not 0 and whose image value is 0, setting the image there to
+  the `mri` value and adding the voxel size (of `mri`). With a threshold
+  (`MRIsegmentDilateThreshold(seg, bin, thr, lo, hi)`): on `bin`, and a neighbour is taken only
+  when `thr`'s value there truncated to `int` is within `[lo, hi]`. A voxel more than 500 outside
+  the volume: FS-582.
+- **The rest.** `MRIsegmentToImage(src, dst, seg, s)`: `src`'s frame-0 values copied at segment
+  `s`'s voxels (all segments for `s < 0`) into `dst` (a clone of `src` when none); for `s >= count`
+  the destination after `MRIsegmentToImage: invalid segment #<s>`. `MRIsetSegmentValue(mri, seg, s,
+  v)` (FS-579 outside the table). `MRIsegmentFill(seg, s, mri, v)` (a clone of the segmented volume
+  when none; `NULL` after `MRIsegmentFill: invalid segment #<s>` outside `[0, count)`).
+  `MRIsegmentMax`: the first not-ignored segment with the most voxels (above 0) or -1;
+  `MRIfindMaxSegmentNumber`: the last segment with the most voxels (0 for none);
+  `MRImaxSegmentArea`: the most voxels of any slot of the table (-1 for an empty table);
+  `MRIsegmentClearIgnoreFlags`; `MRIcompactSegments`.
+- `csf_labels` (`rfa.cpp`): CSF (24), Unknown (0), the left and right lateral ventricles (4, 43),
+  inferior lateral ventricles (5, 44), third (14) and fourth (15) ventricles.
+
+## 23. Flooding the outside
+
+- `MRISfloodoutside(src, dst)`: `dst` = a copy of `src` (in place allowed); the eight corners set
+  to 1; then sweeps until one sets nothing: each sweep is eight passes, one from each corner in the
+  order (0,0,0), (w,0,0), (0,h,0), (0,0,d), (w,h,0), (w,0,d), (0,h,d), (w,h,d), columns outermost,
+  then rows, then slices, each running away from its corner; a voxel whose value truncated to `int`
+  (FS-17 beyond `int`) is 0 becomes 1 when its neighbour towards the pass's corner along any one
+  axis (the voxel itself on the volume's edge) is 1. Values other than 0 and 1 are walls.
+- `MRISaccentuate(src, dst, lo, hi)`: frame 0 set to 255 where the source's value truncated to
+  `int` is within `[lo, hi]`, else 0; a new destination is a volume of the source's extent and type
+  with its header.
+- `distance(x, y, z)`: `sqrtf((x*x + y*y) + z*z)` in single precision.
+
+## 24. The Voronoi diagram and the soap bubble
+
+Control values: `CONTROL_NONE` 0, `CONTROL_MARKED` 1, `CONTROL_TMP` 2, `CONTROL_NBR` 3.
+
+- **The Voronoi diagram** (`MRIbuildVoronoiDiagram(src, ctrl, dst)`): float, 16-bit and byte
+  sources (another type: `NULL` after `MRIbuildVoronoiDiagram: src type <t> unsupported`); the
+  destination is of the source's type (else `mriBuildVoronoiDiagram<Float|Short|Uchar>: incorrect
+  input type(s)`, the program ends; a missing destination is a clone of the source, FS-583 for a
+  16-bit source). Frame 0 of the destination takes the source's value where the control value
+  (converted to a byte as x86-64 does: truncated to 32 bits, low byte; for a byte source truncated
+  to `int`, with `ctrl=<n>` printed when above 255) is not 0, else 0. The work volume is a copy of
+  the control volume (byte or `int`, else `mriMarkUnmarkedNeighbors: all inputs must be MRI_UCHAR
+  or MRI_INT`, the program ends) with `CONTROL_MARKED` replaced by `CONTROL_NBR`. Then layers: every
+  voxel within the 26-neighbourhood (positions clamped) of a `CONTROL_NBR` voxel that is
+  `CONTROL_NONE` becomes `CONTROL_TMP`; `CONTROL_NBR` becomes `CONTROL_MARKED`; `CONTROL_TMP`
+  becomes `CONTROL_NBR`; each `CONTROL_NBR` voxel (in the float version, its value converted to a
+  byte; in the 16-bit version, the work volume's byte at that column: FS-585 for an `int` control)
+  takes the mean of its `CONTROL_MARKED` neighbours' destination values (summed in single precision
+  in slice, row, column order; divided by `(float) n`; `nint` for 16-bit, truncated for byte). The
+  layers stop when one changes nothing or every voxel outside the control points has a value. At
+  the end the control volume's `CONTROL_TMP` voxels become `CONTROL_NONE`.
+- **The soap bubble** (`MRIsoapBubble(src, ctrl, dst, niter, min_change)`, the destination may be
+  the source): no iteration copies the source. A missing destination is a copy of the source; a
+  work copy of the destination is made before anything else.
+  - *Float* (the control volume must be byte: `mriSoapBubbleFloat: ctrl must be UCHAR`): the box of
+    the control values above 0 (`MRIboundingBox`). Per frame: every voxel within 2 of the box
+    (inside the volume) that is not a control point (byte 1) takes, in place, the mean of the
+    control points of its 5 x 5 x 5 neighbourhood (single precision; when there is one), and the
+    largest change `|mean - old|` (single precision) is kept. Then up to `niter` passes over the box:
+    each voxel that is not a control point gets in the work copy the 3 x 3 x 3 mean of the
+    destination (`float` sum / 27.0f); the change is `|sum / 27.0 - work value|` in double
+    precision, kept as the largest (stored as single precision); the work copy is copied into the
+    destination (every voxel and frame), the box grows by one voxel, and the passes stop after one
+    whose largest change (the first phase's included in the first pass) is below `min_change`,
+    else the largest change restarts at 0. The box and the largest change carry over between
+    frames. FreeSurfer runs the passes on several threads (FS-584).
+  - *16-bit*: per frame, each voxel that is not a control point (the control volume's byte:
+    FS-585 for wider types) first takes `nint` of the mean of the control points of its 3 x 3 x 3
+    neighbourhood (`int` sum, single-precision quotient), in place; then `niter` passes as above
+    without the change test (`nint(sum / 27.0f)`).
+  - *Other types*: `niter` passes per frame, the control value converted to a byte, each other
+    voxel's work value `nint(sum / 27.0f)` of the destination's 27 bytes (the volumes' bytes: FS-585
+    for wider types), the work copy copied into the destination after each pass.
+
+## 25. Validation plan (part 5)
+
+- **Probe (black box).** `fsfilter`'s commands `seg`, `mseg` (the segmentation printed in full,
+  or as its FNV-1a above 4,000 characters, after a list of operations: dilations, removal,
+  compaction, images, fills, values, maxima, ignore flags, erasure), `salloc`; pattern volumes of
+  up to 64 x 64 x 48 (thousands of segments; above 32,767 for FS-577; a pillar beside a
+  checkerboard for FS-578); `flood`, `acc`, `dist`; `vor`, `soap` (float, 16-bit, byte, `int`
+  and `long` sources; byte, `int`, float and 16-bit control volumes; given, new and in-place
+  destinations). `mseg`'s heap usage is compared as `1000`. `real.py --norm`: the Voronoi diagram
+  and soap bubble of `nu.mgz` on recorded heads (white matter 110 as byte; `ctrl_pts.mgz` as float,
+  50 passes, `min_change` 1).
+- **Expected.** Every line identical under `reproduce` but those that touch memory outside a volume
+  or crash (FS-579, FS-581, FS-582, FS-583, FS-586); the default identical but where a noted defect
+  it corrects changed the result. Observed: segments at seeds 7 (123 cases), 13 and 17 (333 each),
+  flooding at 7, 13 and 17 (480 each), Voronoi and soap bubble at 7, 13 and 17 (778 each): 0
+  different in either mode; `real.py --norm` on three recorded heads (six bias fields of 256³
+  voxels): 6 identical in either mode (observed).

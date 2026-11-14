@@ -660,6 +660,41 @@ bool seg_case(const std::string &cmd)
     put_vol(ctrl);
     return true;
   }
+  if (cmd == "vsr") {
+    // vsr <volume file> <label file> label type niter min_change: the control points where the
+    // label volume (as int) equals label, the volume as uchar or float (type 0 or 3), its Voronoi
+    // diagram, then the soap bubble in place (mri_normalize's call); the FNV-1a of the diagram, of
+    // the bubble and of the control volume after
+    MRI *src = MRIread(next());
+    MRI *lab = MRIread(next());
+    if (!src || !lab) fail("cannot read the volume");
+    int label = geti(), type = geti(), niter = geti();
+    float mc = getf();
+    MRI *ctrl = MRIalloc(lab->width, lab->height, lab->depth, MRI_UCHAR);
+    for (int z = 0; z < lab->depth; z++)
+      for (int y = 0; y < lab->height; y++)
+        for (int x = 0; x < lab->width; x++) MRIvox(ctrl, x, y, z) = (int)MRIgetVoxVal(lab, x, y, z, 0) == label;
+    if (type == MRI_FLOAT) {
+      MRI *f = MRIallocSequence(src->width, src->height, src->depth, MRI_FLOAT, 1);
+      MRIcopyHeader(src, f);
+      for (int z = 0; z < src->depth; z++)
+        for (int y = 0; y < src->height; y++)
+          for (int x = 0; x < src->width; x++) MRIFvox(f, x, y, z) = MRIgetVoxVal(src, x, y, z, 0);
+      src = f;
+    }
+    MRI *bias = MRIbuildVoronoiDiagram(src, ctrl, NULL);
+    for (int k = 0; k < 3; k++) {
+      const MRI *m = k == 2 ? ctrl : bias;
+      if (k == 1) MRIsoapBubble(bias, ctrl, bias, niter, mc);
+      uint64_t h = 0xcbf29ce484222325ull;
+      const unsigned char *b = (const unsigned char *)m->chunk;
+      for (size_t i = 0; i < m->bytes_total; i++) h = (h ^ b[i]) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
+    return true;
+  }
   if (cmd == "soap") {
     MRI *src = get_vol();
     MRI *ctrl = get_vol();
@@ -822,7 +857,10 @@ std::string escape(const std::string &s)
 const char *MARK = "\n@@RESULT ";
 
 // the recorded heads' cases run for minutes
-bool toks_hint_long(const std::string &line) { return line.compare(0, 5, "edmf ") == 0 || line.compare(0, 5, "dtrf ") == 0; }
+bool toks_hint_long(const std::string &line)
+{
+  return line.compare(0, 5, "edmf ") == 0 || line.compare(0, 5, "dtrf ") == 0 || line.compare(0, 4, "vsr ") == 0;
+}
 
 }  // namespace
 

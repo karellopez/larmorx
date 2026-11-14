@@ -6,8 +6,9 @@
 //! `index_to_name`, `index_to_annotation`, `annotation_to_name`, `set_atable_from_ctable`,
 //! `print_annotation_table`, `print_annotation_colortable`. FreeSurfer keeps one table per
 //! process (`atable`, `num_entries`, and the global `annotation_table_file`); here it is the
-//! caller's [`AnnotationTables`]. The functions on surfaces (`annotation2label`,
-//! `MRISannot2seg`, `ReadAnnotAsMRISeg`) come with fs.surf.
+//! caller's [`AnnotationTables`]. [`read_annot_as_mri_seg`] (`ReadAnnotAsMRISeg`, `mri_read`'s
+//! annotation volumes) needs no surface; the functions on surfaces (`annotation2label`,
+//! `MRISannot2seg`) come with fs.surf.
 //!
 //! D13: FS-430 (names of 100 bytes or more, table paths of 1,024 bytes or more: both modes keep
 //! them whole, noted).
@@ -16,14 +17,19 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::FS_430;
+use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{ERROR_BAD_PARM, ERROR_NO_FILE, NO_ERROR};
+use larmorx_freesurfer_core::log::{ERROR_BAD_PARM, ERROR_NO_FILE, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_mri::ctab::ColorTable;
 
+use larmorx_freesurfer_mri::mri::{self, MGH_VERSION, MGZ_INTENT_LABEL, MRI_INT, Mri};
+use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
+
 use crate::cfile::CFile;
 use crate::colortab;
+use crate::fio::{self, Slot49};
 use crate::label::{STRLEN, fgetl};
 
 /// The name field's size (`char name[100]`).
@@ -412,4 +418,95 @@ pub fn print_annotation_colortable(
         let _ = fp.write_all(&l);
     }
     0
+}
+
+/// `ReadAnnotAsMRISeg(annotfname, volume_flag)`: an annotation file (`<vertices>`, then a vertex
+/// number and an annotation value per vertex, all big-endian `int`s, then the tag 1 and a binary
+/// colour table) as a volume of `<vertices>` x 1 x 1 `int`s, intent label; with `volume_flag` each
+/// vertex's value is its annotation's entry in the table (0 when the table has no entry of that
+/// colour), and `ReadAnnotAsMRISeg(): nhits = <n>` (the vertices whose annotation is not 0) is
+/// printed. Messages on standard output, `None` after them: `ERROR: could not read <f>`,
+/// `ERROR: ReadAnnotAsMRISeg(): vno = <v> >= num = <n>`, `ERROR: ReadAnnotAsMRISeg(): no color
+/// table found in <f>` (the file ends before the tag); a table read prints `colortable with <n>
+/// entries read (originally <name>)`. A tag other than 1 leaves the volume without a table. A
+/// vertex number below 0 is written outside the volume (FS-53). The numbers the file cuts are
+/// memory contents (FS-49).
+pub fn read_annot_as_mri_seg(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    annotfname: &str,
+    volume_flag: bool,
+) -> Result<Option<Mri>, Fatal> {
+    let mut fp = match CFile::open(dir, annotfname, "r") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            let _ = writeln!(out, "ERROR: could not read {annotfname}");
+            return Ok(None);
+        }
+    };
+    // the freadInt calls of this function share their memory (FS-49); the allocation and each
+    // voxel write between two of them leave it unknown
+    let mut slot = Slot49::new();
+    let num = fio::fread_int_in(g, &mut fp, &mut slot);
+    let mut m = if volume_flag {
+        mri::mri_alloc(g, out, err, num, 1, 1, MRI_INT)?
+    } else {
+        mri::mri_alloc_header(g, out, err, num, 1, 1, MRI_INT, 1)?
+    };
+    slot.clobber();
+    m.intent = MGZ_INTENT_LABEL;
+    m.version = ((MGZ_INTENT_LABEL & 0xffff) << 8) | MGH_VERSION;
+    for _ in 0..num.max(0) {
+        let vno = fio::fread_int_in(g, &mut fp, &mut slot);
+        if vno >= num {
+            let _ = writeln!(out, "ERROR: ReadAnnotAsMRISeg(): vno = {vno} >= num = {num}");
+            return Ok(None);
+        }
+        let i = fio::fread_int_in(g, &mut fp, &mut slot);
+        if volume_flag {
+            mri_set_vox_val(g, err, &mut m, vno, 0, 0, 0, i as f32, 0)?;
+            slot.clobber();
+        }
+    }
+    let tag = fio::fread_int_in(g, &mut fp, &mut slot);
+    if fp.feof() {
+        let _ = writeln!(
+            out,
+            "ERROR: ReadAnnotAsMRISeg(): no color table found in {annotfname}"
+        );
+        fp.close();
+        return Ok(None);
+    }
+    if tag == crate::tags::TAG_OLD_COLORTABLE {
+        m.ct = crate::colortab_bin::ctab_read_from_binary(g, out, err, Some(&mut fp));
+        if let Some(ct) = &m.ct {
+            let mut l = format!("colortable with {} entries read (originally ", ct.nentries())
+                .into_bytes();
+            l.extend_from_slice(&ct.fname);
+            l.extend_from_slice(b")\n");
+            let _ = out.write_all(&l);
+        }
+    }
+    fp.close();
+    if volume_flag && let Some(ct) = m.ct.take() {
+        let mut nhits = 0;
+        for j in 0..num.max(0) {
+            let v = mri_get_vox_val(g, err, &m, j, 0, 0, 0, 0)?;
+            let annot = float_to_int(g, f64::from(v), "ReadAnnotAsMRISeg");
+            if annot != 0 {
+                nhits += 1;
+            }
+            let mut index = colortab::ctab_find_index_from_annotation(&ct, annot);
+            if index == -1 {
+                index = 0;
+            }
+            mri_set_vox_val(g, err, &mut m, j, 0, 0, 0, index as f32, 0)?;
+        }
+        m.ct = Some(ct);
+        let _ = writeln!(out, "ReadAnnotAsMRISeg(): nhits = {nhits}");
+    }
+    Ok(Some(m))
 }

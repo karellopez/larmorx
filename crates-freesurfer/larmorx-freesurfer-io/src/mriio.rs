@@ -282,15 +282,12 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
         MRI_GCA_FILE => "GCA",
-        BRIK_FILE => "AFNI BRIK",
         MRI_MINC_FILE => "MINC",
         MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         NRRD_FILE => "NRRD",
-        MRI_CURV_FILE => "curvature",
         IMAGE_FILE => "image",
-        MGH_ANNOT => "annotation",
         _ => return None,
     })
 }
@@ -476,6 +473,12 @@ pub fn mri_read(
     } else if mtype == identify::GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?
+    } else if mtype == identify::BRIK_FILE {
+        crate::afni::afni_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::MRI_CURV_FILE {
+        mris_read_curv_as_mri(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::MGH_ANNOT {
+        crate::annotation::read_annot_as_mri_seg(g, out, err, dir, &copy, volume_flag)?
     } else if let Some(name) = not_ported(mtype) {
         let _ = writeln!(
             err,
@@ -576,10 +579,8 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
     Some(match mtype {
         MRI_MINC_FILE => "MINC",
         IMAGE_FILE => "image",
-        BRIK_FILE => "AFNI BRIK",
         MGH_MORPH => "GCA morph (m3z)",
         ITK_MORPH => "ITK warp",
-        NRRD_FILE => "NRRD",
         _ => return None,
     })
 }
@@ -600,6 +601,74 @@ fn write_unsupported(mtype: i32) -> Option<&'static str> {
         XIMG_FILE => "XIMG",
         _ => return None,
     })
+}
+
+/// `mriNrrdWrite(mri, fname)`: FreeSurfer 8.2.0 writes no NRRD: `mriNrrdWrite(): Nrrd output not
+/// supported!` (`ERROR_UNSUPPORTED`, after the text of the `errno` its caller left), nothing written.
+fn mri_nrrd_write(g: &mut Globals, err: &mut dyn Write) -> i32 {
+    log::error_printf(
+        g,
+        err,
+        ERROR_UNSUPPORTED,
+        "mriNrrdWrite(): Nrrd output not supported!",
+    );
+    ERROR_UNSUPPORTED
+}
+
+/// `MRISreadCurvAsMRI(curvfile, read_volume)`: a curvature file of the new format (its first three
+/// bytes 16,777,215, then the vertex count, the face count and the values per vertex as big-endian
+/// `int`s, then one big-endian `float` per vertex) as a float volume of `<vertices>` x 1 x 1, intent
+/// shape. A file without the mark gives `None` without a message; values per vertex other than 1
+/// give `ERROR: MRISreadCurvAsMRI: <f>, vals/vertex <n> unsupported` (standard output) and `None`.
+/// A file that ends early gives `freadFloat: fread failed` per value it lacks (FS-167) and memory
+/// contents for the numbers it cuts (FS-49).
+pub fn mris_read_curv_as_mri(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    curvfile: &str,
+    read_volume: bool,
+) -> Result<Option<Mri>, Fatal> {
+    if identify::id_is_curv(g, dir, curvfile) == 0 {
+        return Ok(None);
+    }
+    let Ok(mut fp) = crate::cfile::CFile::open(dir, curvfile, "r") else {
+        // FreeSurfer opens it without a test (it was just read)
+        return Ok(None);
+    };
+    let _ = fio::fread3(&mut fp);
+    // the three freadInt calls share their memory (FS-49)
+    let mut slot = fio::Slot49::new();
+    let vnum = fio::fread_int_in(g, &mut fp, &mut slot);
+    let _fnum = fio::fread_int_in(g, &mut fp, &mut slot);
+    let vals_per_vertex = fio::fread_int_in(g, &mut fp, &mut slot);
+    if vals_per_vertex != 1 {
+        fp.close();
+        let _ = writeln!(
+            out,
+            "ERROR: MRISreadCurvAsMRI: {curvfile}, vals/vertex {vals_per_vertex} unsupported"
+        );
+        return Ok(None);
+    }
+    let shape = mri::MGZ_INTENT_SHAPE;
+    if !read_volume {
+        let mut m = mri::mri_alloc_header(g, out, err, vnum, 1, 1, MRI_FLOAT, 1)?;
+        m.intent = shape;
+        m.version = ((shape & 0xffff) << 8) | mri::MGH_VERSION;
+        m.nframes = 1;
+        fp.close();
+        return Ok(Some(m));
+    }
+    let mut m = mri::mri_alloc(g, out, err, vnum, 1, 1, MRI_FLOAT)?;
+    m.intent = shape;
+    m.version = ((shape & 0xffff) << 8) | mri::MGH_VERSION;
+    for k in 0..vnum.max(0) {
+        let curv = fio::fread_float(g, err, &mut fp);
+        larmorx_freesurfer_mri::voxel::mri_set_vox_val(g, err, &mut m, k, 0, 0, 0, curv, 0)?;
+    }
+    fp.close();
+    Ok(Some(m))
 }
 
 /// `ErrorReturn(code, (code, message))` after `errno = 0`: the message as an error, `code`.
@@ -745,6 +814,10 @@ pub fn mri_write_type(
         crate::mriio_analyze::analyze_write(g, out, err, dir, m, fname)?
     } else if mtype == MRI_ANALYZE4D_FILE {
         crate::mriio_analyze::analyze_write4d(g, out, err, dir, m, fname)?
+    } else if mtype == BRIK_FILE {
+        crate::afni::afni_write(g, err)
+    } else if mtype == NRRD_FILE {
+        mri_nrrd_write(g, err)
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,

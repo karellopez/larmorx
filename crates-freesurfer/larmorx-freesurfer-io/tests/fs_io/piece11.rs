@@ -824,7 +824,8 @@ fn print_label(o: &mut Out, a: Option<&Label>) {
     print_t(o, &a.inverse_linear_transform);
 }
 
-/// Every file under the fixture's `w`: its name (from `w`) and bytes, sorted by name.
+/// Every file under the fixture's `w`: its name (from `w`) and bytes (the machine's user name as
+/// `U`), sorted by name.
 fn odir(o: &mut Out, w: &Work) {
     fn walk(base: &Path, rel: &str, files: &mut Vec<String>) {
         let Ok(rd) = std::fs::read_dir(base.join(rel)) else {
@@ -1063,6 +1064,8 @@ fn answer(
                 "FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING",
                 "Thu Jan  1 00:00:00 2026",
             );
+            // a user name on every platform (Linux's comes from the password database)
+            env.set("USER", "U");
             g.gdiag = tk.int() as u64;
             setup(w, tk.next());
             g.errno = 0;

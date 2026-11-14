@@ -899,8 +899,12 @@ fn answer(
         }
         "mwr" => {
             g.gdiag = u64::from_str_radix(tk.next(), 16).unwrap();
-            let env =
-                Environment::from_pairs([("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T")]);
+            // a user name on every platform (Linux's comes from the password database), so the
+            // GIFTI file has its UserName everywhere
+            let env = Environment::from_pairs([
+                ("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T"),
+                ("USER", "U"),
+            ]);
             setup(w, tk.next());
             let nv = tk.int();
             let usevec = tk.int() != 0;

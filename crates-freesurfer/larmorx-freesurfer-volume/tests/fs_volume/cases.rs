@@ -2535,6 +2535,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "union" | "isect" | "mand" | "mxor" => r23_gen_set(&mut g, &mut t, cmd),
             c if R23_SET.contains(&c) => r23_gen_set(&mut g, &mut t, c),
             c if R23_MASK.contains(&c) => r23_gen_mask(&mut g, &mut t, c),
+            c if R24_HISTO.contains(&c) => r24_gen_histo(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3000,7 +3001,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 211] = [
+pub const COMMANDS: [&str; 220] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3212,6 +3213,15 @@ pub const COMMANDS: [&str; 211] = [
     "offbg",
     "cplab",
     "cplv",
+    "hreg",
+    "hvox",
+    "hthr",
+    "hist",
+    "geq",
+    "heq",
+    "hlr",
+    "hlab",
+    "hsegm",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5538,6 +5548,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "nmask" | "von" | "vinl" | "linv" | "cent" | "pthr" | "cnbhd" => r23_meas(cx, t, o, cmd)?,
         "grow" | "onfg" | "offbg" | "cplab" | "cplv" => r23_multi(cx, t, o, cmd)?,
+        c if R24_HISTO.contains(&c) => r24_histo(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -6821,4 +6832,447 @@ fn r23_multi(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), F
         o.vol(Some(c));
     }
     Ok(())
+}
+
+/// `mrihisto.cpp`'s commands (relay 24).
+const R24_HISTO: [&str; 9] = [
+    "hreg", "hvox", "hthr", "hist", "geq", "heq", "hlr", "hlab", "hsegm",
+];
+
+/// `fsvolume.cpp`'s `fill_pat` tokens: on (0: nothing), seed, the two populations and the spread.
+fn r24_pat(g: &mut Gen, t: &mut Vec<String>, s: Shape, a: &[i64], b: &[i64]) {
+    r24_pat_sp(g, t, s, a, b, &[0, 1, 3, 6, 20]);
+}
+
+/// [`r24_pat`] with the spreads to draw from.
+fn r24_pat_sp(g: &mut Gen, t: &mut Vec<String>, s: Shape, a: &[i64], b: &[i64], sp: &[i64]) {
+    let on = !s.hdr && s.nf > 0 && !g.chance(4);
+    t.push(i64::from(on).to_string());
+    if on {
+        t.push(g.int(0, 1000).to_string());
+        t.push(g.pick(a).to_string());
+        t.push(g.pick(b).to_string());
+        t.push(g.pick(sp).to_string());
+    }
+}
+
+/// `get_histo`'s tokens: -1 for `NULL`, else its allocation, the bins in use and a seed.
+fn r24_histo_toks(g: &mut Gen, t: &mut Vec<String>) {
+    if g.chance(2) {
+        t.push("-1".into());
+        return;
+    }
+    let k = g.pick(&[0i64, 1, 3, 10, 40, 300]);
+    t.push(k.to_string());
+    t.push(g.int(0, k).to_string());
+    t.push(g.int(0, 9).to_string());
+}
+
+/// A region of the cases: x y z dx dy dz around a volume of shape `s`.
+fn r24_region(g: &mut Gen, t: &mut Vec<String>, s: Shape) {
+    let whole = g.chance(3);
+    for e in [s.w, s.h, s.d] {
+        t.push(if whole { 0 } else { g.int(-2, e) }.to_string());
+    }
+    for e in [s.w, s.h, s.d] {
+        t.push(if whole { e } else { g.int(-1, e + 2) }.to_string());
+    }
+}
+
+/// `mrihisto.cpp`'s cases (relay 24): see `fsvolume.cpp`'s `hreg` ... `hsegm`.
+fn r24_gen_histo(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let mut s = shape(g);
+    s.hdr = s.hdr && g.chance(4);
+    // types whose voxel values stay small (an RGB or complex volume's values can span 2^30:
+    // a histogram of one bin per intensity takes gigabytes on both sides)
+    if !matches!(s.ty, 0 | 1 | 2 | 3 | 4 | 10) {
+        s.ty = g.pick(&[0, 3, 4, 1]);
+    }
+    let big = cmd == "hsegm" || g.chance(3);
+    if big {
+        (s.w, s.h, s.d) = (g.int(3, 8), g.int(3, 8), g.int(2, 7));
+        if g.chance(2) {
+            s.nf = 1;
+        }
+    }
+    if cmd == "hsegm" && !g.chance(6) {
+        s.ty = 0;
+    }
+    vol_of(g, t, s);
+    let vals: &[f32] = &[0.0, 1.0, 2.5, 100.0, 255.0, 7.25, -3.0, 128.0, 4096.0];
+    r24_fill_paint(g, t, s, &[&[0.0, 10.0, 100.0]], &[vals]);
+    let (a, b): (&[i64], &[i64]) = if cmd == "hsegm" {
+        (&[95, 100, 110, 128, 115], &[60, 70, 75, 80, 128])
+    } else {
+        (&[100, 0, 50, 255, 300, -20], &[10, 0, 128, 1000, 30])
+    };
+    // the equalisations index their histograms by intensity: mostly volumes from 0 to 255
+    let eq = (cmd == "geq" || cmd == "heq") && !g.chance(4);
+    let (a, b, sp): (&[i64], &[i64], &[i64]) = if eq {
+        (&[255, 200, 100], &[0], &[0, 0, 2])
+    } else {
+        (a, b, &[0, 1, 3, 6, 20])
+    };
+    r24_pat_sp(g, t, s, a, b, sp);
+    match cmd {
+        "hreg" | "hvox" | "hthr" => {
+            let nb: &[i64] = if cmd == "hthr" {
+                &[0, 0, 5, 10, 1, 64]
+            } else {
+                &[0, 0, -1, 5, 1, 256, 3]
+            };
+            t.push(g.pick(nb).to_string());
+            r24_histo_toks(g, t);
+            if cmd == "hvox" {
+                for e in [s.w, s.h, s.d] {
+                    t.push(g.int(-1, e).to_string());
+                }
+                t.push(g.pick(&[1i64, 3, 5, 0, 2, 4]).to_string());
+                let th = g.chance(2);
+                t.push(i64::from(th).to_string());
+                if th {
+                    let mut u = r24_like(g, s);
+                    u.hdr = u.hdr && g.chance(4);
+                    vol_of(g, t, u);
+                    r24_fill_paint(g, t, u, &[&[0.0, 1.0, 50.0]], &[vals]);
+                    r24_pat(g, t, u, &[0, 50, 100], &[20, 80]);
+                }
+                t.push(fx(g.pick(&[0.0f32, 1.0, 50.0, -1.0, 100.0])));
+            } else {
+                r24_region(g, t, s);
+                if cmd == "hthr" {
+                    let mut u = r24_like(g, s);
+                    u.hdr = u.hdr && g.chance(4);
+                    vol_of(g, t, u);
+                    r24_fill_paint(g, t, u, &[&[0.0, 1.0, 50.0]], &[vals]);
+                    r24_pat(g, t, u, &[0, 50, 100], &[20, 80]);
+                    t.push(fx(g.pick(&[0.0f32, 1.0, 50.0, -1.0, 100.0])));
+                    t.push(frame_of(g, s).to_string());
+                }
+            }
+        }
+        "hist" => t.push(g.pick(&[0i64, 0, 5, 1, 256, 2]).to_string()),
+        "geq" => {
+            r24_histo_toks(g, t);
+            t.push(g.pick(&[0i64, 0, 0, 1, 5, -1, 300]).to_string());
+            t.push(g.pick(&[255i64, 255, 10, 50, 0, 1000, -2, 100]).to_string());
+            t.push(g.pick(&[1i64, 1, 0]).to_string());
+        }
+        "heq" => {
+            let mut u = r24_like(g, s);
+            u.hdr = u.hdr && g.chance(4);
+            vol_of(g, t, u);
+            r24_fill_paint(g, t, u, &[&[0.0, 10.0, 100.0]], &[vals]);
+            r24_pat_sp(g, t, u, a, b, sp);
+            let mode = g.pick(&[0, 0, 1, 2]);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let mut o = r24_like(g, s);
+                o.hdr = o.hdr && g.chance(4);
+                vol_of(g, t, o);
+            }
+            t.push(g.pick(&[0i64, 0, 0, 1, 5, -1, 300]).to_string());
+            t.push(g.pick(&[255i64, 255, 10, 50, 0, 1000, 100]).to_string());
+        }
+        "hlr" | "hlab" => {
+            let mut u = r24_like(g, s);
+            u.hdr = u.hdr && g.chance(6);
+            vol_of(g, t, u);
+            let labels: &[f32] = &[0.0, 1.0, 2.0, 3.0, 2.5, -1.0];
+            r24_fill_paint(g, t, u, &[&[0.0, 1.0, 2.0]], &[labels]);
+            t.push(g.pick(&[0i64, 1, 2, 3, -1]).to_string());
+            t.push(g.pick(&[0i64, 0, -1, 5, 1, 256]).to_string());
+            if cmd == "hlr" {
+                r24_region(g, t, s);
+            }
+        }
+        _ => {
+            let mode = g.pick(&[0, 1, 1, 1, 2]);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let mut o = r24_like(g, s);
+                o.hdr = o.hdr && g.chance(6);
+                vol_of(g, t, o);
+                let l: &[f32] = &[128.0, 0.0, 255.0, 1.0];
+                r24_fill_paint(g, t, o, &[&[128.0, 128.0, 0.0]], &[l]);
+            }
+            t.push(g.pick(&[90i64, 85, 100, 0, 60]).to_string());
+            t.push(g.pick(&[120i64, 130, 255, 50, 110]).to_string());
+            let gh = if g.chance(30) {
+                -5
+            } else {
+                g.pick(&[100i64, 95, 110, -1, 90, 80])
+            };
+            t.push(gh.to_string());
+            t.push(g.pick(&[5i64, 7, 3, 1, 0, 9, 5]).to_string());
+            t.push(fx(g.pick(&[-1.0f32, 4.0, 2.0, 0.5, 0.0])));
+            t.push(i64::from(g.chance(4)).to_string());
+        }
+    }
+}
+
+/// `fsvolume.cpp`'s `fill_pat`.
+fn r24_fill_pat(cx: &mut Ctx, t: &mut Toks, m: &mut Mri) -> Result<(), Fatal> {
+    use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
+    if t.i() == 0 {
+        return Ok(());
+    }
+    let seed = t.i() as u32;
+    let (a, b, sp) = (t.i(), t.i(), t.i());
+    for f in 0..m.nframes {
+        for z in 0..m.vg.depth {
+            for y in 0..m.vg.height {
+                for x in 0..m.vg.width {
+                    let mut h = (x as u32).wrapping_mul(73856093)
+                        ^ (y as u32).wrapping_mul(19349663)
+                        ^ (z as u32).wrapping_mul(83492791)
+                        ^ (f as u32).wrapping_mul(2654435761)
+                        ^ seed.wrapping_mul(97);
+                    h = h.wrapping_mul(1103515245).wrapping_add(12345);
+                    let base = if (h >> 8) & 1 != 0 { a } else { b };
+                    let v = base + ((h >> 9) % (2 * sp + 1) as u32) as i32 - sp;
+                    mri_set_vox_val(&mut cx.g, &mut cx.b, m, x, y, z, f, v as f32, 0)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn r24_get_histo(t: &mut Toks) -> Option<larmorx_freesurfer_core::histo::Histogram> {
+    let k = t.i();
+    if k < 0 {
+        return None;
+    }
+    let (nb, seed) = (t.i(), t.i());
+    let n = k as usize;
+    Some(larmorx_freesurfer_core::histo::Histogram {
+        max_bins: k,
+        nbins: nb,
+        bins: (0..n).map(|i| 0.5 * i as f32 + seed as f32).collect(),
+        counts: (0..n).map(|i| ((i as i32 * 7 + seed) % 5) as f32).collect(),
+        bin_size: 0.0,
+        min: 0.0,
+        max: 0.0,
+    })
+}
+
+fn r24_put_histo(o: &mut Out, h: Option<&larmorx_freesurfer_core::histo::Histogram>) {
+    let Some(h) = h else {
+        o.0 += "NULL ";
+        return;
+    };
+    o.i(i64::from(h.nbins));
+    o.i(i64::from(h.max_bins));
+    o.f(h.bin_size);
+    o.f(h.min);
+    o.f(h.max);
+    let n = h.nbins.min(h.max_bins).max(0) as usize;
+    for i in 0..n {
+        o.f(h.bins[i]);
+        o.f(h.counts[i]);
+    }
+}
+
+/// A histogram result: whether it is the given one, then it.
+fn r24_ret(
+    o: &mut Out,
+    r: &Ret<larmorx_freesurfer_core::histo::Histogram>,
+    given: Option<&larmorx_freesurfer_core::histo::Histogram>,
+) {
+    o.i(i64::from(matches!(r, Ret::Given)));
+    match r {
+        Ret::New(h) => r24_put_histo(o, Some(h)),
+        Ret::Given => r24_put_histo(o, given),
+        Ret::Null => r24_put_histo(o, None),
+    }
+}
+
+fn r24_region_of(t: &mut Toks) -> MriRegion {
+    MriRegion {
+        x: t.i(),
+        y: t.i(),
+        z: t.i(),
+        dx: t.i(),
+        dy: t.i(),
+        dz: t.i(),
+    }
+}
+
+fn r24_vol(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+    let mut m = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut m)?;
+    r24_fill_pat(cx, t, &mut m)?;
+    Ok(m)
+}
+
+#[inline(never)]
+fn r24_histo(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::mrihisto as mh;
+    match cmd {
+        "hreg" | "hvox" | "hthr" => {
+            let m = r24_vol(cx, t)?;
+            let nbins = t.i();
+            let mut h = r24_get_histo(t);
+            let r = if cmd == "hvox" {
+                let (x, y, z, ws) = (t.i(), t.i(), t.i(), t.i());
+                let th_vol = if t.i() != 0 {
+                    Some(r24_vol(cx, t)?)
+                } else {
+                    None
+                };
+                let th = t.f();
+                let (g, b) = (&mut cx.g, &mut cx.b);
+                mh::mri_histogram_voxel(
+                    g,
+                    b,
+                    &m,
+                    nbins,
+                    h.as_mut(),
+                    x,
+                    y,
+                    z,
+                    ws,
+                    th_vol.as_ref(),
+                    th,
+                )?
+            } else {
+                let reg = r24_region_of(t);
+                if cmd == "hreg" {
+                    let (g, b) = (&mut cx.g, &mut cx.b);
+                    mh::mri_histogram_region(g, b, &m, nbins, h.as_mut(), &reg)?
+                } else {
+                    let tv = r24_vol(cx, t)?;
+                    let (th, fr) = (t.f(), t.i());
+                    let (g, b) = (&mut cx.g, &mut cx.b);
+                    mh::mri_histogram_region_with_threshold(
+                        g,
+                        b,
+                        &m,
+                        nbins,
+                        h.as_mut(),
+                        &reg,
+                        &tv,
+                        th,
+                        fr,
+                    )?
+                }
+            };
+            r24_ret(o, &r, h.as_ref());
+        }
+        "hist" => {
+            let m = r24_vol(cx, t)?;
+            let nb = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let r = mh::mri_histogram(g, b, &m, nb)?;
+            r24_put_histo(o, Some(&r));
+        }
+        "geq" => {
+            let m = r24_vol(cx, t)?;
+            let mut h = r24_get_histo(t);
+            let (lo, hi, norm) = (t.i(), t.i(), t.i());
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let r = mh::mri_get_equalize_histo(g, b, &m, h.as_mut(), lo, hi, norm)?;
+            r24_ret(o, &r, h.as_ref());
+        }
+        "heq" => {
+            let mut src = r24_vol(cx, t)?;
+            let tpl = r24_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (lo, hi) = (t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let r = mh::mri_histo_equalize(g, a, b, p, &tpl, lo, hi)?;
+            let given = match mode {
+                1 => dst.as_ref(),
+                2 => Some(&src),
+                _ => None,
+            };
+            o.ret(&r, given);
+        }
+        "hlr" | "hlab" => {
+            let m = r24_vol(cx, t)?;
+            let mut l = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut l)?;
+            let (label, nb) = (t.i(), t.i());
+            let r = if cmd == "hlr" {
+                let reg = r24_region_of(t);
+                let (g, b) = (&mut cx.g, &mut cx.b);
+                mh::mri_histogram_label_region(g, b, &m, &l, &reg, label, nb)?
+            } else {
+                let (g, b) = (&mut cx.g, &mut cx.b);
+                Some(mh::mri_histogram_label(g, b, &m, &l, label, nb)?)
+            };
+            r24_put_histo(o, r.as_ref());
+        }
+        _ => {
+            let mut src = r24_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            if let Some(d) = dst.as_mut() {
+                fill_painted(cx, t, d)?;
+            }
+            let (wl, wh, gh, ws) = (t.i(), t.i(), t.i(), t.i());
+            let sg = t.f();
+            if t.i() != 0 {
+                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW;
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let r = mh::mri_histo_segment(g, a, b, p, wl, wh, gh, ws, sg)?;
+            let given = match mode {
+                1 => dst.as_ref(),
+                2 => Some(&src),
+                _ => None,
+            };
+            o.ret(&r, given);
+        }
+    }
+    Ok(())
+}
+
+/// [`fill_paint`] whose odd values keep a histogram's range small (FreeSurfer allocates one bin per
+/// intensity: a range of 2^30 would take gigabytes on both sides): NaN, infinities, 4096.5.
+fn r24_fill_paint(g: &mut Gen, t: &mut Vec<String>, s: Shape, fills: &[&[f32]], vals: &[&[f32]]) {
+    let has = !s.hdr && s.nf > 0;
+    let k = if has && !g.chance(5) {
+        g.int(1, s.nf)
+    } else {
+        0
+    };
+    t.push(k.to_string());
+    for f in 0..k {
+        let l = fills[(f as usize).min(fills.len() - 1)];
+        t.push(fx(g.pick(l)));
+    }
+    let n = if has {
+        g.int(0, (s.w * s.h * s.d).min(24))
+    } else {
+        0
+    };
+    t.push(n.to_string());
+    for _ in 0..n {
+        t.push(g.int(0, s.w - 1).to_string());
+        t.push(g.int(0, s.h - 1).to_string());
+        t.push(g.int(0, s.d - 1).to_string());
+        let f = if g.chance(4) { g.int(0, s.nf - 1) } else { 0 };
+        t.push(f.to_string());
+        let l = vals[(f as usize).min(vals.len() - 1)];
+        let odd = [
+            f32::from_bits(0x7fc0_0000),
+            f32::from_bits(0x7fa1_2345),
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            4096.5,
+        ];
+        t.push(fx(if g.chance(12) { g.pick(&odd) } else { g.pick(l) }));
+    }
+}
+
+/// [`like`] with the small-valued types of [`r24_gen_histo`].
+fn r24_like(g: &mut Gen, s: Shape) -> Shape {
+    let mut o = like(g, s);
+    if !matches!(o.ty, 0 | 1 | 2 | 3 | 4 | 10) {
+        o.ty = g.pick(&[0, 3, 4, 1]);
+    }
+    o
 }

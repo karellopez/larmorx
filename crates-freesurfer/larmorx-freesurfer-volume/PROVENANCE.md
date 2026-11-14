@@ -179,6 +179,12 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   `MRIpercentThresh` (3883-3907), `MRIcountValInNbhd` (3966-3982); `FZERO`'s constant from `mriset.cpp.o`. Changes:
   FS-493 (an error where FreeSurfer never returns, both modes), FS-494 (rule A), FS-495 (rule A), FS-496 (memory:
   the largest value by default, 0 with `reproduce`), FS-12 for `(int)` of values.
+- `src/mrihisto.rs` (3.1-38; relay 24): `utils/mrihisto.cpp` `MRIhistogramRegion` (101-187), `mriHistogramRegion`
+  (321-447, as `region_histogram`), `MRIgetEqualizeHisto` (568-601), `MRIhistoEqualize` (643-696), `MRIhistogram`
+  (725-753), `MRIhistogramLabelRegion` (754-830), `MRIhistogramLabel` (831-939), `MRIhistoSegment` (940-1091),
+  `MRIhistogramVoxel` (1194-1230), `MRIhistogramRegionWithThreshold` (1231-1335); operand orders and `FZERO`'s constant
+  from `mrihisto.cpp.o`. Changes: FS-498 (bins kept inside by default), FS-499 (memory: 0 read, writes dropped),
+  FS-500 (rule A), FS-501 and FS-502 (errors), FS-503 (one thread's order).
 - `src/conform.rs` (3.1-38; relay 23): `utils/mri_conform.cpp` `MRIgetConformMatrix` (39-73), `MRIconform` (75-138),
   `MRIconformedTemplate` (140-256). Changes: FS-491 (memory: an error by default, zeros with `reproduce`), FS-492
   (rule A).

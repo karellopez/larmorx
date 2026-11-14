@@ -2009,6 +2009,18 @@ defects! {
         "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds past the list's allocation, below 0, or NaN reads memory it does not own";
     FS_497 = "FS-497", "FreeSurfer", true,
         "the dilation of a segmentation until it stops changing (MRIdilateSegmentation with -1) never ends when a step's new labels do not reach the next step's copy (a complex volume, whose copy FreeSurfer makes of half of each row): the same changes are counted forever";
+    FS_498 = "FS-498", "FreeSurfer", true,
+        "the histograms of a whole volume (MRIhistogram), of a region of bytes and of a label in a region (MRIhistogramLabelRegion) count a voxel whose bin falls outside the histogram (a NaN voxel or bin size, a rounding past the last bin) in memory they do not own, or crash";
+    FS_499 = "FS-499", "FreeSurfer", true,
+        "the histogram equalisation (MRIgetEqualizeHisto, MRIhistoEqualize) indexes the histograms by intensity from the low to the high limit, outside their bins when the low limit is below 0 or an intensity is beyond the last bin: memory contents read and memory it does not own written";
+    FS_500 = "FS-500", "FreeSurfer", true,
+        "the cumulative histogram for equalisation (MRIgetEqualizeHisto) leaves the values of its bins from the low to the high limit unset (0, or the given histogram's)";
+    FS_501 = "FS-501", "FreeSurfer", true,
+        "the histogram segmentation of white matter (MRIhistoSegment) crashes on a volume of integers or longs (no region histogram to smooth) and on a region whose range needs 2^31 bins or more";
+    FS_502 = "FS-502", "FreeSurfer", true,
+        "the histogram segmentation of white matter (MRIhistoSegment) never ends when its search for the gray-matter peak comes back to a peak it has found (a gray-matter limit below -1 with no peak)";
+    FS_503 = "FS-503", "FreeSurfer", true,
+        "the thresholded region histogram (MRIhistogramRegionWithThreshold) with several threads adds per-thread histograms of fractional counts, whose sums depend on the number of threads";
 }
 
 /// The register entry with ID `id`.

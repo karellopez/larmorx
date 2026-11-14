@@ -655,3 +655,54 @@ Source: `utils/mriset.cpp` 108-3990 (the reached functions; `MRIdilate`, `MRIdil
   counts are `int counts[256]` indexed by the byte: in range.
 - The distance-map callers of mriset.cpp (`MRIextractDistanceMap` users at lines 3474 and after) are left for track D
   (fs.filter), as decided.
+
+## 21. Volume histograms (3.1-38; relay 24)
+Source: `utils/mrihisto.cpp` (the ten reached functions: `MRIhistogramRegion` 101-187, `mriHistogramRegion` 321-447,
+`MRIgetEqualizeHisto` 568-601, `MRIhistoEqualize` 643-696, `MRIhistogram` 725-753, `MRIhistogramLabelRegion` 754-830,
+`MRIhistogramLabel` 831-939, `MRIhistoSegment` 940-1091, `MRIhistogramVoxel` 1194-1230,
+`MRIhistogramRegionWithThreshold` 1231-1335). Object code: `mrihisto.cpp.o` (`<scratch>/C/r23/obj`, disassembly
+`<scratch>/C/r24/mrihisto.s`).
+- **FZERO/FEQUAL in mrihisto.cpp use `FLT_EPSILON`** (`.rodata.cst4` `0x34000000`, `.rodata.cst8`
+  `0x3e80000000000000`): `<float.h>` arrives before `macros.h` through `box.h` ... `label.h`.
+- `MRIhistogramRegion`'s static state (`mri_prev`, `h_prev`, `reg_prev`) serves `if (0 && overlap)`: compiled, it only
+  copies each result into `h_prev` (`HISTOcopy`) and the region into `reg_prev`; no result depends on it. Its own bin
+  size (`(fmax - fmin + 1) / nbins`, `addss .LC3`, `divss`) is overwritten by `mriHistogramRegion`'s `HISTOinit`, whose
+  return value it ignores (an `int` or `long` volume: the error message, the bins set, counts 0).
+- `mriHistogramRegion`'s bin values loop is vectorised (`cvtdq2ps`, `mulps bin_size`, `addps fmin`: `b * bin_size + fmin`
+  in `float`, the same as the scalar tail); each count is `1.0f + counts[b]` (`addss (%rax),%xmm0`). The byte branch has
+  no `bin_no < 0` test: a NaN bin size (`HISTOinit` with one bin and `max_bins` 1 on a constant region: `0 / 0`) gives
+  `nint(NaN)` = `INT_MIN` and a write 8 GiB before the array (FS-498, `CRASH 11` in the probe).
+- **FS-498** (a): `MRIhistogram` has no bound at all: a NaN voxel (NaN bin), a constant volume at or above 255 (`fmax`
+  set to 255 after the count, `HISTOinit`'s `mx <= mn` branch with one bin: a NaN bin size) crash; a rounding of
+  `(fmax - fmin) / bin_size` to `nbins` writes one past the array. `MRIhistogramLabelRegion` likewise (no bound; NaN
+  float voxels). The default keeps the bin in `[0, nbins - 1]` as the other branches do (rule A); `reproduce` counts in
+  the allocation where FreeSurfer's index lies in it, nowhere otherwise.
+- **FS-499** (a): `MRIgetEqualizeHisto` and `MRIhistoEqualize` index the histogram of `MRIhistogram(mri, 0)` by intensity
+  (`counts[i]` for `i` from `low` to `high`), but its bins start at the volume's minimum with the range's width: a volume
+  whose minimum is not 0 (or whose maximum exceeds its bin count) reads past the counts (`high` is lowered to `max`, the
+  intensity, not the bin count), and a given `histo_eq` with fewer bins is written past (`histo_eq->nbins =
+  histo->nbins` then makes later readers read past it). The probe's FreeSurfer runs end with `free(): corrupted unsorted
+  chunks` (`CRASH 6`) or `CRASH 11` there. Both modes: reads 0, writes dropped, noted. The intensity-as-index design is
+  right for byte volumes from 0 to 255, which is how the reached callers use it (kept, rule C).
+- **FS-500** (c, rule A): `histo->bins[i] = i` in the second loop of `MRIgetEqualizeHisto` writes the volume's histogram,
+  freed right after; the result's values from `low` to `high` stay 0 (calloc) or the given histogram's. No reached
+  caller reads them (`MRIhistoEqualize` reads counts only); corrected by default all the same, noted only where the
+  value changes.
+- `MRIgetEqualizeHisto`'s sums are `int`s fed by `float` counts (`total_pix += counts[i]`: `cvtsi2ss`, `addss`,
+  `cvttss2si`): exact below 2^24 per step. `nint(255.0f * (float)total / (float)total_pix)` is `mulss`, `divss`; a
+  `total_pix` of 0 gives NaN or infinity and `nint`'s `INT_MIN` (FS-12).
+- **FS-501** (a): `MRIhistoSegment` assigns `histo = mriHistogramRegion(...)`; for an `int` or `long` source that is
+  `NULL` after the message, and `HISTOsmooth(NULL, ...)` crashes (`CRASH 11`). A later window whose range needs 2^31
+  bins or more makes `nint` give `INT_MIN`; the given histogram's `nbins` becomes it and `HISTOclear`'s `memset` of
+  `nbins * sizeof(float)` bytes crashes. Both modes: an error.
+- **FS-502** (a, a hang): `while (gray_peak > gray_hi)` with `gray_hi` below -1 and no gray peak: `wm_peak = -1`, the
+  search between 72 and -11 finds nothing again, forever (`CRASH 14` from the probe's alarm). The port stops at a
+  white-matter peak it has seen before (the search is a function of it).
+- **FS-503** (b): `MRIhistogramRegionWithThreshold`'s `#pragma omp parallel for if_ROMP(experimental)` is a plain
+  OpenMP loop in the official build (`ROMP_SUPPORT_ENABLED` off): each thread adds `HISTOaddSample`'s fractional
+  weights into its own histogram, summed per thread then added; with more than one thread the float sums depend on
+  the split. One thread's order in both modes. The other 127 per-thread histograms add zeros (no change).
+- `MRIhistoSegment` reads both volumes through `BUFTYPE` row pointers whatever their types (byte `x` of the row); the
+  port reads them the same way (`rows::read` as bytes; another extent's rows: FS-289, FS-290).
+- `MRIhistogramLabel` compares `MRIgetVoxVal(labeled) != label` exactly (`float` against the converted `int`), while
+  its range uses `nint` labels over every frame (`MRIlabelValRange`); the counted voxels lie inside the range.

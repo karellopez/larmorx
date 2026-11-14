@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//! C's `sscanf` conversions `%lf` (a `double`), `%f` (a `float`) and `%d` (an `int`) of one string,
-//! and `strtod` and `strtof`,
+//! C's `sscanf` conversions `%lf` (a `double`), `%f` (a `float`), `%d` (an `int`), `%u`, `%lu`
+//! and `%lld` of one string, and `strtod`, `strtof` and `strtoul`,
 //! as the C library reads them, for ports of C parsers whose values come from `sscanf` (MINC's
 //! `.xfm` reader reads every number with `sscanf(token, "%lf", &d)`).
 //!
@@ -504,6 +504,53 @@ pub fn sscanf_i32(s: &[u8]) -> Option<i32> {
     if used == 0 { None } else { Some(v as i32) }
 }
 
+/// `sscanf(s, "%lld", &v) == 1` (a 64-bit `long long`): `strtoll`'s value, clamped on overflow.
+pub fn sscanf_i64(s: &[u8]) -> Option<i64> {
+    let (v, used) = strtol10(s);
+    if used == 0 { None } else { Some(v) }
+}
+
+/// `strtoul(s, &end, 10)` on 64-bit `unsigned long`: leading white space and one sign are
+/// accepted; a magnitude beyond the range gives `ULONG_MAX`, a negative one is negated in the
+/// unsigned type (`"-1"` is `ULONG_MAX`). The value and the bytes used (0: no conversion).
+pub fn strtoul10(s: &[u8]) -> (u64, usize) {
+    let mut i = 0;
+    while i < s.len() && is_c_space(s[i]) {
+        i += 1;
+    }
+    let mut neg = false;
+    if i < s.len() && (s[i] == b'+' || s[i] == b'-') {
+        neg = s[i] == b'-';
+        i += 1;
+    }
+    let first = i;
+    let mut v: u128 = 0;
+    while i < s.len() && s[i].is_ascii_digit() {
+        v = (v * 10 + (s[i] - b'0') as u128).min(u64::MAX as u128 + 1);
+        i += 1;
+    }
+    if i == first {
+        return (0, 0);
+    }
+    if v > u64::MAX as u128 {
+        return (u64::MAX, i);
+    }
+    let v = v as u64;
+    (if neg { v.wrapping_neg() } else { v }, i)
+}
+
+/// `sscanf(s, "%lu", &v) == 1` (and `%llu`): [`strtoul10`]'s value.
+pub fn sscanf_u64(s: &[u8]) -> Option<u64> {
+    let (v, used) = strtoul10(s);
+    if used == 0 { None } else { Some(v) }
+}
+
+/// `sscanf(s, "%u", &v) == 1`: [`strtoul10`]'s value, its low 32 bits (glibc converts the run
+/// with `strtoul` and stores it in the `unsigned int`).
+pub fn sscanf_u32(s: &[u8]) -> Option<u32> {
+    sscanf_u64(s).map(|v| v as u32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -549,6 +596,14 @@ mod tests {
         assert_eq!(sscanf_i32(b"4294967297"), Some(1));
         assert_eq!(sscanf_i32(b"x"), None);
         assert_eq!(sscanf_i32(b"+"), None);
+        assert_eq!(sscanf_u32(b" 7"), Some(7));
+        assert_eq!(sscanf_u32(b"-1"), Some(u32::MAX));
+        assert_eq!(sscanf_u32(b"4294967296"), Some(0));
+        assert_eq!(sscanf_u32(b"99999999999999999999999"), Some(u32::MAX));
+        assert_eq!(sscanf_u64(b"-1"), Some(u64::MAX));
+        assert_eq!(sscanf_u64(b"18446744073709551616"), Some(u64::MAX));
+        assert_eq!(sscanf_u64(b"-"), None);
+        assert_eq!(sscanf_i64(b"-9223372036854775809"), Some(i64::MIN));
     }
 
     #[test]

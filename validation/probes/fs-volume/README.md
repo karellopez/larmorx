@@ -118,3 +118,33 @@ FS-327), 0 different; `fix` different only with notices. Seed 1, 1,900 cases: 1,
 comparable, hash `0b5f671441495eed2d7a7aa8001aa5317d3c1cf986fe06d3c1bf0a911498246b`, passing with
 AArch64's NaN emulated in debug and release (`oracles/logs/fs-found-c-r18-trap-volume.log`). The port's
 debug and release builds agree on the 4,000 cases of seed 13 in both modes.
+
+Measured 2026-11-13 (part 9, relay 19: 3.1-37's statistics, orientation strings and voxel-to-RAS matrices
+`stats`, `type2s`, `cropbb`, `crass`, `chkostr`, `o2dc`, `s44`, `vx2rx`, `v2v`, `setv2r`; 3.1-35's 2-D images
+`toimgv`, `toimg`, `img2mri` (images of every format, given images of the right and other sizes); 3.1-37's
+neighbourhoods and labels `smpar`, `erasebp`, `nbhd`, `nearnz`, `lmeans`, `mkpos`, `mlbv`, `lnbhd`, `linbhd`,
+`lbbox`, `fillbox`, `mskz`, `clipwm` (volumes painted with small labels); 121 commands; logs
+`oracles/logs/fs-found-c-r19-*.log`): seed 13, piece a 4,000 cases: 3,992 identical with `reproduce`, 8 not
+comparable; images 3,000 cases: 2,944 identical, 56 not comparable; piece b 13,000 cases: 11,761 identical,
+1,239 not comparable (FS-53, FS-58, FS-163, FS-290, FS-467), 0 different; `fix`
+different only with notices. Seed 1, 2,420 cases: 2,254 identical, 166 not comparable, hash
+`3834ef65feb37ff13903d5bf1458c793ceae37307d8779a87e70c4b755ef40a7`, passing with AArch64's NaN emulated in
+debug and release (`oracles/logs/fs-found-c-r19-trap-volume.log`). `check.py`'s `SKIP` adds FS-163 (MRIcopy past a
+smaller destination), FS-330, FS-463, FS-465 and FS-467.
+
+Measured 2026-11-14 (part 10, relay 20: the partial-volume count `pvlab`; 3.1-37 piece c `randn`, `const`, `nseq`,
+`nfr`, `sort`, `revsl`, `cdtype`, `nonmax`, `xrpad`, `ordidx`, `vperm`, `rms`, `vfrac`, `cdt`, `diffv`, `tiv`; piece
+d's first part `fpow`, `mbin`, `reshape`, `mmax`, `mconst`, `fbin`, `vote`, `msq`, `crop`, `revs`, `cutend`,
+`segids`, `hcos`; 151 commands; `fill_paint` fills whole frames and paints voxels of any frame; logs
+`oracles/logs/fs-found-c-r20-*.log`): `pvlab` seed 7, 2,000 cases: 1,540 identical with `reproduce`, 460 not
+comparable, 0 different; piece c seed 7, 16,000 cases: 14,704 identical, 1,296 not comparable, 0 different; seed 13
+(with `pvlab`), 34,000 cases: 30,950 identical, 3,050 not comparable, 0 different; piece d seed 7, 13,000 cases:
+11,988 identical, 1,012 not comparable, 0 different; seed 13, 26,000 cases: 23,856 identical, 2,143 not
+comparable, 1 different (`revs`: `MRIsetVoxelToRasXform`'s centre adds column 4 last in the official build; fixed,
+then `revs`, `setv2r`, `vx2rx` at seed 13, 12,000 cases: 11,700 identical, 300 not comparable, 0 different); `fix`
+different only with notices (GLIBC-07 for `powf` and `cos`). Seed 1, 3,020 cases: 2,813 identical, 207 not comparable, hash
+`0b75c43a5ca8662cac67b4bce54b64c9d718499cda9360cecd3086fb190d45d3`, passing with AArch64's NaN emulated in debug
+(36,191 flips) and release (30,739) (`oracles/logs/fs-found-c-r20-trap-volume.log`); the port's debug and release
+builds agree on 47,000 cases in both modes. `check.py`'s `SKIP` adds FS-469, FS-470, FS-471, FS-473, FS-475 and
+FS-479. `diffv` seeds the generator before `CTABalloc` (its random colours otherwise print `<program> supposed to be
+reproducible but seed not set`).

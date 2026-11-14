@@ -6,9 +6,10 @@
 
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_filter::flood;
+use larmorx_freesurfer_filter::norm;
 use larmorx_freesurfer_filter::segment as sg;
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence,
+    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence,
 };
 use larmorx_freesurfer_volume::arith::Pair;
 
@@ -17,7 +18,9 @@ use super::{Ctx, Gen, Shared, Toks, fx, get_vol, put_vol, rle, token};
 use larmorx_freesurfer_core::globals::Globals;
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 6] = ["seg", "mseg", "salloc", "flood", "acc", "dist"];
+pub const COMMANDS: [&str; 8] = [
+    "seg", "mseg", "salloc", "flood", "acc", "dist", "vor", "soap",
+];
 
 /// The light operations (no volume), for the large pattern volumes.
 const LIGHT: [&str; 7] = ["M", "N", "A", "R", "C", "G", "L"];
@@ -179,7 +182,98 @@ fn flood_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
     }
 }
 
+/// A smooth-ish volume of `nf` frames for the Voronoi diagram and the soap bubble.
+fn field(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
+    t.extend(e.map(|x| x.to_string()));
+    t.push(ty.to_string());
+    t.push(nf.to_string());
+    for _ in 0..3 {
+        t.push(fx(1.0));
+    }
+    let n = (e[0] * e[1] * e[2] * nf) as usize;
+    let base = g.int(40, 120);
+    let vals: Vec<String> = (0..n)
+        .map(|i| {
+            let v = base + (i as i64 * 7 + g.int(0, 30)) % 61;
+            if ty == MRI_FLOAT {
+                if g.chance(40) {
+                    fx(g.pick(&[f32::NAN, f32::INFINITY, -0.0, 1.0e30]))
+                } else {
+                    fx(v as f32 + g.pick(&[0.0f32, 0.25, 0.5, 0.75]))
+                }
+            } else {
+                token(ty, v as f64)
+            }
+        })
+        .collect();
+    t.extend(rle(&vals));
+}
+
+/// Control points: mostly 0, about one in ten marked (1), now and then 2, 3 or 255.
+fn ctrl_vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
+    let ty = if g.chance(12) {
+        g.pick(&[MRI_INT, MRI_FLOAT, MRI_SHORT])
+    } else {
+        MRI_UCHAR
+    };
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let p = g.pick(&[6u64, 10, 25, 1000]);
+    let v: Vec<f64> = (0..n)
+        .map(|_| {
+            if g.chance(p) {
+                1.0
+            } else if g.chance(40) {
+                g.pick(&[2.0, 3.0, 255.0, 259.0])
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    vol_of(t, e, ty, &v);
+}
+
+fn norm_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let e = if g.chance(4) {
+        small(g, 12)
+    } else {
+        small(g, 7)
+    };
+    let ty = if g.chance(10) {
+        g.pick(&[MRI_INT, MRI_LONG])
+    } else {
+        g.pick(&[MRI_FLOAT, MRI_SHORT, MRI_UCHAR])
+    };
+    let nf = if cmd == "soap" && g.chance(5) { 2 } else { 1 };
+    field(g, t, e, ty, nf);
+    ctrl_vol(g, t, e);
+    if cmd == "soap" && g.chance(4) {
+        t.push("2".into());
+    } else if g.chance(2) {
+        t.push("0".into());
+    } else {
+        t.push("1".into());
+        let ty2 = if g.chance(8) {
+            g.pick(&[MRI_FLOAT, MRI_UCHAR, MRI_SHORT])
+        } else {
+            ty
+        };
+        let mut e2 = e;
+        if g.chance(10) {
+            e2[0] += 1;
+        }
+        field(g, t, e2, ty2, nf);
+    }
+    if cmd == "soap" {
+        t.push(g.pick(&[0, 1, 2, 3, 5, 10]).to_string());
+        t.push(fx(g.pick(&[0.0f32, 0.5, 2.0, 1000.0])));
+    }
+}
+
 pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    if matches!(cmd, "vor" | "soap") {
+        norm_case(g, t, cmd);
+        return;
+    }
     if matches!(cmd, "flood" | "acc" | "dist") {
         flood_case(g, t, cmd);
         return;
@@ -387,6 +481,52 @@ fn run_flood(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<()
 
 /// The port's answer for one of this module's commands; `false` for another command.
 pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool, Fatal> {
+    if matches!(cmd, "vor" | "soap") {
+        let mut src = get_vol(cx, t)?;
+        let mut ctrl = get_vol(cx, t)?;
+        let mode = t.i();
+        let mut dst = if mode == 1 {
+            Some(get_vol(cx, t)?)
+        } else {
+            None
+        };
+        let r = if cmd == "vor" {
+            norm::mri_build_voronoi_diagram(
+                &mut cx.g,
+                &mut cx.a,
+                &mut cx.b,
+                &src,
+                &mut ctrl,
+                dst.as_mut(),
+            )?
+        } else {
+            let niter = t.i();
+            let mc = t.f();
+            if mode == 2 {
+                let r = norm::mri_soap_bubble(
+                    &mut cx.g,
+                    &mut cx.a,
+                    &mut cx.b,
+                    Pair::Same(&mut src),
+                    &ctrl,
+                    niter,
+                    mc,
+                )?;
+                same_result(o, r, &src);
+                return Ok(true);
+            }
+            let p = match dst.as_mut() {
+                Some(d) => Pair::Given(&src, d),
+                None => Pair::New(&src),
+            };
+            norm::mri_soap_bubble(&mut cx.g, &mut cx.a, &mut cx.b, p, &ctrl, niter, mc)?
+        };
+        result(o, r, dst.as_ref());
+        if cmd == "vor" {
+            put_vol(o, &ctrl);
+        }
+        return Ok(true);
+    }
     if matches!(cmd, "flood" | "acc" | "dist") {
         run_flood(cx, cmd, t, o)?;
         return Ok(true);

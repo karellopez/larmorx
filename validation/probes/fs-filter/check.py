@@ -51,7 +51,8 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # read after it could not be computed: a crash), FS-567 (a matrix too small for the volume written
 # past its end), FS-568 (a division by zero), FS-569 (a frame loop without end: a crash); FS-579 (a
 # segment number outside the segment table), FS-581 (16-bit voxel coordinates wrapping: writes outside
-# the label map), FS-582 (a segment voxel read outside the index tables)
+# the label map), FS-582 (a segment voxel read outside the index tables), FS-583 (a crash), FS-586
+# (a destination or control volume smaller than the source, or of another type, written outside)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -80,6 +81,8 @@ SKIP = (
     "FS-579",
     "FS-581",
     "FS-582",
+    "FS-583",
+    "FS-586",
 )
 
 # MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000

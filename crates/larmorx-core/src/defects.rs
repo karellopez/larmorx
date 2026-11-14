@@ -1725,6 +1725,14 @@ defects! {
         "the connected segments of a volume with more than 32,768 columns, rows or slices keep voxel coordinates in 16 bits: they wrap, and the label map is then written outside the volume (memory corruption)";
     FS_582 = "FS-582", "FreeSurfer", true,
         "the segment dilations (MRIsegmentDilate, MRIsegmentDilateThreshold) of a segment voxel more than 500 voxels outside the volume read outside the volume's index tables (memory contents, or a crash)";
+    FS_583 = "FS-583", "FreeSurfer", true,
+        "the Voronoi diagram of the control points (MRIbuildVoronoiDiagram) of a 16-bit volume without a destination volume crashes (it reads the type of a destination it has not made yet)";
+    FS_584 = "FS-584", "FreeSurfer", true,
+        "the float soap bubble (MRIsoapBubble of a float volume, mri_normalize's bias field) runs its passes on several threads that update the largest change without synchronisation, so the pass after which it stops can change from run to run";
+    FS_585 = "FS-585", "FreeSurfer", true,
+        "the Voronoi diagram and the soap bubble read a control or destination volume of a wider type (an int control volume for a 16-bit source, a 16-bit or int volume where bytes are expected) byte by byte, so the control points and the averaged values are not the volume's values";
+    FS_586 = "FS-586", "FreeSurfer", true,
+        "the Voronoi diagram and the soap bubble given a destination or control volume smaller than the source (or with fewer frames, or a destination of another type for a float or 16-bit source) read and write outside that volume (memory corruption)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

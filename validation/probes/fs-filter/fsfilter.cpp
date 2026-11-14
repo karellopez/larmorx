@@ -35,6 +35,7 @@
 #include "matrix.h"
 #include "volcluster.h"
 #include "mri.h"
+#include "mrinorm.h"
 #include "mrisegment.h"
 
 MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
@@ -649,6 +650,25 @@ void put_seg(const MRI_SEGMENTATION *sg)
 // then each operation's results, then the segmentation; salloc max_segments max_voxels
 bool seg_case(const std::string &cmd)
 {
+  // mrinorm.cpp: vor <src> <ctrl> <dst?>; soap <src> <ctrl> <dst mode> [<dst>] niter min_change: the result,
+  // then the control volume (vor)
+  if (cmd == "vor") {
+    MRI *src = get_vol();
+    MRI *ctrl = get_vol();
+    MRI *dst = get_opt();
+    put_result(MRIbuildVoronoiDiagram(src, ctrl, dst), dst);
+    put_vol(ctrl);
+    return true;
+  }
+  if (cmd == "soap") {
+    MRI *src = get_vol();
+    MRI *ctrl = get_vol();
+    MRI *dst = get_dst(geti(), src);
+    int niter = geti();
+    float mc = getf();
+    put_result(MRIsoapBubble(src, ctrl, dst, niter, mc), dst);
+    return true;
+  }
   // mriflood.cpp: flood <src> <dst mode> [<dst>]; acc <src> <dst mode> [<dst>] lo hi; dist x y z
   if (cmd == "dist") {
     float x = getf(), y = getf(), z = getf();

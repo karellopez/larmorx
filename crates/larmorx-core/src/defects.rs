@@ -1733,6 +1733,26 @@ defects! {
         "the Voronoi diagram and the soap bubble read a control or destination volume of a wider type (an int control volume for a 16-bit source, a 16-bit or int volume where bytes are expected) byte by byte, so the control points and the averaged values are not the volume's values";
     FS_586 = "FS-586", "FreeSurfer", true,
         "the Voronoi diagram and the soap bubble given a destination or control volume smaller than the source (or with fewer frames, or a destination of another type for a float or 16-bit source) read and write outside that volume (memory corruption)";
+    FS_587 = "FS-587", "FreeSurfer", true,
+        "the intensity normalisation given a control volume (or a bias picture, or a 16-bit spline normalisation's destination) of another type than bytes (16-bit numbers) reads and writes that volume's memory byte by byte (16 bits at a time), so the control points and the written values are not the volume's values";
+    FS_588 = "FS-588", "FreeSurfer", true,
+        "the intensity normalisation given a control volume (or a bias picture, or a 16-bit spline normalisation's destination) smaller than the source reads and writes outside that volume (memory contents or corruption)";
+    FS_589 = "FS-589", "FreeSurfer", true,
+        "the intensity normalisation's windows (the control-point searches, the CSF search) of a volume whose voxel size is tiny, zero or not a number reach past the volume's index tables (memory contents, or a crash)";
+    FS_590 = "FS-590", "FreeSurfer", true,
+        "the one-dimensional normalisation's peak check (MRInormCheckPeaks) chooses its starting peak among the windows above the Talairach origin even when fewer peaks were found: it then reads entries that are not peaks (in mri_normalize, memory never written) and can drop good peaks";
+    FS_591 = "FS-591", "FreeSurfer", true,
+        "the one-dimensional normalisation with more than 80 windows writes past its window and histogram arrays, and its peak check with fewer than 7 windows above the Talairach origin reads before its peak arrays (memory corruption or contents)";
+    FS_592 = "FS-592", "FreeSurfer", true,
+        "the gentle control-point search (MRInormGentlyFindControlPoints, mri_normalize -gentle, mri_ca_normalize) wraps its intensity thresholds below 0 or above 255 around modulo 256 (a high threshold of 260 becomes 4), so the search finds other control points or none";
+    FS_593 = "FS-593", "FreeSurfer", true,
+        "MRI3dUseFileControlPoints with an FS_THRESH_CTRL that is not a number uses a threshold never written (memory contents)";
+    FS_594 = "FS-594", "FreeSurfer", true,
+        "MRI3dUseFileControlPoints with FS_THRESH_CTRL removes the control points below the threshold but keeps each one that directly follows a removed one";
+    FS_595 = "FS-595", "FreeSurfer", true,
+        "MRInormAddFileControlPoints' message on rejected control points prints a number that is not the number of rejected points (whatever the machine holds at that moment)";
+    FS_596 = "FS-596", "FreeSurfer", true,
+        "the intensity normalisation uses values never written: the one-dimensional normalisation's peaks past those found, the number in the rejected control points' message, the bias of a bias field whose type the sampler refuses (memory contents)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

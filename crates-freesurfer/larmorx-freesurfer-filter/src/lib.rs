@@ -22,6 +22,7 @@ pub mod fmri;
 pub(crate) mod mem;
 pub mod nonpar;
 pub mod norm;
+pub mod normalize;
 pub mod segment;
 pub mod sobel;
 pub mod volcluster;

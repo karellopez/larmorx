@@ -291,6 +291,11 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/annotation.cpp` 1248-1310 | `ReadAnnotAsMRISeg` (FS-49, FS-53; relay 30) | `annotation.rs` |
 | `utils/mriio.cpp` 643-647, 781-798, 830-925, 1176-1178, 1211-1213 | `mri_read`'s BRIK, curvature and annotation branches and its frees (FS-672, FS-717); `MRIwriteType`'s BRIK and NRRD branches (relay 30) | `mriio.rs` |
 | `utils/mriio.cpp` 516-528, 1116-1160 | `mri_read`'s COR, bhdr, bshort and bfloat branches; `MRIwriteType`'s COR, bhdr (FS-666), bshort and bfloat branches (relay 27) | `mriio.rs` |
+| `utils/imageio.cpp` 119-130, 147-196, 255-342, 459-518, 612-658, 1495-1505, 1687-1720, 1744-1781, 1799-1874 | `ImageWrite`, `ImageFWrite`, `ImageFRead` (over the HIPS stubs), `ImageReadFrames`'s open, `ImageRead`, `ImageUnpackFileName`, the netpbm stubs (`HAVE_NETPBM` undefined), `JPEGReadImage`'s open and `JPEGWriteImage`'s format check (the IJG's codec not ported: track C's), `RGBReadImage`, `RGBwrite` (FS-718, FS-719, FS-727, FS-730 to FS-732; relay 31) | `imageio.rs` |
+| `utils/image.cpp` 808-826, 3015-3080 | `ImageFromMatrix` (FS-719), `ImageInvert` with `ImageSplit`'s and `ImageCombine`'s allocations (the pixels' values unused: `ImageToMRI` refuses complex images) (relay 31) | `imageio.rs` |
+| `utils/rgb.cpp`; `include/rgb.h` | `iopen`/`imgopen` (read and write), `getrow`, `putrow` (uncompressed 1-byte pixels: what `RGBwrite` reaches), `iclose`, `iflush`, `img_seek`, `img_badrow`, `img_read`, `img_write`, `img_optseek`, `img_getrowsize`, `img_rle_expand`, `cvtimage`, `cvtshorts`, `cvtlongs` (as reading reaches them), `swapImage`, `tmpswapShort`, `tmpswapInt`, `isetname`, `ibufalloc`, `i_errhdlr` (no error function: message and `exit(1)`) (FS-720 to FS-729; relay 31) | `rgb.rs` |
+| `utils/mriio.cpp` 785-794, 1143-1150, 1191-1196, 9981-10101 | `mri_read`'s image branch, `MRIwriteType`'s image and ITK branches, `itkMorphWrite` (FS-733, FS-449, FS-58; relay 31) | `mriio.rs`, `mriio_write.rs` |
+| (larmorx's own) | the hook table for the conversions `mri_read` and `MRIwriteType` call in crates above this one (`ImageToMRI`, `MRItoImage`: fs.volume registers them; relay 31) | `upper.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
 the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte
@@ -365,3 +370,14 @@ characters through larmorx-freesurfer-core's `cscan::scan_f64`. The stores of mi
 FS-717 (the errors of FS-697, FS-699, FS-700, FS-707; the whole strings of FS-702; the float volume of
 FS-706; 0 for memory contents) and their notices are larmorx's own.
 
+Changes for relay 31: the SGI library's file descriptor I/O (`open`, `creat`, `read`, `write`, `lseek`,
+`close`) is a C stream (`cfile::CFile`) of the same bytes and positions; its header is kept as its
+fields, written in x86-64's layout, the descriptor and buffer address as 0 (FS-722). Only the paths
+FreeSurfer's readers and writers reach are ported (`putrow`'s uncompressed 1-byte branch; run-length
+and 2-byte writing are unreachable). The SGI run-length tables are read as SGI's 32-bit entries by
+default (FS-721, FS-729), FreeSurfer's 8-byte reads under `reproduce` for files in the machine's order;
+the expansion is bounded to the library's buffers in both modes (FS-726). `ImageToMRI` and `MRItoImage`
+stay in larmorx-freesurfer-volume (`image::register_io` fills `upper`); `mri_read` and `MRIwriteType`
+call them through `upper`. The defaults of FS-718 to FS-733 (the errors of FS-718, FS-730, FS-731,
+FS-732, FS-733; 0 for memory contents; the name in FS-725's message) and their notices are larmorx's
+own.

@@ -253,6 +253,21 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   FS-710, FS-712, FS-715, FS-716, FS-53 (and FS-672, FS-717 in every piece-6 command); `VARY` for FS-695,
   FS-696's memory contents, FS-701, FS-711, FS-713, FS-714. Seed 7, 1,099 piece-22 cases; seeds 13, 21, 99,
   2,200 each: `reproduce` identical on every comparable case, 0 different.
+- Piece 23 (track A relay 31): image files and ITK warps. `ixd` and `ixh` (piece 6's `mrd` and `mrh`, the type
+  -1 or 21) of SGI images built by `tests/fs_io/piece23.rs` (both byte orders, uncompressed and run-length,
+  1- and 2-byte pixels, 0 to 4 planes, 1 to 3 dimensions and wrong ones, rows of 16,384 to 40,000 2-byte
+  pixels; one fault: a wrong magic number, an unknown storage type or pixel size, a cut header, table or row,
+  run-length lengths of -1, 4,000 or 65,536, rows without their final 0 or past the width), piece 5's MATLAB
+  files, HIPS names (other extensions, `@<image type>` names, a folder), PGM, PPM, PBM, TIFF and JPEG names,
+  missing files, `#` frames; `ixw` (piece 17's `vwr`: `how` 31, `MRIwriteType` as an image, or 1, `MRIwrite`
+  by the name; 41, an ITK warp) of volumes of every type and shape onto SGI, MATLAB, PGM, PPM, PBM, HIPS,
+  TIFF, JPEG, `#` and folder names and plain or compressed NIfTI names, the SGI images read back. FreeSurfer's
+  side (`fsio.cpp`) maps the three to `mrd`, `mrh` and `vwr`, and zeroes an SGI file's descriptor and address
+  bytes (108 to 111, 144 to 151; FS-722) before hashing it, as the port's listing does. `SKIP` for FS-719,
+  FS-724, FS-726, FS-729, fs.volume's FS-290, FS-58, FS-465, piece 5's rules and the codecs not ported (TIFF,
+  JPEG); `VARY` for FS-720 (FreeSurfer's allocator aborts after it, as the heap lies), FS-727, piece 5's
+  FS-245 and `MatReadHeader`'s addresses. Seeds 7, 13 and 21: `reproduce` identical on every comparable case,
+  0 different.
 - `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
   of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four

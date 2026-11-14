@@ -108,7 +108,8 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   caller's `Environment`. Changes: FS-463 (NUL past the end), FS-464 (an error), both modes.
 - `src/image.rs` (3.1-35's image part; relay 19): `utils/mri.cpp` `MRItoImageView` (6796-7106), `MRItoImage`
   (7115-7155), `ImageToMRI` (7157-7314), on track A's `larmorx_freesurfer_io::image`. Changes: FS-466 (each RGB frame's
-  own pixels), rule A; FS-465 (only the pixels written and read), both modes.
+  own pixels), rule A; FS-465 (only the pixels written and read), both modes. `register_io` (larmorx's own, relay 31 of
+  track A) registers `ImageToMRI` and `MRItoImage` with fs.io's `upper` table, which `mri_read` and `MRIwriteType` call.
 - `src/labels.rs` (3.1-37; relay 19): `utils/mri.cpp` `MRIsmoothParcellation` (13124-13186), `MRIeraseBorderPlanes`
   (13188-13220), `MRImaxInNbhd` (13286-13304), `MRIcountNonzeroInNbhd`, `MRIareNonzeroInNbhd` (13329-13362),
   `MRIfindNearestNonzeroLocation` (13363-13401), `MRImeanInLabelMultispectral` .. `MRImaxInLabelInRegion` (14108-14246),

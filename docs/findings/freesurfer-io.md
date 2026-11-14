@@ -1801,3 +1801,85 @@ frame selection), `utils/annotation.cpp` 1248-1310 (`ReadAnnotAsMRISeg`).
   1,932 identical, 101 skipped, 167 compared apart; seed 99: 1,932, 112, 156); `fix` differs only with
   notices. Seed 1's 4,798 portable cases (the recorded test): 4,340 identical, 458 skipped or compared
   apart, 0 different.
+
+## Part 25: image files and ITK warps (relay 31 of track A)
+
+Sources: `utils/imageio.cpp` (`ImageRead`, `ImageFRead`, `ImageUnpackFileName`, `ImageWrite`,
+`ImageFWrite`, `RGBReadImage`, `RGBwrite`, `JPEGReadImage`, `JPEGWriteImage`, the netpbm stubs under
+`#ifndef HAVE_NETPBM`), `utils/image.cpp` (`ImageFromMatrix`, `ImageInvert`, `ImageSplit`,
+`ImageCombine`, `ImageValid`), `utils/hips.cpp` (`HIPS_DEP_ERROR`: `std::cerr << "error: hips is not
+supported"` and `return 0`, `HIPS_OK`), `utils/rgb.cpp` and `include/rgb.h` (the SGI library),
+`utils/mriio.cpp` (`mri_read`'s `IMAGE_FILE` branch: `I = ImageRead(...); mri = ImageToMRI(I);
+ImageFree(&I); start_frame = end_frame = -1;`; `MRIwriteType`'s `IMAGE_FILE` and `ITK_MORPH` branches;
+`itkMorphWrite`). The official build defines neither `HAVE_NETPBM` nor `Darwin`: PGM/PPM/PBM are the
+stubs and `RGBwrite` uses `UNCOMPRESSED(1)` (`#ifndef Linux` picks `RLE(1)` elsewhere). TIFF and JPEG go
+through the bundled libtiff and IJG 6b (`packages/tiff`, `packages/jpeg`; third-party.md P-05: the main
+package, track C): not ported here.
+
+### Mechanisms
+- **FS-718.** `ImageToMRI(I)` reads `I->ocols` first: every `ImageRead` path that returns NULL crashes
+  in `mri_read` (MatlabRead's NULL after `ErrorReturn(NULL, "ImageRead(%s) failed")`; HIPS's `fopen`
+  failure; `ImageFRead`'s "frame out of bounds"; the netpbm stubs' `ErrorReturn(NULL, ...)`;
+  `RGBReadImage`'s `zsize > 3` return; `iopen`'s silent `return(NULL)` when `open` fails, which crashes
+  earlier, at `rgb->ysize`).
+- **HIPS.** `fread_header` returns 0 (`HIPS_OK`) without touching the `calloc`'d header, so
+  `num_frame` is 0: with `start < 0` `nframes = I->num_frame = 0`, `end_frame = -1`, nothing read,
+  `ImageAllocBuffer` returns at `sizeimage == 0`, `ImageValid` returns 1 for `PFBYTE` (0). With a frame,
+  `end_frame = start >= num_frame`: the "frame out of bounds" `ErrorReturn` (the header leaked).
+  `ImageFWrite`'s HIPS case calls `findparam`, `setparam`, `fwrite_header` and `fwrite_image` per frame:
+  four messages for MRItoImage's one-frame image, nothing written.
+- **MATLAB.** `ImageFromMatrix` allocates `PFCOMPLEX` images with `init_header`'s default 1-byte
+  `sizepix` and `hmemcpy`s `rows * cols * 8` bytes (FS-719); `ImageInvert` of a complex image allocates
+  two float images (`ImageAlloc`, `ImageSplit`'s), calls `h_invert` twice (two messages) and
+  `ImageCombine` back; of a real image one `h_invert` (one message). `ImageToMRI` then `ErrorExit`s on
+  `PFCOMPLEX`.
+- **The SGI header (FS-720, FS-722).** `read(f, image, sizeof(RGB_IMAGE))` is 176 bytes on x86-64
+  (pointers and padding included). The swapped magic sets `dorev` and calls `cvtimage((long *)image)`:
+  `cvtshorts(buffer, 12)` swaps the six shorts correctly, `cvtlongs(buffer + 3, 12)` (written for
+  4-byte `long`s) converts bytes 24 to 47 (the name, unused), `cvtlongs(buffer + 26, 4)` converts bytes
+  208 to 215, past the 176-byte `calloc` (FS-720): the probe saw glibc abort in the next allocation
+  (`malloc(): mismatching next->prev_size (unsorted)`, signal 6) in about 4 % of such reads, as the heap
+  lay. The writer's `iclose` writes the structure back whole: `file` (the descriptor of `creat`) at 108,
+  `tmpbuf` (a `malloc` address) at 144, `flags` (`_IOWRT`), `x`, `y`, `z` (the last `img_seek`), `offset`
+  (0: `img_optseek(image, 0)` sets it just before), the rest of the pointers NULL (FS-722). `swapImage`
+  converts `wastebytes` with `tmpswapShort` (0 either way).
+- **Run-length tables (FS-721, FS-729, FS-726).** `tablesize = ysize * zsize * sizeof(long)` (8 bytes
+  an entry), `rowstart` (`unsigned int *`) and `rowsize` (`int *`) each `malloc(tablesize)`, both read
+  with `read(f, ..., tablesize)` from byte 512: the row starts are the first `ysize * zsize` 32-bit
+  numbers (SGI's table) and the lengths the 32-bit numbers from byte 512 + 8 x entries (FS-721). With
+  `dorev`, `cvtlongs((long *)rowstart, tablesize)` loops `short i < tablesize >> 2` over 8-byte `long`s:
+  twice the allocation (memory corruption; past 32,767 entries `i` wraps and the loop never ends:
+  FS-729). `getrow` assigns the length to a `short cnt` (`cnt == -1` returns -1 with the buffer
+  untouched), `img_read`s `cnt` bytes into `tmpbuf` (`IBUFSIZE(xsize)` bytes; a negative `cnt` is a
+  huge `size_t`) and `img_rle_expand` runs until a zero count with no bound on either buffer (FS-726).
+- **2-byte rows (FS-723, FS-724, FS-728).** `getrow`'s `short cnt = xsize << 1`: from 16,384 pixels it
+  is negative (`read` of `(size_t)(int)cnt`: the rest of the file into the 2 x `xsize`-byte buffer, then
+  `retval != cnt`, "getrow: error on read of row", exit 1), from 32,768 it is `2 xsize - 65536`
+  (a partial row; `cvtshorts` of that count only).
+- **The writer (FS-725, FS-730, FS-731, FS-732).** `i_errhdlr("iopen: can't open output file %s\n", 0, 0,
+  0, 0)` passes an `int` 0 for `%s` (glibc prints `(null)`). `RGBwrite` passes `I->cols`, `I->rows` as
+  `unsigned int` into the 16-bit fields (FS-730); its `putrow` calls for planes 1 and 2 go to plane 0
+  (`dim < 3`), each row written three times; `r[x] = *IMAGEpix(I, x, y)` is the byte at `y * ocols + x`
+  of the buffer whatever the format. `ImageWrite` opens `fname` itself (`fopen(fname, "wb")`, closed
+  unused) and `ImageFWrite` writes the `#`-less name: two files for `x.rgb#2`. `ImageFWrite`'s and
+  `ImageWrite`'s results are ignored by `MRIwriteType` (`error` stays 0, FS-731). After
+  `MRItoImage`'s `ErrorReturn(NULL, ...)` (`ImageFree(&I)` first) `MRIwriteType` calls
+  `ImageWrite(NULL, fname)` (FS-732): `RGBwrite` reads `I->cols` (crash), `JPEGWriteImage` reads
+  `I->pixel_format` (crash), the HIPS case prints three messages and reads `I->image` (crash), the
+  netpbm stubs return, then `ImageFree(&image)` with NULL: `ErrorExit(ERROR_BADPARM, "ImageFree: null
+  pointer")`.
+- **`itkMorphWrite` (FS-733).** `shortmax = (int)pow(2.0, 15.0)`; `if (0 && mri->width > shortmax)` (the
+  width check disabled, its message saying `nrows`); `hdr.dim[1] = mri->width` stores a `short`.
+  `pixdim[t] = 0` for all `t` (niiWrite uses 1); `qform_code` set to `NIFTI_XFORM_ALIGNED_ANAT` after
+  `mriToNiftiQform`; `nfill = (int)hdr.vox_offset - sizeof(hdr)` = 4 bytes of `calloc`; rows written
+  with `znzwrite(buf, 4, width)`; `exec_progress_callback` does nothing (no callback set); `znzclose`
+  unchecked.
+
+### Measurements
+- The fs-io probe's piece 23 (`ixd`, `ixh`, `ixw`; FreeSurfer's probe binary rebuilt with the aliases
+  and the SGI header's descriptor and address zeroed before the files are hashed): seeds 7 (345
+  piece-23 cases), 13 and 21 (690 each), and the writes alone at seeds 7 and 13 (230 each):
+  `reproduce` identical on every comparable case (1,008 + 374), 0 different; compared apart 413 of 451
+  identical (FS-720's allocator aborts, piece 5's MATLAB memory, FS-727's pixels, `MatReadHeader`'s
+  addresses); `fix` differs only with notices. Successful writes compared byte for byte: 56 SGI images,
+  44 ITK warps (plain and gzip).

@@ -731,3 +731,55 @@ pub fn mri_mask_and_upsample(
     let lta = transform_reg_dat2_lta(g, out, err, &src.vg, &srcus.vg, None)?;
     Ok(Some((srcus, lta)))
 }
+
+/// `MRIvol2VolTkRegVSM(mov, targ, Rtkreg, InterpCode, param, vsm, vsmlta, pedir)`:
+/// [`mri_vol2vol_vsm`] with the vox2vox `inv(Tmov) Rtkreg Ttarg` (`T` the tkregister vox2ras of
+/// each; `MatrixMultiply`), or none without a registration.
+#[allow(clippy::too_many_arguments)]
+pub fn mri_vol2vol_tkreg_vsm(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    mov: &Mri,
+    targ: &mut Mri,
+    rtkreg: Option<&Matrix>,
+    interp: i32,
+    param: f32,
+    vsm: Option<&Mri>,
+    vsmlta: Option<&Lta>,
+    pedir: i32,
+) -> Result<i32, Fatal> {
+    let vox2vox = match rtkreg {
+        Some(r) => {
+            let tmov = xfm_crs2xyz_tkreg(g, out, err, &mov.vg)?;
+            let inv_tmov = matrix_inverse(g, out, err, Some(&tmov), None)?.into_new();
+            let ttarg = xfm_crs2xyz_tkreg(g, out, err, &targ.vg)?;
+            let mut v = matrix_multiply(g, out, err, inv_tmov.as_ref(), Some(r), None)?.into_new();
+            // MatrixMultiply(vox2vox, Ttarg, vox2vox): FreeSurfer copies the input it writes into
+            match v.as_mut() {
+                Some(m) => {
+                    let c = m.clone();
+                    matrix_multiply(g, out, err, Some(&c), Some(&ttarg), Some(m))?;
+                }
+                None => {
+                    matrix_multiply(g, out, err, None, Some(&ttarg), None)?;
+                }
+            }
+            v
+        }
+        None => None,
+    };
+    mri_vol2vol_vsm(
+        g,
+        out,
+        err,
+        mov,
+        targ,
+        vox2vox.as_ref(),
+        interp,
+        param,
+        vsm,
+        vsmlta,
+        pedir,
+    )
+}

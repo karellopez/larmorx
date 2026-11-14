@@ -1811,7 +1811,7 @@ void run_case()
     fflush(stdout);
     oi(r != NULL && r == d);
     put_vol(r);
-  } else if (cmd == "vv" || cmd == "vvsm") {
+  } else if (cmd == "vv" || cmd == "vvsm" || cmd == "vvtk") {
     MRI *src = get_vol();
     fill_paint(src);
     src->outside_val = getd();
@@ -1825,7 +1825,7 @@ void run_case()
     MRI *vsm = NULL;
     LTA *lta = NULL;
     int pedir = 0;
-    if (cmd == "vvsm") {
+    if (cmd != "vv") {
       if (geti()) {
         vsm = get_vol();
         fill_paint(vsm);
@@ -1840,8 +1840,9 @@ void run_case()
       pedir = geti();
     }
     fflush(stdout);
-    int r = cmd == "vv" ? MRIvol2Vol(src, targ, M, interp, param)
-                         : MRIvol2VolVSM(src, targ, M, interp, param, vsm, lta, pedir);
+    int r = cmd == "vv"     ? MRIvol2Vol(src, targ, M, interp, param)
+            : cmd == "vvtk" ? MRIvol2VolTkRegVSM(src, targ, M, interp, param, vsm, lta, pedir)
+                            : MRIvol2VolVSM(src, targ, M, interp, param, vsm, lta, pedir);
     fflush(stdout);
     oi(r);
     put_vol(targ);
@@ -2496,6 +2497,81 @@ void run_case()
     std::string s = gethex();
     oi(interpolation_code(s.c_str()));
     oi(float2int_code(s.c_str()));
+  } else if (cmd == "sbound" || cmd == "sborder" || cmd == "idxno" || cmd == "ssrob" || cmd == "sfavg" ||
+             cmd == "zcat" || cmd == "aedit" || cmd == "shdim") {
+    // relay 25: mri2.cpp's MRIsegBoundary, MRIsegBorder, MRIindexNo, MRIsegStatsRobust,
+    // MRIsegFrameAvg, MRIzconcat, MRIapplyEdits, MRIshiftDim
+    MRI *seg = get_vol();
+    fill_paint(seg);
+    if (cmd == "sbound") {
+      fflush(stdout);
+      MRI *r = MRIsegBoundary(seg);
+      fflush(stdout);
+      put_vol(r);
+    } else if (cmd == "sborder") {
+      int topo = geti(), ml = -7;
+      fflush(stdout);
+      MRI *r = MRIsegBorder(seg, &ml, topo);
+      fflush(stdout);
+      oi(ml);
+      put_vol(r);
+    } else if (cmd == "idxno") {
+      MRI *d = geti() ? get_vol() : NULL;
+      fflush(stdout);
+      MRI *r = MRIindexNo(seg, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+    } else if (cmd == "ssrob" || cmd == "sfavg") {
+      MRI *m = get_vol();
+      fill_paint(m);
+      int segid = geti();
+      if (cmd == "ssrob") {
+        int frame = geti();
+        float pct = getf();
+        float mn = -7, mx = -7, rg = -7, mean = -7, sd = -7;
+        fflush(stdout);
+        int n = MRIsegStatsRobust(seg, segid, m, frame, &mn, &mx, &rg, &mean, &sd, pct);
+        fflush(stdout);
+        oi(n);
+        of(mn); of(mx); of(rg); of(mean); of(sd);
+      } else {
+        std::vector<double> favg(m->nframes > 0 ? m->nframes : 1, -7.0);
+        fflush(stdout);
+        int n = MRIsegFrameAvg(seg, segid, m, favg.data());
+        fflush(stdout);
+        oi(n);
+        for (int f = 0; f < m->nframes; f++) od(favg[f]);
+      }
+    } else if (cmd == "zcat") {
+      MRI *m2 = get_vol();
+      fill_paint(m2);
+      int nskip = geti();
+      MRI *d = geti() ? get_vol() : NULL;
+      fflush(stdout);
+      MRI *r = MRIzconcat(seg, m2, nskip, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+    } else if (cmd == "aedit") {
+      MRI *old = get_vol();
+      fill_paint(old);
+      MRI *man = get_vol();
+      fill_paint(man);
+      int mode = geti();
+      MRI *d = mode == 1 ? get_vol() : mode == 2 ? seg : NULL;
+      fflush(stdout);
+      MRI *r = MRIapplyEdits(seg, old, man, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+    } else {
+      int dim = geti(), nshift = geti(), wrap = geti();
+      fflush(stdout);
+      MRI *r = MRIshiftDim(seg, dim, nshift, wrap);
+      fflush(stdout);
+      put_vol(r);
+    }
   } else {
     fail("unknown command");
   }

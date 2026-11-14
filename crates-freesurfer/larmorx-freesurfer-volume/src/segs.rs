@@ -14,6 +14,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{FS_489, FS_490};
+use larmorx_core::glibc_qsort::qsort;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{Histogram, histo_init};
 use larmorx_freesurfer_core::log::Fatal;
@@ -249,4 +250,246 @@ pub fn histo_seg(
         }
     }
     Ok(h)
+}
+
+/// `MRIsegStatsRobust(seg, segid, mri, frame, &min, &max, &range, &mean, &std, Pct)`: as
+/// [`mri_seg_stats`] over the segment's values of `frame` sorted (`qsort` with `compare_floats`,
+/// glibc's order) and trimmed: the `k`-th value is kept when `k` is neither below nor above `Pct
+/// n / 100` and `(100 - Pct) n / 100` (`Pct n` in `float`); returns the count kept (all five 0 and
+/// the count 0 for an empty segment).
+pub fn mri_seg_stats_robust(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    seg: &Mri,
+    segid: i32,
+    mri: &Mri,
+    frame: i32,
+    pct: f32,
+) -> Result<(i32, SegStats), Fatal> {
+    const WHAT: &str = "MRIsegStatsRobust";
+    let mut st = SegStats::default();
+    let mut vlist: Vec<f32> = Vec::new();
+    for c in 0..seg.vg.width {
+        for r in 0..seg.vg.height {
+            for s in 0..seg.vg.depth {
+                let lab = mri_get_vox_val(g, err, seg, c, r, s, 0, 0)?;
+                if int_of(g, WHAT, f64::from(lab)) != segid {
+                    continue;
+                }
+                vlist.push(mri_get_vox_val(g, err, mri, c, r, s, frame, 0)?);
+            }
+        }
+    }
+    let n = vlist.len() as i32;
+    if n == 0 {
+        return Ok((0, st));
+    }
+    qsort(&mut vlist, |a: &f32, b: &f32| {
+        if a < b {
+            -1
+        } else if a > b {
+            1
+        } else {
+            0
+        }
+    });
+    let (mut sum, mut sum2) = (0.0f64, 0.0f64);
+    let mut m = 0i32;
+    let lo = div64(f64::from(mul(pct, n as f32)), 100.0);
+    let hi = div64(f64::from(mul(sub(100.0, pct), n as f32)), 100.0);
+    for (k, &v) in vlist.iter().enumerate() {
+        let k = k as f64;
+        if k < lo || k > hi {
+            continue;
+        }
+        let val = widen(v);
+        if m == 0 {
+            st.min = narrow(val);
+            st.max = narrow(val);
+        }
+        if f64::from(st.min) > val {
+            st.min = narrow(val);
+        }
+        if f64::from(st.max) < val {
+            st.max = narrow(val);
+        }
+        sum = add64(sum, val);
+        sum2 = add64(mul64(val, val), sum2);
+        m += 1;
+    }
+    st.range = sub(st.max, st.min);
+    st.mean = narrow(div64(sum, f64::from(m)));
+    st.std = if m > 1 {
+        let a = mul(mul(m as f32, st.mean), st.mean);
+        let b = mul64(widen(add(st.mean, st.mean)), sum);
+        let q = add64(sub64(widen(a), b), sum2);
+        narrow(sqrt64(div64(q, f64::from(m - 1))))
+    } else {
+        0.0
+    };
+    Ok((m, st))
+}
+
+/// `MRIsegFrameAvg(seg, segid, mri, favg)`: each frame's mean over the segment's voxels (sums
+/// in `double`); all 0 for an empty segment. Returns the count and the means.
+pub fn mri_seg_frame_avg(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    seg: &Mri,
+    segid: i32,
+    mri: &Mri,
+) -> Result<(i32, Vec<f64>), Fatal> {
+    const WHAT: &str = "MRIsegFrameAvg";
+    let mut favg = vec![0.0f64; mri.nframes.max(0) as usize];
+    let mut n = 0i32;
+    for c in 0..seg.vg.width {
+        for r in 0..seg.vg.height {
+            for s in 0..seg.vg.depth {
+                let lab = mri_get_vox_val(g, err, seg, c, r, s, 0, 0)?;
+                if int_of(g, WHAT, f64::from(lab)) != segid {
+                    continue;
+                }
+                for (f, a) in favg.iter_mut().enumerate() {
+                    let v = mri_get_vox_val(g, err, mri, c, r, s, f as i32, 0)?;
+                    *a = add64(*a, widen(v));
+                }
+                n += 1;
+            }
+        }
+    }
+    if n != 0 {
+        for a in favg.iter_mut() {
+            *a = div64(*a, f64::from(n));
+        }
+    }
+    Ok((n, favg))
+}
+
+/// `MRIsegBoundary(seg)`: a clone of the segmentation (`MRIclone`: its type, zeros) whose inner
+/// voxels (1 to extent - 2) hold their label where one of the 27 voxels around them (itself
+/// included) has another label, else 0.
+pub fn mri_seg_boundary(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    seg: &Mri,
+) -> Result<Mri, Fatal> {
+    const WHAT: &str = "MRIsegBoundary";
+    let mut b = crate::arith::mri_clone(g, out, err, seg, None)?.unwrap_new();
+    for c in 1..seg.vg.width.wrapping_sub(1) {
+        for r in 1..seg.vg.height.wrapping_sub(1) {
+            for s in 1..seg.vg.depth.wrapping_sub(1) {
+                let v = mri_get_vox_val(g, err, seg, c, r, s, 0, 0)?;
+                let cseg = int_of(g, WHAT, f64::from(v));
+                if cseg == 0 {
+                    mri_set_vox_val(g, err, &mut b, c, r, s, 0, 0.0, 0)?;
+                    continue;
+                }
+                let mut boundary = false;
+                'n: for dc in -1..2 {
+                    for dr in -1..2 {
+                        for ds in -1..2 {
+                            let v = mri_get_vox_val(g, err, seg, c + dc, r + dr, s + ds, 0, 0)?;
+                            if cseg != int_of(g, WHAT, f64::from(v)) {
+                                boundary = true;
+                                break 'n;
+                            }
+                        }
+                    }
+                }
+                let v = if boundary { cseg as f32 } else { 0.0 };
+                mri_set_vox_val(g, err, &mut b, c, r, s, 0, v, 0)?;
+            }
+        }
+    }
+    Ok(b)
+}
+
+/// `MRIsegBorder(seg, &maxlabel, topo)`: an `int` volume of the segmentation's grid and header with
+/// `1 + n` frames (`n` 6, 18 or 26 neighbours for `topo` 1, 2, 3, else 0): frame 0 is 1 where a
+/// neighbour (within the volume, at most `topo` steps away) has another label, and the next frames
+/// list those neighbours' labels in the order met; the largest label (not below 0) is returned
+/// too. `nhits = <n>, maxlabel=<m>` on standard output.
+pub fn mri_seg_border(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    seg: &Mri,
+    topo: i32,
+) -> Result<(Mri, i32), Fatal> {
+    const WHAT: &str = "MRIsegBorder";
+    let nnbrs = match topo {
+        1 => 6,
+        2 => 18,
+        3 => 26,
+        _ => 0,
+    };
+    let (w, h, d) = (seg.vg.width, seg.vg.height, seg.vg.depth);
+    let mut border = larmorx_freesurfer_mri::mri::mri_alloc_sequence(
+        g,
+        out,
+        err,
+        w,
+        h,
+        d,
+        larmorx_freesurfer_mri::mri::MRI_INT,
+        1 + nnbrs,
+    )?;
+    larmorx_freesurfer_mri::mri::mri_copy_header(g, out, err, seg, Some(&mut border))?;
+    larmorx_freesurfer_mri::mri::mri_copy_pulse_parameters(seg, &mut border);
+    let mut maxlabel = 0i32;
+    let mut nhits = 0i32;
+    for c in 0..w {
+        for r in 0..h {
+            for s in 0..d {
+                let v = mri_get_vox_val(g, err, seg, c, r, s, 0, 0)?;
+                let voxlabel = int_of(g, WHAT, f64::from(v));
+                if maxlabel < voxlabel {
+                    maxlabel = voxlabel;
+                }
+                let mut knbr = 0i32;
+                for dc in -1i32..2 {
+                    let cc = c + dc;
+                    if cc < 0 || cc >= w {
+                        continue;
+                    }
+                    for dr in -1i32..2 {
+                        let rr = r + dr;
+                        if rr < 0 || rr >= h {
+                            continue;
+                        }
+                        for ds in -1i32..2 {
+                            let ss = s + ds;
+                            if ss < 0 || ss >= d {
+                                continue;
+                            }
+                            if dc.abs() + dr.abs() + ds.abs() > topo {
+                                continue;
+                            }
+                            let v = mri_get_vox_val(g, err, seg, cc, rr, ss, 0, 0)?;
+                            let nbrlabel = int_of(g, WHAT, f64::from(v));
+                            if voxlabel != nbrlabel {
+                                mri_set_vox_val(g, err, &mut border, c, r, s, 0, 1.0, 0)?;
+                                mri_set_vox_val(
+                                    g,
+                                    err,
+                                    &mut border,
+                                    c,
+                                    r,
+                                    s,
+                                    1 + knbr,
+                                    nbrlabel as f32,
+                                    0,
+                                )?;
+                                knbr += 1;
+                                nhits = nhits.wrapping_add(1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let _ = writeln!(out, "nhits = {nhits}, maxlabel={maxlabel}");
+    Ok((border, maxlabel))
 }

@@ -26,6 +26,7 @@ pub mod label_coords;
 pub mod labels;
 pub mod ltaops;
 pub mod ltaread;
+pub mod mri2ops;
 pub mod mrihisto;
 pub mod mriset;
 pub mod mrivoxel;

@@ -2350,7 +2350,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
-            "vv" | "vvsm" | "vvk" | "vvd" | "maskup" => {
+            "vv" | "vvsm" | "vvtk" | "vvk" | "vvd" | "maskup" => {
                 let mut s = shape(&mut g);
                 s.hdr = s.hdr && g.chance(4);
                 vol_of(&mut g, &mut t, s);
@@ -2359,7 +2359,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     fill_paint(&mut g, &mut t, s, &[&[0.0, 1.0, 2.0, 5.0]], &[vals]);
                 }
                 match cmd {
-                    "vv" | "vvsm" => {
+                    "vv" | "vvsm" | "vvtk" => {
                         t.push(dx(g.pick(&[0.0, 0.0, -1.0, 7.5, 1e30])));
                         let mut o = like(&mut g, s);
                         if !g.chance(8) {
@@ -2373,7 +2373,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         t.push(fx(g.pick(&[0.0f32, 3.0, 1.0, 2.5, -1.0])));
                         t.push(i64::from(g.chance(8)).to_string());
                         t.push(i64::from(g.chance(8)).to_string());
-                        if cmd == "vvsm" {
+                        if cmd != "vv" {
                             let has = !g.chance(5);
                             t.push(i64::from(has).to_string());
                             if has {
@@ -2539,6 +2539,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R24_HISTO.contains(&c) => r24_gen_histo(&mut g, &mut t, c),
             c if R25_LTA.contains(&c) => r25_gen_lta(&mut g, &mut t, c),
             c if R25_RES.contains(&c) => r25_gen_res(&mut g, &mut t, c),
+            c if R25_MRI2.contains(&c) => r25_gen_mri2(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3004,7 +3005,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 231] = [
+pub const COMMANDS: [&str; 240] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3236,6 +3237,15 @@ pub const COMMANDS: [&str; 231] = [
     "a2vmu",
     "spmw",
     "icode",
+    "vvtk",
+    "sbound",
+    "idxno",
+    "ssrob",
+    "sfavg",
+    "zcat",
+    "aedit",
+    "shdim",
+    "sborder",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5549,8 +5559,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let m = xf::mri_get_resample_matrix(g, a, b, &src, &tmpl)?;
             o.m(m.as_ref());
         }
-        "vv" | "vvsm" | "vvk" | "vvd" | "maskup" | "cov" | "mpca" | "pcast" | "fdr" | "rgbb"
-        | "vxn" => piece_d_and_regions(cx, t, o, cmd)?,
+        "vv" | "vvsm" | "vvtk" | "vvk" | "vvd" | "maskup" | "cov" | "mpca" | "pcast" | "fdr"
+        | "rgbb" | "vxn" => piece_d_and_regions(cx, t, o, cmd)?,
         "talcras" | "talmat" | "talpt" | "talvol" => r22_tal(cx, t, o, cmd)?,
         "dilate" | "dilu" | "msegs" => r22_dilate_msegs(cx, t, o, cmd)?,
         "sstat" | "hseg" => r22_stats(cx, t, o, cmd)?,
@@ -5565,6 +5575,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         c if R24_HISTO.contains(&c) => r24_histo(cx, t, o, cmd)?,
         c if R25_LTA.contains(&c) => r25_lta(cx, t, o, cmd)?,
         c if R25_RES.contains(&c) => r25_res(cx, t, o, cmd)?,
+        c if R25_MRI2.contains(&c) => r25_mri2(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -5606,7 +5617,7 @@ impl lr::LtaIo for NoIo {
 #[inline(never)]
 fn piece_d_and_regions(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
     match cmd {
-        "vv" | "vvsm" => r21_vv(cx, t, o, cmd)?,
+        "vv" | "vvsm" | "vvtk" => r21_vv(cx, t, o, cmd)?,
         "vvk" => r21_vvk(cx, t, o, cmd)?,
         "vvd" => r21_vvd(cx, t, o, cmd)?,
         "maskup" => r21_maskup(cx, t, o, cmd)?,
@@ -5637,7 +5648,7 @@ fn r21_vv(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fata
         cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_VERBOSE;
     }
     let (mut vsm, mut lta, mut pedir) = (None, None, 0);
-    if cmd == "vvsm" {
+    if cmd != "vv" {
         if t.i() != 0 {
             let mut v = get_vol(cx, t)?;
             fill_painted(cx, t, &mut v)?;
@@ -5663,6 +5674,20 @@ fn r21_vv(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fata
     let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
     let r = if cmd == "vv" {
         v2::mri_vol2vol(g, a, b, &src, &mut targ, m.as_ref(), interp, param)?
+    } else if cmd == "vvtk" {
+        v2::mri_vol2vol_tkreg_vsm(
+            g,
+            a,
+            b,
+            &src,
+            &mut targ,
+            m.as_ref(),
+            interp,
+            param,
+            vsm.as_ref(),
+            lta.as_ref(),
+            pedir,
+        )?
     } else {
         v2::mri_vol2vol_vsm(
             g,
@@ -8029,6 +8054,207 @@ fn r25_res(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fat
             o.i(i64::from(
                 larmorx_freesurfer_io::registerio::float2int_code(&s),
             ));
+        }
+    }
+    Ok(())
+}
+
+/// mri2.cpp's functions of relay 25 (`vvtk` shares `vvsm`'s tokens).
+const R25_MRI2: [&str; 8] = [
+    "sbound", "idxno", "ssrob", "sfavg", "zcat", "aedit", "shdim", "sborder",
+];
+
+/// A segmentation-like volume of a small shape: labels from a few, painted.
+fn r25_segvol(g: &mut Gen, t: &mut Vec<String>, nf: i64) -> Shape {
+    let mut s = shape(g);
+    if !matches!(s.ty, 0 | 1 | 3 | 4 | 10) {
+        s.ty = g.pick(&[0, 1, 3]);
+    }
+    s.w = g.int(1, 5);
+    s.h = g.int(1, 5);
+    s.d = g.int(1, 4);
+    s.nf = nf;
+    s.hdr = s.hdr && g.chance(4);
+    vol_of(g, t, s);
+    let labs: &[f32] = &[0.0, 2.0, 3.0, 41.0, 2.0, 3.0, 17.0];
+    fill_paint(g, t, s, &[labs, &[0.0, 1.0]], &[labs]);
+    s
+}
+
+fn r25_gen_mri2(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    match cmd {
+        "sbound" => {
+            r25_segvol(g, t, 1);
+        }
+        "sborder" => {
+            r25_segvol(g, t, 1);
+            t.push(g.pick(&[1i64, 1, 2, 3, 0, 4, -1]).to_string());
+        }
+        "idxno" => {
+            let s = r25_segvol(g, t, 1);
+            let given = g.chance(4);
+            t.push(i64::from(given).to_string());
+            if given {
+                let o = like(g, s);
+                vol_of(g, t, o);
+            }
+        }
+        "ssrob" | "sfavg" => {
+            let s = r25_segvol(g, t, 1);
+            let mut o = like(g, s);
+            o.nf = g.int(1, 3);
+            vol_of(g, t, o);
+            let vals: &[f32] = &[0.0, 1.0, 2.5, -3.0, 100.0, 7.0, 0.25];
+            fill_paint(g, t, o, &[vals, vals, vals], &[vals]);
+            t.push(g.pick(&[2i64, 3, 41, 0, 17, 99]).to_string());
+            if cmd == "ssrob" {
+                t.push(frame_of(g, o).to_string());
+                t.push(fx(g.pick(&[0.0f32, 10.0, 25.0, 50.0, 2.5, f32::NAN, 60.0])));
+            }
+        }
+        "zcat" => {
+            let nf = g.int(1, 2);
+            let s = r25_segvol(g, t, nf);
+            let mut o = like(g, s);
+            if g.chance(6) {
+                o.w = g.int(1, 5);
+            }
+            o.nf = s.nf;
+            o.ty = s.ty;
+            vol_of(g, t, o);
+            let vals: &[f32] = &[0.0, 1.0, 9.0];
+            fill_paint(g, t, o, &[vals, vals], &[vals]);
+            t.push(g.pick(&[0i64, 0, 1, 2, -1, 5]).to_string());
+            let given = g.chance(6);
+            t.push(i64::from(given).to_string());
+            if given {
+                let mut d = like(g, s);
+                d.d = s.d + o.d - g.int(0, 1);
+                vol_of(g, t, d);
+            }
+        }
+        "aedit" => {
+            let nf = g.int(1, 2);
+            let s = r25_segvol(g, t, nf);
+            for _ in 0..2 {
+                let o = Shape { hdr: false, ..s };
+                vol_of(g, t, o);
+                let vals: &[f32] = &[0.0, 2.0, 3.0, 255.0];
+                fill_paint(g, t, o, &[vals, vals], &[vals]);
+            }
+            let mode = g.int(0, 2);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let o = Shape { hdr: false, ..s };
+                vol_of(g, t, o);
+            }
+        }
+        _ => {
+            // shdim
+            let nf = g.int(1, 2);
+            r25_segvol(g, t, nf);
+            t.push(g.pick(&[1i64, 2, 3, 2, 3, 0, 4]).to_string());
+            t.push(g.pick(&[1i64, -1, 2, -3, 0, 5, -6]).to_string());
+            t.push(g.int(0, 1).to_string());
+        }
+    }
+}
+
+#[inline(never)]
+fn r25_mri2(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::mri2ops as m2;
+    let mut seg = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut seg)?;
+    match cmd {
+        "sbound" => {
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = sg::mri_seg_boundary(g, a, b, &seg)?;
+            o.vol(Some(&r));
+        }
+        "sborder" => {
+            let topo = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let (r, ml) = sg::mri_seg_border(g, a, b, &seg, topo)?;
+            o.i(i64::from(ml));
+            o.vol(Some(&r));
+        }
+        "idxno" => {
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = m2::mri_index_no(g, a, b, &seg, d.as_mut())?;
+            o.ret(&r, d.as_ref());
+        }
+        "ssrob" | "sfavg" => {
+            let mut m = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut m)?;
+            let segid = t.i();
+            if cmd == "ssrob" {
+                let (frame, pct) = (t.i(), t.f());
+                let (g, b) = (&mut cx.g, &mut cx.b);
+                let (n, st) = sg::mri_seg_stats_robust(g, b, &seg, segid, &m, frame, pct)?;
+                o.i(i64::from(n));
+                for v in [st.min, st.max, st.range, st.mean, st.std] {
+                    o.f(v);
+                }
+            } else {
+                let (g, b) = (&mut cx.g, &mut cx.b);
+                let (n, favg) = sg::mri_seg_frame_avg(g, b, &seg, segid, &m)?;
+                o.i(i64::from(n));
+                for v in favg {
+                    o.d(v);
+                }
+            }
+        }
+        "zcat" => {
+            let mut m2v = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut m2v)?;
+            let nskip = t.i();
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = m2::mri_zconcat(g, a, b, &seg, &m2v, nskip, d.as_mut())?;
+            o.ret(&r, d.as_ref());
+        }
+        "aedit" => {
+            let mut old = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut old)?;
+            let mut man = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut man)?;
+            let mode = t.i();
+            match mode {
+                1 => {
+                    let mut d = get_vol(cx, t)?;
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    let r = m2::mri_apply_edits(g, a, b, &seg, &old, &man, Some(&mut d))?;
+                    o.ret(&r, Some(&d));
+                }
+                2 => {
+                    // in place into newauto: its copy is the input
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    let copy =
+                        larmorx_freesurfer_mri::copy::mri_copy(g, a, b, &seg, None)?.unwrap_new();
+                    let r = m2::mri_apply_edits(g, a, b, &copy, &old, &man, Some(&mut seg))?;
+                    o.ret(&r, Some(&seg));
+                }
+                _ => {
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    let r = m2::mri_apply_edits(g, a, b, &seg, &old, &man, None)?;
+                    o.ret(&r, None);
+                }
+            }
+        }
+        _ => {
+            let (dim, nshift, wrap) = (t.i(), t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = m2::mri_shift_dim(g, a, b, &seg, dim, nshift, wrap)?;
+            o.vol(r.as_ref());
         }
     }
     Ok(())

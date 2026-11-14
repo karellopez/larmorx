@@ -2037,6 +2037,10 @@ defects! {
         "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) decides whether a voxel has a clear winner from the hits of its highest label instead of the label with the most hits, so a label with half or more of the voxel can lose to the tissue-type vote";
     FS_511 = "FS-511", "FreeSurfer", true,
         "applying an SPM warp field (MRIapplySpmWarp) stores, where a sample fails before any has succeeded (a trilinear sample of a type it cannot read), a value never written";
+    FS_512 = "FS-512", "FreeSurfer", true,
+        "concatenating two volumes along the slices (MRIzconcat) copies as many rows as the volumes have columns: rows past the width stay 0, and where the width is larger it reads and writes rows the volumes do not have";
+    FS_513 = "FS-513", "FreeSurfer", true,
+        "shifting a volume along its rows or slices (MRIshiftDim) wraps and drops the shifted indices by the number of columns instead of the number of rows or slices";
 }
 
 /// The register entry with ID `id`.

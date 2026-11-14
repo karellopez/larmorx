@@ -16,13 +16,15 @@
 //! Defects (`larmorx_core::defects`; mechanisms in `docs/findings/freesurfer-io.md`, Part 24):
 //! FS-693 (a header that cannot be read is read for ever), FS-694 (the header's last line without
 //! a newline), FS-695 (a count before any type or name line), FS-696 (a bare `count` line), FS-697
-//! (a token that is not a number), FS-698 (more numbers than the count), FS-699 (a negative or
-//! huge count), FS-700 (an attribute of a type FreeSurfer does not check), FS-701 (fewer values
-//! than FreeSurfer reads), FS-702 (long strings over the structure), FS-703 (`IDCODE_STRING`
-//! without its `~`), FS-704 (the brick types' names), FS-705 (no `BRICK_FLOAT_FACS` or
-//! `BRICK_STATS`), FS-706 (frames scaled differently), FS-707 (a volume of no voxels), FS-708 (the
-//! messages' names and numbers), FS-709 (a folder in the BRIK's place), FS-249 (names past
-//! FreeSurfer's buffer).
+//! (a token that is not a number), FS-698 and FS-710 (more numbers than the count, within and past
+//! the allocation), FS-699, FS-714 and FS-715 (negative, -1 and huge counts), FS-700 (an attribute
+//! of a type FreeSurfer does not check), FS-701 (fewer values than FreeSurfer reads), FS-702 (long
+//! strings: the C library's overflow abort), FS-703 and FS-716 (`IDCODE_STRING` without its `~`),
+//! FS-704 and FS-711 (the brick types' names), FS-705 (no `BRICK_FLOAT_FACS` or `BRICK_STATS`),
+//! FS-706 and FS-712 (frames scaled differently), FS-707 (a volume of no voxels), FS-708 and FS-713
+//! (the messages' names and numbers), FS-709 (a folder in the BRIK's place), FS-249 (names past
+//! FreeSurfer's buffer). Each variant that decides whether a probe line compares has its own ID
+//! (a run keeps one notice per defect).
 
 use std::io::Write;
 use std::path::Path;

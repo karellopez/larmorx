@@ -566,8 +566,8 @@ mod tests {
         w(IHDR_START + IHDR_Y, &1i16.to_be_bytes());
         w(SEHDR_START + SEHDR_IALLOC, &files.to_be_bytes());
         w(IHDR_START + IHDR_NECHO, &echoes.to_be_bytes());
-        w(IHDR_START + IHDR_THICK, &dg(3.0).to_vec());
-        w(IHDR_START + IHDR_PIXSIZ, &dg(2.0).to_vec());
+        w(IHDR_START + IHDR_THICK, &dg(3.0));
+        w(IHDR_START + IHDR_PIXSIZ, &dg(2.0));
         w(SEHDR_START + SEHDR_PTYPE, &SIGNA_AXIAL.to_be_bytes()[2..]);
         h
     }

@@ -444,7 +444,8 @@ fn mat_alloc(g: &mut Globals, err: &mut dyn Write, rows: i32, cols: i32) -> Opti
 
 /// The bytes `matAlloc` takes for `rows` x `cols` in glibc (a pointer and a row's block each).
 fn nums_bytes(rows: i32, cols: i32) -> i64 {
-    i64::from(rows.max(0)) * (8 + usable(8 * i64::from(cols.max(0))) + 8)
+    // saturating: a header's sizes up to 2^31 each overflow 64 bits (a refusal either way)
+    i64::from(rows.max(0)).saturating_mul(8 + usable(8 * i64::from(cols.max(0))) + 8)
 }
 
 /// The element of a version 4 or 5 type: its `MAT_*` code (FreeSurfer's switch value: an
@@ -1699,7 +1700,7 @@ fn to_matrix(
     if big(
         g,
         "a .mat matrix",
-        i64::from(rows.max(0)) * i64::from(cols.max(0)) * pair,
+        (i64::from(rows.max(0)) * i64::from(cols.max(0))).saturating_mul(pair),
     ) {
         return Ok(None);
     }
@@ -1727,7 +1728,7 @@ fn to_matrix(
 /// `matAlloc` of a header's size, refusing one beyond the machine (FS-243: then as a failed
 /// allocation).
 fn alloc_for(g: &mut Globals, err: &mut dyn Write, rows: i32, cols: i32) -> Option<Nums> {
-    let numbers = 8 * i64::from(rows.max(0)) * i64::from(cols.max(0));
+    let numbers = (8 * i64::from(rows.max(0))).saturating_mul(i64::from(cols.max(0)));
     if big(g, "a .mat matrix", nums_bytes(rows, cols)) || numbers > MAX_BYTES {
         badfile(
             g,

@@ -3486,8 +3486,10 @@ read_volume)`:
   files in volume (<n>) not divisible by mosaics per volume (<m>)`), and the frames are the quotient.
 - The geometry (every field big-endian): the pixel sizes at 5,000 and 5,008 (times the mosaic rows
   and columns); the slice spacing `(1 + distance_factor) * thickness` (distance factor at 4,136, a
-  value of `-19222` taken as 0; thickness at 1,544); the field of view at 3,744 (the width at 3,752
-  is read into the same variable and byte-swapped a second time, so it is ignored — FS-691); the
+  value of `-19222` taken as 0; thickness at 1,544); the field of view (meant to be the larger of
+  the height at 3,744 and the width at 3,752, but the width is read into the same variable and the
+  height byte-swapped a second time, so the width is ignored — FS-691, D13: larmorx uses the larger
+  of the two by default and `reproduce` gives FreeSurfer's); the
   flip angle (2,112, degrees to radians); TR, TE, TI (1,560, 1,568, 1,576); the slice, column and row
   direction cosines (3,792, 3,832, 3,856, each three doubles, the Sagittal and Transverse negated);
   the image centre (3,768), from which `c_r`/`c_a`/`c_s` are computed with the slice normal, the
@@ -3516,5 +3518,5 @@ columns, file counts that do and do not divide the mosaics, headers shorter than
 parse, and names with no file. Measured (2026-11-14): seeds 7, 13, 21, 99, each 150 piece-21 cases:
 `reproduce` identical on every comparable case, 0 different (the crash and mosaic-corruption cases
 skipped: FS-688, FS-692; the DICOM path not ported; FS-689 compared apart); `fix` differs only with
-the error-message correction (FS-01). The recorded cross-platform test includes two `imd`/`imh`
-cases.
+the field-of-view correction (FS-691) and the error-message correction (FS-01). The recorded
+cross-platform test includes two `imd`/`imh` cases.

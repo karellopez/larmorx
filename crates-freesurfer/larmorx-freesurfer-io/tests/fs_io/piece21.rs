@@ -92,7 +92,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
 
     // a mosaic or a structural series
     let mosaic = g.chance(3);
-    let brms = g.pick(&[2, 4]) as i32;
+    let brms = g.pick(&[2, 4]);
     let (rows, cols): (i16, i16) = if mosaic {
         let mr = g.pick(&[1, 2]);
         let mc = g.pick(&[1, 2]);
@@ -103,24 +103,24 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     let nsl = if mosaic {
         g.int(1, 6) as i32
     } else if g.chance(10) {
-        g.pick(&[0, 1]) as i32
+        g.pick(&[0, 1])
     } else {
         1
     };
-    let avg = if mosaic { g.pick(&[1, 2]) as i32 } else { 1 };
+    let avg = if mosaic { g.pick(&[1, 2]) } else { 1 };
     let seq: Vec<u8> = if g.chance(12) {
         b"scout_64".to_vec()
     } else {
         g.pick(&[&b"fl3d"[..], b"ep2d", b"se"]).to_vec()
     };
     let slice_dir = if g.chance(12) {
-        g.pick(&[0, 7, -1]) as i32
+        g.pick(&[0, 7, -1])
     } else {
         g.int(1, 6) as i32
     };
     let bad_matrix = !mosaic && g.chance(14);
     let base = if bad_matrix {
-        brms + g.pick(&[1, -1]) as i32
+        brms + g.pick(&[1, -1])
     } else {
         brms
     };

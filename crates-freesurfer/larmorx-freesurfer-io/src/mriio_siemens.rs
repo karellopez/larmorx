@@ -26,10 +26,10 @@
 //! parts and then overwrite the Coronal with the Transverse, never filling the third element (a
 //! copy-and-paste slip); no program reads these fields (`siemensRead` reads the cosines itself), so
 //! larmorx keeps the behaviour and documents it (no defect constant, as nothing produces it).
-//! FS-691: `siemensRead` reads the field-of-view
-//! width into the height's value and then byte-swaps the height a second time, so the width is
-//! ignored and the field of view is the height (the second value is a byte-swap artefact that only
-//! wins for pathological bytes); kept and documented.
+//! FS-691 (D13): `siemensRead` reads the field-of-view width into the height's value and then
+//! byte-swaps the height a second time instead of using the width, so the field of view is the
+//! height where it should be the larger of the height and the width; by default larmorx uses the
+//! larger of the two and `reproduce` gives FreeSurfer's.
 
 use std::io::Write;
 use std::path::Path;
@@ -220,7 +220,7 @@ pub fn siemens_read(
         ));
     }
 
-    let file_n = cstd::atoi(stem[stem.len() - digits..].as_bytes());
+    let file_n = cstd::atoi(&stem.as_bytes()[stem.len() - digits..]);
     let name_of = |n: i32| format!("{prefix}{n}.{ima}");
 
     // the lowest and highest image numbers whose files exist around this one
@@ -399,19 +399,29 @@ pub fn siemens_read(
     let d2 = be_f64(b);
     m.vg.zsize = ((1.0 + d) * d2) as f32;
 
-    // field of view: FreeSurfer reads the width into the same variable and then byte-swaps the
-    // height's value a second time, so the width is ignored (FS-691)
+    // field of view (meant to be the larger of the height and the width): FreeSurfer reads the
+    // width into the same variable and then byte-swaps the height's value a second time instead of
+    // using the width (FS-691, D13). By default the larger of the height and the width; `reproduce`
+    // the larger of the height and its double-byte-swap.
     let (b, _) = read_be(&mut fp, 3744, 8);
-    let d = be_f64(b);
-    let (_b, _) = read_be(&mut fp, 3752, 8);
-    let d2 = machine::swap_double(d);
-    m.fov = (if d > d2 { d } else { d2 }) as f32;
-    if d2 > d {
+    let height = be_f64(b);
+    let (b, _) = read_be(&mut fp, 3752, 8);
+    let width = be_f64(b);
+    let reproduce_fov = height.max(machine::swap_double(height));
+    let default_fov = height.max(width);
+    if reproduce_fov.to_bits() != default_fov.to_bits() {
         g.notices.add(
             &FS_691,
-            "siemensRead: the field of view is the byte-swap artefact of the height, not the width",
+            format!(
+                "siemensRead: the field of view is the larger of the height {height} and the width {width} ({default_fov}); FreeSurfer uses the larger of the height and its byte-swap ({reproduce_fov})"
+            ),
         );
     }
+    m.fov = (if g.notices.reproduce() {
+        reproduce_fov
+    } else {
+        default_fov
+    }) as f32;
 
     m.thick = m.vg.zsize;
     m.ps = m.vg.xsize;
@@ -575,7 +585,7 @@ fn read_voxels(
                 log::error_printf(g, err, ERROR_BADFILE, "siemensRead(): could not read file");
             }
             // the file holds big-endian shorts (`swab` turns them into the native order)
-            for (k, v) in row.chunks_exact(2).enumerate() {
+            for (k, v) in row.as_chunks::<2>().0.iter().enumerate() {
                 let idx = base + k;
                 if idx < raw.len() && 2 * (k + 1) <= got {
                     raw[idx] = i16::from_be_bytes([v[0], v[1]]);
@@ -613,10 +623,10 @@ fn read_voxels(
                         + j as u64 * vox_per_row
                         + i as u64) as usize
                         * 2;
-                    if let Some(c) = m.chunk.as_mut() {
-                        if off + 2 <= c.len() {
-                            c[off..off + 2].copy_from_slice(&val.to_le_bytes());
-                        }
+                    if let Some(c) = m.chunk.as_mut()
+                        && off + 2 <= c.len()
+                    {
+                        c[off..off + 2].copy_from_slice(&val.to_le_bytes());
                     }
                 }
             }

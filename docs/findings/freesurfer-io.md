@@ -1694,6 +1694,7 @@ and its helpers `imaLoadVal`, `imaLoadValFromKey`, the dictionary, `imaParseName
 ### Measurements
 - The fs-io probe's piece 21 (`imd`, `imh`, piece 6's `mrd`/`mrh`, type -1 or 6): seeds 7, 13, 21, 99,
   150 cases each, `reproduce` identical on every comparable case, 0 different; across 666 cases (seed 5)
-  FS-688 fired 49 times, FS-692 4, FS-689 2 (FS-691 never: the field-of-view swap never wins for ordinary
-  byte patterns). The unit tests in `mriio_siemens.rs` check the geometry and voxels of a structural
+  FS-688 fired 49 times, FS-692 4, FS-689 2, and (over 50 seed-13 cases) FS-691 25 times (the D13
+  field-of-view correction, which only `fix` applies, so `reproduce` still matches the oracle). The
+  unit tests in `mriio_siemens.rs` check the geometry and voxels of a structural
   series, the name-parse and bad-extension refusals, and the short-header note.

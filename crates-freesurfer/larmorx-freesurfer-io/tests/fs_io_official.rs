@@ -10,12 +10,12 @@
 //! one (fs.core's ArgumentParser), piece 10's sixteen (fs.labels' text colour tables and
 //! lookups, registration files), piece 11's thirteen (labels, control points, annotation tables,
 //! point sets), piece 12's four (GIFTI volumes read and written, point-set files, the XML help
-//! renderer) and piece 14's one (MGH and MGZ volumes written), without those that take seconds in
-//! a debug build,
+//! renderer) and piece 14's one (MGH, MGZ and NIfTI volumes written), without those that take
+//! seconds in a debug build,
 //! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
 //! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 23, with piece 14
-//! and the MGH writer: 4,799 cases, 4,327 lines identical, 45 of them with memory digits; 472
-//! hashed as `SKIP`),
+//! and the MGH and NIfTI writers: 4,798 cases, 4,286 lines identical, 42 of them with memory
+//! digits; 512 hashed as `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -36,8 +36,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "9e99627e2d9fe58da3972e7dcbb60820e68abde92a65b6ce0b2d0510bbeddccb";
-const SKIPPED: usize = 472;
+const OFFICIAL_SHA256: &str = "c27dbc15ed4d6f33b9294f5e9e276858e0df63032c2b3e4356af5f032fa06c07";
+const SKIPPED: usize = 512;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

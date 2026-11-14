@@ -140,9 +140,27 @@ fn volume14(
     for v in [w, h, d, i64::from(ty), nf, i64::from(alloc)] {
         t.push(v.to_string());
     }
-    let geom = [
+    // FreeSurfer's coronal axes, or (one in two) a signed permutation of the axes (every
+    // quaternion branch of the NIfTI writer's qform), now and then all zero (no orientation)
+    let mut geom = [
         1.0f32, 1.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0,
     ];
+    if g.chance(40) {
+        geom[3..].fill(0.0);
+    } else if g.chance(2) {
+        let perm = g.pick(&[
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ]);
+        geom[3..].fill(0.0);
+        for (axis, p) in perm.iter().enumerate() {
+            geom[3 + 3 * axis + p] = if g.chance(2) { 1.0 } else { -1.0 };
+        }
+    }
     for v in geom {
         t.push(fhex(if g.chance(10) { 2.0 * v + 0.5 } else { v }));
     }

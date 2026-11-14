@@ -131,5 +131,42 @@ grew past its 12 GiB box). `GetLargestCC6`/`18` scan `i` (rows) outermost, then 
 
 `MRIreclassifyWMCtxNonPar` and `MRIclassifyAmbiguousNonPar` (`mrifilter.cpp` 4914, 5093) need
 `mri2.cpp`'s `MRImatchSegs` (5687), `MRIsegStats` (3826), `HISTOseg` (5717) and `mriset.cpp`'s
-`MRIdilate` (1723), which no track has ported yet. `fmriutils.cpp`'s 21 functions, `filter.cpp`'s
-image reductions and `diffuse.cpp`'s tables are the next relay's.
+`MRIdilate` (1723), which no track has ported yet (track C takes them first, relay 27's notes).
+`filter.cpp`'s image reductions (`ImageConvolve1d` 713, `ImageReduce` 928, `ImageReduce1d` 979) were
+ported with fs.io's images (`larmorx-freesurfer-io/src/image.rs`: `ImageScaleDown` calls them and
+fs.filter's crate sits above fs.io); nothing of them is left here.
+
+## 10. `fmriutils.cpp`'s frame functions (relay 27)
+
+Operand orders from the unit oracle's `fmriutils.cpp.o` (`relay27/fmriutils.asm`, GCC 8.4.0 `-O3`,
+not vectorised: the loops call `MRIgetVoxVal`, or alias their row pointers):
+
+- `fMRImatrixMultiply`: `movss pin; mulss val; addss (pout)`: `add(mul(v, w), out)`.
+- `fMRIcovariance`: `v1` from the first call, `v2` from the second; `subsd m` from each; `mulsd
+  %xmm1(v1 - m), %xmm0(v2 - m)`; `addsd %xmm0, %xmm2(sum)`: `sum + (v2 - m)(v1 - m)`; `divsd
+  (double) DOFLag`. `DOF` is `cvtsi2ss nframes; subss DOFAdjust; cvttss2si` (single precision,
+  x86-64's `INT_MIN` for NaN and out-of-range: FS-565; `INT_MIN - Lag` then wraps for `Lag >= 1`).
+- `MRIframeMean`: `mulsd (w), v` (the value first), `addsd v, sum` (`sum + v`), `divsd nframes`;
+  `MRIframeSum` likewise; `fMRIcumSum`: `addsd (sum), v` (`v + sum`, the other order).
+- `MRIvolMax`/`MRIvolMin`: `maxsd`/`minsd` with the new value as the destination, the same as C's
+  `if (max < v) max = v` for NaNs (a NaN in either keeps the running value).
+- `MRIconjunct`: `fabs` is a call (`-fno-builtin`); `SIGN` is `surfcluster.h`'s / `mrisurf_base.h`'s
+  `((x) > 0 ? 1.0 : -1.0)`, compared in single precision; the result `mulsd sign` after `min` (`min *
+  sign`). A voxel of 0 gives -0.0 (kept: harmless, rule C; no defect ID).
+- `MRIframeNorm`: `var * (float)(nframes - 1)` in single precision (`mulss`), `sqrtss` (with the
+  library call for a negative argument, the same NaN), `DBL_MIN + sss` (`addsd` with `DBL_MIN` in the
+  destination), `(v - mean) / den`.
+- `fMRItemporalAR1`: the `voxvar == 0` test (`ucomiss`) stores 0 and then the quotient over it (no
+  `continue`: FS-563, rule A).
+- `matrix.cpp`'s `MatrixDemean(M, Mdm)`: `vsum + e`, `vsum / rows`, `(double) e - vmean`; it demeans
+  `M` itself and returns `Mdm` (unchanged when it is another matrix; only the in-place call
+  `MatrixDemean(M, M)` of `fMRIspatialCorMatrix` is reached: ported as `fmri::matrix_demean_in_place`,
+  for track A's fs.core).
+- `MRIframeNorm` frees the covariance at its end: with one frame and every voxel masked out the
+  covariance is `NULL` and `MRIfree` prints its error (`MRIfree: null pointer`), seen on the probe
+  (seed 17).
+- `fMRIsubSample` with a negative step: `ceil` of a negative quotient gives a count of 0 or less, a
+  negative count clones the input's frames (a mismatch), so only a count of 0 (`Stop - Start` below
+  `|Delta|`) or a caller's volume of 0 frames reaches the endless loop (FS-569).
+- `ASLinterpMatrix(1)`: element (1, 2) of a 1 x 1 matrix is the float after its number, inside the
+  64-byte-rounded block of the new allocator (FS-566: nothing visible).

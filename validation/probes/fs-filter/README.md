@@ -6,10 +6,11 @@ FreeSurfer's functions (running `fsfilter` is a black-box run of FreeSurfer's co
 
 What it shows: the replica `crates-freesurfer/larmorx-freesurfer-filter` gives FreeSurfer's results
 bit for bit with `--upstream-defects reproduce`, case by case, and differs by default only where a
-defect it corrects is noted. Queue item 3.1-42 (track D, relays 25 and 26): the fast-marching
+defect it corrects is noted. Queue item 3.1-42 (track D, relays 25 to 27): the fast-marching
 distance maps `MRIextractDistanceMap` and `MRIdistanceTransform`; `mrifilter.cpp`'s convolutions,
 Gaussian smoothing, window statistics, pyramid reductions, Sobel derivatives, divergence, Laplacian
-and white-matter border classification; `connectcomp.cpp`'s connected components.
+and white-matter border classification; `connectcomp.cpp`'s connected components; `fmriutils.cpp`'s
+frame functions.
 
 ## Files
 
@@ -37,7 +38,16 @@ and white-matter border classification; `connectcomp.cpp`'s connected components
   <labels> <gray_low> <gray_hi>` (`MRIcomputeClassStatistics`: 0 and the four results);
   `rmh|lcc6|lcc18 <volume>` (`RemoveHoles`, `GetLargestCC6`, `GetLargestCC18`: the volume after);
   `gf6|gf18 <volume> <labels> <label> <x> <y> <z>` (`GrassFire6`, `GrassFire18`: the size, the
-  bounds, the labels).
+  bounds, the labels). Relay 27's frame commands (`fmriutils.cpp`; a matrix is `<rows> <cols>`
+  and its elements' bits row by row, printed the same way or `NULL`): `fmm <src> <matrix> <dst?>`
+  (`fMRImatrixMultiply`); `fcov <src> <lag> <adj> <mask?> <dst?>`, `far1 <src> <adj> <mask?> <dst?>`
+  (`fMRIcovariance`, `fMRItemporalAR1`; `adj` a float's bits); `fskip|fdrop|ffrm <src> <n> <dst?>`;
+  `vmax|vmin|conj|fmed|fsum <src> <dst?>`; `vmaxi <src> <base> <mask?> <dst?>`; `fmean <src> <dst?>
+  <n> <weights>` (doubles' bits); `fsub <src> <start> <delta> <stop> <dst?>`; `fext <src> <n>
+  <frames>` (the volume or `NULL`); `asl <ntp>` (the matrix); `f2m <src> <0 | 1 matrix>` (`<same>`,
+  the result, any other given matrix); `m2f <matrix> <volume> <mask?>` (the return value and the
+  volume); `scm <src>` (`fMRIspatialCorMatrix`); `fcum|fnorm <src> <mask?> <dst?>` (`fMRIcumSum`,
+  `MRIframeNorm`).
 - `build.sh [<workspace>]`: builds `fsfilter` with the unit oracle's compiler, flags and libraries
   (`validation/investigations/freesurfer-unit-oracle`, `build.py all` first) into
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-filter/` (with `BUILD_INFO.txt`). From a worktree,
@@ -48,7 +58,8 @@ and white-matter border classification; `connectcomp.cpp`'s connected components
   prints the counts and the hash of the official lines the port's test checks
   (`tests/fs_filter_official.rs`). `SKIP`: FS-540, FS-541, FS-53 (memory outside a volume), FS-58;
   relay 26's FS-546, FS-548, FS-549, FS-550, FS-551, FS-552, FS-555, FS-559, FS-560, FS-561 and
-  FS-163 (memory outside a volume, crashes, a hang).
+  FS-163 (memory outside a volume, crashes, a hang); relay 27's FS-562, FS-564, FS-567, FS-568,
+  FS-569 (memory outside a volume or a matrix, crashes).
 - `real.py [--json out.json]`: the pipeline's maps on three recorded heads
   (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/`): `aseg.mgz` labels 2 and 3 (signed,
   100), `filled.mgz` 255 (signed, 100), `wm.mgz` 110 (unsigned, the default limit), `aseg.mgz` 17
@@ -80,3 +91,9 @@ Every run on generated inputs inside a memory box:
   both modes.
 - The operand orders that decide which of two NaNs survives were read from the official build's
   object code (`docs/findings/freesurfer-filter.md` §7) and confirmed by NaN-rich cases.
+
+## Results (relay 27, 2026-11-14)
+
+- The 21 frame commands at seeds 7 (420 cases), 13 (2,100) and 17 (4,200): 0 different under
+  `reproduce` and 0 default differences without a notice (each official run under a second for the
+  2,100 cases: they are small).

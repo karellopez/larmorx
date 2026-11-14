@@ -8,13 +8,15 @@ the probe `validation/probes/fs-filter/`, a black-box run of FreeSurfer's code),
 `specs/freesurfer-mri.md` (the structure these functions work on), `specs/freesurfer-volume.md` (the
 voxel functions they call) and the cited standards.
 
-Status: **parts 1 and 2**. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
+Status: **parts 1 to 3**. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
 and `MRIdistanceTransform`. Part 2 (§9-17): the Gaussian kernel, the one-dimensional and separable
 convolutions, the matrix Gaussian smoothing, the window means and standard deviations, the pyramid
 reductions, the Sobel derivatives, the divergence and Laplacian, the white-matter border
-classification, the connected components and the global Sobel tables `sx`, `sy`. Not yet: the WM/cortex reclassifications
-(`MRIreclassifyWMCtxNonPar`, `MRIclassifyAmbiguousNonPar`), the frame functions (`fMRI*`,
-`MRIframe*`, `MRIvol*`), the 2-D image reductions, 3.1-43 (but `MRIgaussianSmoothNI`, here), 3.1-44.
+classification, the connected components and the global Sobel tables `sx`, `sy`. Part 3 (§17-18):
+the frame functions (`fMRI*`, `MRIframe*`, `MRIvol*`, `MRIconjunct`, `ASLinterpMatrix`). Not yet:
+the WM/cortex reclassifications (`MRIreclassifyWMCtxNonPar`, `MRIclassifyAmbiguousNonPar`), 3.1-43
+(but `MRIgaussianSmoothNI`, here), 3.1-44. The 2-D image reductions (`ImageConvolve1d`,
+`ImageReduce`, `ImageReduce1d`) are specified with the images in `specs/freesurfer-io.md`.
 
 ## 1. Conventions
 
@@ -189,6 +191,14 @@ the points leave in the order these exact steps give, which decides the distance
 | FS-559 | a | the border labels of a uchar volume written into a destination not uchar or smaller | an error, `NULL` |
 | FS-560 | a | the class statistics count negative or NaN intensities in a bin before the histogram | left out of the histogram (both modes) |
 | FS-561 | a | the region growing with a label its volume stores as 0 never ends when two object voxels touch | an error (both modes) |
+| FS-562 | a | the covariance or AR(1) map written directly as floats into a given output that is not float or is smaller | other voxels' bytes as FreeSurfer writes them; nothing outside (both modes) |
+| FS-563 | c | the AR(1) of a voxel of variance 0 is its covariance divided by 0 | 0 |
+| FS-564 | a | the AR(1) or the normalisation of a series whose covariance cannot be computed crashes after the covariance's message (unless every voxel is masked out) | an error (both modes) |
+| FS-565 | a | a degrees-of-freedom count, or a subsampled frame count, NaN or outside the `int` range becomes -2147483648 | saturated, NaN 0; the frame count an error |
+| FS-566 | a | `ASLinterpMatrix(1)` writes one element past the matrix | dropped (the matrix the same) |
+| FS-567 | a | `fMRItoMatrix` into a given matrix with fewer rows or columns than needed writes into other elements and past it | an error, `NULL` |
+| FS-568 | a | `fMRIfromMatrix` with a mask of no voxel divides by 0 (a crash) | an error (both modes) |
+| FS-569 | a | `fMRIsubSample` whose frames never reach the stop (a negative step, or the frame number past the `int` range) reads without end (a crash) | an error (both modes) |
 
 ## 9. The Gaussian kernel and the one-dimensional convolutions
 
@@ -425,3 +435,119 @@ row: `sx` is `sy` transposed).
   (FS-546, FS-548, FS-549, FS-550, FS-551, FS-552, FS-555, FS-559, FS-560, FS-561, FS-163, and FS-53, FS-58);
   the default differs only where a defect it corrects is noted. Observed at seeds 7 (1,200 cases),
   13 (1,400) and 17 (2,000): 0 different (observed).
+
+## 17. The frame functions
+
+A *series* is a volume of several frames; "at each voxel" means for every voxel of the input's
+extent, in the order stated (`c` columns, `r` rows, `s` slices; "columns outermost" visits `c`, then
+`r`, then `s`). Values are read and written with `MRIgetVoxVal`/`MRIsetVoxVal` (frames outside the
+volume: FS-52, FS-53; integer outputs clamped and rounded as `MRIsetVoxVal` does) unless said
+*direct* (a 4-byte float written at the voxel's place whatever the output's type and extent:
+FS-562). "A new output" has the input's extent and header (`MRIcopyHeader`); messages go to standard
+output; "fails" means the function prints the message and returns `NULL` (a given output unchanged).
+Sums are `double` and add in the stated operand order (a NaN's bits: the first operand's).
+
+- **`fMRImatrixMultiply(in, M, out)`**: fails with `ERROR: fMRImatrixMultiply: input dimension
+  mismatch` when the input's frames are not `M`'s columns, `... input is not MRI_FLOAT` for a
+  non-float input; a given output of another extent or of frames other than `M`'s rows fails with
+  `... output dimension mismatch`, one not float with `... output is not MRI_FLOAT`. A new output is
+  float with `M`'s rows as frames. The output is cleared, then for each output frame `o` and input
+  frame `i` in turn each voxel becomes `(v_i * M[o+1][i+1]) + out` in single precision (the product
+  first).
+- **`fMRIcovariance(f, Lag, DOFAdjust, mask, covar)`**: a negative `DOFAdjust` means "remove the
+  mean" with `DOFAdjust` = 1. `Lag` outside `[0, nframes)` fails with `ERROR: fMRIcovariance: Lag out
+  of bound <Lag> ` (a blank before the newline). `DOF` = `nframes - DOFAdjust` in single precision,
+  truncated to `int` (FS-565); `DOFLag = DOF - Lag`; `DOFLag <= 0` fails with `ERROR: fMRIcovariance:
+  DOFLag = <DOFLag> <= 0 (DOF=<DOF>, Lag=<Lag>)`. A new output is float of one frame; a given one is
+  written direct. Columns outermost: a voxel whose mask value is below 0.5 (NaN is not) gets 0;
+  otherwise, with `m` the voxel's `MRIframeMean` (when removing the mean) or 0, `sum = sum + (v[f+Lag]
+  - m)(v[f] - m)` over `f < nframes - Lag` (the later frame's difference first), and the voxel gets
+  `sum / DOFLag` as a float.
+- **`fMRItemporalAR1(f, DOFAdjust, mask, ar1)`**: the covariances at lags 0 and 1 (as above, their
+  messages first), then a new float output of one frame (a given one written direct); columns
+  outermost, masked voxels 0, others `cov1 / cov0` in double (FS-563: a variance of 0 gives 0;
+  FS-564: a covariance that failed ends the program at the first voxel not masked out).
+- **`fMRInskip(in, n, out)`**, **`fMRIndrop(in, n, out)`**, **`fMRIframe(in, frame, out)`**: fail
+  with `ERROR: fMRInskip: nskip >= nframes` (`fMRIndrop: ndrop >= nframes`, `fMRIframe: frame >=
+  nframes`) when `nframes <= n`. The output has `nframes - n` frames (one for `fMRIframe`) of the
+  input's type (`fMRIframe`'s new output also takes the pulse parameters); a given one of another
+  extent or frame count fails with `ERROR: <name>: output dimension mismatch`, of another type with
+  `... structure type mismatch`. It is cleared, then output frame `k` takes input frame `k + n`
+  (`fMRIndrop`: `k`; `fMRIframe`: `frame`), slices outermost. A negative `n` or `frame` reads frames
+  before the volume (FS-53).
+- **`MRIvolMax(in, out)`**, **`MRIvolMin`**: a new output of the input's type and one frame; a given
+  one of another extent fails with `ERROR: MRIvolMax: dimension mismatch` (`MRIvolMin`). Columns
+  outermost, the voxel's frame 0, replaced by a later frame only when strictly larger (smaller): a NaN
+  never replaces, a NaN in frame 0 stays.
+- **`MRIconjunct(in, out)`**: a new float output (a given one of another extent: `ERROR: MRIconjunct:
+  dimension mismatch`). Columns outermost: from frame 0 and then every frame from 0 again, the value
+  of the smallest magnitude (replaced only when strictly smaller); the voxel gets `|v| * sign` with
+  `sign` = 1 for `v > 0` and -1 otherwise (so 0 gives -0; a NaN of frame 0 stays, its sign cleared).
+- **`MRIvolMaxIndex(in, base, mask, out)`**: a new int output (a given one of another extent fails
+  with `ERROR: MRIvolMax: dimension mismatch`). Columns outermost, each voxel first set to 0; where the
+  mask is below 0.5 it stays 0; otherwise the first frame of the largest value (replaced only when
+  strictly larger) plus `base`.
+- **`MRIframeMean(vol, out, weights)`**: weights of a count other than 0 or the frames fail with
+  `ERROR: MRIframeMean(): dim mismatch: weight=<n>, vol=<nframes>`. A new float output of one frame.
+  Columns outermost, `sum = sum + v_f` (times `w_f` first, `v_f * w_f`, when weights are given), the
+  voxel `sum / nframes`.
+- **`MRIframeMedian(vol, out)`**: the median of the voxel's frames as `specs/freesurfer-core.md`'s
+  `median` gives it. **`MRIframeSum(vol, out)`**: `sum = sum + v_f`.
+- **`fMRIsubSample(f, Start, Delta, Stop, sub)`**: a negative `Stop` is the frame count; `Start >
+  Stop` fails with `ERROR: fMRIsubSample(): Start > Stop`, `Delta == 0` with `... Delta == 0`. The
+  count `n = ceil((Stop - Start) / Delta)` in double, truncated to `int` (FS-565); a new output is a
+  float clone of the input's extent (`MRIcloneBySpace`) of `n` frames (a negative `n`: the input's
+  count); `n` other than the output's frames fails with `ERROR: fMRIsubSample(): frame mismatch
+  (<n>, <frames>)`. Frames `Start, Start + Delta, ...` below `Stop` go to output frames 0, 1, ...
+  (columns outermost); FS-569 where they never reach `Stop`.
+- **`fMRIextractFrames(mri, list)`**: an empty list fails with `ERROR: fMRIextractFrames():
+  framelist is empty`, a frame `f >= nframes` with `ERROR: fMRIextractFrames(): f=<f> >= <nframes>`;
+  otherwise a clone of the input's type with the listed frames in order and the pulse parameters.
+- **`ASLinterpMatrix(ntp)`**: a real matrix of `ceil(ntp / 2)` rows and `ntp` columns of zeros, then
+  row 1: +1 at column 1, -1 at column 2; when `ntp` is odd the last row `r` (if not row 1): +1 at
+  column `2r - 1`, -1 at `2r - 2`; every other row `r`: -0.5 at `2r - 2`, +1 at `2r - 1`, -0.5 at
+  `2r` (FS-566 for `ntp` = 1).
+- **`fMRItoMatrix(f, M)`**: a new real matrix of `nframes` rows and `nvox` columns (the voxel count)
+  or the given one; voxel `n`, counted slices outermost and columns fastest, puts frame `k` at
+  element `(k + 1, n + 1)` (FS-567 for a given matrix too small; a larger one keeps its other
+  elements).
+- **`fMRIfromMatrix(M, f, mask)`**: with a mask of another extent (`MRIdimMismatch` without frames):
+  `fMRIfromMatrix(): mask dimension mismatch`, return 1. `nvox` = the mask's voxels at 0.5 or more
+  (NaN counts), or every voxel. Columns not `nvox`: not a multiple of it gives `ERROR:
+  fMRIfromMatrix: dim mismatch nvox=<nvox>, mat <rows> <cols>`, return 1 (FS-568 for `nvox` = 0);
+  otherwise `M` is reshaped to `cols / nvox` rows of `nvox` (its elements row by row). Rows other than
+  the frames, or columns other than `nvox`: `ERROR: fMRIfromMatrix: dim mismatch`, return 1. Then the
+  inverse of `fMRItoMatrix` over the selected voxels (slices outermost); return 0.
+- **`fMRIspatialCorMatrix(f)`**: prints `fMRIspatialCorMatrix: creating matrix`, builds
+  `fMRItoMatrix`, prints `... demeaing` and subtracts from each column its mean (the double sum of
+  its elements from the first row divided by the rows; each element `(double) e - mean` stored as a
+  float), prints `... normalizing` and divides each column by its length (`MatrixNormalizeCol`),
+  prints `... creating matrix transpose`, `... multiplying` and forms `M' M` in double
+  (`MatrixMultiplyD`), prints `... allocating SCM`, makes a float volume of the input's extent with
+  one frame per voxel (no header copied), prints `... filling SCM` and fills it with
+  `fMRIfromMatrix`.
+- **`fMRIcumSum(in, mask, out)`**: a new float output with the input's frames; a given one of another
+  extent or frame count fails with `ERROR: fMRIcumSum(): output dimension mismatch`. Slices
+  outermost, voxels whose mask value is below 0.5 untouched; otherwise `sum = v_f + sum` (the value
+  first) written to frame `f` after each frame.
+- **`MRIframeNorm(src, mask, out)`**: a new float output with the input's frames; the frame mean,
+  then `fMRIcovariance(src, 0, -1, mask)`. Columns outermost, masked voxels untouched; otherwise
+  `den = DBL_MIN + (double) sqrtf(var * (float)(nframes - 1))` (the product and root in single
+  precision) and frame `f` gets `((double) v_f - mean) / den`. At the end the mean and covariance are
+  freed: a covariance that failed (with every voxel masked out) gives the error `MRIfree: null
+  pointer` (FS-564 otherwise).
+
+## 18. Validation plan (part 3)
+
+- **Probe (black box).** `fsfilter`'s commands `fmm`, `fcov`, `far1`, `fskip`, `fdrop`, `ffrm`,
+  `vmax`, `vmin`, `conj`, `vmaxi`, `fmean`, `fmed`, `fsum`, `fsub`, `fext`, `asl`, `f2m`, `m2f`, `scm`,
+  `fcum`, `fnorm` (the README lists their tokens) print the result (volume with header fields, or
+  matrix: rows, columns, elements' bits) and any given destination. The cases: series of 1 to 6
+  frames of every type, NaN-rich float series, masks of uchar and float (values about 0.5, NaN,
+  empty), destinations of other types, extents and frames, lags and adjustments out of range (NaN,
+  1e10, negative), weights of the wrong count, negative and zero steps, frames outside the series,
+  matrices too small and too large.
+- **Expected.** Every line identical under `reproduce` but those that touch memory outside a volume
+  or crash (FS-562, FS-564, FS-567, FS-568, FS-569, and FS-53, FS-58); the default differs only where
+  a defect it corrects is noted. Observed at seeds 7 (420 frame cases), 13 (2,100) and 17 (4,200): 0
+  different in either mode (observed).

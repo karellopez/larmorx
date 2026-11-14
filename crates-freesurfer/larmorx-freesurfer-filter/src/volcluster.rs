@@ -131,6 +131,19 @@ fn mask_zero(v: f32) -> bool {
     v > -1.0 && v < 1.0
 }
 
+/// `(float) x` of a `double` as x86-64 converts it (`cvtsd2ss`): a NaN keeps its sign and the
+/// top of its payload, quieted.
+fn narrow(x: f64) -> f32 {
+    if x.is_nan() {
+        let b = x.to_bits();
+        f32::from_bits(
+            (((b >> 32) as u32) & 0x8000_0000) | 0x7fc0_0000 | (((b >> 29) as u32) & 0x003f_ffff),
+        )
+    } else {
+        x as f32
+    }
+}
+
 /// The hits of [`clust_init_hit_map`]: the map and the hits' column, row and slice in order.
 pub struct HitMap {
     pub map: Mri,
@@ -704,7 +717,7 @@ fn islands_into(
         err,
         mask,
         0,
-        thresh as f32,
+        narrow(thresh),
         0.0,
         0,
         0.0,
@@ -724,8 +737,8 @@ fn islands_into(
             for s in 0..mask.vg.depth {
                 let v = f64::from(gv(g, err, &ocn, c, r, s, 0)?);
                 if v <= f64::from(nkeep) {
-                    let v0 = f64::from(gv(g, err, mask, c, r, s, 0)?);
-                    sv(g, err, o, c, r, s, 0, v0 as f32)?;
+                    let v0 = gv(g, err, mask, c, r, s, 0)?;
+                    sv(g, err, o, c, r, s, 0, v0)?;
                 } else {
                     sv(g, err, o, c, r, s, 0, 0.0)?;
                 }
@@ -808,11 +821,11 @@ fn holes_into(
             for s in 0..d {
                 let v = f64::from(gv(g, err, &newmask, c, r, s, 0)?);
                 if v == 0.0 {
-                    let v0 = f64::from(gv(g, err, mask, c, r, s, 0)?);
-                    let x = if v0 > thresh {
-                        v0 as f32
+                    let v0 = gv(g, err, mask, c, r, s, 0)?;
+                    let x = if f64::from(v0) > thresh {
+                        v0
                     } else {
-                        fill_val as f32
+                        narrow(fill_val)
                     };
                     sv(g, err, o, c, r, s, 0, x)?;
                 } else {

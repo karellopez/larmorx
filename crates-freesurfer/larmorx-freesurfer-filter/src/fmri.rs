@@ -26,7 +26,7 @@ use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_
 use larmorx_freesurfer_core::matrix_ops::{matrix_normalize_col, matrix_reshape, matrix_transpose};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{add, add64, div64, mul, mul64, sqrt, sub, sub64};
-use larmorx_freesurfer_core::utils::median;
+use larmorx_freesurfer_core::utils::{kth_smallest, quick_select};
 use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, Mri, mri_alloc, mri_alloc_sequence, mri_copy_header,
     mri_copy_pulse_parameters, mri_free,
@@ -517,14 +517,24 @@ fn vol_extreme(
     for c in 0..invol.vg.width {
         for r in 0..invol.vg.height {
             for s in 0..invol.vg.depth {
-                let mut m = f64::from(gv(g, err, invol, c, r, s, 0)?);
+                let v0 = gv(g, err, invol, c, r, s, 0)?;
+                let mut m = f64::from(v0);
                 for f in 1..invol.nframes {
                     let v = f64::from(gv(g, err, invol, c, r, s, f)?);
                     if (max && m < v) || (!max && m > v) {
                         m = v;
                     }
                 }
-                sv(g, err, d, c, r, s, 0, m as f32)?;
+                // one frame: frame 0's float as it is; more: through double (a NaN, frame 0's,
+                // quieted), as the official build compiles it
+                let x = if invol.nframes <= 1 {
+                    v0
+                } else if m.is_nan() {
+                    f32::from_bits(v0.to_bits() | 0x0040_0000)
+                } else {
+                    m as f32
+                };
+                sv(g, err, d, c, r, s, 0, x)?;
             }
         }
     }
@@ -709,6 +719,21 @@ pub fn mri_frame_mean(
     Ok(result(fresh))
 }
 
+/// `median(t, n)` (`utils.cpp`) as the official build computes it: `kth_smallest` of the middle for
+/// an odd count; for an even one the two `quick_select`s `q` (n / 2) and `q2` (n / 2 + 1) as
+/// `(q2 + q) * 0.5f` in single precision (GCC adds the second to the first and folds the `double`
+/// half: a NaN's bits are `q2`'s when both are NaN). fs.core's `median` adds `q + q2`, whose NaN
+/// rust may take from either operand.
+fn median_as_built(g: &mut Globals, t: &mut [f32]) -> f32 {
+    let n = t.len();
+    if n % 2 == 1 {
+        return kth_smallest(t, n.div_ceil(2));
+    }
+    let q = quick_select(g, t, n / 2);
+    let q2 = quick_select(g, t, n / 2 + 1);
+    mul(add(q2, q), 0.5)
+}
+
 /// `MRIframeMedian(vol, volmn)`: the median of the frames (`median`) at each voxel, in frame 0 of
 /// a new float volume with the input's header or of the caller's.
 pub fn mri_frame_median(
@@ -727,7 +752,7 @@ pub fn mri_frame_median(
                 for f in 0..vol.nframes {
                     t[f as usize] = gv(g, err, vol, c, r, s, f)?;
                 }
-                let m = median(g, &mut t);
+                let m = median_as_built(g, &mut t);
                 sv(g, err, d, c, r, s, 0, m)?;
             }
         }
@@ -850,8 +875,10 @@ pub fn fmri_sub_sample(
         for r in 0..f.vg.height {
             for s in 0..f.vg.depth {
                 for (k, &frame) in frames.iter().enumerate() {
-                    let v = f64::from(gv(g, err, f, c, r, s, frame)?);
-                    sv(g, err, d, c, r, s, k as i32, v as f32)?;
+                    // `double v = MRIgetVoxVal(...)` stored back as a float: the official build keeps
+                    // the float (a signalling NaN too)
+                    let v = gv(g, err, f, c, r, s, frame)?;
+                    sv(g, err, d, c, r, s, k as i32, v)?;
                 }
             }
         }
@@ -886,8 +913,8 @@ pub fn fmri_extract_frames(
         for r in 0..mri.vg.height {
             for s in 0..mri.vg.depth {
                 for (n, &f) in framelist.iter().enumerate() {
-                    let v = f64::from(gv(g, err, mri, c, r, s, f)?);
-                    sv(g, err, &mut ss, c, r, s, n as i32, v as f32)?;
+                    let v = gv(g, err, mri, c, r, s, f)?;
+                    sv(g, err, &mut ss, c, r, s, n as i32, v)?;
                 }
             }
         }
@@ -1000,7 +1027,7 @@ pub fn fmri_to_matrix(
         for r in 0..fmri.vg.height {
             for c in 0..fmri.vg.width {
                 for f in 0..fmri.nframes {
-                    let v = f64::from(gv(g, err, fmri, c, r, s, f)?) as f32;
+                    let v = gv(g, err, fmri, c, r, s, f)?;
                     if !small {
                         mm.set_relt(f + 1, nthcol + 1, v);
                     } else if f < mm.rows
@@ -1108,8 +1135,8 @@ pub fn fmri_from_matrix(
                     continue;
                 }
                 for f in 0..fmri.nframes {
-                    let v = f64::from(muse.relt(f + 1, nthcol + 1));
-                    sv(g, err, fmri, c, r, s, f, v as f32)?;
+                    let v = muse.relt(f + 1, nthcol + 1);
+                    sv(g, err, fmri, c, r, s, f, v)?;
                 }
                 nthcol += 1;
             }

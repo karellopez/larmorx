@@ -1909,6 +1909,9 @@ mod tests {
         assert!(String::from_utf8_lossy(&e).contains("nifti1Write(): unknown data type 7"));
     }
 
+    // macOS refuses a path of more than 1,024 bytes (its PATH_MAX; ENAMETOOLONG), and these names of 1,019 to
+    // 1,024 bytes sit in a temporary folder: the test needs Linux's or Windows' longer paths (CI, 2026-11-14).
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn fs_451_long_names_cut_or_abort_only_with_reproduce() {
         // four folders of 200 bytes keep every name within the file system's 255 bytes

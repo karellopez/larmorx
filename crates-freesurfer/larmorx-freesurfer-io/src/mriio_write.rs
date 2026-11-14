@@ -1833,14 +1833,12 @@ mod tests {
         }
     }
 
+    /// A pair write's status, standard error, files (name and bytes) and whether FS-451 was noted.
+    type PairWrite = (Result<i32, Fatal>, Vec<u8>, Vec<(String, Vec<u8>)>, bool);
+
     /// `nifti1Write` of `m` as `name` in a new folder (`sub` made in it first): the status, the
     /// standard error and the files.
-    fn pair(
-        mode: UpstreamDefects,
-        m: &mut Mri,
-        sub: &str,
-        name: &str,
-    ) -> (Result<i32, Fatal>, Vec<u8>, Vec<(String, Vec<u8>)>, bool) {
+    fn pair(mode: UpstreamDefects, m: &mut Mri, sub: &str, name: &str) -> PairWrite {
         let dir = tempfile::Builder::new()
             .prefix("ni1 w ~")
             .tempdir()

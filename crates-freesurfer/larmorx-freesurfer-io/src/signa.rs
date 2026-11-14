@@ -583,7 +583,9 @@ mod tests {
 
     fn shorts(m: &Mri) -> Vec<i16> {
         let c = m.chunk.as_ref().unwrap();
-        c.chunks(2).map(|v| i16::from_le_bytes([v[0], v[1]])).collect()
+        c.chunks(2)
+            .map(|v| i16::from_le_bytes([v[0], v[1]]))
+            .collect()
     }
 
     #[test]
@@ -593,10 +595,21 @@ mod tests {
         let env = Environment::default();
         let mut g = Globals::new(UpstreamDefects::Fix);
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
-            .unwrap()
-            .unwrap();
-        assert_eq!((m.vg.width, m.vg.height, m.vg.depth, m.nframes), (2, 1, 3, 1));
+        let m = signa_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            "I.001",
+            true,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            (m.vg.width, m.vg.height, m.vg.depth, m.nframes),
+            (2, 1, 3, 1)
+        );
         assert_eq!(shorts(&m), vec![10, 11, 20, 21, 30, 31]);
         // Data General sizes / 1,000 then * 1,000 (float)
         assert!((m.vg.xsize - 2.0).abs() < 1e-5 && (m.thick - 3.0).abs() < 1e-5);
@@ -612,9 +625,17 @@ mod tests {
         let env = Environment::default();
         let mut g = Globals::new(UpstreamDefects::Fix);
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
-            .unwrap()
-            .unwrap();
+        let m = signa_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            "I.001",
+            true,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!((m.vg.depth, m.nframes), (2, 3));
         // file k: slice k / 3, frame k % 3
         assert_eq!(
@@ -622,12 +643,23 @@ mod tests {
             vec![10, 11, 40, 41, 20, 21, 50, 51, 30, 31, 60, 61]
         );
         let mut g = Globals::new(UpstreamDefects::Reproduce);
-        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
-            .unwrap()
-            .unwrap();
+        let m = signa_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            "I.001",
+            true,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!((m.vg.depth, m.nframes), (3, 3));
         let n = g.notices.as_slice();
-        assert!(n.iter().any(|x| x.defect.id == "FS-686" && x.detail.contains("past the table")));
+        assert!(
+            n.iter()
+                .any(|x| x.defect.id == "FS-686" && x.detail.contains("past the table"))
+        );
     }
 
     /// FS-687: a slice file cut short: refused by default, FreeSurfer's partial slice in
@@ -643,14 +675,30 @@ mod tests {
         let mut g = Globals::new(UpstreamDefects::Fix);
         let (mut o, mut e) = (Vec::new(), Vec::new());
         assert!(
-            signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
-                .unwrap()
-                .is_none()
+            signa_read(
+                &mut g,
+                &mut o,
+                &mut e,
+                &env,
+                Some(dir.path()),
+                "I.001",
+                true
+            )
+            .unwrap()
+            .is_none()
         );
         let mut g = Globals::new(UpstreamDefects::Reproduce);
-        let m = signa_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "I.001", true)
-            .unwrap()
-            .unwrap();
+        let m = signa_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            "I.001",
+            true,
+        )
+        .unwrap()
+        .unwrap();
         // 20 whole; 21's first byte (0x00) then the slice's 0, swapped
         assert_eq!(shorts(&m), vec![10, 11, 20, 0]);
     }

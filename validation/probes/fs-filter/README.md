@@ -70,7 +70,8 @@ frame functions.
   (`tests/fs_filter_official.rs`). `SKIP`: FS-540, FS-541, FS-53 (memory outside a volume), FS-58;
   relay 26's FS-546, FS-548, FS-549, FS-550, FS-551, FS-552, FS-555, FS-559, FS-560, FS-561 and
   FS-163 (memory outside a volume, crashes, a hang); relay 27's FS-562, FS-564, FS-567, FS-568,
-  FS-569 (memory outside a volume or a matrix, crashes).
+  FS-569, FS-570, FS-571, FS-573, FS-575 (memory outside a volume, a matrix or a histogram, memory
+  never written, crashes).
 - `real.py [--json out.json]`: the pipeline's maps on three recorded heads
   (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/`): `aseg.mgz` labels 2 and 3 (signed,
   100), `filled.mgz` 255 (signed, 100), `wm.mgz` 110 (unsigned, the default limit), `aseg.mgz` 17

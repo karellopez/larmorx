@@ -1765,6 +1765,10 @@ defects! {
         "writing a NIfTI volume of exactly 32,768 rows, slices or frames passes the size check and stores -32,768 in the header's 16-bit field: a header readers reject or misread";
     FS_450 = "FS-450", "FreeSurfer", true,
         "the singular value decomposition of a matrix without columns (MatrixSVD, MatrixSVDEigenValues; any row count) crashes";
+    FS_451 = "FS-451", "FreeSurfer", true,
+        "writing a NIfTI pair (.hdr and .img) under a name of 1,020 bytes or more writes the files under names cut to 1,023 bytes (from 1,023 bytes the header and the image share one name and the header is lost), and a name of 1,024 bytes or more is copied past a buffer: memory corruption";
+    FS_452 = "FS-452", "FreeSurfer", true,
+        "writing a NIfTI pair (.hdr and .img) ignores both files' close: files whose last bytes could not be written (a full disk) are reported as written";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

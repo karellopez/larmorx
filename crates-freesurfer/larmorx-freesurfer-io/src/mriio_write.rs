@@ -32,6 +32,9 @@
 //! - **FS-446** (memory): a volume made without voxels has its contiguous-buffer flag never
 //!   written: with `FS_MGZIO_USEVOXELBUFWRITE` both modes take it as unset, noted.
 //! - **FS-58**: a volume without voxels (FreeSurfer crashes): the program ends with a message.
+//!
+//! NIfTI: `niiWrite` ([`nii_write`]: `.nii`, `.nii.gz`, FS-447 to FS-449) and `nifti1Write`
+//! ([`nifti1_write`]: the `.hdr`/`.img` pair; FS-447, FS-449, FS-451, FS-452).
 
 use std::io::Write;
 use std::path::Path;
@@ -39,7 +42,7 @@ use std::path::Path;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
     FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444, FS_445, FS_446, FS_447, FS_448,
-    FS_449,
+    FS_449, FS_451, FS_452,
 };
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
@@ -55,6 +58,7 @@ use larmorx_freesurfer_mri::mri::{
 use larmorx_freesurfer_mri::vol_geom;
 use larmorx_io::znz::ZnzFile;
 
+use crate::cfile::CFile;
 use crate::fio;
 use crate::fstagsio::{self, FsTagsIo};
 use crate::tags::{
@@ -1039,6 +1043,90 @@ fn reshape_ico7(
     Ok(r)
 }
 
+/// FS-447: whether a long volume's rows are written as 32-bit numbers (the default) rather than
+/// as their first bytes (FreeSurfer's, `reproduce`), noted when the volume has voxels to write.
+fn long_rows_as_ints(g: &mut Globals, m: &Mri, func: &str) -> bool {
+    let long_rows = m.mtype == mri::MRI_LONG;
+    let (w, h, d, nf) = (m.vg.width, m.vg.height, m.vg.depth, m.nframes);
+    if long_rows && w > 0 && h > 0 && d > 0 && nf > 0 {
+        g.notices.add(
+            &FS_447,
+            format!(
+                "{func} of a long volume: each row's first bytes as 32-bit numbers (FreeSurfer)"
+            ),
+        );
+    }
+    long_rows && g.notices.fix()
+}
+
+/// The bytes a NIfTI writer writes for the stored row `row` of `m`: its first `width x unit`
+/// bytes, or (FS-447's default for a long volume) each value as a 32-bit number, clamped (noted).
+fn nifti_row(
+    g: &mut Globals,
+    m: &Mri,
+    row: usize,
+    unit: usize,
+    as_ints: bool,
+    func: &str,
+) -> Vec<u8> {
+    let w = m.vg.width.max(0) as usize;
+    if !as_ints {
+        return row_bytes(m, row, w * unit);
+    }
+    let b = row_bytes(m, row, w * 8);
+    let mut r = Vec::with_capacity(w * 4);
+    for v in b.as_chunks::<8>().0 {
+        let l = i64::from_le_bytes(*v);
+        let i = l.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+        if i64::from(i) != l {
+            g.notices.add(
+                &FS_447,
+                format!("{func}: the long {l} clamped to a 32-bit number"),
+            );
+        }
+        r.extend_from_slice(&i.to_le_bytes());
+    }
+    r
+}
+
+/// The NIfTI writers' size checks: more than 32,768 rows, slices or frames end the program
+/// (`NIFTI FORMAT ERROR: nrows <n> in volume exceeds 32768` on standard output, status 1); FS-449
+/// for exactly 32,768.
+fn nifti_size_checks(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    func: &str,
+    h: i32,
+    d: i32,
+    nf: i32,
+) -> Result<(), Fatal> {
+    for (n, what, sp) in [
+        (h, "nrows", " "),
+        (d, "nslices", " "),
+        (nf, "nframes", "  "),
+    ] {
+        // FS-449: 32,768 passes FreeSurfer's check and is stored as -32768; corrected, refused as
+        // the larger ones are, against the field's true limit
+        let limit = if n == SHORTMAX {
+            g.notices.add(
+                &FS_449,
+                format!("{func}: {n} {what}, which the header's 16-bit field holds as -32768"),
+            );
+            g.notices.fix().then_some(SHORTMAX - 1)
+        } else {
+            (n > SHORTMAX).then_some(SHORTMAX)
+        };
+        if let Some(limit) = limit {
+            let _ = writeln!(
+                out,
+                "NIFTI FORMAT ERROR:{sp}{what} {n} in volume exceeds {limit}"
+            );
+            return Err(Fatal::Exit(1));
+        }
+    }
+    Ok(())
+}
+
 /// `niiWrite(mri, fname, intent)`: the volume as a NIfTI-1 file (`.nii`; compressed when the name
 /// ends in `z`), with FreeSurfer's header extension (code 14). See `specs/freesurfer-io.md` §93.
 #[allow(clippy::too_many_arguments)]
@@ -1071,30 +1159,7 @@ pub fn nii_write(
         None => m0,
     };
     let (w, h, d, nf) = (m.vg.width, m.vg.height, m.vg.depth, m.nframes);
-    for (n, what, sp) in [
-        (h, "nrows", " "),
-        (d, "nslices", " "),
-        (nf, "nframes", "  "),
-    ] {
-        // FS-449: 32,768 passes FreeSurfer's check and is stored as -32768; corrected, refused as
-        // the larger ones are, against the field's true limit
-        let limit = if n == SHORTMAX {
-            g.notices.add(
-                &FS_449,
-                format!("niiWrite: {n} {what}, which the header's 16-bit field holds as -32768"),
-            );
-            g.notices.fix().then_some(SHORTMAX - 1)
-        } else {
-            (n > SHORTMAX).then_some(SHORTMAX)
-        };
-        if let Some(limit) = limit {
-            let _ = writeln!(
-                out,
-                "NIFTI FORMAT ERROR:{sp}{what} {n} in volume exceeds {limit}"
-            );
-            return Err(Fatal::Exit(1));
-        }
-    }
+    nifti_size_checks(g, out, "niiWrite", h, d, nf)?;
     let mut hdr = NiftiHeader([0u8; 348]);
     hdr.i32_at(0, 348);
     for t in 0..8 {
@@ -1276,35 +1341,13 @@ pub fn nii_write(
             "niiWrite(): the volume has no voxels (FreeSurfer crashes here)\n",
         )?;
     }
-    let long_rows = m.mtype == mri::MRI_LONG;
-    if long_rows && w > 0 && h > 0 && d > 0 && nf > 0 {
-        g.notices.add(
-            &FS_447,
-            "niiWrite of a long volume: each row's first bytes as 32-bit numbers (FreeSurfer)",
-        );
-    }
-    let as_ints = long_rows && g.notices.fix();
+    let as_ints = long_rows_as_ints(g, m, "niiWrite");
     for t in 0..nf {
         for k in 0..d {
             let mut slice = Vec::with_capacity(w.max(0) as usize * h.max(0) as usize * unit);
             for j in 0..h {
                 let row = ((t * d + k) * h + j) as usize;
-                if as_ints {
-                    let b = row_bytes(m, row, w.max(0) as usize * 8);
-                    for v in b.as_chunks::<8>().0 {
-                        let l = i64::from_le_bytes(*v);
-                        let i = l.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
-                        if i64::from(i) != l {
-                            g.notices.add(
-                                &FS_447,
-                                format!("niiWrite: the long {l} clamped to a 32-bit number"),
-                            );
-                        }
-                        slice.extend_from_slice(&i.to_le_bytes());
-                    }
-                } else {
-                    slice.extend_from_slice(&row_bytes(m, row, w.max(0) as usize * unit));
-                }
+                slice.extend_from_slice(&nifti_row(g, m, row, unit, as_ints, "niiWrite"));
             }
             let n = (w.max(0) as usize) * (h.max(0) as usize);
             if fio::fs_znzwrite(fp, &slice, unit, n) != n as i64 {
@@ -1333,6 +1376,233 @@ pub fn nii_write(
         }
     }
     Ok(NO_ERROR)
+}
+
+// ---------------------------------------------------------------- NIfTI-1 pairs (`nifti1Write`)
+
+/// `STRLEN`: the size of `nifti1Write`'s name buffers.
+const STRLEN: usize = 1024;
+
+/// `nifti1Write(mri, fname)`: the volume as a NIfTI-1 pair, the 348-byte header in `<stem>.hdr`
+/// (magic `ni1`, voxel offset 0, no extension) and the voxels in `<stem>.img`, the stem the name
+/// without a final `.img` or `.hdr`. As [`nii_write`] for the ico7 reshape, the size checks, the
+/// header's fields, quaternion and affine, and the voxels; complex volumes are an unknown type here.
+/// See `specs/freesurfer-io.md` §95.
+///
+/// **FS-451** (memory; wrong names): FreeSurfer builds the names in buffers of 1,024 bytes: from a
+/// name of 1,020 bytes the names are cut to 1,023 bytes, with `nifti1Write: Truncation of
+/// hdr_fname` (and `img_fname`) on standard error (from 1,023 bytes the header and the image are one
+/// file), and a name of 1,024 bytes or more is copied past the buffer. By default (and for the
+/// longer names in both modes) the whole names; `reproduce` cuts the names as FreeSurfer, noted.
+/// **FS-452**: the two files' closes are not checked (a full disk: reported as written); by default
+/// a failed close gives the write's error (`nifti1Write(): error writing header to <hdr>`, `...
+/// error writing data to <img>`, `ERROR_BADFILE`); `reproduce` 0.
+pub fn nifti1_write(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    m0: &mut Mri,
+    fname: &str,
+) -> Result<i32, Fatal> {
+    let reshaped = if m0.vg.width == 163842 && m0.vg.height == 1 && m0.vg.depth == 1 {
+        Some(reshape_ico7(g, out, err, m0)?)
+    } else {
+        None
+    };
+    let m: &Mri = reshaped.as_ref().unwrap_or(m0);
+    let (w, h, d, nf) = (m.vg.width, m.vg.height, m.vg.depth, m.nframes);
+    nifti_size_checks(g, out, "nifti1Write", h, d, nf)?;
+    let mut hdr = NiftiHeader([0u8; 348]);
+    hdr.i32_at(0, 348);
+    for t in 0..8 {
+        hdr.dim(t, 1);
+        hdr.pixdim(t, 1.0);
+    }
+    hdr.dim(0, if nf == 1 { 3 } else { 4 });
+    if w < SHORTMAX {
+        hdr.dim(1, w as i16);
+    } else {
+        hdr.dim(1, -1);
+        hdr.i32_at(144, w);
+    }
+    hdr.dim(2, h as i16);
+    hdr.dim(3, d as i16);
+    hdr.dim(4, nf as i16);
+    hdr.pixdim(1, m.vg.xsize);
+    hdr.pixdim(2, m.vg.ysize);
+    hdr.pixdim(3, m.vg.zsize);
+    hdr.pixdim(4, (f64::from(m.tr) / 1000.0) as f32);
+    let (datatype, bitpix): (i16, i16) = match m.mtype {
+        MRI_UCHAR => (DT_UNSIGNED_CHAR, 8),
+        MRI_INT | mri::MRI_LONG => (DT_SIGNED_INT, 32),
+        MRI_FLOAT => (DT_FLOAT, 32),
+        MRI_SHORT => (DT_SIGNED_SHORT, 16),
+        MRI_USHRT => (DT_UINT16, 16),
+        mri::MRI_BITMAP => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_UNSUPPORTED,
+                "nifti1Write(): data type MRI_BITMAP unsupported",
+            );
+            return Ok(ERROR_UNSUPPORTED);
+        }
+        mri::MRI_TENSOR => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_UNSUPPORTED,
+                "nifti1Write(): data type MRI_TENSOR unsupported",
+            );
+            return Ok(ERROR_UNSUPPORTED);
+        }
+        t => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!("nifti1Write(): unknown data type {t}"),
+            );
+            return Ok(ERROR_BADPARM);
+        }
+    };
+    hdr.i16_at(70, datatype);
+    hdr.i16_at(72, bitpix);
+    hdr.0[123] = 2 | 8; // NIFTI_UNITS_MM | NIFTI_UNITS_SEC
+    let descrip = format!("FreeSurfer {BUILD_DATE}");
+    hdr.0[148..148 + descrip.len()].copy_from_slice(descrip.as_bytes());
+    let r = mri_to_nifti_qform(g, out, err, m, &mut hdr)?;
+    if r != NO_ERROR {
+        return Ok(r);
+    }
+    mri_to_nifti_sform(g, out, err, m, &mut hdr)?;
+    hdr.0[344..348].copy_from_slice(b"ni1\0");
+
+    // the names: the stem without a final `.img` or `.hdr` (after the last dot of the whole name)
+    let fb = fname.as_bytes();
+    let mut stem = fb.to_vec();
+    if let Some(p) = stem.iter().rposition(|&c| c == b'.')
+        && matches!(&stem[p..], b".img" | b".hdr")
+    {
+        stem.truncate(p);
+    }
+    if fb.len() >= STRLEN {
+        g.notices.add(
+            &FS_451,
+            format!(
+                "nifti1Write: a name of {} bytes (FreeSurfer copies it past its 1,024-byte buffer): the whole names",
+                fb.len()
+            ),
+        );
+    }
+    let name_of = |g: &mut Globals, err: &mut dyn Write, suffix: &[u8], var: &str| {
+        let mut n = [stem.as_slice(), suffix].concat();
+        if fb.len() < STRLEN && n.len() >= STRLEN {
+            g.notices.add(
+                &FS_451,
+                format!(
+                    "nifti1Write: the {} name of {} bytes, which FreeSurfer cuts to 1,023",
+                    &var[..3],
+                    n.len()
+                ),
+            );
+            if g.notices.reproduce() {
+                let _ = writeln!(err, "nifti1Write: Truncation of {var}");
+                n.truncate(STRLEN - 1);
+            }
+        }
+        String::from_utf8_lossy(&n).into_owned()
+    };
+    let hdr_fname = name_of(g, err, b".hdr", "hdr_fname");
+    let img_fname = name_of(g, err, b".img", "img_fname");
+
+    let Ok(mut fp) = CFile::open(dir, &hdr_fname, "w") else {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("nifti1Write(): error opening file {hdr_fname}"),
+        ));
+    };
+    if fp.fwrite(&hdr.0, 348, 1) != 1 {
+        fp.close();
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("nifti1Write(): error writing header to {hdr_fname}"),
+        ));
+    }
+    if fp.close() != 0 && unchecked_close(g, &hdr_fname) {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("nifti1Write(): error writing header to {hdr_fname}"),
+        ));
+    }
+    let Ok(mut fp) = CFile::open(dir, &img_fname, "w") else {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("nifti1Write(): error opening file {img_fname}"),
+        ));
+    };
+    // a volume without voxels: FreeSurfer takes its first row's address from slices it does not
+    // have (a crash)
+    if m.chunk.is_none() && i64::from(d.max(0)) * i64::from(nf.max(0)) * i64::from(h.max(0)) > 0 {
+        g.notices.add(
+            &FS_58,
+            "nifti1Write of a volume made without voxels".to_string(),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            "nifti1Write(): the volume has no voxels (FreeSurfer crashes here)\n",
+        )?;
+    }
+    let unit = (bitpix / 8) as usize;
+    let as_ints = long_rows_as_ints(g, m, "nifti1Write");
+    let wn = w.max(0) as usize;
+    for t in 0..nf {
+        for k in 0..d {
+            for j in 0..h {
+                let row = ((t * d + k) * h + j) as usize;
+                let b = nifti_row(g, m, row, unit, as_ints, "nifti1Write");
+                if fp.fwrite(&b, unit, wn) != wn {
+                    fp.close();
+                    return Ok(fail_code(
+                        g,
+                        err,
+                        ERROR_BADFILE,
+                        &format!("nifti1Write(): error writing data to {img_fname}"),
+                    ));
+                }
+            }
+        }
+    }
+    if fp.close() != 0 && unchecked_close(g, &img_fname) {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("nifti1Write(): error writing data to {img_fname}"),
+        ));
+    }
+    Ok(NO_ERROR)
+}
+
+/// FS-452: a close of one of `nifti1Write`'s files that failed, which FreeSurfer does not check:
+/// noted; whether it is an error (the default).
+fn unchecked_close(g: &mut Globals, name: &str) -> bool {
+    g.notices.add(
+        &FS_452,
+        format!("nifti1Write of {name}: the close failed (FreeSurfer reports success)"),
+    );
+    g.notices.fix()
 }
 
 #[cfg(test)]

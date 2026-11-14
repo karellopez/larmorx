@@ -53,6 +53,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # segment number outside the segment table), FS-581 (16-bit voxel coordinates wrapping: writes outside
 # the label map), FS-582 (a segment voxel read outside the index tables), FS-583 (a crash), FS-586
 # (a destination or control volume smaller than the source, or of another type, written outside)
+# FS-588 (a control volume smaller than the source: memory outside), FS-589 (windows past the
+# index tables), FS-591 (windows past the MNI's arrays), FS-593 (a threshold never written),
+# FS-487 (a Talairach point through a matrix FreeSurfer could not make: a crash)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -83,14 +86,30 @@ SKIP = (
     "FS-582",
     "FS-583",
     "FS-586",
+    "FS-588",
+    "FS-589",
+    "FS-591",
+    "FS-593",
+    "FS-487",
 )
 
 # MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000
 HEAP = re.compile(r"heap usage = -?[0-9]+ Kbytes")
+# FS-596: the number in MRInormAddFileControlPoints' message on rejected points is whatever a
+# register holds (not given to the message); where the port cannot know it, both sides' number is
+# masked and the rest of the line compared
+REJECTED = re.compile(r"!!!!! -?[0-9]+ control points rejected")
+MASKED = ("FS-596",)
 
 
 def normalise(line: str) -> str:
     return HEAP.sub("heap usage = 1000 Kbytes", line)
+
+
+def mask(line: str, ids: list[str]) -> str:
+    if any(x in ids for x in MASKED):
+        return REJECTED.sub("!!!!! ? control points rejected", line)
+    return line
 
 
 def probe_binary(ws: Path) -> Path:
@@ -181,6 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
         cmd = case.split()[0]
+        c, r, f = mask(c, ids), mask(r, ids), mask(f, fids)
         for x in ids:
             rep_ids[x] += 1
         if any(x in ids for x in SKIP):

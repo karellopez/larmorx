@@ -646,7 +646,7 @@ pub(super) fn result(o: &mut String, r: Ret<Mri>, dst: Option<&Mri>) {
     }
 }
 
-fn get_volc(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+pub(super) fn get_volc(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
     let mut m = get_vol(cx, t)?;
     m.vg.c_r = t.f();
     m.vg.c_a = t.f();

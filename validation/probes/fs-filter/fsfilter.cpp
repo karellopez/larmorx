@@ -32,11 +32,13 @@
 #include "error.h"
 #include "fastmarching.h"
 #include "fmriutils.h"
+#include "label.h"
 #include "matrix.h"
 #include "volcluster.h"
 #include "mri.h"
 #include "mrinorm.h"
 #include "mrisegment.h"
+#include "utils.h"
 
 MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
 int MRImaxSegmentArea(MRI_SEGMENTATION *mriseg);
@@ -788,10 +790,238 @@ bool seg_case(const std::string &cmd)
   return true;
 }
 
+std::string slurp_file(const std::string &path)
+{
+  std::string r;
+  if (FILE *f = fopen(path.c_str(), "rb")) {
+    int ch;
+    while ((ch = fgetc(f)) != EOF) r += (char)ch;
+    fclose(f);
+  }
+  return r;
+}
+
+// ---- relay 29: mrinorm.cpp's normalisation ------------------------------------------------------
+
+// control points: n, then n voxel triples; MRI3dUseLabelControlPoints of a label in voxel
+// coordinates (mrinorm.cpp's file-scope points)
+void set_pts(MRI *mri)
+{
+  int n = geti();
+  LABEL *l = LabelAlloc(n > 0 ? n : 1, NULL, NULL);
+  l->coords = LABEL_COORDS_VOXEL;
+  l->n_points = n;
+  for (int i = 0; i < n; i++) {
+    l->lv[i].x = geti();
+    l->lv[i].y = geti();
+    l->lv[i].z = geti();
+  }
+  MRI3dUseLabelControlPoints(mri, l);
+}
+
+std::string unhex(const char *h)
+{
+  std::string r;
+  if (h[0] != 'h') fail("a hex token");
+  for (const char *p = h + 1; p[0] && p[1]; p += 2) {
+    char b[3] = {p[0], p[1], 0};
+    r += (char)strtol(b, NULL, 16);
+  }
+  return r;
+}
+
+bool norm2_case(const std::string &cmd)
+{
+  if (cmd == "spl") {
+    // spl <src> <dst mode> [<dst>] field ran_mode ran npoints <inputs> <outputs>
+    MRI *src = get_vol();
+    MRI *dst = get_dst(geti(), src);
+    int fm = geti();
+    int rm = geti();
+    const char *rs = next();
+    if (rm) setenv("RAN", rs, 1);
+    setRandomSeed(1234);
+    int n = geti();
+    std::vector<float> in(n > 80 ? n : 80, 0.0f), op(n > 80 ? n : 80, 0.0f);
+    for (int i = 0; i < n; i++) in[i] = getf();
+    for (int i = 0; i < n; i++) op[i] = getf();
+    MRI *field = NULL;
+    MRI *r = MRIsplineNormalize(src, dst, fm ? &field : NULL, in.data(), op.data(), n);
+    put_result(r, dst);
+    if (fm) put_full(field);
+  } else if (cmd == "ninit") {
+    // ninit <volume with centre> xform_mode [16 doubles: m[c][r]] noavg above below wsize desired sigma
+    MRI *m = get_volc();
+    int xm = geti();
+    if (xm) {
+      Transform *t = (Transform *)calloc(1, sizeof(Transform));
+      for (int c = 0; c < 4; c++)
+        for (int r = 0; r < 4; r++) t->m[c][r] = getd();
+      Transform *ti = (Transform *)calloc(1, sizeof(Transform));
+      if (xm == 1) m->linear_transform = t;
+      m->inverse_linear_transform = ti;
+    }
+    if (geti()) setenv("NO_AVERAGE305", "1", 1);
+    int above = geti(), below = geti(), ws = geti(), des = geti();
+    float sg = getf();
+    MNI *mni = (MNI *)calloc(1, sizeof(MNI));
+    oi(MRInormInit(m, mni, above, below, ws, des, sg));
+    oi(mni->windows_above_t0); oi(mni->windows_below_t0); oi(mni->desired_wm_value); of(mni->smooth_sigma);
+    int nw = mni->windows_above_t0 + mni->windows_below_t0;
+    for (int i = 0; i < nw && i < MAX_SPLINE_POINTS; i++) {
+      MRI_REGION *g = &mni->regions[i];
+      oi(g->x); oi(g->y); oi(g->z); oi(g->dx); oi(g->dy); oi(g->dz);
+    }
+  } else if (cmd == "npk") {
+    // npk mode above below desired sigma maxgrad npeaks {y dy nbins bin_size min max {bin count}*}*
+    // <80 inputs> <80 outputs>: MRInormFindPeaks (mode 0) or MRInormCheckPeaks (mode 1)
+    int mode = geti();
+    MNI *mni = (MNI *)calloc(1, sizeof(MNI));
+    mni->windows_above_t0 = geti();
+    mni->windows_below_t0 = geti();
+    mni->desired_wm_value = geti();
+    mni->smooth_sigma = getf();
+    mni->max_gradient = getf();
+    int np = geti();
+    int nw = mni->windows_above_t0 + mni->windows_below_t0;
+    for (int i = 0; i < nw; i++) {
+      mni->regions[i].y = geti();
+      mni->regions[i].dy = geti();
+      int nb = geti();
+      HISTOGRAM *h = HISTOalloc(nb);
+      h->bin_size = getf();
+      h->min = getf();
+      h->max = getf();
+      for (int b = 0; b < nb; b++) {
+        h->bins[b] = getf();
+        h->counts[b] = getf();
+      }
+      mni->histograms[i] = *h;
+    }
+    float in[MAX_SPLINE_POINTS], op[MAX_SPLINE_POINTS];
+    for (int i = 0; i < MAX_SPLINE_POINTS; i++) in[i] = getf();
+    for (int i = 0; i < MAX_SPLINE_POINTS; i++) op[i] = getf();
+    oi(mode == 0 ? MRInormFindPeaks(mni, in, op) : MRInormCheckPeaks(mni, in, op, np));
+    for (int i = 0; i < MAX_SPLINE_POINTS; i++) of(in[i]);
+    for (int i = 0; i < MAX_SPLINE_POINTS; i++) of(op[i]);
+  } else if (cmd == "gfc") {
+    // gfc <src> wm above below <ctrl?> <not control?> <points>
+    MRI *src = get_vol();
+    float wm = getf(), ab = getf(), be = getf();
+    MRI *ctrl = get_opt();
+    MRI *nc = get_opt();
+    set_pts(src);
+    put_result(MRInormGentlyFindControlPoints(src, wm, ab, be, ctrl, nc), ctrl);
+  } else if (cmd == "fcw") {
+    // fcw <src> wm above below <ctrl?> whalf_mm debug(0 NULL, 1 "", 2 "dbg") <not control?>
+    MRI *src = get_vol();
+    float wm = getf(), ab = getf(), be = getf();
+    MRI *ctrl = get_opt();
+    float wh = getf();
+    int dm = geti();
+    MRI *nc = get_opt();
+    int n = -7;
+    MRI *r = MRInormFindControlPointsInWindow(src, wm, ab, be, ctrl, wh, dm == 0 ? NULL : dm == 1 ? "" : "dbg",
+                                              &n, 0, nc);
+    oi(n);
+    put_result(r, ctrl);
+  } else if (cmd == "afc") {
+    // afc <ctrl> value <mri?> <points>: MRInormAddFileControlPoints twice
+    MRI *ctrl = get_vol();
+    int value = geti();
+    MRI *m = get_opt();
+    set_pts(ctrl);
+    oi(MRInormAddFileControlPoints(ctrl, value, m));
+    oi(MRInormAddFileControlPoints(ctrl, value, m));
+    put_full(ctrl);
+  } else if (cmd == "bbi") {
+    // bbi <src> <ctrl> sigma
+    MRI *src = get_vol();
+    MRI *ctrl = get_vol();
+    float sg = getf();
+    put_full(MRIbuildBiasImage(src, ctrl, NULL, sg));
+    put_full(ctrl);
+  } else if (cmd == "g3d") {
+    // g3d <src> <bias?> wm <norm mode> [<norm>] above below only_file sigma <not control?> <points>
+    MRI *src = get_vol();
+    MRI *bias = get_opt();
+    float wm = getf();
+    MRI *norm = get_dst(geti(), src);
+    float ab = getf(), be = getf();
+    int of_ = geti();
+    float sg = getf();
+    MRI *nc = get_opt();
+    set_pts(src);
+    put_result(MRI3dGentleNormalize(src, bias, wm, norm, ab, be, of_, sg, nc), norm);
+    put_full(src);
+  } else if (cmd == "abc") {
+    // abc <in> <bias> <out mode> [<out>] target
+    MRI *in = get_vol();
+    MRI *bias = get_vol();
+    MRI *dst = get_dst(geti(), in);
+    float tv = getf();
+    put_result(MRIapplyBiasCorrectionSameGeometry(in, bias, dst, tv), dst);
+  } else if (cmd == "g3df") {
+    // g3df <volume file> above below sigma: MRI3dGentleNormalize of a recorded head's volume in
+    // place (wm 110, no bias, no control-point file), as mri_normalize calls it; the result's
+    // extent, type and the FNV-1a (64 bits) of its voxels
+    MRI *src = MRIread(next());
+    if (!src) fail("cannot read the volume");
+    float ab = getf(), be = getf(), sg = getf();
+    MRI *r = MRI3dGentleNormalize(src, NULL, 110, src, ab, be, 0, sg, NULL);
+    oi(r == src); oi(r->width); oi(r->height); oi(r->depth); oi(r->type);
+    uint64_t h = 0xcbf29ce484222325ull;
+    const unsigned char *b = (const unsigned char *)r->chunk;
+    for (size_t i = 0; i < r->bytes_total; i++) h = (h ^ b[i]) * 0x100000001b3ull;
+    char t[24];
+    snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+    out += t;
+  } else if (cmd == "ufc") {
+    // ufc <volume with centre> thresh_mode thresh <file bytes in hex>: the file written as cp.dat
+    // in <cases>.out.d, MRI3dUseFileControlPoints, then MRInormAddFileControlPoints(new byte volume,
+    // 255, NULL), the volume, and control.edited.dat up to its "written by" line (hex) or NOFILE
+    MRI *m = get_volc();
+    int tm = geti();
+    const char *ts = next();
+    if (tm) setenv("FS_THRESH_CTRL", ts, 1);
+    std::string bytes = unhex(next());
+    std::string d = scratch + ".d";
+    mkdir(d.c_str(), 0700);
+    if (chdir(d.c_str()) != 0) fail("chdir");
+    unlink("control.edited.dat");
+    FILE *fp = fopen("cp.dat", "wb");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+    oi(MRI3dUseFileControlPoints(m, "cp.dat"));
+    MRI *c = MRIalloc(m->width, m->height, m->depth, MRI_UCHAR);
+    oi(MRInormAddFileControlPoints(c, 255, NULL));
+    put_full(c);
+    std::string e = slurp_file("control.edited.dat");
+    unlink("cp.dat");
+    if (e.empty()) {
+      out += "NOFILE ";
+    } else {
+      size_t w = e.find("written by");
+      if (w != std::string::npos) e = e.substr(0, w);
+      out += "h";
+      char b[4];
+      for (unsigned char ch : e) {
+        snprintf(b, sizeof b, "%02x", ch);
+        out += b;
+      }
+      out += " ";
+      unlink("control.edited.dat");
+    }
+  } else {
+    return false;
+  }
+  return true;
+}
+
 void run_case()
 {
   std::string cmd = next();
-  if (filter_case(cmd) || fmri_case(cmd) || clus_case(cmd) || seg_case(cmd)) return;
+  if (filter_case(cmd) || fmri_case(cmd) || clus_case(cmd) || seg_case(cmd) || norm2_case(cmd)) return;
   if (cmd == "edm" || cmd == "dtr") {
     // edm|dtr <src> <dst?> label max_distance mode <mask?>
     MRI *src = get_vol();
@@ -859,7 +1089,8 @@ const char *MARK = "\n@@RESULT ";
 // the recorded heads' cases run for minutes
 bool toks_hint_long(const std::string &line)
 {
-  return line.compare(0, 5, "edmf ") == 0 || line.compare(0, 5, "dtrf ") == 0 || line.compare(0, 4, "vsr ") == 0;
+  return line.compare(0, 5, "edmf ") == 0 || line.compare(0, 5, "dtrf ") == 0 || line.compare(0, 4, "vsr ") == 0 ||
+         line.compare(0, 5, "g3df ") == 0;
 }
 
 }  // namespace

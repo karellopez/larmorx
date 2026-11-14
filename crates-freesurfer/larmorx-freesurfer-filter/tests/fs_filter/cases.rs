@@ -28,6 +28,8 @@ mod clus;
 mod conv;
 #[path = "fmri.rs"]
 mod fmri;
+#[path = "normz.rs"]
+mod normz;
 #[path = "seg.rs"]
 mod seg;
 
@@ -304,13 +306,14 @@ const DIST_PER_ROUND: usize = 8;
 
 /// `n` case lines of `seed`: in each round, [`DIST_PER_ROUND`] distance maps' cases, then each
 /// command of [`conv`] once, then each command of [`fmri`] once, then each command of [`clus`]
-/// once, then each command of [`seg`] once.
+/// once, then each command of [`seg`] once, then each command of [`normz`] once.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
     let nconv = conv::COMMANDS.len();
     let nfmri = fmri::COMMANDS.len();
     let nclus = clus::COMMANDS.len();
-    let round = nconv + nfmri + nclus + seg::COMMANDS.len() + DIST_PER_ROUND;
+    let nseg = seg::COMMANDS.len();
+    let round = nconv + nfmri + nclus + nseg + normz::COMMANDS.len() + DIST_PER_ROUND;
     (0..n)
         .map(|k| {
             let mut t = Vec::new();
@@ -331,10 +334,15 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push(cmd.to_owned());
                     clus::gen_case(&mut g, &mut t, cmd);
                 }
-                i => {
+                i if i < DIST_PER_ROUND + nconv + nfmri + nclus + nseg => {
                     let cmd = seg::COMMANDS[i - DIST_PER_ROUND - nconv - nfmri - nclus];
                     t.push(cmd.to_owned());
                     seg::gen_case(&mut g, &mut t, cmd);
+                }
+                i => {
+                    let cmd = normz::COMMANDS[i - DIST_PER_ROUND - nconv - nfmri - nclus - nseg];
+                    t.push(cmd.to_owned());
+                    normz::gen_case(&mut g, &mut t, cmd);
                 }
             }
             t.join(" ")
@@ -470,6 +478,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
         return Ok(());
     }
     if seg::run(cx, cmd, t, o)? {
+        return Ok(());
+    }
+    if normz::run(cx, cmd, t, o)? {
         return Ok(());
     }
     match cmd {

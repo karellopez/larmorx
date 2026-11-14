@@ -23,12 +23,41 @@ const OFFICIAL_SHA256: &str = "cbd22e7d47689363e45058cd6b0de247ba0b801fc2b109d9f
 const SKIPPED: usize = 139;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 29] = [
+const SKIP: [&str; 34] = [
     "FS-540", "FS-541", "FS-58", "FS-53", "FS-546", "FS-548", "FS-549", "FS-550", "FS-551",
     "FS-552", "FS-555", "FS-163", "FS-559", "FS-560", "FS-561", "FS-562", "FS-564", "FS-567",
     "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575", "FS-579", "FS-581", "FS-582",
-    "FS-583", "FS-586",
+    "FS-583", "FS-586", "FS-588", "FS-589", "FS-591", "FS-593", "FS-487",
 ];
+
+/// FS-596: the number in `MRInormAddFileControlPoints`' message on rejected points is whatever
+/// FreeSurfer's register holds; where the port cannot know it (`check.py`'s `MASKED`) both sides'
+/// number is replaced by `?`.
+fn mask(out: &str, ids: &[&str]) -> String {
+    if !ids.contains(&"FS-596") {
+        return out.to_owned();
+    }
+    let (pre, tail) = ("!!!!! ", " control points rejected");
+    let mut r = String::new();
+    let mut rest = out;
+    while let Some(i) = rest.find(pre) {
+        let after = &rest[i + pre.len()..];
+        let n = after
+            .char_indices()
+            .take_while(|&(k, c)| c.is_ascii_digit() || (k == 0 && c == '-'))
+            .count();
+        if n > 0 && after[n..].starts_with(tail) {
+            r.push_str(&rest[..i + pre.len()]);
+            r.push('?');
+            rest = &after[n..];
+        } else {
+            r.push_str(&rest[..i + pre.len()]);
+            rest = after;
+        }
+    }
+    r.push_str(rest);
+    r
+}
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
@@ -40,7 +69,7 @@ fn reproduce_gives_the_official_outputs() {
             skipped += 1;
             h.update(b"SKIP\n");
         } else {
-            h.update(out.as_bytes());
+            h.update(mask(&out, &ids).as_bytes());
             h.update(b"\n");
         }
     }

@@ -1822,7 +1822,8 @@ pub fn mri_apply_bias_correction_same_geometry(
                     f64::from(z),
                     &mut b,
                 );
-                let v = mul64(val, div64(f64::from(target_val), b));
+                // the official build's operands: the ratio first in the product (its NaN wins)
+                let v = mul64(div64(f64::from(target_val), b), val);
                 mri_set_vox_val(g, err, dst, x, y, z, 0, v as f32, 0)?;
             }
         }

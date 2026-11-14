@@ -244,6 +244,7 @@ dependencies = [
  "larmorx-freesurfer-mri",
  "larmorx-freesurfer-volume",
  "sha2",
+ "tempfile",
 ]
 
 [[package]]

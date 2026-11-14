@@ -275,6 +275,8 @@ impl Encoding {
 /// `NrrdIoState`, the parts reading uses.
 struct Nio {
     path: Vec<u8>,
+    /// On Windows, the directory NrrdIO itself would take (FS-773).
+    path_nrrdio: Vec<u8>,
     /// `nio->line` as a C string, and its buffer (`lineLen` bytes) as C leaves it.
     line: Vec<u8>,
     buf: CBuf,
@@ -298,6 +300,7 @@ impl Nio {
     fn new() -> Nio {
         Nio {
             path: Vec::new(),
+            path_nrrdio: Vec::new(),
             line: Vec::new(),
             buf: Vec::new(),
             line_len: 0,
@@ -1767,6 +1770,27 @@ impl Reader<'_> {
         }
         let wfix = cfg!(windows) && self.notices.fix();
         let need_path = |s: &[u8]| need_path(s, wfix);
+        if cfg!(windows) {
+            let names: Vec<Vec<u8>> = match &self.nio.data_fn_format {
+                Some(f) => vec![f.clone()],
+                None => self.nio.data_fn.clone(),
+            };
+            let differs = names.iter().any(|n| {
+                super::read::need_path(n, true) != super::read::need_path(n, false)
+                    || (super::read::need_path(n, false) && self.nio.path != self.nio.path_nrrdio)
+            });
+            if differs && self.nio.data_fn_index == 0 {
+                self.notices.add(
+                    &d::FS_773,
+                    if wfix {
+                        "a data file was named relative to the header's directory up to its last \
+                         backslash, or by its drive (NrrdIO takes / only)"
+                    } else {
+                        "a data file was named with / as the only separator"
+                    },
+                );
+            }
+        }
         let needed = match &self.nio.data_fn_format {
             Some(f) => need_path(f),
             None => self.nio.data_fn.iter().any(|n| need_path(n)),
@@ -2481,16 +2505,8 @@ pub fn load_with(
     };
     let wfix = cfg!(windows) && r.notices.fix();
     r.nio.path = split_path(filename, wfix);
-    if cfg!(windows) && filename.contains(&b'\\') && split_path(filename, false) != r.nio.path {
-        r.notices.add(
-            &d::FS_773,
-            if wfix {
-                "the header's directory was taken up to its last backslash (NrrdIO separates \
-                 directories with / only)"
-            } else {
-                "the header's directory was taken up to its last / only"
-            },
-        );
+    if cfg!(windows) {
+        r.nio.path_nrrdio = split_path(filename, false);
     }
     let mut file = match CFile::open(filename) {
         Ok(f) => f,

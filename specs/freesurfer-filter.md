@@ -229,7 +229,11 @@ the points leave in the order these exact steps give, which decides the distance
 | FS-593 | a | `FS_THRESH_CTRL` not a number: a threshold never written | an error (`reproduce`: 0, noted) |
 | FS-594 | c | the threshold's removal keeps the point after each removed one | all removed (`reproduce`: as FreeSurfer) |
 | FS-595 | f | the rejected points' message prints a number it is not given | the count (`reproduce`: the number where it is known) |
-| FS-596 | a | values never written: peaks past those found, the rejected points' number, a bias the sampler refused | 0 or the count, noted (both modes) |
+| FS-596 | a | values never written: the rejected points' number, a bias the sampler refused | 0 or the count, noted (both modes) |
+| FS-597 | a | the tissue levels read from a smoothed histogram bin outside the histogram (a peak or valley not found); a search started below the `int` range crashes | 0, noted; no peak (both modes) |
+| FS-598 | a | the second control-point search never ends when fewer than 10 voxels can still become control points | an error (both modes) |
+| FS-599 | c | the first control-point search gives up after an eleventh pass that found enough | the pass kept (`reproduce`: `NULL`) |
+| FS-600 | a | the one-dimensional normalisation's peak check reads peak entries never written | 0, noted (both modes) |
 
 ## 9. The Gaussian kernel and the one-dimensional convolutions
 
@@ -961,3 +965,163 @@ is x86-64's conversion to `int` (FS-17 beyond its range).
   crashing or using memory never written (FS-588, FS-589, FS-591, FS-593, FS-487); the default
   identical but where a noted defect it corrects changed the result. Observed: seeds 7 (100 cases),
   13 and 17 (500 each): 0 different in either mode.
+
+## 28. The normalisation's histogram steps
+
+Behaviour of the one- and three-dimensional normalisations that use histograms (part 7). Messages
+go to standard output unless marked *(err)*; `%2.0f` and the like are C formats.
+
+**`MRInormFillHistograms(mri, mni)`**: for each of the `windows_above_t0 + windows_below_t0`
+windows (more than 80: FS-591, an error), the window region's histogram as `MRIhistogramRegion`
+makes it with 0 bins asked (one bin per intensity of the region's range, the MNI's histogram
+reused), then the counts of the bins whose values lie in `[0, 30]` and in `[225, 255]` set to 0.
+Returns `NO_ERROR`.
+
+**`MRInormalize(src, dst, mni)`**: without an MNI, a zeroed one set up by `MRInormInit` with every
+argument 0. The histograms (above), the peaks (`MRInormFindPeaks`, §26; the peak arrays' entries
+never written are read as 0, FS-600). No peak: `ERROR: MRInormalize(): could not find any valid
+peaks.`, `Make sure the Talairach alignment is correct. See ` (with its trailing blank) and
+`http://surfer.nmr.mgh.harvard.edu/fswiki/FsTutorial/Talairach_freeview`, then an error message
+with an empty text (`ERROR_BADPARM`), result `NULL`. Otherwise `MRIsplineNormalize(): npeaks = <n>`;
+with one peak `ERROR: number of peaks must be > 1 for spline` and `NULL`; else
+`MRIsplineNormalize(src, dst, NULL, inputs, outputs, n)` (§26). With `DIAG_SHOW`: *(err)*
+`normalization found <n> peaks:` and `<i>: <%2.1f input> --> <%2.3f output>` per peak.
+
+**The tissue levels** (a step of the two searches below; inputs: the source and a control volume):
+1. The control volume binarised at 1 (a new volume, 0 and 1). The histogram of the source's voxels
+   labelled 1 (`MRIhistogramLabel`, 0 bins asked). Its highest count's bin (the first of equal
+   ones, counts above 0 only): its value `wm` (a bin outside the histogram: 0, FS-597).
+   `white matter peak found at <%2.0f wm>`.
+2. The whole volume's histogram (`MRIhistogram`, 0 bins: every frame), its zero bin cleared
+   (`HISTOclearZeroBin`), the bins valued 0 to 5 cleared, smoothed with sigma 2 (`HISTOsmooth`):
+   `hs`, bin size `bs`. With `DIAG_WRITE` and `DIAG_VERBOSE`: the plots `h0.plt` (before the
+   clearing), `h.plt`, `hs.plt`.
+3. The highest peak of `hs` between the bins `(int)(wm - 20)` and `(int)(wm + 20)` (sums in
+   `float`, conversions truncating): its bin `wp`, its value the new `wm` (printed again as in 1).
+4. `HISTOfindPreviousValley(hs, nint(wp - 5 bs))` is called (its result unused; its reads may be
+   outside the histogram, which only notes). The grey matter peak `gp` =
+   `HISTOfindPreviousPeak(hs, (int)(wp - 10 bs), 10)`; none (below 0): `HISTOfindBin(hs, 0.75 wm)`
+   (`float` product). The valley `gv = HISTOfindPreviousValley(hs, (int)(gp - 10 bs))`; the CSF
+   peak `cp = HISTOfindPreviousPeak(hs, (int)(gv - 10 bs), 10)`, none: `HISTOfindBin(hs, (float)(gp
+   * 0.5))`. Products `k * bs` are `float`; differences `(float)bin - k bs` in `float`. A peak
+   search started from -2^31 finds none (FS-597).
+5. In `double`: `gp > 0.8 wp` → `gp = (int)(0.8 wp)`; `cp > 0.75 gp` → `cp = (int)(0.75 gp)`;
+   the value of bin `gp` below 40 → `gp = (int)(0.7 wp)`; `cp <= 0` or `gv <= 0` →
+   `cp = (int)(0.5 gp)` (truncation toward zero).
+6. `gm peak at <%2.0f value of gp> (<gp>), valley at <%2.0f value of gv> (<gv>)`; the threshold
+   bin `(2 gp + cp) / 3` (32-bit integer arithmetic, truncating division); `csf peak at <%2.0f
+   value of cp>, setting threshold to <%2.0f value of the threshold bin>`. Results: the threshold's
+   value, `wm`, the values of `gp` and `cp`. Every bin read outside `hs` (negative, or past its
+   allocated bins) is 0 with FS-597.
+
+**`MRInormFindControlPoints(src, wm_target, above, below, ctrl, which, scan_type, not_control)`**
+(`wm_target` 0 means 110; `scan_type` has no effect): into `ctrl`, or a new byte volume of the
+source's size with its header.
+1. The file's control points (`MRInormAddFileControlPoints(ctrl, 255, src)`, §26).
+2. The first search: `MRInormFindControlPointsInWindow(src, wm_target, (float)(1.5 above - 5p),
+   (float)(1.5 below + 5p), ctrl, 3, "", ...)` for p = 0, 1, ... (the products and sums in
+   `double`) until a pass reports 10 or more new control points; after the pass with p = 10
+   FreeSurfer stops with the error `MRInormFindControlPoints: could not find enough control points`
+   (`ERROR_UNSUPPORTED`) and `NULL` whatever that pass found (FS-599: by default a last pass that
+   found 10 or more is kept).
+3. One more window search with `above`, `below` at half-width 2 mm.
+4. The tissue levels of `src` under `ctrl` (above): `wm`, `gm`. Then `ctrl` cleared to 0.
+5. The second search: the window search with `(float)ceil(1.5 above + 5p)` and
+   `(float)ceil(1.5 below + 5p)`, half-width 3 mm, for p = 0, 1, ... until a pass reports 10 or
+   more (no limit: FS-598, where no later pass can reach 10 the port stops with an error).
+6. `low = wm_target - floor((wm - gm) / 3.0)` (`double` division, `float` result); `low =
+   max((double)wm_target - 1.5 below, low)` (`a >= b ? a : b`, then `float`); the window search
+   with `ceilf(above)`, `ceilf(wm_target - low)` at 2 mm.
+7. `q = (wm - gm) / 4` (`float`), `low = wm_target - q`, `hi = above + wm_target`, the
+   half-width `h = (int)ceilf(1 / xsize)` (FS-589 when too wide). A working copy of `ctrl`.
+8. With `which >= 1`, repeated until a pass adds none: in z, y, x order, each voxel not marked in
+   `not_control` (above 0), not a control point, whose value `v0` lies in `[low, hi]`: its window
+   of half-width `h` is scanned (z, y, x offsets, from `-h`); a voxel at or above `hi` or at or
+   below `low` ends the scan (the voxel is not added); each of the 7 positions within 1 step
+   (|dx| + |dy| + |dz| <= 1) that is a control point counts, its value added to a `float` sum
+   (the candidate becomes 128). After the scan, mean = sum / count (`float`; 0/0 is NaN). If
+   `v0 >= wm_target` or `mean - v0 < q / 2`, the working copy gets the candidate's value (0 or
+   128). After the pass the working copy is copied into `ctrl`. With `DIAG_SHOW`: *(err)* `<n>
+   contiguous <2h+1>x<2h+1>x<2h+1> control points added above <%2.0f low>`.
+9. `low = max(low, wm_target - below)` (`float`). The working copy refreshed from `ctrl`. With
+   `which >= 2`, repeated until a pass adds none: candidates as in 8; the scan counts the control
+   points among the 27 positions within one step on each axis (values summed) and ends when one of
+   the 7 positions of 8 has a value above `hi` or below `low`; a candidate with 4 or more such
+   control points and no such value, and `v0 >= wm_target` or `mean - v0 < q / 2`, becomes 128 in
+   the working copy. *(err, `DIAG_SHOW`)* `<n> contiguous 6-connected control points added above
+   threshold <%2.0f>`.
+10. `mriRemoveOutliers(ctrl, 2)` (§26), the file's control points again (255). *(err,
+    `DIAG_SHOW`)* `<n> control points found.` (the count: the last pass of step 5, plus step 6,
+    plus the growth of steps 8 and 9, plus the file's points of step 10).
+With a diagnostic voxel `(Gx, Gy, Gz)` (`Gx >= 0`): `after 7x7x7 - (x, y, z) is [NOT ]a control
+point` after step 5, `after 5x5x5 - ...` after 6, `after 3x3x3 - ...` after 8, `after 6-connected
+- ...` after 9, and at the end `(x, y, z) is[ NOT] a control point (T1=<%2.0f>)`.
+
+**`MRI3dNormalize(orig, src, wm_target, norm, above, below, only_file, prune, bias_sigma,
+scan_type, not_control)`** (`wm_target` 0 means 110):
+1. A `float` copy of `src` (`MRIchangeType(src, MRI_FLOAT, 0, 255, 1)`: values unscaled). Without
+   `norm`, the result is a copy of that copy (so a `float` volume).
+2. One pass: the control points of `MRInormFindControlPoints(copy, wm_target, above, below, NULL,
+   2, scan_type, not_control)` (`NULL`: the error `MRInormFindControlPoints failed`,
+   `ERROR_UNSUPPORTED`, and the program's end); with `only_file`, a new byte volume with the copy's
+   header holding the file's control points (255), *(err)* `only using <n> unique control points
+   from file...`, and with `WRITE_CONTROL_POINTS` set `writing control point volume to cp.mgz` and
+   that file.
+3. With a control volume name set (`MRI3dWriteControlPoints`): *(err)* `writing control point volume
+   to <name>...`, the copy's header given to it, written. Then binarised at 1 (0 and 1).
+4. With `prune > 0`, the grey matter pruning (below) of the control points against `orig`.
+5. The bias field (`MRIbuildBiasImage(copy, ctrl, bias_sigma)`, §26); with a bias name set:
+   *(err)* `writing bias field volume to <name>...` and the file. With `DIAG_WRITE` and
+   `DIAG_VERBOSE`: *(err)* `writing out control and bias volumes...` and `src<k>.mgh`,
+   `ctrl<k>.mgh`, `bias<k>.mgh` (k counting the calls of the run).
+6. Each voxel in z, y, x order: `s` the copy's value, `b` the bias's; `n = s` when `|b| <
+   FLT_EPSILON`, else `(wm_target * s) / b` (`float`, `wm_target` the first operand); at most 255
+   when `norm` holds bytes; written with `MRIsetVoxVal`. At the diagnostic voxel: `bias at (x, y,
+   z) = <%2.1f b>, T1 <%2.0f s> --> <nint(n)>`.
+7. Unless `only_file`, `norm` is copied into the float copy (`MRIcopy`; its messages are FreeSurfer's),
+   then discarded.
+
+**The grey matter pruning** (`remove_gray_matter_control_points(ctrl, src, wm_target, above, below,
+...)`, `src` = `orig`):
+1. The tissue levels of `src` under `ctrl`: the threshold `csf`, `wm`, `gm`. `using csf threshold
+   <%2.0f csf> for control point removal`.
+2. `inside` = a copy of `ctrl`; twice: `after <n> erosions, <k> voxels remaining` (k = voxels of
+   `inside` equal to 1), the erosion of `inside` (`MRIerode`); when it leaves 100 or fewer voxels of
+   1, stop (not kept), else it becomes `inside`. `outside = ctrl - inside` (`MRIsubtract`).
+3. A new `inside`: the window search of `src` with `wm_target`, `above`, `below`, half-width 3 mm
+   (no control volume given, no message); binarised at 1; eroded in place; fewer than 100 voxels of
+   1: `MRInormGentlyFindControlPoints(src, wm_target, above, below, inside, NULL)` (§26) into it.
+4. The half-width `h = (int)ceilf(4 / xsize)`. With `DIAG_WRITE` and `DIAG_VERBOSE`: `writing
+   control point and src files for call <k>...` and `co<k>.mgz` (outside), `ci<k>.mgz` (inside),
+   `cb<k>.mgz` (ctrl), `orig<k>.mgz` (src). Diagnostic voxel: `(x, y, z) is [NOT ]a control point`
+   when it is not one, else `(x, y, z) is a control point, is [NOT ]inside, is [NOT ]outside`.
+5. The count `n` of pairs (an `inside` voxel, an `inside` voxel of its window, x outermost, then y,
+   then z) whose second value lies above the first and below `wm_target`.
+6. `d = (wm - gm) / 10` (`float`, used as `double`), `low = (wm + gm) / 2 + 10` (`float`): `wm
+   standard deviation = <%2.1f d> (<n> DOFs), low wm thresh=<%2.3f low>`.
+7. Each `outside` voxel (x, then y, then z), value `v0`, `hi = (float)(v0 + 2 d)`: within 4.5 mm
+   of a voxel at or below `csf` (`csf_in_window`, §26) it is removed from `ctrl` (set to 0) and
+   counted as close to CSF; otherwise, when `v0 <= low`, its window (x, y, z offsets from `-h`) is
+   scanned for a control point of `ctrl` (as it is being changed) with a value above `hi`: at the
+   first such one the voxel is removed when CSF lies within 7 mm (counted as removed), else kept
+   (counted as retained). Diagnostic voxel messages: `(x, y, z)=<%2.0f v0>, is ctrl - checking for
+   nbhd vals > <%2.0f hi>`, `removing voxel (x, y, z) due to csf proximity (< %2.0f mm)` of 4.5
+   (` 4`), `found nbhd val <%2.0f> at (xi, yi, zi) -> removing` or `... -> retaining due to
+   lack of CSF proximity`, `<n> voxels examined, (x, y, z) [NOT ]removed` (n counts the scanned
+   control points since the last voxel not close to CSF).
+8. The file's control points that are 0 in `ctrl` are set back to 1 (each lowering the removed
+   count by one). With `DIAG_WRITE` and `DIAG_VERBOSE`: `ca<k>.mgz`. `<close + removed> potential
+   gm control points removed (<retained> >7 mm from csf retained, <close> < 4.5 mm removed)`.
+
+## 29. Validation plan (part 7)
+
+Probe commands (`validation/probes/fs-filter`, black-box runs of FreeSurfer's library functions
+by name): `nrm` (MRInormalize after MRInormInit, or without an MNI; the windows' histograms),
+`nfcp` (MRInormFindControlPoints), `n3d` (MRI3dNormalize, with a separate `orig` or a copy, every
+destination kind, `prune` 0 and 1, `only_file`), and on the recorded heads `nrmf` (MRInormInit and
+MRInormalize of `nu.mgz`) and `n3df` (MRI3dNormalize of `T1.mgz` in place, without and with
+pruning): `real.py --norm3`. Generated cases: head-like ellipsoids tall in y (`nrm`), brain-like
+blocks of 15 to 21 voxels a side (`nfcp`, `n3d`). Results (observed): seeds 7 and 13 (100 cases of
+each command), seed 17 (200 of each): 0 different with `reproduce`, and with the default only
+differences that carry a notice. FS-597, FS-598 and FS-600 cases are counted, not compared
+(memory contents, a hang).

@@ -1994,6 +1994,21 @@ fn tissue_bin(g: &mut Globals, h: &Histogram, b: i32) -> f32 {
     0.0
 }
 
+/// `HISTOfindPreviousPeak(h, b0, whalf)` from `find_tissue_intensities`: a start of -2^31 (a
+/// bin below the `int` range) wraps to the top of the `int` range in FreeSurfer, whose search then
+/// reads far outside the histogram (a crash): FS-597, no peak (both modes).
+fn prev_peak(g: &mut Globals, h: &Histogram, b0: i32, whalf: i32) -> i32 {
+    if b0 == i32::MIN {
+        g.notices.add(
+            &FS_597,
+            "find_tissue_intensities: a peak search from bin -2147483648 (FreeSurfer reads far \
+             outside the histogram; none found here)",
+        );
+        return -1;
+    }
+    histo_find_previous_peak(g, h, b0, whalf)
+}
+
 /// The tissue levels [`find_tissue_intensities`] finds: the CSF threshold it returns, and the
 /// white matter, grey matter and CSF levels.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -2071,7 +2086,7 @@ pub fn find_tissue_intensities(
     histo_find_previous_valley(g, &hs, v);
     let v = below(wm_peak, 10.0);
     let b0 = float_to_int(g, f64::from(v), WHAT);
-    let mut gm_peak = histo_find_previous_peak(g, &hs, b0, MIN_PEAK_HALF_WIDTH);
+    let mut gm_peak = prev_peak(g, &hs, b0, MIN_PEAK_HALF_WIDTH);
     if gm_peak < 0 {
         gm_peak = histo_find_bin(g, &hs, mul(wm_val, 0.75));
     }
@@ -2080,7 +2095,7 @@ pub fn find_tissue_intensities(
     let gm_valley = histo_find_previous_valley(g, &hs, b0);
     let v = below(gm_valley, 10.0);
     let b0 = float_to_int(g, f64::from(v), WHAT);
-    let mut csf_peak = histo_find_previous_peak(g, &hs, b0, MIN_PEAK_HALF_WIDTH);
+    let mut csf_peak = prev_peak(g, &hs, b0, MIN_PEAK_HALF_WIDTH);
     if csf_peak < 0 {
         csf_peak = histo_find_bin(g, &hs, (f64::from(gm_peak) * 0.5) as f32);
     }
@@ -2401,6 +2416,8 @@ pub fn mri_norm_find_control_points(
     let mut idx: Option<Idx> = None;
     let mut tmp = mri_copy(g, out, err, c, None)?.unwrap_new();
     let mut total_filled = 0;
+    #[allow(clippy::while_immutable_condition)]
+    // `do { if (which < 1) break; ... } while (nfilled > 0)`
     while which >= 1 {
         let mut nfilled = 0;
         for z in 0..d {
@@ -2484,6 +2501,8 @@ pub fn mri_norm_find_control_points(
     total_filled = 0;
     low = cmax(low, low_below);
     mri_copy(g, out, err, c, Some(&mut tmp))?;
+    #[allow(clippy::while_immutable_condition)]
+    // `do { if (which < 2) break; ... } while (nfilled > 0)`
     while which >= 2 {
         let mut nfilled = 0;
         for z in 0..d {

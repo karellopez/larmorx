@@ -64,6 +64,17 @@ GENTLE = (
 )
 
 
+# mri_normalize without an aseg (recon-all's T1 step): the one-dimensional normalisation
+# (MRInormInit, then MRInormalize into a new volume) of nu.mgz, and the three-dimensional passes
+# (MRI3dNormalize in place, wm 110, above 25, below 10, bias sigma 8) of T1.mgz without and with
+# the grey matter pruning: (command, volume, above, below, prune, sigma)
+NORM3 = (
+    ("nrmf", "nu.mgz", None, None, None, None),
+    ("n3df", "T1.mgz", 25.0, 10.0, 0, 8.0),
+    ("n3df", "T1.mgz", 25.0, 10.0, 1, 8.0),
+)
+
+
 def fx(v: float) -> str:
     return struct.pack(">f", v).hex()
 
@@ -74,6 +85,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument(
         "--norm", action="store_true", help="the bias fields (Voronoi, soap bubble) instead"
+    )
+    ap.add_argument(
+        "--norm3",
+        action="store_true",
+        help="the one- and three-dimensional normalisations (MRInormalize, MRI3dNormalize) instead",
     )
     ap.add_argument(
         "--gentle",
@@ -90,6 +106,15 @@ def main(argv: list[str] | None = None) -> int:
     for head in HEADS:
         sub = head.split("-", 1)[1]
         mri = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
+        if a.norm3:
+            for cmd, vol, above, below, prune, sigma in NORM3:
+                if cmd == "nrmf":
+                    lines.append(f"nrmf {mri / 'mri' / vol}")
+                else:
+                    lines.append(
+                        f"n3df {mri / 'mri' / vol} {fx(above)} {fx(below)} {prune} {fx(sigma)}"
+                    )
+            continue
         if a.gentle:
             for vol, above, below, sigma in GENTLE:
                 lines.append(f"g3df {mri / 'mri' / vol} {fx(above)} {fx(below)} {fx(sigma)}")
@@ -105,7 +130,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-filter"
     inputs.mkdir(parents=True, exist_ok=True)
     name = (
-        "real-gentle-cases.txt"
+        "real-norm3-cases.txt"
+        if a.norm3
+        else "real-gentle-cases.txt"
         if a.gentle
         else "real-norm-cases.txt"
         if a.norm

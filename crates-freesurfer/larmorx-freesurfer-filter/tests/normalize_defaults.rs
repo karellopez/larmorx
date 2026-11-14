@@ -179,3 +179,35 @@ fn gentle_normalisation_of_a_uniform_volume() {
         assert_eq!(v, 110.0, "{mode:?}");
     }
 }
+
+/// FS-599: a uniform volume of 60 with one-voxel windows (column size 10) and no margins: the
+/// first search's window reaches 60 at its eleventh pass, which finds every voxel. FreeSurfer
+/// gives up (`could not find enough control points`, `NULL`); the default keeps that pass and goes
+/// on to a control volume.
+#[test]
+fn fs599_the_eleventh_pass_counts() {
+    let run = |mode| {
+        let mut g = Globals::new(mode);
+        let mut src = vol(&mut g, 4, MRI_UCHAR, |_, _, _| 60.0);
+        src.vg.xsize = 10.0;
+        let mut st = nz::NormState::default();
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = nz::mri_norm_find_control_points(
+            &mut g, &mut o, &mut e, None, &mut st, &src, 110.0, 0.0, 0.0, None, 2, 0, None,
+        )
+        .unwrap();
+        (
+            r.is_null(),
+            noted(&g, "FS-599"),
+            String::from_utf8_lossy(&e).into_owned(),
+        )
+    };
+    let (null, seen, _) = run(UpstreamDefects::Fix);
+    assert!(!null && seen);
+    let (null, seen, err) = run(UpstreamDefects::Reproduce);
+    assert!(null && seen, "{err}");
+    assert!(
+        err.contains("could not find enough control points"),
+        "{err}"
+    );
+}

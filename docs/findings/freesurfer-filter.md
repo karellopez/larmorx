@@ -305,3 +305,51 @@ not vectorised: the loops call `MRIgetVoxVal`, or alias their row pointers):
   search 1 s, the Voronoi diagram 5 s, the 65-tap Gaussian 11 s) where the official code averages
   15 s per volume including the read: the convolution (§10's `MRIconvolve1d`) is the part to speed
   up, without changing a bit.
+
+## 14. `mrinorm.cpp`'s histogram steps (relay 30)
+
+Closed (object code of the unit oracle's `mrinorm.cpp.o`, `relay27/mrinorm.asm`; FreeSurfer's source).
+- **Operand orders.** `MRI3dNormalize`'s `src * (float)wm_target / (float)bias` is compiled as
+  `wm_target * src` (the target in the destination register), then `/ bias`; `FZERO(bias)` with
+  float.h's `FLT_EPSILON` (`|bias| < eps` via `andps` and `comiss`). In `MRInormFindControlPoints`
+  `1.5 * intensity_above` is `above * 1.5` (`double`), the second search's `ceil(1.5 above + 5 pass)`
+  is `5 pass + 1.5 above` and `ceil(1.5 below + 5 pass)` `1.5 below + 5 pass` (the first search's
+  pass 0 is `0.0 + 1.5 below`, the same value); `(wm_val - gm_val) / 4` is `0.25 * (wm - gm)`;
+  `hi_thresh = wm_target + intensity_above` is `above + wm_target`; `ceil(WHALF / xsize)` is the
+  inlined `float` rounding. `remove_gray_matter_control_points` (inlined into `MRI3dNormalize`):
+  `(val - val0)^2` in `float`, then added to the `double` sum (the square first); `(wm + gm) / 2` as
+  `* 0.5`; the `sqrt(delta_std / n)` call is made and its result discarded (its argument is never
+  negative, so no `errno`). `find_tissue_intensities`: `wm_val * .75` in `float` (exact), `gm_peak *
+  .5` in `double` then `float`; `0.8 wm_peak`, `0.75 gm_peak`, `0.7 wm_peak` in `double`, truncated.
+  `MAX` is macros.h's (`a >= b ? a : b`): a NaN keeps the second operand.
+- **Rule C, kept and documented (no ID):** both searches' loops compare the count of the *last*
+  pass with 10 (`pnctrl` is set, not added): a slow trickle of control points needs further passes;
+  `remove_gray_matter_control_points` computes a white matter standard deviation from the inner
+  control points and then overwrites it with `(wm - gm) / 10` (the DOF count is still printed);
+  `MRInormFindControlPoints`' first two counts are overwritten unused; `scan_type` is passed down
+  and never used. The `min_val`/`max_val` of the growth loops are never read.
+- **FS-597.** `find_tissue_intensities` indexes `hwm->bins[wm_peak]` (`cltq`: -1 when the labelled
+  histogram has no count, unreachable once a voxel is labelled), `hsmooth->bins[...]` with the
+  white matter peak (-1 when the 40-bin region has no count), `gm_peak` (`HISTOfindBin` returns
+  `(int)val - bins[0]` for a bin size of 1: negative or past the end), `gm_valley`
+  (`HISTOfindPreviousValley` returns its start when it is 0 or below: very negative starts),
+  `csf_peak` and the threshold bin. `bins` is its own `calloc` block: index -1 reads the upper half
+  of glibc's chunk size field (0 for blocks under 4 GiB), other negative indices the chunk header or
+  the block before, past the end the next chunk: memory contents. A start of -2^31 (`(int)` of a
+  value below the range: `cvttss2si`) makes `HISTOfindPreviousPeak`'s `b0 - 1` wrap to 2^31 - 1 and
+  read `counts[2^31 - 1]`: a crash. The probe counts these cases (`SKIP`).
+- **FS-598.** The second search's loop has no bound. The first search must have succeeded; its
+  window's low end is the second's (`floor(wm - x)` against `floor(wm - ceil(x))`, equal for a whole
+  `wm_target`), its high end lower: every voxel of the first search's last pass qualifies in the
+  second by the same pass, so the second ends unless the rounding of a target with a fraction
+  moves part of that batch to an earlier pass. The port checks, after each pass that found fewer
+  than 10, whether the widest window (the last pass whose `5 pass` fits an `int`; after it
+  FreeSurfer's `5 pass` wraps and its windows only shrink) can still give 10 (a copy of the control
+  volume, no message): if not, an error. Not reached by the probe's cases.
+- **FS-599.** `pass++; if (pass > 10) ErrorReturn(...)` precedes the loop's `while (nctrl < 10)`:
+  the eleventh pass's result is never looked at (rule A: kept by default).
+- **FS-600** (split from FS-596): `MRInormalize`'s `inputs`/`outputs` are stack arrays never
+  initialised; the peak check (FS-590) reads past the peaks found.
+- **Results.** Seeds 7, 13 (100 `nrm`, `nfcp`, `n3d` cases each) and 17 (200 each): 0 different with
+  `reproduce`; seed 13 with the default: no difference without a notice.
+

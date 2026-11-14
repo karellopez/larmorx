@@ -12,7 +12,7 @@ Status: **parts 1 and 2**. Part 1 (§1-8): the fast-marching distance maps `MRIe
 and `MRIdistanceTransform`. Part 2 (§9-17): the Gaussian kernel, the one-dimensional and separable
 convolutions, the matrix Gaussian smoothing, the window means and standard deviations, the pyramid
 reductions, the Sobel derivatives, the divergence and Laplacian, the white-matter border
-classification and the connected components. Not yet: the WM/cortex reclassifications
+classification, the connected components and the global Sobel tables `sx`, `sy`. Not yet: the WM/cortex reclassifications
 (`MRIreclassifyWMCtxNonPar`, `MRIclassifyAmbiguousNonPar`), the frame functions (`fMRI*`,
 `MRIframe*`, `MRIvol*`), the 2-D image reductions, 3.1-43 (but `MRIgaussianSmoothNI`, here), 3.1-44.
 
@@ -406,6 +406,10 @@ the background voxels of the first row of the first slice is kept; every other v
 **`GetLargestCC6(vol)`**, **`GetLargestCC18`**: scanning rows, then columns, then slices, each
 unlabelled voxel above 0 seeds a new region (labels from 1); the first largest is kept and every
 other voxel set to 0 (all of them when there is none).
+
+**The global Sobel tables** (read by FreeSurfer's 2-D image code): `sy` = `{-0.25, -0.5, -0.25, 0,
+0, 0, 0.25, 0.5, 0.25}` and `sx` = `{-0.25, 0, 0.25, -0.5, 0, 0.5, -0.25, 0, 0.25}` (floats, row by
+row: `sx` is `sy` transposed).
 
 ## 16. Validation plan (part 2)
 

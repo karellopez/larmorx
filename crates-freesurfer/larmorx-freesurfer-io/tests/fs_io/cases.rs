@@ -1213,9 +1213,15 @@ pub(crate) fn run_line_with(
         if skip {
             extra.push("SKIP");
         }
-        // piece 2: FreeSurfer's numbers or names from memory contents
-        let memory = piece2::KINDS.contains(&t[0]) && matches!(id, "FS-49" | "FS-167");
-        if memory || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187" | "FS-192") {
+        // piece 2: FreeSurfer's numbers or names from memory contents (FS-49 and FS-192 compared
+        // where `reproduce` gives the earlier numbers' bytes, as FreeSurfer's memory holds them)
+        let earlier = n.detail.ends_with("as in FreeSurfer");
+        let memory =
+            piece2::KINDS.contains(&t[0]) && (id == "FS-167" || (id == "FS-49" && !earlier));
+        if memory
+            || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187")
+            || (id == "FS-192" && !earlier)
+        {
             extra.push("VARY");
         }
     }

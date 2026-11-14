@@ -248,9 +248,11 @@ pub fn tag_skip(
 /// `TAG_OLD_SURF_GEOM`, `TAG_OLD_USEREALRAS` and `TAG_OLD_COLORTABLE`, a 64-bit length for the
 /// others.
 pub fn tag_read_start(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile, plen: &mut i64) -> i32 {
-    // freadInt's four bytes; at the end of the file the number is not used (nothing to note)
-    let mut b = [0u8; 4];
-    let got = fp.read_bytes(&mut b);
+    // freadInt's four bytes; at the end of the file the number is not used (nothing to note).
+    // Both freadInt calls use the same memory in FreeSurfer (FS-49: a length the file cuts keeps
+    // the tag's bytes; the end-of-file test between them leaves that memory alone).
+    let mut slot = fio::Slot49::new();
+    let (b, got) = fio::fread_int_raw(fp, &mut slot);
     if fp.feof() {
         return 0;
     }
@@ -259,7 +261,7 @@ pub fn tag_read_start(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile, plen
     }
     let tag = i32::from_be_bytes(b);
     match tag {
-        TAG_OLD_MGH_XFORM => *plen = i64::from(fio::fread_int(g, fp)) - 1,
+        TAG_OLD_MGH_XFORM => *plen = i64::from(fio::fread_int_in(g, fp, &mut slot)) - 1,
         TAG_OLD_SURF_GEOM | TAG_OLD_USEREALRAS | TAG_OLD_COLORTABLE => *plen = 0,
         _ => *plen = fio::fread_long(g, err, fp),
     }

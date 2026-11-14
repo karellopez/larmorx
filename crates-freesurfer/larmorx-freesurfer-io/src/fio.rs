@@ -138,27 +138,134 @@ pub fn fread_short_ex(fp: &mut CFile, ps: &mut i16) -> i32 {
     ret
 }
 
+/// The memory `freadInt` and `freadDouble` read into, as FreeSurfer's official build has it for
+/// the calls one function makes (FS-49): eight bytes, `freadDouble`'s number over all of them,
+/// `freadInt`'s over bytes 4 to 7. A read the file cannot complete keeps there the bytes the
+/// earlier number left: `freadInt` its file's bytes in file order, `freadDouble` its value least
+/// significant byte first. A caller that models its own calls keeps one slot across them and
+/// calls [`Slot49::clobber`] where FreeSurfer calls anything else between two of them (that memory
+/// then holds what the other function left: unknown here). Unknown bytes read as 0 and are noted
+/// as memory contents; with `reproduce` the known ones are FreeSurfer's.
+#[derive(Clone, Debug, Default)]
+pub struct Slot49 {
+    b: [u8; 8],
+    known: [bool; 8],
+    /// A number cut by the file took a byte of memory FreeSurfer never wrote (or another
+    /// function's).
+    memory: bool,
+}
+
+impl Slot49 {
+    /// A slot that holds memory FreeSurfer never wrote (a caller's first call).
+    pub fn new() -> Slot49 {
+        Slot49::default()
+    }
+
+    /// Another function ran between two calls: the slot's bytes are unknown again.
+    pub fn clobber(&mut self) {
+        self.b = [0; 8];
+        self.known = [false; 8];
+    }
+
+    /// Whether a number the file cut took a byte this slot did not know (memory contents in
+    /// FreeSurfer).
+    pub fn took_memory(&self) -> bool {
+        self.memory
+    }
+
+    /// `freadInt`'s `fread` gave `got` (the bytes `b[..got]`): the slot's bytes 4 to 7 after it.
+    fn put_int(&mut self, b: &[u8; 4], got: usize) {
+        self.b[4..4 + got].copy_from_slice(&b[..got]);
+        self.known[4..4 + got].fill(true);
+    }
+
+    /// A number of `n` bytes at `at` that the file cut after `got`: FreeSurfer's bytes, 0 where the
+    /// slot is unknown or where the default reads 0; whether a missing byte was unknown.
+    fn take(&mut self, g: &Globals, at: usize, n: usize, got: usize) -> (Vec<u8>, bool) {
+        let mut v = self.b[at..at + n].to_vec();
+        let mut unknown = false;
+        for i in got..n {
+            unknown |= !self.known[at + i];
+            if !self.known[at + i] || !g.notices.reproduce() {
+                v[i] = 0;
+            }
+        }
+        self.memory |= unknown;
+        (v, unknown)
+    }
+}
+
+/// FS-49's notice for a number of `n` bytes the file ended after `got` of.
+fn note49(g: &mut Globals, what: &str, got: usize, n: usize, unknown: bool) {
+    if unknown {
+        memory(g, &FS_49, what, got, n);
+    } else if g.notices.reproduce() {
+        g.notices.add(
+            &FS_49,
+            format!("{what}: the file ended after {got} of the number's {n} bytes: the others are the earlier number's, as in FreeSurfer"),
+        );
+    } else {
+        g.notices.add(
+            &FS_49,
+            format!("{what}: the file ended after {got} of the number's {n} bytes: the others read as 0 (FreeSurfer's are the earlier number's)"),
+        );
+    }
+}
+
 /// `freadDouble(fp)`: a big-endian `double`; `freadDouble: fread failed` (an error) when the file
-/// does not hold it (FS-49: its missing bytes).
+/// does not hold it (FS-49: its missing bytes, memory contents).
 pub fn fread_double(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile) -> f64 {
+    fread_double_in(g, err, fp, &mut Slot49::new())
+}
+
+/// [`fread_double`] into the caller's model of FreeSurfer's memory ([`Slot49`]: FS-49's missing
+/// bytes are the earlier number's where it knows them).
+pub fn fread_double_in(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    fp: &mut CFile,
+    slot: &mut Slot49,
+) -> f64 {
     let (ret, b, got) = fread_n(fp, [0u8; 8]);
+    slot.b[..got].copy_from_slice(&b[..got]);
+    slot.known[..got].fill(true);
+    let (v, unknown) = slot.take(g, 0, 8, got);
     if got < 8 {
-        memory(g, &FS_49, "freadDouble", got, 8);
+        note49(g, "freadDouble", got, 8, unknown);
     }
     if ret != 1 {
         log::error_printf(g, err, ERROR_BADFILE, "freadDouble: fread failed");
     }
-    f64::from_be_bytes(b)
+    // the swapped value is stored back over the number's memory
+    slot.b.reverse();
+    slot.known.reverse();
+    f64::from_be_bytes(v.try_into().unwrap())
 }
 
 /// `freadInt(fp)`: a big-endian `int`, with no message when the file does not hold it (its test
-/// can never be true; FS-49: its missing bytes).
+/// can never be true; FS-49: its missing bytes, memory contents).
 pub fn fread_int(g: &mut Globals, fp: &mut CFile) -> i32 {
+    fread_int_in(g, fp, &mut Slot49::new())
+}
+
+/// [`fread_int`] into the caller's model of FreeSurfer's memory ([`Slot49`]: FS-49's missing
+/// bytes are the earlier number's where it knows them).
+pub fn fread_int_in(g: &mut Globals, fp: &mut CFile, slot: &mut Slot49) -> i32 {
     let (_, b, got) = fread_n(fp, [0u8; 4]);
+    slot.put_int(&b, got);
+    let (v, unknown) = slot.take(g, 4, 4, got);
     if got < 4 {
-        memory(g, &FS_49, "freadInt", got, 4);
+        note49(g, "freadInt", got, 4, unknown);
     }
-    i32::from_be_bytes(b)
+    i32::from_be_bytes(v.try_into().unwrap())
+}
+
+/// `freadInt`'s read when the caller tests the end of the file before it uses the number
+/// (`TAGreadStart`): the four bytes into `slot`, the count the file gave; nothing noted.
+pub fn fread_int_raw(fp: &mut CFile, slot: &mut Slot49) -> ([u8; 4], usize) {
+    let (_, b, got) = fread_n(fp, [0u8; 4]);
+    slot.put_int(&b, got);
+    (b, got)
 }
 
 /// `freadLong(fp)`: a big-endian `long long`; `freadLong: fread failed` when the file does not
@@ -986,6 +1093,104 @@ mod tests {
         // at the end: the caller's value byte-reversed
         assert_eq!(fread_int_ex(&mut f, &mut i), 0);
         assert_eq!(i, 0x0500_0000);
+    }
+
+    fn unhex(s: &str) -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    /// FS-49 at fs.io's callers: the numbers FreeSurfer's official build gives where the file cuts
+    /// a number read right after another (observed with the fs-io probe,
+    /// `validation/probes/fs-io/fs49_slot_cases.py`); the default reads the missing bytes as 0.
+    #[test]
+    fn fs49_slot_keeps_the_earlier_numbers_bytes() {
+        use crate::colortab_bin::ctab_read_from_binary;
+        use crate::tags::tag_read_start;
+        for (mode, want) in [
+            (
+                UpstreamDefects::Reproduce,
+                [29i64, -1_412_628_451, 301_989_917],
+            ),
+            (
+                UpstreamDefects::Fix,
+                [-1, 0xabcd_0000u32 as i32 as i64 - 1, 0x1200_0000 - 1],
+            ),
+        ] {
+            for (hex, w) in ["0000001e", "0000001eabcd", "0000001e12"].iter().zip(want) {
+                let mut gl = g(mode);
+                let mut e = Vec::new();
+                let mut f = CFile::from_bytes(unhex(hex));
+                let mut len = -7;
+                assert_eq!(tag_read_start(&mut gl, &mut e, &mut f, &mut len), 30);
+                assert_eq!(len, w, "{hex} {mode:?}");
+                assert!(gl.notices.contains(&FS_49));
+            }
+        }
+        // the slot directly: freadDouble's value stored back reversed, freadInt over bytes 4 to 7
+        let mut gl = g(UpstreamDefects::Reproduce);
+        let mut e = Vec::new();
+        let mut s = Slot49::new();
+        let mut f = CFile::from_bytes(unhex("0102030405060708aa"));
+        assert_eq!(
+            fread_double_in(&mut gl, &mut e, &mut f, &mut s).to_bits(),
+            0x0102_0304_0506_0708
+        );
+        assert_eq!(fread_int_in(&mut gl, &mut f, &mut s), 0xaa03_0201u32 as i32);
+        assert!(!s.took_memory());
+        s.clobber();
+        assert_eq!(fread_int_in(&mut gl, &mut f, &mut s), 0);
+        assert!(s.took_memory());
+        // colour tables on C streams: (file, entry 1's ri gi bi ai) or the error
+        let colour = |hex: &str, mode| {
+            let mut gl = g(mode);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let mut f = CFile::from_bytes(unhex(hex));
+            let ct = ctab_read_from_binary(&mut gl, &mut o, &mut e, Some(&mut f));
+            let rgba = ct.and_then(|c| {
+                c.entries
+                    .iter()
+                    .flatten()
+                    .last()
+                    .map(|x| (x.ri, x.gi, x.bi, x.ai))
+            });
+            (rgba, String::from_utf8_lossy(&e).into_owned())
+        };
+        let r = UpstreamDefects::Reproduce;
+        assert_eq!(
+            colour("00000001000000010000000002780000000009", r).0,
+            Some((9, 9, 9, 246))
+        );
+        assert_eq!(
+            colour("000000010000000100000000027800000000090a0b", r).0,
+            Some((9, 168_493_065, 168_493_065, -168_492_810))
+        );
+        let v2 = "fffffffe0000000300000001000000000100000001000000026200000102030400";
+        assert_eq!(
+            colour(v2, r).0,
+            Some((66051, 67_109_379, 67_109_379, -67_109_124))
+        );
+        assert_eq!(
+            colour(&format!("{v2}aabb"), r).0,
+            Some((66051, 67_152_571, 67_152_571, -67_152_316))
+        );
+        let (none, msg) = colour(
+            "fffffffe000000030000000100000000020000000100000002620000000005000000060000000700000001",
+            r,
+        );
+        assert!(
+            none.is_none() && msg.contains("Duplicate structure 1"),
+            "{msg}"
+        );
+        assert!(colour("fffffffe", r).1.contains("nentries was -2"));
+        // the default: the end of the file inside the table is an error (FS-192)
+        let (none, msg) = colour(v2, UpstreamDefects::Fix);
+        assert!(
+            none.is_none() && msg.contains("ends inside the colour table"),
+            "{msg}"
+        );
     }
 
     #[test]

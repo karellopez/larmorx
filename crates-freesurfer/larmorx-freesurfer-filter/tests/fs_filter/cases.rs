@@ -86,10 +86,18 @@ fn token(ty: i32, v: f64) -> String {
 
 fn extent(g: &mut Gen) -> [i32; 3] {
     if g.chance(40) {
-        return [g.int(20, 32) as i32, g.int(20, 32) as i32, g.int(18, 32) as i32];
+        return [
+            g.int(20, 32) as i32,
+            g.int(20, 32) as i32,
+            g.int(18, 32) as i32,
+        ];
     }
     if g.chance(10) {
-        return [g.int(10, 18) as i32, g.int(9, 16) as i32, g.int(8, 14) as i32];
+        return [
+            g.int(10, 18) as i32,
+            g.int(9, 16) as i32,
+            g.int(8, 14) as i32,
+        ];
     }
     let mut e = [0; 3];
     for x in &mut e {
@@ -110,13 +118,21 @@ fn label_vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32, la
     let back = g.pick(&[0i64, 0, 0, 2, 255, -1]);
     let mut v = vec![back as f64; n];
     for _ in 0..g.int(0, 3) {
-        let c = [g.int(0, i64::from(w) - 1), g.int(0, i64::from(h) - 1), g.int(0, i64::from(d) - 1)];
+        let c = [
+            g.int(0, i64::from(w) - 1),
+            g.int(0, i64::from(h) - 1),
+            g.int(0, i64::from(d) - 1),
+        ];
         let r = g.int(0, i64::from(w.min(h).min(d)).max(4) / 2 + 2);
         let ball = g.chance(2);
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
-                    let dd = [i64::from(x) - c[0], i64::from(y) - c[1], i64::from(z) - c[2]];
+                    let dd = [
+                        i64::from(x) - c[0],
+                        i64::from(y) - c[1],
+                        i64::from(z) - c[2],
+                    ];
                     let inside = if ball {
                         dd.iter().map(|q| q * q).sum::<i64>() <= r * r
                     } else {
@@ -185,7 +201,9 @@ fn max_distance(g: &mut Gen) -> f32 {
     if g.chance(12) {
         return g.pick(&[f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 1e30, 1e-3, -0.0]);
     }
-    g.pick(&[-1.0, -1.0, 0.0, 3.0, 5.0, 10.0, 100.0, 2.5, 1.0, 0.5, 7.25, 4.0])
+    g.pick(&[
+        -1.0, -1.0, 0.0, 3.0, 5.0, 10.0, 100.0, 2.5, 1.0, 0.5, 7.25, 4.0,
+    ])
 }
 
 fn dist_case(g: &mut Gen, t: &mut Vec<String>) {
@@ -195,7 +213,9 @@ fn dist_case(g: &mut Gen, t: &mut Vec<String>) {
     let ty = if g.chance(3) {
         MRI_FLOAT
     } else {
-        g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_INT, MRI_USHRT, MRI_LONG])
+        g.pick(&[
+            MRI_UCHAR, MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_INT, MRI_USHRT, MRI_LONG,
+        ])
     };
     let nf = if g.chance(8) { 2 } else { 1 };
     let label = g.pick(&[1i64, 1, 1, 3, 128, 255, 2]);
@@ -339,11 +359,20 @@ fn get_vol(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
         };
         let bytes: Vec<u8> = match ty {
             MRI_UCHAR => vec![v.parse::<i64>().expect("byte") as u8],
-            MRI_SHORT => (v.parse::<i64>().expect("short") as i16).to_le_bytes().to_vec(),
-            MRI_USHRT => (v.parse::<i64>().expect("ushort") as u16).to_le_bytes().to_vec(),
-            MRI_INT => (v.parse::<i64>().expect("int") as i32).to_le_bytes().to_vec(),
+            MRI_SHORT => (v.parse::<i64>().expect("short") as i16)
+                .to_le_bytes()
+                .to_vec(),
+            MRI_USHRT => (v.parse::<i64>().expect("ushort") as u16)
+                .to_le_bytes()
+                .to_vec(),
+            MRI_INT => (v.parse::<i64>().expect("int") as i32)
+                .to_le_bytes()
+                .to_vec(),
             MRI_LONG => v.parse::<i64>().expect("long").to_le_bytes().to_vec(),
-            MRI_FLOAT => u32::from_str_radix(v, 16).expect("hex").to_le_bytes().to_vec(),
+            MRI_FLOAT => u32::from_str_radix(v, 16)
+                .expect("hex")
+                .to_le_bytes()
+                .to_vec(),
             _ => panic!("type {ty}"),
         };
         for _ in 0..k {
@@ -394,11 +423,19 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
     match cmd {
         "edm" | "dtr" => {
             let src = get_vol(cx, t)?;
-            let mut dst = if t.i() != 0 { Some(get_vol(cx, t)?) } else { None };
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
             let label = t.i();
             let maxd = t.f();
             let mode = t.i();
-            let mask = if t.i() != 0 { Some(get_vol(cx, t)?) } else { None };
+            let mask = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
             let given = dst.is_some();
             let r = if cmd == "edm" {
                 fmm::mri_extract_distance_map(
@@ -475,7 +512,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
                     None,
                 )?
             };
-            let Ret::New(m) = r else { panic!("a new volume") };
+            let Ret::New(m) = r else {
+                panic!("a new volume")
+            };
             *o += &format!(
                 "{} {} {} {} {} {:016x} {:08x} ",
                 m.vg.width,
@@ -529,7 +568,12 @@ pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>
         Ok(()) => o.trim_end().to_owned(),
         Err(f) => format!("EXIT {}", f.status()),
     };
-    let mut ids: Vec<&'static str> = cx.g.notices.as_slice().iter().map(|n| n.defect.id).collect();
+    let mut ids: Vec<&'static str> =
+        cx.g.notices
+            .as_slice()
+            .iter()
+            .map(|n| n.defect.id)
+            .collect();
     ids.sort_unstable();
     ids.dedup();
     (format!("{result} | {text}"), ids)

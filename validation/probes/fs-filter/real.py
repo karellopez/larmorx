@@ -32,6 +32,7 @@ sys.path.insert(0, str(HERE))
 import check  # noqa: E402
 
 from larmorx_validation import oracle_cache  # noqa: E402
+from larmorx_validation.freesurfer_unit import freesurfer_env  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
 HEADS = ("ds000005-sub-01", "ds000228-sub-pixar008", "ds002422-sub-02")
@@ -71,7 +72,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs.mkdir(parents=True, exist_ok=True)
     cases_path = inputs / "real-cases.txt"
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
+    # MRIread runs FreeSurfer's licence check: FREESURFER_HOME and FS_LICENSE (read in place)
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}
+    env.update(freesurfer_env())
     t0 = time.monotonic()
     done = oracle_cache.run(
         [exe, cases_path],

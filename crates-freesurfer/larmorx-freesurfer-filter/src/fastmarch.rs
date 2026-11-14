@@ -23,12 +23,12 @@ use larmorx_core::defects::{FS_58, FS_539, FS_540, FS_541, FS_542, FS_543, FS_54
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc, mri_copy_header};
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 use larmorx_freesurfer_volume::arith::{Pair, mri_clear, mri_scalar_mul};
 use larmorx_freesurfer_volume::resize::mri_change_type;
-use larmorx_freesurfer_core::run::Environment;
 
 /// `eAlive`, `eTrial`, `eFar`, `eForbidden`.
 const ALIVE: u8 = 0;
@@ -650,9 +650,8 @@ pub fn mri_extract_distance_map(
     }
     if mode == BOTH_UNSIGNED {
         let c = dist.chunk.as_mut().expect("voxels");
-        for v in c[..4 * n].chunks_exact_mut(4) {
-            let f = f32::from_le_bytes(v.try_into().expect("4 bytes")).abs();
-            v.copy_from_slice(&f.to_le_bytes());
+        for v in c[..4 * n].as_chunks_mut::<4>().0 {
+            *v = f32::from_le_bytes(*v).abs().to_le_bytes();
         }
     }
     Ok(ret(fresh))
@@ -695,11 +694,13 @@ pub fn mri_distance_transform(
         DTRANS_MODE_UNSIGNED => BOTH_UNSIGNED,
         DTRANS_MODE_OUTSIDE => OUTSIDE,
         DTRANS_MODE_INSIDE => {
-            g.notices.add(
-                &FS_543,
-                "MRIdistanceTransform with DTRANS_MODE_INSIDE",
-            );
-            if g.notices.reproduce() { BOTH_UNSIGNED } else { INSIDE }
+            g.notices
+                .add(&FS_543, "MRIdistanceTransform with DTRANS_MODE_INSIDE");
+            if g.notices.reproduce() {
+                BOTH_UNSIGNED
+            } else {
+                INSIDE
+            }
         }
         m => {
             g.notices.add(
@@ -723,10 +724,30 @@ pub fn mri_distance_transform(
     if src.mtype != MRI_FLOAT {
         // a change to floats copies the values (MRIchangeType gives no NULL for floats)
         if let Some(tmp) = mri_change_type(g, out, err, env, src, MRI_FLOAT, 0.0, 1.0, 1)? {
-            mri_extract_distance_map(g, out, err, &tmp, Some(&mut *dist), label, max_dist, fm_mode, mask)?;
+            mri_extract_distance_map(
+                g,
+                out,
+                err,
+                &tmp,
+                Some(&mut *dist),
+                label,
+                max_dist,
+                fm_mode,
+                mask,
+            )?;
         }
     } else {
-        mri_extract_distance_map(g, out, err, src, Some(&mut *dist), label, max_dist, fm_mode, mask)?;
+        mri_extract_distance_map(
+            g,
+            out,
+            err,
+            src,
+            Some(&mut *dist),
+            label,
+            max_dist,
+            fm_mode,
+            mask,
+        )?;
     }
     dist.outside_val = f64::from(max_dist);
     mri_scalar_mul(g, out, err, Pair::Same(dist), src.vg.xsize)?;

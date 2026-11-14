@@ -218,7 +218,7 @@ fn lut(g: &mut Gen) -> Vec<u8> {
 
 /// A table in the probe's form: `<version> <nentries> <idbase> <fname> <k>`, then `k` entries
 /// `<index> <name> <r> <g> <b> <a> <tissue type> <count>`.
-fn table(g: &mut Gen, holes: bool) -> Vec<String> {
+pub(super) fn table(g: &mut Gen, holes: bool) -> Vec<String> {
     let nentries = if g.chance(10) {
         g.int(0, 3)
     } else {
@@ -335,7 +335,7 @@ fn lut_setup(g: &mut Gen, file: &str) -> String {
 }
 
 /// A float's bits in hex: ordinary numbers mostly, sometimes -0, subnormal, huge, infinite, NaN.
-fn fbits(g: &mut Gen) -> String {
+pub(super) fn fbits(g: &mut Gen) -> String {
     let v: f32 = match g.below(14) {
         0 => f32::NAN,
         1 => f32::INFINITY,
@@ -367,7 +367,7 @@ fn num_text(g: &mut Gen) -> String {
 
 /// An MNI `.xfm` file: whole mostly, with comments, blank lines, indentation, CR LF, a wrong first
 /// line, fewer lines, numbers that do not read.
-fn xfm_text(g: &mut Gen) -> Vec<u8> {
+pub(super) fn xfm_text(g: &mut Gen) -> Vec<u8> {
     let mut s = Vec::new();
     match g.below(12) {
         0 => s.extend_from_slice(b"  MNI Transform File\n"),
@@ -659,24 +659,24 @@ pub fn generate(g: &mut Gen, kind: &str, portable: bool) -> Vec<String> {
 
 // ---------------------------------------------------------------- the port's answers
 
-struct Toks<'a> {
-    t: &'a [&'a str],
-    i: usize,
+pub(crate) struct Toks<'a> {
+    pub(crate) t: &'a [&'a str],
+    pub(crate) i: usize,
 }
 
 impl<'a> Toks<'a> {
-    fn next(&mut self) -> &'a str {
+    pub(crate) fn next(&mut self) -> &'a str {
         let s = self.t[self.i];
         self.i += 1;
         s
     }
-    fn int(&mut self) -> i64 {
+    pub(crate) fn int(&mut self) -> i64 {
         self.next().parse().unwrap()
     }
-    fn bytes(&mut self) -> Vec<u8> {
+    pub(crate) fn bytes(&mut self) -> Vec<u8> {
         dec(self.next()).unwrap_or_default()
     }
-    fn string(&mut self) -> String {
+    pub(crate) fn string(&mut self) -> String {
         String::from_utf8(self.bytes()).unwrap()
     }
 }
@@ -685,7 +685,7 @@ fn unit(i: i32) -> f32 {
     (f64::from(i as f32) / 255.0) as f32
 }
 
-fn read_table(tk: &mut Toks) -> ColorTable {
+pub(super) fn read_table(tk: &mut Toks) -> ColorTable {
     let version = tk.int() as i32;
     let nentries = tk.int() as i32;
     let idbase = tk.int() as i32;
@@ -740,7 +740,7 @@ fn ostr(o: &mut Out, s: &[u8]) {
     }
 }
 
-fn print_table(o: &mut Out, ct: Option<&ColorTable>, alloc: bool, sub_alloc: bool) {
+pub(super) fn print_table(o: &mut Out, ct: Option<&ColorTable>, alloc: bool, sub_alloc: bool) {
     let Some(ct) = ct else {
         o.0.push_str("N ");
         return;

@@ -21,9 +21,8 @@
 //! of the C library: leading white space, the longest number, `out_of_range` when `errno` is
 //! `ERANGE`; `stof`'s NaN payloads as glibc's `nan(...)`), booleans as `TRUE`, `YES`, `1`,
 //! `FALSE`, `NO`, `0` in any case. The help text is printed by FreeSurfer's XML help renderer
-//! (`outputHelpXml`, `utils/fsPrintHelp.cpp`), which the caller passes in ([`HelpFn`]);
-//! [`output_help_xml`] gives its two answers that need no XML and refuses the rest until that
-//! renderer is ported.
+//! (`outputHelpXml`, `utils/fsPrintHelp.cpp`: [`crate::help_xml`]), which the caller passes in
+//! ([`HelpFn`]); [`output_help_xml`] is that renderer.
 
 use std::io::Write;
 
@@ -245,29 +244,14 @@ impl Value {
 /// standard output, standard error).
 pub type HelpFn = fn(&mut Globals, &mut dyn Write, &mut dyn Write, Option<&[u8]>) -> i32;
 
-/// `outputHelpXml(text, size)` for what needs no XML: no text, `No xml string passed.` (standard
-/// error, -1); an empty one, `Document not parsed successfully. ` (libxml2 makes no document of 0
-/// bytes; -1). A text to render: not ported yet (a message, -1).
+/// `outputHelpXml(text, size)`: FreeSurfer's XML help renderer ([`crate::help_xml::output_help_xml`]).
 pub fn output_help_xml(
-    _g: &mut Globals,
-    _out: &mut dyn Write,
+    g: &mut Globals,
+    out: &mut dyn Write,
     err: &mut dyn Write,
     text: Option<&[u8]>,
 ) -> i32 {
-    match text {
-        None => {
-            let _ = err.write_all(b"No xml string passed.\n");
-        }
-        Some([]) => {
-            let _ = err.write_all(b"Document not parsed successfully. \n");
-        }
-        Some(_) => {
-            let _ = err.write_all(
-                b"larmorx-freesurfer: the XML help renderer (fsPrintHelp) is not ported yet\n",
-            );
-        }
-    }
-    -1
+    crate::help_xml::output_help_xml(g, out, err, text)
 }
 
 /// `ArgumentParser`.

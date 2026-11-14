@@ -317,7 +317,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
 // ---------------------------------------------------------------- the port's answers
 
 thread_local! {
-    /// Whether the XML help renderer (not ported) was asked to render a text.
+    /// Whether the XML help renderer was asked to render a text.
     static RENDERED: Cell<bool> = const { Cell::new(false) };
     /// Whether FreeSurfer's answer depends on its name index's order (libstdc++'s hash order):
     /// two or more names matched where it takes the first.
@@ -404,10 +404,8 @@ pub fn run(
     RENDERED.with(|r| r.set(false));
     AMBIG.with(|a| a.set(false));
     let r = answer(tk, g, out, err, o);
-    if RENDERED.with(Cell::get) {
-        // FreeSurfer's XML help renderer is not ported yet
-        extra.push("SKIP");
-    }
+    // the XML help renderer is ported (relay 21): a rendered help text is compared
+    let _ = RENDERED.with(Cell::get);
     if AMBIG.with(Cell::get) {
         extra.push("VARY");
     }

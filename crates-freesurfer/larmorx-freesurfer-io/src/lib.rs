@@ -13,11 +13,13 @@
 //! (`docs/freesurfer/queue.md`); `PROVENANCE.md` lists what each item translates.
 #![forbid(unsafe_code)]
 
+pub mod annotation;
 pub mod bfileio;
 pub mod bruker;
 pub mod cfile;
 pub mod colortab;
 pub mod colortab_bin;
+pub mod ctrpoints;
 pub mod dicom_probe;
 pub mod dti;
 pub mod fio;
@@ -28,11 +30,13 @@ pub mod gifti_common;
 pub mod gifti_vol;
 pub mod identify;
 pub mod image;
+pub mod label;
 pub mod matfile;
 pub mod minc;
 pub mod mosaic;
 pub mod mriio;
 pub mod mriio_old;
+pub mod pointset;
 pub mod registerio;
 pub mod signa;
 pub mod streams;

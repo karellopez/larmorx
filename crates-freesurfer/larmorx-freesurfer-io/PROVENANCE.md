@@ -201,6 +201,31 @@ caps of FS-420 (2^24 places, 2^20 random entries) are larmorx's own; FS-415 clos
 notice), FS-416 returns no table.
 
 
+## FreeSurfer files and functions translated (part 10, relay 20: fs.labels' labels, control points, annotation tables, point sets)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/label.cpp` 54-214, 534-620, 804-845, 1121-1132, 1246-1305, 2543-2575; `include/label.h` 35-63 (`LABEL_VERTEX`, `LABEL`, `LABEL_COORDS_*`); `include/mri.h` 86-89 | `LabelReadFrom`, `LabelRead`, `LabelFree`, `LabelWriteInto`, `LabelWrite`, `LabelAlloc`, `labelLoadTransform`, `LabelCopy`, `LabelRemoveDuplicates`, `LabelHasVertex`, `LabelRealloc` | `label.rs` |
+| `utils/ctrpoints.cpp` 37-170, 495-558; `include/ctrpoints.h` (`MPoint`) | `MRIreadControlPoints`, `MRIwriteControlPoints`, `MRIfillPoints` | `ctrpoints.rs` |
+| `utils/annotation.cpp` 44-89, 115-316, 524-555; `include/annotation.h` (`annotation_table_file`) | `ATABLE_ELT`, `read_named_annotation_table`, `read_annotation_table`, `annotation_to_index`, `index_to_name`, `index_to_annotation`, `annotation_to_name`, `set_atable_from_ctable`, `print_annotation_table`, `print_annotation_colortable` | `annotation.rs` |
+| `include/pointset.h`; `utils/pointset.cpp` 17-71, 103-154 | `fsPointSet` (`Point`, `add`, `set`, `get`, `remove`, `clear`, `npoints`, `print`, `printCoords`, `writeCoords`), `save`, `save_as_ctrlpoint`, `writeCentroidTable` | `pointset.rs` |
+| `utils/utils.cpp` 284-304 (`fgetl`) | with the caller's buffer size (199 for control points and annotation tables) | `label.rs` (`fgetl`) |
+
+Changes for part 10: a label's places a `Vec<LabelVertex>` of `max_points` places, its names and
+space `Vec<u8>` C strings (FS-423, FS-427: longer ones kept whole), its subject's transform a
+`larmorx_io::xfm::GeneralTransform` with its forward and inverse matrices (`None`: the zeroed
+`General_transform` of a label without one), its surface, hash and template pointers the caller's
+handles (`Option<usize>`); `getenv` through the program's `Environment`; files through `CFile` (the
+program's directory for relative names); `sscanf` through fs.core's `cscan::Scanf`; numbers through
+`cstd::fmt_f` and `format_double` (`%g`, the streams' default); FreeSurfer's process-wide
+annotation table (`atable`, `num_entries`, `annotation_table_file`) the caller's
+`AnnotationTables`; `fsPointSet`'s `ofstream`s as whole-file writes (a file that does not open is
+not written, as a failed stream); `MRIfillPoints`' sums and differences in the official object's
+operand order through `larmorx_freesurfer_core::sse`. The defaults of FS-424 (no points stored),
+FS-425 (only the points read), FS-428 (closed once), FS-429 (the copy's places made), FS-430 (whole
+names), FS-431 (nothing removed) and the cap of FS-426 (2^26 places) are larmorx's own.
+`loadfsPointSet` and the label coordinate conversions are not ported yet (see the findings' Part 10).
+
 ## FreeSurfer files and functions translated (track D's GIFTI volumes, moved here in its relay 23)
 
 Written by track D (the surface track) in its relays 21 and 22 in `larmorx-freesurfer-surf` and
@@ -220,3 +245,19 @@ Behaviour: `specs/freesurfer-surfio.md` §107-111; mechanisms: `docs/findings/fr
 Changes for this part: gifticlib's settings and persistent state (its globals `G` and `GXD`) are
 fs.core's `Globals::gifti`, one per run as in FreeSurfer, which the volume and the surface functions
 share (before relay 23 they were the surface crate's `SurfGlobals::gifti`).
+
+## FreeSurfer files and functions translated (part 11, relay 21 of track A: GIFTI branches, MRIwrite, point-set files)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mriio.cpp` 783-784 | `mri_read`'s GIFTI branch (`MRISreadGiftiAsMRI`) | `mriio.rs` |
+| `utils/mriio.cpp` 1109-1295, 1309-1360; `include/mri.h` 1906-1908 | `MRIwriteType` (the directory check, the refusals, the GIFTI branch, the b-values tail), `MRIwrite` (the several volumes' names, FS-432) | `mriio.rs` |
+| `utils/pointset.cpp` 74-92; `include/json.h` 14249 | `loadfsPointSet` (FS-433), FreeSurfer's `type_error.305` wording | `pointset.rs` |
+
+Changes for part 11: the writers not ported yet (COR, MINC, image, `.bhdr`, bshort, bfloat, ANALYZE,
+BRIK, the morphs, MGH, GDF, NIfTI, NRRD) answer with a message and -1; `chklc` passes (the port needs
+no key); `stat` as `std::fs::metadata`; the several volumes as a slice; `loadfsPointSet`'s nlohmann
+values through `larmorx_core::json` (track C's port), its uncaught exceptions as FS-433's clear error
+(status 1) or, with `reproduce`, the abort's lines and status 134. `errno` set as FreeSurfer leaves it
+after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `gifti_common.rs` and
+`gifti_vol.rs`.

@@ -279,21 +279,50 @@ pub fn errno_of(e: &std::io::Error) -> Option<i32> {
 
 /// The operating system's error code is Linux's `errno` value on Linux, the platform of
 /// FreeSurfer's official programs; elsewhere (macOS numbers several codes differently, Windows
-/// has its own) the error's kind gives Linux's value.
+/// has its own) the error's kind gives Linux's value, after [`windows_errno`] on Windows.
 #[cfg(target_os = "linux")]
 fn raw_errno(e: &std::io::Error) -> Option<i32> {
     e.raw_os_error()
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(windows)]
+fn raw_errno(e: &std::io::Error) -> Option<i32> {
+    e.raw_os_error().and_then(windows_errno)
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
 fn raw_errno(_: &std::io::Error) -> Option<i32> {
     None
+}
+
+/// Linux's `errno` for the Windows error codes whose kind would give another one: a name Windows
+/// refuses (`ERROR_INVALID_NAME` 123, `ERROR_BAD_PATHNAME` 161: a `:`, `*`, `?`, `"`, `<`, `>` or
+/// `|` in it) is an ordinary name on Linux, where looking it up finds nothing (`ENOENT`, 2), not
+/// `ENAMETOOLONG` (36), which stays for a name too long (`ERROR_FILENAME_EXCED_RANGE`, 206, by its
+/// kind); `None`: the kind decides.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn windows_errno(code: i32) -> Option<i32> {
+    match code {
+        123 | 161 => Some(2),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use larmorx_core::defects::UpstreamDefects;
+
+    #[test]
+    fn windows_names_that_cannot_exist_give_enoent() {
+        assert_eq!(windows_errno(123), Some(2));
+        assert_eq!(windows_errno(161), Some(2));
+        assert_eq!(windows_errno(206), None);
+        assert_eq!(windows_errno(2), None);
+        // the kinds give Linux's values for the other codes
+        let e = std::io::Error::from(std::io::ErrorKind::NotFound);
+        assert_eq!(errno_of(&e), Some(2));
+    }
 
     fn capture(f: impl FnOnce(&mut Globals, &mut Vec<u8>), mode: UpstreamDefects) -> Vec<u8> {
         let mut g = Globals::new(mode);

@@ -307,6 +307,37 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-323 | FreeSurfer 8.2.0 `MRIneighbors*` | a voxel more than 500 voxels outside the volume reads the boundary index tables past their ends | a (out of bounds) | none known | an error in both modes, named | – |
 | FS-324 | FreeSurfer 8.2.0 `MRIsampleVolumeDerivativeScale` | a scale whose double is infinite (infinity, above about 9e307) never returns | a (hang) | none known | an error in both modes, named | – |
 | FS-325 | FreeSurfer 8.2.0 `MRIlinearTransformInterp` | where a sample fails (sinc sampling at a point that is not whole, a type the trilinear sampler refuses) the voxel gets the last sample that succeeded; before the first, a value never written | a (memory: never written) | none known (recon-all's calls use nearest or trilinear on supported types) | 0 before the first sample in both modes, named; the repeated value kept (FreeSurfer prints an error for each failure) | – |
+| FS-326 | FreeSurfer 8.2.0 `MRIresampleFill`/`MRIresample` with `SAMPLE_VOTE` | each label's votes for a voxel are counted in a byte, which stops at 255: a label with more votes ties with one of 255 and the lower label wins | c | none known (recon-all does not vote) | every vote counted (rule A, 2026-11-13), named; `reproduce` stops at 255 | – |
+| FS-327 | FreeSurfer 8.2.0 `MRIresampleFill`/`MRIresample` with `SAMPLE_VOTE` | a template whose orientation is unknown (no good RAS, no principal slice direction) or whose matrix does not invert: FreeSurfer writes through the NULL matrix and crashes | a (crash) | none known | an error in both modes, named | – |
+| FS-328 | FreeSurfer 8.2.0 `MRIresampleFill`/`MRIresample` | a volume of 64-bit integers (long) is written as 32-bit integers at the voxel's index: halves of other voxels change | c | none known (recon-all's volumes are bytes, shorts, ints and floats) | the voxel written (rule A, 2026-11-13), named; `reproduce` FreeSurfer's halves | – |
+| FS-329 | FreeSurfer 8.2.0 `MRIstats`, `MRIprintStats` | the statistics of a volume of 64-bit integers (long) read 32-bit integers at the voxels' indices: halves of the first voxels instead of the voxels | c | none known (recon-all's volumes are bytes, shorts, ints and floats) | the voxels read (rule A, 2026-11-13), named; `reproduce` FreeSurfer's halves | – |
+| FS-330 | FreeSurfer 8.2.0 `MRIprintStats` | the printed statistics of a volume without voxels, or of a type the statistics do not read (bitmap, tensor, RGB, complex), are values never written | a (memory: never written) | none known | 0 in both modes, named | – |
+| FS-461 | FreeSurfer 8.2.0 `MRIreplaceValues`, `MRIreplaceValuesUchar` | in a byte volume the value is replaced in frame 0 only; the other frames of a new or other destination are not written | c | none known (single-frame byte volumes on recon-all's paths) | every frame (rule A, 2026-11-13), named; `reproduce` frame 0 only | – |
+| FS-462 | FreeSurfer 8.2.0 `MRIcalcCRASforSampledVolume` | the centre of a volume sampled by a whole factor divides by the sampled volume's extent: an extent of 0 ends the program | a (crash) | none known | an error in both modes, named | – |
+| FS-463 | FreeSurfer 8.2.0 `MRIcheckOrientationString`, `MRIorientationStringToDircos` | three characters are read from an orientation string of fewer than two, past its end | a (memory) | none known (the strings come from command lines and headers of three letters) | the places past the end taken as the string's end in both modes, named | – |
+| FS-464 | FreeSurfer 8.2.0 `MRIsetVoxelToRasXform` | a voxel-to-RAS matrix smaller than 3 x 4 is read past its elements | a (memory) | none known (callers pass 4 x 4 matrices) | an error in both modes, named | – |
+| FS-465 | FreeSurfer 8.2.0 `MRItoImage`, `MRItoImageView`, `ImageToMRI` | a given image smaller than the slice (or of a narrower pixel format), or an image holding fewer frames or pixels than its header counts, is written or read past its pixels | a (memory) | none known (the 2-D image helpers serve mri_em_register's diagnostic views) | only the pixels written and read (0 outside) in both modes, named | – |
+| FS-466 | FreeSurfer 8.2.0 `ImageToMRI` | an RGB image's frames after the first are read one byte per pixel from the start instead of three: they overlap the first frame | c | none known (multi-frame RGB images are not on recon-all's paths) | each frame's own pixels (rule A, 2026-11-13), named; `reproduce` FreeSurfer's | – |
+| FS-467 | FreeSurfer 8.2.0 `MRIsmoothParcellation` | the neighbours' labels are counted in an array indexed by the label: a negative label is counted outside the array | a (memory) | none known (parcellation labels are not negative) | a negative label counted in a bin of its own in both modes, named | – |
+| FS-468 | FreeSurfer 8.2.0 `MRIclipBrightWM` | every voxel is stored through a byte: a value below 0 or above 255, or NaN, becomes the low byte of its 32-bit truncation (0 for NaN and beyond the 32-bit range) | a (undefined conversion) | none known (recon-all's T1 volume is bytes) | clamped to [0, 255], NaN 0 (the D13 rule for undefined conversions), named; `reproduce` x86-64's byte | – |
+| FS-469 | FreeSurfer 8.2.0 `MRIvoxelsInLabelWithPartialVolumeEffects` | a voxel on the label's border whose own label is negative or not below the label limit is weighed with a mean taken from memory contents | a (memory) | none known (mri_segstats passes the largest label plus one; labels are not negative) | that label's mean over the voxel's 15 x 15 x 15 window in both modes, named | – |
+| FS-470 | FreeSurfer 8.2.0 `MRIvoxelsInLabelWithPartialVolumeEffects` | without an intensity volume, the first border voxel weighed is read from no volume: the program crashes | a (crash) | none known (callers pass the partial-volume intensities) | an error in both modes, named | – |
+| FS-471 | FreeSurfer 8.2.0 `MRIvoxelsInLabelWithPartialVolumeEffects` | a negative label limit, or a very large one (from about 699,000 labels with Linux's default 8 MiB stack), crashes the program | a (crash) | none known (segmentations with label values that large are rare) | a negative limit an error in both modes; a large one counted (no tables of its size), named | – |
+| FS-472 | FreeSurfer 8.2.0 `MRIconst`, `MRInormalizeSequence` | a value stored into a byte, short or unsigned short volume through an integer keeps the integer's low bits: past the type's range it wraps | c | none known | clamped to the type's range (rule A, 2026-11-14), named; `reproduce` the low bits | – |
+| FS-473 | FreeSurfer 8.2.0 `MRIreverseSliceOrder` | b-value or b-vector tables of fewer rows than frames are copied past their rows | a (memory; a crash) | none known (the tables hold a row per frame) | those entries left 0 in both modes, named | – |
+| FS-474 | FreeSurfer 8.2.0 `MRIorderIndices` | the order of voxels by value keeps each voxel's coordinates and value in bytes: a coordinate past 255 wraps, a value outside 0 to 255 or NaN becomes the low byte of its 32-bit truncation | c | none known (its callers order byte volumes of up to 256 voxels a side) | whole coordinates and values clamped to 0 to 255, NaN 0 (rule A, 2026-11-14), named; `reproduce` the bytes | – |
+| FS-475 | FreeSurfer 8.2.0 `MRIcomputeVolumeFractions` | a voxel of label 0 is counted into the frame before the first (labels are frame plus 1): reads and writes outside the volume | a (memory; a crash) | none known (its callers' segmentations hold label 0 outside the brain: their runs would crash or write memory) | label 0 left out in both modes, named | – |
+| FS-476 | FreeSurfer 8.2.0 `MRIcomputeVolumeFractions` | the second pass (target voxels no segmentation voxel reached) never marks the last label | c | none known | the last label marked too (rule A, 2026-11-14), named; `reproduce` FreeSurfer's | – |
+| FS-477 | FreeSurfer 8.2.0 `MRIapplyDiffVect` | a column, row or slice equal to the volume's extent passes the bounds check and is written past the volume | c | none known (the lists come from MRIdiff2Vect of the same volumes) | out of bounds (the message and NULL) (rule A, 2026-11-14), named; `reproduce` the write | – |
+| FS-478 | FreeSurfer 8.2.0 `MRIapplyDiffVect` | applied in place, the volume loses its colour table, with the error 'CTABdeepCopy: ct was NULL' | c | none known | the colour table kept (rule A, 2026-11-14), named; `reproduce` FreeSurfer's | – |
+| FS-479 | FreeSurfer 8.2.0 `MRIestimateTIV` | a transform file without a linear transform is read for its first one: the program crashes | a (crash) | none known (the Talairach transforms hold one) | an error in both modes, named | – |
+| FS-480 | FreeSurfer 8.2.0 `MRIvote` | told to exclude zeros, the vote still takes a last run of zeros when it is the longest | c | none known | zeros excluded from the last run too (rule A, 2026-11-14), named; `reproduce` FreeSurfer's | – |
+| FS-481 | FreeSurfer 8.2.0 `mri_reshape` | a volume of 64-bit integers is reshaped as 32-bit integers at the voxels' indices: halves of the first voxels, the rest left 0 | c | none known (recon-all's volumes are bytes, shorts, ints and floats) | the whole voxels (rule A, 2026-11-14), named; `reproduce` FreeSurfer's halves | – |
+| FS-482 | FreeSurfer 8.2.0 `MRIvol2VolVSM` | with a voxel-shift map of a type the trilinear sampler refuses (RGB, complex), the shift is the last value written, at the first such voxel a value never written | a (memory: never written) | none known (shift maps are float volumes) | 0 there in both modes, named | – |
+| FS-483 | FreeSurfer 8.2.0 `MRIcovarianceMatrix`, `MRIpca` | with a mask, the voxels whose mask value is above 0.5 are counted but those not below 0.5 are summed: a mask voxel of exactly 0.5 (or NaN) enters the sums and not the count | c | none known (mri_glmfit's masks are binary) | the count takes the voxels the sums use (rule A, 2026-11-14), named; `reproduce` FreeSurfer's count | – |
+| FS-484 | FreeSurfer 8.2.0 `MRIpca` | the PCA of a volume without frames crashes in the singular value decomposition of its empty covariance | a (crash) | none known | an error in both modes, named | – |
+| FS-485 | FreeSurfer 8.2.0 `MRIvoxelDirection` | within half a window of the volume's last column, row or slice, the window stops at the face but is read back as a full cube: gradients pair with the wrong offsets and the last entries were never written | a (memory: never written) | possible (mri_segment's direction test at voxels near the volume's far faces, which are background in recon-all's volumes) | the window not cut (the index tables clamp it, as on the near faces) (rule A, 2026-11-14), named; `reproduce` FreeSurfer's pairing with 0 for the entries never written | – |
+| FS-486 | FreeSurfer 8.2.0 `MRIvoxelGradientDir2ndDerivative` | for a volume whose type the trilinear sampler refuses, the first sample subtracted is a value never written | a (memory: never written) | none known (mri_segment passes byte volumes) | 0 there in both modes, named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -739,15 +770,15 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (681 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 15 to 17 (FS-311 to FS-325 new); before it track C's relays 11 to 14 (FS-285 to FS-310 and ITK-117 new); before it track C's relays 7 and 8 (FS-90 to FS-99 and FS-281 to FS-284 new); before it the confounds' part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 new; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused); before it FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
+**Counts** (712 entries, recounted from the table on 2026-11-14, after FreeSurfer's foundations, track C's relays 18 to 21 (FS-326 to FS-330 and FS-461 to FS-486 new); before it track C's relays 15 to 17 (FS-311 to FS-325 new); before it track C's relays 11 to 14 (FS-285 to FS-310 and ITK-117 new); before it track C's relays 7 and 8 (FS-90 to FS-99 and FS-281 to FS-284 new); before it the confounds' part (PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41 new; PIPE-84 to PIPE-90, PD-04 to PD-10, NP-11 to NP-20 and SCI-42 to SCI-55 unused); before it FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 181 | |
+| (a) crash, undefined behaviour, out of bounds | 199 | |
 | (b) race, nondeterminism | 21 | |
-| (c) deterministic bug that changes results | 327 | 17 |
+| (c) deterministic bug that changes results | 340 | 17 |
 | (d) imprecision | 29 | |
 | (e) command-line or parsing quirk | 92 | |
 | (f) documentation or message only | 29 | |
@@ -4088,6 +4119,80 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
 - **larmorx:** corrected by default (FS-320, FS-321, rule A); FS-322 and FS-325 take 0 where FreeSurfer's
   value was never written, FS-323 and FS-324 are errors, in both modes; `reproduce` gives the official
   build's result wherever it is defined. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-326 to FS-328, FS-461 FreeSurfer 8.2.0's fs.volume: resampling onto a template, value replacement — (c, rule A; a, crash)
+- **What:** resampling by voting counts each label's votes in a byte, so counts stop at 255 and a label
+  with more votes can lose to a lower one (FS-326); voting onto a template whose orientation is unknown or
+  whose matrix does not invert crashes (FS-327); resampling a volume of 64-bit integers writes 32-bit halves
+  of other voxels (FS-328); replacing a value in a byte volume touches frame 0 only (FS-461). Kept (rule
+  C): the fill value of `MRIresampleFill` shows only in a volume of a type the sampling does not write.
+- **Evidence:** verified (`validation/probes/fs-volume`, commands `rsfill`, `repval`: FreeSurfer 8.2.0's
+  functions from the unit oracle's build against the port; seed 13, 4,000 cases, every comparable line
+  identical with `reproduce`, `fix` different only with its notices; FS-326 and FS-461 by the port's tests).
+  The mechanisms: `docs/findings/freesurfer-volume.md` §11 (closed to FreeSurfer's clean-room implementers).
+- **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths.
+- **larmorx:** corrected by default (FS-326, FS-328, FS-461, rule A); FS-327 an error in both modes;
+  `reproduce` gives the official build's result wherever it is defined. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-329, FS-330, FS-462 to FS-468 FreeSurfer 8.2.0's fs.volume: statistics, orientation strings, voxel-to-RAS matrices, 2-D images, neighbourhoods and labels — (c, rule A; a, memory, crash, undefined conversion)
+- **What:** the statistics of a volume of 64-bit integers read 32-bit halves (FS-329), and the printed
+  statistics of a volume without voxels or of an unread type are values never written (FS-330); the centre
+  of a sampled volume divides by an extent that may be 0 (FS-462); an orientation string of fewer than two
+  characters is read past its end (FS-463); a voxel-to-RAS matrix smaller than 3 x 4 is read past its
+  elements (FS-464); the conversions between slices and 2-D images write or read past an image's pixels
+  (FS-465), and an RGB image's later frames are read from the wrong place (FS-466); the parcellation
+  smoothing counts negative labels outside its array (FS-467); the clipping of bright white matter stores
+  out-of-range values through a byte (FS-468). Kept (rule C): that clipping stores every voxel as a whole
+  byte, so a T1 volume of floats loses its fractions (FreeSurfer's T1 volume is bytes).
+- **Evidence:** verified (`validation/probes/fs-volume`, part 9: FreeSurfer 8.2.0's functions from the unit
+  oracle's build against the port; seed 13, 20,000 cases, every comparable line identical with `reproduce`,
+  `fix` different only with its notices; FS-329 and FS-466 by the port's tests). The mechanisms:
+  `docs/findings/freesurfer-volume.md` §12 (closed to FreeSurfer's clean-room implementers).
+- **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths.
+- **larmorx:** corrected by default (FS-329, FS-466, FS-468, rule A and the D13 rule for undefined
+  conversions); FS-330, FS-463, FS-465, FS-467 defined in both modes (0, the string's end, the pixels only, a
+  bin of its own), FS-462 and FS-464 errors in both modes; `reproduce` gives the official build's result
+  wherever it is defined. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-469 to FS-481 FreeSurfer 8.2.0's fs.volume: the partial-volume count, frames, orders, fractions, difference lists and mri2.cpp's voxelwise operations — (c, rule A; a, memory, crash)
+- **What:** the partial-volume count of a label weighs a border voxel of an out-of-range label with memory
+  contents (FS-469) and crashes without an intensity volume (FS-470) or with a negative or huge label limit
+  (FS-471); narrow integer stores wrap (FS-472); the slice reversal reads b-tables past their rows (FS-473);
+  the order by value keeps coordinates and values in bytes (FS-474); the partial-volume fractions count label 0
+  outside the volume (FS-475) and never mark the last label in their second pass (FS-476); a difference list
+  accepts an index at the extent (FS-477) and, applied in place, loses the colour table (FS-478); the
+  intracranial volume estimate crashes on a transform file without a transform (FS-479); the vote's zero
+  exclusion skips the last run (FS-480); the reshape of a 64-bit integer volume copies 32-bit halves (FS-481).
+- **Evidence:** verified (`validation/probes/fs-volume`, part 10: FreeSurfer 8.2.0's functions from the unit
+  oracle's build against the port; seeds 7 and 13, 65,000 cases, every comparable line identical with
+  `reproduce`, `fix` different only with its notices). The mechanisms: `docs/findings/freesurfer-volume.md`
+  §13 and §14 (closed to FreeSurfer's clean-room implementers).
+- **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths (mri_segstats' partial-volume counts
+  pass the largest label plus one).
+- **larmorx:** corrected by default (FS-472, FS-474, FS-476, FS-477, FS-478, FS-480, FS-481, rule A);
+  FS-469, FS-473, FS-475 defined in both modes (the window mean, 0, label 0 left out); FS-470, FS-479 and a
+  negative FS-471 errors in both modes; `reproduce` gives the official build's result wherever it is
+  defined. Found 2026-11-14.
+- **D13 / gap:** none.
+
+### FS-482 to FS-486 FreeSurfer 8.2.0's fs.volume: volume-to-volume resampling, the frame PCA and voxel neighbourhood measures — (c, rule A; a, memory, crash)
+- **What:** the resampling with a voxel-shift map takes, for a map of a type the sampler refuses, a shift never
+  written (FS-482); the masked frame covariance and PCA count the mask voxels above 0.5 but sum those not below
+  0.5 (FS-483); the PCA of a volume without frames crashes (FS-484); the gradient-direction measure near the far
+  faces reads a window it filled only partly (FS-485); the second derivative along the gradient of a refused type
+  subtracts a sample never written (FS-486).
+- **Evidence:** verified (`validation/probes/fs-volume`, part 11: FreeSurfer 8.2.0's functions from the unit
+  oracle's build against the port; seeds 7 and 13, 16,000 cases of the new commands, every comparable line
+  identical with `reproduce`, `fix` different only with its notices). The mechanisms:
+  `docs/findings/freesurfer-volume.md` §15 and §16 (closed to FreeSurfer's clean-room implementers).
+- **fMRIPrep:** none. **FreeSurfer:** FS-485 possible in mri_segment near the volume's far faces (background in
+  recon-all's volumes); the others none known.
+- **larmorx:** FS-483 and FS-485 corrected by default (rule A); FS-482, FS-486 defined in both modes (0); FS-484
+  an error in both modes; `reproduce` gives the official build's result wherever it is defined. Found
+  2026-11-14.
 - **D13 / gap:** none.
 
 ## fMRIPrep and its libraries

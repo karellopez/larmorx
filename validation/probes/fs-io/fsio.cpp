@@ -18,6 +18,7 @@
 
 #include <fcntl.h>
 #include <ftw.h>
+#include <pwd.h>
 #include <signal.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -25,11 +26,13 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <algorithm>
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -56,6 +59,13 @@
 #include "registerio.h"
 #include "image.h"
 #include "argparse.h"
+#include "label.h"
+#include "ctrpoints.h"
+#include "annotation.h"
+#include "pointset.h"
+#include "mrisurf.h"
+#include "utils.h"
+#include <zlib.h>
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -624,6 +634,12 @@ const unsigned char help9[] = "<help><name>probe</name><synopsis>probe [options]
 
 // piece 10: fs.labels' text colour tables and lookups (colortab.cpp)
 void run_piece10(const std::string &cmd);
+void run_piece11(const std::string &cmd);
+bool piece11_cmd(const std::string &cmd);
+void run_piece12(const std::string &cmd);
+bool piece12_cmd(const std::string &cmd);
+void run_piece13(const std::string &cmd);
+bool piece13_cmd(const std::string &cmd);
 
 void run_piece9(const std::string &cmd)
 {
@@ -739,6 +755,9 @@ void run_piece10(const std::string &cmd)
 {
   fwide(stderr, -1);
   unsetenv("FREESURFER_SEED");
+  if (piece11_cmd(cmd)) { run_piece11(cmd); return; }
+  if (piece12_cmd(cmd)) { run_piece12(cmd); return; }
+  if (piece13_cmd(cmd)) { run_piece13(cmd); return; }
   if (cmd == "cra") {
     int check = (int)geti();
     setup(next());
@@ -878,6 +897,524 @@ void run_piece10(const std::string &cmd)
   oi(Gerror);
 }
 
+// piece 11: fs.labels' labels (label.cpp), control points (ctrpoints.cpp), annotation tables
+// (annotation.cpp) and point sets (pointset.h/.cpp)
+// the user name FreeSurfer writes into control-point files (shown as U)
+std::string user11()
+{
+  struct passwd *pw = getpwuid(geteuid());
+  return (pw && pw->pw_name) ? pw->pw_name : "unknown user";
+}
+std::vector<std::string> walked11;
+int walk11(const char *p, const struct stat *st, int flag, struct FTW *)
+{
+  if (flag == FTW_F) walked11.push_back(p);
+  (void)st;
+  return 0;
+}
+// every file under w: its name and bytes (FNV-1a 64 beyond 256 bytes), sorted by name
+void odir11()
+{
+  walked11.clear();
+  nftw("w", walk11, 16, FTW_PHYS);
+  std::sort(walked11.begin(), walked11.end());
+  std::string u = "written by " + user11() + " on ";
+  for (const std::string &f : walked11) {
+    ostr(f.c_str());
+    std::vector<unsigned char> b = read_file(f);
+    std::string s(b.begin(), b.end());
+    size_t at = s.find(u);
+    if (at != std::string::npos) s.replace(at, u.size(), "written by U on ");
+    std::vector<unsigned char> c(s.begin(), s.end());
+    if (c.size() <= 256) obytes(c);
+    else fnv_bytes(c.data(), c.size());
+  }
+  out += "| ";
+}
+// an environment variable: N (unset) or x<hex>
+void env11(const char *name)
+{
+  bool n;
+  std::string v = getstr(&n);
+  if (n) unsetenv(name);
+  else setenv(name, v.c_str(), 1);
+}
+// a label: N, or <max_points> <coords> <n_points> <name> <subject> <space> <avg_stat> <k> and k
+// places <vno> <x> <y> <z> <xv> <yv> <zv> <deleted> <stat>, then N or <m> vertex indices (the
+// count of indices kept in vli11)
+int vli11 = 0;
+LABEL *read_label11()
+{
+  vli11 = 0;
+  if (strcmp(toks[pos].c_str(), "N") == 0) { pos++; return NULL; }
+  LABEL *a = (LABEL *)calloc(1, sizeof(LABEL));
+  a->max_points = (int)geti();
+  a->coords = (int)geti();
+  a->n_points = (int)geti();
+  bool n;
+  std::string s = getstr(&n);
+  strncpy(a->name, s.c_str(), STRLEN - 1);
+  s = getstr(&n);
+  strncpy(a->subject_name, s.c_str(), STRLEN - 1);
+  s = getstr(&n);
+  strncpy(a->space, s.c_str(), sizeof(a->space) - 1);
+  a->avg_stat = getd();
+  a->lv = (LABEL_VERTEX *)calloc(a->max_points > 0 ? a->max_points : 1, sizeof(LABEL_VERTEX));
+  int k = (int)geti();
+  for (int i = 0; i < k; i++) {
+    LABEL_VERTEX &v = a->lv[i];
+    v.vno = (int)geti(); v.x = getf(); v.y = getf(); v.z = getf();
+    v.xv = (int)geti(); v.yv = (int)geti(); v.zv = (int)geti();
+    v.deleted = (unsigned char)geti(); v.stat = getf();
+  }
+  if (strcmp(toks[pos].c_str(), "N") == 0) pos++;
+  else {
+    int m = (int)geti();
+    a->vertex_label_ind = (int *)calloc(m > 0 ? m : 1, sizeof(int));
+    vli11 = m;
+    for (int i = 0; i < m; i++) a->vertex_label_ind[i] = (int)geti();
+  }
+  return a;
+}
+// a label: N, or its fields, its places (FNV-1a 64 of their text beyond 2,000 characters), its
+// vertex indices (the first max_points of the vli it holds) and transforms
+void print_label11(const LABEL *a, int vli)
+{
+  if (!a) { out += "N "; return; }
+  oi(a->max_points); oi(a->coords); oi(a->n_points); ocs(a->name); ocs(a->subject_name);
+  ocs(a->space); od(a->avg_stat);
+  std::string saved = out;
+  out.clear();
+  for (int i = 0; i < a->max_points; i++) {
+    const LABEL_VERTEX &v = a->lv[i];
+    oi(v.vno); of(v.x); of(v.y); of(v.z); oi(v.xv); oi(v.yv); oi(v.zv); oi(v.deleted); of(v.stat);
+  }
+  std::string pts = out;
+  out = saved;
+  if (pts.size() > 2000) fnv_bytes((const unsigned char *)pts.data(), pts.size());
+  else out += "[ " + pts + "] ";
+  if (!a->vertex_label_ind) out += "N ";
+  else for (int i = 0; i < a->max_points && i < vli; i++) oi(a->vertex_label_ind[i]);
+  print_t(a->linear_transform);
+  print_t(a->inverse_linear_transform);
+}
+// a volume for MRIfillPoints: <width> <height> <depth> <type>, its voxel sizes, direction
+// cosines and centre (float bits), then <k> voxels <c> <r> <s> <value bits>
+MRI *read_mri11()
+{
+  int w = (int)geti(), h = (int)geti(), d = (int)geti(), t = (int)geti();
+  MRI *m = MRIalloc(w, h, d, t);
+  m->xsize = getf(); m->ysize = getf(); m->zsize = getf();
+  m->x_r = getf(); m->x_a = getf(); m->x_s = getf();
+  m->y_r = getf(); m->y_a = getf(); m->y_s = getf();
+  m->z_r = getf(); m->z_a = getf(); m->z_s = getf();
+  m->c_r = getf(); m->c_a = getf(); m->c_s = getf();
+  m->ras_good_flag = 1;
+  int k = (int)geti();
+  for (int i = 0; i < k; i++) {
+    int c = (int)geti(), r = (int)geti(), s = (int)geti();
+    MRIsetVoxVal(m, c, r, s, 0, getf());
+  }
+  return m;
+}
+// the volume's frame-0 values in column, row, slice order as floats (FNV-1a 64)
+void print_mri11(const MRI *m)
+{
+  std::vector<unsigned char> b;
+  for (int s = 0; s < m->depth; s++)
+    for (int r = 0; r < m->height; r++)
+      for (int c = 0; c < m->width; c++) {
+        float v = MRIgetVoxVal(m, c, r, s, 0);
+        unsigned char t[4];
+        memcpy(t, &v, 4);
+        b.insert(b.end(), t, t + 4);
+      }
+  fnv_bytes(b.data(), b.size());
+}
+void opoint11(const fsPointSet::Point &p)
+{
+  od(p.x); od(p.y); od(p.z); od(p.value); oi(p.index); oi(p.count); ostr(p.labelname.c_str());
+}
+fsPointSet::Point read_point11()
+{
+  fsPointSet::Point p;
+  p.x = getd(); p.y = getd(); p.z = getd(); p.value = getd();
+  p.index = (int)geti(); p.count = (int)geti();
+  bool n;
+  p.labelname = getstr(&n);
+  return p;
+}
+
+bool piece11_cmd(const std::string &cmd)
+{
+  static const char *k[] = {"lrd", "lwr", "lal", "lre", "lcp", "ldu", "lhv", "crd", "cwr", "cfp", "atr",
+                            "ats", "pss"};
+  for (const char *c : k)
+    if (cmd == c) return true;
+  return false;
+}
+
+void run_piece11(const std::string &cmd)
+{
+  if (cmd == "lrd") {
+    env11("SUBJECTS_DIR");
+    setup(next());
+    errno = 0;
+    bool ns;
+    std::string subj = getstr(&ns);
+    std::string fn = name10();
+    print_label11(LabelRead(ns ? NULL : subj.c_str(), fn.c_str()), 0);
+  } else if (cmd == "lwr") {
+    env11("SUBJECTS_DIR");
+    setup(next());
+    errno = 0;
+    LABEL *a = read_label11();
+    std::string fn = name10();
+    oi(LabelWrite(a, fn.c_str()));
+    odir11();
+  } else if (cmd == "lal") {
+    env11("SUBJECTS_DIR");
+    int n = (int)geti();
+    bool ns, nl;
+    std::string subj = getstr(&ns), nm = getstr(&nl);
+    print_label11(LabelAlloc(n, ns ? NULL : subj.c_str(), nl ? NULL : nm.c_str()), 0);
+  } else if (cmd == "lre") {
+    LABEL *a = read_label11();
+    int n = (int)geti();
+    print_label11(LabelRealloc(a, n), vli11);
+  } else if (cmd == "lcp") {
+    env11("SUBJECTS_DIR");
+    LABEL *s = read_label11();
+    int vs = vli11;
+    LABEL *d = read_label11();
+    int vd = vli11;
+    print_label11(LabelCopy(s, d), s->vertex_label_ind ? s->max_points : vd);
+    (void)vs;
+  } else if (cmd == "ldu") {
+    Gdiag = (int)geti();
+    LABEL *a = read_label11();
+    oi(LabelRemoveDuplicates(a));
+    print_label11(a, vli11);
+  } else if (cmd == "lhv") {
+    LABEL *a = read_label11();
+    int k = (int)geti();
+    for (int i = 0; i < k; i++) oi(LabelHasVertex((int)geti(), a));
+  } else if (cmd == "crd") {
+    Gdiag = (int)geti();
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    int count = -7, real = -7;
+    MPoint *p = MRIreadControlPoints(fn.c_str(), &count, &real);
+    oi(count); oi(real);
+    if (!p) out += "N ";
+    else for (int i = 0; i < count; i++) { od(p[i].x); od(p[i].y); od(p[i].z); }
+  } else if (cmd == "cwr") {
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "Thu Jan  1 00:00:00 2026", 1);
+    Gdiag = (int)geti();
+    setup(next());
+    errno = 0;
+    int k = (int)geti();
+    std::vector<MPoint> p(k > 0 ? k : 1);
+    for (int i = 0; i < k; i++) { p[i].x = getd(); p[i].y = getd(); p[i].z = getd(); }
+    int count = (int)geti(), real = (int)geti();
+    std::string fn = name10();
+    oi(MRIwriteControlPoints(p.data(), count, real, fn.c_str()));
+    odir11();
+  } else if (cmd == "cfp") {
+    MRI *m = read_mri11();
+    int fillval = (int)geti(), real = (int)geti(), k = (int)geti();
+    std::vector<MPoint> p(k > 0 ? k : 1);
+    for (int i = 0; i < k; i++) { p[i].x = getd(); p[i].y = getd(); p[i].z = getd(); }
+    fflush(stdout);
+    oi(MRIfillPoints(m, fillval, k, real, p.data()));
+    print_mri11(m);
+  } else if (cmd == "atr" || cmd == "ats") {
+    if (cmd == "atr") {
+      env11("FREESURFER_HOME");
+      setup(next());
+      errno = 0;
+      bool n;
+      std::string f = getstr(&n);
+      annotation_table_file = n ? NULL : strdup(f.c_str());
+    } else {
+      unsetenv("FREESURFER_HOME");
+      COLOR_TABLE *ct = read_ct10();
+      oi(set_atable_from_ctable(geti() ? ct : NULL));
+    }
+    int k = (int)geti();
+    for (int i = 0; i < k; i++) {
+      std::string op = next();
+      if (op == "R") oi(read_annotation_table());
+      else if (op == "N") { std::string nm = name10(); oi(read_named_annotation_table(nm.c_str())); }
+      else if (op == "i") oi(annotation_to_index((int)geti()));
+      else if (op == "n") ostr(index_to_name((int)geti()));
+      else if (op == "a") oi(index_to_annotation((int)geti()));
+      else if (op == "m") { int ix = -7; ostr(annotation_to_name((int)geti(), &ix)); oi(ix); }
+      else if (op == "p") { fflush(stdout); oi(print_annotation_table(stdout)); }
+      else if (op == "c") { fflush(stdout); oi(print_annotation_colortable(stdout)); }
+      else fail("unknown annotation query");
+      fflush(stdout);
+    }
+  } else if (cmd == "pss") {
+    setup(next());
+    errno = 0;
+    fsPointSet ps;
+    ps.IncludeZeroCount = (int)geti();
+    ps.IncludeZeroIndex = (int)geti();
+    bool n;
+    ps.vox2ras = getstr(&n);
+    int k = (int)geti();
+    for (int i = 0; i < k; i++) ps.add(read_point11());
+    int nops = (int)geti();
+    for (int i = 0; i < nops; i++) {
+      std::string op = next();
+      if (op == "S") { std::string f = name10(); oi(ps.save(f)); }
+      else if (op == "C") { std::string f = name10(); oi(ps.save_as_ctrlpoint(f)); }
+      else if (op == "P") { fflush(stdout); oi(ps.print(stdout)); }
+      else if (op == "K") { fflush(stdout); oi(ps.printCoords(stdout)); }
+      else if (op == "W") { std::string f = name10(); oi(ps.writeCoords(f)); }
+      else if (op == "T") { std::string f = name10(), l = name10(); std::cout.flush(); oi(ps.writeCentroidTable(f, l)); std::cout.flush(); }
+      else if (op == "G") opoint11(ps.get((int)geti()));
+      else if (op == "E") { int ix = (int)geti(); double x = getd(), y = getd(), z = getd(), v = getd(); oi(ps.set(ix, x, y, z, v)); }
+      else if (op == "F") { int ix = (int)geti(); oi(ps.set(ix, read_point11())); }
+      else if (op == "A") { double x = getd(), y = getd(), z = getd(), v = getd(); oi(ps.add(x, y, z, v)); }
+      else if (op == "R") ps.remove((int)geti());
+      else if (op == "Z") ps.clear();
+      else fail("unknown point-set operation");
+      fflush(stdout);
+    }
+    oi(ps.npoints());
+    odir11();
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
+// piece 12 (relay 21): MRIread's and MRIwrite's GIFTI branches (mgi, mwr), fsPrintHelp's XML help
+// renderer (hlp), loadfsPointSet (lps)
+bool piece12_cmd(const std::string &cmd)
+{
+  return cmd == "mgi" || cmd == "mwr" || cmd == "hlp" || cmd == "lps";
+}
+// a GIFTI file's text with its UserName value written U and each <Data> payload Base64-decoded
+// and inflated (zlib 1.2.11's compressed bytes here, the port's own there; the values the same):
+// fs-surfio's gii_normal (relay 22 of track D)
+int b64val12(unsigned char c)
+{
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
+  return -1;
+}
+std::string gii_normal12(const std::string &f)
+{
+  std::string s = f;
+  size_t u = s.find("<![CDATA[UserName]]></Name>");
+  if (u != std::string::npos) {
+    size_t v = s.find("<Value><![CDATA[", u);
+    if (v != std::string::npos) {
+      v += 16;
+      size_t e = s.find("]]>", v);
+      if (e != std::string::npos) s.replace(v, e - v, "U");
+    }
+  }
+  std::string r;
+  size_t p = 0;
+  char h[4];
+  for (;;) {
+    size_t a = s.find("<Data>", p);
+    size_t b = a == std::string::npos ? a : s.find("</Data>", a + 6);
+    if (b == std::string::npos) { r += s.substr(p); break; }
+    a += 6;
+    r += s.substr(p, a - p);
+    std::string pay = s.substr(a, b - a), bin;
+    unsigned acc = 0;
+    int nb = 0;
+    for (unsigned char c : pay) {
+      int v = b64val12(c);
+      if (v < 0) continue;
+      acc = (acc << 6) | (unsigned)v;
+      nb += 6;
+      if (nb >= 8) { nb -= 8; bin.push_back((char)((acc >> nb) & 0xff)); }
+    }
+    std::string inf;
+    bool ok = false;
+    z_stream zs;
+    memset(&zs, 0, sizeof zs);
+    if (inflateInit(&zs) == Z_OK) {
+      zs.next_in = (Bytef *)bin.data();
+      zs.avail_in = (uInt)bin.size();
+      unsigned char buf[4096];
+      int ret;
+      do {
+        zs.next_out = buf;
+        zs.avail_out = sizeof buf;
+        ret = inflate(&zs, Z_NO_FLUSH);
+        inf.append((char *)buf, sizeof buf - zs.avail_out);
+      } while (ret == Z_OK);
+      ok = ret == Z_STREAM_END;
+      inflateEnd(&zs);
+    }
+    if (ok) {
+      r += "Z";
+      for (unsigned char c : inf) { snprintf(h, sizeof h, "%02x", c); r += h; }
+    } else {
+      r += "B" + pay;
+    }
+    p = b;
+  }
+  return r;
+}
+// every file under w: its name and its bytes (a .gii file, in any case, normalised), FNV-1a 64 beyond 256 bytes
+void odir12()
+{
+  walked11.clear();
+  nftw("w", walk11, 16, FTW_PHYS);
+  std::sort(walked11.begin(), walked11.end());
+  for (const std::string &f : walked11) {
+    ostr(f.c_str());
+    std::vector<unsigned char> b = read_file(f);
+    std::string s(b.begin(), b.end());
+    if (f.size() > 4 && strcasecmp(f.c_str() + f.size() - 4, ".gii") == 0) s = gii_normal12(s);
+    std::vector<unsigned char> c(s.begin(), s.end());
+    if (c.size() <= 256) obytes(c);
+    else fnv_bytes(c.data(), c.size());
+  }
+  out += "| ";
+}
+// a volume: <w> <h> <d> <type> <frames>, the 15 geometry floats, tr, <len> <post-fix N|x..>, <k>
+// voxels <c> <r> <s> <f> <value>
+MRI *read_mri12()
+{
+  int w = (int)geti(), h = (int)geti(), d = (int)geti(), t = (int)geti(), nf = (int)geti();
+  MRI *m = MRIallocSequence(w, h, d, t, nf);
+  m->xsize = getf(); m->ysize = getf(); m->zsize = getf();
+  m->x_r = getf(); m->x_a = getf(); m->x_s = getf();
+  m->y_r = getf(); m->y_a = getf(); m->y_s = getf();
+  m->z_r = getf(); m->z_a = getf(); m->z_s = getf();
+  m->c_r = getf(); m->c_a = getf(); m->c_s = getf();
+  m->ras_good_flag = 1;
+  m->tr = getf();
+  m->len_fnamePostFixes = (int)geti();
+  bool n;
+  std::string pf = getstr(&n);
+  if (!n) snprintf(m->fnamePostFixes, sizeof m->fnamePostFixes, "%s", pf.c_str());
+  int k = (int)geti();
+  for (int i = 0; i < k; i++) {
+    int c = (int)geti(), r = (int)geti(), s = (int)geti(), f = (int)geti();
+    MRIsetVoxVal(m, c, r, s, f, getf());
+  }
+  return m;
+}
+void run_piece12(const std::string &cmd)
+{
+  fwide(stderr, -1);
+  if (cmd == "mgi") {
+    Gdiag = strtoull(next(), NULL, 16);
+    MRIIO_Strip_Pound = (int)geti();
+    int type = (int)geti(), vf = (int)geti();
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = mri_read(name.c_str(), type, vf, -1, -1, NULL);
+    print_mri6(m);
+    print_ct10(m ? m->ct : NULL, false, false);
+    oi(errno);
+  } else if (cmd == "mwr") {
+    Gdiag = strtoull(next(), NULL, 16);
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T", 1);
+    setenv("SURFER_SIDEDOOR", "1", 1);  // FreeSurfer's licence check skipped (the port needs no key)
+    setup(next());
+    int nv = (int)geti(), usevec = (int)geti();
+    std::vector<MRI *> vs;
+    for (int i = 0; i < nv; i++) vs.push_back(read_mri12());
+    std::string fn = name10();
+    errno = 0;
+    int r = MRIwrite(vs[0], fn.c_str(), usevec ? &vs : NULL);
+    fflush(stdout);
+    oi(r);
+    oi(errno);
+    odir12();
+  } else if (cmd == "hlp") {
+    bool n;
+    std::string t = getstr(&n);
+    fflush(stdout);
+    int r = outputHelpXml(n ? NULL : (const unsigned char *)t.data(), (unsigned int)t.size());
+    fflush(stdout);
+    oi(r);
+  } else if (cmd == "lps") {
+    setup(next());
+    std::string fn = name10();
+    errno = 0;
+    fsPointSet ps = loadfsPointSet(fn);
+    ostr(ps.vox2ras.c_str());
+    oi(ps.npoints());
+    for (int i = 0; i < ps.npoints(); i++) opoint11(ps.get(i));
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
+// piece 13 (track A relay 22): the label coordinate conversions and one frame of a volume written
+bool piece13_cmd(const std::string &cmd) { return cmd == "lcv" || cmd == "mwf"; }
+
+// lcv <s|t|v|x> <Gdiag> <SUBJECTS_DIR> <label> <volume (read_mri11)> <0 new|1 itself|2 given>
+// [<label>] <0|1 surface> [<its volume geometry>]: LabelToScannerRAS, LabelToSurfaceRAS,
+// LabelToVoxel or LabelVoxelToSurfaceRAS, the result printed.
+// mwf <Gdiag> <setup> <volume (read_mri12)> <frame> <name>: MRIwriteFrame, then the files under w.
+void run_piece13(const std::string &cmd)
+{
+  fwide(stderr, -1);
+  if (cmd == "lcv") {
+    std::string which = next();
+    Gdiag = strtoull(next(), NULL, 16);
+    env11("SUBJECTS_DIR");
+    LABEL *a = read_label11();
+    int vli = vli11;
+    MRI *m = read_mri11();
+    int dk = (int)geti();
+    LABEL *d = NULL;
+    if (dk == 2) d = read_label11();
+    if (geti()) {
+      MRIS *surf = MRISalloc(0, 0);
+      read_vg(surf->vg);
+      a->mris = surf;
+    }
+    if (dk == 1) d = a;
+    errno = 0;
+    LABEL *r;
+    if (which == "s") r = LabelToScannerRAS(a, m, d);
+    else if (which == "t") r = LabelToSurfaceRAS(a, m, d);
+    else if (which == "v") r = LabelToVoxel(a, m, d);
+    else r = LabelVoxelToSurfaceRAS(a, m, d);
+    fflush(stdout);
+    print_label11(r, vli);
+  } else if (cmd == "mwf") {
+    Gdiag = strtoull(next(), NULL, 16);
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T", 1);
+    setenv("SURFER_SIDEDOOR", "1", 1);  // FreeSurfer's licence check skipped (the port needs no key)
+    setup(next());
+    MRI *m = read_mri12();
+    int frame = (int)geti();
+    std::string fn = name10();
+    errno = 0;
+    int r = MRIwriteFrame(m, fn.c_str(), frame);
+    fflush(stdout);
+    oi(r);
+    oi(errno);
+    odir12();
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
 bool piece10_cmd(const std::string &cmd)
 {
   static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme",
@@ -889,7 +1426,10 @@ bool piece10_cmd(const std::string &cmd)
 
 void run_piece8(const std::string &cmd)
 {
-  if (cmd == "apa" || piece10_cmd(cmd)) { run_piece9(cmd); return; }
+  if (cmd == "apa" || piece10_cmd(cmd) || piece11_cmd(cmd) || piece12_cmd(cmd) || piece13_cmd(cmd)) {
+    run_piece9(cmd);
+    return;
+  }
   fwide(stderr, -1);
   Gerror = (int)geti();
   if (cmd == "ial") {
@@ -1967,7 +2507,7 @@ int main(int argc, char *argv[])
     }
     // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
     {
-      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr"};
+      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

@@ -532,7 +532,11 @@ pub fn run(
         {
             extra.push("SKIP");
         }
-        if matches!(n.defect.id, "FS-49" | "FS-167" | "FS-421") {
+        // (FS-49 and FS-167 compared where `reproduce` gives the earlier number's bytes, as
+        // FreeSurfer's memory holds them)
+        if matches!(n.defect.id, "FS-49" | "FS-167" | "FS-421")
+            && !n.detail.ends_with("as in FreeSurfer")
+        {
             extra.push("VARY");
         }
     }

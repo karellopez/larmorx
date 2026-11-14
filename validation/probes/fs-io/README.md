@@ -204,7 +204,10 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   read right after another (FS-49: `TAGreadStart`'s tag-30 length, the binary colour tables' runs of numbers on
   C streams), and after an allocation, a name or a print (memory contents), compared with `reproduce`:
   `python -P validation/probes/fs-io/fs49_slot_cases.py` (prints `PASS` when every line is identical or marked
-  `SKIP`/`VARY` by the port; 13 identical, 3 memory contents, 2026-11-14).
+  `SKIP`/`VARY` by the port; 13 identical, 3 memory contents, 2026-11-14). Relay 26 added four `ztr` cases
+  (FS-167: `znzTAGreadStart`'s tag-30 length and 64-bit length, plain and compressed) and the znzlib colour table
+  is compared: 20 cases, 17 identical, 3 memory contents. Since relay 26 lines whose FS-167 notices end "as in
+  FreeSurfer" are compared in every piece (pieces 2, 6, 14).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

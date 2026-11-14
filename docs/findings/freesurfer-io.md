@@ -1457,3 +1457,30 @@ status 139 and the aborts as 134.
   6,692, 0 different (682 `SKIP`, 195 `VARY`). `fix` differs only with notices.
 - Found on the way: niftilib prints `** no header file found for '<stem>.hdr'` (its debug level 1)
   whenever the `.hdr` is missing (first seed-7 run: 26 lines differed until it was ported).
+
+## Part 18: FS-167 at fs.io's znz readers (relay 26 of track A)
+- **Measured (objdump of the unit oracle's fio.cpp.o, `<scratch>/A/r26/fio.dis`):** relative to the
+  calling function's stack pointer `C` at the call: `freadDouble`, `znzreadLong` read 8 bytes at
+  `C-32`; `freadInt`, `znzreadInt`, `znzreadFloat` 4 bytes at `C-28`; `znzreadDouble` 8 bytes at
+  `C-48`, `znzreadShort` 2 bytes at `C-42`. `znzreadInt` and `znzreadLong` pass the value to
+  `swapInt`/`swapLong64` in a register (the memory keeps the file's order); `znzreadFloat` swaps in
+  place (`byteswapbuffloat`); `znzreadDouble` and `znzreadShort` store the swapped value back.
+  `znzread` (znzlib.c.o) pushes `rbx` and calls `gzread`/`fread` below the reader's frame: every
+  reader's call overwrites `C-48..C-40` (so `znzreadDouble`'s and `znzreadShort`'s bytes are never an
+  earlier number's but another call's), never `C-32..C-24`. `znzeof` tail-jumps to `gzeof` (a leaf)
+  or `feof`. So within one function a `znzreadInt`/`znzreadLong` cut by the end of the file keeps
+  the bytes the previous `znzreadInt`/`znzreadLong` left, as FS-49's C-stream readers do.
+- **Callers given the slot:** `znzTAGreadStart` (tags.cpp.o: `znzeof`, `znzreadInt`, `znzeof`,
+  `znzreadInt` or `znzreadLong`), `FStagsIO::read_tagid_len` (fstagsio.cpp.o: the same sequence; MGH's
+  and the NIfTI extension's tags), `znzCTABreadFromBinary` (colortab.cpp.o: V1 and V2 inlined, the
+  same calls between numbers as the C-stream reader). The others (mghRead's header, `VOL_GEOM`'s and
+  the frames' readers, the matrices) keep FS-167's memory contents (not measured).
+- **The port's notices:** one notice per defect per run; a memory-contents notice now replaces an
+  earlier "as in FreeSurfer" notice of the same defect (`fio::memory`), so a line whose later number
+  took memory is still counted apart (three `fsr` lines of seed 7 were compared before that).
+- **Measured (the probe):** `fs49_slot_cases.py` 20 cases: 17 identical (the four new `ztr` cases:
+  tag 30 cut at 0 and 2 bytes, plain and compressed, a 64-bit length cut at 6 bytes: identical; cut at
+  2: memory contents, official `0x0000050000000003`: the tag's bytes in the last four, as the model
+  says); seed 7, 5,048 cases of `ztr`, `ctr`, `tr`, `fsr`, `mgr`, `mrd`, `mrh`, `mri`, `nrd`:
+  `reproduce` identical on 4,060, 0 different (73 lines with FS-167 compared: 56 `ztr`, 7 `fsr`, 3
+  `ctr`, 7 volume reads); `fix` differs only with notices.

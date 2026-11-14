@@ -640,7 +640,11 @@ pub fn run_env(
         }
         // FreeSurfer's numbers from memory contents (a header cut short), a transform name read
         // past its tag's text (FS-421)
-        if matches!(n.defect.id, "FS-49" | "FS-167" | "FS-421") {
+        // (FS-49 and FS-167 compared where `reproduce` gives the earlier number's bytes, as
+        // FreeSurfer's memory holds them)
+        if matches!(n.defect.id, "FS-49" | "FS-167" | "FS-421")
+            && !n.detail.ends_with("as in FreeSurfer")
+        {
             extra.push("VARY");
         }
     }

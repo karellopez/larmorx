@@ -1388,7 +1388,7 @@ defects! {
     FS_331 = "FS-331", "FreeSurfer", true,
         "RASFromSurfaceRAS_ (and VGtkreg2RAS) given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, the program ends when one of the matrix's first 4 x 4 numbers left unwritten is not finite, and one of more than 4 rows gives nothing after a size-mismatch error";
     FS_167 = "FS-167", "FreeSurfer", true,
-        "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
+        "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents; znzreadInt and znzreadLong keep there the bytes of the number read just before them, as freadInt does (FS-49): a tag's length cut by the end of a compressed or plain volume file, and a binary colour table's numbers in such a file";
     FS_168 = "FS-168", "FreeSurfer", true,
         "fio_dirname of a name of one character (a, or a/ with trailing slashes) can return / instead of ., depending on what the memory allocator left in memory it had just been given back";
     FS_169 = "FS-169", "FreeSurfer", true,

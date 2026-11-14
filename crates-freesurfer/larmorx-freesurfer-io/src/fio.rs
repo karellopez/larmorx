@@ -23,7 +23,7 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
-    Defect, FS_49, FS_167, FS_168, FS_169, FS_170, FS_171, FS_172, FS_173,
+    Defect, FS_49, FS_167, FS_168, FS_169, FS_170, FS_171, FS_172, FS_173, Notices,
 };
 use larmorx_freesurfer_core::cscan::{self, Scan};
 use larmorx_freesurfer_core::cstd;
@@ -37,14 +37,29 @@ use larmorx_io::znz::ZnzFile;
 use crate::cfile::CFile;
 
 /// A read of `n` bytes that the file ended after `got`: the missing bytes are 0 here, memory
-/// contents in FreeSurfer (`defect`).
+/// contents in FreeSurfer (`defect`). A run keeps one notice per defect: this one replaces an
+/// earlier notice of the defect that said FreeSurfer's bytes were the earlier number's (the run's
+/// result then holds memory contents somewhere).
 pub(crate) fn memory(g: &mut Globals, defect: &'static Defect, what: &str, got: usize, n: usize) {
-    g.notices.add(
-        defect,
-        format!(
-            "{what}: the file ended after {got} of the number's {n} bytes: the others read as 0 (FreeSurfer's are memory contents)"
-        ),
+    let detail = format!(
+        "{what}: the file ended after {got} of the number's {n} bytes: the others read as 0 (FreeSurfer's are memory contents)"
     );
+    let earlier = g
+        .notices
+        .as_slice()
+        .iter()
+        .any(|x| x.defect.id == defect.id && x.detail.ends_with("as in FreeSurfer"));
+    if earlier {
+        let mut list = g.notices.as_slice().to_vec();
+        for x in list.iter_mut().filter(|x| x.defect.id == defect.id) {
+            x.detail = detail.clone();
+        }
+        let mut fresh = Notices::new(g.notices.mode());
+        fresh.extend(list);
+        g.notices = fresh;
+        return;
+    }
+    g.notices.add(defect, detail);
 }
 
 /// `fread(&x, N, 1, fp)` into memory that holds `init`: the count returned, the memory after it
@@ -198,16 +213,29 @@ impl Slot49 {
 
 /// FS-49's notice for a number of `n` bytes the file ended after `got` of.
 fn note49(g: &mut Globals, what: &str, got: usize, n: usize, unknown: bool) {
+    note_slot(g, &FS_49, what, got, n, unknown);
+}
+
+/// FS-49's or FS-167's notice for a number of `n` bytes the file ended after `got` of, read into a
+/// [`Slot49`]: memory contents where a missing byte was unknown, else the earlier number's.
+fn note_slot(
+    g: &mut Globals,
+    defect: &'static Defect,
+    what: &str,
+    got: usize,
+    n: usize,
+    unknown: bool,
+) {
     if unknown {
-        memory(g, &FS_49, what, got, n);
+        memory(g, defect, what, got, n);
     } else if g.notices.reproduce() {
         g.notices.add(
-            &FS_49,
+            defect,
             format!("{what}: the file ended after {got} of the number's {n} bytes: the others are the earlier number's, as in FreeSurfer"),
         );
     } else {
         g.notices.add(
-            &FS_49,
+            defect,
             format!("{what}: the file ended after {got} of the number's {n} bytes: the others read as 0 (FreeSurfer's are the earlier number's)"),
         );
     }
@@ -489,6 +517,48 @@ pub fn znz_read_int(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> i
     }
     znz_failed(g, err, fp, ret, "znzreadInt: znzread failed");
     i32::from_be_bytes(b)
+}
+
+/// [`znz_read_int`] into the caller's model of FreeSurfer's memory: the official build's
+/// `znzreadInt` reads into the same four bytes as `freadInt` (the slot's bytes 4 to 7, below its
+/// caller's frame) and leaves them in file order, and its `znzread` call (and `znzeof` between two
+/// calls) does not reach them: a number the file cuts keeps the earlier number's bytes (FS-167,
+/// as FS-49).
+pub fn znz_read_int_in(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    fp: &mut ZnzFile,
+    slot: &mut Slot49,
+) -> i32 {
+    let (ret, b, got) = znzread_n(fp, [0u8; 4]);
+    slot.put_int(&b, got);
+    let (v, unknown) = slot.take(g, 4, 4, got);
+    if got < 4 {
+        note_slot(g, &FS_167, "znzreadInt", got, 4, unknown);
+    }
+    znz_failed(g, err, fp, ret, "znzreadInt: znzread failed");
+    i32::from_be_bytes(v.try_into().unwrap())
+}
+
+/// [`znz_read_long`] into the caller's model of FreeSurfer's memory: `znzreadLong` reads into the
+/// slot's eight bytes (as `freadDouble`) and leaves them in file order.
+pub fn znz_read_long_in(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    fp: &mut ZnzFile,
+    slot: &mut Slot49,
+) -> i64 {
+    let (ret, b, got) = znzread_n(fp, [0u8; 8]);
+    slot.b[..got].copy_from_slice(&b[..got]);
+    slot.known[..got].fill(true);
+    let (v, unknown) = slot.take(g, 0, 8, got);
+    if got < 8 {
+        note_slot(g, &FS_167, "znzreadLong", got, 8, unknown);
+    }
+    znz_failed(g, err, fp, ret, "znzreadLong: znzread failed");
+    let mut le = [0u8; 8];
+    le.copy_from_slice(&v);
+    machine::swap_long64(g, i64::from_le_bytes(le))
 }
 
 /// `znzreadLong(fp)`: a big-endian `long long` (`znzreadLong: znzread failed`; FS-167).
@@ -1106,6 +1176,69 @@ mod tests {
     /// FS-49 at fs.io's callers: the numbers FreeSurfer's official build gives where the file cuts
     /// a number read right after another (observed with the fs-io probe,
     /// `validation/probes/fs-io/fs49_slot_cases.py`); the default reads the missing bytes as 0.
+    #[test]
+    fn fs167_znz_slot_keeps_the_tags_bytes() {
+        use crate::tags::znz_tag_read_start;
+        // znzTAGreadStart: tag 30's length cut at 0 or 2 bytes, a 64-bit length cut at 6 bytes
+        // (the tag's last two) and at 2 (memory contents), plain and compressed; observed values
+        // (validation/probes/fs-io/fs49_slot_cases.py, 2026-11-14)
+        let dir = tempfile::Builder::new()
+            .prefix("znz slot ~")
+            .tempdir()
+            .unwrap();
+        let path = dir.path().join("t");
+        for gz in [false, true] {
+            for (hex, want_r, want_f, memory) in [
+                ("0000001e", 29i64, -1i64, false),
+                (
+                    "0000001eabcd",
+                    0xabcd_001ei64 as i32 as i64 - 1,
+                    0xabcd_0000u32 as i32 as i64 - 1,
+                    false,
+                ),
+                ("00000003000000000000", 3, 0, false),
+                ("000000030000", 3, 0, true),
+            ] {
+                let b = unhex(hex);
+                let p = path.to_str().unwrap().as_bytes().to_vec();
+                if gz {
+                    let mut z = ZnzFile::open(&p, b"wb", true).unwrap();
+                    fs_znzwrite(&mut z, &b, 1, b.len());
+                    z.close();
+                } else {
+                    std::fs::write(&path, &b).unwrap();
+                }
+                for (mode, want) in [
+                    (UpstreamDefects::Reproduce, want_r),
+                    (UpstreamDefects::Fix, want_f),
+                ] {
+                    let mut gl = g(mode);
+                    let mut e = Vec::new();
+                    let mut z = ZnzFile::open(&p, b"rb", gz).unwrap();
+                    let mut len = -7;
+                    let tag = znz_tag_read_start(&mut gl, &mut e, &mut z, &mut len, 0);
+                    assert_eq!(
+                        (tag, len),
+                        (if hex.starts_with("0000001e") { 30 } else { 3 }, want),
+                        "{hex} {gz} {mode:?}"
+                    );
+                    let n = gl
+                        .notices
+                        .as_slice()
+                        .iter()
+                        .find(|n| n.defect.id == "FS-167")
+                        .unwrap();
+                    let earlier = n.detail.ends_with("as in FreeSurfer");
+                    assert_eq!(
+                        earlier,
+                        mode == UpstreamDefects::Reproduce && !memory,
+                        "{hex}"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn fs49_slot_keeps_the_earlier_numbers_bytes() {
         use crate::colortab_bin::ctab_read_from_binary;

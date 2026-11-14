@@ -97,7 +97,8 @@ The messages of `znzreadShort`, `znzreadInt`, `znzreadLong` and `znzreadDouble` 
 read returned another count than 1, the file is **not** at its end (`znzeof` false after the read),
 and `Gdiag_no >= 0`: an `.mgz`'s optional fields end at the end of the file, which is no error.
 `znzreadFloat`'s message appears whenever the read fails, at the end of the file too. Missing bytes:
-memory contents (FS-167), as in §2 (`znzread3`'s are 0, as `fread3`'s).
+memory contents (FS-167), as in §2 (`znzread3`'s are 0, as `fread3`'s), except where §100 gives
+the earlier number's bytes.
 
 ## 4. Writing one number
 
@@ -2686,15 +2687,27 @@ right after another:
   comes between); each entry's red, green, blue and transparency, and in version 2 the next entry's
   structure number after the transparency (a duplicate there gives `Duplicate structure <s>`; a
   number at or past the count FS-189). Every other number cut by the end of the file (after the
-  table's allocation, a name, an entry's allocation) is memory contents. The znz readers (§3, FS-167)
-  are memory contents in larmorx (FreeSurfer's behave the same way; not reproduced).
+  table's allocation, a name, an entry's allocation) is memory contents.
+- Since relay 26, the same on znzlib files (FS-167; the official build's `znzreadInt`, `znzreadFloat`
+  and `znzreadLong` read into the same eight bytes as `freadDouble`, `znzreadInt` and `znzreadLong`
+  leaving the file's order there; `znzeof` between two reads leaves them): `znzTAGreadStart` and the
+  volume tags' reader (§11's znz form, MGH files and FreeSurfer's NIfTI extension): tag 30's length
+  keeps the tag number's bytes, a 64-bit length cut after 4 or more of its bytes keeps the tag
+  number's for its last four (cut earlier: memory contents); the binary colour tables in znzlib files
+  (§13) as on C streams. `znzreadDouble` and `znzreadShort` read elsewhere (eight bytes 16 below,
+  overwritten by every other reader's call): their missing bytes stay memory contents, as do every
+  other caller's (mghRead's header, the geometry and frame readers).
 
-By default the missing bytes are 0 (noted: FS-49, FS-192); with `reproduce` the earlier number's bytes
-where the rule above gives them (the notice ends "as in FreeSurfer"), 0 elsewhere (noted as memory
-contents). Validation: `validation/probes/fs-io/fs49_slot_cases.py` (16 hand-made cases: `reproduce`
-identical on 13, the 3 others memory contents, observed 2026-11-14); the probe's `ctr` and `tr` cases
-(seed 7, 3,846 cases: identical on 2,697, 0 different; seed 13, 5,770: 4,045, 0 different), lines
-whose notices end "as in FreeSurfer" compared, the others counted apart.
+By default the missing bytes are 0 (noted: FS-49, FS-167, FS-192); with `reproduce` the earlier
+number's bytes where the rule above gives them (the notice ends "as in FreeSurfer"), 0 elsewhere (noted
+as memory contents; a run's notice of the defect says memory contents as soon as one number took
+them). Validation: `validation/probes/fs-io/fs49_slot_cases.py` (20 hand-made cases, 4 of them
+`znzTAGreadStart`'s: `reproduce` identical on 17, the 3 others memory contents, observed 2026-11-14);
+the probe's `ctr` and `tr` cases (seed 7, 3,846 cases: identical on 2,697, 0 different; seed 13, 5,770:
+4,045, 0 different); since relay 26 `ztr`, `fsr` and the volume readers too (seed 7, 5,048 cases of
+`ztr`, `ctr`, `tr`, `fsr`, `mgr`, `mrd`, `mrh`, `mri`, `nrd`: identical on 4,060, 0 different, 73 of them
+lines with FS-167 now compared), lines whose notices end "as in FreeSurfer" compared, the others
+counted apart.
 
 ## 101. ANALYZE read (`analyzeRead(name, read_volume)`; `mri_read`'s ANALYZE 2 and ANALYZE 4D 16)
 

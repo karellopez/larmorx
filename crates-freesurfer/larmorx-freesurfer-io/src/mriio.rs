@@ -565,7 +565,6 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
         ITK_MORPH => "ITK warp",
         GDF_FILE => "GDF",
         NIFTI1_FILE => "NIfTI-1",
-        NII_FILE => "NIfTI",
         NRRD_FILE => "NRRD",
         _ => return None,
     })
@@ -674,6 +673,8 @@ pub fn mri_write_type(
         crate::gifti_vol::mri_write_gifti(g, &mut io, dir, m, fname)?
     } else if mtype == MRI_MGH_FILE {
         crate::mriio_write::mgh_write(g, out, err, env, dir, m, fname, -1, intent)?
+    } else if mtype == NII_FILE {
+        crate::mriio_write::nii_write(g, out, err, env, dir, m, fname, intent)?
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,

@@ -88,7 +88,14 @@ fn mat_toks(g: &mut Gen, t: &mut Vec<String>, none: u64) {
 }
 
 /// A volume's tokens (`read_mri14`); its extent, type, frames and whether it has voxels.
-fn volume14(g: &mut Gen, t: &mut Vec<String>, with_bvals: bool) -> (i64, i64, i64, i32, i64, bool) {
+fn volume14(
+    g: &mut Gen,
+    t: &mut Vec<String>,
+    with_bvals: bool,
+    nifti: bool,
+) -> (i64, i64, i64, i32, i64, bool) {
+    // NIfTI's special shapes, now and then: the ico7 surface (reshaped) and 32,768 rows (FS-449)
+    let special = if nifti { g.below(16) } else { 99 };
     let w = if g.chance(25) { 0 } else { g.int(1, 6) };
     let h = if g.chance(3) { g.int(1, 3) } else { 1 };
     let d = if g.chance(25) {
@@ -118,6 +125,17 @@ fn volume14(g: &mut Gen, t: &mut Vec<String>, with_bvals: bool) -> (i64, i64, i6
         mri::MRI_RGB,
         mri::MRI_TENSOR,
     ]);
+    let (w, h, d, nf, ty) = match special {
+        0 => (
+            163842,
+            1,
+            1,
+            g.int(1, 2),
+            g.pick(&[mri::MRI_UCHAR, mri::MRI_FLOAT]),
+        ),
+        1 => (1, 32768, 1, 1, mri::MRI_UCHAR),
+        _ => (w, h, d, nf, ty),
+    };
     let alloc = !g.chance(30);
     for v in [w, h, d, i64::from(ty), nf, i64::from(alloc)] {
         t.push(v.to_string());
@@ -151,7 +169,7 @@ fn volume14(g: &mut Gen, t: &mut Vec<String>, with_bvals: bool) -> (i64, i64, i6
     t.push(fhex(g.pick(&[0.0f32, 3.0, 1.5, 7.0])));
     t.push(g.pick(&[1i64, 1, 0, 21, -3]).to_string());
     let bytes = (w * h * d * nf) as usize * mri::mri_sizeof(ty);
-    if g.chance(5) {
+    if g.chance(5) || special <= 1 {
         t.push("-".into());
     } else {
         let mut b = vec![0u8; bytes];
@@ -235,7 +253,11 @@ fn volume14(g: &mut Gen, t: &mut Vec<String>, with_bvals: bool) -> (i64, i64, i6
 pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     let mut t = vec![kind.to_owned()];
     t.push(g.pick(&["0", "0", "0", "10000", "40"]).into());
-    let (name, spec): (&str, String) = match g.below(20) {
+    let (name, spec): (&str, String) = match g.below(26) {
+        20 | 21 => ("w/o.nii.gz", "-".into()),
+        22 | 23 => ("w/o.nii", "-".into()),
+        24 => ("w/O.NII", "-".into()),
+        25 => ("w/o.nii.mgz.nii", "-".into()),
         0 => ("w/o.mgh", "-".into()),
         1 => ("w/o.MGZ", "-".into()),
         2 => ("w/o.mgh.gz", "-".into()),
@@ -252,9 +274,10 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     };
     t.push(spec);
     t.push(if g.chance(6) { "1" } else { "0" }.into());
-    let how = i64::from(g.chance(3));
+    let nifti = name.to_ascii_lowercase().contains(".nii");
+    let how = i64::from(nifti || g.chance(3));
     t.push(how.to_string());
-    let (_, _, _, _, nf, alloc) = volume14(g, &mut t, how == 1);
+    let (_, _, _, _, nf, alloc) = volume14(g, &mut t, how == 1, nifti);
     let frame = match g.below(10) {
         0 => -3,
         1 if nf > 0 => g.int(0, nf - 1),

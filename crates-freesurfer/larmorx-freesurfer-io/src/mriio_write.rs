@@ -38,7 +38,8 @@ use std::path::Path;
 
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
-    FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444, FS_445, FS_446,
+    FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444, FS_445, FS_446, FS_447, FS_448,
+    FS_449,
 };
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
@@ -51,12 +52,13 @@ use larmorx_freesurfer_mri::mri::{
     self, MGH_VERSION, MGZ_INTENT_UNKNOWN, MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_SHORT,
     MRI_UCHAR, MRI_USHRT, Mri, WARPFIELD_DTFMT_UNKNOWN,
 };
+use larmorx_freesurfer_mri::vol_geom;
 use larmorx_io::znz::ZnzFile;
 
 use crate::fio;
 use crate::fstagsio::{self, FsTagsIo};
 use crate::tags::{
-    TAG_AUTO_ALIGN, TAG_CMDLINE, TAG_FIELDSTRENGTH, TAG_GCAMORPH_AFFINE, TAG_MGH_XFORM,
+    self, TAG_AUTO_ALIGN, TAG_CMDLINE, TAG_FIELDSTRENGTH, TAG_GCAMORPH_AFFINE, TAG_MGH_XFORM,
     TAG_ORIG_RAS2VOX, TAG_PEDIR,
 };
 
@@ -342,7 +344,7 @@ pub fn mgh_write(
                 let total = m.chunk.as_ref().map_or(0, |c| c.len());
                 let have = total.saturating_sub(place).min(n);
                 let mut slice = vec![0u8; n];
-                if let Some(c) = m.chunk.as_ref() {
+                if let Some(c) = m.chunk.as_ref().filter(|_| have > 0) {
                     slice[..have].copy_from_slice(&c[place..place + have]);
                 }
                 if unit > 1 {
@@ -637,18 +639,7 @@ pub fn mri_tag_write(
             4,
         );
     }
-    let first = m.frames.first();
-    if first.is_none() && m.nframes <= 1 {
-        g.notices.add(
-            &FS_441,
-            format!(
-                "the tags of a volume of {} frames: its first frame's label and threshold (FreeSurfer reads memory past its frames)",
-                m.nframes
-            ),
-        );
-    }
-    let first_marked = first.is_some_and(|f| f.label != 0 || f.thresh.abs() >= f32::EPSILON);
-    if m.nframes > 1 || first_marked {
+    if frames_marked(g, m) {
         io.write_mri_frames(g, out, err, m)?;
     }
     if let Some(ct) = &m.ct {
@@ -664,6 +655,684 @@ pub fn mri_tag_write(
         io.write_endtag(g, out);
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------- NIfTI (`niiWrite`)
+
+/// The date of FreeSurfer 8.2.0's official build (`__DATE__` in its `mriio.cpp`, the same in the
+/// unit oracle's build): a NIfTI file's description is `FreeSurfer <date>`.
+pub const BUILD_DATE: &str = "Mar 14 2026";
+
+const DT_UNSIGNED_CHAR: i16 = 2;
+const DT_SIGNED_SHORT: i16 = 4;
+const DT_SIGNED_INT: i16 = 8;
+const DT_FLOAT: i16 = 16;
+const DT_COMPLEX: i16 = 32;
+const DT_UINT16: i16 = 512;
+const NIFTI_INTENT_DISPVECT: i16 = 1006;
+const NIFTI_ECODE_FREESURFER: i32 = 14;
+const NIFTI_XFORM_SCANNER_ANAT: i16 = 1;
+const SHORTMAX: i32 = 32768;
+/// `WarpfieldDTFMT::WARPFIELD_DTFMT_DISP_RAS`.
+const WARPFIELD_DTFMT_DISP_RAS: i32 = 3;
+
+/// `struct nifti_1_header` (348 bytes) in x86-64's memory: the fields at their offsets,
+/// little-endian.
+struct NiftiHeader([u8; 348]);
+
+impl NiftiHeader {
+    fn i32_at(&mut self, o: usize, v: i32) {
+        self.0[o..o + 4].copy_from_slice(&v.to_le_bytes());
+    }
+    fn i16_at(&mut self, o: usize, v: i16) {
+        self.0[o..o + 2].copy_from_slice(&v.to_le_bytes());
+    }
+    fn f32_at(&mut self, o: usize, v: f32) {
+        self.0[o..o + 4].copy_from_slice(&v.to_le_bytes());
+    }
+    fn dim(&mut self, i: usize, v: i16) {
+        self.i16_at(40 + 2 * i, v);
+    }
+    fn dim_of(&self, i: usize) -> i16 {
+        i16::from_le_bytes([self.0[40 + 2 * i], self.0[41 + 2 * i]])
+    }
+    fn pixdim(&mut self, i: usize, v: f32) {
+        self.f32_at(76 + 4 * i, v);
+    }
+    fn vox_offset(&self) -> f32 {
+        f32::from_le_bytes([self.0[108], self.0[109], self.0[110], self.0[111]])
+    }
+}
+
+/// `mriToNiftiQform(mri, hdr)`: the quaternion of the direction cosines (`mat44_to_quatern`'s
+/// steps in `float`, the constants and square roots in `double`), `qfac` 1 for a positive
+/// determinant, -1 (the third column negated) for a negative one, and -100000 with `WARNING: bad
+/// orientation matrix (determinant = 0) in nifti1 file ...` and ` ... continuing.` on standard
+/// output for 0; the offsets from `extract_i_to_r`.
+fn mri_to_nifti_qform(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mri,
+    hdr: &mut NiftiHeader,
+) -> Result<i32, Fatal> {
+    let v = &m.vg;
+    let (r11, r12, mut r13) = (v.x_r, v.y_r, v.z_r);
+    let (r21, r22, mut r23) = (v.x_a, v.y_a, v.z_a);
+    let (r31, r32, mut r33) = (v.x_s, v.y_s, v.z_s);
+    let mut qfac: f32 = -100000.0;
+    let r_det: f32 = r11 * (r22 * r33 - r32 * r23) - r12 * (r21 * r33 - r31 * r23)
+        + r13 * (r21 * r32 - r31 * r22);
+    if r_det == 0.0 {
+        let _ = out.write_all(
+            b"WARNING: bad orientation matrix (determinant = 0) in nifti1 file ...\n ... continuing.\n",
+        );
+    } else if r_det > 0.0 {
+        qfac = 1.0;
+    } else {
+        r13 = -r13;
+        r23 = -r23;
+        r33 = -r33;
+        qfac = -1.0;
+    }
+    let d64 = f64::from;
+    let mut a = (d64(r11 + r22 + r33) + 1.0) as f32;
+    let (mut b, mut c, mut d);
+    if d64(a) > 0.5 {
+        a = (0.5 * d64(a).sqrt()) as f32;
+        b = (0.25 * d64(r32 - r23) / d64(a)) as f32;
+        c = (0.25 * d64(r13 - r31) / d64(a)) as f32;
+        d = (0.25 * d64(r21 - r12) / d64(a)) as f32;
+    } else {
+        let xd = (1.0 + d64(r11) - d64(r22 + r33)) as f32;
+        let yd = (1.0 + d64(r22) - d64(r11 + r33)) as f32;
+        let zd = (1.0 + d64(r33) - d64(r11 + r22)) as f32;
+        if d64(xd) > 1.0 {
+            b = (0.5 * d64(xd).sqrt()) as f32;
+            c = (0.25 * d64(r12 + r21) / d64(b)) as f32;
+            d = (0.25 * d64(r13 + r31) / d64(b)) as f32;
+            a = (0.25 * d64(r32 - r23) / d64(b)) as f32;
+        } else if d64(yd) > 1.0 {
+            c = (0.5 * d64(yd).sqrt()) as f32;
+            b = (0.25 * d64(r12 + r21) / d64(c)) as f32;
+            d = (0.25 * d64(r23 + r32) / d64(c)) as f32;
+            a = (0.25 * d64(r13 - r31) / d64(c)) as f32;
+        } else {
+            d = (0.5 * d64(zd).sqrt()) as f32;
+            b = (0.25 * d64(r13 + r31) / d64(d)) as f32;
+            c = (0.25 * d64(r23 + r32) / d64(d)) as f32;
+            a = (0.25 * d64(r21 - r12) / d64(d)) as f32;
+        }
+        if d64(a) < 0.0 {
+            b = -b;
+            c = -c;
+            d = -d;
+        }
+    }
+    hdr.i16_at(252, NIFTI_XFORM_SCANNER_ANAT);
+    hdr.pixdim(0, qfac);
+    hdr.f32_at(256, b);
+    hdr.f32_at(260, c);
+    hdr.f32_at(264, d);
+    let i_to_r = vol_geom::extract_i_to_r(g, out, err, &m.vg)?;
+    hdr.f32_at(268, i_to_r.relt(1, 4));
+    hdr.f32_at(272, i_to_r.relt(2, 4));
+    hdr.f32_at(276, i_to_r.relt(3, 4));
+    Ok(NO_ERROR)
+}
+
+/// `mriToNiftiSform(mri, hdr)`: the rows of `MRIxfmCRS2XYZ(mri, 0)`, the scanner code.
+fn mri_to_nifti_sform(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mri,
+    hdr: &mut NiftiHeader,
+) -> Result<(), Fatal> {
+    let v = vol_geom::xfm_crs2xyz(g, out, err, &m.vg, 0, false)?;
+    for c in 0..4 {
+        hdr.f32_at(280 + 4 * c, v.relt(1, c as i32 + 1));
+        hdr.f32_at(296 + 4 * c, v.relt(2, c as i32 + 1));
+        hdr.f32_at(312 + 4 * c, v.relt(3, c as i32 + 1));
+    }
+    hdr.i16_at(254, NIFTI_XFORM_SCANNER_ANAT);
+    Ok(())
+}
+
+/// Whether the frames tag is written (`MRITAGwrite`, `__getMRITAGlength`; FS-441).
+fn frames_marked(g: &mut Globals, m: &Mri) -> bool {
+    let first = m.frames.first();
+    if first.is_none() && m.nframes <= 1 {
+        g.notices.add(
+            &FS_441,
+            format!(
+                "the tags of a volume of {} frames: its first frame's label and threshold (FreeSurfer reads memory past its frames)",
+                m.nframes
+            ),
+        );
+    }
+    m.nframes > 1 || first.is_some_and(|f| f.label != 0 || f.thresh.abs() >= f32::EPSILON)
+}
+
+/// `__getMRITAGlength(mri, niftiheaderext)`: the bytes [`mri_tag_write`] writes, each tag with its
+/// number and length (`[DEBUG] __getMRITAGlength(): ...` lines with `DIAG_INFO`).
+pub fn mri_tag_length(g: &mut Globals, out: &mut dyn Write, m: &Mri, nifti: bool) -> i64 {
+    let info = g.gdiag & DIAG_INFO != 0;
+    let mut dlen: i64 = 0;
+    if info {
+        let _ = writeln!(out, "[DEBUG] __getMRITAGlength(): dlen = {dlen:<6}");
+    }
+    let add = |g: &Globals, out: &mut dyn Write, dlen: &mut i64, taglen: i64, tag: i32| {
+        *dlen += taglen;
+        if g.gdiag & DIAG_INFO != 0 {
+            let _ = writeln!(
+                out,
+                "[DEBUG] __getMRITAGlength(): +{taglen:<6}, dlen = {:<6} (TAG = {tag:<2})",
+                *dlen
+            );
+        }
+    };
+    if m.warp_field_format != WARPFIELD_DTFMT_UNKNOWN {
+        let (src, trg) = (
+            m.gcamorph_image_vg.fname.c_bytes().to_vec(),
+            m.gcamorph_atlas_vg.fname.c_bytes().to_vec(),
+        );
+        let t = fstagsio::getlen_gcamorph_geom(g, &src, &trg, nifti, true, true);
+        add(g, out, &mut dlen, t, tags::TAG_GCAMORPH_GEOM);
+        let t = fstagsio::getlen_gcamorph_geom(g, &src, &trg, nifti, true, false);
+        add(g, out, &mut dlen, t, tags::TAG_GCAMORPH_GEOM_PLUSSHEAR);
+        add(
+            g,
+            out,
+            &mut dlen,
+            fstagsio::getlen_gcamorph_meta(true),
+            tags::TAG_GCAMORPH_META,
+        );
+        if m.gcamorph_affine.is_some() {
+            add(
+                g,
+                out,
+                &mut dlen,
+                fstagsio::getlen_matrix(nifti, true),
+                TAG_GCAMORPH_AFFINE,
+            );
+        }
+        if m.gcamorph_label.is_some() {
+            let (w, h, d) = (m.vg.width, m.vg.height, m.vg.depth);
+            let t = fstagsio::getlen_gcamorph_labels(g, w, h, d, 4, nifti, true);
+            add(g, out, &mut dlen, t, tags::TAG_GCAMORPH_LABELS);
+        }
+        if nifti {
+            add(
+                g,
+                out,
+                &mut dlen,
+                fstagsio::getlen_endtag(true),
+                tags::TAG_END_NIIHDREXTENSION,
+            );
+        }
+        return dlen;
+    }
+    if nifti {
+        add(g, out, &mut dlen, fstagsio::getlen_dof(true), tags::TAG_DOF);
+        let t = fstagsio::getlen_scan_parameters(m, true);
+        add(g, out, &mut dlen, t, tags::TAG_SCAN_PARAMETERS);
+        add(
+            g,
+            out,
+            &mut dlen,
+            fstagsio::getlen_ras_xform(true),
+            tags::TAG_RAS_XFORM,
+        );
+        let t = fstagsio::getlen_ras_xform_extra(true);
+        add(g, out, &mut dlen, t, tags::TAG_RAS_XFORM_EXTRA);
+    }
+    let flen = c_bytes(m.transform_fname.as_bytes()).len() as i64;
+    if flen > 0 {
+        let t = fstagsio::getlen_tag(TAG_MGH_XFORM, flen + 1, nifti, true);
+        add(g, out, &mut dlen, t, TAG_MGH_XFORM);
+    }
+    if m.auto_align.is_some() {
+        add(
+            g,
+            out,
+            &mut dlen,
+            fstagsio::getlen_matrix(nifti, true),
+            TAG_AUTO_ALIGN,
+        );
+    }
+    if !nifti {
+        let n = match &m.pedir {
+            Some(p) => c_bytes(p).len() as i64 + 1,
+            None => 7,
+        };
+        add(
+            g,
+            out,
+            &mut dlen,
+            fstagsio::getlen_tag(TAG_PEDIR, n, nifti, true),
+            TAG_PEDIR,
+        );
+    }
+    if m.orig_ras2vox.is_some() {
+        add(
+            g,
+            out,
+            &mut dlen,
+            fstagsio::getlen_matrix(nifti, true),
+            TAG_ORIG_RAS2VOX,
+        );
+    }
+    if !nifti {
+        let t = fstagsio::getlen_tag(TAG_FIELDSTRENGTH, 4, nifti, true);
+        add(g, out, &mut dlen, t, TAG_FIELDSTRENGTH);
+    }
+    if frames_marked(g, m) {
+        let t = fstagsio::getlen_mri_frames(m, nifti, true);
+        add(g, out, &mut dlen, t, tags::TAG_MRI_FRAME);
+    }
+    if let Some(ct) = &m.ct {
+        let t = fstagsio::getlen_old_colortable(ct, nifti, true);
+        add(g, out, &mut dlen, t, tags::TAG_OLD_COLORTABLE);
+    }
+    for c in &m.cmdlines {
+        let n = c_bytes(c.as_bytes()).len() as i64 + 1;
+        add(
+            g,
+            out,
+            &mut dlen,
+            fstagsio::getlen_tag(TAG_CMDLINE, n, nifti, true),
+            TAG_CMDLINE,
+        );
+    }
+    if nifti {
+        add(
+            g,
+            out,
+            &mut dlen,
+            fstagsio::getlen_endtag(true),
+            tags::TAG_END_NIIHDREXTENSION,
+        );
+    }
+    dlen
+}
+
+/// `__writeFSniiextensionHeader(fp, mri, intent)`: `>`, the intent (16 bits, big-endian) and the
+/// version's low byte; an `intent` other than -1 becomes the volume's intent (truncated to 16
+/// bits) and version first.
+fn write_fs_nii_extension_header(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    fp: &mut ZnzFile,
+    m: &mut Mri,
+    intentcode: i32,
+) {
+    let info = g.gdiag & DIAG_INFO != 0;
+    if info {
+        let _ = writeln!(
+            out,
+            "[DEBUG] __writeFSniiextensionHeader(): intent (user) = {intentcode}, mri->intent (orig) = {}, mri->version (orig) = {}",
+            m.intent, m.version
+        );
+    }
+    let mut intent = ((m.version >> 8) & 0xffff) as u16;
+    if intentcode != MGZ_INTENT_UNKNOWN {
+        intent = intentcode as u16;
+        m.intent = i32::from(intent);
+        m.version = ((i32::from(intent) & 0xffff) << 8) | MGH_VERSION;
+    }
+    let le = intent.to_le_bytes();
+    let ext = [b'>', le[1], le[0], (m.version & 0xff) as u8];
+    if info {
+        let _ = writeln!(
+            out,
+            "[DEBUG] __writeFSniiextensionHeader(): intent swapped byte order ({:02x} {:02x}) => ({:02x} {:02x})",
+            le[0], ext[1], ext[1], ext[2]
+        );
+        let _ = writeln!(
+            out,
+            "[DEBUG] __writeFSniiextensionHeader(): intent = {intent}, mgh version = {}, mri->intent (new) = {}, mri->version (new) = {}",
+            ext[3], m.intent, m.version
+        );
+        let _ = writeln!(
+            out,
+            "[DEBUG] __writeFSniiextensionHeader(): {:02x} {:02x} {:02x} {:02x}",
+            ext[0], ext[1], ext[2], ext[3]
+        );
+    }
+    fio::fs_znzwrite(fp, &ext, 1, 4);
+}
+
+/// The ico7 surface's reshape (`mri_reshape(mri, 27307, 1, 6, nframes)`): a new volume of that
+/// extent with the volume's header and pulse parameters and, for uchar, short, unsigned short,
+/// float, int and long volumes, the voxels in the same order (the others' zeros).
+fn reshape_ico7(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mri,
+) -> Result<Mri, Fatal> {
+    let copied = matches!(
+        m.mtype,
+        MRI_UCHAR | MRI_SHORT | MRI_USHRT | MRI_FLOAT | MRI_INT | mri::MRI_LONG
+    );
+    if copied && m.chunk.is_none() && m.nframes > 0 {
+        // FreeSurfer reads the first voxel through slices the volume does not have (a crash)
+        g.notices.add(
+            &FS_58,
+            "mri_reshape of a volume made without voxels".to_string(),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            "mri_reshape(): the volume has no voxels (FreeSurfer crashes here)\n",
+        )?;
+    }
+    let mut r = mri::mri_alloc_sequence(g, out, err, 27307, 1, 6, m.mtype, m.nframes)?;
+    let _ = mri::mri_copy_header(g, out, err, m, Some(&mut r))?;
+    mri::mri_copy_pulse_parameters(m, &mut r);
+    if copied && let (Some(s), Some(d)) = (m.chunk.as_ref(), r.chunk.as_mut()) {
+        let n = s.len().min(d.len());
+        d[..n].copy_from_slice(&s[..n]);
+    }
+    Ok(r)
+}
+
+/// `niiWrite(mri, fname, intent)`: the volume as a NIfTI-1 file (`.nii`; compressed when the name
+/// ends in `z`), with FreeSurfer's header extension (code 14). See `specs/freesurfer-io.md` §93.
+#[allow(clippy::too_many_arguments)]
+pub fn nii_write(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    m0: &mut Mri,
+    fname: &str,
+    intent: i32,
+) -> Result<i32, Fatal> {
+    let _ = env;
+    let use_compression = fname.as_bytes().last() == Some(&b'z');
+    if g.gdiag_no > 0 {
+        let _ = writeln!(
+            out,
+            "niiWrite: use_compression = {}",
+            i32::from(use_compression)
+        );
+    }
+    let mut reshaped = if m0.vg.width == 163842 && m0.vg.height == 1 && m0.vg.depth == 1 {
+        Some(reshape_ico7(g, out, err, m0)?)
+    } else {
+        None
+    };
+    let m: &mut Mri = match reshaped.as_mut() {
+        Some(r) => r,
+        None => m0,
+    };
+    let (w, h, d, nf) = (m.vg.width, m.vg.height, m.vg.depth, m.nframes);
+    for (n, what, sp) in [
+        (h, "nrows", " "),
+        (d, "nslices", " "),
+        (nf, "nframes", "  "),
+    ] {
+        // FS-449: 32,768 passes FreeSurfer's check and is stored as -32768; corrected, refused as
+        // the larger ones are, against the field's true limit
+        let limit = if n == SHORTMAX {
+            g.notices.add(
+                &FS_449,
+                format!("niiWrite: {n} {what}, which the header's 16-bit field holds as -32768"),
+            );
+            g.notices.fix().then_some(SHORTMAX - 1)
+        } else {
+            (n > SHORTMAX).then_some(SHORTMAX)
+        };
+        if let Some(limit) = limit {
+            let _ = writeln!(
+                out,
+                "NIFTI FORMAT ERROR:{sp}{what} {n} in volume exceeds {limit}"
+            );
+            return Err(Fatal::Exit(1));
+        }
+    }
+    let mut hdr = NiftiHeader([0u8; 348]);
+    hdr.i32_at(0, 348);
+    for t in 0..8 {
+        hdr.dim(t, 1);
+        hdr.pixdim(t, 1.0);
+    }
+    hdr.dim(0, if nf == 1 { 3 } else { 4 });
+    if w < SHORTMAX {
+        hdr.dim(1, w as i16);
+    } else {
+        hdr.dim(1, -1);
+        hdr.i32_at(144, w);
+    }
+    hdr.dim(2, h as i16);
+    hdr.dim(3, d as i16);
+    hdr.dim(4, nf as i16);
+    hdr.pixdim(1, m.vg.xsize);
+    hdr.pixdim(2, m.vg.ysize);
+    hdr.pixdim(3, m.vg.zsize);
+    hdr.pixdim(4, (f64::from(m.tr) / 1000.0) as f32);
+    let (datatype, bitpix): (i16, i16) = match m.mtype {
+        MRI_UCHAR => (DT_UNSIGNED_CHAR, 8),
+        MRI_INT | mri::MRI_LONG => (DT_SIGNED_INT, 32),
+        MRI_FLOAT => (DT_FLOAT, 32),
+        MRI_FLOAT_COMPLEX => (DT_COMPLEX, 64),
+        MRI_SHORT => (DT_SIGNED_SHORT, 16),
+        MRI_USHRT => (DT_UINT16, 16),
+        mri::MRI_BITMAP => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_UNSUPPORTED,
+                "niiWrite(): data type MRI_BITMAP unsupported",
+            );
+            return Ok(ERROR_UNSUPPORTED);
+        }
+        mri::MRI_TENSOR => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_UNSUPPORTED,
+                "niiWrite(): data type MRI_TENSOR unsupported",
+            );
+            return Ok(ERROR_UNSUPPORTED);
+        }
+        t => {
+            log::error_printf(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!("niiWrite(): unknown data type {t}"),
+            );
+            return Ok(ERROR_BADPARM);
+        }
+    };
+    hdr.i16_at(70, datatype);
+    hdr.i16_at(72, bitpix);
+    hdr.f32_at(108, 352.0);
+    hdr.0[123] = 2 | 8; // NIFTI_UNITS_MM | NIFTI_UNITS_SEC
+    let descrip = format!("FreeSurfer {BUILD_DATE}");
+    hdr.0[148..148 + descrip.len()].copy_from_slice(descrip.as_bytes());
+    if m.intent == mri::MGZ_INTENT_WARPMAP {
+        hdr.i16_at(68, NIFTI_INTENT_DISPVECT);
+        hdr.dim(0, 5);
+        hdr.dim(4, 1);
+        hdr.dim(5, nf as i16);
+        let dims: Vec<String> = (0..8).map(|i| hdr.dim_of(i).to_string()).collect();
+        let _ = writeln!(
+            out,
+            "[INFO] niiWrite(): MGZ_INTENT_WARPMAP => NIFTI_INTENT_DISPVECT, intent_code = {NIFTI_INTENT_DISPVECT}, dimensions = {{{}}}",
+            dims.join(", ")
+        );
+        if m.warp_field_format != WARPFIELD_DTFMT_DISP_RAS {
+            let _ = writeln!(
+                out,
+                "[INFO] niiWrite(): convert displacement from {} to {WARPFIELD_DTFMT_DISP_RAS}",
+                m.warp_field_format
+            );
+            let _ = writeln!(
+                err,
+                "larmorx-freesurfer: writing a warp map's displacements in another format (Warpfield::changeFormat) is not ported yet ({fname})"
+            );
+            return Ok(-1);
+        }
+    }
+    let r = mri_to_nifti_qform(g, out, err, m, &mut hdr)?;
+    if r != NO_ERROR {
+        return Ok(r);
+    }
+    mri_to_nifti_sform(g, out, err, m, &mut hdr)?;
+    hdr.0[344..348].copy_from_slice(b"n+1\0");
+    let path = utils::resolve(dir, fname);
+    let Some(mut file) = ZnzFile::open(path.as_os_str().as_encoded_bytes(), b"w", use_compression)
+    else {
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("niiWrite(): error opening file {fname}"),
+        ));
+    };
+    let fp = &mut file;
+    let mgztaglen = mri_tag_length(g, out, m, true) as i32;
+    let mut esize = mgztaglen;
+    let info = g.gdiag & DIAG_INFO != 0;
+    if esize > 0 {
+        esize = esize.wrapping_add(12);
+        if info {
+            let _ = writeln!(
+                out,
+                "[DEBUG] niiWrite(): mgztaglen = {mgztaglen}, esize = {esize}"
+            );
+        }
+        if esize & 0xf != 0 {
+            esize = esize.wrapping_add(0xf) & !0xf;
+        }
+        let vo = hdr.vox_offset() + esize as f32;
+        hdr.f32_at(108, vo);
+        if info {
+            let _ = writeln!(
+                out,
+                "[DEBUG] niiWrite(): updated vox_offset = {} (mgztaglen = {mgztaglen}, esize = {esize})",
+                hdr.vox_offset() as i64
+            );
+        }
+    }
+    if fio::fs_znzwrite(fp, &hdr.0, 348, 1) != 1 {
+        file.close();
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("niiWrite(): error writing header to {fname}"),
+        ));
+    }
+    let chbuf = [u8::from(esize > 0), 0, 0, 0];
+    if fio::fs_znzwrite(fp, &chbuf, 1, 4) != 4 {
+        file.close();
+        return Ok(fail_code(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("niiWrite(): error writing data to {fname}"),
+        ));
+    }
+    if esize > 0 {
+        fio::fs_znzwrite(fp, &esize.to_le_bytes(), 4, 1);
+        fio::fs_znzwrite(fp, &NIFTI_ECODE_FREESURFER.to_le_bytes(), 4, 1);
+        write_fs_nii_extension_header(g, out, fp, m, intent);
+        mri_tag_write(g, out, err, m, fp, true)?;
+        let reminder = esize.wrapping_sub(mgztaglen.wrapping_add(12));
+        if reminder > 0 {
+            let pad = vec![0u8; reminder as usize];
+            fio::fs_znzwrite(fp, &pad, 1, pad.len());
+        }
+        if info {
+            let _ = writeln!(
+                out,
+                "[DEBUG] niiWrite(): mgztaglen = {mgztaglen}, esize = {esize}, reminder = {reminder}"
+            );
+            let _ = writeln!(
+                out,
+                "[DEBUG] niiWrite(): write freesurfer header-extension, mgztaglen = {mgztaglen}, esize = {esize}, ecode = {NIFTI_ECODE_FREESURFER}"
+            );
+        }
+    }
+    let unit = (bitpix / 8) as usize;
+    // a volume without voxels: FreeSurfer takes its first row's address from slices it does not
+    // have (a crash)
+    if m.chunk.is_none() && i64::from(d.max(0)) * i64::from(nf.max(0)) * i64::from(h.max(0)) > 0 {
+        g.notices.add(
+            &FS_58,
+            "niiWrite of a volume made without voxels".to_string(),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            "niiWrite(): the volume has no voxels (FreeSurfer crashes here)\n",
+        )?;
+    }
+    let long_rows = m.mtype == mri::MRI_LONG;
+    if long_rows && w > 0 && h > 0 && d > 0 && nf > 0 {
+        g.notices.add(
+            &FS_447,
+            "niiWrite of a long volume: each row's first bytes as 32-bit numbers (FreeSurfer)",
+        );
+    }
+    let as_ints = long_rows && g.notices.fix();
+    for t in 0..nf {
+        for k in 0..d {
+            let mut slice = Vec::with_capacity(w.max(0) as usize * h.max(0) as usize * unit);
+            for j in 0..h {
+                let row = ((t * d + k) * h + j) as usize;
+                if as_ints {
+                    let b = row_bytes(m, row, w.max(0) as usize * 8);
+                    for v in b.chunks_exact(8) {
+                        let l = i64::from_le_bytes(v.try_into().expect("8 bytes"));
+                        let i = l.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+                        if i64::from(i) != l {
+                            g.notices.add(
+                                &FS_447,
+                                format!("niiWrite: the long {l} clamped to a 32-bit number"),
+                            );
+                        }
+                        slice.extend_from_slice(&i.to_le_bytes());
+                    }
+                } else {
+                    slice.extend_from_slice(&row_bytes(m, row, w.max(0) as usize * unit));
+                }
+            }
+            let n = (w.max(0) as usize) * (h.max(0) as usize);
+            if fio::fs_znzwrite(fp, &slice, unit, n) != n as i64 {
+                file.close();
+                return Ok(fail_code(
+                    g,
+                    err,
+                    ERROR_BADFILE,
+                    &format!("niiWrite(): error writing data to {fname}"),
+                ));
+            }
+        }
+    }
+    if file.close() != 0 {
+        g.notices.add(
+            &FS_448,
+            format!("niiWrite of {fname}: the close failed (FreeSurfer reports success)"),
+        );
+        if g.notices.fix() {
+            return Ok(fail_code(
+                g,
+                err,
+                ERROR_BADFILE,
+                &format!("niiWrite(): error writing data to {fname}"),
+            ));
+        }
+    }
+    Ok(NO_ERROR)
 }
 
 #[cfg(test)]

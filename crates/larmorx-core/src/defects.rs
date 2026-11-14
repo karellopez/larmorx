@@ -1757,6 +1757,12 @@ defects! {
         "writing an MGH volume with FS_MGZIO_USEVOXELBUFWRITE set crashes for a volume without slices (a depth or a frame count of 0)";
     FS_446 = "FS-446", "FreeSurfer", true,
         "a volume made without voxels (a header read alone) leaves its contiguous-buffer flag unset (memory contents): writing it as an MGH file with FS_MGZIO_USEVOXELBUFWRITE set then crashes or not depending on memory";
+    FS_447 = "FS-447", "FreeSurfer", true,
+        "writing a volume of 64-bit integers (long) as NIfTI declares 32-bit integers and stores the first half of each row's bytes: wrong values";
+    FS_448 = "FS-448", "FreeSurfer", true,
+        "writing a NIfTI volume ignores the file's close: a compressed file whose last bytes could not be written (a full disk) is reported as written";
+    FS_449 = "FS-449", "FreeSurfer", true,
+        "writing a NIfTI volume of exactly 32,768 rows, slices or frames passes the size check and stores -32,768 in the header's 16-bit field: a header readers reject or misread";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

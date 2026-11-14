@@ -107,7 +107,7 @@ fn fs594_consecutive_points_removed() {
             &mut g,
             6,
             MRI_UCHAR,
-            |x, y, z| if z == 2 { 50.0 } else { 0.0 },
+            |_, _, z| if z == 2 { 50.0 } else { 0.0 },
         );
         let env = Environment::from_pairs([("FS_THRESH_CTRL", "10")]);
         let mut st = nz::NormState::default();

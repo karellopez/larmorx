@@ -76,7 +76,9 @@ def main(argv: list[str] | None = None) -> int:
         "--norm", action="store_true", help="the bias fields (Voronoi, soap bubble) instead"
     )
     ap.add_argument(
-        "--gentle", action="store_true", help="the gentle normalisation (MRI3dGentleNormalize) instead"
+        "--gentle",
+        action="store_true",
+        help="the gentle normalisation (MRI3dGentleNormalize) instead",
     )
     a = ap.parse_args(argv)
     ws = workspace()
@@ -102,7 +104,13 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"{cmd} {mri / 'mri' / name} {label} {fx(maxd)} {mode}")
     inputs = ws / "oracles" / "inputs" / "fs-filter"
     inputs.mkdir(parents=True, exist_ok=True)
-    name = "real-gentle-cases.txt" if a.gentle else "real-norm-cases.txt" if a.norm else "real-cases.txt"
+    name = (
+        "real-gentle-cases.txt"
+        if a.gentle
+        else "real-norm-cases.txt"
+        if a.norm
+        else "real-cases.txt"
+    )
     cases_path = inputs / name
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     # MRIread runs FreeSurfer's licence check: FREESURFER_HOME and FS_LICENSE (read in place)

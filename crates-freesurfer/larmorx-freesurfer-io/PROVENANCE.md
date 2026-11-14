@@ -273,6 +273,9 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 1206-1210 | `MRIwriteType`'s NIfTI branch | `mriio.rs` |
 | `utils/mriio.cpp` 8177-8363 | `nifti1Write` (FS-447, FS-449, FS-451, FS-452, FS-58; relay 24) | `mriio_write.rs` |
 | `utils/mriio.cpp` 1124-1135, 1203-1205 | `MRIwriteType`'s `stat` (its `errno`) and NIfTI-1 branch (relay 24) | `mriio.rs` |
+| `utils/mriio.cpp` 8365-8979, 10107-10227, 10400-10441, 12149-12198, 12717-12859; `include/mri.h` 310-326; `utils/mri2.cpp` 653-735 | `niiRead`, `niftiSformToMri`, `niftiQformToMri`, `swap_nifti_1_header`, `niiPrintHdr`, `__niiReadHeaderextension`, `__niiReadSetVox2ras`, `__readFSniiextensionHeader`, `MRI::update_ras_xform`, `mri_reshape` as the readers call it (FS-454 to FS-460, FS-641 to FS-643; relay 25) | `mriio_nifti.rs` |
+| `utils/mriio.cpp` 7680-8175 | `nifti1Read` (FS-453, FS-454, FS-457, FS-458, FS-643, FS-644; relay 25) | `mriio_nifti.rs` |
+| `utils/mriio.cpp` 772-777 | `mri_read`'s NIfTI branches (relay 25) | `mriio.rs` |
 | `utils/utils.cpp` 1551-1556 | `exec_progress_callback` (no callback in the port's programs: nothing) | (not translated) |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
@@ -298,3 +301,19 @@ ended with the C library's overflow message (status 134) under `reproduce`, as m
 The niiWrite helpers shared with it: the size checks (`nifti_size_checks`), a row's bytes and
 FS-447's clamp (`nifti_row`, `long_rows_as_ints`). `matfile`'s size products saturate (a header's
 sizes overflowed 64 bits: a debug build's panic; the refusal, FS-243, as before for the sizes that fit).
+
+Changes for relay 25: the NIfTI header is kept as the 348 bytes of `struct nifti_1_header` in x86-64's
+memory and byte-swapped in place field by field (as `swap_nifti_1_header`), its fields read from their
+offsets. The arithmetic follows the official build's object code (the unit oracle's `mriio.cpp.o`,
+`objdump`): `niftiQformToMri`'s quaternion with GCC's folding of `1.0 - s` and `1.0 / sqrt(s)` into
+`float` operations (exact, the same values) and its operand order (which NaN payload a result keeps:
+`b * (2a)` as `B * A2`, `2.0*a*c` as `C * A2`, `r13` as `2ac + 2bd`, the centre's sums `y + x + z`,
+`z + (x + y)`, `x + y + z`), the scaled loops' `value * slope + intercept` (`slope * value` for
+`float` data), the units' products with the field first (the factor first for `c_s` and TR), the
+field of view and axis ends as `(extent x size) x 0.5` with the sign flipped first for the start;
+`(long)vox_offset` as `cvttss2si`; `float`/`double` conversions as `cvtss2sd`/`cvtsd2ss` written
+out (`widen`, `narrow`: NaN payloads kept, quieted). The voxel loops of both readers are one
+function (`read_voxels`) with their differences as parameters (the count line, the swaps of
+`double`s and complex values); `mri_reshape`'s copy is `mriio_write::reshape` (the writer's ico7
+reshape generalised); `nifti1Read`'s cut names (FS-453) are larmorx's own under `reproduce`. The
+fixes of FS-454 to FS-460, FS-643 and FS-644 are larmorx's own.

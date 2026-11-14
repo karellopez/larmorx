@@ -19,7 +19,7 @@ schemas; §75 (3.1-34): the rest of the registration files; part 10 (§76-82): l
 annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; part 12
 (§87-89): a label's coordinates converted, one frame of a volume written; **part 13** (§90-92): MGH and
 MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94), NIfTI-1 pairs
-(`.hdr` and `.img`) written (§95-96).
+(`.hdr` and `.img`) written (§95-96); **part 15** (§97-99): NIfTI volumes and NIfTI-1 pairs read.
 
 ## 1. Conventions
 
@@ -2416,7 +2416,7 @@ The file is compressed (gzip) when the name's last character is `z`. With `Gdiag
 ## 94. Validation plan (NIfTI)
 
 Piece 14's `mgw` through `MRIwrite` with the names `.nii`, `.nii.gz`, `.NII` and `o.nii.mgz.nii`
-(§92's volumes; the read back gives `mghRead`'s refusal), with the ico7 shape (one case in 16 of
+(§92's volumes; read back with `mghRead`'s refusal until part 15, with `mri_read` since), with the ico7 shape (one case in 16 of
 NIfTI names: 163,842 x 1 x 1, uchar or float, one or two frames) and 32,768 rows (FS-449), the
 volumes' axes FreeSurfer's coronal ones, a signed permutation (one in two) or none (one in 40: the
 determinant's warning), now and then perturbed (non-orthonormal). The files are compared whole
@@ -2471,3 +2471,193 @@ FS-451's names (`validation/probes/fs-io/nifti1_long_names.py`, nine cases in fo
 200-byte names: names of 1,019 to 1,023 bytes without an extension, `.img` names of 1,023, 1,024 and
 1,027 bytes, a `.hdr` name of 1,024 bytes): `reproduce` identical on 9, `fix` differs only with
 FS-451. The recorded test `fs_io_official` (4,798 cases: 4,309 identical, 489 counted).
+
+## 97. NIfTI read (`niiRead(name, read_volume)`: `.nii` and `.nii.gz`; `mri_read`'s `NII_FILE`)
+
+The file is opened compressed (zlib's reader, which also reads a plain file as it is) when the
+name's last character is `z`, plain otherwise. With `Gdiag_no` above 0: `niiRead: use_compression =
+<0|1>` on standard output. Messages below are errors (§1) and give no volume; those marked *errno 0*
+clear `errno` first, the others keep it.
+
+- **Opening and the header:** `niiRead(): error opening file <name>` (*errno 0*), `niiRead(): error
+  reading header from <name>` (*errno 0*: fewer than 348 bytes). The 348-byte header is read in the
+  machine's (little-endian) order. When `dim[0]` is not 1 to 7 the header is byte-swapped (big-endian):
+  every numeric field reversed except `extents`, `session_error`, `glmax` and `glmin` (FS-643); still
+  not 1 to 7: `niiRead(): bad number of dimensions (<dim0>) in <name>`. Then, in this order: the
+  magic `n+1\0` (`niiRead(): bad magic number in <name>`), `dim[0]` 1 to 5 (`niiRead(): <dim0>
+  dimensions in <name>; unsupported`, `ERROR_UNSUPPORTED`), a data type other than 0 (`niiRead():
+  unknown or no data type in <name>; bailing out`, `ERROR_UNSUPPORTED`). `dim[4]` of 0: `WARNING:
+  hdr.dim[4] = 0 (nframes), setting to 1` and 1 is used from there (the header printout included).
+- **Units:** `xyzt_units & 7`: 1 metres (x 1000), 2 millimetres (x 1), 3 microns (x 0.001), 0 (x 1);
+  other values: `niiRead(): unknown space units <u> in <name>` (`ERROR_BADFILE`). `xyzt_units & 0x38`:
+  8 seconds (TR x 1000), 16 milliseconds (x 1), 24 microseconds (x 0.001); other values give the
+  factor 0 and, when `dim[4] > 1`, `WARNING: niiRead(): unknown time units <t> in <name>` on standard
+  output.
+- **Slice timing:** with `slice_code` not 0, the slice dimension (`(dim_info >> 4) & 3`) not 0 and
+  `slice_duration > 0`: a code outside 1 to 6 gives `niiRead(): unsupported slice timing pattern
+  <code> in <name>` (`ERROR_UNSUPPORTED`).
+- **Frames:** 1 when `dim[0] < 4`, else `dim[4]`; times `dim[5]` when `dim[0] > 4` and `dim[5] > 0`
+  (32-bit products, wrapping). With `Gdiag_no` above 0: `niiRead(): hdr.dim <dim0> ... <dim5>`.
+- **Types:** the data are scaled when `scl_slope` is not 0 and not (`scl_slope` 1 and `scl_inter` 0)
+  (a NaN slope scales). Unscaled: 2 uchar (1 byte), 4 short (2), 512 unsigned short (2; `INFO: This is
+  an unsigned short.` on standard error), 8 and 768 int (4; FS-457: an unsigned value above
+  2,147,483,647 becomes negative, kept in both modes, noted), 16 float (4), 32 float complex (8), 64
+  double read as float (8; `niiRead(): detected input as 64 bit double, reading in as 32 bit float` on
+  standard output); other types `niiRead(): unsupported datatype <dt> (with scl_slope = 0) in <name>`
+  (`ERROR_UNSUPPORTED`). Scaled: 2, 4, 8, 16, 64, 256 (signed char), 512 and 768 give a float volume;
+  others `... (with scl_slope != 0) in <name>`.
+- **Extents:** the columns are `dim[1]` when positive, else `glmin` (FreeSurfer's form for 32,768
+  columns or more); rows `dim[2]`, slices `dim[3]` (FS-458: also when `dim[0]` is below 2 or 3, where
+  NIfTI says they do not count; `fix` takes 1 for an extent past `dim[0]` that is not 1, noted;
+  `reproduce` the header's). FS-643: a byte-swapped header's `glmin` is used unswapped; `fix` swaps it
+  (noted). **The ico7 surface** is a volume whose columns x rows x slices (32-bit product) is 163,842.
+  `intent_code` 1006 prints `[INFO] niiRead(): intent_code = 1006, dimensions = {<dim0>, ..., <dim7>}`.
+  The volume: with voxels, the extents and frames; without, the extents (163,842 x 1 x 1 for the ico7
+  surface) and the frames.
+- **The geometry:** voxel sizes `pixdim[1..3]`, TR `pixdim[4]`. Then (`INFO: using NIfTI-1 sform
+  (sform_code=<c>)`, standard error) with `sform_code` not 0: the 4 x 4 matrix of the three `srow`
+  rows (last row 0; with `DIAG_INFO`: `[DEBUG] niftiSformToMri() sform:` and the matrix,
+  `specs/freesurfer-core.md`'s matrix printing, precision 10) given to `specs/freesurfer-mri.md`'s
+  `MRIsetVox2RASFromMatrix` (the voxel sizes stay `pixdim`'s; its warning when they differ from the
+  columns' lengths), the RAS flag 1; else with `qform_code` not 0 (`INFO: using NIfTI-1 qform
+  (qform_code=<c>)`) the quaternion below, the RAS flag 1; else `WARNING: neither NIfTI-1 qform or
+  sform are valid` and `WARNING: your volume will probably be incorrectly oriented` (standard error),
+  the axes x = (-1, 0, 0), y = (0, 1, 0), z = (0, 0, 1), the centre `(width x xsize) x 0.5`, `(height x
+  ysize) x 0.5`, `(depth x zsize) x 0.5` (float), the RAS flag 0.
+- **The quaternion** (all `float` unless said; `widen` and `store` are exact conversions to and from
+  `double`, NaNs quieted with sign and payload kept; each operation's NaN as §1's `sse` rule, the
+  left operand first): `s = (b b + c c) + d d`; `a = 1 - s`; when `a < 1e-7` (false for a NaN):
+  `k = 1 / sqrt(s)`, `b = b k`, `c = c k`, `d = d k`, `a = 0` (so `a a`, `2a` are 0); else `a =
+  sqrt(a)`, `aa = a a`, `A2f = a + a`, `A2 = widen(a) + widen(a)`. With `B = widen(b)`, `C = widen(c)`,
+  `D = widen(d)`, in `double`: `bc = (B + B) C`, `bd = (B + B) D`, `cd = (C + C) D`, `ab = B A2`, `ac =
+  C A2`, `ad = D A2`. Then `R11 = ((aa + b b) - c c) - d d`, `R12 = store(bc - ad)`, `R13 = store(ac +
+  bd)`, `R21 = store(bc + ad)`, `R22 = ((aa + c c) - b b) - d d`, `R23 = store(cd - ab)`, `R31 =
+  store(bd - widen(c A2f))`, `R32 = store(cd + widen(b A2f))`, `R33 = ((aa + d d) - c c) - b b`;
+  `pixdim[0] < 0` negates (sign bit) `R13`, `R23`, `R33`. The axes: x = (R11, R21, R31), y = (R12, R22,
+  R32), z = (R13, R23, R33). The centre, with `W2 = width x 0.5`, `H2`, `D2` alike (double): `c_r =
+  store(((widen(R12 ysize) H2 + widen(R11 xsize) W2) + widen(R13 zsize) D2) + widen(qoffset_x))`,
+  `c_a = store((widen(R23 zsize) D2 + (widen(R21 xsize) W2 + widen(R22 ysize) H2)) +
+  widen(qoffset_y))`, `c_s = store(((widen(xsize R31) W2 + H2 widen(R32 ysize)) + D2 widen(R33
+  zsize)) + widen(qoffset_z))` (the products in float, in the order written).
+- **The extension:** with `DIAG_INFO`: `[DEBUG] niiRead(): hdr.vox_offset = <(long)vox_offset>, file
+  position = <348>` before the geometry and `[DEBUG] niiRead(): geom from Nifti sform/qform:` with the
+  geometry (`VOL_GEOM::geomprint`) after it. The four extender bytes follow the header (at byte 348,
+  whatever `sizeof_hdr` says); FS-641: bytes the file does not have are memory contents (both modes
+  take 0: no extension; noted). When the first is 1 (`[DEBUG] niiRead(): processing extension ...`
+  with `DIAG_INFO`): extensions in turn, each a 32-bit size and a 32-bit code; when they do not read
+  whole, or the code is below 0, above 14 or odd: `[WARN] __niiReadHeaderextension(): no valid
+  extension read, rollback bytes read` (standard output; the position goes back by the 4-byte words
+  read) and the end. FS-459: the code is checked before a byte-swapped file's size and code are swapped
+  (FreeSurfer's extensions in a big-endian file are not found); `fix` checks the swapped code. With
+  `DIAG_INFO`: `[DEBUG] __niiReadHeaderextension(): pre-swap exts: ecode <c>, esize <s>` (swapped
+  files), `[DEBUG] __niiReadHeaderextension(): ecode <c>, esize <s>`. Another code: FS-460: the next
+  size and code are read right after these 8 bytes (the extension's data are not skipped); `fix` skips
+  `size - 8` bytes and ends when no 8 bytes are left before the voxel offset or the size is below 8.
+  Code 14 (FreeSurfer's): the RAS flag 1 (`[DEBUG] ... processing NIFTI_ECODE_FREESURFER ...`); 4
+  bytes: an endian mark, the intent (16 bits, big-endian), the MGH version; the volume's intent and its
+  version `(intent << 8) | version` (with `DIAG_INFO`: `[DEBUG] __readFSniiextensionHeader(): <four
+  bytes %02x>`, `... intent swapped byte order (<b1> <b2>) => (<b2> <b1>)`, `... intent = <i>, mgh version
+  = <v>, mri->version = <n>`, `[DEBUG] __niiReadHeaderextension(): version = <n>, intent = <i>
+  (<name>)`); then §16's tags in the extension's form with `size - 12` bytes of tags, the RAS transform
+  tag read into a copy of the geometry found so far; the end.
+- **The RAS transform's check:** when the tags held one and the volume is not the ico7 surface: the
+  threshold `vg_isEqual_Threshold` (FLT_EPSILON unless a program sets it) or `atof(VOL_GEOM_THRESH)`
+  when that variable is set; `debug` is `DIAG_INFO` or `TAG_RAS_XFORM_DEBUG` being set. With `debug`:
+  `[DEBUG] niiRead(): geometry check, thresh=<%g> (ras_xform vs sform/qform) ...`, `VOL_GEOM::checkgeom`
+  (`specs/freesurfer-mri.md`), and when it finds a difference both geometries printed
+  (`[WARNING] niiRead(<name>): vol geom from Nifti sform/qform:`, `[WARNING] niiRead(<name>): vol geom
+  from TAG_RAS_XFORM in FS header extension:`), then `[DEBUG] niiRead(): volume vox2ras check,
+  thresh=<%g> (ras_xform vs sform/qform) ...`. `VOL_GEOM::checkvox2ras` of the transform's geometry and
+  the volume's (with the sform's matrix, 0 when no sform, its last element 1 when one) decides; with
+  `debug` and a difference: `[WARNING] niiRead(<name>): VOX2RAS differs - TAG_RAS_XFORM vs Nifti
+  sform/qform in FS header extension (thresh=<%g of vg_isEqual_Threshold>)` and `[WARNING]
+  niiRead(<name>): ignore TAG_RAS_XFORM in FS header extension, use Nifti sform/qform`. No difference
+  (always for the ico7 surface): (`[INFO] niiRead(): update vol geom with TAG_RAS_XFORM in FS header
+  extension` with `debug`) the volume takes the transform's axes, centre and shears.
+- **No extension** and `intent_code` 1006: the intent 3 (a warp map), the warp-field format 3 (RAS
+  displacements), the version `(3 << 8) | 1`, and `[INFO] niiRead(): (no header extension)
+  NIFTI_INTENT_DISPVECT => MGZ_INTENT_WARPMAP, mri->version = 769, mri->intent = 3 (WARP)`.
+- **The units applied** (float): voxel sizes and `c_r`, `c_a` times the space factor, `c_s` the factor
+  times `c_s`, TR the time factor times TR; the field of view `width x xsize`, `xstart = -(width x
+  xsize) x 0.5`, `xend = (width x xsize) x 0.5`, alike for y (height) and z (depth). With `Gdiag_no`
+  above 0 the header is printed (`nifti header ---------------------------------`, the fields, a line
+  of 41 dashes): `sizeof_hdr <d> `, `data_type  <s> `, `db_name    <s> `, `extents    <d> `,
+  `session_error <d> `, `regular    <c> `, `dim_info   <c> `, `dim[<n>] <d>` (8 lines), `intent_p1  <f>
+  ` (p2, p3), `intent_code  <d> `, `datatype      <d> `, `bitpix        <d> `, `slice_start   <d> `,
+  `pixdim[<n>] <f>` (8 lines), `vox_offset    <f>`, `scl_slope     <f>`, `scl_inter     <f>`,
+  `slice_end     <d>`, `slice_code    <c>`, `xyzt_units    <c>`, `cal_max       <f>`, `cal_min
+  <f>`, `slice_duration <f>`, `toffset        <f> `, `glmax          <d> `, `glmin          <d> `,
+  `descrip        <s> `, `aux_file       <s> `, `qform_code     <d> `, `sform_code     <d> ` (each line
+  ending as written; `%c` the raw byte, a NUL included; `%f` C's six decimals; `<s>` the bytes from the
+  field to the next NUL, running on into later fields; FS-642 past the header's end: memory, both
+  modes stop at the end, noted).
+- **The voxels** (with `read_volume`; without, the volume as it stands): with `DIAG_INFO` `[DEBUG]
+  niiRead(): hdr.vox_offset = <(long)vox_offset>`; the file goes to `(long)vox_offset` (truncated; a NaN
+  or a value outside the 64-bit range gives the lowest 64-bit number) from its start (`niiRead(): error
+  finding voxel data in <name>`, *errno 0*, when that fails: a negative offset in a plain file); with
+  `DIAG_INFO` `[DEBUG] niiRead(): zeek to image data, after znzseek(<o>), file position = <p>`. Rows of
+  `width` voxels, frame by frame, slice by slice, row by row. Unscaled: each row read whole (else
+  `ERROR: Read <n>, expected <width>` on standard output and `niiRead(): error reading from <name>`,
+  *errno 0*), byte-swapped by its voxel size for a swapped header (2 or 4 bytes; FS-455: doubles are
+  swapped by 4-byte halves, `fix` by 8 bytes; FS-456: complex values are not swapped, `fix` swaps each
+  4-byte part; both noted), doubles stored as floats (`store`). Scaled: each row read in the file's
+  type (`niiRead(): error reading from <name>`, *errno 0*, no count line), swapped by its size, each
+  value converted to float (an int's value rounded, a double stored) and `value x slope + intercept`
+  (float; for float data `slope x value + intercept`: the order decides a NaN's payload). FS-454:
+  unsigned 32-bit data are read twice: first as signed numbers, then once more from the end of the
+  data as unsigned ones (the second read normally fails: the error above); `fix` reads them once as
+  unsigned numbers (noted in both modes). **The ico7 surface** is then reshaped to 163,842 x 1 x 1 (a
+  new volume with the header and pulse parameters; uchar, short, unsigned short, float, int and long
+  voxels in order, others' zeros). The status: the volume.
+
+## 98. NIfTI-1 pairs read (`nifti1Read(name, read_volume)`; `mri_read`'s `NIFTI1_FILE`)
+
+The stem is the name without a final `.img` or `.hdr` (§95); the header comes from `<stem>.hdr`, the
+voxels from `<stem>.img` from its first byte (`vox_offset` is not used; no extension is read). FS-453:
+the names are built in 1,024-byte buffers: a name of 1,024 bytes or more with its extension is cut to
+1,023 bytes with `nifti1Read: Truncation on line 7704` (the header's name) and `nifti1Read:
+Truncation on line 7708` (the image's) on standard error; `fix` uses the whole names (noted). As §97
+with these differences: the plain C stream (no compression, no `Gdiag_no` lines, no `[DEBUG]` lines
+of its own); every message names `<stem>.hdr` (`nifti1Read(): ...`) until the voxels, then `<stem>.img`;
+the magic `ni1\0`; `dim[0]` 2, 3 or 4 (`nifti1Read(): <dim0> dimensions in <hdr>; unsupported`); no
+change of a `dim[4]` of 0 (0 frames: FreeSurfer's empty volume, §93's shape message); an unknown time
+unit with `dim[4] > 1` is an error (`nifti1Read(): unknown time units <t> in <hdr>`, `ERROR_BADFILE`);
+the frames 1 when `dim[0] < 4`, else `dim[4]` (no `dim[5]`); unscaled types 2, 4, 512 (its `INFO`
+line), 8 and 768, 16 only (`nifti1Read(): unsupported datatype <dt> (with scl_slope = 0) in <hdr>`);
+TR from `pixdim[4]` and its unit only when `dim[0]` is 4; the geometry's messages `INFO: using NIfTI-1
+sform ` and `INFO: using NIfTI-1 qform ` (standard error, a blank before the newline) and the two
+`WARNING` lines on **standard output**; the sform without a copy for a check; no extension, no intent
+change; the units applied without the field of view and the axes' start and end; without
+`read_volume` the volume after the units. The image: `nifti1Read(): error opening file <img>`
+(*errno 0*); rows as §97 (unscaled rows without the `ERROR: Read` line; no double or complex types;
+FS-454 as §97); the ico7 reshape as §97, except that a volume of 0 frames is refused by the reshape:
+`ERROR: mri_reshape: number of elements cannot change` and `  nv1 = 163842, nv1 = 0` on standard
+output, after which FreeSurfer crashes (FS-644: `fix` gives no volume; `reproduce` ends the program
+with status 139).
+
+## 99. Validation plan (part 15)
+
+Piece 15's `nrd` (`mri_read` with voxels) and `nrh` (`MRIreadHeader`) after a `Gdiag_no` (-1, 1 or 5)
+and piece 6's arguments (`Gdiag` 0, `DIAG_INFO`, `DIAG_SHOW`; the frame-list switch; the variables
+`FS_SKIP_TAGS`, `TAG_RAS_XFORM_DEBUG`, `VOL_GEOM_THRESH=0.25`; the type -1, `NII_FILE`, `NIFTI1_FILE`
+or MGH), on: headers built field by field (one in six big-endian; `sizeof_hdr` 348, 540 or 0; texts
+empty, short or filling their field; `dim[0]` -3 to 6; extents 1 to 4, `dim[1]` -1 or 0 with `glmin`,
+the ico7 shapes 27,307 x 1 x 6 and -1 / 163,842; extents past `dim[0]` of 0, 1 or 2; `dim[4]` -1 to 3,
+`dim[5]` -1 to 2; every data type, 0, RGB and 64-bit integers among them; voxel sizes, TR, slope and
+intercept with NaNs, infinities, -0 and subnormals; slice codes 1 to 9 with slice dimensions and
+durations; every unit combination and invalid ones; the forms' codes (0, 1, 2, 4, -1) with
+quaternions of rotations, random ones, ones with NaNs, sforms with shears and odd numbers; intent
+1006; the magic right, of the other form or wrong), extensions (none; the extender only; the file
+ending at or within it; another program's text extension, FreeSurfer's after it or not; odd codes and
+sizes; FreeSurfer's with random tags), voxel offsets (348, 0, NaN, -16, 10^30, fractional, past the
+data), voxels (floats and doubles with NaN payloads, cut short, doubled, extended); files written by
+the port's `niiWrite` from piece 14's volumes (every tag), then changed (sform or both forms off,
+scaled, other units, `dim[4]` 0, another type, cut, the extender cleared, intent 1006, a quaternion
+NaN, the sform perturbed by 1e-5); `.nii`, `.NII`, `.nii.Z`, `.nii.gz` (now and then cut), names with
+`#0` or `@nii`; pairs `w/a.hdr`, `w/a`, `w/a.img` (ANALYZE's name to `mri_read`, not ported), with or
+without the image. Piece 14's read back uses the writer's reader (`mghRead`, `mri_read` of the name's
+type, `NIFTI1_FILE` for pairs). Measured (2026-11-14): seed 13, 5,769 `nrd`, `nrh` and `mgw` cases:
+`reproduce` identical on 5,323, 0 different (349 SKIP, 97 VARY); seed 7, 8,075 cases with piece 6's
+readers (`mrd`, `mrh`, `mri`, `mgr`, which now reach the NIfTI readers for `.nii` names and `@nii`):
+identical on 6,919, 0 different (834 SKIP, 322 VARY). `fix` differs only with notices. The
+recorded test `fs_io_official` (4,799 cases: 4,341 identical, 458 counted).

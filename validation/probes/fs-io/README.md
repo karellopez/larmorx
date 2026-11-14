@@ -169,6 +169,18 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `MRIwriteType(name, NIFTI1_FILE, intent)` (`nifti1Write`: the `.hdr`/`.img` pair) with the names `w/o.img`,
   `w/o.hdr`, `w/o`, `w/O.IMG`, `w/a.b.img.gz`, `w/.hdr`, `w/no/o.img`: seed 13, 1,470 `mgw` cases (195 pairs):
   identical on 1,322, 0 different.
+- Piece 15 (track A relay 25): `nrd` and `nrh` (`mri_read` with voxels and `MRIreadHeader`, as piece 6's `mrd` and
+  `mrh`, after a `Gdiag_no`: `niiPrintHdr` above 0) of NIfTI files built by `tests/fs_io/piece15.rs`: headers field by
+  field (both byte orders, every data type scaled or not, extents past `dim[0]`, `glmin` columns, the ico7 shapes,
+  units, slice codes, forms with NaN quaternions, odd voxel offsets, texts without NUL bytes), extensions (none,
+  another program's, odd codes, FreeSurfer's with random tags, the file ending at the extender), voxels cut or
+  doubled; and files the port's `niiWrite` wrote from piece 14's volumes, then changed; `.nii`, `.nii.gz`, NIfTI-1
+  pairs by `.hdr` names and stems. Piece 6's environment bits 4 (`TAG_RAS_XFORM_DEBUG`) and 8
+  (`VOL_GEOM_THRESH=0.25`). Since relay 25 piece 14's read back uses the writer's reader (`mghRead` after
+  `mghWrite`, `mri_read` after `MRIwrite`, `mri_read` with `NIFTI1_FILE` after the pair writer). `SKIP` for FS-644
+  (FreeSurfer crashes) and `.img` names (`analyzeRead`, not ported); `VARY` for FS-641 and FS-642 (memory). Seed 13,
+  5,769 `nrd`/`nrh`/`mgw` cases: `reproduce` identical on 5,323, 0 different; seed 7, 8,075 with piece 6's readers:
+  6,919 identical, 0 different.
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four
   nested folders (FS-451: the names cut to 1,023 bytes with FreeSurfer's two messages, one file for both from a stem
   of 1,022 bytes, the C library's overflow abort from a name of 1,024 bytes), compared in both modes:

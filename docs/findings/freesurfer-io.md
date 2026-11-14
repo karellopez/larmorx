@@ -1211,3 +1211,94 @@ names: 9 of 9 identical with `reproduce`, `fix` differing only with FS-451. The 
 digits), 0 different, 370 SKIP and 119 VARY; `fs_io_official` re-recorded (4a4aba35...), passes in
 debug and release, under the ARM NaN emulation (2,415 / 2,316 NaNs flipped) and on Windows x64 (the
 cross-check tool; the unit tests of the writers too, the long names included).
+
+## Part 15: NIfTI volumes and NIfTI-1 pairs read (relay 25 of track A)
+
+`niiRead` (`utils/mriio.cpp` 8365-8979) and `nifti1Read` (7680-8175) with their helpers, reached by
+`mri_read` (`NII_FILE`, `NIFTI1_FILE`) and `MRIreadHeader`. The official build's object code (the
+unit oracle's `mriio.cpp.o`, the same flags) was read where bits depend on it: `niftiQformToMri` is a
+function of its own (not inlined) whose `1.0 - (b*b + c*c + d*d)` and `1.0 / sqrt(...)` GCC computes
+in `float` (`subss`, `sqrtss`, `divss`: exact for these operations, the values the `double`
+expressions give), whose products `2.0*a*d` and `2*a*c` it computes as `d * (2a)` and `c * (2a)` and
+whose sums it reorders (`r13` as `2ac + 2bd`; `c_r` as `y + x + z`; `c_a` as `z + (x + y)`): only a NaN's
+payload depends on that order. `__niiReadSetVox2ras` and `__niiReadHeaderextension` are inlined into
+`niiRead`. The scaled loops are scalar: `value * slope + intercept` (the value's register first), but
+`slope * value` for `float` data (both readers). `KEEP_NII_OPEN` is 1: the file stays open after the
+header, and the extender is read at byte 348 whatever `sizeof_hdr` says.
+
+- **FS-453** (7697-7709): `nifti1Read` builds `<stem>.hdr` and `<stem>.img` with `snprintf` into
+  `STRLEN` (1,024-byte) buffers and prints `nifti1Read: Truncation on line 7704` (and 7708) on
+  standard error when they do not fit: the cut names are opened. Class c (wrong names); rule A: the
+  whole names by default.
+- **FS-454** (8806 and 8940; 7999 and 8133 in `nifti1Read`): the scaled branch's
+  `if` chain is not an `else if` chain, and `DT_UINT32` appears in the `DT_SIGNED_INT || DT_UINT32`
+  block and in a block of its own: unsigned 32-bit data are read twice, first as `int`s (values
+  above 2^31 - 1 negative), then as `unsigned int`s from where the first pass ended. The second pass
+  fails at the file's end (`error reading`, the volume freed) unless the file holds the data twice.
+  Class c; rule A: by default one pass as unsigned numbers.
+- **FS-455** (8744): unscaled `DT_DOUBLE` reads into a `double` row, and a swapped header's
+  `bytes_per_voxel == 8` branch calls `byteswapbuffloat(dbuf, 8 * width)`, which reverses 4-byte
+  groups: each double's halves are swapped separately. Class c; rule A: 8-byte swaps by default.
+- **FS-456** (same lines): unscaled `DT_COMPLEX` reads into the volume's row (8 bytes a voxel), but
+  the 8-byte branch swaps `dbuf` (the doubles' buffer, unused for complex data): the values stay
+  big-endian. Class c; rule A: each 4-byte part swapped by default.
+- **FS-457** (8499-8500, 7807-7808): unscaled `DT_UINT32` is read as an `MRI_INT` volume: values above
+  2,147,483,647 become negative. Rule C: FreeSurfer's volume type (MRI has no unsigned 32-bit type;
+  label and count volumes stay far below 2^31); kept in both modes, noted when such a value occurs.
+- **FS-458** (8539-8545, 7845-7851): the extents are `dim[2]` and `dim[3]` whatever `dim[0]` is; NIfTI-1
+  says the fields past `dim[0]` are to be ignored. Writers leave them 1 (nibabel, FSL, FreeSurfer),
+  but a 0 gives FreeSurfer an empty volume and a larger value a read past the data. Class c; rule A:
+  1 by default for an extent past `dim[0]` that is not 1.
+- **FS-459** (12726-12756): the extension's size and code are read in the file's order, the code is
+  checked against 0..14 and evenness, and only then swapped: a big-endian file's codes are never valid
+  (14 reads as 234,881,024), so FreeSurfer's own extension in a big-endian file is not read, and the
+  warning `no valid extension read` is printed. Class c; rule A: the code checked after the swap.
+- **FS-460** (12760-12761): an extension of another code is `continue`d past without skipping its
+  `esize - 8` bytes of data: the next size and code come from that data (AFNI's XML text gives an
+  invalid code and the warning; zeros give code 0, valid, and the loop walks on 8 bytes at a time).
+  FreeSurfer's extension after another one is not found. Class c; rule A: by default the data are
+  skipped, and the walk stops where no further extension fits before the voxel offset.
+- **FS-641** (8605-8606): `nifti1_extender extdr;` is not initialised, and `znzread(extdr.extension,
+  1, 4, fp)`'s count is not checked: a file that ends within 4 bytes of the header leaves the bytes it
+  does not give as stack contents; when the first is 1, the extension reading starts. Class a (memory
+  never written); both modes take 0 (no extension), noted; the probe marks such cases VARY.
+- **FS-642** (12149-12198): `niiPrintHdr` prints `data_type`, `db_name`, `descrip` and `aux_file` with
+  `%s`: a field without a NUL runs on into the next fields (deterministic within the header), and past
+  the header's 348 bytes into `niiRead`'s stack when no NUL follows. Class a (memory) past the header,
+  f within it; both modes print through the header's end, noted; VARY in the probe.
+- **FS-643** (10400-10441): `swap_nifti_1_header` does not swap `glmax` and `glmin` (nor `extents` and
+  `session_error`, unused), and `glmin` is the column count when `dim[1]` is not positive: a
+  big-endian header's count is read byte-reversed. Class c; rule A: swapped by default.
+- **FS-644** (8161-8165 with `mri2.cpp` 653-667): a pair of the ico7 shape whose `dim[4]` is 0 gives a
+  volume of 0 frames (`nifti1Read` does not change a 0, `niiRead` does); `mri_reshape` sets the
+  volume's `nframes` to 1, finds `nv1 = 163842` and `nv2 = 163842 x 0`, prints its error and returns
+  NULL; `MRIfree` then frees one frame of a volume that has none: SIGSEGV (observed: `CRASH 11`,
+  seed 13). Class a (a crash); rule A: by default no volume after the message; `reproduce` ends the
+  program with status 139.
+- **The port's command lines and transform name are text** (larmorx's own limitation, not a
+  FreeSurfer defect; found by piece 15's random tags): `Mri::cmdlines` and `transform_fname` are
+  `String`s, filled with `from_utf8_lossy`, so a tag of bytes that are not UTF-8 reads as U+FFFD where
+  FreeSurfer keeps the bytes (3 of seed 7's 8,075 cases, through FreeSurfer's NIfTI extension; MGH
+  files likewise). A rewrite of such a volume would change those bytes. Piece 15 now writes ASCII
+  command lines; the fields' change to bytes is for a later relay (they are shared with fs.volume and
+  fs.surf).
+- **The probe's memory limit** (seed 7, one case): a big-endian header with `dim[1]` -1 and `glmin`
+  3 reads (FS-643's `reproduce`) 50,331,648 columns; the official build's allocation fails in the
+  probe's 1 GiB (`could not allocate memory for slice 7 out of 8`), the port's succeeds and its read
+  fails later. Piece 15 now gives such headers `glmin` 0 (the same in both byte orders); FS-643's fix
+  is checked by the unit test.
+- **`mri_read`'s type for `.img`** (not a defect here): `string_to_type("img")` is `MRI_ANALYZE4D_FILE`,
+  which `mri_read` gives to `analyzeRead` (not ported yet: such names are SKIP); `analyzeRead` itself
+  hands NIfTI-1 pairs to `nifti1Read` (the official output shows its `INFO` line). Pairs are read
+  here by `.hdr` names, stems and the explicit `NIFTI1_FILE` type.
+- **Not defects:** `MRIsetVox2RASFromMatrix` keeps the voxel sizes `pixdim` gives (with its warning when
+  the sform's columns differ); the extension's rollback seek's position is never used afterwards (the
+  voxels are found from the start); `exec_progress_callback` has no callback.
+
+### Measured (piece 15, 2026-11-14, the probe, the unit oracle's build)
+See `specs/freesurfer-io.md` §99 and the probe's README (piece 15). The recorded set (`check.py --seed
+1 --n 4800 --portable --light`): 4,799 cases, 4,341 identical (37 with memory digits), 0 different,
+458 SKIP or VARY; `fs_io_official` re-recorded (83439bc7...), passes in debug and release, under the
+ARM NaN emulation (2,939 / 2,845 NaNs flipped) and on Windows x64 (the cross-check tool; the readers'
+unit tests too).
+

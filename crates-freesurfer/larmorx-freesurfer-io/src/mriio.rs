@@ -9,7 +9,8 @@
 //! FreeSurfer's volume_io, [`crate::minc`]) and `setDirectionCosine`.
 //!
 //! The readers of the other formats come with their queue items: until then [`mri_read`] reads
-//! MGH/MGZ, `.npy` ([`crate::fscnpy`]) and Bruker studies ([`crate::bruker`]) and refuses the others
+//! MGH/MGZ, NIfTI-1 (`.nii`, `.nii.gz` and pairs: [`crate::mriio_nifti`]), GIFTI, `.npy`
+//! ([`crate::fscnpy`]) and Bruker studies ([`crate::bruker`]) and refuses the others
 //! with a message that names the format (`larmorx-freesurfer: reading <format> volumes is not
 //! ported yet`, standard error, `None`).
 //!

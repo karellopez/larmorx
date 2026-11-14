@@ -239,6 +239,20 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   non-divisible counts, short headers, unparsable names). `SKIP` for FS-688 (FreeSurfer aborts on a short
   header) and FS-692 (it writes past a transposed raw volume); `VARY` for FS-689 (geometry read past the
   header). Seeds 7, 13, 21, 99 (150 cases each): `reproduce` identical on every comparable case, 0 different.
+- Piece 22 (track A relay 30): AFNI datasets, curvature files and annotations read as volumes, the AFNI and
+  NRRD writers. `afd` and `afh` (piece 6's `mrd` and `mrh`, the type -1 or 7) of `.HEAD`/`.BRIK` pairs built by
+  `tests/fs_io/piece22.rs` attribute by attribute (every attribute FreeSurfer reads, AFNI's spacing or none, CR
+  LF lines, unknown attributes, AFNI's order or shuffled, then one fault: an attribute missing or of another
+  type, too few or too many numbers, a bad token, a negative, zero or bare count, a string without its `'` or
+  `~`, long strings, a count before any type line, an unknown type, a last line without a newline, orientations
+  out of range or degenerate, other byte orders and brick types, frames of mixed factors), BRIKs right, cut,
+  longer, missing or a folder, and frame lists; `cud` and `cuh` (the type -1 or 25) of curvature files (whole,
+  cut, old-format, values per vertex 0 to 3, NaN values, a folder); `and` and `anh` (the type -1 or 33) of
+  annotations (vertex numbers in and out of range, colour tables of both versions, another tag, none, cut);
+  `kwr` (mapped to piece 17's `vwr`, `how` 17 for AFNI or 36 for NRRD). `SKIP` for FS-693, FS-697, FS-709,
+  FS-710, FS-712, FS-715, FS-716, FS-53 (and FS-672, FS-717 in every piece-6 command); `VARY` for FS-695,
+  FS-696's memory contents, FS-701, FS-711, FS-713, FS-714. Seed 7, 1,099 piece-22 cases; seeds 13, 21, 99,
+  2,200 each: `reproduce` identical on every comparable case, 0 different.
 - `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
   of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four

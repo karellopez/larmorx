@@ -1449,6 +1449,81 @@ mod tests {
         }
     }
 
+    fn nii(mode: UpstreamDefects, m: &mut Mri) -> (Result<i32, Fatal>, Vec<u8>) {
+        let dir = tempfile::Builder::new()
+            .prefix("nii w ~")
+            .tempdir()
+            .unwrap();
+        let mut g = Globals::new(mode);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let env = Environment::default();
+        let r = nii_write(
+            &mut g,
+            &mut o,
+            &mut e,
+            &env,
+            Some(dir.path()),
+            m,
+            "a.nii",
+            -1,
+        );
+        (
+            r,
+            std::fs::read(dir.path().join("a.nii")).unwrap_or_default(),
+        )
+    }
+
+    #[test]
+    fn a_nifti_file_is_header_extension_and_voxels() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut m = volume(&mut g, MRI_FLOAT, 1);
+        let (r, b) = nii(UpstreamDefects::Fix, &mut m);
+        assert_eq!(r, Ok(0));
+        assert_eq!(&b[0..4], &348i32.to_le_bytes());
+        assert_eq!(&b[344..348], b"n+1\0");
+        assert_eq!(&b[148..170], b"FreeSurfer Mar 14 2026");
+        let vox = f32::from_le_bytes(b[108..112].try_into().unwrap()) as usize;
+        assert_eq!(
+            (vox % 16, b[348], &b[356..360]),
+            (0, 1, &14i32.to_le_bytes()[..])
+        );
+        assert_eq!(&b[vox..], &m.chunk.as_ref().unwrap()[..]);
+    }
+
+    #[test]
+    fn fs_447_a_long_volume_is_clamped_by_default() {
+        for (mode, want) in [
+            (UpstreamDefects::Fix, i32::MAX.to_le_bytes()),
+            (UpstreamDefects::Reproduce, [0, 0, 0, 0]),
+        ] {
+            let mut g = Globals::new(mode);
+            let mut m = volume(&mut g, mri::MRI_LONG, 1);
+            let c = m.chunk.as_mut().unwrap();
+            c[..8].copy_from_slice(&(1i64 << 40).to_le_bytes());
+            let (r, b) = nii(mode, &mut m);
+            assert_eq!(r, Ok(0));
+            let vox = f32::from_le_bytes(b[108..112].try_into().unwrap()) as usize;
+            assert_eq!(&b[vox..vox + 4], &want);
+        }
+    }
+
+    #[test]
+    fn fs_449_32768_rows_are_refused_by_default() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let mut m =
+                mri::mri_alloc_sequence(&mut g, &mut o, &mut e, 1, 32768, 1, MRI_UCHAR, 1).unwrap();
+            let (r, b) = nii(mode, &mut m);
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(r, Err(Fatal::Exit(1)));
+            } else {
+                assert_eq!(r, Ok(0));
+                assert_eq!(&b[44..46], &(-32768i16).to_le_bytes());
+            }
+        }
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn fs_440_a_full_disk_is_an_error_by_default() {

@@ -123,8 +123,8 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             blobs(g, t, e);
             t.push(fx(thmin(g)));
             t.push(g.pick(&[0, 1]).to_string());
-            for k in 0..3 {
-                t.push(g.int(0, i64::from(e[k]) - 1).to_string());
+            for n in e {
+                t.push(g.int(0, i64::from(n) - 1).to_string());
             }
             t.push(g.pick(&[0, 1]).to_string());
             t.push(g.pick(&[-1, 0, 1, 2, 3]).to_string());

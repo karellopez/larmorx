@@ -212,6 +212,33 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   place, a folder name with a `.`; voxels of the four types) built by `tests/fs_io/piece18.rs`; GDF writes through
   piece 17's `vwr`, whose prefix ends with the GDF image stem (`N`: none). `SKIP` for FS-674, `VARY` for FS-676 and
   FS-677's memory contents. Seed 13, 1,428 piece-18 cases: `reproduce` identical on 1,300, 0 different.
+- Piece 19 (track A relay 28): GE Genesis and GE Signa LX series. `grd` and `grh` (piece 6's `mrd` and `mrh`,
+  the type -1, 4 or 5, piece 6's environment bits 64 `GE_ODD`, 128 `GE_EVEN`, 256 `KILLIANY_SWAP`):
+  FreeSurfer crashes once the series is found (FS-680; the result `CRASH 11` after its lines, which
+  `reproduce` prints before its status 139, shown as `CRASH 11`). `gfd` and `gfh` (voxels, header):
+  `genesisReadFixed` and `gelxReadFixed` (type 4 or 5), FreeSurfer's two functions compiled from the tag
+  with FS-680's line corrected and nothing else changed (`build.sh` generates `ge_fixed.cpp` from the
+  unit oracle's `mriio.cpp`: its include block without `_MRIIO_SRC`, the two functions renamed, their
+  `__FUNCTION__` spelled as the originals, `#line` keeping `__LINE__`; compiled with `mriio.cpp`'s own
+  command: its object code is the official one's but for that line), against the port's
+  `genesis_read_as_patched` and `gelx_read_as_patched`. The series built by `tests/fs_io/piece19.rs`:
+  `I.<nnn>`, `<stem><n>.MR`, `<stem><nnn>.MR` and `e<n>s<n>i<n>` files, headers field by field, cut,
+  folders and gaps. `SKIP` for FS-682 and files taken for DICOM; `VARY` for FS-49, FS-167's memory
+  contents and FS-685. Seed 7, 2,032 piece-19 cases: `reproduce` identical on 1,892, 0 different.
+  `build.sh` must run with a clean `PATH` (no other toolchain's `ld`): `PATH=/usr/bin:/bin`.
+- Piece 20 (track A relay 28): GE Signa and GE XIMG series. `srd` and `srh` (piece 6's `mrd` and `mrh`, the
+  type -1, 14 or 19, the environment bits 64, 128, 256) of Signa series built by `tests/fs_io/piece20.rs` (a
+  14,336-byte header of 16-bit integers and Data General floats: extents, sizes, timing, image counts,
+  echoes, plane types; slices `I.001` ... beside it, cut or missing, a header file by another name) and
+  XIMG series (Genesis files with XIMG's offsets). `SKIP` for FS-686's writes past the slice table and
+  FS-682. Seed 13, 1,016 piece-20 cases: `reproduce` identical on 994, 0 different.
+- Piece 21 (track A relay 29): old Siemens `.ima` series. `imd` and `imh` (piece 6's `mrd` and `mrh`, the type
+  -1 or 6) of `.ima` series built by `tests/fs_io/piece21.rs` (a complete 6,144-byte header followed by the
+  voxels, every field FreeSurfer reads at its fixed big-endian offset, with its sibling files
+  `<study>-<series>-<n>.ima`; structural and mosaic series, scouts, bad slice directions and matrix sizes,
+  non-divisible counts, short headers, unparsable names). `SKIP` for FS-688 (FreeSurfer aborts on a short
+  header) and FS-692 (it writes past a transposed raw volume); `VARY` for FS-689 (geometry read past the
+  header). Seeds 7, 13, 21, 99 (150 cases each): `reproduce` identical on every comparable case, 0 different.
 - `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
   of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four

@@ -283,6 +283,9 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 1362-1903 | the COR header's flags, `corRead`, `corWrite` (FS-657 to FS-660, FS-672, FS-166; relay 27) | `mriio_cor.rs` |
 | `utils/mriio.cpp` 2766-4013; `utils/mri.cpp` 11806-11870 | `bvolumeWrite`, `get_b_info`, `bvolumeRead`, `decompose_b_fname`, `write_bhdr`, `read_bhdr`; the unscaled path of `MRIchangeType` (copied: fs.io cannot call fs.volume) (FS-661 to FS-671, FS-58, FS-249; relay 27) | `mriio_bvol.rs` |
 | `utils/mriio.cpp` 5970-6520, 10566-10870 | `gdfRead` (with `gdf_crop_flag`, larmorx-freesurfer-core's `Globals`), `gdfWrite`, `sdtRead`, `MRIreadRaw` and its buffer copies (FS-673 to FS-679, FS-58; relay 27) | `mriio_gdf.rs` |
+| `utils/mriio.cpp` 4014-4745 | `genesisRead`, `gelxRead` (FS-680: FreeSurfer's crash in `reproduce`, the series read by default; FS-681 to FS-685, FS-167, FS-249; the arithmetic in the operand order of the official object code; relay 28) | `mriio_ge.rs` |
+| `utils/mriio.cpp` 7275-7620; `utils/signa.cpp` 200-322 | `ximgRead` (FS-684, FS-682, FS-167, FS-249), `signaRead` and `orderShortBuffer` (FS-686, FS-687, FS-684; relay 28) | `mriio_ge.rs`, `signa.rs` |
+| `utils/mriio.cpp` 1904-2379; `utils/imautils.cpp` | `siemensRead` with the old-Siemens `.ima` header reader `imaLoadFileInfo` and its helpers (`imaLoadVal`, `imaLoadValFromKey`, the dictionary, `imaParseName`, the file counting), as far as `siemensRead` reaches them (FS-688 the stack-free crash, FS-689 memory, FS-690 the unused-cosine slip, FS-691 the field-of-view swap, FS-692 the transposed raw volume; FS-01; relay 29) | `mriio_siemens.rs` |
 | `utils/mriio.cpp` 516-528, 1116-1160 | `mri_read`'s COR, bhdr, bshort and bfloat branches; `MRIwriteType`'s COR, bhdr (FS-666), bshort and bfloat branches (relay 27) | `mriio.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and

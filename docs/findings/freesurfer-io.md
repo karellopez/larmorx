@@ -1570,3 +1570,131 @@ bvolumeRead.dis` and `corRead.dis` (from relay 25's `mriio.dis` of the unit orac
 - **FS-678.** `cm` gives `units_factor = 1.0`, `m` 100.0, and the sizes are divided by it.
 - **FS-679.** `(int)min_crop[k]` and `(int)max_crop[k]` of floats from the file (`cvttss2si`).
 - `MRIreadRaw`'s error path leaks the volume and buffer and leaves the file open (no visible effect).
+
+## Part 21: GE Genesis and GE Signa LX series (relay 28 of track A)
+`utils/mriio.cpp` 4014-4444 (`genesisRead`), 4446-4745 (`gelxRead`). The object code read: the unit oracle's
+`mriio.cpp.o` (`objdump -d -r`) and the probe's `ge_fixed.o` (the two functions compiled alone with
+`mriio.cpp`'s command and FS-680's line corrected), whose instructions equal the official ones but for the
+corrected load (and `endbr64`, which the unit oracle's archive lacks and the probe's toolchain adds: no other
+difference; scripts and listings in the relay's scratch `rl28/`: `gen.dis`, `lx.dis`).
+
+### Mechanisms
+- **FS-680.** Both functions declare `MRI *header = nullptr;` and allocate it with
+  `header = MRIallocHeader(1, 1, 1, MRI_SHORT, header->nframes);`: the object code clears the slot at
+  entry (`movq $0x0,0xb8(%rsp)`) and loads `0x478(%rax)` (`nframes`) from it before the call, a read at
+  address 0x478 (signal 11). Everything before it runs: `GE_ODD`/`GE_EVEN`'s lines, the name parsing,
+  the `fname_format` prints (genesisRead), the file searches. The intent is one frame (the
+  `header`'s `nframes` is set from the file later). Both lines are unchanged in FreeSurfer's development
+  branch (the workspace's clone, commit 766ac058 of 2026-10-07: `utils/mriio.cpp` 4188 and 4540). An
+  upstream report draft: `docs/upstream-reports/freesurfer-ge-genesis-null-header.md`.
+- **FS-681.** `fname_format2[STRLEN]` is written only on the `.MR` branch; the `I.` branch tests
+  `strlen(fname_format2) != 0` on the uninitialised stack array (at `0x4c0(%rsp)`) and, when it is not
+  empty, prepends the folder and prints it. Every probe run found a zero byte there.
+- **FS-682.** The folder (`fname_dir`) and stem (`fname_base`) are copied into `fname_format` and used as
+  `sprintf`'s format (`__sprintf_chk` with the buffer's size: `%n` in writable memory aborts, an overlong
+  result aborts, `%s` reads an argument register).
+- **FS-683.** `header->depth = im_high - im_low + 1` (the file count) is set before `nframes` is read;
+  the voxel loop's `frame = (i - im_low) % mri->nframes` and `if (frame != nframes - 1) slice--` place
+  file `k` at slice `k / nframes` only.
+- **FS-684.** gelxRead's `ErrorReturn` texts are genesisRead's, copied.
+- **FS-685.** `header->nframes = freadShort(fp)` on a header allocated with `nframes` frames (1 once
+  FS-680 is corrected): `MRIfree(&header)` runs `~MRI()`, whose `for (i < nframes) if
+  (frames[i].m_ras2vox) MatrixFree(...)` reads past the one-entry `frames` array (heap contents: the
+  probe's patched readers crashed with signal 11 or `free(): invalid pointer`, signal 6, or went on).
+  The same mechanism as FS-671 (Part 19).
+- The `.MR` stem's digit loop `for (c--; isdigit(*c) && c >= fname_base; c--)` reads one byte before
+  `fname_base` (the last byte of `fname_dir` in the frame) when every byte before `.MR` is a digit; the
+  loop ends either way at the same place: no visible effect.
+- The arithmetic (both functions): `sqrtss` with a `sqrtf` call only for a negative argument (never:
+  sums of squares); `n_a *= -1` compiled as a sign flip (`xorps`); the centre `(tl + br) / 2.0 + n *
+  zsize * (depth - 1.0) / 2.0` as `addsd` with the second term in the destination (its NaN wins); `/ 2.0`
+  as `* 0.5`; `xend - xstart` as `xend + xend`; the field of view's `?:` chain as `comiss` then `maxss`.
+  gelxRead's `ylength` sums `y_s^2 + (y_r^2 + y_a^2)` (genesisRead's left to right).
+- `orderFloatBytes` is `swapFloat` (a call: the value's bits are moved, a signalling NaN survives);
+  the header fields `thick`, `xsize`, `ysize` are read in place (`fread(&(header->thick), ...)`), so a
+  cut read keeps the field's earlier bytes (MRIallocHeader's 1.0).
+- gelxRead's header `fopen` failure returns without freeing `header` (a leak, no visible effect).
+- **For the upstream report** (`docs/upstream-reports/freesurfer-ge-genesis-null-header.md`, behaviour
+  only until filed): the cause is FS-680's line in both functions; the fix `header = MRIallocHeader(1, 1, 1,
+  MRI_SHORT, 1);` (the frame count is read from the file later). With it, multi-echo Genesis series meet
+  FS-685 (allocate the header after the echo count is known, or the volume from the count without raising
+  the header's) and FS-683 (depth the file count, only `files / echoes` slices filled).
+
+## Part 22: GE Signa and GE XIMG series (relay 28 of track A)
+`utils/signa.cpp` 200-322 (`signaRead`, `orderShortBuffer`), `utils/mriio.cpp` 7275-7620 (`ximgRead`). Object code:
+the unit oracle's `signa.cpp.o` and `mriio.cpp.o` (`rl28/sr.dis`, `rl28/ximg.dis`).
+
+### Mechanisms
+- **FS-686.** `signaRead` allocates `(imnr1 - imnr0) / 2 + 1` slices for any echo count (and `MRIalloc`, one
+  frame, under `GE_ODD`/`GE_EVEN` whatever the echoes), then `frame = (i - imnr0) % num_echoes`,
+  `fread(&MRISseq_vox(mri, 0, 0, slice, frame), ...)` (`slices[slice + frame * depth]`), `if (frame == 0)
+  slice--`: for two echoes every pair goes to one slice; for three, file 2 (frame 2) already goes to slice
+  1, and the entries pass `depth * nframes` (a pointer read past the `calloc`'d table, a write through
+  it). With `GE_ODD` the step of 2 makes every frame 0 for two echoes (all files into slice 0) and frames
+  2 of a one-frame table for three.
+- **FS-687.** `fread`'s count is not checked; `orderShortBuffer` swaps all `x * y` shorts afterwards.
+- **FS-684.** signaRead's `ErrorReturn` texts say `is_signa` and `read_signa` (older names).
+- signaRead's `sprintf(fname, "%s/I.%03d", path, i)` writes the slice names into the caller's buffer
+  (`mri_read`'s `fname_copy`, unused afterwards: no visible effect; a path of about 1,016 bytes or more
+  overflows it: FS-249). The volume is allocated with voxels also when only the header is asked for, and
+  leaked on the slice errors (no visible effect). `if (!mri)` never holds (`MRIalloc` ends the program).
+- The products `1000 * header.strtx` are `float` (`mulss`, the field in the destination except for the
+  thickness: one NaN operand either way).
+- ximgRead: `MRIallocHeader(1, 1, 1, MRI_SHORT, 1)` (no FS-680); the file's two offsets are read, printed,
+  replaced; TI and TE at +198 and +202 next to TR at +200 overlap TR's bytes (unknown whether XIMG files
+  hold them there; no XIMG file was at hand: kept, no defect declared). Its arithmetic is genesisRead's
+  (same operand order).
+
+## Part 23: Old Siemens `.ima` series (relay 29 of track A)
+`utils/mriio.cpp` 1904-2379 (`siemensRead`), `utils/imautils.cpp` (the IMA header reader `imaLoadFileInfo`
+and its helpers `imaLoadVal`, `imaLoadValFromKey`, the dictionary, `imaParseName`,
+`imaCountFilesInSeries`). Object code read: the unit oracle's `imautils.cpp.o` (`rl29/ilfi.dis`).
+
+### Mechanisms
+- **FS-688.** `imaLoadValFromKey(fp, key, pval)` calls `imaLoadVal`, which `fseek`s to the dictionary
+  offset and `fread`s the field; on a short read it returns `NULL`, and `imaLoadValFromKey` then does
+  `free(pval)` and returns `NULL`. Most of `imaLoadFileInfo`'s calls pass the address of a stack variable
+  (`&Year`, `&dtmp`, `&stmp`, ...), so the failing load frees a stack address and glibc aborts
+  (`free(): invalid pointer` / `munmap_chunk(): invalid pointer`, signal 6). The first stack-targeted
+  load is the birthdate year at offset 808 (eight bytes), and the last is `G28_Pre_Columns` at 4,996 (two
+  bytes), so any header shorter than 4,998 bytes aborts at the first field it cannot hold (the message
+  names that field's offset). `PatientName` (768) and `PulseSequence` (3,009) pass `NULL`, so their failed
+  loads only free the heap buffer and print `ERROR: imaLoadVal: could not read ... from offset ...`.
+  larmorx does not crash: `imaLoadFileInfo` here reads `BaseRawMatrixSize` (2,864) and `Columns` (4,996)
+  for the mosaic decision, notes FS-688 when either runs past the end, and reads 0. The crash is not
+  reproduced (class a).
+- **FS-689.** `siemensRead` reads the pixel sizes with `fread(&d, 8, 1, fp)` at 5,000 and 5,008 (`d` an
+  uninitialised stack `double`); a header of 4,998 to 5,016 bytes makes `imaLoadFileInfo` finish but these
+  reads fail, and `ErrorPrintf("siemensRead(): could not read file")` leaves `d` as the stack held it.
+  larmorx reads 0 and notes FS-689.
+- **FS-690** (not reached). `imaLoadFileInfo` sets `ifi->Vc[0] = -Sag; ifi->Vc[1] = Cor; ifi->Vc[1] =
+  -Tra;` (and the same for `Vr`, `Vs`): the Coronal value is overwritten by the Transverse and the third
+  element is never written (a copy-and-paste slip from `ImgCenter`). `siemensRead` reads the cosines from
+  the file itself (3,792, 3,832, 3,856), so no program reads `ifi->Vc/Vr/Vs`. Kept, documented.
+- **FS-691.** `siemensRead` reads the field-of-view height at 3,744 into `d`, order-swaps it, then
+  `fseek(3752); fread(&d2); d2 = orderDoubleBytes(d)` — it byte-swaps `d` again (not the newly-read `d2`),
+  so the width is ignored and `d2` is the double-byte-swap of the height, which only exceeds `d` for
+  bytes that form a larger double. `mri->fov = (d > d2 ? d : d2)`.
+- **FS-692.** `mri_raw = MRIalloc(rows, cols, n_files, MRI_SHORT)` gives the raw volume `width = rows`,
+  `height = cols`; the read loop `for (i = 0; i < rows; i++) fread(&MRISvox(mri_raw, 0, i, z), 2, cols,
+  fp)` writes `cols` shorts at `voxel(0, i, z)` for `i` up to `rows - 1`. When `rows > cols` the offset
+  `i * width = i * rows` passes the slice (`width * height = rows * cols`), so the last rows of the last
+  file are written past the `calloc`'d voxels (memory corruption; a segfault for the full files the probe
+  generates). When `rows < cols` the reads spill into the next row but stay inside the volume, so larmorx
+  reproduces that scrambled layout; when `rows > cols` larmorx guards the write and notes FS-692 (the
+  probe skips it). The de-mosaic reads `MRISvox(mri_raw, width*bc + i, height*br + j, file)` with
+  `width = base`, so a non-square mosaic also reads from the mangled raw layout.
+- The counting loops (`while (FileExists(fname_use))` and `siemensRead`'s own `sprintf` loops) leave
+  `errno` at ENOENT (2) after the last `fopen` that fails; `fopen` success and `fread` do not clear it, so
+  the final `errno` the probe prints is 2 (the per-row `could not read file` on a short voxel read prints
+  `error: No such file or directory` before the message).
+- The error messages carry FreeSurfer's spurious NUL byte before the newline (FS-01, the whole module):
+  `reproduce` keeps it, the default removes it.
+
+### Measurements
+- The fs-io probe's piece 21 (`imd`, `imh`, piece 6's `mrd`/`mrh`, type -1 or 6): seeds 7, 13, 21, 99,
+  150 cases each, `reproduce` identical on every comparable case, 0 different; across 666 cases (seed 5)
+  FS-688 fired 49 times, FS-692 4, FS-689 2, and (over 50 seed-13 cases) FS-691 25 times (the D13
+  field-of-view correction, which only `fix` applies, so `reproduce` still matches the oracle). The
+  unit tests in `mriio_siemens.rs` check the geometry and voxels of a structural
+  series, the name-parse and bad-extension refusals, and the short-header note.

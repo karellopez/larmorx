@@ -1991,6 +1991,30 @@ defects! {
         "a GDF header's units 'cm' leave the voxel sizes as they are and 'm' divides them by 100, where millimetres need them multiplied by 10 and 1,000";
     FS_679 = "FS-679", "FreeSurfer", true,
         "a GDF crop box (MIN_CROP, MAX_CROP, with mri_convert's cropping) outside the integer range, or NaN, becomes the lowest integer";
+    FS_680 = "FS-680", "FreeSurfer", true,
+        "reading GE Genesis files (I.001, or names ending NNN.MR) and GE Signa LX files (names like e1s2i3) always ends with a crash (signal 11) once the series' file names are found: no such volume can be read";
+    FS_681 = "FS-681", "FreeSurfer", false,
+        "reading GE Genesis files named I.<number> prints a second 'fname_format2 :' line from memory never written, or none (kept: no such line)";
+    FS_682 = "FS-682", "FreeSurfer", true,
+        "reading GE Genesis, GE LX or GE XIMG files, a % in the folder's or the series' name is taken as a C conversion when the other files' names are made: wrong names, a crash or an abort";
+    FS_683 = "FS-683", "FreeSurfer", true,
+        "a GE Genesis series of several echoes (their count in the file's header) is read as a volume with one slice per file in every echo: the slices past the file count divided by the echoes stay 0, and the centre is computed for the larger depth";
+    FS_684 = "FS-684", "FreeSurfer", false,
+        "reading GE LX or GE XIMG files the error messages name genesisRead, and reading GE Signa files is_signa and read_signa (kept)";
+    FS_685 = "FS-685", "FreeSurfer", true,
+        "reading a GE Genesis series of several echoes, FreeSurfer frees a header whose frame count it raised after allocating one frame: it reads past the frame table, and depending on memory contents crashes (signal 11 or an abort) or goes on";
+    FS_686 = "FS-686", "FreeSurfer", true,
+        "a GE Signa series of several echoes is read as a volume of (files - 1) / 2 + 1 slices whatever the echo count, each file's slice advanced as for two echoes: with three or more echoes files land in the wrong slices and frames and past the volume (memory corruption or a crash); with GE_ODD or GE_EVEN the volume has one frame while the files are read as echoes (the same, or every file into the first slice)";
+    FS_687 = "FS-687", "FreeSurfer", true,
+        "a GE Signa slice file shorter than its slice gives a slice of the bytes it holds and zeros (or an earlier file's bytes), byte-swapped, without a message";
+    FS_688 = "FS-688", "FreeSurfer", true,
+        "reading an old Siemens .ima header shorter than 4,998 bytes, the header reader frees a stack address when a field read runs past the end of the file and aborts the program (signal 6)";
+    FS_689 = "FS-689", "FreeSurfer", true,
+        "reading an old Siemens .ima header between 4,998 and 5,016 bytes, the pixel-size fields are read past the end of the file and keep whatever the stack held (memory contents)";
+    FS_691 = "FS-691", "FreeSurfer", true,
+        "an old Siemens .ima volume's field of view is read from the height's value (the width read overwrites the same variable) and byte-swapped a second time, so the width is ignored and only pathological bytes change the result from the height";
+    FS_692 = "FS-692", "FreeSurfer", true,
+        "reading an old Siemens .ima mosaic whose file has more rows than columns, the raw volume is allocated with the columns and rows exchanged, so the pixel read writes past the voxels (memory corruption or a crash)";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

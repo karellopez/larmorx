@@ -41,8 +41,14 @@ pub(crate) mod piece16;
 pub(crate) mod piece17;
 #[path = "piece18.rs"]
 pub(crate) mod piece18;
+#[path = "piece19.rs"]
+pub(crate) mod piece19;
 #[path = "piece2.rs"]
 mod piece2;
+#[path = "piece20.rs"]
+pub(crate) mod piece20;
+#[path = "piece21.rs"]
+pub(crate) mod piece21;
 #[path = "piece3.rs"]
 mod piece3;
 #[path = "piece4.rs"]
@@ -258,12 +264,14 @@ const FORMATS: [&str; 20] = [
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
 /// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-14, track A
-/// relay 27, with pieces 17 and 18 (2 cases: 4.1 of 5.2 s); relay 24, with piece 14's NIfTI-1 pairs (2 cases: 4.7 of 5.6 s); relay 23, with piece 14's
+/// relay 29, with piece 21 (Siemens .ima: 2 cases, the .mat readers, 4.2 of 5.3 s); relay
+/// 28, with pieces 19 and 20 (2 cases: 5.4 of 6.4 s); relay 27, with pieces 17 and 18 (2
+/// cases: 4.1 of 5.2 s); relay 24, with piece 14's NIfTI-1 pairs (2 cases: 4.7 of 5.6 s); relay 23, with piece 14's
 /// command and its NIfTI names (2 cases: 4.6 of 5.9 s); relay 21, with piece 12's four commands; first 2026-11-13, relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
 /// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
 /// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
 /// them.
-pub const HEAVY_SEED1: [usize; 2] = [150, 3480];
+pub const HEAVY_SEED1: [usize; 2] = [2657, 3967];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]
@@ -306,6 +314,9 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece16::KINDS);
     kinds.extend(piece17::KINDS);
     kinds.extend(piece18::KINDS);
+    kinds.extend(piece19::KINDS);
+    kinds.extend(piece20::KINDS);
+    kinds.extend(piece21::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -366,6 +377,18 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece18::KINDS.contains(&kind) {
             lines.push(piece18::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece19::KINDS.contains(&kind) {
+            lines.push(piece19::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece20::KINDS.contains(&kind) {
+            lines.push(piece20::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece21::KINDS.contains(&kind) {
+            lines.push(piece21::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         if piece16::KINDS.contains(&kind) {
@@ -831,6 +854,21 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece18::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece19::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece19::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece20::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece20::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece21::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece21::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1220,6 +1258,8 @@ pub(crate) fn run_line_with(
         Ok(()) => o.0.trim_end().to_owned(),
         // libstdc++'s terminate ends with abort (SIGABRT); the port's status 134 stands for it
         Err(134) => "CRASH 6".to_owned(),
+        // a crash FreeSurfer has (signal 11) where `reproduce` prints its text first (FS-680)
+        Err(139) => "CRASH 11".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
     // FSIO_DETAIL set: each notice's detail on standard error (a probe run's diagnosis)

@@ -39,6 +39,9 @@
 
 MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
 int MRImaxSegmentArea(MRI_SEGMENTATION *mriseg);
+MRI *MRISaccentuate(MRI *mri_src, MRI *mri_dst, int lo_thresh, int hi_thresh);
+MRI *MRISfloodoutside(MRI *mri_src, MRI *mri_dst);
+float distance(float x, float y, float z);
 
 const char *Progname = "fsfilter";
 
@@ -646,6 +649,25 @@ void put_seg(const MRI_SEGMENTATION *sg)
 // then each operation's results, then the segmentation; salloc max_segments max_voxels
 bool seg_case(const std::string &cmd)
 {
+  // mriflood.cpp: flood <src> <dst mode> [<dst>]; acc <src> <dst mode> [<dst>] lo hi; dist x y z
+  if (cmd == "dist") {
+    float x = getf(), y = getf(), z = getf();
+    of(distance(x, y, z));
+    return true;
+  }
+  if (cmd == "flood" || cmd == "acc") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(geti(), src);
+    MRI *r;
+    if (cmd == "flood") {
+      r = MRISfloodoutside(src, dst);
+    } else {
+      int lo = geti(), hi = geti();
+      r = MRISaccentuate(src, dst, lo, hi);
+    }
+    put_result(r, dst);
+    return true;
+  }
   if (cmd == "salloc") {
     int ms = geti(), mv = geti();
     MRI_SEGMENTATION *sg = MRIsegmentAlloc(ms, mv);

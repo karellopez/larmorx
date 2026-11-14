@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! The fs.filter probe's segment commands (`fsfilter.cpp`'s `seg_case`, `utils/mrisegment.cpp`):
-//! their case generators and the port's answers.
+//! The fs.filter probe's segment and flood commands (`fsfilter.cpp`'s `seg_case`,
+//! `utils/mrisegment.cpp`, `utils/mriflood.cpp`): their case generators and the port's answers.
 
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_filter::flood;
 use larmorx_freesurfer_filter::segment as sg;
 use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence,
 };
+use larmorx_freesurfer_volume::arith::Pair;
 
-use super::conv::{opt, result, small};
-use super::{Ctx, Gen, Toks, fx, get_vol, put_vol, rle, token};
+use super::conv::{opt, result, same_result, small};
+use super::{Ctx, Gen, Shared, Toks, fx, get_vol, put_vol, rle, token};
+use larmorx_freesurfer_core::globals::Globals;
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 3] = ["seg", "mseg", "salloc"];
+pub const COMMANDS: [&str; 6] = ["seg", "mseg", "salloc", "flood", "acc", "dist"];
 
 /// The light operations (no volume), for the large pattern volumes.
 const LIGHT: [&str; 7] = ["M", "N", "A", "R", "C", "G", "L"];
@@ -89,7 +92,98 @@ fn opt_vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
     }
 }
 
+/// A volume of walls (hollow boxes of 255 or 2), with 1s and other values scattered.
+fn walls(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32) {
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let mut v = vec![0.0f64; n];
+    for _ in 0..g.int(0, 3) {
+        let lo = [0, 1, 2].map(|k| g.int(0, i64::from(e[k]) - 1) as i32);
+        let hi = [0, 1, 2].map(|k| (lo[k] + g.int(1, 6) as i32).min(e[k] - 1));
+        let wall = g.pick(&[255.0, 255.0, 2.0, 7.0]);
+        for z in lo[2]..=hi[2] {
+            for y in lo[1]..=hi[1] {
+                for x in lo[0]..=hi[0] {
+                    let edge = x == lo[0]
+                        || x == hi[0]
+                        || y == lo[1]
+                        || y == hi[1]
+                        || z == lo[2]
+                        || z == hi[2];
+                    if edge && !g.chance(30) {
+                        v[((z * e[1] + y) * e[0] + x) as usize] = wall;
+                    }
+                }
+            }
+        }
+    }
+    for x in v.iter_mut() {
+        if g.chance(25) {
+            *x = g.pick(&[1.0, 254.0, 3.0, 300.0, -3.0]);
+        }
+    }
+    let vals: Vec<String> = v
+        .iter()
+        .map(|&x| {
+            if ty == MRI_FLOAT && g.chance(20) {
+                fx(g.pick(&[f32::NAN, -0.0, 0.5, 1.5, f32::INFINITY]))
+            } else {
+                token(ty, x)
+            }
+        })
+        .collect();
+    t.extend(e.map(|x| x.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    for _ in 0..3 {
+        t.push(fx(1.0));
+    }
+    t.extend(rle(&vals));
+}
+
+fn flood_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    if cmd == "dist" {
+        for _ in 0..3 {
+            t.push(fx(g.pick(&[
+                1.0f32,
+                -2.5,
+                0.0,
+                -0.0,
+                3.0e19,
+                1.0e-30,
+                f32::NAN,
+                -f32::NAN,
+                f32::INFINITY,
+                0.1,
+                7.25,
+            ])));
+        }
+        return;
+    }
+    let e = if g.chance(4) {
+        small(g, 14)
+    } else {
+        small(g, 8)
+    };
+    let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_FLOAT, MRI_SHORT, MRI_INT]);
+    walls(g, t, e, ty);
+    let m = g.pick(&[0, 0, 1, 2]);
+    t.push(m.to_string());
+    if m == 1 {
+        let ty2 = g.pick(&[ty, ty, MRI_UCHAR, MRI_FLOAT]);
+        walls(g, t, e, ty2);
+    }
+    if cmd == "acc" {
+        let (lo, hi) = g.pick(&[(1, 254), (1, 255), (0, 0), (-5, 2), (3, 1)]);
+        t.push(lo.to_string());
+        t.push(hi.to_string());
+    }
+}
+
 pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    if matches!(cmd, "flood" | "acc" | "dist") {
+        flood_case(g, t, cmd);
+        return;
+    }
     if cmd == "salloc" {
         t.push(g.pick(&[0, 1, 3, 7, 2, -1]).to_string());
         t.push(g.pick(&[5, 5, 0, 1, -2]).to_string());
@@ -259,8 +353,44 @@ fn put_seg(o: &mut String, s: &sg::MriSegmentation) {
     }
 }
 
+fn run_flood(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
+    if cmd == "dist" {
+        let (x, y, z) = (t.f(), t.f(), t.f());
+        *o += &format!("{:08x} ", flood::distance(x, y, z).to_bits());
+        return Ok(());
+    }
+    let mut src = get_vol(cx, t)?;
+    let m = t.i();
+    let mut dst = if m == 1 { Some(get_vol(cx, t)?) } else { None };
+    let (lo, hi) = if cmd == "acc" { (t.i(), t.i()) } else { (0, 0) };
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let call = |g: &mut Globals, a: &mut Shared, b: &mut Shared, p: Pair| {
+        if cmd == "flood" {
+            flood::mris_flood_outside(g, a, b, p)
+        } else {
+            flood::mris_accentuate(g, a, b, p, lo, hi)
+        }
+    };
+    if m == 2 {
+        let r = call(g, a, b, Pair::Same(&mut src))?;
+        same_result(o, r, &src);
+    } else {
+        let p = match dst.as_mut() {
+            Some(d) => Pair::Given(&src, d),
+            None => Pair::New(&src),
+        };
+        let r = call(g, a, b, p)?;
+        result(o, r, dst.as_ref());
+    }
+    Ok(())
+}
+
 /// The port's answer for one of this module's commands; `false` for another command.
 pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool, Fatal> {
+    if matches!(cmd, "flood" | "acc" | "dist") {
+        run_flood(cx, cmd, t, o)?;
+        return Ok(true);
+    }
     if cmd == "salloc" {
         let (ms, mv) = (t.i(), t.i());
         let s = sg::mri_segment_alloc(&mut cx.g, &mut cx.b, ms, mv)?;

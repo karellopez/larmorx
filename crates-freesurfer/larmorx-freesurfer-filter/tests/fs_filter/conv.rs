@@ -960,7 +960,7 @@ fn smooth(
 }
 
 /// `put_result(r, src)` when the source was its own destination.
-fn same_result(o: &mut String, r: Ret<Mri>, src: &Mri) {
+pub(super) fn same_result(o: &mut String, r: Ret<Mri>, src: &Mri) {
     match r {
         Ret::New(m) => {
             *o += "0 ";

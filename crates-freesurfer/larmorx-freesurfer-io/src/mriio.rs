@@ -221,7 +221,7 @@ pub fn mri_read_header(
         if usetype == MRI_VOLUME_TYPE_UNKNOWN {
             match std::fs::metadata(utils::resolve(dir, fname)) {
                 Err(e) => {
-                    g.errno = e.raw_os_error().unwrap_or(2);
+                    g.errno = log::errno_of(&e).unwrap_or(2);
                     let _ = writeln!(out, "ERROR: could not find volume {fname}.  Does it exist?");
                 }
                 Ok(_) => {

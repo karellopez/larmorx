@@ -188,6 +188,7 @@ the points leave in the order these exact steps give, which decides the distance
 | FS-558 | c | the classifier's gray likelihood uses the white variance; both likelihoods 0 give a NaN white probability (white) | kept in both modes (rule D: measured at `mri_segment`'s port) |
 | FS-559 | a | the border labels of a uchar volume written into a destination not uchar or smaller | an error, `NULL` |
 | FS-560 | a | the class statistics count negative or NaN intensities in a bin before the histogram | left out of the histogram (both modes) |
+| FS-561 | a | the region growing with a label its volume stores as 0 never ends when two object voxels touch | an error (both modes) |
 
 ## 9. The Gaussian kernel and the one-dimensional convolutions
 
@@ -417,6 +418,6 @@ other voxel set to 0 (all of them when there is none).
   kernels with NaN weights, destinations of other types, extents and frames, invalid frames and
   axes, deviations 0, negative and NaN, label volumes with odd values.
 - **Expected.** Every line identical under `reproduce` but those that touch memory outside a volume
-  (FS-546, FS-548, FS-549, FS-550, FS-551, FS-552, FS-555, FS-559, FS-560, FS-163, and FS-53, FS-58);
+  (FS-546, FS-548, FS-549, FS-550, FS-551, FS-552, FS-555, FS-559, FS-560, FS-561, FS-163, and FS-53, FS-58);
   the default differs only where a defect it corrects is noted. Observed at seeds 7 (1,200 cases),
   13 (1,400) and 17 (2,000): 0 different (observed).

@@ -2,7 +2,7 @@
 
 **Closed to FreeSurfer clean-room implementers** (it names FreeSurfer's files, functions and lines;
 the behaviour is `specs/freesurfer-filter.md`). Queue item 3.1-42, replica in
-`crates-freesurfer/larmorx-freesurfer-filter` (track D, relay 25, 2026-11-14).
+`crates-freesurfer/larmorx-freesurfer-filter` (track D, relays 25 and 26, 2026-11-14).
 
 ## 1. The fast-marching distance maps (`utils/mri_fastmarching.cpp`, `include/fastmarching.h`)
 
@@ -75,3 +75,61 @@ placement's (`aseg.mgz` label 3; `filled.mgz` 255; signed, 100), mriset's (`wm.m
 default limit) and mris_distance_to_label's (`aseg.mgz` 17 outside 5, 4 inside 10) maps on three
 heads: 18 maps, all 18 identical in both modes (none reaches a defect); 122 s for the 18 in the
 official code, 94 s in the port (release build, one thread, reading the volumes included).
+
+## 7. `mrifilter.cpp`'s convolutions, statistics and derivatives (relay 26)
+
+- **`FLT_EPSILON`.** `mrifilter.cpp` (and `fmriutils.cpp`, `mrinorm.cpp`, `mriflood.cpp`,
+  `mrisegment.cpp`, `rfa.cpp`, `volcluster.cpp`) see `<float.h>`'s `FLT_EPSILON` (1.19e-7): the
+  unit oracle's preprocessed sources (`g++ -E -dM` with the probe's flags). `connectcomp.cpp`,
+  `filter.cpp` and `diffuse.cpp` get `macros.h`'s 1e-5 (no `<float.h>` before it).
+- **Operand orders** (the unit oracle's `mrifilter.cpp.o`, GCC 8.4.0 `-O3`; they decide only which
+  of two NaNs survives): every convolution tap is `mulss k, v` then `addss p, total` (the voxel
+  times the weight, the product added to the sum) in all ten OpenMP bodies of `MRIconvolve1d` and in
+  `MRIconvolve1dByte`, `Short`, `Int`, `MRIreduce1d`, `MRIreduceSlice`; `MRImean`'s
+  `val += MRIgetVoxVal(...)` is `addss sum, v` (the returned voxel is the destination); `MRIstd` and
+  `MRIstdNonzero` add the square into the sum's register the same way. `MRIlaplacian` alternates:
+  its first, third and fifth neighbours are added into the sum, the second, fourth and sixth take the
+  sum into the neighbour (the spilled sum is the memory operand). `MRIxSobelForAllTypes` computes
+  `2m` as `m + m` and its three column sums with three orders (`(2m + t) + b` before the loop,
+  `(t + 2m) + b` for the second, `b + (2m + t)` in the loop), and its `/ eight` as `* 0.125f`;
+  `MRIySobelForAllTypes` and `MRIzSobelForAllTypes` as `(2m + right) + left` (GCC commutes, never
+  reassociates). `MRIsobel`'s magnitude is `z² + (x² + y²)`. `MRIdivergence` adds in double
+  `(dx + dy) + dz`. `MRIgaussian1d`'s products are commuted but its operands cannot both be NaN.
+- **`MRIborderClassifyVoxel`** calls `expf` (C++'s float overload); the gray class's sum of squares
+  and variance are never used (FS-558: the gray likelihood uses the white variance) and the official
+  build drops their computation. `MRIreclassify`'s `MAX(pw, pg)` is branchless (`cmpless`, `andps`,
+  `andnps`, `orps`): the second argument for equal or NaN values, as the macro.
+- **FS-558 (rule D).** Using the gray variance changes `mri_segment`'s `wm.seg.mgz` wherever the two
+  variances differ; whether that improves the white-matter segmentation is to be measured at
+  `mri_segment`'s port (the recorded heads' `wm.seg.mgz` against the final `wm.mgz` edits and the
+  surfaces), so both modes keep FreeSurfer's computation until then (`fixed_by_default` false).
+- **`MRIconvolveGaussian`'s progress range** divides by the frame count before anything else
+  (`(nstart - nend) / nframes`, integer): a volume without frames crashes (SIGFPE), FS-550.
+- **`MRIreduce` of one slice**: `MRIreduce1d(mtmp1, mri_dst, kernel, KERNEL_SIZE, MRI_HEIGHT)` with
+  `mri_dst` NULL allocates `sdepth / 2 = 0` slices (FS-553); the following `MRIsetResolution` and
+  matrix scaling already treat depth 1 as a 2-D case, so the intent is a slice.
+- **The typed convolutions** read through the code's pointer type: `MRIconvolve1dByte`'s float
+  branch keeps a `BUFTYPE *` (`inBase_f`), so a float source's row is read byte by byte (its first
+  `width` bytes); `MRIconvolve1dShort`/`Int` cast every source's rows (FS-547).
+- **`MRIlaplacian`**'s centre is `MRIgetVoxVal(mri_src, x, y, z, 0)` in a loop over frames `f`
+  (FS-554). **`MRIdivergence`** reassigns its parameter with `MRIalloc` at once (FS-556).
+- **`MRIgaussianSmoothNI`'s kernel sum** is `long double` with an OpenMP `reduction(+)`: with several
+  threads the partial sums are combined in the runtime's order (the source's comment says the long
+  double was chosen to make thread counts agree in practice). The port adds in one thread's order.
+  Its `%Lg` diagnostics (only with `Gdiag_no > 0`) are formatted from the sum rounded to double.
+
+## 8. `connectcomp.cpp` (relay 26)
+
+`GrassFire6`/`18`'s `myQueue` is a FIFO over a realloc'd array; the region, its size and bounds do
+not depend on the order, so the port uses a `VecDeque`. With a label stored as 0 (a uchar label
+volume and a label of -1, or 0 itself) `MRIsetVoxVal` marks nothing and two object voxels push each
+other for ever (FS-561: the probe's official run ends by its 20-second alarm, the port's first try
+grew past its 12 GiB box). `GetLargestCC6`/`18` scan `i` (rows) outermost, then `j` (columns), then
+`k` (slices); ties keep the first region.
+
+## 9. Waiting (relay 26)
+
+`MRIreclassifyWMCtxNonPar` and `MRIclassifyAmbiguousNonPar` (`mrifilter.cpp` 4914, 5093) need
+`mri2.cpp`'s `MRImatchSegs` (5687), `MRIsegStats` (3826), `HISTOseg` (5717) and `mriset.cpp`'s
+`MRIdilate` (1723), which no track has ported yet. `fmriutils.cpp`'s 21 functions, `filter.cpp`'s
+image reductions and `diffuse.cpp`'s tables are the next relay's.

@@ -4,8 +4,8 @@
 //! fs.filter against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
 //! official build's output lines for the probe's cases of seed 1, recorded by
 //! `validation/probes/fs-filter/check.py --seed 1 --n <N>` on Linux x64 from the unit oracle's build,
-//! against the port's output with `reproduce` (lines where FreeSurfer reads memory outside a volume
-//! or crashes, FS-53, FS-58, FS-540, FS-541, hashed as `SKIP`).
+//! against the port's output with `reproduce` (lines where FreeSurfer touches memory outside a
+//! volume, crashes or hangs, `check.py`'s `SKIP`, hashed as `SKIP`).
 
 #[path = "fs_filter/cases.rs"]
 mod cases;
@@ -13,14 +13,18 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-14 from the clean commit 66a5e65f (the distance maps `MRIextractDistanceMap`,
-/// `MRIdistanceTransform`): 400 cases, 348 lines identical, 52 hashed as `SKIP`.
-const N: usize = 400;
-const OFFICIAL_SHA256: &str = "aa81ea376da2b51f6f2f0b03df0522542c3ad826072e65d49b82c51f1fc74d13";
-const SKIPPED: usize = 52;
+/// Recorded 2026-11-14 from the clean commit 35804881 (the distance maps, the convolutions,
+/// smoothing, window statistics, reductions, derivatives, border classification and connected
+/// components): 800 cases, 711 lines identical, 89 hashed as `SKIP`.
+const N: usize = 800;
+const OFFICIAL_SHA256: &str = "6607b883ff71d2a108b3647deb9eb6f3140919e64df28e7331c393fc66e86bc7";
+const SKIPPED: usize = 89;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 4] = ["FS-540", "FS-541", "FS-58", "FS-53"];
+const SKIP: [&str; 15] = [
+    "FS-540", "FS-541", "FS-58", "FS-53", "FS-546", "FS-548", "FS-549", "FS-550", "FS-551", "FS-552",
+    "FS-555", "FS-163", "FS-559", "FS-560", "FS-561",
+];
 
 #[test]
 fn reproduce_gives_the_official_outputs() {

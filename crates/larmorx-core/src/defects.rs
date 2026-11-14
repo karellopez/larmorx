@@ -1973,6 +1973,10 @@ defects! {
         "a bshort or bfloat geometry file's line that starts with a NUL byte makes the reader read, and possibly change, the byte before its line buffer";
     FS_670 = "FS-670", "FreeSurfer", true,
         "a bshort or bfloat volume in the root folder (/<stem>_000.bshort) is read from the working folder instead";
+    FS_671 = "FS-671", "FreeSurfer", true,
+        "writing as bshort or bfloat a volume of another type with two or more frames ends by freeing the converted copy as if it had a frame table for every frame (it has one): the program may crash after the files are written";
+    FS_672 = "FS-672", "FreeSurfer", true,
+        "a volume whose Talairach transform (named by a COR header or an MGH tag) fails to load keeps it marked as the volume's own; freeing the volume then frees a transform that was never written: memory contents, usually ending the program with 'delete_general_transform' and status 1";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

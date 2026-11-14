@@ -555,12 +555,20 @@ fn answer(
     let dir = Some(w.fix.as_path());
     g.progname = "fsio".into();
     let awr = tk[0] == "awr";
+    let vwr = tk[0] == "vwr";
     let mut tk = Toks { t: tk, i: 1 };
     // piece 16: awr <Gdiag_no> <N_Zero_Pad_Output> <N_Zero_Pad_Input for the read back>, then mgw's
     if awr {
         g.gdiag_no = tk.int() as i32;
         g.n_zero_pad_output = tk.int() as i32;
         g.n_zero_pad_input = tk.int() as i32;
+    }
+    // piece 17: vwr <subject name> <SUBJECTS_DIR> <BFILE_LITTLE_ENDIAN 0|1>, then mgw's
+    let (mut subject, mut sd, mut le) = (None, None, false);
+    if vwr {
+        subject = super::dec(tk.next());
+        sd = super::dec(tk.next());
+        le = tk.int() != 0;
     }
     g.gdiag = u64::from_str_radix(tk.next(), 16).unwrap();
     setup(w, tk.next());
@@ -572,9 +580,19 @@ fn answer(
     if bits & 1 != 0 {
         pairs.push(("FS_MGZIO_USEVOXELBUFWRITE", "1"));
     }
+    if le {
+        pairs.push(("BFILE_LITTLE_ENDIAN", "1"));
+    }
+    let sd = sd.map(|b| String::from_utf8(b).unwrap());
+    if let Some(sd) = &sd {
+        pairs.push(("SUBJECTS_DIR", sd.as_str()));
+    }
     let env = Environment::from_pairs(pairs);
     let how = tk.int();
     let mut m = read_mri14(g, out, err, &mut tk);
+    if let Some(s) = subject {
+        m.subject_name = String::from_utf8(s).unwrap();
+    }
     let frame = tk.int() as i32;
     let intent = tk.int() as i32;
     let name = tk.string();
@@ -587,6 +605,7 @@ fn answer(
         2 => Some(NIFTI1_FILE),
         3 => Some(MRI_ANALYZE_FILE),
         4 => Some(MRI_ANALYZE4D_FILE),
+        10.. => Some(how as i32 - 10),
         _ => None,
     };
     let r = if let Some(ty) = typed {

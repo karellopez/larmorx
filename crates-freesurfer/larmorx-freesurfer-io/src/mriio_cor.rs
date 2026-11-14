@@ -16,16 +16,19 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_249, FS_657, FS_658, FS_659, FS_660};
+use larmorx_core::defects::{FS_166, FS_249, FS_657, FS_658, FS_659, FS_660, FS_672};
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BAD_FILE, ERROR_BADFILE, ERROR_BADPARM, Fatal, NO_ERROR};
-use larmorx_freesurfer_core::utils;
-use larmorx_freesurfer_mri::mri::{self, MRI_UCHAR, Mri};
+use larmorx_freesurfer_core::{sse, utils};
+use larmorx_freesurfer_mri::mri::{
+    self, MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+};
 
 use crate::cfile::CFile;
 use crate::minc;
+use crate::mriio_nifti::{narrow, widen};
 
 /// `STRLEN`: FreeSurfer's name and line buffers.
 const STRLEN: usize = 1024;
@@ -139,23 +142,25 @@ impl<T: Copy + Default> Req<T> {
 /// the line buffer whatever the line's length. `buf` holds what earlier lines left in the buffer
 /// past this line's end (`written` of its bytes were ever written). FS-658.
 fn flip_number(g: &mut Globals, buf: &[u8], written: usize, line_len: usize) -> Option<f32> {
-    let scan = |s: &[u8]| -> Option<f32> {
+    let scan = |g: &mut Globals, s: &[u8]| -> Option<f32> {
         let mut b = Bytes::new(s);
-        let mut errno = 0;
+        let mut errno = g.errno;
         let mut sc = Scanf::new(&mut b);
         let v = sc.f(&mut errno, true);
         sc.finish(&mut errno);
+        g.errno = errno;
         v
     };
     if line_len >= 11 {
-        return scan(cstr(&buf[11..]));
+        return scan(g, cstr(&buf[11..]));
     }
     if g.notices.fix() {
         g.notices.add(
             &FS_658,
             "corRead: a flip line shorter than 'flip angle ': no number (FreeSurfer reads past the line's end)",
         );
-        return None;
+        // glibc's sscanf of an empty text: errno 0
+        return scan(g, b"");
     }
     // the bytes after the line's end: an earlier line's, or never written (memory contents)
     let s = cstr(&buf[11..]);
@@ -170,7 +175,18 @@ fn flip_number(g: &mut Globals, buf: &[u8], written: usize, line_len: usize) -> 
             "corRead: the flip angle read past the line's end from an earlier line's bytes, as in FreeSurfer",
         );
     }
-    scan(s)
+    scan(g, s)
+}
+
+/// FS-672: FreeSurfer frees a volume whose Talairach transform failed to load (its transform
+/// never written, but marked as the volume's to free).
+fn freed(g: &mut Globals, bad_transform: bool) {
+    if bad_transform {
+        g.notices.add(
+            &FS_672,
+            "a volume whose Talairach transform failed to load, freed (FreeSurfer frees a transform never written: memory contents, the program may end with status 1)",
+        );
+    }
 }
 
 /// `corRead(fname, read_volume)`: a COR volume: the folder `fname` (or the folder of a file in
@@ -322,7 +338,7 @@ pub fn cor_read(
             if let Some(v) = flip_number(g, &buf, written, l.len()) {
                 flip_angle = v;
             }
-            flip_angle = (TWO_PI * f64::from(flip_angle) / 360.0) as f32;
+            flip_angle = narrow(sse::div64(sse::mul64(widen(flip_angle), TWO_PI), 360.0));
         } else if has(b"psiz ") {
             let v = lf(g);
             psiz.set(v);
@@ -459,18 +475,18 @@ pub fn cor_read(
     }
     m.imnr0 = imnr0;
     m.imnr1 = imnr1;
-    m.fov = (fov * 1000.0) as f32;
-    m.thick = (thick * 1000.0) as f32;
-    m.ps = (psiz * 1000.0) as f32;
+    m.fov = narrow(sse::mul64(fov, 1000.0));
+    m.thick = narrow(sse::mul64(thick, 1000.0));
+    m.ps = narrow(sse::mul64(psiz, 1000.0));
     m.vg.xsize = m.ps;
     m.vg.ysize = m.ps;
     m.vg.zsize = m.thick;
-    m.xstart = sev[0] * 1000.0;
-    m.xend = sev[1] * 1000.0;
-    m.ystart = sev[2] * 1000.0;
-    m.yend = sev[3] * 1000.0;
-    m.zstart = sev[4] * 1000.0;
-    m.zend = sev[5] * 1000.0;
+    m.xstart = sse::mul(sev[0], 1000.0);
+    m.xend = sse::mul(sev[1], 1000.0);
+    m.ystart = sse::mul(sev[2], 1000.0);
+    m.yend = sse::mul(sev[3], 1000.0);
+    m.zstart = sse::mul(sev[4], 1000.0);
+    m.zend = sse::mul(sev[5], 1000.0);
     m.vg.fname.strcpy_bytes(fname.as_bytes());
     m.tr = tr;
     m.te = te;
@@ -481,6 +497,7 @@ pub fn cor_read(
     (m.vg.y_r, m.vg.y_a, m.vg.y_s) = (y_r, y_a, y_s);
     (m.vg.z_r, m.vg.z_a, m.vg.z_s) = (z_r, z_a, z_s);
     (m.vg.c_r, m.vg.c_a, m.vg.c_s) = (c_r, c_a, c_s);
+    let mut bad_transform = false;
     if !xform.is_empty() {
         let mut t = if xform[0] == b'/' {
             xform.clone()
@@ -522,6 +539,7 @@ pub fn cor_read(
                     }
                 }
                 None => {
+                    bad_transform = true;
                     g.errno = 0;
                     let mut s = b"error loading transform from ".to_vec();
                     s.extend_from_slice(&t);
@@ -545,6 +563,7 @@ pub fn cor_read(
             Ok(f) => f,
             Err(e) => {
                 g.errno = e;
+                freed(g, bad_transform);
                 return Ok(fail0(
                     g,
                     err,
@@ -562,6 +581,7 @@ pub fn cor_read(
                 c[o..o + n].copy_from_slice(&row[..n]);
             }
             if n < w {
+                freed(g, bad_transform);
                 return Ok(fail0(
                     g,
                     err,
@@ -676,7 +696,7 @@ pub fn cor_write(
         g.notices.add(
             &FS_660,
             if g.notices.reproduce() {
-                "corWrite: imnr0 to imnr1 asks for more slices than the volume has: the next frames' slices, then memory (a crash), as in FreeSurfer"
+                "corWrite: imnr0 to imnr1 asks for more slices than the volume has: the next frames' slices, as in FreeSurfer"
             } else {
                 "corWrite: imnr0 to imnr1 asks for more slices than the volume has: refused (FreeSurfer writes other frames' slices or crashes)"
             },
@@ -735,7 +755,7 @@ pub fn cor_write(
             &format!("corWrite(): can't open file {info} for writing"),
         ));
     };
-    let gk = |v: f32| cfmt::g(f64::from(v) / 1000.0, 6);
+    let gk = |v: f32| cfmt::g(sse::div64(widen(v), 1000.0), 6);
     let f6 = |v: f32| cfmt::f(f64::from(v), 6);
     let mut s = format!(
         "imnr0 {}\nimnr1 {}\nptype 2\nx {}\ny {}\n",
@@ -758,7 +778,7 @@ pub fn cor_write(
     s.push_str(&format!("tr {}\nte {}\nti {}\n", f6(m.tr), f6(m.te), f6(m.ti)));
     s.push_str(&format!(
         "flip angle {}\n",
-        cfmt::f(360.0 * m.flip_angle / TWO_PI, 6)
+        cfmt::f(sse::div64(sse::mul64(360.0, m.flip_angle), TWO_PI), 6)
     ));
     s.push_str(&format!("ras_good_flag {}\n", m.vg.ras_good_flag));
     let v = &m.vg;
@@ -782,6 +802,18 @@ pub fn cor_write(
     let w = m.vg.width.max(0) as usize;
     let bpv = m.bytes_per_vox;
     let slices = i64::from(d.max(0)) * i64::from(nf.max(0));
+    // FreeSurfer's row pointers: the types initSlices does not step all point at the first
+    // voxel (FS-166; reached only with `reproduce`, FS-659 refuses such volumes by default)
+    let stepped = matches!(
+        m.mtype,
+        MRI_UCHAR | MRI_SHORT | MRI_USHRT | MRI_RGB | MRI_INT | MRI_LONG | MRI_FLOAT | MRI_FLOAT_COMPLEX
+    );
+    if !stepped {
+        g.notices.add(
+            &FS_166,
+            "corWrite of a volume whose rows all point at its first voxel, as in FreeSurfer",
+        );
+    }
     let mut i = i64::from(m.imnr0);
     while i <= i64::from(m.imnr1) {
         let name = format!("{use_name}COR-{i:03}");
@@ -796,11 +828,19 @@ pub fn cor_write(
         let k = i - i64::from(m.imnr0);
         if k >= slices {
             // past FreeSurfer's slice pointers (fix mode refused this above)
+            g.notices.add(
+                &FS_660,
+                "corWrite: a slice past the volume's voxels (FreeSurfer crashes)",
+            );
             fp.close();
             return Err(Fatal::Exit(139));
         }
         for j in 0..m.vg.height {
-            let o = (k as u64 * m.vox_per_slice + j as u64 * m.vox_per_row) as usize * bpv;
+            let o = if stepped {
+                (k as u64 * m.vox_per_slice + j as u64 * m.vox_per_row) as usize * bpv
+            } else {
+                0
+            };
             if fp.fwrite(&chunk[o..o + w], 1, w) < w {
                 fp.close();
                 return Ok(fail_code(

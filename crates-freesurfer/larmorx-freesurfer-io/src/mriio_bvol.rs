@@ -27,7 +27,7 @@ use std::path::Path;
 
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
-    FS_58, FS_249, FS_661, FS_662, FS_663, FS_664, FS_665, FS_667, FS_668, FS_669, FS_670,
+    FS_58, FS_249, FS_661, FS_671, FS_662, FS_663, FS_664, FS_665, FS_667, FS_668, FS_669, FS_670,
 };
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
@@ -38,7 +38,7 @@ use larmorx_freesurfer_core::log::{
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_inverse};
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::utils;
+use larmorx_freesurfer_core::{sse, utils};
 use larmorx_freesurfer_mri::info::mri_limits;
 use larmorx_freesurfer_mri::mri::{self, MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriFrame};
 use larmorx_freesurfer_mri::vol_geom;
@@ -47,6 +47,7 @@ use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use crate::bfileio;
 use crate::cfile::CFile;
 use crate::mriio::{MRI_CORONAL, mri_read_info, set_direction_cosine};
+use crate::mriio_nifti::{narrow, widen};
 
 /// `STRLEN`: FreeSurfer's name and line buffers.
 const STRLEN: usize = 1024;
@@ -295,7 +296,7 @@ pub fn read_bhdr(
                 if let Some(v) = f(g) {
                     m.tr = v;
                 }
-                m.tr = (1000.0 * f64::from(m.tr)) as f32;
+                m.tr = narrow(sse::mul64(1000.0, widen(m.tr)));
             } else if has(b"image_ti: ") {
                 if let Some(v) = f(g) {
                     m.ti = v;
@@ -337,22 +338,33 @@ pub fn read_bhdr(
     drop(fp);
     let w = m.vg.width as f32;
     let h = m.vg.height as f32;
-    let (xr, xa, xs) = ((trr - tlr) / w, (tra - tla) / w, (trs - tls) / w);
-    m.vg.xsize = (xr * xr + xa * xa + xs * xs).sqrt();
+    let len = |a: f32, b: f32, c: f32| {
+        sse::sqrt(sse::add(sse::add(sse::mul(a, a), sse::mul(b, b)), sse::mul(c, c)))
+    };
+    let (xr, xa, xs) = (
+        sse::div(sse::sub(trr, tlr), w),
+        sse::div(sse::sub(tra, tla), w),
+        sse::div(sse::sub(trs, tls), w),
+    );
+    m.vg.xsize = len(xr, xa, xs);
     if m.vg.xsize != 0.0 {
-        m.vg.x_r = xr / m.vg.xsize;
-        m.vg.x_a = xa / m.vg.xsize;
-        m.vg.x_s = xs / m.vg.xsize;
+        m.vg.x_r = sse::div(xr, m.vg.xsize);
+        m.vg.x_a = sse::div(xa, m.vg.xsize);
+        m.vg.x_s = sse::div(xs, m.vg.xsize);
     } else {
         m.vg.xsize = 1.0;
         (m.vg.x_r, m.vg.x_a, m.vg.x_s) = (-1.0, 0.0, 0.0);
     }
-    let (yr, ya, ys) = ((brr - trr) / h, (bra - tra) / h, (brs - trs) / h);
-    m.vg.ysize = (yr * yr + ya * ya + ys * ys).sqrt();
+    let (yr, ya, ys) = (
+        sse::div(sse::sub(brr, trr), h),
+        sse::div(sse::sub(bra, tra), h),
+        sse::div(sse::sub(brs, trs), h),
+    );
+    m.vg.ysize = len(yr, ya, ys);
     if m.vg.ysize != 0.0 {
-        m.vg.y_r = yr / m.vg.ysize;
-        m.vg.y_a = ya / m.vg.ysize;
-        m.vg.y_s = ys / m.vg.ysize;
+        m.vg.y_r = sse::div(yr, m.vg.ysize);
+        m.vg.y_a = sse::div(ya, m.vg.ysize);
+        m.vg.y_s = sse::div(ys, m.vg.ysize);
     } else {
         m.vg.ysize = 1.0;
         (m.vg.y_r, m.vg.y_a, m.vg.y_s) = (0.0, 0.0, -1.0);
@@ -408,8 +420,15 @@ pub fn write_bhdr(
     matrix_multiply(g, out, err, Some(&t), Some(&crs), Some(&mut ras))?;
     let (brr, bra, brs) = (ras.relt(1, 1), ras.relt(2, 1), ras.relt(3, 1));
     let v = &m.vg;
-    let vl = (v.z_r * v.z_r + v.z_a * v.z_a + v.z_s * v.z_s).sqrt();
-    let (nr, na, ns) = (v.z_r / vl, v.z_a / vl, v.z_s / vl);
+    let vl = sse::sqrt(sse::add(
+        sse::add(sse::mul(v.z_r, v.z_r), sse::mul(v.z_a, v.z_a)),
+        sse::mul(v.z_s, v.z_s),
+    ));
+    let (nr, na, ns) = (
+        sse::div(v.z_r, vl),
+        sse::div(v.z_a, vl),
+        sse::div(v.z_s, vl),
+    );
     let mut s = String::new();
     let fl = |s: &mut String, name: &str, x: f64| {
         s.push_str(&format!("{name}: {}\n", cfmt::f(x, 6)));
@@ -432,7 +451,7 @@ pub fn write_bhdr(
     fl(&mut s, "      normal_a", f64::from(na));
     fl(&mut s, "      normal_s", f64::from(ns));
     fl(&mut s, "      image_te", f64::from(m.te));
-    fl(&mut s, "      image_tr", f64::from(m.tr) / 1000.0);
+    fl(&mut s, "      image_tr", sse::div64(widen(m.tr), 1000.0));
     fl(&mut s, "      image_ti", f64::from(m.ti));
     fl(&mut s, "    flip_angle", m.flip_angle);
     Ok(s.into_bytes())
@@ -627,13 +646,13 @@ fn get_b_info(
     }
     m.imnr0 = 1;
     m.imnr1 = nslices;
-    m.xend = (f64::from(m.vg.width as f32 * m.vg.xsize) / 2.0) as f32;
+    m.xend = half(sse::mul(m.vg.width as f32, m.vg.xsize));
     m.xstart = -m.xend;
-    m.yend = (f64::from(m.vg.height as f32 * m.vg.ysize) / 2.0) as f32;
+    m.yend = half(sse::mul(m.vg.height as f32, m.vg.ysize));
     m.ystart = -m.yend;
-    m.zend = (f64::from(m.vg.depth as f32 * m.vg.zsize) / 2.0) as f32;
+    m.zend = half(sse::mul(m.vg.depth as f32, m.vg.zsize));
     m.zstart = -m.zend;
-    let (dx, dy) = (m.xend - m.xstart, m.yend - m.ystart);
+    let (dx, dy) = (sse::sub(m.xend, m.xstart), sse::sub(m.yend, m.ystart));
     m.fov = if dx > dy { dx } else { dy };
     // calloc(nframes): a count calloc refuses leaves no frames (nothing reads them)
     m.frames = frames_calloc(m.nframes).unwrap_or_default();
@@ -849,7 +868,7 @@ fn four(
 
 /// `(a) / 2.0` of a `float` expression, back to `float`.
 fn half(a: f32) -> f32 {
-    (f64::from(a) / 2.0) as f32
+    narrow(sse::div64(widen(a), 2.0))
 }
 
 /// The bvolume writer's stem of `fname`: the name without `_<nnn>.bshort`, `_<nnn>.bfloat` or a
@@ -969,15 +988,15 @@ fn subject_files(
             -v.xsize,
             0.0,
             0.0,
-            half(v.width as f32 * f.xsize),
+            half(sse::mul(v.width as f32, f.xsize)),
             0.0,
             0.0,
             v.zsize,
-            -half(v.depth as f32 * f.zsize),
+            -half(sse::mul(v.depth as f32, f.zsize)),
             0.0,
             -v.ysize,
             0.0,
-            half(v.height as f32 * f.ysize),
+            half(sse::mul(v.height as f32, f.ysize)),
             0.0,
             0.0,
             0.0,
@@ -1202,6 +1221,13 @@ pub fn bvolume_write(
         None
     };
     let dealloc = converted.is_some();
+    if dealloc && vol.nframes >= 2 {
+        // FS-671: FreeSurfer's converted copy has one frame's table, freed for every frame
+        g.notices.add(
+            &FS_671,
+            "bvolumeWrite of a converted volume with two or more frames (FreeSurfer frees frames past the copy's table at its end: memory contents, a crash or not)",
+        );
+    }
     let mri: &Mri = converted.as_ref().unwrap_or(vol);
     let stem = write_stem(fname);
     let _ = writeln!(out, "INFO: bvolumeWrite: stem = {stem}");

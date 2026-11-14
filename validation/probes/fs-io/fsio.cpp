@@ -1452,7 +1452,7 @@ void run_piece13(const std::string &cmd)
 }
 
 // piece 14 (track A relay 23): mghWrite and MRITAGwrite, directly or through MRIwrite
-bool piece14_cmd(const std::string &cmd) { return cmd == "mgw" || cmd == "awr"; }
+bool piece14_cmd(const std::string &cmd) { return cmd == "mgw" || cmd == "awr" || cmd == "vwr"; }
 
 // a volume with every field the MGH writer writes: <w> <h> <d> <type> <frames> <alloc 1 voxels|0
 // header>, the 15 geometry floats, <ras_good_flag>, tr te ti fov (floats), flip (double), the
@@ -1526,14 +1526,25 @@ MRI *read_mri14()
 void run_piece14(const std::string &cmd)
 {
   fwide(stderr, -1);
-  if (cmd == "mgw" || cmd == "awr") {
+  if (cmd == "mgw" || cmd == "awr" || cmd == "vwr") {
     // piece 16 (track A relay 26): awr <Gdiag_no> <N_Zero_Pad_Output> <N_Zero_Pad_Input for the
     // read back>, then mgw's fields; how 3 MRIwriteType(MRI_ANALYZE_FILE), 4 MRI_ANALYZE4D_FILE
+    // piece 17 (track A relay 27): vwr <subject name (N: none)> <SUBJECTS_DIR (N: unset)>
+    // <BFILE_LITTLE_ENDIAN 0|1>, then mgw's fields; how 10 + t: MRIwriteType(t), read back as t
     const bool awr = cmd == "awr";
+    std::string subject;
+    bool no_subject = true;
     if (awr) {
       Gdiag_no = (int)geti();
       N_Zero_Pad_Output = (int)geti();
       N_Zero_Pad_Input = (int)geti();
+    }
+    if (cmd == "vwr") {
+      subject = getstr(&no_subject);
+      bool nsd;
+      std::string sd = getstr(&nsd);
+      if (!nsd) setenv("SUBJECTS_DIR", sd.c_str(), 1);
+      if (geti()) setenv("BFILE_LITTLE_ENDIAN", "1", 1);
     }
     Gdiag = strtoull(next(), NULL, 16);
     setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T", 1);
@@ -1543,11 +1554,13 @@ void run_piece14(const std::string &cmd)
     if (bits & 1) setenv("FS_MGZIO_USEVOXELBUFWRITE", "1", 1);
     int how = (int)geti();
     MRI *m = read_mri14();
+    if (!no_subject) snprintf(m->subject_name, sizeof m->subject_name, "%s", subject.c_str());
     int frame = (int)geti(), intent = (int)geti();
     std::string fn = name10();
     int back = (int)geti();
     errno = 0;
-    int r = how == 2   ? MRIwriteType(m, fn.c_str(), NIFTI1_FILE, intent)
+    int r = how >= 10  ? MRIwriteType(m, fn.c_str(), how - 10, intent)
+            : how == 2 ? MRIwriteType(m, fn.c_str(), NIFTI1_FILE, intent)
             : how == 3 ? MRIwriteType(m, fn.c_str(), MRI_ANALYZE_FILE, intent)
             : how == 4 ? MRIwriteType(m, fn.c_str(), MRI_ANALYZE4D_FILE, intent)
             : how      ? MRIwrite(m, fn.c_str(), NULL, intent)
@@ -1566,8 +1579,11 @@ void run_piece14(const std::string &cmd)
       errno = 0;
       // the reader of the write (relay 25): mghRead after mghWrite, mri_read of the name's type after
       // MRIwrite, the NIfTI-1 pair's reader after MRIwriteType(NIFTI1_FILE)
-      const int bt = how == 2 ? NIFTI1_FILE : how == 3 ? MRI_ANALYZE_FILE : how == 4 ? MRI_ANALYZE4D_FILE
-                                                                                : MRI_VOLUME_TYPE_UNKNOWN;
+      const int bt = how >= 10  ? how - 10
+                     : how == 2 ? NIFTI1_FILE
+                     : how == 3 ? MRI_ANALYZE_FILE
+                     : how == 4 ? MRI_ANALYZE4D_FILE
+                                : MRI_VOLUME_TYPE_UNKNOWN;
       MRI *b = how == 0 ? mghRead(fn.c_str(), 1, -1) : mri_read(fn.c_str(), bt, TRUE, -1, -1, NULL);
       fflush(stdout);
       print_mri6(b);
@@ -1733,8 +1749,12 @@ void run_piece6(const std::string &cmd0)
   // mrd and mrh do, after a Gdiag_no (niiRead's and niiPrintHdr's prints when above 0)
   // piece 16 (track A relay 26): ard and arh read ANALYZE files (.img/.hdr pairs, SPM series) as
   // mrd and mrh do, after a Gdiag_no, N_Zero_Pad_Input and SPM_START_FRAME (N: unset)
+  // piece 17 (track A relay 27): vrd and vrh read COR folders and bshort/bfloat volumes as mrd and
+  // mrh do
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
-  const std::string cmd = cmd0 == "nrd" || cmd0 == "ard" ? "mrd" : cmd0 == "nrh" || cmd0 == "arh" ? "mrh" : cmd0;
+  const std::string cmd = cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd"   ? "mrd"
+                          : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" ? "mrh"
+                                                                             : cmd0;
   if (nifti) Gdiag_no = (int)geti();
   if (cmd0 == "ard" || cmd0 == "arh") {
     N_Zero_Pad_Input = (int)geti();
@@ -2685,7 +2705,8 @@ int main(int argc, char *argv[])
     }
     // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
     {
-      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr"};
+      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
+                                 "vrd", "vrh", "vwr"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

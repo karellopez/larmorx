@@ -93,7 +93,7 @@ fn vol_geom_bytes(g: &mut Gen, shear: bool) -> Vec<u8> {
 }
 
 /// An `.xfm` file's text.
-fn xfm_text(g: &mut Gen) -> Vec<u8> {
+pub(crate) fn xfm_text(g: &mut Gen) -> Vec<u8> {
     let mut t = String::from("MNI Transform File\n% made for the probe\n\n");
     let ty = if g.chance(10) {
         g.pick(&["Grid_Transform", "Thin_Plate_Spline_Transform", "Lin"])

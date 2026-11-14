@@ -193,3 +193,19 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
 - `src/segs.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mri2.cpp` `MRIsegStats` (3826-3877),
   `MRImatchSegs` (5687-5708), `HISTOseg` (5717-5740); operand orders from `mri2.cpp.o`. Changes: FS-489 (rule A),
   FS-490 (no count, both modes).
+- `src/ltaops.rs` (3.1-40; relay 25): `utils/transform.cpp` `LTAprint` (3238-3279), `LTAconcat2` (3378-3385),
+  `LTAconcat` (3396-3461), `LTAreduce` (3469-3521), `LTAinvert` (3530-3560), `LTAfillInverse` (3568-3580), the static
+  `LTAgetV2V` (3646-3668) and `LTAgetR2R` (3672-3694), `LTAchangeType` (3695-4064), `LTAmriIsSource` (4908-4915),
+  `LTAmriIsTarget` (4921-4929). Changes: FS-504 (errors), FS-505, FS-506, FS-507 (rule A), FS-508 (error).
+- `src/vgeom.rs`, relay 25: `utils/transform.cpp` `VGgetVoxelToRasXform` (4340-4398), `VGgetRasToVoxelXform`
+  (4402-4410); `vol_geom_text` (the bytes of `writeVolGeom`, for `LTAprint`).
+- `src/aseg2vol.rs` (3.1-37; relay 25): `utils/resample.cpp` `ASEGVOLINDEX` (87-93), `MRIaseg2vol` (2509-2697),
+  `MRIaseg2volMU` (2699-2742), `MostHitsInVolVox` (2777-2835), `CompareAVIndices` (2845-2864), `MRIapplySpmWarp`
+  (2879-2994). Changes: FS-509 (error), FS-510 (rule A), FS-511 (0 in both modes).
+- `src/segs.rs`, relay 25: `utils/mri2.cpp` `MRIsegBoundary` (3700-3739), `MRIsegStatsRobust` (3886-3958),
+  `MRIsegFrameAvg` (3965-3998), `MRIsegBorder` (8072-8125); `utils/utils.cpp` `compare_floats` (1197-1205).
+- `src/vol2vol.rs`, relay 25: `utils/mri2.cpp` `MRIvol2VolTkRegVSM` (3525-3553).
+- `src/mri2ops.rs` (3.1-37; relay 25): `utils/mri2.cpp` `MRIindexNo` (3771-3789), `MRIzconcat` (6466-6531),
+  `MRIapplyEdits` (7168-7193), `MRIfixEntoWM` (7222-7253), `LabelAmygalaCortalJunction` (7264-7329), `MRIshiftDim`
+  (7338-7401), `MRIcropToFoV` (7480-7547), `MRIcropAroundCRS` (7641-7752), `MRIcropAroundRAS` (7763-7836). Changes:
+  FS-512, FS-513 (rule A), FS-514 (one thread's order), FS-515 (error), FS-516 (rule A), FS-517 (error).

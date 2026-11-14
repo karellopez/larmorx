@@ -211,3 +211,22 @@ FS-498 (NaN bins: `CRASH 11`), FS-499 (`free(): corrupted unsorted chunks`, `CRA
 the shared FS-53, FS-58, FS-289, FS-290. Seed 1, 4,400 cases: 4,076 identical, 324 not comparable, 3 `MRIconform`
 resamplings hashed as `HEAVY`, hash `57e8624ef07b6982203b2398d1e26004c15d18d0836be0363340247b7e170574`. `check.py`'s
 `SKIP` adds FS-498, FS-499, FS-501, FS-502.
+
+Measured 2026-11-14 (part 16: relay 25, 246 commands; logs `oracles/logs/fs-found-c-r25-*`): transform.cpp's LTA
+operations `ltafill` (`LTAfillInverse`), `ltainv` (`LTAinvert`: new, given and in place), `ltachg` (`LTAchangeType`:
+every pair of types, `FSLOUTPUTTYPE` unset or one of four, `Gdiag_no`), `ltacat` (`LTAconcat`, 0 to 3 arrays, chained,
+inverted and mismatched, with and without `Reduce`), `ltared` (`LTAreduce`), `ltasrc` (`LTAmriIsSource` /
+`LTAmriIsTarget`), `ltaprt` (`LTAprint`); arrays from `get_lta_full` (every transform's centre, spread, type, label,
+matrix, geometries and optionally its inverse) along a pool of four scanner-like geometries per case, printed whole by
+`put_lta_full`. Seeds 7 and 13, 8,400 cases each: 8,191 and 8,198 identical with `reproduce`, the rest not comparable
+(FS-504, FS-508), 0 different. resample.cpp's `a2v` (`MRIaseg2vol`, with colour tables from `get_ctab`: 50 or 1,001
+places, empty places, tissue types -2 to 100, tissue-type tables of 4, 101 or none; `setRandomSeed(1)` before
+`CTABalloc`), `a2vmu` (`MRIaseg2volMU`, `USF` -1, 1, 2), `spmw` (`MRIapplySpmWarp`), `icode` (`interpolation_code`,
+`float2int_code`): seeds 7 and 13, 4,800 cases each, 4,700 and 4,719 identical, 0 different. mri2.cpp's `vvtk`
+(`MRIvol2VolTkRegVSM`, `vvsm`'s tokens), `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`, `zcat`, `aedit`, `shdim`: seed
+7, 2,700 cases, 2,501 identical; seed 13, 5,400, 4,930 identical; 0 different. `fento`, `lacj` (given output), `lacjn`
+(new output with `CTABalloc`'s 7,032 colours), `cfov`, `ccrs`, `crras` (`MRIcropAroundRAS`; `cras` is relay 19's):
+seed 7, 2,400 cases, 2,332 identical; seed 13, 3,600, 3,455 identical; 0 different. `fix` different only with notices
+everywhere. Seed 1, 4,920 cases: 4,552 identical, 368 not comparable, 22 hashed as `HEAVY` (`check.py`'s `heavy`: the
+`MRIconform` resamplings and `lacjn`), hash `1acd334c6204657f39e004854539ea20a8405b3bc252092b59abcbc37450cc2e`.
+`check.py`'s `SKIP` adds FS-504, FS-508, FS-509, FS-511, FS-515, FS-517.

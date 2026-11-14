@@ -706,3 +706,84 @@ Source: `utils/mrihisto.cpp` (the ten reached functions: `MRIhistogramRegion` 10
   port reads them the same way (`rows::read` as bytes; another extent's rows: FS-289, FS-290).
 - `MRIhistogramLabel` compares `MRIgetVoxVal(labeled) != label` exactly (`float` against the converted `int`), while
   its range uses `nint` labels over every frame (`MRIlabelValRange`); the counted voxels lie inside the range.
+
+## 22. Operations on a transform array (3.1-40; relay 25)
+`transform.cpp`'s `LTAfillInverse` (3568), `LTAinvert` (3530), `LTAconcat` (3396), `LTAconcat2` (3378), `LTAreduce` (3469),
+`LTAchangeType` (3695) with the static `LTAgetV2V` / `LTAgetR2R`, `LTAmriIsSource` (4908), `LTAmriIsTarget` (4921) and
+`LTAprint` (3238), in `larmorx_freesurfer_volume::ltaops` on fs.mri's `Lta` (track A's `LTAalloc`, `LTAcopy`, `LTcopy`).
+- `LTAinvert` swaps transforms through a `calloc`ed `LT` with C++'s implicit assignment: the matrices' pointers move, the
+  geometries go through `VOL_GEOM::operator=` (cached matrices copied only when the source has them: FS-59's rule). The
+  port assigns in the same three steps. It loops over `lta->num_xforms` (the source's), equal to the copy's after a
+  successful `LTAcopy`.
+- `LTAconcat` calls `LTAchangeType(lta1, lta->type)` on the caller's arrays and `LTAfillInverse` on every one before
+  anything else: the inputs change, an `ErrorExit` can come from any of them first.
+- **FS-504** (a): `ltaArray[0]` with no array, `lta->xforms[k-1]` with `k == 0` (the first array empty),
+  `lta1->xforms[0]` / `[nx-1]` of an empty array, `LTAreduce`'s `lta->xforms[0]`, `LTAmriIsSource/Target`'s
+  `xforms[0]` / `[num_xforms-1]`, `LTAprint`'s `lt->m_L->rptr` of a missing matrix and `LTAchangeType`'s `Gdiag_no` print
+  of `xforms[0]`: reads outside `calloc(0)` blocks or through `NULL`. The port errors (`MRIaseg2volMU` likewise when
+  `LTAconcat` returned `NULL` and `LTAmriIsSource(NULL, ..)` follows).
+- **FS-505** (c, rule A): `MatrixInverse(xforms[i].m_L, inv_xforms[i].m_L)` with `inv_xforms[i].m_L == NULL` allocates the
+  result and returns it; the return value is only compared with `NULL`.
+- **FS-506** (c, rule A): the `LINEAR_PHYSVOX_TO_PHYSVOX` -> `LINEAR_RAS_TO_RAS` case calls `LTAgetV2V(m_L, ..)` (RAS ->
+  vox) on the physical-voxel matrix and then `dISize * (m_L * sSize)`: the result is `dISize inv(Vdst) P Vsrc sSize`, not
+  RAS to RAS (the comment says "modified to physvox to physvox": the block was copied from the vox case). Default:
+  `Vdst (dISize P sSize) inv(Vsrc)` (`LTAgetR2R` of the vox matrix); the round trip RAS -> physvox -> RAS gives the
+  matrix back (unit test).
+- **FS-507** (c, rule A): the `REGISTER_DAT` -> `LINEAR_RAS_TO_RAS` loop sets `lt = &lta->xforms[0]` for every `i`.
+- **FS-508** (a): `MatrixCopy(mfsl, m_L)` with `mfsl == NULL` (`MRItkreg2FSL`'s final inverse failed) frees `m_L` (its
+  local copy set to `NULL`, the transform's pointer left dangling); the next `LTAfillInverse` reads the freed matrix
+  (observed: `MatrixInverse: matrix (29932 x -1912492832) is not square`).
+- Kept (rule C): `LTAreduce` compares each transform with the previous transform's destination even after inverting the
+  previous one (the chain's end is then its source); `LTAconcat` hands it oriented transforms, so the case does not arise
+  there. `LTAchangeType`'s `1. / size` in `double` stored as `float` equals `float`'s division (Figueroa's double
+  rounding bound).
+- `MatrixPrint(Gstdout, ..)`: `Gstdout` is `stdout` once `DiagInit` ran (as FreeSurfer's programs do); the probe sets it.
+  A program that never calls `DiagInit` would print through `NULL` (`MatrixPrint: fp = NULL!` and standard output): not
+  modelled (Globals has no flag for it; a note for track A).
+
+## 23. Segmentations onto another grid, SPM warps (3.1-37; relay 25)
+`resample.cpp`'s `MRIaseg2vol` (2509), `MostHitsInVolVox` (2777), `CompareAVIndices` (2845), `MRIaseg2volMU` (2699),
+`MRIapplySpmWarp` (2879); `transform.cpp`'s `VGgetVoxelToRasXform` (4340) and `VGgetRasToVoxelXform` (4402) in vgeom.rs.
+- `round` is declared `double round(double)` at the top of resample.cpp and called (`-fno-builtin`): `(int)round(float)`
+  is `cvttsd2si` of glibc's `round`.
+- `qsort(avind, Na, sizeof(ASEGVOLINDEX), CompareAVIndices)`: glibc's merge order (`larmorx_core::glibc_qsort::qsort`);
+  the order of equal pairs shows only in the `Gdiag_no > 1` line's `asegindex`.
+- The reverse map multiplies `Vv2a` by `Pv`, whose fourth element is what the last forward product left (1 for an
+  affine `Va2v`; another value when `tkR`'s last row is not `0 0 0 1`): the port carries `Pv` the same way.
+- **FS-509** (a): `ct->entries[segid]->TissueType` with `segid` outside `[0, nentries)` or an empty place (crash),
+  `nPerTType[TissueType]` for types >= 100 and the loop over `ct->ctabTissueType->nentries` > 100 (static `int[100]`), and
+  `segidlist[1000]` & co. for more than 1,000 labels in a voxel (static arrays).
+- **FS-510** (c, rule A): `if (ct && (float)nhits / N < 0.5)` uses `nhits` of the last label group (the variable of the
+  counting loop), not `nmost`. It changes the result when the most-hit label has at least half of the voxel but the
+  highest label less: e.g. labels A 6 hits (tissue type unassigned, -1), B 2 and C 2 (type 2): the re-vote picks C.
+- `MostHitsInVolVox`'s static `TTypeMax` keeps its value from earlier calls when no tissue type counts; then every label
+  has a negative type and none can equal it: the stale value never matters (the result is the first label, 0 hits).
+- **FS-511** (a): `double val` is uninitialised in `MRIapplySpmWarp`; a failed sample (`MRIsampleVolumeFrameType` of a
+  type the trilinear sampler refuses) keeps the previous `val`.
+- `CTABalloc` draws random colours: the probe calls `setRandomSeed(1)` before it (FreeSurfer's programs set their seed).
+
+## 24. Segment statistics, borders, concatenation, edits, shifts and crops (3.1-37; relay 25)
+`mri2.cpp`'s `MRIvol2VolTkRegVSM` (3525), `MRIsegBoundary` (3700), `MRIindexNo` (3771), `MRIsegStatsRobust` (3886),
+`MRIsegFrameAvg` (3965), `MRIzconcat` (6466), `MRIapplyEdits` (7168), `MRIfixEntoWM` (7222), `LabelAmygalaCortalJunction`
+(7264), `MRIshiftDim` (7338), `MRIcropToFoV` (7480), `MRIcropAroundCRS` (7641), `MRIcropAroundRAS` (7763), `MRIsegBorder`
+(8072).
+- `MRIsegStatsRobust` repeats `MRIsegStats`' arithmetic (§18's operand orders: `sum2 = val * val + sum2`, `2 * mean` as
+  `mean + mean`); `compare_floats` (utils.cpp 1197) returns 0 for NaNs.
+- `MRIzconcat`, `MRIapplyEdits`, `MRIshiftDim`, `MRIcropAroundCRS` pass voxels through `double v = MRIgetVoxVal(..);
+  MRIsetVoxVal(.., v)`: GCC drops the conversions (a signalling NaN keeps its bits; the brief's "a float stored through a
+  double"): the port passes the `float`.
+- **FS-512** (c, rule A): `MRIzconcat`'s row loop is `for(r=0; r < mri1->width; r++)`.
+- **FS-513** (c, rule A): `MRIshiftDim` wraps and tests `r2` and `s2` against `src->width`.
+- **FS-514** (b): `LabelAmygalaCortalJunction`'s `#pragma omp parallel for` writes neighbours of other threads' voxels:
+  a cortex voxel next to a left and a right amygdala voxel in different columns gets whichever thread writes last.
+- **FS-515** (a): `MRIcropAroundRAS`'s `int crsFoV[3]` is set only for the axes the orientation string names; `???`
+  (`ras_good_flag` 0) or a letter twice leaves entries uninitialised.
+- **FS-516** (c, rule A): `vg_isEqual` returns 1 for equal geometries, but `MRIcropAroundRAS` treats `ret1 != 0` as "the
+  volume is not the destination": it inverts the LTA when the volume is its destination, proceeds untouched when the
+  volume is neither end, and refuses only when it is both. `vg_isEqual(&lta->xforms[0].dst, vol)` also compares the
+  MRI's `valid`, which `MRI::MRI` never sets (memory contents; the probe sets it).
+- **FS-517** (a, hang): `MRIcropAroundCRS` with `c0` = `INT_MIN` (a NaN or huge centre) and a FoV of 0 computes `c1 = c0 +
+  0 - 1`, which wraps to `INT_MAX`: `for(int c=c0; c<=c1; c++)` never ends (the probe's child is stopped by its alarm).
+- Not ported here: `MRIvol2VolFill`, `MRImask_with_T2_and_aparc_aseg` (needs `GetLargestCC6`), the topology fixes
+  (`MRIvolTopoFix`, `MRIvolTopoErodeOne`, `QuadEulerCharChange`), `MRIfindBrightNonWM`, `FixSubCortMassHA` with
+  `BinarizeMRI` and `DEMorphBinVol`, `SpatialCor`; `MRIvol2surfVSM` is a surface function.

@@ -1769,6 +1769,28 @@ defects! {
         "writing a NIfTI pair (.hdr and .img) under a name of 1,020 to 1,023 bytes without the .img or .hdr extension writes the files under names cut to 1,023 bytes, with a message (from 1,022 bytes the header and the image share one name and the header is lost), and under a name of 1,024 bytes or more the program aborts (buffer overflow detected)";
     FS_452 = "FS-452", "FreeSurfer", true,
         "writing a NIfTI pair (.hdr and .img) ignores both files' close: files whose last bytes could not be written (a full disk) are reported as written";
+    FS_453 = "FS-453", "FreeSurfer", true,
+        "reading a NIfTI pair (.hdr and .img) under a name of 1,020 to 1,023 bytes without the .img or .hdr extension opens files under names cut to 1,023 bytes, with a message";
+    FS_454 = "FS-454", "FreeSurfer", true,
+        "reading a scaled NIfTI volume of unsigned 32-bit values (a nonzero slope other than slope 1 with intercept 0) reads its data twice, first as signed numbers, then again after the end of the data: the read fails with 'error reading', or keeps the bytes that follow the data";
+    FS_455 = "FS-455", "FreeSurfer", true,
+        "reading an unscaled big-endian NIfTI volume of doubles swaps each value's two 4-byte halves separately instead of its 8 bytes: wrong values";
+    FS_456 = "FS-456", "FreeSurfer", true,
+        "reading an unscaled big-endian NIfTI volume of complex values leaves the values unswapped: wrong values";
+    FS_457 = "FS-457", "FreeSurfer", false,
+        "reading an unscaled NIfTI volume of unsigned 32-bit values gives an int volume: values above 2,147,483,647 become negative (kept: FreeSurfer's volume type)";
+    FS_458 = "FS-458", "FreeSurfer", true,
+        "reading a NIfTI volume of 1 or 2 dimensions, the header's extents past its number of dimensions are used as the volume's rows or slices instead of 1: an extent of 0 gives an empty volume, a larger one a read past the data";
+    FS_459 = "FS-459", "FreeSurfer", true,
+        "reading a big-endian NIfTI file with header extensions checks each extension's code before swapping its bytes: the extensions, FreeSurfer's own included, are never read, and a warning is printed";
+    FS_460 = "FS-460", "FreeSurfer", true,
+        "reading a NIfTI file whose header extension of another program comes first reads that extension's data as the next extension's size and code: FreeSurfer's extension after it is not found, or other bytes are read as one";
+    FS_641 = "FS-641", "FreeSurfer", true,
+        "reading a NIfTI file that ends within 4 bytes after its 348-byte header decides from memory contents whether a header extension follows";
+    FS_642 = "FS-642", "FreeSurfer", true,
+        "printing a NIfTI header (debug output) prints its text fields as C strings: a field without a NUL byte runs on into the following fields, and past the header's end into memory";
+    FS_643 = "FS-643", "FreeSurfer", true,
+        "reading a big-endian NIfTI volume whose column count is not positive takes the columns from the header's glmin field without swapping its bytes: a wrong extent";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

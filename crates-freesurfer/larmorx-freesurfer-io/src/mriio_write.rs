@@ -1007,14 +1007,30 @@ fn write_fs_nii_extension_header(
     fio::fs_znzwrite(fp, &ext, 1, 4);
 }
 
-/// The ico7 surface's reshape (`mri_reshape(mri, 27307, 1, 6, nframes)`): a new volume of that
-/// extent with the volume's header and pulse parameters and, for uchar, short, unsigned short,
-/// float, int and long volumes, the voxels in the same order (the others' zeros).
+/// The ico7 surface's reshape (`mri_reshape(mri, 27307, 1, 6, nframes)`).
 fn reshape_ico7(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
     m: &Mri,
+) -> Result<Mri, Fatal> {
+    reshape(g, out, err, m, 27307, 1, 6, m.nframes)
+}
+
+/// `mri_reshape(mri, w, h, d, nf)` as the NIfTI readers and writers call it (the same number of
+/// voxels): a new volume of that extent with the volume's header and pulse parameters and, for
+/// uchar, short, unsigned short, float, int and long volumes, the voxels in the same order (the
+/// others' zeros).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn reshape(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mri,
+    w: i32,
+    h: i32,
+    d: i32,
+    nf: i32,
 ) -> Result<Mri, Fatal> {
     let copied = matches!(
         m.mtype,
@@ -1033,7 +1049,7 @@ fn reshape_ico7(
             "mri_reshape(): the volume has no voxels (FreeSurfer crashes here)\n",
         )?;
     }
-    let mut r = mri::mri_alloc_sequence(g, out, err, 27307, 1, 6, m.mtype, m.nframes)?;
+    let mut r = mri::mri_alloc_sequence(g, out, err, w, h, d, m.mtype, nf)?;
     let _ = mri::mri_copy_header(g, out, err, m, Some(&mut r))?;
     mri::mri_copy_pulse_parameters(m, &mut r);
     if copied && let (Some(s), Some(d)) = (m.chunk.as_ref(), r.chunk.as_mut()) {

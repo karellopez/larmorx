@@ -534,6 +534,9 @@ void set_env6(int bits)
 {
   if (bits & 1) setenv("FS_SKIP_TAGS", "1", 1);
   if (bits & 2) setenv("FS_MGZIO_USEVOXELBUFREAD", "1", 1);
+  // piece 15 (track A relay 25): niiRead's geometry check
+  if (bits & 4) setenv("TAG_RAS_XFORM_DEBUG", "1", 1);
+  if (bits & 8) setenv("VOL_GEOM_THRESH", "0.25", 1);
 }
 
 // piece 7: Bruker ParaVision studies
@@ -1546,7 +1549,10 @@ void run_piece14(const std::string &cmd)
     if (back) {
       unsetenv("FS_MGZIO_USEVOXELBUFWRITE");
       errno = 0;
-      MRI *b = mghRead(fn.c_str(), 1, -1);
+      // the reader of the write (relay 25): mghRead after mghWrite, mri_read of the name's type after
+      // MRIwrite, the NIfTI-1 pair's reader after MRIwriteType(NIFTI1_FILE)
+      MRI *b = how == 0 ? mghRead(fn.c_str(), 1, -1)
+               : mri_read(fn.c_str(), how == 2 ? NIFTI1_FILE : MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1, NULL);
       fflush(stdout);
       print_mri6(b);
       oi(errno);
@@ -1705,8 +1711,13 @@ void run_piece7(const std::string &cmd)
   }
 }
 
-void run_piece6(const std::string &cmd)
+void run_piece6(const std::string &cmd0)
 {
+  // piece 15 (track A relay 25): nrd and nrh read NIfTI files (.nii, .nii.gz, .hdr/.img pairs) as
+  // mrd and mrh do, after a Gdiag_no (niiRead's and niiPrintHdr's prints when above 0)
+  const bool nifti = cmd0 == "nrd" || cmd0 == "nrh";
+  const std::string cmd = cmd0 == "nrd" ? "mrd" : cmd0 == "nrh" ? "mrh" : cmd0;
+  if (nifti) Gdiag_no = (int)geti();
   char cwd[4096];
   if (getcwd(cwd, sizeof cwd)) fixpfx = std::string(cwd) + "/";
   // standard error byte-oriented, as in a program that has written to it: glibc's perror then

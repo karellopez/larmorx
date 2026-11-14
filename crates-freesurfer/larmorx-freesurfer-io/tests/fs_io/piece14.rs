@@ -88,7 +88,7 @@ fn mat_toks(g: &mut Gen, t: &mut Vec<String>, none: u64) {
 }
 
 /// A volume's tokens (`read_mri14`); its extent, type, frames and whether it has voxels.
-fn volume14(
+pub(crate) fn volume14(
     g: &mut Gen,
     t: &mut Vec<String>,
     with_bvals: bool,
@@ -322,7 +322,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     );
     t.push(enc(Some(name.as_bytes())));
     // never a folder read back: Linux opens it and fails at the first read, Windows at the open
-    let back = alloc && name != "w/d.mgz" && how != 2 && g.chance(2);
+    let back = alloc && name != "w/d.mgz" && g.chance(2);
     t.push(i64::from(back).to_string());
     t
 }
@@ -367,7 +367,12 @@ fn read_rmat(g: &mut Globals, tk: &mut Toks) -> Option<Matrix> {
     Some(m)
 }
 
-fn read_mri14(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write, tk: &mut Toks) -> Mri {
+pub(crate) fn read_mri14(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    tk: &mut Toks,
+) -> Mri {
     let v: Vec<i32> = (0..6).map(|_| tk.int() as i32).collect();
     let mut m = if v[5] != 0 {
         mri::mri_alloc_sequence(g, out, err, v[0], v[1], v[2], v[3], v[4]).unwrap()
@@ -594,7 +599,19 @@ fn answer(
     if back {
         g.errno = 0;
         let env = Environment::default();
-        let b = mriio::mgh_read(g, out, err, &env, dir, &name, true, -1).map_err(fatal)?;
+        // the reader of the write (relay 25): mghRead, mri_read of the name's type after MRIwrite,
+        // the NIfTI-1 pair's reader after MRIwriteType(NIFTI1_FILE)
+        let b = if how == 0 {
+            mriio::mgh_read(g, out, err, &env, dir, &name, true, -1)
+        } else {
+            let ty = if how == 2 {
+                larmorx_freesurfer_io::identify::NIFTI1_FILE
+            } else {
+                larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN
+            };
+            mriio::mri_read(g, out, err, &env, dir, &name, ty, true, -1, -1)
+        }
+        .map_err(fatal)?;
         super::piece6::print_mri(o, w, b.as_ref());
         o.i(i64::from(g.errno));
     }

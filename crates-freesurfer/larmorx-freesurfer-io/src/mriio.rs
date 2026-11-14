@@ -298,7 +298,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         GDF_FILE => "GDF",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         XIMG_FILE => "GE XIMG",
-        NIFTI1_FILE | NII_FILE => "NIfTI",
         NRRD_FILE => "NRRD",
         MRI_CURV_FILE => "curvature",
         IMAGE_FILE => "image",
@@ -451,6 +450,10 @@ pub fn mri_read(
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {
         crate::bruker::bruker_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::NII_FILE {
+        crate::mriio_nifti::nii_read(g, out, err, env, dir, &copy, volume_flag)?
+    } else if mtype == identify::NIFTI1_FILE {
+        crate::mriio_nifti::nifti1_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?

@@ -160,3 +160,14 @@ comparable, hash `f38160d248ccc2da57ad5e1109d8b8e978231de8a9466a4c1693df2b08ee24
 emulated in debug and release (`oracles/logs/fs-found-c-r21-trap-volume.log`); the port's debug and release builds
 agree on 11,000 cases of the new commands in both modes. `check.py`'s `SKIP` adds FS-482, FS-484, FS-485, FS-486.
 `pcast` calls `fflush(NULL)` after `WritePCAStats` (the file it leaves open reaches the disk at the program's end).
+
+Measured 2026-11-14 (part 12, relay 22: 3.1-38's `talairachex.cpp`: `talcras`, `talmat`, `talpt`, `talvol`; 166
+commands; logs in `<scratch>/C/r22/`): seed 7, 2,000 cases: 1,941 identical with `reproduce`, 59 not comparable
+(FS-487, FS-488, FS-53, FS-325; 35 of them identical), 0 different; seed 13, 4,000 cases: 3,859 identical, 141 not
+comparable (84 identical), 0 different; `fix` different only with notices. The port's debug and release builds agree
+on seed 13's 4,000 cases in both modes. Seed 1, 3,320 cases: 3,083 identical, 237 not comparable, hash
+`c3cfc45ecb3faa4cac3084f1f8b08334eab226e31b8e8627585fdd19774571c9`, passing with AArch64's NaN emulated in debug and
+release (`oracles/logs/fs-found-c-r22-trap-volume2.log`). `check.py`'s `SKIP` adds FS-487, FS-488. `talvol` leaves
+out `SAMPLE_CUBIC_BSPLINE` (fs.bspline is not ported yet). Relay 22 also measured `fdr` with `log10` now
+correctly rounded by default (seeds 7 and 13, 987 cases each: 958 and 947 identical with `reproduce`, 0 different;
+`fix` different only with notices, GLIBC-07 among them).

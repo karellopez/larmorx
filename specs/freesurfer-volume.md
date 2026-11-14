@@ -1435,3 +1435,60 @@ file (or a path that cannot be opened), points inside, near the faces and outsid
 `reproduce` but where FreeSurfer reads or writes memory it does not own or crashes (FS-53, FS-58, FS-290, FS-323,
 FS-482, FS-484, FS-485, FS-486, and the decompositions that never return: FS-47, FS-48), counted and not compared;
 the default differs only with a notice (FS-483, FS-485, GLIBC-07 for `pow`).
+
+## 46. Talairach helpers (3.1-38: talairachex.cpp)
+- `ModifyTalairachCRAS(mri_tal, lta)`: sets the Talairach volume's centre. With a transform array: it must hold
+  exactly one transform (otherwise `<Progname>: xfm has more than one xfrm`, also for none) of type
+  `LINEAR_RAS_TO_RAS` (otherwise `<Progname>: xfm passed is not of RAS-to-RAS type`; both end the program with
+  `ERROR_BADPARM`, the count checked first). Its destination geometry's centre is taken when that geometry's `valid`
+  is 1 (with both `DIAG_SHOW` and `DIAG_VERBOSE`: `INFO: Modifying dst c_(r,a,s), using the transform dst` on
+  standard output). Otherwise, and without a transform array: when the environment has `NO_AVERAGE305` (any value,
+  empty included) `INFO: tal c_(r,a,s) not modified` on standard error and the centre is kept; else the centre
+  becomes average_305's, the `double` constants -0.095, -16.51 and 9.75 stored as `float`s (with `DIAG_VERBOSE`, on
+  standard error: `INFO: Modifying talairach volume c_(r,a,s) based on average_305.` and `INFO: If not preferred,
+  set environmental varible NO_AVERAGE305 true.` with a transform array, `INFO: Modifying talairach volume c_(r,a,s)
+  based on average_305` without). Then both cached matrices are recomputed from the geometry (voxel-to-RAS, then
+  its inverse: section 2's rules). Returns 0.
+- The Talairach volume of a volume `v`: a header of `v`'s extent and type with one frame, `v`'s header copied into
+  it, then `ModifyTalairachCRAS` with the same transform array (its messages each time).
+- `MtalairachFromVoxel(src, lta)`: `src`'s voxel-to-RAS matrix (section 2, no shear), with a transform array
+  multiplied on the left by its first transform's matrix (`MatrixMultiply(M, A)`); without, a copy. A transform
+  array holding no transform ends the program with `lta does not have xform`, one of another type than
+  `LINEAR_RAS_TO_RAS` with `lta must be RAS_TO_RAS transform` (`ERROR_BADPARM`; checked in that order).
+- `MtalVoxelFromVoxel(src, lta)`: `MtalairachFromVoxel` first, then the Talairach volume of `src`; the product of the
+  Talairach volume's RAS-to-voxel matrix and the first (`NULL` when either is: `MatrixMultiply`'s messages).
+- `MvoxelFromTalairach(dst, lta)`: the inverse of the first transform's matrix (`MatrixInverse`, its messages), or a
+  4 x 4 identity without a transform array; then `dst`'s RAS-to-voxel matrix times it (`NULL` when either is). The
+  type of the array is not checked. FS-487: an array holding no transform is taken as having no matrix
+  (`MatrixInverse: NULL input matrix!`, the program ends).
+- `MvoxelFromTalVoxel(dst, lta)`: the Talairach volume of `dst` first, its voxel-to-RAS matrix, then
+  `MvoxelFromTalairach(dst, lta)`, and the product of the latter and the former.
+- `TransformWithMatrix(M, x, y, z)`: each coordinate rounded to `float`; then for each of the first three rows `r`,
+  in `float` arithmetic, `((M[r][1] x + M[r][2] y) + M[r][3] z) + M[r][4]`, rounded once per operation (no fused
+  operations), the result widened to `double`. Of two NaN operands the result keeps (quieted): in rows 1 and 2 the
+  matrix element's of each product and the left partial sum's of each sum; in row 3 the coordinate's of each product
+  and the left partial sum's of each sum (each NaN made from numbers is the default NaN `0xffc00000`).
+- The point functions return 0 and write the point through their matrix: `MRIvoxelToTalairachEx` (through
+  `MtalairachFromVoxel(src)`), `MRIvoxelToTalairachVoxelEx` (`MtalVoxelFromVoxel(src)`), `MRItalairachToVoxelEx`
+  (`MvoxelFromTalairach(dst)`), `MRItalairachVoxelToVoxelEx` (`MvoxelFromTalVoxel(dst)`), each matrix computed again
+  for every point (its messages each time). FS-487: where that matrix is `NULL` the original crashes; larmorx gives
+  the error `<function>: no matrix to transform the point with` and leaves the point unset.
+- `MRItoTalairachExInterp(src, tal, lta, interp)` and `MRItoTalairachEx(src, tal, lta)`: the matrix
+  `MtalVoxelFromVoxel(src, lta)`, then `voxel to talairach voxel transform` and the matrix (`MatrixPrint`, 5 decimals;
+  `MatrixPrint: mat = NULL!` for none) on standard error; without `tal`, a clone of `src` (voxels not copied) with
+  `ModifyTalairachCRAS`; then `MRIlinearTransformInterp(src, tal, M, interp)` (`MRIlinearTransform`, trilinear, for
+  the second), whose result is ignored; returns `tal`.
+- `MRIfromTalairachEx(tal, dst, lta)`: `MvoxelFromTalVoxel(dst, lta)`, `talairach voxel to voxel transform` and the
+  matrix on standard error, `MRIlinearTransform(tal, dst, M)`; returns `dst`. FS-488: without `dst` the original
+  crashes before its check; larmorx ends with that check's `<Progname>: Needs target volume to recover c_(ras)`
+  (`ERROR_BADPARM`).
+- `MRASFromTalVoxel` and `MRItalairachVoxelToWorldEx` are reached by no program and not ported.
+
+## 47. Validation plan (section 46)
+The probe's commands `talcras`, `talmat` (the four matrices), `talpt` (the four point functions and
+`TransformWithMatrix` on a matrix of its own, NaNs included), `talvol` (the three resamplings, with and without the
+second volume; sampling methods but the cubic B-spline): generated volumes and transform arrays of 0, 1 or 2
+transforms of several types (the first one's matrix voxel-to-voxel-like, anything or with NaNs, its destination
+geometry valid or not), `NO_AVERAGE305` set or not, `DIAG_SHOW` and `DIAG_VERBOSE`. Expected: identical with
+`reproduce` but where FreeSurfer crashes or reads memory it does not own (FS-487, FS-488, and the resampling's FS-53,
+FS-325), counted and not compared; the default differs only with a notice.

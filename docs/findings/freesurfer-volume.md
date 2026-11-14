@@ -565,3 +565,25 @@ Source: `utils/region.cpp` 116-133, 299-499 (`REGIONclear`, `REGIONcopy`, `REGIO
   `MRIdistanceTransform`). `resample.cpp`'s surface functions (`vol2surf_linear`, `MRISapplyReg`, `surf2surf_nnfr`,
   `surf2surf_nnfr_jac`, `MRIsurf2VolOpt`, `MRIseg2SegPVF`'s surface parts) need the surface structure of
   larmorx-freesurfer-surf, which depends on this crate: the same question.
+
+## 17. Talairach helpers (3.1-38; relay 22)
+Source: `utils/talairachex.cpp` 33-347. Object code: `talairachex.cpp.o` of the unit oracle's `libutils.a`
+(`<scratch>/C/r21/obj/talairachex.s`).
+- `TransformWithMatrix` is the `DOUBLE_INTERNAL 0` branch: `float xf = x` (`cvtsd2ss`) and `float` products and sums
+  (`mulss`, `addss`), each row's result `cvtss2sd`. The operand orders of the build (which NaN survives): rows 1 and 2
+  `mulss %xmm_coord, %xmm_elt` (the element in the destination), row 3 `mulss elt(mem), %xmm_coord` (the coordinate
+  in the destination); the sums keep the running sum in the destination; the constant term added last from memory.
+- `ModifyTalairachCRAS`'s average_305 centre: `mri_tal->c_r = -0.095` etc. are `double` literals converted to `float`
+  (`cvtsd2ss` at compile time); `getenv("NO_AVERAGE305")` (any value). The cache rebuild is `AffineMatrixFree`,
+  `MatrixFree`, `AffineMatrixAlloc` + `SetAffineMatrix(extract_i_to_r)`, `extract_r_to_i` (the order of
+  `MRIreInitCache`).
+- **FS-487** (a): `TransformWithMatrix(NULL, ...)` reads `mat->data` (a crash) when `MtalairachFromVoxel`,
+  `MtalVoxelFromVoxel`, `MvoxelFromTalairach` or `MvoxelFromTalVoxel` returns `NULL` (a singular voxel-to-RAS matrix:
+  `extract_r_to_i`'s `NULL` into `MatrixMultiply`; or a singular transform). `MvoxelFromTalairach` reads
+  `lta->xforms[0].m_L` without checking `num_xforms`: `LTAalloc(0)`'s `calloc(0, sizeof(LT))` is a minimum chunk
+  (glibc: 24 usable bytes), and `m_L` lies beyond it; on the probe's runs it read 0 (`MatrixInverse(NULL)`:
+  `error: MatrixInverse: NULL input matrix!`, exit 252), which larmorx gives in both modes (the lines stay
+  not compared: memory contents).
+- **FS-488** (a): `MRIfromTalairachEx` calls `MvoxelFromTalVoxel(mri_dst, lta)` (which reads `mri_dst->width`) before
+  `if (!mri_dst) ErrorExit(...)`: `CRASH 11` on the probe's runs.
+- Not reached: `MRASFromTalVoxel`, `MRItalairachVoxelToWorldEx` (the inventory's foundations view lists no caller).

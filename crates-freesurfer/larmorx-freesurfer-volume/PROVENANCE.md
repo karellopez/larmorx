@@ -148,3 +148,10 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   `MRIvoxelMean` (174-205), `MRIvoxelDirection` (316-384), `MRIvoxelGradientDir2ndDerivative` (393-433); operand
   orders from `mrivoxel.cpp.o`. Changes: FS-485 (the window not cut by default), FS-486 (0 for a sample never
   written, both modes).
+- `src/talairachex.rs` (3.1-38; relay 22): `utils/talairachex.cpp` `ModifyTalairachCRAS` (33-95),
+  `MtalairachFromVoxel` (111-127), `MtalVoxelFromVoxel` (129-148), `MvoxelFromTalairach` (150-164),
+  `MvoxelFromTalVoxel` (166-184), `TransformWithMatrix` (207-253), `MRIvoxelToTalairachEx` (255-263),
+  `MRIvoxelToTalairachVoxelEx` (267-275), `MRItalairachToVoxelEx` (279-287), `MRItalairachVoxelToVoxelEx` (302-310),
+  `MRItoTalairachExInterp` (315-328), `MRItoTalairachEx` (330-343; 3.1-39's), `MRIfromTalairachEx` (347-361; 3.1-39's);
+  operand orders from `talairachex.cpp.o`. Changes: FS-487, FS-488 (errors where FreeSurfer crashes; no matrix for a
+  transform array without transforms, both modes).

@@ -66,7 +66,7 @@ HouseholderSequence and Jacobi rotations of a 4 x 4 matrix) - Mozilla Public Lic
   Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL
   was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos, atan2, cbrt, tanh, hypot, powf, expf, logf, sinf, cosf, tanhf, cbrtf; hypot since 2026-11-11, for the confounds' part) - MIT License
+CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, log10, sin, cos, asin, acos, atan2, cbrt, tanh, hypot, powf, expf, logf, sinf, cosf, tanhf, cbrtf, acosf; hypot since 2026-11-11, for the confounds' part; acosf since 2026-11-13 and log10 since 2026-11-14, for FreeSurfer's foundations) - MIT License
   exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   log.c: Copyright (c) 2022 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   dint.h: Copyright (c) 2022 CERN. Author: Tom Hubrecht.
@@ -80,6 +80,8 @@ CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos
   tanhf.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   tanh.c: Copyright (c) 2023-2026 Alexei Sibidanov, Cyprien Peignier, Paul Zimmermann.
   cbrtf.c: Copyright (c) 2023 Alexei Sibidanov.
+  acosf.c: Copyright (c) 2023 Alexei Sibidanov.
+  log10.c: Copyright (c) 2022-2025 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal

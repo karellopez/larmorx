@@ -12,6 +12,10 @@
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
 //! `stl`, `tri`, `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii`, `gwr`, `mpf` and `mpg`
 //! cases run in a temporary folder of their own.
+//!
+//! When the hash differs, the assertion names the first case whose output differs from the
+//! recorded per-case digests (`fs_surfio/official_digests.txt`), how many differ and which; the
+//! digests are recorded on Linux x64 by the ignored `record_official_digests`.
 
 #[path = "fs_surfio/cases.rs"]
 mod cases;
@@ -32,23 +36,137 @@ const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
 const OFFICIAL_SHA256: &str = "6a44bcf748d45fc2be9fbcfb07335b04a355090e528bf8db73b40258f0e84b1c";
 
+/// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
+const DIGESTS: &str = include_str!("fs_surfio/official_digests.txt");
+
+fn d48(b: &[u8]) -> String {
+    Sha256::digest(b)[..6]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// Each case of seed 1: its line, the bytes hashed for it (`SKIP\n` or its output and a
+/// newline), its output and its notices.
+fn outputs() -> Vec<(String, Vec<u8>, String, Vec<&'static str>)> {
+    cases::generate(1, 1350)
+        .into_iter()
+        .map(|line| {
+            let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
+            let refused = out.starts_with("EXIT ");
+            let skip = ids.iter().any(|x| SKIP.contains(x))
+                || (refused && ids.iter().any(|x| SKIP_WHEN_REFUSED.contains(x)));
+            let hashed = if skip {
+                b"SKIP\n".to_vec()
+            } else {
+                format!("{out}\n").into_bytes()
+            };
+            (line, hashed, out, ids)
+        })
+        .collect()
+}
+
+fn entry(line: &str, hashed: &[u8]) -> String {
+    let o = if hashed == b"SKIP\n" {
+        "SKIP".to_owned()
+    } else {
+        d48(hashed)
+    };
+    format!("{} {o}", d48(line.as_bytes()))
+}
+
+fn cut(s: &str, n: usize) -> String {
+    s.chars().take(n).collect()
+}
+
+fn sha256_of(all: &[(String, Vec<u8>, String, Vec<&'static str>)]) -> String {
+    let mut h = Sha256::new();
+    for (_, hashed, _, _) in all {
+        h.update(hashed);
+    }
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// When the hash differs, the message names the first case whose output differs from the
+/// recorded per-case digests (`fs_surfio/official_digests.txt`: the first 48 bits of the SHA-256
+/// of each case line and of its hashed output; CI shows only the message): its index, its line,
+/// the port's output and notices here, and how many cases differ. The case's official output is
+/// the Linux port's (`fs_surfio_probe run` of that line, or `fssurfio`).
 #[test]
 fn reproduce_gives_the_official_outputs() {
-    let mut h = Sha256::new();
-    for line in cases::generate(1, 1350) {
-        let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
-        let refused = out.starts_with("EXIT ");
-        let skip = ids.iter().any(|x| SKIP.contains(x))
-            || (refused && ids.iter().any(|x| SKIP_WHEN_REFUSED.contains(x)));
-        h.update(if skip {
-            "SKIP".as_bytes()
-        } else {
-            out.as_bytes()
-        });
-        h.update(b"\n");
+    let all = outputs();
+    let hex = sha256_of(&all);
+    if hex == OFFICIAL_SHA256 {
+        return;
     }
-    let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
-    assert_eq!(hex, OFFICIAL_SHA256);
+    let recorded: Vec<&str> = DIGESTS
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .collect();
+    let mut differ = Vec::new();
+    let mut message = format!(
+        "fs.surfio's seed-1 cases: SHA-256 {hex} where {OFFICIAL_SHA256} is recorded; {} cases, {} recorded digests.",
+        all.len(),
+        recorded.len()
+    );
+    for (i, (line, hashed, out, ids)) in all.iter().enumerate() {
+        let mine = entry(line, hashed);
+        let want = recorded.get(i).copied().unwrap_or("none");
+        if mine == want {
+            continue;
+        }
+        if differ.is_empty() {
+            let same_case = want.split(' ').next() == mine.split(' ').next();
+            message.push_str(&format!(
+                " First differing case {i}{}: {} | recorded {want}, here {mine} | here: {} | notices: {}.",
+                if same_case {
+                    ""
+                } else {
+                    " (the digests list another case: regenerate them)"
+                },
+                cut(line, 300),
+                cut(out, 1500),
+                ids.join(",")
+            ));
+        }
+        differ.push(i);
+    }
+    let first: Vec<String> = differ
+        .iter()
+        .take(12)
+        .map(|&i| format!("{i} {}", all[i].0.split(' ').next().unwrap_or("")))
+        .collect();
+    message.push_str(&format!(
+        " {} cases differ; the first: {}.",
+        differ.len(),
+        first.join(", ")
+    ));
+    panic!("{message}");
+}
+
+/// Records `fs_surfio/official_digests.txt` from this platform's outputs, after checking that
+/// they give `OFFICIAL_SHA256` (Linux x64, where the port's outputs are the official build's):
+///
+///     cargo test -p larmorx-freesurfer-surf --test fs_surfio_official -- --ignored record_official_digests
+#[test]
+#[ignore = "records the per-case digests (Linux x64)"]
+fn record_official_digests() {
+    let all = outputs();
+    assert_eq!(
+        sha256_of(&all),
+        OFFICIAL_SHA256,
+        "the outputs are not the recorded ones"
+    );
+    let mut text = String::from(
+        "# SPDX-License-Identifier: LicenseRef-FreeSurfer\n# fs_surfio_official.rs's per-case digests: the first 48 bits of the SHA-256 of each seed-1 case line and of its hashed output (SKIP: hashed as SKIP); recorded by record_official_digests on Linux x64.\n",
+    );
+    for (line, hashed, _, _) in &all {
+        text.push_str(&entry(line, hashed));
+        text.push('\n');
+    }
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fs_surfio/official_digests.txt");
+    std::fs::write(p, text).expect("the digests written");
 }
 
 /// FS-120 is kept by default (rule D, until measured): the default mode never notes FS-120 on

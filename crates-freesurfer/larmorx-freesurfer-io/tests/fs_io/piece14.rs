@@ -267,7 +267,8 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
             .to_string(),
     );
     t.push(enc(Some(name.as_bytes())));
-    let back = alloc && g.chance(2);
+    // never a folder read back: Linux opens it and fails at the first read, Windows at the open
+    let back = alloc && name != "w/d.mgz" && g.chance(2);
     t.push(i64::from(back).to_string());
     t
 }

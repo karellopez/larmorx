@@ -191,7 +191,11 @@ pub fn invert_4x4_matrix(m: &Transform) -> Result<Transform, &'static str> {
 
 /// `input_transform_file(filename, &transform)` as FreeSurfer's volume_io reads it (MINC 1.5.1's
 /// reader in [`FsVolumeIo`]'s dialect): the transform, or `None` after its messages (FreeSurfer's
-/// `ERROR`). A relative name is opened in `dir`, the program's directory, when given.
+/// `ERROR`). A relative name is opened in `dir`, the program's directory, when given: FreeSurfer
+/// opens it in its working directory, which volume_io's expansion never sees, so on Windows the
+/// folder's backslashes are written as `/` (a separator there too): volume_io's escape (FS-79's
+/// `reproduce`, applied by both the existence check and the open) would drop them, and the folder
+/// `C:\Users\...` would be read as `C:Users...`.
 pub fn input_transform_file(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -203,6 +207,11 @@ pub fn input_transform_file(
     let path: Vec<u8> = match dir {
         Some(d) if !filename.is_empty() && filename[0] != b'/' && filename[0] != b'~' => {
             let mut p = d.to_string_lossy().into_owned().into_bytes();
+            if cfg!(windows) && !p.starts_with(b"\\\\?\\") {
+                for c in p.iter_mut().filter(|c| **c == b'\\') {
+                    *c = b'/';
+                }
+            }
             p.push(b'/');
             p.extend_from_slice(filename);
             p

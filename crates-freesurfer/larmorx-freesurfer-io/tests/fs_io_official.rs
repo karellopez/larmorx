@@ -9,11 +9,13 @@
 //! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images), piece 9's
 //! one (fs.core's ArgumentParser), piece 10's sixteen (fs.labels' text colour tables and
 //! lookups, registration files), piece 11's thirteen (labels, control points, annotation tables,
-//! point sets) and piece 12's four (GIFTI volumes read and written, point-set files, the XML help
-//! renderer), without those that take seconds in a debug build,
+//! point sets), piece 12's four (GIFTI volumes read and written, point-set files, the XML help
+//! renderer) and piece 14's one (MGH and MGZ volumes written), without those that take seconds in
+//! a debug build,
 //! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 21, with piece 12:
-//! 4,798 cases, 4,236 lines identical, 41 of them with memory digits; 562 hashed as `SKIP`),
+//! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 23, with piece 14
+//! and the MGH writer: 4,799 cases, 4,327 lines identical, 45 of them with memory digits; 472
+//! hashed as `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -34,8 +36,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "0ab4252a25f8c72651f78c40a740717a4d8216bdae0548951562daf0010234c2";
-const SKIPPED: usize = 562;
+const OFFICIAL_SHA256: &str = "9e99627e2d9fe58da3972e7dcbb60820e68abde92a65b6ce0b2d0510bbeddccb";
+const SKIPPED: usize = 472;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

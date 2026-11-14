@@ -763,7 +763,7 @@ pub fn mri_write(
         }
         None => (b, None),
     };
-    let ext = ext.map_or_else(|| b"(null)".to_vec(), |e| e);
+    let ext = ext.unwrap_or_else(|| b"(null)".to_vec());
     let mut error = NO_ERROR;
     for (n, v) in vs.iter().enumerate() {
         let mut name = stem.to_vec();

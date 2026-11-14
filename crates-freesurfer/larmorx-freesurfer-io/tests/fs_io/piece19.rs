@@ -296,8 +296,11 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
         let nm = move |n: i64| format!("{pre}{n}");
         let pick = series(g, &mut entries, &nm, lo, hi, &mut |g, _| lx_file(g, w, h));
         if g.chance(10) {
-            g.pick(&["w/e1s2x3", "w/e1e2s3i4", "w/e1s2i", "w/E1S2I3"])
-                .to_owned()
+            // names of no LX form (made as files, so the form is what refuses them; none differs
+            // from a series file by case alone: Windows' names ignore case)
+            let bad = g.pick(&["w/e1s2x3", "w/e1e2s3i4", "w/e1s2i", "w/q1s2i3"]);
+            entries.push(file_entry(bad, b"x"));
+            bad.to_owned()
         } else {
             pick
         }

@@ -18,7 +18,7 @@
 //! 20's two (GE Signa and GE XIMG series), without those that take seconds in a debug build,
 //! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
 //! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 28, with pieces 19
-//! and 20: 4,798 cases, 4,344 lines identical, 40 of them with memory digits; 454 hashed as
+//! and 20: 4,798 cases, 4,344 lines identical, 39 of them with memory digits; 454 hashed as
 //! `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
@@ -40,7 +40,7 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "db8106ab61a2902e17d7540109f03ff2debae65e304dd866c3151e652ab67e4d";
+const OFFICIAL_SHA256: &str = "e1397e6f0c68ed2dcf221f41ccbc1a55b48d2c0cf0d2b95f399a2c0db3bd9386";
 const SKIPPED: usize = 454;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.

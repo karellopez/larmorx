@@ -18,7 +18,8 @@ Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 
 schemas; §75 (3.1-34): the rest of the registration files; part 10 (§76-82): labels, control points,
 annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; part 12
 (§87-89): a label's coordinates converted, one frame of a volume written; **part 13** (§90-92): MGH and
-MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94).
+MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94), NIfTI-1 pairs
+(`.hdr` and `.img`) written (§95-96).
 
 ## 1. Conventions
 
@@ -2103,8 +2104,14 @@ beside it: `Saving bvals and bvecs` on standard output, `<stem>.bvals` and
 `<stem>.<scanner|voxel|unknown>_space.bvecs` (§ on `DTIwriteBValues`/`DTIwriteBVectors`), the stem the
 name without its volume extension (`IDstemFromName`; none: nothing more written). Not ported yet in
 larmorx (a message, status -1): COR, MINC, image, `.bhdr`, bshort, bfloat, ANALYZE, ANALYZE 4D, BRIK,
-GCA and ITK morphs, GDF, NIfTI-1 (`.img`/`.hdr`), NRRD. MGH and MGZ: §90 (`mghWrite(mri, name, -1,
-intent)`); NIfTI (`.nii`, `.nii.gz`): §93 (`niiWrite(mri, name, intent)`).
+GCA and ITK morphs, GDF, NRRD. MGH and MGZ: §90 (`mghWrite(mri, name, -1, intent)`); NIfTI (`.nii`,
+`.nii.gz`): §93 (`niiWrite(mri, name, intent)`); NIfTI-1 pairs (the type `NIFTI1_FILE`, 20): §95
+(`nifti1Write(mri, name)`). Before any writer but COR, the name is looked up (`stat`): a name that does
+not exist sets `errno` to `ENOENT` (2), so a writer's error message is then preceded by `error: No
+such file or directory`, and `errno` is 2 after a write that succeeds (a name that exists keeps
+`errno`). A new `.img` name identifies as ANALYZE (not written by larmorx yet), so `MRIwrite` reaches
+§95 only for a name whose `.hdr` already holds a NIfTI-1 header; programs ask for the type
+(`mri_convert --out_type nifti1`).
 
 ## 85. Reading point sets (`loadfsPointSet`)
 
@@ -2418,3 +2425,49 @@ NIfTI names, 41 ico7, 43 of 32,768 rows): `reproduce` identical on 3,603, 0 diff
 VARY); `fix` differs only with notices (FS-447, FS-449 among them). The recorded test
 `fs_io_official` (4,798 cases, 4,286 identical, 512 counted).
 
+## 95. NIfTI-1 pairs written (`nifti1Write(mri, name)`: `<stem>.hdr` and `<stem>.img`)
+
+As §93 for the ico7 surface (a volume of 163,842 x 1 x 1 written as 27,307 x 1 x 6; FS-58), the
+limits (the same messages on standard output and status 1; FS-449), the header's dimensions, voxel
+sizes, TR, units, description, quaternion and affine (§93's steps, their messages included), with
+these differences: no compression; no warp-map intent and no header extension; `vox_offset` 0; the
+magic `ni1\0`; the types uchar 2/8, int and long 8/32 (FS-447), float 16/32, short 4/16, unsigned short
+512/16; a bitmap or tensor volume: `nifti1Write(): data type MRI_BITMAP unsupported` / `MRI_TENSOR
+unsupported` (`ERROR_UNSUPPORTED`, -3), any other type (complex and RGB volumes included)
+`nifti1Write(): unknown data type <t>` (`ERROR_BADPARM`, -4); nothing written, `errno` kept (§84's
+`ENOENT` for a new name then prints first).
+
+- **The names:** the stem is the name without a final `.img` or `.hdr` (exactly these four characters
+  after the last dot of the whole name: `o.IMG` and `a.img.gz` keep theirs, `w/.hdr` gives the stem
+  `w/`). The header goes to `<stem>.hdr`, the voxels to `<stem>.img`. FS-451: FreeSurfer builds the
+  names in 1,024-byte buffers. A stem of 1,020 to 1,023 bytes (a name without `.img` or `.hdr`) gives
+  names cut to their first 1,023 bytes, with `nifti1Write: Truncation of hdr_fname` and `nifti1Write:
+  Truncation of img_fname` on standard error: a stem of 1,021 bytes writes `<stem>.h` and `<stem>.i`,
+  one of 1,022 or 1,023 bytes writes both into one file (`<stem>.` or `<stem>`), which holds the
+  voxels in the end. A name of 1,024 bytes or more ends the program in the C library's overflow check:
+  `*** buffer overflow detected ***: terminated` on standard error, status 134 (the signal SIGABRT),
+  after the header was computed and before any file is opened. `reproduce` does all of this (notice);
+  `fix` writes `<stem>.hdr` and `<stem>.img` with the whole stem (notice).
+- **The files:** `<stem>.hdr` opened for writing (`nifti1Write(): error opening file <hdr name>`,
+  `ERROR_BADFILE`, -5, `errno` 0, when it does not open), the 348-byte header written (`nifti1Write():
+  error writing header to <hdr name>` when it does not), closed; `<stem>.img` opened (`nifti1Write():
+  error opening file <img name>`), then the voxels as the volume stores them (little-endian), frame by
+  frame, slice by slice, row by row (a row that does not write: `nifti1Write(): error writing data to
+  <img name>`, -5, the file closed; the header file stays). A volume made without voxels (any row to
+  write): FS-58, the program ends after both files were opened (the header written, the image
+  empty). FS-447 as §93. FS-452: neither close is checked (a full disk: status 0); `fix` gives
+  `nifti1Write(): error writing header to <hdr name>` for the header's close and `nifti1Write(): error
+  writing data to <img name>` for the image's (-5). The status is 0.
+
+## 96. Validation plan (NIfTI-1 pairs)
+
+Piece 14's `mgw` with `MRIwriteType(name, NIFTI1_FILE, intent)` (`how` 2) and the names `w/o.img`,
+`w/o.hdr`, `w/o`, `w/O.IMG`, `w/a.b.img.gz`, `w/.hdr` and `w/no/o.img` (a missing folder), §94's
+volumes (every type, frames, voxels or none, the ico7 shape, 32,768 rows, the axes' permutations,
+b-values: the `.bvals` and `.bvecs` beside the pair); every file under `w` compared whole. Measured
+(2026-11-14): seed 7, 294 `mgw` cases: `reproduce` identical on 261, 0 different; seed 13, 1,470
+(195 pairs): 1,322 identical, 0 different (133 SKIP, 15 VARY); `fix` differs only with notices.
+FS-451's names (`validation/probes/fs-io/nifti1_long_names.py`, nine cases in four nested folders of
+200-byte names: names of 1,019 to 1,023 bytes without an extension, `.img` names of 1,023, 1,024 and
+1,027 bytes, a `.hdr` name of 1,024 bytes): `reproduce` identical on 9, `fix` differs only with
+FS-451. The recorded test `fs_io_official` (4,798 cases: 4,309 identical, 489 counted).

@@ -271,6 +271,8 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 1197-1198 | `MRIwriteType`'s MGH branch | `mriio.rs` |
 | `utils/mriio.cpp` 9522-9760, 10229-10398, 12538-12731, 12865-12899; `utils/mri2.cpp` 653-735 | `niiWrite` (FS-447, FS-448, FS-449, FS-58), `mriToNiftiSform`, `mriToNiftiQform`, `__getMRITAGlength`, `__writeFSniiextensionHeader`, `mri_reshape` as `niiWrite` calls it (the ico7 surface) | `mriio_write.rs` |
 | `utils/mriio.cpp` 1206-1210 | `MRIwriteType`'s NIfTI branch | `mriio.rs` |
+| `utils/mriio.cpp` 8177-8363 | `nifti1Write` (FS-447, FS-449, FS-451, FS-452, FS-58; relay 24) | `mriio_write.rs` |
+| `utils/mriio.cpp` 1124-1135, 1203-1205 | `MRIwriteType`'s `stat` (its `errno`) and NIfTI-1 branch (relay 24) | `mriio.rs` |
 | `utils/utils.cpp` 1551-1556 | `exec_progress_callback` (no callback in the port's programs: nothing) | (not translated) |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
@@ -287,3 +289,12 @@ on Windows (volume_io's escape, FS-79's `reproduce`, dropped its backslashes). `
 the bytes of `struct nifti_1_header` in x86-64's memory; its data are written one slice per write (each
 row's count was checked; a slice's count is); the warp map's format change (`Warpfield::changeFormat`)
 is not ported yet (a message, -1).
+
+Changes for relay 24: `nifti1Write`'s two files are C streams (`cfile::CFile`, an 8,192-byte buffer
+where glibc's is the file system's block: only the row at which a full disk is found can differ);
+FS-451's names are built from the whole name by default, and cut to 1,023 bytes or the program
+ended with the C library's overflow message (status 134) under `reproduce`, as measured
+(`validation/probes/fs-io/nifti1_long_names.py`); FS-452's check of the closes is larmorx's own.
+The niiWrite helpers shared with it: the size checks (`nifti_size_checks`), a row's bytes and
+FS-447's clamp (`nifti_row`, `long_rows_as_ints`). `matfile`'s size products saturate (a header's
+sizes overflowed 64 bits: a debug build's panic; the refusal, FS-243, as before for the sizes that fit).

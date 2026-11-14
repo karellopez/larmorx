@@ -165,7 +165,15 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `mwr`, `mgr`, `mrd`, `mrh`, `mri`, `mgi`: identical on 8,056, 0 different. Since relay 23 `mgi` prints the GIFTI
   reader's colour-table entries without their tissue type and count (memory contents in FreeSurfer). NIfTI (`niiWrite`) through
   `MRIwrite` with `.nii`, `.nii.gz`, `.NII` names, the ico7 shape and 32,768 rows, axes permuted with signs: seed 13,
-  3,920 `mgw`/`mwr` cases: identical on 3,603, 0 different.
+  3,920 `mgw`/`mwr` cases: identical on 3,603, 0 different. Since relay 24 `mgw`'s `how` 2 calls
+  `MRIwriteType(name, NIFTI1_FILE, intent)` (`nifti1Write`: the `.hdr`/`.img` pair) with the names `w/o.img`,
+  `w/o.hdr`, `w/o`, `w/O.IMG`, `w/a.b.img.gz`, `w/.hdr`, `w/no/o.img`: seed 13, 1,470 `mgw` cases (195 pairs):
+  identical on 1,322, 0 different.
+- `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four
+  nested folders (FS-451: the names cut to 1,023 bytes with FreeSurfer's two messages, one file for both from a stem
+  of 1,022 bytes, the C library's overflow abort from a name of 1,024 bytes), compared in both modes:
+  `python -P validation/probes/fs-io/nifti1_long_names.py` (Linux; prints `PASS` when `reproduce` is identical on
+  every case and `fix` differs only with FS-451).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

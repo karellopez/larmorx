@@ -1165,3 +1165,49 @@ larmorx-freesurfer-io's `mriio_write.rs` (`mgh_write`, `mri_tag_write`), wired i
   written as NIfTI (and one reshaped) crash FreeSurfer at the first row (`MRIseq_vox` on `slices`,
   NULL).
 
+
+## Part 14: NIfTI-1 pairs written (relay 24 of track A)
+
+`nifti1Write` (mriio.cpp 8177-8363), reached from `MRIwriteType(..., NIFTI1_FILE)` (1203-1205; a new
+`.img` name identifies as ANALYZE in `mri_identify`, 285-292 and 365: only a name whose `.hdr` already
+holds the `ni1` magic, or a type given by the caller, reaches it). The header is niiWrite's (the same
+`mriToNiftiQform`, `mriToNiftiSform`, the same size checks and messages: FS-449 applies unchanged),
+without the extension, `vox_offset` 0, magic `ni1`; no `MRI_FLOAT_COMPLEX` case (an unknown type
+here); `fopen`/`fwrite`/`fclose` on two plain streams; one `fwrite` per row.
+
+### Mechanisms
+- **FS-451** (8318-8331): `char fname_stem[STRLEN]` (1,024, `STR_LEN`) filled by `strcpy`, then
+  `snprintf(hdr_fname, STRLEN, "%s.hdr", fname_stem)` and the same for `.img`, each with
+  `std::cerr << __FUNCTION__ << ": Truncation of hdr_fname"` when `needed >= STRLEN`. The truncated
+  names are used: a stem of 1,020 bytes gives `<stem>.hd` / `<stem>.im`, 1,022 and 1,023 give one name
+  for both files (the header opened, written and closed, then the image's `fopen(..., "w")` truncates
+  it). A name of 1,024 bytes or more overflows `fname_stem` in the `strcpy`: the official build (and the
+  unit oracle's, the same flags) is compiled with `_FORTIFY_SOURCE` (Ubuntu's GCC 8 at -O3), so the
+  call is `__strcpy_chk` and glibc ends the program: `*** buffer overflow detected ***: terminated`,
+  SIGABRT. Measured with the fs-io probe (`nifti1_long_names.py`): exactly so for names of 1,024 and
+  1,027 bytes (`.img`) and 1,024 (`.hdr`), the cut names and both messages for stems of 1,020 to 1,023.
+  Class a (an abort) and c (wrong names); rule A: the whole names by default; `reproduce` exact.
+- **FS-452** (8335, 8360): `fclose(fp)` unchecked for both files. A full disk (or any late write
+  error) is found by stdio only when its buffer is flushed: the 348-byte header always waits for the
+  close, so a header that never reached the disk is reported as written; the image's last buffer
+  likewise. Class c; rule A as FS-448 (niiWrite's close): by default the write's message and
+  `ERROR_BADFILE`.
+- **`MRIwriteType`'s `stat`** (1124-1135): `stat(fname)` of a name that does not exist sets `errno` to
+  ENOENT; nothing resets it, so every writer's `ErrorReturn` that keeps `errno` (the type refusals)
+  prints `error: No such file or directory` first, and `errno` is 2 after a successful write of a new
+  file. The port's `MRIwriteType` did not set it (found by piece 14's `how` 2: `MRIwrite`'s
+  `mri_identify` had set the same value before). Not a defect.
+- **The `.mat` reader's size products** (larmorx's own): `8 * rows * cols` and the
+  allocation-size estimate in 64-bit integers overflowed for a header's sizes near 2^31 each (a case
+  of the regenerated seed-1 set): a debug build's panic, a release build's wrapped (small) size. They
+  saturate now: the refusal FreeSurfer's failed `calloc` gives (FS-243), as for every other size
+  beyond the limit.
+
+### Measured (piece 14, 2026-11-14, the probe, the unit oracle's build)
+Seed 7, 294 `mgw` cases: `reproduce` identical on 261, 0 different; seed 13, 1,470 (195 NIfTI-1
+pairs): 1,322 identical, 0 different (133 SKIP, 15 VARY); `fix` differs only with notices. The long
+names: 9 of 9 identical with `reproduce`, `fix` differing only with FS-451. The recorded set
+(`check.py --seed 1 --n 4800 --portable --light`): 4,798 cases, 4,309 identical (47 with memory
+digits), 0 different, 370 SKIP and 119 VARY; `fs_io_official` re-recorded (4a4aba35...), passes in
+debug and release, under the ARM NaN emulation (2,415 / 2,316 NaNs flipped) and on Windows x64 (the
+cross-check tool; the unit tests of the writers too, the long names included).

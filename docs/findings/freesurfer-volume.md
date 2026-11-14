@@ -605,3 +605,53 @@ Source: `utils/mriset.cpp` 1642-1822 (`MRIdilateUchar`, `MRIdilate`); `utils/mri
   FreeSurfer's message is `error: Cannot allocate memory` then `error: HISTOalloc(<n>): could not allocate histogram`;
   larmorx-freesurfer-core's `histo_alloc` gives only the second (the probe's `hseg` showed it; `segs::histo_seg` sets
   `errno` before the call until `histo_alloc` does).
+
+## 19. Conforming (3.1-38; relay 23)
+Source: `utils/mri_conform.cpp` 39-256 (`MRIgetConformMatrix`, `MRIconform`, `MRIconformedTemplate`); `utils/mriio.cpp`
+204 (`setDirectionCosine`, track A's `larmorx_freesurfer_io::mriio::set_direction_cosine`).
+- `MRIconform` builds its template inline (the `#if 0` call of `MRIconformedTemplate` is not compiled); the template
+  takes the centre of the copy `res` (after `setDirectionCosine` when `ras_good_flag` is 0: centre 0) but TR, TE, TI
+  and the flip angle of the input `mri`. `setDirectionCosine` does not refresh the cached matrices; neither does the
+  port. The comment "FALSE means don't rescale" at the `MRIchangeType` call is wrong: `no_scale_option_flag` 0 scales.
+- `MRIconformedTemplate`'s `KeepDC` branch (mri_convert's `--conform-dc`): `int Nvox[3], FoV[3]; double delta[3]`;
+  `iLR`/`iIS`/`iAP` stay 3 when the orientation string lacks the letter (`???` for cosines that are not good; or two
+  columns with the same dominant axis), and `delta[3]`, `FoV[3]` are read past the arrays (**FS-491**, a, memory
+  contents: on the probe's 109 cases FreeSurfer's results happened to match zeros, but the read is undefined) while
+  `K->rptr[row][4]` gets the step and is overwritten by the padding. `conform_FoV = conform_width * conform_size`
+  and `FoV[c] = Nvox[c] * delta[c]` are `double`-to-`int` conversions (`cvttsd2si`: -2147483648 beyond the range or
+  NaN), `conform_FoV - FoV[i]` an `int` subtraction that wraps (**FS-492**, c, rule A: clamped and exact by default).
+- The probe's `conform` hashes `MRIconform`'s 256^3 result (FNV-1a 64 of the chunk's bytes) on both sides
+  (`fsvolume.cpp`'s `put_vol(r, true)`, cases.rs's `vol_with`).
+
+## 20. Set operations, morphology, masks and counts (3.1-38; relay 23)
+Source: `utils/mriset.cpp` 108-3990 (the reached functions; `MRIdilate`, `MRIdilateUchar`, `MRIsetValues`,
+`MRIreplaceValues(Uchar)`, `MRIcheckVolDims` in earlier relays). Object code: `mriset.cpp.o` (`<scratch>/C/r23/obj`).
+- **FZERO in mriset.cpp is `FLT_EPSILON`** (`.rodata.cst8` offset 0x18, `0x3e80000000000000`, `.LC13` in
+  `MRIcomputeCentroid`): `<float.h>` comes in before `macros.h` here (§16's rule: read each file's constant).
+- `MRIerode`, `MRIdilateUchar`'s OpenMP loops write each voxel once from the source; `MRIdilate6` and `MRIerode6`
+  have no in-place guard (one pass reading voxels already written); `MRIdilate6`'s x loop tests `!y1` after the y loop
+  (`y1 == 2`), so `x1 = 0` (the voxel itself) is read again: no effect on the maximum.
+- `MRIdilateThreshLabel` and `MRIdilateInvThreshLabel` update the bounding box inside the loops that read it
+  (`for (x = xmin; x <= xmax; x++)` re-reads `xmax`; a lowered `xmin` takes effect from the next row) with the
+  last neighbour visited (`xi`, `yi`, `zi` of offset +1), and `MRIfree(&mri_tmp)` with `niter <= 0` prints
+  `MRIfree: null pointer` (the port does the same).
+- **FS-493** (a, a hang): `MRIerodeSegmentation`'s `while (n != 1) { ...; n--; }` and `MRIdilateSegmentation`'s for
+  `nDils` 0 or below -1 run until `n` wraps around (about 2^32 recursive steps): the probe's child is killed by its
+  5-second alarm (`CRASH 14`). Both modes: an error.
+- **FS-497** (a, a hang): `MRIdilateSegmentation(seg, out, -1, ...)` loops `while (nchanges)`; on a complex volume
+  (`MRI_FLOAT_COMPLEX`) `MRIcopy(out, seg2)` copies half of each row (FS-161), so the labels written into the second
+  half never reach `seg2` and every step counts the same changes (seed 13's case: `CRASH 14` in FreeSurfer). The
+  port compares an FNV-1a hash of `seg2`'s voxels before and after the copy: unchanged with changes counted is an
+  error in both modes (with FS-161 corrected, the default copies whole rows and the dilation ends).
+- **FS-494** (c, rule A): `MRIthresholdMask`'s byte branch `*pdst++ = out_val` (a `float` into `unsigned char`) is
+  compiled as `cvttss2si` and the low byte: 300 gives 44, -1 gives 255, NaN gives 0.
+- **FS-495** (c, rule A) and **FS-496** (a): `MRIpercentThresh` callocs `width * depth * height` doubles, fills
+  `nlist` of them, sorts them and returns `vlist[npct]`; `pct` 0 gives `npct == nlist` (0 from the calloc'd tail, or
+  past the allocation when the mask is full). Callers (mri_glmfit's `--prune` and the like) use percentages below
+  100; a percentage of 0 means "the largest value".
+- `MRImask` reads `FS_MRIMASK_ALLOW_DIFF_GEOM` with `sscanf("%d")` (an unparsable value keeps 1); the port reads the
+  program's environment (`Environment`), never the process's.
+- `MRIcopyLabel`'s non-byte branch increments the null `pdst` (pointer arithmetic only: no effect). `findLabel`'s
+  counts are `int counts[256]` indexed by the byte: in range.
+- The distance-map callers of mriset.cpp (`MRIextractDistanceMap` users at lines 3474 and after) are left for track D
+  (fs.filter), as decided.

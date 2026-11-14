@@ -1819,6 +1819,8 @@ defects! {
         "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds to the end of the sorted voxels or past it returns 0 from the unused part of its list, not the largest value";
     FS_496 = "FS-496", "FreeSurfer", true,
         "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds past the list's allocation, below 0, or NaN reads memory it does not own";
+    FS_497 = "FS-497", "FreeSurfer", true,
+        "the dilation of a segmentation until it stops changing (MRIdilateSegmentation with -1) never ends when a step's new labels do not reach the next step's copy (a complex volume, whose copy FreeSurfer makes of half of each row): the same changes are counted forever";
 }
 
 /// The register entry with ID `id`.

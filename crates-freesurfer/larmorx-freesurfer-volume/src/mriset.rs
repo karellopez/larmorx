@@ -7,7 +7,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_493, FS_494, FS_495, FS_496};
+use larmorx_core::defects::{FS_493, FS_494, FS_495, FS_496, FS_497};
 use larmorx_core::glibc_qsort::qsort;
 use larmorx_freesurfer_core::cscan;
 use larmorx_freesurfer_core::globals::Globals;
@@ -936,6 +936,16 @@ pub fn mri_dilate_segmentation(
     Ok(ret_of(fresh))
 }
 
+/// FNV-1a (64 bits) of a volume's voxels: whether a step changed the working copy, without a copy.
+fn chunk_hash(m: &Mri) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in m.chunk.as_deref().unwrap_or(&[]) {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    h
+}
+
 struct DilMask<'a> {
     mask: Option<&'a Mri>,
     frame: i32,
@@ -965,7 +975,21 @@ fn dilate_seg_into(
         while nch != 0 {
             n += 1;
             dilate_seg_into(g, out, err, &seg2, o, 1, m, &mut nch)?;
+            let before = chunk_hash(&seg2);
             mri_copy(g, out, err, o, Some(&mut seg2))?;
+            if nch != 0 && chunk_hash(&seg2) == before {
+                // FS-497: the working copy did not change, so the next step is this one again
+                // (FreeSurfer loops forever)
+                g.notices.add(
+                    &FS_497,
+                    format!("{WHAT}: step {n} changes {nch} voxels that the next step does not see"),
+                );
+                let msg = format!(
+                    "{WHAT}: step {n} changes {nch} voxels that the next step does not see \
+                     (FreeSurfer loops forever)\n"
+                );
+                log::error_exit(g, err, ERROR_BADPARM, &msg)?;
+            }
         }
         *pnchanges = n;
         return Ok(true);

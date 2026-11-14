@@ -30,6 +30,8 @@ use sha2::{Digest, Sha256};
 const N: usize = 3420;
 const OFFICIAL_SHA256: &str = "d67e661fe83e2a5e38001491e6b0b8afd724b5a995ba9a2675034e540593182b";
 const SKIPPED: usize = 275;
+/// The `MRIconform` cases hashed as `HEAVY`.
+const HEAVY: usize = 0;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 45] = [
@@ -40,11 +42,24 @@ const SKIP: [&str; 45] = [
     "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488", "FS-490",
 ];
 
+/// `check.py`'s `heavy`: `MRIconform` resampling onto its 256^3 grid, hashed as `HEAVY` without
+/// running (minutes in a debug build); the probe compares those cases (seeds 7 and 13) and the
+/// Windows check runs them (`docs/findings/freesurfer-volume.md` §19).
+fn heavy(line: &str) -> bool {
+    let t: Vec<&str> = line.split_whitespace().collect();
+    t.len() >= 5 && t[..2] == ["conform", "0"] && t[2..5] != ["256", "256", "256"]
+}
+
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    let mut skipped = 0;
+    let (mut skipped, mut heavies) = (0, 0);
     for line in cases::generate(1, N) {
+        if heavy(&line) {
+            heavies += 1;
+            h.update(b"HEAVY\n");
+            continue;
+        }
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         if ids.iter().any(|x| SKIP.contains(x)) {
             skipped += 1;
@@ -55,6 +70,7 @@ fn reproduce_gives_the_official_outputs() {
         }
     }
     assert_eq!(skipped, SKIPPED);
+    assert_eq!(heavies, HEAVY);
     let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
     assert_eq!(hex, OFFICIAL_SHA256);
 }
@@ -62,7 +78,7 @@ fn reproduce_gives_the_official_outputs() {
 /// The default differs from `reproduce` only where a defect it corrects is noted.
 #[test]
 fn fix_differs_only_with_a_notice() {
-    for line in cases::generate(1, N) {
+    for line in cases::generate(1, N).into_iter().filter(|l| !heavy(l)) {
         let (r, _) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
         assert!(r == f || !ids.is_empty(), "{line}");

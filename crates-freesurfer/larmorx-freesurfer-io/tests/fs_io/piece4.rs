@@ -334,7 +334,7 @@ fn dicom_file(g: &mut Gen, portable: bool) -> Vec<u8> {
 }
 
 /// A file entry (`F<hex name>:<size>[+<offset>:<hex>]...`) from its bytes: zero runs left out.
-pub(super) fn file_entry(name: &str, b: &[u8]) -> String {
+pub(crate) fn file_entry(name: &str, b: &[u8]) -> String {
     let mut s = format!("F{}:{}", hex(name.as_bytes()), b.len());
     let mut i = 0;
     while i < b.len() {
@@ -748,7 +748,7 @@ impl<'a> Toks<'a> {
 }
 
 /// The case's files in `<fix>/w` (made afresh), as `fsio`'s `setup` makes them.
-pub(super) fn setup(w: &Work, spec: &str) {
+pub(crate) fn setup(w: &Work, spec: &str) {
     let root = w.fix.join("w");
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir(&root).unwrap();

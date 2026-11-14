@@ -659,24 +659,24 @@ pub fn generate(g: &mut Gen, kind: &str, portable: bool) -> Vec<String> {
 
 // ---------------------------------------------------------------- the port's answers
 
-pub(super) struct Toks<'a> {
-    pub(super) t: &'a [&'a str],
-    pub(super) i: usize,
+pub(crate) struct Toks<'a> {
+    pub(crate) t: &'a [&'a str],
+    pub(crate) i: usize,
 }
 
 impl<'a> Toks<'a> {
-    pub(super) fn next(&mut self) -> &'a str {
+    pub(crate) fn next(&mut self) -> &'a str {
         let s = self.t[self.i];
         self.i += 1;
         s
     }
-    pub(super) fn int(&mut self) -> i64 {
+    pub(crate) fn int(&mut self) -> i64 {
         self.next().parse().unwrap()
     }
-    pub(super) fn bytes(&mut self) -> Vec<u8> {
+    pub(crate) fn bytes(&mut self) -> Vec<u8> {
         dec(self.next()).unwrap_or_default()
     }
-    pub(super) fn string(&mut self) -> String {
+    pub(crate) fn string(&mut self) -> String {
         String::from_utf8(self.bytes()).unwrap()
     }
 }

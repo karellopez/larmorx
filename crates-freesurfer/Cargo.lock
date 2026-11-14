@@ -327,11 +327,14 @@ dependencies = [
 name = "larmorx-freesurfer-volume"
 version = "0.1.0-rc.1"
 dependencies = [
+ "flate2",
  "larmorx-core",
  "larmorx-freesurfer-core",
  "larmorx-freesurfer-io",
  "larmorx-freesurfer-mri",
+ "larmorx-io",
  "sha2",
+ "tempfile",
 ]
 
 [[package]]

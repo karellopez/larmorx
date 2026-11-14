@@ -37,11 +37,11 @@ pub const KINDS: [&str; 13] = [
 
 // ---------------------------------------------------------------- generation
 
-fn d_entry(name: &str) -> String {
+pub(crate) fn d_entry(name: &str) -> String {
     format!("D{}", hex(name.as_bytes()))
 }
 
-fn dbits(v: f64) -> String {
+pub(crate) fn dbits(v: f64) -> String {
     format!("{:016x}", v.to_bits())
 }
 
@@ -146,7 +146,7 @@ fn label_text(g: &mut Gen) -> Vec<u8> {
     s
 }
 
-fn fval(g: &mut Gen) -> f32 {
+pub(crate) fn fval(g: &mut Gen) -> f32 {
     match g.below(16) {
         0 => f32::NAN,
         1 => -0.0,
@@ -158,7 +158,7 @@ fn fval(g: &mut Gen) -> f32 {
 }
 
 /// A label's tokens (`N` sometimes): its fields and places.
-fn label_toks(g: &mut Gen, may_null: bool) -> Vec<String> {
+pub(crate) fn label_toks(g: &mut Gen, may_null: bool) -> Vec<String> {
     if may_null && g.chance(4) {
         return vec!["N".into()];
     }
@@ -210,7 +210,7 @@ fn label_toks(g: &mut Gen, may_null: bool) -> Vec<String> {
     t
 }
 
-fn subjects_dir(g: &mut Gen) -> String {
+pub(crate) fn subjects_dir(g: &mut Gen) -> String {
     match g.below(8) {
         0 => "N".into(),
         1 => enc(Some(b"w/nosuch")),
@@ -219,7 +219,7 @@ fn subjects_dir(g: &mut Gen) -> String {
 }
 
 /// The subject folders a case may need, then its files.
-fn subject_dirs() -> Vec<String> {
+pub(crate) fn subject_dirs() -> Vec<String> {
     [
         "w/subj",
         "w/subj/s1",
@@ -671,24 +671,24 @@ pub fn generate(g: &mut Gen, kind: &str, portable: bool) -> Vec<String> {
 
 // ---------------------------------------------------------------- the port's answers
 
-fn oi(o: &mut Out, v: i64) {
+pub(crate) fn oi(o: &mut Out, v: i64) {
     o.i(v);
 }
 
-fn of(o: &mut Out, f: f32) {
+pub(crate) fn of(o: &mut Out, f: f32) {
     o.0.push_str(&format!("{:08x} ", f.to_bits()));
 }
 
-fn od(o: &mut Out, v: f64) {
+pub(crate) fn od(o: &mut Out, v: f64) {
     o.0.push_str(&format!("{:016x} ", v.to_bits()));
 }
 
-pub(super) fn ostr(o: &mut Out, s: Option<&[u8]>) {
+pub(crate) fn ostr(o: &mut Out, s: Option<&[u8]>) {
     o.0.push_str(&enc(s));
     o.0.push(' ');
 }
 
-fn ocs(o: &mut Out, s: &[u8]) {
+pub(crate) fn ocs(o: &mut Out, s: &[u8]) {
     let n = s
         .iter()
         .position(|&c| c == 0)
@@ -697,7 +697,7 @@ fn ocs(o: &mut Out, s: &[u8]) {
     ostr(o, Some(&s[..n]));
 }
 
-pub(super) fn fnv(o: &mut Out, b: &[u8]) {
+pub(crate) fn fnv(o: &mut Out, b: &[u8]) {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for &c in b {
         h ^= u64::from(c);
@@ -706,20 +706,20 @@ pub(super) fn fnv(o: &mut Out, b: &[u8]) {
     o.0.push_str(&format!("fnv{h:016x} "));
 }
 
-pub(super) fn obytes(o: &mut Out, b: &[u8]) {
+pub(crate) fn obytes(o: &mut Out, b: &[u8]) {
     o.0.push_str(&hex(b));
     o.0.push(' ');
 }
 
-pub(super) fn f32_of(t: &str) -> f32 {
+pub(crate) fn f32_of(t: &str) -> f32 {
     f32::from_bits(u32::from_str_radix(t, 16).unwrap())
 }
 
-fn f64_of(t: &str) -> f64 {
+pub(crate) fn f64_of(t: &str) -> f64 {
     f64::from_bits(u64::from_str_radix(t, 16).unwrap())
 }
 
-fn read_label(tk: &mut Toks) -> Option<Label> {
+pub(crate) fn read_label(tk: &mut Toks) -> Option<Label> {
     if tk.t[tk.i] == "N" {
         tk.i += 1;
         return None;
@@ -782,7 +782,7 @@ fn print_t(o: &mut Out, t: &Option<larmorx_freesurfer_mri::mri::Transform4>) {
     }
 }
 
-fn print_label(o: &mut Out, a: Option<&Label>) {
+pub(crate) fn print_label(o: &mut Out, a: Option<&Label>) {
     let Some(a) = a else {
         o.0.push_str("N ");
         return;
@@ -861,7 +861,7 @@ fn odir(o: &mut Out, w: &Work) {
     o.0.push_str("| ");
 }
 
-fn env_of(tk: &mut Toks, env: &mut Environment, name: &str) {
+pub(crate) fn env_of(tk: &mut Toks, env: &mut Environment, name: &str) {
     let t = tk.next();
     match super::dec(t) {
         None => env.remove(name),
@@ -869,7 +869,7 @@ fn env_of(tk: &mut Toks, env: &mut Environment, name: &str) {
     }
 }
 
-fn read_mri(g: &mut Globals, tk: &mut Toks) -> Mri {
+pub(crate) fn read_mri(g: &mut Globals, tk: &mut Toks) -> Mri {
     let (w, h, d, ty) = (
         tk.int() as i32,
         tk.int() as i32,
@@ -933,7 +933,7 @@ fn read_point(tk: &mut Toks) -> Point {
     p
 }
 
-pub(super) fn opoint(o: &mut Out, p: &Point) {
+pub(crate) fn opoint(o: &mut Out, p: &Point) {
     od(o, p.x);
     od(o, p.y);
     od(o, p.z);

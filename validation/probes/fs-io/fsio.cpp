@@ -63,6 +63,7 @@
 #include "ctrpoints.h"
 #include "annotation.h"
 #include "pointset.h"
+#include "mrisurf.h"
 #include "utils.h"
 #include <zlib.h>
 
@@ -637,6 +638,8 @@ void run_piece11(const std::string &cmd);
 bool piece11_cmd(const std::string &cmd);
 void run_piece12(const std::string &cmd);
 bool piece12_cmd(const std::string &cmd);
+void run_piece13(const std::string &cmd);
+bool piece13_cmd(const std::string &cmd);
 
 void run_piece9(const std::string &cmd)
 {
@@ -754,6 +757,7 @@ void run_piece10(const std::string &cmd)
   unsetenv("FREESURFER_SEED");
   if (piece11_cmd(cmd)) { run_piece11(cmd); return; }
   if (piece12_cmd(cmd)) { run_piece12(cmd); return; }
+  if (piece13_cmd(cmd)) { run_piece13(cmd); return; }
   if (cmd == "cra") {
     int check = (int)geti();
     setup(next());
@@ -1357,6 +1361,60 @@ void run_piece12(const std::string &cmd)
   oi(Gerror);
 }
 
+// piece 13 (track A relay 22): the label coordinate conversions and one frame of a volume written
+bool piece13_cmd(const std::string &cmd) { return cmd == "lcv" || cmd == "mwf"; }
+
+// lcv <s|t|v|x> <Gdiag> <SUBJECTS_DIR> <label> <volume (read_mri11)> <0 new|1 itself|2 given>
+// [<label>] <0|1 surface> [<its volume geometry>]: LabelToScannerRAS, LabelToSurfaceRAS,
+// LabelToVoxel or LabelVoxelToSurfaceRAS, the result printed.
+// mwf <Gdiag> <setup> <volume (read_mri12)> <frame> <name>: MRIwriteFrame, then the files under w.
+void run_piece13(const std::string &cmd)
+{
+  fwide(stderr, -1);
+  if (cmd == "lcv") {
+    std::string which = next();
+    Gdiag = strtoull(next(), NULL, 16);
+    env11("SUBJECTS_DIR");
+    LABEL *a = read_label11();
+    int vli = vli11;
+    MRI *m = read_mri11();
+    int dk = (int)geti();
+    LABEL *d = NULL;
+    if (dk == 2) d = read_label11();
+    if (geti()) {
+      MRIS *surf = MRISalloc(0, 0);
+      read_vg(surf->vg);
+      a->mris = surf;
+    }
+    if (dk == 1) d = a;
+    errno = 0;
+    LABEL *r;
+    if (which == "s") r = LabelToScannerRAS(a, m, d);
+    else if (which == "t") r = LabelToSurfaceRAS(a, m, d);
+    else if (which == "v") r = LabelToVoxel(a, m, d);
+    else r = LabelVoxelToSurfaceRAS(a, m, d);
+    fflush(stdout);
+    print_label11(r, vli);
+  } else if (cmd == "mwf") {
+    Gdiag = strtoull(next(), NULL, 16);
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T", 1);
+    setenv("SURFER_SIDEDOOR", "1", 1);  // FreeSurfer's licence check skipped (the port needs no key)
+    setup(next());
+    MRI *m = read_mri12();
+    int frame = (int)geti();
+    std::string fn = name10();
+    errno = 0;
+    int r = MRIwriteFrame(m, fn.c_str(), frame);
+    fflush(stdout);
+    oi(r);
+    oi(errno);
+    odir12();
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
 bool piece10_cmd(const std::string &cmd)
 {
   static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme",
@@ -1368,7 +1426,10 @@ bool piece10_cmd(const std::string &cmd)
 
 void run_piece8(const std::string &cmd)
 {
-  if (cmd == "apa" || piece10_cmd(cmd) || piece11_cmd(cmd) || piece12_cmd(cmd)) { run_piece9(cmd); return; }
+  if (cmd == "apa" || piece10_cmd(cmd) || piece11_cmd(cmd) || piece12_cmd(cmd) || piece13_cmd(cmd)) {
+    run_piece9(cmd);
+    return;
+  }
   fwide(stderr, -1);
   Gerror = (int)geti();
   if (cmd == "ial") {

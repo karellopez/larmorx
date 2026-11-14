@@ -201,12 +201,12 @@ fn gii(g: &mut Gen) -> Vec<u8> {
     b
 }
 
-fn fhex(v: f32) -> String {
+pub(crate) fn fhex(v: f32) -> String {
     format!("{:08x}", v.to_bits())
 }
 
 /// A volume: extent, type, frames, the 15 geometry floats, tr, the name suffix, voxels.
-fn volume(g: &mut Gen, t: &mut Vec<String>, postfix: bool) {
+pub(crate) fn volume(g: &mut Gen, t: &mut Vec<String>, postfix: bool) {
     let (w, h, d, nf) = (
         g.int(1, 6),
         if g.chance(3) { g.int(1, 3) } else { 1 },
@@ -732,7 +732,7 @@ fn gii_normal(f: &[u8]) -> Vec<u8> {
 }
 
 /// Every file under `w`: its name and bytes (a `.gii` file, in any case, normalised), FNV-1a 64 beyond 256 bytes.
-fn odir(o: &mut Out, w: &Work) {
+pub(crate) fn odir(o: &mut Out, w: &Work) {
     fn walk(base: &Path, rel: &str, files: &mut Vec<String>) {
         let Ok(rd) = std::fs::read_dir(base.join(rel)) else {
             return;
@@ -765,7 +765,7 @@ fn odir(o: &mut Out, w: &Work) {
     o.0.push_str("| ");
 }
 
-fn read_volume(g: &mut Globals, tk: &mut Toks) -> Mri {
+pub(crate) fn read_volume(g: &mut Globals, tk: &mut Toks) -> Mri {
     let v: Vec<i32> = (0..5).map(|_| tk.int() as i32).collect();
     let (mut s1, mut s2) = (Vec::new(), Vec::new());
     let mut m = mri::mri_alloc_sequence(g, &mut s1, &mut s2, v[0], v[1], v[2], v[3], v[4]).unwrap();

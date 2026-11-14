@@ -1737,6 +1737,10 @@ defects! {
         "printing a program's help, a word longer than a line (70 characters, 62 in an explanation) is cut at the line's end and its next character is dropped";
     FS_436 = "FS-436", "FreeSurfer", true,
         "printing a program's help, a comment or processing instruction among the kinds of arguments is printed as a section of that name in capitals followed by ARGUMENTS";
+    FS_437 = "FS-437", "FreeSurfer", true,
+        "converting a label of a surface from voxel coordinates to tkregister (surface) RAS converts each point the other way, as a tkregister RAS point to a voxel: wrong coordinates";
+    FS_438 = "FS-438", "FreeSurfer", true,
+        "writing one frame of a volume to a file reports success when the file could not be written (an unknown format, a missing folder)";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

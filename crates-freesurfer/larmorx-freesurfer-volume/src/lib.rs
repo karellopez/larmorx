@@ -16,6 +16,8 @@ pub mod arith;
 pub mod cma;
 pub mod coords;
 pub mod deriv;
+pub mod io_frames;
+pub mod label_coords;
 pub mod ltaread;
 pub mod resample;
 pub mod resize;

@@ -22,6 +22,12 @@ which give the same results on every platform, without the six that take seconds
 
     python -P validation/probes/fs-io/check.py --seed 1 --n 1100 [--portable] [--json out.json]
     python -P validation/probes/fs-io/check.py --seed 1 --n 4800 --portable --light
+
+Piece 13 (the label coordinate conversions and ``MRIwriteFrame``, in larmorx-freesurfer-volume)
+has its own example; its recorded test (``tests/fs_io13_official.rs``) is seed 1's first 1,200:
+
+    python -P validation/probes/fs-io/check.py --package larmorx-freesurfer-volume \
+        --example fs_io13_probe --seed 1 --n 1200 --portable --light
 """
 
 from __future__ import annotations
@@ -52,7 +58,13 @@ def probe_binary(ws: Path) -> Path:
     return exe
 
 
-def port_binary(jobs: int) -> Path:
+# each example's recorded test: its seed 1 set's size
+LIGHT_N = {"fs_io_probe": 4800, "fs_io13_probe": 1200}
+
+
+def port_binary(
+    jobs: int, package: str = "larmorx-freesurfer-io", example: str = "fs_io_probe"
+) -> Path:
     manifest = REPO / "crates-freesurfer" / "Cargo.toml"
     env = {k: v for k, v in os.environ.items() if k != "FSLDIR"}
     subprocess.run(
@@ -61,9 +73,9 @@ def port_binary(jobs: int) -> Path:
             "build",
             "--release",
             "--example",
-            "fs_io_probe",
+            example,
             "-p",
-            "larmorx-freesurfer-io",
+            package,
             "--manifest-path",
             str(manifest),
             "-j",
@@ -72,7 +84,7 @@ def port_binary(jobs: int) -> Path:
         check=True,
         env=env,
     )
-    return REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_io_probe"
+    return REPO / "crates-freesurfer" / "target" / "release" / "examples" / example
 
 
 def matches(official: str, port: str) -> bool:
@@ -97,18 +109,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--light", action="store_true", help="the recorded test's cases")
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument("--package", default="larmorx-freesurfer-io")
+    ap.add_argument("--example", default="fs_io_probe", choices=sorted(LIGHT_N))
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
         raise SystemExit("no workspace with oracles/")
     exe = probe_binary(ws)
-    port = port_binary(a.jobs)
+    port = port_binary(a.jobs, a.package, a.example)
     inputs = ws / "oracles" / "inputs" / "fs-io"
     inputs.mkdir(parents=True, exist_ok=True)
-    if a.light and not (a.portable and a.seed == 1 and a.n == 4800):
-        raise SystemExit("--light is the recorded test's set: --seed 1 --n 4800 --portable")
+    light_n = LIGHT_N[a.example]
+    if a.light and not (a.portable and a.seed == 1 and a.n == light_n):
+        raise SystemExit(f"--light is the recorded test's set: --seed 1 --n {light_n} --portable")
     tag = "light" if a.light else "portable" if a.portable else "all"
-    cases_path = inputs / f"cases-{tag}-{a.seed}-{a.n}.txt"
+    prefix = "" if a.example == "fs_io_probe" else f"{a.example}-"
+    cases_path = inputs / f"{prefix}cases-{tag}-{a.seed}-{a.n}.txt"
     if a.light:
         gen = [str(port), "recorded"]
     else:

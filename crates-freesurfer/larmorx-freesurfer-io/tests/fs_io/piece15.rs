@@ -161,7 +161,8 @@ fn handmade(g: &mut Gen, pair: bool) -> (Vec<u8>, Vec<u8>) {
     match g.below(14) {
         0 => {
             dims[1] = g.pick(&[-1, 0]);
-            glmin = g.int(0, 5) as i32;
+            // a big-endian header's glmin is read unswapped (FS-643): 0, whose bytes read the same
+            glmin = if big { 0 } else { g.int(0, 5) as i32 };
         }
         1 => {
             // the ico7 surface as FreeSurfer writes it
@@ -169,7 +170,7 @@ fn handmade(g: &mut Gen, pair: bool) -> (Vec<u8>, Vec<u8>) {
             dims[2] = 1;
             dims[3] = 6;
         }
-        2 => {
+        2 if !big => {
             dims[1] = -1;
             glmin = 163842;
             dims[2] = 1;
@@ -431,7 +432,12 @@ fn fs_extension(g: &mut Gen, big: bool) -> Vec<u8> {
         body.extend_from_slice(&tag.to_be_bytes());
         body.extend_from_slice(&(len as i64).to_be_bytes());
         for _ in 0..len {
-            body.push(g.below(256) as u8);
+            // a command line's text in ASCII (the port keeps command lines as text: NOTES, relay 25)
+            body.push(if tag == 3 {
+                b'a' + g.below(26) as u8
+            } else {
+                g.below(256) as u8
+            });
         }
     }
     let esize = (8 + body.len()).div_ceil(16) * 16;
@@ -625,6 +631,10 @@ pub fn run(
         // FreeSurfer reads memory there: the extender past the file's end, a text past the header
         if matches!(n.defect.id, "FS-641" | "FS-642") {
             extra.push("VARY");
+        }
+        // FreeSurfer crashes there
+        if n.defect.id == "FS-644" {
+            extra.push("SKIP");
         }
     }
     r

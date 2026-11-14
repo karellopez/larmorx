@@ -1791,6 +1791,8 @@ defects! {
         "printing a NIfTI header (debug output) prints its text fields as C strings: a field without a NUL byte runs on into the following fields, and past the header's end into memory";
     FS_643 = "FS-643", "FreeSurfer", true,
         "reading a big-endian NIfTI volume whose column count is not positive takes the columns from the header's glmin field without swapping its bytes: a wrong extent";
+    FS_644 = "FS-644", "FreeSurfer", true,
+        "reading a NIfTI pair (.hdr and .img) of the ico7 surface's shape (163,842 voxels) whose header gives 0 frames prints that the number of elements cannot change and then crashes";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

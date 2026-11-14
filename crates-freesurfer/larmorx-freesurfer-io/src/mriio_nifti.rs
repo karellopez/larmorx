@@ -22,7 +22,8 @@
 //! FS-458 (the extents past `dim[0]` used), FS-459 (big-endian extensions never read), FS-460
 //! (another extension's data read as the next extension's size and code), FS-641 (the extender
 //! read past the file's end: memory contents), FS-642 (the header's texts printed past the
-//! header), FS-643 (`glmin` not swapped in a big-endian header).
+//! header), FS-643 (`glmin` not swapped in a big-endian header), FS-644 (the ico7 reshape of a
+//! volume without frames: a crash).
 
 use std::io::Write;
 use std::path::Path;
@@ -30,6 +31,7 @@ use std::path::Path;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
     FS_453, FS_454, FS_455, FS_456, FS_457, FS_458, FS_459, FS_460, FS_641, FS_642, FS_643,
+    FS_644,
 };
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
@@ -1324,12 +1326,40 @@ pub fn nii_read(
     }
     drop(fp);
     if is_ico7 {
-        let nf = m.nframes;
-        return Ok(Some(crate::mriio_write::reshape(
-            g, out, err, &m, 163842, 1, 1, nf,
-        )?));
+        return ico7(g, out, err, m);
     }
     Ok(Some(m))
+}
+
+/// The ico7 surface's reshape after a read (`mri_reshape(mri, 163842, 1, 1, nframes)`): a volume
+/// without frames is refused (`ERROR: mri_reshape: number of elements cannot change` and `  nv1 =
+/// 163842, nv1 = 0` on standard output), after which FreeSurfer frees the volume as one of one
+/// frame and crashes (FS-644: by default `None`; `reproduce` ends the program with status 139).
+fn ico7(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: Mri,
+) -> Result<Option<Mri>, Fatal> {
+    let nf = m.nframes;
+    if nf == 0 {
+        let nv1 = m.vg.width.wrapping_mul(m.vg.height).wrapping_mul(m.vg.depth);
+        let _ = writeln!(
+            out,
+            "ERROR: mri_reshape: number of elements cannot change\n  nv1 = {nv1}, nv1 = 0"
+        );
+        g.notices.add(
+            &FS_644,
+            "the ico7 reshape of a NIfTI volume without frames: FreeSurfer then frees a frame the volume does not have (a crash)",
+        );
+        if g.notices.reproduce() {
+            return Err(Fatal::Exit(139));
+        }
+        return Ok(None);
+    }
+    Ok(Some(crate::mriio_write::reshape(
+        g, out, err, &m, 163842, 1, 1, nf,
+    )?))
 }
 
 /// `MRI::update_ras_xform(vg)`: the direction cosines, centre and shears of `vg`.
@@ -1621,10 +1651,7 @@ pub fn nifti1_read(
         return Ok(None);
     }
     if is_ico7 {
-        let nf = m.nframes;
-        return Ok(Some(crate::mriio_write::reshape(
-            g, out, err, &m, 163842, 1, 1, nf,
-        )?));
+        return ico7(g, out, err, m);
     }
     Ok(Some(m))
 }
@@ -1632,6 +1659,71 @@ pub fn nifti1_read(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    /// A header: `dims` (dim[0] first), the data type, the voxel offset, the magic, big-endian or
+    /// not, then `more` to change it.
+    fn header(dims: &[i16], dt: i16, magic: &[u8; 4], big: bool) -> Vec<u8> {
+        let mut h = vec![0u8; 348];
+        let put = |h: &mut Vec<u8>, o: usize, b: &[u8]| {
+            if big {
+                let mut r = b.to_vec();
+                r.reverse();
+                h[o..o + b.len()].copy_from_slice(&r);
+            } else {
+                h[o..o + b.len()].copy_from_slice(b);
+            }
+        };
+        put(&mut h, 0, &348i32.to_le_bytes());
+        for i in 0..8 {
+            put(&mut h, 40 + 2 * i, &dims.get(i).copied().unwrap_or(1).to_le_bytes());
+            put(&mut h, 76 + 4 * i, &1.0f32.to_le_bytes());
+        }
+        put(&mut h, 70, &dt.to_le_bytes());
+        put(&mut h, 108, &352.0f32.to_le_bytes());
+        h[123] = 10;
+        h[344..348].copy_from_slice(magic);
+        h
+    }
+
+    fn read(
+        mode: UpstreamDefects,
+        files: &[(&str, Vec<u8>)],
+        name: &str,
+        pair: bool,
+    ) -> (Option<Mri>, String, Vec<&'static str>, Result<(), i32>) {
+        let dir = tempfile::Builder::new()
+            .prefix("nii r ~")
+            .tempdir()
+            .unwrap();
+        for (n, b) in files {
+            std::fs::write(dir.path().join(n), b).unwrap();
+        }
+        let mut g = Globals::new(mode);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let env = Environment::default();
+        let r = if pair {
+            nifti1_read(&mut g, &mut o, &mut e, Some(dir.path()), name, true)
+        } else {
+            nii_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), name, true)
+        };
+        let ids = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
+        let mut text = String::from_utf8_lossy(&o).into_owned();
+        text.push_str(&String::from_utf8_lossy(&e));
+        match r {
+            Ok(m) => (m, text, ids, Ok(())),
+            Err(f) => (None, text, ids, Err(f.status().into())),
+        }
+    }
+
+    fn floats(m: &Mri) -> Vec<f32> {
+        m.chunk
+            .as_ref()
+            .unwrap()
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect()
+    }
 
     #[test]
     fn widen_narrow_keep_nan_payloads() {
@@ -1646,5 +1738,201 @@ mod tests {
         assert_eq!(float_to_long(352.9), 352);
         assert_eq!(float_to_long(-1.5), -1);
         assert_eq!(float_to_long(1e19), i64::MIN);
+    }
+
+    #[test]
+    fn a_float_volume_with_its_qform_and_millimetres() {
+        let mut h = header(&[3, 2, 1, 1], DT_FLOAT, b"n+1\0", false);
+        h[252] = 1; // qform_code
+        h[256..260].copy_from_slice(&0.0f32.to_le_bytes());
+        h[268..272].copy_from_slice(&(-10.0f32).to_le_bytes());
+        let mut b = h;
+        b.extend_from_slice(&[0, 0, 0, 0]);
+        b.extend_from_slice(&1.5f32.to_le_bytes());
+        b.extend_from_slice(&f32::from_bits(0x7f80_0001).to_le_bytes());
+        let (m, text, ids, r) = read(UpstreamDefects::Fix, &[("a.nii", b)], "a.nii", false);
+        assert_eq!((r, ids.len()), (Ok(()), 0), "{text}");
+        let m = m.unwrap();
+        assert!(text.contains("INFO: using NIfTI-1 qform (qform_code=1)"));
+        assert_eq!((m.vg.width, m.vg.x_r, m.vg.y_a, m.vg.z_s), (2, 1.0, 1.0, 1.0));
+        // the centre: the first voxel's offset plus half the extent (1 voxel of 1 mm)
+        assert_eq!(m.vg.c_r, -9.0);
+        let v = floats(&m);
+        assert_eq!((v[0], v[1].to_bits()), (1.5, 0x7f80_0001));
+        assert_eq!((m.xstart, m.xend, m.fov), (-1.0, 1.0, 2.0));
+    }
+
+    #[test]
+    fn fs_455_big_endian_doubles_swapped_whole_by_default() {
+        let mut b = header(&[3, 2, 1, 1], DT_DOUBLE, b"n+1\0", true);
+        b.extend_from_slice(&[0, 0, 0, 0]);
+        for v in [2.5f64, -0.75] {
+            b.extend_from_slice(&v.to_be_bytes());
+        }
+        let files = [("a.nii", b)];
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &files, "a.nii", false);
+        assert_eq!(floats(&m.unwrap()), [2.5, -0.75]);
+        assert!(ids.contains(&"FS-455"));
+        let (m, _, _, _) = read(UpstreamDefects::Reproduce, &files, "a.nii", false);
+        assert_ne!(floats(&m.unwrap()), [2.5, -0.75]);
+    }
+
+    #[test]
+    fn fs_456_big_endian_complex_values_swapped_by_default() {
+        let mut b = header(&[3, 1, 1, 1], DT_COMPLEX, b"n+1\0", true);
+        b.extend_from_slice(&[0, 0, 0, 0]);
+        for v in [2.5f32, -0.75] {
+            b.extend_from_slice(&v.to_be_bytes());
+        }
+        let files = [("a.nii", b)];
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &files, "a.nii", false);
+        assert_eq!(floats(&m.unwrap()), [2.5, -0.75]);
+        assert!(ids.contains(&"FS-456"));
+        let (m, _, _, _) = read(UpstreamDefects::Reproduce, &files, "a.nii", false);
+        let v = floats(&m.unwrap());
+        assert_eq!(v[0].to_bits(), 2.5f32.to_bits().swap_bytes());
+    }
+
+    #[test]
+    fn fs_454_scaled_unsigned_ints_read_once_by_default() {
+        let mut b = header(&[3, 2, 1, 1], DT_UINT32, b"n+1\0", false);
+        b[112..116].copy_from_slice(&2.0f32.to_le_bytes());
+        b.extend_from_slice(&[0, 0, 0, 0]);
+        for v in [3u32, 0x8000_0000] {
+            b.extend_from_slice(&v.to_le_bytes());
+        }
+        let files = [("a.nii", b)];
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &files, "a.nii", false);
+        assert_eq!(floats(&m.unwrap()), [6.0, 4_294_967_296.0]);
+        assert!(ids.contains(&"FS-454"));
+        let (m, text, _, _) = read(UpstreamDefects::Reproduce, &files, "a.nii", false);
+        assert!(m.is_none());
+        assert!(text.contains("niiRead(): error reading from a.nii"), "{text}");
+    }
+
+    #[test]
+    fn fs_457_unsigned_ints_above_the_int_range_noted() {
+        let mut b = header(&[3, 1, 1, 1], DT_UINT32, b"n+1\0", false);
+        b.extend_from_slice(&[0, 0, 0, 0]);
+        b.extend_from_slice(&0x8000_0001u32.to_le_bytes());
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &[("a.nii", b)], "a.nii", false);
+        let m = m.unwrap();
+        assert_eq!(m.mtype, MRI_INT);
+        assert!(ids.contains(&"FS-457"));
+    }
+
+    #[test]
+    fn fs_458_and_fs_643_the_extents_a_header_gives() {
+        // 2 dimensions with dim[3] = 0: FreeSurfer's empty volume, by default 1 slice
+        let mut b = header(&[2, 2, 1, 0], DT_UNSIGNED_CHAR, b"n+1\0", false);
+        b.extend_from_slice(&[0, 0, 0, 0, 7, 9]);
+        let files = [("a.nii", b)];
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &files, "a.nii", false);
+        let m = m.unwrap();
+        assert_eq!((m.vg.depth, m.chunk.unwrap()), (1, vec![7, 9]));
+        assert!(ids.contains(&"FS-458"));
+        let (m, _, _, _) = read(UpstreamDefects::Reproduce, &files, "a.nii", false);
+        assert_eq!(m.unwrap().vg.depth, 0);
+        // a big-endian header without a column count: glmin swapped by default
+        let mut b = header(&[3, -1, 1, 1], DT_UNSIGNED_CHAR, b"n+1\0", true);
+        b[144..148].copy_from_slice(&3i32.to_be_bytes());
+        b.extend_from_slice(&[0, 0, 0, 0, 1, 2, 3]);
+        let files = [("a.nii", b)];
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &files, "a.nii", false);
+        assert_eq!(m.unwrap().vg.width, 3);
+        assert!(ids.contains(&"FS-643"));
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let mut h = NiftiHdr([0; 348]);
+        h.0.copy_from_slice(&files[0].1[..348]);
+        swap_nifti_1_header(&mut h);
+        assert_eq!(extents(&mut g, "niiRead", &h, true).0, 0x0300_0000);
+    }
+
+    /// FreeSurfer's extension (code 14) holding only its 4-byte header (intent 5, version 1).
+    fn fs_ext(big: bool) -> Vec<u8> {
+        let mut e = vec![0u8; 16];
+        let (sz, code) = if big {
+            (16i32.to_be_bytes(), 14i32.to_be_bytes())
+        } else {
+            (16i32.to_le_bytes(), 14i32.to_le_bytes())
+        };
+        e[..4].copy_from_slice(&sz);
+        e[4..8].copy_from_slice(&code);
+        e[8..12].copy_from_slice(&[b'>', 0, 5, 1]);
+        e
+    }
+
+    #[test]
+    fn fs_459_and_fs_460_the_extensions_found_by_default() {
+        // another program's extension first, then FreeSurfer's
+        let mut b = header(&[3, 1, 1, 1], DT_UNSIGNED_CHAR, b"n+1\0", false);
+        let mut ext = vec![1u8, 0, 0, 0];
+        let mut afni = vec![0u8; 32];
+        afni[..4].copy_from_slice(&32i32.to_le_bytes());
+        afni[4..8].copy_from_slice(&4i32.to_le_bytes());
+        afni[8..20].copy_from_slice(b"<?xml ?>    ");
+        ext.extend_from_slice(&afni);
+        ext.extend_from_slice(&fs_ext(false));
+        b[108..112].copy_from_slice(&((348 + ext.len()) as f32).to_le_bytes());
+        b.extend_from_slice(&ext);
+        b.push(42);
+        let files = [("a.nii", b)];
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &files, "a.nii", false);
+        let m = m.unwrap();
+        assert_eq!((m.intent, m.version, m.vg.ras_good_flag), (5, 0x501, 1));
+        assert!(ids.contains(&"FS-460"));
+        let (m, text, _, _) = read(UpstreamDefects::Reproduce, &files, "a.nii", false);
+        assert_eq!(m.unwrap().intent, 0);
+        assert!(text.contains("no valid extension read"));
+        // a big-endian file's extension: its code swapped before the check by default
+        let mut b = header(&[3, 1, 1, 1], DT_UNSIGNED_CHAR, b"n+1\0", true);
+        let mut ext = vec![1u8, 0, 0, 0];
+        ext.extend_from_slice(&fs_ext(true));
+        b[108..112].copy_from_slice(&((348 + ext.len()) as f32).to_be_bytes());
+        b.extend_from_slice(&ext);
+        b.push(42);
+        let files = [("a.nii", b)];
+        let (m, _, ids, _) = read(UpstreamDefects::Fix, &files, "a.nii", false);
+        assert_eq!(m.unwrap().intent, 5);
+        assert!(ids.contains(&"FS-459"));
+        let (m, _, _, _) = read(UpstreamDefects::Reproduce, &files, "a.nii", false);
+        assert_eq!(m.unwrap().intent, 0);
+    }
+
+    #[test]
+    fn a_pair_read_and_fs_644_its_ico7_shape_without_frames() {
+        let mut h = header(&[3, 2, 2, 1], DT_SIGNED_SHORT, b"ni1\0", false);
+        h[254] = 1; // sform_code: the rows' axes, 2 mm voxels (the voxel sizes stay pixdim's)
+        for (r, o) in [(0usize, 280usize), (1, 296), (2, 312)] {
+            h[o + 4 * r..o + 4 * r + 4].copy_from_slice(&2.0f32.to_le_bytes());
+            h[80 + 4 * r..84 + 4 * r].copy_from_slice(&2.0f32.to_le_bytes());
+        }
+        let img: Vec<u8> = [1i16, -2, 3, 4].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let files = [("a.hdr", h.clone()), ("a.img", img)];
+        let (m, text, ids, r) = read(UpstreamDefects::Fix, &files, "a.img", true);
+        assert_eq!((r, ids.len()), (Ok(()), 0), "{text}");
+        let m = m.unwrap();
+        assert_eq!((m.vg.xsize, m.vg.x_r, m.mtype), (2.0, 1.0, MRI_SHORT));
+        assert_eq!(m.chunk.unwrap(), [1, 0, 254, 255, 3, 0, 4, 0]);
+        assert!(text.contains("INFO: using NIfTI-1 sform \n"));
+        // the ico7 shape with 0 frames
+        let h = header(&[4, 27307, 1, 6, 0], DT_UNSIGNED_CHAR, b"ni1\0", false);
+        let files = [("a.hdr", h), ("a.img", Vec::new())];
+        let (m, text, ids, r) = read(UpstreamDefects::Fix, &files, "a", true);
+        assert!(m.is_none() && r.is_ok() && ids.contains(&"FS-644"));
+        assert!(text.contains("ERROR: mri_reshape: number of elements cannot change\n  nv1 = 163842, nv1 = 0\n"));
+        let (_, _, _, r) = read(UpstreamDefects::Reproduce, &files, "a", true);
+        assert_eq!(r, Err(139));
+    }
+
+    #[test]
+    fn fs_453_a_pairs_names_cut_only_with_reproduce() {
+        let stem = "s".repeat(1021);
+        let (_, text, ids, _) = read(UpstreamDefects::Fix, &[], &stem, true);
+        assert!(text.contains(&format!("nifti1Read(): error opening file {stem}.hdr")));
+        assert!(ids.contains(&"FS-453"));
+        let (_, text, _, _) = read(UpstreamDefects::Reproduce, &[], &stem, true);
+        assert!(text.contains("nifti1Read: Truncation on line 7704\nnifti1Read: Truncation on line 7708\n"));
+        assert!(text.contains(&format!("error opening file {stem}.h\0")) || text.contains(&format!("error opening file {stem}.h")));
     }
 }

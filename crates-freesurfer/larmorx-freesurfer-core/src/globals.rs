@@ -98,6 +98,16 @@ pub struct Globals {
     /// `MRIIO_Strip_Pound` (`mri.h`: 1): `MRIgetVolumeName` also removes what follows a name's
     /// last `#`.
     pub mriio_strip_pound: i32,
+    /// `N_Zero_Pad_Input` (`mri.h`: -1): the zero padding of the frame numbers in the names of an
+    /// SPM series of ANALYZE files `analyzeRead` reads (`mri_convert --in_nspmzeropad`); below 0 a
+    /// single file.
+    pub n_zero_pad_input: i32,
+    /// `N_Zero_Pad_Output` (`mri.h`: -1): the zero padding of the frame numbers in the names of the
+    /// series `analyzeWriteSeries` writes (`mri_convert --out_nspmzeropad`); below 0 it becomes 3.
+    pub n_zero_pad_output: i32,
+    /// `gdf_crop_flag` (`mriio.cpp`, set by `mriio_set_gdf_crop_flag`: `mri_convert
+    /// --gdf_crop`): whether `gdfRead` zeroes the voxels outside the file's crop box.
+    pub gdf_crop_flag: bool,
     /// The DICOM format probe's process-wide state: CTN's condition stack and `IsDICOM`'s
     /// `static` answer for the last name it was asked (fs.io's `identify`).
     pub dicom: DicomState,
@@ -167,6 +177,9 @@ impl Globals {
             drand48: Drand48::default(),
             vg_is_equal_threshold: f64::from(f32::EPSILON),
             mriio_strip_pound: 1,
+            n_zero_pad_input: -1,
+            n_zero_pad_output: -1,
+            gdf_crop_flag: false,
             dicom: DicomState::default(),
             gifti: larmorx_io::gifti::Gifti::default(),
             sample_volume_derivative_sign: 1.0,

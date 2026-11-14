@@ -36,7 +36,7 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
-    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432,
+    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666,
 };
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
@@ -281,22 +281,15 @@ pub fn mri_read_type(
 fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MRI_CORONAL_SLICE_DIRECTORY => "COR",
         SIEMENS_FILE => "Siemens",
         MRI_GCA_FILE => "GCA",
-        BHDR => "bhdr",
-        BSHORT_FILE => "bshort",
-        BFLOAT_FILE => "bfloat",
         GENESIS_FILE => "GE Genesis",
         SIGNA_FILE => "GE Signa",
         GE_LX_FILE => "GE LX",
-        MRI_ANALYZE_FILE | MRI_ANALYZE4D_FILE => "ANALYZE",
         BRIK_FILE => "AFNI BRIK",
         MRI_MINC_FILE => "MINC",
-        SDT_FILE => "Varian SDT",
         MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
-        GDF_FILE => "GDF",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         XIMG_FILE => "GE XIMG",
         NRRD_FILE => "NRRD",
@@ -447,6 +440,24 @@ pub fn mri_read(
     }
     let read = if mtype == MRI_MGH_FILE {
         mgh_read(g, out, err, env, dir, &copy, volume_flag, -1)?
+    } else if mtype == identify::MRI_CORONAL_SLICE_DIRECTORY {
+        crate::mriio_cor::cor_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::BHDR {
+        let first = identify::bhdr_firstslicefname(g, dir, &copy);
+        let t = identify::bhdr_precision(g, dir, &copy);
+        match first {
+            Some(f) => crate::mriio_bvol::bvolume_read(g, out, err, dir, &f, volume_flag, t)?,
+            // no first slice: the precision is unknown too, which bvolumeRead refuses first
+            None => crate::mriio_bvol::bvolume_read(g, out, err, dir, "", volume_flag, t)?,
+        }
+    } else if mtype == identify::BSHORT_FILE {
+        crate::mriio_bvol::bvolume_read(g, out, err, dir, &copy, volume_flag, MRI_SHORT)?
+    } else if mtype == identify::BFLOAT_FILE {
+        crate::mriio_bvol::bvolume_read(g, out, err, dir, &copy, volume_flag, MRI_FLOAT)?
+    } else if mtype == identify::GDF_FILE {
+        crate::mriio_gdf::gdf_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::SDT_FILE {
+        crate::mriio_gdf::sdt_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::NPY_FILE {
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {
@@ -455,6 +466,8 @@ pub fn mri_read(
         crate::mriio_nifti::nii_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::NIFTI1_FILE {
         crate::mriio_nifti::nifti1_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::MRI_ANALYZE_FILE || mtype == identify::MRI_ANALYZE4D_FILE {
+        crate::mriio_analyze::analyze_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?
@@ -556,18 +569,11 @@ pub fn mri_read(
 fn write_not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MRI_CORONAL_SLICE_DIRECTORY => "COR",
         MRI_MINC_FILE => "MINC",
         IMAGE_FILE => "image",
-        BHDR => "bhdr",
-        BSHORT_FILE => "bshort",
-        BFLOAT_FILE => "bfloat",
-        MRI_ANALYZE_FILE => "ANALYZE",
-        MRI_ANALYZE4D_FILE => "ANALYZE 4D",
         BRIK_FILE => "AFNI BRIK",
         MGH_MORPH => "GCA morph (m3z)",
         ITK_MORPH => "ITK warp",
-        GDF_FILE => "GDF",
         NRRD_FILE => "NRRD",
         _ => return None,
     })
@@ -682,12 +688,59 @@ pub fn mri_write_type(
     let error = if mtype == GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mri_write_gifti(g, &mut io, dir, m, fname)?
+    } else if mtype == MRI_CORONAL_SLICE_DIRECTORY {
+        crate::mriio_cor::cor_write(g, out, err, dir, m, fname)?
+    } else if mtype == BHDR {
+        let ext = if m.mtype == MRI_SHORT {
+            "bshort"
+        } else {
+            "bfloat"
+        };
+        let t = if m.mtype == MRI_SHORT {
+            MRI_SHORT
+        } else {
+            MRI_FLOAT
+        };
+        let name = match identify::bhdr_stem(fname) {
+            Some(stem) => format!("{stem}_000.{ext}"),
+            None => {
+                // FS-666: no stem; glibc prints the null pointer as "(null)"
+                g.notices.add(
+                    &FS_666,
+                    if g.notices.reproduce() {
+                        "MRIwriteType as bhdr of a name that is not .bhdr: written as (null)_000, as in FreeSurfer"
+                    } else {
+                        "MRIwriteType as bhdr of a name that is not .bhdr: refused (FreeSurfer writes (null)_000 files)"
+                    },
+                );
+                if g.notices.fix() {
+                    return Ok(fail_code(
+                        g,
+                        err,
+                        ERROR_BADPARM,
+                        &format!("MRIwriteType(): {fname} is not a .bhdr name"),
+                    ));
+                }
+                format!("(null)_000.{ext}")
+            }
+        };
+        crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, &name, t)?
+    } else if mtype == GDF_FILE {
+        crate::mriio_gdf::gdf_write(g, out, err, dir, m, fname)?
+    } else if mtype == BSHORT_FILE {
+        crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, fname, MRI_SHORT)?
+    } else if mtype == BFLOAT_FILE {
+        crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, fname, MRI_FLOAT)?
     } else if mtype == MRI_MGH_FILE {
         crate::mriio_write::mgh_write(g, out, err, env, dir, m, fname, -1, intent)?
     } else if mtype == NII_FILE {
         crate::mriio_write::nii_write(g, out, err, env, dir, m, fname, intent)?
     } else if mtype == NIFTI1_FILE {
         crate::mriio_write::nifti1_write(g, out, err, dir, m, fname)?
+    } else if mtype == MRI_ANALYZE_FILE {
+        crate::mriio_analyze::analyze_write(g, out, err, dir, m, fname)?
+    } else if mtype == MRI_ANALYZE4D_FILE {
+        crate::mriio_analyze::analyze_write4d(g, out, err, dir, m, fname)?
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,
@@ -1273,7 +1326,7 @@ pub fn mri_tag_read(
     // (FS-421; 0 here), a name copied in has its NUL; `tname_known` bytes are written
     let mut tname = [0u8; STRLEN];
     let n0 = m.transform_fname.len().min(STRLEN);
-    tname[..n0].copy_from_slice(&m.transform_fname.as_bytes()[..n0]);
+    tname[..n0].copy_from_slice(&m.transform_fname[..n0]);
     let mut tname_known = (n0 + 1).min(STRLEN);
     let mut io = FsTagsIo::new(fp, niftiheaderext);
     loop {
@@ -1398,11 +1451,10 @@ pub fn mri_tag_read(
                     );
                 }
                 if info {
-                    let _ = writeln!(
-                        out,
-                        "[DEBUG] MRITAGread() TAG_MGH_XFORM = {} ({len})",
-                        String::from_utf8_lossy(&name)
-                    );
+                    let mut t = b"[DEBUG] MRITAGread() TAG_MGH_XFORM = ".to_vec();
+                    t.extend_from_slice(&name);
+                    t.extend_from_slice(format!(" ({len})\n").as_bytes());
+                    let _ = out.write_all(&t);
                 }
                 if utils::file_exists(dir, &tmpstr) {
                     name = tmpstr.into_bytes();
@@ -1412,7 +1464,7 @@ pub fn mri_tag_read(
                     tname_known = tname_known.max(k + 1);
                 }
                 let lossy = String::from_utf8_lossy(&name).into_owned();
-                m.transform_fname = lossy.clone();
+                m.transform_fname = name.clone();
                 if utils::file_exists(dir, &lossy) {
                     match minc::input_transform_file(g, out, err, dir, &name) {
                         Some(t) => {
@@ -1422,17 +1474,17 @@ pub fn mri_tag_read(
                             m.transform = Some(t);
                             m.free_transform = 1;
                             if diag::verbose_on(g) {
-                                let _ = writeln!(err, "INFO: loaded talairach xform : {lossy}");
+                                let mut t = b"INFO: loaded talairach xform : ".to_vec();
+                                t.extend_from_slice(&name);
+                                t.push(b'\n');
+                                let _ = err.write_all(&t);
                             }
                         }
                         None => {
                             g.errno = 0;
-                            log::error_printf(
-                                g,
-                                err,
-                                ERROR_BAD_FILE,
-                                &format!("error loading transform from {lossy}"),
-                            );
+                            let mut t = b"error loading transform from ".to_vec();
+                            t.extend_from_slice(&name);
+                            log::error_printf_bytes(g, err, ERROR_BAD_FILE, &t);
                             m.linear_transform = None;
                             m.inverse_linear_transform = None;
                             m.free_transform = 1;
@@ -1455,8 +1507,7 @@ pub fn mri_tag_read(
                     )?;
                 }
                 let data = read_tag_text(g, &mut io, len, "command-line")?;
-                m.cmdlines
-                    .push(String::from_utf8_lossy(c_str(&data)).into_owned());
+                m.cmdlines.push(c_str(&data).to_vec());
             }
             TAG_AUTO_ALIGN => {
                 m.auto_align = Some(io.read_matrix(g, out, err));

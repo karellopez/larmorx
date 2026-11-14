@@ -29,7 +29,7 @@ pub const KINDS: [&str; 2] = ["nrd", "nrh"];
 
 // ---------------------------------------------------------------- generation
 
-fn le16(b: &mut [u8], o: usize, v: i16, big: bool) {
+pub(crate) fn le16(b: &mut [u8], o: usize, v: i16, big: bool) {
     let x = if big {
         v.to_be_bytes()
     } else {
@@ -37,7 +37,7 @@ fn le16(b: &mut [u8], o: usize, v: i16, big: bool) {
     };
     b[o..o + 2].copy_from_slice(&x);
 }
-fn le32(b: &mut [u8], o: usize, v: i32, big: bool) {
+pub(crate) fn le32(b: &mut [u8], o: usize, v: i32, big: bool) {
     let x = if big {
         v.to_be_bytes()
     } else {
@@ -45,13 +45,13 @@ fn le32(b: &mut [u8], o: usize, v: i32, big: bool) {
     };
     b[o..o + 4].copy_from_slice(&x);
 }
-fn lef(b: &mut [u8], o: usize, v: f32, big: bool) {
+pub(crate) fn lef(b: &mut [u8], o: usize, v: f32, big: bool) {
     le32(b, o, v.to_bits() as i32, big);
 }
 
 /// A float of a header: usual values, now and then an odd one (NaNs with payloads, infinities,
 /// zeros, a subnormal).
-fn hfloat(g: &mut Gen, usual: &[f32]) -> f32 {
+pub(crate) fn hfloat(g: &mut Gen, usual: &[f32]) -> f32 {
     match g.below(14) {
         0 => f32::from_bits(g.pick(&[0x7fc0_0001u32, 0xff80_0003, 0x7f80_0010])),
         1 => g.pick(&[f32::INFINITY, -0.0, 1.0e-40, -3.5]),
@@ -71,7 +71,7 @@ fn dt_size(dt: i16) -> usize {
 }
 
 /// Random voxel bytes of type `dt`: floats and doubles with odd values among the usual ones.
-fn voxels(g: &mut Gen, dt: i16, n: usize, big: bool) -> Vec<u8> {
+pub(crate) fn voxels(g: &mut Gen, dt: i16, n: usize, big: bool) -> Vec<u8> {
     let mut b = Vec::with_capacity(n * 8);
     for _ in 0..n {
         match dt {
@@ -127,7 +127,7 @@ fn voxels(g: &mut Gen, dt: i16, n: usize, big: bool) -> Vec<u8> {
 }
 
 /// A text field of `n` bytes: empty, a short text, or text to the field's end without a NUL.
-fn text(g: &mut Gen, b: &mut [u8], o: usize, n: usize) {
+pub(crate) fn text(g: &mut Gen, b: &mut [u8], o: usize, n: usize) {
     match g.below(8) {
         0 => {
             let t = b"FreeSurfer probe";
@@ -141,7 +141,7 @@ fn text(g: &mut Gen, b: &mut [u8], o: usize, n: usize) {
 
 /// A header built field by field, with its extension block and voxels: the file's bytes (a pair's
 /// header alone in the first, its voxels in the second).
-fn handmade(g: &mut Gen, pair: bool) -> (Vec<u8>, Vec<u8>) {
+pub(crate) fn handmade(g: &mut Gen, pair: bool) -> (Vec<u8>, Vec<u8>) {
     let big = g.chance(6);
     let mut h = vec![0u8; 348];
     le32(&mut h, 0, g.pick(&[348, 348, 348, 348, 540, 0]), big);
@@ -432,12 +432,8 @@ fn fs_extension(g: &mut Gen, big: bool) -> Vec<u8> {
         body.extend_from_slice(&tag.to_be_bytes());
         body.extend_from_slice(&(len as i64).to_be_bytes());
         for _ in 0..len {
-            // a command line's text in ASCII (the port keeps command lines as text: NOTES, relay 25)
-            body.push(if tag == 3 {
-                b'a' + g.below(26) as u8
-            } else {
-                g.below(256) as u8
-            });
+            // any bytes, command lines included (the port keeps them as bytes since relay 26)
+            body.push(g.below(256) as u8);
         }
     }
     let esize = (8 + body.len()).div_ceil(16) * 16;

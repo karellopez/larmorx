@@ -4,8 +4,9 @@
 CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (it names FreeSurfer's functions; running fsio is a
 black-box run of FreeSurfer's code).
 
-Hand-made ``tr`` cases (``TAGreadStart`` on C streams: a ``TAG_OLD_MGH_XFORM`` tag whose 32-bit
-length the file cuts after 0 to 2 bytes keeps the tag's bytes) and ``ctr`` cases (the binary
+Hand-made ``tr`` and ``ztr`` cases (``TAGreadStart`` on C streams and ``znzTAGreadStart`` on znzlib
+files: a ``TAG_OLD_MGH_XFORM`` tag whose 32-bit length the file cuts after 0 to 2 bytes keeps the
+tag's bytes, as does a 64-bit length cut after 4 or more) and ``ctr`` cases (the binary
 colour table readers on C streams and one on a znzlib file: tables that end inside a run of
 numbers read with nothing else between them, which keep the earlier number's bytes; tables that
 end after an allocation, a name or a print, which read memory contents). Runs ``fsio`` through the
@@ -68,8 +69,14 @@ CASES = [
     ),
     (
         "ctr 1 1 0 0 fffffffe0000000300000001000000000100000001000000026200000102030400",
-        "on a znzlib file (FS-167's reader, memory contents in the port)",
+        "on a znzlib file (FS-167, as on a C stream since relay 26)",
     ),
+    # relay 26: znzTAGreadStart (FS-167) on plain and compressed files: the tag-30 length and a
+    # 64-bit length keep the tag's bytes
+    ("ztr 0 0 0000001e t 0", "znz: tag 30's length cut at 0 bytes (29)"),
+    ("ztr 1 0 0000001eabcd t 0", "znz, compressed: cut at 2 bytes"),
+    ("ztr 1 0 00000003000000000000 t 0", "znz: a 64-bit length cut at 6 bytes: the tag's last two"),
+    ("ztr 0 0 000000030000 t 0", "znz: a 64-bit length cut at 2 bytes: then memory"),
 ]
 
 

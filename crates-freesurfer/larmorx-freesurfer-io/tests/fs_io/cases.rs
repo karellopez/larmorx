@@ -35,6 +35,12 @@ pub(crate) mod piece12;
 pub(crate) mod piece14;
 #[path = "piece15.rs"]
 pub(crate) mod piece15;
+#[path = "piece16.rs"]
+pub(crate) mod piece16;
+#[path = "piece17.rs"]
+pub(crate) mod piece17;
+#[path = "piece18.rs"]
+pub(crate) mod piece18;
 #[path = "piece2.rs"]
 mod piece2;
 #[path = "piece3.rs"]
@@ -42,9 +48,9 @@ mod piece3;
 #[path = "piece4.rs"]
 pub(crate) mod piece4;
 #[path = "piece5.rs"]
-mod piece5;
+pub(crate) mod piece5;
 #[path = "piece6.rs"]
-mod piece6;
+pub(crate) mod piece6;
 #[path = "piece7.rs"]
 mod piece7;
 #[path = "piece8.rs"]
@@ -252,12 +258,12 @@ const FORMATS: [&str; 20] = [
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
 /// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-14, track A
-/// relay 24, with piece 14's NIfTI-1 pairs (2 cases: 4.7 of 5.6 s); relay 23, with piece 14's
+/// relay 27, with pieces 17 and 18 (2 cases: 4.1 of 5.2 s); relay 24, with piece 14's NIfTI-1 pairs (2 cases: 4.7 of 5.6 s); relay 23, with piece 14's
 /// command and its NIfTI names (2 cases: 4.6 of 5.9 s); relay 21, with piece 12's four commands; first 2026-11-13, relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
 /// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
 /// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
 /// them.
-pub const HEAVY_SEED1: [usize; 1] = [2204];
+pub const HEAVY_SEED1: [usize; 2] = [150, 3480];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]
@@ -297,6 +303,9 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece12::KINDS);
     kinds.extend(piece14::KINDS);
     kinds.extend(piece15::KINDS);
+    kinds.extend(piece16::KINDS);
+    kinds.extend(piece17::KINDS);
+    kinds.extend(piece18::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -349,6 +358,18 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece15::KINDS.contains(&kind) {
             lines.push(piece15::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece17::KINDS.contains(&kind) {
+            lines.push(piece17::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece18::KINDS.contains(&kind) {
+            lines.push(piece18::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece16::KINDS.contains(&kind) {
+            lines.push(piece16::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -795,6 +816,21 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece15::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece16::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece16::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece17::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece17::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece18::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece18::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1213,11 +1249,12 @@ pub(crate) fn run_line_with(
         if skip {
             extra.push("SKIP");
         }
-        // piece 2: FreeSurfer's numbers or names from memory contents (FS-49 and FS-192 compared
-        // where `reproduce` gives the earlier numbers' bytes, as FreeSurfer's memory holds them)
+        // piece 2: FreeSurfer's numbers or names from memory contents (FS-49, FS-167 and FS-192
+        // compared where `reproduce` gives the earlier numbers' bytes, as FreeSurfer's memory holds
+        // them)
         let earlier = n.detail.ends_with("as in FreeSurfer");
         let memory =
-            piece2::KINDS.contains(&t[0]) && (id == "FS-167" || (id == "FS-49" && !earlier));
+            piece2::KINDS.contains(&t[0]) && ((id == "FS-167" || id == "FS-49") && !earlier);
         if memory
             || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187")
             || (id == "FS-192" && !earlier)

@@ -415,11 +415,11 @@ pub(crate) fn read_mri14(
         c[..n].copy_from_slice(&b[..n]);
     }
     if let Some(tf) = super::dec(tk.next()) {
-        m.transform_fname = String::from_utf8(tf).unwrap();
+        m.transform_fname = tf;
     }
     m.pedir = super::dec(tk.next());
     let nc = tk.int();
-    m.cmdlines = (0..nc).map(|_| tk.string()).collect();
+    m.cmdlines = (0..nc).map(|_| tk.bytes()).collect();
     let label = tk.int() as i32;
     let thresh = f32_of(tk.next());
     if let Some(fr) = m.frames.first_mut() {
@@ -532,7 +532,11 @@ pub fn run(
         {
             extra.push("SKIP");
         }
-        if matches!(n.defect.id, "FS-49" | "FS-167" | "FS-421") {
+        // (FS-49 and FS-167 compared where `reproduce` gives the earlier number's bytes, as
+        // FreeSurfer's memory holds them)
+        if matches!(n.defect.id, "FS-49" | "FS-167" | "FS-421")
+            && !n.detail.ends_with("as in FreeSurfer")
+        {
             extra.push("VARY");
         }
     }
@@ -550,7 +554,24 @@ fn answer(
     let fatal = |f: larmorx_freesurfer_core::log::Fatal| f.status();
     let dir = Some(w.fix.as_path());
     g.progname = "fsio".into();
+    let awr = tk[0] == "awr";
+    let vwr = tk[0] == "vwr";
     let mut tk = Toks { t: tk, i: 1 };
+    // piece 16: awr <Gdiag_no> <N_Zero_Pad_Output> <N_Zero_Pad_Input for the read back>, then mgw's
+    if awr {
+        g.gdiag_no = tk.int() as i32;
+        g.n_zero_pad_output = tk.int() as i32;
+        g.n_zero_pad_input = tk.int() as i32;
+    }
+    // piece 17: vwr <subject name> <SUBJECTS_DIR> <BFILE_LITTLE_ENDIAN 0|1>, then mgw's
+    let (mut subject, mut sd, mut le, mut gdf_stem) = (None, None, false, None);
+    if vwr {
+        subject = super::dec(tk.next());
+        sd = super::dec(tk.next());
+        le = tk.int() != 0;
+        // piece 18: the GDF image stem
+        gdf_stem = super::dec(tk.next());
+    }
     g.gdiag = u64::from_str_radix(tk.next(), 16).unwrap();
     setup(w, tk.next());
     let bits = tk.int();
@@ -561,32 +582,48 @@ fn answer(
     if bits & 1 != 0 {
         pairs.push(("FS_MGZIO_USEVOXELBUFWRITE", "1"));
     }
+    if le {
+        pairs.push(("BFILE_LITTLE_ENDIAN", "1"));
+    }
+    let sd = sd.map(|b| String::from_utf8(b).unwrap());
+    if let Some(sd) = &sd {
+        pairs.push(("SUBJECTS_DIR", sd.as_str()));
+    }
     let env = Environment::from_pairs(pairs);
     let how = tk.int();
     let mut m = read_mri14(g, out, err, &mut tk);
+    if let Some(s) = subject {
+        m.subject_name = String::from_utf8(s).unwrap();
+    }
+    if let Some(s) = gdf_stem {
+        m.gdf_image_stem = String::from_utf8(s).unwrap();
+    }
     let frame = tk.int() as i32;
     let intent = tk.int() as i32;
     let name = tk.string();
     let back = tk.int() != 0;
     g.errno = 0;
-    let r = if how == 2 {
-        mriio::mri_write_type(
-            g,
-            out,
-            err,
-            &env,
-            dir,
-            &mut m,
-            &name,
-            larmorx_freesurfer_io::identify::NIFTI1_FILE,
-            intent,
-        )
+    use larmorx_freesurfer_io::identify::{
+        MRI_ANALYZE_FILE, MRI_ANALYZE4D_FILE, MRI_VOLUME_TYPE_UNKNOWN, NIFTI1_FILE,
+    };
+    let typed = match how {
+        2 => Some(NIFTI1_FILE),
+        3 => Some(MRI_ANALYZE_FILE),
+        4 => Some(MRI_ANALYZE4D_FILE),
+        10.. => Some(how as i32 - 10),
+        _ => None,
+    };
+    let r = if let Some(ty) = typed {
+        mriio::mri_write_type(g, out, err, &env, dir, &mut m, &name, ty, intent)
     } else if how != 0 {
         mriio::mri_write(g, out, err, &env, dir, &mut m, &name, None, intent)
     } else {
         mriio_write::mgh_write(g, out, err, &env, dir, &mut m, &name, frame, intent)
     }
     .map_err(fatal)?;
+    if awr {
+        o.i(i64::from(g.n_zero_pad_output));
+    }
     o.i(i64::from(r));
     o.i(i64::from(g.errno));
     o.i(i64::from(m.intent));
@@ -604,11 +641,7 @@ fn answer(
         let b = if how == 0 {
             mriio::mgh_read(g, out, err, &env, dir, &name, true, -1)
         } else {
-            let ty = if how == 2 {
-                larmorx_freesurfer_io::identify::NIFTI1_FILE
-            } else {
-                larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN
-            };
+            let ty = typed.unwrap_or(MRI_VOLUME_TYPE_UNKNOWN);
             mriio::mri_read(g, out, err, &env, dir, &name, ty, true, -1, -1)
         }
         .map_err(fatal)?;

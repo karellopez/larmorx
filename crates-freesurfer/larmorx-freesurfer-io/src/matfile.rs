@@ -1190,6 +1190,8 @@ fn v5_fixed(
         );
     }
     mf.imagf = i32::from(flags & 0x0800 != 0);
+    // FreeSurfer's value: 0x10 of the word's high byte (16 for a complex flag it sees)
+    let fs_imagf = 0x10 & i32::from((flags >> 24) as u8 as i8);
     pb.fseek(&mut g.errno, sub_end(fdata, fbytes, fsmall), 0);
     // dimensions
     let Some((_, dbytes, dsmall, ddata)) = sub_tag(g, pb, other) else {
@@ -1253,6 +1255,13 @@ fn v5_fixed(
     if g.gdiag & DIAG_VERBOSE != 0 {
         if nsmall || !name.contains(&0) {
             g.notices.add(&FS_239, "a version 5 name printed whole");
+        }
+        if fs_imagf != mf.imagf {
+            // the message prints the flag: FreeSurfer's 16 (or 0) where larmorx reads 1 (or 0)
+            g.notices.add(
+                &FS_236,
+                "a version 5 matrix's complex flag printed as larmorx reads it (FreeSurfer prints its own bit's value)",
+            );
         }
         let head = format!(
             "MATFILE5: {} x {}, imag {}, name '",

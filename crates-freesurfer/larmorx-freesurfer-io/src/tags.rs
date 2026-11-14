@@ -397,9 +397,12 @@ pub fn znz_tag_read_start(
     if fp.eof() {
         return 0;
     }
-    // a number cut by the end of the file is not used: no memory contents reach a result
+    // a number cut by the end of the file is not used: no memory contents reach a result.
+    // FS-167: every znzreadInt and znzreadLong here reads into the same memory (the official
+    // build's), so a length the file cuts keeps the tag's bytes
+    let mut slot = fio::Slot49::new();
     let before = g.notices.clone();
-    let tag = fio::znz_read_int(g, err, fp);
+    let tag = fio::znz_read_int_in(g, err, fp, &mut slot);
     if fp.eof() {
         g.notices = before;
         return 0;
@@ -409,10 +412,10 @@ pub fn znz_tag_read_start(
         return tag;
     }
     match tag {
-        TAG_OLD_MGH_XFORM => *plen = i64::from(fio::znz_read_int(g, err, fp)) - 1,
+        TAG_OLD_MGH_XFORM => *plen = i64::from(fio::znz_read_int_in(g, err, fp, &mut slot)) - 1,
         TAG_OLD_SURF_GEOM | TAG_OLD_USEREALRAS | TAG_OLD_COLORTABLE | TAG_GCAMORPH_GEOM
         | TAG_GCAMORPH_TYPE | TAG_GCAMORPH_LABELS => *plen = 0,
-        _ => *plen = fio::znz_read_long(g, err, fp),
+        _ => *plen = fio::znz_read_long_in(g, err, fp, &mut slot),
     }
     tag
 }

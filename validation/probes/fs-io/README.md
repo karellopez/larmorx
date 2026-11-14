@@ -181,6 +181,39 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   (FreeSurfer crashes) and `.img` names (`analyzeRead`, not ported); `VARY` for FS-641 and FS-642 (memory). Seed 13,
   5,769 `nrd`/`nrh`/`mgw` cases: `reproduce` identical on 5,323, 0 different; seed 7, 8,075 with piece 6's readers:
   6,919 identical, 0 different.
+- Piece 16 (track A relay 26): `ard` and `arh` (`mri_read` with voxels and `MRIreadHeader`, as piece 6's `mrd` and
+  `mrh`, after a `Gdiag_no`, `N_Zero_Pad_Input` and `SPM_START_FRAME`, `N` for unset; piece 6's environment bits 16
+  `ATROPHY_SIMULATOR` and 32 `FS_ANALYZE_NO_RESCALE`) of ANALYZE 7.5 pairs and SPM series built by
+  `tests/fs_io/piece16.rs` field by field (both byte orders, `sizeof_hdr` 0, 349 or 540 with big-endian fields, every
+  data type taken and some refused, extents -1 to 4, odd voxel sizes, offsets, scale factors and orientation codes,
+  voxel files cut or longer), `.mat` files (MATLAB version 4 matrices of 4 x 4 and other shapes, piece 5's files),
+  NIfTI-1 headers in the `.hdr` (a pair, a single file, a series of pairs, a `.nii` beside the `.img`) and missing
+  files; `awr` (piece 14's `mgw` after a `Gdiag_no`, `N_Zero_Pad_Output` and the read back's `N_Zero_Pad_Input`, with
+  `how` 3 `MRIwriteType(MRI_ANALYZE_FILE)` and 4 `MRIwriteType(MRI_ANALYZE4D_FILE)`; `N_Zero_Pad_Output` printed after
+  the write; the read back with the writer's type). `SKIP` for FS-646, FS-648, FS-650, FS-651 (FreeSurfer crashes or
+  aborts), piece 5's classes for the `.mat` reader, piece 14's for the writers (FS-58, FS-53); `VARY` for FS-645 and
+  `DIAG_SHOW`'s addresses. Seed 7, 840 piece-16 cases: `reproduce` identical on 758, 0 different; seed 13, 7,569 cases
+  with pieces 6, 14 and 15's readers and writers: 6,692 identical, 0 different. Since relay 26 piece 15's `.img` names
+  reach `analyzeRead` (compared).
+- Piece 17 (track A relay 27): COR folders and bshort/bfloat volumes. `vrd` and `vrh` (`mri_read` with voxels and
+  `MRIreadHeader`, as piece 6's `mrd` and `mrh`, the type -1, 0, 8, 9 or 23) of COR folders (`COR-.info` headers line
+  by line, a field missing, without its number or given twice, short and long flip lines, direction cosines,
+  Talairach transforms beside the slices, in `../transforms` or missing; slices cut or missing) and bvolumes
+  (slices and `.hdr` headers in both byte orders, whole or broken; `.bhdr` geometry files of every line form, a final
+  line without a newline, a NUL-started line, a folder in its place) built by `tests/fs_io/piece17.rs`; `vwr`
+  (piece 14's `mgw` after a subject name, `SUBJECTS_DIR` and `BFILE_LITTLE_ENDIAN`, `how` 10 + the type:
+  `MRIwriteType` as COR 0, bshort 8, bfloat 9 or bhdr 23, the read back with that type). `SKIP` for FS-661, FS-665,
+  FS-669, FS-671, FS-672 and FS-660's crash; `VARY` for FS-657, FS-662 and FS-658's memory contents. Seed 13, 2,181
+  piece-17 cases: `reproduce` identical on 1,852, 0 different.
+- Piece 18 (track A relay 27): GDF and Varian SDT volumes. `xrd` and `xrh` (piece 6's `mrd` and `mrh` after the GDF
+  crop flag, `mriio_set_gdf_crop_flag`) of GDF headers (every field, missing or without its value, units,
+  orientations, axes, offsets, crop boxes, a bare `DATA_TYPE`) with their slice files (plain or zero-padded numbers,
+  cut, missing), and SDT volumes (`.spr` headers of every line form, a last line without a newline, a folder in its
+  place, a folder name with a `.`; voxels of the four types) built by `tests/fs_io/piece18.rs`; GDF writes through
+  piece 17's `vwr`, whose prefix ends with the GDF image stem (`N`: none). `SKIP` for FS-674, `VARY` for FS-676 and
+  FS-677's memory contents. Seed 13, 1,428 piece-18 cases: `reproduce` identical on 1,300, 0 different.
+- `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
+  of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four
   nested folders (FS-451: the names cut to 1,023 bytes with FreeSurfer's two messages, one file for both from a stem
   of 1,022 bytes, the C library's overflow abort from a name of 1,024 bytes), compared in both modes:
@@ -190,7 +223,10 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   read right after another (FS-49: `TAGreadStart`'s tag-30 length, the binary colour tables' runs of numbers on
   C streams), and after an allocation, a name or a print (memory contents), compared with `reproduce`:
   `python -P validation/probes/fs-io/fs49_slot_cases.py` (prints `PASS` when every line is identical or marked
-  `SKIP`/`VARY` by the port; 13 identical, 3 memory contents, 2026-11-14).
+  `SKIP`/`VARY` by the port; 13 identical, 3 memory contents, 2026-11-14). Relay 26 added four `ztr` cases
+  (FS-167: `znzTAGreadStart`'s tag-30 length and 64-bit length, plain and compressed) and the znzlib colour table
+  is compared: 20 cases, 17 identical, 3 memory contents. Since relay 26 lines whose FS-167 notices end "as in
+  FreeSurfer" are compared in every piece (pieces 2, 6, 14).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

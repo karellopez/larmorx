@@ -42,36 +42,36 @@ const NOTE_LENGTH: i64 = 1 << 24;
 /// `STRLEN - 1`: the longest name a table keeps.
 const NAME_MAX: usize = 1023;
 
-/// The stream a reader reads from; on a C stream with the memory `freadInt` reads into
-/// (FS-49: the official build inlines both versions' readers into `CTABreadFromBinary`, so every
-/// `freadInt` of a read uses the same memory; a number the file cuts keeps the bytes the one
-/// before it left, unless FreeSurfer called another function between them).
+/// The stream a reader reads from, with the memory `freadInt` or `znzreadInt` reads into (FS-49,
+/// FS-167: the official build inlines both versions' readers into `CTABreadFromBinary` and
+/// `znzCTABreadFromBinary`, so every number of a read uses the same memory; a number the file
+/// cuts keeps the bytes the one before it left, unless FreeSurfer called another function between
+/// them).
 pub enum In<'a> {
     File(&'a mut CFile, fio::Slot49),
-    Znz(&'a mut ZnzFile),
+    Znz(&'a mut ZnzFile, fio::Slot49),
 }
 
 impl In<'_> {
     fn int(&mut self, g: &mut Globals, err: &mut dyn Write) -> i32 {
         match self {
             In::File(fp, slot) => fio::fread_int_in(g, fp, slot),
-            In::Znz(fp) => fio::znz_read_int(g, err, fp),
+            In::Znz(fp, slot) => fio::znz_read_int_in(g, err, fp, slot),
         }
     }
 
     /// FreeSurfer calls another function here (an allocation, a read, a copy, a print): the
     /// memory `freadInt` reads into is unknown again.
     fn clobber(&mut self) {
-        if let In::File(_, slot) = self {
-            slot.clobber();
+        match self {
+            In::File(_, slot) | In::Znz(_, slot) => slot.clobber(),
         }
     }
 
-    /// Whether a number the file cut took memory contents (always on a znzlib file: FS-167).
+    /// Whether a number the file cut took memory contents.
     fn took_memory(&self) -> bool {
         match self {
-            In::File(_, slot) => slot.took_memory(),
-            In::Znz(_) => true,
+            In::File(_, slot) | In::Znz(_, slot) => slot.took_memory(),
         }
     }
 
@@ -103,7 +103,7 @@ impl In<'_> {
         }
         match self {
             In::File(fp, _) => fp.fread(b, 1, b.len()),
-            In::Znz(fp) => {
+            In::Znz(fp, _) => {
                 let before = fp.tell();
                 let r = fio::fs_znzread(fp, b, 1, b.len());
                 let after = fp.tell();
@@ -119,12 +119,12 @@ impl In<'_> {
     fn eof(&self) -> bool {
         match self {
             In::File(fp, _) => fp.feof(),
-            In::Znz(fp) => fp.eof(),
+            In::Znz(fp, _) => fp.eof(),
         }
     }
 
     fn znz(&self) -> bool {
-        matches!(self, In::Znz(_))
+        matches!(self, In::Znz(..))
     }
 }
 
@@ -567,7 +567,7 @@ pub fn znz_ctab_read_from_binary(
         log::error_printf(g, err, ERROR_BADPARM, "CTABreadFromBinary: fp was NULL");
         return None;
     };
-    read_any(g, out, err, In::Znz(fp))
+    read_any(g, out, err, In::Znz(fp, fio::Slot49::new()))
 }
 
 /// The stream a writer writes to.

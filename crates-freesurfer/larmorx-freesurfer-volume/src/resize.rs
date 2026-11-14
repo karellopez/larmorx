@@ -35,6 +35,7 @@ use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, sub};
 use larmorx_freesurfer_core::utils::nint;
 use larmorx_freesurfer_mri::copy::mri_copy;
+pub use larmorx_freesurfer_mri::info::mri_limits;
 use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriFrame, MriRegion,
     mri_alloc, mri_alloc_sequence, mri_copy_header,
@@ -991,40 +992,6 @@ pub fn mri_mean_frame_thresh(
         }
     }
     div64(mean, f64::from(num))
-}
-
-/// `MRIlimits(mri, &min, &max)`: the smallest and largest voxel (`MRIgetVoxVal`, C's comparisons
-/// from voxel (0, 0, 0) of frame 0: a NaN first voxel stays); a volume without voxels leaves them
-/// as they were. `NO_ERROR`.
-pub fn mri_limits(
-    g: &mut Globals,
-    err: &mut dyn Write,
-    mri: &Mri,
-    min: &mut f32,
-    max: &mut f32,
-) -> Result<i32, Fatal> {
-    if mri.chunk.is_none() {
-        return Ok(NO_ERROR);
-    }
-    let v0 = mri_get_vox_val(g, err, mri, 0, 0, 0, 0, 0)?;
-    *min = v0;
-    *max = v0;
-    for f in 0..mri.nframes {
-        for i in 0..mri.vg.width {
-            for j in 0..mri.vg.height {
-                for k in 0..mri.vg.depth {
-                    let val = mri_get_vox_val(g, err, mri, i, j, k, f, 0)?;
-                    if val < *min {
-                        *min = val;
-                    }
-                    if val > *max {
-                        *max = val;
-                    }
-                }
-            }
-        }
-    }
-    Ok(NO_ERROR)
 }
 
 /// `MRIchangeType(src, dest_type, f_low, f_high, no_scale_option_flag)`: a copy of the volume as

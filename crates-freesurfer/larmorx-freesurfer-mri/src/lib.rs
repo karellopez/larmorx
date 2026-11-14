@@ -25,6 +25,7 @@
 
 pub mod copy;
 pub mod ctab;
+pub mod info;
 pub mod lta;
 pub mod mri;
 pub mod tkreg;

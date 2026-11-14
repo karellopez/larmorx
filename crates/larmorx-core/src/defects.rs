@@ -1388,7 +1388,7 @@ defects! {
     FS_331 = "FS-331", "FreeSurfer", true,
         "RASFromSurfaceRAS_ (and VGtkreg2RAS) given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, the program ends when one of the matrix's first 4 x 4 numbers left unwritten is not finite, and one of more than 4 rows gives nothing after a size-mismatch error";
     FS_167 = "FS-167", "FreeSurfer", true,
-        "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
+        "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents; znzreadInt and znzreadLong keep there the bytes of the number read just before them, as freadInt does (FS-49): a tag's length cut by the end of a compressed or plain volume file, and a binary colour table's numbers in such a file";
     FS_168 = "FS-168", "FreeSurfer", true,
         "fio_dirname of a name of one character (a, or a/ with trailing slashes) can return / instead of ., depending on what the memory allocator left in memory it had just been given back";
     FS_169 = "FS-169", "FreeSurfer", true,
@@ -1906,7 +1906,7 @@ defects! {
     FS_456 = "FS-456", "FreeSurfer", true,
         "reading an unscaled big-endian NIfTI volume of complex values leaves the values unswapped: wrong values";
     FS_457 = "FS-457", "FreeSurfer", false,
-        "reading an unscaled NIfTI volume of unsigned 32-bit values gives an int volume: values above 2,147,483,647 become negative (kept: FreeSurfer's volume type)";
+        "reading an unscaled NIfTI volume, or an ANALYZE volume, of unsigned 32-bit values gives an int volume: values above 2,147,483,647 become negative (kept: FreeSurfer's volume type)";
     FS_458 = "FS-458", "FreeSurfer", true,
         "reading a NIfTI volume of 1 or 2 dimensions, the header's extents past its number of dimensions are used as the volume's rows or slices instead of 1: an extent of 0 gives an empty volume, a larger one a read past the data";
     FS_459 = "FS-459", "FreeSurfer", true,
@@ -1921,6 +1921,76 @@ defects! {
         "reading a big-endian NIfTI volume whose column count is not positive takes the columns from the header's glmin field without swapping its bytes: a wrong extent";
     FS_644 = "FS-644", "FreeSurfer", true,
         "reading a NIfTI pair (.hdr and .img) of the ico7 surface's shape (163,842 voxels) whose header gives 0 frames prints that the number of elements cannot change and then crashes";
+    FS_645 = "FS-645", "FreeSurfer", true,
+        "reading an ANALYZE file or SPM series with SPM_START_FRAME set to a text that does not start with a number uses memory contents as the first frame's number (the default is 1)";
+    FS_646 = "FS-646", "FreeSurfer", true,
+        "reading or writing ANALYZE files (.img and .hdr, SPM series) under names too long for FreeSurfer's buffers (about 1,000 bytes when reading, 1,024 when writing) ends the program (buffer overflow detected)";
+    FS_647 = "FS-647", "FreeSurfer", true,
+        "reading an ANALYZE header of an unsupported data type prints the type after FreeSurfer has released the header's memory (the number printed is still the header's)";
+    FS_648 = "FS-648", "FreeSurfer", true,
+        "reading an ANALYZE volume without a usable .mat file whose header's orientation code is not one of -1 to 5 prints a line with an unreadable orientation name and then crashes";
+    FS_649 = "FS-649", "FreeSurfer", true,
+        "reading an ANALYZE volume of double values with several frames puts every frame's values into the first frame: the first frame holds the last frame's values and the others stay 0";
+    FS_650 = "FS-650", "FreeSurfer", true,
+        "reading an ANALYZE volume whose .mat file holds a matrix that is not 4 columns wide, or has fewer than 3 rows, prints a matrix error and crashes";
+    FS_651 = "FS-651", "FreeSurfer", true,
+        "reading an SPM series of NIfTI pairs (zero-padded frame names) whose first frame's pair cannot be read as NIfTI crashes after the reader's message";
+    FS_652 = "FS-652", "FreeSurfer", true,
+        "reading a big-endian ANALYZE header, its extents field is byte-swapped as a 16-bit number and dim[5] to dim[7] are not swapped: the header dump prints wrong values";
+    FS_653 = "FS-653", "FreeSurfer", true,
+        "writing an ANALYZE volume with exactly 32,768 columns, rows, slices or frames writes that extent as -32,768 (larger extents are refused)";
+    FS_654 = "FS-654", "FreeSurfer", true,
+        "writing an ANALYZE volume of long (64-bit) values writes 32-bit ints, but from the first half of each row's bytes: the values come out as pieces of the longs";
+    FS_655 = "FS-655", "FreeSurfer", true,
+        "writing ANALYZE files ignores the files' close: files whose last bytes could not be written (a full disk) are reported as written";
+    FS_656 = "FS-656", "FreeSurfer", true,
+        "an ANALYZE voxel offset, or a written volume's smallest and largest value or origin, outside the integer range it is converted to (a NaN included) becomes the lowest int (the offset is then ignored), or wraps around 16 bits for the origin";
+    FS_657 = "FS-657", "FreeSurfer", true,
+        "a COR volume's header (COR-.info) whose required field (imnr0, imnr1, ptype, x, y, thick, psiz, strtx to endz) has no number after its name counts the field as given and uses memory contents for it";
+    FS_658 = "FS-658", "FreeSurfer", true,
+        "a COR header's flip-angle line is read eleven characters in, where the writer's 'flip angle ' ends: a shorter line gives a number from an earlier, longer line of the file or from memory contents";
+    FS_659 = "FS-659", "FreeSurfer", true,
+        "writing a volume that is not 8-bit as COR writes the first bytes of each row (a quarter of a float row) as the slice's voxels, after only a warning";
+    FS_660 = "FS-660", "FreeSurfer", true,
+        "writing COR slices from imnr0 to imnr1 when that range is longer than the volume's depth writes the next frames' slices as further slices, then crashes past the voxels";
+    FS_661 = "FS-661", "FreeSurfer", true,
+        "a bshort or bfloat volume's geometry file (<stem>.bhdr) that opens but cannot be read (a folder of that name) is read again for ever, printing an error each time";
+    FS_662 = "FS-662", "FreeSurfer", true,
+        "a bshort or bfloat slice header (<stem>_000.hdr) without its four numbers leaves the rows, columns, frames or byte order it lacks as memory contents (an error is printed, the reading goes on)";
+    FS_663 = "FS-663", "FreeSurfer", true,
+        "writing a bvolume for a subject warns 'overwriting file register.dat' whether or not register.dat exists";
+    FS_664 = "FS-664", "FreeSurfer", true,
+        "writing a bshort or bfloat volume writes its geometry to <stem>.hdr, while reading looks for <stem>.bhdr: a written volume read back loses its orientation, sizes and timing (the coronal 1 mm default)";
+    FS_665 = "FS-665", "FreeSurfer", true,
+        "writing as bshort or bfloat a volume of another type that names a subject, with SUBJECTS_DIR unset, crashes after the slices are written";
+    FS_666 = "FS-666", "FreeSurfer", true,
+        "writing a volume with the bhdr type to a name that does not end in .bhdr writes the files (null)_000.bshort or .bfloat and their headers in the working folder";
+    FS_667 = "FS-667", "FreeSurfer", false,
+        "writing a bvolume for a subject builds both volumes' direction matrices for register.dat from the R components alone (their A and S rows repeat them), so the matrices are singular and register.dat is written only when rounding hides that (kept: the geometry file is written instead, as always)";
+    FS_668 = "FS-668", "FreeSurfer", true,
+        "a bshort or bfloat geometry file's last line is ignored when it does not end with a newline";
+    FS_669 = "FS-669", "FreeSurfer", true,
+        "a bshort or bfloat geometry file's line that starts with a NUL byte makes the reader read, and possibly change, the byte before its line buffer";
+    FS_670 = "FS-670", "FreeSurfer", true,
+        "a bshort or bfloat volume in the root folder (/<stem>_000.bshort) is read from the working folder instead";
+    FS_671 = "FS-671", "FreeSurfer", true,
+        "writing as bshort or bfloat a volume of another type with two or more frames ends by freeing the converted copy as if it had a frame table for every frame (it has one): the program may crash after the files are written";
+    FS_672 = "FS-672", "FreeSurfer", true,
+        "a volume whose Talairach transform (named by a COR header or an MGH tag) fails to load keeps it marked as the volume's own; freeing the volume then frees a transform that was never written: memory contents, usually ending the program with 'delete_general_transform' and status 1";
+    FS_673 = "FS-673", "FreeSurfer", true,
+        "a Varian SDT volume's header (.spr) whose last line does not end with a newline has that line ignored";
+    FS_674 = "FS-674", "FreeSurfer", true,
+        "an SDT header (.spr) that opens but cannot be read (a folder of that name) is read again for ever, printing an error each time";
+    FS_675 = "FS-675", "FreeSurfer", true,
+        "an SDT volume whose name has no extension but sits in a folder whose name has a '.' (x.d/vol) gets its header's name from the folder's ('x.spr'), not 'x.d/vol.spr'";
+    FS_676 = "FS-676", "FreeSurfer", true,
+        "a GDF header line without its value (IMAGE_FILE_PATH, IP_RES, SL_THICK, UNITS, SIZE, the FS_?_RAS axes, ORIENTATION, MIN_CROP, MAX_CROP alone) counts the field as given and uses memory contents for it";
+    FS_677 = "FS-677", "FreeSurfer", true,
+        "a GDF DATA_TYPE line shorter than 'DATA_TYPE ' takes its type from the characters past its end: an earlier, longer line's or memory contents";
+    FS_678 = "FS-678", "FreeSurfer", true,
+        "a GDF header's units 'cm' leave the voxel sizes as they are and 'm' divides them by 100, where millimetres need them multiplied by 10 and 1,000";
+    FS_679 = "FS-679", "FreeSurfer", true,
+        "a GDF crop box (MIN_CROP, MAX_CROP, with mri_convert's cropping) outside the integer range, or NaN, becomes the lowest integer";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

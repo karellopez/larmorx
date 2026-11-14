@@ -148,7 +148,9 @@ fn to_int(g: &mut Globals, x: f64, what: &str) -> i32 {
     if x.is_nan() || x >= 2_147_483_648.0 || x <= -2_147_483_649.0 {
         g.notices.add(
             &FS_492,
-            format!("MRIconformedTemplate: the {what} {x} converted to an int, outside the int range"),
+            format!(
+                "MRIconformedTemplate: the {what} {x} converted to an int, outside the int range"
+            ),
         );
         if g.notices.reproduce() {
             return i32::MIN;

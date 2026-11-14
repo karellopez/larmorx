@@ -35,9 +35,9 @@ use crate::deriv::{Axis, index};
 use crate::frames::compare_doubles;
 use crate::labels::{WM_MIN_VAL, int_of};
 use crate::orient::mri_get_voxel_to_voxel_xform;
-use crate::vgeom::{get_vol_geom, vg_is_not_equal_thresh};
 use crate::rows::{self, Num, need_voxels};
 use crate::sample::{SAMPLE_NEAREST, cvtt, sample_volume_frame, sample_volume_frame_type};
+use crate::vgeom::{get_vol_geom, vg_is_not_equal_thresh};
 use crate::xform::mri_set_values;
 
 /// The bounding box of the voxels `above_zero` says are above 0 (in any of `nframes` frames),
@@ -349,20 +349,17 @@ pub fn mri_complement(
         check_dims(g, err, v.a(), v.dref())?;
     } else {
         let s = v.a();
-        let mut d = mri_alloc_sequence(
-            g,
-            out,
-            err,
-            s.vg.width,
-            s.vg.height,
-            s.vg.depth,
-            s.mtype,
-            1,
-        )?;
+        let mut d =
+            mri_alloc_sequence(g, out, err, s.vg.width, s.vg.height, s.vg.depth, s.mtype, 1)?;
         mri_copy_header(g, out, err, v.a(), Some(&mut d))?;
         v.fresh = Some(d);
     }
-    let (w, h, d, nf) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth, v.a().nframes);
+    let (w, h, d, nf) = (
+        v.a().vg.width,
+        v.a().vg.height,
+        v.a().vg.depth,
+        v.a().nframes,
+    );
     for f in 0..nf {
         for z in 0..d {
             for y in 0..h {
@@ -380,7 +377,16 @@ pub fn mri_complement(
 /// A voxel by `MRIsampleVolumeFrame` (at whole coordinates: the nearest sample).
 fn sample_at(g: &mut Globals, err: &mut dyn Write, m: &Mri, x: i32, y: i32, z: i32, f: i32) -> f64 {
     let mut val = 0.0f64;
-    sample_volume_frame(g, err, m, f64::from(x), f64::from(y), f64::from(z), f, &mut val);
+    sample_volume_frame(
+        g,
+        err,
+        m,
+        f64::from(x),
+        f64::from(y),
+        f64::from(z),
+        f,
+        &mut val,
+    );
     val
 }
 
@@ -397,7 +403,12 @@ pub fn mri_and(
     let mut v = Vols::of_tri(t);
     check_dims(g, err, v.a(), v.b())?;
     clone_into(g, out, err, &mut v)?;
-    let (w, h, d, nf) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth, v.a().nframes);
+    let (w, h, d, nf) = (
+        v.a().vg.width,
+        v.a().vg.height,
+        v.a().vg.depth,
+        v.a().nframes,
+    );
     let th = f64::from(thresh);
     for f in 0..nf {
         for z in 0..d {
@@ -558,16 +569,8 @@ pub fn mri_erode_nn(
             return Ok(Ret::Null);
         }
         Pair::New(s) => {
-            let mut m = mri_alloc_sequence(
-                g,
-                out,
-                err,
-                s.vg.width,
-                s.vg.height,
-                s.vg.depth,
-                s.mtype,
-                1,
-            )?;
+            let mut m =
+                mri_alloc_sequence(g, out, err, s.vg.width, s.vg.height, s.vg.depth, s.mtype, 1)?;
             mri_copy_header(g, out, err, s, Some(&mut m))?;
             mri_copy_pulse_parameters(s, &mut m);
             if s.ct.is_some() {
@@ -611,8 +614,16 @@ pub fn mri_erode_nn(
                             if nn_def == NEAREST_NEIGHBOR_EDGE && n > 2 {
                                 continue;
                             }
-                            let val =
-                                f64::from(mri_get_vox_val(g, err, src, c + dc, r + dr, s + ds, 0, 0)?);
+                            let val = f64::from(mri_get_vox_val(
+                                g,
+                                err,
+                                src,
+                                c + dc,
+                                r + dr,
+                                s + ds,
+                                0,
+                                0,
+                            )?);
                             if val < valmin {
                                 valmin = val;
                             }
@@ -786,16 +797,8 @@ fn seg_out<'a>(
             None
         }
         Pair::New(s) => {
-            let m = mri_alloc_sequence(
-                g,
-                out,
-                err,
-                s.vg.width,
-                s.vg.height,
-                s.vg.depth,
-                s.mtype,
-                1,
-            )?;
+            let m =
+                mri_alloc_sequence(g, out, err, s.vg.width, s.vg.height, s.vg.depth, s.mtype, 1)?;
             Some((s, fresh.insert(m)))
         }
         Pair::Given(s, d) => Some((s, d)),
@@ -982,7 +985,9 @@ fn dilate_seg_into(
                 // (FreeSurfer loops forever)
                 g.notices.add(
                     &FS_497,
-                    format!("{WHAT}: step {n} changes {nch} voxels that the next step does not see"),
+                    format!(
+                        "{WHAT}: step {n} changes {nch} voxels that the next step does not see"
+                    ),
                 );
                 let msg = format!(
                     "{WHAT}: step {n} changes {nch} voxels that the next step does not see \
@@ -1053,7 +1058,8 @@ fn dilate_seg_into(
 /// grown by one voxel and clipped to the volume (`[xmin, xmax, ymin, ymax, zmin, zmax]`).
 fn label_box(g: &mut Globals, what: &str, m: &Mri, label: i32) -> [i32; 6] {
     let (w, h, d) = (m.vg.width, m.vg.height, m.vg.depth);
-    let (mut xmin, mut xmax, mut ymin, mut ymax, mut zmin, mut zmax) = (w - 1, 0, h - 1, 0, d - 1, 0);
+    let (mut xmin, mut xmax, mut ymin, mut ymax, mut zmin, mut zmax) =
+        (w - 1, 0, h - 1, 0, d - 1, 0);
     for z in 0..d {
         for y in 0..h {
             for x in 0..w {
@@ -1350,7 +1356,8 @@ pub fn mri_dilate_label(
                                         break;
                                     }
                                     let xi = index(g, err, "MRIdilateLabel", t, Axis::X, x + x0)?;
-                                    let val = f64::from(mri_get_vox_val(g, err, t, xi, yi, zi, f, 0)?);
+                                    let val =
+                                        f64::from(mri_get_vox_val(g, err, t, xi, yi, zi, f, 0)?);
                                     if val == lab {
                                         out_val = lab;
                                         break;
@@ -1539,16 +1546,8 @@ pub fn mri_replace_list(
     let (mut v, _) = Vols::of_pair(p);
     if !v.has_dst() {
         let s = v.a();
-        let mut d = mri_alloc_sequence(
-            g,
-            out,
-            err,
-            s.vg.width,
-            s.vg.height,
-            s.vg.depth,
-            MRI_INT,
-            1,
-        )?;
+        let mut d =
+            mri_alloc_sequence(g, out, err, s.vg.width, s.vg.height, s.vg.depth, MRI_INT, 1)?;
         mri_copy_header(g, out, err, v.a(), Some(&mut d))?;
         mri_copy_pulse_parameters(v.a(), &mut d);
         v.fresh = Some(d);
@@ -1558,7 +1557,10 @@ pub fn mri_replace_list(
         return Ok(v.null());
     }
     if v.dref().mtype == MRI_UCHAR && targlist[..nlist].iter().any(|&t| t > 255) {
-        let _ = writeln!(out, "ERROR: MRIreplaceList(): output is UCHAR, but target is > 255");
+        let _ = writeln!(
+            out,
+            "ERROR: MRIreplaceList(): output is UCHAR, but target is > 255"
+        );
         return Ok(v.null());
     }
     let (w, h, d) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth);
@@ -1606,7 +1608,12 @@ pub fn mri_replace_values_only(
         let ov = nint(g, f64::from(out_val)) as u8;
         return v.with_pair(|pp| mri_replace_values_uchar(g, out, err, pp, iv, ov));
     }
-    let (w, h, d, nf) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth, v.a().nframes);
+    let (w, h, d, nf) = (
+        v.a().vg.width,
+        v.a().vg.height,
+        v.a().vg.depth,
+        v.a().nframes,
+    );
     for z in 0..d {
         for y in 0..h {
             for x in 0..w {
@@ -1742,7 +1749,12 @@ pub fn mri_mask(
         );
         return Ok(v.null());
     }
-    let (w, h, d, nf) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth, v.a().nframes);
+    let (w, h, d, nf) = (
+        v.a().vg.width,
+        v.a().vg.height,
+        v.a().vg.depth,
+        v.a().nframes,
+    );
     for z in 0..d {
         for y in 0..h {
             for x in 0..w {
@@ -2373,7 +2385,9 @@ pub fn mri_percent_thresh(
     let def = if inside { &FS_495 } else { &FS_496 };
     g.notices.add(
         def,
-        format!("MRIpercentThresh: the index {npct} of a list of {nlist} values ({ntot} allocated)"),
+        format!(
+            "MRIpercentThresh: the index {npct} of a list of {nlist} values ({ntot} allocated)"
+        ),
     );
     if g.notices.reproduce() {
         return Ok(0.0);

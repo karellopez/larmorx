@@ -6101,8 +6101,21 @@ fn escape(b: &[u8]) -> String {
     s
 }
 
-/// The port's line for a case line, and the defects it noted.
+/// The port's line for a case line, and the defects it noted. Run on a thread of its own with a
+/// 32 MiB stack: a debug build gives `case`'s match (every command's locals) a frame near the
+/// 2 MiB of a test's thread (relay 23 passed it).
 pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>) {
+    std::thread::scope(|s| {
+        std::thread::Builder::new()
+            .stack_size(32 << 20)
+            .spawn_scoped(s, || run_line_here(line, mode))
+            .expect("a thread for the case")
+            .join()
+            .expect("the case's thread")
+    })
+}
+
+fn run_line_here(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>) {
     let shared = Shared::default();
     let mut cx = Ctx {
         g: Globals::new(mode),
@@ -6142,7 +6155,17 @@ const COSINES: [[f32; 9]; 9] = [
     [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0],
     [0.0, 1.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0],
     [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0],
-    [0.984_807_7, 0.173_648_18, 0.0, -0.173_648_18, 0.984_807_7, 0.0, 0.0, 0.0, 1.0],
+    [
+        0.984_807_7,
+        0.173_648_18,
+        0.0,
+        -0.173_648_18,
+        0.984_807_7,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    ],
     [1.0, 0.0, 0.0, 0.9, 0.1, 0.0, 0.0, 0.0, 1.0],
     [-1.0, 0.0, 0.0, 0.0, f32::NAN, -1.0, 0.0, 1.0, 0.0],
 ];
@@ -6165,7 +6188,11 @@ fn real_geom(g: &mut Gen, s: Shape, exact: bool) -> Vec<String> {
         t.push(fx(v));
     }
     t.push(if exact || !g.chance(6) { "1" } else { "0" }.to_owned());
-    let c = if exact { COSINES[0] } else { COSINES[g.below(COSINES.len() as u64) as usize] };
+    let c = if exact {
+        COSINES[0]
+    } else {
+        COSINES[g.below(COSINES.len() as u64) as usize]
+    };
     for v in c {
         t.push(fx(v));
     }
@@ -6263,7 +6290,10 @@ fn r23_conform(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
 }
 
 /// mriset.cpp's commands of relay 23.
-const R23_SET: [&str; 15] = ["compl", "edges", "erodenn", "erode", "erode2d", "erodeseg", "dilseg", "dtl", "dtli", "dlu", "dlab", "openn", "mopen", "mclose", "dil6"];
+const R23_SET: [&str; 15] = [
+    "compl", "edges", "erodenn", "erode", "erode2d", "erodeseg", "dilseg", "dtl", "dtli", "dlu",
+    "dlab", "openn", "mopen", "mclose", "dil6",
+];
 
 /// The cases of mriset.cpp's set operations and morphology (relay 23).
 fn r23_gen_set(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
@@ -6276,7 +6306,9 @@ fn r23_gen_set(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
         s.ty = 0;
     }
     vol_of(g, t, s);
-    let labels: &[f32] = &[0.0, 0.0, 2.0, 3.0, 41.0, 1.0, -1.0, 0.5, 255.0, 300.0, 130.0];
+    let labels: &[f32] = &[
+        0.0, 0.0, 2.0, 3.0, 41.0, 1.0, -1.0, 0.5, 255.0, 300.0, 130.0,
+    ];
     fill_paint(g, t, s, &[&[0.0, 0.0, 1.0, 2.0, 41.0, 130.0]], &[labels]);
     let two = matches!(cmd, "union" | "isect" | "mand" | "mxor");
     if two {
@@ -6334,7 +6366,11 @@ fn r23_gen_set(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             t.push(g.pick(&[0i64, 1, 2, 3, 6]).to_string());
         }
         "dilseg" => {
-            let nd = if rare { g.pick(&[0i64, -2]) } else { g.pick(&[1i64, 1, 2, 3, -1]) };
+            let nd = if rare {
+                g.pick(&[0i64, -2])
+            } else {
+                g.pick(&[1i64, 1, 2, 3, -1])
+            };
             t.push(nd.to_string());
             t.push(g.pick(&[0i64, 0, 1, -1]).to_string());
             t.push(dx(g.pick(&[0.5, 0.0, 1.0])));
@@ -6478,12 +6514,17 @@ fn r23_set1(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fa
 }
 
 /// mriset.cpp's masks, counts and in-place functions (relay 23).
-const R23_MASK: [&str; 20] = ["rlist", "rvonly", "mdiff", "mmask", "tmask", "mnot", "slv", "b2c", "nmask", "von", "vinl", "linv", "cent", "pthr", "cnbhd", "grow", "onfg", "offbg", "cplab", "cplv"];
+const R23_MASK: [&str; 20] = [
+    "rlist", "rvonly", "mdiff", "mmask", "tmask", "mnot", "slv", "b2c", "nmask", "von", "vinl",
+    "linv", "cent", "pthr", "cnbhd", "grow", "onfg", "offbg", "cplab", "cplv",
+];
 
 /// A painted label volume of the shape `s` (its tokens).
 fn r23_painted(g: &mut Gen, t: &mut Vec<String>, s: Shape) {
     vol_of(g, t, s);
-    let labels: &[f32] = &[0.0, 0.0, 2.0, 3.0, 41.0, 1.0, -1.0, 0.5, 255.0, 300.0, 130.0];
+    let labels: &[f32] = &[
+        0.0, 0.0, 2.0, 3.0, 41.0, 1.0, -1.0, 0.5, 255.0, 300.0, 130.0,
+    ];
     fill_paint(g, t, s, &[&[0.0, 0.0, 1.0, 2.0, 41.0]], &[labels]);
 }
 
@@ -6556,7 +6597,16 @@ fn r23_gen_mask(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 }
             }
             "rvonly" => {
-                t.push(fx(g.pick(&[0.0, 1.0, 2.0, 41.0, 0.5, 255.0, 300.0, f32::NAN])));
+                t.push(fx(g.pick(&[
+                    0.0,
+                    1.0,
+                    2.0,
+                    41.0,
+                    0.5,
+                    255.0,
+                    300.0,
+                    f32::NAN,
+                ])));
                 t.push(fx(g.pick(&[7.0, 0.0, -1.0, 255.0, 256.0, 2.5])));
             }
             "mdiff" | "mmask" => {
@@ -6585,7 +6635,17 @@ fn r23_gen_mask(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 second(g, t, false);
             }
             t.push(frame_of(g, s).to_string());
-            t.push(dx(g.pick(&[50.0, 0.0, 100.0, 90.0, 10.0, -5.0, 150.0, f64::NAN, 99.5])));
+            t.push(dx(g.pick(&[
+                50.0,
+                0.0,
+                100.0,
+                90.0,
+                10.0,
+                -5.0,
+                150.0,
+                f64::NAN,
+                99.5,
+            ])));
         }
         "cnbhd" => {
             t.push(g.pick(&[3i64, 1, 5, 0, -1, 7]).to_string());
@@ -6682,15 +6742,21 @@ fn r23_meas(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fa
         }
         "von" => {
             let th = t.i();
-            o.i(i64::from(ms::mri_total_voxels_on(&mut cx.g, &mut cx.b, &m, th)?));
+            o.i(i64::from(ms::mri_total_voxels_on(
+                &mut cx.g, &mut cx.b, &m, th,
+            )?));
         }
         "vinl" => {
             let l = t.i();
-            o.i(i64::from(ms::mri_voxels_in_label(&mut cx.g, &mut cx.b, &m, l)?));
+            o.i(i64::from(ms::mri_voxels_in_label(
+                &mut cx.g, &mut cx.b, &m, l,
+            )?));
         }
         "linv" => {
             let l = t.i();
-            o.i(i64::from(ms::mri_label_in_volume(&mut cx.g, &mut cx.b, &m, l)?));
+            o.i(i64::from(ms::mri_label_in_volume(
+                &mut cx.g, &mut cx.b, &m, l,
+            )?));
         }
         "cent" => {
             let (r, c) = ms::mri_compute_centroid(&mut cx.g, &mut cx.b, &m)?;

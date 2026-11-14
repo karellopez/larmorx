@@ -180,3 +180,17 @@ agree on seed 13's 4,000 cases in both modes. Seed 1, 3,420 cases: 3,145 identic
 release (`oracles/logs/fs-found-c-r22-trap-volume3.log`) and on Windows x64 (track A's
 `validation/investigations/windows-cross-check/`, the test cross-built and run on the Windows helper). `check.py`'s
 `SKIP` adds FS-490.
+
+Measured 2026-11-14 (part 14, relay 23: 3.1-38's `mri_conform.cpp` and the rest of `mriset.cpp`; 211 commands; logs in
+`<scratch>/C/r23/`): `conform` (`MRIconform`'s 256^3 result hashed with FNV-1a 64 on both sides): seed 7, 200 cases,
+199 identical with `reproduce`, 1 not comparable, 0 different; seed 13, 400 cases, 392 identical, 8 not comparable, 0
+different. The 39 mriset commands (`union isect mand mxor compl edges erodenn erode erode2d erodeseg dilseg dtl dtli
+dlu dlab openn mopen mclose dil6 rlist rvonly mdiff mmask tmask mnot slv b2c nmask von vinl linv cent pthr cnbhd grow
+onfg offbg cplab cplv`): seed 7, 3,900 cases, 3,659 identical, 241 not comparable, 0 different; seed 13, 7,800 cases,
+7,318 identical, 482 not comparable, 0 different (after FS-497: a complex volume dilated until nothing changes hangs
+FreeSurfer, `CRASH 14`, and hung the port until it was detected); `fix` different only with notices. Seed 1, 4,220
+cases: 3,877 identical, 343 not comparable, 4 `MRIconform` resamplings hashed as `HEAVY` (identical; `check.py`'s
+`heavy`: too slow for the recorded test's debug build), hash
+`551daf3a76aa59b45c0fcbccc1ac8c8ba764416f7367e11dd4f0beae5bb74483`. `check.py`'s `SKIP` adds FS-491, FS-493, FS-496,
+FS-497. The port's `run_line` now runs each case on a thread with a 32 MiB stack (the debug build's frame of `case`
+passed a test thread's 2 MiB).

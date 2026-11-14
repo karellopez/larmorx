@@ -7,7 +7,7 @@
 //! against the port's output with `reproduce` (lines where FreeSurfer reads or writes memory it does
 //! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, FS-300, FS-302 to FS-310, FS-314,
 //! FS-315, FS-322 to FS-325, FS-327, FS-163, FS-330, FS-463, FS-465, FS-467, FS-469 to FS-471,
-//! FS-473, FS-475, FS-479, FS-482, FS-484 to FS-488, FS-490, and the
+//! FS-473, FS-475, FS-479, FS-482, FS-484 to FS-488, FS-490, FS-491, FS-493, FS-496, FS-497, and the
 //! eigen-systems it never returns from, FS-47, FS-48, ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
@@ -26,20 +26,23 @@ use sha2::{Digest, Sha256};
 /// relay 20, 151 commands: the partial-volume count, 3.1-37's pieces c and d's first part; relay
 /// 21, 162 commands: piece d's volume-to-volume resampling, PCA and FDR, 3.1-38's regions and
 /// voxel measures; relay 22, 171 commands: 3.1-38's Talairach helpers, dilation, the segment
-/// mask, statistics and histogram): 3,420 cases, 3,145 lines identical, 275 hashed as `SKIP`.
-const N: usize = 3420;
-const OFFICIAL_SHA256: &str = "d67e661fe83e2a5e38001491e6b0b8afd724b5a995ba9a2675034e540593182b";
-const SKIPPED: usize = 275;
+/// mask, statistics and histogram; relay 23, 211 commands: conforming and the rest of mriset.cpp):
+/// 4,220 cases, 3,877 lines identical, 343 hashed as `SKIP`, 4 `MRIconform` resamplings hashed as
+/// `HEAVY` (identical too).
+const N: usize = 4220;
+const OFFICIAL_SHA256: &str = "551daf3a76aa59b45c0fcbccc1ac8c8ba764416f7367e11dd4f0beae5bb74483";
+const SKIPPED: usize = 343;
 /// The `MRIconform` cases hashed as `HEAVY`.
-const HEAVY: usize = 0;
+const HEAVY: usize = 4;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 45] = [
+const SKIP: [&str; 49] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
     "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
     "FS-330", "FS-463", "FS-465", "FS-467", "FS-163", "FS-469", "FS-470", "FS-471", "FS-473",
     "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488", "FS-490",
+    "FS-491", "FS-493", "FS-496", "FS-497",
 ];
 
 /// `check.py`'s `heavy`: `MRIconform` resampling onto its 256^3 grid, hashed as `HEAVY` without

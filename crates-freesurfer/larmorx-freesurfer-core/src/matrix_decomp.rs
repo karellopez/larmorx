@@ -31,12 +31,17 @@
 //!   columns and a given output, or a `NULL` inner pseudo-inverse.
 //! - **FS-46** (corrected by default): [`matrix_svd_pseudo_inverse`]'s given output, failed
 //!   decomposition and `NULL` inner result.
+//! - **FS-450** (corrected by default): [`matrix_svd`] and [`matrix_svd_eigen_values`] of a matrix
+//!   without columns (any row count) crash FreeSurfer. By default the decomposition is the empty
+//!   one (nothing written: `V` 0 x 0, the values cleared, the condition number `1e8` as for a
+//!   matrix of zeros); `reproduce` ends the program with status 139, as FreeSurfer's crash
+//!   (signal 11).
 //! - FS-25 and FS-28 as in [`crate::matrix_ops`]; FS-41, FS-42 and VNL's ITK-110 to ITK-112 in
 //!   [`crate::numerics`].
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_40, FS_43, FS_44, FS_45, FS_46};
+use larmorx_core::defects::{FS_40, FS_43, FS_44, FS_45, FS_46, FS_450};
 
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
@@ -218,6 +223,24 @@ pub fn matrix_eigen_system(
     matrix_calculate_eigen_system_helper(g, out, err, m, evalues, m_evectors, sym)
 }
 
+/// FS-450: the decomposition of a matrix without columns, which FreeSurfer's crashes (signal 11):
+/// `reproduce` ends the program with status 139; by default the empty decomposition follows.
+fn no_columns(g: &mut Globals, func: &str, rows: i32) -> Result<(), Fatal> {
+    let rep = reproduce(g);
+    g.notices.add(
+        &FS_450,
+        if rep {
+            format!("{func} of a {rows} x 0 matrix: FreeSurfer crashes (status 139)")
+        } else {
+            format!("{func} of a {rows} x 0 matrix: the empty decomposition (FreeSurfer crashes)")
+        },
+    );
+    if rep {
+        return Err(Fatal::Exit(139));
+    }
+    Ok(())
+}
+
 /// `MatrixSVD(mA, v_z, mV)`: [`numerics::open_svdcmp`] of `mA` (which becomes `U`), the singular
 /// values into `v_z` and `V` into `mV`, which is returned (a new matrix when there is none).
 ///
@@ -227,7 +250,7 @@ pub fn matrix_eigen_system(
 /// converging): `mV` comes back unchanged, zeros for a new one, with no message. By default a new
 /// `mV` is cols x cols, a given one of another size is refused (FS-28), and a failure gives the
 /// error `MatrixSVD: the decomposition failed (...)` and `Null`; `reproduce` does what FreeSurfer
-/// does. FS-25.
+/// does. FS-25. FS-450 for a matrix without columns.
 pub fn matrix_svd(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -275,6 +298,9 @@ pub fn matrix_svd(
         {
             return Ok(Ret::Null);
         }
+    }
+    if cols == 0 {
+        no_columns(g, name, rows)?;
     }
     if numerics::open_svdcmp(g, err, m_a, v_z, v) != NO_ERROR {
         if rep {
@@ -326,6 +352,10 @@ fn singular_count(g: &mut Globals, func: &str, rows: i32, cols: i32) -> i32 {
 /// singular values of the row vector `w`: their largest magnitude over their smallest (the first
 /// value as it is, the others' magnitudes), `1e8` when the smallest is below `FLT_EPSILON`.
 fn condition_from(g: &mut Globals, w: &Matrix, nw: i32) -> f32 {
+    if nw < 1 {
+        // no singular values (FS-450's default for a matrix without columns): as for zeros
+        return 1e8;
+    }
     let mut wmin = read_relt(g, w, 1, 1);
     let mut wmax = wmin;
     for row in 2..=nw {
@@ -348,7 +378,7 @@ fn condition_from(g: &mut Globals, w: &Matrix, nw: i32) -> f32 {
 /// into `evalues` (which must hold `rows` floats: the first `rows` are cleared first) and the
 /// condition number ([`condition_from`]). When the decomposition fails (fewer rows than columns, or
 /// LINPACK not converging) it returns `Gerror` (FreeSurfer's last error code) as a float, the
-/// eigenvalues cleared. FS-25, FS-40.
+/// eigenvalues cleared. FS-25, FS-40, FS-450.
 pub fn matrix_svd_eigen_values(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -365,6 +395,9 @@ pub fn matrix_svd_eigen_values(
     let mut v = real(g, out, err, cols, cols, false)?;
     let nev = rows.max(0) as usize;
     evalues[..nev].fill(0.0);
+    if cols == 0 {
+        no_columns(g, "MatrixSVDEigenValues", rows)?;
+    }
     if numerics::open_svdcmp(g, err, &mut u, &mut w, &mut v) != NO_ERROR {
         return Ok(g.gerror as f32);
     }
@@ -792,5 +825,35 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c, 4.0);
+    }
+
+    #[test]
+    fn decompositions_of_a_matrix_without_columns_fs450() {
+        // FreeSurfer crashes (signal 11) on every row count (the open maths probe's msvd and
+        // msvdvalues of 0 x 0, 1 x 0, 2 x 0 and 3 x 0 matrices, observed 2026-11-14).
+        for rows in [0, 3] {
+            let mut g = Globals::new(UpstreamDefects::Fix);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let mut a = Matrix::real(rows, 0);
+            let mut z = Matrix::real(0, 1);
+            let v = matrix_svd(&mut g, &mut o, &mut e, &mut a, &mut z, None)
+                .unwrap()
+                .unwrap_new();
+            assert_eq!((v.rows, v.cols), (0, 0));
+            let mut vals = [7.0f32; 4];
+            let c = matrix_svd_eigen_values(&mut g, &mut o, &mut e, &a, &mut vals).unwrap();
+            assert_eq!(c, 1e8);
+            assert_eq!(vals[..rows as usize], [0.0; 3][..rows as usize]);
+            assert!(g.notices.contains(&FS_450));
+            assert!(!g.notices.contains(&larmorx_core::defects::FS_16));
+            assert!(e.is_empty());
+
+            let mut g = Globals::new(UpstreamDefects::Reproduce);
+            let r = matrix_svd(&mut g, &mut o, &mut e, &mut a, &mut z, None);
+            assert_eq!(r.err().map(Fatal::status), Some(139));
+            let r = matrix_svd_eigen_values(&mut g, &mut o, &mut e, &a, &mut vals);
+            assert_eq!(r.err().map(Fatal::status), Some(139));
+            assert!(g.notices.contains(&FS_450));
+        }
     }
 }

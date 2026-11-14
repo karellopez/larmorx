@@ -1715,6 +1715,16 @@ defects! {
         "MRIclassifyAmbiguousNonPar dilates the white matter and cortex masks NdilWM and NdilCtx times, but each dilation starts again from the undilated mask, so any count above 1 dilates by one voxel only";
     FS_575 = "FS-575", "FreeSurfer", true,
         "MRIclassifyAmbiguousNonPar with a dilation count of 0 or less crashes (it reads a dilated mask it never made)";
+    FS_577 = "FS-577", "FreeSurfer", true,
+        "the connected segments (MRIsegment, MRImaxsegment) record each scanned voxel's segment number in a 16-bit map: a segment numbered above 32,767 is not seen by the voxels next to it, which start or join other segments, so one connected region can be split";
+    FS_578 = "FS-578", "FreeSurfer", true,
+        "MRImaxsegment (mri_watershed), when it removes small segments during its scan, renumbers the segments it keeps but not the voxels already scanned: the voxels scanned next join the wrong segment or start a new one, so a connected region can be split or joined to another";
+    FS_579 = "FS-579", "FreeSurfer", true,
+        "MRIsetSegmentValue with a segment number outside the segment table reads memory outside it (memory contents, or a crash)";
+    FS_581 = "FS-581", "FreeSurfer", true,
+        "the connected segments of a volume with more than 32,768 columns, rows or slices keep voxel coordinates in 16 bits: they wrap, and the label map is then written outside the volume (memory corruption)";
+    FS_582 = "FS-582", "FreeSurfer", true,
+        "the segment dilations (MRIsegmentDilate, MRIsegmentDilateThreshold) of a segment voxel more than 500 voxels outside the volume read outside the volume's index tables (memory contents, or a crash)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

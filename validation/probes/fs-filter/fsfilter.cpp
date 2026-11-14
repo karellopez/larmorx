@@ -35,8 +35,10 @@
 #include "matrix.h"
 #include "volcluster.h"
 #include "mri.h"
+#include "mrisegment.h"
 
 MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
+int MRImaxSegmentArea(MRI_SEGMENTATION *mriseg);
 
 const char *Progname = "fsfilter";
 
@@ -582,10 +584,137 @@ bool clus_case(const std::string &cmd)
   return true;
 }
 
+// a segmented volume: 0 and a volume (get_vol), or 1 and a pattern of ones and zeros (uchar, voxel
+// sizes 1): w h d p_lo p_hi zsplit seed, voxel i (slice z) 1 when a 32-bit hash of i and the seed,
+// modulo 1000, is below p_lo (z < zsplit) or p_hi; p_lo -1: a checkerboard below zsplit; p_lo -2: a
+// checkerboard beside a pillar of the last zsplit columns
+MRI *get_segvol()
+{
+  if (!geti()) return get_vol();
+  int w = geti(), h = geti(), d = geti(), plo = geti(), phi = geti(), zsplit = geti();
+  uint32_t seed = (uint32_t)strtoul(next(), NULL, 10);
+  MRI *m = MRIalloc(w, h, d, MRI_UCHAR);
+  m->xsize = m->ysize = m->zsize = 1;
+  unsigned char *b = (unsigned char *)m->chunk;
+  size_t n = (size_t)w * h * d;
+  for (size_t i = 0; i < n; i++) {
+    int z = (int)(i / ((size_t)w * h)), y = (int)(i % ((size_t)w * h) / w), xx = (int)(i % w);
+    if (plo == -1 && z < zsplit) {
+      b[i] = (xx + y + z) % 2 == 0;
+    } else if (plo == -2) {
+      b[i] = xx >= w - zsplit || (xx + y + z) % 2 == 0;
+    } else {
+      uint32_t x = (uint32_t)i * 2654435761u + seed * 40503u;
+      x ^= x >> 13;
+      x *= 0x5bd1e995u;
+      x ^= x >> 15;
+      b[i] = (int)(x % 1000) < (z < zsplit ? plo : phi) ? 1 : 0;
+    }
+  }
+  return m;
+}
+
+// the segmentation: nsegments max_segments, then every slot's nvoxels, area, label, found, centroid,
+// bounds, ignore and voxels; its FNV-1a (64 bits) as H<hex> when longer than 4000 characters
+void put_seg(const MRI_SEGMENTATION *sg)
+{
+  if (!sg) { out += "NULL "; return; }
+  std::string keep;
+  keep.swap(out);
+  oi(sg->nsegments); oi(sg->max_segments);
+  for (int s = 0; s < sg->max_segments; s++) {
+    const MRI_SEGMENT *m = &sg->segments[s];
+    oi(m->nvoxels); of(m->area); oi(m->label); oi(m->found); of(m->cx); of(m->cy); of(m->cz);
+    oi(m->x0); oi(m->x1); oi(m->y0); oi(m->y1); oi(m->z0); oi(m->z1); oi(m->ignore);
+    for (int v = 0; v < m->nvoxels; v++) { oi(m->voxels[v].x); oi(m->voxels[v].y); oi(m->voxels[v].z); }
+  }
+  std::string t;
+  t.swap(out);
+  out.swap(keep);
+  if (t.size() > 4000) {
+    uint64_t hsh = 0xcbf29ce484222325ull;
+    for (unsigned char c : t) hsh = (hsh ^ c) * 0x100000001b3ull;
+    char b[24];
+    snprintf(b, sizeof b, "H%016" PRIx64 " ", hsh);
+    out += b;
+  } else {
+    out += t;
+  }
+}
+
+// mrisegment.cpp's segments: seg|mseg <segvol> low hi nops <op>...: MRIsegment or MRImaxsegment,
+// then each operation's results, then the segmentation; salloc max_segments max_voxels
+bool seg_case(const std::string &cmd)
+{
+  if (cmd == "salloc") {
+    int ms = geti(), mv = geti();
+    MRI_SEGMENTATION *sg = MRIsegmentAlloc(ms, mv);
+    put_seg(sg);
+    return true;
+  }
+  if (cmd != "seg" && cmd != "mseg") return false;
+  MRI *vol = get_segvol();
+  float lo = getf(), hi = getf();
+  int nops = geti();
+  MRI_SEGMENTATION *sg = cmd == "seg" ? MRIsegment(vol, lo, hi) : MRImaxsegment(vol, lo, hi);
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    if (op == "D") {
+      MRI *m = get_vol();
+      oi(MRIsegmentDilate(sg, m));
+    } else if (op == "T") {
+      MRI *b = get_vol();
+      MRI *t = get_vol();
+      int l = geti(), h = geti();
+      oi(MRIsegmentDilateThreshold(sg, b, t, l, h));
+    } else if (op == "R") {
+      oi(MRIremoveSmallSegments(sg, geti()));
+    } else if (op == "C") {
+      oi(MRIcompactSegments(sg));
+    } else if (op == "I") {
+      int s = geti();
+      MRI *dst = get_opt();
+      put_result(MRIsegmentToImage(vol, dst, sg, s), dst);
+    } else if (op == "V") {
+      int s = geti();
+      MRI *m = get_vol();
+      float val = getf();
+      oi(MRIsetSegmentValue(m, sg, s, val));
+      put_vol(m);
+    } else if (op == "F") {
+      int s = geti();
+      MRI *dst = get_opt();
+      float f = getf();
+      put_result(MRIsegmentFill(sg, s, dst, f), dst);
+    } else if (op == "M") {
+      oi(MRIsegmentMax(sg));
+    } else if (op == "N") {
+      oi(MRIfindMaxSegmentNumber(sg));
+    } else if (op == "A") {
+      oi(MRImaxSegmentArea(sg));
+    } else if (op == "L") {
+      oi(MRIsegmentClearIgnoreFlags(sg));
+    } else if (op == "G") {
+      int s = geti();
+      if (s >= 0 && s < sg->max_segments) sg->segments[s].ignore = 1;
+    } else if (op == "E") {
+      int mn = geti();
+      MRI *m = get_vol();
+      oi(MRIeraseSmallSegments(sg, m, mn));
+      put_vol(m);
+    } else {
+      fail("unknown segment operation");
+    }
+  }
+  put_seg(sg);
+  return true;
+}
+
 void run_case()
 {
   std::string cmd = next();
-  if (filter_case(cmd) || fmri_case(cmd) || clus_case(cmd)) return;
+  if (filter_case(cmd) || fmri_case(cmd) || clus_case(cmd) || seg_case(cmd)) return;
   if (cmd == "edm" || cmd == "dtr") {
     // edm|dtr <src> <dst?> label max_distance mode <mask?>
     MRI *src = get_vol();

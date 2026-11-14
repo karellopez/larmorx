@@ -23,6 +23,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -48,7 +49,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # (a region growing that never ends: the official run's alarm), FS-562 (a covariance or AR(1)
 # map written directly into a destination that is not float or is smaller), FS-564 (a covariance
 # read after it could not be computed: a crash), FS-567 (a matrix too small for the volume written
-# past its end), FS-568 (a division by zero), FS-569 (a frame loop without end: a crash)
+# past its end), FS-568 (a division by zero), FS-569 (a frame loop without end: a crash); FS-579 (a
+# segment number outside the segment table), FS-581 (16-bit voxel coordinates wrapping: writes outside
+# the label map), FS-582 (a segment voxel read outside the index tables)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -74,7 +77,17 @@ SKIP = (
     "FS-571",
     "FS-573",
     "FS-575",
+    "FS-579",
+    "FS-581",
+    "FS-582",
 )
+
+# MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000
+HEAP = re.compile(r"heap usage = -?[0-9]+ Kbytes")
+
+
+def normalise(line: str) -> str:
+    return HEAP.sub("heap usage = 1000 Kbytes", line)
 
 
 def probe_binary(ws: Path) -> Path:
@@ -145,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if done.returncode != 0:
         raise SystemExit(f"fsfilter failed ({done.returncode}): {done.stderr[-2000:]}")
-    official = done.stdout.splitlines()
+    official = [normalise(line) for line in done.stdout.splitlines()]
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(

@@ -28,6 +28,8 @@ mod clus;
 mod conv;
 #[path = "fmri.rs"]
 mod fmri;
+#[path = "seg.rs"]
+mod seg;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -302,12 +304,13 @@ const DIST_PER_ROUND: usize = 8;
 
 /// `n` case lines of `seed`: in each round, [`DIST_PER_ROUND`] distance maps' cases, then each
 /// command of [`conv`] once, then each command of [`fmri`] once, then each command of [`clus`]
-/// once.
+/// once, then each command of [`seg`] once.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
     let nconv = conv::COMMANDS.len();
     let nfmri = fmri::COMMANDS.len();
-    let round = nconv + nfmri + clus::COMMANDS.len() + DIST_PER_ROUND;
+    let nclus = clus::COMMANDS.len();
+    let round = nconv + nfmri + nclus + seg::COMMANDS.len() + DIST_PER_ROUND;
     (0..n)
         .map(|k| {
             let mut t = Vec::new();
@@ -323,10 +326,15 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push(cmd.to_owned());
                     fmri::gen_case(&mut g, &mut t, cmd);
                 }
-                i => {
+                i if i < DIST_PER_ROUND + nconv + nfmri + nclus => {
                     let cmd = clus::COMMANDS[i - DIST_PER_ROUND - nconv - nfmri];
                     t.push(cmd.to_owned());
                     clus::gen_case(&mut g, &mut t, cmd);
+                }
+                i => {
+                    let cmd = seg::COMMANDS[i - DIST_PER_ROUND - nconv - nfmri - nclus];
+                    t.push(cmd.to_owned());
+                    seg::gen_case(&mut g, &mut t, cmd);
                 }
             }
             t.join(" ")
@@ -459,6 +467,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
         return Ok(());
     }
     if clus::run(cx, cmd, t, o)? {
+        return Ok(());
+    }
+    if seg::run(cx, cmd, t, o)? {
         return Ok(());
     }
     match cmd {

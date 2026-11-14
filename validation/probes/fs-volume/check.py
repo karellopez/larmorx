@@ -98,6 +98,8 @@ SKIP = (
     "FS-508",
     "FS-509",
     "FS-511",
+    "FS-515",
+    "FS-517",
 )
 
 
@@ -106,6 +108,10 @@ def heavy(case: str) -> bool:
     0 but the grid itself): compared here, hashed as ``HEAVY`` in the recorded test (minutes each in
     a debug build)."""
     t = case.split()
+    if t[:1] == ["lacjn"]:
+        # LabelAmygalaCortalJunction's new colour table: CTABalloc's 7,032 random colours and
+        # CTABunique's search (seconds each, minutes in a debug build)
+        return True
     return t[:2] == ["conform", "0"] and t[2:5] != ["256", "256", "256"]
 
 

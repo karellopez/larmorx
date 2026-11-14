@@ -518,6 +518,24 @@ COLOR_TABLE *get_ctab()
   return ct;
 }
 
+// LabelAmygalaCortalJunction's colour table (relay 25): its size, its entries, and entries 7030 and
+// 7031's names and colours (their tissue types are memory contents: not printed)
+void put_ct_lacj(const COLOR_TABLE *ct)
+{
+  if (!ct) { out += "NULL "; return; }
+  oi(ct->nentries);
+  int n = 0;
+  for (int i = 0; i < ct->nentries; i++) n += ct->entries[i] != NULL;
+  oi(n);
+  for (int k : {7030, 7031}) {
+    if (k >= ct->nentries || !ct->entries[k]) { out += "- "; continue; }
+    const CTE *e = ct->entries[k];
+    ohex(std::string(e->name));
+    oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+    of(e->rf); of(e->gf); of(e->bf); of(e->af);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -2569,6 +2587,58 @@ void run_case()
       int dim = geti(), nshift = geti(), wrap = geti();
       fflush(stdout);
       MRI *r = MRIshiftDim(seg, dim, nshift, wrap);
+      fflush(stdout);
+      put_vol(r);
+    }
+  } else if (cmd == "fento" || cmd == "lacj" || cmd == "lacjn" || cmd == "cfov" || cmd == "ccrs" || cmd == "crras") {
+    // relay 25: mri2.cpp's MRIfixEntoWM, LabelAmygalaCortalJunction, MRIcropToFoV,
+    // MRIcropAroundCRS, MRIcropAroundRAS
+    MRI *vol = get_vol();
+    fill_paint(vol);
+    if (cmd == "fento") {
+      MRI *e = get_vol();
+      fill_paint(e);
+      int level = geti();
+      double lh = getd(), rh = getd();
+      int acj = geti();
+      fflush(stdout);
+      int n = MRIfixEntoWM(vol, e, level, lh, rh, acj);
+      fflush(stdout);
+      oi(n);
+      put_vol(vol);
+    } else if (cmd == "lacj" || cmd == "lacjn") {
+      // lacjn: a new output, with CTABalloc's 7,032 random colours (seconds: hashed as HEAVY)
+      int topo = geti();
+      MRI *d = cmd == "lacj" ? get_vol() : NULL;
+      setRandomSeed(1);  // CTABalloc draws random colours
+      fflush(stdout);
+      MRI *r = LabelAmygalaCortalJunction(vol, topo, d);
+      fflush(stdout);
+      oi(r != NULL && r == d);
+      put_vol(r);
+      put_ct_lacj(r ? r->ct : NULL);
+    } else if (cmd == "cfov") {
+      int cf = geti(), rf = geti(), sf = geti();
+      double th = getd();
+      fflush(stdout);
+      MRI_REGION *r = MRIcropToFoV(vol, cf, rf, sf, th);
+      fflush(stdout);
+      oi(r->x); oi(r->y); oi(r->z); oi(r->dx); oi(r->dy); oi(r->dz);
+    } else {
+      double ctr[3];
+      for (int k = 0; k < 3; k++) ctr[k] = getd();
+      int fov[3];
+      for (int k = 0; k < 3; k++) fov[k] = geti();
+      int nk = geti();
+      std::vector<int> keep;
+      for (int k = 0; k < nk; k++) keep.push_back(geti());
+      LTA *l = NULL;
+      if (cmd == "crras") {
+        set_fsltype();
+        if (geti()) l = get_lta_full();
+      }
+      fflush(stdout);
+      MRI *r = cmd == "ccrs" ? MRIcropAroundCRS(vol, ctr, fov, keep) : MRIcropAroundRAS(vol, ctr, fov, l, keep);
       fflush(stdout);
       put_vol(r);
     }

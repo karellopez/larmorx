@@ -2540,6 +2540,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R25_LTA.contains(&c) => r25_gen_lta(&mut g, &mut t, c),
             c if R25_RES.contains(&c) => r25_gen_res(&mut g, &mut t, c),
             c if R25_MRI2.contains(&c) => r25_gen_mri2(&mut g, &mut t, c),
+            c if R25_CROP.contains(&c) => r25_gen_crop(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3005,7 +3006,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 240] = [
+pub const COMMANDS: [&str; 246] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3246,6 +3247,12 @@ pub const COMMANDS: [&str; 240] = [
     "aedit",
     "shdim",
     "sborder",
+    "fento",
+    "lacj",
+    "lacjn",
+    "cfov",
+    "ccrs",
+    "crras",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5576,6 +5583,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         c if R25_LTA.contains(&c) => r25_lta(cx, t, o, cmd)?,
         c if R25_RES.contains(&c) => r25_res(cx, t, o, cmd)?,
         c if R25_MRI2.contains(&c) => r25_mri2(cx, t, o, cmd)?,
+        c if R25_CROP.contains(&c) => r25_crop(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -8254,6 +8262,175 @@ fn r25_mri2(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fa
             let (dim, nshift, wrap) = (t.i(), t.i(), t.i());
             let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
             let r = m2::mri_shift_dim(g, a, b, &seg, dim, nshift, wrap)?;
+            o.vol(r.as_ref());
+        }
+    }
+    Ok(())
+}
+
+/// mri2.cpp's entorhinal fix, amygdala junction and crops (relay 25).
+const R25_CROP: [&str; 6] = ["fento", "lacj", "lacjn", "cfov", "ccrs", "crras"];
+
+fn r25_gen_crop(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let pool = r25_pool(g);
+    let nf = if g.chance(5) { 2 } else { 1 };
+    let mut s = r25_shape(g, &[0, 1, 3, 4], nf, 6);
+    s.d = g.int(1, 5);
+    let mut geo = pool[0].clone();
+    geo[0] = "1".into();
+    r25_vol_geo(g, t, s, &geo);
+    let labs: &[f32] = match cmd {
+        "fento" => &[0.0, 3006.0, 4006.0, 3201.0, 4201.0, 7030.0, 7031.0, 2.0],
+        "lacj" | "lacjn" => &[0.0, 18.0, 54.0, 3.0, 42.0, 3.0, 42.0, 2.0],
+        _ => &[0.0, 1.0, 0.5, 0.25, 2.0, 41.0],
+    };
+    fill_paint(g, t, s, &[labs, labs], &[labs]);
+    match cmd {
+        "fento" => {
+            let o = Shape { hdr: false, ..s };
+            r25_vol_geo(g, t, o, &geo);
+            fill_paint(g, t, o, &[labs], &[labs]);
+            t.push(g.int(0, 4).to_string());
+            t.push(dx(g.pick(&[255.0, 127.0, 110.0, 0.5, f64::NAN])));
+            t.push(dx(g.pick(&[255.0, 127.0, 1e40])));
+            t.push(g.int(0, 1).to_string());
+        }
+        "lacj" | "lacjn" => {
+            t.push(g.pick(&[1i64, 2, 3, 3, 0]).to_string());
+            if cmd == "lacj" {
+                let o = Shape { hdr: false, ..s };
+                r25_vol_geo(g, t, o, &geo);
+            }
+        }
+        "cfov" => {
+            for _ in 0..3 {
+                t.push(g.pick(&[2i64, 3, 4, 8, 1, 0]).to_string());
+            }
+            t.push(dx(g.pick(&[0.5, 0.5, 1.0, 0.0, 30.0, f64::NAN])));
+        }
+        _ => {
+            for k in [s.w, s.h, s.d] {
+                let v = if g.chance(10) {
+                    g.pick(&[f64::NAN, 1e12, -0.5])
+                } else {
+                    g.int(-2, k + 1) as f64 + g.pick(&[0.0, 0.5, 0.25, -0.5])
+                };
+                t.push(dx(v));
+            }
+            for _ in 0..3 {
+                t.push(g.pick(&[1i64, 2, 3, 4, 2, 3, 0]).to_string());
+            }
+            let nk = g.pick(&[0usize, 0, 1, 2]);
+            t.push(nk.to_string());
+            for _ in 0..nk {
+                t.push(g.pick(&[1i64, 2, 41, 0]).to_string());
+            }
+            if cmd == "crras" {
+                t.push("1".into());
+                let l = g.chance(2);
+                t.push(i64::from(l).to_string());
+                if l {
+                    let mut pool2 = pool.clone();
+                    let mut vg = geo.clone();
+                    for (k, v) in [s.w, s.h, s.d].into_iter().enumerate() {
+                        vg[k + 1] = v.to_string();
+                    }
+                    pool2[0] = vg;
+                    let chain = match g.below(5) {
+                        0 => vec![0, 1],
+                        1 => vec![2, 3],
+                        2 => vec![0, 0],
+                        _ => vec![1, 0],
+                    };
+                    let ty = g.pick(&[1i64, 1, 0]);
+                    r25_lta_toks(g, t, &pool2, &chain, ty);
+                }
+            }
+        }
+    }
+}
+
+#[inline(never)]
+fn r25_crop(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::mri2ops as m2;
+    let mut vol = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut vol)?;
+    match cmd {
+        "fento" => {
+            let mut e = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut e)?;
+            let (level, lh, rh, acj) = (t.i(), t.d(), t.d(), t.i() != 0);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let n = m2::mri_fix_ento_wm(g, a, b, &mut vol, &e, level, lh, rh, acj)?;
+            o.i(i64::from(n));
+            o.vol(Some(&vol));
+        }
+        "lacj" | "lacjn" => {
+            let topo = t.i();
+            let mut d = if cmd == "lacj" {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            larmorx_freesurfer_core::random::set_random_seed(&mut cx.g, 1);
+            let env = Environment::default();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = m2::label_amygala_cortal_junction(g, a, b, &env, &vol, topo, d.as_mut())?;
+            o.ret(&r, d.as_ref());
+            let ct = match &r {
+                Ret::New(m) => m.ct.as_ref(),
+                Ret::Given => d.as_ref().and_then(|m| m.ct.as_ref()),
+                Ret::Null => None,
+            };
+            match ct {
+                None => o.0 += "NULL ",
+                Some(ct) => {
+                    o.i(i64::from(ct.nentries()));
+                    o.i(ct.entries.iter().filter(|e| e.is_some()).count() as i64);
+                    for k in [7030usize, 7031] {
+                        match ct.entries.get(k).and_then(|e| e.as_deref()) {
+                            None => o.0 += "- ",
+                            Some(e) => {
+                                o.hex(&e.name);
+                                for v in [e.ri, e.gi, e.bi, e.ai] {
+                                    o.i(i64::from(v));
+                                }
+                                for v in [e.rf, e.gf, e.bf, e.af] {
+                                    o.f(v);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "cfov" => {
+            let fov = [t.i(), t.i(), t.i()];
+            let th = t.d();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = m2::mri_crop_to_fov(g, a, b, &vol, fov, th)?;
+            for v in [r.x, r.y, r.z, r.dx, r.dy, r.dz] {
+                o.i(i64::from(v));
+            }
+        }
+        _ => {
+            let ctr = [t.d(), t.d(), t.d()];
+            let fov = [t.i(), t.i(), t.i()];
+            let nk = t.i();
+            let keep: Vec<i32> = (0..nk).map(|_| t.i()).collect();
+            let r = if cmd == "ccrs" {
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                m2::mri_crop_around_crs(g, a, b, &mut vol, ctr, fov, &keep)?
+            } else {
+                let env = r25_fsl_env(t);
+                let l = if t.i() != 0 {
+                    Some(r25_get_lta(cx, t)?)
+                } else {
+                    None
+                };
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                m2::mri_crop_around_ras(g, a, b, &env, &mut vol, ctr, fov, l.as_ref(), &keep)?
+            };
             o.vol(r.as_ref());
         }
     }

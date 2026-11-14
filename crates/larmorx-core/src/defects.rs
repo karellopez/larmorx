@@ -2041,6 +2041,14 @@ defects! {
         "concatenating two volumes along the slices (MRIzconcat) copies as many rows as the volumes have columns: rows past the width stay 0, and where the width is larger it reads and writes rows the volumes do not have";
     FS_513 = "FS-513", "FreeSurfer", true,
         "shifting a volume along its rows or slices (MRIshiftDim) wraps and drops the shifted indices by the number of columns instead of the number of rows or slices";
+    FS_514 = "FS-514", "FreeSurfer", true,
+        "labelling the amygdala-cortex junction (LabelAmygalaCortalJunction) with several threads writes the left and the right label into a cortex voxel next to both amygdalae in an order that depends on the threads";
+    FS_515 = "FS-515", "FreeSurfer", true,
+        "cropping around an RAS point (MRIcropAroundRAS) of a volume whose orientation names an axis twice, or is unknown, crops to a field of view that is never set: memory contents";
+    FS_516 = "FS-516", "FreeSurfer", true,
+        "cropping around an RAS point through an LTA (MRIcropAroundRAS) decides the LTA's direction backwards (it inverts the LTA when the volume is its destination, goes on when the volume is neither end, refuses when it is both) and compares the volume's validity flag, which no volume constructor sets";
+    FS_517 = "FS-517", "FreeSurfer", true,
+        "cropping around a voxel (MRIcropAroundCRS) whose last voxel lies beyond the int range (a centre that is not a number or too far away, with a field of view that overflows) never ends";
 }
 
 /// The register entry with ID `id`.

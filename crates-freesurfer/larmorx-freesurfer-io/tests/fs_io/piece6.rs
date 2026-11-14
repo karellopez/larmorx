@@ -16,7 +16,7 @@ use flate2::write::GzEncoder;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_io::{mriio, registerio};
+use larmorx_freesurfer_io::{identify, mriio, mriio_ge, registerio};
 use larmorx_freesurfer_mri::mri::{Mri, mri_sizeof};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 
@@ -725,6 +725,16 @@ fn answer(
     if bits & 32 != 0 {
         pairs.push(("FS_ANALYZE_NO_RESCALE", "1"));
     }
+    // piece 19: genesisRead's switches
+    if bits & 64 != 0 {
+        pairs.push(("GE_ODD", "1"));
+    }
+    if bits & 128 != 0 {
+        pairs.push(("GE_EVEN", "1"));
+    }
+    if bits & 256 != 0 {
+        pairs.push(("KILLIANY_SWAP", "1"));
+    }
     let mut env = Environment::from_pairs(pairs);
     for (k, v) in more_env {
         // ASCII values only (the generated cases'): the same on every platform
@@ -732,7 +742,7 @@ fn answer(
     }
     let mut ty = -1;
     let (mut rv, mut frame) = (false, -1);
-    if tk[0] == "mrh" || tk[0] == "mrd" {
+    if matches!(tk[0], "mrh" | "mrd" | "gfd" | "gfh") {
         ty = next().parse().unwrap();
     }
     if tk[0] == "mgr" {
@@ -746,6 +756,13 @@ fn answer(
         "mrh" => mriio::mri_read_header(g, out, err, &env, dir, &name, ty),
         "mri" => mriio::mri_read_info(g, out, err, &env, dir, &name),
         "mrd" => mriio::mri_read(g, out, err, &env, dir, &name, ty, true, -1, -1),
+        // piece 19: FreeSurfer's GE readers with FS-680 bypassed (the probe's ge_fixed.cpp)
+        "gfd" | "gfh" if ty == identify::GE_LX_FILE => {
+            mriio_ge::gelx_read_as_patched(g, out, err, dir, &name, tk[0] == "gfd")
+        }
+        "gfd" | "gfh" => {
+            mriio_ge::genesis_read_as_patched(g, out, err, &env, dir, &name, tk[0] == "gfd")
+        }
         _ => mriio::mgh_read(g, out, err, &env, dir, &name, rv, frame),
     }
     .map_err(fatal)?;

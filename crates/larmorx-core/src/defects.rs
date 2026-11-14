@@ -1991,6 +1991,18 @@ defects! {
         "a GDF header's units 'cm' leave the voxel sizes as they are and 'm' divides them by 100, where millimetres need them multiplied by 10 and 1,000";
     FS_679 = "FS-679", "FreeSurfer", true,
         "a GDF crop box (MIN_CROP, MAX_CROP, with mri_convert's cropping) outside the integer range, or NaN, becomes the lowest integer";
+    FS_680 = "FS-680", "FreeSurfer", true,
+        "reading GE Genesis files (I.001, or names ending NNN.MR) and GE Signa LX files (names like e1s2i3) always ends with a crash (signal 11) once the series' file names are found: no such volume can be read";
+    FS_681 = "FS-681", "FreeSurfer", false,
+        "reading GE Genesis files named I.<number> prints a second 'fname_format2 :' line from memory never written, or none (kept: no such line)";
+    FS_682 = "FS-682", "FreeSurfer", true,
+        "reading GE Genesis or GE LX files, a % in the folder's or the series' name is taken as a C conversion when the other files' names are made: wrong names, a crash or an abort";
+    FS_683 = "FS-683", "FreeSurfer", true,
+        "a GE Genesis series of several echoes (their count in the file's header) is read as a volume with one slice per file in every echo: the slices past the file count divided by the echoes stay 0, and the centre is computed for the larger depth";
+    FS_684 = "FS-684", "FreeSurfer", false,
+        "reading GE LX files, the error messages name genesisRead (kept)";
+    FS_685 = "FS-685", "FreeSurfer", true,
+        "reading a GE Genesis series of several echoes, FreeSurfer frees a header whose frame count it raised after allocating one frame: it reads past the frame table, and depending on memory contents crashes (signal 11 or an abort) or goes on";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

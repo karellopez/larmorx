@@ -283,9 +283,7 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
     Some(match mtype {
         SIEMENS_FILE => "Siemens",
         MRI_GCA_FILE => "GCA",
-        GENESIS_FILE => "GE Genesis",
         SIGNA_FILE => "GE Signa",
-        GE_LX_FILE => "GE LX",
         BRIK_FILE => "AFNI BRIK",
         MRI_MINC_FILE => "MINC",
         MGH_MORPH => "GCA morph (m3z)",
@@ -458,6 +456,10 @@ pub fn mri_read(
         crate::mriio_gdf::gdf_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::SDT_FILE {
         crate::mriio_gdf::sdt_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::GENESIS_FILE {
+        crate::mriio_ge::genesis_read(g, out, err, env, dir, &copy, volume_flag)?
+    } else if mtype == identify::GE_LX_FILE {
+        crate::mriio_ge::gelx_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::NPY_FILE {
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {
@@ -584,7 +586,6 @@ fn write_unsupported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
         GENESIS_FILE => "GENESIS",
-        GE_LX_FILE => "GE LX",
         SIEMENS_FILE => "SIEMENS",
         SDT_FILE => "SDT",
         OTL_FILE => "OTL",

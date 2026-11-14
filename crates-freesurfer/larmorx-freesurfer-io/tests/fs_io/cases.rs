@@ -41,6 +41,8 @@ pub(crate) mod piece16;
 pub(crate) mod piece17;
 #[path = "piece18.rs"]
 pub(crate) mod piece18;
+#[path = "piece19.rs"]
+pub(crate) mod piece19;
 #[path = "piece2.rs"]
 mod piece2;
 #[path = "piece3.rs"]
@@ -306,6 +308,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece16::KINDS);
     kinds.extend(piece17::KINDS);
     kinds.extend(piece18::KINDS);
+    kinds.extend(piece19::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -366,6 +369,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece18::KINDS.contains(&kind) {
             lines.push(piece18::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece19::KINDS.contains(&kind) {
+            lines.push(piece19::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         if piece16::KINDS.contains(&kind) {
@@ -831,6 +838,11 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece18::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece19::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece19::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1220,6 +1232,8 @@ pub(crate) fn run_line_with(
         Ok(()) => o.0.trim_end().to_owned(),
         // libstdc++'s terminate ends with abort (SIGABRT); the port's status 134 stands for it
         Err(134) => "CRASH 6".to_owned(),
+        // a crash FreeSurfer has (signal 11) where `reproduce` prints its text first (FS-680)
+        Err(139) => "CRASH 11".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
     // FSIO_DETAIL set: each notice's detail on standard error (a probe run's diagnosis)

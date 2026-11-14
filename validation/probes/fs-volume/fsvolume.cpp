@@ -33,6 +33,7 @@
 #include "colortab.h"
 #include "diag.h"
 #include "error.h"
+#include "histo.h"
 #include "image.h"
 #include "mri_circulars.h"
 #include "matrix.h"
@@ -1899,6 +1900,51 @@ void run_case()
       fflush(stdout);
       oi(r != NULL && r == tal);
       put_vol(r);
+    }
+  } else if (cmd == "dilate" || cmd == "dilu") {
+    // MRIdilate / MRIdilateUchar (mriset.cpp): the painted source, the destination mode
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *dst = get_dst(src);
+    fflush(stdout);
+    MRI *r = cmd == "dilate" ? MRIdilate(src, dst) : MRIdilateUchar(src, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "msegs") {
+    MRI *seg = get_vol();
+    fill_paint(seg);
+    MRI *dst = get_dst(seg);
+    int n = geti();
+    std::vector<int> list(n + 1);
+    for (int i = 0; i < n; i++) list[i] = geti();
+    int maskid = geti();
+    fflush(stdout);
+    MRI *r = MRImatchSegs(seg, list.data(), n, maskid, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "sstat" || cmd == "hseg") {
+    MRI *seg = get_vol();
+    fill_paint(seg);
+    MRI *vol = get_vol();
+    fill_paint(vol);
+    int segid = geti();
+    if (cmd == "sstat") {
+      int frame = geti();
+      float mn = -7, mx = -7, rg = -7, mean = -7, sd = -7;
+      fflush(stdout);
+      int n = MRIsegStats(seg, segid, vol, frame, &mn, &mx, &rg, &mean, &sd);
+      fflush(stdout);
+      oi(n);
+      of(mn); of(mx); of(rg); of(mean); of(sd);
+    } else {
+      double bmin = getd(), bmax = getd(), bdelta = getd();
+      fflush(stdout);
+      HISTOGRAM *h = HISTOseg(seg, segid, vol, bmin, bmax, bdelta);
+      fflush(stdout);
+      oi(h->nbins);
+      for (int i = 0; i < h->nbins; i++) { of(h->bins[i]); of(h->counts[i]); }
     }
   } else {
     fail("unknown command");

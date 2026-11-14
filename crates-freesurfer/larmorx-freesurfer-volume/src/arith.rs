@@ -1871,7 +1871,16 @@ fn check_vol_dims(g: &mut Globals, err: &mut dyn Write, v: &Vols) -> Result<(), 
     if !v.has_dst() {
         return Ok(());
     }
-    let (a, b) = (v.a(), v.dref());
+    check_dims(g, err, v.a(), v.dref())
+}
+
+/// `MRIcheckVolDims(a, b)` of two volumes (see [`check_vol_dims`]).
+pub(crate) fn check_dims(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    a: &Mri,
+    b: &Mri,
+) -> Result<(), Fatal> {
     for (what, x, y) in [
         ("height", a.vg.height, b.vg.height),
         ("width", a.vg.width, b.vg.width),

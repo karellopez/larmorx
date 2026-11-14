@@ -33,6 +33,7 @@ use larmorx_freesurfer_volume::frames as fr;
 use larmorx_freesurfer_volume::image as img;
 use larmorx_freesurfer_volume::labels as lb;
 use larmorx_freesurfer_volume::ltaread as lr;
+use larmorx_freesurfer_volume::mriset as ms;
 use larmorx_freesurfer_volume::mrivoxel as mv;
 use larmorx_freesurfer_volume::order as od;
 use larmorx_freesurfer_volume::orient as orn;
@@ -42,6 +43,7 @@ use larmorx_freesurfer_volume::resample as rsm;
 use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
 use larmorx_freesurfer_volume::sample as sm;
+use larmorx_freesurfer_volume::segs as sg;
 use larmorx_freesurfer_volume::seq as sq;
 use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::stats as st;
@@ -2527,6 +2529,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 }
             }
             "talcras" | "talmat" | "talpt" | "talvol" => r22_gen(&mut g, &mut t, cmd),
+            "dilate" | "dilu" | "msegs" | "sstat" | "hseg" => r22_gen_segs(&mut g, &mut t, cmd),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -2607,6 +2610,57 @@ fn r22_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                     coord(g)
                 };
                 t.push(dx(v));
+            }
+        }
+    }
+}
+
+/// The cases of `MRIdilate`, `MRIdilateUchar`, `MRImatchSegs`, `MRIsegStats` and `HISTOseg`
+/// (relay 22, for fs.filter).
+fn r22_gen_segs(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let mut s = shape(g);
+    s.hdr = s.hdr && g.chance(6);
+    if cmd == "dilu" && !g.chance(8) {
+        s.ty = 0;
+    }
+    if g.chance(2) {
+        (s.w, s.h, s.d) = (g.int(1, 6), g.int(1, 6), g.int(1, 4));
+    }
+    vol_of(g, t, s);
+    let labels: &[f32] = &[0.0, 0.0, 2.0, 3.0, 41.0, 1.0, -1.0, 0.5, 255.0, 300.0];
+    fill_paint(g, t, s, &[&[0.0, 0.0, 1.0, 2.0, 41.0]], &[labels]);
+    match cmd {
+        "dilate" | "dilu" | "msegs" => {
+            let mode = g.pick(&[0, 0, 1, 2]);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let mut o = like(g, s);
+                o.hdr = o.hdr && g.chance(4);
+                vol_of(g, t, o);
+            }
+            if cmd == "msegs" {
+                let n = g.pick(&[1i64, 2, 3, 0, 1]);
+                t.push(n.to_string());
+                for _ in 0..n {
+                    t.push(g.pick(&[0i64, 2, 3, 41, 1, 255, -1, 300]).to_string());
+                }
+                t.push(g.pick(&[1i64, 1, 255, 0, -3, 70000]).to_string());
+            }
+        }
+        _ => {
+            let mut v = like(g, s);
+            v.hdr = v.hdr && g.chance(6);
+            vol_of(g, t, v);
+            let vals: &[f32] = &[0.0, 1.0, 2.5, -3.0, 100.0, 7.25, 1e-3, 1e6];
+            fill_paint(g, t, v, &[&[0.0, 5.0, 2.0]], &[vals]);
+            t.push(g.pick(&[0i64, 2, 3, 41, 1, 0, 2]).to_string());
+            if cmd == "sstat" {
+                t.push(frame_of(g, v).to_string());
+            } else {
+                let (bmin, bmax) = g.pick(&[(0.0, 10.0), (-5.0, 5.0), (0.0, 100.0), (2.0, 1.0)]);
+                t.push(dx(bmin));
+                t.push(dx(bmax));
+                t.push(dx(g.pick(&[1.0, 0.5, 2.0, 3.0, -1.0, 1.0])));
             }
         }
     }
@@ -2941,7 +2995,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 166] = [
+pub const COMMANDS: [&str; 171] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3108,6 +3162,11 @@ pub const COMMANDS: [&str; 166] = [
     "talmat",
     "talpt",
     "talvol",
+    "dilate",
+    "dilu",
+    "msegs",
+    "sstat",
+    "hseg",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5411,6 +5470,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "vv" | "vvsm" | "vvk" | "vvd" | "maskup" | "cov" | "mpca" | "pcast" | "fdr" | "rgbb"
         | "vxn" => piece_d_and_regions(cx, t, o, cmd)?,
         "talcras" | "talmat" | "talpt" | "talvol" => r22_tal(cx, t, o, cmd)?,
+        "dilate" | "dilu" | "msegs" => r22_dilate_msegs(cx, t, o, cmd)?,
+        "sstat" | "hseg" => r22_stats(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -5867,6 +5928,64 @@ fn r22_tal_vol(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str, kind: i32) ->
                 _ => tx::mri_from_talairach_ex(g, a, b, &env, &m, tal.as_mut(), lta)?,
             };
             o.ret(&r, tal.as_ref());
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r22_dilate_msegs(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut src = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut src)?;
+    let (mode, mut dst) = dst_mode(cx, t)?;
+    let mut list = Vec::new();
+    let mut maskid = 0;
+    if cmd == "msegs" {
+        let n = t.i();
+        for _ in 0..n {
+            list.push(t.i());
+        }
+        maskid = t.i();
+    }
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let p = pair(mode, &mut src, &mut dst);
+    let r = match cmd {
+        "dilate" => ms::mri_dilate(g, a, b, p)?,
+        "dilu" => ms::mri_dilate_uchar(g, a, b, p)?,
+        _ => sg::mri_match_segs(g, a, b, p, &list, maskid)?,
+    };
+    // the volume the result is: the destination given, or the source itself
+    let given = match mode {
+        1 => dst.as_ref(),
+        2 => Some(&src),
+        _ => None,
+    };
+    o.ret(&r, given);
+    Ok(())
+}
+
+#[inline(never)]
+fn r22_stats(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut seg = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut seg)?;
+    let mut vol = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut vol)?;
+    let segid = t.i();
+    let (g, b) = (&mut cx.g, &mut cx.b);
+    if cmd == "sstat" {
+        let frame = t.i();
+        let (n, st) = sg::mri_seg_stats(g, b, &seg, segid, &vol, frame)?;
+        o.i(i64::from(n));
+        for v in [st.min, st.max, st.range, st.mean, st.std] {
+            o.f(v);
+        }
+    } else {
+        let (bmin, bmax, bdelta) = (t.d(), t.d(), t.d());
+        let h = sg::histo_seg(g, b, &seg, segid, &vol, bmin, bmax, bdelta)?;
+        o.i(i64::from(h.nbins));
+        for i in 0..h.nbins.max(0) as usize {
+            o.f(h.bins[i]);
+            o.f(h.counts[i]);
         }
     }
     Ok(())

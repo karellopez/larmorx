@@ -1803,6 +1803,10 @@ defects! {
         "the Talairach point conversions (MRIvoxelToTalairachEx and its siblings) use a matrix that could not be made (a singular voxel-to-RAS matrix or transform) and crash; and the Talairach-to-voxel matrix of a transform file that holds no transform reads past it: memory contents";
     FS_488 = "FS-488", "FreeSurfer", true,
         "the resampling of a volume out of Talairach space (MRIfromTalairachEx) without a target volume uses the target before its own check and crashes";
+    FS_489 = "FS-489", "FreeSurfer", true,
+        "the mask of listed labels (MRImatchSegs) made in the segmentation itself clears each voxel before reading its label: every voxel is matched as label 0";
+    FS_490 = "FS-490", "FreeSurfer", true,
+        "the histogram of a segment's intensities (HISTOseg) with a bin count of 0 counts each matching voxel in the bin before the first: memory it does not own";
 }
 
 /// The register entry with ID `id`.

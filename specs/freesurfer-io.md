@@ -3445,3 +3445,76 @@ inside or after the header, folders in their place; a header file by another nam
 cut files. Measured (2026-11-14): seed 13, 1,016 piece-20 cases: `reproduce` identical on 994, 0
 different (18 counted: FS-686's writes past the table, formats not ported; 4 compared apart: FS-49,
 FS-167); `fix` differs only with notices.
+
+## 116. Old Siemens `.ima` series read (`siemensRead`; `mri_read`'s type 6, `mri_identify`'s `SIEMENS_FILE`)
+
+An old Siemens Numaris `.ima` file, written on a Sun (every value big-endian), is one image of a
+series named `<study><sep><series><sep><image>.ima` (the separator `-`, or `_`). `siemensRead(fname,
+read_volume)`:
+
+- `Starting siemensRead()` (standard output).
+- If the file is really a DICOM (`IsDICOM`, §47): `INFO: this looks like a dicom, not an old Siemens
+  .ima file, so I'm going to unpack it as a dicom.` and `If this fails, run mri_convert with -it
+  dicom`, then it is loaded as a Siemens DICOM (`sdcmLoadVolume`, a later item: not ported; larmorx
+  says so and stops).
+- Otherwise the header reader `imaLoadFileInfo` runs: it opens the file (`ERROR: could not open
+  <fname>` and `siemensRead(): <fname>` when it cannot), parses the name into three numbers (the
+  separator `-` when the base name holds one, else `_`; a name that does not split into three parts
+  gives `ERROR: could not parse <fname>` and `siemensRead(): <fname>`), and decides whether the
+  series is a mosaic (`BaseRawMatrixSize` at byte 2,864 differs from `Columns` at 4,996). FS-688: the
+  reader loads some fields into stack variables and frees the stack address when a read runs past the
+  end of a header shorter than 4,998 bytes, which aborts the program (signal 6); larmorx reads 0 past
+  the end and does not crash.
+- The name must end in `.ima` or `.IMA` (`siemensRead(): bad file name <fname> (must end in '.ima' or
+  '.IMA')`), and the file must exist (`siemensRead(): file <fname> doesn't exist`).
+- The series is the files `<prefix><n>.<ext>` whose numbers run down and up from this one's without a
+  gap (each counting loop ends on a name that does not open, leaving `errno` at ENOENT; FreeSurfer
+  prints it at the end). The lowest-numbered file is opened (`siemensRead(): can't open file <f>
+  (low = <a>, this = <b>, high = <c>)` when it cannot).
+- The header fields (all big-endian): `rows` (byte 4,994) and `cols` (4,996), printed as `rows = <r>`
+  and `cols = <c>`; the nominal slice count (4,004; `0` gives the error `\n\nPlease try with the
+  option '-it siemens_dicom'.\n The handling failed assuming the old siemens format.\n`); the base
+  raw matrix size (2,864); the number of averages (1,584); the sequence file name (3,009, 65 bytes:
+  a name containing `scout`, lower-cased, gives `siemensRead(): series appears to be a scout
+  (sequence file name is <name>)`).
+- A structural series (`nominal slices == 1` and not a mosaic): the slices are the files, one frame;
+  the base matrix must equal both `rows` and `cols` (`siemensRead(): bad file/base matrix sizes`).
+  Otherwise a mosaic: `rows` and `cols` must divide by the base matrix (`siemensRead(): file rows
+  (<r>) not divisible by image rows (<b>)`, `... file cols ...`), the mosaic holds
+  `(rows/base) * (cols/base)` images (`siemensRead(): mosaic_size==0, Try '-it siemens_dicom' flag
+  with mri_convert` when either is 0), the files must divide into whole volumes (`siemensRead():
+  files in volume (<n>) not divisible by mosaics per volume (<m>)`), and the frames are the quotient.
+- The geometry (every field big-endian): the pixel sizes at 5,000 and 5,008 (times the mosaic rows
+  and columns); the slice spacing `(1 + distance_factor) * thickness` (distance factor at 4,136, a
+  value of `-19222` taken as 0; thickness at 1,544); the field of view at 3,744 (the width at 3,752
+  is read into the same variable and byte-swapped a second time, so it is ignored — FS-691); the
+  flip angle (2,112, degrees to radians); TR, TE, TI (1,560, 1,568, 1,576); the slice, column and row
+  direction cosines (3,792, 3,832, 3,856, each three doubles, the Sagittal and Transverse negated);
+  the image centre (3,768), from which `c_r`/`c_a`/`c_s` are computed with the slice normal, the
+  mosaic size and half the depth; `ras_good_flag = 1`. The slice direction at 3,760 must be 1 to 6
+  (`siemensRead(): bad slice direction (<d>) in file <f>`). `imnr0 = 1`, `imnr1 = depth`.
+- With the voxels: a raw volume of `rows` x `cols` x `files` (MRI_SHORT) is read, each file's pixels
+  at byte 6,144, big-endian shorts byte-swapped to the native order (`siemensRead(): could not read
+  file` per row the file cannot fill; `siemensRead(): can't open file ...` when a file will not
+  open); then the slices are laid out of their mosaics. FS-692: the raw volume is allocated with the
+  columns and rows exchanged, so a file with more rows than columns is read past its voxels (memory
+  corruption or a crash); larmorx does not write out of bounds.
+- FS-689: a header between 4,998 and 5,016 bytes lets `imaLoadFileInfo` finish but leaves the pixel
+  sizes read past the end of the file (memory contents; 0 by default).
+- FS-690 (not reached by any program): `imaLoadFileInfo`'s row, column and slice direction cosines
+  store the Sagittal and Coronal parts and then overwrite the Coronal with the Transverse, never
+  filling the third element; `siemensRead` reads the cosines itself and does not use these fields.
+
+## 117. Validation plan (part 23)
+
+Piece 21's commands `imd` and `imh` (piece 6's `mrd`, `mrh`, the type -1 or 6): structural and
+mosaic `.ima` series (base matrix 2 or 4, mosaic rows and columns of 1 or 2, 1 to 6 nominal slices,
+1 or 2 averages, one to four sibling files, the separator `-` or `_`, the extension `.ima` or `.IMA`),
+scouts, slice directions in and out of 1..6, base matrices that do and do not divide the rows and
+columns, file counts that do and do not divide the mosaics, headers shorter than 4,998 bytes
+(FreeSurfer aborts: FS-688, skipped) and between 4,998 and 6,144 (FS-689, memory), names that do not
+parse, and names with no file. Measured (2026-11-14): seeds 7, 13, 21, 99, each 150 piece-21 cases:
+`reproduce` identical on every comparable case, 0 different (the crash and mosaic-corruption cases
+skipped: FS-688, FS-692; the DICOM path not ported; FS-689 compared apart); `fix` differs only with
+the error-message correction (FS-01). The recorded cross-platform test includes two `imd`/`imh`
+cases.

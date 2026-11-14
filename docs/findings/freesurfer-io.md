@@ -1644,3 +1644,56 @@ the unit oracle's `signa.cpp.o` and `mriio.cpp.o` (`rl28/sr.dis`, `rl28/ximg.dis
   replaced; TI and TE at +198 and +202 next to TR at +200 overlap TR's bytes (unknown whether XIMG files
   hold them there; no XIMG file was at hand: kept, no defect declared). Its arithmetic is genesisRead's
   (same operand order).
+
+## Part 23: Old Siemens `.ima` series (relay 29 of track A)
+`utils/mriio.cpp` 1904-2379 (`siemensRead`), `utils/imautils.cpp` (the IMA header reader `imaLoadFileInfo`
+and its helpers `imaLoadVal`, `imaLoadValFromKey`, the dictionary, `imaParseName`,
+`imaCountFilesInSeries`). Object code read: the unit oracle's `imautils.cpp.o` (`rl29/ilfi.dis`).
+
+### Mechanisms
+- **FS-688.** `imaLoadValFromKey(fp, key, pval)` calls `imaLoadVal`, which `fseek`s to the dictionary
+  offset and `fread`s the field; on a short read it returns `NULL`, and `imaLoadValFromKey` then does
+  `free(pval)` and returns `NULL`. Most of `imaLoadFileInfo`'s calls pass the address of a stack variable
+  (`&Year`, `&dtmp`, `&stmp`, ...), so the failing load frees a stack address and glibc aborts
+  (`free(): invalid pointer` / `munmap_chunk(): invalid pointer`, signal 6). The first stack-targeted
+  load is the birthdate year at offset 808 (eight bytes), and the last is `G28_Pre_Columns` at 4,996 (two
+  bytes), so any header shorter than 4,998 bytes aborts at the first field it cannot hold (the message
+  names that field's offset). `PatientName` (768) and `PulseSequence` (3,009) pass `NULL`, so their failed
+  loads only free the heap buffer and print `ERROR: imaLoadVal: could not read ... from offset ...`.
+  larmorx does not crash: `imaLoadFileInfo` here reads `BaseRawMatrixSize` (2,864) and `Columns` (4,996)
+  for the mosaic decision, notes FS-688 when either runs past the end, and reads 0. The crash is not
+  reproduced (class a).
+- **FS-689.** `siemensRead` reads the pixel sizes with `fread(&d, 8, 1, fp)` at 5,000 and 5,008 (`d` an
+  uninitialised stack `double`); a header of 4,998 to 5,016 bytes makes `imaLoadFileInfo` finish but these
+  reads fail, and `ErrorPrintf("siemensRead(): could not read file")` leaves `d` as the stack held it.
+  larmorx reads 0 and notes FS-689.
+- **FS-690** (not reached). `imaLoadFileInfo` sets `ifi->Vc[0] = -Sag; ifi->Vc[1] = Cor; ifi->Vc[1] =
+  -Tra;` (and the same for `Vr`, `Vs`): the Coronal value is overwritten by the Transverse and the third
+  element is never written (a copy-and-paste slip from `ImgCenter`). `siemensRead` reads the cosines from
+  the file itself (3,792, 3,832, 3,856), so no program reads `ifi->Vc/Vr/Vs`. Kept, documented.
+- **FS-691.** `siemensRead` reads the field-of-view height at 3,744 into `d`, order-swaps it, then
+  `fseek(3752); fread(&d2); d2 = orderDoubleBytes(d)` — it byte-swaps `d` again (not the newly-read `d2`),
+  so the width is ignored and `d2` is the double-byte-swap of the height, which only exceeds `d` for
+  bytes that form a larger double. `mri->fov = (d > d2 ? d : d2)`.
+- **FS-692.** `mri_raw = MRIalloc(rows, cols, n_files, MRI_SHORT)` gives the raw volume `width = rows`,
+  `height = cols`; the read loop `for (i = 0; i < rows; i++) fread(&MRISvox(mri_raw, 0, i, z), 2, cols,
+  fp)` writes `cols` shorts at `voxel(0, i, z)` for `i` up to `rows - 1`. When `rows > cols` the offset
+  `i * width = i * rows` passes the slice (`width * height = rows * cols`), so the last rows of the last
+  file are written past the `calloc`'d voxels (memory corruption; a segfault for the full files the probe
+  generates). When `rows < cols` the reads spill into the next row but stay inside the volume, so larmorx
+  reproduces that scrambled layout; when `rows > cols` larmorx guards the write and notes FS-692 (the
+  probe skips it). The de-mosaic reads `MRISvox(mri_raw, width*bc + i, height*br + j, file)` with
+  `width = base`, so a non-square mosaic also reads from the mangled raw layout.
+- The counting loops (`while (FileExists(fname_use))` and `siemensRead`'s own `sprintf` loops) leave
+  `errno` at ENOENT (2) after the last `fopen` that fails; `fopen` success and `fread` do not clear it, so
+  the final `errno` the probe prints is 2 (the per-row `could not read file` on a short voxel read prints
+  `error: No such file or directory` before the message).
+- The error messages carry FreeSurfer's spurious NUL byte before the newline (FS-01, the whole module):
+  `reproduce` keeps it, the default removes it.
+
+### Measurements
+- The fs-io probe's piece 21 (`imd`, `imh`, piece 6's `mrd`/`mrh`, type -1 or 6): seeds 7, 13, 21, 99,
+  150 cases each, `reproduce` identical on every comparable case, 0 different; across 666 cases (seed 5)
+  FS-688 fired 49 times, FS-692 4, FS-689 2 (FS-691 never: the field-of-view swap never wins for ordinary
+  byte patterns). The unit tests in `mriio_siemens.rs` check the geometry and voxels of a structural
+  series, the name-parse and bad-extension refusals, and the short-header note.

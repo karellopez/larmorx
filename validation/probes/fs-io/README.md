@@ -232,6 +232,13 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   echoes, plane types; slices `I.001` ... beside it, cut or missing, a header file by another name) and
   XIMG series (Genesis files with XIMG's offsets). `SKIP` for FS-686's writes past the slice table and
   FS-682. Seed 13, 1,016 piece-20 cases: `reproduce` identical on 994, 0 different.
+- Piece 21 (track A relay 29): old Siemens `.ima` series. `imd` and `imh` (piece 6's `mrd` and `mrh`, the type
+  -1 or 6) of `.ima` series built by `tests/fs_io/piece21.rs` (a complete 6,144-byte header followed by the
+  voxels, every field FreeSurfer reads at its fixed big-endian offset, with its sibling files
+  `<study>-<series>-<n>.ima`; structural and mosaic series, scouts, bad slice directions and matrix sizes,
+  non-divisible counts, short headers, unparsable names). `SKIP` for FS-688 (FreeSurfer aborts on a short
+  header) and FS-692 (it writes past a transposed raw volume); `VARY` for FS-689 (geometry read past the
+  header). Seeds 7, 13, 21, 99 (150 cases each): `reproduce` identical on every comparable case, 0 different.
 - `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
   of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four

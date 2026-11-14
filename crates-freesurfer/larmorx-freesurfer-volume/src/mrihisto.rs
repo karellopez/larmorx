@@ -40,7 +40,7 @@ use larmorx_freesurfer_core::cstd;
 use larmorx_freesurfer_core::diag::{self, DIAG_SHOW, DIAG_WRITE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{
-    Histogram, histo_add_into_second, histo_alloc, histo_add_sample, histo_clear_in_place,
+    Histogram, histo_add_into_second, histo_add_sample, histo_alloc, histo_clear_in_place,
     histo_find_last_peak_in_region, histo_find_valley, histo_init, histo_plot, histo_realloc,
     histo_smooth, histo_soap_bubble_zeros_in_place,
 };
@@ -290,7 +290,14 @@ pub fn region_histogram(
         return Ok(Ret::Null);
     }
     histo_clear_in_place(h);
-    histo_init(g, err, Some(&mut *h), nbins, f64::from(fmin), f64::from(fmax))?;
+    histo_init(
+        g,
+        err,
+        Some(&mut *h),
+        nbins,
+        f64::from(fmin),
+        f64::from(fmax),
+    )?;
     let (x0, x1, y0, y1, z0, z1) = clip(mri, region);
     for b in 0..nbins.max(0) {
         let v = add(mul(b as f32, h.bin_size), fmin);
@@ -354,7 +361,14 @@ pub fn mri_histogram(
         fmax = 255.0;
     }
     let mut h = alloc(g, err, nbins)?;
-    histo_init(g, err, Some(&mut h), nbins, f64::from(fmin), f64::from(fmax))?;
+    histo_init(
+        g,
+        err,
+        Some(&mut h),
+        nbins,
+        f64::from(fmin),
+        f64::from(fmax),
+    )?;
     for frame in 0..mri.nframes {
         for z in 0..mri.vg.depth {
             for y in 0..mri.vg.height {
@@ -418,7 +432,10 @@ pub fn mri_get_equalize_histo(
             total as f32
         };
         wr(g, &mut eq.counts, i, v, WHAT);
-        let have = usize::try_from(i).ok().and_then(|k| eq.bins.get(k)).copied();
+        let have = usize::try_from(i)
+            .ok()
+            .and_then(|k| eq.bins.get(k))
+            .copied();
         if have.is_some_and(|b| b != i as f32) {
             g.notices.add(
                 &FS_500,
@@ -533,7 +550,14 @@ pub fn mri_histogram_label_region(
         nbins = span_bins(g, fmin, fmax);
     }
     let mut h = alloc(g, err, nbins)?;
-    histo_init(g, err, Some(&mut h), nbins, f64::from(fmin), f64::from(fmax))?;
+    histo_init(
+        g,
+        err,
+        Some(&mut h),
+        nbins,
+        f64::from(fmin),
+        f64::from(fmax),
+    )?;
     if fequal(fmin, fmax) {
         h.bin_size = 1.0;
         log::error_printf(g, err, ERROR_BADPARM, &format!("{WHAT}: constant image"));
@@ -565,15 +589,8 @@ pub fn mri_histogram_label_region(
                         div(v.wrapping_sub(bmin) as f32, h.bin_size)
                     }
                     MRI_FLOAT => {
-                        let v = rows::read(
-                            g,
-                            WHAT,
-                            mri,
-                            i64::from(z),
-                            i64::from(y),
-                            i64::from(x),
-                            ty,
-                        );
+                        let v =
+                            rows::read(g, WHAT, mri, i64::from(z), i64::from(y), i64::from(x), ty);
                         div(sub(v.f(), fmin), h.bin_size)
                     }
                     _ => {
@@ -617,7 +634,14 @@ pub fn mri_histogram_label(
         nbins = span_bins(g, fmin, fmax);
     }
     let mut h = alloc(g, err, nbins)?;
-    histo_init(g, err, Some(&mut h), nbins, f64::from(fmin), f64::from(fmax))?;
+    histo_init(
+        g,
+        err,
+        Some(&mut h),
+        nbins,
+        f64::from(fmin),
+        f64::from(fmax),
+    )?;
     let ty = mri.mtype;
     let lab = label as f32;
     for z in 0..mri.vg.depth {
@@ -643,15 +667,8 @@ pub fn mri_histogram_label(
                         div(v.wrapping_sub(bmin) as f32, h.bin_size)
                     }
                     MRI_FLOAT => {
-                        let v = rows::read(
-                            g,
-                            WHAT,
-                            mri,
-                            i64::from(z),
-                            i64::from(y),
-                            i64::from(x),
-                            ty,
-                        );
+                        let v =
+                            rows::read(g, WHAT, mri, i64::from(z), i64::from(y), i64::from(x), ty);
                         div(sub(v.f(), fmin), h.bin_size)
                     }
                     _ => {
@@ -712,7 +729,14 @@ pub fn mri_histogram_voxel(
     let mut fresh = None;
     let h = prepare(g, err, histo, nbins, &mut fresh)?;
     histo_clear_in_place(h);
-    histo_init(g, err, Some(&mut *h), nbins, f64::from(fmin), f64::from(fmax))?;
+    histo_init(
+        g,
+        err,
+        Some(&mut *h),
+        nbins,
+        f64::from(fmin),
+        f64::from(fmax),
+    )?;
     match mri_thresh {
         None => {
             region_histogram(g, err, mri, nbins, Some(&mut *h), &region)?;
@@ -781,9 +805,23 @@ pub fn mri_histogram_region_with_threshold(
     // the per-thread histograms: allocated and set over the range, the first one filled
     let mut t0 = alloc(g, err, nbins)?;
     histo_clear_in_place(&mut t0);
-    histo_init(g, err, Some(&mut t0), nbins, f64::from(fmin), f64::from(fmax))?;
+    histo_init(
+        g,
+        err,
+        Some(&mut t0),
+        nbins,
+        f64::from(fmin),
+        f64::from(fmax),
+    )?;
     histo_clear_in_place(h);
-    histo_init(g, err, Some(&mut *h), nbins, f64::from(fmin), f64::from(fmax))?;
+    histo_init(
+        g,
+        err,
+        Some(&mut *h),
+        nbins,
+        f64::from(fmin),
+        f64::from(fmax),
+    )?;
     for z in z0..z1 {
         for y in y0..y1 {
             for x in x0..x1 {
@@ -863,7 +901,15 @@ pub fn mri_histo_segment(
             for x in 0..width {
                 let xl = i64::from(x);
                 let label = byte(rows::read(g, WHAT, lab, zl, yl, xl, MRI_UCHAR));
-                let in_val = byte(rows::read(g, WHAT, src.unwrap_or(lab), zl, yl, xl, MRI_UCHAR));
+                let in_val = byte(rows::read(
+                    g,
+                    WHAT,
+                    src.unwrap_or(lab),
+                    zl,
+                    yl,
+                    xl,
+                    MRI_UCHAR,
+                ));
                 if label != MRI_AMBIGUOUS {
                     continue;
                 }
@@ -886,7 +932,9 @@ pub fn mri_histo_segment(
                         g,
                         err,
                         ERROR_UNSUPPORTED,
-                        &format!("{WHAT}: no region histogram to smooth (FreeSurfer crashes here)\n"),
+                        &format!(
+                            "{WHAT}: no region histogram to smooth (FreeSurfer crashes here)\n"
+                        ),
                     )?;
                     return Ok(Ret::Null);
                 };

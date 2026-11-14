@@ -7264,7 +7264,11 @@ fn r24_fill_paint(g: &mut Gen, t: &mut Vec<String>, s: Shape, fills: &[&[f32]], 
             f32::NEG_INFINITY,
             4096.5,
         ];
-        t.push(fx(if g.chance(12) { g.pick(&odd) } else { g.pick(l) }));
+        t.push(fx(if g.chance(12) {
+            g.pick(&odd)
+        } else {
+            g.pick(l)
+        }));
     }
 }
 

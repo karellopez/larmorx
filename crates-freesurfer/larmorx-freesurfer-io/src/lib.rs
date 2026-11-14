@@ -36,6 +36,7 @@ pub mod minc;
 pub mod mosaic;
 pub mod mriio;
 pub mod mriio_old;
+pub mod mriio_write;
 pub mod pointset;
 pub mod registerio;
 pub mod signa;

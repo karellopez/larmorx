@@ -562,7 +562,6 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
         BRIK_FILE => "AFNI BRIK",
         MGH_MORPH => "GCA morph (m3z)",
         ITK_MORPH => "ITK warp",
-        MRI_MGH_FILE => "MGH",
         GDF_FILE => "GDF",
         NIFTI1_FILE => "NIfTI-1",
         NII_FILE => "NIfTI",
@@ -619,10 +618,10 @@ pub fn mri_write_type(
     err: &mut dyn Write,
     env: &Environment,
     dir: Option<&Path>,
-    m: &Mri,
+    m: &mut Mri,
     fname: &str,
     mtype: i32,
-    _intent: i32,
+    intent: i32,
 ) -> Result<i32, Fatal> {
     use crate::identify::*;
     if mtype != MRI_CORONAL_SLICE_DIRECTORY
@@ -672,6 +671,8 @@ pub fn mri_write_type(
     let error = if mtype == GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mri_write_gifti(g, &mut io, dir, m, fname)?
+    } else if mtype == MRI_MGH_FILE {
+        crate::mriio_write::mgh_write(g, out, err, env, dir, m, fname, -1, intent)?
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,
@@ -731,9 +732,9 @@ pub fn mri_write(
     err: &mut dyn Write,
     env: &Environment,
     dir: Option<&Path>,
-    m: &Mri,
+    m: &mut Mri,
     fname: &str,
-    several: Option<&[Mri]>,
+    several: Option<&mut [Mri]>,
     intent: i32,
 ) -> Result<i32, Fatal> {
     larmorx_freesurfer_core::chklc::chklc();
@@ -765,7 +766,7 @@ pub fn mri_write(
     };
     let ext = ext.unwrap_or_else(|| b"(null)".to_vec());
     let mut error = NO_ERROR;
-    for (n, v) in vs.iter().enumerate() {
+    for (n, v) in vs.iter_mut().enumerate() {
         let mut name = stem.to_vec();
         if v.len_fname_post_fixes == 0 {
             name.extend_from_slice(format!("_{n}").as_bytes());

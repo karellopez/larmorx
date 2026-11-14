@@ -47,12 +47,22 @@ pub fn mri_write_frame(
             ),
         )?;
     }
-    let tmp = match mri_copy_frame(g, out, err, Pair::New(mri), frame, 0)? {
+    let mut tmp = match mri_copy_frame(g, out, err, Pair::New(mri), frame, 0)? {
         Ret::New(m) => m,
         // not reached: frame 0 of a new one-frame volume is always in range
         _ => return Ok(ERROR_BADPARM),
     };
-    let r = mri_write(g, out, err, env, dir, &tmp, fname, None, MGZ_INTENT_UNKNOWN)?;
+    let r = mri_write(
+        g,
+        out,
+        err,
+        env,
+        dir,
+        &mut tmp,
+        fname,
+        None,
+        MGZ_INTENT_UNKNOWN,
+    )?;
     if r == NO_ERROR {
         return Ok(NO_ERROR);
     }

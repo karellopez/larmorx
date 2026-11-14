@@ -1741,6 +1741,18 @@ defects! {
         "converting a label of a surface from voxel coordinates to tkregister (surface) RAS converts each point the other way, as a tkregister RAS point to a voxel: wrong coordinates";
     FS_438 = "FS-438", "FreeSurfer", true,
         "writing one frame of a volume to a file reports success when the file could not be written (an unknown format, a missing folder)";
+    FS_439 = "FS-439", "FreeSurfer", true,
+        "writing an MGH volume of a type the MGH writer does not handle (long, RGB, tensor, bitmap, double complex), or whose byte rows fail to write, ends with an error but leaves the file open: a compressed .mgz file stays empty and an uncompressed .mgh file holds only what was written before the error";
+    FS_440 = "FS-440", "FreeSurfer", true,
+        "writing an MGH volume reports success when the file could not be written in full (a full disk, a failed compression): only a byte volume's rows are checked";
+    FS_441 = "FS-441", "FreeSurfer", true,
+        "writing an MGH volume (or FreeSurfer's NIfTI header extension) of a volume without frames reads a first frame the volume does not have: memory contents decide whether a frames tag is written";
+    FS_442 = "FS-442", "FreeSurfer", true,
+        "writing one chosen frame of a volume of several frames to an MGH file writes the volume's whole frame count in the header: the file holds fewer frames than its header says and cannot be read back";
+    FS_443 = "FS-443", "FreeSurfer", true,
+        "writing an MGH volume with FS_MGZIO_USEVOXELBUFWRITE set leaves the volume's own voxels byte-swapped in memory: the program's volume is wrong after the write";
+    FS_444 = "FS-444", "FreeSurfer", true,
+        "writing one chosen frame that the volume does not have to an MGH file reads memory outside the volume";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

@@ -908,12 +908,30 @@ fn answer(
             setup(w, tk.next());
             let nv = tk.int();
             let usevec = tk.int() != 0;
-            let vs: Vec<Mri> = (0..nv).map(|_| read_volume(g, &mut tk)).collect();
+            let mut vs: Vec<Mri> = (0..nv).map(|_| read_volume(g, &mut tk)).collect();
             let name = tk.string();
             g.errno = 0;
-            let several = if usevec { Some(&vs[..]) } else { None };
-            let r = mriio::mri_write(g, out, err, &env, dir, &vs[0], &name, several, -1)
-                .map_err(fatal)?;
+            // FreeSurfer's first volume is the vector's first: with several, only the vector's are
+            // written (a copy stands for the first); with one, the first itself
+            let r = if usevec && vs.len() > 1 {
+                let (mut s1, mut s2) = (Vec::new(), Vec::new());
+                let mut first =
+                    mri::mri_alloc_header(g, &mut s1, &mut s2, 1, 1, 1, mri::MRI_UCHAR, 1).unwrap();
+                mriio::mri_write(
+                    g,
+                    out,
+                    err,
+                    &env,
+                    dir,
+                    &mut first,
+                    &name,
+                    Some(&mut vs[..]),
+                    -1,
+                )
+            } else {
+                mriio::mri_write(g, out, err, &env, dir, &mut vs[0], &name, None, -1)
+            }
+            .map_err(fatal)?;
             o.i(i64::from(r));
             o.i(i64::from(g.errno));
             odir(o, w);

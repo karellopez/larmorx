@@ -243,7 +243,12 @@ pub fn getlen_endtag(addtaglength: bool) -> i64 {
 }
 
 /// `MatrixPrint(stdout, m)`.
-fn print_matrix(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write, m: Option<&Matrix>) {
+pub(crate) fn print_matrix(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: Option<&Matrix>,
+) {
     let mut buf = Vec::new();
     matrix_print(g, Some(&mut buf), out, err, m, 5);
     let _ = out.write_all(&buf);

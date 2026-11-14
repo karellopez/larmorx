@@ -194,3 +194,20 @@ cases: 3,877 identical, 343 not comparable, 4 `MRIconform` resamplings hashed as
 `551daf3a76aa59b45c0fcbccc1ac8c8ba764416f7367e11dd4f0beae5bb74483`. `check.py`'s `SKIP` adds FS-491, FS-493, FS-496,
 FS-497. The port's `run_line` now runs each case on a thread with a 32 MiB stack (the debug build's frame of `case`
 passed a test thread's 2 MiB).
+
+Measured 2026-11-14 (part 15: 3.1-38's `mrihisto.cpp`, relay 24, 220 commands; logs `oracles/logs/fs-found-c-r24-*`):
+`hreg` (`MRIhistogramRegion`), `hvox` (`MRIhistogramVoxel`, with and without a threshold volume), `hthr`
+(`MRIhistogramRegionWithThreshold`), `hist` (`MRIhistogram`), `geq` (`MRIgetEqualizeHisto`), `heq` (`MRIhistoEqualize`),
+`hlr` (`MRIhistogramLabelRegion`), `hlab` (`MRIhistogramLabel`), `hsegm` (`MRIhistoSegment`, labels of 128, with and
+without `DIAG_SHOW`). Volumes are filled by `fill_pat` (two populations around two levels with a spread, from a seed:
+bimodal histograms, so `MRIhistoSegment` finds peaks and valleys: about 40 % of its comparable cases label voxels
+white and non-white); given histograms (`get_histo`: an allocation, the bins in use, old contents) are printed by
+`put_histo` (the bins in use up to the allocation). The generator keeps to bytes, ints, longs, floats, shorts and
+unsigned shorts and values up to 4096.5 (with NaN and infinities): an RGB volume's values span about 2^30 and a
+histogram of one bin per intensity then takes 7 GB on both sides. Seed 7, 1,800 cases: 1,489 identical with
+`reproduce`, 311 not comparable, 0 different; seed 13, 1,800 cases: 1,513 identical, 287 not comparable, 0 different;
+`fix` different only with notices; debug and release identical on seed 13's 1,800 cases in both modes. Not comparable:
+FS-498 (NaN bins: `CRASH 11`), FS-499 (`free(): corrupted unsorted chunks`, `CRASH 6`), FS-501, FS-502 (`CRASH 14`) and
+the shared FS-53, FS-58, FS-289, FS-290. Seed 1, 4,400 cases: 4,076 identical, 324 not comparable, 3 `MRIconform`
+resamplings hashed as `HEAVY`, hash `57e8624ef07b6982203b2398d1e26004c15d18d0836be0363340247b7e170574`. `check.py`'s
+`SKIP` adds FS-498, FS-499, FS-501, FS-502.

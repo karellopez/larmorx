@@ -1074,3 +1074,67 @@ fs.volume's matrices and `MRIcopyFrame`; the orchestrator's layering of 2026-11-
   not ported yet, 23 FS-429); seed 13 (3,000): 2,823 identical, 0 different (177 counted); `fix` differs
   only with notices (FS-437, FS-438, FS-01, FS-12, FS-522). In the fsio harness the surface is
   `MRISalloc(0, 0)` with its `vg` read from the case.
+
+## Part 13: MGH and MGZ written (relay 23 of track A)
+
+Restricted (FreeSurfer's internals). Behaviour: `specs/freesurfer-io.md` §90-92. The port:
+larmorx-freesurfer-io's `mriio_write.rs` (`mgh_write`, `mri_tag_write`), wired into `mriio.rs`'s
+`mri_write_type`.
+
+### Mechanisms
+- `mghWrite` (mriio.cpp 11247-11518) writes each number with `znzwriteInt`/`znzwriteShort`/
+  `znzwriteFloat` and ignores their counts; only the `MRI_UCHAR` row (`znzwrite(&MRIseq_vox(mri, 0, y,
+  z, frame), 1, width, fp) != width`) is checked. Its `default:` (`MRI_LONG`, `MRI_RGB`, `MRI_TENSOR`,
+  `MRI_BITMAP`, `MRI_DOUBLE_COMPLEX`) and that row's error `ErrorReturn` without `znzclose(fp)`
+  (FS-439): the `gzFile`'s input buffer (8 KiB in zlib 1.2.11's `gz_init`) still holds the 284-byte
+  header, never compressed (the file `gzopen` created stays empty); a plain `FILE` keeps it in its
+  buffer until `exit` flushes the streams (the probe calls `fflush(NULL)` after the write, which shows
+  the same state). `znzclose(fp)`'s result is ignored (FS-440).
+- `FS_MGZIO_USEVOXELBUFWRITE` (11357-11427): `voxelbuf = &MRIseq_vox(mri, 0, 0, 0, start_frame)` =
+  `slices[start_frame * depth][0]`; `byteswapbufshort`/`byteswapbuffloat` (bfileio.cpp 81-117) swap
+  `bytes_per_slice` bytes of the volume's own chunk in place before each `znzwrite` (FS-443: never
+  swapped back). `bytes_per_voxel == 8` (`MRI_LONG`, `MRI_FLOAT_COMPLEX`) is swapped in 4-byte
+  groups. `MRI::initSlices` (mri.cpp 260-305) advances the row pointer for uchar, short, ushort, RGB,
+  int, long, float and (by `bytes_per_vox * vox_per_row`) float complex only: a tensor's rows all point
+  at the chunk's start, so the write starts there whatever the frame. With `depth * nframes == 0`,
+  `slices` is `calloc(0)` and `slices[0]` is read past it (FS-445: SIGSEGV in the probe).
+- `MRI::ischunked` is an `int` without an initialiser (mri.h 826) and the constructor returns before
+  setting it when `alloc` is false (mri.cpp 231): a header-only volume's flag is heap contents
+  (FS-446; in the probe it was non-zero, and the voxel-buffer branch then crashed on `slices`, NULL).
+- `MRITAGwrite` (12421-12534) tests `mri->frames[0].label` and `FZERO(mri->frames[0].thresh)`
+  (`fabs(f) < FLT_EPSILON`, macros.h 80) without checking `nframes`: `frames` is `calloc(nframes,
+  sizeof(MRI_FRAME))` (mri.cpp 211), past its end for 0 frames (FS-441). The `#if 0` block of
+  `tag_data` is not compiled.
+- With a chosen frame (`frame >= 0`) the header's `nframes` is still `mri->nframes` (FS-442); no
+  FreeSurfer caller passes a frame (MRIwriteType, MRISurfOverlay.cpp 195: -1). A frame at or beyond
+  `nframes` reads beyond the chunk through `MRISseq_vox` (FS-444).
+- `exec_progress_callback` (utils.cpp 1551) does nothing without `progress_callback` (only freeview
+  sets one).
+
+### Found while comparing (the probe's other pieces)
+- The tag readers' `znzreadInt` at the end of the file was noted as FS-167 (memory contents) although
+  `znzTAGreadStart` (tags.cpp) and `FStagsIO::read_tagid_len` return 0 at `znzeof` and never use the
+  number: 139 of 588 `mgw` cases were marked VARY for it. Without the spurious notice four reader
+  differences showed (fixed): `mghRead`'s header-alone skip of a negative byte count (an unknown type's
+  size -1) is `znzseek(fp, total_bytes, SEEK_CUR)`, glibc's `fseek` failing with EINVAL, which
+  `mri_read` then leaves in `errno`; `FileExists("")` (utils.cpp 445: `fopen("", "r")`, ENOENT) for an
+  empty `TAG_MGH_XFORM` name, where the port's `resolve(dir, "")` opened the folder.
+- gifti.cpp 2950 (`readLabelTable`) `malloc`s each colour entry without setting `TissueType` and
+  `count` (heap contents: in one seed-13 case the bytes of the XML text, `959723828`); the probe's
+  `mgi` now leaves them out on both sides, as for `CTABalloc`'s entries (track D's reader: a notice to
+  add there).
+- Windows: `minc::input_transform_file` joined the program's folder to a relative name and volume_io's
+  `expand_filename` (in `reproduce`, FS-79) took the folder's backslashes for escapes, twice (the
+  existence check and the open both expand): a label's `talairach.xfm` was not found (seed 1's case
+  1194). The folder is now given with `/`.
+
+### Measured (piece 14 and the re-runs, 2026-11-14, the probe, the unit oracle's build)
+- `mgw` seed 7 (588 cases): `reproduce` identical on 495, 0 different (69 SKIP, 24 VARY); seed 13,
+  10,294 cases of `mgw`, `mwr`, `mgr`, `mrd`, `mrh`, `mri`, `mgi`: identical on 8,056, 0 different
+  (1,838 SKIP, 400 VARY); seed 7, 12,000 cases of every command: 10,807 identical, 0 different; piece
+  13 seed 13, 3,000: 2,930 identical, 0 different (70 SKIP: FS-429); `fix` differs only with notices.
+- The recorded tests re-recorded: `fs_io_official` 9e99627e... (4,799 cases, 4,327 identical, 472
+  counted), `fs_io13_official` 3dbe8afd... (1,200, 1,174 identical, 26 counted); both pass under the
+  ARM NaN emulation (debug and release) and on Windows x64 (the cross-check tool on the Windows
+  laptop; seed 1's set compared case by case: only the probe's relative-folder `bvw` artefact).
+

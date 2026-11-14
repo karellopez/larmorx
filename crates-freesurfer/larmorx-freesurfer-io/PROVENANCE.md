@@ -261,3 +261,24 @@ values through `larmorx_core::json` (track C's port), its uncaught exceptions as
 (status 1) or, with `reproduce`, the abort's lines and status 134. `errno` set as FreeSurfer leaves it
 after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `gifti_common.rs` and
 `gifti_vol.rs`.
+
+## FreeSurfer files and functions translated (part 13, relay 23 of track A: MGH and MGZ written)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mriio.cpp` 11247-11518; `include/mri.h` 2027 | `mghWrite` (FS-439 to FS-446, FS-58) | `mriio_write.rs` |
+| `utils/mriio.cpp` 12421-12534 | `MRITAGwrite` (FS-441) | `mriio_write.rs` |
+| `utils/mriio.cpp` 1197-1198 | `MRIwriteType`'s MGH branch | `mriio.rs` |
+| `utils/utils.cpp` 1551-1556 | `exec_progress_callback` (no callback in the port's programs: nothing) | (not translated) |
+
+Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
+the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte
+volume's rows stay one write each, as their count is checked); a compressed file's bytes are
+zlib-rs's (`larmorx_io::znz`), the stream they inflate to FreeSurfer's. `MRIwriteType` and `MRIwrite`
+take the volume mutably (FreeSurfer's `mghWrite` changes its intent and version). FS-440's check of
+the writes and the close is larmorx's own (FreeSurfer has none). The tag readers' start
+(`znzTAGreadStart`, `FStagsIO::read_tagid_len`) no longer notes FS-167 for a number cut by the end of
+the file, which they do not use; `mghRead`'s skip before the file's start sets `errno` EINVAL (glibc's
+`fseek`); `utils::resolve` keeps an empty name empty (`FileExists("")` is false in FreeSurfer: the
+folder opened instead); `minc::input_transform_file` gives volume_io the program's folder with `/`
+on Windows (volume_io's escape, FS-79's `reproduce`, dropped its backslashes).

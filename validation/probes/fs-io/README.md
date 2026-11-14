@@ -150,6 +150,20 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `SKIP` for the writers not ported yet and FS-429. Seed 7, 1,000 cases: `reproduce` identical on 947, 0 different;
   seed 13, 3,000: 2,823 identical, 0 different. The recorded test `fs_io13_official` (seed 1's 1,200: `--seed 1
   --n 1200 --portable --light`).
+- Piece 14 (track A relay 23): `mgw` (`mghWrite` with a chosen frame and an intent, or `MRIwrite` with b-values beside
+  the volume, `FS_MGZIO_USEVOXELBUFWRITE` set or not) of a volume given with every field the MGH writer writes (`read_mri14`:
+  extent, type, frames, voxels or none, geometry and RAS flag, TR, TE, TI, field of view, flip angle, field strength,
+  degrees of freedom, the buffer's bytes, the transform's name, the phase-encoding direction, command lines, the first
+  frame's label and threshold, the auto-align and original RAS-to-voxel matrices, a GCA morph's fields, a piece-10
+  colour table, b-values); printed: the status, `errno`, the volume's intent, version and voxels after the call, every
+  file under `w`, and one case in two the file read back with `mghRead` (piece 6's printing). Every written file whose
+  bytes start a gzip stream is printed inflated (`gz:` and the stream's bytes: zlib 1.2.11's compressed bytes here,
+  zlib-rs's in the port), in pieces 12, 13 and 14 alike. After the write `fsio` calls `fflush(NULL)`, so a file
+  FreeSurfer leaves open (FS-439) shows what the program's end would write. `SKIP` for FS-58, FS-441, FS-444, FS-445,
+  FS-446 and the read back of files whose header does not match their data (piece 6's rules); `VARY` for FS-49,
+  FS-167, FS-421. Seed 7, 588 `mgw` cases: `reproduce` identical on 495, 0 different; seed 13, 10,294 cases of `mgw`,
+  `mwr`, `mgr`, `mrd`, `mrh`, `mri`, `mgi`: identical on 8,056, 0 different. Since relay 23 `mgi` prints the GIFTI
+  reader's colour-table entries without their tissue type and count (memory contents in FreeSurfer).
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

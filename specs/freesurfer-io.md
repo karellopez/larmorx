@@ -16,8 +16,9 @@ piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and 
 Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 9** (§65-74, queue item
 3.1-33's first piece, fs.labels): text colour tables, their lookups, random colours, tissue-type
 schemas; §75 (3.1-34): the rest of the registration files; part 10 (§76-82): labels, control points,
-annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; **part 12**
-(§87-89): a label's coordinates converted, one frame of a volume written.
+annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; part 12
+(§87-89): a label's coordinates converted, one frame of a volume written; **part 13** (§90-92): MGH and
+MGZ volumes written, the tags written after them.
 
 ## 1. Conventions
 
@@ -1176,7 +1177,9 @@ floats). A tensor volume (type 6) has 9 frames whatever the header says. The int
   extents that are not above 0), then the data skipped: `frames x width x height x depth x bytes per
   voxel` bytes (64-bit arithmetic; an unknown type's size is -1), read in pieces of 1,024 bytes and
   a last piece in a compressed file (FS-76: a last piece of 0 bytes, a volume without voxels,
-  divides by zero in FreeSurfer: no read, noted), passed over in a plain one.
+  divides by zero in FreeSurfer: no read, noted), passed over in a plain one (a negative count that
+  would go before the file's start fails: `errno` EINVAL, 22, and reading goes on where it was; the
+  same for the data before a chosen frame).
 - **The voxels:** frame 0 or more reads that frame alone (the data before it passed over), below
   -1 the first `-frame` frames, -1 all. The bytes per slice are `width x height x bytes per voxel` in
   a 32-bit `int` (a negative count: `errno` ENOMEM, the C library's failed allocation). Each slice
@@ -2100,7 +2103,7 @@ beside it: `Saving bvals and bvecs` on standard output, `<stem>.bvals` and
 `<stem>.<scanner|voxel|unknown>_space.bvecs` (§ on `DTIwriteBValues`/`DTIwriteBVectors`), the stem the
 name without its volume extension (`IDstemFromName`; none: nothing more written). Not ported yet in
 larmorx (a message, status -1): COR, MINC, image, `.bhdr`, bshort, bfloat, ANALYZE, ANALYZE 4D, BRIK,
-GCA and ITK morphs, MGH/MGZ, GDF, NIfTI-1, NIfTI, NRRD.
+GCA and ITK morphs, GDF, NIfTI-1, NIfTI, NRRD. MGH and MGZ: §90 (`mghWrite(mri, name, -1, intent)`).
 
 ## 85. Reading point sets (`loadfsPointSet`)
 
@@ -2218,3 +2221,116 @@ writer is not ported yet and FS-429's are counted, not compared. Measured (2026-
 2,823, 0 different (177 counted); `fix` differs only with notices (FS-437, FS-438, FS-01, FS-12,
 FS-522). The recorded test (`tests/fs_io13_official.rs`): seed 1's first 1,200 cases, 1,145 lines
 identical, 55 counted.
+
+## 90. MGH and MGZ written (`mghWrite(mri, name, frame, intent)`)
+
+The name: compressed (gzip) when its last extension is `mgz` in any case or it holds `mgh.gz`
+anywhere, plain when the last extension is `mgh` in any case; any other name (none, or no dot):
+`mghWrite: filename '<name>' needs to have an extension of .mgh or .mgz` (`ERROR_BADPARM`, -4,
+`errno` 0, nothing written). The file is created or emptied (`mghWrite(<name>, <frame>): could not
+open file`, -4, `errno` 0, when it does not open: a missing folder, a folder of that name).
+
+- **The intent:** an `intent` other than -1 becomes the volume's intent and its version
+  `((intent & 0xffff) << 8) | 1`; the volume keeps both after the call (a later write sees them).
+- **The header** (284 bytes, big-endian): the version, width, height, depth, the frame count,
+  type and degrees of freedom (32-bit `int`s); the RAS flag as a `short`, 1 when the volume's flag
+  is not 0, else -1; then always the fifteen floats (x, y, z voxel sizes; the x, y and z direction
+  cosines; the centre), whatever the flag; then 194 zero bytes. FS-442: with one chosen frame
+  (`frame` 0 or more) of a volume of several, FreeSurfer still writes the volume's frame count (the
+  file holds one frame and cannot be read back); `fix` writes 1, `reproduce` the count (notice
+  either way).
+- **The voxels**, all frames for `frame` below 0, else that frame alone; frame by frame, slice by
+  slice, row by row, each number big-endian: uchar as is, short and unsigned short (2 bytes), int and
+  float (4 bytes), float complex as the real then the imaginary float of each voxel. Any other type
+  (long, RGB, tensor, bitmap, double complex, unknown), as soon as there is a row to write (depth,
+  height and frames all above 0): `mghWrite: unsupported type <t>` (`ERROR_UNSUPPORTED`, -3, `errno`
+  0). A byte row that does not write in full (a full disk): `mghWrite: could not write <width> bytes
+  to <name>` (`ERROR_BADFILE`, -5). FS-439: after either error FreeSurfer leaves the file open: a
+  compressed file stays empty (its compressor still held the header), a plain one holds the header
+  once the program ends; `fix` closes the file (the header written, compressed or not), `reproduce`
+  leaves it as FreeSurfer does (notice either way). A volume made without voxels (a header read
+  alone): FreeSurfer crashes at the first row of a uchar volume, at the first voxel of the other
+  types it writes (FS-58: the program ends with `mghWrite(): the volume has no voxels (FreeSurfer
+  crashes here)`). FS-444: a chosen frame the volume does not have: FreeSurfer reads memory outside the
+  volume; `fix` refuses before opening the file (`mghWrite(<name>, <frame>): the volume has <n>
+  frames`, -4), `reproduce` writes zeros for it (notice).
+- **`FS_MGZIO_USEVOXELBUFWRITE` set** (a volume with voxels; FS-446: a volume made without voxels has
+  this choice from memory contents in FreeSurfer, taken as "no" in both modes, noted): `INFO:
+  Environment variable FS_MGZIO_USEVOXELBUFWRITE set` and `mghWrite(): output voxel bufer ...` on
+  standard output, then the voxels as stored, slice after slice (`width x height x bytes per voxel`
+  bytes each, the voxel size from the type: 1, 2, 4 or 8, as a 32-bit product), every type (long,
+  RGB and tensor too) with 2-byte numbers swapped in pairs and 4- and 8-byte numbers in 4-byte groups,
+  from the chosen frame's start (a tensor volume: always from the voxels' start); a slice that does
+  not write in full: the file closed, `mghWrite: (FS_MGZIO_USEVOXELBUFWRITE) could not write <n>
+  bytes, wrote only <m> bytes` (-5). FS-443: FreeSurfer swaps the volume's own voxels in place and
+  leaves them swapped; `fix` leaves the volume as it was, `reproduce` swaps it (notice). FS-445: a
+  volume without slices (depth or frames 0) crashes FreeSurfer; both modes write no voxels (notice).
+- **The scan parameters:** TR, the flip angle (rounded to a float), TE, TI and the field of view
+  (big-endian floats).
+- **The tags** (§91), then the file is closed. The status is 0. FS-440: FreeSurfer checks no write
+  but a byte row's and ignores the close: a file that could not be written in full (a full disk)
+  still gives 0; `fix` gives `mghWrite: could not write <name>` (-5) when a write or the close
+  failed, `reproduce` 0 (notice either way). (larmorx's plain files are unbuffered: a failed write
+  shows at once, where glibc's buffered stream shows it at a later flush.)
+- **Messages:** `FS_MGZIO_TIMING` set: `INFO: Environment variable FS_MGZIO_TIMING set` first and
+  `Total time (mghWrite) = <s>.<ns> seconds` (+ ` (USEVOXELBUF)`) after the voxels. With `Gdiag` bit
+  `DIAG_INFO`: `[DEBUG] mghWrite() intent (user) = <intent>, mri->intent (new) = <i>, mri->version
+  (new) = <v>`, `[DEBUG] mghWrite() fpos = <position %-6lld> (after header, before 4D data)`, for a
+  float complex volume `[DEBUG] [<x> <y> <z> <frame>] real = <%f>, imag = <%f>` per voxel, `[DEBUG]
+  mghWrite() fpos = <%-6lld> (after 4D data, before scan parameters)`, `[DEBUG] tr = <%.6f>, flip_angle
+  = <%.6f>, te = <%.6f>, ti = <%.6f>, fov = <%.6f>` and `[DEBUG] mghWrite() fpos = <%-6lld> (after scan
+  parameters, before TAG)`; positions are uncompressed byte counts.
+- The compressed stream: zlib's gzip file at its default level. The bytes a decompressor gets are
+  the contract; the compressed bytes themselves may differ between deflate implementations (larmorx's
+  are zlib-rs's).
+
+## 91. The tags written after the voxels (`MRITAGwrite(mri, fp, niftiheaderext)`)
+
+In this order, with §16's writers (an `.mgz` here; FreeSurfer's NIfTI extension is
+`niftiheaderext`):
+
+- A GCA morph (its warp-field format set, not -1): its image and atlas geometries shearless (tag
+  10), the same with their shears (tag 15), the metadata (format, spacing, the exponent; with
+  `DIAG_INFO` first `[DEBUG] MRITAGwrite() TAG_GCAMORPH_META dlen = 12, warpFieldFormat = <f>,
+  gcamorphSpacing = <s>, gcamorphExp_k = <%.6f>`), the affine matrix when it has one (tag 14; with
+  `DIAG_INFO` `[DEBUG] MRITAGwrite() TAG_GCAMORPH_AFFINE` and the matrix), the labels when it has them
+  (tag 12, `width x height x depth`; with `DIAG_INFO` `[DEBUG] MRITAGwrite() TAG_GCAMORPH_LABELS`), in
+  the extension the end tag; nothing else.
+- Otherwise: in the extension the degrees of freedom, the scan parameters, the RAS transform and its
+  extra part; the talairach transform's name with its NUL (tag 31) when it is not empty; the
+  auto-align matrix (tag 33) when there is one; in an `.mgz` the phase-encoding direction with its
+  NUL (tag 41), or `UNKNOWN` without one (7 bytes) when there is none; the original RAS-to-voxel
+  matrix (tag 44, `saving original ras2vox` on standard output first) when there is one; in an `.mgz`
+  the field strength as 4 bytes in the machine's (little-endian) order (tag 43); the frames (tag 42)
+  when there is more than one or the first has a label other than 0 or a threshold of at least
+  `FLT_EPSILON` in magnitude (FS-441: a volume without frames: FreeSurfer reads a first frame it does
+  not have; both modes write no frames tag, noted); the colour table (tag 2, §13) when there is one;
+  each command line with its NUL (tag 3); in the extension the end tag.
+
+## 92. Validation plan (part 13)
+
+The probe's piece 14 (`validation/probes/fs-io/`, `mgw`): `mghWrite` called directly (a chosen frame:
+-1, -3, each frame, the frame count; intents -1, 0 to 5, 65,539, -7) or through `MRIwrite` (b-values
+beside the volume), on volumes of 0 to 6 by 1 to 3 by 0 to 2 voxels and 0 to 3 frames, with and
+without voxels, of the types uchar, short, unsigned short, int, float, float complex, long, RGB and
+tensor, the voxels' bytes random or zero; geometries with and without the RAS flag (1, 0, -1, 2);
+scan parameters including NaN, infinity, a subnormal and `-0`; the flip angle as a double (NaN,
+`1e-50`, `1e300`); field strengths, degrees of freedom, the transform's name (none, empty, relative,
+absolute), the phase-encoding direction (none, empty, `ROW`, `COL`), 0 to 3 command lines, the first
+frame's label and threshold (around `FLT_EPSILON`), auto-align and original RAS-to-voxel matrices
+(3 x 3 and 4 x 4), GCA morph fields (geometries with names copied over earlier names, an affine,
+labels), a colour table (piece 10's); `FS_MGZIO_USEVOXELBUFWRITE` set one case in six; `Gdiag` 0,
+`DIAG_INFO`, `DIAG_SHOW`; names `.mgz`, `.MGZ`, `.mgh`, `.MGH`, `.mgh.gz`, `a.b.mgh.gz.x`, `.mgz`
+alone, `.mgz.mgh`, `.nii`, none, a missing folder, an existing folder. Printed: the status, `errno`,
+the volume's intent, version and voxels after the call, every file under the case's folder (a gzip
+stream inflated: the compressed bytes are not compared, §90) and, one case in two, the file read back
+with `mghRead`. Counted, not compared: FreeSurfer's crashes and memory contents (FS-58, FS-441,
+FS-444, FS-445, FS-446) and the read back of files whose header does not match their data (FS-442's
+`reproduce`, a tensor written from the voxel block: FreeSurfer's reader then meets garbage, §43-44).
+Piece 12's `mwr` and piece 13's `mwf` `.mgz` cases are compared the same way. Measured (2026-11-14):
+seed 7, 588 `mgw` cases: `reproduce` identical on 495, 0 different (93 counted); seed 13, 10,294 cases
+of `mgw`, `mwr`, `mgr`, `mrd`, `mrh`, `mri`, `mgi`: identical on 8,056, 0 different; seed 7, 12,000
+cases of every command: identical on 10,807, 0 different; piece 13 seed 13, 3,000: identical on
+2,930, 0 different; `fix` differs only with notices (FS-01, FS-439, FS-442, FS-443). The recorded
+tests (`tests/fs_io_official.rs`: 4,799 cases, 4,327 identical, 472 counted; `fs_io13_official`: 1,200,
+1,174 identical, 26 counted) on every platform.

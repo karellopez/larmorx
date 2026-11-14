@@ -14,11 +14,12 @@
 //! writer's reader), piece 15's two (NIfTI files and NIfTI-1 pairs read), piece 16's three (ANALYZE
 //! pairs and SPM series read and written), piece 17's three (COR folders and bshort, bfloat and
 //! bhdr volumes read and written), piece 18's two (GDF and SDT volumes read), piece 19's four (GE
-//! Genesis and GE LX series: FreeSurfer's crash, and its readers with that line corrected) and piece
-//! 20's two (GE Signa and GE XIMG series), without those that take seconds in a debug build,
+//! Genesis and GE LX series: FreeSurfer's crash, and its readers with that line corrected), piece
+//! 20's two (GE Signa and GE XIMG series) and piece 21's two (old Siemens .ima series), without
+//! those that take seconds in a debug build,
 //! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 28, with pieces 19
-//! and 20: 4,798 cases, 4,344 lines identical, 39 of them with memory digits; 454 hashed as
+//! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 29, with piece 21:
+//! 4,798 cases, 4,330 lines identical, 49 of them with memory digits; 468 hashed as
 //! `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
@@ -40,8 +41,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "e1397e6f0c68ed2dcf221f41ccbc1a55b48d2c0cf0d2b95f399a2c0db3bd9386";
-const SKIPPED: usize = 454;
+const OFFICIAL_SHA256: &str = "bc1780d7975aeffbedf9612236783f23b3f26447b4fa776129f41a1f2dfc8e0f";
+const SKIPPED: usize = 468;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

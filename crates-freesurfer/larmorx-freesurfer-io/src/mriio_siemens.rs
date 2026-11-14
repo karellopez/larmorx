@@ -638,3 +638,168 @@ fn fail(g: &mut Globals, err: &mut dyn Write, code: i32, message: &str) -> Optio
     log::error_printf(g, err, code, message);
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    fn put(b: &mut Vec<u8>, at: usize, v: &[u8]) {
+        if b.len() < at + v.len() {
+            b.resize(at + v.len(), 0);
+        }
+        b[at..at + v.len()].copy_from_slice(v);
+    }
+
+    fn p64(b: &mut Vec<u8>, at: usize, v: f64) {
+        put(b, at, &v.to_be_bytes());
+    }
+    fn p32(b: &mut Vec<u8>, at: usize, v: i32) {
+        put(b, at, &v.to_be_bytes());
+    }
+    fn p16(b: &mut Vec<u8>, at: usize, v: i16) {
+        put(b, at, &v.to_be_bytes());
+    }
+
+    /// A complete structural `.ima` file of `n` x `n` voxels `base + k`, one slice, an axial
+    /// sequence 1.5 mm thick with 1 x 1.25 mm pixels around (1, -2, -3) in file coordinates.
+    fn ima(n: i16, base: i16) -> Vec<u8> {
+        let mut b = vec![0u8; 6144];
+        p64(&mut b, 1544, 1.5); // slice thickness
+        p64(&mut b, 1560, 2000.0); // tr
+        p64(&mut b, 1568, 30.0); // te
+        p64(&mut b, 1576, 900.0); // ti
+        p32(&mut b, 1584, 1); // averages
+        p64(&mut b, 2112, 90.0); // flip angle (degrees)
+        p32(&mut b, 2864, n as i32); // base raw matrix size
+        put(&mut b, 3009, b"fl3d"); // sequence name
+        p64(&mut b, 3744, 256.0); // fov height
+        p64(&mut b, 3752, 240.0); // fov width (ignored)
+        p32(&mut b, 3760, 1); // slice direction
+        p64(&mut b, 3768, 1.0); // image centre sag
+        p64(&mut b, 3776, 2.0); // cor
+        p64(&mut b, 3784, 3.0); // tra
+        p64(&mut b, 3792, 0.0); // normal sag
+        p64(&mut b, 3800, 0.0); // normal cor
+        p64(&mut b, 3808, 1.0); // normal tra
+        p64(&mut b, 3832, 1.0); // column sag
+        p64(&mut b, 3856, 0.0); // row sag
+        p64(&mut b, 3864, 1.0); // row cor
+        p32(&mut b, 4004, 1); // nominal slices
+        p64(&mut b, 4136, 0.0); // distance factor
+        p16(&mut b, 4994, n); // rows
+        p16(&mut b, 4996, n); // cols
+        p64(&mut b, 5000, 1.0); // pixel size row
+        p64(&mut b, 5008, 1.25); // pixel size col
+        for k in 0..(n as i32 * n as i32) {
+            b.extend_from_slice(&(base + k as i16).to_be_bytes());
+        }
+        b
+    }
+
+    fn shorts(m: &Mri) -> Vec<i16> {
+        m.chunk
+            .as_ref()
+            .unwrap()
+            .chunks(2)
+            .map(|c| i16::from_le_bytes([c[0], c[1]]))
+            .collect()
+    }
+
+    /// A three-file structural series reads its geometry and voxels.
+    #[test]
+    fn a_structural_series_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        for n in 3..=5 {
+            std::fs::write(
+                dir.path().join(format!("1-2-{n}.ima")),
+                ima(2, 10 * n as i16),
+            )
+            .unwrap();
+        }
+        let p = Some(dir.path());
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = siemens_read(&mut g, &mut o, &mut e, &env, p, "1-2-4.ima", true)
+            .unwrap()
+            .unwrap();
+        // one slice per file: width, height = base matrix (2); depth = file count (3)
+        assert_eq!(
+            (m.vg.width, m.vg.height, m.vg.depth, m.nframes),
+            (2, 2, 3, 1)
+        );
+        assert_eq!(m.mtype, MRI_SHORT);
+        assert_eq!(
+            shorts(&m),
+            vec![30, 31, 32, 33, 40, 41, 42, 43, 50, 51, 52, 53]
+        );
+        assert_eq!((m.vg.xsize, m.vg.ysize, m.vg.zsize), (1.0, 1.25, 1.5));
+        assert_eq!((m.tr, m.te, m.ti), (2000.0, 30.0, 900.0));
+        assert!((m.flip_angle - std::f64::consts::FRAC_PI_2).abs() < 1e-15);
+        assert_eq!(m.fov, 256.0); // the height, not the width (FS-691)
+        assert_eq!(m.vg.ras_good_flag, 1);
+        // the direction cosines are read and negated as siemensRead does
+        assert_eq!((m.vg.z_r, m.vg.z_a, m.vg.z_s), (0.0, 0.0, -1.0));
+        assert_eq!((m.vg.x_r, m.vg.x_a, m.vg.x_s), (-1.0, 0.0, 0.0));
+        assert_eq!((m.vg.y_r, m.vg.y_a, m.vg.y_s), (0.0, 1.0, 0.0));
+    }
+
+    /// A name that does not parse gives imaLoadFileInfo's `NULL` and `siemensRead(): <fname>`.
+    #[test]
+    fn an_unparsable_name_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("x.ima"), ima(2, 0)).unwrap();
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = siemens_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "x.ima", false).unwrap();
+        assert!(r.is_none());
+        assert!(String::from_utf8(o).unwrap().contains("could not parse x.ima"));
+        assert!(String::from_utf8(e).unwrap().contains("siemensRead(): x.ima"));
+    }
+
+    /// A file name that does not end in `.ima` or `.IMA` is refused.
+    #[test]
+    fn a_bad_extension_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("1-2-4.Ima"), ima(2, 0)).unwrap();
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r =
+            siemens_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "1-2-4.Ima", false).unwrap();
+        assert!(r.is_none());
+        assert!(
+            String::from_utf8(e)
+                .unwrap()
+                .contains("must end in '.ima' or '.IMA'")
+        );
+    }
+
+    /// FS-688: a header too short for imaLoadFileInfo aborts FreeSurfer; larmorx does not crash and
+    /// notes it.
+    #[test]
+    fn a_short_header_is_noted_not_crashed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut f = ima(2, 0);
+        f.truncate(3000);
+        std::fs::write(dir.path().join("1-2-4.ima"), f).unwrap();
+        let env = Environment::default();
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let _ = siemens_read(&mut g, &mut o, &mut e, &env, Some(dir.path()), "1-2-4.ima", false);
+        assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-688"));
+    }
+
+    /// imaParseName tries `-` first and only falls back to `_` when there is no `-` at all.
+    #[test]
+    fn name_parsing_commits_to_the_first_separator() {
+        let mut out = Vec::new();
+        assert!(ima_parse_name(&mut out, "w/1-2-3.ima"));
+        assert!(ima_parse_name(&mut out, "w/1_2_3.ima"));
+        // a single `-` has no second field: it fails and does not retry `_`
+        assert!(!ima_parse_name(&mut out, "w/1-2_3.ima"));
+        assert!(!ima_parse_name(&mut out, "w/x.ima"));
+    }
+}

@@ -22,10 +22,11 @@ const OFFICIAL_SHA256: &str = "91ea7bc20dc852444c665d431a47a23c024a7532f707939f0
 const SKIPPED: usize = 133;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 24] = [
+const SKIP: [&str; 29] = [
     "FS-540", "FS-541", "FS-58", "FS-53", "FS-546", "FS-548", "FS-549", "FS-550", "FS-551",
     "FS-552", "FS-555", "FS-163", "FS-559", "FS-560", "FS-561", "FS-562", "FS-564", "FS-567",
-    "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575",
+    "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575", "FS-579", "FS-581", "FS-582",
+    "FS-583", "FS-586",
 ];
 
 #[test]

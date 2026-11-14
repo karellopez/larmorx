@@ -58,6 +58,7 @@ struct Libm {
     atan2f: F32x2,
     exp: F64,
     log: F64,
+    log10: F64,
     pow: F64x2,
 }
 
@@ -97,6 +98,7 @@ impl Libm {
                 atan2f: t::<*mut c_void, F32x2>(symbol(h, c"atan2f")),
                 exp: t::<*mut c_void, F64>(symbol(h, c"exp")),
                 log: t::<*mut c_void, F64>(symbol(h, c"log")),
+                log10: t::<*mut c_void, F64>(symbol(h, c"log10")),
                 pow: t::<*mut c_void, F64x2>(symbol(h, c"pow")),
             }
         }
@@ -525,6 +527,24 @@ fn double_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
             t.count(r.to_bits(), r.is_nan(), lx::log_glibc(x).to_bits(), || {
                 format!("{:#018x}", x.to_bits())
             });
+        },
+        checks,
+    );
+    sampled(
+        threads,
+        7,
+        &samples::LOG,
+        &s,
+        "log10_glibc",
+        "glibc log10",
+        |x, t| {
+            let r = (m.log10)(x);
+            t.count(
+                r.to_bits(),
+                r.is_nan(),
+                lx::log10_glibc(x).to_bits(),
+                || format!("{:#018x}", x.to_bits()),
+            );
         },
         checks,
     );

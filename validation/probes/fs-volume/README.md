@@ -148,3 +148,35 @@ different only with notices (GLIBC-07 for `powf` and `cos`). Seed 1, 3,020 cases
 builds agree on 47,000 cases in both modes. `check.py`'s `SKIP` adds FS-469, FS-470, FS-471, FS-473, FS-475 and
 FS-479. `diffv` seeds the generator before `CTABalloc` (its random colours otherwise print `<program> supposed to be
 reproducible but seed not set`).
+
+Measured 2026-11-14 (part 11, relay 21: 3.1-37 piece d's rest and 3.1-38's first files: `vv`, `vvsm`, `vvk`, `vvd`,
+`maskup`, `cov`, `mpca`, `pcast`, `fdr`, `rgbb`, `vxn`; 162 commands; logs `oracles/logs/fs-found-c-r21-*.log`): the
+resampling commands at seeds 7 and 13, 2,000 cases each: 1,976 and 1,957 identical with `reproduce`, 0 different;
+the PCA and FDR commands seed 7, 1,000 cases: 934 identical, 0 different; seed 13, 3,000 cases: 2,829 identical, 0
+different (after FS-484); the regions and voxel measures with `maskup`, seeds 7 and 13, 3,000 cases each: 2,277 and
+2,262 identical, 0 different (after `FZERO`'s 1e-5 threshold in `region.cpp` and `mrivoxel.cpp`, which a complex
+volume's 5.4e-7 voxel showed); `fix` different only with notices. Seed 1, 3,240 cases: 2,992 identical, 248 not
+comparable, hash `f38160d248ccc2da57ad5e1109d8b8e978231de8a9466a4c1693df2b08ee243c`, passing with AArch64's NaN
+emulated in debug and release (`oracles/logs/fs-found-c-r21-trap-volume.log`); the port's debug and release builds
+agree on 11,000 cases of the new commands in both modes. `check.py`'s `SKIP` adds FS-482, FS-484, FS-485, FS-486.
+`pcast` calls `fflush(NULL)` after `WritePCAStats` (the file it leaves open reaches the disk at the program's end).
+
+Measured 2026-11-14 (part 12, relay 22: 3.1-38's `talairachex.cpp`: `talcras`, `talmat`, `talpt`, `talvol`; 166
+commands; logs in `<scratch>/C/r22/`): seed 7, 2,000 cases: 1,941 identical with `reproduce`, 59 not comparable
+(FS-487, FS-488, FS-53, FS-325; 35 of them identical), 0 different; seed 13, 4,000 cases: 3,859 identical, 141 not
+comparable (84 identical), 0 different; `fix` different only with notices. The port's debug and release builds agree
+on seed 13's 4,000 cases in both modes. Seed 1, 3,320 cases: 3,083 identical, 237 not comparable, hash
+`c3cfc45ecb3faa4cac3084f1f8b08334eab226e31b8e8627585fdd19774571c9`, passing with AArch64's NaN emulated in debug and
+release (`oracles/logs/fs-found-c-r22-trap-volume2.log`). `check.py`'s `SKIP` adds FS-487, FS-488. `talvol` leaves
+out `SAMPLE_CUBIC_BSPLINE` (fs.bspline is not ported yet). Relay 22 also measured `fdr` with `log10` now
+correctly rounded by default (seeds 7 and 13, 987 cases each: 958 and 947 identical with `reproduce`, 0 different;
+`fix` different only with notices, GLIBC-07 among them).
+
+Measured 2026-11-14 (part 13, relay 22, for fs.filter: `dilate`, `dilu`, `msegs`, `sstat`, `hseg`; 171 commands): seeds 7
+and 13, 2,000 cases each: 1,878 and 1,882 identical with `reproduce`, the rest not comparable (FS-53, FS-58, FS-290,
+FS-490), 0 different; `fix` different only with notices (FS-489 among them). The port's debug and release builds
+agree on seed 13's 4,000 cases in both modes. Seed 1, 3,420 cases: 3,145 identical, 275 not comparable, hash
+`d67e661fe83e2a5e38001491e6b0b8afd724b5a995ba9a2675034e540593182b`, passing with AArch64's NaN emulated in debug and
+release (`oracles/logs/fs-found-c-r22-trap-volume3.log`) and on Windows x64 (track A's
+`validation/investigations/windows-cross-check/`, the test cross-built and run on the Windows helper). `check.py`'s
+`SKIP` adds FS-490.

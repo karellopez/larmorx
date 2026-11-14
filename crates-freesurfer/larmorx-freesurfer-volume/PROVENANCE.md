@@ -132,3 +132,31 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   (2643-2708), `MRIreverseSlices` (2748-2799), `MRIcutEndSlices` (2801-2838), `MRIsegIdListNot0`, `MRIsegIdList`
   (2873-2928), `MRIhalfCosBias` (3077-3100); operand orders from the official build's object `mri2.cpp.o` (the unit
   oracle's `libutils.a`). Changes: FS-480, FS-481, rule A.
+- `src/vol2vol.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIvol2Vol` (877-1051), `MRIvol2VolTLKernel` (1233-1302),
+  `MRImaskAndUpsample` (1304-1344), `MRIvol2VolDelta` (2580-2641), `MRIvol2VolVSM` (3102-3266); `utils/transform.cpp`
+  `TransformRegDat2LTA` (4417-4452, 3.1-40 taken early); operand orders from the official `mri2.cpp.o`. Changes:
+  FS-482 (0 for a shift never written, both modes); cubic B-splines and `LTAchangeType` port errors until ported.
+- `src/pca.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIfdr2vwth` (1402-1574), `MRIcovarianceMatrix` (1576-1641),
+  `MRIpca` (1643-1744), `PrintPCAStats`, `WritePCAStats` (1746-1779); `utils/sig.cpp` `fdr2vwth`, `doublecompar`
+  (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's with `reproduce`, CORE-MATH's correctly
+  rounded `larmorx_core::math::log10` by default (relay 22; GLIBC-07 noted where it changes the returned threshold
+  or the debug line's text).
+- `src/region.rs` (3.1-38; relay 21): `utils/region.cpp` `REGIONalloc` (49-57), `REGIONclear`, `REGIONcopy` (116-133),
+  `REGIONgetBoundingBoxM` (299-334), `REGIONgetBoundingBox` (344-379), `REGIONgetBoundingBoxEqOdd` (387-492),
+  `REGIONprint` (495-499); `FZERO`'s 1e-5 of this file.
+- `src/mrivoxel.rs` (3.1-38; relay 21): `utils/mrivoxel.cpp` `MRIvoxelDx`, `MRIvoxelDy`, `MRIvoxelDz` (55-148),
+  `MRIvoxelMean` (174-205), `MRIvoxelDirection` (316-384), `MRIvoxelGradientDir2ndDerivative` (393-433); operand
+  orders from `mrivoxel.cpp.o`. Changes: FS-485 (the window not cut by default), FS-486 (0 for a sample never
+  written, both modes).
+- `src/talairachex.rs` (3.1-38; relay 22): `utils/talairachex.cpp` `ModifyTalairachCRAS` (33-95),
+  `MtalairachFromVoxel` (111-127), `MtalVoxelFromVoxel` (129-148), `MvoxelFromTalairach` (150-164),
+  `MvoxelFromTalVoxel` (166-184), `TransformWithMatrix` (207-253), `MRIvoxelToTalairachEx` (255-263),
+  `MRIvoxelToTalairachVoxelEx` (267-275), `MRItalairachToVoxelEx` (279-287), `MRItalairachVoxelToVoxelEx` (302-310),
+  `MRItoTalairachExInterp` (315-328), `MRItoTalairachEx` (330-343; 3.1-39's), `MRIfromTalairachEx` (347-361; 3.1-39's);
+  operand orders from `talairachex.cpp.o`. Changes: FS-487, FS-488 (errors where FreeSurfer crashes; no matrix for a
+  transform array without transforms, both modes).
+- `src/mriset.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mriset.cpp` `MRIdilateUchar` (1642-1721),
+  `MRIdilate` (1723-1822). Changes: none.
+- `src/segs.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mri2.cpp` `MRIsegStats` (3826-3877),
+  `MRImatchSegs` (5687-5708), `HISTOseg` (5717-5740); operand orders from `mri2.cpp.o`. Changes: FS-489 (rule A),
+  FS-490 (no count, both modes).

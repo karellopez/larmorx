@@ -28,6 +28,8 @@ mod expf_glibc;
 mod expf_numpy;
 mod hypot;
 mod log;
+mod log10;
+mod log10_glibc;
 mod log_glibc;
 mod logf;
 mod logf_glibc;
@@ -105,6 +107,12 @@ pub use atanf_glibc::atanf_glibc_with_at0;
 /// `expm1f`, Sun's notice; no fused multiply-adds, one build on x86-64), for `reproduce` where an
 /// original's result depends on glibc's last bits; [`tanhf`] (correctly rounded) is the default.
 pub use tanhf_glibc::{expm1f_glibc, tanhf_glibc};
+
+/// The base-10 logarithm for `f64` with glibc 2.35's bits (fdlibm's `__ieee754_log10`, Sun's
+/// notice, over glibc's FMA-build `log`, behind its SVID wrapper's results for `x <= 0`), not
+/// correctly rounded, for `reproduce`; [`log10`] (correctly rounded) is the default
+/// ([`Libm::log10`] chooses by the mode).
+pub use log10_glibc::log10_glibc;
 
 /// The arc cosine for `f32`, correctly rounded (CORE-MATH's `cr_acosf`; no fused multiply-adds,
 /// so no FMA-compiled copy). The `double` [`acos`] rounded to `f32` differs from it on two floats
@@ -264,6 +272,11 @@ dispatch!(
     sin
 );
 dispatch!(
+    /// The base-10 logarithm of `x`, correctly rounded (CORE-MATH's `cr_log10`). glibc's `log10`
+    /// is not correctly rounded ([`log10_glibc`] has its bits, for `reproduce`).
+    log10
+);
+dispatch!(
     /// The arcsine of `x`, correctly rounded (CORE-MATH's `cr_asin`). ITK's `std::asin`
     /// (glibc's `asin`), as in `Euler3DTransform::ComputeMatrixParameters`.
     asin
@@ -389,6 +402,7 @@ mod fma {
         unsafe { kernel(x) }
     }
     fma_copy!(log);
+    fma_copy!(log10);
     fma_copy!(sin);
     fma_copy!(asin);
     fma_copy!(acos);
@@ -472,6 +486,7 @@ mod tests {
                 (super::tan(x), super::tan::tan(x)),
                 (super::exp(x), super::exp::exp(x)),
                 (super::log(x.abs()), super::log::log(x.abs())),
+                (super::log10(x.abs()), super::log10::log10(x.abs())),
                 (super::cbrt(x), super::cbrt::cbrt(x)),
                 (super::atan2(x, 1.5), super::atan2::atan2(x, 1.5)),
                 (super::atan2(-0.25, x), super::atan2::atan2(-0.25, x)),
@@ -491,6 +506,11 @@ mod tests {
             // tanh over every branch (|x| up to 25)
             let w = u * 25.0;
             for (a, b) in [
+                // near 1, where log10's accurate path runs most
+                (
+                    super::log10(1.0 + u / 64.0),
+                    super::log10::log10(1.0 + u / 64.0),
+                ),
                 (super::asin(u), super::asin::asin(u)),
                 (super::acos(u), super::acos::acos(u)),
                 (super::tanh(w), super::tanh::tanh(w)),

@@ -117,7 +117,7 @@ const TWO_POW_52: f64 = f64::from_bits(0x4330000000000000);
 /// `fast_two_sum`: `(hi, lo)` with `hi + lo = a + b` exactly (round-to-nearest).
 /// Assumes |a| >= |b|.
 #[inline(always)]
-fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
+pub(super) fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
     let hi = a + b;
     let e = hi - a; // exact
     let lo = b - e; // exact
@@ -196,7 +196,7 @@ fn p_2(z: &Dint64) -> Dint64 {
 }
 
 /// `log_2`: log(x) in dint arithmetic. `x` must be positive and normalized.
-fn log_2(mut x: Dint64) -> Dint64 {
+pub(super) fn log_2(mut x: Dint64) -> Dint64 {
     let mut e = x.ex;
 
     // Find the lookup index
@@ -236,7 +236,7 @@ fn fast_extract(x: f64) -> (i64, u64) {
 
 /// `dint_fromd`: the double `b` (non-zero, finite) as a normalized dint.
 #[inline(always)]
-fn dint_fromd(b: f64) -> Dint64 {
+pub(super) fn dint_fromd(b: f64) -> Dint64 {
     let (ex, hi) = fast_extract(b);
 
     let t = hi.leading_zeros();
@@ -280,7 +280,7 @@ fn dint_tod(a: &Dint64) -> f64 {
 }
 
 /// The bits of `bits` as doubles (Rust has no hex-float literals).
-const fn f64_table<const N: usize>(bits: [u64; N]) -> [f64; N] {
+pub(super) const fn f64_table<const N: usize>(bits: [u64; N]) -> [f64; N] {
     let mut out = [0.0; N];
     let mut k = 0;
     while k < N {
@@ -291,7 +291,7 @@ const fn f64_table<const N: usize>(bits: [u64; N]) -> [f64; N] {
 }
 
 /// [`f64_table`] for pairs.
-const fn f64_pair_table<const N: usize>(bits: [[u64; 2]; N]) -> [[f64; 2]; N] {
+pub(super) const fn f64_pair_table<const N: usize>(bits: [[u64; 2]; N]) -> [[f64; 2]; N] {
     let mut out = [[0.0; 2]; N];
     let mut k = 0;
     while k < N {
@@ -1048,7 +1048,7 @@ static LOG_INV: [[f64; 2]; 363] = f64_pair_table([
 /// `[-0.00202941894531250, 0.00212097167968735]`, with absolute error < 2^-70.278.
 /// The polynomial is `P[0]*x + P[1]*x^2 + ... + P[5]*x^6`. The algorithm assumes that
 /// `P[0] = 1`.
-static P: [f64; 6] = f64_table([
+pub(super) static P: [f64; 6] = f64_table([
     0x3ff0000000000000, // 0x1p0
     0xbfdffffffffffffa, // -0x1.ffffffffffffap-2
     0x3fd555555554f4d8, // 0x1.555555554f4d8p-2

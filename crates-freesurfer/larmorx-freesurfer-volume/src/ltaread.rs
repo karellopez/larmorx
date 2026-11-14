@@ -530,7 +530,8 @@ pub fn minc_get_volume_info(
             };
             match std::fs::metadata(&full) {
                 Err(e) => {
-                    g.errno = e.raw_os_error().unwrap_or(2);
+                    // Linux's errno on every platform (Windows' own codes are not errno values)
+                    g.errno = log::errno_of(&e).unwrap_or(2);
                     if contains(name, b"average_305") {
                         if g.gdiag & DIAG_SHOW != 0 && g.gdiag & DIAG_VERBOSE != 0 {
                             let _ = out

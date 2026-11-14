@@ -1965,6 +1965,24 @@ defects! {
         "the vote over each voxel's sorted frames (MRIvote) told to exclude zeros still takes a last run of zeros when it is the longest";
     FS_481 = "FS-481", "FreeSurfer", true,
         "the reshape of a volume of 64-bit integers (mri_reshape) copies 32-bit integers at the voxels' indices: halves of the first voxels, the rest left 0";
+    FS_482 = "FS-482", "FreeSurfer", true,
+        "the resampling with a voxel-shift map (MRIvol2VolVSM) shifts by the last value the map's sampler wrote; for a map of a type the sampler refuses, at the first voxel a value never written: memory contents";
+    FS_483 = "FS-483", "FreeSurfer", true,
+        "the frame covariance and PCA of a masked volume (MRIcovarianceMatrix, MRIpca) count the mask voxels above 0.5 but sum every voxel not below 0.5: a mask voxel of exactly 0.5 (or NaN) enters the sums and not the count";
+    FS_484 = "FS-484", "FreeSurfer", true,
+        "the frame PCA of a volume without frames (MRIpca) crashes in the singular value decomposition of its empty covariance";
+    FS_485 = "FS-485", "FreeSurfer", true,
+        "the gradient-direction measure of a voxel (MRIvoxelDirection) cuts its window at the volume's far faces but reads it back as a full cube: the gradients pair with the wrong offsets and the last entries were never written (memory contents)";
+    FS_486 = "FS-486", "FreeSurfer", true,
+        "the second derivative along the gradient (MRIvoxelGradientDir2ndDerivative) of a volume whose type the trilinear sampler refuses subtracts a sample never written: memory contents";
+    FS_487 = "FS-487", "FreeSurfer", true,
+        "the Talairach point conversions (MRIvoxelToTalairachEx and its siblings) use a matrix that could not be made (a singular voxel-to-RAS matrix or transform) and crash; and the Talairach-to-voxel matrix of a transform file that holds no transform reads past it: memory contents";
+    FS_488 = "FS-488", "FreeSurfer", true,
+        "the resampling of a volume out of Talairach space (MRIfromTalairachEx) without a target volume uses the target before its own check and crashes";
+    FS_489 = "FS-489", "FreeSurfer", true,
+        "the mask of listed labels (MRImatchSegs) made in the segmentation itself clears each voxel before reading its label: every voxel is matched as label 0";
+    FS_490 = "FS-490", "FreeSurfer", true,
+        "the histogram of a segment's intensities (HISTOseg) with a bin count of 0 counts each matching voxel in the bin before the first: memory it does not own";
 }
 
 /// The register entry with ID `id`.

@@ -20,10 +20,13 @@ use larmorx_core::defects::{FS_166, FS_249, FS_657, FS_658, FS_659, FS_660, FS_6
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BAD_FILE, ERROR_BADFILE, ERROR_BADPARM, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BAD_FILE, ERROR_BADFILE, ERROR_BADPARM, Fatal, NO_ERROR,
+};
 use larmorx_freesurfer_core::{sse, utils};
 use larmorx_freesurfer_mri::mri::{
-    self, MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    self, MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR,
+    MRI_USHRT, Mri,
 };
 
 use crate::cfile::CFile;
@@ -775,7 +778,12 @@ pub fn cor_write(
     ] {
         s.push_str(&format!("{name} {}\n", gk(v)));
     }
-    s.push_str(&format!("tr {}\nte {}\nti {}\n", f6(m.tr), f6(m.te), f6(m.ti)));
+    s.push_str(&format!(
+        "tr {}\nte {}\nti {}\n",
+        f6(m.tr),
+        f6(m.te),
+        f6(m.ti)
+    ));
     s.push_str(&format!(
         "flip angle {}\n",
         cfmt::f(sse::div64(sse::mul64(360.0, m.flip_angle), TWO_PI), 6)
@@ -806,7 +814,14 @@ pub fn cor_write(
     // voxel (FS-166; reached only with `reproduce`, FS-659 refuses such volumes by default)
     let stepped = matches!(
         m.mtype,
-        MRI_UCHAR | MRI_SHORT | MRI_USHRT | MRI_RGB | MRI_INT | MRI_LONG | MRI_FLOAT | MRI_FLOAT_COMPLEX
+        MRI_UCHAR
+            | MRI_SHORT
+            | MRI_USHRT
+            | MRI_RGB
+            | MRI_INT
+            | MRI_LONG
+            | MRI_FLOAT
+            | MRI_FLOAT_COMPLEX
     );
     if !stepped {
         g.notices.add(
@@ -875,11 +890,16 @@ mod tests {
         m.thick = 1.0;
         m.ps = 1.0;
         m.flip_angle = 0.5;
-        assert_eq!(cor_write(&mut g, &mut o, &mut e, p, &m, "c").unwrap(), NO_ERROR);
+        assert_eq!(
+            cor_write(&mut g, &mut o, &mut e, p, &m, "c").unwrap(),
+            NO_ERROR
+        );
         let info = std::fs::read_to_string(dir.path().join("c/COR-.info")).unwrap();
         assert!(info.starts_with("imnr0 1\nimnr1 2\nptype 2\nx 4\ny 3\n"));
         assert!(info.contains("flip angle 28.647890\n"));
-        let back = cor_read(&mut g, &mut o, &mut e, p, "c", true).unwrap().unwrap();
+        let back = cor_read(&mut g, &mut o, &mut e, p, "c", true)
+            .unwrap()
+            .unwrap();
         assert_eq!(back.chunk, m.chunk);
         assert_eq!(back.imnr1, 2);
         // 0.5 rad written in degrees with 6 decimals, read back in radians
@@ -894,11 +914,17 @@ mod tests {
         let mut g = Globals::new(UpstreamDefects::Fix);
         let (mut o, mut e) = (Vec::new(), Vec::new());
         let m = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 2, 1, MRI_FLOAT).unwrap();
-        assert_eq!(cor_write(&mut g, &mut o, &mut e, p, &m, "c").unwrap(), ERROR_BADPARM);
+        assert_eq!(
+            cor_write(&mut g, &mut o, &mut e, p, &m, "c").unwrap(),
+            ERROR_BADPARM
+        );
         assert!(g.notices.contains(&FS_659));
         let mut m = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 2, 1, MRI_UCHAR).unwrap();
         m.imnr1 = 3;
-        assert_eq!(cor_write(&mut g, &mut o, &mut e, p, &m, "d").unwrap(), ERROR_BADPARM);
+        assert_eq!(
+            cor_write(&mut g, &mut o, &mut e, p, &m, "d").unwrap(),
+            ERROR_BADPARM
+        );
         assert!(g.notices.contains(&FS_660));
     }
 }

@@ -3,7 +3,7 @@
 // 2026 Karel Lopez Vilaret.
 //! fs.io against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the official
 //! build's output lines for the probe's recorded cases (`cases::recorded_cases`: seed 1's 4,800
-//! portable cases, about 45 of each of the 104 commands that behave alike on every platform: piece
+//! portable cases, about 44 of each of the 109 commands that behave alike on every platform: piece
 //! 1's ten, piece 2's twelve, piece 3's six, piece 4's seven (the format probe's file cases made
 //! portable), piece 5's seven (mosaics, MATLAB files), piece 6's five (reading volumes and
 //! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images), piece 9's
@@ -11,13 +11,13 @@
 //! lookups, registration files), piece 11's thirteen (labels, control points, annotation tables,
 //! point sets), piece 12's four (GIFTI volumes read and written, point-set files, the XML help
 //! renderer), piece 14's one (MGH, MGZ, NIfTI volumes and NIfTI-1 pairs written, read back by the
-//! writer's reader), piece 15's two (NIfTI files and NIfTI-1 pairs read) and piece 16's three (ANALYZE
-//! pairs and SPM series read and written), without those that take
-//! seconds in a debug build,
+//! writer's reader), piece 15's two (NIfTI files and NIfTI-1 pairs read), piece 16's three (ANALYZE
+//! pairs and SPM series read and written), piece 17's three (COR folders and bshort, bfloat and
+//! bhdr volumes read and written) and piece 18's two (GDF and SDT volumes read), without those that
+//! take seconds in a debug build,
 //! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 26, with piece 16's
-//! ANALYZE reads and writes, FS-167's znz readers compared where FreeSurfer keeps the earlier
-//! number's bytes: 4,799 cases, 4,337 lines identical, 55 of them with memory digits; 462 hashed as
+//! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 27, with pieces 17
+//! and 18: 4,798 cases, 4,341 lines identical, 38 of them with memory digits; 457 hashed as
 //! `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
@@ -39,8 +39,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "85577f87e3a774abc2219f52f391b28adc1a98074bef1ccf093f94ac08da092f";
-const SKIPPED: usize = 462;
+const OFFICIAL_SHA256: &str = "a99761ad7337bfe5464361677cc55bbce94fa739400e6be31588ac0af26f6b25";
+const SKIPPED: usize = 457;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

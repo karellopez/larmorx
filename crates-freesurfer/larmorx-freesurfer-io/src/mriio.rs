@@ -691,8 +691,16 @@ pub fn mri_write_type(
     } else if mtype == MRI_CORONAL_SLICE_DIRECTORY {
         crate::mriio_cor::cor_write(g, out, err, dir, m, fname)?
     } else if mtype == BHDR {
-        let ext = if m.mtype == MRI_SHORT { "bshort" } else { "bfloat" };
-        let t = if m.mtype == MRI_SHORT { MRI_SHORT } else { MRI_FLOAT };
+        let ext = if m.mtype == MRI_SHORT {
+            "bshort"
+        } else {
+            "bfloat"
+        };
+        let t = if m.mtype == MRI_SHORT {
+            MRI_SHORT
+        } else {
+            MRI_FLOAT
+        };
         let name = match identify::bhdr_stem(fname) {
             Some(stem) => format!("{stem}_000.{ext}"),
             None => {

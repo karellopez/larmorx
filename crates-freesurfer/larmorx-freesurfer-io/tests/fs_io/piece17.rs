@@ -424,7 +424,12 @@ fn cor_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i32) {
     let y = if g.chance(20) { 0 } else { g.int(1, 3) };
     let imnr0 = g.pick(&[1i64, 1, 1, 1, 0, 2, -1]);
     let n = g.int(1, 3);
-    let imnr1 = imnr0 + n - 1 + if g.chance(10) { g.pick(&[-1, 1, -3]) } else { 0 };
+    let imnr1 = imnr0 + n - 1
+        + if g.chance(10) {
+            g.pick(&[-1, 1, -3])
+        } else {
+            0
+        };
     entries.push(dir_entry("w/c"));
     let (info, xf) = cor_info(g, x, y, imnr0, imnr1);
     if !g.chance(25) {
@@ -603,8 +608,10 @@ pub fn run(
     };
     for n in g.notices.as_slice() {
         // FreeSurfer reads for ever, reads or writes outside its buffers, or crashes
-        if matches!(n.defect.id, "FS-661" | "FS-669" | "FS-665" | "FS-671" | "FS-672")
-            || (n.defect.id == "FS-660" && n.detail.ends_with("(FreeSurfer crashes)"))
+        if matches!(
+            n.defect.id,
+            "FS-661" | "FS-669" | "FS-665" | "FS-671" | "FS-672"
+        ) || (n.defect.id == "FS-660" && n.detail.ends_with("(FreeSurfer crashes)"))
         {
             extra.push("SKIP");
         }

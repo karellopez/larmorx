@@ -27,7 +27,7 @@ use std::path::Path;
 
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
-    FS_58, FS_249, FS_661, FS_671, FS_662, FS_663, FS_664, FS_665, FS_667, FS_668, FS_669, FS_670,
+    FS_58, FS_249, FS_661, FS_662, FS_663, FS_664, FS_665, FS_667, FS_668, FS_669, FS_670, FS_671,
 };
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
@@ -40,7 +40,9 @@ use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_inverse};
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::{sse, utils};
 use larmorx_freesurfer_mri::info::mri_limits;
-use larmorx_freesurfer_mri::mri::{self, MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriFrame};
+use larmorx_freesurfer_mri::mri::{
+    self, MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriFrame,
+};
 use larmorx_freesurfer_mri::vol_geom;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
@@ -339,7 +341,10 @@ pub fn read_bhdr(
     let w = m.vg.width as f32;
     let h = m.vg.height as f32;
     let len = |a: f32, b: f32, c: f32| {
-        sse::sqrt(sse::add(sse::add(sse::mul(a, a), sse::mul(b, b)), sse::mul(c, c)))
+        sse::sqrt(sse::add(
+            sse::add(sse::mul(a, a), sse::mul(b, b)),
+            sse::mul(c, c),
+        ))
     };
     let (xr, xa, xs) = (
         sse::div(sse::sub(trr, tlr), w),
@@ -528,13 +533,8 @@ fn get_b_info(
                 Ok(f) => f,
                 Err(e) => {
                     g.errno = e;
-                    return Ok(fail0(
-                        g,
-                        err,
-                        ERROR_BADFILE,
-                        &format!("cannot open {name}"),
-                    )
-                    .map(|m| (m, String::new(), String::new())));
+                    return Ok(fail0(g, err, ERROR_BADFILE, &format!("cannot open {name}"))
+                        .map(|m| (m, String::new(), String::new())));
                 }
             };
             let (v, n) = scan_hdr(g, &mut fp, true);
@@ -692,7 +692,10 @@ pub fn bvolume_read(
     mtype: i32,
 ) -> Result<Option<Mri>, Fatal> {
     let Some((ext, size)) = ext_of(mtype) else {
-        let _ = writeln!(err, "ERROR: bvolumeRead: type ({mtype}) is not short or float");
+        let _ = writeln!(
+            err,
+            "ERROR: bvolumeRead: type ({mtype}) is not short or float"
+        );
         return Ok(None);
     };
     let Some((mut m, directory, stem)) = get_b_info(g, out, err, dir, fname, read_volume, mtype)?
@@ -801,8 +804,10 @@ fn change_type_unscaled(
     dest_type: i32,
 ) -> Result<Mri, Fatal> {
     let st = src.mtype;
-    let plain = (st == MRI_UCHAR && matches!(dest_type, MRI_SHORT | MRI_INT | MRI_LONG | MRI_FLOAT))
-        || (matches!(st, MRI_SHORT | MRI_USHRT) && matches!(dest_type, MRI_INT | MRI_LONG | MRI_FLOAT))
+    let plain = (st == MRI_UCHAR
+        && matches!(dest_type, MRI_SHORT | MRI_INT | MRI_LONG | MRI_FLOAT))
+        || (matches!(st, MRI_SHORT | MRI_USHRT)
+            && matches!(dest_type, MRI_INT | MRI_LONG | MRI_FLOAT))
         || (st == MRI_LONG && matches!(dest_type, MRI_INT | MRI_FLOAT))
         || (st == MRI_INT && matches!(dest_type, MRI_LONG | MRI_FLOAT));
     if !plain {
@@ -822,7 +827,10 @@ fn change_type_unscaled(
                 cfmt::pad(&cfmt::f(f64::from(lo), 0), 2),
                 cfmt::pad(&cfmt::f(f64::from(hi), 0), 2)
             );
-            let _ = writeln!(out, "***** DISABLING forcing and not doing scaling ********");
+            let _ = writeln!(
+                out,
+                "***** DISABLING forcing and not doing scaling ********"
+            );
         }
     }
     let mut dest = mri::mri_alloc_sequence(
@@ -905,7 +913,9 @@ fn subject_files(
     stem: &str,
     output_dir: &str,
 ) -> Result<Option<i32>, Fatal> {
-    let Some(subjects_dir) = env.get("SUBJECTS_DIR").map(|s| s.to_string_lossy().into_owned())
+    let Some(subjects_dir) = env
+        .get("SUBJECTS_DIR")
+        .map(|s| s.to_string_lossy().into_owned())
     else {
         g.errno = 0;
         log::error_printf(
@@ -924,7 +934,10 @@ fn subject_files(
             return Ok(None);
         }
         Ok(md) if !md.is_dir() => {
-            let _ = writeln!(err, "{subject_dir} is not a directory; writing to bhdr instead");
+            let _ = writeln!(
+                err,
+                "{subject_dir} is not a directory; writing to bhdr instead"
+            );
             return Ok(None);
         }
         Ok(_) => {
@@ -1046,7 +1059,12 @@ fn subject_files(
             Some(i) => inv.push(Some(i)),
             None => {
                 g.errno = 0;
-                log::error_printf(g, err, ERROR_BADPARM, "bvolumeWrite(): error inverting matrix");
+                log::error_printf(
+                    g,
+                    err,
+                    ERROR_BADPARM,
+                    "bvolumeWrite(): error inverting matrix",
+                );
                 inv.push(None);
             }
         }
@@ -1177,7 +1195,10 @@ pub fn bvolume_write(
     mtype: i32,
 ) -> Result<i32, Fatal> {
     let Some((ext, size)) = ext_of(mtype) else {
-        let _ = writeln!(err, "ERROR: bvolumeWrite: type ({mtype}) is not short or float");
+        let _ = writeln!(
+            err,
+            "ERROR: bvolumeWrite: type ({mtype}) is not short or float"
+        );
         return Ok(1);
     };
     if vol.chunk.is_none() {
@@ -1369,7 +1390,10 @@ mod tests {
         let mut g = Globals::new(UpstreamDefects::Fix);
         let mut e = Vec::new();
         let d = |g: &mut Globals, e: &mut Vec<u8>, n: &str| decompose_b_fname(g, e, n);
-        assert_eq!(d(&mut g, &mut e, "w/b_000.bshort"), Ok(("w".into(), "b".into())));
+        assert_eq!(
+            d(&mut g, &mut e, "w/b_000.bshort"),
+            Ok(("w".into(), "b".into()))
+        );
         assert_eq!(d(&mut g, &mut e, "b.bfloat"), Ok((".".into(), "b".into())));
         assert_eq!(d(&mut g, &mut e, "w/b_"), Ok(("w".into(), "b".into())));
         assert_eq!(d(&mut g, &mut e, "w/x_y"), Ok(("w".into(), "x_y".into())));
@@ -1392,17 +1416,32 @@ mod tests {
             let (mut o, mut e) = (Vec::new(), Vec::new());
             let env = Environment::default();
             let mut m = short_volume(&mut g);
-            let r = bvolume_write(&mut g, &mut o, &mut e, &env, p, &mut m, "v_000.bshort", MRI_SHORT)
-                .unwrap();
+            let r = bvolume_write(
+                &mut g,
+                &mut o,
+                &mut e,
+                &env,
+                p,
+                &mut m,
+                "v_000.bshort",
+                MRI_SHORT,
+            )
+            .unwrap();
             assert_eq!(r, NO_ERROR);
             assert!(g.notices.contains(&FS_664));
             let back = bvolume_read(&mut g, &mut o, &mut e, p, "v_000.bshort", true, MRI_SHORT)
                 .unwrap()
                 .unwrap();
             assert_eq!(back.chunk, m.chunk, "{mode:?}");
-            assert_eq!((back.vg.width, back.vg.height, back.vg.depth, back.nframes), (3, 2, 2, 2));
+            assert_eq!(
+                (back.vg.width, back.vg.height, back.vg.depth, back.nframes),
+                (3, 2, 2, 2)
+            );
             if mode == UpstreamDefects::Fix {
-                assert_eq!((back.vg.xsize, back.vg.ysize, back.vg.zsize), (2.0, 1.5, 3.0));
+                assert_eq!(
+                    (back.vg.xsize, back.vg.ysize, back.vg.zsize),
+                    (2.0, 1.5, 3.0)
+                );
                 assert_eq!((back.vg.x_a, back.vg.y_r, back.vg.z_s), (1.0, 1.0, -1.0));
                 assert_eq!(back.tr, 2000.0);
                 assert_eq!(back.vg.ras_good_flag, 1);

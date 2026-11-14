@@ -64,7 +64,11 @@ fn gdf_case(g: &mut Gen, entries: &mut Vec<String>, crop: &mut bool) -> (String,
     };
     let pad = g.chance(4);
     let stem = g.pick(&["w/g_", "w/g_", "w/g"]);
-    let offset = if g.chance(5) { g.pick(&[0i64, 4, 16, -2]) } else { 0 };
+    let offset = if g.chance(5) {
+        g.pick(&[0i64, 4, 16, -2])
+    } else {
+        0
+    };
     let mut lines: Vec<String> = vec!["GDF FILE VERSION3".into(), "START MAIN HEADER".into()];
     lines.push(match g.below(12) {
         0 => "IMAGE_FILE_PATH w/g_.img".into(),
@@ -125,7 +129,15 @@ fn gdf_case(g: &mut Gen, entries: &mut Vec<String>, crop: &mut bool) -> (String,
             if g.chance(12) {
                 g.pick(&["oblique", ""])
             } else {
-                g.pick(&["coronal", "coronal", "sagittal", "axial", "horizontal", "Coronal", "x cor"])
+                g.pick(&[
+                    "coronal",
+                    "coronal",
+                    "sagittal",
+                    "axial",
+                    "horizontal",
+                    "Coronal",
+                    "x cor",
+                ])
             }
         ));
     }

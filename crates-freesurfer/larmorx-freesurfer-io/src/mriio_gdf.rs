@@ -272,11 +272,7 @@ pub fn gdf_read(
                             "gdfRead: a DATA_TYPE line without its type: empty (FreeSurfer reads past the line's end)"
                         },
                     );
-                    data_type_string = Some(if g.notices.reproduce() {
-                        s
-                    } else {
-                        Vec::new()
-                    });
+                    data_type_string = Some(if g.notices.reproduce() { s } else { Vec::new() });
                 }
             } else {
                 data_type_string = Some(s);
@@ -289,7 +285,10 @@ pub fn gdf_read(
             os_orig = orientation_string.clone();
             o_d = true;
         } else if has(b"FILE_OFFSET") {
-            if let Some(v) = scan_after_word(g, l, 1, |sc, e| sc.d(e, true)).pop().flatten() {
+            if let Some(v) = scan_after_word(g, l, 1, |sc, e| sc.d(e, true))
+                .pop()
+                .flatten()
+            {
                 file_offset = v;
             }
         } else if has(b"MIN_CROP") {

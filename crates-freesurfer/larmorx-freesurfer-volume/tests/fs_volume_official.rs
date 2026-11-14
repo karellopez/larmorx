@@ -8,8 +8,8 @@
 //! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, FS-300, FS-302 to FS-310, FS-314,
 //! FS-315, FS-322 to FS-325, FS-327, FS-163, FS-330, FS-463, FS-465, FS-467, FS-469 to FS-471,
 //! FS-473, FS-475, FS-479, FS-482, FS-484 to FS-488, FS-490, FS-491, FS-493, FS-496 to FS-499, FS-501,
-//! FS-502, and the eigen-systems it never returns from, FS-47, FS-48, ITK-112, ITK-115, ITK-116, hashed
-//! as `SKIP`).
+//! FS-502, FS-504, FS-508, FS-509, FS-511, FS-515, FS-517, and the eigen-systems it never returns
+//! from, FS-47, FS-48, ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
 mod cases;
@@ -28,30 +28,35 @@ use sha2::{Digest, Sha256};
 /// 21, 162 commands: piece d's volume-to-volume resampling, PCA and FDR, 3.1-38's regions and
 /// voxel measures; relay 22, 171 commands: 3.1-38's Talairach helpers, dilation, the segment
 /// mask, statistics and histogram; relay 23, 211 commands: conforming and the rest of mriset.cpp;
-/// relay 24, 220 commands: mrihisto.cpp's volume histograms): 4,400 cases, 4,076 lines identical,
-/// 324 hashed as `SKIP`, 3 `MRIconform` resamplings hashed as `HEAVY` (identical too).
-const N: usize = 4400;
-const OFFICIAL_SHA256: &str = "57e8624ef07b6982203b2398d1e26004c15d18d0836be0363340247b7e170574";
-const SKIPPED: usize = 324;
-/// The `MRIconform` cases hashed as `HEAVY`.
-const HEAVY: usize = 3;
+/// relay 24, 220 commands: mrihisto.cpp's volume histograms; relay 25, 246 commands:
+/// transform.cpp's LTA operations, resample.cpp's segmentation mapping and SPM warp, mri2.cpp's
+/// segment statistics, borders, concatenation, edits, shifts and crops): 4,920 cases, 4,552 lines
+/// identical, 368 hashed as `SKIP`, 22 hashed as `HEAVY` (identical too).
+const N: usize = 4920;
+const OFFICIAL_SHA256: &str = "1acd334c6204657f39e004854539ea20a8405b3bc252092b59abcbc37450cc2e";
+const SKIPPED: usize = 368;
+/// The cases hashed as `HEAVY`.
+const HEAVY: usize = 22;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 53] = [
+const SKIP: [&str; 59] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
     "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
     "FS-330", "FS-463", "FS-465", "FS-467", "FS-163", "FS-469", "FS-470", "FS-471", "FS-473",
     "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488", "FS-490",
-    "FS-491", "FS-493", "FS-496", "FS-497", "FS-498", "FS-499", "FS-501", "FS-502",
+    "FS-491", "FS-493", "FS-496", "FS-497", "FS-498", "FS-499", "FS-501", "FS-502", "FS-504",
+    "FS-508", "FS-509", "FS-511", "FS-515", "FS-517",
 ];
 
-/// `check.py`'s `heavy`: `MRIconform` resampling onto its 256^3 grid, hashed as `HEAVY` without
-/// running (minutes in a debug build); the probe compares those cases (seeds 7 and 13) and the
-/// Windows check runs them (`docs/findings/freesurfer-volume.md` §19).
+/// `check.py`'s `heavy`: `MRIconform` resampling onto its 256^3 grid and
+/// `LabelAmygalaCortalJunction`'s new colour table of 7,032 random colours, hashed as `HEAVY`
+/// without running (minutes in a debug build); the probe compares those cases (seeds 7 and 13) and
+/// the Windows check runs them (`docs/findings/freesurfer-volume.md` §19).
 fn heavy(line: &str) -> bool {
     let t: Vec<&str> = line.split_whitespace().collect();
-    t.len() >= 5 && t[..2] == ["conform", "0"] && t[2..5] != ["256", "256", "256"]
+    t.first() == Some(&"lacjn")
+        || (t.len() >= 5 && t[..2] == ["conform", "0"] && t[2..5] != ["256", "256", "256"])
 }
 
 #[test]

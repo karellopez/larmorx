@@ -7553,8 +7553,8 @@ fn r25_gen_lta(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             }
             let mut geo = geo.clone();
             // the volume's extent is its own: the pool's when it is small
-            for k in 1..=3 {
-                geo[k] = ext(k).to_string();
+            for (k, v) in geo.iter_mut().enumerate().take(4).skip(1) {
+                *v = ext(k).to_string();
             }
             t.extend(geo);
             t.push("0".into());
@@ -7851,8 +7851,8 @@ fn r25_gen_res(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             // the transform between the segmentation and a small volume, in either direction
             let mut pool2 = pool.clone();
             pool2[0] = geo;
-            for k in 1..=3 {
-                pool2[1][k] = g.int(1, 4).to_string();
+            for v in pool2[1].iter_mut().take(4).skip(1) {
+                *v = g.int(1, 4).to_string();
             }
             let chain = match g.below(5) {
                 0 => vec![1, 0],
@@ -7958,8 +7958,10 @@ fn r25_get_ctab(t: &mut Toks) -> Option<larmorx_freesurfer_mri::ctab::ColorTable
     }
     let k = t.i();
     if k >= 0 {
-        let mut tt = ColorTable::default();
-        tt.entries = (0..k).map(|_| Some(Box::default())).collect();
+        let tt = ColorTable {
+            entries: (0..k).map(|_| Some(Box::default())).collect(),
+            ..ColorTable::default()
+        };
         ct.ctab_tissue_type = Some(Box::new(tt));
     }
     Some(ct)

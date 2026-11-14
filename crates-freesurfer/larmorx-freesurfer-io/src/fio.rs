@@ -184,10 +184,11 @@ impl Slot49 {
     fn take(&mut self, g: &Globals, at: usize, n: usize, got: usize) -> (Vec<u8>, bool) {
         let mut v = self.b[at..at + n].to_vec();
         let mut unknown = false;
-        for i in got..n {
-            unknown |= !self.known[at + i];
-            if !self.known[at + i] || !g.notices.reproduce() {
-                v[i] = 0;
+        let known = &self.known[at..at + n];
+        for (x, &k) in v.iter_mut().zip(known).skip(got) {
+            unknown |= !k;
+            if !k || !g.notices.reproduce() {
+                *x = 0;
             }
         }
         self.memory |= unknown;

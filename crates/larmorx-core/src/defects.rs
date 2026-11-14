@@ -2297,6 +2297,8 @@ defects! {
         "a detached NRRD header in the root directory (/name.nhdr) whose data file name is relative fails (need nio->path for header-relative datafiles)";
     FS_771 = "FS-771", "NrrdIO", true,
         "a NRRD header that gives its data file before its dimension reads an axis far outside its array (the program crashes)";
+    FS_772 = "FS-772", "NrrdIO", true,
+        "the message for a data file list that fails its check shows the reader's line buffer at the field's offset: bytes of earlier header lines, or memory never written when the buffer grew";
 }
 
 /// The register entry with ID `id`.

@@ -147,16 +147,28 @@ impl CFile {
     }
 }
 
-/// `airOneLine(file, line, size)`: the characters stored (before the NUL it writes) and its
-/// return value. A last line that ends without a newline sets `partial`; `keep_last` (FS-763
-/// corrected) keeps it, NrrdIO drops it.
-fn air_one_line(
-    file: &mut CFile,
-    size: usize,
-    keep_last: bool,
-    partial: &mut bool,
-) -> (Vec<u8>, usize) {
-    let mut line = Vec::new();
+/// A buffer as C leaves it: `None` for a byte never written (what `malloc` returned).
+type CBuf = Vec<Option<u8>>;
+
+/// The C string at `buf[at..]` (up to its NUL), and whether a byte never written was reached
+/// before one.
+fn cbuf_str(buf: &CBuf, at: usize) -> (Vec<u8>, bool) {
+    let mut v = Vec::new();
+    for b in buf.iter().skip(at) {
+        match b {
+            Some(0) => return (v, false),
+            Some(c) => v.push(*c),
+            None => return (v, true),
+        }
+    }
+    (v, true)
+}
+
+/// `airOneLine(file, line, size)` on the buffer `line` (its length is `size`): what it writes
+/// there, and its return value. A last line that ends without a newline sets `partial`;
+/// `keep_last` (FS-763 corrected) keeps it, NrrdIO drops it.
+fn air_one_line(file: &mut CFile, line: &mut CBuf, keep_last: bool, partial: &mut bool) -> usize {
+    let size = line.len();
     let mut c = 0i32;
     let mut i = 0usize;
     while i + 2 <= size {
@@ -164,37 +176,39 @@ fn air_one_line(
         if c == EOF || c == b'\n' as i32 {
             break;
         }
-        line.push(c as u8);
+        line[i] = Some(c as u8);
         i += 1;
     }
     if c == EOF {
         if i > 0 {
             *partial = true;
             if keep_last {
-                return (line, i + 1);
+                line[i] = Some(0);
+                return i + 1;
             }
         }
-        return (Vec::new(), 0);
+        line[0] = Some(0);
+        return 0;
     }
     if c == b'\n' as i32 {
-        if i >= 1 && line[i - 1] == b'\r' {
+        if i >= 1 && line[i - 1] == Some(b'\r') {
             i -= 1;
         }
-        line.truncate(i);
-        return (line, i + 1);
+        line[i] = Some(0);
+        return i + 1;
     }
     // the buffer is full (i == size - 1)
     let c = file.getc();
     if c == b'\n' as i32 {
-        if line[i - 1] == b'\r' {
+        if line[i - 1] == Some(b'\r') {
             i -= 1;
         }
-        line.truncate(i);
-        return (line, i + 1);
+        line[i] = Some(0);
+        return i + 1;
     }
     file.ungetc(c);
-    line.truncate(size - 1);
-    (line, size + 1)
+    line[size - 1] = Some(0);
+    size + 1
 }
 
 // ------------------------------------------------------------------------------------------
@@ -247,7 +261,9 @@ impl Encoding {
 /// `NrrdIoState`, the parts reading uses.
 struct Nio {
     path: Vec<u8>,
+    /// `nio->line` as a C string, and its buffer (`lineLen` bytes) as C leaves it.
     line: Vec<u8>,
+    buf: CBuf,
     line_len: usize,
     pos: usize,
     endian: i32,
@@ -269,6 +285,7 @@ impl Nio {
         Nio {
             path: Vec::new(),
             line: Vec::new(),
+            buf: Vec::new(),
             line_len: 0,
             pos: 0,
             endian: 0,
@@ -365,34 +382,39 @@ impl Reader<'_> {
 
     // ---------------------------------------------------------------------------- lines
 
-    /// `_nrrdOneLine`: sets `nio.line` and returns `*lenP`.
+    /// `_nrrdOneLine`: sets `nio.line` (and its buffer) and returns `*lenP`.
     fn one_line(&mut self, file: &mut CFile) -> u32 {
         let keep = self.notices.fix();
         let mut partial = false;
         if self.nio.line_len == 0 {
             self.nio.line_len = 3;
+            self.nio.buf = vec![None; 3];
         }
-        let (piece, mut len) = air_one_line(file, self.nio.line_len, keep, &mut partial);
+        let mut len = air_one_line(file, &mut self.nio.buf, keep, &mut partial);
         let ret = if len <= self.nio.line_len {
-            self.nio.line = cstr(&piece).to_vec();
             len as u32
         } else {
-            let mut pieces = vec![piece];
+            let mut pieces = vec![cbuf_str(&self.nio.buf, 0).0];
             while len == self.nio.line_len + 1 {
                 self.nio.line_len *= 2;
-                let (p, l) = air_one_line(file, self.nio.line_len, keep, &mut partial);
-                pieces.push(p);
-                len = l;
+                self.nio.buf = vec![None; self.nio.line_len];
+                len = air_one_line(file, &mut self.nio.buf, keep, &mut partial);
+                pieces.push(cbuf_str(&self.nio.buf, 0).0);
             }
             self.nio.line_len *= 3;
             let mut line = Vec::new();
             for p in &pieces {
-                line.extend_from_slice(cstr(p));
+                line.extend_from_slice(p);
             }
             let n = line.len() as u32 + 1;
-            self.nio.line = line;
+            self.nio.buf = vec![None; self.nio.line_len];
+            for (k, &c) in line.iter().enumerate() {
+                self.nio.buf[k] = Some(c);
+            }
+            self.nio.buf[line.len()] = Some(0);
             n
         };
+        self.nio.line = cbuf_str(&self.nio.buf, 0).0;
         if partial {
             self.notices.add(
                 &d::FS_763,
@@ -2141,7 +2163,16 @@ impl Reader<'_> {
                     if self.exit.is_some() {
                         return Err(());
                     }
-                    let tail = self.nio.info();
+                    // `nio->line + nio->pos`: after a data file list the buffer holds the last
+                    // line read, and the field's offset may lie past its end, in older bytes.
+                    let (tail, unset) = cbuf_str(&self.nio.buf, self.nio.pos);
+                    if unset {
+                        self.notices.add(
+                            &d::FS_772,
+                            "the message shows memory NrrdIO's line buffer never had written \
+                             (left out)",
+                        );
+                    }
                     let m = cat(
                         &format!("{me}: trouble parsing {} info \"", FIELD_STR[ret]),
                         &tail,

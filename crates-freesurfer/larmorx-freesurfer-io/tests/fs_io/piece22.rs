@@ -105,7 +105,11 @@ impl Attr {
 }
 
 fn afni_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
-    let nf = if g.chance(25) { 0 } else { g.pick(&[1i64, 1, 1, 2, 3]) };
+    let nf = if g.chance(25) {
+        0
+    } else {
+        g.pick(&[1i64, 1, 1, 2, 3])
+    };
     let dim = |g: &mut Gen| if g.chance(40) { 0 } else { g.int(1, 4) };
     let (w, h, d) = (dim(g), dim(g), dim(g));
     let mut bt = if g.chance(14) {
@@ -313,7 +317,9 @@ fn afni_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
             t = t.replacen(&format!("type={}\n", a.ty), "", 1);
         }
         if bare_count && a.count.is_empty() {
-            t = t.replace("count = \n", "count\n").replace("count=\n", "count\n");
+            t = t
+                .replace("count = \n", "count\n")
+                .replace("count=\n", "count\n");
         }
         head.push_str(&t);
     }
@@ -337,7 +343,11 @@ fn afni_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
             1 => data.push((i * 37 % 251) as u8),
             2 => {
                 let v = ((i as i64 * 1009) % 30000 - 15000) as i16;
-                data.extend_from_slice(&if big { v.to_be_bytes() } else { v.to_le_bytes() });
+                data.extend_from_slice(&if big {
+                    v.to_be_bytes()
+                } else {
+                    v.to_le_bytes()
+                });
             }
             _ => {
                 let v = if g.chance(20) {
@@ -345,7 +355,11 @@ fn afni_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
                 } else {
                     (i as f32) * 0.75 - 3.0
                 };
-                data.extend_from_slice(&if big { v.to_be_bytes() } else { v.to_le_bytes() });
+                data.extend_from_slice(&if big {
+                    v.to_be_bytes()
+                } else {
+                    v.to_le_bytes()
+                });
             }
         }
     }
@@ -455,7 +469,13 @@ fn annot_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
     };
     be32(&mut d, num);
     let cols: Vec<(i32, i32, i32)> = (0..g.int(1, 4))
-        .map(|i| (20 * i as i32 + 5, 220 - 30 * i as i32, (i as i32 * 77) % 256))
+        .map(|i| {
+            (
+                20 * i as i32 + 5,
+                220 - 30 * i as i32,
+                (i as i32 * 77) % 256,
+            )
+        })
         .collect();
     let annot = |c: (i32, i32, i32)| c.0 | (c.1 << 8) | (c.2 << 16);
     for v in 0..num.max(0) {

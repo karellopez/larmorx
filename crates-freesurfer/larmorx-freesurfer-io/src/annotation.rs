@@ -462,7 +462,10 @@ pub fn read_annot_as_mri_seg(
     for _ in 0..num.max(0) {
         let vno = fio::fread_int_in(g, &mut fp, &mut slot);
         if vno >= num {
-            let _ = writeln!(out, "ERROR: ReadAnnotAsMRISeg(): vno = {vno} >= num = {num}");
+            let _ = writeln!(
+                out,
+                "ERROR: ReadAnnotAsMRISeg(): vno = {vno} >= num = {num}"
+            );
             return Ok(None);
         }
         let i = fio::fread_int_in(g, &mut fp, &mut slot);
@@ -483,8 +486,11 @@ pub fn read_annot_as_mri_seg(
     if tag == crate::tags::TAG_OLD_COLORTABLE {
         m.ct = crate::colortab_bin::ctab_read_from_binary(g, out, err, Some(&mut fp));
         if let Some(ct) = &m.ct {
-            let mut l = format!("colortable with {} entries read (originally ", ct.nentries())
-                .into_bytes();
+            let mut l = format!(
+                "colortable with {} entries read (originally ",
+                ct.nentries()
+            )
+            .into_bytes();
             l.extend_from_slice(&ct.fname);
             l.extend_from_slice(b")\n");
             let _ = out.write_all(&l);

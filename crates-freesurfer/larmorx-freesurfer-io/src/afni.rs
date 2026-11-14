@@ -29,15 +29,13 @@ use std::path::Path;
 
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
-    Defect, FS_249, FS_693, FS_694, FS_695, FS_696, FS_697, FS_698, FS_699, FS_700, FS_701,
-    FS_702, FS_703, FS_704, FS_705, FS_706, FS_707, FS_708, FS_709, FS_710, FS_711, FS_712,
-    FS_713, FS_714, FS_715, FS_716,
+    Defect, FS_249, FS_693, FS_694, FS_695, FS_696, FS_697, FS_698, FS_699, FS_700, FS_701, FS_702,
+    FS_703, FS_704, FS_705, FS_706, FS_707, FS_708, FS_709, FS_710, FS_711, FS_712, FS_713, FS_714,
+    FS_715, FS_716,
 };
 use larmorx_freesurfer_core::cscan::{self, Bytes, Scan};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{
-    self, ERROR_BADFILE, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal,
-};
+use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::{cstd, sse, utils};
 use larmorx_freesurfer_mri::mri::{self, MRI_FLOAT, MRI_SHORT, MRI_UCHAR, Mri};
 
@@ -254,12 +252,19 @@ fn get_numbers<T: Copy + Default>(
     let nm = text(name);
     // malloc(count * sizeof): a negative count is a size malloc refuses
     let bytes = (i64::from(count) as u64).wrapping_mul(4);
-    let usable = if count < 0 { None } else { malloc_usable(bytes) };
+    let usable = if count < 0 {
+        None
+    } else {
+        malloc_usable(bytes)
+    };
     if count < 0 {
         note(
             g,
             &FS_699,
-            format!("{}: a negative count ({count}) for {nm}: FreeSurfer's reader fails without a message", kind.who),
+            format!(
+                "{}: a negative count ({count}) for {nm}: FreeSurfer's reader fails without a message",
+                kind.who
+            ),
         );
         if rep {
             // malloc's failure leaves errno at ENOMEM
@@ -278,7 +283,10 @@ fn get_numbers<T: Copy + Default>(
         note(
             g,
             &FS_715,
-            format!("{}: a count of {count} for {nm}: whether FreeSurfer's buffer of {bytes} bytes can be had is the machine's (FreeSurfer: not deterministic)", kind.who),
+            format!(
+                "{}: a count of {count} for {nm}: whether FreeSurfer's buffer of {bytes} bytes can be had is the machine's (FreeSurfer: not deterministic)",
+                kind.who
+            ),
         );
     }
     let usable = (usable.unwrap_or(0) / 4) as usize;
@@ -370,7 +378,10 @@ fn get_numbers<T: Copy + Default>(
                 note(
                     g,
                     &FS_697,
-                    format!("{}: '{tok}' is not a number (FreeSurfer: not deterministic: it writes past its buffer until it crashes)", kind.who),
+                    format!(
+                        "{}: '{tok}' is not a number (FreeSurfer: not deterministic: it writes past its buffer until it crashes)",
+                        kind.who
+                    ),
                 );
                 if !rep {
                     fail0(
@@ -398,7 +409,10 @@ fn get_numbers<T: Copy + Default>(
                         note(
                             g,
                             &FS_710,
-                            format!("{}: more numbers than the count ({count}) for {nm}, beyond FreeSurfer's buffer: ignored (FreeSurfer writes them past it: not deterministic)", kind.who),
+                            format!(
+                                "{}: more numbers than the count ({count}) for {nm}, beyond FreeSurfer's buffer: ignored (FreeSurfer writes them past it: not deterministic)",
+                                kind.who
+                            ),
                         );
                     }
                 } else if !extra_noted {
@@ -407,9 +421,15 @@ fn get_numbers<T: Copy + Default>(
                         g,
                         &FS_698,
                         if rep {
-                            format!("{}: more numbers than the count ({count}) for {nm}: kept past the count within FreeSurfer's buffer, as in FreeSurfer", kind.who)
+                            format!(
+                                "{}: more numbers than the count ({count}) for {nm}: kept past the count within FreeSurfer's buffer, as in FreeSurfer",
+                                kind.who
+                            )
                         } else {
-                            format!("{}: more numbers than the count ({count}) for {nm}: the extra ones ignored (FreeSurfer keeps them past the count, within its buffer)", kind.who)
+                            format!(
+                                "{}: more numbers than the count ({count}) for {nm}: the extra ones ignored (FreeSurfer keeps them past the count, within its buffer)",
+                                kind.who
+                            )
                         },
                     );
                 }
@@ -463,7 +483,9 @@ fn get_string(
         note(
             g,
             &FS_715,
-            format!("get_afni_string: a count of {count} for {nm}: whether FreeSurfer's buffer can be had is the machine's (FreeSurfer: not deterministic)"),
+            format!(
+                "get_afni_string: a count of {count} for {nm}: whether FreeSurfer's buffer can be had is the machine's (FreeSurfer: not deterministic)"
+            ),
         );
     }
     let c = fp.getc();
@@ -482,7 +504,9 @@ fn get_string(
         note(
             g,
             &FS_699,
-            format!("get_afni_string: the string {nm} written through a null pointer: FreeSurfer crashes (signal 11)"),
+            format!(
+                "get_afni_string: the string {nm} written through a null pointer: FreeSurfer crashes (signal 11)"
+            ),
         );
         return Err(Fatal::Exit(139));
     }
@@ -490,7 +514,9 @@ fn get_string(
         note(
             g,
             &FS_714,
-            format!("get_afni_string: a count of -1 for {nm}: the string is memory contents (FreeSurfer: memory contents)"),
+            format!(
+                "get_afni_string: a count of -1 for {nm}: the string is memory contents (FreeSurfer: memory contents)"
+            ),
         );
     }
     let mut buf = Vec::new();
@@ -569,7 +595,10 @@ fn wrong_type(
     note(
         g,
         &FS_700,
-        format!("read_afni_header: {name} listed as {} (FreeSurfer reads it as {expect} through a null pointer: a crash)", text(ty)),
+        format!(
+            "read_afni_header: {name} listed as {} (FreeSurfer reads it as {expect} through a null pointer: a crash)",
+            text(ty)
+        ),
     );
     if g.notices.reproduce() {
         return Err(Fatal::Exit(139));
@@ -775,8 +804,7 @@ fn read_afni_header(
                     s => Values::S(s),
                 }
             } else if tyc.len() >= 15 && &tyc[..15] == b"float-attribute" {
-                match get_numbers(g, err, &mut fp, count, &nmc, &FLOATS, strtod_float)
-                {
+                match get_numbers(g, err, &mut fp, count, &nmc, &FLOATS, strtod_float) {
                     None => return Ok(false),
                     f => Values::F(f),
                 }
@@ -1037,7 +1065,9 @@ fn type_name(g: &mut Globals, t: i32) -> Vec<u8> {
         None => note(
             g,
             &FS_711,
-            format!("the AFNI brick type {t} printed as {afni} (FreeSurfer prints its name table's bytes past its end: memory contents)"),
+            format!(
+                "the AFNI brick type {t} printed as {afni} (FreeSurfer prints its name table's bytes past its end: memory contents)"
+            ),
         ),
         _ => {}
     }
@@ -1051,9 +1081,7 @@ fn type_name(g: &mut Globals, t: i32) -> Vec<u8> {
 fn print_afni_header(g: &mut Globals, out: &mut dyn Write, af: &Af) {
     let f6 = |v: f32| cfmt::f(widen(v), 6);
     let mut t: Vec<u8> = Vec::new();
-    t.extend_from_slice(
-        b"AFNI Header Information ============================================\n",
-    );
+    t.extend_from_slice(b"AFNI Header Information ============================================\n");
     t.extend_from_slice(
         format!(
             "DATASET_RANK      : spatial dims {}, sub-bricks {}\n",
@@ -1118,7 +1146,11 @@ fn print_afni_header(g: &mut Globals, out: &mut dyn Write, af: &Af) {
     let stats = af.stats.clone().unwrap_or_default();
     let mut i = 0;
     while i < numstats {
-        let a = short_of(g, stats.get(i as usize).copied(), "printAFNIHeader's BRICK_STATS");
+        let a = short_of(
+            g,
+            stats.get(i as usize).copied(),
+            "printAFNIHeader's BRICK_STATS",
+        );
         let b = short_of(
             g,
             stats.get(i as usize + 1).copied(),
@@ -1137,10 +1169,15 @@ fn print_afni_header(g: &mut Globals, out: &mut dyn Write, af: &Af) {
     }
     let facs = af.facs.clone().unwrap_or_default();
     for k in 0..af.i32(NUMFACS).max(0) as usize {
-        let v = short_of(g, facs.get(k).copied(), "printAFNIHeader's BRICK_FLOAT_FACS");
+        let v = short_of(
+            g,
+            facs.get(k).copied(),
+            "printAFNIHeader's BRICK_FLOAT_FACS",
+        );
         let _ = writeln!(out, "BRICK_FLOAT_FACS  : {}", f6(v));
     }
-    let _ = out.write_all(b"====================================================================\n");
+    let _ =
+        out.write_all(b"====================================================================\n");
 }
 
 /// `afniRead(fname, read_volume)`: an AFNI dataset: `fname` must end in `.BRIK` (`afniRead(): bad
@@ -1222,7 +1259,10 @@ pub fn afni_read(
             g,
             err,
             ERROR_BADPARM,
-            format!("afniRead(): unsupported data type {type0}, Must be 0 (byte), 1(short), or 3(float)").as_bytes(),
+            format!(
+                "afniRead(): unsupported data type {type0}, Must be 0 (byte), 1(short), or 3(float)"
+            )
+            .as_bytes(),
         );
         return Ok(None);
     }
@@ -1374,7 +1414,9 @@ pub fn afni_read(
         note(
             g,
             &FS_707,
-            format!("afniRead: a volume of no voxels ({w} x {h} x {d}, {nframes} frames): FreeSurfer divides by zero (signal 8)"),
+            format!(
+                "afniRead: a volume of no voxels ({w} x {h} x {d}, {nframes} frames): FreeSurfer divides by zero (signal 8)"
+            ),
         );
         if rep {
             return Err(Fatal::Exit(136));
@@ -1412,7 +1454,10 @@ pub fn afni_read(
             g,
             err,
             ERROR_BADFILE,
-            format!("afniRead(): BRIK file length ({a}) is not divisible by the number of voxels ({b})").as_bytes(),
+            format!(
+                "afniRead(): BRIK file length ({a}) is not divisible by the number of voxels ({b})"
+            )
+            .as_bytes(),
         );
         return Ok(None);
     }
@@ -1445,8 +1490,7 @@ pub fn afni_read(
     let numfacs = af.i32(NUMFACS);
     let facs = af.facs.clone();
     let fac_at = |g: &mut Globals, k: usize, what: &str| -> Option<f32> {
-        facs.as_ref()
-            .map(|v| short_of(g, v.get(k).copied(), what))
+        facs.as_ref().map(|v| short_of(g, v.get(k).copied(), what))
     };
     let mut scaling: f32 = 1.0;
     let fs_type;
@@ -1582,7 +1626,11 @@ pub fn afni_read(
             }
             continue;
         };
-        let a = short_of(g, v.get(2 * frame as usize).copied(), "afniRead's BRICK_STATS");
+        let a = short_of(
+            g,
+            v.get(2 * frame as usize).copied(),
+            "afniRead's BRICK_STATS",
+        );
         let b = short_of(
             g,
             v.get(2 * frame as usize + 1).copied(),
@@ -1812,7 +1860,14 @@ mod tests {
         std::fs::write(dir.path().join("a+orig.BRIK"), brik).unwrap();
         let mut g = Globals::new(mode);
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let r = afni_read(&mut g, &mut o, &mut e, Some(dir.path()), "a+orig.BRIK", true);
+        let r = afni_read(
+            &mut g,
+            &mut o,
+            &mut e,
+            Some(dir.path()),
+            "a+orig.BRIK",
+            true,
+        );
         o.extend_from_slice(&e);
         let text = String::from_utf8_lossy(&o).into_owned();
         match r {
@@ -1851,12 +1906,20 @@ mod tests {
     /// by its own factor; FreeSurfer keeps bytes and writes the second frame's floats into them.
     #[test]
     fn frames_scaled_differently() {
-        let (m, g, _) = read(UpstreamDefects::Fix, &head("", "0 0.5", true), &[1, 2, 3, 4]);
+        let (m, g, _) = read(
+            UpstreamDefects::Fix,
+            &head("", "0 0.5", true),
+            &[1, 2, 3, 4],
+        );
         let m = m.unwrap();
         assert_eq!(m.mtype, MRI_FLOAT);
         assert_eq!(floats(&m), vec![1.0, 2.0, 1.5, 2.0]);
         assert!(g.notices.contains(&FS_706));
-        let (m, g, _) = read(UpstreamDefects::Reproduce, &head("", "0 0.5", true), &[1, 2, 3, 4]);
+        let (m, g, _) = read(
+            UpstreamDefects::Reproduce,
+            &head("", "0 0.5", true),
+            &[1, 2, 3, 4],
+        );
         // the bytes volume of 4 bytes: frame 1's two floats start at byte 2 and pass its end
         assert!(m.is_some());
         assert!(g.notices.contains(&FS_712));
@@ -1868,12 +1931,20 @@ mod tests {
         let (m, g, _) = read(UpstreamDefects::Fix, &head("", "", true), &[1, 2, 3, 4]);
         assert_eq!(m.unwrap().chunk.as_deref(), Some(&[1u8, 2, 3, 4][..]));
         assert!(g.notices.contains(&FS_705));
-        let (m, _, text) = read(UpstreamDefects::Reproduce, &head("", "", true), &[1, 2, 3, 4]);
+        let (m, _, text) = read(
+            UpstreamDefects::Reproduce,
+            &head("", "", true),
+            &[1, 2, 3, 4],
+        );
         assert!(m.is_none() && text.ends_with("EXIT 139"));
         // without BRICK_STATS: no stats lines by default; FreeSurfer crashes after frame 0
         let (m, _, text) = read(UpstreamDefects::Fix, &head("", "0 0", false), &[1, 2, 3, 4]);
         assert!(m.is_some() && !text.contains("<-->"));
-        let (_, _, text) = read(UpstreamDefects::Reproduce, &head("", "0 0", false), &[1, 2, 3, 4]);
+        let (_, _, text) = read(
+            UpstreamDefects::Reproduce,
+            &head("", "0 0", false),
+            &[1, 2, 3, 4],
+        );
         assert!(text.ends_with("EXIT 139"));
     }
 
@@ -1888,7 +1959,9 @@ mod tests {
         assert!(g.notices.contains(&FS_694));
         let (m, _, text) = read(UpstreamDefects::Reproduce, &h, &[1, 2, 3, 4]);
         assert!(m.is_none());
-        assert!(text.contains("get_afni_float(): hit EOF while reading 2 floats for BRICK_FLOAT_FACS"));
+        assert!(
+            text.contains("get_afni_float(): hit EOF while reading 2 floats for BRICK_FLOAT_FACS")
+        );
     }
 
     /// FS-707: a frame count of 0: an error by default; FreeSurfer divides by zero.
@@ -1921,7 +1994,11 @@ mod tests {
         let h = head("", "0 0", true).replacen(" 0 3 4\n", " 0 3 x4\n", 1);
         let (m, _, text) = read(UpstreamDefects::Fix, &h, &[1, 2, 3, 4]);
         assert!(m.is_none());
-        assert!(text.contains("get_afni_int(): 'x4' is not a number (reading 3 ints for ORIENT_SPECIFIC)"));
+        assert!(
+            text.contains(
+                "get_afni_int(): 'x4' is not a number (reading 3 ints for ORIENT_SPECIFIC)"
+            )
+        );
     }
 
     /// The BRIK writer refuses.

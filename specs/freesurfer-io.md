@@ -23,7 +23,9 @@ MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94
 §100: a number cut after another (FS-49); **part 16** (§101-103): ANALYZE volumes read and written;
 **part 19** (§104-106): COR, bshort, bfloat and bhdr volumes read and written; **part 20** (§107-109): GDF
 volumes read and written, Varian SDT volumes read; **part 21** (§110-112): GE Genesis and GE Signa LX
-series read; **part 22** (§113-115): GE Signa and GE XIMG series read.
+series read; **part 22** (§113-115): GE Signa and GE XIMG series read; **part 23** (§116-117): old Siemens
+`.ima` series read; **part 24** (§118-121): AFNI datasets read (and their writer's refusal), curvature
+files and annotations read as volumes, the NRRD writer's refusal, `mri_read`'s frees.
 
 ## 1. Conventions
 
@@ -3520,3 +3522,245 @@ parse, and names with no file. Measured (2026-11-14): seeds 7, 13, 21, 99, each 
 skipped: FS-688, FS-692; the DICOM path not ported; FS-689 compared apart); `fix` differs only with
 the field-of-view correction (FS-691) and the error-message correction (FS-01). The recorded
 cross-platform test includes two `imd`/`imh` cases.
+
+## 118. AFNI datasets read (`afniRead`; `mri_read`'s type 7, `mri_identify`'s `BRIK_FILE`) and written (`afniWrite`)
+
+An AFNI dataset is a text header `<prefix>.HEAD` beside its voxels `<prefix>.BRIK`. `mri_identify`
+takes a name whose extension is `BRIK` in any case; `afniRead(fname, read_volume)` then needs the
+exact `.BRIK` (the text after the last `.`): otherwise `afniRead(): bad file name <fname>`
+(`ERROR_BADPARM`, `errno` 0 first), as for a name without a `.`. The header is the name with
+`.HEAD` in place of `.BRIK` (`afniRead(): error opening file <head>` when it does not open;
+`ERROR_BADFILE`). Every message below is an error (FreeSurfer's error printer, §1) with `errno` set
+to 0 first unless said otherwise; each makes the reader return no volume.
+
+**The header** is read line by line (lines of at most 1,023 bytes; a longer line is read as several).
+Each line is taken without any of its white space (anywhere: `type = x` and `type=x` are alike).
+A line starting `type=` sets the current type (the rest of the line), `name=` the current name, and a
+line starting `count` (five characters) is an attribute: its count is the number from the seventh
+character on (C's `atoi`: `count=12` is 12, `countX` and `count=` are 0). Every other line is
+ignored (blank lines between attributes too). The type and the name stay until the next such line
+(an attribute without its own type line takes the previous one's). The attribute's values follow:
+
+- **`string-attribute`** (the type's first 16 characters): the next character must be `'`
+  (`get_afni_string(): afni header string <name> does not start with "'"`); then `count` bytes, each
+  `~` read as the string's end; the file ending first gives `get_afni_string(): end of file reached
+  at <i> of <count> bytes of string <name>` (`<i>` the byte's number from 1; the byte read at the end
+  of the file is taken as 0xff); a last byte that is not `~` gives `warning: string <name> does not end
+  with "~"` (an error-printer warning; the string kept). The rest of that line is skipped.
+- **`float-attribute`** (15 characters) and **`integer-attribute`** (17 characters): `count`
+  numbers from the following lines (C's `strtod` stored as a `float`, `strtol` base 10 stored as an
+  `int`: its low 32 bits; an overflow sets `errno` to 34, which a later message prints). A line read
+  at the end of the file gives `get_afni_float(): hit EOF while reading <count> floats for <name>`
+  (`get_afni_int(): ... ints ...`), a blank line `... hit a blank line while reading ...`, a line
+  starting with `type` `... hit a type line while reading ...`. The numbers of one line are read
+  to its end, also past the count (the attribute keeps the first `count`).
+- Another type: `read_afni_header(): unknown type <type>`.
+
+The attributes used (others are ignored):
+
+| Attribute | Needs | Gives |
+|---|---|---|
+| `DATASET_RANK` | integers | the second value is the number of frames (sub-bricks) |
+| `DATASET_DIMENSIONS` | integers, count 3 or more (required) | width, height, depth |
+| `TYPESTRING` | a string of at most 15 characters | printed only |
+| `SCENE_DATA` | integers | the first three printed |
+| `ORIENT_SPECIFIC` | integers, count 3 or more, each 0 to 5 (required) | the axes' directions |
+| `ORIGIN` | floats, count 3 or more (required) | the first voxel's coordinates |
+| `DELTA` | floats, count 3 or more (required) | the voxel sizes (signed) |
+| `IDCODE_STRING` | a string | printed only |
+| `BYTEORDER_STRING` | a string of at most 9 characters (required) | `MSB_FIRST` or `LSB_FIRST` |
+| `BRICK_STATS` | floats | a minimum and a maximum per frame, printed |
+| `BRICK_TYPES` | integers, all equal (required) | the voxel type: 0 byte, 1 short, 3 float |
+| `BRICK_FLOAT_FACS` | floats | a scale factor per frame (0: none) |
+
+Checks while reading: `DATASET_DIMENSIONS`, `ORIENT_SPECIFIC` of another type: `read_afni_header():
+variable <name> listed as <type> (expecting integer-attribute)`; `ORIGIN`, `DELTA`: `... (expecting
+float-attribute)`; `BYTEORDER_STRING`: `... (expecting string-attribute)`; fewer than 3 values:
+`read_afni_header(): not enough variables in <name> (need 3, have <count>` (as printed, without the
+closing parenthesis; `ORIGIN` checks its count before its type, `DELTA` and the others after);
+`ORIENT_SPECIFIC` values outside 0 to 5: `read_afni_header(): ORIENT_SPECIFIC variables should be 0
+to 5, inclusive (are <a>, <b>, <c> here)`; `BRICK_TYPES` of different values: `multiple data types are
+not supported` (without clearing `errno`). At the end, a required attribute missing gives `missing
+fields in afni header file` and one line per missing one, in this order: `  ORIENT_SPECIFIC missing`,
+`  BRICK_TYPES missing`, `  DATASET_DIMENSIONS missing`, `  DELTA missing`, `  ORIGIN missing`,
+`  BYTEORDER_STRING missing`.
+
+**The printout** (standard output), always:
+
+    AFNI Header Information ============================================
+    DATASET_RANK      : spatial dims <r0>, sub-bricks <r1>
+    DATASET_DIMENSIONS: (<w>, <h>, <d>)
+    TYPESTRING        : <typestring>
+    SCENE_DATA        : view type <s0>, func type <s1>, verify <s2>
+    ORIGIN            : (<x>, <y>, <z>)
+    DELTA             : (<x>, <y>, <z>)
+    IDCODE_STRING     : <idcode, or (null)>
+    BYTEORDER_STRING  : <byteorder>
+    BRICK_STATS       : min <a>\t max <b>          (a line per pair)
+    BRICK_TYPES       : <name>                   (a line per type)
+    BRICK_FLOAT_FACS  : <f>                      (a line per factor)
+    ====================================================================
+
+the floats as C's `%f`, missing values 0. FreeSurfer names the brick types `byte`, `short`, `float`,
+`complex` for 0 to 3 (FS-704: AFNI's 2 is `int` and 3 is `float`; larmorx prints AFNI's names `byte`,
+`short`, `int`, `float`, `double`, `complex`, `rgb`, `rgba`, others `unknown (<n>)`; `reproduce`
+FreeSurfer's). Then, when there is not exactly one brick type: `INFO: number of frames
+dataset_rank[1] = <r1> : numtypes = <n> ` (with its trailing space).
+
+**The volume.** The byte order: `MSB_FIRST` big-endian, `LSB_FIRST` little-endian, another
+`read_afni_header(): unrecognized byte order string <s>`. The first brick type 2 or above 3:
+`afniRead(): unsupported data type <t>, Must be 0 (byte), 1(short), or 3(float)` (negative types pass).
+A header of the dimensions and `DATASET_RANK`'s frames is made; the axes' directions from
+`ORIENT_SPECIFIC` (code 0: (-1, 0, 0), 1: (1, 0, 0), 2: (0, 1, 0), 3: (0, -1, 0), 4: (0, 0, 1),
+5: (0, 0, -1), for the columns, rows and slices); a zero determinant (two axes along one line):
+`read_afni_header(): error in orientations <a>, <b>, <c> (direction cosine matrix has determinant
+zero)`. The voxel sizes are `DELTA`; the centre, in double precision from the signed sizes:
+`c = x (xsize (width - 1) / 2 + origin_x) + y (ysize (height - 1) / 2 + origin_y) + z (zsize (depth -
+1) / 2 + origin_z)` (each axis' direction times its term, summed in that order, stored as a float);
+then the sizes are made positive; `ras_good_flag` 1; `imnr0` 1, `imnr1` the depth; `ps` the column
+size, `thick` the slice size; `xend = (width / 2) xsize` (double, stored as a float), `xstart =
+-xend`, likewise y and z; `fov` the largest of `xend - xstart`, `yend - ystart`, `zend - zstart`.
+
+The BRIK (`afniRead(): error opening file <head>` when it does not open: FS-708, larmorx names the
+BRIK) must hold a whole number of values per voxel: its length modulo the voxels (width x height x
+depth x frames, the product in 32-bit `int`) not 0 gives `afniRead(): BRIK file length (<len>) is not
+divisible by the number of voxels (<n>)`; then its bytes per voxel (the brick type plus 1) must equal
+the length divided by the voxels: `afniRead(): type info stored in header does not agree with the
+file size: <bpv> != <quotient>/<memory>` (`ERROR_UNSUPPORTED`; FS-713: FreeSurfer's third number is
+memory contents; larmorx prints `<bpv> != <length>/<voxels>`, `reproduce` the quotient and 0). The
+type: float when `BRICK_FLOAT_FACS` has values and its first is not 0; else byte (1 byte per
+voxel), short (2), float (4); another size: `afniRead(): don't know what to do with <n> bytes per
+voxel`. Without the voxels the header is returned here.
+
+With the voxels: frame after frame, slice after slice, row after row, `width` values are read
+(`afniRead(): error reading from file <fname>` when the file ends first), byte-swapped for a
+big-endian BRIK; the frame's scale is its `BRICK_FLOAT_FACS` value (0 gives 1); a byte or short
+voxel of scale 1 is stored as read, other voxels as the float `value x scale` (SSE single precision).
+After each frame, on standard output: `BRICK_STATS min = <stat> <--> actual min = <m>` and `BRICK_STATS
+max = <stat> <--> actual max = <M>` (`<stat>` the frame's pair from `BRICK_STATS`; `<m>`, `<M>` the
+frame's smallest and largest value as read, before scaling, times the frame's scale, as floats; each
+row's minimum and maximum start from its first value, compared with `<` and `>`).
+
+**Defects** (D13; `larmorx_core::defects`):
+
+- FS-693: a `.HEAD` that opens but cannot be read (a folder): FreeSurfer prints `failed reading
+  file` for ever; larmorx prints it once and reads the header as empty (both modes).
+- FS-694: the header's last line without a newline is ignored by FreeSurfer (a count line lost; a
+  line of numbers ends with `hit EOF while reading`); larmorx reads it (`reproduce`: ignored).
+- FS-695: a count line before any type or name line takes them from memory contents; both modes:
+  no type (`read_afni_header(): unknown type `) or no name (the attribute ignored), noted.
+- FS-696: a bare `count` line takes its number from past the line's end (an earlier, longer
+  line's characters, or memory contents); larmorx reads 0 (`reproduce`: the earlier line's; memory
+  contents 0).
+- FS-697: a token that is not a number (a word, a decimal number among integers, a comma): FreeSurfer
+  writes past its buffer until it crashes; larmorx: `get_afni_int(): '<token>' is not a number
+  (reading <count> ints for <name>)` (`get_afni_float(): ... floats ...`); `reproduce` cannot crash
+  alike.
+- FS-698 and FS-710: more numbers than the count: FreeSurfer keeps them past the count within its
+  allocation (read where it reads past the count, FS-701) and writes past the allocation beyond it
+  (FS-710: memory corruption); larmorx keeps the first `count` (`reproduce`: within the allocation).
+- FS-699: a negative count: numbers fail without a message (`errno` 12, ENOMEM) and strings of
+  count -2 or less (or 2,147,483,647) crash (signal 11, after the opening `'`); larmorx:
+  `get_afni_int(): bad count <n> for <name>` (`get_afni_float`), `get_afni_string(): bad count <n>
+  for string <name>`; `reproduce` FreeSurfer's. FS-714: a string of count -1 is memory contents
+  (an `IDCODE_STRING` of count -1 crashes). FS-715: a count of about 67 million numbers (268 MB) or
+  more: whether FreeSurfer's buffer can be had is the machine's.
+- FS-700: `DATASET_RANK`, `TYPESTRING`, `SCENE_DATA`, `IDCODE_STRING` of another type, and
+  `BRICK_STATS`, `BRICK_TYPES`, `BRICK_FLOAT_FACS` of another type with a count above 0: FreeSurfer
+  crashes (signal 11); larmorx: `read_afni_header(): variable <name> listed as <type> (expecting
+  <type>)`; `reproduce` status 139.
+- FS-701: fewer values than read (`DATASET_RANK` under 2, `SCENE_DATA` under 3, `BRICK_TYPES` empty,
+  an odd `BRICK_STATS` count, frames beyond `BRICK_STATS`'s pairs or `BRICK_FLOAT_FACS`'s values):
+  memory contents in FreeSurfer, 0 in both modes, noted.
+- FS-702: a `TYPESTRING` of 16 characters or more, a `BYTEORDER_STRING` of 10 or more: FreeSurfer's
+  copy ends the program (`*** buffer overflow detected ***: terminated` on standard error, signal 6);
+  larmorx keeps them whole (`reproduce`: the message and status 134).
+- FS-703 and FS-716: an `IDCODE_STRING` without its closing `~` is copied one byte past its buffer
+  (FS-716 for 24, 40, 56 ... characters: over the allocator's records); larmorx copies nothing past.
+- FS-705: without `BRICK_FLOAT_FACS`, reading the voxels crashes before the first row (signal 11);
+  without `BRICK_STATS` after the first frame; larmorx scales by 1 and prints no `BRICK_STATS` lines
+  (`reproduce`: status 139 there).
+- FS-706 and FS-712: frames of different scale factors: FreeSurfer takes the volume's type from the
+  first frame's alone (the store above: a scaled frame after an unscaled first writes floats into a
+  byte or short volume, FS-712 past its end; an unscaled frame, or one of factor 1, after a scaled
+  first writes bytes or shorts into a float volume); larmorx makes a float volume whenever a frame's
+  factor is not 0 and scales each frame by its own (`reproduce`: FreeSurfer's stores).
+- FS-707: a dimension or frame count of 0 (or a voxel count that wraps to 0): FreeSurfer divides by
+  zero (signal 8); larmorx: `afniRead(): the volume has no voxels (<w> x <h> x <d>, <n> frames)`;
+  `reproduce` status 136.
+- FS-708: the BRIK that cannot be opened is named by its header's name; lengths and counts beyond the
+  `int` range are printed as their low 32 bits; larmorx names the BRIK and prints them whole.
+- FS-709: a folder in the BRIK's place: its length is the file system's; larmorx refuses it with
+  `afniRead(): error opening file <brik>` in both modes.
+- FS-711: brick types 4 and above (and negative ones) are printed from past FreeSurfer's table of
+  names (memory contents); larmorx prints AFNI's name (`reproduce`: nothing).
+- FS-249: names of 1,024 bytes or more (FreeSurfer's buffer) are used whole.
+
+**Writing** (`MRIwriteType`'s type 7, after its folder check, §84): FreeSurfer 8.2.0 refuses at once:
+`AFNI BRIK write unsupported` (`ERROR_UNSUPPORTED`, `errno` 0 first; nothing written; the write
+returns -3).
+
+## 119. Curvature files and annotations read as volumes; the NRRD writer
+
+**`MRISreadCurvAsMRI(curvfile, read_volume)`** (`mri_read`'s type 25, `mri_identify`'s curvature
+test, §28): a file whose first three bytes are not the new format's mark (16,777,215, big-endian) gives
+no volume and no message. Otherwise three big-endian `int`s: the vertices, the faces (unused), the
+values per vertex; values per vertex other than 1: `ERROR: MRISreadCurvAsMRI: <f>, vals/vertex <n>
+unsupported` (standard output) and no volume. The volume: `<vertices>` x 1 x 1 floats, one frame,
+intent shape (2; version `(2 << 8) | 1`); with the voxels, each vertex's big-endian `float` in turn
+(the bits kept; a file ending early gives `freadFloat: fread failed` per missing value, FS-167, and
+the numbers it cuts are memory contents, FS-49). A vertex count of 0 or less gives a volume of that
+extent (the allocation's messages, `specs/freesurfer-mri.md`).
+
+**`ReadAnnotAsMRISeg(annotfname, volume_flag)`** (`mri_read`'s type 33, `mri_identify`'s `annot`
+extension): a file that does not open: `ERROR: could not read <f>` (standard output). The first
+big-endian `int` is the vertices `n`: a volume of `n` x 1 x 1 `int`s (intent label: 1, version `(1 <<
+8) | 1`). Then `n` pairs of big-endian `int`s, a vertex number and its annotation (a colour,
+`r + 256 g + 65536 b`): a vertex number of `n` or more: `ERROR: ReadAnnotAsMRISeg(): vno = <v> >= num =
+<n>` and no volume; with the voxels the annotation is stored at that vertex (as a float converted to
+the nearest `int`; a vertex number below 0 is written outside the volume: FS-53). Then a big-endian
+`int` tag: the file ending first: `ERROR: ReadAnnotAsMRISeg(): no color table found in <f>` and no
+volume; tag 1: a binary colour table (§13), and `colortable with <n> entries read (originally
+<name>)` when it reads; another tag: no table. With the voxels and a table, each vertex's annotation
+(taken back as an `int`, truncated) is replaced by the first entry of its colour (0 when none) and
+`ReadAnnotAsMRISeg(): nhits = <k>` is printed, `<k>` the vertices whose annotation was not 0. The
+numbers a cut file ends are memory contents (FS-49: they share their memory between reads, but not
+across the volume's allocation or a voxel write).
+
+**`mriNrrdWrite`** (`MRIwriteType`'s type 26): FreeSurfer 8.2.0 writes no NRRD: `mriNrrdWrite(): Nrrd
+output not supported!` (`ERROR_UNSUPPORTED`, the `errno` its caller left printed first: ENOENT after
+the folder check of a new name), nothing written; -3.
+
+## 120. `mri_read`'s frees (FS-672, FS-717)
+
+When `mri_read` is given a frame list (`name#n` or `#a:b`, §42) it frees the volume its reader gave
+(after copying the frames, or on an error). Two volumes make that free misbehave in FreeSurfer:
+one whose Talairach transform (a COR header's `xform`, an MGH tag) failed to load (FS-672: the free
+reads a transform never written: usually `delete_general_transform` and status 1), and the header
+of a multi-frame volume read without its voxels whose frame table has one entry (an AFNI dataset's;
+FS-717: the free reads past the table: a crash or not, as memory holds). larmorx frees nothing
+wrongly in both modes and notes them.
+
+## 121. Validation plan (part 24)
+
+Piece 22 of the fs.io probe: `afd` and `afh` (`mri_read` with and without voxels, the type -1 or 7)
+of AFNI pairs built attribute by attribute (every attribute above, AFNI's spacing or none, CR LF
+lines, unknown attributes, AFNI's order or shuffled; one fault each: an attribute missing, of the
+wrong type, with too few or too many numbers, a bad token, a negative, zero or bare count, a string
+without its `'` or its `~`, `TYPESTRING`s of 15 to 90 characters, `BYTEORDER_STRING`s of 9 to 20, a
+count before any type line, an unknown type, a last line without a newline, orientations out of
+range or degenerate, other byte orders, brick types 2, 4, 5, 6 and -1, mixed brick types, too few
+stats or factors, a numbers line starting with `type`; frames of mixed factors; BRIKs right, a value
+short, longer, missing or a folder; names `.BRIK`, `.brik`, without an extension, missing; frame
+lists), `cud` and `cuh` (the type -1 or 25: curvature files whole, cut anywhere, old-format, values per
+vertex 0 to 3, NaN and infinite values, a folder), `and` and `anh` (the type -1 or 33: annotations with
+vertex numbers in range, `n` and -1, colour tables of both versions, another tag, none, cut files,
+missing files, folders), `kwr` (`MRIwriteType` as type 7 or 26, onto new names, missing folders and
+existing folders, the read back). FreeSurfer's lines where it crashes, reads for ever or depends on
+the machine (FS-693, FS-697, FS-709, FS-710, FS-712, FS-715, FS-716, FS-53, FS-672, FS-717, and
+those of the earlier pieces) are skipped; memory contents (FS-695, FS-696's, FS-701, FS-711, FS-713,
+FS-714, FS-49, FS-167) compared apart. Measured (2026-11-14, observed): seeds 7 (1,099 piece-22
+cases), 13, 21 and 99 (2,200 each): `reproduce` identical on every comparable case (seed 13: 1,932
+identical, 101 skipped, 167 compared apart; seed 99: 1,932, 112, 156), 0 different; `fix` differs
+only with notices (FS-01's message byte, FS-704's names, FS-694, FS-698, FS-699, FS-700, FS-702,
+FS-706, FS-707, FS-708).

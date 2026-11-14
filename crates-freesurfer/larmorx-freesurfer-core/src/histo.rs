@@ -100,6 +100,8 @@ use crate::utils::{nint, resolve};
 
 /// `MAX_BINS`.
 pub const MAX_BINS: i32 = 10000;
+/// `ENOMEM`: the C library's `calloc` sets it when the size cannot be allocated.
+const ENOMEM: i32 = 12;
 /// `HISTOsmooth`'s `MAX_LEN`: the longest kernel.
 const MAX_LEN: i32 = 2000;
 /// `HISTOfindLastPeakInRegion`'s `MIN_STD`.
@@ -233,9 +235,11 @@ pub fn histo_free(h: &mut Option<Histogram>) -> i32 {
 }
 
 /// `HISTOalloc(nbins)`: zeros, `max_bins = nbins = nbins`. A negative count is an allocation
-/// that fails: `HISTOalloc(<n>): could not allocate histogram` and the program's end.
+/// that fails, setting `errno` to `ENOMEM` as the C library's does: `Cannot allocate memory`,
+/// `HISTOalloc(<n>): could not allocate histogram` and the program's end.
 pub fn histo_alloc(g: &mut Globals, err: &mut dyn Write, nbins: i32) -> Result<Histogram, Fatal> {
     if nbins < 0 {
+        g.errno = ENOMEM;
         log::error_exit(
             g,
             err,
@@ -248,7 +252,8 @@ pub fn histo_alloc(g: &mut Globals, err: &mut dyn Write, nbins: i32) -> Result<H
 }
 
 /// `HISTOrealloc(histo, nbins)`: a new histogram when there is none; else new arrays of zeros,
-/// `max_bins = nbins = nbins` (the other fields kept).
+/// `max_bins = nbins = nbins` (the other fields kept). A negative count fails as `histo_alloc`'s
+/// (`errno` `ENOMEM`).
 pub fn histo_realloc(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -259,6 +264,7 @@ pub fn histo_realloc(
         return Ok(Ret::New(histo_alloc(g, err, nbins)?));
     };
     if nbins < 0 {
+        g.errno = ENOMEM;
         log::error_exit(
             g,
             err,

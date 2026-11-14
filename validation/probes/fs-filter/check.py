@@ -40,7 +40,24 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FS-539), FS-58 (a volume without voxels), FS-53 (a mask smaller than the volume read past its
 # memory). FS-539's reads of the next row are compared: they are
 # deterministic, and reproduce follows them
-SKIP = ("FS-540", "FS-541", "FS-58", "FS-53")
+# FS-546 (a convolution's access outside the volumes' memory), FS-548 (a kernel volume read as
+# floats past its memory), FS-549 (a kernel longer than the index tables), FS-550 (a crash), FS-551
+# (a matrix written past its end), FS-552 (a crash), FS-555 (a Sobel filter writing outside its
+# destination), FS-163 (a copy into a volume of fewer frames: FreeSurfer writes past it)
+SKIP = (
+    "FS-540",
+    "FS-541",
+    "FS-58",
+    "FS-53",
+    "FS-546",
+    "FS-548",
+    "FS-549",
+    "FS-550",
+    "FS-551",
+    "FS-552",
+    "FS-555",
+    "FS-163",
+)
 
 
 def probe_binary(ws: Path) -> Path:

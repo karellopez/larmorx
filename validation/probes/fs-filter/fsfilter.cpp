@@ -31,6 +31,8 @@
 #include "fastmarching.h"
 #include "mri.h"
 
+MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
+
 const char *Progname = "fsfilter";
 
 namespace {
@@ -112,6 +114,34 @@ MRI *get_vol()
 // an optional volume: 0 for none, 1 and a volume
 MRI *get_opt() { return geti() ? get_vol() : NULL; }
 
+double getd()
+{
+  uint64_t u = (uint64_t)strtoull(next(), NULL, 16);
+  double d;
+  memcpy(&d, &u, 8);
+  return d;
+}
+
+// a volume with its centre: get_vol's tokens, then c_r c_a c_s (float bits)
+MRI *get_volc()
+{
+  MRI *m = get_vol();
+  m->c_r = getf();
+  m->c_a = getf();
+  m->c_s = getf();
+  MRIreInitCache(m);
+  return m;
+}
+
+// a kernel: its length, then its weights (float bits)
+std::vector<float> get_kernel()
+{
+  int n = geti();
+  std::vector<float> k(n > 0 ? n : 0);
+  for (int i = 0; i < n; i++) k[i] = getf();
+  return k;
+}
+
 // the volume: extent, type, frames, outside_val, xsize, then its stored voxels as get_vol reads them
 void put_vol(const MRI *m)
 {
@@ -151,9 +181,136 @@ void put_vol(const MRI *m)
   flush();
 }
 
+// the header fields fs.filter's functions set: the voxel sizes, direction cosines, centre, start
+// and end coordinates, thickness, pixel size (float bits), scale, imnr0, imnr1
+void put_hdr(const MRI *m)
+{
+  if (!m) return;
+  for (float f : {m->xsize, m->ysize, m->zsize, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a, m->y_s, m->z_r,
+                  m->z_a, m->z_s, m->c_r, m->c_a, m->c_s, m->xstart, m->xend, m->ystart, m->yend,
+                  m->zstart, m->zend, m->thick, m->ps})
+    of(f);
+  oi(m->scale); oi(m->imnr0); oi(m->imnr1);
+}
+
+void put_full(const MRI *m)
+{
+  put_vol(m);
+  put_hdr(m);
+}
+
+// the destination of a function F(src, ..., dst): 0 none, 1 a given volume, 2 the source itself
+MRI *get_dst(int mode, MRI *src) { return mode == 1 ? get_vol() : mode == 2 ? src : NULL; }
+
+// the result r of a call given dst: whether it is dst, then r's volume (NULL when NULL), then dst's
+// when one was given and r is another
+void put_result(MRI *r, MRI *dst)
+{
+  oi(r == dst);
+  put_full(r);
+  if (dst && r != dst) put_full(dst);
+}
+
+bool filter_case(const std::string &cmd)
+{
+  if (cmd == "g1d") {
+    float sigma = getf();
+    int max_len = geti();
+    put_full(MRIgaussian1d(sigma, max_len));
+  } else if (cmd == "cv1" || cmd == "cvb" || cmd == "cvs" || cmd == "cvi") {
+    // cv1|cvb|cvs|cvi <src> <dst?> <kernel> axis src_frame dst_frame
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    std::vector<float> k = get_kernel();
+    int axis = geti(), sf = geti(), df = geti();
+    float *kp = k.data();
+    int len = (int)k.size();
+    MRI *r = cmd == "cv1" ? MRIconvolve1d(src, dst, kp, len, axis, sf, df)
+           : cmd == "cvb" ? MRIconvolve1dByte(src, dst, kp, len, axis, sf, df)
+           : cmd == "cvs" ? MRIconvolve1dShort(src, dst, kp, len, axis, sf, df)
+                          : MRIconvolve1dInt(src, dst, kp, len, axis, sf, df);
+    put_result(r, dst);
+  } else if (cmd == "cvg") {
+    // cvg <src> <dst mode> [<dst>] <kernel volume>
+    MRI *src = get_vol();
+    MRI *dst = get_dst(geti(), src);
+    MRI *kv = get_vol();
+    MRI *r = MRIconvolveGaussian(src, dst, kv);
+    put_result(r, dst);
+  } else if (cmd == "gsn" || cmd == "gs") {
+    // gsn <src> <dst mode> [<dst>] cstd rstd sstd (double bits); gs <src> <dst mode> [<dst>] std norm
+    MRI *src = get_vol();
+    MRI *dst = get_dst(geti(), src);
+    MRI *r;
+    if (cmd == "gsn") {
+      double c = getd(), rr = getd(), s = getd();
+      r = MRIgaussianSmoothNI(src, c, rr, s, dst);
+    } else {
+      double s = getd();
+      int norm = geti();
+      r = MRIgaussianSmooth(src, s, norm, dst);
+    }
+    put_result(r, dst);
+  } else if (cmd == "mgs") {
+    // mgs <src> <mask?> <dst mode> [<dst>] std
+    MRI *src = get_vol();
+    MRI *mask = get_opt();
+    MRI *dst = get_dst(geti(), src);
+    double s = getd();
+    put_result(MRImaskedGaussianSmooth(src, mask, s, dst), dst);
+  } else if (cmd == "mean") {
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    int wsize = geti();
+    put_result(MRImean(src, dst, wsize), dst);
+  } else if (cmd == "std" || cmd == "stdnz") {
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    MRI *mean = get_vol();
+    int wsize = geti();
+    MRI *r = cmd == "std" ? MRIstd(src, dst, mean, wsize) : MRIstdNonzero(src, dst, mean, wsize);
+    put_result(r, dst);
+  } else if (cmd == "red" || cmd == "red2") {
+    MRI *src = get_volc();
+    MRI *dst = get_opt();
+    put_result(cmd == "red" ? MRIreduce(src, dst) : MRIreduce2D(src, dst), dst);
+    put_hdr(src);
+  } else if (cmd == "r1d" || cmd == "rsl") {
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    std::vector<float> k = get_kernel();
+    int axis = geti();
+    MRI *r = cmd == "r1d" ? MRIreduce1d(src, dst, k.data(), (int)k.size(), axis)
+                          : MRIreduceSlice(src, dst, k.data(), (int)k.size(), axis);
+    put_result(r, dst);
+  } else if (cmd == "xsob" || cmd == "ysob" || cmd == "zsob") {
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    int frame = geti();
+    MRI *r = cmd == "xsob" ? MRIxSobel(src, dst, frame) : cmd == "ysob" ? MRIySobel(src, dst, frame)
+                                                         : MRIzSobel(src, dst, frame);
+    put_result(r, dst);
+  } else if (cmd == "sob" || cmd == "sobf") {
+    MRI *src = get_vol();
+    MRI *grad = get_opt();
+    MRI *mag = get_opt();
+    MRI *r = cmd == "sob" ? MRIsobel(src, grad, mag) : MRIsobelFrame(src, grad, mag, geti());
+    put_result(r, grad);
+    if (mag) put_full(mag);
+  } else if (cmd == "div" || cmd == "lap") {
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    put_result(cmd == "div" ? MRIdivergence(src, dst) : MRIlaplacian(src, dst), dst);
+  } else {
+    return false;
+  }
+  return true;
+}
+
 void run_case()
 {
   std::string cmd = next();
+  if (filter_case(cmd)) return;
   if (cmd == "edm" || cmd == "dtr") {
     // edm|dtr <src> <dst?> label max_distance mode <mask?>
     MRI *src = get_vol();

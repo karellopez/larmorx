@@ -22,6 +22,9 @@ use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, mri_alloc_sequence,
 };
 
+#[path = "conv.rs"]
+mod conv;
+
 /// The cases' random numbers.
 pub struct Gen(u64);
 
@@ -290,13 +293,21 @@ fn dist_case(g: &mut Gen, t: &mut Vec<String>) {
     }
 }
 
-/// `n` case lines of `seed`.
+/// `n` case lines of `seed`: the distance maps' cases and each command of [`conv`] in turn.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
+    let round = conv::COMMANDS.len() + 1;
     (0..n)
-        .map(|_| {
+        .map(|k| {
             let mut t = Vec::new();
-            dist_case(&mut g, &mut t);
+            match k % round {
+                0 => dist_case(&mut g, &mut t),
+                i => {
+                    let cmd = conv::COMMANDS[i - 1];
+                    t.push(cmd.to_owned());
+                    conv::gen_case(&mut g, &mut t, cmd);
+                }
+            }
             t.join(" ")
         })
         .collect()
@@ -420,6 +431,9 @@ fn put_vol(o: &mut String, m: &Mri) {
 
 fn case(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
     let cmd = t.next();
+    if conv::run(cx, cmd, t, o)? {
+        return Ok(());
+    }
     match cmd {
         "edm" | "dtr" => {
             let src = get_vol(cx, t)?;

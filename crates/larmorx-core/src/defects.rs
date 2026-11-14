@@ -1653,6 +1653,30 @@ defects! {
         "MRIdistanceTransform with DTRANS_MODE_INSIDE computes the unsigned distances on both sides of the label (DTRANS_MODE_UNSIGNED's map) instead of the distances inside it";
     FS_544 = "FS-544", "FreeSurfer", true,
         "the fast-marching distance maps given a mode they do not know (MRIextractDistanceMap's 1 to 4, MRIdistanceTransform's DTRANS_MODE_* 1 to 4, mris_distance_to_label's -mode) return a map of zeros without a message";
+    FS_545 = "FS-545", "FreeSurfer", true,
+        "the one-dimensional convolution (MRIconvolve1d) of a volume of a type other than uchar or float into a float volume takes the volume's outside value before the first voxel of a row and the next row's voxels past its last, where uchar and float volumes (and the integer-typed convolutions) repeat the edge voxel";
+    FS_546 = "FS-546", "FreeSurfer", true,
+        "the one-dimensional convolutions (MRIconvolve1d and its uchar, short and int forms) given a destination smaller than the source, or a source or destination frame the volume does not have, read and write other voxels or memory outside the volumes (a crash, memory corruption or memory contents)";
+    FS_547 = "FS-547", "FreeSurfer", true,
+        "the one-dimensional convolution into a uchar volume reads a float source's memory byte by byte as uchar voxels, and into a short or int volume reads a source of another type as shorts or ints: the values are other voxels' bytes, and for a narrower source type memory past the volume";
+    FS_548 = "FS-548", "FreeSurfer", true,
+        "the separable Gaussian convolution (MRIconvolveGaussian) given a kernel volume that is not float reads its memory as floats: wrong weights, or memory past the kernel";
+    FS_549 = "FS-549", "FreeSurfer", true,
+        "the one-dimensional convolutions with a kernel longer than 1,001 taps read past the volume's boundary index tables near the edges: memory contents as voxel indices (a crash or wrong voxels)";
+    FS_550 = "FS-550", "FreeSurfer", true,
+        "the separable Gaussian convolution (MRIconvolveGaussian) of a volume without frames crashes (an integer division by zero)";
+    FS_551 = "FS-551", "FreeSurfer", true,
+        "the Gaussian smoothing (MRIgaussianSmoothNI, MRIgaussianSmooth, MRImaskedGaussianSmooth) of a volume with an extent of 0 along a smoothed axis writes outside a matrix (memory corruption)";
+    FS_552 = "FS-552", "FreeSurfer", true,
+        "the masked Gaussian smoothing (MRImaskedGaussianSmooth) given a target whose extent or frames differ from the source's prints the smoother's dimension-mismatch error and then crashes";
+    FS_553 = "FS-553", "FreeSurfer", true,
+        "the pyramid reduction (MRIreduce) of a volume of one slice, without a destination, returns a volume of depth 0 (no voxels) instead of the reduced slice";
+    FS_554 = "FS-554", "FreeSurfer", true,
+        "the six-neighbour Laplacian (MRIlaplacian) of a volume of several frames takes the centre voxel of every frame from the first frame";
+    FS_555 = "FS-555", "FreeSurfer", true,
+        "the Sobel derivatives (MRIxSobel, MRIySobel, MRIzSobel, MRIsobel and its gradient magnitude) given a destination smaller than the source or without the frame they write, or, for a source that is not uchar, a destination that is not float, write floats into other voxels' bytes or into memory outside it (memory corruption, a crash), and read a gradient volume without its three frames outside its memory";
+    FS_556 = "FS-556", "FreeSurfer", true,
+        "the divergence (MRIdivergence) ignores the destination it is given: it returns a new volume and leaves the given one unchanged";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

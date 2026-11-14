@@ -721,8 +721,21 @@ pub fn cor_write(
     if !use_name.ends_with('/') {
         use_name.push('/');
     }
-    if let Err(e) = std::fs::create_dir(utils::resolve(dir, &use_name)) {
-        let code = log::errno_of(&e).unwrap_or(5);
+    let target = utils::resolve(dir, &use_name);
+    if let Err(e) = std::fs::create_dir(&target) {
+        // Linux's mkdir answers EEXIST for any name that exists, a file included (with the trailing
+        // slash too); macOS answers ENOTDIR for a file: the existing name gives Linux's EEXIST on
+        // every platform, as FreeSurfer's official programs run on Linux (CI, batch 14).
+        let exists = !cfg!(target_os = "linux")
+            && std::fs::symlink_metadata(
+                target.as_os_str().to_string_lossy().trim_end_matches('/'),
+            )
+            .is_ok();
+        let code = if exists {
+            EEXIST
+        } else {
+            log::errno_of(&e).unwrap_or(5)
+        };
         g.errno = code;
         if code != EEXIST {
             let _ = writeln!(out, "ERROR: creating directory {use_name}");

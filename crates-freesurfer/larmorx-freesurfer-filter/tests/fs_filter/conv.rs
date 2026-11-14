@@ -28,7 +28,7 @@ pub const COMMANDS: [&str; 32] = [
 
 /// A volume of blobs: random boxes of values above 0 on a background (uchar mostly; float with
 /// negative values and NaNs, or int, now and then).
-fn blobs(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
+pub(super) fn blobs(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
     let ty = if g.chance(4) {
         g.pick(&[MRI_FLOAT, MRI_INT, MRI_SHORT])
     } else {
@@ -136,12 +136,12 @@ fn intensities(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
     t.extend(rle(&vals));
 }
 
-fn dx(v: f64) -> String {
+pub(super) fn dx(v: f64) -> String {
     format!("{:016x}", v.to_bits())
 }
 
 /// A small extent (one voxel along an axis now and then).
-fn small(g: &mut Gen, max: i64) -> [i32; 3] {
+pub(super) fn small(g: &mut Gen, max: i64) -> [i32; 3] {
     let mut e = [0; 3];
     for x in &mut e {
         *x = if g.chance(8) { 1 } else { g.int(2, max) as i32 };
@@ -149,14 +149,14 @@ fn small(g: &mut Gen, max: i64) -> [i32; 3] {
     e
 }
 
-fn any_type(g: &mut Gen) -> i32 {
+pub(super) fn any_type(g: &mut Gen) -> i32 {
     g.pick(&[
         MRI_UCHAR, MRI_UCHAR, MRI_FLOAT, MRI_FLOAT, MRI_SHORT, MRI_INT, MRI_LONG, MRI_USHRT,
     ])
 }
 
 /// A float value: small multiples, with now and then NaNs of several payloads, infinities, -0.
-fn fval(g: &mut Gen) -> f32 {
+pub(super) fn fval(g: &mut Gen) -> f32 {
     if g.chance(40) {
         return g.pick(&[
             f32::NAN,
@@ -175,7 +175,7 @@ fn fval(g: &mut Gen) -> f32 {
 }
 
 /// A volume's tokens: extent, type, frames, voxel sizes, then its voxels (random values).
-fn vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
+pub(super) fn vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
     t.extend(e.map(|v| v.to_string()));
     t.push(ty.to_string());
     t.push(nf.to_string());
@@ -225,7 +225,7 @@ fn vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
 }
 
 /// A binary-ish mask (uchar or float).
-fn mask_vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
+pub(super) fn mask_vol(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3]) {
     let ty = if g.chance(3) { MRI_FLOAT } else { MRI_UCHAR };
     t.extend(e.map(|v| v.to_string()));
     t.push(ty.to_string());
@@ -269,7 +269,7 @@ fn kernel(g: &mut Gen, t: &mut Vec<String>) {
     }
 }
 
-fn frame(g: &mut Gen, nf: i32) -> i32 {
+pub(super) fn frame(g: &mut Gen, nf: i32) -> i32 {
     if g.chance(15) {
         g.pick(&[-1, nf, 5])
     } else {
@@ -278,7 +278,7 @@ fn frame(g: &mut Gen, nf: i32) -> i32 {
 }
 
 /// An optional destination volume: none, or one of `ty` (sometimes another extent or frames).
-fn opt_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32, odd: u64) {
+pub(super) fn opt_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32, odd: u64) {
     if g.chance(2) {
         t.push("0".into());
         return;
@@ -297,7 +297,7 @@ fn opt_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32, odd:
 }
 
 /// A destination by mode: 0 none, 1 given (`ty`, sometimes another extent or frames), 2 the source.
-fn mode_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
+pub(super) fn mode_dst(g: &mut Gen, t: &mut Vec<String>, e: [i32; 3], ty: i32, nf: i32) {
     let m = g.pick(&[0, 0, 1, 2]);
     t.push(m.to_string());
     if m == 1 {
@@ -612,7 +612,7 @@ fn hdr(o: &mut String, m: &Mri) {
     *o += &format!("{} {} {} ", m.scale, m.imnr0, m.imnr1);
 }
 
-fn full(o: &mut String, m: Option<&Mri>) {
+pub(super) fn full(o: &mut String, m: Option<&Mri>) {
     match m {
         None => *o += "NULL ",
         Some(m) => {
@@ -623,7 +623,7 @@ fn full(o: &mut String, m: Option<&Mri>) {
 }
 
 /// `put_result(r, dst)` for a result that may be the given destination.
-fn result(o: &mut String, r: Ret<Mri>, dst: Option<&Mri>) {
+pub(super) fn result(o: &mut String, r: Ret<Mri>, dst: Option<&Mri>) {
     match r {
         Ret::New(m) => {
             *o += "0 ";
@@ -646,7 +646,7 @@ fn result(o: &mut String, r: Ret<Mri>, dst: Option<&Mri>) {
     }
 }
 
-fn get_volc(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+pub(super) fn get_volc(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
     let mut m = get_vol(cx, t)?;
     m.vg.c_r = t.f();
     m.vg.c_a = t.f();
@@ -655,7 +655,7 @@ fn get_volc(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
     Ok(m)
 }
 
-fn opt(cx: &mut Ctx, t: &mut Toks) -> Result<Option<Mri>, Fatal> {
+pub(super) fn opt(cx: &mut Ctx, t: &mut Toks) -> Result<Option<Mri>, Fatal> {
     Ok(if t.i() != 0 {
         Some(get_vol(cx, t)?)
     } else {
@@ -668,7 +668,7 @@ fn kern(t: &mut Toks) -> Vec<f32> {
     (0..n.max(0)).map(|_| t.f()).collect()
 }
 
-fn dbl(t: &mut Toks) -> f64 {
+pub(super) fn dbl(t: &mut Toks) -> f64 {
     f64::from_bits(u64::from_str_radix(t.next(), 16).expect("hex"))
 }
 
@@ -960,7 +960,7 @@ fn smooth(
 }
 
 /// `put_result(r, src)` when the source was its own destination.
-fn same_result(o: &mut String, r: Ret<Mri>, src: &Mri) {
+pub(super) fn same_result(o: &mut String, r: Ret<Mri>, src: &Mri) {
     match r {
         Ret::New(m) => {
             *o += "0 ";

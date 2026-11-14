@@ -22,8 +22,16 @@ use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, mri_alloc_sequence,
 };
 
+#[path = "clus.rs"]
+mod clus;
 #[path = "conv.rs"]
 mod conv;
+#[path = "fmri.rs"]
+mod fmri;
+#[path = "normz.rs"]
+mod normz;
+#[path = "seg.rs"]
+mod seg;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -297,19 +305,44 @@ fn dist_case(g: &mut Gen, t: &mut Vec<String>) {
 const DIST_PER_ROUND: usize = 8;
 
 /// `n` case lines of `seed`: in each round, [`DIST_PER_ROUND`] distance maps' cases, then each
-/// command of [`conv`] once.
+/// command of [`conv`] once, then each command of [`fmri`] once, then each command of [`clus`]
+/// once, then each command of [`seg`] once, then each command of [`normz`] once.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
-    let round = conv::COMMANDS.len() + DIST_PER_ROUND;
+    let nconv = conv::COMMANDS.len();
+    let nfmri = fmri::COMMANDS.len();
+    let nclus = clus::COMMANDS.len();
+    let nseg = seg::COMMANDS.len();
+    let round = nconv + nfmri + nclus + nseg + normz::COMMANDS.len() + DIST_PER_ROUND;
     (0..n)
         .map(|k| {
             let mut t = Vec::new();
             match k % round {
                 i if i < DIST_PER_ROUND => dist_case(&mut g, &mut t),
-                i => {
+                i if i < DIST_PER_ROUND + nconv => {
                     let cmd = conv::COMMANDS[i - DIST_PER_ROUND];
                     t.push(cmd.to_owned());
                     conv::gen_case(&mut g, &mut t, cmd);
+                }
+                i if i < DIST_PER_ROUND + nconv + nfmri => {
+                    let cmd = fmri::COMMANDS[i - DIST_PER_ROUND - nconv];
+                    t.push(cmd.to_owned());
+                    fmri::gen_case(&mut g, &mut t, cmd);
+                }
+                i if i < DIST_PER_ROUND + nconv + nfmri + nclus => {
+                    let cmd = clus::COMMANDS[i - DIST_PER_ROUND - nconv - nfmri];
+                    t.push(cmd.to_owned());
+                    clus::gen_case(&mut g, &mut t, cmd);
+                }
+                i if i < DIST_PER_ROUND + nconv + nfmri + nclus + nseg => {
+                    let cmd = seg::COMMANDS[i - DIST_PER_ROUND - nconv - nfmri - nclus];
+                    t.push(cmd.to_owned());
+                    seg::gen_case(&mut g, &mut t, cmd);
+                }
+                i => {
+                    let cmd = normz::COMMANDS[i - DIST_PER_ROUND - nconv - nfmri - nclus - nseg];
+                    t.push(cmd.to_owned());
+                    normz::gen_case(&mut g, &mut t, cmd);
                 }
             }
             t.join(" ")
@@ -436,6 +469,18 @@ fn put_vol(o: &mut String, m: &Mri) {
 fn case(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
     let cmd = t.next();
     if conv::run(cx, cmd, t, o)? {
+        return Ok(());
+    }
+    if fmri::run(cx, cmd, t, o)? {
+        return Ok(());
+    }
+    if clus::run(cx, cmd, t, o)? {
+        return Ok(());
+    }
+    if seg::run(cx, cmd, t, o)? {
+        return Ok(());
+    }
+    if normz::run(cx, cmd, t, o)? {
         return Ok(());
     }
     match cmd {

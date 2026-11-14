@@ -22,6 +22,14 @@ brings code adds its files and functions here, with the third-party code it foun
 | `src/classify.rs` | `utils/mrifilter.cpp` (`MRImarkBorderVoxels` 4515, `MRIborderClassifyVoxel` 4687, `MRIreclassify` 4824, `MRIcomputeClassStatistics` 5395); `include/mri.h` (`MRI_AMBIGUOUS`, `MRI_WHITE`, `MRI_NOT_WHITE`) | 3.1-42, track D relay 26 |
 | `src/cc.rs` | `utils/connectcomp.cpp` (`xoff6`..`zoff26` 30-36, `RemoveHoles` 38, `GrassFire6` 180, `GrassFire18` 260, `GetLargestCC6` 340, `GetLargestCC18` 391; `myList*`/`myQueue*` 779-1335 as a `VecDeque`) | 3.1-42, track D relay 26 |
 | `src/diffuse.rs` | `utils/diffuse.cpp` (the global tables `sy`, `sx`, 28-29) | 3.1-42, track D relay 26 |
+| `src/fmri.rs` | `utils/fmriutils.cpp` (`fMRImatrixMultiply` 49, `fMRIcovariance` 120, `fMRItemporalAR1` 193, `fMRInskip` 521, `fMRIndrop` 572, `fMRIframe` 623, `MRIvolMax` 1450, `MRIvolMin` 1486, `MRIconjunct` 1531, `MRIvolMaxIndex` 1571, `MRIframeMean` 1683, `MRIframeMedian` 1720, `MRIframeSum` 1745, `fMRIsubSample` 2371, `fMRIextractFrames` 2412, `ASLinterpMatrix` 2645, `fMRItoMatrix` 2681, `fMRIfromMatrix` 2719, `fMRIspatialCorMatrix` 2790, `fMRIcumSum` 2886, `MRIframeNorm` 2999); `utils/matrix.cpp` (`MatrixDemean` 4039, the in-place call only); `include/surfcluster.h` (`SIGN`) | 3.1-42, track D relay 27 |
+| `src/volcluster.rs` | `utils/volcluster.cpp` (`clustAllocCluster` 40, `clustAllocClusterList` 60, `clustFreeCluster` 72, `clustFreeClusterList` 110, `clustValueInRange` 165, `clustInitHitMap` 181, `clustAddMember` 297, `clustGrowOneVoxel` 357, `clustGrow` 398, `clustMaxMember` 437, `clustPruneBySize` 458, `clustPruneByDistance` 486, `clustCopyCluster` 580, `clustCopyClusterList` 609, `clustCompareCluster` 623, `clustSortClusterList` 646, `clustComputeXYZ` 667, `clustComputeTal` 680, `clustClusterList2Vol` 693, `clustGetClusters` 778, `ConvertCRS2XYZ` 925, `MRIremoveVolumeIslands` 2056, `MRIremoveVolumeHoles` 2114); `include/volcluster.h` (`VOLCLUSTER`) | 3.1-43 (40-165), 3.1-44 (181-925) and lines 2056-2175, track D relay 27 |
+| `src/nonpar.rs` | `utils/mrifilter.cpp` (`MRIreclassifyWMCtxNonPar` 4914, `MRIclassifyAmbiguousNonPar` 5093) | 3.1-42, track D relay 27 |
+| `src/segment.rs` | `utils/mrisegment.cpp` (`MRImaxSegmentArea` 67, `MRImaxsegment` 83, `MRIsegment` 313, `MRIsegmentFree` 477, `MRIsegmentAlloc` 499, `mriSegmentMerge` 529, `mriSegmentReallocateVoxels` 573, `mriSegmentReallocateSegments` 638, `MRIsegmentToImage` 672, `MRIsetSegmentValue` 703, `mriSegmentNew` 727, `MRIcompactSegments` 757, `MRIsegmentDilate` 829, `MRIremoveSmallSegments` 883, `MRIeraseSmallSegments` 900, `mriComputeSegmentStatistics` 924, `MRIsegmentDilateThreshold` 958, `MRIsegmentMax` 1014, `MRIsegmentClearIgnoreFlags` 1034, `MRIfindMaxSegmentNumber` 1046, `MRIsegmentFill` 1061); `include/mrisegment.h` (`MSV`, `MRI_SEGMENT`, `MRI_SEGMENTATION`); `utils/rfa.cpp` (`csf_labels` 680) | 3.1-43, track D relay 28 |
+| `src/flood.rs` | `utils/mriflood.cpp` (`MRISfloodoutside` 253, `MRISaccentuate` 433, `distance` 1129) | 3.1-43, track D relay 28 |
+| `src/norm.rs` | `utils/mrinorm.cpp` (`mriBuildVoronoiDiagramShort` 1635, `mriBuildVoronoiDiagramFloat` 1795, `mriBuildVoronoiDiagramUchar` 1943, `MRIbuildVoronoiDiagram` 2097, `MRIsoapBubble` 2119, `mriSoapBubbleFloat` 2367, `mriSoapBubbleShort` 2521, `mriMarkUnmarkedNeighbors` 2708); `include/mrinorm.h` (`CONTROL_*`) | 3.1-43, track D relay 28 |
+| `src/normalize.rs` | `utils/mrinorm.cpp` (the file's state 75-81, `MRIsplineNormalize` 98, `mriSplineNormalizeShort` 168, `MRInormInit` 368, `MRInormFindPeaks` 555, `MRInormCheckPeaks` 610, `MRInormGentlyFindControlPoints` 1096, `MRInormFindControlPointsInWindow` 1260, `MRIbuildBiasImage` 1347, `MRI3dGentleNormalize` 1502, `mriRemoveOutliers` 2781, `MRI3dUseFileControlPoints` 2838, `MRI3dUseLabelControlPoints` 2940, `MRI3dWriteControlPoints` 2985, `MRI3dWriteBias` 2991, `MRInormAddFileControlPoints` 2997, `csf_in_window` 3292, `MRIapplyBiasCorrectionSameGeometry` 3635); `include/mrinorm.h` (`MNI`, the window and peak constants) | 3.1-43, track D relay 29 |
+| `src/normalize.rs` (relay 30 part) | `utils/mrinorm.cpp` (`MRInormFillHistograms` 536, `MRInormalize` 724, `MRInormFindControlPoints` 774, `MRI3dNormalize` 1386, `remove_gray_matter_control_points` 3043, `find_tissue_intensities` 3355) | 3.1-43, track D relay 30 |
 | `src/mem.rs` | the row-pointer voxel macros of `include/mri.h` (`MRIvox`, `MRIseq_vox`, `MRIFseq_vox`, `MRISseq_vox`, `MRIIseq_vox` 1477-1495) as an access model (in, another voxel, outside) | 3.1-42, track D relay 26 |
 | `src/fastmarch.rs` | `utils/mri_fastmarching.cpp` (`MRIextractDistanceMap`, 25-116); `include/fastmarching.h` (`FastMarching<sign>`: constructor, destructor, `Init`, `SetLimit`, `AddTrialPoint`, `AddAlivePoint`, `InitTrialFromAlive`, `Run`, `_UpdatePoint`, `_GetValue`, `_UpdateValue`, `InitFromMRI`, `_AddAlivePoint`; `HeapCompare`); `utils/mri.cpp` (`MRIdistanceTransform`, 15492-15540) | 3.1-42, track D relay 25 |
 
@@ -32,6 +40,11 @@ headers name Florent Segonne for `mri_fastmarching.cpp` and `connectcomp.cpp`, B
 its steps are written here from the algorithm (a binary heap's sift-up and sift-down in that
 order, `specs/freesurfer-filter.md` §5), not copied; the official build's machine code
 (`mri_fastmarching.cpp.o` of the unit oracle) gave `_UpdateValue`'s operand orders.
+
+`mriflood.cpp`'s surface functions (`MRISshell`, `MRISribbon`, `MRISmakeBoundingVolume`,
+`MRISfillInterior`) are not here yet: they need `mrisurf_mri.cpp`'s surface-to-voxel maps
+(`MRISsurfaceRASToVoxel`, `MRIS_*RAS2VoxelMap`, queue item 3.4-02) and `mriset.cpp`'s
+`MRIcomplement` and `MRIintersect` (track C).
 
 `InitForOutsideMatch` and `MRISextractOutsideDistanceMap` (`utils/mris_fastmarching.cpp`, the
 surface variant) are not here: they need `MRISbinarizeVolume` (3.1-51's leftovers).
@@ -55,3 +68,10 @@ surface variant) are not here: they need `MRISbinarizeVolume` (3.1-51's leftover
   modes until measured, rule D); `reproduce` gives FreeSurfer's results, but where FreeSurfer
   crashes, hangs or touches memory outside its volumes (an error, or the accesses dropped and read
   as 0).
+- `mrisegment.cpp`: a segment's voxel list is a vector of `nvoxels` (no spare capacity: FreeSurfer's
+  `max_voxels` only decides memory); the scan's search for an empty slot and the compaction's
+  search for the next live slot resume where they stopped (the same slots, linear instead of
+  quadratic); `MRImaxsegment` takes `getMemoryUsed` as a function. FS-577 to FS-582.
+- `mrinorm.cpp`'s Voronoi diagram and soap bubble work on arrays of the volumes' values and write
+  them back; FreeSurfer's byte accesses of wider volumes read their bytes (FS-585); the float soap
+  bubble's OpenMP loop runs in one thread's order (FS-584). FS-583 to FS-586.

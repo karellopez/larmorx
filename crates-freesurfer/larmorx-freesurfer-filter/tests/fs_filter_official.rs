@@ -13,18 +13,52 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-14 from the clean commit 35804881 (the distance maps, the convolutions,
-/// smoothing, window statistics, reductions, derivatives, border classification and connected
-/// components): 800 cases, 711 lines identical, 89 hashed as `SKIP`.
-const N: usize = 800;
-const OFFICIAL_SHA256: &str = "6607b883ff71d2a108b3647deb9eb6f3140919e64df28e7331c393fc66e86bc7";
-const SKIPPED: usize = 89;
+/// Recorded 2026-11-14 from the clean commit f8f4442a (the distance maps, the convolutions,
+/// smoothing, window statistics, reductions, derivatives, border and non-parametric
+/// classification, connected components, the frame functions, the volume clusters, the connected
+/// segments, flooding, the Voronoi diagram and the soap bubble, the intensity normalisation with
+/// its histogram steps): 1,800 cases, 1,663 lines identical, 137 hashed as `SKIP`.
+const N: usize = 1800;
+const OFFICIAL_SHA256: &str = "ebc93e25841130e21667655b8d7c70fb2fe9c9991f811a5db5bbfab3b95c2388";
+const SKIPPED: usize = 137;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 15] = [
+const SKIP: [&str; 37] = [
     "FS-540", "FS-541", "FS-58", "FS-53", "FS-546", "FS-548", "FS-549", "FS-550", "FS-551",
-    "FS-552", "FS-555", "FS-163", "FS-559", "FS-560", "FS-561",
+    "FS-552", "FS-555", "FS-163", "FS-559", "FS-560", "FS-561", "FS-562", "FS-564", "FS-567",
+    "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575", "FS-579", "FS-581", "FS-582",
+    "FS-583", "FS-586", "FS-588", "FS-589", "FS-591", "FS-593", "FS-487", "FS-597", "FS-598",
+    "FS-600",
 ];
+
+/// FS-596: the number in `MRInormAddFileControlPoints`' message on rejected points is whatever
+/// FreeSurfer's register holds; where the port cannot know it (`check.py`'s `MASKED`) both sides'
+/// number is replaced by `?`.
+fn mask(out: &str, ids: &[&str]) -> String {
+    if !ids.contains(&"FS-596") {
+        return out.to_owned();
+    }
+    let (pre, tail) = ("!!!!! ", " control points rejected");
+    let mut r = String::new();
+    let mut rest = out;
+    while let Some(i) = rest.find(pre) {
+        let after = &rest[i + pre.len()..];
+        let n = after
+            .char_indices()
+            .take_while(|&(k, c)| c.is_ascii_digit() || (k == 0 && c == '-'))
+            .count();
+        if n > 0 && after[n..].starts_with(tail) {
+            r.push_str(&rest[..i + pre.len()]);
+            r.push('?');
+            rest = &after[n..];
+        } else {
+            r.push_str(&rest[..i + pre.len()]);
+            rest = after;
+        }
+    }
+    r.push_str(rest);
+    r
+}
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
@@ -36,7 +70,7 @@ fn reproduce_gives_the_official_outputs() {
             skipped += 1;
             h.update(b"SKIP\n");
         } else {
-            h.update(out.as_bytes());
+            h.update(mask(&out, &ids).as_bytes());
             h.update(b"\n");
         }
     }

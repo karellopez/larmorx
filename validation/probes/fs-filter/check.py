@@ -23,6 +23,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -45,7 +46,18 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # (a matrix written past its end), FS-552 (a crash), FS-555 (a Sobel filter writing outside its
 # destination), FS-163 (a copy into a volume of fewer frames: FreeSurfer writes past it), FS-559
 # (border labels written outside the destination), FS-560 (a histogram bin before its start), FS-561
-# (a region growing that never ends: the official run's alarm)
+# (a region growing that never ends: the official run's alarm), FS-562 (a covariance or AR(1)
+# map written directly into a destination that is not float or is smaller), FS-564 (a covariance
+# read after it could not be computed: a crash), FS-567 (a matrix too small for the volume written
+# past its end), FS-568 (a division by zero), FS-569 (a frame loop without end: a crash); FS-579 (a
+# segment number outside the segment table), FS-581 (16-bit voxel coordinates wrapping: writes outside
+# the label map), FS-582 (a segment voxel read outside the index tables), FS-583 (a crash), FS-586
+# (a destination or control volume smaller than the source, or of another type, written outside)
+# FS-588 (a control volume smaller than the source: memory outside), FS-589 (windows past the
+# index tables), FS-591 (windows past the MNI's arrays), FS-593 (a threshold never written),
+# FS-487 (a Talairach point through a matrix FreeSurfer could not make: a crash), FS-597 (tissue
+# levels from bins outside a histogram), FS-598 (a control-point search that never ends), FS-600
+# (peaks never written)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -62,7 +74,47 @@ SKIP = (
     "FS-559",
     "FS-560",
     "FS-561",
+    "FS-562",
+    "FS-564",
+    "FS-567",
+    "FS-568",
+    "FS-569",
+    "FS-570",
+    "FS-571",
+    "FS-573",
+    "FS-575",
+    "FS-579",
+    "FS-581",
+    "FS-582",
+    "FS-583",
+    "FS-586",
+    "FS-588",
+    "FS-589",
+    "FS-591",
+    "FS-593",
+    "FS-487",
+    "FS-597",
+    "FS-598",
+    "FS-600",
 )
+
+# MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000
+HEAP = re.compile(r"heap usage = -?[0-9]+ Kbytes")
+# FS-596: the number in MRInormAddFileControlPoints' message on rejected points is whatever a
+# register holds (not given to the message); where the port cannot know it, both sides' number is
+# masked and the rest of the line compared
+REJECTED = re.compile(r"!!!!! -?[0-9]+ control points rejected")
+MASKED = ("FS-596",)
+
+
+def normalise(line: str) -> str:
+    return HEAP.sub("heap usage = 1000 Kbytes", line)
+
+
+def mask(line: str, ids: list[str]) -> str:
+    if any(x in ids for x in MASKED):
+        return REJECTED.sub("!!!!! ? control points rejected", line)
+    return line
 
 
 def probe_binary(ws: Path) -> Path:
@@ -133,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if done.returncode != 0:
         raise SystemExit(f"fsfilter failed ({done.returncode}): {done.stderr[-2000:]}")
-    official = done.stdout.splitlines()
+    official = [normalise(line) for line in done.stdout.splitlines()]
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(
@@ -153,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
         cmd = case.split()[0]
+        c, r, f = mask(c, ids), mask(r, ids), mask(f, fids)
         for x in ids:
             rep_ids[x] += 1
         if any(x in ids for x in SKIP):

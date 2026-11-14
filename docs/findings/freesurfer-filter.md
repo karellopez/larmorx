@@ -131,5 +131,225 @@ grew past its 12 GiB box). `GetLargestCC6`/`18` scan `i` (rows) outermost, then 
 
 `MRIreclassifyWMCtxNonPar` and `MRIclassifyAmbiguousNonPar` (`mrifilter.cpp` 4914, 5093) need
 `mri2.cpp`'s `MRImatchSegs` (5687), `MRIsegStats` (3826), `HISTOseg` (5717) and `mriset.cpp`'s
-`MRIdilate` (1723), which no track has ported yet. `fmriutils.cpp`'s 21 functions, `filter.cpp`'s
-image reductions and `diffuse.cpp`'s tables are the next relay's.
+`MRIdilate` (1723): track C ported them (its relay 22, merged at 01910d99); relay 27 ported the two
+classifiers (§11).
+`filter.cpp`'s image reductions (`ImageConvolve1d` 713, `ImageReduce` 928, `ImageReduce1d` 979) were
+ported with fs.io's images (`larmorx-freesurfer-io/src/image.rs`: `ImageScaleDown` calls them and
+fs.filter's crate sits above fs.io); nothing of them is left here.
+
+## 10. `fmriutils.cpp`'s frame functions (relay 27)
+
+Operand orders from the unit oracle's `fmriutils.cpp.o` (`relay27/fmriutils.asm`, GCC 8.4.0 `-O3`,
+not vectorised: the loops call `MRIgetVoxVal`, or alias their row pointers):
+
+- `fMRImatrixMultiply`: `movss pin; mulss val; addss (pout)`: `add(mul(v, w), out)`.
+- `fMRIcovariance`: `v1` from the first call, `v2` from the second; `subsd m` from each; `mulsd
+  %xmm1(v1 - m), %xmm0(v2 - m)`; `addsd %xmm0, %xmm2(sum)`: `sum + (v2 - m)(v1 - m)`; `divsd
+  (double) DOFLag`. `DOF` is `cvtsi2ss nframes; subss DOFAdjust; cvttss2si` (single precision,
+  x86-64's `INT_MIN` for NaN and out-of-range: FS-565; `INT_MIN - Lag` then wraps for `Lag >= 1`).
+- `MRIframeMean`: `mulsd (w), v` (the value first), `addsd v, sum` (`sum + v`), `divsd nframes`;
+  `MRIframeSum` likewise; `fMRIcumSum`: `addsd (sum), v` (`v + sum`, the other order).
+- `MRIvolMax`/`MRIvolMin`: `maxsd`/`minsd` with the new value as the destination, the same as C's
+  `if (max < v) max = v` for NaNs (a NaN in either keeps the running value).
+- `MRIconjunct`: `fabs` is a call (`-fno-builtin`); `SIGN` is `surfcluster.h`'s / `mrisurf_base.h`'s
+  `((x) > 0 ? 1.0 : -1.0)`, compared in single precision; the result `mulsd sign` after `min` (`min *
+  sign`). A voxel of 0 gives -0.0 (kept: harmless, rule C; no defect ID).
+- `MRIframeNorm`: `var * (float)(nframes - 1)` in single precision (`mulss`), `sqrtss` (with the
+  library call for a negative argument, the same NaN), `DBL_MIN + sss` (`addsd` with `DBL_MIN` in the
+  destination), `(v - mean) / den`.
+- `fMRItemporalAR1`: the `voxvar == 0` test (`ucomiss`) stores 0 and then the quotient over it (no
+  `continue`: FS-563, rule A).
+- `matrix.cpp`'s `MatrixDemean(M, Mdm)`: `vsum + e`, `vsum / rows`, `(double) e - vmean`; it demeans
+  `M` itself and returns `Mdm` (unchanged when it is another matrix; only the in-place call
+  `MatrixDemean(M, M)` of `fMRIspatialCorMatrix` is reached: ported as `fmri::matrix_demean_in_place`,
+  for track A's fs.core).
+- `MRIframeNorm` frees the covariance at its end: with one frame and every voxel masked out the
+  covariance is `NULL` and `MRIfree` prints its error (`MRIfree: null pointer`), seen on the probe
+  (seed 17).
+- `fMRIsubSample` with a negative step: `ceil` of a negative quotient gives a count of 0 or less, a
+  negative count clones the input's frames (a mismatch), so only a count of 0 (`Stop - Start` below
+  `|Delta|`) or a caller's volume of 0 frames reaches the endless loop (FS-569).
+- `ASLinterpMatrix(1)`: element (1, 2) of a 1 x 1 matrix is the float after its number, inside the
+  64-byte-rounded block of the new allocator (FS-566: nothing visible).
+
+## 11. `volcluster.cpp` and the non-parametric classification (relay 27)
+
+- `clustInitHitMap`'s `int maskval = MRIgetVoxVal(...)` truncates (`cvttss2si`): a mask value of 0.5
+  is outside the mask, NaN and values beyond the `int` range (x86-64's `INT_MIN`) inside. The port
+  tests `-1 < m < 1`, the same set, so no defect is needed.
+- `clustAddMember` reallocs `x`, `y`, `z` without writing the new element; `clustCopyCluster` copies
+  them; only `clustComputeXYZ`/`clustComputeTal` set them (FS-570). `clustGetClusters` never calls
+  `clustPruneByDistance` (its `distthresh` is 0), so the reached programs never read them.
+- `clustFreeClusterList` frees `(*list)[0]` (already freed and set to `NULL` by `clustFreeCluster`:
+  `free(NULL)`) and never the list itself: a leak, no output.
+- `clustGetClusters` sorts the size-pruned list with `qsort` of `clustCompareCluster`; the clusters'
+  p-values are 0 (`calloc`), so the order is by size then `|maxval|`, ties in discovery order
+  (glibc's merge sort: `larmorx_core::glibc_qsort::qsort` on indices).
+- `VolClustFixMNI` is set only by `mri_volcluster` (not reached): `clustComputeTal` is
+  `clustComputeXYZ` in every reached program (`FixMNITal` not ported).
+- `MRIremoveVolumeIslands`' documentation says "binarizes mask > thresh"; the code keeps `|v| >=
+  thresh` (`clustValueInRange` with `thsign` 0). Kept (rule C: `mri_binarize`'s `--remove-islands`
+  relies on it); the spec states the code's behaviour.
+- `MRIreclassifyWMCtxNonPar`/`MRIclassifyAmbiguousNonPar` (`mri_segment.cpp` 311-315, its `-aseg`
+  path): the crossing search stores the signed `d` as its minimum (`min = d`, not `fabs(d)`). The
+  difference `(1 - ctxCDF) - wmCDF` never increases along the bins (both CDFs are running sums of
+  non-negative counts), so the bin found is the argmin of `|d|` either way (proved by cases: before
+  the sign change both versions follow the decreasing positive values; at it the first negative
+  value is taken by both or by neither; after it `|d|` only grows): no defect ID, no notice.
+- `hbinmax = MIN(wmmax, ctxmax)` (the brighter white matter falls into the last bin, clamped by
+  `HISTOseg`) and the upper-threshold loop starting at bin 0 against its comment ("from this
+  minimum, look ahead"): FS-572, rule D (measured at `mri_segment`'s port).
+- `for (n = 0; n < NdilWM; n++) wmmaskdil = MRIdilate(wmmask, wmmaskdil)`: each dilation reads the
+  undilated mask (FS-574, rule D: `mri_segment`'s defaults are 2 and 2, so the documented "within
+  NdilWM voxels" is one voxel in every recorded run). `NdilWM <= 0` leaves `wmmaskdil` `NULL`
+  (FS-575).
+- `MRIclassifyAmbiguousNonPar` writes `wm.pdf.dat` and `ctx.pdf.dat` (`HISTOwriteTxt`) into the
+  program's current directory on every call: `mri_segment -aseg` leaves them in `mri/`. The port
+  writes them where its caller says (`dir`; the program passes its current directory).
+- Operand orders (`relay26/mrifilter.asm`): `MIN` as `minss` (`a < b ? a : b`), `d = (1.0 - ctx) -
+  wm` (`subsd` twice), the ratio `(double) a / ((double) b + 1e-6)`; the reclassification compares
+  `val > thresh` in single precision (`thresh` is a bin value, a float).
+
+## 12. `mrisegment.cpp`, `mriflood.cpp` and `mrinorm.cpp`'s Voronoi diagram and soap bubble (relay 28)
+
+- **The segment table's growth is safe.** `mriSegmentReallocateSegments` copies only the first
+  `nsegments` slots, which would lose a live segment numbered at or above the count; but
+  `mriSegmentNew` calls it only when the count equals the table's length, and the scan keeps the
+  count equal to the number of live segments (a new segment adds one, a merge removes one), so
+  every slot is live then. No defect (FS-576 unused).
+- **FS-577.** `mri_labeled` is `MRI_SHORT`: `MRISvox(mri_labeled, x, y, z) = label` stores the low 16
+  bits; a label of 32,768 or more reads back negative, so a later neighbour does not see it. Reached
+  by a 64 x 64 x 17 checkerboard (34,816 single-voxel segments) under a slab: the slab joins only
+  the singletons numbered below 32,768.
+- **FS-578.** `MRImaxsegment` calls `MRIremoveSmallSegments` (which compacts, renumbering the kept
+  segments) inside its scan and then only clears labels `>= nsegments`; the voxels of a kept
+  segment that moved keep its old number, which is either cleared (its next voxels start a new
+  segment) or another segment's. Reached when the table first grows past 8,800 slots (at 9,680
+  segments) with a segment of at least 100 voxels: a pillar of 8 columns beside a 64 x 64 x 6
+  checkerboard. The default rebuilds the map from the segments.
+- **`MRImaxsegment`'s heap usage** is `getMemoryUsed()` (a `popen` of `grep -i vmdata
+  /proc/<pid>/status | cut -f 2`): the port takes it as a function (the program passes
+  `get_memory_used`, the probe a constant 1000, and `check.py` replaces the official number).
+- **Speed without changing results.** `mriSegmentNew` searches the first empty slot from 0 and
+  `MRIcompactSegments` searches the next live slot from `s + 1` for each empty slot: quadratic in
+  the number of segments (17 s in a debug build for 35,000). The port searches from the first slot
+  that may be empty (a merge lowers it) and resumes the compaction's search: the same slots.
+- **`MRISfloodoutside`** reads `(int)MRIgetVoxVal` (`cvttss2si`); a voxel set to 1 reads back 1 in
+  every type, so the port keeps the `int` values in an array and writes each filled voxel.
+- **`distance`** compiles to `mulss` of each coordinate, `addss` of y² to x², then of z², and
+  `sqrtss` (a call to `sqrtf` only below 0).
+- **The Voronoi diagram, 16-bit:** `if (mri_src->type != MRI_SHORT || mri_dst->type != MRI_SHORT)`
+  runs before `if (!mri_dst) mri_dst = MRIclone(...)`: a `NULL` destination crashes (FS-583, `CRASH
+  11` in the probe). Its marks are read with `MRIvox` (bytes) of the work copy of the control volume,
+  so an `int` control volume's bytes are read (FS-585). The float version reads them with
+  `MRIgetVoxVal` into a `BUFTYPE` (`cvttss2si`, low byte), the byte version into an `int`.
+- **The soap bubble, float:** the first phase's `fabs` is `std::fabs(float)` (`andps`); the passes'
+  `fabs(mean / (3 * 3 * 3.0) - val)` is a double (a call to `fabs` under `-fno-builtin`). The work
+  copy is made from the destination before the first phase, and each pass copies all of it back,
+  so the first phase's values outside the pass's box are replaced by the work copy's (the source's)
+  at the first pass: only the values inside the box survive (kept: FreeSurfer's behaviour, not a
+  defect we can show changes a pipeline result). `#pragma omp parallel for` over the box's slices
+  shares `max_change` without synchronisation (FS-584; the probe runs one thread). The box and
+  `max_change` are not reset between frames, and `max_change` is not reset after the pass that
+  stops a frame.
+- **The soap bubble, 16-bit and other types:** `MRIvox(mri_ctrl, ...)` and `MRIseq_vox(mri_dst,
+  ...)` are byte accesses whatever the volume's type (FS-585); within each row's first `width`
+  bytes they stay inside the volume.
+
+## 13. `mrinorm.cpp`'s normalisation without histograms (relay 29)
+
+- **The file's state.** `num_control_points`, `xctrl`, `yctrl`, `zctrl` (set by
+  `MRI3dUseFileControlPoints` and `MRI3dUseLabelControlPoints`), `control_volume_fname`,
+  `bias_volume_fname` and the function statics (`MRInormAddFileControlPoints`' `first`, the
+  diagnostic `pass` counters, `remove_gray_matter_control_points`' `ncalls`) are the port's
+  `NormState`, one per program run (the probe runs each case in a fresh process: a fresh state).
+- **FS-587 / FS-588.** Every control-volume access is `MRIvox` (a byte at `slices[z][y][x]`): a
+  control volume of another type is read and written in its first bytes of each row; a smaller one
+  outside it. The 16-bit spline normalisation writes `*pdst++ = (short)dval` through
+  `&MRISvox(mri_dst, 0, y, z)`, whatever the destination's type. The port's direct accesses go
+  through `mem.rs` (`Wrapped` as FreeSurfer with `reproduce`; by value by default; `Outside` reads 0
+  and writes nowhere).
+- **FS-589.** `whalf = ceil(WHALF / xsize)` (`ceilf`, `cvttss2si`), `nint(whalf_mm / xsize)`,
+  `nint(max_dist / xsize)`: a voxel size of 0 gives `INT_MIN`, and `-whalf` wraps to `INT_MIN`, so
+  the loop reads `xi[x + INT_MIN]`; above 500 the index tables (`MAX_INDEX` 500 each side) are left.
+- **FS-590.** `MRInormCheckPeaks` reads `outputs[above - 7]`, `[above - 4]`, `[above - 1]` and
+  starts there whatever `npeaks` is; `MRInormalize`'s arrays `inputs[80]`, `outputs[80]` are
+  uninitialised locals, so in `mri_normalize` the entries past the peaks found are stack contents
+  (FS-596 when the port meets its never-written marker, `NEVER_WRITTEN`). The backward pass reads
+  `outputs[old_slice]` and `inputs[slice + 1]` from the start, so a start past the peaks decides
+  which real peaks are dropped. Reached by the probe's `npk` (14 windows above, 9 peaks).
+- **FS-591.** `MNI` holds `histograms[80]` and `regions[80]`; `MRInormInit` writes
+  `regions[i]` for `i < above + below` unchecked; `MRInormCheckPeaks` reads `outputs[above - 7]`.
+- **FS-592.** `BUFTYPE low_thresh, hi_thresh` in `MRInormGentlyFindControlPoints`: the object code
+  stores `cvttsd2si` (7x7x7: double `wm - 1.5 below`, `1.5 above + wm`) and `cvttss2si` (5x5x5:
+  float) results and compares `movzbl` of them with the truncated voxel values (`int`). With
+  `mri_normalize`'s values (110, 25 or 12.5 above, 5 below) the thresholds stay inside a byte.
+- **FS-594.** The removal loop `for (i ...) if (deleted[i]) { shift; count--; }` advances `i` past the
+  element shifted into `i`.
+- **FS-595 / FS-596.** `ErrorPrintf(ERROR_BADFILE, "!!!!! %ld control points rejected ...\n")` passes
+  no number: `%ld` reads the first variadic register (`rdx`). In the official object code `rdx`
+  holds, when the last point was skipped for its value, that value as `cvttss2si`'s 32 bits
+  zero-extended (the `push rax` / `pop rdx` around the `printf`); after any other last point it is
+  what `MRIindexNotInVolume`, `MRIgetVoxVal` or `printf` left (not reproduced: the port prints the
+  count with FS-596; the probe masks the number then).
+- **Operand orders** (object code): `MRIapplyBiasCorrectionSameGeometry` computes
+  `divsd` of the target by the bias, then `mulsd` with the value as the second operand (the ratio's
+  NaN wins); `MRI3dGentleNormalize`'s `(float)src * wm / (float)bias` in single precision, left to
+  right; `MRIsplineNormalize`'s `(float)val * frac` (`mulss`, the value first) then `+ randomNumber`
+  in double.
+- **`MRIbuildBiasImage`** prints `performing soap bubble smoothing` but smooths with
+  `MRIconvolveGaussian`; it ignores its `mri_bias` argument (a new clone each time).
+- **`mri_normalize`'s `-g 1`** sets `mni.max_gradient` (`MRInormCheckPeaks`), not the gentle flag
+  (`-gentle`).
+- **Speed (release builds, one 256³ head):** the port's gentle normalisation takes 18 s (the
+  search 1 s, the Voronoi diagram 5 s, the 65-tap Gaussian 11 s) where the official code averages
+  15 s per volume including the read: the convolution (§10's `MRIconvolve1d`) is the part to speed
+  up, without changing a bit.
+
+## 14. `mrinorm.cpp`'s histogram steps (relay 30)
+
+Closed (object code of the unit oracle's `mrinorm.cpp.o`, `relay27/mrinorm.asm`; FreeSurfer's source).
+- **Operand orders.** `MRI3dNormalize`'s `src * (float)wm_target / (float)bias` is compiled as
+  `wm_target * src` (the target in the destination register), then `/ bias`; `FZERO(bias)` with
+  float.h's `FLT_EPSILON` (`|bias| < eps` via `andps` and `comiss`). In `MRInormFindControlPoints`
+  `1.5 * intensity_above` is `above * 1.5` (`double`), the second search's `ceil(1.5 above + 5 pass)`
+  is `5 pass + 1.5 above` and `ceil(1.5 below + 5 pass)` `1.5 below + 5 pass` (the first search's
+  pass 0 is `0.0 + 1.5 below`, the same value); `(wm_val - gm_val) / 4` is `0.25 * (wm - gm)`;
+  `hi_thresh = wm_target + intensity_above` is `above + wm_target`; `ceil(WHALF / xsize)` is the
+  inlined `float` rounding. `remove_gray_matter_control_points` (inlined into `MRI3dNormalize`):
+  `(val - val0)^2` in `float`, then added to the `double` sum (the square first); `(wm + gm) / 2` as
+  `* 0.5`; the `sqrt(delta_std / n)` call is made and its result discarded (its argument is never
+  negative, so no `errno`). `find_tissue_intensities`: `wm_val * .75` in `float` (exact), `gm_peak *
+  .5` in `double` then `float`; `0.8 wm_peak`, `0.75 gm_peak`, `0.7 wm_peak` in `double`, truncated.
+  `MAX` is macros.h's (`a >= b ? a : b`): a NaN keeps the second operand.
+- **Rule C, kept and documented (no ID):** both searches' loops compare the count of the *last*
+  pass with 10 (`pnctrl` is set, not added): a slow trickle of control points needs further passes;
+  `remove_gray_matter_control_points` computes a white matter standard deviation from the inner
+  control points and then overwrites it with `(wm - gm) / 10` (the DOF count is still printed);
+  `MRInormFindControlPoints`' first two counts are overwritten unused; `scan_type` is passed down
+  and never used. The `min_val`/`max_val` of the growth loops are never read.
+- **FS-597.** `find_tissue_intensities` indexes `hwm->bins[wm_peak]` (`cltq`: -1 when the labelled
+  histogram has no count, unreachable once a voxel is labelled), `hsmooth->bins[...]` with the
+  white matter peak (-1 when the 40-bin region has no count), `gm_peak` (`HISTOfindBin` returns
+  `(int)val - bins[0]` for a bin size of 1: negative or past the end), `gm_valley`
+  (`HISTOfindPreviousValley` returns its start when it is 0 or below: very negative starts),
+  `csf_peak` and the threshold bin. `bins` is its own `calloc` block: index -1 reads the upper half
+  of glibc's chunk size field (0 for blocks under 4 GiB), other negative indices the chunk header or
+  the block before, past the end the next chunk: memory contents. A start of -2^31 (`(int)` of a
+  value below the range: `cvttss2si`) makes `HISTOfindPreviousPeak`'s `b0 - 1` wrap to 2^31 - 1 and
+  read `counts[2^31 - 1]`: a crash. The probe counts these cases (`SKIP`).
+- **FS-598.** The second search's loop has no bound. The first search must have succeeded; its
+  window's low end is the second's (`floor(wm - x)` against `floor(wm - ceil(x))`, equal for a whole
+  `wm_target`), its high end lower: every voxel of the first search's last pass qualifies in the
+  second by the same pass, so the second ends unless the rounding of a target with a fraction
+  moves part of that batch to an earlier pass. The port checks, after each pass that found fewer
+  than 10, whether the widest window (the last pass whose `5 pass` fits an `int`; after it
+  FreeSurfer's `5 pass` wraps and its windows only shrink) can still give 10 (a copy of the control
+  volume, no message): if not, an error. Not reached by the probe's cases.
+- **FS-599.** `pass++; if (pass > 10) ErrorReturn(...)` precedes the loop's `while (nctrl < 10)`:
+  the eleventh pass's result is never looked at (rule A: kept by default).
+- **FS-600** (split from FS-596): `MRInormalize`'s `inputs`/`outputs` are stack arrays never
+  initialised; the peak check (FS-590) reads past the peaks found.
+- **Results.** Seeds 7, 13 (100 `nrm`, `nfcp`, `n3d` cases each) and 17 (200 each): 0 different with
+  `reproduce`; seed 13 with the default: no difference without a notice.
+

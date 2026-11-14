@@ -31,6 +31,8 @@ pub(crate) mod piece10;
 pub(crate) mod piece11;
 #[path = "piece12.rs"]
 pub(crate) mod piece12;
+#[path = "piece14.rs"]
+pub(crate) mod piece14;
 #[path = "piece2.rs"]
 mod piece2;
 #[path = "piece3.rs"]
@@ -290,6 +292,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece10::KINDS);
     kinds.extend(piece11::KINDS);
     kinds.extend(piece12::KINDS);
+    kinds.extend(piece14::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -334,6 +337,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece12::KINDS.contains(&kind) {
             lines.push(piece12::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece14::KINDS.contains(&kind) {
+            lines.push(piece14::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -770,6 +777,11 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece12::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece14::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece14::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1161,6 +1173,12 @@ pub(crate) fn run_line_with(
         Err(134) => "CRASH 6".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
+    // FSIO_DETAIL set: each notice's detail on standard error (a probe run's diagnosis)
+    if std::env::var_os("FSIO_DETAIL").is_some() {
+        for n in g.notices.as_slice() {
+            eprintln!("{}: {}", n.defect.id, n.detail);
+        }
+    }
     let mut ids: Vec<&'static str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
     for n in g.notices.as_slice() {
         let id = n.defect.id;

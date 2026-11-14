@@ -857,8 +857,11 @@ impl<'a> FsTagsIo<'a> {
         if self.fp.eof() {
             return 0;
         }
+        // a number cut by the end of the file is not used: no memory contents reach a result
+        let before = g.notices.clone();
         let tag = fio::znz_read_int(g, err, self.fp);
         if self.fp.eof() {
+            g.notices = before;
             return 0;
         }
         if self.niftiheaderext {

@@ -27,13 +27,15 @@
 //!   left byte-swapped: by default they are not touched; `reproduce` swaps them.
 //! - **FS-444** (memory): one chosen frame outside the volume: by default an error before the
 //!   file is opened; `reproduce` writes zeros for it, noted.
+//! - **FS-445** (crash): with `FS_MGZIO_USEVOXELBUFWRITE`, a volume without slices: both modes
+//!   write no voxels (there are none), noted.
 //! - **FS-58**: a volume without voxels (FreeSurfer crashes): the program ends with a message.
 
 use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444};
+use larmorx_core::defects::{FS_55, FS_58, FS_439, FS_440, FS_441, FS_442, FS_443, FS_444, FS_445};
 use larmorx_freesurfer_core::diag::DIAG_INFO;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
@@ -267,7 +269,13 @@ pub fn mgh_write(
         let _ = out.write_all(b"INFO: Environment variable FS_MGZIO_USEVOXELBUFWRITE set\n");
         let _ = out.write_all(b"mghWrite(): output voxel bufer ...\n");
         let size = mri::mri_sizeof(m.mtype);
-        if size == usize::MAX {
+        if i64::from(depth) * i64::from(m.nframes) <= 0 {
+            // FreeSurfer takes the address of a first slice the volume does not have
+            g.notices.add(
+                &FS_445,
+                "mghWrite with FS_MGZIO_USEVOXELBUFWRITE of a volume without slices: no voxels written (FreeSurfer crashes)",
+            );
+        } else if size == usize::MAX {
             // MRIsizeof's -1: FreeSurfer writes and swaps far past the volume
             g.notices.add(
                 &FS_55,

@@ -731,7 +731,25 @@ fn gii_normal(f: &[u8]) -> Vec<u8> {
     r
 }
 
-/// Every file under `w`: its name and bytes (a `.gii` file, in any case, normalised), FNV-1a 64 beyond 256 bytes.
+/// A gzip stream (an `.mgz`: zlib-rs's compressed bytes here, zlib 1.2.11's in `fsio`; the stream
+/// they inflate to is the same): `gz:` and the inflated bytes when it inflates whole to its end
+/// (track A relay 23), else the bytes as they are.
+pub(crate) fn gz_normal(b: &[u8]) -> Vec<u8> {
+    if b.len() < 2 || b[0] != 0x1f || b[1] != 0x8b {
+        return b.to_vec();
+    }
+    let mut d = flate2::bufread::GzDecoder::new(b);
+    let mut inf = Vec::new();
+    if d.read_to_end(&mut inf).is_err() || !d.into_inner().is_empty() {
+        return b.to_vec();
+    }
+    let mut r = b"gz:".to_vec();
+    r.extend_from_slice(&inf);
+    r
+}
+
+/// Every file under `w`: its name and bytes (a `.gii` file, in any case, normalised; a gzip stream
+/// inflated), FNV-1a 64 beyond 256 bytes.
 pub(crate) fn odir(o: &mut Out, w: &Work) {
     fn walk(base: &Path, rel: &str, files: &mut Vec<String>) {
         let Ok(rd) = std::fs::read_dir(base.join(rel)) else {
@@ -756,6 +774,7 @@ pub(crate) fn odir(o: &mut Out, w: &Work) {
         if f.to_ascii_lowercase().ends_with(".gii") {
             b = gii_normal(&b);
         }
+        b = gz_normal(&b);
         if b.len() <= 256 {
             obytes(o, &b);
         } else {

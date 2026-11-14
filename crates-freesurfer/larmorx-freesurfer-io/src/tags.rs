@@ -395,8 +395,11 @@ pub fn znz_tag_read_start(
     if fp.eof() {
         return 0;
     }
+    // a number cut by the end of the file is not used: no memory contents reach a result
+    let before = g.notices.clone();
     let tag = fio::znz_read_int(g, err, fp);
     if fp.eof() {
+        g.notices = before;
         return 0;
     }
     if tagwithzerolen != 0 && tagwithzerolen == tag {

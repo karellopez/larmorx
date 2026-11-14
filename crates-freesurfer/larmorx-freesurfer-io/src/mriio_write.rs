@@ -399,7 +399,7 @@ pub fn mgh_write(
                             slice.extend_from_slice(&b);
                         }
                         MRI_FLOAT_COMPLEX => {
-                            for (x, c) in row(8).chunks_exact(8).enumerate() {
+                            for (x, c) in row(8).as_chunks::<8>().0.iter().enumerate() {
                                 let real = f32::from_le_bytes([c[0], c[1], c[2], c[3]]);
                                 let imag = f32::from_le_bytes([c[4], c[5], c[6], c[7]]);
                                 slice.extend_from_slice(&real.to_be_bytes());

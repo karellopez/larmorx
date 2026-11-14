@@ -143,7 +143,7 @@ fn volume14(g: &mut Gen, t: &mut Vec<String>, with_bvals: bool) -> (i64, i64, i6
         _ => g.pick(&[
             0.0f64,
             0.174_532_925_199_432_95,
-            1.570_796_326_794_896_6,
+            std::f64::consts::FRAC_PI_2,
             90.0,
         ]),
     };
@@ -247,7 +247,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
         8 => ("w/a.b.mgh.gz.x", "-".into()),
         9 => ("w/.mgz", "-".into()),
         10 => ("w/o.mgz.mgh", "-".into()),
-        11 | 12 | 13 => ("w/o.mgh", "-".into()),
+        11..=13 => ("w/o.mgh", "-".into()),
         _ => ("w/o.mgz", "-".into()),
     };
     t.push(spec);

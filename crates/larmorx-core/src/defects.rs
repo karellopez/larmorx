@@ -1799,6 +1799,10 @@ defects! {
         "the gradient-direction measure of a voxel (MRIvoxelDirection) cuts its window at the volume's far faces but reads it back as a full cube: the gradients pair with the wrong offsets and the last entries were never written (memory contents)";
     FS_486 = "FS-486", "FreeSurfer", true,
         "the second derivative along the gradient (MRIvoxelGradientDir2ndDerivative) of a volume whose type the trilinear sampler refuses subtracts a sample never written: memory contents";
+    FS_487 = "FS-487", "FreeSurfer", true,
+        "the Talairach point conversions (MRIvoxelToTalairachEx and its siblings) use a matrix that could not be made (a singular voxel-to-RAS matrix or transform) and crash; and the Talairach-to-voxel matrix of a transform file that holds no transform reads past it: memory contents";
+    FS_488 = "FS-488", "FreeSurfer", true,
+        "the resampling of a volume out of Talairach space (MRIfromTalairachEx) without a target volume uses the target before its own check and crashes";
 }
 
 /// The register entry with ID `id`.

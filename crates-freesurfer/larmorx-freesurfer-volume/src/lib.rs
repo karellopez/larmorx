@@ -34,6 +34,7 @@ pub mod sample;
 pub mod seq;
 pub mod skull;
 pub mod stats;
+pub mod talairachex;
 pub mod vgeom;
 pub mod vol2vol;
 pub mod voxops;

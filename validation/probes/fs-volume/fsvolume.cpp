@@ -39,6 +39,7 @@
 #include "mri.h"
 #include "mri2.h"
 #include "region.h"
+#include "talairachex.h"
 #include "transform.h"
 #include "utils.h"
 
@@ -1824,6 +1825,80 @@ void run_case()
       of(MRIvoxelDirection(m, x, y, z, w));
       of(MRIvoxelGradientDir2ndDerivative(m, x, y, z, w));
       fflush(stdout);
+    }
+  } else if (cmd == "talcras" || cmd == "talmat" || cmd == "talpt" || cmd == "talvol") {
+    // talairachex.cpp: kind, then the volume (painted and an optional second volume for
+    // talvol), the transform array, NO_AVERAGE305, DIAG_SHOW, DIAG_VERBOSE; kind 4 of talpt: a
+    // 4 x 4 matrix instead
+    int kind = cmd == "talcras" ? 0 : geti();
+    MATRIX *M = NULL;
+    MRI *m = NULL, *tal = NULL;
+    LTA *lta = NULL;
+    int interp = 0;
+    if (cmd == "talpt" && kind == 4) {
+      M = MatrixAlloc(4, 4, MATRIX_REAL);
+      for (int r = 1; r <= 4; r++)
+        for (int c = 1; c <= 4; c++) M->rptr[r][c] = getf();
+    } else {
+      m = get_vol();
+      if (cmd == "talvol") {
+        fill_paint(m);
+        if (geti()) tal = get_vol();
+      }
+      if (geti()) {
+        int n = geti();
+        lta = LTAalloc(n, NULL);
+        lta->type = geti();
+        if (n >= 1) {
+          for (int r = 1; r <= 4; r++)
+            for (int c = 1; c <= 4; c++) lta->xforms[0].m_L->rptr[r][c] = getf();
+          set_geom(&lta->xforms[0].dst);
+        }
+      }
+      if (geti()) setenv("NO_AVERAGE305", "true", 1);
+      else unsetenv("NO_AVERAGE305");
+      if (geti()) Gdiag |= DIAG_SHOW;
+      if (geti()) Gdiag |= DIAG_VERBOSE;
+      if (cmd == "talvol" && kind == 0) interp = geti();
+    }
+    if (cmd == "talcras") {
+      fflush(stdout);
+      int r = ModifyTalairachCRAS(m, lta);
+      fflush(stdout);
+      oi(r);
+      put_vol(m);
+    } else if (cmd == "talmat") {
+      fflush(stdout);
+      MATRIX *R = kind == 0 ? MtalairachFromVoxel(m, lta)
+                  : kind == 1 ? MtalVoxelFromVoxel(m, lta)
+                  : kind == 2 ? MvoxelFromTalairach(m, lta)
+                              : MvoxelFromTalVoxel(m, lta);
+      fflush(stdout);
+      om(R);
+    } else if (cmd == "talpt") {
+      int n = geti();
+      for (int i = 0; i < n; i++) {
+        double x = getd(), y = getd(), z = getd();
+        double px = -7, py = -7, pz = -7;
+        fflush(stdout);
+        int r = 0;
+        if (kind == 4) TransformWithMatrix(M, x, y, z, &px, &py, &pz);
+        else if (kind == 0) r = MRIvoxelToTalairachEx(m, x, y, z, &px, &py, &pz, lta);
+        else if (kind == 1) r = MRIvoxelToTalairachVoxelEx(m, x, y, z, &px, &py, &pz, lta);
+        else if (kind == 2) r = MRItalairachToVoxelEx(m, x, y, z, &px, &py, &pz, lta);
+        else r = MRItalairachVoxelToVoxelEx(m, x, y, z, &px, &py, &pz, lta);
+        fflush(stdout);
+        oi(r);
+        od(px); od(py); od(pz);
+      }
+    } else {
+      fflush(stdout);
+      MRI *r = kind == 0 ? MRItoTalairachExInterp(m, tal, lta, interp)
+               : kind == 1 ? MRItoTalairachEx(m, tal, lta)
+                           : MRIfromTalairachEx(m, tal, lta);
+      fflush(stdout);
+      oi(r != NULL && r == tal);
+      put_vol(r);
     }
   } else {
     fail("unknown command");

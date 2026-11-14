@@ -45,6 +45,7 @@ use larmorx_freesurfer_volume::sample as sm;
 use larmorx_freesurfer_volume::seq as sq;
 use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::stats as st;
+use larmorx_freesurfer_volume::talairachex as tx;
 use larmorx_freesurfer_volume::vgeom;
 use larmorx_freesurfer_volume::vol2vol as v2;
 use larmorx_freesurfer_volume::voxops as vx;
@@ -2525,11 +2526,90 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "talcras" | "talmat" | "talpt" | "talvol" => r22_gen(&mut g, &mut t, cmd),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
     }
     lines
+}
+
+/// `talairachex.cpp`'s cases (relay 22): see `fsvolume.cpp`'s `talcras`.
+fn r22_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let kind = match cmd {
+        "talcras" => 0,
+        "talmat" => g.int(0, 3),
+        "talpt" => g.int(0, 4),
+        _ => g.int(0, 2),
+    };
+    if cmd != "talcras" {
+        t.push(kind.to_string());
+    }
+    if cmd == "talpt" && kind == 4 {
+        let nan = g.chance(3);
+        if nan {
+            for _ in 0..16 {
+                t.push(fx(fval(g)));
+            }
+        } else {
+            m44_elems(g, t);
+        }
+    } else {
+        let mut s = shape(g);
+        s.hdr = s.hdr && g.chance(6);
+        vol_of(g, t, s);
+        if cmd == "talvol" {
+            let vals: &[f32] = &[0.0, 1.0, 2.0, 3.0, -1.0, 4.0, 0.5, 100.0, 7.0];
+            fill_paint(g, t, s, &[&[0.0, 1.0, 2.0, 5.0]], &[vals]);
+            // the second volume: the Talairach volume (kinds 0, 1) or the target (kind 2)
+            let given = if kind == 2 { !g.chance(8) } else { g.chance(2) };
+            t.push(i64::from(given).to_string());
+            if given {
+                let mut o = like(g, s);
+                o.hdr = false;
+                vol_of(g, t, o);
+            }
+        }
+        let has = !g.chance(4);
+        t.push(i64::from(has).to_string());
+        if has {
+            let n = g.pick(&[1i64, 1, 1, 1, 1, 2, 0]);
+            t.push(n.to_string());
+            // LINEAR_RAS_TO_RAS mostly
+            t.push(g.pick(&[1i64, 1, 1, 1, 0, 2]).to_string());
+            if n >= 1 {
+                if g.chance(12) {
+                    for _ in 0..16 {
+                        t.push(fx(fval(g)));
+                    }
+                } else {
+                    m44_elems(g, t);
+                }
+                geom(g, t);
+            }
+        }
+        t.push(i64::from(g.chance(4)).to_string());
+        t.push(i64::from(g.chance(6)).to_string());
+        t.push(i64::from(g.chance(4)).to_string());
+        if cmd == "talvol" && kind == 0 {
+            // not SAMPLE_CUBIC_BSPLINE (5): fs.bspline is not ported yet
+            t.push(g.pick(&[0i64, 1, 1, 2, 3, 4]).to_string());
+        }
+    }
+    if cmd == "talpt" {
+        let n = g.int(1, 3);
+        t.push(n.to_string());
+        for _ in 0..n {
+            for _ in 0..3 {
+                let v = if g.chance(12) {
+                    f64::from_bits(g.pick(&[0x7ff8_0000_0000_0123u64, 0xfff8_0000_0000_0007]))
+                } else {
+                    coord(g)
+                };
+                t.push(dx(v));
+            }
+        }
+    }
 }
 
 /// Labels the segmentation cases draw from: cma.h's (left and right), the parcellations', a few
@@ -2861,7 +2941,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 162] = [
+pub const COMMANDS: [&str; 166] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3024,6 +3104,10 @@ pub const COMMANDS: [&str; 162] = [
     "fdr",
     "rgbb",
     "vxn",
+    "talcras",
+    "talmat",
+    "talpt",
+    "talvol",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5326,6 +5410,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "vv" | "vvsm" | "vvk" | "vvd" | "maskup" | "cov" | "mpca" | "pcast" | "fdr" | "rgbb"
         | "vxn" => piece_d_and_regions(cx, t, o, cmd)?,
+        "talcras" | "talmat" | "talpt" | "talvol" => r22_tal(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -5671,6 +5756,118 @@ fn r21_vxn(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fat
         o.f(mv::mri_voxel_gradient_dir_2nd_derivative(
             g, b, &m, x, y, z, w,
         )?);
+    }
+    Ok(())
+}
+
+/// `talairachex.cpp`'s commands (relay 22).
+fn r22_tal(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let kind = if cmd == "talcras" { 0 } else { t.i() };
+    if cmd == "talpt" && kind == 4 {
+        let mut m = Matrix::real(4, 4);
+        for r in 1..=4 {
+            for c in 1..=4 {
+                m.set_relt(r, c, t.f());
+            }
+        }
+        let n = t.i();
+        for _ in 0..n {
+            let (x, y, z) = (t.d(), t.d(), t.d());
+            let p = tx::transform_with_matrix(&m, x, y, z);
+            o.i(0);
+            o.d(p[0]);
+            o.d(p[1]);
+            o.d(p[2]);
+        }
+        return Ok(());
+    }
+    r22_tal_vol(cx, t, o, cmd, kind)
+}
+
+#[inline(never)]
+fn r22_tal_vol(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str, kind: i32) -> Result<(), Fatal> {
+    let mut m = get_vol(cx, t)?;
+    let mut tal = None;
+    if cmd == "talvol" {
+        fill_painted(cx, t, &mut m)?;
+        if t.i() != 0 {
+            tal = Some(get_vol(cx, t)?);
+        }
+    }
+    let mut lta = None;
+    if t.i() != 0 {
+        let n = t.i();
+        let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+        let mut l = larmorx_freesurfer_mri::lta::lta_alloc(g, a, b, n, None)?;
+        l.ltype = t.i();
+        if n >= 1 {
+            let ml = l.xforms[0].m_l.as_mut().expect("LTAalloc's matrix");
+            for r in 1..=4 {
+                for c in 1..=4 {
+                    ml.set_relt(r, c, t.f());
+                }
+            }
+            set_geom(t, &mut l.xforms[0].dst);
+        }
+        lta = Some(l);
+    }
+    let env = if t.i() != 0 {
+        Environment::from_pairs([("NO_AVERAGE305", "true")])
+    } else {
+        Environment::default()
+    };
+    if t.i() != 0 {
+        cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW;
+    }
+    if t.i() != 0 {
+        cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+    }
+    let interp = if cmd == "talvol" && kind == 0 {
+        t.i()
+    } else {
+        0
+    };
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let lta = lta.as_ref();
+    match cmd {
+        "talcras" => {
+            let r = tx::modify_talairach_cras(g, a, b, &env, &mut m, lta)?;
+            o.i(i64::from(r));
+            o.vol(Some(&m));
+        }
+        "talmat" => {
+            let r = match kind {
+                0 => tx::mtalairach_from_voxel(g, a, b, &m, lta)?,
+                1 => tx::mtal_voxel_from_voxel(g, a, b, &env, &m, lta)?,
+                2 => tx::mvoxel_from_talairach(g, a, b, &m, lta)?,
+                _ => tx::mvoxel_from_tal_voxel(g, a, b, &env, &m, lta)?,
+            };
+            o.m(r.as_ref());
+        }
+        "talpt" => {
+            let n = t.i();
+            for _ in 0..n {
+                let (x, y, z) = (t.d(), t.d(), t.d());
+                let (r, p) = match kind {
+                    0 => tx::mri_voxel_to_talairach_ex(g, a, b, &m, x, y, z, lta)?,
+                    1 => tx::mri_voxel_to_talairach_voxel_ex(g, a, b, &env, &m, x, y, z, lta)?,
+                    2 => tx::mri_talairach_to_voxel_ex(g, a, b, &m, x, y, z, lta)?,
+                    _ => tx::mri_talairach_voxel_to_voxel_ex(g, a, b, &env, &m, x, y, z, lta)?,
+                };
+                o.i(i64::from(r));
+                for v in p.unwrap_or([-7.0; 3]) {
+                    o.d(v);
+                }
+            }
+        }
+        _ => {
+            let r = match kind {
+                0 => tx::mri_to_talairach_ex_interp(g, a, b, &env, &m, tal.as_mut(), lta, interp)?,
+                1 => tx::mri_to_talairach_ex(g, a, b, &env, &m, tal.as_mut(), lta)?,
+                _ => tx::mri_from_talairach_ex(g, a, b, &env, &m, tal.as_mut(), lta)?,
+            };
+            o.ret(&r, tal.as_ref());
+        }
     }
     Ok(())
 }

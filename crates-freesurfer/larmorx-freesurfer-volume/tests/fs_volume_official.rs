@@ -6,7 +6,8 @@
 //! `validation/probes/fs-volume/check.py --seed 1 --n <N>` on Linux x64 from the unit oracle's build,
 //! against the port's output with `reproduce` (lines where FreeSurfer reads or writes memory it does
 //! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, FS-300, FS-302 to FS-310, FS-314,
-//! FS-315, FS-322 to FS-325, FS-327, FS-163, FS-330, FS-463, FS-465, FS-467, and the
+//! FS-315, FS-322 to FS-325, FS-327, FS-163, FS-330, FS-463, FS-465, FS-467, FS-469 to FS-471,
+//! FS-473, FS-475, FS-479, FS-482, FS-484 to FS-488, and the
 //! eigen-systems it never returns from, FS-47, FS-48, ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
@@ -24,18 +25,19 @@ use sha2::{Digest, Sha256};
 /// orientation strings, voxel-to-RAS matrices, neighbourhoods and labels, and 3.1-35's 2-D images;
 /// relay 20, 151 commands: the partial-volume count, 3.1-37's pieces c and d's first part; relay
 /// 21, 162 commands: piece d's volume-to-volume resampling, PCA and FDR, 3.1-38's regions and
-/// voxel measures): 3,240 cases, 2,992 lines identical, 248 hashed as `SKIP`.
-const N: usize = 3240;
-const OFFICIAL_SHA256: &str = "f38160d248ccc2da57ad5e1109d8b8e978231de8a9466a4c1693df2b08ee243c";
-const SKIPPED: usize = 248;
+/// voxel measures; relay 22, 166 commands: 3.1-38's Talairach helpers): 3,320 cases, 3,083 lines
+/// identical, 237 hashed as `SKIP`.
+const N: usize = 3320;
+const OFFICIAL_SHA256: &str = "c3cfc45ecb3faa4cac3084f1f8b08334eab226e31b8e8627585fdd19774571c9";
+const SKIPPED: usize = 237;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 42] = [
+const SKIP: [&str; 44] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
     "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
     "FS-330", "FS-463", "FS-465", "FS-467", "FS-163", "FS-469", "FS-470", "FS-471", "FS-473",
-    "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486",
+    "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488",
 ];
 
 #[test]

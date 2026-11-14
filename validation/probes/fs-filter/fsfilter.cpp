@@ -30,6 +30,8 @@
 #include "diag.h"
 #include "error.h"
 #include "fastmarching.h"
+#include "fmriutils.h"
+#include "matrix.h"
 #include "mri.h"
 
 MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
@@ -362,10 +364,113 @@ bool filter_case(const std::string &cmd)
   return true;
 }
 
+// a matrix: rows cols, then its elements row by row (float bits)
+MATRIX *get_mat()
+{
+  int rows = geti(), cols = geti();
+  MATRIX *m = MatrixAlloc(rows, cols, MATRIX_REAL);
+  for (int r = 1; r <= rows; r++)
+    for (int c = 1; c <= cols; c++) m->rptr[r][c] = getf();
+  return m;
+}
+
+// the matrix: rows cols, then its elements row by row (float bits); NULL when NULL
+void put_mat(const MATRIX *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->rows); oi(m->cols);
+  for (int r = 1; r <= m->rows; r++)
+    for (int c = 1; c <= m->cols; c++) of(m->rptr[r][c]);
+}
+
+// fmriutils.cpp's frame functions
+bool fmri_case(const std::string &cmd)
+{
+  if (cmd == "fmm") {
+    MRI *src = get_vol();
+    MATRIX *M = get_mat();
+    MRI *dst = get_opt();
+    put_result(fMRImatrixMultiply(src, M, dst), dst);
+  } else if (cmd == "fcov" || cmd == "far1") {
+    // fcov <src> lag adj <mask?> <dst?>; far1 <src> adj <mask?> <dst?>
+    MRI *src = get_vol();
+    int lag = cmd == "fcov" ? geti() : 0;
+    float adj = getf();
+    MRI *mask = get_opt();
+    MRI *dst = get_opt();
+    MRI *r = cmd == "fcov" ? fMRIcovariance(src, lag, adj, mask, dst) : fMRItemporalAR1(src, adj, mask, dst);
+    put_result(r, dst);
+  } else if (cmd == "fskip" || cmd == "fdrop" || cmd == "ffrm") {
+    MRI *src = get_vol();
+    int n = geti();
+    MRI *dst = get_opt();
+    MRI *r = cmd == "fskip" ? fMRInskip(src, n, dst) : cmd == "fdrop" ? fMRIndrop(src, n, dst) : fMRIframe(src, n, dst);
+    put_result(r, dst);
+  } else if (cmd == "vmax" || cmd == "vmin" || cmd == "conj" || cmd == "fmed" || cmd == "fsum") {
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    MRI *r = cmd == "vmax" ? MRIvolMax(src, dst) : cmd == "vmin" ? MRIvolMin(src, dst)
+           : cmd == "conj" ? MRIconjunct(src, dst) : cmd == "fmed" ? MRIframeMedian(src, dst)
+                           : MRIframeSum(src, dst);
+    put_result(r, dst);
+  } else if (cmd == "vmaxi") {
+    MRI *src = get_vol();
+    int base = geti();
+    MRI *mask = get_opt();
+    MRI *dst = get_opt();
+    put_result(MRIvolMaxIndex(src, base, mask, dst), dst);
+  } else if (cmd == "fmean") {
+    // fmean <src> <dst?> n w1 .. wn (double bits)
+    MRI *src = get_vol();
+    MRI *dst = get_opt();
+    int n = geti();
+    std::vector<double> w(n);
+    for (int i = 0; i < n; i++) w[i] = getd();
+    put_result(MRIframeMean(src, dst, w), dst);
+  } else if (cmd == "fsub") {
+    MRI *src = get_vol();
+    int start = geti(), delta = geti(), stop = geti();
+    MRI *dst = get_opt();
+    put_result(fMRIsubSample(src, start, delta, stop, dst), dst);
+  } else if (cmd == "fext") {
+    MRI *src = get_vol();
+    int n = geti();
+    std::vector<int> fl(n);
+    for (int i = 0; i < n; i++) fl[i] = geti();
+    put_full(fMRIextractFrames(src, fl));
+  } else if (cmd == "asl") {
+    put_mat(ASLinterpMatrix(geti()));
+  } else if (cmd == "f2m") {
+    // f2m <src> <0 | 1 matrix>: whether the result is the given matrix, the result, the given one
+    MRI *src = get_vol();
+    MATRIX *M = geti() ? get_mat() : NULL;
+    MATRIX *r = fMRItoMatrix(src, M);
+    oi(r == M);
+    put_mat(r);
+    if (M && r != M) put_mat(M);
+  } else if (cmd == "m2f") {
+    MATRIX *M = get_mat();
+    MRI *v = get_vol();
+    MRI *mask = get_opt();
+    oi(fMRIfromMatrix(M, v, mask));
+    put_full(v);
+  } else if (cmd == "scm") {
+    put_full(fMRIspatialCorMatrix(get_vol()));
+  } else if (cmd == "fcum" || cmd == "fnorm") {
+    MRI *src = get_vol();
+    MRI *mask = get_opt();
+    MRI *dst = get_opt();
+    put_result(cmd == "fcum" ? fMRIcumSum(src, mask, dst) : MRIframeNorm(src, mask, dst), dst);
+  } else {
+    return false;
+  }
+  return true;
+}
+
 void run_case()
 {
   std::string cmd = next();
-  if (filter_case(cmd)) return;
+  if (filter_case(cmd) || fmri_case(cmd)) return;
   if (cmd == "edm" || cmd == "dtr") {
     // edm|dtr <src> <dst?> label max_distance mode <mask?>
     MRI *src = get_vol();

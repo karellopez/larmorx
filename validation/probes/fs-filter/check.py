@@ -45,7 +45,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # (a matrix written past its end), FS-552 (a crash), FS-555 (a Sobel filter writing outside its
 # destination), FS-163 (a copy into a volume of fewer frames: FreeSurfer writes past it), FS-559
 # (border labels written outside the destination), FS-560 (a histogram bin before its start), FS-561
-# (a region growing that never ends: the official run's alarm)
+# (a region growing that never ends: the official run's alarm), FS-562 (a covariance or AR(1)
+# map written directly into a destination that is not float or is smaller), FS-564 (a covariance
+# read after it could not be computed: a crash), FS-567 (a matrix too small for the volume written
+# past its end), FS-568 (a division by zero), FS-569 (a frame loop without end: a crash)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -62,6 +65,11 @@ SKIP = (
     "FS-559",
     "FS-560",
     "FS-561",
+    "FS-562",
+    "FS-564",
+    "FS-567",
+    "FS-568",
+    "FS-569",
 )
 
 

@@ -1687,6 +1687,22 @@ defects! {
         "the region growing of the connected components (GrassFire6, GrassFire18) given a label that its label volume stores as 0 (0 itself, or a value the volume's type clamps or rounds to 0) never ends when two object voxels of the region touch: the program hangs while its memory grows";
     FS_560 = "FS-560", "FreeSurfer", true,
         "the white and gray class statistics (MRIcomputeClassStatistics) of an intensity volume with negative values or NaNs count them in a histogram bin before its start (memory corruption)";
+    FS_562 = "FS-562", "FreeSurfer", true,
+        "the temporal covariance and AR(1) maps (fMRIcovariance, fMRItemporalAR1) given an output volume that is not float, or smaller than the input, write floats into other voxels' bytes or outside the output (memory corruption)";
+    FS_563 = "FS-563", "FreeSurfer", true,
+        "the temporal AR(1) map (fMRItemporalAR1) of a voxel whose variance is 0 is its lag-1 covariance divided by 0 (NaN, or plus or minus infinity) instead of 0";
+    FS_564 = "FS-564", "FreeSurfer", true,
+        "the temporal AR(1) map and the time-course normalisation (fMRItemporalAR1, MRIframeNorm) of a series whose covariance cannot be computed (one frame, or a degrees-of-freedom adjustment that leaves none) print the covariance's error and then crash, unless every voxel is masked out";
+    FS_565 = "FS-565", "FreeSurfer", true,
+        "the temporal covariance (fMRIcovariance) with a degrees-of-freedom adjustment that is NaN or leaves a count outside the 32-bit integer range, and the frame subsampling (fMRIsubSample) with a frame count outside that range, convert the number undefinedly (x86-64: -2147483648; the covariance then divides by about 2^31 for a lag of 1 or more)";
+    FS_566 = "FS-566", "FreeSurfer", true,
+        "the ASL control-interpolation matrix (ASLinterpMatrix) of one time point writes one element past the matrix (memory outside it; the returned matrix is not changed)";
+    FS_567 = "FS-567", "FreeSurfer", true,
+        "the volume-to-matrix conversion (fMRItoMatrix) given a matrix with fewer rows than frames or fewer columns than voxels writes into other elements and outside the matrix (memory corruption)";
+    FS_568 = "FS-568", "FreeSurfer", true,
+        "the matrix-to-volume conversion (fMRIfromMatrix) with a mask that selects no voxel and a matrix with columns crashes (an integer division by zero)";
+    FS_569 = "FS-569", "FreeSurfer", true,
+        "the frame subsampling (fMRIsubSample) with a negative step from a start below the stop, or a step that carries the frame number past the 32-bit integer range, reads frames before the volume's memory without end (a crash)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

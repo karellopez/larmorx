@@ -17,5 +17,6 @@ pub mod classify;
 pub mod conv;
 pub mod diffuse;
 pub mod fastmarch;
+pub mod fmri;
 pub(crate) mod mem;
 pub mod sobel;

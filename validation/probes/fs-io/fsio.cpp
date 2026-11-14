@@ -1512,7 +1512,8 @@ MRI *read_mri14()
   }
   return m;
 }
-// mgw <Gdiag> <setup> <env bits: 1 FS_MGZIO_USEVOXELBUFWRITE> <0 mghWrite|1 MRIwrite> <volume
+// mgw <Gdiag> <setup> <env bits: 1 FS_MGZIO_USEVOXELBUFWRITE> <0 mghWrite|1 MRIwrite|2 MRIwriteType
+// as NIFTI1_FILE (relay 24: nifti1Write)> <volume
 // (read_mri14)> <frame> <intent> <name> <read back 0|1>: the status, errno, the volume's intent,
 // version and voxels after the write (FNV-1a 64), the files under w (an .mgz inflated); then, when
 // asked, mghRead of the name with its voxels (piece 6's printing)
@@ -1532,7 +1533,8 @@ void run_piece14(const std::string &cmd)
     std::string fn = name10();
     int back = (int)geti();
     errno = 0;
-    int r = how ? MRIwrite(m, fn.c_str(), NULL, intent) : mghWrite(m, fn.c_str(), frame, intent);
+    int r = how == 2 ? MRIwriteType(m, fn.c_str(), NIFTI1_FILE, intent)
+            : how ? MRIwrite(m, fn.c_str(), NULL, intent) : mghWrite(m, fn.c_str(), frame, intent);
     fflush(NULL);  // a stream left open (FS-439) as the program's end would leave it
     oi(r);
     oi(errno);

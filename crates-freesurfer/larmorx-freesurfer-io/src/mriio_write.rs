@@ -1389,11 +1389,13 @@ const STRLEN: usize = 1024;
 /// header's fields, quaternion and affine, and the voxels; complex volumes are an unknown type here.
 /// See `specs/freesurfer-io.md` §95.
 ///
-/// **FS-451** (memory; wrong names): FreeSurfer builds the names in buffers of 1,024 bytes: from a
-/// name of 1,020 bytes the names are cut to 1,023 bytes, with `nifti1Write: Truncation of
-/// hdr_fname` (and `img_fname`) on standard error (from 1,023 bytes the header and the image are one
-/// file), and a name of 1,024 bytes or more is copied past the buffer. By default (and for the
-/// longer names in both modes) the whole names; `reproduce` cuts the names as FreeSurfer, noted.
+/// **FS-451** (wrong names; an abort): FreeSurfer builds the names in buffers of 1,024 bytes: from
+/// a stem of 1,020 bytes (a name without `.img` or `.hdr`) the names are cut to 1,023 bytes, with
+/// `nifti1Write: Truncation of hdr_fname` and `... img_fname` on standard error (from a stem of
+/// 1,022 bytes the header and the image are one file, the image's), and a name of 1,024 bytes or
+/// more ends the program in the C library's overflow check (`*** buffer overflow detected ***:
+/// terminated` on standard error, status 134). By default the whole names; `reproduce` as
+/// FreeSurfer, noted (observed with the fs-io probe, `specs/freesurfer-io.md` §95).
 /// **FS-452**: the two files' closes are not checked (a full disk: reported as written); by default
 /// a failed close gives the write's error (`nifti1Write(): error writing header to <hdr>`, `...
 /// error writing data to <img>`, `ERROR_BADFILE`); `reproduce` 0.
@@ -1488,13 +1490,18 @@ pub fn nifti1_write(
         stem.truncate(p);
     }
     if fb.len() >= STRLEN {
+        // the copy into the 1,024-byte buffer: the C library's overflow check ends the program
         g.notices.add(
             &FS_451,
             format!(
-                "nifti1Write: a name of {} bytes (FreeSurfer copies it past its 1,024-byte buffer): the whole names",
+                "nifti1Write: a name of {} bytes, which FreeSurfer's 1,024-byte buffer cannot hold (the program aborts)",
                 fb.len()
             ),
         );
+        if g.notices.reproduce() {
+            let _ = err.write_all(b"*** buffer overflow detected ***: terminated\n");
+            return Err(Fatal::Exit(134));
+        }
     }
     let name_of = |g: &mut Globals, err: &mut dyn Write, suffix: &[u8], var: &str| {
         let mut n = [stem.as_slice(), suffix].concat();

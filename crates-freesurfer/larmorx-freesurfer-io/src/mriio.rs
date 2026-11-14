@@ -623,9 +623,17 @@ pub fn mri_write_type(
     intent: i32,
 ) -> Result<i32, Fatal> {
     use crate::identify::*;
-    if mtype != MRI_CORONAL_SLICE_DIRECTORY
-        && std::fs::metadata(utils::resolve(dir, fname)).is_ok_and(|md| md.is_dir())
-    {
+    // `stat(fname)`: a name that does not exist sets `errno` (ENOENT), which the writers' error
+    // messages then print first
+    let is_dir = mtype != MRI_CORONAL_SLICE_DIRECTORY
+        && match std::fs::metadata(utils::resolve(dir, fname)) {
+            Ok(md) => md.is_dir(),
+            Err(e) => {
+                g.errno = log::errno_of(&e).unwrap_or(2);
+                false
+            }
+        };
+    if is_dir {
         return Ok(fail_code(
             g,
             err,

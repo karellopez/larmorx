@@ -271,7 +271,16 @@ fn volume14(
 pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     let mut t = vec![kind.to_owned()];
     t.push(g.pick(&["0", "0", "0", "10000", "40"]).into());
-    let (name, spec): (&str, String) = match g.below(26) {
+    let pick = g.below(30);
+    let pair = pick >= 26;
+    let (name, spec): (&str, String) = match pick {
+        // NIfTI-1 pairs (MRIwriteType as NIFTI1_FILE: nifti1Write), relay 24
+        26 | 27 => ("w/o.img", "-".into()),
+        28 => ("w/o.hdr", "-".into()),
+        29 => (
+            g.pick(&["w/O.IMG", "w/o", "w/a.b.img.gz", "w/no/o.img", "w/.hdr"]),
+            "-".into(),
+        ),
         20 | 21 => ("w/o.nii.gz", "-".into()),
         22 | 23 => ("w/o.nii", "-".into()),
         24 => ("w/O.NII", "-".into()),
@@ -292,10 +301,14 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     };
     t.push(spec);
     t.push(if g.chance(6) { "1" } else { "0" }.into());
-    let nifti = name.to_ascii_lowercase().contains(".nii");
-    let how = i64::from(nifti || g.chance(3));
+    let nifti = name.to_ascii_lowercase().contains(".nii") || pair;
+    let how = if pair {
+        2
+    } else {
+        i64::from(nifti || g.chance(3))
+    };
     t.push(how.to_string());
-    let (_, _, _, _, nf, alloc) = volume14(g, &mut t, how == 1, nifti);
+    let (_, _, _, _, nf, alloc) = volume14(g, &mut t, how >= 1, nifti);
     let frame = match g.below(10) {
         0 => -3,
         1 if nf > 0 => g.int(0, nf - 1),
@@ -309,7 +322,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     );
     t.push(enc(Some(name.as_bytes())));
     // never a folder read back: Linux opens it and fails at the first read, Windows at the open
-    let back = alloc && name != "w/d.mgz" && g.chance(2);
+    let back = alloc && name != "w/d.mgz" && how != 2 && g.chance(2);
     t.push(i64::from(back).to_string());
     t
 }
@@ -551,7 +564,19 @@ fn answer(
     let name = tk.string();
     let back = tk.int() != 0;
     g.errno = 0;
-    let r = if how != 0 {
+    let r = if how == 2 {
+        mriio::mri_write_type(
+            g,
+            out,
+            err,
+            &env,
+            dir,
+            &mut m,
+            &name,
+            larmorx_freesurfer_io::identify::NIFTI1_FILE,
+            intent,
+        )
+    } else if how != 0 {
         mriio::mri_write(g, out, err, &env, dir, &mut m, &name, None, intent)
     } else {
         mriio_write::mgh_write(g, out, err, &env, dir, &mut m, &name, frame, intent)

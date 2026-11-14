@@ -138,7 +138,9 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   FS-482 (0 for a shift never written, both modes); cubic B-splines and `LTAchangeType` port errors until ported.
 - `src/pca.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIfdr2vwth` (1402-1574), `MRIcovarianceMatrix` (1576-1641),
   `MRIpca` (1643-1744), `PrintPCAStats`, `WritePCAStats` (1746-1779); `utils/sig.cpp` `fdr2vwth`, `doublecompar`
-  (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's in both modes.
+  (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's with `reproduce`, CORE-MATH's correctly
+  rounded `larmorx_core::math::log10` by default (relay 22; GLIBC-07 noted where it changes the returned threshold
+  or the debug line's text).
 - `src/region.rs` (3.1-38; relay 21): `utils/region.cpp` `REGIONalloc` (49-57), `REGIONclear`, `REGIONcopy` (116-133),
   `REGIONgetBoundingBoxM` (299-334), `REGIONgetBoundingBox` (344-379), `REGIONgetBoundingBoxEqOdd` (387-492),
   `REGIONprint` (495-499); `FZERO`'s 1e-5 of this file.

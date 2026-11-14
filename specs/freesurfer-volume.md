@@ -1366,8 +1366,8 @@ the default differs only with a notice (GLIBC-07 for `powf` and `cos`).
   matching voxels found`, 1. `vwth = fdr2vwth(values)`; with `debug`, `MRIfdr2vwth: np = <np>, nv = <total voxels>
   sign=<s>` before and `MRIfdr2vwth: vwth = <%lf>, log10(vwhth) = <%lf of -log10(vwth)>` after. Each output's frame
   0 (written directly) gets the input's frame value where it passes (mask, sign, value not above `vwth`), else 1 (0
-  with `log10flag`). With `log10flag` the returned `vwth` is `-log10` of the threshold (`log10`: glibc 2.35's,
-  section 44). Returns 0.
+  with `log10flag`). With `log10flag` the returned `vwth` is `-log10` of the threshold (`log10`: glibc 2.35's
+  with `reproduce`, correctly rounded by default, section 44). Returns 0.
 
 ## 43. Regions (3.1-38: region.cpp)
 - `REGIONalloc` zeros; `REGIONclear` sets every field to 0; `REGIONcopy` copies; `REGIONprint`: `x y z  dx dy dz`
@@ -1421,8 +1421,10 @@ the default differs only with a notice (GLIBC-07 for `powf` and `cos`).
   into [1, 2) (or [0.5, 1) for negative exponents), `z = n log10_2lo + ivln10 ln(m)` then `z + n log10_2hi`
   (`ivln10 = 0x3FDBCB7B1526E50E`, `log10_2hi = 0x3FD34413509F6000`, `log10_2lo = 0x3D59FEF311F12B36`, each
   operation one IEEE double operation, `ln` glibc's own natural logarithm); `x <= 0`: `-inf` for a zero, the
-  positive quiet NaN `0x7ff8000000000000` for a negative number or `-inf`; a NaN: itself quieted. larmorx has no
-  correctly rounded `log10`: both modes use these bits.
+  positive quiet NaN `0x7ff8000000000000` for a negative number or `-inf`; a NaN: itself quieted. These are the
+  `reproduce` bits; by default `log10` is correctly rounded (CORE-MATH's `cr_log10`, the same results for `x <= 0`
+  and NaNs), and GLIBC-07 is noted where the other choice changes the returned threshold or the debug line's
+  printed text.
 
 ## 45. Validation plan (sections 41 to 44)
 The probe's commands `vv`, `vvsm`, `vvk`, `vvd`, `maskup` (section 41), `cov`, `mpca`, `pcast`, `fdr` (section 42),

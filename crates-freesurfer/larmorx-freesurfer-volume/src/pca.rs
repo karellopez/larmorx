@@ -13,15 +13,17 @@
 //! - **FS-484** (crash): the PCA of a volume without frames crashes in the SVD of its 0 x 0
 //!   covariance (VXL's `ssvdc`); both modes give an error (rule B).
 //!
-//! `log10` has no correctly rounded version in larmorx yet: glibc 2.35's
-//! ([`larmorx_core::math::log10_glibc`]) in both modes.
+//! `pow` and `log10` are the C library's: correctly rounded by default, glibc 2.35's with
+//! `reproduce` ([`Libm`]); GLIBC-07 is noted where the other choice changes a value: a `pow`
+//! value tested, the threshold's `-log10` returned with `log10flag`, the debug line's printed
+//! `-log10`.
 
 use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{FS_483, FS_484};
 use larmorx_core::glibc_qsort::qsort;
-use larmorx_core::math::{Libm, log10_glibc};
+use larmorx_core::math::{Libm, log10, log10_glibc};
 use larmorx_freesurfer_core::cstd::note_glibc07;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
@@ -468,13 +470,17 @@ pub fn mri_fdr2vwth(
         return Ok(1);
     }
     *vwth = fdr2vwth(&mut p, fdr);
+    // log10's own witness: only where the other choice changes what is printed or returned
+    let libm10 = Libm::new(g.mode());
     if debug {
-        let l = -log10_glibc(*vwth);
+        let shown = |l: f64| larmorx_core::cfmt::f(-l, 6);
+        let (cr, gl) = (shown(log10(*vwth)), shown(log10_glibc(*vwth)));
+        libm10.note(cr != gl);
         let _ = writeln!(
             out,
             "MRIfdr2vwth: vwth = {}, log10(vwhth) = {}",
             larmorx_core::cfmt::f(*vwth, 6),
-            larmorx_core::cfmt::f(l, 6)
+            if libm10.is_glibc() { gl } else { cr }
         );
     }
     let valnull: f32 = if log10flag { 0.0 } else { 1.0 };
@@ -512,8 +518,13 @@ pub fn mri_fdr2vwth(
         }
     }
     if log10flag {
-        *vwth = -log10_glibc(*vwth);
+        *vwth = -libm10.log10(*vwth);
     }
-    note_glibc07(g, &libm, "pow");
+    let names = match (libm.differed(), libm10.differed()) {
+        (true, true) => "pow and log10",
+        (false, true) => "log10",
+        _ => "pow",
+    };
+    note_glibc07(g, if libm.differed() { &libm } else { &libm10 }, names);
     Ok(0)
 }

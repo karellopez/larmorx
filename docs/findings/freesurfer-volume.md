@@ -530,7 +530,9 @@ program); `utils/region.cpp` 49-57, 344-379, 495-499; `utils/transform.cpp` 4417
   probe calls `fflush(NULL)` as `exit` would).
 - `MRIfdr2vwth`: `-val` and `fabs` are sign-bit operations; `pow` is `pow@GLIBC_2.29` (the FMA build);
   `log10` is `log10@@GLIBC_2.2.5`, fdlibm's `__ieee754_log10` over the FMA `__ieee754_log` behind the SVID wrapper
-  (`larmorx_core::math::log10_glibc`, checked by `validation/investigations/glibc-maths/`). A negative frame is not
+  (`larmorx_core::math::log10_glibc`, checked by `validation/investigations/glibc-maths/`; `reproduce` only since
+  relay 22: the default is CORE-MATH's correctly rounded `log10`, `validation/probes/coremath-log10/`, which differs
+  from glibc's on 10.2 % of p-values). A negative frame is not
   checked: `MRIFseq_vox` reads before the slice array (FS-290's place).
 - `TransformRegDat2LTA`'s `MatrixMultiply(vox2vox, Ttarg, vox2vox)` multiplies into its first operand (FreeSurfer
   copies it first). `LTAalloc`'s identity `m_L` is overwritten by the copy (a leak).

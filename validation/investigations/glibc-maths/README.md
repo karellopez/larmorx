@@ -73,7 +73,7 @@ Per function (identical of compared; NaN results identical of NaN results):
 | `atan2f_glibc` | 1,342,177,280 sampled + 30,276 special pairs | the same |
 | `exp_glibc`, `log_glibc` | 1,610,612,736 sampled + 174 special each | the same |
 | `pow_glibc` | 1,073,741,824 sampled + 30,276 special pairs | the same |
-| `log10_glibc` | 1,610,612,736 sampled + 174 special | – (new, 2026-11-14) |
+| `log10_glibc` | 1,610,612,736 sampled + 174 special | – (new, 2026-11-14); `validation/probes/coremath-log10/` checks it against glibc's `log10` on 2,147,614,729 more arguments: 0 differ (the `reproduce` choice of `Libm::log10`; CORE-MATH's `log10` is the default) |
 
 The replicas' outputs did not move: after the switch to re-exports, the FSL replicas' unit tests
 and golden test (`crates-nc`, `cargo test --workspace`) and the AFNI replicas' unit tests and

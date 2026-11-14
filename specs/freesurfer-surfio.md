@@ -3845,3 +3845,128 @@ and its closing value are written `<t>` and `<v>` on both sides (not compared; F
 the defaults' tests). Counted, not compared: FS-534 (memory contents), FS-533 (never generated),
 fs.mri's FS-53. FS-530's, FS-531's and FS-532's cases compare as FreeSurfer's crash. Observed
 (relay 23): the probe README. The defaults are checked by `tests/props9_defaults.rs`.
+
+## 115. Edges, corners and their measurements (queue item 3.1-51's leftovers; relay 24)
+
+Behaviour of the surface's edge and corner tables and of the face, edge and corner measurements
+without their gradients (FreeSurfer's `MRIScountEdges`, `MRISedges`, `MRIScorners`,
+`MRISfaceNormalFace`, `MRISfaceMetric`, `SurfGradUnitVector`, `MRISedgeMetric(Edge)`,
+`MRIScornerMetric(Corner)` with their gradient argument 0; fs.surf adds the gradients).
+
+- **Edge count**: for every vertex, its first `vnum` neighbours whose number is at least its own.
+- **Edge table**: that many edges, all fields zero, then filled vertex by vertex (vertex order, then
+  neighbour order): edge `(v0, v1)` for each neighbour `v1 >= v0`. Its two faces are the faces of `v0`
+  (in `v0`'s face order) that are also faces of `v1` (in `v1`'s order), found by a double loop. A
+  third such face prints `ERROR: MRISedges(): too many faces: <v0> <v1> n=<i>, m=<j>, k=2` and the
+  table stops (return 1); fewer than two prints `ERROR: MRISedges(): not enough faces <v0> <v1>
+  k=<k>` and stops (return 1). On a stop the edge being built keeps what it has, the later edges stay
+  zero (vertex 0 to vertex 0, faces 0 and 0), and no vertex gets its edge numbers (FS-535). Fields:
+  `vtxno[0..1]` the ends, `vtxno[2]` (`[3]`) the first vertex of face 0 (face 1), in the face's order,
+  that is neither end (0 when none); `corner[n][k]` the position (0 to 2) of `vtxno[n]` in face `k`
+  (first match), except `corner[2][1]` and `corner[3][0]`, which are 9; before that fill, for each
+  face `k` found, `corner[k][0]` and `corner[k][1]` are set from the face's first two positions only
+  where they hold `v0` or `v1` (only visible where the later fill finds nothing). After a complete
+  table every vertex gets `vtotal` edge numbers (zeros), and for every edge the entry of each end
+  whose neighbour is the other end is the edge's number. Returns 0.
+- **Corner table**: nothing when it exists; the edge table first when there is none; three corners
+  per face (face order; corner `k` has vertices `v[k]`, `v[k+1]`, `v[k+2]`, wrapping), `cornerno`,
+  `faceno`; for each of its two edges (vertex 0 to 1, 0 to 2): among vertex 0's first `vtotal`
+  neighbours the first equal to the other vertex gives the edge (vertex 0's edge number there) and
+  the direction (+1 when the edge's first end is vertex 0, else -1); none found prints
+  `MRIScorners(): ERROR: could not find an edge for corner <c>, edge <e>, <v0>-><v>` (edge and
+  direction 0). FS-535: a vertex without edge numbers (the table stopped) makes FreeSurfer crash
+  (`reproduce`: the crash, signal 11); the default prints `ERROR: MRIScorners(): the surface's edges
+  are not built (MRISedges failed): no corners`, leaves no corner table (0 corners) and returns 1.
+- **Face normal**: a face outside `0..nfaces` prints `MRISfaceNormalFace(): faceno = <f> (0,<n>)`
+  and returns 1. Else, in x87 extended precision (64-bit significand, round to nearest even, the
+  x87's NaN rules: of two NaNs the quiet one, else the larger significand; the vertex coordinates
+  are floats, the first vertex's and the third's taken as signalling-kept memory operands, the
+  second's loaded): `a = p1 - p0`, `b = p2 - p1`; when the test vertex (default -1) is 0, `a -= d`;
+  1: `a += d`, `b -= d`; 2: `b += d` (`d` the three extended test deltas, default zeros);
+  `c = (a_y b_z - a_z b_y, a_z b_x - a_x b_z, a_x b_y - a_y b_x)`, `L = sqrt((c_x^2 + c_y^2) + c_z^2)`;
+  the caller's length gets `L` (as a double) and its 3 x 1 matrix `c` (as doubles, the matrix made
+  when absent) when asked; the face's normal (a 3 x 1 matrix, made when absent) `c / L` rounded to
+  doubles. Returns 0. The face metric does every face in order and returns 0.
+- **Unit vector**: `w = v1 - v0` in extended precision (doubles; `v1` a memory operand, `v0`
+  loaded), `L = sqrt((0 + w_x^2 + w_y^2) + w_z^2)` extended; `L == 0` gives `u = 0`; else
+  `u = w / L` rounded to doubles; returns `L`.
+- **Edge measurement**: length (the unit vector's `L` as a double) and `u` from the two ends'
+  current coordinates (floats as doubles); `area[k]` the faces' areas (floats as doubles),
+  `maxarea` the first when it is larger, else the second; `dot` the dot product of the two faces'
+  normals (fs.core's `DVectorDot`); `|dot| > 1000` (the dot product's -10e10 for a missing normal)
+  prints `ERROR: MRISedgeMetricEdge(): edgeno=<e> DoGrad=0`, `   vno0=<a> vno1=<b> fno0=<f> fno1=<g>`
+  and then (normals present) `   f0->norm (<x>,<y>,<z>) f0->norm (<x>,<y>,<z>)` (`%f`) and
+  `   break <source>/utils/surfgrad.cpp:462`, returning 1; with a normal missing FreeSurfer crashes
+  before that third line (FS-538, `reproduce`); the default computes a missing normal (as above)
+  before the dot product. Otherwise `dot` clamped to [-1, 1] and `angle = acos(dot) * 180 / pi`
+  (the product first, then the division; `acos` correctly rounded, glibc's default NaN for an
+  argument beyond 1: FreeSurfer's glibc `acos` differs in the last bit on some arguments, GLIBC-07,
+  kept so by the user's decision of 2026-11-04). The edge metric does every edge in order (0).
+- **Corner measurement**: `dot = ((u1x d1)(u2x d2) + 0)`, then `+ (u1y d1)(u2y d2)`, then
+  `+ (d2 u2z)(d1 u1z)` (doubles; `u1`, `u2` the corner's edges' unit vectors, `d1`, `d2` their
+  directions; each new product is the first operand of its addition, the earlier sum the second);
+  `angle = 180 acos(dot) / pi` as above (`dot` not clamped: beyond 1 gives the default NaN). The
+  corner metric builds the corner table when absent, then does every corner; returns 0.
+
+## 116. Surface statistics, the edge overlay, the quality summaries, curvature averaging, the middle of the grey matter (relay 24)
+
+- **Statistics** (`[n, mean, stddev, min, max]`, fs.core's `DListStats`; `None` after its
+  `ERROR: DListStats() nlist = 0` when nothing is kept): an element is kept when none of its
+  vertices is ripped or has a mask value (voxel `(vno, 0, 0, 0)`, a float as double) below 0.5.
+  *Triangle areas*: `MRIScomputeMetricProperties` first; the faces' areas (3 vertices).
+  *Edges* (`metricid` 0 length, 1 dot, 2 angle): the edge table when absent,
+  `MRIScomputeMetricProperties`, the edge measurement, then the 4 vertices of each edge; another
+  `metricid` prints `ERROR: MRISedgeStats() metricid <m> unrecognized` at the first kept edge and
+  gives `None`. FS-538: FreeSurfer measures the hinges on the faces' last normals (stale after the
+  vertices move; none yet: crash); the default computes every normal for the current coordinates
+  first (a notice when one changes or was missing). *Corners* (0 dot, 1 angle): the corner table
+  when absent, `MRIScomputeMetricProperties`, the corner measurement, the 3 vertices of each corner;
+  another `metricid` prints `ERROR: MRIScornerStats() metricid <m> unrecognized`. FS-537:
+  FreeSurfer reads the edges' unit vectors from the last edge measurement (stale after the vertices
+  move; none yet: zeros, every corner 90 degrees); the default computes the edges' lengths and unit
+  vectors for the current coordinates first (a notice when one changes).
+- **Edge overlay** (`MRISmaxEdgeStatToOverlay`): the face metric, the edge table when absent,
+  `MRIScomputeMetricProperties`, the edge measurement; a float volume of `nvertices` x 1 x 1 (zeros);
+  for each edge whose first 2 (length) or 4 (dot, angle) vertices are all kept: the value (length,
+  dot or angle; another `metricid` prints `ERROR: MRISmaxEdgeStatToOverlay() metricid <m>
+  unrecognized` and gives `None`), written (as a float) at each of the edge's two ends whose current
+  value is smaller in magnitude (`|current| < |value|`), added to a double sum (`sum + value`) and
+  counted; prints `MRISmaxEdgeStatToOverlay(): metric <m>   avg <sum / count>` (`%g`: `-nan` when no
+  edge counts). Returns the volume.
+- **One-line summary** (`MRISprintSurfQualityStats(fp)`): the triangle areas, the corner angles
+  (degrees), the edge lengths and the hinge angles (degrees), computed in that order, then for each
+  the mean, stddev, min and max as `%7.5f ` and one more space after each group, and a newline;
+  returns 0. **Table** (`MRISprettyPrintSurfQualityStats(fp)`): the face metric first, the same four
+  statistics, then the lines `Area   `, `Corner `, `Edge   `, `Hinge  ` followed by the count
+  (`%7d`), mean and stddev (`%8.5f`), min (`%8.6f`) and max (`%8.4f`), single spaces between;
+  returns 0. FS-536: when a statistic is `None`, FreeSurfer writes the groups (lines) before it and
+  crashes (`reproduce`); the default writes nothing of the summary and returns 1.
+- **Curvature averaging** (`MRISaverageCurvatures(n)`): `n` passes; in each, for every unripped
+  vertex in order, `curv` plus its unripped 1-hop neighbours' curvatures (float sum from its own,
+  each neighbour added to the sum as `sum + c`), divided by their count plus one (a float count from
+  0, `count + 1` per neighbour, then `+ 1`), stored aside; then copied to the unripped vertices.
+  Then the curvatures' extremes (`min_curv`, `max_curv`, as `mrisComputeCurvatureMinMax`).
+- **Middle of the grey matter** (`mrisFindMiddleOfGray`): the averaging with 3 passes; the current
+  coordinates saved as the temporary set; the original set restored; `MRIScomputeMetricProperties`;
+  every unripped vertex moved (as `MRISsetXYZ` from line 13221) to `x = (t n_x) + orig_x`,
+  `y = (n_y t) + orig_y`, `z = (n_z t) + orig_z` with `t = 0.5 curv` (floats, operands in that
+  order: the product first in each addition).
+
+## 117. Validation plan, part 22
+
+The probe's `mpg` command (relay 24): `mpf`'s surfaces (icosahedra, closed; open grids of 2 to 5 by
+2 to 5 vertices and `srd`'s small meshes, whose edge tables stop) read by `MRISread`, 0 to 3
+vertices ripped (one case in four); curvatures (eighths in [-2, 2], NaNs and infinities in heavy
+cases) in half the cases; a mask (none in half the cases, else one voxel per vertex, one more or
+fewer one in six) of 0, 1, 0.5, 0.25 or 2; the face normal's test vertex -1 (seven cases in eight)
+or -1 to 3 with sixteenths as deltas; then 1 to 5 of: the edge count, the edge table (the edges and
+every vertex's edge numbers or `N`), the corner table, the face metric (every normal or `N`), one
+face normal (faces -1 and `nfaces` one in eight; the length and the matrix asked or not), the edge
+metric (the table first when absent), the corner metric, the three statistics (with or without
+the mask; metric ids out of range one in ten), the overlay, the two summaries, the curvature
+averaging (0 to 3 passes), the middle of the grey matter, a vertex moved, `MRIScomputeMetricProperties`.
+Each prints its numbers' bits or text. Comparison: `reproduce` gives FreeSurfer's lines except
+those whose only differences are numbers at most 2 units in the last place apart from glibc's
+`acos` (counted apart, the check's `reproduce_differ_acos_last_bits`); FS-535's, FS-536's and
+FS-538's crashes compare as FreeSurfer's crash. Observed (relay 24): the probe README. The defaults
+are checked by `tests/props10_defaults.rs`.

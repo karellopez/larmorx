@@ -2,15 +2,16 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (1,320 cases, thirty of each of
-//! the 44 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1320` on Linux x64 from the unit
-//! oracle's build (2026-11-14, relay 23: 1,282 lines identical, 38 counted, not compared, where
+//! official build's output lines for the probe's cases of seed 1 (1,350 cases, thirty of each of
+//! the 45 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1350` on Linux x64 from the unit
+//! oracle's build (2026-11-14, relay 24: 1,309 lines identical, 41 counted, not compared, where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
-//! `SKIP`), against the port's output with `reproduce` (a case the port marks with one of those
-//! defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`, `stl`, `tri`,
-//! `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii`, `gwr` and `mpf` cases run in a temporary
-//! folder of their own.
+//! `SKIP`; an `mpg` line whose only differences are glibc's `acos` last bits would be hashed as the
+//! port's, none in this set), against the port's output with `reproduce` (a case the port marks
+//! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
+//! `stl`, `tri`, `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii`, `gwr`, `mpf` and `mpg`
+//! cases run in a temporary folder of their own.
 
 #[path = "fs_surfio/cases.rs"]
 mod cases;
@@ -29,12 +30,12 @@ const SKIP: [&str; 44] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "d09e84accbd867aaf99fcb4d8d0516924b60bf0d7f3ae04d851b083b1009ad2f";
+const OFFICIAL_SHA256: &str = "6a44bcf748d45fc2be9fbcfb07335b04a355090e528bf8db73b40258f0e84b1c";
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    for line in cases::generate(1, 1320) {
+    for line in cases::generate(1, 1350) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let refused = out.starts_with("EXIT ");
         let skip = ids.iter().any(|x| SKIP.contains(x))
@@ -61,7 +62,7 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
         ..SurfGlobals::default()
     };
     let (mut noted, mut changed, mut cases) = (0, 0, 0);
-    for line in cases::generate(1, 103 * 44) {
+    for line in cases::generate(1, 103 * 45) {
         if !line.starts_with("mprop ") {
             continue;
         }

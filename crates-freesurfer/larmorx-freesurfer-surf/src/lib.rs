@@ -98,6 +98,7 @@ pub mod names;
 pub mod nbhd;
 pub mod positions;
 pub mod props;
+pub mod props10;
 pub mod props2;
 pub mod props3;
 pub mod props4;

@@ -206,7 +206,7 @@ pub(super) fn mpf_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
 }
 
-fn dump_vol(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
+pub(super) fn dump_vol(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
     let Some(m) = m else {
         o.s("NULL");
         return;

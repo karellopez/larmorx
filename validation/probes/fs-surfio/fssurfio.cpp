@@ -53,6 +53,7 @@
 #include "mrisurf_sphere_interp.h"
 #include "matrix.h"
 #include "mrisutils.h"
+#include "surfgrad.h"
 #include "transform.h"
 #include "topo_parms.h"
 #include "tritri.h"
@@ -3334,6 +3335,151 @@ void mpf_case()
   }
 }
 
+// relay 24: queue item 3.1-51's leftovers, second group: the edge and corner tables, the face,
+// edge and corner metrics (no gradients), the quality statistics and printers, the overlay of the
+// largest edge statistic, MRISaverageCurvatures and mrisFindMiddleOfGray, on a surface read by
+// MRISread with some vertices ripped, curvatures given or not, a mask of one voxel per vertex (or
+// none) and MRISfaceNormalFace's test delta
+static void mpg_stats(double *st)
+{
+  if (!st) { out += "NULL "; return; }
+  for (int k = 0; k < 5; k++) od(st[k]);
+  free(st);
+}
+
+static void mpg_edges(MRIS *s)
+{
+  oi(s->nedges);
+  if (!s->edges) { out += "N "; return; }
+  for (int e = 0; e < s->nedges; e++) {
+    MRI_EDGE *x = &s->edges[e];
+    for (int k = 0; k < 4; k++) oi(x->vtxno[k]);
+    oi(x->faceno[0]); oi(x->faceno[1]);
+    for (int k = 0; k < 4; k++) { oi(x->corner[k][0]); oi(x->corner[k][1]); }
+  }
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX_TOPOLOGY *vt = &s->vertices_topology[vno];
+    if (!vt->e) { out += "N "; continue; }
+    for (int k = 0; k < vt->vtotal; k++) oi(vt->e[k]);
+  }
+}
+
+void mpg_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int nrip = geti();
+  std::vector<int> rips;
+  for (int k = 0; k < nrip; k++) rips.push_back(geti());
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno : rips) s->vertices[vno].ripflag = 1;
+  if (geti())
+    for (int vno = 0; vno < s->nvertices; vno++) s->vertices[vno].curv = getf();
+  MRI *mask = NULL;
+  int mw = geti();
+  if (mw > 0) {
+    mask = MRIalloc(mw, 1, 1, MRI_FLOAT);
+    for (int c = 0; c < mw; c++) MRIsetVoxVal(mask, c, 0, 0, 0, getf());
+  }
+  MRISfaceNormalFace_AddDeltaVertex = geti();
+  for (int k = 0; k < 3; k++) MRISfaceNormalFace_AddDelta[k] = getd();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "cnt") {
+      oi(MRIScountEdges(s));
+    } else if (op == "edg") {
+      oi(MRISedges(s));
+      mpg_edges(s);
+    } else if (op == "cor") {
+      oi(MRIScorners(s));
+      oi(s->ncorners);
+      for (int c = 0; s->corners && c < s->ncorners; c++) {
+        MRI_CORNER *x = &s->corners[c];
+        oi(x->vtxno[0]); oi(x->vtxno[1]); oi(x->vtxno[2]); oi(x->faceno);
+        oi(x->edgeno[0]); oi(x->edgeno[1]); oi(x->edgedir[0]); oi(x->edgedir[1]);
+      }
+    } else if (op == "fm") {
+      oi(MRISfaceMetric(s, 0));
+      for (int f = 0; f < s->nfaces; f++) {
+        DMATRIX *n = s->faces[f].norm;
+        if (!n) { out += "N "; continue; }
+        od(n->rptr[1][1]); od(n->rptr[2][1]); od(n->rptr[3][1]);
+      }
+    } else if (op == "fnf") {
+      int fno = geti(), want = geti();
+      DMATRIX *c = NULL;
+      double cl = 0;
+      oi(MRISfaceNormalFace(s, fno, (want & 1) ? &c : NULL, (want & 2) ? &cl : NULL));
+      if (c) { od(c->rptr[1][1]); od(c->rptr[2][1]); od(c->rptr[3][1]); }
+      od(cl);
+      if (fno >= 0 && fno < s->nfaces && s->faces[fno].norm) {
+        DMATRIX *n = s->faces[fno].norm;
+        od(n->rptr[1][1]); od(n->rptr[2][1]); od(n->rptr[3][1]);
+      }
+    } else if (op == "em") {
+      if (!s->edges) MRISedges(s);
+      oi(MRISedgeMetric(s, 0));
+      for (int e = 0; e < s->nedges; e++) {
+        MRI_EDGE *x = &s->edges[e];
+        od(x->len); od(x->u[0]); od(x->u[1]); od(x->u[2]);
+        od(x->area[0]); od(x->area[1]); od(x->maxarea); od(x->dot); od(x->angle);
+      }
+    } else if (op == "cm") {
+      oi(MRIScornerMetric(s, 0));
+      for (int c = 0; s->corners && c < s->ncorners; c++) { od(s->corners[c].dot); od(s->corners[c].angle); }
+    } else if (op == "ast") {
+      int m = geti();
+      mpg_stats(MRIStriangleAreaStats(s, m ? mask : NULL, NULL));
+    } else if (op == "est") {
+      int id = geti(), m = geti();
+      mpg_stats(MRISedgeStats(s, id, m ? mask : NULL, NULL));
+    } else if (op == "cst") {
+      int id = geti(), m = geti();
+      mpg_stats(MRIScornerStats(s, id, m ? mask : NULL, NULL));
+    } else if (op == "ovl") {
+      int id = geti(), m = geti();
+      mpf_vol(MRISmaxEdgeStatToOverlay(s, id, m ? mask : NULL));
+    } else if (op == "pq") {
+      oi(MRISprintSurfQualityStats(stdout, s));
+    } else if (op == "ppq") {
+      oi(MRISprettyPrintSurfQualityStats(stdout, s));
+    } else if (op == "avc") {
+      oi(MRISaverageCurvatures(s, geti()));
+      of(s->min_curv); of(s->max_curv);
+      for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+    } else if (op == "mid") {
+      mrisFindMiddleOfGray(s);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->x); of(v->y); of(v->z); of(v->curv);
+      }
+    } else if (op == "mv") {
+      int vno = geti();
+      float x = getf(), y = getf(), z = getf();
+      MRISsetXYZ(s, vno, x, y, z);
+    } else if (op == "mp") {
+      MRIScomputeMetricProperties(s);
+    } else {
+      fail("mpg op");
+    }
+  }
+}
+
 void mpe_case()
 {
   mkdir(workdir.c_str(), 0700);
@@ -3788,6 +3934,8 @@ void run_case()
     mpe_case();
   } else if (cmd == "mpf") {
     mpf_case();
+  } else if (cmd == "mpg") {
+    mpg_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

@@ -260,6 +260,18 @@ and release, plain and under the AArch64 NaN emulation (2,344 and 92,611 flips);
 volume functions' move to `larmorx-freesurfer-io` (relay 23) changed no output: relay 22's seed-7
 `gwr`, `gii` and `srd` outputs identical in both modes (2,790 cases).
 
+Relay 24 (queue item 3.1-51's leftovers, second group; the 45th command `mpg`: the edge and corner
+tables, the face, edge and corner metrics, the triangle, edge and corner statistics, the edge
+overlay, the two quality summaries, the curvature averaging and the middle of the grey matter;
+`specs/freesurfer-surfio.md` §117): `mpg` at seeds 7, 13, 17 and 5 (888 cases each, from 40,000
+cases of the whole probe): 0 different with `reproduce` beyond 3, 5, 5 and 5 lines whose only
+differences are glibc's `acos` last bits (at most 2 units in the last place; `check.py` counts them
+apart as `reproduce_differ_acos_last_bits`, GLIBC-07); 15 to 19 counted (fs.mri's FS-53, FS-121,
+FS-06); `fix` different only with notices (FS-535 to FS-538) and those `acos` bits. Seed 7, 9,000
+cases of the whole probe: 8,712 identical, 288 counted, 0 different. Seed 1, 1,350 cases: 1,309
+identical, 41 `SKIP`, hash `6a44bcf748d45fc2be9fbcfb07335b04a355090e528bf8db73b40258f0e84b1c` (the
+test).
+
 ```
 validation/probes/fs-surfio/build.sh <workspace>
 scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 66000

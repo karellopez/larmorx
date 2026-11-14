@@ -835,10 +835,11 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
             let mut m = get_volc(cx, t)?;
             let xm = t.i();
             if xm != 0 {
+                // the probe's tokens are FreeSurfer's `m[c][r]`: element (r, c), `tr[r][c]` here
                 let mut tr = [[0.0f64; 4]; 4];
-                for c in tr.iter_mut() {
-                    for r in c.iter_mut() {
-                        *r = super::conv::dbl(t);
+                for c in 0..4 {
+                    for r in tr.iter_mut() {
+                        r[c] = super::conv::dbl(t);
                     }
                 }
                 if xm == 1 {
@@ -1177,10 +1178,11 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
             let mut m = get_volc(cx, t)?;
             let xm = t.i();
             if xm != 0 {
+                // the probe's tokens are FreeSurfer's `m[c][r]`: element (r, c), `tr[r][c]` here
                 let mut tr = [[0.0f64; 4]; 4];
-                for c in tr.iter_mut() {
-                    for r in c.iter_mut() {
-                        *r = super::conv::dbl(t);
+                for c in 0..4 {
+                    for r in tr.iter_mut() {
+                        r[c] = super::conv::dbl(t);
                     }
                 }
                 if xm == 1 {

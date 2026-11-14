@@ -521,7 +521,9 @@ pub fn mri_norm_init(
                 let m_l = lt.m_l.as_mut().expect("LTAalloc's matrix");
                 for row in 1..=3 {
                     for col in 1..=4 {
-                        *m_l.relt_mut(row, col) = t[(col - 1) as usize][(row - 1) as usize] as f32;
+                        // `m[col - 1][row - 1]` of FreeSurfer's column-major `Transform`: element
+                        // (row, col), `t[row - 1][col - 1]` here (larmorx_io's row-major layout)
+                        *m_l.relt_mut(row, col) = t[(row - 1) as usize][(col - 1) as usize] as f32;
                     }
                 }
                 let _ = err.write_all(b"talairach transform\n");

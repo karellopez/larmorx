@@ -45,6 +45,12 @@ Prints the counts and `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1). Run inside
 | 7 | 1,500 (first generator) | 2,880 | | 0 | 120 |
 | 13 | 4,000 (with the undefined cases) | 7,352 | 196 | 0 | 648 |
 | 17 | 4,000 (with the well-formed files) | 7,402 | 1,138 | 0 | 598 |
+| 101 | 20,000 | 36,926 | 6,070 | 0 | 3,074 |
+| 202 | 20,000 | 36,992 | 6,250 | 0 | 3,008 |
+| 303 | 20,000 | 36,918 | 6,266 | 0 | 3,082 |
+
+(Each case is compared with both originals; seeds 101 to 303 ran three at a time in a 12 GiB box,
+logs `<workspace>/oracles/logs/fs-found-c-r26-nrrd-seed*.log`.)
 
 On the undefined cases both originals behaved alike: FS-761 never returned; FS-762, FS-768 and all
 but one FS-767 case aborted (signal 6: FreeSurfer's build has `_FORTIFY_SOURCE` and the stack

@@ -101,7 +101,8 @@ comparison of the port with `reproduce` identical to both originals (the whole `
 every NaN's bits, the data, the comments and key/values; the messages; standard error). The cases
 where the port notes an undefined path were run too, not compared: FS-761 never returned (both),
 FS-762 aborted (signal 6, both), FS-768 aborted, FS-771 crashed (signal 11), FS-767 aborted but
-once, FS-765 and FS-766 returned. The larger runs: see the probe's README.
+once, FS-765 and FS-766 returned. Seeds 101, 202 and 303, 20,000 files each: 110,836
+comparisons identical (18,586 of them successful reads), 0 differences.
 
 ## Not ported
 

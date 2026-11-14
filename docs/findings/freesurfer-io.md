@@ -1484,3 +1484,70 @@ status 139 and the aborts as 134.
   says); seed 7, 5,048 cases of `ztr`, `ctr`, `tr`, `fsr`, `mgr`, `mrd`, `mrh`, `mri`, `nrd`:
   `reproduce` identical on 4,060, 0 different (73 lines with FS-167 compared: 56 `ztr`, 7 `fsr`, 3
   `ctr`, 7 volume reads); `fix` differs only with notices.
+
+## Part 19: COR, bshort, bfloat and bhdr volumes read and written (relay 27 of track A)
+`utils/mriio.cpp` 1362-1903 (`corRead`, `corWrite` and the COR header's flags), 2766-4013
+(`bvolumeWrite`, `get_b_info`, `bvolumeRead`, `decompose_b_fname`, `write_bhdr`, `read_bhdr`),
+`utils/mri_identify.cpp`'s `bhdr_stem`, `bhdr_firstslicefname`, `bhdr_precision`, `utils/mri.cpp`'s
+`MRIchangeType` (11806, the unscaled path) and the `MRI` destructor (370), `packages/minc/
+minc_volume_io.c`'s `delete_general_transform` (723). The object code read: `<scratch>/A/rl27/
+bvolumeRead.dis` and `corRead.dis` (from relay 25's `mriio.dis` of the unit oracle's `mriio.cpp.o`).
+
+### Mechanisms
+- **Object code.** `read_bhdr` and `get_b_info` are inlined into `bvolumeRead`: the corners' axes are
+  `subss` (the later corner in the destination), `divss` by `cvtsi2ss(width)`, the squares summed r, a,
+  s with `addss` (the running sum the destination), `sqrtss`, then `ucomiss` against 0 with `jp` (a
+  NaN size takes the division branch). `xend = width * xsize / 2.0` is `cvtsi2ss(width)`, `mulss xsize`
+  and `mulss 0.5f` (GCC's exact narrowing), `xstart` its `xorps`, and `fov` `maxss` of `xend + xend`
+  and `yend + yend` (the second when either is NaN, as C's `?:`). corRead's scaling is `mulsd` of
+  the double by 1000.0 then `cvtsd2ss`, `mulss` of the floats by 1000.0f, and the flip angle
+  `cvtss2sd`, `mulsd 2π`, `divsd 360`, `cvtsd2ss`. The port writes these with `larmorx_freesurfer_core::sse`
+  (SSE's NaN on every platform).
+- **FS-657.** `imnr0`, `imnr1`, `ptype`, `x`, `y` (`int`), `thick`, `psiz` (`double`) and `strtx` ...
+  `endz` (`float`) are locals with no initial value; their line sets the field's flag whatever
+  `sscanf` assigns.
+- **FS-658.** `sscanf(line + 11, "%f", &flip_angle)` for any line starting `flip `; `line` is `char
+  line[STRLEN]` reused by `fgets`, so past a short line's NUL lie an earlier line's bytes (or the stack's
+  for bytes no line wrote). glibc's `sscanf` of an empty text sets `errno` to 0 (measured:
+  `validation/probes/fs-io/sscanf_empty.c`;
+  `larmorx_freesurfer_core::cscan`'s end rule), which the probe sees in `errno` after a short `flip
+  angle` line.
+- **FS-659, FS-660.** `corWrite` writes `fwrite(mri->slices[i - imnr0][j], 1, width, fp)`: a row of
+  another type gives its first `width` bytes; `slices` has `depth * nframes` entries, so a longer
+  `imnr0..imnr1` range writes the next frames' slices, then reads past the array (heap memory as a row
+  pointer: a crash). For `MRI_TENSOR` (and the other types `MRI::initSlices` does not step) every row
+  pointer is the first voxel's (FS-166).
+- **FS-661.** `read_bhdr` loops `if (!fgets(...) && ferror(fp)) ErrorPrintf(...); if (feof(fp)) break;`:
+  a read error never sets the end-of-file flag.
+- **FS-662.** `fscanf(fp, "%d %d %d %*d", &ny, &nx, &nt)` and `fscanf(fp, "%*d %*d %*d %d",
+  &swap_bytes_flag)` into uninitialised locals; only the message follows a short read.
+- **FS-663.** `if (FileExists(analyse_fname)) fprintf(stderr, "warning: overwriting file %s\n",
+  register_fname);` after `analyse.dat` was written.
+- **FS-664.** `fname = std::string(stem) + ".hdr";` (the reader opens `"%s/%s.bhdr"`).
+- **FS-665.** With `subject_name` set and `SUBJECTS_DIR` unset: `if (dealloc) MRIfree(&mri);` and the
+  write goes on to `write_bhdr(mri = NULL, fp)` (`MRIxfmCRS2XYZ(NULL)`: signal 11). `MRI::subject_name`
+  is set by no reader (only copied by `MRIcopyHeader`; the file's static `subject_name` is never
+  assigned), so this path needs a program that sets it.
+- **FS-666.** `bhdr_stem(fname)` returns NULL for a name that is not `.bhdr`; `sprintf(tmpstr,
+  "%s_000.bshort", NULL)` prints glibc's `(null)`.
+- **FS-667.** `stuff_four_by_four(as, x_r, y_r, z_r, c_r, y_r, y_r, y_r, c_r, z_r, z_r, z_r, c_r, 0, 0,
+  0, 1)` and likewise `af`: the 3 x 3 part has two proportional rows, so `MatrixDeterminant` is 0 (or
+  rounding noise for oblique volumes); `cs` also mixes the subject's extents with the written volume's
+  sizes in its fourth column. Kept (rule C): the corrected path has never run in FreeSurfer, and the
+  geometry file it falls back to is what every bvolume write has produced.
+- **FS-668, FS-669.** `read_bhdr` breaks on `feof` before using the line `fgets` returned with the end
+  of the file; `line[strlen(line) - 1]` reads `line[-1]` for an empty C string (and writes 0 there when
+  that byte is `\n`).
+- **FS-670.** `decompose_b_fname` cuts the folder at the last `/`: `/stem...` gives the folder `""`,
+  which `get_b_info` replaces with `.`.
+- **FS-671.** `bvolumeWrite` sets `vol->depth = nslices * nframes; vol->nframes = 1` for
+  `MRIchangeType`, whose copy is allocated with one frame (`frames` of one `MRI_FRAME`), then sets the
+  copy's `nframes` back; `MRIfree` runs `~MRI()`, whose loop `for (i < nframes) if
+  (frames[i].m_ras2vox) MatrixFree(...)` reads past the one-entry array (heap contents: a crash when they
+  are not 0; the probe saw both).
+- **FS-672.** `MRI::transform` (a `General_transform`) has no initialiser; a failed
+  `input_transform_file` sets `free_transform = 1` without it; `~MRI()` calls `delete_general_transform`
+  on its uninitialised `type`: an unknown type prints `delete_general_transform` and `exit(1)` (the
+  probe: corRead's later error frees the volume, EXIT 1). The same holds for `MRITAGread`'s talairach
+  tag (fs.io's mghRead path) wherever FreeSurfer later frees that volume (mri_read's frame copies and
+  NaN check); not noted there yet.

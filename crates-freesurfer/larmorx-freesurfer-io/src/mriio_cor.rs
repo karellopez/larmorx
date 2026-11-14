@@ -856,3 +856,49 @@ pub fn cor_write(
     }
     Ok(NO_ERROR)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    #[test]
+    fn a_written_cor_folder_reads_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = Some(dir.path());
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut m = mri::mri_alloc(&mut g, &mut o, &mut e, 4, 3, 2, MRI_UCHAR).unwrap();
+        for (i, b) in m.chunk.as_mut().unwrap().iter_mut().enumerate() {
+            *b = (i * 11 % 256) as u8;
+        }
+        m.thick = 1.0;
+        m.ps = 1.0;
+        m.flip_angle = 0.5;
+        assert_eq!(cor_write(&mut g, &mut o, &mut e, p, &m, "c").unwrap(), NO_ERROR);
+        let info = std::fs::read_to_string(dir.path().join("c/COR-.info")).unwrap();
+        assert!(info.starts_with("imnr0 1\nimnr1 2\nptype 2\nx 4\ny 3\n"));
+        assert!(info.contains("flip angle 28.647890\n"));
+        let back = cor_read(&mut g, &mut o, &mut e, p, "c", true).unwrap().unwrap();
+        assert_eq!(back.chunk, m.chunk);
+        assert_eq!(back.imnr1, 2);
+        // 0.5 rad written in degrees with 6 decimals, read back in radians
+        assert!((back.flip_angle - 0.5).abs() < 1e-6);
+    }
+
+    /// FS-659 and FS-660: refused by default.
+    #[test]
+    fn refuses_volumes_cor_cannot_hold() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = Some(dir.path());
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 2, 1, MRI_FLOAT).unwrap();
+        assert_eq!(cor_write(&mut g, &mut o, &mut e, p, &m, "c").unwrap(), ERROR_BADPARM);
+        assert!(g.notices.contains(&FS_659));
+        let mut m = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 2, 1, MRI_UCHAR).unwrap();
+        m.imnr1 = 3;
+        assert_eq!(cor_write(&mut g, &mut o, &mut e, p, &m, "d").unwrap(), ERROR_BADPARM);
+        assert!(g.notices.contains(&FS_660));
+    }
+}

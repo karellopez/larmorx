@@ -19,7 +19,9 @@ schemas; §75 (3.1-34): the rest of the registration files; part 10 (§76-82): l
 annotation tables, point sets; part 11 (§83-86): GIFTI volumes, `MRIwrite`, point-set files; part 12
 (§87-89): a label's coordinates converted, one frame of a volume written; **part 13** (§90-92): MGH and
 MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94), NIfTI-1 pairs
-(`.hdr` and `.img`) written (§95-96); **part 15** (§97-99): NIfTI volumes and NIfTI-1 pairs read.
+(`.hdr` and `.img`) written (§95-96); **part 15** (§97-99): NIfTI volumes and NIfTI-1 pairs read;
+§100: a number cut after another (FS-49); **part 16** (§101-103): ANALYZE volumes read and written;
+**part 19** (§104-106): COR, bshort, bfloat and bhdr volumes read and written.
 
 ## 1. Conventions
 
@@ -2944,3 +2946,235 @@ FS-645, memory contents); seed 13, 7,569 cases of `ard`, `arh`, `awr`, `nrd`, `n
 `mri`: identical on 6,692, 0 different (682 counted, 195 compared apart). `fix` differs only with
 notices. Unit tests (`mriio_analyze::tests`): FS-645, FS-646 (a 996-byte stem), FS-648, FS-649, FS-650,
 FS-652, FS-653, FS-654, FS-656, a series' count from `SPM_START_FRAME`, the scale factor.
+
+## 104. COR volumes read and written (`corRead`, `corWrite`; `mri_read`'s and `MRIwriteType`'s COR 0)
+
+A COR volume is a folder of 8-bit coronal slices `COR-<nnn>` (`%03d` of the slice number, `-01` for -1)
+and a text header `COR-.info`. `mri_identify` gives COR to any folder and to a name whose last
+component starts with `COR-`.
+
+**Reading** (`mri_read(name, 0 or -1, ...)`; `MRIreadHeader` without voxels):
+
+- The folder: the name itself when it is a folder; else the name up to its last `/` (the name's final
+  character not looked at; no `/`: the empty name). `stat` failing: `corRead(): can't stat <name>`;
+  not a folder: `corRead(): <name> isn't a directory` (both `ERROR_BADFILE`, `errno` 0, no volume). A
+  `/` is added when the folder's name does not end with one. `COR-.info` that does not open:
+  `corRead(): can't open file <folder>/COR-.info`.
+- The header, line by line (lines of up to 1,023 bytes; a longer line is read as several): a line is
+  taken by its first characters, in this order: `imnr0 `, `imnr1 `, `ptype `, `x `, `y ` (integers),
+  `fov `, `thick `, `flip ` (see below), `psiz `, `locatn ` (doubles), `strtx `, `endx `, `strty `,
+  `endy `, `strtz `, `endz `, `tr `, `te `, `ti ` (floats), `ras_good_flag ` (integer), `x_ras `,
+  `y_ras `, `z_ras `, `c_ras ` (three floats, each assigned while it reads), `xform` or `transform`
+  (a word). Each value is the C library's `sscanf("%*s <conversion>")` of the line: the first word
+  skipped, then blanks, then the number (a line without one leaves the value as it was, and for the
+  required fields counts the field as given: FS-657). A later line of the same name overrides an
+  earlier one. Unset: `ras_good_flag` 0, the direction cosines and centre 0, TR, TE, TI, flip angle,
+  `fov` and `locatn` 0, no transform.
+- **The flip line** (FS-658): the number is read eleven characters into the line (after `flip angle `,
+  the writer's form) whatever the line holds; then the angle is converted from degrees: `(2π x
+  (double)angle) / 360` stored as a `float` (the conversion is applied to the previous angle again
+  when the line has no number). FreeSurfer reads past a line shorter than eleven characters into what
+  an earlier, longer line left in its line buffer, or memory contents; `fix` reads no number there.
+  With `reproduce` the earlier line's bytes are read as FreeSurfer reads them, and memory contents are
+  noted (0 bytes).
+- **Required fields:** `imnr0`, `imnr1`, `ptype`, `x`, `y`, `thick`, `psiz`, `strtx`, `endx`, `strty`,
+  `endy`, `strtz`, `endz`. Any missing: `missing fields in file <folder>/COR-.info:` then one line per
+  missing field in that order (`  imnr0 field missing` ..., two blanks first), each an error
+  (`ERROR_BADFILE`, `errno` 0 before the first), no volume.
+- **Warnings** on standard output for values other than COR's: `warning: non-standard value for imnr0
+  (<n>, usually 1) in file <info>`, `imnr1 (<n>, usually 256)`, `ptype (<n>, usually 2)`, `x (<n>,
+  usually 256)`, `y (<n>, usually 256)`, `thick (<%g>, usually 0.001)`, `psiz (<%g>, usually 0.001)` (the
+  doubles compared exactly with 0.001), in that order.
+- **The volume:** `x` by `y` by `imnr1 - imnr0 + 1` bytes (`MRIalloc`, or `MRIallocHeader` with one
+  frame without voxels). All nine direction cosines 0 with `Gdiag`'s `DIAG_SHOW` and `DIAG_VERBOSE`
+  both set: a framed message on standard error (`Could not find the direction cosine information.` /
+  `Will use the CORONAL orientation.` / `If not suitable, please provide the information in COR-.info
+  file`, between lines of 52 dashes) and the coronal axes (x_r -1, y_s -1, z_a 1), `ras_good_flag` 0;
+  without both flags the cosines stay 0. `imnr0`, `imnr1` as read; `fov`, `thick`, `ps` the doubles
+  times 1,000 stored as floats; the voxel sizes `ps`, `ps`, `thick`; the start and end coordinates
+  the floats times 1,000 in `float`; the file name the name given; TR, TE, TI, flip angle, cosines,
+  centre, `ras_good_flag` as read.
+- **The transform** (a non-empty `xform`/`transform` word): its name is the word when it starts with
+  `/`, else `<name>/<word>` (cut to 1,023 bytes after `corRead: Truncation on line 1699` on standard
+  error); that file not existing: `<name>/../transforms/talairach.xfm`, and when that does not exist
+  either `can't find talairach file '<that>'` on standard output (the transform name stays the first
+  one). An existing file is read with MINC's `.xfm` reader (§ on `input_transform_file`): the
+  transform, its forward and inverse matrices, the volume owning it, the name the file read (with
+  `DIAG_VERBOSE`, `INFO: loaded talairach xform : <name>` on standard error); a failure prints the
+  reader's messages and `error loading transform from <name>` (`ERROR_BAD_FILE`, `errno` 0), no
+  matrices, the name empty, the volume still marked as owning a transform (FS-672: freeing such a
+  volume later frees a transform never written: memory contents; FreeSurfer's program usually ends with
+  `delete_general_transform` on standard error and status 1).
+- **The voxels** (with voxels): for each slice number from `imnr0` to `imnr1`, `<folder>/COR-<nnn>`
+  (`corRead(): can't open file <name>`), `y` rows of `x` bytes (`corRead(): error reading from file
+  <name>` for a short row; both `ERROR_BADFILE`, `errno` 0, no volume).
+
+**Writing** (`MRIwriteType(mri, name, 0)`; `MRIwrite` of a folder's name):
+
+- A volume without voxels: `corWrite(): mri structure to be written contains no voxel data`
+  (`ERROR_BADPARM`, `errno` 0, the status). Warnings on standard output: `non-standard value for imnr0
+  (<n>, usually 1) in volume structure`, `imnr1 (<n>, usually 256)`, `type (<t>, usually 0)`, `width
+  (<n>, usually 256)`, `height (<n>, usually 256)`, `thick (<%g>, usually 1)`, `ps (<%g>, usually 1)`.
+- FS-659: a volume that is not 8-bit: FreeSurfer writes the first `width` bytes of each row (of an
+  int, float, tensor... row; for the types whose rows FreeSurfer does not point at their places, FS-166,
+  the volume's first bytes for every row); `fix` refuses it: `corWrite(): COR slices hold bytes; the
+  volume's type is <t>` (`ERROR_BADPARM`), nothing written. FS-660: `imnr1 - imnr0 + 1` above the
+  depth: FreeSurfer writes the next frames' slices as further slices and crashes past the last frame's;
+  `fix` refuses: `corWrite(): imnr0 <a> to imnr1 <b> asks for <n> slices; the volume has <d>`.
+- The folder `<name>/` is made (mode 0777 less the umask); a failure other than "exists": `ERROR:
+  creating directory <name>/` on standard output, the system's message on standard error (`perror`),
+  status 1. Then `stat(name)`: `corWrite(): can't stat <name>`, `corWrite(): <name> isn't a directory`
+  (`ERROR_BADFILE`, `errno` 0). `errno` after a successful write: 17 (`EEXIST`) when the folder existed.
+- `COR-.info` (`corWrite(): can't open file <f> for writing`): `imnr0 <n>`, `imnr1 <n>`, `ptype 2`, `x
+  <w>`, `y <h>`, `fov <%g>`, `thick <%g>` (the slice size), `psiz <%g>` (the column size), `locatn 0`,
+  `strtx`, `endx`, `strty`, `endy`, `strtz`, `endz` (`%g`), each a `float` field divided by 1,000 in
+  `double`; `tr`, `te`, `ti` (`%f`); `flip angle <%f>` (degrees: `(360 x angle) / (2π)` in `double`);
+  `ras_good_flag <n>`; `x_ras`, `y_ras`, `z_ras`, `c_ras` with three `%f` each; `xform <name>` when the
+  volume has a transform name. One line each, `\n`.
+- The slices `COR-<nnn>` from `imnr0` to `imnr1` (`corWrite(): can't open file <f> for writing`), each
+  row's first `width` bytes of slice `n - imnr0` (`corWrite(): error writing to file <f> ` with a final
+  blank, for a row that does not write); status 0.
+
+## 105. bshort and bfloat volumes read and written (`bvolumeRead`, `bvolumeWrite`; types 8, 9 and bhdr 23)
+
+A bvolume is one file per slice, `<stem>_<nnn>.bshort` (16-bit integers) or `.bfloat` (32-bit floats),
+each with a text header `<stem>_<nnn>.hdr` of four integers `<rows> <columns> <frames> <order>` (order
+0 big-endian, else little-endian), and an optional geometry file `<stem>.bhdr`. `mri_identify` gives the
+type by the extension `bshort`, `bfloat` (exactly, after the last `.`) or `bhdr`.
+
+**The stem** (reading): the name after its last `/` (the folder before it; no `/`: `.`; a name in the
+root folder, `/<stem>...`: FreeSurfer reads it from the working folder, FS-670; `fix` reads it from
+`/`), its extension removed when it is exactly `.bshort` or `.bfloat`, then cut at its last `_` when
+that `_` is its last character or the fourth from its end (`<stem>_000`, `<stem>_`). An empty stem:
+`decompose_b_fname(): bad bshort/bfloat file specifier "<name>"` (`ERROR_BADPARM`), no volume. The
+bhdr type reads `<stem>_000.bfloat` when it exists and is readable, else `<stem>_000.bshort` (`<stem>`
+the name without its last `.` part), as float or short; neither: `ERROR: bvolumeRead: type (-1) is not
+short or float` on standard error (another type the same message with it), no volume.
+
+**Reading** (`mri_read`, `MRIreadHeader`):
+
+- With `<folder>/<stem>.bhdr` (it opens): the geometry file, line by line (up to 1,023 bytes; the
+  newline removed; leading blanks skipped; lines taken by their first characters: `cols: `, `rows: `,
+  `nslices: `, `n_time_points: ` (integers: the extents and frames), `slice_thick: `, `image_te: `,
+  `image_tr: ` (seconds: the value times 1,000 in `double` is TR, applied even without a number),
+  `image_ti: `, `flip_angle` (the ten characters alone decide; a double), `top_left_r: ` ...
+  `top_left_s: `, `top_right_r: ` ... , `bottom_right_r: ` ... , `normal_r: `, `normal_a: `, `normal_s: `
+  (floats; the normal is the slice axis); each `sscanf("%*s <conversion>")`; others ignored). Unset
+  extents are 1 (and the frames 1), the corners 0. FS-668: a last line without a newline is ignored by
+  FreeSurfer (`fix` reads it, noted). FS-669: a line that starts with a NUL byte is ignored (FreeSurfer
+  reads, and may change, the byte before its line buffer). FS-661: a geometry file that opens but cannot
+  be read (a folder) makes FreeSurfer print `read_bhdr(): could not read file` for ever; larmorx prints
+  it once and reads the file as empty. Then, in `float`: `x = (top right - top left) / columns` per
+  component, the column size its length (`sqrtf` of the sum of squares in the order r, a, s), the
+  column axis `x / size`; a size of 0 gives size 1 and axis (-1, 0, 0) (a NaN size is not 0); `y =
+  (bottom right - top right) / rows`, likewise, with (0, 0, -1) for a size of 0. The centre: the
+  voxel-to-RAS matrix (§ on `MRIxfmCRS2XYZ`, base 0) with its fourth column replaced by the top-left
+  corner, times `(columns / 2, rows / 2, slices / 2, 1)` (fs.core's `float` matrix product);
+  `ras_good_flag` 1; `thick` the slice size, `ps` the column size. Then `<folder>/<stem>_000.hdr`
+  (`cannot open <name>`, `ERROR_BADFILE`, `errno` 0, no volume) gives the frames (`fscanf("%d %d %d
+  %*d")`: fewer than three numbers prints `bvolumeRead(): could not read file`, `ERROR_BADFILE`, and
+  FreeSurfer's frame count is then memory contents: FS-662, 1 here); a frame count that cannot be
+  allocated ends the program: `get_b_info: could not allocate <n> frames` (`ERROR_NOMEMORY`). The rows
+  and columns of `_000.hdr` are not used; `imnr1` is 0.
+- Without it: with `DIAG_SHOW` and `DIAG_VERBOSE`, a framed message on standard error (`Could not find
+  the direction cosine information.` / `Will use the CORONAL orientation.` / `If not suitable, please
+  provide the information in <folder>/<stem>.bhdr file` between lines of 65 dashes);
+  `<folder>/<stem>_000.hdr` (`can't find file <name> (last resort);bailing out on read`) gives rows,
+  columns and frames (fewer than three: `get_b_info(): could not read file`, FS-662's memory contents);
+  `<folder>/<stem>_000.<ext>` must exist (`can't find file <name>; bailing out on read`); the slices
+  are counted while `<stem>_<nnn>.<ext>` exists from 000 on; 1 mm voxels, the coronal axes, centre 0,
+  `ras_good_flag` 0, `imnr1` the slices.
+- Both: `imnr0` 1; the end coordinates `extent x size / 2` (the product in `float`), the starts their
+  negatives; `fov` the larger of `xend - xstart` and `yend - ystart` (the second when either is NaN);
+  the volume's name the name given.
+- **The voxels:** the byte order from the fourth number of `<folder>/<stem>_000.hdr` (FreeSurfer's
+  flag is memory contents when it is missing: FS-662, big-endian here, after `bvolumeRead(): could not
+  read file`); for each slice `<folder>/<stem>_<nnn>.<ext>` (`bvolumeRead(): error opening file <name>`),
+  frame after frame, row after row, `columns` values (`bvolumeRead(): error reading from file <name>`
+  for a short row; both `ERROR_BADFILE`, `errno` 0, no volume), byte-swapped unless little-endian. Then
+  `INFO: bvolumeRead: min = <%g>, max = <%g>` (`MRIlimits`) on standard output, `imnr1` the depth,
+  `thick` the slice size.
+
+**Writing** (`MRIwriteType` as bshort 8, bfloat 9, bhdr 23: `<stem>_000.bshort` for a short volume, else
+`<stem>_000.bfloat`, `<stem>` the name without its last `.` part; FS-666: a bhdr name that does not end
+in `.bhdr` gives FreeSurfer the stem `(null)` and files `(null)_000...` in the working folder; `fix`
+refuses it: `MRIwriteType(): <name> is not a .bhdr name`, `ERROR_BADPARM`):
+
+- A volume without voxels: FS-58 (FreeSurfer crashes; larmorx ends with `bvolumeWrite(): the volume has
+  no voxels (FreeSurfer crashes here)`). Another type: `ERROR: bvolumeWrite: type (<t>) is not short or
+  float` on standard error, status 1.
+- A volume of another type is converted to short or float first, every frame's slices as one volume:
+  with `DIAG_VERBOSE` `INFO: bvolumeWrite: changing type` and `INFO: bvolumeWrite: range <%g> <%g>`
+  (`MRIlimits`); then fs.volume's `MRIchangeType` without scaling (bytes, shorts, unsigned shorts, ints
+  and longs to float directly; otherwise `MRIlimits` and, when the range does not fit the type,
+  `******* WARNING - forcing scaling of values to prevent cropping of input [<%2.0f>, <%2.0f>]` and
+  `***** DISABLING forcing and not doing scaling ********` on standard output), each value through
+  `MRIgetVoxVal` and `MRIsetVoxVal`. FS-671: with two or more frames FreeSurfer's converted copy has a
+  frame table of one frame and is freed at the end as if it had one for each: memory contents, the
+  program may crash after the files are written (larmorx: noted).
+- The stem: the name without `_<nnn>.bshort` or `_<nnn>.bfloat` (the `_` eleven characters from the
+  end, the name longer than eleven), and without a final `_<nnn>` (the `_` four from the end).
+  `INFO: bvolumeWrite: stem = <stem>` on standard output. `BFILE_LITTLE_ENDIAN` set: `INFO:
+  BFILE_LITTLE_ENDIAN is set, so writing as little endian` and `swap = 0, order=1234, le=1234 be=4321,
+  endian=1`, and the files little-endian; otherwise big-endian.
+- For each slice `<stem>_<nnn>.hdr` (`<rows> <columns> <frames> <0|1>` and a newline) and
+  `<stem>_<nnn>.<ext>` (its rows frame after frame); a file that does not open: `bvolumeWrite(): can't
+  open file <name>` (`ERROR_BADFILE`, `errno` 0, the status); writes unchecked.
+- A volume that names a subject (its `subject_name`): `SUBJECTS_DIR` unset prints `bvolumeWrite():
+  environment variable SUBJECTS_DIR unset` (an error; FS-665: with a converted volume FreeSurfer then
+  crashes); `$SUBJECTS_DIR/<subject>` not there: `can't stat <dir>; writing to bhdr instead`, not a
+  folder: `<dir> is not a directory; writing to bhdr instead` (standard error); its `mri/T1` and then
+  `mri/orig` read without voxels (`MRIreadInfo`), neither: `can't read the subject's orig or T1 volumes;
+  writing to bhdr instead`. With one (coronal axes set when its `ras_good_flag` is 0): six 4 x 4
+  matrices: each volume's direction matrix, whose rows are (x_r, y_r, z_r, c_r), (y_r, y_r, y_r, c_r),
+  (z_r, z_r, z_r, c_r), (0, 0, 0, 1) (FS-667: the A and S rows repeat the R components; kept), each
+  volume's centring (identity with `(n - 1) / 2` per extent in the fourth column), and each volume's
+  tkregister matrix (`-xsize`, `zsize`, `-ysize` of that volume placed as tkregister places them, the
+  fourth column the extents times the written volume's sizes over 2). Any of the six with determinant 0:
+  `bvolumeWrite(): bad determinant in matrix (check structural volume)` (the subject's three) or
+  `(check functional volume)`, then `bvolumeWrite(): one or more zero determinants; aborting
+  register.dat write and writing bhdr instead` (all errors): the geometry file is written. (The
+  direction matrices are singular, so this is what happens unless rounding hides it.) Otherwise the
+  inverses (`bvolumeWrite(): error inverting matrix`, then the summary) and `cf x ibf x iaf x as x bs x
+  ics`; `<folder of the stem>/analyse.dat` (`warning: overwriting file <f>` on standard error when it
+  exists; `bvolumeWrite(): couldn't open file <f> for writing`): the volume's `path_to_t1` or `.`,
+  `<stem>_%03d.bshort`, `<slices> <frames>`, `<columns> <rows>`; `register.dat`: the subject, the
+  column and slice sizes and `1` (`%g`), the matrix's four rows (`%g`); FS-663: FreeSurfer's `warning:
+  overwriting file <register.dat>` is printed always (it tests `analyse.dat`), `fix` only when
+  `register.dat` exists. Status 0.
+- Otherwise the geometry file, these lines: `          cols: <w>`, `          rows: <h>`, `       nslices:
+  <d>`, ` n_time_points: <f>`, then `   slice_thick`, `    top_left_r/a/s`, `   top_right_r/a/s`,
+  `bottom_right_r/a/s`, `      normal_r/a/s`, `      image_te`, `      image_tr` (TR / 1,000 in
+  `double`), `      image_ti`, `    flip_angle`, each `: <%f>`. The top left is the first voxel's centre
+  (the voxel-to-RAS matrix's fourth column), the top right the matrix times `(columns, 0, 0, 1)`, the
+  bottom right times `(columns, rows, 0, 1)`; the normal the slice axis over its length (`sqrtf`, in
+  `float`). FS-664: FreeSurfer writes it to `<stem>.hdr`, which no reader reads (a written volume read
+  back has the coronal default); `fix` writes `<stem>.bhdr` (noted). Status 0.
+
+## 106. Validation plan (part 19)
+
+Piece 17's commands in the closed probe `validation/probes/fs-io/`: `vrd` (`mri_read` with voxels) and
+`vrh` (`MRIreadHeader`) with piece 6's `Gdiag` (0, `DIAG_INFO`, `DIAG_SHOW`, both with `DIAG_VERBOSE`)
+and frame-list switch, the type -1 (identified), 0, 8, 9 or 23, of: COR folders `w/c` (headers in the
+writer's order with each field's number now and then in another form or missing, one line left out,
+given twice or without its value; short and long flip lines, `flip_angle`, a long first line for a
+short flip line to read; direction cosines whole, partial or zero; `xform`/`transform` names whose
+file is beside the slices, in `../transforms`, absolute and missing, or bare; slices cut or missing;
+names `w/c`, `w/c/`, `w/c/COR-001`, `w/c/COR-.info`, a missing folder, a file `w/f`), and bvolumes
+(`w/b`, `w/x_y`, `w/b.c` stems, shorts or floats in either byte order, 1 to 3 slices of 0 to 4 by 0 to 3
+voxels and 0 to 3 frames, slice headers whole, with two or three numbers, other spacing, other order
+flags, no newline; data cut, longer, missing; `.bhdr` files with every line form, unknown lines,
+`flip_angleX`, a NUL-started line, CR LF, a last line without a newline, other extents; a folder named
+`.bhdr`; names `<stem>_000.<ext>`, `<stem>.<ext>`, `<stem>_001.<ext>`, `<stem>_.<ext>`, the stem with
+its type, `<stem>.bhdr`, a missing file, the bhdr type of `w/b.mgz`). `vwr`: piece 14's `mgw` volumes
+(§94) written with `MRIwriteType` as COR (`w/c`, `w/c/`, `w/new/c`, an existing file `w/f`), bshort
+(`w/o_000.bshort`, `w/o.bshort`, `w/o`, `w/o_000`, `w/no/o.bshort`), bfloat (`w/o_000.bfloat`,
+`w/o.bfloat`, `w/o_001.bfloat`, `w/o`) or bhdr (`w/o.bhdr`), with or without `BFILE_LITTLE_ENDIAN`, a
+subject `s1` with `SUBJECTS_DIR` `w/subj` (its `mri/T1` or `mri/orig` COR header with coronal, other or
+no direction cosines; no subject folder, a file in its place) or unset; every file under `w` printed,
+and the read back with the writer's type. Measured (2026-11-14): seed 13, 2,181 piece-17 cases:
+`reproduce` identical on 1,852, 0 different (228 counted where FreeSurfer crashes, reads for ever or
+past its buffers: FS-661, FS-665, FS-669, FS-671, FS-672, FS-58, FS-53; 101 compared apart: FS-657,
+FS-658's memory contents, FS-662); `fix` differs only with notices. Unit tests
+(`mriio_bvol::tests`, `mriio_cor::tests`): the stems, a written bvolume read back in both modes
+(FS-664), FS-666, a written COR folder read back, FS-659, FS-660.

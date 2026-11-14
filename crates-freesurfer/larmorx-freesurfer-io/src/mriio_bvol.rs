@@ -1343,3 +1343,108 @@ pub fn bvolume_write(
     fp.close();
     Ok(NO_ERROR)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    fn short_volume(g: &mut Globals) -> Mri {
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut m = mri::mri_alloc_sequence(g, &mut o, &mut e, 3, 2, 2, MRI_SHORT, 2).unwrap();
+        for (i, b) in m.chunk.as_mut().unwrap().iter_mut().enumerate() {
+            *b = (i * 7 % 251) as u8;
+        }
+        (m.vg.xsize, m.vg.ysize, m.vg.zsize) = (2.0, 1.5, 3.0);
+        (m.vg.x_r, m.vg.x_a, m.vg.x_s) = (0.0, 1.0, 0.0);
+        (m.vg.y_r, m.vg.y_a, m.vg.y_s) = (1.0, 0.0, 0.0);
+        (m.vg.z_r, m.vg.z_a, m.vg.z_s) = (0.0, 0.0, -1.0);
+        (m.vg.c_r, m.vg.c_a, m.vg.c_s) = (4.0, -2.0, 1.0);
+        m.tr = 2000.0;
+        m
+    }
+
+    #[test]
+    fn decomposes_bvolume_names_and_stems() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut e = Vec::new();
+        let d = |g: &mut Globals, e: &mut Vec<u8>, n: &str| decompose_b_fname(g, e, n);
+        assert_eq!(d(&mut g, &mut e, "w/b_000.bshort"), Ok(("w".into(), "b".into())));
+        assert_eq!(d(&mut g, &mut e, "b.bfloat"), Ok((".".into(), "b".into())));
+        assert_eq!(d(&mut g, &mut e, "w/b_"), Ok(("w".into(), "b".into())));
+        assert_eq!(d(&mut g, &mut e, "w/x_y"), Ok(("w".into(), "x_y".into())));
+        assert_eq!(d(&mut g, &mut e, "/a_001"), Ok(("".into(), "a".into())));
+        assert!(d(&mut g, &mut e, "w/").is_err());
+        assert!(String::from_utf8_lossy(&e).contains("bad bshort/bfloat file specifier \"w/\""));
+        assert_eq!(write_stem("w/o_000.bshort"), "w/o");
+        assert_eq!(write_stem("w/o_001"), "w/o");
+        assert_eq!(write_stem("w/o.bshort"), "w/o.bshort");
+        assert_eq!(write_stem("_000.bshort"), "_000.bshort");
+    }
+
+    /// The writer's geometry file is read back by default (FS-664) and lost with `reproduce`.
+    #[test]
+    fn a_written_bvolume_reads_back_with_its_geometry_by_default() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let dir = tempfile::tempdir().unwrap();
+            let p = Some(dir.path());
+            let mut g = Globals::new(mode);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let env = Environment::default();
+            let mut m = short_volume(&mut g);
+            let r = bvolume_write(&mut g, &mut o, &mut e, &env, p, &mut m, "v_000.bshort", MRI_SHORT)
+                .unwrap();
+            assert_eq!(r, NO_ERROR);
+            assert!(g.notices.contains(&FS_664));
+            let back = bvolume_read(&mut g, &mut o, &mut e, p, "v_000.bshort", true, MRI_SHORT)
+                .unwrap()
+                .unwrap();
+            assert_eq!(back.chunk, m.chunk, "{mode:?}");
+            assert_eq!((back.vg.width, back.vg.height, back.vg.depth, back.nframes), (3, 2, 2, 2));
+            if mode == UpstreamDefects::Fix {
+                assert_eq!((back.vg.xsize, back.vg.ysize, back.vg.zsize), (2.0, 1.5, 3.0));
+                assert_eq!((back.vg.x_a, back.vg.y_r, back.vg.z_s), (1.0, 1.0, -1.0));
+                assert_eq!(back.tr, 2000.0);
+                assert_eq!(back.vg.ras_good_flag, 1);
+            } else {
+                assert_eq!(back.vg.xsize, 1.0);
+                assert_eq!(back.vg.x_r, -1.0);
+                assert_eq!(back.vg.ras_good_flag, 0);
+            }
+        }
+    }
+
+    /// FS-666: the bhdr type with a name that is not `.bhdr`.
+    #[test]
+    fn the_bhdr_type_needs_a_bhdr_name() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let dir = tempfile::tempdir().unwrap();
+            let p = Some(dir.path());
+            let mut g = Globals::new(mode);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let env = Environment::default();
+            let mut m = short_volume(&mut g);
+            let r = crate::mriio::mri_write_type(
+                &mut g,
+                &mut o,
+                &mut e,
+                &env,
+                p,
+                &mut m,
+                "v.mgz",
+                crate::identify::BHDR,
+                -1,
+            )
+            .unwrap();
+            assert!(g.notices.contains(&larmorx_core::defects::FS_666));
+            let written = dir.path().join("(null)_000.bshort").exists();
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(r, ERROR_BADPARM);
+                assert!(!written);
+            } else {
+                assert_eq!(r, NO_ERROR);
+                assert!(written);
+            }
+        }
+    }
+}

@@ -2532,6 +2532,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "talcras" | "talmat" | "talpt" | "talvol" => r22_gen(&mut g, &mut t, cmd),
             "dilate" | "dilu" | "msegs" | "sstat" | "hseg" => r22_gen_segs(&mut g, &mut t, cmd),
             "conform" => r23_gen_conform(&mut g, &mut t),
+            "union" | "isect" | "mand" | "mxor" => r23_gen_set(&mut g, &mut t, cmd),
+            c if R23_SET.contains(&c) => r23_gen_set(&mut g, &mut t, c),
+            c if R23_MASK.contains(&c) => r23_gen_mask(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -2997,7 +3000,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 172] = [
+pub const COMMANDS: [&str; 211] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3170,6 +3173,45 @@ pub const COMMANDS: [&str; 172] = [
     "sstat",
     "hseg",
     "conform",
+    "union",
+    "isect",
+    "mand",
+    "mxor",
+    "compl",
+    "edges",
+    "erodenn",
+    "erode",
+    "erode2d",
+    "erodeseg",
+    "dilseg",
+    "dtl",
+    "dtli",
+    "dlu",
+    "dlab",
+    "openn",
+    "mopen",
+    "mclose",
+    "dil6",
+    "rlist",
+    "rvonly",
+    "mdiff",
+    "mmask",
+    "tmask",
+    "mnot",
+    "slv",
+    "b2c",
+    "nmask",
+    "von",
+    "vinl",
+    "linv",
+    "cent",
+    "pthr",
+    "cnbhd",
+    "grow",
+    "onfg",
+    "offbg",
+    "cplab",
+    "cplv",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5489,6 +5531,13 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "dilate" | "dilu" | "msegs" => r22_dilate_msegs(cx, t, o, cmd)?,
         "sstat" | "hseg" => r22_stats(cx, t, o, cmd)?,
         "conform" => r23_conform(cx, t, o)?,
+        "union" | "isect" | "mand" | "mxor" => r23_set2(cx, t, o, cmd)?,
+        c if R23_SET.contains(&c) => r23_set1(cx, t, o, cmd)?,
+        "rlist" | "rvonly" | "mdiff" | "mmask" | "tmask" | "mnot" | "slv" | "b2c" => {
+            r23_mask1(cx, t, o, cmd)?
+        }
+        "nmask" | "von" | "vinl" | "linv" | "cent" | "pthr" | "cnbhd" => r23_meas(cx, t, o, cmd)?,
+        "grow" | "onfg" | "offbg" | "cplab" | "cplv" => r23_multi(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -6209,6 +6258,501 @@ fn r23_conform(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             o.m(r.as_ref());
             o.geom_v(&m.vg, false);
         }
+    }
+    Ok(())
+}
+
+/// mriset.cpp's commands of relay 23.
+const R23_SET: [&str; 15] = ["compl", "edges", "erodenn", "erode", "erode2d", "erodeseg", "dilseg", "dtl", "dtli", "dlu", "dlab", "openn", "mopen", "mclose", "dil6"];
+
+/// The cases of mriset.cpp's set operations and morphology (relay 23).
+fn r23_gen_set(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let mut s = shape(g);
+    s.hdr = s.hdr && g.chance(6);
+    if g.chance(2) {
+        (s.w, s.h, s.d) = (g.int(1, 7), g.int(1, 7), g.int(1, 5));
+    }
+    if matches!(cmd, "union" | "dtl" | "dtli" | "dlu" | "erode") && g.chance(2) {
+        s.ty = 0;
+    }
+    vol_of(g, t, s);
+    let labels: &[f32] = &[0.0, 0.0, 2.0, 3.0, 41.0, 1.0, -1.0, 0.5, 255.0, 300.0, 130.0];
+    fill_paint(g, t, s, &[&[0.0, 0.0, 1.0, 2.0, 41.0, 130.0]], &[labels]);
+    let two = matches!(cmd, "union" | "isect" | "mand" | "mxor");
+    if two {
+        let mut o = like(g, s);
+        o.hdr = o.hdr && g.chance(6);
+        vol_of(g, t, o);
+        fill_paint(g, t, o, &[&[0.0, 0.0, 1.0, 2.0, 41.0]], &[labels]);
+    }
+    let mode = if two {
+        g.pick(&[0, 0, 1, 2, 3])
+    } else {
+        g.pick(&[0, 0, 1, 2])
+    };
+    t.push(mode.to_string());
+    if mode == 1 {
+        let mut o = like(g, s);
+        o.hdr = o.hdr && g.chance(4);
+        vol_of(g, t, o);
+    }
+    if cmd == "dtl" || cmd == "dtli" {
+        let mut o = like(g, s);
+        o.hdr = o.hdr && g.chance(6);
+        if g.chance(2) {
+            o.ty = 0;
+        }
+        vol_of(g, t, o);
+        let vals: &[f32] = &[0.0, 50.0, 100.0, 115.0, 120.0, 200.0, 255.0];
+        fill_paint(g, t, o, &[&[0.0, 120.0, 100.0]], &[vals]);
+    }
+    if cmd == "dilseg" {
+        let has = g.chance(2);
+        t.push(i64::from(has).to_string());
+        if has {
+            let mut o = like(g, s);
+            o.hdr = o.hdr && g.chance(6);
+            vol_of(g, t, o);
+            fill_paint(g, t, o, &[&[0.0, 1.0]], &[&[0.0, 1.0, 0.5, 0.7]]);
+        }
+    }
+    let rare = g.chance(12);
+    match cmd {
+        "mand" => t.push(g.pick(&[0i64, 1, 2, -1, 100]).to_string()),
+        "mxor" => {
+            let (a, b) = g.pick(&[(1i64, 2i64), (0, 0), (2, 41), (-1, 1), (3, 1)]);
+            t.push(a.to_string());
+            t.push(b.to_string());
+        }
+        "edges" => t.push(dx(g.pick(&[0.0, 1.0, 255.0, -3.5, 1e40, f64::NAN]))),
+        "erodenn" => {
+            t.push(g.pick(&[1i64, 2, 3, 0]).to_string());
+            t.push(g.pick(&[0i64, 1]).to_string());
+        }
+        "erodeseg" => {
+            t.push(if rare { 0 } else { g.pick(&[1i64, 1, 2, 3]) }.to_string());
+            t.push(g.pick(&[0i64, 1, 2, 3, 6]).to_string());
+        }
+        "dilseg" => {
+            let nd = if rare { g.pick(&[0i64, -2]) } else { g.pick(&[1i64, 1, 2, 3, -1]) };
+            t.push(nd.to_string());
+            t.push(g.pick(&[0i64, 0, 1, -1]).to_string());
+            t.push(dx(g.pick(&[0.5, 0.0, 1.0])));
+        }
+        "dtl" | "dtli" => {
+            t.push(g.pick(&[2i64, 41, 130, 1, 0, 300]).to_string());
+            t.push(g.pick(&[1i64, 2, 3, 0]).to_string());
+            t.push(g.pick(&[0i64, 100, 115, 200, -1, 256]).to_string());
+        }
+        "dlu" | "dlab" => {
+            t.push(g.pick(&[2i64, 41, 1, 0, 300, 130]).to_string());
+            t.push(g.pick(&[1i64, 2, 0, 3]).to_string());
+        }
+        "openn" => t.push(g.pick(&[1i64, 2, 3, 0]).to_string()),
+        _ => {}
+    }
+}
+
+#[inline(never)]
+fn r23_set2(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut v1 = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut v1)?;
+    let mut v2 = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut v2)?;
+    let mode = t.i();
+    let mut d3 = if mode == 1 {
+        Some(get_vol(cx, t)?)
+    } else {
+        None
+    };
+    let (t1, t2) = match cmd {
+        "mand" => (t.i(), 0),
+        "mxor" => (t.i(), t.i()),
+        _ => (0, 0),
+    };
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let tri = match mode {
+        1 => Tri::Given(&v1, &v2, d3.as_mut().expect("a destination")),
+        2 => Tri::First(&mut v1, &v2),
+        3 => Tri::Second(&v1, &mut v2),
+        _ => Tri::New(&v1, &v2),
+    };
+    let r = match cmd {
+        "union" => ms::mri_union(g, a, b, tri)?,
+        "isect" => ms::mri_intersect(g, a, b, tri)?,
+        "mand" => ms::mri_and(g, a, b, tri, t1)?,
+        _ => ms::mri_xor(g, a, b, tri, t1, t2)?,
+    };
+    let given = match mode {
+        1 => d3.as_ref(),
+        2 => Some(&v1),
+        3 => Some(&v2),
+        _ => None,
+    };
+    o.ret(&r, given);
+    Ok(())
+}
+
+#[inline(never)]
+fn r23_set1(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut src = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut src)?;
+    let (mode, mut dst) = dst_mode(cx, t)?;
+    let mut val = None;
+    if cmd == "dtl" || cmd == "dtli" {
+        let mut v = get_vol(cx, t)?;
+        fill_painted(cx, t, &mut v)?;
+        val = Some(v);
+    }
+    let mut mask = None;
+    if cmd == "dilseg" && t.i() != 0 {
+        let mut v = get_vol(cx, t)?;
+        fill_painted(cx, t, &mut v)?;
+        mask = Some(v);
+    }
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let p = pair(mode, &mut src, &mut dst);
+    let mut n = 0;
+    let r = match cmd {
+        "compl" => ms::mri_complement(g, a, b, p)?,
+        "edges" => {
+            let sv = t.d();
+            ms::mri_set_edges(g, a, b, p, sv)?
+        }
+        "erodenn" => {
+            let (nn, ee) = (t.i(), t.i());
+            ms::mri_erode_nn(g, a, b, p, nn, ee)?
+        }
+        "erode" => ms::mri_erode(g, a, b, p)?,
+        "erode2d" => ms::mri_erode_2d(g, a, b, p)?,
+        "erodeseg" => {
+            let (ne, th) = (t.i(), t.i());
+            ms::mri_erode_segmentation(g, a, b, p, ne, th)?
+        }
+        "dilseg" => {
+            let (nd, mf) = (t.i(), t.i());
+            let mt = t.d();
+            n = -7;
+            ms::mri_dilate_segmentation(g, a, b, p, nd, mask.as_ref(), mf, mt, &mut n)?
+        }
+        "dtl" | "dtli" => {
+            let (label, niter, th) = (t.i(), t.i(), t.i());
+            let v = val.as_ref().expect("the value volume");
+            if cmd == "dtl" {
+                ms::mri_dilate_thresh_label(g, a, b, p, v, label, niter, th)?
+            } else {
+                ms::mri_dilate_inv_thresh_label(g, a, b, p, v, label, niter, th)?
+            }
+        }
+        "dlu" | "dlab" => {
+            let (label, niter) = (t.i(), t.i());
+            if cmd == "dlu" {
+                ms::mri_dilate_label_uchar(g, a, b, p, label, niter)?
+            } else {
+                ms::mri_dilate_label(g, a, b, p, label, niter)?
+            }
+        }
+        "openn" => {
+            let order = t.i();
+            ms::mri_open_n(g, a, b, p, order)?
+        }
+        "mopen" => ms::mri_open(g, a, b, p)?,
+        "mclose" => ms::mri_close(g, a, b, p)?,
+        _ => ms::mri_dilate6(g, a, b, p)?,
+    };
+    let given = match mode {
+        1 => dst.as_ref(),
+        2 => Some(&src),
+        _ => None,
+    };
+    o.i(i64::from(matches!(r, Ret::Given)));
+    if cmd == "dilseg" {
+        o.i(i64::from(n));
+    }
+    match &r {
+        Ret::New(m) => o.vol(Some(m)),
+        Ret::Given => o.vol(given),
+        Ret::Null => o.vol(None),
+    }
+    Ok(())
+}
+
+/// mriset.cpp's masks, counts and in-place functions (relay 23).
+const R23_MASK: [&str; 20] = ["rlist", "rvonly", "mdiff", "mmask", "tmask", "mnot", "slv", "b2c", "nmask", "von", "vinl", "linv", "cent", "pthr", "cnbhd", "grow", "onfg", "offbg", "cplab", "cplv"];
+
+/// A painted label volume of the shape `s` (its tokens).
+fn r23_painted(g: &mut Gen, t: &mut Vec<String>, s: Shape) {
+    vol_of(g, t, s);
+    let labels: &[f32] = &[0.0, 0.0, 2.0, 3.0, 41.0, 1.0, -1.0, 0.5, 255.0, 300.0, 130.0];
+    fill_paint(g, t, s, &[&[0.0, 0.0, 1.0, 2.0, 41.0]], &[labels]);
+}
+
+/// The cases of mriset.cpp's masks, counts and in-place functions (relay 23).
+fn r23_gen_mask(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let mut s = shape(g);
+    s.hdr = s.hdr && g.chance(6);
+    if g.chance(2) {
+        (s.w, s.h, s.d) = (g.int(1, 7), g.int(1, 7), g.int(1, 5));
+    }
+    if matches!(cmd, "grow" | "onfg" | "offbg" | "cplab" | "tmask") && !g.chance(4) {
+        s.ty = 0;
+    }
+    let start = t.len();
+    r23_painted(g, t, s);
+    let src_toks: Vec<String> = t[start..start + 47].to_vec();
+    let second = |g: &mut Gen, t: &mut Vec<String>, byte: bool| {
+        let mut o = like(g, s);
+        o.hdr = o.hdr && g.chance(6);
+        if byte && !g.chance(4) {
+            o.ty = 0;
+        }
+        r23_painted(g, t, o);
+    };
+    if R23_MASK[..8].contains(&cmd) {
+        let mode = g.pick(&[0, 0, 1, 2]);
+        t.push(mode.to_string());
+        if mode == 1 {
+            let mut o = like(g, s);
+            o.hdr = o.hdr && g.chance(4);
+            vol_of(g, t, o);
+        }
+        let with_m2 = match cmd {
+            "rlist" => {
+                let has = g.chance(2);
+                t.push(i64::from(has).to_string());
+                has
+            }
+            "mdiff" | "mmask" | "tmask" | "slv" => true,
+            _ => false,
+        };
+        if with_m2 {
+            if cmd == "mmask" && g.chance(2) {
+                // the source's own geometry (no resampling), another type and seed
+                let mut m = src_toks.clone();
+                m[3] = g.pick(&["0", "3", "1", "4"]).to_owned();
+                m[5] = "0".to_owned();
+                m[6] = g.int(0, 255).to_string();
+                t.extend(m);
+                let ms = Shape {
+                    ty: m_ty(&t[t.len() - 44]),
+                    hdr: false,
+                    ..s
+                };
+                let vals: &[f32] = &[0.0, 1.0, 2.0, 41.0, 0.5];
+                fill_paint(g, t, ms, &[&[0.0, 1.0]], &[vals]);
+            } else {
+                second(g, t, cmd == "tmask");
+            }
+        }
+        match cmd {
+            "rlist" => {
+                let n = g.int(0, 4);
+                t.push(n.to_string());
+                for _ in 0..n {
+                    t.push(g.pick(&[0i64, 2, 3, 41, 1, 255, -1, 300]).to_string());
+                }
+                for _ in 0..n {
+                    t.push(g.pick(&[5i64, 0, 77, 256, 1000, -4]).to_string());
+                }
+            }
+            "rvonly" => {
+                t.push(fx(g.pick(&[0.0, 1.0, 2.0, 41.0, 0.5, 255.0, 300.0, f32::NAN])));
+                t.push(fx(g.pick(&[7.0, 0.0, -1.0, 255.0, 256.0, 2.5])));
+            }
+            "mdiff" | "mmask" => {
+                t.push(g.pick(&[0i64, 1, 2, 41]).to_string());
+                t.push(fx(g.pick(&[0.0, -1.0, 7.5, f32::NAN])));
+            }
+            "tmask" => {
+                t.push(fx(g.pick(&[0.5, 1.0, 100.0, 0.0])));
+                t.push(fx(g.pick(&[0.0, 300.0, -1.0, f32::NAN, 7.0])));
+            }
+            "slv" => {
+                t.push(g.pick(&[0i64, 2, 41, 1]).to_string());
+                t.push(fx(g.pick(&[9.0, -1.0, f32::NAN, 0.5])));
+            }
+            _ => {}
+        }
+        return;
+    }
+    match cmd {
+        "von" => t.push(g.pick(&[0i64, 1, 2, 100, -1]).to_string()),
+        "vinl" | "linv" => t.push(g.pick(&[0i64, 1, 2, 41, -1, 3]).to_string()),
+        "pthr" => {
+            let has = g.chance(2);
+            t.push(i64::from(has).to_string());
+            if has {
+                second(g, t, false);
+            }
+            t.push(frame_of(g, s).to_string());
+            t.push(dx(g.pick(&[50.0, 0.0, 100.0, 90.0, 10.0, -5.0, 150.0, f64::NAN, 99.5])));
+        }
+        "cnbhd" => {
+            t.push(g.pick(&[3i64, 1, 5, 0, -1, 7]).to_string());
+            for e in [s.w, s.h, s.d] {
+                t.push(g.int(-1, e).to_string());
+            }
+            t.push(g.pick(&[0i64, 1, 2, 41]).to_string());
+        }
+        "grow" | "onfg" | "offbg" | "cplab" | "cplv" => {
+            second(g, t, cmd != "cplv");
+            if cmd == "onfg" || cmd == "cplv" {
+                second(g, t, cmd == "onfg");
+            }
+            match cmd {
+                "grow" => {
+                    t.push(g.pick(&[0i64, 2, 41, 1]).to_string());
+                    t.push(g.pick(&[1i64, 255, 300, 2, 0]).to_string());
+                }
+                "cplab" | "cplv" => t.push(g.pick(&[0i64, 2, 41, 1, 300]).to_string()),
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The type token of a volume's tokens (`t` at its type).
+fn m_ty(tok: &str) -> i64 {
+    tok.parse().expect("a type")
+}
+
+#[inline(never)]
+fn r23_mask1(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut src = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut src)?;
+    let (mode, mut dst) = dst_mode(cx, t)?;
+    let need = matches!(cmd, "mdiff" | "mmask" | "tmask" | "slv") || (cmd == "rlist" && t.i() != 0);
+    let mut m2 = None;
+    if need {
+        let mut v = get_vol(cx, t)?;
+        fill_painted(cx, t, &mut v)?;
+        m2 = Some(v);
+    }
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let p = pair(mode, &mut src, &mut dst);
+    let r = match cmd {
+        "rlist" => {
+            let n = t.i();
+            let l1: Vec<i32> = (0..n).map(|_| t.i()).collect();
+            let l2: Vec<i32> = (0..n).map(|_| t.i()).collect();
+            ms::mri_replace_list(g, a, b, p, &l1, &l2, m2.as_ref())?
+        }
+        "rvonly" => {
+            let (iv, ov) = (t.f(), t.f());
+            ms::mri_replace_values_only(g, a, b, p, iv, ov)?
+        }
+        "mdiff" | "mmask" => {
+            let (mk, ov) = (t.i(), t.f());
+            let m = m2.as_ref().expect("the mask");
+            if cmd == "mdiff" {
+                ms::mri_mask_different_geometry(g, a, b, p, m, mk, ov)?
+            } else {
+                ms::mri_mask(g, a, b, &Environment::default(), p, m, mk, ov)?
+            }
+        }
+        "tmask" => {
+            let (th, ov) = (t.f(), t.f());
+            ms::mri_threshold_mask(g, a, b, p, m2.as_ref().expect("the mask"), th, ov)?
+        }
+        "mnot" => ms::mri_not(g, a, b, p)?,
+        "slv" => {
+            let (label, v) = (t.i(), t.f());
+            ms::mri_set_label_values(g, a, b, p, m2.as_ref().expect("the labels"), label, v)?
+        }
+        _ => ms::mri_bin_mask_to_col(g, a, b, p)?,
+    };
+    let given = match mode {
+        1 => dst.as_ref(),
+        2 => Some(&src),
+        _ => None,
+    };
+    o.ret(&r, given);
+    Ok(())
+}
+
+#[inline(never)]
+fn r23_meas(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut m = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut m)?;
+    match cmd {
+        "nmask" => {
+            let n = ms::mri_n_mask(&mut cx.g, &mut cx.b, &m)?;
+            o.i(i64::from(n));
+        }
+        "von" => {
+            let th = t.i();
+            o.i(i64::from(ms::mri_total_voxels_on(&mut cx.g, &mut cx.b, &m, th)?));
+        }
+        "vinl" => {
+            let l = t.i();
+            o.i(i64::from(ms::mri_voxels_in_label(&mut cx.g, &mut cx.b, &m, l)?));
+        }
+        "linv" => {
+            let l = t.i();
+            o.i(i64::from(ms::mri_label_in_volume(&mut cx.g, &mut cx.b, &m, l)?));
+        }
+        "cent" => {
+            let (r, c) = ms::mri_compute_centroid(&mut cx.g, &mut cx.b, &m)?;
+            o.i(i64::from(r));
+            for v in c {
+                o.d(v);
+            }
+        }
+        "pthr" => {
+            let mut mask = None;
+            if t.i() != 0 {
+                let mut v = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut v)?;
+                mask = Some(v);
+            }
+            let (frame, pct) = (t.i(), t.d());
+            let r = ms::mri_percent_thresh(&mut cx.g, &mut cx.b, &m, mask.as_ref(), frame, pct)?;
+            o.d(r);
+        }
+        _ => {
+            let (ws, x, y, z, v) = (t.i(), t.i(), t.i(), t.i(), t.i());
+            let n = ms::mri_count_val_in_nbhd(&mut cx.g, &mut cx.b, &m, ws, x, y, z, v)?;
+            o.i(i64::from(n));
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r23_multi(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut va = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut va)?;
+    let mut vb = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut vb)?;
+    let mut vc = None;
+    if cmd == "onfg" || cmd == "cplv" {
+        let mut v = get_vol(cx, t)?;
+        fill_painted(cx, t, &mut v)?;
+        vc = Some(v);
+    }
+    let (g, b) = (&mut cx.g, &mut cx.b);
+    let r = match cmd {
+        "grow" => {
+            let (il, ol) = (t.i(), t.i());
+            ms::mri_grow_label(g, b, &va, &mut vb, il, ol)?
+        }
+        "onfg" => ms::mri_turn_on_fg(g, b, &mut va, &vb, vc.as_mut().expect("bg"))?,
+        "offbg" => ms::mri_turn_off_bg(g, b, &mut va, &vb)?,
+        "cplab" => {
+            let l = t.i();
+            ms::mri_copy_label(g, b, &va, &mut vb, l)?
+        }
+        _ => {
+            let l = t.i();
+            ms::mri_copy_labeled_voxels(g, b, &va, &vb, vc.as_mut().expect("dst"), l)?
+        }
+    };
+    o.i(i64::from(r));
+    o.vol(Some(&va));
+    o.vol(Some(&vb));
+    if let Some(c) = vc.as_ref() {
+        o.vol(Some(c));
     }
     Ok(())
 }

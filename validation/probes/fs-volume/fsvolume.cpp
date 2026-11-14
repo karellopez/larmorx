@@ -1991,6 +1991,161 @@ void run_case()
       om(M);
       put_geom(m, false);
     }
+  } else if (cmd == "union" || cmd == "isect" || cmd == "mand" || cmd == "mxor") {
+    // mriset.cpp's two-volume functions: a, b (each painted), the destination mode, parameters
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *b = get_vol();
+    fill_paint(b);
+    MRI *dst = get_dst2(a, b);
+    int t1 = 0, t2 = 0;
+    if (cmd == "mand") t1 = geti();
+    if (cmd == "mxor") { t1 = geti(); t2 = geti(); }
+    fflush(stdout);
+    MRI *r = cmd == "union" ? MRIunion(a, b, dst)
+             : cmd == "isect" ? MRIintersect(a, b, dst)
+             : cmd == "mand"  ? MRIand(a, b, dst, t1)
+                              : MRIxor(a, b, dst, t1, t2);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "compl" || cmd == "edges" || cmd == "erodenn" || cmd == "erode" || cmd == "erode2d" ||
+             cmd == "erodeseg" || cmd == "dilseg" || cmd == "dtl" || cmd == "dtli" || cmd == "dlu" ||
+             cmd == "dlab" || cmd == "openn" || cmd == "mopen" || cmd == "mclose" || cmd == "dil6") {
+    // mriset.cpp's one-volume functions: the painted source, the destination mode, parameters
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *dst = get_dst(src);
+    MRI *val = NULL, *mask = NULL, *r = NULL;
+    int n = 0;
+    if (cmd == "dtl" || cmd == "dtli") { val = get_vol(); fill_paint(val); }
+    if (cmd == "dilseg" && geti()) { mask = get_vol(); fill_paint(mask); }
+    fflush(stdout);
+    if (cmd == "compl") r = MRIcomplement(src, dst);
+    else if (cmd == "edges") { double sv = getd(); fflush(stdout); r = MRIsetEdges(src, sv, dst); }
+    else if (cmd == "erodenn") { int nn = geti(), ee = geti(); fflush(stdout); r = MRIerodeNN(src, dst, nn, ee); }
+    else if (cmd == "erode") r = MRIerode(src, dst);
+    else if (cmd == "erode2d") r = MRIerode2D(src, dst);
+    else if (cmd == "erodeseg") { int ne = geti(), th = geti(); fflush(stdout); r = MRIerodeSegmentation(src, dst, ne, th); }
+    else if (cmd == "dilseg") {
+      int nd = geti(), mf = geti();
+      double mt = getd();
+      n = -7;
+      fflush(stdout);
+      r = MRIdilateSegmentation(src, dst, nd, mask, mf, mt, &n);
+    }
+    else if (cmd == "dtl" || cmd == "dtli") {
+      int label = geti(), niter = geti(), th = geti();
+      fflush(stdout);
+      r = cmd == "dtl" ? MRIdilateThreshLabel(src, val, dst, label, niter, th)
+                       : MRIdilateInvThreshLabel(src, val, dst, label, niter, th);
+    }
+    else if (cmd == "dlu" || cmd == "dlab") {
+      int label = geti(), niter = geti();
+      fflush(stdout);
+      r = cmd == "dlu" ? MRIdilateLabelUchar(src, dst, label, niter) : MRIdilateLabel(src, dst, label, niter);
+    }
+    else if (cmd == "openn") { int order = geti(); fflush(stdout); r = MRIopenN(src, dst, order); }
+    else if (cmd == "mopen") r = MRIopen(src, dst);
+    else if (cmd == "mclose") r = MRIclose(src, dst);
+    else r = MRIdilate6(src, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    if (cmd == "dilseg") oi(n);
+    put_vol(r);
+  } else if (cmd == "rlist" || cmd == "rvonly" || cmd == "mdiff" || cmd == "mmask" || cmd == "tmask" ||
+             cmd == "mnot" || cmd == "slv" || cmd == "b2c") {
+    // mriset.cpp's masks and replacements: the painted source, the destination mode, a second
+    // painted volume (mask or labels) where the function takes one, parameters
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *dst = get_dst(src);
+    MRI *m2 = NULL, *r = NULL;
+    if (cmd == "mdiff" || cmd == "mmask" || cmd == "tmask" || cmd == "slv" || (cmd == "rlist" && geti())) {
+      m2 = get_vol();
+      fill_paint(m2);
+    }
+    if (cmd == "rlist") {
+      int n = geti();
+      std::vector<int> a(n + 1), b(n + 1);
+      for (int i = 0; i < n; i++) a[i] = geti();
+      for (int i = 0; i < n; i++) b[i] = geti();
+      fflush(stdout);
+      r = MRIreplaceList(src, a.data(), b.data(), n, m2, dst);
+    } else if (cmd == "rvonly") {
+      float iv = getf(), ov = getf();
+      fflush(stdout);
+      r = MRIreplaceValuesOnly(src, dst, iv, ov);
+    } else if (cmd == "mdiff" || cmd == "mmask") {
+      int mk = geti();
+      float ov = getf();
+      fflush(stdout);
+      r = cmd == "mdiff" ? MRImaskDifferentGeometry(src, m2, dst, mk, ov) : MRImask(src, m2, dst, mk, ov);
+    } else if (cmd == "tmask") {
+      float th = getf(), ov = getf();
+      fflush(stdout);
+      r = MRIthresholdMask(src, m2, dst, th, ov);
+    } else if (cmd == "mnot") {
+      fflush(stdout);
+      r = MRInot(src, dst);
+    } else if (cmd == "slv") {
+      int label = geti();
+      float v = getf();
+      fflush(stdout);
+      r = MRIsetLabelValues(src, m2, dst, label, v);
+    } else {
+      fflush(stdout);
+      r = MRIbinMaskToCol(src, dst);
+    }
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "nmask" || cmd == "von" || cmd == "vinl" || cmd == "linv" || cmd == "cent" || cmd == "pthr" ||
+             cmd == "cnbhd") {
+    // mriset.cpp's counts and measures of one painted volume
+    MRI *m = get_vol();
+    fill_paint(m);
+    if (cmd == "nmask") { fflush(stdout); oi(MRInMask(m)); }
+    else if (cmd == "von") { int th = geti(); fflush(stdout); oi(MRItotalVoxelsOn(m, th)); }
+    else if (cmd == "vinl") { int l = geti(); fflush(stdout); oi(MRIvoxelsInLabel(m, l)); }
+    else if (cmd == "linv") { int l = geti(); fflush(stdout); oi(MRIlabelInVolume(m, l)); }
+    else if (cmd == "cent") {
+      double xc = -7, yc = -7, zc = -7;
+      fflush(stdout);
+      oi(MRIcomputeCentroid(m, &xc, &yc, &zc));
+      od(xc); od(yc); od(zc);
+    } else if (cmd == "pthr") {
+      MRI *mask = NULL;
+      if (geti()) { mask = get_vol(); fill_paint(mask); }
+      int frame = geti();
+      double pct = getd();
+      fflush(stdout);
+      od(MRIpercentThresh(m, mask, frame, pct));
+    } else {
+      int ws = geti(), x = geti(), y = geti(), z = geti(), v = geti();
+      fflush(stdout);
+      oi(MRIcountValInNbhd(m, ws, x, y, z, v));
+    }
+    fflush(stdout);
+  } else if (cmd == "grow" || cmd == "onfg" || cmd == "offbg" || cmd == "cplab" || cmd == "cplv") {
+    // mriset.cpp's functions on two or three painted volumes changed in place
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *b = get_vol();
+    fill_paint(b);
+    MRI *c = NULL;
+    if (cmd == "onfg" || cmd == "cplv") { c = get_vol(); fill_paint(c); }
+    int r = 0;
+    if (cmd == "grow") { int il = geti(), ol = geti(); fflush(stdout); r = MRIgrowLabel(a, b, il, ol); }
+    else if (cmd == "onfg") { fflush(stdout); r = MRIturnOnFG(a, b, c); }
+    else if (cmd == "offbg") { fflush(stdout); r = MRIturnOffBG(a, b); }
+    else if (cmd == "cplab") { int l = geti(); fflush(stdout); r = MRIcopyLabel(a, b, l); }
+    else { int l = geti(); fflush(stdout); r = MRIcopyLabeledVoxels(a, b, c, l); }
+    fflush(stdout);
+    oi(r);
+    put_vol(a);
+    put_vol(b);
+    if (c) put_vol(c);
   } else {
     fail("unknown command");
   }

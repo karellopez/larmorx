@@ -25,6 +25,7 @@ use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{add, add64, div64, mul, mul64, sub};
 use larmorx_freesurfer_core::utils::nint;
+use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::ctab::ctab_deep_copy;
 use larmorx_freesurfer_mri::mri::{
     MRI_BITMAP, MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriRegion,
@@ -61,15 +62,15 @@ enum S<'a> {
 }
 
 /// The resolved volumes: the sources, a fresh destination when one was made, the given one.
-struct Vols<'a> {
+pub(crate) struct Vols<'a> {
     s1: S<'a>,
     s2: S<'a>,
     given: Option<&'a mut Mri>,
-    fresh: Option<Mri>,
+    pub(crate) fresh: Option<Mri>,
 }
 
 impl<'a> Vols<'a> {
-    fn of_pair(p: Pair<'a>) -> (Vols<'a>, Option<&'a Mri>) {
+    pub(crate) fn of_pair(p: Pair<'a>) -> (Vols<'a>, Option<&'a Mri>) {
         match p {
             Pair::New(s) => (
                 Vols {
@@ -100,7 +101,7 @@ impl<'a> Vols<'a> {
             ),
         }
     }
-    fn of_tri(t: Tri<'a>) -> Vols<'a> {
+    pub(crate) fn of_tri(t: Tri<'a>) -> Vols<'a> {
         match t {
             Tri::New(a, b) => Vols {
                 s1: S::Own(a),
@@ -128,49 +129,85 @@ impl<'a> Vols<'a> {
             },
         }
     }
-    fn has_dst(&self) -> bool {
+    pub(crate) fn has_dst(&self) -> bool {
         self.given.is_some() || self.fresh.is_some()
     }
-    fn d(&mut self) -> &mut Mri {
+    pub(crate) fn d(&mut self) -> &mut Mri {
         match &mut self.given {
             Some(d) => d,
             None => self.fresh.as_mut().expect("a destination"),
         }
     }
-    fn dref(&self) -> &Mri {
+    pub(crate) fn dref(&self) -> &Mri {
         match &self.given {
             Some(d) => d,
             None => self.fresh.as_ref().expect("a destination"),
         }
     }
     /// The first source (the destination when it is the source).
-    fn a(&self) -> &Mri {
+    pub(crate) fn a(&self) -> &Mri {
         match self.s1 {
             S::Own(m) => m,
             S::Dst => self.dref(),
         }
     }
-    fn b(&self) -> &Mri {
+    pub(crate) fn b(&self) -> &Mri {
         match self.s2 {
             S::Own(m) => m,
             S::Dst => self.dref(),
         }
     }
-    fn done(self) -> Ret<Mri> {
+    pub(crate) fn done(self) -> Ret<Mri> {
         match self.fresh {
             Some(m) => Ret::New(m),
             None => Ret::Given,
         }
     }
+    /// `mri_dst = MRIcopy(mri_src, mri_dst)`: a copy of the first source made here, or copied into
+    /// the given destination; nothing for the source itself (`MRIcopy` returns at once).
+    pub(crate) fn copy_a(
+        &mut self,
+        g: &mut Globals,
+        out: &mut dyn Write,
+        err: &mut dyn Write,
+    ) -> Result<(), Fatal> {
+        match (self.s1, &mut self.given) {
+            (S::Dst, _) => {}
+            (S::Own(s), Some(d)) => {
+                mri_copy(g, out, err, s, Some(&mut **d))?;
+            }
+            (S::Own(s), None) => {
+                self.fresh = mri_copy(g, out, err, s, None)?.into_new();
+            }
+        }
+        Ok(())
+    }
+    /// The [`Pair`] these volumes were made of, the destination made here given (`f(src, dst)`
+    /// after `if (!dst) dst = MRIclone(src, NULL)`): `f`'s result, a made destination returned
+    /// as new.
+    pub(crate) fn with_pair(
+        self,
+        f: impl FnOnce(Pair) -> Result<Ret<Mri>, Fatal>,
+    ) -> Result<Ret<Mri>, Fatal> {
+        match (self.s1, self.given, self.fresh) {
+            (S::Dst, Some(d), _) => f(Pair::Same(d)),
+            (S::Own(s), Some(d), _) => f(Pair::Given(s, d)),
+            (S::Own(s), None, Some(mut m)) => Ok(match f(Pair::Given(s, &mut m))? {
+                Ret::Null => Ret::Null,
+                _ => Ret::New(m),
+            }),
+            _ => unreachable!("a pair always has a destination here"),
+        }
+    }
     /// `NULL` returned: a destination made here is dropped (FreeSurfer leaks it).
-    fn null(self) -> Ret<Mri> {
+    pub(crate) fn null(self) -> Ret<Mri> {
         Ret::Null
     }
 }
 
 /// The voxel `(x, y, z, f)` of a source by `MRIgetVoxVal`.
 #[allow(clippy::too_many_arguments)]
-fn getv(
+pub(crate) fn getv(
     g: &mut Globals,
     err: &mut dyn Write,
     v: &Vols,
@@ -185,7 +222,7 @@ fn getv(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn setv(
+pub(crate) fn setv(
     g: &mut Globals,
     err: &mut dyn Write,
     v: &mut Vols,
@@ -201,7 +238,7 @@ fn setv(
 /// `MRIclone(mri_src, NULL)`'s allocation when `v` has no destination: `MRIallocSequence` of the
 /// source's extent, type and frames, then (as `MRIclone` does on any destination) the colour
 /// table's deep copy and `MRIcopyHeader`.
-fn clone_into(
+pub(crate) fn clone_into(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -341,7 +378,7 @@ pub fn mri_match(a: &Mri, b: &Mri) -> i32 {
 }
 
 /// `FEQUAL(f1, f2)`: `fabs(f1 - f2) < FLT_EPSILON` (the `float` difference).
-fn fequal(a: f32, b: f32) -> bool {
+pub(crate) fn fequal(a: f32, b: f32) -> bool {
     f64::from(sub(a, b).abs()) < f64::from(f32::EPSILON)
 }
 

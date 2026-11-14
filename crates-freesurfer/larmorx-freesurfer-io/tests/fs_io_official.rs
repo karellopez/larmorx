@@ -16,8 +16,9 @@
 //! seconds in a debug build,
 //! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
 //! --light` on Linux x64 from the unit oracle's build (2026-11-14, track A relay 26, with piece 16's
-//! ANALYZE reads and writes: 4,799 cases, 4,327 lines identical, 55 of them with memory digits; 472
-//! hashed as `SKIP`),
+//! ANALYZE reads and writes, FS-167's znz readers compared where FreeSurfer keeps the earlier
+//! number's bytes: 4,799 cases, 4,337 lines identical, 55 of them with memory digits; 462 hashed as
+//! `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -38,8 +39,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "c0804721e2da257026def1bdacb8f28671af70bed02c5653de6ff8ccc9669c3a";
-const SKIPPED: usize = 472;
+const OFFICIAL_SHA256: &str = "85577f87e3a774abc2219f52f391b28adc1a98074bef1ccf093f94ac08da092f";
+const SKIPPED: usize = 462;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

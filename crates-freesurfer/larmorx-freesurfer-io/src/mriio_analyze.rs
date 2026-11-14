@@ -533,7 +533,7 @@ fn read_analyze_header(
 /// `(int)f` (`cvttss2si`): FS-656: outside the int range (or NaN) FreeSurfer gets the lowest int;
 /// by default the value clamped (NaN 0), noted.
 fn float_to_int(g: &mut Globals, f: f32, what: &str) -> i32 {
-    if !f.is_nan() && f >= -2_147_483_648.0 && f < 2_147_483_648.0 {
+    if (-2_147_483_648.0..2_147_483_648.0).contains(&f) {
         return f as i32;
     }
     g.notices.add(
@@ -567,7 +567,7 @@ fn rint_to_short(g: &mut Globals, f: f32, what: &str) -> i16 {
         format!("{what}: {f} rounded to a short, outside the short range"),
     );
     if g.notices.reproduce() {
-        let i = if !r.is_nan() && r >= -2_147_483_648.0 && r < 2_147_483_648.0 {
+        let i = if (-2_147_483_648.0..2_147_483_648.0).contains(&r) {
             r as i32
         } else {
             i32::MIN

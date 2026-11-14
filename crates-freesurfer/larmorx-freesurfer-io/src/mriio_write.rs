@@ -665,3 +665,150 @@ pub fn mri_tag_write(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    fn volume(g: &mut Globals, mtype: i32, nframes: i32) -> Mri {
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut m = mri::mri_alloc_sequence(g, &mut o, &mut e, 2, 1, 1, mtype, nframes).unwrap();
+        let n = m.chunk.as_ref().unwrap().len();
+        let c = m.chunk.as_mut().unwrap();
+        for (i, b) in c.iter_mut().enumerate().take(n) {
+            *b = (i * 37 + 5) as u8;
+        }
+        m
+    }
+
+    fn write(
+        mode: UpstreamDefects,
+        env: &Environment,
+        m: &mut Mri,
+        name: &str,
+        frame: i32,
+    ) -> (i32, Vec<u8>, Vec<&'static str>) {
+        let dir = tempfile::Builder::new()
+            .prefix("mgh w ~")
+            .tempdir()
+            .unwrap();
+        let mut g = Globals::new(mode);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = mgh_write(
+            &mut g,
+            &mut o,
+            &mut e,
+            env,
+            Some(dir.path()),
+            m,
+            name,
+            frame,
+            -1,
+        )
+        .unwrap();
+        let b = std::fs::read(dir.path().join(name)).unwrap_or_default();
+        let ids = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
+        (r, b, ids)
+    }
+
+    #[test]
+    fn an_mgh_file_is_header_voxels_scan_parameters_and_tags() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut m = volume(&mut g, MRI_FLOAT, 1);
+        m.tr = 2.0;
+        let env = Environment::default();
+        let (r, b, ids) = write(UpstreamDefects::Fix, &env, &mut m, "a.mgh", -1);
+        assert_eq!((r, ids.len()), (0, 0));
+        assert_eq!(&b[..8], &[0, 0, 0, 1, 0, 0, 0, 2]);
+        assert_eq!(&b[28..30], &[0, 1]); // the RAS flag
+        // the voxels: the buffer's floats big-endian
+        let c = m.chunk.as_ref().unwrap();
+        assert_eq!(&b[284..288], &[c[3], c[2], c[1], c[0]]);
+        assert_eq!(&b[292..296], &2.0f32.to_be_bytes());
+        // the phase-encoding direction (UNKNOWN, no NUL) and the field strength's tags
+        let tags = &b[312..];
+        assert_eq!(&tags[..12], &[0, 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 7]);
+        assert_eq!(&tags[12..19], b"UNKNOWN");
+        assert_eq!(&tags[19..31], &[0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 4]);
+        assert_eq!(tags.len(), 35);
+    }
+
+    #[test]
+    fn fs_439_an_unsupported_type_leaves_an_mgz_empty_only_with_reproduce() {
+        let env = Environment::default();
+        for (mode, empty) in [
+            (UpstreamDefects::Fix, false),
+            (UpstreamDefects::Reproduce, true),
+        ] {
+            let mut g = Globals::new(mode);
+            let mut m = volume(&mut g, mri::MRI_RGB, 1);
+            let (r, b, ids) = write(mode, &env, &mut m, "a.mgz", -1);
+            assert_eq!(r, ERROR_UNSUPPORTED);
+            assert_eq!(b.is_empty(), empty);
+            assert!(ids.contains(&"FS-439"));
+        }
+    }
+
+    #[test]
+    fn fs_442_one_frame_counts_one_frame_by_default() {
+        let env = Environment::default();
+        for (mode, count) in [(UpstreamDefects::Fix, 1u8), (UpstreamDefects::Reproduce, 3)] {
+            let mut g = Globals::new(mode);
+            let mut m = volume(&mut g, MRI_UCHAR, 3);
+            let (r, b, ids) = write(mode, &env, &mut m, "a.mgh", 1);
+            assert_eq!((r, b[19]), (0, count));
+            assert_eq!(&b[284..286], &m.chunk.as_ref().unwrap()[2..4]);
+            assert!(ids.contains(&"FS-442"));
+        }
+    }
+
+    #[test]
+    fn fs_443_the_voxel_buffer_write_swaps_the_volume_only_with_reproduce() {
+        let env = Environment::from_pairs([("FS_MGZIO_USEVOXELBUFWRITE", "1")]);
+        for (mode, swapped) in [
+            (UpstreamDefects::Fix, false),
+            (UpstreamDefects::Reproduce, true),
+        ] {
+            let mut g = Globals::new(mode);
+            let mut m = volume(&mut g, mri::MRI_SHORT, 1);
+            let before = m.chunk.clone().unwrap();
+            let (r, b, _) = write(mode, &env, &mut m, "a.mgh", -1);
+            assert_eq!(r, 0);
+            assert_eq!(&b[284..286], &[before[1], before[0]]);
+            assert_eq!(m.chunk.as_ref().unwrap()[0] == before[1], swapped);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fs_440_a_full_disk_is_an_error_by_default() {
+        let dir = tempfile::Builder::new()
+            .prefix("mgh f ~")
+            .tempdir()
+            .unwrap();
+        std::os::unix::fs::symlink("/dev/full", dir.path().join("a.mgh")).unwrap();
+        for (mode, want) in [
+            (UpstreamDefects::Fix, ERROR_BADFILE),
+            (UpstreamDefects::Reproduce, 0),
+        ] {
+            let mut g = Globals::new(mode);
+            let mut m = volume(&mut g, MRI_FLOAT, 1);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let env = Environment::default();
+            let r = mgh_write(
+                &mut g,
+                &mut o,
+                &mut e,
+                &env,
+                Some(dir.path()),
+                &mut m,
+                "a.mgh",
+                -1,
+                -1,
+            )
+            .unwrap();
+            assert_eq!(r, want);
+        }
+    }
+}

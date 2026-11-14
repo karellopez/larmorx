@@ -691,6 +691,13 @@ fn answer(
     if bits & 2 != 0 {
         pairs.push(("FS_MGZIO_USEVOXELBUFREAD", "1"));
     }
+    // piece 15: niiRead's geometry check
+    if bits & 4 != 0 {
+        pairs.push(("TAG_RAS_XFORM_DEBUG", "1"));
+    }
+    if bits & 8 != 0 {
+        pairs.push(("VOL_GEOM_THRESH", "0.25"));
+    }
     let env = Environment::from_pairs(pairs);
     let mut ty = -1;
     let (mut rv, mut frame) = (false, -1);

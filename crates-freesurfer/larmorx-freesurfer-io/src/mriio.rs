@@ -9,7 +9,8 @@
 //! FreeSurfer's volume_io, [`crate::minc`]) and `setDirectionCosine`.
 //!
 //! The readers of the other formats come with their queue items: until then [`mri_read`] reads
-//! MGH/MGZ, `.npy` ([`crate::fscnpy`]) and Bruker studies ([`crate::bruker`]) and refuses the others
+//! MGH/MGZ, NIfTI-1 (`.nii`, `.nii.gz` and pairs: [`crate::mriio_nifti`]), GIFTI, `.npy`
+//! ([`crate::fscnpy`]) and Bruker studies ([`crate::bruker`]) and refuses the others
 //! with a message that names the format (`larmorx-freesurfer: reading <format> volumes is not
 //! ported yet`, standard error, `None`).
 //!
@@ -75,6 +76,7 @@ const UNUSED_SPACE_SIZE: i32 = 256;
 const USED_SPACE_SIZE: i32 = 60;
 /// `errno`'s `ENOMEM` on Linux (a failed `calloc`).
 const ENOMEM: i32 = 12;
+const EINVAL: i32 = 22;
 /// The bytes of a tag's number and length in FreeSurfer's NIfTI header extension.
 const LEN_TAGHEADER: i64 = 12;
 
@@ -297,7 +299,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         GDF_FILE => "GDF",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         XIMG_FILE => "GE XIMG",
-        NIFTI1_FILE | NII_FILE => "NIfTI",
         NRRD_FILE => "NRRD",
         MRI_CURV_FILE => "curvature",
         IMAGE_FILE => "image",
@@ -450,6 +451,10 @@ pub fn mri_read(
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {
         crate::bruker::bruker_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::NII_FILE {
+        crate::mriio_nifti::nii_read(g, out, err, env, dir, &copy, volume_flag)?
+    } else if mtype == identify::NIFTI1_FILE {
+        crate::mriio_nifti::nifti1_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?
@@ -562,10 +567,7 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
         BRIK_FILE => "AFNI BRIK",
         MGH_MORPH => "GCA morph (m3z)",
         ITK_MORPH => "ITK warp",
-        MRI_MGH_FILE => "MGH",
         GDF_FILE => "GDF",
-        NIFTI1_FILE => "NIfTI-1",
-        NII_FILE => "NIfTI",
         NRRD_FILE => "NRRD",
         _ => return None,
     })
@@ -619,15 +621,23 @@ pub fn mri_write_type(
     err: &mut dyn Write,
     env: &Environment,
     dir: Option<&Path>,
-    m: &Mri,
+    m: &mut Mri,
     fname: &str,
     mtype: i32,
-    _intent: i32,
+    intent: i32,
 ) -> Result<i32, Fatal> {
     use crate::identify::*;
-    if mtype != MRI_CORONAL_SLICE_DIRECTORY
-        && std::fs::metadata(utils::resolve(dir, fname)).is_ok_and(|md| md.is_dir())
-    {
+    // `stat(fname)`: a name that does not exist sets `errno` (ENOENT), which the writers' error
+    // messages then print first
+    let is_dir = mtype != MRI_CORONAL_SLICE_DIRECTORY
+        && match std::fs::metadata(utils::resolve(dir, fname)) {
+            Ok(md) => md.is_dir(),
+            Err(e) => {
+                g.errno = log::errno_of(&e).unwrap_or(2);
+                false
+            }
+        };
+    if is_dir {
         return Ok(fail_code(
             g,
             err,
@@ -672,6 +682,12 @@ pub fn mri_write_type(
     let error = if mtype == GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mri_write_gifti(g, &mut io, dir, m, fname)?
+    } else if mtype == MRI_MGH_FILE {
+        crate::mriio_write::mgh_write(g, out, err, env, dir, m, fname, -1, intent)?
+    } else if mtype == NII_FILE {
+        crate::mriio_write::nii_write(g, out, err, env, dir, m, fname, intent)?
+    } else if mtype == NIFTI1_FILE {
+        crate::mriio_write::nifti1_write(g, out, err, dir, m, fname)?
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,
@@ -731,9 +747,9 @@ pub fn mri_write(
     err: &mut dyn Write,
     env: &Environment,
     dir: Option<&Path>,
-    m: &Mri,
+    m: &mut Mri,
     fname: &str,
-    several: Option<&[Mri]>,
+    several: Option<&mut [Mri]>,
     intent: i32,
 ) -> Result<i32, Fatal> {
     larmorx_freesurfer_core::chklc::chklc();
@@ -765,7 +781,7 @@ pub fn mri_write(
     };
     let ext = ext.unwrap_or_else(|| b"(null)".to_vec());
     let mut error = NO_ERROR;
-    for (n, v) in vs.iter().enumerate() {
+    for (n, v) in vs.iter_mut().enumerate() {
         let mut name = stem.to_vec();
         if v.len_fname_post_fixes == 0 {
             name.extend_from_slice(format!("_{n}").as_bytes());
@@ -794,6 +810,14 @@ pub fn mri_write(
 fn reverse_each(b: &mut [u8], n: usize) {
     for c in b.chunks_exact_mut(n) {
         c.reverse();
+    }
+}
+
+/// `znzseek(fp, off, SEEK_CUR)` on a plain file: a position before the file's start fails with
+/// `EINVAL` (glibc's `fseek`, which leaves `errno` so).
+fn seek_cur(g: &mut Globals, fp: &mut ZnzFile, off: i64) {
+    if fp.seek(off, Whence::Cur) < 0 {
+        g.errno = EINVAL;
     }
 }
 
@@ -931,7 +955,7 @@ pub fn mgh_read(
                 }
             }
         } else {
-            fp.seek(total_bytes, Whence::Cur);
+            seek_cur(g, &mut fp, total_bytes);
         }
     } else {
         let (start_frame, end_frame);
@@ -952,7 +976,7 @@ pub fn mgh_read(
                     c += 1;
                 }
             } else {
-                fp.seek(skip, Whence::Cur);
+                seek_cur(g, &mut fp, skip);
             }
             nframes = 1;
         } else {

@@ -1074,3 +1074,303 @@ fs.volume's matrices and `MRIcopyFrame`; the orchestrator's layering of 2026-11-
   not ported yet, 23 FS-429); seed 13 (3,000): 2,823 identical, 0 different (177 counted); `fix` differs
   only with notices (FS-437, FS-438, FS-01, FS-12, FS-522). In the fsio harness the surface is
   `MRISalloc(0, 0)` with its `vg` read from the case.
+
+## Part 13: MGH and MGZ written (relay 23 of track A)
+
+Restricted (FreeSurfer's internals). Behaviour: `specs/freesurfer-io.md` §90-92. The port:
+larmorx-freesurfer-io's `mriio_write.rs` (`mgh_write`, `mri_tag_write`), wired into `mriio.rs`'s
+`mri_write_type`.
+
+### Mechanisms
+- `mghWrite` (mriio.cpp 11247-11518) writes each number with `znzwriteInt`/`znzwriteShort`/
+  `znzwriteFloat` and ignores their counts; only the `MRI_UCHAR` row (`znzwrite(&MRIseq_vox(mri, 0, y,
+  z, frame), 1, width, fp) != width`) is checked. Its `default:` (`MRI_LONG`, `MRI_RGB`, `MRI_TENSOR`,
+  `MRI_BITMAP`, `MRI_DOUBLE_COMPLEX`) and that row's error `ErrorReturn` without `znzclose(fp)`
+  (FS-439): the `gzFile`'s input buffer (8 KiB in zlib 1.2.11's `gz_init`) still holds the 284-byte
+  header, never compressed (the file `gzopen` created stays empty); a plain `FILE` keeps it in its
+  buffer until `exit` flushes the streams (the probe calls `fflush(NULL)` after the write, which shows
+  the same state). `znzclose(fp)`'s result is ignored (FS-440).
+- `FS_MGZIO_USEVOXELBUFWRITE` (11357-11427): `voxelbuf = &MRIseq_vox(mri, 0, 0, 0, start_frame)` =
+  `slices[start_frame * depth][0]`; `byteswapbufshort`/`byteswapbuffloat` (bfileio.cpp 81-117) swap
+  `bytes_per_slice` bytes of the volume's own chunk in place before each `znzwrite` (FS-443: never
+  swapped back). `bytes_per_voxel == 8` (`MRI_LONG`, `MRI_FLOAT_COMPLEX`) is swapped in 4-byte
+  groups. `MRI::initSlices` (mri.cpp 260-305) advances the row pointer for uchar, short, ushort, RGB,
+  int, long, float and (by `bytes_per_vox * vox_per_row`) float complex only: a tensor's rows all point
+  at the chunk's start, so the write starts there whatever the frame. With `depth * nframes == 0`,
+  `slices` is `calloc(0)` and `slices[0]` is read past it (FS-445: SIGSEGV in the probe).
+- `MRI::ischunked` is an `int` without an initialiser (mri.h 826) and the constructor returns before
+  setting it when `alloc` is false (mri.cpp 231): a header-only volume's flag is heap contents
+  (FS-446; in the probe it was non-zero, and the voxel-buffer branch then crashed on `slices`, NULL).
+- `MRITAGwrite` (12421-12534) tests `mri->frames[0].label` and `FZERO(mri->frames[0].thresh)`
+  (`fabs(f) < FLT_EPSILON`, macros.h 80) without checking `nframes`: `frames` is `calloc(nframes,
+  sizeof(MRI_FRAME))` (mri.cpp 211), past its end for 0 frames (FS-441). The `#if 0` block of
+  `tag_data` is not compiled.
+- With a chosen frame (`frame >= 0`) the header's `nframes` is still `mri->nframes` (FS-442); no
+  FreeSurfer caller passes a frame (MRIwriteType, MRISurfOverlay.cpp 195: -1). A frame at or beyond
+  `nframes` reads beyond the chunk through `MRISseq_vox` (FS-444).
+- `exec_progress_callback` (utils.cpp 1551) does nothing without `progress_callback` (only freeview
+  sets one).
+
+### Found while comparing (the probe's other pieces)
+- The tag readers' `znzreadInt` at the end of the file was noted as FS-167 (memory contents) although
+  `znzTAGreadStart` (tags.cpp) and `FStagsIO::read_tagid_len` return 0 at `znzeof` and never use the
+  number: 139 of 588 `mgw` cases were marked VARY for it. Without the spurious notice four reader
+  differences showed (fixed): `mghRead`'s header-alone skip of a negative byte count (an unknown type's
+  size -1) is `znzseek(fp, total_bytes, SEEK_CUR)`, glibc's `fseek` failing with EINVAL, which
+  `mri_read` then leaves in `errno`; `FileExists("")` (utils.cpp 445: `fopen("", "r")`, ENOENT) for an
+  empty `TAG_MGH_XFORM` name, where the port's `resolve(dir, "")` opened the folder.
+- gifti.cpp 2950 (`readLabelTable`) `malloc`s each colour entry without setting `TissueType` and
+  `count` (heap contents: in one seed-13 case the bytes of the XML text, `959723828`); the probe's
+  `mgi` now leaves them out on both sides, as for `CTABalloc`'s entries (track D's reader: a notice to
+  add there).
+- Windows: `minc::input_transform_file` joined the program's folder to a relative name and volume_io's
+  `expand_filename` (in `reproduce`, FS-79) took the folder's backslashes for escapes, twice (the
+  existence check and the open both expand): a label's `talairach.xfm` was not found (seed 1's case
+  1194). The folder is now given with `/`.
+
+### Measured (piece 14 and the re-runs, 2026-11-14, the probe, the unit oracle's build)
+- `mgw` seed 7 (588 cases): `reproduce` identical on 495, 0 different (69 SKIP, 24 VARY); seed 13,
+  10,294 cases of `mgw`, `mwr`, `mgr`, `mrd`, `mrh`, `mri`, `mgi`: identical on 8,056, 0 different
+  (1,838 SKIP, 400 VARY); seed 7, 12,000 cases of every command: 10,807 identical, 0 different; piece
+  13 seed 13, 3,000: 2,930 identical, 0 different (70 SKIP: FS-429); `fix` differs only with notices.
+- The recorded tests re-recorded: `fs_io_official` 9e99627e... (4,799 cases, 4,327 identical, 472
+  counted), `fs_io13_official` 3dbe8afd... (1,200, 1,174 identical, 26 counted); both pass under the
+  ARM NaN emulation (debug and release) and on Windows x64 (the cross-check tool on the Windows
+  laptop; seed 1's set compared case by case: only the probe's relative-folder `bvw` artefact).
+
+### NIfTI (`niiWrite`, mriio.cpp 9522-9760; same relay)
+- `niiWrite` reshapes an ico7 overlay with `mri_reshape(mri0, 27307, 1, 6, nframes)` (mri2.cpp 653-735:
+  `MRIallocSequence`, `MRIcopyHeader`, `MRIcopyPulseParameters`, a voxel copy whose `switch` has only
+  uchar, short, ushort, float, int and long) and writes, and changes the intent of, the copy; the
+  port's `reshape_ico7` (mri2.cpp is fs.volume's: written here for this one call).
+- `mriToNiftiQform` (10245-10398) works in `float r11..r33, a, b, c, d, xd, yd, zd, r_det` with
+  `double` literals (`1.0`, `0.5`, `0.25`) and `sqrt` (double): each statement rounds to float at the
+  assignment; `qfac` starts at -100000 and stays there when `r_det == 0.0` (only a printed warning).
+  `extract_i_to_r` gives the offsets; `mriToNiftiSform` (10229) copies `MRIxfmCRS2XYZ(mri, 0)`.
+- `hdr.dim[2..4]` are `short`s: the checks `mri->height > shortmax` (and depth, frames) with
+  `shortmax = (int)pow(2, 15)` let 32,768 through, stored as -32,768 (FS-449). `hdr.dim[1]` for 32,768
+  columns and more is -1 with the count in `glmin` (FreeSurfer's own convention, its reader's).
+- `MRI_LONG` maps to `DT_SIGNED_INT`, `bitpix` 32, and the data loop writes `znzwrite(buf, bitpix / 8,
+  width)` from `&MRIseq_vox(mri, 0, j, k, t)`: the first `4 width` bytes of a row of `8 width` (FS-447).
+- `sprintf(hdr.descrip, "FreeSurfer %s", __DATE__)`: `Mar 14 2026` in the official 8.2.0 binaries
+  (`strings` of `bin/mri_convert`) and in the unit oracle's `libutils.a` alike.
+- `__getMRITAGlength` (12538-12731) mirrors `MRITAGwrite`'s order with `FStagsIO::getlen_*` and the
+  same `frames[0]` test (FS-441); `__writeFSniiextensionHeader` (12865-12899) assigns the `unsigned
+  short` intent to `mri->intent` (an intent of 65,539 becomes 3 there, where `mghWrite` keeps 65,539).
+- `znzclose(fp)`'s result is ignored (FS-448); the header, the extension flag and each row's
+  `znzwrite` are checked (`ErrorReturn` after `znzclose`). The ErrorReturns for the types do not set
+  `errno = 0` first.
+- Measured: seed 13, 3,920 `mgw`/`mwr` cases (788 NIfTI names, 41 ico7, 43 of 32,768 rows): reproduce
+  identical on 3,603, 0 different. Three differences before the FS-58 checks: header-only volumes
+  written as NIfTI (and one reshaped) crash FreeSurfer at the first row (`MRIseq_vox` on `slices`,
+  NULL).
+
+
+## Part 14: NIfTI-1 pairs written (relay 24 of track A)
+
+`nifti1Write` (mriio.cpp 8177-8363), reached from `MRIwriteType(..., NIFTI1_FILE)` (1203-1205; a new
+`.img` name identifies as ANALYZE in `mri_identify`, 285-292 and 365: only a name whose `.hdr` already
+holds the `ni1` magic, or a type given by the caller, reaches it). The header is niiWrite's (the same
+`mriToNiftiQform`, `mriToNiftiSform`, the same size checks and messages: FS-449 applies unchanged),
+without the extension, `vox_offset` 0, magic `ni1`; no `MRI_FLOAT_COMPLEX` case (an unknown type
+here); `fopen`/`fwrite`/`fclose` on two plain streams; one `fwrite` per row.
+
+### Mechanisms
+- **FS-451** (8318-8331): `char fname_stem[STRLEN]` (1,024, `STR_LEN`) filled by `strcpy`, then
+  `snprintf(hdr_fname, STRLEN, "%s.hdr", fname_stem)` and the same for `.img`, each with
+  `std::cerr << __FUNCTION__ << ": Truncation of hdr_fname"` when `needed >= STRLEN`. The truncated
+  names are used: a stem of 1,020 bytes gives `<stem>.hd` / `<stem>.im`, 1,022 and 1,023 give one name
+  for both files (the header opened, written and closed, then the image's `fopen(..., "w")` truncates
+  it). A name of 1,024 bytes or more overflows `fname_stem` in the `strcpy`: the official build (and the
+  unit oracle's, the same flags) is compiled with `_FORTIFY_SOURCE` (Ubuntu's GCC 8 at -O3), so the
+  call is `__strcpy_chk` and glibc ends the program: `*** buffer overflow detected ***: terminated`,
+  SIGABRT. Measured with the fs-io probe (`nifti1_long_names.py`): exactly so for names of 1,024 and
+  1,027 bytes (`.img`) and 1,024 (`.hdr`), the cut names and both messages for stems of 1,020 to 1,023.
+  Class a (an abort) and c (wrong names); rule A: the whole names by default; `reproduce` exact.
+- **FS-452** (8335, 8360): `fclose(fp)` unchecked for both files. A full disk (or any late write
+  error) is found by stdio only when its buffer is flushed: the 348-byte header always waits for the
+  close, so a header that never reached the disk is reported as written; the image's last buffer
+  likewise. Class c; rule A as FS-448 (niiWrite's close): by default the write's message and
+  `ERROR_BADFILE`.
+- **`MRIwriteType`'s `stat`** (1124-1135): `stat(fname)` of a name that does not exist sets `errno` to
+  ENOENT; nothing resets it, so every writer's `ErrorReturn` that keeps `errno` (the type refusals)
+  prints `error: No such file or directory` first, and `errno` is 2 after a successful write of a new
+  file. The port's `MRIwriteType` did not set it (found by piece 14's `how` 2: `MRIwrite`'s
+  `mri_identify` had set the same value before). Not a defect.
+- **The `.mat` reader's size products** (larmorx's own): `8 * rows * cols` and the
+  allocation-size estimate in 64-bit integers overflowed for a header's sizes near 2^31 each (a case
+  of the regenerated seed-1 set): a debug build's panic, a release build's wrapped (small) size. They
+  saturate now: the refusal FreeSurfer's failed `calloc` gives (FS-243), as for every other size
+  beyond the limit.
+
+### Measured (piece 14, 2026-11-14, the probe, the unit oracle's build)
+Seed 7, 294 `mgw` cases: `reproduce` identical on 261, 0 different; seed 13, 1,470 (195 NIfTI-1
+pairs): 1,322 identical, 0 different (133 SKIP, 15 VARY); `fix` differs only with notices. The long
+names: 9 of 9 identical with `reproduce`, `fix` differing only with FS-451. The recorded set
+(`check.py --seed 1 --n 4800 --portable --light`): 4,798 cases, 4,309 identical (47 with memory
+digits), 0 different, 370 SKIP and 119 VARY; `fs_io_official` re-recorded (4a4aba35...), passes in
+debug and release, under the ARM NaN emulation (2,415 / 2,316 NaNs flipped) and on Windows x64 (the
+cross-check tool; the unit tests of the writers too, the long names included).
+
+## Part 15: NIfTI volumes and NIfTI-1 pairs read (relay 25 of track A)
+
+`niiRead` (`utils/mriio.cpp` 8365-8979) and `nifti1Read` (7680-8175) with their helpers, reached by
+`mri_read` (`NII_FILE`, `NIFTI1_FILE`) and `MRIreadHeader`. The official build's object code (the
+unit oracle's `mriio.cpp.o`, the same flags) was read where bits depend on it: `niftiQformToMri` is a
+function of its own (not inlined) whose `1.0 - (b*b + c*c + d*d)` and `1.0 / sqrt(...)` GCC computes
+in `float` (`subss`, `sqrtss`, `divss`: exact for these operations, the values the `double`
+expressions give), whose products `2.0*a*d` and `2*a*c` it computes as `d * (2a)` and `c * (2a)` and
+whose sums it reorders (`r13` as `2ac + 2bd`; `c_r` as `y + x + z`; `c_a` as `z + (x + y)`): only a NaN's
+payload depends on that order. `__niiReadSetVox2ras` and `__niiReadHeaderextension` are inlined into
+`niiRead`. The scaled loops are scalar: `value * slope + intercept` (the value's register first), but
+`slope * value` for `float` data (both readers). `KEEP_NII_OPEN` is 1: the file stays open after the
+header, and the extender is read at byte 348 whatever `sizeof_hdr` says.
+
+- **FS-453** (7697-7709): `nifti1Read` builds `<stem>.hdr` and `<stem>.img` with `snprintf` into
+  `STRLEN` (1,024-byte) buffers and prints `nifti1Read: Truncation on line 7704` (and 7708) on
+  standard error when they do not fit: the cut names are opened. Class c (wrong names); rule A: the
+  whole names by default.
+- **FS-454** (8806 and 8940; 7999 and 8133 in `nifti1Read`): the scaled branch's
+  `if` chain is not an `else if` chain, and `DT_UINT32` appears in the `DT_SIGNED_INT || DT_UINT32`
+  block and in a block of its own: unsigned 32-bit data are read twice, first as `int`s (values
+  above 2^31 - 1 negative), then as `unsigned int`s from where the first pass ended. The second pass
+  fails at the file's end (`error reading`, the volume freed) unless the file holds the data twice.
+  Class c; rule A: by default one pass as unsigned numbers.
+- **FS-455** (8744): unscaled `DT_DOUBLE` reads into a `double` row, and a swapped header's
+  `bytes_per_voxel == 8` branch calls `byteswapbuffloat(dbuf, 8 * width)`, which reverses 4-byte
+  groups: each double's halves are swapped separately. Class c; rule A: 8-byte swaps by default.
+- **FS-456** (same lines): unscaled `DT_COMPLEX` reads into the volume's row (8 bytes a voxel), but
+  the 8-byte branch swaps `dbuf` (the doubles' buffer, unused for complex data): the values stay
+  big-endian. Class c; rule A: each 4-byte part swapped by default.
+- **FS-457** (8499-8500, 7807-7808): unscaled `DT_UINT32` is read as an `MRI_INT` volume: values above
+  2,147,483,647 become negative. Rule C: FreeSurfer's volume type (MRI has no unsigned 32-bit type;
+  label and count volumes stay far below 2^31); kept in both modes, noted when such a value occurs.
+- **FS-458** (8539-8545, 7845-7851): the extents are `dim[2]` and `dim[3]` whatever `dim[0]` is; NIfTI-1
+  says the fields past `dim[0]` are to be ignored. Writers leave them 1 (nibabel, FSL, FreeSurfer),
+  but a 0 gives FreeSurfer an empty volume and a larger value a read past the data. Class c; rule A:
+  1 by default for an extent past `dim[0]` that is not 1.
+- **FS-459** (12726-12756): the extension's size and code are read in the file's order, the code is
+  checked against 0..14 and evenness, and only then swapped: a big-endian file's codes are never valid
+  (14 reads as 234,881,024), so FreeSurfer's own extension in a big-endian file is not read, and the
+  warning `no valid extension read` is printed. Class c; rule A: the code checked after the swap.
+- **FS-460** (12760-12761): an extension of another code is `continue`d past without skipping its
+  `esize - 8` bytes of data: the next size and code come from that data (AFNI's XML text gives an
+  invalid code and the warning; zeros give code 0, valid, and the loop walks on 8 bytes at a time).
+  FreeSurfer's extension after another one is not found. Class c; rule A: by default the data are
+  skipped, and the walk stops where no further extension fits before the voxel offset.
+- **FS-641** (8605-8606): `nifti1_extender extdr;` is not initialised, and `znzread(extdr.extension,
+  1, 4, fp)`'s count is not checked: a file that ends within 4 bytes of the header leaves the bytes it
+  does not give as stack contents; when the first is 1, the extension reading starts. Class a (memory
+  never written); both modes take 0 (no extension), noted; the probe marks such cases VARY.
+- **FS-642** (12149-12198): `niiPrintHdr` prints `data_type`, `db_name`, `descrip` and `aux_file` with
+  `%s`: a field without a NUL runs on into the next fields (deterministic within the header), and past
+  the header's 348 bytes into `niiRead`'s stack when no NUL follows. Class a (memory) past the header,
+  f within it; both modes print through the header's end, noted; VARY in the probe.
+- **FS-643** (10400-10441): `swap_nifti_1_header` does not swap `glmax` and `glmin` (nor `extents` and
+  `session_error`, unused), and `glmin` is the column count when `dim[1]` is not positive: a
+  big-endian header's count is read byte-reversed. Class c; rule A: swapped by default.
+- **FS-644** (8161-8165 with `mri2.cpp` 653-667): a pair of the ico7 shape whose `dim[4]` is 0 gives a
+  volume of 0 frames (`nifti1Read` does not change a 0, `niiRead` does); `mri_reshape` sets the
+  volume's `nframes` to 1, finds `nv1 = 163842` and `nv2 = 163842 x 0`, prints its error and returns
+  NULL; `MRIfree` then frees one frame of a volume that has none: SIGSEGV (observed: `CRASH 11`,
+  seed 13). Class a (a crash); rule A: by default no volume after the message; `reproduce` ends the
+  program with status 139.
+- **The port's command lines and transform name are text** (larmorx's own limitation, not a
+  FreeSurfer defect; found by piece 15's random tags): `Mri::cmdlines` and `transform_fname` are
+  `String`s, filled with `from_utf8_lossy`, so a tag of bytes that are not UTF-8 reads as U+FFFD where
+  FreeSurfer keeps the bytes (3 of seed 7's 8,075 cases, through FreeSurfer's NIfTI extension; MGH
+  files likewise). A rewrite of such a volume would change those bytes. Piece 15 now writes ASCII
+  command lines; the fields' change to bytes is for a later relay (they are shared with fs.volume and
+  fs.surf).
+- **The probe's memory limit** (seed 7, one case): a big-endian header with `dim[1]` -1 and `glmin`
+  3 reads (FS-643's `reproduce`) 50,331,648 columns; the official build's allocation fails in the
+  probe's 1 GiB (`could not allocate memory for slice 7 out of 8`), the port's succeeds and its read
+  fails later. Piece 15 now gives such headers `glmin` 0 (the same in both byte orders); FS-643's fix
+  is checked by the unit test.
+- **`mri_read`'s type for `.img`** (not a defect here): `string_to_type("img")` is `MRI_ANALYZE4D_FILE`,
+  which `mri_read` gives to `analyzeRead` (not ported yet: such names are SKIP); `analyzeRead` itself
+  hands NIfTI-1 pairs to `nifti1Read` (the official output shows its `INFO` line). Pairs are read
+  here by `.hdr` names, stems and the explicit `NIFTI1_FILE` type.
+- **Not defects:** `MRIsetVox2RASFromMatrix` keeps the voxel sizes `pixdim` gives (with its warning when
+  the sform's columns differ); the extension's rollback seek's position is never used afterwards (the
+  voxels are found from the start); `exec_progress_callback` has no callback.
+
+### Measured (piece 15, 2026-11-14, the probe, the unit oracle's build)
+See `specs/freesurfer-io.md` §99 and the probe's README (piece 15). The recorded set (`check.py --seed
+1 --n 4800 --portable --light`): 4,799 cases, 4,341 identical (37 with memory digits), 0 different,
+458 SKIP or VARY; `fs_io_official` re-recorded (83439bc7...), passes in debug and release, under the
+ARM NaN emulation (2,939 / 2,845 NaNs flipped) and on Windows x64 (the cross-check tool; the readers'
+unit tests too).
+
+
+## Part 16: FS-49 at fs.io's readers (relay 25 of track A, continued)
+
+FS-49's `reproduce` at the readers of fs.io that call `freadInt` (`TAGreadStart` on a C stream, the
+binary colour tables on a C stream), from the official object code (`objdump -d -r` of the unit
+oracle's `fio.cpp.o`, `tags.cpp.o`, `colortab.cpp.o`; GCC 8.4.0, the official flags) and glibc 2.35's
+`feof`:
+
+### Mechanisms
+- **One memory for every `freadInt` and `freadDouble` of a function.** `freadInt` (fio.cpp 182)
+  takes a 24-byte frame and reads into `0x4(%rsp)`: 28 bytes below its caller's stack pointer.
+  `freadDouble` (169) pushes `rbx`, takes 16 bytes and reads into `(%rsp)`: 32 bytes below the
+  caller's, so `freadInt`'s `int` is the `double`'s bytes 4 to 7 (relay 16's `MatrixReadFrom` slot,
+  the same layout). `fread` writes the bytes it gets and nothing else, so a number the file cuts keeps
+  the rest of that memory: after a `freadInt`, the file's bytes in file order (the swapped value is
+  only returned); after a `freadDouble`, its value least significant byte first (`movsd %xmm0,(%rsp)`
+  stores the swapped number back). Calls made by `freadInt` itself (`fread`, `swapInt`,
+  `ErrorPrintf`) lie below its frame. Any other function the caller calls between two reads can write
+  there (its return address and pushes cover those bytes from the third push on): larmorx treats that
+  memory as unknown after any other call.
+- **`TAGreadStart`** (tags.cpp 51): `freadInt` (the tag), `feof`, then for tag 30
+  (`TAG_OLD_MGH_XFORM`) `freadInt` (the length): both from one frame. glibc 2.35's `feof` (single
+  threaded: the `_IO_FLAGS2_NEED_LOCK` test jumps to a three-instruction tail) uses no stack; locked,
+  it pushes `rbp` and `rbx` (16 and 24 bytes below the caller) and writes 36 bytes below only when
+  the lock is contended: never the four bytes 28 below. A length cut after `k` bytes is therefore the
+  file's `k` bytes, then the tag's last `4 - k` bytes (`00 00 00 1e`): 30 at the very end (so `len`
+  29). A cut tag number sets the end-of-file flag, so `TAGreadStart` returns 0 before any length.
+- **The binary colour tables** (colortab.cpp 351-830): GCC inlines `CTABreadFromBinaryV1` and
+  `CTABreadFromBinaryV2` into `CTABreadFromBinary`: every `freadInt` of a read shares one memory.
+  The calls between them (the object code's order): version 2: `freadInt` (version), `freadInt`
+  (count), `calloc` x 2, `freadInt` (name length), `malloc`, `fread`, [`ErrorPrintf`], `strncpy`,
+  `free`, `freadInt` (count to read), [`__printf_chk` with `DIAG_SHOW`], then per entry `freadInt`
+  (structure), `malloc`, `freadInt` (name length), `malloc`, `fread`, [`ErrorPrintf`], `strncpy`,
+  `freadInt` x 4 (red, green, blue, transparency), the next entry's `freadInt` (structure) with no
+  call between. Version 1: `freadInt` (version, its count), `calloc` x 2, `freadInt` (name length),
+  `malloc`, `fread`, `strncpy`, `free`, then per entry `malloc`, `freadInt` (name length), `malloc`,
+  `fread`, [`ErrorPrintf`], `strncpy`, `freadInt` x 4. So the runs with nothing between are: (version,
+  version 2's count), (count to read, first structure) without `DIAG_SHOW`, (red, green, blue,
+  transparency, next structure) in version 2, (red, green, blue, transparency) in version 1.
+- **After a call, memory contents.** Observed: after an allocation or a name, the official build's
+  missing numbers were `-1721761792` in one run and `-933494784` in another (`0x99600000`,
+  `0xc8600000`: part of an address, which address-space randomisation moves): memory contents, as the
+  port notes them.
+- **znz readers (FS-167, not changed):** `znzreadInt` pushes `rbx`, takes 16 bytes and reads into
+  `0x4(%rsp)`: the same 28 bytes below its caller. The official build's znz colour table reader keeps
+  the earlier number's bytes the same way (fs49_slot_cases.py's last case); larmorx still reads 0 there
+  (FS-167: memory contents in both modes). A later relay can give FS-167's znz readers the same slot.
+
+### What larmorx does
+`larmorx_freesurfer_io::fio::Slot49` holds FreeSurfer's eight bytes with which of them are known;
+`fread_int_in` / `fread_double_in` read through a caller's slot (`fread_int` / `fread_double` use a
+fresh, unknown one: memory contents, as before). `tags::tag_read_start` keeps one slot for its two
+reads; `colortab_bin`'s C-stream reader keeps one for the whole read and forgets it at each call
+FreeSurfer makes between two numbers (the table's allocation, a name, an entry's allocation,
+`DIAG_SHOW`'s print). By default the missing bytes stay 0 (noted, FreeSurfer's being the earlier
+number's or memory contents); with `reproduce` the known bytes are FreeSurfer's and the notice says
+so ("... the others are the earlier number's, as in FreeSurfer"); unknown bytes stay 0 with the
+memory notice. FS-192's `reproduce` notice says "memory contents" only when a number of the read took
+an unknown byte. The probe compares the lines whose notices say "as in FreeSurfer".
+
+### Measured (2026-11-14, the probe, the unit oracle's build)
+- `validation/probes/fs-io/fs49_slot_cases.py`: 16 hand cases (5 tags, 11 colour tables): `reproduce`
+  identical on 13 (the 5 tags; version 1 and 2 tables cut inside a colour, a duplicate structure number
+  that comes from the last colour number, the count read from the version's bytes, `DIAG_SHOW`), the
+  other 3 marked memory contents (`VARY`) by the port; their official numbers are an address's bytes.
+  Its observed values are in `fio::tests::fs49_slot_keeps_the_earlier_numbers_bytes`.
+- Seed 7, 3,846 `ctr` and `tr` cases: `reproduce` identical on 2,697 (2,690 before), 0 different, 663
+  `VARY` (693 before), 486 `SKIP` (463: tables whose next structure number now comes from the last
+  colour number, beyond the table: FS-189, where FreeSurfer reads and writes outside it). Seed 13,
+  5,770 cases: identical on 4,045, 0 different. `fix` differs only with notices.
+- `fs_io_official` unchanged (its seed-1 set holds no such case), passes in debug and release, under
+  the ARM NaN emulation and on Windows x64.

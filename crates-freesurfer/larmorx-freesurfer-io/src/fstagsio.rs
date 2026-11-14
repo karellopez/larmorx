@@ -243,7 +243,12 @@ pub fn getlen_endtag(addtaglength: bool) -> i64 {
 }
 
 /// `MatrixPrint(stdout, m)`.
-fn print_matrix(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write, m: Option<&Matrix>) {
+pub(crate) fn print_matrix(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: Option<&Matrix>,
+) {
     let mut buf = Vec::new();
     matrix_print(g, Some(&mut buf), out, err, m, 5);
     let _ = out.write_all(&buf);
@@ -852,8 +857,11 @@ impl<'a> FsTagsIo<'a> {
         if self.fp.eof() {
             return 0;
         }
+        // a number cut by the end of the file is not used: no memory contents reach a result
+        let before = g.notices.clone();
         let tag = fio::znz_read_int(g, err, self.fp);
         if self.fp.eof() {
+            g.notices = before;
             return 0;
         }
         if self.niftiheaderext {

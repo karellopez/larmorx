@@ -209,3 +209,12 @@ SAX2's text and CDATA nodes, `xmlNodeListGetString`, `xmlDocGetRootElement`, the
 gives the same values; libxml2's error messages for texts that are not well formed are not reproduced
 (a line of larmorx's instead). FS-434 (both modes print nothing), FS-435 and FS-436 (corrected by
 default) are larmorx's choices.
+
+Changes in relay 24 of track A (2026-11-14): `utils::median`'s even mean in the official build's
+order (`(q2 + q) * 0.5f` through `sse`'s NaN rule: of two NaNs the second selection's; from the
+disassembly track D read and the open core probe's observed bits); `histo_alloc` and `histo_realloc`
+of a negative count set `errno` to ENOMEM as glibc's failing `calloc` does (FreeSurfer's message then
+starts `error: Cannot allocate memory`); FS-450 (`utils/numerics.cpp` 1225-1247 through
+`utils/matrix.cpp` 1779-1830: `MatrixSVD` and `MatrixSVDEigenValues` of a matrix without columns
+crash in VNL's LINPACK `ssvdc`): by default the empty decomposition, `reproduce` the program's end
+with status 139 (`docs/findings/freesurfer-maths.md`, "Relay 24").

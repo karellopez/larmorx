@@ -534,6 +534,9 @@ void set_env6(int bits)
 {
   if (bits & 1) setenv("FS_SKIP_TAGS", "1", 1);
   if (bits & 2) setenv("FS_MGZIO_USEVOXELBUFREAD", "1", 1);
+  // piece 15 (track A relay 25): niiRead's geometry check
+  if (bits & 4) setenv("TAG_RAS_XFORM_DEBUG", "1", 1);
+  if (bits & 8) setenv("VOL_GEOM_THRESH", "0.25", 1);
 }
 
 // piece 7: Bruker ParaVision studies
@@ -640,6 +643,8 @@ void run_piece12(const std::string &cmd);
 bool piece12_cmd(const std::string &cmd);
 void run_piece13(const std::string &cmd);
 bool piece13_cmd(const std::string &cmd);
+void run_piece14(const std::string &cmd);
+bool piece14_cmd(const std::string &cmd);
 
 void run_piece9(const std::string &cmd)
 {
@@ -758,6 +763,7 @@ void run_piece10(const std::string &cmd)
   if (piece11_cmd(cmd)) { run_piece11(cmd); return; }
   if (piece12_cmd(cmd)) { run_piece12(cmd); return; }
   if (piece13_cmd(cmd)) { run_piece13(cmd); return; }
+  if (piece14_cmd(cmd)) { run_piece14(cmd); return; }
   if (cmd == "cra") {
     int check = (int)geti();
     setup(next());
@@ -1269,7 +1275,32 @@ std::string gii_normal12(const std::string &f)
   }
   return r;
 }
-// every file under w: its name and its bytes (a .gii file, in any case, normalised), FNV-1a 64 beyond 256 bytes
+// a gzip stream (an .mgz: zlib 1.2.11's compressed bytes here, zlib-rs's in the port; the stream
+// they inflate to is the same): `gz:` and the inflated bytes when it inflates whole to its end
+// (track A relay 23), else the bytes as they are
+std::string gz_normal14(const std::string &s)
+{
+  if (s.size() < 2 || (unsigned char)s[0] != 0x1f || (unsigned char)s[1] != 0x8b) return s;
+  std::string inf;
+  z_stream zs;
+  memset(&zs, 0, sizeof zs);
+  if (inflateInit2(&zs, 15 + 16) != Z_OK) return s;
+  zs.next_in = (Bytef *)s.data();
+  zs.avail_in = (uInt)s.size();
+  unsigned char buf[4096];
+  int ret;
+  do {
+    zs.next_out = buf;
+    zs.avail_out = sizeof buf;
+    ret = inflate(&zs, Z_NO_FLUSH);
+    inf.append((char *)buf, sizeof buf - zs.avail_out);
+  } while (ret == Z_OK);
+  bool ok = ret == Z_STREAM_END && zs.avail_in == 0;
+  inflateEnd(&zs);
+  return ok ? "gz:" + inf : s;
+}
+// every file under w: its name and its bytes (a .gii file, in any case, normalised; a gzip stream
+// inflated), FNV-1a 64 beyond 256 bytes
 void odir12()
 {
   walked11.clear();
@@ -1280,6 +1311,7 @@ void odir12()
     std::vector<unsigned char> b = read_file(f);
     std::string s(b.begin(), b.end());
     if (f.size() > 4 && strcasecmp(f.c_str() + f.size() - 4, ".gii") == 0) s = gii_normal12(s);
+    s = gz_normal14(s);
     std::vector<unsigned char> c(s.begin(), s.end());
     if (c.size() <= 256) obytes(c);
     else fnv_bytes(c.data(), c.size());
@@ -1323,7 +1355,8 @@ void run_piece12(const std::string &cmd)
     errno = 0;
     MRI *m = mri_read(name.c_str(), type, vf, -1, -1, NULL);
     print_mri6(m);
-    print_ct10(m ? m->ct : NULL, false, false);
+    // the entries' tissue type and count are never written (memory contents): left out
+    print_ct10(m ? m->ct : NULL, true, false);
     oi(errno);
   } else if (cmd == "mwr") {
     Gdiag = strtoull(next(), NULL, 16);
@@ -1415,6 +1448,121 @@ void run_piece13(const std::string &cmd)
   oi(Gerror);
 }
 
+// piece 14 (track A relay 23): mghWrite and MRITAGwrite, directly or through MRIwrite
+bool piece14_cmd(const std::string &cmd) { return cmd == "mgw"; }
+
+// a volume with every field the MGH writer writes: <w> <h> <d> <type> <frames> <alloc 1 voxels|0
+// header>, the 15 geometry floats, <ras_good_flag>, tr te ti fov (floats), flip (double), the
+// field strength (float), dof, the buffer's bytes (`-`: zeros) copied in, the transform's name,
+// the phase-encoding direction (N: none), <ncmds> and the command lines, the first frame's label and
+// threshold, the auto-align and original ras2vox matrices (read_rmat), <warpFieldFormat> and, unless
+// -1, the spacing, the exponent (double), the image and atlas geometries (read_vg), the affine
+// (read_rmat) and <labels 0|1> (c*7+r*3+k), <ct 0|1> and a piece-10 table, <bvals: -1 or n> and n
+// b-values, n x 3 vectors and the space
+MRI *read_mri14()
+{
+  int w = (int)geti(), h = (int)geti(), d = (int)geti(), t = (int)geti(), nf = (int)geti();
+  int alloc = (int)geti();
+  MRI *m = alloc ? MRIallocSequence(w, h, d, t, nf) : MRIallocHeader(w, h, d, t, nf);
+  m->xsize = getf(); m->ysize = getf(); m->zsize = getf();
+  m->x_r = getf(); m->x_a = getf(); m->x_s = getf();
+  m->y_r = getf(); m->y_a = getf(); m->y_s = getf();
+  m->z_r = getf(); m->z_a = getf(); m->z_s = getf();
+  m->c_r = getf(); m->c_a = getf(); m->c_s = getf();
+  m->ras_good_flag = (int)geti();
+  m->tr = getf(); m->te = getf(); m->ti = getf(); m->fov = getf();
+  m->flip_angle = getd();
+  m->FieldStrength = getf();
+  m->dof = (int)geti();
+  std::vector<unsigned char> b = unhex(next());
+  if (m->chunk && m->ischunked) memcpy(m->chunk, b.data(), std::min((size_t)b.size(), (size_t)m->bytes_total));
+  bool n;
+  std::string tf = getstr(&n);
+  if (!n) snprintf(m->transform_fname, sizeof m->transform_fname, "%s", tf.c_str());
+  std::string pe = getstr(&n);
+  if (!n) m->pedir = strdup(pe.c_str());
+  int nc = (int)geti();
+  for (int i = 0; i < nc; i++) m->cmdlines[i] = strdup(getstr(&n).c_str());
+  m->ncmds = nc;
+  int label = (int)geti();
+  float thresh = getf();
+  if (m->nframes > 0) { m->frames[0].label = label; m->frames[0].thresh = thresh; }
+  m->AutoAlign = read_rmat();
+  m->origRas2Vox = read_rmat();
+  m->warpFieldFormat = (int)geti();
+  if (m->warpFieldFormat != WarpfieldDTFMT::WARPFIELD_DTFMT_UNKNOWN) {
+    m->gcamorphSpacing = (int)geti();
+    m->gcamorphExp_k = getd();
+    read_vg(m->gcamorph_image_vg);
+    read_vg(m->gcamorph_atlas_vg);
+    m->gcamorphAffine = read_rmat();
+    if (geti()) {
+      m->initGCAMorphLabel();
+      for (int c = 0; c < m->width; c++)
+        for (int r = 0; r < m->height; r++)
+          for (int k = 0; k < m->depth; k++) m->gcamorphLabel[c][r][k] = c * 7 + r * 3 + k;
+    }
+  }
+  if (geti()) m->ct = read_ct10();
+  int nb = (int)geti();
+  if (nb >= 0) {
+    m->bvals = MatrixAlloc(nb, 1, MATRIX_REAL);
+    for (int i = 1; i <= nb; i++) m->bvals->rptr[i][1] = getf();
+    m->bvecs = MatrixAlloc(nb, 3, MATRIX_REAL);
+    for (int i = 1; i <= nb; i++)
+      for (int c = 1; c <= 3; c++) m->bvecs->rptr[i][c] = getf();
+    m->bvec_space = (int)geti();
+  }
+  return m;
+}
+// mgw <Gdiag> <setup> <env bits: 1 FS_MGZIO_USEVOXELBUFWRITE> <0 mghWrite|1 MRIwrite|2 MRIwriteType
+// as NIFTI1_FILE (relay 24: nifti1Write)> <volume
+// (read_mri14)> <frame> <intent> <name> <read back 0|1>: the status, errno, the volume's intent,
+// version and voxels after the write (FNV-1a 64), the files under w (an .mgz inflated); then, when
+// asked, mghRead of the name with its voxels (piece 6's printing)
+void run_piece14(const std::string &cmd)
+{
+  fwide(stderr, -1);
+  if (cmd == "mgw") {
+    Gdiag = strtoull(next(), NULL, 16);
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "T", 1);
+    setenv("SURFER_SIDEDOOR", "1", 1);  // FreeSurfer's licence check skipped (the port needs no key)
+    setup(next());
+    int bits = (int)geti();
+    if (bits & 1) setenv("FS_MGZIO_USEVOXELBUFWRITE", "1", 1);
+    int how = (int)geti();
+    MRI *m = read_mri14();
+    int frame = (int)geti(), intent = (int)geti();
+    std::string fn = name10();
+    int back = (int)geti();
+    errno = 0;
+    int r = how == 2 ? MRIwriteType(m, fn.c_str(), NIFTI1_FILE, intent)
+            : how ? MRIwrite(m, fn.c_str(), NULL, intent) : mghWrite(m, fn.c_str(), frame, intent);
+    fflush(NULL);  // a stream left open (FS-439) as the program's end would leave it
+    oi(r);
+    oi(errno);
+    oi(m->intent);
+    oi(m->version);
+    if (!m->chunk || !m->ischunked) out += "nochunk ";
+    else fnv_bytes((const unsigned char *)m->chunk, m->bytes_total);
+    odir12();
+    if (back) {
+      unsetenv("FS_MGZIO_USEVOXELBUFWRITE");
+      errno = 0;
+      // the reader of the write (relay 25): mghRead after mghWrite, mri_read of the name's type after
+      // MRIwrite, the NIfTI-1 pair's reader after MRIwriteType(NIFTI1_FILE)
+      MRI *b = how == 0 ? mghRead(fn.c_str(), 1, -1)
+               : mri_read(fn.c_str(), how == 2 ? NIFTI1_FILE : MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1, NULL);
+      fflush(stdout);
+      print_mri6(b);
+      oi(errno);
+    }
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
 bool piece10_cmd(const std::string &cmd)
 {
   static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme",
@@ -1426,7 +1574,8 @@ bool piece10_cmd(const std::string &cmd)
 
 void run_piece8(const std::string &cmd)
 {
-  if (cmd == "apa" || piece10_cmd(cmd) || piece11_cmd(cmd) || piece12_cmd(cmd) || piece13_cmd(cmd)) {
+  if (cmd == "apa" || piece10_cmd(cmd) || piece11_cmd(cmd) || piece12_cmd(cmd) || piece13_cmd(cmd) ||
+      piece14_cmd(cmd)) {
     run_piece9(cmd);
     return;
   }
@@ -1562,8 +1711,13 @@ void run_piece7(const std::string &cmd)
   }
 }
 
-void run_piece6(const std::string &cmd)
+void run_piece6(const std::string &cmd0)
 {
+  // piece 15 (track A relay 25): nrd and nrh read NIfTI files (.nii, .nii.gz, .hdr/.img pairs) as
+  // mrd and mrh do, after a Gdiag_no (niiRead's and niiPrintHdr's prints when above 0)
+  const bool nifti = cmd0 == "nrd" || cmd0 == "nrh";
+  const std::string cmd = cmd0 == "nrd" ? "mrd" : cmd0 == "nrh" ? "mrh" : cmd0;
+  if (nifti) Gdiag_no = (int)geti();
   char cwd[4096];
   if (getcwd(cwd, sizeof cwd)) fixpfx = std::string(cwd) + "/";
   // standard error byte-oriented, as in a program that has written to it: glibc's perror then
@@ -2507,7 +2661,7 @@ int main(int argc, char *argv[])
     }
     // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
     {
-      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr"};
+      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

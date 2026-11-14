@@ -7,8 +7,8 @@
 //! 1,200 cases (`fs_io13/piece13.rs`, every case portable), recorded by
 //! `validation/probes/fs-io/check.py --package larmorx-freesurfer-volume --example fs_io13_probe
 //! --seed 1 --n 1200 --portable --light` on Linux x64 from the unit oracle's build (2026-11-14,
-//! track A relay 22: 1,200 cases, 1,145 lines identical; 55 hashed as `SKIP`: writers not ported
-//! yet, FS-429), against the port's output with `reproduce` (lines the port marks `SKIP` or `VARY`
+//! track A relay 23, with the MGH writer and written `.mgz` files compared inflated: 1,200 cases,
+//! 1,174 lines identical; 26 hashed as `SKIP`: FS-429), against the port's output with `reproduce` (lines the port marks `SKIP` or `VARY`
 //! hashed as `SKIP`). When the hash differs, the assertion names the first case whose output
 //! differs from the recorded per-case digests (`fs_io13/official_digests.txt`, recorded on Linux
 //! x64 by the ignored test below):
@@ -23,8 +23,8 @@ mod piece13;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "f8f83b35b2bdfbe962ddea7d132141f2a229b5346bc3cc87ae8658e5f410467a";
-const SKIPPED: usize = 55;
+const OFFICIAL_SHA256: &str = "3dbe8afd4ef9c25dade8780e7e81f7ace3e8c9a778c1a9de5fd366387bd83251";
+const SKIPPED: usize = 26;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io13/official_digests.txt");

@@ -833,3 +833,40 @@ GLIBC-07 in both modes wherever the two choices give another value on an argumen
 `HISTOrobustGaussianFit` (`exp`), `HISTOgetEntropy` (`log`), `PDFgaussian` (`log`). Measured: seed 7,
 15,400 cases: `reproduce` identical on 15,064, 0 different; `fix` differs without a notice on none
 (the 3 `mrot` lines carry GLIBC-07); the recorded seed-1 hash unchanged (fba798ad...).
+
+## Relay 24 (track A, 2026-11-14): `median`'s order, `HISTOalloc`'s `errno`, FS-450
+
+- **`median` (utils.cpp 1462-1479), the even mean** (from track D's disassembly of the unit oracle's
+  `utils.cpp.o`, `median` +0x41..0x4c): `return 0.5 * (q + q2);` is compiled to `addss` of `q` into
+  the register holding `q2` and `mulss` by `0.5f`: GCC folds the `double` product and its narrowing
+  (exact for every float), and the sum's destination is `q2`. Of two NaNs the result is `q2`'s,
+  quieted (SSE's rule). The port computed `(0.5 * f64::from(q + q2)) as f32`, whose NaN came from
+  either operand depending on the build (debug and release differed on 5 of track D's seed-13 cases).
+  Now `sse::mul(sse::add(q2, q), 0.5)`. Observed with the open core probe (`median` of
+  `7fc00001 7fc00002` gives `7fc00002`; of `7fc00002 7f800001`, `7fc00001`; of `7f800000 ff800000`,
+  the default NaN `ffc00000`): the unit test `order_statistics_and_fs09` holds these six lines.
+- **`HISTOalloc` and `HISTOrealloc` of a negative count** (histo.cpp 95-130): `calloc(nbins, 4)` with
+  the count converted to `size_t` overflows; glibc's `calloc` then sets `errno` to `ENOMEM`, and
+  `ErrorExit` prints `strerror(errno)` first. Observed (open maths probe): `halloc -7` and
+  `hrealloc <H> -3` end with status 254 and `error: Cannot allocate memory` before
+  `error: HISTOalloc(-7): could not allocate histogram` (the NUL byte of FS-01 after it). The port set
+  no `errno` (track C found it through `HISTOseg`, whose port set it before the call meanwhile). Not a
+  defect: the port's omission, corrected.
+- **FS-450: the SVD of a matrix without columns** (class a, crash; rule A by default). `OpenSvdcmp`
+  (numerics.cpp 1225) passes a `rows x 0` matrix (`rows >= cols` holds for any row count) to
+  `vnl_svd<float>`; its `assert(n_ > 0)` is compiled out (ITK's release build), and LINPACK's `ssvdc`
+  with `p = 0` sets `m = min(p, n + 1) = 0` and writes `e(m) = 0`, one float before the work vector
+  `espace`, whose storage is `NULL` for a size of 0: a write near address 0, signal 11. Reached from
+  `MatrixSVD` (matrix.cpp 1779: no check) and `MatrixSVDEigenValues` (1792: none); the other
+  callers (`MatrixSVDInverse`, `MatrixSingular`, `MatrixConditionNumber`, `MatrixSVDPseudoInverse`)
+  return before the call for such a matrix (`MatrixIsZero` holds for a matrix without elements);
+  `MatrixColNullSpace` (4545, not ported) would crash for 0 x 0 only. Observed (open maths probe):
+  `msvd` of 0 x 0, 1 x 0, 2 x 0 and 3 x 0 matrices (new and given `V`), `msvdvalues` of 0 x 0, 1 x 0
+  and 3 x 0: `CRASH 11` every time. The decomposition of an empty matrix is well defined (nothing to
+  write), so the default (rule A) gives it: `MatrixSVD` returns its `V` (0 x 0 when new; a given one
+  must be 0 x 0, FS-28), `MatrixSVDEigenValues` clears the `rows` values and returns `1e8` as for a
+  matrix of zeros (no out-of-range read of the vector of no values); `reproduce` ends the program
+  with status 139 (128 + 11), FS-450 noted in both modes. fMRIPrep impact: none (FreeSurfer's
+  programs decompose matrices with at least one column: design matrices, 4 x 4 transforms,
+  coordinate sets). Also seen on the same probe: `mpinverse` of a 0 x 0 matrix crashes too; its path
+  is `MatrixInverse`'s `OpenLUMatrixInverse` of 0 x 0 (FS-33, memory it does not own), not the SVD.

@@ -158,10 +158,65 @@ fn abs_of_an_infinite_range_fs50() {
             );
         } else {
             assert!(
-                text.contains("HISTOalloc(-2147483648): could not allocate histogram"),
+                text.starts_with(
+                    "error: Cannot allocate memory\nerror: HISTOalloc(-2147483648): could not allocate histogram"
+                ),
                 "{text}"
             );
         }
+    }
+}
+
+#[test]
+fn negative_counts_fail_with_enomem() {
+    // The official messages (the open maths probe's `halloc -7` and `hrealloc <H> -3`, observed
+    // 2026-11-14): the C library's ENOMEM text first, the program's end with status 254.
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        // FS-01: the message's NUL byte only with reproduce.
+        let nul: &[u8] = if mode == UpstreamDefects::Reproduce {
+            b"\0\n"
+        } else {
+            b"\n"
+        };
+        let mut gm = g(mode);
+        let mut err = Vec::new();
+        let r = histo_alloc(&mut gm, &mut err, -7);
+        assert_eq!(r.err().map(Fatal::status), Some(254));
+        assert_eq!(gm.errno, 12);
+        assert_eq!(
+            err,
+            [
+                &b"error: Cannot allocate memory\nerror: HISTOalloc(-7): could not allocate histogram"[..],
+                nul
+            ]
+            .concat()
+        );
+        let mut gm = g(mode);
+        let mut err = Vec::new();
+        let mut h = hist(&[0.0, 1.0], &[1.0, 1.0]);
+        let r = histo_realloc(&mut gm, &mut err, Some(&mut h), -3);
+        assert_eq!(r.err().map(Fatal::status), Some(254));
+        assert_eq!(
+            err,
+            [
+                &b"error: Cannot allocate memory\nerror: HISTOrealloc(-3): could not allocate histogram"[..],
+                nul
+            ]
+            .concat()
+        );
+        let mut gm = g(mode);
+        let mut err = Vec::new();
+        let r = histo_realloc(&mut gm, &mut err, None, -1);
+        assert!(r.is_err());
+        assert!(err.starts_with(b"error: Cannot allocate memory\nerror: HISTOalloc(-1)"));
+        // A count of 0 allocates (glibc's calloc of 0 bytes succeeds): no message.
+        let mut gm = g(mode);
+        let mut err = Vec::new();
+        assert_eq!(
+            histo_alloc(&mut gm, &mut err, 0).map(|h| h.nbins).ok(),
+            Some(0)
+        );
+        assert!(err.is_empty() && gm.errno == 0);
     }
 }
 

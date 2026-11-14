@@ -31,6 +31,10 @@ pub(crate) mod piece10;
 pub(crate) mod piece11;
 #[path = "piece12.rs"]
 pub(crate) mod piece12;
+#[path = "piece14.rs"]
+pub(crate) mod piece14;
+#[path = "piece15.rs"]
+pub(crate) mod piece15;
 #[path = "piece2.rs"]
 mod piece2;
 #[path = "piece3.rs"]
@@ -248,11 +252,12 @@ const FORMATS: [&str; 20] = [
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
 /// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-14, track A
-/// relay 21, with piece 12's four commands; first 2026-11-13, relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
+/// relay 24, with piece 14's NIfTI-1 pairs (2 cases: 4.7 of 5.6 s); relay 23, with piece 14's
+/// command and its NIfTI names (2 cases: 4.6 of 5.9 s); relay 21, with piece 12's four commands; first 2026-11-13, relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
 /// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
 /// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
 /// them.
-pub const HEAVY_SEED1: [usize; 2] = [1140, 1239];
+pub const HEAVY_SEED1: [usize; 1] = [2204];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]
@@ -290,6 +295,8 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece10::KINDS);
     kinds.extend(piece11::KINDS);
     kinds.extend(piece12::KINDS);
+    kinds.extend(piece14::KINDS);
+    kinds.extend(piece15::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -334,6 +341,14 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece12::KINDS.contains(&kind) {
             lines.push(piece12::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece14::KINDS.contains(&kind) {
+            lines.push(piece14::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece15::KINDS.contains(&kind) {
+            lines.push(piece15::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -770,6 +785,16 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece12::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
+        if piece14::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece14::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece15::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece15::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
         match t[0] {
             "rd" => {
                 g.gdiag_no = t[2].parse().unwrap();
@@ -1161,6 +1186,12 @@ pub(crate) fn run_line_with(
         Err(134) => "CRASH 6".to_owned(),
         Err(status) => format!("EXIT {status}"),
     };
+    // FSIO_DETAIL set: each notice's detail on standard error (a probe run's diagnosis)
+    if std::env::var_os("FSIO_DETAIL").is_some() {
+        for n in g.notices.as_slice() {
+            eprintln!("{}: {}", n.defect.id, n.detail);
+        }
+    }
     let mut ids: Vec<&'static str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
     for n in g.notices.as_slice() {
         let id = n.defect.id;
@@ -1182,9 +1213,15 @@ pub(crate) fn run_line_with(
         if skip {
             extra.push("SKIP");
         }
-        // piece 2: FreeSurfer's numbers or names from memory contents
-        let memory = piece2::KINDS.contains(&t[0]) && matches!(id, "FS-49" | "FS-167");
-        if memory || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187" | "FS-192") {
+        // piece 2: FreeSurfer's numbers or names from memory contents (FS-49 and FS-192 compared
+        // where `reproduce` gives the earlier numbers' bytes, as FreeSurfer's memory holds them)
+        let earlier = n.detail.ends_with("as in FreeSurfer");
+        let memory =
+            piece2::KINDS.contains(&t[0]) && (id == "FS-167" || (id == "FS-49" && !earlier));
+        if memory
+            || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187")
+            || (id == "FS-192" && !earlier)
+        {
             extra.push("VARY");
         }
     }

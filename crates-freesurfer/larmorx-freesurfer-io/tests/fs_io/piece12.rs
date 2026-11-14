@@ -731,7 +731,25 @@ fn gii_normal(f: &[u8]) -> Vec<u8> {
     r
 }
 
-/// Every file under `w`: its name and bytes (a `.gii` file, in any case, normalised), FNV-1a 64 beyond 256 bytes.
+/// A gzip stream (an `.mgz`: zlib-rs's compressed bytes here, zlib 1.2.11's in `fsio`; the stream
+/// they inflate to is the same): `gz:` and the inflated bytes when it inflates whole to its end
+/// (track A relay 23), else the bytes as they are.
+pub(crate) fn gz_normal(b: &[u8]) -> Vec<u8> {
+    if b.len() < 2 || b[0] != 0x1f || b[1] != 0x8b {
+        return b.to_vec();
+    }
+    let mut d = flate2::bufread::GzDecoder::new(b);
+    let mut inf = Vec::new();
+    if d.read_to_end(&mut inf).is_err() || !d.into_inner().is_empty() {
+        return b.to_vec();
+    }
+    let mut r = b"gz:".to_vec();
+    r.extend_from_slice(&inf);
+    r
+}
+
+/// Every file under `w`: its name and bytes (a `.gii` file, in any case, normalised; a gzip stream
+/// inflated), FNV-1a 64 beyond 256 bytes.
 pub(crate) fn odir(o: &mut Out, w: &Work) {
     fn walk(base: &Path, rel: &str, files: &mut Vec<String>) {
         let Ok(rd) = std::fs::read_dir(base.join(rel)) else {
@@ -756,6 +774,7 @@ pub(crate) fn odir(o: &mut Out, w: &Work) {
         if f.to_ascii_lowercase().ends_with(".gii") {
             b = gii_normal(&b);
         }
+        b = gz_normal(&b);
         if b.len() <= 256 {
             obytes(o, &b);
         } else {
@@ -888,7 +907,9 @@ fn answer(
             let m =
                 mriio::mri_read(g, out, err, &env, dir, &name, ty, vf, -1, -1).map_err(fatal)?;
             super::piece6::print_mri(o, w, m.as_ref());
-            print_table(o, m.as_ref().and_then(|m| m.ct.as_ref()), false, false);
+            // the GIFTI reader's entries' tissue type and count are never written by FreeSurfer
+            // (memory contents): left out, as for CTABalloc's
+            print_table(o, m.as_ref().and_then(|m| m.ct.as_ref()), true, false);
             o.i(i64::from(g.errno));
         }
         "hlp" => {
@@ -908,12 +929,30 @@ fn answer(
             setup(w, tk.next());
             let nv = tk.int();
             let usevec = tk.int() != 0;
-            let vs: Vec<Mri> = (0..nv).map(|_| read_volume(g, &mut tk)).collect();
+            let mut vs: Vec<Mri> = (0..nv).map(|_| read_volume(g, &mut tk)).collect();
             let name = tk.string();
             g.errno = 0;
-            let several = if usevec { Some(&vs[..]) } else { None };
-            let r = mriio::mri_write(g, out, err, &env, dir, &vs[0], &name, several, -1)
-                .map_err(fatal)?;
+            // FreeSurfer's first volume is the vector's first: with several, only the vector's are
+            // written (a copy stands for the first); with one, the first itself
+            let r = if usevec && vs.len() > 1 {
+                let (mut s1, mut s2) = (Vec::new(), Vec::new());
+                let mut first =
+                    mri::mri_alloc_header(g, &mut s1, &mut s2, 1, 1, 1, mri::MRI_UCHAR, 1).unwrap();
+                mriio::mri_write(
+                    g,
+                    out,
+                    err,
+                    &env,
+                    dir,
+                    &mut first,
+                    &name,
+                    Some(&mut vs[..]),
+                    -1,
+                )
+            } else {
+                mriio::mri_write(g, out, err, &env, dir, &mut vs[0], &name, None, -1)
+            }
+            .map_err(fatal)?;
             o.i(i64::from(r));
             o.i(i64::from(g.errno));
             odir(o, w);

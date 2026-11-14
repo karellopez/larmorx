@@ -1174,7 +1174,7 @@ defects! {
     FS_48 = "FS-48", "FreeSurfer", true,
         "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of a file keep, for the bytes they could not read, bytes of the number read before them (memory contents where none was read; freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with them";
+        "freadInt and freadDouble at the end of a file keep, for the bytes they could not read, bytes of the number read before them (memory contents where none was read just before; freadInt prints nothing): MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with them, and so do an old-style transform tag's length and a binary colour table's numbers cut by the end of the file";
     FS_50 = "FS-50", "FreeSurfer", true,
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,
@@ -1795,6 +1795,58 @@ defects! {
         "converting a label of a surface from voxel coordinates to tkregister (surface) RAS converts each point the other way, as a tkregister RAS point to a voxel: wrong coordinates";
     FS_438 = "FS-438", "FreeSurfer", true,
         "writing one frame of a volume to a file reports success when the file could not be written (an unknown format, a missing folder)";
+    FS_439 = "FS-439", "FreeSurfer", true,
+        "writing an MGH volume of a type the MGH writer does not handle (long, RGB, tensor, bitmap, double complex), or whose byte rows fail to write, ends with an error but leaves the file open: a compressed .mgz file stays empty and an uncompressed .mgh file holds only what was written before the error";
+    FS_440 = "FS-440", "FreeSurfer", true,
+        "writing an MGH volume reports success when the file could not be written in full (a full disk, a failed compression): only a byte volume's rows are checked";
+    FS_441 = "FS-441", "FreeSurfer", true,
+        "writing an MGH volume (or FreeSurfer's NIfTI header extension) of a volume without frames reads a first frame the volume does not have: memory contents decide whether a frames tag is written";
+    FS_442 = "FS-442", "FreeSurfer", true,
+        "writing one chosen frame of a volume of several frames to an MGH file writes the volume's whole frame count in the header: the file holds fewer frames than its header says and cannot be read back";
+    FS_443 = "FS-443", "FreeSurfer", true,
+        "writing an MGH volume with FS_MGZIO_USEVOXELBUFWRITE set leaves the volume's own voxels byte-swapped in memory: the program's volume is wrong after the write";
+    FS_444 = "FS-444", "FreeSurfer", true,
+        "writing one chosen frame that the volume does not have to an MGH file reads memory outside the volume";
+    FS_445 = "FS-445", "FreeSurfer", true,
+        "writing an MGH volume with FS_MGZIO_USEVOXELBUFWRITE set crashes for a volume without slices (a depth or a frame count of 0)";
+    FS_446 = "FS-446", "FreeSurfer", true,
+        "a volume made without voxels (a header read alone) leaves its contiguous-buffer flag unset (memory contents): writing it as an MGH file with FS_MGZIO_USEVOXELBUFWRITE set then crashes or not depending on memory";
+    FS_447 = "FS-447", "FreeSurfer", true,
+        "writing a volume of 64-bit integers (long) as NIfTI declares 32-bit integers and stores the first half of each row's bytes: wrong values";
+    FS_448 = "FS-448", "FreeSurfer", true,
+        "writing a NIfTI volume ignores the file's close: a compressed file whose last bytes could not be written (a full disk) is reported as written";
+    FS_449 = "FS-449", "FreeSurfer", true,
+        "writing a NIfTI volume of exactly 32,768 rows, slices or frames passes the size check and stores -32,768 in the header's 16-bit field: a header readers reject or misread";
+    FS_450 = "FS-450", "FreeSurfer", true,
+        "the singular value decomposition of a matrix without columns (MatrixSVD, MatrixSVDEigenValues; any row count) crashes";
+    FS_451 = "FS-451", "FreeSurfer", true,
+        "writing a NIfTI pair (.hdr and .img) under a name of 1,020 to 1,023 bytes without the .img or .hdr extension writes the files under names cut to 1,023 bytes, with a message (from 1,022 bytes the header and the image share one name and the header is lost), and under a name of 1,024 bytes or more the program aborts (buffer overflow detected)";
+    FS_452 = "FS-452", "FreeSurfer", true,
+        "writing a NIfTI pair (.hdr and .img) ignores both files' close: files whose last bytes could not be written (a full disk) are reported as written";
+    FS_453 = "FS-453", "FreeSurfer", true,
+        "reading a NIfTI pair (.hdr and .img) under a name of 1,020 to 1,023 bytes without the .img or .hdr extension opens files under names cut to 1,023 bytes, with a message";
+    FS_454 = "FS-454", "FreeSurfer", true,
+        "reading a scaled NIfTI volume of unsigned 32-bit values (a nonzero slope other than slope 1 with intercept 0) fails with 'error reading' unless the file holds the data twice, and then gives the second copy's values";
+    FS_455 = "FS-455", "FreeSurfer", true,
+        "reading an unscaled big-endian NIfTI volume of doubles swaps each value's two 4-byte halves separately instead of its 8 bytes: wrong values";
+    FS_456 = "FS-456", "FreeSurfer", true,
+        "reading an unscaled big-endian NIfTI volume of complex values leaves the values unswapped: wrong values";
+    FS_457 = "FS-457", "FreeSurfer", false,
+        "reading an unscaled NIfTI volume of unsigned 32-bit values gives an int volume: values above 2,147,483,647 become negative (kept: FreeSurfer's volume type)";
+    FS_458 = "FS-458", "FreeSurfer", true,
+        "reading a NIfTI volume of 1 or 2 dimensions, the header's extents past its number of dimensions are used as the volume's rows or slices instead of 1: an extent of 0 gives an empty volume, a larger one a read past the data";
+    FS_459 = "FS-459", "FreeSurfer", true,
+        "reading a big-endian NIfTI file never reads its header extensions, FreeSurfer's own included, and prints a warning that no valid extension was read";
+    FS_460 = "FS-460", "FreeSurfer", true,
+        "reading a NIfTI file whose first header extension is another program's does not find FreeSurfer's extension after it, and may take other bytes of the file for one";
+    FS_641 = "FS-641", "FreeSurfer", true,
+        "reading a NIfTI file that ends within 4 bytes after its 348-byte header decides from memory contents whether a header extension follows";
+    FS_642 = "FS-642", "FreeSurfer", true,
+        "printing a NIfTI header (debug output) prints its text fields as C strings: a field without a NUL byte runs on into the following fields, and past the header's end into memory";
+    FS_643 = "FS-643", "FreeSurfer", true,
+        "reading a big-endian NIfTI volume whose column count is not positive takes the columns from the header's glmin field without swapping its bytes: a wrong extent";
+    FS_644 = "FS-644", "FreeSurfer", true,
+        "reading a NIfTI pair (.hdr and .img) of the ico7 surface's shape (163,842 voxels) whose header gives 0 frames prints that the number of elements cannot change and then crashes";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

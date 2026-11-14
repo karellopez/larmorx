@@ -38,6 +38,7 @@ use crate::diag::{self, BUILD_ROOT};
 use crate::globals::Globals;
 use crate::log::{self, Fatal};
 use crate::run::Environment;
+use crate::sse;
 
 /// `STR_LEN` (`include/const.h`): FreeSurfer's usual string buffer.
 pub const STR_LEN: usize = 1024;
@@ -159,7 +160,8 @@ pub fn file_exists(dir: Option<&Path>, fname: &str) -> bool {
 /// A file name as a program in `dir` reads it.
 pub fn resolve(dir: Option<&Path>, fname: &str) -> PathBuf {
     match dir {
-        Some(d) if !Path::new(fname).is_absolute() => d.join(fname),
+        // an empty name stays empty: C's open("") fails (ENOENT), where the folder would open
+        Some(d) if !fname.is_empty() && !Path::new(fname).is_absolute() => d.join(fname),
         _ => PathBuf::from(fname),
     }
 }
@@ -595,6 +597,11 @@ pub fn quick_select(g: &mut Globals, arr: &mut [f32], k: usize) -> f32 {
 
 /// `median(t, n)`: `kth_smallest` of the middle for an odd count, the mean (in `float`) of two
 /// `quick_select`s for an even one; reorders `t` (FS-09).
+///
+/// The official build computes the mean as `(q2 + q) * 0.5f` in single precision (GCC folds the
+/// `double` half, exact for every `float`), the second selection in the destination: of two NaNs
+/// the second's is passed on (SSE's rule, `sse::add`), on every platform and in debug and release
+/// builds alike.
 pub fn median(g: &mut Globals, t: &mut [f32]) -> f32 {
     let n = t.len();
     if n % 2 == 1 {
@@ -602,7 +609,7 @@ pub fn median(g: &mut Globals, t: &mut [f32]) -> f32 {
     }
     let q = quick_select(g, t, n / 2);
     let q2 = quick_select(g, t, n / 2 + 1);
-    (0.5f64 * f64::from(q + q2)) as f32
+    sse::mul(sse::add(q2, q), 0.5)
 }
 
 // ---- the fast arctangent -----------------------------------------------------------------
@@ -1270,6 +1277,23 @@ mod tests {
         // NaNs stop the scans instead of running past the list.
         let mut a = [f32::NAN, 1.0, 3.0, f32::NAN, 2.0, 0.0];
         let _ = median(&mut gl, &mut a);
+        // The even mean's NaN bits as the official build gives them (the open core probe's
+        // `median`, observed 2026-11-14): of two NaNs the second selection's, quieted; the
+        // default NaN (sign set) for inf + -inf.
+        for (list, want) in [
+            (&[0x7fc0_0001u32, 0x7fc0_0002][..], 0x7fc0_0002u32),
+            (&[0x7f80_0001, 0x7fc0_0002], 0x7fc0_0002),
+            (&[0x7fc0_0002, 0x7f80_0001], 0x7fc0_0001),
+            (
+                &[0xffc0_0005, 0x7fa0_0003, 0x3f80_0000, 0x4000_0000],
+                0xffc0_0005,
+            ),
+            (&[0x3f80_0000, 0x4000_0000], 0x3fc0_0000),
+            (&[0x7f80_0000, 0xff80_0000], 0xffc0_0000),
+        ] {
+            let mut a: Vec<f32> = list.iter().map(|&b| f32::from_bits(b)).collect();
+            assert_eq!(median(&mut gl, &mut a).to_bits(), want, "{list:x?}");
+        }
     }
 
     #[test]

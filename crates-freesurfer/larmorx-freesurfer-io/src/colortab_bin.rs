@@ -42,17 +42,36 @@ const NOTE_LENGTH: i64 = 1 << 24;
 /// `STRLEN - 1`: the longest name a table keeps.
 const NAME_MAX: usize = 1023;
 
-/// The stream a reader reads from.
+/// The stream a reader reads from; on a C stream with the memory `freadInt` reads into
+/// (FS-49: the official build inlines both versions' readers into `CTABreadFromBinary`, so every
+/// `freadInt` of a read uses the same memory; a number the file cuts keeps the bytes the one
+/// before it left, unless FreeSurfer called another function between them).
 pub enum In<'a> {
-    File(&'a mut CFile),
+    File(&'a mut CFile, fio::Slot49),
     Znz(&'a mut ZnzFile),
 }
 
 impl In<'_> {
     fn int(&mut self, g: &mut Globals, err: &mut dyn Write) -> i32 {
         match self {
-            In::File(fp) => fio::fread_int(g, fp),
+            In::File(fp, slot) => fio::fread_int_in(g, fp, slot),
             In::Znz(fp) => fio::znz_read_int(g, err, fp),
+        }
+    }
+
+    /// FreeSurfer calls another function here (an allocation, a read, a copy, a print): the
+    /// memory `freadInt` reads into is unknown again.
+    fn clobber(&mut self) {
+        if let In::File(_, slot) = self {
+            slot.clobber();
+        }
+    }
+
+    /// Whether a number the file cut took memory contents (always on a znzlib file: FS-167).
+    fn took_memory(&self) -> bool {
+        match self {
+            In::File(_, slot) => slot.took_memory(),
+            In::Znz(_) => true,
         }
     }
 
@@ -83,7 +102,7 @@ impl In<'_> {
             return 0;
         }
         match self {
-            In::File(fp) => fp.fread(b, 1, b.len()),
+            In::File(fp, _) => fp.fread(b, 1, b.len()),
             In::Znz(fp) => {
                 let before = fp.tell();
                 let r = fio::fs_znzread(fp, b, 1, b.len());
@@ -99,7 +118,7 @@ impl In<'_> {
 
     fn eof(&self) -> bool {
         match self {
-            In::File(fp) => fp.feof(),
+            In::File(fp, _) => fp.feof(),
             In::Znz(fp) => fp.eof(),
         }
     }
@@ -195,6 +214,8 @@ fn read_name(
     };
     let mut buf = vec![0u8; (want as usize).min(NAME_MAX + 1)];
     let got = fp.bytes(&mut buf, want);
+    // malloc, fread, strncpy (and free) in FreeSurfer
+    fp.clobber();
     if !fp.znz() && got != want {
         log::error_printf(
             g,
@@ -266,10 +287,17 @@ fn ended(
         return Some(ct);
     }
     if g.notices.reproduce() {
-        g.notices.add(
-            &FS_192,
-            format!("{who}: the file ends inside the table: its missing numbers read as 0 (memory contents in FreeSurfer)"),
-        );
+        if fp.took_memory() {
+            g.notices.add(
+                &FS_192,
+                format!("{who}: the file ends inside the table: its missing numbers read as 0 (memory contents in FreeSurfer)"),
+            );
+        } else {
+            g.notices.add(
+                &FS_192,
+                format!("{who}: the file ends inside the table: its missing numbers are the earlier numbers' bytes, as in FreeSurfer"),
+            );
+        }
         Some(ct)
     } else {
         g.notices.add(
@@ -335,6 +363,7 @@ fn read_v1(
         return None;
     }
     let mut ct = table(g, err, 1, nentries)?;
+    fp.clobber();
     let len = fp.int(g, err);
     if len < 0 {
         log::error_printf(
@@ -347,6 +376,8 @@ fn read_v1(
     }
     ct.fname = read_name(g, err, fp, W, len, Copy::StrncpyTable);
     for structure in 0..nentries {
+        // the entry's malloc
+        fp.clobber();
         let len = fp.int(g, err);
         if len < 0 {
             log::error_printf(
@@ -397,6 +428,7 @@ fn read_v2(
         return None;
     }
     let mut ct = table(g, err, 2, nentries)?;
+    fp.clobber();
     let len = fp.int(g, err);
     if len < 0 {
         log::error_printf(
@@ -430,6 +462,7 @@ fn read_v2(
             out,
             "[INFO] CTABreadFromBinaryV2(): ct->nentries={nentries}, num_entries_to_read={num}"
         );
+        fp.clobber();
     }
     for _ in 0..num.max(0) {
         let structure = fp.int(g, err);
@@ -466,6 +499,8 @@ fn read_v2(
             );
             return None;
         }
+        // the entry's malloc
+        fp.clobber();
         let len = fp.int(g, err);
         if len < 0 {
             log::error_printf(
@@ -517,7 +552,7 @@ pub fn ctab_read_from_binary(
         log::error_printf(g, err, ERROR_BADPARM, "CTABreadFromBinary: fp was NULL");
         return None;
     };
-    read_any(g, out, err, In::File(fp))
+    read_any(g, out, err, In::File(fp, fio::Slot49::new()))
 }
 
 /// `znzCTABreadFromBinary(fp)`: as [`ctab_read_from_binary`] on a znzlib file (the second version

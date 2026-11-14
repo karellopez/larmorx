@@ -137,6 +137,20 @@ impl CFile {
         start + self.read_raw(&mut buf[start..])
     }
 
+    /// The bytes left to read (`None`: the standard input).
+    fn remaining(&mut self) -> Option<u64> {
+        let pushed = u64::from(self.push.is_some());
+        match &mut self.src {
+            Src::File(f) => {
+                let len = f.get_ref().metadata().ok()?.len();
+                let pos = f.stream_position().ok()?;
+                Some(len.saturating_sub(pos) + pushed)
+            }
+            Src::Stdin(_) => None,
+            Src::Empty => Some(pushed),
+        }
+    }
+
     /// `fseek(file, off, SEEK_END) == 0`.
     fn seek_end(&mut self, off: i64) -> bool {
         self.push = None;
@@ -811,12 +825,12 @@ impl Reader<'_> {
 
     /// `_nrrdCheck(nrrd, AIR_FALSE, AIR_TRUE)`.
     fn check(&mut self) -> R<()> {
-        for fi in 1..=field::MAX_FIELD {
+        for (fi, name) in FIELD_STR.iter().enumerate().skip(1) {
             if self.field_check(fi).is_err() {
                 if self.exit.is_some() {
                     return Err(());
                 }
-                let m = format!("_nrrdCheck: trouble with {} field", FIELD_STR[fi]);
+                let m = format!("_nrrdCheck: trouble with {name} field");
                 return self.fail(b(&m));
             }
         }
@@ -922,6 +936,15 @@ impl Reader<'_> {
             }
         }
         if Self::parse_str_d(&info, FIELD_SEP, dim + 1).len() == dim + 1 {
+            if dim == NRRD_DIM_MAX {
+                self.notices.add(
+                    &d::FS_765,
+                    format!(
+                        "a 17th value of {plural} was parsed for a 16-dimensional array (NrrdIO \
+                         writes it past its array of 16)"
+                    ),
+                );
+            }
             let m = format!("{me}: seem to have more than expected {dim} {plural}");
             return self.fail(b(&m));
         }
@@ -1479,9 +1502,8 @@ impl Reader<'_> {
                 for dd in 0..sd {
                     match self.space_vector(&info[at..], sd) {
                         Ok((v, used)) => {
-                            for ii in 0..NRRD_SPACE_DIM_MAX {
-                                self.nrrd.measurement_frame[dd][ii] =
-                                    if ii < sd { v[ii] } else { air_nan() };
+                            for (ii, x) in self.nrrd.measurement_frame[dd].iter_mut().enumerate() {
+                                *x = if ii < sd { v[ii] } else { air_nan() };
                             }
                             at += used;
                         }
@@ -1743,7 +1765,8 @@ impl Reader<'_> {
             self.nio.data_fn_index = num as i32;
             return Ok(None);
         }
-        let need_path = |s: &[u8]| s.first() != Some(&b'/') && s != b"-";
+        let wfix = cfg!(windows) && self.notices.fix();
+        let need_path = |s: &[u8]| need_path(s, wfix);
         let needed = match &self.nio.data_fn_format {
             Some(f) => need_path(f),
             None => self.nio.data_fn.iter().any(|n| need_path(n)),
@@ -1945,12 +1968,36 @@ impl Reader<'_> {
         Ok(())
     }
 
-    /// The encoding's `read`: `n` elements into `data`.
-    fn read_data(&mut self, file: &mut CFile, data: &mut [u8], n: usize) -> R<()> {
+    /// The encoding's `read`: `n` elements appended to `data` (NrrdIO reads them into its
+    /// cleared array; growing the array with the data read keeps the memory to what the file
+    /// holds, the values the same).
+    fn read_data(&mut self, file: &mut CFile, data: &mut Vec<u8>, n: usize) -> R<()> {
         let esize = self.nrrd.element_size();
+        let want = n * esize;
+        let bound = file.remaining().map(|r| {
+            let r = usize::try_from(r).unwrap_or(usize::MAX);
+            match self.nio.encoding {
+                Encoding::Raw => r,
+                Encoding::Hex => r / 2,
+                Encoding::Ascii => r.saturating_mul(esize),
+                _ => 0,
+            }
+        });
+        let reserve = bound.map_or(want, |b| want.min(b));
+        if data.try_reserve_exact(reserve).is_err() {
+            let m = format!(
+                "_nrrdCalloc: couldn't allocate {} things of size {esize}",
+                self.nrrd.element_number()
+            );
+            return self.fail(b(&m));
+        }
         match self.nio.encoding {
             Encoding::Raw => {
-                let got = file.fread(&mut data[..n * esize]) / esize;
+                let start = data.len();
+                data.resize(start + reserve, 0);
+                let got_bytes = file.fread(&mut data[start..]);
+                data.truncate(start + got_bytes);
+                let got = got_bytes / esize;
                 if got != n {
                     let pct = 100.0 * got as f64 / n as f64;
                     let m = format!(
@@ -2002,7 +2049,7 @@ impl Reader<'_> {
     }
 
     /// `_nrrdEncodingAscii_read`.
-    fn read_ascii(&mut self, file: &mut CFile, data: &mut [u8], n: usize) -> R<()> {
+    fn read_ascii(&mut self, file: &mut CFile, data: &mut Vec<u8>, n: usize) -> R<()> {
         let me = "_nrrdEncodingAscii_read";
         let t = self.nrrd.type_;
         if t == types::BLOCK {
@@ -2025,7 +2072,8 @@ impl Reader<'_> {
                     ),
                 );
             }
-            let at = &mut data[i * esize..(i + 1) * esize];
+            let mut el = [0u8; 8];
+            let at = &mut el[..esize];
             let ok = if t >= types::INT {
                 match t {
                     types::INT => {
@@ -2077,18 +2125,19 @@ impl Reader<'_> {
                 );
                 return self.fail(m);
             }
+            data.extend_from_slice(&el[..esize]);
         }
         Ok(())
     }
 
     /// `_nrrdEncodingHex_read`.
-    fn read_hex(&mut self, file: &mut CFile, data: &mut [u8], n: usize) -> R<()> {
+    fn read_hex(&mut self, file: &mut CFile, data: &mut Vec<u8>, n: usize) -> R<()> {
         let me = "_nrrdEncodingHex_read";
         let esize = self.nrrd.element_size();
         let nib_num = 2 * n * esize;
         let mut nib_idx = 0usize;
         let mut car = 0i32;
-        let mut at = 0usize;
+        let mut byte = 0u8;
         while nib_idx < nib_num {
             car = file.getc();
             if car == EOF {
@@ -2117,8 +2166,11 @@ impl Reader<'_> {
             if nib == -1 {
                 continue;
             }
-            data[at] = data[at].wrapping_add((nib << (4 * (1 - (nib_idx & 1)))) as u8);
-            at += nib_idx & 1;
+            byte = byte.wrapping_add((nib << (4 * (1 - (nib_idx & 1)))) as u8);
+            if nib_idx & 1 == 1 {
+                data.push(byte);
+                byte = 0;
+            }
             nib_idx += 1;
         }
         if nib_idx != nib_num {
@@ -2223,15 +2275,13 @@ impl Reader<'_> {
             self.add(b(&m));
             return self.fail(b(&format!("{me}: couldn't allocate memory for data")));
         };
-        let mut data = Vec::new();
-        if data.try_reserve_exact(total).is_err() {
+        if total > isize::MAX as usize {
             let m = format!("_nrrdCalloc: couldn't allocate {num} things of size {esize}");
             self.add(b(&m));
             return self.fail(b(&format!("{me}: couldn't allocate memory for data")));
         }
-        data.resize(total, 0u8);
+        let mut data: Vec<u8> = Vec::new();
         let vals_per_piece = num / self.nio.data_fn_number() as usize;
-        let mut offset = 0usize;
         let mut current = first;
         while let Some(df) = current {
             let mut own;
@@ -2248,14 +2298,9 @@ impl Reader<'_> {
             if !self.nio.encoding.is_compression() && self.byte_skip(f).is_err() {
                 return self.fail(b(&format!("{me}: couldn't skip bytes")));
             }
-            let end = offset + vals_per_piece * esize;
-            if self
-                .read_data(f, &mut data[offset..end], vals_per_piece)
-                .is_err()
-            {
+            if self.read_data(f, &mut data, vals_per_piece).is_err() {
                 return self.fail(b(&format!("{me}:")));
             }
-            offset = end;
             current = match self.data_file_next() {
                 Ok(f) => f,
                 Err(()) => {
@@ -2263,6 +2308,7 @@ impl Reader<'_> {
                 }
             };
         }
+        data.resize(total, 0);
         if self.nio.endian != 0
             && esize > 1
             && self.nio.encoding.endian_matters()
@@ -2389,11 +2435,30 @@ fn sscanf_ints(s: &[u8], max: usize) -> ([i64; 4], usize) {
 }
 
 /// `_nrrdSplitName(&path, NULL, name)`: the directory part (`.` when there is none).
-fn split_path(name: &[u8]) -> Vec<u8> {
-    match name.iter().rposition(|&c| c == b'/') {
+/// On Windows (FS-773 corrected) a backslash separates directories too.
+fn split_path(name: &[u8], windows_fix: bool) -> Vec<u8> {
+    match name
+        .iter()
+        .rposition(|&c| c == b'/' || (windows_fix && c == b'\\'))
+    {
         Some(w) if name.len() - w > 1 => name[..w].to_vec(),
         _ => b".".to_vec(),
     }
+}
+
+/// `_NEED_PATH(name)`: a data file name relative to the header (not `/...`, not `-`). On Windows
+/// (FS-773 corrected) `\\...` and a drive (`C:...`) are not relative either.
+fn need_path(s: &[u8], windows_fix: bool) -> bool {
+    if s.first() == Some(&b'/') || s == b"-" {
+        return false;
+    }
+    if windows_fix
+        && (s.first() == Some(&b'\\')
+            || (s.len() >= 2 && s[0].is_ascii_alphabetic() && s[1] == b':'))
+    {
+        return false;
+    }
+    true
 }
 
 /// `nrrdLoad(nrrd, filename, nio)` with a new nrrd and I/O state, as FreeSurfer calls it:
@@ -2414,7 +2479,19 @@ pub fn load_with(
         nrrd: Nrrd::default(),
         exit: None,
     };
-    r.nio.path = split_path(filename);
+    let wfix = cfg!(windows) && r.notices.fix();
+    r.nio.path = split_path(filename, wfix);
+    if cfg!(windows) && filename.contains(&b'\\') && split_path(filename, false) != r.nio.path {
+        r.notices.add(
+            &d::FS_773,
+            if wfix {
+                "the header's directory was taken up to its last backslash (NrrdIO separates \
+                 directories with / only)"
+            } else {
+                "the header's directory was taken up to its last / only"
+            },
+        );
+    }
     let mut file = match CFile::open(filename) {
         Ok(f) => f,
         Err(errno) => {

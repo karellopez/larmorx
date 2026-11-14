@@ -2284,7 +2284,7 @@ defects! {
     FS_764 = "FS-764", "NrrdIO", true,
         "the message for a space dimension beyond 8 shows the array's dimension instead of the space dimension";
     FS_765 = "FS-765", "NrrdIO", true,
-        "a sizes line with more than 16 values for a 16-dimensional array is parsed one value past the reader's array (memory beside it is written) before the read fails";
+        "a sizes, spacings, thicknesses, axis mins or axis maxs line with more than 16 values for a 16-dimensional array is parsed one value past the reader's array (memory beside it is written) before the read fails";
     FS_766 = "FS-766", "NrrdIO", true,
         "a data file name template (data file: name%03d.raw ...) holding a second conversion (another %d, %s) formats it from no argument, and one wider than ten digits writes past the name's buffer";
     FS_767 = "FS-767", "NrrdIO", true,
@@ -2299,6 +2299,8 @@ defects! {
         "a NRRD header that gives its data file before its dimension reads an axis far outside its array (the program crashes)";
     FS_772 = "FS-772", "NrrdIO", true,
         "the message for a data file list that fails its check shows the reader's line buffer at the field's offset: bytes of earlier header lines, or memory never written when the buffer grew";
+    FS_773 = "FS-773", "NrrdIO", true,
+        "on Windows a header name whose directories are separated by backslashes, and data file names that start with a drive or a backslash, are taken as relative to the current directory: detached data files are not found";
 }
 
 /// The register entry with ID `id`.

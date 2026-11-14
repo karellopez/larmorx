@@ -395,7 +395,12 @@ pub fn generate(r: &mut Rng, dir: &Path) -> Vec<u8> {
                 v.pop();
             }
             2 => v[0] = "0".into(),
-            3 => v[0] = num_int(r, sizes[0] as i64),
+            // never a size in the gigabytes: NrrdIO clears its whole array first, and whether that
+            // fails depends on the machine's memory (the port grows its array as it reads)
+            3 => {
+                let x = num_int(r, sizes[0] as i64);
+                v[0] = if x == "4294967297" { "abc".into() } else { x };
+            }
             _ => {}
         }
         fields.push(format!(

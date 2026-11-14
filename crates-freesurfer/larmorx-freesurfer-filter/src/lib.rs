@@ -15,6 +15,7 @@
 pub mod cc;
 pub mod classify;
 pub mod conv;
+pub mod diffuse;
 pub mod fastmarch;
 pub(crate) mod mem;
 pub mod sobel;

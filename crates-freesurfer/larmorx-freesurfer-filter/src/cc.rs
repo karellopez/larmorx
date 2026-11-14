@@ -75,9 +75,9 @@ fn grass_fire(
     let mut q = VecDeque::from([pt]);
     while let Some(c) = q.pop_front() {
         r.size += 1;
-        for k in 0..3 {
-            r.min[k] = r.min[k].min(c[k]);
-            r.max[k] = r.max[k].max(c[k]);
+        for (k, &ck) in c.iter().enumerate() {
+            r.min[k] = r.min[k].min(ck);
+            r.max[k] = r.max[k].max(ck);
         }
         for o in offs {
             let n = [c[0] + o[0], c[1] + o[1], c[2] + o[2]];

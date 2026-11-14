@@ -278,7 +278,7 @@ pub fn mri_border_classify_voxel(
     let mut pg = like(g, gmean)?;
     let ptotal = add(pg, pw);
     // !FZERO(ptotal): a NaN total divides too
-    if !(ptotal.abs() < f32::EPSILON) {
+    if ptotal.abs().partial_cmp(&f32::EPSILON) != Some(std::cmp::Ordering::Less) {
         pg = div(pg, ptotal);
     }
     pw = div(pw, ptotal);

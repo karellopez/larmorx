@@ -541,8 +541,8 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             match cmd {
                 "bcv" => {
                     t.push(g.pick(&[3, 5, 7, 11, 1, 0]).to_string());
-                    for k in 0..3 {
-                        t.push(g.int(0, i64::from(e[k]) - 1).to_string());
+                    for ek in e {
+                        t.push(g.int(0, i64::from(ek) - 1).to_string());
                     }
                 }
                 "rcl" => {
@@ -586,8 +586,8 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 .collect();
             t.extend(rle(&vals));
             t.push(g.pick(&[1, 3, 300, -1]).to_string());
-            for k in 0..3 {
-                t.push(g.int(0, i64::from(e[k]) - 1).to_string());
+            for ek in e {
+                t.push(g.int(0, i64::from(ek) - 1).to_string());
             }
         }
         _ => {

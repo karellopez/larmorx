@@ -293,17 +293,21 @@ fn dist_case(g: &mut Gen, t: &mut Vec<String>) {
     }
 }
 
-/// `n` case lines of `seed`: the distance maps' cases and each command of [`conv`] in turn.
+/// The distance maps' cases in each round of the generator (before each command of [`conv`]).
+const DIST_PER_ROUND: usize = 8;
+
+/// `n` case lines of `seed`: in each round, [`DIST_PER_ROUND`] distance maps' cases, then each
+/// command of [`conv`] once.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
-    let round = conv::COMMANDS.len() + 1;
+    let round = conv::COMMANDS.len() + DIST_PER_ROUND;
     (0..n)
         .map(|k| {
             let mut t = Vec::new();
             match k % round {
-                0 => dist_case(&mut g, &mut t),
+                i if i < DIST_PER_ROUND => dist_case(&mut g, &mut t),
                 i => {
-                    let cmd = conv::COMMANDS[i - 1];
+                    let cmd = conv::COMMANDS[i - DIST_PER_ROUND];
                     t.push(cmd.to_owned());
                     conv::gen_case(&mut g, &mut t, cmd);
                 }

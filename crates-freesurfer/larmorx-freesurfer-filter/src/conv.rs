@@ -1036,8 +1036,8 @@ fn smooth_ni(
                     cc = middle[2].as_ref().expect("slices")[s as usize];
                 }
                 let val = mul64(mul64(aa, bb), cc);
-                scale = scale + F80::from_f64(val);
-                vmf = vmf + F80::from_f64(mul64(val, val));
+                scale += F80::from_f64(val);
+                vmf += F80::from_f64(mul64(val, val));
             }
         }
     }

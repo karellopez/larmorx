@@ -74,6 +74,7 @@ fn dst_fits(
 }
 
 /// Writes the float `v` at `(x, y, z)` of frame `frame` of `dst` through its row pointers.
+#[allow(clippy::too_many_arguments)]
 fn put(g: &mut Globals, what: &str, dst: &mut Mri, frame: i32, x: i32, y: i32, z: i32, v: f32) {
     let sl = i64::from(frame) * i64::from(dst.vg.depth) + i64::from(z);
     mem::write(

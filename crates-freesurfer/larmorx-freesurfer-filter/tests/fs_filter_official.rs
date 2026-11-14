@@ -13,17 +13,19 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-14 from the clean commit 35804881 (the distance maps, the convolutions,
-/// smoothing, window statistics, reductions, derivatives, border classification and connected
-/// components): 800 cases, 711 lines identical, 89 hashed as `SKIP`.
-const N: usize = 800;
-const OFFICIAL_SHA256: &str = "6607b883ff71d2a108b3647deb9eb6f3140919e64df28e7331c393fc66e86bc7";
-const SKIPPED: usize = 89;
+/// Recorded 2026-11-14 from the clean commit 6700b476 (the distance maps, the convolutions,
+/// smoothing, window statistics, reductions, derivatives, border and non-parametric
+/// classification, connected components, the frame functions and the volume clusters): 1,380
+/// cases, 1,247 lines identical, 133 hashed as `SKIP`.
+const N: usize = 1380;
+const OFFICIAL_SHA256: &str = "91ea7bc20dc852444c665d431a47a23c024a7532f707939f0f7733a88ba27449";
+const SKIPPED: usize = 133;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 15] = [
+const SKIP: [&str; 24] = [
     "FS-540", "FS-541", "FS-58", "FS-53", "FS-546", "FS-548", "FS-549", "FS-550", "FS-551",
-    "FS-552", "FS-555", "FS-163", "FS-559", "FS-560", "FS-561",
+    "FS-552", "FS-555", "FS-163", "FS-559", "FS-560", "FS-561", "FS-562", "FS-564", "FS-567",
+    "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575",
 ];
 
 #[test]

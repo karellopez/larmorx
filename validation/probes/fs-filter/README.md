@@ -74,6 +74,28 @@ frame functions.
   <niter> <min_change>` (`real.py --norm`: a recorded head's bias field: the FNV-1a of the Voronoi
   diagram, of the soap bubble in place and of the control volume). `MRImaxsegment` prints the
   process's heap usage: `check.py` compares it as `1000`, the number the port's probe passes.
+  Relay 29's commands (`mrinorm.cpp`'s normalisation; `<points>` is a count and voxel triples, set
+  through `MRI3dUseLabelControlPoints`): `spl <src> <mode> [<dst>] <field> <ran_mode> <ran>
+  <n> <inputs> <outputs>` (`MRIsplineNormalize` with `RAN` set to the token when `ran_mode` is 1,
+  the random seed 1234; then the bias picture); `ninit <src with c_r c_a c_s> <xform_mode> [<16
+  doubles>] <noavg> <above> <below> <wsize> <wm> <sigma>` (`MRInormInit`, a transform and its
+  inverse for mode 1, the inverse alone for 2: the return value, the windows' counts, white matter,
+  sigma and each region); `npk <mode> <above> <below> <wm> <sigma> <max_gradient> <npeaks>
+  <windows> <80 inputs> <80 outputs>` (`MRInormFindPeaks` for mode 0, `MRInormCheckPeaks` for 1;
+  each window `y dy nbins bin_size min max` and its bins and counts; the count and both arrays);
+  `gfc <src> <wm> <above> <below> <ctrl?> <not?> <points>` (`MRInormGentlyFindControlPoints`);
+  `fcw <src> <wm> <above> <below> <ctrl?> <whalf_mm> <debug> <not?>`
+  (`MRInormFindControlPointsInWindow`: the count first); `afc <ctrl> <value> <mri?> <points>`
+  (`MRInormAddFileControlPoints` twice); `bbi <src> <ctrl> <sigma>` (`MRIbuildBiasImage`; then the
+  control volume); `g3d <src> <bias?> <wm> <mode> [<norm>] <above> <below> <only_file> <sigma>
+  <not?> <points>` (`MRI3dGentleNormalize`; then the source); `abc <in> <bias> <mode> [<out>]
+  <target>` (`MRIapplyBiasCorrectionSameGeometry`); `ufc <src with centre> <thresh_mode> <thresh>
+  <file in hex>` (`MRI3dUseFileControlPoints` of the file written as `cp.dat` in `<cases>.out.d/`,
+  `FS_THRESH_CTRL` set when the mode is 1; the return value, `MRInormAddFileControlPoints` of a new
+  byte volume and the volume, then `control.edited.dat` up to its `written by` line in hex, or
+  `NOFILE`); `g3df <volume file> <above> <below> <sigma>` (`real.py --gentle`: a recorded head's
+  gentle normalisation in place; the FNV-1a of its voxels). The number in the rejected control
+  points' message is compared as `?` where the port notes FS-596 (a register's contents).
 - `build.sh [<workspace>]`: builds `fsfilter` with the unit oracle's compiler, flags and libraries
   (`validation/investigations/freesurfer-unit-oracle`, `build.py all` first) into
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-filter/` (with `BUILD_INFO.txt`). From a worktree,
@@ -138,3 +160,12 @@ Every run on generated inputs inside a memory box:
   matter (110 in `wm.mgz`) as control points and 10 soap-bubble passes (bytes), and with
   `ctrl_pts.mgz` as a float bias field with 50 passes and `min_change` 1 (`mri_normalize`'s call):
   6 of 6 identical in both modes; 46 s in the official code, 32 s in the port.
+
+## Results (relay 29, 2026-11-14)
+
+- The normalisation commands (`spl`, `ninit`, `npk`, `gfc`, `fcw`, `afc`, `bbi`, `g3d`, `abc`,
+  `ufc`) at seeds 7 (100 cases), 13 and 17 (500 each): 0 different under `reproduce` (FS-596's
+  number masked), 0 default differences without a notice.
+- `real.py --gentle` on the three recorded heads: the gentle normalisation of `nu.mgz` (25, 5,
+  sigma 8: `mri_normalize`'s first pass) and of `T1.mgz` (12.5, 5): 6 of 6 identical in both
+  modes; 88 s in the official code, 111 s in the port (its Gaussian convolution is the slow part).

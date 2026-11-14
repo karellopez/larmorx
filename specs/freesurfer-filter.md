@@ -16,8 +16,12 @@ classification, the connected components and the global Sobel tables `sx`, `sy`.
 the frame functions (`fMRI*`, `MRIframe*`, `MRIvol*`, `MRIconjunct`, `ASLinterpMatrix`). Part 4
 (§19-21): the volume clusters (`clust*`, `MRIremoveVolumeIslands`, `MRIremoveVolumeHoles`) and the
 non-parametric white matter and cortex classification (`MRIreclassifyWMCtxNonPar`,
-`MRIclassifyAmbiguousNonPar`). Not yet: 3.1-43's intensity normalisation, segments and flood fill
-(`mrinorm.cpp`, `mrisegment.cpp`, `mriflood.cpp`, `rfa.cpp`'s `csf_labels`). The 2-D image reductions (`ImageConvolve1d`,
+`MRIclassifyAmbiguousNonPar`). Part 5 (§22-25): segments, flooding, the Voronoi diagram and the
+soap bubble. Part 6 (§26-27): the intensity normalisation without histograms (the spline
+normalisation, the windows, the peak check, the control-point searches and files, the bias image,
+the gentle normalisation, the bias correction). Not yet: the normalisation's histogram steps
+(`MRInormFillHistograms`, `MRInormalize`, `MRInormFindControlPoints`, `MRI3dNormalize`, the
+high-signal control points) and the surface flood functions. The 2-D image reductions (`ImageConvolve1d`,
 `ImageReduce`, `ImageReduce1d`) are specified with the images in `specs/freesurfer-io.md`.
 
 ## 1. Conventions
@@ -216,6 +220,16 @@ the points leave in the order these exact steps give, which decides the distance
 | FS-584 | b | the float soap bubble's passes update the largest change on several threads without synchronisation | one thread's order, always |
 | FS-585 | c | wider control or destination volumes read byte by byte (16-bit Voronoi with an `int` control, the 16-bit soap bubble's control, the soap bubble of other types) | by value (`reproduce`: bytes) |
 | FS-586 | a | a destination or control volume smaller than the source, with fewer frames, or (float, 16-bit soap bubble) of another type: memory outside | an error (both modes) |
+| FS-587 | c | a control volume (bias picture, 16-bit spline destination) of another type read and written byte by byte (16 bits at a time) | by value (`reproduce`: its memory as FreeSurfer) |
+| FS-588 | a | a control volume (bias picture, 16-bit spline destination) smaller than the source: memory outside | reads 0, writes nowhere (both modes) |
+| FS-589 | a | a window wider than the index tables (voxel size tiny, zero or NaN) | an error (both modes) |
+| FS-590 | c | the peak check's starting peaks past the peaks found read other entries | taken among the peaks (`reproduce`: the entries) |
+| FS-591 | a | more than 80 windows, or fewer than 7 above the origin in the peak check: outside the arrays | an error (both modes) |
+| FS-592 | c | the gentle search's thresholds outside 0..255 wrap modulo 256 | the numbers (`reproduce`: wrapped) |
+| FS-593 | a | `FS_THRESH_CTRL` not a number: a threshold never written | an error (`reproduce`: 0, noted) |
+| FS-594 | c | the threshold's removal keeps the point after each removed one | all removed (`reproduce`: as FreeSurfer) |
+| FS-595 | f | the rejected points' message prints a number it is not given | the count (`reproduce`: the number where it is known) |
+| FS-596 | a | values never written: peaks past those found, the rejected points' number, a bias the sampler refused | 0 or the count, noted (both modes) |
 
 ## 9. The Gaussian kernel and the one-dimensional convolutions
 
@@ -817,3 +831,133 @@ Control values: `CONTROL_NONE` 0, `CONTROL_MARKED` 1, `CONTROL_TMP` 2, `CONTROL_
   flooding at 7, 13 and 17 (480 each), Voronoi and soap bubble at 7, 13 and 17 (778 each): 0
   different in either mode; `real.py --norm` on three recorded heads (six bias fields of 256³
   voxels): 6 identical in either mode (observed).
+
+## 26. The intensity normalisation
+
+State of a program run: the control points from a file or a label (voxel triples), the names under
+which the control volume and the bias field are written (none by default), and whether the volume
+size of rejected control points was reported. `WM` = 110 (`DEFAULT_DESIRED_WHITE_MATTER_VALUE`); a
+`wm_target` of exactly 0 means `WM`. A control volume is read and written as bytes at `(x, y, z)` of
+frame 0 (FS-587 for another type, FS-588 when smaller than the source). Windows read positions
+clamped into the volume; a half-width beyond 500 (or one that is not a number) is FS-589. "Truncated"
+is x86-64's conversion to `int` (FS-17 beyond its range).
+
+- **The spline normalisation** (`MRIsplineNormalize(src, dst, &field, inputs, outputs, n)`; a
+  16-bit source has its own form): `RAN` (read with `atof`; 0 when unset); with `&field`, a byte
+  picture of 25 x height made when none is given; `n` cut to 80; `Starting OpenSpline(): npoints =
+  <n>` on standard output (not for 16-bit sources); the natural cubic spline through `(inputs,
+  outputs)` (`specs/burkardt-spline.md`'s `OpenSpline`/`OpenSplint`); for each row `y` the spline's
+  value `frac` at `y` (the picture's row: the low byte of `nint(110 / frac)`); each voxel
+  `nint(val * frac + randomNumber(0, RAN))` (the product in single precision, the sum in double;
+  one draw per voxel, in z, x order within the row) clamped to `[0, 255]`. Without a destination, a
+  clone of the source. The 16-bit form writes 16-bit numbers into the destination (FS-587).
+- **The windows** (`MRInormInit(mri, mni, above, below, wsize, wm, sigma)`): zero arguments take
+  14 windows above the Talairach origin, 9 below, `wsize = nint(10 / ysize)`, `WM`, sigma 2 (when
+  `|sigma| < FLT_EPSILON`). With a Talairach transform: `talairach transform` and the 4 x 4 matrix
+  (rows from the transform's first three rows, `MatrixPrint`) on standard error, then `INFO:
+  Modifying talairach volume c_(r,a,s) based on average_305` (the destination's centre (-0.095,
+  -16.51, 9.75) as floats) or, with `NO_AVERAGE305` set, `INFO: tal dst c_(r,a,s) not modified`;
+  the origin is `MRItalairachToVoxelEx` of (0, 0, 0) rounded (failure: the error `MRInormComputeWindows:
+  could not find Talairach origin`, returning the error code). Without one: `no Talairach xform
+  detected - using skull bounding box to determine origin` on standard output, the box of
+  `MRIfindApproximateSkullBoundingBox(mri, 50)`: x and z its centre (truncated), y its top plus
+  `75 / ysize` (single precision, truncated). Window `i` (of `above + below`, at most 80: FS-591):
+  y from `origin_y - step * above`, each `step = nint(wsize / 2)` lower; height `wsize`; 120 wide
+  centred on the origin (`x = x0 - 60`); depth 120 + 24 (`nint(120 * 0.2)`), `z = z0 - (60 + 24)`.
+- **The peaks** (`MRInormFindPeaks(mni, inputs, outputs)`): each window's histogram smoothed with
+  sigma (`HISTOsmooth`, one smoothed histogram reused), its last peak between bins 3 and `nbins - 3`
+  (`HISTOfindLastPeakInRegion`, window 7, 15 %); a window without one is left out; the others give
+  `input = y + dy / 2` and `output = ` the unsmoothed histogram's bin value at the peak. Then the
+  check below, and each kept output becomes `wm / output` (single precision).
+- **The peak check** (`MRInormCheckPeaks(mni, inputs, outputs, n)`): 0 peaks when `n < (above +
+  below) / 3`. The maximum gradient is `mni`'s (1 when `|g| < FLT_EPSILON`). The candidates are the
+  entries `above - 7`, `above - 4`, `above - 1` (fewer than 7 above: FS-591; past `n`: FS-590, by
+  default each taken as at most `n - 1`); the start is the middle one when its output lies between
+  the others' (`I >= min(U, D) && I <= max(U, D)`, `min` the first when smaller, `max` the first
+  when not smaller), else the upper when it lies between the other two, else the lower. From the
+  start forwards, each peak `s` is dropped when `|(out[s] - out[last]) / (in[s] - in[s - 1])|` (single
+  precision) exceeds the maximum gradient or `s - last > 2`, else it becomes `last`; backwards the
+  same with `out[last] - out[s]` and `in[s + 1] - in[s]`. The kept peaks move to the front in order;
+  their number is returned.
+- **Control points in a window** (`MRInormFindControlPointsInWindow(src, wm, above, below, ctrl,
+  whalf_mm, debug, &n, scan_type, not_control)`): half-width `nint(whalf_mm / xsize)`; thresholds
+  `floor(wm - below)`, `floor(wm + above)` (single precision); into the given control volume (or a
+  new byte one with the source's header): voxels already above 0 and those the `not_control` volume
+  marks (above 0) are skipped; a voxel whose truncated value and every truncated value of its window
+  lie within the thresholds (compared as floats) becomes 128, any other 0. `n` is the count of new
+  ones; with `Gdiag` and the debug string, `<debug> <n> <k>x<k>x<k> control points found` on
+  standard error.
+- **Gentle control points** (`MRInormGentlyFindControlPoints(src, wm, above, below, ctrl,
+  not_control)`): into the given control volume (or a new byte one with the header): first, voxels
+  equal to 1 count and stay; others (unless `not_control` marks them) with truncated values within
+  `[wm - 1.5 below, wm + 1.5 above]` (double precision, truncated, then kept as a byte: FS-592) and a
+  window of half-width `ceil(3 / xsize)` within them become 128, else 0; then, among voxels whose
+  value truncates to 0, those within `[wm - below, wm + above]` (single precision, then bytes) with a
+  window of `ceil(2 / xsize)` become 128. Then the outlier removal (2 neighbours), the file's points
+  (255), the count, and the volume binarised (`>= 1` to 1, else 0).
+- **Outlier removal** (`min_nbrs`): in scan order, each voxel above 0 whose 3 x 3 x 3 neighbourhood
+  (clamped: an edge voxel counts itself again) holds fewer than `min_nbrs + 1` voxels above 0 is
+  set to 0 (later voxels see it).
+- **Control points from a file** (`MRI3dUseFileControlPoints(mri, fname)`): nothing for `nofile`
+  (any case); the points of `MRIreadControlPoints` (none when it fails); `FS_THRESH_CTRL` (`%f`; 0
+  when unset; FS-593 when not a number), `thresholding control points at <%2.1f>` when above 0; for
+  tkregister coordinates each point whose voxel (the position rounded) is at most the threshold is
+  reported `unlikely control point <i> - (<x>, <y>, <z>) = <v>` (`%2.1f` of the position, `%2.0f`
+  of the voxel at the truncated position) and, with `FS_THRESH_CTRL` set, `FS_THRESH_CTRL detected
+  in env - deleting <k> control points`, removed (FS-594), and the rest written to
+  `control.edited.dat` (`MRIwriteControlPoints`, tkregister). The state's points: each position
+  (`MRIsurfaceRASToVoxel`, or `MRIworldToVoxel` for scanner coordinates; another flag: the error
+  `MRI3dUseFileControlPoints has bad useRealRAS flag <n>` ends the program) rounded.
+- **From a label** (`MRI3dUseLabelControlPoints(mri, label)`): the label's points (made voxel
+  coordinates by `LabelToVoxel` unless they are) rounded; `read in <n> label control points`.
+- **Adding them** (`MRInormAddFileControlPoints(ctrl, value, mri)`): each point inside the control
+  volume: when `mri` is given and its voxel is not above 0, `control point <i> @ (<x>, <y>, <z>),
+  MRI=<truncated>, skipping!!!!!` (rejected); else the control voxel becomes `value`'s low byte
+  (counted when it was 0). A point outside: `control point <i> @ (<x>, <y>, <z>) not in volume,
+  skipping!!!!!` (rejected). With rejections the error `!!!!! <n> control points rejected for being
+  out of bounds !!!!!!` (FS-595/596) and, once per run, `volume size (<w>, <h>, <d>)`. Returns the
+  count.
+- **The bias image** (`MRIbuildBiasImage(src, ctrl, bias, sigma)`; a new volume whatever `bias`
+  is): `building Voronoi diagram...`; a clone of the source with the control points' Voronoi diagram
+  (§24); `performing soap bubble smoothing, sigma = <%g>...`; smoothed in place by the Gaussian
+  `MRIgaussian1d(sigma, -1)` (§9-10); then, in x, y, z order, each control voxel above 0 set back to
+  the source's value.
+- **The gentle normalisation** (`MRI3dGentleNormalize(src, bias, wm, norm, above, below,
+  only_file, sigma, not_control)`; `norm` may be the source): without a bias field, the control
+  points (the gentle search, or with `only_file` the file's points alone at 255: none or a mean of
+  their voxels `|mean| < FLT_EPSILON` copies the source into `norm` and gives the error
+  `MRI3dGentleNormalize: mean = <%2.1f>, nctrl = <n>, norm failed`; else `only using <n> control
+  points from file, mean <%2.1f>, scaling by <%2.2f>...` on standard error and the source multiplied
+  in place by `(float)(wm / mean)`; `WRITE_CONTROL_POINTS` writes `c.mgz`), written under the
+  control volume's name when set, binarised, then the bias image (written under the bias name when
+  set). Each voxel: `s`, `b` the truncated source and bias values; `s * wm / b` in single precision
+  (`s` itself where `b` is 0), at most 255 in a byte destination.
+- **CSF in a window** (`csf_in_window(mri, x0, y0, z0, max_dist, csf)`): 1 when a voxel of the
+  window of half-width `nint(max_dist / xsize)`, at a distance `sqrt(dx² + dy² + dz²)` (from the
+  clamped positions; single precision, summed in that order) not beyond `max_dist`, is at most
+  `csf` (scanning x, then y, then z), else 0.
+- **The bias correction** (`MRIapplyBiasCorrectionSameGeometry(in, bias, out, target)`; `out` may
+  be `in`): in x, y, z order each voxel `(target / b) * v` in double precision (`b` the bias sampled
+  at the voxel's own position, `MRIsampleVolume`; the quotient's NaN wins over the value's), stored
+  as float. Without `out`, a clone of the input.
+
+## 27. Validation plan (part 6)
+
+- **Probe (black box).** `fsfilter`'s commands `spl` (float, byte, 16-bit and `int` sources; new,
+  given (sometimes float for a 16-bit source) and in-place destinations; the bias picture; `RAN`
+  unset, a number, a negative number or text; 0 to 82 spline points, some outputs 0 or NaN), `ninit`
+  (an ellipsoidal head of up to 36 x 40 x 36 bytes; no transform, a transform and its inverse, the
+  inverse alone; `NO_AVERAGE305`; window counts up to 90), `npk` (both functions; 7 to 29 windows of
+  histograms of 7 to 48 bins with a moving peak and empty windows; the peak arrays given in full),
+  `gfc`, `fcw` (tissue-like volumes, voxel sizes including 0, NaN and 0.001, thresholds that wrap,
+  given control volumes of other types and extents, masks), `afc` (two calls: the size reported
+  once), `bbi`, `g3d` (given bias fields, `only_file`, in-place and byte destinations), `abc`
+  (NaN-rich values and bias, a NaN target), `ufc` (control-point files with comments, `useRealRAS
+  1`, trailers; `FS_THRESH_CTRL` numbers and text; `control.edited.dat` compared up to its `written
+  by` line). The number of FS-596's message is masked on both sides. `real.py --gentle`: the gentle
+  normalisation of three recorded heads' `nu.mgz` (25, 5, sigma 8: `mri_normalize`'s first pass) and
+  `T1.mgz` (12.5, 5).
+- **Expected.** Every line identical under `reproduce` but those touching memory outside a volume,
+  crashing or using memory never written (FS-588, FS-589, FS-591, FS-593, FS-487); the default
+  identical but where a noted defect it corrects changed the result. Observed: seeds 7 (100 cases),
+  13 and 17 (500 each): 0 different in either mode.

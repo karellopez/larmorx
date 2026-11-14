@@ -911,7 +911,11 @@ pub fn mri_norm_gently_find_control_points(
             fresh.insert(c)
         }
     };
-    let sv = values(g, err, src)?;
+    // the truncated values (`int val = MRIgetVoxVal(...)`), converted once per voxel
+    let sv: Vec<i32> = values(g, err, src)?
+        .into_iter()
+        .map(|v| float_to_int(g, f64::from(v), WHAT))
+        .collect();
     let at =
         |x: i32, y: i32, z: i32| ((z as usize * h as usize) + y as usize) * w as usize + x as usize;
     // the byte thresholds (`BUFTYPE`): the low byte of the truncated value (FS-592)
@@ -968,13 +972,13 @@ pub fn mri_norm_gently_find_control_points(
                     }
                     let mut val0 = 0;
                     if pass == 0 {
-                        val0 = float_to_int(g, f64::from(sv[at(x, y, z)]), WHAT);
+                        val0 = sv[at(x, y, z)];
                     }
                     if is_not_control(g, err, not_control, x, y, z)? {
                         continue;
                     }
                     if pass == 1 {
-                        val0 = float_to_int(g, f64::from(sv[at(x, y, z)]), WHAT);
+                        val0 = sv[at(x, y, z)];
                     }
                     let mut ctrl = 0u8;
                     if val0 >= lo_t && val0 <= hi_t {
@@ -996,7 +1000,7 @@ pub fn mri_norm_gently_find_control_points(
                                 let mut xk = -whalf;
                                 while ctrl != 0 && xk <= whalf {
                                     let xi = t.x(x + xk);
-                                    let val = float_to_int(g, f64::from(sv[at(xi, yi, zi)]), WHAT);
+                                    let val = sv[at(xi, yi, zi)];
                                     if val > hi_t || val < lo_t {
                                         ctrl = 0;
                                     }
@@ -1085,7 +1089,11 @@ pub fn mri_norm_find_control_points_in_window(
     };
     let low = sub(wm_target, intensity_below).floor();
     let hi = add(wm_target, intensity_above).floor();
-    let sv = values(g, err, src)?;
+    // the truncated values (`int val = MRIgetVoxVal(...)`), converted once per voxel
+    let sv: Vec<i32> = values(g, err, src)?
+        .into_iter()
+        .map(|v| float_to_int(g, f64::from(v), WHAT))
+        .collect();
     let at =
         |x: i32, y: i32, z: i32| ((z as usize * h as usize) + y as usize) * w as usize + x as usize;
     let mut idx: Option<Idx> = None;
@@ -1100,7 +1108,7 @@ pub fn mri_norm_find_control_points_in_window(
                 if is_not_control(g, err, not_control, x, y, z)? {
                     continue;
                 }
-                let val0 = float_to_int(g, f64::from(sv[at(x, y, z)]), WHAT);
+                let val0 = sv[at(x, y, z)];
                 let mut ctrl = 0u8;
                 if val0 as f32 >= low && val0 as f32 <= hi {
                     if idx.is_none() {
@@ -1120,7 +1128,7 @@ pub fn mri_norm_find_control_points_in_window(
                             let mut xk = -whalf;
                             while ctrl != 0 && xk <= whalf {
                                 let xi = t.x(x + xk);
-                                val = float_to_int(g, f64::from(sv[at(xi, yi, zi)]), WHAT);
+                                val = sv[at(xi, yi, zi)];
                                 if val as f32 > hi || (val as f32) < low {
                                     ctrl = 0;
                                 }

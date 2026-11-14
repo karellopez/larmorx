@@ -255,3 +255,53 @@ not vectorised: the loops call `MRIgetVoxVal`, or alias their row pointers):
 - **The soap bubble, 16-bit and other types:** `MRIvox(mri_ctrl, ...)` and `MRIseq_vox(mri_dst,
   ...)` are byte accesses whatever the volume's type (FS-585); within each row's first `width`
   bytes they stay inside the volume.
+
+## 13. `mrinorm.cpp`'s normalisation without histograms (relay 29)
+
+- **The file's state.** `num_control_points`, `xctrl`, `yctrl`, `zctrl` (set by
+  `MRI3dUseFileControlPoints` and `MRI3dUseLabelControlPoints`), `control_volume_fname`,
+  `bias_volume_fname` and the function statics (`MRInormAddFileControlPoints`' `first`, the
+  diagnostic `pass` counters, `remove_gray_matter_control_points`' `ncalls`) are the port's
+  `NormState`, one per program run (the probe runs each case in a fresh process: a fresh state).
+- **FS-587 / FS-588.** Every control-volume access is `MRIvox` (a byte at `slices[z][y][x]`): a
+  control volume of another type is read and written in its first bytes of each row; a smaller one
+  outside it. The 16-bit spline normalisation writes `*pdst++ = (short)dval` through
+  `&MRISvox(mri_dst, 0, y, z)`, whatever the destination's type. The port's direct accesses go
+  through `mem.rs` (`Wrapped` as FreeSurfer with `reproduce`; by value by default; `Outside` reads 0
+  and writes nowhere).
+- **FS-589.** `whalf = ceil(WHALF / xsize)` (`ceilf`, `cvttss2si`), `nint(whalf_mm / xsize)`,
+  `nint(max_dist / xsize)`: a voxel size of 0 gives `INT_MIN`, and `-whalf` wraps to `INT_MIN`, so
+  the loop reads `xi[x + INT_MIN]`; above 500 the index tables (`MAX_INDEX` 500 each side) are left.
+- **FS-590.** `MRInormCheckPeaks` reads `outputs[above - 7]`, `[above - 4]`, `[above - 1]` and
+  starts there whatever `npeaks` is; `MRInormalize`'s arrays `inputs[80]`, `outputs[80]` are
+  uninitialised locals, so in `mri_normalize` the entries past the peaks found are stack contents
+  (FS-596 when the port meets its never-written marker, `NEVER_WRITTEN`). The backward pass reads
+  `outputs[old_slice]` and `inputs[slice + 1]` from the start, so a start past the peaks decides
+  which real peaks are dropped. Reached by the probe's `npk` (14 windows above, 9 peaks).
+- **FS-591.** `MNI` holds `histograms[80]` and `regions[80]`; `MRInormInit` writes
+  `regions[i]` for `i < above + below` unchecked; `MRInormCheckPeaks` reads `outputs[above - 7]`.
+- **FS-592.** `BUFTYPE low_thresh, hi_thresh` in `MRInormGentlyFindControlPoints`: the object code
+  stores `cvttsd2si` (7x7x7: double `wm - 1.5 below`, `1.5 above + wm`) and `cvttss2si` (5x5x5:
+  float) results and compares `movzbl` of them with the truncated voxel values (`int`). With
+  `mri_normalize`'s values (110, 25 or 12.5 above, 5 below) the thresholds stay inside a byte.
+- **FS-594.** The removal loop `for (i ...) if (deleted[i]) { shift; count--; }` advances `i` past the
+  element shifted into `i`.
+- **FS-595 / FS-596.** `ErrorPrintf(ERROR_BADFILE, "!!!!! %ld control points rejected ...\n")` passes
+  no number: `%ld` reads the first variadic register (`rdx`). In the official object code `rdx`
+  holds, when the last point was skipped for its value, that value as `cvttss2si`'s 32 bits
+  zero-extended (the `push rax` / `pop rdx` around the `printf`); after any other last point it is
+  what `MRIindexNotInVolume`, `MRIgetVoxVal` or `printf` left (not reproduced: the port prints the
+  count with FS-596; the probe masks the number then).
+- **Operand orders** (object code): `MRIapplyBiasCorrectionSameGeometry` computes
+  `divsd` of the target by the bias, then `mulsd` with the value as the second operand (the ratio's
+  NaN wins); `MRI3dGentleNormalize`'s `(float)src * wm / (float)bias` in single precision, left to
+  right; `MRIsplineNormalize`'s `(float)val * frac` (`mulss`, the value first) then `+ randomNumber`
+  in double.
+- **`MRIbuildBiasImage`** prints `performing soap bubble smoothing` but smooths with
+  `MRIconvolveGaussian`; it ignores its `mri_bias` argument (a new clone each time).
+- **`mri_normalize`'s `-g 1`** sets `mni.max_gradient` (`MRInormCheckPeaks`), not the gentle flag
+  (`-gentle`).
+- **Speed (release builds, one 256³ head):** the port's gentle normalisation takes 18 s (the
+  search 1 s, the Voronoi diagram 5 s, the 65-tap Gaussian 11 s) where the official code averages
+  15 s per volume including the read: the convolution (§10's `MRIconvolve1d`) is the part to speed
+  up, without changing a bit.

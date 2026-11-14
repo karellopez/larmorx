@@ -392,9 +392,10 @@ fn nifti_ext(name: &[u8]) -> Option<usize> {
 /// NIfTI-1 single file, 2 for a NIfTI-1 pair's header, 0 for an ANALYZE header (`sizeof_hdr` 348
 /// in either byte order), -1 otherwise. The header file is the name itself when it exists (and is
 /// not an `.img` name), else the stem with `.nii`, `.nii.gz`, `.hdr`, `.hdr.gz` (`.hdr` first for
-/// an `.img` name), the first that opens; its first 348 bytes (inflated for a `.gz` name). A
+/// an `.img` name), the first that opens (none: `** no header file found for '<hname>'` on standard
+/// error, niftilib's debug level being 1); its first 348 bytes (inflated for a `.gz` name). A
 /// failed open sets `errno`.
-fn is_nifti_file(g: &mut Globals, dir: Option<&Path>, hname: &[u8]) -> i32 {
+fn is_nifti_file(g: &mut Globals, err: &mut dyn Write, dir: Option<&Path>, hname: &[u8]) -> i32 {
     let ext = nifti_ext(hname);
     if hname.is_empty() || ext == Some(0) {
         return -1;
@@ -422,6 +423,10 @@ fn is_nifti_file(g: &mut Globals, dir: Option<&Path>, hname: &[u8]) -> i32 {
         found
     };
     let Some(hdrname) = found else {
+        let mut t = b"** no header file found for '".to_vec();
+        t.extend_from_slice(hname);
+        t.extend_from_slice(b"'\n");
+        let _ = err.write_all(&t);
         return -1;
     };
     let mut h = [0u8; 348];
@@ -792,7 +797,7 @@ pub fn analyze_read(
     let hdrfile = frame_name(startframe, b"hdr");
     let matfile = frame_name(startframe, b"mat");
     let mut imgfile = frame_name(startframe, b"img");
-    let nifticode = is_nifti_file(g, dir, hdrfile.as_bytes());
+    let nifticode = is_nifti_file(g, err, dir, hdrfile.as_bytes());
     if g.gdiag != 0 {
         let _ = writeln!(out, "nifticode = {nifticode}");
     }
@@ -1665,4 +1670,341 @@ pub fn analyze_write4d(
         return Ok(e);
     }
     write_data(g, err, dir, WHO, " ", fname, m, bpv, 0..m.nframes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    /// A little-endian ANALYZE header of extents `dims` (`dim[1..=4]`), type `dt`, orientation
+    /// `orient` and voxel sizes 1.
+    fn header(dims: [i16; 4], dt: i16, orient: i8) -> Dsr {
+        let mut h = Dsr([0u8; 348]);
+        h.set_i32(0, 348);
+        h.set_i16(40, 4);
+        for (i, d) in dims.iter().enumerate() {
+            h.set_i16(42 + 2 * i, *d);
+        }
+        h.set_i16(70, dt);
+        for i in 1..4 {
+            h.set_f32(76 + 4 * i, 1.0);
+        }
+        h.set_f32(112, 1.0);
+        h.0[252] = orient as u8;
+        h
+    }
+
+    fn setup(mode: UpstreamDefects) -> (Globals, Vec<u8>, Vec<u8>, Environment) {
+        (
+            Globals::new(mode),
+            Vec::new(),
+            Vec::new(),
+            Environment::default(),
+        )
+    }
+
+    fn tmp() -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix("analyze ~")
+            .tempdir()
+            .unwrap()
+    }
+
+    #[test]
+    fn fs645_a_start_frame_that_is_not_a_number_counts_from_1() {
+        let (mut g, mut o, _, _) = setup(UpstreamDefects::Reproduce);
+        let env = |v: &str| Environment::from_pairs([("SPM_START_FRAME", v)]);
+        assert_eq!(
+            get_spm_start_frame(&mut g, &mut o, &Environment::default()),
+            1
+        );
+        assert!(o.is_empty());
+        assert_eq!(get_spm_start_frame(&mut g, &mut o, &env(" 7x")), 7);
+        assert_eq!(
+            get_spm_start_frame(&mut g, &mut o, &env("99999999999")),
+            1215752191
+        );
+        assert!(!g.notices.contains(&FS_645));
+        assert_eq!(get_spm_start_frame(&mut g, &mut o, &env("abc")), 1);
+        assert!(g.notices.contains(&FS_645));
+        assert_eq!(
+            String::from_utf8(o).unwrap(),
+            "Using env var SPM_START_FRAME = 7\nUsing env var SPM_START_FRAME = 1215752191\nUsing env var SPM_START_FRAME = 1\n"
+        );
+    }
+
+    #[test]
+    fn fs646_a_long_name_aborts_in_freesurfer() {
+        // no file is touched before the name's length is checked, so the test needs no long path
+        let name = [b"a/".as_slice(), &[b'x'; 996]].concat();
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, mut o, mut e, env) = setup(mode);
+            let d = tmp();
+            let r = count_analyze_files(&mut g, &mut o, &mut e, &env, Some(d.path()), &name, -1);
+            assert!(g.notices.contains(&FS_646));
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(r.unwrap().0, 0);
+            } else {
+                assert_eq!(r.unwrap_err(), Fatal::Exit(134));
+                assert_eq!(e, OVERFLOW);
+            }
+        }
+        // 995 bytes of stem: `<stem>.img` fits the 1,000-byte buffer
+        let (mut g, mut o, mut e, env) = setup(UpstreamDefects::Reproduce);
+        let d = tmp();
+        let name = [b"a/".as_slice(), &[b'x'; 993]].concat();
+        let r = count_analyze_files(&mut g, &mut o, &mut e, &env, Some(d.path()), &name, -1);
+        assert_eq!(r.unwrap().0, 0);
+        assert!(!g.notices.contains(&FS_646));
+    }
+
+    #[test]
+    fn a_series_is_counted_from_the_start_frame() {
+        let (mut g, mut o, mut e, _) = setup(UpstreamDefects::Fix);
+        let d = tmp();
+        for n in ["s002.img", "s003.img", "s005.img"] {
+            std::fs::write(d.path().join(n), b"").unwrap();
+        }
+        let env = Environment::from_pairs([("SPM_START_FRAME", "2")]);
+        let r = count_analyze_files(&mut g, &mut o, &mut e, &env, Some(d.path()), b"s", 3);
+        assert_eq!(r.unwrap(), (2, b"s".to_vec()));
+        assert_eq!(g.errno, 2);
+        // a .img name with zero padding: an error
+        let r = count_analyze_files(&mut g, &mut o, &mut e, &env, Some(d.path()), b"s.img", 3);
+        assert_eq!(r.unwrap().0, -1);
+        assert!(String::from_utf8(o).unwrap().ends_with(
+            "ERROR: CountAnalyzeFiles: file with .img extension specified        with zero pad variable.\n"
+        ));
+    }
+
+    #[test]
+    fn fs649_double_frames_each_in_their_place_by_default() {
+        let d = tmp();
+        std::fs::write(d.path().join("a.hdr"), header([2, 1, 1, 2], DT_DOUBLE, 0).0).unwrap();
+        let vals = [1.5f64, -2.0, 3.25, 4.0];
+        let img: Vec<u8> = vals.iter().flat_map(|v| v.to_le_bytes()).collect();
+        std::fs::write(d.path().join("a.img"), img).unwrap();
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, mut o, mut e, env) = setup(mode);
+            let m = analyze_read(&mut g, &mut o, &mut e, &env, Some(d.path()), "a.img", true)
+                .unwrap()
+                .unwrap();
+            let f: Vec<f32> = m
+                .chunk
+                .as_ref()
+                .unwrap()
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|b| f32::from_le_bytes(*b))
+                .collect();
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(f, [1.5, -2.0, 3.25, 4.0]);
+            } else {
+                // FreeSurfer: the second frame's values written over the first's
+                assert_eq!(f, [3.25, 4.0, 0.0, 0.0]);
+            }
+            assert!(g.notices.contains(&FS_649));
+            assert_eq!(m.mtype, MRI_FLOAT);
+        }
+    }
+
+    #[test]
+    fn fs648_an_unknown_orientation_code_is_assumed_transverse_flipped() {
+        let d = tmp();
+        std::fs::write(
+            d.path().join("a.hdr"),
+            header([2, 2, 1, 1], DT_UNSIGNED_CHAR, 6).0,
+        )
+        .unwrap();
+        std::fs::write(d.path().join("a.img"), [1u8, 2, 3, 4]).unwrap();
+        let (mut g, mut o, mut e, env) = setup(UpstreamDefects::Fix);
+        let m = analyze_read(&mut g, &mut o, &mut e, &env, Some(d.path()), "a.img", false)
+            .unwrap()
+            .unwrap();
+        assert!(g.notices.contains(&FS_648));
+        assert_eq!(
+            (m.vg.ras_good_flag, m.vg.x_r, m.vg.y_a, m.vg.z_s),
+            (0, -1.0, -1.0, 1.0)
+        );
+        assert!(
+            String::from_utf8(e)
+                .unwrap()
+                .contains("orient value = 6, not valid.")
+        );
+        let (mut g, mut o, mut e, env) = setup(UpstreamDefects::Reproduce);
+        let r = analyze_read(&mut g, &mut o, &mut e, &env, Some(d.path()), "a.img", false);
+        assert_eq!(r.unwrap_err(), Fatal::Exit(139));
+    }
+
+    #[test]
+    fn fs650_a_mat_file_of_another_shape_is_an_error() {
+        let d = tmp();
+        std::fs::write(
+            d.path().join("a.hdr"),
+            header([2, 2, 1, 1], DT_UNSIGNED_CHAR, 0).0,
+        )
+        .unwrap();
+        std::fs::write(d.path().join("a.img"), [1u8, 2, 3, 4]).unwrap();
+        let mut mat = Matrix::real(4, 3);
+        mat.set_relt(1, 1, 2.0);
+        let (mut g, ..) = setup(UpstreamDefects::Fix);
+        assert_eq!(
+            matfile::matlab_write(&mut g, Some(d.path()), &mat, "a.mat", Some(b"M")),
+            NO_ERROR
+        );
+        let (mut g, mut o, mut e, env) = setup(UpstreamDefects::Fix);
+        let r = analyze_read(&mut g, &mut o, &mut e, &env, Some(d.path()), "a.img", true);
+        assert!(r.unwrap().is_none());
+        assert!(g.notices.contains(&FS_650));
+        assert!(
+            String::from_utf8(e)
+                .unwrap()
+                .contains("holds a 4 x 3 matrix")
+        );
+        let (mut g, mut o, mut e, env) = setup(UpstreamDefects::Reproduce);
+        let r = analyze_read(&mut g, &mut o, &mut e, &env, Some(d.path()), "a.img", true);
+        assert_eq!(r.unwrap_err(), Fatal::Exit(139));
+    }
+
+    #[test]
+    fn fs652_a_big_endian_header_dump() {
+        let mut h = header([2, 2, 1, 1], DT_SIGNED_SHORT, 0);
+        h.set_i32(32, 16384);
+        h.set_i16(50, 7);
+        // the header as a big-endian machine writes it
+        let mut b = h.clone();
+        for (o, n) in [(0, 4), (32, 4), (70, 2), (112, 4)] {
+            b.0[o..o + n].reverse();
+        }
+        for i in 0..8 {
+            b.0[40 + 2 * i..42 + 2 * i].reverse();
+            b.0[76 + 4 * i..80 + 4 * i].reverse();
+        }
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, ..) = setup(mode);
+            g.gdiag_no = 1;
+            let mut x = b.clone();
+            swap_analyze_header(&mut g, &mut x);
+            assert!(g.notices.contains(&FS_652));
+            let mut text = Vec::new();
+            dump_analyze_header(&mut text, &x);
+            let text = String::from_utf8(text).unwrap();
+            if mode == UpstreamDefects::Fix {
+                assert!(text.contains("  extents       16384\n"));
+                assert!(text.contains("  dim 4 2 2 1 1 7 0 0 \n"));
+            } else {
+                // 16,384 is 0x4000: its low 16 bits are 0
+                assert!(text.contains("  extents       0\n"));
+                assert!(text.contains("  dim 4 2 2 1 1 1792 0 0 \n"));
+            }
+        }
+    }
+
+    #[test]
+    fn fs653_an_extent_of_32768_is_refused_by_default() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, mut o, mut e, _) = setup(mode);
+            let m =
+                mri::mri_alloc_header(&mut g, &mut o, &mut e, 32768, 1, 1, MRI_UCHAR, 1).unwrap();
+            let r = check_extents(&mut g, &mut o, &m);
+            assert!(g.notices.contains(&FS_653));
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(r.unwrap_err(), Fatal::Exit(1));
+                assert!(
+                    String::from_utf8(o)
+                        .unwrap()
+                        .ends_with("ANALYZE FORMAT ERROR: ncols 32768 in volume exceeds 32767\n")
+                );
+            } else {
+                assert!(r.is_ok());
+            }
+        }
+    }
+
+    #[test]
+    fn fs654_a_long_volume_is_written_as_ints_by_default() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, mut o, mut e, _) = setup(mode);
+            let d = tmp();
+            let mut m = mri::mri_alloc(&mut g, &mut o, &mut e, 2, 1, 1, MRI_LONG).unwrap();
+            let c = m.chunk.as_mut().unwrap();
+            c[..8].copy_from_slice(&5i64.to_le_bytes());
+            c[8..].copy_from_slice(&(-3i64).to_le_bytes());
+            let r = analyze_write4d(&mut g, &mut o, &mut e, Some(d.path()), &m, "o.img");
+            assert_eq!(r.unwrap(), 0);
+            assert!(g.notices.contains(&FS_654));
+            let img = std::fs::read(d.path().join("o.img")).unwrap();
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(img, [5, 0, 0, 0, 0xfd, 0xff, 0xff, 0xff]);
+            } else {
+                assert_eq!(img, [5, 0, 0, 0, 0, 0, 0, 0]);
+            }
+            let hdr = std::fs::read(d.path().join("o.hdr")).unwrap();
+            assert_eq!((hdr.len(), hdr[252]), (348, 0xff));
+            assert!(d.path().join("o.mat").is_file());
+        }
+    }
+
+    #[test]
+    fn fs656_conversions_outside_the_range() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (mut g, ..) = setup(mode);
+            assert_eq!(float_to_int(&mut g, 7.9, "x"), 7);
+            assert_eq!(float_to_int(&mut g, -4.5, "x"), -4);
+            assert_eq!(rint_to_short(&mut g, 2.5, "x"), 2);
+            assert_eq!(rint_to_short(&mut g, -3.5, "x"), -4);
+            assert!(!g.notices.contains(&FS_656));
+            let fix = mode == UpstreamDefects::Fix;
+            assert_eq!(
+                float_to_int(&mut g, f32::NAN, "x"),
+                if fix { 0 } else { i32::MIN }
+            );
+            assert_eq!(
+                float_to_int(&mut g, 3.0e9, "x"),
+                if fix { i32::MAX } else { i32::MIN }
+            );
+            // 40,000 wraps in 16 bits: -25,536
+            assert_eq!(
+                rint_to_short(&mut g, 40000.0, "x"),
+                if fix { i16::MAX } else { -25536 }
+            );
+            assert_eq!(
+                rint_to_short(&mut g, 1.0e12, "x"),
+                if fix { i16::MAX } else { 0 }
+            );
+            assert!(g.notices.contains(&FS_656));
+        }
+    }
+
+    #[test]
+    fn a_pair_round_trip_with_the_scale_factor() {
+        let d = tmp();
+        let mut h = header([2, 1, 1, 0], DT_SIGNED_SHORT, 0);
+        h.set_f32(112, 0.5);
+        std::fs::write(d.path().join("a.hdr"), h.0).unwrap();
+        let img: Vec<u8> = [6i16, -3].iter().flat_map(|v| v.to_le_bytes()).collect();
+        std::fs::write(d.path().join("a.img"), img).unwrap();
+        let (mut g, mut o, mut e, env) = setup(UpstreamDefects::Fix);
+        let m = analyze_read(&mut g, &mut o, &mut e, &env, Some(d.path()), "a.img", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(m.mtype, MRI_FLOAT);
+        let f: Vec<f32> = m
+            .chunk
+            .as_ref()
+            .unwrap()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| f32::from_le_bytes(*b))
+            .collect();
+        assert_eq!(f, [3.0, -1.5]);
+        let text = String::from_utf8(o).unwrap();
+        assert!(text.ends_with(
+            "  analyzeRead() roi_scale   0.500000000\n  analyzeRead() changing type to float\n  analyzeRead() scaling by   0.500000000\n"
+        ));
+        assert_eq!(m.frames.len(), 1);
+    }
 }

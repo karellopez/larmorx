@@ -585,9 +585,24 @@ pub fn run(
     w: &Work,
     extra: &mut Vec<&'static str>,
 ) -> Result<(), u8> {
+    run_env(tk, g, out, err, o, w, extra, &[])
+}
+
+/// [`run`] with more environment variables (piece 16's `SPM_START_FRAME`).
+#[allow(clippy::too_many_arguments)]
+pub fn run_env(
+    tk: &[&str],
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    o: &mut Out,
+    w: &Work,
+    extra: &mut Vec<&'static str>,
+    more_env: &[(&str, Vec<u8>)],
+) -> Result<(), u8> {
     let s = super::Shared::default();
     let (mut o2, mut e2) = (s.clone(), s.clone());
-    let r = answer(tk, g, &mut o2, &mut e2, o, w);
+    let r = answer(tk, g, &mut o2, &mut e2, o, w, more_env);
     let text = s.0.borrow().clone();
     let _ = out.write_all(&text);
     // formats the port does not read yet, and .lta registrations (fs.volume's LTAread)
@@ -639,6 +654,7 @@ fn answer(
     err: &mut dyn Write,
     o: &mut Out,
     w: &Work,
+    more_env: &[(&str, Vec<u8>)],
 ) -> Result<(), u8> {
     let fatal = |f: larmorx_freesurfer_core::log::Fatal| f.status();
     let dir = Some(w.fix.as_path());
@@ -698,7 +714,18 @@ fn answer(
     if bits & 8 != 0 {
         pairs.push(("VOL_GEOM_THRESH", "0.25"));
     }
-    let env = Environment::from_pairs(pairs);
+    // piece 16: analyzeRead's switches
+    if bits & 16 != 0 {
+        pairs.push(("ATROPHY_SIMULATOR", "1"));
+    }
+    if bits & 32 != 0 {
+        pairs.push(("FS_ANALYZE_NO_RESCALE", "1"));
+    }
+    let mut env = Environment::from_pairs(pairs);
+    for (k, v) in more_env {
+        // ASCII values only (the generated cases'): the same on every platform
+        env.set(*k, String::from_utf8_lossy(v).into_owned());
+    }
     let mut ty = -1;
     let (mut rv, mut frame) = (false, -1);
     if tk[0] == "mrh" || tk[0] == "mrd" {

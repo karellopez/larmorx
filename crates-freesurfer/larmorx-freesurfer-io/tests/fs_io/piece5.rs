@@ -330,7 +330,7 @@ fn v5_file(g: &mut Gen, portable: bool) -> Vec<u8> {
     b
 }
 
-fn mat_file(g: &mut Gen, portable: bool, several: bool) -> Vec<u8> {
+pub(crate) fn mat_file(g: &mut Gen, portable: bool, several: bool) -> Vec<u8> {
     let mut b = if g.chance(2) || several {
         let k = if several { g.int(1, 3) } else { 1 };
         (0..k).flat_map(|_| v4_var(g, portable)).collect()

@@ -154,8 +154,8 @@ impl Reader<'_> {
         let got = self.fp.read_bytes(&mut b);
         if got < 4 {
             self.sync(g);
-            if self.who == "gelxRead" {
-                lx_message(g);
+            if self.who != "genesisRead" {
+                lx_message(g, self.who);
             }
             log::error_printf(g, err, ERROR_BADFILE, "genesisRead(): could not read file");
         }
@@ -730,11 +730,11 @@ pub fn gelx_read_as_patched(
     gelx(g, out, err, dir, fname, read_volume, false)
 }
 
-/// FS-684: gelxRead's messages name genesisRead.
-fn lx_message(g: &mut Globals) {
+/// FS-684: gelxRead's and ximgRead's messages name genesisRead.
+fn lx_message(g: &mut Globals, who: &str) {
     g.notices.add(
         &FS_684,
-        "gelxRead: its messages name genesisRead, as FreeSurfer's do",
+        format!("{who}: its messages name genesisRead, as FreeSurfer's do"),
     );
 }
 
@@ -759,7 +759,7 @@ fn gelx(
 ) -> Result<Option<Mri>, Fatal> {
     const WHO: &str = "gelxRead";
     if !utils::file_exists(dir, fname) {
-        lx_message(g);
+        lx_message(g, WHO);
         return Ok(fail0(
             g,
             err,
@@ -791,7 +791,7 @@ fn gelx(
         }
     }
     if !(good && e == 1 && s == 1 && ic == 1) {
-        lx_message(g);
+        lx_message(g, WHO);
         return Ok(fail0(
             g,
             err,
@@ -833,7 +833,7 @@ fn gelx(
         Ok(f) => f,
         Err(e) => {
             g.errno = e;
-            lx_message(g);
+            lx_message(g, WHO);
             return Ok(fail0(
                 g,
                 err,
@@ -882,7 +882,7 @@ fn gelx(
             Ok(f) => f,
             Err(e) => {
                 g.errno = e;
-                lx_message(g);
+                lx_message(g, WHO);
                 return Ok(fail0(
                     g,
                     err,
@@ -901,7 +901,214 @@ fn gelx(
                     g.errno = e;
                 }
                 fp.close();
-                lx_message(g);
+                lx_message(g, WHO);
+                return Ok(fail0(
+                    g,
+                    err,
+                    ERROR_BADFILE,
+                    &format!("genesisRead(): error reading from file file {name}"),
+                ));
+            }
+        }
+        fp.close();
+        i = i.wrapping_add(1);
+        if i < im_low {
+            break;
+        }
+    }
+    Ok(Some(m))
+}
+
+/// XIMG's fixed offsets: the voxels and the image header (whatever the file says).
+const XIMG_PIXEL_DATA_OFFSET: i32 = 8432;
+const XIMG_IMAGE_HEADER_OFFSET: i32 = 2308;
+
+/// `ximgRead(fname, read_volume)`: a GE XIMG series (Genesis files with XIMG's header
+/// corrections), as `mri_read` calls it.
+///
+/// `XIMG: using XIMG header corrections` first (standard output). The name and the series as
+/// genesisRead's (§110 of the spec) with one series for `.MR` names (`<stem>%d.MR`) and no
+/// `GE_ODD`/`GE_EVEN`; the messages name genesisRead (FS-684). The first file's pixel data offset
+/// (byte 4) and image header offset (byte 148) are printed (`XIMG: pixel data offset is <n>, using
+/// offset 8432`, `XIMG: image header offset is <n>, using offset 2308`) and replaced by those
+/// constants; the image header's fields at genesisRead's places but the thickness and pixel sizes 2
+/// bytes later, TR and the corners 6 bytes later (TI and TE where genesisRead reads them, inside
+/// TR's bytes); one frame; `KILLIANY_SWAP` as genesisRead. The voxels from byte 8,432 of each file.
+pub fn ximg_read(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    fname: &str,
+    read_volume: bool,
+) -> Result<Option<Mri>, Fatal> {
+    const WHO: &str = "ximgRead";
+    let _ = out.write_all(b"XIMG: using XIMG header corrections\n");
+    if !utils::file_exists(dir, fname) {
+        lx_message(g, WHO);
+        return Ok(fail0(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("genesisRead(): error opening file {fname}"),
+        ));
+    }
+    if fname.len() >= STRLEN {
+        g.notices.add(
+            &FS_249,
+            format!(
+                "{WHO}: a name of {} bytes used whole (FreeSurfer's buffer holds 1023)",
+                fname.len()
+            ),
+        );
+    }
+    let (fdir, base) = match fname.rfind('/') {
+        None => ("", fname),
+        Some(i) => (&fname[..=i], &fname[i + 1..]),
+    };
+    let bb = base.as_bytes();
+    let (im_init, series) = if bb.starts_with(b"I.") {
+        let s = Series {
+            dir: fdir.to_owned(),
+            pre: "I.".into(),
+            pad: true,
+            suf: String::new(),
+        };
+        (cstd::atoi(&bb[2..]), s)
+    } else if bb.len() >= 3 && bb.ends_with(b".MR") {
+        let stem = &base[..base.len() - 3];
+        let digits = stem
+            .bytes()
+            .rev()
+            .take_while(|c| c.is_ascii_digit())
+            .count();
+        let (pre, num) = stem.split_at(stem.len() - digits);
+        fit(g, err, WHO, 7341, &format!("{pre}%d.MR"));
+        let s = Series {
+            dir: fdir.to_owned(),
+            pre: pre.to_owned(),
+            pad: false,
+            suf: ".MR".into(),
+        };
+        (cstd::atoi(num.as_bytes()), s)
+    } else {
+        lx_message(g, WHO);
+        return Ok(fail0(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("genesisRead(): can't determine file name format for {fname}"),
+        ));
+    };
+    let own = format!(
+        "{}{}{}",
+        series.pre,
+        if series.pad { "%03d" } else { "%d" },
+        series.suf
+    );
+    fit(g, err, WHO, 7356, &own);
+    fit(g, err, WHO, 7360, &series.format());
+    series.note_percent(g, WHO);
+    let (im_low, im_high) = extent(dir, &series, im_init, 1);
+    let mut header = mri::mri_alloc_header(g, out, err, 1, 1, 1, MRI_SHORT, 1)?;
+    header.vg.depth = im_high.wrapping_sub(im_low).wrapping_add(1);
+    header.imnr0 = 1;
+    header.imnr1 = header.vg.depth;
+    let first_name = series.name(im_low);
+    let fp = match CFile::open(dir, &first_name, "r") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            lx_message(g, WHO);
+            return Ok(fail0(
+                g,
+                err,
+                ERROR_BADFILE,
+                &format!("genesisRead(): error opening file {first_name}\n"),
+            ));
+        }
+    };
+    let mut r = Reader { fp, who: WHO };
+    r.seek(g, 4);
+    let pixel = r.local_int(g, err, "the pixel data's offset");
+    let _ = write!(out, "XIMG: pixel data offset is {pixel}, ");
+    let _ = writeln!(out, "using offset {XIMG_PIXEL_DATA_OFFSET}");
+    r.seek(g, 8);
+    let width = r.local_int(g, err, "the width");
+    let height = r.local_int(g, err, "the height");
+    r.seek(g, 148);
+    let ih = r.local_int(g, err, "the image header's offset");
+    let _ = write!(out, "XIMG: image header offset is {ih}, ");
+    let _ = writeln!(out, "using offset {XIMG_IMAGE_HEADER_OFFSET}");
+    let at = |k: i32| i64::from(XIMG_IMAGE_HEADER_OFFSET + k);
+    header.vg.width = width;
+    header.vg.height = height;
+    header.vg.fname.strcpy_bytes(fname.as_bytes());
+    r.seek(g, at(26 + 2));
+    header.thick = r.field(g, err, header.thick, "the slice thickness");
+    header.vg.zsize = header.thick;
+    r.seek(g, at(50 + 2));
+    header.vg.xsize = r.field(g, err, header.vg.xsize, "the pixel width");
+    header.vg.ysize = r.field(g, err, header.vg.ysize, "the pixel height");
+    header.ps = header.vg.xsize;
+    r.seek(g, at(194 + 6));
+    header.tr = (f64::from(r.fread_int(g)) / 1e3) as f32;
+    r.seek(g, at(198));
+    header.ti = (f64::from(r.fread_int(g)) / 1e3) as f32;
+    r.seek(g, at(202));
+    header.te = (f64::from(r.fread_int(g)) / 1e3) as f32;
+    r.seek(g, at(254));
+    header.flip_angle = (TWO_PI * f64::from(r.fread_short(g, err))) / 360.0;
+    r.seek(g, at(130 + 6));
+    let mut k = corners(g, err, &mut r);
+    let nlength = length(k.n[0], k.n[1], k.n[2]);
+    for c in &mut k.n {
+        *c = sse::div(*c, nlength);
+    }
+    if env.get("KILLIANY_SWAP").is_some() {
+        let _ = out.write_all(b"WARNING - swapping normal direction!\n");
+        k.n[1] = -k.n[1];
+    }
+    geometry(&mut header, &k, false);
+    r.fp.close();
+    let (w, h, d) = (header.vg.width, header.vg.height, header.vg.depth);
+    let mut m = if read_volume {
+        mri::mri_alloc(g, out, err, w, h, d, header.mtype)?
+    } else {
+        mri::mri_alloc_header(g, out, err, w, h, d, header.mtype, 1)?
+    };
+    mri::mri_copy_header(g, out, err, &header, Some(&mut m))?;
+    if !read_volume {
+        return Ok(Some(m));
+    }
+    let mut i = im_low;
+    while i <= im_high {
+        let name = series.name(i);
+        let mut fp = match CFile::open(dir, &name, "r") {
+            Ok(f) => f,
+            Err(e) => {
+                g.errno = e;
+                lx_message(g, WHO);
+                return Ok(fail0(
+                    g,
+                    err,
+                    ERROR_BADFILE,
+                    &format!("genesisRead(): error opening file {name}"),
+                ));
+            }
+        };
+        let mut errno = g.errno;
+        fp.fseek(&mut errno, i64::from(XIMG_PIXEL_DATA_OFFSET), 0);
+        g.errno = errno;
+        let slice = i.wrapping_sub(im_low);
+        for y in 0..m.vg.height {
+            if !read_row(&mut fp, &mut m, y, slice, 0) {
+                if let Some(e) = fp.read_errno() {
+                    g.errno = e;
+                }
+                fp.close();
+                lx_message(g, WHO);
                 return Ok(fail0(
                     g,
                     err,

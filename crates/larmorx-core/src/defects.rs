@@ -1996,13 +1996,17 @@ defects! {
     FS_681 = "FS-681", "FreeSurfer", false,
         "reading GE Genesis files named I.<number> prints a second 'fname_format2 :' line from memory never written, or none (kept: no such line)";
     FS_682 = "FS-682", "FreeSurfer", true,
-        "reading GE Genesis or GE LX files, a % in the folder's or the series' name is taken as a C conversion when the other files' names are made: wrong names, a crash or an abort";
+        "reading GE Genesis, GE LX or GE XIMG files, a % in the folder's or the series' name is taken as a C conversion when the other files' names are made: wrong names, a crash or an abort";
     FS_683 = "FS-683", "FreeSurfer", true,
         "a GE Genesis series of several echoes (their count in the file's header) is read as a volume with one slice per file in every echo: the slices past the file count divided by the echoes stay 0, and the centre is computed for the larger depth";
     FS_684 = "FS-684", "FreeSurfer", false,
-        "reading GE LX files, the error messages name genesisRead (kept)";
+        "reading GE LX or GE XIMG files the error messages name genesisRead, and reading GE Signa files is_signa and read_signa (kept)";
     FS_685 = "FS-685", "FreeSurfer", true,
         "reading a GE Genesis series of several echoes, FreeSurfer frees a header whose frame count it raised after allocating one frame: it reads past the frame table, and depending on memory contents crashes (signal 11 or an abort) or goes on";
+    FS_686 = "FS-686", "FreeSurfer", true,
+        "a GE Signa series of several echoes is read as a volume of (files - 1) / 2 + 1 slices whatever the echo count, each file's slice advanced as for two echoes: with three or more echoes files land in the wrong slices and frames and past the volume (memory corruption or a crash); with GE_ODD or GE_EVEN the volume has one frame while the files are read as echoes (the same, or every file into the first slice)";
+    FS_687 = "FS-687", "FreeSurfer", true,
+        "a GE Signa slice file shorter than its slice gives a slice of the bytes it holds and zeros (or an earlier file's bytes), byte-swapped, without a message";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

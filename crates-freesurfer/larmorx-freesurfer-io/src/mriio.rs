@@ -283,13 +283,11 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
     Some(match mtype {
         SIEMENS_FILE => "Siemens",
         MRI_GCA_FILE => "GCA",
-        SIGNA_FILE => "GE Signa",
         BRIK_FILE => "AFNI BRIK",
         MRI_MINC_FILE => "MINC",
         MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
-        XIMG_FILE => "GE XIMG",
         NRRD_FILE => "NRRD",
         MRI_CURV_FILE => "curvature",
         IMAGE_FILE => "image",
@@ -460,6 +458,10 @@ pub fn mri_read(
         crate::mriio_ge::genesis_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::GE_LX_FILE {
         crate::mriio_ge::gelx_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::XIMG_FILE {
+        crate::mriio_ge::ximg_read(g, out, err, env, dir, &copy, volume_flag)?
+    } else if mtype == identify::SIGNA_FILE {
+        crate::signa::signa_read(g, out, err, env, dir, &copy, volume_flag)?
     } else if mtype == identify::NPY_FILE {
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {

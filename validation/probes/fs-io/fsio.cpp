@@ -1769,11 +1769,14 @@ void run_piece6(const std::string &cmd0)
   // piece 19 (track A relay 28): grd and grh read GE Genesis and GE LX series as mrd and mrh do
   // (FreeSurfer crashes: FS-680); gfd and gfh (voxels, header) call genesisReadFixed (type 4) or
   // gelxReadFixed (type 5) directly
+  // piece 20 (track A relay 28): srd and srh read GE Signa and GE XIMG series as mrd and mrh do
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
-      cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd"   ? "mrd"
-      : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" ? "mrh"
-                                                                                          : cmd0;
+      cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd"
+          ? "mrd"
+      : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh"
+          ? "mrh"
+          : cmd0;
   if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
   if (nifti) Gdiag_no = (int)geti();
   if (cmd0 == "ard" || cmd0 == "arh") {
@@ -2728,7 +2731,8 @@ int main(int argc, char *argv[])
     // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
     {
       static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
-                                 "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh"};
+                                 "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
+                                 "srd", "srh"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

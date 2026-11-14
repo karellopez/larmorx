@@ -39,6 +39,7 @@
 #include "matrix.h"
 #include "mri.h"
 #include "mri2.h"
+#include "mri_conform.h"
 #include "region.h"
 #include "talairachex.h"
 #include "transform.h"
@@ -210,7 +211,19 @@ void oam(const AffineMatrix *am)
   for (int i = 0; i < 16; i++) of(am->mat[i]);
 }
 
-void put_vol(const MRI *m)
+// FNV-1a (64 bits) of bytes: the voxels of a conformed (256^3) volume
+uint64_t fnv1a(const unsigned char *p, size_t n)
+{
+  uint64_t h = 0xcbf29ce484222325ull;
+  for (size_t i = 0; i < n; i++) {
+    h ^= p[i];
+    h *= 0x100000001b3ull;
+  }
+  return h;
+}
+
+// the volume; with `hash`, its voxels' FNV-1a and byte count instead of their hex
+void put_vol(const MRI *m, bool hash = false)
 {
   if (!m) { out += "NULL "; return; }
   oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
@@ -221,8 +234,15 @@ void put_vol(const MRI *m)
   oam(m->i_to_r__);
   om(m->r_to_i__);
   if (m->chunk && m->ischunked) {
-    std::string b((const char *)m->chunk, m->bytes_total);
-    ohex(b);
+    if (hash) {
+      char b[48];
+      snprintf(b, sizeof b, "fnv %016" PRIx64 " %zu ", fnv1a((const unsigned char *)m->chunk, m->bytes_total),
+               (size_t)m->bytes_total);
+      out += b;
+    } else {
+      std::string b((const char *)m->chunk, m->bytes_total);
+      ohex(b);
+    }
   } else {
     out += "nochunk ";
   }
@@ -1945,6 +1965,31 @@ void run_case()
       fflush(stdout);
       oi(h->nbins);
       for (int i = 0; i < h->nbins; i++) { of(h->bins[i]); of(h->counts[i]); }
+    }
+  } else if (cmd == "conform") {
+    // mri_conform.cpp: 0 MRIconform (the voxels hashed), 1 MRIconformedTemplate, 2 MRIgetConformMatrix
+    int kind = geti();
+    MRI *m = get_vol();
+    fill_paint(m);
+    if (kind == 0) {
+      fflush(stdout);
+      MRI *r = MRIconform(m);
+      fflush(stdout);
+      put_vol(r, true);
+    } else if (kind == 1) {
+      int cw = geti();
+      double cs = getd();
+      int keep = geti();
+      fflush(stdout);
+      MRI *r = MRIconformedTemplate(m, cw, cs, keep);
+      fflush(stdout);
+      put_vol(r);
+    } else {
+      fflush(stdout);
+      MATRIX *M = MRIgetConformMatrix(m);
+      fflush(stdout);
+      om(M);
+      put_geom(m, false);
     }
   } else {
     fail("unknown command");

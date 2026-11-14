@@ -1807,6 +1807,10 @@ defects! {
         "the mask of listed labels (MRImatchSegs) made in the segmentation itself clears each voxel before reading its label: every voxel is matched as label 0";
     FS_490 = "FS-490", "FreeSurfer", true,
         "the histogram of a segment's intensities (HISTOseg) with a bin count of 0 counts each matching voxel in the bin before the first: memory it does not own";
+    FS_491 = "FS-491", "FreeSurfer", true,
+        "the conformed template that keeps a volume's direction cosines, for a volume whose orientation has no left-right, inferior-superior or anterior-posterior axis (cosines not good, or two axes along one direction), reads a voxel size and a field of view that are not the volume's: memory contents";
+    FS_492 = "FS-492", "FreeSurfer", true,
+        "the conformed template that keeps a volume's direction cosines converts a field of view beyond the 32-bit integer range, or NaN, to the integer -2147483648, and the difference of two fields of view wraps around";
 }
 
 /// The register entry with ID `id`.

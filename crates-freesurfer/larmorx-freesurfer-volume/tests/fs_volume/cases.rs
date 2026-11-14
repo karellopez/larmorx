@@ -27,6 +27,7 @@ use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
 use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::combine as cb;
+use larmorx_freesurfer_volume::conform as cf;
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::deriv as dv;
 use larmorx_freesurfer_volume::frames as fr;
@@ -2530,6 +2531,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             }
             "talcras" | "talmat" | "talpt" | "talvol" => r22_gen(&mut g, &mut t, cmd),
             "dilate" | "dilu" | "msegs" | "sstat" | "hseg" => r22_gen_segs(&mut g, &mut t, cmd),
+            "conform" => r23_gen_conform(&mut g, &mut t),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -2995,7 +2997,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 171] = [
+pub const COMMANDS: [&str; 172] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3167,6 +3169,7 @@ pub const COMMANDS: [&str; 171] = [
     "msegs",
     "sstat",
     "hseg",
+    "conform",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -3384,6 +3387,11 @@ impl Out {
         }
     }
     fn vol(&mut self, m: Option<&Mri>) {
+        self.vol_with(m, false);
+    }
+    /// The volume; with `hash`, its voxels' FNV-1a (64 bits) and byte count instead of their hex
+    /// (`fsvolume.cpp`'s `put_vol(m, true)`: a conformed volume's 256^3 voxels).
+    fn vol_with(&mut self, m: Option<&Mri>, hash: bool) {
         let Some(m) = m else {
             self.0 += "NULL ";
             return;
@@ -3410,6 +3418,14 @@ impl Out {
         self.am(m.vg.i_to_r.as_ref());
         self.m(m.vg.r_to_i.as_ref());
         match &m.chunk {
+            Some(c) if hash => {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for &x in c {
+                    h ^= u64::from(x);
+                    h = h.wrapping_mul(0x0100_0000_01b3);
+                }
+                self.0 += &format!("fnv {h:016x} {} ", c.len());
+            }
             Some(c) => self.hex(c),
             None => self.0 += "nochunk ",
         }
@@ -5472,6 +5488,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "talcras" | "talmat" | "talpt" | "talvol" => r22_tal(cx, t, o, cmd)?,
         "dilate" | "dilu" | "msegs" => r22_dilate_msegs(cx, t, o, cmd)?,
         "sstat" | "hseg" => r22_stats(cx, t, o, cmd)?,
+        "conform" => r23_conform(cx, t, o)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -6065,4 +6082,133 @@ pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>
     ids.sort_unstable();
     ids.dedup();
     (format!("{result} | {text}"), ids)
+}
+
+/// Direction cosines (columns x, y, z; each r, a, s) a scanner gives, a slight rotation, and
+/// degenerate ones (two axes along one direction: FS-491; a NaN).
+const COSINES: [[f32; 9]; 9] = [
+    [-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0],
+    [-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0],
+    [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+    [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0],
+    [0.0, 1.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0],
+    [0.984_807_7, 0.173_648_18, 0.0, -0.173_648_18, 0.984_807_7, 0.0, 0.0, 0.0, 1.0],
+    [1.0, 0.0, 0.0, 0.9, 0.1, 0.0, 0.0, 0.0, 1.0],
+    [-1.0, 0.0, 0.0, 0.0, f32::NAN, -1.0, 0.0, 1.0, 0.0],
+];
+
+/// A scanner-like geometry's tokens (`geom`'s order): voxel sizes, good RAS mostly, the cosines
+/// of [`COSINES`] (`exact`: coronal, 1 mm, good: the conformed grid itself), a centre near 0.
+fn real_geom(g: &mut Gen, s: Shape, exact: bool) -> Vec<String> {
+    let mut t = vec!["1".to_owned()];
+    for v in [s.w, s.h, s.d] {
+        t.push(v.to_string());
+    }
+    for _ in 0..3 {
+        let v = if exact {
+            1.0
+        } else if g.chance(20) {
+            f32::NAN
+        } else {
+            g.pick(&[1.0f32, 1.0, 0.9375, 1.2, 2.0, 0.5, 3.0])
+        };
+        t.push(fx(v));
+    }
+    t.push(if exact || !g.chance(6) { "1" } else { "0" }.to_owned());
+    let c = if exact { COSINES[0] } else { COSINES[g.below(COSINES.len() as u64) as usize] };
+    for v in c {
+        t.push(fx(v));
+    }
+    for _ in 0..3 {
+        t.push(fx(if g.chance(3) { 0.0 } else { num(g, -30, 30, 4) }));
+    }
+    for _ in 0..3 {
+        t.push(fx(0.0));
+    }
+    t.push(g.pick(&NAMES).to_owned());
+    t
+}
+
+/// `mri_conform.cpp`'s cases (relay 23): `MRIconform` (kind 0; the result's voxels hashed),
+/// `MRIconformedTemplate` (1), `MRIgetConformMatrix` (2).
+fn r23_gen_conform(g: &mut Gen, t: &mut Vec<String>) {
+    let kind = g.pick(&[0i64, 1, 1, 2, 0, 1]);
+    t.push(kind.to_string());
+    let mut s = shape(g);
+    s.hdr = s.hdr && g.chance(6);
+    s.nf = s.nf.min(2);
+    // the conformed grid itself (no resampling): bytes, 256^3, coronal, 1 mm
+    let exact = kind == 0 && g.chance(6);
+    if exact {
+        s = Shape {
+            w: 256,
+            h: 256,
+            d: 256,
+            ty: 0,
+            nf: 1,
+            hdr: false,
+            drop: false,
+        };
+    } else if g.chance(2) {
+        (s.w, s.h, s.d) = (g.int(4, 24), g.int(4, 24), g.int(2, 16));
+    }
+    let start = t.len() + 7;
+    vol_of(g, t, s);
+    if exact || !g.chance(3) {
+        let geo = real_geom(g, s, exact);
+        t.splice(start..start + geo.len(), geo);
+    }
+    if exact {
+        // no fills (16.7 million voxels), a few voxels painted
+        t.push("0".into());
+        let n = g.int(0, 6);
+        t.push(n.to_string());
+        for _ in 0..n {
+            for _ in 0..3 {
+                t.push(g.int(100, 155).to_string());
+            }
+            t.push("0".into());
+            t.push(fx(g.pick(&[0.0f32, 255.0, 17.0, 300.0, -4.0])));
+        }
+    } else {
+        let vals: &[f32] = &[0.0, 50.0, 100.0, 200.0, 37.5, 1000.0, -20.0];
+        fill_paint(g, t, s, &[&[0.0, 10.0, 100.0, 250.0]], &[vals]);
+    }
+    if kind == 1 {
+        t.push(g.pick(&[256i64, 256, 128, 255, 64, 1, 0]).to_string());
+        let cs = if g.chance(12) {
+            g.pick(&[f64::NAN, 1e10, 0.0])
+        } else {
+            g.pick(&[1.0, 1.0, 0.7, 0.5, 2.0, 1.2])
+        };
+        t.push(dx(cs));
+        t.push(g.pick(&[1i64, 1, 0]).to_string());
+    }
+}
+
+#[inline(never)]
+fn r23_conform(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let kind = t.i();
+    let mut m = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut m)?;
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    match kind {
+        0 => {
+            let env = Environment::default();
+            let r = cf::mri_conform(g, a, b, &env, &m)?;
+            o.vol_with(r.as_ref(), true);
+        }
+        1 => {
+            let (cw, cs, keep) = (t.i(), t.d(), t.i());
+            let r = cf::mri_conformed_template(g, a, b, &m, cw, cs, keep != 0)?;
+            o.vol(Some(&r));
+        }
+        _ => {
+            let r = cf::mri_get_conform_matrix(g, a, b, &mut m)?;
+            o.m(r.as_ref());
+            o.geom_v(&m.vg, false);
+        }
+    }
+    Ok(())
 }

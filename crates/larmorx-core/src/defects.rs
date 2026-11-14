@@ -1945,6 +1945,34 @@ defects! {
         "writing ANALYZE files ignores the files' close: files whose last bytes could not be written (a full disk) are reported as written";
     FS_656 = "FS-656", "FreeSurfer", true,
         "an ANALYZE voxel offset, or a written volume's smallest and largest value or origin, outside the integer range it is converted to (a NaN included) becomes the lowest int (the offset is then ignored), or wraps around 16 bits for the origin";
+    FS_657 = "FS-657", "FreeSurfer", true,
+        "a COR volume's header (COR-.info) whose required field (imnr0, imnr1, ptype, x, y, thick, psiz, strtx to endz) has no number after its name counts the field as given and uses memory contents for it";
+    FS_658 = "FS-658", "FreeSurfer", true,
+        "a COR header's flip-angle line is read eleven characters in, where the writer's 'flip angle ' ends: a shorter line gives a number from an earlier, longer line of the file or from memory contents";
+    FS_659 = "FS-659", "FreeSurfer", true,
+        "writing a volume that is not 8-bit as COR writes the first bytes of each row (a quarter of a float row) as the slice's voxels, after only a warning";
+    FS_660 = "FS-660", "FreeSurfer", true,
+        "writing COR slices from imnr0 to imnr1 when that range is longer than the volume's depth writes the next frames' slices as further slices, then crashes past the voxels";
+    FS_661 = "FS-661", "FreeSurfer", true,
+        "a bshort or bfloat volume's geometry file (<stem>.bhdr) that opens but cannot be read (a folder of that name) is read again for ever, printing an error each time";
+    FS_662 = "FS-662", "FreeSurfer", true,
+        "a bshort or bfloat slice header (<stem>_000.hdr) without its four numbers leaves the rows, columns, frames or byte order it lacks as memory contents (an error is printed, the reading goes on)";
+    FS_663 = "FS-663", "FreeSurfer", true,
+        "writing a bvolume for a subject warns 'overwriting file register.dat' whether or not register.dat exists";
+    FS_664 = "FS-664", "FreeSurfer", true,
+        "writing a bshort or bfloat volume writes its geometry to <stem>.hdr, while reading looks for <stem>.bhdr: a written volume read back loses its orientation, sizes and timing (the coronal 1 mm default)";
+    FS_665 = "FS-665", "FreeSurfer", true,
+        "writing as bshort or bfloat a volume of another type that names a subject, with SUBJECTS_DIR unset, crashes after the slices are written";
+    FS_666 = "FS-666", "FreeSurfer", true,
+        "writing a volume with the bhdr type to a name that does not end in .bhdr writes the files (null)_000.bshort or .bfloat and their headers in the working folder";
+    FS_667 = "FS-667", "FreeSurfer", false,
+        "writing a bvolume for a subject builds both volumes' direction matrices for register.dat from the R components alone (their A and S rows repeat them), so the matrices are singular and register.dat is written only when rounding hides that (kept: the geometry file is written instead, as always)";
+    FS_668 = "FS-668", "FreeSurfer", true,
+        "a bshort or bfloat geometry file's last line is ignored when it does not end with a newline";
+    FS_669 = "FS-669", "FreeSurfer", true,
+        "a bshort or bfloat geometry file's line that starts with a NUL byte makes the reader read, and possibly change, the byte before its line buffer";
+    FS_670 = "FS-670", "FreeSurfer", true,
+        "a bshort or bfloat volume in the root folder (/<stem>_000.bshort) is read from the working folder instead";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

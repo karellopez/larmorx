@@ -36,7 +36,7 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
-    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432,
+    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666,
 };
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
@@ -281,12 +281,8 @@ pub fn mri_read_type(
 fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MRI_CORONAL_SLICE_DIRECTORY => "COR",
         SIEMENS_FILE => "Siemens",
         MRI_GCA_FILE => "GCA",
-        BHDR => "bhdr",
-        BSHORT_FILE => "bshort",
-        BFLOAT_FILE => "bfloat",
         GENESIS_FILE => "GE Genesis",
         SIGNA_FILE => "GE Signa",
         GE_LX_FILE => "GE LX",
@@ -446,6 +442,20 @@ pub fn mri_read(
     }
     let read = if mtype == MRI_MGH_FILE {
         mgh_read(g, out, err, env, dir, &copy, volume_flag, -1)?
+    } else if mtype == identify::MRI_CORONAL_SLICE_DIRECTORY {
+        crate::mriio_cor::cor_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::BHDR {
+        let first = identify::bhdr_firstslicefname(g, dir, &copy);
+        let t = identify::bhdr_precision(g, dir, &copy);
+        match first {
+            Some(f) => crate::mriio_bvol::bvolume_read(g, out, err, dir, &f, volume_flag, t)?,
+            // no first slice: the precision is unknown too, which bvolumeRead refuses first
+            None => crate::mriio_bvol::bvolume_read(g, out, err, dir, "", volume_flag, t)?,
+        }
+    } else if mtype == identify::BSHORT_FILE {
+        crate::mriio_bvol::bvolume_read(g, out, err, dir, &copy, volume_flag, MRI_SHORT)?
+    } else if mtype == identify::BFLOAT_FILE {
+        crate::mriio_bvol::bvolume_read(g, out, err, dir, &copy, volume_flag, MRI_FLOAT)?
     } else if mtype == identify::NPY_FILE {
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
     } else if mtype == identify::BRUKER_FILE {
@@ -557,12 +567,8 @@ pub fn mri_read(
 fn write_not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MRI_CORONAL_SLICE_DIRECTORY => "COR",
         MRI_MINC_FILE => "MINC",
         IMAGE_FILE => "image",
-        BHDR => "bhdr",
-        BSHORT_FILE => "bshort",
-        BFLOAT_FILE => "bfloat",
         BRIK_FILE => "AFNI BRIK",
         MGH_MORPH => "GCA morph (m3z)",
         ITK_MORPH => "ITK warp",
@@ -681,6 +687,39 @@ pub fn mri_write_type(
     let error = if mtype == GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mri_write_gifti(g, &mut io, dir, m, fname)?
+    } else if mtype == MRI_CORONAL_SLICE_DIRECTORY {
+        crate::mriio_cor::cor_write(g, out, err, dir, m, fname)?
+    } else if mtype == BHDR {
+        let ext = if m.mtype == MRI_SHORT { "bshort" } else { "bfloat" };
+        let t = if m.mtype == MRI_SHORT { MRI_SHORT } else { MRI_FLOAT };
+        let name = match identify::bhdr_stem(fname) {
+            Some(stem) => format!("{stem}_000.{ext}"),
+            None => {
+                // FS-666: no stem; glibc prints the null pointer as "(null)"
+                g.notices.add(
+                    &FS_666,
+                    if g.notices.reproduce() {
+                        "MRIwriteType as bhdr of a name that is not .bhdr: written as (null)_000, as in FreeSurfer"
+                    } else {
+                        "MRIwriteType as bhdr of a name that is not .bhdr: refused (FreeSurfer writes (null)_000 files)"
+                    },
+                );
+                if g.notices.fix() {
+                    return Ok(fail_code(
+                        g,
+                        err,
+                        ERROR_BADPARM,
+                        &format!("MRIwriteType(): {fname} is not a .bhdr name"),
+                    ));
+                }
+                format!("(null)_000.{ext}")
+            }
+        };
+        crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, &name, t)?
+    } else if mtype == BSHORT_FILE {
+        crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, fname, MRI_SHORT)?
+    } else if mtype == BFLOAT_FILE {
+        crate::mriio_bvol::bvolume_write(g, out, err, env, dir, m, fname, MRI_FLOAT)?
     } else if mtype == MRI_MGH_FILE {
         crate::mriio_write::mgh_write(g, out, err, env, dir, m, fname, -1, intent)?
     } else if mtype == NII_FILE {

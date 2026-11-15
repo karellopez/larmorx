@@ -2278,3 +2278,29 @@ port: fs.io `mriio.rs` (`mri_read_volume`, `mri_read_ex`, `mri_remove_nans`), fs
   FreeSurfer. Results unchanged (every hash suite passes). The other header-sized allocations of fs.core, fs.mri,
   fs.io and fs.gca were checked: labels (FS-426), colour tables (FS-191 and the ASCII readers' limit) and the GCA
   reader (FS-756) were already limited; the rest are zero vectors or bounded by a volume already made.
+
+## Part 31: the conformed-size checks and the command lines (relay 36 of track A)
+
+Sources: `utils/mriio.cpp` 305-318 (`mriConformed`), 320-366 (`MRIfindMinSize`), 368-427 (`MRIfindRightSize`),
+12134-12143 (`MRIaddCommandLine`); `include/mri.h` 185-200 (`VOL_GEOM`'s defaults), 801-802 (`char
+*cmdlines[MAX_CMDS]; int ncmds`). The port: fs.volume `conformed.rs` (beside `getSliceDirection`, which track C
+ported into fs.volume's `coords.rs`: fs.io sits below fs.volume), fs.io `mriio.rs` (`mri_add_command_line`).
+
+- `mriConformed`'s `mri->xsize * 10000` is a `float` product (`mulss`) passed to `nint(double)`; the `||` chain
+  stops at the first failing size, so only the sizes tested can give FS-12's notice.
+- `MRIfindMinSize`: the sizes are widened to `double` for the comparisons and `minsize` is a `double`; the
+  official build keeps `(float)minsize`'s conversion (measured: a signalling NaN size `7fa00001` comes back
+  `7fe00001`): the port quiets it explicitly rather than through a round trip a compiler may fold (the brief's
+  "a float stored through a double"). `nint(fmax / minsize * 10000) / 10000` is an `int` division, then `ceil` of
+  an `int` (a no-op).
+- `MRIfindRightSize`: `(int)ceil(fmax / conform_size)` (`cvttsd2si`: INT_MIN for NaN and beyond `int`: FS-17,
+  INT_MIN then below 256 gives 256 in `reproduce`; the default saturates, NaN to 0 (256) and beyond to `INT_MAX`: a
+  conform size of 0 then prints the warning with 2147483647 slices); `(conform_width - 256.) / 256. < 0.1` keeps
+  widths up to 281 at 256.
+- `MRIaddCommandLine`: `fs::error()` prints and returns; `int i = mri->ncmds++` then `mri->cmdlines[i] = calloc(...)`
+  with `i = 1000` writes the 8-byte pointer over `ncmds` and the 4 bytes after it (FS-842); from then on the count is
+  the pointer's low 32 bits (a heap address), so the next call writes at that index and `mghWrite` walks that many
+  lines. 39 programs call it on the volume they write (recon-all's every step): a volume would need 1,000 steps
+  first.
+- The probe's `acl` builds each line as `line + std::to_string(i)` (a `std::string`, which may hold a NUL: `strcpy`
+  stops there).

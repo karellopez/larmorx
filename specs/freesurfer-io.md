@@ -4356,3 +4356,47 @@ and every message. Measured (2026-11-15, observed): seeds 7, 13 and 21 (286, 862
 identical on all 2,010, 0 different, none skipped; `fix` differs only with notices. The frame records' limit
 (FS-760): `crates-freesurfer/larmorx-freesurfer-mri/tests/frames_count.rs` (the refusal at once, both modes) and the
 measurement of §134 (5) (`<scratch>`'s `frames_probe.py`, kept in `validation/probes/fs-io/frames_probe.py`).
+
+## 136. The conformed-size checks and the command lines (`mriConformed`, `MRIfindMinSize`, `MRIfindRightSize`, `MRIaddCommandLine`)
+
+1. **`mriConformed(geometry)`**: 1 when the geometry is FreeSurfer's conformed grid, else 0. In order, each failing
+   test giving 0 at once: the slice direction (§ the orientation string of the direction cosines: the third letter
+   `P` or `A` is coronal; cosines not good, `ras_good_flag` 0, are `unknown`) must be coronal; the extent exactly
+   256 x 256 x 256; then for the voxel sizes x, y, z in turn, `nint(size * 10000)` must be 10,000, the product in
+   single precision and `nint` FreeSurfer's (`f + 0.5`, or `f - 0.5` below 0, truncated; NaN or beyond `int`:
+   FS-12) (so 1.00004 passes, 1.00005 does not).
+2. **`MRIfindMinSize(geometry, &width)`**: the smallest voxel size by these comparisons (in double precision): when
+   x > y, the smaller of y and z (z when y > z, else y); otherwise x when z > x, else z (a NaN compares false
+   everywhere). Returned as a single-precision value that passed through double precision (a signalling NaN comes
+   back quiet: `7fa00001` gives `7fe00001`). The width: the physical extents `xsize * width`, `ysize * height`,
+   `zsize * depth` (each product in single precision of the size and the extent converted to single precision);
+   their maximum `fmax` (when the first exceeds the second, the larger of the first and the third, the first winning
+   ties; otherwise the third when it exceeds the second, else the second); then `nint(fmax / minsize * 10000)`
+   (double precision) divided by 10,000 as integers (truncated toward 0); at least 256.
+3. **`MRIfindRightSize(geometry, size)`**: `ceil(fmax / size)` (double precision) converted to `int` (NaN or beyond
+   `int`: FS-17); 256 when below 256 or when `(width - 256) / 256 < 0.1` (up to 281). A width above 256 prints on
+   standard error:
+
+       WARNING ==================++++++++++++++++++++++++=======================================
+       The physical sizes are (<fw> mm, <fh> mm, <fd> mm), which cannot fit in 256^3 mm^3 volume.
+       The resulting volume will have <width> slices.
+       If you find problems, please let us know (freesurfer@nmr.mgh.harvard.edu).
+       ==================================================++++++++++++++++++++++++===============
+
+   followed by an empty line; the extents with two decimals (`%.2f`: `nan`, `inf` as the C library writes them).
+4. **`MRIaddCommandLine(volume, line)`**: the line's bytes up to its first NUL recorded as the volume's next command
+   line (the writers store them: §§ MGH tags), `NO_ERROR`. With 1,000 already recorded: the error `can't add cmd to
+   mri since max cmds (<n>) has been reached`, then (FS-842) FreeSurfer writes past its table, so its count of lines
+   becomes memory contents; the port keeps the line in both modes, noted.
+
+## 137. Validation plan (part 31)
+
+Piece 29 of the fs.io probe: `cnf` (the three checks of one geometry: extents 256 or 0, 1, 255, 257, 300, 1,000,
+16,777,217, -1; voxel sizes 1, 1.00004, 0.99996, 1.00005, 0.5 to 3, 0, -1, 1e30, the smallest subnormal, quiet and
+signalling NaNs, infinity; direction cosines coronal, axial, sagittal, oblique, zero, with a NaN, good or not; sizes
+for `MRIfindRightSize` 1, 0.5, 0.7, 0, -1, NaN) and `acl` (0, 1, 2, 3, 999, 1,000 or 1,001 lines on a new volume: a
+line with its number appended; empty, 3,000 bytes, with a NUL inside). Printed: the three results (the size's bits),
+the warning, the sum of the return values, the count and the first and last lines. Not compared: the 1,001st line
+(FS-842: FreeSurfer's count is memory contents). Measured (2026-11-15, observed): seeds 7, 13 and 21 (850 piece-29
+cases each): `reproduce` identical on all 2,368 compared, 182 skipped (FS-842); `fix` differs only with notices
+(FS-12, FS-17).

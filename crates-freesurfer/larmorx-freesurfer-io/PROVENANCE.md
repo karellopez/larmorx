@@ -302,6 +302,7 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 1141-1143, 2596-2760; `utils/mri.cpp` 12658-12679 (`MRIlimits`, through fs.mri); `packages/minc`'s `set_volume_direction_cosine` (its exit) and its output's dimension-name conversion (FS-797) | `MRIwriteType`'s MINC branch, `mincWrite` over `larmorx_io::minc`'s writer (track C's port of MINC 1.5.1's output and netCDF 3.6.0-p1's writer) in `FsMinc` (FS-746 to FS-748, FS-58; relay 34) | `mriio_minc.rs`, `minc.rs`, `mriio.rs` |
 | `utils/mriio.cpp` 1001-1047, 12086-12131; `utils/utils.cpp` 996-1008 (`FileNameFromWildcard`, through fs.core) | `MRIread`, `MRIreadEx`, `MRIremoveNaNs` (FS-841, FS-249; relay 36) | `mriio.rs` (`mri_read_volume`, `mri_read_ex`, `mri_remove_nans`), `examples/read_volume.rs` |
 | `utils/mriio.cpp` 3450-3458, 3543-3544 | `get_b_info`'s frame tables checked with fs.mri's `frames_calloc_fails` (FS-760; relay 36) | `mriio_bvol.rs` |
+| `utils/mriio.cpp` 12134-12143 | `MRIaddCommandLine` (FS-842; relay 36) | `mriio.rs` (`mri_add_command_line`) |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
 the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte

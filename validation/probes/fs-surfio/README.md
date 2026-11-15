@@ -353,9 +353,31 @@ read and write `NO_ERROR`; the 42 new-format files the port writes are the recor
 byte (the MGH overlay `w-g.pct.mgh` is the eighth kind: its new-format copy is another format);
 FreeSurfer 33.5 s, the port 49 s (observed).
 
+Relay 36 of track D (the 49th to 51st commands; `specs/freesurfer-surfio.md` §124-125; findings §29):
+`pvw` (the patch, `MRISwriteIntoVolume`, the value readers `MRISreadValues` and
+`MRISreadValuesIntoArray`, the three-vector volumes: normals, white normals, principal directions,
+and `MRISreadNormals`), `vps` (another file's positions: `MRISreadVertexPositions` and the white,
+pial, canonical and original-property readers, on a surface read from a triangle or quadrangle file
+of a mesh, its other files of the same mesh moved in every format, a group-average area beside it
+now and then) and `ann` (`MRISwriteAnnotation` and `MRISreadAnnotation`: annotation files, MGH
+segmentations, GIFTI; a surface's and a caller's colour tables). The runner marks `NP` (a format the
+port does not read yet: DICOM, which CTN takes some w files and patches for) and `FS-625u` (a
+caller's colour table FreeSurfer has freed, used again); both, FS-191, FS-622 and FS-623 are counted,
+not compared. Seeds 7, 13, 17: `pvw` 1,000 cases each, `vps` 1,000 then 500 each, `ann` 1,000 each: 0
+different in both modes (`fix`'s `atan2f` last bits in `vps`'s canonical coordinates apart:
+check.py's `fix_libm`). Seed 1, 1,530 cases: 1,480 identical, one `mpg` line hashed as the port's
+(`acos` last bits), 49 `SKIP`, hash `ae997cbd7a99cc74ba69b29e2381ee1b84f9f111e519c27a1abcb7882bc4f4b6`
+(the test, from the clean commit 16bade30; seed 1's `gwr` writes take no folder that does not exist:
+Windows resolves `nodir/..` by the name). `real.py --pvw`: 30 of 30 identical in both modes;
+`--vps`: 6 of 6 with `reproduce` (the default's `atan2f` changes `theta` and `phi`); `--ann`: 24 of
+24 in both modes, every written annotation file the recorded one byte for byte (observed).
+
 ```
 validation/probes/fs-surfio/build.sh <workspace>
 scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 66000
 scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py
 scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py --curv
+scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py --pvw
+scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py --vps
+scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py --ann
 ```

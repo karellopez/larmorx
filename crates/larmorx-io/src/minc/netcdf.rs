@@ -663,7 +663,7 @@ fn var_shape(v: &mut Var, dims: &[Dim]) -> Result<(), i32> {
         // variable too big for the format (FS-777).
         X_UINT_MAX
     };
-    if matches!(v.ty, NC_BYTE | NC_CHAR | NC_SHORT) && v.len % 4 != 0 {
+    if matches!(v.ty, NC_BYTE | NC_CHAR | NC_SHORT) && !v.len.is_multiple_of(4) {
         v.len += 4 - v.len % 4;
     }
     Ok(())
@@ -1020,26 +1020,34 @@ pub fn decode(ty: i32, x: &[u8], n: usize) -> Option<Values> {
         NC_CHAR => Values::Char(x[..n].to_vec()),
         NC_SHORT => Values::Short(
             x[..2 * n]
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|c| i16::from_be_bytes([c[0], c[1]]))
                 .collect(),
         ),
         NC_INT => Values::Int(
             x[..4 * n]
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| i32::from_be_bytes([c[0], c[1], c[2], c[3]]))
                 .collect(),
         ),
         // The bits as stored: a signalling NaN stays one.
         NC_FLOAT => Values::Float(
             x[..4 * n]
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| f32::from_bits(u32::from_be_bytes([c[0], c[1], c[2], c[3]])))
                 .collect(),
         ),
         NC_DOUBLE => Values::Double(
             x[..8 * n]
-                .chunks_exact(8)
+                .as_chunks::<8>()
+                .0
+                .iter()
                 .map(|c| {
                     f64::from_bits(u64::from_be_bytes([
                         c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7],

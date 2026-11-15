@@ -281,8 +281,7 @@ pub fn get_sign(ty: i32, sign: i32) -> i32 {
 /// `MI_get_sign_from_string`.
 pub fn sign_from_string(ty: i32, sign: Option<&[u8]>) -> i32 {
     let s = match sign {
-        None => MI_PRIV_DEFSIGN,
-        Some(s) if s.is_empty() => MI_PRIV_DEFSIGN,
+        None | Some(b"") => MI_PRIV_DEFSIGN,
         Some(s) if s == MI_SIGNED => MI_PRIV_SIGNED,
         Some(s) if s == MI_UNSIGNED => MI_PRIV_UNSIGNED,
         Some(_) => MI_PRIV_DEFSIGN,

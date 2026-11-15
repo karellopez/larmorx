@@ -380,12 +380,9 @@ fn initialize_from_id(
     let mut dim_names = Vec::new();
     let mut sizes_in_file = Vec::new();
     for &dimid in &inq.dimids {
-        let (name, size) = match nc::ncdiminq(s, c.streams, cdfid, dimid)? {
-            Some(x) => x,
-            // ncdiminq failed: the name and size buffers keep what they held (memory); an empty
-            // name and size 0 here.
-            None => (Vec::new(), 0),
-        };
+        // ncdiminq failed: the name and size buffers keep what they held (memory); an empty
+        // name and size 0 here.
+        let (name, size) = nc::ncdiminq(s, c.streams, cdfid, dimid)?.unwrap_or_default();
         if name.len() > MI_MAX_ATTSTR_LEN {
             c.notices.add(
                 &d::FS_782,
@@ -729,10 +726,7 @@ fn initialize_from_id(
     let range_specified = vr0 < vr1;
     let mut valid = [0.0f64; 2];
     if no_volume_type {
-        valid = match mi::miget_valid_range(s, c, cdfid, img_var)? {
-            Some(v) => v,
-            None => [0.0, 0.0],
-        };
+        valid = mi::miget_valid_range(s, c, cdfid, img_var)?.unwrap_or([0.0, 0.0]);
     }
     if no_volume_type || !range_specified {
         volume.set_voxel_range(valid[0], valid[1]);

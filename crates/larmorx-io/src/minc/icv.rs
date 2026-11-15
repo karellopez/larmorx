@@ -681,10 +681,8 @@ fn get_dim(s: &mut Session, c: &mut Ctx, i: usize, cdfid: i32) -> Result<bool, E
             }
         }
         let (g, sc) = (v.derv_dim_grow[k], v.derv_dim_scale[k]);
-        if k == 0 {
-            min_grow = g;
-            min_scale = sc;
-        } else if (min_grow && !g)
+        if k == 0
+            || (min_grow && !g)
             || (min_grow && g && min_scale > sc)
             || (!min_grow && !g && min_scale < sc)
         {
@@ -964,8 +962,8 @@ pub fn miicv_get(
     let mut chunk_start = var_start.clone();
     let mut chunk_count = vec![1i64; ndims];
     let lo = (v.derv_firstdim + 1).max(0) as usize;
-    for k in lo..ndims {
-        chunk_count[k] = var_count[k];
+    if lo < ndims {
+        chunk_count[lo..ndims].copy_from_slice(&var_count[lo..ndims]);
     }
     let firstdim = v.derv_firstdim.max(0) as usize;
     // A type netCDF does not know has no buffer: MINC's reads below fail with its messages.

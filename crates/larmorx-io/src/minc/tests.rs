@@ -41,7 +41,7 @@ fn enc(t: i32, x: &[f64]) -> Vec<u8> {
 }
 
 fn pad(o: &mut Vec<u8>) {
-    while o.len() % 4 != 0 {
+    while !o.len().is_multiple_of(4) {
         o.push(0);
     }
 }

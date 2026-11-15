@@ -187,10 +187,10 @@ standard output, standard error and the exit compared. 60 % of the cases have mi
 both originals, FreeSurfer's as measured), the rest any call (MINC 1.5.1 only): every type and sign, ranges
 empty, reversed and not a number, steps zero, negative, infinite and not a number, cosines zero, oblique, NaN
 and huge, sizes up to 300,000 voxels (slabs of more than one dimension), dimension orders and names, file names
-missing, a directory, under a file, empty, with blanks, `$VAR`, over an older file. Final code: seeds 2 to 9,
-2,000 cases each but seed 2 (300): see the probe's README for each seed's count; 0 different, the cases a defect
-of undefined behaviour makes incomparable (FS-781, FS-789, FS-798 to FS-801) counted apart. The unit test
-`seeded_volumes_written` (80 cases) gives MINC 1.5.1's own hash.
+missing, a directory, under a file, empty, with blanks, `$VAR`, over an older file. Final code: seeds 3 to 7
+and 9, 2,000 cases each: 17,433 comparisons identical (10,941 of them files written), 0 different, 1,738 not
+compared (a defect of undefined behaviour, FS-781, FS-789, FS-798 to FS-801, counted apart; each seed's counts in
+the probe's README). The unit test `seeded_volumes_written` (80 cases) gives MINC 1.5.1's own hash.
 
 ### Not ported (gaps, each reported)
 

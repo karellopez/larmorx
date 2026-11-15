@@ -68,6 +68,14 @@ clone_one() {
   fi
 }
 
+sha256_of() {
+  if command -v sha256sum >/dev/null; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
 # Download a release tarball, check its SHA-256 and unpack it, for upstreams pinned by a
 # tarball (the commit column is "sha256:<hex>"). Idempotent: a marker file records the hash.
 fetch_tarball() {
@@ -84,11 +92,7 @@ fetch_tarball() {
     rm -rf "$tmp"
     return 1
   fi
-  if command -v sha256sum >/dev/null; then
-    got="$(sha256sum "$tmp/src.tar" | cut -d' ' -f1)"
-  else
-    got="$(shasum -a 256 "$tmp/src.tar" | cut -d' ' -f1)"
-  fi
+  got="$(sha256_of "$tmp/src.tar")"
   if [[ "$got" != "$want" ]]; then
     echo "  ! $name: sha256 $got, expected $want" >&2
     rm -rf "$tmp"
@@ -99,6 +103,76 @@ fetch_tarball() {
   echo "$want" > "$dest/.upstream-sha256"
   rm -rf "$tmp"
   echo "  + $name @ sha256 ${want:0:9}"
+}
+
+# Fetch an SVN revision file by file, for upstreams with no release tarball (the commit column is
+# "svn:<revision>:sha256:<hex>"). The url names the revision's tree through Subversion's WebDAV
+# baseline path ".../!svn/bc/<revision>/<path>"; scripts/upstream/<name>.sha256 lists every file
+# with its SHA-256 (sha256sum's format) and <hex> is that manifest's own SHA-256, so the row pins
+# every byte. Each file is downloaded and checked before anything is written into the destination.
+# Idempotent: a marker file records the pin.
+fetch_svn() {
+  local name="$1" url="$2" pin="$3" dest="$4"
+  local rest rev want manifest got tmp hex file ok=1
+  rest="${pin#svn:}"
+  rev="${rest%%:*}"
+  want="${rest#*:sha256:}"
+  manifest="$REPO_DIR/scripts/upstream/$name.sha256"
+  if [[ ! "$rev" =~ ^[0-9]+$ || "$rest" != "$rev:sha256:$want" || ! "$want" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "  ! $name: malformed pin '$pin' (expected svn:<revision>:sha256:<hex>)" >&2
+    return 1
+  fi
+  if [[ "$url" != *"/!svn/bc/$rev/"* ]]; then
+    echo "  ! $name: the url does not name revision $rev through /!svn/bc/$rev/" >&2
+    return 1
+  fi
+  if [[ ! -f "$manifest" ]]; then
+    echo "  ! $name: no manifest $manifest" >&2
+    return 1
+  fi
+  got="$(sha256_of "$manifest")"
+  if [[ "$got" != "$want" ]]; then
+    echo "  ! $name: manifest sha256 $got, expected $want" >&2
+    return 1
+  fi
+  if [[ -f "$dest/.upstream-svn" && "$(cat "$dest/.upstream-svn")" == "$pin" ]]; then
+    echo "  = $name (already at r$rev, manifest sha256 ${want:0:9})"
+    return 0
+  fi
+  while read -r hex file; do
+    [[ -z "$hex" ]] && continue
+    if [[ ! "$hex" =~ ^[0-9a-f]{64}$ || ! "$file" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ || "/$file/" == *"/../"* ]]; then
+      echo "  ! $name: malformed manifest line '$hex  $file'" >&2
+      return 1
+    fi
+  done < "$manifest"
+  command -v curl >/dev/null || { echo "  ! $name: curl is required" >&2; return 1; }
+  tmp="$(mktemp -d)"
+  while read -r hex file; do
+    [[ -z "$hex" ]] && continue
+    mkdir -p "$tmp/files/$(dirname "$file")"
+    if ! curl -sSfLg --retry 3 -o "$tmp/files/$file" "$url/$file"; then
+      echo "  ! $name: failed to download $url/$file" >&2
+      ok=0
+      break
+    fi
+    got="$(sha256_of "$tmp/files/$file")"
+    if [[ "$got" != "$hex" ]]; then
+      echo "  ! $name: $file sha256 $got, expected $hex" >&2
+      ok=0
+      break
+    fi
+  done < "$manifest"
+  if [[ "$ok" != 1 ]]; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  mkdir -p "$dest"
+  cp -R "$tmp/files/." "$dest/"
+  cp "$manifest" "$dest/MANIFEST.sha256"
+  echo "$pin" > "$dest/.upstream-svn"
+  rm -rf "$tmp"
+  echo "  + $name @ r$rev (manifest sha256 ${want:0:9}, $(grep -c . "$manifest") files)"
 }
 
 echo "cloning upstream references (jobs=$JOBS)..."
@@ -117,6 +191,8 @@ while IFS=$'\t' read -r name url sha licence location; do
   esac
   if [[ "$sha" == sha256:* ]]; then
     fetch_tarball "$name" "$url" "$sha" "$dest" &
+  elif [[ "$sha" == svn:* ]]; then
+    fetch_svn "$name" "$url" "$sha" "$dest" &
   else
     clone_one "$name" "$url" "$sha" "$dest" &
   fi

@@ -272,9 +272,6 @@ impl Dialect for FreeSurferDialect {
         // FreeSurfer's copy ends the program after the warning (exit status 1).
         Some(Exit { status: 1 })
     }
-    fn empty_allocation_crashes(&self) -> bool {
-        false
-    }
     fn output_dimension_names(
         &self,
         names: &[Vec<u8>],

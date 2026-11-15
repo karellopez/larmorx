@@ -803,9 +803,8 @@ fn output_minc_hyperslab(
         // Voxels never allocated (FS-799): volume_io follows the array's pointer table (a crash)
         // for an allocated type of two or more dimensions; else miicv_put reads the values from a
         // null or unset pointer unless it fails first.
-        let crashes = total > 0
-            && ((volume.data_type != DataType::None && n_array >= 2)
-                || icv::put_reads_values(s, file.minc_icv));
+        let crashes = (volume.data_type != DataType::None && n_array >= 2)
+            || (total > 0 && icv::put_reads_values(s, file.minc_icv));
         if crashes {
             c.notices.add(
                 &larmorx_core::defects::FS_799,

@@ -2436,7 +2436,7 @@ defects! {
     FS_792 = "FS-792", "MINC volume_io", true,
         "a direction_cosines attribute of fewer than three values on the first dimension read with direction cosines takes its missing values from memory never written";
     FS_798 = "FS-798", "MINC volume_io", true,
-        "a volume with a dimension of size 0 crashes volume_io's allocation (alloc_volume_data sets up its pointers into an allocation of no bytes)";
+        "a volume with a dimension of size 0 is allocated with its pointers set up into an allocation of no bytes: allocating it or writing it as MINC crashes or reads memory";
     FS_799 = "FS-799", "MINC volume_io", true,
         "a volume whose voxels were never allocated, written as MINC, is read through a null or unset pointer (a crash) unless its conversion fails first";
     FS_800 = "FS-800", "MINC volume_io", true,

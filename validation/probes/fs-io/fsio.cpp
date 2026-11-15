@@ -1784,13 +1784,14 @@ void run_piece6(const std::string &cmd0)
   // anh (annotations) as mrd and mrh do
   // piece 23 (track A relay 31): ixd and ixh (image files: MATLAB, SGI, HIPS, PGM/PPM/PBM, TIFF,
   // JPEG names) as mrd and mrh do
+  // piece 24 (track A relay 32): nnd and nnh (NRRD files, attached and detached) as mrd and mrh do
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
-              cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and" || cmd0 == "ixd"
+              cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and" || cmd0 == "ixd" || cmd0 == "nnd"
           ? "mrd"
       : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh" || cmd0 == "imh" ||
-              cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh" || cmd0 == "ixh"
+              cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh" || cmd0 == "ixh" || cmd0 == "nnh"
           ? "mrh"
           : cmd0;
   if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
@@ -2749,7 +2750,7 @@ int main(int argc, char *argv[])
       static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
-                                 "kwr", "ixd", "ixh", "ixw"};
+                                 "kwr", "ixd", "ixh", "ixw", "nnd", "nnh"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

@@ -25,7 +25,7 @@ mod read;
 #[cfg(test)]
 mod tests;
 
-pub use read::{LoadError, load, load_with};
+pub use read::{LoadError, load, load_with, load_with_errno};
 
 /// `NRRD_DIM_MAX`.
 pub const NRRD_DIM_MAX: usize = 16;

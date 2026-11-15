@@ -286,7 +286,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
-        NRRD_FILE => "NRRD",
         _ => return None,
     })
 }
@@ -472,6 +471,8 @@ pub fn mri_read(
     } else if mtype == identify::GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?
+    } else if mtype == identify::NRRD_FILE {
+        crate::mriio_nrrd::mri_nrrd_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::BRIK_FILE {
         crate::afni::afni_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::MRI_CURV_FILE {

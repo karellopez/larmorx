@@ -206,3 +206,4 @@ Every run on generated inputs inside a memory box:
   `real.py --gentle`: 6 of 6 identical; 83 s official, 32 s port (relay 29: 111 s). `real.py
   --norm`: 6 of 6 identical; 43 s official, 19 s port.
 - `ccsf` (`MRIcountCSFInNbhd`) at seeds 7 and 13 (200 cases each): 0 different in both modes.
+- The seed-1 record: 1,860 cases (20 rounds of 93), 1,678 identical, 182 counted.

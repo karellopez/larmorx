@@ -127,7 +127,7 @@ pub enum IntoVolume {
     /// The volume given.
     Given,
     /// A volume made by the call.
-    New(Mri),
+    New(Box<Mri>),
     /// `NULL` (after its message; a volume the call made is dropped, as FreeSurfer leaks it).
     Null,
 }
@@ -209,7 +209,7 @@ pub fn write_into_volume(
         }
     }
     Ok(match made {
-        Some(m) if !given => IntoVolume::New(m),
+        Some(m) if !given => IntoVolume::New(Box::new(m)),
         _ => IntoVolume::Given,
     })
 }

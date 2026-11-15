@@ -21,29 +21,37 @@
 //! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) needs `fs.bspline` (wave 3.2), and a voxel-shift
 //! transform that is not voxel-to-voxel needs `LTAchangeType` (3.1-39): port errors until they are
 //! ported.
+//!
+//! `MRIvol2VolFill` (relay 29) maps the other way, each source voxel to its nearest target voxel,
+//! summing (or averaging) the voxels that land in one; FS-504 where `MRImaskAndUpsample` returns no
+//! volume (FreeSurfer then reads its unset transform).
 
 use std::io::Write;
 
-use larmorx_core::defects::FS_482;
+use larmorx_core::defects::{FS_482, FS_504};
 use larmorx_freesurfer_core::diag::DIAG_VERBOSE;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_UNSUPPORTED, Fatal};
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::matrix::{
     MATRIX_REAL, Matrix, matrix_alloc, matrix_copy, matrix_multiply, matrix_multiply_d,
 };
 use larmorx_freesurfer_core::matrix_ops::{matrix_identity, matrix_inverse, matrix_print};
+use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::sse::{add, mul, sub};
+use larmorx_freesurfer_core::sse::{add, add64, div64, mul, sub};
 use larmorx_freesurfer_core::utils::{nint, nint2};
 use larmorx_freesurfer_mri::lta::{LINEAR_VOX_TO_VOX, Lta, lta_alloc, lta_copy};
-use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc_sequence, mri_copy_header};
+use larmorx_freesurfer_mri::mri::{
+    MRI_FLOAT, Mri, mri_alloc_sequence, mri_copy_header, use_vol_geom_to_mri,
+};
 use larmorx_freesurfer_mri::tkreg::{tkreg_mtx, xfm_crs2xyz_tkreg};
 use larmorx_freesurfer_mri::vol_geom::{VolGeom, xfm_crs2xyz};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
-use crate::arith::mri_extract_region;
+use crate::arith::{mri_clear, mri_extract_region};
 use crate::coords::index_not_in_volume;
 use crate::labels::int_of;
+use crate::ltaops::{lta_change_type, lta_fill_inverse, lta_mri_is_source, lta_mri_is_target};
 use crate::region::{region_get_bounding_box, region_print};
 use crate::resize::{mri_upsample_n, mri_upsample_n_conserve};
 use crate::sample::{
@@ -782,4 +790,244 @@ pub fn mri_vol2vol_tkreg_vsm(
         vsmlta,
         pedir,
     )
+}
+
+/// `(double)` of a `float` as `cvtss2sd` makes it (a signalling NaN quieted).
+fn widen(x: f32) -> f64 {
+    if x.is_nan() {
+        f64::from(f32::from_bits(x.to_bits() | 0x0040_0000))
+    } else {
+        f64::from(x)
+    }
+}
+
+/// A `double` stored in a `float` (`cvtsd2ss`): rounded to nearest; a NaN keeps its sign and the
+/// top 22 bits of its payload, quieted.
+fn narrow(x: f64) -> f32 {
+    if x.is_nan() {
+        let b = x.to_bits();
+        f32::from_bits(
+            (((b >> 32) as u32) & 0x8000_0000) | 0x7fc0_0000 | (((b >> 29) as u32) & 0x003f_ffff),
+        )
+    } else {
+        x as f32
+    }
+}
+
+/// FS-504: `MRImaskAndUpsample` returned no volume (or no transform), whose transform FreeSurfer
+/// then reads: an error in both modes.
+fn no_upsampled(g: &mut Globals, err: &mut dyn Write) -> Result<Ret<Mri>, Fatal> {
+    g.notices.add(
+        &FS_504,
+        "MRIvol2VolFill: no transform array (MRImaskAndUpsample gave none; FreeSurfer reads memory it does not own)",
+    );
+    log::error_exit(
+        g,
+        err,
+        ERROR_BADPARM,
+        "MRIvol2VolFill: no transform array (FreeSurfer reads memory it does not own here)\n",
+    )?;
+    Ok(Ret::Null)
+}
+
+/// `MRIvol2VolFill(src, mask, lta, UpsampleFactor, DoConserve, outfill)`: every source voxel
+/// mapped to its nearest target voxel (`nint` of `v2v (c, r, s, 1)`, `MatrixMultiply` in
+/// `float`), the voxels that land in one summed (`DoConserve`) or averaged (the sum divided by the
+/// count); target voxels no source voxel reaches stay 0. The LTA must have at most one transform
+/// (else `ERROR: MRIvol2VolFill(): LTA can only have one xform` on standard output and `Null`) and
+/// the source must be its source or its destination (else `ERROR: MRIvol2VolFill(): src MRI is
+/// neither source nor target in LTA`); a copy of it is changed to `LINEAR_VOX_TO_VOX` and its
+/// voxel-to-voxel matrix is used, inverted when the source is not its source. The target's grid is
+/// that end's geometry. With `UpsampleFactor > 0` the source is first cut to its (or the mask's)
+/// bounding box padded by 2 and upsampled ([`mri_mask_and_upsample`]), the matrix composed with the
+/// inverse of that step's. The output is a new `float` volume of the target's grid with the
+/// source's frames, TR, TE, TI and flip angle, or the caller's (cleared first). With `Gdiag_no > 0`
+/// `MRIvol2VolFill(): USF=<n>, DoConserve=<n>` and `MRIvol2VolFill(): not using inverse` (or `using
+/// inverse`) on standard output. Each sum is `vout + vsrc` in `double` (the official build's
+/// operands), each average `vout / nhits`. FS-504.
+#[allow(clippy::too_many_arguments)]
+pub fn mri_vol2vol_fill(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    src: &mut Mri,
+    mask: Option<&Mri>,
+    lta: &Lta,
+    upsample: i32,
+    conserve: i32,
+    outfill: Option<&mut Mri>,
+) -> Result<Ret<Mri>, Fatal> {
+    if lta.num_xforms > 1 {
+        let _ = writeln!(out, "ERROR: MRIvol2VolFill(): LTA can only have one xform");
+        return Ok(Ret::Null);
+    }
+    if lta_mri_is_source(g, err, lta, src)? == 0 && lta_mri_is_target(g, err, lta, src)? == 0 {
+        let _ = writeln!(
+            out,
+            "ERROR: MRIvol2VolFill(): src MRI is neither source nor target in LTA"
+        );
+        return Ok(Ret::Null);
+    }
+    if lta.num_xforms <= 0 {
+        // LTAmriIsSource ended the program (FS-504)
+        return Ok(Ret::Null);
+    }
+    if g.gdiag_no > 0 {
+        let _ = writeln!(
+            out,
+            "MRIvol2VolFill(): USF={upsample}, DoConserve={conserve}"
+        );
+    }
+    let Some(mut ltatmp) = lta_copy(g, out, err, lta, None)?.into_new() else {
+        return no_upsampled(g, err);
+    };
+    if ltatmp.ltype != LINEAR_VOX_TO_VOX {
+        lta_change_type(g, out, err, env, &mut ltatmp, LINEAR_VOX_TO_VOX)?;
+    }
+    // the last transform of the caller's LTA (one here)
+    let last = (lta.num_xforms - 1) as usize;
+    let mut vgtarg = VolGeom::default();
+    let mut v2v = if lta_mri_is_source(g, err, &ltatmp, src)? != 0 {
+        if g.gdiag_no > 0 {
+            let _ = writeln!(out, "MRIvol2VolFill(): not using inverse");
+        }
+        vgtarg.assign(g, &ltatmp.xforms[last].dst);
+        ltatmp.xforms[0].m_l.clone()
+    } else {
+        if g.gdiag_no > 0 {
+            let _ = writeln!(out, "MRIvol2VolFill(): using inverse");
+        }
+        lta_fill_inverse(g, out, err, &mut ltatmp)?;
+        vgtarg.assign(g, &ltatmp.inv_xforms[last].dst);
+        ltatmp.inv_xforms[0].m_l.clone()
+    };
+    let mut srcmus_own: Option<Mri> = None;
+    if upsample > 0 {
+        let Some((mu, l)) =
+            mri_mask_and_upsample(g, out, err, env, src, mask, upsample, 2, conserve != 0)?
+        else {
+            return no_upsampled(g, err);
+        };
+        let Some(l) = l else {
+            return no_upsampled(g, err);
+        };
+        let vmusinv = matrix_inverse(g, out, err, l.xforms[0].m_l.as_ref(), None)?.into_new();
+        // v2v = MatrixMultiply(v2v, vmusinv, v2v): into its own first operand
+        match v2v.as_mut() {
+            Some(m) => {
+                let c = m.clone();
+                if matrix_multiply(g, out, err, Some(&c), vmusinv.as_ref(), Some(m))?.is_null() {
+                    v2v = None;
+                }
+            }
+            None => {
+                v2v = matrix_multiply(g, out, err, None, vmusinv.as_ref(), None)?.into_new();
+            }
+        }
+        srcmus_own = Some(mu);
+    }
+    let src: &Mri = src;
+    let srcmus: &Mri = srcmus_own.as_ref().unwrap_or(src);
+    let mut fresh = None;
+    let o: &mut Mri = match outfill {
+        Some(d) => d,
+        None => {
+            let mut m = mri_alloc_sequence(
+                g,
+                out,
+                err,
+                vgtarg.width,
+                vgtarg.height,
+                vgtarg.depth,
+                MRI_FLOAT,
+                src.nframes,
+            )?;
+            use_vol_geom_to_mri(g, out, err, &vgtarg, &mut m.vg)?;
+            m.tr = src.tr;
+            m.te = src.te;
+            m.flip_angle = src.flip_angle;
+            m.ti = src.ti;
+            fresh.insert(m)
+        }
+    };
+    mri_clear(g, err, o)?;
+    let mut hitmap = if conserve == 0 {
+        // the number of source voxels in each target voxel
+        let mut h = mri_alloc_sequence(
+            g,
+            out,
+            err,
+            vgtarg.width,
+            vgtarg.height,
+            vgtarg.depth,
+            MRI_FLOAT,
+            1,
+        )?;
+        use_vol_geom_to_mri(g, out, err, &vgtarg, &mut h.vg)?;
+        Some(h)
+    } else {
+        None
+    };
+    let mut crssrc = Matrix::real(4, 1);
+    crssrc.set_relt(4, 1, 1.0);
+    let mut crstarg = Matrix::real(4, 1);
+    for c in 0..srcmus.vg.width {
+        for r in 0..srcmus.vg.height {
+            for s in 0..srcmus.vg.depth {
+                crssrc.set_relt(1, 1, c as f32);
+                crssrc.set_relt(2, 1, r as f32);
+                crssrc.set_relt(3, 1, s as f32);
+                if matrix_multiply(g, out, err, v2v.as_ref(), Some(&crssrc), Some(&mut crstarg))?
+                    .is_null()
+                {
+                    // FreeSurfer reads the NULL result: unreachable with LTA matrices
+                    return no_upsampled(g, err);
+                }
+                let ct = nint(g, f64::from(crstarg.relt(1, 1)));
+                let rt = nint(g, f64::from(crstarg.relt(2, 1)));
+                let st = nint(g, f64::from(crstarg.relt(3, 1)));
+                if ct < 0 || ct >= vgtarg.width {
+                    continue;
+                }
+                if rt < 0 || rt >= vgtarg.height {
+                    continue;
+                }
+                if st < 0 || st >= vgtarg.depth {
+                    continue;
+                }
+                if let Some(h) = hitmap.as_mut() {
+                    let nhits = mri_get_vox_val(g, err, h, ct, rt, st, 0, 0)? as i32;
+                    mri_set_vox_val(g, err, h, ct, rt, st, 0, (nhits + 1) as f32, 0)?;
+                }
+                for f in 0..src.nframes {
+                    let vsrc = mri_get_vox_val(g, err, srcmus, c, r, s, f, 0)?;
+                    let vout = mri_get_vox_val(g, err, o, ct, rt, st, f, 0)?;
+                    let v = narrow(add64(widen(vout), widen(vsrc)));
+                    mri_set_vox_val(g, err, o, ct, rt, st, f, v, 0)?;
+                }
+            }
+        }
+    }
+    if let Some(h) = hitmap.as_ref() {
+        for ct in 0..vgtarg.width {
+            for rt in 0..vgtarg.height {
+                for st in 0..vgtarg.depth {
+                    let nhits = mri_get_vox_val(g, err, h, ct, rt, st, 0, 0)? as i32;
+                    if nhits == 0 {
+                        continue;
+                    }
+                    for f in 0..src.nframes {
+                        let vout = mri_get_vox_val(g, err, o, ct, rt, st, f, 0)?;
+                        let v = narrow(div64(widen(vout), f64::from(nhits)));
+                        mri_set_vox_val(g, err, o, ct, rt, st, f, v, 0)?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(match fresh {
+        Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
 }

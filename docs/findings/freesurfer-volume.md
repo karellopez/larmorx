@@ -784,6 +784,62 @@ Source: `utils/mrihisto.cpp` (the ten reached functions: `MRIhistogramRegion` 10
   MRI's `valid`, which `MRI::MRI` never sets (memory contents; the probe sets it).
 - **FS-517** (a, hang): `MRIcropAroundCRS` with `c0` = `INT_MIN` (a NaN or huge centre) and a FoV of 0 computes `c1 = c0 +
   0 - 1`, which wraps to `INT_MAX`: `for(int c=c0; c<=c1; c++)` never ends (the probe's child is stopped by its alarm).
-- Not ported here: `MRIvol2VolFill`, `MRImask_with_T2_and_aparc_aseg` (needs `GetLargestCC6`), the topology fixes
+- Not ported in relay 25: `MRIvol2VolFill`, `MRImask_with_T2_and_aparc_aseg` (needs `GetLargestCC6`), the topology fixes
   (`MRIvolTopoFix`, `MRIvolTopoErodeOne`, `QuadEulerCharChange`), `MRIfindBrightNonWM`, `FixSubCortMassHA` with
-  `BinarizeMRI` and `DEMorphBinVol`, `SpatialCor`; `MRIvol2surfVSM` is a surface function.
+  `BinarizeMRI` and `DEMorphBinVol`, `SpatialCor`; `MRIvol2surfVSM` is a surface function. Relay 29 ported most of them
+  (§25).
+
+## 25. Filling a coarser grid, bright non-white-matter voxels, voxel topology, binary volumes (3.1-37; relay 29)
+`mri2.cpp`'s `MRIvol2VolFill` (3568-3692), `MRIvolTopoErodeOne` (5885-5908), `MRIvolTopoDilateOne` (5917-5940),
+`QuadEulerCharChange` (5965-6068), `MRIfindBrightNonWM` (6361-6454), `FixSubCortMassHA::FixSCM` (6534-6587),
+`BinarizeMRI::dump` (6620-6642), `qualifies` (6652-6691), `binarize` (6692-6789), `DEMorphBinVol::morph` (6794-6844,
+6846-6867, 6868-6888), `check` (6890-6922), `dump` (6923-6935), `copyFrame` (6937-6964). The object code read: the unit
+oracle's `libutils.a` member `mri2.cpp.o` (`objdump -dr -C`, `<scratch>/C/r20/mri2.s`).
+- **Callers in recon-all's programs:** `mris_place_surface` (white and pial) calls `MRIfindBrightNonWM(invol, wm)` after
+  `MRIclipBrightWM` and masks labels 130 and 100 out for the white surface; its `FillLatVents` uses `DEMorphBinVol`
+  (`morph(bin)` with `morphtype` 1, `nmorph`, `nnbrsthresh`, `mm_debug` 1; its `topo` argument is never passed to the
+  structure: track A's/D's program port should note it); `mri_edit_wm_with_aseg -fix-scm-ha` and `-fix-scm-ha-only` run
+  `FixSubCortMassHA::FixSCM`; `mri_vol2vol --fill-average`, `--fill-conserve`, `--fill-upsample` and `--downsample` run `MRIvol2VolFill(in, NULL,
+  ltareg, FillUpsample, DoFillConserve, out)`; `mri_binarize --fix-vol-topo` runs `MRIvolTopoFix`. `BinarizeMRI` has no
+  other caller than `DEMorphBinVol`; `MRIvolTopoDilateOne` none (ported as the erosion's twin). `SpatialCor::read`
+  (8028) has no caller in FreeSurfer 8.2.0's sources (the reach list's entry comes from the class's other members):
+  not ported. `MRIvolTopoFix` needs `MRIStessellate` and `MRIScomputeEulerNumber` (`mrisurf_timeStep.cpp`, the surface
+  crate above this one): left to the surface track. `MRImask_with_T2_and_aparc_aseg` needs fs.filter's `GetLargestCC6`
+  (the filter crate is above this one): left to fs.filter.
+- **`MRIvol2VolFill`'s arithmetic:** `MRIsetVoxVal(outfill, ..., vsrc + vout)` is `addsd %xmm1,%xmm0` with `vout` in
+  `xmm0` (the first `MRIgetVoxVal` call's result, `vsrc`, saved on the stack): `vout + vsrc` for NaN operands; the
+  average `vout / nhits` is `divsd` with `nhits` converted by `cvtsi2sd`; the hit map's counts pass through `cvttss2si`
+  and `cvtsi2ss`. `vgtarg = ltatmp->xforms[lta->num_xforms - 1].dst` is `VOL_GEOM`'s copy assignment (`__strcpy_chk`
+  and `MatrixCopy` inlined); `v2v = MatrixMultiply(v2v, vmusinv, v2v)` multiplies into its own first operand. The probe
+  sets `Gstdout = stdout` with `Gdiag_no` (as `DiagInit` does in the programs; without it `LTAchangeType`'s
+  `MatrixPrint(Gstdout, ...)` prints `MatrixPrint: fp = NULL!` first, which the port, modelling the programs, does not).
+- **`MRIfindBrightNonWM`:** `val = MRIgetVoxVal(...)` into a `BUFTYPE` is `cvttss2si` and the low byte (`cmp
+  $0x7d,%al`; FS-802 below). `aMIN_WHITE = ((3*3*3-1)/2)` is 13, not the 14 the comment says: the object code labels a
+  voxel when the count is at most 12 (`cmp $0xc,%eax; jg`). The 27 white-matter bytes of the block are read through nine
+  row pointers built from the T1's `yi`/`zi` tables, the voxel itself included (it is below 5, so it never counts). The
+  `MRIdilateThreshLabel(..., 10, 115)` call is commented out in 8.2.0 (ATH's note).
+- **`QuadEulerCharChange`, the topology passes:** each `int v = MRIgetVoxVal(...)` is `cvttss2si`; `abs` is a call
+  (`-fno-builtin`). The mask is read at every neighbour without a bounds test, the centre's own reads too (the voxel
+  functions' FS-52/FS-53 notices).
+- **`BinarizeMRI`:** with `invert`, voxels outside the mask take the swapped off value, i.e. the caller's on value, and
+  count in `nhits`: the same as `mri_binarize --inv --mask` (it sets `BinValNot = 1`, the merge value of masked voxels),
+  so kept (rule C). The `#pragma omp parallel for reduction(+ : nhitslocal)` loop writes each voxel's own frames only.
+  `fstart` and `fend` are written back into the structure (a second call keeps the first one's frames).
+- **FS-803** (c, rule A): the masked/edge branch is `MRIsetVoxVal(outvol,c,r,s,f,OffVal)` with `f` from `fstart`, the
+  other branch `f-fstart`. Unreachable from FreeSurfer's callers (`fstart` stays -1).
+- **FS-804** (a, memory): `int binval = MRIgetVoxVal(binvol0,c,r,s,frame);` on `binvol0 = copyFrame(outvol,0)`, a
+  one-frame volume; the neighbours use frame 0.
+- **FS-805** (c, rule A): the overloads call `morph(binvol)` on `bm.binarize(involuse, ...)`, whose single frame is the
+  chosen one, and `morph` selects `copyFrame(binvol, frame)` again: frame 1 reads past it (FS-806), frame 2 or more is
+  refused by `copyFrame` (`NULL`).
+- **FS-806** (a, memory; rule B): `check` tests `frame < 0 || frame > invol->nframes`, `copyFrame` `frameno > nframes`.
+- **FS-807** (rule B): `morph(MRI *binvol)` starts with `check(binvol,NULL,NULL);` and ignores its result (the other
+  overloads return `NULL`).
+- **FS-808** (c, rule A): the overloads' `involuse = copyFrame(invol,frame)` for `nframes > 1` uses `mm_mritype` -1 ->
+  `MRI_UCHAR` (`MRIsetVoxVal` clips to 0..255 and rounds), though the class comment says -1 means "same type as input";
+  a one-frame input is binarized as it is. The output of `morph(binvol)` is a byte copy too (`copyFrame`), which the
+  default keeps (the result is binary). The overloads never write `outvol` and leak `involuse` (`free_involuse` unused).
+- **FS-802** (c, rule A): see above; values 0 to 255 are unchanged.
+- No new not-comparable IDs: FS-803, FS-804, FS-806's reads and writes past a volume are the voxel functions' FS-53
+  (`check.py`'s SKIP already).
+

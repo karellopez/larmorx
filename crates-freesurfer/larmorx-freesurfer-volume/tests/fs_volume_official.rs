@@ -30,13 +30,15 @@ use sha2::{Digest, Sha256};
 /// mask, statistics and histogram; relay 23, 211 commands: conforming and the rest of mriset.cpp;
 /// relay 24, 220 commands: mrihisto.cpp's volume histograms; relay 25, 246 commands:
 /// transform.cpp's LTA operations, resample.cpp's segmentation mapping and SPM warp, mri2.cpp's
-/// segment statistics, borders, concatenation, edits, shifts and crops): 4,920 cases, 4,552 lines
-/// identical, 368 hashed as `SKIP`, 22 hashed as `HEAVY` (identical too).
-const N: usize = 4920;
-const OFFICIAL_SHA256: &str = "1acd334c6204657f39e004854539ea20a8405b3bc252092b59abcbc37450cc2e";
-const SKIPPED: usize = 368;
+/// segment statistics, borders, concatenation, edits, shifts and crops; relay 29, 257 commands
+/// (2026-11-15): mri2.cpp's fill onto a coarser grid, bright non-white-matter voxels, voxel
+/// topology and binary-volume classes): 5,140 cases, 4,765 lines identical, 375 hashed as `SKIP`,
+/// 26 hashed as `HEAVY` (identical too).
+const N: usize = 5140;
+const OFFICIAL_SHA256: &str = "d18ca1b6afbd2c9bedc741eaeda8e14266b41035990f1df7c0de987e3eb4c402";
+const SKIPPED: usize = 375;
 /// The cases hashed as `HEAVY`.
-const HEAVY: usize = 22;
+const HEAVY: usize = 26;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 59] = [

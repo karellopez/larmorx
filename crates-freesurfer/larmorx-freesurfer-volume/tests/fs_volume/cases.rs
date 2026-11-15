@@ -2541,6 +2541,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R25_RES.contains(&c) => r25_gen_res(&mut g, &mut t, c),
             c if R25_MRI2.contains(&c) => r25_gen_mri2(&mut g, &mut t, c),
             c if R25_CROP.contains(&c) => r25_gen_crop(&mut g, &mut t, c),
+            c if R29.contains(&c) => r29_gen(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3006,7 +3007,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 246] = [
+pub const COMMANDS: [&str; 257] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3253,6 +3254,17 @@ pub const COMMANDS: [&str; 246] = [
     "cfov",
     "ccrs",
     "crras",
+    "vvfill",
+    "fbnwm",
+    "qecc",
+    "vtero",
+    "vtdil",
+    "fscm",
+    "binmri",
+    "demb",
+    "demt",
+    "demm",
+    "demc",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5584,6 +5596,12 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         c if R25_RES.contains(&c) => r25_res(cx, t, o, cmd)?,
         c if R25_MRI2.contains(&c) => r25_mri2(cx, t, o, cmd)?,
         c if R25_CROP.contains(&c) => r25_crop(cx, t, o, cmd)?,
+        "vvfill" => r29_vvfill(cx, t, o)?,
+        "fbnwm" => r29_fbnwm(cx, t, o)?,
+        "qecc" | "vtero" | "vtdil" => r29_topo(cx, t, o, cmd)?,
+        "fscm" => r29_fscm(cx, t, o)?,
+        "binmri" => r29_binmri(cx, t, o)?,
+        "demb" | "demt" | "demm" | "demc" => r29_demorph(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -8433,6 +8451,707 @@ fn r25_crop(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fa
                 let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
                 m2::mri_crop_around_ras(g, a, b, &env, &mut vol, ctr, fov, l.as_ref(), &keep)?
             };
+            o.vol(r.as_ref());
+        }
+    }
+    Ok(())
+}
+
+// ---- relay 29: the rest of mri2.cpp's volume functions -----------------------------------------
+
+/// mri2.cpp's functions of relay 29.
+const R29: [&str; 11] = [
+    "vvfill", "fbnwm", "qecc", "vtero", "vtdil", "fscm", "binmri", "demb", "demt", "demm", "demc",
+];
+
+/// `fsvolume.cpp`'s `fill_pat`'s tokens: none now and then, else a seed, two levels and a spread.
+fn r29_pat(g: &mut Gen, t: &mut Vec<String>, a: &[i64], b: &[i64], sp: &[i64]) {
+    if g.chance(4) {
+        t.push("0".into());
+        return;
+    }
+    t.push("1".into());
+    t.push(g.int(0, 1000).to_string());
+    t.push(g.pick(a).to_string());
+    t.push(g.pick(b).to_string());
+    t.push(g.pick(sp).to_string());
+}
+
+/// `fsvolume.cpp`'s `fill_box`'s tokens: none now and then, else a box inside the volume and its
+/// value.
+fn r29_box(g: &mut Gen, t: &mut Vec<String>, s: Shape, vals: &[f32]) {
+    if g.chance(3) || s.hdr {
+        t.push("0".into());
+        return;
+    }
+    t.push("1".into());
+    let mut c = Vec::new();
+    for n in [s.w, s.h, s.d] {
+        let a = g.int(0, n - 1);
+        let b = g.int(a, n - 1);
+        c.push((a, b));
+    }
+    for (a, _) in &c {
+        t.push(a.to_string());
+    }
+    for (_, b) in &c {
+        t.push(b.to_string());
+    }
+    t.push(fx(g.pick(vals)));
+}
+
+/// A voxel-to-voxel-like 4 x 4 matrix for `MRIvol2VolFill` (a scale, a small shift; sometimes
+/// [`r25_m44`]'s).
+fn r29_m44(g: &mut Gen, t: &mut Vec<String>) {
+    if g.chance(5) {
+        r25_m44(g, t);
+        return;
+    }
+    for r in 0..4 {
+        for c in 0..4 {
+            let v = if r == 3 {
+                if c == 3 { 1.0 } else { 0.0 }
+            } else if c == 3 {
+                g.pick(&[0.0f32, 0.0, 1.0, -1.0, 0.5, 2.0, -2.5, 3.0])
+            } else if r == c {
+                g.pick(&[1.0f32, 1.0, 0.5, 2.0, -1.0, 0.25, 1.5])
+            } else {
+                g.pick(&[0.0f32, 0.0, 0.0, 0.0, 0.1, -0.3])
+            };
+            t.push(fx(v));
+        }
+    }
+}
+
+/// [`r25_lta_toks`] with [`r29_m44`]'s matrices.
+fn r29_lta_toks(g: &mut Gen, t: &mut Vec<String>, pool: &[Vec<String>], chain: &[usize], ty: i64) {
+    let n = chain.len() - 1;
+    t.push(n.to_string());
+    t.push(ty.to_string());
+    t.push(fx(g.pick(&[0.0f32, 0.0, 0.1, 1.0])));
+    t.push(g.pick(&["-", "-", "62657274"]).to_owned());
+    for i in 0..n {
+        for _ in 0..3 {
+            t.push(fx(num(g, -10, 10, 2)));
+        }
+        t.push(fx(g.pick(&[10000.0f32, 1.0])));
+        t.push(g.pick(&[-1i64, 0, 1, 14]).to_string());
+        t.push(g.pick(&[0i64, 0, 3]).to_string());
+        r29_m44(g, t);
+        t.extend(pool[chain[i]].iter().cloned());
+        t.extend(pool[chain[i + 1]].iter().cloned());
+        if g.chance(4) {
+            t.push("1".into());
+            r29_m44(g, t);
+            t.extend(pool[chain[i + 1]].iter().cloned());
+            t.extend(pool[chain[i]].iter().cloned());
+        } else {
+            t.push("0".into());
+        }
+    }
+}
+
+/// A binary-like volume of up to `max` voxels a side (`max.min(6)` slices).
+fn r29_bin(g: &mut Gen, t: &mut Vec<String>, ty: &[i64], nf: i64, max: i64) -> Shape {
+    let mut s = r25_shape(g, ty, nf, max);
+    s.d = g.int(1, max.min(6));
+    vol_of(g, t, s);
+    r29_pat(g, t, &[1, 1, 2], &[0, 0, 1], &[0, 0, 1]);
+    r29_box(g, t, s, &[1.0, 1.0, 0.0, 2.0]);
+    let bv: &[f32] = &[0.0, 1.0, 1.0, 0.7, 2.0, 0.4, -1.0];
+    fill_paint(g, t, s, &[bv, bv, bv], &[bv]);
+    s
+}
+
+/// A volume of `s`'s extent (sometimes another), filled and painted with `vals`.
+fn r29_other(g: &mut Gen, t: &mut Vec<String>, s: Shape, ty: &[i64], vals: &[f32]) -> Shape {
+    let mut o = Shape {
+        ty: g.pick(ty),
+        nf: 1,
+        hdr: false,
+        drop: false,
+        ..s
+    };
+    if g.chance(10) {
+        o.w = g.int(1, s.w + 1);
+    }
+    vol_of(g, t, o);
+    fill_paint(g, t, o, &[vals], &[vals]);
+    o
+}
+
+fn r29_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    match cmd {
+        "vvfill" => {
+            let pool = r25_pool(g);
+            let nf = if g.chance(4) { 2 } else { 1 };
+            let s = r25_shape(g, &[0, 1, 3, 4, 3, 3], nf, 5);
+            let mut geo = pool[0].clone();
+            geo[0] = "1".into();
+            for (k, v) in [s.w, s.h, s.d].into_iter().enumerate() {
+                geo[k + 1] = v.to_string();
+            }
+            r25_vol_geo(g, t, s, &geo);
+            r29_pat(g, t, &[10, 100, 3], &[0, 1, -2], &[0, 2, 5]);
+            r29_box(g, t, s, &[10.0, 0.0, 3.5]);
+            let vals: &[f32] = &[0.0, 1.0, 2.5, -3.0, 100.0, 7.0];
+            fill_paint(g, t, s, &[vals, vals], &[vals]);
+            let mk = g.chance(4);
+            t.push(i64::from(mk).to_string());
+            if mk {
+                let m = Shape {
+                    ty: g.pick(&[0, 3]),
+                    nf: 1,
+                    ..s
+                };
+                r25_vol_geo(g, t, m, &geo);
+                fill_paint(g, t, m, &[&[0.0, 1.0]], &[&[1.0, 0.0]]);
+            }
+            let mut pool2 = pool.clone();
+            pool2[0] = geo;
+            for v in pool2[1].iter_mut().take(4).skip(1) {
+                *v = g.int(1, 6).to_string();
+            }
+            let chain = match g.below(10) {
+                0 => vec![2, 3],
+                1 => vec![0, 1, 1],
+                2..=5 => vec![0, 1],
+                _ => vec![1, 0],
+            };
+            let ty = g.pick(&[0i64, 0, 0, 1, 1, 14]);
+            r29_lta_toks(g, t, &pool2, &chain, ty);
+            t.push(g.int(0, 4).to_string());
+            t.push(g.pick(&[0i64, 0, 1, 2, 3, -1]).to_string());
+            t.push(g.pick(&[0i64, 1, 2]).to_string());
+            t.push(g.pick(&[0i64, 0, 0, 1]).to_string());
+            let given = g.chance(5);
+            t.push(i64::from(given).to_string());
+            if given {
+                let dims: Vec<i64> = (1..4).map(|k| pool2[1][k].parse().unwrap()).collect();
+                let o = Shape {
+                    w: dims[0],
+                    h: dims[1],
+                    d: dims[2],
+                    ty: g.pick(&[3, 3, 0, 1]),
+                    nf: if g.chance(5) { g.int(1, 3) } else { s.nf },
+                    hdr: false,
+                    drop: false,
+                };
+                r25_vol_geo(g, t, o, &pool2[1]);
+            }
+        }
+        "fbnwm" => {
+            let mut s = r25_shape(g, &[0, 0, 0, 3, 4, 1], 1, 6);
+            s.d = g.int(1, 5);
+            vol_of(g, t, s);
+            r29_pat(
+                g,
+                t,
+                &[200, 130, 255, 300, 126],
+                &[60, 0, 110, 125],
+                &[0, 10, 80],
+            );
+            r29_box(g, t, s, &[200.0, 130.0, 60.0, 0.0]);
+            let tv: &[f32] = &[
+                0.0, 130.0, 200.0, 126.0, 125.0, 255.0, 300.0, 400.0, -1.0, 100.0, 115.0,
+            ];
+            fill_paint(g, t, s, &[tv], &[tv]);
+            let mut o = s;
+            if g.chance(6) {
+                o.ty = g.pick(&[3, 1]);
+            }
+            if g.chance(10) {
+                o.w = g.int(1, 6);
+            }
+            vol_of(g, t, o);
+            r29_pat(g, t, &[110, 5, 250], &[0, 4, 1], &[0, 0, 3]);
+            r29_box(g, t, o, &[110.0, 0.0, 250.0]);
+            let wv: &[f32] = &[0.0, 110.0, 5.0, 4.0, 250.0, 1.0];
+            fill_paint(g, t, o, &[wv], &[wv]);
+        }
+        "qecc" | "vtero" | "vtdil" => {
+            let s = r29_bin(g, t, &[0, 0, 3, 1, 4], 1, 8);
+            if g.chance(5) {
+                t.push(g.int(0, s.w - 1).to_string());
+                t.push(g.int(0, s.h - 1).to_string());
+                t.push(g.int(0, s.d - 1).to_string());
+            } else {
+                for _ in 0..3 {
+                    t.push("-1".into());
+                }
+            }
+            match cmd {
+                "qecc" => {
+                    let mk = g.chance(4);
+                    t.push(i64::from(mk).to_string());
+                    if mk {
+                        r29_other(g, t, s, &[0, 3], &[1.0, 1.0, 0.0]);
+                    }
+                    let at = |g: &mut Gen, n: i64| {
+                        if n >= 3 && !g.chance(6) {
+                            g.int(1, n - 2)
+                        } else {
+                            g.int(-1, n)
+                        }
+                    };
+                    let (c, r, sl) = (at(g, s.w), at(g, s.h), at(g, s.d));
+                    for v in [c, r, sl] {
+                        t.push(v.to_string());
+                    }
+                }
+                "vtero" => {
+                    let k = g.chance(3);
+                    t.push(i64::from(k).to_string());
+                    if k {
+                        r29_other(g, t, s, &[0, 3], &[0.0, 0.0, 1.0]);
+                    }
+                }
+                _ => {
+                    t.push(g.pick(&[1i64, 1, 2, 255, 0, -1]).to_string());
+                }
+            }
+        }
+        "fscm" => {
+            let mut s = r25_shape(g, &[0, 1, 3, 4, 0], 1, 6);
+            s.d = g.int(1, 5);
+            vol_of(g, t, s);
+            r29_pat(g, t, &[17, 53, 2, 41], &[2, 3, 0, 42, 17], &[0]);
+            r29_box(g, t, s, &[17.0, 53.0, 3.0, 2.0, 18.0]);
+            let labs: &[f32] = &[
+                0.0, 2.0, 3.0, 41.0, 42.0, 17.0, 53.0, 18.0, 54.0, 5.0, 44.0, 10.0,
+            ];
+            fill_paint(g, t, s, &[labs], &[labs]);
+            let mut o = Shape {
+                ty: g.pick(&[0, 0, 3]),
+                ..s
+            };
+            if g.chance(10) {
+                o.w = g.int(1, 6);
+            }
+            vol_of(g, t, o);
+            r29_pat(g, t, &[110, 250], &[0, 1], &[0]);
+            r29_box(g, t, o, &[110.0, 0.0]);
+            fill_paint(g, t, o, &[&[110.0, 0.0]], &[&[110.0, 0.0, 250.0, 1.0]]);
+            t.push(g.pick(&[1i64, 1, 0, 2, -1, 3]).to_string());
+        }
+        "binmri" => {
+            t.push(g.pick(&[1i64, 1, 2, 1, 3]).to_string());
+            t.push(dx(g.pick(&[0.5, 0.5, 1.0, -1.0, 2.0, f64::NAN, 0.0])));
+            t.push(dx(g.pick(&[
+                f64::INFINITY,
+                f64::INFINITY,
+                2.0,
+                1.0,
+                100.0,
+                0.5,
+            ])));
+            let nm = g.pick(&[0usize, 0, 1, 2, 3]);
+            t.push(nm.to_string());
+            for _ in 0..nm {
+                t.push(g.pick(&[1i64, 2, 0, 41, -1, 100]).to_string());
+            }
+            t.push(dx(g.pick(&[0.5, 0.5, 1.0, f64::NEG_INFINITY])));
+            t.push(dx(g.pick(&[f64::INFINITY, f64::INFINITY, 1.0])));
+            for _ in 0..3 {
+                t.push(i64::from(g.chance(4)).to_string());
+            }
+            t.push(dx(g.pick(&[1.0, 1.0, 255.0, -2.5, 0.5])));
+            t.push(dx(g.pick(&[0.0, 0.0, 7.0, -1.0, f64::NAN])));
+            t.push(g.pick(&[-1i64, -1, 0, 1, 2]).to_string());
+            t.push(g.pick(&[-1i64, -1, 1, 2, 3, 0]).to_string());
+            t.push(i64::from(g.chance(4)).to_string());
+            t.push(g.pick(&[-1i64, -1, 0, 3, 1, 4]).to_string());
+            t.push(i64::from(g.chance(4)).to_string());
+            t.push(i64::from(g.chance(3)).to_string());
+            let has_in = !g.chance(20);
+            t.push(i64::from(has_in).to_string());
+            let nf = g.pick(&[1i64, 1, 2, 3]);
+            let mut s = r25_shape(g, &[0, 3, 3, 1, 4], nf, 5);
+            s.d = g.int(1, 4);
+            if has_in {
+                vol_of(g, t, s);
+                r29_pat(g, t, &[1, 2, 100], &[0, -1], &[0, 1, 2]);
+                r29_box(g, t, s, &[1.0, 0.0, 2.0]);
+                let v: &[f32] = &[0.0, 1.0, 2.0, 0.5, -1.0, 41.0, 100.0];
+                fill_paint(g, t, s, &[v, v, v], &[v]);
+            }
+            let mk = g.chance(3);
+            t.push(i64::from(mk).to_string());
+            if mk {
+                r29_other(g, t, s, &[0, 3], &[1.0, 0.0, 0.5, 2.0]);
+            }
+            let given = g.chance(5);
+            t.push(i64::from(given).to_string());
+            if given {
+                let mut o = Shape {
+                    ty: g.pick(&[3, 0, 1]),
+                    nf: g.int(1, 3),
+                    hdr: false,
+                    drop: false,
+                    ..s
+                };
+                if g.chance(8) {
+                    o.h = g.int(1, 5);
+                }
+                vol_of(g, t, o);
+            }
+            let twice = g.chance(5);
+            t.push(i64::from(twice).to_string());
+            if twice {
+                let nf2 = g.pick(&[1i64, 2, 3]);
+                let mut s2 = r25_shape(g, &[0, 3], nf2, 4);
+                s2.d = g.int(1, 3);
+                vol_of(g, t, s2);
+                r29_pat(g, t, &[1, 2], &[0], &[0, 1]);
+                r29_box(g, t, s2, &[1.0, 0.0]);
+                fill_paint(g, t, s2, &[&[0.0, 1.0]], &[&[1.0, 2.0, 0.0]]);
+            }
+            t.push(g.int(-1, s.w).to_string());
+            t.push(g.int(0, s.h - 1).to_string());
+            t.push(g.int(0, s.d - 1).to_string());
+            t.push(g.pick(&[-1i64, 0, 0, 1, 2]).to_string());
+        }
+        _ => {
+            // demb demt demm demc
+            let mt = if g.chance(10) {
+                g.pick(&[0i64, 3])
+            } else {
+                g.pick(&[1i64, 2])
+            };
+            t.push(mt.to_string());
+            let topo = if g.chance(10) {
+                g.pick(&[0i64, 4])
+            } else {
+                g.pick(&[1i64, 2, 3])
+            };
+            t.push(topo.to_string());
+            t.push(g.pick(&[0i64, 0, 1, 2, 3, 5, -1]).to_string());
+            t.push(g.pick(&[1i64, 1, 2, 3, 0]).to_string());
+            let fr = if g.chance(5) {
+                g.pick(&[1i64, 2, -1])
+            } else {
+                0
+            };
+            t.push(fr.to_string());
+            t.push(g.pick(&[-1i64, -1, -1, 3, 0, 1]).to_string());
+            t.push(g.pick(&[1i64, 1, 0]).to_string());
+            let nf = g.pick(&[1i64, 1, 2, 3]);
+            let s = r29_bin(g, t, &[0, 0, 3, 1, 4], nf, 8);
+            match cmd {
+                "demb" => {}
+                "demt" | "demm" => {
+                    let mk = g.chance(4);
+                    t.push(i64::from(mk).to_string());
+                    if mk {
+                        r29_other(g, t, s, &[0, 3], &[1.0, 1.0, 0.0]);
+                    }
+                    let given = g.chance(5);
+                    t.push(i64::from(given).to_string());
+                    if given {
+                        let mut o = Shape {
+                            ty: g.pick(&[0, 3]),
+                            nf: 1,
+                            ..s
+                        };
+                        if g.chance(6) {
+                            o.d = g.int(1, 6);
+                        }
+                        vol_of(g, t, o);
+                    }
+                    if cmd == "demt" {
+                        t.push(dx(g.pick(&[0.5, 0.5, 1.0, 2.0, -1.0, f64::NAN])));
+                        t.push(dx(g.pick(&[f64::INFINITY, 1.0, 100.0, 2.0])));
+                    } else {
+                        let n = g.pick(&[0usize, 1, 1, 2, 3]);
+                        t.push(n.to_string());
+                        for _ in 0..n {
+                            t.push(g.pick(&[1i64, 2, 41, 0, 255, 1000]).to_string());
+                        }
+                    }
+                }
+                _ => {
+                    for _ in 0..2 {
+                        let has = g.chance(3);
+                        t.push(i64::from(has).to_string());
+                        if has {
+                            let mut o = Shape {
+                                ty: g.pick(&[0, 3]),
+                                nf: 1,
+                                hdr: false,
+                                drop: false,
+                                ..s
+                            };
+                            if g.chance(4) {
+                                o.w = g.int(1, 6);
+                            }
+                            vol_of(g, t, o);
+                        }
+                    }
+                    t.push(g.pick(&[0i64, 1, 2, -1, s.nf, s.nf - 1]).to_string());
+                }
+            }
+        }
+    }
+}
+
+/// A volume of the case, filled by `fill_pat` then painted.
+fn r29_vol(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+    use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
+    let mut m = get_vol(cx, t)?;
+    r24_fill_pat(cx, t, &mut m)?;
+    if t.i() != 0 {
+        let (x0, y0, z0, x1, y1, z1) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+        let v = t.f();
+        for f in 0..m.nframes {
+            for z in z0..=z1 {
+                for y in y0..=y1 {
+                    for x in x0..=x1 {
+                        mri_set_vox_val(&mut cx.g, &mut cx.b, &mut m, x, y, z, f, v, 0)?;
+                    }
+                }
+            }
+        }
+    }
+    fill_painted(cx, t, &mut m)?;
+    Ok(m)
+}
+
+/// A volume of the case, painted.
+fn r29_painted(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+    let mut m = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut m)?;
+    Ok(m)
+}
+
+#[inline(never)]
+fn r29_vvfill(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let mut src = r29_vol(cx, t)?;
+    let mask = if t.i() != 0 {
+        Some(r29_painted(cx, t)?)
+    } else {
+        None
+    };
+    let l = r25_get_lta(cx, t)?;
+    let env = r25_fsl_env(t);
+    let (usf, cons, gd) = (t.i(), t.i(), t.i());
+    let mut d = if t.i() != 0 {
+        Some(get_vol(cx, t)?)
+    } else {
+        None
+    };
+    if gd != 0 {
+        cx.g.gdiag_no = gd;
+    }
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let r = larmorx_freesurfer_volume::vol2vol::mri_vol2vol_fill(
+        g,
+        a,
+        b,
+        &env,
+        &mut src,
+        mask.as_ref(),
+        &l,
+        usf,
+        cons,
+        d.as_mut(),
+    )?;
+    o.ret(&r, d.as_ref());
+    Ok(())
+}
+
+#[inline(never)]
+fn r29_fbnwm(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let t1 = r29_vol(cx, t)?;
+    let wm = r29_vol(cx, t)?;
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let r = larmorx_freesurfer_volume::mri2ops::mri_find_bright_non_wm(g, a, b, &t1, &wm)?;
+    o.vol(r.as_ref());
+    Ok(())
+}
+
+#[inline(never)]
+fn r29_topo(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::topo;
+    let mut v = r29_vol(cx, t)?;
+    cx.g.gx = t.i();
+    cx.g.gy = t.i();
+    cx.g.gz = t.i();
+    match cmd {
+        "qecc" => {
+            let m = if t.i() != 0 {
+                Some(r29_painted(cx, t)?)
+            } else {
+                None
+            };
+            let (c, r, s) = (t.i(), t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let n = topo::quad_euler_char_change(g, a, b, &v, m.as_ref(), c, r, s)?;
+            o.i(i64::from(n));
+        }
+        "vtero" => {
+            let k = if t.i() != 0 {
+                Some(r29_painted(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let n = topo::mri_vol_topo_erode_one(g, a, b, &mut v, k.as_ref())?;
+            o.i(i64::from(n));
+            o.vol(Some(&v));
+        }
+        _ => {
+            let onval = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let n = topo::mri_vol_topo_dilate_one(g, a, b, &mut v, onval)?;
+            o.i(i64::from(n));
+            o.vol(Some(&v));
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r29_fscm(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let aseg = r29_vol(cx, t)?;
+    let mut scm = r29_vol(cx, t)?;
+    let nd = t.i();
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let (n, mask) = larmorx_freesurfer_volume::morph::fix_scm(g, a, b, &mut scm, &aseg, nd)?;
+    o.i(i64::from(n));
+    o.vol(Some(&scm));
+    o.vol(Some(&mask));
+    Ok(())
+}
+
+#[inline(never)]
+fn r29_binmri(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::morph::BinarizeMri;
+    let mut bm = BinarizeMri {
+        bin_type: t.i(),
+        thmin: t.d(),
+        thmax: t.d(),
+        ..BinarizeMri::default()
+    };
+    let nm = t.i();
+    for _ in 0..nm {
+        bm.matchlist.push(t.i());
+    }
+    bm.maskthmin = t.d();
+    bm.maskthmax = t.d();
+    bm.zero_col_edges = t.i();
+    bm.zero_row_edges = t.i();
+    bm.zero_slice_edges = t.i();
+    bm.on_val = t.d();
+    bm.off_val = t.d();
+    bm.fstart = t.i();
+    bm.fend = t.i();
+    bm.invert = t.i();
+    bm.mritype = t.i();
+    bm.do_abs = t.i();
+    bm.debug = t.i();
+    let inv = if t.i() != 0 {
+        Some(r29_vol(cx, t)?)
+    } else {
+        None
+    };
+    let m = if t.i() != 0 {
+        Some(r29_painted(cx, t)?)
+    } else {
+        None
+    };
+    let mut d = if t.i() != 0 {
+        Some(get_vol(cx, t)?)
+    } else {
+        None
+    };
+    let twice = t.i() != 0;
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let r = bm.binarize(g, a, b, inv.as_ref(), m.as_ref(), d.as_mut())?;
+    o.ret(&r, d.as_ref());
+    o.i(i64::from(bm.nhits));
+    o.i(i64::from(bm.fstart));
+    o.i(i64::from(bm.fend));
+    o.d(bm.on_val);
+    o.d(bm.off_val);
+    if twice {
+        let in2 = r29_vol(cx, t)?;
+        let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+        let r2 = bm.binarize(g, a, b, Some(&in2), None, None)?;
+        o.vol(r2.into_new().as_ref());
+        o.i(i64::from(bm.nhits));
+        o.i(i64::from(bm.fstart));
+        o.i(i64::from(bm.fend));
+    }
+    let (c, r, s, f) = (t.i(), t.i(), t.i(), t.i());
+    if let Some(i) = inv.as_ref() {
+        let q = bm.qualifies(&mut cx.g, &mut cx.b, i, m.as_ref(), c, r, s, f)?;
+        o.i(i64::from(q));
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r29_demorph(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::morph::DeMorphBinVol;
+    let mut dm = DeMorphBinVol {
+        morphtype: t.i(),
+        topo: t.i(),
+        nnbrsthresh: t.i(),
+        nmorph: t.i(),
+        frame: t.i(),
+        mritype: t.i(),
+        debug: t.i(),
+        nchangestot: 0,
+    };
+    let inv = r29_vol(cx, t)?;
+    match cmd {
+        "demb" => {
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = dm.morph(g, a, b, &inv)?;
+            o.vol(r.as_ref());
+            o.i(i64::from(dm.nchangestot));
+        }
+        "demt" | "demm" => {
+            let m = if t.i() != 0 {
+                Some(r29_painted(cx, t)?)
+            } else {
+                None
+            };
+            let od = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let r = if cmd == "demt" {
+                let (lo, hi) = (t.d(), t.d());
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                dm.morph_thresh(g, a, b, &inv, lo, hi, m.as_ref(), od.as_ref())?
+            } else {
+                let n = t.i();
+                let ml: Vec<i32> = (0..n).map(|_| t.i()).collect();
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                dm.morph_match(g, a, b, &inv, &ml, m.as_ref(), od.as_ref())?
+            };
+            o.vol(r.as_ref());
+            o.i(i64::from(dm.nchangestot));
+        }
+        _ => {
+            let m = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let od = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let fr = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let e = dm.check(g, a, Some(&inv), m.as_ref(), od.as_ref());
+            o.i(i64::from(e));
+            dm.dump(a);
+            let r = dm.copy_frame(g, a, b, &inv, fr)?;
             o.vol(r.as_ref());
         }
     }

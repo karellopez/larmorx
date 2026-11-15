@@ -4,7 +4,7 @@
 //! More of `utils/mri2.cpp` (3.1-37, relay 25): `MRIindexNo` (3771), `MRIzconcat` (6466),
 //! `MRIapplyEdits` (7168), `MRIfixEntoWM` (7222), `LabelAmygalaCortalJunction` (7264),
 //! `MRIshiftDim` (7338), `MRIcropToFoV` (7480), `MRIcropAroundCRS` (7641) and `MRIcropAroundRAS`
-//! (7763).
+//! (7763); relay 29: `MRIfindBrightNonWM` (6361).
 //!
 //! The voxels pass from `MRIgetVoxVal` to `MRIsetVoxVal` through a `double` FreeSurfer's compiler
 //! removes: they are copied as `float`s (a signalling NaN keeps its bits).
@@ -29,11 +29,14 @@
 //! - **FS-517** (hang): `MRIcropAroundCRS` whose last voxel lies beyond `int` (a centre that is not
 //!   a number, or too far, with a FoV that overflows): FreeSurfer's loop never ends; an error in
 //!   both modes.
+//! - **FS-802** (rule A): `MRIfindBrightNonWM` takes each T1 value as the low byte of its
+//!   truncation to an `int` (300 is 44, not bright). By default the value clamped to 0..255 (NaN
+//!   0); `reproduce` the low byte.
 
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_512, FS_513, FS_514, FS_515, FS_516, FS_517};
+use larmorx_core::defects::{FS_512, FS_513, FS_514, FS_515, FS_516, FS_517, FS_802};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
@@ -45,16 +48,23 @@ use larmorx_freesurfer_io::colortab::ctab_alloc;
 use larmorx_freesurfer_mri::ctab::ctab_deep_copy;
 use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, Lta, lta_copy};
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, Mri, MriRegion, mri_alloc, mri_alloc_sequence, mri_copy_header,
+    MRI_FLOAT, MRI_INT, MRI_UCHAR, Mri, MriRegion, mri_alloc, mri_alloc_sequence, mri_copy_header,
     mri_copy_pulse_parameters,
 };
 use larmorx_freesurfer_mri::vol_geom::{VolGeom, p0_to_cras, set_vox2ras_from_matrix, xfm_crs2xyz};
 
-use crate::arith::mri_extract_region;
+use crate::arith::{Pair, Tri, mri_clone, mri_extract_region, mri_replace_values};
 use crate::coords::dircos_to_orientation_string;
+use crate::deriv::{Axis, index};
+use crate::labels::WM_MIN_VAL;
 use crate::labels::int_of;
 use crate::ltaops::{InvertInto, lta_change_type, lta_invert, lta_print};
+use crate::mriset::{
+    mri_close, mri_dilate_inv_thresh_label, mri_dilate_thresh_label, mri_union,
+    mri_voxels_in_label, mri_xor,
+};
 use crate::region::region_print;
+use crate::rows::{self, Num};
 use crate::sample::cvtt;
 use crate::vgeom::vg_is_equal;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -952,4 +962,139 @@ pub fn mri_crop_around_ras(
         pg(crs_center[2])
     );
     mri_crop_around_crs(g, out, err, vol, crs_center, fov, keep)
+}
+
+/// `BRIGHT_LABEL` (`include/mri.h`).
+pub const BRIGHT_LABEL: i32 = 130;
+/// `BRIGHT_BORDER_LABEL` (`include/mri.h`).
+pub const BRIGHT_BORDER_LABEL: i32 = 100;
+
+/// A byte of frame 0 through FreeSurfer's byte pointer (`MRIvox`, whatever the volume's type).
+fn vox_byte(g: &mut Globals, what: &str, m: &Mri, x: i32, y: i32, z: i32) -> u8 {
+    match rows::read(
+        g,
+        what,
+        m,
+        i64::from(z),
+        i64::from(y),
+        i64::from(x),
+        MRI_UCHAR,
+    ) {
+        Num::I(i) => i as u8,
+        Num::F(f) => f as u8,
+    }
+}
+
+/// `BUFTYPE val = MRIgetVoxVal(...)`: the low byte of the value's truncation to an `int`
+/// (`cvttss2si`; FS-802: clamped to 0..255 by default, NaN 0).
+fn byte_of(g: &mut Globals, v: f32) -> u8 {
+    if v.is_nan() || !(0.0..256.0).contains(&v) {
+        g.notices.add(
+            &FS_802,
+            format!("MRIfindBrightNonWM: the T1 value {v} taken as a byte"),
+        );
+        if g.notices.reproduce() {
+            return (cvtt(f64::from(v)) & 0xff) as u8;
+        }
+        return if v.is_nan() || v < 0.0 { 0 } else { 255 };
+    }
+    v as u8
+}
+
+/// `MRIfindBrightNonWM(mri_T1, mri_wm)`: a clone of the T1 (`MRIclone`) labelled 130 (bright) at
+/// each voxel whose white-matter byte (`MRIvox`, whatever the type, row by row) is below
+/// `WM_MIN_VAL` (5), whose T1 value as a byte (FS-802) is above 125, and fewer than 13 of whose
+/// 27 neighbours (the T1's index tables, clamped at the faces; the voxel itself included) have a
+/// white-matter byte of at least 5; the label is written as a byte (`MRIvox`). Then closed in
+/// place (`MRIclose`), dilated once into the T1's voxels of at least 100 (`MRIdilateThreshLabel`,
+/// label 130, into a new volume), the dilation's shell (`MRIxor` of the two in 1..255, into the
+/// dilation) relabelled 100 (`MRIreplaceValues` 1 -> 100), the union of shell and label
+/// (`MRIunion`, into the label volume), `MRIfindBrightNonWM(): <n> bright non-wm voxels
+/// segmented.` (the voxels labelled 130, `MRIvoxelsInLabel`) on standard output, and three
+/// dilations into the T1's voxels of exactly 0 (`MRIdilateInvThreshLabel`, label 130, in place).
+pub fn mri_find_bright_non_wm(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    t1: &Mri,
+    wm: &Mri,
+) -> Result<Option<Mri>, Fatal> {
+    const WHAT: &str = "MRIfindBrightNonWM";
+    let Some(mut labeled) = mri_clone(g, out, err, t1, None)?.into_new() else {
+        return Ok(None);
+    };
+    let (w, h, d) = (t1.vg.width, t1.vg.height, t1.vg.depth);
+    for z in 0..d {
+        for y in 0..h {
+            // pwm = &MRIvox(mri_wm, 0, y, z): the row pointer is read
+            rows::touch(g, WHAT, wm, i64::from(z), i64::from(y));
+            for x in 0..w {
+                let v = mri_get_vox_val(g, err, t1, x, y, z, 0, 0)?;
+                let wmb = vox_byte(g, WHAT, wm, x, y, z);
+                if i32::from(wmb) >= WM_MIN_VAL {
+                    continue;
+                }
+                if byte_of(g, v) <= 125 {
+                    continue;
+                }
+                let mut nwhite = 0;
+                for xk in -1..=1 {
+                    let xi = index(g, err, WHAT, t1, Axis::X, x + xk)?;
+                    for yk in -1..=1 {
+                        let yi = index(g, err, WHAT, t1, Axis::Y, y + yk)?;
+                        for zk in -1..=1 {
+                            let zi = index(g, err, WHAT, t1, Axis::Z, z + zk)?;
+                            if i32::from(vox_byte(g, WHAT, wm, xi, yi, zi)) >= WM_MIN_VAL {
+                                nwhite += 1;
+                            }
+                        }
+                    }
+                }
+                // aMIN_WHITE = (3 * 3 * 3 - 1) / 2 = 13
+                if nwhite < 13 {
+                    rows::write(
+                        g,
+                        WHAT,
+                        &mut labeled,
+                        i64::from(z),
+                        i64::from(y),
+                        i64::from(x),
+                        MRI_UCHAR,
+                        Num::I(i64::from(BRIGHT_LABEL)),
+                    );
+                }
+            }
+        }
+    }
+    mri_close(g, out, err, Pair::Same(&mut labeled))?;
+    let tmp = mri_dilate_thresh_label(g, out, err, Pair::New(&labeled), t1, BRIGHT_LABEL, 1, 100)?;
+    let Some(mut tmp) = tmp.into_new() else {
+        return Ok(None);
+    };
+    mri_xor(g, out, err, Tri::Second(&labeled, &mut tmp), 1, 255)?;
+    mri_replace_values(
+        g,
+        out,
+        err,
+        Pair::Same(&mut tmp),
+        1.0,
+        BRIGHT_BORDER_LABEL as f32,
+    )?;
+    mri_union(g, out, err, Tri::Second(&tmp, &mut labeled))?;
+    let n = mri_voxels_in_label(g, err, &labeled, BRIGHT_LABEL)?;
+    let _ = writeln!(
+        out,
+        "MRIfindBrightNonWM(): {n} bright non-wm voxels segmented."
+    );
+    mri_dilate_inv_thresh_label(
+        g,
+        out,
+        err,
+        Pair::Same(&mut labeled),
+        t1,
+        BRIGHT_LABEL,
+        3,
+        0,
+    )?;
+    Ok(Some(labeled))
 }

@@ -39,6 +39,8 @@ const FAR: u8 = 2;
 const FORBIDDEN: u8 = 3;
 /// `EPS`.
 const EPS: f32 = 1e-6;
+/// `EDOM` (Linux).
+const EDOM: i32 = 33;
 
 /// `DTRANS_MODE_SIGNED` (negative inside the label, positive outside).
 pub const DTRANS_MODE_SIGNED: i32 = 1;
@@ -274,6 +276,11 @@ impl Fm<'_> {
         let s3 = sse::add(ab, c);
         let c3 = sse::mul(sse::sub(sse::add(sse::mul(c, c), aa_bb), 1.0), 3.0);
         let delta = sse::sub(sse::mul(s3, s3), c3);
+        // FreeSurfer takes the first root before it tests `delta`: glibc's `sqrtf` of a negative
+        // `delta` sets `errno` to `EDOM` (the root itself is not used)
+        if delta < 0.0 {
+            g.errno = EDOM;
+        }
         if delta >= 0.0 {
             let sol = sse::div(sse::add(sse::sqrt(delta), s3), 3.0);
             if sse::add(EPS, sol) >= c {

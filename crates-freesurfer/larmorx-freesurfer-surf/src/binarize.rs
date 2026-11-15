@@ -447,11 +447,13 @@ pub fn mri_compute_laminar_volume_fractions(
     }
     let mut layers = mri_upsample_n(g, io.out, io.err, src, None, nvox)?.unwrap_new();
     let mut pial = mri_clone(g, io.out, io.err, &layers, None)?.unwrap_new();
-    if g.notices.reproduce() && sg.laminar_wm.is_some() {
+    if sg.laminar_wm.is_some() {
         g.notices.add(
             &FS_613,
-            "MRIcomputeLaminarVolumeFractions: a later call takes the first call's white interior",
+            "MRIcomputeLaminarVolumeFractions: a later call (FreeSurfer reuses the first call's white interior; larmorx computes this call's own)",
         );
+    }
+    if g.notices.reproduce() && sg.laminar_wm.is_some() {
         let wm = sg.laminar_wm.take().expect("the first call's interior");
         mri_copy(g, io.out, io.err, &wm, Some(&mut layers))?;
         sg.laminar_wm = Some(wm);
@@ -459,25 +461,8 @@ pub fn mri_compute_laminar_volume_fractions(
         restore_vertex_positions(g, io, mris, WHITE_VERTICES)?;
         compute_metric_properties(g, sg, io, mris)?;
         crate::mriflood::mris_fill_interior(g, sg, io, mris, resolution, Some(&mut layers))?;
-        match &sg.laminar_wm {
-            None => sg.laminar_wm = Some(mri_copy(g, io.out, io.err, &layers, None)?.unwrap_new()),
-            Some(wm) => {
-                let same = (wm.vg.width, wm.vg.height, wm.vg.depth, wm.mtype, wm.nframes)
-                    == (
-                        layers.vg.width,
-                        layers.vg.height,
-                        layers.vg.depth,
-                        layers.mtype,
-                        layers.nframes,
-                    )
-                    && wm.chunk == layers.chunk;
-                if !same {
-                    g.notices.add(
-                        &FS_613,
-                        "MRIcomputeLaminarVolumeFractions: a later call's white interior differs from the first call's, which FreeSurfer would take",
-                    );
-                }
-            }
+        if sg.laminar_wm.is_none() {
+            sg.laminar_wm = Some(mri_copy(g, io.out, io.err, &layers, None)?.unwrap_new());
         }
     }
     restore_vertex_positions(g, io, mris, PIAL_VERTICES)?;

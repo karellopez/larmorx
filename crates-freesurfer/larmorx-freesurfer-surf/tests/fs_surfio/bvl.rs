@@ -136,12 +136,16 @@ pub(super) fn bvl_tokens(t: &mut Vec<String>, g: &mut Gen) {
         let fractions = k == 1 && g.chance(2);
         let ty = if fractions {
             3
+        } else if k == 0 {
+            g.pick(&[0, 0, 0, 0, 0, 0, 0, 3, 1])
         } else {
-            g.pick(&[0, 0, 0, 0, 3, 1])
+            g.pick(&[0, 0, 0, 3, 1])
         };
+        // mostly the surface's extent and geometry, so that the surface lies in the volume
+        let own = !fractions && g.chance(if k == 0 { 4 } else { 2 });
         let d = if fractions {
             vols[0].1
-        } else if g.chance(2) {
+        } else if !own {
             dims
         } else {
             [0, 1, 2].map(|_| g.int(6, 14))
@@ -152,7 +156,7 @@ pub(super) fn bvl_tokens(t: &mut Vec<String>, g: &mut Gen) {
             ix(t, x);
         }
         ix(t, nf);
-        if fractions || g.chance(2) {
+        if !own {
             for x in sgeom {
                 fv(t, x);
             }
@@ -160,16 +164,18 @@ pub(super) fn bvl_tokens(t: &mut Vec<String>, g: &mut Gen) {
             geom(t, g, heavy);
         }
         let mut label = -1;
-        match g.below(6) {
+        match g.below(8) {
             0 => ix(t, 0),
             1 => ix(t, g.int(1, 3)),
             _ if !fractions => {
+                // a ball around the centre, kept off the border (FS-614 now and then all the same)
                 ix(t, -1);
-                let c = d.map(|x| x / 2 + g.int(-1, 1));
+                let c = d.map(|x| x / 2);
                 for x in c {
                     ix(t, x);
                 }
-                ix(t, g.int(2, 5));
+                let room = d.iter().copied().min().unwrap_or(6) / 2 - 2;
+                ix(t, g.int(2, room.max(2)));
                 label = g.int(1, 3);
                 ix(t, label);
             }
@@ -181,6 +187,9 @@ pub(super) fn bvl_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let lo = [0, 1, 2].map(|k| m.v.iter().map(|p| p[k]).fold(f32::INFINITY, f32::min));
     let hi = [0, 1, 2].map(|k| m.v.iter().map(|p| p[k]).fold(f32::NEG_INFINITY, f32::max));
     let finite = lo.iter().chain(&hi).all(|x| x.is_finite());
+    // one resolution for the case's laminar fractions mostly (a second call at another one copies
+    // the first call's interior into a volume of another extent: FS-163, FreeSurfer crashes)
+    let lres = g.pick(&[0.5, 1.0, 1.0, 2.0]);
     let nops = g.int(1, 3);
     ix(t, nops);
     for _ in 0..nops {
@@ -230,7 +239,14 @@ pub(super) fn bvl_tokens(t: &mut Vec<String>, g: &mut Gen) {
                     g.int(0, 3)
                 };
                 ix(t, label);
-                ix(t, if g.chance(8) { -1 } else { g.int(0, 3) });
+                ix(
+                    t,
+                    if g.chance(10) {
+                        g.pick(&[-1, 3])
+                    } else {
+                        g.int(0, 2)
+                    },
+                );
                 f32tok(t, g.pick(&[0.5f32, 1.0, 1.0, 2.0]));
                 f32tok(t, g.pick(&[0.5f32, 1.0, 2.0, 3.0]));
             }
@@ -238,7 +254,7 @@ pub(super) fn bvl_tokens(t: &mut Vec<String>, g: &mut Gen) {
             6 => t.push("msn".into()),
             _ => {
                 t.push("lvf".into());
-                f64tok(t, g.pick(&[0.5, 1.0, 1.0, 2.0]));
+                f64tok(t, lres);
                 ix(t, 0);
                 let given = vols.len() == 2 && vols[1].2 == 3 && g.chance(2);
                 ix(t, if given { 1 } else { -1 });

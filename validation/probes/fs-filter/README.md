@@ -96,6 +96,10 @@ frame functions.
   `NOFILE`); `g3df <volume file> <above> <below> <sigma>` (`real.py --gentle`: a recorded head's
   gentle normalisation in place; the FNV-1a of its voxels). The number in the rejected control
   points' message is compared as `?` where the port notes FS-596 (a register's contents).
+  `hsc <src> <thick> <ctrl?>` (`MRInormFindHighSignalLowStdControlPoints`, the source's slice
+  thickness set), `hsl <src> <thick> <mode> [<norm>] <sigma> <wm> <points>`
+  (`MRInormalizeHighSignalLowStd`; then the source), `hslf <volume file> <sigma>` (`real.py --snr`:
+  a recorded head's high-signal normalisation into a new volume, wm 110; the FNV-1a of its voxels).
 - `build.sh [<workspace>]`: builds `fsfilter` with the unit oracle's compiler, flags and libraries
   (`validation/investigations/freesurfer-unit-oracle`, `build.py all` first) into
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-filter/` (with `BUILD_INFO.txt`). From a worktree,

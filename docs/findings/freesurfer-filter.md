@@ -353,3 +353,42 @@ Closed (object code of the unit oracle's `mrinorm.cpp.o`, `relay27/mrinorm.asm`;
 - **Results.** Seeds 7, 13 (100 `nrm`, `nfcp`, `n3d` cases each) and 17 (200 each): 0 different with
   `reproduce`; seed 13 with the default: no difference without a notice.
 
+
+## 15. `mrinorm.cpp`'s high-signal normalisation and the normalisation's speed (relay 31)
+
+- **The object code** (`relay27/mrinorm.asm` of the unit oracle's build). `WSIZE(mri)` is
+  `cvtss2sd thick; 7.0 / thick; * 0.5; cvttsd2si; lea 1(%rax,%rax)`: the doubling wraps
+  (`INT_MIN` gives 1), computed twice (for `MRImean` and `MRIstd`). The `total` loop (unused) is not
+  compiled; the count loop is `addss counts[b], num` from `num = 0` (the count in the destination),
+  `comiss 20000.0f` (`num > 20000`). `num = segments[s1].nvoxels` is `cvtsi2ss`, then `nvoxels = 0`
+  (a store), and after the second search `cvttss2si num` is both stored back and passed to `printf`
+  (FS-602). `2 * h->bins[h->nbins - 1]` is `addss x, x`. `MRInormalizeHighSignalLowStd`'s loop:
+  `ucomiss 0, bias; jnp` (a NaN bias divides), `mulss wm_target` into the source value, `divss bias`
+  into the product.
+- **FS-601.** `MRIsegmentMax` returns -1 with fewer than two (or no) segments; `segments[-1]` is the
+  64 bytes before the table's `calloc` block (`MRI_SEGMENT` is 64 bytes: `nvoxels` at -48, the
+  centroid at -32..-24, inside the previous chunk; the chunk header is -16..0). With `s1` = -1 the
+  code also stores 0 to `segments[-1].nvoxels` and restores it. When the table is `mmap`ed (large
+  tables), the page before it is unmapped: SIGSEGV (seen in about 10 % of the probe's cases).
+  Memory contents: printed as 0 in both modes, the cases counted (`SKIP`).
+- **FS-602, FS-603.** As the spec (§30); FS-603 needs a slice thickness below 3.3e-9 mm.
+- **`-snr` only.** `mri_normalize` reaches `MRInormalizeHighSignalLowStd` only with `-snr` (its
+  `nosnr` is 1 by default) when the one-dimensional normalisation is not used: not on recon-all's
+  path.
+- **Speed (bit for bit).** One pruned `MRI3dNormalize` pass of a recorded head's `T1.mgz`: 51 s in
+  the port before, FreeSurfer 19 s; after, 11.5 s with identical output. Where the time was:
+  track C's `MRIerode` (27 index lookups and checked byte reads per voxel: 5.5 s per erosion of
+  256^3, three per pruning), the Voronoi diagram's four full scans per growth step (10 s), the
+  65-tap convolution (one checked operation per tap: 10 s), the second 6-connected growth's full
+  scans (4 s), checked byte access to the control volumes. The changes keep every output's
+  operations: the convolution sums each output's taps in their order for a whole row at once
+  (plain arithmetic gives the same numbers; NaN outputs are recomputed operation by operation for
+  their bits); the Voronoi diagram grows from its frontier (marks only go from none to temporary
+  while the neighbours are marked; each frontier voxel's mean reads only marked voxels); the
+  growth re-examines only voxels within one voxel of the last pass's fills (a voxel's step reads
+  the control volume only in its clamped 3 x 3 x 3 box, read-only during a pass); the window search
+  answers from three passes of running counts of the values outside `[low, hi]` (with clamping
+  tables a window's voxels are its box within the volume; the last value read, printed for the
+  diagnostic voxel, is the window's last voxel); `MRIerode`'s byte branch takes separable minima
+  over the clamped box. Each is used only where its condition holds (byte control volumes of the
+  source's extent, tables that clamp); otherwise the original loops run.

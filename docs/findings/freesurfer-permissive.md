@@ -440,6 +440,38 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
   the generated `tif_fax3sm.c` and `port.h` (compared with `<workspace>/tags/jpeg-6b`, SHA-256
   75c3ec241e9996504fe02a9ed4d12f16b74ade713972f3db9e65ce95cd27e35d, and `tags/libtiff-3.6.1`).
 
+## JPEG: FreeSurfer's calls of IJG 6b (`utils/imageio.cpp`; track C relay 31, 2026-11-15)
+
+The library is larmorx-io's `jpeg` (open findings: `docs/findings/jpeg-6b.md`); these are the call
+sites track A wires (`imageio.rs`).
+- `JPEGReadImage(fname)`: `jpeg_std_error`, `jpeg_create_decompress`, then `fopen(fname, "rb")`
+  (on failure `ErrorExit(ERROR_NO_FILE, "JPEGReadImage:  Input file does not exist\n")`),
+  `jpeg_stdio_src`, `jpeg_read_header(TRUE)`, `out_color_space` set to `JCS_GRAYSCALE` and at once
+  to `JCS_RGB` (only the second counts), `jpeg_start_decompress`, `ImageAlloc(output_height,
+  output_width, PFRGB, 1)`, then each scanline into `IMAGERGBpix(I, 0, rowctr--)` from the last
+  row up (the image is stored bottom row first), `jpeg_finish_decompress`,
+  `jpeg_destroy_decompress`; the file is never closed. Port: `larmorx_io::jpeg::decode_rgb` gives
+  the rows top first; the caller stores row k at image row `output_height - 1 - k`. Any IJG error
+  ends the program with status 1 after its message (no FreeSurfer message).
+- `JPEGReadHeader(fp, I)`: `jpeg_read_header(TRUE)` on the caller's open file, then
+  `ImageAlloc(image_height, image_width, PFBYTE, 1)` or `init_header(I, "orig", "seq", 1, "today",
+  image_height, image_width, PFBYTE, 1, "temp")`, `jpeg_destroy_decompress`. Port:
+  `larmorx_io::jpeg::read_header` on the file's bytes (the reading position the caller's file had
+  is IJG's business only through `jpeg_stdio_src`'s reads; ImageReadHeader opens the file just
+  before).
+- `JPEGWriteImage(I, fname, frame)`: a pixel format other than `PFBYTE` is `ErrorReturn
+  (ERROR_UNSUPPORTED, "JPEGWrite: only PFBYTE currently supported")` before anything; then
+  `jpeg_std_error`, `jpeg_create_compress`, `fopen(fname, "wb")` (on failure `ErrorExit
+  (ERROR_BAD_FILE, "JPEGWriteImage:  Could not open file")`), `jpeg_stdio_dest`, `image_width =
+  I->ocols`, `image_height = I->orows`, one grey component, `jpeg_set_defaults`,
+  `jpeg_start_compress(TRUE)`, rows `IMAGEpix(I, 0, I->rows - next_scanline - 1)` (counted from
+  `rows`, not `orows`: the bottom image row first), `jpeg_finish_compress`,
+  `jpeg_destroy_compress`, `fclose`. The `frame` argument is not used. Port:
+  `larmorx_io::jpeg::encode_gray` (the file is created by the caller before the call, so an IJG
+  error such as `Empty JPEG image (DNL not supported)` leaves an empty file, as FreeSurfer's).
+- The official binaries link FreeSurfer's static `libjpeg.a` (IJG 6b; the binary's strings hold
+  `6b  27-Mar-1998` and IJG's messages).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
@@ -450,5 +482,6 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
 `validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) and
 `validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) and
 `validation/probes/fs-misc` (`facts.cpp` includes FreeSurfer's FNV headers) and
-`validation/probes/fs-nrrd-minc` (its build compiles against FreeSurfer's `packages/` headers; `src/minc.rs`'s `FreeSurferDialect`) are closed to
+`validation/probes/fs-nrrd-minc` (its build compiles against FreeSurfer's `packages/` headers; `src/minc.rs`'s `FreeSurferDialect`) and
+`validation/probes/fs-jpeg` (its build links FreeSurfer's `libjpeg.a` with its `packages/jpeg` headers) are closed to
 FreeSurfer's clean-room implementers, as this file is.

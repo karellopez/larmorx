@@ -14,6 +14,8 @@
 //!   classic-format reader.
 //!
 //! - [`dicom`]: DICOM files opened as CTN 3.0.6's object library opens them (`DCM_OpenFile`).
+//! - [`jpeg`]: JPEG files read and written as IJG's libjpeg 6b does (decoder to RGB; the grey
+//!   encoder with its defaults).
 //! - [`gifti`]: GIFTI files, read and written as gifticlib 1.12 does, over [`xml`], a pure-Rust
 //!   parser with expat 2.0.1's events and failures.
 //!
@@ -27,6 +29,7 @@ pub mod itk_hdf5;
 pub mod itk_output;
 pub mod itk_transform;
 mod itk_transform_names;
+pub mod jpeg;
 pub mod minc;
 pub mod nifti;
 pub mod nrrd;

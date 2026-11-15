@@ -360,3 +360,40 @@ path, `transform_point`) takes the operand order of volume_io's x86-64 object co
 the probe's `libminc_up.so`) through `larmorx_core::ItkReal`'s `sse_*` operations, so the NaN bits are x86-64's on
 every platform. Defects FS-797 to FS-801 (`larmorx_core::defects`; `docs/findings/minc-volumes.md`, FreeSurfer's
 copy's in `docs/findings/freesurfer-permissive.md`).
+
+## JPEG: IJG libjpeg 6b's decompressor and grey compressor (`src/jpeg/`; FreeSurfer's foundations, track C relay 31, 2026-11-15)
+
+Translated from the Independent JPEG Group's JPEG software, release 6b of 27-Mar-1998
+(`jpegsrc.v6b.tar.gz`, SHA-256 75c3ec241e9996504fe02a9ed4d12f16b74ade713972f3db9e65ce95cd27e35d;
+`<workspace>/tags/jpeg-6b`, `upstream.tsv`); copyright (C) 1991-1998, Thomas G. Lane; IJG's
+conditions (its README, `LICENSES/IJG.txt`; the acknowledgement in `NOTICE`); SPDX `Apache-2.0 AND
+IJG` in each translated file (`cases.rs`, the test encoder, is larmorx's own). The configuration:
+IJG's defaults (`jmorecfg.h`: 8-bit samples, `INT32` a 64-bit `long` on LP64, no arithmetic
+coding, multi-scan and progressive decoding, block smoothing, `jmemnobs.c`'s memory), as FreeSurfer
+8.2.0 builds its `packages/jpeg` (IJG 6b file for file but one `#include` in `jerror.c`).
+
+| larmorx | IJG 6b |
+|---|---|
+| `msg::TABLE`, `msg::format`, `ErrMgr`, `Fatal` | `jerror.h` (the message table, generated from it), `jerror.c`: `format_message`, `emit_message`, `output_message`, `error_exit`'s message, `reset_error_mgr` |
+| `D::fill`, `byte`, `two_bytes`, `skip` (`Src`) | `jdatasrc.c`: `init_source`, `fill_input_buffer` (the fake EOI), `skip_input_data`; `jdmarker.c`'s `INPUT_BYTE`, `INPUT_2BYTES` |
+| `D::get_soi`, `get_sof`, `get_sos`, `get_dht`, `get_dqt`, `get_dri`, `get_interesting_appn`, `examine_app0`, `examine_app14`, `skip_variable`, `next_marker`, `first_marker`, `read_markers`, `read_restart_marker`, `resync_to_restart` | `jdmarker.c` (its trace messages not kept: trace level 0) |
+| `D::initial_setup`, `per_scan_setup`, `latch_quant_tables`, `start_input_pass`, `consume_markers`, `consume_input` | `jdinput.c` |
+| `D::default_decompress_parms`, `read_header`; `decompress`, `decode_rgb`, `read_header` | `jdapimin.c`: `default_decompress_parms`, `jpeg_read_header`, `jpeg_consume_input`, `jpeg_finish_decompress`; `jdapistd.c`: `jpeg_start_decompress`, `jpeg_read_scanlines`; `jdmaster.c`: `master_selection`'s order of checks, `use_merged_upsample` (never chosen: fancy upsampling), `jpeg_calc_output_dimensions` (scale 1/1), `prepare_range_limit_table` (`range_limit`) |
+| `D::make_derived`, `start_pass_huff`, `fill_bit_buffer`, `huff_decode`, `huff_decode_slow`, `get_bits`, `process_restart`, `decode_mcu`, `decode_block`, `huff_extend` | `jdhuff.c`, `jdhuff.h` (`HUFF_DECODE`, `CHECK_BIT_BUFFER`, `GET_BITS`) |
+| `D::start_pass_phuff`, `decode_mcu_prog`, `dc_first`, `ac_first`, `dc_refine`, `ac_refine` | `jdphuff.c` |
+| `D::start_imcu_row`, `consume_data`; `decompress_onepass`, `idct_row`, `smoothing_ok`, `idct_smooth_row` | `jdcoefct.c` |
+| `build_dct_tables`, `idct_islow` | `jddctmgr.c` (`start_pass`, the slow integer method only), `jidctint.c` |
+| `Up`, `h2v1_fancy`, `h2v2_fancy`, `Output::emit` | `jdsample.c` (`jinit_upsampler`'s choice, every method); `jdmainct.c`'s context rows as their effect (the row above the first and below the last real row repeat it); `jdpostct.c` (pass-through) |
+| `YccTables`, `Convert` | `jdcolor.c`: `build_ycc_rgb_table`, `ycc_rgb_convert`, `gray_rgb_convert`, `null_convert`, `jinit_color_deconverter`'s checks (for `JCS_RGB` output) |
+| `NATURAL_ORDER` | `jutils.c`: `jpeg_natural_order` with its 16 extra entries |
+| `encode_gray`, `encode_one_block`, `emit_code`, `emit_bits`, `fdct_islow`, `c_derived`, `Dest` | `jcparam.c` (`jpeg_set_defaults`, `jpeg_set_quality`, `jpeg_quality_scaling`, `jpeg_add_quant_table`, the standard tables), `jcmaster.c` (`initial_setup`'s checks), `jcprepct.c` (`expand_bottom_edge`), `jcsample.c` (`fullsize_downsample`, `expand_right_edge`), `jccolor.c` (`grayscale_convert`), `jccoefct.c`, `jcdctmgr.c` (`forward_DCT`, the slow integer divisors), `jfdctint.c`, `jchuff.c` (`jpeg_make_c_derived_tbl`, `emit_bits`, `flush_bits`, `encode_one_block`), `jcmarker.c` (the markers of a baseline grey file), `jdatadst.c` (4,096-byte blocks, `term_destination`) |
+
+- Not translated (no caller here sets them): IDCT scaling, colour quantization, the fast and float
+  DCTs, raw data, buffered-image mode, suspending sources, other compressor parameters.
+- The sample rows of three iMCU rows are kept per component; the coefficients of the whole image
+  only for files of several scans, as IJG keeps them (`Options::max_alloc` models a failing
+  `malloc`: `Insufficient memory (case 4)`).
+- D13: FS-813 (`larmorx_core::defects`); `docs/findings/jpeg-6b.md`.
+- Checks: `src/jpeg/tests.rs` (a digest of 400 generated files decoded in both modes and 40 grey
+  files written); the differential probe `validation/probes/fs-jpeg` against IJG 6b built from its
+  release and FreeSurfer 8.2.0's `libjpeg.a` (README there).

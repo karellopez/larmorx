@@ -213,6 +213,13 @@ translated into Rust in crates/larmorx-core/src/libtiff.rs. Its notice (LICENSES
   Leffler and Silicon Graphics. (The full text, with its warranty disclaimer, in
   LICENSES/libtiff.txt.)
 
+The Independent JPEG Group's JPEG software, release 6b of 27-Mar-1998 (libjpeg 6b: its
+decompressor and its compressor's path for one 8-bit grey component), translated into Rust in
+crates/larmorx-io/src/jpeg/. This software is based in part on the work of the Independent JPEG
+Group. Copyright (C) 1991-1998, Thomas G. Lane. IJG 6b's README, with its copyright, no-warranty
+notice and conditions, is LICENSES/IJG.txt; the changes to the original files are listed in
+crates/larmorx-io/src/jpeg/mod.rs and crates/larmorx-io/PROVENANCE.md.
+
 netCDF 3.6.0-p1's classic-format reader (src/libsrc: posixio.c, v1hpg.c, nc.c, var.c, dim.c, attr.c,
 putget.c, ncx.c, error.c, v2i.c), translated into Rust in crates/larmorx-io/src/minc/netcdf.rs. Its
 licence (LICENSES/NetCDF.txt):

@@ -625,3 +625,97 @@ pub fn write_from_volume(
     }
     Ok(0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    #[test]
+    fn unpack_names() {
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let mut u = |n: &str| image_unpack_file_name(&mut g, n);
+        assert_eq!(u("a.rgb#2"), ("a.rgb".into(), 2, RGBI_IMAGE));
+        assert_eq!(u("a#1.rgb"), ("a".into(), 1, RGBI_IMAGE));
+        assert_eq!(u("w/x.dat"), ("w/x.dat".into(), -1, HIPS_IMAGE));
+        assert_eq!(u("x.MAT"), ("x.MAT".into(), -1, MATLAB_IMAGE));
+        assert_eq!(u("x.tiff#q"), ("x.tiff".into(), -1, TIFF_IMAGE));
+        assert_eq!(u("x.Jpeg"), ("x.Jpeg".into(), -1, JPEG_IMAGE));
+        assert_eq!(u("noext"), ("noext".into(), -1, HIPS_IMAGE));
+        assert_eq!(u("p.pbm#-3"), ("p.pbm".into(), -3, PBM_IMAGE));
+    }
+
+    /// An SGI image written and read back: the header's fields in their byte orders, the rows
+    /// three times at one place, grey pixels read back.
+    #[test]
+    fn sgi_round_trip() {
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut im = image_alloc(&mut g, &mut err, 2, 3, PFBYTE, 1, 0).unwrap();
+            im.image = Some(vec![5, 9, 200, 0, 7, 255]);
+            let w = image_write(
+                &mut g,
+                &mut out,
+                &mut err,
+                Some(dir.path()),
+                Some(&im),
+                "o.rgb",
+            )
+            .unwrap();
+            assert!(w.ok);
+            let b = std::fs::read(dir.path().join("o.rgb")).unwrap();
+            assert_eq!(b.len(), 512 + 6);
+            assert_eq!(&b[0..12], &[0x01, 0xda, 0, 1, 0, 2, 0, 3, 0, 2, 0, 1]);
+            assert_eq!(&b[12..20], &[0, 0, 0, 0, 0, 0, 0, 255]);
+            assert_eq!(&b[24..32], b"no name\0");
+            assert_eq!(&b[112..114], &[2, 0]);
+            assert_eq!(&b[118..120], &[1, 0]);
+            assert!(b[176..512].iter().all(|&x| x == 0));
+            assert_eq!(&b[512..], &[5, 9, 200, 0, 7, 255]);
+            let r = rgb_read_image(&mut g, &mut err, Some(dir.path()), "o.rgb")
+                .unwrap()
+                .unwrap();
+            assert_eq!(r.pixel_format, PFRGB);
+            assert_eq!(
+                r.image.unwrap(),
+                vec![
+                    5, 5, 5, 9, 9, 9, 200, 200, 200, 0, 0, 0, 7, 7, 7, 255, 255, 255
+                ]
+            );
+        }
+    }
+
+    /// FS-730: an image wider than 65,535 pixels: refused by default, written modulo 65,536 by
+    /// `reproduce` (a header-only file: the rows have 0 bytes).
+    #[test]
+    fn sgi_too_wide() {
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut im = image_alloc(&mut g, &mut err, 1, 65536, PFBYTE, 1, 0).unwrap();
+            im.image = Some(vec![1; 65536]);
+            let name = format!("w{}.rgb", mode.name());
+            let w = image_write(
+                &mut g,
+                &mut out,
+                &mut err,
+                Some(dir.path()),
+                Some(&im),
+                &name,
+            )
+            .unwrap();
+            let b = std::fs::read(dir.path().join(&name)).unwrap();
+            if mode.fix() {
+                assert!(!w.ok && w.code == ERROR_BADPARM);
+                assert!(b.is_empty(), "only ImageWrite's own empty file");
+            } else {
+                assert!(w.ok);
+                assert_eq!(b.len(), 176);
+                assert_eq!(&b[6..8], &[0, 0], "65,536 stored as 0");
+            }
+        }
+    }
+}

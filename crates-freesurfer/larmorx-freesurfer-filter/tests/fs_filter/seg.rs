@@ -2,12 +2,14 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! The fs.filter probe's segment and flood commands (`fsfilter.cpp`'s `seg_case`,
-//! `utils/mrisegment.cpp`, `utils/mriflood.cpp`): their case generators and the port's answers.
+//! `utils/mrisegment.cpp`, `utils/mriflood.cpp`, `utils/rfa.cpp`): their case generators and the
+//! port's answers.
 
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_filter::flood;
 use larmorx_freesurfer_filter::norm;
+use larmorx_freesurfer_filter::rfa;
 use larmorx_freesurfer_filter::segment as sg;
 use larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN;
 use larmorx_freesurfer_io::mriio::mri_read;
@@ -23,8 +25,8 @@ use super::{Ctx, Gen, Shared, Toks, fx, get_vol, put_vol, rle, token};
 use larmorx_freesurfer_core::globals::Globals;
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 8] = [
-    "seg", "mseg", "salloc", "flood", "acc", "dist", "vor", "soap",
+pub const COMMANDS: [&str; 9] = [
+    "seg", "mseg", "salloc", "flood", "acc", "dist", "vor", "soap", "ccsf",
 ];
 
 /// The light operations (no volume), for the large pattern volumes.
@@ -274,7 +276,51 @@ fn norm_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
     }
 }
 
+/// `ccsf`: a label volume (the CSF labels, others, now and then a fraction in floats), a window
+/// size and a position (inside mostly; at and past the faces).
+fn ccsf_case(g: &mut Gen, t: &mut Vec<String>) {
+    let e = small(g, 12);
+    let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_INT, MRI_SHORT, MRI_FLOAT]);
+    let labels = [
+        24.0, 0.0, 4.0, 43.0, 5.0, 44.0, 14.0, 15.0, 2.0, 3.0, 41.0, 42.0, 255.0,
+    ];
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let block = g.chance(2);
+    let a = g.pick(&labels);
+    let b = g.pick(&labels);
+    let v: Vec<f64> = (0..n)
+        .map(|i| {
+            if ty == MRI_FLOAT && g.chance(40) {
+                return 4.5;
+            }
+            if block {
+                if (i % e[0] as usize) < e[0] as usize / 2 {
+                    a
+                } else {
+                    b
+                }
+            } else {
+                g.pick(&labels)
+            }
+        })
+        .collect();
+    vol_of(t, e, ty, &v);
+    t.push(g.pick(&[5, 5, 3, 1, 7, 0, -1, 9, 4]).to_string());
+    for &m in &e {
+        let p = if g.chance(6) {
+            g.pick(&[-1i64, -3, i64::from(m), i64::from(m) + 2])
+        } else {
+            g.int(0, i64::from(m) - 1)
+        };
+        t.push(p.to_string());
+    }
+}
+
 pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    if cmd == "ccsf" {
+        ccsf_case(g, t);
+        return;
+    }
     if matches!(cmd, "vor" | "soap") {
         norm_case(g, t, cmd);
         return;
@@ -550,6 +596,13 @@ fn vsr(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
 
 /// The port's answer for one of this module's commands; `false` for another command.
 pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool, Fatal> {
+    if cmd == "ccsf" {
+        let seg = get_vol(cx, t)?;
+        let (wsize, x, y, z) = (t.i(), t.i(), t.i(), t.i());
+        let n = rfa::mri_count_csf_in_nbhd(&mut cx.g, &mut cx.b, &seg, wsize, x, y, z)?;
+        *o += &format!("{n} ");
+        return Ok(true);
+    }
     if cmd == "vsr" {
         vsr(cx, t, o)?;
         return Ok(true);

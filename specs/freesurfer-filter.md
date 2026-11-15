@@ -8,7 +8,7 @@ the probe `validation/probes/fs-filter/`, a black-box run of FreeSurfer's code),
 `specs/freesurfer-mri.md` (the structure these functions work on), `specs/freesurfer-volume.md` (the
 voxel functions they call) and the cited standards.
 
-Status: **parts 1 to 8**. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
+Status: **parts 1 to 8**, and §32. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
 and `MRIdistanceTransform`. Part 2 (§9-17): the Gaussian kernel, the one-dimensional and separable
 convolutions, the matrix Gaussian smoothing, the window means and standard deviations, the pyramid
 reductions, the Sobel derivatives, the divergence and Laplacian, the white-matter border
@@ -22,7 +22,7 @@ normalisation, the windows, the peak check, the control-point searches and files
 the gentle normalisation, the bias correction). Part 7 (§28-29): the normalisation's histogram
 steps (`MRInormFillHistograms`, `MRInormalize`, `MRInormFindControlPoints`, `MRI3dNormalize`).
 Part 8 (§30-31): the high-signal normalisation (`MRInormFindHighSignalLowStdControlPoints`,
-`MRInormalizeHighSignalLowStd`). Not yet: the surface flood functions. The 2-D image reductions (`ImageConvolve1d`,
+`MRInormalizeHighSignalLowStd`). §32: `MRIcountCSFInNbhd`. Not yet: the surface flood functions. The 2-D image reductions (`ImageConvolve1d`,
 `ImageReduce`, `ImageReduce1d`) are specified with the images in `specs/freesurfer-io.md`.
 
 ## 1. Conventions
@@ -1194,3 +1194,15 @@ now and then a one-voxel margin of 0; small cubes with odd thicknesses (0, NaN, 
 different with `reproduce`, none without a notice with the default. Cases with fewer than two
 segments (every small volume, single blocks: about 40 %) are counted, not compared (FS-601:
 memory contents, or a crash, which FreeSurfer shows in about one case in ten).
+
+## 32. The CSF count of the random-forest features
+
+**`MRIcountCSFInNbhd(seg, wsize, x, y, z)`** (`mri_rf_label`, `mri_rf_train`): the voxels of the
+`wsize` window around `(x, y, z)` whose label is CSF (24), unknown (0), the left or right lateral
+ventricle (4, 43), the left or right inferior lateral ventricle (5, 44), the third or fourth
+ventricle (14, 15), counted label by label in that order by `MRIcountValInNbhd(seg, wsize, x, y,
+z, label)` (`specs/freesurfer-volume.md`: half-width `(wsize - 1) / 2`, positions clamped by the
+index tables, its error past them), the total an unsigned 32-bit sum returned as a signed one.
+Probe command `ccsf <seg> <wsize> <x> <y> <z>` (label volumes of 1 to 12 voxels a side, every
+voxel type the generator writes, windows -1 to 9, positions inside, at and past the faces).
+Results (observed): seeds 7 and 13 (200 cases each): 0 different in both modes.

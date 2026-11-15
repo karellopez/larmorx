@@ -100,6 +100,7 @@ frame functions.
   thickness set), `hsl <src> <thick> <mode> [<norm>] <sigma> <wm> <points>`
   (`MRInormalizeHighSignalLowStd`; then the source), `hslf <volume file> <sigma>` (`real.py --snr`:
   a recorded head's high-signal normalisation into a new volume, wm 110; the FNV-1a of its voxels).
+  `ccsf <seg> <wsize> <x> <y> <z>` (`MRIcountCSFInNbhd`: the count).
 - `build.sh [<workspace>]`: builds `fsfilter` with the unit oracle's compiler, flags and libraries
   (`validation/investigations/freesurfer-unit-oracle`, `build.py all` first) into
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-filter/` (with `BUILD_INFO.txt`). From a worktree,
@@ -204,4 +205,4 @@ Every run on generated inputs inside a memory box:
   of FS-597 as before); 126 s in the official code, 69 s in the port (relay 30: 296 s).
   `real.py --gentle`: 6 of 6 identical; 83 s official, 32 s port (relay 29: 111 s). `real.py
   --norm`: 6 of 6 identical; 43 s official, 19 s port.
-- The seed-1 record: 1,840 cases (20 rounds of 92), 1,657 identical, 183 counted.
+- `ccsf` (`MRIcountCSFInNbhd`) at seeds 7 and 13 (200 cases each): 0 different in both modes.

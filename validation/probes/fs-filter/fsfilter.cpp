@@ -38,6 +38,7 @@
 #include "mri.h"
 #include "mrinorm.h"
 #include "mrisegment.h"
+#include "rfa.h"
 #include "utils.h"
 
 MRI *MRIstdNonzero(MRI *mri_src, MRI *mri_dst, MRI *mri_mean, int wsize);
@@ -652,6 +653,13 @@ void put_seg(const MRI_SEGMENTATION *sg)
 // then each operation's results, then the segmentation; salloc max_segments max_voxels
 bool seg_case(const std::string &cmd)
 {
+  if (cmd == "ccsf") {
+    // ccsf <seg> wsize x y z: MRIcountCSFInNbhd (rfa.cpp; relay 31)
+    MRI *seg = get_vol();
+    int ws = geti(), x = geti(), y = geti(), z = geti();
+    oi(MRIcountCSFInNbhd(seg, ws, x, y, z));
+    return true;
+  }
   // mrinorm.cpp: vor <src> <ctrl> <dst?>; soap <src> <ctrl> <dst mode> [<dst>] niter min_change: the result,
   // then the control volume (vor)
   if (cmd == "vor") {

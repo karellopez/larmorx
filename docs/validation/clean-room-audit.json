@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-15-freesurfer-batch-25",
+ "dossier": "2026-11-15-freesurfer-batch-26",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 460637,
+  "accesses": 461205,
   "agents": 494,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 752,
-  "archived_files": 752,
+  "archive_checksums_matched": 754,
+  "archived_files": 754,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -322,28 +322,32 @@
    "2026-11-15-session-transcripts-freesurfer-batch-25": {
     "files": 8,
     "sha256": "0a126a9dafc7a436b4377e8e5a97fc6a726506e57a4593f21758725ce6a8bf8d"
+   },
+   "2026-11-15-session-transcripts-freesurfer-batch-26": {
+    "files": 2,
+    "sha256": "f41b5cdedba62b9d5e2012a2670a94fbdc17b6772ebd95eb4ed70f86c66d7e1f"
    }
   },
-  "commits_printed": 4518,
+  "commits_printed": 4527,
   "distinct_transcripts": 498,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
    "agents_without_worktree": 390,
    "bad_lines": 0,
-   "calls_without_result": 94,
+   "calls_without_result": 95,
    "compaction_parent_missing": 9,
    "compactions": 81,
    "refused_calls": 1723,
    "refused_calls_restricted_accesses": 742,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 9626
+   "unresolved_paths": 9636
   },
-  "last_record": "2026-11-15 16:10 UTC",
+  "last_record": "2026-11-15 16:53 UTC",
   "live_files": 498,
   "live_files_also_archived": 497,
   "sessions": 4,
-  "tool_calls": 130633,
+  "tool_calls": 130780,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -359,7 +363,7 @@
    ],
    [
     "Bash",
-    113954
+    114098
    ],
    [
     "CronCreate",
@@ -427,12 +431,12 @@
    ],
    [
     "Write",
-    6941
+    6944
    ]
   ],
-  "transcript_bytes": 17139640997,
-  "transcript_files": 1250,
-  "unique_paths": 88381
+  "transcript_bytes": 17353642684,
+  "transcript_files": 1252,
+  "unique_paths": 88425
  },
  "levels": [
   [
@@ -513,7 +517,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "d135ab4e"
+  "verdicts_repository": "acdb3e00"
  },
  "overview": {
   "agents_by_role": [

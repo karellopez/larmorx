@@ -631,7 +631,14 @@ fn flr_put(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
 /// <resolution>`: the recorded heads' calls (`real.py`), as `fssurfio.cpp`'s.
 pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     cx.g.progname = "fssurfio".into();
-    let env = Environment::from_pairs(vec![("SURFER_SIDEDOOR".to_owned(), "1".to_owned())]);
+    // relay 35 of track D: a GIFTI file's `Date` (`flr crv`) the same on both sides
+    let env = Environment::from_pairs(vec![
+        ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
+        (
+            "FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING".to_owned(),
+            "probe date".to_owned(),
+        ),
+    ]);
     let (mut so, mut se) = (cx.a.clone(), cx.b.clone());
     let mut io = coords::Io {
         out: &mut so,

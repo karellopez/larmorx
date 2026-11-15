@@ -3915,6 +3915,8 @@ static void flr_put(MRI *m)
 void flr_case()
 {
   setenv("SURFER_SIDEDOOR", "1", 1);
+  // relay 35 of track D: a GIFTI file's Date (flr crv) the same on both sides
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "probe date", 1);
   std::string op = next();
   out += op + " ";
   if (op == "fil") {

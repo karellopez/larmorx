@@ -15,7 +15,15 @@ library is seen as the child's signal or timeout).
 
 ## Results (2026-11-16, track C relay 32)
 
-See the table at the end of this page (the probe's runs, seeds 1 to 6).
+| set | cases | identical | expected differences (noted) | differing |
+|---|---|---|---|---|
+| generated files read (seeds 1 to 7; 2,000 or 3,000 each) | 19,000 | 15,182 | 1,213 crashes of the original (a defect noted), 346 hangs of the original (FS-814), 425 memory-dependent results (FS-815 to FS-834 noted), 1,831 codecs not ported yet | 3, resolved: 2 originals timed out under load (identical when run alone), 1 crash of the original noted once FS-833 covered the byte swap |
+| files written by a scanline writer (the writer below; seeds 1 to 3) | 4,300 | 4,300 (transcripts and file bytes) | – | 0 |
+| zlib's decompressor alone (`validation/probes/zlib-deflate inflate`, seeds 1 and 2) | 10,000 streams, every call | all | – | 0 |
+
+libtiff 3.6.1 as released and FreeSurfer's copy gave the same results but where memory contents
+decide (about 1 % of the files read: heap layouts differ between the two builds). Logs
+`<workspace>/oracles/logs/fs-found-c-r32-tiff-*.log`.
 
 ## Configuration and messages
 
@@ -84,18 +92,18 @@ does what the correction does and notes it.
 
 Many of these are reached only through a directory that failed to read: libtiff's
 `TIFFSetDirectory` returns 0 but leaves the half-read directory in place, with the previous
-directory's strip state and sizes, and a caller that reads on (FreeSurfer's image reader does
-not test the result) decodes the new directory's strips with the old buffer and sizes. The port
+directory's strip state and sizes, and a caller that reads on without testing the result decodes
+the new directory's strips with the old buffer and sizes. The port
 reproduces every such path that libtiff's code defines (identical in the probe) and notes those
 that depend on memory.
 
 ## The writer
 
-FreeSurfer's `TiffWriteImage` sequence (`TIFFOpen "w"`, `SampleFormat` twice, the size, the
-orientation, the samples, the bits, planar configuration, photometric, the resolution unit and the
-two resolutions as `double`s when set, `COMPRESSION_DEFLATE`, `TIFFWriteScanline` per row,
-`TIFFWriteDirectory`, `TIFFClose`) gives byte-identical files: one strip (no RowsPerStrip
-written), zlib level 6 in libtiff's 8 KiB (or one scanline) buffer, the directory after the data
-with its tags in tag order, the rationals as libtiff converts them (multiplied by 8 until the
-numerator reaches 2^28; a negative resolution warns `"XResolution": Information lost writing
-value (-3) as (unsigned) RATIONAL` and is written as 0).
+A writer that sets SampleFormat (twice), the size, the orientation, the samples, the bits, the
+planar configuration, the photometric interpretation, the resolution unit and the two resolutions
+(as `double`s), Compression Deflate, then writes every row with `TIFFWriteScanline` and calls
+`TIFFWriteDirectory` and `TIFFClose`, gets byte-identical files from the port: one strip (no
+RowsPerStrip written: it was not set), zlib level 6 in libtiff's raw buffer (8 KiB, or one
+scanline when longer), the directory after the data with its entries in tag order, the rationals
+as libtiff converts them (multiplied by 8 until the numerator reaches 2^28; a negative value warns
+`"XResolution": Information lost writing value (-3) as (unsigned) RATIONAL` and is written as 0).

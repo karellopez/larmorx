@@ -680,9 +680,8 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
     out
 }
 
-/// The parameters of a writing case (FreeSurfer's TiffWriteImage): columns, rows, samples
-/// per pixel, bits per sample, the first SampleFormat, the resolutions (0: not set), the
-/// compression, and the rows' bytes.
+/// The parameters of a writing case: columns, rows, samples per pixel, bits per sample, the
+/// first SampleFormat, the resolutions (0: not set), the compression, and the rows' bytes.
 pub struct WriteCase {
     pub cols: u32,
     pub rows: u32,
@@ -922,8 +921,9 @@ pub fn port_read(
     (out, cap.text(Stream::Err), ids, r.err())
 }
 
-/// The write transcript of the port (FreeSurfer's TiffWriteImage, the probe's `tf_write` in
-/// C) into `path`: standard output, standard error, the notices' IDs.
+/// The write transcript of the port (the probe's `tf_write` in C: TIFFOpen "w", the fields,
+/// every row, TIFFWriteDirectory, TIFFClose) into `path`: standard output, standard error, the
+/// notices' IDs.
 pub fn port_write(path: &str, c: &WriteCase, opts: Options) -> (String, String, Vec<&'static str>) {
     let mut cap = Captured::default();
     let mut out = String::new();

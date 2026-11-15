@@ -97,6 +97,11 @@ protector); FS-771 crashed (signal 11); FS-765 and FS-766 returned.
 | 5 | 4,000 | 6,204 | 3,110 | 1 (FreeSurfer's line 1328, since added) | 1,759 |
 | 6 | 4,000 | 6,209 | 3,121 | 2 (FS-794, since added) | 1,771 |
 | 7 | 4,000 | 6,221 | 3,119 | 2 (FS-794, the cache with FS-793) | 1,745 |
+| 8 | 4,000 | 6,220 | 3,012 | 2 (the shim's limit of 100,000 slabs: since counted apart) | 1,752 |
+| 9 | 4,000 | 6,168 | 3,098 | 0 | 1,812 |
+| 10 | 4,000 | 6,170 | 3,063 | 0 | 1,796 |
+| 8, final code | 4,000 | 6,220 | 3,012 | 0 | 1,754 |
+| 11, final code | 4,000 | 6,198 | 3,101 | 0 | 1,754 |
 
 (Seeds 1 to 3, the first runs, found the differences fixed since: the shared cosine buffer, `nctypelen`'s
 messages, the cache, raw-byte names, FreeSurfer's dialect. Logs

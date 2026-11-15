@@ -107,8 +107,11 @@ directory, a missing file, char and unknown types, long and empty names, unknown
 global attributes standing for missing dimension variables, `image-max` over a foreign dimension,
 numeric strings) and reads each with the port (`reproduce`) and with MINC 1.5.1 and FreeSurfer 8.2.0's
 copy in a forked child (one in ten MINC 1.5.1 runs with the cache forced on,
-`VOLUME_CACHE_THRESHOLD=0`). See the probe's README for the runs: every comparison identical but the
-cases a defect of undefined behaviour makes incomparable (counted).
+`VOLUME_CACHE_THRESHOLD=0`). 35,000 files over nine seeds: every difference the runs found was fixed;
+with the final code, seeds 8 and 11 (8,000 files) gave 12,418 comparisons identical (6,113 of them
+successful reads) and none different, the cases a defect of undefined behaviour makes incomparable
+counted apart (the probe's README). The unit test of 120 seeded files gives MINC 1.5.1's own hash of
+its dumps on Linux, under AArch64's NaN rules (emulated) in debug and release, and on Windows x64.
 
 ## Not ported (gaps, each reported)
 

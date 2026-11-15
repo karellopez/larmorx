@@ -115,7 +115,10 @@ pub struct FsMinc;
 
 /// The folder FreeSurfer's copy of MINC was compiled in, as its messages print it.
 fn minc_prefix() -> String {
-    format!("{}/packages/minc/", larmorx_freesurfer_core::diag::BUILD_ROOT)
+    format!(
+        "{}/packages/minc/",
+        larmorx_freesurfer_core::diag::BUILD_ROOT
+    )
 }
 
 fn minc_fatal(at: &str, msg: &str, streams: &mut dyn Streams) -> larmorx_io::minc::Exit {

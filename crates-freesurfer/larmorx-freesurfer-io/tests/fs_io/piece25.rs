@@ -67,7 +67,7 @@ fn tsize(t: i32) -> usize {
 }
 
 fn pad4(v: &mut Vec<u8>) {
-    while v.len() % 4 != 0 {
+    while !v.len().is_multiple_of(4) {
         v.push(0);
     }
 }
@@ -455,7 +455,10 @@ fn minc_file(g: &mut Gen) -> Vec<u8> {
     }
     let mut gatts = Vec::new();
     if g.chance(2) {
-        gatts.push((b"history".to_vec(), Val::Text(b"made by the probe\n".to_vec())));
+        gatts.push((
+            b"history".to_vec(),
+            Val::Text(b"made by the probe\n".to_vec()),
+        ));
     }
     Cdf {
         version: if g.chance(6) { 2 } else { 1 },
@@ -509,7 +512,11 @@ fn crc32(b: &[u8]) -> u32 {
     for &x in b {
         c ^= u32::from(x);
         for _ in 0..8 {
-            c = if c & 1 != 0 { (c >> 1) ^ 0xedb8_8320 } else { c >> 1 };
+            c = if c & 1 != 0 {
+                (c >> 1) ^ 0xedb8_8320
+            } else {
+                c >> 1
+            };
         }
     }
     !c
@@ -543,7 +550,11 @@ fn read_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
         }
         _ => {
             let b = minc_file(g);
-            let b = if file.ends_with(".gz") { gz_stored(&b) } else { b };
+            let b = if file.ends_with(".gz") {
+                gz_stored(&b)
+            } else {
+                b
+            };
             entries.push(file_entry(file, &b));
         }
     }

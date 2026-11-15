@@ -81,7 +81,9 @@ impl Streams for InDir<'_> {
 fn in_dir(dir: Option<&Path>, fname: &str) -> (Vec<u8>, Option<Vec<u8>>) {
     let b = fname.as_bytes();
     match dir {
-        Some(d) if !b.is_empty() && b[0] != b'/' && b[0] != b'~' && !Path::new(fname).is_absolute() => {
+        Some(d)
+            if !b.is_empty() && b[0] != b'/' && b[0] != b'~' && !Path::new(fname).is_absolute() =>
+        {
             let mut p = d.to_string_lossy().into_owned().into_bytes();
             if cfg!(windows) && !p.starts_with(b"\\\\?\\") {
                 for c in p.iter_mut().filter(|c| **c == b'\\') {
@@ -465,7 +467,10 @@ pub fn minc_read(
         let t = v.voxel_to_world_matrix(&FsMinc, &mut streams);
         let _ = writeln!(out, "MINC Linear Transform");
         for row in &t {
-            let line: String = row.iter().map(|&x| format!("{} ", fmt_f(x, 7, 4))).collect();
+            let line: String = row
+                .iter()
+                .map(|&x| format!("{} ", fmt_f(x, 7, 4)))
+                .collect();
             let _ = writeln!(out, "{line}");
         }
     }
@@ -495,12 +500,19 @@ mod tests {
     #[allow(clippy::type_complexity)]
     fn cdf(
         dims: &[(&str, u32)],
-        vars: &[(&str, &[u32], &[(&str, &str)], &[(&str, &[f64])], i32, Vec<u8>)],
+        vars: &[(
+            &str,
+            &[u32],
+            &[(&str, &str)],
+            &[(&str, &[f64])],
+            i32,
+            Vec<u8>,
+        )],
     ) -> Vec<u8> {
         fn name(o: &mut Vec<u8>, n: &[u8]) {
             o.extend_from_slice(&(n.len() as u32).to_be_bytes());
             o.extend_from_slice(n);
-            while o.len() % 4 != 0 {
+            while !o.len().is_multiple_of(4) {
                 o.push(0);
             }
         }
@@ -557,7 +569,7 @@ mod tests {
         let mut o = header(&begins);
         for v in vars {
             o.extend_from_slice(&v.5);
-            while o.len() % 4 != 0 {
+            while !o.len().is_multiple_of(4) {
                 o.push(0);
             }
         }
@@ -570,7 +582,14 @@ mod tests {
         cdf(
             &DIMS,
             &[
-                ("xspace", &[], &[], &[("step", &[-2.0]), ("start", &[10.0])], 4, vec![0; 4]),
+                (
+                    "xspace",
+                    &[],
+                    &[],
+                    &[("step", &[-2.0]), ("start", &[10.0])],
+                    4,
+                    vec![0; 4],
+                ),
                 ("image", &[0, 1, 2], &[("signtype", sign)], &[], ty, data),
             ],
         )
@@ -595,12 +614,18 @@ mod tests {
         let m = m.unwrap_or_else(|| panic!("{err}"));
         assert_eq!(m.mtype, MRI_SHORT);
         assert_eq!(m.chunk.as_deref(), Some(&[0xff, 0xff, 5, 0][..]));
-        assert_eq!((m.vg.xsize, m.vg.x_r, m.vg.x_a, m.vg.x_s), (2.0, -1.0, -0.0, -0.0));
+        assert_eq!(
+            (m.vg.xsize, m.vg.x_r, m.vg.x_a, m.vg.x_s),
+            (2.0, -1.0, -0.0, -0.0)
+        );
         // voxel 1 (of 2) at x = 10 - 2 = 8
         assert_eq!(m.vg.c_r, 8.0);
         let (m, _, _) = read(dir.path(), &b, UpstreamDefects::Reproduce);
         let m = m.unwrap();
-        assert_eq!((m.mtype, m.chunk.as_deref()), (MRI_UCHAR, Some(&[0xff, 5][..])));
+        assert_eq!(
+            (m.mtype, m.chunk.as_deref()),
+            (MRI_UCHAR, Some(&[0xff, 5][..]))
+        );
     }
 
     /// 32-bit integers: `reproduce` packs them as 32-bit numbers into the row's first half.
@@ -633,14 +658,26 @@ mod tests {
         assert!(String::from_utf8_lossy(&err).contains("mincRead(): can't find file no.mnc"));
         let (m, _, err) = read(dir.path(), b"not netCDF", UpstreamDefects::Fix);
         assert!(m.is_none());
-        assert!(err.contains("mincRead(): error reading volume from file v.mnc"), "{err}");
+        assert!(
+            err.contains("mincRead(): error reading volume from file v.mnc"),
+            "{err}"
+        );
         assert!(!err.contains(&*dir.path().to_string_lossy()), "{err}");
         let five = cdf(
-            &[("foo", 1), ("zspace", 1), ("yspace", 1), ("xspace", 1), ("time", 1)],
+            &[
+                ("foo", 1),
+                ("zspace", 1),
+                ("yspace", 1),
+                ("xspace", 1),
+                ("time", 1),
+            ],
             &[("image", &[0, 1, 2, 3, 4], &[], &[], 3, vec![0, 1])],
         );
         let (m, _, err) = read(dir.path(), &five, UpstreamDefects::Fix);
         assert!(m.is_none());
-        assert!(err.contains("mincRead(): 5 dimensions in file; expecting 3 or 4"), "{err}");
+        assert!(
+            err.contains("mincRead(): 5 dimensions in file; expecting 3 or 4"),
+            "{err}"
+        );
     }
 }

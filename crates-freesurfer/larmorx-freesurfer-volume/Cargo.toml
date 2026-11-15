@@ -15,6 +15,8 @@ larmorx-core.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true
+# the fs.io probe's cases (tests/fs_io13, through fs.io's cases.rs) register the GCA reader
+larmorx-freesurfer-gca.workspace = true
 larmorx-io.workspace = true
 sha2.workspace = true
 tempfile.workspace = true

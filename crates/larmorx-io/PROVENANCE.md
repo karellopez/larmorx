@@ -278,3 +278,33 @@ FreeSurfer's clean-room implementers).
   recorded on Linux x86-64, also under the AArch64 NaN trap, debug and release); the differential
   probe `validation/probes/fs-dicom` against CTN 3.0.6 built from its source and against the copy
   in the unit oracle (README there).
+
+## NRRD: NrrdIO's reader (`src/nrrd/`; FreeSurfer's foundations, track C relay 26, 2026-11-14)
+
+Ported from Teem's NrrdIO, SVN `NrrdIO/trunk` revision 3991 (2008-11-18, `TEEM_VERSION` 1.9.0;
+`<workspace>/tags/NrrdIO-r3991`, its `MANIFEST.sha256`), Gordon Kindlmann and the University of
+Utah, zlib-style terms (the notice in `NOTICE`); SPDX `Apache-2.0 AND Zlib` in each file. As
+FreeSurfer 8.2.0's programs behave: the quiet NaN's high bit set, no zlib or bzip2 (the `gzip` and
+`bzip2` encodings unavailable), no direct I/O.
+
+| larmorx | NrrdIO r3991 |
+|---|---|
+| `nrrd::load`, `load_with`, `LoadError` | `read.c`: `nrrdLoad`, `nrrdRead`, `_nrrdRead`, `_nrrdSplitName`, `_nrrdOneLine`, `nrrdLineSkip`, `nrrdByteSkip`, `_nrrdCalloc` (see below); `miscAir.c`: `airFopen`; `string.c`: `airOneLine` |
+| `Reader::format_read`, `header_check`, `data_file_next`, `sprintf_d` | `formatNRRD.c`: `_nrrdFormatNRRD_read`, `_nrrdFormatNRRD_contentStartsLike`, `_nrrdHeaderCheck`, `nrrdIoStateDataFileIterNext` |
+| `Reader::parse_field`, `parse_info`, `space_vector`, `quoted`, `contains_percent_d`, `parse_data_file`, `data_fn_check` | `parseNrrd.c`: `_nrrdReadNrrdParseField`, every `_nrrdReadNrrdParse_*`, `_nrrdSpaceVectorParse`, `_nrrdGetQuotedString`, `_nrrdContainsPercentDAndMore`, `_nrrdDataFNNumber`, `_nrrdDataFNCheck` |
+| `Reader::field_check`, `check_space_info`, `check`; `Nrrd::element_size`, `element_number`; `size_check`, `space_dimension`, `kind_size` | `simple.c`: `_nrrdFieldCheck*`, `_nrrdFieldCheckSpaceInfo`, `_nrrdCheck`, `nrrdElementSize`, `nrrdElementNumber`, `nrrdSpaceDimension`, `nrrdSpaceSet`; `axis.c`: `_nrrdSizeCheck`, `nrrdKindSize`, `_nrrdAxisInfoInit`, `nrrdAxisInfoSet_nva` |
+| `Reader::read_data`, `read_ascii`, `read_hex`, `fscanf_s`, `HEX_TABLE`; the swap in `format_read` | `encodingRaw.c`, `encodingAscii.c`, `encodingHex.c` (`_nrrdReadHexTable`), `encodingGzip.c`/`encodingBzip2.c` (their unavailable branches), `encoding.c`; `endianNrrd.c`: `nrrdSwapEndian`, `_nrrdBlockEndian` |
+| `Biff` | `biffbiff.c`: `biffAdd`, `_biffAddErr`, `_biffAddKey`, `biffGet`, `biffDone`, `biffGetDone`, `biffCheck` |
+| `AirEnum`, the enum tables, `type_name`, `space_name` | `enum.c`: `airEnumVal`, `airEnumStr`, `airEnumValCheck`, `_airEnumIndex`; `enumsNrrd.c` (type, encoding, centering, kind, field, space), `endianAir.c` (`airEndian`) |
+| `Strtok`, `strntok`, `unescape`, `to_lower`, `is_print`, `Reader::one_linify`, `parse_str_d`, `parse_str_z`, `single_sscanf_*` | `string.c`: `airStrtok`, `airStrntok`, `airUnescape`, `airToLower`, `airOneLinify`; `parseAir.c`: `airParseStrD`, `airParseStrZ`, `airSingleSscanf` |
+| `Nrrd::key_value_add`; the comment rules in `parse_info` | `keyvalue.c`: `nrrdKeyValueAdd`; `comment.c`: `nrrdCommentAdd` |
+| `air_nan` | `754.c`: `airFloatQNaN` (through `larmorx_core::nrrdio`), as a `double` |
+
+- C's stdio is emulated (`CFile`: `getc`, one `ungetc`, `fread`, `fseek(SEEK_END)`; a directory
+  opens and reads as empty, as on Linux; errno texts are glibc's, through `dicom::cond`), and the
+  line buffer byte for byte (`CBuf`: what `airOneLine` writes, never-written bytes known).
+- NrrdIO clears its whole array before reading; the port grows it as it reads, bounded by what
+  the data files hold (the values are the same; `docs/findings/nrrdio.md`, "Memory").
+- D13: FS-518 to FS-520 and FS-761 to FS-773 (`larmorx_core::defects`); `docs/findings/nrrdio.md`.
+- Checks: `src/nrrd/tests.rs`; the differential probe `validation/probes/fs-nrrd-minc` against
+  NrrdIO r3991 built from its source and against FreeSurfer's copy (README there).

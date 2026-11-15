@@ -209,7 +209,9 @@ translated into Rust in crates/larmorx-core/src/libtiff.rs. Its notice (LICENSES
   Leffler and Silicon Graphics. (The full text, with its warranty disclaimer, in
   LICENSES/libtiff.txt.)
 
-NrrdIO 1.9.0's IEEE 754 constants (Teem's 754.c), in crates/larmorx-core/src/nrrdio.rs:
+NrrdIO 1.9.0's IEEE 754 constants (Teem's 754.c), in crates/larmorx-core/src/nrrdio.rs, and NrrdIO's
+NRRD reader (Teem's SVN NrrdIO/trunk at revision 3991: nrrdLoad and what it calls), translated into
+Rust in crates/larmorx-io/src/nrrd/ (an altered version):
 
   NrrdIO: stand-alone code for basic nrrd functionality
   Copyright (C) 2005  Gordon Kindlmann

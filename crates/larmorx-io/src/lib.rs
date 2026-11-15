@@ -26,6 +26,7 @@ pub mod itk_output;
 pub mod itk_transform;
 mod itk_transform_names;
 pub mod nifti;
+pub mod nrrd;
 pub mod xfm;
 pub mod xml;
 pub mod znz;

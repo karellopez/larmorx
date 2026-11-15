@@ -306,6 +306,28 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
   3.1-21 is FreeSurfer's code: its replica belongs in crates-freesurfer (track A); a port of
   Bristow's upstream alone would serve no program. Relay 8 ported nothing of it (handoff).
 
+## NrrdIO's NRRD reader (track C relay 26, 2026-11-14)
+
+- FreeSurfer's `mriNrrdRead` (`utils/mriio.cpp`, `NRRD_FILE`) calls `nrrdSanity`, `nrrdNew`,
+  `nrrdIoStateNew`, `nrrdLoad`, and on a failure prints `biffGetDone(NRRD)`; it reads `dim`,
+  `spaceDim`, `type`, `axis[i].size`, `data`, `spaceOrigin`, `axis[i].spaceDirection[i]`, `space`,
+  and prints the key/value pairs (`nrrdKeyValueSize`, `nrrdKeyValueIndex`), the content and the
+  element count and size (`nrrdElementNumber`, `nrrdElementSize`). `mriNrrdWrite` refuses. These
+  are the call sites; track A writes them (`larmorx-freesurfer-io`).
+- Its copy (`packages/nrrdio`) is NrrdIO r3991 (`docs/findings/nrrdio.md`) token for token but
+  for compile fixes (`<scratch>`'s `tokdiff.py`, relay 26): `memcpy` became `memmove` in eleven
+  places, three variables gained initial values, two `void **` casts became a temporary, `NrrdIO.h`
+  drops ITK's symbol-mangling include, `sampleIO.c` and `qnanhibit.c` are fenced off, one
+  iteration macro gained a bounds check (FreeSurfer reformatted the files); the build: `TEEM_DIO=0 TEEM_QNANHIBIT=1 TEEM_32BIT=0
+  TEEM_ENDIAN=1234`, no `TEEM_ZLIB`, no `TEEM_BZIP2` (its `CMakeLists.txt` and the unit oracle's
+  `compile_commands.json`); its build has `_FORTIFY_SOURCE` and the stack protector (FS-762's
+  overflows abort).
+- Measured by behaviour (`validation/probes/fs-nrrd-minc`, `libnrrd_fs.so` from the unit oracle's
+  `libnrrdio.a`): it gives NrrdIO r3991's results on every case, the undefined ones included (the
+  same hangs, aborts and crashes): the port needs no dialect for it.
+- FS-518 to FS-520 and FS-761 to FS-773 are NrrdIO's: none is on recon-all's or fMRIPrep's paths
+  (they read no NRRD file).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
@@ -315,5 +337,6 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
 `validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) and
 `validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) and
 `validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) and
-`validation/probes/fs-misc` (`facts.cpp` includes FreeSurfer's FNV headers) are closed to
+`validation/probes/fs-misc` (`facts.cpp` includes FreeSurfer's FNV headers) and
+`validation/probes/fs-nrrd-minc` (its build compiles against FreeSurfer's `packages/` headers) are closed to
 FreeSurfer's clean-room implementers, as this file is.

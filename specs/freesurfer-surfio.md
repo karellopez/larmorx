@@ -4259,6 +4259,13 @@ volume's extent and first row); then every vertex's position, `curv` and `val`, 
 and its data inflated: §111). Expected: every line identical under `reproduce`, except cases noted
 with fs.io's or fs.mri's memory defects (counted, not compared); the default identical but where a
 noted defect it corrects changed the result. Observed (relay 35): seed 7, 400 cases: 0 different
-with `reproduce` (15 counted), the default different only with notices; seeds 13 and 17: §123's
-numbers in the probe's README.
+with `reproduce` (15 counted), the default different only with notices; seeds 13 and 17, 1,000
+cases each: 0 different (29 and 32 counted). On recorded heads (the probe's `flr crv`, three heads,
+both hemispheres): `curv`, `sulc`, `thickness`, `area`, `curv.pial`, `jacobian_white`, `volume` and
+the MGH overlay `w-g.pct.mgh` read into the white surface, written in the new binary format, MGZ,
+compressed NIfTI, GIFTI and VTK and read back: 48 of 48 identical, and every new-format file written
+is the recorded file byte for byte (observed). A clean-room implementer's black-box form: the
+recorded heads' per-vertex files are §122.1's new binary format as recon-all's programs wrote them
+(`mris_curvature -w` writes its `.H` and `.K` files through it): read one, write it back, compare
+the bytes.
 

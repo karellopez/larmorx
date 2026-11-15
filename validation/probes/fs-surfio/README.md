@@ -325,8 +325,37 @@ relay 33's (928fb0e2: `MRISfillInterior` and `MRISshell` through dense buffers, 
 of the port's time is mostly the surface reads (0.72 s each: 0.47 s the file, topology and metric
 properties, 0.25 s the neighbourhoods of three hops with their distances).
 
+Relay 35 of track D (the 48th command `crv`: queue items 3.1-47/48's curvature files by name,
+`MRISwriteCurvature` and `MRISreadCurvatureFile` with `__mrisreadcurvmri`; `specs/freesurfer-surfio.md`
+§122-123): an empty work folder with `d` and `d/s`, the environment (`FS_POSIX`, `FS_GII`,
+`MRIS_READVAL_FRAME`, `FS_LEAVE_NANS`, the creation time), the read frame now and then, 0 to 3 input
+files (MGH, MGZ and NIfTI-1 volumes of about one voxel per vertex, text, VTK, GIFTI, the old and new
+binary formats), a surface from `MRISalloc`, then 1 to 4 writes and reads (a read takes the name
+just written one time in two, else an input's), each status, the volume of values and the
+overlays, then the vertices, the counts and every file in the folder (a `.gii` one as
+`gii_normal`). `crv` at seed 7 (400 cases) and seeds 13 and 17 (1,000 each): 0 different with
+`reproduce` (15, 29 and 32 counted: fs.io's FS-167 and FS-49, fs.mri's FS-53, the GIFTI reader's
+memory defects), `fix` different only with notices. Two findings on the way
+(`docs/findings/freesurfer-surfio.md` §28): the GIFTI writers kept a signalling NaN's bits where the
+official build's value setter is inlined (the shape and statistics arrays, their volume forms,
+`mriWriteGifti`) and quiet it for the coordinates (`cvtss2sd`): fixed in fs.io's
+`gifti_set_da_value_2d_f32` and `gifti_write.rs` (`gwr`'s values gained signalling NaNs: seeds 7 and
+13, 400 cases each, 0 different); and the binary value readers now leave a failed read's `errno` (a
+folder read as a file: `Is a directory`). The port's generator makes no random volume headers: a
+random MGH header asks `MRIalloc` for 449,657,401 frames, which the official build refuses and the
+port's fs.mri allocates (§28, for fs.mri's owner). Seed 1, 1,440 cases: 1,394 identical, 46 `SKIP`,
+hash `37a9826cf1a8836be95c51edaac799764f82183bf20a3e96e3ebefe4db048aaf` (the test, from the clean
+commit 85cf1e6e). `real.py --curv` (`flr crv`): the three heads' recorded `curv`, `sulc`,
+`thickness`, `area`, `curv.pial`, `jacobian_white`, `volume` and `w-g.pct.mgh` of both hemispheres
+read into the white surface, written in the new binary format, MGZ, compressed NIfTI, GIFTI and VTK
+and read back (the MGZ and new-format files): 48 of 48 identical in both modes, no notice; every
+read and write `NO_ERROR`; the 42 new-format files the port writes are the recorded files byte for
+byte (the MGH overlay `w-g.pct.mgh` is the eighth kind: its new-format copy is another format);
+FreeSurfer 33.5 s, the port 49 s (observed).
+
 ```
 validation/probes/fs-surfio/build.sh <workspace>
 scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 66000
 scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py
+scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py --curv
 ```

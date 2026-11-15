@@ -143,6 +143,9 @@ fn dimension_ordering(
     Some((to_volume, to_file))
 }
 
+/// The file's dimension names and sizes.
+type DimNames = (Vec<Vec<u8>>, Vec<i32>);
+
 /// `create_output_dim_names` without an original file: the options' names when they give a first
 /// one, else the volume's; with the file's sizes, or `None` after volume_io's message when the
 /// names are not the volume's in some order.
@@ -150,7 +153,7 @@ fn create_output_dim_names(
     c: &mut Ctx,
     volume: &Volume,
     options: Option<&MincOutputOptions>,
-) -> Result<Option<(Vec<Vec<u8>>, Vec<i32>)>, Exit> {
+) -> Result<Option<DimNames>, Exit> {
     if let Some(e) = c
         .dialect
         .output_dimension_names(&volume.dimension_names, c.notices, c.streams)

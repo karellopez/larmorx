@@ -509,14 +509,9 @@ fn default_fill(ty: i32) -> Vec<u8> {
         NC_CHAR => vec![0],
         NC_SHORT => (-32767i16).to_be_bytes().to_vec(),
         NC_INT => (-2_147_483_647i32).to_be_bytes().to_vec(),
-        NC_FLOAT => 9.969_209_968_386_869e36_f32
-            .to_bits()
-            .to_be_bytes()
-            .to_vec(),
-        _ => 9.969_209_968_386_869e36_f64
-            .to_bits()
-            .to_be_bytes()
-            .to_vec(),
+        // NC_FILL_FLOAT and NC_FILL_DOUBLE (9.9692099683868690e+36, 15 * 2^119).
+        NC_FLOAT => 0x7cf0_0000_u32.to_be_bytes().to_vec(),
+        _ => 0x479e_0000_0000_0000_u64.to_be_bytes().to_vec(),
     }
 }
 

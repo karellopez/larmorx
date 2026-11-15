@@ -292,21 +292,20 @@ pub fn micreate_std_variable(
 ) -> Result<i32, Exit> {
     s.mi_enter("micreate_std_variable");
     let name = nc::cstr(name);
-    let varid;
-    if DIMVARLIST.contains(&name) {
-        varid = chk!(
+    let varid = if DIMVARLIST.contains(&name) {
+        chk!(
             s,
             c,
             create_dim_variable(s, c, cdfid, name, datatype, ndims)?
-        );
+        )
     } else if DIMWIDTHLIST.contains(&name) {
-        varid = chk!(
+        chk!(
             s,
             c,
             create_dimwidth_variable(s, c, cdfid, name, datatype, ndims)?
-        );
+        )
     } else if VARLIST.contains(&name) {
-        varid = match name {
+        match name {
             b"image" => chk!(
                 s,
                 c,
@@ -321,7 +320,7 @@ pub fn micreate_std_variable(
             }
             b"rootvariable" => chk!(s, c, create_root_variable(s, c, cdfid, name)?),
             _ => chk!(s, c, create_simple_variable(s, c, cdfid, name)?),
-        };
+        }
     } else {
         s.log_pkg_error(
             c,
@@ -334,7 +333,7 @@ pub fn micreate_std_variable(
         )?;
         s.mi_return_error(c)?;
         return Ok(MI_ERROR);
-    }
+    };
     s.mi_return();
     Ok(varid)
 }

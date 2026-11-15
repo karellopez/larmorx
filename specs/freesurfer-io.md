@@ -3934,3 +3934,88 @@ every comparable case (1,379), 0 different; 314 compared apart, 259 identical (t
 allocator aborting after FS-720's write past the SGI header, `malloc(): mismatching next->prev_size
 (unsorted)`, and memory contents); `fix` differs only with notices; 68 SGI images and 62 ITK warps
 written and compared byte for byte.
+
+## 126. NRRD volumes read (`mriNrrdRead`; `mri_read`'s type 26, `mri_identify`'s `NRRD_FILE`)
+
+The file is read by NrrdIO's `nrrdLoad` (NrrdIO r3991 as FreeSurfer 8.2.0 builds it: no gzip or bzip2
+encodings; its own behaviour, messages and defects: `docs/findings/nrrdio.md`, `larmorx_io::nrrd`),
+with the name `mri_read` gives (the working directory before a name without `/`, §42). The whole file
+is read, the samples included, whether or not the voxels were asked for (`MRIreadHeader` gets them
+too). In order:
+
+1. NrrdIO fails: `mriNrrdRead: trouble reading "<name>":` and a newline, then NrrdIO's messages, the
+   newest first, each `[nrrd] <message>` and a newline (standard error); no volume. `errno` is what C's
+   stdio left: a failed open's (`ENOENT`, `EACCES`, ...) of the header or of a data file, `EISDIR`
+   after a read of a folder (a folder opens; its reads fail), `ENOMEM` after a failed allocation;
+   otherwise unchanged. A NrrdIO abort (its `PANIC`s) prints its message and ends the program with
+   its status.
+2. Not three or four axes, or a space of other than three dimensions (no space, a bare `space
+   dimension` other than 3, a space with time): on standard output `mriNrrdRead: "<name>" is a
+   <dim>-dimensional nrrd of type <t> (<type name>)`, `mriNrrdRead: the array contains <n> elements,
+   <s> bytes in size` (the element count and size as 32-bit signed numbers: FS-740) and, when the
+   file has one, `mriNrrdRead: content: <content>`; then the error `Nrrd input of diffusion data not
+   supported!` (`ERROR_UNSUPPORTED`; the `errno` text first when `errno` is set); no volume.
+3. The key/value pairs, in the file's order: `mriNrrdRead: key:value <i> = <key>:<value>` (standard
+   output), `i` from 0.
+4. The sample type: signed and unsigned 8-bit samples go into bytes (`MRI_UCHAR`), 16-bit into
+   `MRI_SHORT`, 32-bit into `MRI_INT`, 64-bit into `MRI_LONG`, floats into `MRI_FLOAT`; another type
+   (double, block): `mriNrrdRead: Unsupported type: <t> (<type name>)` (standard output), no volume,
+   no error.
+5. The volume: the first axis's size its width, the second's its height, the third's its depth, a
+   fourth's its frames (one frame for three axes). The samples are taken in the file's order (the
+   first axis fastest), each sample's bytes copied: a signed byte's -1 is 255 (FS-734), an unsigned
+   16-bit 40,000 is -25,536 (FS-734), an unsigned 32-bit past 2^31 - 1 negative (FS-734), an unsigned
+   64-bit past 2^63 - 1 negative (FS-735). 64-bit samples land as follows (FS-741): sample `x` of a
+   row is cut to its low 32 bits and stored, little-endian, at byte `4 x` of the row of 8-byte voxels, so the row's first half holds the row's samples' low halves, two to a
+   voxel, and its second half zeros. 32-bit indexes (FS-739: a volume of 2^31 samples or more reads
+   outside the data).
+6. The geometry (FS-736 to FS-738): the centre `c_ras` is the space origin's three numbers (in
+   `float`; a file without one gives NaN, FS-737), the good-RAS flag 1; the voxel sizes are the
+   diagonal of the first three axes' space directions (the first axis's first coordinate, the second's
+   second, the third's third; an axis without a direction gives NaN, FS-738; zero and negative sizes
+   kept); the direction cosines come from the space's name alone: `RAS` (right-anterior-superior)
+   gives the axes +x, +y, +z; `LAS` -x, +y, +z; `LPS` -x, -y, +z; another space keeps the allocation's
+   coronal axes (x -1 0 0, y 0 0 -1, z 0 1 0). The origin and directions are used in the file's own
+   coordinates (LPS and LAS not turned to RAS).
+
+**larmorx by default** (rule A, except as said): the geometry the file states, as ITK's NRRD reader
+takes it: each of the first three axes' space direction turned to RAS (RAS as given; LAS's first
+coordinate negated; LPS's first two; another three-dimensional space's coordinates taken as LPS, as
+ITK does) gives that axis's voxel size (the vector's length) and direction cosines (the vector over its
+length); an axis without a direction has size 1 along its own LPS axis (ITK's default: the first
+axis -x, the second -y, the third +z); the space origin, turned to RAS likewise, is the first voxel's
+centre (0 without one), and `c_ras` the point the volume's centre voxel `(w/2, h/2, d/2)` then lies at
+(`MRIp0ToCRAS`'s computation in `float`). A direction of length 0: `mriNrrdRead: axis <i> of "<name>"
+has a space direction of length 0` (standard error), no volume (rule B). The samples' values kept: a
+signed byte file with a negative sample becomes `MRI_SHORT`, an unsigned 16-bit file with a sample
+above 32,767 `MRI_INT`, an unsigned 32-bit file with a sample above 2^31 - 1 `MRI_LONG` (each only
+then: otherwise FreeSurfer's type); an unsigned 64-bit sample above 2^63 - 1: `mriNrrdRead: "<name>"
+holds the unsigned 64-bit sample <v>: more than a 64-bit signed voxel holds` (standard error), no
+volume (rule B). 64-bit samples stored as they are, one to a voxel. An axis of more than 2^31 - 1
+samples: `mriNrrdRead: axis <i> of "<name>" has <n> samples: more than a volume's extent can hold`,
+no volume (rule B); a volume of 2^31 samples or more indexed in 64 bits. The element count and size
+printed whole (FS-740).
+
+## 127. Validation plan (part 26)
+
+Piece 24 of the fs.io probe: `nnd` and `nnh` (`mri_read` with and without voxels, the type -1 or 26,
+names `.nrrd`, `.NRRD`, `.nhdr`, `.NHDR`, `<name>@nrrd`) of NRRD files built field by field: attached and
+detached (the data file beside the header, `./`, in a sub-folder; missing, a folder, cut), the raw,
+ASCII (`ascii`, `text`) and hex encodings, raw in both byte orders, every sample type (signed char to
+unsigned 64-bit, float, double, block), two to five axes, the spaces RAS, LAS, LPS (both spellings),
+scanner, right- and left-handed, right-anterior-superior-time, a bare space dimension (3, or 2), none
+(with `spacings`); space directions diagonal, flipped, oblique, of length 0 or `none`, missing; with and
+without a space origin; `kinds`, key/value pairs (empty values, `:=` in the value), comments, a
+`content` line, NRRD0004 and NRRD0005 magics, a wrong magic; samples beyond the range of the type
+FreeSurfer stores them in; frame lists. NrrdIO's undefined paths (FS-761, FS-762, FS-765 to FS-768,
+FS-771) and FS-739 are skipped. Measured (2026-11-15, observed): seeds 7, 13 and 21 (908 piece-24 cases
+each, 2,724): `reproduce` identical on every case, 0 different; `fix` differs only with notices (FS-736 to
+FS-738, FS-741, FS-734, FS-735, FS-01, and NrrdIO's FS-518).
+
+`validation/probes/fs-io/nrrd_itk_geometry.py`: 400 seeded files (the six three-dimensional spaces,
+diagonal, flipped and oblique directions, an axis without one, with and without an origin) read by ITK
+5.4.5 (ANTs 2.6.5's `PrintHeader`) and by `mriNrrdRead`: the default's voxel-to-RAS matrix equals
+ITK's on all 400 (to ITK's printed precision; ITK's own handling of LAS files taken back, below),
+FreeSurfer's (`reproduce`) on 42. ITK 5.4.5 turns a LAS file's coordinates to LPS by negating the first
+coordinate instead of the second, and leaves the default column of an axis without a direction
+alone: the check compares against the file's own geometry.

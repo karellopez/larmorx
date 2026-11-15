@@ -18,7 +18,8 @@
 //! of the directions, the axes from the space's name), FS-737 (a file without a space origin: a
 //! NaN centre), FS-738 (an axis without a space direction: NaN voxel sizes), FS-739 (a volume of
 //! 2^31 samples or more, or an axis past 2^31 - 1, indexed in 32 bits), FS-740 (the refusal's
-//! element count and size printed modulo 2^32), FS-249 (names past FreeSurfer's buffer). NrrdIO's
+//! element count and size printed modulo 2^32), FS-741 (64-bit samples stored as 32-bit numbers in
+//! the first half of each row). NrrdIO's
 //! own defects (FS-518 to FS-520, FS-761 to FS-773) follow the same mode inside `load_with`.
 
 use std::io::Write;
@@ -251,8 +252,18 @@ pub fn mri_nrrd_read(
 ) -> Result<Option<Mri>, Fatal> {
     let rep = g.notices.reproduce();
     // nrrdSanity() passes on every platform larmorx supports
-    let path = larmorx_freesurfer_core::utils::resolve(dir, fname);
-    let on_disk = path.to_string_lossy().into_owned();
+    // the name as NrrdIO opens it in `dir` (joined with `/`, which every platform takes, so that
+    // NrrdIO's messages and data file names give `dir/` before the program's name)
+    let prefix = match dir {
+        Some(d) if !fname.is_empty() && !Path::new(fname).is_absolute() => {
+            Some(format!("{}/", d.to_string_lossy()))
+        }
+        _ => None,
+    };
+    let on_disk = match &prefix {
+        Some(p) => format!("{p}{fname}"),
+        None => fname.to_owned(),
+    };
     let mut biff = nrrd::Biff::new();
     let (loaded, errno) = {
         let mut streams = Writers {
@@ -273,12 +284,9 @@ pub fn mri_nrrd_read(
         }
         Err(LoadError::Failed { .. }) => {
             let mut text = biff.get_done(nrrd::NRRD).unwrap_or_default();
-            if let Some(d) = dir {
-                // the messages name the file as the program gave it (NrrdIO opened it in `dir`)
-                if on_disk != fname {
-                    let pre = format!("{}/", d.to_string_lossy());
-                    text = replace_all(&text, pre.as_bytes(), b"");
-                }
+            if let Some(p) = &prefix {
+                // the messages name the files as the program would (NrrdIO opened them in `dir`)
+                text = replace_all(&text, p.as_bytes(), b"");
             }
             put(
                 err,
@@ -488,4 +496,100 @@ fn replace_all(text: &[u8], pat: &[u8], with: &[u8]) -> Vec<u8> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    fn read(dir: &Path, text: &[u8], mode: UpstreamDefects) -> (Option<Mri>, String, String) {
+        std::fs::write(dir.join("v.nrrd"), text).unwrap();
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let m = mri_nrrd_read(&mut g, &mut out, &mut err, Some(dir), "v.nrrd", true).unwrap();
+        let s = |b: Vec<u8>| String::from_utf8_lossy(&b).into_owned();
+        (m, s(out), s(err))
+    }
+
+    /// An oblique LPS volume: `fix` gives the geometry the file states (ITK's, in RAS),
+    /// `reproduce` FreeSurfer's (the origin as the centre, the diagonal as the sizes, LPS's axes).
+    #[test]
+    fn geometry_both_ways() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut t = b"NRRD0004\ntype: uchar\ndimension: 3\nspace: LPS\nsizes: 2 2 2\n".to_vec();
+        t.extend_from_slice(b"space directions: (0,2,0) (-1,0,0) (0,0,3)\n");
+        t.extend_from_slice(b"space origin: (10,20,30)\nencoding: raw\n\n");
+        t.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        let (m, _, _) = read(dir.path(), &t, UpstreamDefects::Fix);
+        let m = m.unwrap();
+        let v = &m.vg;
+        assert_eq!((v.xsize, v.ysize, v.zsize), (2.0, 1.0, 3.0));
+        // LPS (0, 2, 0) is RAS (0, -2, 0); (-1, 0, 0) is (1, 0, 0)
+        assert_eq!((v.x_r, v.x_a, v.x_s), (0.0, -1.0, 0.0));
+        assert_eq!((v.y_r, v.y_a, v.y_s), (1.0, 0.0, 0.0));
+        assert_eq!((v.z_r, v.z_a, v.z_s), (0.0, 0.0, 1.0));
+        // the first voxel at RAS (-10, -20, 30); the centre one voxel on along each axis
+        assert_eq!((v.c_r, v.c_a, v.c_s), (-9.0, -22.0, 33.0));
+        assert_eq!(m.chunk.as_deref(), Some(&[1u8, 2, 3, 4, 5, 6, 7, 8][..]));
+        let (m, _, _) = read(dir.path(), &t, UpstreamDefects::Reproduce);
+        let v = m.unwrap().vg;
+        assert_eq!((v.xsize, v.ysize, v.zsize), (0.0, 0.0, 3.0));
+        assert_eq!((v.x_r, v.y_a, v.z_s), (-1.0, -1.0, 1.0));
+        assert_eq!((v.c_r, v.c_a, v.c_s), (10.0, 20.0, 30.0));
+    }
+
+    /// Samples FreeSurfer's type cannot hold: signed bytes (`fix` 16-bit), 64-bit samples
+    /// (`reproduce`: the low halves packed into each row's first half).
+    #[test]
+    fn samples_both_ways() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut t =
+            b"NRRD0004\ntype: signed char\ndimension: 3\nspace: RAS\nsizes: 2 1 1\n".to_vec();
+        t.extend_from_slice(b"encoding: raw\n\n\xfb\x07");
+        let (m, _, _) = read(dir.path(), &t, UpstreamDefects::Fix);
+        let m = m.unwrap();
+        assert_eq!(m.mtype, MRI_SHORT);
+        assert_eq!(m.chunk.as_deref(), Some(&[0xfb, 0xff, 7, 0][..]));
+        let (m, _, _) = read(dir.path(), &t, UpstreamDefects::Reproduce);
+        let m = m.unwrap();
+        assert_eq!(
+            (m.mtype, m.chunk.as_deref()),
+            (MRI_UCHAR, Some(&[0xfb, 7][..]))
+        );
+        let mut t = b"NRRD0004\ntype: longlong\ndimension: 3\nspace: RAS\nsizes: 2 1 1\n".to_vec();
+        t.extend_from_slice(b"endian: little\nencoding: raw\n\n");
+        t.extend_from_slice(&0x1_0000_0005i64.to_le_bytes());
+        t.extend_from_slice(&(-2i64).to_le_bytes());
+        let (m, _, _) = read(dir.path(), &t, UpstreamDefects::Reproduce);
+        let c = m.unwrap().chunk.unwrap();
+        assert_eq!(&c[..8], &[5, 0, 0, 0, 0xfe, 0xff, 0xff, 0xff]);
+        assert_eq!(&c[8..], &[0u8; 8]);
+        let (m, _, _) = read(dir.path(), &t, UpstreamDefects::Fix);
+        let c = m.unwrap().chunk.unwrap();
+        assert_eq!(&c[..8], &0x1_0000_0005i64.to_le_bytes());
+    }
+
+    /// What is not a volume is described and refused; a file NrrdIO cannot read gives its
+    /// messages.
+    #[test]
+    fn refusals() {
+        let dir = tempfile::tempdir().unwrap();
+        let t = b"NRRD0004\ntype: float\ndimension: 2\ncontent: c\nsizes: 2 3\nendian: little\nencoding: raw\n\n";
+        let mut t = t.to_vec();
+        t.extend_from_slice(&[0u8; 24]);
+        let (m, out, err) = read(dir.path(), &t, UpstreamDefects::Fix);
+        assert!(m.is_none(), "{err}");
+        assert_eq!(
+            out,
+            "mriNrrdRead: \"v.nrrd\" is a 2-dimensional nrrd of type 9 (float)\n\
+             mriNrrdRead: the array contains 6 elements, 4 bytes in size\n\
+             mriNrrdRead: content: c\n",
+            "{err}"
+        );
+        assert!(err.contains("Nrrd input of diffusion data not supported!"));
+        let (m, _, err) = read(dir.path(), b"NRRD0004\ntype: uchar\n", UpstreamDefects::Fix);
+        assert!(m.is_none());
+        assert!(err.starts_with("mriNrrdRead: trouble reading \"v.nrrd\":\n[nrrd] "));
+    }
 }

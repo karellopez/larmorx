@@ -1885,3 +1885,71 @@ package, track C): not ported here.
   notices. Successful writes compared byte for byte: 68 SGI images and 62 ITK warps (plain and gzip).
   Seed 1's 4,800 portable cases (the recorded test): 4,292 identical (47 with memory digits), 508
   skipped or compared apart, 0 different.
+
+## Part 26: NRRD volumes (relay 32 of track A)
+
+Sources: `utils/mriio.cpp` 9787-9975 (`mriNrrdRead`; `mri_read`'s `NRRD_FILE` branch, mriio.cpp 778);
+`include/mri.h` (`MRIseq_vox`, `MRISseq_vox`, `MRIIseq_vox`, `MRILseq_vox`, `MRIFseq_vox`), `include/machine.h`
+(`typedef int long32`), `utils/mri.cpp` (`MRIsizeof`: `sizeof(long)` for `MRI_LONG`; `MRIallocSequence`'s
+`calloc` chunk), `utils/mri.cpp`'s `MRIorientationStringToDircos`. NrrdIO itself (`packages/nrrdio`, the
+same as NrrdIO r3991 on every probed case): track C's `larmorx_io::nrrd` (`docs/findings/nrrdio.md`).
+
+### Mechanisms
+- **The read.** `nrrdSanity()` (true), `nrrdNew()`, `nrrdIoStateNew()`, `nrrdLoad(nin, fname, nio)`; on
+  failure `biffGetDone(NRRD)` printed after `"mriNrrdRead: trouble reading \"%s\":\n%s"` (the Nrrd and
+  the I/O state leak). `read_volume` is never looked at: the data are always loaded and copied.
+- **The refusal (FS-740).** `(nin->dim != 3 && nin->dim != 4) || nin->spaceDim != 3`: three `printf`s,
+  the counts through `(int)nrrdElementNumber(nin)` and `(int)nrrdElementSize(nin)` (`size_t` cut to
+  `int`: FS-740), then `ErrorReturn(NULL, (ERROR_UNSUPPORTED, "Nrrd input of diffusion data not
+  supported!"))` (no `errno` reset: `ErrorPrintf` prints `strerror(errno)` first when it is set).
+- **The types (FS-734, FS-735).** `switch (nin->type)`: `nrrdTypeChar`/`UChar` -> `MRI_UCHAR`,
+  `Short`/`UShort` -> `MRI_SHORT`, `Int`/`UInt` -> `MRI_INT`, `LLong`/`ULLong` -> `MRI_LONG`, `Float` ->
+  `MRI_FLOAT`; the copies read `nin->data` through `unsigned char *`, `short *`, `int *`, `long *` and
+  `float *`, so unsigned samples are taken as signed of the same width and signed bytes as unsigned.
+- **64-bit voxels (FS-741).** `MRILseq_vox` is `((long32 *)mri->slices[z + f * depth][y])[x]`: a 4-byte
+  `int` lvalue at byte `4 x` of a row whose voxels are `MRIsizeof(MRI_LONG) = sizeof(long) = 8` bytes;
+  `= (long)_l[index]` converts the sample to `int` (its low 32 bits, two's complement). Each row's first
+  half thus holds its samples' low halves, the second half the `calloc`'s zeros. (The same macro is
+  behind fs.volume's FS-298.)
+- **The index (FS-739).** `int index = x + (y * width) + (z * width * height) + (f * width * height *
+  depth)`, all `int`: from 2^31 samples it overflows (undefined; with GCC's code a negative index, a read
+  before the data). `width = nin->axis[0].size` and the like cut `size_t` to `int`.
+- **The geometry (FS-736, FS-737, FS-738).** `mri->c_r = (float)nin->spaceOrigin[0]` (and `c_a`, `c_s`),
+  `ras_good_flag = 1`, `mri->xsize = (float)nin->axis[0].spaceDirection[0]`, `ysize` from
+  `axis[1].spaceDirection[1]`, `zsize` from `axis[2].spaceDirection[2]`, then `switch (nin->space)`:
+  `MRIorientationStringToDircos(mri, "RAS" | "LAS" | "LPS")` for the three spaces, nothing for the others
+  (the allocation's coronal cosines stay). NrrdIO's "no origin" and `none` are `AIR_NAN` (the float quiet
+  NaN 0x7fffffff widened: 0x7fffffffe0000000), which `(float)` turns back into 0x7fffffff. The NRRD
+  origin is the first sample's position, not the centre FreeSurfer's `c_ras` is; LPS and LAS coordinates
+  are not converted. Every NRRD volume therefore lies half its extent off (FreeSurfer's reading agreed
+  with the file's geometry on 42 of the 400 files of `nrrd_itk_geometry.py`: one-voxel and symmetric
+  extents).
+- **`errno`.** On a failed load `errno` is what glibc's stdio left: `fopen`'s on the header (2:
+  `ENOENT`) or on a data file (NrrdIO's `nrrdIoStateDataFileIterNext`), `EISDIR` (21) after `fread` or
+  `getc` on a folder's stream (`fopen` of a folder succeeds on Linux), `ENOMEM` after `calloc` fails. The
+  probe prints `errno` after `mri_read`: the port's `larmorx_io::nrrd::load_with_errno` returns it
+  (added this relay to track C's module: a thread-local set where its emulated stdio fails; `ERANGE`
+  from `strtod` and `strtol` in NrrdIO's number parsers is not kept: a successful load of a header with
+  a number out of `double`'s range leaves `ERANGE` in FreeSurfer, 0 in the port; no generated case has
+  one).
+
+### Decisions (rules A to D)
+- FS-734 (rule A): the type that holds every sample, only where FreeSurfer's does not (`MRI_SHORT`,
+  `MRI_INT`, `MRI_LONG`): outputs identical whenever FreeSurfer's values are right.
+- FS-735 (rule B): no voxel type holds an unsigned 64-bit sample past 2^63 - 1: refused with a message.
+- FS-736 to FS-738 (rule A): the geometry the file states, as ITK's NRRD reader takes it (ITK, Slicer and
+  ANTs read the same files this way): measured by `validation/probes/fs-io/nrrd_itk_geometry.py` (400
+  files: the default equals ITK's voxel-to-RAS matrix on all 400). A direction of length 0 is refused
+  (rule B: no voxel size).
+- FS-739 (rule B for an axis past 2^31 - 1: no volume can hold it; rule A for the index).
+- FS-740 (rule A): the counts printed whole. FS-741 (rule A): the samples one to a voxel.
+- Not a defect: doubles and blocks refused with a message; `read_volume` ignored (the same result,
+  read in full).
+
+### ITK 5.4.5's own reading of LAS files
+`itkNrrdImageIO.cxx` (ITK v5.4.5, `ReadImageInformation`) turns non-LPS coordinates into LPS with
+`case nrrdSpaceLeftAnteriorSuperior: spaceDir[0] *= -1; // R -> L` (and the same for the origin): a LAS
+file's first coordinate is already L, its second (A) is the one to negate. So ITK, and the ANTs, Slicer
+and SimpleITK reads built on it, mirror LAS volumes left-right and front-back. The check takes ITK's
+LPS matrix of a LAS file as the file's RAS one (what undoing ITK's step gives), but for the axes
+without a direction, whose default columns ITK sets in LPS. (An ITK defect; not larmorx's.)

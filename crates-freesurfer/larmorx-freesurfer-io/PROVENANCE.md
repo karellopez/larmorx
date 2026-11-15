@@ -296,6 +296,7 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/rgb.cpp`; `include/rgb.h` | `iopen`/`imgopen` (read and write), `getrow`, `putrow` (uncompressed 1-byte pixels: what `RGBwrite` reaches), `iclose`, `iflush`, `img_seek`, `img_badrow`, `img_read`, `img_write`, `img_optseek`, `img_getrowsize`, `img_rle_expand`, `cvtimage`, `cvtshorts`, `cvtlongs` (as reading reaches them), `swapImage`, `tmpswapShort`, `tmpswapInt`, `isetname`, `ibufalloc`, `i_errhdlr` (no error function: message and `exit(1)`) (FS-720 to FS-729; relay 31) | `rgb.rs` |
 | `utils/mriio.cpp` 785-794, 1143-1150, 1191-1196, 9981-10101 | `mri_read`'s image branch, `MRIwriteType`'s image and ITK branches, `itkMorphWrite` (FS-733, FS-449, FS-58; relay 31) | `mriio.rs`, `mriio_write.rs` |
 | (larmorx's own) | the hook table for the conversions `mri_read` and `MRIwriteType` call in crates above this one (`ImageToMRI`, `MRItoImage`: fs.volume registers them; relay 31) | `upper.rs` |
+| `utils/mriio.cpp` 778-780, 9787-9975; `include/mri.h` (`MRI*seq_vox`); `utils/mri.cpp`'s `MRIorientationStringToDircos` for `RAS`, `LAS`, `LPS` | `mri_read`'s NRRD branch, `mriNrrdRead` over `larmorx_io::nrrd::load_with_errno` (NrrdIO r3991, track C's port: the main package's) (FS-734 to FS-741; relay 32) | `mriio_nrrd.rs`, `mriio.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
 the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte
@@ -381,3 +382,13 @@ stay in larmorx-freesurfer-volume (`image::register_io` fills `upper`); `mri_rea
 call them through `upper`. The defaults of FS-718 to FS-733 (the errors of FS-718, FS-730, FS-731,
 FS-732, FS-733; 0 for memory contents; the name in FS-725's message) and their notices are larmorx's
 own.
+
+Changes for relay 32: NrrdIO is track C's port (`larmorx_io::nrrd`, Apache-2.0 AND Zlib), called with
+the program's notices; its `errno` (`load_with_errno`, added to that module for this caller) is copied
+into the port's. The samples are copied as bytes (no conversion of a float through a register); the
+64-bit samples' 32-bit stores (FS-741) are written at FreeSurfer's offsets under `reproduce`. The
+default's geometry (FS-736 to FS-738) follows ITK 5.4.5's NRRD reader (`itkNrrdImageIO.cxx`, Apache-2.0:
+its LPS conversion and its defaults, its LAS slip corrected; findings Part 26), the sizes and cosines in
+`double` then stored as `float`, the centre by `MRIp0ToCRAS` (fs.mri). The defaults of FS-734 to FS-741
+(the wider types, the refusals of FS-735, FS-739 and a zero-length direction, the stated geometry, the
+whole counts, the 64-bit stores) and their notices are larmorx's own.

@@ -197,3 +197,32 @@ fn strings() {
     assert_eq!(t.next_token(), Some(&b""[..]));
     assert_eq!(t.next_token(), None);
 }
+
+/// The `errno` C's stdio leaves (`load_with_errno`): a missing header or data file gives fopen's
+/// ENOENT, a folder in the data file's place EISDIR (its read), a header that loads none.
+#[test]
+fn errno_left() {
+    let dir = tempfile::tempdir().unwrap();
+    let errno_of = |name: &[u8]| {
+        let mut biff = Biff::new();
+        let mut n = Notices::new(UpstreamDefects::Fix);
+        load_with_errno(name, &mut biff, &mut n, &mut larmorx_core::cfmt::Silent)
+    };
+    let missing = dir.path().join("none.nrrd");
+    let (r, e) = errno_of(missing.to_string_lossy().as_bytes());
+    assert_eq!((r, e), (Err(LoadError::Failed { code: 2 }), Some(2)));
+    let good = write(
+        dir.path(),
+        "a.nrrd",
+        b"NRRD0004\ntype: uchar\ndimension: 1\nsizes: 2\nencoding: raw\n\n\x01\x02",
+    );
+    let (r, e) = errno_of(&good);
+    assert!(r.is_ok() && e.is_none());
+    let head = b"NRRD0004\ntype: uchar\ndimension: 1\nsizes: 2\nencoding: raw\ndata file: d.raw\n";
+    let detached = write(dir.path(), "b.nhdr", head);
+    let (r, e) = errno_of(&detached);
+    assert_eq!((r.is_err(), e), (true, Some(2)));
+    std::fs::create_dir(dir.path().join("d.raw")).unwrap();
+    let (r, e) = errno_of(&detached);
+    assert_eq!((r.is_err(), e), (true, Some(21)));
+}

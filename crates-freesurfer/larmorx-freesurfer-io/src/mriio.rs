@@ -1375,6 +1375,15 @@ fn read_tag_text(
         if len < 0 {
             return Ok(Vec::new());
         }
+    } else if len > 1 << 28 {
+        // beyond 256 MiB the machine's memory decides whether FreeSurfer's allocation succeeds
+        // (a crash where it fails): the file's bytes read as where it succeeds
+        g.notices.add(
+            &FS_257,
+            format!(
+                "MRITAGread: a {what} tag of length {len} (FreeSurfer's allocation of that size fails without the memory: a crash)"
+            ),
+        );
     }
     // the file's bytes, read in pieces (a length larger than the file reads what it has)
     let mut v = Vec::new();

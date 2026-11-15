@@ -49,6 +49,18 @@ Their results are in `docs/freesurfer/` (closed too).
       python -P validation/investigations/freesurfer-inventory/layering.py \
           <scratch>/core.json <scratch>/edges.json --from fs.mri --into fs.volume --closure --names
 
+- `ported.py`: what is left of queue items (track D, relay 34 of FreeSurfer's foundations). For the
+  items named, the reached functions the queue gives them (waves.py's rule and the queue's
+  `(lines a-b)`), each marked by whether `crates-freesurfer/*/src` names it: `ported` (a doc
+  comment of an item or a `fn` of that name), `module` (only a module's list or a body: a helper
+  folded into its caller), `neg` (a "Not here" or "waits" sentence), `miss` (nothing); `-v` lists
+  the `neg` and `miss` ones with the programs reaching them and their callees that are themselves
+  left. A reading aid (names matched as words; GPL items in `crates-gpl/` are not scanned): every
+  line goes into a plan only after a check by hand.
+
+      python -P validation/investigations/freesurfer-inventory/ported.py <scratch>/core.json \
+          <scratch>/edges.json . 3.1-42 3.1-47 -v
+
 - `report_code.py`: code.md's tables (Markdown on standard output) and `docs/freesurfer/code.toml`
   from the build graph and the three call-graph views (full, core, core calls-only); the commands
   in code.md §6.

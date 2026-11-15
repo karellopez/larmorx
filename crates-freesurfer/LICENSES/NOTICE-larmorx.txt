@@ -265,7 +265,10 @@ The FNV-1a hash (Glenn Fowler, Landon Curt Noll, Kiem-Phong Vo; public domain), 
 crates/larmorx-core/src/fnv.rs.
 
 zlib 1.2.11's file layer (gzlib.c, gzread.c, gzwrite.c, gzclose.c), translated into Rust in
-crates/larmorx-io/src/znz.rs (an altered version: inflate and deflate are zlib-rs's). Its licence:
+crates/larmorx-io/src/znz.rs (an altered version: inflate is zlib-rs's), and zlib 1.2.11's
+compressor with Ubuntu 22.04's patches (deflate.c, deflate.h, trees.c, compress.c, adler32.c,
+crc32.c), translated into Rust in crates/larmorx-core/src/zlib.rs and crates/larmorx-core/src/zlib/
+(an altered version: Rust's slices in place of the stream's pointers). Its licence:
 
   (C) 1995-2017 Jean-loup Gailly and Mark Adler
   This software is provided 'as-is', without any express or implied warranty. In no event will

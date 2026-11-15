@@ -61,6 +61,7 @@ Taken early from `fs.volume`'s item 3.1-39 for the surfaces' `MRIS::lta` (the or
 | `include/transform.h` | `TransformType`, `LINEAR_TRANSFORM` (`LT`), `LINEAR_TRANSFORM_ARRAY` (`LTA`; its `get_matrix` method stays in fs.volume), the transform type numbers | `lta.rs` |
 | `utils/transform.cpp` 160, 185, 305, 630, 812 | `LTAcopy`, `LTcopy`, `initVolGeom`, `LTAalloc`, `LTAfree` | `lta.rs`, `vol_geom.rs` (`init_vol_geom`) |
 | `utils/mri.cpp` 3014 | `MRIboundingBox` | `voxel.rs` |
+| `utils/mri.cpp` 211-212; `include/mri.h` 99-158 (`sizeof(MRI_FRAME)`, 1,288 bytes) | `MRI::MRI`'s frame table: `frames_calloc_fails` (FS-760: records past 16 GiB refused before any frame is made; track A relay 36), `SIZEOF_MRI_FRAME`; the voxel chunk's `calloc` through fs.core's `alloc` (zeros untouched until written) | `mri.rs` |
 
 ## Moved down from larmorx-freesurfer-volume (track A relay 26)
 

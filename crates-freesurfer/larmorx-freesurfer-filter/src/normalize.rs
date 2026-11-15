@@ -20,7 +20,7 @@ use std::path::Path;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
     FS_587, FS_588, FS_589, FS_590, FS_591, FS_592, FS_593, FS_594, FS_595, FS_596, FS_597, FS_598,
-    FS_599, FS_600,
+    FS_599, FS_600, FS_601, FS_602, FS_603,
 };
 use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::cstd::atof;
@@ -54,7 +54,7 @@ use larmorx_freesurfer_mri::mri::{
 use larmorx_freesurfer_mri::vol_geom::world_to_voxel;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_volume::arith::{
-    Pair, Tri, mri_binarize, mri_clear, mri_clone, mri_scalar_mul, mri_subtract,
+    Pair, Tri, mri_binarize, mri_clear, mri_clone, mri_divide, mri_scalar_mul, mri_subtract,
 };
 use larmorx_freesurfer_volume::coords::surface_ras_to_voxel;
 use larmorx_freesurfer_volume::label_coords::{Io as LabelIo, LabelDst, label_to_voxel};
@@ -62,16 +62,17 @@ use larmorx_freesurfer_volume::labels::mri_mean_in_label;
 use larmorx_freesurfer_volume::mrihisto::{
     mri_histogram, mri_histogram_label, mri_histogram_region,
 };
-use larmorx_freesurfer_volume::mriset::{mri_erode, mri_voxels_in_label};
+use larmorx_freesurfer_volume::mriset::{mri_erode, mri_mask, mri_voxels_in_label};
 use larmorx_freesurfer_volume::resize::mri_change_type;
 use larmorx_freesurfer_volume::sample::sample_volume;
 use larmorx_freesurfer_volume::skull::find_approximate_skull_bounding_box;
 use larmorx_freesurfer_volume::talairachex::mri_talairach_to_voxel_ex;
 use larmorx_freesurfer_volume::vgeom::get_vol_geom;
 
-use crate::conv::{mri_convolve_gaussian, mri_gaussian1d};
+use crate::conv::{mri_convolve_gaussian, mri_gaussian1d, mri_mean, mri_std};
 use crate::mem::{self, Notes};
 use crate::norm::{CONTROL_MARKED, CONTROL_NONE, mri_build_voronoi_diagram};
+use crate::segment::{MriSegmentation, mri_segment, mri_segment_max, mri_segment_to_image};
 
 /// `MAX_SPLINE_POINTS` (`mrinorm.h`): the windows and spline points an `MNI` holds.
 pub const MAX_SPLINE_POINTS: usize = 80;
@@ -3101,6 +3102,290 @@ pub fn mri_3d_normalize(
     }
     Ok(match fresh {
         Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
+}
+
+/// `WSIZE(mri)` of the high-signal search: `((int)((7.0 / thick) / 2)) * 2 + 1` (a window of
+/// about 7 mm, odd). The conversion out of the `int` range is FS-17 (`reproduce`: `INT_MIN`, which
+/// the doubling wraps to a window of 1, as the official build's `lea` does); a finite half-width
+/// of 2^30 or more overflows the doubling in FreeSurfer (FS-603: `reproduce` wraps; by default the
+/// window covers the volume). By default a window wider than the volume is cut to twice its
+/// largest side plus one, and a negative one to -3: the same voxels in every window
+/// ([`mri_mean`]'s half-width `(wsize - 1) / 2`, `MRIstd`'s `wsize / 2`), finite loops.
+fn snr_wsize(g: &mut Globals, m: &Mri, what: &str) -> i32 {
+    let half = float_to_int(g, mul64(div64(7.0, f64::from(m.thick)), 0.5), what);
+    let w64 = 2 * i64::from(half) + 1;
+    if g.notices.reproduce() {
+        return half.wrapping_mul(2).wrapping_add(1);
+    }
+    if w64 > i64::from(i32::MAX) || w64 < i64::from(i32::MIN) {
+        let finite = (7.0 / f64::from(m.thick)).is_finite()
+            && (mul64(div64(7.0, f64::from(m.thick)), 0.5)).abs() < 2147483648.0;
+        if finite {
+            g.notices.add(
+                &FS_603,
+                format!(
+                    "{what}: a window half-width of {half} voxels (slice thickness {}) overflows \
+                     FreeSurfer's int doubling",
+                    m.thick
+                ),
+            );
+        }
+    }
+    let (w, h, d) = ext(m);
+    let cover = 2 * i64::from(w.max(h).max(d).max(0)) + 1;
+    w64.clamp(-3, cover.max(1)) as i32
+}
+
+/// The voxel count and centroid FreeSurfer prints for segment `s` of `seg` (`s` -1: no such
+/// segment, the entry before the table read: FS-601, 0 printed).
+fn seg_info(g: &mut Globals, seg: &MriSegmentation, s: i32, what: &str) -> (i32, f32, f32, f32) {
+    match usize::try_from(s).ok().and_then(|i| seg.segments.get(i)) {
+        Some(m) => (m.nvoxels(), m.cx, m.cy, m.cz),
+        None => {
+            g.notices.add(
+                &FS_601,
+                format!(
+                    "{what}: segment {s} printed (fewer than two segments): its voxel count and \
+                     centroid are memory before the segment table (0 used)"
+                ),
+            );
+            (0, 0.0, 0.0, 0.0)
+        }
+    }
+}
+
+/// `MRInormFindHighSignalLowStdControlPoints(mri_src, mri_ctrl)`: the voxels of high signal and
+/// low local spread. With `w = WSIZE` (about 7 mm: `((int)((7.0 / thick) / 2)) * 2 + 1`, FS-17,
+/// FS-603), the local mean ([`mri_mean`]) and standard deviation ([`mri_std`]) over `w` windows,
+/// their ratio ([`mri_divide`]) set to 0 where the standard deviation truncates to 0
+/// ([`mri_mask`]); the ratio's histogram ([`mri_histogram`], `nint(max - min + 1)` bins); from the
+/// top bin down to bin 1 the `float` running count until it passes 20,000 (bin 0 when it never
+/// does): `using SNR threshold <%2.3f bin value> at bin <b>`; the 6-connected segments of the
+/// ratio within `[bins[b], 2 bins[last]]` ([`mri_segment`]); the largest and the next largest
+/// ([`mri_segment_max`], the first with its count set aside) copied into the control volume (a
+/// new byte volume with the source's header when none is given) at their voxels
+/// ([`mri_segment_to_image`]), `using segments <s1> and <s2> with <n1> and <n2> voxels, centroids
+/// (<%2.0f x3>) and (<%2.0f x3>)` (FS-601 for a missing segment, FS-602 for counts above 2^24),
+/// then binarised at 1 (`CONTROL_NONE`, `CONTROL_MARKED`). `DIAG_WRITE` with `DIAG_VERBOSE`:
+/// `m.mgz`, `s.mgz`, `h.plt`, `rb.mgz`, `csnr.mgz`; `Gx` at 0 or more: `(<Gx>, <Gy>, <Gz>) is
+/// [NOT ]an control point` (the byte, [`cget`]).
+pub fn mri_norm_find_high_signal_low_std_control_points(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    src: &Mri,
+    ctrl: Option<&mut Mri>,
+) -> Result<Ret<Mri>, Fatal> {
+    const WHAT: &str = "MRInormFindHighSignalLowStdControlPoints";
+    let mut fresh = None;
+    let ctrl: &mut Mri = match ctrl {
+        Some(c) => c,
+        None => {
+            let mut c = mri_alloc(
+                g,
+                out,
+                err,
+                src.vg.width,
+                src.vg.height,
+                src.vg.depth,
+                MRI_UCHAR,
+            )?;
+            mri_copy_header(g, out, err, src, Some(&mut c))?;
+            fresh.insert(c)
+        }
+    };
+    let wsize = snr_wsize(g, src, WHAT);
+    let mut mean = mri_mean(g, out, err, src, None, wsize)?.unwrap_new();
+    let wsize = snr_wsize(g, src, WHAT);
+    let mut std = mri_std(g, out, err, src, None, &mean, wsize)?.unwrap_new();
+    let mut ratio = mri_divide(g, out, err, Tri::New(&mean, &std))?.unwrap_new();
+    mri_mask(g, out, err, env, Pair::Same(&mut ratio), &std, 0, 0.0)?;
+    if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        write_vol(g, out, err, env, dir, &mut mean, "m.mgz")?;
+        write_vol(g, out, err, env, dir, &mut std, "s.mgz")?;
+    }
+    drop(mean);
+    drop(std);
+    let h = mri_histogram(g, err, &ratio, 0)?;
+    let nbins = h.nbins;
+    // the official build: the count loop from the top bin (the unused total is not computed)
+    let mut num = 0.0f32;
+    let mut b = nbins - 1;
+    while b >= 1 {
+        num = add(num, h.counts[b as usize]);
+        if num > 20000.0 {
+            break;
+        }
+        b -= 1;
+    }
+    let low = h.bins[b as usize];
+    let _ = writeln!(
+        out,
+        "using SNR threshold {} at bin {b}",
+        ff(f64::from(low), 2, 3)
+    );
+    if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        histo_plot(&h, dir, "h.plt");
+        write_vol(g, out, err, env, dir, &mut ratio, "rb.mgz")?;
+    }
+    let top = h.bins[(nbins - 1) as usize];
+    let mut seg = mri_segment(g, out, err, &ratio, low, add(top, top))?;
+    drop(h);
+    let s1 = mri_segment_max(&seg);
+    mri_segment_to_image(g, out, err, &ratio, Some(&mut *ctrl), &seg, s1)?;
+    // FreeSurfer keeps s1's count in a float and sets it to 0 while it looks for the second
+    let set_aside = match usize::try_from(s1).ok() {
+        Some(i) if i < seg.segments.len() => Some(std::mem::take(&mut seg.segments[i].voxels)),
+        _ => {
+            g.notices.add(
+                &FS_601,
+                format!(
+                    "{WHAT}: no segment above the threshold: FreeSurfer reads and writes the \
+                     voxel count before the segment table (memory; nothing written here)"
+                ),
+            );
+            None
+        }
+    };
+    let s2 = mri_segment_max(&seg);
+    mri_segment_to_image(g, out, err, &ratio, Some(&mut *ctrl), &seg, s2)?;
+    if let Some(v) = set_aside {
+        seg.segments[s1 as usize].voxels = v;
+    }
+    let (mut n1, c1x, c1y, c1z) = seg_info(g, &seg, s1, WHAT);
+    let (n2, c2x, c2y, c2z) = seg_info(g, &seg, s2, WHAT);
+    if s1 >= 0 {
+        let through = n1 as f32 as i32;
+        if through != n1 {
+            g.notices.add(
+                &FS_602,
+                format!(
+                    "{WHAT}: segment {s1}'s {n1} voxels printed as {through} by FreeSurfer (its \
+                     count kept in a float)"
+                ),
+            );
+            if g.notices.reproduce() {
+                n1 = through;
+            }
+        }
+    }
+    let c = |v: f32| ff(f64::from(v), 2, 0);
+    let _ = writeln!(
+        out,
+        "using segments {s1} and {s2} with {n1} and {n2} voxels, centroids ({}, {}, {}) and ({}, \
+         {}, {})",
+        c(c1x),
+        c(c1y),
+        c(c1z),
+        c(c2x),
+        c(c2y),
+        c(c2z)
+    );
+    mri_binarize(
+        g,
+        out,
+        err,
+        Pair::Same(&mut *ctrl),
+        1.0,
+        CONTROL_NONE as f32,
+        CONTROL_MARKED as f32,
+    )?;
+    if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        write_vol(g, out, err, env, dir, ctrl, "csnr.mgz")?;
+    }
+    let (gx, gy, gz) = (g.gx, g.gy, g.gz);
+    if gx >= 0 {
+        let v = cget(g, err, WHAT, ctrl, gx, gy, gz)?;
+        let s = if v != 0.0 { "" } else { "NOT " };
+        let _ = writeln!(out, "({gx}, {gy}, {gz}) is {s}an control point");
+    }
+    Ok(match fresh {
+        Some(c) => Ret::New(c),
+        None => Ret::Given,
+    })
+}
+
+/// `MRInormalizeHighSignalLowStd(mri_src, mri_norm, bias_sigma, wm_target)` (`mri_normalize -snr`
+/// when the one-dimensional normalisation is not used): the control points of
+/// [`mri_norm_find_high_signal_low_std_control_points`] and the file's
+/// ([`mri_norm_add_file_control_points`] at 255), binarised; the bias field
+/// ([`mri_build_bias_image`]); each voxel `(v * wm_target) / bias` in `float` (`v` where the bias
+/// is exactly 0), at most 255 in a byte destination. `norm`: a clone of the source (its voxels
+/// zero until written), a given volume, or the source itself. `DIAG_WRITE` with `DIAG_VERBOSE`:
+/// `bsnr.mgz`, `nsnr.mgz`.
+#[allow(clippy::too_many_arguments)]
+pub fn mri_normalize_high_signal_low_std(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    st: &mut NormState,
+    src: &mut Mri,
+    norm: Dst,
+    bias_sigma: f32,
+    wm_target: f32,
+) -> Result<Ret<Mri>, Fatal> {
+    let (w, h, d) = ext(src);
+    let mut fresh = match norm {
+        Dst::New => Some(mri_clone(g, out, err, src, None)?.unwrap_new()),
+        _ => None,
+    };
+    let mut given = match norm {
+        Dst::Given(m) => Some(m),
+        _ => None,
+    };
+    let mut ctrl =
+        mri_norm_find_high_signal_low_std_control_points(g, out, err, env, dir, src, None)?
+            .unwrap_new();
+    mri_norm_add_file_control_points(g, out, err, st, &mut ctrl, 255, Some(src))?;
+    mri_binarize(
+        g,
+        out,
+        err,
+        Pair::Same(&mut ctrl),
+        1.0,
+        CONTROL_NONE as f32,
+        CONTROL_MARKED as f32,
+    )?;
+    let mut bias = mri_build_bias_image(g, out, err, src, &mut ctrl, bias_sigma)?;
+    drop(ctrl);
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let s = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
+                let b = mri_get_vox_val(g, err, &bias, x, y, z, 0, 0)?;
+                // `!bias`: exactly 0 (a NaN bias divides)
+                let mut v = if b == 0.0 {
+                    s
+                } else {
+                    div(mul(s, wm_target), b)
+                };
+                let n: &mut Mri = match (fresh.as_mut(), given.as_deref_mut()) {
+                    (Some(n), _) | (None, Some(n)) => n,
+                    _ => &mut *src,
+                };
+                if v > 255.0 && n.mtype == MRI_UCHAR {
+                    v = 255.0;
+                }
+                mri_set_vox_val(g, err, n, x, y, z, 0, v, 0)?;
+            }
+        }
+    }
+    if g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        write_vol(g, out, err, env, dir, &mut bias, "bsnr.mgz")?;
+        let n: &mut Mri = match (fresh.as_mut(), given) {
+            (Some(n), _) | (None, Some(n)) => n,
+            _ => &mut *src,
+        };
+        write_vol(g, out, err, env, dir, n, "nsnr.mgz")?;
+    }
+    Ok(match fresh {
+        Some(n) => Ret::New(n),
         None => Ret::Given,
     })
 }

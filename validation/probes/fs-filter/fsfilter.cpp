@@ -1069,11 +1069,27 @@ bool norm2_case(const std::string &cmd)
     set_pts(src);
     put_result(MRI3dNormalize(orig, src, wm, norm, ab, be, of_, pr, sg, 0, nc), norm);
     put_full(src);
-  } else if (cmd == "nrmf" || cmd == "n3df") {
+  } else if (cmd == "hsc") {
+    // hsc <src> thick <ctrl?>: MRInormFindHighSignalLowStdControlPoints (relay 31)
+    MRI *src = get_vol();
+    src->thick = getf();
+    MRI *ctrl = get_opt();
+    put_result(MRInormFindHighSignalLowStdControlPoints(src, ctrl), ctrl);
+  } else if (cmd == "hsl") {
+    // hsl <src> thick <norm mode> [<norm>] sigma wm <points>: MRInormalizeHighSignalLowStd
+    MRI *src = get_vol();
+    src->thick = getf();
+    MRI *norm = get_dst(geti(), src);
+    float sg = getf(), wm = getf();
+    set_pts(src);
+    put_result(MRInormalizeHighSignalLowStd(src, norm, sg, wm), norm);
+    put_full(src);
+  } else if (cmd == "nrmf" || cmd == "n3df" || cmd == "hslf") {
     // nrmf <volume file>: MRInormInit then MRInormalize (a new volume), as mri_normalize without an
     // aseg; n3df <volume file> above below prune sigma: MRI3dNormalize in place with a copy as
-    // mri_orig (wm 110, no control-point file), as mri_normalize's 3d passes; the result's extent,
-    // type and the FNV-1a (64 bits) of its voxels
+    // mri_orig (wm 110, no control-point file), as mri_normalize's 3d passes; hslf <volume file>
+    // sigma: MRInormalizeHighSignalLowStd (a new volume, wm 110), as mri_normalize -snr; the
+    // result's extent, type and the FNV-1a (64 bits) of its voxels
     MRI *src = MRIread(next());
     if (!src) fail("cannot read the volume");
     MRI *r;
@@ -1082,6 +1098,8 @@ bool norm2_case(const std::string &cmd)
       MNI *mni = (MNI *)calloc(1, sizeof(MNI));
       MRInormInit(src, mni, 0, 0, 0, 0, 0.0f);
       r = MRInormalize(src, NULL, mni);
+    } else if (cmd == "hslf") {
+      r = MRInormalizeHighSignalLowStd(src, NULL, getf(), 110);
     } else {
       float ab = getf(), be = getf();
       int pr = geti();
@@ -1178,7 +1196,8 @@ const char *MARK = "\n@@RESULT ";
 bool toks_hint_long(const std::string &line)
 {
   return line.compare(0, 5, "edmf ") == 0 || line.compare(0, 5, "dtrf ") == 0 || line.compare(0, 4, "vsr ") == 0 ||
-         line.compare(0, 5, "g3df ") == 0 || line.compare(0, 5, "nrmf ") == 0 || line.compare(0, 5, "n3df ") == 0;
+         line.compare(0, 5, "g3df ") == 0 || line.compare(0, 5, "nrmf ") == 0 || line.compare(0, 5, "n3df ") == 0 ||
+         line.compare(0, 5, "hslf ") == 0;
 }
 
 }  // namespace

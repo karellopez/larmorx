@@ -1761,6 +1761,12 @@ defects! {
         "the one-dimensional normalisation (MRInormalize, mri_normalize without an aseg) checks its peaks against entries of its peak arrays past the peaks found, which it never wrote (memory contents): it can keep or drop peaks, or find none, by what the memory holds";
     FS_599 = "FS-599", "FreeSurfer", true,
         "the three-dimensional normalisation's first control-point search (MRInormFindControlPoints) gives up after its eleventh pass even when that pass found enough control points (the error 'could not find enough control points')";
+    FS_601 = "FS-601", "FreeSurfer", true,
+        "the high-signal control-point search of mri_normalize's -snr normalisation (MRInormFindHighSignalLowStdControlPoints, MRInormalizeHighSignalLowStd) prints, when fewer than two regions pass its signal-to-noise threshold, the missing region's voxel count and centroid from memory outside its table in the message 'using segments ...' (memory contents); with no region at all FreeSurfer also writes into that memory and restores it";
+    FS_602 = "FS-602", "FreeSurfer", true,
+        "the high-signal control-point search (MRInormFindHighSignalLowStdControlPoints) prints the largest region's voxel count rounded to single precision in its message 'using segments ...': a count above 16,777,216 voxels can be printed wrong (its control points are not changed)";
+    FS_603 = "FS-603", "FreeSurfer", true,
+        "the high-signal control-point search (MRInormFindHighSignalLowStdControlPoints) sizes its window of about 7 mm in voxels as an int that overflows for a slice thickness below about 3.3e-9 mm: the window wraps to no voxels or a negative size (its local means are not computed and its spreads are 0)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

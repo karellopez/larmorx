@@ -23,12 +23,12 @@ const OFFICIAL_SHA256: &str = "ebc93e25841130e21667655b8d7c70fb2fe9c9991f811a5db
 const SKIPPED: usize = 137;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 37] = [
+const SKIP: [&str; 38] = [
     "FS-540", "FS-541", "FS-58", "FS-53", "FS-546", "FS-548", "FS-549", "FS-550", "FS-551",
     "FS-552", "FS-555", "FS-163", "FS-559", "FS-560", "FS-561", "FS-562", "FS-564", "FS-567",
     "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575", "FS-579", "FS-581", "FS-582",
     "FS-583", "FS-586", "FS-588", "FS-589", "FS-591", "FS-593", "FS-487", "FS-597", "FS-598",
-    "FS-600",
+    "FS-600", "FS-601",
 ];
 
 /// FS-596: the number in `MRInormAddFileControlPoints`' message on rejected points is whatever

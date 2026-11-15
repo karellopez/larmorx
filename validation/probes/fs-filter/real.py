@@ -75,6 +75,15 @@ NORM3 = (
 )
 
 
+# mri_normalize -snr when the one-dimensional normalisation is not used: the high-signal,
+# low-spread normalisation (MRInormalizeHighSignalLowStd into a new volume, wm 110, bias sigma 8)
+# of nu.mgz and T1.mgz: (volume, sigma)
+SNR = (
+    ("nu.mgz", 8.0),
+    ("T1.mgz", 8.0),
+)
+
+
 def fx(v: float) -> str:
     return struct.pack(">f", v).hex()
 
@@ -90,6 +99,11 @@ def main(argv: list[str] | None = None) -> int:
         "--norm3",
         action="store_true",
         help="the one- and three-dimensional normalisations (MRInormalize, MRI3dNormalize) instead",
+    )
+    ap.add_argument(
+        "--snr",
+        action="store_true",
+        help="the high-signal, low-spread normalisation (MRInormalizeHighSignalLowStd) instead",
     )
     ap.add_argument(
         "--gentle",
@@ -115,6 +129,10 @@ def main(argv: list[str] | None = None) -> int:
                         f"n3df {mri / 'mri' / vol} {fx(above)} {fx(below)} {prune} {fx(sigma)}"
                     )
             continue
+        if a.snr:
+            for vol, sigma in SNR:
+                lines.append(f"hslf {mri / 'mri' / vol} {fx(sigma)}")
+            continue
         if a.gentle:
             for vol, above, below, sigma in GENTLE:
                 lines.append(f"g3df {mri / 'mri' / vol} {fx(above)} {fx(below)} {fx(sigma)}")
@@ -132,6 +150,8 @@ def main(argv: list[str] | None = None) -> int:
     name = (
         "real-norm3-cases.txt"
         if a.norm3
+        else "real-snr-cases.txt"
+        if a.snr
         else "real-gentle-cases.txt"
         if a.gentle
         else "real-norm-cases.txt"

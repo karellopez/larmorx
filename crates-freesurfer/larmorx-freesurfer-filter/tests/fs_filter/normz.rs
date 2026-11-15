@@ -21,8 +21,9 @@ use super::conv::{dx, full, get_volc, opt, result, same_result, small, vol};
 use super::{Ctx, Gen, Toks, fx, get_vol, rle, token};
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 13] = [
+pub const COMMANDS: [&str; 15] = [
     "spl", "ninit", "npk", "gfc", "fcw", "afc", "bbi", "g3d", "abc", "ufc", "nrm", "nfcp", "n3d",
+    "hsc", "hsl",
 ];
 
 /// A volume's header tokens and voxels of type `ty` from `v` (one frame), voxel size `xs`.
@@ -722,6 +723,91 @@ fn nfcp_n3d_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
     pts(g, t, e);
 }
 
+/// A volume for the high-signal search: noise everywhere (integers), regions of high mean and low
+/// spread among regions of low mean and high spread (two slabs, three, cells of 6 voxels, one
+/// block), now and then a constant margin of one voxel; extents of 28 to 32 voxels (more than the
+/// search's 20,000 voxels) mostly, else small ones (the count never passes 20,000: one region);
+/// the slice thickness after it.
+fn snr_case_vol(g: &mut Gen, t: &mut Vec<String>) -> ([i32; 3], i32) {
+    let big = !g.chance(5);
+    let e = if big {
+        [32, 32, g.int(28, 32) as i32]
+    } else {
+        let n = g.int(5, 13) as i32;
+        [n, g.int(5, 13) as i32, n]
+    };
+    let ty = g.pick(&[MRI_FLOAT, MRI_UCHAR, MRI_SHORT, MRI_FLOAT, MRI_UCHAR]);
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let shape = g.pick(&[0u64, 0, 0, 0, 2, 2, 2, 3, 3, 1]);
+    let hi = g.int(90, 130) as f64;
+    let lo = g.int(30, 70) as f64;
+    let sp_hi = g.pick(&[3i64, 4, 5, 2]);
+    let sp_lo = g.pick(&[10i64, 15, 25]);
+    let margin = i32::from(g.chance(4));
+    let salt = g.below(1 << 30);
+    let (w, h) = (e[0] as usize, e[1] as usize);
+    let d = e[2];
+    let mut v = vec![0.0f64; n];
+    for (i, x) in v.iter_mut().enumerate() {
+        let p = [(i % w) as i32, ((i / w) % h) as i32, (i / (w * h)) as i32];
+        if margin > 0 && (0..3).any(|k| p[k] < margin || p[k] >= e[k] - margin) {
+            *x = 0.0;
+            continue;
+        }
+        let high = match shape {
+            // two slabs along z with a thin low band between them
+            0 => p[2] < d / 2 - 2 || p[2] >= d / 2 + 2,
+            // one block
+            1 => (0..3).all(|k| p[k] >= e[k] / 4 && p[k] < e[k] - e[k] / 4),
+            // three slabs
+            2 => (p[2] % 10) < 7,
+            // cells of 6 voxels, high or low at random
+            _ => {
+                let c = p.map(|v| (v / 6) as u64);
+                ((c[0] * 73_856_093) ^ (c[1] * 19_349_663) ^ (c[2] * 83_492_791) ^ salt) % 3 != 0
+            }
+        };
+        *x = if high {
+            hi + g.int(-sp_hi, sp_hi) as f64
+        } else {
+            lo + g.int(-sp_lo, sp_lo) as f64
+        };
+    }
+    let mut vals: Vec<String> = v.iter().map(|&x| token(ty, x)).collect();
+    if ty == MRI_FLOAT && !big && g.chance(10) {
+        let k = g.below(n as u64) as usize;
+        vals[k] = fx(g.pick(&[f32::NAN, f32::INFINITY, 1e30]));
+    }
+    t.extend(e.map(|x| x.to_string()));
+    t.push(ty.to_string());
+    t.push("1".into());
+    for _ in 0..3 {
+        t.push(fx(1.0));
+    }
+    t.extend(rle(&vals));
+    let thick = if big {
+        g.pick(&[2.0f32, 2.0, 2.0, 1.5, 3.0, 1.0])
+    } else if g.chance(6) {
+        g.pick(&[0.0f32, f32::NAN, -1.0, 100.0, -0.0, f32::INFINITY])
+    } else {
+        g.pick(&[1.0f32, 2.0, 0.5, 1.5, 0.25])
+    };
+    t.push(fx(thick));
+    (e, ty)
+}
+
+fn hsc_hsl_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let (e, ty) = snr_case_vol(g, t);
+    if cmd == "hsc" {
+        opt_ctrl(g, t, e, 4);
+    } else {
+        dst_mode(g, t, e, ty, MRI_UCHAR);
+        t.push(fx(g.pick(&[0.0f32, 2.0, 4.0, 8.0])));
+        t.push(fx(g.pick(&[110.0f32, 110.0, 100.0, 0.0])));
+        pts(g, t, e);
+    }
+}
+
 pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
     match cmd {
         "spl" => spl_case(g, t),
@@ -735,6 +821,7 @@ pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
         "ufc" => ufc_case(g, t),
         "nrm" => nrm_case(g, t),
         "nfcp" | "n3d" => nfcp_n3d_case(g, t, cmd),
+        "hsc" | "hsl" => hsc_hsl_case(g, t, cmd),
         c => panic!("unknown command {c}"),
     }
 }
@@ -1319,7 +1406,50 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
             }
             full(o, Some(&src));
         }
-        "nrmf" | "n3df" => {
+        "hsc" => {
+            let mut src = get_vol(cx, t)?;
+            src.thick = t.f();
+            let mut ctrl = opt(cx, t)?;
+            let env = Environment::default();
+            let r = nz::mri_norm_find_high_signal_low_std_control_points(
+                &mut cx.g,
+                &mut cx.a,
+                &mut cx.b,
+                &env,
+                None,
+                &src,
+                ctrl.as_mut(),
+            )?;
+            result(o, r, ctrl.as_ref());
+        }
+        "hsl" => {
+            let mut src = get_vol(cx, t)?;
+            src.thick = t.f();
+            let mode = t.i();
+            let mut norm = if mode == 1 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (sg, wm) = (t.f(), t.f());
+            set_pts(cx, t, &mut st, &mut src)?;
+            let env = Environment::default();
+            let d = match (mode, norm.as_mut()) {
+                (2, _) => nz::Dst::Same,
+                (_, Some(n)) => nz::Dst::Given(n),
+                _ => nz::Dst::New,
+            };
+            let r = nz::mri_normalize_high_signal_low_std(
+                &mut cx.g, &mut cx.a, &mut cx.b, &env, None, &mut st, &mut src, d, sg, wm,
+            )?;
+            if mode == 2 {
+                same_result(o, r, &src);
+            } else {
+                result(o, r, norm.as_ref());
+            }
+            full(o, Some(&src));
+        }
+        "nrmf" | "n3df" | "hslf" => {
             let path = t.next();
             let env = Environment::default();
             let mut src = mri_read(
@@ -1341,6 +1471,21 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                 let mut mni = nz::Mni::default();
                 nz::mri_norm_init(g, a, b, &env, &src, &mut mni, 0, 0, 0, 0, 0.0)?;
                 nz::mri_normalize(g, a, b, &env, Pair::New(&src), Some(&mut mni))?.into_new()
+            } else if cmd == "hslf" {
+                let sg = t.f();
+                nz::mri_normalize_high_signal_low_std(
+                    g,
+                    a,
+                    b,
+                    &env,
+                    None,
+                    &mut st,
+                    &mut src,
+                    nz::Dst::New,
+                    sg,
+                    110.0,
+                )?
+                .into_new()
             } else {
                 let (ab, be) = (t.f(), t.f());
                 let pr = t.i();
@@ -1367,7 +1512,7 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                 )?;
                 None
             };
-            if cmd == "nrmf" && made.is_none() {
+            if cmd != "n3df" && made.is_none() {
                 *o += "NULL ";
                 return Ok(true);
             }

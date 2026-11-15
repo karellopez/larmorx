@@ -231,7 +231,7 @@ impl Deflate {
             ins_h: 0,
             hash_bits,
             hash_mask: hash_size - 1,
-            hash_shift: (hash_bits + MIN_MATCH - 1) / MIN_MATCH,
+            hash_shift: hash_bits.div_ceil(MIN_MATCH),
             block_start: 0,
             match_length: 0,
             prev_match: 0,

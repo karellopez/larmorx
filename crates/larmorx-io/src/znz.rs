@@ -1137,7 +1137,7 @@ impl GzFile {
                 zl::DEF_MEM_LEVEL,
                 self.strategy,
             ) {
-                Ok(d) => self.deflate = Some(d),
+                Ok(d) => self.deflate = Some(d.with_upstream_defects(self.notices.mode())),
                 Err(_) => {
                     self.error(zl::Z_MEM_ERROR);
                     return Err(());
@@ -1437,6 +1437,10 @@ impl GzFile {
                 }
                 if self.comp(zl::Z_FINISH, None).is_err() {
                     ret = self.err;
+                }
+                if let Some(d) = &self.deflate {
+                    // the compressor's own defects (FS-811 after a change of level)
+                    self.notices.extend(d.notices.as_slice().iter().cloned());
                 }
                 if self.file.flush().is_err() {
                     ret = Z_ERRNO;

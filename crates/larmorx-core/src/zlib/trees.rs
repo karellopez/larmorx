@@ -345,14 +345,14 @@ impl Heap {
         let mut max_code: i32 = -1;
         self.heap_len = 0;
         self.heap_max = HEAP_SIZE as i32;
-        for n in 0..elems {
-            if tree[n].fc != 0 {
+        for (n, t) in tree.iter_mut().enumerate().take(elems) {
+            if t.fc != 0 {
                 self.heap_len += 1;
                 self.heap[self.heap_len as usize] = n as i32;
                 max_code = n as i32;
                 self.depth[n] = 0;
             } else {
-                tree[n].dl = 0;
+                t.dl = 0;
             }
         }
         while self.heap_len < 2 {

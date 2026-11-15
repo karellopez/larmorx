@@ -764,7 +764,8 @@ fn snr_case_vol(g: &mut Gen, t: &mut Vec<String>) -> ([i32; 3], i32) {
             // cells of 6 voxels, high or low at random
             _ => {
                 let c = p.map(|v| (v / 6) as u64);
-                ((c[0] * 73_856_093) ^ (c[1] * 19_349_663) ^ (c[2] * 83_492_791) ^ salt) % 3 != 0
+                !((c[0] * 73_856_093) ^ (c[1] * 19_349_663) ^ (c[2] * 83_492_791) ^ salt)
+                    .is_multiple_of(3)
             }
         };
         *x = if high {

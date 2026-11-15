@@ -164,30 +164,83 @@ fn long_kernel(g: &mut Globals, what: &str, len: usize) {
 /// The convolution of a frame `a` (`[z][y][x]` of `w h d`) with `k` along `axis`, each tap's
 /// voxel the nearest of the axis (the index tables), as `total + v k[i]` from tap 0 (the official
 /// build multiplies the voxel by the weight and adds the product to the sum: the NaNs' bits).
+///
+/// Each output's sum is computed tap by tap in that order for a whole row of outputs at once
+/// (plain `float` arithmetic, which gives the same numbers: no operation is fused or reordered);
+/// an output that ends as a NaN is computed again one operation at a time for its bits.
 fn convolve_plane(a: &[f32], (w, h, d): (i32, i32, i32), k: &[f32], axis: i32) -> Vec<f32> {
     let n = count(w, h, d);
     let mut o = vec![0.0f32; n];
+    if n == 0 || k.is_empty() {
+        return o;
+    }
     let halflen = (k.len() / 2) as i32;
-    let (wu, hu) = (w as usize, h as usize);
-    for z in 0..d {
-        for y in 0..h {
-            let row = (z as usize * hu + y as usize) * wu;
-            for x in 0..w {
-                let mut total = 0.0f32;
-                for (i, &ki) in k.iter().enumerate() {
-                    let j = i as i32 - halflen;
-                    let idx = match axis {
-                        MRI_WIDTH => row + clamp_index(x + j, w) as usize,
-                        MRI_HEIGHT => {
-                            (z as usize * hu + clamp_index(y + j, h) as usize) * wu + x as usize
-                        }
-                        _ => (clamp_index(z + j, d) as usize * hu + y as usize) * wu + x as usize,
-                    };
-                    total = add(total, mul(a[idx], ki));
+    let (wu, hu, du) = (w as usize, h as usize, d as usize);
+    match axis {
+        MRI_WIDTH => {
+            // the row with its clamped taps beyond each end
+            let mut pad = vec![0.0f32; wu + k.len() - 1];
+            for (r, out) in o.chunks_exact_mut(wu).enumerate() {
+                let row = &a[r * wu..(r + 1) * wu];
+                for (p, v) in pad.iter_mut().enumerate() {
+                    *v = row[clamp_index(p as i32 - halflen, w) as usize];
                 }
-                o[row + x as usize] = total;
+                for (i, &ki) in k.iter().enumerate() {
+                    for (t, &v) in out.iter_mut().zip(&pad[i..i + wu]) {
+                        *t += v * ki;
+                    }
+                }
             }
         }
+        MRI_HEIGHT => {
+            for z in 0..du {
+                for y in 0..hu {
+                    let out = &mut o[(z * hu + y) * wu..(z * hu + y + 1) * wu];
+                    for (i, &ki) in k.iter().enumerate() {
+                        let yi = clamp_index(y as i32 + i as i32 - halflen, h) as usize;
+                        let src = &a[(z * hu + yi) * wu..(z * hu + yi + 1) * wu];
+                        for (t, &v) in out.iter_mut().zip(src) {
+                            *t += v * ki;
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            let plane = hu * wu;
+            for z in 0..du {
+                let out = &mut o[z * plane..(z + 1) * plane];
+                for (i, &ki) in k.iter().enumerate() {
+                    let zi = clamp_index(z as i32 + i as i32 - halflen, d) as usize;
+                    let src = &a[zi * plane..(zi + 1) * plane];
+                    for (t, &v) in out.iter_mut().zip(src) {
+                        *t += v * ki;
+                    }
+                }
+            }
+        }
+    }
+    for (p, t) in o.iter_mut().enumerate() {
+        if !t.is_nan() {
+            continue;
+        }
+        let (x, y, z) = (
+            (p % wu) as i32,
+            ((p / wu) % hu) as i32,
+            (p / (wu * hu)) as i32,
+        );
+        let row = (z as usize * hu + y as usize) * wu;
+        let mut total = 0.0f32;
+        for (i, &ki) in k.iter().enumerate() {
+            let j = i as i32 - halflen;
+            let idx = match axis {
+                MRI_WIDTH => row + clamp_index(x + j, w) as usize,
+                MRI_HEIGHT => (z as usize * hu + clamp_index(y + j, h) as usize) * wu + x as usize,
+                _ => (clamp_index(z + j, d) as usize * hu + y as usize) * wu + x as usize,
+            };
+            total = add(total, mul(a[idx], ki));
+        }
+        *t = total;
     }
     o
 }

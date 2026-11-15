@@ -449,7 +449,91 @@ pub fn mri_build_voronoi_diagram(
             marked[ec.at(x, y, z)]
         }
     };
-    loop {
+    // the growth step by step from its frontier: the same marks and values as the full scans
+    // below (marks only go from CONTROL_NONE to CONTROL_TMP while the neighbours are marked, and
+    // each frontier voxel's mean reads only CONTROL_MARKED voxels, which no step writes)
+    let frontier_ok = ctrl.mtype == MRI_UCHAR
+        && (ec.w, ec.h, ec.d) == (e.w, e.h, e.d)
+        && matches!(ver, Ver::Uchar | Ver::Float);
+    if frontier_ok {
+        let mut frontier: Vec<usize> = Vec::new();
+        let mut tmp0: Vec<usize> = Vec::new();
+        for (p, &m) in marked.iter().enumerate() {
+            if m == CONTROL_NBR {
+                frontier.push(p);
+            } else if m == CONTROL_TMP {
+                tmp0.push(p);
+            }
+        }
+        let coords = |p: usize| -> (i32, i32, i32) {
+            (
+                (p % ec.w) as i32,
+                ((p / ec.w) % ec.h) as i32,
+                (p / (ec.w * ec.h)) as i32,
+            )
+        };
+        loop {
+            let mut nchanged = 0i32;
+            let mut next: Vec<usize> = Vec::new();
+            for &p in &frontier {
+                let (x, y, z) = coords(p);
+                for zk in -1..=1 {
+                    let zi = tc.zi(z + zk);
+                    for yk in -1..=1 {
+                        let yi = tc.yi(y + yk);
+                        for xk in -1..=1 {
+                            let j = ec.at(tc.xi(x + xk), yi, zi);
+                            if marked[j] == CONTROL_NONE {
+                                marked[j] = CONTROL_TMP;
+                                next.push(j);
+                            }
+                        }
+                    }
+                }
+            }
+            for &p in &frontier {
+                marked[p] = CONTROL_MARKED;
+            }
+            next.append(&mut tmp0);
+            for &p in &next {
+                marked[p] = CONTROL_NBR;
+            }
+            frontier = next;
+            for &p in &frontier {
+                let (x, y, z) = coords(p);
+                let mut mean = 0.0f32;
+                let mut n = 0i32;
+                for zk in -1..=1 {
+                    let zi = t.zi(z + zk);
+                    for yk in -1..=1 {
+                        let yi = t.yi(y + yk);
+                        for xk in -1..=1 {
+                            let xi = t.xi(x + xk);
+                            if marked[ec.at(xi, yi, zi)] == CONTROL_MARKED {
+                                n += 1;
+                                mean = add(mean, dv[ed.at(xi, yi, zi)]);
+                            }
+                        }
+                    }
+                }
+                if n > 0 {
+                    let q = div(mean, n as f32);
+                    dv[ed.at(x, y, z)] = match ver {
+                        Ver::Uchar => f32::from(to_byte(g, q, what)),
+                        _ => q,
+                    };
+                    nchanged += 1;
+                }
+            }
+            total = total.wrapping_sub(nchanged);
+            if !(nchanged > 0 && total > 0) {
+                break;
+            }
+        }
+    }
+    // otherwise the full scans of every step (the loop ends with its own `break`)
+    #[allow(clippy::while_immutable_condition)]
+    while !frontier_ok {
         let mut nchanged = 0i32;
         mark_unmarked(&mut marked, ec, &tc, CONTROL_NBR, CONTROL_TMP);
         replace(&mut marked, CONTROL_NBR, CONTROL_MARKED);

@@ -4096,6 +4096,67 @@ void flr_case()
       out += t;
     }
     oi(s->status); of(s->total_area); of(s->orig_area); od(s->radius);
+  } else if (op == "ann") {
+    // relay 36 of track D: a recorded annotation read into its white surface
+    // (MRISreadAnnotation), written as an annotation file, a segmentation (.mgz) and GIFTI
+    // (MRISwriteAnnotation) into the work folder and read back; each status, the annotations'
+    // and the colour table's FNV-1a, each written file's (a .gii one's after gii_normal)
+    MRIS *s = MRISread(next());
+    std::string af = next();
+    if (!s) fail("cannot read the inputs");
+    mkdir(workdir.c_str(), 0700);
+    clear_dir(workdir, true);
+    if (chdir(workdir.c_str()) != 0) fail("chdir");
+    auto fnv = [](const std::string &b) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : b) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    auto ann_fnv = [&]() {
+      std::string b;
+      for (int v = 0; v < s->nvertices; v++) b.append((const char *)&s->vertices[v].annotation, 4);
+      fnv(b);
+      std::string c;
+      if (s->ct) {
+        for (int k = 0; k < s->ct->nentries; k++) {
+          CTE *e = s->ct->entries[k];
+          if (!e) { c += "-"; continue; }
+          c += e->name;
+          c.append((const char *)&e->ri, 16);
+        }
+      }
+      fnv(c);
+    };
+    auto slurp = [](const std::string &n) {
+      std::string b;
+      if (FILE *fp = fopen(n.c_str(), "rb")) {
+        char buf[65536];
+        size_t k;
+        while ((k = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, k);
+        fclose(fp);
+      }
+      return b;
+    };
+    oi(MRISreadAnnotation(s, af.c_str()));
+    ann_fnv();
+    for (const char *nm : {"./a.annot", "./s.mgz", "./g.gii"}) oi(MRISwriteAnnotation(s, nm));
+    std::vector<std::string> files;
+    list_files(".", "", files);
+    std::sort(files.begin(), files.end());
+    for (const std::string &n : files) {
+      oh(n.c_str());
+      std::string b = slurp(n);
+      bool gii = n.size() >= 4 && n.compare(n.size() - 4, 4, ".gii") == 0;
+      fnv(gii ? gii_normal(b) : b);
+    }
+    oi(slurp("a.annot") == slurp(af));
+    for (const std::string &n : files) {
+      for (int v = 0; v < s->nvertices; v++) s->vertices[v].annotation = 0;
+      oi(MRISreadAnnotation(s, ("./" + n).c_str()));
+      ann_fnv();
+    }
   } else fail("flr op");
 }
 
@@ -4558,6 +4619,111 @@ void vps_case()
   oi(m->status); of(m->total_area); of(m->orig_area); od(m->radius); oi(m->nvertices); oi(m->nfaces);
 }
 
+// ---- relay 36 of track D: ann, the annotation files (queue items 3.1-47/48) -------------------
+
+// a colour table from the case (gwr's form), or NULL
+COLOR_TABLE *ann_ctab()
+{
+  int nct = geti();
+  if (nct < 0) return NULL;
+  COLOR_TABLE *ctab = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+  ctab->nentries = nct;
+  ctab->version = 2;
+  ctab->entries = (COLOR_TABLE_ENTRY **)calloc(nct + 1, sizeof(COLOR_TABLE_ENTRY *));
+  strcpy(ctab->fname, "user.ctab");
+  for (int k = 0; k < nct; k++) {
+    if (!geti()) continue;
+    CTE *e = (CTE *)calloc(1, sizeof(CTE));
+    std::string name = geth();
+    strncpy(e->name, name.c_str(), sizeof(e->name) - 1);
+    e->ri = geti(); e->gi = geti(); e->bi = geti(); e->ai = geti();
+    e->rf = e->ri / 255.0f; e->gf = e->gi / 255.0f; e->bf = e->bi / 255.0f; e->af = e->ai / 255.0f;
+    ctab->entries[k] = e;
+  }
+  return ctab;
+}
+
+void ann_dump_ctab(const COLOR_TABLE *ct)
+{
+  if (!ct) { out += "NULL "; return; }
+  oi(ct->nentries);
+  oh(ct->fname);
+  for (int k = 0; k < ct->nentries; k++) {
+    CTE *e = ct->entries[k];
+    if (!e) { out += "- "; continue; }
+    oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+  }
+}
+
+// ann: Gdiag's bits (1 show, 2 verbose), the environment (1 FS_POSIX, 2 FS_GII=.gii; always the
+// creation time's replacement, SURFER_SIDEDOOR and USER=U), the input files, a surface from
+// MRISalloc (its vertices, hemisphere, name; per vertex its annotation and ripflag), the surface's
+// colour table and the caller's (or none), then 1 to 4 of MRISwriteAnnotation (`w`: a name,
+// writect) and MRISreadAnnotation (`r`: a name, the GIFTI data array, the caller's table or NULL),
+// each status; then the annotations, the surface's colour table and the folder's files
+void ann_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("s", 0700);
+  mkdir("s/surf", 0700);
+  mkdir("s/label", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int envs = geti();
+  if (envs & 1) setenv("FS_POSIX", "1", 1);
+  if (envs & 2) setenv("FS_GII", ".gii", 1);
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "probe date", 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  setenv("USER", "U", 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti();
+  MRIS *m = MRISalloc(nv, 0);
+  m->hemisphere = geti();
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    m->vertices[vno].annotation = geti();
+    m->vertices[vno].ripflag = geti();
+  }
+  m->ct = ann_ctab();
+  COLOR_TABLE *user = ann_ctab();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    const char *nm = name_tok();
+    if (op == "w") {
+      int writect = geti();
+      oi(MRISwriteAnnotation(m, nm, writect != 0));
+    } else if (op == "r") {
+      int danum = geti();
+      int usect = geti();
+      oi(MRISreadAnnotation(m, nm, danum, usect ? user : NULL));
+    } else fail("ann op");
+    fflush(stdout);
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) oi(m->vertices[vno].annotation);
+  ann_dump_ctab(m->ct);
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) dump_crv_file(name);
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -4808,6 +4974,8 @@ void run_case()
     pvw_case();
   } else if (cmd == "vps") {
     vps_case();
+  } else if (cmd == "ann") {
+    ann_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

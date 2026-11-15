@@ -422,6 +422,10 @@ pub struct SurfGlobals {
     /// `MRIcomputeLaminarVolumeFractions`' `static MRI *mri_interior_wm`
     /// (`mrisurf_metricProperties.cpp` line 13135): the first call's white interior (FS-613).
     pub laminar_wm: Option<larmorx_freesurfer_mri::mri::Mri>,
+    /// `annotation.cpp`'s process-wide annotation table (`atable`, `num_entries`,
+    /// `annotation_table_file`), as the surface library's annotation functions use it (`annot`'s
+    /// `MRISseg2annot` sets it, `MRISannot2seg` reads it; relay 36 of track D).
+    pub atable: larmorx_freesurfer_io::annotation::AnnotationTables,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -470,6 +474,7 @@ impl Default for SurfGlobals {
             sras_map: Default::default(),
             vox2sras: Default::default(),
             laminar_wm: None,
+            atable: Default::default(),
         }
     }
 }

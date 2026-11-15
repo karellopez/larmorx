@@ -70,8 +70,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # 33 of track D, 3.1-51's rest: the outside distance map's label reads beyond the label volume's
 # memory, FS-614; relay 36 of track D, the value files: a name of 1,023 bytes or more copied without
 # its end, FS-622; a volume whose voxel count overflows an int, FS-623; a volume format the port
-# does not read yet (DICOM), NP, the runner's mark for its placeholder message): counted, never
-# compared
+# does not read yet (DICOM), NP, the runner's mark for its placeholder message; a binary colour
+# table's entry count beyond the machine's memory, FS-191, whose outcome depends on the machine; a
+# caller's colour table FreeSurfer has freed used again, FS-625u, the runner's mark):
+# counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -121,6 +123,8 @@ SKIP: tuple[str, ...] = (
     "FS-622",
     "FS-623",
     "NP",
+    "FS-191",
+    "FS-625u",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port

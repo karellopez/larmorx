@@ -24,7 +24,7 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{Mri, mri_alloc};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_surf::{curvfile, mriflood, readwrite, sras, valfile, vpos};
+use larmorx_freesurfer_surf::{annot, curvfile, mriflood, readwrite, sras, valfile, vpos};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
 pub(super) const FRAMES: [[f32; 9]; 6] = [
@@ -890,6 +890,74 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             o.f(s.total_area);
             o.f(s.orig_area);
             o.d(s.radius);
+        }
+        "ann" => {
+            // relay 36 of track D: `fssurfio.cpp`'s `flr ann` (a recorded annotation read, written
+            // as an annotation file, a segmentation and GIFTI, read back)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let af = t.next().to_owned();
+            let td = tempfile::tempdir().expect("a work folder");
+            let dir = td.path();
+            let fnv = |b: &[u8], o: &mut Out| {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for &c in b {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let ann_fnv = |s: &Mris, o: &mut Out| {
+                let mut b = Vec::new();
+                for v in 0..s.nvertices.max(0) as usize {
+                    b.extend_from_slice(&s.vertex(v).annotation.to_le_bytes());
+                }
+                fnv(&b, o);
+                let mut c = Vec::new();
+                if let Some(ct) = &s.ct {
+                    for e in &ct.entries {
+                        let Some(e) = e else {
+                            c.push(b'-');
+                            continue;
+                        };
+                        c.extend_from_slice(&e.name);
+                        for x in [e.ri, e.gi, e.bi, e.ai] {
+                            c.extend_from_slice(&x.to_le_bytes());
+                        }
+                    }
+                }
+                fnv(&c, o);
+            };
+            let r = annot::read_annotation(g, sg, &mut io, None, &mut s, &af, -1, None)?;
+            o.i(i64::from(r));
+            ann_fnv(&s, o);
+            for nm in ["./a.annot", "./s.mgz", "./g.gii"] {
+                let r = annot::write_annotation(g, sg, &mut io, Some(dir), &mut s, nm, true)?;
+                o.i(i64::from(r));
+            }
+            let mut files = Vec::new();
+            list_files(dir, "", &mut files);
+            files.sort();
+            let slurp = |n: &str| std::fs::read(dir.join(n)).unwrap_or_default();
+            for n in &files {
+                o.h(Some(n.as_bytes()));
+                let b = slurp(n);
+                if n.ends_with(".gii") {
+                    fnv(&gii_normal(&b), o);
+                } else {
+                    fnv(&b, o);
+                }
+            }
+            o.i(i64::from(
+                slurp("a.annot") == std::fs::read(&af).unwrap_or_default(),
+            ));
+            for n in &files {
+                for v in 0..s.nvertices.max(0) as usize {
+                    s.vertex_mut(v).annotation = 0;
+                }
+                let nm = format!("./{n}");
+                let r = annot::read_annotation(g, sg, &mut io, Some(dir), &mut s, &nm, -1, None)?;
+                o.i(i64::from(r));
+                ann_fnv(&s, o);
+            }
         }
         _ => panic!("flr op {op}"),
     }

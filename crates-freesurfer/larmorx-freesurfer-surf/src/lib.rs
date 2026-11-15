@@ -77,6 +77,7 @@
 
 pub mod aaa;
 pub mod alloc;
+pub mod annot;
 pub mod base;
 pub mod basemisc;
 pub mod binarize;

@@ -1807,6 +1807,10 @@ defects! {
         "reading a surface's values (MRISreadValues) from a file name of 1,023 bytes or more: FreeSurfer's copy of the name has no end, so the volume format test reads memory past it (an undefined answer)";
     FS_623 = "FS-623", "FreeSurfer", true,
         "reading a surface's values from a volume (MRISreadValues) whose width x height x depth overflows a 32-bit int to the vertex count writes past the values (a crash or memory corruption)";
+    FS_624 = "FS-624", "FreeSurfer", true,
+        "reading a surface segmentation (an MGH or NIfTI file of one value per vertex) as an annotation (MRISreadAnnotation) maps its numbers through the first colour table the program used for that, not through the file's own, when an earlier one was used (a second segmentation with another colour table gets the first table's colours)";
+    FS_625 = "FS-625", "FreeSurfer", true,
+        "reading a surface segmentation as an annotation (MRISreadAnnotation of an MGH or NIfTI file) with a colour table given by the caller frees that table, so a later use of it (another read with it, or the surface's table when it came from it) reads freed memory: a crash or garbage";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

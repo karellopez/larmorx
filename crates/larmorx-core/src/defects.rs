@@ -2353,6 +2353,8 @@ defects! {
         "on Windows a header name whose directories are separated by backslashes, and data file names that start with a drive or a backslash, are taken as relative to the current directory: detached data files are not found";
     FS_774 = "FS-774", "MINC", true,
         "a compressed MINC file (.gz, .bz, .bz2, .Z, .z, .zip, or a missing name whose compressed file exists) is decompressed by running gunzip -c (or bunzip2 -c, zcat, pcat) through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
+    FS_775 = "FS-775", "FreeSurfer", true,
+        "a MINC image of type double cannot be read: the program ends with bad data type (exit status 1)";
     FS_776 = "FS-776", "netCDF", true,
         "a variable of a version 1 netCDF file whose data offset is 2 GiB or more is read at a negative offset: memory beside the reader's buffer, or an Invalid argument error";
     FS_777 = "FS-777", "netCDF", true,
@@ -2383,6 +2385,12 @@ defects! {
         "a MINC volume of 2^32 voxels or more counts its voxels in 32 bits: its data are allocated too small and read past their end";
     FS_790 = "FS-790", "MINC volume_io", true,
         "a MINC volume with a dimension of size 0 (a time dimension without records) is read into no data";
+    FS_791 = "FS-791", "MINC volume_io", true,
+        "a direction_cosines attribute of fewer than three values takes its missing values from the dimension read before it";
+    FS_793 = "FS-793", "netCDF", true,
+        "values of a netCDF file shorter than its header are read past its end as bytes of an earlier block of the reader's buffer where netCDF means zeros";
+    FS_792 = "FS-792", "MINC volume_io", true,
+        "a direction_cosines attribute of fewer than three values on the first dimension read with direction cosines takes its missing values from memory never written";
 }
 
 /// The register entry with ID `id`.

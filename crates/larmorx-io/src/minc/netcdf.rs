@@ -67,7 +67,24 @@ const MAX_ATT_BYTES: u64 = 1 << 28;
 /// `nc_strerror`.
 pub fn strerror(err: i32) -> String {
     if err > 0 {
-        return crate::xfm::files::strerror(err);
+        // glibc's texts (xfm's table holds the file errors).
+        let extra = match err {
+            3 => Some("No such process"),
+            7 => Some("Argument list too long"),
+            8 => Some("Exec format error"),
+            10 => Some("No child processes"),
+            15 => Some("Block device required"),
+            18 => Some("Invalid cross-device link"),
+            25 => Some("Inappropriate ioctl for device"),
+            29 => Some("Illegal seek"),
+            31 => Some("Too many links"),
+            32 => Some("Broken pipe"),
+            _ => None,
+        };
+        return match extra {
+            Some(s) => s.to_string(),
+            None => crate::xfm::files::strerror(err),
+        };
     }
     match err {
         0 => "No error",
@@ -122,7 +139,13 @@ pub fn type_size(ty: i32) -> usize {
 pub fn nctypelen(s: &mut Session, streams: &mut dyn Streams, ty: i32) -> Result<i32, Exit> {
     match type_size(ty) {
         0 => {
-            advise(s, streams, "nctypelen", NC_EBADTYPE, &format!("Unknown type {ty}"))?;
+            advise(
+                s,
+                streams,
+                "nctypelen",
+                NC_EBADTYPE,
+                &format!("Unknown type {ty}"),
+            )?;
             Ok(-1)
         }
         n => Ok(n as i32),
@@ -212,13 +235,151 @@ impl Source {
     }
 }
 
+/// posixio's buffer (`ncio_px`, `px_get`, `px_pgin`): two blocks of the file, filled by `read`
+/// and zeros past its end. Its state decides what a read past the end of a file gives: moving
+/// forward one block when the count of valid bytes ends in the first keeps the old first block
+/// under the new block's offset (bytes of an earlier block, FS-793), which `bytes` gives with
+/// `reproduce` and corrects (zeros) otherwise.
+pub(crate) struct Px {
+    pub(crate) source: Source,
+    pub(crate) blksz: u64,
+    len: u64,
+    bf_offset: Option<u64>,
+    bf_extent: u64,
+    bf_cnt: u64,
+    base: Vec<u8>,
+    /// Correct the reads past the end of the file (not `reproduce`).
+    pub(crate) fix: bool,
+    /// A read gave other bytes than the file's (zeros past its end) under `reproduce`, or would
+    /// have without it.
+    pub(crate) stale: bool,
+}
+
+impl Px {
+    fn new(source: Source, blksz: u64) -> Px {
+        let len = source.len();
+        Px {
+            source,
+            blksz,
+            len,
+            bf_offset: None,
+            bf_extent: 0,
+            bf_cnt: 0,
+            base: vec![0; 2 * blksz as usize],
+            fix: true,
+            stale: false,
+        }
+    }
+
+    /// `ncio_px_sync` of a file opened read-only: the buffer invalidated.
+    fn sync(&mut self) {
+        self.bf_offset = None;
+        self.bf_cnt = 0;
+    }
+
+    /// `px_pgin`: `extent` bytes at `offset` into the buffer at `at`; the count `read` gave.
+    fn pgin(&mut self, offset: u64, extent: u64, at: usize) -> Result<u64, i32> {
+        let buf = &mut self.base[at..at + extent as usize];
+        self.source.read_at(offset, buf)?;
+        Ok(self.len.saturating_sub(offset).min(extent))
+    }
+
+    /// `px_get`: the region's start in the buffer.
+    fn get(&mut self, offset: u64, extent: u64) -> Result<usize, i32> {
+        let b = self.blksz;
+        let blkoffset = offset - offset % b;
+        let mut diff = offset - blkoffset;
+        let blkextent = (diff + extent).div_ceil(b) * b;
+        if 2 * b < blkextent {
+            return Err(E2BIG);
+        }
+        'done: {
+            let Some(bo) = self.bf_offset else {
+                self.bf_cnt = self.pgin(blkoffset, blkextent, 0)?;
+                self.bf_offset = Some(blkoffset);
+                self.bf_extent = blkextent;
+                break 'done;
+            };
+            if blkoffset == bo {
+                if blkextent > self.bf_extent {
+                    self.bf_cnt = self.pgin(bo + b, b, b as usize)?;
+                    self.bf_extent = 2 * b;
+                    self.bf_cnt += b;
+                }
+                break 'done;
+            }
+            if self.bf_extent > b && blkoffset == bo + b {
+                if blkextent == b {
+                    diff += b;
+                    break 'done;
+                }
+                if self.bf_cnt > b {
+                    self.bf_cnt -= b;
+                    let n = self.bf_cnt as usize;
+                    self.base.copy_within(b as usize..b as usize + n, 0);
+                }
+                self.bf_offset = Some(blkoffset);
+                self.bf_cnt = self.pgin(blkoffset + b, b, b as usize)?;
+                self.bf_extent = 2 * b;
+                self.bf_cnt += b;
+                break 'done;
+            }
+            if blkoffset + b == bo {
+                let mut upper_cnt = 0;
+                if self.bf_cnt > b {
+                    self.bf_cnt = b;
+                    self.bf_extent = b;
+                }
+                if self.bf_cnt > 0 {
+                    self.base.copy_within(0..b as usize, b as usize);
+                    upper_cnt = self.bf_cnt;
+                }
+                self.bf_cnt = self.pgin(blkoffset, b, 0)?;
+                self.bf_offset = Some(blkoffset);
+                if upper_cnt != 0 {
+                    self.bf_extent = 2 * b;
+                    self.bf_cnt = b + upper_cnt;
+                } else {
+                    self.bf_extent = b;
+                }
+                break 'done;
+            }
+            self.bf_cnt = self.pgin(blkoffset, blkextent, 0)?;
+            self.bf_offset = Some(blkoffset);
+            self.bf_extent = blkextent;
+        }
+        if self.bf_cnt < extent + diff {
+            self.bf_cnt = extent + diff;
+        }
+        Ok(diff as usize)
+    }
+
+    /// The bytes at `offset..offset+extent` as `px_get` gives them (with `fix`, the file's own,
+    /// zeros past its end; a difference is noted in [`Px::stale`]).
+    pub(crate) fn bytes(&mut self, offset: u64, extent: u64) -> Result<Vec<u8>, i32> {
+        let d = self.get(offset, extent)?;
+        let mut v = self.base[d..d + extent as usize].to_vec();
+        if offset + extent > self.len {
+            let mut want = vec![0u8; extent as usize];
+            self.source.read_at(offset, &mut want)?;
+            if want != v {
+                self.stale = true;
+                if self.fix {
+                    v = want;
+                }
+            }
+        }
+        Ok(v)
+    }
+}
+
 /// An open netCDF file (`NC`).
 pub struct NcFile {
     pub ncid: i32,
     pub path: Vec<u8>,
-    pub(crate) source: Source,
-    /// posixio's block size: the file system's preferred size, at least 8192 (`blksize`).
-    pub(crate) blksz: u64,
+    /// posixio's buffer over the file; its block size is the file system's preferred size, at
+    /// least 8192 (`blksize`).
+    pub(crate) px: Px,
     pub version: u8,
     pub numrecs: u64,
     pub recsize: u64,
@@ -233,9 +394,8 @@ pub struct NcFile {
 /// `offset`, zero past the end of the file; a window spanning more than two blocks is refused
 /// (`E2BIG`).
 struct Stream<'a> {
-    src: &'a mut Source,
+    src: &'a mut Px,
     src_len: u64,
-    blksz: u64,
     offset: u64,
     extent: u64,
     buf: Vec<u8>,
@@ -251,14 +411,7 @@ impl Stream<'_> {
         if extent > self.extent {
             self.extent = extent;
         }
-        let blkoffset = self.offset - self.offset % self.blksz;
-        let diff = self.offset - blkoffset;
-        let blkextent = (diff + self.extent).div_ceil(self.blksz) * self.blksz;
-        if 2 * self.blksz < blkextent {
-            return Err(E2BIG);
-        }
-        self.buf = vec![0; self.extent as usize];
-        self.src.read_at(self.offset, &mut self.buf)?;
+        self.buf = self.src.bytes(self.offset, self.extent)?;
         self.pos = 0;
         self.have = true;
         Ok(())
@@ -351,11 +504,12 @@ fn get_atts(g: &mut Stream, version: u8, budget: &mut u64) -> Result<Vec<Att>, i
 
 /// `nc_get_NC` (with `NC_computeshapes`): the header, or netCDF's error.
 fn read_header(f: &mut NcFile) -> Result<(), i32> {
-    let src_len = f.source.len();
+    let src_len = f.px.len;
+    let blksz = f.px.blksz;
+    f.px.sync();
     let mut g = Stream {
-        src: &mut f.source,
+        src: &mut f.px,
         src_len,
-        blksz: f.blksz,
         offset: 0,
         extent: 0,
         buf: Vec::new(),
@@ -363,7 +517,7 @@ fn read_header(f: &mut NcFile) -> Result<(), i32> {
         have: false,
     };
     // The first window: the chunk (the block size), at most 4096 bytes.
-    g.fault(f.blksz.min(4096))?;
+    g.fault(blksz.min(4096))?;
     let magic = g.take(4).to_vec();
     if &magic[..3] != b"CDF" {
         return Err(NC_ENOTNC);
@@ -535,11 +689,7 @@ fn block_size(f: &std::fs::File) -> u64 {
 /// `nc_open` for reading: the file's header, or netCDF's error (a system error number or a
 /// netCDF code). `data` stands for the file's bytes when the caller has them (a decompressed
 /// file).
-pub(crate) fn nc_open(
-    s: &mut Session,
-    path: &[u8],
-    data: Option<Vec<u8>>,
-) -> Result<i32, i32> {
+pub(crate) fn nc_open(s: &mut Session, path: &[u8], data: Option<Vec<u8>>) -> Result<i32, i32> {
     if path.is_empty() {
         return Err(EINVAL);
     }
@@ -560,11 +710,12 @@ pub(crate) fn nc_open(
         }
     };
     let ncid = s.alloc_fd();
+    let mut px = Px::new(source, blksz);
+    px.fix = !s.reproduce;
     let mut f = NcFile {
         ncid,
         path: path.to_vec(),
-        source,
-        blksz,
+        px,
         version: 0,
         numrecs: 0,
         recsize: 0,
@@ -574,7 +725,10 @@ pub(crate) fn nc_open(
         negative_offset: false,
     };
     let r = read_header(&mut f);
-    if f.vars.iter().any(|v| v.len == X_UINT_MAX && v.xsz != 0 && v.dsizes.first() == Some(&0)) {
+    if f.vars
+        .iter()
+        .any(|v| v.len == X_UINT_MAX && v.xsz != 0 && v.dsizes.first() == Some(&0))
+    {
         s.pending.push((
             &d::FS_777,
             format!(
@@ -613,15 +767,27 @@ pub fn advise(
     err: i32,
     msg: &str,
 ) -> Result<(), Exit> {
+    advise_bytes(s, streams, routine, err, msg.as_bytes())
+}
+
+/// [`advise`] of a message holding names (bytes as C prints them).
+pub fn advise_bytes(
+    s: &mut Session,
+    streams: &mut dyn Streams,
+    routine: &str,
+    err: i32,
+    msg: &[u8],
+) -> Result<(), Exit> {
     s.ncerr = if err > 0 { NC_SYSERR } else { err };
     if s.ncopts & NC_VERBOSE != 0 {
-        let mut t = format!("{routine}: {msg}");
+        let mut t = format!("{routine}: ").into_bytes();
+        t.extend_from_slice(msg);
         if err != NC_NOERR {
-            t.push_str(": ");
-            t.push_str(&strerror(err));
+            t.extend_from_slice(b": ");
+            t.extend_from_slice(strerror(err).as_bytes());
         }
-        t.push('\n');
-        streams.err(&t);
+        t.push(b'\n');
+        streams.err_bytes(&t);
     }
     if s.ncopts & NC_FATAL != 0 && err != NC_NOERR {
         return Err(Exit { status: s.ncopts });
@@ -655,8 +821,10 @@ pub fn ncopen(
     match nc_open(s, path, data) {
         Ok(id) => Ok(id),
         Err(e) => {
-            let msg = format!("filename \"{}\"", String::from_utf8_lossy(path));
-            advise(s, streams, "ncopen", e, &msg)?;
+            let mut msg = b"filename \"".to_vec();
+            msg.extend_from_slice(cstr(path));
+            msg.push(b'"');
+            advise_bytes(s, streams, "ncopen", e, &msg)?;
             Ok(-1)
         }
     }
@@ -809,11 +977,10 @@ pub fn ncattinq(
     match lookup_att(s, ncid, varid, name) {
         Ok(a) => Ok(Some((a.ty, a.nelems as u32 as i32))),
         Err(e) => {
-            let msg = format!(
-                "ncid {ncid}; varid {varid}; attname \"{}\"",
-                String::from_utf8_lossy(name)
-            );
-            advise(s, streams, "ncattinq", e, &msg)?;
+            let mut msg = format!("ncid {ncid}; varid {varid}; attname \"").into_bytes();
+            msg.extend_from_slice(cstr(name));
+            msg.push(b'"');
+            advise_bytes(s, streams, "ncattinq", e, &msg)?;
             Ok(None)
         }
     }
@@ -975,10 +1142,75 @@ fn edge_check(v: &Var, start: &[u64], edges: &[u64]) -> Result<(), i32> {
     Ok(())
 }
 
-/// `nc_get_vara` in the variable's own type: the external bytes of the hyperslab in C order.
-/// netCDF reads it in contiguous runs (`NCiocount`, pieces of at most one block); the bytes are
-/// those of each element's offset (`NC_varoffset`), read here row by row with adjacent rows
-/// merged.
+/// `getNCvx_<type>_<type>`: `nelems` values at `start`, in pieces of at most one block.
+fn get_run(
+    f: &mut NcFile,
+    v: &Var,
+    start: &[u64],
+    nelems: u64,
+    out: &mut Vec<u8>,
+) -> Result<(), i32> {
+    if nelems == 0 {
+        return Ok(());
+    }
+    let mut offset = var_offset(f, v, start);
+    let mut remaining = v.xsz.wrapping_mul(nelems);
+    let chunk = f.px.blksz;
+    loop {
+        let extent = remaining.min(chunk);
+        if offset < 0 {
+            // A negative offset (a 32-bit begin of 2 GiB or more): netCDF reads memory beside
+            // its buffer or fails (FS-776); refused.
+            f.negative_offset = true;
+            return Err(EINVAL);
+        }
+        let b = f.px.bytes(offset as u64, extent)?;
+        out.extend_from_slice(&b);
+        remaining -= extent;
+        if remaining == 0 {
+            return Ok(());
+        }
+        offset += extent as i64;
+    }
+}
+
+/// `NCiocount`: the index of the dimension the odometer steps (`-1` for one run) and the run's
+/// length.
+fn iocount(f: &NcFile, v: &Var, edges: &[u64]) -> (i64, u64) {
+    let n = v.shape.len();
+    let mut edp0 = 0usize;
+    if v.is_recvar() {
+        if n == 1 && f.recsize <= v.len {
+            return (0, edges[0]);
+        }
+        edp0 = 1;
+    }
+    let mut edp = n;
+    while edp > edp0 {
+        edp -= 1;
+        if edges[edp] < v.shape[edp] {
+            let mut z = edp;
+            loop {
+                if edges[z] == 0 {
+                    return (edp as i64 - 1, 0);
+                }
+                if z == edp0 {
+                    break;
+                }
+                z -= 1;
+            }
+            break;
+        }
+    }
+    let mut count: u64 = 1;
+    for &e in &edges[edp..n] {
+        count = count.wrapping_mul(e);
+    }
+    (edp as i64 - 1, count)
+}
+
+/// `nc_get_vara` in the variable's own type: the external bytes of the hyperslab in C order,
+/// read in netCDF's runs.
 fn get_vara(f: &mut NcFile, varid: i32, start: &[u64], edges: &[u64]) -> Result<Vec<u8>, i32> {
     let vi = usize::try_from(varid)
         .ok()
@@ -993,67 +1225,40 @@ fn get_vara(f: &mut NcFile, varid: i32, start: &[u64], edges: &[u64]) -> Result<
     let edges = &edges[..n.min(edges.len())];
     coord_check(f, &v, start)?;
     edge_check(&v, start, edges)?;
-    if n > 0 && v.is_recvar() && start[0].wrapping_add(edges[0]) > f.numrecs {
-        return Err(NC_EEDGE);
-    }
-    // The runs: (offset, bytes).
-    let mut runs: Vec<(i64, u64)> = Vec::new();
-    let mut push = |off: i64, len: u64| {
-        if len == 0 {
-            return;
-        }
-        if let Some(last) = runs.last_mut()
-            && last.0.wrapping_add(last.1 as i64) == off
-        {
-            last.1 += len;
-            return;
-        }
-        runs.push((off, len));
-    };
+    let mut out = Vec::new();
     if n == 0 {
-        push(var_offset(f, &v, &[]), v.xsz);
-    } else if n == 1 && v.is_recvar() && f.recsize > v.len {
-        for k in 0..edges[0] {
-            push(var_offset(f, &v, &[start[0] + k]), v.xsz);
+        get_run(f, &v, start, 1, &mut out)?;
+        return Ok(out);
+    }
+    if v.is_recvar() {
+        if start[0].wrapping_add(edges[0]) > f.numrecs {
+            return Err(NC_EEDGE);
         }
-    } else if edges.iter().all(|&e| e > 0) {
-        let row = edges[n - 1].wrapping_mul(v.xsz);
-        let mut coord = start.to_vec();
-        loop {
-            push(var_offset(f, &v, &coord), row);
-            if n == 1 {
-                break;
-            }
-            let mut i = n - 2;
-            loop {
-                coord[i] += 1;
-                if coord[i] < start[i] + edges[i] {
-                    break;
-                }
-                coord[i] = start[i];
-                if i == 0 {
-                    coord[0] = start[0] + edges[0];
-                    break;
-                }
-                i -= 1;
-            }
-            if coord[0] >= start[0] + edges[0] {
-                break;
-            }
+        if n == 1 && f.recsize <= v.len {
+            get_run(f, &v, start, edges[0], &mut out)?;
+            return Ok(out);
         }
     }
-    let total: u64 = runs.iter().map(|r| r.1).sum();
-    let mut out = vec![0u8; total as usize];
-    let mut at = 0usize;
-    for (off, len) in runs {
-        if off < 0 {
-            // A negative offset (a 32-bit begin of 2 GiB or more): netCDF reads memory beside
-            // its buffer or fails (FS-776); refused.
-            f.negative_offset = true;
-            return Err(EINVAL);
+    let (ii, count) = iocount(f, &v, edges);
+    if ii == -1 {
+        get_run(f, &v, start, count, &mut out)?;
+        return Ok(out);
+    }
+    let index = ii as usize;
+    let mut coord = start.to_vec();
+    let upper: Vec<u64> = start.iter().zip(edges).map(|(s, e)| s + e).collect();
+    while coord[0] < upper[0] {
+        get_run(f, &v, &coord, count, &mut out)?;
+        // odo1
+        let mut k = index;
+        loop {
+            coord[k] += 1;
+            if k == 0 || coord[k] < upper[k] {
+                break;
+            }
+            coord[k] = start[k];
+            k -= 1;
         }
-        f.source.read_at(off as u64, &mut out[at..at + len as usize])?;
-        at += len as usize;
     }
     Ok(out)
 }
@@ -1083,6 +1288,21 @@ pub fn ncvarget(
         }
     };
     if let Some(f) = s.file_mut(ncid)
+        && f.px.stale
+    {
+        f.px.stale = false;
+        let p = String::from_utf8_lossy(&f.path).into_owned();
+        let fix = f.px.fix;
+        s.pending.push((
+            &d::FS_793,
+            if fix {
+                format!("{p}: values past the end of the file read as 0 (netCDF's buffer gives bytes of an earlier block)")
+            } else {
+                format!("{p}: values past the end of the file read from netCDF's buffer: bytes of an earlier block (reproduce)")
+            },
+        ));
+    }
+    if let Some(f) = s.file_mut(ncid)
         && f.negative_offset
     {
         f.negative_offset = false;
@@ -1095,9 +1315,14 @@ pub fn ncvarget(
     match r {
         Ok(v) => Ok(Some(v)),
         Err(e) => {
-            advise(s, streams, "ncvarget", e, &format!("ncid {ncid}; varid {varid}"))?;
+            advise(
+                s,
+                streams,
+                "ncvarget",
+                e,
+                &format!("ncid {ncid}; varid {varid}"),
+            )?;
             Ok(None)
         }
     }
 }
-

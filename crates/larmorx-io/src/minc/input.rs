@@ -63,6 +63,8 @@ pub struct MincFile {
     pub end_volume_flag: bool,
     pub n_slab_dims: usize,
     pub original_input_options: MincInputOptions,
+    /// The cache's own opening of the file (volume_io's volume cache).
+    pub cache_file: Option<Box<MincFile>>,
 }
 
 /// The input formats of `volume_input_struct`.
@@ -100,14 +102,18 @@ fn expand(c: &mut Ctx, name: &[u8]) -> Vec<u8> {
 
 /// `get_minc_file_n_dimensions`: the image's dimension count, or `-1` (and an error) when the
 /// file cannot be opened.
-pub fn get_minc_file_n_dimensions(s: &mut Session, c: &mut Ctx, filename: &[u8]) -> Result<i32, Exit> {
+pub fn get_minc_file_n_dimensions(
+    s: &mut Session,
+    c: &mut Ctx,
+    filename: &[u8],
+) -> Result<i32, Exit> {
     s.ncopts = nc::NC_VERBOSE;
     let expanded = expand(c, filename);
     let Some(cdfid) = mi::miopen(s, c, &expanded)? else {
-        c.dialect.print_error(
-            &format!("Error opening {}\n", String::from_utf8_lossy(&expanded)),
-            c.streams,
-        );
+        let mut m = b"Error opening ".to_vec();
+        m.extend_from_slice(nc::cstr(&expanded));
+        m.push(b'\n');
+        c.dialect.print_error_bytes(&m, c.streams);
         return Ok(-1);
     };
     let img_var = nc::ncvarid(s, c.streams, cdfid, b"image")?;
@@ -246,7 +252,14 @@ pub fn start_volume_input(
     if status != Status::Ok && create_volume_flag {
         *volume = None;
     }
-    Ok((status, if status == Status::Ok { Some(input) } else { None }))
+    Ok((
+        status,
+        if status == Status::Ok {
+            Some(input)
+        } else {
+            None
+        },
+    ))
 }
 
 /// `initialize_minc_input`.
@@ -260,13 +273,10 @@ pub fn initialize_minc_input(
     s.ncopts = 0;
     let expanded = expand(c, filename);
     let Some(minc_id) = mi::miopen(s, c, &expanded)? else {
-        c.dialect.print_error(
-            &format!(
-                "Error: opening MINC file \"{}\".\n",
-                String::from_utf8_lossy(&expanded)
-            ),
-            c.streams,
-        );
+        let mut m = b"Error: opening MINC file \"".to_vec();
+        m.extend_from_slice(nc::cstr(&expanded));
+        m.extend_from_slice(b"\".\n");
+        c.dialect.print_error_bytes(&m, c.streams);
         return Ok(None);
     };
     match initialize_from_id(s, c, minc_id, volume, options)? {
@@ -421,13 +431,19 @@ fn initialize_from_id(
         p("Error:  dimension names did not match: \n", c);
         p("\n", c);
         p("Requested:\n", c);
+        let line = |k: usize, n: &[u8], c: &mut Ctx| {
+            let mut m = format!("{}: ", k + 1).into_bytes();
+            m.extend_from_slice(nc::cstr(n));
+            m.push(b'\n');
+            c.dialect.print_error_bytes(&m, c.streams);
+        };
         for (k, n) in volume.dimension_names.iter().enumerate() {
-            p(&format!("{}: {}\n", k + 1, String::from_utf8_lossy(n)), c);
+            line(k, n, c);
         }
         p("\n", c);
         p("In File:\n", c);
         for (k, n) in dim_names.iter().enumerate() {
-            p(&format!("{}: {}\n", k + 1, String::from_utf8_lossy(n)), c);
+            line(k, n, c);
         }
         return Ok(None);
     };
@@ -461,6 +477,7 @@ fn initialize_from_id(
     let mut irr_starts: Vec<Option<Vec<f64>>> = vec![None; n_file];
     let mut irr_widths: Vec<Option<Vec<f64>>> = vec![None; n_file];
     let mut prev_space: Vec<u8> = Vec::new();
+    let mut tmp_cos: [Option<f64>; 3] = [None; 3];
     let mut consensus = true;
     let mut vol_sizes = volume.sizes.clone();
     let mut vol_seps = volume.separations.clone();
@@ -477,14 +494,59 @@ fn initialize_from_id(
                 if mi::miattget1(s, c, cdfid, dimvar, b"start", &mut start_pos[dd])?.is_none() {
                     start_pos[dd] = 0.0;
                 }
-                let mut t = [0.0f64; 3];
-                if mi::miattget(s, c, cdfid, dimvar, b"direction_cosines", 3, &mut t)?.is_some() {
-                    dircos[dd] = t;
+                // volume_io reads every dimension's cosines into one buffer: an attribute of
+                // fewer than three values keeps the earlier dimensions' values (FS-791).
+                let mut t = [
+                    tmp_cos[0].unwrap_or(0.0),
+                    tmp_cos[1].unwrap_or(0.0),
+                    tmp_cos[2].unwrap_or(0.0),
+                ];
+                if let Some(len) =
+                    mi::miattget(s, c, cdfid, dimvar, b"direction_cosines", 3, &mut t)?
+                {
+                    let written = (len.max(0) as usize).min(3);
+                    for k in 0..written {
+                        tmp_cos[k] = Some(t[k]);
+                    }
+                    if written < 3 {
+                        let name = String::from_utf8_lossy(&dim_names[dd]).into_owned();
+                        if c.notices.reproduce() {
+                            if tmp_cos.iter().any(|x| x.is_none()) {
+                                c.notices.add(
+                                    &d::FS_792,
+                                    format!("the {len} direction cosines of {name}: the rest is memory never written (read as 0)"),
+                                );
+                            } else {
+                                c.notices.add(
+                                    &d::FS_791,
+                                    format!("the {len} direction cosines of {name}: the rest from the dimension read before (reproduce)"),
+                                );
+                            }
+                            dircos[dd] = [
+                                tmp_cos[0].unwrap_or(0.0),
+                                tmp_cos[1].unwrap_or(0.0),
+                                tmp_cos[2].unwrap_or(0.0),
+                            ];
+                        } else {
+                            c.notices.add(
+                                &d::FS_791,
+                                format!("the {len} direction cosines of {name} read as none (volume_io keeps the rest from the dimension read before)"),
+                            );
+                        }
+                    } else {
+                        dircos[dd] = t;
+                    }
                 }
                 let mut buf = Vec::new();
-                if let Some(sp) =
-                    mi::miattgetstr(s, c, cdfid, dimvar, b"spacetype", MI_MAX_ATTSTR_LEN + 1, &mut buf)?
-                {
+                if let Some(sp) = mi::miattgetstr(
+                    s,
+                    c,
+                    cdfid,
+                    dimvar,
+                    b"spacetype",
+                    MI_MAX_ATTSTR_LEN + 1,
+                    &mut buf,
+                )? {
                     if !prev_space.is_empty() && !sp.is_empty() && prev_space != sp {
                         consensus = false;
                     }
@@ -494,8 +556,15 @@ fn initialize_from_id(
                 }
             } else if dim_names[dd] == b"time" {
                 let mut buf = Vec::new();
-                let spacing =
-                    mi::miattgetstr(s, c, cdfid, dimvar, b"spacing", MI_MAX_ATTSTR_LEN + 1, &mut buf)?;
+                let spacing = mi::miattgetstr(
+                    s,
+                    c,
+                    cdfid,
+                    dimvar,
+                    b"spacing",
+                    MI_MAX_ATTSTR_LEN + 1,
+                    &mut buf,
+                )?;
                 let irregular = match &spacing {
                     Some(sp) => sp == b"irregular",
                     None => {
@@ -510,16 +579,36 @@ fn initialize_from_id(
                     let n = sizes_in_file[dd];
                     let st = [0i64];
                     let ct = [n];
-                    let starts = mi::mivarget(s, c, cdfid, dimvar, &st, &ct, nc::NC_DOUBLE, Some(mi::MI_SIGNED))?;
+                    let starts = mi::mivarget(
+                        s,
+                        c,
+                        cdfid,
+                        dimvar,
+                        &st,
+                        &ct,
+                        nc::NC_DOUBLE,
+                        Some(mi::MI_SIGNED),
+                    )?;
                     irr_starts[dd] = Some(typed_to_vec(starts, n));
                     let wvar = nc::ncvarid(s, c.streams, cdfid, b"time-width")?;
                     if wvar < 0 {
                         irr_widths[dd] = Some(vec![file_sep[dd]; n.max(0) as usize]);
                     } else {
-                        let w = mi::mivarget(s, c, cdfid, wvar, &st, &ct, nc::NC_DOUBLE, Some(mi::MI_SIGNED))?;
+                        let w = mi::mivarget(
+                            s,
+                            c,
+                            cdfid,
+                            wvar,
+                            &st,
+                            &ct,
+                            nc::NC_DOUBLE,
+                            Some(mi::MI_SIGNED),
+                        )?;
                         irr_widths[dd] = Some(typed_to_vec(w, n));
                     }
-                } else if mi::miattget1(s, c, cdfid, dimvar, b"start", &mut start_pos[dd])?.is_none() {
+                } else if mi::miattget1(s, c, cdfid, dimvar, b"start", &mut start_pos[dd])?
+                    .is_none()
+                {
                     start_pos[dd] = 0.0;
                 }
             }
@@ -553,14 +642,37 @@ fn initialize_from_id(
     let (converted_type, converted_sign);
     if no_volume_type {
         let mut buf = Vec::new();
-        let st = mi::miattgetstr(s, c, cdfid, img_var, b"signtype", MI_MAX_ATTSTR_LEN, &mut buf)?;
+        let st = mi::miattgetstr(
+            s,
+            c,
+            cdfid,
+            img_var,
+            b"signtype",
+            MI_MAX_ATTSTR_LEN,
+            &mut buf,
+        )?;
         converted_sign = match st {
             Some(v) => v == mi::MI_SIGNED,
             None => file_datatype != NC_BYTE,
         };
         converted_type = file_datatype;
-        if let Some(e) = volume.set_type(converted_type, converted_sign, 0.0, 0.0, c.dialect, c.streams) {
+        if let Some(e) = volume.set_type(
+            converted_type,
+            converted_sign,
+            0.0,
+            0.0,
+            c.dialect,
+            c.streams,
+        ) {
             return Err(e);
+        }
+        if volume.data_type == volume::DataType::None && c.notices.reproduce() {
+            c.notices.add(
+                &d::FS_781,
+                format!(
+                    "an image of type {converted_type}: the volume's data type is a value never written, read as none (reproduce)"
+                ),
+            );
         }
         if volume.data_type == volume::DataType::None && !c.notices.reproduce() {
             c.notices.add(
@@ -605,7 +717,11 @@ fn initialize_from_id(
         s,
         c,
         icvid,
-        if converted_sign { mi::MI_SIGNED } else { mi::MI_UNSIGNED },
+        if converted_sign {
+            mi::MI_SIGNED
+        } else {
+            mi::MI_UNSIGNED
+        },
     )?;
     icv::miicv_setint(s, c, icvid, MI_ICV_DO_NORM, 1)?;
     icv::miicv_setint(s, c, icvid, MI_ICV_DO_FILLVALUE, 1)?;
@@ -627,8 +743,20 @@ fn initialize_from_id(
     icv::miicv_setdbl(s, c, icvid, icv::MI_ICV_VALID_MAX, vmax)?;
     if options.user_real_range[0] < options.user_real_range[1] {
         icv::miicv_setint(s, c, icvid, icv::MI_ICV_USER_NORM, 1)?;
-        icv::miicv_setdbl(s, c, icvid, icv::MI_ICV_IMAGE_MIN, options.user_real_range[0])?;
-        icv::miicv_setdbl(s, c, icvid, icv::MI_ICV_IMAGE_MAX, options.user_real_range[1])?;
+        icv::miicv_setdbl(
+            s,
+            c,
+            icvid,
+            icv::MI_ICV_IMAGE_MIN,
+            options.user_real_range[0],
+        )?;
+        icv::miicv_setdbl(
+            s,
+            c,
+            icvid,
+            icv::MI_ICV_IMAGE_MAX,
+            options.user_real_range[1],
+        )?;
     }
     if options.convert_vector_to_scalar {
         icv::miicv_setint(s, c, icvid, MI_ICV_DO_DIM_CONV, 1)?;
@@ -665,7 +793,8 @@ fn initialize_from_id(
         }
         if to_volume_index[dd as usize] != INVALID_AXIS {
             n_slab_dims += 1;
-            slab_size = slab_size.wrapping_mul(sizes_in_file[dd as usize] as i32 as i64) as i32 as i64;
+            slab_size =
+                slab_size.wrapping_mul(sizes_in_file[dd as usize] as i32 as i64) as i32 as i64;
         }
         dd -= 1;
         if !(dd >= 0 && slab_size < MIN_SLAB_SIZE) {
@@ -684,7 +813,7 @@ fn initialize_from_id(
     if prev_nc_type != converted_type {
         different = true;
     }
-    if different {
+    if different && !volume.is_cached_volume {
         volume.data = None;
     }
     Ok(Some(MincFile {
@@ -704,6 +833,7 @@ fn initialize_from_id(
         end_volume_flag: false,
         n_slab_dims,
         original_input_options: options.clone(),
+        cache_file: None,
     }))
 }
 
@@ -755,9 +885,38 @@ fn input_more_minc_file(
                 format!("a volume of {total} voxels allocated whole (volume_io counts its voxels in 32 bits)"),
             );
         }
-        let ok = volume.alloc(c.dialect, c.streams);
-        if !ok {
-            // No data type (FS-781 with reproduce): the slab is read into nothing.
+        if volume.sizes.contains(&0) {
+            // An empty dimension (a record dimension without records): volume_io allocates
+            // nothing and reads through null pointers (a crash). Read as an empty volume.
+            c.notices.add(
+                &d::FS_790,
+                "a volume with a dimension of size 0 read as empty (volume_io reads into data it never allocated)",
+            );
+        }
+        let data_size = (volume.total_voxels() as u32 as u64) * volume.data_type.size() as u64;
+        let cached = c
+            .dialect
+            .cache_threshold()
+            .is_some_and(|t| t >= 0 && data_size as i128 > t as i128);
+        // No data type (FS-781 with reproduce): the slab is read into nothing.
+        let _ = volume.alloc(c.dialect, c.streams);
+        if cached && volume.data.is_some() {
+            // volume_io's cache: a second opening of the file on this volume, its blocks read
+            // through that opening's conversion.
+            volume.is_cached_volume = true;
+            let name = file.filename.clone();
+            let opts = file.original_input_options.clone();
+            if let Some(mut f2) = initialize_minc_input(s, c, &name, volume, Some(&opts))? {
+                loop {
+                    let (more, _) = input_more_minc_file(s, c, &mut f2, volume)?;
+                    if !more {
+                        break;
+                    }
+                }
+                file.cache_file = Some(Box::new(f2));
+            }
+            file.end_volume_flag = true;
+            return Ok((false, 1.0));
         }
     }
     let n_file = file.dim_names.len();
@@ -787,7 +946,8 @@ fn input_more_minc_file(
                     file.indices[dd] = 0;
                 }
             }
-            n_done = n_done.wrapping_add(total.wrapping_mul(file.indices[dd] as i32 as i64)) as i32 as i64;
+            n_done = n_done.wrapping_add(total.wrapping_mul(file.indices[dd] as i32 as i64)) as i32
+                as i64;
             total = total.wrapping_mul(file.sizes_in_file[dd] as i32 as i64) as i32 as i64;
         }
         if file.to_volume_index[dd] != INVALID_AXIS {
@@ -843,7 +1003,9 @@ fn input_slab(
     // The image's own dimensions (with a vector dimension the ICV converts).
     let mut st = start.to_vec();
     let mut ct = count.to_vec();
-    if let Some(inq) = s.file(file.cdfid).and_then(|f| f.vars.get(file.img_var as usize))
+    if let Some(inq) = s
+        .file(file.cdfid)
+        .and_then(|f| f.vars.get(file.img_var as usize))
         && inq.dimids.len() > n_file
     {
         st.resize(inq.dimids.len(), 0);
@@ -890,6 +1052,10 @@ pub fn delete_volume_input(s: &mut Session, c: &mut Ctx, input: VolumeInput) -> 
     if let Some(f) = input.minc_file {
         mi::miclose(s, c, f.cdfid)?;
         icv::miicv_free(s, c, f.minc_icv)?;
+        if let Some(cf) = f.cache_file {
+            mi::miclose(s, c, cf.cdfid)?;
+            icv::miicv_free(s, c, cf.minc_icv)?;
+        }
     }
     Ok(())
 }

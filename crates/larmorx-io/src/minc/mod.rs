@@ -26,11 +26,13 @@
 //!
 //! Not ported yet: volume_io's free-format input (a `.fre` name: an error says so), the vector to
 //! colour conversion and the dimension conversion of a vector dimension (only reached with a
-//! dimension count below the file's), and the volume cache (volume_io keeps a volume larger than
-//! `VOLUME_CACHE_THRESHOLD` bytes, 80,000,000 by default, in a cache read on demand: the values are
-//! those of the whole read, which this port always does).
+//! dimension count below the file's). volume_io's volume cache (a volume larger than
+//! `VOLUME_CACHE_THRESHOLD` bytes, 80,000,000 by default) is read as the cache reads it: through a
+//! second opening of the file on the volume its first opening set up ([`Dialect::cache_threshold`];
+//! a float volume's voxel range is then its real range, which changes how out-of-range voxels are
+//! read), into the whole array.
 //!
-//! The defects (register entries FS-774 to FS-790; `docs/findings/minc-volumes.md`) are corrected by
+//! The defects (register entries FS-774 to FS-793; `docs/findings/minc-volumes.md`) are corrected by
 //! default and reproduced with [`larmorx_core::defects::UpstreamDefects::Reproduce`], each with a
 //! notice.
 
@@ -94,6 +96,11 @@ pub enum PkgSite {
     IcvAttached,
     /// `miicv_set*` / `miicv_inq*`: an unknown property, or one of the other kind.
     IcvBadProperty,
+    /// `MI_var_loop`: its buffer's allocation failed (`MI_log_sys_error1`; a variable of a type
+    /// netCDF does not know sizes it from `nctypelen`'s `-1`).
+    VarLoopAlloc,
+    /// `miattget_with_sign`: its buffer's allocation failed (`MI_log_sys_error1`).
+    AttGetAlloc,
 }
 
 /// The points where a program's copy of MINC behaves differently from MINC 1.5.1's. Every
@@ -124,6 +131,16 @@ pub trait Dialect {
     fn bad_data_type(&self, _nc_type: i32, _streams: &mut dyn Streams) -> Option<Exit> {
         None
     }
+    /// `miget_valid_range` of an image of `nc_type`, after its `valid_range` attribute was read:
+    /// `Some(exit)` when the program's copy ends there (a type it has no default range for).
+    fn default_range(
+        &self,
+        _nc_type: i32,
+        _notices: &mut Notices,
+        _streams: &mut dyn Streams,
+    ) -> Option<Exit> {
+        None
+    }
     /// Irregular spacings of a dimension (`set_volume_irregular_starts`, then `_widths`):
     /// `Some(exit)` when the program does not support them.
     fn irregular_spacing(&self, _widths: bool, _streams: &mut dyn Streams) -> Option<Exit> {
@@ -136,6 +153,18 @@ pub trait Dialect {
     /// volume_io's `print_error`.
     fn print_error(&self, text: &str, streams: &mut dyn Streams) {
         streams.err(text);
+    }
+    /// volume_io's `print_error` of a message holding names (bytes as C prints them).
+    fn print_error_bytes(&self, text: &[u8], streams: &mut dyn Streams) {
+        streams.err_bytes(text);
+    }
+    /// volume_io's volume cache threshold (`get_n_bytes_cache_threshold`): a volume of more bytes
+    /// is read through a second opening of its file, as volume_io's cache reads it; `None` for a
+    /// copy without the cache. MINC 1.5.1: `VOLUME_CACHE_THRESHOLD` (`%d`), else 80,000,000.
+    fn cache_threshold(&self) -> Option<i64> {
+        let v = crate::xfm::files::getenv(b"VOLUME_CACHE_THRESHOLD")
+            .and_then(|v| larmorx_core::cscan::sscanf_i32(&v));
+        Some(v.unwrap_or(80_000_000) as i64)
     }
     /// The `.xfm` dialect of the program's volume_io: its 4 x 4 inverse decides whether a volume's
     /// voxel-to-world matrix is singular (`create_linear_transform` then makes it the identity),
@@ -176,6 +205,8 @@ pub struct Session {
     pub(crate) icvs: Vec<Option<icv::Icv>>,
     /// Notices netCDF's reader raised, passed on to the caller's notices by `miopen`.
     pub(crate) pending: Vec<(&'static larmorx_core::defects::Defect, String)>,
+    /// Whether files opened now reproduce posixio's reads past their end (`reproduce`).
+    pub(crate) reproduce: bool,
 }
 
 impl Default for Session {
@@ -197,6 +228,7 @@ impl Session {
             callers_ncopts: 0,
             icvs: Vec::new(),
             pending: Vec::new(),
+            reproduce: false,
         }
     }
 
@@ -220,6 +252,22 @@ impl Session {
     pub(crate) fn free_fd(&mut self, fd: i32) {
         self.fds.retain(|&f| f != fd);
     }
+}
+
+/// The element count of a file's `image` variable as its netCDF header announces it (record
+/// dimensions counted with the header's record count), or `None` when the file is not netCDF or has
+/// no image variable: what a read would allocate before it reads anything.
+pub fn header_image_size(path: &[u8]) -> Option<u128> {
+    let mut s = Session::new();
+    let id = netcdf::nc_open(&mut s, path, None).ok()?;
+    let f = s.file(id)?;
+    let v = f.vars.iter().find(|v| netcdf::cstr(&v.name) == b"image")?;
+    let mut n: u128 = 1;
+    for &d in &v.dimids {
+        let size = f.dims.get(d as usize)?.size;
+        n = n.saturating_mul(if size == 0 { f.numrecs } else { size } as u128);
+    }
+    Some(n)
 }
 
 /// The defect IDs of this module (`larmorx_core::defects::FS_774` to `FS_790`).
@@ -256,4 +304,12 @@ pub mod defects {
     pub const VOXEL_COUNT: &str = "FS-789";
     /// A dimension of size 0 (a record dimension without records).
     pub const EMPTY_DIMENSION: &str = "FS-790";
+    /// Values past the end of a file shorter than its header.
+    pub const PAST_END: &str = "FS-793";
+    /// FreeSurfer's copy refuses a MINC image of type double.
+    pub const NO_DOUBLE: &str = "FS-775";
+    /// A `direction_cosines` attribute of fewer than three values keeps the earlier dimension's.
+    pub const SHORT_COSINES: &str = "FS-791";
+    /// ... and for the first dimension read, memory never written.
+    pub const SHORT_COSINES_UNSET: &str = "FS-792";
 }

@@ -100,3 +100,94 @@ impl Lib {
         (oc, err)
     }
 }
+
+type MincLoadFn = unsafe extern "C" fn(
+    *const c_char,
+    c_int,
+    c_int,
+    *mut *mut u8,
+    *mut usize,
+    *mut *mut u8,
+    *mut usize,
+    *mut *mut u8,
+    *mut usize,
+    *mut c_int,
+) -> c_int;
+
+/// A MINC original with the shim's `fm_minc_load` and `fm_minc_free`.
+pub struct MincLib {
+    load: MincLoadFn,
+    free: FreeFn,
+}
+
+impl MincLib {
+    pub fn open(path: &str) -> MincLib {
+        let c = CString::new(path).unwrap();
+        // SAFETY: the dynamic loader with a NUL-terminated name (RTLD_NOW | RTLD_LOCAL).
+        let h = unsafe { dlopen(c.as_ptr(), 2) };
+        assert!(!h.is_null(), "dlopen({path})");
+        let sym = |name: &str| {
+            let c = CString::new(name).unwrap();
+            // SAFETY: a symbol lookup in the library opened above.
+            let p = unsafe { dlsym(h, c.as_ptr()) };
+            assert!(!p.is_null(), "{name} in {path}");
+            p
+        };
+        // SAFETY: the shim's functions have these signatures (shim_minc.c).
+        unsafe {
+            MincLib {
+                load: std::mem::transmute::<*mut c_void, MincLoadFn>(sym("fm_minc_load")),
+                free: std::mem::transmute::<*mut c_void, FreeFn>(sym("fm_minc_free")),
+            }
+        }
+    }
+
+    /// Runs the original on `name` in a child process (`cache_threshold` >= 0 sets
+    /// `VOLUME_CACHE_THRESHOLD`): its outcome, standard output and standard error.
+    pub fn run(
+        &self,
+        name: &[u8],
+        timeout_ms: i32,
+        cache_threshold: i32,
+    ) -> (Outcome, Vec<u8>, Vec<u8>) {
+        let c = CString::new(name.to_vec()).expect("a name without NUL");
+        let mut p = [std::ptr::null_mut(); 3];
+        let mut l = [0usize; 3];
+        let mut st = 0 as c_int;
+        // SAFETY: the shim fills the pointers with malloc'ed buffers (or NULL) and lengths.
+        let r = unsafe {
+            (self.load)(
+                c.as_ptr(),
+                timeout_ms,
+                cache_threshold,
+                &mut p[0],
+                &mut l[0],
+                &mut p[1],
+                &mut l[1],
+                &mut p[2],
+                &mut l[2],
+                &mut st,
+            )
+        };
+        let take = |p: *mut u8, n: usize| -> Vec<u8> {
+            if p.is_null() {
+                return Vec::new();
+            }
+            // SAFETY: `n` bytes the shim wrote at `p`, freed once here.
+            let v = unsafe { std::slice::from_raw_parts(p, n).to_vec() };
+            unsafe { (self.free)(p as *mut c_void) };
+            v
+        };
+        let dump = take(p[0], l[0]);
+        let out = take(p[1], l[1]);
+        let err = take(p[2], l[2]);
+        let oc = match r {
+            0 => Outcome::Returned(String::from_utf8_lossy(&dump).into_owned()),
+            1 => Outcome::Exit(st),
+            2 => Outcome::Signal(st),
+            3 => Outcome::Hang,
+            _ => panic!("the shim failed ({r})"),
+        };
+        (oc, out, err)
+    }
+}

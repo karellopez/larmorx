@@ -15,6 +15,7 @@
 //! `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1).
 
 mod ffi;
+mod minc;
 mod nrrd;
 
 /// splitmix64.
@@ -60,6 +61,31 @@ fn main() {
         println!(
             "nrrd: {} cases, {} comparisons identical ({} of them reads that succeeded), {} differ, {} not compared (undefined in the original)",
             t.cases, t.same, t.read_ok, t.differ, t.skipped
+        );
+        for (k, v) in &t.outcomes {
+            println!("  original on undefined cases: {k}: {v}");
+        }
+        for (k, v) in &t.notices {
+            println!("  notices (fix): {k}: {v}");
+        }
+        fail |= t.differ > 0;
+    }
+    if only.as_deref().is_none_or(|o| o == "minc") {
+        let up = ffi::MincLib::open(&format!("{dir}/libminc_up.so"));
+        let fs = ffi::MincLib::open(&format!("{dir}/libminc_fs.so"));
+        if let Some(i) = args.iter().position(|a| a == "--files") {
+            minc::files(std::path::Path::new(&args[i + 1]), &up);
+            return;
+        }
+        if let Ok(one) = std::env::var("LXPROBE_ONE") {
+            minc::one(one.as_bytes(), &up, &fs, &work);
+            return;
+        }
+        let mut t = minc::Tally::default();
+        minc::run(seed, count, &work, &up, &fs, &mut t);
+        println!(
+            "minc: {} cases ({} not run: an image of more than 2^22 values announced), {} comparisons identical ({} of them reads that succeeded), {} differ, {} not compared (undefined in the original)",
+            t.cases, t.too_big, t.same, t.read_ok, t.differ, t.skipped
         );
         for (k, v) in &t.outcomes {
             println!("  original on undefined cases: {k}: {v}");

@@ -205,27 +205,47 @@ pub(crate) fn from_double(c: &mut Ctx, out: &mut Typed, dv: f64) {
     match out {
         Typed::U8(v) => {
             let x = round(c_min(255.0, c_max(0.0, dv)));
-            let r = if x.is_nan() { nan_int(c, 0) as u8 } else { cvt_i32(x) as u8 };
+            let r = if x.is_nan() {
+                nan_int(c, 0) as u8
+            } else {
+                cvt_i32(x) as u8
+            };
             v.push(r);
         }
         Typed::I8(v) => {
             let x = round(c_min(127.0, c_max(-128.0, dv)));
-            let r = if x.is_nan() { nan_int(c, 0) as i8 } else { cvt_i32(x) as i8 };
+            let r = if x.is_nan() {
+                nan_int(c, 0) as i8
+            } else {
+                cvt_i32(x) as i8
+            };
             v.push(r);
         }
         Typed::U16(v) => {
             let x = round(c_min(65535.0, c_max(0.0, dv)));
-            let r = if x.is_nan() { nan_int(c, 0) as u16 } else { cvt_i32(x) as u16 };
+            let r = if x.is_nan() {
+                nan_int(c, 0) as u16
+            } else {
+                cvt_i32(x) as u16
+            };
             v.push(r);
         }
         Typed::I16(v) => {
             let x = round(c_min(32767.0, c_max(-32768.0, dv)));
-            let r = if x.is_nan() { nan_int(c, 0) as i16 } else { cvt_i32(x) as i16 };
+            let r = if x.is_nan() {
+                nan_int(c, 0) as i16
+            } else {
+                cvt_i32(x) as i16
+            };
             v.push(r);
         }
         Typed::U32(v) => {
             let x = round(c_min(4_294_967_295.0, c_max(0.0, dv)));
-            let r = if x.is_nan() { nan_int(c, 0) as u32 } else { cvt_i64(x) as u32 };
+            let r = if x.is_nan() {
+                nan_int(c, 0) as u32
+            } else {
+                cvt_i64(x) as u32
+            };
             v.push(r);
         }
         Typed::I32(v) => {
@@ -592,6 +612,7 @@ pub fn miopen(s: &mut Session, c: &mut Ctx, path: &[u8]) -> Result<Option<i32>, 
 }
 
 fn miopen_inner(s: &mut Session, c: &mut Ctx, path: &[u8]) -> Result<Option<i32>, Exit> {
+    s.reproduce = c.notices.reproduce();
     s.mi_enter("miopen");
     let old = s.ncopts;
     s.ncopts = 0;
@@ -671,7 +692,7 @@ pub fn miattget_with_sign(
     let tl = nc::nctypelen(s, c.streams, att_type)?;
     if tl < 0 && actual_length != 0 {
         // MALLOC of a negative size: the allocation fails.
-        sys_error(s, c, "miattget")?;
+        sys_error(s, c, PkgSite::AttGetAlloc, "miattget")?;
         s.mi_return_error(c)?;
         return Ok(None);
     }
@@ -695,7 +716,10 @@ pub fn miattget_with_sign(
 }
 
 /// `MI_log_sys_error1` after an allocation that failed (`errno` `ENOMEM`).
-fn sys_error(s: &mut Session, c: &mut Ctx, p1: &str) -> Result<(), Exit> {
+fn sys_error(s: &mut Session, c: &mut Ctx, site: PkgSite, p1: &str) -> Result<(), Exit> {
+    if let Some(e) = c.dialect.pkg_error(site, nc::NC_SYSERR, p1, c.streams) {
+        return Err(e);
+    }
     if s.ncopts & nc::NC_VERBOSE != 0 {
         s.ncerr = nc::NC_SYSERR;
         c.streams
@@ -863,6 +887,11 @@ pub fn miget_datatype(
 
 /// `miget_default_range`.
 pub fn miget_default_range(ty: i32, is_signed: bool) -> [f64; 2] {
+    default_range_of(ty, is_signed)
+}
+
+/// MINC 1.5.1's `miget_default_range` table.
+pub fn default_range_of(ty: i32, is_signed: bool) -> [f64; 2] {
     match ty {
         NC_INT => {
             if is_signed {
@@ -907,7 +936,9 @@ fn range_to_int(c: &mut Ctx, x: f64) -> f64 {
     } else {
         c.notices.add(
             &d::FS_787,
-            format!("the valid range bound {x} clamped to int's range (MINC's conversion is undefined)"),
+            format!(
+                "the valid range bound {x} clamped to int's range (MINC's conversion is undefined)"
+            ),
         );
         if x.is_nan() {
             0.0
@@ -963,7 +994,20 @@ pub fn miget_valid_range(
     s.ncopts = 0;
     let att_sign: &[u8] = if is_signed { MI_SIGNED } else { MI_UNSIGNED };
     let mut vr = [0.0f64; 2];
-    let st = miattget_with_sign(s, c, cdfid, imgid, b"valid_range", Some(att_sign), 2, &mut vr)?;
+    let st = miattget_with_sign(
+        s,
+        c,
+        cdfid,
+        imgid,
+        b"valid_range",
+        Some(att_sign),
+        2,
+        &mut vr,
+    )?;
+    // A copy of MINC may check the type's default range here, whether or not it uses it.
+    if let Some(e) = c.dialect.default_range(ty, c.notices, c.streams) {
+        return Err(e);
+    }
     if st != Some(2) {
         vr = miget_default_range(ty, is_signed);
         let mut mx = [vr[1]];
@@ -998,7 +1042,11 @@ pub fn miget_valid_range(
 }
 
 /// `miget_image_range`.
-pub fn miget_image_range(s: &mut Session, c: &mut Ctx, cdfid: i32) -> Result<Option<[f64; 2]>, Exit> {
+pub fn miget_image_range(
+    s: &mut Session,
+    c: &mut Ctx,
+    cdfid: i32,
+) -> Result<Option<[f64; 2]>, Exit> {
     s.mi_enter("miget_image_range");
     let mut range = [MI_DEFAULT_MIN, MI_DEFAULT_MAX];
     let old = s.ncopts;
@@ -1103,33 +1151,142 @@ pub(crate) fn mi_varaccess_get(
     let var_sign = sign_from_string(inq.ty, st.as_deref());
     let call_sign = get_sign(datatype, sign);
     let ndims = inq.dimids.len();
-    let st_: Vec<i64> = (0..ndims).map(|i| start.get(i).copied().unwrap_or(0)).collect();
-    let ct_: Vec<i64> = (0..ndims).map(|i| count.get(i).copied().unwrap_or(1)).collect();
-    if nc::type_size(inq.ty) == 0 {
-        // nctypelen's message, then netCDF's own for the read.
-        nc::nctypelen(s, c.streams, inq.ty)?;
-    }
-    let got = nc::ncvarget(s, c.streams, cdfid, varid, &st_, &ct_)?;
-    s.drain_notices(c.notices);
-    let Some(vals) = got else {
-        s.mi_return_error(c)?;
-        return Ok(None);
-    };
-    let Some(mut out) = Typed::new(datatype, call_sign) else {
-        s.mi_return_error(c)?;
-        return Ok(None);
-    };
-    let n = vals.len();
+    let st_: Vec<i64> = (0..ndims)
+        .map(|i| start.get(i).copied().unwrap_or(0))
+        .collect();
+    let ct_: Vec<i64> = (0..ndims)
+        .map(|i| count.get(i).copied().unwrap_or(1))
+        .collect();
     let fast = datatype == inq.ty
         && call_sign == var_sign
         && conv.is_none_or(|k| !k.do_scale && !k.do_fillvalue);
+    if !fast {
+        // MI_varaccess's sizes of the two types (nctypelen's messages for a type netCDF does not
+        // know), then MI_var_loop's buffer.
+        let value_size = nc::nctypelen(s, c.streams, inq.ty)? as i64;
+        nc::nctypelen(s, c.streams, datatype)?;
+        if value_size < 0 && !var_loop_alloc_ok(&ct_, value_size) {
+            sys_error(s, c, PkgSite::VarLoopAlloc, "MI_var_loop")?;
+            s.mi_return_error(c)?;
+            return Ok(None);
+        }
+    }
     if fast {
-        copy_raw(&vals, &mut out, n);
+        let got = nc::ncvarget(s, c.streams, cdfid, varid, &st_, &ct_)?;
+        s.drain_notices(c.notices);
+        let Some(vals) = got else {
+            s.mi_return_error(c)?;
+            return Ok(None);
+        };
+        let mut out = Typed::new(datatype, call_sign).expect("a numeric type");
+        copy_raw(&vals, &mut out, vals.len());
+        s.mi_return();
+        return Ok(Some(out));
+    }
+    // MI_var_loop: pieces of at most MI_MAX_VAR_BUFFER_SIZE bytes, each read and converted.
+    let value_size = nc::type_size(inq.ty) as i64;
+    let pieces = if value_size > 0 {
+        var_loop_pieces(&st_, &ct_, value_size)
     } else {
-        convert(c, &vals, var_sign, &mut out, n, conv);
+        vec![(st_.clone(), ct_.clone())]
+    };
+    let mut out = Typed::new(datatype, call_sign);
+    for (ps, pc) in pieces {
+        let got = nc::ncvarget(s, c.streams, cdfid, varid, &ps, &pc)?;
+        s.drain_notices(c.notices);
+        let Some(vals) = got else {
+            s.mi_return_error(c)?;
+            return Ok(None);
+        };
+        let Some(o) = out.as_mut() else {
+            // MI_convert_type: the sizes of the input and output types (the second's message).
+            nc::nctypelen(s, c.streams, datatype)?;
+            s.mi_return_error(c)?;
+            return Ok(None);
+        };
+        convert(c, &vals, var_sign, o, vals.len(), conv);
     }
     s.mi_return();
-    Ok(Some(out))
+    Ok(Some(out.unwrap_or(Typed::F64(Vec::new()))))
+}
+
+/// `MI_var_loop`'s pieces of a hyperslab (no buffer size steps): each `(start, count)` one read.
+fn var_loop_pieces(start: &[i64], count: &[i64], value_size: i64) -> Vec<(Vec<i64>, Vec<i64>)> {
+    let ndims = count.len();
+    if ndims == 0 {
+        return vec![(Vec::new(), Vec::new())];
+    }
+    let mut nvalues: i64 = 1;
+    let mut newn: i64 = 1;
+    let mut firstdim = ndims as i64 - 1;
+    while firstdim >= 1 {
+        newn = newn.wrapping_mul(count[firstdim as usize]);
+        if newn.wrapping_mul(value_size) > MI_MAX_VAR_BUFFER_SIZE {
+            break;
+        }
+        nvalues = newn;
+        firstdim -= 1;
+    }
+    let fd = firstdim.max(0) as usize;
+    let ntimes = (MI_MAX_VAR_BUFFER_SIZE / (nvalues * value_size).max(1)).min(count[fd]);
+    let mut var_count: Vec<i64> = (0..ndims)
+        .map(|i| {
+            if i > fd {
+                count[i]
+            } else if i == fd {
+                ntimes
+            } else {
+                1
+            }
+        })
+        .collect();
+    let mut var_start = start.to_vec();
+    let var_end: Vec<i64> = start.iter().zip(count).map(|(s, c)| s + c).collect();
+    let mut out = Vec::new();
+    if ntimes <= 0 && count[fd] > 0 {
+        return vec![(start.to_vec(), count.to_vec())];
+    }
+    while var_start[0] < var_end[0] {
+        var_count[fd] = ntimes.min(var_end[fd] - var_start[fd]);
+        out.push((var_start.clone(), var_count.clone()));
+        var_start[fd] += var_count[fd];
+        let mut i = fd;
+        while i > 0 && var_start[i] >= var_end[i] {
+            var_start[i] = start[i];
+            i -= 1;
+            var_start[i] += 1;
+        }
+    }
+    out
+}
+
+/// Whether `MI_var_loop`'s buffer (`ntimes * nvalues * value_size` bytes, C's `long`
+/// arithmetic) can be allocated, for a value size of `nctypelen`'s `-1`: a negative or huge size
+/// fails as `malloc` fails.
+fn var_loop_alloc_ok(count: &[i64], value_size: i64) -> bool {
+    let ndims = count.len() as i64;
+    let mut nvalues: i64 = 1;
+    let mut newn: i64 = 1;
+    let mut firstdim = ndims - 1;
+    while firstdim >= 1 {
+        newn = newn.wrapping_mul(count[firstdim as usize]);
+        if newn.wrapping_mul(value_size) > MI_MAX_VAR_BUFFER_SIZE {
+            break;
+        }
+        nvalues = newn;
+        firstdim -= 1;
+    }
+    let ntimes = if firstdim < 0 {
+        1
+    } else {
+        let d = nvalues.wrapping_mul(value_size);
+        if d == 0 {
+            return false;
+        }
+        (MI_MAX_VAR_BUFFER_SIZE / d).min(count[firstdim as usize])
+    };
+    let bytes = ntimes.wrapping_mul(nvalues).wrapping_mul(value_size);
+    (0..1 << 40).contains(&bytes)
 }
 
 /// `mivarget`.

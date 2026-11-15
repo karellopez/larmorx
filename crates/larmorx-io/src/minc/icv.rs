@@ -104,13 +104,13 @@ pub struct Icv {
     pub offset: f64,
 }
 
-fn default_range(ty: i32, sign: i32) -> [f64; 2] {
-    mi::miget_default_range(ty, sign == MI_PRIV_SIGNED)
+fn default_range(_c: &mut Ctx, ty: i32, sign: i32) -> Result<[f64; 2], Exit> {
+    Ok(mi::miget_default_range(ty, sign == MI_PRIV_SIGNED))
 }
 
 impl Icv {
     fn new() -> Icv {
-        let r = default_range(NC_SHORT, MI_PRIV_SIGNED);
+        let r = mi::default_range_of(NC_SHORT, true);
         Icv {
             user_type: NC_SHORT,
             user_sign: MI_PRIV_SIGNED,
@@ -246,6 +246,18 @@ pub fn miicv_setdbl(
         s.mi_return_error(c)?;
         return Ok(MI_ERROR);
     }
+    if prop == MI_ICV_TYPE {
+        let t = mi::cvt_i32(value);
+        let sign = icv(s, i).user_sign;
+        icv(s, i).user_type = t;
+        nc::nctypelen(s, c.streams, t)?;
+        let r = default_range(c, t, sign)?;
+        let v = icv(s, i);
+        v.user_vmax = r[1];
+        v.user_vmin = r[0];
+        s.mi_return();
+        return Ok(0);
+    }
     let v = icv(s, i);
     let b = value != 0.0;
     let dir = |x: f64| {
@@ -257,12 +269,6 @@ pub fn miicv_setdbl(
         }
     };
     match prop {
-        MI_ICV_TYPE => {
-            v.user_type = mi::cvt_i32(value);
-            let r = default_range(v.user_type, v.user_sign);
-            v.user_vmax = r[1];
-            v.user_vmin = r[0];
-        }
         MI_ICV_DO_RANGE => v.user_do_range = b,
         MI_ICV_VALID_MAX => v.user_vmax = value,
         MI_ICV_VALID_MIN => v.user_vmin = value,
@@ -321,7 +327,12 @@ pub fn miicv_setint(
 }
 
 /// `miicv_setstr` for the sign (the only string property volume_io sets).
-pub fn miicv_setstr_sign(s: &mut Session, c: &mut Ctx, icvid: i32, value: &[u8]) -> Result<i32, Exit> {
+pub fn miicv_setstr_sign(
+    s: &mut Session,
+    c: &mut Ctx,
+    icvid: i32,
+    value: &[u8],
+) -> Result<i32, Exit> {
     s.mi_enter("miicv_setstr");
     let Some(i) = chkid(s, c, icvid)? else {
         s.mi_return_error(c)?;
@@ -337,9 +348,13 @@ pub fn miicv_setstr_sign(s: &mut Session, c: &mut Ctx, icvid: i32, value: &[u8])
         s.mi_return_error(c)?;
         return Ok(MI_ERROR);
     }
+    let (t, sign) = {
+        let v = icv(s, i);
+        v.user_sign = mi::sign_from_string(v.user_type, Some(value));
+        (v.user_type, v.user_sign)
+    };
+    let r = default_range(c, t, sign)?;
     let v = icv(s, i);
-    v.user_sign = mi::sign_from_string(v.user_type, Some(value));
-    let r = default_range(v.user_type, v.user_sign);
     v.user_vmax = r[1];
     v.user_vmin = r[0];
     s.mi_return();
@@ -347,7 +362,12 @@ pub fn miicv_setstr_sign(s: &mut Session, c: &mut Ctx, icvid: i32, value: &[u8])
 }
 
 /// `miicv_inqdbl` for the normalisation range (the only properties volume_io inquires about).
-pub fn miicv_inq_norm(s: &mut Session, c: &mut Ctx, icvid: i32, max: bool) -> Result<Option<f64>, Exit> {
+pub fn miicv_inq_norm(
+    s: &mut Session,
+    c: &mut Ctx,
+    icvid: i32,
+    max: bool,
+) -> Result<Option<f64>, Exit> {
     s.mi_enter("miicv_inqdbl");
     let Some(i) = chkid(s, c, icvid)? else {
         s.mi_return_error(c)?;
@@ -396,13 +416,23 @@ fn get_type(s: &mut Session, c: &mut Ctx, i: usize, cdfid: i32, varid: i32) -> R
     let old = s.ncopts;
     s.ncopts = 0;
     let mut buf = Vec::new();
-    let st = mi::miattgetstr(s, c, cdfid, varid, b"signtype", mi::MI_MAX_ATTSTR_LEN, &mut buf)?;
+    let st = mi::miattgetstr(
+        s,
+        c,
+        cdfid,
+        varid,
+        b"signtype",
+        mi::MI_MAX_ATTSTR_LEN,
+        &mut buf,
+    )?;
     s.ncopts = old;
-    let v = icv(s, i);
-    v.var_sign = mi::sign_from_string(inq.ty, st.as_deref());
-    if nc::type_size(v.var_type) == 0 {
-        nc::nctypelen(s, c.streams, inq.ty)?;
-    }
+    let user_type = {
+        let v = icv(s, i);
+        v.var_sign = mi::sign_from_string(inq.ty, st.as_deref());
+        v.user_type
+    };
+    nc::nctypelen(s, c.streams, inq.ty)?;
+    nc::nctypelen(s, c.streams, user_type)?;
     s.mi_return();
     Ok(true)
 }
@@ -470,7 +500,13 @@ fn get_norm(s: &mut Session, c: &mut Ctx, i: usize, cdfid: i32) -> Result<bool, 
 }
 
 /// `miicv_ndattach`.
-fn miicv_ndattach(s: &mut Session, c: &mut Ctx, icvid: i32, cdfid: i32, varid: i32) -> Result<i32, Exit> {
+fn miicv_ndattach(
+    s: &mut Session,
+    c: &mut Ctx,
+    icvid: i32,
+    cdfid: i32,
+    varid: i32,
+) -> Result<i32, Exit> {
     s.mi_enter("miicv_ndattach");
     let Some(i) = chkid(s, c, icvid)? else {
         s.mi_return_error(c)?;
@@ -537,7 +573,11 @@ fn get_dim(s: &mut Session, c: &mut Ctx, i: usize, cdfid: i32) -> Result<bool, E
     s.mi_enter("MI_icv_get_dim");
     let (ndims, nimg, last) = {
         let v = icv(s, i);
-        (v.var_dim.len(), v.user_num_imgdims, v.var_dim.last().copied())
+        (
+            v.var_dim.len(),
+            v.user_num_imgdims,
+            v.var_dim.last().copied(),
+        )
     };
     if ndims < nimg {
         s.log_pkg_error(
@@ -699,7 +739,13 @@ fn get_dim(s: &mut Session, c: &mut Ctx, i: usize, cdfid: i32) -> Result<bool, E
 }
 
 /// `miicv_attach`.
-pub fn miicv_attach(s: &mut Session, c: &mut Ctx, icvid: i32, cdfid: i32, varid: i32) -> Result<i32, Exit> {
+pub fn miicv_attach(
+    s: &mut Session,
+    c: &mut Ctx,
+    icvid: i32,
+    cdfid: i32,
+    varid: i32,
+) -> Result<i32, Exit> {
     s.mi_enter("miicv_attach");
     let Some(i) = chkid(s, c, icvid)? else {
         s.mi_return_error(c)?;
@@ -784,9 +830,14 @@ fn calc_scale(s: &mut Session, c: &mut Ctx, i: usize, coords: &[i64]) -> Result<
     } else {
         let mut slice_imgmax = MI_DEFAULT_MAX;
         let mut slice_imgmin = MI_DEFAULT_MIN;
-        if (!v.derv_var_float || !v.user_do_norm) && v.imgmaxid != MI_ERROR && v.imgminid != MI_ERROR
+        if (!v.derv_var_float || !v.user_do_norm)
+            && v.imgmaxid != MI_ERROR
+            && v.imgminid != MI_ERROR
         {
-            for (vid, out) in [(v.imgmaxid, &mut slice_imgmax), (v.imgminid, &mut slice_imgmin)] {
+            for (vid, out) in [
+                (v.imgmaxid, &mut slice_imgmax),
+                (v.imgminid, &mut slice_imgmin),
+            ] {
                 let Some(mm) = mi::mitranslate_coords(s, c, v.cdfid, v.varid, coords, vid)? else {
                     s.mi_return_error(c)?;
                     return Ok(false);
@@ -904,6 +955,8 @@ pub fn miicv_get(
         return Ok(None);
     }
     let v = icv(s, i).clone();
+    // MI_icv_access's chunk size: the ICV type's size.
+    nc::nctypelen(s, c.streams, v.user_type)?;
     let ndims = v.var_dim.len();
     let var_start: Vec<i64> = (0..ndims).map(|k| start[k]).collect();
     let var_count: Vec<i64> = (0..ndims).map(|k| count[k]).collect();
@@ -915,15 +968,12 @@ pub fn miicv_get(
         chunk_count[k] = var_count[k];
     }
     let firstdim = v.derv_firstdim.max(0) as usize;
-    let Some(mut out) = Typed::new(v.user_type, v.user_sign) else {
-        s.mi_return_error(c)?;
-        s.mi_return_error(c)?;
-        return Ok(None);
-    };
+    // A type netCDF does not know has no buffer: MINC's reads below fail with its messages.
+    let mut out = Typed::new(v.user_type, v.user_sign);
     if ndims == 0 {
         s.mi_return();
         s.mi_return();
-        return Ok(Some(out));
+        return Ok(out);
     }
     while chunk_start[0] < var_end[0] {
         {
@@ -963,7 +1013,10 @@ pub fn miicv_get(
             s.mi_return_error(c)?;
             return Ok(None);
         };
-        append(&mut out, part);
+        match out.as_mut() {
+            Some(o) => append(o, part),
+            None => out = Some(part),
+        }
         chunk_start[firstdim] += chunk_count[firstdim];
         let mut k = firstdim;
         while k > 0 && chunk_start[k] >= var_end[k] {
@@ -974,7 +1027,7 @@ pub fn miicv_get(
     }
     s.mi_return();
     s.mi_return();
-    Ok(Some(out))
+    Ok(out)
 }
 
 fn append(out: &mut Typed, part: Typed) {

@@ -348,6 +348,7 @@ dependencies = [
  "larmorx-transform",
  "proptest",
  "rayon",
+ "sha2",
  "tempfile",
  "thiserror",
 ]

@@ -142,6 +142,8 @@ pub struct Volume {
     pub(crate) uptodate: bool,
     pub coordinate_system_name: Vec<u8>,
     pub is_rgba_data: bool,
+    /// Whether volume_io keeps the volume in its cache ([`super::Dialect::cache_threshold`]).
+    pub is_cached_volume: bool,
     pub data: Option<VolumeData>,
 }
 
@@ -248,6 +250,7 @@ impl Volume {
             uptodate: true,
             coordinate_system_name: MI_UNKNOWN_SPACE.to_vec(),
             is_rgba_data: false,
+            is_cached_volume: false,
             data: None,
         };
         for i in 0..n {
@@ -505,7 +508,11 @@ impl Volume {
     }
 
     /// `alloc_volume_data`: `false` (with volume_io's message) for a volume without a data type.
-    pub(crate) fn alloc(&mut self, dialect: &dyn super::Dialect, streams: &mut dyn Streams) -> bool {
+    pub(crate) fn alloc(
+        &mut self,
+        dialect: &dyn super::Dialect,
+        streams: &mut dyn Streams,
+    ) -> bool {
         if self.data_type == DataType::None {
             dialect.print_error(
                 "Error: cannot allocate array data until size specified.\n",

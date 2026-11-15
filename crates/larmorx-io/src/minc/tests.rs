@@ -171,7 +171,7 @@ fn dump(path: &std::path::Path, mode: UpstreamDefects) -> (String, Option<i32>, 
     let mut notices = Notices::new(mode);
     let mut s = Session::new();
     let mut o = String::new();
-    let name = path.to_string_lossy().into_owned().into_bytes();
+    let name = c_name(path);
     let r = {
         let mut c = Ctx {
             streams: &mut cap,
@@ -300,6 +300,12 @@ fn dump(path: &std::path::Path, mode: UpstreamDefects) -> (String, Option<i32>, 
     (o, r.err().map(|e| e.status), cap.err, notices)
 }
 
+/// A path as the reader is given it: `/` separators (Windows accepts them; volume_io takes a backslash
+/// as its escape with `reproduce`, FS-79).
+fn c_name(p: &std::path::Path) -> Vec<u8> {
+    p.to_string_lossy().replace('\\', "/").into_bytes()
+}
+
 fn write_tmp(dir: &std::path::Path, n: &str, bytes: &[u8]) -> std::path::PathBuf {
     let p = dir.join(n);
     std::fs::write(&p, bytes).unwrap();
@@ -400,7 +406,7 @@ fn failure_messages() {
     let p = write_tmp(dir.path(), "x.mnc", b"not netcdf");
     let (d, exit, err, _) = dump(&p, UpstreamDefects::Reproduce);
     assert_eq!((d.as_str(), exit), ("status 1\n", None));
-    let n = p.to_string_lossy();
+    let n = String::from_utf8(c_name(&p)).unwrap();
     assert_eq!(
         String::from_utf8_lossy(&err),
         format!(
@@ -557,7 +563,7 @@ fn one_slice_slabs_in_their_place() {
         let mut cap = Cap::default();
         let mut notices = Notices::new(mode);
         let mut s = Session::new();
-        let name = p.to_string_lossy().into_owned().into_bytes();
+        let name = c_name(&p);
         let mut c = Ctx {
             streams: &mut cap,
             notices: &mut notices,

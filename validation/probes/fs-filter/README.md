@@ -189,3 +189,19 @@ Every run on generated inputs inside a memory box:
 - The first `real.py --norm3` run found that the port's `MRInormInit` transposed the volume's
   Talairach transform (the probe's own transform tokens had been transposed the same way, so the
   generated cases agreed): fixed in f7381d67.
+
+## Results (relay 31, 2026-11-15)
+
+- The high-signal normalisation (`hsc`, `hsl`) at seeds 7, 13 and 17 (100 cases of each command):
+  0 different under `reproduce`, 0 default differences without a notice. Cases with fewer than two
+  segments (every small volume, the blocks: about 65 %) are counted (FS-601: memory before the
+  segment table; FreeSurfer crashes in about half of them).
+- `real.py --snr` on the three recorded heads: the high-signal normalisation of `nu.mgz` and
+  `T1.mgz` (bias sigma 8): 6 of 6 identical in both modes; 269 s in the official code, 269 s in the
+  port.
+- The normalisation's speed (the port's outputs unchanged): every command at seeds 7 and 13 (920
+  cases each) in both modes, 0 different. `real.py --norm3`: the 9 volumes identical (the 4 lines
+  of FS-597 as before); 126 s in the official code, 69 s in the port (relay 30: 296 s).
+  `real.py --gentle`: 6 of 6 identical; 83 s official, 32 s port (relay 29: 111 s). `real.py
+  --norm`: 6 of 6 identical; 43 s official, 19 s port.
+- The seed-1 record: 1,840 cases (20 rounds of 92), 1,657 identical, 183 counted.

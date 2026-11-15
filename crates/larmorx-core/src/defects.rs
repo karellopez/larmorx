@@ -2471,6 +2471,20 @@ defects! {
         "a volume created without a type (MI_ORIGINAL_TYPE) has a voxel range and sign that were never written: written as MINC, its valid range, image range and conversion come from memory contents";
     FS_797 = "FS-797", "FreeSurfer", true,
         "a MINC volume with a time dimension (more than one frame) cannot be written: the program ends with convert_spatial_axis_to_dim_name, bad axis (exit status 1) before the file is created";
+    FS_802 = "FS-802", "FreeSurfer", true,
+        "finding bright voxels outside the white matter (MRIfindBrightNonWM) takes each T1 value as the low byte of its truncation to an integer: a value above 255, below 0 or not a number wraps (300 is not bright, 400 is)";
+    FS_803 = "FS-803", "FreeSurfer", true,
+        "binarizing a frame range that does not start at frame 0 (BinarizeMRI with a first frame above 0) writes the off value of the voxels outside the mask or on a zeroed edge into the input's frame number instead of the output's: the output's first frames keep 0 there, and frames past its end are written outside it";
+    FS_804 = "FS-804", "FreeSurfer", true,
+        "dilating or eroding a binary volume (DEMorphBinVol) with a frame other than 0 reads each voxel's own value from that frame of its one-frame working copy (memory outside it), its neighbours from frame 0";
+    FS_805 = "FS-805", "FreeSurfer", true,
+        "dilating or eroding a thresholded or label-matched volume (DEMorphBinVol's thresholds and match lists) with a frame other than 0 selects that frame again from the one-frame binarized volume: frame 1 reads past it, a later frame gives no output";
+    FS_806 = "FS-806", "FreeSurfer", true,
+        "DEMorphBinVol accepts a frame equal to the number of frames (its checks allow one past the last) and reads that frame past the volume";
+    FS_807 = "FS-807", "FreeSurfer", true,
+        "dilating or eroding a binary volume (DEMorphBinVol) with a neighbourhood other than 1 to 3, a morphology type other than 1 or 2, or a frame out of range prints its error and goes on: a result is made with those settings";
+    FS_808 = "FS-808", "FreeSurfer", true,
+        "dilating or eroding a thresholded or label-matched volume of several frames (DEMorphBinVol's thresholds and match lists) copies the chosen frame into bytes first (values rounded and clamped to 0 to 255), so its thresholds and labels compare with the bytes; a one-frame volume is compared as it is";
 }
 
 /// The register entry with ID `id`.

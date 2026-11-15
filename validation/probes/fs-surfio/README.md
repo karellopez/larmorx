@@ -344,8 +344,8 @@ official build's value setter is inlined (the shape and statistics arrays, their
 folder read as a file: `Is a directory`). The port's generator makes no random volume headers: a
 random MGH header asks `MRIalloc` for 449,657,401 frames, which the official build refuses and the
 port's fs.mri allocates (§28, for fs.mri's owner). Seed 1, 1,440 cases: 1,394 identical, 46 `SKIP`,
-hash `37a9826cf1a8836be95c51edaac799764f82183bf20a3e96e3ebefe4db048aaf` (the test, from the clean
-commit 85cf1e6e). `real.py --curv` (`flr crv`): the three heads' recorded `curv`, `sulc`,
+hash `60c0fd6aedcaf440b976e919450952585e9039708bd865e255dd4cf902ca8eab` (the test, from the clean
+commit f3ca2f1c; seed 1's writes take no name Windows changes: a trailing dot, a `*`). `real.py --curv` (`flr crv`): the three heads' recorded `curv`, `sulc`,
 `thickness`, `area`, `curv.pial`, `jacobian_white`, `volume` and `w-g.pct.mgh` of both hemispheres
 read into the white surface, written in the new binary format, MGZ, compressed NIfTI, GIFTI and VTK
 and read back (the MGZ and new-format files): 48 of 48 identical in both modes, no notice; every

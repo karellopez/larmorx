@@ -58,6 +58,11 @@
 #include "transform.h"
 #include "topo_parms.h"
 #include "tritri.h"
+#include "label.h"
+
+// fastmarching.h's declaration (the header redefines mrisurf_metricProperties.h's macros)
+void MRISextractOutsideDistanceMap(MRIS *mris, MRI *mri_src, int label, int offset, float resolution,
+                                   float max_distance);
 
 // declared in utils/ only (mrisurf_deform.h) or nowhere (the MRIS_MP overload), defined in libutils
 int mrisFlipPatch(MRIS *mris);
@@ -3475,6 +3480,12 @@ void mpg_case()
       MRISsetXYZ(s, vno, x, y, z);
     } else if (op == "mp") {
       MRIScomputeMetricProperties(s);
+    } else if (op == "mke") {
+      // relay 33 of track D: MRISmarkEdge without its hole filling (FillHoles 0)
+      int id = geti(), m = geti();
+      double th = getd();
+      oi(MRISmarkEdge(s, m ? mask : NULL, id, th, 0));
+      for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].marked);
     } else {
       fail("mpg op");
     }
@@ -3930,6 +3941,144 @@ void flr_case()
   } else fail("flr op");
 }
 
+// relay 33 of track D: 3.1-51's rest: MRISbinarizeVolume, MRISmaskLabel, MRISmaskNotLabel and
+// MRIcomputeLaminarVolumeFractions (mrisurf_metricProperties.cpp) and MRISextractOutsideDistanceMap
+// (mris_fastmarching.cpp) on a surface read by MRISread: its white positions those read, its pial
+// positions a second surface's (the same mesh) or the white ones; a volume geometry of the case,
+// its values set from the vertex numbers, some vertices marked, a label of vertex numbers, 1 or 2
+// volumes; each result printed: a volume as fli_vol does with its xstart, ystart, zstart; the
+// vertices' values and marks; the vertices' curvatures; the vertices' positions
+static void bvl_values(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->curv); of(x->stat); of(x->val); of(x->imag_val); of(x->val2); of(x->valbak); of(x->val2bak);
+    oi(x->marked);
+  }
+}
+
+void bvl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  int two = geti();
+  std::vector<std::string> names;
+  std::vector<int> counts;
+  for (int k = 0; k < 1 + (two != 0); k++) {
+    std::string bytes = geth();
+    counts.push_back(geti());
+    counts.push_back(geti());
+    std::string name = "d/lh.s" + std::to_string(k);
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("the surface file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+    names.push_back(name);
+  }
+  errno = 0;
+  std::vector<MRIS *> surfs;
+  for (size_t k = 0; k < names.size(); k++) {
+    MRIS *m = MRISread(names[k].c_str());
+    if (!m) { out += "NULL "; return; }
+    if (counts[2 * k] != m->nvertices || counts[2 * k + 1] != m->nfaces) {
+      oi(m->nvertices); oi(m->nfaces); out += "COUNTS ";
+      return;
+    }
+    surfs.push_back(m);
+  }
+  MRIS *s = surfs[0];
+  s->vg.valid = geti();
+  s->vg.width = geti(); s->vg.height = geti(); s->vg.depth = geti();
+  fli_geom(&s->vg);
+  MRISsaveVertexPositions(s, WHITE_VERTICES);
+  if (two)
+    for (int v = 0; v < s->nvertices; v++) {
+      s->vertices[v].x = surfs[1]->vertices[v].x;
+      s->vertices[v].y = surfs[1]->vertices[v].y;
+      s->vertices[v].z = surfs[1]->vertices[v].z;
+    }
+  MRISsaveVertexPositions(s, PIAL_VERTICES);
+  MRISrestoreVertexPositions(s, WHITE_VERTICES);
+  MRIScomputeMetricProperties(s);
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    float b = (float)(v + 1) * 0.25f;
+    x->curv = b; x->stat = b + 1; x->val = b + 2; x->imag_val = b + 3; x->val2 = b + 4;
+    x->valbak = b + 5; x->val2bak = b + 6;
+  }
+  int nmark = geti();
+  for (int k = 0; k < nmark; k++) s->vertices[geti()].marked = 1;
+  int npts = geti();
+  LABEL *lab = LabelAlloc(npts > 0 ? npts : 1, NULL, NULL);
+  lab->n_points = npts;
+  for (int k = 0; k < npts; k++) lab->lv[k].vno = geti();
+  Gdiag = (unsigned long)(unsigned int)geti();
+  Gdiag_no = geti();
+  int nvol = geti();
+  std::vector<MRI *> vols;
+  for (int k = 0; k < nvol; k++) {
+    int type = geti(), w = geti(), h = geti(), d = geti(), nf = geti();
+    MRI *v = MRIallocSequence(w, h, d, type, nf);
+    fli_geom(v);
+    MRIreInitCache(v);
+    int fill = geti();
+    if (fill > 0)
+      for (int sl = 0; sl < d; sl++)
+        for (int r = 0; r < h; r++)
+          for (int c = 0; c < w; c++) MRIsetVoxVal(v, c, r, sl, 0, (float)((c + 2 * r + 3 * sl + fill) % 4));
+    if (fill < 0) {
+      // a ball of value `val` around (cx, cy, cz), radius rr (voxels)
+      int cx = geti(), cy = geti(), cz = geti(), rr = geti(), val = geti();
+      for (int sl = 0; sl < d; sl++)
+        for (int r = 0; r < h; r++)
+          for (int c = 0; c < w; c++)
+            if ((c - cx) * (c - cx) + (r - cy) * (r - cy) + (sl - cz) * (sl - cz) <= rr * rr)
+              MRIsetVoxVal(v, c, r, sl, 0, (float)val);
+    }
+    vols.push_back(v);
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "bin") {
+      float res = getf(), dist = getf();
+      MRI_REGION reg;
+      reg.x = geti(); reg.y = geti(); reg.z = geti();
+      reg.dx = geti(); reg.dy = geti(); reg.dz = geti();
+      MRI *r = MRISbinarizeVolume(s, &reg, res, dist);
+      fli_vol(r);
+      of(r->xstart); of(r->ystart); of(r->zstart);
+      MRIfree(&r);
+    } else if (op == "odm") {
+      MRI *v = vols[geti()];
+      int label = geti(), offset = geti();
+      float res = getf(), maxd = getf();
+      MRISextractOutsideDistanceMap(s, v, label, offset, res, maxd);
+      for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+    } else if (op == "msk") {
+      oi(MRISmaskLabel(s, lab));
+      bvl_values(s);
+    } else if (op == "msn") {
+      oi(MRISmaskNotLabel(s, lab));
+      bvl_values(s);
+    } else if (op == "lvf") {
+      double res = getd();
+      MRI *v = vols[geti()];
+      int di = geti();
+      MRI *given = di >= 0 ? vols[di] : NULL;
+      fli_ret(MRIcomputeLaminarVolumeFractions(s, res, v, given), given);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        of(s->vertices[vno].x); of(s->vertices[vno].y); of(s->vertices[vno].z);
+      }
+    } else fail("bvl op");
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -4172,6 +4321,8 @@ void run_case()
     fli_case();
   } else if (cmd == "flr") {
     flr_case();
+  } else if (cmd == "bvl") {
+    bvl_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

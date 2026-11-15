@@ -9,8 +9,9 @@
 //! table (`edg`), the corners (`cor`), the face metric (`fm`), one face normal (`fnf`), the edge
 //! metric (`em`), the corner metric (`cm`), the statistics (`ast`, `est`, `cst`), the overlay
 //! (`ovl`), the two printers (`pq`, `ppq`), the curvature averaging (`avc`), the middle of the
-//! grey matter (`mid`), a vertex moved (`mv`) and `MRIScomputeMetricProperties` (`mp`): the
-//! generator and the port's answers, as `fssurfio.cpp`'s.
+//! grey matter (`mid`), a vertex moved (`mv`), `MRIScomputeMetricProperties` (`mp`) and, since
+//! relay 33, the edge marks (`mke`, `MRISmarkEdge` without its hole filling): the generator and
+//! the port's answers, as `fssurfio.cpp`'s.
 
 use super::mpd::{grid, ico};
 use super::mpf::dump_vol;
@@ -107,7 +108,7 @@ pub(super) fn mpg_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let nops = g.int(1, 5);
     ix(t, nops);
     for _ in 0..nops {
-        match g.below(20) {
+        match g.below(22) {
             0 => t.push("cnt".into()),
             1 => t.push("edg".into()),
             2 => t.push("cor".into()),
@@ -179,6 +180,23 @@ pub(super) fn mpg_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 for _ in 0..3 {
                     small(t, g, heavy);
                 }
+            }
+            20 | 21 => {
+                // relay 33: MRISmarkEdge (its hole filling 0)
+                t.push("mke".into());
+                let id = if g.chance(10) {
+                    g.pick(&[-1, 3])
+                } else {
+                    g.int(0, 2)
+                };
+                ix(t, id);
+                ix(t, g.int(0, 1));
+                let th: f64 = match id {
+                    0 => g.pick(&[0.1, 0.5, 1.0, 2.0, 5.0, 20.0, 50.0]),
+                    1 => g.pick(&[0.5, 0.9, 0.99, 0.999, 1.0]),
+                    _ => g.pick(&[1.0, 5.0, 10.0, 20.0, 45.0, 90.0]),
+                };
+                t.push(format!("{:016x}", th.to_bits()));
             }
             _ => t.push("mp".into()),
         }
@@ -400,6 +418,15 @@ pub(super) fn mpg_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "mp" => {
                 larmorx_freesurfer_surf::mp::compute_metric_properties(g, sg, &mut io, &mut s)?;
+            }
+            "mke" => {
+                let (id, m, th) = (t.i(), t.i(), t.d());
+                let mk = mask.as_ref().filter(|_| m != 0);
+                let r = props10::mris_mark_edge(g, sg, &mut io, &mut s, mk, id, th)?;
+                o.i(i64::from(r));
+                for vno in 0..s.nvertices as usize {
+                    o.i(i64::from(s.vertex(vno).marked));
+                }
             }
             _ => panic!("mpg op {op}"),
         }

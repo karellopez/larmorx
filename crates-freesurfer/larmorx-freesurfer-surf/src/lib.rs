@@ -79,6 +79,7 @@ pub mod aaa;
 pub mod alloc;
 pub mod base;
 pub mod basemisc;
+pub mod binarize;
 pub mod coords;
 pub mod curvio;
 pub mod discrete;

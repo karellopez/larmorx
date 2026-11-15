@@ -1777,6 +1777,18 @@ defects! {
         "the bounding volume (MRISmakeBoundingVolume; mris_place_surface's T2 and FLAIR steps) of a surface whose bounding box spans more than 2^31 voxels of the surface's volume geometry gets a garbage extent (an integer overflow)";
     FS_608 = "FS-608", "FreeSurfer", true,
         "the interior of a surface (MRISfillInterior; mris_place_surface, mri_surf2volseg, mris_volmask's callers) in a given volume that the surface does not cross (no voxel of its shell inside the volume) ends the program with the misleading messages 'volume size must be greater than 0 in every dimension' and 'could not allocate memory for -999996 slices'";
+    FS_609 = "FS-609", "FreeSurfer", true,
+        "the outside distance map of a surface (MRISextractOutsideDistanceMap) reads its label volume as bytes: a label volume of another type is compared by one byte of each voxel's value, and a point of the map outside the label volume reads another voxel's byte while it stays in the volume's memory";
+    FS_614 = "FS-614", "FreeSurfer", true,
+        "the outside distance map of a surface (MRISextractOutsideDistanceMap) reads memory outside its label volume for a point of the map beyond the volume's memory (a crash or another program's data)";
+    FS_610 = "FS-610", "FreeSurfer", true,
+        "the outside distance map of a surface (MRISextractOutsideDistanceMap) whose label volume has no voxel of the label ends the program with 'No labels 0 could be found in the volume', naming 0 instead of the label";
+    FS_611 = "FS-611", "FreeSurfer", true,
+        "masking a surface's values by a label (MRISmaskLabel, MRISmaskNotLabel) writes outside the surface's vertices for a label point that names no vertex (a volume label's points, vertex -1) or a vertex beyond the surface's";
+    FS_612 = "FS-612", "FreeSurfer", false,
+        "masking a surface's values outside a label (MRISmaskNotLabel) leaves the values of the vertices that were already marked before the call, and clears the marks of the label's vertices";
+    FS_613 = "FS-613", "FreeSurfer", true,
+        "the laminar volume fractions of a surface pair (MRIcomputeLaminarVolumeFractions) compute the white surface's interior at the program's first call only and reuse it for every later call, whatever its surface, volume or resolution";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

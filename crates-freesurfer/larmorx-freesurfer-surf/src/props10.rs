@@ -842,6 +842,65 @@ pub fn mris_max_edge_stat_to_overlay(
     Ok(Some(overlay))
 }
 
+/// `MRISmarkEdge(surf, mask, metricid, thresh, FillHoles)` without its hole filling (`FillHoles`
+/// 0): the face metric, the edges when there are none, `MRIScomputeMetricProperties` and the edge
+/// metric; the marks cleared (`MRISclearMarks`: unripped vertices); then for each edge kept (none
+/// of its vertices ripped or under 0.5 in the mask: both ends for the length, all four for the
+/// others) whose statistic passes the threshold, its vertices marked (`marked` 1) and the edge
+/// counted: length (0) below `thresh` marks its two ends, the hinge dot product's magnitude (1)
+/// or the hinge angle (2, degrees) above it all four. Another `metricid` prints `ERROR:
+/// MRISmaxEdgeStatToOverlay() metricid <m> unrecognized` at the first edge kept and returns -1.
+/// Returns the edges counted. FreeSurfer's `FillHoles` then fills the holes of the marked map
+/// (`MRISfillHoles`, the surface clusters of fs.surf, queue item 3.4-04) and adds the vertices it
+/// fills: that step comes with fs.surf's clusters.
+pub fn mris_mark_edge(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    surf: &mut Mris,
+    mask: Option<&Mri>,
+    metricid: i32,
+    thresh: f64,
+) -> Result<i32, Fatal> {
+    mris_face_metric(sg, io, surf);
+    if surf.edges.is_none() {
+        mris_edges(io, surf);
+    }
+    mp::compute_metric_properties(g, sg, io, surf)?;
+    mris_edge_metric(g, sg, io, surf)?;
+    crate::discrete::clear_marks(surf);
+    let mut nhits = 0i32;
+    let nvmax = if metricid == 0 { 2 } else { 4 };
+    for edgeno in 0..usize::try_from(surf.nedges).unwrap_or(0) {
+        let e = surf.edges.as_ref().expect("the edges")[edgeno].clone();
+        let mut skip = false;
+        for &vno in &e.vtxno[..nvmax] {
+            skip |= skip_vertex(g, io, surf, mask, vno)?;
+        }
+        if skip {
+            continue;
+        }
+        let nmark = match metricid {
+            0 if e.len < thresh => 2,
+            1 if e.dot.abs() > thresh => 4,
+            2 if e.angle > thresh => 4,
+            0..=2 => continue,
+            _ => {
+                let _ = writeln!(
+                    io.out,
+                    "ERROR: MRISmaxEdgeStatToOverlay() metricid {metricid} unrecognized"
+                );
+                return Ok(-1);
+            }
+        };
+        for &vno in &e.vtxno[..nmark] {
+            surf.vertex_mut(vno as usize).marked = 1;
+        }
+        nhits = nhits.wrapping_add(1);
+    }
+    Ok(nhits)
+}
+
 /// The four statistics both printers take: the triangle areas, the corner angles (degrees), the
 /// edge lengths and the hinge angles (degrees).
 fn quality_stats(

@@ -4552,6 +4552,6 @@ versions 0 (a word without its number, or ended), 1 and 2, with counts -2 to 4 a
 `sxw`: a header read, written by stem or by name (into a file or a folder), and the written file's bytes (after
 every stream is flushed). `lro`: two labels of 0 to 6 points of vertices -1 to 5, a fifth deleted. Not compared:
 FS-843 (FreeSurfer crashes), FS-844 and FS-58 (memory, crashes), FS-845 where the port refuses, FS-848 (billions of
-reads, crashes), FS-847 where the port refuses, FS-849. Measured (2026-11-15, observed): seeds 7 and 13 (1,100 piece-30
-cases each): `reproduce` identical on all 970 and 970 compared (130 skipped each), 0 different; `fix` differs only
-with notices (FS-01, FS-847).
+reads, crashes), FS-847 where the port refuses, FS-849. Measured (2026-11-15, observed): seeds 7, 13 and 21 (1,100
+piece-30 cases each): `reproduce` identical on all 2,880 compared (970, 949 and 961), 420 skipped, 0 different; `fix`
+differs only with notices (FS-01, FS-847).

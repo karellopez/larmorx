@@ -322,6 +322,15 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
 - Piece 29 (track A relay 36): `cnf` (`mriConformed`, `MRIfindMinSize`, `MRIfindRightSize` of one geometry) and
   `acl` (`MRIaddCommandLine` 0 to 1,001 times). `SKIP` for FS-842 (the 1,001st line). Seeds 7, 13 and 21 (850 cases
   each): `reproduce` identical on all 2,368 compared, 182 skipped; `fix` differs only with notices (FS-12, FS-17).
+- Piece 30 (track A relay 37): `reo` (`MRIreorder` of a volume the case makes, into `NULL`, a given volume with
+  voxels or a header without them), `sxl` (`is_sxa_volume`, `ld_sxadat_from_stem` or `ld_sxadat`,
+  `sxa_framepower`), `sxw` (`sv_sxadat_by_stem` or `sv_sxadat` of a header read; the file after `fflush(NULL)`) and
+  `lro` (`LabelRemoveOverlap`). `SKIP` for FS-843 (FreeSurfer crashes), FS-844 and FS-58, FS-845 where the port
+  refuses, FS-848, FS-847 where the port refuses, FS-849. Seeds 7, 13 and 21 (1,100 cases each): `reproduce`
+  identical on all 2,880 compared, 420 skipped; `fix` differs only with notices (FS-01, FS-847).
+- `reorder_triples.py` (relay 37): dimension numbers that pass `MRIreorder`'s check only through 32-bit overflow
+  (FS-843; `python3 -P reorder_triples.py [count]`); official `mri_convert -r <a> <b> <c>` with them ends with a
+  segmentation fault (status 139).
 - `subset.py` (relay 36): the probe on a subset of its kinds (`subset.py <worktree> <seed> <n> <kind,...>`, inside
   `boxed.sh`): the official and the port's lines of those kinds, a JSON summary and the first differing cases.
 - `frames_probe.py` (relay 36): MGH files of one voxel per frame with 2,000,000 to 449,657,401 frames, a command run

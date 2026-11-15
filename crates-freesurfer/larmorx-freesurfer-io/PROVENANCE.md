@@ -303,6 +303,10 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 1001-1047, 12086-12131; `utils/utils.cpp` 996-1008 (`FileNameFromWildcard`, through fs.core) | `MRIread`, `MRIreadEx`, `MRIremoveNaNs` (FS-841, FS-249; relay 36) | `mriio.rs` (`mri_read_volume`, `mri_read_ex`, `mri_remove_nans`), `examples/read_volume.rs` |
 | `utils/mriio.cpp` 3450-3458, 3543-3544 | `get_b_info`'s frame tables checked with fs.mri's `frames_calloc_fails` (FS-760; relay 36) | `mriio_bvol.rs` |
 | `utils/mriio.cpp` 12134-12143 | `MRIaddCommandLine` (FS-842; relay 36) | `mriio.rs` (`mri_add_command_line`) |
+| `utils/mriio.cpp` 11570-11842; `include/mri.h` 937-939 (`XDIM`, `YDIM`, `ZDIM`); `include/macros.h` 94 (`ISIGN`) | `MRIreorderVox2RAS`, `MRIreorder` (FS-843, FS-844, FS-845, FS-58; relay 37) | `reorder.rs` |
+| `utils/selxavgio.cpp`; `include/selxavgio.h` | `sv_sxadat_by_stem`, `ld_sxadat_from_stem`, `sxa_framepower`, `is_sxa_volume`, `ld_sxadat`, `sv_sxadat` (FS-846 to FS-849; relay 37) | `selxavgio.rs` |
+| `utils/label.cpp` 722-736 | `LabelRemoveOverlap` (FS-850; relay 37) | `label.rs` (`label_remove_overlap`) |
+| (larmorx's own) | a failed read's `errno` given to the C library's `scanf` (`cscan::Stream::read_error`; relay 37) | `cfile.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
 the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte

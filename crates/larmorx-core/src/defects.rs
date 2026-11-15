@@ -1772,9 +1772,9 @@ defects! {
     FS_605 = "FS-605", "FreeSurfer", true,
         "the cached conversion from a volume's voxels to a surface's tkregister RAS (MRISsurfaceRASFromVoxelCached; mri_mc) makes its matrix at its first call and keeps it for every later surface and volume, so later conversions use the first pair's geometry";
     FS_606 = "FS-606", "FreeSurfer", false,
-        "the surface shell and interior volumes (MRISshell, MRISfillInterior; mris_volmask's ribbon, mris_place_surface, mri_surf2volseg) draw nothing for a face whose first two corners are at one point (the face is a segment, or a point when all three coincide): its sample points are computed as 0/0 (its edges are drawn by the neighbouring faces of a closed surface)";
+        "the surface shell and interior volumes (MRISshell, MRISfillInterior; mris_volmask's ribbon, mris_place_surface, mri_surf2volseg) draw nothing for a face whose first two corners are at one point (the face is a segment, or a point when all three coincide); its edges are drawn by the neighbouring faces of a closed surface";
     FS_607 = "FS-607", "FreeSurfer", true,
-        "the bounding volume of a surface (MRISmakeBoundingVolume; mris_place_surface's T2 and FLAIR steps) counts the voxels its bounding box spans as an int: a box spanning more than 2^31 voxels of the surface's volume geometry wraps (C leaves the overflow undefined) and the volume's extent is garbage";
+        "the bounding volume (MRISmakeBoundingVolume; mris_place_surface's T2 and FLAIR steps) of a surface whose bounding box spans more than 2^31 voxels of the surface's volume geometry gets a garbage extent (an integer overflow)";
     FS_608 = "FS-608", "FreeSurfer", true,
         "the interior of a surface (MRISfillInterior; mris_place_surface, mri_surf2volseg, mris_volmask's callers) in a given volume that the surface does not cross (no voxel of its shell inside the volume) ends the program with the misleading messages 'volume size must be greater than 0 in every dimension' and 'could not allocate memory for -999996 slices'";
     FS_221 = "FS-221", "FreeSurfer", true,

@@ -392,3 +392,60 @@ Closed (object code of the unit oracle's `mrinorm.cpp.o`, `relay27/mrinorm.asm`;
   diagnostic voxel, is the window's last voxel); `MRIerode`'s byte branch takes separable minima
   over the clamped box. Each is used only where its condition holds (byte control volumes of the
   source's extent, tables that clamp); otherwise the original loops run.
+
+## 16. `mriflood.cpp`'s surface functions and `mrisurf_mri.cpp`'s surface-to-voxel maps (relay 32)
+
+The ports are `crates-freesurfer/larmorx-freesurfer-surf/src/mriflood.rs` (beside the surface: the
+surface crate builds on the filter crate) and `src/sras.rs`; the behaviour is the filter spec's §33
+and the surfio spec's §118.
+
+- **Object code** (the unit oracle's `mriflood.cpp.o`, `objdump`): `MRISshell` is single precision
+  throughout: the side lengths `sqrtss` (a `sqrtf` call only for a negative argument, never reached),
+  `divss` by `mri_dst->xsize`, `ysize`, `zsize` (the destination's sizes, one per side), `ceilf`
+  inlined (the SSE2 truncate-and-adjust sequence, exact `ceilf`), `cvttss2si`; the samples
+  `x0 + ((x2 - x0) * (float) v) / (float) numv` with `p1 - p0` kept, then `p0 + ((p1 - p0) * u) /
+  numu` (the product's operands swapped: the same bits), each converted to `double` for
+  `MRISsurfaceRASToVoxelCached`. `dmax`'s conditional compiles to C's comparisons (`comiss`/`jb`,
+  `cmpnless`): NaN takes the last branch as in C. `MRISfillInterior` is double precision with
+  library calls for `sqrt` and `ceil` (`-fno-builtin`: the same correctly rounded results); the
+  final loop's `val < 0.5`, `val2 > 0.5` and `cosa >= 0` are `comiss` on the `float`s (equal to the
+  `double` tests). `MRISmakeBoundingVolume`'s `std::min`/`std::max` are `minsd`/`maxsd` with the
+  second corner in the destination (a NaN gives the first corner's value), `floor`/`ceil` calls,
+  `(float) n * xsize` in single precision then `cvtss2sd` and `divsd` by the resolution, `n * 0.5 +
+  lo` for the centre voxel stored as `float`.
+- **FS-604.** `MRIS_loadRAS2VoxelMap` keys its map on `MRIcompareHeaders(cache->mri, mri)` alone; the
+  matrix also depends on the volume's extent (`MRIxfmCRS2XYZ`'s `P0 = c - Mdc D (n/2)`) and on
+  `mris->vg` (`RASFromSurfaceRAS_` of a header made from it). `MRISsurfaceRASToVoxelCached`'s map is
+  a function `static`: every surface and volume of the program shares it. `MRISribbon` calls the
+  cached conversion for its outer then its inner surface with one source volume: a second surface
+  whose `vg` differs gets the first's matrix. A volume made by `MRIalloc` of another extent compares
+  different (`xstart`, `xend`, `fov` follow the extent); one whose header was copied from the first
+  (`MRIcopyHeader` keeps the extent) compares equal. The recorded heads' white and pial surfaces
+  share their `vg`, so recon-all's ribbons are not affected (`real.py`: no notice).
+- **FS-605.** `MRISsurfaceRASFromVoxelCached`'s `m_vox2sras[tid]` is made once per thread
+  (`mri_mc` only).
+- **FS-606.** `numu = ceil(2 d0)` is 0 when the first two corners coincide; `(float) u / (float)
+  numu` is then `0 / 0`; the samples are NaN, `nint` gives `INT_MIN` (outside). A closed surface's
+  neighbouring faces draw the segment's edges; rule C. The probe moves a face's second corner onto
+  its first in one case of eight; the recorded heads have none (no notice).
+- **FS-607, FS-608.** `real_chi - real_clo + 1` is `int` arithmetic (wraps in the build); with no
+  shell voxel `REGIONgetBoundingBox` returns `x = 999998`, `dx = -999996` (its 1000000 and 0 start
+  values), and `MRIalloc` of it fails in `MRI::Shape::Shape()` (printed once per negative extent)
+  and the slice allocation (`could not allocate memory for -999996 slices`, `fs::fatal(1)`).
+- **The errno after a GIFTI read failure** (a seed-1 `gwr` case, found while recording): glibc
+  2.35's `getpwuid` sets `errno` to 0 when its lookup ends without an error (gdb's watch on
+  `*__errno_location()` in the official probe: `__getpwuid_r`, `nss/getXXbyYY_r.c:388`, called by
+  `insertCommonMetaData`); an `ErrorPrintf` after it prints no `strerror` line. Fixed in
+  `larmorx-freesurfer-io`'s `gifti_common::insert_common_meta_data` (a95f764d). Other callers of
+  `getpwuid(geteuid())` in FreeSurfer: `ctrpoints.cpp:164` (`MRIwriteControlPoints`),
+  `version.cpp:109`, `:273` (track A's ports: not yet the same).
+- **Speed (bit for bit).** On a recorded head (`examples/fs_flood_timing.rs`, `lh.white` with
+  `aseg.mgz`): `MRISfloodoutside` of a 256^3 volume 2.16 s before, 0.27 s after (byte volume) or 0.6 s
+  (another type). FreeSurfer's sweeps (eight corner passes, slices innermost, until a sweep fills
+  nothing) converge to the closure: every floodable voxel 6-connected to a filled one is filled
+  and nothing else (each fill needs a filled face neighbour; at the end no floodable voxel has
+  one), so the port fills breadth-first from each filled voxel in scan order, reading and writing
+  a dense byte volume's bytes directly. `MatrixMultiply`'s float rows were copied into two heap
+  vectors per element (fs.core): now on the stack below 17 columns (the same `dot_float`).
+  `MRISshell` loads its cached map once per call (the later loads of the call find the same volume
+  and surface and change nothing). The 24 recorded calls: 138 s before, see the probe README after.

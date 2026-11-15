@@ -43,10 +43,11 @@ its steps are written here from the algorithm (a binary heap's sift-up and sift-
 order, `specs/freesurfer-filter.md` §5), not copied; the official build's machine code
 (`mri_fastmarching.cpp.o` of the unit oracle) gave `_UpdateValue`'s operand orders.
 
-`mriflood.cpp`'s surface functions (`MRISshell`, `MRISribbon`, `MRISmakeBoundingVolume`,
-`MRISfillInterior`) are not here yet: they need `mrisurf_mri.cpp`'s surface-to-voxel maps
-(`MRISsurfaceRASToVoxel`, `MRIS_*RAS2VoxelMap`, queue item 3.4-02) and `mriset.cpp`'s
-`MRIcomplement` and `MRIintersect` (track C).
+`mriflood.cpp`'s surface functions (`MRISshell` 154, `MRISribbon` 97, `MRISmakeBoundingVolume`
+1421, `MRISfillInterior` 1495) are in `larmorx-freesurfer-surf`'s `src/mriflood.rs` (relay 32: they
+draw the surface, and the surface crate builds on this one). Since relay 32 `MRISfloodoutside`
+fills breadth-first the closure FreeSurfer's sweeps converge to (the same voxels; a dense byte
+volume read and written directly; `docs/findings/freesurfer-filter.md` §16).
 
 `InitForOutsideMatch` and `MRISextractOutsideDistanceMap` (`utils/mris_fastmarching.cpp`, the
 surface variant) are not here: they need `MRISbinarizeVolume` (3.1-51's leftovers).

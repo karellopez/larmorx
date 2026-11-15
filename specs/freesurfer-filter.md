@@ -106,7 +106,9 @@ precision, each operation's NaN as §1 with the operand written first taken firs
 - `r = s * (A + 1)` (A first);
 - `P = A*A + B*B` (for `s = -1`; `B*B + A*A` for `s = +1`), `S = (A + B) + C`;
 - `D = S*S - ((C*C + P) - 1) * 3`; when `D >= 0`: `t = (sqrt(D) + S) / 3` (`sqrtss`); when
-  `1e-6 + t >= C`, the value is `s * t`;
+  `1e-6 + t >= C`, the value is `s * t`. The official code takes this root before it tests `D`:
+  a `D` below 0 (not a NaN) sets `errno` to `EDOM` (33, glibc's `sqrtf`), which a later message
+  naming `errno` shows;
 - otherwise `E = (A + B)*(A + B) - (c + c)` with `c = P - 1`; when `E >= 0`: `t = ((A + B) +
   sqrt(E)) * 0.5`; when `1e-6 + t >= B`, the value is `s * t`;
 - otherwise `r`.
@@ -1296,4 +1298,44 @@ beyond `int` is negative, and the face is skipped.
   count of voxels that are not 0 and FNV-1a of its voxels.
 - **Expected.** Every line identical under `reproduce`; the default identical but where a noted
   defect it corrects changed the result (FS-604, FS-605, FS-607, FS-608). Observed: the README of
+  `validation/probes/fs-surfio`.
+
+## 35. The outside distance map of a surface: the march within a label
+
+Used by the surface library's outside distance map (`specs/freesurfer-surfio.md` §120). The
+volume `V` (floats, a signed distance map's extent, all 0) and the distance map `M` (the same
+extent: its start `(x0, y0, z0)` in mm and its voxels per mm `(sx, sy, sz)`) and a label volume
+`Q` with a label `l`; the limit `L`; `s = +1` (§3's states and queue).
+
+- Every point far. For each voxel `(x, y, z)` (z outermost, x innermost): its point in tkregister
+  RAS `(x0 + x / sx, y0 + y / sy, z0 + z / sz)` (single precision) taken to `Q`'s voxels
+  (`Q`'s tkregister vox2ras inverted; a matrix that cannot be inverted ends the program with
+  `MatrixMultiply(): m1 is null` on standard output and `MatrixMultiply: m1 is null`, status
+  `ERROR_BADPARM`), each coordinate truncated towards 0 to an `int`, and `Q`'s byte there compared
+  with `l`. Not equal: `V = L` there (the point stays far); equal: the voxel is inside the label and
+  forbidden.
+- Then every voxel whose `M` is at or below 0 (or -0): `V = L` and forbidden.
+- Then for each voxel (the same order), with its next neighbour along x, along y and along z (the
+  voxel itself at an axis's last index), in that order: where the neighbour's inside-the-label state
+  differs from the voxel's, the neighbour, and after the three the voxel itself, become alive unless
+  forbidden: `V = 0.5`, and a far point joins the alive list.
+- Then the trial points from the alive list (§3) and the march to `L` (§3, §4, §5).
+- FS-609: `Q` is read as bytes: a label volume of another type is compared by one byte of each
+  voxel's value (the byte `x` of the row); a point outside `Q` whose byte is still in `Q`'s memory
+  reads that byte (another voxel's). `reproduce` does both; by default a point outside `Q` is not
+  the label and a volume of another type is compared by its voxels' values (truncated). FS-614: a
+  point beyond `Q`'s memory (a slice or row `Q` does not have, or a byte past its voxels) makes the
+  official code read memory it does not own (a crash, or other data): in both modes such a point is
+  not the label (noted).
+
+## 36. Validation plan (part 10)
+
+- **Probe (black box).** The surface probe's `bvl` command (`specs/freesurfer-surfio.md` §121):
+  outside distance maps of icosahedra, grids and small meshes in label balls of byte, float and int
+  volumes, at offsets 0 to 3 mm, resolutions 1 and 2 voxels per mm and distances 1 to 3 mm (and
+  the values below their minimums), the label's absence, points outside the label volume.
+- **Expected.** Every line identical under `reproduce` except the cases noted FS-614 (counted, not
+  compared: the official code reads memory it does not own); the default identical but where a
+  noted defect it corrects changed the result (FS-609, FS-610). The `errno` of §4: the fs-filter
+  probe's distance-map commands and the surface probe's messages. Observed: the README of
   `validation/probes/fs-surfio`.

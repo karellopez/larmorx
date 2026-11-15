@@ -674,6 +674,33 @@ bool seg_case(const std::string &cmd)
     put_vol(ap);
     return true;
   }
+  if (cmd == "t2mf") {
+    // t2mf <volume file> <T2 file> <aparc+aseg file or -> T2_thresh mm_from_exterior: the T2 mask in place
+    // on recorded volumes, as the registration programs call it; whether the result is the volume, then
+    // the FNV-1a (64 bits) of its voxels and of the aparc+aseg's after the call (none: -)
+    MRI *src = MRIread(next());
+    MRI *t2 = MRIread(next());
+    std::string an = next();
+    MRI *ap = an == "-" ? NULL : MRIread(an.c_str());
+    if (!src || !t2 || (an != "-" && !ap)) fail("cannot read the volume");
+    float th = getf();
+    int mm = geti();
+    MRI *r = MRImask_with_T2_and_aparc_aseg(src, src, t2, ap, th, mm);
+    oi(r == src);
+    for (const MRI *m : {(const MRI *)src, (const MRI *)ap}) {
+      if (!m) {
+        out += "- ";
+        continue;
+      }
+      uint64_t h = 0xcbf29ce484222325ull;
+      const unsigned char *b = (const unsigned char *)m->chunk;
+      for (size_t i = 0; i < m->bytes_total; i++) h = (h ^ b[i]) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
+    return true;
+  }
   // mrinorm.cpp: vor <src> <ctrl> <dst?>; soap <src> <ctrl> <dst mode> [<dst>] niter min_change: the result,
   // then the control volume (vor)
   if (cmd == "vor") {
@@ -1219,7 +1246,7 @@ bool toks_hint_long(const std::string &line)
 {
   return line.compare(0, 5, "edmf ") == 0 || line.compare(0, 5, "dtrf ") == 0 || line.compare(0, 4, "vsr ") == 0 ||
          line.compare(0, 5, "g3df ") == 0 || line.compare(0, 5, "nrmf ") == 0 || line.compare(0, 5, "n3df ") == 0 ||
-         line.compare(0, 5, "hslf ") == 0;
+         line.compare(0, 5, "hslf ") == 0 || line.compare(0, 5, "t2mf ") == 0;
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 //! port's answers.
 
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_filter::flood;
 use larmorx_freesurfer_filter::norm;
@@ -634,6 +635,50 @@ fn fnv(m: &Mri) -> String {
     format!("{h:016x} ")
 }
 
+/// `t2mf` (`fsfilter.cpp`): the T2 mask in place on a recorded head's volumes.
+fn t2mf(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
+    let read = |cx: &mut Ctx, path: &str| -> Result<Mri, Fatal> {
+        Ok(mri_read(
+            &mut cx.g,
+            &mut cx.a,
+            &mut cx.b,
+            &Environment::default(),
+            None,
+            path,
+            MRI_VOLUME_TYPE_UNKNOWN,
+            true,
+            -1,
+            -1,
+        )?
+        .expect("the volume"))
+    };
+    let (sp, tp, ap) = (t.next(), t.next(), t.next());
+    let mut src = read(cx, sp)?;
+    let t2 = read(cx, tp)?;
+    let mut ap = if ap == "-" { None } else { Some(read(cx, ap)?) };
+    let (th, mm) = (t.f(), t.i());
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let env = Environment::default();
+    let r = t2mask::mri_mask_with_t2_and_aparc_aseg(
+        g,
+        a,
+        b,
+        &env,
+        Pair::Same(&mut src),
+        &t2,
+        ap.as_mut(),
+        th,
+        mm,
+    )?;
+    *o += if matches!(r, Ret::Given) { "1 " } else { "0 " };
+    *o += &fnv(&src);
+    match &ap {
+        Some(m) => *o += &fnv(m),
+        None => *o += "- ",
+    }
+    Ok(())
+}
+
 /// `vsr` (`fsfilter.cpp`): a recorded head's Voronoi diagram and soap bubble.
 fn vsr(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
     let read = |cx: &mut Ctx, path: &str| -> Result<Mri, Fatal> {
@@ -731,6 +776,10 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
             Some(m) => put_vol(o, m),
             None => *o += "NULL ",
         }
+        return Ok(true);
+    }
+    if cmd == "t2mf" {
+        t2mf(cx, t, o)?;
         return Ok(true);
     }
     if cmd == "ccsf" {

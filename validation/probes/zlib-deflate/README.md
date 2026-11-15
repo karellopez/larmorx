@@ -43,21 +43,27 @@ to 65,536 bytes until the stream ends. Compared after every call: the status, th
 bytes used, `total_in`, `total_out`, `adler`, `data_type`, `msg`; at the end every output byte and
 `deflateEnd`'s status.
 
+Each case runs the port twice (`reproduce` and `fix`) and Ubuntu's zlib twice, its allocations
+(through `zalloc`) zeroed and filled with 0xa5: the port's `reproduce` must equal zlib with zeroed
+allocations; a difference between zlib's two runs is zlib reading memory it never set (FS-809);
+`fix` may differ from `reproduce` only with a notice. Where the port notes that zlib would write
+or read past a buffer or crash (FS-810, FS-811, FS-812) zlib is not run (its first runs ended with
+signal 11). zlib as released runs too with `LXZ_RELEASED=1` (it may crash on 1.2.11's own bugs,
+which Ubuntu's patches fix). `one` with `LXZ_PORT_ONLY=1` runs only the port.
+
 ## Numbers
 
-From the commits of relay 30 of FreeSurfer's foundations (track C), on the main machine:
+From relay 30 of FreeSurfer's foundations (track C), on the main machine (details and the defects
+in `docs/findings/zlib-deflate.md`):
 
-- `cases` seed 1: 300 cases (21.9 MB of input): the port = Ubuntu's zlib in all; zlib as released
-  differs from Ubuntu's in 85 (the patched calls above). Seeds 2 and 3: see
-  `docs/findings/zlib-deflate.md`.
-- `sums` seed 1: 3,000 cases (adler32 and crc32 from random initial values, compress2 at levels
-  -2 to 10 into buffers from 0 bytes to compressBound, compressBound): 0 differ.
-- `gz` seed 1: 500 files (modes `wb`, `ab`, levels 0 to 9, strategies `f`, `h`, `R`, `F`, `T`;
-  writes of 0 to 300,000 bytes, `gzputc`, `gzputs`, seeks forward, flushes, `gztell`): 495
-  identical with every call's result; 5 differ only where FS-78's notice says zlib compressed
-  memory it never set (a seek before the first write: zeros in larmorx).
-- `testset`: the 96 recipes of `larmorx_core::zlib::cases` give zlib's digest
-  `0x002945f52e85d35d` (the test `zlib::tests::recipes_give_zlibs_bytes`); `gzset`: the 40
-  recipes of `larmorx_io::znz::gzcases` give zlib's digest `0xaf81bfd10cd0fb1b`
-  (`znz::tests::gzip_writer_recipes_give_zlibs_files`).
-- `files`: the reference runs' `.mgz` and `.nii.gz` files: see `docs/findings/zlib-deflate.md`.
+- `cases`: seed 1, 300 cases with `LXZ_RELEASED=1` (zlib as released differs from Ubuntu's in 85:
+  the patched calls); seeds 2 to 6, 20,000 cases each (10.8 GB of input): 0 different with
+  `reproduce`; zlib read memory it never set in 1,095 (FS-809); 171 not run (FS-810: 163; FS-811,
+  FS-812: 8).
+- `sums`: seed 1, 3,000 cases; seed 2, 20,000 cases: 0 differ.
+- `gz`: seed 1, 500 files: 495 identical, 5 FS-78; seed 2, 5,000 files: 4,932 identical, 68
+  FS-78.
+- `files`: the reference runs' 624 `.mgz` and `.nii.gz` files (30.7 GB inflated): the port's
+  deflate data is the file's in all 624 (zlib's level 6), 600 byte-identical whole.
+- `testset`: zlib's digest `0x002945f52e85d35d` (96 recipes; `zlib::tests::recipes_give_zlibs_bytes`);
+  `gzset`: `0xaf81bfd10cd0fb1b` (40 recipes; `znz::tests::gzip_writer_recipes_give_zlibs_files`).

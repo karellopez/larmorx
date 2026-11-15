@@ -74,19 +74,57 @@ they do (stored blocks follow the output space), which is why the buffers are ke
 FS-78 (zeros where zlib compresses memory it never set: a seek before the first write) stays the
 only difference.
 
+## zlib's own defects (FS-809 to FS-812)
+
+The probe gives zlib's allocations two contents (all zeros, as the port's buffers start, and all
+0xa5): a case whose output differs between them reads memory zlib never set. All such cases, and
+the cases where the port found zlib would write or read past a buffer or crash, are calls outside
+zlib's documented use; none is on a path FreeSurfer's or fMRIPrep's files take.
+
+- **FS-809** (class a, memory): `deflatePrime` while compressed bytes wait behind some already
+  handed out (a `deflate` that ran out of output space) writes its bits at `pending_buf +
+  pending` instead of after the waiting bytes: it overwrites bytes already handed out, and the next
+  `deflate` hands out bytes it never wrote. zlib.h says the call belongs before the first
+  `deflate`. By default (rule A) the bits go after the waiting bytes; `reproduce` puts them where
+  zlib does (the unset bytes are the buffer's: zeros, or older bytes, as in zlib with a zeroed
+  allocation). Named in both modes.
+- **FS-810** (class a, out of bounds): `deflatePrime` checks only that the waiting bytes start
+  before the symbol buffer, not that its bits fit: repeated calls while bytes wait write past the
+  pending buffer, and the next `deflate` reads past it. Refused (`Z_BUF_ERROR`, zlib's answer for
+  "no room") in both modes (rule B: writing past a buffer is never reproduced).
+- **FS-811** (class a, crash): storing (level 0) can slide its window while more bytes wait to be
+  hashed (`insert`, up to the window size) than lie before the current position; after a switch to
+  a compressing level (`deflateParams`) the next fill of the window computes the first of them as
+  `strstart - insert` in unsigned arithmetic and reads about 4 GiB before the window: the program
+  crashes (the probe's first runs ended with signal 11). zlib 1.2.12 limits `insert` to
+  `strstart` at the slides. larmorx limits it where zlib 1.2.11 would read, so only the crashing
+  cases change, in both modes.
+- **FS-812** (class a, memory): after `deflateResetKeep` (an internal, undocumented call that keeps
+  the window and its read-ahead) a switch to level 0 does not flush (`last_flush` is -2), so the
+  bytes read ahead stay counted while storing fills the window: `deflateGetDictionary` then copies
+  from past the window's end. The bytes past the end are zeros, in both modes. (What zlib writes
+  in that state is reproduced as it is: the probe finds it equal to zlib's.)
+
 ## The numbers (the probe, from relay 30's commits)
 
-- Deflate streams (`cases`): seed 1, 300 cases (21.9 MB of input); seeds 2 and 3, 10,000 cases
-  each (see the logs `<workspace>/oracles/logs/fs-found-c-r30-zlib-cases{2,3}.log`): every call's
-  status, counts, totals, check value, data type and message, and every output byte, equal to
-  Ubuntu's `libz.so.1`.
-- Checksums and `compress2` (`sums`): seed 1, 3,000 cases; seed 2, 20,000 cases: 0 differ.
-- gzip files (`gz`): seed 1, 500 files: 495 identical, 5 differ where FS-78's notice says so;
-  seed 2, 5,000 files: see the log `fs-found-c-r30-zlib-gz.log`.
+- Deflate streams (`cases`, 10 threads): seed 1, 300 cases (21.9 MB of input; zlib as released
+  differs from Ubuntu's in 85, the patched calls); seeds 2 to 6, 20,000 cases each (100,000 cases,
+  10.8 GB of input, about 16 s a seed): with `reproduce`, every call's status, counts, totals,
+  check value, data type and message, and every output byte, equal to Ubuntu's `libz.so.1` with
+  zeroed allocations, in every case run; zlib read memory it never set in 1,095 (all FS-809);
+  not run because zlib would write or read past its buffer, 163 (FS-810), or crash or read past
+  its window, 8 (FS-811, FS-812); `fix` differs from `reproduce` only with a notice (4,965 cases
+  carry one). Logs: `<workspace>/oracles/logs/fs-found-c-r30-zlib-cases{1..6}.log`.
+- Checksums and `compress2` (`sums`): seed 1, 3,000 cases; seed 2, 20,000 cases (adler32 and
+  crc32 from random initial values, compress2 at levels -2 to 10 into buffers from 0 bytes to
+  compressBound, compressBound): 0 differ.
+- gzip files (`gz`): seed 1, 500 files: 495 identical with every call's result, 5 differ only
+  where FS-78's notice says so; seed 2, 5,000 files: 4,932 identical, 68 FS-78.
 - The reference runs' compressed files (`files`): 624 (606 `.mgz`, 18 `.nii.gz`; 30.7 GB
-  inflated, 12 runs of 6 heads): the port's deflate data is the file's in all 624, at zlib's
-  level 6; 600 are byte-identical whole (the header `gzopen` writes); 24 have another writer's
-  header (a name or a time stamp) around the same level-6 deflate data.
+  inflated; 18 runs of 6 heads): the port's deflate data is the file's in all 624, at zlib's
+  level 6; 600 are byte-identical whole (the header `gzopen` writes); 24 (4 files of each head's
+  v8 run) have another writer's header (a name or a time stamp) around the same level-6 deflate
+  data.
 - The recorded digests: `zlib::tests::recipes_give_zlibs_bytes` (96 recipes, 0x002945f52e85d35d)
   and `znz::tests::gzip_writer_recipes_give_zlibs_files` (40 recipes, 0xaf81bfd10cd0fb1b), both
-  computed by the probe through zlib itself (`testset`, `gzset`).
+  computed by the probe through zlib itself (`testset`, `gzset`); unit tests of FS-809 to FS-812.

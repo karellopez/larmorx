@@ -204,7 +204,7 @@ impl<'a> Ctx<'a> {
         }
     }
 
-    fn expand(&mut self, filename: &[u8]) -> Vec<u8> {
+    pub(crate) fn expand(&mut self, filename: &[u8]) -> Vec<u8> {
         expand_with(filename, self.dialect, self.notices, self.windows)
     }
 
@@ -254,7 +254,7 @@ impl<'a> Ctx<'a> {
     }
 
     /// `file_exists_as_compressed`: the first of `name.z`, `name.Z`, `name.gz` that exists.
-    fn file_exists_as_compressed(&mut self, expanded: &[u8]) -> Option<Vec<u8>> {
+    pub(crate) fn file_exists_as_compressed(&mut self, expanded: &[u8]) -> Option<Vec<u8>> {
         let e = self.expand(expanded);
         for ending in COMPRESSED_ENDINGS {
             let mut c = e.clone();

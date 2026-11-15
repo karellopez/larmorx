@@ -13,6 +13,7 @@ publish = false
 [dependencies]
 larmorx-core = { path = "../../../crates/larmorx-core" }
 larmorx-io = { path = "../../../crates/larmorx-io" }
+sha2 = { version = "0.11.0", default-features = false }
 
 [profile.release]
 debug = false

@@ -30,7 +30,7 @@
 // status. The index loops are the C code's.
 #![allow(clippy::result_unit_err, clippy::needless_range_loop)]
 
-mod files;
+pub(crate) mod files;
 mod gaussian;
 mod read;
 mod write;

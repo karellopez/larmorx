@@ -13,7 +13,9 @@ NrrdIO has no release tarball of its own: it is generated from Teem's `air`, `bi
 libraries into one directory of Teem's Subversion repository. The port follows
 `https://svn.code.sf.net/p/teem/code/NrrdIO/trunk` at revision 3991 (its last change before
 revision 4426, 2008-11-18; `TEEM_VERSION_STRING "1.9.0"`), fetched file by file
-(`!svn/bc/3991/...`) into `<workspace>/tags/NrrdIO-r3991` with a SHA-256 manifest; FreeSurfer
+(`!svn/bc/3991/...`) into `<workspace>/tags/NrrdIO-r3991` with a SHA-256 manifest
+(`scripts/upstream/NrrdIO-r3991.sha256`, pinned by its own SHA-256 in `upstream.tsv`;
+`scripts/bootstrap_workspace.sh` downloads and checks every file); FreeSurfer
 8.2.0's programs give this revision's results on every probed case (its copy:
 `docs/findings/freesurfer-permissive.md`). Teem 1.9.0's own `nrrd` library (`teem-1.9.0-src.tar.gz`, SHA-256
 `e0b34337...`) is the source NrrdIO was cut from; its other formats (PNM, PNG, VTK, text) are

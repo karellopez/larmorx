@@ -2389,6 +2389,52 @@ defects! {
         "the message for a data file list that fails its check shows the reader's line buffer at the field's offset: bytes of earlier header lines, or memory never written when the buffer grew";
     FS_773 = "FS-773", "NrrdIO", true,
         "on Windows a header name whose directories are separated by backslashes, and data file names that start with a drive or a backslash, are taken as relative to the current directory: detached data files are not found";
+    FS_774 = "FS-774", "MINC", true,
+        "a compressed MINC file (.gz, .bz, .bz2, .Z, .z, .zip, or a missing name whose compressed file exists) is decompressed by running gunzip -c (or bunzip2 -c, zcat, pcat) through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
+    FS_775 = "FS-775", "FreeSurfer", true,
+        "a MINC image of type double cannot be read: the program ends with bad data type (exit status 1)";
+    FS_776 = "FS-776", "netCDF", true,
+        "a variable of a version 1 netCDF file whose data offset is 2 GiB or more is read at a negative offset: memory beside the reader's buffer, or an Invalid argument error";
+    FS_777 = "FS-777", "netCDF", true,
+        "a netCDF variable whose dimension sizes multiply to a multiple of 2^64 crashes the reader (a division by zero)";
+    FS_778 = "FS-778", "netCDF", true,
+        "a netCDF header whose dimension, attribute or variable list (or an attribute's values) announces more entries than the file holds is read on through zeros until memory runs out";
+    FS_779 = "FS-779", "MINC volume_io", true,
+        "a MINC file without an image variable, or with more dimensions than the volume can have, makes the volume input use a dimension count it never set and go on with no volume (a crash or an error, by memory contents)";
+    FS_780 = "FS-780", "MINC volume_io", true,
+        "a time dimension whose variable has no spacing attribute is read as regular or irregular by memory contents";
+    FS_781 = "FS-781", "MINC volume_io", true,
+        "a MINC image of type char (or of a type netCDF does not know) leaves the volume's type unset: the read fails or goes on by memory contents (an allocation message, then an ICV is not attached to an image variable error that ends the program)";
+    FS_782 = "FS-782", "MINC volume_io", true,
+        "a MINC dimension name longer than 64 bytes overflows the volume input's name buffer";
+    FS_783 = "FS-783", "MINC volume_io", true,
+        "a MINC image of more than 512 dimensions overflows the volume input's and MINC's dimension arrays";
+    FS_784 = "FS-784", "MINC", true,
+        "an empty string attribute (signtype, spacetype, spacing) is checked one byte before MINC's buffer and read as an empty string or as what the buffer held";
+    FS_785 = "FS-785", "MINC", true,
+        "an image-max or image-min variable over a dimension the image does not have is read at an index never set (memory contents)";
+    FS_786 = "FS-786", "MINC", true,
+        "a value that is not a number (a slice range of NaN) converted to an integer voxel gives x86's undefined conversion (INT_MIN for an int image, 0 otherwise)";
+    FS_787 = "FS-787", "MINC", true,
+        "a valid range outside its integer type's range (or not a number) is converted to the type with C's undefined conversion (x86's value)";
+    FS_788 = "FS-788", "FreeSurfer", true,
+        "a compressed MINC file (.mnc.gz and the other compressed endings) cannot be read: the program ends with Cannot uncompress the file (exit status 1)";
+    FS_789 = "FS-789", "MINC volume_io", true,
+        "a MINC volume of 2^32 voxels or more counts its voxels in 32 bits: its data are allocated too small and read past their end";
+    FS_790 = "FS-790", "MINC volume_io", true,
+        "a MINC volume with a dimension of size 0 (a time dimension without records) is read into no data";
+    FS_791 = "FS-791", "MINC volume_io", true,
+        "a direction_cosines attribute of fewer than three values takes its missing values from the dimension read before it";
+    FS_793 = "FS-793", "netCDF", true,
+        "values of a netCDF file shorter than its header are read past its end as bytes of an earlier block of the reader's buffer where netCDF means zeros";
+    FS_794 = "FS-794", "MINC volume_io", true,
+        "a MINC volume with a dimension of size 1 whose order differs from the volume's (one x slice of a zspace, yspace, xspace file read as x, y, z) is read with each slab written as one run from its first voxel: slabs overwrite each other and the rest of the volume is never written";
+    FS_795 = "FS-795", "MINC volume_io", true,
+        "... such a run that passes the end of the volume's array writes memory beside it";
+    FS_796 = "FS-796", "MINC volume_io", true,
+        "... and the voxels no slab wrote keep the memory the volume's array was given";
+    FS_792 = "FS-792", "MINC volume_io", true,
+        "a direction_cosines attribute of fewer than three values on the first dimension read with direction cosines takes its missing values from memory never written";
 }
 
 /// The register entry with ID `id`.

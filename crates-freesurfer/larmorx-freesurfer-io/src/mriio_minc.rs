@@ -26,7 +26,7 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_742, FS_743, FS_744, FS_745};
+use larmorx_core::defects::{FS_58, FS_742, FS_743, FS_744, FS_745, FS_746, FS_747, FS_748};
 use larmorx_freesurfer_core::cstd::{double_to_int_x86, fmt_f};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -490,6 +490,327 @@ pub fn minc_read(
     Ok(Some(m))
 }
 
+/// `mincWrite(mri, fname)` (`utils/mriio.cpp` 2596-2760): the volume as a MINC 1 file through
+/// volume_io's volume output (`larmorx_io::minc`, MINC 1.5.1's writer) in the dialect of FreeSurfer's
+/// copy ([`FsMinc`]). `NO_ERROR`; `ERROR_BADPARM` after `mincWrite(): bad data type (<t>) in mri
+/// structure` (an error; types other than bytes, 16- and 32-bit integers, longs and floats); 1 after
+/// `ERROR: mincWrite: output_volume exited with 1` (standard output) when the output fails (its
+/// messages first); `Err(Fatal::Exit)` where the library ends the program (a direction cosine of
+/// length 0, a volume of more than one frame with `reproduce`: FS-797).
+///
+/// A volume whose RAS is not good gets the coronal direction cosines and centre 0 first, in the
+/// caller's volume (`setDirectionCosine`). The file's type: bytes unsigned, 16-bit integers signed,
+/// 32-bit integers and longs 32-bit signed, floats float; its voxel range the volume's least and
+/// greatest values as floats (`MRIlimits`); dimensions `xspace`, `yspace`, `zspace` (and `time` with
+/// more than one frame) of the volume's width, height, depth (and frames); steps the voxel sizes;
+/// the axes' direction cosines the volume's columns' (made unit vectors); starts that put voxel
+/// (width/2, height/2, depth/2) at the centre; every voxel's value as a C `double`; history "".
+///
+/// Defects: FS-746 (a long volume's values read as the 32-bit numbers of the first half of each row:
+/// by default each voxel's value, clamped to the 32-bit range); FS-58 (a volume made without voxels:
+/// FreeSurfer reads them through rows it does not have and crashes; refused, the program ends).
+pub fn minc_write(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    m: &mut Mri,
+    fname: &str,
+) -> Result<i32, Fatal> {
+    let rep = g.notices.reproduce();
+    if m.vg.ras_good_flag == 0 {
+        crate::mriio::set_direction_cosine(g, err, &mut m.vg, crate::mriio::MRI_CORONAL);
+    }
+    let (nc, signed) = match m.mtype {
+        MRI_UCHAR => (netcdf::NC_BYTE, false),
+        MRI_SHORT => (netcdf::NC_SHORT, true),
+        MRI_INT | MRI_LONG => (netcdf::NC_INT, true),
+        MRI_FLOAT => (netcdf::NC_FLOAT, true),
+        t => {
+            g.errno = 0;
+            log::error_printf(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!("mincWrite(): bad data type ({t}) in mri structure"),
+            );
+            return Ok(ERROR_BADPARM);
+        }
+    };
+    let (w, h, d, nf) = (m.vg.width, m.vg.height, m.vg.depth, m.nframes);
+    let (wu, hu, du, nfu) = (
+        w.max(0) as usize,
+        h.max(0) as usize,
+        d.max(0) as usize,
+        nf.max(0) as usize,
+    );
+    let n_voxels = wu * hu * du * nfu;
+    // MRIlimits: a volume without voxels leaves the range unset (memory never written)
+    let (mut fmin, mut fmax) = (0.0f32, 0.0f32);
+    larmorx_freesurfer_mri::info::mri_limits(g, err, m, &mut fmin, &mut fmax)?;
+    // FS-746: the values a long volume gives (its 64-bit voxels, or FreeSurfer's 32-bit numbers
+    // at 4 x in each row)
+    let long_value = |m: &Mri, x: usize, y: usize, z: usize, t: usize, packed: bool| -> i64 {
+        let chunk = m.chunk.as_ref().expect("voxels");
+        let at = row_start(m, y, z, t);
+        if packed {
+            let b = &chunk[at + 4 * x..at + 4 * x + 4];
+            i64::from(i32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        } else {
+            let b = &chunk[at + 8 * x..at + 8 * x + 8];
+            i64::from_le_bytes(b.try_into().expect("8 bytes"))
+        }
+    };
+    let mut min = larmorx_io::minc::libsrc::f32_to_f64(fmin);
+    let mut max = larmorx_io::minc::libsrc::f32_to_f64(fmax);
+    let ints = matches!(m.mtype, MRI_INT | MRI_LONG);
+    if ints
+        && n_voxels > 0
+        && let Some(c) = m.chunk.as_ref()
+    {
+        // FS-746: a long volume's values (each voxel's, clamped to 32 bits, or FreeSurfer's 32-bit
+        // numbers at 4 x in each row); FS-747: the exact range of the 32-bit values written
+        let (mut differs, mut clamped) = (false, None);
+        let (mut lo, mut hi) = (i64::MAX, i64::MIN);
+        for t in 0..nfu {
+            for z in 0..du {
+                for y in 0..hu {
+                    for x in 0..wu {
+                        let v = if m.mtype == MRI_LONG {
+                            let whole = long_value(m, x, y, z, t, false);
+                            differs |= whole != long_value(m, x, y, z, t, true);
+                            if clamped.is_none() && i32::try_from(whole).is_err() {
+                                clamped = Some(whole);
+                            }
+                            whole.clamp(i64::from(i32::MIN), i64::from(i32::MAX))
+                        } else {
+                            let at = row_start(m, y, z, t) + 4 * x;
+                            i64::from(i32::from_le_bytes(
+                                c[at..at + 4].try_into().expect("4 bytes"),
+                            ))
+                        };
+                        lo = lo.min(v);
+                        hi = hi.max(v);
+                    }
+                }
+            }
+        }
+        if differs || clamped.is_some() {
+            g.notices.add(
+                &FS_746,
+                match clamped {
+                    _ if rep => "mincWrite of a long volume: the 32-bit numbers of the first half of each row written, as in FreeSurfer".to_string(),
+                    Some(l) => format!(
+                        "mincWrite of a long volume: each voxel's value written, clamped to the file's 32-bit integers ({l} first; FreeSurfer: the 32-bit numbers in the first half of each row)"
+                    ),
+                    None => "mincWrite of a long volume: each voxel's value written (FreeSurfer: the 32-bit numbers in the first half of each row)".to_string(),
+                },
+            );
+        }
+        // MRIlimits' range as floats: past 2^24 it misses the values, and near the 32-bit limits
+        // it passes them (the file's every voxel then -2147483648)
+        let (elo, ehi) = (lo as f64, hi as f64);
+        if !rep && (elo, ehi) != (min, max) {
+            g.notices.add(
+                &FS_747,
+                format!(
+                    "mincWrite: the valid range of 32-bit integers taken exactly, {elo} to {ehi} (FreeSurfer: its values as floats, {min} to {max})"
+                ),
+            );
+            (min, max) = (elo, ehi);
+        } else if rep && m.mtype == MRI_INT && (elo, ehi) != (min, max) {
+            g.notices.add(
+                &FS_747,
+                format!(
+                    "mincWrite: the valid range of 32-bit integers taken from their values as floats, {min} to {max}, as in FreeSurfer"
+                ),
+            );
+        }
+    }
+    if m.mtype == MRI_FLOAT
+        && min.is_nan()
+        && n_voxels > 0
+        && let Some(c) = m.chunk.as_ref()
+    {
+        // FS-748: MRIlimits starts from the first voxel; a NaN there stays the range whatever the
+        // other voxels hold (the file's valid range NaN, volume_io's message)
+        let (mut lo, mut hi) = (f32::NAN, f32::NAN);
+        for t in 0..nfu {
+            for z in 0..du {
+                for y in 0..hu {
+                    for x in 0..wu {
+                        let at = row_start(m, y, z, t) + 4 * x;
+                        let v = f32::from_le_bytes(c[at..at + 4].try_into().expect("4 bytes"));
+                        if !v.is_nan() {
+                            lo = if lo.is_nan() || v < lo { v } else { lo };
+                            hi = if hi.is_nan() || v > hi { v } else { hi };
+                        }
+                    }
+                }
+            }
+        }
+        if !lo.is_nan() {
+            let (lo, hi) = (f64::from(lo), f64::from(hi));
+            if rep {
+                g.notices.add(
+                    &FS_748,
+                    format!(
+                        "mincWrite: a float volume whose first voxel is NaN written with the valid range NaN, as in FreeSurfer (its other values {lo} to {hi})"
+                    ),
+                );
+            } else {
+                g.notices.add(
+                    &FS_748,
+                    format!(
+                        "mincWrite: a float volume whose first voxel is NaN written with the range of its other values, {lo} to {hi} (FreeSurfer: NaN)"
+                    ),
+                );
+                (min, max) = (lo, hi);
+            }
+        }
+    }
+    let names: Vec<Vec<u8>> = [&b"xspace"[..], b"yspace", b"zspace", b"time"]
+        .iter()
+        .map(|n| n.to_vec())
+        .collect();
+    let n_dims = if nf == 1 { 3 } else { 4 };
+    let (path, prefix) = in_dir(dir, fname);
+    let exit = |e: Exit| Fatal::Exit(e.status);
+    let mut s = Session::new();
+    let f = larmorx_io::minc::libsrc::f32_to_f64;
+    let vg = &m.vg;
+    let seps = [f(vg.xsize), f(vg.ysize), f(vg.zsize), 1.0];
+    let cosines = [
+        [vg.x_r, vg.x_a, vg.x_s],
+        [vg.y_r, vg.y_a, vg.y_s],
+        [vg.z_r, vg.z_a, vg.z_s],
+    ];
+    let centre = [f(vg.c_r), f(vg.c_a), f(vg.c_s)];
+    let mut vol = {
+        let mut streams = InDir {
+            out: &mut *out,
+            err: &mut *err,
+            prefix: prefix.clone(),
+        };
+        let mut c = Ctx {
+            streams: &mut streams,
+            notices: &mut g.notices,
+            dialect: &FsMinc,
+        };
+        let mut vol = Volume::create_volume(
+            &mut c,
+            n_dims as i32,
+            Some(&names[..n_dims]),
+            nc,
+            signed,
+            min,
+            max,
+        )
+        .map_err(exit)?
+        .expect("3 or 4 dimensions");
+        vol.set_sizes(&[w, h, d, nf]);
+        vol.alloc_volume_data(&mut c);
+        vol.set_separations(&seps);
+        for (axis, cos) in cosines.iter().enumerate() {
+            vol.set_direction_cosine(
+                axis as i32,
+                &[f(cos[0]), f(cos[1]), f(cos[2])],
+                c.dialect,
+                c.streams,
+            )
+            .map_err(exit)?;
+        }
+        vol.set_translation(
+            &[
+                f64::from(w) / 2.0,
+                f64::from(h) / 2.0,
+                f64::from(d) / 2.0,
+                0.0,
+                0.0,
+            ],
+            &centre,
+            c.dialect,
+            c.streams,
+        );
+        vol
+    };
+    if m.chunk.is_none() && n_voxels > 0 {
+        // FreeSurfer reads the first voxel through rows the volume does not have (a crash)
+        g.notices.add(
+            &FS_58,
+            "mincWrite of a volume made without voxels".to_string(),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            "mincWrite(): the volume has no voxels (FreeSurfer crashes here)\n",
+        )?;
+    } else if m.chunk.is_none() {
+        g.notices.add(
+            &FS_58,
+            "mincWrite of a volume made without voxels: its range taken as 0 (FreeSurfer: memory never written)".to_string(),
+        );
+    }
+    if let Some(chunk) = m.chunk.as_ref() {
+        let bpv = m.bytes_per_vox;
+        for t in 0..nfu {
+            for x in 0..wu {
+                for y in 0..hu {
+                    for z in 0..du {
+                        let at = row_start(m, y, z, t) + x * bpv;
+                        let v = match m.mtype {
+                            MRI_UCHAR => f64::from(chunk[at]),
+                            MRI_SHORT => f64::from(i16::from_le_bytes([chunk[at], chunk[at + 1]])),
+                            MRI_INT => f64::from(i32::from_le_bytes(
+                                chunk[at..at + 4].try_into().expect("4 bytes"),
+                            )),
+                            MRI_LONG => {
+                                let l = long_value(m, x, y, z, t, rep);
+                                l.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as f64
+                            }
+                            _ => f(f32::from_le_bytes(
+                                chunk[at..at + 4].try_into().expect("4 bytes"),
+                            )),
+                        };
+                        vol.set_voxel_value(&[x, y, z, t, 0], v);
+                    }
+                }
+            }
+        }
+    }
+    let status = {
+        let mut streams = InDir {
+            out: &mut *out,
+            err: &mut *err,
+            prefix,
+        };
+        let mut c = Ctx {
+            streams: &mut streams,
+            notices: &mut g.notices,
+            dialect: &FsMinc,
+        };
+        minc::output_volume(
+            &mut s,
+            &mut c,
+            &path,
+            nc,
+            signed,
+            min,
+            max,
+            &mut vol,
+            Some(b""),
+            None,
+        )
+        .map_err(exit)?
+    };
+    if status != Status::Ok {
+        let _ = writeln!(out, "ERROR: mincWrite: output_volume exited with 1");
+        return Ok(1);
+    }
+    Ok(log::NO_ERROR)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,6 +999,238 @@ mod tests {
         assert!(
             err.contains("mincRead(): 5 dimensions in file; expecting 3 or 4"),
             "{err}"
+        );
+    }
+
+    /// A volume of `ty` of `w` x 1 x 1 voxels (one frame) holding `vals` (little-endian bytes of
+    /// each), coronal, RAS good.
+    fn vol(ty: i32, vals: &[Vec<u8>]) -> Mri {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut m = mri::mri_alloc_sequence(&mut g, &mut o, &mut e, vals.len() as i32, 1, 1, ty, 1)
+            .unwrap();
+        m.vg.ras_good_flag = 1;
+        (m.vg.x_r, m.vg.x_a, m.vg.x_s) = (-1.0, 0.0, 0.0);
+        (m.vg.y_r, m.vg.y_a, m.vg.y_s) = (0.0, 0.0, -1.0);
+        (m.vg.z_r, m.vg.z_a, m.vg.z_s) = (0.0, 1.0, 0.0);
+        let c = m.chunk.as_mut().unwrap();
+        let mut at = 0;
+        for v in vals {
+            c[at..at + v.len()].copy_from_slice(v);
+            at += m.bytes_per_vox;
+        }
+        m
+    }
+
+    /// Written in `mode`, read back by the default reader: the voxels' bytes, the type, the notices
+    /// of the write and its standard error.
+    fn round_trip(
+        m: &mut Mri,
+        mode: UpstreamDefects,
+    ) -> (i32, Option<Vec<u8>>, Vec<String>, String) {
+        let dir = tempfile::tempdir().unwrap();
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let r = minc_write(&mut g, &mut out, &mut err, Some(dir.path()), m, "o.mnc");
+        let ids: Vec<String> = g
+            .notices
+            .as_slice()
+            .iter()
+            .map(|n| n.defect.id.to_string())
+            .collect();
+        let e = String::from_utf8_lossy(&err).into_owned();
+        if r != Ok(0) {
+            return (-1, None, ids, e);
+        }
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let b = minc_read(&mut g, &mut out, &mut err, Some(dir.path()), "o.mnc", true)
+            .unwrap()
+            .unwrap();
+        (b.mtype, b.chunk, ids, e)
+    }
+
+    fn as_i64(c: Option<Vec<u8>>) -> Vec<i64> {
+        c.unwrap()
+            .chunks(8)
+            .map(|x| i64::from_le_bytes(x.try_into().unwrap()))
+            .collect()
+    }
+
+    fn as_bits(c: Option<Vec<u8>>) -> Vec<u32> {
+        c.unwrap()
+            .chunks(4)
+            .map(|x| u32::from_le_bytes(x.try_into().unwrap()))
+            .collect()
+    }
+
+    fn ints(xs: &[i32]) -> Vec<Vec<u8>> {
+        xs.iter().map(|x| x.to_le_bytes().to_vec()).collect()
+    }
+
+    fn floats(xs: &[u32]) -> Vec<Vec<u8>> {
+        xs.iter().map(|x| x.to_le_bytes().to_vec()).collect()
+    }
+
+    /// FS-747: 32-bit integers past 2^24 and near the limits (read back as 32-bit integers into
+    /// `MRI_LONG`); FreeSurfer's float range sinks every voxel to -2147483648 near the limits.
+    #[test]
+    fn integer_ranges() {
+        for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+            let mut m = vol(MRI_INT, &ints(&[16_777_217, 0, -16_777_217, 5]));
+            let (ty, b, ids, _) = round_trip(&mut m, mode);
+            assert_eq!(ty, MRI_LONG);
+            assert_eq!(as_i64(b), [16_777_217, 0, -16_777_217, 5]);
+            assert!(ids.contains(&"FS-747".to_string()), "{ids:?}");
+        }
+        let edges = [2_147_483_647, -2_147_483_648, 1, 123_456_789];
+        let mut m = vol(MRI_INT, &ints(&edges));
+        let (_, b, ids, _) = round_trip(&mut m, UpstreamDefects::Reproduce);
+        assert_eq!(as_i64(b), [-2_147_483_648; 4]);
+        assert!(ids.contains(&"FS-747".to_string()), "{ids:?}");
+        let mut m = vol(MRI_INT, &ints(&edges));
+        let (_, b, ids, _) = round_trip(&mut m, UpstreamDefects::Fix);
+        assert_eq!(as_i64(b), edges.map(i64::from));
+        assert_eq!(ids, ["FS-747"]);
+        // small values: the same file both ways, no notice
+        let mut m = vol(MRI_INT, &ints(&[3, -4, 7]));
+        let (_, b, ids, _) = round_trip(&mut m, UpstreamDefects::Fix);
+        assert_eq!(as_i64(b), [3, -4, 7]);
+        assert!(ids.is_empty(), "{ids:?}");
+    }
+
+    /// FS-746: a long volume. FreeSurfer writes the 32-bit numbers of each row's first half; by
+    /// default each voxel's value, clamped to 32 bits.
+    #[test]
+    fn long_volumes() {
+        let longs = |xs: &[i64]| {
+            xs.iter()
+                .map(|x| x.to_le_bytes().to_vec())
+                .collect::<Vec<_>>()
+        };
+        let vals = [7i64, -2, 3_000_000_000, 5];
+        let mut m = vol(MRI_LONG, &longs(&vals));
+        let (_, b, ids, _) = round_trip(&mut m, UpstreamDefects::Fix);
+        assert_eq!(as_i64(b), [7, -2, 2_147_483_647, 5]);
+        assert!(ids.contains(&"FS-746".to_string()), "{ids:?}");
+        // FreeSurfer: 7 and -2 as 32-bit halves: 7, 0, -2, -1
+        let mut m = vol(MRI_LONG, &longs(&[7, -2, 9, 5]));
+        let (_, b, ids, _) = round_trip(&mut m, UpstreamDefects::Reproduce);
+        assert_eq!(as_i64(b), [7, 0, -2, -1]);
+        assert!(ids.contains(&"FS-746".to_string()), "{ids:?}");
+    }
+
+    /// Floats: NaN and infinities are written; MINC's reader takes infinities to the largest
+    /// floats. FS-748: a NaN first voxel makes the file's valid range NaN (volume_io's message).
+    #[test]
+    fn float_values() {
+        for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+            let mut m = vol(MRI_FLOAT, &floats(&[0x3f80_0000, 0x7f80_0000, 0xff80_0000]));
+            let (ty, b, _, _) = round_trip(&mut m, mode);
+            assert_eq!(ty, MRI_FLOAT);
+            assert_eq!(as_bits(b), [0x3f80_0000, 0x7f7f_ffff, 0xff7f_ffff]);
+            // a signalling NaN made quiet
+            let mut m = vol(MRI_FLOAT, &floats(&[0x3f80_0000, 0x7fa0_0001, 0x4000_0000]));
+            let (_, b, _, _) = round_trip(&mut m, mode);
+            assert_eq!(as_bits(b), [0x3f80_0000, 0x7fe0_0001, 0x4000_0000]);
+        }
+        let first_nan = floats(&[0x7fc0_0000, 0x3f80_0000, 0x4000_0000]);
+        let mut m = vol(MRI_FLOAT, &first_nan);
+        let (_, b, ids, e) = round_trip(&mut m, UpstreamDefects::Reproduce);
+        assert_eq!(as_bits(b), [0x7fc0_0000, 0x3f80_0000, 0x4000_0000]);
+        assert!(
+            e.contains("Volume has invalid min and max voxel value"),
+            "{e}"
+        );
+        assert!(ids.contains(&"FS-748".to_string()));
+        let mut m = vol(MRI_FLOAT, &first_nan);
+        let (_, b, ids, e) = round_trip(&mut m, UpstreamDefects::Fix);
+        assert_eq!(as_bits(b), [0x7fc0_0000, 0x3f80_0000, 0x4000_0000]);
+        assert!(e.is_empty(), "{e}");
+        assert_eq!(ids, ["FS-748"]);
+    }
+
+    /// The refusals and the program's ends: a type the writer does not take, a volume made without
+    /// voxels (FS-58), a zero direction cosine (the copy's exit), more than one frame (FS-797:
+    /// FreeSurfer's copy ends the program; by default written).
+    #[test]
+    fn refusals_and_exits() {
+        let dir = tempfile::tempdir().unwrap();
+        let run = |m: &mut Mri, mode| {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let r = minc_write(&mut g, &mut out, &mut err, Some(dir.path()), m, "o.mnc");
+            let s = |b: Vec<u8>| String::from_utf8_lossy(&b).into_owned();
+            (r, s(out), s(err))
+        };
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut m =
+            mri::mri_alloc_sequence(&mut g, &mut o, &mut e, 2, 1, 1, mri::MRI_USHRT, 1).unwrap();
+        let (r, _, err) = run(&mut m, UpstreamDefects::Fix);
+        assert_eq!(r, Ok(ERROR_BADPARM));
+        assert!(
+            err.contains("mincWrite(): bad data type (10) in mri structure"),
+            "{err}"
+        );
+        let mut m = mri::mri_alloc_header(&mut g, &mut o, &mut e, 2, 1, 1, MRI_UCHAR, 1).unwrap();
+        m.nframes = 1;
+        let (r, _, err) = run(&mut m, UpstreamDefects::Reproduce);
+        assert!(matches!(r, Err(Fatal::Exit(_))), "{r:?}");
+        assert!(
+            err.contains("mincWrite(): the volume has no voxels"),
+            "{err}"
+        );
+        // RAS not good: the coronal cosines set in the caller's volume, then written
+        let mut m = vol(MRI_UCHAR, &[vec![1], vec![2]]);
+        m.vg.ras_good_flag = 0;
+        (m.vg.x_r, m.vg.x_a, m.vg.x_s) = (0.0, 0.0, 0.0);
+        let (r, _, _) = run(&mut m, UpstreamDefects::Fix);
+        assert_eq!(r, Ok(0));
+        assert_eq!((m.vg.x_r, m.vg.z_a), (-1.0, 1.0));
+        let mut m = vol(MRI_UCHAR, &[vec![1], vec![2]]);
+        (m.vg.y_r, m.vg.y_a, m.vg.y_s) = (0.0, 0.0, 0.0);
+        let (r, _, err) = run(&mut m, UpstreamDefects::Fix);
+        assert_eq!(r, Err(Fatal::Exit(1)));
+        assert!(
+            err.contains("Warning: zero length direction cosine"),
+            "{err}"
+        );
+        let mut m = mri::mri_alloc_sequence(&mut g, &mut o, &mut e, 2, 1, 1, MRI_UCHAR, 2).unwrap();
+        m.vg.ras_good_flag = 1;
+        (m.vg.x_r, m.vg.y_s, m.vg.z_a) = (-1.0, -1.0, 1.0);
+        let (r, _, err) = run(&mut m, UpstreamDefects::Reproduce);
+        assert_eq!(r, Err(Fatal::Exit(1)));
+        assert!(
+            err.contains("convert_spatial_axis_to_dim_name, bad axis"),
+            "{err}"
+        );
+        let mut m = mri::mri_alloc_sequence(&mut g, &mut o, &mut e, 2, 1, 1, MRI_UCHAR, 2).unwrap();
+        m.vg.ras_good_flag = 1;
+        (m.vg.x_r, m.vg.y_s, m.vg.z_a) = (-1.0, -1.0, 1.0);
+        let (r, _, err) = run(&mut m, UpstreamDefects::Fix);
+        assert_eq!(r, Ok(0), "{err}");
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let b = minc_read(&mut g, &mut o, &mut e, Some(dir.path()), "o.mnc", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(b.nframes, 2);
+        // a missing folder: the output's message
+        let mut m = vol(MRI_UCHAR, &[vec![1]]);
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let r = minc_write(
+            &mut g,
+            &mut out,
+            &mut err,
+            Some(dir.path()),
+            &mut m,
+            "no/o.mnc",
+        );
+        assert_eq!(r, Ok(1));
+        assert!(
+            String::from_utf8_lossy(&out).contains("ERROR: mincWrite: output_volume exited with 1"),
+            "{}",
+            String::from_utf8_lossy(&out)
         );
     }
 }

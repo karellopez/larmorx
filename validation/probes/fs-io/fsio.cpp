@@ -1467,7 +1467,11 @@ void run_piece13(const std::string &cmd)
 
 // piece 14 (track A relay 23): mghWrite and MRITAGwrite, directly or through MRIwrite
 // piece 22 (track A relay 30): kwr is vwr (the AFNI and NRRD writers)
-bool piece14_cmd(const std::string &cmd) { return cmd == "mgw" || cmd == "awr" || cmd == "vwr" || cmd == "kwr" || cmd == "ixw"; }
+// piece 26 (track A relay 34): mcw is vwr (the MINC writer)
+bool piece14_cmd(const std::string &cmd)
+{
+  return cmd == "mgw" || cmd == "awr" || cmd == "vwr" || cmd == "kwr" || cmd == "ixw" || cmd == "mcw";
+}
 
 // a volume with every field the MGH writer writes: <w> <h> <d> <type> <frames> <alloc 1 voxels|0
 // header>, the 15 geometry floats, <ras_good_flag>, tr te ti fov (floats), flip (double), the
@@ -1541,7 +1545,7 @@ MRI *read_mri14()
 void run_piece14(const std::string &cmd0)
 {
   // piece 23 (track A relay 31): ixw writes image files as vwr does
-  const std::string cmd = cmd0 == "kwr" || cmd0 == "ixw" ? "vwr" : cmd0;
+  const std::string cmd = cmd0 == "kwr" || cmd0 == "ixw" || cmd0 == "mcw" ? "vwr" : cmd0;
   fwide(stderr, -1);
   if (cmd == "mgw" || cmd == "awr" || cmd == "vwr") {
     // piece 16 (track A relay 26): awr <Gdiag_no> <N_Zero_Pad_Output> <N_Zero_Pad_Input for the
@@ -2753,7 +2757,7 @@ int main(int argc, char *argv[])
       static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
-                                 "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch"};
+                                 "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

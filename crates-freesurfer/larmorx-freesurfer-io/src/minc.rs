@@ -109,7 +109,11 @@ impl Dialect for FsVolumeIo {
 /// 4. an image of type double has no default range: the program ends (FS-775: corrected by
 ///    default, the doubles read), as does an image of a type volume_io does not know and a
 ///    dimension of irregular spacing;
-/// 5. its `.xfm` dialect is [`FsVolumeIo`] (its own 4 x 4 inverse).
+/// 5. its `.xfm` dialect is [`FsVolumeIo`] (its own 4 x 4 inverse);
+/// 6. writing: a direction cosine of length 0 ends the program after volume_io's warning (exit
+///    status 1); a volume of four dimensions (`xspace`, `yspace`, `zspace`, `time`) ends it at the
+///    start of the output with `convert_spatial_axis_to_dim_name, bad axis` (FS-797: corrected by
+///    default, written as MINC 1.5.1 writes it).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FsMinc;
 
@@ -208,6 +212,36 @@ impl larmorx_io::minc::Dialect for FsMinc {
     }
     fn xfm(&self) -> &dyn Dialect {
         &FsVolumeIo
+    }
+    fn zero_direction_cosine(&self, _streams: &mut dyn Streams) -> Option<larmorx_io::minc::Exit> {
+        // the copy ends the program after volume_io's warning (exit status 1), in both modes
+        Some(larmorx_io::minc::Exit { status: 1 })
+    }
+    fn output_dimension_names(
+        &self,
+        names: &[Vec<u8>],
+        notices: &mut larmorx_core::defects::Notices,
+        streams: &mut dyn Streams,
+    ) -> Option<larmorx_io::minc::Exit> {
+        // FS-797: the copy names only the spatial axes; a volume with a fourth dimension (mincWrite's
+        // `time`) ends the program. Other dimension lists are not mincWrite's.
+        let spatial = |n: &[u8]| matches!(n, b"xspace" | b"yspace" | b"zspace");
+        if names.len() == 4
+            && names[0] == b"xspace"
+            && names[1] == b"yspace"
+            && names[2] == b"zspace"
+            && !spatial(&names[3])
+        {
+            if notices.reproduce() {
+                streams.err("convert_spatial_axis_to_dim_name, bad axis\n");
+                return Some(larmorx_io::minc::Exit { status: 1 });
+            }
+            notices.add(
+                &larmorx_core::defects::FS_797,
+                "a volume with a time dimension written as MINC 1.5.1 writes it (FreeSurfer's copy ends the program)",
+            );
+        }
+        None
     }
     fn bad_data_type(
         &self,

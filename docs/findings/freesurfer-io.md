@@ -2027,3 +2027,79 @@ build, track D). Besides the GIFTI writer (D's fix), FreeSurfer calls it in `MRI
 (`ctrpoints.cpp` 164: `unknown user` when it gives no name), `VERuser` (`version.cpp` 109; `FSENVgetenv` calls it
 when `SUBJECTS_DIR` is set) and `getAllInfo` (`version.cpp` 273; `--all-info`): the port sets `g.errno = 0` at
 the three (relay 33), so an error message after them prints no stale `errno` line.
+
+## Part 28: MINC volumes written (relay 34 of track A)
+
+Sources: `utils/mriio.cpp` 1109-1143 (`MRIwriteType`'s `MRI_MINC_FILE` branch, first after the folder check),
+2596-2760 (`mincWrite`); `utils/mri.cpp` 12658-12679 (`MRIlimits`); `include/mri.h` (`MRI*seq_vox`),
+`include/machine.h` (`long32`); FreeSurfer's copy of MINC's writing path (`packages/minc`: `minc_volumes.c`'s
+`set_volume_direction_cosine`, `minc_output_volume.c`'s dimension names, `minc_output_mnc.c` 975-996). The library:
+track C's `larmorx_io::minc` writer (batch 20; `docs/findings/minc-volumes.md`, "Writing a volume";
+`freesurfer-permissive.md`, FreeSurfer's write path).
+
+### Mechanisms
+- **The sequence.** `if (mri->ras_good_flag == 0) setDirectionCosine(mri, MRI_CORONAL)` (the caller's volume
+  changed), the type map (`NC_BYTE` unsigned; `NC_SHORT`, `NC_LONG` (= `NC_INT`) for `MRI_INT` and `MRI_LONG`,
+  `NC_FLOAT` signed; else `errno = 0; ErrorReturn(ERROR_BADPARM, ...)`), `MRIlimits(mri, &fmin, &fmax)`, `min =
+  (double)fmin` (`cvtss2sd`), `create_volume(nframes == 1 ? 3 : 4, {xspace, yspace, zspace, time}, type, signed,
+  min, max)`, `set_volume_sizes({w, h, d, nframes})`, `alloc_volume_data`, `set_volume_separations({xsize, ysize,
+  zsize, 1})`, `set_volume_direction_cosine` for dimensions 0, 1, 2 with the x, y, z columns, `set_volume_translation(
+  {w / 2.0, h / 2.0, d / 2.0, 0}, {c_r, c_a, c_s, 0})`, the voxel loops (frames, then x, y, z) with
+  `set_volume_voxel_value(vol, x, y, z, t, 0, (double)MRI*seq_vox(...))` and `exec_progress_callback` (no callback
+  set: nothing), `output_volume(fname, type, signed, min, max, vol, "", NULL)`, `delete_volume`; `status != OK`:
+  `printf("ERROR: mincWrite: output_volume exited with %d\n", status)`, return 1.
+- **`MRIlimits`.** Returns without touching `min`/`max` when `mri->slices == NULL` (a header-only volume: mincWrite's
+  `fmin`/`fmax` are then uninitialised stack floats); else starts from `MRIgetVoxVal(mri, 0, 0, 0, 0)` and keeps a
+  value only when `val < *min` or `val > *max`: a NaN first voxel stays (FS-748), later NaNs are ignored.
+  `MRIgetVoxVal` reads an `MRI_LONG` voxel as the 64-bit `long` of the contiguous buffer, converted to `float`.
+- **`MRI_LONG` (FS-746).** `MRILseq_vox` is `((long32 *)mri->slices[z + n * depth][y])[x]` with `typedef int
+  long32`: the 4-byte number at byte `4 x` of the row of 8-byte voxels (as mincRead's FS-744 and NRRD's FS-741 write
+  them): the first half of each row read two numbers to a voxel (low half, then high half), the second half never.
+  The range, though, is the 64-bit values' (`MRIlimits`): a long volume whose values pass 32 bits gives a range the
+  library converts with FS-787, and the halves are then scaled into it (the unit test's `[7, -2, 3e9, 5]` reads
+  back `[-8, -3, -2, -3]`).
+- **The float range of 32-bit integers (FS-747).** `MRIlimits` gives `float`s: past 2^24 the extremes round
+  (16,777,217 gives 16,777,216: the value lies outside the file's `valid_range`; FreeSurfer's own reader still reads
+  it, MINC readers that apply the range clamp it); a greatest value from 2,147,483,520 up rounds to 2^31, past the
+  type: the library converts the valid range to the type with x86's conversion (FS-787: `INT_MIN`), and every voxel
+  is written as `0x80000000` (the unit test: `[2147483647, -2147483648, 1, 123456789]` all -2147483648 in the file).
+- **NaN first voxel (FS-748).** The voxel range NaN: `set_volume_voxel_range`'s `min >= max` test fails, the NaN
+  range stays; `minc_output_mnc.c` 990-996's `voxel_min < voxel_max` fails and prints `Volume has invalid min and max
+  voxel value`, the conversion's valid range is not set (the type's own); `valid_range` holds NaN. The values are
+  written and read back as they were.
+- **Infinities.** Written as infinities (`7f800000`); read back by volume_io as the largest floats (`7f7fffff`):
+  MINC's reading conversion of a float image (track C's library, both modes), not mincWrite's.
+- **Four dimensions (FS-797) and zero cosines.** FreeSurfer's copy's dimension-name conversion knows only the
+  spatial axes: `time` ends the program (`convert_spatial_axis_to_dim_name, bad axis`, exit 1) at the start of
+  `output_volume`, after the voxels are set (a header-only volume of 4 dimensions crashes in the loops first). Its
+  `set_volume_direction_cosine` exits 1 after the zero-length warning (track C's measurement), before the loops.
+- **A header-only volume.** `MRIseq_vox` through `slices == NULL`: a crash at the first voxel (FS-58) when there is
+  one; with an extent 0 the loops do nothing and the range is memory never written (and a size 0 is the library's
+  FS-798).
+- **`errno`.** `MRIwriteType`'s `stat` of a new name sets `ENOENT`; a successful write leaves it (the probe's `0 2`
+  lines); the library's failures set their own (`1 2`: a missing folder; `1 20`: a file in a folder's place).
+- **Package-error sites of the writing path** (batch 21's merge fix: `BadStdVar`, `WrongNDims`, `BadSuffix`,
+  `MaxMinDims`): mincWrite gives only standard names, dimension variables of one dimension and `image-max`/`-min`
+  over the slower dimensions; no output of piece 26 (seeds 7, 13, 21, both modes) holds a `minc_convenience.c`
+  line: not reachable, not probed.
+
+### Decisions (rules A to D)
+- FS-746 (rule A, as FS-744 and FS-447): each voxel's 64-bit value, clamped to the 32-bit range (noted).
+- FS-747 (rule A): the valid range of 32-bit integer volumes taken exactly from their values (only where the float
+  range differs: otherwise FreeSurfer's file byte for byte).
+- FS-748 (rule A): a NaN first voxel does not decide the range: the range of the other values (a volume of NaNs
+  only keeps NaN).
+- FS-58 (rule B, as the other writers): a header-only volume with voxels to write is refused, the program ends; with
+  none, the range 0 to 0 (FreeSurfer's is memory never written: not compared).
+- Kept (rule C): `setDirectionCosine` in the caller's volume (FreeSurfer's callers may rely on it); the program's
+  end at a zero direction cosine (the copy's, track C's decision); infinities read back as the largest floats
+  (MINC's reading).
+
+### What the probe measured (piece 26)
+Seeds 7, 13 and 21 (888 piece-26 cases each): `reproduce` identical on every compared case (794, 790, 769), 0
+different; 94, 98 and 119 skipped (an extent or frame count of 0: the library's FS-798 with FS-53's read of voxel
+`(0, 0, 0)`; header-only volumes: FS-58). Seed 7's compared outcomes under `reproduce`: 345 files written, 146
+program ends (four dimensions, FS-797; zero cosines), 132 types refused, 79 folders refused, 92 outputs that failed
+(a missing folder, a file in a folder's place). `fix` differs only with notices (FS-746, FS-747, FS-748, FS-797, and the read
+back's FS-744 and FS-01). The light run (`check.py --seed 1 --n 4800 --portable --light`, relay 34): 4,800 cases,
+4,310 identical (42 with memory digits), 490 hashed as `SKIP`, 0 different (`5dd80d2c...`, `tests/fs_io_official.rs`).

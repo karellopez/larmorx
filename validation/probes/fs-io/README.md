@@ -286,6 +286,18 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `mrh`. `SKIP` under `reproduce` for FS-745 (five dimensions: names past mincRead's array) and the library's
   memory-contents defects (track C's list). Seeds 7 (298 piece-25 cases), 13 and 21 (894 each): `reproduce`
   identical on every compared case (1,815), 0 different; `fix` differs only with notices.
+- Piece 26 (track A relay 34): MINC 1 volumes written. `mcw` (piece 17's `vwr`: `how` 11, `MRIwriteType` as type 1,
+  or 1, `MRIwrite` of a `.mnc` name) of volumes built by `tests/fs_io/piece26.rs`: bytes, 16- and 32-bit integers,
+  longs, floats (and unsigned 16-bit, RGB, complex and tensor volumes, refused), one to three frames or none, with
+  voxels or header-only; voxel sizes ordinary, negative, 0, tiny, huge; direction cosines coronal, permuted, oblique,
+  neither unit nor orthogonal, of length 0, with a NaN or an infinity; centres; the good-RAS flag 1, 0, -1; values
+  constant, small, or at the types' edges (integers past 2^24 and at the 32-bit limits, longs past 32 bits, NaNs,
+  infinities, subnormals, -0); `.mnc`, `.MNC`, `.mnc.gz`, bare names, a blank, a sub-folder, an older file, a
+  missing folder, under a file, a folder; the file read back now and then (piece 25's reader). FreeSurfer's side maps
+  `mcw` to `vwr`. `SKIP` for FS-58 and the library's undefined writes (FS-781, FS-789, FS-798 to FS-801), and the
+  read back's piece-25 list under `reproduce`. Seeds 7, 13 and 21 (888 piece-26 cases each): `reproduce` identical on
+  every compared case (2,353), 0 different, 311 skipped; `fix` differs only with notices (FS-746 to FS-748, FS-797,
+  the reader's FS-744, FS-01).
 - `nrrd_itk_geometry.py` (relay 32): the default's NRRD geometry (FS-736 to FS-738) against ITK 5.4.5's NRRD
   reader (ANTs 2.6.5's `PrintHeader`, through the oracle-output cache): 400 seeded files, the voxel-to-RAS
   matrices compared: `python -P validation/probes/fs-io/nrrd_itk_geometry.py --seed 1 --n 400` (prints

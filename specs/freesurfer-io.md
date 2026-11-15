@@ -25,7 +25,9 @@ MGZ volumes written, the tags written after them, NIfTI volumes written (§93-94
 volumes read and written, Varian SDT volumes read; **part 21** (§110-112): GE Genesis and GE Signa LX
 series read; **part 22** (§113-115): GE Signa and GE XIMG series read; **part 23** (§116-117): old Siemens
 `.ima` series read; **part 24** (§118-121): AFNI datasets read (and their writer's refusal), curvature
-files and annotations read as volumes, the NRRD writer's refusal, `mri_read`'s frees.
+files and annotations read as volumes, the NRRD writer's refusal, `mri_read`'s frees; **part 25**
+(§122-125): image files read and written as volumes, ITK warps written; **part 26** (§126-127): NRRD volumes
+read; **part 27** (§128-129): MINC 1 volumes read; **part 28** (§130-131): MINC 1 volumes written.
 
 ## 1. Conventions
 
@@ -4103,3 +4105,73 @@ compared (memory contents or crashes): FS-745 and the library's FS-774, FS-776 t
 FS-789, FS-790, FS-792, FS-795, FS-796, under `reproduce`. Measured (2026-11-15, observed): seeds 7 (298 piece-25
 cases), 13 and 21 (894 each): `reproduce` identical on every compared case (1,815), 0 different; 271 skipped;
 `fix` differs only with notices.
+
+## 130. MINC 1 volumes written (`mincWrite`; `MRIwriteType`'s type 1, `MRI_MINC_FILE`)
+
+`MRIwriteType` as type 1 (and `MRIwrite` of a name `mri_identify` takes as MINC: `.mnc`) writes the volume through
+MINC 1.5.1's volume output (`larmorx_io::minc`, the main package's port of volume_io's `output_volume` over MINC
+1.5.1's writer and netCDF 3.6.0-p1's classic writer: its own behaviour, bytes, messages and defects:
+`docs/findings/minc-volumes.md`) in the dialect of FreeSurfer 8.2.0's copy (§128), whose writing differs in two
+points: (f) a direction cosine of length 0 prints volume_io's `Warning: zero length direction cosine in
+set_volume_direction_cosine()` (standard error) and ends the program with exit status 1, in both modes; (g) a
+volume of four dimensions (`xspace`, `yspace`, `zspace`, `time`) ends the program at the start of the output with
+`convert_spatial_axis_to_dim_name, bad axis` (standard error, exit status 1; FS-797). The name is the program's
+(a name without `/` in the working directory); before it, `MRIwriteType`'s own refusal of an existing folder
+(§§ of part 11) applies. In order:
+
+1. The good-RAS flag 0: the volume's direction cosines become the coronal ones (x `(-1, 0, 0)`, y `(0, 0, -1)`, z
+   `(0, 1, 0)`) and its centre `(0, 0, 0)`, **in the caller's volume** (they stay after the write).
+2. The type: `MRI_UCHAR` as netCDF bytes, unsigned; `MRI_SHORT` 16-bit integers, signed; `MRI_INT` and
+   `MRI_LONG` 32-bit integers, signed; `MRI_FLOAT` floats, signed. Another type: `mincWrite(): bad data type (<t>)
+   in mri structure` (an error, `ERROR_BADPARM`, `errno` 0 first), nothing written, `ERROR_BADPARM` returned.
+3. The range: the least and greatest voxel values of all frames as `float` (`MRIlimits`: starting from voxel
+   `(0, 0, 0)` of frame 0, then every voxel; a NaN never replaces the range, so a NaN first voxel keeps the range
+   NaN: FS-748), widened to `double` (a signalling NaN made quiet). A volume made without voxels leaves the range
+   unset (memory never written).
+4. A volume of three dimensions (one frame) or four (any other frame count, 0 included): names `xspace`,
+   `yspace`, `zspace` (and `time`), the file's type and sign from step 2, the voxel range from step 3; sizes the
+   width, height, depth (and frames); steps the voxel sizes (as `double`), the fourth 1; the direction cosine of
+   dimension 0 the volume's `(x_r, x_a, x_s)`, 1 `(y_r, y_a, y_s)`, 2 `(z_r, z_a, z_s)` (as `double`; volume_io
+   makes each a unit vector, (f) for one of length 0); then the starts volume_io computes so that voxel `(w/2,
+   h/2, d/2)` (each `int / 2.0` in `double`) lies at the centre `(c_r, c_a, c_s)`.
+5. A volume made without voxels and at least one voxel to write: FreeSurfer reads the first voxel through rows the
+   volume does not have and crashes (FS-58).
+6. Every voxel, frames outermost, then x, y, z: its value as a C `double` (bytes, shorts and ints exactly; floats
+   widened, a signalling NaN made quiet; `MRI_LONG`: the 32-bit number at byte `4 x` of the row of 8-byte voxels,
+   so the row's first half read as 32-bit numbers, one to a voxel: FS-746), stored in the volume as volume_io
+   stores it (C's conversions on x86-64).
+7. `output_volume(name, type, sign, range, volume, history "", no options)`. A status other than `OK` (the file not
+   created: a missing folder, a file or folder in a folder's place; the library's messages first):
+   `ERROR: mincWrite: output_volume exited with 1` (standard output), 1 returned. Otherwise `NO_ERROR`; `errno`
+   as the file's creation left it (the `stat` of a new name sets `ENOENT`, which stays).
+
+What reading the file back gives (observed, both modes): infinities read as the largest floats (MINC's reading
+of a float image); NaNs read as they were written; an integer volume's values whatever its valid range, except
+where the range itself fails (FS-747).
+
+**larmorx by default** (rule A): an `MRI_LONG` volume's own values, each clamped to the 32-bit range (FS-746); the
+valid range of a 32-bit integer volume (`MRI_INT`, `MRI_LONG`) taken from its values exactly (FreeSurfer's `float`
+range misses values past 2^24, and with values near the 32-bit limits it passes 2^31 - 1, which the library
+converts to -2147483648: every voxel is written as -2147483648; FS-747); a float volume whose first voxel is NaN
+takes the range of its other values (FS-748; FreeSurfer: NaN, with volume_io's `Volume has invalid min and max
+voxel value`); a volume of four dimensions written as MINC 1.5.1 writes it (FS-797); a volume made without voxels
+and voxels to write refused with `mincWrite(): the volume has no voxels (FreeSurfer crashes here)` (the program
+ends, `ERROR_BADPARM`; FS-58), one with nothing to write takes the range 0 to 0. Kept (rule C): the caller's
+volume changed by step 1; the program's end at a direction cosine of length 0.
+
+## 131. Validation plan (part 28)
+
+Piece 26 of the fs.io probe: `mcw` (`MRIwriteType` as type 1, or `MRIwrite` of a `.mnc` name) of volumes of
+bytes, 16- and 32-bit integers, longs and floats (and, refused, unsigned 16-bit, RGB, complex and tensor volumes),
+one frame, two or three, or none; with voxels or made without; extents 1 to 5 (now and then 0); voxel sizes 1,
+odd, negative, 0, tiny or huge; direction cosines coronal, a signed permutation of the axes, oblique, neither unit
+nor orthogonal, one of length 0, one holding a NaN or an infinity; centres 0, halves or far; the good-RAS flag 1, 0
+or -1; voxel values constant, small, or at the types' edges (integers past 2^24 and at the 32-bit limits, longs
+past 32 bits, floats NaN (quiet, signalling, negative), infinite, subnormal, -0, the largest); names `.mnc`, `.MNC`,
+`.mnc.gz`, bare, with a blank, in a sub-folder, over an older file, in a missing folder, under a file, or a folder;
+`Gdiag` 0 or 0x10000040; the file read back now and then (`mri_read` of type 1 or by its name: §128). Printed: the
+status, `errno`, the volume's intent and version and its voxels' hash after the write, every file's bytes, the
+read-back volume. Not compared (memory contents or crashes): FS-58, a dimension of size 0 (the library's FS-798)
+and the library's FS-781, FS-789, FS-799 to FS-801; under `reproduce` the read back's §129 list. Measured
+(2026-11-15, observed): seeds 7, 13 and 21 (888 piece-26 cases each): `reproduce` identical on every compared case
+(2,353), 0 different; 311 skipped; `fix` differs only with notices.

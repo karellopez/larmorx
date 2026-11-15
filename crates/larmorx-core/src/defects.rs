@@ -2149,6 +2149,12 @@ defects! {
         "reading a MINC volume of 32-bit integers stores each value as a 32-bit number, one after another from the start of its row, in a volume of 64-bit voxels: the voxels hold pairs of other values, the second half of every row zeros, and unsigned values above 2^31 - 1 negative";
     FS_745 = "FS-745", "FreeSurfer", true,
         "reading a MINC file of five or more dimensions reads the names of its dimensions past the four the reader gives (memory contents): a crash, or the file refused after a read of what memory names";
+    FS_746 = "FS-746", "FreeSurfer", true,
+        "writing a volume of 64-bit integers (long) as MINC writes the 32-bit numbers in the first half of each row's bytes, one to a voxel: the halves of other voxels, wrong values";
+    FS_747 = "FS-747", "FreeSurfer", true,
+        "writing a volume of 32-bit integers as MINC takes the file's valid range from the values rounded to floats: past 2^24 the values lie outside the file's valid range, and with values near the 32-bit limits the range passes them and every voxel is written as -2147483648";
+    FS_748 = "FS-748", "FreeSurfer", true,
+        "writing a float volume as MINC whose first voxel is NaN gives the file a valid range of NaN (with volume_io's message: Volume has invalid min and max voxel value), whatever the other voxels hold";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

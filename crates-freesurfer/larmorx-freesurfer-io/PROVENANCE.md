@@ -298,6 +298,7 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | (larmorx's own) | the hook table for the conversions `mri_read` and `MRIwriteType` call in crates above this one (`ImageToMRI`, `MRItoImage`: fs.volume registers them; relay 31) | `upper.rs` |
 | `utils/mriio.cpp` 778-780, 9787-9975; `include/mri.h` (`MRI*seq_vox`); `utils/mri.cpp`'s `MRIorientationStringToDircos` for `RAS`, `LAS`, `LPS` | `mri_read`'s NRRD branch, `mriNrrdRead` over `larmorx_io::nrrd::load_with_errno` (NrrdIO r3991, track C's port: the main package's) (FS-734 to FS-741; relay 32) | `mriio_nrrd.rs`, `mriio.rs` |
 | `utils/mriio.cpp` 646-648, 2381-2592; `include/mri.h` (`MRI*seq_vox`); `packages/minc`'s `MI_LOG_PKG_ERROR2` / `MI_LOG_SYS_ERROR1` sites, `minc_convenience.c` 568, `minc_volume_io.c` 2035, 2073, 2289 (their messages and lines) | `mri_read`'s MINC branch, `mincRead` over `larmorx_io::minc` (MINC 1.5.1 and netCDF 3.6.0-p1, track C's port: the main package's) in FreeSurfer's dialect `FsMinc` (FS-742 to FS-745; relay 33) | `mriio_minc.rs`, `minc.rs`, `mriio.rs` |
+| `utils/mriio.cpp` 1141-1143, 2596-2760; `utils/mri.cpp` 12658-12679 (`MRIlimits`, through fs.mri); `packages/minc`'s `set_volume_direction_cosine` (its exit) and its output's dimension-name conversion (FS-797) | `MRIwriteType`'s MINC branch, `mincWrite` over `larmorx_io::minc`'s writer (track C's port of MINC 1.5.1's output and netCDF 3.6.0-p1's writer) in `FsMinc` (FS-746 to FS-748, FS-58; relay 34) | `mriio_minc.rs`, `minc.rs`, `mriio.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
 the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte
@@ -404,3 +405,11 @@ stored as 32 for `MRI_LONG`, `cvtsd2ss`); the messages name the file as the prog
 port opened it in is taken out). The defaults of FS-742 to FS-745 (the wider types, the 64-bit stores, the
 refusal) and their notices are larmorx's own. `ctrpoints.rs`: `MRIwriteControlPoints` sets `errno` 0 at
 its user lookup and writes `unknown user` when there is no name.
+
+Changes for relay 34: MINC 1 volumes are written by track C's port of MINC 1.5.1's volume output in
+FreeSurfer's dialect (`FsMinc` gains the copy's exit after a zero-length direction cosine and its refusal of a
+fourth dimension, FS-797, from track C's probe's measured `FreeSurferDialect`). The voxel values are read from the
+contiguous buffer as FreeSurfer reads them through its row pointers (`long32` at byte `4 x` for `MRI_LONG`), floats
+widened as `cvtss2sd` widens them; the messages name the file as the program does. The defaults of FS-746 to
+FS-748 (each long's value clamped, the exact range of 32-bit integers, the range of a float volume whose first voxel
+is NaN), the FS-58 refusal and their notices are larmorx's own.

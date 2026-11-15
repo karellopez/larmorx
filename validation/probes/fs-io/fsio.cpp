@@ -1791,6 +1791,7 @@ void run_piece6(const std::string &cmd0)
   // piece 24 (track A relay 32): nnd and nnh (NRRD files, attached and detached) as mrd and mrh do
   // piece 25 (track A relay 33): mcd and mch (MINC 1 files) as mrd and mrh do
   // piece 27 (track A relay 35): gcd and gch (GCA atlases, .gca and .gcz) as mrd and mrh do
+  // piece 28 (track A relay 36): mrr and mrx (MRIread, MRIreadEx) below
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
@@ -1833,6 +1834,28 @@ void run_piece6(const std::string &cmd0)
     else if (cmd == "gfd" || cmd == "gfh")
       m = type == GE_LX_FILE ? gelxReadFixed(name.c_str(), cmd == "gfd") : genesisReadFixed(name.c_str(), cmd == "gfd");
     else m = mghRead(name.c_str(), rv, frame);
+    print_mri6(m);
+    oi(errno);
+  } else if (cmd == "mrr" || cmd == "mrx") {
+    // piece 28 (track A relay 36): MRIread (twice in one process when asked: MRIremoveNaNs' NaN
+    // line is printed once per process) and MRIreadEx, after FS_LEAVE_NANS when asked
+    Gdiag = strtoull(next(), NULL, 16);
+    MRIIO_Strip_Pound = (int)geti();
+    set_env6((int)geti());
+    if ((int)geti()) setenv("FS_LEAVE_NANS", "1", 1);
+    int frame = -1, twice = 0;
+    if (cmd == "mrx") frame = (int)geti();
+    else twice = (int)geti();
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    // MRIread's licence check (chklc) needs FREESURFER_HOME (any value: with FS_LICENSE set it is
+    // not used, so no FreeSurfer file can be found through it) and the machine's licence file
+    setenv("FREESURFER_HOME", "/nonexistent-freesurfer-home", 1);
+    if (!getenv("FS_LICENSE")) setenv("FS_LICENSE", "/usr/local/freesurfer/license.txt", 1);
+    errno = 0;
+    MRI *m = cmd == "mrx" ? MRIreadEx(name.c_str(), frame) : MRIread(name.c_str(), NULL);
+    if (twice) m = MRIread(name.c_str(), NULL);
     print_mri6(m);
     oi(errno);
   } else if (cmd == "rrr") {
@@ -2758,7 +2781,8 @@ int main(int argc, char *argv[])
       static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr", "mgi", "mwr", "mgw", "ard", "arh", "awr",
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
-                                 "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch"};
+                                 "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
+                                 "mrr", "mrx"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

@@ -230,3 +230,19 @@ seed 7, 2,400 cases, 2,332 identical; seed 13, 3,600, 3,455 identical; 0 differe
 everywhere. Seed 1, 4,920 cases: 4,552 identical, 368 not comparable, 22 hashed as `HEAVY` (`check.py`'s `heavy`: the
 `MRIconform` resamplings and `lacjn`), hash `1acd334c6204657f39e004854539ea20a8405b3bc252092b59abcbc37450cc2e`.
 `check.py`'s `SKIP` adds FS-504, FS-508, FS-509, FS-511, FS-515, FS-517.
+Measured 2026-11-15 (part 17: relay 29, 257 commands; logs `oracles/logs/fs-found-c-r29-*`): mri2.cpp's `vvfill`
+(`MRIvol2VolFill`: one-transform LTAs from or to the source, two transforms, neither end, voxel-to-voxel, RAS and
+tkregister types, `FSLOUTPUTTYPE`, upsampling factors -1 to 3, `DoConserve` 0 to 2, `Gdiag_no` with `Gstdout` set as the
+programs' `DiagInit` sets it, masks, given outputs), `fbnwm` (`MRIfindBrightNonWM`), `qecc` (`QuadEulerCharChange`, with
+masks, centres outside and the debugging voxel `Gx Gy Gz`), `vtero` (`MRIvolTopoErodeOne`, keep masks), `vtdil`
+(`MRIvolTopoDilateOne`), `fscm` (`FixSubCortMassHA::FixSCM`), `binmri` (`BinarizeMRI`: every field, a second call with
+the frames the first left, `qualifies` at one voxel), `demb`, `demt`, `demm`, `demc` (`DEMorphBinVol`'s `morph` of a
+binary volume, by thresholds and by a match list, `check`, `dump` and `copyFrame`). The volumes take a new token group,
+`fill_box` (a box set to one value in every frame), between `fill_pat` and `fill_paint`. Seed 7, 11,000 cases: 10,110
+identical with `reproduce`, 890 not comparable (the shared FS-53, FS-58, FS-290: frames and voxels past the volumes), 0
+different; seed 13, 11,000 cases: 10,111 identical, 889 not comparable, 0 different; `fix` different only with notices
+(FS-802, FS-803, FS-805 to FS-808 among them); the port's debug and release builds agree on seed 13's 5,500 cases in
+both modes. Seed 1, 5,140 cases: 4,765 identical, 375 not comparable, 26 hashed as `HEAVY`, hash
+`d18ca1b6afbd2c9bedc741eaeda8e14266b41035990f1df7c0de987e3eb4c402`, passing with AArch64's NaN emulated in debug and
+release (`oracles/logs/fs-found-c-r29-trap-volume.log`) and on Windows x64 (the cross-check tool). `check.py`'s `SKIP`
+is unchanged.

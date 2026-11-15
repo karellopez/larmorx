@@ -37,6 +37,7 @@ use std::path::Path;
 
 use larmorx_core::defects::{
     FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666, FS_672, FS_717,
+    FS_841,
 };
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
@@ -275,6 +276,158 @@ pub fn mri_read_type(
 ) -> Result<Option<Mri>, Fatal> {
     larmorx_freesurfer_core::chklc::chklc();
     mri_read(g, out, err, env, dir, fname, mtype, true, -1, -1)
+}
+
+/// `MRIread(fname, NULL)`: the volume of `fname` (a name with a `*` replaced by the first path
+/// `glob` finds, `FileNameFromWildcard`), read whole with its type found from the name
+/// (`mri_read(fname, MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1)`), then its non-finite voxels made 0
+/// ([`mri_remove_nans`]). FreeSurfer's licence check passes first; the progress range it splits
+/// between the two steps has no callback on any program's path. A name of 1,024 bytes or more
+/// (after the wildcard) passes FreeSurfer's buffer (FS-249: used whole). The DICOM series'
+/// list of volumes (FreeSurfer's second argument) belongs to the DICOM loaders, not ported.
+pub fn mri_read_volume(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    fname: &str,
+) -> Result<Option<Mri>, Fatal> {
+    mri_read_ex_frames(g, out, err, env, dir, fname, -1, "MRIread")
+}
+
+/// `MRIreadEx(fname, nthframe)`: [`mri_read_volume`] with the frames `nthframe` to `nthframe`
+/// (`-1`: every frame; otherwise one frame, refused when out of range, and the volume refused
+/// when one of its voxels is not finite: `mri_read`'s frame check).
+pub fn mri_read_ex(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    fname: &str,
+    nthframe: i32,
+) -> Result<Option<Mri>, Fatal> {
+    mri_read_ex_frames(g, out, err, env, dir, fname, nthframe, "MRIreadEx")
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mri_read_ex_frames(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    fname: &str,
+    frame: i32,
+    who: &str,
+) -> Result<Option<Mri>, Fatal> {
+    larmorx_freesurfer_core::chklc::chklc();
+    fits(g, who, fname);
+    let name = utils::file_name_from_wildcard(dir, fname);
+    if name != fname {
+        fits(g, who, &name);
+    }
+    let m = mri_read(
+        g,
+        out,
+        err,
+        env,
+        dir,
+        &name,
+        MRI_VOLUME_TYPE_UNKNOWN,
+        true,
+        frame,
+        frame,
+    )?;
+    let Some(mut m) = m else {
+        return Ok(None);
+    };
+    mri_remove_nans(g, out, err, env, &mut m);
+    Ok(Some(m))
+}
+
+/// `MRIremoveNaNs(mri, mri)` (every caller passes one volume as both): each voxel that is not
+/// finite (NaN or infinite; only a float volume can hold one) is counted and, unless
+/// `FS_LEAVE_NANS` is set, made 0. The first such voxel of the process prints `NaN found at
+/// voxel (<x>, <y>, <z>, <f>)` on standard output (once per process, the first in the order x,
+/// y, z, frame); a volume with any prints the error `WARNING: <n> NaNs found in volume
+/// <name>...` (the count a 32-bit `int`). FreeSurfer runs the loop over x on its OpenMP threads:
+/// with several, the voxel the line names (and how many lines are printed) depends on their
+/// timing when the non-finite voxels lie in more than one column of x (FS-841, noted; the port
+/// prints the serial order's first, as FreeSurfer with one thread).
+pub fn mri_remove_nans(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    m: &mut Mri,
+) {
+    if m.mtype != MRI_FLOAT {
+        return;
+    }
+    let leave = env.get("FS_LEAVE_NANS").is_some();
+    let (w, h, d, nf) = (m.width, m.height, m.depth, m.nframes);
+    let (row, slice, vol) = (
+        m.vox_per_row as usize,
+        m.vox_per_slice as usize,
+        m.vox_per_vol as usize,
+    );
+    let mut nans = 0i32;
+    let mut first: Option<(i32, i32, i32, i32)> = None;
+    let mut columns = 0u32;
+    if let Some(chunk) = m.chunk.as_mut() {
+        for x in 0..w.max(0) {
+            let mut in_column = false;
+            for y in 0..h.max(0) {
+                for z in 0..d.max(0) {
+                    for f in 0..nf.max(0) {
+                        let o = (f as usize * vol
+                            + z as usize * slice
+                            + y as usize * row
+                            + x as usize)
+                            * 4;
+                        let Some(b) = chunk.get_mut(o..o + 4) else {
+                            continue;
+                        };
+                        let v = f32::from_le_bytes([b[0], b[1], b[2], b[3]]);
+                        if v.is_finite() {
+                            continue;
+                        }
+                        nans = nans.wrapping_add(1);
+                        in_column = true;
+                        if !leave {
+                            b.copy_from_slice(&0f32.to_le_bytes());
+                        }
+                        if first.is_none() {
+                            first = Some((x, y, z, f));
+                        }
+                    }
+                }
+            }
+            columns += u32::from(in_column);
+        }
+    }
+    if let Some((x, y, z, f)) = first
+        && !g.remove_nans_shown
+    {
+        g.remove_nans_shown = true;
+        let _ = writeln!(out, "NaN found at voxel ({x}, {y}, {z}, {f})");
+    }
+    if columns > 1 {
+        g.notices.add(
+            &FS_841,
+            format!(
+                "MRIremoveNaNs: non-finite voxels in {columns} columns of x: with several threads FreeSurfer's NaN line may name another voxel or be printed more than once"
+            ),
+        );
+    }
+    if nans > 0 {
+        let mut msg = format!("WARNING: {nans} NaNs found in volume ").into_bytes();
+        msg.extend_from_slice(m.vg.fname.c_bytes());
+        msg.extend_from_slice(b"...\n");
+        log::error_printf_bytes(g, err, ERROR_BADPARM, &msg);
+    }
 }
 
 /// The formats [`mri_read`] does not read yet: their names.

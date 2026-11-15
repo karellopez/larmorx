@@ -35,7 +35,7 @@ use crate::tags::{
 };
 
 /// `sizeof(MRI_FRAME)` on x86-64 (GCC's layout of `include/mri.h`'s structure): 1,288 bytes.
-pub const SIZEOF_MRI_FRAME: i64 = 1288;
+pub const SIZEOF_MRI_FRAME: i64 = larmorx_freesurfer_mri::mri::SIZEOF_MRI_FRAME as i64;
 
 /// `FRAME_TYPE_DIFFUSION_AUGMENTED`: a frame that also stores its diffusion parameters.
 pub const FRAME_TYPE_DIFFUSION_AUGMENTED: i32 = 1;

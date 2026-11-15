@@ -23,6 +23,7 @@
 //!   fast arctangent, memory reports, logic-problem reports, temporary files; FS-06, FS-09 to
 //!   FS-12), [`version`] (`--version`, `--all-info`, the stamps; FS-07), [`fsenv`] (FS-08),
 //!   [`timer`], [`romp`], [`chklc`] (no licence check), [`xdebug`], [`fio`]'s table.
+//! - [`alloc`]: the C library's `calloc` as the port models it (larmorx's own code; FS-760).
 //! - The C library's behaviour they need, larmorx's own code: [`cstd`] (conversions), [`cglob`]
 //!   (`glob`, `fnmatch`), [`ctime`] (`gmtime`, `localtime` with the time-zone files,
 //!   `strftime("%c")`), [`system`] (the user's and the machine's names).
@@ -31,6 +32,7 @@
 #![forbid(unsafe_code)]
 
 pub mod affine;
+pub mod alloc;
 pub mod argparse;
 pub mod base;
 pub mod cglob;

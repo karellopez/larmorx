@@ -54,12 +54,6 @@ use crate::mriio_nifti::{narrow, widen};
 /// `STRLEN`: FreeSurfer's name and line buffers.
 const STRLEN: usize = 1024;
 
-/// `sizeof(MRI_FRAME)` on x86-64: what `calloc` of the frames asks for per frame.
-const MRI_FRAME_BYTES: u64 = crate::fstagsio::SIZEOF_MRI_FRAME as u64;
-
-/// The size above which `calloc` fails (the x86-64 user address space).
-const CALLOC_LIMIT: u64 = 1 << 47;
-
 /// The extension and voxel size of a bvolume's type.
 fn ext_of(mtype: i32) -> Option<(&'static str, usize)> {
     match mtype {
@@ -463,10 +457,10 @@ pub fn write_bhdr(
 }
 
 /// `calloc(n, sizeof(MRI_FRAME))` of a bvolume's frames: the frames, or `None` where `calloc`
-/// fails (a negative count, or more than the address space).
-fn frames_calloc(n: i32) -> Option<Vec<MriFrame>> {
-    let bytes = (n as i64 as u64).checked_mul(MRI_FRAME_BYTES)?;
-    if bytes > CALLOC_LIMIT {
+/// fails (a negative count, more than the address space, or FS-760's records past 16 GiB:
+/// fs.mri's `frames_calloc_fails`, checked before any frame is made).
+fn frames_calloc(g: &mut Globals, n: i32) -> Option<Vec<MriFrame>> {
+    if mri::frames_calloc_fails(g, n) {
         return None;
     }
     Some((0..n).map(|_| MriFrame::default()).collect())
@@ -552,7 +546,7 @@ fn get_b_info(
                 }
             };
             m.nframes = nt;
-            if frames_calloc(nt).is_none() {
+            if mri::frames_calloc_fails(g, nt) {
                 log::error_exit(
                     g,
                     err,
@@ -655,7 +649,7 @@ fn get_b_info(
     let (dx, dy) = (sse::sub(m.xend, m.xstart), sse::sub(m.yend, m.ystart));
     m.fov = if dx > dy { dx } else { dy };
     // calloc(nframes): a count calloc refuses leaves no frames (nothing reads them)
-    m.frames = frames_calloc(m.nframes).unwrap_or_default();
+    m.frames = frames_calloc(g, m.nframes).unwrap_or_default();
     if read_volume {
         let mut m2 = mri::mri_alloc_sequence(
             g,

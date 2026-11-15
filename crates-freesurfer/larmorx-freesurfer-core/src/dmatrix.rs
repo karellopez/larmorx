@@ -183,18 +183,18 @@ pub fn dmatrix_alloc(
         return Ok(None);
     }
     let nelts = i64::from(rows) * i64::from(cols);
-    let mut store = Vec::new();
-    let ok = nelts >= i64::from(i32::MIN)
-        && nelts <= i64::from(i32::MAX)
-        && nelts + 2 >= 0
-        && store.try_reserve_exact((nelts + 2) as usize).is_ok();
-    if !ok {
+    let store = if nelts >= i64::from(i32::MIN) && nelts <= i64::from(i32::MAX) && nelts + 2 >= 0 {
+        crate::alloc::zeroed::<f64>((nelts + 2) as usize)
+    } else {
+        None
+    };
+    let Some(store) = store else {
         let _ = writeln!(
             out,
             "ERROR: DMatrixAlloc({rows}, {cols}): allocation failed"
         );
         return Ok(None);
-    }
+    };
     if rows < -1 {
         log::error_exit(
             g,
@@ -204,7 +204,6 @@ pub fn dmatrix_alloc(
         )?;
         return Ok(None);
     }
-    store.resize((nelts + 2) as usize, 0.0);
     Ok(Some(DMatrix {
         mtype,
         rows,

@@ -70,11 +70,6 @@ pub const IMAGE_HORIZONTAL: i32 = 1;
 /// `HIPS_OK`.
 pub const HIPS_OK: i32 = 0;
 
-/// The size above which `calloc` is taken to fail (128 TiB, the x86-64 user address space).
-const CALLOC_LIMIT: u64 = 1 << 47;
-/// `ENOMEM`, what a failed `calloc` leaves in `errno`.
-const ENOMEM: i32 = 12;
-
 /// `IMAGE` (`struct header`): the fields FreeSurfer's reached code uses. The names, dates and
 /// descriptions, the history and the extra parameters are never set (`init_header` leaves them
 /// as `calloc` made them, NULL) and are not kept.
@@ -103,15 +98,10 @@ pub struct Image {
     pub ysize: f32,
 }
 
-/// `calloc(n, 1)` as glibc answers it on x86-64 Linux: `None` when it fails (`errno` `ENOMEM`).
+/// `calloc(n, 1)` as glibc answers it on x86-64 Linux: `None` when it fails (`errno` `ENOMEM`);
+/// the zeros are not touched until written (fs.core's `alloc::calloc_bytes`).
 fn calloc(g: &mut Globals, n: u64) -> Option<Vec<u8>> {
-    let mut v = Vec::new();
-    if n > CALLOC_LIMIT || v.try_reserve_exact(n as usize).is_err() {
-        g.errno = ENOMEM;
-        return None;
-    }
-    v.resize(n as usize, 0);
-    Some(v)
+    larmorx_freesurfer_core::alloc::calloc_bytes(&mut g.errno, n)
 }
 
 /// The bytes `[off, off + n)` of `im`'s buffer, or `None` (and FS-405 noted) when they are not
@@ -1448,7 +1438,7 @@ pub fn image_convolve1d(
     let halflen = len / 2;
     for n in [width, height] {
         if n.wrapping_add(2 * halflen) < 0 {
-            g.errno = ENOMEM;
+            g.errno = larmorx_freesurfer_core::alloc::ENOMEM;
             error_exit(
                 g,
                 err,

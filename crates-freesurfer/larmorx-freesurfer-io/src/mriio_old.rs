@@ -41,12 +41,10 @@ pub fn lcalloc<T: Clone + Default>(
     let fits = nmemb
         .checked_mul(size)
         .is_some_and(|b| b <= isize::MAX as usize);
-    let mut v: Vec<T> = Vec::new();
-    if !fits || v.try_reserve_exact(nmemb).is_err() {
-        return Err(mgh_print_error(g, out, "Cannot calloc()\n"));
+    match larmorx_freesurfer_core::alloc::zeroed::<T>(nmemb).filter(|_| fits) {
+        Some(v) => Ok(v),
+        None => Err(mgh_print_error(g, out, "Cannot calloc()\n")),
     }
-    v.resize(nmemb, T::default());
-    Ok(v)
 }
 
 #[cfg(test)]

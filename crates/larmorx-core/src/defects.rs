@@ -1814,7 +1814,7 @@ defects! {
     FS_228 = "FS-228", "FreeSurfer", true,
         "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
     FS_249 = "FS-249", "FreeSurfer", true,
-        "reading a volume (mri_read, MRIreadHeader) whose name is 1,024 bytes or more once the working directory is put before it writes past FreeSurfer's name buffers: the result is undefined and the program can crash";
+        "reading a volume (MRIread, MRIreadEx, mri_read, MRIreadHeader) whose name is 1,024 bytes or more (for mri_read and MRIreadHeader, once the working directory is put before it) writes past FreeSurfer's name buffers: the result is undefined and the program can crash";
     FS_253 = "FS-253", "FreeSurfer", true,
         "reading an MGH or MGZ volume that holds the NIfTI header extension's RAS-transform tag (tag 9) crashes";
     FS_254 = "FS-254", "FreeSurfer", true,
@@ -2183,6 +2183,10 @@ defects! {
         "reading a GCA atlas whose node grid reaches past its prior grid (a prior spacing larger than its sizes allow, or the sizes FS-749 reads) reads priors outside the prior grid for the class weights: memory contents or a crash";
     FS_759 = "FS-759", "FreeSurfer", true,
         "reading a GCA atlas of more than 109 inputs whose file holds the MR parameters overwrites the atlas's internal references with them: the program crashes";
+    FS_760 = "FS-760", "FreeSurfer", true,
+        "reading a volume whose header asks for millions of frames (or making a volume of that many): FreeSurfer keeps and fills about 1.6 kB of memory for each frame before it reads a voxel (3.2 GB for 2,000,000 frames of one voxel each), so past the machine's memory it ends at once (MRIalloc: could not allocate <n> frame, status 254; 449,657,401 frames) and below it fills the memory (12,000,000 frames: more than 12 GiB): the outcome depends on the machine";
+    FS_841 = "FS-841", "FreeSurfer", true,
+        "reading a float volume with non-finite voxels (NaN or infinite) through MRIread, MRIreadEx or MRIremoveNaNs on several threads: the voxel its 'NaN found at voxel' line names, and how many such lines it prints, depend on the threads' timing when those voxels lie in more than one column of x (the count and the voxels' new values do not)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

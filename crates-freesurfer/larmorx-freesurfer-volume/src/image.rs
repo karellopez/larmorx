@@ -489,3 +489,21 @@ pub fn image_to_mri(
     }
     Ok(mri)
 }
+
+/// Registers [`image_to_mri`] and [`mri_to_image`] (a new image) with fs.io, whose `mri_read`
+/// and `MRIwriteType` convert image files through them ([`larmorx_freesurfer_io::upper`]).
+pub fn register_io() {
+    larmorx_freesurfer_io::upper::register(|u| {
+        u.image_to_mri = Some(image_to_mri);
+        u.mri_to_image = Some(mri_to_image_new);
+    });
+}
+
+fn mri_to_image_new(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mri: &Mri,
+    slice: i32,
+) -> Result<Option<Image>, Fatal> {
+    Ok(mri_to_image(g, err, mri, None, slice)?.into_new())
+}

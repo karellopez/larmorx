@@ -51,6 +51,8 @@ pub(crate) mod piece20;
 pub(crate) mod piece21;
 #[path = "piece22.rs"]
 pub(crate) mod piece22;
+#[path = "piece23.rs"]
+pub(crate) mod piece23;
 #[path = "piece3.rs"]
 mod piece3;
 #[path = "piece4.rs"]
@@ -265,15 +267,15 @@ const FORMATS: [&str; 20] = [
 ];
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
-/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-14, track A
-/// relay 29, with piece 21 (Siemens .ima: 2 cases, the .mat readers, 4.2 of 5.3 s); relay
+/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-15, track A
+/// relay 31, with piece 23 (none: 1.4 s in all); relay 29, with piece 21 (Siemens .ima: 2 cases, the .mat readers, 4.2 of 5.3 s); relay
 /// 28, with pieces 19 and 20 (2 cases: 5.4 of 6.4 s); relay 27, with pieces 17 and 18 (2
 /// cases: 4.1 of 5.2 s); relay 24, with piece 14's NIfTI-1 pairs (2 cases: 4.7 of 5.6 s); relay 23, with piece 14's
 /// command and its NIfTI names (2 cases: 4.6 of 5.9 s); relay 21, with piece 12's four commands; first 2026-11-13, relay 19, with piece 10's sixteen commands: .mat files whose corrupted headers make the readers
 /// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
 /// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
 /// them.
-pub const HEAVY_SEED1: [usize; 2] = [1173, 4451];
+pub const HEAVY_SEED1: [usize; 0] = [];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]
@@ -320,6 +322,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece20::KINDS);
     kinds.extend(piece21::KINDS);
     kinds.extend(piece22::KINDS);
+    kinds.extend(piece23::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -396,6 +399,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece22::KINDS.contains(&kind) {
             lines.push(piece22::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece23::KINDS.contains(&kind) {
+            lines.push(piece23::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         if piece16::KINDS.contains(&kind) {
@@ -767,6 +774,7 @@ pub(crate) fn run_line_with(
     w: &Work,
     more: Option<ExtraPiece>,
 ) -> (String, Vec<&'static str>) {
+    larmorx_freesurfer_volume::image::register_io();
     let shared = Shared::default();
     let mut io = shared.clone();
     let mut g = Globals::new(mode);
@@ -880,6 +888,11 @@ pub(crate) fn run_line_with(
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece22::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece23::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece23::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {

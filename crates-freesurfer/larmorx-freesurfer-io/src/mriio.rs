@@ -287,7 +287,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         NRRD_FILE => "NRRD",
-        IMAGE_FILE => "image",
         _ => return None,
     })
 }
@@ -479,6 +478,12 @@ pub fn mri_read(
         mris_read_curv_as_mri(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::MGH_ANNOT {
         crate::annotation::read_annot_as_mri_seg(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::IMAGE_FILE {
+        // every voxel read whatever volume_flag says; the frames are not checked
+        let r = crate::imageio::read_as_volume(g, out, err, dir, &copy)?;
+        start_frame = -1;
+        end_frame = -1;
+        r
     } else if let Some(name) = not_ported(mtype) {
         let _ = writeln!(
             err,
@@ -608,9 +613,7 @@ fn write_not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
         MRI_MINC_FILE => "MINC",
-        IMAGE_FILE => "image",
         MGH_MORPH => "GCA morph (m3z)",
-        ITK_MORPH => "ITK warp",
         _ => return None,
     })
 }
@@ -848,6 +851,10 @@ pub fn mri_write_type(
         crate::afni::afni_write(g, err)
     } else if mtype == NRRD_FILE {
         mri_nrrd_write(g, err)
+    } else if mtype == IMAGE_FILE {
+        crate::imageio::write_from_volume(g, out, err, dir, m, fname)?
+    } else if mtype == ITK_MORPH {
+        crate::mriio_write::itk_morph_write(g, out, err, dir, m, fname)?
     } else if let Some(name) = write_not_ported(mtype) {
         let _ = writeln!(
             err,

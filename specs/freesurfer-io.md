@@ -3764,3 +3764,173 @@ cases), 13, 21 and 99 (2,200 each): `reproduce` identical on every comparable ca
 identical, 101 skipped, 167 compared apart; seed 99: 1,932, 112, 156), 0 different; `fix` differs
 only with notices (FS-01's message byte, FS-704's names, FS-694, FS-698, FS-699, FS-700, FS-702,
 FS-706, FS-707, FS-708).
+
+## 122. Image files read as volumes (`mri_read`'s type 21, `IMAGE_FILE`)
+
+`mri_identify` gives the image type to names whose extension is `mat`, `svs`, `tif`, `tiff`, `jpg`,
+`jpeg`, `pgm`, `ppm`, `pbm` or `rgb` (and a name with `@<one of those>` has it too, §42); `mri_read`
+then reads the file as a 2-D image and converts it into a volume. Every voxel is read whatever the
+voxels flag says (the header reader reads the image too), and the frame list (`name#n`, §42) is not
+checked: the image's frames are the volume's.
+
+**The image's format** comes from the name `mri_read` passes (the `#` part already removed while
+`MRIIO_Strip_Pound` is set): with a `#` left in it, the text after the last `#` is read as a frame number
+(C's `%d`: none read gives -1; an overflow sets `errno` 34) and the name ends before that `#`. The
+extension is the text after the name's last `.`, found before the `#` is cut: a `.` after the `#`
+still gives it (`a#1.rgb` is the file `a` read as an SGI image). Upper-cased, `MAT` is MATLAB, `TIF`,
+`TIFF` and `SVS` are TIFF, `JPG` and `JPEG` JPEG, `PGM`, `PPM`, `PBM` those, `RGB` an SGI image; any
+other extension, or none, is a HIPS image. So `x.dat@rgb` is the HIPS image `x.dat`.
+
+**Readers.** Each gives an image or none; "none" ends the program in FreeSurfer (FS-718: the null image
+is converted, a crash, status 139); larmorx by default prints `mri_read(): could not read the image
+<name>` (an error, `ERROR_BADFILE`, `errno` 0 first) and gives no volume.
+
+- **MATLAB** (`.mat`): with `DIAG_WRITE` (8) in `Gdiag`, `ImageRead: buf=<name>, frame=<f>, type=1
+  (M=1,H=0)` on standard output first. The file's first variable is read as §37's `MatlabRead`
+  (its messages); none: `ImageRead(<name>) failed` (an error, `ERROR_NO_FILE`, `errno` as the reader
+  left it) and none. A real matrix of `r` rows and `c` columns is an image of `r` rows and `c` columns of
+  floats, row by row; the image is then "flipped" by HIPS, which is gone: `error: hips is not
+  supported` on standard error, nothing changed. A complex matrix: two such lines and the program ends
+  on its format (`IMAGE type = 4 not supported`, below; FS-719: FreeSurfer first copies the numbers
+  past the image's memory, 8 bytes a pixel into 1).
+- **HIPS** (any other extension): the file is opened (a folder opens; a name that does not open:
+  `ImageRead(<name>, <f>) failed`, `ERROR_NO_FILE`, the `errno` text first, and none). HIPS's header
+  reader and parameter look-up are gone: two lines `error: hips is not supported` on standard error.
+  Without a frame number (below 0) the image is empty: no rows, columns or frames, bytes; with one,
+  `ImageFRead(<name>, <f>) - frame out of bounds` (an error, `ERROR_BADFILE`, no newline) and none.
+- **PGM, PPM, PBM**: FreeSurfer is built without netpbm: `pgm not supported` (`ppm`, `pbm`; an error,
+  `ERROR_UNSUPPORTED`, no newline, the `errno` text first when there is one) and none.
+- **JPEG**: a name that does not open ends the program: `JPEGReadImage:  Input file does not exist`
+  (two spaces; `ERROR_NO_FILE`, status 255, the `errno` text first). Decoding is the IJG's library
+  (third-party, P-05): not ported yet.
+- **TIFF**: libtiff (third-party, P-05): not ported yet.
+- **SGI images** (`.rgb`): below.
+
+**SGI images.** The file starts with a header of 176 bytes (x86-64's layout of the SGI library's
+structure): at 0 the magic number, 2 the storage type, 4 the dimensions, 6 the width (`xsize`), 8 the
+height (`ysize`), 10 the planes (`zsize`), all 16-bit; the rest of the 176 bytes is not used when
+reading. A name that does not open gives none (no message; `errno` set). Fewer than 176 bytes: `iopen:
+error on read of image header`. The six 16-bit numbers are read little-endian; when the magic number so
+read is 474 (0732) byte-swapped, all six are swapped (the file is big-endian, SGI's order and
+FreeSurfer's own writer's; FS-720 for FreeSurfer's memory). Then a magic number other than 474: `iopen:
+bad magic in image file <magic as read, hexadecimal>`. Every message of this paragraph and the next
+goes to standard error and ends the program with status 1. More than three planes: `Too many color
+planes in RGBReadImage (<name>)` (an error, `ERROR_BADPARM`) and none.
+
+The storage type's high byte is 0 (uncompressed) or 1 (run-length); its low byte the bytes per pixel.
+The image has `ysize` rows of `xsize` RGB pixels. For each row `i` from 0, planes 0, 1 and 2 are read in
+turn: an image of fewer than 3 dimensions reads plane 0 three times (grey), of fewer than 2 row 0 every
+time. A row or plane at or past the image's (`zsize` of 1 or 2 with 3 dimensions: plane 2): `img_seek:
+row number out of range`; dimensions other than 1, 2, 3 with a row to read: `img_seek: weird dim`; a
+storage type whose high byte is neither 0 nor 1: `img_seek: weird image type`; a pixel size other than 1
+or 2: `getrow: weird bpp`. Uncompressed rows start at byte 512 + (`row` x `xsize` + `plane` x `xsize`
+x `ysize`) x `bpp` (32-bit unsigned arithmetic); a row of `xsize` x `bpp` bytes, 2-byte values in the
+header's byte order; a row the file cuts: `getrow: error on read of row`. Rows of 2-byte pixels of
+16,384 pixels or more: FS-723 (up to 32,767: the read fails with that message), FS-724, FS-728 (from
+32,768 only part of the row is read). Each pixel's red, green and blue byte is the low byte of its
+value in planes 0, 1 and 2.
+
+Run-length images: two tables follow the header from byte 512, the row starts and the row lengths,
+one 32-bit entry per row and plane (index `row + plane x ysize`) in the header's byte order; `iopen:
+error on read of rowstart` and `... rowsize` when the file cuts them. A row is read from its start,
+its length's bytes (`getrow: error on read of row` when cut; a length of -1 reads nothing and keeps
+the buffer's earlier values), then expanded: a byte (a 16-bit unit for 2-byte pixels) whose low 7
+bits are 0 ends the row; with its high bit the next `count` units are copied, without it the next unit
+is repeated `count` times. FreeSurfer 8.2.0 reads these tables as 8-byte entries (FS-721, FS-729) and
+bounds neither the row's bytes nor the expansion (FS-726); pixels no read gave are memory contents
+(FS-727). larmorx reads SGI's tables by default (`reproduce`: FreeSurfer's, little-endian files).
+
+**The volume** is `ImageToMRI`'s (`specs/freesurfer-volume.md` §34): width the columns, height the
+rows, depth 1; bytes for HIPS's empty image, floats for MATLAB, RGB for SGI images (`reading RGB
+image....` on standard output; each voxel `red + 256 green + 65536 blue`); the image's rows run upwards
+(image row `height - 1 - y` is volume row `y`); voxel sizes 1, coronal direction cosines. A complex
+image ends the program: `IMAGE type = 4 not supported` (an error, `ERROR_BADPARM`, status 252). Then
+`mri_read`'s usual ending (the name, the cached matrices, §42).
+
+## 123. Image files written (`MRIwriteType`'s type 21)
+
+A volume whose depth is not 1 ends the program: `MRIwriteType(<name>): image files cannnot have
+depth > 1` (`ERROR_BADPARM`; three `n`s). Slice 0 of frame 0 becomes an image (`MRItoImage`,
+`specs/freesurfer-volume.md` §34: bytes for byte volumes and any type it does not know, 32-bit pixels
+for `int` and `float` volumes, the volume's rows reversed). A volume of another type than bytes,
+`int` and `float` with at least one row: `MRItoImage: unsupported type <t>` (an error) and no image;
+FreeSurfer goes on with it (FS-732: a crash, status 139, or for PGM and PPM names the format's message
+and `ImageFree: null pointer`, status 252); larmorx stops there by default and returns -3
+(`ERROR_UNSUPPORTED`).
+
+The name is opened for writing as given (created empty, or emptied): `ImageWrite(<name>) failed` (an
+error, `ERROR_NO_FILE`, the `errno` text first) when it does not open. Then by the format §122 gives
+(the name without its `#` part is the file the format writes):
+
+- **SGI** (`.rgb`): an uncompressed image of 1-byte pixels (storage type 1), 2 dimensions (1 for a single
+  row), one plane; the file is created (mode 0666) or emptied, and its 176-byte header written; each
+  image row `y` from 0 is written three times at byte 512 + `y` x width (the same place: the image has
+  one plane), its bytes the image's pixel bytes `y x columns` to `(y + 1) x columns - 1` from the start
+  of its pixel buffer (for 4-byte pixels: the first bytes of the buffer, not whole pixels). Then the
+  header again at the start. Header (written last): magic 474, type 1, dimensions, width, height,
+  planes as big-endian 16-bit numbers; the smallest and largest byte written (10,000,000 and 0 when
+  none) as big-endian 32-bit numbers; 4 zero bytes; `no name` and zeros to 80 bytes; 4 zero bytes (the
+  colour map); the program's file descriptor (FS-722: 0 in larmorx); the flags 2 (16-bit
+  little-endian); 2 zero bytes; the last row written (16-bit little-endian, 0 when none or one row);
+  zeros to byte 144; a memory address (FS-722: 0 in larmorx); zeros to 176. Bytes 176 to 511 are zeros
+  (the gap the writes leave); nothing is written past the header when the image has no pixels. A
+  file that cannot be created: `iopen: can't open output file (null)` (FS-725; larmorx by default
+  names it) on standard error and status 1. Widths or heights beyond 65,535 are stored modulo 65,536
+  (FS-730; larmorx refuses them by default: `RGBwrite(<name>): an image of <c> x <r> pixels does not fit
+  an SGI image (at most 65535 x 65535)`, `ERROR_BADPARM`).
+- **HIPS** (any other extension): HIPS's writer is gone: three lines `error: hips is not supported`
+  (its parameter look-up and setting, its header) and one per frame (1), nothing written.
+- **PGM, PPM**: `pgm not supported`, `ppm not supported` (errors, `ERROR_UNSUPPORTED`, the `errno` text
+  first: ENOENT after the folder check of a new name).
+- **JPEG, MATLAB, PBM** (FreeSurfer's JPEG writer takes them all): an image that is not of bytes:
+  `JPEGWrite: only PFBYTE currently supported` (an error); of bytes: the IJG's encoder (third-party, not
+  ported yet).
+- **TIFF**: libtiff (not ported yet).
+
+`MRIwriteType` returns 0 (FS-731: also when nothing was written; larmorx by default returns the
+error: -1 when the name does not open, -3 for a format's refusal and for HIPS, -4 for FS-730), then
+writes the volume's b-values when it has them (§84).
+
+## 124. ITK warps written (`itkMorphWrite`; `MRIwriteType`'s type 31, `ITK_MORPH`)
+
+A volume of other than 3 frames: `MRIwriteType: itk warp - input mri must have 3 frames, not <n>` (an
+error, `ERROR_UNSUPPORTED`) and -1. With `Gdiag_no` above 0, `itkMorphWrite: use_compression = <0|1>`
+on standard output (1 when the name ends in `z`: the file is gzip-compressed). The NIfTI writers' size
+checks (§93: more than 32,768 rows, slices or frames end the program with `NIFTI FORMAT ERROR: ...`,
+status 1; FS-449 at 32,768); the width is not checked (FS-733: 32,768 or more is stored modulo 65,536
+as a signed 16-bit number; larmorx by default ends with `NIFTI FORMAT ERROR: ncols <w> in volume
+exceeds 32767`, status 1). A volume that is not of floats: `itkMorphWrite(): unknown data type <t>` (an
+error, `ERROR_BADPARM`, the `errno` text first) and -4.
+
+The file is a NIfTI-1 file (`n+1`): the 348-byte header with 5 dimensions (width, height, depth, 1,
+frames; the unused ones 1), the voxel sizes in `pixdim` 1 to 3 and 0 in the others but the first (the
+quaternion's `qfac`), float data (16, 32 bits), the vector intent (1007), voxel offset 352, `regular`
+`r`, units millimetres (2), the description `FreeSurfer Mar 14 2026` (the build's date), the quaternion
+and offsets as §93's writer computes them with the code 2 (aligned anatomy), the affine rows with the
+code 1 (scanner); then 4 zero bytes and the voxels frame by frame, slice by slice, row by row, as
+little-endian floats. `itkMorphWrite(): error opening file <name>`, `... error writing header to
+<name>`, `... error writing data to <name>` (errors, `ERROR_BADFILE`, `errno` 0 first) and -5. The close
+is not checked; 0.
+
+## 125. Validation plan (part 25)
+
+Piece 23 of the fs.io probe: `ixd` and `ixh` (`mri_read` with and without voxels, the type -1 or 21) of
+SGI images (both byte orders, uncompressed and run-length, 1- and 2-byte pixels, 0 to 4 planes, 1 to 3
+dimensions and the wrong ones, rows of 16,384 to 40,000 2-byte pixels; one fault: a wrong magic number,
+an unknown storage type or pixel size, a header, table or row cut, run-length lengths of -1, 4,000 or
+65,536, rows without their final 0 or running past the width), MATLAB files (§39's generator), HIPS
+names (`h.x`, `h`, `h.dat@rgb`, `h.x@mat`, a folder), PGM, PPM and PBM names, TIFF and JPEG names
+(present or missing), missing files and folders, `#` frames with `MRIIO_Strip_Pound` on and off,
+`DIAG_WRITE`; `ixw` (`MRIwriteType` as type 21 or `MRIwrite` by the name; type 31 for ITK warps) of
+volumes of every type and shape (depths 0 to 2, 0 to 3 frames, widths and heights of 65,536, widths of
+32,768) onto SGI, MATLAB, PGM, PPM, PBM, HIPS, TIFF and JPEG names, `#` names (two files), a missing
+folder, folders, compressed and plain NIfTI names; written SGI images read back. The SGI header's
+descriptor and address bytes (108 to 111, 144 to 151) are zeroed on both sides before the files are
+compared. FreeSurfer's lines where it reads or writes past its buffers (FS-719, FS-724, FS-726, FS-729,
+and fs.volume's FS-290, FS-58, FS-465) are skipped, TIFF and JPEG codecs (not ported) too; memory
+contents and heap-dependent outcomes (FS-720, FS-727, MATLAB's FS-245 and addresses) compared apart.
+Measured (2026-11-15, observed): seeds 7, 13 and 21 (690 piece-23 cases each): `reproduce` identical on
+every comparable case (1,379), 0 different; 314 compared apart, 259 identical (the others: FreeSurfer's
+allocator aborting after FS-720's write past the SGI header, `malloc(): mismatching next->prev_size
+(unsorted)`, and memory contents); `fix` differs only with notices; 68 SGI images and 62 ITK warps
+written and compared byte for byte.

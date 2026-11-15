@@ -37,6 +37,7 @@
 #include "volcluster.h"
 #include "mri.h"
 #include "mrinorm.h"
+#include "mri2.h"
 #include "mrisegment.h"
 #include "rfa.h"
 #include "utils.h"
@@ -658,6 +659,19 @@ bool seg_case(const std::string &cmd)
     MRI *seg = get_vol();
     int ws = geti(), x = geti(), y = geti(), z = geti();
     oi(MRIcountCSFInNbhd(seg, ws, x, y, z));
+    return true;
+  }
+  if (cmd == "t2m") {
+    // t2m <src> <dst mode> [<dst>] <T2> <aparc?> T2_thresh mm_from_exterior: MRImask_with_T2_and_aparc_aseg
+    // (mri2.cpp; relay 34): the result, then the aparc+aseg after the call (changed in place)
+    MRI *src = get_vol();
+    MRI *dst = get_dst(geti(), src);
+    MRI *t2 = get_vol();
+    MRI *ap = get_opt();
+    float th = getf();
+    int mm = geti();
+    put_result(MRImask_with_T2_and_aparc_aseg(src, dst, t2, ap, th, mm), dst);
+    put_vol(ap);
     return true;
   }
   // mrinorm.cpp: vor <src> <ctrl> <dst?>; soap <src> <ctrl> <dst mode> [<dst>] niter min_change: the result,

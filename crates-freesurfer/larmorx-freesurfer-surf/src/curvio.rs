@@ -121,6 +121,14 @@ pub(crate) fn fgetl_line(fp: &mut CFile, n: usize) -> Option<(Vec<u8>, usize)> {
     }
 }
 
+/// The `errno` a failed read left (a directory's `EISDIR`, 21): C's `fread` sets it at once, so the
+/// next error message prints it (relay 35 of track D: an empty name read as the folder `./`).
+fn sync_read_errno(g: &mut Globals, fp: &CFile) {
+    if let Some(e) = fp.read_errno() {
+        g.errno = e;
+    }
+}
+
 fn verbose_show(g: &Globals) -> bool {
     g.gdiag & DIAG_SHOW != 0 && diag::verbose_on(g)
 }
@@ -295,6 +303,7 @@ pub fn read_curv_old_format(
     };
     let (_, vnum) = fread3(&mut fp);
     let (_, _fnum) = fread3(&mut fp);
+    sync_read_errno(g, &fp);
     if vnum != mris.nvertices {
         fp.close();
         let m = format!("__mrisreadoldcurvaturefile(): incompatible vertex number in file {fname}");
@@ -402,6 +411,7 @@ pub fn read_curvature_into_array(
         }
     };
     let (_, vnum) = fread3(&mut fp);
+    sync_read_errno(g, &fp);
     if vnum == NEW_VERSION_MAGIC_NUMBER {
         fp.close();
         return read_new_curvature_into_array(g, io, dir, sname, in_array_size);
@@ -467,12 +477,14 @@ pub fn read_new_curvature_into_array(
         }
     };
     let (_, vnum) = fread3(&mut fp);
+    sync_read_errno(g, &fp);
     if vnum != NEW_VERSION_MAGIC_NUMBER {
         fp.close();
         return read_curvature_into_array(g, io, dir, sname, in_array_size);
     }
     let vnum = fread_int(g, &mut fp);
     let _fnum = fread_int(g, &mut fp);
+    sync_read_errno(g, &fp);
     if vnum != in_array_size {
         fp.close();
         let m = format!(
@@ -557,6 +569,7 @@ pub fn read_float_file(
     };
     let vnum = fread_int(g, &mut fp);
     let fnum = fread_int(g, &mut fp);
+    sync_read_errno(g, &fp);
     if vnum != mris.nvertices {
         fp.close();
         let m = format!("{F}: incompatible # of vertices in file {fname}");
@@ -610,6 +623,7 @@ pub fn read_binary_areas(
     };
     let (_, vnum) = fread3(&mut fp);
     let (_, _fnum) = fread3(&mut fp);
+    sync_read_errno(g, &fp);
     if vnum != mris.nvertices {
         fp.close();
         let m = format!("{F}: incompatible vertex number in file {fname}");

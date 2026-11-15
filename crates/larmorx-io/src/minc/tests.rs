@@ -532,3 +532,81 @@ fn char_image_refused() {
     assert!(notices.contains(&larmorx_core::defects::FS_781));
     assert!(String::from_utf8_lossy(&err).contains("is not a numeric type"));
 }
+
+/// One x slice of a `zspace, yspace, xspace` file read as x, y, z: volume_io reads each z slab as one
+/// run into the volume (FS-794; FS-796 for the voxels no slab wrote, with `reproduce`).
+#[test]
+fn one_slice_slabs_in_their_place() {
+    let dir = tempfile::tempdir().unwrap();
+    let vals: Vec<f64> = (0..20000).map(|k| k as f64).collect();
+    let bytes = nc(
+        &[(b"zspace", 2), (b"yspace", 10000), (b"xspace", 1)],
+        &[(
+            b"image",
+            vec![0, 1, 2],
+            vec![
+                (b"signtype", V::T(b"signed__".to_vec())),
+                (b"valid_range", V::N(DOUBLE, vec![0.0, 30000.0])),
+            ],
+            SHORT,
+            vals,
+        )],
+    );
+    let p = write_tmp(dir.path(), "slice.mnc", &bytes);
+    let read = |mode| {
+        let mut cap = Cap::default();
+        let mut notices = Notices::new(mode);
+        let mut s = Session::new();
+        let name = p.to_string_lossy().into_owned().into_bytes();
+        let mut c = Ctx {
+            streams: &mut cap,
+            notices: &mut notices,
+            dialect: &Mni,
+        };
+        let names: Vec<Vec<u8>> = [&b"xspace"[..], b"yspace", b"zspace"]
+            .iter()
+            .map(|x| x.to_vec())
+            .collect();
+        let mut vol = None;
+        let (st, input) = start_volume_input(
+            &mut s,
+            &mut c,
+            &name,
+            0,
+            Some(&names),
+            0,
+            false,
+            0.0,
+            0.0,
+            true,
+            &mut vol,
+            None,
+        )
+        .unwrap();
+        assert_eq!(st, Status::Ok);
+        let mut input = input.unwrap();
+        let v = vol.as_mut().unwrap();
+        while input_more_of_volume(&mut s, &mut c, v, &mut input)
+            .unwrap()
+            .0
+        {}
+        let d = v.data.clone().unwrap();
+        (d, notices)
+    };
+    let (fixed, nf) = read(UpstreamDefects::Fix);
+    assert!(nf.contains(&larmorx_core::defects::FS_794));
+    for (y, z) in [(0, 0), (1, 0), (9999, 1), (5000, 1)] {
+        assert_eq!(fixed.get(y * 2 + z), (z * 10000 + y) as f64);
+    }
+    let (runs, nr) = read(UpstreamDefects::Reproduce);
+    assert!(nr.contains(&larmorx_core::defects::FS_794));
+    assert!(nr.contains(&larmorx_core::defects::FS_796));
+    for p in [0usize, 1, 2, 5000, 10000, 10001, 19999] {
+        let want = match p {
+            0 => 0.0,
+            1..=10000 => (10000 + p - 1) as f64,
+            _ => 0.0,
+        };
+        assert_eq!(runs.get(p), want, "voxel {p}");
+    }
+}

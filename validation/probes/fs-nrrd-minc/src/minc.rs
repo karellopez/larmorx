@@ -284,6 +284,7 @@ impl Dialect for FreeSurferDialect {
             PkgSite::IcvTooFewDims => "minc_image_conversion.c:2599",
             PkgSite::VarLoopAlloc => "minc_value_conversion.c:490",
             PkgSite::AttGetAlloc => "minc_netcdf_convenience.c:801",
+            PkgSite::IcvNotAttached => "minc_image_conversion.c:1328",
             _ => "minc_image_conversion.c:?",
         };
         Some(self.fatal(at, message, streams))
@@ -352,6 +353,8 @@ impl Dialect for FreeSurferDialect {
 pub struct FsInverse;
 
 thread_local! {
+    /// Set when the port's run reached the shim's limit of 100,000 slabs.
+    static LIMIT_HIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Set when [`FsInverse`] met a matrix with an entry that is not finite or beyond 1e300: the
     /// probe does not model FreeSurfer's inverse there.
     static NOT_MODELLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -545,6 +548,11 @@ fn run_port(s: &mut Session, c: &mut Ctx, name: &[u8], o: &mut String) -> Result
     loop {
         let (more, frac) = minc::input_more_of_volume(s, c, v, &mut input)?;
         f = frac;
+        if more && k >= 100000 {
+            // The shim stops reading after 100,000 slabs: the rest of the volume is never
+            // written (memory in the original's process); the case is not compared.
+            LIMIT_HIT.with(|l| l.set(true));
+        }
         if !(more && k < 100000) {
             break;
         }
@@ -1216,7 +1224,7 @@ fn crc32(b: &[u8]) -> u32 {
 /// not compared.
 const UNDEFINED: &[&str] = &[
     "FS-774", "FS-776", "FS-777", "FS-778", "FS-779", "FS-782", "FS-783", "FS-784", "FS-785",
-    "FS-789", "FS-790", "FS-792",
+    "FS-789", "FS-790", "FS-792", "FS-795", "FS-796",
 ];
 /// ... and those undefined in MINC 1.5.1 only (FreeSurfer's copy ends the program first).
 const UNDEFINED_UP: &[&str] = &["FS-781"];
@@ -1360,8 +1368,10 @@ pub fn run(seed: u64, count: u64, work: &Path, up: &MincLib, fs: &MincLib, t: &m
                 &fsd
             };
             NOT_MODELLED.with(|f| f.set(false));
+            LIMIT_HIT.with(|l| l.set(false));
             let p = port(&name, UpstreamDefects::Reproduce, dialect);
             let not_modelled = NOT_MODELLED.with(|f| f.get());
+            let limit_hit = LIMIT_HIT.with(|l| l.get());
             let pf = port(&name, UpstreamDefects::Fix, dialect);
             for id in &pf.notices {
                 *t.notices.entry(format!("{side} {id}")).or_default() += 1;
@@ -1383,6 +1393,22 @@ pub fn run(seed: u64, count: u64, work: &Path, up: &MincLib, fs: &MincLib, t: &m
                 })
                 .cloned()
                 .collect();
+            if cache_variant && side == "up" && p.notices.iter().any(|n| n == "FS-793") {
+                // The cache reads a short file's blocks in the order the caller asks for voxels:
+                // not followed by the port (it reads slabs).
+                *t.outcomes
+                    .entry(format!("{side} FS-793 with the cache (not modelled) -> {label}"))
+                    .or_default() += 1;
+                t.skipped += 1;
+                continue;
+            }
+            if limit_hit {
+                *t.outcomes
+                    .entry(format!("{side} more than 100,000 slabs (the shim's limit: not read to the end) -> {label}"))
+                    .or_default() += 1;
+                t.skipped += 1;
+                continue;
+            }
             if not_modelled {
                 *t.outcomes
                     .entry(format!("{side} a non-finite voxel-to-world matrix (FreeSurfer's inverse not modelled by the probe) -> {label}"))

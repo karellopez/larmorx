@@ -2389,6 +2389,12 @@ defects! {
         "a direction_cosines attribute of fewer than three values takes its missing values from the dimension read before it";
     FS_793 = "FS-793", "netCDF", true,
         "values of a netCDF file shorter than its header are read past its end as bytes of an earlier block of the reader's buffer where netCDF means zeros";
+    FS_794 = "FS-794", "MINC volume_io", true,
+        "a MINC volume with a dimension of size 1 whose order differs from the volume's (one x slice of a zspace, yspace, xspace file read as x, y, z) is read with each slab written as one run from its first voxel: slabs overwrite each other and the rest of the volume is never written";
+    FS_795 = "FS-795", "MINC volume_io", true,
+        "... such a run that passes the end of the volume's array writes memory beside it";
+    FS_796 = "FS-796", "MINC volume_io", true,
+        "... and the voxels no slab wrote keep the memory the volume's array was given";
     FS_792 = "FS-792", "MINC volume_io", true,
         "a direction_cosines attribute of fewer than three values on the first dimension read with direction cosines takes its missing values from memory never written";
 }

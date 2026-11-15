@@ -32,7 +32,7 @@
 //! a float volume's voxel range is then its real range, which changes how out-of-range voxels are
 //! read), into the whole array.
 //!
-//! The defects (register entries FS-774 to FS-793; `docs/findings/minc-volumes.md`) are corrected by
+//! The defects (register entries FS-774 to FS-796; `docs/findings/minc-volumes.md`) are corrected by
 //! default and reproduced with [`larmorx_core::defects::UpstreamDefects::Reproduce`], each with a
 //! notice.
 
@@ -306,6 +306,12 @@ pub mod defects {
     pub const EMPTY_DIMENSION: &str = "FS-790";
     /// Values past the end of a file shorter than its header.
     pub const PAST_END: &str = "FS-793";
+    /// A slab read straight into the volume where a dimension of size 1 hides the order.
+    pub const SCRAMBLED_SLAB: &str = "FS-794";
+    /// ... and a run past the end of the volume's array.
+    pub const SLAB_PAST_ARRAY: &str = "FS-795";
+    /// ... and voxels no slab wrote (memory contents).
+    pub const SLAB_UNWRITTEN: &str = "FS-796";
     /// FreeSurfer's copy refuses a MINC image of type double.
     pub const NO_DOUBLE: &str = "FS-775";
     /// A `direction_cosines` attribute of fewer than three values keeps the earlier dimension's.

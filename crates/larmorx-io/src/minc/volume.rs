@@ -145,6 +145,8 @@ pub struct Volume {
     /// Whether volume_io keeps the volume in its cache ([`super::Dialect::cache_threshold`]).
     pub is_cached_volume: bool,
     pub data: Option<VolumeData>,
+    /// The voxels slabs wrote, kept while a scrambled read (FS-794, `reproduce`) leaves some unset.
+    pub(crate) written: Option<Vec<bool>>,
 }
 
 /// `convert_dim_name_to_spatial_axis`.
@@ -252,6 +254,7 @@ impl Volume {
             is_rgba_data: false,
             is_cached_volume: false,
             data: None,
+            written: None,
         };
         for i in 0..n {
             let name = match names {

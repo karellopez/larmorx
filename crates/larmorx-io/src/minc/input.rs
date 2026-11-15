@@ -956,6 +956,17 @@ fn input_more_minc_file(
     }
     let fraction = if increment {
         file.end_volume_flag = true;
+        if let Some(mask) = volume.written.take()
+            && mask.iter().any(|w| !w)
+        {
+            c.notices.add(
+                &d::FS_796,
+                format!(
+                    "{}: voxels no slab wrote read as 0 (volume_io leaves the memory its array was given)",
+                    String::from_utf8_lossy(&file.filename)
+                ),
+            );
+        }
         1.0
     } else {
         n_done as f64 / total as f64
@@ -1014,15 +1025,17 @@ fn input_slab(
     let Some(vals) = icv::miicv_get(s, c, file.minc_icv, &st, &ct)? else {
         return Ok(());
     };
+    let reproduce = c.notices.reproduce();
     let Some(data) = volume.data.as_mut() else {
         return Ok(());
     };
+    let written = &mut volume.written;
     // Each value's volume index, in the hyperslab's C order.
     let sizes: Vec<usize> = volume.sizes.iter().map(|&x| x.max(0) as usize).collect();
+    let total = count.iter().product::<i64>().max(0) as usize;
+    let mut places = Vec::with_capacity(total);
     let mut coord = vec![0i64; n_file];
-    let total: i64 = count.iter().product();
-    for j in 0..total.max(0) as usize {
-        let mut vidx = 0usize;
+    for _ in 0..total {
         let mut vv = vec![0usize; n_array];
         for fi in 0..n_file {
             let vi = file.to_volume_index[fi];
@@ -1030,18 +1043,59 @@ fn input_slab(
                 vv[vi as usize] = (start[fi] + coord[fi]) as usize;
             }
         }
+        let mut vidx = 0usize;
         for (k, &x) in vv.iter().enumerate() {
             vidx = vidx * sizes[k] + x;
         }
-        if j < vals.len() && vidx < data.len() {
-            data.put_from(vidx, &vals, j);
-        }
+        places.push(vidx);
         for fi in (0..n_file).rev() {
             coord[fi] += 1;
             if coord[fi] < count[fi] {
                 break;
             }
             coord[fi] = 0;
+        }
+    }
+    // A read volume_io makes straight into the volume's array puts the values one after the
+    // other from the slab's first voxel: where a dimension of size 1 hid the volume's order from
+    // its check, that run is not the slab's place (FS-794).
+    if direct && let Some(&first) = places.first() {
+        let scrambled = places.iter().enumerate().any(|(j, &p)| p != first + j);
+        if scrambled {
+            let name = String::from_utf8_lossy(&file.filename).into_owned();
+            if reproduce {
+                if first + total > data.len() {
+                    c.notices.add(
+                        &d::FS_795,
+                        format!("{name}: a slab written past the end of the volume's array (memory beside it); stopped at its end"),
+                    );
+                } else {
+                    c.notices.add(
+                        &d::FS_794,
+                        format!("{name}: a slab read as one run into the volume (reproduce)"),
+                    );
+                }
+                for (j, p) in places.iter_mut().enumerate() {
+                    *p = first + j;
+                }
+                let n = data.len();
+                let mask = written.get_or_insert_with(|| vec![false; n]);
+                for &p in &places {
+                    if p < n {
+                        mask[p] = true;
+                    }
+                }
+            } else {
+                c.notices.add(
+                    &d::FS_794,
+                    format!("{name}: a slab put in its place (volume_io writes it as one run where a dimension of size 1 hides the volume's order)"),
+                );
+            }
+        }
+    }
+    for (j, &p) in places.iter().enumerate() {
+        if j < vals.len() && p < data.len() {
+            data.put_from(p, &vals, j);
         }
     }
     Ok(())

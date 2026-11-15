@@ -328,6 +328,57 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
 - FS-518 to FS-520 and FS-761 to FS-773 are NrrdIO's: none is on recon-all's or fMRIPrep's paths
   (they read no NRRD file).
 
+## MINC 1 volumes and netCDF (track C relay 27, 2026-11-15)
+
+- FreeSurfer's `mincRead` (`utils/mriio.cpp`, `MRI_MINC_FILE`; a `.mnc` or `.mnc.gz` name, or a file
+  starting with `CDF`) calls `start_volume_input(name, 0, {xspace, yspace, zspace, time}, NC_UNSPECIFIED,
+  0, 0, 0, TRUE, &vol, NULL, &info)`, refuses anything but 3 or 4 dimensions, maps `nc_data_type` (byte
+  and char to uchar, short, long to `MRI_LONG`, float and double to float), reads the separations
+  (`fabs`) and `direction_cosines` (negated for a negative separation), `convert_voxel_to_world` at the
+  centre voxel, then `input_more_of_volume` until done and `get_volume_voxel_value(i, j, k, t, 0)` cast to
+  the MRI type, then `delete_volume_input`, `delete_volume`. These are the call sites; track A writes
+  them (`larmorx-freesurfer-io`, over `larmorx_io::minc`). Its four names are read past their end for a
+  five-dimensional file (`dim_names[4]`); its casts of a voxel value are C's (a signed byte to `unsigned
+  char`, an unsigned short above 32,767 to `short`: x86's wrap).
+- Its netCDF (`packages/netcdf`) is netCDF 3.6.0-p1 (`docs/findings/minc-volumes.md`) token for token but
+  for two compile fixes (`<scratch>`'s `toksim.py`, relay 27): `nc.c` initialises a variable (`int last =
+  -1`) and `netcdf.h` drops the `NC_NAT` enumerator.
+- Its MINC (`packages/minc`, a rework of MINC 1.5.1's libsrc and volume_io into fewer files; not read: what
+  follows is measured by behaviour with `validation/probes/fs-nrrd-minc`'s `libminc_fs.so`, the unit
+  oracle's `libminc.a` and `libnetcdf.a`):
+  - every MINC package error (`MI_LOG_PKG_ERROR2`, and the allocation failures of `MI_log_sys_error1`)
+    prints `<its build directory>/packages/minc/<file>:<line> <message>` on standard error and ends the
+    program with exit status 1, whatever `ncopts` holds; the build directory is the official build's (a
+    string of the official binaries; the probe reads it from the library's own message). The sites
+    measured: `minc_netcdf_convenience.c:402` "Cannot
+    uncompress the file", `:786` "Non-numeric datatype" (an attribute), `:801` "miattget" (its
+    allocation), `:899` "Attribute is not a scalar value", `:940` "Non-character datatype";
+    `minc_value_conversion.c:229` "Non-numeric datatype" (a variable), `:490` "MI_var_loop" (its
+    allocation); `minc_image_conversion.c:1328` "ICV is not attached to an image variable", `:2599`
+    "Variable has too few dimensions to be an image";
+  - no "MINC package entry point" line when an error returns to MINC's caller;
+  - it cannot decompress: a compressed file ends the program at `:402` (FS-788; corrected: decompressed);
+  - `set_volume_type` of a type it has no case for prints `minc_volume_io.c:2289 bad nc_data_type` and
+    ends the program (status 1);
+  - `miget_valid_range` checks the type's default range after reading `valid_range`, used or not: a
+    double image, or a type netCDF does not know, prints `minc_convenience.c:568 bad data type` and ends
+    the program (status 1): FreeSurfer 8.2.0 reads no MINC file of doubles (FS-775; corrected: read as
+    MINC 1.5.1 reads it);
+  - irregular time spacing prints `minc_volume_io.c:2035 set_volume_irregular_starts NYI` and ends the
+    program;
+  - no volume cache (its volume has no `is_cached_volume`);
+  - its 4 x 4 inverse (`create_linear_transform`'s) prints `invert_4x4_matrix failed, Some row is all
+    zeros` or `... col is all zeros` on standard output (rows checked first) and gives the identity, as
+    its `.xfm` dialect does (`larmorx_freesurfer_io::minc::FsVolumeIo`);
+  - otherwise MINC 1.5.1's results on every case the probe compared (the slice scaling, the fill values,
+    the reads past a short file's end (FS-793), the scrambled one-slice reads (FS-794), the messages).
+- The probe's `FreeSurferDialect` (`src/minc.rs`) is this list as a `larmorx_io::minc::Dialect`; its
+  stand-in for the 4 x 4 inverse is a measurement (a matrix with an entry beyond 1e300 or not finite is not
+  modelled: such cases are counted, not compared). Track A's dialect for `mincRead` takes these facts
+  and its own `FsVolumeIo` inverse.
+- FS-774 to FS-796 are MINC's, netCDF's and these: none is on recon-all's or fMRIPrep's paths (they read
+  no MINC volume), except where a user gives FreeSurfer a `.mnc` input.
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
@@ -338,5 +389,5 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
 `validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) and
 `validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) and
 `validation/probes/fs-misc` (`facts.cpp` includes FreeSurfer's FNV headers) and
-`validation/probes/fs-nrrd-minc` (its build compiles against FreeSurfer's `packages/` headers) are closed to
+`validation/probes/fs-nrrd-minc` (its build compiles against FreeSurfer's `packages/` headers; `src/minc.rs`'s `FreeSurferDialect`) are closed to
 FreeSurfer's clean-room implementers, as this file is.

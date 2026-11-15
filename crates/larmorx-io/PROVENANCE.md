@@ -308,3 +308,32 @@ FreeSurfer 8.2.0's programs behave: the quiet NaN's high bit set, no zlib or bzi
 - D13: FS-518 to FS-520 and FS-761 to FS-773 (`larmorx_core::defects`); `docs/findings/nrrdio.md`.
 - Checks: `src/nrrd/tests.rs`; the differential probe `validation/probes/fs-nrrd-minc` against
   NrrdIO r3991 built from its source and against FreeSurfer's copy (README there).
+
+## MINC 1 volumes: volume_io's input over MINC's library and netCDF (`src/minc/`; FreeSurfer's foundations, track C relay 27, 2026-11-15)
+
+**Ported** from two release tarballs:
+
+- MINC 1.5.1 (`minc-1.5.1.tar.gz`, SHA-256 `0b41d5bb1b178c62792c9e4fbd8ddd971d1a90aad7c257ff00bcbdddc3998afe`,
+  `<workspace>/tags/minc-1.5.1`; © 1993-1995 David MacDonald and 1993-2000 Peter Neelin, McConnell Brain
+  Imaging Centre, Montreal Neurological Institute, McGill University; MNI's permissive notice,
+  `LICENSES/LicenseRef-MNI.txt`);
+- netCDF 3.6.0-p1 (`netcdf-3.6.0-p1.tar.gz`, SHA-256
+  `a9e6105ed89ce6cfd2edc78e8184232a2f950e674c5241c28cae361a1fe1adfe`, from a mirror of Unidata's archive,
+  `https://www.gfd-dennou.org/arch/netcdf/unidata-mirror/old/`, `<workspace>/tags/netcdf-3.6.0-p1`;
+  © 1993-2004 University Corporation for Atmospheric Research/Unidata, `LICENSES/NetCDF.txt`).
+
+| larmorx | the original |
+|---|---|
+| `minc/netcdf.rs`: `Px`, `Stream`, `read_header`, `var_shape`, `get_vara`, `iocount`, `get_run`, `var_offset`, `coord_check`, `edge_check`, `strerror`, `advise`, `ncopen`, `ncclose`, `ncvarid`, `ncvarinq`, `ncdiminq`, `ncattinq`, `ncattget`, `ncvarget`, `nctypelen` | netCDF 3.6.0-p1 `src/libsrc/`: `posixio.c` (`blksize`, `px_pgin`, `px_get`, `ncio_px_sync`, `ncio_open`), `v1hpg.c` (`v1hs`, `fault_v1hs`, `check_v1hs`, the `v1h_get_*` functions, `NC_computeshapes`, `nc_get_NC`), `nc.c` (`nc__open_mp`, `NC_check_id`, `nc_close`), `var.c` (`NC_var_shape`, `NC_findvar`, `nc_inq_varid`, `nc_inq_var`), `dim.c` (`nc_inq_dim`), `attr.c` (`ncx_len_NC_attrV`, `NC_findattr`, `NC_lookupattr`, `nc_inq_att`, `nc_get_att`), `putget.c` (`NCcoordck`, `NCedgeck`, `NC_varoffset`, `getNCvx_<type>_<type>`, `NCiocount`, `odo1`, `nc_get_vara`), `ncx.c` (the big-endian getters), `error.c` (`nc_strerror`), `v2i.c` (`nc_advise`, `ncopen`, `ncclose`, `ncvarid`, `ncvarinq`, `ncdiminq`, `ncattinq`, `ncattget`, `ncvarget`, `nctypelen`) |
+| `minc/libsrc.rs` | MINC 1.5.1 `libsrc/`: `minc_error.c` (`MI_save_routine_name`, `MI_return`, `MI_return_error`, `MI_log_pkg_error2`, `MI_log_sys_error1`), `netcdf_convenience.c` (`miexpand_file`, `miopen`, `miclose`, `miattget`, `miattget_with_sign`, `miattget1`, `miattgetstr`, `mivarget`, `mivarget1`, `mitranslate_coords`), `minc_convenience.c` (`miget_datatype`, `miget_default_range`, `miget_valid_range`, `miget_image_range`), `value_conversion.c` (`MI_varaccess`, `MI_var_loop`, `MI_get_sign_from_string`, `MI_get_sign`, `MI_convert_type`), `minc_basic.h` (`MI_TO_DOUBLE`, `MI_FROM_DOUBLE`), `minc_useful.h` (`ROUND`, `MAX`, `MIN`) |
+| `minc/icv.rs` | MINC 1.5.1 `libsrc/image_conversion.c` (`miicv_create`, `miicv_free`, `miicv_setdbl`, `miicv_setint`, `miicv_setstr`, `miicv_inqdbl`, `miicv_ndattach`, `MI_icv_get_type`, `MI_icv_get_vrange`, `MI_icv_get_norm`, `miicv_detach`, `miicv_get`, `MI_icv_access`, `MI_icv_calc_scale`, `MI_icv_chkid`), `dim_conversion.c` (`miicv_attach`, `MI_icv_get_dim`, `MI_get_dim_flip`, `MI_get_dim_scale`) |
+| `minc/volume.rs` | MINC 1.5.1 `volume_io/Volumes/volumes.c` (`get_default_dim_names`, `convert_dim_name_to_spatial_axis`, `create_volume`, `set_volume_type`, `alloc_volume_data`, `set_volume_voxel_range`, `get_volume_real_range`, `set_volume_real_range`, `set_volume_separations`, `set_volume_starts`, `set_volume_direction_unit_cosine`, `set_volume_space_type`, `get_volume_total_n_voxels`, `compute_world_transform`, `check_recompute_world_transform`, `convert_voxel_to_world`), `multidim_arrays.c` (`get_type_size`, `alloc_multidim_array`), `evaluate.c` (`get_volume_voxel_value`) |
+| `minc/input.rs` | MINC 1.5.1 `volume_io/Volumes/input_volume.c` (`start_volume_input`, `input_more_of_volume`, `delete_volume_input`), `input_mnc.c` (`get_minc_file_n_dimensions`, `initialize_minc_input`, `initialize_minc_input_from_minc_id`, `match_dimension_names`, `input_more_minc_file`, `input_slab`, `input_minc_hyperslab`, `close_minc_input`, `set_default_minc_input_options`), `volume_cache.c` (`get_n_bytes_cache_threshold`, `open_cache_volume_input_file`), `Prog_utils/files.c` (`filename_extension_matches`) |
+
+The voxel-to-world matrix is made with `larmorx_io::xfm`'s `create_linear_transform` (a singular matrix
+gives the identity) through the dialect's `.xfm` dialect. Decompression is in memory (flate2, the
+`bzip2` crate) where MINC runs `gunzip` or `bunzip2` through the shell (FS-774). A program's own copy of
+MINC plugs in through `minc::Dialect` (FreeSurfer's, measured as a black box by
+`validation/probes/fs-nrrd-minc`, is described in a file closed to FreeSurfer's clean-room implementers,
+`docs/findings/freesurfer-permissive.md`). Defects FS-774 to FS-796 (`larmorx_core::defects`;
+`docs/findings/minc-volumes.md`).

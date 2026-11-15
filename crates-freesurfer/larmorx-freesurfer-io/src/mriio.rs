@@ -614,7 +614,6 @@ fn freeing(g: &mut Globals, m: &Mri) {
 fn write_not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MRI_MINC_FILE => "MINC",
         MGH_MORPH => "GCA morph (m3z)",
         _ => return None,
     })
@@ -723,11 +722,12 @@ fn fail_code(g: &mut Globals, err: &mut dyn Write, code: i32, message: &str) -> 
 /// `MRIwriteType(): code inconsistency (file type recognized but not caught)`. An image file needs a
 /// depth of 1 (`MRIwriteType(<f>): image files cannnot have depth > 1`, the program ends), a GCA or
 /// ITK morph three frames (`MRIwriteType: gcam - input mri must have 3 frames, not <n>`, `MRIwriteType:
-/// itk warp - ...`, -1). GIFTI files: [`crate::gifti_vol::mri_write_gifti`]. After a writer that
+/// itk warp - ...`, -1). GIFTI files: [`crate::gifti_vol::mri_write_gifti`]; MINC files:
+/// [`crate::mriio_minc::minc_write`]. After a writer that
 /// succeeds, a volume with b-values also writes them beside it: `Saving bvals and bvecs` on
 /// standard output, `<stem>.bvals` and `<stem>.<space>_space.bvecs` (`scanner`, `voxel` or
-/// `unknown`), the stem the name without its volume extension (none: nothing written). The other
-/// writers are not ported yet: a message and -1.
+/// `unknown`), the stem the name without its volume extension (none: nothing written). The GCA
+/// morph writer (m3z) is not ported yet: a message and -1.
 #[allow(clippy::too_many_arguments)]
 pub fn mri_write_type(
     g: &mut Globals,
@@ -793,7 +793,9 @@ pub fn mri_write_type(
         );
         return Ok(-1);
     }
-    let error = if mtype == GIFTI_FILE {
+    let error = if mtype == MRI_MINC_FILE {
+        crate::mriio_minc::minc_write(g, out, err, dir, m, fname)?
+    } else if mtype == GIFTI_FILE {
         let mut io = Io { out, err, env };
         crate::gifti_vol::mri_write_gifti(g, &mut io, dir, m, fname)?
     } else if mtype == MRI_CORONAL_SLICE_DIRECTORY {

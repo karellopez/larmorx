@@ -3938,6 +3938,64 @@ void flr_case()
     MRI *b = MRISmakeBoundingVolume(s, res);
     MRISfillInterior(s, res, b);
     flr_put(b);
+  } else if (op == "crv") {
+    // relay 35 of track D: a recorded curvature file read into its surface (MRISreadCurvatureFile),
+    // its values' FNV-1a, then written in five formats into the work folder (MRISwriteCurvature)
+    // and read back from the MGZ and new-format files; each written file's FNV-1a (a .gii one's
+    // after gii_normal) and whether the new-format file is the recorded file byte for byte
+    MRIS *s = MRISread(next());
+    std::string cf = next();
+    if (!s) fail("cannot read the inputs");
+    mkdir(workdir.c_str(), 0700);
+    clear_dir(workdir, true);
+    if (chdir(workdir.c_str()) != 0) fail("chdir");
+    auto fnv = [](const std::string &b) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : b) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    auto curv_fnv = [&]() {
+      std::string b;
+      for (int v = 0; v < s->nvertices; v++) b.append((const char *)&s->vertices[v].curv, 4);
+      fnv(b);
+      of(s->max_curv); of(s->min_curv);
+    };
+    auto slurp = [](const std::string &n) {
+      std::string b;
+      if (FILE *fp = fopen(n.c_str(), "rb")) {
+        char buf[65536];
+        size_t k;
+        while ((k = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, k);
+        fclose(fp);
+      }
+      return b;
+    };
+    oi(MRISreadCurvatureFile(s, cf.c_str()));
+    curv_fnv();
+    // five stems: a GIFTI file beside a file of its stem would stop the read-back (FS_GII's rule)
+    for (const char *nm : {"./o", "./m.mgz", "./n.nii.gz", "./g.gii", "./v.vtk"}) oi(MRISwriteCurvature(s, nm));
+    std::vector<std::string> files;
+    list_files(".", "", files);
+    std::sort(files.begin(), files.end());
+    for (const std::string &n : files) {
+      oh(n.c_str());
+      std::string b = slurp(n);
+      bool gii = n.size() >= 4 && n.compare(n.size() - 4, 4, ".gii") == 0;
+      fnv(gii ? gii_normal(b) : b);
+    }
+    auto newfmt = [](const std::string &n) { return n.size() >= 2 && n.compare(n.size() - 2, 2, ".o") == 0; };
+    std::string written;
+    for (const std::string &n : files)
+      if (newfmt(n)) written = slurp(n);
+    oi(written == slurp(cf));
+    for (const std::string &n : files) {
+      if (!newfmt(n) && n.find(".mgz") == std::string::npos) continue;
+      for (int v = 0; v < s->nvertices; v++) s->vertices[v].curv = 0;
+      oi(MRISreadCurvatureFile(s, ("./" + n).c_str()));
+      curv_fnv();
+    }
   } else fail("flr op");
 }
 

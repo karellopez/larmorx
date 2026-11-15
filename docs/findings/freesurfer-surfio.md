@@ -1618,3 +1618,53 @@ include/fastmarching.h 493).
   wait for those items. `MRISaverageGradients_write` (9465) is an empty debugging stub (its body
   prints a line and declares a variable; nothing calls it).
 
+## 28. Curvature files by name: `MRISwriteCurvature`, `MRISreadCurvatureFile` (relay 35 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
+`crates-freesurfer/larmorx-freesurfer-surf/src/curvfile.rs` (`MRISwriteCurvature` mrisurf_io.cpp
+281, `MRISreadCurvatureFile` 4849, `__mrisreadcurvmri` 4874).
+
+- **`MRIread` is not in fs.io yet** (track A's relay 36; fs.io has `mri_read`, `MRIreadType`,
+  `MRIreadInfo`, `MRIreadHeader`): `__mrisreadcurvmri`'s MGH/NIfTI branch calls `MRIread(fname)`
+  (mriio.cpp 1002: `FileNameFromWildcard(fname, buf)` into a `char[STRLEN]`, `mri_read(buf,
+  MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1)`, `MRIremoveNaNs(mri, mri)`), so `curvfile.rs` carries a
+  private translation, `mri_read_whole`, to be replaced by fs.io's. `MRIremoveNaNs` (12086): its
+  loop over `x` is `#pragma omp parallel for if_ROMP(shown_reproducible)`, with a `static int first`
+  shared by the threads (the first `NaN found at voxel` line is a race when it runs in parallel;
+  the probe runs one thread); `nans` a reduction; `FS_LEAVE_NANS` read with `getenv` per voxel; the
+  `ErrorPrintf` names `mri_src->fname`, `mri_read`'s name.
+- **`MRIalloc` in `MRISwriteCurvature`** is a C++ constructor (`new MRI(shape, type, alloc)`): the
+  `if (TempMRI == NULL) return ERROR_NOMEMORY` branch is dead. The MGH/NIfTI volume's version is set
+  to `((MGZ_INTENT_SHAPE & 0xffff) << 8) | MGH_VERSION` before `MRIwrite(TempMRI, curv_to_write)`
+  (the default intent `MGZ_INTENT_UNKNOWN`, so `mghWrite` keeps that version).
+- **The GIFTI writers' NaN bits** (found by `crv`: 3 of 400 seed-7 cases before the fix; the probe's
+  `gwr` never generated a signalling NaN): `gifti.cpp`'s `static void gifti_set_DA_value_2D(da, row,
+  col, double value)` is inlined by GCC 8.4 at -O3 into `MRISwriteGIFTIShape` (both overloads),
+  `MRISwriteGIFTIStats` (both) and `mriWriteGifti`, where `(float)(double)x` folds to `x`
+  (`-fno-signaling-nans`): a signalling NaN keeps its bits in the FLOAT32 array. It stays out of
+  line (and a `.constprop` clone) in `MRISwriteGIFTISurface` and `MRISwriteGIFTIRGBAVector`, whose
+  calls pass `cvtss2sd` of the coordinates (a signalling NaN quieted, `0x00400000` set). Observed in
+  the unit oracle's `gifti.cpp.o` (`objdump -dr`: the relocations to
+  `.text._ZL21gifti_set_DA_value_2DP12giiDataArrayiid` and its `.constprop.91` appear only in those
+  two functions; the only `cvtss2sd` in `mriWriteGifti` is `TimeStep`'s `sprintf`). The port took
+  every value through `f64` at run time (the setter a function of another crate): fs.io's
+  `gifti_set_da_value_2d_f32` stores a `float`'s bits for the inlined sites, and
+  `MRISwriteGIFTISurface`'s coordinates are quieted explicitly (the same bits in debug and release
+  builds and on every platform). `gwr`'s values now include signalling NaNs (seeds 7 and 13, 400
+  cases each: 0 different; both the kept and the quieted payloads occur).
+- **A failed read's `errno`** (found by `crv`, 3 cases of 2,000: an empty name with `FS_POSIX` is
+  `./`, the old-format reader opens the folder, `fread3` fails with `EISDIR`, and the next message
+  prints `Is a directory`): fs.io's `fio` readers do not carry `CFile::read_errno` into `errno` (their
+  callers do), so `curvio.rs`'s binary readers (`__mrisreadcurvoldformat`, the curvature arrays,
+  `MRISreadFloatFile`, `MRISreadBinaryAreas`) now set it after their reads.
+- **fs.mri's `MRIalloc` with a frame count from a random MGH header** (found while building `crv`'s
+  generator, not a port of this relay's): `MRIallocSequence` with 449,657,401 frames fails in the
+  official build (`calloc(nframes, sizeof(MRI_FRAME))` beyond what the machine gives: `error: Cannot
+  allocate memory`, `MRIalloc: could not allocate 449657401 frame`, exit 254), while the port's
+  `Mri::new` allocates each frame's 4 x 4 matrix one by one until the memory box kills it (100 GB
+  in an unboxed run). The machine's memory decides FreeSurfer's answer (FS-354's family); the
+  port should refuse such a count before it allocates (for fs.mri's owner). `crv`'s generator makes
+  no random volume headers.
+- **Unreachable:** `MRISreadBinaryCurvature` (4759) and `MRISreadNewCurvatureFile` (5781) have no
+  caller in FreeSurfer 8.2.0's tree (a grep: only their definitions, a comment, the header).
+

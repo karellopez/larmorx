@@ -503,6 +503,12 @@ pub(crate) struct Expanded {
     pub data: Option<Vec<u8>>,
 }
 
+/// Whether C's `fopen(name, "r")` succeeds: Unix opens a folder for reading (its reads fail),
+/// Windows refuses it; Linux's answer on every platform.
+fn fopens(p: &std::path::Path) -> bool {
+    std::fs::File::open(p).is_ok() || (!cfg!(unix) && p.is_dir())
+}
+
 /// `miexpand_file` (`header_only` false): `None` is its error.
 pub(crate) fn miexpand_file(
     s: &mut Session,
@@ -526,7 +532,7 @@ pub(crate) fn miexpand_file(
     }
     let mut first_ncerr = s.ncerr;
     let p = crate::xfm::files::to_path(path);
-    if first_ncerr == nc::NC_NOERR && std::fs::File::open(&p).is_err() {
+    if first_ncerr == nc::NC_NOERR && !fopens(&p) {
         first_ncerr = nc::NC_SYSERR;
     }
     let ext: &[u8] = match path.iter().rposition(|&ch| ch == b'.') {
@@ -540,7 +546,7 @@ pub(crate) fn miexpand_file(
         for e in COMPRESSION_ENDINGS {
             let mut cand = path.to_vec();
             cand.extend_from_slice(e);
-            if std::fs::File::open(crate::xfm::files::to_path(&cand)).is_ok() {
+            if fopens(&crate::xfm::files::to_path(&cand)) {
                 found = Some((cand, compress_type(e)));
                 break;
             }

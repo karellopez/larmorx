@@ -807,6 +807,9 @@ pub(crate) fn nc_open(s: &mut Session, path: &[u8], data: Option<Vec<u8>>) -> Re
             let p = crate::xfm::files::to_path(path);
             let f = match std::fs::File::open(&p) {
                 Ok(f) => f,
+                // Windows refuses to open a folder (access denied); Unix opens it and its first
+                // read fails: Linux's error on every platform
+                Err(_) if !cfg!(unix) && p.is_dir() => return Err(EISDIR),
                 Err(e) => return Err(crate::xfm::files::errno_of(&e)),
             };
             if f.metadata().map(|m| m.is_dir()).unwrap_or(false) {

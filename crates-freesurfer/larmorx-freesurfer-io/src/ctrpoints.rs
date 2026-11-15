@@ -158,7 +158,8 @@ pub fn mri_read_control_points(
 /// newline) and gives `ERROR_BADPARM`, as does a file that does not open
 /// (`MRIwriteControlPoints(<name>): could not open file`) or a point that does not write. The
 /// file: each point `%f %f %f`, then `info`, `numpoints <count>`, `useRealRAS <n>` and `written
-/// by <user> on <date>` (the effective user's name; `currentDateTime()`, which
+/// by <user> on <date>` (the effective user's name, else `unknown user`; `errno` 0 after the
+/// user's lookup, as glibc 2.35's `getpwuid`; `currentDateTime()`, which
 /// `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` replaces). `NO_ERROR`.
 #[allow(clippy::too_many_arguments)]
 pub fn mri_write_control_points(
@@ -203,7 +204,10 @@ pub fn mri_write_control_points(
             return ERROR_BADPARM;
         }
     }
-    let user = system::user_name(env);
+    // getpwuid(geteuid()): glibc 2.35 leaves errno 0 (the user found or not); "unknown user"
+    // when it gives no name
+    g.errno = 0;
+    let user = system::passwd_name(env).unwrap_or_else(|| "unknown user".to_owned());
     let date = timer::current_date_time(env, true);
     let tail = format!(
         "info\nnumpoints {count}\nuseRealRAS {use_real_ras}\nwritten by {user} on {date}\n"

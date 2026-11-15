@@ -480,7 +480,7 @@ fn length(v: [f64; 3]) -> f64 {
     big * (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]).sqrt()
 }
 
-fn replace_all(text: &[u8], pat: &[u8], with: &[u8]) -> Vec<u8> {
+pub(crate) fn replace_all(text: &[u8], pat: &[u8], with: &[u8]) -> Vec<u8> {
     if pat.is_empty() {
         return text.to_vec();
     }

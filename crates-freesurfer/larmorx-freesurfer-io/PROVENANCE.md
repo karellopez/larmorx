@@ -297,6 +297,7 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 785-794, 1143-1150, 1191-1196, 9981-10101 | `mri_read`'s image branch, `MRIwriteType`'s image and ITK branches, `itkMorphWrite` (FS-733, FS-449, FS-58; relay 31) | `mriio.rs`, `mriio_write.rs` |
 | (larmorx's own) | the hook table for the conversions `mri_read` and `MRIwriteType` call in crates above this one (`ImageToMRI`, `MRItoImage`: fs.volume registers them; relay 31) | `upper.rs` |
 | `utils/mriio.cpp` 778-780, 9787-9975; `include/mri.h` (`MRI*seq_vox`); `utils/mri.cpp`'s `MRIorientationStringToDircos` for `RAS`, `LAS`, `LPS` | `mri_read`'s NRRD branch, `mriNrrdRead` over `larmorx_io::nrrd::load_with_errno` (NrrdIO r3991, track C's port: the main package's) (FS-734 to FS-741; relay 32) | `mriio_nrrd.rs`, `mriio.rs` |
+| `utils/mriio.cpp` 646-648, 2381-2592; `include/mri.h` (`MRI*seq_vox`); `packages/minc`'s `MI_LOG_PKG_ERROR2` / `MI_LOG_SYS_ERROR1` sites, `minc_convenience.c` 568, `minc_volume_io.c` 2035, 2073, 2289 (their messages and lines) | `mri_read`'s MINC branch, `mincRead` over `larmorx_io::minc` (MINC 1.5.1 and netCDF 3.6.0-p1, track C's port: the main package's) in FreeSurfer's dialect `FsMinc` (FS-742 to FS-745; relay 33) | `mriio_minc.rs`, `minc.rs`, `mriio.rs` |
 
 Changes for part 13: FreeSurfer's one `znzwrite*` per number is one write per slice (the header and
 the scan parameters one write each): the same bytes, whose counts FreeSurfer does not check (a byte
@@ -392,3 +393,14 @@ its LPS conversion and its defaults, its LAS slip corrected; findings Part 26), 
 `double` then stored as `float`, the centre by `MRIp0ToCRAS` (fs.mri). The defaults of FS-734 to FS-741
 (the wider types, the refusals of FS-735, FS-739 and a zero-length direction, the stated geometry, the
 whole counts, the 64-bit stores) and their notices are larmorx's own.
+
+Changes for relay 33: MINC 1 volumes are read by track C's port (`larmorx_io::minc`, Apache-2.0 AND
+LicenseRef-MNI AND NetCDF) in FreeSurfer's dialect (`minc.rs`'s `FsMinc`: track C's probe's measured
+`FreeSurferDialect`, its source lines read from `packages/minc`, its `.xfm` dialect `FsVolumeIo`), with the
+program's notices. mincRead counts the file's dimensions first (volume_io's own count, which it then does
+not repeat), so a file of five or more can be refused before its names are read (FS-745). The voxel stores
+follow the official object code's conversions (`cvttsd2si` to 32 bits for bytes and shorts, to 64 bits
+stored as 32 for `MRI_LONG`, `cvtsd2ss`); the messages name the file as the program does (the folder the
+port opened it in is taken out). The defaults of FS-742 to FS-745 (the wider types, the 64-bit stores, the
+refusal) and their notices are larmorx's own. `ctrpoints.rs`: `MRIwriteControlPoints` sets `errno` 0 at
+its user lookup and writes `unknown user` when there is no name.

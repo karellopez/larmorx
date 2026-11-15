@@ -28,6 +28,13 @@ fn env_value(env: &Environment, names: &[&str]) -> Option<String> {
 
 /// The effective user's name (`getpwuid(geteuid())->pw_name`), or `UNKNOWN`.
 pub fn user_name(env: &Environment) -> String {
+    passwd_name(env).unwrap_or_else(|| "UNKNOWN".to_owned())
+}
+
+/// The effective user's name as `getpwuid(geteuid())` gives it, `None` when nothing gives one.
+/// glibc 2.35's lookup leaves `errno` 0 whether it finds the user or not: callers that track
+/// FreeSurfer's `errno` set it to 0 there.
+pub fn passwd_name(env: &Environment) -> Option<String> {
     let from_passwd = || -> Option<String> {
         let status = std::fs::read_to_string("/proc/self/status").ok()?;
         let euid = status
@@ -42,9 +49,7 @@ pub fn user_name(env: &Environment) -> String {
             (f.len() > 2 && f[2] == euid).then(|| f[0].to_owned())
         })
     };
-    from_passwd()
-        .or_else(|| env_value(env, &["USER", "USERNAME"]))
-        .unwrap_or_else(|| "UNKNOWN".to_owned())
+    from_passwd().or_else(|| env_value(env, &["USER", "USERNAME"]))
 }
 
 /// `uname`'s fields: `sysname`, `nodename`, `release`, `machine`; `None` where `uname` would fail

@@ -53,8 +53,10 @@ pub fn argv2cmdline(argv: &[String]) -> String {
     argv.iter().map(|a| format!("{a} ")).collect()
 }
 
-/// `VERuser()`.
-pub fn ver_user(env: &Environment) -> String {
+/// `VERuser()`: the user's name, else `UNKNOWN`; `errno` 0 after the lookup (glibc 2.35's
+/// `getpwuid` leaves it 0 whether it finds the user or not).
+pub fn ver_user(g: &mut Globals, env: &Environment) -> String {
+    g.errno = 0;
     system::user_name(env)
 }
 
@@ -129,8 +131,10 @@ pub fn get_all_info_at(env: &Environment, argv: &[String], progname: &str, t: i6
     )
 }
 
-/// `getAllInfo` now.
-pub fn get_all_info(env: &Environment, argv: &[String], progname: &str) -> String {
+/// `getAllInfo` now; `errno` 0 after it (glibc 2.35's `getpwuid`, whether it finds the user or
+/// not; `uname` and the clock leave it alone).
+pub fn get_all_info(g: &mut Globals, env: &Environment, argv: &[String], progname: &str) -> String {
+    g.errno = 0;
     get_all_info_at(env, argv, progname, ctime::now())
 }
 
@@ -219,7 +223,8 @@ pub fn handle_version_option(
                 let _ = writeln!(out, "{progname} freesurfer {FS_VERSION}");
             }
             VersionReport::AllInfo(a) => {
-                let _ = writeln!(out, "{}", get_all_info(env, a, progname));
+                let line = get_all_info(g, env, a, progname);
+                let _ = writeln!(out, "{line}");
             }
         }
     }

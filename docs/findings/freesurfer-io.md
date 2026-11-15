@@ -1953,3 +1953,77 @@ file's first coordinate is already L, its second (A) is the one to negate. So IT
 and SimpleITK reads built on it, mirror LAS volumes left-right and front-back. The check takes ITK's
 LPS matrix of a LAS file as the file's RAS one (what undoing ITK's step gives), but for the axes
 without a direction, whose default columns ITK sets in LPS. (An ITK defect; not larmorx's.)
+
+## Part 27: MINC volumes (relay 33 of track A)
+
+Sources: `utils/mriio.cpp` 2381-2592 (`mincRead`; `mri_read`'s `MRI_MINC_FILE` branch, mriio.cpp 646-648);
+`include/mri.h` (`MRIseq_vox`, `MRISseq_vox`, `MRILseq_vox`, `MRIFseq_vox`), `include/machine.h` (`typedef int
+long32`), `include/diag.h` (`DIAG_SHOW` 0x40, `DIAG_VERBOSE` 0x10000000, `DIAG_VERBOSE_ON`); FreeSurfer's copy of
+MINC (`packages/minc`: its `MI_LOG_PKG_ERROR2` and `MI_LOG_SYS_ERROR1` print `__FILE__:__LINE__ <message>` and
+`exit(1)`; the lines the dialect `FsMinc` names are those of the macro's last line, as GCC's `__LINE__` gives a
+call spread over lines). The library itself: track C's `larmorx_io::minc` (`docs/findings/minc-volumes.md`,
+`docs/findings/freesurfer-permissive.md`, "MINC 1 volumes and netCDF").
+
+### Mechanisms
+- **The read.** `FileExists(fname)` (else `errno = 0` and `ErrorReturn(NULL, (ERROR_BADFILE, "mincRead(): can't
+  find file %s"))`), then `start_volume_input(tmp, 0, dim_names, NC_UNSPECIFIED, 0, 0, 0, TRUE, &vol, NULL,
+  &input_info)` with `const char *dim_names[4] = {MIxspace, MIyspace, MIzspace, MItime}`: volume_io counts the
+  file's dimensions itself (n 0) and makes a volume of that many dimensions named from the array. A status other
+  than `OK`: `errno = 0`, `ErrorReturn(NULL, (ERROR_BADPARM, "mincRead(): error reading volume from file %s"))`.
+  Not 3 or 4 dimensions: `"mincRead(): %d dimensions in file; expecting 3 or 4"`. The input is not deleted on
+  these returns (the netCDF file stays open: a later read in the same program gets the next descriptor in its
+  messages; the port's session is per call).
+- **The first diagnostic block never prints.** `if (Gdiag & DIAG_VERBOSE_ON & DIAG_SHOW)` is `Gdiag & (Gdiag &
+  0x10000000) & 0x40`: always 0. The `DimSizes`/`DataType` lines and the `MINC Linear Transform` block print under
+  `(Gdiag & DIAG_SHOW) && DIAG_VERBOSE_ON` (the object code's `cmp $0x10000040`). The block prints
+  `pVox2WorldLin->m[j][i]` for row `i`, column `j`: `Transform_elem(t, i, j)`, the matrix's row `i`.
+- **The types.** `vol->nc_data_type`: `NC_BYTE`/`NC_CHAR` -> `MRI_UCHAR`, `NC_SHORT` -> `MRI_SHORT`, `NC_LONG`
+  (= `NC_INT`) -> `MRI_LONG`, `NC_FLOAT`/`NC_DOUBLE` -> `MRI_FLOAT`, else `"mincRead(): bad data type (%d) in input
+  file %s"` (unreachable: volume_io's copy ends the program for a character image, and netCDF knows no other
+  type). The two `dtype = get_volume_nc_data_type(...)` / `orderIntBytes(...)` lines before are overwritten.
+- **The voxel stores (object code, GCC 8.4.0 -O3).** `val = get_volume_voxel_value(vol, i, j, k, t, 0)` (the
+  volume's voxel value, in the file's valid range: not the real value), then `(unsigned char)val`: `cvttsd2si
+  %xmm0,%edx` (32 bits) and the low byte stored (FS-742: a signed byte's -1 is 255); `(short)val`: `cvttsd2si`
+  to 32 bits and the low 16 stored (FS-743: an unsigned 16-bit 40,000 is -25,536); `(long)val`: `cvttsd2si
+  %xmm0,%rdx` (64 bits) and `mov %edx` (32 bits) through `MRILseq_vox`'s `long32 *` at byte `4 x` of the row of
+  8-byte voxels (FS-744: as NRRD's FS-741; unsigned 32-bit values past 2^31 - 1 negative); `(float)val`:
+  `cvtsd2ss`. The loops run `i` (width) outermost, then `j`, `k`, `t`; stores are independent, so the order does
+  not matter.
+- **Five or more dimensions (FS-745).** With n 0 volume_io names each of the file's dimensions from
+  `dim_names[i]`: a file of five reads `dim_names[4]`, one pointer past the array (the next stack slot); six or
+  more fail in `create_volume`. The probe's five-dimensional files (seeds 7, 13 and 21): FreeSurfer crashed
+  (signal 11) on 47 of 48 and on one printed `Error: MINC file has only 4 dims, ...` (what the stack slot named).
+- **The geometry.** `get_volume_separations`: `xsize = fabs(separations[0])` (and y, z) stored as `float`; `ps`,
+  `thick`; `x_r .. z_s` from `vol->direction_cosines[0..2]` (the volume's dimensions 0 to 2 are x, y, z by the
+  names given), negated when the separation is negative; `convert_voxel_to_world(vol, {w/2.0, h/2.0, d/2.0, 0})`
+  -> `c_r, c_a, c_s`; `ras_good_flag = 1`; `xend = xsize * width / 2.0` (a `float` product, then the division in
+  `double`), `xstart = -xend` (y, z likewise), `fov` the largest of the three `end - start` (`float`).
+- **`errno`.** Reset to 0 before each of mincRead's own errors; a successful read leaves it as it was (volume_io
+  and netCDF set none on the probe's successful cases).
+
+### Decisions (rules A to D)
+- FS-742, FS-743 (rule A, as FS-734): the type that holds every value read (`MRI_SHORT` for signed bytes with a
+  value below 0, `MRI_INT` for unsigned 16-bit values above 32,767), only then (otherwise FreeSurfer's type and
+  bytes). A header read (`read_volume` 0) reads no values and keeps FreeSurfer's type.
+- FS-744 (rule A, as FS-741): one value to a 64-bit voxel.
+- FS-745 (rule B): a file of five or more dimensions is refused with mincRead's own message (`"mincRead(): <n>
+  dimensions in file; expecting 3 or 4"`) after volume_io's count and before the names are read; `reproduce`
+  reads with the names past the array empty (track C's FS-779 notice) and is not compared (memory contents).
+- Kept (rule C): doubles stored as floats (FreeSurfer has no double voxels); the real range not applied
+  (FreeSurfer stores voxel values: its MINC volumes keep the file's integer values); the time step not read (TR
+  0).
+
+### What the probe measured (piece 25)
+Seeds 7 (298 piece-25 cases), 13 and 21 (894 each): `reproduce` identical on every compared case (255, 771,
+789), 0 different; 43, 123 and 105 skipped: files without an image variable or cut before it (FS-779: volume_io
+uses a count it never set; FreeSurfer answers `ncvarid: ncid 3: Variable not found` and no volume, or crashes),
+five-dimensional files (FS-745, crashes). `fix` differs only with notices (FS-01, FS-742 to FS-745, and the
+library's FS-775, FS-779, FS-780, FS-781, FS-787, FS-788, FS-793). The netCDF descriptor in messages is 3 in the
+probe's child, as in a program whose only open files are its standard streams (the session's `first_fd`).
+
+### getpwuid and errno (from track D's relay 32)
+glibc 2.35's `getpwuid(geteuid())` leaves `errno` 0 whether it finds the user or not (gdb's watch on the official
+build, track D). Besides the GIFTI writer (D's fix), FreeSurfer calls it in `MRIwriteControlPoints`
+(`ctrpoints.cpp` 164: `unknown user` when it gives no name), `VERuser` (`version.cpp` 109; `FSENVgetenv` calls it
+when `SUBJECTS_DIR` is set) and `getAllInfo` (`version.cpp` 273; `--all-info`): the port sets `g.errno = 0` at
+the three (relay 33), so an error message after them prints no stale `errno` line.

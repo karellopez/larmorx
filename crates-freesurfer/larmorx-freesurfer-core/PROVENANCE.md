@@ -219,3 +219,7 @@ starts `error: Cannot allocate memory`); FS-450 (`utils/numerics.cpp` 1225-1247 
 `utils/matrix.cpp` 1779-1830: `MatrixSVD` and `MatrixSVDEigenValues` of a matrix without columns
 crash in VNL's LINPACK `ssvdc`): by default the empty decomposition, `reproduce` the program's end
 with status 139 (`docs/findings/freesurfer-maths.md`, "Relay 24").
+
+Changes for relay 33 of track A: `VERuser` and `getAllInfo` set `errno` 0 (glibc 2.35's `getpwuid`,
+whether it finds the user or not; `system::passwd_name`); their callers (`FSENVgetenv`,
+`handleVersionOption`, argparse's `--all-info`) pass the program's globals.

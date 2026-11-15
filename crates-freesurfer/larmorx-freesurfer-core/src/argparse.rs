@@ -877,7 +877,8 @@ impl ArgumentParser {
             info += 1;
         }
         if self.exists(g, err, "all-info")? {
-            let _ = writeln!(out, "{}", get_all_info(env, av, &progname));
+            let line = get_all_info(g, env, av, &progname);
+            let _ = writeln!(out, "{line}");
             info += 1;
         }
         if info > 0 && av.len().wrapping_sub(info) == 1 {

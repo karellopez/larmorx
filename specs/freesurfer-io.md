@@ -4019,3 +4019,87 @@ ITK's on all 400 (to ITK's printed precision; ITK's own handling of LAS files ta
 FreeSurfer's (`reproduce`) on 42. ITK 5.4.5 turns a LAS file's coordinates to LPS by negating the first
 coordinate instead of the second, and leaves the default column of an axis without a direction
 alone: the check compares against the file's own geometry.
+
+## 128. MINC 1 volumes read (`mincRead`; `mri_read`'s type 1, `mri_identify`'s `MRI_MINC_FILE`)
+
+The file is read by MINC 1.5.1's volume input as FreeSurfer 8.2.0's copy of MINC behaves (`larmorx_io::minc`,
+the main package's port of MINC 1.5.1 with netCDF 3.6.0-p1's classic reader; its own behaviour, messages and
+defects: `docs/findings/minc-volumes.md`), with the name `mri_read` gives (the working directory before a name
+without `/`, §42). FreeSurfer's copy differs from MINC 1.5.1 in these points, which the reader takes as a
+dialect: (a) a package error (an attribute or variable of the wrong kind, a failed allocation, a conversion
+variable used wrongly) prints `<folder>/packages/minc/<file>.c:<line> <message>` on standard error, where
+`<folder>` is the official build's folder (the one its other messages name, §1) and `<file>:<line>` the place in
+its copy (`minc_netcdf_convenience.c:402` "Cannot uncompress the file", `:786` "Non-numeric datatype", `:801`
+"miattget", `:899` "Attribute is not a scalar value", `:940` "Non-character datatype";
+`minc_value_conversion.c:229` "Non-numeric datatype", `:490` "MI_var_loop"; `minc_image_conversion.c:1015`
+"Non-numeric datatype", `:1328` "ICV is not attached to an image variable", `:2599` and `:2612` "Variable has
+too few dimensions to be an image"), and ends the program with exit status 1; (b) no `MINC package entry point`
+lines; no volume cache (every volume read whole in one pass); (c) a compressed file (`.mnc.gz`) is not
+decompressed: "Cannot uncompress the file", exit status 1 (FS-788); (d) an image of type double: `<folder>/
+packages/minc/minc_convenience.c:568 bad data type`, exit status 1 (FS-775); a character image:
+`minc_volume_io.c:2289 bad nc_data_type`, exit 1; a dimension of irregular spacing: `minc_volume_io.c:2035
+set_volume_irregular_starts NYI`, exit 1; (e) its `.xfm` dialect (§45: FreeSurfer's 4 x 4 inverse)
+decides whether the voxel-to-world matrix is singular. netCDF's file numbers in messages are file
+descriptors: 3 for the first file a program opens beyond its standard streams.
+
+In order:
+
+1. The name does not open for reading (`FileExists`): `mincRead(): can't find file <name>` (an error,
+   `ERROR_BADFILE`, `errno` 0 first), no volume.
+2. The file's dimension count (volume_io's: the `image` variable's dimensions; messages of a file that is not
+   netCDF or has no image, as the library prints them).
+3. The volume input with the dimension names `xspace`, `yspace`, `zspace` and `time` (in that order: volume
+   dimension 0 is the file's `xspace`, 1 `yspace`, 2 `zspace`, 3 `time`, whatever their order in the file), in
+   the file's own type and sign. A failure (after the library's messages): `mincRead(): error reading volume
+   from file <name>` (`ERROR_BADPARM`, `errno` 0), no volume. A file of five or more dimensions gives the
+   volume input more names than FreeSurfer's four (FS-745: memory contents; FreeSurfer crashes).
+4. Not three or four dimensions: `mincRead(): <n> dimensions in file; expecting 3 or 4` (`ERROR_BADPARM`,
+   `errno` 0), no volume.
+5. With `Gdiag` holding both `DIAG_SHOW` (0x40) and `DIAG_VERBOSE` (0x10000000): `DimSizes: <n>, <w>, <h>,
+   <d>, <frames>` and `DataType: <netCDF type>` (standard output).
+6. The type: bytes (netCDF type 1, and 2) `MRI_UCHAR`, 16-bit integers (3) `MRI_SHORT`, 32-bit integers (4)
+   `MRI_LONG`, floats (5) and doubles (6) `MRI_FLOAT`; another: `mincRead(): bad data type (<t>) in input
+   file <name>` (not reachable). The volume: width, height, depth the sizes of `xspace`, `yspace`, `zspace`,
+   the frames `time`'s (1 for three dimensions); with voxels, or the header alone (`read_volume` 0: the
+   frame count set, no voxels).
+7. The geometry: the voxel sizes the steps' absolute values (`float`); `ps` the x size, `thick` the z size;
+   the direction cosines of the x, y and z dimensions as volume_io holds them (unit vectors), each negated
+   when its step is negative; the centre the world position of voxel `(w/2, h/2, d/2)` (volume_io's
+   voxel-to-world transform: `start + step * index` along each axis's cosine, in `double`), stored as
+   `float`; the good-RAS flag 1; `xend = xsize * width / 2.0` (the product in `float`, then the division in
+   `double`, stored as `float`), `xstart = -xend` (y, z alike), `fov` the largest of `xend - xstart`, `yend -
+   ystart`, `zend - zstart` (`float`). The time step is not read (TR 0).
+8. With voxels: every value is volume_io's voxel value (in the file's valid range: the real range is not
+   applied), converted as x86-64's C conversions do: `MRI_UCHAR` the low byte of the value truncated to a
+   32-bit integer (a signed byte's -1 is 255: FS-742), `MRI_SHORT` its low 16 bits (an unsigned 40,000 is
+   -25,536: FS-743), `MRI_FLOAT` rounded to `float` (a NaN keeps its sign and top payload bits, quieted);
+   `MRI_LONG` (FS-744): the value truncated to 64 bits and its low 32 bits stored, little-endian, at byte `4 x`
+   of the row of 8-byte voxels (the row's first half holds its values two to a voxel, the second half
+   zeros; an unsigned value past 2^31 - 1 reads negative).
+9. With `DIAG_SHOW` and `DIAG_VERBOSE`: `MINC Linear Transform` and four lines of the voxel-to-world matrix's
+   rows, each number `%7.4f` followed by a space (standard output).
+
+**larmorx by default** (rule A, except as said): a file of five or more dimensions is refused after step 2
+with step 4's message (rule B), before the volume input; the values kept: a signed byte file with a value
+below 0 becomes `MRI_SHORT`, an unsigned 16-bit file with a value above 32,767 `MRI_INT` (each only then:
+otherwise FreeSurfer's type and bytes; a header read keeps FreeSurfer's type); 32-bit integers one to a
+64-bit voxel (`MRI_LONG`, the value truncated to 64 bits). The dialect's (c) and (d) for doubles are the
+library's corrections: the file decompressed (FS-788), the doubles read (FS-775).
+
+## 129. Validation plan (part 27)
+
+Piece 25 of the fs.io probe: `mcd` and `mch` (`mri_read` with and without voxels, the type -1 or 1, names
+`.mnc`, `.MNC`, `<name>@minc`, `.mnc.gz` (a stored gzip stream), and a `.bin` name found by its `CDF` magic) of
+netCDF classic files (versions 1 and 2) built for it: an `image` variable of bytes, 16- and 32-bit integers
+(signed and unsigned, with and without `signtype`), floats and doubles (NaN and infinity among them), over
+`zspace`, `yspace`, `xspace` in the standard or a shuffled order, with a `time` dimension (first, as the record
+dimension or not, or elsewhere), one or two spatial dimensions fewer, an extra `vector_dimension` or an unknown
+first dimension (five dimensions); dimension variables with positive, negative and zero steps, starts, axis or
+oblique direction cosines (some swapped or negated), `spacetype`; valid ranges (the type's, inside it, reversed;
+as doubles or floats), `image-max`/`image-min` per volume, per slice or per slice and frame; sizes 1 to 4 (or 5
+to 12); values at the types' ends; `Gdiag` 0, 0x40, 0x10000040; frame lists; and now and then a folder, no file,
+a `CDF` file of garbage, a file that is not netCDF, a netCDF file without an image, or a file cut short. Not
+compared (memory contents or crashes): FS-745 and the library's FS-774, FS-776 to FS-779, FS-782 to FS-785,
+FS-789, FS-790, FS-792, FS-795, FS-796, under `reproduce`. Measured (2026-11-15, observed): seeds 7 (298 piece-25
+cases), 13 and 21 (894 each): `reproduce` identical on every compared case (1,815), 0 different; 271 skipped;
+`fix` differs only with notices.

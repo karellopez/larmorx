@@ -97,6 +97,140 @@ impl Dialect for FsVolumeIo {
     }
 }
 
+/// FreeSurfer 8.2.0's copy of MINC's volume input (`packages/minc`): the dialect of the main
+/// package's MINC 1.5.1 volume reader (`larmorx_io::minc`, track C's port) as FreeSurfer's copy
+/// behaves, measured by track C's probe (`validation/probes/fs-nrrd-minc`) and this crate's
+/// (piece 25 of fs.io's):
+///
+/// 1. a package error prints its copy's source file and line and the message on standard error
+///    and ends the program with exit status 1 (`MI_LOG_PKG_ERROR2`, `MI_LOG_SYS_ERROR1`);
+/// 2. no `MINC package entry point` lines; no volume cache;
+/// 3. no decompression (FS-788: corrected by default, the file decompressed);
+/// 4. an image of type double has no default range: the program ends (FS-775: corrected by
+///    default, the doubles read), as does an image of a type volume_io does not know and a
+///    dimension of irregular spacing;
+/// 5. its `.xfm` dialect is [`FsVolumeIo`] (its own 4 x 4 inverse).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FsMinc;
+
+/// The folder FreeSurfer's copy of MINC was compiled in, as its messages print it.
+fn minc_prefix() -> String {
+    format!(
+        "{}/packages/minc/",
+        larmorx_freesurfer_core::diag::BUILD_ROOT
+    )
+}
+
+fn minc_fatal(at: &str, msg: &str, streams: &mut dyn Streams) -> larmorx_io::minc::Exit {
+    streams.err(&format!("{}{at} {msg}\n", minc_prefix()));
+    larmorx_io::minc::Exit { status: 1 }
+}
+
+impl larmorx_io::minc::Dialect for FsMinc {
+    fn pkg_error(
+        &self,
+        site: larmorx_io::minc::PkgSite,
+        _code: i32,
+        message: &str,
+        streams: &mut dyn Streams,
+    ) -> Option<larmorx_io::minc::Exit> {
+        use larmorx_io::minc::PkgSite as S;
+        // the line of the macro's last line (GCC's __LINE__ of a call spread over lines)
+        let at = match site {
+            S::Uncompress => "minc_netcdf_convenience.c:402",
+            S::AttNonNumeric => "minc_netcdf_convenience.c:786",
+            S::AttGetAlloc => "minc_netcdf_convenience.c:801",
+            S::AttNonScalar => "minc_netcdf_convenience.c:899",
+            S::AttNonChar => "minc_netcdf_convenience.c:940",
+            S::VarNonNumeric => "minc_value_conversion.c:229",
+            S::VarLoopAlloc => "minc_value_conversion.c:490",
+            S::IcvNonNumeric => "minc_image_conversion.c:1015",
+            S::IcvNotAttached => "minc_image_conversion.c:1328",
+            S::IcvTooFewDims => "minc_image_conversion.c:2599",
+            S::IcvTooFewDimsVector => "minc_image_conversion.c:2612",
+            // never raised on volume_io's reading path (it sets each property once, before it
+            // attaches): the first site of each kind, miicv_setdbl's
+            S::IcvAttached => "minc_image_conversion.c:399",
+            S::IcvBadProperty => "minc_image_conversion.c:454",
+        };
+        Some(minc_fatal(at, message, streams))
+    }
+    fn logs_entry_point(&self) -> bool {
+        false
+    }
+    fn cache_threshold(&self) -> Option<i64> {
+        None
+    }
+    fn decompresses(&self, notices: &mut larmorx_core::defects::Notices) -> bool {
+        if notices.reproduce() {
+            false
+        } else {
+            notices.add(
+                &larmorx_core::defects::FS_788,
+                "a compressed MINC file decompressed (FreeSurfer's copy cannot)",
+            );
+            true
+        }
+    }
+    fn default_range(
+        &self,
+        nc_type: i32,
+        notices: &mut larmorx_core::defects::Notices,
+        streams: &mut dyn Streams,
+    ) -> Option<larmorx_io::minc::Exit> {
+        use larmorx_io::minc::netcdf::{NC_BYTE, NC_DOUBLE, NC_FLOAT, NC_INT, NC_SHORT};
+        match nc_type {
+            NC_BYTE | NC_SHORT | NC_INT | NC_FLOAT => None,
+            NC_DOUBLE if notices.fix() => {
+                notices.add(
+                    &larmorx_core::defects::FS_775,
+                    "a MINC image of type double read (FreeSurfer's copy ends the program)",
+                );
+                None
+            }
+            _ => Some(minc_fatal(
+                "minc_convenience.c:568",
+                "bad data type",
+                streams,
+            )),
+        }
+    }
+    fn xfm(&self) -> &dyn Dialect {
+        &FsVolumeIo
+    }
+    fn bad_data_type(
+        &self,
+        _nc_type: i32,
+        streams: &mut dyn Streams,
+    ) -> Option<larmorx_io::minc::Exit> {
+        Some(minc_fatal(
+            "minc_volume_io.c:2289",
+            "bad nc_data_type",
+            streams,
+        ))
+    }
+    fn irregular_spacing(
+        &self,
+        widths: bool,
+        streams: &mut dyn Streams,
+    ) -> Option<larmorx_io::minc::Exit> {
+        Some(if widths {
+            // never reached: the starts' message comes first
+            minc_fatal(
+                "minc_volume_io.c:2073",
+                "set_volume_irregular_widths NYI",
+                streams,
+            )
+        } else {
+            minc_fatal(
+                "minc_volume_io.c:2035",
+                "set_volume_irregular_starts NYI",
+                streams,
+            )
+        })
+    }
+}
+
 /// `invert_4x4_matrix(mat, inv)` (`minc_gaussian.c`, `invert_4x4_matrix_wkr_fast`): Gaussian
 /// elimination with scaled partial pivoting over a row map. Each row's scale is `1 / max |a_ij|`
 /// (a row of zeros: `Some row is all zeros`); for columns 0 to 2 the row of the largest scaled

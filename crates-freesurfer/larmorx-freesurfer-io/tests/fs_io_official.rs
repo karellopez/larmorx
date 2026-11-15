@@ -19,11 +19,12 @@
 //! seven (AFNI datasets, curvature files and annotations read as volumes, the AFNI and NRRD
 //! writers), piece 23's three (image files read and written as volumes, ITK warps written) and
 //! piece 24's two (NRRD volumes read), piece 25's two (MINC volumes read), piece 26's one (MINC
-//! volumes written) and piece 27's two (GCA atlases read as volumes),
+//! volumes written), piece 27's two (GCA atlases read as volumes) and piece 28's two (MRIread and
+//! MRIreadEx with their non-finite voxels removed),
 //! without those that take seconds in a debug build (`cases::HEAVY_SEED1`, none since piece 23),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-15, track A relay 35, with piece 27:
-//! 4,800 cases, 4,303 lines identical, 45 of them with memory digits; 497 hashed as
+//! --light` on Linux x64 from the unit oracle's build (2026-11-15, track A relay 36, with piece 28:
+//! 4,800 cases, 4,302 lines identical, 51 of them with memory digits; 498 hashed as
 //! `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
@@ -45,8 +46,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "465026753bd05fce4264bc81e5fcd68e698beed94fcb236f6b838ede18e290e7";
-const SKIPPED: usize = 497;
+const OFFICIAL_SHA256: &str = "875d6f00abb2730b26f420b25606d532b5aaa55bb87b6e7c1f6343a2f8cc5150";
+const SKIPPED: usize = 498;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

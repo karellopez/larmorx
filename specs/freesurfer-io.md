@@ -4302,3 +4302,57 @@ different; `fix` differs only with notices. FreeSurfer 8.2.0's own atlases (`ave
 `mri_convert <atlas>[#<f>] <out>.mgz` with `FS_LEAVE_NANS=1` (its `MRIread` replaces NaNs otherwise): every voxel
 identical in both modes (the dump: `crates-freesurfer/larmorx-freesurfer-gca/examples/gca_volume.rs`). Damaged
 compressed data, the crash past 109 inputs and the defaults: the fs.gca unit tests.
+
+## 134. Volumes read whole with their non-finite voxels removed (`MRIread`, `MRIreadEx`, `MRIremoveNaNs`)
+
+`MRIread(name)` is the entry through which FreeSurfer's programs read a volume; `MRIreadEx(name, n)` the same with a
+frame.
+
+1. **The name.** A name holding a `*` is replaced by the first path the C library's `glob` finds for it (sorted in
+   byte order; no match, or a name without `*`: the name as given). A name, or a match, of 1,024 bytes or more: FS-249
+   (used whole here).
+2. **The reading.** `mri_read` of the name with the type found from it (§6's identification, the `@type` and
+   `#frames` suffixes as there), the voxels read. `MRIread` asks for no frame range: the volume is returned as read,
+   without `mri_read`'s check of non-finite voxels (§6: that check runs only when frames are chosen). `MRIreadEx` asks
+   for the frames `n` to `n`: with `n = -1` as `MRIread`; otherwise the one frame, refused when out of range
+   (`mri_read(): start frame (<n>) is out of range (<f> frames in volume)`), and a float volume with a non-finite
+   voxel anywhere refused (`nan_inf_check(): NaN at voxel <x>, <y>, <z>, <f>` or `Inf`; no volume). A name `mri_read`
+   cannot read: its messages, no volume (and no removal).
+3. **The removal** (`MRIremoveNaNs(mri, mri)`, also called by other programs on a volume they made). Only a float
+   volume can hold a non-finite value. Each voxel that is not finite (any NaN, quiet or signalling, either sign; +inf;
+   -inf) is counted (a 32-bit count, wrapping past 2^31 - 1) and, unless the environment holds `FS_LEAVE_NANS` (any
+   value, even empty), set to +0.0; with it the voxel keeps its bits. Order of the walk: x outermost, then y, then z,
+   then the frame. The first non-finite voxel the process meets prints `NaN found at voxel (<x>, <y>, <z>, <f>)` on
+   standard output (for an infinity too), once per process: a later volume with non-finite voxels prints no such line.
+   A volume with any prints the error `WARNING: <n> NaNs found in volume <name>...` (standard error, after the text of
+   a non-zero `errno` as every error), `<name>` the volume's name as `mri_read` stored it (the name given to
+   `mri_read`, with the wildcard already replaced). Nothing else changes; no status.
+4. **Threads (FS-841).** FreeSurfer walks x on its OpenMP threads (one per core unless `OMP_NUM_THREADS` says
+   otherwise): the count and the voxels' new values do not depend on them; the voxel the line names, and how many
+   such lines are printed (each thread may print one before the others see the first), do when the non-finite voxels
+   lie in more than one column of x. The port walks in the order above and prints the first, once, as FreeSurfer with
+   one thread; such a volume is noted (FS-841).
+5. **The frame records (FS-760).** Every reader that makes a volume from a header's frame count (MGH, NIfTI, ANALYZE,
+   MINC, NRRD, bshort/bfloat, ...) refuses a count whose frame records would take more than 16 GiB (1,288 bytes a
+   frame: more than 13,338,407 frames) before reading a voxel: the error `MRIalloc: could not allocate <n> frame`
+   after `Cannot allocate memory`, status 254 (the bshort/bfloat reader's own text: `get_b_info: could not allocate
+   <n> frames`). FreeSurfer gives that answer only when the machine cannot hold the records (it fills about 1.6 kB for
+   each frame first: observed, FreeSurfer 8.2.0's `mri_info` on one-voxel MGH files in a 12 GiB memory box: 2,000,000
+   frames 3.2 GB and exit 0; 12,000,000 and 20,000,000 frames ended by the box; 449,657,401 frames refused at once,
+   exit 254); between, its outcome depends on the machine. The port answers as a machine without that memory, in both
+   modes, noted.
+
+## 135. Validation plan (part 30)
+
+Piece 28 of the fs.io probe: `mrr` (`MRIread`, now and then twice in one process, to see the NaN line printed once
+per process) and `mrx` (`MRIreadEx`, frames -1, 0, 1, 2, 5) of MGH files (`.mgh`, `.mgz`) of 1 to 4 x 1 to 3 x 1 to
+3 voxels and 1 to 3 frames, of bytes, 32-bit integers, shorts and floats; the floats with no, one, some in one column
+of x, or many non-finite voxels (quiet NaNs with payloads, a negative NaN, signalling NaNs, both infinities) among
+ordinary values, the largest float, a subnormal, -0; `FS_LEAVE_NANS` set in a third of the cases; names given whole,
+with a `*` that matches two files (the first in byte order is read), one, or none, with a `#` frame list, or missing.
+The official side runs the functions themselves (`fsio`, one thread: `OMP_NUM_THREADS=1`; the licence check reads the
+machine's licence through `FS_LICENSE`). Printed: the volume's header, geometry, matrices and voxels' hash, `errno`,
+and every message. Measured (2026-11-15, observed): seeds 7, 13 and 21 (286, 862 and 862 piece-28 cases): `reproduce`
+identical on all 2,010, 0 different, none skipped; `fix` differs only with notices. The frame records' limit
+(FS-760): `crates-freesurfer/larmorx-freesurfer-mri/tests/frames_count.rs` (the refusal at once, both modes) and the
+measurement of §134 (5) (`<scratch>`'s `frames_probe.py`, kept in `validation/probes/fs-io/frames_probe.py`).

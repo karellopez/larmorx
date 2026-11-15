@@ -2549,6 +2549,8 @@ defects! {
         "deflateGetDictionary after a switch to storing (deflateParams to level 0 right after deflateResetKeep, which does not flush, keeping bytes read ahead) copies from past the end of its window: the dictionary's last bytes are memory contents";
     FS_811 = "FS-811", "zlib 1.2.11", true,
         "storing (level 0) can slide the window down while more bytes wait to be hashed than lie before the current position; after a switch to a compressing level (deflateParams) the next fill of the window reads far before its start and the program crashes (zlib 1.2.12 limits the count to the position)";
+    FS_813 = "FS-813", "IJG libjpeg 6b", true,
+        "a JPEG file whose scan names one component twice (two frame components with one identifier, or an identifier repeated in the scan's list) is decoded without a complaint: in a file of one scan the component left out keeps the memory contents of the decoder's sample buffer, so its colour comes from whatever that memory held; in a file of several scans the second copy decides that component's coefficients (libjpeg 9 refuses such a scan)";
 }
 
 /// The register entry with ID `id`.

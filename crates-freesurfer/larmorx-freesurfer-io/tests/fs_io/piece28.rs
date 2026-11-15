@@ -79,9 +79,9 @@ fn mgh(g: &mut Gen) -> Vec<u8> {
             1 => bad[g.below(n as u64) as usize] = true,
             2 => {
                 let x = g.int(0, i64::from(w) - 1) as usize;
-                for i in 0..n {
+                for (i, v) in bad.iter_mut().enumerate() {
                     if i % w as usize == x && g.chance(2) {
-                        bad[i] = true;
+                        *v = true;
                     }
                 }
             }

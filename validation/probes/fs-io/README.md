@@ -311,6 +311,22 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `reproduce` identical on every compared case (4,619), 0 different, 631 skipped; `fix` differs only with notices
   (FS-01, FS-17, FS-749, FS-751, FS-753, FS-754). FreeSurfer 8.2.0's own atlases against the official `mri_convert`:
   `crates-freesurfer/larmorx-freesurfer-gca/examples/gca_volume.rs` (findings Part 29).
+- Piece 28 (track A relay 36): `MRIread` and `MRIreadEx`. `mrr` (`MRIread(name, NULL)`, now and then twice in one
+  process: the NaN line is printed once per process) and `mrx` (`MRIreadEx`, frames -1, 0, 1, 2, 5) of small MGH
+  files (`tests/fs_io/piece28.rs`: bytes, ints, shorts, floats with no, one, some in one column of x, or many
+  non-finite voxels), `FS_LEAVE_NANS` set or not, wildcard names (two matches, one, none), `#` frame lists, missing
+  files. `MRIread` runs FreeSurfer's licence check: `fsio` sets `FREESURFER_HOME` to a folder that does not exist
+  and `FS_LICENSE` to `/usr/local/freesurfer/license.txt` unless the environment names one (the machine's licence
+  file is needed). Seeds 7, 13 and 21 (286, 862, 862 cases): `reproduce` identical on all 2,010; `fix` differs only
+  with notices (FS-01, FS-841).
+- Piece 29 (track A relay 36): `cnf` (`mriConformed`, `MRIfindMinSize`, `MRIfindRightSize` of one geometry) and
+  `acl` (`MRIaddCommandLine` 0 to 1,001 times). `SKIP` for FS-842 (the 1,001st line). Seeds 7, 13 and 21 (850 cases
+  each): `reproduce` identical on all 2,368 compared, 182 skipped; `fix` differs only with notices (FS-12, FS-17).
+- `subset.py` (relay 36): the probe on a subset of its kinds (`subset.py <worktree> <seed> <n> <kind,...>`, inside
+  `boxed.sh`): the official and the port's lines of those kinds, a JSON summary and the first differing cases.
+- `frames_probe.py` (relay 36): MGH files of one voxel per frame with 2,000,000 to 449,657,401 frames, a command run
+  on each, its exit status, peak memory and last lines (FS-760: `boxed.sh 12 python3 frames_probe.py <dir>
+  <mri_info>`, with FreeSurfer 8.2.0's `mri_info` or fs.io's example `read_volume`).
 - `nrrd_itk_geometry.py` (relay 32): the default's NRRD geometry (FS-736 to FS-738) against ITK 5.4.5's NRRD
   reader (ANTs 2.6.5's `PrintHeader`, through the oracle-output cache): 400 seeded files, the voxel-to-RAS
   matrices compared: `python -P validation/probes/fs-io/nrrd_itk_geometry.py --seed 1 --n 400` (prints

@@ -50,6 +50,12 @@ pub trait Stream {
     fn hit_end(&mut self) -> bool {
         self.peek().is_none()
     }
+    /// When [`Stream::peek`] gave nothing because a read failed: the `errno` that read set (a C
+    /// stream's `read` sets it before `scanf` remembers the end: a directory's `EISDIR`, 21); `None`
+    /// for the end of the input.
+    fn read_error(&self) -> Option<i32> {
+        None
+    }
 }
 
 /// A `FILE *` over a reader.
@@ -594,7 +600,9 @@ impl EndRule {
         let c = st.peek();
         if c.is_none() && !self.eof {
             self.eof = true;
-            self.saved = errno_now;
+            // a failed read sets errno itself (glibc's scanf remembers errno after the read, even
+            // in the white space it skips with errno cleared)
+            self.saved = st.read_error().unwrap_or(errno_now);
         }
         c
     }
@@ -632,6 +640,9 @@ impl Stream for Tracked<'_> {
     }
     fn hit_end(&mut self) -> bool {
         self.st.hit_end()
+    }
+    fn read_error(&self) -> Option<i32> {
+        self.st.read_error()
     }
 }
 

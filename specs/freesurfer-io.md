@@ -28,7 +28,9 @@ series read; **part 22** (§113-115): GE Signa and GE XIMG series read; **part 2
 files and annotations read as volumes, the NRRD writer's refusal, `mri_read`'s frees; **part 25**
 (§122-125): image files read and written as volumes, ITK warps written; **part 26** (§126-127): NRRD volumes
 read; **part 27** (§128-129): MINC 1 volumes read; **part 28** (§130-131): MINC 1 volumes written; **part
-29** (§132-133): GCA atlases read as volumes.
+29** (§132-133): GCA atlases read as volumes; **part 30** (§134-135): volumes read whole with their non-finite
+voxels removed; **part 31** (§136-137): the conformed-size checks and the command lines; **part 32** (§138-141): a
+volume's axes reordered, the selective-average headers, a label's overlap with another removed.
 
 ## 1. Conventions
 
@@ -41,7 +43,10 @@ read; **part 27** (§128-129): MINC 1 volumes read; **part 28** (§130-131): MIN
   end-of-file flag is set by a read that finds no more bytes (a read that ends exactly at the end of
   the file does not set it); `fopen` of a directory for reading succeeds on Linux (on every platform
   here); its failure leaves `errno` set (Linux's numbers: 2 for a missing file, 13 for a refused
-  one, 20 for a file used as a directory, 36 for a name too long).
+  one, 20 for a file used as a directory, 36 for a name too long). A read of a directory fails with `EISDIR`
+  (21) and leaves it in `errno`; a `scanf` call that meets that failure (in the white space it skips before an
+  item too) returns as at the end of the input with `errno` 21 (observed: `fscanf(fp, "%*s %f", ...)` on a
+  directory returns `EOF`, `errno` 21).
 - A **znz file** is FreeSurfer's own copy of znzlib (an older form than nifticlib 2.0.0's): a plain
   file is read and written with `fread` and `fwrite`; a compressed one with one zlib 1.2.11 `gzread`
   (or `gzwrite`) of `size x nmemb` bytes, the count returned being the bytes over `size` (complete
@@ -4400,3 +4405,153 @@ the warning, the sum of the return values, the count and the first and last line
 (FS-842: FreeSurfer's count is memory contents). Measured (2026-11-15, observed): seeds 7, 13 and 21 (850 piece-29
 cases each): `reproduce` identical on all 2,368 compared, 182 skipped (FS-842); `fix` differs only with notices
 (FS-12, FS-17).
+
+## 138. A volume's axes reordered (`MRIreorder`, `MRIreorderVox2RAS`)
+
+`MRIreorder(src, dst, xdim, ydim, zdim)` moves a volume's voxels so that the source's column axis becomes the
+destination's axis `|xdim|` (1 columns, 2 rows, 3 slices), its row axis axis `|ydim|`, its slice axis axis `|zdim|`;
+a negative number reverses that axis. `mri_convert -r <x> <y> <z>` calls it (on failure: `error reordering axes`,
+exit 1), so do `mri_robust_register`, `mri_robust_template` and the conform step that puts slices in LIA order.
+
+1. **Diagnostics.** With `Gdiag` not 0: `MRIreorder() -----------` and `xdim=<x> ydim=<y> zdim=<z>` on standard
+   output first.
+2. **The numbers.** The absolute values' product and sum are computed in 32-bit signed arithmetic, wrapping
+   (`abs` of -2147483648 is itself); unless both are 6: `ERROR: replicated/incorrect dimension number` on standard
+   output and no volume. Only 1, 2 and 3 in some order (signs free) are meant: other triples pass that test through
+   the wrapping (FS-843, observed: `mri_convert -r 99577 2147399842 2147467883` and `-r 106555 -2147423458
+   2147437289` end with a segmentation fault, status 139; `-r -2147483648 1 3` gives the message). By default they
+   are refused with the same message and no volume; with `reproduce` the program ends with status 139.
+3. **The destination.** Without one: a new volume of the reordered extent (the source's extent along each source
+   axis put at its destination axis), the source's type and frame count, zero voxels; the source's header copied into
+   it (`MRIcopyHeader`: everything but its extent, type and counts); its voxel sizes then the reordered sizes. A given
+   destination keeps its own extent, sizes, type and frames.
+4. **The geometry** (`MRIreorderVox2RAS(src, dst, ...)`, on a given destination too, before its checks). `Msrc` is
+   the source's voxel-to-scanner matrix (§ the volume geometry's `Mdc D, P0` form, without shear). `Q` is a 4 x 4
+   single-precision matrix, zero but for: row `k` (k = 1 for x, 2 for y, 3 for z) holds +1 or -1 (the sign of
+   `dim_k`, +1 for 0 and above) in column `|dim_k|`, and, for a negative `dim_k`, the source's extent along axis `k`
+   minus 1 in column 4; `Q[4][4] = 1`. `Mdst = Msrc Q`, each element summed in single precision over the inner index
+   in order (FreeSurfer's `MatrixMultiply`). With `Gdiag` not 0 it prints on standard output `Msrc
+   ------------------------`, `Msrc`, `Q ------------------------`, `Q`, `Qinv ------------------------`, `Q`'s
+   inverse, `Mdst ------------------------`, `Mdst`, each matrix in `MatrixPrint`'s form (`% 2.5f`, two spaces
+   between, `;` and a new line after each row). The destination then takes `Mdst` as its voxel-to-scanner matrix
+   (`MRIsetVox2RASFromMatrix`): its direction cosines are `Mdst`'s first three columns divided by their lengths (in
+   double precision, stored as single), its centre from the fourth column (§ `MRIp0ToCRAS`), its cached matrices
+   recomputed; its voxel sizes are not changed: when a column's length differs from the destination's voxel size by
+   more than 0.001 the warning `WARNING: MRIsetRas2VoxFromMatrix(): voxels sizes are inconsistent` with the six
+   numbers (`%g` pairs) and `This is probably due to shear in the vox2ras matrix`, `Input Vox2RAS ------` and the
+   matrix are printed (standard output) first. A zero direction column gives NaN cosines (and no cached inverse).
+   Called by itself with numbers that are not 1, 2 and 3 (FreeSurfer writes outside its matrix: FS-843), the port
+   prints the message of (2) and returns 1 with the destination unchanged; otherwise 0.
+5. **Diagnostics again.** With `Gdiag` not 0: `src <w> <h> <d>, <xsize> <ysize> <zsize>` and `dst ...` (`%f`).
+6. **The destination's checks** (a new destination always passes): for the source's axes x, y, z in turn, the
+   destination's extent along `|dim|` must equal the source's extent along that axis; the first that does not gives,
+   with `errno` 0, the error (for x: `MRIreorder: incorrect dst width` whatever the axis; for y: `MRIreorder:
+   incorrect dst width != src height`, `... dst height != src height`, `... dst depth != height` for axes 1, 2, 3;
+   for z: `MRIreorder: incorrect dst depth` whatever the axis), and no volume (the destination's geometry already
+   changed by (4)).
+7. **The voxels.** None (an extent or the frame count 0): the destination is returned as it is. Otherwise only
+   `MRI_UCHAR`, `MRI_SHORT`, `MRI_USHRT`, `MRI_INT` and `MRI_FLOAT` are moved: any other type gives, with `errno` 0,
+   the error `MRIreorder: unsupported voxel format <type>` and no volume (a new destination is dropped). For each
+   frame, source slice, row and column (in that order, the column fastest), the destination voxel is the source's
+   index along each axis put at its destination axis, reversed (`extent - 1 - i`) where the number is negative; the
+   voxel's bytes are copied as they are (a signalling NaN keeps its bits). A volume without voxels on either side
+   (a header read alone): FreeSurfer crashes (FS-58: an error that ends the program, both modes).
+8. **A given destination that does not fit** (no program passes one): fewer frames than the source (FS-844:
+   FreeSurfer reads past its slice table): refused in both modes with the error `MRIreorder: dst has fewer frames
+   (<n>) than src (<m>)`. Another voxel type (FS-845): FreeSurfer writes each source voxel with the source's voxel size
+   at the destination's row start plus the column times the source's voxel size (same-size types: the bytes
+   reinterpreted; a larger destination type: the bytes in the first part of each row; a smaller one: past the row,
+   and past the voxels for the last rows). By default refused (`MRIreorder: dst type <t> differs from src type <s>`,
+   no volume); with `reproduce` the bytes placed as FreeSurfer places them while every write stays in the
+   destination's voxels (refused as by default where one would not, or for a destination type whose rows FreeSurfer
+   does not step, FS-166).
+9. **Returns** the new volume, the given one, or none.
+
+## 139. The selective-average headers (`is_sxa_volume`, `ld_sxadat`, `ld_sxadat_from_stem`, `sxa_framepower`, `sv_sxadat`, `sv_sxadat_by_stem`)
+
+A selective average (FS-FAST's `selxavg`) keeps a text header in `<stem>.dat` beside its volume. FreeSurfer 8.2.0's
+programs reach these functions only through a branch that is never taken (the surface sampling of a volume tests
+`0 && is_sxa_volume(...)`); they belong to the library.
+
+1. **The name.** `<stem>.dat`, the stem being the volume name without its extension as `IDstemFromName` finds it
+   (`.w`, `.nii`, `.mgz`, `.mgh`, `.img`, `.bhdr`, `.nii.gz`, `_000.bfloat`, `_000.bshort`), or the whole name when
+   it has none of them. A name of 1,000 bytes or more with `.dat`: FS-846 (FreeSurfer's buffer overflows; used whole,
+   noted).
+2. **`is_sxa_volume(volid)`**: 0 for no name; 1 when `<stem>.dat` opens for reading (a folder does), else 0 (`errno`
+   the open's).
+3. **`ld_sxadat_from_stem(volid)`**: none when `is_sxa_volume` is 0; else `ld_sxadat(<stem>.dat)`.
+4. **`ld_sxadat(file)`.** A file that does not open: `ldsxdat():: <strerror>` and `Could not open <file>` on standard
+   error, none. Otherwise a header of zeros (every count, number and list place 0, no lists) filled by `fscanf`
+   calls, each reading what it can (a value not there leaves its field as it was; a number that stops early, as `1`
+   of `1e-50` for `%d`, leaves the rest for the next call):
+   - `"%*s %f"` for `TR`, `TimeWindow`, `TPreStim`; `"%*s %d"` for `Nc` (the conditions, fixation included), `Nh`
+     (the estimates per condition); `Nnnc = Nc - 1` (wrapping);
+   - `"%*s %d"` for `version`: when the call returns 0 (its word read, its number not) `version` is 0 and the header
+     is returned at once (the file left open); an end of file (`EOF`) goes on;
+   - `"%*s %f"` for `TER`, `DOF`; `"%*s"`; `npercond`: a list of `Nc` places (none for a negative `Nc`, `errno`
+     `ENOMEM`; 0 places for 0) read with `"%d"` one by one;
+   - `"%*s %d"` for `nruns`, `ntp`, `nrows`, `ncols`, `nskip`, `DTOrder`; `"%*s %f"` for `RescaleFactor`,
+     `HanningRadius`; `"%*s %d"` for `nNoiseAC`, `BrainAirSeg`, `GammaFit`;
+   - when `GammaFit` is not 0: `"%*s"` and `GammaFit` deltas (`"%f"` each), `"%*s"` and as many taus; the header holds
+     10 of each (FS-847 below);
+   - `"%*s %d"` for `NullCondId`;
+   - `Nch = Nh x Nnnc` (32-bit, wrapping); `"%*s"`; `SumXtX`: a list of `Nch x Nch` places (that product in 32 bits;
+     none when negative) read with `"%f"` for `Nch` rows of `Nch`;
+   - version 1 ends here (the file left open); otherwise `"%*s"`, `hCovMtx` likewise, `"%*s"`, `CondIdMap`: `Nc` places
+     read with `"%d"`; the file closed.
+   A loop's calls after one that fails all fail the same way (a failing call leaves the stream where it was): the
+   port stops at the first. On a folder every call fails with `errno` 21 (§1).
+   - **FS-847** (more than 10 gamma functions): FreeSurfer stores delta `k` from 10 on in tau `k - 10`, and past the
+     taus over the header's next fields: `NullCondId` (read again after), padding, the `SumXtX` and `hCovMtx` places'
+     addresses, `nNoiseAC` (not read again: it keeps the number's bits), padding, the `CondIdMap` address; past 20,
+     outside the header. By default every value is kept (the lists hold `GammaFit` places) and the other fields are
+     untouched; with `reproduce` FreeSurfer's fields for up to 20, refused (none, the error `ld_sxadat(): too many
+     gamma functions for FreeSurfer's header: the header is refused`) beyond, or when a version-1 header (whose
+     `hCovMtx` and `CondIdMap` are not set again) had those addresses written.
+   - **FS-848** (`Nch x Nch` past 2^31 for a positive `Nch`): FreeSurfer's size wraps around, its loops try billions
+     of reads and write outside the list. Refused by default (none, the error `ld_sxadat(): SumXtX past 2^31 numbers:
+     the header is refused`); with `reproduce` read as FreeSurfer while every number read lands in its list (refused
+     where one would not).
+5. **`sxa_framepower(sxa, &nframes)`**: `nframes = 2 x Nc x Nh` (32-bit); a list of that many places (none when
+   negative), for each condition `Nh` places of 1.0 (the averages) then `Nh` of 2.0 (the deviations). FS-848: a
+   count past 2^31 for positive `Nc` and `Nh` (FreeSurfer writes outside its list and crashes): by default no list
+   and the error `sxa_framepower(): <Nc> conditions of <Nh> estimates are past 2^31 frames` (standard error); with
+   `reproduce` the program ends with status 139.
+6. **`sv_sxadat(sxa, file)`**: a file that does not open for writing: `sv_sxdat():: <strerror>` and `Could not open
+   <file>` (standard error), 1. Otherwise the lines `TR         %f`, `TimeWindow %f`, `TPreStim   %f`, `nCond
+   %d` (six spaces), `Nh         %d`; version 0 ends there (0); then `version %d`, `TER %f`, `DOF %f`, `NPerCond `
+   with each count and a space, `nruns %d`, `ntp %d`, `nrows %d`, `ncols %d`, `nskip %d`, `DTOrder %d`,
+   `RescaleFactor %f`, `HanningRadius %f`, `nNoiseAC %d`, `BrainAirSeg %d`, `GammaFit %d`, when not 0 `gfDelta ` and
+   `gfTau ` lines of `%f ` values, `NullCondId %d`, `SumXtX` and each number as `%f ` on its own line; version 1 ends
+   there (0: FreeSurfer leaves the file open, its bytes reach the file when the program ends; the port writes them
+   before it returns); then `hCovMtx` likewise and `CondIdMap ` with each id and a space; 0. FS-849: a header whose
+   lists hold fewer numbers than its counts (FreeSurfer reads past them), more than 10 gamma functions among them, is
+   refused in both modes (`sv_sxadat(): <list> holds fewer numbers than ...: not written`, 1).
+7. **`sv_sxadat_by_stem(sxa, volid)`**: `sv_sxadat` into `<stem>.dat`.
+
+## 140. A label's overlap with another removed (`LabelRemoveOverlap`)
+
+`LabelRemoveOverlap(area1, area2)` marks deleted each point of `area1` (its first `n_points`) whose vertex number
+equals that of any point of `area2` (deleted points of both included; a point marked already is marked again);
+`NO_ERROR`. Points without a vertex (-1) match each other (FS-850, kept in both modes and noted: the callers,
+`mri_label2label --ring` and `mri_cor2label --ring`, pass surface labels).
+
+## 141. Validation plan (part 32)
+
+Piece 30 of the fs.io probe. `reo`: `MRIreorder` of a volume made in the case (extents 0 to 4, frames 0 to 3; bytes,
+32-bit integers, floats (with signalling NaNs), shorts, unsigned shorts, and long, RGB and complex volumes, which it
+refuses; voxel sizes 0.5 to 3; direction cosines coronal, axial, sagittal, oblique, or with a zero column; a byte
+pattern repeated over the voxels); the numbers every signed permutation of 1, 2, 3, repeated numbers, 0, 4, the two
+overflowing triples of (2) and `-2147483648 1 3`; into no volume, a given volume with voxels (the right or a wrong
+extent, the same or another type, the same, fewer or more frames) or a header without voxels; `Gdiag` on in an
+eighth. Printed: the result and the given destination (header, geometry, matrices, the voxels' hash), `errno`, every
+message. `sxl`: `is_sxa_volume`, then `ld_sxadat_from_stem` or `ld_sxadat`, then `sxa_framepower`, of headers of
+versions 0 (a word without its number, or ended), 1 and 2, with counts -2 to 4 and the overflowing (101, 1,000) and
+(40,000, 30,000), -2 to 25 gamma functions, numbers out of range (`1e40`, `2147483648`), `nan`, `inf`, hexadecimal,
+`1e-50` for an integer, not numbers; names with a stem, without, `.nii.gz`, missing, a folder `<stem>.dat`, none.
+`sxw`: a header read, written by stem or by name (into a file or a folder), and the written file's bytes (after
+every stream is flushed). `lro`: two labels of 0 to 6 points of vertices -1 to 5, a fifth deleted. Not compared:
+FS-843 (FreeSurfer crashes), FS-844 and FS-58 (memory, crashes), FS-845 where the port refuses, FS-848 (billions of
+reads, crashes), FS-847 where the port refuses, FS-849. Measured (2026-11-15, observed): seeds 7, 13 and 21 (1,100
+piece-30 cases each): `reproduce` identical on all 2,880 compared (970, 949 and 961), 420 skipped, 0 different; `fix`
+differs only with notices (FS-01, FS-847).

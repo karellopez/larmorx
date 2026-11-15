@@ -2203,6 +2203,22 @@ defects! {
         "reading a float volume with non-finite voxels (NaN or infinite) through MRIread, MRIreadEx or MRIremoveNaNs on several threads: the voxel its 'NaN found at voxel' line names, and how many such lines it prints, depend on the threads' timing when those voxels lie in more than one column of x (the count and the voxels' new values do not)";
     FS_842 = "FS-842", "FreeSurfer", true,
         "adding a command line to a volume that already records 1,000 (MRIaddCommandLine, which every program calls on the volume it writes): after its error message FreeSurfer writes past the volume's table of command lines, so the count of lines becomes memory contents and a later line or the volume's writing can crash or write garbage";
+    FS_843 = "FS-843", "FreeSurfer", true,
+        "reordering a volume's axes (MRIreorder, mri_convert -r): dimension numbers other than 1, 2 and 3 whose sizes' product and sum both come to 6 in 32-bit arithmetic pass FreeSurfer's check and crash the program";
+    FS_844 = "FS-844", "FreeSurfer", true,
+        "reordering a volume's axes into a given volume with fewer frames than the source reads memory past that volume's slices: a crash or memory corruption";
+    FS_845 = "FS-845", "FreeSurfer", true,
+        "reordering a volume's axes into a given volume of another voxel type writes the source's voxels with the source's voxel size at the destination's rows: the values misplaced, and past the destination's voxels for a smaller type";
+    FS_846 = "FS-846", "FreeSurfer", true,
+        "a selective-average volume (FS-FAST's selxavg) whose name with .dat takes 1,000 bytes or more: FreeSurfer writes the header's name past its buffer: memory corruption or a crash";
+    FS_847 = "FS-847", "FreeSurfer", true,
+        "reading a selective-average header with more than 10 gamma functions: FreeSurfer writes their parameters over the header's other values (the null condition, the noise order, the arrays' places) and past the header beyond 20";
+    FS_848 = "FS-848", "FreeSurfer", true,
+        "a selective-average header whose counts ask for more than 2^31 numbers (its matrices of estimates, or its frames' powers): FreeSurfer's sizes wrap around in 32 bits, its numbers are written outside its arrays (a crash), and reading tries billions of numbers";
+    FS_849 = "FS-849", "FreeSurfer", true,
+        "writing a selective-average header whose lists hold fewer numbers than its counts reads past them: memory contents written, or a crash";
+    FS_850 = "FS-850", "FreeSurfer", false,
+        "removing a label's overlap with another (LabelRemoveOverlap, mri_label2label and mri_cor2label --ring): points without a surface vertex match each other, so every such point is removed when the other label has one (kept: the programs that call it pass surface labels, whose points all have vertices)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

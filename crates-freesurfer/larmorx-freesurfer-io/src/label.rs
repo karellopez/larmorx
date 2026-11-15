@@ -20,7 +20,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_423, FS_424, FS_425, FS_426, FS_427, FS_428, FS_429};
+use larmorx_core::defects::{FS_423, FS_424, FS_425, FS_426, FS_427, FS_428, FS_429, FS_850};
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::cstd::{self, fmt_f};
 use larmorx_freesurfer_core::diag::DIAG_SHOW;
@@ -785,6 +785,32 @@ pub fn label_remove_duplicates(g: &mut Globals, err: &mut dyn Write, area: &mut 
         m.extend_from_slice(c_str(&area.name));
         m.extend_from_slice(b".\n");
         let _ = err.write_all(&m);
+    }
+    NO_ERROR
+}
+
+/// `LabelRemoveOverlap(area1, area2)`: marks as deleted every point of `area1` whose vertex
+/// number is that of a point of `area2` (deleted points of either label included). Points
+/// without a vertex (-1) match each other (FS-850: every such point of `area1` is marked when
+/// `area2` has one; kept in both modes, noted: the programs that call it, `mri_label2label` and
+/// `mri_cor2label` with `--ring`, pass surface labels, whose points all have vertices).
+/// `NO_ERROR`.
+pub fn label_remove_overlap(g: &mut Globals, area1: &mut Label, area2: &Label) -> i32 {
+    let n1 = (area1.n_points.max(0) as usize).min(area1.lv.len());
+    let n2 = (area2.n_points.max(0) as usize).min(area2.lv.len());
+    let others = &area2.lv[..n2];
+    let mut unvertexed = false;
+    for lv in area1.lv[..n1].iter_mut() {
+        if others.iter().any(|o| o.vno == lv.vno) {
+            unvertexed |= lv.vno < 0;
+            lv.deleted = 1;
+        }
+    }
+    if unvertexed {
+        g.notices.add(
+            &FS_850,
+            "LabelRemoveOverlap: points without a vertex in both labels match each other: marked deleted",
+        );
     }
     NO_ERROR
 }

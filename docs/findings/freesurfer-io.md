@@ -2304,3 +2304,70 @@ ported into fs.volume's `coords.rs`: fs.io sits below fs.volume), fs.io `mriio.r
   first.
 - The probe's `acl` builds each line as `line + std::to_string(i)` (a `std::string`, which may hold a NUL: `strcpy`
   stops there).
+
+## Part 32: MRIreorder, the selective-average headers, LabelRemoveOverlap (relay 37 of track A)
+
+Sources: `utils/mriio.cpp` 11570-11616 (`MRIreorderVox2RAS`), 11618-11842 (`MRIreorder`); `utils/selxavgio.cpp`
+(the six functions; `dump_sxadat` and `free_sxadat` are declared in `include/selxavgio.h` and defined nowhere);
+`utils/label.cpp` 722-736 (`LabelRemoveOverlap`). The port: fs.io `reorder.rs`, `selxavgio.rs`, `label.rs`.
+
+- **Callers.** `MRIreorder`: `mri_convert.cpp` 3464 (`-r`/`--reorder`, `get_ints` with `atoi`-like parsing, no check
+  of its own), `mri.cpp` 15633 (`MRIconformSliceOrder`, numbers always ±1..3 from the largest cosine per column),
+  `mri2.cpp` 6331-6337 (`QuadEulerCharChangeCheckReorder`, a self-test), `mri_robust_register/Registration.cpp`
+  3471, 3506, 3634 (from `MRIconformSliceOrder`-like logic). Every caller passes `mri_dst = NULL`: the given
+  destination's paths (FS-844, FS-845, the extent checks) are library-only. `selxavgio`: `mrisurf_mri.cpp` 4858
+  (`if (0 && is_sxa_volume(srcvalfile))`, folded away by the compiler) and `attic/mri_vol2roi` (not built): no
+  program of 8.2.0 reaches them.
+- **FS-843.** `abs(xdim) * abs(ydim) * abs(zdim) != 6 || abs(xdim) + abs(ydim) + abs(zdim) != 6` is `int` arithmetic
+  (`imul`, wrapping in practice; `abs(INT_MIN)` is `INT_MIN`). For an odd `a`, `|b| + |c| = 6 - a` and `|b||c| =
+  6 a^-1` (mod 2^32) is a quadratic whose discriminant is 1 mod 8, so a square: solutions with `|b|, |c| < 2^31`
+  exist for most odd `a` (`validation/probes/fs-io/reorder_triples.py`: (99577, 2147399842, 2147467883), (106555,
+  2147423458, 2147437289), signs free). `dstdims[abs(xdim) - 1]` then writes 4 bytes about 8 GB past a stack array: official
+  `mri_convert -r 99577 2147399842 2147467883 v.mgh out` and `-r 106555 -2147423458 2147437289` end with SIGSEGV
+  (139; their buffered standard output lost); `-r -2147483648 1 3` prints the message (the product wraps to 2^31).
+  Rule B (no sense in such numbers): refused with FreeSurfer's message by default; `reproduce` ends with 139. No
+  caller can reach it but `mri_convert -r` (and `MRIreorderVox2RAS`, `Q->rptr[k][abs(dim)]`, called only from
+  `MRIreorder`, after the check: the port refuses such numbers there too).
+- **The geometry.** `MRIreorderVox2RAS` is called before the destination's extent checks, so a given destination
+  that fails them keeps the new geometry (`MRIsetVox2RASFromMatrix` compares the matrix's column lengths with the
+  destination's own sizes: a destination of other sizes prints the shear warning). `Q->rptr[k][4] = extent - 1` is
+  an `int` stored as `float`. `MatrixPrint(stdout, MatrixInverse(Q, NULL))` leaks the inverse (no effect).
+- **The voxels.** The loop's `switch (mri_src->type)` uses the source's macros on the destination
+  (`MRISseq_vox(mri_dst, ...)` = `((short *)mri_dst->slices[zd + f * dst->depth][yd]) + xd`): with a destination of
+  another type the row starts are the destination's and the column step the source's (FS-845); with fewer frames
+  `slices[zd + f * depth]` reads past the slice table (FS-844: `depth * nframes` pointers). The unsupported-type error
+  comes at the first voxel, inside the loops (a volume without voxels returns before it); `errno = 0` before each
+  `ErrorReturn`. `exec_progress_callback` has no callback on any path. A float voxel is copied by `movss` (its bits
+  kept): the port copies bytes.
+- **FS-846.** `char tmpstr[1000]` with `sprintf(tmpstr, "%s.dat", stem)` in `sv_sxadat_by_stem`,
+  `ld_sxadat_from_stem` and `is_sxa_volume`.
+- **FS-847.** `SXADAT` on x86-64: `version` 0, `TR` 4, `TER` 8, `TimeWindow` 12, `TPreStim` 16, `Nc` 20, `Nnnc` 24,
+  `Nh` 28, `DOF` 32, padding 36, `npercond` 40, `nruns` 48 ... `GammaFit` 84, `gfDelta[10]` 88, `gfTau[10]` 128,
+  `NullCondId` 168, padding 172, `SumXtX` 176, `hCovMtx` 184, `nNoiseAC` 192, padding 196, `CondIdMap` 200, size 208
+  (`calloc(1, sizeof(SXADAT))`). The deltas' loop writes `88 + 4k`, the taus' `128 + 4k`: places 0-29 after
+  `gfDelta` are the header's; `NullCondId` is read after both loops, the pointers `SumXtX` (always), `hCovMtx` and
+  `CondIdMap` (version not 1) are set after; `nNoiseAC` (read before) keeps a tau's bits. Past `GammaFit` 20 the taus
+  are written past the 208 bytes (glibc's chunk has 8 more usable bytes, then the next chunk's size field). Rule A
+  (a header with more gamma functions makes sense): every value kept by default.
+- **FS-848.** `Nch = Nh * Nnnc` and `calloc(Nch * Nch, sizeof(float))` are `int`: for `Nch` above 46,340 the
+  size wraps (negative: `calloc` fails, `NULL`; positive: a smaller list), while the loops `for r < Nch, c < Nch` run
+  `Nch^2` times (10^10 for `Nch` 100,000: minutes of `fscanf` calls that fail at the end of the file); a number read
+  is stored at `SumXtX[n]` (`n` an `int` too). In the probe's child (1 GiB of address space) the official run crashes
+  (SIGSEGV) or hits the 5-second limit. `sxa_framepower`'s `2 * Nc * Nh` likewise: for positive `Nc`, `Nh` past
+  2^30 its writes begin at `NULL` or run past the list. Rule B: refused by default.
+- **FS-849.** `sv_sxadat` loops over `Nc`, `GammaFit` and `Nch x Nch` without looking at the lists: a header made by
+  hand (as `mri_vol2roi` changes `nrows`, `ncols` before saving one) whose lists are shorter is read past.
+- **The file left open.** `ld_sxadat` returns without `fclose` when the version is missing or 1, `sv_sxadat` when
+  the version is 1 (its buffered bytes reach the file at `exit`: the probe calls `fflush(NULL)` before reading the
+  file back). No result changes: not a defect.
+- **The scanf errno on a folder.** `fopen(<folder>, "r")` succeeds on Linux and every read fails with `EISDIR`;
+  glibc's `vfscanf` eats white space with `errno` set to 0 and saves `errno` after the failed `getc` as the value
+  every later `inchar` restores (`inchar_errno`), so a call on a folder ends with `errno` 21 (the probe's `sxl` of a
+  folder `w/d.dat`: official `errno` 21; the port gave 0 until `cscan::Stream::read_error`). Only readers that scan a
+  folder see it.
+- **FS-850.** `vno == area2->lv[n2].vno` with -1 on both sides. `mri_cor2label` gives every point a vertex when it
+  has a surface (`lb->lv[nlabel].vno = nth`; -1 only without one), and `--ring` needs the surface; `mri_label2label`'s
+  target labels are surface labels: no program reaches the case. Rule C (kept).
+- **Measured.** Piece 30 seeds 7, 13 and 21 (1,100 cases each): `reproduce` identical on 970, 949 and 961 compared,
+  130, 151 and 139 skipped, 0 different; `fix` differs only with notices (FS-01, FS-847). The light run (seed 1, 4,800 portable cases):
+  4,357 identical (46 with memory digits), 324 SKIP, 119 VARY, 0 different.

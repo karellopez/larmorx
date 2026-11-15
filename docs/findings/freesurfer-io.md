@@ -1877,9 +1877,11 @@ package, track C): not ported here.
 
 ### Measurements
 - The fs-io probe's piece 23 (`ixd`, `ixh`, `ixw`; FreeSurfer's probe binary rebuilt with the aliases
-  and the SGI header's descriptor and address zeroed before the files are hashed): seeds 7 (345
-  piece-23 cases), 13 and 21 (690 each), and the writes alone at seeds 7 and 13 (230 each):
-  `reproduce` identical on every comparable case (1,008 + 374), 0 different; compared apart 413 of 451
-  identical (FS-720's allocator aborts, piece 5's MATLAB memory, FS-727's pixels, `MatReadHeader`'s
-  addresses); `fix` differs only with notices. Successful writes compared byte for byte: 56 SGI images,
-  44 ITK warps (plain and gzip).
+  and the SGI header's descriptor and address zeroed before the files are hashed), on the final code: seeds
+  7, 13 and 21, 690 piece-23 cases each (2,070): `reproduce` identical on every comparable case (1,379),
+  0 different; 377 skipped; 314 compared apart, 259 of them identical (the others: FreeSurfer's allocator
+  aborting after FS-720's write past the SGI header, `malloc(): mismatching next->prev_size (unsorted)`,
+  in 41 reads; piece 5's MATLAB memory, FS-245; FS-727/FS-728's memory pixels); `fix` differs only with
+  notices. Successful writes compared byte for byte: 68 SGI images and 62 ITK warps (plain and gzip).
+  Seed 1's 4,800 portable cases (the recorded test): 4,292 identical (47 with memory digits), 508
+  skipped or compared apart, 0 different.

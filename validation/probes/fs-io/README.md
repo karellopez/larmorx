@@ -266,8 +266,8 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   bytes (108 to 111, 144 to 151; FS-722) before hashing it, as the port's listing does. `SKIP` for FS-719,
   FS-724, FS-726, FS-729, fs.volume's FS-290, FS-58, FS-465, piece 5's rules and the codecs not ported (TIFF,
   JPEG); `VARY` for FS-720 (FreeSurfer's allocator aborts after it, as the heap lies), FS-727, piece 5's
-  FS-245 and `MatReadHeader`'s addresses. Seeds 7, 13 and 21: `reproduce` identical on every comparable case,
-  0 different.
+  FS-245 and `MatReadHeader`'s addresses. Seeds 7, 13 and 21 (690 piece-23 cases each): `reproduce` identical
+  on every comparable case (1,379), 0 different.
 - `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
   of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four

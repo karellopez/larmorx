@@ -3929,8 +3929,8 @@ descriptor and address bytes (108 to 111, 144 to 151) are zeroed on both sides b
 compared. FreeSurfer's lines where it reads or writes past its buffers (FS-719, FS-724, FS-726, FS-729,
 and fs.volume's FS-290, FS-58, FS-465) are skipped, TIFF and JPEG codecs (not ported) too; memory
 contents and heap-dependent outcomes (FS-720, FS-727, MATLAB's FS-245 and addresses) compared apart.
-Measured (2026-11-15, observed): seeds 7, 13 and 21 (about 1,035 piece-23 cases) and 7 and 13 for the
-writes alone (230 each): `reproduce` identical on every comparable case (1,008 and 374), 0 different;
-compared apart 413 of 451 identical (the others: FreeSurfer's allocator aborting after FS-720's write
-past the header, `malloc(): mismatching next->prev_size (unsorted)`, and memory contents); `fix` differs
-only with notices.
+Measured (2026-11-15, observed): seeds 7, 13 and 21 (690 piece-23 cases each): `reproduce` identical on
+every comparable case (1,379), 0 different; 314 compared apart, 259 identical (the others: FreeSurfer's
+allocator aborting after FS-720's write past the SGI header, `malloc(): mismatching next->prev_size
+(unsorted)`, and memory contents); `fix` differs only with notices; 68 SGI images and 62 ITK warps
+written and compared byte for byte.

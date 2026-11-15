@@ -40,8 +40,18 @@ const LEAVES: [&str; 14] = [
 
 /// A name an operation takes: a last part alone, after a hemisphere, with a folder, or an odd one
 /// (empty, a dot early, a folder that does not exist, a wildcard, about 1,024 bytes when the seed
-/// allows).
-fn name(g: &mut Gen) -> String {
+/// allows). With seed 1 (the set every platform runs) a write takes no name whose file Windows
+/// names otherwise (a last dot it drops: an empty name or `lh.` gives `<folder>/lh.`; a `*` it
+/// refuses): another odd name in its place, the same draws.
+fn name(g: &mut Gen, write: bool) -> String {
+    let n = name_drawn(g);
+    if write && !g.1 && (n.is_empty() || n.ends_with('.') || n.contains('*')) {
+        return "l.curv".to_owned();
+    }
+    n
+}
+
+fn name_drawn(g: &mut Gen) -> String {
     let leaf = g.pick(&LEAVES);
     match g.below(20) {
         0..=7 => leaf.to_owned(),
@@ -359,7 +369,7 @@ pub(super) fn crv_tokens(t: &mut Vec<String>, g: &mut Gen) {
             _ if op == "r" && !known.is_empty() && !g.chance(3) => {
                 known[g.below(known.len() as u64) as usize].clone()
             }
-            _ => name(g),
+            _ => name(g, op == "w"),
         };
         if op == "w" {
             known.push(n.clone());

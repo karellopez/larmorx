@@ -121,6 +121,9 @@ pub struct Globals {
     /// `mincFindVolume`'s static `count` (`transform.cpp`): 1 after a `minctracc` line named one
     /// `.mnc` volume, until a later line names another.
     pub minc_find_volume_count: i32,
+    /// `MRIremoveNaNs`'s `static int first` (`mriio.cpp`), inverted: true once its `NaN found at
+    /// voxel` line has been printed (once per process).
+    pub remove_nans_shown: bool,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -184,6 +187,7 @@ impl Globals {
             gifti: larmorx_io::gifti::Gifti::default(),
             sample_volume_derivative_sign: 1.0,
             minc_find_volume_count: 0,
+            remove_nans_shown: false,
             notices: Notices::new(mode),
         }
     }

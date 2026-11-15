@@ -2213,3 +2213,94 @@ different; 218, 207 and 206 skipped (FS-750's cut files above all, FS-755's nega
 voxels for each frame -1). The light run (`check.py --seed 1 --n 4800 --portable --light`, relay 35): 4,800 cases,
 4,303 identical (45 with memory digits), 497 hashed as `SKIP`, 0 different (`46502675...`,
 `tests/fs_io_official.rs`).
+
+## Part 30: MRIread, MRIreadEx, MRIremoveNaNs; the frame records (relay 36 of track A)
+
+Sources: `utils/mriio.cpp` 1001-1027 (`MRIread`), 1030-1047 (`MRIreadEx`), 811-832 (`mri_read`'s end: the name,
+the cached matrices, `if (start_frame == -1) return (mri)` before any frame selection and before `nan_inf_check`),
+12086-12131 (`MRIremoveNaNs`); `utils/utils.cpp` 996-1008 (`FileNameFromWildcard`), 930-971 (`devIsinf`,
+`devIsnan`, `devFinite`); `utils/mri.cpp` 182-213 (`MRI::MRI`: `calloc(nframes, sizeof(MRI_FRAME))`, then
+`frames[i].m_ras2vox = MatrixAlloc(4, 4, MATRIX_REAL)` for every frame); `utils/mriio.cpp` 3450-3458 and 3543-3544
+(`get_b_info`'s two frame tables); `include/romp_support.h` 96-104, 160-223 and `utils/romp_support.cpp` 53-55
+(`if_ROMP`, `romp_level = ROMP_level_assume_reproducible`); `utils/chklc.cpp` 115-160 (the licence check). The
+port: fs.io `mriio.rs` (`mri_read_volume`, `mri_read_ex`, `mri_remove_nans`), fs.mri `mri.rs`
+(`frames_calloc_fails`), fs.core `alloc.rs`.
+
+- **`MRIread`** = `chklc()`, `FileNameFromWildcard(fname, buf)` into `char buf[STRLEN]` (a `strcpy`, then the
+  first `glob` path: a name or match of 1,024 bytes or more overruns the stack buffer: FS-249, now naming
+  `MRIread`), the progress range split (only `exec_progress_callback` reads it: no callback is set on any default
+  path), `mri_read(buf, MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1, mrivector)`, then `MRIremoveNaNs(mri, mri)`.
+  `MRIreadEx` the same with `nthframe` as both frames and no progress range. The `mrivector` argument reaches only
+  the DICOM loaders (queue item 3.7-14); every caller in the default paths passes `NULL`.
+- **`mri_read` with frames -1 returns before `nan_inf_check`**, so `MRIread`'s volume can hold non-finite voxels
+  and `MRIremoveNaNs` sees them; `MRIreadEx(name, n >= 0)` goes through the frame selection, whose check refuses a
+  float volume with any non-finite voxel (of the whole volume, before the copy), so its `MRIremoveNaNs` never finds
+  one.
+- **`MRIremoveNaNs`**: `MRIcopy` when the volumes differ (no caller passes two); the loop
+  `#pragma omp parallel for if_ROMP(shown_reproducible) reduction(+ : nans)` over x. With
+  `ROMP_SUPPORT_ENABLED` off, `if_ROMP(LEVEL)` is `if (ROMP_if_parallel1(LEVEL))`, true for
+  `shown_reproducible` at the default `romp_level` (`assume_reproducible`): the loop is parallel on the OpenMP
+  threads (libgomp's static schedule: contiguous blocks of x per thread). `static int first` is read and written
+  without synchronisation; each thread that meets a non-finite voxel before seeing `first = 0` prints its own line
+  (the race FS-841 names; libgomp's static schedule keeps one column within one thread, so the line is the serial
+  one whenever the non-finite voxels lie in one column). The count is the reduction (exact, an `int`). Per voxel:
+  `MRIgetVoxVal` (a float voxel's bits returned unconverted), `std::isfinite`, `getenv("FS_LEAVE_NANS")` (looked up
+  again for each non-finite voxel; the port looks it up once: the environment does not change), `MRIsetVoxVal(...,
+  0)`. Only `MRI_FLOAT` voxels can be non-finite through `MRIgetVoxVal` (the integer types' largest values convert
+  to finite floats): the port walks float volumes only. The message: `ErrorPrintf(ERROR_BADPARM, "WARNING: %d NaNs
+  found in volume %s...\n", nans, mri_src->fname)` (`fname` as `mri_read` copied it).
+- Other callers of `MRIremoveNaNs`: `mrisutils.cpp:2089` (`mri_vno`, in place), `mri_normalize.cpp:508`,
+  `mri_ms_fitparms.cpp:3074` (in place). Track D's surface library carried a private copy (its curvature reader's
+  volume): it can now use fs.io's (the once-per-process flag is `Globals::remove_nans_shown`, shared).
+- **The probe** (piece 28): `MRIread` calls `chklc()`, which ends the process without `FREESURFER_HOME`; `fsio`
+  sets `FREESURFER_HOME` to a folder that does not exist (with `FS_LICENSE` set it is only copied) and
+  `FS_LICENSE` to the machine's licence file unless the environment names one. `chklc` printed nothing and changed
+  no compared value (2,010 cases identical).
+- **FS-760, the frame records.** `MRI::MRI` allocates `calloc(nframes, 1288)` and then a 4 x 4 matrix per frame
+  (`MatrixAlloc_new`: `posix_memalign` of 256 bytes, zeroed, and the frame's pointer written into the record):
+  about 1.6 kB of memory written per frame before a voxel is read. The `calloc` fails at once only when the
+  product passes what the system gives (Linux's heuristic overcommit refuses an allocation larger than its memory
+  and swap): measured with FreeSurfer 8.2.0's `mri_info` on MGH files of one voxel per frame (`validation/probes/
+  fs-io/frames_probe.py`, in a 12 GiB memory box): 2,000,000 frames 3,192 MB, exit 0, 1.6 s; 12,000,000 and
+  20,000,000 frames killed by the box after 5.6 s (12,261 MB); 449,657,401 frames (579 GB of records) refused at
+  once, exit 254, 10 MB. (FreeSurfer 6's `mri_info`, the older install on this machine, used 11 MB for
+  20,000,000 frames: the 8.2.0 tree under `oracles/freesurfer-8.2.0/root` is the one measured.) The port's frames cost about 1.36 kB each (a boxed 1,024-byte
+  name and an 18-float matrix store): `read_volume` (fs.io's example) 2,000,000 frames 2,719 MB; 12,000,000 killed
+  by the box; 20,000,000 and 449,657,401 refused at once (FS-760), 11 MB. The limit (16 GiB of records, as FS-756's
+  machine size) is applied before any frame is made, in `Mri::new` and in `get_b_info`'s two tables; a negative
+  count stays `calloc`'s own failure (the `size_t` product overflows), without the notice. The incident that found
+  it (track D's probe, 2026-11-15): a random MGH header of 449,657,401 frames grew the port past 100 GB, frame by
+  frame, where FreeSurfer refuses at once.
+- **calloc's zeros** (fs.core `alloc`): FreeSurfer's buffers sized from headers (the voxel chunk, the image
+  buffers, matrices) are `calloc`ed: fresh pages, untouched until written. The port's model filled them
+  (`try_reserve_exact` then `resize`), so a header asking for a large chunk cost its full size at once; it now asks
+  for the memory first and makes the zeros with the allocator's zeroed allocation (`calloc` for large sizes), as
+  FreeSurfer. Results unchanged (every hash suite passes). The other header-sized allocations of fs.core, fs.mri,
+  fs.io and fs.gca were checked: labels (FS-426), colour tables (FS-191 and the ASCII readers' limit) and the GCA
+  reader (FS-756) were already limited; the rest are zero vectors or bounded by a volume already made.
+
+## Part 31: the conformed-size checks and the command lines (relay 36 of track A)
+
+Sources: `utils/mriio.cpp` 305-318 (`mriConformed`), 320-366 (`MRIfindMinSize`), 368-427 (`MRIfindRightSize`),
+12134-12143 (`MRIaddCommandLine`); `include/mri.h` 185-200 (`VOL_GEOM`'s defaults), 801-802 (`char
+*cmdlines[MAX_CMDS]; int ncmds`). The port: fs.volume `conformed.rs` (beside `getSliceDirection`, which track C
+ported into fs.volume's `coords.rs`: fs.io sits below fs.volume), fs.io `mriio.rs` (`mri_add_command_line`).
+
+- `mriConformed`'s `mri->xsize * 10000` is a `float` product (`mulss`) passed to `nint(double)`; the `||` chain
+  stops at the first failing size, so only the sizes tested can give FS-12's notice.
+- `MRIfindMinSize`: the sizes are widened to `double` for the comparisons and `minsize` is a `double`; the
+  official build keeps `(float)minsize`'s conversion (measured: a signalling NaN size `7fa00001` comes back
+  `7fe00001`): the port quiets it explicitly rather than through a round trip a compiler may fold (the brief's
+  "a float stored through a double"). `nint(fmax / minsize * 10000) / 10000` is an `int` division, then `ceil` of
+  an `int` (a no-op).
+- `MRIfindRightSize`: `(int)ceil(fmax / conform_size)` (`cvttsd2si`: INT_MIN for NaN and beyond `int`: FS-17,
+  INT_MIN then below 256 gives 256 in `reproduce`; the default saturates, NaN to 0 (256) and beyond to `INT_MAX`: a
+  conform size of 0 then prints the warning with 2147483647 slices); `(conform_width - 256.) / 256. < 0.1` keeps
+  widths up to 281 at 256.
+- `MRIaddCommandLine`: `fs::error()` prints and returns; `int i = mri->ncmds++` then `mri->cmdlines[i] = calloc(...)`
+  with `i = 1000` writes the 8-byte pointer over `ncmds` and the 4 bytes after it (FS-842); from then on the count is
+  the pointer's low 32 bits (a heap address), so the next call writes at that index and `mghWrite` walks that many
+  lines. 39 programs call it on the volume they write (recon-all's every step): a volume would need 1,000 steps
+  first.
+- The probe's `acl` builds each line as `line + std::to_string(i)` (a `std::string`, which may hold a NUL: `strcpy`
+  stops there).

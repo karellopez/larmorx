@@ -121,11 +121,9 @@ impl Matrix {
             return Err(fail);
         }
         let len = len as usize;
-        let mut store = Vec::new();
-        if store.try_reserve_exact(len).is_err() {
+        let Some(store) = crate::alloc::zeroed::<f32>(len) else {
             return Err(fail);
-        }
-        store.resize(len, 0.0);
+        };
         Ok(Matrix {
             mtype,
             in_buf: false,

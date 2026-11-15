@@ -27,6 +27,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `include/cma.h` (whole); `utils/cma.cpp` 463-1098, 1541-1645, 2117-2160 | the label numbers and the `IS_*` macros (transcribed mechanically); `IsSubCorticalGray`, `SupraTentorialVolCorrection`, `CorticalGMVolCorrection`, `MRIasegContraLatLabel`, `MRIlrswapAseg`, `MRIlrswapSeg`, `MRIfixAsegWithRibbon`, `brainVolumeStatsFilename`, `CacheBrainVolumeStats`, `ReadCachedBrainVolumeStats` (its compute step the caller's), `MRIoneHotEncode`; libstdc++'s `>> double` (`num_get`, "C" locale) as these functions read the cache | 3.1-35 | `cma.rs` |
 | `utils/label.cpp` 3111-3236, 3285-3305; `include/label.h` 78; `utils/mrisurf_mri.cpp` 7199-7247, 7473-7530 | `LabelToScannerRAS`, `LabelToSurfaceRAS` (`LabelFromScannerRAS`), `LabelToVoxel`, `LabelVoxelToSurfaceRAS`; `MRISsurfaceRASToVoxel` and `MRISsurfaceRASFromVoxel` over the surface's `VolGeom` (track A's module of fs.labels, relay 22) | 3.1-31 | `label_coords.rs` |
 | `utils/mriio.cpp` 1297-1308 | `MRIwriteFrame` (track A's module of fs.io, relay 22) | 3.1-30 | `io_frames.rs` |
+| `utils/mriio.cpp` 305-427 | `mriConformed`, `MRIfindMinSize`, `MRIfindRightSize` (fs.io's item, placed beside `getSliceDirection`; track A relay 36) | 3.1-28 | `conformed.rs` |
 
 No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). `readVolGeom`'s
 `sscanf` calls are modelled on glibc 2.35's behaviour measured as a black box (the open

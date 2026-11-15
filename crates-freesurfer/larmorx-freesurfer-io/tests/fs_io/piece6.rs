@@ -748,6 +748,18 @@ fn answer(
     if matches!(tk[0], "mrh" | "mrd" | "gfd" | "gfh") {
         ty = next().parse().unwrap();
     }
+    // piece 28: MRIread (read twice when asked) and MRIreadEx, FS_LEAVE_NANS set when asked
+    let mut twice = false;
+    if matches!(tk[0], "mrr" | "mrx") {
+        if next() == "1" {
+            env.set("FS_LEAVE_NANS", "1".to_owned());
+        }
+        if tk[0] == "mrx" {
+            frame = next().parse().unwrap();
+        } else {
+            twice = next() == "1";
+        }
+    }
     if tk[0] == "mgr" {
         rv = next() != "0";
         frame = next().parse().unwrap();
@@ -759,6 +771,14 @@ fn answer(
         "mrh" => mriio::mri_read_header(g, out, err, &env, dir, &name, ty),
         "mri" => mriio::mri_read_info(g, out, err, &env, dir, &name),
         "mrd" => mriio::mri_read(g, out, err, &env, dir, &name, ty, true, -1, -1),
+        "mrr" => mriio::mri_read_volume(g, out, err, &env, dir, &name).and_then(|m| {
+            if twice {
+                mriio::mri_read_volume(g, out, err, &env, dir, &name)
+            } else {
+                Ok(m)
+            }
+        }),
+        "mrx" => mriio::mri_read_ex(g, out, err, &env, dir, &name, frame),
         // piece 19: FreeSurfer's GE readers with FS-680 bypassed (the probe's ge_fixed.cpp)
         "gfd" | "gfh" if ty == identify::GE_LX_FILE => {
             mriio_ge::gelx_read_as_patched(g, out, err, dir, &name, tk[0] == "gfd")

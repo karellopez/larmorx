@@ -61,6 +61,10 @@ pub(crate) mod piece25;
 pub(crate) mod piece26;
 #[path = "piece27.rs"]
 pub(crate) mod piece27;
+#[path = "piece28.rs"]
+pub(crate) mod piece28;
+#[path = "piece29.rs"]
+pub(crate) mod piece29;
 #[path = "piece3.rs"]
 mod piece3;
 #[path = "piece4.rs"]
@@ -335,6 +339,8 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece25::KINDS);
     kinds.extend(piece26::KINDS);
     kinds.extend(piece27::KINDS);
+    kinds.extend(piece28::KINDS);
+    kinds.extend(piece29::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -427,6 +433,14 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece27::KINDS.contains(&kind) {
             lines.push(piece27::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece28::KINDS.contains(&kind) {
+            lines.push(piece28::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece29::KINDS.contains(&kind) {
+            lines.push(piece29::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         if piece26::KINDS.contains(&kind) {
@@ -942,6 +956,16 @@ pub(crate) fn run_line_with(
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece27::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece28::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece28::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece29::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece29::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {

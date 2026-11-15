@@ -53,6 +53,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `cstd` | none (larmorx's own) | the C library's `atoi`, `atof`, `sscanf`'s `%lx`, `printf`'s `%W.Pf` and one `double` conversion `%f`, `%e`, `%g` with flags (`%e`/`%g` with 3.1-25's `TSV::print`), x86-64's double-to-int conversion, written from the C standard and glibc's documented behaviour |
 | `cglob`, `ctime`, `system` | none (larmorx's own) | the C library's `glob` and `fnmatch` (from POSIX), `gmtime_r`, `localtime` and `strftime("%c")` in the C locale (from POSIX's `TZ`, RFC 8536's TZif files and two behaviours of glibc 2.35 measured against it, `validation/investigations/freesurfer-core/ctime_probe.py`: 180,240 cases, 0 differ), `getpwuid(geteuid())`, `uname`, `getcwd` (from `/proc`, `/etc/passwd` and the environment); no C library source |
 | `run` | none (larmorx's own) | what `larmorx-freesurfer` gives a program (queue item 3.1-01) |
+| `alloc` (track A relay 36) | none (larmorx's own) | the C library's `calloc` as the port models it: sizes past the address space fail, zeros not touched until written (glibc's fresh pages), the machine-dependent size (16 GiB) of FS-756 and FS-760 |
 
 Third-party code in these files (CLAUDE.md rule 3): none; each carries MGH's notice
 (`Copyright © 2021 The General Hospital Corporation (Boston, MA) "MGH"`) or none (`Progname.cpp`,

@@ -16,7 +16,8 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_55, FS_56, FS_60, FS_206, FS_252};
+use larmorx_core::defects::{FS_55, FS_56, FS_60, FS_206, FS_252, FS_760};
+use larmorx_freesurfer_core::alloc::{self, CALLOC_LIMIT, MACHINE_BYTES};
 use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
@@ -56,9 +57,8 @@ pub const MGZ_INTENT_TIME_SERIES: i32 = 5;
 /// `WarpfieldDTFMT::WARPFIELD_DTFMT_UNKNOWN`.
 pub const WARPFIELD_DTFMT_UNKNOWN: i32 = -1;
 
-/// The size above which `calloc` is taken to fail (128 TiB, the x86-64 user address space; the
-/// sizes FreeSurfer computes in `size_t` wrap around for negative extents and unknown types).
-const CALLOC_LIMIT: u64 = 1 << 47;
+/// `sizeof(MRI_FRAME)` on x86-64 (GCC's layout of `include/mri.h`'s structure): 1,288 bytes.
+pub const SIZEOF_MRI_FRAME: u64 = 1288;
 
 /// MINC's `Transform` (`Real m[4][4]`, row by row): `larmorx_io::xfm::Transform`.
 pub type Transform4 = Transform;
@@ -462,17 +462,44 @@ pub fn mri_precision_string(code: i32) -> Option<&'static str> {
 }
 
 /// `ENOMEM`: what a failed `calloc` leaves in `errno` (FreeSurfer's next error message prints it).
-const ENOMEM: i32 = 12;
+const ENOMEM: i32 = alloc::ENOMEM;
 
-/// `calloc(n, 1)` as glibc answers it on x86-64 Linux: `None` when it fails (`errno` `ENOMEM`).
+/// `calloc(n, 1)` as glibc answers it on x86-64 Linux: `None` when it fails (`errno` `ENOMEM`);
+/// the zeros are not touched until written (fs.core's [`alloc::calloc_bytes`]).
 fn calloc(g: &mut Globals, n: u64) -> Option<Vec<u8>> {
-    let mut v = Vec::new();
-    if n > CALLOC_LIMIT || v.try_reserve_exact(n as usize).is_err() {
+    alloc::calloc_bytes(&mut g.errno, n)
+}
+
+/// Whether `calloc(n, sizeof(MRI_FRAME))` of a volume's frame records fails: a negative count
+/// (its `size_t` product overflows), more than the address space, or (FS-760) records of more
+/// than 16 GiB (more than 13,338,407 frames), whose outcome in FreeSurfer depends on the machine:
+/// it keeps about 1.6 kB for each frame and fills them before reading a voxel, so past the
+/// machine's memory its allocation fails at once and below it the frames fill the memory. The
+/// port answers as a machine that refuses them, in both modes (the machine's answer is not
+/// reproduced), with the notice. A failure sets `errno` to `ENOMEM`; the caller prints
+/// FreeSurfer's message.
+pub fn frames_calloc_fails(g: &mut Globals, n: i32) -> bool {
+    let bytes = (n as i64 as u64).checked_mul(SIZEOF_MRI_FRAME);
+    let fails = match bytes {
+        None => true,
+        Some(b) if b > CALLOC_LIMIT => true,
+        Some(b) if b > MACHINE_BYTES => {
+            g.notices.add(
+                &FS_760,
+                format!(
+                    "{n} frames: FreeSurfer's frame records ({b} bytes, about 1.6 kB a frame with \
+                     their matrices, filled before any voxel is read) succeed or fail with the \
+                     machine's memory; refused as by a machine without that memory"
+                ),
+            );
+            true
+        }
+        Some(_) => false,
+    };
+    if fails {
         g.errno = ENOMEM;
-        return None;
     }
-    v.resize(n as usize, 0);
-    Some(v)
+    fails
 }
 
 /// A boundary index table of `len` (`calloc(len + 2 MAX_INDEX, sizeof(int))`), offset by
@@ -551,7 +578,9 @@ impl Mri {
     /// `xstart = -xend`, `imnr1 = depth`, `fov = width`, the region the whole volume), the frames
     /// (a 4 x 4 `m_ras2vox` of zeros each), the cached matrices of the default (coronal)
     /// geometry, and with `alloc` the voxels (zeros), `ras_good_flag = 1` and the index tables.
-    /// FreeSurfer's failures: `nframes` below 0 (`MRIalloc: could not allocate <n> frame`), a
+    /// FreeSurfer's failures: `nframes` below 0, or of more frame records than the machine's
+    /// memory holds ([`frames_calloc_fails`], FS-760: past 16 GiB here, before any frame is
+    /// made) (`MRIalloc: could not allocate <n> frame`), a
     /// buffer that cannot be allocated (`could not allocate memory for slice 1 out of <n>`, or
     /// `for <n> slices`), an index table of negative size; a type `MRIsizeof` does not know
     /// (FS-55) is refused by default (`unsupported MRI data type: <type>`), with `reproduce`
@@ -618,8 +647,7 @@ impl Mri {
         let vox_per_vol = vox_per_slice.wrapping_mul(size_t(d));
         let vox_total = vox_per_vol.wrapping_mul(size_t(nframes));
         let bytes_total = (bytes_per_vox as u64).wrapping_mul(vox_total);
-        if nframes < 0 {
-            g.errno = ENOMEM;
+        if frames_calloc_fails(g, nframes) {
             log::error_exit(
                 g,
                 err,

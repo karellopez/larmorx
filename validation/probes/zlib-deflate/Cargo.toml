@@ -1,0 +1,17 @@
+[package]
+name = "zlib-deflate"
+description = "larmorx-core's zlib compressor and larmorx-io's gzip writer against zlib 1.2.11 (Ubuntu 22.04's libz.so.1, which FreeSurfer 8.2.0's official programs load, and zlib 1.2.11 as released)"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build.
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+larmorx-io = { path = "../../../crates/larmorx-io" }
+
+[profile.release]
+debug = false

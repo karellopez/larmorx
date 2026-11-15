@@ -4,18 +4,16 @@
 //! for byte: C's `%f`, `%g`, `%d`, `%u`, `%lld`, `%llu` and `%Lf` (x86-64's 80-bit `long double`,
 //! [`larmorx_core::cfmt::f80_f`]), the Base64 text, the attribute layout and its indentation.
 //!
-//! GZipBase64Binary data are compressed by zlib-rs at gifticlib's level (through flate2): the
-//! decompressed values are zlib's, the compressed bytes may differ from zlib 1.2.11's
-//! (`docs/findings/gifti.md`).
+//! GZipBase64Binary data are compressed by zlib 1.2.11's `compress2` ([`larmorx_core::zlib`]) at
+//! gifticlib's level, into gifticlib's buffer: the compressed bytes are zlib's.
 
 use std::io::Write as _;
 use std::path::Path;
 
-use flate2::Compression;
-use flate2::write::ZlibEncoder;
 use larmorx_core::cfmt::{self, Streams};
 use larmorx_core::defects::{self as d, Notices};
 use larmorx_core::x87::F80;
+use larmorx_core::zlib;
 
 use super::*;
 
@@ -371,11 +369,6 @@ impl W<'_> {
                     self.putb(&b);
                 }
                 GIFTI_ENCODING_B64GZ => {
-                    let level = if self.lib.zlevel < 0 {
-                        6
-                    } else {
-                        self.lib.zlevel as u32
-                    };
                     // update_partial_buffer(&zdata, &zlen, blen, 1): compress2's buffer
                     let blen = (nbytes as f64 * 1.01 + 12.0) as u64 as i64;
                     if self.lib.xml_verb > 2 {
@@ -385,17 +378,29 @@ impl W<'_> {
                         ));
                     }
                     self.zlen = blen as i32 as i64;
-                    let mut e = ZlibEncoder::new(Vec::new(), Compression::new(level));
-                    let _ = e.write_all(&data[..nbytes]);
-                    let z = e.finish().unwrap_or_default();
+                    let mut zdata = vec![0u8; blen.max(0) as usize];
+                    let (rv, zn) = zlib::compress2(&mut zdata, &data[..nbytes], self.lib.zlevel);
                     if self.verb > 2 {
                         self.out.err(&format!(
                             "-- compress buffer ({}% of {nbytes} bytes)...\n",
-                            cfmt::f(100.0 * z.len() as f64 / nbytes as f64, 2)
+                            cfmt::f(100.0 * zn as f64 / nbytes as f64, 2)
                         ));
+                    }
+                    if rv != zlib::Z_OK {
+                        self.out.err("** zlib compression failure: ");
+                        if rv == zlib::Z_MEM_ERROR {
+                            self.out.err("not enough memory\n");
+                        }
+                        if rv == zlib::Z_BUF_ERROR {
+                            self.out.err("buffer too short\n");
+                        } else {
+                            self.out.err(&format!("unknown error {rv}\n"));
+                        }
+                        errs += 1;
+                    } else if self.verb > 2 {
                         self.out.err("-- compression succeeded\n");
                     }
-                    let b = base64(&z);
+                    let b = base64(&zdata[..zn]);
                     self.putb(&b);
                 }
                 GIFTI_ENCODING_EXTBIN => {

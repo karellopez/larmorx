@@ -69,10 +69,12 @@ Behaviour a caller sees, kept from expat:
 - The `%.*s` of the buffer messages stops at a 0 byte.
 - GZipBase64Binary: `uncompress` with the array's size as the output limit; a short or corrupt
   stream leaves the bytes it produced (the rest of the array zero). The compressed bytes the writer
-  produces are zlib 1.2.11's; larmorx's are zlib-rs's (pure Rust: the decompressed values are equal,
-  the stream equal in about 73 % of the probe's files), compared by content as larmorx compares
-  `.h5` files (decision log 2026-10-16); the "compress buffer (N% ...)" message at verbosity 3 and
-  above shows the stream's size.
+  produces are zlib 1.2.11's `compress2`'s; until 2026-11-15 larmorx's were zlib-rs's (the
+  decompressed values equal, the stream equal in about 73 % of the probe's files, compared by
+  content); since track C's relay 30 `compress2` is zlib's own (`larmorx_core::zlib`) into
+  gifticlib's buffer of `1.01 n + 12` bytes, with its failure messages (`** zlib compression
+  failure: `, `buffer too short`, `unknown error <n>`); the "compress buffer (N% ...)" message at
+  verbosity 3 and above shows the stream's size.
 
 ## The numbers
 

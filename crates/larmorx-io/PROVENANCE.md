@@ -187,18 +187,21 @@ Defects FS-71 to FS-75 (`larmorx_core::defects`).
 `znzlib.c`) and zlib 1.2.11's file layer (`zlib-1.2.11.tar.gz`, SHA-256
 `c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1`, pinned at
 `<workspace>/tags/zlib-1.2.11`; © 1995-2017 Jean-loup Gailly and Mark Adler, the zlib licence;
-`znz.rs`'s SPDX `Apache-2.0 AND Zlib`; altered: translated into Rust, inflate and deflate from
-zlib-rs through flate2):
+`znz.rs`'s SPDX `Apache-2.0 AND Zlib`; altered: translated into Rust, inflate from zlib-rs
+through flate2, deflate zlib 1.2.11's own from `larmorx_core::zlib` since 2026-11-15):
 
 | larmorx | Upstream |
 |---|---|
 | `niftilib::find_file_extension`, `is_gzfile`, `makebasename`, `validfilename`, `is_complete_filename`, `fileexists`, `findhdrname`, `is_nifti_file`, `NiftiOptions` | `niftilib/nifti1_io.c` (`nifti_find_file_extension`, `nifti_is_gzfile`, `nifti_makebasename`, `nifti_validfilename`, `nifti_is_complete_filename`, `nifti_fileexists`, `nifti_findhdrname`, `is_nifti_file`, `compare_strlist`, `is_mixedcase`, `is_uppercase`, `make_uppercase`, `fileext_compare`, `fileext_n_compare`, `g_opts`), `nifti1.h` (`NIFTI_VERSION`, `NIFTI_ONEFILE`) |
 | `znz::ZnzFile` | `znzlib/znzlib.c` (`znzopen`, `Xznzclose`, `znzread`, `znzwrite`, `znzseek`, `znzrewind`, `znztell`, `znzputs`, `znzgets`, `znzflush`, `znzeof`, `znzputc`, `znzgetc`) |
-| `znz::GzFile` | zlib 1.2.11 `gzlib.c` (`gz_reset`, `gz_open`, `gzrewind`, `gzseek64`, `gztell64`, `gzeof`, `gz_error`), `gzread.c` (`gz_load`, `gz_avail`, `gz_look`, `gz_decomp`, `gz_fetch`, `gz_skip`, `gz_read`, `gzread`, `gzgetc`), `gzwrite.c` (`gz_init`, `gz_comp`, `gz_zero`, `gz_write`, `gzwrite`, `gzputc`, `gzflush`), `gzclose.c` and `gzclose_r`/`gzclose_w` |
+| `znz::GzFile` | zlib 1.2.11 `gzlib.c` (`gz_reset`, `gz_open`, `gzrewind`, `gzseek64`, `gztell64`, `gzeof`, `gz_error`), `gzread.c` (`gz_load`, `gz_avail`, `gz_look`, `gz_decomp`, `gz_fetch`, `gz_skip`, `gz_read`, `gzread`, `gzgetc`), `gzwrite.c` (`gz_init`, `gz_comp`, `gz_zero`, `gz_write`, `gzwrite`, `gzputc`, `gzputs`, `gzflush`, `gzsetparams`), `gzclose.c` and `gzclose_r`/`gzclose_w` |
 | `znz::StdioFile` | C's `fopen`, `fread`, `fwrite`, `fseek`, `ftell`, `feof`, `fgetc` by their description (ISO C 7.21) and glibc's behaviour (no glibc code) |
 
-The decompressed bytes are zlib's; the compressed bytes a writer makes are zlib-rs's (a deflate
-with zlib's own bytes is not ported). Defects FS-76 and FS-77 (nifticlib; FS-77 with its
+The decompressed bytes are zlib's; since 2026-11-15 (track C relay 30) the compressed bytes a
+writer makes are zlib 1.2.11's too: `gz_init`'s buffers (twice `want` bytes of input, `want` of
+output) and `gz_comp`'s loop as zlib keeps them, the mode's strategy letters (`f`, `h`, `R`,
+`F`), deflate from `larmorx_core::zlib` (the probe `validation/probes/zlib-deflate`: files
+identical to Ubuntu 22.04's `libz.so.1`, but FS-78's). Defects FS-76 and FS-77 (nifticlib; FS-77 with its
 `reproduce`) and FS-78 (zlib 1.2.11), `larmorx_core::defects`. `NiftiOptions` holds nifticlib's
 settings a program can change (`allow_upper_fext` and the compressed extensions); the variants of
 other programs' copies are not in this crate (`docs/findings/freesurfer-permissive.md`, closed to
@@ -210,7 +213,7 @@ FreeSurfer's clean-room implementers).
 |---|---|---|
 | `src/gifti/mod.rs` | gifticlib 1.12 (`gifti_io.c`, `gifti_io.h`, `gifti_xml.h`: the structures, type and intent tables, checks, sizes, metadata, copies, the free functions' messages, displays) | public domain (Richard Reynolds, NIH/NIMH) |
 | `src/gifti/read.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_read_image`, the element stack and callbacks, the ASCII, Base64Binary and GZipBase64Binary decoders, `gxml_data`'s state between calls; `gifti_io.c`: `gifti_read_extern_DA_data`, `gifti_check_swap`); zlib 1.2.11's `uncompress2` loop (zlib licence) over zlib-rs | public domain; Zlib |
-| `src/gifti/write.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_write_image`, `gxml_write_gifti`, the `ewrite_*` functions, `gxml_disp_b64_data`; `gifti_io.c`: `gifti_write_image`, `gifti_write_extern_DA_data`) | public domain |
+| `src/gifti/write.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_write_image`, `gxml_write_gifti`, the `ewrite_*` functions, `gxml_disp_b64_data`; `gifti_io.c`: `gifti_write_image`, `gifti_write_extern_DA_data`); GZipBase64Binary data by zlib 1.2.11's `compress2` (`larmorx_core::zlib`, since 2026-11-15) into gifticlib's buffer of `1.01 n + 12` bytes, its failure messages | public domain (the compressor: `larmorx_core::zlib`, Zlib) |
 | `src/xml/tok.rs` | expat 2.0.1 (`xmltok.c`, `xmltok_impl.c`, `xmltok_ns.c`, `asciitab.h`, `iasciitab.h`, `latin1tab.h`, `utf8tab.h`: the built-in encodings, byte types, name checks, UTF-8 conversions, every tokenizer, `getAtts`, `charRefNumber`, `updatePosition`) | MIT (expat's COPYING) |
 | `src/xml/role.rs` | expat 2.0.1 (`xmlrole.c`, `xmlrole.h`: the prolog's state machine for the document entity) | MIT |
 | `src/xml/mod.rs` | expat 2.0.1 (`xmlparse.c`: `XML_Parse`, `XML_ParseBuffer`, `XML_GetCurrentLineNumber`, `XML_ErrorString`, the prolog, content, CDATA and epilog processors, `initScan`, `processXmlDecl`, `doParseXmlDecl`, `storeAtts`, `storeAttributeValue`, `appendAttributeValue`, `storeEntityValue`, `defineAttribute`, the content-model scaffold, `reportDefault`, `normalizeLines`, `normalizePublicId`) for the configuration gifticlib uses | MIT |

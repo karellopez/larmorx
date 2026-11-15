@@ -409,6 +409,37 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
 - The probe's `FreeSurferDialect` (`src/minc.rs`) carries these facts for writing too (`output_dimension_names`,
   `zero_direction_cosine`); track A's dialect for `mincWrite` takes them with `FsVolumeIo`.
 
+## zlib's compressor and FreeSurfer's compressed outputs (track C relay 30, 2026-11-15)
+
+- FreeSurfer 8.2.0's official programs are linked with the system's `libz.so.1` (`NEEDED`; the
+  official binaries import `deflate`, `deflateInit_`, `deflateParams`, `deflateReset`,
+  `compress2`, `gzdopen`, `gzflush`, ...); on the reference machine that is Ubuntu 22.04's
+  `zlib1g` 1:1.2.11.dfsg-2ubuntu9.2, which `larmorx_core::zlib` translates.
+- The call sites: MGH/MGZ, NIfTI `.nii.gz`, GCA and morph files go through FreeSurfer's znzlib
+  (`znzopen(name, "w"`/`"wb", compressed)`, `utils/mriio.cpp`, `utils/gca.cpp`, `utils/gcamorph.cpp`)
+  to `gzopen(path, mode)` with no level digit: level 6 (`Z_DEFAULT_COMPRESSION`), default
+  strategy, window 15, memory level 8, the 10-byte header; the bytes do not depend on how the
+  writes are cut (level 6). GIFTI's GZipBase64Binary (`packages/gifti/gifti_xml.c`'s `ewrite_data`):
+  `compress2(zdata, &blen, data, nvals * nbyper, zlevel)` with `blen = nvals * nbyper * 1.01 + 12`
+  and `zlevel` `GZ_DEFAULT_COMPRESSION` (-1, so 6) unless set; on failure it prints `** zlib
+  compression failure: ` and `not enough memory` (for Z_MEM_ERROR, then also `unknown error -4`,
+  its if/else), `buffer too short` or `unknown error <n>`, and Base64-encodes the bytes written.
+  TIFF (`utils/imageio.cpp`'s `TiffWriteImage`) sets `COMPRESSION_DEFLATE` and writes scanline
+  by scanline: libtiff 3.6.1's `tif_zip.c` calls `deflateInit(zipquality)` (default
+  `Z_DEFAULT_COMPRESSION`) and `deflate` per strip, `deflateParams` when the quality tag changes
+  (never set by FreeSurfer). Other zlib callers in the tree (fem_elastic's `ZlibStringCompressor`,
+  libxml2's `gzdopen`, NrrdIO's `gzio.c`, not compiled without `TEEM_ZLIB`) are not on recon-all's
+  paths. None calls `deflatePrime`, `deflateResetKeep`, `deflateGetDictionary` or switches from
+  level 0 (FS-809 to FS-812 cannot happen in FreeSurfer's files).
+- Measured: the reference runs' 624 `.mgz` and `.nii.gz` files are zlib's level-6 deflate byte for
+  byte (600 whole members with `gzopen`'s header; 24 written by the v8 stream's Python tools with
+  another header); `docs/findings/zlib-deflate.md`.
+- FreeSurfer's JPEG and TIFF copies (for the next item): `packages/jpeg` is IJG 6b (27-Mar-1998)
+  file for file but `jerror.c` (one added `#include <stdlib.h>`) and its generated `jconfig.h`;
+  `packages/tiff` is libtiff 3.6.1 but `tif_print.c`, `t4.h`, `tif_fax3.h` (two lines each) and
+  the generated `tif_fax3sm.c` and `port.h` (compared with `<workspace>/tags/jpeg-6b`, SHA-256
+  75c3ec241e9996504fe02a9ed4d12f16b74ade713972f3db9e65ce95cd27e35d, and `tags/libtiff-3.6.1`).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),

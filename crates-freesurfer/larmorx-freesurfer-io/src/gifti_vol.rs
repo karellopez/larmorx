@@ -267,7 +267,7 @@ pub fn mri_write_gifti(
     mri: &Mri,
     out_fname: &str,
 ) -> Result<i32, Fatal> {
-    let mut image = new_image(&g.gifti, io, &mut g.notices);
+    let mut image = new_image(&g.gifti, io, &mut g.notices, &mut g.errno);
     // insertCommonMetaData's getpwuid: glibc's lookup ends with errno 0 (found or not)
     g.errno = 0;
     let rows = mri.height > 1 || mri.depth > 1;

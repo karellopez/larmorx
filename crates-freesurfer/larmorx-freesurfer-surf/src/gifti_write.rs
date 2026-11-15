@@ -788,7 +788,7 @@ pub fn mris_write_gifti_intent(
 
 /// A new image with the common metadata and, for a surface with a subject, `SubjectID`.
 fn surface_image(g: &mut Globals, io: &mut Io, mris: &Mris) -> GiftiImage {
-    let mut image = new_image(&g.gifti, io, &mut g.notices);
+    let mut image = new_image(&g.gifti, io, &mut g.notices, &mut g.errno);
     if !mris.subject_name.is_empty() {
         let mut md = std::mem::take(&mut image.meta);
         add_meta(

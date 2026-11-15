@@ -525,9 +525,19 @@ pub fn add_meta(
     gx.add_to_meta(md, name.as_bytes(), value, true, &mut w, notices);
 }
 
-/// `insertCommonMetaData(md)`: `UserName` (when the password database gives one) and `Date`
+/// `insertCommonMetaData(md)`: `errno` set to 0 (glibc's `getpwuid(geteuid())`, on Linux's
+/// behaviour on every platform), `UserName` (when the password database gives one) and `Date`
 /// (`currentDateTime()`).
-pub fn insert_common_meta_data(gx: &Gifti, io: &mut Io, notices: &mut Notices, md: &mut NvPairs) {
+pub fn insert_common_meta_data(
+    gx: &Gifti,
+    io: &mut Io,
+    notices: &mut Notices,
+    errno: &mut i32,
+    md: &mut NvPairs,
+) {
+    // glibc 2.35's getpwuid sets errno to 0 when its lookup ends without an error (the user found
+    // or not): a later message's errno line depends on it (relay 32 of track D, a gwr case)
+    *errno = 0;
     if let Some(user) = passwd_user_name(io.env) {
         add_meta(gx, io, notices, md, "UserName", Some(user.as_bytes()));
     }
@@ -536,13 +546,13 @@ pub fn insert_common_meta_data(gx: &Gifti, io: &mut Io, notices: &mut Notices, m
 }
 
 /// A new image: version "1.0", the common metadata.
-pub fn new_image(gx: &Gifti, io: &mut Io, notices: &mut Notices) -> GiftiImage {
+pub fn new_image(gx: &Gifti, io: &mut Io, notices: &mut Notices, errno: &mut i32) -> GiftiImage {
     let mut image = GiftiImage {
         version: Some(GIFTI_XML_VERSION.as_bytes().to_vec()),
         ..GiftiImage::default()
     };
     let mut md = std::mem::take(&mut image.meta);
-    insert_common_meta_data(gx, io, notices, &mut md);
+    insert_common_meta_data(gx, io, notices, errno, &mut md);
     image.meta = md;
     image
 }

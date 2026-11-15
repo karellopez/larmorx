@@ -34,6 +34,8 @@ use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 
 #[path = "cfile.rs"]
 mod cfile;
+#[path = "fli.rs"]
+mod fli;
 #[path = "fnam.rs"]
 mod fnam;
 #[path = "gii.rs"]
@@ -144,12 +146,12 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 45] = [
+const COMMANDS: [&str; 46] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
     "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
-    "mpg",
+    "mpg", "fli",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1038,6 +1040,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "mpe" => mpe::mpe_tokens(&mut t, &mut g),
             "mpf" => mpf::mpf_tokens(&mut t, &mut g),
             "mpg" => mpg::mpg_tokens(&mut t, &mut g),
+            "fli" => fli::fli_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2711,6 +2714,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "mpe" => mpe::mpe_case(cx, t, o)?,
         "mpf" => mpf::mpf_case(cx, t, o)?,
         "mpg" => mpg::mpg_case(cx, t, o)?,
+        "fli" => fli::fli_case(cx, t, o)?,
+        // relay 32 of track D: the recorded heads (real.py); never generated
+        "flr" => fli::flr_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2739,7 +2745,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
 
 /// MRISsmoothKernel's timings (`Done allocating shl <n>, <s> sec`, `... t=<s> sec`) and its
 /// closing value (`vtxval <x>`: column 1031 of the output's first row, memory outside a small
-/// volume) as `<t>` and `<v>`, as `fssurfio.cpp` writes them (relay 23).
+/// volume) as `<t>` and `<v>`, as `fssurfio.cpp` writes them (relay 23); MRISfillInterior's time
+/// (`  MRISfillInterior t = <s>`) as `<t>` (relay 32 of track D).
 fn untime(b: &[u8]) -> Vec<u8> {
     let mut r = Vec::with_capacity(b.len());
     for (k, line) in b.split(|&c| c == b'\n').enumerate() {
@@ -2764,6 +2771,9 @@ fn untime(b: &[u8]) -> Vec<u8> {
             r.extend_from_slice(&line[e..]);
         } else if line.starts_with(b"vtxval ") {
             r.extend_from_slice(b"vtxval <v>");
+        } else if line.starts_with(b"  MRISfillInterior t = ") {
+            // relay 32: MRISfillInterior's elapsed time (with Gdiag_no > 0)
+            r.extend_from_slice(b"  MRISfillInterior t = <t>");
         } else {
             r.extend_from_slice(line);
         }

@@ -1767,6 +1767,16 @@ defects! {
         "the high-signal control-point search (MRInormFindHighSignalLowStdControlPoints) prints the largest region's voxel count rounded to single precision in its message 'using segments ...': a count above 16,777,216 voxels can be printed wrong (its control points are not changed)";
     FS_603 = "FS-603", "FreeSurfer", true,
         "the high-signal control-point search (MRInormFindHighSignalLowStdControlPoints) sizes its window of about 7 mm in voxels as an int that overflows for a slice thickness below about 3.3e-9 mm: the window wraps to no voxels or a negative size (its local means are not computed and its spreads are 0)";
+    FS_604 = "FS-604", "FreeSurfer", true,
+        "the surface library's cached conversion from a surface's tkregister RAS to a volume's voxels (MRISsurfaceRASToVoxelCached and the maps MRISfillInterior uses; the ribbon and shell volumes, mris_volmask, mris_place_surface, mri_surf2volseg) keeps the matrix it made for an earlier call while the new volume's header compares equal: a second surface whose volume geometry differs, a volume of another extent whose header was copied from the first (its centre voxel elsewhere) or one differing by less than 1.2e-7 in a header value gets the earlier matrix, so its points land in other voxels";
+    FS_605 = "FS-605", "FreeSurfer", true,
+        "the cached conversion from a volume's voxels to a surface's tkregister RAS (MRISsurfaceRASFromVoxelCached; mri_mc) makes its matrix at its first call and keeps it for every later surface and volume, so later conversions use the first pair's geometry";
+    FS_606 = "FS-606", "FreeSurfer", false,
+        "the surface shell and interior volumes (MRISshell, MRISfillInterior; mris_volmask's ribbon, mris_place_surface, mri_surf2volseg) draw nothing for a face whose first two corners are at one point (the face is a segment, or a point when all three coincide); its edges are drawn by the neighbouring faces of a closed surface";
+    FS_607 = "FS-607", "FreeSurfer", true,
+        "the bounding volume (MRISmakeBoundingVolume; mris_place_surface's T2 and FLAIR steps) of a surface whose bounding box spans more than 2^31 voxels of the surface's volume geometry gets a garbage extent (an integer overflow)";
+    FS_608 = "FS-608", "FreeSurfer", true,
+        "the interior of a surface (MRISfillInterior; mris_place_surface, mri_surf2volseg, mris_volmask's callers) in a given volume that the surface does not cross (no voxel of its shell inside the volume) ends the program with the misleading messages 'volume size must be greater than 0 in every dimension' and 'could not allocate memory for -999996 slices'";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

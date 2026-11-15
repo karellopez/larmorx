@@ -184,7 +184,8 @@ empty solution). Validation: `validation/investigations/freesurfer-spline-replic
 
 ## Relay 16 (track A)
 
-- `matrix.rs`: `Matrix::negative`, FS-13 under `reproduce` (`utils/matrix.cpp`'s `MatrixAlloc_new` 394-516: the block
+- `matrix.rs`: `MatrixMultiply`'s float sum reads a row of fewer than 17 elements onto the stack (track D
+  relay 32, speed only: the same `dot_float` on the same values). `Matrix::negative`, FS-13 under `reproduce` (`utils/matrix.cpp`'s `MatrixAlloc_new` 394-516: the block
   size's arithmetic for negative sizes, measured with `validation/probes/fs-maths/matrixalloc_negative.cpp`).
 - `matrix_io.rs`: `MatrixReadFrom`'s FS-49 under `reproduce` (`Slot`: `utils/fio.cpp`'s `freadInt` and `freadDouble`
   as the official build lays out their variables, track E's amended spec §18.2).

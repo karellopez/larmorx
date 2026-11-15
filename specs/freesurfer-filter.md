@@ -1206,3 +1206,94 @@ index tables, its error past them), the total an unsigned 32-bit sum returned as
 Probe command `ccsf <seg> <wsize> <x> <y> <z>` (label volumes of 1 to 12 voxels a side, every
 voxel type the generator writes, windows -1 to 9, positions inside, at and past the faces).
 Results (observed): seeds 7 and 13 (200 cases each): 0 different in both modes.
+
+## 33. A surface drawn into volumes: the shell, the ribbon, the bounding volume, the interior
+
+These take a surface (the surface library, `specs/freesurfer-surfio.md`) and convert its points to
+voxels with §118 of that spec. A sample's voxel is `nint` of each coordinate (`(int)(f - 0.5)`
+below 0, `(int)(f + 0.5)` otherwise); a coordinate that is NaN or rounds beyond `int` lands outside
+every volume (no notice: the official build's `INT_MIN`). A count `(int) ceil(x)` that is NaN or
+beyond `int` is negative, and the face is skipped.
+
+- **The shell** (`MRISshell(src, mris, dst, clearflag)`, `mris_volmask`'s ribbon): without a
+  destination, a volume of the source's extent and type with its header; `clearflag` not 0 clears
+  it. For each face, its corners `v0 v1 v2` (single precision) give `d0 = |v1 - v0| / xsize`, `d1 =
+  |v2 - v1| / ysize`, `d2 = |v0 - v2| / zsize` (the destination's voxel sizes; each length `sqrtf`
+  of `(dx² + dy²) + dz²`; all single precision), `dmax = d0` when `d0 >= d1` and `d0 >= d2`, else
+  `d1` when `d1 >= d0` and `d1 >= d2`, else `d2`; `numu = (int) ceilf(2 d0)`, `numv = (int)
+  ceilf(2 dmax)`. For `v` from 0 to `numv`: `p0 = v0 + ((v2 - v0) v) / numv`, `p1 = v1 + ((v2 - v1)
+  v) / numv`, and for `u` from 0 to `numu` the sample `p0 + ((p1 - p0) u) / numu` (per coordinate,
+  `v` and `numv` as `float`, single precision, operations in that order), converted to the source's
+  voxels by the cached conversion (§118 of the surfio spec, FS-604); a voxel inside the destination
+  is set to 255.
+- **FS-606** (kept, rule C). A face whose first two corners are at one point (`numu` 0; all three:
+  `numv` 0 too) gives only NaN samples (`0 / 0`), so it draws nothing; on a closed surface its edges
+  are drawn by the neighbouring faces. Kept in both modes, noted.
+- **The ribbon** (`MRISribbon(inner, outer, src, dst)`): with `Gdiag`'s show and verbose bits,
+  `MRISribbon: Creating new (_inter)MRI of <w>, <h>,<d>...` on standard output; a work volume of the
+  source's extent and type with its header; without a destination (`MRISribbon: Creating new
+  (_dst)MRI...` with those bits) one more; `Creating volume inside outer shell...`. The outer
+  surface's shell in the work volume (cleared first), flooded from outside (§23), the values 1 to
+  254 accentuated (§23: 255 there, else 0), complemented (1 where 0, else 0: the inside of the outer
+  surface). `Creating volume outside inner shell...`: the inner surface's shell in the destination
+  (cleared first), flooded from outside. `Finding intersection of volumes...`: the destination
+  becomes the smaller of the work volume and itself (both truncated to `int`; volumes of other
+  extents end the program, `MRIcheckVolDims`), then the values 1 to 255 accentuated: 255 from the
+  outer surface's shell to the inner surface's shell, both included, else 0.
+  `Done with intersection...`.
+- **The bounding volume** (`MRISmakeBoundingVolume(mris, resolution)`, `mris_place_surface`'s T2
+  and FLAIR steps): a header of the surface's volume geometry; the corners of the surface's
+  bounding box (`xlo ylo zlo`, `xhi yhi zhi`, as `double`s) converted to its voxels by the direct
+  conversion; per axis `lo = (int) floor(min)`, `hi = (int) ceil(max)` (`min` the second corner's
+  value when it is below the first, else the first's; `max` the second's when the first is below
+  it, else the first's: a NaN takes the first corner's; FS-17 beyond `int`), `n = hi - lo + 1`; the
+  extent `(int) ceil(((float) n * size) / resolution)` (the product in single precision, the
+  quotient and `ceil` in double; FS-17 beyond `int`). A new `float` volume of that extent, with the
+  geometry's direction cosines, the voxel size `resolution` (as `float`) on every axis and as its
+  centre the geometry's scanner RAS of the voxel `lo + n * 0.5` per axis (each stored as `float`;
+  the geometry's vox2ras in `float` times that vector). Its cached matrices are not made again.
+  **FS-607**: an extent `hi - lo + 1` beyond `int` (a box spanning more than 2^31 voxels) wraps in
+  FreeSurfer; by default the program ends with `MRISmakeBoundingVolume: the surface spans <n>
+  voxels of its volume geometry, more than an int holds` (as an error, `ERROR_BADPARM`; rule B),
+  noted; `reproduce` wraps.
+- **The interior** (`MRISfillInterior(mris, resolution, dst)`; `mri_surf2volseg`, `mris_place_surface`,
+  the laminar volume fractions): first the surface's metric properties (`MRIScomputeMetricProperties`).
+  Without a destination: a `float` volume of `(int) ceil((hi - lo) / resolution)` voxels per axis
+  (the box's extent in single precision, divided in double; FS-17 beyond `int`), voxel size
+  `resolution` (`MRIsetResolution`), and as vox2ras the identity with `resolution` on the diagonal and
+  the box's low corner plus the geometry's centre (single precision) as translation
+  (`MRIsetVoxelToRasXform`, with its messages). The destination is cleared. Work volumes of its extent
+  and header: the cosines (`float`, 0), the distances (`float`, 10) and the shell (`int`). A map of the
+  destination and the surface (§118, loaded twice). For each face, as the shell but in double
+  precision with the destination's voxel sizes per axis (`d0 = sqrt(((x1 - x0) / xsize)² + ((y1 - y0)
+  / ysize)² + ((z1 - z0) / zsize)²)`, the squares added in that order; `numv = (int) ceil(2 dmax)`,
+  `numu = (int) ceil(2 d0)`; the samples `p0 + ((p1 - p0) u) / numu` in double) and the face's normal
+  (the face-normal cache, made where it was deferred); each sample through the map (whose matrix's
+  inverse, in `float`, is made at the first sample, again at later ones while it cannot be inverted).
+  A sample whose voxel is inside: the shell voxel set to 255; the voxel's centre in surface RAS (the
+  inverse times the `float` vector `(col, row, slc, 1)`) and the distance `vlen` from the sample to it
+  (double); when `vlen` is not above the distance kept for the voxel, the cosine `(ux nx + uy ny) + uz
+  nz` of the unit vector `(p - centre) / vlen` with the face's normal, and `vlen`, are kept (as
+  `float`s; a `vlen` of 0 keeps a NaN cosine). Then the shell's bounding box with 2 voxels' padding
+  (`REGIONgetBoundingBox`; with `Gdiag_no > 0` printed after `  Bounding box around shell: ` as
+  `x y z  dx dy dz`); the shell cut to it as `uchar`; flooded from outside (§23); each voxel of the
+  box that is on the shell or not flooded and whose cosine is at least 0 (a NaN is not) is set to 1
+  in the destination. With `Gdiag_no > 0`, `  MRISfillInterior t = <seconds>` (`%g`). Returns the
+  destination. FS-606 as for the shell. **FS-608**: a surface whose shell has no voxel inside the
+  destination gives a box of negative size; FreeSurfer's allocation of it ends the program (`MRI::Shape::Shape():
+  volume size must be greater than 0 in every dimension` three times, then `could not allocate
+  memory for -999996 slices`, status 1); by default the program ends with `MRISfillInterior: the
+  surface does not cross the volume (no voxel of its shell is inside it)` (status 1; rule B), noted.
+
+## 34. Validation plan (part 9)
+
+- **Probe (black box).** The surface probe's `fli` command (`specs/freesurfer-surfio.md` §119):
+  shells, ribbons, bounding volumes and interiors of icosahedra, grids and small meshes, every
+  operation on new and given volumes. `real.py` (the surface probe's folder): for three recorded
+  heads and both hemispheres, the interiors of the white and pial surfaces in a copy of `aseg.mgz`
+  (`MRISfillInterior(surface, 0, volume)`), the ribbon between them in `orig.mgz`'s geometry, the
+  white surface's interior in its bounding volume at 0.5 mm; each result's extent, type, geometry,
+  count of voxels that are not 0 and FNV-1a of its voxels.
+- **Expected.** Every line identical under `reproduce`; the default identical but where a noted
+  defect it corrects changed the result (FS-604, FS-605, FS-607, FS-608). Observed: the README of
+  `validation/probes/fs-surfio`.

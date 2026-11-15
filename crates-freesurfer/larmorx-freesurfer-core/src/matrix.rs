@@ -806,6 +806,17 @@ pub(crate) fn multiply(
                             }
                             val as f32
                         }
+                        // the row and column on the stack when short (no allocation per
+                        // element; the same sum)
+                        Acc::Float if m1_cols <= 16 => {
+                            let n = m1_cols.max(0) as usize;
+                            let (mut a, mut b) = ([0f32; 16], [0f32; 16]);
+                            for i in 0..n {
+                                a[i] = m1.relt(row, i as i32 + 1);
+                                b[i] = m2.relt(i as i32 + 1, col);
+                            }
+                            dot_float(&a[..n], &b[..n])
+                        }
                         Acc::Float => {
                             let a: Vec<f32> = (1..=m1_cols).map(|i| m1.relt(row, i)).collect();
                             let b: Vec<f32> = (1..=m1_cols).map(|i| m2.relt(i, col)).collect();

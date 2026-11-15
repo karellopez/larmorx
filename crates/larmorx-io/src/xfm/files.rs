@@ -227,7 +227,10 @@ impl<'a> Ctx<'a> {
 
     /// `file_exists`.
     pub(crate) fn file_exists(&mut self, filename: &[u8]) -> bool {
-        std::fs::File::open(to_path(&self.expand(filename))).is_ok()
+        // fopen(name, "r"): Unix opens a folder (its reads fail), Windows refuses it; Linux's
+        // answer on every platform
+        let p = to_path(&self.expand(filename));
+        std::fs::File::open(&p).is_ok() || (!cfg!(unix) && p.is_dir())
     }
 
     /// `remove_directories_from_filename`.

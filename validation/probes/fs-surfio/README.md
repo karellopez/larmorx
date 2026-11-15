@@ -272,7 +272,37 @@ cases of the whole probe: 8,712 identical, 288 counted, 0 different. Seed 1, 1,3
 identical, 41 `SKIP`, hash `6a44bcf748d45fc2be9fbcfb07335b04a355090e528bf8db73b40258f0e84b1c` (the
 test).
 
+Relay 32 of track D (the 46th command `fli`: `mrisurf_mri.cpp`'s surface-to-voxel maps and cached
+conversions, `mriflood.cpp`'s shell, ribbon, bounding volume and interior; `specs/freesurfer-surfio.md`
+§118-119, `specs/freesurfer-filter.md` §33-34): one or two surfaces read by `MRISread` (icosahedra,
+grids, `srd`'s meshes scaled into 8 mm, the second often the first shrunk), each with a volume
+geometry of the case, 1 to 3 volumes, then 1 to 4 operations (the four conversions, a map made,
+used, loaded again and used, the shell, the ribbon, the bounding volume, the interior, the
+bounding volume filled), each printing its coordinates' bits or the volume (extent, type, frames,
+geometry, `ras_good_flag`, the voxels as runs `<bits>x<n>` and `E`); `MRISfillInterior`'s elapsed
+time `<t>` on both sides. `fli` at seeds 7, 13 and 17 (100 cases each): 0 different with
+`reproduce`; `fix` different only with notices (FS-604, FS-605, FS-608). Seed 7, 9,200 cases of the
+whole probe: 8,920 identical, 280 counted, 0 different. Seed 1, 1,380 cases: 1,346 identical, 34
+`SKIP`, hash `a20e3b9d9389f40f67a68a3b3a976aeee565c0181c5c131f76b84ae62e2f7098` (the test, from the
+clean commit a95f764d), passing in debug and release, plain and under the AArch64 NaN emulation
+(5,233 and 157,727 flips), and on the Windows laptop (`windows-cross-check`); the port's seed-7 `fli`
+outputs (200 cases) identical with and without the emulation in both modes. The new case mix found
+one difference before that commit: an error after a failed GIFTI read printed `No such file or
+directory` where FreeSurfer prints nothing (glibc's `getpwuid` in `insertCommonMetaData` sets
+`errno` to 0; fixed in a95f764d). `fssurfio`'s alarm is 900 seconds for `flr` lines (5 for the
+rest).
+
+`real.py` (relay 32): `flr` lines on three recorded heads (`ds000005-sub-01`, `ds000228-sub-pixar008`,
+`ds002422-sub-02`, the classic recipe), both hemispheres: the white and pial interiors in a copy of
+`aseg.mgz` (`MRISfillInterior(surface, 0, volume)`, mri_surf2volseg's call), the ribbon between
+them in `orig.mgz` (`MRISribbon`, mris_volmask's), the white surface's interior in its bounding
+volume at 0.5 mm (mris_place_surface's T2 and FLAIR steps): 24 of 24 identical in both modes, no
+notice (observed). The 24 calls: FreeSurfer 55 s; the port 138 s at 9df8cbcb's parent, 87 s after
+the flood's breadth-first fill and the other speed changes (the outputs unchanged; the rest is the
+surface read and `MRISfillInterior`'s per-voxel accesses, relay 33's speed item).
+
 ```
 validation/probes/fs-surfio/build.sh <workspace>
 scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 66000
+scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py
 ```

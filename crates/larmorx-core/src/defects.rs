@@ -2129,6 +2129,14 @@ defects! {
         "refusing a NRRD file that is not a volume (other than three or four axes in a three-dimensional space), the element count and element size it prints are cut to 32 bits (wrong, or negative, from 2^31 on)";
     FS_741 = "FS-741", "FreeSurfer", true,
         "reading a NRRD volume of signed or unsigned 64-bit samples stores each sample's low 32 bits as a 32-bit number, one after another from the start of its row, in a volume of 64-bit voxels: the voxels hold pairs of other samples' low halves, and the second half of every row zeros";
+    FS_742 = "FS-742", "FreeSurfer", true,
+        "reading a MINC volume of signed bytes stores its values as unsigned bytes: a negative value reads as 256 plus the value";
+    FS_743 = "FS-743", "FreeSurfer", true,
+        "reading a MINC volume of unsigned 16-bit integers stores its values as signed 16-bit voxels: values above 32,767 read as the value minus 65,536";
+    FS_744 = "FS-744", "FreeSurfer", true,
+        "reading a MINC volume of 32-bit integers stores each value as a 32-bit number, one after another from the start of its row, in a volume of 64-bit voxels: the voxels hold pairs of other values, the second half of every row zeros, and unsigned values above 2^31 - 1 negative";
+    FS_745 = "FS-745", "FreeSurfer", true,
+        "reading a MINC file of five or more dimensions reads the names of its dimensions past the four the reader gives (memory contents): a crash, or the file refused after a read of what memory names";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

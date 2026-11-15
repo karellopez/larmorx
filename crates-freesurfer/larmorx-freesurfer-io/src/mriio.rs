@@ -282,7 +282,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
         MRI_GCA_FILE => "GCA",
-        MRI_MINC_FILE => "MINC",
         MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
@@ -473,6 +472,8 @@ pub fn mri_read(
         crate::gifti_vol::mris_read_gifti_as_mri(g, &mut io, dir, &copy, volume_flag)?
     } else if mtype == identify::NRRD_FILE {
         crate::mriio_nrrd::mri_nrrd_read(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::MRI_MINC_FILE {
+        crate::mriio_minc::minc_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::BRIK_FILE {
         crate::afni::afni_read(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::MRI_CURV_FILE {

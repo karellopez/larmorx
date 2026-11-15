@@ -65,7 +65,7 @@ pub fn fsenv_getenv<C>(
         return None;
     };
     let (subjects_dir, user) = match var(env, "SUBJECTS_DIR") {
-        Some(s) => (Some(s), Some(version::ver_user(env))),
+        Some(s) => (Some(s), Some(version::ver_user(g, env))),
         None => {
             let _ = writeln!(out, "SUBJECTS_DIR not defined");
             (None, None)

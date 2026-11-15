@@ -25,7 +25,7 @@ use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_surf::{mriflood, readwrite, sras};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
-const FRAMES: [[f32; 9]; 6] = [
+pub(super) const FRAMES: [[f32; 9]; 6] = [
     [-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0],
     [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
     [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0],
@@ -34,12 +34,12 @@ const FRAMES: [[f32; 9]; 6] = [
     [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
 ];
 
-fn fv(t: &mut Vec<String>, x: f32) {
+pub(super) fn fv(t: &mut Vec<String>, x: f32) {
     t.push(format!("{:08x}", x.to_bits()));
 }
 
 /// A geometry's 15 floats: voxel sizes, direction cosines, centre.
-fn geom(t: &mut Vec<String>, g: &mut Gen, heavy: bool) -> [f32; 15] {
+pub(super) fn geom(t: &mut Vec<String>, g: &mut Gen, heavy: bool) -> [f32; 15] {
     let mut v = [0f32; 15];
     let size = |g: &mut Gen| {
         if heavy && g.chance(30) {
@@ -94,7 +94,7 @@ fn surface_bytes(m: &Mesh) -> Vec<u8> {
     b
 }
 
-fn surface(t: &mut Vec<String>, m: &Mesh) {
+pub(super) fn surface(t: &mut Vec<String>, m: &Mesh) {
     hx(t, &surface_bytes(m));
     ix(t, m.v.len() as i64);
     ix(t, m.f.len() as i64);
@@ -326,7 +326,7 @@ pub(super) fn fli_tokens(t: &mut Vec<String>, g: &mut Gen) {
 /// A volume as the probe prints it: its extent, type, frames, voxel sizes, direction cosines,
 /// centre and `ras_good_flag`, then its voxels (frame, slice, row, column) as runs `<bits>x<n>`,
 /// and `E`.
-fn fli_vol(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
+pub(super) fn fli_vol(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
     let Some(m) = m else {
         o.s("NULL");
         return;
@@ -369,7 +369,7 @@ fn fli_vol(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
 }
 
 /// `vols[a]` and `vols[b]` (`a != b`), the second mutable.
-fn pair(vols: &mut [Mri], a: usize, b: usize) -> (&Mri, &mut Mri) {
+pub(super) fn pair(vols: &mut [Mri], a: usize, b: usize) -> (&Mri, &mut Mri) {
     if a < b {
         let (l, r) = vols.split_at_mut(b);
         (&l[a], &mut r[0])
@@ -379,7 +379,13 @@ fn pair(vols: &mut [Mri], a: usize, b: usize) -> (&Mri, &mut Mri) {
     }
 }
 
-fn ret_vol(g: &mut Globals, err: &mut dyn Write, r: Ret<Mri>, given: Option<&Mri>, o: &mut Out) {
+pub(super) fn ret_vol(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    r: Ret<Mri>,
+    given: Option<&Mri>,
+    o: &mut Out,
+) {
     match r {
         Ret::New(m) => {
             o.s("N");

@@ -419,6 +419,9 @@ pub struct SurfGlobals {
     pub sras_map: crate::sras::Ras2VoxelMap,
     /// `MRISsurfaceRASFromVoxelCached`'s statics (`mrisurf_mri.cpp` lines 7531-7533).
     pub vox2sras: crate::sras::Vox2SrasCache,
+    /// `MRIcomputeLaminarVolumeFractions`' `static MRI *mri_interior_wm`
+    /// (`mrisurf_metricProperties.cpp` line 13135): the first call's white interior (FS-613).
+    pub laminar_wm: Option<larmorx_freesurfer_mri::mri::Mri>,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -466,6 +469,7 @@ impl Default for SurfGlobals {
             face_normal_add_delta: [larmorx_core::x87::F80::ZERO; 3],
             sras_map: Default::default(),
             vox2sras: Default::default(),
+            laminar_wm: None,
         }
     }
 }

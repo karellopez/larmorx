@@ -19,7 +19,9 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_58, FS_539, FS_540, FS_541, FS_542, FS_543, FS_544};
+use larmorx_core::defects::{
+    FS_58, FS_539, FS_540, FS_541, FS_542, FS_543, FS_544, FS_609, FS_614,
+};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::ret::Ret;
@@ -37,6 +39,8 @@ const FAR: u8 = 2;
 const FORBIDDEN: u8 = 3;
 /// `EPS`.
 const EPS: f32 = 1e-6;
+/// `EDOM` (Linux).
+const EDOM: i32 = 33;
 
 /// `DTRANS_MODE_SIGNED` (negative inside the label, positive outside).
 pub const DTRANS_MODE_SIGNED: i32 = 1;
@@ -272,6 +276,11 @@ impl Fm<'_> {
         let s3 = sse::add(ab, c);
         let c3 = sse::mul(sse::sub(sse::add(sse::mul(c, c), aa_bb), 1.0), 3.0);
         let delta = sse::sub(sse::mul(s3, s3), c3);
+        // FreeSurfer takes the first root before it tests `delta`: glibc's `sqrtf` of a negative
+        // `delta` sets `errno` to `EDOM` (the root itself is not used)
+        if delta < 0.0 {
+            g.errno = EDOM;
+        }
         if delta >= 0.0 {
             let sol = sse::div(sse::add(sse::sqrt(delta), s3), 3.0);
             if sse::add(EPS, sol) >= c {
@@ -755,4 +764,196 @@ pub fn mri_distance_transform(
         Some(m) => Ret::New(m),
         None => Ret::Given,
     })
+}
+
+/// C's `(int)` of a `double` (`cvttsd2si`): truncated, `INT_MIN` for a NaN and beyond `int`.
+fn trunc_int(v: f64) -> i32 {
+    if v.is_nan() || v >= 2_147_483_648.0 || v <= -2_147_483_649.0 {
+        i32::MIN
+    } else {
+        v.trunc() as i32
+    }
+}
+
+/// `MRIvox(mri, x, y, z) == label` of the label volume of the outside distance map
+/// (`utils/mris_fastmarching.cpp`'s `mriFindLabel` and `include/fastmarching.h`'s
+/// `InitForOutsideMatch`): the byte `x` of row `y` of slice `z`. FS-609: a point outside the
+/// volume whose byte stays in the volume's memory (another voxel's) and a volume not of bytes (a
+/// byte of a voxel's value): with `reproduce` the byte FreeSurfer reads; by default a point
+/// outside the volume is not the label and a volume of another type is read by its values
+/// (`MRIgetVoxVal`, truncated). FS-614: a point beyond the volume's memory (a row pointer it does
+/// not have, or a place past its voxels) is not the label in both modes (FreeSurfer reads memory
+/// it does not own).
+#[allow(clippy::too_many_arguments)]
+pub fn label_matches(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    what: &str,
+    m: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    label: i32,
+) -> Result<bool, Fatal> {
+    let (w, h, d) = (m.vg.width, m.vg.height, m.vg.depth);
+    let inside = (0..w).contains(&x) && (0..h).contains(&y) && (0..d).contains(&z);
+    if inside && m.mtype == MRI_UCHAR {
+        let i = ((z as usize * h as usize) + y as usize) * m.vox_per_row as usize + x as usize;
+        let b = m.chunk.as_ref().expect("voxels")[i];
+        return Ok(i32::from(b) == label);
+    }
+    // FreeSurfer's address: slices[z][y] + x bytes, where the row pointer exists
+    let row = m.vox_per_row as i128 * m.bytes_per_vox as i128;
+    let place = ((0..d).contains(&z) && (0..h).contains(&y) && m.chunk.is_some())
+        .then(|| (i128::from(z) * i128::from(h) + i128::from(y)) * row + i128::from(x))
+        .filter(|&b| b >= 0 && b < i128::from(m.bytes_total));
+    let Some(b) = place else {
+        g.notices.add(
+            &FS_614,
+            format!(
+                "{what}: the point ({x}, {y}, {z}) is beyond the memory of the {w}x{h}x{d} label volume (FreeSurfer reads memory it does not own; taken as not the label)"
+            ),
+        );
+        return Ok(false);
+    };
+    if inside {
+        g.notices.add(
+            &FS_609,
+            format!(
+                "{what}: the label volume is of type {}, read as bytes (FreeSurfer's MRIvox)",
+                m.mtype
+            ),
+        );
+    } else {
+        g.notices.add(
+            &FS_609,
+            format!(
+                "{what}: the point ({x}, {y}, {z}) is outside the {w}x{h}x{d} label volume (FreeSurfer reads another voxel's byte)"
+            ),
+        );
+    }
+    if !g.notices.reproduce() {
+        if !inside {
+            return Ok(false);
+        }
+        let v = mri_get_vox_val(g, err, m, x, y, z, 0, 0)?;
+        let l = if v.is_nan() {
+            0
+        } else {
+            v.clamp(-2147483648.0, 2147483647.0) as i32
+        };
+        return Ok(l == label);
+    }
+    Ok(i32::from(m.chunk.as_ref().expect("voxels")[b as usize]) == label)
+}
+
+/// `FastMarching<+1> fm(mri, NULL); fm.SetLimit(limit); fm.InitForOutsideMatch(distance, src,
+/// label); fm.Run(limit);` and its destructor (`MRISextractOutsideDistanceMap`): `mri` (a float
+/// volume of the distance map's extent, its voxels 0) gets the distances from the surface's
+/// outside boundary within the label. `InitForOutsideMatch`: each voxel's point in tkregister RAS
+/// (`xstart + x / xsize` per axis in `float`, the distance map's start and voxels per mm) taken
+/// to the label volume's voxels (`MRIsurfaceRASToVoxel`, truncated) and compared with `label`
+/// ([`label_matches`], FS-609): a voxel not of the label gets the limit, one of it is forbidden;
+/// then every voxel whose distance (`distance`'s frame 0) is at or below 0 gets the limit and is
+/// forbidden; then, for each voxel and its next neighbour along x, y and z (itself at the last),
+/// where the two differ in the label the neighbour and then the voxel become alive (0.5) unless
+/// forbidden; the trial points from them, and the march to `limit`.
+#[allow(clippy::too_many_arguments)]
+pub fn outside_match(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    mri: &mut Mri,
+    distance: &Mri,
+    src: &mut Mri,
+    label: i32,
+    limit: f32,
+) -> Result<(), Fatal> {
+    let (w, h, d) = (mri.vg.width, mri.vg.height, mri.vg.depth);
+    let status = mri_alloc(g, out, err, w, h, d, MRI_UCHAR)?
+        .chunk
+        .unwrap_or_default();
+    let n = status.len();
+    let dist: Vec<f32> = distance.chunk.as_ref().expect("voxels")[..4 * n]
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| f32::from_le_bytes(*b))
+        .collect();
+    let (x0, y0, z0) = (distance.xstart, distance.ystart, distance.zstart);
+    let (sx, sy, sz) = (distance.vg.xsize, distance.vg.ysize, distance.vg.zsize);
+    let chunk = mri.chunk.as_mut().expect("voxels");
+    let mut fm = Fm {
+        neg: false,
+        w,
+        h,
+        d,
+        vals: &mut chunk[..4 * n],
+        status,
+        heap: Vec::new(),
+        alive: Vec::new(),
+        limit,
+        undef: None,
+    };
+    // `Init()`: every point far
+    fm.status.fill(FAR);
+    // `InitForOutsideMatch`'s segmentation (`mri_seg`, `MRIalloc`: its messages for an empty extent)
+    let mut seg = mri_alloc(g, out, err, w, h, d, MRI_UCHAR)?
+        .chunk
+        .unwrap_or_default();
+    seg.resize(n, 0);
+    const WHAT: &str = "MRISextractOutsideDistanceMap";
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let (xs, ys, zs) = (x0 + x as f32 / sx, y0 + y as f32 / sy, z0 + z as f32 / sz);
+                let (_, v) = larmorx_freesurfer_volume::coords::surface_ras_to_voxel(
+                    g,
+                    out,
+                    err,
+                    &mut src.vg,
+                    f64::from(xs),
+                    f64::from(ys),
+                    f64::from(zs),
+                )?;
+                let (xi, yi, zi) = (trunc_int(v[0]), trunc_int(v[1]), trunc_int(v[2]));
+                let i = fm.idx(x, y, z);
+                if !label_matches(g, err, WHAT, src, xi, yi, zi, label)? {
+                    fm.set(i, limit);
+                    continue;
+                }
+                seg[i] = 1;
+                fm.status[i] = FORBIDDEN;
+            }
+        }
+    }
+    for (i, &dv) in dist.iter().enumerate() {
+        if dv <= 0.0 {
+            fm.set(i, limit);
+            fm.status[i] = FORBIDDEN;
+        }
+    }
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let val1 = seg[fm.idx(x, y, z)];
+                let px = if x < w - 1 { x + 1 } else { x };
+                let py = if y < h - 1 { y + 1 } else { y };
+                let pz = if z < d - 1 { z + 1 } else { z };
+                let mut add = false;
+                for (qx, qy, qz) in [(px, y, z), (x, py, z), (x, y, pz)] {
+                    if val1 != seg[fm.idx(qx, qy, qz)] {
+                        add = true;
+                        fm.add_alive(qx, qy, qz);
+                    }
+                }
+                if add {
+                    fm.add_alive(x, y, z);
+                }
+            }
+        }
+    }
+    fm.init_trial_from_alive(g);
+    fm.run(g, limit);
+    Ok(())
 }

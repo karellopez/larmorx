@@ -1563,8 +1563,58 @@ steps). In the recorded runs the `Corner` mean is 60.00000 (the edges' unit vect
   gives `DVectorDot`'s error and -10e10, then the third `printf` dereferences the NULL norm:
   SIGSEGV. `MRISprettyPrintSurfQualityStats`, `MRISmaxEdgeStatToOverlay` and `MRISmarkEdge` call the
   face metric first. Rule A.
-- **Not ported yet** (3.1-51's rest): `MRISbinarizeVolume` (fs.mri's `MRIalloc` only; next),
-  `MRISmaskLabel`/`MRISmaskNotLabel` (track A's `LABEL`, after its merge), `mrisMarkIntersections`
-  and `MRISmarkEdge` (fs.surf's MHT and `sclustMapSurfClusters`, `MRISfillHoles`),
-  `MRIcomputeLaminarVolumeFractions` (fs.filter's `MRISfillInterior`, fs.volume's `mriset.cpp`
-  functions and `MRIcomputeVolumeFractions`).
+- **Not ported yet** (3.1-51's rest): ported by relay 33 (§27) except `mrisMarkIntersections` and
+  `MRISmarkEdge`'s hole filling (fs.surf's MHT and surface clusters).
+
+## 27. Queue item 3.1-51's rest: the signed distance volume, the label masks, the edge marks, the laminar fractions, the outside distance map (relay 33 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
+`crates-freesurfer/larmorx-freesurfer-surf/src/binarize.rs` (`MRISbinarizeVolume`
+mrisurf_metricProperties.cpp 11773, `MRISmaskLabel` 12395, `MRISmaskNotLabel` 12407,
+`MRIcomputeLaminarVolumeFractions` 13131; `mriFindLabel` and `MRISextractOutsideDistanceMap`,
+mris_fastmarching.cpp; `findOtherEdgeFace`, mrisurf_topology.cpp 1970), `props10.rs`
+(`MRISmarkEdge` 13077) and the filter crate's `fastmarch.rs` (`FastMarching<+1>::InitForOutsideMatch`,
+include/fastmarching.h 493).
+
+- **Reach.** No compiled program calls `MRISbinarizeVolume`, `MRISextractOutsideDistanceMap` or
+  `MRIcomputeLaminarVolumeFractions` (the call graph and a grep of the tree: only their definitions
+  and the header); `MRISmaskNotLabel` is called only by programs in `attic/`; `MRISmarkEdge` by
+  `mris_remove_intersection` (metric 2, its hole filling on) and `dngtester`. They are ported for the
+  module's completeness.
+- **The object code** (the unit oracle's `mrisurf_metricProperties.cpp.o`, `objdump -dr`):
+  `MRISbinarizeVolume` is single precision with inline `sqrtss` (`sqrtf` called only for a NaN
+  result, for `errno`); `MIN`/`MAX` are `macros.h`'s (`minss` for `MIN3`; `cmpless`/`cmpnless` masks
+  for `MAX3`); `iVOL` adds 0.5 in double after a single-precision product (`cvtss2sd`, `addsd`,
+  `cvttsd2si`); `imin - delta` is a `sub` whose sign flag picks 0 or the result (`cmovns`), so the
+  wrapping arithmetic; `(vec0 + vec1 + vec2) / 3.0` is a `divss` by 3 (GCC's exact narrowing of the
+  double division of a float); `SIGN(sign) * MIN(...)` multiplies by a double plus or minus 1, exact.
+  The `ROMP_PF` loop only computes `computeDefectFaceNormal` per face (independent). WHICH_OUTPUT is
+  `stderr` (mrisurf_base.h 289).
+- **`InitForOutsideMatch`** reads `MRIvox(_mri, (int)xv, (int)yv, (int)zv)` without a bounds check
+  (FS-609 within the volume's chunk, FS-614 beyond its row pointers: the probe's official runs crash
+  with signal 11 there, 11 to 20 cases of 200 per seed) and on volumes of any type (bytes). The
+  comment above `MRISextractOutsideDistanceMap` says the source is "a float distance map with zero
+  values inside"; the code reads it as bytes with `MRIvox` and compares with `label` (FS-609).
+- **`_UpdateValue`** (fastmarching.h) computes `sol = (-b + ::sqrt(delta)) / a` before `if (delta >=
+  0 && ...)`: glibc's `__sqrtf` wrapper sets `errno = EDOM` for a negative `delta` (gdb's watch on
+  `__errno_location()` in a bvl case: `__kernel_standard(x=-57.5, type=126)` from
+  `InitForOutsideMatch`'s inlined trial points). The filter crate's march now sets `errno` there
+  (fs.filter's MRIextractDistanceMap too; its probe's hash and `edm`/`dtr` cases unchanged: no case
+  prints `errno` after a distance map).
+- **FS-610**: `ErrorExit(1, "No labels %d could be found in the volume\n", nlabels)` passes the
+  count (always 0 there), not `label`.
+- **FS-611**: the masks index `mris->vertices[area->lv[i].vno]` with no check; `LabelAlloc` fills
+  `vno = -1`, and volume labels keep it.
+- **FS-612**: `MRISmaskNotLabel` uses `marked` as its scratch flag without saving it.
+- **FS-613**: `static MRI *mri_interior_wm = NULL;` (13135) set once by `MRIcopy(mri_layers, NULL)`
+  and never freed or reset; later calls `MRIcopy(mri_interior_wm, mri_layers)`. A later call with
+  another resolution gives a layer volume of another extent: `MRIcopy` writes the first's voxels into
+  it (FS-163's case: the official probe crashed, signal 11, in the 1 seed-17 case before the
+  generator kept one resolution per case).
+- **`MRISmarkEdge`'s `FillHoles`** calls `MRISfillHoles` (mrisurf_vals.cpp 313), which needs
+  `MRIcopyMRIS`, `sclustMapSurfClusters` (surfcluster.cpp: the cluster summary, its `qsort`) and
+  `MRIScopyMRI`: queue items 3.4-03/3.4-04. `mrisMarkIntersections` (13027) needs the surface hash
+  (`MHTcreateFaceTable`, `MHTdoesFaceIntersect`, mrishash.cpp: 3.4-01) and the same clusters: both
+  wait for those items. `MRISaverageGradients_write` (9465) is an empty debugging stub (its body
+  prints a line and declares a variable; nothing calls it).
+

@@ -66,8 +66,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # overlay's data type and name, FS-391, FS-392; an overlay value written outside its volume, fs.mri's
 # FS-53; relay 22, the GIFTI volumes: a file mixing intents, whose intent FreeSurfer reads from
 # memory it never wrote, FS-521; relay 23, 3.1-51's leftovers: a volume of a smaller type read and
-# written as floats past its memory, FS-534; hop lists of fewer hops than the kernel, FS-533):
-# counted, never compared
+# written as floats past its memory, FS-534; hop lists of fewer hops than the kernel, FS-533; relay
+# 33 of track D, 3.1-51's rest: the outside distance map's label reads beyond the label volume's
+# memory, FS-614): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -113,6 +114,7 @@ SKIP: tuple[str, ...] = (
     "FS-521",
     "FS-533",
     "FS-534",
+    "FS-614",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port

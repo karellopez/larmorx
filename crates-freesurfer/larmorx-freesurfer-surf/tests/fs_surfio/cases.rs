@@ -32,6 +32,8 @@ use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
 use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 
+#[path = "bvl.rs"]
+mod bvl;
 #[path = "cfile.rs"]
 mod cfile;
 #[path = "fli.rs"]
@@ -146,12 +148,12 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 46] = [
+const COMMANDS: [&str; 47] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
     "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
-    "mpg", "fli",
+    "mpg", "fli", "bvl",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1041,6 +1043,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "mpf" => mpf::mpf_tokens(&mut t, &mut g),
             "mpg" => mpg::mpg_tokens(&mut t, &mut g),
             "fli" => fli::fli_tokens(&mut t, &mut g),
+            "bvl" => bvl::bvl_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2715,6 +2718,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "mpf" => mpf::mpf_case(cx, t, o)?,
         "mpg" => mpg::mpg_case(cx, t, o)?,
         "fli" => fli::fli_case(cx, t, o)?,
+        "bvl" => bvl::bvl_case(cx, t, o)?,
         // relay 32 of track D: the recorded heads (real.py); never generated
         "flr" => fli::flr_case(cx, t, o)?,
         "names" => {

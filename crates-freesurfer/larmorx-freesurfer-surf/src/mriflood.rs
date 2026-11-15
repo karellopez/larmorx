@@ -28,7 +28,8 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::timer::Timer;
 use larmorx_freesurfer_filter::flood::{mris_accentuate, mris_flood_outside};
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, MRI_UCHAR, Mri, mri_alloc, mri_alloc_from_vol_geom, mri_copy_header,
+    MRI_FLOAT, MRI_INT, MRI_UCHAR, Mri, MriRegion, mri_alloc, mri_alloc_from_vol_geom,
+    mri_copy_header,
 };
 use larmorx_freesurfer_mri::vol_geom::xfm_crs2xyz;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -36,7 +37,7 @@ use larmorx_freesurfer_volume::arith::{Pair, Tri, mri_clear};
 use larmorx_freesurfer_volume::frames::mri_const;
 use larmorx_freesurfer_volume::mriset::{mri_complement, mri_intersect};
 use larmorx_freesurfer_volume::orient::mri_set_voxel_to_ras_xform;
-use larmorx_freesurfer_volume::region::{region_get_bounding_box, region_print};
+use larmorx_freesurfer_volume::region::region_print;
 use larmorx_freesurfer_volume::resize::mri_set_resolution;
 
 use crate::aaa::SurfGlobals;
@@ -102,6 +103,88 @@ fn degenerate_face(g: &mut Globals, what: &str, fno: usize) {
     );
 }
 
+/// A 4 x 4 float matrix's first three rows.
+fn rows_of(m: &Matrix) -> [[f32; 4]; 3] {
+    std::array::from_fn(|r| std::array::from_fn(|c| m.relt(r as i32 + 1, c as i32 + 1)))
+}
+
+/// `MatrixMultiply(m, (x, y, z, 1))`'s first three elements as `double`s: each row's float sum as
+/// the official build makes it (`0 + v0 m0`, then `v1 m1 + val`, `v2 m2 + val`, `val + v3 m3`;
+/// `larmorx_freesurfer_core::matrix`'s product; the NaNs' bits never reach the volumes here).
+// the sums written in the official build's operand order
+#[allow(clippy::assign_op_pattern)]
+fn times(rows: &[[f32; 4]; 3], p: [f32; 3]) -> [f64; 3] {
+    let v = [p[0], p[1], p[2], 1.0];
+    rows.map(|m| {
+        let mut val = 0.0f32 + v[0] * m[0];
+        val = v[1] * m[1] + val;
+        val = v[2] * m[2] + val;
+        f64::from(val + v[3] * m[3])
+    })
+}
+
+/// `REGIONgetBoundingBox(shell, npad)` of the shell's voxels (255; the others 0): the smallest box
+/// holding them widened by `npad` and kept in the volume, as fs.volume's `region_get_bounding_box`
+/// computes it (no voxel: the box of `(999998, ...)` and a negative size).
+fn shell_box(shell: &[u8], w: i32, h: i32, d: i32, npad: i32) -> MriRegion {
+    let (mut lo, mut hi) = ([1_000_000i32; 3], [0i32; 3]);
+    for s in 0..d.max(0) {
+        for r in 0..h.max(0) {
+            let o = (s as usize * h as usize + r as usize) * w as usize;
+            let row = &shell[o..o + w as usize];
+            let (Some(first), Some(last)) = (
+                row.iter().position(|&b| b != 0),
+                row.iter().rposition(|&b| b != 0),
+            ) else {
+                continue;
+            };
+            let (first, last) = (first as i32, last as i32);
+            lo = [lo[0].min(first), lo[1].min(r), lo[2].min(s)];
+            hi = [hi[0].max(last), hi[1].max(r), hi[2].max(s)];
+        }
+    }
+    let two = npad.wrapping_mul(2);
+    let start = |l: i32| l.wrapping_sub(npad).max(0);
+    let (x, y, z) = (start(lo[0]), start(lo[1]), start(lo[2]));
+    let size = |l: i32, u: i32, extent: i32, st: i32| {
+        u.wrapping_sub(l)
+            .wrapping_add(two)
+            .min(extent.wrapping_sub(st))
+    };
+    MriRegion {
+        x,
+        y,
+        z,
+        dx: size(lo[0], hi[0], w, x),
+        dy: size(lo[1], hi[1], h, y),
+        dz: size(lo[2], hi[2], d, z),
+    }
+}
+
+/// `MRIsetVoxVal(dst, col, row, slc, 0, v)` of a voxel inside the volume, `v` 1 or 255 (a byte
+/// and a float as they are): a byte or float volume's voxel written directly, others through
+/// `MRIsetVoxVal`.
+fn set_voxel(
+    g: &mut Globals,
+    err: &mut dyn std::io::Write,
+    dst: &mut Mri,
+    col: i32,
+    row: i32,
+    slc: i32,
+    v: f32,
+) -> Result<(), Fatal> {
+    let o = (slc as usize * dst.vg.height as usize + row as usize) * dst.vox_per_row as usize
+        + col as usize;
+    match (dst.mtype, dst.chunk.as_mut()) {
+        (MRI_UCHAR, Some(c)) => c[o] = v as u8,
+        (MRI_FLOAT, Some(c)) => c[4 * o..4 * o + 4].copy_from_slice(&v.to_le_bytes()),
+        _ => {
+            mri_set_vox_val(g, err, dst, col, row, slc, 0, v, 0)?;
+        }
+    }
+    Ok(())
+}
+
 /// `MRISshell(mri_src, mris, mri_dst, clearflag)`: the surface drawn into a volume of the source's
 /// geometry as voxels of 255. Without a destination, `MRIalloc` of the source's extent and type
 /// with its header (`MRIcopyHeader`); `clearflag` clears it first (`MRIclear`). Each face: its
@@ -140,6 +223,7 @@ pub fn mris_shell(
     }
     let (xs, ys, zs) = (dst.vg.xsize, dst.vg.ysize, dst.vg.zsize);
     let mut loaded = false;
+    let mut rows = None;
     for fno in 0..usize::try_from(mris.nfaces).unwrap_or(0) {
         let [[x0, y0, z0], [x1, y1, z1], [x2, y2, z2]] = corners(mris, fno);
         let d0 =
@@ -190,19 +274,25 @@ pub fn mris_shell(
                 // and change nothing, so the map is used directly (the same bits, faster)
                 if !loaded {
                     mris_load_ras2voxel_map(g, io, &mut sg.sras_map, mri_src, mris)?;
+                    rows = sg.sras_map.sras2vox.as_ref().map(rows_of);
                     loaded = true;
                 }
-                let [fi, fj, fk] = mris_use_ras2voxel_map(
-                    g,
-                    io,
-                    &mut sg.sras_map,
-                    f64::from(px),
-                    f64::from(py),
-                    f64::from(pz),
-                )?;
+                // `MRIS_useRAS2VoxelMap`: the point as floats through the map's matrix (no matrix
+                // ends the program there)
+                let [fi, fj, fk] = match &rows {
+                    Some(r) => times(r, [px, py, pz]),
+                    None => mris_use_ras2voxel_map(
+                        g,
+                        io,
+                        &mut sg.sras_map,
+                        f64::from(px),
+                        f64::from(py),
+                        f64::from(pz),
+                    )?,
+                };
                 let (i, j, k) = (vox(fi), vox(fj), vox(fk));
                 if inside(dst, i, j, k) {
-                    mri_set_vox_val(g, io.err, dst, i, j, k, 0, 255.0, 0)?;
+                    set_voxel(g, io.err, dst, i, j, k, 255.0)?;
                 }
             }
         }
@@ -461,17 +551,28 @@ pub fn mris_fill_interior(
     );
     let mut crs = matrix_alloc(g, io.out, io.err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 vector");
     crs.set_relt(4, 1, 1.0);
-    let dims = [dst.vg.width, dst.vg.height, dst.vg.depth, 1];
-    let mut mri_cosa = mri_const(g, io.out, io.err, dims, 0.0, None)?.unwrap_new();
-    mri_copy_header(g, io.out, io.err, dst, Some(&mut mri_cosa))?;
-    let mut mri_vlen = mri_const(g, io.out, io.err, dims, 10.0, None)?.unwrap_new();
-    mri_copy_header(g, io.out, io.err, dst, Some(&mut mri_vlen))?;
-    let mut mri_shell = mri_alloc(g, io.out, io.err, dims[0], dims[1], dims[2], MRI_INT)?;
-    mri_copy_header(g, io.out, io.err, dst, Some(&mut mri_shell))?;
+    let (w, h, d) = (dst.vg.width, dst.vg.height, dst.vg.depth);
+    let n = (w.max(0) as usize) * (h.max(0) as usize) * (d.max(0) as usize);
+    // FreeSurfer's work volumes (`MRIconst` 0 and 10 and an `int` shell, each with the destination's
+    // header) as dense buffers: only their voxels are used. An empty extent still allocates them
+    // for their messages.
+    if n == 0 {
+        let dims = [w, h, d, 1];
+        mri_const(g, io.out, io.err, dims, 0.0, None)?;
+        mri_const(g, io.out, io.err, dims, 10.0, None)?;
+        mri_alloc(g, io.out, io.err, w, h, d, MRI_INT)?;
+    }
+    let mut cosa_v = vec![0f32; n];
+    let mut vlen_v = vec![10f32; n];
+    let mut shell = vec![0u8; n];
+    let at =
+        |c: i32, r: i32, s: i32| ((s as usize * h as usize) + r as usize) * w as usize + c as usize;
     let mut map = mris_make_ras2voxel_map(g, io, dst, mris)?;
     mris_load_ras2voxel_map(g, io, &mut map, dst, mris)?;
-    let mut vox2sras: Option<Matrix> = None;
-    let mut xyz: Option<Matrix> = None;
+    let rows = map.sras2vox.as_ref().map(rows_of);
+    // the inverse, made at the first sample and again at each later one while it cannot be made
+    // (`Some(None)`), as FreeSurfer's `if (!vox2sras) vox2sras = MatrixInverse(...)`
+    let mut inv: Option<Option<[[f32; 4]; 3]>> = None;
     for fno in 0..usize::try_from(mris.nfaces).unwrap_or(0) {
         let fnorm = get_face_norm(mris, fno);
         let c = corners(mris, fno);
@@ -499,6 +600,11 @@ pub fn mris_fill_interior(
         let (fnu, fnv) = (f64::from(numu), f64::from(numv));
         let (ex0, ey0, ez0) = (x2 - x0, y2 - y0, z2 - z0);
         let (ex1, ey1, ez1) = (x2 - x1, y2 - y1, z2 - z1);
+        let (nx, ny, nz) = (
+            f64::from(fnorm.nx),
+            f64::from(fnorm.ny),
+            f64::from(fnorm.nz),
+        );
         for v in 0..=numv {
             let fv = f64::from(v);
             let (px0, py0, pz0) = (
@@ -518,57 +624,43 @@ pub fn mris_fill_interior(
                     py0 + dy * fu / fnu,
                     pz0 + dz * fu / fnu,
                 );
-                let [fcol, frow, fslc] = mris_use_ras2voxel_map(g, io, &mut map, px, py, pz)?;
-                if vox2sras.is_none() {
-                    vox2sras =
-                        matrix_inverse(g, io.out, io.err, map.sras2vox.as_ref(), None)?.into_new();
+                let [fcol, frow, fslc] = match &rows {
+                    Some(r) => times(r, [px as f32, py as f32, pz as f32]),
+                    // no matrix: MatrixMultiply ends the program
+                    None => mris_use_ras2voxel_map(g, io, &mut map, px, py, pz)?,
+                };
+                if !matches!(inv, Some(Some(_))) {
+                    let m = matrix_inverse(g, io.out, io.err, map.sras2vox.as_ref(), None)?;
+                    inv = Some(m.into_new().as_ref().map(rows_of));
                 }
                 let (col, row, slc) = (vox(fcol), vox(frow), vox(fslc));
                 if !inside(dst, col, row, slc) {
                     continue;
                 }
-                mri_set_vox_val(g, io.err, &mut mri_shell, col, row, slc, 0, 255.0, 0)?;
-                crs.set_relt(1, 1, col as f32);
-                crs.set_relt(2, 1, row as f32);
-                crs.set_relt(3, 1, slc as f32);
-                match xyz.as_mut() {
-                    Some(m) => {
-                        matrix_multiply(g, io.out, io.err, vox2sras.as_ref(), Some(&crs), Some(m))?;
-                    }
+                let k = at(col, row, slc);
+                shell[k] = 255;
+                let [vx, vy, vz] = match inv.as_ref().expect("made at the first sample") {
+                    Some(r) => times(r, [col as f32, row as f32, slc as f32]),
                     None => {
-                        xyz = matrix_multiply(
-                            g,
-                            io.out,
-                            io.err,
-                            vox2sras.as_ref(),
-                            Some(&crs),
-                            None,
-                        )?
-                        .into_new();
+                        // no inverse: MatrixMultiply ends the program
+                        matrix_multiply(g, io.out, io.err, None, Some(&crs), None)?;
+                        unreachable!("MatrixMultiply without a matrix ends the program")
                     }
-                }
-                let m = xyz.as_ref().expect("a 4 x 4 matrix times a 4 x 1 vector");
-                let (vx, vy, vz) = (
-                    f64::from(m.relt(1, 1)),
-                    f64::from(m.relt(2, 1)),
-                    f64::from(m.relt(3, 1)),
-                );
+                };
                 let vlen = (sq(px - vx) + sq(py - vy) + sq(pz - vz)).sqrt();
-                let held = mri_get_vox_val(g, io.err, &mri_vlen, col, row, slc, 0, 0)?;
-                if vlen > f64::from(held) {
+                if vlen > f64::from(vlen_v[k]) {
                     continue;
                 }
                 let (ux, uy, uz) = ((px - vx) / vlen, (py - vy) / vlen, (pz - vz) / vlen);
-                let cosa =
-                    ux * f64::from(fnorm.nx) + uy * f64::from(fnorm.ny) + uz * f64::from(fnorm.nz);
-                mri_set_vox_val(g, io.err, &mut mri_cosa, col, row, slc, 0, cosa as f32, 0)?;
-                mri_set_vox_val(g, io.err, &mut mri_vlen, col, row, slc, 0, vlen as f32, 0)?;
+                let cosa = ux * nx + uy * ny + uz * nz;
+                cosa_v[k] = cosa as f32;
+                vlen_v[k] = vlen as f32;
             }
         }
     }
     drop(map);
-    drop(mri_vlen);
-    let region = region_get_bounding_box(g, io.err, &mri_shell, 2)?;
+    drop(vlen_v);
+    let region = shell_box(&shell, w, h, d, 2);
     if g.gdiag_no > 0 {
         let _ = write!(io.out, "  Bounding box around shell: ");
         region_print(io.out, &region);
@@ -591,29 +683,43 @@ pub fn mris_fill_interior(
     let mut shellbb = mri_alloc(
         g, io.out, io.err, region.dx, region.dy, region.dz, MRI_UCHAR,
     )?;
-    for col in region.x..region.x.wrapping_add(region.dx) {
-        for row in region.y..region.y.wrapping_add(region.dy) {
-            for slc in region.z..region.z.wrapping_add(region.dz) {
-                let val = mri_get_vox_val(g, io.err, &mri_shell, col, row, slc, 0, 0)?;
-                let (c, r, s) = (col - region.x, row - region.y, slc - region.z);
-                mri_set_vox_val(g, io.err, &mut shellbb, c, r, s, 0, val, 0)?;
+    let bb_row = shellbb.vox_per_row as usize;
+    if let Some(bb) = shellbb.chunk.as_mut() {
+        for s in 0..region.dz.max(0) {
+            for r in 0..region.dy.max(0) {
+                let o = (s as usize * region.dy as usize + r as usize) * bb_row;
+                let k = at(region.x, region.y + r, region.z + s);
+                bb[o..o + region.dx as usize].copy_from_slice(&shell[k..k + region.dx as usize]);
             }
         }
     }
-    drop(mri_shell);
+    drop(shell);
     let outsidebb = mris_flood_outside(g, io.out, io.err, Pair::New(&shellbb))?.unwrap_new();
-    for col in region.x..region.x.wrapping_add(region.dx) {
-        for row in region.y..region.y.wrapping_add(region.dy) {
-            for slc in region.z..region.z.wrapping_add(region.dz) {
-                let (c, r, s) = (col - region.x, row - region.y, slc - region.z);
-                let val = mri_get_vox_val(g, io.err, &shellbb, c, r, s, 0, 0)?;
-                let val2 = mri_get_vox_val(g, io.err, &outsidebb, c, r, s, 0, 0)?;
+    let bytes = |m: &Mri| m.mtype == MRI_UCHAR && m.chunk.is_some();
+    let direct =
+        bytes(&shellbb) && bytes(&outsidebb) && outsidebb.vox_per_row == shellbb.vox_per_row;
+    for s in 0..region.dz.max(0) {
+        for r in 0..region.dy.max(0) {
+            for c in 0..region.dx.max(0) {
+                let (val, val2) = if direct {
+                    let o = (s as usize * region.dy as usize + r as usize) * bb_row + c as usize;
+                    let (a, b) = (shellbb.chunk.as_ref(), outsidebb.chunk.as_ref());
+                    (
+                        f32::from(a.expect("voxels")[o]),
+                        f32::from(b.expect("voxels")[o]),
+                    )
+                } else {
+                    (
+                        mri_get_vox_val(g, io.err, &shellbb, c, r, s, 0, 0)?,
+                        mri_get_vox_val(g, io.err, &outsidebb, c, r, s, 0, 0)?,
+                    )
+                };
                 if val < 0.5 && val2 > 0.5 {
                     continue;
                 }
-                let cosa = mri_get_vox_val(g, io.err, &mri_cosa, col, row, slc, 0, 0)?;
-                if cosa >= 0.0 {
-                    mri_set_vox_val(g, io.err, dst, col, row, slc, 0, 1.0, 0)?;
+                let (col, row, slc) = (region.x + c, region.y + r, region.z + s);
+                if cosa_v[at(col, row, slc)] >= 0.0 {
+                    set_voxel(g, io.err, dst, col, row, slc, 1.0)?;
                 }
             }
         }

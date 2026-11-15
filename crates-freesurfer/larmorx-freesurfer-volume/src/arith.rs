@@ -157,6 +157,16 @@ impl<'a> Vols<'a> {
             S::Dst => self.dref(),
         }
     }
+    /// The two sources that are not the destination (`None`: the destination itself) and the
+    /// destination, borrowed together (track D relay 33: the byte fast paths of `mriset.rs`).
+    pub(crate) fn split(&mut self) -> (Option<&'a Mri>, Option<&'a Mri>, &mut Mri) {
+        let own = |s: S<'a>| match s {
+            S::Own(m) => Some(m),
+            S::Dst => None,
+        };
+        let (a, b) = (own(self.s1), own(self.s2));
+        (a, b, self.d())
+    }
     pub(crate) fn done(self) -> Ret<Mri> {
         match self.fresh {
             Some(m) => Ret::New(m),

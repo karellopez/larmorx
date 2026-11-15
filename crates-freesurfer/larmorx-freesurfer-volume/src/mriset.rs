@@ -303,6 +303,20 @@ pub fn mri_union(
     Ok(v.done())
 }
 
+/// The number of bytes of a `uchar` volume of extent `w` x `h` x `d` and one frame whose rows and
+/// slices hold no padding, when `m` is one (track D relay 33: the byte fast paths of
+/// `MRIintersect` and `MRIcomplement`, the ribbon's steps).
+fn dense_bytes(m: &Mri, w: i32, h: i32, d: i32) -> Option<usize> {
+    let n = (w.max(0) as usize) * (h.max(0) as usize) * (d.max(0) as usize);
+    (m.mtype == MRI_UCHAR
+        && m.nframes == 1
+        && (m.vg.width, m.vg.height, m.vg.depth) == (w, h, d)
+        && m.vox_per_row == w as u64
+        && m.vox_per_slice == (w as u64) * (h as u64)
+        && m.chunk.as_ref().is_some_and(|c| c.len() >= n))
+    .then_some(n)
+}
+
 /// `MRIintersect(mri1, mri2, mri_dst)`: for each frame of the destination, the smaller of the
 /// two voxels truncated to `int`s (`MRIgetVoxVal`; FS-12 beyond the range), written with
 /// `MRIsetVoxVal`. `MRIcheckVolDims(mri1, mri2)` first; without a destination a clone of `mri1`.
@@ -317,6 +331,23 @@ pub fn mri_intersect(
     check_dims(g, err, v.a(), v.b())?;
     clone_into(g, out, err, &mut v)?;
     let (w, h, d) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth);
+    // three byte volumes of one extent and one frame: each byte the smaller of the two (a byte is
+    // its own int), the destination read before it is written where it is a source
+    if let Some(n) = dense_bytes(v.a(), w, h, d)
+        && dense_bytes(v.b(), w, h, d).is_some()
+        && dense_bytes(v.dref(), w, h, d).is_some()
+    {
+        let (a, b, dst) = v.split();
+        let a = a.map(|m| &m.chunk.as_ref().expect("voxels")[..n]);
+        let b = b.map(|m| &m.chunk.as_ref().expect("voxels")[..n]);
+        let dc = &mut dst.chunk.as_mut().expect("voxels")[..n];
+        for i in 0..n {
+            let x = a.map_or(dc[i], |a| a[i]);
+            let y = b.map_or(dc[i], |b| b[i]);
+            dc[i] = if x < y { x } else { y };
+        }
+        return Ok(v.done());
+    }
     for f in 0..v.dref().nframes {
         for z in 0..d {
             for y in 0..h {
@@ -360,6 +391,27 @@ pub fn mri_complement(
         v.a().vg.depth,
         v.a().nframes,
     );
+    // byte volumes of one extent and one frame: each byte 1 for 0, else 0 (a byte is its own int)
+    if let Some(n) = dense_bytes(v.a(), w, h, d)
+        && dense_bytes(v.dref(), w, h, d).is_some()
+    {
+        let (a, _, dst) = v.split();
+        let dc = &mut dst.chunk.as_mut().expect("voxels")[..n];
+        match a {
+            Some(a) => {
+                let ac = &a.chunk.as_ref().expect("voxels")[..n];
+                for (o, &i) in dc.iter_mut().zip(ac) {
+                    *o = u8::from(i == 0);
+                }
+            }
+            None => {
+                for o in dc.iter_mut() {
+                    *o = u8::from(*o == 0);
+                }
+            }
+        }
+        return Ok(v.done());
+    }
     for f in 0..nf {
         for z in 0..d {
             for y in 0..h {

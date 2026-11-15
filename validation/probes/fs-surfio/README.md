@@ -292,14 +292,38 @@ directory` where FreeSurfer prints nothing (glibc's `getpwuid` in `insertCommonM
 `errno` to 0; fixed in a95f764d). `fssurfio`'s alarm is 900 seconds for `flr` lines (5 for the
 rest).
 
+Relay 33 of track D (the 47th command `bvl`: the rest of queue item 3.1-51, the signed distance volume,
+the label masks, the laminar fractions and the outside distance map; `mpg` gained `mke`, the edge marks;
+`specs/freesurfer-surfio.md` §120-121, `specs/freesurfer-filter.md` §35-36): a surface read by `MRISread`
+with its white positions and pial positions (a second surface of the same mesh, or the white ones), a
+volume geometry, values set from the vertex numbers, a few vertices marked, a label of vertex numbers,
+1 or 2 volumes (bytes mostly; zeros, a pattern or a ball of one label about the centre), then 1 to 3
+operations. `bvl` at seeds 7, 13 and 17 (200 cases each): 0 different with `reproduce` (16, 11 and 15
+counted: FS-614, where FreeSurfer reads memory beyond the label volume and crashes); `fix` different only
+with notices (FS-608 to FS-614). `mpg` with `mke` at seeds 7, 13 and 17 (200 cases each): 0 different
+beyond one line per seed of glibc's `acos` last bits. Seed 7, 9,400 cases of the whole probe: 9,101
+identical, 298 counted, 1 of `acos` last bits, 0 different. Seed 1, 1,410 cases: 1,371 identical, 39 `SKIP`,
+hash `be9281e6ce75fecf6a59e4429cbadf28616bf09e2b30c94b2bcaf841006ca1fd` (the test, from the clean
+commit ff190548), passing in debug (5.1 s) and release (0.6 s), plain and under the AArch64 NaN
+emulation (58,453 and 334,654 flips), and on the Windows laptop; the port's seed-7 `bvl` and `mpg`
+outputs (400 cases) identical with and without the emulation in both modes. Two findings on the way:
+FreeSurfer's fast march takes its first root before testing it, so glibc's `sqrtf` of a negative
+argument sets `errno` (`Numerical argument out of domain` in a later message; the filter crate's march
+now does so), and the march's work volume is allocated with `MRIalloc` (its messages for an empty
+extent).
+
 `real.py` (relay 32): `flr` lines on three recorded heads (`ds000005-sub-01`, `ds000228-sub-pixar008`,
 `ds002422-sub-02`, the classic recipe), both hemispheres: the white and pial interiors in a copy of
 `aseg.mgz` (`MRISfillInterior(surface, 0, volume)`, mri_surf2volseg's call), the ribbon between
 them in `orig.mgz` (`MRISribbon`, mris_volmask's), the white surface's interior in its bounding
 volume at 0.5 mm (mris_place_surface's T2 and FLAIR steps): 24 of 24 identical in both modes, no
-notice (observed). The 24 calls: FreeSurfer 55 s; the port 138 s at 9df8cbcb's parent, 87 s after
-the flood's breadth-first fill and the other speed changes (the outputs unchanged; the rest is the
-surface read and `MRISfillInterior`'s per-voxel accesses, relay 33's speed item).
+notice (observed). The 24 calls: FreeSurfer 55 s (59 s at relay 33's fresh run); the port 138 s at
+9df8cbcb's parent, 87 s after the flood's breadth-first fill and the other speed changes, 38 s after
+relay 33's (928fb0e2: `MRISfillInterior` and `MRISshell` through dense buffers, the ribbon's byte steps;
+24 of 24 identical in both modes again). Per call (relay 33, one head): the interior 1.26 s
+(FreeSurfer 1.40 s), the ribbon 3.72 s (4.33 s), the bounding volume filled 1.41 s (2.01 s); the rest
+of the port's time is mostly the surface reads (0.72 s each: 0.47 s the file, topology and metric
+properties, 0.25 s the neighbourhoods of three hops with their distances).
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>

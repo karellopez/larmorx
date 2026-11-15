@@ -4032,3 +4032,136 @@ time is written `<t>` on both sides. `real.py` runs the interior, the ribbon and
 bounding volume on three recorded heads (§34 of the filter spec). Observed (relay 32): seeds 7, 13
 and 17, 100 cases each: 0 different with `reproduce`; the default different only with notices
 (FS-604, FS-605, FS-608).
+
+## 120. The signed distance volume, the label masks, the edge marks, the laminar fractions and the outside distance map (the rest of queue item 3.1-51; relay 33 of track D)
+
+**120.1 The other face of an edge** (`findOtherEdgeFace(mris, fno, vno, vn1)`): the first face in
+`vno`'s face list (its first `num`) other than `fno` that `vn1`'s face list also holds; `fno` itself
+when there is none (an edge of one face).
+
+**120.2 The signed distance volume** (`MRISbinarizeVolume(mris, region, resolution, distance)`):
+`region` is a box in tkregister RAS (`x, y, z` its low corner, `dx, dy, dz` its size, integers in
+mm). Single precision throughout; `MIN(a, b)` is `a < b ? a : b` and `MAX(a, b)` is `a >= b ? a :
+b`; C's `(int)` truncates (a NaN or a value beyond `int` gives `INT_MIN`).
+
+- `resolution` below 1 becomes 1 and `distance` below 2 becomes 2 (a NaN stays); `delta = (int)
+  (distance / resolution)`, at least 2.
+- The volume: floats, `(int) ceilf(dx * resolution)` by `(int) ceilf(dy * resolution)` by `(int)
+  ceilf(dz * resolution)` voxels (§§ of `specs/freesurfer-mri.md` for the allocation and its
+  messages); then `mri volume size : <w> by <h> by <d> (resolution = <(int) resolution>)` and a
+  newline on standard error. Its `xstart`, `ystart`, `zstart` are the region's corner (as floats)
+  and its `xsize`, `ysize`, `zsize` are `resolution`: here voxels per mm, so voxel `i` is at
+  `xstart + i / xsize` (`(float) i / xsize`) and a point `x` at voxel `(int)((double)(xsize * (x -
+  xstart)) + 0.5)` (the product in single precision, the sum in double). Every voxel 1000.
+- Every face's normal and original area are computed and stored in the face-normal cache (§27, as
+  "compute the normal": nothing deferred after).
+- For each face (face order), with corners `p0, p1, p2` (current positions): the bounding box of the
+  corners per axis (`MIN(p0, MIN(p1, p2))`, `MAX(p0, MAX(p1, p2))`) taken to voxels as above, the low
+  corner less `delta`, the high plus `delta` (wrapping `int` arithmetic), clamped to the volume
+  (`low >= 0 ? low : 0`, `high < n - 1 ? high : n - 1`). The face's normal `nf` (cache); the edges
+  `e0 = p1 - p0`, `e1 = p2 - p1`, `e2 = p0 - p2`; `n_k = nf x e_k` (`(a1 b2 - b1 a2, a2 b0 - b2 a0,
+  a0 b1 - b0 a1)` for `a x b`); each edge's pseudo-normal `ne_k = nf + n_other` (componentwise,
+  `n_other` the cached normal of the edge's other face by 120.1: `ne_k = 2 nf` for an edge of one
+  face); the corners' pseudo-normals `nv_k` (§99.10, verbose 0).
+- For each voxel of the box (z outermost, then y, then x), its point `q`; `w_k = q - p_k`; `val_k =
+  w_k . n_k` (dot products `(a0 b0 + a1 b1) + a2 b2`). When all three `val_k >= 0`: the distance is
+  `nf . w` with `w = (w0 + w1 + w2) / 3` componentwise (`(w0 + w1) + w2`, divided by 3). Otherwise
+  the distance starts at 1000 and, for `k = 0, 1, 2` in turn when `val_k <= 0`, with `a = w_k`, `b
+  = w_(k+1)` (the edge's second corner's; `w0` after `w2`), `t = a . e_k`:
+  - `t < 0`: `d = |a|` (`sqrtf` of `(a0 a0 + a1 a1) + a2 a2`), its sign from `nv_k . a`;
+  - `t < e_k . e_k`: `d = sqrtf(MAX(0, |a|^2 - t t / |e_k|^2))` (the squares as sums of squares),
+    its sign from `ne_k . a`;
+  - otherwise: `d = |b|`, its sign from `nv_(k+1) . b`;
+  and the distance becomes `MIN(|distance|, d)`, negated unless the sign's dot product is above 0.
+  The voxel takes the distance when `|distance| < |voxel|` (so a NaN never enters the volume).
+- The volume is returned (the caller frees it).
+
+**120.3 The label masks.** `MRISmaskLabel(mris, area)`: for each of the label's first `n_points`
+points, its vertex's values `curv`, `stat`, `val`, `imag_val`, `val2`, `valbak`, `val2bak` set to
+0. `MRISmaskNotLabel(mris, area)`: the label's vertices marked (1); every vertex not marked gets
+those values 0; then the label's vertices' marks set to 0. Both return 0 (`NO_ERROR`). FS-611: a
+point naming no vertex of the surface (-1, as a volume label's points do, or a number at or beyond
+`nvertices`): the official code writes outside the surface's vertices; both modes leave the point
+out (noted). FS-612: in `MRISmaskNotLabel` a vertex marked before the call keeps its values, and a
+label vertex marked before ends unmarked: kept in both modes (rule C), noted.
+
+**120.4 The edge marks** (`MRISmarkEdge(surf, mask, metricid, thresh, FillHoles)`): the face
+metric (§115), the edge table when there is none (§115), the metric properties, the edge metric
+(§115); every unripped vertex's mark cleared. Then for each edge (edge order): skipped when one of
+its vertices (its two ends for `metricid` 0, all four for the others) is ripped or, with a mask (a
+volume of one voxel per vertex), has a mask value below 0.5 (§116's mask reads). `metricid` 0
+marks its two ends when its length is below `thresh`; 1 its four vertices when `|dot| > thresh`; 2
+its four vertices when its angle (degrees) is above `thresh`; each edge marked counts 1. Another
+`metricid` prints `ERROR: MRISmaxEdgeStatToOverlay() metricid <m> unrecognized` and a newline on
+standard output at the first edge not skipped and returns -1. Returns the count. `FillHoles` other
+than 0 then fills the holes of the marks (the surface clusters, `MRISfillHoles`: queue item 3.4-03
+and 3.4-04) and adds the vertices filled; this part comes with them.
+
+**120.5 The laminar volume fractions** (`MRIcomputeLaminarVolumeFractions(mris, resolution, src,
+fractions)`): the current positions saved (`TMP2_VERTICES`). `nvox = nint(MAX(MAX(xsize /
+resolution, ysize / resolution), zsize / resolution))` (`src`'s sizes; double); with `Gdiag`'s
+verbose bit `packing each voxel with <(int) nvox^3> voxels to compute laminar fractions` and a
+newline on standard output. The layer volume: `src` upsampled `nvox` times (`MRIupsampleN`,
+`specs/freesurfer-volume.md`); a clone of it for the pial interior. The white interior: positions
+restored from `WHITE_VERTICES`, metric properties, `MRISfillInterior(mris, resolution, layers)`
+(`specs/freesurfer-filter.md` §33). The pial interior: positions from `PIAL_VERTICES`, metric
+properties, `MRISfillInterior` into the clone. Then `tmp = MRInot(layers)`, `MRIand(pial, tmp,
+tmp, 1)`, `tmp`'s voxels equal to 1 set to 2 (`MRIreplaceValuesOnly`), `tmp`'s voxels of label 2
+copied into `layers` (`MRIcopyLabel`), `layers`' voxels equal to 0 set to 3; the voxel-to-voxel
+matrix from `layers` to `src` (`MRIgetVoxelToVoxelXform`); without `fractions` a float volume of
+`src`'s extent, 3 frames, with `src`'s header; `MRIcomputeVolumeFractions(src, vox2vox, layers,
+fractions)`. Then the saved positions restored (`TMP2_VERTICES`) and the metric properties computed.
+Returns `fractions` (the given one or the new). FS-613: the official code keeps the first call's
+white interior for the whole program and copies it into every later call's layer volume (no white
+restore, metric properties or interior then: `MRIcopy` into a layer volume of another extent follows
+that function's rules, FS-163); `reproduce` does so; the default computes each call's own (noted at
+every later call in both modes).
+
+**120.6 The label's box** (`mriFindLabel(mri, label, offset)`, the outside distance map's): over
+`mri`'s voxels (z outermost), those whose byte equals `label` (FS-609 for a volume not of bytes, as
+`specs/freesurfer-filter.md` §35), each taken to tkregister RAS (`MRIvoxelToSurfaceRAS`): the
+smallest and largest coordinates (double; starting at 100000 and -100000). None ends the program:
+`No labels <n> could be found in the volume` and a newline (status 1): FS-610, the official code
+names the count (0); the default names the label, `reproduce` 0. The box: `x = (int) floor(xmin -
+offset)`, `dx = (int) ceil(xmax - xmin + 2 offset)`, the same for y and z (double).
+
+**120.7 The outside distance map** (`MRISextractOutsideDistanceMap(mris, src, label, offset,
+resolution, max_distance)`): `resolution` below 1 becomes 1, `max_distance` below 1 becomes 1,
+`offset` below 0 becomes 0. The label's box (120.6); the signed distance volume over it at
+`resolution` with distance 5 (120.2, its message printed); a float volume of its extent and header,
+all 0; the march within the label to the limit `2 * resolution * max_distance` (single precision;
+`specs/freesurfer-filter.md` §35, its distance map the signed distance volume); then every voxel
+whose signed distance is below 0 set to -0.1 (single). Then for each vertex: `curv = 1`; for `n = 0`
+to 4, `t = (float)(n * 0.1)`, the point `(1 - t) * white + t * pial` per axis (single; the white and
+pial positions), its voxel as in 120.2; a voxel outside the volume is passed; the first voxel inside
+whose value over `resolution` (single) is at least 0 gives `curv = MIN(value, max_distance) /
+max_distance` and ends the search.
+
+## 121. Validation plan, part 24
+
+The probe's `bvl` command (relay 33 of track D): a surface read by `MRISread` (`d/lh.s0`:
+icosahedra subdivided once on spheres of radius 2 to 6 mm or twice of 3 or 4.5 mm, open grids of 2
+to 4 by 2 to 4, `srd`'s small meshes scaled into 8 mm; moved by quarters up to 2 mm), its white
+positions those read, its pial positions a second surface's (half the cases: the first grown by
+1.2, 1.4 or 1.6 about its offset, or moved by 0.5 mm one time in five) or the white ones; a volume
+geometry of the case (as §119); every vertex's values `curv = (v + 1) / 4`, `stat` to `val2bak` that
+plus 1 to 6; up to 3 vertices marked one case in three; a label of up to 8 vertex numbers; `Gdiag`'s
+verbose and show bits one case in eight, `Gdiag_no` 1 one case in eight; 1 or 2 volumes (bytes
+mostly, else floats or ints; most often the surface's extent and geometry, else their own; zeros,
+the pattern `(c + 2 r + 3 s + k) % 4`, or a ball of label 1 to 3 about the centre, radius 2 to half
+the smallest extent less 2; now and then the second a float volume of the first's extent with 3
+frames); then 1 to 3 of: the signed distance volume (resolutions 0.5, 1, 1.5, 2, a NaN in heavy
+cases; distances 1, 2, 3, 5; the region the surface's box widened by 0 to 3 mm, one size in 30 zero),
+the outside distance map (a ball's volume and label mostly; offsets 0 to 2, -1 or 3 one time in
+ten; resolutions 0.5, 1, 2; distances 0.5 to 3), the two label masks, the laminar fractions (one
+resolution per case, 0.5, 1 or 2; a new volume or the float one); each prints the volume (as §119,
+then `xstart`, `ystart`, `zstart`), the vertices' values and marks, or the vertices' `curv`; the
+fractions are followed by every vertex's position. The `mpg` command (§117) gained `mke` (120.4,
+`FillHoles` 0; `metricid` 0 to 2, -1 or 3 one time in ten; thresholds in mm, of the dot product or
+degrees; with or without the mask). Expected: every line identical under `reproduce` except the
+cases noted FS-614 (counted, not compared); the default identical but where a noted defect it
+corrects changed the result (FS-609, FS-610, FS-613). Observed (relay 33): `bvl` seeds 7, 13 and
+17, 200 cases each: 0 different with `reproduce` (16 to 20 counted per seed), the default
+different only with notices; `mpg` (with `mke`) seeds 7, 13 and 17, 200 cases each: 0 different
+beyond one case per seed of glibc's `acos` last bits (§117).
+

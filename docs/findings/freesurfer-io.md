@@ -2098,8 +2098,8 @@ track C's `larmorx_io::minc` writer (batch 20; `docs/findings/minc-volumes.md`, 
 ### What the probe measured (piece 26)
 Seeds 7, 13 and 21 (888 piece-26 cases each): `reproduce` identical on every compared case (794, 790, 769), 0
 different; 94, 98 and 119 skipped (an extent or frame count of 0: the library's FS-798 with FS-53's read of voxel
-`(0, 0, 0)`; header-only volumes: FS-58). Of seed 7's outcomes under `reproduce`: 337 files written, 223 program ends
-(four dimensions, FS-797; zero cosines), 133 types refused, 66 folders refused, 93 outputs that failed (a missing
-folder, a file in a folder's place). `fix` differs only with notices (FS-746, FS-747, FS-748, FS-797, and the read
+`(0, 0, 0)`; header-only volumes: FS-58). Seed 7's compared outcomes under `reproduce`: 345 files written, 146
+program ends (four dimensions, FS-797; zero cosines), 132 types refused, 79 folders refused, 92 outputs that failed
+(a missing folder, a file in a folder's place). `fix` differs only with notices (FS-746, FS-747, FS-748, FS-797, and the read
 back's FS-744 and FS-01). The light run (`check.py --seed 1 --n 4800 --portable --light`, relay 34): 4,800 cases,
 4,310 identical (42 with memory digits), 490 hashed as `SKIP`, 0 different (`5dd80d2c...`, `tests/fs_io_official.rs`).

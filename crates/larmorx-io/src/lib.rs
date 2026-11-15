@@ -33,6 +33,7 @@ pub mod jpeg;
 pub mod minc;
 pub mod nifti;
 pub mod nrrd;
+pub mod tiff;
 pub mod xfm;
 pub mod xml;
 pub mod znz;

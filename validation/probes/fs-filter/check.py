@@ -57,7 +57,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # index tables), FS-591 (windows past the MNI's arrays), FS-593 (a threshold never written),
 # FS-487 (a Talairach point through a matrix FreeSurfer could not make: a crash), FS-597 (tissue
 # levels from bins outside a histogram), FS-598 (a control-point search that never ends), FS-600
-# (peaks never written), FS-601 (a segment read before the segment table: memory, or a crash)
+# (peaks never written), FS-601 (a segment read before the segment table: memory, or a crash),
+# FS-615 and FS-618 (the T2 mask without an aparc+aseg or without a destination: a crash), FS-290
+# (a face neighbour read outside the volume's memory: the T2 mask's MRIneighborsOff)
 SKIP = (
     "FS-540",
     "FS-541",
@@ -97,6 +99,9 @@ SKIP = (
     "FS-598",
     "FS-600",
     "FS-601",
+    "FS-615",
+    "FS-618",
+    "FS-290",
 )
 
 # MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000

@@ -6,11 +6,13 @@
 //! port's answers.
 
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_filter::flood;
 use larmorx_freesurfer_filter::norm;
 use larmorx_freesurfer_filter::rfa;
 use larmorx_freesurfer_filter::segment as sg;
+use larmorx_freesurfer_filter::t2mask;
 use larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN;
 use larmorx_freesurfer_io::mriio::mri_read;
 use larmorx_freesurfer_mri::mri::mri_copy_header;
@@ -25,8 +27,8 @@ use super::{Ctx, Gen, Shared, Toks, fx, get_vol, put_vol, rle, token};
 use larmorx_freesurfer_core::globals::Globals;
 
 /// The commands of this module, in the generator's round.
-pub const COMMANDS: [&str; 9] = [
-    "seg", "mseg", "salloc", "flood", "acc", "dist", "vor", "soap", "ccsf",
+pub const COMMANDS: [&str; 10] = [
+    "seg", "mseg", "salloc", "flood", "acc", "dist", "vor", "soap", "ccsf", "t2m",
 ];
 
 /// The light operations (no volume), for the large pattern volumes.
@@ -316,7 +318,102 @@ fn ccsf_case(g: &mut Gen, t: &mut Vec<String>) {
     }
 }
 
+/// `t2m`: a source (the destination itself mostly; a destination of its own or none now and
+/// then), a T2 volume (a dark border, a bright rim inside it, a mixed interior; NaNs now and then
+/// in floats), an aparc+aseg (none now and then; labels in a central box, holes; another extent
+/// now and then), a threshold and a number of passes.
+fn t2m_case(g: &mut Gen, t: &mut Vec<String>) {
+    // the dark border's thickness: MRIopenN's three erosions leave a border of 3 voxels or less
+    // nothing with an aparc+aseg
+    let bt = g.pick(&[1usize, 2, 4, 4, 5]);
+    let e = if g.chance(5) {
+        small(g, 10)
+    } else {
+        let lo = 2 * bt as i64 + 3;
+        [
+            g.int(lo, 16) as i32,
+            g.int(lo, 16) as i32,
+            g.int(lo, 14) as i32,
+        ]
+    };
+    let n = (e[0] * e[1] * e[2]) as usize;
+    let depth_of = |i: usize, e: [i32; 3]| {
+        let (w, h) = (e[0] as usize, e[1] as usize);
+        let (x, y, z) = (i % w, (i / w) % h, i / (w * h));
+        let dw = x.min(w - 1 - x);
+        let dh = y.min(h - 1 - y);
+        let dd = z.min(e[2] as usize - 1 - z);
+        dw.min(dh).min(dd)
+    };
+    let sty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_FLOAT, MRI_SHORT, MRI_INT]);
+    let sv: Vec<f64> = (0..n)
+        .map(|_| g.pick(&[0.0, 10.0, 80.0, 110.0, 255.0]))
+        .collect();
+    vol_of(t, e, sty, &sv);
+    let mode = g.pick(&[2, 2, 2, 2, 2, 2, 1, 1, 0]);
+    t.push(mode.to_string());
+    if mode == 1 {
+        let dty = if g.chance(4) {
+            g.pick(&[MRI_UCHAR, MRI_FLOAT, MRI_SHORT])
+        } else {
+            sty
+        };
+        let dv: Vec<f64> = (0..n).map(|_| g.pick(&[0.0, 7.0, 200.0])).collect();
+        vol_of(t, e, dty, &dv);
+    }
+    let tty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_FLOAT, MRI_SHORT]);
+    // now and then a bright voxel on the volume's faces: its face neighbours outside the volume
+    // are read (FS-289, FS-290)
+    let leak = g.chance(5);
+    let tv: Vec<f64> = (0..n)
+        .map(|i| {
+            if tty == MRI_FLOAT && g.chance(40) {
+                return f64::NAN;
+            }
+            let k = depth_of(i, e);
+            if k == 0 && !(leak && g.chance(12)) || k > 0 && k < bt && !g.chance(30) {
+                g.pick(&[0.0, 5.0, 12.0])
+            } else if k == bt && !g.chance(4) || k == bt + 1 && g.chance(2) {
+                g.pick(&[200.0, 255.0, 150.0, 90.0])
+            } else {
+                g.pick(&[60.0, 100.0, 180.0, 255.0, 0.0, 120.0])
+            }
+        })
+        .collect();
+    vol_of(t, e, tty, &tv);
+    if g.chance(8) {
+        t.push("0".into());
+    } else {
+        t.push("1".into());
+        let ea = if g.chance(20) { small(g, 10) } else { e };
+        let na = (ea[0] * ea[1] * ea[2]) as usize;
+        let aty = g.pick(&[MRI_UCHAR, MRI_INT, MRI_INT, MRI_SHORT, MRI_FLOAT]);
+        let inner = bt + g.pick(&[1usize, 2, 2, 3, 0]);
+        let av: Vec<f64> = (0..na)
+            .map(|i| {
+                if depth_of(i, ea) >= inner && !g.chance(8) {
+                    g.pick(&[2.0, 3.0, 41.0, 42.0, 4.0, 24.0, 0.5])
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        vol_of(t, ea, aty, &av);
+    }
+    let th = if g.chance(30) {
+        f32::NAN
+    } else {
+        g.pick(&[100.0f32, 100.0, 50.5, 150.0, 0.0, 255.0, -1.0])
+    };
+    t.push(fx(th));
+    t.push(g.pick(&[5, 5, 5, 5, 1, 2, 3, 0, -1]).to_string());
+}
+
 pub fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    if cmd == "t2m" {
+        t2m_case(g, t);
+        return;
+    }
     if cmd == "ccsf" {
         ccsf_case(g, t);
         return;
@@ -538,6 +635,50 @@ fn fnv(m: &Mri) -> String {
     format!("{h:016x} ")
 }
 
+/// `t2mf` (`fsfilter.cpp`): the T2 mask in place on a recorded head's volumes.
+fn t2mf(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
+    let read = |cx: &mut Ctx, path: &str| -> Result<Mri, Fatal> {
+        Ok(mri_read(
+            &mut cx.g,
+            &mut cx.a,
+            &mut cx.b,
+            &Environment::default(),
+            None,
+            path,
+            MRI_VOLUME_TYPE_UNKNOWN,
+            true,
+            -1,
+            -1,
+        )?
+        .expect("the volume"))
+    };
+    let (sp, tp, ap) = (t.next(), t.next(), t.next());
+    let mut src = read(cx, sp)?;
+    let t2 = read(cx, tp)?;
+    let mut ap = if ap == "-" { None } else { Some(read(cx, ap)?) };
+    let (th, mm) = (t.f(), t.i());
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let env = Environment::default();
+    let r = t2mask::mri_mask_with_t2_and_aparc_aseg(
+        g,
+        a,
+        b,
+        &env,
+        Pair::Same(&mut src),
+        &t2,
+        ap.as_mut(),
+        th,
+        mm,
+    )?;
+    *o += if matches!(r, Ret::Given) { "1 " } else { "0 " };
+    *o += &fnv(&src);
+    match &ap {
+        Some(m) => *o += &fnv(m),
+        None => *o += "- ",
+    }
+    Ok(())
+}
+
 /// `vsr` (`fsfilter.cpp`): a recorded head's Voronoi diagram and soap bubble.
 fn vsr(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
     let read = |cx: &mut Ctx, path: &str| -> Result<Mri, Fatal> {
@@ -596,6 +737,51 @@ fn vsr(cx: &mut Ctx, t: &mut Toks, o: &mut String) -> Result<(), Fatal> {
 
 /// The port's answer for one of this module's commands; `false` for another command.
 pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool, Fatal> {
+    if cmd == "t2m" {
+        let mut src = get_vol(cx, t)?;
+        let mode = t.i();
+        let mut dst = if mode == 1 {
+            Some(get_vol(cx, t)?)
+        } else {
+            None
+        };
+        let t2 = get_vol(cx, t)?;
+        let mut ap = opt(cx, t)?;
+        let (th, mm) = (t.f(), t.i());
+        let env = Environment::default();
+        let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+        let f = t2mask::mri_mask_with_t2_and_aparc_aseg;
+        if mode == 2 {
+            let r = f(
+                g,
+                a,
+                b,
+                &env,
+                Pair::Same(&mut src),
+                &t2,
+                ap.as_mut(),
+                th,
+                mm,
+            )?;
+            same_result(o, r, &src);
+        } else {
+            let p = match dst.as_mut() {
+                Some(d) => Pair::Given(&src, d),
+                None => Pair::New(&src),
+            };
+            let r = f(g, a, b, &env, p, &t2, ap.as_mut(), th, mm)?;
+            result(o, r, dst.as_ref());
+        }
+        match &ap {
+            Some(m) => put_vol(o, m),
+            None => *o += "NULL ",
+        }
+        return Ok(true);
+    }
+    if cmd == "t2mf" {
+        t2mf(cx, t, o)?;
+        return Ok(true);
+    }
     if cmd == "ccsf" {
         let seg = get_vol(cx, t)?;
         let (wsize, x, y, z) = (t.i(), t.i(), t.i(), t.i());

@@ -100,7 +100,11 @@ frame functions.
   thickness set), `hsl <src> <thick> <mode> [<norm>] <sigma> <wm> <points>`
   (`MRInormalizeHighSignalLowStd`; then the source), `hslf <volume file> <sigma>` (`real.py --snr`:
   a recorded head's high-signal normalisation into a new volume, wm 110; the FNV-1a of its voxels).
-  `ccsf <seg> <wsize> <x> <y> <z>` (`MRIcountCSFInNbhd`: the count).
+  `ccsf <seg> <wsize> <x> <y> <z>` (`MRIcountCSFInNbhd`: the count). Relay 34: `t2m <src> <mode>
+  [<dst>] <T2> <aparc?> <thresh> <n>` (`MRImask_with_T2_and_aparc_aseg`: the result, then the
+  aparc+aseg after the call) and `t2mf <volume file> <T2 file> <aparc+aseg file or -> <thresh> <n>`
+  (the same in place on recorded volumes: whether the result is the volume, the FNV-1a of its voxels
+  and of the aparc+aseg's).
 - `build.sh [<workspace>]`: builds `fsfilter` with the unit oracle's compiler, flags and libraries
   (`validation/investigations/freesurfer-unit-oracle`, `build.py all` first) into
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-filter/` (with `BUILD_INFO.txt`). From a worktree,
@@ -207,3 +211,19 @@ Every run on generated inputs inside a memory box:
   --norm`: 6 of 6 identical; 43 s official, 19 s port.
 - `ccsf` (`MRIcountCSFInNbhd`) at seeds 7 and 13 (200 cases each): 0 different in both modes.
 - The seed-1 record: 1,860 cases (20 rounds of 93), 1,678 identical, 182 counted.
+
+## Results (relay 34, 2026-11-15)
+
+- The T2 mask (`t2m`, `MRImask_with_T2_and_aparc_aseg`) at seeds 7, 13 and 17 (255 cases each):
+  0 different under `reproduce`, 0 default differences without a notice. Counted, not compared: the
+  cases noted FS-615 (no aparc+aseg) or FS-618 (no destination), where the official code crashes,
+  and FS-290 (a face neighbour of a voxel on the volume's faces read outside the volume's memory:
+  a crash or memory contents). About a third of the cases erase voxels (up to all 5 passes).
+- `real.py --t2mask` on the three recorded heads (`nu.mgz` masked with `T1.mgz` standing for the T2
+  and the head's `aparc+aseg.mgz`, thresholds 120 and 160, 5 passes): 5 of 6 identical in both
+  modes; 1 counted (ds000005 sub-01 at 120: FS-290, the official program crashes). 32 s in the
+  official code, 150 s in the port: the three erosions and three dilations of `MRIopenN` on the
+  byte mask take 16.6 s of the port's 25 s per call (`examples/fs_t2mask_timing.rs`), a speed
+  item for track C's `mriset.rs` (its byte erosion has a fast path, its byte dilation not).
+- Every command at seed 7 (1,880 cases): 0 different, 204 counted. The seed-1 record: 1,880 cases
+  (20 rounds of 94), 1,673 identical, 207 counted.

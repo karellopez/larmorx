@@ -26,4 +26,5 @@ pub mod normalize;
 pub mod rfa;
 pub mod segment;
 pub mod sobel;
+pub mod t2mask;
 pub mod volcluster;

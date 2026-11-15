@@ -84,6 +84,16 @@ SNR = (
 )
 
 
+# the T2 mask of mri_em_register, mri_ca_register and mri_ca_normalize (-AMASK; MRImask_with_T2_
+# and_aparc_aseg in place, 5 layers): recon-all gives no T2, so T1.mgz stands for one (the function
+# only thresholds it) over nu.mgz with the head's aparc+aseg: (volume, T2, aparc+aseg, threshold,
+# layers)
+T2MASK = (
+    ("nu.mgz", "T1.mgz", "aparc+aseg.mgz", 120.0, 5),
+    ("nu.mgz", "T1.mgz", "aparc+aseg.mgz", 160.0, 5),
+)
+
+
 def fx(v: float) -> str:
     return struct.pack(">f", v).hex()
 
@@ -104,6 +114,11 @@ def main(argv: list[str] | None = None) -> int:
         "--snr",
         action="store_true",
         help="the high-signal, low-spread normalisation (MRInormalizeHighSignalLowStd) instead",
+    )
+    ap.add_argument(
+        "--t2mask",
+        action="store_true",
+        help="the T2 mask (MRImask_with_T2_and_aparc_aseg) instead, with T1.mgz as the T2",
     )
     ap.add_argument(
         "--gentle",
@@ -129,6 +144,11 @@ def main(argv: list[str] | None = None) -> int:
                         f"n3df {mri / 'mri' / vol} {fx(above)} {fx(below)} {prune} {fx(sigma)}"
                     )
             continue
+        if a.t2mask:
+            for vol, t2, aparc, th, mm in T2MASK:
+                m = mri / "mri"
+                lines.append(f"t2mf {m / vol} {m / t2} {m / aparc} {fx(th)} {mm}")
+            continue
         if a.snr:
             for vol, sigma in SNR:
                 lines.append(f"hslf {mri / 'mri' / vol} {fx(sigma)}")
@@ -152,6 +172,8 @@ def main(argv: list[str] | None = None) -> int:
         if a.norm3
         else "real-snr-cases.txt"
         if a.snr
+        else "real-t2mask-cases.txt"
+        if a.t2mask
         else "real-gentle-cases.txt"
         if a.gentle
         else "real-norm-cases.txt"
@@ -182,14 +204,19 @@ def main(argv: list[str] | None = None) -> int:
             [str(port), "run", str(cases_path), mode], check=True, capture_output=True, text=True
         ).stdout
         rows[mode] = ([x.partition("\t") for x in text.splitlines()], time.monotonic() - t0)
-    same = differ = fix_same = 0
+    same = differ = fix_same = skipped = 0
     bad = []
-    for case, c, (r, _, _), (f, _, _) in zip(
+    for case, c, (r, _, ids), (f, _, _) in zip(
         lines, official, rows["reproduce"][0], rows["fix"][0], strict=True
     ):
-        # the outputs only (the text FreeSurfer printed is compared too)
+        # the outputs only (the text FreeSurfer printed is compared too); a line where FreeSurfer
+        # touches memory it does not own (check.py's SKIP: FS-290 for the T2 mask's face
+        # neighbours on a volume's faces) is counted, not compared
         if c == r:
             same += 1
+        elif set(ids.split(",")) & set(check.SKIP):
+            skipped += 1
+            bad.append({"case": case.split()[0] + " " + Path(case.split()[1]).name, "skip": ids})
         else:
             differ += 1
             bad.append({"case": case.split()[0] + " " + Path(case.split()[1]).name, "o": c, "p": r})
@@ -200,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         "served": done.cached,
         "reproduce_identical": same,
         "reproduce_differ": differ,
+        "skipped": skipped,
         "fix_identical": fix_same,
         "seconds_official": round(t_official, 1),
         "seconds_port_reproduce": round(rows["reproduce"][1], 1),

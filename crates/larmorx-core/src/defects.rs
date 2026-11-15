@@ -1789,6 +1789,14 @@ defects! {
         "masking a surface's values outside a label (MRISmaskNotLabel) leaves the values of the vertices that were already marked before the call, and clears the marks of the label's vertices";
     FS_613 = "FS-613", "FreeSurfer", true,
         "the laminar volume fractions of a surface pair (MRIcomputeLaminarVolumeFractions) compute the white surface's interior at the program's first call only and reuse it for every later call, whatever its surface, volume or resolution";
+    FS_615 = "FS-615", "FreeSurfer", true,
+        "the T2 mask of mri_em_register, mri_ca_register and mri_ca_normalize (MRImask_with_T2_and_aparc_aseg) given a T2 volume without an aparc+aseg (their option -T2MASK) crashes the program in its step that erases T2-bright voxels next to the dark exterior, the step that uses the aparc+aseg to stay out of the brain (as soon as one voxel lies outside the largest dark region)";
+    FS_616 = "FS-616", "FreeSurfer", true,
+        "the T2 mask (MRImask_with_T2_and_aparc_aseg) given a destination other than its source masks the destination's own voxels and ignores the source (every FreeSurfer caller passes one volume as both)";
+    FS_617 = "FS-617", "FreeSurfer", true,
+        "the T2 mask (MRImask_with_T2_and_aparc_aseg) asked to erase no layer of bright exterior voxels (a distance of 0 or less) prints the error 'MRIfree: null pointer' at its end (its result is not changed; every FreeSurfer caller asks for 5 layers)";
+    FS_618 = "FS-618", "FreeSurfer", true,
+        "the T2 mask (MRImask_with_T2_and_aparc_aseg) without a destination crashes the program at its end, after its messages (every FreeSurfer caller gives one)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

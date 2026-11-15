@@ -1339,3 +1339,75 @@ extent: its start `(x0, y0, z0)` in mm and its voxels per mm `(sx, sy, sz)`) and
   noted defect it corrects changed the result (FS-609, FS-610). The `errno` of §4: the fs-filter
   probe's distance-map commands and the surface probe's messages. Observed: the README of
   `validation/probes/fs-surfio`.
+
+## 37. The T2 mask of the atlas registration and normalisation
+
+**`MRImask_with_T2_and_aparc_aseg(src, dst, T2, aparc, thresh, n)`** (`mri_em_register`,
+`mri_ca_register`, `mri_ca_normalize`: `-T2MASK <T2> <thresh>` without an aparc+aseg, `-AMASK
+<aparc+aseg> <T2> <thresh>` with one; each passes its input volume as both `src` and `dst` and
+`n = 5`): the voxels of `dst` that the T2 marks as non-brain set to 0. The aparc+aseg, when given,
+is changed in place (its caller frees it).
+
+1. The dark mask `D`: a new volume of the T2's type and extent, 255 where the T2's voxel is below
+   `thresh` (compared in double precision), 0 elsewhere and at NaN (`MRIbinarize`,
+   `specs/freesurfer-volume.md`). A copy of `D` is made and freed unused (only its allocation's
+   messages can show).
+2. With an aparc+aseg `A`: `A` binarized in place at 1 (0 below 1, 255 from 1 and at NaN), dilated
+   in place (`MRIdilate`), inverted in place (`MRInot`: 1 where the value rounds to 0, else 0),
+   reduced in place to its largest face-connected region (`GetLargestCC6`, §15): `A` is now 1 on
+   the exterior, 0 on the dilated brain and on any exterior region cut off from the largest. Then
+   `D = MRIand(D, A, D, 1)` (1 where both are at least 1; the extents must agree: `MRIcheckVolDims`'
+   error otherwise) and `D` opened three times in place (`MRIopenN(D, D, 3)`: three erosions into a
+   new volume, three dilations back). Without one: `D` reduced in place to its largest
+   face-connected region (`GetLargestCC6`, §15).
+3. `D` inverted in place (`MRInot`): 0 now marks what is erased, 1 what is kept.
+4. `n` passes (none when `n <= 0`). Each: `D` copied into the work volume `W` (a new one at the
+   first pass, of `D`'s type and extent); then for every voxel `(x, y, z)` of `D`'s extent, x
+   outermost, then y, then z: skipped when `D`'s value there is 0 (`MRIgetVoxVal`, a `float`
+   compared with 0), skipped when `A`'s value there is 0 (too close to the brain), and otherwise,
+   when the T2's value there is at least `thresh` (both `float`) and at least one of its six face
+   neighbours in `D` is erased (`MRIneighborsOff(D, x, y, z, 1)`: the neighbours' bytes below 1,
+   read as bytes whatever `D`'s type, `specs/freesurfer-volume.md`), `W`'s voxel set to 0 and the
+   count `c` raised by 1 (`c` counts over all passes). After the voxels: `<c> T2-bright exterior
+   voxels removed` and a newline on standard output, then `W` copied into `D`.
+5. `MRImask(dst, D, dst, 0, 0)` (`specs/freesurfer-volume.md`: `dst`'s voxels set to 0 where `D` is
+   0, the environment's `FS_MRIMASK_ALLOW_DIFF_GEOM`, its messages); the result is `dst`.
+
+Defects (each with its `reproduce` switch):
+
+- **FS-615** (a: a crash). Without an aparc+aseg, step 4 reads it: the official program crashes at
+  the first voxel step 4 does not skip for `D` (the program ends with a segmentation fault).
+  Default (rule A): the aparc+aseg's test is skipped (no voxel is too close to the brain), noted
+  once. `reproduce`: at that voxel the error `MRImask_with_T2_and_aparc_aseg(): no aparc+aseg for
+  the bright exterior voxels (FreeSurfer crashes here)`, status `ERROR_BADPARM`.
+- **FS-616** (c). With a `dst` other than `src`, the official code masks `dst`'s own voxels and
+  never reads `src`. Default (rule A): `src`'s voxels masked into `dst` (`MRImask(src, D, dst, 0,
+  0)`). `reproduce`: `dst`'s own. Noted.
+- **FS-617** (f). With `n <= 0`, `MRIfree: null pointer` is printed as an error (standard error,
+  with the error log's form, after step 5's messages); nothing else changes. Default (rule A): no
+  message, noted. `reproduce`: the message.
+- **FS-618** (a: a crash). Without `dst`, the official code crashes in step 5 (after step 4's
+  messages). Default (rule A): a new volume, `src` masked into it (`MRImask(src, D, NULL, 0, 0)`).
+  `reproduce`: the error `MRImask_with_T2_and_aparc_aseg(): no destination (FreeSurfer crashes
+  here)`, status `ERROR_BADPARM`.
+- Step 4's face neighbours of a voxel on the volume's faces lie outside the volume
+  (`specs/freesurfer-volume.md`, FS-289 and FS-290: another voxel's byte, or memory the program
+  does not own). Observed: a recorded head's `T1.mgz` standing for a T2 at threshold 120 made the
+  official code crash this way (§38).
+
+## 38. Validation plan (part 11)
+
+- **Probe (black box).** The fs-filter probe's `t2m <src> <dst mode> [<dst>] <T2> <aparc?>
+  <thresh> <n>` (the result as the other commands print it, then the aparc+aseg after the call):
+  head-like volumes of 7 to 16 voxels a side (a dark border 1 to 5 voxels thick, a bright rim
+  inside it, a mixed interior; NaNs in float T2 volumes; now and then a bright voxel on the faces),
+  aparc+aseg volumes with labels in a central box (holes, other extents now and then, none in one
+  case of eight), every destination kind, thresholds 100, 50.5, 150, 0, 255, -1 and NaN, 5, 3, 2,
+  1, 0 and -1 passes. And `t2mf <volume> <T2> <aparc+aseg> <thresh> <n>` on recorded volumes
+  (`real.py --t2mask`: a head's `nu.mgz` masked in place with its `T1.mgz` standing for the T2
+  and its `aparc+aseg.mgz`, thresholds 120 and 160, 5 passes, three heads).
+- **Expected.** Every line identical under `reproduce` except the cases noted FS-615, FS-618 or
+  FS-290 (counted, not compared: the official code crashes or reads memory it does not own); the
+  default identical but where a noted defect it corrects changed the result. Observed (relay 34):
+  seeds 7, 13 and 17, 255 cases each: 0 different in both modes; `real.py --t2mask`: 5 of 6
+  identical, 1 counted (FS-290: the official program crashes; ds000005's `T1.mgz` at 120).

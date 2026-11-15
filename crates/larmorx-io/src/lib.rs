@@ -10,6 +10,8 @@
 //!
 //! - [`znz`]: znzlib's files, plain or gzip (nifticlib 2.0.0 over zlib 1.2.11's file layer).
 //! - [`xfm`]: MNI transform files (`.xfm`), read and written as MINC 1.5.1's volume_io does.
+//! - [`minc`]: MINC 1 volumes read as MINC 1.5.1's volume_io reads them, over netCDF 3.6.0-p1's
+//!   classic-format reader.
 //!
 //! - [`dicom`]: DICOM files opened as CTN 3.0.6's object library opens them (`DCM_OpenFile`).
 //! - [`gifti`]: GIFTI files, read and written as gifticlib 1.12 does, over [`xml`], a pure-Rust
@@ -25,6 +27,7 @@ pub mod itk_hdf5;
 pub mod itk_output;
 pub mod itk_transform;
 mod itk_transform_names;
+pub mod minc;
 pub mod nifti;
 pub mod nrrd;
 pub mod xfm;

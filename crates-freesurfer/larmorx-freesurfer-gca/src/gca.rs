@@ -521,6 +521,12 @@ pub fn gca_voxel_to_node(
     v: [i32; 3],
 ) -> (i32, [i32; 3]) {
     let (_, p) = gca_voxel_to_prior(g, gca, m, v);
+    gca_prior_point_to_node(g, gca, p)
+}
+
+/// The second half of [`gca_voxel_to_node`]: the node of a prior point (as `gca_voxel_to_prior`
+/// gave it), the bounds checked against the node grid.
+pub fn gca_prior_point_to_node(g: &mut Globals, gca: &Gca, p: [i32; 3]) -> (i32, [i32; 3]) {
     let n = gca_prior_to_node(g, gca, p);
     let mn = gca.mri_node.as_ref().expect("GCAsetup made it");
     (bounds_check(n, mn), n)

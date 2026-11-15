@@ -25,7 +25,8 @@ use larmorx_freesurfer_volume::resample::mri_resample;
 use larmorx_freesurfer_volume::resize::mri_set_resolution;
 
 use crate::gca::{
-    Gca, GcaPrior, gca_copy_dc_to_mri, gca_voxel_to_node, gca_voxel_to_prior, voxel_to_prior_matrix,
+    Gca, GcaPrior, gca_copy_dc_to_mri, gca_prior_point_to_node, gca_voxel_to_prior,
+    voxel_to_prior_matrix,
 };
 use crate::read::gca_read;
 
@@ -57,11 +58,13 @@ fn lookup<'a>(
     m: &larmorx_freesurfer_core::affine::AffineMatrix,
     v: [i32; 3],
 ) -> Option<Option<(&'a GcaPrior, [i32; 3])>> {
-    let (nc, n) = gca_voxel_to_node(g, gca, m, v);
+    // FreeSurfer maps the voxel to its prior point twice (once inside GCAvoxelToNode): the same
+    // computation, done once here
+    let (pc, p) = gca_voxel_to_prior(g, gca, m, v);
+    let (nc, n) = gca_prior_point_to_node(g, gca, p);
     if nc != NO_ERROR {
         return None;
     }
-    let (pc, p) = gca_voxel_to_prior(g, gca, m, v);
     if pc != NO_ERROR {
         return None;
     }

@@ -27,7 +27,8 @@ series read; **part 22** (§113-115): GE Signa and GE XIMG series read; **part 2
 `.ima` series read; **part 24** (§118-121): AFNI datasets read (and their writer's refusal), curvature
 files and annotations read as volumes, the NRRD writer's refusal, `mri_read`'s frees; **part 25**
 (§122-125): image files read and written as volumes, ITK warps written; **part 26** (§126-127): NRRD volumes
-read; **part 27** (§128-129): MINC 1 volumes read; **part 28** (§130-131): MINC 1 volumes written.
+read; **part 27** (§128-129): MINC 1 volumes read; **part 28** (§130-131): MINC 1 volumes written; **part
+29** (§132-133): GCA atlases read as volumes.
 
 ## 1. Conventions
 
@@ -4175,3 +4176,129 @@ read-back volume. Not compared (memory contents or crashes): FS-58, a dimension 
 and the library's FS-781, FS-789, FS-799 to FS-801; under `reproduce` the read back's §129 list. Measured
 (2026-11-15, observed): seeds 7, 13 and 21 (888 piece-26 cases each): `reproduce` identical on every compared case
 (2,353), 0 different; 311 skipped; `fix` differs only with notices.
+
+## 132. GCA atlases read as volumes (`readGCA`; `mri_read`'s type 22, `MRI_GCA_FILE`)
+
+`mri_read` of type 22 (a name ending in `.gca`, a name of type 22, or `@gca`) reads a GCA atlas (FreeSurfer's
+Gaussian classifier atlas: classes on a node grid, label priors on a prior grid) and gives one of four volumes,
+chosen by the name's start frame (`#<n>`; none: -1); the frame range is not applied to the result, and the result is
+not checked for NaN. After the atlas is read: `reading frame <start frame> of gca` (standard output). The atlas is
+read as follows (every number big-endian: `int` 32 bits, `float` IEEE single; a name holding `.gcz` anywhere is read
+through zlib, which also reads plain data as it is).
+
+1. **Opening.** A name that cannot be opened: `GCAread(<name>): could not open file` (an error, `ERROR_BADPARM`, after
+   the open's `errno`: `ENOENT`, `ENOTDIR` when a folder of the path is a file, ...); no volume. A folder: `GCAread(
+   <name>): could not read file` after `Is a directory` (`EISDIR`); a `.gcz` folder: FS-758.
+2. **The version** (`float`). A file that gives fewer than 4 bytes: `GCAread(<name>): could not read file` (the
+   `errno` the read left, 0 at the end of a file). Below 4 (a NaN is not): the old layout, `float` node spacing,
+   `int` node grid sizes (x, y, z), `int` input count, and only when the version is exactly 3.0 an `int` of flags (else
+   flags 0); the prior spacing is the node spacing. Within `FLT_EPSILON` of 4.0 or of 5.0 (so exactly 4.0 or 5.0):
+   the current layout, `float` prior spacing, `float` node spacing, three `int`s of the prior grid's sizes (read, not
+   used: FS-749), three of the node grid's, the input count, the flags. Any other version: `GCAread(<name>), version
+   #<v> found, 5.0 expected` (`<v>` as `%2.1f`: `6.0`, `nan`, `-1.0`; an error, `ERROR_BADFILE`); no volume.
+3. **The grids' sizes.** Per axis, the atlas's extent `W = (int)(node spacing × n)` (`n` the stored node size; the
+   product in `float`; the conversion truncates, and x86-64's `INT_MIN` for NaN or beyond `int`: FS-17), then the node
+   size `(int)((float)W / node spacing + 0.99)` and the prior size `(int)((float)W / prior spacing + 0.99)` (the
+   division in `float`, the addition in `double`). The atlas's width, height and depth are the `W`s (until the tagged
+   section gives others). A negative size ends the program (status 254, `ERROR_NOMEMORY`, after `Cannot allocate
+   memory`): `GCAalloc: could not allocate nodes` (x), `GCAalloc: could not allocate 0th **` (y, x positive),
+   `GCAalloc: could not allocate 0,0th *` (z, x and y positive); then the same three for the prior grid (the same
+   texts; the first is `... could not allocate priors`). Then the helper grids (below) with the default geometry:
+   direction cosines x `(-1, 0, 0)`, y `(0, 0, -1)`, z `(0, 1, 0)`, centre 0, voxel sizes 1; the type 99 (unknown).
+4. **The nodes**, x outermost, then y, then z: an `int` class count and an `int` total training count. A negative
+   count ends the program: `GCAread(<name>): could not allocate <n> labels @ (<x>,<y>,<z>)` (status 254 after `Cannot
+   allocate memory`); a node with classes and a negative input count: `could not allocate mean (<n>) and covariance
+   (<m>) matrices` (`<m>` = `n (n + 1) / 2` in 32-bit `int`). Per class: its label (one unsigned byte below version 4
+   and for exactly 4.0; else an `int` kept in 16 bits unsigned: FS-751; in the old layout each raises the atlas's
+   largest label); one `float` mean per input; `n (n + 1) / 2` `float` covariances (the upper triangle, row by row;
+   the count computed in 32 bits: FS-753); then, unless the flags have bit 0 (no neighbour statistics), for each of the
+   six neighbours an `int` count kept in 16 bits signed (FS-751; negative: `GCAread(<name>): couldn't expand gcs to
+   <n>`, status 254, FS-755) and that many pairs of an `int` label (16 bits) and a `float` prior.
+5. **The priors** (current layout only), x outermost: an `int` label count kept in 16 bits signed (FS-751; negative:
+   `GCAread(<name>): could not allocate <n> labels @ (<x>,<y>,<z>)`, status 254), an `int` total training count,
+   then per label its label (a byte for exactly 4.0, else an `int` in 16 bits) and its `float` prior; each label raises
+   the atlas's largest label.
+6. **The class weights.** Each class's training count is `(int)(total × prior)`: the node's total as a `float` times
+   the prior of the class's label at the node's prior point (`float` product, x86-64's conversion, FS-17); the node's
+   prior point per axis `(int)((double)node × node spacing / prior spacing)` (FS-757 when it lies outside the prior
+   grid). The prior of a label at a point: its stored prior; a label the point has not seen: `0.1 / total` (`float`),
+   or `1e-10` without training; a stored prior within `1e-15` of 0 (as `double`): `1e-10`.
+7. **The tagged section.** Integers are read until the file ends (a zlib error: FS-758); any but `0xab2c` is
+   skipped; after `0xab2c` each integer is a tag until the file ends:
+   - 4, a colour table: `reading colortable from GCA file...` (standard output), the binary colour table (§13, on
+     the same stream), and when one was read `colortable with <n> entries read (originally <its file name>)`;
+   - 2, the type: one `int` skipped, the type; with `DIAG_VERBOSE`: `setting gca type = Normal gca type` (0), `T1/PD
+     gca type` (2), `FLASH gca type` (1), and for any other `Unknown` (the type becomes 99);
+   - 1, the MR parameters: an `int` count, `reading <count> MR parameters out of GCA header...`, then for each of the
+     atlas's inputs (the input count, not the stored count) a `float` TR, flip angle (radians) and TE, and `input <i>:
+     TR=<tr> msec, FA=<deg> deg, TE=<te> msec` (each `%2.1f`; `deg = (360 × angle) / (2π)` in `double`); FS-752,
+     FS-759 for more than 100 inputs;
+   - 3, the geometry: twelve `float`s (`x_r x_a x_s y_r y_a y_s z_r z_a z_s c_r c_a c_s`), three `int`s (width,
+     height, depth), three `float`s (voxel sizes); with `DIAG_SHOW` and `DIAG_VERBOSE`: `Direction cosines read:` and
+     four lines ` x_r = <v>, y_r = <v>, z_r = <v>` (then `x_a`, `x_s`, `c_r` rows; each `% .4f`);
+   - any other: `GCAread(<name>): unknown tag <hex>` and a newline (an error, `ERROR_BADFILE`); the next integer is
+     read as a tag.
+   A number the file cuts (in the header, the grids or a tag's parameters): FS-750 (FS-167 for the number).
+8. **The helper grids** again, with the geometry read.
+
+**The helper grids**: three volumes without voxels (each size not positive prints `MRI::Shape::Shape(): volume size
+must be greater than 0 in every dimension`, as for any volume): the node grid (the node sizes; voxel sizes the
+atlas's times the node spacing, `float`), the prior grid (the prior sizes; times the prior spacing), the atlas's own
+grid (width, height, depth; its voxel sizes); each with the atlas's direction cosines and centre, RAS good, its
+voxel-to-RAS matrix and inverse as for any volume (the cache computed, then once more). The prior grid's inverse must
+exist (FS-754).
+
+**The volumes.** A voxel `(x, y, z)` of a volume with the atlas's geometry maps to a prior point: the prior grid's
+RAS-to-voxel matrix times the volume's voxel-to-RAS matrix (both as `float` 4 x 4, multiplied in `float`) applied to
+the voxel's coordinates as `float`s, each coordinate rounded to the nearest integer (halves away from zero),
+reduced to the prior grid's size - 1 when above it; inside the prior grid or not. Its node: the prior point (so
+reduced) per axis `(int)((double)p × prior spacing / node spacing)`; inside the node grid or not. At each voxel, z
+outermost, then y, then x: outside either grid, 0; a prior point without labels, left as allocated (0); otherwise
+the point's most likely label (the largest prior compared as `double`, the last of equal ones). Frames:
+
+- **0**: a `float` volume over the node grid (voxel sizes the atlas's times the node spacing), one frame: the mean of
+  the node's class of the most likely label (the last such class; none: left 0). The program ends when the atlas has
+  other than one input: `GCAbuildMostLikelyVolume: mri->frames (1) does not match gca->ninputs (<n>)` (status 252).
+- **1**: a 16-bit integer volume over the prior grid (voxel sizes times the prior spacing): the most likely label.
+- **2**: `interpreting as probability volume`; a `float` volume over the prior grid with one frame per input: frame 0
+  the largest prior (a point's only prior as stored; the largest of two or more as the `double` it was compared in,
+  made a `float` again: a signalling NaN comes back quiet), the other frames 0.
+- **any other** (-1, 3, ...): a `float` volume of three frames over the atlas's own grid (its width, height, depth
+  and voxel sizes): frame 0 the means (as frame 0; the program ends for other than one input), frame 1 the most likely
+  labels, frame 2 the volume of frame 2 resampled onto this grid by nearest neighbour (`MRIresample`'s own rounding: a
+  voxel's prior can come from the point next to its label's).
+
+**larmorx by default**: the grids' sizes as the file stores them (rule A, FS-749); a file that ends inside the atlas
+refused (rule B, FS-750: `GCAread(<name>): the file ends inside the atlas's nodes`, `... priors`, `... header`,
+`... tagged parameters`; an error, `ERROR_BADFILE`; no volume); a count or label that does not fit 16 bits refused
+(rule B, FS-751: `GCAread(<name>): a label of <v> does not fit 16 bits`, `a prior label count of <v> ...`, `a
+neighbour label count of <v> ...`, `a neighbour label of <v> ...`); the MR parameters of every input kept, the other
+fields unchanged (rule A, FS-752, FS-759); the covariance count exact (rule A, FS-753); a prior grid whose matrix has
+no inverse refused (rule B, FS-754: `GCAsetup: the atlas's prior grid has a voxel-to-RAS matrix with no inverse`, the
+program ends, status 252); the negative neighbour count printed (FS-755); no allocation limit (FS-756: a count past
+the file's data ends in FS-750); a node whose prior point lies outside the prior grid gets no class weights (FS-757);
+damaged compressed data refused (FS-758: `GCAread(<name>): the compressed data is damaged`, or `could not read file`
+at its start). Kept (rule C): the frames 0 and -1 ending the program for atlases of several inputs (FreeSurfer's own
+clear message); frame 2's quiet NaN.
+
+## 133. Validation plan (part 29)
+
+Piece 27 of the fs.io probe: `gcd` and `gch` (`mri_read` of type -1 or 22, and `MRIreadHeader`: the same volume) of
+atlas files built in the format above: versions 5, 4, 3, 2, 1, 0.5, refused ones (4.5, 6, -1, NaN); node and prior
+spacings ordinary, fractional, equal, inverted, 0, negative or NaN over training extents of 0 to 6 voxels (so the
+stored and computed grids agree or not), now and then a stored node size one larger; 1 to 3 inputs, 0, -1, 101, 109,
+110, 50,000, 70,000; flags 0, 1, 0x10; nodes of 0 to 3 classes (now and then -1 or 70,000), labels small or past 16
+bits, means and covariances ordinary, NaN (quiet, signalling, negative), infinite, subnormal, -0; neighbour lists of
+0 to 2 labels; priors of 0 to 3 labels with ties, zeros, NaN, `1e-16`; at most one anomaly per file (a count or label
+past 16 bits or negative); then the tagged section (junk before it now and then): the type, the MR parameters, a
+binary colour table of either version, the geometry (coronal, RAS, permuted, oblique, of length 0, NaN; sizes 0 to
+5, voxel sizes 1, 2, 0.5, 1.5, 0, NaN), unknown tags; frames none, `#0`, `#1`, `#2`, `#3`, `#0:2`; `Gdiag` 0, 0x40
+or 0x10000040; faults: the file cut short, missing, a folder, not an atlas, empty, compressed (`.gcz`). Printed: the
+volume's header, geometry, matrices and voxels' hash, and every message. Not compared (memory contents, an address,
+the machine's memory, crashes): FS-750, FS-755, FS-756, FS-757, FS-758, FS-759, FS-167. Measured (2026-11-15,
+observed): seeds 7, 13 and 21 (about 1,750 piece-27 cases each): `reproduce` identical on every compared case, 0
+different; `fix` differs only with notices. FreeSurfer 8.2.0's own atlases (`average/RB_all_2020-01-02.gca`,
+`RB_all_withskull_2020_01_02.gca`, `face.gca`, `wmsa_new_eesmith.gca`), frames -1, 0, 1, 2, against the official
+`mri_convert <atlas>[#<f>] <out>.mgz` with `FS_LEAVE_NANS=1` (its `MRIread` replaces NaNs otherwise): every voxel
+identical in both modes (the dump: `crates-freesurfer/larmorx-freesurfer-gca/examples/gca_volume.rs`). Damaged
+compressed data, the crash past 109 inputs and the defaults: the fs.gca unit tests.

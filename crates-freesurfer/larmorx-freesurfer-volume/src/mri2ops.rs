@@ -48,23 +48,23 @@ use larmorx_freesurfer_io::colortab::ctab_alloc;
 use larmorx_freesurfer_mri::ctab::ctab_deep_copy;
 use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, Lta, lta_copy};
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, MRI_UCHAR, Mri, MriRegion, mri_alloc, mri_alloc_sequence,
-    mri_copy_header, mri_copy_pulse_parameters,
+    MRI_FLOAT, MRI_INT, MRI_UCHAR, Mri, MriRegion, mri_alloc, mri_alloc_sequence, mri_copy_header,
+    mri_copy_pulse_parameters,
 };
 use larmorx_freesurfer_mri::vol_geom::{VolGeom, p0_to_cras, set_vox2ras_from_matrix, xfm_crs2xyz};
 
 use crate::arith::{Pair, Tri, mri_clone, mri_extract_region, mri_replace_values};
+use crate::coords::dircos_to_orientation_string;
 use crate::deriv::{Axis, index};
 use crate::labels::WM_MIN_VAL;
+use crate::labels::int_of;
+use crate::ltaops::{InvertInto, lta_change_type, lta_invert, lta_print};
 use crate::mriset::{
     mri_close, mri_dilate_inv_thresh_label, mri_dilate_thresh_label, mri_union,
     mri_voxels_in_label, mri_xor,
 };
-use crate::rows::{self, Num};
-use crate::coords::dircos_to_orientation_string;
-use crate::labels::int_of;
-use crate::ltaops::{InvertInto, lta_change_type, lta_invert, lta_print};
 use crate::region::region_print;
+use crate::rows::{self, Num};
 use crate::sample::cvtt;
 use crate::vgeom::vg_is_equal;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -1067,16 +1067,7 @@ pub fn mri_find_bright_non_wm(
         }
     }
     mri_close(g, out, err, Pair::Same(&mut labeled))?;
-    let tmp = mri_dilate_thresh_label(
-        g,
-        out,
-        err,
-        Pair::New(&labeled),
-        t1,
-        BRIGHT_LABEL,
-        1,
-        100,
-    )?;
+    let tmp = mri_dilate_thresh_label(g, out, err, Pair::New(&labeled), t1, BRIGHT_LABEL, 1, 100)?;
     let Some(mut tmp) = tmp.into_new() else {
         return Ok(None);
     };

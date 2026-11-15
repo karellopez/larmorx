@@ -109,7 +109,8 @@ pub fn fix_scm(
                 if f64::from(mri_get_vox_val(g, err, &mask, c, r, s, 0, 0)?) > 0.5 {
                     continue;
                 }
-                if is_hippo(segid) && f64::from(mri_get_vox_val(g, err, &mask, c, r, s, 0, 0)?) < 0.5
+                if is_hippo(segid)
+                    && f64::from(mri_get_vox_val(g, err, &mask, c, r, s, 0, 0)?) < 0.5
                 {
                     mri_set_vox_val(g, err, scm, c, r, s, 0, 0.0, 0)?;
                     continue;
@@ -325,7 +326,10 @@ impl BinarizeMri {
         if let Some(m) = mask
             && mri_dim_mismatch(invol, m, false) != 0
         {
-            let _ = writeln!(out, "ERROR: BinarizeMRI::binarize(): input/mask dim mismatch");
+            let _ = writeln!(
+                out,
+                "ERROR: BinarizeMRI::binarize(): input/mask dim mismatch"
+            );
             return Ok(Ret::Null);
         }
         let mut fresh = None;
@@ -352,8 +356,10 @@ impl BinarizeMri {
             }
             Some(d) => {
                 if mri_dim_mismatch(invol, d, false) != 0 {
-                    let _ =
-                        writeln!(out, "ERROR: BinarizeMRI::binarize(): input/output dim mismatch");
+                    let _ = writeln!(
+                        out,
+                        "ERROR: BinarizeMRI::binarize(): input/output dim mismatch"
+                    );
                     self.dump(out, mask.is_some());
                     return Ok(Ret::Null);
                 }
@@ -504,7 +510,10 @@ impl DeMorphBinVol {
         if let Some(o) = outvol
             && mri_dim_mismatch(invol, o, false) != 0
         {
-            let _ = writeln!(out, "ERROR: DEMorphBinVol::check(): input/output dim mismatch");
+            let _ = writeln!(
+                out,
+                "ERROR: DEMorphBinVol::check(): input/output dim mismatch"
+            );
             return 1;
         }
         if frame_out(g, "DEMorphBinVol::check", frame, invol.nframes) {

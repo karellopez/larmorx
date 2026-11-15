@@ -426,6 +426,19 @@ void fill_pat(MRI *m)
         }
 }
 
+// relay 29: a box of the case set to one value in every frame (a flag, then x0 y0 z0 x1 y1 z1,
+// both corners included, and the value)
+void fill_box(MRI *m)
+{
+  if (!geti()) return;
+  int x0 = geti(), y0 = geti(), z0 = geti(), x1 = geti(), y1 = geti(), z1 = geti();
+  float v = getf();
+  for (int f = 0; f < m->nframes; f++)
+    for (int z = z0; z <= z1; z++)
+      for (int y = y0; y <= y1; y++)
+        for (int x = x0; x <= x1; x++) MRIsetVoxVal(m, x, y, z, f, v);
+}
+
 void get_region(MRI_REGION *r)
 {
   r->x = geti(); r->y = geti(); r->z = geti();
@@ -2639,6 +2652,220 @@ void run_case()
       }
       fflush(stdout);
       MRI *r = cmd == "ccrs" ? MRIcropAroundCRS(vol, ctr, fov, keep) : MRIcropAroundRAS(vol, ctr, fov, l, keep);
+      fflush(stdout);
+      put_vol(r);
+    }
+  } else if (cmd == "vvfill") {
+    // relay 29: mri2.cpp's MRIvol2VolFill (a mask, the LTA, FSLOUTPUTTYPE, USF, DoConserve,
+    // Gdiag_no, a given output)
+    MRI *src = get_vol();
+    fill_pat(src);
+    fill_box(src);
+    fill_paint(src);
+    MRI *mask = NULL;
+    if (geti()) {
+      mask = get_vol();
+      fill_paint(mask);
+    }
+    LTA *l = get_lta_full();
+    set_fsltype();
+    int usf = geti(), cons = geti(), gd = geti();
+    MRI *o = geti() ? get_vol() : NULL;
+    if (gd) {
+      Gdiag_no = gd;
+      Gstdout = stdout;  // as DiagInit sets it in the programs
+    }
+    fflush(stdout);
+    MRI *r = MRIvol2VolFill(src, mask, l, usf, cons, o);
+    fflush(stdout);
+    oi(r != NULL && r == o);
+    put_vol(r);
+  } else if (cmd == "fbnwm") {
+    // relay 29: mri2.cpp's MRIfindBrightNonWM
+    MRI *t1 = get_vol();
+    fill_pat(t1);
+    fill_box(t1);
+    fill_paint(t1);
+    MRI *wm = get_vol();
+    fill_pat(wm);
+    fill_box(wm);
+    fill_paint(wm);
+    fflush(stdout);
+    MRI *r = MRIfindBrightNonWM(t1, wm);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "qecc" || cmd == "vtero" || cmd == "vtdil") {
+    // relay 29: mri2.cpp's QuadEulerCharChange, MRIvolTopoErodeOne, MRIvolTopoDilateOne (Gx, Gy,
+    // Gz the debugging voxel)
+    MRI *v = get_vol();
+    fill_pat(v);
+    fill_box(v);
+    fill_paint(v);
+    Gx = geti();
+    Gy = geti();
+    Gz = geti();
+    if (cmd == "qecc") {
+      MRI *m = NULL;
+      if (geti()) {
+        m = get_vol();
+        fill_paint(m);
+      }
+      int c = geti(), r = geti(), sl = geti();
+      fflush(stdout);
+      int n = QuadEulerCharChange(v, m, c, r, sl);
+      fflush(stdout);
+      oi(n);
+    } else if (cmd == "vtero") {
+      MRI *k = NULL;
+      if (geti()) {
+        k = get_vol();
+        fill_paint(k);
+      }
+      fflush(stdout);
+      int n = MRIvolTopoErodeOne(v, k);
+      fflush(stdout);
+      oi(n);
+      put_vol(v);
+    } else {
+      int onval = geti();
+      fflush(stdout);
+      int n = MRIvolTopoDilateOne(v, onval);
+      fflush(stdout);
+      oi(n);
+      put_vol(v);
+    }
+  } else if (cmd == "fscm") {
+    // relay 29: mri2.cpp's FixSubCortMassHA::FixSCM
+    MRI *aseg = get_vol();
+    fill_pat(aseg);
+    fill_box(aseg);
+    fill_paint(aseg);
+    MRI *scm = get_vol();
+    fill_pat(scm);
+    fill_box(scm);
+    fill_paint(scm);
+    FixSubCortMassHA f;
+    f.aseg = aseg;
+    f.subcorticalmass = scm;
+    f.nDilate = geti();
+    fflush(stdout);
+    int n = f.FixSCM();
+    fflush(stdout);
+    oi(n);
+    put_vol(scm);
+    put_vol(f.mask);
+  } else if (cmd == "binmri") {
+    // relay 29: mri2.cpp's BinarizeMRI (every field; binarize, again on a second volume with the
+    // frames the first call left, then qualifies at one voxel)
+    BinarizeMRI b;
+    b.BinType = geti();
+    b.thmin = getd();
+    b.thmax = getd();
+    int nm = geti();
+    for (int k = 0; k < nm; k++) b.matchlist.push_back(geti());
+    b.maskthmin = getd();
+    b.maskthmax = getd();
+    b.ZeroColEdges = geti();
+    b.ZeroRowEdges = geti();
+    b.ZeroSliceEdges = geti();
+    b.OnVal = getd();
+    b.OffVal = getd();
+    b.fstart = geti();
+    b.fend = geti();
+    b.invert = geti();
+    b.mritype = geti();
+    b.DoAbs = geti();
+    b.m_debug = geti();
+    MRI *in = NULL;
+    if (geti()) {
+      in = get_vol();
+      fill_pat(in);
+      fill_box(in);
+    fill_paint(in);
+    }
+    MRI *m = NULL;
+    if (geti()) {
+      m = get_vol();
+      fill_paint(m);
+    }
+    MRI *o = geti() ? get_vol() : NULL;
+    int twice = geti();
+    fflush(stdout);
+    MRI *r = b.binarize(in, m, o);
+    fflush(stdout);
+    oi(r != NULL && r == o);
+    put_vol(r);
+    oi(b.nhits);
+    oi(b.fstart);
+    oi(b.fend);
+    od(b.OnVal);
+    od(b.OffVal);
+    if (twice) {
+      MRI *in2 = get_vol();
+      fill_pat(in2);
+      fill_box(in2);
+    fill_paint(in2);
+      fflush(stdout);
+      MRI *r2 = b.binarize(in2, NULL, NULL);
+      fflush(stdout);
+      put_vol(r2);
+      oi(b.nhits);
+      oi(b.fstart);
+      oi(b.fend);
+    }
+    int c = geti(), rr = geti(), sl = geti(), fr = geti();
+    if (in) oi(b.qualifies(in, m, c, rr, sl, fr));
+  } else if (cmd == "demb" || cmd == "demt" || cmd == "demm" || cmd == "demc") {
+    // relay 29: mri2.cpp's DEMorphBinVol (morph of a binary volume, by thresholds, by a match
+    // list; check, dump and copyFrame)
+    DEMorphBinVol d;
+    d.morphtype = geti();
+    d.topo = geti();
+    d.nnbrsthresh = geti();
+    d.nmorph = geti();
+    d.frame = geti();
+    d.mm_mritype = geti();
+    d.mm_debug = geti();
+    MRI *in = get_vol();
+    fill_pat(in);
+    fill_box(in);
+    fill_paint(in);
+    if (cmd == "demb") {
+      fflush(stdout);
+      MRI *r = d.morph(in);
+      fflush(stdout);
+      put_vol(r);
+      oi(d.nchangestot);
+    } else if (cmd == "demt" || cmd == "demm") {
+      MRI *m = NULL;
+      if (geti()) {
+        m = get_vol();
+        fill_paint(m);
+      }
+      MRI *o = geti() ? get_vol() : NULL;
+      MRI *r;
+      if (cmd == "demt") {
+        double a = getd(), bb = getd();
+        fflush(stdout);
+        r = d.morph(in, a, bb, m, o);
+      } else {
+        int n = geti();
+        std::vector<int> ml;
+        for (int k = 0; k < n; k++) ml.push_back(geti());
+        fflush(stdout);
+        r = d.morph(in, ml, m, o);
+      }
+      fflush(stdout);
+      put_vol(r);
+      oi(d.nchangestot);
+    } else {
+      MRI *m = geti() ? get_vol() : NULL;
+      MRI *o = geti() ? get_vol() : NULL;
+      int fr = geti();
+      fflush(stdout);
+      oi(d.check(in, m, o));
+      d.dump(in);
+      MRI *r = d.copyFrame(in, fr);
       fflush(stdout);
       put_vol(r);
     }

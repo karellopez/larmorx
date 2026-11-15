@@ -163,8 +163,7 @@ pub fn quad_euler_char_change(
                     if nhits == 7 {
                         dec -= 1;
                         if debug {
-                            let _ =
-                                writeln!(out, "vertex {dc:2} {dr:2} {ds:2} removed dEC={dec}");
+                            let _ = writeln!(out, "vertex {dc:2} {dr:2} {ds:2} removed dEC={dec}");
                         }
                     }
                 }
@@ -205,8 +204,8 @@ pub fn mri_vol_topo_erode_one(
     keepmask: Option<&Mri>,
 ) -> Result<i32, Fatal> {
     const WHAT: &str = "MRIvolTopoErodeOne";
-    let Some(mrie6) = mri_erode_nn(g, out, err, Pair::New(binvol), NEAREST_NEIGHBOR_FACE, 1)?
-        .into_new()
+    let Some(mrie6) =
+        mri_erode_nn(g, out, err, Pair::New(binvol), NEAREST_NEIGHBOR_FACE, 1)?.into_new()
     else {
         return Ok(0);
     };

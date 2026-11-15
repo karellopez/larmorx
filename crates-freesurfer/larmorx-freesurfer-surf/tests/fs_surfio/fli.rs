@@ -24,7 +24,7 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{Mri, mri_alloc};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_surf::{curvfile, mriflood, readwrite, sras};
+use larmorx_freesurfer_surf::{curvfile, mriflood, readwrite, sras, valfile};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
 pub(super) const FRAMES: [[f32; 9]; 6] = [
@@ -761,6 +761,89 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 )?;
                 o.i(i64::from(r));
                 curv_fnv(&s, o);
+            }
+        }
+        "pvw" => {
+            // relay 36 of track D: `fssurfio.cpp`'s `flr pvw` (a recorded per-vertex file read as
+            // values; the patch, the normals, the values into a volume; read back)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let cf = t.next().to_owned();
+            let td = tempfile::tempdir().expect("a work folder");
+            let dir = td.path();
+            let fnv = |b: &[u8], o: &mut Out| {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for &c in b {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let field_fnv = |s: &Mris, normals: bool, o: &mut Out| {
+                let mut b = Vec::new();
+                for v in 0..s.nvertices.max(0) as usize {
+                    let x = s.vertex(v);
+                    if normals {
+                        for f in [x.nx, x.ny, x.nz] {
+                            b.extend_from_slice(&f.to_bits().to_le_bytes());
+                        }
+                    } else {
+                        b.extend_from_slice(&x.val.to_bits().to_le_bytes());
+                    }
+                }
+                fnv(&b, o);
+            };
+            let r = valfile::read_values(g, sg, &mut io, None, &mut s, &cf)?;
+            o.i(i64::from(r));
+            field_fnv(&s, false, o);
+            o.i(i64::from(valfile::write_patch(
+                g,
+                &mut io,
+                Some(dir),
+                &mut s,
+                "./p.patch",
+            )));
+            let r = valfile::write_normals(g, &mut io, Some(dir), &s, "./n.mgz")?;
+            o.i(i64::from(r));
+            let mut given = larmorx_freesurfer_mri::mri::mri_alloc(
+                g,
+                io.out,
+                io.err,
+                s.nvertices,
+                1,
+                1,
+                larmorx_freesurfer_mri::mri::MRI_FLOAT,
+            )?;
+            let r =
+                valfile::write_into_volume(g, &mut io, &s, Some(&mut given), valfile::VERTEX_VALS)?;
+            o.i(i64::from(matches!(r, valfile::IntoVolume::Given)));
+            let mut b = Vec::new();
+            for v in 0..s.nvertices {
+                let x = larmorx_freesurfer_mri::voxel::mri_get_vox_val(
+                    g, io.err, &given, v, 0, 0, 0, 0,
+                )?;
+                b.extend_from_slice(&x.to_bits().to_le_bytes());
+            }
+            fnv(&b, o);
+            for v in 0..s.nvertices.max(0) as usize {
+                let x = s.vertex_mut(v);
+                (x.nx, x.ny, x.nz) = (0.0, 0.0, 0.0);
+            }
+            o.i(i64::from(valfile::read_normals(
+                g,
+                &mut io,
+                Some(dir),
+                &mut s,
+                "./n.mgz",
+            )?));
+            field_fnv(&s, true, o);
+            let r = valfile::read_values(g, sg, &mut io, Some(dir), &mut s, "./n.mgz")?;
+            o.i(i64::from(r));
+            field_fnv(&s, false, o);
+            let mut files = Vec::new();
+            list_files(dir, "", &mut files);
+            files.sort();
+            for n in &files {
+                o.h(Some(n.as_bytes()));
+                fnv(&std::fs::read(dir.join(n)).unwrap_or_default(), o);
             }
         }
         _ => panic!("flr op {op}"),

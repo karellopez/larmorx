@@ -1797,6 +1797,16 @@ defects! {
         "the T2 mask (MRImask_with_T2_and_aparc_aseg) asked to erase no layer of bright exterior voxels (a distance of 0 or less) prints the error 'MRIfree: null pointer' at its end (its result is not changed; every FreeSurfer caller asks for 5 layers)";
     FS_618 = "FS-618", "FreeSurfer", true,
         "the T2 mask (MRImask_with_T2_and_aparc_aseg) without a destination crashes the program at its end, after its messages (every FreeSurfer caller gives one)";
+    FS_619 = "FS-619", "FreeSurfer", true,
+        "writing one field of a surface's vertices into a new volume (MRISwriteIntoVolume given no volume) makes a volume of 1 x 1 x <vertices>, so a surface of two vertices or more is refused with 'nvertices <n> doesn't match' and no volume is given (the diagnostic dx, dy, dz volumes of the surface deformations then crash the program)";
+    FS_620 = "FS-620", "FreeSurfer", true,
+        "reading a surface's values from a volume (MRISreadValues) at a frame the volume does not have crashes the program (signal 11) instead of printing its 'attempted to read frame' error";
+    FS_621 = "FS-621", "FreeSurfer", true,
+        "reading a surface's values from a w file (MRISreadValues) with a vertex number outside the surface skips that entry without reading its value, so every later entry is read three bytes out of step (other vertex numbers and values), and its 'vertex index out of range' line prints the previous entry's value";
+    FS_622 = "FS-622", "FreeSurfer", true,
+        "reading a surface's values (MRISreadValues) from a file name of 1,023 bytes or more: FreeSurfer's copy of the name has no end, so the volume format test reads memory past it (an undefined answer)";
+    FS_623 = "FS-623", "FreeSurfer", true,
+        "reading a surface's values from a volume (MRISreadValues) whose width x height x depth overflows a 32-bit int to the vertex count writes past the values (a crash or memory corruption)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

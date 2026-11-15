@@ -82,3 +82,9 @@ int fssurfio_write_quadrangle_file(MRIS *mris, const char *fname)
 {
   return __MRISwriteQuadrangleFile(mris, fname);
 }
+
+// relay 36 of track D: MRISreadValuesIntoArray (declared static at the top of mrisurf_io.cpp)
+int fssurfio_read_values_into_array(const char *sname, int size, float **out)
+{
+  return MRISreadValuesIntoArray(sname, size, out);
+}

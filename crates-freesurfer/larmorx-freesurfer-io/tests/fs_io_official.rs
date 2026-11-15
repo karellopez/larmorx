@@ -3,7 +3,7 @@
 // 2026 Karel Lopez Vilaret.
 //! fs.io against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the official
 //! build's output lines for the probe's recorded cases (`cases::recorded_cases`: seed 1's 4,800
-//! portable cases, about 40 of each of the 121 commands that behave alike on every platform: piece
+//! portable cases, about 39 of each of the 123 commands that behave alike on every platform: piece
 //! 1's ten, piece 2's twelve, piece 3's six, piece 4's seven (the format probe's file cases made
 //! portable), piece 5's seven (mosaics, MATLAB files), piece 6's five (reading volumes and
 //! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images), piece 9's
@@ -18,11 +18,11 @@
 //! 20's two (GE Signa and GE XIMG series), piece 21's two (old Siemens .ima series), piece 22's
 //! seven (AFNI datasets, curvature files and annotations read as volumes, the AFNI and NRRD
 //! writers), piece 23's three (image files read and written as volumes, ITK warps written) and
-//! piece 24's two (NRRD volumes read),
+//! piece 24's two (NRRD volumes read) and piece 25's two (MINC volumes read),
 //! without those that take seconds in a debug build (`cases::HEAVY_SEED1`, none since piece 23),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-15, track A relay 32, with piece 24:
-//! 4,800 cases, 4,317 lines identical, 47 of them with memory digits; 483 hashed as
+//! --light` on Linux x64 from the unit oracle's build (2026-11-15, track A relay 33, with piece 25:
+//! 4,800 cases, 4,300 lines identical, 48 of them with memory digits; 500 hashed as
 //! `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
@@ -44,8 +44,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "6ed4280bce25b92d686f9f54a993aa24f29f92faa37448d295501bb2dc1d5be1";
-const SKIPPED: usize = 483;
+const OFFICIAL_SHA256: &str = "e52b277eda6485ef8ead3640ea79fc1cb6e499d4b0d18be2b7f2d0ae9c739c56";
+const SKIPPED: usize = 500;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

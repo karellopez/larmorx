@@ -5,11 +5,11 @@
 //! official build's output lines for the probe's cases of seed 1 (1,530 cases, thirty of each of
 //! the 51 commands; `metric`'s through the probe built with a stub metric-properties step),
 //! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1530` on Linux x64 from the unit
-//! oracle's build (2026-11-15, relay 36 of track D, from the clean commit 77ba7057: 1,480 lines
-//! identical, 50 counted, not compared, where
+//! oracle's build (2026-11-15, relay 36 of track D, from the clean commit 16bade30: 1,480 lines
+//! identical, 49 counted, not compared, where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
-//! `SKIP`; an `mpg` line whose only differences are glibc's `acos` last bits would be hashed as the
-//! port's, none in this set), against the port's output with `reproduce` (a case the port marks
+//! `SKIP`; an `mpg` line whose only differences are glibc's `acos` last bits hashed as the port's,
+//! one in this set), against the port's output with `reproduce` (a case the port marks
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
 //! `stl`, `tri`, `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii`, `gwr`, `mpf`, `mpg`,
 //! `fli`, `bvl`, `crv`, `pvw`, `vps` and `ann` cases run in a temporary folder of their own.
@@ -36,7 +36,7 @@ const SKIP: [&str; 50] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "ba744d66a70cb3ef710d86fd29ff204854d42772f1089a887c2adc7340f02027";
+const OFFICIAL_SHA256: &str = "ae997cbd7a99cc74ba69b29e2381ee1b84f9f111e519c27a1abcb7882bc4f4b6";
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_surfio/official_digests.txt");

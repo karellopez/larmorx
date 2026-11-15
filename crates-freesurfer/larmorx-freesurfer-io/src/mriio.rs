@@ -281,7 +281,6 @@ pub fn mri_read_type(
 fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MRI_GCA_FILE => "GCA",
         MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
@@ -480,6 +479,15 @@ pub fn mri_read(
         mris_read_curv_as_mri(g, out, err, dir, &copy, volume_flag)?
     } else if mtype == identify::MGH_ANNOT {
         crate::annotation::read_annot_as_mri_seg(g, out, err, dir, &copy, volume_flag)?
+    } else if mtype == identify::MRI_GCA_FILE {
+        let Some(read_gca) = crate::upper::get().read_gca else {
+            crate::upper::missing(err, "reading GCA volumes", "fs.gca", "readGCA", &copy);
+            return Ok(None);
+        };
+        let r = read_gca(g, out, err, dir, &copy, start_frame, end_frame)?;
+        // readGCA chose the frames
+        start_frame = -1;
+        r
     } else if mtype == identify::IMAGE_FILE {
         // every voxel read whatever volume_flag says; the frames are not checked
         let r = crate::imageio::read_as_volume(g, out, err, dir, &copy)?;

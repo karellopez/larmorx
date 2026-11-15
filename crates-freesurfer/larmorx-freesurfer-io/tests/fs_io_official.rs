@@ -3,7 +3,7 @@
 // 2026 Karel Lopez Vilaret.
 //! fs.io against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the official
 //! build's output lines for the probe's recorded cases (`cases::recorded_cases`: seed 1's 4,800
-//! portable cases, about 36 of each of the 134 commands that behave alike on every platform: piece
+//! portable cases, about 35 of each of the 136 commands that behave alike on every platform: piece
 //! 1's ten, piece 2's twelve, piece 3's six, piece 4's seven (the format probe's file cases made
 //! portable), piece 5's seven (mosaics, MATLAB files), piece 6's five (reading volumes and
 //! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images), piece 9's
@@ -18,12 +18,12 @@
 //! 20's two (GE Signa and GE XIMG series), piece 21's two (old Siemens .ima series), piece 22's
 //! seven (AFNI datasets, curvature files and annotations read as volumes, the AFNI and NRRD
 //! writers), piece 23's three (image files read and written as volumes, ITK warps written) and
-//! piece 24's two (NRRD volumes read), piece 25's two (MINC volumes read) and piece 26's one (MINC
-//! volumes written),
+//! piece 24's two (NRRD volumes read), piece 25's two (MINC volumes read), piece 26's one (MINC
+//! volumes written) and piece 27's two (GCA atlases read as volumes),
 //! without those that take seconds in a debug build (`cases::HEAVY_SEED1`, none since piece 23),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-15, track A relay 34, with piece 26:
-//! 4,800 cases, 4,310 lines identical, 42 of them with memory digits; 490 hashed as
+//! --light` on Linux x64 from the unit oracle's build (2026-11-15, track A relay 35, with piece 27:
+//! 4,800 cases, 4,303 lines identical, 45 of them with memory digits; 497 hashed as
 //! `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
@@ -45,8 +45,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "5dd80d2cd2eb7cde610bf366497705794550e22ee492811201b6420b2497b47e";
-const SKIPPED: usize = 490;
+const OFFICIAL_SHA256: &str = "465026753bd05fce4264bc81e5fcd68e698beed94fcb236f6b838ede18e290e7";
+const SKIPPED: usize = 497;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

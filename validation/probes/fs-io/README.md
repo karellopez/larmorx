@@ -298,6 +298,19 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   read back's piece-25 list under `reproduce`. Seeds 7, 13 and 21 (888 piece-26 cases each): `reproduce` identical on
   every compared case (2,353), 0 different, 311 skipped; `fix` differs only with notices (FS-746 to FS-748, FS-797,
   the reader's FS-744, FS-01).
+- Piece 27 (track A relay 35): GCA atlases read as volumes. `gcd` and `gch` (piece 6's `mrd` and `mrh`: type -1 or
+  22, `.gca` names, `.gcz` names of type 22, `@gca`) of atlas files built by `tests/fs_io/piece27.rs` as `GCAwrite`
+  lays them out: versions 5, 4, 3, 2, 1, 0.5 and refused ones (4.5, 6, -1, NaN); spacings ordinary, fractional,
+  equal, inverted, 0, negative, NaN over training extents of 0 to 6 voxels (grids stored and computed agreeing or
+  not), now and then a stored node size one larger; 0 to 3 inputs, -1, 101, 109, 110, 50,000, 70,000; flags 0, 1,
+  0x10; classes, labels, means, covariances, neighbour lists and priors with NaN, infinite, subnormal values and
+  ties; at most one anomaly per file (a count or label past 16 bits or negative); the tagged section (type, MR
+  parameters, a binary colour table, the geometry, unknown tags, junk before it); frames none, `#0` to `#3`, `#0:2`;
+  faults (cut, missing, a folder, not an atlas, empty, `.gcz`). FreeSurfer's side maps `gcd`/`gch` to `mrd`/`mrh`.
+  `SKIP` for FS-750, FS-755 to FS-759 and FS-167 under `reproduce`. Seeds 7, 13 and 21 (1,750 piece-27 cases each):
+  `reproduce` identical on every compared case (4,619), 0 different, 631 skipped; `fix` differs only with notices
+  (FS-01, FS-17, FS-749, FS-751, FS-753, FS-754). FreeSurfer 8.2.0's own atlases against the official `mri_convert`:
+  `crates-freesurfer/larmorx-freesurfer-gca/examples/gca_volume.rs` (findings Part 29).
 - `nrrd_itk_geometry.py` (relay 32): the default's NRRD geometry (FS-736 to FS-738) against ITK 5.4.5's NRRD
   reader (ANTs 2.6.5's `PrintHeader`, through the oracle-output cache): 400 seeded files, the voxel-to-RAS
   matrices compared: `python -P validation/probes/fs-io/nrrd_itk_geometry.py --seed 1 --n 400` (prints

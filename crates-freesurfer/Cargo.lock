@@ -195,6 +195,7 @@ dependencies = [
  "larmorx-freesurfer-classic",
  "larmorx-freesurfer-core",
  "larmorx-freesurfer-cortex",
+ "larmorx-freesurfer-gca",
  "larmorx-freesurfer-networks",
  "larmorx-freesurfer-recon",
  "larmorx-freesurfer-topology",
@@ -252,8 +253,15 @@ dependencies = [
 name = "larmorx-freesurfer-gca"
 version = "0.1.0-rc.1"
 dependencies = [
+ "larmorx-core",
+ "larmorx-freesurfer-core",
  "larmorx-freesurfer-filter",
+ "larmorx-freesurfer-io",
+ "larmorx-freesurfer-mri",
  "larmorx-freesurfer-surf",
+ "larmorx-freesurfer-volume",
+ "larmorx-io",
+ "tempfile",
 ]
 
 [[package]]
@@ -263,6 +271,7 @@ dependencies = [
  "flate2",
  "larmorx-core",
  "larmorx-freesurfer-core",
+ "larmorx-freesurfer-gca",
  "larmorx-freesurfer-mri",
  "larmorx-freesurfer-volume",
  "larmorx-io",
@@ -339,6 +348,7 @@ dependencies = [
  "flate2",
  "larmorx-core",
  "larmorx-freesurfer-core",
+ "larmorx-freesurfer-gca",
  "larmorx-freesurfer-io",
  "larmorx-freesurfer-mri",
  "larmorx-io",

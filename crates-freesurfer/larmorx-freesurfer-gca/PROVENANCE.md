@@ -11,10 +11,30 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 
 ## FreeSurfer files and functions translated
 
-None yet: the crate was created empty by queue item 3.1-01 (`docs/freesurfer/queue.md`). Each
-item that brings code adds its files and functions here, with the third-party code it found in
-them (CLAUDE.md rule 3: each ported file is audited for third-party code first).
+### Track A's relay 35 of FreeSurfer's foundations: GCA atlases read as volumes (`mri_read`'s type 22)
+
+Taken early from queue items 3.3-01, 3.3-02, 3.3-04 and 3.3-05 for queue item 3.1-30's `readGCA`; the rest of
+`gca.cpp` comes with those items.
+
+| FreeSurfer file (lines) | Functions | Here |
+|---|---|---|
+| `include/gca.h` 26-252; `utils/gca.cpp` 99-103 | `GCA`, `GCA_NODE`, `GCA_PRIOR`, `GC1D` (laid out compactly: the six neighbour lists in two arrays, `Nbrs`), `MAX_GCA_INPUTS`, `GIBBS_NEIGHBORS`, the types, flags and tags, `VERY_UNLIKELY`, `GCA_UCHAR_VERSION`, `GCA_INT_VERSION` (`tissue_parms` not kept: nothing ported reads it) | `gca.rs` |
+| `utils/gca.cpp` 245-268, 299-342, 344-494 | `GCAcopyDCToMRI`, `GCAcleanup` (Rust's drop), `GCAsetup` (FS-754) | `gca.rs` |
+| `utils/gca.cpp` 524-550, 623-704, 810-917 (`USE_ROUND` 1) | `getPrior`, `boundsCheck`, `gcaNodeToPrior`, `GCApriorToNode`, `GCAvoxelToNode`, `GCAvoxelToPriorReal` and `GCAvoxelToPrior` (one `AffineMM` per volume, not per voxel: the same product) | `gca.rs` |
+| `utils/gca.cpp` 1474-1640, 12601-12663 | `gcaAllocMax` (the grids filled as they are read; their allocation errors), `GCAfree`, `GCANfree`, `free_gcs` (Rust's drop), `alloc_gcs` (its failures: FS-753, FS-756) | `gca.rs`, `read.rs` |
+| `utils/gca.cpp` 2218-2650; `include/macros.h` (`DEGREES`, `FEQUAL`, `DZERO`) | `GCAread` (FS-749 to FS-759; FS-167 for the numbers a file cuts) | `read.rs` |
+| `utils/gca.cpp` 6951-7030, 19208-19330 | `GCAbuildMostLikelyVolume`, `GCAbuildMostLikelyLabelVolume`, `GCAbuildMostLikelyLabelProbabilityVolume` (its NaN as the official object code converts it) | `likely.rs` |
+| `utils/mriio.cpp` 12025-12084 | `readGCA` (registered with fs.io's `upper` table: `mri_read` calls it) | `likely.rs` |
+
+Third-party code: none in these lines (`docs/freesurfer/third-party.md`). The binary colour table of the tagged
+section is fs.io's (`znzCTABreadFromBinary`); the volumes, matrices, resampling and frame copies are fs.mri's,
+fs.core's and fs.volume's.
 
 ## Changes from the originals
 
-None yet.
+The grids are read through a buffer (FreeSurfer's `fread` is buffered; the port's plain file is not): the same
+numbers, messages (`znzreadInt: znzread failed`, `freadFloat: fread failed`) and FS-167 notices as fs.io's readers;
+the file is positioned back before the tagged section, read number by number. Each voxel's prior point is computed
+once for its node and its prior (FreeSurfer computes it twice, identically). The defaults of FS-749 to FS-759 and
+their notices are larmorx's own; the D13 switch `reproduce` gives FreeSurfer's behaviour where it is defined
+(`docs/findings/freesurfer-io.md` Part 29, `specs/freesurfer-io.md` §132).

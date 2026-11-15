@@ -2103,3 +2103,113 @@ program ends (four dimensions, FS-797; zero cosines), 132 types refused, 79 fold
 (a missing folder, a file in a folder's place). `fix` differs only with notices (FS-746, FS-747, FS-748, FS-797, and the read
 back's FS-744 and FS-01). The light run (`check.py --seed 1 --n 4800 --portable --light`, relay 34): 4,800 cases,
 4,310 identical (42 with memory digits), 490 hashed as `SKIP`, 0 different (`5dd80d2c...`, `tests/fs_io_official.rs`).
+
+## Part 29: GCA atlases read as volumes (relay 35 of track A)
+
+Sources: `utils/mriio.cpp` 613-615 (`mri_read`'s `MRI_GCA_FILE` branch: `readGCA`, then `start_frame = -1`),
+12025-12084 (`readGCA`); `utils/gca.cpp` 99-103 (`VERY_UNLIKELY`, `GCA_UCHAR_VERSION`, `GCA_INT_VERSION`), 245-268
+(`GCAcopyDCToMRI`), 299-342 (`GCAcleanup`), 344-494 (`GCAsetup`), 524-550 (`getPrior`), 623-651 (`boundsCheck`),
+653-704 (`gcaNodeToPrior`, `GCApriorToNode`), 810-917 (`GCAvoxelToNode`, `GCAvoxelToPriorReal`, `GCAvoxelToPrior`
+with `USE_ROUND` 1), 1474-1640 (`gcaAllocMax`, `GCAfree`, `GCANfree`), 2218-2650 (`GCAread`), 6951-7030
+(`GCAbuildMostLikelyVolume`), 12601-12663 (`alloc_gcs`, `free_gcs`), 19208-19330 (`GCAbuildMostLikelyLabelVolume`,
+`GCAbuildMostLikelyLabelProbabilityVolume`); `include/gca.h` 26-252 (the structures, `MAX_GCA_INPUTS` 100,
+`GIBBS_NEIGHBORS` 6, the tags); `include/macros.h` (`DEGREES`, `FZERO`, `FEQUAL`, `DZERO`). The port: crate
+`larmorx-freesurfer-gca` (`gca.rs`, `read.rs`, `likely.rs`), registered with fs.io through `upper.rs`
+(`read_gca`), as fs.volume's image conversions are.
+
+### Mechanisms
+- **The grids are recomputed.** `GCAread` calls `gcaAllocMax(ninputs, prior_spacing, node_spacing, node_spacing *
+  node_width, ...)`: the `int` parameters `width`, `height`, `depth` receive `float` products (`cvttss2si`), and the
+  grids are sized again from them (`(int)(((float)width / spacing) + .99)`); the file's prior sizes are read into
+  nothing (`// prior_width = znzreadInt(file)`). GCAwrite writes the sizes `gcaAllocMax` gave at training, so a
+  training volume whose width is not a multiple of the node spacing (253 with nodes every 4, priors every 2: 64
+  nodes, 127 priors written, 64 x 4 = 256 read back, 128 priors expected) or a fractional spacing reads every later
+  number from the wrong place (FS-749). The official atlases (256 voxels, spacings 4 and 2) agree.
+- **Counts and labels in `short` and `unsigned short`.** `GCA_PRIOR::nlabels` and `GC1D::nlabels[i]` are `short`,
+  labels `unsigned short`, all assigned from `znzreadInt` (GCC's modular conversion): FS-751. A negative count reaches
+  `calloc` as a huge `size_t` (NULL, `ENOMEM`): `ErrorExit(ERROR_NOMEMORY, ...)`, exit status 254 after `Cannot
+  allocate memory`; for a neighbour list the message's `%d` gets `gc->nlabels`, the array's address (FS-755); the next
+  test `if (!gc->labels)` tests the wrong pointer (never NULL: `alloc_gcs` made it).
+- **`alloc_gcs`** allocates before the reading: `calloc(nlabels, sizeof(GC1D))` (56 bytes), then per class
+  `calloc(ninputs, 4)` and `calloc((ninputs * (ninputs + 1)) / 2, 4)` (an `int` product: past 46,340 inputs it wraps:
+  FS-753; a negative product fails with `could not allocate mean (%d) and covariance (%d) matrices`, the count
+  printed wrapped too), then, without `GCA_NO_MRF`, three `calloc(6, ...)`. Its own failure messages make
+  `GCAread`'s `if (!gcan->gcs)` unreachable. Whether a huge positive count's allocation succeeds depends on the
+  machine (overcommit, memory): FS-756; a success reads on past the file's end.
+- **A cut file (FS-750).** Every number past the end is `znzreadInt`/`znzreadFloat`/`znzread1`'s memory slot
+  (FS-167): a label count among them keeps the reading going for as long as memory says. `znzreadFloat` prints
+  `freadFloat: fread failed` at each failed read; `znzreadInt` only when the read failed before the end and
+  `Gdiag_no` is set.
+- **TAG_PARAMETERS** loops `n < gca->ninputs` (not over the stored count) into `double TRs[100], FAs[100], TEs[100]`
+  followed in the struct by the 12 direction-cosine `float`s, `width`, `height`, `depth`, three voxel sizes, then the
+  `MRI *mri_node__` pointer (offsets measured from the layout: `TEs[100]` at `x_r`/`x_a`, `TEs[106]` at
+  `width`/`height`, `TEs[109]` at `mri_node__`). From 101 inputs the stores alias (`TRs[100 + k]` is `FAs[k]`,
+  `FAs[100 + k]` is `TEs[k]`, `TEs[100 + k]` the fields after): FS-752 (the reproduce model writes the same bytes
+  in the same order, then reads the fields back); from 110 a pointer is overwritten and `GCAsetup`'s `MRIfree` of it
+  crashes: FS-759. The printed lines use the values just read (the compiler forwards them). With 101 to 109 inputs and
+  no geometry tag after the parameters the overwritten direction cosines are usually dependent: FS-754's crash.
+- **The prior grid's inverse (FS-754).** `GCAsetup` does `tmp = extract_r_to_i(gca->mri_prior__);
+  SetAffineMatrix(gca->prior_r_to_i__, tmp)`: `extract_r_to_i` is `MatrixInverse`, NULL for a singular matrix, and
+  `SetAffineMatrix` reads `tmp->rows` through NULL: a crash (SIGSEGV) for a prior spacing or voxel size of 0,
+  direction cosines of length 0 or dependent, NaN among them. The node and Talairach inverses may be NULL (unused
+  here).
+- **`gcaNodeToPrior` has no bounds check**: the class-weight loop's `&gca->priors[xp][yp][zp]` dereferences the
+  pointer arrays for every node (empty ones too) and reads outside when the node grid reaches past the prior grid
+  (a prior spacing below the node spacing with FS-749's sizes, fractional spacings): FS-757. Its `if (gcap == NULL)`
+  never holds.
+- **The tagged section and zlib's error (FS-758).** `while (znzreadIntEx(&tag, file))`: FreeSurfer's `znzread`
+  returns -1 for zlib's error, which is true: damaged data after the grids loops for ever (the probe's 5-second alarm
+  ends it); at the start `if (!znzreadFloatEx(&version, file))` passes -1 too and the version is the uninitialised
+  stack `float` (a `.gcz` folder: `gzread` of a folder fails with `EISDIR`, and the reading goes on: `Is a directory`,
+  `freadFloat: fread failed`, the helper grids' shape messages, a crash: the probe's seed 7).
+- **The volumes.** `GCAvoxelToNode` calls `GCAvoxelToPrior` and maps that prior point to a node, ignoring the
+  prior's bounds code; `GCAbuildMostLikely*` then call `GCAvoxelToPrior` again (the port computes it once: the same
+  function of the same inputs). `GCAvoxelToPriorReal` multiplies `prior_r_to_i__` and the volume's `i_to_r__` with
+  `AffineMM` at every voxel (the port once per volume). `readGCA`'s frame 0 and default cases give the means a volume
+  of one frame and `GCAbuildMostLikelyVolume` exits when that is not the input count (the official multi-input atlas
+  `wmsa_new_eesmith.gca`'s frames 0 and -1). Frame 2's volume has one frame per input, only frame 0 written.
+- **Frame 2's NaN (the object code).** `GCAbuildMostLikelyLabelProbabilityVolume`'s inner loop, as GCC 8.4.0
+  compiled it: `max_prior` is `cvtss2sd(priors[0])`; for one label the original `float` register is passed to
+  `MRIsetVoxVal` (the conversions folded away: a signalling NaN survives); for two or more the loop runs in `double`
+  (`cmpnlesd`, `andpd`/`andnpd`/`orpd`: take the new prior when `max <= p`) and ends with `cvtsd2ss`: quiet. The
+  port keeps the `float` and sets the quiet bit for two or more (found by piece 27: `0x7fa00003` official for a
+  single label, `0x7fe00003` for three).
+- **`MRIresample`** of the probability volume onto the atlas's grid (frame -1's third frame) rounds by its own rule:
+  a voxel's prior can come from the point next to the one its label came from (the port's unit test allows it).
+- **Speed and memory (the port).** The port's plain `ZnzFile` is unbuffered and the first reader asked for its
+  position around every number: 34 s for `RB_all_2020-01-02.gca` where FreeSurfer takes 0.7 s. `GCAread` now reads the
+  grids through a 64 KiB buffer (the same numbers, messages and notices; the file is positioned back for the tagged
+  section, which the colour table's reader reads itself) and keeps classes compactly (two arrays for the six
+  neighbour lists): 0.57 s and 327 MB against FreeSurfer's 0.68 s and 433 MB (frame 0). Frame -1 (three 256^3 float
+  frames): 7.3 s against 5.0 s, 674 MB against 660 MB (`face.gca`).
+
+### Decisions (rules A to D)
+- FS-749 (rule A): the file's own grid sizes (a notice when they differ from the spacings'); reproduce the spacings'.
+- FS-750 (rule B): a file that ends inside the atlas (header, nodes, priors, a tag's parameters) is refused; reproduce
+  keeps what was read, the rest empty (memory contents in FreeSurfer: not compared).
+- FS-751 (rule B): a count or label past its 16-bit field refused; reproduce keeps the low 16 bits.
+- FS-752, FS-759 (rule A): every input's parameters kept, the other fields untouched; reproduce models the aliasing
+  (101 to 109 inputs) and ends with status 139 beyond (FreeSurfer's crash).
+- FS-753 (rule A): the exact covariance count; reproduce the 32-bit one (an allocation error with the wrapped count,
+  or the reading of a file that ends).
+- FS-754 (rule B): a clear error (`GCAsetup: the atlas's prior grid has a voxel-to-RAS matrix with no inverse`, the
+  program ends with 252); reproduce ends with status 139.
+- FS-755 (rule A for the message): the count printed (both modes; FreeSurfer's address is not reproducible).
+- FS-756: no allocation limit by default (a count past the file's data ends in FS-750); reproduce models the
+  failure (`alloc_gcs(...): could not allocated <n> gcs`) past 16 GiB, noted as the machine's.
+- FS-757 (rule A): a node whose prior point is outside the prior grid gets no class weights (FreeSurfer's evident
+  intent, its NULL test); both modes, noted.
+- FS-758 (rule B): damaged compressed data refused (`GCAread(<name>): the compressed data is damaged`, or `could not
+  read file` at the start); both modes (a hang or memory contents in FreeSurfer).
+- Kept (rule C): frames 0 and -1 ending the program for atlases of several inputs (FreeSurfer's message); frame 2's
+  quiet NaN; the labels as bytes for version 4.0 exactly.
+
+### What the probe measured (piece 27)
+Seeds 7, 13 and 21 (1,750 piece-27 cases each): `reproduce` identical on every compared case (1,532, 1,543, 1,544), 0
+different; 218, 207 and 206 skipped (FS-750's cut files above all, FS-755's negative neighbour counts, FS-167);
+`fix` differs only with notices (FS-01, FS-749, FS-751, FS-753, FS-754, FS-17). FreeSurfer 8.2.0's own atlases
+(`average/RB_all_2020-01-02.gca`, `RB_all_withskull_2020_01_02.gca`, `face.gca`, `wmsa_new_eesmith.gca`) at frames
+-1, 0, 1, 2 against the official `mri_convert` (`FS_LEAVE_NANS=1`): every voxel identical, both modes (50,331,648
+voxels for each frame -1). The light run (`check.py --seed 1 --n 4800 --portable --light`, relay 35): 4,800 cases,
+4,303 identical (45 with memory digits), 497 hashed as `SKIP`, 0 different (`46502675...`,
+`tests/fs_io_official.rs`).

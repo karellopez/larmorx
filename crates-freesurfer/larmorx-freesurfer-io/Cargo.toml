@@ -15,7 +15,9 @@ larmorx-io.workspace = true
 larmorx-core.workspace = true
 
 [dev-dependencies]
-# the probe and its tests link the image conversions fs.io calls (crate::upper)
+# the probe and its tests link the conversions fs.io calls (crate::upper): the image ones and
+# the GCA reader
 larmorx-freesurfer-volume.workspace = true
+larmorx-freesurfer-gca.workspace = true
 sha2.workspace = true
 tempfile.workspace = true

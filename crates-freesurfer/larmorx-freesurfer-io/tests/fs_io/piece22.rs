@@ -430,7 +430,7 @@ fn curv_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
 }
 
 /// A binary colour table (version 1 or 2) of `n` entries, colours from `cols`.
-fn ctab(g: &mut Gen, d: &mut Vec<u8>, cols: &[(i32, i32, i32)]) {
+pub(crate) fn ctab(g: &mut Gen, d: &mut Vec<u8>, cols: &[(i32, i32, i32)]) {
     let name = |d: &mut Vec<u8>, s: &[u8]| {
         be32(d, s.len() as i32 + 1);
         d.extend_from_slice(s);

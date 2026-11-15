@@ -40,7 +40,7 @@ use crate::cfile::CFile;
 /// contents in FreeSurfer (`defect`). A run keeps one notice per defect: this one replaces an
 /// earlier notice of the defect that said FreeSurfer's bytes were the earlier number's (the run's
 /// result then holds memory contents somewhere).
-pub(crate) fn memory(g: &mut Globals, defect: &'static Defect, what: &str, got: usize, n: usize) {
+pub fn memory(g: &mut Globals, defect: &'static Defect, what: &str, got: usize, n: usize) {
     let detail = format!(
         "{what}: the file ended after {got} of the number's {n} bytes: the others read as 0 (FreeSurfer's are memory contents)"
     );

@@ -2163,6 +2163,28 @@ defects! {
         "writing a volume of 32-bit integers as MINC takes the file's valid range from the values rounded to floats: past 2^24 the values lie outside the file's valid range, and with values near the 32-bit limits the range passes them and every voxel is written as -2147483648";
     FS_748 = "FS-748", "FreeSurfer", true,
         "writing a float volume as MINC whose first voxel is NaN gives the file a valid range of NaN (with volume_io's message: Volume has invalid min and max voxel value), whatever the other voxels hold";
+    FS_749 = "FS-749", "FreeSurfer", true,
+        "reading a GCA atlas (.gca, .gcz) whose node grid or prior grid sizes, as the file stores them, differ from the sizes its spacings give (a spacing that is not a whole number, a training volume whose width is not a multiple of the node spacing) reads the file's nodes and priors with the sizes the spacings give: every value after the first difference is read from the wrong place";
+    FS_750 = "FS-750", "FreeSurfer", true,
+        "reading a GCA atlas that ends inside its nodes, priors or tagged parameters takes the missing numbers from memory contents (label counts among them, so the reading can go on far past the end)";
+    FS_751 = "FS-751", "FreeSurfer", true,
+        "reading a GCA atlas keeps a prior's label count, a classifier's neighbour label counts and every label in 16 bits: a count or label of 32,768 or more (65,536 or more for a label) becomes another number, and a count read so reads the rest of the file from the wrong place";
+    FS_752 = "FS-752", "FreeSurfer", true,
+        "reading a GCA atlas of 101 to 109 inputs whose file holds the MR parameters (TR, flip angle, TE per input) writes them past the room for 100: other inputs' parameters and the atlas's direction cosines, centre, sizes and voxel sizes are overwritten (unless the file gives the direction cosines after the parameters)";
+    FS_753 = "FS-753", "FreeSurfer", true,
+        "reading a GCA atlas of more than 46,340 inputs computes the number of covariance values per class in 32 bits, which overflows: an allocation error that prints the wrong count, or a smaller allocation the reading writes past (memory corruption, a crash)";
+    FS_754 = "FS-754", "FreeSurfer", true,
+        "a GCA atlas whose prior grid has a voxel-to-RAS matrix with no inverse (a prior spacing or voxel size of 0, direction cosines of length 0 or linearly dependent, NaN among them) crashes the program that reads it";
+    FS_755 = "FS-755", "FreeSurfer", true,
+        "reading a GCA atlas with a negative neighbour label count ends the program with an allocation error whose count is part of a memory address, not the count";
+    FS_756 = "FS-756", "FreeSurfer", true,
+        "reading a GCA atlas allocates a node's classes before reading them: a class count, or a count of inputs, beyond the machine's memory gives an allocation error or the reading of a file that ends (memory contents), depending on the machine";
+    FS_757 = "FS-757", "FreeSurfer", true,
+        "reading a GCA atlas whose node grid reaches past its prior grid (a prior spacing larger than its sizes allow, or the sizes FS-749 reads) reads priors outside the prior grid for the class weights: memory contents or a crash";
+    FS_759 = "FS-759", "FreeSurfer", true,
+        "reading a GCA atlas of more than 109 inputs whose file holds the MR parameters overwrites the atlas's internal references with them: the program crashes";
+    FS_758 = "FS-758", "FreeSurfer", true,
+        "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

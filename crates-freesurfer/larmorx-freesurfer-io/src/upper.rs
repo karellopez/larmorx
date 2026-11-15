@@ -6,7 +6,8 @@
 //! function calls there).
 //!
 //! FreeSurfer's `utils/mriio.cpp` reads an image file as a volume through `ImageToMRI` and writes
-//! one through `MRItoImage` (`utils/mri.cpp`, ported in fs.volume, which sits above fs.io). The
+//! one through `MRItoImage` (`utils/mri.cpp`, ported in fs.volume, which sits above fs.io), and
+//! reads a GCA atlas as a volume through `readGCA` (its GCA functions in fs.gca). The
 //! crate that holds a conversion registers it here once ([`register`]; idempotent), and every
 //! program that links that crate calls its registration before it runs (the `larmorx-freesurfer`
 //! program does so for every crate it links; the fs.io probe and its tests too). A conversion that
@@ -14,6 +15,7 @@
 //! ... needs <crate>'s <function>, which this program does not link`).
 
 use std::io::Write;
+use std::path::Path;
 use std::sync::RwLock;
 
 use larmorx_freesurfer_core::globals::Globals;
@@ -30,16 +32,30 @@ pub type ImageToMri =
 /// `NULL`, after its message).
 pub type MriToImage = fn(&mut Globals, &mut dyn Write, &Mri, i32) -> Result<Option<Image>, Fatal>;
 
+/// `readGCA(fname, start_frame, end_frame)` (fs.gca): a GCA atlas as a volume, or `None`
+/// (FreeSurfer's `NULL`, after its messages).
+pub type ReadGca = fn(
+    &mut Globals,
+    &mut dyn Write,
+    &mut dyn Write,
+    Option<&Path>,
+    &str,
+    i32,
+    i32,
+) -> Result<Option<Mri>, Fatal>;
+
 /// The registered conversions.
 #[derive(Clone, Copy, Default)]
 pub struct Upper {
     pub image_to_mri: Option<ImageToMri>,
     pub mri_to_image: Option<MriToImage>,
+    pub read_gca: Option<ReadGca>,
 }
 
 static UPPER: RwLock<Upper> = RwLock::new(Upper {
     image_to_mri: None,
     mri_to_image: None,
+    read_gca: None,
 });
 
 /// Registers conversions: `f` sets the fields its crate provides.

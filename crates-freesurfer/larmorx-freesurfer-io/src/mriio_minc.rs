@@ -484,3 +484,163 @@ pub fn minc_read(
     }
     Ok(Some(m))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    /// A netCDF classic file of fixed-size variables: `dims` (name, size), `vars` (name,
+    /// dimension ids, text attributes, double attributes, type, the values' big-endian bytes).
+    #[allow(clippy::type_complexity)]
+    fn cdf(
+        dims: &[(&str, u32)],
+        vars: &[(&str, &[u32], &[(&str, &str)], &[(&str, &[f64])], i32, Vec<u8>)],
+    ) -> Vec<u8> {
+        fn name(o: &mut Vec<u8>, n: &[u8]) {
+            o.extend_from_slice(&(n.len() as u32).to_be_bytes());
+            o.extend_from_slice(n);
+            while o.len() % 4 != 0 {
+                o.push(0);
+            }
+        }
+        let header = |begins: &[u32]| {
+            let mut o = b"CDF\x01".to_vec();
+            o.extend_from_slice(&0u32.to_be_bytes());
+            o.extend_from_slice(&0x0Au32.to_be_bytes());
+            o.extend_from_slice(&(dims.len() as u32).to_be_bytes());
+            for (n, s) in dims {
+                name(&mut o, n.as_bytes());
+                o.extend_from_slice(&s.to_be_bytes());
+            }
+            o.extend_from_slice(&[0; 8]);
+            o.extend_from_slice(&0x0Bu32.to_be_bytes());
+            o.extend_from_slice(&(vars.len() as u32).to_be_bytes());
+            for ((n, ids, texts, nums, ty, data), b) in vars.iter().zip(begins) {
+                name(&mut o, n.as_bytes());
+                o.extend_from_slice(&(ids.len() as u32).to_be_bytes());
+                for d in *ids {
+                    o.extend_from_slice(&d.to_be_bytes());
+                }
+                let natt = texts.len() + nums.len();
+                if natt == 0 {
+                    o.extend_from_slice(&[0; 8]);
+                } else {
+                    o.extend_from_slice(&0x0Cu32.to_be_bytes());
+                    o.extend_from_slice(&(natt as u32).to_be_bytes());
+                    for (an, t) in *texts {
+                        name(&mut o, an.as_bytes());
+                        o.extend_from_slice(&2u32.to_be_bytes());
+                        name(&mut o, t.as_bytes());
+                    }
+                    for (an, v) in *nums {
+                        name(&mut o, an.as_bytes());
+                        o.extend_from_slice(&6u32.to_be_bytes());
+                        o.extend_from_slice(&(v.len() as u32).to_be_bytes());
+                        for x in *v {
+                            o.extend_from_slice(&x.to_bits().to_be_bytes());
+                        }
+                    }
+                }
+                o.extend_from_slice(&(*ty as u32).to_be_bytes());
+                o.extend_from_slice(&(data.len().div_ceil(4) as u32 * 4).to_be_bytes());
+                o.extend_from_slice(&b.to_be_bytes());
+            }
+            o
+        };
+        let mut begins = vec![0u32; vars.len()];
+        let mut off = header(&begins).len() as u32;
+        for (b, v) in begins.iter_mut().zip(vars) {
+            *b = off;
+            off += v.5.len().div_ceil(4) as u32 * 4;
+        }
+        let mut o = header(&begins);
+        for v in vars {
+            o.extend_from_slice(&v.5);
+            while o.len() % 4 != 0 {
+                o.push(0);
+            }
+        }
+        o
+    }
+
+    const DIMS: [(&str, u32); 3] = [("zspace", 1), ("yspace", 1), ("xspace", 2)];
+
+    fn minc(ty: i32, sign: &str, data: Vec<u8>) -> Vec<u8> {
+        cdf(
+            &DIMS,
+            &[
+                ("xspace", &[], &[], &[("step", &[-2.0]), ("start", &[10.0])], 4, vec![0; 4]),
+                ("image", &[0, 1, 2], &[("signtype", sign)], &[], ty, data),
+            ],
+        )
+    }
+
+    fn read(dir: &Path, b: &[u8], mode: UpstreamDefects) -> (Option<Mri>, String, String) {
+        std::fs::write(dir.join("v.mnc"), b).unwrap();
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let m = minc_read(&mut g, &mut out, &mut err, Some(dir), "v.mnc", true).unwrap();
+        let s = |b: Vec<u8>| String::from_utf8_lossy(&b).into_owned();
+        (m, s(out), s(err))
+    }
+
+    /// Signed bytes: `fix` 16-bit voxels, `reproduce` FreeSurfer's unsigned bytes; a negative step
+    /// gives a positive voxel size and the axis's direction negated.
+    #[test]
+    fn signed_bytes_and_a_negative_step() {
+        let dir = tempfile::tempdir().unwrap();
+        let b = minc(1, "signed__", vec![0xff, 5]);
+        let (m, _, err) = read(dir.path(), &b, UpstreamDefects::Fix);
+        let m = m.unwrap_or_else(|| panic!("{err}"));
+        assert_eq!(m.mtype, MRI_SHORT);
+        assert_eq!(m.chunk.as_deref(), Some(&[0xff, 0xff, 5, 0][..]));
+        assert_eq!((m.vg.xsize, m.vg.x_r, m.vg.x_a, m.vg.x_s), (2.0, -1.0, -0.0, -0.0));
+        // voxel 1 (of 2) at x = 10 - 2 = 8
+        assert_eq!(m.vg.c_r, 8.0);
+        let (m, _, _) = read(dir.path(), &b, UpstreamDefects::Reproduce);
+        let m = m.unwrap();
+        assert_eq!((m.mtype, m.chunk.as_deref()), (MRI_UCHAR, Some(&[0xff, 5][..])));
+    }
+
+    /// 32-bit integers: `reproduce` packs them as 32-bit numbers into the row's first half.
+    #[test]
+    fn long_voxels_both_ways() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut d = 7i32.to_be_bytes().to_vec();
+        d.extend_from_slice(&(-2i32).to_be_bytes());
+        let b = minc(4, "signed__", d);
+        let (m, _, _) = read(dir.path(), &b, UpstreamDefects::Fix);
+        let m = m.unwrap();
+        assert_eq!(m.mtype, MRI_LONG);
+        let mut want = 7i64.to_le_bytes().to_vec();
+        want.extend_from_slice(&(-2i64).to_le_bytes());
+        assert_eq!(m.chunk.as_deref(), Some(&want[..]));
+        let (m, _, _) = read(dir.path(), &b, UpstreamDefects::Reproduce);
+        let c = m.unwrap().chunk.unwrap();
+        assert_eq!(&c[..8], &[7, 0, 0, 0, 0xfe, 0xff, 0xff, 0xff]);
+        assert_eq!(&c[8..], &[0u8; 8]);
+    }
+
+    /// The refusals: no file, not a netCDF file, five dimensions (`fix`).
+    #[test]
+    fn refusals() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let m = minc_read(&mut g, &mut out, &mut err, Some(dir.path()), "no.mnc", true).unwrap();
+        assert!(m.is_none());
+        assert!(String::from_utf8_lossy(&err).contains("mincRead(): can't find file no.mnc"));
+        let (m, _, err) = read(dir.path(), b"not netCDF", UpstreamDefects::Fix);
+        assert!(m.is_none());
+        assert!(err.contains("mincRead(): error reading volume from file v.mnc"), "{err}");
+        assert!(!err.contains(&*dir.path().to_string_lossy()), "{err}");
+        let five = cdf(
+            &[("foo", 1), ("zspace", 1), ("yspace", 1), ("xspace", 1), ("time", 1)],
+            &[("image", &[0, 1, 2, 3, 4], &[], &[], 3, vec![0, 1])],
+        );
+        let (m, _, err) = read(dir.path(), &five, UpstreamDefects::Fix);
+        assert!(m.is_none());
+        assert!(err.contains("mincRead(): 5 dimensions in file; expecting 3 or 4"), "{err}");
+    }
+}

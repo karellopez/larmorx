@@ -277,6 +277,15 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   of FreeSurfer's types. FreeSurfer's side maps the two to `mrd` and `mrh`. `SKIP` for NrrdIO's undefined paths
   (FS-761, FS-762, FS-765 to FS-768, FS-771) and FS-739. Seeds 7, 13 and 21 (908 piece-24 cases each): `reproduce`
   identical on every case (2,724), 0 different.
+- Piece 25 (track A relay 33): MINC 1 volumes. `mcd` and `mch` (piece 6's `mrd` and `mrh`, the type -1 or 1, names
+  `.mnc`, `.MNC`, `@minc`, `.mnc.gz`, or a `.bin` file found by its `CDF` magic) of netCDF classic files built by
+  `tests/fs_io/piece25.rs`: an `image` of every type and sign over the spatial dimensions in any order, with or
+  without `time` (the record dimension or not), fewer or more dimensions (five), steps, starts and direction
+  cosines, valid ranges, `image-max`/`image-min` per volume, slice or slice and frame, `Gdiag` 0x10000040; and
+  faults (no file, a folder, garbage, not netCDF, no image, cut). FreeSurfer's side maps the two to `mrd` and
+  `mrh`. `SKIP` under `reproduce` for FS-745 (five dimensions: names past mincRead's array) and the library's
+  memory-contents defects (track C's list). Seeds 7 (298 piece-25 cases), 13 and 21 (894 each): `reproduce`
+  identical on every compared case (1,815), 0 different; `fix` differs only with notices.
 - `nrrd_itk_geometry.py` (relay 32): the default's NRRD geometry (FS-736 to FS-738) against ITK 5.4.5's NRRD
   reader (ANTs 2.6.5's `PrintHeader`, through the oracle-output cache): 400 seeded files, the voxel-to-RAS
   matrices compared: `python -P validation/probes/fs-io/nrrd_itk_geometry.py --seed 1 --n 400` (prints

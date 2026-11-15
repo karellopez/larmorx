@@ -17,6 +17,8 @@
 //! so zlib's checks of them have no counterpart. `gzip` headers write `OS_CODE` 3 (Unix) on
 //! every platform, as the Linux build does.
 
+#[doc(hidden)]
+pub mod cases;
 mod deflate;
 mod trees;
 

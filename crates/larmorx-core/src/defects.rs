@@ -2505,6 +2505,14 @@ defects! {
         "dilating or eroding a binary volume (DEMorphBinVol) with a neighbourhood other than 1 to 3, a morphology type other than 1 or 2, or a frame out of range prints its error and goes on: a result is made with those settings";
     FS_808 = "FS-808", "FreeSurfer", true,
         "dilating or eroding a thresholded or label-matched volume of several frames (DEMorphBinVol's thresholds and match lists) copies the chosen frame into bytes first (values rounded and clamped to 0 to 255), so its thresholds and labels compare with the bytes; a one-frame volume is compared as it is";
+    FS_809 = "FS-809", "zlib 1.2.11", true,
+        "deflatePrime called while compressed bytes wait to be handed out behind some already handed out (a deflate call that ran out of output space) puts its bits at the position given by the number of waiting bytes instead of after them: it overwrites bytes already handed out, and the next deflate call hands out bytes it never wrote (memory contents)";
+    FS_810 = "FS-810", "zlib 1.2.11", true,
+        "deflatePrime does not check that its bits fit in the output buffer behind the waiting bytes: repeated calls while bytes wait write past the buffer, and the next deflate call reads past it";
+    FS_812 = "FS-812", "zlib 1.2.11", true,
+        "deflateGetDictionary after a switch to storing (deflateParams to level 0 right after deflateResetKeep, which does not flush, keeping bytes read ahead) copies from past the end of its window: the dictionary's last bytes are memory contents";
+    FS_811 = "FS-811", "zlib 1.2.11", true,
+        "storing (level 0) can slide the window down while more bytes wait to be hashed than lie before the current position; after a switch to a compressing level (deflateParams) the next fill of the window reads far before its start and the program crashes (zlib 1.2.12 limits the count to the position)";
 }
 
 /// The register entry with ID `id`.

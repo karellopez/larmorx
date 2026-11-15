@@ -7,6 +7,7 @@ use super::trees::{
     self, Flush, Heap, LITERALS, MAX_MATCH, MIN_MATCH, Out, Tables, Trees, d_code, tables,
 };
 use super::*;
+use crate::defects::{FS_809, FS_810, FS_811, FS_812, Notices, UpstreamDefects};
 
 const INIT_STATE: i32 = 42;
 const GZIP_STATE: i32 = 57;
@@ -104,6 +105,8 @@ pub struct Deflate {
     pub adler: u64,
     pub data_type: i32,
     pub msg: Option<&'static str>,
+    /// D13's mode for zlib's defects (FS-809, FS-810) and the notices they gave.
+    pub notices: Notices,
     s: Box<State>,
 }
 
@@ -258,6 +261,7 @@ impl Deflate {
             adler: 0,
             data_type: Z_UNKNOWN,
             msg: None,
+            notices: Notices::new(UpstreamDefects::Fix),
             s: Box::new(s),
         };
         d.reset();
@@ -330,10 +334,47 @@ impl Deflate {
         (self.s.o.pending as u32, self.s.o.bi_valid)
     }
 
-    /// `deflatePrime(strm, bits, value)`.
+    /// The stream with D13's mode for zlib's defects (FS-809, FS-810).
+    pub fn with_upstream_defects(mut self, mode: UpstreamDefects) -> Deflate {
+        self.notices = Notices::new(mode);
+        self
+    }
+
+    /// `deflatePrime(strm, bits, value)`. While bytes wait to be handed out behind some already
+    /// handed out, zlib puts the bits at the position the waiting count gives (FS-809): by
+    /// default they go after the waiting bytes; with `reproduce` where zlib puts them (the bytes
+    /// it never wrote are the buffer's, zeros or older bytes). Bits that would not fit in the
+    /// buffer are refused (`Z_BUF_ERROR`, FS-810) in both modes: zlib writes past it.
     pub fn prime(&mut self, bits: i32, value: i32) -> i32 {
         let s = &mut *self.s;
         if !(0..=16).contains(&bits) || s.sym < s.o.pending_out + ((BUF_SIZE as usize + 7) >> 3) {
+            return Z_BUF_ERROR;
+        }
+        if s.o.pending_out != 0 && s.o.pending != 0 {
+            self.notices.add(
+                &FS_809,
+                format!(
+                    "deflatePrime with {} bytes waiting from offset {} of the output buffer",
+                    s.o.pending, s.o.pending_out
+                ),
+            );
+            if self.notices.fix() {
+                let (po, n) = (s.o.pending_out, s.o.pending);
+                s.o.buf.copy_within(po..po + n, 0);
+                s.o.pending_out = 0;
+            }
+        }
+        // the bytes the bit buffer may hand to the pending buffer during this call
+        let add = ((s.o.bi_valid + bits) / 8) as usize;
+        let size = s.pending_buf_size;
+        if s.o.pending + add > size || s.o.pending_out + s.o.pending + add > size {
+            self.notices.add(
+                &FS_810,
+                format!(
+                    "deflatePrime of {bits} bits with {} bytes waiting from offset {} of a {size}-byte buffer",
+                    s.o.pending, s.o.pending_out
+                ),
+            );
             return Z_BUF_ERROR;
         }
         let (mut bits, mut value) = (bits, value);
@@ -413,15 +454,30 @@ impl Deflate {
     }
 
     /// `deflateGetDictionary(strm, dictionary, &dictLength)`: the window's last bytes (up to
-    /// `w_size`).
-    pub fn get_dictionary(&self) -> Vec<u8> {
+    /// `w_size`). Bytes zlib would copy from past the window's end (FS-812) are zeros, in both
+    /// modes.
+    pub fn get_dictionary(&mut self) -> Vec<u8> {
         let s = &*self.s;
         let mut len = s.strstart + s.lookahead;
         if len > s.w_size {
             len = s.w_size;
         }
         let end = (s.strstart + s.lookahead) as usize;
-        s.window[end - len as usize..end].to_vec()
+        let start = end - len as usize;
+        let mut v = vec![0u8; len as usize];
+        let have = end.min(s.window.len());
+        v[..have - start].copy_from_slice(&s.window[start..have]);
+        if end > s.window.len() {
+            self.notices.add(
+                &FS_812,
+                format!(
+                    "the dictionary's last {} bytes lie past the {}-byte window",
+                    end - s.window.len(),
+                    s.window.len()
+                ),
+            );
+        }
+        v
     }
 
     /// `deflateSetDictionary(strm, dictionary, dictLength)`.
@@ -461,6 +517,7 @@ impl Deflate {
                 total_out: &mut self.total_out,
                 adler: &mut ad,
                 data_type: &mut dt,
+                notices: &mut self.notices,
             };
             st.fill_window();
             while st.s.lookahead >= MIN_MATCH {
@@ -575,6 +632,7 @@ impl Deflate {
                 total_out: &mut self.total_out,
                 adler: &mut self.adler,
                 data_type: &mut self.data_type,
+                notices: &mut self.notices,
             };
             st.deflate(flush)
         };
@@ -734,9 +792,26 @@ struct Strm<'s, 'a, 'b, 'c> {
     total_out: &'s mut u64,
     adler: &'s mut u64,
     data_type: &'s mut i32,
+    notices: &'s mut Notices,
 }
 
 impl Strm<'_, '_, '_, '_> {
+    /// FS-811: more bytes waiting to be hashed than lie before the current position (a slide
+    /// of the stored window kept the count): zlib 1.2.11 reads far before its window here and
+    /// crashes; larmorx hashes the bytes there are (zlib 1.2.12's limit), in both modes.
+    fn limit_insert(&mut self) {
+        if self.s.insert > self.s.strstart {
+            self.notices.add(
+                &FS_811,
+                format!(
+                    "{} bytes to hash before position {} of the window",
+                    self.s.insert, self.s.strstart
+                ),
+            );
+            self.s.insert = self.s.strstart;
+        }
+    }
+
     /// `read_buf(strm, window + at, size)`.
     fn read_buf_window(&mut self, at: usize, size: u32) -> u32 {
         let mut len = self.io.avail_in();
@@ -910,8 +985,11 @@ impl Strm<'_, '_, '_, '_> {
             }
             let at = (self.s.strstart + self.s.lookahead) as usize;
             let n = self.read_buf_window(at, more);
+            self.s.lookahead += n;
+            if self.s.lookahead + self.s.insert >= MIN_MATCH {
+                self.limit_insert();
+            }
             let s = &mut *self.s;
-            s.lookahead += n;
             if s.lookahead + s.insert >= MIN_MATCH {
                 let mut str = s.strstart - s.insert;
                 s.ins_h = u32::from(s.window[str as usize]);

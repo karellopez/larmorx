@@ -9,7 +9,10 @@
 //!   zlib-deflate sums <libdir> <seed> <n>              adler32, crc32, compress2, compressBound
 //!   zlib-deflate gz <libdir> <seed> <n> <scratch>      gzopen/gzwrite/.../gzclose files
 //!   zlib-deflate files <libdir> <list>                 gzip files re-made (one path per line)
+//!   zlib-deflate testset <libdir>                      larmorx-core's recorded recipes
+//!   zlib-deflate gzset <libdir> <scratch>              larmorx-io's recorded gzip writer recipes
 
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::zlib::{self as z, Deflate, GzHeader};
 use std::ffi::{CStr, CString, c_char, c_int, c_long, c_uint, c_ulong, c_void};
 use std::io::Write;
@@ -19,6 +22,28 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 unsafe extern "C" {
     fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    fn malloc(n: usize) -> *mut c_void;
+    fn free(p: *mut c_void);
+}
+
+/// zlib's `zalloc` for the probe: `malloc` with every byte set to the fill in `opaque`, so that
+/// memory zlib reads without having set it gives a chosen value (0x00, or 0xa5 to find such
+/// reads).
+unsafe extern "C" fn fill_alloc(opaque: *mut c_void, items: c_uint, size: c_uint) -> *mut c_void {
+    let n = items as usize * size as usize;
+    // SAFETY: a fresh allocation of n bytes, all of them set.
+    unsafe {
+        let p = malloc(n.max(1));
+        if !p.is_null() {
+            std::ptr::write_bytes(p as *mut u8, opaque as usize as u8, n);
+        }
+        p
+    }
+}
+
+unsafe extern "C" fn fill_free(_opaque: *mut c_void, p: *mut c_void) {
+    // SAFETY: memory from fill_alloc.
+    unsafe { free(p) }
 }
 
 /// zlib 1.2.11's `z_stream` on LP64.
@@ -61,7 +86,8 @@ struct GzHeaderC {
 type P = *mut ZStream;
 #[allow(clippy::type_complexity)]
 struct Lib {
-    init2: unsafe extern "C" fn(P, c_int, c_int, c_int, c_int, c_int, *const c_char, c_int) -> c_int,
+    init2:
+        unsafe extern "C" fn(P, c_int, c_int, c_int, c_int, c_int, *const c_char, c_int) -> c_int,
     deflate: unsafe extern "C" fn(P, c_int) -> c_int,
     end: unsafe extern "C" fn(P) -> c_int,
     reset: unsafe extern "C" fn(P) -> c_int,
@@ -192,12 +218,20 @@ fn gen_data(r: &mut Rng, len: usize) -> Vec<u8> {
             let rate = r.range(1, 200) as u64;
             while v.len() < len {
                 let i = v.len() % period;
-                v.push(if r.chance(rate) { r.next() as u8 } else { base[i] });
+                v.push(if r.chance(rate) {
+                    r.next() as u8
+                } else {
+                    base[i]
+                });
             }
         }
         5 => {
             let words: Vec<Vec<u8>> = (0..r.range(5, 300))
-                .map(|_| (0..r.range(1, 12)).map(|_| b'a' + r.below(26) as u8).collect())
+                .map(|_| {
+                    (0..r.range(1, 12))
+                        .map(|_| b'a' + r.below(26) as u8)
+                        .collect()
+                })
                 .collect();
             while v.len() < len {
                 let w = &words[r.below(words.len() as u64) as usize];
@@ -214,7 +248,8 @@ fn gen_data(r: &mut Rng, len: usize) -> Vec<u8> {
             let mut i = 0i64;
             while v.len() < len {
                 let (x, y) = (i % nx, (i / nx) % nx);
-                let val = (x - nx / 2) * (x - nx / 2) + (y - nx / 3) * (y - nx / 3) + r.range(0, noise);
+                let val =
+                    (x - nx / 2) * (x - nx / 2) + (y - nx / 3) * (y - nx / 3) + r.range(0, noise);
                 if f32s {
                     v.extend_from_slice(&(val as f32 * 0.25).to_le_bytes());
                 } else {
@@ -272,13 +307,31 @@ fn gen_len(r: &mut Rng) -> usize {
 
 #[derive(Clone, Debug)]
 enum Op {
-    Deflate { add: usize, space: usize, flush: i32 },
-    Params { level: i32, strategy: i32, space: usize },
-    Prime { bits: i32, value: i32 },
+    Deflate {
+        add: usize,
+        space: usize,
+        flush: i32,
+    },
+    Params {
+        level: i32,
+        strategy: i32,
+        space: usize,
+    },
+    Prime {
+        bits: i32,
+        value: i32,
+    },
     Reset,
     ResetKeep,
-    Tune { good: i32, lazy: i32, nice: i32, chain: i32 },
-    Bound { len: u64 },
+    Tune {
+        good: i32,
+        lazy: i32,
+        nice: i32,
+        chain: i32,
+    },
+    Bound {
+        len: u64,
+    },
     Pending,
     GetDict,
     Copy,
@@ -299,7 +352,11 @@ struct Case {
 
 fn gen_case(seed: u64, i: u64) -> Case {
     let mut r = Rng::new(seed.wrapping_mul(1_000_003).wrapping_add(i));
-    let level = if r.chance(40) { r.range(-3, 11) as i32 } else { r.range(-1, 9) as i32 };
+    let level = if r.chance(40) {
+        r.range(-3, 11) as i32
+    } else {
+        r.range(-1, 9) as i32
+    };
     let method = if r.chance(60) { 7 } else { 8 };
     let wb = r.range(8, 15) as i32;
     let wbits = match r.below(10) {
@@ -308,8 +365,16 @@ fn gen_case(seed: u64, i: u64) -> Case {
         7..=8 => wb + 16,
         _ => *[7, 16, 32, -7, 0, -16].get(r.below(6) as usize).unwrap(),
     };
-    let mem = if r.chance(40) { r.range(0, 10) as i32 } else { r.range(1, 9) as i32 };
-    let strategy = if r.chance(40) { r.range(-1, 5) as i32 } else { r.range(0, 4) as i32 };
+    let mem = if r.chance(40) {
+        r.range(0, 10) as i32
+    } else {
+        r.range(1, 9) as i32
+    };
+    let strategy = if r.chance(40) {
+        r.range(-1, 5) as i32
+    } else {
+        r.range(0, 4) as i32
+    };
     let len = gen_len(&mut r);
     let data = gen_data(&mut r, len);
     let dict = if r.chance(6) {
@@ -383,7 +448,10 @@ fn gen_case(seed: u64, i: u64) -> Case {
                 strategy: r.range(-1, 5) as i32,
                 space: space(&mut r),
             },
-            78..=81 => Op::Prime { bits: r.range(-1, 17) as i32, value: r.next() as i32 },
+            78..=81 => Op::Prime {
+                bits: r.range(-1, 17) as i32,
+                value: r.next() as i32,
+            },
             82..=83 => Op::Reset,
             84 => Op::ResetKeep,
             85..=87 => Op::Tune {
@@ -392,20 +460,34 @@ fn gen_case(seed: u64, i: u64) -> Case {
                 nice: r.range(3, 258) as i32,
                 chain: r.range(4, 5000) as i32,
             },
-            88..=90 => Op::Bound { len: r.next() >> r.below(64) },
+            88..=90 => Op::Bound {
+                len: r.next() >> r.below(64),
+            },
             91..=93 => Op::Pending,
             94..=96 => Op::GetDict,
             _ => Op::Copy,
         };
         ops.push(op);
     }
-    Case { level, method, wbits, mem, strategy, data, dict, header, ops }
+    Case {
+        level,
+        method,
+        wbits,
+        mem,
+        strategy,
+        data,
+        dict,
+        header,
+        ops,
+    }
 }
 
 /// One implementation's run of a case: a transcript of every call and the output bytes.
 struct Run {
     lines: Vec<String>,
     out: Vec<u8>,
+    /// The port's notices (defect IDs).
+    notes: Vec<&'static str>,
 }
 
 /// The stream interface both implementations are driven through.
@@ -422,6 +504,9 @@ trait Stream {
     fn set_dict(&mut self, d: &[u8]) -> i32;
     fn set_header(&mut self, h: &GzHeader) -> i32;
     fn state(&self) -> String;
+    fn notes(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
     fn end(self: Box<Self>) -> i32;
 }
 
@@ -438,7 +523,11 @@ impl Stream for Port {
         self.0.prime(bits, value)
     }
     fn reset(&mut self, keep: bool) -> i32 {
-        if keep { self.0.reset_keep() } else { self.0.reset() }
+        if keep {
+            self.0.reset_keep()
+        } else {
+            self.0.reset()
+        }
     }
     fn tune(&mut self, a: i32, b: i32, c: i32, d: i32) -> i32 {
         self.0.tune(a, b, c, d)
@@ -474,6 +563,14 @@ impl Stream for Port {
             d.msg.unwrap_or("")
         )
     }
+    fn notes(&self) -> Vec<&'static str> {
+        self.0
+            .notices
+            .as_slice()
+            .iter()
+            .map(|n| n.defect.id)
+            .collect()
+    }
     fn end(self: Box<Self>) -> i32 {
         self.0.end()
     }
@@ -508,11 +605,20 @@ fn zeroed() -> Box<ZStream> {
 static VERSION: &[u8] = b"1.2.11\0";
 
 impl CStream<'_> {
-    fn call(&mut self, inp: &[u8], out: &mut [u8], f: impl FnOnce(&Lib, P) -> c_int) -> (i32, usize, usize) {
+    fn call(
+        &mut self,
+        inp: &[u8],
+        out: &mut [u8],
+        f: impl FnOnce(&Lib, P) -> c_int,
+    ) -> (i32, usize, usize) {
         let mut dummy = [0u8; 1];
         self.z.next_in = inp.as_ptr();
         self.z.avail_in = inp.len() as c_uint;
-        self.z.next_out = if out.is_empty() { dummy.as_mut_ptr() } else { out.as_mut_ptr() };
+        self.z.next_out = if out.is_empty() {
+            dummy.as_mut_ptr()
+        } else {
+            out.as_mut_ptr()
+        };
         self.z.avail_out = out.len() as c_uint;
         let r = f(self.lib, &mut *self.z);
         let used = inp.len() - self.z.avail_in as usize;
@@ -537,7 +643,11 @@ impl Stream for CStream<'_> {
     fn reset(&mut self, keep: bool) -> i32 {
         // SAFETY: as above.
         unsafe {
-            if keep { (self.lib.reset_keep)(&mut *self.z) } else { (self.lib.reset)(&mut *self.z) }
+            if keep {
+                (self.lib.reset_keep)(&mut *self.z)
+            } else {
+                (self.lib.reset)(&mut *self.z)
+            }
         }
     }
     fn tune(&mut self, a: i32, b: i32, c: i32, d: i32) -> i32 {
@@ -621,7 +731,9 @@ impl Stream for CStream<'_> {
             String::new()
         } else {
             // SAFETY: zlib's messages are static NUL-terminated strings.
-            unsafe { CStr::from_ptr(self.z.msg) }.to_string_lossy().into_owned()
+            unsafe { CStr::from_ptr(self.z.msg) }
+                .to_string_lossy()
+                .into_owned()
         };
         format!(
             "ti {} to {} adler {} dt {} msg {:?}",
@@ -635,7 +747,17 @@ impl Stream for CStream<'_> {
 }
 
 fn open_c<'l>(lib: &'l Lib, c: &Case) -> Result<CStream<'l>, i32> {
+    open_c_fill(lib, c, None)
+}
+
+/// A stream whose allocations are filled with `fill` (zlib's own `malloc`'s for `None`).
+fn open_c_fill<'l>(lib: &'l Lib, c: &Case, fill: Option<u8>) -> Result<CStream<'l>, i32> {
     let mut zs = zeroed();
+    if let Some(f) = fill {
+        zs.zalloc = fill_alloc as *mut c_void;
+        zs.zfree = fill_free as *mut c_void;
+        zs.opaque = f as usize as *mut c_void;
+    }
     // SAFETY: deflateInit2_ on a zeroed z_stream with the version and size it checks.
     let r = unsafe {
         (lib.init2)(
@@ -652,7 +774,11 @@ fn open_c<'l>(lib: &'l Lib, c: &Case) -> Result<CStream<'l>, i32> {
     if r != z::Z_OK {
         return Err(r);
     }
-    Ok(CStream { lib, z: zs, hdr: Vec::new() })
+    Ok(CStream {
+        lib,
+        z: zs,
+        hdr: Vec::new(),
+    })
 }
 
 fn run_case(c: &Case, s: Result<Box<dyn Stream + '_>, i32>) -> Run {
@@ -661,7 +787,11 @@ fn run_case(c: &Case, s: Result<Box<dyn Stream + '_>, i32>) -> Run {
     let mut s = match s {
         Err(e) => {
             lines.push(format!("init {e}"));
-            return Run { lines, out };
+            return Run {
+                lines,
+                out,
+                notes: Vec::new(),
+            };
         }
         Ok(s) => s,
     };
@@ -702,17 +832,31 @@ fn run_case(c: &Case, s: Result<Box<dyn Stream + '_>, i32>) -> Run {
                 let (r, u, m) = step(&mut s, &mut out, &mut ip, &mut avail, space, None, flush);
                 lines.push(format!("d {r} {u} {m} {}", s.state()));
             }
-            Op::Params { level, strategy, space } => {
-                let (r, u, m) =
-                    step(&mut s, &mut out, &mut ip, &mut avail, space, Some((level, strategy)), 0);
+            Op::Params {
+                level,
+                strategy,
+                space,
+            } => {
+                let (r, u, m) = step(
+                    &mut s,
+                    &mut out,
+                    &mut ip,
+                    &mut avail,
+                    space,
+                    Some((level, strategy)),
+                    0,
+                );
                 lines.push(format!("p {r} {u} {m} {}", s.state()));
             }
             Op::Prime { bits, value } => lines.push(format!("P {}", s.prime(bits, value))),
             Op::Reset => lines.push(format!("r {} {}", s.reset(false), s.state())),
             Op::ResetKeep => lines.push(format!("k {} {}", s.reset(true), s.state())),
-            Op::Tune { good, lazy, nice, chain } => {
-                lines.push(format!("t {}", s.tune(good, lazy, nice, chain)))
-            }
+            Op::Tune {
+                good,
+                lazy,
+                nice,
+                chain,
+            } => lines.push(format!("t {}", s.tune(good, lazy, nice, chain))),
             Op::Bound { len } => lines.push(format!("b {}", s.bound(len))),
             Op::Pending => lines.push(format!("n {:?}", s.pending())),
             Op::GetDict => {
@@ -727,7 +871,15 @@ fn run_case(c: &Case, s: Result<Box<dyn Stream + '_>, i32>) -> Run {
     for _ in 0..100_000 {
         avail = c.data.len() - ip;
         let space = r.range(1, 65536) as usize;
-        let (ret, u, m) = step(&mut s, &mut out, &mut ip, &mut avail, space, None, z::Z_FINISH);
+        let (ret, u, m) = step(
+            &mut s,
+            &mut out,
+            &mut ip,
+            &mut avail,
+            space,
+            None,
+            z::Z_FINISH,
+        );
         if ret != z::Z_OK || (u == 0 && m == 0 && ret == z::Z_OK && avail == 0 && r.chance(1000)) {
             lines.push(format!("f {ret} {}", s.state()));
             if ret != z::Z_OK {
@@ -735,8 +887,14 @@ fn run_case(c: &Case, s: Result<Box<dyn Stream + '_>, i32>) -> Run {
             }
         }
     }
+    let notes = s.notes();
     lines.push(format!("end {}", s.end()));
-    Run { lines, out }
+    Run { lines, out, notes }
+}
+
+fn port(c: &Case, mode: UpstreamDefects) -> Result<Box<dyn Stream + 'static>, i32> {
+    Deflate::init2(c.level, c.method, c.wbits, c.mem, c.strategy)
+        .map(|d| Box::new(Port(d.with_upstream_defects(mode))) as Box<dyn Stream>)
 }
 
 fn fnv(b: &[u8]) -> u64 {
@@ -756,7 +914,12 @@ fn libs(dir: &str) -> (Lib, Lib) {
 
 fn compare(what: &str, a: &Run, b: &Run) -> Option<String> {
     if a.lines != b.lines {
-        let i = a.lines.iter().zip(&b.lines).position(|(x, y)| x != y).unwrap_or(a.lines.len().min(b.lines.len()));
+        let i = a
+            .lines
+            .iter()
+            .zip(&b.lines)
+            .position(|(x, y)| x != y)
+            .unwrap_or(a.lines.len().min(b.lines.len()));
         return Some(format!(
             "{what}: line {i}: {:?} vs {:?}",
             a.lines.get(i),
@@ -764,16 +927,30 @@ fn compare(what: &str, a: &Run, b: &Run) -> Option<String> {
         ));
     }
     if a.out != b.out {
-        let i = a.out.iter().zip(&b.out).position(|(x, y)| x != y).unwrap_or(a.out.len().min(b.out.len()));
-        return Some(format!("{what}: output byte {i} of {} / {}", a.out.len(), b.out.len()));
+        let i = a
+            .out
+            .iter()
+            .zip(&b.out)
+            .position(|(x, y)| x != y)
+            .unwrap_or(a.out.len().min(b.out.len()));
+        return Some(format!(
+            "{what}: output byte {i} of {} / {}",
+            a.out.len(),
+            b.out.len()
+        ));
     }
     None
 }
 
 fn cases(dir: &str, seed: u64, n: u64, threads: usize) {
     let (sys, up) = libs(dir);
+    let released = std::env::var_os("LXZ_RELEASED").is_some();
     let next = AtomicUsize::new(0);
     let fails = AtomicUsize::new(0);
+    let unset = AtomicUsize::new(0);
+    let past = AtomicUsize::new(0);
+    let crash = AtomicUsize::new(0);
+    let fix_noted = AtomicUsize::new(0);
     let up_differs = AtomicUsize::new(0);
     let bytes = AtomicUsize::new(0);
     let digest = std::sync::Mutex::new(vec![0u64; n as usize]);
@@ -785,21 +962,54 @@ fn cases(dir: &str, seed: u64, n: u64, threads: usize) {
                     break;
                 }
                 let c = gen_case(seed, i);
-                let a = run_case(&c, open_c(&sys, &c).map(|s| Box::new(s) as Box<dyn Stream>));
-                let b = run_case(&c, open_c(&up, &c).map(|s| Box::new(s) as Box<dyn Stream>));
-                let p = run_case(
-                    &c,
-                    Deflate::init2(c.level, c.method, c.wbits, c.mem, c.strategy)
-                        .map(|d| Box::new(Port(d)) as Box<dyn Stream>),
-                );
+                let run_port = |mode| {
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_case(&c, port(&c, mode))))
+                        .unwrap_or_else(|_| Run { lines: vec!["PANIC".into()], out: Vec::new(), notes: Vec::new() })
+                };
+                let p = run_port(UpstreamDefects::Reproduce);
+                let pf = run_port(UpstreamDefects::Fix);
                 bytes.fetch_add(c.data.len(), Ordering::Relaxed);
-                if let Some(m) = compare("released", &a, &b) {
-                    up_differs.fetch_add(1, Ordering::Relaxed);
-                    eprintln!("case {i}: Ubuntu's vs released: {m}");
+                if pf.notes.is_empty() {
+                    if let Some(m) = compare("fix", &p, &pf) {
+                        fails.fetch_add(1, Ordering::Relaxed);
+                        eprintln!("case {i}: DIFFER fix without a notice: {m}");
+                    }
+                } else {
+                    fix_noted.fetch_add(1, Ordering::Relaxed);
                 }
-                if let Some(m) = compare("port", &a, &p) {
+                if p.lines == ["PANIC"] || pf.lines == ["PANIC"] {
                     fails.fetch_add(1, Ordering::Relaxed);
-                    eprintln!("case {i}: DIFFER {m}");
+                    eprintln!("case {i}: PORT PANIC (zlib not run)");
+                } else if p.notes.contains(&"FS-810") || p.notes.contains(&"FS-811") || p.notes.contains(&"FS-812") {
+                    // zlib would write or read past its buffer, or crash: not run
+                    if p.notes.contains(&"FS-811") || p.notes.contains(&"FS-812") {
+                        crash.fetch_add(1, Ordering::Relaxed);
+                    } else {
+                        past.fetch_add(1, Ordering::Relaxed);
+                    }
+                } else {
+                    // zlib's allocations zeroed (as the port's buffers start) and filled with 0xa5:
+                    // a difference between the two is zlib reading memory it never set
+                    let a = run_case(&c, open_c_fill(&sys, &c, Some(0)).map(|s| Box::new(s) as Box<dyn Stream>));
+                    let a5 = run_case(&c, open_c_fill(&sys, &c, Some(0xa5)).map(|s| Box::new(s) as Box<dyn Stream>));
+                    if released {
+                        let b = run_case(&c, open_c_fill(&up, &c, Some(0)).map(|s| Box::new(s) as Box<dyn Stream>));
+                        if let Some(m) = compare("released", &a, &b) {
+                            up_differs.fetch_add(1, Ordering::Relaxed);
+                            eprintln!("case {i}: Ubuntu's vs released: {m}");
+                        }
+                    }
+                    if let Some(m) = compare("unset", &a, &a5) {
+                        unset.fetch_add(1, Ordering::Relaxed);
+                        if !p.notes.contains(&"FS-809") {
+                            fails.fetch_add(1, Ordering::Relaxed);
+                            eprintln!("case {i}: DIFFER zlib reads memory it never set without FS-809: {m}");
+                        }
+                    }
+                    if let Some(m) = compare("port", &a, &p) {
+                        fails.fetch_add(1, Ordering::Relaxed);
+                        eprintln!("case {i}: DIFFER {m}");
+                    }
                 }
                 let mut h = fnv(&p.out);
                 for l in &p.lines {
@@ -815,13 +1025,29 @@ fn cases(dir: &str, seed: u64, n: u64, threads: usize) {
         all.extend_from_slice(&h.to_le_bytes());
     }
     println!(
-        "cases {n} seed {seed}: input {} bytes; port differs {}; released differs from Ubuntu's {}; digest {:016x}",
+        "cases {n} seed {seed}: input {} bytes; port (reproduce) differs from zlib (allocations zeroed) {}; zlib reads memory it never set {} (FS-809); not run, zlib would pass its buffer {} (FS-810) or crash or read past its window {} (FS-811, FS-812); fix differs with a notice {}; released differs from Ubuntu's {}{}; digest {:016x}",
         bytes.load(Ordering::Relaxed),
         fails.load(Ordering::Relaxed),
+        unset.load(Ordering::Relaxed),
+        past.load(Ordering::Relaxed),
+        crash.load(Ordering::Relaxed),
+        fix_noted.load(Ordering::Relaxed),
         up_differs.load(Ordering::Relaxed),
+        if released {
+            ""
+        } else {
+            " (not run: LXZ_RELEASED unset)"
+        },
         fnv(&all)
     );
-    println!("{}", if fails.load(Ordering::Relaxed) == 0 { "VERIFY-PASS" } else { "VERIFY-FAIL" });
+    println!(
+        "{}",
+        if fails.load(Ordering::Relaxed) == 0 {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
+    );
 }
 
 fn one(dir: &str, seed: u64, i: u64) {
@@ -839,17 +1065,40 @@ fn one(dir: &str, seed: u64, i: u64) {
         c.header.is_some(),
         c.ops
     );
-    let a = run_case(&c, open_c(&sys, &c).map(|s| Box::new(s) as Box<dyn Stream>));
-    let p = run_case(
+    let p = run_case(&c, port(&c, UpstreamDefects::Reproduce));
+    println!("port notices {:?}", p.notes);
+    if std::env::var_os("LXZ_PORT_ONLY").is_some() {
+        for l in &p.lines {
+            println!("{l}");
+        }
+        return;
+    }
+    let a = run_case(
         &c,
-        Deflate::init2(c.level, c.method, c.wbits, c.mem, c.strategy)
-            .map(|d| Box::new(Port(d)) as Box<dyn Stream>),
+        open_c_fill(&sys, &c, Some(0)).map(|s| Box::new(s) as Box<dyn Stream>),
+    );
+    let a5 = run_case(
+        &c,
+        open_c_fill(&sys, &c, Some(0xa5)).map(|s| Box::new(s) as Box<dyn Stream>),
+    );
+    println!(
+        "zlib with allocations filled with 0xa5: {:?}",
+        compare("unset", &a, &a5)
     );
     for (k, (x, y)) in a.lines.iter().zip(&p.lines).enumerate() {
-        println!("{k:4} {} {x}\n          {y}", if x == y { " " } else { "*" });
+        println!(
+            "{k:4} {} {x}\n          {y}",
+            if x == y { " " } else { "*" }
+        );
     }
-    println!("lines {} / {}; output {} / {} bytes, {}", a.lines.len(), p.lines.len(), a.out.len(), p.out.len(),
-        if a.out == p.out { "same" } else { "DIFFERENT" });
+    println!(
+        "lines {} / {}; output {} / {} bytes, {}",
+        a.lines.len(),
+        p.lines.len(),
+        a.out.len(),
+        p.out.len(),
+        if a.out == p.out { "same" } else { "DIFFERENT" }
+    );
 }
 
 fn sums(dir: &str, seed: u64, n: u64) {
@@ -859,8 +1108,16 @@ fn sums(dir: &str, seed: u64, n: u64) {
     for i in 0..n {
         let len = gen_len(&mut r).min(300_000);
         let data = gen_data(&mut r, len);
-        let a0 = if r.chance(3) { 1 } else { r.next() & 0xffff_ffff };
-        let c0 = if r.chance(3) { 0 } else { r.next() & 0xffff_ffff };
+        let a0 = if r.chance(3) {
+            1
+        } else {
+            r.next() & 0xffff_ffff
+        };
+        let c0 = if r.chance(3) {
+            0
+        } else {
+            r.next() & 0xffff_ffff
+        };
         // SAFETY: valid buffers for zlib's checksums.
         let (ca, cc) = unsafe {
             (
@@ -883,7 +1140,15 @@ fn sums(dir: &str, seed: u64, n: u64) {
         let mut a = vec![0u8; room.max(1)];
         let mut alen = room as c_ulong;
         // SAFETY: a destination of `room` bytes.
-        let ar = unsafe { (sys.compress2)(a.as_mut_ptr(), &mut alen, data.as_ptr(), data.len() as c_ulong, level) };
+        let ar = unsafe {
+            (sys.compress2)(
+                a.as_mut_ptr(),
+                &mut alen,
+                data.as_ptr(),
+                data.len() as c_ulong,
+                level,
+            )
+        };
         let mut b = vec![0u8; room];
         let (br, blen) = z::compress2(&mut b, &data, level);
         if bound != z::compress_bound(data.len() as u64)
@@ -896,12 +1161,24 @@ fn sums(dir: &str, seed: u64, n: u64) {
         }
     }
     // SAFETY: null buffers give the initial values.
-    let (a1, c1) = unsafe { ((sys.adler32)(0, std::ptr::null(), 0), (sys.crc32)(0, std::ptr::null(), 0)) };
+    let (a1, c1) = unsafe {
+        (
+            (sys.adler32)(0, std::ptr::null(), 0),
+            (sys.crc32)(0, std::ptr::null(), 0),
+        )
+    };
     if (a1, c1) != (z::adler32(0, None), z::crc32(0, None)) {
         bad += 1;
     }
     println!("sums {n}: {bad} differ");
-    println!("{}", if bad == 0 { "VERIFY-PASS" } else { "VERIFY-FAIL" });
+    println!(
+        "{}",
+        if bad == 0 {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
+    );
 }
 
 /// gzopen/gzwrite/gzputc/gzputs/gzseek/gzflush/gzclose through zlib and through
@@ -1018,8 +1295,17 @@ fn gz(dir: &str, seed: u64, n: u64, scratch: &str) {
             let _ = std::fs::remove_file(&pb);
         }
     }
-    println!("gz {n}: {bad} differ; {fs78} differ where FS-78's notice says zlib compressed memory it never set");
-    println!("{}", if bad == 0 { "VERIFY-PASS" } else { "VERIFY-FAIL" });
+    println!(
+        "gz {n}: {bad} differ; {fs78} differ where FS-78's notice says zlib compressed memory it never set"
+    );
+    println!(
+        "{}",
+        if bad == 0 {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
+    );
 }
 
 /// The length of a gzip member's header (RFC 1952: the fixed 10 bytes, then FEXTRA, FNAME,
@@ -1050,10 +1336,21 @@ fn raw(sys: Option<&Lib>, data: &[u8], level: i32) -> Vec<u8> {
     let mut out = vec![0u8; data.len() + data.len() / 100 + 1024];
     let made = match sys {
         Some(l) => {
-            let mut c = open_c(l, &Case {
-                level, method: 8, wbits: -15, mem: 8, strategy: 0,
-                data: Vec::new(), dict: None, header: None, ops: Vec::new(),
-            }).unwrap();
+            let mut c = open_c(
+                l,
+                &Case {
+                    level,
+                    method: 8,
+                    wbits: -15,
+                    mem: 8,
+                    strategy: 0,
+                    data: Vec::new(),
+                    dict: None,
+                    header: None,
+                    ops: Vec::new(),
+                },
+            )
+            .unwrap();
             let (r, _, made) = c.deflate(data, &mut out, z::Z_FINISH);
             assert_eq!(r, z::Z_STREAM_END);
             Box::new(c).end();
@@ -1133,11 +1430,33 @@ fn files(dir: &str, list: &str) {
                 by_level[l as usize] += 1;
                 let ok = raw(None, &data, l) == payload;
                 // the whole member when the header is gzopen's
-                let whole = if member[..10] == [0x1f, 0x8b, 8, 0, 0, 0, 0, 0, if l == 9 { 2 } else if l < 2 { 4 } else { 0 }, 3] {
+                let whole = if member[..10]
+                    == [
+                        0x1f,
+                        0x8b,
+                        8,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        if l == 9 {
+                            2
+                        } else if l < 2 {
+                            4
+                        } else {
+                            0
+                        },
+                        3,
+                    ] {
                     let mut d = Deflate::init2(l, 8, 31, 8, 0).unwrap();
                     let mut out = vec![0u8; data.len() + data.len() / 100 + 1024];
                     let (_, _, made) = d.deflate(&data, &mut out, z::Z_FINISH);
-                    if out[..made] == *member { " whole-member-same" } else { " whole-member-DIFF" }
+                    if out[..made] == *member {
+                        " whole-member-same"
+                    } else {
+                        " whole-member-DIFF"
+                    }
                 } else {
                     " (header not gzopen's)"
                 };
@@ -1164,8 +1483,119 @@ fn files(dir: &str, list: &str) {
     );
     println!(
         "{}",
-        if port_same + no_level == n { "VERIFY-PASS" } else { "VERIFY-FAIL" }
+        if port_same + no_level == n {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
     );
+}
+
+/// The recipes of larmorx-core's recorded digest through zlib itself (`zlib::cases`).
+fn testset(dir: &str) {
+    use larmorx_core::zlib::cases;
+    let (sys, _) = libs(dir);
+    let (mut all, mut differ) = (Vec::new(), 0);
+    for i in 0..cases::N {
+        let rec = cases::recipe(i);
+        let c = Case {
+            level: rec.level,
+            method: 8,
+            wbits: rec.window_bits,
+            mem: rec.mem_level,
+            strategy: rec.strategy,
+            data: Vec::new(),
+            dict: None,
+            header: None,
+            ops: Vec::new(),
+        };
+        let h = match open_c(&sys, &c) {
+            Err(_) => 0,
+            Ok(mut cs) => {
+                if let Some(d) = &rec.dictionary {
+                    cs.set_dict(d);
+                }
+                let (log, out) = cases::drive(&rec, |a, b, f| cs.deflate(a, b, f));
+                Box::new(cs).end();
+                cases::digest(&log, &out)
+            }
+        };
+        if h != cases::port_digest(i) {
+            differ += 1;
+            eprintln!(
+                "recipe {i}: zlib {h:016x} port {:016x}",
+                cases::port_digest(i)
+            );
+        }
+        all.extend_from_slice(&h.to_le_bytes());
+    }
+    println!(
+        "testset {}: {differ} differ; zlib's digest {:#018x}",
+        cases::N,
+        cases::digest(&[], &all)
+    );
+    println!(
+        "{}",
+        if differ == 0 {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
+    );
+}
+
+/// The gzip writer recipes of larmorx-io's recorded digest through zlib's gz functions
+/// (`znz::gzcases`); the digest the test records.
+fn gzset(dir: &str, scratch: &str) {
+    use larmorx_io::znz::gzcases::{self, GzOp};
+    let (sys, _) = libs(dir);
+    std::fs::create_dir_all(scratch).unwrap();
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    let mut eat = |b: &[u8]| {
+        for &x in b {
+            h ^= u64::from(x);
+            h = h.wrapping_mul(0x100_0000_01b3);
+        }
+    };
+    let set_params: unsafe extern "C" fn(*mut c_void, c_int, c_int) -> c_int = {
+        let c = CString::new("/lib/x86_64-linux-gnu/libz.so.1").unwrap();
+        // SAFETY: the loader returns the library already open; gzsetparams has this signature.
+        unsafe {
+            let hd = dlopen(c.as_ptr(), 2);
+            let n = CString::new("gzsetparams").unwrap();
+            std::mem::transmute::<*mut c_void, _>(dlsym(hd, n.as_ptr()))
+        }
+    };
+    for i in 0..gzcases::N {
+        let (mode, ops) = gzcases::recipe(i);
+        let path = format!("{scratch}/r{i}.gz");
+        let _ = std::fs::remove_file(&path);
+        let (cp, cm) = (
+            CString::new(path.clone()).unwrap(),
+            CString::new(mode).unwrap(),
+        );
+        // SAFETY: zlib's gz functions on the file opened here, valid buffers.
+        unsafe {
+            let g = (sys.gzopen)(cp.as_ptr(), cm.as_ptr());
+            for op in &ops {
+                let r: i64 = match op {
+                    GzOp::Write(v) => i64::from((sys.gzwrite)(g, v.as_ptr(), v.len() as c_uint)),
+                    GzOp::Putc(c) => i64::from((sys.gzputc)(g, *c)),
+                    GzOp::Puts(v) => {
+                        let c = CString::new(v.clone()).unwrap();
+                        i64::from((sys.gzputs)(g, c.as_ptr()))
+                    }
+                    GzOp::Seek(o) => (sys.gzseek)(g, *o as c_long, 1) as i64,
+                    GzOp::Flush(f) => i64::from((sys.gzflush)(g, *f)),
+                    GzOp::SetParams(l, s) => i64::from(set_params(g, *l, *s)),
+                };
+                eat(&r.to_le_bytes());
+            }
+            eat(&i64::from((sys.gzclose)(g)).to_le_bytes());
+        }
+        eat(&std::fs::read(&path).unwrap());
+    }
+    println!("gzset {}: zlib's digest {h:#018x}", gzcases::N);
 }
 
 fn main() {
@@ -1177,6 +1607,8 @@ fn main() {
         Some("sums") => sums(&a[2], num(3), num(4)),
         Some("gz") => gz(&a[2], num(3), num(4), &a[5]),
         Some("files") => files(&a[2], &a[3]),
+        Some("testset") => testset(&a[2]),
+        Some("gzset") => gzset(&a[2], &a[3]),
         _ => {
             eprintln!("usage: see the source's header");
             std::process::exit(2);

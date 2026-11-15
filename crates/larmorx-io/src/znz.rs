@@ -1459,6 +1459,75 @@ enum Dest {
     User,
 }
 
+/// The recipes of the gzip writer's recorded digest (the tests here), shared with the probe
+/// `validation/probes/zlib-deflate` (its `gzset` command writes them through zlib itself).
+#[doc(hidden)]
+pub mod gzcases {
+    /// One call on a gzip file opened for writing.
+    #[derive(Clone, Debug)]
+    pub enum GzOp {
+        Write(Vec<u8>),
+        Putc(i32),
+        Puts(Vec<u8>),
+        /// `gzseek(offset, SEEK_CUR)`.
+        Seek(i64),
+        Flush(i32),
+        SetParams(i32, i32),
+    }
+
+    /// The number of recipes.
+    pub const N: u32 = 40;
+
+    /// Recipe `i`: the mode and the calls (between `gzopen` and `gzclose`).
+    pub fn recipe(i: u32) -> (String, Vec<GzOp>) {
+        let mut x = 0x9e37_79b9u64.wrapping_mul(u64::from(i) + 1);
+        let mut next = move || {
+            x = x
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (x >> 33) as u32
+        };
+        let modes = [
+            "wb", "wb1", "wb9", "wb0", "wb6h", "wb5R", "wb3F", "wb8f", "wb", "wbT",
+        ];
+        let mode = modes[(i % 10) as usize].to_string();
+        let mut ops = Vec::new();
+        for _ in 0..(1 + next() % 14) {
+            let op = match next() % 12 {
+                0..=5 => {
+                    let n = match next() % 4 {
+                        0 => next() % 20,
+                        1 => next() % 9000,
+                        2 => 8000 + next() % 9000,
+                        _ => next() % 200_000,
+                    } as usize;
+                    let kind = next() % 3;
+                    let v = (0..n)
+                        .map(|k| match kind {
+                            0 => (next() % 6) as u8,
+                            1 => (k / 7) as u8,
+                            _ => next() as u8,
+                        })
+                        .collect();
+                    GzOp::Write(v)
+                }
+                6 => GzOp::Putc((next() % 600) as i32 - 300),
+                7 => GzOp::Puts((0..next() % 40).map(|_| 1 + (next() % 255) as u8).collect()),
+                8 => GzOp::Seek(i64::from(next() % 30_000)),
+                9 => GzOp::Flush([0, 1, 2, 3, 4, 5][(next() % 6) as usize]),
+                10 => GzOp::SetParams((next() % 11) as i32 - 1, (next() % 5) as i32),
+                _ => GzOp::Write(Vec::new()),
+            };
+            ops.push(op);
+        }
+        // a first-write seek (FS-78) only where the recipe starts with a write
+        if matches!(ops.first(), Some(GzOp::Seek(_))) {
+            ops.insert(0, GzOp::Putc(i32::from(b'x')));
+        }
+        (mode, ops)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1608,5 +1677,43 @@ mod tests {
         assert!(ZnzFile::open(b"/nonexistent/x", b"rb", false).is_none());
         assert!(ZnzFile::open(p.as_os_str().as_encoded_bytes(), b"q", false).is_none());
         assert!(ZnzFile::open(p.as_os_str().as_encoded_bytes(), b"r+", true).is_none());
+    }
+
+    /// The digest of the 40 gzip writer recipes (every call's result and the files' bytes),
+    /// recorded from zlib 1.2.11 itself (Ubuntu 22.04's `libz.so.1`: the probe's `gzset`), and
+    /// from the port on Linux x64.
+    const GZ_RECORDED: u64 = 0xaf81_bfd1_0cd0_fb1b;
+
+    #[test]
+    fn gzip_writer_recipes_give_zlibs_files() {
+        use gzcases::GzOp;
+        let dir = tempfile::tempdir().unwrap();
+        let mut h = 0xcbf2_9ce4_8422_2325u64;
+        let mut eat = |b: &[u8]| {
+            for &x in b {
+                h ^= u64::from(x);
+                h = h.wrapping_mul(0x100_0000_01b3);
+            }
+        };
+        for i in 0..gzcases::N {
+            let (mode, ops) = gzcases::recipe(i);
+            let p = dir.path().join(format!("r{i}.gz"));
+            let pb = p.as_os_str().as_encoded_bytes();
+            let mut g = GzFile::open(pb, mode.as_bytes()).unwrap();
+            for op in &ops {
+                let r = match op {
+                    GzOp::Write(v) => i64::from(g.gzwrite(v)),
+                    GzOp::Putc(c) => i64::from(g.gzputc(*c)),
+                    GzOp::Puts(v) => i64::from(g.gzputs(v)),
+                    GzOp::Seek(o) => g.gzseek(*o, Whence::Cur),
+                    GzOp::Flush(f) => i64::from(g.gzflush_with(*f)),
+                    GzOp::SetParams(l, s) => i64::from(g.gzsetparams(*l, *s)),
+                };
+                eat(&r.to_le_bytes());
+            }
+            eat(&i64::from(g.gzclose()).to_le_bytes());
+            eat(&std::fs::read(&p).unwrap());
+        }
+        assert_eq!(h, GZ_RECORDED, "digest {h:#018x}");
     }
 }

@@ -725,13 +725,13 @@ fn nfcp_n3d_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
 
 /// A volume for the high-signal search: noise everywhere (integers), regions of high mean and low
 /// spread among regions of low mean and high spread (two slabs, three, cells of 6 voxels, one
-/// block), now and then a constant margin of one voxel; extents of 28 to 32 voxels (more than the
-/// search's 20,000 voxels) mostly, else small ones (the count never passes 20,000: one region);
-/// the slice thickness after it.
+/// block), now and then a constant margin of one voxel; in one case of two, extents of 32 x 32 x
+/// 26 to 30 voxels (more than the search's 20,000 voxels), else small ones (the count never passes
+/// 20,000: one region); the slice thickness after it.
 fn snr_case_vol(g: &mut Gen, t: &mut Vec<String>) -> ([i32; 3], i32) {
-    let big = !g.chance(5);
+    let big = g.chance(2);
     let e = if big {
-        [32, 32, g.int(28, 32) as i32]
+        [32, 32, g.int(26, 30) as i32]
     } else {
         let n = g.int(5, 13) as i32;
         [n, g.int(5, 13) as i32, n]

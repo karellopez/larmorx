@@ -2597,8 +2597,6 @@ defects! {
         "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, and the Deflate decoder inflate into, about 2^64 bytes (memory past both buffers); nothing is written";
     FS_834 = "FS-834", "libtiff 3.6.1", true,
         "a SamplesPerPixel of several values (and an entry left unchecked by FS-820) is passed as the address of its array where one value goes: the field takes the address's low bits (nondeterministic); ignored as a wrong count, with libtiff's incorrect-count warning";
-    FS_829 = "FS-829", "libtiff 3.6.1", true,
-        "the strip size of a YCbCr image without YCbCrSubsampling is computed from two values never set (stack contents); the directory's defaults, 2 and 2, are used";
 }
 
 /// The register entry with ID `id`.

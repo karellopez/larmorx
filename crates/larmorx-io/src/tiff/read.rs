@@ -8,7 +8,7 @@
 
 use super::{Mode, TIFF_CODERSETUP, TIFF_MYBUFFER, TIFF_NOBITREV, Tiff, Unported, values};
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_826, FS_829, FS_830};
+use larmorx_core::defects::{FS_826, FS_830};
 
 /// `TIFFhowmany(x, y)` in `uint32` (a division by zero is the caller's).
 fn howmany(x: u32, y: u32) -> u32 {
@@ -77,49 +77,6 @@ impl Tiff {
             n = n.wrapping_mul(u32::from(d.samplesperpixel));
         }
         n
-    }
-
-    /// The YCbCr subsampling as `TIFFVStripSize` reads it with `TIFFGetField`: unset, the
-    /// C function uses two `uint16`s it never wrote (FS-829; the directory's defaults, 2 and 2,
-    /// here).
-    fn ycbcr_subsampling_for_size(&mut self) -> [u16; 2] {
-        if !self.dir.is_set(super::fields::bit::YCBCRSUBSAMPLING) {
-            let name = self.name.clone();
-            self.notices.add(
-                &FS_829,
-                format!(
-                    "{name}: a YCbCr image without YCbCrSubsampling: libtiff 3.6.1 computes its \
-                     strip size from two values it never set (stack contents); the defaults 2 \
-                     and 2 are used"
-                ),
-            );
-        }
-        self.dir.ycbcrsubsampling
-    }
-
-    /// `TIFFVStripSize(tif, nrows)`.
-    pub(crate) fn vstrip_size(&mut self, nrows: u32) -> i32 {
-        let mut nrows = nrows;
-        if nrows == u32::MAX {
-            nrows = self.dir.imagelength;
-        }
-        if self.dir.planarconfig == values::PLANARCONFIG_CONTIG
-            && self.dir.photometric == values::PHOTOMETRIC_YCBCR
-            && self.flags & super::TIFF_UPSAMPLED == 0
-        {
-            let ss = self.ycbcr_subsampling_for_size();
-            let d = &self.dir;
-            let w = howmany(d.imagewidth, u32::from(ss[0])).wrapping_mul(u32::from(ss[0])) as i32;
-            let scanline = howmany((w as u32).wrapping_mul(u32::from(d.bitspersample)), 8) as i32;
-            let samplingarea = i32::from(ss[0]) * i32::from(ss[1]);
-            let nrows = howmany(nrows, u32::from(ss[1])).wrapping_mul(u32::from(ss[1]));
-            let a = (nrows as i32).wrapping_mul(scanline);
-            if samplingarea == 0 {
-                return a;
-            }
-            return a.wrapping_add(2i32.wrapping_mul(a / samplingarea));
-        }
-        (nrows.wrapping_mul(self.scanline_size() as u32)) as i32
     }
 
     /// `TIFFTileRowSize(tif)`.
@@ -310,7 +267,7 @@ impl Tiff {
                 Some(t) => t,
                 None => buf,
             };
-            e = self.decode(m, b, cc, sample, s);
+            e = self.decode(m, b, cc, s);
             self.row = row.wrapping_add(1);
             if e != 0 {
                 self.post_decode(b, cc);
@@ -331,19 +288,18 @@ impl Tiff {
             self.error(Some(&self.name.clone()), &m, s);
             return false;
         }
-        let strip;
-        if d.planarconfig == values::PLANARCONFIG_SEPARATE {
+        let strip = if d.planarconfig == values::PLANARCONFIG_SEPARATE {
             if sample >= d.samplesperpixel {
                 let m = format!("{sample}: Sample out of range, max {}", d.samplesperpixel);
                 self.error(Some(&self.name.clone()), &m, s);
                 return false;
             }
-            strip = u32::from(sample)
+            u32::from(sample)
                 .wrapping_mul(d.stripsperimage)
-                .wrapping_add(row / d.rowsperstrip);
+                .wrapping_add(row / d.rowsperstrip)
         } else {
-            strip = row / d.rowsperstrip;
-        }
+            row / d.rowsperstrip
+        };
         if strip != self.curstrip {
             if !self.fill_strip(strip, s) {
                 return false;
@@ -584,15 +540,13 @@ impl Tiff {
             size
         };
         if self.fill(tile, true, s) {
-            let spi = self.dir.stripsperimage;
-            let sample = if spi == 0 { 0 } else { (tile / spi) as u16 };
             let m = self.codec.decodetile;
             let mut tmp = self.caller_buffer(buf, size, "tile");
             let b: &mut [u8] = match tmp.as_mut() {
                 Some(t) => t,
                 None => buf,
             };
-            let ok = self.decode(m, b, size, sample, s) != 0;
+            let ok = self.decode(m, b, size, s) != 0;
             if ok {
                 self.post_decode(b, size);
             }

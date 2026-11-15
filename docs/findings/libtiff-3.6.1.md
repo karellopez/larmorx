@@ -53,7 +53,7 @@ See the table at the end of this page (the probe's runs, seeds 1 to 6).
   `inflateSync`; another error prints `zlib error: <message>`, where the message is zlib's last
   (`(null)` when zlib set none since its reset).
 
-## Defects (FS-814 to FS-834)
+## Defects (FS-814 to FS-834; FS-829 not used)
 
 Each is corrected by default; `LARMORX_UPSTREAM_DEFECTS=reproduce` gives libtiff's result where
 it is deterministic. Where libtiff's behaviour depends on memory contents or crashes, the port
@@ -76,7 +76,6 @@ does what the correction does and notes it.
 | FS-826 | reading a strip or tile whose arrays a failed `TIFFReadDirectory` never read (a null pointer) | refused |
 | FS-827 | a rational written from NaN, an infinity or a value above 4294967295 converts out of range (x86-64: 0 or the low 32 bits) | clamped |
 | FS-828 | a directory counting more entries than it fills writes the rest as memory never written | zeros |
-| FS-829 | the strip size of a YCbCr image without YCbCrSubsampling uses two values never set | the defaults 2 and 2 |
 | FS-830 | after a failed `TIFFReadDirectory`, the previous directory's scanline and tile sizes stay: a read writes that many bytes into a buffer sized for the new directory | only the caller's buffer is written |
 | FS-831 | when a strip's start fails in the codec's setup (an unsupported predictor), the next row is decoded without a start: the LZW or Deflate decoder's input was never set (a crash) | nothing decoded |
 | FS-832 | the predictor works by whole pixels while bytes are left, past a row whose length is not a multiple of the pixel's | past the caller's buffer nothing is touched |

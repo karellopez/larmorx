@@ -183,8 +183,7 @@ impl Tiff {
             self.dir.imagelength = row.wrapping_add(1);
             imagegrew = true;
         }
-        let strip;
-        if self.dir.planarconfig == values::PLANARCONFIG_SEPARATE {
+        let strip = if self.dir.planarconfig == values::PLANARCONFIG_SEPARATE {
             if sample >= self.dir.samplesperpixel {
                 let m = format!(
                     "{sample}: Sample out of range, max {}",
@@ -193,12 +192,12 @@ impl Tiff {
                 self.error(Some(&self.name.clone()), &m, s);
                 return -1;
             }
-            strip = u32::from(sample)
+            u32::from(sample)
                 .wrapping_mul(self.dir.stripsperimage)
-                .wrapping_add(row / self.dir.rowsperstrip);
+                .wrapping_add(row / self.dir.rowsperstrip)
         } else {
-            strip = row / self.dir.rowsperstrip;
-        }
+            row / self.dir.rowsperstrip
+        };
         if strip != self.curstrip {
             if !self.flush_data(s) {
                 return -1;
@@ -247,7 +246,7 @@ impl Tiff {
         let cc = self.scanlinesize;
         self.post_decode(buf, cc);
         let m = self.codec.encoderow;
-        let status = self.encode(m, buf, cc, sample, s);
+        let status = self.encode(m, buf, cc, s);
         self.row = row.wrapping_add(1);
         status
     }
@@ -473,14 +472,7 @@ impl Tiff {
     }
 
     /// One of the encoding methods on `buf[..cc]`.
-    fn encode(
-        &mut self,
-        m: Encode,
-        buf: &mut [u8],
-        cc: i32,
-        sample: u16,
-        s: &mut dyn Streams,
-    ) -> i32 {
+    fn encode(&mut self, m: Encode, buf: &mut [u8], cc: i32, s: &mut dyn Streams) -> i32 {
         match m {
             Encode::NoRow => self.no_encode("scanline", s),
             Encode::NoStrip => self.no_encode("strip", s),
@@ -510,7 +502,7 @@ impl Tiff {
                 let pf = self.codec.predictor.pfunc;
                 self.pfunc(pf, buf, cc);
                 let inner = self.codec.predictor.ecoderow;
-                self.encode(inner, buf, cc, sample, s)
+                self.encode(inner, buf, cc, s)
             }
             Encode::PredTile => {
                 let pf = self.codec.predictor.pfunc;
@@ -523,7 +515,7 @@ impl Tiff {
                     at += rowsize as usize;
                 }
                 let inner = self.codec.predictor.ecodetile;
-                self.encode(inner, buf, cc, sample, s)
+                self.encode(inner, buf, cc, s)
             }
         }
     }
@@ -1023,7 +1015,7 @@ impl Tiff {
 
     /// `_TIFFSampleToTagType(tif)`.
     fn sample_to_tag_type(&self) -> u16 {
-        let bps = (u32::from(self.dir.bitspersample) + 7) / 8;
+        let bps = u32::from(self.dir.bitspersample).div_ceil(8);
         match self.dir.sampleformat {
             values::SAMPLEFORMAT_IEEEFP => {
                 if bps == 4 {
@@ -1251,11 +1243,11 @@ impl Tiff {
     /// `(uint32) d` as GCC compiles it for x86-64 (`cvttsd2si` to 64 bits, the low 32 kept:
     /// NaN and values out of range give 0 or their low bits); corrected (FS-827), clamped.
     fn double_to_u32(&mut self, d: f64) -> u32 {
-        let in_range = d >= 0.0 && d < 4_294_967_296.0;
+        let in_range = (0.0..4_294_967_296.0).contains(&d);
         if in_range {
             return d as u32;
         }
-        let x86 = if d.is_nan() || d.abs() >= 9.223_372_036_854_775_808e18 {
+        let x86 = if d.is_nan() || d.abs() >= (1u64 << 63) as f64 {
             0
         } else {
             (d as i64) as u32

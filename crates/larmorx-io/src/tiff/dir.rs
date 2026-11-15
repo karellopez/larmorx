@@ -88,13 +88,11 @@ impl Dir {
         let b = usize::from(b);
         self.fieldsset[b / 32] |= 1u64 << (b & 0x1f);
     }
-    pub fn clear_bit(&mut self, b: u16) {
-        let b = usize::from(b);
-        self.fieldsset[b / 32] &= !(1u64 << (b & 0x1f));
-    }
 }
 
-/// An array passed to `TIFFSetField`.
+/// An array passed to `TIFFSetField` (the arrays of fields kept as present only are passed and
+/// not read).
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Data<'a> {
     U16(&'a [u16]),
@@ -105,6 +103,7 @@ pub(crate) enum Data<'a> {
 }
 
 /// The variable arguments of `TIFFSetField`, as the callers in this library pass them.
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Arg<'a> {
     /// One integer (an `int`, a promoted `uint16`, a `uint32`).
@@ -478,7 +477,7 @@ impl Tiff {
             }
             tag::TILEWIDTH | tag::TILELENGTH => {
                 let v = a.int();
-                if v % 16 != 0 {
+                if !v.is_multiple_of(16) {
                     if self.mode != Mode::RdOnly {
                         bad = Some(Bad::U32(v));
                     } else {

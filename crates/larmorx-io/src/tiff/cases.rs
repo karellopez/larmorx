@@ -12,14 +12,14 @@ impl Rng {
     pub fn new(seed: u64) -> Rng {
         Rng(seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) ^ 0xd1b5_4a32_d192_ed03 | 1)
     }
-    pub fn next(&mut self) -> u64 {
+    pub fn next_u64(&mut self) -> u64 {
         self.0 ^= self.0 >> 12;
         self.0 ^= self.0 << 25;
         self.0 ^= self.0 >> 27;
         self.0.wrapping_mul(0x2545_f491_4f6c_dd1d)
     }
     pub fn below(&mut self, n: u64) -> u64 {
-        if n == 0 { 0 } else { self.next() % n }
+        if n == 0 { 0 } else { self.next_u64() % n }
     }
     pub fn chance(&mut self, n: u64) -> bool {
         self.below(n) == 0
@@ -76,7 +76,7 @@ pub fn lzw_encode(data: &[u8], old_style: bool) -> Vec<u8> {
     let mut out = Vec::new();
     let mut acc: u64 = 0;
     let mut nacc = 0u32;
-    let mut put = |out: &mut Vec<u8>, code: u32, nbits: u32, acc: &mut u64, nacc: &mut u32| {
+    let put = |out: &mut Vec<u8>, code: u32, nbits: u32, acc: &mut u64, nacc: &mut u32| {
         if old_style {
             *acc |= u64::from(code) << *nacc;
             *nacc += nbits;
@@ -176,13 +176,13 @@ pub fn packbits_encode(data: &[u8]) -> Vec<u8> {
 fn pixels(r: &mut Rng, n: usize) -> Vec<u8> {
     let kind = r.below(4);
     let mut v = Vec::with_capacity(n);
-    let mut x = r.next() as u8;
+    let mut x = r.next_u64() as u8;
     for i in 0..n {
         v.push(match kind {
-            0 => r.next() as u8,
+            0 => r.next_u64() as u8,
             1 => {
                 if r.chance(9) {
-                    x = r.next() as u8;
+                    x = r.next_u64() as u8;
                 }
                 x
             }
@@ -341,7 +341,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                 5 => lzw_encode(p, old_lzw),
                 _ => {
                     let n = r.below(p.len() as u64 + 8) as usize;
-                    (0..n).map(|_| r.next() as u8).collect()
+                    (0..n).map(|_| r.next_u64() as u8).collect()
                 }
             };
             w.pad();
@@ -604,7 +604,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                 _ => 1,
             };
             let n = (wdt * count as usize).max(4);
-            let data: Vec<u8> = (0..n).map(|_| r.next() as u8 % 97).collect();
+            let data: Vec<u8> = (0..n).map(|_| r.next_u64() as u8 % 97).collect();
             tags.push(Tag {
                 tag: t,
                 ty,
@@ -673,7 +673,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
             }
             _ => {
                 let p = 8 + r.below(out.len() as u64 - 8) as usize;
-                out[p] = r.next() as u8;
+                out[p] = r.next_u64() as u8;
             }
         }
     }
@@ -936,7 +936,7 @@ pub fn port_write(path: &str, c: &WriteCase, opts: Options) -> (String, String, 
         return (out, cap.text(Stream::Err), ids);
     };
     out.push_str("open 1\n");
-    let mut set = |t: &mut Tiff, tg: u32, v: SetValue, out: &mut String, cap: &mut Captured| {
+    let set = |t: &mut Tiff, tg: u32, v: SetValue, out: &mut String, cap: &mut Captured| {
         let r = t.set_field(tg, v, cap).unwrap_or(false);
         out.push_str(&format!("set {tg} {}\n", i32::from(r)));
     };

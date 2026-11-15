@@ -1426,11 +1426,7 @@ pub fn data_width(ty: u16) -> i32 {
 pub(crate) enum Last {
     None,
     Static(Table, u16),
-    Anon {
-        owner: u64,
-        index: u32,
-        info: FieldInfo,
-    },
+    Anon { owner: u64, info: FieldInfo },
     Freed,
 }
 
@@ -1571,9 +1567,8 @@ impl Fields {
         LAST.with(|l| {
             *l.borrow_mut() = match r {
                 FieldRef::Static(t, i) => Last::Static(t, i),
-                FieldRef::Anon(i) => Last::Anon {
+                FieldRef::Anon(_) => Last::Anon {
                     owner: self.serial,
-                    index: i,
                     info: info.clone(),
                 },
             }

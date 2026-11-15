@@ -33,6 +33,13 @@
 //!
 //! The behaviour is proved by the differential probe `validation/probes/fs-tiff` against
 //! libtiff 3.6.1 built from its release and FreeSurfer 8.2.0's copy of it.
+// The translation keeps libtiff's control flow where clippy prefers other forms: indexed loops
+// over the directory entries it changes, its checks before divisions, chunked byte swaps.
+#![allow(
+    clippy::needless_range_loop,
+    clippy::manual_checked_ops,
+    clippy::chunks_exact_to_as_chunks
+)]
 
 #[doc(hidden)]
 pub mod cases;
@@ -117,9 +124,8 @@ pub mod values {
     pub const FILETYPE_PAGE: u32 = 2;
 }
 
-// tif_flags.
+// tif_flags (TIFF_DIRTYHEADER, 0x0004, and TIFF_MAPPED, 0x0800, are never set here).
 pub(crate) const TIFF_FILLORDER: u32 = 0x0003;
-pub(crate) const TIFF_DIRTYHEADER: u32 = 0x0004;
 pub(crate) const TIFF_DIRTYDIRECT: u32 = 0x0008;
 pub(crate) const TIFF_BUFFERSETUP: u32 = 0x0010;
 pub(crate) const TIFF_CODERSETUP: u32 = 0x0020;
@@ -359,9 +365,8 @@ impl Tiff {
         tif.set_default_compression_state();
         tif.flags = u32::from(values::FILLORDER_MSB2LSB);
         // TIFF_MAPPED is set for "r" and cleared again below: the build maps nothing.
-        if m == Mode::RdOnly {
-            tif.flags |= TIFF_STRIPCHOP;
-        } else if m == Mode::RdWr && !create {
+        // STRIPCHOP_DEFAULT for O_RDONLY and O_RDWR ("r", "r+"; not "w" or "a").
+        if m == Mode::RdOnly || !create {
             tif.flags |= TIFF_STRIPCHOP;
         }
         // The machine model is x86-64: little-endian.

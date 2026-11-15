@@ -1355,10 +1355,10 @@ impl Tiff {
                 .and_then(|v| v.get(nstrips as usize - 1))
             {
                 let i = nstrips as usize - 1;
-                if let Some(c) = counts.get_mut(i) {
-                    if off.wrapping_add(*c) > filesize {
-                        *c = filesize.wrapping_sub(off);
-                    }
+                if let Some(c) = counts.get_mut(i)
+                    && off.wrapping_add(*c) > filesize
+                {
+                    *c = filesize.wrapping_sub(off);
                 }
             }
         } else {

@@ -624,7 +624,6 @@ impl Tiff {
         m: Decode,
         buf: &mut [u8],
         cc: i32,
-        sample: u16,
         s: &mut dyn Streams,
     ) -> i32 {
         if matches!(m, Decode::Lzw | Decode::LzwCompat) && self.not_started("LZW") {
@@ -656,7 +655,7 @@ impl Tiff {
             Decode::Zip => self.zip_decode(buf, cc, s),
             Decode::PredRow => {
                 let inner = self.codec.predictor.coderow;
-                if self.decode(inner, buf, cc, sample, s) != 0 {
+                if self.decode(inner, buf, cc, s) != 0 {
                     let pf = self.codec.predictor.pfunc;
                     self.pfunc(pf, buf, cc);
                     1
@@ -666,7 +665,7 @@ impl Tiff {
             }
             Decode::PredTile => {
                 let inner = self.codec.predictor.codetile;
-                if self.decode(inner, buf, cc, sample, s) != 0 {
+                if self.decode(inner, buf, cc, s) != 0 {
                     let rowsize = self.codec.predictor.rowsize;
                     let pf = self.codec.predictor.pfunc;
                     let mut occ = i64::from(cc);
@@ -1005,7 +1004,7 @@ impl Tiff {
         let mut occ: i64 = i64::from(occ0);
         let mut bad_ptr = false;
         // Writes one byte at position p of the output (before the buffer: never written).
-        let mut put = |buf: &mut [u8], p: i64, v: u8, bad: &mut bool| {
+        let put = |buf: &mut [u8], p: i64, v: u8, bad: &mut bool| {
             if p >= 0 && (p as usize) < buf.len() {
                 buf[p as usize] = v;
             } else {
@@ -1366,7 +1365,7 @@ impl Tiff {
             return CODE_EOI;
         }
         let defined = self.raw_defined;
-        let mut rd = |bp: &mut usize| -> i64 {
+        let rd = |bp: &mut usize| -> i64 {
             let b = if *bp < defined {
                 self.rawdata[*bp]
             } else {
@@ -1482,8 +1481,11 @@ impl Tiff {
         let mut sp = self.codec.zip.take().expect("ZIP");
         sp.zipquality = q as i32;
         let mut ok = true;
-        if !rd && sp.init {
-            if let Some(d) = sp.deflate.as_mut() {
+        if !rd
+            && sp.init
+            && let Some(d) = sp.deflate.as_mut()
+        {
+            {
                 let (at, left) = (sp.out_at, sp.out_left);
                 let end = (at + left as usize).min(self.rawdata.len());
                 let (r, _, made) = d.params(
@@ -1516,7 +1518,7 @@ impl Tiff {
         let stride = i64::from(self.codec.predictor.stride);
         let len = buf.len() as i64;
         let mut outside = false;
-        let mut get8 = |buf: &[u8], i: i64, outside: &mut bool| -> u8 {
+        let get8 = |buf: &[u8], i: i64, outside: &mut bool| -> u8 {
             if i >= 0 && i < len {
                 buf[i as usize]
             } else {

@@ -14,6 +14,7 @@ larmorx-freesurfer-core.workspace = true
 larmorx-freesurfer-io.workspace = true
 larmorx-freesurfer-mri.workspace = true
 larmorx-freesurfer-volume.workspace = true
+larmorx-freesurfer-filter.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true

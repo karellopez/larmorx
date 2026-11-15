@@ -272,8 +272,10 @@ pub fn label_voxel_to_surface_ras(
 
 /// The surface's tkregister RAS to the volume's voxels: `inv(vox2ras(mri)) RASFromSurfaceRAS_`, the
 /// latter of a header made from the surface's geometry when it is valid (`MRIallocHeader` of its
-/// extent, `uchar`, one frame, `MRIcopyVolGeomToMRI`), else of `mri`.
-fn sras2vox(
+/// extent, `uchar`, one frame, `MRIcopyVolGeomToMRI`), else of `mri`. Public for the surface
+/// library's maps (`MRIS_loadRAS2VoxelMap` and the cached conversions, larmorx-freesurfer-surf's
+/// `sras`), which make the same matrix.
+pub fn sras2vox(
     g: &mut Globals,
     io: &mut Io,
     surface: Option<&VolGeom>,

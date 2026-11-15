@@ -315,6 +315,7 @@ dependencies = [
  "flate2",
  "larmorx-core",
  "larmorx-freesurfer-core",
+ "larmorx-freesurfer-filter",
  "larmorx-freesurfer-io",
  "larmorx-freesurfer-mri",
  "larmorx-freesurfer-volume",

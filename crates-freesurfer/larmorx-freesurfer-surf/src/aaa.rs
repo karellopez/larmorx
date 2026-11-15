@@ -321,7 +321,7 @@ impl PartialEq for Opaque {
 
 /// The surface library's process-wide variables (FreeSurfer's globals of `mrisurf.cpp` and
 /// `mrisurf_base.cpp`), one value per run beside [`Globals`].
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SurfGlobals {
     /// `UnitizeNormalFace` (1): `mrisNormalFace` makes its normal unit length.
     pub unitize_normal_face: i32,
@@ -414,6 +414,11 @@ pub struct SurfGlobals {
     pub face_normal_add_delta_vertex: i32,
     /// `MRISfaceNormalFace_AddDelta[3]` (`long double`, zeros).
     pub face_normal_add_delta: [larmorx_core::x87::F80; 3],
+    /// `MRISsurfaceRASToVoxelCached`'s static map (`mrisurf_mri.cpp` line 7380), empty until its
+    /// first call.
+    pub sras_map: crate::sras::Ras2VoxelMap,
+    /// `MRISsurfaceRASFromVoxelCached`'s statics (`mrisurf_mri.cpp` lines 7531-7533).
+    pub vox2sras: crate::sras::Vox2SrasCache,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -459,6 +464,8 @@ impl Default for SurfGlobals {
             sras_ways: None,
             face_normal_add_delta_vertex: -1,
             face_normal_add_delta: [larmorx_core::x87::F80::ZERO; 3],
+            sras_map: Default::default(),
+            vox2sras: Default::default(),
         }
     }
 }

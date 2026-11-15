@@ -69,6 +69,10 @@
 //! - [`gifti`]: the GIFTI surface reader (FS-381..FS-396); [`gifti_write`]: the GIFTI writers
 //!   (FS-397..FS-400, FS-523, FS-524); GIFTI files as volumes (FS-521, FS-522) and the pieces of
 //!   `gifti.cpp` they share with these: larmorx-freesurfer-io's `gifti_vol` and `gifti_common`.
+//! - [`sras`] (fs.surf, taken for `mriflood.cpp`): a surface's tkregister RAS to a volume's voxels
+//!   and back, the maps and the cached conversions (FS-604, FS-605).
+//! - [`mriflood`] (fs.filter's `mriflood.cpp`, beside the surface): the shell, the ribbon, the
+//!   bounding volume and the interior of a surface (FS-606, FS-607).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -91,6 +95,7 @@ pub mod metric;
 pub mod mp;
 pub mod mp_faster;
 pub mod mp_slow;
+pub mod mriflood;
 pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;
@@ -110,6 +115,7 @@ pub mod props9;
 pub mod readwrite;
 pub mod scanf;
 pub mod sfile;
+pub mod sras;
 pub mod stl;
 pub mod surfbase;
 pub mod surfread;

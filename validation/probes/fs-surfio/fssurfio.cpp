@@ -52,6 +52,7 @@
 #include "mrisurf_base.h"
 #include "mrisurf_sphere_interp.h"
 #include "matrix.h"
+#include "mrisurf.h"
 #include "mrisutils.h"
 #include "surfgrad.h"
 #include "transform.h"
@@ -3698,6 +3699,181 @@ void mpe_case()
   }
 }
 
+// relay 32 of track D: mrisurf_mri.cpp's surface-to-voxel maps and the cached conversions, and
+// mriflood.cpp's surface functions (MRISshell, MRISribbon, MRISmakeBoundingVolume,
+// MRISfillInterior) on one or two surfaces read by MRISread, each with a volume geometry of the
+// case, and 1 to 3 volumes; each volume printed as its extent, type, frames, geometry and
+// ras_good_flag, then its voxels as runs <bits>x<n>, then E
+static void fli_vol(MRI *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->type); oi(m->nframes);
+  float gs[15] = {m->xsize, m->ysize, m->zsize, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a,
+                  m->y_s, m->z_r, m->z_a, m->z_s, m->c_r, m->c_a, m->c_s};
+  for (float x : gs) of(x);
+  oi(m->ras_good_flag);
+  bool have = false;
+  uint32_t cur = 0;
+  unsigned long long n = 0;
+  char b[48];
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) {
+          float x = MRIgetVoxVal(m, c, r, s, f);
+          uint32_t u;
+          memcpy(&u, &x, 4);
+          if (have && u == cur) { n++; continue; }
+          if (have) { snprintf(b, sizeof b, "%08x" "x%llu ", cur, n); out += b; }
+          cur = u;
+          n = 1;
+          have = true;
+        }
+  if (have) { snprintf(b, sizeof b, "%08x" "x%llu ", cur, n); out += b; }
+  out += "E ";
+}
+
+static void fli_ret(MRI *r, MRI *given)
+{
+  if (!r) { out += "NULL "; return; }
+  if (given) {
+    out += r == given ? "G " : "? ";
+    fli_vol(given);
+  } else {
+    out += "N ";
+    fli_vol(r);
+    MRIfree(&r);
+  }
+}
+
+static void fli_geom(VOL_GEOM *v)
+{
+  v->xsize = getf(); v->ysize = getf(); v->zsize = getf();
+  v->x_r = getf(); v->x_a = getf(); v->x_s = getf();
+  v->y_r = getf(); v->y_a = getf(); v->y_s = getf();
+  v->z_r = getf(); v->z_a = getf(); v->z_s = getf();
+  v->c_r = getf(); v->c_a = getf(); v->c_s = getf();
+}
+
+void fli_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  int two = geti();
+  std::vector<std::string> names;
+  std::vector<int> counts;
+  for (int k = 0; k < 1 + (two != 0); k++) {
+    std::string bytes = geth();
+    counts.push_back(geti());
+    counts.push_back(geti());
+    std::string name = "d/lh.s" + std::to_string(k);
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("the surface file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+    names.push_back(name);
+  }
+  errno = 0;
+  std::vector<MRIS *> surfs;
+  for (size_t k = 0; k < names.size(); k++) {
+    MRIS *s = MRISread(names[k].c_str());
+    if (!s) { out += "NULL "; return; }
+    if (counts[2 * k] != s->nvertices || counts[2 * k + 1] != s->nfaces) {
+      oi(s->nvertices); oi(s->nfaces); out += "COUNTS ";
+      return;
+    }
+    surfs.push_back(s);
+  }
+  for (MRIS *s : surfs) {
+    s->vg.valid = geti();
+    s->vg.width = geti(); s->vg.height = geti(); s->vg.depth = geti();
+    fli_geom(&s->vg);
+  }
+  Gdiag = (unsigned long)(unsigned int)geti();
+  Gdiag_no = geti();
+  int nvol = geti();
+  std::vector<MRI *> vols;
+  for (int k = 0; k < nvol; k++) {
+    int type = geti(), w = geti(), h = geti(), d = geti();
+    MRI *v = MRIalloc(w, h, d, type);
+    fli_geom(v);
+    MRIreInitCache(v);
+    int fill = geti();
+    if (fill)
+      for (int s = 0; s < d; s++)
+        for (int r = 0; r < h; r++)
+          for (int c = 0; c < w; c++) MRIsetVoxVal(v, c, r, s, 0, (float)((c + 2 * r + 3 * s + fill) % 4));
+    vols.push_back(v);
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "r2v" || op == "v2r" || op == "r2vc" || op == "v2rc") {
+      MRIS *m = surfs[geti()];
+      MRI *v = vols[geti()];
+      double a = getd(), b = getd(), c = getd(), x = 0, y = 0, z = 0;
+      if (op == "r2v") MRISsurfaceRASToVoxel(m, v, a, b, c, &x, &y, &z);
+      else if (op == "v2r") MRISsurfaceRASFromVoxel(m, v, a, b, c, &x, &y, &z);
+      else if (op == "r2vc") MRISsurfaceRASToVoxelCached(m, v, a, b, c, &x, &y, &z);
+      else MRISsurfaceRASFromVoxelCached(m, v, a, b, c, &x, &y, &z);
+      od(x); od(y); od(z);
+    } else if (op == "map") {
+      MRIS *m = surfs[geti()];
+      MRI *v = vols[geti()];
+      MRIS_SurfRAS2VoxelMap *map = MRIS_makeRAS2VoxelMap(v, m);
+      for (int j = 0; j < 2; j++) {
+        if (j == 1) {
+          m = surfs[geti()];
+          v = vols[geti()];
+          MRIS_loadRAS2VoxelMap(map, v, m);
+        }
+        int n = geti();
+        for (int i = 0; i < n; i++) {
+          double a = getd(), b = getd(), c = getd(), x, y, z;
+          MRIS_useRAS2VoxelMap(map, v, a, b, c, &x, &y, &z);
+          od(x); od(y); od(z);
+        }
+      }
+      MRIS_freeRAS2VoxelMap(&map);
+    } else if (op == "shl") {
+      MRIS *m = surfs[geti()];
+      MRI *v = vols[geti()];
+      int di = geti(), clear = geti();
+      MRI *given = di >= 0 ? vols[di] : NULL;
+      fli_ret(MRISshell(v, m, given, clear), given);
+    } else if (op == "rib") {
+      MRIS *inner = surfs[geti()], *outer = surfs[geti()];
+      MRI *v = vols[geti()];
+      int di = geti();
+      MRI *given = di >= 0 ? vols[di] : NULL;
+      fli_ret(MRISribbon(inner, outer, v, given), given);
+    } else if (op == "bbv") {
+      MRIS *m = surfs[geti()];
+      double res = getd();
+      MRI *r = MRISmakeBoundingVolume(m, res);
+      fli_vol(r);
+      if (r) MRIfree(&r);
+    } else if (op == "fil") {
+      MRIS *m = surfs[geti()];
+      double res = getd();
+      int di = geti();
+      MRI *given = di >= 0 ? vols[di] : NULL;
+      fli_ret(MRISfillInterior(m, res, given), given);
+    } else if (op == "bbf") {
+      MRIS *m = surfs[geti()];
+      double res = getd();
+      MRI *b = MRISmakeBoundingVolume(m, res);
+      fli_ret(MRISfillInterior(m, res, b), b);
+      MRIfree(&b);
+    } else fail("fli op");
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -3936,6 +4112,8 @@ void run_case()
     mpf_case();
   } else if (cmd == "mpg") {
     mpg_case();
+  } else if (cmd == "fli") {
+    fli_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {
@@ -3983,6 +4161,9 @@ static std::string untime(const std::string &t)
       line = line.substr(0, a + 2) + "<t>" + line.substr(sec);
     } else if (line.rfind("vtxval ", 0) == 0) {
       line = "vtxval <v>";
+    } else if (line.rfind("  MRISfillInterior t = ", 0) == 0) {
+      // relay 32 of track D: MRISfillInterior's elapsed time (with Gdiag_no > 0)
+      line = "  MRISfillInterior t = <t>";
     }
     r += line;
     if (j == std::string::npos) break;

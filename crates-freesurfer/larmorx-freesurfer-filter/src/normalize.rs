@@ -2627,7 +2627,7 @@ pub fn remove_gray_matter_control_points(
     dir: Option<&Path>,
     st: &mut NormState,
     ctrl: &mut Mri,
-    src: &Mri,
+    src: &mut Mri,
     wm_target: f32,
     intensity_above: f32,
     intensity_below: f32,
@@ -2734,28 +2734,9 @@ pub fn remove_gray_matter_control_points(
             &format!("ci{ncalls}.mgz"),
         )?;
         write_vol(g, out, err, env, dir, ctrl, &format!("cb{ncalls}.mgz"))?;
-        // FreeSurfer's MRIwrite here sets the intent and version of `mri_src` (MRI3dNormalize's
-        // original volume), which this port holds read-only: a silent copy is written instead
-        // (only with DIAG_WRITE and DIAG_VERBOSE; the batch-13 merge, 2026-11-14; track D's next
-        // relay makes `orig` mutable through MRI3dNormalize for the exact side effect).
-        let mut g2 = g.clone();
-        let mut src_w = mri_copy(
-            &mut g2,
-            &mut std::io::sink(),
-            &mut std::io::sink(),
-            src,
-            None,
-        )?
-        .unwrap_new();
-        write_vol(
-            g,
-            out,
-            err,
-            env,
-            dir,
-            &mut src_w,
-            &format!("orig{ncalls}.mgz"),
-        )?;
+        // FreeSurfer's MRIwrite sets the written volume's intent and version: here `src`, the
+        // caller's original volume (MRI3dNormalize's `mri_orig`), so it is taken mutably.
+        write_vol(g, out, err, env, dir, src, &format!("orig{ncalls}.mgz"))?;
     }
     let (gx, gy, gz) = (g.gx, g.gy, g.gz);
     if gx >= 0 {
@@ -2957,7 +2938,7 @@ pub fn mri_3d_normalize(
     env: &Environment,
     dir: Option<&Path>,
     st: &mut NormState,
-    orig: &Mri,
+    orig: &mut Mri,
     src: &mut Mri,
     wm_target: f32,
     norm: Dst,

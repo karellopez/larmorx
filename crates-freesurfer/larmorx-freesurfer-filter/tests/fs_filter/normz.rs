@@ -1269,7 +1269,7 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
         }
         "n3d" => {
             let mut src = get_vol(cx, t)?;
-            let orig = if t.i() != 0 {
+            let mut orig = if t.i() != 0 {
                 get_vol(cx, t)?
             } else {
                 mri_copy(&mut cx.g, &mut cx.a, &mut cx.b, &src, None)?.unwrap_new()
@@ -1300,7 +1300,7 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                 &env,
                 None,
                 &mut st,
-                &orig,
+                &mut orig,
                 &mut src,
                 wm,
                 d,
@@ -1345,7 +1345,7 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                 let (ab, be) = (t.f(), t.f());
                 let pr = t.i();
                 let sg = t.f();
-                let orig = mri_copy(g, a, b, &src, None)?.unwrap_new();
+                let mut orig = mri_copy(g, a, b, &src, None)?.unwrap_new();
                 nz::mri_3d_normalize(
                     g,
                     a,
@@ -1353,7 +1353,7 @@ pub fn run(cx: &mut Ctx, cmd: &str, t: &mut Toks, o: &mut String) -> Result<bool
                     &env,
                     None,
                     &mut st,
-                    &orig,
+                    &mut orig,
                     &mut src,
                     110.0,
                     nz::Dst::Same,

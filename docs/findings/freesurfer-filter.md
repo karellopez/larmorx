@@ -449,3 +449,40 @@ and the surfio spec's §118.
   vectors per element (fs.core): now on the stack below 17 columns (the same `dot_float`).
   `MRISshell` loads its cached map once per call (the later loads of the call find the same volume
   and surface and change nothing). The 24 recorded calls: 138 s before, see the probe README after.
+
+## 17. `mri2.cpp`'s `MRImask_with_T2_and_aparc_aseg` (relay 34)
+
+The port is `crates-freesurfer/larmorx-freesurfer-filter/src/t2mask.rs` (fs.volume's file `mri2.cpp`,
+in fs.filter because it calls `GetLargestCC6`: track C's relay 29 handed it over); the behaviour is the
+filter spec's §37.
+
+- **Callers.** `mri_em_register.cpp` 476, `mri_ca_register.cpp` 324 and `mri_ca_normalize.cpp` 423,
+  each as `MRImask_with_T2_and_aparc_aseg(mri_tmp, mri_tmp, mri_T2, mri_aparc_aseg, T2_thresh,
+  MM_FROM_EXTERIOR)` with `MM_FROM_EXTERIOR` 5; `-T2MASK <T2> <thresh>` sets only the T2 (the
+  aparc+aseg stays `nullptr`), `-AMASK <aparc+aseg> <T2> <thresh>` both. recon-all passes neither,
+  so no recorded step runs the function.
+- **FS-615.** The `else // just use T2` branch exists, but the pass loop reads
+  `MRIgetVoxVal(mri_aparc_aseg, x, y, z, 0)` unconditionally: with `-T2MASK` the first voxel whose
+  mask is not 0 dereferences `NULL`. After `MRInot`, every voxel outside the largest dark region is
+  1, so the crash happens on any real input.
+- **FS-616.** The last step is `MRImask(mri_dst, mri_mask, mri_dst, 0, 0)`: `mri_src` is never read
+  (no line of the function uses it); `mri_dst == NULL` gives `MRImask(NULL, ...)`, whose
+  `getVolGeom(mri_src, ...)` dereferences it (FS-618).
+- **FS-617.** `mri_tmp` is `NULL` until the first pass; `MRIfree(&mri_tmp)` at the end prints
+  `MRIfree: null pointer` through `ErrorReturn` when no pass ran.
+- `mri_bright = MRIcopy(mri_mask, NULL)` is only freed. `MRIbinarize(mri_aparc_aseg,
+  mri_aparc_aseg, 1, 0, 255)`, `MRIdilate`, `MRInot` and `GetLargestCC6` change the caller's
+  aparc+aseg in place (the callers free it right after). `nremoved` is set once before the passes,
+  so each pass's message prints the running total.
+- **Real data (FS-290).** With ds000005 sub-01's `T1.mgz` as the T2 at 120 the official program
+  crashed (SIGSEGV): a voxel on the volume's faces kept by the mask, whose `MRIneighborsOff`
+  neighbour at `x - 1` (or `y - 1`, `z - 1`) lies before the slice's first row (`slices[z][y][-1]`
+  or `slices[-1]`): memory the program does not own. The port notes FS-290 (track C's) and reads 0
+  there; the probe counts the line. At 160 and on the other two heads the official run and the
+  port agree.
+- **Speed.** `examples/fs_t2mask_timing.rs` on pixar008: binarize 0.3 s, the aparc+aseg's dilation
+  2.9 s (an `int` volume: the generic path), largest region 1.5 s, `MRIand` 1.1 s, `MRIopenN(.., 3)`
+  16.6 s (three byte erosions with relay 31's fast path, three byte dilations through
+  `MRIdilateUchar`'s 27 indexed reads per voxel), the passes about 1.5 s: 25 s per call against the
+  official 5.3 s (`real.py --t2mask`: 32 s for 6 calls). A follow-up for track C's `mriset.rs` (a
+  byte dilation over the volume's interior read once, as `erode_bytes_inside`).

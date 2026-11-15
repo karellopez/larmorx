@@ -896,8 +896,11 @@ pub fn outside_match(
     };
     // `Init()`: every point far
     fm.status.fill(FAR);
-    // `InitForOutsideMatch`'s segmentation (`mri_seg`)
-    let mut seg = vec![0u8; n];
+    // `InitForOutsideMatch`'s segmentation (`mri_seg`, `MRIalloc`: its messages for an empty extent)
+    let mut seg = mri_alloc(g, out, err, w, h, d, MRI_UCHAR)?
+        .chunk
+        .unwrap_or_default();
+    seg.resize(n, 0);
     const WHAT: &str = "MRISextractOutsideDistanceMap";
     for z in 0..d {
         for y in 0..h {

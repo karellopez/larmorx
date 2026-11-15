@@ -431,7 +431,7 @@ pub fn mri_nrrd_read(
             let w = sizes[0];
             for (row, src) in bytes.chunks_exact(8 * w).enumerate() {
                 let at = row * 8 * w;
-                for (x, v) in src.chunks_exact(8).enumerate() {
+                for (x, v) in src.as_chunks::<8>().0.iter().enumerate() {
                     chunk[at + 4 * x..at + 4 * x + 4].copy_from_slice(&v[..4]);
                 }
             }

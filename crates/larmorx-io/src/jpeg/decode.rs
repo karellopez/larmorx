@@ -763,11 +763,14 @@ impl<'a, 's> D<'a, 's> {
         let mut marker = self.unread_marker;
         self.warn(JWRN_MUST_RESYNC, &[marker, desired]);
         loop {
+            // a marker below SOF0: discard; not a restart marker, or the next two: leave it;
+            // the previous two: discard and look again; otherwise: take it as the one expected
             let action = if marker < 0xC0 {
                 2
-            } else if !(0xD0..=0xD7).contains(&marker) {
-                3
-            } else if marker == 0xD0 + ((desired + 1) & 7) || marker == 0xD0 + ((desired + 2) & 7) {
+            } else if !(0xD0..=0xD7).contains(&marker)
+                || marker == 0xD0 + ((desired + 1) & 7)
+                || marker == 0xD0 + ((desired + 2) & 7)
+            {
                 3
             } else if marker == 0xD0 + ((desired - 1) & 7) || marker == 0xD0 + ((desired - 2) & 7) {
                 2
@@ -1091,11 +1094,10 @@ impl<'a, 's> D<'a, 's> {
         p = 0;
         for l in 1..=HUFF_LOOKAHEAD as usize {
             for _ in 1..=htbl.bits[l] as usize {
-                let mut lookbits = (huffcode[p] << (HUFF_LOOKAHEAD as usize - l)) as usize;
-                for _ in 0..(1usize << (HUFF_LOOKAHEAD as usize - l)) {
+                let first = (huffcode[p] << (HUFF_LOOKAHEAD as usize - l)) as usize;
+                for lookbits in first..first + (1usize << (HUFF_LOOKAHEAD as usize - l)) {
                     d.look_nbits[lookbits] = l as i32;
                     d.look_sym[lookbits] = htbl.huffval[p];
-                    lookbits += 1;
                 }
                 p += 1;
             }
@@ -1251,10 +1253,10 @@ impl<'a, 's> D<'a, 's> {
             self.process_restart()?;
         }
         if !self.insufficient_data {
-            for blkn in 0..self.blocks_in_mcu {
+            for (blkn, &slot) in idx.iter().enumerate().take(self.blocks_in_mcu) {
                 let dctbl = self.dc_derived[self.cur_dc[blkn]].take().expect("table");
                 let actbl = self.ac_derived[self.cur_ac[blkn]].take().expect("table");
-                let r = self.decode_block(blocks, idx[blkn], blkn, &dctbl, &actbl);
+                let r = self.decode_block(blocks, slot, blkn, &dctbl, &actbl);
                 self.dc_derived[self.cur_dc[blkn]] = Some(dctbl);
                 self.ac_derived[self.cur_ac[blkn]] = Some(actbl);
                 r?;
@@ -2126,8 +2128,8 @@ fn decompress(d: &mut D, row: &mut dyn FnMut(&[u8])) -> Result<(), Fatal> {
         build_dct_tables(d);
         let smooth = smoothing_ok(d);
         for r in 0..total {
-            if smooth.is_some() {
-                idct_smooth_row(d, &mut output, r, smooth.as_ref().expect("latch"));
+            if let Some(latch) = &smooth {
+                idct_smooth_row(d, &mut output, r, latch);
             } else {
                 idct_row(d, &mut output, r);
             }
@@ -2178,8 +2180,8 @@ fn missing_components(d: &D) -> Vec<bool> {
 fn build_dct_tables(d: &mut D) {
     for c in d.comps.iter_mut() {
         if let Some(q) = c.quant {
-            for i in 0..DCTSIZE2 {
-                c.dct_table[i] = q[i] as i32;
+            for (m, &v) in c.dct_table.iter_mut().zip(q.iter()) {
+                *m = v as i32;
             }
         }
     }

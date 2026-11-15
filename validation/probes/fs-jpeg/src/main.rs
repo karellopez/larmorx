@@ -167,18 +167,18 @@ fn rust_gray(w: u32, h: u32, pix: &[u8]) -> Out {
 /// The input pixels of IJG-made files: noise, gradients, stripes or flat areas.
 fn pixels(r: &mut Rng, w: u32, h: u32, comps: u32) -> Vec<u8> {
     let kind = r.below(5);
-    let base = r.next();
+    let base = r.next_u64();
     let mut v = Vec::with_capacity((w * h * comps) as usize);
     for y in 0..h {
         for x in 0..w {
             for c in 0..comps {
                 v.push(match kind {
-                    0 => r.next() as u8,
+                    0 => r.next_u64() as u8,
                     1 => ((x * 255) / w.max(1) + c * 30) as u8,
                     2 => ((((x / 2) ^ (y / 3) ^ c) & 1) * 255) as u8,
                     3 => (base >> (8 * c)) as u8,
                     _ => ((x.wrapping_mul(7) ^ y.wrapping_mul(13)).wrapping_add(c * 50)
-                        ^ (r.next() as u32 & 15)) as u8,
+                        ^ (r.next_u64() as u32 & 15)) as u8,
                 });
             }
         }

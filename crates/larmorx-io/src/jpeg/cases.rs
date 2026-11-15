@@ -16,7 +16,7 @@ use super::encode::{
 pub struct Rng(pub u64);
 
 impl Rng {
-    pub fn next(&mut self) -> u64 {
+    pub fn next_u64(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -24,7 +24,7 @@ impl Rng {
         z ^ (z >> 31)
     }
     pub fn below(&mut self, n: u64) -> u64 {
-        if n == 0 { 0 } else { self.next() % n }
+        if n == 0 { 0 } else { self.next_u64() % n }
     }
 }
 
@@ -409,12 +409,12 @@ pub fn damage(f: &mut Vec<u8>, seed: u64, n: u32) {
         }
         let at = g.below(f.len() as u64) as usize;
         match g.below(6) {
-            0 | 1 => f[at] = g.next() as u8,
+            0 | 1 => f[at] = g.next_u64() as u8,
             2 => f[at] ^= 1 << g.below(8),
             3 => {
                 let k = 1 + g.below(4) as usize;
                 for _ in 0..k {
-                    f.insert(at, g.next() as u8);
+                    f.insert(at, g.next_u64() as u8);
                 }
             }
             4 => {
@@ -435,7 +435,7 @@ pub fn gray_image(seed: u64, w: u32, h: u32) -> Vec<u8> {
         for x in 0..w {
             v.push(match kind {
                 0 => sample(seed, 0, x, y),
-                1 => r.next() as u8,
+                1 => r.next_u64() as u8,
                 2 => (((x / 3) ^ (y / 5)) & 1) as u8 * 255,
                 _ => ((x * 255) / w.max(1)) as u8,
             });

@@ -39,5 +39,6 @@ Run (every run inside a memory box):
 Results of 2026-11-15 (track C relay 31): testset 440/440 identical; cases seed 1 (3,000, sides up
 to 96): 2,549 compared, all identical (451 parameter sets the compressor refused); seed 2 (1,500,
 sides up to 400): 1,287 identical; seed 3 (12,000, sides up to 20): 10,071 identical; cuts seed 1
-(300 files): 7,176 identical; IJG's release and FreeSurfer's build never differed (logs
+(300 files): 7,176 identical; after relay 31's clippy changes: testset 440/440 and cases seed 4
+(6,000, sides up to 64) 5,003 identical; IJG's release and FreeSurfer's build never differed (logs
 `<workspace>/oracles/logs/fs-found-c-r31-jpeg-*.log`).

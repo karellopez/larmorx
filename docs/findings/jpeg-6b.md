@@ -14,11 +14,12 @@ GCC 8.4.0, `-O3`; each case in a forked child, so the library's `exit` is seen a
 | random files, IJG-made (every colour space, sampling, quality, progressive, optimized tables, restart intervals, the three DCTs, smoothing) or made by larmorx's test encoder, a third damaged; each also read for its header, and a grey image of the same seed written: sides up to 96 samples | 2,549 (3 x 2,549 comparisons) | all |
 | the same, sides up to 400 | 1,287 | all |
 | the same, sides up to 20 | 10,071 | all |
+| the same, sides up to 64 (after the final changes) | 5,003 | all |
 | IJG's progressive files cut after 24 points each (later scans missing, refinement incomplete: block smoothing) | 7,176 | all |
 | FS-813's two shapes (one scan, several scans), in reproduce mode | 2 | 2 |
 
 IJG 6b as released and FreeSurfer's copy gave the same bytes in every case. Of the random
-files, 6,144 ended with one of IJG's errors and 918 decoded with a warning (logs
+files, 8,286 ended with one of IJG's errors and 1,283 decoded with a warning (logs
 `oracles/logs/fs-found-c-r31-jpeg-*.log`).
 
 ## Messages and exit status

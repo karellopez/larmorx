@@ -15,7 +15,9 @@ use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::cstd::{double_to_int_x86, is_space};
 use larmorx_freesurfer_core::diag;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_NOFILE, ERROR_NOMEMORY, Fatal};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOFILE, ERROR_NOMEMORY, Fatal, NO_ERROR,
+};
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_io::cfile::CFile;
 
@@ -505,6 +507,51 @@ pub fn ico_read_over_alloc(
     let max_v = crate::trifile::room(g, nvf_multiplier * f64::from(ico.nvertices));
     let max_f = crate::trifile::room(g, nvf_multiplier * f64::from(ico.nfaces));
     ico_to_scaled_mris(g, sg, io, &mut ico, max_v, max_f, scale_factor, fname)
+}
+
+/// `ICOreadVertexPositions(mris, fname, which)` (`utils/icosahedron.cpp` 1940, relay 36 of track
+/// D): the icosahedron file's vertex positions as the surface's (`which` `CURRENT_VERTICES`, the
+/// only one its callers pass; another fails `cheapAssert`, line 1963, FS-03). The file's reader's
+/// failure returns `Gerror` (its messages printed); a file of another vertex or face count is
+/// `ICOreadVertexPositions: different size surfaces` (`ERROR_BADPARM`). The distances are freed
+/// (`MRISfreeDistsButNotOrig`) before the positions are set. Returns `NO_ERROR`.
+pub fn read_vertex_positions(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &mut Mris,
+    fname: &str,
+    which: i32,
+) -> Result<i32, Fatal> {
+    let Some(ico) = read_icosahedron(g, io, dir, fname)? else {
+        return Ok(g.gerror);
+    };
+    if ico.nvertices != mris.nvertices || ico.nfaces != mris.nfaces {
+        log::error_printf(
+            g,
+            io.err,
+            ERROR_BADPARM,
+            "ICOreadVertexPositions: different size surfaces",
+        );
+        return Ok(ERROR_BADPARM);
+    }
+    crate::dist::free_dists_but_not_orig(mris);
+    let file = icosahedron_cpp();
+    for vno in 0..ico.nvertices.max(0) {
+        if which != crate::views::CURRENT_VERTICES {
+            return Err(diag::assert_failed(
+                g,
+                io.out,
+                io.err,
+                &file,
+                1963,
+                "!\"ICOreadVertexPositions bad which\"",
+            ));
+        }
+        let p = ico.vertices[vno as usize];
+        coords::set_xyz(g, io, mris, vno, p.x, p.y, p.z, &file, 1957)?;
+    }
+    Ok(NO_ERROR)
 }
 
 /// `ICOread(fname)`: [`ico_read_over_alloc`] with no extra room and no scaling.

@@ -153,7 +153,7 @@ fn voxel(g: &mut Gen, ty: i32, heavy: bool) -> i32 {
 
 /// An MGH volume of one voxel per vertex (mostly): version 1, the extent, frames, type, the RAS
 /// flag and geometry, the voxels; now and then cut.
-fn mgh_curv(g: &mut Gen, nv: i64, compressed: bool) -> Vec<u8> {
+pub(super) fn mgh_curv(g: &mut Gen, nv: i64, compressed: bool) -> Vec<u8> {
     let heavy = g.chance(3);
     let mut b = Vec::new();
     be32(&mut b, 1);
@@ -191,7 +191,7 @@ fn mgh_curv(g: &mut Gen, nv: i64, compressed: bool) -> Vec<u8> {
 /// A NIfTI-1 single file of one voxel per vertex (mostly): the header (the extent, frames, the
 /// data type: bytes, shorts, ints or floats, a scale now and then, the qform code), no extension,
 /// the voxels in little-endian order; now and then cut.
-fn nii_curv(g: &mut Gen, nv: i64, compressed: bool) -> Vec<u8> {
+pub(super) fn nii_curv(g: &mut Gen, nv: i64, compressed: bool) -> Vec<u8> {
     let heavy = g.chance(3);
     let (w, h, d) = extent(g, nv);
     let nf = g.pick(&[1, 1, 1, 2]);

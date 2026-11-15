@@ -85,6 +85,7 @@ int fssurfio_read_new_curvature_into_array(const char *fname, int size, float **
 int fssurfio_read_curv_old_format(MRIS *mris, const char *fname, MRI *curvmri);
 void fssurfio_apply_fsgii_read(char *file_to_read, const char *fname, int *filetype);
 void fssurfio_apply_fsgii_write(char *file_to_write, const char *fname, int *filetype);
+int fssurfio_read_values_into_array(const char *sname, int size, float **out);
 MRIS *fssurfio_read_ascii_file(const char *fname);
 MRIS *fssurfio_read_geo_file(const char *fname);
 int fssurfio_read_geo_file_positions(MRIS *mris, const char *fname);
@@ -3998,6 +3999,164 @@ void flr_case()
       oi(MRISreadCurvatureFile(s, ("./" + n).c_str()));
       curv_fnv();
     }
+  } else if (op == "pvw") {
+    // relay 36 of track D: a recorded per-vertex file read into its surface's values
+    // (MRISreadValues), then the patch (MRISwritePatch), the normals (MRISwriteNormals), the values
+    // into a volume given (MRISwriteIntoVolume), the normals read back (MRISreadNormals, after
+    // zeroing them) and the values read from the normals' volume (frame 0): each status, the
+    // values', normals' and volume's FNV-1a, and each written file's
+    MRIS *s = MRISread(next());
+    std::string cf = next();
+    if (!s) fail("cannot read the inputs");
+    mkdir(workdir.c_str(), 0700);
+    clear_dir(workdir, true);
+    if (chdir(workdir.c_str()) != 0) fail("chdir");
+    auto fnv = [](const std::string &b) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : b) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    auto field_fnv = [&](int which) {
+      std::string b;
+      for (int v = 0; v < s->nvertices; v++) {
+        VERTEX *x = &s->vertices[v];
+        if (which == 0) b.append((const char *)&x->val, 4);
+        else { b.append((const char *)&x->nx, 4); b.append((const char *)&x->ny, 4); b.append((const char *)&x->nz, 4); }
+      }
+      fnv(b);
+    };
+    oi(MRISreadValues(s, cf.c_str()));
+    field_fnv(0);
+    oi(MRISwritePatch(s, "./p.patch"));
+    oi(MRISwriteNormals(s, "./n.mgz"));
+    MRI *given = MRIalloc(s->nvertices, 1, 1, MRI_FLOAT);
+    MRI *r = MRISwriteIntoVolume(s, given, VERTEX_VALS);
+    oi(r == given);
+    {
+      std::string b;
+      for (int v = 0; v < s->nvertices; v++) { float x = MRIgetVoxVal(given, v, 0, 0, 0); b.append((const char *)&x, 4); }
+      fnv(b);
+    }
+    for (int v = 0; v < s->nvertices; v++) { s->vertices[v].nx = 0; s->vertices[v].ny = 0; s->vertices[v].nz = 0; }
+    oi(MRISreadNormals(s, "./n.mgz"));
+    field_fnv(1);
+    oi(MRISreadValues(s, "./n.mgz"));
+    field_fnv(0);
+    std::vector<std::string> files;
+    list_files(".", "", files);
+    std::sort(files.begin(), files.end());
+    for (const std::string &n : files) {
+      oh(n.c_str());
+      std::string b;
+      if (FILE *fp = fopen(n.c_str(), "rb")) {
+        char buf[65536];
+        size_t k;
+        while ((k = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, k);
+        fclose(fp);
+      }
+      fnv(b);
+    }
+  } else if (op == "vps") {
+    // relay 36 of track D: a recorded surface's other files' positions (`vps <surf> <sphere>
+    // <smoothwm> <pial>`): MRISreadCanonicalCoordinates, MRISreadOriginalProperties,
+    // MRISreadPialCoordinates, MRISreadWhiteCoordinates (the surface's own file again) and
+    // MRISreadVertexPositions (the pial file), each status, then the FNV-1a of each coordinate
+    // set, theta and phi, the areas, the normals, and the totals
+    std::string sn = next();
+    MRIS *s = MRISread(sn.c_str());
+    std::string sph = next(), swm = next(), pial = next();
+    if (!s) fail("cannot read the inputs");
+    oi(MRISreadCanonicalCoordinates(s, sph.c_str()));
+    oi(MRISreadOriginalProperties(s, swm.c_str()));
+    oi(MRISreadPialCoordinates(s, pial.c_str()));
+    oi(MRISreadWhiteCoordinates(s, sn.c_str()));
+    oi(MRISreadVertexPositions(s, pial.c_str()));
+    for (int set = 0; set < 8; set++) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (int v = 0; v < s->nvertices; v++) {
+        VERTEX *x = &s->vertices[v];
+        float f[3];
+        switch (set) {
+          case 0: f[0] = x->x; f[1] = x->y; f[2] = x->z; break;
+          case 1: f[0] = x->cx; f[1] = x->cy; f[2] = x->cz; break;
+          case 2: f[0] = x->origx; f[1] = x->origy; f[2] = x->origz; break;
+          case 3: f[0] = x->pialx; f[1] = x->pialy; f[2] = x->pialz; break;
+          case 4: f[0] = x->whitex; f[1] = x->whitey; f[2] = x->whitez; break;
+          case 5: f[0] = x->theta; f[1] = x->phi; f[2] = 0; break;
+          case 6: f[0] = x->area; f[1] = x->origarea; f[2] = 0; break;
+          default: f[0] = x->nx; f[1] = x->ny; f[2] = x->nz; break;
+        }
+        const unsigned char *b = (const unsigned char *)f;
+        for (int k = 0; k < 12; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      }
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
+    oi(s->status); of(s->total_area); of(s->orig_area); od(s->radius);
+  } else if (op == "ann") {
+    // relay 36 of track D: a recorded annotation read into its white surface
+    // (MRISreadAnnotation), written as an annotation file, a segmentation (.mgz) and GIFTI
+    // (MRISwriteAnnotation) into the work folder and read back; each status, the annotations'
+    // and the colour table's FNV-1a, each written file's (a .gii one's after gii_normal)
+    MRIS *s = MRISread(next());
+    std::string af = next();
+    if (!s) fail("cannot read the inputs");
+    mkdir(workdir.c_str(), 0700);
+    clear_dir(workdir, true);
+    if (chdir(workdir.c_str()) != 0) fail("chdir");
+    auto fnv = [](const std::string &b) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : b) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    auto ann_fnv = [&]() {
+      std::string b;
+      for (int v = 0; v < s->nvertices; v++) b.append((const char *)&s->vertices[v].annotation, 4);
+      fnv(b);
+      std::string c;
+      if (s->ct) {
+        for (int k = 0; k < s->ct->nentries; k++) {
+          CTE *e = s->ct->entries[k];
+          if (!e) { c += "-"; continue; }
+          c += e->name;
+          c.append((const char *)&e->ri, 16);
+        }
+      }
+      fnv(c);
+    };
+    auto slurp = [](const std::string &n) {
+      std::string b;
+      if (FILE *fp = fopen(n.c_str(), "rb")) {
+        char buf[65536];
+        size_t k;
+        while ((k = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, k);
+        fclose(fp);
+      }
+      return b;
+    };
+    oi(MRISreadAnnotation(s, af.c_str()));
+    ann_fnv();
+    for (const char *nm : {"./a.annot", "./s.mgz", "./g.gii"}) oi(MRISwriteAnnotation(s, nm));
+    std::vector<std::string> files;
+    list_files(".", "", files);
+    std::sort(files.begin(), files.end());
+    for (const std::string &n : files) {
+      oh(n.c_str());
+      std::string b = slurp(n);
+      bool gii = n.size() >= 4 && n.compare(n.size() - 4, 4, ".gii") == 0;
+      fnv(gii ? gii_normal(b) : b);
+    }
+    oi(slurp("a.annot") == slurp(af));
+    for (const std::string &n : files) {
+      for (int v = 0; v < s->nvertices; v++) s->vertices[v].annotation = 0;
+      oi(MRISreadAnnotation(s, ("./" + n).c_str()));
+      ann_fnv();
+    }
   } else fail("flr op");
 }
 
@@ -4242,6 +4401,332 @@ void crv_case()
     of(v->x); of(v->y); of(v->z); of(v->curv); of(v->val);
   }
   of(m->max_curv); of(m->min_curv); oi(m->nvertices); oi(m->nfaces);
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) dump_crv_file(name);
+}
+
+// ---- relay 36 of track D: pvw, the patch, value and normal files (queue items 3.1-47/48) ---------
+
+// a volume as pvw prints it: its extent, frames and type, then every voxel (frames outermost)
+void dump_pvw_volume(MRI *m)
+{
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) of(MRIgetVoxVal(m, c, r, s, f));
+}
+
+// pvw: Gdiag's bits (1 show, 2 verbose), the environment (1 FS_POSIX, 4 MRIS_READVAL_FRAME <h>,
+// 8 FS_LEAVE_NANS; always SURFER_SIDEDOOR and USER=U), MRISsetReadFrame's frame (-1: not called),
+// the input files, a surface from MRISalloc (its name; per vertex x y z val curv area, the
+// annotation's bits, dx dy dz nx ny nz wnx wny wnz e1x e1y e1z e2x e2y e2z, ripflag, border; per
+// face its vertices and ripflag), then 1 to 4 of MRISwritePatch (`p`), MRISwriteIntoVolume (`i`:
+// the field, a volume given (type, extent, frames) or -1), MRISwriteWhiteNormals (`n`),
+// MRISwriteNormals (`N`), MRISwritePrincipalDirection (`e`: the direction, a name),
+// MRISreadNormals (`R`), MRISreadValues (`v`), MRISreadValuesIntoArray (`a`: a name or none, the
+// size), each status (and volume or values); then every vertex's x y z nx ny nz val and the
+// folder's files
+void pvw_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int envs = geti();
+  if (envs & 1) setenv("FS_POSIX", "1", 1);
+  if (envs & 4) { std::string v = geth(); setenv("MRIS_READVAL_FRAME", v.c_str(), 1); }
+  if (envs & 8) setenv("FS_LEAVE_NANS", "1", 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  setenv("USER", "U", 1);
+  int rf = geti();
+  if (rf != -1) MRISsetReadFrame(rf);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf(); v->val = getf(); v->curv = getf(); v->area = getf();
+    float a = getf();
+    memcpy(&v->annotation, &a, sizeof a);
+    v->dx = getf(); v->dy = getf(); v->dz = getf(); v->nx = getf(); v->ny = getf(); v->nz = getf();
+    v->wnx = getf(); v->wny = getf(); v->wnz = getf();
+    v->e1x = getf(); v->e1y = getf(); v->e1z = getf(); v->e2x = getf(); v->e2y = getf(); v->e2z = getf();
+    v->ripflag = geti();
+    v->border = geti();
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+    m->faces[fno].ripflag = geti();
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "p") {
+      oi(MRISwritePatch(m, name_tok()));
+    } else if (op == "i") {
+      int which = geti(), ty = geti();
+      MRI *given = NULL;
+      if (ty >= 0) {
+        int w = geti(), h = geti(), d = geti(), f = geti();
+        given = MRIallocSequence(w, h, d, ty, f);
+      }
+      MRI *r = MRISwriteIntoVolume(m, given, which);
+      fflush(stdout);
+      if (!r) {
+        out += "NULL ";
+        if (given) dump_pvw_volume(given);
+      } else if (r == given) {
+        out += "GIVEN ";
+        dump_pvw_volume(r);
+      } else {
+        out += "NEW ";
+        dump_pvw_volume(r);
+      }
+    } else if (op == "n") {
+      oi(MRISwriteWhiteNormals(m, name_tok()));
+    } else if (op == "N") {
+      oi(MRISwriteNormals(m, name_tok()));
+    } else if (op == "e") {
+      int di = geti();
+      oi(MRISwritePrincipalDirection(m, di, name_tok()));
+    } else if (op == "R") {
+      oi(MRISreadNormals(m, name_tok()));
+    } else if (op == "v") {
+      oi(MRISreadValues(m, name_tok()));
+    } else if (op == "a") {
+      const char *nm = opt_name();
+      int size = geti();
+      float *arr = NULL;
+      int r = fssurfio_read_values_into_array(nm, size, &arr);
+      fflush(stdout);
+      oi(r);
+      if (r == 0 && arr) {
+        for (int i = 0; i < size; i++) of(arr[i]);
+      } else {
+        out += "NOARRAY ";
+      }
+    } else fail("pvw op");
+    fflush(stdout);
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    of(v->x); of(v->y); of(v->z); of(v->nx); of(v->ny); of(v->nz); of(v->val);
+  }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *fp = fopen(name.c_str(), "rb");
+    if (!fp) { out += "NOFILE "; continue; }
+    std::string b;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, n);
+    fclose(fp);
+    ox(b);
+  }
+}
+
+// ---- relay 36 of track D: vps, another file's vertex positions (queue items 3.1-47/49) ---------
+
+// vps: Gdiag's bits (1 show, 2 verbose), the environment (1 FS_GII=.gii, 2 FS_FASTER_MP, 4
+// TRIANGULARSURFACE_NOEXTRA_READ; always SURFER_SIDEDOOR and USER=U), the surface's file d/lh.white
+// (read by MRISread), the input files, then 1 to 4 of MRISreadVertexPositions (`V`),
+// MRISreadWhiteCoordinates (`W`), MRISreadPialCoordinates (`P`), MRISreadCanonicalCoordinates
+// (`C`), MRISreadOriginalProperties (`O`), each with a name or none (NULL; `V` and `C` take ""),
+// (before the inputs: 1 and d/lh.white.avg.area.mgh's bytes, or 0),
+// each status; then every vertex's coordinate sets, theta, phi, area, origarea, normal, and the
+// surface's status, total_area, orig_area, radius and counts
+void vps_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int envs = geti();
+  if (envs & 1) setenv("FS_GII", ".gii", 1);
+  if (envs & 2) setenv("FS_FASTER_MP", "1", 1);
+  if (envs & 4) setenv("TRIANGULARSURFACE_NOEXTRA_READ", "1", 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  setenv("USER", "U", 1);
+  {
+    std::string bytes = geth();
+    FILE *fp = fopen("d/lh.white", "wb");
+    if (!fp) fail("the surface");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  if (geti()) {
+    std::string bytes = geth();
+    FILE *fp = fopen("d/lh.white.avg.area.mgh", "wb");
+    if (!fp) fail("the average area");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  MRIS *m = MRISread("d/lh.white");
+  fflush(stdout);
+  if (!m) { out += "NOSURFACE "; return; }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    const char *nm = opt_name();
+    int r;
+    if (op == "V") r = MRISreadVertexPositions(m, nm ? nm : "");
+    else if (op == "W") r = MRISreadWhiteCoordinates(m, nm);
+    else if (op == "P") r = MRISreadPialCoordinates(m, nm);
+    else if (op == "C") r = MRISreadCanonicalCoordinates(m, nm ? nm : "");
+    else if (op == "O") r = MRISreadOriginalProperties(m, nm);
+    else fail("vps op");
+    fflush(stdout);
+    oi(r);
+  }
+  out += "| ";
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    for (float x : {v->x, v->y, v->z, v->whitex, v->whitey, v->whitez, v->pialx, v->pialy, v->pialz,
+                    v->cx, v->cy, v->cz, v->origx, v->origy, v->origz, v->theta, v->phi, v->area,
+                    v->origarea, v->nx, v->ny, v->nz})
+      of(x);
+  }
+  oi(m->status); of(m->total_area); of(m->orig_area); od(m->radius); oi(m->nvertices); oi(m->nfaces);
+  oi(m->group_avg_vtxarea_loaded);
+  for (int vno = 0; vno < m->nvertices; vno++) of(m->vertices[vno].group_avg_area);
+}
+
+// ---- relay 36 of track D: ann, the annotation files (queue items 3.1-47/48) -------------------
+
+// a colour table from the case (gwr's form), or NULL
+COLOR_TABLE *ann_ctab()
+{
+  int nct = geti();
+  if (nct < 0) return NULL;
+  COLOR_TABLE *ctab = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+  ctab->nentries = nct;
+  ctab->version = 2;
+  ctab->entries = (COLOR_TABLE_ENTRY **)calloc(nct + 1, sizeof(COLOR_TABLE_ENTRY *));
+  strcpy(ctab->fname, "user.ctab");
+  for (int k = 0; k < nct; k++) {
+    if (!geti()) continue;
+    CTE *e = (CTE *)calloc(1, sizeof(CTE));
+    std::string name = geth();
+    strncpy(e->name, name.c_str(), sizeof(e->name) - 1);
+    e->ri = geti(); e->gi = geti(); e->bi = geti(); e->ai = geti();
+    e->rf = e->ri / 255.0f; e->gf = e->gi / 255.0f; e->bf = e->bi / 255.0f; e->af = e->ai / 255.0f;
+    ctab->entries[k] = e;
+  }
+  return ctab;
+}
+
+void ann_dump_ctab(const COLOR_TABLE *ct)
+{
+  if (!ct) { out += "NULL "; return; }
+  oi(ct->nentries);
+  oh(ct->fname);
+  for (int k = 0; k < ct->nentries; k++) {
+    CTE *e = ct->entries[k];
+    if (!e) { out += "- "; continue; }
+    oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+  }
+}
+
+// ann: Gdiag's bits (1 show, 2 verbose), the environment (1 FS_POSIX, 2 FS_GII=.gii; always the
+// creation time's replacement, SURFER_SIDEDOOR and USER=U), the input files, a surface from
+// MRISalloc (its vertices, hemisphere, name; per vertex its annotation and ripflag), the surface's
+// colour table and the caller's (or none), then 1 to 4 of MRISwriteAnnotation (`w`: a name,
+// writect) and MRISreadAnnotation (`r`: a name, the GIFTI data array, the caller's table or NULL),
+// each status; then the annotations, the surface's colour table and the folder's files
+void ann_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("s", 0700);
+  mkdir("s/surf", 0700);
+  mkdir("s/label", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int envs = geti();
+  if (envs & 1) setenv("FS_POSIX", "1", 1);
+  if (envs & 2) setenv("FS_GII", ".gii", 1);
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "probe date", 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  setenv("USER", "U", 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti();
+  MRIS *m = MRISalloc(nv, 0);
+  m->hemisphere = geti();
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    m->vertices[vno].annotation = geti();
+    m->vertices[vno].ripflag = geti();
+  }
+  m->ct = ann_ctab();
+  COLOR_TABLE *user = ann_ctab();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    const char *nm = name_tok();
+    if (op == "w") {
+      int writect = geti();
+      oi(MRISwriteAnnotation(m, nm, writect != 0));
+    } else if (op == "r") {
+      int danum = geti();
+      int usect = geti();
+      oi(MRISreadAnnotation(m, nm, danum, usect ? user : NULL));
+    } else fail("ann op");
+    fflush(stdout);
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) oi(m->vertices[vno].annotation);
+  ann_dump_ctab(m->ct);
   out += "| ";
   std::vector<std::string> files;
   list_files(".", "", files);
@@ -4495,6 +4980,12 @@ void run_case()
     bvl_case();
   } else if (cmd == "crv") {
     crv_case();
+  } else if (cmd == "pvw") {
+    pvw_case();
+  } else if (cmd == "vps") {
+    vps_case();
+  } else if (cmd == "ann") {
+    ann_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

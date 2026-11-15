@@ -305,7 +305,7 @@ fn text_f(g: &mut Gen, x: f32) -> String {
 }
 
 /// The mesh in a format: its file name's extension and its bytes.
-fn write(g: &mut Gen, m: &Mesh, heavy: bool) -> (String, Vec<u8>) {
+pub(super) fn write(g: &mut Gen, m: &Mesh, heavy: bool) -> (String, Vec<u8>) {
     let nv = m.v.len() as i64;
     let nf = m.f.len() as i64;
     match g.below(12) {

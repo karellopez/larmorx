@@ -1624,11 +1624,12 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
 `crates-freesurfer/larmorx-freesurfer-surf/src/curvfile.rs` (`MRISwriteCurvature` mrisurf_io.cpp
 281, `MRISreadCurvatureFile` 4849, `__mrisreadcurvmri` 4874).
 
-- **`MRIread` is not in fs.io yet** (track A's relay 36; fs.io has `mri_read`, `MRIreadType`,
-  `MRIreadInfo`, `MRIreadHeader`): `__mrisreadcurvmri`'s MGH/NIfTI branch calls `MRIread(fname)`
-  (mriio.cpp 1002: `FileNameFromWildcard(fname, buf)` into a `char[STRLEN]`, `mri_read(buf,
-  MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1)`, `MRIremoveNaNs(mri, mri)`), so `curvfile.rs` carries a
-  private translation, `mri_read_whole`, to be replaced by fs.io's. `MRIremoveNaNs` (12086): its
+- **`MRIread`**: `__mrisreadcurvmri`'s MGH/NIfTI branch calls `MRIread(fname)` (mriio.cpp 1002:
+  `FileNameFromWildcard(fname, buf)` into a `char[STRLEN]`, `mri_read(buf,
+  MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1)`, `MRIremoveNaNs(mri, mri)`). Relay 35 carried a private
+  translation (`mri_read_whole`, its once-per-process flag in `SurfGlobals`); relay 36 replaced it by
+  fs.io's `mriio::mri_read_volume` (track A's relay 36; the flag is fs.core's
+  `Globals::remove_nans_shown`, one per process as FreeSurfer's static). `MRIremoveNaNs` (12086): its
   loop over `x` is `#pragma omp parallel for if_ROMP(shown_reproducible)`, with a `static int first`
   shared by the threads (the first `NaN found at voxel` line is a race when it runs in parallel;
   the probe runs one thread); `nans` a reduction; `FS_LEAVE_NANS` read with `getenv` per voxel; the
@@ -1668,3 +1669,61 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
 - **Unreachable:** `MRISreadBinaryCurvature` (4759) and `MRISreadNewCurvatureFile` (5781) have no
   caller in FreeSurfer 8.2.0's tree (a grep: only their definitions, a comment, the header).
 
+
+## 29. Patches, values, normals, positions, annotations (relay 36 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
+`crates-freesurfer/larmorx-freesurfer-surf/src/valfile.rs` (`MRISwritePatch` mrisurf_io.cpp 1255,
+`MRISwriteIntoVolume` 412, `MRISreadValues` 1844, `MRISreadValuesIntoArray` 1872 (declared `static`
+at line 47: the probe reaches it through `io_statics.cpp`'s `fssurfio_read_values_into_array`),
+`MRISwriteNormals` 2690, `MRISreadNormals` 2711, `MRISwriteWhiteNormals` 2734,
+`MRISwritePrincipalDirection` 2758), `vpos.rs` (`MRISreadVertexPositions` 2369,
+`MRISreadWhiteCoordinates` 897, `MRISreadPialCoordinates` 914, `MRISreadCanonicalCoordinates` 940,
+`MRISreadOriginalProperties` 2512), `ico.rs` (`ICOreadVertexPositions`, icosahedron.cpp 1940),
+`annot.rs` (`MRISreadAnnotation` 1387, `__mrisreadannot` 1425, `__mrisreadseg2annot` 1497,
+`MRISwriteAnnotation` 1756, `__mriswriteannot` 1805; mrisurf_vals.cpp 386 `MRISclearAnnotations`;
+mrisutils.cpp 1287 `MRISseg2annot`; annotation.cpp 914 `MRISannot2seg`) and `surfmri.rs`
+(`MRIScopyMRI`, mrisurf_mri.cpp 4898).
+
+- **FS-619** (`MRISwriteIntoVolume(mris, NULL, which)`): `mri = MRIalloc(1, 1, mris->nvertices,
+  MRI_FLOAT)` (width 1, height 1, depth = vertices), then per unripped vertex `if (mri->width ==
+  mris->nvertices) ... else if (mri->nframes == mris->nvertices) ... else ErrorReturn(NULL, ...)`:
+  for two vertices or more neither holds, the volume leaks and NULL comes back. Its only callers
+  (mrisurf_integrate.cpp 569-575, 608-614, under `Gdiag & DIAG_WRITE && write_iterations > 0 &&
+  DIAG_VERBOSE_ON`) then `MRIwrite(NULL, ...)` and `MRISwriteIntoVolume(mris, NULL, ...)` again.
+- **FS-620** (`MRISreadValuesIntoArray`, 1897-1906): `MRIfree(&TempMRI); ErrorReturn(ERROR_BADFILE,
+  (..., TempMRI->nframes))`: `MRIfree` sets the pointer to NULL, the argument's load faults (signal
+  11) before `ErrorPrintf` prints.
+- **FS-621** (1999-2013): `if (k >= in_array_size || k < 0) { printf(... k, f); continue; }`
+  before `f = freadFloat(fp)`: the entry's 4 value bytes are then read as the next vertex number
+  (3 bytes) and so on; `f` is the previous entry's value (initialised 0). `MRISreadValuesBak` and
+  `MRISreadImagValues` (sfile.rs) read the float before the test.
+- **FS-622**: `strncpy(fname, sname, sizeof(fname)-1)` into an uninitialised `char fname[STRLEN]`.
+  **FS-623**: `nv = width * height * depth` (int) compared with `in_array_size`, then the loop over
+  the volume's true extent writes `array[vno]` for every voxel.
+- The `calloc` failure messages of `MRISreadValuesIntoArray` (`"Couldn't allocate array of size
+  %s\n", ..., nv)`: an `int` for `%s`) are unreachable: `calloc` of `in_array_size` floats never
+  fails on the machines (overcommit); not reproduced.
+- `MRISreadVertexPositions`: the triangle branch calls `mrisReadTriangleFilePositions(mris, fname)`
+  with the completed name, not `surf_to_read`; the STL, VTK and volume types skip
+  `__MRISapplyFSGIIread` and fall through to the binary reader; the old format (`version == 0`)
+  reads its coordinates with `freadFloat`, like the new one. `MRISreadCanonicalCoordinates` and the
+  white/pial readers return `Gerror` (0 when the GIFTI branch returned 1 without `ErrorPrintf`) and
+  stop: the port's first version computed the canonical coordinates after such a failure (found by
+  `vps`, fixed before the commit).
+- **FS-624**: `MRISseg2annot` calls `set_atable_from_ctable(mris->ct)`, which returns at once when
+  `num_entries > 0` (annotation.cpp): the process-wide `atable` of the first table stays.
+- **FS-625**: `__mrisreadseg2annot` sets `surfseg->ct = (COLOR_TABLE *)ctab` (the caller's) and every
+  later path calls `MRIfree(&surfseg)`, which frees `surfseg->ct`; the official probe crashed
+  (signal 11) on the second read with the same table (seed 17). `__mrisreadannot` with a table given
+  sets `mris->ct = (COLOR_TABLE *)ctab` (an alias, never freed there) and returns without `fclose`.
+- **Windows** (found on the Windows laptop, the seed-1 record): `gwr`'s output names in a folder
+  that does not exist (`nodir/o1.gii`) make the combined GIFTI writer read
+  `nodir/../mri/transforms/talairach.xfm`, which Windows resolves by the name (`nodir\..` is the work
+  folder) and Linux does not: seed 1 takes no such name (cases.rs's `Gen` flag, as `crv` does).
+- **The probe's alarm** (`vps` before the fix of its generator): with
+  `TRIANGULARSURFACE_NOEXTRA_READ` set, a triangle file with its creator's line gives counts from
+  the line's text (`crea`, `ted ` = 1,668,441,441 vertices): FreeSurfer's `MRISalloc` then ran past
+  the probe's 5-second alarm inside the 16 GiB box; the port refuses the allocation (FS-03's
+  assertion on the faces). The generator now writes that file without the line under that variable
+  (`srd`'s cases keep the other form).

@@ -17,8 +17,19 @@ Compares the result lines (extent, type, frames, geometry, the count of voxels t
 the FNV-1a of the voxels). With ``--curv`` (relay 35 of track D): each head's recorded per-vertex
 files (``CURVS``) read into its white surface by ``MRISreadCurvatureFile``, written by
 ``MRISwriteCurvature`` in the new binary format, MGZ, compressed NIfTI, GIFTI and VTK, the new-format
-file compared with the recorded one byte for byte, and the MGZ and new-format files read back. Prints the counts; the lines name machine paths, so no hash is recorded
-from them.
+file compared with the recorded one byte for byte, and the MGZ and new-format files read back. With
+``--pvw`` (relay 36 of track D): each head's recorded per-vertex files (``VALS``) read into its
+white surface's values by ``MRISreadValues``, the surface's patch (``MRISwritePatch``), normals
+(``MRISwriteNormals``) and values into a volume (``MRISwriteIntoVolume``) written, the normals and
+the values read back from that volume (``MRISreadNormals``, ``MRISreadValues``). With ``--vps``
+(relay 36 of track D): each head's white surface with its sphere's canonical coordinates
+(``MRISreadCanonicalCoordinates``), smoothwm's original properties (``MRISreadOriginalProperties``),
+the pial and white coordinates and the pial positions (``MRISreadVertexPositions``). With ``--ann``
+(relay 36 of track D): each head's recorded annotations (``ANNOTS``) read into its white surface
+(``MRISreadAnnotation``), written as an annotation file, a segmentation and GIFTI
+(``MRISwriteAnnotation``), the annotation file compared with the recorded one byte for byte, each
+read back. Prints the counts;
+the lines name machine paths, so no hash is recorded from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]
 """
@@ -54,6 +65,11 @@ CURVS = (
     "volume",
     "w-g.pct.mgh",
 )
+# relay 36 of track D: the per-vertex files programs read as values (MRISreadValues: the curvature
+# format and the MGH overlay)
+VALS = ("thickness", "curv", "sulc", "area", "w-g.pct.mgh")
+# relay 36 of track D: the annotations recon-all writes (mris_ca_label) and reads
+ANNOTS = ("aparc.annot", "aparc.a2009s.annot", "aparc.DKTatlas.annot", "BA_exvivo.annot")
 
 
 def dx(v: float) -> str:
@@ -70,6 +86,24 @@ def main(argv: list[str] | None = None) -> int:
         help="relay 35 of track D: the curvature files (flr crv): each head's recorded curvature "
         "files read into the white surface, written in five formats, read back",
     )
+    ap.add_argument(
+        "--pvw",
+        action="store_true",
+        help="relay 36 of track D: the value, patch and normal files (flr pvw): each head's "
+        "recorded per-vertex files read as values, the patch and normals written, read back",
+    )
+    ap.add_argument(
+        "--vps",
+        action="store_true",
+        help="relay 36 of track D: the vertex-position readers (flr vps) on each head's white "
+        "surface: sphere, smoothwm, pial, white",
+    )
+    ap.add_argument(
+        "--ann",
+        action="store_true",
+        help="relay 36 of track D: the annotation files (flr ann): each head's recorded "
+        "annotations read, written in three formats, read back",
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -81,6 +115,25 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.ann:
+                for c in ANNOTS:
+                    lines.append(
+                        f"flr ann {s / 'surf' / f'{hemi}.white'} {s / 'label' / f'{hemi}.{c}'}"
+                    )
+                continue
+            if a.vps:
+                sd = s / "surf"
+                lines.append(
+                    f"flr vps {sd / f'{hemi}.white'} {sd / f'{hemi}.sphere'} "
+                    f"{sd / f'{hemi}.smoothwm'} {sd / f'{hemi}.pial'}"
+                )
+                continue
+            if a.pvw:
+                for c in VALS:
+                    lines.append(
+                        f"flr pvw {s / 'surf' / f'{hemi}.white'} {s / 'surf' / f'{hemi}.{c}'}"
+                    )
+                continue
             if a.curv:
                 for c in CURVS:
                     lines.append(
@@ -96,7 +149,8 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"flr bbf {s / 'surf' / f'{hemi}.white'} {dx(0.5)}")
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
-    cases_path = inputs / ("real-curv-cases.txt" if a.curv else "real-flood-cases.txt")
+    kind = "ann" if a.ann else "vps" if a.vps else "pvw" if a.pvw else "curv" if a.curv else "flood"
+    cases_path = inputs / f"real-{kind}-cases.txt"
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}
     env.update(freesurfer_env())

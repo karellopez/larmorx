@@ -4269,3 +4269,207 @@ recorded heads' per-vertex files are §122.1's new binary format as recon-all's 
 (`mris_curvature -w` writes its `.H` and `.K` files through it): read one, write it back, compare
 the bytes.
 
+
+## 124. Patches, vertex values, normals, positions and annotations (queue items 3.1-47 to 3.1-49; relay 36 of track D)
+
+**124.1 The patch** (`MRISwritePatch(mris, name)`). By the name's surface type (§80's type test
+`MRISfileNameType`): ASCII (`.asc`): §83's ASCII patch; movie.byu (`.geo`): §63's writer; STL
+(`.stl`): §71's writer, the status 1 written, 0 not. Any other name (volume names included): the
+binary patch: the file created (`wb`), -1 and the count of vertices whose rip flag is 0 as
+big-endian 32-bit integers, then per such vertex, in order, its number plus 1 (negated when its
+border flag is set) as a 32-bit integer and its x, y, z as big-endian 32-bit floats (their bits
+kept); `NO_ERROR`. With `Gdiag`'s show and verbose bits: `writing surface patch with npts=<n> to
+<file>` (standard output) first. A file that cannot be created: the text of `errno`, then
+`MRISwritePatch: can't create file <file>` (with its newline) as an error, `ERROR_NOFILE` (-1).
+
+**124.2 One field into a volume** (`MRISwriteIntoVolume(mris, mri, which)`). `which`: 1 or 10
+(`val`), 2 (`area`), 3 (`curv`), 5 (the annotation, an integer converted to `float`), 6, 7, 8 (`dx`,
+`dy`, `dz`). For each vertex whose rip flag is 0, in order: another `which` ends the program
+(`MRISwriteIntoVolume: unsupported type <which>`, `ERROR_UNSUPPORTED`: §2's `ErrorExit`); the value
+goes to column `vno` of frame 0 when the volume's width is the vertex count, else to frame `vno`
+of voxel (0, 0, 0) when its frame count is; else the error `MRISwriteIntoVolume: nvertices <n>
+doesn't match with in MRI <w> x <h> x <d> x <f>` (with its newline; `ERROR_BADPARM`) and no volume
+back (the values set so far stay in a volume given). A volume given is returned; without one a
+float volume of one voxel per vertex is made: FS-619 (rule A): FreeSurfer makes it 1 x 1 x
+`<vertices>`, so a surface of two vertices or more is refused at its first unripped vertex (no
+volume back); the port makes `<vertices>` x 1 x 1 by default and FreeSurfer's with `reproduce`
+(both the same for one vertex or none).
+
+**124.3 Three vectors per vertex.** `MRISwriteNormals(mris, name)` (the normals `nx`, `ny`, `nz`),
+`MRISwriteWhiteNormals` (`wnx`, `wny`, `wnz`), `MRISwritePrincipalDirection(mris, k, name)` (`e1x`,
+`e1y`, `e1z` for `k` 1, else `e2x`, `e2y`, `e2z`): a float volume of `<vertices>` x 1 x 1 and 3
+frames, frame `f` of column `vno` the vector's component `f`, written by `MRIwrite` (its messages;
+its status not looked at); `NO_ERROR`. `MRISreadNormals(mris, name)`: the volume read by `MRIread`
+(§122.4), each vertex's normal from column `vno` of frames 0, 1, 2 (a voxel outside the volume as
+fs.mri's voxel reader answers: FS-52, FS-53); `NO_ERROR`, or `MRISreadNormals(<name>): could not
+open volume` as an error and `ERROR_NOFILE` when no volume was read.
+
+**124.4 The values** (`MRISreadValues(mris, name)`: the values of 124.5 for the vertex count into
+each vertex's `val`, in order; the reader's status). **124.5** `MRISreadValuesIntoArray(name, n)`
+(no name: `Parameter was NULL.`; a negative `n`: `in_array_size was negative.`; both errors with
+`ERROR_BADPARM`), tried in turn:
+1. a volume, when `specs/freesurfer-io.md`'s format test (`mri_identify`) knows the name's type:
+   the frame of §47 (with show and verbose: `MRISreadValues: frame=<f>` on standard output); the
+   header (`MRIreadHeader` of that type; none: `ERROR_BADFILE`, -5); a frame not below the header's
+   frame count: the error `ERROR: attempted to read frame <f> from <file>` and `but this file only
+   has <n> frames.` (two lines), `ERROR_BADFILE` (FS-620, rule A: FreeSurfer crashes with signal 11
+   before printing; `reproduce` ends so); a voxel count (width x height x depth, a 32-bit product)
+   other than `n`: the error `ERROR: Reading <name> as volume encoded scalar file, but size doesn't
+   match expected size of <n>` (with its newline), `ERROR_BADFILE`; then the volume by `MRIread`
+   (none: `ERROR_BADFILE`) and that frame's voxels, slices outermost, then rows, then columns, as
+   the values; `NO_ERROR`. FS-623: a voxel count that overflows to `n` writes past the values in
+   FreeSurfer; the port keeps the first `n`.
+2. the old or new binary curvature of §58 (`MRISreadCurvatureIntoArray` of the name, its messages
+   when the file cannot be opened); when it reads: `reading values from curvature-format file...`
+   on standard output, `NO_ERROR`.
+3. a w file: the name, with `.w` added unless the character after its last dot is `w`; not opened
+   (`rb`): the text of `errno`, `MRISreadValuesIntoArray: File <file> not found` (with its newline),
+   `ERROR_NOFILE`. Two bytes (ignored), a 3-byte big-endian count (missing: `MRISreadValues(<file>):
+   could not read # of vertices`, `ERROR_BADFILE`), then per entry a 3-byte vertex number (missing:
+   `MRISreadValues(<file>): could not read <i>th vno`, `ERROR_BADFILE`, no values) and a big-endian
+   float; values not named are 0. A vertex number outside `[0, n)`: `MRISreadValues: vertex index
+   out of range: <k> f=<value as %f>` on standard output; FS-621 (rule A): FreeSurfer prints the
+   previous entry's value (0 before any) and does not read this entry's float, so every later entry
+   is read three bytes out of step; the port reads it and prints it by default, FreeSurfer's with
+   `reproduce`. `NO_ERROR`.
+Names: a name of 1,023 bytes or more (FS-622: FreeSurfer's copy of it has no end, the format test
+reads past it: undefined) is taken whole in both modes; a w-file name of 1,024 bytes or more after
+`.w` ends FreeSurfer with its buffer-overflow abort (`*** buffer overflow detected ***:
+terminated`, status 134; FS-126: the port takes it whole by default, the abort with `reproduce`).
+
+**124.6 Another file's positions** (`MRISreadVertexPositions(mris, name)`). The neighbour
+distances are freed first (§ dist's free of the current distances, the original ones kept). The
+name is completed as §80's readers complete it (`MRISbuildFileName_read`: the surface's folder and
+hemisphere for a name without `/`); a type (§80's test) that is not ASCII, icosahedron, movie.byu,
+STL, VTK, GIFTI or a volume may become a GIFTI name (`FS_GII`'s rule, §80). Then: movie.byu: §67's
+positions reader; icosahedron (`.tri`, `.ico`): the icosahedron reader's file (§63's format; its
+messages; its failure returns `Gerror`), refused with `ICOreadVertexPositions: different size
+surfaces` (`ERROR_BADPARM`) when its vertex or face count is not the surface's, else its vertices'
+positions (the distances freed first); GIFTI: `Reading <file> as a gii file` (standard output),
+the file read whole (§85's `MRISread`, its messages; no surface: status 1), `MRISreadVertexPosition(<file>):
+dim mismatch <n> <m>` and status 1 when its vertex count is not the surface's, else its positions
+and 0. Any other type (ASCII, STL and VTK names included) is read as a binary surface file: not
+opened (`rb`): the text of `errno`, `MRISreadVertexPosition(<name>): could not open file <file>`,
+`ERROR_NOFILE`; the 3-byte magic number: a triangle file (`ff ff fe`) gives §68's positions reader
+of the completed name (its failure: the error `mrisReadTriangleFile failed.` with its newline and
+its code); else the vertex and quadrangle counts (3 bytes each; a file without a magic number is
+read from its start: the old format); a vertex count other than the surface's or twice the
+quadrangle count other than its face count: the error `` (an empty line), `ERROR: `, `
+MRISreadVertexPositions(<file>): surfaces differ. Main: <n> verts <m> faces, <name>: <n'> verts
+<m'> faces`, `Surfaces may be out-of-date` and an empty line (`ERROR_BADFILE`); then per vertex
+three 2-byte hundredths (`ff ff ff`: the value / 100 in double, stored as float) or three
+big-endian floats (`ff ff fd` and the old format), and for the old format one byte and one 3-byte
+number per face the vertex has, skipped; `NO_ERROR`. With show and verbose: `new surface file
+format`, `surfer: old surface file format`, `reading <n> vertices and <m> faces.`.
+
+**124.7 Coordinate sets from files.** `MRISreadWhiteCoordinates(mris, name)` (no name: `white`),
+`MRISreadPialCoordinates` (`pial`), `MRISreadCanonicalCoordinates(mris, name)`: the current
+positions saved, 124.6 of the name (its failure returns `Gerror`, which may be 0 when the reader
+failed without an error message: the call stops there either way), the positions saved as the
+white, pial or canonical set, the current ones restored; the canonical reader then computes the
+spherical coordinates (radius the rounded mean canonical radius; per vertex `theta` = `atan2f(cy,
+cx)` (plus 2π in double when negative) and `phi` = `atan2f(√(r² − cz²), cz)`, as §(canonical
+coordinates) defines: glibc's `atan2f` with `reproduce`, correctly rounded by default).
+`MRISreadOriginalProperties(mris, name)` (no name: `smoothwm`): the current positions saved; the
+status set to a patch's while 124.6 reads the file (its failure: `MRISreadOriginalProperties:
+could not read surface file <name>` as an error, `ERROR_BADFILE`, the status left a patch's);
+those positions become the original ones; the metric and triangle properties computed and stored
+as the original ones; the status back; the current positions restored, the metric and triangle
+properties computed again, the surface oriented, `orig_area` its total area; `NO_ERROR`.
+
+**124.8 Annotations.** `MRISreadAnnotation(mris, name, da, ct)` (`da` -1, `ct` none by default):
+§81's reader name and type; every unripped vertex's annotation 0; then: an annotation file (124.9),
+an MGH or NIfTI surface segmentation (124.10), GIFTI (§107's reader with the surface given, data
+array `da` and `ct`: `ERROR_BADFILE` when it gives no surface), else `ERROR: unknown annotation
+file format <file>` (standard output), `ERROR_BADFILE`. **124.9** An annotation file (`r`; not
+opened: the text of `errno`, `could not read annot file <file>`, `ERROR_NOFILE`): a big-endian
+32-bit count (not the vertex count: `# elements (<n>) in <file> and # vertices (<m>) don't
+match`, `ERROR_NOFILE`), then per entry a vertex number and its annotation (a vertex outside the
+surface: `vertex out of range: annot file <file> entry <j> (vno=<v> annot=<a>)` with its newline,
+`ERROR_NOFILE`, the entries before it kept). A colour table given becomes the surface's
+(`NO_ERROR`). Else the next 32-bit number: the file's end, `NO_ERROR`; 1 (`TAG_OLD_COLORTABLE`): the
+binary colour table that follows (`specs/freesurfer-io.md`'s `CTABreadFromBinary`, its messages;
+with verbose: `reading colortable from annotation file...` and `colortable with <n> entries read
+(originally <name>)`) becomes the surface's when it reads; `NO_ERROR`. FS-49: the numbers a short
+file cuts are memory contents in FreeSurfer. **124.10** A segmentation: `__mrisreadseg2annot():
+reading <file> as a surface seg` (standard output); the volume by `MRIread` (none: `ERROR_NOFILE`);
+a colour table given replaces the volume's (`__mrisreadseg2annot: Use Customized Colortable`;
+FS-625: FreeSurfer then frees the caller's table when it is done with the volume, so a later use
+of that table reads freed memory; the port leaves it alone, noted); neither: `ERROR:
+__mrisreadseg2annot(): <file> does not have a colortable`; a width other than the vertex count:
+`ERROR: __mrisreadseg2annot(): dimension mismatch <file>=<w>, surf=<n>` (each `ERROR_NOFILE`); then
+each vertex's annotation from its column's voxel (as an integer, as C converts it) through the
+program's annotation table (`specs/freesurfer-io.md`'s `set_atable_from_ctable` from the table,
+then `index_to_annotation`; a number without an entry gives 0), `WARNING: MRISseg2annot: no voxels
+matching ctab` when no voxel other than 0 had an entry, `WARNING: MRISseg2annot: found <n> voxels
+with no entry in ctab` when some had none (with `Gdiag_no` a vertex: `<vno> <segid> <annot>
+<name>`, `%5d %2d %2d %s`); a copy of the table becomes the surface's; `NO_ERROR`. FS-624 (rule A):
+the program's table is set only while it has none, so a second segmentation with another colour
+table is mapped through the first; the port maps it through its own by default (the program's
+table kept as FreeSurfer keeps it), FreeSurfer's with `reproduce`.
+
+**124.11** `MRISwriteAnnotation(mris, name, writect)` (`writect` true by default): §81's writer
+name and type: an annotation file: created (`wb`; not: the text of `errno`, `could not write annot
+file <file>`, `ERROR_NOFILE`), the vertex count, then each vertex's number and annotation (32-bit
+big-endian), and with a colour table the number 1 and the table (`CTABwriteIntoBinary`; with show
+and verbose: `writing colortable into annotation file...` first); `NO_ERROR`. GIFTI: §109's writer
+with the label intent (1002) when `writect`, else the RGBA vector intent (2004); its status. MGH or
+NIfTI: `MRISurfAnnotation::writeAnnotation((): writing <file> as a surface seg` (standard output),
+an `int` volume of `<vertices>` x 1 x 1 (a copy of the surface's colour table; its voxel sizes,
+directions and centre from the surface's volume geometry), each vertex's voxel the entry of its
+annotation's colour in the surface's table (without one, in the program's annotation table), 0 when
+there is none, `MRISannot2seg(): nhits = <n>` (the vertices whose annotation is not 0, standard
+output); its version `(1 << 8) | 1`; written by `MRIwrite`, its status. Else `ERROR: unknown
+output annotation file format <file>` (standard output), `ERROR_BADFILE`.
+
+**124.12 The group-average area** (§85, `MRISread`): when `<file>.avg.area.mgh` is readable, with
+`Gdiag_no` and verbose `Reading in average area <file>`; the volume by `MRIread` (none: `ERROR:
+reading in average area <file>` on standard output and no surface back); its frame 0 into every
+vertex's `group_avg_area` (`MRIScopyMRI`: the voxel count, a 32-bit product, not the vertex count:
+`ERROR: MRIScopyMRI: Surf/Src dimension mismatch.`, nothing copied; with `Gdiag_no` above 0
+`MRIScopyMRI` first); `group_avg_vtxarea_loaded` 1; else 0.
+
+## 125. Validation plan, part 26
+
+The probe's commands of relay 36 (each in an empty work folder; `Gdiag`'s bits one case in four;
+the environment's `SURFER_SIDEDOOR` and `USER=U` always):
+- `pvw`: `FS_POSIX`, `MRIS_READVAL_FRAME`, `FS_LEAVE_NANS` now and then; the read frame set now and
+  then; 0 to 3 input files (MGH, MGZ, NIfTI volumes of mostly one voxel per vertex and 1 to 3
+  frames, binary curvature files, w files whose vertex numbers fall outside the surface now and then,
+  cut now and then; random bytes for other names); a surface from `MRISalloc` of 0 to 6 vertices
+  (22 values each, signalling and quiet NaNs in heavy cases, an annotation's bits, rip and border
+  flags) and 0 to 3 faces; 1 to 4 of 124.1-124.5's calls with names of the formats above (alone,
+  in `d`, after `lh.`, odd names, about 1,024 bytes when the seed is not 1), `which` of every value
+  including unsupported ones, a volume given (float, byte, int, short; widths and frame counts that
+  fit or not) or none, sizes of the array that fit or not; each status, volume and array; then the
+  vertices' positions, normals and values and every file in the folder.
+- `vps`: a mesh (§85's probe's shapes) as the surface's own file, a binary triangle file (without its
+  creator's line under `TRIANGULARSURFACE_NOEXTRA_READ`) or, one case in three, a quadrangle file; one
+  case in six a group-average area beside it; 1 to 4 files of the same mesh moved (or now and then of
+  another mesh) in every format (§85's probe's writer: triangle, the three quadrangle kinds, ASCII,
+  movie.byu, STL, VTK, GIFTI, icosahedron); `FS_GII`, `FS_FASTER_MP`,
+  `TRIANGULARSURFACE_NOEXTRA_READ` now and then; 1 to 4 of 124.6-124.7's calls with those names
+  (whole, or by their last part, completed by the surface's folder and hemisphere) or odd ones;
+  then the coordinate sets, `theta`, `phi`, the areas, the normals, the status, the areas' totals,
+  the radius and the group-average areas.
+- `ann`: 0 to 3 files in `s/label` (annotation files with odd counts, vertices out of range, a tag
+  with a cut or odd colour table, cut files; MGH segmentations; random bytes); a surface named in
+  `s/surf` (left or right) of 0 to 8 vertices with annotations (of the case's colours mostly) and rip
+  flags; the surface's colour table and a caller's (0 to 6 entries, empty places now and then) or
+  none; 1 to 4 writes (124.11, every format by name, `writect` either) and reads (124.8, the written
+  and generated files, a data array and the caller's table or none); then the annotations, the
+  surface's colour table and every file (GIFTI files with their date and user lines normalised).
+Compared with the official build with `reproduce`: identical but where FreeSurfer reads memory it
+never wrote or freed, or the machine's memory decides (FS-49, FS-167, FS-191, FS-622, FS-623, and
+`FS-625u`: a caller's colour table FreeSurfer has freed, used again; counted, not compared); the
+default identical but where a noted correction changed the result or the default's correctly rounded
+`atan2f` changed `theta` or `phi` in their last bits. Observed (relay 36): `pvw` seeds 7, 13, 17
+(1,000 cases each), `vps` seeds 7, 13, 17 (1,000, then 500 each after the quadrangle files) and `ann`
+seeds 7, 13, 17 (1,000 each): 0 different in both modes. On recorded heads (the probe's `flr pvw`,
+`flr vps`, `flr ann`; three heads, both hemispheres): `thickness`, `curv`, `sulc`, `area` and
+`w-g.pct.mgh` read as values, the patch, normals and values written and read back: 30 of 30
+identical in both modes; the white surface's sphere, smoothwm, pial and white files: 6 of 6
+identical with `reproduce`; `aparc`, `aparc.a2009s`, `aparc.DKTatlas` and `BA_exvivo` read, written
+as an annotation file, a segmentation and GIFTI and read back: 24 of 24 identical in both modes
+(observed). A clean-room implementer's black-box form: recon-all's `label/?h.aparc.annot` written
+back by 124.11 is the recorded file byte for byte when read by 124.8 first.

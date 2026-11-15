@@ -21,7 +21,7 @@ correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordi
 ``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1170 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1530 [--json out.json]
 """
 
 from __future__ import annotations
@@ -68,7 +68,12 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # memory it never wrote, FS-521; relay 23, 3.1-51's leftovers: a volume of a smaller type read and
 # written as floats past its memory, FS-534; hop lists of fewer hops than the kernel, FS-533; relay
 # 33 of track D, 3.1-51's rest: the outside distance map's label reads beyond the label volume's
-# memory, FS-614): counted, never compared
+# memory, FS-614; relay 36 of track D, the value files: a name of 1,023 bytes or more copied without
+# its end, FS-622; a volume whose voxel count overflows an int, FS-623; a volume format the port
+# does not read yet (DICOM), NP, the runner's mark for its placeholder message; a binary colour
+# table's entry count beyond the machine's memory, FS-191, whose outcome depends on the machine; a
+# caller's colour table FreeSurfer has freed used again, FS-625u, the runner's mark):
+# counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -115,6 +120,11 @@ SKIP: tuple[str, ...] = (
     "FS-533",
     "FS-534",
     "FS-614",
+    "FS-622",
+    "FS-623",
+    "NP",
+    "FS-191",
+    "FS-625u",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port
@@ -135,9 +145,12 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     """Whether the case runs a function whose default takes correctly rounded maths where
     FreeSurfer's binary takes glibc's: a `surf` rotation (`Z`: `sinf`, `cosf`), a `posn`
     canonical-coordinates step (`cc`, or `sv 3`: `atan2f`), an `mpd` case (the discrete
-    curvatures' and the pseudo-normal's `acosf`)."""
+    curvatures' and the pseudo-normal's `acosf`), a `vps` case that reads canonical coordinates
+    (`C`: `atan2f`; relay 36 of track D)."""
     if cmd == "surf":
         return "Z" in toks
+    if cmd == "vps":
+        return "C" in toks
     if cmd == "posn":
         return "cc" in toks or any(a == "sv" and b == "3" for a, b in itertools.pairwise(toks))
     return cmd == "mpd"

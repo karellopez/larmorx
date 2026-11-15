@@ -77,6 +77,7 @@
 
 pub mod aaa;
 pub mod alloc;
+pub mod annot;
 pub mod base;
 pub mod basemisc;
 pub mod binarize;
@@ -120,7 +121,10 @@ pub mod sfile;
 pub mod sras;
 pub mod stl;
 pub mod surfbase;
+pub mod surfmri;
 pub mod surfread;
 pub mod topology;
 pub mod trifile;
+pub mod valfile;
 pub mod views;
+pub mod vpos;

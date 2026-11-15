@@ -24,7 +24,7 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{Mri, mri_alloc};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_surf::{curvfile, mriflood, readwrite, sras};
+use larmorx_freesurfer_surf::{annot, curvfile, mriflood, readwrite, sras, valfile, vpos};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
 pub(super) const FRAMES: [[f32; 9]; 6] = [
@@ -761,6 +761,202 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 )?;
                 o.i(i64::from(r));
                 curv_fnv(&s, o);
+            }
+        }
+        "pvw" => {
+            // relay 36 of track D: `fssurfio.cpp`'s `flr pvw` (a recorded per-vertex file read as
+            // values; the patch, the normals, the values into a volume; read back)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let cf = t.next().to_owned();
+            let td = tempfile::tempdir().expect("a work folder");
+            let dir = td.path();
+            let fnv = |b: &[u8], o: &mut Out| {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for &c in b {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let field_fnv = |s: &Mris, normals: bool, o: &mut Out| {
+                let mut b = Vec::new();
+                for v in 0..s.nvertices.max(0) as usize {
+                    let x = s.vertex(v);
+                    if normals {
+                        for f in [x.nx, x.ny, x.nz] {
+                            b.extend_from_slice(&f.to_bits().to_le_bytes());
+                        }
+                    } else {
+                        b.extend_from_slice(&x.val.to_bits().to_le_bytes());
+                    }
+                }
+                fnv(&b, o);
+            };
+            let r = valfile::read_values(g, sg, &mut io, None, &mut s, &cf)?;
+            o.i(i64::from(r));
+            field_fnv(&s, false, o);
+            o.i(i64::from(valfile::write_patch(
+                g,
+                &mut io,
+                Some(dir),
+                &mut s,
+                "./p.patch",
+            )));
+            let r = valfile::write_normals(g, &mut io, Some(dir), &s, "./n.mgz")?;
+            o.i(i64::from(r));
+            let mut given = larmorx_freesurfer_mri::mri::mri_alloc(
+                g,
+                io.out,
+                io.err,
+                s.nvertices,
+                1,
+                1,
+                larmorx_freesurfer_mri::mri::MRI_FLOAT,
+            )?;
+            let r =
+                valfile::write_into_volume(g, &mut io, &s, Some(&mut given), valfile::VERTEX_VALS)?;
+            o.i(i64::from(matches!(r, valfile::IntoVolume::Given)));
+            let mut b = Vec::new();
+            for v in 0..s.nvertices {
+                let x = larmorx_freesurfer_mri::voxel::mri_get_vox_val(
+                    g, io.err, &given, v, 0, 0, 0, 0,
+                )?;
+                b.extend_from_slice(&x.to_bits().to_le_bytes());
+            }
+            fnv(&b, o);
+            for v in 0..s.nvertices.max(0) as usize {
+                let x = s.vertex_mut(v);
+                (x.nx, x.ny, x.nz) = (0.0, 0.0, 0.0);
+            }
+            o.i(i64::from(valfile::read_normals(
+                g,
+                &mut io,
+                Some(dir),
+                &mut s,
+                "./n.mgz",
+            )?));
+            field_fnv(&s, true, o);
+            let r = valfile::read_values(g, sg, &mut io, Some(dir), &mut s, "./n.mgz")?;
+            o.i(i64::from(r));
+            field_fnv(&s, false, o);
+            let mut files = Vec::new();
+            list_files(dir, "", &mut files);
+            files.sort();
+            for n in &files {
+                o.h(Some(n.as_bytes()));
+                fnv(&std::fs::read(dir.join(n)).unwrap_or_default(), o);
+            }
+        }
+        "vps" => {
+            // relay 36 of track D: `fssurfio.cpp`'s `flr vps` (a recorded surface's other
+            // files' positions: canonical, original properties, pial, white, current)
+            let sn = t.next().to_owned();
+            let mut s = surf(g, sg, &mut io, &sn)?;
+            let (sph, swm, pial) = (t.next(), t.next(), t.next());
+            o.i(i64::from(vpos::read_canonical_coordinates(
+                g, sg, &mut io, None, &mut s, sph,
+            )?));
+            let r = vpos::read_original_properties(g, sg, &mut io, None, &mut s, Some(swm))?;
+            o.i(i64::from(r));
+            let r = vpos::read_pial_coordinates(g, sg, &mut io, None, &mut s, Some(pial))?;
+            o.i(i64::from(r));
+            let r = vpos::read_white_coordinates(g, sg, &mut io, None, &mut s, Some(&sn))?;
+            o.i(i64::from(r));
+            o.i(i64::from(vpos::read_vertex_positions(
+                g, sg, &mut io, None, &mut s, pial,
+            )?));
+            for set in 0..8 {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for v in 0..s.nvertices.max(0) as usize {
+                    let x = s.vertex(v);
+                    let f = match set {
+                        0 => [x.x, x.y, x.z],
+                        1 => [x.cx, x.cy, x.cz],
+                        2 => [x.origx, x.origy, x.origz],
+                        3 => [x.pialx, x.pialy, x.pialz],
+                        4 => [x.whitex, x.whitey, x.whitez],
+                        5 => [x.theta, x.phi, 0.0],
+                        6 => [x.area, x.origarea, 0.0],
+                        _ => [x.nx, x.ny, x.nz],
+                    };
+                    for c in f {
+                        for b in c.to_bits().to_le_bytes() {
+                            h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+                        }
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+            }
+            o.i(i64::from(s.status.0));
+            o.f(s.total_area);
+            o.f(s.orig_area);
+            o.d(s.radius);
+        }
+        "ann" => {
+            // relay 36 of track D: `fssurfio.cpp`'s `flr ann` (a recorded annotation read, written
+            // as an annotation file, a segmentation and GIFTI, read back)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let af = t.next().to_owned();
+            let td = tempfile::tempdir().expect("a work folder");
+            let dir = td.path();
+            let fnv = |b: &[u8], o: &mut Out| {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for &c in b {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let ann_fnv = |s: &Mris, o: &mut Out| {
+                let mut b = Vec::new();
+                for v in 0..s.nvertices.max(0) as usize {
+                    b.extend_from_slice(&s.vertex(v).annotation.to_le_bytes());
+                }
+                fnv(&b, o);
+                let mut c = Vec::new();
+                if let Some(ct) = &s.ct {
+                    for e in &ct.entries {
+                        let Some(e) = e else {
+                            c.push(b'-');
+                            continue;
+                        };
+                        c.extend_from_slice(&e.name);
+                        for x in [e.ri, e.gi, e.bi, e.ai] {
+                            c.extend_from_slice(&x.to_le_bytes());
+                        }
+                    }
+                }
+                fnv(&c, o);
+            };
+            let r = annot::read_annotation(g, sg, &mut io, None, &mut s, &af, -1, None)?;
+            o.i(i64::from(r));
+            ann_fnv(&s, o);
+            for nm in ["./a.annot", "./s.mgz", "./g.gii"] {
+                let r = annot::write_annotation(g, sg, &mut io, Some(dir), &mut s, nm, true)?;
+                o.i(i64::from(r));
+            }
+            let mut files = Vec::new();
+            list_files(dir, "", &mut files);
+            files.sort();
+            let slurp = |n: &str| std::fs::read(dir.join(n)).unwrap_or_default();
+            for n in &files {
+                o.h(Some(n.as_bytes()));
+                let b = slurp(n);
+                if n.ends_with(".gii") {
+                    fnv(&gii_normal(&b), o);
+                } else {
+                    fnv(&b, o);
+                }
+            }
+            o.i(i64::from(
+                slurp("a.annot") == std::fs::read(&af).unwrap_or_default(),
+            ));
+            for n in &files {
+                for v in 0..s.nvertices.max(0) as usize {
+                    s.vertex_mut(v).annotation = 0;
+                }
+                let nm = format!("./{n}");
+                let r = annot::read_annotation(g, sg, &mut io, Some(dir), &mut s, &nm, -1, None)?;
+                o.i(i64::from(r));
+                ann_fnv(&s, o);
             }
         }
         _ => panic!("flr op {op}"),

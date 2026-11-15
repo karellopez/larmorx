@@ -53,10 +53,14 @@ fn intent_wm(g: &mut Gen) -> i64 {
 }
 
 /// A written file's name: in `d` (a surface's name now and then), at the top, or in a folder that
-/// does not exist.
+/// does not exist. With seed 1 (the set every platform runs) no folder that does not exist: the
+/// combined writer then reads `<folder>/../mri/transforms/talairach.xfm`, which Windows resolves
+/// by the name alone (`nodir\..` is the work folder) where Linux finds no `nodir` (relay 36 of
+/// track D, found on the Windows laptop); another name in its place, the same draws.
 fn out_name(g: &mut Gen, k: usize) -> String {
     match g.below(8) {
-        0 => format!("nodir/o{k}.gii"),
+        0 if g.1 => format!("nodir/o{k}.gii"),
+        0 => format!("o{k}n.gii"),
         1 => format!("o{k}.gii"),
         2 => format!("d/lh.white{k}.gii"),
         3 => format!("d/rh.pial.{k}.gii"),

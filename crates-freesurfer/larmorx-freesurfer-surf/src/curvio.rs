@@ -123,7 +123,7 @@ pub(crate) fn fgetl_line(fp: &mut CFile, n: usize) -> Option<(Vec<u8>, usize)> {
 
 /// The `errno` a failed read left (a directory's `EISDIR`, 21): C's `fread` sets it at once, so the
 /// next error message prints it (relay 35 of track D: an empty name read as the folder `./`).
-fn sync_read_errno(g: &mut Globals, fp: &CFile) {
+pub(crate) fn sync_read_errno(g: &mut Globals, fp: &CFile) {
     if let Some(e) = fp.read_errno() {
         g.errno = e;
     }

@@ -393,12 +393,6 @@ impl LtaIo for FsLtaIo<'_> {
     }
 }
 
-/// `MRIread` (fs.io's volume reader) and `MRIScopyMRI`: reached only when a group-average area
-/// file `<surface>.avg.area.mgh` is readable; until they are ported, reaching them is out of range.
-fn mri_read_pending(fname: &str) -> ! {
-    panic!("MRISread: reading {fname} needs MRIread and MRIScopyMRI (not yet ported)")
-}
-
 /// `mrisReadTransform(mris, mris_fname)` (with `MRISreadTransform`, its public name): the
 /// subject's Talairach transform, `<the surface name's folder>/../mri/transforms/talairach.xfm`
 /// (`FileNamePath`'s folder, `.` without one; FS-356: a surface name of 300 bytes or more is taken
@@ -684,8 +678,10 @@ fn put_face(g: &mut Globals, f: &mut Vec<i32>, i: usize, fno: i32, vno: usize) {
 /// curvature 0, original area -1, border 0, its place in each of its faces; the neighbour lists
 /// ([`nbhd::complete_topology`]), the bounding box, the neighbour distances, the normals; the
 /// Talairach transform ([`read_transform`]); `radius` ([`metric::average_radius`]); the metric
-/// properties; the current positions stored; then `<file>.avg.area.mgh`, when readable, needs
-/// `MRIread` (not yet ported: reaching it panics), else `group_avg_vtxarea_loaded` 0. FS-351
+/// properties; the current positions stored; then `<file>.avg.area.mgh`, when readable, read by
+/// `MRIread` (`ERROR: reading in average area <file>` on standard output and `None` when it gives no
+/// volume) into the vertices' `group_avg_area` (`MRIScopyMRI`, its messages; with `Gdiag_no` and
+/// verbose: `Reading in average area <file>`) and `group_avg_vtxarea_loaded` 1, else 0. FS-351
 /// (a quadrangle face vertex beyond the vertices, reproduced: a segmentation fault here), FS-359
 /// (the old format: its face lists read past their end; by default rebuilt from the faces as for
 /// the other formats), FS-360.
@@ -818,9 +814,18 @@ pub fn read_over_alloc(
         let _ = writeln!(io.out, "Trying to read average area {tmpstr}");
     }
     if fio_file_exists_readable(g, dir, &tmpstr) != 0 {
-        mri_read_pending(&tmpstr);
+        if g.gdiag_no >= 0 && verbose_on(g) {
+            let _ = writeln!(io.out, "Reading in average area {tmpstr}");
+        }
+        let Some(mri) = mriio::mri_read_volume(g, io.out, io.err, io.env, dir, &tmpstr)? else {
+            let _ = writeln!(io.out, "ERROR: reading in average area {tmpstr}");
+            return Ok(None);
+        };
+        crate::surfmri::copy_mri(g, io, &mut mris, &mri, 0, "group_avg_area")?;
+        mris.group_avg_vtxarea_loaded = 1;
+    } else {
+        mris.group_avg_vtxarea_loaded = 0;
     }
-    mris.group_avg_vtxarea_loaded = 0;
     if g.gdiag_no >= 0 && verbose_on(g) {
         let _ = writeln!(
             io.out,

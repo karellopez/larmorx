@@ -15,7 +15,7 @@ file-name functions and `is_nifti_file`, and `znzlib/znzlib.c` (ITK 4.13.2's cop
 the same). znzlib is a thin layer over C's stdio and zlib's `gz*` functions, so their behaviour is
 the module's: the port translates zlib 1.2.11's file layer (`gzlib.c`, `gzread.c`, `gzwrite.c`: its
 8 KiB input and 16 KiB output buffers and its states), the version Ubuntu 22.04 ships
-(`libz.so.1`), with zlib-rs's inflate and deflate.
+(`libz.so.1`), with zlib-rs's inflate and (since 2026-11-15) zlib 1.2.11's own deflate.
 
 ## What the port keeps
 
@@ -58,7 +58,8 @@ gap not compared.
 
 ## Not the same bytes
 
-The compressed bytes of a written `.gz` are zlib-rs's: 208 of 1,241 compressed files
-of the probe's scale-1 run were byte-identical to zlib 1.2.11's at the same level, every one
-decompressing to the same content. Byte-identical outputs need a port of zlib's deflate (the
-decision log's `.h5` precedent compares such files by content).
+Until 2026-11-15 the compressed bytes of a written `.gz` were zlib-rs's: 208 of 1,241 compressed
+files of the probe's scale-1 run were byte-identical to zlib 1.2.11's at the same level, every one
+decompressing to the same content. Since track C's relay 30 the writer uses a translation of zlib
+1.2.11's own deflate (`larmorx_core::zlib`, `docs/findings/zlib-deflate.md`), fed as `gzwrite.c`
+feeds it: the files are zlib's byte for byte (but FS-78's gap).

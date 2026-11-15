@@ -32,6 +32,8 @@
 //!   bit-exact with the hardware, for replicas of programs that compute in `long double`.
 //! - [`python`]: CPython's `argparse` (parsing, usage, help, errors), `textwrap` and number
 //!   parsing and printing, for replicas of Python programs' command lines and messages.
+//! - [`zlib`]: zlib 1.2.11's compressor (`deflate`, `compress2`) and checksums, giving zlib's
+//!   own bytes (gzip and zlib files identical to those of programs linked with it).
 // No unsafe code, except the audited CPU-feature dispatch in `math` and `numpy` (`dot`, `gemm`)
 // (CLAUDE.md rule 5).
 #![deny(unsafe_code)]
@@ -76,6 +78,7 @@ pub mod vnl_random;
 pub mod vnl_svd;
 pub mod vnl_svd_f32;
 pub mod x87;
+pub mod zlib;
 
 pub use affine::{Affine, SingularAffine};
 pub use array::DynArray;

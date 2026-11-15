@@ -172,6 +172,9 @@ pub fn mri_dilate_uchar(
     let (src_own, mut dst) = resolve(g, out, err, p)?;
     {
         let (src, d) = parts(src_own, &mut dst);
+        if dilate_bytes_inside(src, d) {
+            return finish(g, out, err, dst);
+        }
         let (w, h, dd) = (src.vg.width, src.vg.height, src.vg.depth);
         let [xmin, xmax, ymin, ymax, zmin, zmax] =
             grown_box(
@@ -766,32 +769,10 @@ pub fn mri_erode(
 /// byte of its clamped 3 x 3 x 3 box, taken along x, then y, then z (the same voxels as the
 /// neighbourhood's scan). `false` (nothing written) otherwise.
 fn erode_bytes_inside(src: &Mri, d: &mut Mri) -> bool {
-    let (w, h, dd) = (src.vg.width, src.vg.height, src.vg.depth);
-    let clamps = |t: &Option<Vec<i32>>, n: i32| {
-        let t = t.as_deref().unwrap_or(&[]);
-        let k0 = i64::from(MAX_INDEX) - 1;
-        n > 0
-            && k0 >= 0
-            && (k0 + i64::from(n) + 2) as usize <= t.len()
-            && (-1..=n).all(|i| Mri::index(t, i) == i.clamp(0, n - 1))
-    };
-    let dense = |m: &Mri| {
-        m.mtype == MRI_UCHAR
-            && m.vox_per_row == w as u64
-            && m.vox_per_slice == (w as u64) * (h as u64)
-            && m.chunk
-                .as_ref()
-                .is_some_and(|c| c.len() as u64 >= (w as u64) * (h as u64) * (dd as u64))
-    };
-    if (d.vg.width, d.vg.height, d.vg.depth) != (w, h, dd)
-        || !dense(src)
-        || !dense(d)
-        || !clamps(&src.xi, w)
-        || !clamps(&src.yi, h)
-        || !clamps(&src.zi, dd)
-    {
+    if !bytes_inside(src, d) {
         return false;
     }
+    let (w, h, dd) = (src.vg.width, src.vg.height, src.vg.depth);
     let (wu, hu, du) = (w as usize, h as usize, dd as usize);
     let s = &src.chunk.as_ref().expect("voxels")[..wu * hu * du];
     let min3 = |v: &[u8], i: usize, n: usize, stride: usize| -> u8 {
@@ -825,6 +806,125 @@ fn erode_bytes_inside(src: &Mri, d: &mut Mri) -> bool {
             let col = &ay[y * wu + x..];
             for z in 0..du {
                 out[(z * hu + y) * wu + x] = min3(col, z, du, wu * hu);
+            }
+        }
+    }
+    true
+}
+
+/// Whether a byte morphology step may read and write the voxels directly: byte volumes of one
+/// extent with voxels and no row or slice padding, and the source's index tables clamping
+/// every index from -1 to the extent to the nearest voxel (so every access of the 3 x 3 x 3
+/// neighbourhood lies inside both volumes).
+fn bytes_inside(src: &Mri, d: &Mri) -> bool {
+    let (w, h, dd) = (src.vg.width, src.vg.height, src.vg.depth);
+    let clamps = |t: &Option<Vec<i32>>, n: i32| {
+        let t = t.as_deref().unwrap_or(&[]);
+        let k0 = i64::from(MAX_INDEX) - 1;
+        n > 0
+            && k0 >= 0
+            && (k0 + i64::from(n) + 2) as usize <= t.len()
+            && (-1..=n).all(|i| Mri::index(t, i) == i.clamp(0, n - 1))
+    };
+    let dense = |m: &Mri| {
+        m.mtype == MRI_UCHAR
+            && m.vox_per_row == w as u64
+            && m.vox_per_slice == (w as u64) * (h as u64)
+            && m.chunk
+                .as_ref()
+                .is_some_and(|c| c.len() as u64 >= (w as u64) * (h as u64) * (dd as u64))
+    };
+    if (d.vg.width, d.vg.height, d.vg.depth) != (w, h, dd)
+        || !dense(src)
+        || !dense(d)
+        || !clamps(&src.xi, w)
+        || !clamps(&src.yi, h)
+        || !clamps(&src.zi, dd)
+    {
+        return false;
+    }
+    true
+}
+
+/// `MRIdilateUchar`'s dilation when [`bytes_inside`] holds: the bounding box of the nonzero bytes
+/// of frame 0, grown by one voxel and clipped (as [`grown_box`]), and in it each voxel the
+/// largest byte of its clamped 3 x 3 x 3 box, taken along x, then y, then z over the box's rows
+/// (the largest of bytes does not depend on the order). `false` (nothing written) otherwise.
+fn dilate_bytes_inside(src: &Mri, d: &mut Mri) -> bool {
+    if !bytes_inside(src, d) {
+        return false;
+    }
+    let (w, h, dd) = (src.vg.width, src.vg.height, src.vg.depth);
+    let (wu, hu, du) = (w as usize, h as usize, dd as usize);
+    let s = &src.chunk.as_ref().expect("voxels")[..wu * hu * du];
+    // The grown box, as `grown_box` computes it from `byte > 0`.
+    let (mut xmin, mut xmax, mut ymin, mut ymax, mut zmin, mut zmax) =
+        (w - 1, 0, h - 1, 0, dd - 1, 0);
+    for z in 0..du {
+        for y in 0..hu {
+            let row = &s[(z * hu + y) * wu..(z * hu + y + 1) * wu];
+            let (Some(x0), Some(x1)) = (
+                row.iter().position(|&b| b > 0),
+                row.iter().rposition(|&b| b > 0),
+            ) else {
+                continue;
+            };
+            let (x0, x1, y, z) = (x0 as i32, x1 as i32, y as i32, z as i32);
+            xmin = xmin.min(x0 - 1);
+            xmax = xmax.max(x1 + 1);
+            ymin = ymin.min(y - 1);
+            ymax = ymax.max(y + 1);
+            zmin = zmin.min(z - 1);
+            zmax = zmax.max(z + 1);
+        }
+    }
+    let (xmin, xmax) = (xmin.max(0), xmax.min(w - 1));
+    let (ymin, ymax) = (ymin.max(0), ymax.min(h - 1));
+    let (zmin, zmax) = (zmin.max(0), zmax.min(dd - 1));
+    if xmin > xmax || ymin > ymax || zmin > zmax {
+        return true;
+    }
+    let max3 = |v: &[u8], i: usize, n: usize, stride: usize| -> u8 {
+        let a = if i > 0 { v[(i - 1) * stride] } else { v[0] };
+        let c = if i + 1 < n {
+            v[(i + 1) * stride]
+        } else {
+            v[(n - 1) * stride]
+        };
+        a.max(v[i * stride]).max(c)
+    };
+    let (x0, x1) = (xmin as usize, xmax as usize);
+    let (y0, y1) = (ymin as usize, ymax as usize);
+    let (z0, z1) = (zmin as usize, zmax as usize);
+    // Along x for the box's columns, on every row the y and z steps read (the box grown by one
+    // row and slice, clamped).
+    let (ya, yb) = (y0.saturating_sub(1), (y1 + 1).min(hu - 1));
+    let (za, zb) = (z0.saturating_sub(1), (z1 + 1).min(du - 1));
+    let mut ax = vec![0u8; s.len()];
+    for z in za..=zb {
+        for y in ya..=yb {
+            let r = z * hu + y;
+            let row = &s[r * wu..(r + 1) * wu];
+            for x in x0..=x1 {
+                ax[r * wu + x] = max3(row, x, wu, 1);
+            }
+        }
+    }
+    let mut ay = vec![0u8; s.len()];
+    for z in za..=zb {
+        for x in x0..=x1 {
+            let col = &ax[z * hu * wu + x..];
+            for y in y0..=y1 {
+                ay[(z * hu + y) * wu + x] = max3(col, y, hu, wu);
+            }
+        }
+    }
+    let out = &mut d.chunk.as_mut().expect("voxels")[..wu * hu * du];
+    for y in y0..=y1 {
+        for x in x0..=x1 {
+            let col = &ay[y * wu + x..];
+            for z in z0..=z1 {
+                out[(z * hu + y) * wu + x] = max3(col, z, du, wu * hu);
             }
         }
     }
@@ -2566,6 +2666,91 @@ mod tests {
     use super::*;
     use larmorx_core::defects::UpstreamDefects;
     use larmorx_freesurfer_mri::mri::mri_alloc;
+
+    /// The byte dilation's direct path writes, inside the grown bounding box of the nonzero
+    /// bytes, the largest byte of each voxel's clamped 3 x 3 x 3 box, and leaves a given
+    /// destination's other voxels as they were; sparse, empty and full volumes.
+    #[test]
+    fn byte_dilation_is_the_clamped_box_maximum_in_the_grown_box() {
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        for (w, h, d) in [
+            (1, 1, 1),
+            (1, 5, 3),
+            (7, 1, 4),
+            (6, 5, 4),
+            (9, 8, 7),
+            (2, 2, 9),
+            (12, 11, 10),
+        ] {
+            for density in [0u64, 1, 8, 64, 256] {
+                let mut g = Globals::new(UpstreamDefects::Fix);
+                let (mut o, mut e) = (Vec::new(), Vec::new());
+                let mut src = mri_alloc(&mut g, &mut o, &mut e, w, h, d, MRI_UCHAR).unwrap();
+                for b in src.chunk.as_mut().unwrap().iter_mut() {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    *b = if seed % 256 < density {
+                        (seed >> 32) as u8
+                    } else {
+                        0
+                    };
+                }
+                let mut dst = mri_alloc(&mut g, &mut o, &mut e, w, h, d, MRI_UCHAR).unwrap();
+                dst.chunk.as_mut().unwrap().fill(7);
+                mri_dilate(&mut g, &mut o, &mut e, Pair::Given(&src, &mut dst)).unwrap();
+                let at = |x: i32, y: i32, z: i32| ((z * h + y) * w + x) as usize;
+                let s = src.chunk.as_ref().unwrap();
+                let (mut lo, mut hi) = ([w - 1, h - 1, d - 1], [0, 0, 0]);
+                for z in 0..d {
+                    for y in 0..h {
+                        for x in 0..w {
+                            if s[at(x, y, z)] > 0 {
+                                for (k, v) in [x, y, z].into_iter().enumerate() {
+                                    lo[k] = lo[k].min(v - 1);
+                                    hi[k] = hi[k].max(v + 1);
+                                }
+                            }
+                        }
+                    }
+                }
+                let n = [w, h, d];
+                for k in 0..3 {
+                    lo[k] = lo[k].max(0);
+                    hi[k] = hi[k].min(n[k] - 1);
+                }
+                for z in 0..d {
+                    for y in 0..h {
+                        for x in 0..w {
+                            let inside = [x, y, z]
+                                .into_iter()
+                                .enumerate()
+                                .all(|(k, v)| lo[k] <= v && v <= hi[k]);
+                            let mut m = 0u8;
+                            for zk in -1..=1 {
+                                for yk in -1..=1 {
+                                    for xk in -1..=1 {
+                                        let p = at(
+                                            (x + xk).clamp(0, w - 1),
+                                            (y + yk).clamp(0, h - 1),
+                                            (z + zk).clamp(0, d - 1),
+                                        );
+                                        m = m.max(s[p]);
+                                    }
+                                }
+                            }
+                            let want = if inside { m } else { 7 };
+                            assert_eq!(
+                                dst.chunk.as_ref().unwrap()[at(x, y, z)],
+                                want,
+                                "{w}x{h}x{d} density {density} at {x},{y},{z}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /// The byte erosion's direct path gives each voxel the smallest byte of its clamped
     /// 3 x 3 x 3 box, on extents of one voxel and more.

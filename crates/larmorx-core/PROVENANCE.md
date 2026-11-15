@@ -781,3 +781,37 @@ Original code (Apache-2.0).
 - Checks: `src/miniz/tests.rs`, `src/fnv.rs`'s and `src/libtiff.rs`'s tests (digests recorded on
   Linux x86-64), and the differential probe `validation/probes/fs-misc` against miniz 1.15 r4
   and the copies the unit oracle's GCC 8.4.0 compiles (README there).
+
+## zlib 1.2.11's compressor (FreeSurfer's foundations, track C relay 30, 2026-11-15)
+
+| larmorx file | Upstream | Licence |
+|---|---|---|
+| `src/zlib.rs` | zlib 1.2.11 (`zlib.h`'s constants, `zutil.c`'s `z_errmsg`; `adler32.c`: `adler32_z`; `crc32.c`: `crc32_z` with its table of 0xedb88320; `compress.c`: `compress2`, `compressBound`) | Zlib (Jean-loup Gailly and Mark Adler) |
+| `src/zlib/deflate.rs` | zlib 1.2.11 `deflate.c` and `deflate.h` with Ubuntu 22.04's patches (`deflateInit2_`, `deflateReset`, `deflateResetKeep`, `deflateEnd`, `deflateSetHeader`, `deflatePending`, `deflatePrime`, `deflateTune`, `deflateBound`, `deflateGetDictionary`, `deflateSetDictionary`, `deflateParams`, `deflate`, `deflateCopy` as `Clone`; `fill_window`, `read_buf`, `flush_pending`, `lm_init`, `longest_match`, `slide_hash`, `deflate_stored`, `deflate_fast`, `deflate_slow`, `deflate_rle`, `deflate_huff`, the `_tr_tally` macros) | Zlib |
+| `src/zlib/trees.rs` | zlib 1.2.11 `trees.c` with Ubuntu's `sym_buf` (`tr_static_init`, `_tr_init`, `init_block`, `pqdownheap`, `gen_bitlen`, `gen_codes`, `build_tree`, `scan_tree`, `send_tree`, `build_bl_tree`, `send_all_trees`, `_tr_stored_block`, `_tr_flush_bits`, `_tr_align`, `_tr_flush_block`, `compress_block`, `detect_data_type`, `bi_reverse`, `bi_flush`, `bi_windup`) | Zlib |
+| `src/zlib/cases.rs`, `src/zlib/tests.rs` | larmorx's own recipes and checks | Apache-2.0 (`tests.rs`: Apache-2.0 AND Zlib) |
+
+- The source: `zlib-1.2.11.tar.gz` (SHA-256
+  c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1, `<workspace>/tags/zlib-1.2.11`;
+  Ubuntu's `zlib_1.2.11.dfsg.orig.tar.gz` has the same `deflate.c`, `trees.c`, `compress.c`,
+  `adler32.c`, `crc32.c`, `zutil.*`, `zlib.h`) with the twelve patches of Ubuntu's
+  `zlib_1.2.11.dfsg-2ubuntu9.2.debian.tar.xz` (SHA-256
+  5678d0b3d1e609297e5a3dedfcb3474bab1cafe82c0c29aec2cef01e49a88d39,
+  `<workspace>/tags/zlib-1.2.11-ubuntu9.2-debian`) applied in its `series` order: those that reach
+  the compressor are `Permit-a-deflateParams-parameter-change-asap.patch` (`last_flush` -2,
+  `deflateParams`' flush), `410.patch` (IBM Z's hooks: empty on x86-64; `deflate` keeps writing
+  a raw stream's end), `CVE-2018-25032-1.patch` and `-2.patch` (`sym_buf` in place of `d_buf` and
+  `l_buf`, `deflatePrime`'s checks). Built as Ubuntu builds it for x86-64: `GZIP`, not `FASTEST`,
+  `ASMV`, `UNALIGNED_OK` or `ZLIB_DEBUG` (the `_tr_tally` macros, which do not count `matches`);
+  `OS_CODE` 3 on every platform.
+- Kept from the C: every state, the window and its high-water zeroing, the hash chains (16-bit
+  positions), the pending buffer with the symbol buffer inside it at `lit_bufsize`, `ct_data`'s
+  two unions as two fields, unsigned wrapping where zlib's `ulg`/`uInt` wrap (`opt_len`,
+  `static_len`), every return code and `msg`. Changed: slices in place of `next_in`/`next_out`
+  (no null pointers; `avail_*` at most 2^32 - 1 per call); the window and hash arrays start as
+  zeros (zlib's are `malloc`'s; zlib never lets their unset bytes reach the output); the match
+  loops compare slices (the same lengths: the first differing offset from 3 to 257, else 258).
+- Checks: `src/zlib/tests.rs` (a round trip through zlib-rs at every level and strategy; the
+  digest of `cases.rs`'s 96 recipes, recorded from Ubuntu's `libz.so.1`) and the probe
+  `validation/probes/zlib-deflate` (README there; `docs/findings/zlib-deflate.md`).
+

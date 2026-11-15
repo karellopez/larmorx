@@ -11,6 +11,7 @@
 //!   zlib-deflate files <libdir> <list>                 gzip files re-made (one path per line)
 //!   zlib-deflate testset <libdir>                      larmorx-core's recorded recipes
 //!   zlib-deflate gzset <libdir> <scratch>              larmorx-io's recorded gzip writer recipes
+//!   zlib-deflate inflate <libdir> <seed> <n>           zlib's decompressor (larmorx_core::zlib::Inflate)
 
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_core::zlib::{self as z, Deflate, GzHeader};
@@ -108,6 +109,8 @@ struct Lib {
     inflate_init2: unsafe extern "C" fn(P, c_int, *const c_char, c_int) -> c_int,
     inflate: unsafe extern "C" fn(P, c_int) -> c_int,
     inflate_end: unsafe extern "C" fn(P) -> c_int,
+    inflate_sync: unsafe extern "C" fn(P) -> c_int,
+    inflate_reset: unsafe extern "C" fn(P) -> c_int,
     gzopen: unsafe extern "C" fn(*const c_char, *const c_char) -> *mut c_void,
     gzwrite: unsafe extern "C" fn(*mut c_void, *const u8, c_uint) -> c_int,
     gzputc: unsafe extern "C" fn(*mut c_void, c_int) -> c_int,
@@ -158,6 +161,8 @@ fn load(path: &Path) -> Lib {
         inflate_init2: f!("inflateInit2_"),
         inflate: f!("inflate"),
         inflate_end: f!("inflateEnd"),
+        inflate_sync: f!("inflateSync"),
+        inflate_reset: f!("inflateReset"),
         gzopen: f!("gzopen"),
         gzwrite: f!("gzwrite"),
         gzputc: f!("gzputc"),
@@ -1609,9 +1614,305 @@ fn main() {
         Some("files") => files(&a[2], &a[3]),
         Some("testset") => testset(&a[2]),
         Some("gzset") => gzset(&a[2], &a[3]),
+        Some("inflate") => {
+            inflate_cases(&a[2], num(3), num(4), a.get(5).map(|c| c.parse().unwrap()))
+        }
         _ => {
             eprintln!("usage: see the source's header");
             std::process::exit(2);
         }
     }
+}
+
+/// One `inflate`/`inflateSync`/`inflateReset` call's observable result.
+fn inflate_record(
+    tag: &str,
+    ret: c_int,
+    used: usize,
+    wrote: usize,
+    msg: Option<&str>,
+    totals: (u64, u64, u64, i32),
+    out: &[u8],
+) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in out {
+        h = (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3);
+    }
+    format!(
+        "{tag} ret {ret} used {used} wrote {wrote} msg {} totals {} {} {:#x} {} out {h:016x}",
+        msg.unwrap_or("(null)"),
+        totals.0,
+        totals.1,
+        totals.2,
+        totals.3
+    )
+}
+
+/// The decompressor against Ubuntu's zlib: per case a stream made by zlib's compressor (any
+/// level, window, strategy, flushes inside), raw or zlib, maybe damaged (bits flipped, bytes
+/// cut, inserted or replaced, a run of junk), then up to 60 calls with random slices of input
+/// and output and any flush; after an error, `inflateSync` or `inflateReset` or more `inflate`.
+fn inflate_cases(dir: &str, seed: u64, n: u64, only: Option<u64>) {
+    let (sys, _up) = libs(dir);
+    let mut diffs = 0u64;
+    let mut errors = 0u64;
+    let mut syncs = 0u64;
+    for case in 0..n {
+        if only.is_some_and(|o| o != case) {
+            continue;
+        }
+        let mut r = Rng::new(seed.wrapping_mul(1_000_003).wrapping_add(case));
+        let len = match r.below(4) {
+            0 => r.below(64) as usize,
+            1 => r.below(4096) as usize,
+            2 => r.below(70_000) as usize,
+            _ => r.below(300_000) as usize,
+        };
+        let data = gen_data(&mut r, len);
+        let raw = r.chance(4);
+        // zlib 1.2.11's deflateInit2 refuses raw streams of 8 window bits.
+        let wbits = r.range(if raw { 9 } else { 8 }, 15) as i32;
+        let level = r.range(0, 9) as i32;
+        let strategy = r.range(0, 4) as i32;
+        // The stream, made by the port's compressor (byte-identical to zlib's, relay 30), with
+        // flushes inside so that inflateSync has points to find.
+        let mut d = Deflate::init2(level, 8, if raw { -wbits } else { wbits }, 8, strategy)
+            .expect("deflateInit2");
+        let mut z = Vec::new();
+        let mut at = 0usize;
+        let mut buf = vec![0u8; 1 << 16];
+        loop {
+            let take = (r.below(40_000) as usize + 1).min(data.len() - at);
+            let last = at + take == data.len();
+            let flush = if last {
+                z::Z_FINISH
+            } else {
+                [
+                    z::Z_NO_FLUSH,
+                    z::Z_SYNC_FLUSH,
+                    z::Z_FULL_FLUSH,
+                    z::Z_PARTIAL_FLUSH,
+                ][r.below(4) as usize]
+            };
+            let mut inp = &data[at..at + take];
+            loop {
+                let (ret, used, wrote) = d.deflate(inp, &mut buf, flush);
+                z.extend_from_slice(&buf[..wrote]);
+                inp = &inp[used..];
+                if ret == z::Z_STREAM_END || (inp.is_empty() && wrote < buf.len()) {
+                    break;
+                }
+            }
+            at += take;
+            if last {
+                break;
+            }
+        }
+        // Damage.
+        if r.chance(2) && !z.is_empty() {
+            for _ in 0..r.range(1, 4) {
+                let k = r.below(6);
+                let p = r.below(z.len() as u64) as usize;
+                match k {
+                    0 => z[p] ^= 1 << r.below(8),
+                    1 => z.truncate(p),
+                    2 => z.insert(p, r.next() as u8),
+                    3 => {
+                        z.remove(p);
+                    }
+                    4 => z[p] = r.next() as u8,
+                    _ => {
+                        let m = r.range(1, 40) as usize;
+                        for i in p..(p + m).min(z.len()) {
+                            z[i] = r.next() as u8;
+                        }
+                    }
+                }
+                if z.is_empty() {
+                    break;
+                }
+            }
+        }
+        // The calls, the same on both sides.
+        let iw = if raw {
+            -wbits
+        } else if r.chance(5) {
+            0
+        } else {
+            wbits.max(r.range(8, 15) as i32)
+        };
+        let mut port = match z::Inflate::init2(iw) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("case {case}: port init {e}");
+                diffs += 1;
+                continue;
+            }
+        };
+        // SAFETY: an all-zero z_stream is zlib's documented starting state.
+        let mut zs: Box<ZStream> = Box::new(unsafe { std::mem::zeroed() });
+        // zlib's own zcalloc is malloc: a stream synced before its header updates a check value
+        // never set (memory contents). The probe's allocator zero-fills, the port's model.
+        zs.zalloc = fill_alloc as *mut c_void;
+        zs.zfree = fill_free as *mut c_void;
+        zs.opaque = std::ptr::null_mut();
+        let ver = CString::new("1.2.11").unwrap();
+        // SAFETY: inflateInit2_ on a zeroed z_stream with the version and size it checks.
+        let rc = unsafe {
+            (sys.inflate_init2)(
+                &mut *zs,
+                iw,
+                ver.as_ptr(),
+                std::mem::size_of::<ZStream>() as c_int,
+            )
+        };
+        assert_eq!(rc, z::Z_OK);
+        let total_out = data.len() + 1024;
+        let mut out_c = vec![0u8; total_out + 300_000];
+        let mut out_p = out_c.clone();
+        let (mut ic, mut ip) = (0usize, 0usize);
+        let (mut oc, mut op) = (0usize, 0usize);
+        let calls = r.range(1, 60);
+        let mut bad = false;
+        for call in 0..calls {
+            let what = r.below(20);
+            let scale = |k: u64| match k {
+                0 => 8,
+                1 => 600,
+                _ => 70_000,
+            };
+            let (ki, ko) = (r.below(3), r.below(3));
+            let ain = r.below(scale(ki)) as usize;
+            let aout = r.below(scale(ko)) as usize;
+            let flush = [0, 1, 2, 3, 4, 5, 6][r.below(7) as usize];
+            let (lc, lp);
+            if what == 0 {
+                // inflateReset
+                // SAFETY: a z_stream initialised above.
+                let rc = unsafe { (sys.inflate_reset)(&mut *zs) };
+                let rp = port.reset();
+                lc = format!("reset {rc}");
+                lp = format!("reset {rp}");
+            } else if what <= 3 {
+                let ain_c = ain.min(z.len() - ic);
+                zs.next_in = if ain_c == 0 {
+                    std::ptr::null()
+                } else {
+                    z[ic..].as_ptr()
+                };
+                zs.avail_in = ain_c as c_uint;
+                // SAFETY: next_in covers avail_in bytes of z.
+                let rc = unsafe { (sys.inflate_sync)(&mut *zs) };
+                let used_c = ain_c - zs.avail_in as usize;
+                ic += used_c;
+                let ain_p = ain.min(z.len() - ip);
+                let (rp, used_p) = port.sync(&z[ip..ip + ain_p]);
+                ip += used_p;
+                syncs += 1;
+                // SAFETY: msg is null or zlib's static string.
+                let msg = (!zs.msg.is_null()).then(|| {
+                    unsafe { CStr::from_ptr(zs.msg) }
+                        .to_string_lossy()
+                        .into_owned()
+                });
+                lc = inflate_record(
+                    "sync",
+                    rc,
+                    used_c,
+                    0,
+                    msg.as_deref(),
+                    (zs.total_in as u64, zs.total_out as u64, zs.adler as u64, 0),
+                    &[],
+                );
+                lp = inflate_record(
+                    "sync",
+                    rp,
+                    used_p,
+                    0,
+                    port.msg,
+                    (port.total_in, port.total_out, port.adler, 0),
+                    &[],
+                );
+            } else {
+                let ain_c = ain.min(z.len() - ic);
+                let aout_c = aout.min(out_c.len() - oc);
+                zs.next_in = if ain_c == 0 {
+                    std::ptr::null()
+                } else {
+                    z[ic..].as_ptr()
+                };
+                zs.avail_in = ain_c as c_uint;
+                zs.next_out = out_c[oc..].as_mut_ptr();
+                zs.avail_out = aout_c as c_uint;
+                // SAFETY: the slices cover avail_in and avail_out.
+                let rc = unsafe { (sys.inflate)(&mut *zs, flush) };
+                let used_c = ain_c - zs.avail_in as usize;
+                let wrote_c = aout_c - zs.avail_out as usize;
+                let ain_p = ain.min(z.len() - ip);
+                let aout_p = aout.min(out_p.len() - op);
+                let (rp, used_p, wrote_p) =
+                    port.inflate(&z[ip..ip + ain_p], &mut out_p[op..op + aout_p], flush);
+                // SAFETY: msg is null or zlib's static string.
+                let msg = (!zs.msg.is_null()).then(|| {
+                    unsafe { CStr::from_ptr(zs.msg) }
+                        .to_string_lossy()
+                        .into_owned()
+                });
+                lc = inflate_record(
+                    "inflate",
+                    rc,
+                    used_c,
+                    wrote_c,
+                    msg.as_deref(),
+                    (
+                        zs.total_in as u64,
+                        zs.total_out as u64,
+                        zs.adler as u64,
+                        zs.data_type,
+                    ),
+                    &out_c[oc..oc + wrote_c],
+                );
+                lp = inflate_record(
+                    "inflate",
+                    rp,
+                    used_p,
+                    wrote_p,
+                    port.msg,
+                    (port.total_in, port.total_out, port.adler, port.data_type),
+                    &out_p[op..op + wrote_p],
+                );
+                ic += used_c;
+                oc += wrote_c;
+                ip += used_p;
+                op += wrote_p;
+                if rc == z::Z_DATA_ERROR {
+                    errors += 1;
+                }
+            }
+            if only.is_some() {
+                eprintln!("call {call} what {what} flush {flush}:\n  zlib {lc}\n  port {lp}");
+            }
+            if lc != lp {
+                eprintln!("case {case} call {call}:\n  zlib {lc}\n  port {lp}");
+                bad = true;
+                break;
+            }
+        }
+        // SAFETY: the stream initialised above.
+        unsafe { (sys.inflate_end)(&mut *zs) };
+        if bad {
+            diffs += 1;
+        }
+    }
+    println!(
+        "inflate seed {seed}: {n} cases, {diffs} differing, {errors} data errors, {syncs} syncs"
+    );
+    println!(
+        "{}",
+        if diffs == 0 {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
+    );
 }

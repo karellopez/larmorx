@@ -46,7 +46,7 @@ use crate::mp::compute_metric_properties;
 use crate::mris::Mris;
 use crate::sras::{
     mris_load_ras2voxel_map, mris_make_ras2voxel_map, mris_surface_ras_to_voxel,
-    mris_surface_ras_to_voxel_cached, mris_use_ras2voxel_map,
+    mris_use_ras2voxel_map,
 };
 
 /// FreeSurfer's `nint(f)` as its x86-64 build computes it, `(int)(f - 0.5)` below 0 and `(int)(f
@@ -111,7 +111,7 @@ fn degenerate_face(g: &mut Globals, what: &str, fno: usize) {
 /// `v` in `0..=numv` the points `p0 = v0 + ((v2 - v0) v) / numv` and `p1 = v1 + ((v2 - v1) v) /
 /// numv`, and on the line between them, for each `u` in `0..=numu`, `p = p0 + ((p1 - p0) u) /
 /// numu` (all `float`), converted to the source's voxels by the cached conversion
-/// ([`mris_surface_ras_to_voxel_cached`], FS-604) and rounded (`nint`); a voxel inside the
+/// ([`crate::sras::mris_surface_ras_to_voxel_cached`], FS-604) and rounded (`nint`); a voxel inside the
 /// destination is set to 255. FS-606: a face whose first two corners coincide (`numu` 0) gives
 /// only NaN samples and draws nothing (kept, noted).
 #[allow(clippy::too_many_arguments)]
@@ -139,6 +139,7 @@ pub fn mris_shell(
         mri_clear(g, io.err, dst)?;
     }
     let (xs, ys, zs) = (dst.vg.xsize, dst.vg.ysize, dst.vg.zsize);
+    let mut loaded = false;
     for fno in 0..usize::try_from(mris.nfaces).unwrap_or(0) {
         let [[x0, y0, z0], [x1, y1, z1], [x2, y2, z2]] = corners(mris, fno);
         let d0 =
@@ -184,12 +185,17 @@ pub fn mris_shell(
                     py0 + dy * fu / fnu,
                     pz0 + dz * fu / fnu,
                 );
-                let [fi, fj, fk] = mris_surface_ras_to_voxel_cached(
+                // the cached conversion (`MRISsurfaceRASToVoxelCached`): its map loaded at the
+                // first sample; the later loads of this call find the same volume and surface
+                // and change nothing, so the map is used directly (the same bits, faster)
+                if !loaded {
+                    mris_load_ras2voxel_map(g, io, &mut sg.sras_map, mri_src, mris)?;
+                    loaded = true;
+                }
+                let [fi, fj, fk] = mris_use_ras2voxel_map(
                     g,
-                    sg,
                     io,
-                    mris,
-                    mri_src,
+                    &mut sg.sras_map,
                     f64::from(px),
                     f64::from(py),
                     f64::from(pz),

@@ -3874,6 +3874,62 @@ void fli_case()
   }
 }
 
+// relay 32 of track D, the recorded heads (real.py): `flr fil <surface> <volume>`:
+// MRISfillInterior(surface, 0, a copy of the volume) (mri_surf2volseg's call); `flr rib <inner>
+// <outer> <volume>`: MRISribbon(inner, outer, volume, NULL) (mris_volmask's); `flr bbf <surface>
+// <resolution>`: MRISmakeBoundingVolume, then MRISfillInterior into it (mris_place_surface's T2 and
+// FLAIR steps); each result as its extent, type, frames, geometry, the count of voxels that are
+// not 0 and the FNV-1a of its voxels' bytes
+static void flr_put(MRI *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->type); oi(m->nframes);
+  float gs[15] = {m->xsize, m->ysize, m->zsize, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a,
+                  m->y_s, m->z_r, m->z_a, m->z_s, m->c_r, m->c_a, m->c_s};
+  for (float x : gs) of(x);
+  long long nz = 0;
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) nz += MRIgetVoxVal(m, c, r, s, f) != 0;
+  oi(nz);
+  uint64_t h = 0xcbf29ce484222325ull;
+  const unsigned char *b = (const unsigned char *)m->chunk;
+  for (size_t i = 0; i < m->bytes_total; i++) h = (h ^ b[i]) * 0x100000001b3ull;
+  char t[24];
+  snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+  out += t;
+}
+
+void flr_case()
+{
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string op = next();
+  out += op + " ";
+  if (op == "fil") {
+    MRIS *s = MRISread(next());
+    MRI *v = MRIread(next());
+    if (!s || !v) fail("cannot read the inputs");
+    MRI *d = MRIcopy(v, NULL);
+    MRIcopyHeader(v, d);
+    MRISfillInterior(s, 0, d);
+    flr_put(d);
+  } else if (op == "rib") {
+    MRIS *inner = MRISread(next());
+    MRIS *outer = MRISread(next());
+    MRI *v = MRIread(next());
+    if (!inner || !outer || !v) fail("cannot read the inputs");
+    flr_put(MRISribbon(inner, outer, v, NULL));
+  } else if (op == "bbf") {
+    MRIS *s = MRISread(next());
+    double res = getd();
+    if (!s) fail("cannot read the inputs");
+    MRI *b = MRISmakeBoundingVolume(s, res);
+    MRISfillInterior(s, res, b);
+    flr_put(b);
+  } else fail("flr op");
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -4114,6 +4170,8 @@ void run_case()
     mpg_case();
   } else if (cmd == "fli") {
     fli_case();
+  } else if (cmd == "flr") {
+    flr_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {
@@ -4229,7 +4287,8 @@ int main(int argc, char *argv[])
       dup2(fd, 2);
       close(fd);
       setvbuf(stdout, NULL, _IONBF, 0);
-      alarm(5);
+      // relay 32 of track D: the recorded heads' cases (flr) run for minutes
+      alarm(line.compare(0, 4, "flr ") == 0 ? 900 : 5);
       memcpy(buf, line.c_str(), line.size() + 1);
       toks.clear();
       pos = 0;

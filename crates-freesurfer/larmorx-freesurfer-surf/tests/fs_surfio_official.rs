@@ -180,7 +180,7 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
         ..SurfGlobals::default()
     };
     let (mut noted, mut changed, mut cases) = (0, 0, 0);
-    for line in cases::generate(1, 103 * 45) {
+    for line in cases::generate(1, 103 * 46) {
         if !line.starts_with("mprop ") {
             continue;
         }

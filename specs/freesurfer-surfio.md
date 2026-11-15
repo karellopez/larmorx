@@ -3970,3 +3970,65 @@ those whose only differences are numbers at most 2 units in the last place apart
 `acos` (counted apart, the check's `reproduce_differ_acos_last_bits`); FS-535's, FS-536's and
 FS-538's crashes compare as FreeSurfer's crash. Observed (relay 24): the probe README. The defaults
 are checked by `tests/props10_defaults.rs`.
+
+## 118. A surface's RAS and a volume's voxels: the maps and the cached conversions (fs.surf's piece taken early; relay 32 of track D)
+
+The matrix of a surface and a volume, *surface RAS to voxels*, and the two direct conversions
+(`MRISsurfaceRASToVoxel`, `MRISsurfaceRASFromVoxel`) are `specs/freesurfer-io.md`'s (the label
+conversions' section): the surface's volume geometry when it is valid, else the volume, gives the
+tkregister-to-scanner matrix; the volume's scanner-to-voxel matrix times it, in `float`. A point
+`(r, a, s)` goes through a matrix as the `float` vector `(r, a, s, 1)` (each coordinate rounded to
+`float`; the product in `float`, `specs/freesurfer-maths.md`), its first three elements returned
+as `double`s; a missing matrix ends the program (`MatrixMultiply(): m1 is null`, its break line,
+the error, status 252).
+
+- **A map** (`MRIS_SurfRAS2VoxelMap`) holds a volume's header and a matrix. *Loading* it for a volume
+  and a surface (`MRIS_loadRAS2VoxelMap(map, mri, mris)`): when it holds a header that compares
+  equal to the volume's (`specs/freesurfer-volume.md`'s header comparison: voxel sizes, field of
+  view, thickness, pixel size, starts and ends, TR, TE, TI, direction cosines and centre within
+  `FLT_EPSILON`, the flip angle likewise, `ptype`, location and `ras_good_flag` exactly), nothing;
+  otherwise the header and matrix are dropped, a copy of the volume's header is kept and the matrix
+  of the volume and the surface is made. *Making* one (`MRIS_makeRAS2VoxelMap(mri, mris)`): an empty
+  map, loaded. *Using* it (`MRIS_useRAS2VoxelMap(map, mri, r, a, s)`): the point through its matrix
+  (the volume is not read). *Unloading* and *freeing* drop it.
+- **FS-604.** The comparison ignores the volume's extent (which places its centre voxel) and the
+  surface, so FreeSurfer keeps a matrix made for another surface whose volume geometry differs, for a
+  volume of another extent whose header was copied from the first (a new volume's starts, ends and
+  field of view follow its extent, so it compares different), or for a header within `FLT_EPSILON`: later points land in the wrong
+  voxels. By default, when the header compares equal but the exact geometry the matrix depends on
+  (the volume's extent, voxel sizes, direction cosines and centre; the surface's too when its
+  geometry is valid) is not the one the matrix was made from, the matrix is made again when it would
+  differ (noted; a computation that would end the program counts as differing and ends it as a fresh
+  load would); `reproduce` keeps it.
+- **The cached conversion to voxels** (`MRISsurfaceRASToVoxelCached(mris, mri, r, a, s)`): one map
+  for the whole program, loaded for the call's volume and surface, then used; returns `NO_ERROR`.
+- **The cached conversion from voxels** (`MRISsurfaceRASFromVoxelCached(mris, mri, x, y, z)`): one
+  matrix for the whole program, the inverse of *surface RAS to voxels* made at the first call (one
+  that cannot be inverted leaves none, so the next call makes it again; the product then ends the
+  program); the voxel through it. **FS-605.** FreeSurfer keeps the first call's matrix for every
+  later surface and volume; by default it is made again when the geometry (as for FS-604) changes
+  and it would differ (noted); `reproduce` keeps it.
+
+## 119. Validation plan, part 23
+
+The probe's `fli` command (relay 32 of track D): one or two surfaces read by `MRISread` (`d/lh.s0`
+and `d/lh.s1`: icosahedra subdivided once or twice on spheres of radius 2 to 6 mm, open grids of 2
+to 5 by 2 to 5 vertices, `srd`'s small meshes scaled into 8 mm; moved by quarters up to 3 mm; one
+case in eight a face's second corner moved onto its first; the second surface most often the first
+shrunk to 0.5, 0.6 or 0.75 about its offset), each with a volume geometry of the case (valid four
+times in five; 8 to 20 voxels a side; sizes 1, 0.5, 2, 1.5, 0.75, isotropic half the time; LIA, RAS,
+LPS, a permutation or a rotation by (0.6, 0.8) about S, one in 40 a singular frame; centres in
+eighths up to 8 mm; zero sizes and NaN or infinite centres in heavy cases), `Gdiag`'s show and
+verbose bits one case in eight, `Gdiag_no` 1 one case in eight; 1 to 3 volumes (`uchar` four in
+seven, else `int`, `float`, `short`; the first surface's geometry, the same with another extent, or
+their own; zeros, or the pattern `(c + 2 r + 3 s + k) % 4`); then 1 to 4 of: the four conversions
+(sixteenths up to 10 mm, special values in heavy cases), a map made and used, loaded again for
+another pair and used, the shell (a new volume, or another volume of the source's extent four
+times in five; cleared or not), the ribbon (the last surface inside, the first outside), the
+bounding volume, the interior (new or into a volume of the case) and the bounding volume filled
+(`specs/freesurfer-filter.md` §33); each prints its coordinates' bits, or the volume (extent,
+type, frames, geometry, `ras_good_flag`, the voxels' bits as runs). `MRISfillInterior`'s elapsed
+time is written `<t>` on both sides. `real.py` runs the interior, the ribbon and the filled
+bounding volume on three recorded heads (§34 of the filter spec). Observed (relay 32): seeds 7, 13
+and 17, 100 cases each: 0 different with `reproduce`; the default different only with notices
+(FS-604, FS-605, FS-608).

@@ -582,3 +582,101 @@ pub(super) fn fli_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     }
     Ok(())
 }
+
+/// `flr` (`fssurfio.cpp`, relay 32 of track D): a recorded head's result as its extent, type,
+/// frames, geometry, the count of voxels that are not 0 and the FNV-1a of its voxels' bytes.
+fn flr_put(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
+    let Some(m) = m else {
+        o.s("NULL");
+        return;
+    };
+    let v = &m.vg;
+    for x in [v.width, v.height, v.depth, m.mtype, m.nframes] {
+        o.i(i64::from(x));
+    }
+    for x in [
+        v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s, v.z_r, v.z_a, v.z_s,
+        v.c_r, v.c_a, v.c_s,
+    ] {
+        o.f(x);
+    }
+    let mut nz = 0i64;
+    for f in 0..m.nframes {
+        for s in 0..v.depth {
+            for r in 0..v.height {
+                for c in 0..v.width {
+                    let x = mri_get_vox_val(g, err, m, c, r, s, f, 0).unwrap_or(0.0);
+                    nz += i64::from(x != 0.0);
+                }
+            }
+        }
+    }
+    o.i(nz);
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in m.chunk.as_deref().unwrap_or(&[]) {
+        h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    o.s(&format!("{h:016x}"));
+}
+
+/// `flr fil <surface> <volume>`, `flr rib <inner> <outer> <volume>`, `flr bbf <surface>
+/// <resolution>`: the recorded heads' calls (`real.py`), as `fssurfio.cpp`'s.
+pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    cx.g.progname = "fssurfio".into();
+    let env = Environment::from_pairs(vec![("SURFER_SIDEDOOR".to_owned(), "1".to_owned())]);
+    let (mut so, mut se) = (cx.a.clone(), cx.b.clone());
+    let mut io = coords::Io {
+        out: &mut so,
+        err: &mut se,
+        env: &env,
+    };
+    let g = &mut cx.g;
+    let sg = &mut cx.sg;
+    let op = t.next();
+    o.s(op);
+    let surf = |g: &mut Globals, sg: &mut SurfGlobals, io: &mut coords::Io, p: &str| {
+        readwrite::read(g, sg, io, None, p, true).map(|s| s.expect("the surface"))
+    };
+    let vol = |g: &mut Globals, io: &mut coords::Io, p: &str| {
+        larmorx_freesurfer_io::mriio::mri_read(
+            g,
+            io.out,
+            io.err,
+            io.env,
+            None,
+            p,
+            larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN,
+            true,
+            -1,
+            -1,
+        )
+        .map(|v| v.expect("the volume"))
+    };
+    match op {
+        "fil" => {
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let v = vol(g, &mut io, t.next())?;
+            let mut d =
+                larmorx_freesurfer_mri::copy::mri_copy(g, io.out, io.err, &v, None)?.unwrap_new();
+            larmorx_freesurfer_mri::mri::mri_copy_header(g, io.out, io.err, &v, Some(&mut d))?;
+            mriflood::mris_fill_interior(g, sg, &mut io, &mut s, 0.0, Some(&mut d))?;
+            flr_put(g, io.err, Some(&d), o);
+        }
+        "rib" => {
+            let inner = surf(g, sg, &mut io, t.next())?;
+            let outer = surf(g, sg, &mut io, t.next())?;
+            let v = vol(g, &mut io, t.next())?;
+            let r = mriflood::mris_ribbon(g, sg, &mut io, &inner, &outer, &v, None)?;
+            flr_put(g, io.err, r.into_new().as_ref(), o);
+        }
+        "bbf" => {
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let res = t.d();
+            let mut b = mriflood::mris_make_bounding_volume(g, &mut io, &s, res)?;
+            mriflood::mris_fill_interior(g, sg, &mut io, &mut s, res, Some(&mut b))?;
+            flr_put(g, io.err, Some(&b), o);
+        }
+        _ => panic!("flr op {op}"),
+    }
+    Ok(())
+}

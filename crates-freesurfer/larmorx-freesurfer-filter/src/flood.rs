@@ -15,7 +15,7 @@ use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{add, mul, sqrt};
 use larmorx_freesurfer_mri::copy::mri_copy;
-use larmorx_freesurfer_mri::mri::{Mri, mri_alloc, mri_copy_header};
+use larmorx_freesurfer_mri::mri::{MRI_UCHAR, Mri, mri_alloc, mri_copy_header};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_volume::arith::Pair;
 
@@ -71,78 +71,95 @@ pub fn mris_flood_outside(
     ] {
         mri_set_vox_val(g, err, d, i, j, k, 0, FILL_VAL as f32, 0)?;
     }
-    // every voxel's (int) value; a voxel set to 1 reads back as 1 in every type
-    let (wu, hu) = (w.max(0) as usize, h.max(0) as usize);
-    let n = wu * hu * dep.max(0) as usize;
-    let mut v = vec![0i32; n];
-    let idx = |i: i32, j: i32, k: i32| (k as usize * hu + j as usize) * wu + i as usize;
-    for k in 0..dep {
-        for j in 0..h {
-            for i in 0..w {
-                let f = mri_get_vox_val(g, err, d, i, j, k, 0, 0)?;
-                v[idx(i, j, k)] = float_to_int(g, f64::from(f), "MRISfloodoutside");
+    // every voxel's state from its (int) value: 0 floodable, 1 filled, 2 a wall (a voxel set to 1
+    // reads back as 1 in every type)
+    let (wu, hu, du) = (w.max(0) as usize, h.max(0) as usize, dep.max(0) as usize);
+    let n = wu * hu * du;
+    // a byte volume with its voxels in one dense block is read and written directly (its value
+    // is its (int) value; MRIsetVoxVal of 1 stores the byte 1)
+    let bytes = d.mtype == MRI_UCHAR
+        && d.vox_per_row as usize == wu
+        && d.vox_per_slice as usize == wu * hu
+        && d.chunk.as_ref().is_some_and(|c| c.len() >= n);
+    let mut st = vec![2u8; n];
+    if bytes {
+        let c = d.chunk.as_ref().expect("the voxels");
+        for (s, &b) in st.iter_mut().zip(&c[..n]) {
+            *s = match b {
+                0 => 0,
+                1 => 1,
+                _ => 2,
+            };
+        }
+    } else {
+        let mut at = 0;
+        for k in 0..dep {
+            for j in 0..h {
+                for i in 0..w {
+                    let f = mri_get_vox_val(g, err, d, i, j, k, 0, 0)?;
+                    st[at] = match float_to_int(g, f64::from(f), "MRISfloodoutside") {
+                        0 => 0,
+                        FILL_VAL => 1,
+                        _ => 2,
+                    };
+                    at += 1;
+                }
             }
         }
     }
-    let up = |a: i32, len: i32| -> Vec<i32> {
-        if a > 0 {
-            (0..len).collect()
-        } else {
-            (0..len).rev().collect()
+    // FreeSurfer's sweeps (eight passes, one from each corner, until one fills nothing) end with
+    // every floodable voxel 6-connected through floodable voxels to a filled one filled, and no
+    // other: the closure is unique, so a breadth-first fill from each filled voxel in turn gives
+    // the same voxels (bit for bit; relay 32 of track D, the speed work)
+    let plane = wu * hu;
+    let mut queue = std::collections::VecDeque::new();
+    for seed in 0..n {
+        if st[seed] != 1 {
+            continue;
         }
-    };
-    let mut newfilled = 1;
-    while newfilled > 0 {
-        newfilled = 0;
-        // the corners in FreeSurfer's order: (dir i, dir j, dir k), +1 sweeping up from 0
-        for (di, dj, dk) in [
-            (1, 1, 1),
-            (-1, 1, 1),
-            (1, -1, 1),
-            (1, 1, -1),
-            (-1, -1, 1),
-            (-1, 1, -1),
-            (1, -1, -1),
-            (-1, -1, -1),
-        ] {
-            let (is, js, ks) = (up(di, w), up(dj, h), up(dk, dep));
-            for &i in &is {
-                for &j in &js {
-                    for &k in &ks {
-                        if v[idx(i, j, k)] != 0 {
-                            continue;
-                        }
-                        // the neighbour towards the sweep's corner, or the voxel at the edge
-                        let ni = if di > 0 {
-                            if i == 0 { i } else { i - 1 }
-                        } else if i == w - 1 {
-                            i
-                        } else {
-                            i + 1
-                        };
-                        let nj = if dj > 0 {
-                            if j == 0 { j } else { j - 1 }
-                        } else if j == h - 1 {
-                            j
-                        } else {
-                            j + 1
-                        };
-                        let nk = if dk > 0 {
-                            if k == 0 { k } else { k - 1 }
-                        } else if k == dep - 1 {
-                            k
-                        } else {
-                            k + 1
-                        };
-                        if v[idx(ni, j, k)] == FILL_VAL
-                            || v[idx(i, nj, k)] == FILL_VAL
-                            || v[idx(i, j, nk)] == FILL_VAL
-                        {
-                            mri_set_vox_val(g, err, d, i, j, k, 0, FILL_VAL as f32, 0)?;
-                            v[idx(i, j, k)] = FILL_VAL;
-                            newfilled += 1;
-                        }
+        queue.push_back(seed);
+        while let Some(p) = queue.pop_front() {
+            let (i, j, k) = (p % wu, (p / wu) % hu, p / plane);
+            let mut nb = [usize::MAX; 6];
+            if i > 0 {
+                nb[0] = p - 1;
+            }
+            if i + 1 < wu {
+                nb[1] = p + 1;
+            }
+            if j > 0 {
+                nb[2] = p - wu;
+            }
+            if j + 1 < hu {
+                nb[3] = p + wu;
+            }
+            if k > 0 {
+                nb[4] = p - plane;
+            }
+            if k + 1 < du {
+                nb[5] = p + plane;
+            }
+            for q in nb {
+                if q != usize::MAX && st[q] == 0 {
+                    st[q] = 1;
+                    if bytes {
+                        d.chunk.as_mut().expect("the voxels")[q] = FILL_VAL as u8;
+                        queue.push_back(q);
+                        continue;
                     }
+                    let (qi, qj, qk) = (q % wu, (q / wu) % hu, q / plane);
+                    mri_set_vox_val(
+                        g,
+                        err,
+                        d,
+                        qi as i32,
+                        qj as i32,
+                        qk as i32,
+                        0,
+                        FILL_VAL as f32,
+                        0,
+                    )?;
+                    queue.push_back(q);
                 }
             }
         }

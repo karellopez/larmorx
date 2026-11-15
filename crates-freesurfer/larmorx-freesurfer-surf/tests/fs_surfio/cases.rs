@@ -2715,6 +2715,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "mpf" => mpf::mpf_case(cx, t, o)?,
         "mpg" => mpg::mpg_case(cx, t, o)?,
         "fli" => fli::fli_case(cx, t, o)?,
+        // relay 32 of track D: the recorded heads (real.py); never generated
+        "flr" => fli::flr_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {

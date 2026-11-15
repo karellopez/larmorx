@@ -828,3 +828,151 @@ pub fn run(seed: u64, count: u64, work: &Path, up: &MincLib, fs: &MincLib, t: &m
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+/// The cases larmorx-io's `seeded_volumes_written` test exported (`LARMORX_MINC_EXPORT_WRITE`)
+/// run with MINC 1.5.1, hashed as the test hashes the port's runs; with the port's own hash of
+/// the same runs, and whether every case is the same.
+pub fn write_cases(dir: &Path, up: &MincLib, work: &Path) {
+    use sha2::{Digest, Sha256};
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n.ends_with(".case"))
+        .collect();
+    names.sort();
+    let out = work.join("write-cases");
+    let _ = std::fs::remove_dir_all(&out);
+    std::fs::create_dir_all(&out).unwrap();
+    let prefix = out.to_string_lossy().into_owned();
+    let mut h = Sha256::new();
+    let mut hp = Sha256::new();
+    let mut same = 0;
+    for n in &names {
+        let text = std::fs::read_to_string(dir.join(n)).unwrap();
+        let stem = n.trim_end_matches(".case");
+        let fname = format!("{prefix}/{stem}.mnc").into_bytes();
+        let case = parse_case(&text, fname);
+        let fh = |f: &Option<Vec<u8>>| -> String {
+            match f {
+                Some(b) => Sha256::digest(b)
+                    .iter()
+                    .map(|x| format!("{x:02x}"))
+                    .collect(),
+                None => "none".to_string(),
+            }
+        };
+        let _ = std::fs::remove_file(out.join(format!("{stem}.mnc")));
+        let (_oc, o) = original(&case, up);
+        let err = String::from_utf8_lossy(&o.stderr).replace(&prefix, "DIR");
+        h.update(format!("{stem} {:?}\n{}{err}\n{}\n", o.exit, o.dump, fh(&o.file)).as_bytes());
+        let _ = std::fs::remove_file(out.join(format!("{stem}.mnc")));
+        let p = port(&case, UpstreamDefects::Reproduce, &minc::Mni);
+        let perr = String::from_utf8_lossy(&p.stderr).replace(&prefix, "DIR");
+        hp.update(format!("{stem} {:?}\n{}{perr}\n{}\n", p.exit, p.dump, fh(&p.file)).as_bytes());
+        if p.dump == o.dump && p.exit == o.exit && p.stderr == o.stderr && p.file == o.file {
+            same += 1;
+        } else {
+            println!("  differs: {stem}");
+        }
+    }
+    let hex = |d: &[u8]| d.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    println!(
+        "write-cases: {} cases, port identical on {same}; MINC 1.5.1's sha256 {}; the port's {}",
+        names.len(),
+        hex(&h.finalize()),
+        hex(&hp.finalize())
+    );
+}
+
+/// A case description of larmorx-io's `seeded_volumes_written` (`WriteCase::text`).
+fn parse_case(text: &str, fname: Vec<u8>) -> Case {
+    let f = |s: &str| f64::from_bits(u64::from_str_radix(s, 16).unwrap());
+    let mut c = Case {
+        n_dims: 3,
+        names: None,
+        nc_type: 0,
+        signed: false,
+        vmin: 0.0,
+        vmax: 0.0,
+        real: None,
+        sizes: [1; 5],
+        alloc: true,
+        sep: [1.0; 5],
+        cos_unit: false,
+        cos: Vec::new(),
+        translation: None,
+        values: Vec::new(),
+        fname,
+        out_type: 0,
+        out_signed: false,
+        out_min: 0.0,
+        out_max: 0.0,
+        history: None,
+        space: None,
+        fs_shaped: false,
+    };
+    let mut tv = [0.0; 5];
+    let mut tw = [0.0; 3];
+    for line in text.lines() {
+        let w: Vec<&str> = line.split(' ').collect();
+        match w[0] {
+            "n_dims" => c.n_dims = w[1].parse().unwrap(),
+            "type" => {
+                c.nc_type = w[1].parse().unwrap();
+                c.signed = w[2] == "1";
+            }
+            "range" => {
+                c.vmin = f(w[1]);
+                c.vmax = f(w[2]);
+            }
+            "sizes" => {
+                for i in 0..5 {
+                    c.sizes[i] = w[1 + i].parse().unwrap();
+                }
+            }
+            "sep" => {
+                for i in 0..5 {
+                    c.sep[i] = f(w[1 + i]);
+                }
+            }
+            "cos" => c
+                .cos
+                .push((w[1].parse().unwrap(), [f(w[2]), f(w[3]), f(w[4])])),
+            "tvoxel" => {
+                for i in 0..5 {
+                    tv[i] = f(w[1 + i]);
+                }
+            }
+            "tworld" => {
+                for i in 0..3 {
+                    tw[i] = f(w[1 + i]);
+                }
+            }
+            "values" => c.values = w[1..].iter().map(|x| f(x)).collect(),
+            "out" => {
+                c.out_type = w[1].parse().unwrap();
+                c.out_signed = w[2] == "1";
+                c.out_min = f(w[3]);
+                c.out_max = f(w[4]);
+            }
+            "history" => {
+                let hx = w.get(1).copied().unwrap_or("");
+                c.history = Some(
+                    (0..hx.len() / 2)
+                        .map(|i| u8::from_str_radix(&hx[2 * i..2 * i + 2], 16).unwrap())
+                        .collect(),
+                );
+            }
+            _ => {}
+        }
+    }
+    let all: [&[u8]; 4] = [b"xspace", b"yspace", b"zspace", b"time"];
+    c.names = Some(
+        all[..c.n_dims as usize]
+            .iter()
+            .map(|n| Some(n.to_vec()))
+            .collect(),
+    );
+    c.translation = Some((tv, tw));
+    c
+}

@@ -75,6 +75,10 @@ fn main() {
         let up = ffi::MincLib::open(&format!("{dir}/libminc_up.so"));
         let fs = ffi::MincLib::open(&format!("{dir}/libminc_fs.so"));
         let _ = minc::FS_INVERT.set(ffi::invert_fn(&format!("{dir}/libminc_fs.so")));
+        if let Some(i) = args.iter().position(|a| a == "--write-cases") {
+            minc_write::write_cases(std::path::Path::new(&args[i + 1]), &up, &work);
+            return;
+        }
         let mut t = minc_write::Tally::default();
         minc_write::run(seed, count, &work, &up, &fs, &mut t);
         println!(

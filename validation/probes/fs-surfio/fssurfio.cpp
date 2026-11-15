@@ -4556,6 +4556,7 @@ void pvw_case()
 // (read by MRISread), the input files, then 1 to 4 of MRISreadVertexPositions (`V`),
 // MRISreadWhiteCoordinates (`W`), MRISreadPialCoordinates (`P`), MRISreadCanonicalCoordinates
 // (`C`), MRISreadOriginalProperties (`O`), each with a name or none (NULL; `V` and `C` take ""),
+// (before the inputs: 1 and d/lh.white.avg.area.mgh's bytes, or 0),
 // each status; then every vertex's coordinate sets, theta, phi, area, origarea, normal, and the
 // surface's status, total_area, orig_area, radius and counts
 void vps_case()
@@ -4577,6 +4578,13 @@ void vps_case()
     std::string bytes = geth();
     FILE *fp = fopen("d/lh.white", "wb");
     if (!fp) fail("the surface");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  if (geti()) {
+    std::string bytes = geth();
+    FILE *fp = fopen("d/lh.white.avg.area.mgh", "wb");
+    if (!fp) fail("the average area");
     fwrite(bytes.data(), 1, bytes.size(), fp);
     fclose(fp);
   }
@@ -4617,6 +4625,8 @@ void vps_case()
       of(x);
   }
   oi(m->status); of(m->total_area); of(m->orig_area); od(m->radius); oi(m->nvertices); oi(m->nfaces);
+  oi(m->group_avg_vtxarea_loaded);
+  for (int vno = 0; vno < m->nvertices; vno++) of(m->vertices[vno].group_avg_area);
 }
 
 // ---- relay 36 of track D: ann, the annotation files (queue items 3.1-47/48) -------------------

@@ -8,6 +8,7 @@
 //! and `MRISreadOriginalProperties`, on a surface read (`MRISread`) from a triangle file of the
 //! mesh in a work folder `d`; each status, then the surface's coordinate sets and properties.
 
+use super::crv::mgh_curv;
 use super::sfile::utf8;
 use super::srd::{Mesh, be4, mesh, write};
 use super::*;
@@ -98,6 +99,14 @@ pub(super) fn vps_tokens(t: &mut Vec<String>, g: &mut Gen) {
     } else {
         hx(t, &triangle(&m, envs & 4 != 0));
     }
+    // now and then a group-average area beside the surface (MRISread reads it into
+    // group_avg_area): one value per vertex mostly, now and then another extent or frames
+    if g.chance(6) {
+        ix(t, 1);
+        hx(t, &mgh_curv(g, m.v.len() as i64, false));
+    } else {
+        ix(t, 0);
+    }
     let nin = g.int(1, 4);
     ix(t, nin);
     let mut known: Vec<String> = Vec::new();
@@ -167,6 +176,9 @@ pub(super) fn vps_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     pairs.push(("USER".into(), "U".into()));
     let env = Environment::from_pairs(pairs);
     std::fs::write(dir.join("d/lh.white"), t.h()).expect("the surface");
+    if t.i() != 0 {
+        std::fs::write(dir.join("d/lh.white.avg.area.mgh"), t.h()).expect("the average area");
+    }
     let nin = t.i();
     for _ in 0..nin {
         let (n, b) = (utf8(t.h()), t.h());
@@ -225,5 +237,9 @@ pub(super) fn vps_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     o.d(m.radius);
     o.i(i64::from(m.nvertices));
     o.i(i64::from(m.nfaces));
+    o.i(i64::from(m.group_avg_vtxarea_loaded));
+    for vno in 0..m.nvertices.max(0) as usize {
+        o.f(m.vertex(vno).group_avg_area);
+    }
     Ok(())
 }

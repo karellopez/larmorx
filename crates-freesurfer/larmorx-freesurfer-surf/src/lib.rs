@@ -121,6 +121,7 @@ pub mod sfile;
 pub mod sras;
 pub mod stl;
 pub mod surfbase;
+pub mod surfmri;
 pub mod surfread;
 pub mod topology;
 pub mod trifile;

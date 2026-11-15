@@ -116,11 +116,11 @@ fn volume(g: &mut Gen, t: &mut Vec<String>) -> (i64, bool) {
         22 => 7,  // complex
         _ => 6,   // tensor
     };
-    let pick_extent = |g: &mut Gen, hi: i64| if g.chance(30) { 0 } else { g.int(1, hi) };
+    let pick_extent = |g: &mut Gen, hi: i64| if g.chance(60) { 0 } else { g.int(1, hi) };
     let (w, h, d) = (pick_extent(g, 5), pick_extent(g, 4), pick_extent(g, 3));
-    let nf = match g.below(14) {
+    let nf = match g.below(28) {
         0 => 0,
-        1..=3 => g.int(2, 3),
+        1..=6 => g.int(2, 3),
         _ => 1,
     };
     let alloc = !g.chance(14);

@@ -1,4 +1,4 @@
-# MINC 1.5.1's volume input over netCDF 3.6.0-p1
+# MINC 1.5.1's volume input and output over netCDF 3.6.0-p1
 
 **Source-derived from MINC 1.5.1** (volume_io and libsrc; MNI's permissive notice,
 `LICENSES/LicenseRef-MNI.txt`) **and netCDF 3.6.0-p1** (UCAR/Unidata's notice, `LICENSES/NetCDF.txt`):
@@ -120,3 +120,86 @@ its dumps on Linux, under AArch64's NaN rules (emulated) in debug and release, a
   asks for fewer dimensions than the file has: an error says so.
 - With the cache, a short file's values past its end follow the order in which the caller reads voxels
   (the cache loads blocks on demand); the port reads slabs.
+
+## Writing a volume (track C relay 28, 2026-11-15)
+
+volume_io's `output_volume` (`output_volume.c`, `output_mnc.c`) over MINC's library (`micreate`, the standard
+variables, the attribute puts, `mivarput`, `miicv_put`) and netCDF 3.6.0-p1's classic writer (`nc_create`, the
+definitions, `nc_enddef` with `NC_begins`, the header writer and the fill, `nc_put_vara`, `nc_close`), as
+FreeSurfer 8.2.0's `mincWrite` calls it: `create_volume` with the names `xspace, yspace, zspace[, time]`, its
+sizes, `alloc_volume_data`, separations, `set_volume_direction_cosine` of each axis, `set_volume_translation`
+(the centre voxel at `c_ras`), every voxel set, then `output_volume(name, type, sign, min, max, volume, "",
+NULL)`. Ported in `larmorx_io::minc` (`output.rs`, `mwrite.rs`, `ncwrite.rs`, `Volume`'s setters).
+
+What decides the file's bytes, kept by the port:
+
+- **The layout.** The root variable first (`rootvariable`, an int with `varid`, `vartype` `group________`,
+  `version` `MINC Version    1.0`, `parent` ""), the dimensions in the volume's order, a variable per spatial
+  dimension (`step`, `start`, `direction_cosines` only when it is not the axis's own, `units` `mm`,
+  `spacetype` unless unknown; `comments`, `spacing` `regular__`, `alignment` `centre`), `image-min` and
+  `image-max` (scalar doubles with `_FillValue` 0 and 1 when a global real range exists, which
+  `output_volume` always sets from the volume's real range unless it is not a number or empty; else one value
+  per slice over the image's slower dimensions), the global `history` (the caller's string appended: "" gives
+  a one-byte NUL attribute), and the image last (`complete` `false` then `true_`, `signtype`, `valid_range`:
+  floats for a float image, doubles otherwise, left out when the range is empty). The image's `image-max` /
+  `image-min` pointers (`--->image-max`), the root's `children` (`image`) and the parents.
+- **netCDF's header and offsets.** Variables begin right after the header (`nc_enddef`'s alignment 1), each
+  `len` a multiple of 4 for bytes and shorts; every non-record variable is filled with its fill value
+  (`_FillValue`, else netCDF's: `0x81`, `0x8001`, `0x80000001`, `0x7cf00000`, `0x479e000000000000`) before the
+  data are written, the padding included; the `complete` attribute rewritten at the close (same size) makes the
+  header written twice. The file is written through posixio's two-block buffer call by call: a program that ends
+  without closing (an exit inside the library) leaves on disk what the buffer had paged out (the empty
+  32-byte file `nc_create` made, after a failure at the end of the definitions).
+- **The conversion.** The image goes through an image conversion variable of the volume's type with
+  normalisation on: the volume's voxel range onto the file's valid range for the image's real range (for
+  mincWrite's equal types and ranges, the identity; out-of-range integers are clamped to the type and
+  rounded as MINC's `MI_FROM_DOUBLE` does; floats pass unchanged, NaNs too). The volume's voxels are stored
+  as C's casts store a double on x86-64 (`set_volume_voxel_value`: an integer type through a 32-bit truncation,
+  unsigned int through a 64-bit one).
+- **The NaNs.** A NaN in the geometry (a separation, a direction cosine, the world position) reaches the
+  file's `start` attributes; their bits follow volume_io's x86-64 object code (GCC 8.4.0 at `-O3`):
+  `set_volume_direction_cosine` sums `(x x + y y) + z z` and divides each component by the root;
+  `set_volume_translation` subtracts `separation * cosine * voxel` per axis, the second axis's z component as
+  `cosine * separation` (GCC swapped that product); `transform_point` adds each row from the left, the last
+  column after the three products. The port follows that order with SSE's NaN rules on every platform
+  (`larmorx_core::ItkReal`'s `sse_*`).
+- **Messages.** As MINC 1.5.1 prints them with `ncopts` `NC_VERBOSE` during the definitions and
+  `NC_VERBOSE | NC_FATAL` after: a file that cannot be created gives `nccreate: filename "...": <errno text>`,
+  `micreate: MINC package entry point`, `Error: opening MINC file "...".` and `output_volume` returns an error;
+  a failure inside the library after the definitions ends the program with status 3. A zero-length direction
+  cosine is refused with a warning (the axis keeps its default).
+
+| ID | what (class) | larmorx by default | `reproduce` |
+|---|---|---|---|
+| FS-797 | FreeSurfer's copy cannot write a volume with a time dimension (more than one frame): `convert_spatial_axis_to_dim_name, bad axis`, exit status 1, before the file is created (c; `docs/findings/freesurfer-permissive.md`) | written as MINC 1.5.1 writes it (rule A) | the message and the exit (FreeSurfer's dialect, track A) |
+| FS-798 | a volume with a dimension of size 0: its pointers are set up into an allocation of no bytes; allocating it (MINC 1.5.1) or writing it (FreeSurfer's copy) crashes or reads memory (a) | no voxels; the file written with the dimension of size 0 (netCDF's record dimension: a later image dimension of size 0 is refused, `NC_UNLIMITED in the wrong index`) | (the same) |
+| FS-799 | a volume whose voxels were never allocated, written: volume_io follows the array's pointer table (two or more dimensions) or reads the values from a null or unset pointer (a crash) unless the conversion fails first (a) | not written: `output_volume` returns an error after the definitions | (the same) |
+| FS-800 | a volume without spatial axes whose geometry was changed: `compute_world_transform` returns without a transform and the volume takes one from memory never written (the output then says `Cannot output null or non-linear transforms.  Using identity.` and `delete_volume` reports `Internal error:  delete_general_transform`) (a) | the earlier transform (the identity) kept | (the same) |
+| FS-801 | a volume created without a type (`MI_ORIGINAL_TYPE`): its voxel range and sign were never written, so the file's type, valid range and conversion come from memory contents (a) | 0, 0, unsigned (no data type: nothing is allocated) | (the same) |
+
+(A type `set_volume_type` has no case for, a char volume, is FS-781 on the writing path too.)
+
+### The numbers (2026-11-15)
+
+`validation/probes/fs-nrrd-minc --only write` (its README): every case set up and written by MINC 1.5.1 and by
+FreeSurfer 8.2.0's copy in a forked child and by the port (`reproduce`), the file's bytes, the step dumps,
+standard output, standard error and the exit compared. 60 % of the cases have mincWrite's shape (compared with
+both originals, FreeSurfer's as measured), the rest any call (MINC 1.5.1 only): every type and sign, ranges
+empty, reversed and not a number, steps zero, negative, infinite and not a number, cosines zero, oblique, NaN
+and huge, sizes up to 300,000 voxels (slabs of more than one dimension), dimension orders and names, file names
+missing, a directory, under a file, empty, with blanks, `$VAR`, over an older file. Final code: seeds 2 to 9,
+2,000 cases each but seed 2 (300): see the probe's README for each seed's count; 0 different, the cases a defect
+of undefined behaviour makes incomparable (FS-781, FS-789, FS-798 to FS-801) counted apart. The unit test
+`seeded_volumes_written` (80 cases) gives MINC 1.5.1's own hash.
+
+### Not ported (gaps, each reported)
+
+- `output_modified_volume` with an original file (copying its auxiliary variables and attributes):
+  `output_volume` writes without one; FreeSurfer never passes one.
+- The progress report volume_io prints when a write has taken more than 5 seconds (a measure of time).
+- The volume cache's output file (a cached volume is allocated whole: the same file).
+- `NC_SHARE`'s unbuffered I/O (MINC never asks for it).
+- The NaN bits of volume_io's Gaussian elimination (`compute_transform_inverse`) when a matrix with NaN
+  entries meets a NaN made by its arithmetic: GCC's vectorised loops pass on either operand's NaN by the
+  element's place; FreeSurfer's copy uses its own inverse (track A's port, exact). Not met in the runs.
+

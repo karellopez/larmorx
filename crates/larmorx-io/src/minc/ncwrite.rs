@@ -6,7 +6,7 @@
 //! hyperslab writes in each variable's own type (`putget.c`, `ncx.c`), the close (`NC_sync`,
 //! `nc_abort`) and the version 2 entry points with their messages (`v2i.c`).
 //!
-//! The file is written through posixio's two-block buffer call by call ([`super::netcdf::Px`]),
+//! The file is written through posixio's two-block buffer call by call (`netcdf`'s `Px`),
 //! so the bytes on disk are posixio's at every step, an interrupted write included (a program that
 //! ends without closing leaves what the buffer had paged out). `NC_SHARE`'s unbuffered I/O is not
 //! ported (MINC never asks for it): a file created with it is buffered as without it.

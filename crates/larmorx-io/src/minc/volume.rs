@@ -720,11 +720,12 @@ impl Volume {
         }
     }
 
-    /// `alloc_volume_data` as a program calls it before writing a volume: [`Volume::alloc`], a
-    /// dimension of size 0 allocated as no voxels (volume_io sets up its pointers into an
-    /// allocation of no bytes: allocating or writing such a volume crashes or reads memory,
-    /// FS-798). volume_io keeps a volume of more than its cache threshold in its volume cache;
-    /// written, a cached volume gives the same file, so it is allocated whole here.
+    /// `alloc_volume_data` as a program calls it before writing a volume (with volume_io's message
+    /// for a volume without a data type, `false`): a dimension of size 0 allocated as no voxels
+    /// (volume_io sets up its pointers into an allocation of no bytes: allocating or writing such a
+    /// volume crashes or reads memory, FS-798). volume_io keeps a volume of more than its cache
+    /// threshold in its volume cache; written, a cached volume gives the same file, so it is
+    /// allocated whole here.
     pub fn alloc_volume_data(&mut self, c: &mut super::Ctx) -> bool {
         if self.data_type != DataType::None && self.sizes.contains(&0) {
             c.notices.add(

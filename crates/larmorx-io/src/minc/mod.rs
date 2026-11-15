@@ -1,38 +1,47 @@
 // SPDX-License-Identifier: Apache-2.0 AND LicenseRef-MNI AND NetCDF
-//! MINC 1 volumes read as MINC 1.5.1's volume_io reads them (`start_volume_input`,
-//! `input_more_of_volume`, `get_volume_voxel_value`): a port of volume_io's input path
-//! (`Volumes/input_volume.c`, `input_mnc.c`, `volumes.c`), the MINC library it reads through
+//! MINC 1 volumes read and written as MINC 1.5.1's volume_io reads and writes them: a port of
+//! volume_io's input path (`start_volume_input`, `input_more_of_volume`, `get_volume_voxel_value`;
+//! `Volumes/input_volume.c`, `input_mnc.c`, `volumes.c`) and output path (`output_volume`,
+//! `Volumes/output_volume.c`, `output_mnc.c`), the MINC library under them
 //! (`libsrc/netcdf_convenience.c`, `minc_convenience.c`, `image_conversion.c`, `dim_conversion.c`,
 //! `value_conversion.c`, `minc_error.c`; MNI's notice, `LICENSES/LicenseRef-MNI.txt`) and netCDF
-//! 3.6.0-p1's classic-format reader under it ([`netcdf`]; UCAR/Unidata's notice,
+//! 3.6.0-p1's classic-format reader and writer ([`netcdf`], [`ncwrite`]; UCAR/Unidata's notice,
 //! `LICENSES/NetCDF.txt`). The files are listed in `PROVENANCE.md`.
 //!
 //! A MINC 1 file is a netCDF file: an `image` variable over named dimensions (`xspace`, `yspace`,
 //! `zspace`, `time`, `vector_dimension`, ...), the dimensions' variables holding `step`, `start`,
 //! `direction_cosines` and `spacetype`, and `image-max` / `image-min` variables giving each slice's
-//! real range. volume_io reads the image through an image conversion variable ([`icv`]): every
-//! slice's values mapped onto one real range for the whole volume, stored in the volume's type.
-//! MINC 2 files (HDF5) are not netCDF files and fail as such, as they do in MINC 1.5.1.
+//! real range. volume_io reads and writes the image through an image conversion variable ([`icv`]):
+//! every slice's values mapped between its own real range and the volume's, stored in the volume's
+//! type. MINC 2 files (HDF5) are not netCDF files and fail as such, as they do in MINC 1.5.1.
 //!
 //! - [`Session`]: the process state the C code keeps in globals (netCDF's `ncopts` and `ncerr`,
 //!   the open files and their descriptors, MINC's routine name and call depth, the conversion
-//!   variables). One session per program gives the original's messages; a fresh one per read is
-//!   equivalent for the reading path (every read sets `ncopts` itself).
+//!   variables). One session per program gives the original's messages; a fresh one per read or
+//!   write is equivalent (every read and write sets `ncopts` itself).
 //! - [`start_volume_input`], [`input_more_of_volume`], [`delete_volume_input`]: the volume input;
 //!   [`Volume`] and its functions ([`volume`]).
+//! - [`Volume::create_volume`], [`Volume::alloc_volume_data`], [`Volume::set_separations`],
+//!   [`Volume::set_direction_cosine`], [`Volume::set_translation`], [`Volume::set_voxel_value`],
+//!   [`output_volume`]: the volume output ([`output`], over [`mwrite`] and [`ncwrite`]). The file is
+//!   written through posixio's buffer as netCDF writes it, so its bytes are MINC 1.5.1's; the NaNs
+//!   that reach it follow volume_io's x86-64 object code on every platform.
 //! - [`Dialect`]: the points where a program built on its own copy of MINC behaves differently
-//!   (its package errors, decompression, the types and spacings it supports); [`Mni`] is MINC
-//!   1.5.1's own behaviour. A replica of such a program supplies its own dialect, in its own crate.
+//!   (its package errors, decompression, the types and spacings it supports, its 4 x 4 inverse, the
+//!   volumes it can write); [`Mni`] is MINC 1.5.1's own behaviour. A replica of such a program
+//!   supplies its own dialect, in its own crate.
 //!
 //! Not ported yet: volume_io's free-format input (a `.fre` name: an error says so), the vector to
 //! colour conversion and the dimension conversion of a vector dimension (only reached with a
-//! dimension count below the file's). volume_io's volume cache (a volume larger than
-//! `VOLUME_CACHE_THRESHOLD` bytes, 80,000,000 by default) is read as the cache reads it: through a
-//! second opening of the file on the volume its first opening set up ([`Dialect::cache_threshold`];
-//! a float volume's voxel range is then its real range, which changes how out-of-range voxels are
-//! read), into the whole array.
+//! dimension count below the file's), `output_modified_volume` with an original file (its auxiliary
+//! data copied), the progress report of a long write (a measure of time). volume_io's volume cache
+//! (a volume larger than `VOLUME_CACHE_THRESHOLD` bytes, 80,000,000 by default) is read as the cache
+//! reads it: through a second opening of the file on the volume its first opening set up
+//! ([`Dialect::cache_threshold`]; a float volume's voxel range is then its real range, which changes
+//! how out-of-range voxels are read), into the whole array; written, a cached volume gives the same
+//! file as one in memory, so it is allocated whole.
 //!
-//! The defects (register entries FS-774 to FS-796; `docs/findings/minc-volumes.md`) are corrected by
+//! The defects (register entries FS-774 to FS-801; `docs/findings/minc-volumes.md`) are corrected by
 //! default and reproduced with [`larmorx_core::defects::UpstreamDefects::Reproduce`], each with a
 //! notice.
 
@@ -298,7 +307,7 @@ pub fn header_image_size(path: &[u8]) -> Option<u128> {
     Some(n)
 }
 
-/// The defect IDs of this module (`larmorx_core::defects::FS_774` to `FS_790`).
+/// The defect IDs of this module (`larmorx_core::defects::FS_774` to `FS_801`).
 pub mod defects {
     /// `miexpand_file` decompresses through the shell with the name unquoted.
     pub const SHELL_DECOMPRESSION: &str = "FS-774";
@@ -346,4 +355,14 @@ pub mod defects {
     pub const SHORT_COSINES: &str = "FS-791";
     /// ... and for the first dimension read, memory never written.
     pub const SHORT_COSINES_UNSET: &str = "FS-792";
+    /// FreeSurfer's copy cannot write a volume with a time dimension.
+    pub const NO_TIME_OUTPUT: &str = "FS-797";
+    /// A volume with a dimension of size 0 allocated or written.
+    pub const EMPTY_ALLOCATION: &str = "FS-798";
+    /// A volume whose voxels were never allocated, written.
+    pub const UNALLOCATED_OUTPUT: &str = "FS-799";
+    /// A volume without spatial axes: its voxel-to-world transform from memory never written.
+    pub const NO_AXES_TRANSFORM: &str = "FS-800";
+    /// A volume created without a type: its voxel range and sign never written.
+    pub const NO_TYPE: &str = "FS-801";
 }

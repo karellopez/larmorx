@@ -32,6 +32,7 @@
 
 pub(crate) mod files;
 mod gaussian;
+pub(crate) use gaussian::solve_linear_system;
 mod read;
 mod write;
 
@@ -299,9 +300,32 @@ pub fn homogenous_transform_point(t: &Transform, x: f64, y: f64, z: f64, w: f64)
     [xt, yt, zt]
 }
 
-/// `transform_point`: the point `(x, y, z, 1)`.
+/// `transform_point`: the point `(x, y, z, 1)`, with the NaNs of volume_io's x86-64 build on
+/// every platform (its object code's operand order: each row `t_i0 x + t_i1 y + t_i2 z + t_i3`
+/// from the left, `w = t_33 + (x t_30 + y t_31 + z t_32)`).
 pub fn transform_point(t: &Transform, x: f64, y: f64, z: f64) -> [f64; 3] {
-    homogenous_transform_point(t, x, y, z, 1.0)
+    use larmorx_core::ItkReal;
+    let row = |r: &[f64; 4]| {
+        r[0].sse_mul(x)
+            .sse_add(r[1].sse_mul(y))
+            .sse_add(r[2].sse_mul(z))
+            .sse_add(r[3])
+    };
+    let mut xt = row(&t[0]);
+    let mut yt = row(&t[1]);
+    let mut zt = row(&t[2]);
+    let w = &t[3];
+    let wt = w[3].sse_add(
+        x.sse_mul(w[0])
+            .sse_add(y.sse_mul(w[1]))
+            .sse_add(z.sse_mul(w[2])),
+    );
+    if wt != 0.0 && wt != 1.0 {
+        xt = xt.sse_div(wt);
+        yt = yt.sse_div(wt);
+        zt = zt.sse_div(wt);
+    }
+    [xt, yt, zt]
 }
 
 /// `compute_transform_inverse` (`inverse.c`): the inverse by [`invert_square_matrix`], or `None`

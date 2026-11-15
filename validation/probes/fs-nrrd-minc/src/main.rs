@@ -11,11 +11,12 @@
 //! (with `reproduce`) notes a defect of undefined behaviour is not compared; the originals'
 //! outcomes on those cases are counted.
 //!
-//! `fs-nrrd-minc <build-dir> [count] [seed] [--only nrrd|minc]`. Prints the counts and
+//! `fs-nrrd-minc <build-dir> [count] [seed] [--only nrrd|minc|write]`. Prints the counts and
 //! `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1).
 
 mod ffi;
 mod minc;
+mod minc_write;
 mod nrrd;
 
 /// splitmix64.
@@ -42,7 +43,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let dir = args
         .get(1)
-        .expect("usage: fs-nrrd-minc <build-dir> [count] [seed] [--only nrrd|minc]");
+        .expect("usage: fs-nrrd-minc <build-dir> [count] [seed] [--only nrrd|minc|write]");
     let count: u64 = args.get(2).and_then(|v| v.parse().ok()).unwrap_or(2000);
     let seed: u64 = args.get(3).and_then(|v| v.parse().ok()).unwrap_or(1);
     let only = args
@@ -70,9 +71,32 @@ fn main() {
         }
         fail |= t.differ > 0;
     }
+    if only.as_deref().is_none_or(|o| o == "write") {
+        let up = ffi::MincLib::open(&format!("{dir}/libminc_up.so"));
+        let fs = ffi::MincLib::open(&format!("{dir}/libminc_fs.so"));
+        let _ = minc::FS_INVERT.set(ffi::invert_fn(&format!("{dir}/libminc_fs.so")));
+        if let Some(i) = args.iter().position(|a| a == "--write-cases") {
+            minc_write::write_cases(std::path::Path::new(&args[i + 1]), &up, &work);
+            return;
+        }
+        let mut t = minc_write::Tally::default();
+        minc_write::run(seed, count, &work, &up, &fs, &mut t);
+        println!(
+            "minc-write: {} cases, {} comparisons identical ({} of them files written), {} differ, {} not compared (undefined in the original)",
+            t.cases, t.same, t.written, t.differ, t.skipped
+        );
+        for (k, v) in &t.outcomes {
+            println!("  original on undefined cases: {k}: {v}");
+        }
+        for (k, v) in &t.notices {
+            println!("  notices (fix): {k}: {v}");
+        }
+        fail |= t.differ > 0;
+    }
     if only.as_deref().is_none_or(|o| o == "minc") {
         let up = ffi::MincLib::open(&format!("{dir}/libminc_up.so"));
         let fs = ffi::MincLib::open(&format!("{dir}/libminc_fs.so"));
+        let _ = minc::FS_INVERT.set(ffi::invert_fn(&format!("{dir}/libminc_fs.so")));
         if let Some(i) = args.iter().position(|a| a == "--files") {
             minc::files(std::path::Path::new(&args[i + 1]), &up);
             return;

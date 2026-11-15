@@ -379,6 +379,36 @@ these files, checked against the build (relay 8, 2026-11-13; the call graph:
 - FS-774 to FS-796 are MINC's, netCDF's and these: none is on recon-all's or fMRIPrep's paths (they read
   no MINC volume), except where a user gives FreeSurfer a `.mnc` input.
 
+## MINC 1 volumes written (track C relay 28, 2026-11-15)
+
+- FreeSurfer's `mincWrite` (`utils/mriio.cpp`, `MRI_MINC_FILE`) sets up volume_io's volume (`create_volume` with
+  3 dimensions, or 4 when the MRI has more than one frame, named `xspace, yspace, zspace, time`; uchar to
+  `NC_BYTE` unsigned, short to `NC_SHORT`, int and long to `NC_LONG`, float to `NC_FLOAT`, all signed but uchar;
+  `MRIlimits`' min and max as the voxel range), its sizes, `alloc_volume_data`, the sizes as separations (the
+  frames' 1.0), each axis's direction cosine (`set_volume_direction_cosine`, after `setDirectionCosine(mri,
+  MRI_CORONAL)` when `ras_good_flag` is 0), `set_volume_translation` (the voxel `width/2, height/2, depth/2` at
+  `c_r, c_a, c_s`), every voxel (`set_volume_voxel_value` of the voxel as a double, frames slowest), then
+  `output_volume(name, type, sign, min, max, volume, "", NULL)`, and prints `ERROR: mincWrite: output_volume
+  exited with <status>` when that fails. These are the call sites; track A writes them (`larmorx-freesurfer-io`,
+  over `larmorx_io::minc`). Its casts of the MRI's values (a long through a double) are its own.
+- Its MINC (`packages/minc`, not read: measured by behaviour with `validation/probes/fs-nrrd-minc`'s write mode,
+  `libminc_fs.so`) writes the bytes MINC 1.5.1 writes on every case of mincWrite's shape, but:
+  - a fourth dimension (`time`) ends the program before the file is created: `convert_spatial_axis_to_dim_name,
+    bad axis` on standard error, exit status 1 (FS-797: FreeSurfer 8.2.0 writes no MINC file of more than one
+    frame; corrected: written as MINC 1.5.1 writes it);
+  - a direction cosine of length 0 ends the program after MINC's warning (`Warning: zero length direction cosine
+    in set_volume_direction_cosine()`, exit status 1; MINC 1.5.1 keeps the axis's default and goes on): a clear
+    error, kept as FreeSurfer's behaviour (no defect);
+  - its 4 x 4 inverse (`compute_transform_inverse`, its own; `invert_4x4_matrix failed, ...` on standard output
+    for a singular matrix) decides `set_volume_translation`'s starts and the voxel-to-world transform: the probe
+    calls the library's own function (`fm_invert`), track A's `FsVolumeIo` is its port;
+  - a dimension of size 0 is allocated without a crash, and the write then crashes (FS-798, in both libraries);
+  - other dimension lists (not mincWrite's: one or two dimensions, `time` first, another order) are not modelled
+    (it fails differently or writes the dimensions in another order); the probe compares them with MINC 1.5.1
+    only.
+- The probe's `FreeSurferDialect` (`src/minc.rs`) carries these facts for writing too (`output_dimension_names`,
+  `zero_direction_cosine`); track A's dialect for `mincWrite` takes them with `FsVolumeIo`.
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),

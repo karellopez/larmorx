@@ -200,13 +200,14 @@ static void child(const char *fname, int fd) {
   _exit(0);
 }
 
-/* The outcome: 0 the child returned (dump in *out), 1 it exited with *status, 2 it died of
- * signal *status, 3 it ran past timeout_ms (killed). *sout and *serr hold its standard output and
- * error. cache_threshold >= 0 sets VOLUME_CACHE_THRESHOLD in the child. The child's file
- * descriptors 3 and up are closed before the call, so the first file it opens is 3. */
-int fm_minc_load(const char *fname, int timeout_ms, int cache_threshold, unsigned char **out,
-                 size_t *outlen, unsigned char **sout, size_t *soutlen, unsigned char **serr,
-                 size_t *serrlen, int *status) {
+/* Runs fn(arg, 200) in a forked child whose descriptors 3 and up are closed (so that the first
+ * file it opens is 3); its dump pipe is descriptor 200. The outcome: 0 the child returned (dump in
+ * *out), 1 it exited with *status, 2 it died of signal *status, 3 it ran past timeout_ms (killed).
+ * *sout and *serr hold its standard output and error. cache_threshold >= 0 sets
+ * VOLUME_CACHE_THRESHOLD in the child. */
+static int run_child(void (*fn)(void *, int), void *arg, int timeout_ms, int cache_threshold,
+                     unsigned char **out, size_t *outlen, unsigned char **sout, size_t *soutlen,
+                     unsigned char **serr, size_t *serrlen, int *status) {
   int pd[2], po[2], pe[2], st = 0, done = 0, res;
   pid_t pid;
   Buf bb[3] = {{0}, {0}, {0}};
@@ -227,7 +228,7 @@ int fm_minc_load(const char *fname, int timeout_ms, int cache_threshold, unsigne
     } else {
       unsetenv("VOLUME_CACHE_THRESHOLD");
     }
-    child(fname, 200);
+    fn(arg, 200);
   }
   close(pd[1]);
   close(po[1]);
@@ -290,4 +291,173 @@ int fm_minc_load(const char *fname, int timeout_ms, int cache_threshold, unsigne
   return res;
 }
 
+static void load_child(void *arg, int fd) { child((const char *)arg, fd); }
+
+/* mincRead's sequence on fname (above), in a forked child. */
+int fm_minc_load(const char *fname, int timeout_ms, int cache_threshold, unsigned char **out,
+                 size_t *outlen, unsigned char **sout, size_t *soutlen, unsigned char **serr,
+                 size_t *serrlen, int *status) {
+  return run_child(load_child, (void *)fname, timeout_ms, cache_threshold, out, outlen, sout,
+                   soutlen, serr, serrlen, status);
+}
+
+/* A write case (the probe's src/minc_write.rs has the same layout): the volume_io sequence of
+ * FreeSurfer 8.2.0's mincWrite with every argument chosen by the probe. create_volume(n_dims,
+ * names or NULL, nc_type, signed_flag, vmin, vmax); optionally set_volume_real_range;
+ * set_volume_sizes; alloc_volume_data (do_alloc); set_volume_separations;
+ * set_volume_direction_cosine for each listed axis (or set_volume_direction_unit_cosine when
+ * cos_unit); set_volume_translation (do_translation); set_volume_voxel_value of every voxel in
+ * C order with values[k % n_values]; output_volume(fname, out_type, out_signed, out_min,
+ * out_max, volume, history, NULL); delete_volume. */
+typedef struct {
+  int n_dims;
+  int names_null;
+  const char *names[5];
+  int nc_type;
+  int signed_flag;
+  double vmin, vmax;
+  int set_real;
+  double rmin, rmax;
+  int sizes[5];
+  int do_alloc;
+  double sep[5];
+  int n_cos;
+  int cos_unit;
+  int cos_axis[5];
+  double cos[5][3];
+  int do_translation;
+  double tvoxel[5];
+  double tworld[3];
+  long n_values;
+  const double *values;
+  const char *fname;
+  int out_type;
+  int out_signed;
+  double out_min, out_max;
+  const char *history;
+  int set_space;
+  const char *space;
+} WriteCase;
+
+/* A line of the write child's dump, written at once (a later exit keeps what came before). */
+static void wline(int fd, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+static void wline(int fd, const char *fmt, ...) {
+  char t[256];
+  size_t at = 0, n;
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(t, sizeof t, fmt, ap);
+  va_end(ap);
+  n = strlen(t);
+  fflush(stdout);
+  fflush(stderr);
+  while (at < n) {
+    ssize_t wr = write(fd, t + at, n - at);
+    if (wr <= 0) break;
+    at += (size_t)wr;
+  }
+}
+
+static void write_child(void *arg, int fd) {
+  const WriteCase *w = (const WriteCase *)arg;
+  VIO_Status status;
+  Volume vol;
+  char *names[5];
+  int i, idx[5], sizes[5];
+  long k = 0, total = 1;
+  double sep[5], dir[3], tv[5], tw[3];
+  for (i = 0; i < 5; i++) names[i] = w->names[i] ? strdup(w->names[i]) : NULL;
+  vol = create_volume(w->n_dims, w->names_null ? NULL : names, (nc_type)w->nc_type,
+                      w->signed_flag, w->vmin, w->vmax);
+  wline(fd, "created %d\n", vol != NULL);
+  if (vol != NULL) {
+    if (w->set_space) set_volume_space_type(vol, (char *)w->space);
+    if (w->set_real) set_volume_real_range(vol, w->rmin, w->rmax);
+    for (i = 0; i < 5; i++) sizes[i] = w->sizes[i];
+    set_volume_sizes(vol, sizes);
+    if (w->do_alloc) alloc_volume_data(vol);
+    wline(fd, "allocated\n");
+    for (i = 0; i < 5; i++) sep[i] = w->sep[i];
+    set_volume_separations(vol, sep);
+    for (i = 0; i < w->n_cos; i++) {
+      dir[0] = w->cos[i][0];
+      dir[1] = w->cos[i][1];
+      dir[2] = w->cos[i][2];
+      if (w->cos_unit)
+        set_volume_direction_unit_cosine(vol, w->cos_axis[i], dir);
+      else
+        set_volume_direction_cosine(vol, w->cos_axis[i], dir);
+    }
+    wline(fd, "cosines\n");
+    if (w->do_translation) {
+      for (i = 0; i < 5; i++) tv[i] = w->tvoxel[i];
+      for (i = 0; i < 3; i++) tw[i] = w->tworld[i];
+      set_volume_translation(vol, tv, tw);
+    }
+    wline(fd, "translated\n");
+    if (w->do_alloc && w->n_values > 0) {
+      for (i = 0; i < w->n_dims && i < 5; i++) total *= w->sizes[i];
+      for (i = 0; i < 5; i++) idx[i] = 0;
+      if (w->n_dims >= 1 && total > 0) {
+        for (;;) {
+          set_volume_voxel_value(vol, idx[0], idx[1], idx[2], idx[3], idx[4],
+                                 w->values[k % w->n_values]);
+          k++;
+          for (i = w->n_dims - 1; i >= 0; i--) {
+            if (++idx[i] < w->sizes[i]) break;
+            idx[i] = 0;
+          }
+          if (i < 0) break;
+        }
+      }
+    }
+    wline(fd, "set\n");
+    {
+      char *fname = strdup(w->fname);
+      char *hist = w->history ? strdup(w->history) : NULL;
+      status = output_volume(fname, (nc_type)w->out_type, w->out_signed, w->out_min,
+                             w->out_max, vol, hist, NULL);
+      wline(fd, "status %d\n", (int)status);
+    }
+    delete_volume(vol);
+  }
+  fflush(stdout);
+  fflush(stderr);
+  _exit(0);
+}
+
+/* The write case w in a forked child (outcomes as fm_minc_load's). */
+int fm_minc_write(const WriteCase *w, int timeout_ms, unsigned char **out, size_t *outlen,
+                  unsigned char **sout, size_t *soutlen, unsigned char **serr, size_t *serrlen,
+                  int *status) {
+  return run_child(write_child, (void *)w, timeout_ms, -1, out, outlen, sout, soutlen, serr,
+                   serrlen, status);
+}
+
 void fm_minc_free(void *p) { free(p); }
+
+/* compute_transform_inverse of the library (FreeSurfer's copy: its own 4 x 4 inverse) on a
+ * row-major matrix (Transform_elem(t, row, col) = in[4 * row + col]), in the calling process:
+ * 1 when it succeeded; what it printed on standard output is returned in msg (NUL-terminated). */
+int fm_invert(const double *in, double *out, char *msg, int msglen) {
+  Transform t, inv;
+  int r, c, p[2], save, ok;
+  ssize_t n;
+  for (r = 0; r < 4; r++)
+    for (c = 0; c < 4; c++) Transform_elem(t, r, c) = in[4 * r + c];
+  fflush(stdout);
+  if (pipe(p)) return -1;
+  save = dup(1);
+  dup2(p[1], 1);
+  ok = compute_transform_inverse(&t, &inv) ? 1 : 0;
+  fflush(stdout);
+  dup2(save, 1);
+  close(save);
+  close(p[1]);
+  n = read(p[0], msg, (size_t)(msglen - 1));
+  close(p[0]);
+  msg[n > 0 ? n : 0] = 0;
+  for (r = 0; r < 4; r++)
+    for (c = 0; c < 4; c++) out[4 * r + c] = Transform_elem(inv, r, c);
+  return ok;
+}

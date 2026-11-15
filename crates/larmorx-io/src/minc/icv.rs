@@ -814,8 +814,14 @@ pub fn miicv_detach(s: &mut Session, c: &mut Ctx, icvid: i32) -> Result<i32, Exi
     Ok(0)
 }
 
-/// `MI_icv_calc_scale` for a get, at the chunk starting at `coords`.
-fn calc_scale(s: &mut Session, c: &mut Ctx, i: usize, coords: &[i64]) -> Result<bool, Exit> {
+/// `MI_icv_calc_scale` for a get (or a put when `put`), at the chunk starting at `coords`.
+fn calc_scale(
+    s: &mut Session,
+    c: &mut Ctx,
+    i: usize,
+    coords: &[i64],
+    put: bool,
+) -> Result<bool, Exit> {
     s.mi_enter("MI_icv_calc_scale");
     let v = icv(s, i).clone();
     let (mut var_vmax, mut var_vmin) = (v.var_vmax, v.var_vmin);
@@ -878,6 +884,7 @@ fn calc_scale(s: &mut Session, c: &mut Ctx, i: usize, coords: &[i64]) -> Result<
     } else {
         (v.user_vmax, v.user_vmin)
     };
+    let (var_imgmax_true, var_imgmin_true) = (var_imgmax, var_imgmin);
     if v.derv_usr_float {
         usr_imgmax = MI_DEFAULT_MAX;
         usr_vmax = MI_DEFAULT_MAX;
@@ -902,7 +909,17 @@ fn calc_scale(s: &mut Session, c: &mut Ctx, i: usize, coords: &[i64]) -> Result<
     } else {
         0.0
     };
-    let offset = usr_vmin - scale * var_vmin + usr_scale * (var_imgmin - usr_imgmin);
+    let mut offset = usr_vmin - scale * var_vmin + usr_scale * (var_imgmin - usr_imgmin);
+    let mut scale = scale;
+    if put {
+        if scale != 0.0 {
+            offset = (-offset) / scale;
+            scale = 1.0 / scale;
+        } else {
+            offset = var_vmin;
+            scale = 0.0;
+        }
+    }
     let w = icv(s, i);
     w.scale = scale;
     w.offset = offset;
@@ -912,6 +929,18 @@ fn calc_scale(s: &mut Session, c: &mut Ctx, i: usize, coords: &[i64]) -> Result<
             w.do_fillvalue = false;
         } else {
             w.do_fillvalue = true;
+            if put {
+                if w.derv_usr_float {
+                    w.fill_valid_min = var_imgmin_true;
+                    w.fill_valid_max = var_imgmax_true;
+                } else if usr_scale != 0.0 {
+                    w.fill_valid_min = usr_vmin + (var_imgmin_true - usr_imgmin) / usr_scale;
+                    w.fill_valid_max = usr_vmin + (var_imgmax_true - usr_imgmin) / usr_scale;
+                } else {
+                    w.fill_valid_min = usr_vmin;
+                    w.fill_valid_max = usr_vmax;
+                }
+            }
         }
     }
     s.mi_return();
@@ -980,7 +1009,7 @@ pub fn miicv_get(
             w.fill_valid_min = w.var_vmin;
             w.fill_valid_max = w.var_vmax;
         }
-        if icv(s, i).do_scale && !calc_scale(s, c, i, &chunk_start)? {
+        if icv(s, i).do_scale && !calc_scale(s, c, i, &chunk_start, false)? {
             s.mi_return_error(c)?;
             s.mi_return_error(c)?;
             return Ok(None);
@@ -1026,6 +1055,150 @@ pub fn miicv_get(
     s.mi_return();
     s.mi_return();
     Ok(out)
+}
+
+/// Whether a put through the ICV reads the caller's values: it is attached, with a type netCDF
+/// knows and no dimension conversion (otherwise `miicv_put` fails before reading them).
+pub(crate) fn put_reads_values(s: &Session, icvid: i32) -> bool {
+    usize::try_from(icvid)
+        .ok()
+        .and_then(|i| s.icvs.get(i))
+        .and_then(|v| v.as_ref())
+        .is_some_and(|v| v.cdfid != MI_ERROR && nc::type_size(v.user_type) > 0 && !v.do_dimconvert)
+}
+
+/// `miicv_put`: `values` (of the ICV's type and sign, in C order of the hyperslab) written at
+/// `start` / `count` through the ICV (`MI_icv_access`): each chunk scaled from the caller's range
+/// onto the file's, or `MI_ERROR`.
+pub fn miicv_put(
+    s: &mut Session,
+    c: &mut Ctx,
+    icvid: i32,
+    start: &[i64],
+    count: &[i64],
+    values: &Typed,
+) -> Result<i32, Exit> {
+    s.mi_enter("miicv_put");
+    let Some(i) = chkid(s, c, icvid)? else {
+        s.mi_return_error(c)?;
+        return Ok(MI_ERROR);
+    };
+    s.mi_enter("MI_icv_access");
+    if icv(s, i).cdfid == MI_ERROR {
+        s.log_pkg_error(
+            c,
+            Some(PkgSite::IcvNotAttached),
+            MI_ERR_ICVNOTATTACHED,
+            "ICV is not attached to an image variable",
+        )?;
+        s.mi_return_error(c)?;
+        s.mi_return_error(c)?;
+        return Ok(MI_ERROR);
+    }
+    if icv(s, i).do_dimconvert {
+        c.streams
+            .err("larmorx: MINC's dimension conversion of a vector image is not ported yet\n");
+        s.mi_return_error(c)?;
+        s.mi_return_error(c)?;
+        return Ok(MI_ERROR);
+    }
+    let v = icv(s, i).clone();
+    let chunk_elem = nc::nctypelen(s, c.streams, v.user_type)?;
+    let ndims = v.var_dim.len();
+    let var_start: Vec<i64> = (0..ndims).map(|k| start[k]).collect();
+    let var_count: Vec<i64> = (0..ndims).map(|k| count[k]).collect();
+    let var_end: Vec<i64> = (0..ndims).map(|k| var_start[k] + var_count[k]).collect();
+    let mut chunk_start = var_start.clone();
+    let mut chunk_count = vec![1i64; ndims];
+    let lo = (v.derv_firstdim + 1).max(0) as usize;
+    let mut chunk_n: i64 = 1;
+    if lo < ndims {
+        chunk_count[lo..ndims].copy_from_slice(&var_count[lo..ndims]);
+        for &k in &var_count[lo..ndims] {
+            chunk_n = chunk_n.wrapping_mul(k);
+        }
+    }
+    let _ = chunk_elem;
+    let firstdim = v.derv_firstdim.max(0) as usize;
+    if ndims == 0 {
+        s.mi_return();
+        s.mi_return();
+        return Ok(0);
+    }
+    let mut at = 0usize;
+    while chunk_start[0] < var_end[0] {
+        {
+            let w = icv(s, i);
+            w.do_fillvalue = false;
+            w.fill_valid_min = w.var_vmin;
+            w.fill_valid_max = w.var_vmax;
+        }
+        if icv(s, i).do_scale && !calc_scale(s, c, i, &chunk_start, true)? {
+            s.mi_return_error(c)?;
+            s.mi_return_error(c)?;
+            return Ok(MI_ERROR);
+        }
+        let w = icv(s, i).clone();
+        let conv = Conversion {
+            do_scale: w.do_scale,
+            scale: w.scale,
+            offset: w.offset,
+            do_fillvalue: w.do_fillvalue,
+            fillvalue: w.user_fillvalue,
+            fill_valid_min: w.fill_valid_min,
+            fill_valid_max: w.fill_valid_max,
+        };
+        let n = chunk_n.max(0) as usize;
+        let part = sub(values, at, n);
+        if super::mwrite::mi_varaccess_put(
+            s,
+            c,
+            w.cdfid,
+            w.varid,
+            &chunk_start,
+            &chunk_count,
+            w.user_type,
+            w.user_sign,
+            &part,
+            Some(&conv),
+        )? == MI_ERROR
+        {
+            s.mi_return_error(c)?;
+            s.mi_return_error(c)?;
+            return Ok(MI_ERROR);
+        }
+        at += n;
+        chunk_start[firstdim] += chunk_count[firstdim];
+        let mut k = firstdim;
+        while k > 0 && chunk_start[k] >= var_end[k] {
+            chunk_start[k] = var_start[k];
+            chunk_start[k - 1] += 1;
+            k -= 1;
+        }
+    }
+    s.mi_return();
+    s.mi_return();
+    Ok(0)
+}
+
+/// The values `at..at+n` of `t` (zeros past its end: the caller's buffer is as large as the
+/// hyperslab).
+fn sub(t: &Typed, at: usize, n: usize) -> Typed {
+    fn take<T: Copy + Default>(v: &[T], at: usize, n: usize) -> Vec<T> {
+        (at..at + n)
+            .map(|i| v.get(i).copied().unwrap_or_default())
+            .collect()
+    }
+    match t {
+        Typed::U8(v) => Typed::U8(take(v, at, n)),
+        Typed::I8(v) => Typed::I8(take(v, at, n)),
+        Typed::U16(v) => Typed::U16(take(v, at, n)),
+        Typed::I16(v) => Typed::I16(take(v, at, n)),
+        Typed::U32(v) => Typed::U32(take(v, at, n)),
+        Typed::I32(v) => Typed::I32(take(v, at, n)),
+        Typed::F32(v) => Typed::F32(take(v, at, n)),
+        Typed::F64(v) => Typed::F64(take(v, at, n)),
+    }
 }
 
 fn append(out: &mut Typed, part: Typed) {

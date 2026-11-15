@@ -616,3 +616,308 @@ fn one_slice_slabs_in_their_place() {
         assert_eq!(runs.get(p), want, "voxel {p}");
     }
 }
+
+/// A case of [`seeded_volumes_written`]: FreeSurfer's mincWrite sequence (`create_volume`,
+/// `set_volume_sizes`, `alloc_volume_data`, `set_volume_separations`,
+/// `set_volume_direction_cosine` of each axis, `set_volume_translation`, every voxel set,
+/// `output_volume`), every argument given. `text` is its description for the probe
+/// (`validation/probes/fs-nrrd-minc`'s `--write-cases`: one `key value...` line per field, the
+/// doubles as their bits in hex).
+struct WriteCase {
+    n_dims: i32,
+    nc_type: i32,
+    signed: bool,
+    range: [f64; 2],
+    sizes: [i32; 5],
+    sep: [f64; 5],
+    cos: Vec<(i32, [f64; 3])>,
+    tvoxel: [f64; 5],
+    tworld: [f64; 3],
+    values: Vec<f64>,
+    out: (i32, bool, f64, f64),
+    history: Vec<u8>,
+}
+
+impl WriteCase {
+    fn text(&self) -> String {
+        let h = |v: &[f64]| {
+            v.iter()
+                .map(|x| format!("{:016x}", x.to_bits()))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let mut t = format!(
+            "n_dims {}\ntype {} {}\nrange {}\nsizes {}\nsep {}\n",
+            self.n_dims,
+            self.nc_type,
+            i32::from(self.signed),
+            h(&self.range),
+            self.sizes.map(|x| x.to_string()).join(" "),
+            h(&self.sep)
+        );
+        for (a, d) in &self.cos {
+            let _ = writeln!(t, "cos {a} {}", h(d));
+        }
+        let _ = writeln!(t, "tvoxel {}\ntworld {}", h(&self.tvoxel), h(&self.tworld));
+        let _ = writeln!(t, "values {}", h(&self.values));
+        let _ = writeln!(
+            t,
+            "out {} {} {}",
+            self.out.0,
+            i32::from(self.out.1),
+            h(&[self.out.2, self.out.3])
+        );
+        let hist: String = self.history.iter().map(|b| format!("{b:02x}")).collect();
+        let _ = writeln!(t, "history {hist}");
+        t
+    }
+
+    /// The case written to `name` with the port: its dump (one line per step, as the probe's
+    /// shim writes them), exit status, standard error and the file's bytes.
+    fn run(&self, name: &[u8]) -> (String, Option<i32>, Vec<u8>, Option<Vec<u8>>) {
+        let mut cap = Cap::default();
+        let mut notices = Notices::new(UpstreamDefects::Reproduce);
+        let mut s = Session::new();
+        let mut d = String::new();
+        let r = {
+            let mut c = Ctx {
+                streams: &mut cap,
+                notices: &mut notices,
+                dialect: &Mni,
+            };
+            (|| -> Result<(), Exit> {
+                let names: Vec<Vec<u8>> = [&b"xspace"[..], b"yspace", b"zspace", b"time"]
+                    [..self.n_dims as usize]
+                    .iter()
+                    .map(|n| n.to_vec())
+                    .collect();
+                let vol = Volume::create_volume(
+                    &mut c,
+                    self.n_dims,
+                    Some(&names),
+                    self.nc_type,
+                    self.signed,
+                    self.range[0],
+                    self.range[1],
+                )?;
+                let _ = writeln!(d, "created {}", i32::from(vol.is_some()));
+                let Some(mut vol) = vol else {
+                    return Ok(());
+                };
+                vol.set_sizes(&self.sizes);
+                vol.alloc_volume_data(&mut c);
+                d.push_str("allocated\n");
+                vol.set_separations(&self.sep);
+                for (a, dir) in &self.cos {
+                    vol.set_direction_cosine(*a, dir, c.dialect, c.streams)?;
+                }
+                d.push_str("cosines\n");
+                vol.set_translation(&self.tvoxel, &self.tworld, c.dialect, c.streams);
+                d.push_str("translated\n");
+                let n = self.n_dims as usize;
+                let mut idx = [0usize; 5];
+                let mut k = 0;
+                'all: loop {
+                    vol.set_voxel_value(&idx, self.values[k % self.values.len()]);
+                    k += 1;
+                    let mut i = n;
+                    loop {
+                        if i == 0 {
+                            break 'all;
+                        }
+                        i -= 1;
+                        idx[i] += 1;
+                        if idx[i] < self.sizes[i] as usize {
+                            break;
+                        }
+                        idx[i] = 0;
+                    }
+                }
+                d.push_str("set\n");
+                let st = output_volume(
+                    &mut s,
+                    &mut c,
+                    name,
+                    self.out.0,
+                    self.out.1,
+                    self.out.2,
+                    self.out.3,
+                    &mut vol,
+                    Some(&self.history),
+                    None,
+                )?;
+                let _ = writeln!(d, "status {}", st as i32);
+                Ok(())
+            })()
+        };
+        drop(s);
+        let p = std::path::Path::new(std::str::from_utf8(name).unwrap());
+        (d, r.err().map(|e| e.status), cap.err, std::fs::read(p).ok())
+    }
+}
+
+/// Seeded volumes of mincWrite's four types (and the others), their ranges (empty, reversed,
+/// not a number), geometry (zero, negative, infinite and not-a-number steps, oblique and zero
+/// cosines) and values (out of range, not a number), written as MINC 1.5.1 writes them: the
+/// SHA-256 of the dumps, messages and files equals that of MINC 1.5.1's own (recorded with the
+/// probe: `LARMORX_MINC_EXPORT_WRITE=<dir>` writes the cases' descriptions, the probe's
+/// `--write-cases <dir>` prints the original's hash).
+#[test]
+fn seeded_volumes_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let export = std::env::var_os("LARMORX_MINC_EXPORT_WRITE");
+    let mut r = 0x7772_6974_u64;
+    let mut next = || {
+        r = r.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = r;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    };
+    let odd = [
+        f64::NAN,
+        -f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        0.0,
+        -0.0,
+        1e300,
+        3.4e38,
+        4e38,
+        2_147_483_648.0,
+        65536.5,
+        -32768.5,
+        255.5,
+        -1.0,
+    ];
+    let mut h = Sha256::new();
+    for case in 0..80 {
+        let (t, signed) = [
+            (BYTE, false),
+            (SHORT, true),
+            (INT, true),
+            (FLOAT, true),
+            (BYTE, true),
+            (SHORT, false),
+            (INT, false),
+            (DOUBLE, true),
+        ][(next() % 8) as usize];
+        let range = match next() % 6 {
+            0 => [0.0, 0.0],
+            1 => [200.0, 3.0],
+            2 => [f64::NAN, 100.0],
+            _ => {
+                let a = (next() % 200) as f64 - 50.0;
+                [
+                    a,
+                    a + 1.0 + (next() % 3000) as f64 + 0.25 * f64::from(t == FLOAT),
+                ]
+            }
+        };
+        let n_dims = if next() % 4 == 0 { 4 } else { 3 };
+        let mut sizes = [1i32; 5];
+        for s in sizes.iter_mut().take(n_dims as usize) {
+            *s = 1 + (next() % 5) as i32;
+        }
+        let mut sep = [1.0f64; 5];
+        for s in sep.iter_mut().take(3) {
+            *s = [1.0, 0.5, -2.0, 0.9375, 0.0, f64::INFINITY, f64::NAN, 1.5][(next() % 8) as usize];
+        }
+        let mut cos = Vec::new();
+        for axis in 0..3 {
+            let mut v = [0.0f64; 3];
+            v[axis] = if next() % 2 == 0 { 1.0 } else { -1.0 };
+            match next() % 6 {
+                0 => v[(axis + 1) % 3] = ((next() % 200) as f64 - 100.0) / 300.0,
+                1 => v = [0.0; 3],
+                2 => v[(axis + 2) % 3] = f64::NAN,
+                3 => v = [0.6, 0.8, 0.0],
+                _ => {}
+            }
+            cos.push((axis as i32, v));
+        }
+        let mut tvoxel = [0.0f64; 5];
+        for (i, v) in tvoxel.iter_mut().enumerate().take(3) {
+            *v = sizes[i] as f64 / 2.0;
+        }
+        let tworld = [
+            ((next() % 2001) as f64 - 1000.0) / 8.0,
+            ((next() % 2001) as f64 - 1000.0) / 16.0,
+            if next() % 9 == 0 {
+                f64::NAN
+            } else {
+                ((next() % 2001) as f64 - 1000.0) / 4.0
+            },
+        ];
+        let values: Vec<f64> = (0..(3 + next() % 20))
+            .map(|_| {
+                if next() % 6 == 0 {
+                    odd[(next() % odd.len() as u64) as usize]
+                } else {
+                    let lo = range[0].min(range[1]).max(-5000.0);
+                    let lo = if lo.is_nan() { 0.0 } else { lo };
+                    let v = lo + (next() % 4000) as f64 / 3.0;
+                    if t == FLOAT || t == DOUBLE {
+                        v
+                    } else {
+                        v.round()
+                    }
+                }
+            })
+            .collect();
+        let out = if next() % 5 == 0 {
+            let ot = [BYTE, SHORT, INT, FLOAT][(next() % 4) as usize];
+            (ot, next() % 2 == 0, range[1], range[0])
+        } else {
+            (t, signed, range[0], range[1])
+        };
+        let history = if next() % 3 == 0 {
+            b"lx history\n".to_vec()
+        } else {
+            Vec::new()
+        };
+        let wc = WriteCase {
+            n_dims,
+            nc_type: t,
+            signed,
+            range,
+            sizes,
+            sep,
+            cos,
+            tvoxel,
+            tworld,
+            values,
+            out,
+            history,
+        };
+        let name = format!("w{case:03}");
+        if let Some(e) = &export {
+            std::fs::create_dir_all(e).unwrap();
+            std::fs::write(
+                std::path::Path::new(e).join(format!("{name}.case")),
+                wc.text(),
+            )
+            .unwrap();
+        }
+        let path = dir.path().join(format!("{name}.mnc"));
+        let pb = c_name(&path);
+        let (d, exit, err, file) = wc.run(&pb);
+        let prefix = String::from_utf8_lossy(&c_name(dir.path())).into_owned();
+        let err = String::from_utf8_lossy(&err).replace(&prefix, "DIR");
+        let fh: String = match &file {
+            Some(b) => Sha256::digest(b)
+                .iter()
+                .map(|x| format!("{x:02x}"))
+                .collect(),
+            None => "none".to_string(),
+        };
+        h.update(format!("{name} {exit:?}\n{d}{err}\n{fh}\n").as_bytes());
+    }
+    let got: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    // MINC 1.5.1 on the same 80 cases (the probe's --write-cases), hashed the same way.
+    assert_eq!(got, SEEDED_WRITE_SHA256, "the written volumes' SHA-256");
+}
+
+/// The SHA-256 of MINC 1.5.1's runs of [`seeded_volumes_written`]'s cases.
+const SEEDED_WRITE_SHA256: &str =
+    "42ded1ed2f8e044f72ae866c86936f9aa2dc84014ccf97a4545418f664fae198";

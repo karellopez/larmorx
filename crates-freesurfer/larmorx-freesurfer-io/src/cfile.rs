@@ -98,7 +98,8 @@ impl CFile {
     /// `fopen(name, mode)`: the stream, or `errno` (`EINVAL` 22 for a mode that is not one,
     /// the operating system's error otherwise, as Linux numbers it). A relative name starts in
     /// `dir` (the program's working directory) when given. A directory opens for reading on
-    /// every platform, as on Linux (its reads fail with `EISDIR`).
+    /// every platform, as on Linux (its reads fail with `EISDIR`); for writing it fails with
+    /// `EISDIR` on every platform.
     pub fn open(dir: Option<&Path>, name: &str, mode: &str) -> Result<CFile, i32> {
         let Some((r, w, a, trunc, excl)) = parse_mode(mode) else {
             return Err(22);
@@ -132,6 +133,11 @@ impl CFile {
                     let mut f = CFile::from_bytes(Vec::new());
                     f.is_dir = true;
                     return Ok(f);
+                }
+                // a directory opened for writing: Linux's EISDIR (Windows answers EACCES)
+                #[cfg(not(unix))]
+                if w && path.is_dir() {
+                    return Err(21);
                 }
                 Err(log::errno_of(&e).unwrap_or(5))
             }

@@ -1624,11 +1624,12 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
 `crates-freesurfer/larmorx-freesurfer-surf/src/curvfile.rs` (`MRISwriteCurvature` mrisurf_io.cpp
 281, `MRISreadCurvatureFile` 4849, `__mrisreadcurvmri` 4874).
 
-- **`MRIread` is not in fs.io yet** (track A's relay 36; fs.io has `mri_read`, `MRIreadType`,
-  `MRIreadInfo`, `MRIreadHeader`): `__mrisreadcurvmri`'s MGH/NIfTI branch calls `MRIread(fname)`
-  (mriio.cpp 1002: `FileNameFromWildcard(fname, buf)` into a `char[STRLEN]`, `mri_read(buf,
-  MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1)`, `MRIremoveNaNs(mri, mri)`), so `curvfile.rs` carries a
-  private translation, `mri_read_whole`, to be replaced by fs.io's. `MRIremoveNaNs` (12086): its
+- **`MRIread`**: `__mrisreadcurvmri`'s MGH/NIfTI branch calls `MRIread(fname)` (mriio.cpp 1002:
+  `FileNameFromWildcard(fname, buf)` into a `char[STRLEN]`, `mri_read(buf,
+  MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1)`, `MRIremoveNaNs(mri, mri)`). Relay 35 carried a private
+  translation (`mri_read_whole`, its once-per-process flag in `SurfGlobals`); relay 36 replaced it by
+  fs.io's `mriio::mri_read_volume` (track A's relay 36; the flag is fs.core's
+  `Globals::remove_nans_shown`, one per process as FreeSurfer's static). `MRIremoveNaNs` (12086): its
   loop over `x` is `#pragma omp parallel for if_ROMP(shown_reproducible)`, with a `static int first`
   shared by the threads (the first `NaN found at voxel` line is a race when it runs in parallel;
   the probe runs one thread); `nans` a reduction; `FS_LEAVE_NANS` read with `getenv` per voxel; the

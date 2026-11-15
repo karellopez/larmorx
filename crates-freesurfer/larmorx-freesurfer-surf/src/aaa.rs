@@ -422,10 +422,6 @@ pub struct SurfGlobals {
     /// `MRIcomputeLaminarVolumeFractions`' `static MRI *mri_interior_wm`
     /// (`mrisurf_metricProperties.cpp` line 13135): the first call's white interior (FS-613).
     pub laminar_wm: Option<larmorx_freesurfer_mri::mri::Mri>,
-    /// `MRIremoveNaNs`' `static int first` (`utils/mriio.cpp` line 12091, inverted): whether its
-    /// `NaN found at voxel` line was printed in this process (`curvfile`'s private `MRIread`, until
-    /// fs.io has it; relay 35 of track D).
-    pub nan_found_shown: bool,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -474,7 +470,6 @@ impl Default for SurfGlobals {
             sras_map: Default::default(),
             vox2sras: Default::default(),
             laminar_wm: None,
-            nan_found_shown: false,
         }
     }
 }

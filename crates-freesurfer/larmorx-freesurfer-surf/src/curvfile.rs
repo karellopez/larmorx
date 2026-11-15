@@ -12,9 +12,9 @@
 //! (`curvio`, `sfile`, `formats`, `gifti`, `gifti_write`) and fs.io's (`MRIwrite`,
 //! `MRISreadCurvAsMRI`, `mri_read`).
 //!
-//! `MRIread` (fs.io, `utils/mriio.cpp` 1002-1027: the name's wildcard, `mri_read` of every
-//! frame, `MRIremoveNaNs`) is not in fs.io yet (track A's next item): [`mri_read_whole`] is a
-//! private translation of it for the volume branch here, to be replaced by fs.io's when it lands.
+//! The volume branch reads through fs.io's `MRIread` ([`mriio::mri_read_volume`]: the name's
+//! wildcard, `mri_read` of every frame, `MRIremoveNaNs` with its once-per-process line); relay 35's
+//! private copy of it was dropped in relay 36, when fs.io's landed.
 //!
 //! Not translated: `MRISreadBinaryCurvature` 4759 and `MRISreadNewCurvatureFile` 5781, which no
 //! FreeSurfer program or library function calls.
@@ -26,15 +26,11 @@ use std::path::Path;
 
 use larmorx_freesurfer_core::diag::DIAG_SHOW;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{
-    self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOFILE, Fatal, NO_ERROR,
-};
-use larmorx_freesurfer_core::utils::file_name_from_wildcard;
+use larmorx_freesurfer_core::log::{ERROR_BADFILE, ERROR_NOFILE, Fatal, NO_ERROR};
 use larmorx_freesurfer_io::fio::{fwrite_float, fwrite_int, fwrite3};
 use larmorx_freesurfer_io::gifti_common::NIFTI_INTENT_SHAPE;
 use larmorx_freesurfer_io::identify::{
-    ASCII_FILE, GIFTI_FILE, MRI_CURV_FILE, MRI_MGH_FILE, MRI_VOLUME_TYPE_UNKNOWN, NII_FILE,
-    VTK_FILE,
+    ASCII_FILE, GIFTI_FILE, MRI_CURV_FILE, MRI_MGH_FILE, NII_FILE, VTK_FILE,
 };
 use larmorx_freesurfer_io::mriio;
 use larmorx_freesurfer_mri::mri::{
@@ -212,7 +208,7 @@ pub fn read_curvature_file(
 }
 
 /// `__mrisreadcurvmri(mris, fname, type, read_volume, curvmri)`: the curvature from a volume of
-/// one voxel per vertex: an MGH or NIfTI file read by `MRIread` ([`mri_read_whole`]), a curvature
+/// one voxel per vertex: an MGH or NIfTI file read by `MRIread` ([`mriio::mri_read_volume`]), a curvature
 /// file of the new format by `MRISreadCurvAsMRI`. Its frame is `MRISgetReadFrame()`'s. Returns
 /// `ERROR_BADFILE` when nothing was read (the reader's messages), or after `ERROR: attempted to
 /// read frame <f> from <file>` and `  but this file only has <n> frames.` (standard output) when
@@ -236,7 +232,7 @@ pub fn read_curv_mri(
 ) -> Result<i32, Fatal> {
     let frame = sfile::get_read_frame(g, sg, io);
     let temp = if mtype == MRI_MGH_FILE || mtype == NII_FILE {
-        mri_read_whole(g, sg, io, dir, fname)?
+        mriio::mri_read_volume(g, io.out, io.err, io.env, dir, fname)?
     } else if mtype == MRI_CURV_FILE {
         mriio::mris_read_curv_as_mri(g, io.out, io.err, dir, fname, read_volume)?
     } else {
@@ -292,74 +288,6 @@ pub fn read_curv_mri(
     mris.max_curv = curvmax;
     mris.min_curv = curvmin;
     Ok(NO_ERROR)
-}
-
-/// `MRIread(fname)` (`utils/mriio.cpp` 1002-1027) for [`read_curv_mri`], until fs.io has it:
-/// the name's first wildcard match (`FileNameFromWildcard`: a name with a `*` becomes the first
-/// path `glob` finds, when it finds one), every frame of it read with its voxels (`mri_read(name,
-/// MRI_VOLUME_TYPE_UNKNOWN, TRUE, -1, -1)`), then `MRIremoveNaNs(mri, mri)`: each voxel (columns
-/// outermost, then rows, slices and frames) that is not finite is counted and set to 0 unless
-/// `FS_LEAVE_NANS` is set; the first in the process prints `NaN found at voxel (<c>, <r>, <s>,
-/// <f>)` (standard output; FreeSurfer's `static int first`, here
-/// [`SurfGlobals::nan_found_shown`]); a count above 0 gives `WARNING: <n> NaNs found in volume
-/// <name>...` (`ErrorPrintf(ERROR_BADPARM)`, the volume's name as read). FreeSurfer's loop over
-/// the columns runs in parallel only past the reproducible level (`if_ROMP(shown_reproducible)`):
-/// one thread, in order.
-fn mri_read_whole(
-    g: &mut Globals,
-    sg: &mut SurfGlobals,
-    io: &mut Io,
-    dir: Option<&Path>,
-    fname: &str,
-) -> Result<Option<Mri>, Fatal> {
-    larmorx_freesurfer_core::chklc::chklc();
-    let name = file_name_from_wildcard(dir, fname);
-    let Some(mut m) = mriio::mri_read(
-        g,
-        io.out,
-        io.err,
-        io.env,
-        dir,
-        &name,
-        MRI_VOLUME_TYPE_UNKNOWN,
-        true,
-        -1,
-        -1,
-    )?
-    else {
-        return Ok(None);
-    };
-    let leave = io.env.get("FS_LEAVE_NANS").is_some();
-    let mut nans = 0i32;
-    for x in 0..m.vg.width {
-        for y in 0..m.vg.height {
-            for z in 0..m.vg.depth {
-                for f in 0..m.nframes {
-                    let val = mri_get_vox_val(g, io.err, &m, x, y, z, f, 0)?;
-                    if !val.is_finite() {
-                        nans = nans.wrapping_add(1);
-                        if !leave {
-                            mri_set_vox_val(g, io.err, &mut m, x, y, z, f, 0.0, 0)?;
-                        }
-                        if !sg.nan_found_shown {
-                            let _ = writeln!(io.out, "NaN found at voxel ({x}, {y}, {z}, {f})");
-                            sg.nan_found_shown = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if nans > 0 {
-        let vname = m.vg.fname.to_string_lossy();
-        log::error_printf(
-            g,
-            io.err,
-            ERROR_BADPARM,
-            &format!("WARNING: {nans} NaNs found in volume {vname}...\n"),
-        );
-    }
-    Ok(Some(m))
 }
 
 #[cfg(test)]

@@ -20,8 +20,8 @@ use larmorx_freesurfer_core::utils::{most_frequent_int_list, nint};
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::ctab::ctab_deep_copy;
 use larmorx_freesurfer_mri::mri::{
-    MRI_INT, MRI_UCHAR, Mri, mri_alloc_sequence, mri_copy_header, mri_copy_pulse_parameters,
-    mri_free,
+    MAX_INDEX, MRI_INT, MRI_UCHAR, Mri, mri_alloc_sequence, mri_copy_header,
+    mri_copy_pulse_parameters, mri_free,
 };
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -683,6 +683,9 @@ pub fn mri_erode(
         } else {
             need_voxels(g, err, WHAT, src)?;
             need_voxels(g, err, WHAT, d)?;
+            if erode_bytes_inside(src, d) {
+                return finish(g, out, err, dst);
+            }
             for z in 0..dd {
                 for y in 0..h {
                     for x in 0..w {
@@ -704,6 +707,76 @@ pub fn mri_erode(
         }
     }
     finish(g, out, err, dst)
+}
+
+/// `MRIerode`'s byte erosion when every access lies inside both volumes (byte volumes of one
+/// extent with voxels, index tables that clamp to the nearest voxel): each voxel the smallest
+/// byte of its clamped 3 x 3 x 3 box, taken along x, then y, then z (the same voxels as the
+/// neighbourhood's scan). `false` (nothing written) otherwise.
+fn erode_bytes_inside(src: &Mri, d: &mut Mri) -> bool {
+    let (w, h, dd) = (src.vg.width, src.vg.height, src.vg.depth);
+    let clamps = |t: &Option<Vec<i32>>, n: i32| {
+        let t = t.as_deref().unwrap_or(&[]);
+        let k0 = i64::from(MAX_INDEX) - 1;
+        n > 0
+            && k0 >= 0
+            && (k0 + i64::from(n) + 2) as usize <= t.len()
+            && (-1..=n).all(|i| Mri::index(t, i) == i.clamp(0, n - 1))
+    };
+    let dense = |m: &Mri| {
+        m.mtype == MRI_UCHAR
+            && m.vox_per_row == w as u64
+            && m.vox_per_slice == (w as u64) * (h as u64)
+            && m.chunk
+                .as_ref()
+                .is_some_and(|c| c.len() as u64 >= (w as u64) * (h as u64) * (dd as u64))
+    };
+    if (d.vg.width, d.vg.height, d.vg.depth) != (w, h, dd)
+        || !dense(src)
+        || !dense(d)
+        || !clamps(&src.xi, w)
+        || !clamps(&src.yi, h)
+        || !clamps(&src.zi, dd)
+    {
+        return false;
+    }
+    let (wu, hu, du) = (w as usize, h as usize, dd as usize);
+    let s = &src.chunk.as_ref().expect("voxels")[..wu * hu * du];
+    let min3 = |v: &[u8], i: usize, n: usize, stride: usize| -> u8 {
+        let a = if i > 0 { v[(i - 1) * stride] } else { v[0] };
+        let c = if i + 1 < n {
+            v[(i + 1) * stride]
+        } else {
+            v[(n - 1) * stride]
+        };
+        a.min(v[i * stride]).min(c)
+    };
+    let mut ax = vec![0u8; s.len()];
+    for r in 0..hu * du {
+        let row = &s[r * wu..(r + 1) * wu];
+        for x in 0..wu {
+            ax[r * wu + x] = min3(row, x, wu, 1);
+        }
+    }
+    let mut ay = vec![0u8; s.len()];
+    for z in 0..du {
+        for x in 0..wu {
+            let col = &ax[z * hu * wu + x..];
+            for y in 0..hu {
+                ay[(z * hu + y) * wu + x] = min3(col, y, hu, wu);
+            }
+        }
+    }
+    let out = &mut d.chunk.as_mut().expect("voxels")[..wu * hu * du];
+    for y in 0..hu {
+        for x in 0..wu {
+            let col = &ay[y * wu + x..];
+            for z in 0..du {
+                out[(z * hu + y) * wu + x] = min3(col, z, du, wu * hu);
+            }
+        }
+    }
+    true
 }
 
 /// `MRIerode2D(mri_src, mri_dst)`: frame 0; each voxel the smallest of its 3 x 3 neighbourhood
@@ -2434,4 +2507,61 @@ pub fn mri_count_val_in_nbhd(
         }
     }
     Ok(total)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_mri::mri::mri_alloc;
+
+    /// The byte erosion's direct path gives each voxel the smallest byte of its clamped
+    /// 3 x 3 x 3 box, on extents of one voxel and more.
+    #[test]
+    fn byte_erosion_is_the_clamped_box_minimum() {
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        for (w, h, d) in [
+            (1, 1, 1),
+            (1, 5, 3),
+            (7, 1, 4),
+            (6, 5, 4),
+            (9, 8, 7),
+            (2, 2, 9),
+        ] {
+            let mut g = Globals::new(UpstreamDefects::Fix);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let mut src = mri_alloc(&mut g, &mut o, &mut e, w, h, d, MRI_UCHAR).unwrap();
+            for b in src.chunk.as_mut().unwrap().iter_mut() {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                *b = (seed % 251) as u8;
+            }
+            let r = mri_erode(&mut g, &mut o, &mut e, Pair::New(&src))
+                .unwrap()
+                .unwrap_new();
+            let at = |x: i32, y: i32, z: i32| ((z * h + y) * w + x) as usize;
+            let s = src.chunk.as_ref().unwrap();
+            for z in 0..d {
+                for y in 0..h {
+                    for x in 0..w {
+                        let mut m = 255u8;
+                        for zk in -1..=1 {
+                            for yk in -1..=1 {
+                                for xk in -1..=1 {
+                                    let p = at(
+                                        (x + xk).clamp(0, w - 1),
+                                        (y + yk).clamp(0, h - 1),
+                                        (z + zk).clamp(0, d - 1),
+                                    );
+                                    m = m.min(s[p]);
+                                }
+                            }
+                        }
+                        assert_eq!(r.chunk.as_ref().unwrap()[at(x, y, z)], m, "{w}x{h}x{d}");
+                    }
+                }
+            }
+        }
+    }
 }

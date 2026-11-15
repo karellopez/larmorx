@@ -8,7 +8,7 @@ the probe `validation/probes/fs-filter/`, a black-box run of FreeSurfer's code),
 `specs/freesurfer-mri.md` (the structure these functions work on), `specs/freesurfer-volume.md` (the
 voxel functions they call) and the cited standards.
 
-Status: **parts 1 to 4**. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
+Status: **parts 1 to 8**, and §32. Part 1 (§1-8): the fast-marching distance maps `MRIextractDistanceMap`
 and `MRIdistanceTransform`. Part 2 (§9-17): the Gaussian kernel, the one-dimensional and separable
 convolutions, the matrix Gaussian smoothing, the window means and standard deviations, the pyramid
 reductions, the Sobel derivatives, the divergence and Laplacian, the white-matter border
@@ -19,9 +19,10 @@ non-parametric white matter and cortex classification (`MRIreclassifyWMCtxNonPar
 `MRIclassifyAmbiguousNonPar`). Part 5 (§22-25): segments, flooding, the Voronoi diagram and the
 soap bubble. Part 6 (§26-27): the intensity normalisation without histograms (the spline
 normalisation, the windows, the peak check, the control-point searches and files, the bias image,
-the gentle normalisation, the bias correction). Not yet: the normalisation's histogram steps
-(`MRInormFillHistograms`, `MRInormalize`, `MRInormFindControlPoints`, `MRI3dNormalize`, the
-high-signal control points) and the surface flood functions. The 2-D image reductions (`ImageConvolve1d`,
+the gentle normalisation, the bias correction). Part 7 (§28-29): the normalisation's histogram
+steps (`MRInormFillHistograms`, `MRInormalize`, `MRInormFindControlPoints`, `MRI3dNormalize`).
+Part 8 (§30-31): the high-signal normalisation (`MRInormFindHighSignalLowStdControlPoints`,
+`MRInormalizeHighSignalLowStd`). §32: `MRIcountCSFInNbhd`. Not yet: the surface flood functions. The 2-D image reductions (`ImageConvolve1d`,
 `ImageReduce`, `ImageReduce1d`) are specified with the images in `specs/freesurfer-io.md`.
 
 ## 1. Conventions
@@ -1126,3 +1127,82 @@ blocks of 15 to 21 voxels a side (`nfcp`, `n3d`). Results (observed): seeds 7 an
 each command), seed 17 (200 of each): 0 different with `reproduce`, and with the default only
 differences that carry a notice. FS-597, FS-598 and FS-600 cases are counted, not compared
 (memory contents, a hang).
+
+## 30. The high-signal normalisation
+
+`mri_normalize -snr`, when the one-dimensional normalisation is not used (it failed, or `-no1d`),
+normalises by the voxels of high signal and low local spread.
+
+**`MRInormFindHighSignalLowStdControlPoints(src, ctrl)`**:
+1. Without `ctrl`, a new byte volume of the source's extent with its header.
+2. The window size `w = 2 (int)((7.0 / thick) / 2) + 1` (`double` arithmetic, `thick` the
+   slice thickness; about 7 mm, odd): `thick` 1 gives 7, 2 gives 3, 0.5 gives 15. A quotient
+   outside the `int` range or NaN (`thick` 0, NaN, or below about 1.6e-9 mm) is FS-17: FreeSurfer
+   takes `INT_MIN`, whose doubling wraps to a window of 1 (`reproduce`); the default saturates it.
+   A finite half-width of 2^30 or more overflows the doubling (FS-603: FreeSurfer's window wraps,
+   to no voxels or a negative size; the default takes a window covering the volume). A negative
+   thickness gives a negative window: no local means (left 0) and spreads of 0.
+3. The local mean (`MRImean(src, w)`, §11) and standard deviation (`MRIstd(src, mean, w)`, §11)
+   of frame 0; their ratio (`MRIdivide(mean, std)`: 0 where the deviation is below
+   `FLT_EPSILON`); the ratio set to 0 wherever the deviation truncates to the integer 0 (below 1:
+   `MRImask(ratio, std, ratio, 0, 0)`). With `DIAG_WRITE` and `DIAG_VERBOSE`: `m.mgz` (mean) and
+   `s.mgz` (deviation).
+4. The ratio's histogram (`MRIhistogram(ratio, 0)`: `nint(max - min + 1)` bins between its minimum
+   and maximum). From the top bin down to bin 1, the counts are summed in `float`; the bin `b` where
+   the sum first passes 20,000 (bin 0 when it never does). *(out)* `using SNR threshold <%2.3f
+   bins[b]> at bin <b>`. With `DIAG_WRITE` and `DIAG_VERBOSE`: `h.plt` (the histogram's plot) and
+   `rb.mgz` (the ratio).
+5. The 6-connected segments of the ratio within `[bins[b], 2 bins[last]]` (`MRIsegment`, §22). The
+   largest (`MRIsegmentMax`: the first with the most voxels) is `s1`; with `s1`'s voxels set aside,
+   the largest again is `s2` (-1 when there is none). The ratio's values at the voxels of `s1`, then
+   of `s2`, are written into `ctrl` (`MRIsegmentToImage`; `s` -1 writes the voxels of every
+   segment, of which only `s1`'s are set aside: none).
+6. *(out)* `using segments <s1> and <s2> with <n1> and <n2> voxels, centroids (<%2.0f cx1>,
+   <%2.0f cy1>, <%2.0f cz1>) and (<%2.0f cx2>, <%2.0f cy2>, <%2.0f cz2>)`, the counts and the
+   segments' centroids. FreeSurfer keeps `s1`'s count in a `float` while it looks for `s2`, so a
+   count above 16,777,216 can print rounded (FS-602; the default prints the exact count). For a
+   segment -1 FreeSurfer prints whatever memory lies before its segment table (FS-601; with no
+   segment at all it also writes into that memory, and it can crash): the port prints 0 for that
+   segment's count and centroid in both modes.
+7. `ctrl` binarised at 1 (values of at least 1 become 1, the others 0). With `DIAG_WRITE` and
+   `DIAG_VERBOSE`: `csnr.mgz`. At the diagnostic voxel: `(x, y, z) is [NOT ]an control point` (its
+   byte in `ctrl`).
+
+**`MRInormalizeHighSignalLowStd(src, norm, bias_sigma, wm_target)`**:
+1. Without `norm`, a clone of the source (its type and header; voxels 0 until written).
+2. The control points above, the file's control points added (`MRInormAddFileControlPoints(ctrl,
+   255, src)`, §26), binarised at 1; the bias field (`MRIbuildBiasImage(src, ctrl, bias_sigma)`,
+   §26).
+3. Each voxel in z, y, x order: `s` the source's value, `b` the bias's; `n = s` when `b` is
+   exactly 0 (a NaN bias divides), else `(s * wm_target) / b` (`float`, the source value the first
+   operand of the product, the product the first of the quotient: the NaNs' bits); at most 255 when
+   `norm` holds bytes; written with `MRIsetVoxVal`. `norm` may be the source itself (each voxel is
+   read before it is written).
+4. With `DIAG_WRITE` and `DIAG_VERBOSE`: `bsnr.mgz` (the bias) and `nsnr.mgz` (the result).
+
+## 31. Validation plan (part 8)
+
+Probe commands: `hsc` (MRInormFindHighSignalLowStdControlPoints with a slice thickness, with or
+without a control volume), `hsl` (MRInormalizeHighSignalLowStd, every destination kind, control
+points from a file), and on the recorded heads `hslf` (MRInormalizeHighSignalLowStd of `nu.mgz` and
+`T1.mgz` into a new volume, wm 110, bias sigma 8): `real.py --snr` (observed: the 6 volumes
+identical with `reproduce` and with the default). Generated cases: volumes of 32 x 32 x 28 to 32
+voxels (more than the 20,000 voxels of the threshold) with regions of high mean and low spread
+(two slabs, three slabs, cells of 6 voxels, one block) among regions of low mean and high spread,
+now and then a one-voxel margin of 0; small cubes with odd thicknesses (0, NaN, infinity, -1,
+-0, 100, 0.25). Results (observed): seeds 7 (20 cases of each), 13 and 17 (100 of each): 0
+different with `reproduce`, none without a notice with the default. Cases with fewer than two
+segments (every small volume, single blocks: about 40 %) are counted, not compared (FS-601:
+memory contents, or a crash, which FreeSurfer shows in about one case in ten).
+
+## 32. The CSF count of the random-forest features
+
+**`MRIcountCSFInNbhd(seg, wsize, x, y, z)`** (`mri_rf_label`, `mri_rf_train`): the voxels of the
+`wsize` window around `(x, y, z)` whose label is CSF (24), unknown (0), the left or right lateral
+ventricle (4, 43), the left or right inferior lateral ventricle (5, 44), the third or fourth
+ventricle (14, 15), counted label by label in that order by `MRIcountValInNbhd(seg, wsize, x, y,
+z, label)` (`specs/freesurfer-volume.md`: half-width `(wsize - 1) / 2`, positions clamped by the
+index tables, its error past them), the total an unsigned 32-bit sum returned as a signed one.
+Probe command `ccsf <seg> <wsize> <x> <y> <z>` (label volumes of 1 to 12 voxels a side, every
+voxel type the generator writes, windows -1 to 9, positions inside, at and past the faces).
+Results (observed): seeds 7 and 13 (200 cases each): 0 different in both modes.

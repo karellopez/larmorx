@@ -7,10 +7,11 @@
 //! FS-595 (the rejected points' message), and the uniform field's normalisation.
 
 use larmorx_core::defects::UpstreamDefects;
+use larmorx_freesurfer_core::diag::{DIAG_VERBOSE, DIAG_WRITE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_filter::normalize as nz;
-use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc};
+use larmorx_freesurfer_mri::mri::{MGH_VERSION, MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
 fn noted(g: &Globals, id: &str) -> bool {
@@ -210,4 +211,52 @@ fn fs599_the_eleventh_pass_counts() {
         err.contains("could not find enough control points"),
         "{err}"
     );
+}
+
+/// With `DIAG_WRITE` and `DIAG_VERBOSE`, the grey-matter pruning writes its diagnostic volumes,
+/// `orig<n>.mgz` among them: the caller's original volume itself, whose version the write sets
+/// (FreeSurfer's `MRIwrite` of an `.mgz`: the MGH version with the volume's intent).
+#[test]
+fn pruning_diagnostics_write_the_original() {
+    let mut g = Globals::new(UpstreamDefects::Fix);
+    g.gdiag = DIAG_WRITE | DIAG_VERBOSE;
+    let n = 24;
+    let mut src = vol(&mut g, n, MRI_FLOAT, |x, y, z| {
+        if (6..18).contains(&x) && (6..18).contains(&y) && (6..18).contains(&z) {
+            110.0
+        } else if (3..21).contains(&x) && (3..21).contains(&y) && (3..21).contains(&z) {
+            70.0
+        } else {
+            20.0
+        }
+    });
+    let mut ctrl = vol(&mut g, n, MRI_UCHAR, |x, y, z| {
+        let i = |v: i32| (5..19).contains(&v);
+        if i(x) && i(y) && i(z) { 1.0 } else { 0.0 }
+    });
+    src.version = 0x7777;
+    let dir = tempfile::tempdir().unwrap();
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let mut st = nz::NormState::default();
+    let env = Environment::default();
+    nz::remove_gray_matter_control_points(
+        &mut g,
+        &mut o,
+        &mut e,
+        &env,
+        Some(dir.path()),
+        &mut st,
+        &mut ctrl,
+        &mut src,
+        110.0,
+        10.0,
+        10.0,
+    )
+    .unwrap();
+    assert!(
+        dir.path().join("orig1.mgz").exists(),
+        "{}",
+        String::from_utf8_lossy(&o)
+    );
+    assert_eq!(src.version, MGH_VERSION, "{}", String::from_utf8_lossy(&e));
 }

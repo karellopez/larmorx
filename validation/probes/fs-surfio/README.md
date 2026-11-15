@@ -317,9 +317,13 @@ extent).
 `aseg.mgz` (`MRISfillInterior(surface, 0, volume)`, mri_surf2volseg's call), the ribbon between
 them in `orig.mgz` (`MRISribbon`, mris_volmask's), the white surface's interior in its bounding
 volume at 0.5 mm (mris_place_surface's T2 and FLAIR steps): 24 of 24 identical in both modes, no
-notice (observed). The 24 calls: FreeSurfer 55 s; the port 138 s at 9df8cbcb's parent, 87 s after
-the flood's breadth-first fill and the other speed changes (the outputs unchanged; the rest is the
-surface read and `MRISfillInterior`'s per-voxel accesses, relay 33's speed item).
+notice (observed). The 24 calls: FreeSurfer 55 s (59 s at relay 33's fresh run); the port 138 s at
+9df8cbcb's parent, 87 s after the flood's breadth-first fill and the other speed changes, 38 s after
+relay 33's (928fb0e2: `MRISfillInterior` and `MRISshell` through dense buffers, the ribbon's byte steps;
+24 of 24 identical in both modes again). Per call (relay 33, one head): the interior 1.26 s
+(FreeSurfer 1.40 s), the ribbon 3.72 s (4.33 s), the bounding volume filled 1.41 s (2.01 s); the rest
+of the port's time is mostly the surface reads (0.72 s each: 0.47 s the file, topology and metric
+properties, 0.25 s the neighbourhoods of three hops with their distances).
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>

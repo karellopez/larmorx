@@ -152,6 +152,17 @@ impl larmorx_io::minc::Dialect for FsMinc {
             // attaches): the first site of each kind, miicv_setdbl's
             S::IcvAttached => "minc_image_conversion.c:399",
             S::IcvBadProperty => "minc_image_conversion.c:454",
+            // the writing path's sites (track C's MINC writer, batch 20); mincWrite reaches none of
+            // them (standard names only, dimension variables of at most one dimension, image-max/min
+            // over the slower dimensions): their lines in FreeSurfer's copy, not yet probed.
+            // micreate_std_variable's name in no list (the copy has two more BAD_STDVAR sites, 603
+            // and 1213, that MINC 1.5.1 does not have)
+            S::BadStdVar => "minc_convenience.c:1223",
+            // two sites share it: MI_create_dim_variable's (611) and MI_create_dimwidth_variable's
+            // (689); the first
+            S::WrongNDims => "minc_convenience.c:611",
+            S::BadSuffix => "minc_convenience.c:681",
+            S::MaxMinDims => "minc_convenience.c:754",
         };
         Some(minc_fatal(at, message, streams))
     }

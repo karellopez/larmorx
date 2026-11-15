@@ -75,7 +75,16 @@ fn opt_name(t: &mut Vec<String>, g: &mut Gen, names: &[&str]) {
 
 fn value(g: &mut Gen, heavy: bool) -> String {
     let v = if heavy && g.chance(12) {
-        f32::from_bits(g.pick(&[0x7fc0_0000, 0xff80_0000, 0x7f80_0000, 0x8000_0000]))
+        // relay 35 of track D: signalling NaNs too (the shape and statistics arrays keep their
+        // bits, the coordinates are quieted: the official build's conversions)
+        f32::from_bits(g.pick(&[
+            0x7fc0_0000,
+            0xff80_0000,
+            0x7f80_0000,
+            0x8000_0000,
+            0x7fa0_0001,
+            0xff80_0123,
+        ]))
     } else {
         g.int(-400, 400) as f32 / 8.0
     };
@@ -352,7 +361,7 @@ fn find(s: &[u8], pat: &[u8], from: usize) -> Option<usize> {
 
 /// The probe's `gii_normal`: the `UserName` value `U`, each `<Data>` payload Base64-decoded and
 /// inflated, `Z` and its bytes in hex (`B` and the payload when it does not inflate).
-fn gii_normal(f: &[u8]) -> Vec<u8> {
+pub(super) fn gii_normal(f: &[u8]) -> Vec<u8> {
     let mut s = f.to_vec();
     if let Some(u) = find(&s, b"<![CDATA[UserName]]></Name>", 0)
         && let Some(v) = find(&s, b"<Value><![CDATA[", u)

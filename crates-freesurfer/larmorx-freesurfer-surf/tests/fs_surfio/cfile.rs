@@ -139,7 +139,7 @@ fn new_curv(g: &mut Gen, n: i64) -> Vec<u8> {
     b
 }
 
-fn curv_file(g: &mut Gen, n: i64) -> Vec<u8> {
+pub(super) fn curv_file(g: &mut Gen, n: i64) -> Vec<u8> {
     if g.chance(2) {
         old_curv(g, n)
     } else {
@@ -178,7 +178,7 @@ fn area_file(g: &mut Gen, nv: i64) -> Vec<u8> {
 /// A text curvature file: lines `vno x y z curv` in varied forms, comments and blank lines, now
 /// and then too few lines (FS-137), a line without its fifth number, or a line of more than 99
 /// bytes (split by `fgetl`).
-fn ascii_curv(g: &mut Gen, n: i64) -> Vec<u8> {
+pub(super) fn ascii_curv(g: &mut Gen, n: i64) -> Vec<u8> {
     let mut s = String::new();
     let lines = if g.chance(5) { g.int(0, n) } else { n };
     for k in 0..lines {
@@ -860,7 +860,7 @@ pub(super) fn cfile_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
 }
 
 /// The case's volume of values (`mt` >= 0: `MRIalloc(nv, 1, 1, mt)`).
-fn case_mri_split(
+pub(super) fn case_mri_split(
     g: &mut Globals,
     io: &mut coords::Io,
     t: &mut Toks,
@@ -875,7 +875,7 @@ fn case_mri_split(
     )?))
 }
 
-fn dump_mri_g(
+pub(super) fn dump_mri_g(
     g: &mut Globals,
     io: &mut coords::Io,
     o: &mut Out,

@@ -419,6 +419,44 @@ pub fn gifti_set_da_value_2d(
     col: i32,
     value: f64,
 ) -> Result<(), Fatal> {
+    set_da_value_2d(g, err, da, row, col, Value::Double(value))
+}
+
+/// [`gifti_set_da_value_2d`] of a C `float` where the official build stores it without its
+/// conversion to `double` (the call inlined: `MRISwriteGIFTIShape`, `MRISwriteGIFTIStats` and
+/// their volume forms, `mriWriteGifti`; GCC folds `(float)(double)x` to `x`, so a signalling NaN
+/// keeps its bits in a FLOAT32 array, observed in the unit oracle's `gifti.cpp.o` and the probe,
+/// relay 35 of track D). The other data types take the value as a `double`, as there.
+pub fn gifti_set_da_value_2d_f32(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    da: &mut DataArray,
+    row: i32,
+    col: i32,
+    value: f32,
+) -> Result<(), Fatal> {
+    set_da_value_2d(g, err, da, row, col, Value::Float(value))
+}
+
+/// The value [`set_da_value_2d`] stores.
+#[derive(Clone, Copy)]
+enum Value {
+    Double(f64),
+    Float(f32),
+}
+
+fn set_da_value_2d(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    da: &mut DataArray,
+    row: i32,
+    col: i32,
+    v: Value,
+) -> Result<(), Fatal> {
+    let value = match v {
+        Value::Double(d) => d,
+        Value::Float(f) => f64::from(f),
+    };
     if da.data.is_none() {
         let _ = err.write_all(b"** gifti_set_DA_value_2D, invalid params: data=(nil)\n");
         return Err(Fatal::Exit(1));
@@ -461,7 +499,10 @@ pub fn gifti_set_da_value_2d(
         NIFTI_TYPE_UINT8 => vec![to_int_bits(g, value) as u8],
         NIFTI_TYPE_INT16 => (to_int_bits(g, value) as i16).to_le_bytes().to_vec(),
         NIFTI_TYPE_INT32 => to_int_bits(g, value).to_le_bytes().to_vec(),
-        NIFTI_TYPE_FLOAT32 => (value as f32).to_le_bytes().to_vec(),
+        NIFTI_TYPE_FLOAT32 => match v {
+            Value::Double(d) => (d as f32).to_le_bytes().to_vec(),
+            Value::Float(f) => f.to_bits().to_le_bytes().to_vec(),
+        },
         NIFTI_TYPE_INT8 => vec![to_int_bits(g, value) as i8 as u8],
         NIFTI_TYPE_UINT16 => (to_int_bits(g, value) as u16).to_le_bytes().to_vec(),
         NIFTI_TYPE_UINT32 => to_uint32_bits(g, value).to_le_bytes().to_vec(),

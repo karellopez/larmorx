@@ -26,7 +26,9 @@ use std::path::Path;
 
 use larmorx_freesurfer_core::diag::DIAG_SHOW;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOFILE, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOFILE, Fatal, NO_ERROR,
+};
 use larmorx_freesurfer_core::utils::file_name_from_wildcard;
 use larmorx_freesurfer_io::fio::{fwrite_float, fwrite_int, fwrite3};
 use larmorx_freesurfer_io::gifti_common::NIFTI_INTENT_SHAPE;
@@ -244,12 +246,11 @@ pub fn read_curv_mri(
         return Ok(ERROR_BADFILE);
     };
     if temp.nframes <= frame {
-        let _ = writeln!(io.out, "ERROR: attempted to read frame {frame} from {fname}");
         let _ = writeln!(
             io.out,
-            "  but this file only has {} frames.",
-            temp.nframes
+            "ERROR: attempted to read frame {frame} from {fname}"
         );
+        let _ = writeln!(io.out, "  but this file only has {} frames.", temp.nframes);
         return Ok(ERROR_BADFILE);
     }
     let (w, h, d) = (temp.vg.width, temp.vg.height, temp.vg.depth);

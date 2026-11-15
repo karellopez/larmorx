@@ -25,7 +25,7 @@ use larmorx_io::gifti::{
 };
 
 use crate::gifti_common::{
-    NIFTI_INTENT_LABEL, NIFTI_INTENT_SHAPE, add_array, alloc_data, free, gifti_set_da_value_2d,
+    NIFTI_INTENT_LABEL, NIFTI_INTENT_SHAPE, add_array, alloc_data, free, gifti_set_da_value_2d_f32,
     meta, new_image, read_label_table, read_valid, scan_f, set_attributes, set_sizes,
     validate_and_write, value, vertices_cols,
 };
@@ -327,7 +327,8 @@ pub fn mri_write_gifti(
             for r in 0..height {
                 for c in 0..mri.width {
                     let v = mri_get_vox_val(g, io.err, mri, c, r, s, frame, 0)?;
-                    gifti_set_da_value_2d(g, io.err, da, i, 0, f64::from(v))?;
+                    // the official build stores the float as it is (relay 35 of track D)
+                    gifti_set_da_value_2d_f32(g, io.err, da, i, 0, v)?;
                     i += 1;
                 }
             }

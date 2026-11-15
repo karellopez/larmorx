@@ -44,11 +44,11 @@ use larmorx_io::gifti::{
     NIFTI_INTENT_TRIANGLE, NIFTI_TYPE_FLOAT32, NIFTI_TYPE_INT32, NvPairs, intent_to_string,
 };
 
-pub use larmorx_freesurfer_io::gifti_common::gifti_set_da_value_2d;
 use larmorx_freesurfer_io::gifti_common::{
     add_array, add_meta, alloc_data, free, new_image, read_valid, set_attributes, set_sizes,
     validate_and_write, vertices_cols,
 };
+pub use larmorx_freesurfer_io::gifti_common::{gifti_set_da_value_2d, gifti_set_da_value_2d_f32};
 
 use crate::coords::Io;
 use crate::gifti::{
@@ -57,6 +57,16 @@ use crate::gifti::{
 };
 use crate::mris::Mris;
 use crate::readwrite::read_transform;
+
+/// A `float` through x86-64's `cvtss2sd`: a signalling NaN quieted (its quiet bit set, its payload
+/// kept); every other value as it is.
+fn quiet(x: f32) -> f32 {
+    if x.is_nan() {
+        f32::from_bits(x.to_bits() | 0x0040_0000)
+    } else {
+        x
+    }
+}
 
 /// NIfTI-1's statistics intents the writers accept (`nifti1.h`): `NIFTI_INTENT_CORREL` (2) to
 /// `NIFTI_INTENT_LOG10PVAL` (24), and `NIFTI_INTENT_ESTIMATE` (1001).
@@ -174,9 +184,10 @@ fn write_shape(
         }
     }
     alloc_data(shape);
+    // the official build stores the float as it is (its setter inlined: relay 35 of track D)
     for vno in 0..mris.nvertices.max(0) {
-        let v = f64::from(mris.vertex(vno as usize).curv);
-        gifti_set_da_value_2d(g, io.err, shape, vno, 0, v)?;
+        let v = mris.vertex(vno as usize).curv;
+        gifti_set_da_value_2d_f32(g, io.err, shape, vno, 0, v)?;
     }
     Ok(NO_ERROR)
 }
@@ -202,9 +213,10 @@ fn write_stats(
     set_sizes(&g.gifti, io, fix, stats);
     stats_meta(&g.gifti, io, &mut g.notices, &mut stats.meta, intent);
     alloc_data(stats);
+    // the official build stores the float as it is (its setter inlined: relay 35 of track D)
     for vno in 0..mris.nvertices.max(0) {
-        let v = f64::from(mris.vertex(vno as usize).stat);
-        gifti_set_da_value_2d(g, io.err, stats, vno, 0, v)?;
+        let v = mris.vertex(vno as usize).stat;
+        gifti_set_da_value_2d_f32(g, io.err, stats, vno, 0, v)?;
     }
     Ok(NO_ERROR)
 }
@@ -524,7 +536,10 @@ fn write_surface(
         alloc_data(coords);
         for vno in 0..mris.nvertices.max(0) {
             let v = mris.vertex(vno as usize);
-            let (x, y, z) = (f64::from(v.x), f64::from(v.y), f64::from(v.z));
+            // the official build converts each coordinate to `double` for the call (`cvtss2sd`:
+            // a signalling NaN quieted), explicitly here, as every build of the port must
+            let q = |x: f32| f64::from(quiet(x));
+            let (x, y, z) = (q(v.x), q(v.y), q(v.z));
             gifti_set_da_value_2d(g, io.err, coords, vno, 0, x)?;
             gifti_set_da_value_2d(g, io.err, coords, vno, 1, y)?;
             gifti_set_da_value_2d(g, io.err, coords, vno, 2, z)?;
@@ -871,7 +886,8 @@ fn copy_frame(
             for c in 0..mri.width {
                 let v = mri_get_vox_val(g, io.err, mri, c, r, s, frame, 0)?;
                 let vno = voxel_vertex(g, mri, c, r, s);
-                gifti_set_da_value_2d(g, io.err, da, vno, 0, f64::from(v))?;
+                // the official build stores the float as it is (relay 35 of track D)
+                gifti_set_da_value_2d_f32(g, io.err, da, vno, 0, v)?;
             }
         }
     }

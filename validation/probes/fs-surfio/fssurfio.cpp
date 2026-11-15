@@ -3915,6 +3915,8 @@ static void flr_put(MRI *m)
 void flr_case()
 {
   setenv("SURFER_SIDEDOOR", "1", 1);
+  // relay 35 of track D: a GIFTI file's Date (flr crv) the same on both sides
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "probe date", 1);
   std::string op = next();
   out += op + " ";
   if (op == "fil") {
@@ -3938,6 +3940,64 @@ void flr_case()
     MRI *b = MRISmakeBoundingVolume(s, res);
     MRISfillInterior(s, res, b);
     flr_put(b);
+  } else if (op == "crv") {
+    // relay 35 of track D: a recorded curvature file read into its surface (MRISreadCurvatureFile),
+    // its values' FNV-1a, then written in five formats into the work folder (MRISwriteCurvature)
+    // and read back from the MGZ and new-format files; each written file's FNV-1a (a .gii one's
+    // after gii_normal) and whether the new-format file is the recorded file byte for byte
+    MRIS *s = MRISread(next());
+    std::string cf = next();
+    if (!s) fail("cannot read the inputs");
+    mkdir(workdir.c_str(), 0700);
+    clear_dir(workdir, true);
+    if (chdir(workdir.c_str()) != 0) fail("chdir");
+    auto fnv = [](const std::string &b) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : b) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    auto curv_fnv = [&]() {
+      std::string b;
+      for (int v = 0; v < s->nvertices; v++) b.append((const char *)&s->vertices[v].curv, 4);
+      fnv(b);
+      of(s->max_curv); of(s->min_curv);
+    };
+    auto slurp = [](const std::string &n) {
+      std::string b;
+      if (FILE *fp = fopen(n.c_str(), "rb")) {
+        char buf[65536];
+        size_t k;
+        while ((k = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, k);
+        fclose(fp);
+      }
+      return b;
+    };
+    oi(MRISreadCurvatureFile(s, cf.c_str()));
+    curv_fnv();
+    // five stems: a GIFTI file beside a file of its stem would stop the read-back (FS_GII's rule)
+    for (const char *nm : {"./o", "./m.mgz", "./n.nii.gz", "./g.gii", "./v.vtk"}) oi(MRISwriteCurvature(s, nm));
+    std::vector<std::string> files;
+    list_files(".", "", files);
+    std::sort(files.begin(), files.end());
+    for (const std::string &n : files) {
+      oh(n.c_str());
+      std::string b = slurp(n);
+      bool gii = n.size() >= 4 && n.compare(n.size() - 4, 4, ".gii") == 0;
+      fnv(gii ? gii_normal(b) : b);
+    }
+    auto newfmt = [](const std::string &n) { return n.size() >= 2 && n.compare(n.size() - 2, 2, ".o") == 0; };
+    std::string written;
+    for (const std::string &n : files)
+      if (newfmt(n)) written = slurp(n);
+    oi(written == slurp(cf));
+    for (const std::string &n : files) {
+      if (!newfmt(n) && n.find(".mgz") == std::string::npos) continue;
+      for (int v = 0; v < s->nvertices; v++) s->vertices[v].curv = 0;
+      oi(MRISreadCurvatureFile(s, ("./" + n).c_str()));
+      curv_fnv();
+    }
   } else fail("flr op");
 }
 
@@ -4077,6 +4137,116 @@ void bvl_case()
       }
     } else fail("bvl op");
   }
+}
+
+// ---- relay 35 of track D: crv, the curvature files by name (queue items 3.1-47/48) ----------------
+
+// a file under the work folder as crv prints it: a .gii one as gii_normal, any other its bytes
+void dump_crv_file(const std::string &name)
+{
+  oh(name.c_str());
+  FILE *fp = fopen(name.c_str(), "rb");
+  if (!fp) { out += "NOFILE "; return; }
+  std::string b;
+  char buf[4096];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof buf, fp)) > 0) b.append(buf, n);
+  fclose(fp);
+  bool gii = name.size() >= 4 && name.compare(name.size() - 4, 4, ".gii") == 0;
+  ox(gii ? gii_normal(b) : b);
+}
+
+// crv: Gdiag's bits (1 show, 2 verbose), the environment (1 FS_POSIX, 2 FS_GII <h>, 4
+// MRIS_READVAL_FRAME <h>, 8 FS_LEAVE_NANS), the creation time's replacement (and always
+// SURFER_SIDEDOOR), MRISsetReadFrame's frame (-1: not called), the input files, a surface from
+// MRISalloc (its hemisphere, name, subject, per vertex x y z curv val, the faces' vertices), then 1
+// to 4 of MRISwriteCurvature (`w`: a name, a GIFTI curvature name or none) and
+// MRISreadCurvatureFile (`r`: a name, a volume of the values (case_mri) or none, the overlays' list
+// given or not), each status, the volume's values and the overlays; then every vertex's x y z curv
+// val, max_curv, min_curv, the counts and the folder's files
+void crv_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  mkdir("d/s", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int envs = geti();
+  if (envs & 1) setenv("FS_POSIX", "1", 1);
+  if (envs & 2) { std::string v = geth(); setenv("FS_GII", v.c_str(), 1); }
+  if (envs & 4) { std::string v = geth(); setenv("MRIS_READVAL_FRAME", v.c_str(), 1); }
+  if (envs & 8) setenv("FS_LEAVE_NANS", "1", 1);
+  std::string date = geth();
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", date.c_str(), 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  int rf = geti();
+  if (rf != -1) MRISsetReadFrame(rf);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  m->hemisphere = geti();
+  std::string fname = geth(), subj = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  snprintf(m->subject_name.data(), STRLEN, "%s", subj.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf(); v->curv = getf(); v->val = getf();
+  }
+  for (int fno = 0; fno < nf; fno++) for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "w") {
+      const char *nm = name_tok();
+      const char *cf = opt_name();
+      oi(MRISwriteCurvature(m, nm, cf));
+    } else if (op == "r") {
+      const char *nm = name_tok();
+      MRI *mri = case_mri(nv);
+      int ov = geti();
+      std::vector<OverlayInfoStruct> o;
+      oi(MRISreadCurvatureFile(m, nm, mri, ov ? &o : NULL));
+      fflush(stdout);
+      dump_mri(mri);
+      if (ov) {
+        oi((long long)o.size());
+        for (OverlayInfoStruct &x : o) {
+          if (x.__foverlay) oh(x.__foverlay); else out += "NULL ";
+          oi(x.__type); oi(x.__giftiIntent); oh(x.__shapedatatype); oi(x.__format);
+          oi(x.__nValsPerVertex);
+          MRI *v = x.__overlaymri;
+          if (!v) { out += "NULL "; continue; }
+          oi(v->width); oi(v->height); oi(v->depth); oi(v->nframes);
+          for (int i = 0; i < v->width; i++) of(MRIgetVoxVal(v, i, 0, 0, 0));
+        }
+      }
+    } else fail("crv op");
+    fflush(stdout);
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    of(v->x); of(v->y); of(v->z); of(v->curv); of(v->val);
+  }
+  of(m->max_curv); of(m->min_curv); oi(m->nvertices); oi(m->nfaces);
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) dump_crv_file(name);
 }
 
 void run_case()
@@ -4323,6 +4493,8 @@ void run_case()
     flr_case();
   } else if (cmd == "bvl") {
     bvl_case();
+  } else if (cmd == "crv") {
+    crv_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

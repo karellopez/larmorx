@@ -3559,6 +3559,10 @@ invalid params: dim0_index=<i> (max=<n>), dim1_index=<j> (max=<m>)` on standard 
 stored. The value is converted to the array's type (`FLOAT32` rounded to `float`; the integer types
 by C's conversion, x86-64's results beyond their range, FS-17); another type: `**
 gifti_set_DA_value_2D, unsupported type <t>-unknown, or can't convert to double`, nothing stored.
+A NaN's bits in a `FLOAT32` array (relay 35 of track D, observed): the curvature and statistics
+arrays (§109.2), their volume forms (§110) and `mriWriteGifti`'s values keep a `float`'s bits as
+they are, a signalling NaN included; the surface's coordinates (§109.3) are quieted as a `float`
+becomes a `double` on x86-64 (the quiet bit, `0x00400000`, set; the rest of the payload kept).
 
 **109.2 The intents** (`MRISwriteGIFTI(mris, intent, file, curv_name)`): `NIFTI_INTENT_POINTSET` or
 `NIFTI_INTENT_TRIANGLE` write the surface (§109.3), `NIFTI_INTENT_SHAPE` the curvature,
@@ -4164,4 +4168,104 @@ corrects changed the result (FS-609, FS-610, FS-613). Observed (relay 33): `bvl`
 17, 200 cases each: 0 different with `reproduce` (16 to 20 counted per seed), the default
 different only with notices; `mpg` (with `mke`) seeds 7, 13 and 17, 200 cases each: 0 different
 beyond one case per seed of glibc's `acos` last bits (§117).
+
+## 122. Curvature files by name (queue items 3.1-47 and 3.1-48; relay 35 of track D)
+
+**122.1 Writing** (`MRISwriteCurvature(mris, name, curv_name)`, `curv_name` absent by default).
+The file and its type are those of §80's curvature writer's name (`MRISwriteCurvature_getfilename`,
+FS-126 for names of 1,024 bytes or more, `FS_GII`'s rule). With `Gdiag`'s show bit: `writing
+curvature file <file> type <type>` (standard output, the type as a number) first. Then by type:
+- MGH (3: `.mgh`, `.mgz`) or NIfTI (`.nii`, `.nii.gz`): a float volume of `<vertices>` x 1 x 1, one
+  frame, voxel `v` the curvature of vertex `v` (its bits as they are), its version `(2 << 8) | 1`
+  (the shape intent; an MGH file writes it in its header's first `int`), written by `MRIwrite` (the
+  volume formats' own rules: `specs/freesurfer-io.md` §84); `MRIwrite`'s status returned. A surface of
+  no vertex gives the volume's message `MRI::Shape::Shape(): volume size must be greater than 0 in
+  every dimension` and whatever the writer does with it.
+- VTK: §54's VTK surface writer, then its curvature appender, on the same name (their messages);
+  `NO_ERROR` (0) whatever they gave.
+- ASCII (`.asc`): §57's text curvature writer's status.
+- GIFTI: §109's writer with `NIFTI_INTENT_SHAPE` (2005) and `curv_name`; its status.
+- any other name (the new binary format): the file created (`wb`); the bytes `ff ff ff`, the vertex
+  count, the face count and 1 as big-endian 32-bit integers, then each vertex's curvature as a
+  big-endian 32-bit float with its bits as they are; `NO_ERROR`. A file that cannot be created:
+  the text of `errno` (`error: <text>`) then `MRISwriteCurvature: could not open <file>` as an error
+  (`specs/freesurfer-core.md` §2's `ErrorPrintf` form), `ERROR_NOFILE` (-1), nothing written.
+
+**122.2 Reading** (`MRISreadCurvatureFile(mris, name, curvmri, overlays)`, both last absent by
+default). The file and its type are those of §80's curvature reader's name
+(`MRISreadCurvatureFile_getfilename`, FS-126, FS-148, `FS_GII`'s rule). By type:
+- VTK: §62's VTK reader into the surface (its counts and faces must be the file's; its coordinates
+  kept; the fields' values in `curv` and `val`); `curvmri` is not given to it. No surface back
+  (an error, its messages printed): `ERROR_BADFILE` (-5); else `NO_ERROR`.
+- MGH, NIfTI, or the new binary format: §122.3.
+- ASCII: §57's text curvature reader with `curvmri`; its status.
+- GIFTI: §107's reader with the surface given and the overlays' list (`-1`: every array, no colour
+  table): a file of shapes fills the surface's curvature (and the list); a surface file makes a new
+  surface, which the caller never sees (its own surface as the reader left it). No surface back:
+  `ERROR_BADFILE`; else `NO_ERROR`.
+- anything else: §58's old binary format reader with `curvmri`; its status.
+
+**122.3 A volume of values.** The frame read is `MRISgetReadFrame()`'s (§47: the frame set, else
+`MRIS_READVAL_FRAME` read as a decimal number, else 0). The volume: for MGH and NIfTI the whole
+volume as `MRIread` reads it (below); for the new binary format `specs/freesurfer-io.md`'s curvature-as-volume reader (`MRISreadCurvAsMRI`)
+(`<vertices>` x 1 x 1). Nothing read: `ERROR_BADFILE`. A frame not below the volume's frame count:
+`ERROR: attempted to read frame <f> from <file>` and `  but this file only has <n> frames.`
+(standard output), `ERROR_BADFILE`. The volume's width x height x depth (32-bit integer product)
+not the surface's vertex count: `ERROR: number of vertices in <file> does not match surface
+(<n>,<vertices>)` (standard output), status 1. Else each voxel of that frame, slices outermost,
+then rows, then columns, goes to the next vertex's `curv` (as a `float`, its bits kept), and, given
+`curvmri`, to `curvmri`'s voxel at the same column, row and slice of frame 0 (a type smaller than
+float clamps and rounds as a voxel store does; a voxel outside `curvmri`'s extent is memory the
+program does not own: fs.mri's FS-53, nothing written in either mode); the surface's `max_curv`
+and `min_curv` from the values (the first voxel starts both; a NaN never replaces either after
+that; 10,000 and -10,000 when the volume has no voxel); `NO_ERROR`. A negative frame reads before
+the volume's first frame (FS-52 or FS-53).
+
+**122.4 `MRIread`** as the MGH and NIfTI branch uses it: a name holding `*` becomes the first path
+the C library's `glob` finds for it (sorted; none: the name as it is); the volume is read with every
+frame and its voxels (`specs/freesurfer-io.md` §42's `mri_read`, its messages); then every voxel that is
+not finite (columns outermost, then rows, slices, frames) is counted and set to 0 unless
+`FS_LEAVE_NANS` is set (to any value); the first such voxel in the process prints `NaN found at
+voxel (<c>, <r>, <s>, <f>)` (standard output, once per process); a count above 0 then gives
+`WARNING: <n> NaNs found in volume <name>...` as an error (`specs/freesurfer-core.md` §2's form: the text of `errno` first
+when it is set; `Gerror` `ERROR_BADPARM`), `<name>` the name as read.
+
+**122.5 Not translated.** `MRISreadBinaryCurvature` and `MRISreadNewCurvatureFile`: no FreeSurfer
+8.2.0 program or library function calls them.
+
+## 123. Validation plan, part 25
+
+The probe's `crv` command (relay 35 of track D): an empty work folder with `d` and `d/s`; `Gdiag`'s
+show and verbose bits one case in four; `FS_POSIX` one case in six, `FS_GII` (`.gii`, `x` or empty)
+one in six, `MRIS_READVAL_FRAME` (`0`, `1`, `2`, `-1`, `x`, `3`) one in eight, `FS_LEAVE_NANS` one in
+four; `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` and `SURFER_SIDEDOOR` always; the read frame
+set (-2 to 2) one case in eight; 0 to 3 input files in `d` (most after `lh.`), `d/s` or the top,
+by their names' formats: MGH and MGZ volumes and NIfTI-1 files (`.nii`, `.nii.gz`) of mostly one
+voxel per vertex (now and then along another axis, split in two rows, or one voxel more or fewer;
+1 to 3 frames; bytes, shorts, ints or floats with NaNs and infinities; a NIfTI scale now and then;
+now and then cut), text curvature files, VTK files, GIFTI files (§108's), the old and new binary
+formats, and for the non-volume names random bytes one time in twelve; a surface from `MRISalloc`
+of 0 to 6 vertices (coordinates in eighths, NaNs and infinities in heavy cases; curvature and `val`
+with signalling and quiet NaNs of both signs) and 0 to 3 faces, half the cases a left surface named
+`d/lh.white`, else of another hemisphere or name; then 1 to 4 writes and reads: names of the 14
+formats' last parts alone, after `lh.` or `rh.`, with `d/`, `d/s/` or `./`, odd names (empty, a
+dot at their first or second byte, a folder that does not exist, wildcards, `both.`), names of
+about 1,024 bytes when the seed is not 1; a read takes the name just written one time in two, else
+an input's name (whole, or its last part) or a new one; a read gives a volume of the values (float,
+bytes, shorts or ints) one time in three and the overlays' list one time in four. Each status, the
+volume's values, the overlays (name, type, intent, shape type, format, values per vertex, the
+volume's extent and first row); then every vertex's position, `curv` and `val`, `max_curv`,
+`min_curv`, the counts, and every file in the folder (a `.gii` file with its `UserName` written `U`
+and its data inflated: §111). Expected: every line identical under `reproduce`, except cases noted
+with fs.io's or fs.mri's memory defects (counted, not compared); the default identical but where a
+noted defect it corrects changed the result. Observed (relay 35): seed 7, 400 cases: 0 different
+with `reproduce` (15 counted), the default different only with notices; seeds 13 and 17, 1,000
+cases each: 0 different (29 and 32 counted). On recorded heads (the probe's `flr crv`, three heads,
+both hemispheres): `curv`, `sulc`, `thickness`, `area`, `curv.pial`, `jacobian_white`, `volume` and
+the MGH overlay `w-g.pct.mgh` read into the white surface, written in the new binary format, MGZ,
+compressed NIfTI, GIFTI and VTK and read back: 48 of 48 identical, and every new-format file written
+is the recorded file byte for byte (observed). A clean-room implementer's black-box form: the
+recorded heads' per-vertex files are §122.1's new binary format as recon-all's programs wrote them
+(`mris_curvature -w` writes its `.H` and `.K` files through it): read one, write it back, compare
+the bytes.
 

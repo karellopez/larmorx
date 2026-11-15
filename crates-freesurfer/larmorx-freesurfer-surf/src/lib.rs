@@ -81,6 +81,7 @@ pub mod base;
 pub mod basemisc;
 pub mod binarize;
 pub mod coords;
+pub mod curvfile;
 pub mod curvio;
 pub mod discrete;
 pub mod dist;

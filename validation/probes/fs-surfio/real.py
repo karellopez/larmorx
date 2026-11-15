@@ -14,7 +14,10 @@ between each hemisphere's white and pial surfaces in ``orig.mgz``'s geometry (``
 mris_volmask's), and the white surface's interior in its bounding volume at 0.5 mm
 (``MRISmakeBoundingVolume`` then ``MRISfillInterior``, mris_place_surface's T2 and FLAIR steps).
 Compares the result lines (extent, type, frames, geometry, the count of voxels that are not 0 and
-the FNV-1a of the voxels). Prints the counts; the lines name machine paths, so no hash is recorded
+the FNV-1a of the voxels). With ``--curv`` (relay 35 of track D): each head's recorded per-vertex
+files (``CURVS``) read into its white surface by ``MRISreadCurvatureFile``, written by
+``MRISwriteCurvature`` in the new binary format, MGZ, compressed NIfTI, GIFTI and VTK, the new-format
+file compared with the recorded one byte for byte, and the MGZ and new-format files read back. Prints the counts; the lines name machine paths, so no hash is recorded
 from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]
@@ -39,6 +42,18 @@ from larmorx_validation.freesurfer_unit import freesurfer_env  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
 HEADS = ("ds000005-sub-01", "ds000228-sub-pixar008", "ds002422-sub-02")
+# relay 35 of track D: the per-vertex files recon-all writes with MRISwriteCurvature (the new binary
+# format, and the MGH overlay of mri_segstats' grey/white contrast)
+CURVS = (
+    "curv",
+    "sulc",
+    "thickness",
+    "area",
+    "curv.pial",
+    "jacobian_white",
+    "volume",
+    "w-g.pct.mgh",
+)
 
 
 def dx(v: float) -> str:
@@ -49,6 +64,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--curv",
+        action="store_true",
+        help="relay 35 of track D: the curvature files (flr crv): each head's recorded curvature "
+        "files read into the white surface, written in five formats, read back",
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -60,6 +81,12 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.curv:
+                for c in CURVS:
+                    lines.append(
+                        f"flr crv {s / 'surf' / f'{hemi}.white'} {s / 'surf' / f'{hemi}.{c}'}"
+                    )
+                continue
             for surf in ("white", "pial"):
                 lines.append(f"flr fil {s / 'surf' / f'{hemi}.{surf}'} {s / 'mri' / 'aseg.mgz'}")
             lines.append(
@@ -69,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"flr bbf {s / 'surf' / f'{hemi}.white'} {dx(0.5)}")
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
-    cases_path = inputs / "real-flood-cases.txt"
+    cases_path = inputs / ("real-curv-cases.txt" if a.curv else "real-flood-cases.txt")
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}
     env.update(freesurfer_env())

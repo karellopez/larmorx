@@ -14,7 +14,9 @@
 //! (`fil`) and the bounding volume filled (`bbf`), each printing its numbers or volume: the
 //! generator and the port's answers, as `fssurfio.cpp`'s.
 
+use super::gwr::gii_normal;
 use super::mpd::{grid, ico};
+use super::sfile::list_files;
 use super::srd::{Mesh, be4, mesh};
 use super::*;
 
@@ -22,7 +24,7 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{Mri, mri_alloc};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_surf::{mriflood, readwrite, sras};
+use larmorx_freesurfer_surf::{curvfile, mriflood, readwrite, sras};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
 pub(super) const FRAMES: [[f32; 9]; 6] = [
@@ -629,7 +631,14 @@ fn flr_put(g: &mut Globals, err: &mut dyn Write, m: Option<&Mri>, o: &mut Out) {
 /// <resolution>`: the recorded heads' calls (`real.py`), as `fssurfio.cpp`'s.
 pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     cx.g.progname = "fssurfio".into();
-    let env = Environment::from_pairs(vec![("SURFER_SIDEDOOR".to_owned(), "1".to_owned())]);
+    // relay 35 of track D: a GIFTI file's `Date` (`flr crv`) the same on both sides
+    let env = Environment::from_pairs(vec![
+        ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
+        (
+            "FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING".to_owned(),
+            "probe date".to_owned(),
+        ),
+    ]);
     let (mut so, mut se) = (cx.a.clone(), cx.b.clone());
     let mut io = coords::Io {
         out: &mut so,
@@ -681,6 +690,78 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             let mut b = mriflood::mris_make_bounding_volume(g, &mut io, &s, res)?;
             mriflood::mris_fill_interior(g, sg, &mut io, &mut s, res, Some(&mut b))?;
             flr_put(g, io.err, Some(&b), o);
+        }
+        "crv" => {
+            // relay 35 of track D: `fssurfio.cpp`'s `flr crv` (a recorded curvature file read,
+            // written in five formats into a work folder, read back)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let cf = t.next().to_owned();
+            let td = tempfile::tempdir().expect("a work folder");
+            let dir = td.path();
+            let fnv = |b: &[u8], o: &mut Out| {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for &c in b {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let curv_fnv = |s: &Mris, o: &mut Out| {
+                let mut b = Vec::new();
+                for v in 0..s.nvertices.max(0) as usize {
+                    b.extend_from_slice(&s.vertex(v).curv.to_bits().to_le_bytes());
+                }
+                fnv(&b, o);
+                o.f(s.max_curv);
+                o.f(s.min_curv);
+            };
+            let r = curvfile::read_curvature_file(g, sg, &mut io, None, &mut s, &cf, None, None)?;
+            o.i(i64::from(r));
+            curv_fnv(&s, o);
+            // five stems: a GIFTI file beside a file of its stem would stop the read-back
+            for nm in ["./o", "./m.mgz", "./n.nii.gz", "./g.gii", "./v.vtk"] {
+                let r = curvfile::write_curvature(g, &mut io, Some(dir), &mut s, nm, None)?;
+                o.i(i64::from(r));
+            }
+            let mut files = Vec::new();
+            list_files(dir, "", &mut files);
+            files.sort();
+            let slurp = |n: &str| std::fs::read(dir.join(n)).unwrap_or_default();
+            for n in &files {
+                o.h(Some(n.as_bytes()));
+                let b = slurp(n);
+                if n.ends_with(".gii") {
+                    fnv(&gii_normal(&b), o);
+                } else {
+                    fnv(&b, o);
+                }
+            }
+            let written = files
+                .iter()
+                .filter(|n| n.ends_with(".o"))
+                .map(|n| slurp(n))
+                .next_back()
+                .unwrap_or_default();
+            o.i(i64::from(written == std::fs::read(&cf).unwrap_or_default()));
+            for n in &files {
+                if !n.ends_with(".o") && !n.contains(".mgz") {
+                    continue;
+                }
+                for v in 0..s.nvertices.max(0) as usize {
+                    s.vertex_mut(v).curv = 0.0;
+                }
+                let r = curvfile::read_curvature_file(
+                    g,
+                    sg,
+                    &mut io,
+                    Some(dir),
+                    &mut s,
+                    &format!("./{n}"),
+                    None,
+                    None,
+                )?;
+                o.i(i64::from(r));
+                curv_fnv(&s, o);
+            }
         }
         _ => panic!("flr op {op}"),
     }

@@ -273,6 +273,7 @@ name = "larmorx-core"
 version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
+ "flate2",
  "ndarray",
  "num-complex",
  "rayon",

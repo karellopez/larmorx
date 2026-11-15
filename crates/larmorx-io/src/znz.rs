@@ -6,16 +6,17 @@
 //! the version Ubuntu 22.04 ships), translated with its
 //! buffers (8 KiB of input, 16 KiB of output) and states (`LOOK`, `COPY`, `GZIP`), so that reads,
 //! seeks, `gztell`, `gzeof` and the end of corrupt or truncated data come at the same calls as in
-//! zlib; inflate and deflate themselves are zlib-rs's (through flate2). The decompressed bytes are
-//! zlib's; the compressed bytes a writer produces are zlib-rs's at the same level (a deflate that
-//! gives zlib's own bytes is not ported). The plain side is C's stdio, by its
-//! description (ISO C 7.21) and glibc's behaviour.
+//! zlib. Inflate is zlib-rs's (through flate2; the decompressed bytes are fixed by the format);
+//! deflate is zlib 1.2.11's own ([`larmorx_core::zlib`]), fed as `gzwrite.c` feeds it (its input
+//! and output buffers, `gz_comp`'s loop), so a written file has zlib's bytes. The plain side is
+//! C's stdio, by its description (ISO C 7.21) and glibc's behaviour.
 
 use std::io::{Read, Seek, SeekFrom, Write};
 
-use flate2::{Compress, Compression, Decompress, FlushCompress, FlushDecompress, Status};
+use flate2::{Decompress, FlushDecompress, Status};
 use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{self as d, Notices, UpstreamDefects};
+use larmorx_core::zlib::{self as zl, Deflate};
 
 /// `SEEK_SET`, `SEEK_CUR`, `SEEK_END` (C's values).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,9 +76,18 @@ pub struct GzFile {
     inflate: Option<Decompress>,
     /// Inflate's room for a caller's buffer (at most [`SCRATCH`] bytes).
     scratch: Vec<u8>,
-    // writing
-    deflate: Option<Compress>,
-    wbuf: Vec<u8>,
+    // writing (gz_init's buffers: `in` of twice `want` bytes, `out` of `want`)
+    strategy: i32,
+    deflate: Option<Deflate>,
+    /// `state->in`, with `strm.next_in` (an offset in it) and `strm.avail_in`.
+    inb: Vec<u8>,
+    w_next: usize,
+    w_avail: usize,
+    /// `state->out`, with `strm.next_out` (an offset), `strm.avail_out` and `state->x.next`.
+    outb: Vec<u8>,
+    o_next: usize,
+    o_avail: usize,
+    x_wnext: usize,
     // both
     x_pos: i64,
     seek: bool,
@@ -423,14 +433,7 @@ impl ZnzFile {
                     -1
                 }
             }
-            Inner::Gz(g) => {
-                let n = g.gzwrite(s);
-                if n < 0 || (n as usize) < s.len() && !s.is_empty() {
-                    -1
-                } else {
-                    n
-                }
-            }
+            Inner::Gz(g) => g.gzputs(s),
         }
     }
 
@@ -564,6 +567,7 @@ impl GzFile {
     pub fn open(path: &[u8], mode: &[u8]) -> Option<GzFile> {
         let mut m = None;
         let mut level = -1;
+        let mut strategy = zl::Z_DEFAULT_STRATEGY;
         let mut direct = false;
         let mut exclusive = false;
         let mut append = false;
@@ -581,6 +585,10 @@ impl GzFile {
                 }
                 b'+' => return None,
                 b'x' => exclusive = true,
+                b'f' => strategy = zl::Z_FILTERED,
+                b'h' => strategy = zl::Z_HUFFMAN_ONLY,
+                b'R' => strategy = zl::Z_RLE,
+                b'F' => strategy = zl::Z_FIXED,
                 b'T' => direct = true,
                 _ => {}
             }
@@ -633,8 +641,15 @@ impl GzFile {
             how: How::Look,
             inflate: None,
             scratch: Vec::new(),
+            strategy,
             deflate: None,
-            wbuf: Vec::new(),
+            inb: Vec::new(),
+            w_next: 0,
+            w_avail: 0,
+            outb: Vec::new(),
+            o_next: 0,
+            o_avail: 0,
+            x_wnext: 0,
             x_pos: 0,
             seek: false,
             skip: 0,
@@ -657,6 +672,7 @@ impl GzFile {
         self.error(Z_OK);
         self.x_pos = 0;
         self.avail_in = 0;
+        self.w_avail = 0;
     }
 
     /// `gz_error` (the message is not kept: znzlib never asks for it).
@@ -1077,12 +1093,19 @@ impl GzFile {
                 return -1;
             }
         }
-        if self.size > 0 && self.wbuf.len() < self.size {
-            self.wbuf.push(c as u8);
-            self.x_pos += 1;
-            return c & 0xff;
+        if self.size > 0 {
+            if self.w_avail == 0 {
+                self.w_next = 0;
+            }
+            let have = self.w_next + self.w_avail;
+            if have < self.size {
+                self.inb[have] = c as u8;
+                self.w_avail += 1;
+                self.x_pos += 1;
+                return c & 0xff;
+            }
         }
-        if self.gzwrite(&[c as u8]) == 1 {
+        if self.write_bytes(&[c as u8]) == 1 {
             c & 0xff
         } else {
             -1
@@ -1101,61 +1124,104 @@ impl GzFile {
 
     // ---- writing (gzwrite.c) ----
 
-    /// `gz_init`.
-    fn init_write(&mut self) {
-        self.wbuf = Vec::with_capacity(self.want);
+    /// `gz_init`: the buffers and (unless writing directly) the deflate stream (gzip wrapper,
+    /// window 15, memory level 8).
+    fn init_write(&mut self) -> Result<(), ()> {
+        self.inb = vec![0u8; self.want << 1];
         if !self.direct {
-            let level = if self.level < 0 { 6 } else { self.level as u32 };
-            self.deflate = Some(Compress::new_gzip(Compression::new(level), 15));
-        }
-        self.size = self.want;
-    }
-
-    /// `gz_comp(flush)`: compresses the buffered input and writes what deflate gives.
-    fn comp(&mut self, flush: FlushCompress) -> Result<(), ()> {
-        if self.size == 0 {
-            self.init_write();
-        }
-        let input = std::mem::take(&mut self.wbuf);
-        if self.direct {
-            if self.file.write_all(&input).is_err() {
-                self.error(Z_ERRNO);
-                return Err(());
-            }
-            self.wbuf = input;
-            self.wbuf.clear();
-            return Ok(());
-        }
-        let d = self.deflate.as_mut().expect("deflate state");
-        let mut at = 0usize;
-        let mut out = vec![0u8; self.want];
-        loop {
-            let (ti, to) = (d.total_in(), d.total_out());
-            let st = d.compress(&input[at..], &mut out, flush);
-            at += (d.total_in() - ti) as usize;
-            let made = (d.total_out() - to) as usize;
-            if made > 0 && self.file.write_all(&out[..made]).is_err() {
-                self.error(Z_ERRNO);
-                return Err(());
-            }
-            match st {
+            self.outb = vec![0u8; self.want];
+            match Deflate::init2(
+                self.level,
+                zl::Z_DEFLATED,
+                zl::MAX_WBITS + 16,
+                zl::DEF_MEM_LEVEL,
+                self.strategy,
+            ) {
+                Ok(d) => self.deflate = Some(d),
                 Err(_) => {
-                    self.error(Z_STREAM_ERROR);
+                    self.error(zl::Z_MEM_ERROR);
                     return Err(());
                 }
-                Ok(Status::StreamEnd) => break,
-                Ok(_) => {
-                    if made == 0 && (at == input.len() || (d.total_in() - ti) == 0) {
-                        break;
-                    }
-                }
             }
         }
-        if flush == FlushCompress::Finish {
-            d.reset();
+        self.size = self.want;
+        if !self.direct {
+            self.o_avail = self.size;
+            self.o_next = 0;
+            self.x_wnext = 0;
         }
-        self.wbuf = input;
-        self.wbuf.clear();
+        Ok(())
+    }
+
+    /// `gz_comp(flush)`: deflate on the input at `next_in` (the input buffer, or `user`'s bytes
+    /// for `gz_write`'s direct path) until it produces no more output, the output buffer written
+    /// out when full or when flushing (for `Z_FINISH`, at the stream's end).
+    fn comp(&mut self, flush: i32, user: Option<&[u8]>) -> Result<(), ()> {
+        if self.size == 0 {
+            self.init_write()?;
+        }
+        if self.direct {
+            let src = match user {
+                Some(u) => &u[self.w_next..self.w_next + self.w_avail],
+                None => &self.inb[self.w_next..self.w_next + self.w_avail],
+            };
+            if self.file.write_all(src).is_err() {
+                self.error(Z_ERRNO);
+                return Err(());
+            }
+            self.w_next += self.w_avail;
+            self.w_avail = 0;
+            return Ok(());
+        }
+        let mut ret = Z_OK;
+        loop {
+            if self.o_avail == 0
+                || (flush != zl::Z_NO_FLUSH && (flush != zl::Z_FINISH || ret == zl::Z_STREAM_END))
+            {
+                if self.o_next > self.x_wnext {
+                    if self
+                        .file
+                        .write_all(&self.outb[self.x_wnext..self.o_next])
+                        .is_err()
+                    {
+                        self.error(Z_ERRNO);
+                        return Err(());
+                    }
+                    self.x_wnext = self.o_next;
+                }
+                if self.o_avail == 0 {
+                    self.o_avail = self.size;
+                    self.o_next = 0;
+                    self.x_wnext = 0;
+                }
+            }
+            let have = self.o_avail;
+            let d = self.deflate.as_mut().expect("deflate state");
+            let src = match user {
+                Some(u) => &u[self.w_next..self.w_next + self.w_avail],
+                None => &self.inb[self.w_next..self.w_next + self.w_avail],
+            };
+            let (r, used, made) = d.deflate(
+                src,
+                &mut self.outb[self.o_next..self.o_next + self.o_avail],
+                flush,
+            );
+            self.w_next += used;
+            self.w_avail -= used;
+            self.o_next += made;
+            self.o_avail -= made;
+            ret = r;
+            if r == Z_STREAM_ERROR {
+                self.error(Z_STREAM_ERROR);
+                return Err(());
+            }
+            if have == self.o_avail {
+                break;
+            }
+        }
+        if flush == zl::Z_FINISH {
+            self.deflate.as_mut().expect("deflate state").reset();
+        }
         Ok(())
     }
 
@@ -1171,17 +1237,86 @@ impl GzFile {
                 ),
             );
         }
-        if !self.wbuf.is_empty() {
-            self.comp(FlushCompress::None)?;
+        if self.w_avail != 0 {
+            self.comp(zl::Z_NO_FLUSH, None)?;
         }
+        let mut first = true;
         while len > 0 {
-            let n = (self.size as i64).min(len) as usize;
-            self.wbuf.resize(n, 0);
+            let n = if self.size as i64 > len {
+                len as usize
+            } else {
+                self.size
+            };
+            if first {
+                self.inb[..n].fill(0);
+                first = false;
+            }
+            self.w_avail = n;
+            self.w_next = 0;
             self.x_pos += n as i64;
-            self.comp(FlushCompress::None)?;
+            self.comp(zl::Z_NO_FLUSH, None)?;
             len -= n as i64;
         }
         Ok(())
+    }
+
+    /// `gz_write`: the bytes taken, or 0 after an error.
+    fn write_bytes(&mut self, buf: &[u8]) -> usize {
+        if buf.is_empty() {
+            return 0;
+        }
+        if self.size == 0 && self.init_write().is_err() {
+            return 0;
+        }
+        if self.seek {
+            self.seek = false;
+            if self.zero(self.skip).is_err() {
+                return 0;
+            }
+        }
+        if buf.len() < self.size {
+            let mut rest = buf;
+            loop {
+                if self.w_avail == 0 {
+                    self.w_next = 0;
+                }
+                let have = self.w_next + self.w_avail;
+                let copy = (self.size - have).min(rest.len());
+                self.inb[have..have + copy].copy_from_slice(&rest[..copy]);
+                self.w_avail += copy;
+                self.x_pos += copy as i64;
+                rest = &rest[copy..];
+                if !rest.is_empty() && self.comp(zl::Z_NO_FLUSH, None).is_err() {
+                    return 0;
+                }
+                if rest.is_empty() {
+                    break;
+                }
+            }
+        } else {
+            if self.w_avail != 0 && self.comp(zl::Z_NO_FLUSH, None).is_err() {
+                return 0;
+            }
+            let mut at = 0usize;
+            while at < buf.len() {
+                let n = (buf.len() - at).min(u32::MAX as usize);
+                self.w_next = at;
+                self.w_avail = n;
+                self.x_pos += n as i64;
+                if self.comp(zl::Z_NO_FLUSH, Some(buf)).is_err() {
+                    return 0;
+                }
+                at = self.w_next;
+            }
+            if self.w_avail != 0 {
+                // zlib would keep pointing into the caller's buffer; the bytes are kept instead
+                let (a, n) = (self.w_next, self.w_avail);
+                self.inb[..n].copy_from_slice(&buf[a..a + n]);
+            }
+            // (with nothing left, zlib's `next_in` points past the caller's bytes, never read)
+            self.w_next = 0;
+        }
+        buf.len()
     }
 
     /// `gzwrite`: the bytes taken, or 0 after an error.
@@ -1193,45 +1328,34 @@ impl GzFile {
             self.error(Z_DATA_ERROR);
             return 0;
         }
-        if buf.is_empty() {
-            return 0;
+        self.write_bytes(buf) as i32
+    }
+
+    /// `gzputs(str)`: the bytes before the first zero; their count, or -1.
+    pub fn gzputs(&mut self, s: &[u8]) -> i32 {
+        if self.mode != GzMode::Write || self.err != Z_OK {
+            return -1;
         }
-        if self.size == 0 {
-            self.init_write();
-        }
-        if self.seek {
-            self.seek = false;
-            if self.zero(self.skip).is_err() {
-                return 0;
-            }
-        }
-        if buf.len() < self.size {
-            let mut rest = buf;
-            while !rest.is_empty() {
-                let copy = (self.size - self.wbuf.len()).min(rest.len());
-                self.wbuf.extend_from_slice(&rest[..copy]);
-                self.x_pos += copy as i64;
-                rest = &rest[copy..];
-                if !rest.is_empty() && self.comp(FlushCompress::None).is_err() {
-                    return 0;
-                }
-            }
+        let s = &s[..s.iter().position(|&b| b == 0).unwrap_or(s.len())];
+        let ret = self.write_bytes(s);
+        if ret == 0 && !s.is_empty() {
+            -1
         } else {
-            if !self.wbuf.is_empty() && self.comp(FlushCompress::None).is_err() {
-                return 0;
-            }
-            self.wbuf.extend_from_slice(buf);
-            self.x_pos += buf.len() as i64;
-            if self.comp(FlushCompress::None).is_err() {
-                return 0;
-            }
+            ret as i32
         }
-        buf.len() as i32
     }
 
     /// `gzflush(Z_SYNC_FLUSH)`.
     pub fn gzflush(&mut self) -> i32 {
+        self.gzflush_with(zl::Z_SYNC_FLUSH)
+    }
+
+    /// `gzflush(flush)`.
+    pub fn gzflush_with(&mut self, flush: i32) -> i32 {
         if self.mode != GzMode::Write || self.err != Z_OK {
+            return Z_STREAM_ERROR;
+        }
+        if !(0..=zl::Z_FINISH).contains(&flush) {
             return Z_STREAM_ERROR;
         }
         if self.seek {
@@ -1240,8 +1364,46 @@ impl GzFile {
                 return self.err;
             }
         }
-        let _ = self.comp(FlushCompress::Sync);
+        let _ = self.comp(flush, None);
         self.err
+    }
+
+    /// `gzsetparams(level, strategy)`.
+    pub fn gzsetparams(&mut self, level: i32, strategy: i32) -> i32 {
+        if self.mode != GzMode::Write || self.err != Z_OK {
+            return Z_STREAM_ERROR;
+        }
+        if level == self.level && strategy == self.strategy {
+            return Z_OK;
+        }
+        if self.seek {
+            self.seek = false;
+            if self.zero(self.skip).is_err() {
+                return self.err;
+            }
+        }
+        if self.size != 0 {
+            if self.w_avail != 0 && self.comp(zl::Z_BLOCK, None).is_err() {
+                return self.err;
+            }
+            if let Some(d) = self.deflate.as_mut() {
+                let (wn, wa) = (self.w_next, self.w_avail);
+                let (on, oa) = (self.o_next, self.o_avail);
+                let (_, used, made) = d.params(
+                    level,
+                    strategy,
+                    &self.inb[wn..wn + wa],
+                    &mut self.outb[on..on + oa],
+                );
+                self.w_next += used;
+                self.w_avail -= used;
+                self.o_next += made;
+                self.o_avail -= made;
+            }
+        }
+        self.level = level;
+        self.strategy = strategy;
+        Z_OK
     }
 
     /// `gzclose`: `gzclose_r` (`Z_BUF_ERROR` when the data ended early, else `Z_OK`) or
@@ -1273,7 +1435,7 @@ impl GzFile {
                         ret = self.err;
                     }
                 }
-                if self.comp(FlushCompress::Finish).is_err() {
+                if self.comp(zl::Z_FINISH, None).is_err() {
                     ret = self.err;
                 }
                 if self.file.flush().is_err() {
@@ -1303,7 +1465,7 @@ mod tests {
     use larmorx_core::cfmt::{Captured, Stream};
 
     fn gz(data: &[u8]) -> Vec<u8> {
-        let mut e = flate2::write::GzEncoder::new(Vec::new(), Compression::new(6));
+        let mut e = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::new(6));
         e.write_all(data).unwrap();
         e.finish().unwrap()
     }

@@ -12,3 +12,7 @@ ndarray.workspace = true
 num-complex.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+# zlib-rs's inflater checks the compressor's streams (tests only).
+flate2.workspace = true

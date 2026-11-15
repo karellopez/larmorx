@@ -382,11 +382,9 @@ pub fn mri_remove_nans(
             for y in 0..h.max(0) {
                 for z in 0..d.max(0) {
                     for f in 0..nf.max(0) {
-                        let o = (f as usize * vol
-                            + z as usize * slice
-                            + y as usize * row
-                            + x as usize)
-                            * 4;
+                        let o =
+                            (f as usize * vol + z as usize * slice + y as usize * row + x as usize)
+                                * 4;
                         let Some(b) = chunk.get_mut(o..o + 4) else {
                             continue;
                         };
@@ -436,7 +434,12 @@ pub fn mri_remove_nans(
 /// reached` and FreeSurfer then writes the line's address over the count and the field after
 /// the table (FS-842: the count becomes memory contents, the next call or the writer crashes or
 /// writes garbage); the port keeps the line in both modes (the message printed, noted).
-pub fn mri_add_command_line(g: &mut Globals, err: &mut dyn Write, m: &mut Mri, cmdline: &[u8]) -> i32 {
+pub fn mri_add_command_line(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    m: &mut Mri,
+    cmdline: &[u8],
+) -> i32 {
     if m.cmdlines.len() >= MAX_CMDS {
         log::error(
             g,

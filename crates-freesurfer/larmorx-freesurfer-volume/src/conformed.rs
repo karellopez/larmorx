@@ -58,7 +58,11 @@ fn extents(vg: &VolGeom) -> ([f64; 3], f64) {
 pub fn mri_find_min_size(g: &mut Globals, vg: &VolGeom) -> (f32, i32) {
     let (xs, ys, zs) = (vg.xsize, vg.ysize, vg.zsize);
     let min = if f64::from(xs) > f64::from(ys) {
-        if f64::from(ys) > f64::from(zs) { zs } else { ys }
+        if f64::from(ys) > f64::from(zs) {
+            zs
+        } else {
+            ys
+        }
     } else if f64::from(zs) > f64::from(xs) {
         xs
     } else {

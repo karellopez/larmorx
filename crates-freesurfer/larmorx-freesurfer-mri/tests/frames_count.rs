@@ -44,7 +44,10 @@ fn the_limit_is_16_gib_of_frame_records() {
         let mut g = Globals::new(mode);
         assert!(frames_calloc_fails(&mut g, -1));
         assert!(frames_calloc_fails(&mut g, i32::MIN));
-        assert!(g.notices.is_empty(), "a negative count is calloc's own failure");
+        assert!(
+            g.notices.is_empty(),
+            "a negative count is calloc's own failure"
+        );
         assert!(!frames_calloc_fails(&mut g, 0));
     }
 }

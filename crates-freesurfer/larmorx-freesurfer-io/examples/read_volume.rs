@@ -23,7 +23,9 @@ fn main() {
     let mut g = Globals::new(mode);
     let (mut out, mut err) = (std::io::stdout(), std::io::stderr());
     let env = Environment::default();
-    let m = larmorx_freesurfer_io::mriio::mri_read_volume(&mut g, &mut out, &mut err, &env, None, &args[1]);
+    let m = larmorx_freesurfer_io::mriio::mri_read_volume(
+        &mut g, &mut out, &mut err, &env, None, &args[1],
+    );
     let ids: Vec<&str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
     match m {
         Ok(Some(m)) => println!(

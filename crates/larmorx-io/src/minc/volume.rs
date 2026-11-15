@@ -273,6 +273,47 @@ impl Volume {
         Ok(Some(v))
     }
 
+    /// `create_volume` as a program calls it to write a volume: [`Volume::create`], with the
+    /// notices of a type volume_io leaves unset (FS-781: a type it has no case for, whose data
+    /// type is then memory never written; FS-801: `MI_ORIGINAL_TYPE`, whose voxel range and sign
+    /// are then memory never written: here 0, 0 and unsigned).
+    pub fn create_volume(
+        c: &mut super::Ctx,
+        n_dimensions: i32,
+        names: Option<&[Vec<u8>]>,
+        nc_type: i32,
+        signed: bool,
+        voxel_min: f64,
+        voxel_max: f64,
+    ) -> Result<Option<Volume>, super::Exit> {
+        let v = Volume::create(
+            n_dimensions,
+            names,
+            nc_type,
+            signed,
+            voxel_min,
+            voxel_max,
+            c.dialect,
+            c.streams,
+        )?;
+        if v.is_some() {
+            if nc_type == MI_ORIGINAL_TYPE {
+                c.notices.add(
+                    &larmorx_core::defects::FS_801,
+                    "a volume created without a type: its voxel range taken as 0 to 0, unsigned (volume_io leaves them as memory never written)",
+                );
+            } else if data_type_of(nc_type, signed).is_none() {
+                c.notices.add(
+                    &larmorx_core::defects::FS_781,
+                    format!(
+                        "a volume of type {nc_type} created with no data type (volume_io leaves its type as memory never written)"
+                    ),
+                );
+            }
+        }
+        Ok(v)
+    }
+
     /// `get_volume_n_dimensions`.
     pub fn n_dimensions(&self) -> usize {
         self.sizes.len()
@@ -417,6 +458,175 @@ impl Volume {
         self.uptodate = false;
     }
 
+    /// `set_volume_direction_cosine`: the direction made a unit vector (a zero vector refused with
+    /// volume_io's warning), then [`Volume::set_direction_unit_cosine`].
+    pub fn set_direction_cosine(
+        &mut self,
+        axis: i32,
+        dir: &[f64; 3],
+        dialect: &dyn super::Dialect,
+        streams: &mut dyn Streams,
+    ) -> Result<(), super::Exit> {
+        use larmorx_core::ItkReal;
+        // volume_io's object code: (x x + y y) + z z, then each component / sqrt (NaNs as x86-64).
+        let mut len = dir[0]
+            .sse_mul(dir[0])
+            .sse_add(dir[1].sse_mul(dir[1]))
+            .sse_add(dir[2].sse_mul(dir[2]));
+        if len == 0.0 {
+            dialect.print_error(
+                "Warning: zero length direction cosine in set_volume_direction_cosine()\n",
+                streams,
+            );
+            if let Some(e) = dialect.zero_direction_cosine(streams) {
+                return Err(e);
+            }
+            return Ok(());
+        }
+        if len <= 0.0 {
+            len = 1.0;
+        }
+        let len = len.sqrt();
+        let unit = [
+            dir[0].sse_div(len),
+            dir[1].sse_div(len),
+            dir[2].sse_div(len),
+        ];
+        self.set_direction_unit_cosine(axis, &unit, dialect, streams);
+        Ok(())
+    }
+
+    /// `set_volume_translation`: the starts that put `voxel` at `world` with the volume's
+    /// separations and direction cosines (missing spatial axes completed orthogonally; a singular
+    /// set of directions solved by the identity, as volume_io's inverse gives it).
+    pub fn set_translation(
+        &mut self,
+        voxel: &[f64],
+        world: &[f64; 3],
+        dialect: &dyn super::Dialect,
+        streams: &mut dyn Streams,
+    ) {
+        use larmorx_core::ItkReal;
+        let mut t = xfm::make_identity_transform();
+        let mut origin = [0.0f64; 3];
+        let all3 = self.spatial_axes.iter().all(|&a| a >= 0);
+        for dim in 0..N_DIMENSIONS {
+            origin[dim] = world[dim];
+            for dim2 in 0..N_DIMENSIONS {
+                let axis = self.spatial_axes[dim2];
+                if axis >= 0 {
+                    let a = axis as usize;
+                    let (sep, cos) = (self.separations[a], self.direction_cosines[a][dim]);
+                    // volume_io's object code (three spatial axes): sep * cos, then * voxel, but
+                    // cos * sep for the second axis's z component (NaNs as x86-64).
+                    let p = if all3 && dim == 2 && dim2 == 1 {
+                        cos.sse_mul(sep)
+                    } else {
+                        sep.sse_mul(cos)
+                    };
+                    origin[dim] = origin[dim].sse_sub(p.sse_mul(voxel[a]));
+                    t[dim][dim2] = cos;
+                }
+            }
+        }
+        let n_axes = self.spatial_axes.iter().filter(|&&a| a >= 0).count();
+        let normalize = |t: &mut xfm::Transform, col: usize| {
+            let mut len = t[0][col] * t[0][col] + t[1][col] * t[1][col] + t[2][col] * t[2][col];
+            if len == 0.0 {
+                len = 1.0;
+            } else {
+                len = len.sqrt();
+            }
+            t[0][col] /= len;
+            t[1][col] /= len;
+            t[2][col] /= len;
+        };
+        if n_axes == 1 {
+            let dim = if self.spatial_axes[0] >= 0 {
+                0
+            } else if self.spatial_axes[1] >= 0 {
+                1
+            } else {
+                2
+            };
+            let a1 = if dim == 0 { 1 } else { 0 };
+            t[0][a1] = t[1][dim] + t[2][dim];
+            t[1][a1] = -t[0][dim] - t[2][dim];
+            t[2][a1] = t[1][dim] - t[0][dim];
+            normalize(&mut t, a1);
+        }
+        if n_axes == 1 || n_axes == 2 {
+            let dim = if self.spatial_axes[2] < 0 {
+                2
+            } else if self.spatial_axes[1] < 0 {
+                1
+            } else {
+                0
+            };
+            let a1 = (dim + 1) % N_DIMENSIONS;
+            let a2 = (dim + 2) % N_DIMENSIONS;
+            t[0][dim] = t[1][a1] * t[2][a2] - t[1][a2] * t[2][a1];
+            t[1][dim] = t[2][a1] * t[0][a2] - t[2][a2] * t[0][a1];
+            t[2][dim] = t[0][a1] * t[1][a2] - t[0][a2] * t[1][a1];
+            normalize(&mut t, dim);
+        }
+        let inverse = dialect
+            .xfm()
+            .invert(&t, streams)
+            .unwrap_or_else(xfm::make_identity_transform);
+        let s3 = xfm::transform_point(&inverse, origin[0], origin[1], origin[2]);
+        let mut starts = vec![0.0; self.n_dimensions()];
+        for dim in 0..N_DIMENSIONS {
+            let axis = self.spatial_axes[dim];
+            if axis >= 0 {
+                starts[axis as usize] = s3[dim];
+            }
+        }
+        self.set_starts(&starts);
+    }
+
+    /// `set_volume_voxel_value`: `value` stored in the volume's type as C's cast stores it on x86
+    /// (an integer type through a 32-bit truncation, an unsigned int through a 64-bit one; a
+    /// float rounded). Indices past the volume's dimensions are ignored; a voxel outside the
+    /// volume is not written.
+    pub fn set_voxel_value(&mut self, v: &[usize], value: f64) {
+        let n = self.n_dimensions();
+        if (0..n).any(|k| v[k] >= self.sizes[k].max(0) as usize) {
+            return;
+        }
+        let i = self.index(v);
+        let Some(d) = self.data.as_mut() else {
+            return;
+        };
+        if i >= d.len() {
+            return;
+        }
+        match d {
+            VolumeData::U8(a) => a[i] = super::libsrc::cvt_i32(value) as u8,
+            VolumeData::I8(a) => a[i] = super::libsrc::cvt_i32(value) as i8,
+            VolumeData::U16(a) => a[i] = super::libsrc::cvt_i32(value) as u16,
+            VolumeData::I16(a) => a[i] = super::libsrc::cvt_i32(value) as i16,
+            VolumeData::U32(a) => a[i] = super::libsrc::cvt_i64(value) as u32,
+            VolumeData::I32(a) => a[i] = super::libsrc::cvt_i32(value),
+            VolumeData::F32(a) => a[i] = super::libsrc::f64_to_f32(value),
+            VolumeData::F64(a) => a[i] = value,
+        }
+    }
+
+    /// `get_volume_dimension_names`: the volume's names with each spatial axis's canonical
+    /// (`xspace`, `yspace`, `zspace`).
+    pub fn dimension_names_canonical(&self) -> Vec<Vec<u8>> {
+        let mut names = self.dimension_names.clone();
+        let canon: [&[u8]; 3] = [b"xspace", b"yspace", b"zspace"];
+        for (i, c) in canon.iter().enumerate() {
+            let a = self.spatial_axes[i];
+            if a >= 0 {
+                names[a as usize] = c.to_vec();
+            }
+        }
+        names
+    }
+
     /// `set_volume_sizes`.
     pub fn set_sizes(&mut self, sizes: &[i32]) {
         let n = self.n_dimensions();
@@ -508,6 +718,22 @@ impl Volume {
             Some(d) => d.get(self.index(v)),
             None => 0.0,
         }
+    }
+
+    /// `alloc_volume_data` as a program calls it before writing a volume (with volume_io's message
+    /// for a volume without a data type, `false`): a dimension of size 0 allocated as no voxels
+    /// (volume_io sets up its pointers into an allocation of no bytes: allocating or writing such a
+    /// volume crashes or reads memory, FS-798). volume_io keeps a volume of more than its cache
+    /// threshold in its volume cache; written, a cached volume gives the same file, so it is
+    /// allocated whole here.
+    pub fn alloc_volume_data(&mut self, c: &mut super::Ctx) -> bool {
+        if self.data_type != DataType::None && self.sizes.contains(&0) {
+            c.notices.add(
+                &larmorx_core::defects::FS_798,
+                "a volume with a dimension of size 0 allocated as no voxels (volume_io sets up its pointers into an allocation of no bytes and crashes)",
+            );
+        }
+        self.alloc(c.dialect, c.streams)
     }
 
     /// `alloc_volume_data`: `false` (with volume_io's message) for a volume without a data type.

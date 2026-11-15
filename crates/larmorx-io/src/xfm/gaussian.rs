@@ -105,6 +105,16 @@ fn elimination_real(coefs: &[Vec<f64>], values: &mut [Vec<f64>]) -> bool {
     ok
 }
 
+/// `solve_linear_system`: `x` with `coefs × x = values`, or `None` (volume_io's `FALSE`).
+pub(crate) fn solve_linear_system(coefs: &[Vec<f64>], values: &[f64]) -> Option<Vec<f64>> {
+    let mut v = vec![values.to_vec()];
+    if elimination_real(coefs, &mut v) {
+        v.pop()
+    } else {
+        None
+    }
+}
+
 /// `invert_square_matrix`: the inverse of an n x n matrix, or `None` (volume_io's `FALSE`).
 pub fn invert_square_matrix(matrix: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     let n = matrix.len();

@@ -1,7 +1,8 @@
-# fs-nrrd-minc: NrrdIO's NRRD reader and MINC's volume input
+# fs-nrrd-minc: NrrdIO's NRRD reader and MINC's volume input and output
 
 The check behind `larmorx_io::nrrd` (NrrdIO r3991's `nrrdLoad`, relay 26) and `larmorx_io::minc` (MINC
-1.5.1's volume input over netCDF 3.6.0-p1, relay 27) for FreeSurfer's foundations, track C. Findings: `docs/findings/nrrdio.md`
+1.5.1's volume input over netCDF 3.6.0-p1, relay 27, and its volume output, relay 28) for FreeSurfer's
+foundations, track C. Findings: `docs/findings/nrrdio.md`
 (the upstream) and `docs/findings/freesurfer-permissive.md` (FreeSurfer's copies; this probe
 compiles against FreeSurfer's `packages/` headers and is closed to FreeSurfer's clean-room
 implementers as that file is).
@@ -10,9 +11,10 @@ implementers as that file is).
 bash build.sh <out>    # needs the unit oracle (oracles/freesurfer-8.2.0-unit), tags/NrrdIO-r3991,
                        # and for MINC tags/minc-1.5.1 and tags/netcdf-3.6.0-p1 (build_minc.sh);
                        # GCC 8.4.0 from the unit oracle
-<out>/fs-nrrd-minc <out> [count] [seed] [--only nrrd|minc]
+<out>/fs-nrrd-minc <out> [count] [seed] [--only nrrd|minc|write]
 <out>/fs-nrrd-minc <out> 1 1 --only minc --files <dir>   # MINC 1.5.1's dumps of <dir>'s files hashed
 LXPROBE_ONE=<file> <out>/fs-nrrd-minc <out> 1 1 --only minc   # one file, every output printed
+<out>/fs-nrrd-minc <out> 1 1 --only write --write-cases <dir>  # MINC 1.5.1's runs of exported write cases hashed
 ```
 
 - `libnrrd_up.so`: NrrdIO r3991's files built as FreeSurfer builds its copy (`TEEM_DIO=0
@@ -110,3 +112,49 @@ messages, the cache, raw-byte names, FreeSurfer's dialect. Logs
 The unit test `larmorx_io::minc::tests::seeded_files_as_minc` hashes the port's dumps of 120 seeded files;
 `--files` on its exported files (`LARMORX_MINC_EXPORT=<dir>`) gives MINC 1.5.1's hash of its own dumps:
 `c96915507a07c679e24d29c32397d68ce1ddcc485b7997b6605062d72286de47`, the test's constant.
+
+## MINC output (relay 28, 2026-11-15)
+
+- `shim_minc.c`'s `fm_minc_write` runs a write case in a forked child (`WriteCase`, the same layout as
+  `src/ffi.rs`'s `WriteCaseC`): FreeSurfer 8.2.0's `mincWrite` sequence with every argument given
+  (`create_volume`, optionally `set_volume_space_type` and `set_volume_real_range`, `set_volume_sizes`,
+  `alloc_volume_data`, `set_volume_separations`, `set_volume_direction_cosine` or `_unit_cosine` per listed
+  axis, `set_volume_translation`, `set_volume_voxel_value` of every voxel in C order, `output_volume`,
+  `delete_volume`), its dump written line by line on the pipe (a later exit keeps the steps done). Its
+  `fm_invert` calls the library's own `compute_transform_inverse` in the probe's process (its standard output
+  captured): the FreeSurfer side's 4 x 4 inverse is FreeSurfer's own (the read probe uses it too since this
+  relay; relay 27's stand-in modelled only its failure messages and left non-finite matrices uncompared).
+- The driver (`src/minc_write.rs`) draws a case of mincWrite's shape six times in ten (the names `xspace,
+  yspace, zspace[, time]`, its four types, the file's type and range the volume's, history ""), compared with
+  MINC 1.5.1 and FreeSurfer's copy (`FreeSurferDialect`, as measured: FS-797, its exit after a zero-length
+  cosine, its inverse), else any call (MINC 1.5.1 only): 0 to 6 dimensions, names from the standard ones,
+  `foo`, empty and `NULL`, every type and sign (with `MI_ORIGINAL_TYPE` and char), voxel and file ranges
+  ordinary, empty, reversed, not a number and huge, steps 0, negative, infinite, tiny, huge and not a number,
+  cosines unit, oblique, zero, NaN and huge (and axes out of range), sizes up to 300,000 voxels, voxel values out
+  of range, NaN and infinite, file names in a missing directory, a directory, under a file, empty, `.gz`,
+  `$LXPROBE_W`, with blanks, over an older file; histories `NULL`, "" and a line; space types. Each case is run by
+  the original, then by the port with `reproduce` (and with the default, for the notices' counts), each from the
+  same setting; the step dumps, standard output, standard error, exit status and the file's bytes must be the
+  original's. A case where the port notes a defect of undefined behaviour (FS-781, FS-789, FS-798 to FS-801) is
+  counted, not compared.
+
+| seed | cases | comparisons identical | of them files written | differ | not compared (undefined) |
+|---|---|---|---|---|---|
+| 3 | 2,000 | 2,912 | 1,843 | 0 | 281 |
+| 4 | 2,000 | 2,862 | 1,796 | 0 | 314 |
+| 5 | 2,000 | 2,878 | 1,778 | 0 | 309 |
+| 6 | 2,000 | 2,941 | 1,844 | 0 | 294 |
+| 7 | 2,000 | 2,925 | 1,816 | 0 | 274 |
+| 9 | 2,000 | 2,915 | 1,864 | 0 | 266 |
+
+(The final code. Seeds 1 and 2, the first runs, found what was fixed since: FreeSurfer's exit after a zero-length
+cosine, its inverse's values (now called itself), the NaN bits of volume_io's object code, FS-797 to FS-801.
+Logs `<workspace>/oracles/logs/fs-found-c-r28-write-seed*.log`. The read probe with FreeSurfer's own inverse:
+seeds 8 and 11, 2,000 files each, 3,107 and 3,077 comparisons identical, 0 different,
+`fs-found-c-r28-read-seed{8,11}.log`.)
+
+The unit test `larmorx_io::minc::tests::seeded_volumes_written` writes 80 seeded cases with the port and hashes
+the runs; `LARMORX_MINC_EXPORT_WRITE=<dir>` exports their descriptions and `--write-cases <dir>` gives MINC
+1.5.1's hash of the same runs: `42ded1ed2f8e044f72ae866c86936f9aa2dc84014ccf97a4545418f664fae198`, the test's
+constant.
+

@@ -268,6 +268,36 @@ impl FreeSurferDialect {
 }
 
 impl Dialect for FreeSurferDialect {
+    fn zero_direction_cosine(&self, _streams: &mut dyn Streams) -> Option<Exit> {
+        // FreeSurfer's copy ends the program after the warning (exit status 1).
+        Some(Exit { status: 1 })
+    }
+    fn output_dimension_names(
+        &self,
+        names: &[Vec<u8>],
+        notices: &mut Notices,
+        streams: &mut dyn Streams,
+    ) -> Option<Exit> {
+        // mincWrite's four dimensions (xspace, yspace, zspace, time): FreeSurfer's copy ends the
+        // program (FS-797). Other dimension lists are not mincWrite's: not modelled.
+        let spatial = |n: &[u8]| matches!(n, b"xspace" | b"yspace" | b"zspace");
+        if names.len() == 4
+            && names[0] == b"xspace"
+            && names[1] == b"yspace"
+            && names[2] == b"zspace"
+            && !spatial(&names[3])
+        {
+            if notices.reproduce() {
+                streams.err("convert_spatial_axis_to_dim_name, bad axis\n");
+                return Some(Exit { status: 1 });
+            }
+            notices.add(
+                &larmorx_core::defects::FS_797,
+                "a volume with a time dimension written as MINC 1.5.1 writes it (FreeSurfer's copy ends the program)",
+            );
+        }
+        None
+    }
     fn pkg_error(
         &self,
         site: PkgSite,
@@ -347,16 +377,23 @@ impl Dialect for FreeSurferDialect {
     }
 }
 
-/// FreeSurfer's 4 x 4 inverse as the probe measures it: a matrix with a row (checked first) or a
-/// column of zeros fails with its message on standard output; otherwise volume_io's inverse (track A's port of FreeSurfer's
-/// own is the reference: `larmorx_freesurfer_io::minc::FsVolumeIo`).
+/// FreeSurfer's 4 x 4 inverse: its copy's own `compute_transform_inverse`, called in this process
+/// through the shim (`fm_invert`), its message on standard output passed on.
 pub struct FsInverse;
+
+/// The FreeSurfer library's `fm_invert` (set when the probe opens `libminc_fs.so`).
+pub static FS_INVERT: std::sync::OnceLock<crate::ffi::InvertFn> = std::sync::OnceLock::new();
+
+/// Whether a matrix was met that the probe does not model since the last call (none since
+/// FreeSurfer's own inverse is called; kept for the counts' form).
+pub fn take_not_modelled() -> bool {
+    NOT_MODELLED.with(|f| f.replace(false))
+}
 
 thread_local! {
     /// Set when the port's run reached the shim's limit of 100,000 slabs.
     static LIMIT_HIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    /// Set when [`FsInverse`] met a matrix with an entry that is not finite or beyond 1e300: the
-    /// probe does not model FreeSurfer's inverse there.
+    /// See [`take_not_modelled`].
     static NOT_MODELLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -366,21 +403,12 @@ impl larmorx_io::xfm::Dialect for FsInverse {
         t: &larmorx_io::xfm::Transform,
         streams: &mut dyn Streams,
     ) -> Option<larmorx_io::xfm::Transform> {
-        if t.iter()
-            .flatten()
-            .any(|v| !v.is_finite() || v.abs() > 1e300)
-        {
-            NOT_MODELLED.with(|f| f.set(true));
+        let f = FS_INVERT.get().expect("FreeSurfer's library opened");
+        let (ok, inv, msg) = crate::ffi::call_invert(*f, t);
+        if !msg.is_empty() {
+            streams.out(&msg);
         }
-        if (0..4).any(|r| (0..4).all(|c| t[r][c] == 0.0)) {
-            streams.out("invert_4x4_matrix failed, Some row is all zeros\n");
-            return None;
-        }
-        if (0..4).any(|c| (0..4).all(|r| t[r][c] == 0.0)) {
-            streams.out("invert_4x4_matrix failed, Some col is all zeros\n");
-            return None;
-        }
-        larmorx_io::xfm::compute_transform_inverse(t)
+        if ok { Some(inv) } else { None }
     }
 }
 
@@ -1397,7 +1425,9 @@ pub fn run(seed: u64, count: u64, work: &Path, up: &MincLib, fs: &MincLib, t: &m
                 // The cache reads a short file's blocks in the order the caller asks for voxels:
                 // not followed by the port (it reads slabs).
                 *t.outcomes
-                    .entry(format!("{side} FS-793 with the cache (not modelled) -> {label}"))
+                    .entry(format!(
+                        "{side} FS-793 with the cache (not modelled) -> {label}"
+                    ))
                     .or_default() += 1;
                 t.skipped += 1;
                 continue;

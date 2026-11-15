@@ -43,14 +43,15 @@ pub const NC_ENOMEM: i32 = -61;
 pub const NC_SYSERR: i32 = -31;
 
 /// The C library's error numbers the reader meets (glibc's values).
-const EINVAL: i32 = 22;
+pub(crate) const EINVAL: i32 = 22;
 const E2BIG: i32 = 7;
 const EISDIR: i32 = 21;
+pub(crate) const EPERM: i32 = 1;
 
 /// `X_UINT_MAX`.
-const X_UINT_MAX: u64 = 4_294_967_295;
+pub(crate) const X_UINT_MAX: u64 = 4_294_967_295;
 /// `X_INT_MAX`.
-const X_INT_MAX: u64 = 2_147_483_647;
+pub(crate) const X_INT_MAX: u64 = 2_147_483_647;
 /// `NC_MAX_VAR_DIMS`: the size of the dimension arrays MINC and volume_io pass to `ncvarinq`.
 pub const MAX_VAR_DIMS: usize = 512;
 /// `MAX_NC_NAME`.
@@ -197,6 +198,27 @@ pub(crate) enum Source {
 }
 
 impl Source {
+    /// `write` of `data` at `offset` (`lseek` first), or the system error.
+    fn write_at(&mut self, offset: u64, data: &[u8]) -> Result<(), i32> {
+        match self {
+            Source::Memory(m) => {
+                let end = offset as usize + data.len();
+                if m.len() < end {
+                    m.resize(end, 0);
+                }
+                m[offset as usize..end].copy_from_slice(data);
+                Ok(())
+            }
+            Source::File(f) => {
+                use std::io::{Seek, SeekFrom, Write};
+                if f.seek(SeekFrom::Start(offset)).is_err() {
+                    return Err(EINVAL);
+                }
+                f.write_all(data)
+                    .map_err(|e| crate::xfm::files::errno_of(&e))
+            }
+        }
+    }
     fn len(&self) -> u64 {
         match self {
             Source::Memory(m) => m.len() as u64,
@@ -235,24 +257,32 @@ impl Source {
     }
 }
 
-/// posixio's buffer (`ncio_px`, `px_get`, `px_pgin`): two blocks of the file, filled by `read`
-/// and zeros past its end. Its state decides what a read past the end of a file gives: moving
-/// forward one block when the count of valid bytes ends in the first keeps the old first block
-/// under the new block's offset (bytes of an earlier block, FS-793), which `bytes` gives with
-/// `reproduce` and corrects (zeros) otherwise.
+/// posixio's buffer (`ncio_px`, `px_get`, `px_pgin`, `px_pgout`): two blocks of the file, filled
+/// by `read` and zeros past its end, written back with `write` when a region released as modified
+/// leaves the buffer. Its state decides what a read past the end of a file gives: moving forward
+/// one block when the count of valid bytes ends in the first keeps the old first block under the
+/// new block's offset (bytes of an earlier block, FS-793), which `bytes` gives with `reproduce`
+/// and corrects (zeros) otherwise. A file being written ([`Px::writable`]) is read and written
+/// call by call as posixio does, so the bytes it leaves on disk are posixio's.
 pub(crate) struct Px {
     pub(crate) source: Source,
     pub(crate) blksz: u64,
-    len: u64,
+    /// The file's length: at the opening, and for a file being written as its writes grow it.
+    pub(crate) len: u64,
     bf_offset: Option<u64>,
     bf_extent: u64,
     bf_cnt: u64,
-    base: Vec<u8>,
+    pub(crate) base: Vec<u8>,
     /// Correct the reads past the end of the file (not `reproduce`).
     pub(crate) fix: bool,
     /// A read gave other bytes than the file's (zeros past its end) under `reproduce`, or would
     /// have without it.
     pub(crate) stale: bool,
+    /// `NC_WRITE`: the file was created or opened for writing.
+    pub(crate) writable: bool,
+    /// `RGN_MODIFIED` and `RGN_WRITE` in `bf_rflags`.
+    modified: bool,
+    write_flag: bool,
 }
 
 impl Px {
@@ -268,13 +298,36 @@ impl Px {
             base: vec![0; 2 * blksz as usize],
             fix: true,
             stale: false,
+            writable: false,
+            modified: false,
+            write_flag: false,
         }
     }
 
-    /// `ncio_px_sync` of a file opened read-only: the buffer invalidated.
-    fn sync(&mut self) {
-        self.bf_offset = None;
-        self.bf_cnt = 0;
+    /// `ncio_px_init2` of a new file: the buffer at offset 0, both blocks, zeros, nothing read.
+    pub(crate) fn new_file(source: Source, blksz: u64) -> Px {
+        let mut px = Px::new(source, blksz);
+        px.writable = true;
+        px.fix = false;
+        px.bf_offset = Some(0);
+        px.bf_extent = 2 * blksz;
+        px
+    }
+
+    /// `ncio_px_sync`: a modified buffer written back; the buffer of a file opened read-only
+    /// invalidated.
+    pub(crate) fn sync(&mut self) -> Result<(), i32> {
+        if self.modified {
+            if let Some(bo) = self.bf_offset {
+                self.pgout(bo, self.bf_cnt, 0)?;
+            }
+            self.modified = false;
+            self.write_flag = false;
+        } else if !self.write_flag {
+            self.bf_offset = None;
+            self.bf_cnt = 0;
+        }
+        Ok(())
     }
 
     /// `px_pgin`: `extent` bytes at `offset` into the buffer at `at`; the count `read` gave.
@@ -284,8 +337,28 @@ impl Px {
         Ok(self.len.saturating_sub(offset).min(extent))
     }
 
-    /// `px_get`: the region's start in the buffer.
+    /// `px_pgout`: `extent` bytes of the buffer at `at` written at `offset`.
+    fn pgout(&mut self, offset: u64, extent: u64, at: usize) -> Result<(), i32> {
+        let data = &self.base[at..at + extent as usize];
+        self.source.write_at(offset, data)?;
+        self.len = self.len.max(offset + extent);
+        Ok(())
+    }
+
+    /// A write to the file outside the buffer (`fgrow`'s long of zeros).
+    pub(crate) fn write_raw(&mut self, offset: u64, data: &[u8]) -> Result<(), i32> {
+        self.source.write_at(offset, data)?;
+        self.len = self.len.max(offset + data.len() as u64);
+        Ok(())
+    }
+
+    /// `px_get` for reading: the region's start in the buffer.
     fn get(&mut self, offset: u64, extent: u64) -> Result<usize, i32> {
+        self.get_rgn(offset, extent, false)
+    }
+
+    /// `px_get` with `RGN_WRITE` when `write`: the region's start in the buffer.
+    pub(crate) fn get_rgn(&mut self, offset: u64, extent: u64, write: bool) -> Result<usize, i32> {
         let b = self.blksz;
         let blkoffset = offset - offset % b;
         let mut diff = offset - blkoffset;
@@ -314,6 +387,9 @@ impl Px {
                     break 'done;
                 }
                 if self.bf_cnt > b {
+                    if self.modified {
+                        self.pgout(bo, b, 0)?;
+                    }
                     self.bf_cnt -= b;
                     let n = self.bf_cnt as usize;
                     self.base.copy_within(b as usize..b as usize + n, 0);
@@ -327,6 +403,9 @@ impl Px {
             if blkoffset + b == bo {
                 let mut upper_cnt = 0;
                 if self.bf_cnt > b {
+                    if self.modified {
+                        self.pgout(bo + b, self.bf_cnt - b, b as usize)?;
+                    }
                     self.bf_cnt = b;
                     self.bf_extent = b;
                 }
@@ -344,6 +423,11 @@ impl Px {
                 }
                 break 'done;
             }
+            if self.modified {
+                self.pgout(bo, self.bf_cnt, 0)?;
+                self.modified = false;
+                self.write_flag = false;
+            }
             self.bf_cnt = self.pgin(blkoffset, blkextent, 0)?;
             self.bf_offset = Some(blkoffset);
             self.bf_extent = blkextent;
@@ -351,7 +435,29 @@ impl Px {
         if self.bf_cnt < extent + diff {
             self.bf_cnt = extent + diff;
         }
+        if write {
+            self.write_flag = true;
+        }
         Ok(diff as usize)
+    }
+
+    /// `ncio_px_rel`: the region released, marked modified when `modified` (`EPERM` for a file
+    /// opened read-only).
+    pub(crate) fn rel(&mut self, modified: bool) -> Result<(), i32> {
+        if modified && !self.writable {
+            return Err(EPERM);
+        }
+        if modified {
+            self.modified = true;
+        }
+        Ok(())
+    }
+
+    /// A region written whole: `get` with `RGN_WRITE`, the bytes copied, `rel` modified.
+    pub(crate) fn put(&mut self, offset: u64, data: &[u8]) -> Result<(), i32> {
+        let d = self.get_rgn(offset, data.len() as u64, true)?;
+        self.base[d..d + data.len()].copy_from_slice(data);
+        self.rel(true)
     }
 
     /// The bytes at `offset..offset+extent` as `px_get` gives them (with `fix`, the file's own,
@@ -359,7 +465,7 @@ impl Px {
     pub(crate) fn bytes(&mut self, offset: u64, extent: u64) -> Result<Vec<u8>, i32> {
         let d = self.get(offset, extent)?;
         let mut v = self.base[d..d + extent as usize].to_vec();
-        if offset + extent > self.len {
+        if !self.writable && offset + extent > self.len {
             let mut want = vec![0u8; extent as usize];
             self.source.read_at(offset, &mut want)?;
             if want != v {
@@ -388,6 +494,8 @@ pub struct NcFile {
     pub vars: Vec<Var>,
     /// A read met a negative offset (FS-776).
     pub(crate) negative_offset: bool,
+    /// The state of a file created for writing (`None` for a file opened read-only).
+    pub(crate) wr: Option<super::ncwrite::WriteState>,
 }
 
 /// The header stream (`v1hs`) over posixio's `get` (`px_get`): a window of `extent` bytes at
@@ -449,7 +557,7 @@ impl Stream<'_> {
 }
 
 /// `ncx_len_NC_attrV`.
-fn att_xsz(ty: i32, nelems: u64) -> u64 {
+pub(crate) fn att_xsz(ty: i32, nelems: u64) -> u64 {
     let sz = type_size(ty) as u64;
     (sz.wrapping_mul(nelems)).div_ceil(4) * 4
 }
@@ -506,7 +614,7 @@ fn get_atts(g: &mut Stream, version: u8, budget: &mut u64) -> Result<Vec<Att>, i
 fn read_header(f: &mut NcFile) -> Result<(), i32> {
     let src_len = f.px.len;
     let blksz = f.px.blksz;
-    f.px.sync();
+    let _ = f.px.sync();
     let mut g = Stream {
         src: &mut f.px,
         src_len,
@@ -629,7 +737,7 @@ fn read_header(f: &mut NcFile) -> Result<(), i32> {
 }
 
 /// `NC_var_shape`.
-fn var_shape(v: &mut Var, dims: &[Dim]) -> Result<(), i32> {
+pub(crate) fn var_shape(v: &mut Var, dims: &[Dim]) -> Result<(), i32> {
     v.xsz = type_size(v.ty) as u64;
     let mut product: u64 = 1;
     if !v.dimids.is_empty() {
@@ -671,7 +779,7 @@ fn var_shape(v: &mut Var, dims: &[Dim]) -> Result<(), i32> {
 
 /// The block size posixio uses for a file (`blksize`): the file system's preferred I/O size when
 /// it is at least 8192, else 8192.
-fn block_size(f: &std::fs::File) -> u64 {
+pub(crate) fn block_size(f: &std::fs::File) -> u64 {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
@@ -723,6 +831,7 @@ pub(crate) fn nc_open(s: &mut Session, path: &[u8], data: Option<Vec<u8>>) -> Re
         gatts: Vec::new(),
         vars: Vec::new(),
         negative_offset: false,
+        wr: None,
     };
     let r = read_header(&mut f);
     if f.vars
@@ -802,7 +911,7 @@ impl Session {
         }
         self.files.iter().find(|f| f.ncid == ncid)
     }
-    fn file_mut(&mut self, ncid: i32) -> Option<&mut NcFile> {
+    pub(crate) fn file_mut(&mut self, ncid: i32) -> Option<&mut NcFile> {
         if ncid < 0 {
             return None;
         }
@@ -832,6 +941,9 @@ pub fn ncopen(
 
 /// `ncclose`.
 pub fn ncclose(s: &mut Session, streams: &mut dyn Streams, ncid: i32) -> Result<i32, Exit> {
+    if s.file(ncid).is_some_and(|f| f.wr.is_some()) {
+        return super::ncwrite::ncclose_written(s, streams, ncid);
+    }
     match s.files.iter().position(|f| f.ncid == ncid && ncid >= 0) {
         Some(i) => {
             s.files.remove(i);
@@ -1081,7 +1193,7 @@ pub fn ncattget(
 }
 
 /// `NC_varoffset`.
-fn var_offset(f: &NcFile, v: &Var, coord: &[u64]) -> i64 {
+pub(crate) fn var_offset(f: &NcFile, v: &Var, coord: &[u64]) -> i64 {
     let n = v.shape.len();
     if n == 0 {
         return v.begin;
@@ -1115,14 +1227,14 @@ fn var_offset(f: &NcFile, v: &Var, coord: &[u64]) -> i64 {
     lcoord.wrapping_add(v.begin)
 }
 
-/// `NCcoordck` for a file opened read-only.
-fn coord_check(f: &NcFile, v: &Var, coord: &[u64]) -> Result<(), i32> {
+/// `NCcoordck` (a record beyond the file's records is refused only in a file opened read-only).
+pub(crate) fn coord_check(f: &NcFile, v: &Var, coord: &[u64]) -> Result<(), i32> {
     if v.shape.is_empty() {
         return Ok(());
     }
     let mut i = 0;
     if v.is_recvar() {
-        if coord[0] > X_INT_MAX || coord[0] >= f.numrecs {
+        if coord[0] > X_INT_MAX || (f.wr.is_none() && coord[0] >= f.numrecs) {
             return Err(NC_EINVALCOORDS);
         }
         i = 1;
@@ -1137,7 +1249,7 @@ fn coord_check(f: &NcFile, v: &Var, coord: &[u64]) -> Result<(), i32> {
 }
 
 /// `NCedgeck`.
-fn edge_check(v: &Var, start: &[u64], edges: &[u64]) -> Result<(), i32> {
+pub(crate) fn edge_check(v: &Var, start: &[u64], edges: &[u64]) -> Result<(), i32> {
     if v.shape.is_empty() {
         return Ok(());
     }
@@ -1184,7 +1296,7 @@ fn get_run(
 
 /// `NCiocount`: the index of the dimension the odometer steps (`-1` for one run) and the run's
 /// length.
-fn iocount(f: &NcFile, v: &Var, edges: &[u64]) -> (i64, u64) {
+pub(crate) fn iocount(f: &NcFile, v: &Var, edges: &[u64]) -> (i64, u64) {
     let n = v.shape.len();
     let mut edp0 = 0usize;
     if v.is_recvar() {
@@ -1224,6 +1336,9 @@ fn get_vara(f: &mut NcFile, varid: i32, start: &[u64], edges: &[u64]) -> Result<
         .ok()
         .filter(|&i| i < f.vars.len())
         .ok_or(NC_ENOTVAR)?;
+    if f.wr.as_ref().is_some_and(|w| w.indef()) {
+        return Err(super::ncwrite::NC_EINDEFINE);
+    }
     let v = f.vars[vi].clone();
     if type_size(v.ty) == 0 {
         return Err(NC_EBADTYPE);

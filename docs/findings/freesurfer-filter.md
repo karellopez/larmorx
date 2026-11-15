@@ -476,8 +476,10 @@ filter spec's §37.
   so each pass's message prints the running total.
 - **Real data (FS-290).** With ds000005 sub-01's `T1.mgz` as the T2 at 120 the official program
   crashed (SIGSEGV): a voxel on the volume's faces kept by the mask, whose `MRIneighborsOff`
-  neighbour at `x - 1` (or `y - 1`, `z - 1`) lies before the slice's first row (`slices[z][y][-1]`
-  or `slices[-1]`): memory the program does not own. The port notes FS-290 (track C's) and reads 0
+  neighbours outside the volume are read through the row pointers as they are (`MRIvox` at
+  `y - 1 = -1` or `z - 1 = -1` takes a row pointer before the table, `slices[z][-1]` or
+  `slices[-1]`; `x - 1 = -1` on the first row a byte before the voxels): memory the program does
+  not own. The port notes FS-290 (track C's) and reads 0
   there; the probe counts the line. At 160 and on the other two heads the official run and the
   port agree.
 - **Speed.** `examples/fs_t2mask_timing.rs` on pixar008: binarize 0.3 s, the aparc+aseg's dilation

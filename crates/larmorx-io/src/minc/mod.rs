@@ -41,7 +41,10 @@
 pub mod icv;
 mod input;
 pub mod libsrc;
+pub mod mwrite;
+pub mod ncwrite;
 pub mod netcdf;
+pub mod output;
 pub mod volume;
 
 #[cfg(test)]
@@ -54,6 +57,7 @@ pub use input::{
     MincFile, MincInputOptions, VolumeInput, delete_volume_input, get_minc_file_n_dimensions,
     input_more_of_volume, start_volume_input,
 };
+pub use output::{MincOutputOptions, output_volume};
 pub use volume::{DataType, Volume, VolumeData};
 
 /// The program ends: `exit(status)` (netCDF's or MINC's fatal error, or a dialect's), its messages
@@ -101,6 +105,15 @@ pub enum PkgSite {
     VarLoopAlloc,
     /// `miattget_with_sign`: its buffer's allocation failed (`MI_log_sys_error1`).
     AttGetAlloc,
+    /// `micreate_std_variable`: a name that is not a standard MINC variable.
+    BadStdVar,
+    /// `MI_create_dim_variable`, `MI_create_dimwidth_variable`: a dimension variable of more than
+    /// one dimension.
+    WrongNDims,
+    /// `MI_create_dimwidth_variable`: a name without the `-width` suffix.
+    BadSuffix,
+    /// `MI_verify_maxmin_dims`: `image-max` / `image-min` over the image's fastest dimensions.
+    MaxMinDims,
 }
 
 /// The points where a program's copy of MINC behaves differently from MINC 1.5.1's. Every
@@ -165,6 +178,16 @@ pub trait Dialect {
         let v = crate::xfm::files::getenv(b"VOLUME_CACHE_THRESHOLD")
             .and_then(|v| larmorx_core::cscan::sscanf_i32(&v));
         Some(v.unwrap_or(80_000_000) as i64)
+    }
+    /// The start of `output_volume`'s dimension names (the volume's names given): `Some(exit)` when
+    /// the program's copy ends there.
+    fn output_dimension_names(
+        &self,
+        _names: &[Vec<u8>],
+        _notices: &mut Notices,
+        _streams: &mut dyn Streams,
+    ) -> Option<Exit> {
+        None
     }
     /// The `.xfm` dialect of the program's volume_io: its 4 x 4 inverse decides whether a volume's
     /// voxel-to-world matrix is singular (`create_linear_transform` then makes it the identity),

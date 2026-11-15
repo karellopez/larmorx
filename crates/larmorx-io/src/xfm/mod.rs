@@ -32,6 +32,7 @@
 
 pub(crate) mod files;
 mod gaussian;
+pub(crate) use gaussian::solve_linear_system;
 mod read;
 mod write;
 

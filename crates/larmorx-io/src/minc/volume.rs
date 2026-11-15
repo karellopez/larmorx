@@ -417,6 +417,152 @@ impl Volume {
         self.uptodate = false;
     }
 
+    /// `set_volume_direction_cosine`: the direction made a unit vector (a zero vector refused with
+    /// volume_io's warning), then [`Volume::set_direction_unit_cosine`].
+    pub fn set_direction_cosine(
+        &mut self,
+        axis: i32,
+        dir: &[f64; 3],
+        dialect: &dyn super::Dialect,
+        streams: &mut dyn Streams,
+    ) {
+        let mut len = dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2];
+        if len == 0.0 {
+            dialect.print_error(
+                "Warning: zero length direction cosine in set_volume_direction_cosine()\n",
+                streams,
+            );
+            return;
+        }
+        if len <= 0.0 {
+            len = 1.0;
+        }
+        let len = len.sqrt();
+        let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
+        self.set_direction_unit_cosine(axis, &unit, dialect, streams);
+    }
+
+    /// `set_volume_translation`: the starts that put `voxel` at `world` with the volume's
+    /// separations and direction cosines (missing spatial axes completed orthogonally; a singular
+    /// set of directions solved by the identity, as volume_io's inverse gives it).
+    pub fn set_translation(
+        &mut self,
+        voxel: &[f64],
+        world: &[f64; 3],
+        dialect: &dyn super::Dialect,
+        streams: &mut dyn Streams,
+    ) {
+        let mut t = xfm::make_identity_transform();
+        let mut origin = [0.0f64; 3];
+        for dim in 0..N_DIMENSIONS {
+            origin[dim] = world[dim];
+            for dim2 in 0..N_DIMENSIONS {
+                let axis = self.spatial_axes[dim2];
+                if axis >= 0 {
+                    let a = axis as usize;
+                    origin[dim] -= self.separations[a] * self.direction_cosines[a][dim] * voxel[a];
+                    t[dim][dim2] = self.direction_cosines[a][dim];
+                }
+            }
+        }
+        let n_axes = self.spatial_axes.iter().filter(|&&a| a >= 0).count();
+        let normalize = |t: &mut xfm::Transform, col: usize| {
+            let mut len = t[0][col] * t[0][col] + t[1][col] * t[1][col] + t[2][col] * t[2][col];
+            if len == 0.0 {
+                len = 1.0;
+            } else {
+                len = len.sqrt();
+            }
+            t[0][col] /= len;
+            t[1][col] /= len;
+            t[2][col] /= len;
+        };
+        if n_axes == 1 {
+            let dim = if self.spatial_axes[0] >= 0 {
+                0
+            } else if self.spatial_axes[1] >= 0 {
+                1
+            } else {
+                2
+            };
+            let a1 = if dim == 0 { 1 } else { 0 };
+            t[0][a1] = t[1][dim] + t[2][dim];
+            t[1][a1] = -t[0][dim] - t[2][dim];
+            t[2][a1] = t[1][dim] - t[0][dim];
+            normalize(&mut t, a1);
+        }
+        if n_axes == 1 || n_axes == 2 {
+            let dim = if self.spatial_axes[2] < 0 {
+                2
+            } else if self.spatial_axes[1] < 0 {
+                1
+            } else {
+                0
+            };
+            let a1 = (dim + 1) % N_DIMENSIONS;
+            let a2 = (dim + 2) % N_DIMENSIONS;
+            t[0][dim] = t[1][a1] * t[2][a2] - t[1][a2] * t[2][a1];
+            t[1][dim] = t[2][a1] * t[0][a2] - t[2][a2] * t[0][a1];
+            t[2][dim] = t[0][a1] * t[1][a2] - t[0][a2] * t[1][a1];
+            normalize(&mut t, dim);
+        }
+        let inverse = dialect
+            .xfm()
+            .invert(&t, streams)
+            .unwrap_or_else(xfm::make_identity_transform);
+        let s3 = xfm::transform_point(&inverse, origin[0], origin[1], origin[2]);
+        let mut starts = vec![0.0; self.n_dimensions()];
+        for dim in 0..N_DIMENSIONS {
+            let axis = self.spatial_axes[dim];
+            if axis >= 0 {
+                starts[axis as usize] = s3[dim];
+            }
+        }
+        self.set_starts(&starts);
+    }
+
+    /// `set_volume_voxel_value`: `value` stored in the volume's type as C's cast stores it on x86
+    /// (an integer type through a 32-bit truncation, an unsigned int through a 64-bit one; a
+    /// float rounded). Indices past the volume's dimensions are ignored; a voxel outside the
+    /// volume is not written.
+    pub fn set_voxel_value(&mut self, v: &[usize], value: f64) {
+        let n = self.n_dimensions();
+        if (0..n).any(|k| v[k] >= self.sizes[k].max(0) as usize) {
+            return;
+        }
+        let i = self.index(v);
+        let Some(d) = self.data.as_mut() else {
+            return;
+        };
+        if i >= d.len() {
+            return;
+        }
+        match d {
+            VolumeData::U8(a) => a[i] = super::libsrc::cvt_i32(value) as u8,
+            VolumeData::I8(a) => a[i] = super::libsrc::cvt_i32(value) as i8,
+            VolumeData::U16(a) => a[i] = super::libsrc::cvt_i32(value) as u16,
+            VolumeData::I16(a) => a[i] = super::libsrc::cvt_i32(value) as i16,
+            VolumeData::U32(a) => a[i] = super::libsrc::cvt_i64(value) as u32,
+            VolumeData::I32(a) => a[i] = super::libsrc::cvt_i32(value),
+            VolumeData::F32(a) => a[i] = super::libsrc::f64_to_f32(value),
+            VolumeData::F64(a) => a[i] = value,
+        }
+    }
+
+    /// `get_volume_dimension_names`: the volume's names with each spatial axis's canonical
+    /// (`xspace`, `yspace`, `zspace`).
+    pub fn dimension_names_canonical(&self) -> Vec<Vec<u8>> {
+        let mut names = self.dimension_names.clone();
+        let canon: [&[u8]; 3] = [b"xspace", b"yspace", b"zspace"];
+        for (i, c) in canon.iter().enumerate() {
+            let a = self.spatial_axes[i];
+            if a >= 0 {
+                names[a as usize] = c.to_vec();
+            }
+        }
+        names
+    }
+
     /// `set_volume_sizes`.
     pub fn set_sizes(&mut self, sizes: &[i32]) {
         let n = self.n_dimensions();
@@ -511,11 +657,9 @@ impl Volume {
     }
 
     /// `alloc_volume_data`: `false` (with volume_io's message) for a volume without a data type.
-    pub(crate) fn alloc(
-        &mut self,
-        dialect: &dyn super::Dialect,
-        streams: &mut dyn Streams,
-    ) -> bool {
+    /// (volume_io keeps a volume of more than its cache threshold in its volume cache; written, a
+    /// cached volume gives the same file, so it is allocated whole here.)
+    pub fn alloc(&mut self, dialect: &dyn super::Dialect, streams: &mut dyn Streams) -> bool {
         if self.data_type == DataType::None {
             dialect.print_error(
                 "Error: cannot allocate array data until size specified.\n",

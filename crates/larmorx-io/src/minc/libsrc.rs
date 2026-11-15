@@ -1210,7 +1210,11 @@ pub(crate) fn mi_varaccess_get(
 }
 
 /// `MI_var_loop`'s pieces of a hyperslab (no buffer size steps): each `(start, count)` one read.
-fn var_loop_pieces(start: &[i64], count: &[i64], value_size: i64) -> Vec<(Vec<i64>, Vec<i64>)> {
+pub(crate) fn var_loop_pieces(
+    start: &[i64],
+    count: &[i64],
+    value_size: i64,
+) -> Vec<(Vec<i64>, Vec<i64>)> {
     let ndims = count.len();
     if ndims == 0 {
         return vec![(Vec::new(), Vec::new())];

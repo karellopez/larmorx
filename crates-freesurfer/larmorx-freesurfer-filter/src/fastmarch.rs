@@ -784,6 +784,7 @@ fn trunc_int(v: f64) -> i32 {
 /// (`MRIgetVoxVal`, truncated). FS-614: a point beyond the volume's memory (a row pointer it does
 /// not have, or a place past its voxels) is not the label in both modes (FreeSurfer reads memory
 /// it does not own).
+#[allow(clippy::too_many_arguments)]
 pub fn label_matches(
     g: &mut Globals,
     err: &mut dyn Write,

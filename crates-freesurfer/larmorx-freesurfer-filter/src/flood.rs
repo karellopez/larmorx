@@ -170,6 +170,18 @@ pub fn mris_flood_outside(
     })
 }
 
+/// The number of bytes of a `uchar` volume of extent `w` x `h` x `d` whose rows and slices hold no
+/// padding (frame 0), when `m` is one.
+fn dense_bytes(m: &Mri, w: i32, h: i32, d: i32) -> Option<usize> {
+    let n = (w.max(0) as usize) * (h.max(0) as usize) * (d.max(0) as usize);
+    (m.mtype == MRI_UCHAR
+        && (m.vg.width, m.vg.height, m.vg.depth) == (w, h, d)
+        && m.vox_per_row == w as u64
+        && m.vox_per_slice == (w as u64) * (h as u64)
+        && m.chunk.as_ref().is_some_and(|c| c.len() >= n))
+    .then_some(n)
+}
+
 /// `MRISaccentuate(mri_src, mri_dst, lo_thresh, hi_thresh)`: frame 0 of each voxel set to 255
 /// where the source's value truncated to `int` (FS-17 beyond `int`) is within `[lo_thresh,
 /// hi_thresh]`, 0 elsewhere; a new destination is `MRIalloc` of the source's extent and type with
@@ -197,6 +209,38 @@ pub fn mris_accentuate(
         Some(s) => (s.vg.width, s.vg.height, s.vg.depth),
         None => (w, h, dep),
     };
+    // byte volumes of one extent, rows and slices without padding: each byte through a table (the
+    // same values: a byte is its own `int`), in place or from the source (relay 33's speed work)
+    if let Some(n) = dense_bytes(d, w, h, dep)
+        && src.is_none_or(|s| dense_bytes(s, w, h, dep).is_some())
+    {
+        let lut: [u8; 256] = std::array::from_fn(|b| {
+            let b = b as i32;
+            if b >= lo_thresh && b <= hi_thresh {
+                255
+            } else {
+                0
+            }
+        });
+        let dc = &mut d.chunk.as_mut().expect("voxels")[..n];
+        match src {
+            Some(s) => {
+                let sc = &s.chunk.as_ref().expect("voxels")[..n];
+                for (o, &i) in dc.iter_mut().zip(sc) {
+                    *o = lut[usize::from(i)];
+                }
+            }
+            None => {
+                for o in dc.iter_mut() {
+                    *o = lut[usize::from(*o)];
+                }
+            }
+        }
+        return Ok(match fresh {
+            Some(m) if !given => Ret::New(m),
+            _ => Ret::Given,
+        });
+    }
     for k in 0..dep {
         for j in 0..h {
             for i in 0..w {

@@ -271,3 +271,35 @@ pub fn mri_vol_topo_dilate_one(
     }
     Ok(nhits)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_mri::mri::{MRI_UCHAR, mri_alloc};
+
+    /// An isolated voxel adds a cube (6 faces, 12 edges, 8 corners: +2); a voxel whose 26
+    /// neighbours are all set closes a cavity (-2); a voxel next to one face neighbour joins it (0).
+    #[test]
+    fn euler_changes_of_simple_shapes() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut v = mri_alloc(&mut g, &mut out, &mut err, 3, 3, 3, MRI_UCHAR).unwrap();
+        let n = quad_euler_char_change(&mut g, &mut out, &mut err, &v, None, 1, 1, 1).unwrap();
+        assert_eq!(n, 2);
+        mri_set_vox_val(&mut g, &mut err, &mut v, 0, 1, 1, 0, 1.0, 0).unwrap();
+        let n = quad_euler_char_change(&mut g, &mut out, &mut err, &v, None, 1, 1, 1).unwrap();
+        assert_eq!(n, 0);
+        for c in 0..3 {
+            for r in 0..3 {
+                for s in 0..3 {
+                    mri_set_vox_val(&mut g, &mut err, &mut v, c, r, s, 0, 1.0, 0).unwrap();
+                }
+            }
+        }
+        mri_set_vox_val(&mut g, &mut err, &mut v, 1, 1, 1, 0, 0.0, 0).unwrap();
+        let n = quad_euler_char_change(&mut g, &mut out, &mut err, &v, None, 1, 1, 1).unwrap();
+        assert_eq!(n, -2);
+        assert!(out.is_empty() && err.is_empty());
+    }
+}

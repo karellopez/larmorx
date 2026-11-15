@@ -211,3 +211,14 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   `MRIapplyEdits` (7168-7193), `MRIfixEntoWM` (7222-7253), `LabelAmygalaCortalJunction` (7264-7329), `MRIshiftDim`
   (7338-7401), `MRIcropToFoV` (7480-7547), `MRIcropAroundCRS` (7641-7752), `MRIcropAroundRAS` (7763-7836). Changes:
   FS-512, FS-513 (rule A), FS-514 (one thread's order), FS-515 (error), FS-516 (rule A), FS-517 (error).
+- `src/vol2vol.rs`, relay 29: `utils/mri2.cpp` `MRIvol2VolFill` (3568-3692). Changes: FS-504 (an error where
+  `MRImaskAndUpsample` gives no volume).
+- `src/mri2ops.rs`, relay 29: `utils/mri2.cpp` `MRIfindBrightNonWM` (6361-6454); `include/mri.h` `BRIGHT_LABEL`,
+  `BRIGHT_BORDER_LABEL` (1690-1691). Changes: FS-802 (rule A).
+- `src/topo.rs` (3.1-37; relay 29): `utils/mri2.cpp` `MRIvolTopoErodeOne` (5885-5908), `MRIvolTopoDilateOne`
+  (5917-5940), `QuadEulerCharChange` (5965-6068).
+- `src/morph.rs` (3.1-37; relay 29): `utils/mri2.cpp` `FixSubCortMassHA::FixSCM` (6534-6587), `BinarizeMRI::dump`
+  (6620-6642), `BinarizeMRI::qualifies` (6652-6691), `BinarizeMRI::binarize` (6692-6789), `DEMorphBinVol::morph`
+  (6794-6844, 6846-6867, 6868-6888), `DEMorphBinVol::check` (6890-6922), `DEMorphBinVol::dump` (6923-6935),
+  `DEMorphBinVol::copyFrame` (6937-6964); `include/mri2.h` the classes' fields and defaults (225-237, 249-271,
+  281-300). Changes: FS-803, FS-805, FS-808 (rule A), FS-804 (frame 0), FS-806, FS-807 (rule B: errors).

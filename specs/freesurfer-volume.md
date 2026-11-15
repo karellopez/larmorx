@@ -1959,3 +1959,123 @@ and 1,001 places with empty places and odd tissue types, given and new outputs, 
 identical with `reproduce` but where FreeSurfer crashes, hangs or touches memory it does not own (FS-504, FS-508,
 FS-509, FS-511, FS-515, FS-517 and the shared voxel defects), counted and not compared; the default differs only with
 a notice.
+
+## 59. Filling a coarser grid, bright voxels outside the white matter, voxel topology (3.1-37: mri2.cpp, relay 29)
+- **`MRIvol2VolFill(src, mask, lta, UpsampleFactor, DoConserve, outfill)`**: maps the source onto the LTA's other end by
+  sending each source voxel to its nearest target voxel. Refusals on standard output with `NULL`: more than one
+  transform (`ERROR: MRIvol2VolFill(): LTA can only have one xform`), a source that is neither the LTA's source nor its
+  destination (`ERROR: MRIvol2VolFill(): src MRI is neither source nor target in LTA`; the source tested first, as
+  `LTAmriIsSource` and `LTAmriIsTarget` compare geometries, section 54). A copy of the LTA is changed to
+  `LINEAR_VOX_TO_VOX` (section 54's `LTAchangeType`, its `Gdiag_no` lines included) and its voxel-to-voxel matrix used as
+  is when the source is its source, else its inverse (the inverse filled first); the target grid is the geometry at
+  that end. With `UpsampleFactor > 0` the source is first `MRImaskAndUpsample(src, mask, UpsampleFactor, 2, DoConserve)`
+  (section 41: the bounding box of the mask's, else the source's, nonzero voxels of frame 0 padded by 2, then upsampled
+  when the factor is above 1) and the matrix is multiplied on the right by the inverse of that step's voxel-to-voxel
+  matrix; no such volume: an error in both modes (FS-504). The output: a new `float` volume of the target grid with the
+  source's frames, TR, TE, TI and flip angle (the geometry's header), or the caller's; it is cleared. Each source voxel
+  `(c, r, s)` (columns outermost) maps to `M (c, r, s, 1)` (a `float` matrix product), rounded (`nint`) per axis; outside
+  the target grid it is dropped; every frame of the source is added into the target voxel (`out + src` in `double`,
+  stored as `float`). Without `DoConserve` each target voxel's sum is then divided by the number of source voxels that
+  landed in it (in `double`; voxels none reached stay 0). With `Gdiag_no > 0`: `MRIvol2VolFill(): USF=<n>,
+  DoConserve=<n>` first, `MRIvol2VolFill(): not using inverse` or `MRIvol2VolFill(): using inverse` after the type
+  change.
+- **`MRIfindBrightNonWM(T1, wm)`**: a clone of the T1 (its type, header, zero voxels) labelled 130 at each voxel (slices
+  outermost) where the white-matter volume's byte (frame 0's bytes read as bytes whatever its type, its rows walked from
+  column 0) is below 5, the T1 value as a byte is above 125 (FreeSurfer takes the low byte of its truncation to an
+  integer: FS-802; by default clamped to 0 to 255, NaN 0) and fewer than 13 of the 27 voxels of its 3 x 3 x 3 block
+  (clamped at the T1's faces, the voxel included) have a white-matter byte of at least 5; the label is written as a
+  byte. Then: closed in place (`MRIclose`, section 50); dilated once into the T1's voxels of at least 100
+  (`MRIdilateThreshLabel(label, T1, NULL, 130, 1, 100)`); that dilation's voxels that differ from the label volume in
+  being on (`MRIxor` of the two, on meaning 1 to 255) become 1, then 100 (`MRIreplaceValues`); the label volume takes the
+  larger of the two (`MRIunion`); `MRIfindBrightNonWM(): <n> bright non-wm voxels segmented.` on standard output with
+  the voxels labelled 130; finally three dilations of label 130 into T1 voxels of exactly 0
+  (`MRIdilateInvThreshLabel(label, T1, label, 130, 3, 0)`). Returns the label volume (0, 100 and 130).
+- **`QuadEulerCharChange(vol, mask, c, r, s)`**: the change of the Euler characteristic of the quad mesh of the set
+  voxels (value above 0.5, frame 0) if voxel `(c, r, s)` were added (its own value is not read). Over its 26 neighbours
+  (offsets from -1 to 1, columns outermost, then rows, slices; with a mask, a neighbour whose mask value is below 0.5 is
+  skipped): a face neighbour (one offset) that is set gives -1, otherwise +1; an edge (two offsets) whose three other
+  voxels (the diagonal one and the two face ones along its axes) are all unset gives -1, all set +1; a corner (three
+  offsets) whose seven other voxels are all unset gives +1, all set -1. A voxel outside the volume on a tested axis
+  counts as unset; reads the function makes without testing (the centre outside the volume) go through the voxel
+  functions. When `(c, r, s)` equals `(Gx, Gy, Gz)`: `  debug vox <c> <r> <s>`, a line for each change (`face`, `edge` or
+  `vertex`, the offsets `%2d`, `added dEC=<n>` or `removed dEC=<n>` with the running total) and `  debug vox <c> <r> <s>
+  <dEC>` on standard output.
+- **`MRIvolTopoErodeOne(binvol, keepmask)`**: one layer of boundary voxels turned off in place where that keeps the
+  Euler characteristic: the voxels 1 to extent - 2 on each axis (columns outermost), skipping those in the keep mask
+  (above 0.5), those not set (the value truncated to an integer below 1) and those inside (on after a face-neighbour
+  erosion that erodes the edges, `MRIerodeNN(binvol, NULL, NEAREST_NEIGHBOR_FACE, 1)`), are turned off (0) when
+  `QuadEulerCharChange(binvol, NULL, c, r, s)` is 0, each decided on the volume as the earlier ones left it. Returns how
+  many.
+- **`MRIvolTopoDilateOne(binvol, onval)`**: every voxel (columns outermost) that is unset (truncated value at most 0) and
+  on after a six-neighbour dilation (`MRIdilate6`) is set to `onval` when `QuadEulerCharChange` is not 0, decided in
+  order on the volume as it changes. Returns how many.
+- `MRIvolTopoFix` (it tessellates surfaces) belongs to the surface module; `MRImask_with_T2_and_aparc_aseg` (it keeps
+  the largest connected component) to the filter module.
+
+## 60. Binary volumes: FixSubCortMassHA, BinarizeMRI, DEMorphBinVol (3.1-37: mri2.cpp, relay 29)
+- **`FixSubCortMassHA::FixSCM()`** (fields `subcorticalmass`, `aseg`, `nDilate`): a mask (`int`, the segmentation's
+  extent, header and pulse parameters) is 1 where the label (value truncated to an integer) is 0, 2, 3, 41 or 42;
+  `Dilating <n> voxels in 3d` on standard output; the mask dilated `nDilate` times in place (`MRIdilate`); then the
+  subcortical mass is set to 0 at every amygdala (18, 54) and inferior lateral ventricle (5, 44) voxel, and at every
+  hippocampus (17, 53) voxel outside the dilated mask (not above 0.5). Returns 0; the mask stays in the structure.
+- **`BinarizeMRI`**: fields and defaults `BinType` 1 (thresholds; 2 a match list), `thmin` 0.5, `thmax` infinity,
+  `matchlist` empty, `maskthmin` 0.5, `maskthmax` infinity, `ZeroColEdges`, `ZeroRowEdges`, `ZeroSliceEdges` 0, `OnVal` 1,
+  `OffVal` 0, `fstart` and `fend` -1, `invert` 0, `nhits` 0, `mritype` -1, `DoAbs` 0, `m_debug` 0.
+  - `dump`: `BinarizeMRI: BinType=<n> `, then ` thmin=<g> thmax=<g> ` (type 1) or `match N=<n> ` and each value and a
+    space (type 2), `maskthmin=<g> maskthmax=<g> ` when a mask is given, `zce=<n> zre=<n> zse=<n> `, `on=<g> off=<g> `,
+    `fstart=<n> fend=<n> `, `invert=<n> `, `DoAbs=<n> `, `mritype=<n> `, a newline, and for type 1 with a match list
+    `WARNING: BinType=1 but matchlist not empty N=<n>`. Returns 0.
+  - `qualifies(invol, mask, c, r, s, f)`: 0 when the mask's value (frame 0) is below `maskthmin` or above `maskthmax`, or
+    the voxel lies on an edge being zeroed; 1 when `f < 0`; otherwise, of the voxel's value of frame `f` (its absolute
+    value with `DoAbs`): type 1, 1 unless it is below `thmin` or above `thmax` (a NaN passes); other types, 1 when it
+    equals a value of the match list.
+  - `binarize(invol, mask, outvol)`: the dump first with `m_debug`; no input: `ERROR: BinarizeMRI::binarize(): input is
+    NULL` and `NULL`; type 1 with a match list: `WARNING: BinarizeMRI::binarize(): BinType=1 but matchlist not empty
+    N=<n>` and the dump. `fstart` below 0 becomes 0 and `fend` below 0 the input's frames (stored in the structure);
+    `fend` past the frames: `ERROR: BinarizeMRI::binarize(): fend=<n> >= nframes=<n>`, the dump, `NULL`; a mask of
+    another extent: `ERROR: BinarizeMRI::binarize(): input/mask dim mismatch`, `NULL`. The output: new (the input's
+    extent, type `mritype` or `float` for -1, `fend - fstart` frames, the input's header and pulse parameters) or the
+    caller's (another extent: `ERROR: BinarizeMRI::binarize(): input/output dim mismatch`, the dump, `NULL`). With
+    `invert` the on and off values are swapped for the call (the dump again with `m_debug`). Each voxel: outside the
+    mask or on a zeroed edge, every frame off; otherwise each frame on where it qualifies, else off, into frame `f -
+    fstart` (values stored as `float`). FreeSurfer writes the first case's off value into frame `f` (FS-803; by default
+    `f - fstart`). `nhits`: the on voxels, with `invert` the voxels times frames minus them. With `m_debug` `BinarizeMRI:
+    nhits = <n>` at the end.
+- **`DEMorphBinVol`**: fields and defaults `morphtype` 1 (dilation; 2 erosion), `topo` 1 (the neighbours within that sum
+  of absolute offsets: 1 faces, 2 edges, 3 corners), `nnbrsthresh` 0, `nmorph` 0, `frame` 0, `nchangestot` 0,
+  `mm_mritype` -1, `mm_debug` 1; its lines on standard output.
+  - `check(invol, ubermask, outvol)`: 1 after `ERROR: DEMorphBinVol::check(): input is NULL`, `ERROR: DEMorphBinVol():
+    input/ubermask dim mismatch`, `ERROR: DEMorphBinVol::check(): input/output dim mismatch`, `ERROR:
+    DEMorphBinVol::check(): frame=<n>, out of range <nframes>` (a frame below 0 or past the frames; FreeSurfer accepts one
+    equal to the number of frames: FS-806), `topo=<n>, must be 1, 2, or 3`, `morphtype=<n>, must be 1 or 2` (same prefix);
+    else 0.
+  - `dump`: `DEMorphBinVol: topo=<n> morphtype=<n> nnbrsthresh=<n> frame=<n> nmorph=<n> mritype=<n> ` and a newline.
+  - `copyFrame(invol, frameno)`: frame out of range (as `check`, FS-806): `ERROR: DEMorphBinVol::copyFrame():
+    frameno=<n>, out of range <nframes>` and `NULL`; else a new one-frame volume of `mm_mritype` (bytes for -1), the
+    input's header and pulse parameters, holding that frame (the voxel functions' conversions).
+  - `morph(binvol)`: `check(binvol)` (FreeSurfer goes on after its error: FS-807; by default `NULL`), the dump with
+    `mm_debug`, the output a copy of frame `frame` (`copyFrame`; `NULL` passed on), then `nmorph` passes over the voxels
+    1 to extent - 2: each pass works from a copy of the output as it stands; a voxel that is off for a dilation (on for
+    an erosion; on meaning its value truncated to an integer is at least 1) is set to 1 (0) when more than `nnbrsthresh`
+    of its neighbours within `topo` (offsets from -1, columns outermost; counting stops once above the threshold) are on
+    (off); `DEMorphBinVol::morph(): pass=<k>/<n>, nchanges = <n>, tot = <n>` after each pass with `mm_debug`;
+    `nchangestot` the total. FreeSurfer reads the voxel's own value from frame `frame` of the one-frame copy (FS-804;
+    by default frame 0).
+  - `morph(invol, thmin, thmax, mask, outvol)` and `morph(invol, matchlist, mask, outvol)`: `check(invol, mask, outvol)`
+    (`NULL` after its error); a volume of several frames has frame `frame` copied first (`copyFrame`: FreeSurfer copies
+    into bytes, FS-808; by default the input's type); then binarized (`BinarizeMRI` type 1 with the thresholds, or type 2
+    with the list, within the mask, `m_debug` as `mm_debug`; `NULL` passed on) and `morph` of the result. The result is
+    a new volume (`outvol` is only checked). FreeSurfer's `morph` then selects frame `frame` again from the one-frame
+    binarized volume (FS-805; by default frame 0).
+
+## 61. Validation plan (sections 59 and 60)
+The probe's `vvfill` (sources of up to 5 x 5 x 4 voxels and 2 frames, masks, one-transform LTAs from the source or to it,
+two transforms, neither end, voxel-to-voxel, RAS-to-RAS and tkregister types, upsampling factors -1 to 3, `DoConserve` 0
+to 2, `Gdiag_no`, given outputs of the target grid or other frames), `fbnwm` (T1 and white-matter volumes of up to 6 x 6 x 5
+voxels from two-level patterns, boxes and painted voxels, values beyond 255, below 0 and NaN, other types and widths),
+`qecc`, `vtero`, `vtdil` (binary patterns and boxes of up to 8 x 8 x 6 voxels, masks, centres outside, the debugging
+voxel), `fscm` (label patterns with hippocampus, amygdala and ventricles; dilations -1 to 3), `binmri` (every field,
+frame ranges, masks, given outputs, a second call on another volume, `qualifies` at one voxel), `demb`, `demt`, `demm`,
+`demc` (every type, neighbourhood, threshold, pass count and frame, valid and not). Expected: identical with
+`reproduce` but where FreeSurfer touches memory it does not own (the shared voxel defects), counted and not compared;
+the default differs only with a notice.

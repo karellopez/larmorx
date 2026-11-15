@@ -136,10 +136,9 @@ fn sgi_file(g: &mut Gen) -> Vec<u8> {
     d.resize(512, 0);
     let (nx, ny, nz) = (usize::from(x), usize::from(y), usize::from(z));
     let unit = usize::from(bpp.max(1));
+    // (the same draws as before relay 31's lint fix: no chance drawn for 1-byte pixels)
     let px = |g: &mut Gen| -> u16 {
-        if unit == 1 {
-            g.below(256) as u16
-        } else if g.chance(3) {
+        if unit == 1 || g.chance(3) {
             g.below(256) as u16
         } else {
             g.below(65536) as u16

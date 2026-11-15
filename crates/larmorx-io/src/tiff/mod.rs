@@ -371,17 +371,14 @@ impl Tiff {
                 b'b' if create && !bigendian => tif.flags |= TIFF_SWAB,
                 b'l' if create && bigendian => tif.flags |= TIFF_SWAB,
                 b'B' => {
-                    tif.flags =
-                        (tif.flags & !TIFF_FILLORDER) | u32::from(values::FILLORDER_MSB2LSB)
+                    tif.flags = (tif.flags & !TIFF_FILLORDER) | u32::from(values::FILLORDER_MSB2LSB)
                 }
                 b'L' => {
-                    tif.flags =
-                        (tif.flags & !TIFF_FILLORDER) | u32::from(values::FILLORDER_LSB2MSB)
+                    tif.flags = (tif.flags & !TIFF_FILLORDER) | u32::from(values::FILLORDER_LSB2MSB)
                 }
                 b'H' => {
                     // HOST_FILLORDER of FreeSurfer's port.h: FILLORDER_MSB2LSB.
-                    tif.flags =
-                        (tif.flags & !TIFF_FILLORDER) | u32::from(values::FILLORDER_MSB2LSB)
+                    tif.flags = (tif.flags & !TIFF_FILLORDER) | u32::from(values::FILLORDER_MSB2LSB)
                 }
                 b'C' if m == Mode::RdOnly => tif.flags |= TIFF_STRIPCHOP,
                 b'c' if m == Mode::RdOnly => tif.flags &= !TIFF_STRIPCHOP,

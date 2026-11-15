@@ -462,11 +462,8 @@ impl Tiff {
                     }
                     if ok {
                         self.dir.extrasamples = v as u16;
-                        self.dir.sampleinfo = arr
-                            .iter()
-                            .copied()
-                            .take(usize::from(v as u16))
-                            .collect();
+                        self.dir.sampleinfo =
+                            arr.iter().copied().take(usize::from(v as u16)).collect();
                     }
                 }
                 if !ok {

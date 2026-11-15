@@ -110,8 +110,7 @@ impl Tiff {
             let ss = self.ycbcr_subsampling_for_size();
             let d = &self.dir;
             let w = howmany(d.imagewidth, u32::from(ss[0])).wrapping_mul(u32::from(ss[0])) as i32;
-            let scanline =
-                howmany((w as u32).wrapping_mul(u32::from(d.bitspersample)), 8) as i32;
+            let scanline = howmany((w as u32).wrapping_mul(u32::from(d.bitspersample)), 8) as i32;
             let samplingarea = i32::from(ss[0]) * i32::from(ss[1]);
             let nrows = howmany(nrows, u32::from(ss[1])).wrapping_mul(u32::from(ss[1]));
             let a = (nrows as i32).wrapping_mul(scanline);
@@ -362,7 +361,14 @@ impl Tiff {
     }
 
     /// `TIFFReadRawStrip1` / `TIFFReadRawTile1` into the raw buffer.
-    fn read_raw1(&mut self, strip: u32, size: i32, module: &str, tile: bool, s: &mut dyn Streams) -> i32 {
+    fn read_raw1(
+        &mut self,
+        strip: u32,
+        size: i32,
+        module: &str,
+        tile: bool,
+        s: &mut dyn Streams,
+    ) -> i32 {
         let Some(off) = self.strip_entry(false, strip) else {
             return -1;
         };
@@ -390,17 +396,12 @@ impl Tiff {
             let m = if tile {
                 format!(
                     "{name}: Read error at row {}, col {}; got {} bytes, expected {}",
-                    self.row as i64,
-                    self.col as i64,
-                    cc as i64 as u64,
-                    size as i64 as u64
+                    self.row as i64, self.col as i64, cc as i64 as u64, size as i64 as u64
                 )
             } else {
                 format!(
                     "{name}: Read error at scanline {}; got {} bytes, expected {}",
-                    self.row,
-                    cc as i64 as u64,
-                    size as i64 as u64
+                    self.row, cc as i64 as u64, size as i64 as u64
                 )
             };
             self.error(Some(module), &m, s);
@@ -434,7 +435,11 @@ impl Tiff {
     }
 
     fn fill(&mut self, strip: u32, tile: bool, s: &mut dyn Streams) -> bool {
-        let module = if tile { "TIFFFillTile" } else { "TIFFFillStrip" };
+        let module = if tile {
+            "TIFFFillTile"
+        } else {
+            "TIFFFillStrip"
+        };
         let Some(bc) = self.strip_entry(true, strip) else {
             return false;
         };
@@ -557,7 +562,13 @@ impl Tiff {
     }
 
     /// `TIFFReadEncodedTile(tif, tile, buf, size)`.
-    fn read_encoded_tile(&mut self, tile: u32, buf: &mut [u8], size: i32, s: &mut dyn Streams) -> i32 {
+    fn read_encoded_tile(
+        &mut self,
+        tile: u32,
+        buf: &mut [u8],
+        size: i32,
+        s: &mut dyn Streams,
+    ) -> i32 {
         let tilesize = self.tilesize;
         if !self.check_read(true, s) {
             return -1;

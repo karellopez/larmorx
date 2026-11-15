@@ -44,10 +44,18 @@ struct W {
 
 impl W {
     fn u16(&self, v: u16) -> [u8; 2] {
-        if self.big { v.to_be_bytes() } else { v.to_le_bytes() }
+        if self.big {
+            v.to_be_bytes()
+        } else {
+            v.to_le_bytes()
+        }
     }
     fn u32(&self, v: u32) -> [u8; 4] {
-        if self.big { v.to_be_bytes() } else { v.to_le_bytes() }
+        if self.big {
+            v.to_be_bytes()
+        } else {
+            v.to_le_bytes()
+        }
     }
     fn shorts(&self, v: &[u16]) -> Vec<u8> {
         v.iter().flat_map(|&x| self.u16(x)).collect()
@@ -202,7 +210,11 @@ fn difference(v: &mut [u8], row: usize, stride: usize, bps: u16, big: bool) {
             };
             for i in (stride..n).rev() {
                 let d = get(r, i).wrapping_sub(get(r, i - stride));
-                let b = if big { d.to_be_bytes() } else { d.to_le_bytes() };
+                let b = if big {
+                    d.to_be_bytes()
+                } else {
+                    d.to_le_bytes()
+                };
                 r[2 * i..2 * i + 2].copy_from_slice(&b);
             }
         } else {
@@ -250,7 +262,10 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         };
         let tiled = r.chance(4);
         let (tw, th) = if tiled {
-            (r.pick(&[16u32, 16, 32, 8, 0]), r.pick(&[16u32, 16, 32, 24, 0]))
+            (
+                r.pick(&[16u32, 16, 32, 8, 0]),
+                r.pick(&[16u32, 16, 32, 24, 0]),
+            )
         } else {
             (0, 0)
         };
@@ -259,14 +274,26 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         } else {
             Some(1 + r.below(u64::from(length) + 4) as u32)
         };
-        let fillorder: Option<u16> = if r.chance(3) { Some(r.pick(&[1, 2, 2, 3])) } else { None };
-        let orientation: Option<u16> = if r.chance(2) { Some(r.pick(&[1, 1, 4, 4, 2, 5, 9, 0])) } else { None };
+        let fillorder: Option<u16> = if r.chance(3) {
+            Some(r.pick(&[1, 2, 2, 3]))
+        } else {
+            None
+        };
+        let orientation: Option<u16> = if r.chance(2) {
+            Some(r.pick(&[1, 1, 4, 4, 2, 5, 9, 0]))
+        } else {
+            None
+        };
         let photometric: Option<u16> = if r.chance(8) {
             None
         } else {
             Some(r.pick(&[1, 1, 0, 2, 2, 3, 6, 5, 4]))
         };
-        let sampleformat: Option<u16> = if r.chance(2) { Some(r.pick(&[1, 1, 2, 3, 4, 7, 0])) } else { None };
+        let sampleformat: Option<u16> = if r.chance(2) {
+            Some(r.pick(&[1, 1, 2, 3, 4, 7, 0]))
+        } else {
+            None
+        };
         // The geometry of the data.
         let samples_per_unit = if planar == 1 { u32::from(spp) } else { 1 };
         let row_bits = |cols: u32| u64::from(cols) * u64::from(bps) * u64::from(samples_per_unit);
@@ -308,8 +335,9 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
             let enc = match comp {
                 1 => p.clone(),
                 32773 => packbits_encode(p),
-                32946 | 8 => larmorx_core::zlib::compress_vec(p, r.pick(&[1, 6, 9]))
-                    .unwrap_or_default(),
+                32946 | 8 => {
+                    larmorx_core::zlib::compress_vec(p, r.pick(&[1, 6, 9])).unwrap_or_default()
+                }
                 5 => lzw_encode(p, old_lzw),
                 _ => {
                     let n = r.below(p.len() as u64 + 8) as usize;
@@ -327,9 +355,19 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
             if v <= 0xffff && r.chance(2) {
                 let mut d = w.u16(v as u16).to_vec();
                 d.extend_from_slice(&[0, 0]);
-                Tag { tag: t, ty: 3, count: 1, data: d }
+                Tag {
+                    tag: t,
+                    ty: 3,
+                    count: 1,
+                    data: d,
+                }
             } else {
-                Tag { tag: t, ty: 4, count: 1, data: w.u32(v).to_vec() }
+                Tag {
+                    tag: t,
+                    ty: 4,
+                    count: 1,
+                    data: w.u32(v).to_vec(),
+                }
             }
         };
         if !r.chance(40) {
@@ -344,37 +382,94 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                 .map(|k| if k > 0 && r.chance(30) { bps + 1 } else { bps })
                 .collect();
             if r.chance(25) {
-                tags.push(Tag { tag: 258, ty: 4, count: n, data: w.longs(&vals.iter().map(|&x| u32::from(x)).collect::<Vec<_>>()) });
+                tags.push(Tag {
+                    tag: 258,
+                    ty: 4,
+                    count: n,
+                    data: w.longs(&vals.iter().map(|&x| u32::from(x)).collect::<Vec<_>>()),
+                });
             } else {
-                tags.push(Tag { tag: 258, ty: 3, count: n, data: w.shorts(&vals) });
+                tags.push(Tag {
+                    tag: 258,
+                    ty: 3,
+                    count: n,
+                    data: w.shorts(&vals),
+                });
             }
         }
         if comp != 1 || r.chance(2) {
-            tags.push(Tag { tag: 259, ty: 3, count: 1, data: w.shorts(&[comp, 0]) });
+            tags.push(Tag {
+                tag: 259,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[comp, 0]),
+            });
         }
         if let Some(p) = photometric {
-            tags.push(Tag { tag: 262, ty: 3, count: 1, data: w.shorts(&[p, 0]) });
+            tags.push(Tag {
+                tag: 262,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[p, 0]),
+            });
         }
         if let Some(f) = fillorder {
-            tags.push(Tag { tag: 266, ty: 3, count: 1, data: w.shorts(&[f, 0]) });
+            tags.push(Tag {
+                tag: 266,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[f, 0]),
+            });
         }
         if r.chance(3) {
-            let text: Vec<u8> = (0..r.below(30)).map(|_| b'a' + r.below(26) as u8).chain([0]).collect();
-            tags.push(Tag { tag: 270, ty: 2, count: text.len() as u32, data: text });
+            let text: Vec<u8> = (0..r.below(30))
+                .map(|_| b'a' + r.below(26) as u8)
+                .chain([0])
+                .collect();
+            tags.push(Tag {
+                tag: 270,
+                ty: 2,
+                count: text.len() as u32,
+                data: text,
+            });
         }
-        let (otag, ctag) = if tiled { (324u16, 325u16) } else { (273u16, 279u16) };
+        let (otag, ctag) = if tiled {
+            (324u16, 325u16)
+        } else {
+            (273u16, 279u16)
+        };
         let offs_short = offsets.iter().all(|&o| o <= 0xffff) && r.chance(4);
         if offs_short && !tiled {
             let v: Vec<u16> = offsets.iter().map(|&o| o as u16).collect();
-            tags.push(Tag { tag: otag, ty: 3, count: v.len() as u32, data: w.shorts(&v) });
+            tags.push(Tag {
+                tag: otag,
+                ty: 3,
+                count: v.len() as u32,
+                data: w.shorts(&v),
+            });
         } else {
-            tags.push(Tag { tag: otag, ty: 4, count: offsets.len() as u32, data: w.longs(&offsets) });
+            tags.push(Tag {
+                tag: otag,
+                ty: 4,
+                count: offsets.len() as u32,
+                data: w.longs(&offsets),
+            });
         }
         if let Some(o) = orientation {
-            tags.push(Tag { tag: 274, ty: 3, count: 1, data: w.shorts(&[o, 0]) });
+            tags.push(Tag {
+                tag: 274,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[o, 0]),
+            });
         }
         if spp != 1 || r.chance(3) {
-            tags.push(Tag { tag: 277, ty: 3, count: 1, data: w.shorts(&[spp, 0]) });
+            tags.push(Tag {
+                tag: 277,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[spp, 0]),
+            });
         }
         if let Some(v) = rps {
             tags.push(short_or_long(&w, &mut r, 278, v));
@@ -383,29 +478,73 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
             0 => {}
             1 => {
                 let bad: Vec<u32> = counts.iter().map(|_| 0).collect();
-                tags.push(Tag { tag: ctag, ty: 4, count: bad.len() as u32, data: w.longs(&bad) });
+                tags.push(Tag {
+                    tag: ctag,
+                    ty: 4,
+                    count: bad.len() as u32,
+                    data: w.longs(&bad),
+                });
             }
-            _ => tags.push(Tag { tag: ctag, ty: 4, count: counts.len() as u32, data: w.longs(&counts) }),
+            _ => tags.push(Tag {
+                tag: ctag,
+                ty: 4,
+                count: counts.len() as u32,
+                data: w.longs(&counts),
+            }),
         }
         if r.chance(3) {
             let num = 72 + r.below(300) as u32;
-            let den = if r.chance(20) { 0 } else { 1 + r.below(3) as u32 };
-            tags.push(Tag { tag: 282, ty: 5, count: 1, data: w.longs(&[num, den]) });
-            tags.push(Tag { tag: 283, ty: 5, count: 1, data: w.longs(&[num + 1, den]) });
+            let den = if r.chance(20) {
+                0
+            } else {
+                1 + r.below(3) as u32
+            };
+            tags.push(Tag {
+                tag: 282,
+                ty: 5,
+                count: 1,
+                data: w.longs(&[num, den]),
+            });
+            tags.push(Tag {
+                tag: 283,
+                ty: 5,
+                count: 1,
+                data: w.longs(&[num + 1, den]),
+            });
         }
         if planar != 1 || r.chance(3) {
-            tags.push(Tag { tag: 284, ty: 3, count: 1, data: w.shorts(&[planar, 0]) });
+            tags.push(Tag {
+                tag: 284,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[planar, 0]),
+            });
         }
         if r.chance(3) {
-            tags.push(Tag { tag: 296, ty: 3, count: 1, data: w.shorts(&[r.pick(&[1, 2, 3, 4]), 0]) });
+            tags.push(Tag {
+                tag: 296,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[r.pick(&[1, 2, 3, 4]), 0]),
+            });
         }
         if predictor != 0 {
-            tags.push(Tag { tag: 317, ty: 3, count: 1, data: w.shorts(&[predictor, 0]) });
+            tags.push(Tag {
+                tag: 317,
+                ty: 3,
+                count: 1,
+                data: w.shorts(&[predictor, 0]),
+            });
         }
         if photometric == Some(3) && bps <= 8 && r.chance(2) {
             let n = 3u32 << bps;
             let v: Vec<u16> = (0..n).map(|k| (k * 257) as u16).collect();
-            tags.push(Tag { tag: 320, ty: 3, count: n, data: w.shorts(&v) });
+            tags.push(Tag {
+                tag: 320,
+                ty: 3,
+                count: n,
+                data: w.shorts(&v),
+            });
         }
         if tiled {
             if tw > 0 || r.chance(2) {
@@ -414,25 +553,47 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
             tags.push(short_or_long(&w, &mut r, 323, th));
         }
         if spp > 1 && r.chance(3) {
-            let n = if r.chance(4) { u32::from(spp) } else { u32::from(spp) - 1 };
+            let n = if r.chance(4) {
+                u32::from(spp)
+            } else {
+                u32::from(spp) - 1
+            };
             let v: Vec<u16> = (0..n).map(|_| r.pick(&[0, 1, 2, 3])).collect();
             if r.chance(3) {
                 let mut d: Vec<u8> = v.iter().map(|&x| x as u8).collect();
                 while d.len() < 4 {
                     d.push(0);
                 }
-                tags.push(Tag { tag: 338, ty: 1, count: n, data: d });
+                tags.push(Tag {
+                    tag: 338,
+                    ty: 1,
+                    count: n,
+                    data: d,
+                });
             } else {
-                tags.push(Tag { tag: 338, ty: 3, count: n, data: w.shorts(&v) });
+                tags.push(Tag {
+                    tag: 338,
+                    ty: 3,
+                    count: n,
+                    data: w.shorts(&v),
+                });
             }
         }
         if let Some(f) = sampleformat {
             let n = if r.chance(3) { 1 } else { u32::from(spp) };
-            tags.push(Tag { tag: 339, ty: 3, count: n, data: w.shorts(&vec![f; n as usize]) });
+            tags.push(Tag {
+                tag: 339,
+                ty: 3,
+                count: n,
+                data: w.shorts(&vec![f; n as usize]),
+            });
         }
         // Unknown and odd tags.
         for _ in 0..r.below(4) {
-            let t = r.pick(&[40000u16, 50000, 65000, 33432, 305, 306, 340, 341, 297, 530, 0, 700, 34675, 330, 32995, 37439]);
+            let t = r.pick(&[
+                40000u16, 50000, 65000, 33432, 305, 306, 340, 341, 297, 530, 0, 700, 34675, 330,
+                32995, 37439,
+            ]);
             let ty = r.pick(&[1u16, 2, 3, 4, 5, 7, 11, 12, 6, 8, 9, 10, 13, 0, 14]);
             let count = r.pick(&[0u32, 1, 1, 2, 3, 4, 5, 9, 20]);
             let wdt = match ty {
@@ -444,7 +605,12 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
             };
             let n = (wdt * count as usize).max(4);
             let data: Vec<u8> = (0..n).map(|_| r.next() as u8 % 97).collect();
-            tags.push(Tag { tag: t, ty, count, data });
+            tags.push(Tag {
+                tag: t,
+                ty,
+                count,
+                data,
+            });
         }
         tags.sort_by_key(|t| t.tag);
         if r.chance(10) && tags.len() > 2 {
@@ -548,7 +714,11 @@ pub fn write_case(seed: u64, i: u64) -> WriteCase {
     };
     let xres = res(&mut r);
     let yres = res(&mut r);
-    let compression = if r.chance(8) { r.pick(&[1u16, 32773, 8, 5]) } else { 32946 };
+    let compression = if r.chance(8) {
+        r.pick(&[1u16, 32773, 8, 5])
+    } else {
+        32946
+    };
     let row = ((u64::from(cols) * u64::from(bps) * u64::from(spp)).div_ceil(8)) as usize;
     let data = pixels(&mut r, row * rows as usize);
     WriteCase {
@@ -709,7 +879,10 @@ pub fn reset_thread_state() {
 
 /// The read transcript of the port on the file `path` (the probe's `tf_read` in C): its
 /// standard output and standard error, the notices' IDs, or the codec not ported yet.
-pub fn port_read(path: &str, opts: Options) -> (String, String, Vec<&'static str>, Option<super::Unported>) {
+pub fn port_read(
+    path: &str,
+    opts: Options,
+) -> (String, String, Vec<&'static str>, Option<super::Unported>) {
     let mut cap = Captured::default();
     let mut out = String::new();
     let mut ids: Vec<&'static str> = Vec::new();
@@ -767,29 +940,109 @@ pub fn port_write(path: &str, c: &WriteCase, opts: Options) -> (String, String, 
         let r = t.set_field(tg, v, cap).unwrap_or(false);
         out.push_str(&format!("set {tg} {}\n", i32::from(r)));
     };
-    set(&mut t, tag::SAMPLEFORMAT, SetValue::Int(i64::from(c.sample_format)), &mut out, &mut cap);
-    set(&mut t, tag::IMAGEWIDTH, SetValue::Int(i64::from(c.cols)), &mut out, &mut cap);
-    set(&mut t, tag::IMAGELENGTH, SetValue::Int(i64::from(c.rows)), &mut out, &mut cap);
-    set(&mut t, tag::ORIENTATION, SetValue::Int(4), &mut out, &mut cap);
-    set(&mut t, tag::SAMPLESPERPIXEL, SetValue::Int(i64::from(c.spp)), &mut out, &mut cap);
-    set(&mut t, tag::SAMPLEFORMAT, SetValue::Int(2), &mut out, &mut cap);
-    set(&mut t, tag::BITSPERSAMPLE, SetValue::Int(i64::from(c.bps)), &mut out, &mut cap);
-    set(&mut t, tag::PLANARCONFIG, SetValue::Int(1), &mut out, &mut cap);
-    set(&mut t, tag::PHOTOMETRIC, SetValue::Int(1), &mut out, &mut cap);
-    set(&mut t, tag::RESOLUTIONUNIT, SetValue::Int(2), &mut out, &mut cap);
+    set(
+        &mut t,
+        tag::SAMPLEFORMAT,
+        SetValue::Int(i64::from(c.sample_format)),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::IMAGEWIDTH,
+        SetValue::Int(i64::from(c.cols)),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::IMAGELENGTH,
+        SetValue::Int(i64::from(c.rows)),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::ORIENTATION,
+        SetValue::Int(4),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::SAMPLESPERPIXEL,
+        SetValue::Int(i64::from(c.spp)),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::SAMPLEFORMAT,
+        SetValue::Int(2),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::BITSPERSAMPLE,
+        SetValue::Int(i64::from(c.bps)),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::PLANARCONFIG,
+        SetValue::Int(1),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::PHOTOMETRIC,
+        SetValue::Int(1),
+        &mut out,
+        &mut cap,
+    );
+    set(
+        &mut t,
+        tag::RESOLUTIONUNIT,
+        SetValue::Int(2),
+        &mut out,
+        &mut cap,
+    );
     if c.xres != 0.0 {
-        set(&mut t, tag::XRESOLUTION, SetValue::Double(c.xres), &mut out, &mut cap);
+        set(
+            &mut t,
+            tag::XRESOLUTION,
+            SetValue::Double(c.xres),
+            &mut out,
+            &mut cap,
+        );
     }
     if c.yres != 0.0 {
-        set(&mut t, tag::YRESOLUTION, SetValue::Double(c.yres), &mut out, &mut cap);
+        set(
+            &mut t,
+            tag::YRESOLUTION,
+            SetValue::Double(c.yres),
+            &mut out,
+            &mut cap,
+        );
     }
-    set(&mut t, tag::COMPRESSION, SetValue::Int(i64::from(c.compression)), &mut out, &mut cap);
+    set(
+        &mut t,
+        tag::COMPRESSION,
+        SetValue::Int(i64::from(c.compression)),
+        &mut out,
+        &mut cap,
+    );
     let row = ((u64::from(c.cols) * u64::from(c.bps) * u64::from(c.spp)).div_ceil(8)) as usize;
     let mut bad = 0u32;
     for k in 0..c.rows as usize {
         let mut b = c.data[k * row..(k + 1) * row].to_vec();
         b.resize(row + 64, 0);
-        let r = t.write_scanline(&mut b, k as u32, 0, &mut cap).unwrap_or(-1);
+        let r = t
+            .write_scanline(&mut b, k as u32, 0, &mut cap)
+            .unwrap_or(-1);
         if r != 1 {
             bad += 1;
             if bad <= 3 {

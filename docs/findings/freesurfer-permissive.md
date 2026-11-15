@@ -472,6 +472,45 @@ sites track A wires (`imageio.rs`).
 - The official binaries link FreeSurfer's static `libjpeg.a` (IJG 6b; the binary's strings hold
   `6b  27-Mar-1998` and IJG's messages).
 
+## TIFF: FreeSurfer's calls of libtiff 3.6.1 (`utils/imageio.cpp`; track C relay 32, 2026-11-16)
+
+The library is larmorx-io's `tiff` (open findings: `docs/findings/libtiff-3.6.1.md`); these are the
+call sites track A wires (`imageio.rs`'s TIFF image reading and writing, "not ported yet" until now).
+FreeSurfer's `packages/tiff` is libtiff 3.6.1 (two `$Id` lines, one cast in `tif_print.c`), built with
+`-DZIP_SUPPORT -DPIXARLOG_SUPPORT` and FreeSurfer's flags; the official programs link it statically
+and load the system's zlib.
+- `TiffReadImage(fname, frame0, nthreads, end_frame)`: `TIFFOpen(fname, "r")` (NULL: return NULL),
+  `TIFFNumberOfDirectories`, `TiffReadDirectoryInfo` (below), `TIFFSetDirectory(tif, frame0)` (its
+  result not tested), `TIFFGetFieldDefaulted` of ImageWidth (an `int`), ImageLength, SamplesPerPixel,
+  BitsPerSample, Photometric, FillOrder, Compression, ResolutionUnit (`short`s), XResolution and
+  YResolution (`float`s; when the call returns 0: 0.1 for a unit of 1, else 25.4), Orientation;
+  `TIFFClose`; then, per frame, `TiffReadImageDirectory`. Variables that `TIFFGetFieldDefaulted`
+  leaves unset (no default: width, length, photometric) keep their stack contents.
+- `TiffReadDirectoryInfo(tif, info, start, end)`: `TIFFSetDirectory(tif, 0)`, then per directory
+  until `TIFFReadDirectory` returns 0: `TIFFIsTiled`, PlanarConfiguration into an `int` (the
+  function writes a `uint16`: the `int`'s other two bytes keep their stack contents; separate planes
+  return `ERROR_UNSUPPORTED`), the same fields as above, `TIFFScanlineSize`, `TIFFTileSize`, the
+  image size `width * height * samples * (bits / 8)`.
+- `TiffReadImageDirectory(fname, I, nframe, orientation, info)`: `TIFFOpen(fname, "r")` again,
+  `TIFFSetDirectory(tif, nframe)`, PlanarConfiguration into an `int` (separate: a message and
+  `exit(1)`), then `TiffReadTiledImage` or `TiffReadStrippedImage`, `TIFFClose`.
+- `TiffReadStrippedImage`: per row `TIFFReadScanline(tif, buf, row, 0)` into the image row (for the
+  orientations TOPLEFT and BOTLEFT; others `ErrorExit`), the buffer the image's own row (8, 16, 32
+  or 64 bits per sample choose the row's pixel type), so a scanline longer than the image row writes
+  into the next rows (the port's `read_scanline` writes as many bytes as the slice it is given holds:
+  pass the image from the row on); 1-bit rows unpacked by FreeSurfer; RGB(A) rows copied.
+- `TiffReadTiledImage`: `TIFFGetField` of the tile width and length (into `int`s), `TIFFTileSize`,
+  then `TIFFReadTile(tif, tilebuf, x, y, 0, 0)` over the tiles, its return value stored in an
+  `unsigned long` (a -1 becomes 2^64 - 1 in FreeSurfer's copy loop).
+- `TiffReadHeader(fname, I)`: `TIFFOpen`, the size and samples and bits, `TIFFClose`.
+- `TiffWriteImage(I, fname, frame)`: `TIFFOpen(fname, "w")`, `TIFFSetField` of SampleFormat (the
+  image type's), ImageWidth, ImageLength, Orientation BOTLEFT, SamplesPerPixel, SampleFormat INT
+  (again), BitsPerSample, PlanarConfig CONTIG, Photometric MINISBLACK, ResolutionUnit INCH,
+  XResolution and YResolution `(double) nint(25.4 / size)` when the size is not 0, Compression
+  DEFLATE; `TIFFWriteScanline` per row (bottom row of the image first); `TIFFWriteDirectory`;
+  `TIFFClose`. The port's `cases::port_write` is this sequence; its files are FreeSurfer's byte for byte
+  (2,300 cases in the probe).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
@@ -483,5 +522,7 @@ sites track A wires (`imageio.rs`).
 `validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) and
 `validation/probes/fs-misc` (`facts.cpp` includes FreeSurfer's FNV headers) and
 `validation/probes/fs-nrrd-minc` (its build compiles against FreeSurfer's `packages/` headers; `src/minc.rs`'s `FreeSurferDialect`) and
-`validation/probes/fs-jpeg` (its build links FreeSurfer's `libjpeg.a` with its `packages/jpeg` headers) are closed to
+`validation/probes/fs-jpeg` (its build links FreeSurfer's `libjpeg.a` with its `packages/jpeg` headers) and
+`validation/probes/fs-tiff` (its build links FreeSurfer's `libtiff.a` with its `packages/tiff` headers; its write
+transcript is FreeSurfer's `TiffWriteImage` sequence) are closed to
 FreeSurfer's clean-room implementers, as this file is.

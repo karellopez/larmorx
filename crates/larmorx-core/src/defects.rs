@@ -2593,6 +2593,10 @@ defects! {
         "when a strip's start fails in the codec's setup (an unsupported predictor), reading the next row of that strip calls the LZW or Deflate decoder without a start: its input pointers were never set (a crash); nothing is decoded";
     FS_832 = "FS-832", "libtiff 3.6.1", true,
         "the predictor's horizontal differencing works by whole pixels while bytes are left, so a row whose byte count is not a multiple of the pixel's (a scanline size left from another directory) is processed past its end; past the caller's buffer nothing is touched";
+    FS_833 = "FS-833", "libtiff 3.6.1", true,
+        "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, and the Deflate decoder inflate into, about 2^64 bytes (memory past both buffers); nothing is written";
+    FS_834 = "FS-834", "libtiff 3.6.1", true,
+        "a SamplesPerPixel of several values (and an entry left unchecked by FS-820) is passed as the address of its array where one value goes: the field takes the address's low bits (nondeterministic); ignored as a wrong count, with libtiff's incorrect-count warning";
     FS_829 = "FS-829", "libtiff 3.6.1", true,
         "the strip size of a YCbCr image without YCbCrSubsampling is computed from two values never set (stack contents); the directory's defaults, 2 and 2, are used";
 }

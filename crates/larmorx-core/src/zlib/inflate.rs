@@ -154,9 +154,9 @@ fn inflate_table(
         root = min;
     }
     let mut left: i32 = 1;
-    for len in 1..=MAXBITS {
+    for &c in &count[1..=MAXBITS] {
         left <<= 1;
-        left -= i32::from(count[len]);
+        left -= i32::from(c);
         if left < 0 {
             return -1;
         }
@@ -649,7 +649,8 @@ impl Inflate {
                     }
                     needbits!(16);
                     self.flags = 0;
-                    if self.wrap & 1 == 0 || ((u64::from(getbits!(8)) << 8) + (hold >> 8)) % 31 != 0
+                    if self.wrap & 1 == 0
+                        || !((u64::from(getbits!(8)) << 8) + (hold >> 8)).is_multiple_of(31)
                     {
                         self.msg = Some("incorrect header check");
                         self.mode = Mode::Bad;
@@ -1063,13 +1064,12 @@ impl Inflate {
                             self.mode = Mode::Bad;
                             continue;
                         }
-                        let from;
-                        if copy > self.wnext {
+                        let from = if copy > self.wnext {
                             copy -= self.wnext;
-                            from = (self.wsize - copy) as usize;
+                            (self.wsize - copy) as usize
                         } else {
-                            from = (self.wnext - copy) as usize;
-                        }
+                            (self.wnext - copy) as usize
+                        };
                         if copy > self.length {
                             copy = self.length;
                         }
@@ -1083,18 +1083,18 @@ impl Inflate {
                             put += 1;
                         }
                     } else {
-                        let mut from = put - self.offset as usize;
+                        let from = put - self.offset as usize;
                         copy = self.length;
                         if copy > left {
                             copy = left;
                         }
                         left -= copy;
                         self.length -= copy;
-                        for _ in 0..copy {
-                            output[put] = output[from];
-                            put += 1;
-                            from += 1;
+                        // Byte by byte, in order: the source may overlap what is being written.
+                        for k in 0..copy as usize {
+                            output[put + k] = output[from + k];
                         }
+                        put += copy as usize;
                     }
                     if self.length == 0 {
                         self.mode = Mode::Len;
@@ -1342,12 +1342,12 @@ impl Inflate {
                                     from += 1;
                                 }
                             } else {
-                                let mut from = out - dist as usize;
-                                for _ in 0..len {
-                                    output[out] = output[from];
-                                    out += 1;
-                                    from += 1;
+                                let from = out - dist as usize;
+                                // Byte by byte, in order (the copy overlaps when dist < len).
+                                for k in 0..len as usize {
+                                    output[out + k] = output[from + k];
                                 }
+                                out += len as usize;
                             }
                             break;
                         } else if op & 64 == 0 {

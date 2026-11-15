@@ -397,3 +397,34 @@ coding, multi-scan and progressive decoding, block smoothing, `jmemnobs.c`'s mem
 - Checks: `src/jpeg/tests.rs` (a digest of 400 generated files decoded in both modes and 40 grey
   files written); the differential probe `validation/probes/fs-jpeg` against IJG 6b built from its
   release and FreeSurfer 8.2.0's `libjpeg.a` (README there).
+
+## TIFF: libtiff 3.6.1's reader and writer (`src/tiff/`; FreeSurfer's foundations, track C relay 32, 2026-11-16)
+
+Translated from libtiff 3.6.1 (`tiff-v3.6.1.tar.gz`, SHA-256
+538c6302bb2426a69d25e45dcb5e5b11d7235cf497368651b2d6c92612dbf83f; `<workspace>/tags/libtiff-3.6.1`,
+`upstream.tsv`); Copyright (c) 1988-1997 Sam Leffler, Copyright (c) 1991-1997 Silicon Graphics,
+Inc.; libtiff's notice (`LICENSES/libtiff.txt`, its acknowledgement in `NOTICE`); SPDX
+`Apache-2.0 AND libtiff` in each translated file (`cases.rs` and `tests.rs` are larmorx's own). The
+configuration is FreeSurfer 8.2.0's build of its `packages/tiff` (libtiff 3.6.1 but two `$Id`
+lines and a cast in `tif_print.c`, which is not translated): `ZIP_SUPPORT`, `PIXARLOG_SUPPORT`,
+`tiffconf.h`'s codecs, `STRIPCHOP_DEFAULT`, `SUBIFD_SUPPORT`, `port.h` without `HAVE_MMAP`,
+`HOST_FILLORDER` MSB2LSB, `HOST_BIGENDIAN` 0, `NDEBUG` (its asserts compiled out). Deflate over
+`larmorx_core::zlib` (zlib 1.2.11 as Ubuntu 22.04 builds it, the library FreeSurfer's official
+programs load).
+
+| larmorx | libtiff 3.6.1 |
+|---|---|
+| `mod.rs`: `Tiff::open`, `client_open`, `init_order`, `get_mode`, `number_of_directories`, `advance_directory`, `set_directory`, `close`, `header_bytes` | `tif_open.c` (`TIFFClientOpen`, `TIFFInitOrder`, `_TIFFgetMode`, the queries), `tif_unix.c` (`TIFFOpen`), `tif_dir.c` (`TIFFNumberOfDirectories`, `TIFFAdvanceDirectory` unmapped, `TIFFSetDirectory`), `tif_close.c` |
+| `io.rs`: `Fd` | `tif_unix.c`'s `_tiffReadProc`, `_tiffWriteProc`, `_tiffSeekProc`, `_tiffSizeProc` (with Linux's `read`, `lseek`, `fstat` and `open` results on every platform) |
+| `fields.rs`: `MAIN`, `PREDICT`, `ZIP`, `FAX`, `FAX3`, `FAX4`, `PIXARLOG`, `LOGLUV`, `Fields::merge`, `merge_anon`, `setup`, `find`, `data_width`, the tags | `tif_dirinfo.c` (`tiffFieldInfo`, `_TIFFSetupFieldInfo`, `tagCompare`, `_TIFFMergeFieldInfo`, `_TIFFFindFieldInfo` with its cache, `_TIFFCreateAnonFieldInfo`, `TIFFDataWidth`), `tif_predict.c`, `tif_zip.c`, `tif_fax3.c`, `tif_pixarlog.c`, `tif_luv.c` (their field tables), `tiff.h` |
+| `dir.rs`: `Dir`, `default_directory`, `free_directory`, `set_field`, `set_field_arg`, `vsetfield`, `check_ink_names`, `get_field`, `vgetfield`, `get_field_defaulted` | `tif_dir.h`, `tif_dir.c` (`TIFFDefaultDirectory`, `TIFFFreeDirectory`, `TIFFVSetField` with `OkToChangeTag`, `_TIFFVSetField`, `setExtraSamples`, `checkInkNamesString`, `TIFFVGetField`, `_TIFFVGetField`), `tif_aux.c` (`TIFFVGetFieldDefaulted`); the codecs' `vsetfield`/`vgetfield` hooks (`PredictorVSetField`, `ZIPVSetField` and their get side) |
+| `dirread.rs`: `read_directory`, `check_malloc`, `extract_data`, `check_dir_count`, `fetch_data`, `fetch_string`, `cvt_rational`, `fetch_rational`, `fetch_byte_array`, `fetch_short_array`, `fetch_long_array`, `fetch_rational_array`, `fetch_float_array`, `fetch_double_array`, `fetch_any_array`, `fetch_normal_tag`, `fetch_per_sample_shorts`, `fetch_per_sample_anys`, `fetch_strip_thing`, `fetch_extra_samples`, `fetch_colormap`, `fetch_short_pair`, `fetch_ref_black_white`, `estimate_strip_byte_counts`, `missing_required`, `chop_up_single_uncompressed_strip` | `tif_dirread.c` (every function of the unmapped path), `tif_dir.h`'s `TIFFExtractData` |
+| `read.rs`: `scanline_size`, `number_of_strips`, `number_of_tiles`, `vstrip_size`, `tile_row_size`, `vtile_size`, `tile_size`, `compute_tile`, `check_tile`, `check_read`, `read_scanline`, `seek_row`, `read_raw1`, `read_buffer_setup`, `fill_strip`, `start_strip`, `start_tile`, `read_tile`, `read_encoded_tile` | `tif_strip.c`, `tif_tile.c`, `tif_read.c` (unmapped), `tif_swab.c`'s `TIFFReverseBits` |
+| `codec.rs`: the method enums, `set_default_compression_state`, `set_compression_scheme`, `predictor_init`, `cleanup`, `setup_decode`, `predictor_setup`, `predictor_setup_decode`, `pre_decode`, `decode`, `no_decode`, `codec_seek`, `post_decode`, `dump_decode`, `packbits_decode`, `lzw_pre_decode`, `lzw_decode_with`, `lzw_next_code`, `code_loop`, `zip_decode`, `zip_set_quality`, `pfunc` | `tif_compress.c`, `tif_codec.c` (`_TIFFBuiltinCODECS`, `NotConfigured`), `tif_dumpmode.c`, `tif_packbits.c`, `tif_lzw.c` (`LZWSetupDecode`, `LZWPreDecode`, `LZWDecode`, `LZWDecodeCompat`, `LZWCleanup`, `LZWSetupEncode`), `tif_zip.c`, `tif_predict.c` (`horAcc8`, `horAcc16`, `swabHorAcc16`, `horDiff8`, `horDiff16`, the row and tile wrappers), `tif_read.c`'s `_TIFFSwab*BitData` |
+| `write.rs`: `write_check`, `setup_strips`, `write_buffer_setup`, `write_scanline`, `grow_strips`, `append_to_strip`, `flush_data1`, `flush_data`, `flush`, `setup_encode`, `pre_encode`, `post_encode`, `encode`, `no_encode`, `dump_encode`, `packbits_encode`, `zip_encode`, `zip_post_encode`, `write_directory`, `setup_short_long`, `setup_short`, `write_data`, `write_short_array`, `write_long_array`, `write_rational_array`, `write_any_array`, `write_float_array`, `write_byte_array`, `write_normal_tag`, `link_directory` | `tif_write.c`, `tif_flush.c`, `tif_dirwrite.c` (`_TIFFWriteDirectory` with `done`, its writers of the fields the port keeps, `TIFFLinkDirectory`), `tif_dumpmode.c`, `tif_packbits.c`, `tif_zip.c` and `tif_predict.c`'s encoders |
+
+Not translated: memory mapping (the build has none), `TIFFClientOpen`'s client procedures, tag
+extenders and `TIFFReassignTagToIgnore` (empty), `TIFFPrintDirectory` (`tif_print.c`), the RGBA
+interface (`tif_getimage.c`, `tif_color.c`), `TIFFWriteEncodedStrip`/`Tile`, `TIFFRewriteDirectory`,
+`TIFFUnlinkDirectory`; the CCITT, PixarLog, SGILog, ThunderScan and NeXT codecs (the next relay;
+`Unported` meanwhile). Validated by `validation/probes/fs-tiff` (`docs/findings/libtiff-3.6.1.md`).

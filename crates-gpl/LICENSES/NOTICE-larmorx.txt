@@ -200,7 +200,10 @@ Geldreich, 2013), translated into Rust in crates/larmorx-core/src/miniz.rs. mini
 the public domain (the Unlicense).
 
 libtiff 3.6.1's error and warning reporting (tif_error.c, tif_warning.c, tif_unix.c's handlers),
-translated into Rust in crates/larmorx-core/src/libtiff.rs. Its notice (LICENSES/libtiff.txt):
+translated into Rust in crates/larmorx-core/src/libtiff.rs, and its reader and writer (directories,
+strips and tiles, the None, PackBits, LZW and Deflate codecs, the predictor), translated into Rust
+in crates/larmorx-io/src/tiff/ (altered versions: see crates/larmorx-io/PROVENANCE.md). Its notice
+(LICENSES/libtiff.txt):
 
   Copyright (c) 1988-1997 Sam Leffler
   Copyright (c) 1991-1997 Silicon Graphics, Inc.
@@ -273,9 +276,10 @@ crates/larmorx-core/src/fnv.rs.
 
 zlib 1.2.11's file layer (gzlib.c, gzread.c, gzwrite.c, gzclose.c), translated into Rust in
 crates/larmorx-io/src/znz.rs (an altered version: inflate is zlib-rs's), and zlib 1.2.11's
-compressor with Ubuntu 22.04's patches (deflate.c, deflate.h, trees.c, compress.c, adler32.c,
-crc32.c), translated into Rust in crates/larmorx-core/src/zlib.rs and crates/larmorx-core/src/zlib/
-(an altered version: Rust's slices in place of the stream's pointers). Its licence:
+compressor and decompressor with Ubuntu 22.04's patches (deflate.c, deflate.h, trees.c,
+compress.c, adler32.c, crc32.c, inflate.c, inflate.h, inftrees.c, inffast.c), translated into Rust
+in crates/larmorx-core/src/zlib.rs and crates/larmorx-core/src/zlib/ (an altered version: Rust's
+slices in place of the stream's pointers). Its licence:
 
   (C) 1995-2017 Jean-loup Gailly and Mark Adler
   This software is provided 'as-is', without any express or implied warranty. In no event will

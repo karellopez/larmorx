@@ -9,7 +9,7 @@ use super::dir::{Layer, PostDecode};
 use super::fields::Table;
 use super::{TIFF_NOBITREV, Tiff, Unported, compression as c};
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_817, FS_818, FS_819, FS_831, FS_832};
+use larmorx_core::defects::{FS_817, FS_818, FS_819, FS_831, FS_832, FS_833};
 use larmorx_core::zlib::{self as z, Deflate, Inflate};
 
 /// `tif_setupdecode`'s codec part (the predictor wraps it: [`Codec::pred_setup`]).
@@ -412,7 +412,12 @@ impl Tiff {
                 k.encodestatus = false;
                 k.setupencode = SetupEncode::NotConfigured;
             }
-            c::CCITTRLE | c::CCITTRLEW | c::CCITTFAX3 | c::CCITTFAX4 | c::PIXARLOG | c::SGILOG
+            c::CCITTRLE
+            | c::CCITTRLEW
+            | c::CCITTFAX3
+            | c::CCITTFAX4
+            | c::PIXARLOG
+            | c::SGILOG
             | c::SGILOG24 => {
                 // These codecs register private tags and tag methods at this point; not
                 // ported yet.
@@ -593,7 +598,11 @@ impl Tiff {
     fn not_started(&mut self, which: &str) -> bool {
         let started = match which {
             "LZW" => self.codec.lzw.as_ref().is_some_and(|l| l.started),
-            _ => self.codec.zip.as_ref().is_some_and(|z| z.started && z.inflate.is_some()),
+            _ => self
+                .codec
+                .zip
+                .as_ref()
+                .is_some_and(|z| z.started && z.inflate.is_some()),
         };
         if !started {
             let name = self.name.clone();
@@ -623,6 +632,18 @@ impl Tiff {
         }
         if m == Decode::Zip && self.not_started("Deflate") {
             return 0;
+        }
+        if cc < 0 && matches!(m, Decode::Dump | Decode::Zip) {
+            let name = self.name.clone();
+            self.notices.add(
+                &FS_833,
+                format!(
+                    "{name}: a negative size of {cc} bytes (a size that overflows 32 bits, kept \
+                     after a TIFFReadDirectory that failed): libtiff 3.6.1 copies or inflates \
+                     about 2^64 bytes (memory past the buffers); nothing written"
+                ),
+            );
+            return i32::from(m == Decode::Dump);
         }
         match m {
             Decode::NoRow => self.no_decode("scanline", s),
@@ -763,11 +784,11 @@ impl Tiff {
     /// A raw byte at `at` as the decoders read it: past the strip's `end`, what the buffer
     /// holds from an earlier strip (FS-817), or never written (FS-819: 0).
     fn raw_byte(&mut self, at: usize, end: usize) -> u8 {
+        if at >= self.raw_defined {
+            self.past_raw_notice();
+            return 0;
+        }
         if at >= end {
-            if at >= self.raw_defined {
-                self.past_raw_notice();
-                return 0;
-            }
             let name = self.name.clone();
             self.notices.add(
                 &FS_817,
@@ -939,7 +960,11 @@ impl Tiff {
     }
 
     fn lzw_error(&self, what: &str, compat: bool, s: &mut dyn Streams) {
-        let f = if compat { "LZWDecodeCompat" } else { "LZWDecode" };
+        let f = if compat {
+            "LZWDecodeCompat"
+        } else {
+            "LZWDecode"
+        };
         let m = format!("{f}: {what} at scanline {}", self.row as i32);
         self.error(Some(&self.name.clone()), &m, s);
     }
@@ -962,10 +987,8 @@ impl Tiff {
 
     fn null_entry_notice(&mut self, what: &str) {
         let name = self.name.clone();
-        self.notices.add(
-            &FS_818,
-            format!("decoding the LZW data of {name}: {what}"),
-        );
+        self.notices
+            .add(&FS_818, format!("decoding the LZW data of {name}: {what}"));
     }
 
     #[allow(clippy::too_many_lines)]
@@ -1431,11 +1454,7 @@ impl Tiff {
                 break;
             }
             if state != z::Z_OK {
-                let m = format!(
-                    "{}: zlib error: {}",
-                    self.name,
-                    inf.msg.unwrap_or("(null)")
-                );
+                let m = format!("{}: zlib error: {}", self.name, inf.msg.unwrap_or("(null)"));
                 self.error(Some(MODULE), &m, s);
                 r = 0;
                 break;
@@ -1467,7 +1486,12 @@ impl Tiff {
             if let Some(d) = sp.deflate.as_mut() {
                 let (at, left) = (sp.out_at, sp.out_left);
                 let end = (at + left as usize).min(self.rawdata.len());
-                let (r, _, made) = d.params(q as i32, z::Z_DEFAULT_STRATEGY, &[], &mut self.rawdata[at..end]);
+                let (r, _, made) = d.params(
+                    q as i32,
+                    z::Z_DEFAULT_STRATEGY,
+                    &[],
+                    &mut self.rawdata[at..end],
+                );
                 sp.out_at += made;
                 sp.out_left -= made as u32;
                 if r != z::Z_OK {
@@ -1530,8 +1554,11 @@ impl Tiff {
                     let mut cp = 0i64;
                     loop {
                         for _ in 0..stride {
-                            let v = get8(buf, cp + stride, &mut outside)
-                                .wrapping_add(get8(buf, cp, &mut outside));
+                            let v = get8(buf, cp + stride, &mut outside).wrapping_add(get8(
+                                buf,
+                                cp,
+                                &mut outside,
+                            ));
                             put8(buf, cp + stride, v, &mut outside);
                             cp += 1;
                         }
@@ -1553,8 +1580,11 @@ impl Tiff {
                     let mut wp = 0i64;
                     loop {
                         for _ in 0..stride {
-                            let v = get16(buf, wp + stride, &mut outside)
-                                .wrapping_add(get16(buf, wp, &mut outside));
+                            let v = get16(buf, wp + stride, &mut outside).wrapping_add(get16(
+                                buf,
+                                wp,
+                                &mut outside,
+                            ));
                             put16(buf, wp + stride, v, &mut outside);
                             wp += 1;
                         }
@@ -1570,12 +1600,18 @@ impl Tiff {
                 if cc > stride && stride > 0 {
                     cc -= stride;
                     if stride == 3 || stride == 4 {
-                        let mut prev: Vec<u8> = (0..stride).map(|k| get8(buf, k, &mut outside)).collect();
+                        let mut prev: Vec<u8> =
+                            (0..stride).map(|k| get8(buf, k, &mut outside)).collect();
                         let mut cp = 0i64;
                         loop {
                             for k in 0..stride {
                                 let r1 = get8(buf, cp + stride + k, &mut outside);
-                                put8(buf, cp + stride + k, r1.wrapping_sub(prev[k as usize]), &mut outside);
+                                put8(
+                                    buf,
+                                    cp + stride + k,
+                                    r1.wrapping_sub(prev[k as usize]),
+                                    &mut outside,
+                                );
                                 prev[k as usize] = r1;
                             }
                             cp += stride;
@@ -1588,8 +1624,11 @@ impl Tiff {
                         let mut cp = cc - 1;
                         loop {
                             for _ in 0..stride {
-                                let v = get8(buf, cp + stride, &mut outside)
-                                    .wrapping_sub(get8(buf, cp, &mut outside));
+                                let v = get8(buf, cp + stride, &mut outside).wrapping_sub(get8(
+                                    buf,
+                                    cp,
+                                    &mut outside,
+                                ));
                                 put8(buf, cp + stride, v, &mut outside);
                                 cp -= 1;
                             }
@@ -1608,8 +1647,11 @@ impl Tiff {
                     let mut wp = wc - 1;
                     loop {
                         for _ in 0..stride {
-                            let v = get16(buf, wp + stride, &mut outside)
-                                .wrapping_sub(get16(buf, wp, &mut outside));
+                            let v = get16(buf, wp + stride, &mut outside).wrapping_sub(get16(
+                                buf,
+                                wp,
+                                &mut outside,
+                            ));
                             put16(buf, wp + stride, v, &mut outside);
                             wp -= 1;
                         }

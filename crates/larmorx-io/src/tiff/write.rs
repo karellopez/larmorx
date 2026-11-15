@@ -154,7 +154,13 @@ impl Tiff {
         }
     }
 
-    fn write_scanline_inner(&mut self, buf: &mut [u8], row: u32, sample: u16, s: &mut dyn Streams) -> i32 {
+    fn write_scanline_inner(
+        &mut self,
+        buf: &mut [u8],
+        row: u32,
+        sample: u16,
+        s: &mut dyn Streams,
+    ) -> i32 {
         const MODULE: &str = "TIFFWriteScanline";
         if self.flags & TIFF_BEENWRITING == 0 && !self.write_check(false, MODULE, s) {
             return -1;
@@ -200,11 +206,8 @@ impl Tiff {
             self.curstrip = strip;
             if strip >= self.dir.stripsperimage && imagegrew {
                 let rps = self.dir.rowsperstrip;
-                self.dir.stripsperimage = self
-                    .dir
-                    .imagelength
-                    .wrapping_add(rps.wrapping_sub(1))
-                    / rps;
+                self.dir.stripsperimage =
+                    self.dir.imagelength.wrapping_add(rps.wrapping_sub(1)) / rps;
             }
             let spi = self.dir.stripsperimage;
             self.row = if spi == 0 {
@@ -259,7 +262,9 @@ impl Tiff {
             return false;
         }
         let d = &mut self.dir;
-        d.stripoffset.get_or_insert_with(Vec::new).resize(n as usize, 0);
+        d.stripoffset
+            .get_or_insert_with(Vec::new)
+            .resize(n as usize, 0);
         d.stripbytecount
             .get_or_insert_with(Vec::new)
             .resize(n as usize, 0);
@@ -270,7 +275,12 @@ impl Tiff {
     /// `TIFFAppendToStrip(tif, strip, data, cc)` for the raw buffer's `[from, from + cc)`.
     fn append_to_strip(&mut self, strip: u32, from: usize, cc: i32, s: &mut dyn Streams) -> bool {
         const MODULE: &str = "TIFFAppendToStrip";
-        let off = self.dir.stripoffset.as_ref().and_then(|v| v.get(strip as usize)).copied();
+        let off = self
+            .dir
+            .stripoffset
+            .as_ref()
+            .and_then(|v| v.get(strip as usize))
+            .copied();
         let Some(off) = off else {
             return false;
         };
@@ -287,7 +297,12 @@ impl Tiff {
                     v[strip as usize] = e;
                 }
             }
-            self.curoff = self.dir.stripoffset.as_ref().map(|v| v[strip as usize]).unwrap_or(0);
+            self.curoff = self
+                .dir
+                .stripoffset
+                .as_ref()
+                .map(|v| v[strip as usize])
+                .unwrap_or(0);
         }
         let raw = std::mem::take(&mut self.rawdata);
         let end = (from + cc.max(0) as usize).min(raw.len());
@@ -378,7 +393,12 @@ impl Tiff {
                 false
             }
             SetupEncode::Zip => {
-                let q = self.codec.zip.as_ref().map(|z| z.zipquality_pub()).unwrap_or(-1);
+                let q = self
+                    .codec
+                    .zip
+                    .as_ref()
+                    .map(|z| z.zipquality_pub())
+                    .unwrap_or(-1);
                 match Deflate::init(q) {
                     Ok(d) => {
                         let zs = self.codec.zip.as_mut().expect("ZIP");
@@ -453,7 +473,14 @@ impl Tiff {
     }
 
     /// One of the encoding methods on `buf[..cc]`.
-    fn encode(&mut self, m: Encode, buf: &mut [u8], cc: i32, sample: u16, s: &mut dyn Streams) -> i32 {
+    fn encode(
+        &mut self,
+        m: Encode,
+        buf: &mut [u8],
+        cc: i32,
+        sample: u16,
+        s: &mut dyn Streams,
+    ) -> i32 {
         match m {
             Encode::NoRow => self.no_encode("scanline", s),
             Encode::NoStrip => self.no_encode("strip", s),
@@ -505,7 +532,9 @@ impl Tiff {
     fn no_encode(&self, method: &str, s: &mut dyn Streams) -> i32 {
         let m = match codec_name(self.dir.compression) {
             Some(n) if n.starts_with("LZW") => {
-                format!("{n} {method} encoding is no longer implemented due to Unisys patent enforcement")
+                format!(
+                    "{n} {method} encoding is no longer implemented due to Unisys patent enforcement"
+                )
             }
             Some(n) => format!("{n} {method} encoding is not implemented"),
             None => format!(
@@ -669,9 +698,11 @@ impl Tiff {
         let mut r = 1;
         loop {
             let (at, left) = zs.out();
-            let (st, used, made) = zs
-                .deflate_mut()
-                .deflate(input, &mut self.rawdata[at..at + left as usize], z::Z_NO_FLUSH);
+            let (st, used, made) = zs.deflate_mut().deflate(
+                input,
+                &mut self.rawdata[at..at + left as usize],
+                z::Z_NO_FLUSH,
+            );
             input = &input[used..];
             zs.out_advance(made as u32);
             if st != z::Z_OK {
@@ -702,9 +733,11 @@ impl Tiff {
         loop {
             let mut zs = self.codec.zip.take().expect("ZIP");
             let (at, left) = zs.out();
-            let (st, _, made) =
-                zs.deflate_mut()
-                    .deflate(&[], &mut self.rawdata[at..at + left as usize], z::Z_FINISH);
+            let (st, _, made) = zs.deflate_mut().deflate(
+                &[],
+                &mut self.rawdata[at..at + left as usize],
+                z::Z_FINISH,
+            );
             zs.out_advance(made as u32);
             match st {
                 z::Z_STREAM_END | z::Z_OK => {
@@ -853,15 +886,40 @@ impl Tiff {
                 }
                 bit::POSITION => {
                     let (x, y) = (self.dir.xposition, self.dir.yposition);
-                    self.write_rational_array(fields::TIFF_RATIONAL, tag::XPOSITION, &[x], &mut entries, s)
-                        && self.write_rational_array(fields::TIFF_RATIONAL, tag::YPOSITION, &[y], &mut entries, s)
+                    self.write_rational_array(
+                        fields::TIFF_RATIONAL,
+                        tag::XPOSITION,
+                        &[x],
+                        &mut entries,
+                        s,
+                    ) && self.write_rational_array(
+                        fields::TIFF_RATIONAL,
+                        tag::YPOSITION,
+                        &[y],
+                        &mut entries,
+                        s,
+                    )
                 }
                 bit::RESOLUTION => {
                     let (x, y) = (self.dir.xresolution, self.dir.yresolution);
-                    self.write_rational_array(fields::TIFF_RATIONAL, tag::XRESOLUTION, &[x], &mut entries, s)
-                        && self.write_rational_array(fields::TIFF_RATIONAL, tag::YRESOLUTION, &[y], &mut entries, s)
+                    self.write_rational_array(
+                        fields::TIFF_RATIONAL,
+                        tag::XRESOLUTION,
+                        &[x],
+                        &mut entries,
+                        s,
+                    ) && self.write_rational_array(
+                        fields::TIFF_RATIONAL,
+                        tag::YRESOLUTION,
+                        &[y],
+                        &mut entries,
+                        s,
+                    )
                 }
-                bit::BITSPERSAMPLE | bit::MINSAMPLEVALUE | bit::MAXSAMPLEVALUE | bit::SAMPLEFORMAT => {
+                bit::BITSPERSAMPLE
+                | bit::MINSAMPLEVALUE
+                | bit::MAXSAMPLEVALUE
+                | bit::SAMPLEFORMAT => {
                     let v = match self.get_field(fip.tag, s) {
                         Some(Value::U16(v)) => v,
                         _ => 0,
@@ -1065,9 +1123,7 @@ impl Tiff {
         e.offset = self.dataoff;
         let cc = e.count.wrapping_mul(fields::data_width(e.ty) as u32) as i32;
         if self.seek_ok(e.offset) && self.fd.write(&b, cc) == cc {
-            self.dataoff = self
-                .dataoff
-                .wrapping_add((cc.wrapping_add(1) & !1) as u32);
+            self.dataoff = self.dataoff.wrapping_add((cc.wrapping_add(1) & !1) as u32);
             return true;
         }
         let f = self
@@ -1213,11 +1269,7 @@ impl Tiff {
             ),
         );
         if self.fix() {
-            if d.is_nan() || d < 0.0 {
-                0
-            } else {
-                u32::MAX
-            }
+            if d.is_nan() || d < 0.0 { 0 } else { u32::MAX }
         } else {
             x86
         }
@@ -1237,7 +1289,13 @@ impl Tiff {
             fields::TIFF_BYTE | fields::TIFF_SBYTE => {
                 let b: Vec<u8> = v
                     .iter()
-                    .map(|&x| if ty == fields::TIFF_BYTE { x as u8 } else { x as i8 as u8 })
+                    .map(|&x| {
+                        if ty == fields::TIFF_BYTE {
+                            x as u8
+                        } else {
+                            x as i8 as u8
+                        }
+                    })
                     .collect();
                 let mut e = Entry {
                     tag: t as u16,
@@ -1252,14 +1310,26 @@ impl Tiff {
             fields::TIFF_SHORT | fields::TIFF_SSHORT => {
                 let w: Vec<u16> = v
                     .iter()
-                    .map(|&x| if ty == fields::TIFF_SHORT { x as u16 } else { x as i16 as u16 })
+                    .map(|&x| {
+                        if ty == fields::TIFF_SHORT {
+                            x as u16
+                        } else {
+                            x as i16 as u16
+                        }
+                    })
                     .collect();
                 self.write_short_array(ty, t, n, &w, out, s)
             }
             fields::TIFF_LONG | fields::TIFF_SLONG => {
                 let w: Vec<u32> = v
                     .iter()
-                    .map(|&x| if ty == fields::TIFF_LONG { x as u32 } else { x as i32 as u32 })
+                    .map(|&x| {
+                        if ty == fields::TIFF_LONG {
+                            x as u32
+                        } else {
+                            x as i32 as u32
+                        }
+                    })
                     .collect();
                 self.write_long_array(ty, t, n, &w, out, s)
             }
@@ -1436,7 +1506,8 @@ impl Tiff {
             if self.swab() {
                 dircount = dircount.swap_bytes();
             }
-            self.fd.seek(u32::from(dircount).wrapping_mul(12), Whence::Cur);
+            self.fd
+                .seek(u32::from(dircount).wrapping_mul(12), Whence::Cur);
             let mut l = [0u8; 4];
             if !self.read_ok(&mut l, 4) {
                 self.error(Some(MODULE), "Error fetching directory link", s);

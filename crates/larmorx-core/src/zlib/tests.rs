@@ -153,7 +153,7 @@ fn inflate_round_trips_in_small_steps() {
         .enumerate()
     {
         let data: Vec<u8> = (0..40_000u32)
-            .map(|i| ((i * 7 + k as u32) % 251 ^ (i >> 5)) as u8)
+            .map(|i| (((i * 7 + k as u32) % 251) ^ (i >> 5)) as u8)
             .collect();
         let mut d = Deflate::init2(level, Z_DEFLATED, wbits, 8, Z_DEFAULT_STRATEGY).unwrap();
         let mut z = vec![0u8; compress_bound(data.len() as u64) as usize + 64];

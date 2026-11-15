@@ -14,7 +14,7 @@ use super::{
     cut, values,
 };
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_815, FS_820, FS_821, FS_822, FS_823, FS_824, FS_825};
+use larmorx_core::defects::{FS_815, FS_820, FS_821, FS_822, FS_823, FS_824, FS_825, FS_834};
 
 const MODULE: &str = "TIFFReadDirectory";
 
@@ -326,7 +326,9 @@ impl Tiff {
                     }
                     dir[i].tag = 0;
                 }
-                tag::STRIPOFFSETS | tag::STRIPBYTECOUNTS | tag::TILEOFFSETS
+                tag::STRIPOFFSETS
+                | tag::STRIPBYTECOUNTS
+                | tag::TILEOFFSETS
                 | tag::TILEBYTECOUNTS => self.dir.set_bit(fip.bit),
                 tag::IMAGEWIDTH
                 | tag::IMAGELENGTH
@@ -411,9 +413,7 @@ impl Tiff {
                 );
             }
             match t {
-                tag::MINSAMPLEVALUE | tag::MAXSAMPLEVALUE | tag::BITSPERSAMPLE
-                    if dp.count == 1 =>
-                {
+                tag::MINSAMPLEVALUE | tag::MAXSAMPLEVALUE | tag::BITSPERSAMPLE if dp.count == 1 => {
                     let v = self.extract_data(dp.ty, dp.offset);
                     if !self.set_field_arg(t, Arg::Int(v), s) {
                         return false;
@@ -471,8 +471,7 @@ impl Tiff {
                 }
             }
         }
-        if self.dir.photometric == values::PHOTOMETRIC_PALETTE && !self.dir.is_set(bit::COLORMAP)
-        {
+        if self.dir.photometric == values::PHOTOMETRIC_PALETTE && !self.dir.is_set(bit::COLORMAP) {
             self.missing_required("Colormap", s);
             return false;
         }
@@ -537,8 +536,18 @@ impl Tiff {
     /// `BYTECOUNTLOOKSBAD`.
     fn bytecount_looks_bad(&self) -> bool {
         let d = &self.dir;
-        let c0 = d.stripbytecount.as_ref().and_then(|v| v.first()).copied().unwrap_or(0);
-        let o0 = d.stripoffset.as_ref().and_then(|v| v.first()).copied().unwrap_or(0);
+        let c0 = d
+            .stripbytecount
+            .as_ref()
+            .and_then(|v| v.first())
+            .copied()
+            .unwrap_or(0);
+        let o0 = d
+            .stripoffset
+            .as_ref()
+            .and_then(|v| v.first())
+            .copied()
+            .unwrap_or(0);
         (c0 == 0 && o0 != 0)
             || (d.compression == compression::NONE && c0 > self.fd.size().wrapping_sub(o0))
     }
@@ -579,10 +588,19 @@ impl Tiff {
         } else {
             // Read at most what the file still holds (plus one byte: a short read fails).
             let left = u64::from(self.fd.size().saturating_sub(dp.offset)) + 1;
-            let want = if cc < 0 { 0 } else { (cc as u64).min(left) as usize };
+            let want = if cc < 0 {
+                0
+            } else {
+                (cc as u64).min(left) as usize
+            };
             let mut buf = vec![0u8; want];
             let got = self.fd.read(&mut buf, cc);
             if got == cc {
+                if cc == 0 {
+                    // TIFFFetchData returns the byte count, which its callers take for a
+                    // failure when it is 0 (no message).
+                    return None;
+                }
                 buf.truncate(cc.max(0) as usize);
                 Some(buf)
             } else {
@@ -624,7 +642,13 @@ impl Tiff {
     }
 
     /// `cvtRational`.
-    fn cvt_rational(&self, dp: &DirEntry, num: u32, denom: u32, s: &mut dyn Streams) -> Option<f32> {
+    fn cvt_rational(
+        &self,
+        dp: &DirEntry,
+        num: u32,
+        denom: u32,
+        s: &mut dyn Streams,
+    ) -> Option<f32> {
         if denom == 0 {
             let f = self
                 .field_with_tag(u32::from(dp.tag), s)
@@ -666,7 +690,11 @@ impl Tiff {
                 } else {
                     (o >> (8 * i)) & 0xff
                 } as u8;
-                *x = if sbyte { b as i8 as i16 as u16 } else { u16::from(b) };
+                *x = if sbyte {
+                    b as i8 as i16 as u16
+                } else {
+                    u16::from(b)
+                };
             }
             v.truncate(n);
             return Some(v);
@@ -686,7 +714,13 @@ impl Tiff {
             let sbyte = dp.ty == fields::TIFF_SBYTE;
             return Some(
                 b.iter()
-                    .map(|&x| if sbyte { x as i8 as i16 as u16 } else { u16::from(x) })
+                    .map(|&x| {
+                        if sbyte {
+                            x as i8 as i16 as u16
+                        } else {
+                            u16::from(x)
+                        }
+                    })
                     .collect(),
             );
         }
@@ -852,6 +886,21 @@ impl Tiff {
         let Some(fip) = self.field_with_tag(t, s) else {
             return false;
         };
+        if dp.count > 1 && !fip.passcount && fip.readcount == 1 {
+            // libtiff 3.6.1 passes the array's address where the one value goes (FS-834): the
+            // field takes the address's low bits (nondeterministic). As libtiff's count check
+            // does elsewhere, the tag is ignored.
+            self.notices.add(
+                &FS_834,
+                format!(
+                    "{}: {} holds {} values: libtiff 3.6.1 sets it to the low bits of an address \
+                     (nondeterministic); ignored as a wrong count",
+                    self.name, fip.name, dp.count
+                ),
+            );
+            self.check_dir_count(dp, 1, s);
+            return true;
+        }
         if dp.count > 1 {
             let n = u64::from(dp.count);
             let ok: Option<bool> = match dp.ty {
@@ -1231,11 +1280,7 @@ impl Tiff {
             Some(v) => {
                 let a = v.first().copied().unwrap_or(0);
                 let b = v.get(1).copied().unwrap_or(0);
-                self.set_field_arg(
-                    u32::from(dp.tag),
-                    Arg::Int2(u32::from(a), u32::from(b)),
-                    s,
-                );
+                self.set_field_arg(u32::from(dp.tag), Arg::Int2(u32::from(a), u32::from(b)), s);
                 true
             }
             None => false,
@@ -1266,11 +1311,7 @@ impl Tiff {
         const M: &str = "EstimateStripByteCounts";
         let nstrips = self.dir.nstrips;
         self.dir.stripbytecount = None;
-        let ok = self.check_malloc(
-            u64::from(nstrips) * 4,
-            "for \"StripByteCounts\" array",
-            s,
-        );
+        let ok = self.check_malloc(u64::from(nstrips) * 4, "for \"StripByteCounts\" array", s);
         let mut counts = vec![0u32; if ok { nstrips as usize } else { 0 }];
         if self.dir.compression != compression::NONE {
             let mut space: u32 = (8 + 2 + dir.len() * 12 + 4) as u32;

@@ -59,6 +59,8 @@ pub(crate) mod piece24;
 pub(crate) mod piece25;
 #[path = "piece26.rs"]
 pub(crate) mod piece26;
+#[path = "piece27.rs"]
+pub(crate) mod piece27;
 #[path = "piece3.rs"]
 mod piece3;
 #[path = "piece4.rs"]
@@ -332,6 +334,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece24::KINDS);
     kinds.extend(piece25::KINDS);
     kinds.extend(piece26::KINDS);
+    kinds.extend(piece27::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -420,6 +423,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece25::KINDS.contains(&kind) {
             lines.push(piece25::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece27::KINDS.contains(&kind) {
+            lines.push(piece27::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         if piece26::KINDS.contains(&kind) {
@@ -796,6 +803,7 @@ pub(crate) fn run_line_with(
     more: Option<ExtraPiece>,
 ) -> (String, Vec<&'static str>) {
     larmorx_freesurfer_volume::image::register_io();
+    larmorx_freesurfer_gca::register_io();
     let shared = Shared::default();
     let mut io = shared.clone();
     let mut g = Globals::new(mode);
@@ -929,6 +937,11 @@ pub(crate) fn run_line_with(
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece26::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece27::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece27::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {

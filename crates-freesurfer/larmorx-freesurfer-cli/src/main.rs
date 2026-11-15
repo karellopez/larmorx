@@ -94,6 +94,7 @@ where
 {
     // the conversions fs.io's readers and writers call in the crates above it
     larmorx_freesurfer_volume::image::register_io();
+    larmorx_freesurfer_gca::register_io();
     let mut args = args.into_iter();
     let prog = args.next().map_or_else(
         || "larmorx-freesurfer".to_owned(),

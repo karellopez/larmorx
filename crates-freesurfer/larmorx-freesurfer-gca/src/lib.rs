@@ -7,6 +7,14 @@
 //!
 //! Translated from FreeSurfer's source under FreeSurfer's licence (`crates-freesurfer/LICENSE`);
 //! larmorx (Apache-2.0) never links this crate: it runs the `larmorx-freesurfer` program as a
-//! separate process (`docs/licensing.md`). Empty until its queue items bring the code
-//! (`docs/freesurfer/queue.md`); `PROVENANCE.md` lists what each item translates.
+//! separate process (`docs/licensing.md`). Its queue items (`docs/freesurfer/queue.md`, 3.3-01
+//! to 3.3-09) bring the code; so far the pieces `mri_read` needs to read an atlas as a volume
+//! (`readGCA`, track A's relay 35 of FreeSurfer's foundations); `PROVENANCE.md` lists what each
+//! piece translates.
 #![forbid(unsafe_code)]
+
+pub mod gca;
+pub mod likely;
+pub mod read;
+
+pub use likely::register_io;

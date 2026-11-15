@@ -11,6 +11,7 @@
 
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::globals::Globals;
+use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 
@@ -29,9 +30,18 @@ fn main() {
     let m = larmorx_freesurfer_io::mriio::mri_read(
         &mut g, &mut out, &mut err, &env, None, &args[1], 22, true, -1, -1,
     );
-    let Ok(Some(m)) = m else {
-        eprintln!("no volume");
-        std::process::exit(1);
+    let m = match m {
+        Ok(Some(m)) => m,
+        Ok(None) => {
+            eprintln!("no volume");
+            std::process::exit(1);
+        }
+        // the program's end, with its status (as the official program's)
+        Err(Fatal::Exit(code)) => std::process::exit(code & 0xff),
+        Err(other) => {
+            eprintln!("no volume: {other:?}");
+            std::process::exit(134);
+        }
     };
     println!(
         "{} {} {} {} type {}",

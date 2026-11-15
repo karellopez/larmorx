@@ -21,7 +21,7 @@ correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordi
 ``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1170 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1530 [--json out.json]
 """
 
 from __future__ import annotations
@@ -145,9 +145,12 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     """Whether the case runs a function whose default takes correctly rounded maths where
     FreeSurfer's binary takes glibc's: a `surf` rotation (`Z`: `sinf`, `cosf`), a `posn`
     canonical-coordinates step (`cc`, or `sv 3`: `atan2f`), an `mpd` case (the discrete
-    curvatures' and the pseudo-normal's `acosf`)."""
+    curvatures' and the pseudo-normal's `acosf`), a `vps` case that reads canonical coordinates
+    (`C`: `atan2f`; relay 36 of track D)."""
     if cmd == "surf":
         return "Z" in toks
+    if cmd == "vps":
+        return "C" in toks
     if cmd == "posn":
         return "cc" in toks or any(a == "sv" and b == "3" for a, b in itertools.pairwise(toks))
     return cmd == "mpd"

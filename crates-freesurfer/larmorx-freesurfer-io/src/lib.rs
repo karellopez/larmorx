@@ -43,6 +43,7 @@ pub mod mriio_cor;
 pub mod mriio_gdf;
 pub mod mriio_ge;
 pub mod mriio_nifti;
+pub mod mriio_nrrd;
 pub mod mriio_old;
 pub mod mriio_siemens;
 pub mod mriio_write;

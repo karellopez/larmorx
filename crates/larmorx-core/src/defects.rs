@@ -2103,6 +2103,22 @@ defects! {
         "writing a volume of a type image files do not take (16-bit, 64-bit, RGB and other types, with at least one row) as an image file goes on after MRItoImage's error: a crash (signal 11), or for PGM and PPM names the format's refusal and ImageFree: null pointer";
     FS_733 = "FS-733", "FreeSurfer", true,
         "writing a volume 32,768 voxels wide or wider as an ITK warp (a NIfTI displacement field) stores its width in the header's 16-bit field modulo 65,536 (negative, or a smaller width): a file ITK misreads";
+    FS_734 = "FS-734", "FreeSurfer", true,
+        "reading a NRRD volume of signed 8-bit, unsigned 16-bit or unsigned 32-bit samples stores them in a voxel type that cannot hold every value (unsigned bytes, signed 16-bit, signed 32-bit): negative 8-bit samples read as 256 plus the value, unsigned samples past the signed range read as negative numbers";
+    FS_735 = "FS-735", "FreeSurfer", true,
+        "reading a NRRD volume of unsigned 64-bit samples stores them as signed 64-bit voxels: samples past 2^63 - 1 read as negative numbers";
+    FS_736 = "FS-736", "FreeSurfer", true,
+        "reading a NRRD volume takes the file's space origin (the first voxel's position) as the volume's centre, the voxel sizes from the diagonal of the space directions alone and the axes' directions from the space's name alone (RAS, LAS or LPS; another space keeps the default coronal axes), and keeps LPS and LAS coordinates unconverted: every NRRD volume lies half its extent off, and oblique or flipped volumes get wrong axes and zero or negative voxel sizes";
+    FS_737 = "FS-737", "FreeSurfer", true,
+        "reading a NRRD volume without a space origin gives the volume a NaN centre";
+    FS_738 = "FS-738", "FreeSurfer", true,
+        "reading a NRRD volume one of whose first three axes has no space direction (none, or no space directions at all) gives NaN voxel sizes";
+    FS_739 = "FS-739", "FreeSurfer", true,
+        "reading a NRRD volume of 2^31 samples or more, or with an axis of 2^31 samples or more, indexes the samples in 32-bit arithmetic (and cuts the axis to 32 bits): reads outside the data, a crash";
+    FS_740 = "FS-740", "FreeSurfer", true,
+        "refusing a NRRD file that is not a volume (other than three or four axes in a three-dimensional space), the element count and element size it prints are cut to 32 bits (wrong, or negative, from 2^31 on)";
+    FS_741 = "FS-741", "FreeSurfer", true,
+        "reading a NRRD volume of signed or unsigned 64-bit samples stores each sample's low 32 bits as a 32-bit number, one after another from the start of its row, in a volume of 64-bit voxels: the voxels hold pairs of other samples' low halves, and the second half of every row zeros";
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,

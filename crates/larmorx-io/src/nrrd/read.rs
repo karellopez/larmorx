@@ -37,6 +37,21 @@ pub enum LoadError {
 // C's stdio, as NrrdIO uses it
 // ------------------------------------------------------------------------------------------
 
+thread_local! {
+    /// The `errno` C's stdio and allocator leave during one [`load_with_errno`] (Linux's codes):
+    /// a failed `fopen`'s, `EISDIR` after a read of a folder's stream, `ENOMEM` after a failed
+    /// `calloc`; `None` while nothing set it. (The number parsers' `ERANGE` is not kept.)
+    static ERRNO: std::cell::Cell<Option<i32>> = const { std::cell::Cell::new(None) };
+}
+
+fn set_errno(e: i32) {
+    ERRNO.with(|c| c.set(Some(e)));
+}
+
+/// `EISDIR`, `ENOMEM`.
+const EISDIR: i32 = 21;
+const ENOMEM: i32 = 12;
+
 enum Src {
     File(BufReader<File>),
     Stdin(std::io::Stdin),
@@ -62,6 +77,7 @@ impl CFile {
             });
         }
         if name.is_empty() {
+            set_errno(2);
             return Err(2);
         }
         let path = to_path(name);
@@ -73,7 +89,11 @@ impl CFile {
                     stdin: false,
                 });
             }
-            Err(e) => return Err(errno_of(&e)),
+            Err(e) => {
+                let e = errno_of(&e);
+                set_errno(e);
+                return Err(e);
+            }
             _ => {}
         }
         match File::open(&path) {
@@ -82,7 +102,11 @@ impl CFile {
                 push: None,
                 stdin: false,
             }),
-            Err(e) => Err(errno_of(&e)),
+            Err(e) => {
+                let e = errno_of(&e);
+                set_errno(e);
+                Err(e)
+            }
         }
     }
 
@@ -92,7 +116,11 @@ impl CFile {
             let r = match &mut self.src {
                 Src::File(f) => f.read(&mut buf[n..]),
                 Src::Stdin(s) => s.read(&mut buf[n..]),
-                Src::Empty => Ok(0),
+                Src::Empty => {
+                    // read(2) of a folder fails with EISDIR
+                    set_errno(EISDIR);
+                    Ok(0)
+                }
             };
             match r {
                 Ok(0) => break,
@@ -148,6 +176,13 @@ impl CFile {
             }
             Src::Stdin(_) => None,
             Src::Empty => Some(pushed),
+        }
+    }
+
+    /// The `errno` a read of more than the stream holds leaves: `EISDIR` for a folder.
+    fn short_read(&self) {
+        if matches!(self.src, Src::Empty) {
+            set_errno(EISDIR);
         }
     }
 
@@ -2009,6 +2044,7 @@ impl Reader<'_> {
         });
         let reserve = bound.map_or(want, |b| want.min(b));
         if data.try_reserve_exact(reserve).is_err() {
+            set_errno(ENOMEM);
             let m = format!(
                 "_nrrdCalloc: couldn't allocate {} things of size {esize}",
                 self.nrrd.element_number()
@@ -2020,6 +2056,10 @@ impl Reader<'_> {
                 let start = data.len();
                 data.resize(start + reserve, 0);
                 let got_bytes = file.fread(&mut data[start..]);
+                if got_bytes < want {
+                    // glibc's fread of what is missing reads the stream (a folder's: EISDIR)
+                    file.short_read();
+                }
                 data.truncate(start + got_bytes);
                 let got = got_bytes / esize;
                 if got != n {
@@ -2295,11 +2335,13 @@ impl Reader<'_> {
                      wrapped size and reads past it)"
                 ),
             );
+            set_errno(ENOMEM);
             let m = format!("_nrrdCalloc: couldn't allocate {num} things of size {esize}");
             self.add(b(&m));
             return self.fail(b(&format!("{me}: couldn't allocate memory for data")));
         };
         if total > isize::MAX as usize {
+            set_errno(ENOMEM);
             let m = format!("_nrrdCalloc: couldn't allocate {num} things of size {esize}");
             self.add(b(&m));
             return self.fail(b(&format!("{me}: couldn't allocate memory for data")));
@@ -2530,6 +2572,21 @@ pub fn load_with(
         return Err(LoadError::Failed { code: 1 });
     }
     Ok(r.nrrd)
+}
+
+/// [`load_with`], and the `errno` C's stdio and allocator left while NrrdIO read (`None`: not set;
+/// Linux's codes on every platform: a failed `fopen`'s of the header or a data file, `EISDIR`
+/// after a read of a folder, `ENOMEM` after a failed allocation). A caller that prints `errno`
+/// afterwards (FreeSurfer's `ErrorPrintf`) needs it; the number parsers' `ERANGE` is not kept.
+pub fn load_with_errno(
+    filename: &[u8],
+    biff: &mut Biff,
+    notices: &mut Notices,
+    streams: &mut dyn Streams,
+) -> (Result<Nrrd, LoadError>, Option<i32>) {
+    ERRNO.with(|c| c.set(None));
+    let r = load_with(filename, biff, notices, streams);
+    (r, ERRNO.with(|c| c.take()))
 }
 
 /// [`load_with`] whose messages of NrrdIO's own go nowhere.

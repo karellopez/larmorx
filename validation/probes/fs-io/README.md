@@ -268,6 +268,20 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   JPEG); `VARY` for FS-720 (FreeSurfer's allocator aborts after it, as the heap lies), FS-727, piece 5's
   FS-245 and `MatReadHeader`'s addresses. Seeds 7, 13 and 21 (690 piece-23 cases each): `reproduce` identical
   on every comparable case (1,379), 0 different.
+- Piece 24 (track A relay 32): NRRD volumes. `nnd` and `nnh` (piece 6's `mrd` and `mrh`, the type -1 or 26, or
+  `@nrrd`) of NRRD files built by `tests/fs_io/piece24.rs` field by field: attached and detached (the data file
+  beside the header, in a sub-folder; missing, a folder, cut), the raw, ASCII and hex encodings in both byte
+  orders, every sample type, two to five axes, the spaces (RAS, LAS, LPS, scanner, right- and left-handed, with
+  time, a bare space dimension, none), space directions diagonal, flipped, oblique, of length 0 or `none`, with
+  and without an origin, kinds, key/value pairs, comments, a content line, a wrong magic; samples past the range
+  of FreeSurfer's types. FreeSurfer's side maps the two to `mrd` and `mrh`. `SKIP` for NrrdIO's undefined paths
+  (FS-761, FS-762, FS-765 to FS-768, FS-771) and FS-739. Seeds 7, 13 and 21 (908 piece-24 cases each): `reproduce`
+  identical on every case (2,724), 0 different.
+- `nrrd_itk_geometry.py` (relay 32): the default's NRRD geometry (FS-736 to FS-738) against ITK 5.4.5's NRRD
+  reader (ANTs 2.6.5's `PrintHeader`, through the oracle-output cache): 400 seeded files, the voxel-to-RAS
+  matrices compared: `python -P validation/probes/fs-io/nrrd_itk_geometry.py --seed 1 --n 400` (prints
+  `PASS` when the default agrees with ITK on every file; 2026-11-15: 400 of 400, FreeSurfer's reading 42).
+  ITK's own LAS conversion is taken back (findings Part 26).
 - `sscanf_empty.c` (relay 27): glibc's `sscanf` of an empty or blank text gives `EOF` with `errno` 0 (the end rule
   of `larmorx_freesurfer_core::cscan`; FS-658's short flip lines).
 - `nifti1_long_names.py` (relay 24): nine `mgw` cases of the pair writer under names of 1,019 to 1,027 bytes in four

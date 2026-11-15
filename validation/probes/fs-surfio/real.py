@@ -21,7 +21,10 @@ file compared with the recorded one byte for byte, and the MGZ and new-format fi
 ``--pvw`` (relay 36 of track D): each head's recorded per-vertex files (``VALS``) read into its
 white surface's values by ``MRISreadValues``, the surface's patch (``MRISwritePatch``), normals
 (``MRISwriteNormals``) and values into a volume (``MRISwriteIntoVolume``) written, the normals and
-the values read back from that volume (``MRISreadNormals``, ``MRISreadValues``). Prints the counts;
+the values read back from that volume (``MRISreadNormals``, ``MRISreadValues``). With ``--vps``
+(relay 36 of track D): each head's white surface with its sphere's canonical coordinates
+(``MRISreadCanonicalCoordinates``), smoothwm's original properties (``MRISreadOriginalProperties``),
+the pial and white coordinates and the pial positions (``MRISreadVertexPositions``). Prints the counts;
 the lines name machine paths, so no hash is recorded from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]
@@ -83,6 +86,12 @@ def main(argv: list[str] | None = None) -> int:
         help="relay 36 of track D: the value, patch and normal files (flr pvw): each head's "
         "recorded per-vertex files read as values, the patch and normals written, read back",
     )
+    ap.add_argument(
+        "--vps",
+        action="store_true",
+        help="relay 36 of track D: the vertex-position readers (flr vps) on each head's white "
+        "surface: sphere, smoothwm, pial, white",
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -94,6 +103,13 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.vps:
+                sd = s / "surf"
+                lines.append(
+                    f"flr vps {sd / f'{hemi}.white'} {sd / f'{hemi}.sphere'} "
+                    f"{sd / f'{hemi}.smoothwm'} {sd / f'{hemi}.pial'}"
+                )
+                continue
             if a.pvw:
                 for c in VALS:
                     lines.append(
@@ -115,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"flr bbf {s / 'surf' / f'{hemi}.white'} {dx(0.5)}")
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
-    kind = "pvw" if a.pvw else "curv" if a.curv else "flood"
+    kind = "vps" if a.vps else "pvw" if a.pvw else "curv" if a.curv else "flood"
     cases_path = inputs / f"real-{kind}-cases.txt"
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}

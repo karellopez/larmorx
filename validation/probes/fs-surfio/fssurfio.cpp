@@ -4058,6 +4058,44 @@ void flr_case()
       }
       fnv(b);
     }
+  } else if (op == "vps") {
+    // relay 36 of track D: a recorded surface's other files' positions (`vps <surf> <sphere>
+    // <smoothwm> <pial>`): MRISreadCanonicalCoordinates, MRISreadOriginalProperties,
+    // MRISreadPialCoordinates, MRISreadWhiteCoordinates (the surface's own file again) and
+    // MRISreadVertexPositions (the pial file), each status, then the FNV-1a of each coordinate
+    // set, theta and phi, the areas, the normals, and the totals
+    std::string sn = next();
+    MRIS *s = MRISread(sn.c_str());
+    std::string sph = next(), swm = next(), pial = next();
+    if (!s) fail("cannot read the inputs");
+    oi(MRISreadCanonicalCoordinates(s, sph.c_str()));
+    oi(MRISreadOriginalProperties(s, swm.c_str()));
+    oi(MRISreadPialCoordinates(s, pial.c_str()));
+    oi(MRISreadWhiteCoordinates(s, sn.c_str()));
+    oi(MRISreadVertexPositions(s, pial.c_str()));
+    for (int set = 0; set < 8; set++) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (int v = 0; v < s->nvertices; v++) {
+        VERTEX *x = &s->vertices[v];
+        float f[3];
+        switch (set) {
+          case 0: f[0] = x->x; f[1] = x->y; f[2] = x->z; break;
+          case 1: f[0] = x->cx; f[1] = x->cy; f[2] = x->cz; break;
+          case 2: f[0] = x->origx; f[1] = x->origy; f[2] = x->origz; break;
+          case 3: f[0] = x->pialx; f[1] = x->pialy; f[2] = x->pialz; break;
+          case 4: f[0] = x->whitex; f[1] = x->whitey; f[2] = x->whitez; break;
+          case 5: f[0] = x->theta; f[1] = x->phi; f[2] = 0; break;
+          case 6: f[0] = x->area; f[1] = x->origarea; f[2] = 0; break;
+          default: f[0] = x->nx; f[1] = x->ny; f[2] = x->nz; break;
+        }
+        const unsigned char *b = (const unsigned char *)f;
+        for (int k = 0; k < 12; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      }
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
+    oi(s->status); of(s->total_area); of(s->orig_area); od(s->radius);
   } else fail("flr op");
 }
 
@@ -4450,6 +4488,76 @@ void pvw_case()
   }
 }
 
+// ---- relay 36 of track D: vps, another file's vertex positions (queue items 3.1-47/49) ---------
+
+// vps: Gdiag's bits (1 show, 2 verbose), the environment (1 FS_GII=.gii, 2 FS_FASTER_MP, 4
+// TRIANGULARSURFACE_NOEXTRA_READ; always SURFER_SIDEDOOR and USER=U), the surface's file d/lh.white
+// (read by MRISread), the input files, then 1 to 4 of MRISreadVertexPositions (`V`),
+// MRISreadWhiteCoordinates (`W`), MRISreadPialCoordinates (`P`), MRISreadCanonicalCoordinates
+// (`C`), MRISreadOriginalProperties (`O`), each with a name or none (NULL; `V` and `C` take ""),
+// each status; then every vertex's coordinate sets, theta, phi, area, origarea, normal, and the
+// surface's status, total_area, orig_area, radius and counts
+void vps_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int envs = geti();
+  if (envs & 1) setenv("FS_GII", ".gii", 1);
+  if (envs & 2) setenv("FS_FASTER_MP", "1", 1);
+  if (envs & 4) setenv("TRIANGULARSURFACE_NOEXTRA_READ", "1", 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  setenv("USER", "U", 1);
+  {
+    std::string bytes = geth();
+    FILE *fp = fopen("d/lh.white", "wb");
+    if (!fp) fail("the surface");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  MRIS *m = MRISread("d/lh.white");
+  fflush(stdout);
+  if (!m) { out += "NOSURFACE "; return; }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    const char *nm = opt_name();
+    int r;
+    if (op == "V") r = MRISreadVertexPositions(m, nm ? nm : "");
+    else if (op == "W") r = MRISreadWhiteCoordinates(m, nm);
+    else if (op == "P") r = MRISreadPialCoordinates(m, nm);
+    else if (op == "C") r = MRISreadCanonicalCoordinates(m, nm ? nm : "");
+    else if (op == "O") r = MRISreadOriginalProperties(m, nm);
+    else fail("vps op");
+    fflush(stdout);
+    oi(r);
+  }
+  out += "| ";
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    for (float x : {v->x, v->y, v->z, v->whitex, v->whitey, v->whitez, v->pialx, v->pialy, v->pialz,
+                    v->cx, v->cy, v->cz, v->origx, v->origy, v->origz, v->theta, v->phi, v->area,
+                    v->origarea, v->nx, v->ny, v->nz})
+      of(x);
+  }
+  oi(m->status); of(m->total_area); of(m->orig_area); od(m->radius); oi(m->nvertices); oi(m->nfaces);
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -4698,6 +4806,8 @@ void run_case()
     crv_case();
   } else if (cmd == "pvw") {
     pvw_case();
+  } else if (cmd == "vps") {
+    vps_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

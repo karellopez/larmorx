@@ -24,7 +24,7 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{Mri, mri_alloc};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_surf::{curvfile, mriflood, readwrite, sras, valfile};
+use larmorx_freesurfer_surf::{curvfile, mriflood, readwrite, sras, valfile, vpos};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
 pub(super) const FRAMES: [[f32; 9]; 6] = [
@@ -845,6 +845,51 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 o.h(Some(n.as_bytes()));
                 fnv(&std::fs::read(dir.join(n)).unwrap_or_default(), o);
             }
+        }
+        "vps" => {
+            // relay 36 of track D: `fssurfio.cpp`'s `flr vps` (a recorded surface's other
+            // files' positions: canonical, original properties, pial, white, current)
+            let sn = t.next().to_owned();
+            let mut s = surf(g, sg, &mut io, &sn)?;
+            let (sph, swm, pial) = (t.next(), t.next(), t.next());
+            o.i(i64::from(vpos::read_canonical_coordinates(
+                g, sg, &mut io, None, &mut s, sph,
+            )?));
+            let r = vpos::read_original_properties(g, sg, &mut io, None, &mut s, Some(swm))?;
+            o.i(i64::from(r));
+            let r = vpos::read_pial_coordinates(g, sg, &mut io, None, &mut s, Some(pial))?;
+            o.i(i64::from(r));
+            let r = vpos::read_white_coordinates(g, sg, &mut io, None, &mut s, Some(&sn))?;
+            o.i(i64::from(r));
+            o.i(i64::from(vpos::read_vertex_positions(
+                g, sg, &mut io, None, &mut s, pial,
+            )?));
+            for set in 0..8 {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for v in 0..s.nvertices.max(0) as usize {
+                    let x = s.vertex(v);
+                    let f = match set {
+                        0 => [x.x, x.y, x.z],
+                        1 => [x.cx, x.cy, x.cz],
+                        2 => [x.origx, x.origy, x.origz],
+                        3 => [x.pialx, x.pialy, x.pialz],
+                        4 => [x.whitex, x.whitey, x.whitez],
+                        5 => [x.theta, x.phi, 0.0],
+                        6 => [x.area, x.origarea, 0.0],
+                        _ => [x.nx, x.ny, x.nz],
+                    };
+                    for c in f {
+                        for b in c.to_bits().to_le_bytes() {
+                            h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+                        }
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+            }
+            o.i(i64::from(s.status.0));
+            o.f(s.total_area);
+            o.f(s.orig_area);
+            o.d(s.radius);
         }
         _ => panic!("flr op {op}"),
     }

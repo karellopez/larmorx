@@ -76,6 +76,8 @@ mod stl;
 mod swr;
 #[path = "tri.rs"]
 mod tri;
+#[path = "vps.rs"]
+mod vps;
 
 /// The generator's state, and whether it may make names of about 1,024 bytes (not with seed 1,
 /// the platform-independent set: file systems differ on such names).
@@ -152,12 +154,12 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 49] = [
+const COMMANDS: [&str; 50] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
     "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
-    "mpg", "fli", "bvl", "crv", "pvw",
+    "mpg", "fli", "bvl", "crv", "pvw", "vps",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1050,6 +1052,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "bvl" => bvl::bvl_tokens(&mut t, &mut g),
             "crv" => crv::crv_tokens(&mut t, &mut g),
             "pvw" => pvw::pvw_tokens(&mut t, &mut g),
+            "vps" => vps::vps_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2727,6 +2730,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "bvl" => bvl::bvl_case(cx, t, o)?,
         "crv" => crv::crv_case(cx, t, o)?,
         "pvw" => pvw::pvw_case(cx, t, o)?,
+        "vps" => vps::vps_case(cx, t, o)?,
         // relay 32 of track D: the recorded heads (real.py); never generated
         "flr" => fli::flr_case(cx, t, o)?,
         "names" => {

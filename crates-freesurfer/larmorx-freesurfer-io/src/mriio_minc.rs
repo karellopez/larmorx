@@ -564,7 +564,10 @@ pub fn minc_write(
     let mut min = larmorx_io::minc::libsrc::f32_to_f64(fmin);
     let mut max = larmorx_io::minc::libsrc::f32_to_f64(fmax);
     let ints = matches!(m.mtype, MRI_INT | MRI_LONG);
-    if ints && m.chunk.is_some() && n_voxels > 0 {
+    if ints
+        && n_voxels > 0
+        && let Some(c) = m.chunk.as_ref()
+    {
         // FS-746: a long volume's values (each voxel's, clamped to 32 bits, or FreeSurfer's 32-bit
         // numbers at 4 x in each row); FS-747: the exact range of the 32-bit values written
         let (mut differs, mut clamped) = (false, None);
@@ -582,7 +585,6 @@ pub fn minc_write(
                             whole.clamp(i64::from(i32::MIN), i64::from(i32::MAX))
                         } else {
                             let at = row_start(m, y, z, t) + 4 * x;
-                            let c = m.chunk.as_ref().expect("voxels");
                             i64::from(i32::from_le_bytes(
                                 c[at..at + 4].try_into().expect("4 bytes"),
                             ))
@@ -625,10 +627,13 @@ pub fn minc_write(
             );
         }
     }
-    if m.mtype == MRI_FLOAT && min.is_nan() && n_voxels > 0 {
+    if m.mtype == MRI_FLOAT
+        && min.is_nan()
+        && n_voxels > 0
+        && let Some(c) = m.chunk.as_ref()
+    {
         // FS-748: MRIlimits starts from the first voxel; a NaN there stays the range whatever the
         // other voxels hold (the file's valid range NaN, volume_io's message)
-        let c = m.chunk.as_ref().expect("voxels");
         let (mut lo, mut hi) = (f32::NAN, f32::NAN);
         for t in 0..nfu {
             for z in 0..du {

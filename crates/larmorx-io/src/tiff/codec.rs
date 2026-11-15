@@ -9,7 +9,7 @@ use super::dir::{Layer, PostDecode};
 use super::fields::Table;
 use super::{TIFF_NOBITREV, Tiff, Unported, compression as c};
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_817, FS_818, FS_819};
+use larmorx_core::defects::{FS_817, FS_818, FS_819, FS_831, FS_832};
 use larmorx_core::zlib::{self as z, Deflate, Inflate};
 
 /// `tif_setupdecode`'s codec part (the predictor wraps it: [`Codec::pred_setup`]).
@@ -183,6 +183,8 @@ pub(crate) struct Lzw {
     dec_free_entp: i32,
     dec_maxcodep: i32,
     codetab: Option<Vec<CodeEnt>>,
+    /// `LZWPreDecode` has run (the state is set).
+    started: bool,
 }
 
 impl Lzw {
@@ -200,6 +202,7 @@ impl Lzw {
             dec_free_entp: 0,
             dec_maxcodep: 0,
             codetab: None,
+            started: false,
         }
     }
 }
@@ -217,8 +220,8 @@ pub(crate) struct Zip {
     /// The encoder's output: an offset into the raw buffer and the space left.
     out_at: usize,
     out_left: u32,
-    /// `stream.msg` of the encoder (the decoder keeps its own).
-    msg: Option<&'static str>,
+    /// `ZIPPreDecode` has run (the stream's input is set).
+    started: bool,
 }
 
 /// The codec part of `struct tiff`: its method table and private state.
@@ -382,7 +385,7 @@ impl Tiff {
                     in_left: 0,
                     out_at: 0,
                     out_left: 0,
-                    msg: None,
+                    started: false,
                 }));
                 self.fields.merge(Table::Zip);
                 let k = &mut self.codec;
@@ -578,9 +581,32 @@ impl Tiff {
                 let sp = self.codec.zip.as_mut().expect("ZIP state");
                 sp.in_at = 0;
                 sp.in_left = rawcc as u32;
+                sp.started = true;
                 sp.inflate.as_mut().expect("inflate").reset() == z::Z_OK
             }
         }
+    }
+
+    /// FS-831: a decoder called before its strip was started (the strip's start failed in the
+    /// codec's setup and the next row is read without a new start): libtiff's decoder state
+    /// was never set.
+    fn not_started(&mut self, which: &str) -> bool {
+        let started = match which {
+            "LZW" => self.codec.lzw.as_ref().is_some_and(|l| l.started),
+            _ => self.codec.zip.as_ref().is_some_and(|z| z.started && z.inflate.is_some()),
+        };
+        if !started {
+            let name = self.name.clone();
+            self.notices.add(
+                &FS_831,
+                format!(
+                    "{name}: the {which} decoder runs on a strip it never started (its setup \
+                     failed at the strip's start): libtiff 3.6.1 uses state never set (a crash); \
+                     nothing decoded"
+                ),
+            );
+        }
+        !started
     }
 
     /// One of the decoding methods into `buf[..cc]`.
@@ -592,6 +618,12 @@ impl Tiff {
         sample: u16,
         s: &mut dyn Streams,
     ) -> i32 {
+        if matches!(m, Decode::Lzw | Decode::LzwCompat) && self.not_started("LZW") {
+            return 0;
+        }
+        if m == Decode::Zip && self.not_started("Deflate") {
+            return 0;
+        }
         match m {
             Decode::NoRow => self.no_decode("scanline", s),
             Decode::NoStrip => self.no_decode("strip", s),
@@ -625,11 +657,10 @@ impl Tiff {
                         return 1;
                     }
                     while occ > 0 {
-                        let end = (at + rowsize as usize).min(buf.len());
                         if at >= buf.len() {
                             break;
                         }
-                        self.pfunc(pf, &mut buf[at..end], rowsize);
+                        self.pfunc(pf, &mut buf[at..], rowsize);
                         occ -= i64::from(rowsize);
                         at += rowsize as usize;
                     }
@@ -894,6 +925,7 @@ impl Tiff {
         }
         sp.dec_oldcodep = -1;
         sp.dec_maxcodep = (sp.dec_nbitsmask - 1) as i32;
+        sp.started = true;
         true
     }
 
@@ -1268,6 +1300,9 @@ impl Tiff {
             1
         };
         sp.codetab = Some(tab);
+        if self.past_raw.replace(false) {
+            self.past_raw_notice();
+        }
         if never_written {
             self.null_entry_notice(
                 "it used a table entry the decoder never writes (codes 256 and 257 after a \
@@ -1307,8 +1342,14 @@ impl Tiff {
             self.warning(Some(&self.name.clone()), &m, s);
             return CODE_EOI;
         }
+        let defined = self.raw_defined;
         let mut rd = |bp: &mut usize| -> i64 {
-            let b = self.rawdata.get(*bp).copied().unwrap_or(0);
+            let b = if *bp < defined {
+                self.rawdata[*bp]
+            } else {
+                self.past_raw.set(true);
+                0
+            };
             *bp += 1;
             i64::from(b)
         };
@@ -1340,6 +1381,16 @@ impl Tiff {
     /// `ZIPDecode`.
     fn zip_decode(&mut self, op: &mut [u8], occ: i32, s: &mut dyn Streams) -> i32 {
         const MODULE: &str = "ZIPDecode";
+        let past = self
+            .codec
+            .zip
+            .as_ref()
+            .is_some_and(|z| z.in_at + z.in_left as usize > self.raw_defined);
+        if past {
+            // The strip's byte count passes the bytes the raw buffer holds (a strip left from
+            // an earlier directory): zlib reads memory past them.
+            self.past_raw_notice();
+        }
         let mut sp = self.codec.zip.take().expect("ZIP");
         let inf = sp.inflate.as_mut().expect("inflate");
         let n = (occ.max(0) as usize).min(op.len());
@@ -1347,8 +1398,8 @@ impl Tiff {
         let mut avail_out = occ.max(0) as u32;
         let mut r = 1;
         loop {
-            let input =
-                &self.rawdata[sp.in_at..(sp.in_at + sp.in_left as usize).min(self.rawdata.len())];
+            let input = &self.rawdata[sp.in_at.min(self.raw_defined)
+                ..(sp.in_at + sp.in_left as usize).min(self.raw_defined)];
             let (state, used, wrote) = inf.inflate(input, &mut op[out_at..n], z::Z_PARTIAL_FLUSH);
             sp.in_at += used;
             sp.in_left -= used as u32;
@@ -1365,8 +1416,8 @@ impl Tiff {
                     inf.msg.unwrap_or("(null)")
                 );
                 self.error(Some(MODULE), &m, s);
-                let input = &self.rawdata
-                    [sp.in_at..(sp.in_at + sp.in_left as usize).min(self.rawdata.len())];
+                let input = &self.rawdata[sp.in_at.min(self.raw_defined)
+                    ..(sp.in_at + sp.in_left as usize).min(self.raw_defined)];
                 let (sr, skipped) = inf.sync(input);
                 sp.in_at += skipped;
                 sp.in_left -= skipped as u32;
@@ -1430,51 +1481,156 @@ impl Tiff {
         ok
     }
 
-    /// The predictor's routines on `buf[..cc]`.
-    pub(crate) fn pfunc(&self, pf: Option<PFunc>, buf: &mut [u8], cc: i32) {
+    /// The predictor's routines on `buf[..cc]`, with libtiff's loops: they run by whole
+    /// pixels (`stride` samples) while the count left is positive, so a row whose length is not
+    /// a multiple of the pixel runs past it (FS-832 when past the caller's buffer; bytes past
+    /// `cc` within it are changed as libtiff changes them).
+    pub(crate) fn pfunc(&mut self, pf: Option<PFunc>, buf: &mut [u8], cc: i32) {
         let Some(pf) = pf else {
             return;
         };
-        let stride = self.codec.predictor.stride.max(1) as usize;
-        let cc = (cc.max(0) as usize).min(buf.len());
+        let stride = i64::from(self.codec.predictor.stride);
+        let len = buf.len() as i64;
+        let mut outside = false;
+        let mut get8 = |buf: &[u8], i: i64, outside: &mut bool| -> u8 {
+            if i >= 0 && i < len {
+                buf[i as usize]
+            } else {
+                *outside = true;
+                0
+            }
+        };
+        let put8 = |buf: &mut [u8], i: i64, v: u8, outside: &mut bool| {
+            if i >= 0 && i < len {
+                buf[i as usize] = v;
+            } else {
+                *outside = true;
+            }
+        };
+        let get16 = |buf: &[u8], i: i64, outside: &mut bool| -> u16 {
+            if i >= 0 && 2 * i + 1 < len {
+                u16::from_le_bytes([buf[2 * i as usize], buf[2 * i as usize + 1]])
+            } else {
+                *outside = true;
+                0
+            }
+        };
+        let put16 = |buf: &mut [u8], i: i64, v: u16, outside: &mut bool| {
+            if i >= 0 && 2 * i + 1 < len {
+                buf[2 * i as usize..2 * i as usize + 2].copy_from_slice(&v.to_le_bytes());
+            } else {
+                *outside = true;
+            }
+        };
         match pf {
             PFunc::HorAcc8 => {
-                if cc > stride {
-                    for i in stride..cc {
-                        buf[i] = buf[i].wrapping_add(buf[i - stride]);
+                let mut cc = i64::from(cc);
+                if cc > stride && stride > 0 {
+                    cc -= stride;
+                    let mut cp = 0i64;
+                    loop {
+                        for _ in 0..stride {
+                            let v = get8(buf, cp + stride, &mut outside)
+                                .wrapping_add(get8(buf, cp, &mut outside));
+                            put8(buf, cp + stride, v, &mut outside);
+                            cp += 1;
+                        }
+                        cc -= stride;
+                        if cc as i32 <= 0 {
+                            break;
+                        }
                     }
                 }
             }
             PFunc::HorAcc16 | PFunc::SwabHorAcc16 => {
-                let wc = cc / 2;
-                if wc > stride {
+                let mut wc = i64::from(cc / 2);
+                if wc > stride && stride > 0 {
                     if pf == PFunc::SwabHorAcc16 {
-                        buf[..wc * 2].chunks_exact_mut(2).for_each(|w| w.swap(0, 1));
+                        let n = (wc as usize * 2).min(buf.len());
+                        buf[..n].chunks_exact_mut(2).for_each(|w| w.swap(0, 1));
                     }
-                    for i in stride..wc {
-                        let a = u16::from_le_bytes([buf[2 * i], buf[2 * i + 1]]);
-                        let b = u16::from_le_bytes([buf[2 * (i - stride)], buf[2 * (i - stride) + 1]]);
-                        buf[2 * i..2 * i + 2].copy_from_slice(&a.wrapping_add(b).to_le_bytes());
+                    wc -= stride;
+                    let mut wp = 0i64;
+                    loop {
+                        for _ in 0..stride {
+                            let v = get16(buf, wp + stride, &mut outside)
+                                .wrapping_add(get16(buf, wp, &mut outside));
+                            put16(buf, wp + stride, v, &mut outside);
+                            wp += 1;
+                        }
+                        wc -= stride;
+                        if wc as i32 <= 0 {
+                            break;
+                        }
                     }
                 }
             }
             PFunc::HorDiff8 => {
-                if cc > stride {
-                    for i in (stride..cc).rev() {
-                        buf[i] = buf[i].wrapping_sub(buf[i - stride]);
+                let mut cc = i64::from(cc);
+                if cc > stride && stride > 0 {
+                    cc -= stride;
+                    if stride == 3 || stride == 4 {
+                        let mut prev: Vec<u8> = (0..stride).map(|k| get8(buf, k, &mut outside)).collect();
+                        let mut cp = 0i64;
+                        loop {
+                            for k in 0..stride {
+                                let r1 = get8(buf, cp + stride + k, &mut outside);
+                                put8(buf, cp + stride + k, r1.wrapping_sub(prev[k as usize]), &mut outside);
+                                prev[k as usize] = r1;
+                            }
+                            cp += stride;
+                            cc -= stride;
+                            if cc as i32 <= 0 {
+                                break;
+                            }
+                        }
+                    } else {
+                        let mut cp = cc - 1;
+                        loop {
+                            for _ in 0..stride {
+                                let v = get8(buf, cp + stride, &mut outside)
+                                    .wrapping_sub(get8(buf, cp, &mut outside));
+                                put8(buf, cp + stride, v, &mut outside);
+                                cp -= 1;
+                            }
+                            cc -= stride;
+                            if cc as i32 <= 0 {
+                                break;
+                            }
+                        }
                     }
                 }
             }
             PFunc::HorDiff16 => {
-                let wc = cc / 2;
-                if wc > stride {
-                    for i in (stride..wc).rev() {
-                        let a = u16::from_le_bytes([buf[2 * i], buf[2 * i + 1]]);
-                        let b = u16::from_le_bytes([buf[2 * (i - stride)], buf[2 * (i - stride) + 1]]);
-                        buf[2 * i..2 * i + 2].copy_from_slice(&a.wrapping_sub(b).to_le_bytes());
+                let mut wc = i64::from(cc / 2);
+                if wc > stride && stride > 0 {
+                    wc -= stride;
+                    let mut wp = wc - 1;
+                    loop {
+                        for _ in 0..stride {
+                            let v = get16(buf, wp + stride, &mut outside)
+                                .wrapping_sub(get16(buf, wp, &mut outside));
+                            put16(buf, wp + stride, v, &mut outside);
+                            wp -= 1;
+                        }
+                        wc -= stride;
+                        if wc as i32 <= 0 {
+                            break;
+                        }
                     }
                 }
             }
+        }
+        if outside {
+            let name = self.name.clone();
+            self.notices.add(
+                &FS_832,
+                format!(
+                    "{name}: the predictor's differencing of a row of {cc} bytes with {stride} \
+                     samples per pixel runs past the row (libtiff 3.6.1 works by whole pixels): \
+                     memory outside the buffer, not touched"
+                ),
+            );
         }
     }
 }

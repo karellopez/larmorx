@@ -700,6 +700,13 @@ fn data_text(t: &mut Tiff, out: &mut String, cap: &mut Captured) -> Result<(), s
     Ok(())
 }
 
+/// The library-wide state of a new process (the cache of `_TIFFFindFieldInfo`): each probe
+/// case starts from it, as each original runs in a fresh child.
+pub fn reset_thread_state() {
+    super::fields::reset_last();
+    super::take_closed_notices();
+}
+
 /// The read transcript of the port on the file `path` (the probe's `tf_read` in C): its
 /// standard output and standard error, the notices' IDs, or the codec not ported yet.
 pub fn port_read(path: &str, opts: Options) -> (String, String, Vec<&'static str>, Option<super::Unported>) {
@@ -732,13 +739,13 @@ pub fn port_read(path: &str, opts: Options) -> (String, String, Vec<&'static str
             }
             Ok(())
         })();
-        for n in t.notices().as_slice() {
-            ids.push(n.defect.id);
-        }
         t.close(&mut cap);
         out.push_str("close\n");
         res
     })();
+    for n in super::take_closed_notices() {
+        ids.push(n.defect.id);
+    }
     (out, cap.text(Stream::Err), ids, r.err())
 }
 
@@ -750,6 +757,9 @@ pub fn port_write(path: &str, c: &WriteCase, opts: Options) -> (String, String, 
     let mut ids = Vec::new();
     let Ok(Some(mut t)) = Tiff::open(path, "w", opts, &mut cap) else {
         out.push_str("open 0\n");
+        for n in super::take_closed_notices() {
+            ids.push(n.defect.id);
+        }
         return (out, cap.text(Stream::Err), ids);
     };
     out.push_str("open 1\n");
@@ -790,10 +800,10 @@ pub fn port_write(path: &str, c: &WriteCase, opts: Options) -> (String, String, 
     out.push_str(&format!("rows {} bad {bad}\n", c.rows));
     let r = t.write_directory(&mut cap).unwrap_or(false);
     out.push_str(&format!("writedir {}\n", i32::from(r)));
-    for n in t.notices().as_slice() {
-        ids.push(n.defect.id);
-    }
     t.close(&mut cap);
     out.push_str("close\n");
+    for n in super::take_closed_notices() {
+        ids.push(n.defect.id);
+    }
     (out, cap.text(Stream::Err), ids)
 }

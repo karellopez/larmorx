@@ -208,10 +208,33 @@ pub struct Tiff {
     /// The bytes of the raw buffer written by reads since it was allocated (the rest is
     /// memory never written: FS-819).
     pub(crate) raw_defined: usize,
+    /// A decoder read past the raw buffer's defined bytes (noted after the call).
+    pub(crate) past_raw: std::cell::Cell<bool>,
     pub(crate) fields: Fields,
     pub(crate) opts: Options,
     pub(crate) notices: Notices,
     pub(crate) unported: Option<Unported>,
+}
+
+thread_local! {
+    static CLOSED_NOTICES: std::cell::RefCell<Vec<larmorx_core::defects::Notice>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The notices of the handles closed or dropped on this thread since the last call (a
+/// [`Tiff::open`] that fails, a [`Tiff::close`]), as libtiff's messages they go with were
+/// written.
+pub fn take_closed_notices() -> Vec<larmorx_core::defects::Notice> {
+    CLOSED_NOTICES.with(|c| std::mem::take(&mut *c.borrow_mut()))
+}
+
+impl Drop for Tiff {
+    fn drop(&mut self) {
+        let list = std::mem::replace(&mut self.notices, Notices::new(self.opts.upstream_defects));
+        if !list.is_empty() {
+            CLOSED_NOTICES.with(|c| c.borrow_mut().extend(list.as_slice().iter().cloned()));
+        }
+    }
 }
 
 /// `%.1000s` and `%.100s`: the name cut to `n` bytes (at a character boundary).
@@ -327,6 +350,7 @@ impl Tiff {
             rawcp: 0,
             rawcc: 0,
             raw_defined: 0,
+            past_raw: std::cell::Cell::new(false),
             fields: Fields::new(fields::next_serial()),
             opts,
             notices: Notices::new(opts.upstream_defects),

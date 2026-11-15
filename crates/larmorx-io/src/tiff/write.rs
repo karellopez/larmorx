@@ -491,8 +491,7 @@ impl Tiff {
                 let mut at = 0usize;
                 let mut left = i64::from(cc);
                 while left > 0 && rowsize > 0 && at < buf.len() {
-                    let end = (at + rowsize as usize).min(buf.len());
-                    self.pfunc(pf, &mut buf[at..end], rowsize);
+                    self.pfunc(pf, &mut buf[at..], rowsize);
                     left -= i64::from(rowsize);
                     at += rowsize as usize;
                 }

@@ -197,6 +197,14 @@ impl Tiff {
             }
             if fix >= nfields {
                 if self.fix() {
+                    self.notices.add(
+                        &FS_820,
+                        format!(
+                            "{}: tag {} is checked (libtiff 3.6.1 checks no entry after a type \
+                             check that ran to the end of its table)",
+                            self.name, dp.tag
+                        ),
+                    );
                     fix = 0;
                 } else {
                     unchecked.push(i);
@@ -665,6 +673,16 @@ impl Tiff {
         }
         let b = self.fetch_data(dp, s)?;
         if self.fix() {
+            if u32::from(dp.tag) == tag::EXTRASAMPLES {
+                self.notices.add(
+                    &FS_824,
+                    format!(
+                        "{}: ExtraSamples of {} BYTE values read as bytes (libtiff 3.6.1 reads \
+                         them as 16-bit values, half of them memory never written)",
+                        self.name, dp.count
+                    ),
+                );
+            }
             let sbyte = dp.ty == fields::TIFF_SBYTE;
             return Some(
                 b.iter()

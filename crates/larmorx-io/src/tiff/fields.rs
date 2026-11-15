@@ -457,6 +457,11 @@ thread_local! {
     static SERIAL: RefCell<u64> = const { RefCell::new(0) };
 }
 
+/// Forgets the cache of the last field found (a new process's state).
+pub(crate) fn reset_last() {
+    LAST.with(|l| *l.borrow_mut() = Last::None);
+}
+
 /// A new handle's serial number (for the anonymous fields the cache may hold).
 pub(crate) fn next_serial() -> u64 {
     SERIAL.with(|s| {

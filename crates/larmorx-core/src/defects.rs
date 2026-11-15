@@ -2587,6 +2587,12 @@ defects! {
         "writing a rational value that is NaN, infinite or above 4294967295 converts it to an unsigned 32-bit integer out of range (undefined; x86-64 gives 0 or its low 32 bits); clamped to 0 or 4294967295";
     FS_828 = "FS-828", "libtiff 3.6.1", true,
         "a directory that counts more entries than it fills writes the rest as memory never written; written as zeros";
+    FS_830 = "FS-830", "libtiff 3.6.1", true,
+        "after a TIFFReadDirectory that fails, the scanline and tile sizes of the previous directory are kept: TIFFReadScanline and TIFFReadTile write that many bytes into a buffer sized for the new directory (memory past it); only the buffer is written";
+    FS_831 = "FS-831", "libtiff 3.6.1", true,
+        "when a strip's start fails in the codec's setup (an unsupported predictor), reading the next row of that strip calls the LZW or Deflate decoder without a start: its input pointers were never set (a crash); nothing is decoded";
+    FS_832 = "FS-832", "libtiff 3.6.1", true,
+        "the predictor's horizontal differencing works by whole pixels while bytes are left, so a row whose byte count is not a multiple of the pixel's (a scanline size left from another directory) is processed past its end; past the caller's buffer nothing is touched";
     FS_829 = "FS-829", "libtiff 3.6.1", true,
         "the strip size of a YCbCr image without YCbCrSubsampling is computed from two values never set (stack contents); the directory's defaults, 2 and 2, are used";
 }

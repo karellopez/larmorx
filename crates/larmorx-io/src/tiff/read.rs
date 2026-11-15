@@ -8,7 +8,7 @@
 
 use super::{Mode, TIFF_CODERSETUP, TIFF_MYBUFFER, TIFF_NOBITREV, Tiff, Unported, values};
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_826, FS_829};
+use larmorx_core::defects::{FS_826, FS_829, FS_830};
 
 /// `TIFFhowmany(x, y)` in `uint32` (a division by zero is the caller's).
 fn howmany(x: u32, y: u32) -> u32 {
@@ -264,6 +264,28 @@ impl Tiff {
         }
     }
 
+    /// A buffer of `cc` bytes when the caller's is shorter (libtiff writes `cc` bytes there:
+    /// FS-830 when the size is the previous directory's), its start the caller's bytes.
+    fn caller_buffer(&mut self, buf: &[u8], cc: i32, what: &str) -> Option<Vec<u8>> {
+        let cc = cc.max(0) as usize;
+        if cc <= buf.len() {
+            return None;
+        }
+        let name = self.name.clone();
+        self.notices.add(
+            &FS_830,
+            format!(
+                "{name}: libtiff writes a {what} of {cc} bytes into a buffer of {} (the size \
+                 TIFFScanlineSize or TIFFTileSize gives now; libtiff keeps the previous \
+                 directory's after a TIFFReadDirectory that failed): memory past the buffer",
+                buf.len()
+            ),
+        );
+        let mut t = vec![0u8; cc];
+        t[..buf.len()].copy_from_slice(buf);
+        Some(t)
+    }
+
     /// `TIFFReadScanline(tif, buf, row, sample)`: 1, or -1. `buf` receives
     /// `TIFFScanlineSize` bytes (a shorter slice is filled as far as it goes: the C function
     /// writes past the caller's buffer).
@@ -284,10 +306,19 @@ impl Tiff {
         if e != 0 {
             let m = self.codec.decoderow;
             let cc = self.scanlinesize;
-            e = self.decode(m, buf, cc, sample, s);
+            let mut tmp = self.caller_buffer(buf, cc, "scanline");
+            let b: &mut [u8] = match tmp.as_mut() {
+                Some(t) => t,
+                None => buf,
+            };
+            e = self.decode(m, b, cc, sample, s);
             self.row = row.wrapping_add(1);
             if e != 0 {
-                self.post_decode(buf, cc);
+                self.post_decode(b, cc);
+            }
+            if let Some(t) = tmp {
+                let n = buf.len();
+                buf.copy_from_slice(&t[..n]);
             }
         }
         Ok(if e > 0 { 1 } else { -1 })
@@ -545,8 +576,20 @@ impl Tiff {
             let spi = self.dir.stripsperimage;
             let sample = if spi == 0 { 0 } else { (tile / spi) as u16 };
             let m = self.codec.decodetile;
-            if self.decode(m, buf, size, sample, s) != 0 {
-                self.post_decode(buf, size);
+            let mut tmp = self.caller_buffer(buf, size, "tile");
+            let b: &mut [u8] = match tmp.as_mut() {
+                Some(t) => t,
+                None => buf,
+            };
+            let ok = self.decode(m, b, size, sample, s) != 0;
+            if ok {
+                self.post_decode(b, size);
+            }
+            if let Some(t) = tmp {
+                let n = buf.len();
+                buf.copy_from_slice(&t[..n]);
+            }
+            if ok {
                 return size;
             }
         }

@@ -726,7 +726,17 @@ impl Tiff {
     }
 
     /// `(*tif->tif_postdecode)(tif, buf, cc)`.
-    pub(crate) fn post_decode(&self, buf: &mut [u8], cc: i32) {
+    pub(crate) fn post_decode(&mut self, buf: &mut [u8], cc: i32) {
+        if cc < 0 && self.codec.postdecode != PostDecode::None {
+            let name = self.name.clone();
+            self.notices.add(
+                &FS_833,
+                format!(
+                    "{name}: byte-swapping a negative size of {cc} bytes: libtiff 3.6.1 swaps about \
+                     2^63 values (memory past the buffer); nothing swapped"
+                ),
+            );
+        }
         let n = (cc.max(0) as usize).min(buf.len());
         let b = &mut buf[..n];
         match self.codec.postdecode {

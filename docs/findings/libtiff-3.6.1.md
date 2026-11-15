@@ -79,7 +79,7 @@ does what the correction does and notes it.
 | FS-830 | after a failed `TIFFReadDirectory`, the previous directory's scanline and tile sizes stay: a read writes that many bytes into a buffer sized for the new directory | only the caller's buffer is written |
 | FS-831 | when a strip's start fails in the codec's setup (an unsupported predictor), the next row is decoded without a start: the LZW or Deflate decoder's input was never set (a crash) | nothing decoded |
 | FS-832 | the predictor works by whole pixels while bytes are left, past a row whose length is not a multiple of the pixel's | past the caller's buffer nothing is touched |
-| FS-833 | a negative strip or tile size (a stripped image's `TIFFTileSize` overflows 32 bits; kept after a failed `TIFFReadDirectory`) makes the None decoder copy, and the Deflate decoder inflate into, about 2^64 bytes | nothing written |
+| FS-833 | a negative strip or tile size (a stripped image's `TIFFTileSize` overflows 32 bits; kept after a failed `TIFFReadDirectory`) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes | nothing written |
 | FS-834 | a SamplesPerPixel of several values is passed as its array's address where one value goes (the field takes the address's low bits) | ignored, with libtiff's incorrect-count warning |
 
 Many of these are reached only through a directory that failed to read: libtiff's

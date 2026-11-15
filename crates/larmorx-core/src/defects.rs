@@ -2594,7 +2594,7 @@ defects! {
     FS_832 = "FS-832", "libtiff 3.6.1", true,
         "the predictor's horizontal differencing works by whole pixels while bytes are left, so a row whose byte count is not a multiple of the pixel's (a scanline size left from another directory) is processed past its end; past the caller's buffer nothing is touched";
     FS_833 = "FS-833", "libtiff 3.6.1", true,
-        "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, and the Deflate decoder inflate into, about 2^64 bytes (memory past both buffers); nothing is written";
+        "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes (memory past the buffers); nothing is written";
     FS_834 = "FS-834", "libtiff 3.6.1", true,
         "a SamplesPerPixel of several values (and an entry left unchecked by FS-820) is passed as the address of its array where one value goes: the field takes the address's low bits (nondeterministic); ignored as a wrong count, with libtiff's incorrect-count warning";
 }

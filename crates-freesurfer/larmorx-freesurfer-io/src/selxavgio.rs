@@ -298,15 +298,12 @@ fn read_gamma(
     }
     // the 30 places of 4 bytes from gfDelta to the end of the header, as written
     let mut slot: [Option<u32>; 30] = [None; 30];
-    scan(g, fp, Item::Word);
-    for k in 0..n {
-        let Some(v) = one_f(g, fp) else { break };
-        slot[k] = Some(v.to_bits());
-    }
-    scan(g, fp, Item::Word);
-    for k in 0..n {
-        let Some(v) = one_f(g, fp) else { break };
-        slot[10 + k] = Some(v.to_bits());
+    for first in [0, 10] {
+        scan(g, fp, Item::Word);
+        for place in slot[first..first + n].iter_mut() {
+            let Some(v) = one_f(g, fp) else { break };
+            *place = Some(v.to_bits());
+        }
     }
     for k in 0..NGAMMA {
         sxa.gf_delta[k] = f32::from_bits(slot[k].unwrap_or(0));
@@ -319,7 +316,11 @@ fn read_gamma(
         sxa.n_noise_ac = b as i32;
     }
     let tail = version_after(g, fp, sxa);
-    if tail.version_one && (24..30).filter(|&k| k != 26 && k != 27).any(|k| slot[k].is_some()) {
+    if tail.version_one
+        && (24..30)
+            .filter(|&k| k != 26 && k != 27)
+            .any(|k| slot[k].is_some())
+    {
         return Err("a pointer of the header overwritten and never set again");
     }
     Ok(())
@@ -534,9 +535,7 @@ pub fn sv_sxadat(
         if a.len() as i64 >= gf {
             Ok(())
         } else {
-            Err(format!(
-                "{what} holds fewer numbers than GammaFit ({gf})"
-            ))
+            Err(format!("{what} holds fewer numbers than GammaFit ({gf})"))
         }
     };
     let check = (|| -> Result<(), String> {

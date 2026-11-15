@@ -27,8 +27,8 @@ use larmorx_freesurfer_core::matrix::matrix_multiply;
 use larmorx_freesurfer_core::matrix_ops::{matrix_const_val, matrix_inverse, matrix_print};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT,
-    Mri, mri_alloc_sequence, mri_copy_header,
+    MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    mri_alloc_sequence, mri_copy_header,
 };
 use larmorx_freesurfer_mri::vol_geom::{set_vox2ras_from_matrix, xfm_crs2xyz};
 
@@ -57,7 +57,11 @@ fn isign(a: i32) -> i32 {
 
 /// Whether the three numbers are 1, 2 and 3 in some order and with any signs.
 fn is_permutation(xdim: i32, ydim: i32, zdim: i32) -> bool {
-    let mut a = [xdim.unsigned_abs(), ydim.unsigned_abs(), zdim.unsigned_abs()];
+    let mut a = [
+        xdim.unsigned_abs(),
+        ydim.unsigned_abs(),
+        zdim.unsigned_abs(),
+    ];
     a.sort_unstable();
     a == [1, 2, 3]
 }
@@ -65,7 +69,11 @@ fn is_permutation(xdim: i32, ydim: i32, zdim: i32) -> bool {
 /// FreeSurfer's check of the dimension numbers: the product and the sum of their `abs` values
 /// (32-bit, `abs(INT_MIN)` itself) both 6.
 fn passes_check(xdim: i32, ydim: i32, zdim: i32) -> bool {
-    let (a, b, c) = (xdim.wrapping_abs(), ydim.wrapping_abs(), zdim.wrapping_abs());
+    let (a, b, c) = (
+        xdim.wrapping_abs(),
+        ydim.wrapping_abs(),
+        zdim.wrapping_abs(),
+    );
     a.wrapping_mul(b).wrapping_mul(c) == 6 && a.wrapping_add(b).wrapping_add(c) == 6
 }
 
@@ -477,14 +485,7 @@ mod tests {
             assert!(r.is_null());
             assert!(o.ends_with(b"ERROR: replicated/incorrect dimension number\n"));
             let r = mri_reorder(
-                &mut g,
-                &mut o,
-                &mut e,
-                &src,
-                None,
-                99577,
-                2147399842,
-                2147467883,
+                &mut g, &mut o, &mut e, &src, None, 99577, 2147399842, 2147467883,
             );
             assert!(g.notices.contains(&FS_843));
             match mode {

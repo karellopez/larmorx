@@ -102,7 +102,14 @@ fn gen_reo(g: &mut Gen, t: &mut Vec<String>) {
             [-2147483648, 1, 3],
         ])
     } else if g.chance(8) {
-        g.pick(&[[1, 1, 3], [0, 2, 3], [4, 2, 3], [1, 2, -1], [3, 3, 0], [2, -2, 3]])
+        g.pick(&[
+            [1, 1, 3],
+            [0, 2, 3],
+            [4, 2, 3],
+            [1, 2, -1],
+            [3, 3, 0],
+            [2, -2, 3],
+        ])
     } else {
         signed_perm(g)
     };
@@ -157,7 +164,16 @@ fn num(g: &mut Gen, int: bool) -> String {
     if g.chance(14) {
         return g
             .pick(&[
-                "1e40", "nan", "-0", "0x1p3", "2147483648", "+5", "x", "-7", "inf", "1e-50",
+                "1e40",
+                "nan",
+                "-0",
+                "0x1p3",
+                "2147483648",
+                "+5",
+                "x",
+                "-7",
+                "inf",
+                "1e-50",
             ])
             .into();
     }
@@ -192,7 +208,11 @@ fn header(g: &mut Gen) -> Vec<u8> {
         return s.into_bytes();
     }
     let version = g.pick(&[1, 2, 2]);
-    s += &format!("version {version}\nTER {}\nDOF {}\n", num(g, false), num(g, false));
+    s += &format!(
+        "version {version}\nTER {}\nDOF {}\n",
+        num(g, false),
+        num(g, false)
+    );
     s += "NPerCond";
     for _ in 0..nc.max(0) {
         s += &format!(" {}", num(g, true));
@@ -337,7 +357,13 @@ fn fnv(o: &mut Out, b: &[u8]) {
 }
 
 /// `oarr30`: `N`, or `c<count>` and the values (FNV-1a 64 of their bytes beyond 64).
-fn oarr<T: Copy>(o: &mut Out, a: Option<&[T]>, n: i64, bytes: fn(T) -> [u8; 4], show: fn(&mut Out, T)) {
+fn oarr<T: Copy>(
+    o: &mut Out,
+    a: Option<&[T]>,
+    n: i64,
+    bytes: fn(T) -> [u8; 4],
+    show: fn(&mut Out, T),
+) {
     let Some(a) = a else {
         o.0.push_str("N ");
         return;
@@ -440,8 +466,8 @@ pub fn run(
                     }
                 }
             };
-            let mut src =
-                mri::mri_alloc_sequence(g, out, err, p[0], p[1], p[2], p[4], p[3]).map_err(fatal)?;
+            let mut src = mri::mri_alloc_sequence(g, out, err, p[0], p[1], p[2], p[4], p[3])
+                .map_err(fatal)?;
             {
                 let v = &mut src.vg;
                 (v.xsize, v.ysize, v.zsize) = (geo[0], geo[1], geo[2]);

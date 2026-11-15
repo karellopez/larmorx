@@ -65,10 +65,10 @@ pub(crate) mod piece27;
 pub(crate) mod piece28;
 #[path = "piece29.rs"]
 pub(crate) mod piece29;
-#[path = "piece30.rs"]
-pub(crate) mod piece30;
 #[path = "piece3.rs"]
 mod piece3;
+#[path = "piece30.rs"]
+pub(crate) mod piece30;
 #[path = "piece4.rs"]
 pub(crate) mod piece4;
 #[path = "piece5.rs"]

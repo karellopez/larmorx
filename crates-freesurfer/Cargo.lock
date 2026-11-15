@@ -261,6 +261,7 @@ dependencies = [
  "larmorx-freesurfer-surf",
  "larmorx-freesurfer-volume",
  "larmorx-io",
+ "tempfile",
 ]
 
 [[package]]

@@ -110,9 +110,9 @@ pub fn gca_build_most_likely_volume(
                             .labels
                             .iter()
                             .zip(&gcan.gcs)
-                            .filter(|(l, _)| i32::from(**l) == max_label)
-                            .map(|(_, gc)| gc)
-                            .last();
+                            .rev()
+                            .find(|(l, _)| i32::from(**l) == max_label)
+                            .map(|(_, gc)| gc);
                         let Some(gc) = gc_max else {
                             continue;
                         };

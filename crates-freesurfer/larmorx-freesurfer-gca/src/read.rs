@@ -32,10 +32,10 @@
 //! FS-167 notes each number the file cut.
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use larmorx_core::defects::{
-    FS_749, FS_750, FS_751, FS_752, FS_753, FS_755, FS_756, FS_757, FS_758, FS_759,
+    FS_167, FS_749, FS_750, FS_751, FS_752, FS_753, FS_755, FS_756, FS_757, FS_758, FS_759,
 };
 use larmorx_freesurfer_core::cstd::{fmt_f, format_double};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
@@ -49,9 +49,9 @@ use larmorx_io::znz::ZnzFile;
 
 use crate::gca::{
     FILE_TAG, GCA_FLASH, GCA_INT_VERSION, GCA_NO_MRF, GCA_NORMAL, GCA_PARAM, GCA_UCHAR_VERSION,
-    GCA_UNKNOWN, GIBBS_NEIGHBORS, Gc1d, Gca, GcaNode, GcaPrior, MAX_GCA_INPUTS, TAG_GCA_COLORTABLE,
-    TAG_GCA_DIRCOS, TAG_GCA_TYPE, TAG_PARAMETERS, gca_alloc_max, gca_node_to_prior, gca_setup,
-    get_prior, libc_enomem, to_int,
+    GCA_UNKNOWN, GIBBS_NEIGHBORS, Gc1d, Gca, GcaNode, GcaPrior, MAX_GCA_INPUTS, Nbrs,
+    TAG_GCA_COLORTABLE, TAG_GCA_DIRCOS, TAG_GCA_TYPE, TAG_PARAMETERS, gca_alloc_max,
+    gca_node_to_prior, gca_setup, get_prior, libc_enomem, to_int,
 };
 
 /// The size beyond which an allocation's success depends on the machine (FS-756): 16 GiB.
@@ -61,13 +61,75 @@ const GC1D_BYTES: i128 = 56;
 /// `FLT_EPSILON`, as `FEQUAL` compares.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
 
-/// The file as `GCAread` reads it, noting a number the file cut (FS-750).
+/// The bytes the buffered reader asks the file for at a time.
+const CHUNK: usize = 1 << 16;
+
+/// The file as `GCAread` reads it, noting a number the file cut (FS-750). The grids are read
+/// through a buffer (FreeSurfer's `fread` is buffered too; the port's plain file is not), with the
+/// readers' own messages and notices (`fio`: `znzreadInt: znzread failed` when a read fails before
+/// the end and `Gdiag_no` is set, `freadFloat: fread failed` whenever one fails; FS-167 for each
+/// number the file cut); [`Rd::direct`] gives the file back at the reading's place for the tagged
+/// section, read number by number as FreeSurfer does (the colour table's reader reads the file
+/// itself).
 struct Rd<'a> {
     fp: &'a mut ZnzFile,
     cut: bool,
+    buf: Vec<u8>,
+    pos: usize,
+    /// the file gave its last bytes
+    ended: bool,
+    /// a read failed (zlib's error, a plain read's error): not the end
+    failed: bool,
+    /// the bytes taken so far
+    taken: u64,
+    direct: bool,
 }
 
 impl Rd<'_> {
+    fn of(fp: &mut ZnzFile) -> Rd<'_> {
+        Rd {
+            fp,
+            cut: false,
+            buf: Vec::new(),
+            pos: 0,
+            ended: false,
+            failed: false,
+            taken: 0,
+            direct: false,
+        }
+    }
+
+    /// `n` bytes (fewer where the file ends or fails) and how many.
+    fn take<const N: usize>(&mut self) -> ([u8; N], usize) {
+        while self.buf.len() - self.pos < N && !self.ended && !self.failed {
+            self.buf.drain(..self.pos);
+            self.pos = 0;
+            let have = self.buf.len();
+            self.buf.resize(have + CHUNK, 0);
+            let r = fio::fs_znzread(self.fp, &mut self.buf[have..], 1, CHUNK);
+            if r < 0 {
+                self.failed = true;
+                self.buf.truncate(have);
+            } else {
+                self.buf.truncate(have + r as usize);
+                if (r as usize) < CHUNK {
+                    // a short read: the end, or a plain file's error
+                    if self.fp.eof() {
+                        self.ended = true;
+                    } else {
+                        self.failed = true;
+                    }
+                }
+            }
+        }
+        let got = (self.buf.len() - self.pos).min(N);
+        let mut b = [0u8; N];
+        b[..got].copy_from_slice(&self.buf[self.pos..self.pos + got]);
+        self.pos += got;
+        self.taken += got as u64;
+        (b, got)
+    }
+
     fn note(&mut self, before: i64, n: i64) {
         let after = self.fp.tell();
         if before < 0 || after - before != n {
@@ -75,28 +137,67 @@ impl Rd<'_> {
         }
     }
 
+    /// The file at the reading's place, for the tagged section (number by number from here).
+    fn direct(&mut self) {
+        if !self.direct {
+            self.fp
+                .seek(self.taken as i64, larmorx_io::znz::Whence::Set);
+            self.buf = Vec::new();
+            self.pos = 0;
+            self.direct = true;
+        }
+    }
+
     /// `znzreadInt(file)`.
     fn int(&mut self, g: &mut Globals, err: &mut dyn Write) -> i32 {
-        let b = self.fp.tell();
-        let v = fio::znz_read_int(g, err, self.fp);
-        self.note(b, 4);
-        v
+        if self.direct {
+            let b = self.fp.tell();
+            let v = fio::znz_read_int(g, err, self.fp);
+            self.note(b, 4);
+            return v;
+        }
+        let (b, got) = self.take::<4>();
+        if got < 4 {
+            self.cut = true;
+            fio::memory(g, &FS_167, "znzreadInt", got, 4);
+            if self.failed && g.gdiag_no >= 0 {
+                log::error_printf(g, err, ERROR_BADFILE, "znzreadInt: znzread failed");
+            }
+        }
+        i32::from_be_bytes(b)
     }
 
     /// `znzreadFloat(file)`.
     fn float(&mut self, g: &mut Globals, err: &mut dyn Write) -> f32 {
-        let b = self.fp.tell();
-        let v = fio::znz_read_float(g, err, self.fp);
-        self.note(b, 4);
-        v
+        if self.direct {
+            let b = self.fp.tell();
+            let v = fio::znz_read_float(g, err, self.fp);
+            self.note(b, 4);
+            return v;
+        }
+        let (b, got) = self.take::<4>();
+        if got < 4 {
+            self.cut = true;
+            log::error_printf(g, err, ERROR_BADFILE, "freadFloat: fread failed");
+            fio::memory(g, &FS_167, "znzreadFloat", got, 4);
+        }
+        f32::from_be_bytes(b)
     }
 
     /// `znzread1(&v, file)`: one unsigned byte.
     fn byte(&mut self, g: &mut Globals) -> i32 {
-        let b = self.fp.tell();
-        let (_, v) = fio::znzread1(g, self.fp);
-        self.note(b, 1);
-        v
+        if self.direct {
+            let b = self.fp.tell();
+            let (_, v) = fio::znzread1(g, self.fp);
+            self.note(b, 1);
+            return v;
+        }
+        let (b, got) = self.take::<1>();
+        if got < 1 {
+            self.cut = true;
+            fio::memory(g, &FS_167, "znzread1", got, 1);
+        }
+        i32::from(b[0])
     }
 }
 
@@ -126,7 +227,7 @@ fn open_errno(path: &Path) -> i32 {
     }
 }
 
-fn open(path: &PathBuf, gzipped: bool) -> Opened {
+fn open(path: &Path, gzipped: bool) -> Opened {
     if path.is_dir() {
         return Opened::Folder;
     }
@@ -276,6 +377,40 @@ fn cut(g: &mut Globals, err: &mut dyn Write, fname: &str, where_: &str) -> Grids
     Grids::Refused
 }
 
+/// A node's classes and labels as they are read.
+#[derive(Default)]
+struct NodeRead {
+    labels: Vec<u16>,
+    gcs: Vec<Gc1d>,
+}
+
+/// A class as it is read.
+#[derive(Default)]
+struct ClassRead {
+    means: Vec<f32>,
+    covars: Vec<f32>,
+    nbrs: Option<(Vec<i16>, Vec<u16>, Vec<f32>)>,
+}
+
+impl ClassRead {
+    fn done(self) -> Gc1d {
+        Gc1d {
+            means: self.means.into_boxed_slice(),
+            covars: self.covars.into_boxed_slice(),
+            nbrs: self.nbrs.map(|(c, l, p)| {
+                let mut nlabels = [0i16; GIBBS_NEIGHBORS];
+                nlabels[..c.len()].copy_from_slice(&c);
+                Box::new(Nbrs {
+                    nlabels,
+                    labels: l.into_boxed_slice(),
+                    label_priors: p.into_boxed_slice(),
+                })
+            }),
+            ..Gc1d::default()
+        }
+    }
+}
+
 /// One node's classes (after its two counts).
 #[allow(clippy::too_many_arguments)]
 fn read_node(
@@ -287,27 +422,26 @@ fn read_node(
     version: f32,
     flags: i32,
     ncovars: i64,
-    gcan: &mut GcaNode,
+    nlabels: i32,
+    node: &mut NodeRead,
     at: [i32; 3],
 ) -> Result<Option<Grids>, Fatal> {
     let [x, y, z] = at;
-    if gcan.nlabels != 0 {
-        if gcan.nlabels < 0 {
+    if nlabels != 0 {
+        if nlabels < 0 {
             alloc_exit(
                 g,
                 err,
-                &format!(
-                    "GCAread({fname}): could not allocate {} labels @ ({x},{y},{z})",
-                    gcan.nlabels
-                ),
+                &format!("GCAread({fname}): could not allocate {nlabels} labels @ ({x},{y},{z})"),
             )?;
         }
-        alloc_gcs(g, err, gcan.nlabels, flags, gca.ninputs, ncovars)?;
+        alloc_gcs(g, err, nlabels, flags, gca.ninputs, ncovars)?;
     }
     let old = f64::from(version) < GCA_UCHAR_VERSION;
     let bytes = old || f64::from(version) == GCA_UCHAR_VERSION;
-    for _ in 0..gcan.nlabels {
-        let mut gc = Gc1d::default();
+    let ninputs = gca.ninputs.max(0) as usize;
+    for _ in 0..nlabels {
+        let mut gc = ClassRead::default();
         let label = if bytes {
             rd.byte(g)
         } else {
@@ -321,30 +455,35 @@ fn read_node(
         if old && i32::from(label) > gca.max_label {
             gca.max_label = i32::from(label);
         }
-        gcan.labels.push(label);
-        for _ in 0..gca.ninputs.max(0) {
+        node.labels.push(label);
+        gc.means.reserve_exact(ninputs.min(1 << 16));
+        for _ in 0..ninputs {
             gc.means.push(rd.float(g, err));
             if rd.cut {
-                gcan.gcs.push(gc);
+                node.gcs.push(gc.done());
                 return Ok(Some(Grids::Cut));
             }
         }
+        gc.covars
+            .reserve_exact((ncovars.max(0) as usize).min(1 << 16));
         for _ in 0..ncovars.max(0) {
             gc.covars.push(rd.float(g, err));
             if rd.cut {
-                gcan.gcs.push(gc);
+                node.gcs.push(gc.done());
                 return Ok(Some(Grids::Cut));
             }
         }
         if rd.cut {
-            gcan.gcs.push(gc);
+            node.gcs.push(gc.done());
             return Ok(Some(Grids::Cut));
         }
         if gca.flags & GCA_NO_MRF == 0 {
+            let (mut counts, mut labels, mut priors) = (Vec::new(), Vec::new(), Vec::new());
             for _ in 0..GIBBS_NEIGHBORS {
                 let v = rd.int(g, err);
                 if rd.cut {
-                    gcan.gcs.push(gc);
+                    gc.nbrs = Some((counts, labels, priors));
+                    node.gcs.push(gc.done());
                     return Ok(Some(Grids::Cut));
                 }
                 let Some(nl) = fits16(g, err, fname, "a neighbour label count of", v, true) else {
@@ -363,8 +502,7 @@ fn read_node(
                         &format!("GCAread({fname}): couldn't expand gcs to {nl}"),
                     )?;
                 }
-                gc.nlabels.push(nl as i16);
-                let (mut labels, mut priors) = (Vec::new(), Vec::new());
+                counts.push(nl as i16);
                 for _ in 0..nl {
                     let v = rd.int(g, err);
                     let p = rd.float(g, err);
@@ -377,20 +515,28 @@ fn read_node(
                     labels.push(l as u16);
                     priors.push(p);
                 }
-                gc.labels.push(labels);
-                gc.label_priors.push(priors);
                 if rd.cut {
-                    gcan.gcs.push(gc);
+                    gc.nbrs = Some((counts, labels, priors));
+                    node.gcs.push(gc.done());
                     return Ok(Some(Grids::Cut));
                 }
             }
+            gc.nbrs = Some((counts, labels, priors));
         }
-        gcan.gcs.push(gc);
+        node.gcs.push(gc.done());
     }
     Ok(None)
 }
 
+/// The room to reserve for a grid of `cells` (at most what the file can hold: 8 bytes each).
+fn reserve(cells: [i32; 3], file_bytes: Option<u64>) -> usize {
+    let n = cells.iter().map(|&c| c.max(0) as u64).product::<u64>();
+    let cap = file_bytes.map_or(1 << 20, |b| b / 8);
+    n.min(cap) as usize
+}
+
 /// The node grid (both layouts).
+#[allow(clippy::too_many_arguments)]
 fn read_nodes(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -399,21 +545,26 @@ fn read_nodes(
     fname: &str,
     version: f32,
     flags: i32,
+    file_bytes: Option<u64>,
 ) -> Result<Grids, Fatal> {
     let ncovars = covar_count(g, gca.ninputs);
+    gca.nodes = Vec::with_capacity(reserve(
+        [gca.node_width, gca.node_height, gca.node_depth],
+        file_bytes,
+    ));
     for x in 0..gca.node_width {
         for y in 0..gca.node_height {
             for z in 0..gca.node_depth {
-                let mut gcan = GcaNode {
-                    nlabels: rd.int(g, err),
-                    total_training: rd.int(g, err),
-                    ..GcaNode::default()
-                };
+                let nlabels = rd.int(g, err);
+                let total_training = rd.int(g, err);
                 if rd.cut {
-                    gcan.nlabels = 0;
-                    gca.nodes.push(gcan);
+                    gca.nodes.push(GcaNode {
+                        total_training,
+                        ..GcaNode::default()
+                    });
                     return Ok(cut(g, err, fname, "nodes"));
                 }
+                let mut node = NodeRead::default();
                 let r = read_node(
                     g,
                     err,
@@ -423,11 +574,17 @@ fn read_nodes(
                     version,
                     flags,
                     ncovars,
-                    &mut gcan,
+                    nlabels,
+                    &mut node,
                     [x, y, z],
                 )?;
-                gcan.nlabels = gcan.nlabels.min(gcan.gcs.len() as i32).max(0);
-                gca.nodes.push(gcan);
+                gca.nodes.push(GcaNode {
+                    nlabels: node.gcs.len() as i32,
+                    labels: node.labels.into_boxed_slice(),
+                    gcs: node.gcs.into_boxed_slice(),
+                    total_training,
+                    ..GcaNode::default()
+                });
                 match r {
                     None => {}
                     Some(Grids::Cut) => return Ok(cut(g, err, fname, "nodes")),
@@ -447,8 +604,13 @@ fn read_priors(
     gca: &mut Gca,
     fname: &str,
     version: f32,
+    file_bytes: Option<u64>,
 ) -> Result<Grids, Fatal> {
     let bytes = f64::from(version) == GCA_UCHAR_VERSION;
+    gca.priors = Vec::with_capacity(reserve(
+        [gca.prior_width, gca.prior_height, gca.prior_depth],
+        file_bytes,
+    ));
     for x in 0..gca.prior_width {
         for y in 0..gca.prior_height {
             for z in 0..gca.prior_depth {
@@ -470,11 +632,8 @@ fn read_priors(
                         ),
                     )?;
                 }
-                let mut gcap = GcaPrior {
-                    nlabels: nlabels as i16,
-                    total_training,
-                    ..GcaPrior::default()
-                };
+                let n = nlabels.max(0) as usize;
+                let (mut labels, mut priors) = (Vec::with_capacity(n), Vec::with_capacity(n));
                 for _ in 0..nlabels {
                     let label = if bytes {
                         rd.byte(g)
@@ -492,11 +651,16 @@ fn read_priors(
                     if label > gca.max_label {
                         gca.max_label = label;
                     }
-                    gcap.labels.push(label as u16);
-                    gcap.priors.push(p);
+                    labels.push(label as u16);
+                    priors.push(p);
                 }
-                gcap.nlabels = gcap.labels.len() as i16;
-                gca.priors.push(gcap);
+                gca.priors.push(GcaPrior {
+                    nlabels: labels.len() as i16,
+                    labels: labels.into_boxed_slice(),
+                    priors: priors.into_boxed_slice(),
+                    total_training,
+                    ..GcaPrior::default()
+                });
                 if rd.cut {
                     return Ok(cut(g, err, fname, "priors"));
                 }
@@ -909,10 +1073,12 @@ pub fn gca_read(
             &format!("GCAread({fname}): could not read file"),
         ));
     }
-    let mut rd = Rd {
-        fp: &mut fp,
-        cut: false,
+    let file_bytes = if gzipped {
+        None
+    } else {
+        std::fs::metadata(&path).ok().map(|m| m.len())
     };
+    let mut rd = Rd::of(&mut fp);
     let v = f64::from(version);
     let (mut gca, grids) = if v < GCA_UCHAR_VERSION {
         let ns = rd.float(g, err);
@@ -925,13 +1091,12 @@ pub fn gca_read(
         let whd = nw.map(|n| to_int(g, f64::from(mul(ns, n as f32)), "GCAread"));
         let grid = stored_grid(g, ns, ns, whd, nw, None);
         let mut gca = gca_alloc_max(g, out, err, ninputs, ns, ns, whd, 0, flags, grid)?;
-        let grids = read_nodes(g, err, &mut rd, &mut gca, fname, version, flags)?;
+        let grids = read_nodes(g, err, &mut rd, &mut gca, fname, version, flags, file_bytes)?;
         (gca, grids)
     } else {
         // !FEQUAL(version, 4) && !FEQUAL(version, 5): a NaN version equals neither
-        if !((v - GCA_UCHAR_VERSION).abs() < FLT_EPSILON)
-            && !((v - GCA_INT_VERSION).abs() < FLT_EPSILON)
-        {
+        let fequal = |a: f64, b: f64| (a - b).abs() < FLT_EPSILON;
+        if !fequal(v, GCA_UCHAR_VERSION) && !fequal(v, GCA_INT_VERSION) {
             return Ok(fail(
                 g,
                 err,
@@ -955,9 +1120,9 @@ pub fn gca_read(
         let whd = nw.map(|n| to_int(g, f64::from(mul(ns, n as f32)), "GCAread"));
         let grid = stored_grid(g, ps, ns, whd, nw, Some(pw));
         let mut gca = gca_alloc_max(g, out, err, ninputs, ps, ns, whd, 0, flags, grid)?;
-        let mut grids = read_nodes(g, err, &mut rd, &mut gca, fname, version, flags)?;
+        let mut grids = read_nodes(g, err, &mut rd, &mut gca, fname, version, flags, file_bytes)?;
         if matches!(grids, Grids::Done) {
-            grids = read_priors(g, err, &mut rd, &mut gca, fname, version)?;
+            grids = read_priors(g, err, &mut rd, &mut gca, fname, version, file_bytes)?;
         }
         (gca, grids)
     };
@@ -968,6 +1133,7 @@ pub fn gca_read(
     class_training(g, &mut gca);
     let mut clobbered = false;
     if !rd.cut {
+        rd.direct();
         match read_tags(g, out, err, &mut rd, &mut gca, fname, &mut clobbered)? {
             Tags::Done => {}
             Tags::Cut => {

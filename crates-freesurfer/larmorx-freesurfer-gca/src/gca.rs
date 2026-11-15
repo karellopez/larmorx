@@ -53,54 +53,64 @@ pub const TAG_GCA_COLORTABLE: i32 = 0x0004;
 pub const VERY_UNLIKELY: f32 = 1e-10;
 
 /// `GC1D`: a class's Gaussian (one mean per input, the covariance's upper triangle) and, unless
-/// the atlas has no neighbour statistics, the labels and priors of its six neighbours.
+/// the atlas has no neighbour statistics, the labels and priors of its six neighbours. Laid out
+/// compactly (an atlas holds about a million classes): the lists one after another.
 #[derive(Clone, Debug, Default)]
 pub struct Gc1d {
-    pub means: Vec<f32>,
-    pub covars: Vec<f32>,
-    /// `nlabels[6]` (`short`): empty without neighbour statistics (`GCA_NO_MRF`).
-    pub nlabels: Vec<i16>,
-    pub labels: Vec<Vec<u16>>,
-    pub label_priors: Vec<Vec<f32>>,
-    pub n_just_priors: i16,
+    pub means: Box<[f32]>,
+    pub covars: Box<[f32]>,
+    /// `nlabels`, `labels`, `label_priors`: `None` without neighbour statistics (`GCA_NO_MRF`).
+    pub nbrs: Option<Box<Nbrs>>,
     pub ntraining: i32,
+    pub n_just_priors: i16,
     pub regularized: i8,
+}
+
+/// The six neighbours' label lists of a class: `nlabels[i]` (`short`), and the labels and priors
+/// of neighbour 0, then 1, ... (a list the file cut is shorter than its count).
+#[derive(Clone, Debug, Default)]
+pub struct Nbrs {
+    pub nlabels: [i16; GIBBS_NEIGHBORS],
+    pub labels: Box<[u16]>,
+    pub label_priors: Box<[f32]>,
+}
+
+impl Nbrs {
+    /// Neighbour `i`'s labels and priors.
+    pub fn of(&self, i: usize) -> (&[u16], &[f32]) {
+        let n = self.labels.len();
+        let start: usize = self.nlabels[..i]
+            .iter()
+            .map(|&c| c.max(0) as usize)
+            .sum::<usize>()
+            .min(n);
+        let end = (start + self.nlabels[i].max(0) as usize).min(n);
+        (&self.labels[start..end], &self.label_priors[start..end])
+    }
 }
 
 /// `GCA_NODE`: the classes at one node of the node grid.
 #[derive(Clone, Debug, Default)]
 pub struct GcaNode {
+    pub labels: Box<[u16]>,
+    pub gcs: Box<[Gc1d]>,
     pub nlabels: i32,
     pub max_labels: i32,
-    pub labels: Vec<u16>,
-    pub gcs: Vec<Gc1d>,
     pub total_training: i32,
 }
 
 /// `GCA_PRIOR`: the label priors at one point of the prior grid.
 #[derive(Clone, Debug, Default)]
 pub struct GcaPrior {
+    pub labels: Box<[u16]>,
+    pub priors: Box<[f32]>,
+    pub total_training: i32,
     pub nlabels: i16,
     pub max_labels: i16,
-    pub labels: Vec<u16>,
-    pub priors: Vec<f32>,
-    pub total_training: i32,
 }
 
-static EMPTY_NODE: GcaNode = GcaNode {
-    nlabels: 0,
-    max_labels: 0,
-    labels: Vec::new(),
-    gcs: Vec::new(),
-    total_training: 0,
-};
-static EMPTY_PRIOR: GcaPrior = GcaPrior {
-    nlabels: 0,
-    max_labels: 0,
-    labels: Vec::new(),
-    priors: Vec::new(),
-    total_training: 0,
-};
+static EMPTY_NODE: std::sync::LazyLock<GcaNode> = std::sync::LazyLock::new(GcaNode::default);
+static EMPTY_PRIOR: std::sync::LazyLock<GcaPrior> = std::sync::LazyLock::new(GcaPrior::default);
 
 /// `GCA` (`GAUSSIAN_CLASSIFIER_ARRAY`). `tissue_parms` is not kept: no function ported here
 /// reads or writes it (`GCAread` leaves it zero).
@@ -560,8 +570,8 @@ mod tests {
     fn priors_of_unseen_labels() {
         let p = GcaPrior {
             nlabels: 2,
-            labels: vec![3, 7],
-            priors: vec![0.25, 0.0],
+            labels: Box::new([3, 7]),
+            priors: Box::new([0.25, 0.0]),
             total_training: 4,
             ..GcaPrior::default()
         };

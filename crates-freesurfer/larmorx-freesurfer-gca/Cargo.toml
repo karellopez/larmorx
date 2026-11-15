@@ -16,3 +16,6 @@ larmorx-freesurfer-io.workspace = true
 larmorx-freesurfer-volume.workspace = true
 larmorx-freesurfer-filter.workspace = true
 larmorx-freesurfer-surf.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -414,7 +414,7 @@ fn gca_file(g: &mut Gen) -> Vec<u8> {
                     bef(&mut d, tr);
                     bef(
                         &mut d,
-                        g.pick(&[0.523_598_8f32, 0.087_266_46, 0.0, f32::NAN]),
+                        g.pick(&[std::f32::consts::FRAC_PI_6, 0.087_266_46, 0.0, f32::NAN]),
                     );
                     bef(&mut d, g.pick(&[5.0f32, 2.5, 30.0]));
                 }

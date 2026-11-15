@@ -2,11 +2,12 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! A GCA atlas read as a volume (`mri_read` of type 22, the frame by the name's `#`), its voxels
-//! printed one per line (`x y z frame value-bits value`), for comparisons with FreeSurfer's own
-//! `mri_convert <atlas> <volume>.mgz` (track A's relay 35: `docs/findings/freesurfer-io.md` Part
-//! 29).
+//! printed one per line (`x y z frame value-bits value`), or with a third argument written there
+//! as raw little-endian `float`s (x fastest, then y, z, frame), for comparisons with FreeSurfer's
+//! own `mri_convert <atlas> <volume>.mgz` (track A's relay 35: `docs/findings/freesurfer-io.md`
+//! Part 29).
 //!
-//!     cargo run --release --example gca_volume -p larmorx-freesurfer-gca -- <atlas>[#<frame>] [fix|reproduce]
+//!     cargo run --release --example gca_volume -p larmorx-freesurfer-gca -- <atlas>[#<frame>] [fix|reproduce] [<raw>]
 
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::globals::Globals;
@@ -36,16 +37,25 @@ fn main() {
         "{} {} {} {} type {}",
         m.vg.width, m.vg.height, m.vg.depth, m.nframes, m.mtype
     );
+    let mut raw = Vec::new();
+    let print = args.len() < 4;
     for f in 0..m.nframes {
         for z in 0..m.vg.depth {
             for y in 0..m.vg.height {
                 for x in 0..m.vg.width {
                     let v =
                         mri_get_vox_val(&mut g, &mut err, &m, x, y, z, f, 0).unwrap_or(f32::NAN);
-                    println!("{x} {y} {z} {f} {:08x} {v}", v.to_bits());
+                    if print {
+                        println!("{x} {y} {z} {f} {:08x} {v}", v.to_bits());
+                    } else {
+                        raw.extend_from_slice(&v.to_le_bytes());
+                    }
                 }
             }
         }
+    }
+    if !print {
+        std::fs::write(&args[3], &raw).expect("the raw output");
     }
     for n in g.notices.as_slice() {
         eprintln!("notice {}: {}", n.defect.id, n.detail);

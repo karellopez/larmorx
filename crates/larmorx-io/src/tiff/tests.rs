@@ -218,4 +218,4 @@ fn generated_files_digest() {
     assert_eq!(fnv(&all), DIGEST, "digest {:#018x}", fnv(&all));
 }
 
-const DIGEST: u64 = 0;
+const DIGEST: u64 = 0xf618_4d81_883e_a184;

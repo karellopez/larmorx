@@ -17,6 +17,7 @@ pub mod aseg2vol;
 pub mod cma;
 pub mod combine;
 pub mod conform;
+pub mod conformed;
 pub mod coords;
 pub mod deriv;
 pub mod frames;

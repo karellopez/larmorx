@@ -1791,7 +1791,7 @@ void run_piece6(const std::string &cmd0)
   // piece 24 (track A relay 32): nnd and nnh (NRRD files, attached and detached) as mrd and mrh do
   // piece 25 (track A relay 33): mcd and mch (MINC 1 files) as mrd and mrh do
   // piece 27 (track A relay 35): gcd and gch (GCA atlases, .gca and .gcz) as mrd and mrh do
-  // piece 28 (track A relay 36): mrr and mrx (MRIread, MRIreadEx) below
+  // piece 28 (track A relay 36): mrr and mrx (MRIread, MRIreadEx) below; piece 29: cnf, acl
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
@@ -1858,6 +1858,34 @@ void run_piece6(const std::string &cmd0)
     if (twice) m = MRIread(name.c_str(), NULL);
     print_mri6(m);
     oi(errno);
+  } else if (cmd == "cnf") {
+    // piece 29 (track A relay 36): mriConformed, MRIfindMinSize, MRIfindRightSize of a VOL_GEOM
+    VOL_GEOM vg;
+    vg.width = (int)geti(); vg.height = (int)geti(); vg.depth = (int)geti();
+    float *f[] = {&vg.xsize, &vg.ysize, &vg.zsize, &vg.x_r, &vg.x_a, &vg.x_s, &vg.y_r, &vg.y_a, &vg.y_s,
+                  &vg.z_r, &vg.z_a, &vg.z_s};
+    for (float *p : f) { uint32_t u = getx32(); memcpy(p, &u, 4); }
+    vg.ras_good_flag = (int)geti();
+    uint32_t u = getx32();
+    float cs;
+    memcpy(&cs, &u, 4);
+    errno = 0;
+    oi(mriConformed(&vg));
+    int cw = -7;
+    of(MRIfindMinSize(&vg, &cw));
+    oi(cw);
+    oi(MRIfindRightSize(&vg, cs));
+  } else if (cmd == "acl") {
+    // piece 29: MRIaddCommandLine n times on a new volume (the line, then its number appended)
+    int n = (int)geti();
+    bool nn;
+    std::string line = getstr(&nn);
+    MRI *m = MRIallocHeader(1, 1, 1, MRI_UCHAR, 1);
+    long long r = 0;
+    for (int i = 0; i < n; i++) r += MRIaddCommandLine(m, line + std::to_string(i));
+    oi(r);
+    oi(m->ncmds);
+    if (m->ncmds > 0 && m->ncmds <= MAX_CMDS) { ostr(m->cmdlines[0]); ostr(m->cmdlines[m->ncmds - 1]); }
   } else if (cmd == "rrr") {
     bool nn;
     std::string name = getstr(&nn);
@@ -2782,7 +2810,7 @@ int main(int argc, char *argv[])
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
-                                 "mrr", "mrx"};
+                                 "mrr", "mrx", "cnf", "acl"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

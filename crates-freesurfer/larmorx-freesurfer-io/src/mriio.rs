@@ -37,7 +37,7 @@ use std::path::Path;
 
 use larmorx_core::defects::{
     FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666, FS_672, FS_717,
-    FS_841,
+    FS_841, FS_842,
 };
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
@@ -428,6 +428,33 @@ pub fn mri_remove_nans(
         msg.extend_from_slice(b"...\n");
         log::error_printf_bytes(g, err, ERROR_BADPARM, &msg);
     }
+}
+
+/// `MRIaddCommandLine(mri, cmdline)`: the line (its bytes before a NUL, as `strcpy` copies them)
+/// recorded as the volume's next command line; `NO_ERROR`. A volume that already records
+/// `MAX_CMDS` (1,000) prints the error `can't add cmd to mri since max cmds (<n>) has been
+/// reached` and FreeSurfer then writes the line's address over the count and the field after
+/// the table (FS-842: the count becomes memory contents, the next call or the writer crashes or
+/// writes garbage); the port keeps the line in both modes (the message printed, noted).
+pub fn mri_add_command_line(g: &mut Globals, err: &mut dyn Write, m: &mut Mri, cmdline: &[u8]) -> i32 {
+    if m.cmdlines.len() >= MAX_CMDS {
+        log::error(
+            g,
+            err,
+            &format!(
+                "can't add cmd to mri since max cmds ({}) has been reached",
+                m.cmdlines.len()
+            ),
+        );
+        g.notices.add(
+            &FS_842,
+            format!(
+                "MRIaddCommandLine: a command line past the {MAX_CMDS} the volume records: FreeSurfer writes its address over the count (memory contents from then on); kept"
+            ),
+        );
+    }
+    m.cmdlines.push(c_str(cmdline).to_vec());
+    NO_ERROR
 }
 
 /// The formats [`mri_read`] does not read yet: their names.

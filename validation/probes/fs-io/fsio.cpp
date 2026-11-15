@@ -65,6 +65,7 @@
 #include "pointset.h"
 #include "mrisurf.h"
 #include "utils.h"
+#include "selxavgio.h"
 #include <zlib.h>
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
@@ -1769,6 +1770,61 @@ void run_piece7(const std::string &cmd)
   }
 }
 
+// piece 30 (track A relay 37): MRIreorder's volumes, the selective-average headers and labels
+// a volume's geometry from 15 float bits (voxel sizes, cosines, centre), ras_good 1, caches
+void geo30(MRI *m, const float *g)
+{
+  float *f[] = {&m->xsize, &m->ysize, &m->zsize, &m->x_r, &m->x_a, &m->x_s, &m->y_r, &m->y_a, &m->y_s,
+                &m->z_r, &m->z_a, &m->z_s, &m->c_r, &m->c_a, &m->c_s};
+  for (int i = 0; i < 15; i++) *f[i] = g[i];
+  m->ras_good_flag = 1;
+  MRIreInitCache(m);
+}
+// a byte pattern repeated over a volume's voxels (none: zeros)
+void fill30(MRI *m, const std::string &pat)
+{
+  if (!m || !m->chunk || !m->ischunked || pat.empty()) return;
+  unsigned char *c = (unsigned char *)m->chunk;
+  for (size_t i = 0; i < m->bytes_total; i++) c[i] = (unsigned char)pat[i % pat.size()];
+}
+// an array: N, or c<count> and its values (FNV-1a 64 of their bytes beyond 64)
+void oarr30(const void *p, long long n, bool isf)
+{
+  if (!p) { out += "N "; return; }
+  out += "c" + std::to_string(n) + " ";
+  if (n > 64) { fnv_bytes((const unsigned char *)p, (size_t)n * 4); return; }
+  for (long long i = 0; i < n; i++) {
+    if (isf) of(((const float *)p)[i]);
+    else oi(((const int *)p)[i]);
+  }
+}
+void print_sxa30(const SXADAT *s)
+{
+  if (!s) { out += "N "; return; }
+  oi(s->version); of(s->TR); of(s->TER); of(s->TimeWindow); of(s->TPreStim);
+  oi(s->Nc); oi(s->Nnnc); oi(s->Nh); of(s->DOF);
+  oarr30(s->npercond, s->Nc, false);
+  oi(s->nruns); oi(s->ntp); oi(s->nrows); oi(s->ncols); oi(s->nskip); oi(s->DTOrder);
+  of(s->RescaleFactor); of(s->HanningRadius); oi(s->BrainAirSeg); oi(s->GammaFit);
+  for (int i = 0; i < 10; i++) of(s->gfDelta[i]);
+  for (int i = 0; i < 10; i++) of(s->gfTau[i]);
+  oi(s->NullCondId);
+  int nch = s->Nh * s->Nnnc;
+  oarr30(s->SumXtX, nch * nch, true);
+  oarr30(s->hCovMtx, nch * nch, true);
+  oi(s->nNoiseAC);
+  oarr30(s->CondIdMap, s->Nc, false);
+}
+LABEL *label30()
+{
+  int n = (int)geti();
+  LABEL *a = (LABEL *)calloc(1, sizeof(LABEL));
+  a->max_points = a->n_points = n;
+  a->lv = (LABEL_VERTEX *)calloc(n > 0 ? n : 1, sizeof(LABEL_VERTEX));
+  for (int i = 0; i < n; i++) { a->lv[i].vno = (int)geti(); a->lv[i].deleted = (unsigned char)geti(); }
+  return a;
+}
+
 void run_piece6(const std::string &cmd0)
 {
   // piece 15 (track A relay 25): nrd and nrh read NIfTI files (.nii, .nii.gz, .hdr/.img pairs) as
@@ -1792,6 +1848,7 @@ void run_piece6(const std::string &cmd0)
   // piece 25 (track A relay 33): mcd and mch (MINC 1 files) as mrd and mrh do
   // piece 27 (track A relay 35): gcd and gch (GCA atlases, .gca and .gcz) as mrd and mrh do
   // piece 28 (track A relay 36): mrr and mrx (MRIread, MRIreadEx) below; piece 29: cnf, acl
+  // piece 30 (track A relay 37): reo (MRIreorder), sxl and sxw (selxavgio), lro (LabelRemoveOverlap)
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
@@ -1886,6 +1943,76 @@ void run_piece6(const std::string &cmd0)
     oi(r);
     oi(m->ncmds);
     if (m->ncmds > 0 && m->ncmds <= MAX_CMDS) { ostr(m->cmdlines[0]); ostr(m->cmdlines[m->ncmds - 1]); }
+  } else if (cmd == "reo") {
+    // piece 30 (track A relay 37): MRIreorder of a volume made here, into NULL or a given volume
+    // (dmode 1: with voxels, filled with 0x5a; 2: a header without voxels), then both printed
+    Gdiag = strtoull(next(), NULL, 16);
+    int w = (int)geti(), h = (int)geti(), d = (int)geti(), nf = (int)geti(), type = (int)geti();
+    float geo[15];
+    for (float &x : geo) x = getf();
+    bool vn;
+    std::string pat = getstr(&vn);
+    int xd = (int)geti(), yd = (int)geti(), zd = (int)geti();
+    int dmode = (int)geti();
+    int dw = (int)geti(), dh = (int)geti(), dd = (int)geti(), dnf = (int)geti(), dtype = (int)geti();
+    MRI *src = MRIallocSequence(w, h, d, type, nf);
+    geo30(src, geo);
+    fill30(src, pat);
+    MRI *dst = NULL;
+    if (dmode == 1) { dst = MRIallocSequence(dw, dh, dd, dtype, dnf); fill30(dst, "\x5a"); }
+    else if (dmode == 2) dst = MRIallocHeader(dw, dh, dd, dtype, dnf);
+    errno = 0;
+    MRI *r = MRIreorder(src, dst, xd, yd, zd);
+    print_mri6(r);
+    if (dst) print_mri6(dst);
+    oi(errno);
+  } else if (cmd == "sxl") {
+    // piece 30: is_sxa_volume, then ld_sxadat_from_stem (or ld_sxadat of the name) and
+    // sxa_framepower of the header read
+    int direct = (int)geti();
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    oi(is_sxa_volume(nn ? NULL : name.c_str()));
+    if (!nn) {
+      SXADAT *s = direct ? ld_sxadat(name.c_str()) : ld_sxadat_from_stem(name.c_str());
+      print_sxa30(s);
+      if (s) {
+        int nfr = -7;
+        float *fp = sxa_framepower(s, &nfr);
+        oi(nfr);
+        oarr30(fp, nfr, true);
+      }
+    }
+    oi(errno);
+  } else if (cmd == "sxw") {
+    // piece 30: a header read with ld_sxadat (nrows and ncols set to 1, as mri_vol2roi does),
+    // written with sv_sxadat_by_stem or sv_sxadat; the written file after every stream's flush
+    // (FreeSurfer leaves a version-1 file open: its bytes reach the file when the program ends)
+    bool nn, on, dn;
+    std::string name = getstr(&nn);
+    std::string outname = getstr(&on);
+    std::string datname = getstr(&dn);
+    int by_stem = (int)geti();
+    setup(next());
+    errno = 0;
+    SXADAT *s = ld_sxadat(name.c_str());
+    if (!s) out += "N ";
+    else {
+      s->nrows = 1;
+      s->ncols = 1;
+      oi(by_stem ? sv_sxadat_by_stem(s, outname.c_str()) : sv_sxadat(s, outname.c_str()));
+      fflush(NULL);
+      ofile(datname);
+    }
+    oi(errno);
+  } else if (cmd == "lro") {
+    // piece 30: LabelRemoveOverlap of two labels (vertex numbers and deleted flags)
+    LABEL *a = label30();
+    LABEL *b = label30();
+    oi(LabelRemoveOverlap(a, b));
+    for (int i = 0; i < a->n_points; i++) oi(a->lv[i].deleted);
   } else if (cmd == "rrr") {
     bool nn;
     std::string name = getstr(&nn);
@@ -2810,7 +2937,7 @@ int main(int argc, char *argv[])
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
-                                 "mrr", "mrx", "cnf", "acl"};
+                                 "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

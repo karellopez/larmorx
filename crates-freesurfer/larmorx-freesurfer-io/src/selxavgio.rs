@@ -189,13 +189,19 @@ fn read_d(g: &mut Globals, fp: &mut CFile, into: &mut i32) {
     }
 }
 
-/// `calloc(n, sizeof(int or float))` of a count FreeSurfer computes in `int`: `None` for a
-/// negative count (its `size_t` is past the address space), zeros otherwise.
-fn calloc_n<T: Clone + Default>(n: i32) -> Option<Vec<T>> {
-    if n < 0 {
-        return None;
+/// `calloc(n, sizeof(int or float))` of a count FreeSurfer computes in `int`: `None` (and
+/// `errno` `ENOMEM`) for a negative count (its `size_t` is past the address space), zeros
+/// otherwise.
+fn calloc_n<T: Clone + Default>(g: &mut Globals, n: i32) -> Option<Vec<T>> {
+    let v = if n < 0 {
+        None
+    } else {
+        larmorx_freesurfer_core::alloc::zeroed::<T>(n as usize)
+    };
+    if v.is_none() {
+        g.errno = larmorx_freesurfer_core::alloc::ENOMEM;
     }
-    larmorx_freesurfer_core::alloc::zeroed::<T>(n as usize)
+    v
 }
 
 /// The values of one loop of `fscanf(fp, "%d" or "%f", &a[i])` for `i` from 0 while below
@@ -368,7 +374,7 @@ pub fn ld_sxadat(
     read_f(g, &mut fp, &mut sxa.ter);
     read_f(g, &mut fp, &mut sxa.dof);
     scan(g, &mut fp, Item::Word);
-    sxa.npercond = calloc_n(sxa.nc);
+    sxa.npercond = calloc_n(g, sxa.nc);
     let nc = i64::from(sxa.nc);
     // a negative count reads nothing; a count of 0 and up has its array
     let _ = read_list(g, &mut fp, &mut sxa.npercond, nc, one_d);
@@ -400,11 +406,19 @@ pub fn ld_sxadat(
     let exact = i64::from(nch) * i64::from(nch) * i64::from(nch > 0);
     let wrapped = nch.wrapping_mul(nch);
     let overflow = exact != i64::from(wrapped) && nch > 0;
-    if overflow && !g.notices.reproduce() {
-        return Ok(too_large(g, err, "SumXtX"));
+    if overflow {
+        g.notices.add(
+            &FS_848,
+            format!(
+                "ld_sxadat: {nch} x {nch} estimates past 2^31 numbers (FreeSurfer's sizes wrap around; its loops make billions of reads)"
+            ),
+        );
+        if !g.notices.reproduce() {
+            return Ok(too_large(g, err, "SumXtX"));
+        }
     }
     scan(g, &mut fp, Item::Word);
-    sxa.sum_xtx = calloc_n(wrapped);
+    sxa.sum_xtx = calloc_n(g, wrapped);
     if read_list(g, &mut fp, &mut sxa.sum_xtx, exact, one_f).is_err() {
         return Ok(too_large(g, err, "SumXtX"));
     }
@@ -412,12 +426,12 @@ pub fn ld_sxadat(
         return Ok(Some(sxa));
     }
     scan(g, &mut fp, Item::Word);
-    sxa.h_cov_mtx = calloc_n(wrapped);
+    sxa.h_cov_mtx = calloc_n(g, wrapped);
     if read_list(g, &mut fp, &mut sxa.h_cov_mtx, exact, one_f).is_err() {
         return Ok(too_large(g, err, "hCovMtx"));
     }
     scan(g, &mut fp, Item::Word);
-    sxa.cond_id_map = calloc_n(sxa.nc);
+    sxa.cond_id_map = calloc_n(g, sxa.nc);
     let _ = read_list(g, &mut fp, &mut sxa.cond_id_map, nc, one_d);
     fp.close();
     Ok(Some(sxa))
@@ -466,7 +480,7 @@ pub fn sxa_framepower(
         );
         return Ok((None, nframes));
     }
-    let mut fp: Option<Vec<f32>> = calloc_n(nframes);
+    let mut fp: Option<Vec<f32>> = calloc_n(g, nframes);
     if let Some(p) = fp.as_mut() {
         let mut frame = 0usize;
         for _ in 0..sxa.nc.max(0) {
@@ -485,6 +499,8 @@ pub fn sxa_framepower(
 fn values<'a, T>(a: &'a Option<Vec<T>>, n: i64, what: &str) -> Result<&'a [T], String> {
     let n = n.max(0) as usize;
     match a {
+        // a loop of no turns reads nothing (a NULL array included)
+        _ if n == 0 => Ok(&[]),
         Some(v) if v.len() >= n => Ok(&v[..n]),
         _ => Err(format!(
             "{what} holds fewer numbers than the header's count ({n})"

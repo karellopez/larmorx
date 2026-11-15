@@ -421,6 +421,11 @@ impl Stream for CFile {
     fn hit_end(&mut self) -> bool {
         self.eof && self.rpos >= self.rbuf.len()
     }
+    fn read_error(&self) -> Option<i32> {
+        (self.rpos >= self.rbuf.len() && self.error && !self.eof)
+            .then_some(self.read_errno)
+            .flatten()
+    }
     fn peek(&mut self) -> Option<u8> {
         if !self.fill() {
             return None;

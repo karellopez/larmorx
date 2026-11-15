@@ -2435,6 +2435,16 @@ defects! {
         "... and the voxels no slab wrote keep the memory the volume's array was given";
     FS_792 = "FS-792", "MINC volume_io", true,
         "a direction_cosines attribute of fewer than three values on the first dimension read with direction cosines takes its missing values from memory never written";
+    FS_798 = "FS-798", "MINC volume_io", true,
+        "a volume with a dimension of size 0 crashes volume_io's allocation (alloc_volume_data sets up its pointers into an allocation of no bytes)";
+    FS_799 = "FS-799", "MINC volume_io", true,
+        "a volume whose voxels were never allocated, written as MINC, is read through a null or unset pointer (a crash) unless its conversion fails first";
+    FS_800 = "FS-800", "MINC volume_io", true,
+        "a volume without spatial axes whose geometry was changed gets its voxel-to-world transform from memory never written (compute_world_transform returns without one): written as MINC, its output reports a transform that is not linear and deleting it an internal error";
+    FS_801 = "FS-801", "MINC volume_io", true,
+        "a volume created without a type (MI_ORIGINAL_TYPE) has a voxel range and sign that were never written: written as MINC, its valid range, image range and conversion come from memory contents";
+    FS_797 = "FS-797", "FreeSurfer", true,
+        "a MINC volume with a time dimension (more than one frame) cannot be written: the program ends with convert_spatial_axis_to_dim_name, bad axis (exit status 1) before the file is created";
 }
 
 /// The register entry with ID `id`.

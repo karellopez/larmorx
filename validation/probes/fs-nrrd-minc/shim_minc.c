@@ -435,3 +435,29 @@ int fm_minc_write(const WriteCase *w, int timeout_ms, unsigned char **out, size_
 }
 
 void fm_minc_free(void *p) { free(p); }
+
+/* compute_transform_inverse of the library (FreeSurfer's copy: its own 4 x 4 inverse) on a
+ * row-major matrix (Transform_elem(t, row, col) = in[4 * row + col]), in the calling process:
+ * 1 when it succeeded; what it printed on standard output is returned in msg (NUL-terminated). */
+int fm_invert(const double *in, double *out, char *msg, int msglen) {
+  Transform t, inv;
+  int r, c, p[2], save, ok;
+  ssize_t n;
+  for (r = 0; r < 4; r++)
+    for (c = 0; c < 4; c++) Transform_elem(t, r, c) = in[4 * r + c];
+  fflush(stdout);
+  if (pipe(p)) return -1;
+  save = dup(1);
+  dup2(p[1], 1);
+  ok = compute_transform_inverse(&t, &inv) ? 1 : 0;
+  fflush(stdout);
+  dup2(save, 1);
+  close(save);
+  close(p[1]);
+  n = read(p[0], msg, (size_t)(msglen - 1));
+  close(p[0]);
+  msg[n > 0 ? n : 0] = 0;
+  for (r = 0; r < 4; r++)
+    for (c = 0; c < 4; c++) out[4 * r + c] = Transform_elem(inv, r, c);
+  return ok;
+}

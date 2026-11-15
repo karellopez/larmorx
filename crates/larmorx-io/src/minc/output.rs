@@ -800,7 +800,26 @@ fn output_minc_hyperslab(
     }
     let total: usize = file_count.iter().map(|&x| x.max(0) as usize).product();
     let Some(data) = volume.data.as_ref() else {
-        return Ok(Status::Error);
+        // Voxels never allocated (FS-799): volume_io follows the array's pointer table (a crash)
+        // for an allocated type of two or more dimensions; else miicv_put reads the values from a
+        // null or unset pointer unless it fails first.
+        let crashes = total > 0
+            && ((volume.data_type != DataType::None && n_array >= 2)
+                || icv::put_reads_values(s, file.minc_icv));
+        if crashes {
+            c.notices.add(
+                &larmorx_core::defects::FS_799,
+                "a volume whose voxels were never allocated not written (volume_io reads them through a null or unset pointer and crashes)",
+            );
+            return Ok(Status::Error);
+        }
+        let vals = empty_values(volume.data_type);
+        let r = icv::miicv_put(s, c, file.minc_icv, &long_start, &long_count, &vals)?;
+        return Ok(if r == MI_ERROR {
+            Status::Error
+        } else {
+            Status::Ok
+        });
     };
     let idx: Vec<usize> = if direct {
         (base..base + total).collect()
@@ -1121,6 +1140,12 @@ pub fn output_volume(
     if used.global_image_range[0] >= used.global_image_range[1] {
         let (rmin, rmax) = volume.real_range();
         used.set_real_range(rmin, rmax);
+    }
+    if !volume.uptodate && volume.spatial_axes.iter().all(|&a| a < 0) {
+        c.notices.add(
+            &larmorx_core::defects::FS_800,
+            "a volume without spatial axes written with its earlier voxel-to-world transform (volume_io's compute_world_transform returns none: it takes memory never written)",
+        );
     }
     let linear = volume
         .voxel_to_world_transform(c.dialect, c.streams)

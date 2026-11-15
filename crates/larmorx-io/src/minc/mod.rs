@@ -179,6 +179,16 @@ pub trait Dialect {
             .and_then(|v| larmorx_core::cscan::sscanf_i32(&v));
         Some(v.unwrap_or(80_000_000) as i64)
     }
+    /// `set_volume_direction_cosine` of a vector of length 0, after its warning: `Some(exit)` when
+    /// the program's copy ends there.
+    fn zero_direction_cosine(&self, _streams: &mut dyn Streams) -> Option<Exit> {
+        None
+    }
+    /// Whether `alloc_volume_data` of a volume with a dimension of size 0 crashes (MINC 1.5.1's
+    /// does, FS-798).
+    fn empty_allocation_crashes(&self) -> bool {
+        true
+    }
     /// The start of `output_volume`'s dimension names (the volume's names given): `Some(exit)` when
     /// the program's copy ends there.
     fn output_dimension_names(

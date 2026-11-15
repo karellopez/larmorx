@@ -1057,6 +1057,16 @@ pub fn miicv_get(
     Ok(out)
 }
 
+/// Whether a put through the ICV reads the caller's values: it is attached, with a type netCDF
+/// knows and no dimension conversion (otherwise `miicv_put` fails before reading them).
+pub(crate) fn put_reads_values(s: &Session, icvid: i32) -> bool {
+    usize::try_from(icvid)
+        .ok()
+        .and_then(|i| s.icvs.get(i))
+        .and_then(|v| v.as_ref())
+        .is_some_and(|v| v.cdfid != MI_ERROR && nc::type_size(v.user_type) > 0 && !v.do_dimconvert)
+}
+
 /// `miicv_put`: `values` (of the ICV's type and sign, in C order of the hyperslab) written at
 /// `start` / `count` through the ICV (`MI_icv_access`): each chunk scaled from the caller's range
 /// onto the file's, or `MI_ERROR`.

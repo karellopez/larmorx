@@ -273,6 +273,47 @@ impl Volume {
         Ok(Some(v))
     }
 
+    /// `create_volume` as a program calls it to write a volume: [`Volume::create`], with the
+    /// notices of a type volume_io leaves unset (FS-781: a type it has no case for, whose data
+    /// type is then memory never written; FS-801: `MI_ORIGINAL_TYPE`, whose voxel range and sign
+    /// are then memory never written: here 0, 0 and unsigned).
+    pub fn create_volume(
+        c: &mut super::Ctx,
+        n_dimensions: i32,
+        names: Option<&[Vec<u8>]>,
+        nc_type: i32,
+        signed: bool,
+        voxel_min: f64,
+        voxel_max: f64,
+    ) -> Result<Option<Volume>, super::Exit> {
+        let v = Volume::create(
+            n_dimensions,
+            names,
+            nc_type,
+            signed,
+            voxel_min,
+            voxel_max,
+            c.dialect,
+            c.streams,
+        )?;
+        if v.is_some() {
+            if nc_type == MI_ORIGINAL_TYPE {
+                c.notices.add(
+                    &larmorx_core::defects::FS_801,
+                    "a volume created without a type: its voxel range taken as 0 to 0, unsigned (volume_io leaves them as memory never written)",
+                );
+            } else if data_type_of(nc_type, signed).is_none() {
+                c.notices.add(
+                    &larmorx_core::defects::FS_781,
+                    format!(
+                        "a volume of type {nc_type} created with no data type (volume_io leaves its type as memory never written)"
+                    ),
+                );
+            }
+        }
+        Ok(v)
+    }
+
     /// `get_volume_n_dimensions`.
     pub fn n_dimensions(&self) -> usize {
         self.sizes.len()
@@ -425,21 +466,34 @@ impl Volume {
         dir: &[f64; 3],
         dialect: &dyn super::Dialect,
         streams: &mut dyn Streams,
-    ) {
-        let mut len = dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2];
+    ) -> Result<(), super::Exit> {
+        use larmorx_core::ItkReal;
+        // volume_io's object code: (x x + y y) + z z, then each component / sqrt (NaNs as x86-64).
+        let mut len = dir[0]
+            .sse_mul(dir[0])
+            .sse_add(dir[1].sse_mul(dir[1]))
+            .sse_add(dir[2].sse_mul(dir[2]));
         if len == 0.0 {
             dialect.print_error(
                 "Warning: zero length direction cosine in set_volume_direction_cosine()\n",
                 streams,
             );
-            return;
+            if let Some(e) = dialect.zero_direction_cosine(streams) {
+                return Err(e);
+            }
+            return Ok(());
         }
         if len <= 0.0 {
             len = 1.0;
         }
         let len = len.sqrt();
-        let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
+        let unit = [
+            dir[0].sse_div(len),
+            dir[1].sse_div(len),
+            dir[2].sse_div(len),
+        ];
         self.set_direction_unit_cosine(axis, &unit, dialect, streams);
+        Ok(())
     }
 
     /// `set_volume_translation`: the starts that put `voxel` at `world` with the volume's
@@ -452,16 +506,26 @@ impl Volume {
         dialect: &dyn super::Dialect,
         streams: &mut dyn Streams,
     ) {
+        use larmorx_core::ItkReal;
         let mut t = xfm::make_identity_transform();
         let mut origin = [0.0f64; 3];
+        let all3 = self.spatial_axes.iter().all(|&a| a >= 0);
         for dim in 0..N_DIMENSIONS {
             origin[dim] = world[dim];
             for dim2 in 0..N_DIMENSIONS {
                 let axis = self.spatial_axes[dim2];
                 if axis >= 0 {
                     let a = axis as usize;
-                    origin[dim] -= self.separations[a] * self.direction_cosines[a][dim] * voxel[a];
-                    t[dim][dim2] = self.direction_cosines[a][dim];
+                    let (sep, cos) = (self.separations[a], self.direction_cosines[a][dim]);
+                    // volume_io's object code (three spatial axes): sep * cos, then * voxel, but
+                    // cos * sep for the second axis's z component (NaNs as x86-64).
+                    let p = if all3 && dim == 2 && dim2 == 1 {
+                        cos.sse_mul(sep)
+                    } else {
+                        sep.sse_mul(cos)
+                    };
+                    origin[dim] = origin[dim].sse_sub(p.sse_mul(voxel[a]));
+                    t[dim][dim2] = cos;
                 }
             }
         }
@@ -656,10 +720,29 @@ impl Volume {
         }
     }
 
+    /// `alloc_volume_data` as a program calls it before writing a volume: [`Volume::alloc`], a
+    /// dimension of size 0 allocated as no voxels (MINC 1.5.1 crashes there, FS-798: noted when the
+    /// dialect says so). volume_io keeps a volume of more than its cache threshold in its volume
+    /// cache; written, a cached volume gives the same file, so it is allocated whole here.
+    pub fn alloc_volume_data(&mut self, c: &mut super::Ctx) -> bool {
+        if self.data_type != DataType::None
+            && self.sizes.contains(&0)
+            && c.dialect.empty_allocation_crashes()
+        {
+            c.notices.add(
+                &larmorx_core::defects::FS_798,
+                "a volume with a dimension of size 0 allocated as no voxels (volume_io sets up its pointers into an allocation of no bytes and crashes)",
+            );
+        }
+        self.alloc(c.dialect, c.streams)
+    }
+
     /// `alloc_volume_data`: `false` (with volume_io's message) for a volume without a data type.
-    /// (volume_io keeps a volume of more than its cache threshold in its volume cache; written, a
-    /// cached volume gives the same file, so it is allocated whole here.)
-    pub fn alloc(&mut self, dialect: &dyn super::Dialect, streams: &mut dyn Streams) -> bool {
+    pub(crate) fn alloc(
+        &mut self,
+        dialect: &dyn super::Dialect,
+        streams: &mut dyn Streams,
+    ) -> bool {
         if self.data_type == DataType::None {
             dialect.print_error(
                 "Error: cannot allocate array data until size specified.\n",

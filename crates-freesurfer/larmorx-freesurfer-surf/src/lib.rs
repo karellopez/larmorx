@@ -73,6 +73,8 @@
 //!   and back, the maps and the cached conversions (FS-604, FS-605).
 //! - [`mriflood`] (fs.filter's `mriflood.cpp`, beside the surface): the shell, the ribbon, the
 //!   bounding volume and the interior of a surface (FS-606, FS-607).
+//! - [`props11`]: a surface moved to Talairach space (FS-629), the vertex-to-voxel conversions, the
+//!   normal-dot and principal-curvature distributions (FS-626..FS-628), Ashburner's triangle energy.
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -107,6 +109,7 @@ pub mod nbhd;
 pub mod positions;
 pub mod props;
 pub mod props10;
+pub mod props11;
 pub mod props2;
 pub mod props3;
 pub mod props4;

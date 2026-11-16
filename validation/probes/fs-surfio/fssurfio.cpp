@@ -4734,6 +4734,194 @@ void ann_case()
   for (const std::string &name : files) dump_crv_file(name);
 }
 
+// ---- relay 37 of track D: mpx, group (e) (queue items 3.1-49/50) ------------------------------
+
+// mpx: a surface read by MRISread (d/lh.s0), some vertices ripped, its radius, its canonical
+// positions given or not, per-vertex overrides (p current, o original, w white, n normal, e the
+// tangent axes), Gdiag's write and verbose bits or none (set after the read), the surface's volume
+// geometry kept or the case's, one volume of the case, a Talairach transform (LTAalloc) and its
+// matrix or not; then 1 to 4 of MRIStalairachTransform in place or into a clone (`tal`), one of
+// the seven vertex-to-voxel conversions (`v2v`), mrisComputeNormalDotDistribution (`ndd`),
+// mrisComputePrincipalCurvatureDistributions (`pcd`; `G` for a volume it would read outside),
+// mrisSampleAshburnerTriangleEnergy (`ash`); with Gdiag's bits the work folder's files by name,
+// length and FNV-1a hash
+static uint64_t mpx_fnv64(const std::string &b)
+{
+  uint64_t h = 0xcbf29ce484222325ULL;
+  for (unsigned char c : b) {
+    h ^= c;
+    h *= 0x100000001b3ULL;
+  }
+  return h;
+}
+
+static void mpx_ohash(uint64_t v)
+{
+  char b[24];
+  snprintf(b, sizeof b, "%016" PRIx64 " ", v);
+  out += b;
+}
+
+static void mpx_dump_surface(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    of(v->x); of(v->y); of(v->z);
+  }
+  for (float x : {m->xlo, m->ylo, m->zlo, m->xhi, m->yhi, m->zhi, m->xctr, m->yctr, m->zctr}) of(x);
+  oi(m->dist_alloced_flags);
+}
+
+static void mpx_dump_histo(HISTOGRAM *h)
+{
+  oi(h->nbins);
+  of(h->bin_size);
+  for (int b = 0; b < h->nbins; b++) { of(h->bins[b]); of(h->counts[b]); }
+}
+
+void mpx_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int nrip = geti();
+  std::vector<int> rips;
+  for (int k = 0; k < nrip; k++) rips.push_back(geti());
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno : rips) s->vertices[vno].ripflag = 1;
+  s->radius = getd();
+  if (geti())
+    for (int vno = 0; vno < nv; vno++) {
+      VERTEX *v = &s->vertices[vno];
+      v->cx = getf(); v->cy = getf(); v->cz = getf();
+    }
+  int nover = geti();
+  for (int k = 0; k < nover; k++) {
+    VERTEX *v = &s->vertices[geti()];
+    std::string kind = next();
+    if (kind == "p") { v->x = getf(); v->y = getf(); v->z = getf(); }
+    else if (kind == "o") { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
+    else if (kind == "w") { v->whitex = getf(); v->whitey = getf(); v->whitez = getf(); }
+    else if (kind == "n") { v->nx = getf(); v->ny = getf(); v->nz = getf(); }
+    else if (kind == "e") {
+      v->e1x = getf(); v->e1y = getf(); v->e1z = getf();
+      v->e2x = getf(); v->e2y = getf(); v->e2z = getf();
+    } else fail("mpx override");
+  }
+  int gd = geti();
+  if (geti()) {
+    s->vg.valid = geti();
+    s->vg.width = geti(); s->vg.height = geti(); s->vg.depth = geti();
+    fli_geom(&s->vg);
+  }
+  int type = geti(), w = geti(), h = geti(), d = geti();
+  MRI *vol = MRIalloc(w, h, d, type);
+  fli_geom(vol);
+  MRIreInitCache(vol);
+  if (geti()) s->lta = LTAalloc(1, NULL);
+  if (geti()) {
+    MATRIX *m = MatrixAlloc(4, 4, MATRIX_REAL);
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) *MATRIX_RELT(m, r, c) = getf();
+    s->SRASToTalSRAS_ = m;
+  }
+  if (gd) Gdiag |= DIAG_WRITE | DIAG_VERBOSE;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "tal") {
+      if (geti() == 0) {
+        MRIStalairachTransform(s, s);
+        oi(1);
+        mpx_dump_surface(s);
+      } else {
+        MRIS *c = MRIStalairachTransform(s, NULL);
+        oi(1);
+        mpx_dump_surface(c);
+        oi(c->lta != NULL);
+      }
+    } else if (op == "v2v") {
+      int kind = geti(), vno = geti();
+      VERTEX *v = &s->vertices[vno];
+      double x = -7, y = -7, z = -7;
+      if (kind == 0) MRISvertexToVoxel(s, v, vol, &x, &y, &z);
+      else if (kind == 1) MRISvertexToVoxelNotCached(s, v, vol, &x, &y, &z);
+      else if (kind == 2) MRISvertexNormalToVoxel(s, v, vol, &x, &y, &z);
+      else if (kind == 3) oi(MRISvertexNormalToVoxelScaled(s, v, vol, &x, &y, &z));
+      else if (kind == 4) { int which = geti(); MRISvertexCoordToVoxel(s, v, vol, which, &x, &y, &z); }
+      else if (kind == 5) MRISorigVertexToVoxel(s, v, vol, &x, &y, &z);
+      else MRISwhiteVertexToVoxel(s, v, vol, &x, &y, &z);
+      od(x); od(y); od(z);
+    } else if (op == "ndd") {
+      HISTOGRAM *hd = HISTOalloc(geti());
+      oi(mrisComputeNormalDotDistribution(s, hd));
+      mpx_dump_histo(hd);
+      for (int vno = 0; vno < nv; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        for (float x : {v->x, v->y, v->z, v->tx, v->ty, v->tz, v->nx, v->ny, v->nz, v->area}) of(x);
+      }
+      of(s->total_area);
+    } else if (op == "pcd") {
+      int n1 = geti(), n2 = geti(), pw = geti(), ph = geti(), pd = geti(), pt = geti();
+      if (pw < 100 || ph < 100 || pt != MRI_FLOAT) { out += "G "; continue; }
+      HISTOGRAM *h1 = HISTOalloc(n1), *h2 = HISTOalloc(n2);
+      MRI *m = MRIalloc(pw, ph, pd, pt);
+      oi(mrisComputePrincipalCurvatureDistributions(s, h1, h2, m));
+      mpx_dump_histo(h1);
+      mpx_dump_histo(h2);
+      of(m->xsize); of(m->ysize); of(m->xstart); of(m->ystart);
+      std::string b;
+      for (int z = 0; z < pd; z++)
+        for (int y = 0; y < ph; y++)
+          for (int x = 0; x < pw; x++) {
+            float f = MRIgetVoxVal(m, x, y, z, 0);
+            b.append((const char *)&f, 4);
+          }
+      mpx_ohash(mpx_fnv64(b));
+      for (int vno = 0; vno < nv; vno++) { of(s->vertices[vno].k1); of(s->vertices[vno].k2); }
+    } else if (op == "ash") {
+      int vno = geti();
+      INTEGRATION_PARMS *parms = (INTEGRATION_PARMS *)calloc(1, sizeof(INTEGRATION_PARMS));
+      parms->l_ashburner_lambda = getf();
+      float a = getf(), b = getf(), c = getf();
+      of(mrisSampleAshburnerTriangleEnergy(s, vno, parms, a, b, c));
+      VERTEX *v = &s->vertices[vno];
+      of(v->x); of(v->y); of(v->z);
+    } else fail("mpx op");
+  }
+  if (gd) {
+    out += "| ";
+    std::vector<std::string> files;
+    list_files(".", "", files);
+    std::sort(files.begin(), files.end());
+    for (const std::string &name : files) {
+      oh(name.c_str());
+      FILE *f = fopen(name.c_str(), "rb");
+      if (!f) { out += "NOFILE "; continue; }
+      std::string b;
+      char buf[4096];
+      size_t n;
+      while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+      fclose(f);
+      oi((long long)b.size());
+      mpx_ohash(mpx_fnv64(b));
+    }
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -4986,6 +5174,8 @@ void run_case()
     vps_case();
   } else if (cmd == "ann") {
     ann_case();
+  } else if (cmd == "mpx") {
+    mpx_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

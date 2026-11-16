@@ -15,7 +15,7 @@ use std::sync::Arc;
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
     FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, FS_530, FS_531, FS_532,
-    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, Notice, UpstreamDefects,
+    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, FS_902, FS_906, Notice, UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -70,6 +70,8 @@ mod mprop;
 mod mpx;
 #[path = "pvw.rs"]
 mod pvw;
+#[path = "scl.rs"]
+mod scl;
 #[path = "sfile.rs"]
 mod sfile;
 #[path = "srd.rs"]
@@ -162,12 +164,12 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 54] = [
+const COMMANDS: [&str; 55] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
     "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
-    "mpg", "fli", "bvl", "crv", "pvw", "vps", "ann", "mpx", "lbl", "wvl",
+    "mpg", "fli", "bvl", "crv", "pvw", "vps", "ann", "mpx", "lbl", "wvl", "scl",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1065,6 +1067,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "mpx" => mpx::mpx_tokens(&mut t, &mut g),
             "lbl" => lbl::lbl_tokens(&mut t, &mut g),
             "wvl" => wvl::wvl_tokens(&mut t, &mut g),
+            "scl" => scl::scl_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2750,6 +2753,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "mpx" => mpx::mpx_case(cx, t, o)?,
         "lbl" => lbl::lbl_case(cx, t, o)?,
         "wvl" => wvl::wvl_case(cx, t, o)?,
+        "scl" => scl::scl_case(cx, t, o)?,
         // relay 32 of track D: the recorded heads (real.py); never generated
         "flr" => fli::flr_case(cx, t, o)?,
         "names" => {
@@ -2809,6 +2813,13 @@ fn untime(b: &[u8]) -> Vec<u8> {
         } else if line.starts_with(b"  MRISfillInterior t = ") {
             // relay 32: MRISfillInterior's elapsed time (with Gdiag_no > 0)
             r.extend_from_slice(b"  MRISfillInterior t = <t>");
+        } else if (line.starts_with(b"SurfClusterSumFast: n=")
+            || line.starts_with(b"SurfClusterSum: n="))
+            && let Some(a) = line.windows(6).position(|w| w == b", t = ")
+        {
+            // relay 38: the cluster summaries' elapsed times (with Gdiag_no > 0)
+            r.extend_from_slice(&line[..a + 6]);
+            r.extend_from_slice(b"<t>");
         } else {
             r.extend_from_slice(line);
         }
@@ -2913,7 +2924,9 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_538)
                     || cx.g.notices.contains(&FS_620)
                     || cx.g.notices.contains(&FS_629)
-                    || cx.g.notices.contains(&FS_632)) =>
+                    || cx.g.notices.contains(&FS_632)
+                    || cx.g.notices.contains(&FS_902)
+                    || cx.g.notices.contains(&FS_906)) =>
         {
             "CRASH 11".to_owned()
         }

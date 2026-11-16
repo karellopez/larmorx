@@ -417,3 +417,7 @@ of 19 field names into new and given volumes; the folder's files by their bytes;
 `fix` different only with notices (FS-633, FS-01); one seed-17 case of FS-634 (a vertex listing more
 faces than the surface has: FreeSurfer reads its face-normal cache past the faces and crashed) counted,
 not compared (`check.py`'s `SKIP`).
+
+`lc.py <object.o> .LC<n> ...` (relay 37 of track D) prints an object file's local constants as
+`float` and `double` (the values the disassembly's `.LC` loads name: findings §30's FZERO bound, the
+distributions' limits, Ashburner's `SMALL`).

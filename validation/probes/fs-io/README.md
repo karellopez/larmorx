@@ -370,6 +370,14 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   identical on every compared case (877, 867), 0 different. `tiff_hand_cases.py`: 16 hand-made files for the
   measurements of Part 35 (`python3 -P tiff_hand_cases.py > hand.txt`, then `fsio hand.txt` and `fs_io_probe run
   hand.txt reproduce`, each inside `boxed.sh`).
+- Piece 32 since relay 41: `trs` draws 0 to 2 more queries per case from a generator seeded by the case's text (the
+  earlier cases of every seed keep their stream): `I` (`TransformApplyInverseType`, or `TransformApplyInverse` for
+  interpolation -1), `V` (`TransformVox2Ras`), `X` (`TransformRas2Vox`), `O` (`TransformCompose` into a new transform
+  or into itself), the transform printed after `V`, `X`, `O` (`ptrans`). `SKIP` also for FS-928 and track C's FS-504
+  and FS-957. Seeds 7, 13 and 21 (about 400 `trs` cases each): `reproduce` identical on every compared case (238, 248,
+  244), 0 different (`fsio` REBUILT). `gcw_nifti_difference.txt`: one `gcw` case (a NIfTI warp written from a warp
+  volume with NaNs) whose written file differs from `fsio`'s (findings Part 37): `fsio gcw_nifti_difference.txt` and
+  `fs_io_probe run gcw_nifti_difference.txt reproduce`, each inside `boxed.sh`.
 - Piece 33 (track A relay 41): stacked autoencoders read as volumes. `aed` and `aeh` (piece 6's `mrd` and `mrh`: type
   -1 or 30, `.sae`, `.ae`, `.csae`, `.SAE`, `.dat@sae` names) of autoencoder files built by `tests/fs_io/piece33.rs` as
   FreeSurfer's training programs write them: the header line (windows of one to seven voxels a side, one voxel now and

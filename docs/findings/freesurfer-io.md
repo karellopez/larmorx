@@ -2714,3 +2714,34 @@ Sources: `utils/autoencoder.cpp` 72-103 (`SAEalloc`), 105-202 (`AEalloc`), 204-2
 - **Where autoencoders come from.** Only `utils/autoencoder.cpp` reads and writes them; the training and applying
   programs (`mri_train_autoencoder`, `mri_apply_autoencoder`) are in FreeSurfer's `attic/`, not built in 8.2.0, so
   `mri_read` (through `mri_convert` and the other readers) is the only way an 8.2.0 program meets one.
+
+## Part 37: TRANSFORM on track C's LTA functions, GCAMvoxToRas, GCAMsampleMorph's NaNs (relay 41 of track A)
+
+Sources: `utils/transform.cpp` 2699-2733 (`TransformApplyInverse`, `TransformApplyInverseType`), 4122-4139
+(`TransformCreateDensityMap`), 4535-4552 (`TransformRas2Vox`, `TransformVox2Ras`), 4858-4875 (`TransformCompose`);
+`utils/gcamorph.cpp` 5274-5320 (`GCAMsampleMorph`), 11184-11263 (`GCAMrasToVox`), 11265-11316 (`GCAMvoxToRas`);
+`include/mri.h` 1951 (`#define MRIgetRasToVoxelXform extract_r_to_i`). The port: fs.gca `transform.rs`, `gcam.rs` on
+track C's fs.volume `ltaapply.rs` and `ltaconv.rs` (used as they are).
+
+- **`GCAMrasToVox(gcam, mri)` with a volume** takes `MRIgetRasToVoxelXform(mri)`, a macro for `extract_r_to_i`: the
+  inverse of the voxel-to-RAS matrix computed from the geometry each time, not `mri->r_to_i__`. The port's earlier
+  translation took the cached matrix (the same for any volume whose cache is current; not for a header given a
+  geometry by `MRIcopyVolGeomToMRI`, which does not refresh the cache); `extract_r_to_i` of a singular geometry is
+  `NULL`, and the first node's `MatrixMultiply(NULL, ...)` ends the program. Found by the new `X` query.
+- **`TransformCreateDensityMap` of a singular array (FS-928).** `TransformApply` gives `NULL` after
+  `MRIlinearTransform: xform is singular`; the density map prints `scaling volume by 0.000...` and calls
+  `MRIscalarMul(NULL, NULL, det)`, which reads `mri_src->width` (`SIGSEGV`; one seed-21 case).
+- **`GCAMsampleMorph`'s operand orders** (`gcamorph.cpp.o`): the eight weights are `mulss` chains in which the corners
+  at `xp` start from `ypd` (`ypd * xmd`) and `[xp][yp][zm]`'s is `zpd * (ymd * xmd)`; x and y load each position and
+  `mulsd` the weight into it, then `addsd` each term into the running sum; z `mulsd`s the position into the weight
+  (but `[xm][yp][zm]`'s), adds terms 1-3, then `addsd`s that sum into term 4 (`movapd` of term 4, `addsd` of the sum),
+  terms 5-7 into that, and the result into term 8. Only the NaN a sum of two NaNs keeps depends on it (one seed-7 `f`
+  query: `7fe00001` from a signalling NaN in a node's y against a quiet one).
+- **A difference left for the next relay: `gcw` of a warp volume with NaN voxels written as NIfTI.** The case
+  `validation/probes/fs-io/gcw_nifti_difference.txt` (a 3 x 2 x 2 warp volume of three frames with two quiet NaNs
+  and three 1e30 values, an unknown warp format 7 in its tag, written to `o.nii` in format 0) gives another FNV-1a of
+  the written file than `fsio` (seed 1's portable case 4377 when piece 32 drew the new queries from the main
+  generator). Not caused by this relay's code (the functions it changed are not on that path: `Warpfield`'s
+  `MatrixMultiplyD` and subtractions were checked against `warpfield.cpp.o` and `matrix.cpp.o` and agree); the
+  written bytes are not printed by the probe, so the next relay compares them (`fsio` keeping its fixture, or a
+  print of the file). The recorded set does not hold that case.

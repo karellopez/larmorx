@@ -5110,3 +5110,53 @@ clock. Black box: FreeSurfer 8.2.0's `mri_convert <file>.sae[#<layer>] out.mgz`.
 7, 13 and 21 (about 790 piece-33 cases each): `reproduce` identical on every compared case (423, 435, 442), 0
 different; `fix` differs only with notices. Not compared: FreeSurfer's crashes (FS-878, FS-922, FS-923, FS-927, FS-13,
 FS-926, FS-924), memory contents (FS-877, FS-925, FS-49), the clock's weights printed by the check.
+
+## 154. Transforms applied backwards, converted and composed (`TransformApplyInverse`, `TransformApplyInverseType`, `TransformRas2Vox`, `TransformVox2Ras`, `TransformCompose`)
+
+1. **`TransformApplyInverseType(t, src, dst, interp)`**: a linear transform array: its inverse transforms filled
+   (each matrix inverted; one that cannot be ends the program, `TransformInvert: xform noninvertible`), then the
+   inverse resampling of `src` (into `dst` when given; the interpolation `interp`) as the linear array's inverse
+   resampler defines it (fs.volume's spec); **`TransformApplyInverse(t, src, dst)`**: the same with trilinear
+   interpolation. For a GCA morph these resample through `GCAMmorphFromAtlas` (nearest neighbour for
+   `TransformApplyInverse`), not ported yet: the port prints `larmorx-freesurfer: <function> of a GCA morph is not
+   ported yet (it needs GCAMmorphFromAtlas)` and gives no volume.
+2. **`TransformRas2Vox(t, src, dst)`**: a GCA morph: each node's current and original positions taken from RAS to
+   voxels (the RAS-to-voxel matrix of `src`, computed from its geometry, not a cached one; without `src` the image
+   geometry's voxel-to-RAS matrix, as FreeSurfer keeps it), as `float`s through a `float` matrix product; nodes marked
+   area-invalid become valid; the original properties recomputed; type voxels; `src`'s geometry becomes the image's.
+   A singular `src` geometry ends the program at the first product (`MatrixMultiply(): m1 is null` with its file and
+   line). A linear transform array: the transform's type becomes voxel to voxel and the array is converted with
+   `src` and `dst` (fs.volume's spec: `LTArasToVoxelXform`). FS-928: a linear array not already of voxels without
+   `src` (FreeSurfer dereferences a null volume): refused in both modes, `ERROR_BADPARM`.
+3. **`TransformVox2Ras(t, src, dst)`**: a GCA morph of type RAS: nothing; else each node's current and original
+   positions taken through the image geometry's voxel-to-RAS matrix (as `float`s, a `float` product; `Gdiag &
+   DIAG_SHOW` with verbose: `vox 2 ras matrix:` and the matrix), type RAS. A linear array: the transform's type
+   becomes RAS to RAS and the array is converted (`LTAvoxelToRasXform`). Status 0.
+4. **`TransformCompose(t_src, m_left, m_right, t_dst)`**: with no `t_dst`, a new transform of `t_src`'s type (a GCA
+   morph's: `TransformAlloc(MORPH_3D_TYPE): unsupported`); a GCA morph source: `TransformCompose: MORPH_3D_TYPE
+   unsupported` (`ERROR_UNSUPPORTED`) and none; a linear array: the destination's first matrix from the source's
+   first matrix and the given matrices (fs.volume's spec: `LTAcompose`, FS-956; into the source itself, both
+   products apply). FS-928: a destination that holds a GCA morph: refused in both modes.
+5. **`TransformCreateDensityMap`** (§150) of a linear array whose resampling gives no volume (a singular matrix):
+   FreeSurfer scales a null volume (a crash) after `scaling volume by <det>...`: FS-928, refused (no volume).
+6. **`GCAMsampleMorph`'s sums** (`TransformSampleInverseFloat` of a morph, §144): each coordinate is the sum of the
+   eight corners' positions times their trilinear weights in `double`; where two NaNs meet, the operand order of
+   FreeSurfer's build decides which one the result keeps: the weights of the corners at `xp` are formed `(ypd * xmd)`
+   (and `zpd * (ymd * xmd)` for `[xp][yp][zm]`); x and y multiply each position by its weight and add the terms in
+   corner order onto the sum; z multiplies each weight by its position (but `[xm][yp][zm]`'s position by its
+   weight), adds the first three, then adds that sum onto the fourth term, the fifth to seventh onto it, and it onto
+   the eighth term.
+
+## 155. Validation plan (part 38)
+
+Piece 32's `trs` (§147, §151) with four more queries, drawn (0 to 2 per case) from a generator seeded by the case's
+text: `I` (`TransformApplyInverseType` with interpolation 0, 1 or 2, or `TransformApplyInverse` for -1, of the float
+volume of `A`), `V` (`TransformVox2Ras` without or with a header volume of the source geometry), `X`
+(`TransformRas2Vox` with a header of the source geometry and without or with one of the destination geometry), `O`
+(`TransformCompose` with the left and right matrices given or not, into a new transform or into itself); after
+`V`, `X`, `O` the transform printed (`ptrans`: type; a morph's type and a hash of its nodes' current and original
+positions; an array's type, count, first matrix and two geometries). Black box: FreeSurfer 8.2.0's
+`mri_vol2vol --inv` and `lta_convert` cover the same functions. Measured (2026-11-16, observed): seeds 7, 13 and 21
+(about 400 `trs` cases each, 285 with the new queries in seed 7): `reproduce` identical on every compared case (238,
+248, 244), 0 different; `fix` differs only with notices. Not compared: FS-928, track C's FS-504 and FS-957 (FreeSurfer
+crashes or reads memory), a GCA morph's resamplings (not ported).

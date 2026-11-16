@@ -59,7 +59,7 @@ fs.volume's LTA functions), and `MRIwriteType`'s `MGH_MORPH` branch with the wri
 | `utils/mriio.cpp` 1179-1190; `utils/gcamorph.cpp` 352-454, 1383-1393, 1417-1679 (the branch without an atlas), 15111-15178 | `MRIwriteType`'s `MGH_MORPH` branch (FS-856; registered with fs.io's `upper` table as `write_morph`), `GCAMwrite`, `__warpfieldWrite`, `__m3zWrite`, `GCAMinitVolGeom`, `GCAMinit` (without a GCA), `GCAMreadWarpFromMRI` | `gcam_write.rs` |
 | `utils/warpfield.cpp` 132-236, 567-655 | `Warpfield::convert(GCA_MORPH *, ...)` (with `doGCAMsampleMorph` 0, its only caller's), `Warpfield::write`, `Warpfield::setWarp` | `gcam_write.rs` |
 
-Not yet: `TransformWrite`, `TransformCopy` (`GCAMcopy`), `TransformApply*`, `TransformCreateDensityMap`,
+Not yet (relay 39; since relay 40 `TransformWrite`, `TransformCopy`, `TransformApply`, `TransformApplyType`, `TransformCreateDensityMap` are in, below): `TransformWrite`, `TransformCopy` (`GCAMcopy`), `TransformApply*`, `TransformCreateDensityMap`,
 `TransformCompose`, `TransformConcat`, `TransformInvertReplace`, `TransformRas2Vox`, `TransformVox2Ras`; `GCAMinit`'s
 branch with a GCA. `GCAMwriteMRI`'s `log10f` and `logf` are larmorx_core's `Libm` choice since this relay (correctly
 rounded by default, glibc 2.35's with `reproduce`).
@@ -78,3 +78,10 @@ gives the same values; only `SHOW_NEG`'s lines differ in order, FS-852); the `wi
 flag is `Globals::gcam_metric_width_reported`; the Voronoi diagram of an index volume is given a copy of it as its
 source (FreeSurfer passes the same volume twice; the source is read only before it is written); the defaults of
 FS-851 to FS-855 are larmorx's own (`docs/findings/freesurfer-io.md` Part 33, `specs/freesurfer-io.md` §142).
+
+## Relay 40 of track A: TRANSFORM written, copied and applied
+
+| FreeSurfer file (lines) | Functions | Here |
+|---|---|---|
+| `utils/transform.cpp` 2660-2697, 4122-4176 | `TransformApplyType`, `TransformApply`, `TransformCreateDensityMap` (their linear branches; the morph's: not ported yet), `TransformWrite`, `TransformCopy` (FS-876) | `transform.rs` |
+| `utils/gcamorph.cpp` 17347-17393 | `GCAMcopy` (FS-875) | `gcam.rs` |

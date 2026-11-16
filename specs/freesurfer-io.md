@@ -4987,3 +4987,34 @@ differs only with notices. Hand-made files (one and several pages, 1-bit rows of
 that are and are not multiples of the tile width, separate planes in the first and a later page, pages of other
 sizes and shapes): `reproduce` identical where FreeSurfer's outcome does not depend on memory; the corrected
 defaults: `crates-freesurfer/larmorx-freesurfer-io/tests/tiff_images.rs`.
+
+## 150. Transforms written, copied and applied (`TransformWrite`, `TransformCopy`, `TransformApplyType`, `TransformApply`, `TransformCreateDensityMap`)
+
+1. **`TransformWrite(t, name)`**: a GCA morph as `GCAMwrite` writes it (§145, the absolute-voxel data format), a
+   linear transform array as `LTAwriteEx` writes it (the name's type: `.lta`, `.xfm`, `register.dat`, FSL's `.mat`;
+   the `# created by <USER> on <date>` line takes `USER`, else `LOGNAME`, and the date's override
+   `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`); their status.
+2. **`TransformCopy(t, NULL)`**: a new transform of the same type: copies of the inverse's three index volumes when
+   the source has them; a linear array copied (`LTAcopy`); a GCA morph copied (`GCAMcopy`: the sizes, `neg`,
+   `exp_k`, the spacing, the geometries, `ninputs`, the type, the status, the determinant and every node; into a
+   given morph of another grid: `GCAMcopy: incompatible size.` and the end, `ERROR_BADPARM`). FS-875: FreeSurfer's
+   copy of a morph keeps neither the inverse's index volumes nor the affine (a new morph has neither, and the copies
+   are made into the destination's own): by default both are copied; `reproduce` leaves them out. FS-876: a given
+   destination of the other kind is not used (FreeSurfer copies into its memory).
+3. **`TransformApplyType(t, src, dst, interp)`**: a linear array resamples `src` with `LTAtransformInterp` (into
+   `dst` when given); **`TransformApply(t, src, dst)`**: a new volume with `LTAtransform` (trilinear; `dst` unused);
+   **`TransformCreateDensityMap(t, src, dst)`**: `TransformApply`, then `scaling volume by <det>...` (`%2.3f` of the
+   first transform's matrix's determinant, a `float`) on standard output and the volume multiplied by it in place.
+   For a GCA morph these resample through `GCAMmorphToAtlas` and its density form, not ported yet: the port prints
+   `larmorx-freesurfer: <function> of a GCA morph is not ported yet (it needs <callee>)` and gives no volume.
+
+## 151. Validation plan (part 36)
+
+Piece 32's `trs` (§147) with four more queries: `W` (`TransformWrite` under `.lta`, `.xfm`, `.dat`, `.m3z`, `.mat`
+names, no extension, a missing folder; `USER` and the creation time fixed; the status, `errno` and the folder's
+files), `C` (`TransformCopy` into a new transform, whose type, inverse volumes and, for a morph, index volumes and
+affine are printed; the later queries use the copy), `A` and `D` (`TransformApplyType` with the interpolations 0, 1
+and 2 and `TransformCreateDensityMap` of a float volume of 1 to 4 voxels a side holding `(x + 3y + 7z) / 2`: the
+result's size, geometry, type, frames and voxels). Not compared: a GCA morph's resamplings (not ported). Measured
+(2026-11-16, observed): seed 7 (1,200 piece-32 cases; 68 `W`, 56 `C`, 128 `A`, 63 `D` queries): `reproduce`
+identical on every compared case (915), 0 different; `fix` differs only with notices (FS-875 among them).

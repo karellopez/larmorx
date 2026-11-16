@@ -2636,3 +2636,20 @@ The port: fs.io `imageio_tiff.rs` over track C's `larmorx_io::tiff` (used as it 
   compared case (877 and 867), 118 and 131 skipped, 205 and 202 compared apart, 0 different; `fix` differs only with
   notices. 16 hand-made files (`validation/probes/fs-io/tiff_hand_cases.py`): `reproduce` identical but the FS-867 file (memory contents) and the different-shape pages
   (FS-865: FreeSurfer's heap check aborts).
+
+- **TRANSFORM, written, copied and applied (relay 40).** Sources: `utils/transform.cpp` 2660-2697
+  (`TransformApplyType`, `TransformApply`), 4122-4176 (`TransformCreateDensityMap`, `TransformWrite`,
+  `TransformCopy`); `utils/gcamorph.cpp` 17347-17393 (`GCAMcopy`). `GCAMcopy` copies the index volumes with
+  `MRIcopy(src, dst->mri_xind)` and the affine with `MatrixCopy(src, dst->m_affine)`, discarding the results: a
+  destination without them (every `GCAMalloc`'d morph: `TransformCopy(t, NULL)` passes `tdst->xform` of a fresh
+  `calloc`, NULL) keeps NULL, and the copies leak (FS-875; `TransformConcat` is the one caller in FreeSurfer 8.2.0).
+  The nodes are copied with `memcpy` per node (the `gc` pointers shared). `TransformCopy` casts `tdst->xform` to the
+  source's kind whatever the destination holds (FS-876). `TransformApply` ignores `mri_dst` (`LTAtransform(mri_src,
+  NULL, lta)`; `GCAMmorphToAtlas(..., NULL, ...)`), `TransformApplyType` passes it; `TransformCreateDensityMap`'s
+  linear branch multiplies the new volume by `MatrixDeterminant(xforms[0].m_L)` (a `float`, printed `%2.3f`).
+  `TransformWrite` returns `GCAMwrite`'s (the default `datainterp`, `WARPFIELD_DTFMT_ABS_CRS`) or `LTAwriteEx`'s
+  status. The morph branches of the resamplings and `TransformApplyInverse*`, `TransformCompose`,
+  `TransformConcat`, `TransformInvertReplace`, `TransformRas2Vox`, `TransformVox2Ras` wait for their callees
+  (`GCAMmorphToAtlas`, `GCAMmorphFromAtlas`, `LTAinverseTransformInterp`, `LTAcompose`, `GCAMconcat2/3`,
+  `GCAMfillInverse`, `LTArasToVoxelXform`, `LTAvoxelToRasXform`, `GCAMvoxToRas`). Measured: piece 32 seed 7 with the
+  `W`, `C`, `A`, `D` queries: `reproduce` identical on every compared case (915), 0 different.

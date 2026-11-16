@@ -2,7 +2,8 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! A linear transform array applied (`utils/transform.cpp`, 3.1-39 and 3.1-40): `LTAtransform`
-//! (907) and `LTAtransformInterp` (912) with `LTAtransformAtPoint` (1388), the conversion of a
+//! (907) and `LTAtransformInterp` (912) with `LTAtransformAtPoint` (1388), its inverse
+//! `LTAinverseTransformInterp` (1157, for track A's `TransformApplyInverse`), the conversion of a
 //! voxel transform to coronal RAS (`LTAvoxelTransformToCoronalRasTransform`, 1946), the MNI to
 //! Talairach correction (`FixMNITal`, 1983), a subject's transform made to work with tkregister's
 //! coordinates (`DevolveXFM` 2027, `DevolveXFMWithSubjectsDir` 2032) and the arrays' geometries
@@ -343,6 +344,173 @@ pub fn lta_transform_interp(
         Some(d) => d,
         None => own.insert(mri_clone(g, out, err, src, None)?.unwrap_new()),
     };
+    octree(g, out, err, src, d, lta, "LTAtransformInterp")?;
+    Ok(match own {
+        Some(d) => Ret::New(d),
+        None if given => Ret::Given,
+        None => Ret::Null,
+    })
+}
+
+/// The destination `LTAinverseTransformInterp` makes when it is given none (one transform): the
+/// source's clone; with the inverse transform's destination geometry valid (1) its centre (`INFO:
+/// Modifying dst c_(r,a,s), using the transform dst` on standard error with `DIAG_VERBOSE`), else
+/// with `USE_AVERAGE305` set (any value) the centre of `average_305`, either way with
+/// `ras_good_flag` 1 and the cached matrices recomputed; else the clone as it is (`INFO: Transform
+/// dst volume info is not used (valid flag = 0).`). The clone keeps the source's Talairach file
+/// name.
+fn new_inverse_destination(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    src: &Mri,
+    tran: &VolGeom,
+) -> Result<Mri, Fatal> {
+    let mut d = mri_clone(g, out, err, src, None)?.unwrap_new();
+    if tran.valid == 1 {
+        if g.gdiag & DIAG_VERBOSE != 0 {
+            let _ = err.write_all(b"INFO: Modifying dst c_(r,a,s), using the transform dst\n");
+        }
+        d.vg.c_r = tran.c_r;
+        d.vg.c_a = tran.c_a;
+        d.vg.c_s = tran.c_s;
+        d.vg.ras_good_flag = 1;
+        reinit_cache(g, out, err, &mut d.vg)?;
+    } else if env.get("USE_AVERAGE305").is_some() {
+        let _ = err.write_all(b"INFO: Environmental variable USE_AVERAGE305 set\n");
+        let _ = err.write_all(b"INFO: Modifying dst c_(r,a,s), using average_305 values\n");
+        d.vg.c_r = -0.0950f64 as f32;
+        d.vg.c_a = -16.5100f64 as f32;
+        d.vg.c_s = 9.7500f64 as f32;
+        d.vg.ras_good_flag = 1;
+        reinit_cache(g, out, err, &mut d.vg)?;
+    } else {
+        let _ = err.write_all(b"INFO: Transform dst volume info is not used (valid flag = 0).\n");
+    }
+    Ok(d)
+}
+
+/// `LTAinverseTransformInterp(mri_src, mri_dst, lta, interp)`: [`lta_transform_interp`] with the
+/// array's inverse transforms (`inv_xforms`, as `LTAfillInverse` fills them): with one transform
+/// (and no destination given, the one [`new_inverse_destination`] makes), `LINEAR_RAS_TO_RAS` is
+/// `MRIapplyRASlinearTransformInterp` of the inverse's matrix; `LINEAR_VOX_TO_VOX` of the RAS
+/// matrix `i2r(dst) M r2i(src)` of the inverse (its geometries where valid, else, with `INFO: LTA
+/// inv dst (src) geometry information missing!` on standard error, the destination's or the
+/// source's); `LINEAR_PHYSVOX_TO_PHYSVOX` changes the array to `LINEAR_RAS_TO_RAS` first (which
+/// fills its inverses again); another type (`REGISTER_DAT` included: no change of type here) ends
+/// the program (`LTAtransform: unknown linear transform`). Any other number of transforms: the
+/// octree part of [`lta_transform_interp`], unchanged (the forward transforms, inverted at each
+/// voxel). FS-504, FS-886.
+#[allow(clippy::too_many_arguments)]
+pub fn lta_inverse_transform_interp(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    src: &Mri,
+    dst: Option<&mut Mri>,
+    lta: &mut Lta,
+    interp: i32,
+) -> Result<Ret<Mri>, Fatal> {
+    const WHAT: &str = "LTAinverseTransformInterp";
+    let mut own = None;
+    let given = dst.is_some();
+    if lta.num_xforms == 1 {
+        if lta.inv_xforms.is_empty() {
+            outside(g, err, WHAT, "an array without its inverse transforms")?;
+            return Ok(Ret::Null);
+        }
+        let d: &mut Mri = match dst {
+            Some(d) => d,
+            None => {
+                let tran = lta.inv_xforms[0].dst.clone();
+                own.insert(new_inverse_destination(g, out, err, env, src, &tran)?)
+            }
+        };
+        let r = if lta.ltype == LINEAR_RAS_TO_RAS {
+            let m = lta.inv_xforms[0].m_l.clone();
+            mri_apply_ras_linear_transform_interp(g, out, err, src, Some(d), m.as_ref(), interp)?
+        } else if lta.ltype == LINEAR_VOX_TO_VOX {
+            let lt = &lta.inv_xforms[0];
+            let i2r = if lt.dst.valid != 0 {
+                vg_i_to_r(g, out, err, &lt.dst)?
+            } else {
+                let _ = err.write_all(
+                    b"INFO: LTA inv dst geometry information missing!\n      We assume that the dst volume passed is the\n      same as the dst for the transform.\n",
+                );
+                extract_i_to_r(g, out, err, &d.vg)?
+            };
+            let tmp = matrix_multiply(g, out, err, Some(&i2r), lt.m_l.as_ref(), None)?.into_new();
+            let r2i = if lt.src.valid != 0 {
+                vg_r_to_i(g, out, err, &lt.src)?
+            } else {
+                let _ = err.write_all(
+                    b"INFO: LTA inv src geometry information missing!\n      We assume that the src volume passed is the\n      same as the src for the transform.\n",
+                );
+                extract_r_to_i(g, out, err, &src.vg)?
+            };
+            // MatrixMultiply(tmp, r2i, tmp): FreeSurfer multiplies a copy of tmp into it
+            let tmp = match tmp {
+                Some(mut t) => {
+                    let t0 = t.clone();
+                    match matrix_multiply(g, out, err, Some(&t0), r2i.as_ref(), Some(&mut t))? {
+                        Ret::Null => None,
+                        _ => Some(t),
+                    }
+                }
+                None => matrix_multiply(g, out, err, None, r2i.as_ref(), None)?.into_new(),
+            };
+            mri_apply_ras_linear_transform_interp(g, out, err, src, Some(d), tmp.as_ref(), interp)?
+        } else if lta.ltype == LINEAR_PHYSVOX_TO_PHYSVOX {
+            lta_change_type(g, out, err, env, lta, LINEAR_RAS_TO_RAS)?;
+            let m = lta.inv_xforms[0].m_l.clone();
+            mri_apply_ras_linear_transform_interp(g, out, err, src, Some(d), m.as_ref(), interp)?
+        } else {
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                "LTAtransform: unknown linear transform\n",
+            )?;
+            Ret::Null
+        };
+        return Ok(match (r, own) {
+            (Ret::Given, Some(d)) => Ret::New(d),
+            (Ret::Given, None) => Ret::Given,
+            (Ret::New(m), _) => Ret::New(m),
+            (Ret::Null, _) => Ret::Null,
+        });
+    }
+    let _ = err.write_all(b"applying octree transform to image...\n");
+    let d: &mut Mri = match dst {
+        Some(d) => d,
+        None => own.insert(mri_clone(g, out, err, src, None)?.unwrap_new()),
+    };
+    octree(g, out, err, src, d, lta, WHAT)?;
+    Ok(match own {
+        Some(d) => Ret::New(d),
+        None if given => Ret::Given,
+        None => Ret::Null,
+    })
+}
+
+/// The octree part of `LTAtransformInterp` and `LTAinverseTransformInterp` (the same in both):
+/// every voxel of the source's extent takes the source's voxel at the destination's index tables'
+/// entries for the rounded point the inverse of [`lta_transform_at_point`] maps it to (the first
+/// frames of the destination; a voxel whose matrix does not invert keeps its value); an array of
+/// no transforms maps every voxel to the point 0. `what` names the function in the index tables'
+/// messages.
+#[allow(clippy::too_many_arguments)]
+fn octree(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Mri,
+    d: &mut Mri,
+    lta: &Lta,
+    what: &str,
+) -> Result<(), Fatal> {
     let (width, height, depth) = (src.vg.width, src.vg.height, src.vg.depth);
     let mut v_x = Matrix::real(4, 1);
     let mut v_y = Matrix::real(4, 1);
@@ -378,7 +546,6 @@ pub fn lta_transform_interp(
                 let x1 = f64::from(v_x.relt(1, 1));
                 let x2 = f64::from(v_x.relt(2, 1));
                 let x3 = f64::from(v_x.relt(3, 1));
-                let what = "LTAtransformInterp";
                 let ix = nint(g, x1);
                 let xi = index(g, err, what, d, Axis::X, ix)?;
                 let iy = nint(g, x2);
@@ -392,11 +559,7 @@ pub fn lta_transform_interp(
             }
         }
     }
-    Ok(match own {
-        Some(d) => Ret::New(d),
-        None if given => Ret::Given,
-        None => Ret::Null,
-    })
+    Ok(())
 }
 
 /// The world-to-voxel and voxel-to-world matrices of a 256^3 coronal volume

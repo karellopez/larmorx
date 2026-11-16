@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "dicom.h"
 #include "condition.h"
 #include "lst.h"
@@ -149,14 +152,35 @@ static void snapshot(gb *b) {
     }
 }
 
+/* the caller's element of the element requests (ops 7 to 11) and its context */
+static void dump_element_of_caller(gb *b, const DCM_ELEMENT *e) {
+    char d[sizeof e->description + 1];
+    memcpy(d, e->description, sizeof e->description);
+    d[sizeof e->description] = '\0';
+    put_u32(b, e->tag);
+    put_u32(b, (unsigned) e->representation);
+    put_u64(b, (unsigned long long) e->multiplicity);
+    put_u32(b, e->length);
+    put_s(b, d);
+    put_c(b, e->d.ot == NULL ? '0' : '1');
+}
+
 /* Runs `ops` (nops pairs: code, argument) on one object handle; returns the dump's length. Codes:
  * 1 DCM_OpenFile(name, arg) and the object; 2 DCM_CloseObject and the handle's state after it;
  * 3 the stack's snapshot; 4 COND_PopCondition(arg); 5 COND_DumpConditions (standard error);
- * 6 COND_TopCondition with a buffer of arg bytes. */
+ * 6 COND_TopCondition with a buffer of arg bytes; 7 DCM_GetElement(&object, arg, &element) and
+ * the element after it; 8 DCM_GetElementValue(&object, &element, &rtnLength, &ctx) with the
+ * element's length set to arg (arg < 0: kept), into a buffer of min(length, file size + 4096)
+ * bytes filled with 0xa5 (rtnLength 0xa5a5a5a5 before), and the buffer, rtnLength and the
+ * context after it; 9 the context set to arg; 10 the element's tag set to arg; 11 its
+ * representation set to arg; 12 the file cut to arg bytes (truncate). */
 long fdp_run(const char *name, const long *ops, int nops, unsigned char *out, long cap) {
     gb b = {out, 0, cap};
     DCM_OBJECT *object = NULL;
+    DCM_ELEMENT element;
+    void *ctx = NULL;
     int i;
+    memset(&element, 0, sizeof element);
     for (i = 0; i < nops; i++) {
         long op = ops[2 * i], arg = ops[2 * i + 1];
         CONDITION c;
@@ -199,6 +223,47 @@ long fdp_run(const char *name, const long *ops, int nops, unsigned char *out, lo
             put_s(&b, text);
             break;
         }
+        case 7:
+            c = DCM_GetElement(&object, (DCM_TAG) arg, &element);
+            put_c(&b, 'g');
+            put_u64(&b, (unsigned long long) c);
+            dump_element_of_caller(&b, &element);
+            break;
+        case 8: {
+            struct stat st;
+            long room, fsz = stat(name, &st) == 0 ? (long) st.st_size : 0;
+            unsigned char *buf;
+            U32 rtn = 0xa5a5a5a5u;
+            if (arg >= 0) element.length = (U32) arg;
+            room = (long) element.length;
+            if (room > fsz + 4096) room = fsz + 4096;
+            buf = malloc((size_t) room + 64);
+            memset(buf, 0xa5, (size_t) room + 64);
+            element.d.ot = buf;
+            c = DCM_GetElementValue(&object, &element, &rtn, &ctx);
+            element.d.ot = NULL;
+            put_c(&b, 'v');
+            put_u64(&b, (unsigned long long) c);
+            put_u32(&b, rtn);
+            put_u64(&b, (unsigned long long) (uintptr_t) ctx);
+            put_u32(&b, (unsigned) room);
+            put(&b, buf, room);
+            free(buf);
+            break;
+        }
+        case 9:
+            ctx = (void *) (uintptr_t) (unsigned long) arg;
+            break;
+        case 10:
+            element.tag = (DCM_TAG) arg;
+            break;
+        case 11:
+            element.representation = (DCM_VALUEREPRESENTATION) arg;
+            break;
+        case 12:
+            put_c(&b, 't');
+            put_u32(&b, truncate(name, (off_t) arg) == 0 ? 1u : 0u);
+            break;
         default:
             break;
         }

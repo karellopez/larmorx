@@ -1,4 +1,4 @@
-# CTN 3.0.6's DICOM file reading (`DCM_OpenFile`)
+# CTN 3.0.6's DICOM file reading (`DCM_OpenFile`, `DCM_GetElement`, `DCM_GetElementValue`)
 
 **Source-derived from CTN 3.0.6** (the DICOM Central Test Node's object library; CTN's notice,
 `LICENSES/LicenseRef-CTN.txt`): closed to a clean room of CTN's reading. The port is
@@ -69,7 +69,47 @@
   pipe): later messages print "Invalid argument". The port models these; a program's own history
   of errno is outside it (the probe's children start from 0).
 
-## Defects (FS-90 to FS-98; rules A to D, `larmorx_core::defects`)
+## What `DCM_GetElement` and `DCM_GetElementValue` do (item 3.1-56, 2026-11-16)
+FreeSurfer's DICOM reader asks for every element it uses with these two calls, by tag: first
+`DCM_GetElement`, then `DCM_GetElementValue` with a buffer of the element's length (or one its own
+allocation rule gives) and a context of `NULL`.
+- **`DCM_GetElement(&object, tag, &element)`.** The first group of the tag's number, then its
+  first element of the tag; the caller gets a copy of the element (tag, representation,
+  description, multiplicity, length) with its value pointer `NULL`. Pixel data have the
+  representation the reading gave them (OB or OW) and, encapsulated, the length 0xFFFFFFFF. A
+  missing element pushes "Requested element (%x %x) not found in DCM_GetElementVM" (the routine's
+  old name: FS-894); no object, "NULL object passed to routine DCM_GetElementVM". On a failure the
+  caller's element is left as it was.
+- **`DCM_GetElementValue(&object, &element, &rtnLength, &ctx)`.** Looks the element up again (the
+  same search) and refuses, in this order: no or an illegal object; no group of the number
+  ("Requested element (g e) not found in DCM_GetElementValue"); a group that holds no element (the
+  same message with the group's number twice: FS-894; reachable with `DCM_NOGROUPLENGTH` when a
+  group's only element was its group length); no element of the tag; a request whose own
+  representation says SQ ("DCM Cannot retrieve value of element with SQ representation (%08x) in
+  (%s)", the tag in 8 digits; the element's own representation is not looked at: FS-951); a
+  context past the value's length ("DCM Illegal context value in DCM_GetElementValue"). Then it
+  sets `*rtnLength` to l = min(the request's length, the value's length - the context), copies l
+  bytes from the context on, moves the context past them, and returns `DCM_NORMAL` when the
+  context reaches the value's length, `DCM_GETINCOMPLETE` (no condition pushed) otherwise. A
+  request of 0 bytes at the end succeeds.
+- **Where the bytes come from.** A value read with the file (every element but pixel data) is
+  copied from memory, already in the machine's byte order. Pixel data left in the file are read
+  through the object's descriptor: `lseek` to the value's offset plus the context, `read` of l
+  bytes with the count as an `int`; fewer bytes than l (the file's end, or a file cut since the
+  open), or -1 (a count of 2 GiB or more, which the kernel refuses with EFAULT; a descriptor a failed
+  open already closed, EBADF, which a failure that keeps the object leaves), push "DCM failed to
+  access file: <the object's name> in DCM_GetElementValue" with `*rtnLength` already set and the
+  bytes read in the buffer, the context not moved. The check compares the count read, as unsigned,
+  with l: the -1 of a failed read of l = 0xFFFFFFFF (an encapsulated value asked for whole) passes
+  (FS-952). An encapsulated value's bytes are the file's from its first item tag on. In the reverse
+  byte order, 16-bit pixel data are swapped in 2-byte units over the l bytes read, from the piece's
+  own start (a piece at an odd context is swapped out of step with the pixels; an odd l: FS-953);
+  8-bit pixel data are left.
+- **The context** is a `void *` used as an offset: CTN 3.0.6 compares and adds it as a 32-bit number,
+  the copy as a `long` (the same for every offset a value can have; only a caller that sets it to 4
+  GiB or more by hand sees the two differ).
+
+## Defects (FS-90 to FS-98, FS-894, FS-951 to FS-953; rules A to D, `larmorx_core::defects`)
 
 | ID | What | Decided | larmorx |
 |---|---|---|---|
@@ -82,9 +122,13 @@
 | FS-96 | FD and FL of big-endian data left in the file's byte order | c (rule A) | reversed in 8- and 4-byte units; `reproduce` left, named |
 | FS-97 | one recursion per nesting level: deep enough nesting exhausts the stack | a | an error past 128 levels ("DCM Failed to read stream in readSequence"), named; CTN reads 2,000 levels within an 8 MiB stack |
 | FS-98 | a fragment of encapsulated pixel data with an odd length (or one past the count) closes the object, and the reader then writes through it: a crash | a | the open fails with the fragment's condition, named |
+| FS-894 | `DCM_GetElement`'s messages name the routine `DCM_GetElementVM`; `DCM_GetElementValue`'s "not found" for a group that holds no element shows the group's number for the element's | f (rule C) | kept (messages only; FreeSurfer prints the stack as it is) |
+| FS-951 | a sequence's value asked for with a request that does not say SQ: CTN copies from its list of items' memory (the list's head, then the heap past it) | a (memory contents) | refused with the SQ message (rule B); `reproduce` the bytes not given (`ValueRead::unknown`), named |
+| FS-952 | a request of 4,294,967,295 bytes of pixel data left in the file: `read` refuses the count (EFAULT) and its -1, as unsigned, equals the request: `DCM_NORMAL`, nothing written into the buffer | a (memory never written) | "failed to access file" (rule B); `reproduce` CTN's success with nothing written, named |
+| FS-953 | an odd count of 16-bit pixel data in the reverse byte order: the swap runs on past the bytes two at a time until its 32-bit count wraps: a crash | a | the whole pairs swapped, the last byte kept, named |
 
 Classes as in the register: a, a crash or memory never written (never reproduced); c, a
-deterministic error with a `reproduce` switch.
+deterministic error with a `reproduce` switch; f, a message.
 
 ## The numbers (the probe, 2026-11-13)
 - Scale 5 (log `<workspace>/oracles/logs/fs-found-c-r7-dicom-probe-5.log`): 10,030 files (part 10
@@ -97,3 +141,19 @@ deterministic error with a `reproduce` switch.
   with 45 failing opens that overflow the stack): against CTN 3.0.6, 9,429 identical, 601
   explained by FS-90 to FS-98 (360 of them a crash of CTN), 0 different; the same against the
   second copy (361 crashes).
+- The element requests (2026-11-16, scale 5, log `<workspace>/oracles/logs/fs-found-c-r35-dicom-probe-5.log`):
+  the same 10,030 files and the element cases' 8 (big-endian 16- and 8-bit pixel data,
+  encapsulated pixel data in both byte orders, a group of only its group length, an object kept by
+  a failure after its pixel data, native and encapsulated, pixel data only inside an item), each
+  opened five times (the format probe's four options, then one of six others) with requests on
+  every object an open leaves: FreeSurfer's (the element, then its value whole), the value again at
+  its end, pieces of 0 to 43 bytes, a context past the value, a request that says SQ, a sequence
+  asked for as another representation, requests of 2 GiB - 1, 2 GiB, 4 GiB - 1 and the length + 2
+  of pixel data left in the file, a piece at an odd context, a tag only the value request names,
+  missing elements and groups, the file cut before its pixel data are asked for again, then the
+  requests on the closed handle. Against CTN 3.0.6: 10,038 cases, 8,710 identical, 1,328
+  explained (410 of them a crash of CTN, at the open or by FS-91's and FS-951's copies), 0
+  different; of the explained cases whose original finished (918), every element request and value
+  was checked one by one: all equal but the values the port names as memory it cannot give (FS-91,
+  FS-951). Against the copy: 8,718 identical, 1,320 explained (408 crashes), 912 checked, 0
+  different.

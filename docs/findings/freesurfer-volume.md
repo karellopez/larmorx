@@ -945,3 +945,52 @@ oracle's `libutils.a` member `mri2.cpp.o` (`objdump -dr -C`, `<scratch>/C/r20/mr
   values. `VLSTfree(&vl)` of `NULL` returns `ERROR_BADPARM` silently.
 - The probe's `vlcopy` with a negative `num` and a source with slopes: `calloc(-1, 4)` fails with `ENOMEM`, which
   `ErrorExit` prints first (`Cannot allocate memory`).
+
+## 28. The inverse move, conversions between voxel and RAS coordinates, composition (3.1-40, for TRANSFORM; relay 35)
+`transform.cpp`'s `LTAinverseTransformInterp` (1157), `LTAvoxelToRasXform` (1898), `LTArasToVoxelXform` (1930),
+`LTAsetVolGeom` (4280) and `LTAcompose` (4844), in `larmorx_freesurfer_volume::ltaapply` and `ltaconv`, for track A's
+`TransformApplyInverse`, `TransformVox2Ras`, `TransformRas2Vox` and `TransformCompose`. None is reached by recon-all's
+default steps or by fMRIPrep (their callers: `mri_nl_align`, `mri_linear_align`, `mri_hires_register`, `mri_jacobian`,
+`mris_ca_deform`, `mri_apply_bias`, through `TransformApplyInverse`'s and `TransformRas2Vox`'s linear branches).
+- **`LTAinverseTransformInterp`** is `LTAtransformInterp` with `lta->inv_xforms[0]`: no `REGISTER_DAT` change first (such
+  an array ends the program with `LTAtransform: unknown linear transform`), a new destination that is always the source's
+  clone (keeping its Talairach file name), its centre from the inverse's destination geometry when that is valid (exactly
+  1) or from `average_305` with `USE_AVERAGE305`, and `inv` in the two missing-geometry messages (`INFO: LTA inv dst
+  geometry information missing!`). The voxel-to-voxel branch tests `inv_xforms[0].dst.valid` as any non-zero value. Its
+  octree branch is `LTAtransformInterp`'s token for token (the forward transforms at each voxel, inverted); its block for
+  one transform (`LTAtransformAtPoint` into `m_L_inv`, `ErrorReturn ... could not invert matrix`) is never reached (one
+  transform returns before). `LTAchangeType`, which the physical-voxel branch calls, ends with `LTAfillInverse`, so the
+  inverse it then applies is the changed array's. The port shares the octree loop (`ltaapply::octree`).
+- **FS-954** (c; rule A): `LTArasToVoxelXform`'s loop computes `MRIrasXformToVoxelXform(src, dst, xforms[i].m_L)` but
+  frees and replaces `xforms[0].m_L` (as `LTAtoVoxelCoords`, 1884, not ported): an array of several transforms ends with
+  the first holding the last one's conversion and the others still RAS-to-RAS, then is typed voxel-to-voxel. The default
+  converts each in place; `reproduce` FreeSurfer's (the probe: 305 of seed 7's 1,000 `ltar2v` cases have several
+  transforms, all identical with `reproduce`).
+- **FS-955** (c, kept; rule C): `LTAvoxelToRasXform` without `mri_src` computes `VGgetRasToVoxelXform(dst) * (m_L *
+  VGgetVoxelToRasXform(src))`: the RAS-to-voxel conversion. The source's comment says it: before 10/2018 the
+  `VGget*To*Xform` functions returned the inverse of their names, and the two calls were swapped when they were fixed "to
+  keep the output of LTAvoxelToRasXform() unchanged" (the variables are still named `m_source_r2v` and `m_dst_v2r`). With
+  `mri_src` the conversion (`MRIvoxelXformToRasXform`: `vox2ras(dst) * (m_L * ras2vox(src))`) is the right one. Kept: the
+  original keeps this output on purpose (rule C); the probe's `ltav2r` cases without volumes are identical in both modes.
+- **FS-956** (c; rule A): `LTAcompose(src, left, right, dst)` runs `MatrixMultiply(left, src.m_L, dst.m_L)` and then
+  `MatrixMultiply(src.m_L, right, dst.m_L)`: with both matrices and a destination other than the source, the second
+  product starts again from `src.m_L` and overwrites the first: `L * right`. In place (`dst == src`, as `TransformCompose(t,
+  ..., t)` gives) the second product starts from the first's result (FreeSurfer's `MatrixMultiply` copies an input that is
+  also its output): `(left * L) * right`. The default gives that product into another array too; `reproduce`
+  FreeSurfer's. A destination transform without a matrix keeps none (the products go into new matrices that are dropped).
+  The new array (`LTAalloc(1, NULL)`) has type 0 (`LINEAR_VOX_TO_VOX`) whatever the source's; a given destination keeps
+  its type. No caller in FreeSurfer 8.2.0 passes both (the only one, in `mri_compute_bias`, is commented out).
+- **FS-957** (a, crash; rule A): `LTArasToVoxelXform(lta, src, NULL)` converts with the source as the destination
+  (`MRIrasXformToVoxelXform`'s `if (!mri_dst) mri_dst = mri_src`), then `LTAsetVolGeom(lta, src, NULL)` reads the null
+  volume (`MRIcopyVolGeomFromMRI`): a segmentation fault (`CRASH 11` in the probe) after the first transform's source
+  geometry is set; an array of no transforms reads no geometry and returns normally. The default
+  sets both geometries from the source (as the conversion assumed); `reproduce` ends with an error. `TransformRas2Vox`
+  passes its `mri_dst` through; `mri_nl_align` calls it with `NULL` only for morphs.
+- `LTAvoxelToRasXform` converts whatever the array's type (no early return, unlike `LTArasToVoxelXform` for an array that
+  is already voxel-to-voxel) and sets only `lta->type`, never the transforms' own types; `TransformVox2Ras` and
+  `TransformRas2Vox` set the `TRANSFORM`'s type before the call.
+- The probe (`validation/probes/fs-volume`, part 19, commands `ltaixf`, `ltav2r`, `ltar2v`, `ltacmp`): seed 7, 4,000 cases:
+  3,724 identical with `reproduce`, 276 not comparable (FS-504: transforms without matrices; FS-957: FreeSurfer's crash;
+  the shared voxel defects FS-53, FS-323, FS-325), 0 different; seed 13, 4,000 cases: 3,702 identical, 298 not comparable, 0
+  different; `fix` different only with notices; the port's debug and release builds agree on seed 13's 2,000 cases in both
+  modes.

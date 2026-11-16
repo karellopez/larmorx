@@ -9,13 +9,13 @@ use larmorx_core::cfmt::{Captured, Stream};
 use larmorx_core::defects::{Notices, UpstreamDefects};
 use std::path::{Path, PathBuf};
 
-fn scratch(tag: &str) -> PathBuf {
+pub(super) fn scratch(tag: &str) -> PathBuf {
     let d = std::env::temp_dir().join(format!("larmorx-dicom-{}-{tag}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d
 }
 
-fn el(o: &mut Vec<u8>, tag: u32, vr: Option<&[u8; 2]>, len: u32, val: &[u8], big: bool) {
+pub(super) fn el(o: &mut Vec<u8>, tag: u32, vr: Option<&[u8; 2]>, len: u32, val: &[u8], big: bool) {
     let p16 = |o: &mut Vec<u8>, v: u16| {
         o.extend_from_slice(&if big {
             v.to_be_bytes()
@@ -47,15 +47,15 @@ fn el(o: &mut Vec<u8>, tag: u32, vr: Option<&[u8; 2]>, len: u32, val: &[u8], big
     o.extend_from_slice(val);
 }
 
-struct Run {
-    cond: Condition,
-    object: Option<DcmObject>,
-    stack: CondStack,
-    out: Captured,
-    notices: Notices,
+pub(super) struct Run {
+    pub(super) cond: Condition,
+    pub(super) object: Option<DcmObject>,
+    pub(super) stack: CondStack,
+    pub(super) out: Captured,
+    pub(super) notices: Notices,
 }
 
-fn open(path: &Path, options: u64, mode: UpstreamDefects, dialect: &dyn Dialect) -> Run {
+pub(super) fn open(path: &Path, options: u64, mode: UpstreamDefects, dialect: &dyn Dialect) -> Run {
     let mut r = Run {
         cond: 0,
         object: None,
@@ -76,7 +76,7 @@ fn open(path: &Path, options: u64, mode: UpstreamDefects, dialect: &dyn Dialect)
     r
 }
 
-fn part10(dataset: &[u8], ts: &[u8]) -> Vec<u8> {
+pub(super) fn part10(dataset: &[u8], ts: &[u8]) -> Vec<u8> {
     let mut o = vec![0u8; 128];
     o.extend_from_slice(b"DICM");
     let mut meta = Vec::new();

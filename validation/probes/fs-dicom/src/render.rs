@@ -132,6 +132,30 @@ pub fn render(b: &[u8]) -> Vec<String> {
                     out.push(format!("pop -> {c:#x}"));
                 }
                 b'D' => out.push("dump".into()),
+                b'g' => {
+                    let c = p.u64()?;
+                    let (tag, rep, vm, len) = (p.u32()?, p.u32()?, p.u64()?, p.u32()?);
+                    let desc = p.s()?;
+                    let z = p.u8()?;
+                    out.push(format!(
+                        "get ({:04x},{:04x}) -> {c:#x} vr={rep} vm={vm} len={len:#x} {desc:?} ot={}",
+                        tag >> 16,
+                        tag & 0xffff,
+                        z as char
+                    ));
+                }
+                b'v' => {
+                    let c = p.u64()?;
+                    let (rtn, ctx, room) = (p.u32()?, p.u64()?, p.u32()?);
+                    let d = p.bytes(room as usize)?;
+                    let h: String = d.iter().take(32).map(|b| format!("{b:02x}")).collect();
+                    let sum = d.iter().fold(0u64, |a, &x| a.wrapping_mul(31).wrapping_add(x as u64));
+                    out.push(format!("value -> {c:#x} rtn={rtn:#x} ctx={ctx:#x} room={room} {h} sum={sum:x}"));
+                }
+                b't' => {
+                    let ok = p.u32()?;
+                    out.push(format!("truncate -> {ok}"));
+                }
                 b'T' => {
                     let (c, code) = (p.u64()?, p.u64()?);
                     let t = p.s()?;

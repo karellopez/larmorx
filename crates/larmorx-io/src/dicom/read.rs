@@ -9,6 +9,7 @@
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
+use std::sync::Arc;
 
 use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{self, Notices};
@@ -48,7 +49,7 @@ impl std::error::Error for Unsupported {}
 /// condition stack, the streams, the notices.
 struct Reader<'a> {
     name: &'a [u8],
-    file: File,
+    file: Arc<File>,
     fd: i32,
     dialect: &'a dyn Dialect,
     stack: &'a mut CondStack,
@@ -76,7 +77,7 @@ impl Reader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> i64 {
         let mut n = 0;
         while n < buf.len() {
-            match self.file.read(&mut buf[n..]) {
+            match (&*self.file).read(&mut buf[n..]) {
                 Ok(0) => break,
                 Ok(k) => n += k,
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
@@ -93,7 +94,7 @@ impl Reader<'_> {
     }
 
     fn seek_cur(&mut self, by: i64) {
-        let _ = self.file.seek(SeekFrom::Current(by));
+        let _ = (&*self.file).seek(SeekFrom::Current(by));
     }
 }
 
@@ -240,7 +241,8 @@ pub fn open_file_named(
     if size == 0 {
         return Ok(DCM_FILEACCESSERROR);
     }
-    let fd = stack.open_fd();
+    let file = Arc::new(file);
+    let fd = stack.open_fd_for(Arc::clone(&file));
     let mut r = Reader {
         name: name_bytes,
         file,
@@ -1122,7 +1124,7 @@ fn read_data(
         }
         if byte_order != BYTEORDER_SAME {
             let bits = object.as_ref().map(|o| o.pixel_bits_allocated).unwrap_or(0);
-            swap_in_place(r, &item, bits, &mut data);
+            swap_in_place(r.dialect, r.notices, &item, bits, &mut data);
         }
         item.data = Data::Bytes(data);
     }
@@ -1159,7 +1161,7 @@ fn finish_data(
 
 /// `swapATGroupElement` (a little-endian machine): the two 16-bit halves of each 4-byte tag
 /// exchanged.
-fn swap_at_group_element(d: &mut [u8]) {
+pub(super) fn swap_at_group_element(d: &mut [u8]) {
     let mut i = 0;
     while d.len() - i >= 4 {
         d.swap(i, i + 2);
@@ -1168,8 +1170,15 @@ fn swap_at_group_element(d: &mut [u8]) {
     }
 }
 
-/// `swapInPlace`: values of data in the reverse byte order brought to the machine's.
-fn swap_in_place(r: &mut Reader, item: &ElementItem, bits_allocated: u16, d: &mut [u8]) {
+/// `swapInPlace`: values of data in the reverse byte order brought to the machine's (the value's
+/// bytes `d`, of the element `item`; `bits_allocated` the object's Bits Allocated).
+pub(super) fn swap_in_place(
+    dialect: &dyn Dialect,
+    notices: &mut Notices,
+    item: &ElementItem,
+    bits_allocated: u16,
+    d: &mut [u8],
+) {
     let pairs = |d: &mut [u8]| {
         for p in d.as_chunks_mut::<2>().0 {
             p.swap(0, 1);
@@ -1180,25 +1189,35 @@ fn swap_in_place(r: &mut Reader, item: &ElementItem, bits_allocated: u16, d: &mu
             if item.tag == TAG_PIXEL_DATA && bits_allocated != 16 {
                 return;
             }
+            if !d.len().is_multiple_of(2) {
+                // FS-953: CTN swaps on past the value until its 32-bit count wraps (a crash)
+                notices.add(
+                    &defects::FS_953,
+                    format!(
+                        "{} bytes of a {} value in the reverse byte order: the whole pairs swapped, the last byte kept",
+                        d.len(),
+                        vr_name(item.representation)
+                    ),
+                );
+            }
             pairs(d);
         }
         Vr::Ul | Vr::Sl => {
-            if r.dialect.swap_4byte_in_pairs() && d.len() >= 4 {
+            if dialect.swap_4byte_in_pairs() && d.len() >= 4 {
                 // FS-94: the dialect's swap, in reproduce; corrected otherwise
-                if r.notices.reproduce() {
-                    r.notices
-                        .add(&defects::FS_94, "4-byte integers swapped in 2-byte pairs");
+                if notices.reproduce() {
+                    notices.add(&defects::FS_94, "4-byte integers swapped in 2-byte pairs");
                     pairs(d);
                     return;
                 }
-                r.notices.add(&defects::FS_94, "4-byte integers reversed");
+                notices.add(&defects::FS_94, "4-byte integers reversed");
             }
             let whole = d.len() / 4 * 4;
             for q in d[..whole].as_chunks_mut::<4>().0 {
                 q.reverse();
             }
             if whole < d.len() {
-                r.notices.add(
+                notices.add(
                     &defects::FS_95,
                     format!(
                         "a {} value of {} bytes",
@@ -1212,21 +1231,21 @@ fn swap_in_place(r: &mut Reader, item: &ElementItem, bits_allocated: u16, d: &mu
         Vr::Fd | Vr::Fl => {
             let w = if item.representation == Vr::Fd { 8 } else { 4 };
             if d.len() >= w {
-                r.notices.add(
+                notices.add(
                     &defects::FS_96,
                     format!(
                         "{} values of ({:04x},{:04x}) {}",
                         vr_name(item.representation),
                         tag_group(item.tag),
                         tag_element(item.tag),
-                        if r.notices.fix() {
+                        if notices.fix() {
                             "brought to the machine's byte order"
                         } else {
                             "left in the file's byte order"
                         }
                     ),
                 );
-                if r.notices.fix() {
+                if notices.fix() {
                     let whole = d.len() / w * w;
                     for q in d[..whole].chunks_exact_mut(w) {
                         q.reverse();
@@ -1238,7 +1257,7 @@ fn swap_in_place(r: &mut Reader, item: &ElementItem, bits_allocated: u16, d: &mu
     }
 }
 
-fn vr_name(v: Vr) -> &'static str {
+pub(super) fn vr_name(v: Vr) -> &'static str {
     Vr::code_table()
         .iter()
         .find(|(x, _)| *x == v)

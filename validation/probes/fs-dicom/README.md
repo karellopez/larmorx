@@ -9,7 +9,10 @@ element's bytes, standard output and standard error, on generated files.
 - `shim.c`: one entry point, `fdp_run(name, ops, n, out, cap)`, running a script of operations on
   one object handle (1 `DCM_OpenFile(name, arg)` and the object walked through CTN's private
   structures; 2 `DCM_CloseObject`; 3 the stack, bottom first; 4 `COND_PopCondition(arg)`; 5
-  `COND_DumpConditions`; 6 `COND_TopCondition`), writing typed records (`src/port.rs` writes the
+  `COND_DumpConditions`; 6 `COND_TopCondition`; 7 `DCM_GetElement` and the caller's element after
+  it; 8 `DCM_GetElementValue` into a buffer of `min(length, file size + 4096)` bytes filled with
+  0xa5, and the buffer, `rtnLength` and the context after it; 9 the context set; 10 and 11 the
+  caller's tag and representation set; 12 the file cut, `truncate`), writing typed records (`src/port.rs` writes the
   same from the port; `src/render.rs` shows them as text). The element item's allocated length is
   dumped as its low 32 bits (FreeSurfer's copy computes an undefined length's room in 64 bits,
   CTN 3.0.6 in 32; nothing reads it back).
@@ -38,6 +41,22 @@ validation/probes/fs-dicom/build.sh <out>
 scripts/orchestration/boxed.sh 12 bash -c "cd <out> && ./fs-dicom <out> 5"
 ```
 
+- The element script (since 2026-11-16, item 3.1-56): every file also runs a second script, five
+  opens (the format probe's four, then one of six other options) each followed by requests on the
+  object it leaves, built from the port's object (`requests` in `src/main.rs`: FreeSurfer's way,
+  pieces, contexts, SQ, large pixel requests, missing tags), the file cut once before its pixel data
+  are asked for again (restored before every run). Where the original finished but the case is
+  not identical, every `get` and `value` record is compared one by one: a value may differ only
+  when the port names it as memory it cannot give (FS-91, FS-951) or FS-953's swap; otherwise the
+  case counts `ELEMENT REQUESTS DIFFERENT`. The defects that explain a difference now include
+  FS-951 and FS-953.
+
 Results: `docs/findings/ctn-dicom.md` ("The numbers"); scale 5 (2026-11-13): 10,030 files, 11
 opens each, against both originals 0 different (CTN 3.0.6: 9,429 identical, 601 explained, 360 of
-them its crash; FreeSurfer's copy: 9,429 identical, 601 explained, 361 crashes).
+them its crash; FreeSurfer's copy: 9,429 identical, 601 explained, 361 crashes). Scale 5
+(2026-11-16, 10,038 files, the 8 element cases added; log
+`<workspace>/oracles/logs/fs-found-c-r35-dicom-probe-5.log`, 2.6 minutes on the main machine): the open script
+against CTN 3.0.6 9,412 identical, 626 explained (454 crashes; FS-93's crashes depend on memory and
+vary from run to run), against the copy 9,418 identical, 620 explained; the element script against
+CTN 3.0.6 8,710 identical, 1,328 explained (410 crashes), 918 checked request by request, against the
+copy 8,718 identical, 1,320 explained (408 crashes), 912 checked: 0 different in all four.

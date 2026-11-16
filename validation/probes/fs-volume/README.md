@@ -271,3 +271,17 @@ agree on seed 13's 9,000 cases in both modes. Seed 1, 5,500 cases: 5,115 identic
 `HEAVY`, hash `e5554290c86893a1d7372b8cc0bce17444979537407874d10d3631134e5a7a8d`, passing with AArch64's NaN emulated in
 debug and release (`oracles/logs/fs-found-c-r34-trap-volume.log`) and on Windows x64 (the cross-check tool).
 `check.py`'s `SKIP` adds FS-886, FS-887, FS-889, FS-890 and fs.io's FS-167 (an MGH header cut short: memory contents).
+
+Measured 2026-11-16 (part 19: relay 35, 279 commands; logs `oracles/logs/fs-found-c-r35-*`): transform.cpp's
+`ltaixf` (`LTAinverseTransformInterp`: as `ltaxf`, with inverse transforms given or left as `LTAalloc`'s), `ltav2r`
+(`LTAvoxelToRasXform`: 0 to 3 transforms of every type, with and without source and destination volumes), `ltar2v`
+(`LTArasToVoxelXform` with `LTAsetVolGeom`: a destination volume or none), `ltacmp` (`LTAcompose`: a left matrix, a right
+one, both or none; into a new array, another array of 0 to 2 transforms, or the source itself). `fsvolume.cpp` declares
+`LTAinverseTransformInterp` itself (transform.h does not). Seed 7, 4,000 cases of the new commands: 3,739 identical with
+`reproduce`, 261 not comparable (FS-504; FS-957: all 111 such `ltar2v` cases checked are `CRASH 11` in the original; the
+shared voxel defects), 0 different; seed 13, 4,000 cases: 3,708 identical, 292 not comparable, 0 different; `fix`
+different only with notices (FS-954, FS-956, FS-957 and the shared ones); the port's debug and release builds agree on
+seed 13's 2,000 cases in both modes. Seed 1, 5,580 cases: 5,185 identical, 395 not comparable, 26 hashed as `HEAVY`,
+hash `34c600cf7461870de2c46970677d0bdeff03f1932250cae9569ec1338a3d8a53`, passing with AArch64's NaN emulated in debug
+(72,725 flips) and release (62,790) (`oracles/logs/fs-found-c-r35-trap-volume.log`) and on Windows x64 (the cross-check
+tool). `check.py`'s `SKIP` adds FS-957. The binary before this part: `<scratch>/C/fsvolume.before-r35`.

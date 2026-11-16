@@ -369,6 +369,7 @@ fn activate(
 /// ([`ae_alloc`], one output with `FOCUSED_AUTOENCODER`). A window of one voxel (`whalf` 0) is
 /// checked: the input set to 0, the network run and dumped ([`ae_dump`]), then the input 1, run
 /// and dumped. `Ok(None)` where the reading stops (FS-879's sizes by default, FS-878, FS-922).
+#[allow(clippy::too_many_arguments)]
 fn sae_alloc(
     g: &mut Globals,
     env: &Environment,

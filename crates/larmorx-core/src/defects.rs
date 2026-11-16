@@ -2749,6 +2749,14 @@ defects! {
         "a request of 4,294,967,295 bytes of pixel data left in the file (an encapsulated value, whose length is undefined, asked for whole) reads nothing, the read failing, and the failure is taken for a complete read: the request succeeds with nothing written into the caller's buffer (memory never written); corrected: the read is reported as failed (DCM failed to access file)";
     FS_953 = "FS-953", "CTN", true,
         "an odd number of bytes of 16-bit pixel data in the reverse byte order (big endian) asked for (a request of an odd length) is swapped two bytes at a time past its end until the 32-bit count wraps: the program crashes; the whole pairs are swapped and the last byte is kept";
+    FS_954 = "FS-954", "FreeSurfer", true,
+        "converting a transform array from RAS to voxel coordinates (LTArasToVoxelXform) stores every converted matrix in the first transform: an array of several transforms ends with the first holding the last one's matrix converted and the others unconverted; corrected: each transform converted in place";
+    FS_955 = "FS-955", "FreeSurfer", false,
+        "converting a transform array from voxel to RAS coordinates without volumes (LTAvoxelToRasXform from the transforms' own geometries) applies the conversion from RAS to voxel coordinates (the destination's RAS-to-voxel matrix times the matrix times the source's voxel-to-RAS matrix), as before FreeSurfer's 2018 change, which kept this output on purpose; with volumes the conversion is the right one; kept (a deliberate choice of the original)";
+    FS_956 = "FS-956", "FreeSurfer", true,
+        "composing a transform with a matrix on the left and one on the right into another array (LTAcompose) gives only the right product: the left one is computed and then overwritten (composing in place gives both); corrected: the right matrix multiplies the left product";
+    FS_957 = "FS-957", "FreeSurfer", true,
+        "converting a transform array from RAS to voxel coordinates with no destination volume (LTArasToVoxelXform) converts the matrices with the source as the destination, then copies the geometry of the missing volume: the program crashes; corrected: the source's geometry for both";
 }
 
 /// The register entry with ID `id`.

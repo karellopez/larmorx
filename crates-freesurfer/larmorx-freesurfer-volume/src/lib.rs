@@ -27,6 +27,7 @@ pub mod io_frames;
 pub mod label_coords;
 pub mod labels;
 pub mod ltaapply;
+pub mod ltaconv;
 pub mod ltaops;
 pub mod ltaread;
 pub mod ltawrite;

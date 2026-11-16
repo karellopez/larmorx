@@ -9,12 +9,13 @@
 //! holds: the SGI images (`RGBReadImage`, `RGBwrite`, over [`crate::rgb`]), the PGM, PPM and PBM
 //! stubs (FreeSurfer is built without netpbm: `pgm not supported`, ...), the HIPS stubs (the HIPS
 //! library is gone: `utils/hips.cpp`'s functions print `error: hips is not supported` and return
-//! 0, HIPS's "no error"), and the JPEG writer's refusal of an image that is not of bytes.
+//! 0, HIPS's "no error"), and the JPEG reader and writer (`JPEGReadImage`, `JPEGWriteImage`).
 //!
 //! TIFF images (libtiff) and the JPEG codec (the IJG's library) are third-party code FreeSurfer
-//! bundles (`docs/freesurfer/third-party.md`, P-05: the main package's, track C's): reading a TIFF
-//! or a JPEG image, and writing a TIFF or a JPEG image of bytes, say `... is not ported yet` until
-//! they are.
+//! bundles (`docs/freesurfer/third-party.md`, P-05: the main package's, track C's). JPEG images are
+//! read and written over `larmorx_io::jpeg` (IJG 6b, track C's; `JPEGReadImage` and
+//! `JPEGWriteImage` since track A's relay 39); reading or writing a TIFF image says `... is not
+//! ported yet` until FreeSurfer's TIFF functions are wired to `larmorx_io::tiff`.
 //!
 //! The image a reader returns is `ImageToMRI`'s input, the one a writer takes `MRItoImage`'s
 //! output: both are fs.volume's, called through [`crate::upper`].

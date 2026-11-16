@@ -2025,6 +2025,26 @@ void run_piece6(const std::string &cmd0)
       ofile(datname);
     }
     oi(errno);
+  } else if (cmd == "gcw") {
+    // piece 32 (track A relay 39): GCAMread of a morph, then GCAMwrite under another name with a
+    // warp format (mri_convert's path for a morph input); the status and the files under w
+    Gdiag = strtoull(next(), NULL, 16);
+    set_env6((int)geti());
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    setenv("FREESURFER_HOME", "/nonexistent-freesurfer-home", 1);
+    if (!getenv("FS_LICENSE")) setenv("FS_LICENSE", "/usr/local/freesurfer/license.txt", 1);
+    std::string oname_ = getstr(&nn);
+    int datainterp = (int)geti();
+    errno = 0;
+    GCA_MORPH *gcam = GCAMread(name.c_str());
+    if (!gcam) { out += "N "; oi(errno); return; }
+    fflush(stdout);
+    oi(GCAMwrite(gcam, oname_.c_str(), datainterp));
+    fflush(NULL);
+    odir12();
+    oi(errno);
   } else if (cmd == "trs") {
     // piece 32 (track A relay 39): TransformRead of a file, TransformInvert (0 none, 1 without a
     // volume, 2 with a header volume of the transform's source geometry), then queries: s, r, R
@@ -3043,7 +3063,7 @@ int main(int argc, char *argv[])
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
                                  "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h",
-                                 "m3w", "trs"};
+                                 "m3w", "trs", "gcw"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

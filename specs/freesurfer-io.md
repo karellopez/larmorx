@@ -4656,11 +4656,14 @@ NaN and infinity as for any one-frame read (`nan_inf_check`, §42); without a fr
    first: `reading 'frame' # <f> from gcam (see gcamorph.h for definitions)`): the field `f` over the same grid, one
    `float` frame: 0, 1, 2 the gradient (0 after reading); 3 the label; 4, 5, 6 the original position; 13, 14, 15 the
    current position; 10 the means (0: no node read has a class); 16 the Jacobian `area / orig_area` (`float`; 1 where
-   the original area is within `FLT_EPSILON` of 0); 22 its logarithm (`logf`, glibc's single-precision function;
+   the original area is within `FLT_EPSILON` of 0); 22 its logarithm (`logf`, a single-precision function;
    -100 below 0); 17 the area; 18 the original area; 19 negative: 1 when the node is not position-invalid and either
    original area is positive while its area is 0 or less, else 0; 20 the smaller of `area1` and `area2` (`a < b ? a
    : b`) for a valid node, else 0; 21 that smaller area `d` for a valid node: 0 above 1, `-log10f(d)` in (0, 1],
-   `log10f(|d|)` otherwise (glibc's single-precision `log10f`; NaN quiet), else 0; 23 the status; 24 the validity.
+   `log10f(|d|)` otherwise (the single-precision `log10f`; NaN quiet), else 0; 23 the status; 24 the validity.
+   FreeSurfer's `logf` and `log10f` are glibc 2.35's (not correctly rounded: `log10f` is 1 ulp off on about 30
+   million positive floats, `specs/glibc-dbl.md`'s family); larmorx's default is the correctly rounded functions,
+   glibc's with `reproduce` (GLIBC-07 noted where the two give another value for the volume).
    11, 12 and anything past 24 end the program at the first node: `GCAMwriteMRI(<f>): unknown which parameter`
    (`ERROR_BADPARM`, status 252). 7, 8, 9 (the node coordinates `xn`, `yn`, `zn`) go through the morph's inverse onto
    a `float` volume of the image geometry (its sizes and voxel sizes): every node that is not position-invalid
@@ -4711,3 +4714,182 @@ nodes, spacing 2) through the official probe's `mrd` with the frames none, 0, 3 
 identical in both modes (`fix` only without FreeSurfer's NUL byte); peak memory 524 MiB for one head (FreeSurfer's
 `mri_info`: 534 MiB). Damaged compressed data after the nodes, the machine's memory, the empty image and the defaults:
 the fs.gca unit tests (`crates-freesurfer/larmorx-freesurfer-gca/tests/gcam_read.rs`).
+
+## 144. Transforms (`TRANSFORM`: a linear transform array or a GCA morph)
+
+The atlas programs take a transform file through one type: a *transform* holds a type and either a linear transform
+array (the LTA of `specs/freesurfer-volume.md`) or a GCA morph (§142). Its type is the array's type (0 voxel to voxel,
+1 RAS to RAS, 2 physical voxels, 14 register.dat, 15 FSL, 21 coronal RAS, ...) or 11 for a morph.
+
+1. **Making one.** Of a linear type: an array of one transform (`LTAalloc(1, volume)`: the identity, `sigma` 10000,
+   centred on the volume's bounding box of voxels above 70, or 0 without a volume). Of type 11:
+   `TransformAlloc(MORPH_3D_TYPE): unsupported` (an error, `ERROR_UNSUPPORTED`) and nothing.
+2. **Reading one** (`TransformRead`). A name whose file part (after the last `/`, cut at its last `#`, then its last
+   `@`) is `identity.nofile`: an identity RAS-to-RAS array of one transform, no file read. Otherwise by
+   `TransformFileNameType` (the volume spec's rule: `.m3z`, `.m3d`, `.mgz`, `.nii`, names ending `nii.gz` are morphs;
+   `.lta`, `.oct`, no extension arrays; `.xfm` MNI; `.fslmat` FSL; any other a register.dat): a morph is read as
+   §142 reads it (its messages; nothing when it cannot be read), anything else as the volume spec's `LTAreadEx`
+   reads it (its messages), the transform taking the array's type. A file that cannot be read gives nothing.
+3. **Freeing one**: the array or the morph; `NO_ERROR`.
+4. **Inverting one** (`TransformInvert(t, volume)`): an array's inverse transforms filled (each matrix's inverse; a
+   matrix that cannot be inverted ends the program, `TransformInvert: xform noninvertible`); a morph's inverse index
+   volumes made on the volume's grid as §142 item 9 makes them (the volume's extent must be the morph's image's, else
+   the program ends: `mri passed volume size ( <w> <h> <d> ) is different from the one used to create M3D data ( ...
+   )`); a morph without a volume: nothing. A morph whose inverse exists already: nothing. `NO_ERROR`.
+   `TransformSwapInverse`: an array's transforms and inverse transforms exchanged (`NO_ERROR`); a morph:
+   `TransformSwapInverse: MORPH_3D_TYPE not supported` (`ERROR_UNSUPPORTED`).
+5. **An array that is not voxel to voxel**, before each sample of items 6 to 9: `Converting to LTA type
+   LINEAR_VOXEL_TO_VOXEL...` (standard output), the volume spec's `LTAchangeType` to type 0 (its errors: both
+   geometries must be valid), `After conversion:` and each transform's matrix as `MatrixAsciiWriteInto` prints it
+   (`1 4 4` and the rows, `%+f` two spaces apart). The array keeps the new type: a second sample prints nothing.
+6. **Sampling an image voxel to the atlas** (`TransformSample(t, x, y, z)`, `float`s; the status and a point). A
+   morph without its inverse: `TransformSample: gcam has not been inverted!` (`ERROR_UNSUPPORTED`), the point 0. A
+   morph: the point clamped to its inverse index volumes (below 0 to 0, at or past the extent to the extent - 1;
+   `float` comparisons, NaN kept); each index volume sampled trilinearly at it (the volume spec's `MRIsampleVolume`: whole coordinates take the nearest voxel) and the sample, as a `float`, times the spacing (as a `float`).
+   An array: the first transform's matrix times `(x, y, z, 1)` (`float` matrices, `MatrixMultiply`). `NO_ERROR`.
+   `TransformSampleReal` is the same but a morph's index volumes are read at the nearest voxel of the clamped point
+   (`nint`), times the spacing, and an array's coordinates below 0 become 0. FS-862: the nearest voxel is not
+   clamped again, so a point within half a voxel of the far face reads one voxel past the index volumes.
+   `TransformSampleReal2`: a morph's trilinear samples times the spacing in `double`, then `float`; an array as
+   `TransformSampleReal`.
+7. **Sampling an atlas voxel to the image** (`TransformSampleInverse(t, x, y, z)`, `int`s). A morph: the node at
+   `nint(x / spacing)` (an integer division) and likewise y and z, clamped to the grid (at or past the last to the
+   last, then below 0 to 0); its current position (as `float`s), and `ERROR_BADPARM` when the node is not valid
+   (else `NO_ERROR`). FS-857: a spacing of 0; FS-861: a grid of no nodes. An array (item 5 first): the first inverse
+   transform's matrix times `(x, y, z, 1)`; `NO_ERROR`. `TransformSampleInverseVoxel(t, width, height, depth, x, y,
+   z)`: that point rounded (`nint`) and clamped to `[0, extent - 1]`, `ERROR_BADPARM` when a coordinate had to be
+   clamped, else the sample's status. `TransformSampleInverseFloat(t, x, y, z)` (`float`s): an array as item 7; a
+   morph through `GCAMsampleMorph`: the point divided by the spacing (`float`), outside `[0, extent)` on an axis
+   `ERROR_BADPARM` and no point; else the eight nodes around it (`(int)` of the point, the next ones clamped to the
+   grid), `ERROR_BADPARM` when one has an invalid position (2), else their current positions weighted trilinearly
+   (the weights `float` products of `d = point - corner` and `1 - d`, each times the `double` position, summed in
+   `double` in the corner order (lower x, lower y, lower z), (lower, lower, upper), (lower, upper, lower), ... (upper,
+   upper, upper), stored as `float`).
+8. **A direction** (`TransformSampleDirection(t, p, n)`): `TransformSampleReal` at `p` and at `p + 2 n` (`float`),
+   their difference divided by its length (`sqrtf` of the sum of squares, each a `float` operation); `NO_ERROR`.
+9. **A source voxel to the atlas** (`TransformSourceVoxelToAtlas(t, volume, x, y, z)`): a voxel-to-voxel array's first
+   matrix applied to the voxel (`TransformWithMatrix`: the coordinates as `float`s through the matrix's first three
+   rows in `float`, widened to `double`); another linear type ends the program (`RFAsourceVoxelToNode: needs
+   vox-to-vox transform`, `ERROR_BADPARM`); a morph item 6's sample widened to `double`. `NO_ERROR`.
+10. **The geometries.** `TransformGetSrcVolGeom`: a morph's image geometry, an array's first transform's source;
+    `TransformGetDstVolGeom`: the atlas geometry, the first transform's destination (a geometry copied as C++'s
+    assignment copies one: every field and the name). `TransformSetMRIVolGeomToSrc`/`...ToDst`: that geometry into a
+    volume (`MRIcopyVolGeomToMRI`). `TransformCopyVolGeomToMRI`: an array's first destination geometry into the
+    volume; a morph changes nothing. Each `NO_ERROR`. FS-859: an array without transforms.
+
+**larmorx by default**: FS-857 and FS-861 end the program with a message (`TransformSampleInverse: the morph's
+spacing is 0 (FreeSurfer divides by it and crashes)`, `TransformSampleInverse: the morph has no nodes (FreeSurfer
+reads past them here)`; `ERROR_BADPARM`, both modes: FreeSurfer crashes); FS-858, a linear file of type 11, is
+refused at the read (`TransformRead(<name>): the linear transform has the morph's type 11 (FreeSurfer then uses it as
+a morph)`, `ERROR_BADFILE`, nothing; both modes: FreeSurfer treats the array as a morph); FS-859, any use of an
+array's first transform when it has none, ends the program (`<function>: the transform array holds no transform
+(FreeSurfer reads past it here)`, `ERROR_BADPARM`, both modes); FS-860, freeing no transform, frees nothing (both
+modes; FreeSurfer crashes); FS-862, the nearest sample reads the last voxel (rule A; `reproduce` FreeSurfer's voxel
+past it: the next row's or slice's first voxel inside the volume, memory contents past it).
+
+Not specified yet (their parts are not ported): writing a transform (`TransformWrite`), copying one
+(`TransformCopy`), applying one to a volume (`TransformApply*`, `TransformCreateDensityMap`), composing,
+concatenating and inverting in place (`TransformCompose`, `TransformConcat`, `TransformInvertReplace`), and the
+RAS/voxel changes (`TransformRas2Vox`, `TransformVox2Ras`).
+
+## 145. A three-frame volume written as a GCA morph (`MRIwriteType`'s type 29) and GCA morphs written (`GCAMwrite`)
+
+1. **`MRIwriteType(volume, name, 29)`** (an `.m3z` or `.m3d` name through `MRIwrite`, `@m3z`, or the type asked
+   for): a volume without three frames is refused (the writer rule: `MRIwriteType: gcam - input mri must have 3
+   frames, not <n>`, -1). Else a morph of the volume's grid (§142 item 4), both its geometries the volume's
+   (`getVolGeom`), then:
+   - *the identity morph*: the inputs the volume's frames; the voxel-to-voxel identity (item 1 of §144, centred on the
+     volume's bounding box) inverted; each node `(x, y, z)` (x outermost) valid, its node coordinates its own, its
+     original and current positions the identity's product with `(x, y, z, 1)` (`float`), `log_p` 0; with `Gx`,
+     `Gy`, `Gz` at the node: `node(<x>,<y>,<z>) --> MRI (<ox>, <oy>, <oz>)` (`%2.1f`; standard output); spacing 1;
+     the affine a copy of the identity's matrix and `det` its determinant; the metric properties (§142 item 7: its
+     first-call line on a narrow grid, `SHOW_NEG`'s lines); each node's original areas its areas, and a valid node
+     with neither original area above 0 area-invalid; the inverse index volumes (`float` volumes of the volume's
+     extent) each voxel's identity sample (§144 item 6) over the spacing; the original positions saved, the original
+     properties (§142 item 6), the metric properties again; type voxels;
+   - *the frames read as displacements*: on a grid equal to the volume's (always here) `GCAMreadWarpFromMRI(): warp
+     and gcam have the same dims` (standard output) and each node's current position its original position plus its
+     voxel's three frames (`double` sums); on another grid (`... do not have the same dims`) the frames' samples at
+     the node's voxel times the spacing (the `MRIsampleVolumeFrameType`, trilinear: whole coordinates take the
+     voxel);
+   - `GCAMwrite(morph, name)` (2) with absolute voxel coordinates.
+   FreeSurfer's branch returns `NO_ERROR` whatever `GCAMwrite` did (FS-856).
+2. **`GCAMwrite(morph, name, format)`**: `GCAMwrite(<name>)` (standard output); the name's format by `mri_identify`:
+   type 29 the morph file (3), MGH or NIfTI the warp volume (4; FreeSurfer's status 0 whatever its write did), any
+   other `ERROR_BADPARM` with no message and nothing written.
+3. **The morph file**: compressed (zlib's gzip stream, as the writers make them) when the name holds `.m3z`
+   anywhere, else plain; a file that cannot be made: `GCAMwrite(<name>): could not open file` (`errno` cleared
+   first; `ERROR_BADPARM`). Big-endian: the version 1.0 (`float`), width, height, depth and spacing (`int`s), `exp_k`
+   (`float`); per node, x outermost: `origx`, `origy`, `origz`, `x`, `y`, `z` (`float`s), `xn`, `yn`, `zn` (`int`s);
+   the tag 10 and the image's and the atlas's geometries (§15's block without shears: `valid`, the extent, 15
+   `float`s, the 512 name bytes as the geometry holds them); the tag 11 and the type; the tag 12 and each node's
+   label (x outermost); with an affine matrix, the tag 31 and §12's matrix tag with tag number 0 (its 64-bit length
+   1,600 and the text `Matrix` and the sixteen numbers). `NO_ERROR`. It is the layout §142 item 2 reads.
+4. **The warp volume** (`Warpfield::convert`, then `Warpfield::write`): a morph of type RAS is first taken to voxels
+   (`converting GCAM from GCAM_RAS to GCAM_VOX`, §142 item 8). `[INFO] Warpfield::convert(): converting GCAM ...`,
+   `[INFO] Warpfield::convert(): gcam       [<w> x <h> x <d>]`, `... gcam image [...]`, `... gcam atlas [...]` (the
+   grid's and the geometries' extents; standard output). A three-frame `float` volume of the grid with the atlas
+   geometry (its direction cosines, voxel sizes and centre: `MRIcopyVolGeomToMRI`), the warp-map intent (3) and
+   version `(3 << 8) | 1`, the format, the spacing, `exp_k`, both geometries; with an affine: `[DEBUG]
+   Warpfield::convert() gcam->m_affine (spacing=<s>, exp-k=<k>, det=<d>):` (`%.2f`), the matrix (§12's
+   `MatrixPrint`), `[DEBUG] Warpfield::convert() __warpmap->gcamorphAffine (spacing=<s>, exp-k=<k>)`, the copy; the
+   labels' table. Each atlas voxel `(c, r, s)` takes its node's label and its current position `p` (as `float`s) in
+   the format: 0 `p`; 1 `p - (c, r, s)` (`float`); 2 the image's voxel-to-RAS matrix (no shears) times `(p, 1)`
+   (`MatrixMultiplyD`: `float` matrices accumulated in `double`, stored as `float`); 3 that minus the atlas's
+   voxel-to-RAS matrix times `(c, r, s, 1)` (`float` differences). `[INFO] Warpfield::convert(): total out of range
+   voxel count: 0`. Then the volume is written as its name's format (the `MRIwrite`); a write that fails: `ERROR:
+   Warpfield::write(<name>)` (standard output).
+5. **A warp volume written as NIfTI** (the `niiWrite` of a volume of intent 3): in another format than RAS
+   displacements (3), `[INFO] niiWrite(): convert displacement from <f> to 3` (as before) and the volume's own three
+   frames converted to RAS displacements in place (the caller's volume changes): with the image geometry's
+   voxel-to-RAS matrix (with shears) and its inverse, and the atlas geometry's voxel-to-RAS matrix (with shears),
+   each atlas voxel's value `v`: from 0, `M_image (v, 1) - M_atlas (c, r, s, 1)`; from 1, `M_image ((v + (c, r, s)),
+   1) - M_atlas (c, r, s, 1)`; from 2, `v - M_atlas (c, r, s, 1)` (each product `MatrixMultiplyD`, each sum and
+   difference a `float` operation, in that order). (The other conversions, between any two formats, follow the same
+   forms: to voxels through the inverse; a format outside 0 to 3 is set and nothing converted.) A volume of another
+   intent cannot be converted: `[ERROR] Can't create Warpfield object with non MGZ_INTENT_WARPMAP MRI` (standard
+   output), status 1.
+
+**larmorx by default**: FS-856 (rule A): `MRIwriteType` returns the writer's status (`ERROR_BADPARM` for a file that
+cannot be made, a warp volume's write status, and for a name of another format `MRIwriteType(): GCAMwrite(<name>)
+wrote nothing: the name is not .m3z, .m3d, .mgz or .nii`, `ERROR_BADPARM`); `reproduce` returns `NO_ERROR`.
+
+## 146. JPEG images (`JPEGReadImage`, `JPEGWriteImage`)
+
+1. **Reading** (an image name of the JPEG type, the image files): a file that cannot be opened ends the program
+   (`JPEGReadImage:  Input file does not exist`, `ERROR_NO_FILE`). Else IJG 6b's decompressor with RGB output over
+   the file's bytes (`larmorx_io::jpeg`'s behaviour, `docs/findings/jpeg-6b.md`: its warnings on standard error,
+   the first of the object only; an error writes IJG's message and ends the program with status 1), into an RGB
+   image of the file's width and height (`ImageAlloc(height, width, PFRGB, 1)`), the file's first row stored as the
+   image's last row (the rows bottom up). A folder reads as an empty file (`Empty input file`).
+2. **Writing** (an image of bytes; another pixel format: `JPEGWrite: only PFBYTE currently supported`,
+   `ERROR_UNSUPPORTED`): the file made (a failure ends the program: `JPEGWriteImage:  Could not open file`,
+   `ERROR_BAD_FILE`), then IJG 6b's compressor of one 8-bit grey component with its defaults (quality 75) of the
+   image's `ocols` x `orows` samples, the image's last row first (`IMAGEpix(I, 0, rows - r - 1)`); an error of the
+   compressor (an empty image, a side past 65,500, a write that fails) ends the program with status 1, the file
+   left as written. The MATLAB, PBM and any other image type than SGI, TIFF, PGM, PPM and HIPS write through this
+   writer too.
+
+## 147. Validation plan (part 34)
+
+Piece 32 of the fs.io probe. `m3w` (piece 17's `vwr`: `MRIwrite` of `.m3z`, `.m3d`, `@m3z` names, upper case, a name
+holding `.m3z` before `.m3d`, a missing folder, a folder of that name; `MRIwriteType(..., 29)` of `.mgz`, `.mgh`,
+`.nii`, `.nii.gz`, `.m3z`, `.m3d`, `.img` names, no extension, a missing folder) of volumes of 1 to 4 voxels a side,
+three frames (now and then one, two or four), `float` displacements (steps of 1/8, NaN quiet and signalling, infinite,
+subnormal, 1e30, -0), bytes, shorts, ints, without voxels now and then; coronal axes or signed permutations, voxel
+sizes 0.5 to 2, a nudged cosine now and then: the status, `errno`, every file (inflated) and half the time the file
+read back with `mri_read` (§142). `gcw` (piece 31's morph files and warp volumes read, then `GCAMwrite` under `.m3z`,
+`.m3d`, `.mgz`, `.nii`, `.nii.gz`, `.img`, a missing folder, in the formats 0 to 3). `trs` (`TransformRead` of `.lta`
+files of types 0, 1, 14 and 11 with one, two or no transforms, small geometries valid or not; MNI `.xfm` files;
+register.dat files; `identity.nofile`; morphs (piece 31's, a small image); missing files; inverted not, without a
+volume or with a header volume of the source geometry; then 1 to 6 of the queries of §144 items 4 to 10 at points
+inside, on the faces, outside, NaN, infinite), `SHOW_NEG` and `FS_SKIP_TAGS` now and then. Not compared: FS-851,
+FS-855, FS-857 to FS-861, FS-58; compared apart: FS-167, FS-49, FS-53 (memory contents). Measured (2026-11-16,
+observed): seeds 7 and 13 (1,200 piece-32 cases each): `reproduce` identical on every compared case (958 and 945; 58
+and 79 skipped, 184 and 176 compared apart), 0 different; `fix` differs only with notices (FS-01, FS-856, FS-862,
+GLIBC-07, the identification's). The six recorded heads' `talairach.m3z` read and written again as `.m3z`, `.mgz`
+(formats 0 and 3), `.nii.gz` (0) and `.nii` (1): 30 of 30 outputs identical in both modes (`.m3d`: FreeSurfer's probe
+stops writing at its 64 MiB file limit; its bytes are the `.m3z`'s stream). JPEG (piece 23, since this part with real
+files: track C's test encoder, now and then damaged): seeds 7 and 13 (1,200 image cases each): `reproduce` identical on
+every compared case (seed 13: 54 JPEG reads compared, 21 decoded, 33 IJG errors). The defaults and the cases FreeSurfer
+crashes on: `crates-freesurfer/larmorx-freesurfer-gca/tests/transform_write.rs`.

@@ -45,6 +45,25 @@ Third-party code: none in these lines (`docs/freesurfer/third-party.md`). The bi
 section is fs.io's (`znzCTABreadFromBinary`); the volumes, matrices, resampling and frame copies are fs.mri's,
 fs.core's and fs.volume's.
 
+### Track A's relay 39: TRANSFORM and the morph writer
+
+The `TRANSFORM` functions whose callees are ported (C relay 31's inventory: TRANSFORM goes with fs.gca, above
+fs.volume's LTA functions), and `MRIwriteType`'s `MGH_MORPH` branch with the writer it reaches.
+
+| FreeSurfer file (lines) | Functions | Here |
+|---|---|---|
+| `include/transform.h` 62-70; `utils/transform.cpp` 2126-2201, 2608-2658 | `TRANSFORM` (an enum of the array and the morph), `TransformRead` (FS-858), `TransformFree` (FS-860), `TransformAlloc`, `TransformSwapInverse`, `TransformInvert` | `transform.rs` |
+| `utils/transform.cpp` 2209-2443 | `TransformSample`, `TransformSampleReal` (FS-862), `TransformSampleReal2` (their static vectors as locals: no state between calls) | `transform.rs` |
+| `utils/transform.cpp` 2449-2606, 4553-4578, 4877-4901; `utils/gcamorph.cpp` 5236-5330 | `TransformSampleInverse` (FS-857, FS-861), `TransformSampleInverseFloat`, `TransformSampleInverseVoxel`, `TransformSampleDirection`, `TransformSourceVoxelToAtlas`, `boundsCheckf`, `GCAMsampleMorph` | `transform.rs` |
+| `utils/transform.cpp` 411-424, 4793-4842 | `TransformCopyVolGeomToMRI`, `TransformGetSrcVolGeom`, `TransformGetDstVolGeom`, `TransformSetMRIVolGeomToSrc`, `TransformSetMRIVolGeomToDst` (FS-859 for each) | `transform.rs` |
+| `utils/mriio.cpp` 1179-1190; `utils/gcamorph.cpp` 352-454, 1383-1393, 1417-1679 (the branch without an atlas), 15111-15178 | `MRIwriteType`'s `MGH_MORPH` branch (FS-856; registered with fs.io's `upper` table as `write_morph`), `GCAMwrite`, `__warpfieldWrite`, `__m3zWrite`, `GCAMinitVolGeom`, `GCAMinit` (without a GCA), `GCAMreadWarpFromMRI` | `gcam_write.rs` |
+| `utils/warpfield.cpp` 132-236, 567-655 | `Warpfield::convert(GCA_MORPH *, ...)` (with `doGCAMsampleMorph` 0, its only caller's), `Warpfield::write`, `Warpfield::setWarp` | `gcam_write.rs` |
+
+Not yet: `TransformWrite`, `TransformCopy` (`GCAMcopy`), `TransformApply*`, `TransformCreateDensityMap`,
+`TransformCompose`, `TransformConcat`, `TransformInvertReplace`, `TransformRas2Vox`, `TransformVox2Ras`; `GCAMinit`'s
+branch with a GCA. `GCAMwriteMRI`'s `log10f` and `logf` are larmorx_core's `Libm` choice since this relay (correctly
+rounded by default, glibc 2.35's with `reproduce`).
+
 ## Changes from the originals
 
 The grids are read through a buffer (FreeSurfer's `fread` is buffered; the port's plain file is not): the same

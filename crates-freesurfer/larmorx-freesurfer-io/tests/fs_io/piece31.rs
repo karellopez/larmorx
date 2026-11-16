@@ -159,7 +159,7 @@ impl Grid {
 
 /// An `.m3z`'s uncompressed bytes (`GCAMwrite`'s layout) and where its nodes end; `node_frames`
 /// asks for a small valid image geometry (the node-coordinate frames go through the inverse).
-fn m3z_bytes(g: &mut Gen, node_frames: bool) -> (Vec<u8>, usize) {
+pub(crate) fn m3z_bytes(g: &mut Gen, node_frames: bool) -> (Vec<u8>, usize) {
     let mut b = Vec::new();
     let version = match g.below(30) {
         0 => 2.0,
@@ -307,7 +307,7 @@ fn m3z_bytes(g: &mut Gen, node_frames: bool) -> (Vec<u8>, usize) {
 /// A gzip stream of `b` in stored blocks (`gzip -0`), the first ending at `split` (or at 65,535
 /// bytes); with `damage`, the block after `split` has a wrong length check (zlib's `invalid stored
 /// block lengths`).
-fn gz_stored(b: &[u8], split: Option<usize>, damage: bool) -> Vec<u8> {
+pub(crate) fn gz_stored(b: &[u8], split: Option<usize>, damage: bool) -> Vec<u8> {
     let mut o = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3];
     let mut blocks: Vec<&[u8]> = Vec::new();
     let mut rest = b;
@@ -351,7 +351,7 @@ fn gz_stored(b: &[u8], split: Option<usize>, damage: bool) -> Vec<u8> {
 
 /// An MGH warp volume (`Warpfield::write`'s layout, compressed): three float frames, the warp's
 /// version or another, the morph's metadata, geometries, affine and labels as tags.
-fn warp_mgz(g: &mut Gen) -> Vec<u8> {
+pub(crate) fn warp_mgz(g: &mut Gen) -> Vec<u8> {
     let mut b = Vec::new();
     let version = if g.chance(6) { 1 } else { (3 << 8) | 1 };
     be32(&mut b, version);

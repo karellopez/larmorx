@@ -291,7 +291,7 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/annotation.cpp` 1248-1310 | `ReadAnnotAsMRISeg` (FS-49, FS-53; relay 30) | `annotation.rs` |
 | `utils/mriio.cpp` 643-647, 781-798, 830-925, 1176-1178, 1211-1213 | `mri_read`'s BRIK, curvature and annotation branches and its frees (FS-672, FS-717); `MRIwriteType`'s BRIK and NRRD branches (relay 30) | `mriio.rs` |
 | `utils/mriio.cpp` 516-528, 1116-1160 | `mri_read`'s COR, bhdr, bshort and bfloat branches; `MRIwriteType`'s COR, bhdr (FS-666), bshort and bfloat branches (relay 27) | `mriio.rs` |
-| `utils/imageio.cpp` 119-130, 147-196, 255-342, 459-518, 612-658, 1495-1505, 1687-1720, 1744-1781, 1799-1874 | `ImageWrite`, `ImageFWrite`, `ImageFRead` (over the HIPS stubs), `ImageReadFrames`'s open, `ImageRead`, `ImageUnpackFileName`, the netpbm stubs (`HAVE_NETPBM` undefined), `JPEGReadImage`'s open and `JPEGWriteImage`'s format check (the IJG's codec not ported: track C's), `RGBReadImage`, `RGBwrite` (FS-718, FS-719, FS-727, FS-730 to FS-732; relay 31) | `imageio.rs` |
+| `utils/imageio.cpp` 119-130, 147-196, 255-342, 459-518, 612-658, 1495-1505, 1687-1720, 1744-1781, 1799-1874 | `ImageWrite`, `ImageFWrite`, `ImageFRead` (over the HIPS stubs), `ImageReadFrames`'s open, `ImageRead`, `ImageUnpackFileName`, the netpbm stubs (`HAVE_NETPBM` undefined), `JPEGReadImage` and `JPEGWriteImage` (relay 39: whole, over track C's `larmorx_io::jpeg`: IJG 6b's decompressor and compressor), `RGBReadImage`, `RGBwrite` (FS-718, FS-719, FS-727, FS-730 to FS-732; relay 31) | `imageio.rs` |
 | `utils/image.cpp` 808-826, 3015-3080 | `ImageFromMatrix` (FS-719), `ImageInvert` with `ImageSplit`'s and `ImageCombine`'s allocations (the pixels' values unused: `ImageToMRI` refuses complex images) (relay 31) | `imageio.rs` |
 | `utils/rgb.cpp`; `include/rgb.h` | `iopen`/`imgopen` (read and write), `getrow`, `putrow` (uncompressed 1-byte pixels: what `RGBwrite` reaches), `iclose`, `iflush`, `img_seek`, `img_badrow`, `img_read`, `img_write`, `img_optseek`, `img_getrowsize`, `img_rle_expand`, `cvtimage`, `cvtshorts`, `cvtlongs` (as reading reaches them), `swapImage`, `tmpswapShort`, `tmpswapInt`, `isetname`, `ibufalloc`, `i_errhdlr` (no error function: message and `exit(1)`) (FS-720 to FS-729; relay 31) | `rgb.rs` |
 | `utils/mriio.cpp` 785-794, 1143-1150, 1191-1196, 9981-10101 | `mri_read`'s image branch, `MRIwriteType`'s image and ITK branches, `itkMorphWrite` (FS-733, FS-449, FS-58; relay 31) | `mriio.rs`, `mriio_write.rs` |
@@ -422,3 +422,11 @@ contiguous buffer as FreeSurfer reads them through its row pointers (`long32` at
 widened as `cvtss2sd` widens them; the messages name the file as the program does. The defaults of FS-746 to
 FS-748 (each long's value clamped, the exact range of 32-bit integers, the range of a float volume whose first voxel
 is NaN), the FS-58 refusal and their notices are larmorx's own.
+
+## FreeSurfer files and functions translated (relay 39 of track A: the warp format change, the morph writer's hook)
+
+| FreeSurfer file (lines) | Functions | Here |
+|---|---|---|
+| `utils/warpfield.cpp` 55-74, 659-951; `utils/mriio.cpp` 9655-9661 | `Warpfield::Warpfield(MRI *)` (its matrices with shears), `Warpfield::changeFormat` and `__changeFormatFrom_abs_crs`, `__changeFormatFrom_disp_crs`, `__changeFormatFrom_abs_ras`, `__changeFormatFrom_disp_ras`, as `niiWrite` calls them (the volume changed in place) | `warpfield.rs`, `mriio_write.rs` |
+| `utils/mriio.cpp` 1179-1190 | `MRIwriteType`'s `MGH_MORPH` branch: through `upper.rs`'s `write_morph` (fs.gca's `gcam_write.rs`; the message of a program that does not link it) | `mriio.rs`, `upper.rs` |
+

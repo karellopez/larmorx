@@ -66,6 +66,9 @@
 #include "mrisurf.h"
 #include "utils.h"
 #include "selxavgio.h"
+#include "transform.h"
+#include "gcamorph.h"
+#include "mri_circulars.h"
 #include <zlib.h>
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
@@ -1473,7 +1476,8 @@ void run_piece13(const std::string &cmd)
 // piece 26 (track A relay 34): mcw is vwr (the MINC writer)
 bool piece14_cmd(const std::string &cmd)
 {
-  return cmd == "mgw" || cmd == "awr" || cmd == "vwr" || cmd == "kwr" || cmd == "ixw" || cmd == "mcw";
+  return cmd == "mgw" || cmd == "awr" || cmd == "vwr" || cmd == "kwr" || cmd == "ixw" || cmd == "mcw" ||
+         cmd == "m3w";
 }
 
 // a volume with every field the MGH writer writes: <w> <h> <d> <type> <frames> <alloc 1 voxels|0
@@ -1548,7 +1552,13 @@ MRI *read_mri14()
 void run_piece14(const std::string &cmd0)
 {
   // piece 23 (track A relay 31): ixw writes image files as vwr does
-  const std::string cmd = cmd0 == "kwr" || cmd0 == "ixw" || cmd0 == "mcw" ? "vwr" : cmd0;
+  // piece 32 (track A relay 39): m3w writes GCA morphs (MRIwrite of .m3z/.m3d names, MRIwriteType
+  // as MGH_MORPH) as vwr does, after MRIread's licence check's variables (the read back)
+  const std::string cmd = cmd0 == "kwr" || cmd0 == "ixw" || cmd0 == "mcw" || cmd0 == "m3w" ? "vwr" : cmd0;
+  if (cmd0 == "m3w") {
+    setenv("FREESURFER_HOME", "/nonexistent-freesurfer-home", 1);
+    if (!getenv("FS_LICENSE")) setenv("FS_LICENSE", "/usr/local/freesurfer/license.txt", 1);
+  }
   fwide(stderr, -1);
   if (cmd == "mgw" || cmd == "awr" || cmd == "vwr") {
     // piece 16 (track A relay 26): awr <Gdiag_no> <N_Zero_Pad_Output> <N_Zero_Pad_Input for the
@@ -2014,6 +2024,113 @@ void run_piece6(const std::string &cmd0)
       fflush(NULL);
       ofile(datname);
     }
+    oi(errno);
+  } else if (cmd == "gcw") {
+    // piece 32 (track A relay 39): GCAMread of a morph, then GCAMwrite under another name with a
+    // warp format (mri_convert's path for a morph input); the status and the files under w
+    Gdiag = strtoull(next(), NULL, 16);
+    set_env6((int)geti());
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    setenv("FREESURFER_HOME", "/nonexistent-freesurfer-home", 1);
+    if (!getenv("FS_LICENSE")) setenv("FS_LICENSE", "/usr/local/freesurfer/license.txt", 1);
+    std::string oname_ = getstr(&nn);
+    int datainterp = (int)geti();
+    errno = 0;
+    GCA_MORPH *gcam = GCAMread(name.c_str());
+    if (!gcam) { out += "N "; oi(errno); return; }
+    fflush(stdout);
+    oi(GCAMwrite(gcam, oname_.c_str(), datainterp));
+    fflush(NULL);
+    odir12();
+    oi(errno);
+  } else if (cmd == "trs") {
+    // piece 32 (track A relay 39): TransformRead of a file, TransformInvert (0 none, 1 without a
+    // volume, 2 with a header volume of the transform's source geometry), then queries: s, r, R
+    // (TransformSample, ...Real, ...Real2 of a float point), i (TransformSampleInverse of a voxel),
+    // f (TransformSampleInverseFloat), v (TransformSampleInverseVoxel with extents), d
+    // (TransformSampleDirection), a (TransformSourceVoxelToAtlas), g (the source and destination
+    // geometries), w (TransformSwapInverse), m (TransformSetMRIVolGeomToSrc, ...ToDst and
+    // TransformCopyVolGeomToMRI on a 2 x 2 x 2 header); TransformFree at the end
+    Gdiag = strtoull(next(), NULL, 16);
+    set_env6((int)geti());
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    setenv("FREESURFER_HOME", "/nonexistent-freesurfer-home", 1);
+    if (!getenv("FS_LICENSE")) setenv("FS_LICENSE", "/usr/local/freesurfer/license.txt", 1);
+    int inv = (int)geti();
+    int nq = (int)geti();
+    errno = 0;
+    TRANSFORM *t = TransformRead(name.c_str());
+    if (!t) { out += "N "; oi(errno); oi(Gerror); return; }
+    oi(t->type);
+    if (inv == 1) oi(TransformInvert(t, NULL));
+    if (inv == 2) {
+      VOL_GEOM vg;
+      TransformGetSrcVolGeom(t, &vg);
+      MRI *m = MRIallocHeader(vg.width, vg.height, vg.depth, MRI_UCHAR, 1);
+      MRIcopyVolGeomToMRI(m, &vg);
+      oi(TransformInvert(t, m));
+    }
+    fflush(stdout);
+    auto pvg = [](const VOL_GEOM &v) {
+      oi(v.valid); oi(v.width); oi(v.height); oi(v.depth);
+      const float f[] = {v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s,
+                         v.z_r, v.z_a, v.z_s, v.c_r, v.c_a, v.c_s, v.s_r, v.s_a, v.s_s};
+      for (float x : f) of(x);
+      oname(v.fname);
+    };
+    auto pmri = [](const MRI *m) {
+      oi(m->width); oi(m->height); oi(m->depth);
+      const float f[] = {m->xsize, m->ysize, m->zsize, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a, m->y_s,
+                         m->z_r, m->z_a, m->z_s, m->c_r, m->c_a, m->c_s};
+      for (float x : f) of(x);
+      oi(m->ras_good_flag);
+    };
+    for (int q = 0; q < nq; q++) {
+      std::string k = next();
+      out += k + " ";
+      float px = -7, py = -7, pz = -7;
+      if (k == "s" || k == "r" || k == "R" || k == "f") {
+        float x = getf(), y = getf(), z = getf();
+        int r = k == "s"   ? TransformSample(t, x, y, z, &px, &py, &pz)
+                : k == "r" ? TransformSampleReal(t, x, y, z, &px, &py, &pz)
+                : k == "R" ? TransformSampleReal2(t, x, y, z, &px, &py, &pz)
+                           : TransformSampleInverseFloat(t, x, y, z, &px, &py, &pz);
+        oi(r); of(px); of(py); of(pz);
+      } else if (k == "i") {
+        int x = (int)geti(), y = (int)geti(), z = (int)geti();
+        oi(TransformSampleInverse(t, x, y, z, &px, &py, &pz)); of(px); of(py); of(pz);
+      } else if (k == "v") {
+        int w = (int)geti(), h = (int)geti(), d = (int)geti();
+        int x = (int)geti(), y = (int)geti(), z = (int)geti();
+        int ix = -7, iy = -7, iz = -7;
+        oi(TransformSampleInverseVoxel(t, w, h, d, x, y, z, &ix, &iy, &iz)); oi(ix); oi(iy); oi(iz);
+      } else if (k == "d") {
+        float x = getf(), y = getf(), z = getf(), nx = getf(), ny = getf(), nz = getf();
+        oi(TransformSampleDirection(t, x, y, z, nx, ny, nz, &px, &py, &pz)); of(px); of(py); of(pz);
+      } else if (k == "a") {
+        int x = (int)geti(), y = (int)geti(), z = (int)geti();
+        double dx = -7, dy = -7, dz = -7;
+        oi(TransformSourceVoxelToAtlas(t, NULL, x, y, z, &dx, &dy, &dz)); od(dx); od(dy); od(dz);
+      } else if (k == "g") {
+        VOL_GEOM a, b;
+        oi(TransformGetSrcVolGeom(t, &a));
+        oi(TransformGetDstVolGeom(t, &b));
+        pvg(a); pvg(b);
+      } else if (k == "w") {
+        oi(TransformSwapInverse(t));
+      } else if (k == "m") {
+        MRI *m = MRIallocHeader(2, 2, 2, MRI_UCHAR, 1);
+        oi(TransformSetMRIVolGeomToSrc(t, m)); pmri(m);
+        oi(TransformSetMRIVolGeomToDst(t, m)); pmri(m);
+        oi(TransformCopyVolGeomToMRI(t, m)); pmri(m);
+      }
+      fflush(stdout);
+    }
+    oi(TransformFree(&t));
     oi(errno);
   } else if (cmd == "lro") {
     // piece 30: LabelRemoveOverlap of two labels (vertex numbers and deleted flags)
@@ -2945,7 +3062,8 @@ int main(int argc, char *argv[])
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
-                                 "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h"};
+                                 "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h",
+                                 "m3w", "trs", "gcw"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

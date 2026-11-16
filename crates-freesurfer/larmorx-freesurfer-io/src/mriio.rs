@@ -810,15 +810,6 @@ fn freeing(g: &mut Globals, m: &Mri) {
     }
 }
 
-/// The writers [`mri_write_type`] does not have yet: their formats' names.
-fn write_not_ported(mtype: i32) -> Option<&'static str> {
-    use crate::identify::*;
-    Some(match mtype {
-        MGH_MORPH => "GCA morph (m3z)",
-        _ => return None,
-    })
-}
-
 /// The formats `MRIwriteType` refuses to write: the name its message gives.
 fn write_unsupported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
@@ -923,11 +914,10 @@ fn fail_code(g: &mut Globals, err: &mut dyn Write, code: i32, message: &str) -> 
 /// depth of 1 (`MRIwriteType(<f>): image files cannnot have depth > 1`, the program ends), a GCA or
 /// ITK morph three frames (`MRIwriteType: gcam - input mri must have 3 frames, not <n>`, `MRIwriteType:
 /// itk warp - ...`, -1). GIFTI files: [`crate::gifti_vol::mri_write_gifti`]; MINC files:
-/// [`crate::mriio_minc::minc_write`]. After a writer that
+/// [`crate::mriio_minc::minc_write`]; GCA morphs: fs.gca's writer ([`crate::upper::WriteMorph`]). After a writer that
 /// succeeds, a volume with b-values also writes them beside it: `Saving bvals and bvecs` on
 /// standard output, `<stem>.bvals` and `<stem>.<space>_space.bvecs` (`scanner`, `voxel` or
-/// `unknown`), the stem the name without its volume extension (none: nothing written). The GCA
-/// morph writer (m3z) is not ported yet: a message and -1.
+/// `unknown`), the stem the name without its volume extension (none: nothing written).
 #[allow(clippy::too_many_arguments)]
 pub fn mri_write_type(
     g: &mut Globals,
@@ -1059,12 +1049,12 @@ pub fn mri_write_type(
         crate::imageio::write_from_volume(g, out, err, dir, m, fname)?
     } else if mtype == ITK_MORPH {
         crate::mriio_write::itk_morph_write(g, out, err, dir, m, fname)?
-    } else if let Some(name) = write_not_ported(mtype) {
-        let _ = writeln!(
-            err,
-            "larmorx-freesurfer: writing {name} volumes is not ported yet ({fname})"
-        );
-        return Ok(-1);
+    } else if mtype == MGH_MORPH {
+        let Some(write_morph) = crate::upper::get().write_morph else {
+            crate::upper::missing(err, "writing GCA morphs", "fs.gca", "GCAMwrite", fname);
+            return Ok(-1);
+        };
+        write_morph(g, out, err, env, dir, m, fname)?
     } else if let Some(name) = write_unsupported(mtype) {
         return Ok(fail_code(
             g,

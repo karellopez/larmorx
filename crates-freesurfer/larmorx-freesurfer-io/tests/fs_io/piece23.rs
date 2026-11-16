@@ -7,7 +7,8 @@
 //! 16,384 pixels and more; then one fault: a wrong magic number, an unknown type, dimension or
 //! pixel size, a cut header, tables or rows, run-length rows of length -1, longer than the buffer
 //! or running past the width), MATLAB files (piece 5's), HIPS names (any other extension, or a
-//! name with `@<image type>`), PGM, PPM and PBM files, TIFF and JPEG files (not ported: SKIP),
+//! name with `@<image type>`), PGM, PPM and PBM files, JPEG files (since relay 39: track C's
+//! generated files, now and then damaged), TIFF files (not ported: SKIP),
 //! missing files and folders, with and without `#` frames; `ixw` (piece 17's `vwr`, `how` 31 or
 //! `MRIwrite` by the name) of volumes of every type as SGI, MATLAB (the JPEG writer), PGM, PPM,
 //! PBM, HIPS, TIFF and JPEG names, `#` and folder names, volumes 65,536 pixels wide or tall; and
@@ -16,6 +17,7 @@
 use std::io::Write;
 
 use larmorx_freesurfer_core::globals::Globals;
+use larmorx_io::jpeg::cases as jpeg_cases;
 
 use super::piece4::file_entry;
 use super::piece12::fhex;
@@ -237,7 +239,16 @@ fn read_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
         }
         _ => {
             let name = g.pick(&["w/t.tif", "w/t.tiff", "w/t.svs", "w/j.jpg", "w/j.jpeg"]);
-            if !g.chance(3) {
+            if name.contains(".jp") && !g.chance(6) {
+                // relay 39: JPEG files of track C's test encoder (IJG 6b decodes them), now and
+                // then damaged
+                let seed = g.below(1 << 62);
+                let mut f = jpeg_cases::make(&jpeg_cases::Recipe::random(seed, 24));
+                if g.chance(4) {
+                    jpeg_cases::damage(&mut f, seed, g.int(1, 4) as u32);
+                }
+                entries.push(file_entry(name, &f));
+            } else if !g.chance(3) {
                 entries.push(file_entry(name, b"II*\x00\x08\x00\x00\x00\xff\xd8\xff"));
             }
             (name.into(), if g.chance(2) { 21 } else { -1 })

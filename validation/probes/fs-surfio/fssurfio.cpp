@@ -5931,6 +5931,21 @@ static void vls_dump(MRIS *s)
   of(s->max_curv); of(s->min_curv);
 }
 
+// after the long-range sampling: each vertex's neighbours in use, their size and original
+// distances; the surface's neighbourhood size, mean neighbour count and flag
+static void vls_topo_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX_TOPOLOGY *t = &s->vertices_topology[v];
+    oi(t->vtotal); oi(t->nsizeCur);
+    for (int i = 0; i < t->vtotal; i++) oi(t->v[i]);
+    if (s->vertices[v].dist_orig)
+      for (int i = 0; i < t->vtotal; i++) of(s->vertices[v].dist_orig[i]);
+    else out += "N ";
+  }
+  oi(s->nsize); of(s->avg_nbrs); oi(s->vtotalsMightBeTooBig);
+}
+
 void vls_case()
 {
   mkdir(workdir.c_str(), 0700);
@@ -5971,6 +5986,13 @@ void vls_case()
     if (extra) { s->dx2[v] = getf(); s->dy2[v] = getf(); s->dz2[v] = getf(); }
   }
   for (int f = 0; f < nf; f++) s->faces[f].marked = geti();
+  // relay 40: the long-range sampling's seed, diagnostic vertex, heartbeat and vertex pair
+  setenv("FREESURFER_SEED", std::to_string(geti()).c_str(), 1);
+  Gdiag_no = geti();
+  if (geti()) Gdiag |= DIAG_HEARTBEAT;
+  int vd1 = geti(), vd2 = geti();
+  if (vd1 >= 0) setenv("VDIAG1", std::to_string(vd1).c_str(), 1);
+  if (vd2 >= 0) setenv("VDIAG2", std::to_string(vd2).c_str(), 1);
   int npts = geti();
   LABEL *lab = LabelAlloc(npts > 0 ? npts : 1, NULL, NULL);
   lab->n_points = npts;
@@ -6054,8 +6076,35 @@ void vls_case()
     else if (op == "MRISmodeFilterZeroVals") oi(MRISmodeFilterZeroVals(s));
     else if (op == "MRISsoapBubbleVals") oi(MRISsoapBubbleVals(s, geti()));
     else if (op == "MRISsoapBubbleD") oi(MRISsoapBubbleD(s, geti()));
+    else if (op == "MRISsampleDistances") {
+      int m = geti();
+      std::vector<int> nb(m + 1 > 1 ? m + 1 : 1);
+      for (size_t i = 0; i < nb.size(); i++) nb[i] = geti();
+      oi(MRISsampleDistances(s, nb.data(), m));
+      vls_topo_dump(s);
+    } else if (op == "MRISsampleAtEachDistance") {
+      int a = geti(), b = geti();
+      oi(MRISsampleAtEachDistance(s, a, b));
+      vls_topo_dump(s);
+    }
     else fail("vls op");
     vls_dump(s);
+  }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    if (name == "d/lh.s0") continue;
+    oh(name.c_str());
+    FILE *f = fopen(name.c_str(), "rb");
+    if (!f) { out += "NOFILE "; continue; }
+    std::string b;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+    fclose(f);
+    ox(b);
   }
 }
 

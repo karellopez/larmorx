@@ -17,12 +17,14 @@
 
 use super::fli::{fv, surface};
 use super::mpd::{grid, ico};
+use super::sfile::list_files;
 use super::srd::mesh;
 use super::*;
 
+use larmorx_freesurfer_core::diag::DIAG_HEARTBEAT;
 use larmorx_freesurfer_io::label::label_alloc;
 use larmorx_freesurfer_surf::valfilter::{self, Field};
-use larmorx_freesurfer_surf::{nbhd, readwrite, valmarks};
+use larmorx_freesurfer_surf::{nbhd, readwrite, sampdist, valmarks};
 
 fn dv(t: &mut Vec<String>, x: f64) {
     t.push(format!("{:016x}", x.to_bits()));
@@ -188,6 +190,24 @@ pub(super) fn vls_tokens(t: &mut Vec<String>, g: &mut Gen) {
     for _ in 0..nf {
         ix(t, g.pick(&[0, 0, 1, 2, -1]));
     }
+    // the long-range sampling's seed, diagnostic vertex, heartbeat and vertex pair
+    ix(t, g.int(1, 999));
+    ix(
+        t,
+        if nv > 0 && g.chance(10) {
+            g.int(0, nv - 1)
+        } else {
+            -1
+        },
+    );
+    ix(t, i64::from(g.chance(8)));
+    if nv > 1 && g.chance(8) {
+        ix(t, g.int(0, nv - 1));
+        ix(t, g.int(0, nv - 1));
+    } else {
+        ix(t, -1);
+        ix(t, -1);
+    }
     let npts = g.int(0, 6);
     ix(t, npts);
     for _ in 0..npts {
@@ -256,9 +276,52 @@ pub(super) fn vls_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 ix(t, vn1);
             }
             11 if zero_vals => t.push("MRISmodeFilterZeroVals".into()),
+            12 => {
+                t.push("MRISsampleDistances".into());
+                let m = if g.chance(20) { 100 } else { g.int(0, 4) };
+                ix(t, m);
+                for _ in 0..=m.max(0) {
+                    ix(t, g.pick(&[0, 0, 1, 3, 5, 8, 20]));
+                }
+            }
+            13 => {
+                t.push("MRISsampleAtEachDistance".into());
+                let n = if g.chance(20) {
+                    g.pick(&[150, 250])
+                } else {
+                    g.int(0, 3)
+                };
+                ix(t, n);
+                ix(t, g.pick(&[0, 2, 5, 8]));
+            }
             _ => t.push(g.pick(&PLAIN).into()),
         }
     }
+}
+
+/// After the long-range sampling: each vertex's neighbours in use, their size and original
+/// distances; the surface's neighbourhood size, mean neighbour count and flag.
+fn topo_dump(s: &Mris, o: &mut Out) {
+    for vno in 0..s.nvertices.max(0) as usize {
+        let t = s.topology(vno);
+        let n = t.vtotal.max(0) as usize;
+        o.i(i64::from(t.vtotal));
+        o.i(i64::from(t.nsizeCur));
+        for i in 0..n {
+            o.i(i64::from(t.v.as_ref().expect("v")[i]));
+        }
+        match &s.vertex(vno).dist_orig {
+            Some(d) => {
+                for &x in &d[..n] {
+                    o.f(x);
+                }
+            }
+            None => o.s("N"),
+        }
+    }
+    o.i(i64::from(s.nsize));
+    o.f(s.avg_nbrs);
+    o.i(i64::from(s.vtotalsMightBeTooBig));
 }
 
 fn dump(s: &Mris, o: &mut Out) {
@@ -376,6 +439,28 @@ pub(super) fn vls_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     for fno in 0..nf as usize {
         s.face_mut(fno).marked = t.i();
     }
+    let seed = t.i();
+    g.gdiag_no = t.i();
+    if t.i() != 0 {
+        g.gdiag |= DIAG_HEARTBEAT;
+    }
+    let (vd1, vd2) = (t.i(), t.i());
+    let mut pairs = vec![
+        ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
+        ("FREESURFER_SEED".to_owned(), seed.to_string()),
+    ];
+    if vd1 >= 0 {
+        pairs.push(("VDIAG1".to_owned(), vd1.to_string()));
+    }
+    if vd2 >= 0 {
+        pairs.push(("VDIAG2".to_owned(), vd2.to_string()));
+    }
+    let env = Environment::from_pairs(pairs);
+    let mut io = coords::Io {
+        out: &mut so,
+        err: &mut se,
+        env: &env,
+    };
     let npts = t.i();
     let mut lab = label_alloc(g, io.env, io.err, npts.max(1), None, None)?;
     lab.n_points = npts;
@@ -511,12 +596,49 @@ pub(super) fn vls_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "MRISmodeFilterZeroVals" => Some(valfilter::mode_filter_zero_vals(g, &mut io, &mut s)?),
             "MRISsoapBubbleVals" => Some(valfilter::soap_bubble_vals(g, io.out, &mut s, t.i())),
             "MRISsoapBubbleD" => Some(valfilter::soap_bubble_d(g, io.out, &mut s, t.i())),
+            "MRISsampleDistances" => {
+                let m = t.i();
+                let nbrs: Vec<i32> = (0..(m + 1).max(1)).map(|_| t.i()).collect();
+                o.i(i64::from(sampdist::sample_distances(
+                    g, &mut io, d, &mut s, &nbrs, m,
+                )?));
+                topo_dump(&s, o);
+                None
+            }
+            "MRISsampleAtEachDistance" => {
+                let (a, b) = (t.i(), t.i());
+                o.i(i64::from(sampdist::sample_at_each_distance(
+                    g, &mut io, d, &mut s, a, b,
+                )?));
+                topo_dump(&s, o);
+                None
+            }
             _ => panic!("vls op {op}"),
         };
         if let Some(r) = r {
             o.i(i64::from(r));
         }
         dump(&s, o);
+    }
+    o.0 += "| ";
+    let mut files = Vec::new();
+    list_files(dir, "", &mut files);
+    files.sort();
+    for n in files {
+        if n == "d/lh.s0" {
+            continue;
+        }
+        o.h(Some(n.as_bytes()));
+        match std::fs::read(dir.join(&n)) {
+            Ok(b) => {
+                let mut x = String::from("x");
+                for c in b {
+                    x += &format!("{c:02x}");
+                }
+                o.s(&x);
+            }
+            Err(_) => o.s("NOFILE"),
+        }
     }
     Ok(())
 }

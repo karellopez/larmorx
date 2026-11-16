@@ -15,7 +15,8 @@ use std::sync::Arc;
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
     FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, FS_530, FS_531, FS_532,
-    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, FS_902, FS_906, Notice, UpstreamDefects,
+    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, FS_902, FS_906, FS_974, FS_977, Notice,
+    UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -2939,7 +2940,8 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_629)
                     || cx.g.notices.contains(&FS_632)
                     || cx.g.notices.contains(&FS_902)
-                    || cx.g.notices.contains(&FS_906)) =>
+                    || cx.g.notices.contains(&FS_906)
+                    || cx.g.notices.contains(&FS_977)) =>
         {
             "CRASH 11".to_owned()
         }
@@ -2956,7 +2958,9 @@ pub fn run_line_with(
         // division by 0 (signal 8)
         Err(Fatal::Exit(136))
             if mode.reproduce()
-                && (cx.g.notices.contains(&FS_118) || cx.g.notices.contains(&FS_153)) =>
+                && (cx.g.notices.contains(&FS_118)
+                    || cx.g.notices.contains(&FS_153)
+                    || cx.g.notices.contains(&FS_974)) =>
         {
             "CRASH 8".to_owned()
         }

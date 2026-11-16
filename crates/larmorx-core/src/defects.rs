@@ -1863,6 +1863,14 @@ defects! {
         "marking a surface's intersections (mrisMarkIntersections) leaves the marks of ripped vertices as they were, and its hole filling counts a ripped vertex as marked or not by that old mark; the programs' surfaces have no ripped vertices there";
     FS_917 = "FS-917", "FreeSurfer", true,
         "ripping a surface's vertices by a label (MRISripLabel, MRISripNotLabel: mris_place_surface's label option) writes outside the surface's vertices for a label point that names no vertex (-1, a volume label's points) or a vertex beyond the surface's";
+    FS_974 = "FS-974", "FreeSurfer", true,
+        "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
+    FS_975 = "FS-975", "FreeSurfer", true,
+        "sampling long-range neighbours at each distance (MRISsampleAtEachDistance) writes its counts past its array of 200 for a neighbourhood of 200 or more (MRISsampleDistances then stops at 100)";
+    FS_976 = "FS-976", "FreeSurfer", true,
+        "sampling long-range neighbours (MRISsampleDistances) with counts that sum below 0, or more than 32,767 neighbours for one vertex, reads and writes outside the vertex's neighbour list: the program crashes or computes garbage";
+    FS_977 = "FS-977", "FreeSurfer", true,
+        "sampling long-range neighbours (MRISsampleDistances) with a diagnostic vertex (Gdiag_no) beyond the surface's vertices, or a ripped one without original distances, reads outside them for its log file";
     FS_971 = "FS-971", "FreeSurfer", true,
         "the median filters of a surface's values (MRISmedianFilterVals, MRISmedianFilterVal2s, MRISmedianFilterVal2baks, MRISmedianFilterCurvature, MRISmedianFilterD) write past their list of 1,024 values for a vertex with more than 1,023 unripped neighbours in use";
     FS_972 = "FS-972", "FreeSurfer", true,

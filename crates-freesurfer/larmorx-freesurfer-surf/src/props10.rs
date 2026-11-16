@@ -41,7 +41,7 @@ use larmorx_freesurfer_core::diag;
 use larmorx_freesurfer_core::dmatrix::{DMatrix, dvector_dot};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{Fatal, NO_ERROR};
-use larmorx_freesurfer_core::sse::{self, add, add64, div, div64, mul, mul64};
+use larmorx_freesurfer_core::sse::{self, add, add64, div64, mul, mul64};
 use larmorx_freesurfer_core::utils::dlist_stats;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -1069,35 +1069,12 @@ pub fn mris_pretty_print_surf_quality_stats(
 
 /// `MRISaverageCurvatures(mris, navgs)`: `navgs` times, every unripped vertex's curvature
 /// replaced by the mean (in `float`: its own plus its unripped 1-hop neighbours', counted from
-/// 0, divided by their count plus one) computed from the previous step's values; then the
-/// curvatures' extremes (`mrisComputeCurvatureMinMax`). Returns `NO_ERROR`.
+/// 0, divided by their count plus one) computed from the previous step's values; a vertex whose
+/// `vnum` is not above 0 keeps its value undivided (GCC skips the division by 1: a signalling NaN
+/// stays signalling; [`crate::valfilter`], relay 40); then the curvatures' extremes
+/// (`mrisComputeCurvatureMinMax`). Returns `NO_ERROR`.
 pub fn mris_average_curvatures(mris: &mut Mris, navgs: i32) -> i32 {
-    for _ in 0..navgs.max(0) {
-        for vno in 0..nverts(mris) {
-            if mris.vertex(vno).ripflag != 0 {
-                continue;
-            }
-            let mut curv = mris.vertex(vno).curv;
-            let mut num = 0.0f32;
-            for &n in nbrs(mris, vno, mris.topology(vno).vnum) {
-                let vn = mris.vertex(n as usize);
-                if vn.ripflag != 0 {
-                    continue;
-                }
-                num = add(num, 1.0);
-                curv = add(curv, vn.curv);
-            }
-            num = add(num, 1.0);
-            mris.vertex_mut(vno).tdx = div(curv, num);
-        }
-        for vno in 0..nverts(mris) {
-            let v = mris.vertex_mut(vno);
-            if v.ripflag != 0 {
-                continue;
-            }
-            v.curv = v.tdx;
-        }
-    }
+    crate::valfilter::average_curvatures(mris, navgs);
     compute_curvature_min_max(mris);
     NO_ERROR
 }

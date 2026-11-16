@@ -88,6 +88,8 @@ mod swr;
 mod tri;
 #[path = "vcp.rs"]
 mod vcp;
+#[path = "vls.rs"]
+mod vls;
 #[path = "vps.rs"]
 mod vps;
 #[path = "wvl.rs"]
@@ -168,12 +170,13 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 57] = [
+const COMMANDS: [&str; 58] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
     "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
     "mpg", "fli", "bvl", "crv", "pvw", "vps", "ann", "mpx", "lbl", "wvl", "scl", "vcp", "mht",
+    "vls",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1073,6 +1076,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "wvl" => wvl::wvl_tokens(&mut t, &mut g),
             "scl" => scl::scl_tokens(&mut t, &mut g),
             "vcp" => vcp::vcp_tokens(&mut t, &mut g),
+            "vls" => vls::vls_tokens(&mut t, &mut g),
             "mht" => mht::mht_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
@@ -2761,6 +2765,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "wvl" => wvl::wvl_case(cx, t, o)?,
         "scl" => scl::scl_case(cx, t, o)?,
         "vcp" => vcp::vcp_case(cx, t, o)?,
+        "vls" => vls::vls_case(cx, t, o)?,
         "mht" => mht::mht_case(cx, t, o)?,
         // relay 32 of track D: the recorded heads (real.py); never generated
         "flr" => fli::flr_case(cx, t, o)?,

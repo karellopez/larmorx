@@ -1861,6 +1861,14 @@ defects! {
         "filling the holes of a surface map (MRISfillHoles, and the hinge removal's hole filling through MRISmarkEdge) treats a vertex whose value equals the threshold, or is NaN, as neither in the map nor in a hole: it stays out of the map even inside a hole, and it separates the holes around it";
     FS_916 = "FS-916", "FreeSurfer", false,
         "marking a surface's intersections (mrisMarkIntersections) leaves the marks of ripped vertices as they were, and its hole filling counts a ripped vertex as marked or not by that old mark; the programs' surfaces have no ripped vertices there";
+    FS_917 = "FS-917", "FreeSurfer", true,
+        "ripping a surface's vertices by a label (MRISripLabel, MRISripNotLabel: mris_place_surface's label option) writes outside the surface's vertices for a label point that names no vertex (-1, a volume label's points) or a vertex beyond the surface's";
+    FS_971 = "FS-971", "FreeSurfer", true,
+        "the median filters of a surface's values (MRISmedianFilterVals, MRISmedianFilterVal2s, MRISmedianFilterVal2baks, MRISmedianFilterCurvature, MRISmedianFilterD) write past their list of 1,024 values for a vertex with more than 1,023 unripped neighbours in use";
+    FS_972 = "FS-972", "FreeSurfer", true,
+        "the mode filters of a surface's values (MRISmodeFilterVals, MRISmodeFilterZeroVals) count a neighbour whose value rounds above the largest value truncated (2.6 next to a largest value of 2.6: 3 above 2) outside their table, so that value is never chosen, and the program may crash";
+    FS_973 = "FS-973", "FreeSurfer", true,
+        "the mode filter of a surface's zero values (MRISmodeFilterZeroVals) never ends when a vertex's value is not a number and a vertex of value 0 next to it keeps being processed: the value changes at every pass, as NaN is never equal to itself, and the program prints a line per pass for ever";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

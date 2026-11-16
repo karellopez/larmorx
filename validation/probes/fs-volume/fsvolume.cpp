@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 #include <string>
 #include <vector>
 
@@ -45,6 +46,7 @@
 #include "talairachex.h"
 #include "transform.h"
 #include "utils.h"
+#include "voxlist.h"
 
 extern double vg_isEqual_Threshold;
 extern double MRIsampleVolumeDerivativeSign;
@@ -548,6 +550,59 @@ void put_ct_lacj(const COLOR_TABLE *ct)
     of(e->rf); of(e->gf); of(e->bf); of(e->af);
   }
 }
+
+// relay 34: a voxel list of the case: its allocation n (VLSTalloc), its nvox and max_vox, then for
+// each of the n voxels xi yi zi fi xd yd zd vsrc vdst; a flag, then a volume for its mri
+VOXEL_LIST *get_vl()
+{
+  int n = geti();
+  VOXEL_LIST *vl = VLSTalloc(n);
+  vl->nvox = geti();
+  vl->max_vox = geti();
+  vl->type = geti();
+  for (int i = 0; i < n; i++) {
+    vl->xi[i] = geti(); vl->yi[i] = geti(); vl->zi[i] = geti(); vl->fi[i] = geti();
+    vl->xd[i] = getf(); vl->yd[i] = getf(); vl->zd[i] = getf();
+    vl->vsrc[i] = getf(); vl->vdst[i] = getf();
+  }
+  return vl;
+}
+
+// a list's type, nvox, max_vox and its first nvox voxels (none for a negative count)
+void put_vl(const VOXEL_LIST *vl)
+{
+  if (!vl) { out += "NULL "; return; }
+  oi(vl->type); oi(vl->nvox); oi(vl->max_vox);
+  for (int i = 0; i < vl->nvox; i++) {
+    oi(vl->xi[i]); oi(vl->yi[i]); oi(vl->zi[i]); oi(vl->fi[i]);
+    of(vl->xd[i]); of(vl->yd[i]); of(vl->zd[i]); of(vl->vsrc[i]); of(vl->vdst[i]);
+  }
+  oi(vl->mx != NULL); oi(vl->my != NULL); oi(vl->mz != NULL); oi(vl->t != NULL);
+}
+
+// relay 34: the environment LTAwriteEx and DevolveXFM read: USER/LOGNAME (0 both unset, 1 USER,
+// 2 LOGNAME only, 3 USER empty; the name in hex), the creation time's override (always set)
+void set_user()
+{
+  int k = geti();
+  std::string u = gethex();
+  unsetenv("USER");
+  unsetenv("LOGNAME");
+  if (k == 1) setenv("USER", u.c_str(), 1);
+  else if (k == 2) setenv("LOGNAME", u.c_str(), 1);
+  else if (k == 3) setenv("USER", "", 1);
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "Mon Nov 16 10:00:00 2026", 1);
+}
+
+// relay 34: a file's bytes as hex, or `absent`
+void put_file(const std::string &name)
+{
+  struct stat st;
+  if (stat(name.c_str(), &st) != 0) { out += "absent "; return; }
+  ohex(slurp(name));
+}
+
+void run_case();
 
 void run_case()
 {
@@ -2869,6 +2924,237 @@ void run_case()
       fflush(stdout);
       put_vol(r);
     }
+  } else if (cmd == "ltawr") {
+    // relay 34: transform.cpp's LTAwriteEx (the .lta, MINC .xfm, register.dat and FSL writers)
+    std::string dir = scratch.substr(0, scratch.rfind('/'));
+    if (chdir(dir.c_str())) fail("chdir");
+    set_user();
+    set_fsltype();
+    if (geti()) { Gdiag_no = 1; Gstdout = stdout; }
+    // perror (regio_write_register) on a standard error not yet oriented duplicates it and
+    // fdopens it "w+": EINVAL on the child's write-only file; oriented, errno stays fopen's
+    fwide(stderr, -1);
+    std::string name = gethex();
+    LTA *l = get_lta_full();
+    unlink(name.c_str());
+    errno = 0;
+    fflush(stdout);
+    int r = LTAwriteEx(l, name.c_str());
+    fflush(stdout);
+    oi(r);
+    oi(errno);
+    put_file(name);
+    unlink(name.c_str());
+  } else if (cmd == "ltadvg") {
+    VOL_GEOM vg;
+    set_geom(&vg);
+    fflush(stdout);
+    oi(LTAdumpVolGeom(stdout, &vg));
+    fflush(stdout);
+  } else if (cmd == "ltaxf") {
+    // relay 34: LTAtransformInterp (one transform: the RAS, voxel and physical-voxel paths; none or
+    // several: the octree path), USE_AVERAGE305, FSLOUTPUTTYPE, Gdiag
+    MRI *src = get_vol();
+    fill_pat(src);
+    fill_paint(src);
+    MRI *dst = geti() ? get_vol() : NULL;
+    LTA *l = get_lta_full();
+    int interp = geti();
+    int avg = geti();
+    if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+    else unsetenv("USE_AVERAGE305");
+    set_fsltype();
+    Gdiag = (unsigned long)geti();
+    fflush(stdout);
+    MRI *r = LTAtransformInterp(src, dst, l, interp);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+    put_lta_full(l);
+  } else if (cmd == "ltapt") {
+    LTA *l = get_lta_full();
+    int n = geti();
+    MATRIX *m = get_m44();
+    for (int i = 0; i < n; i++) {
+      float x = getf(), y = getf(), z = getf();
+      MATRIX *r = LTAtransformAtPoint(l, x, y, z, m);
+      oi(r != NULL && r == m);
+      om(r);
+    }
+  } else if (cmd == "ltacor") {
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    oi(LTAvoxelTransformToCoronalRasTransform(l));
+    fflush(stdout);
+    put_lta_full(l);
+  } else if (cmd == "fixmni") {
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      float x = getf(), y = getf(), z = getf(), a, b, c;
+      oi(FixMNITal(x, y, z, &a, &b, &c));
+      of(a); of(b); of(c);
+    }
+  } else if (cmd == "ltamod") {
+    LTA *l = get_lta_full();
+    MRI *src = geti() ? get_vol() : NULL;
+    MRI *dst = geti() ? get_vol() : NULL;
+    vg_isEqual_Threshold = getd();
+    fflush(stdout);
+    oi(LTAmodifySrcDstGeom(l, src, dst));
+    fflush(stdout);
+    put_lta_full(l);
+  } else if (cmd == "devxfm") {
+    // relay 34: DevolveXFMWithSubjectsDir in a subjects folder of the case (relative names in the
+    // scratch's folder): the subject's folder or not, orig.mgz, orig.mgh (bytes) or an orig folder,
+    // transforms/<name> (bytes), the name or NULL, SUBJECTS_DIR or a given folder, XFM or NULL
+    std::string dir = scratch.substr(0, scratch.rfind('/'));
+    if (chdir(dir.c_str())) fail("chdir");
+    std::string sd = gethex(), subj = gethex();
+    int mk = geti();
+    std::string mgz = gethex(), mgh = gethex();
+    int cor = geti();
+    std::string xname = gethex(), xbytes = gethex();
+    int havex = geti(), nullname = geti(), sdmode = geti();
+    MATRIX *X = get_m44();
+    if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+    std::string s1 = sd + "/" + subj, s2 = s1 + "/mri", s3 = s2 + "/transforms";
+    std::vector<std::string> files;
+    // what an earlier case that ended the child may have left
+    for (const char *su : {"s01", "bert"}) {
+      std::string m = sd + "/" + su + "/mri";
+      for (const char *f : {"/orig.mgz", "/orig.mgh", "/transforms/talairach.xfm", "/transforms/reg.lta"})
+        unlink((m + f).c_str());
+      rmdir((m + "/orig").c_str());
+      rmdir((m + "/transforms").c_str());
+      rmdir(m.c_str());
+      rmdir((sd + "/" + su).c_str());
+    }
+    rmdir(sd.c_str());
+    mkdir(sd.c_str(), 0700);
+    if (mk) {
+      mkdir(s1.c_str(), 0700);
+      mkdir(s2.c_str(), 0700);
+      mkdir(s3.c_str(), 0700);
+      if (!mgz.empty()) { spill(s2 + "/orig.mgz", mgz); files.push_back(s2 + "/orig.mgz"); }
+      if (!mgh.empty()) { spill(s2 + "/orig.mgh", mgh); files.push_back(s2 + "/orig.mgh"); }
+      if (cor) mkdir((s2 + "/orig").c_str(), 0700);
+      if (havex) { spill(s3 + "/" + xname, xbytes); files.push_back(s3 + "/" + xname); }
+    }
+    if (sdmode == 1) setenv("SUBJECTS_DIR", sd.c_str(), 1);
+    else unsetenv("SUBJECTS_DIR");
+    errno = 0;
+    fflush(stdout);
+    MATRIX *r = DevolveXFMWithSubjectsDir(subj.c_str(), X, nullname ? NULL : xname.c_str(),
+                                          sdmode == 2 ? sd.c_str() : NULL);
+    fflush(stdout);
+    oi(r != NULL && r == X);
+    om(r);
+    for (const std::string &f : files) unlink(f.c_str());
+    rmdir((s2 + "/orig").c_str());
+    rmdir(s3.c_str());
+    rmdir(s2.c_str());
+    rmdir(s1.c_str());
+    rmdir(sd.c_str());
+  } else if (cmd == "angrm") {
+    double a[3];
+    for (int k = 0; k < 3; k++) a[k] = getd();
+    om(MRIangles2RotMat(a));
+  } else if (cmd == "affp2m") {
+    double p[12];
+    for (int k = 0; k < 12; k++) p[k] = getd();
+    MATRIX *m = get_m44();
+    fflush(stdout);
+    MATRIX *r = TranformAffineParams2Matrix(p, m);
+    fflush(stdout);
+    oi(r != NULL && r == m);
+    om(r);
+  } else if (cmd == "affm2p") {
+    MATRIX *m = get_m44();
+    fflush(stdout);
+    double *p = TranformExtractAffineParams(m, NULL);
+    fflush(stdout);
+    if (!p) out += "NULL ";
+    else for (int k = 0; k < 12; k++) od(p[k]);
+  } else if (cmd == "ltarot") {
+    LTA *l = get_lta_full();
+    fflush(stdout);
+    oi(LTAmat2RotMat(l));
+    fflush(stdout);
+    put_lta_full(l);
+  } else if (cmd == "rmsmj") {
+    MATRIX *a = get_m44(), *b = get_m44();
+    double rad = getd();
+    od(RMSregDiffMJ(a, b, rad));
+  } else if (cmd == "vlcre") {
+    // relay 34: voxlist.cpp's VLSTcreate (a given list: none, VLSTalloc's or an earlier VLSTcreate's)
+    MRI *m = get_vol();
+    fill_pat(m);
+    fill_paint(m);
+    float lo = getf(), hi = getf();
+    int mode = geti();
+    VOXEL_LIST *given = NULL;
+    if (mode == 1) given = get_vl();
+    int skip = geti(), border = geti();
+    if (mode == 2) given = VLSTcreate(m, getf(), getf(), NULL, 0, 0);
+    if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+    Gx = geti(); Gy = geti(); Gz = geti();
+    fflush(stdout);
+    VOXEL_LIST *r = VLSTcreate(m, lo, hi, given, skip, border);
+    fflush(stdout);
+    oi(r == given);
+    oi(r->mri == m);
+    put_vl(r);
+  } else if (cmd == "vlsort") {
+    VOXEL_LIST *src = get_vl();
+    int mode = geti();
+    VOXEL_LIST *dst = mode == 1 ? get_vl() : mode == 2 ? src : NULL;
+    fflush(stdout);
+    VOXEL_LIST *r = VLSTsort(src, dst);
+    fflush(stdout);
+    oi(r == dst);
+    put_vl(r);
+    if (mode == 1) put_vl(src);
+  } else if (cmd == "vlstat") {
+    VOXEL_LIST *vl = get_vl();
+    if (geti()) {
+      MRI *m = get_vol();
+      fill_paint(m);
+      vl->mri = m;
+    }
+    VLSTcomputeStats(vl);
+    od(vl->mean);
+    od(vl->std);
+  } else if (cmd == "vlcopy") {
+    VOXEL_LIST *src = get_vl();
+    if (geti()) src->mx = (float *)calloc(1, sizeof(float));
+    if (geti()) src->my = (float *)calloc(1, sizeof(float));
+    if (geti()) src->mz = (float *)calloc(1, sizeof(float));
+    if (geti()) src->t = (float *)calloc(1, sizeof(float));
+    VOXEL_LIST *dst = geti() ? get_vl() : NULL;
+    int into = geti(), start = geti(), num = geti();
+    fflush(stdout);
+    VOXEL_LIST *r = into ? VLSTcopyInto(src, dst, start, num) : VLSTcopy(src, dst, start, num);
+    fflush(stdout);
+    oi(r == dst);
+    put_vl(r);
+  } else if (cmd == "vladd") {
+    // relay 34: VLSTadd, VLSTaddUnique, VLSTaddWithValue, VLSTinList in turn, then VLSTfree twice
+    VOXEL_LIST *vl = get_vl();
+    int k = geti();
+    for (int i = 0; i < k; i++) {
+      int op = geti(), x = geti(), y = geti(), z = geti();
+      float a = getf(), b = getf(), c = getf();
+      fflush(stdout);
+      if (op == 0) oi(VLSTadd(vl, x, y, z, a, b, c));
+      else if (op == 1) oi(VLSTaddUnique(vl, x, y, z, a, b, c));
+      else if (op == 2) { float v1 = getf(), v2 = getf(); oi(VLSTaddWithValue(vl, x, y, z, a, b, c, v1, v2)); }
+      else oi(VLSTinList(vl, x, y, z));
+      fflush(stdout);
+    }
+    put_vl(vl);
+    oi(VLSTfree(&vl));
+    oi(vl == NULL);
+    oi(VLSTfree(&vl));
   } else {
     fail("unknown command");
   }

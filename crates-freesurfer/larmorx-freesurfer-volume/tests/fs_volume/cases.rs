@@ -52,6 +52,7 @@ use larmorx_freesurfer_volume::stats as st;
 use larmorx_freesurfer_volume::talairachex as tx;
 use larmorx_freesurfer_volume::vgeom;
 use larmorx_freesurfer_volume::vol2vol as v2;
+use larmorx_freesurfer_volume::voxlist::{self as vlst, VoxelList};
 use larmorx_freesurfer_volume::voxops as vx;
 use larmorx_freesurfer_volume::xform as xf;
 
@@ -2542,6 +2543,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R25_MRI2.contains(&c) => r25_gen_mri2(&mut g, &mut t, c),
             c if R25_CROP.contains(&c) => r25_gen_crop(&mut g, &mut t, c),
             c if R29.contains(&c) => r29_gen(&mut g, &mut t, c),
+            c if R34.contains(&c) => r34_gen(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3007,7 +3009,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 257] = [
+pub const COMMANDS: [&str; 275] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3265,6 +3267,24 @@ pub const COMMANDS: [&str; 257] = [
     "demt",
     "demm",
     "demc",
+    "ltawr",
+    "ltadvg",
+    "ltaxf",
+    "ltapt",
+    "ltacor",
+    "fixmni",
+    "ltamod",
+    "devxfm",
+    "angrm",
+    "affp2m",
+    "affm2p",
+    "ltarot",
+    "rmsmj",
+    "vlcre",
+    "vlsort",
+    "vlstat",
+    "vlcopy",
+    "vladd",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5602,6 +5622,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "fscm" => r29_fscm(cx, t, o)?,
         "binmri" => r29_binmri(cx, t, o)?,
         "demb" | "demt" | "demm" | "demc" => r29_demorph(cx, t, o, cmd)?,
+        c if R34[..13].contains(&c) => r34_lta_cmds(cx, t, o, cmd)?,
+        c if R34.contains(&c) => r34_vl_cmds(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -9153,6 +9175,890 @@ fn r29_demorph(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(),
             dm.dump(a);
             let r = dm.copy_frame(g, a, b, &inv, fr)?;
             o.vol(r.as_ref());
+        }
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------------------------------------
+// Relay 34: transform.cpp's LTA writers, LTAtransformInterp and its helpers, the MNI and
+// tkregister helpers, rotations and affine parameters; voxlist.cpp's lists.
+
+const R34: [&str; 18] = [
+    "ltawr", "ltadvg", "ltaxf", "ltapt", "ltacor", "fixmni", "ltamod", "devxfm", "angrm", "affp2m",
+    "affm2p", "ltarot", "rmsmj", "vlcre", "vlsort", "vlstat", "vlcopy", "vladd",
+];
+
+/// The time `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` gives every case (`fsvolume.cpp`'s
+/// `set_user`).
+const R34_TIME: &str = "Mon Nov 16 10:00:00 2026";
+
+/// A transform array of `n` transforms along the pool's geometries.
+fn r34_lta(g: &mut Gen, t: &mut Vec<String>, pool: &[Vec<String>], n: usize, ty: i64) {
+    let chain = r25_chain_any(g, n, pool.len());
+    r25_lta_toks(g, t, pool, &chain, ty);
+}
+
+/// `fsvolume.cpp`'s `get_vl`'s tokens: `n` voxels allocated, the counts, the type and the voxels
+/// (indices within `ext` mostly, values from `vals`).
+fn r34_vl(g: &mut Gen, t: &mut Vec<String>, n: i64, nvox: i64, max_vox: i64, ext: [i64; 3]) {
+    t.push(n.to_string());
+    t.push(nvox.to_string());
+    t.push(max_vox.to_string());
+    t.push(g.pick(&[0i64, 0, 0, 1]).to_string());
+    let vals: &[f32] = &[1.0, 2.0, 2.0, 0.5, -3.0, 100.0, f32::NAN, 7.25];
+    for _ in 0..n {
+        for e in ext {
+            let v = if g.chance(20) { e } else { g.int(0, (e - 1).max(0)) };
+            t.push(v.to_string());
+        }
+        t.push(g.pick(&[0i64, 0, 0, 1]).to_string());
+        for _ in 0..3 {
+            t.push(fx(num(g, -10, 10, 4)));
+        }
+        t.push(fx(g.pick(vals)));
+        t.push(fx(g.pick(vals)));
+    }
+}
+
+/// An MGH file's bytes (big-endian header of 284 bytes, then the voxels) of a small volume.
+fn r34_mgh(g: &mut Gen) -> Vec<u8> {
+    let mut b = Vec::new();
+    let (w, h, d) = (g.int(1, 4), g.int(1, 4), g.int(1, 3));
+    let ty = g.pick(&[0i32, 0, 3, 4]);
+    for v in [1i32, w as i32, h as i32, d as i32, 1, ty, 0] {
+        b.extend_from_slice(&v.to_be_bytes());
+    }
+    let good = g.chance(4);
+    b.extend_from_slice(&i16::from(!good).to_be_bytes());
+    let size = |g: &mut Gen| g.pick(&[1.0f32, 1.0, 0.9375, 1.2, 2.0, 0.0]);
+    for _ in 0..3 {
+        let s = size(g);
+        b.extend_from_slice(&s.to_be_bytes());
+    }
+    let cos = [
+        [-1.0f32, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+        [-0.99, 0.141, 0.0, 0.0, 0.0, -1.0, 0.141, 0.99, 0.0],
+    ];
+    for v in g.pick(&cos) {
+        b.extend_from_slice(&v.to_be_bytes());
+    }
+    for _ in 0..3 {
+        b.extend_from_slice(&num(g, -40, 40, 8).to_be_bytes());
+    }
+    b.resize(284, 0);
+    let bytes = match ty {
+        0 => 1,
+        4 => 2,
+        _ => 4,
+    };
+    for k in 0..(w * h * d * bytes) {
+        b.push((k * 29 + 3) as u8);
+    }
+    b
+}
+
+/// [`r34_mgh`]'s bytes gzipped (an `.mgz`).
+fn r34_mgz(g: &mut Gen) -> Vec<u8> {
+    use std::io::Write as _;
+    let raw = r34_mgh(g);
+    let mut e = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    e.write_all(&raw).expect("gzip in memory");
+    e.finish().expect("gzip in memory")
+}
+
+/// An angle in radians (or a parameter in degrees with `deg`), now and then NaN or infinite.
+fn r34_angle(g: &mut Gen, deg: bool) -> f64 {
+    if g.chance(30) {
+        return g.pick(&[f64::NAN, f64::INFINITY, -0.0, 1e300]);
+    }
+    let a = g.int(-3600, 3600) as f64 / 20.0;
+    if deg { a } else { a * std::f64::consts::PI / 180.0 }
+}
+
+fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let pool = r25_pool(g);
+    match cmd {
+        "ltawr" => {
+            t.push(g.pick(&[1i64, 1, 1, 2, 0, 3]).to_string());
+            t.push(hex(g.pick(&[b"larmorx".as_slice(), b"u1"])));
+            t.push(g.pick(&[1i64, 1, 2, 0, 3, 4]).to_string());
+            t.push(i64::from(g.chance(10)).to_string());
+            let names: &[&str] = &[
+                "fsvol-w.lta",
+                "fsvol-w.lta",
+                "fsvol-w.LTA",
+                "fsvol-w.xfm",
+                "fsvol-w.XFM",
+                "fsvol-w.dat",
+                "fsvol-w.reg",
+                "fsvol-w.fslmat",
+                "fsvol-w.mat",
+                "fsvol-w",
+                "fsvol-nodir/w.lta",
+                "fsvol-nodir/w.xfm",
+                "fsvol-nodir/w.dat",
+                "fsvol-nodir/w.fslmat",
+                "fsvol.d/w",
+            ];
+            t.push(hex(g.pick(names).as_bytes()));
+            let n = if g.chance(25) { 0 } else { g.pick(&[1, 1, 1, 2]) };
+            let ty = g.pick(&[0i64, 1, 1, 2, 14, 15, 12, 21, 10]);
+            r34_lta(g, t, &pool, n, ty);
+        }
+        "ltadvg" => geom(g, t),
+        "ltaxf" => {
+            let nf = if g.chance(4) { 2 } else { 1 };
+            let s = r25_shape(g, &[0, 0, 3, 3, 1, 4], nf, 4);
+            let gi = g.below(pool.len() as u64) as usize;
+            r25_vol_geo(g, t, s, &pool[gi]);
+            r29_pat(g, t, &[10, 100, 3], &[0, 1, -2], &[0, 2, 5]);
+            let vals: &[f32] = &[0.0, 1.0, 2.5, -3.0, 100.0, 7.0];
+            fill_paint(g, t, s, &[vals, vals], &[vals]);
+            let given = g.chance(3);
+            t.push(i64::from(given).to_string());
+            if given {
+                let o = Shape {
+                    w: g.int(1, 4),
+                    h: g.int(1, 4),
+                    d: g.int(1, 3),
+                    ty: g.pick(&[0, 3, 3, 1]),
+                    nf: if g.chance(5) { g.int(1, 3) } else { s.nf },
+                    hdr: false,
+                    drop: false,
+                };
+                let gj = g.below(pool.len() as u64) as usize;
+                r25_vol_geo(g, t, o, &pool[gj]);
+            }
+            let n = if g.chance(5) {
+                g.pick(&[0usize, 2, 2, 3])
+            } else {
+                1
+            };
+            let ty = g.pick(&[1i64, 1, 0, 0, 0, 2, 14, 21, 10]);
+            r34_lta(g, t, &pool, n, ty);
+            t.push(g.pick(&[0i64, 1, 1, 1, 2, 3]).to_string());
+            t.push(g.pick(&[0i64, 0, 1, 2]).to_string());
+            t.push(g.pick(&[1i64, 1, 0, 2]).to_string());
+            t.push(g.pick(&[0u64, 0, 0, 0x1000_0000, 0x4000]).to_string());
+        }
+        "ltapt" => {
+            let n = g.pick(&[1usize, 2, 2, 3, 0]);
+            let ty = g.pick(&R25_TYPES);
+            r34_lta(g, t, &pool, n, ty);
+            let k = g.int(1, 3);
+            t.push(k.to_string());
+            m44(g, t);
+            for _ in 0..k {
+                for _ in 0..3 {
+                    t.push(fx(num(g, -12, 12, 2)));
+                }
+            }
+        }
+        "ltacor" | "ltarot" => {
+            let n = if g.chance(20) { 0 } else { g.pick(&[1, 1, 1, 2]) };
+            let ty = g.pick(&R25_TYPES);
+            r34_lta(g, t, &pool, n, ty);
+        }
+        "fixmni" => {
+            let k = g.int(1, 4);
+            t.push(k.to_string());
+            for _ in 0..3 * k {
+                t.push(fx(num(g, -100, 100, 8)));
+            }
+        }
+        "ltamod" => {
+            let n = if g.chance(20) { 0 } else { g.pick(&[1, 1, 2]) };
+            let ty = g.pick(&R25_TYPES);
+            let chain = r25_chain_any(g, n, pool.len());
+            r25_lta_toks(g, t, &pool, &chain, ty);
+            for end in [0usize, 1] {
+                let have = !g.chance(4);
+                t.push(i64::from(have).to_string());
+                if have {
+                    let gi = if g.chance(3) || chain.is_empty() {
+                        g.below(pool.len() as u64) as usize
+                    } else if end == 0 {
+                        chain[0]
+                    } else {
+                        *chain.last().unwrap()
+                    };
+                    let geo = &pool[gi];
+                    let ext = |k: usize| geo[k].parse::<i64>().unwrap().clamp(1, 6);
+                    let s = Shape {
+                        w: ext(1),
+                        h: ext(2),
+                        d: ext(3),
+                        ty: 0,
+                        nf: 1,
+                        hdr: true,
+                        drop: false,
+                    };
+                    let mut geo = geo.clone();
+                    // the pool's own extent when it is small, so that it can match
+                    for (k, v) in geo.iter_mut().enumerate().take(4).skip(1) {
+                        *v = ext(k).to_string();
+                    }
+                    r25_vol_geo(g, t, s, &geo);
+                }
+            }
+            t.push(dx(g.pick(&[f64::from(f32::EPSILON), 1e-4, 0.0, 1e-8])));
+        }
+        "devxfm" => {
+            t.push(hex(b"fsvol-sd"));
+            t.push(hex(g.pick(&[b"s01".as_slice(), b"bert"])));
+            let mk = !g.chance(10);
+            t.push(i64::from(mk).to_string());
+            let which = g.below(8);
+            let mgz = if which < 3 {
+                r34_mgz(g)
+            } else if which == 6 {
+                b"not a gzip file".to_vec()
+            } else {
+                Vec::new()
+            };
+            let mgh = if (3..5).contains(&which) || which == 6 || g.chance(5) {
+                r34_mgh(g)
+            } else {
+                Vec::new()
+            };
+            t.push(if mgz.is_empty() { "-".to_owned() } else { hex(&mgz) });
+            t.push(if mgh.is_empty() { "-".to_owned() } else { hex(&mgh) });
+            t.push(i64::from(which == 5 || g.chance(8)).to_string());
+            let lta = g.chance(4);
+            let name = if lta { "reg.lta" } else { "talairach.xfm" };
+            t.push(hex(name.as_bytes()));
+            let text = if lta { lta_text(g) } else { xfm_text(g) };
+            t.push(hex(text.as_bytes()));
+            t.push(i64::from(!g.chance(10)).to_string());
+            t.push(i64::from(!lta && g.chance(2)).to_string());
+            t.push(g.pick(&[1i64, 1, 2, 2, 0]).to_string());
+            if g.chance(5) {
+                m44(g, t);
+            } else {
+                t.push("0".into());
+            }
+            t.push(i64::from(g.chance(10)).to_string());
+        }
+        "angrm" => {
+            for _ in 0..3 {
+                t.push(dx(r34_angle(g, false)));
+            }
+        }
+        "affp2m" | "affm2p" => {
+            if cmd == "affp2m" {
+                for k in 0..12 {
+                    let v = match k {
+                        0..=2 => f64::from(num(g, -50, 50, 4)),
+                        3..=5 => r34_angle(g, true),
+                        6..=8 => g.pick(&[1.0f64, 1.0, 0.9, 1.1, -1.0, 0.0, 2.0]),
+                        _ => g.pick(&[0.0f64, 0.0, 0.01, -0.1, 0.3]),
+                    };
+                    t.push(dx(v));
+                }
+                m44(g, t);
+            } else if g.chance(8) {
+                t.push("0".into());
+            } else {
+                t.push("1".into());
+                if g.chance(2) {
+                    r25_m44(g, t);
+                } else {
+                    m44_elems(g, t);
+                }
+            }
+        }
+        "rmsmj" => {
+            for _ in 0..2 {
+                t.push("1".into());
+                r25_m44(g, t);
+            }
+            t.push(dx(g.pick(&[70.0f64, 70.0, 0.0, 1.5, 100.0, f64::NAN])));
+        }
+        "vlcre" => {
+            let nf = if g.chance(4) { 2 } else { 1 };
+            let s = r25_shape(g, &[0, 0, 3, 3, 1, 4], nf, 5);
+            vol_of(g, t, s);
+            r29_pat(g, t, &[1, 2, 100], &[0, 1, 255], &[0, 0, 1]);
+            let vals: &[f32] = &[0.0, 1.0, 2.0, 1.5, 100.0, f32::NAN];
+            fill_paint(g, t, s, &[vals], &[vals]);
+            let (lo, hi) = g.pick(&[
+                (1.0f32, 1.0f32),
+                (1.0, 2.0),
+                (0.5, 2.0),
+                (0.001, 1e10),
+                (100.0, 255.0),
+                (-1.0, 0.0),
+                (2.0, 1.0),
+                (f32::NAN, 1.0),
+            ]);
+            t.push(fx(lo));
+            t.push(fx(hi));
+            let mode = g.pick(&[0i64, 0, 0, 1, 2]);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let n = g.int(0, 8);
+                let mx = if g.chance(3) { g.int(0, n) } else { n };
+                r34_vl(g, t, n, n, mx, [s.w, s.h, s.d]);
+            }
+            t.push(g.pick(&[0i64, 0, 0, 1, 2]).to_string());
+            t.push(i64::from(g.chance(4)).to_string());
+            if mode == 2 {
+                let (a, b) = g.pick(&[(1.0f32, 1.0f32), (0.0, 0.0), (0.5, 300.0)]);
+                t.push(fx(a));
+                t.push(fx(b));
+            }
+            t.push(i64::from(g.chance(10)).to_string());
+            if g.chance(5) {
+                for e in [s.w, s.h, s.d] {
+                    t.push(g.int(0, e - 1).to_string());
+                }
+            } else {
+                for _ in 0..3 {
+                    t.push("-1".into());
+                }
+            }
+        }
+        "vlsort" => {
+            let ext = [g.int(1, 4), g.int(1, 4), g.int(1, 3)];
+            let n = g.int(0, 7);
+            let nv = if g.chance(5) { g.int(0, n) } else { n };
+            r34_vl(g, t, n, nv, n, ext);
+            let mode = g.pick(&[0i64, 1, 2, 2]);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let m = g.int(0, 7);
+                let mv = if g.chance(8) { g.int(0, m) } else { g.int(0, m.min(nv)) };
+                r34_vl(g, t, m, mv, m, ext);
+            }
+        }
+        "vlstat" => {
+            let s = r25_shape(g, &[0, 3, 3, 1], 1, 4);
+            let n = g.int(0, 6);
+            let nv = if g.chance(6) { g.int(0, n) } else { n };
+            r34_vl(g, t, n, nv, n, [s.w, s.h, s.d]);
+            let have = !g.chance(6);
+            t.push(i64::from(have).to_string());
+            if have {
+                vol_of(g, t, Shape { hdr: false, ..s });
+                let vals: &[f32] = &[0.0, 1.0, 2.0, 0.1, 100.0, -7.5, 1e30, f32::NAN];
+                fill_paint(g, t, s, &[vals], &[vals]);
+            }
+        }
+        "vlcopy" => {
+            let ext = [g.int(1, 4), g.int(1, 4), g.int(1, 3)];
+            let n = g.int(0, 7);
+            r34_vl(g, t, n, n, n, ext);
+            let slopes = g.below(6);
+            for k in 0..4 {
+                let on = match slopes {
+                    0 => true,
+                    1 => g.chance(2),
+                    _ => false,
+                };
+                let _ = k;
+                t.push(i64::from(on).to_string());
+            }
+            let given = g.chance(2);
+            t.push(i64::from(given).to_string());
+            let into = g.chance(3);
+            let start = if g.chance(10) { g.int(-1, n + 1) } else { g.int(0, n.max(1) - 1) };
+            let num = if g.chance(10) { g.int(-1, n + 2) } else { g.int(0, (n - start.max(0)).max(0)) };
+            if given {
+                let need = if into { start + num } else { num };
+                let m = if g.chance(8) { g.int(0, 6) } else { need.max(0) + g.int(0, 2) };
+                let mx = if g.chance(8) { g.int(0, m) } else { m };
+                let nv = g.int(0, m);
+                r34_vl(g, t, m, nv, mx, ext);
+            }
+            t.push(i64::from(into).to_string());
+            t.push(start.to_string());
+            t.push(num.to_string());
+        }
+        _ => {
+            // vladd
+            let ext = [g.int(1, 4), g.int(1, 4), g.int(1, 3)];
+            let n = g.int(0, 6);
+            let mx = if g.chance(8) { g.int(0, n + 1) } else { n };
+            let nv = g.int(0, mx.min(n));
+            r34_vl(g, t, n, nv, mx, ext);
+            let k = g.int(1, 6);
+            t.push(k.to_string());
+            for _ in 0..k {
+                let op = g.int(0, 3);
+                t.push(op.to_string());
+                for e in ext {
+                    t.push(g.int(0, (e - 1).max(0)).to_string());
+                }
+                for _ in 0..3 {
+                    t.push(fx(num(g, -5, 5, 2)));
+                }
+                if op == 2 {
+                    t.push(fx(num(g, -5, 5, 2)));
+                    t.push(fx(num(g, -5, 5, 2)));
+                }
+            }
+        }
+    }
+}
+
+/// `fsvolume.cpp`'s `get_vl`.
+fn r34_get_vl<'a>(cx: &mut Ctx, t: &mut Toks) -> Result<VoxelList<'a>, Fatal> {
+    let n = t.i();
+    let mut vl = vlst::vlst_alloc(&mut cx.g, &mut cx.b, n)?;
+    vl.nvox = t.i();
+    vl.max_vox = t.i();
+    vl.vtype = t.i();
+    for i in 0..n.max(0) as usize {
+        vl.xi[i] = t.i();
+        vl.yi[i] = t.i();
+        vl.zi[i] = t.i();
+        vl.fi[i] = t.i();
+        vl.xd[i] = t.f();
+        vl.yd[i] = t.f();
+        vl.zd[i] = t.f();
+        vl.vsrc[i] = t.f();
+        vl.vdst[i] = t.f();
+    }
+    Ok(vl)
+}
+
+impl Out {
+    /// `fsvolume.cpp`'s `put_vl`; FS-890 where its voxels lie past the list's arrays (`fsvolume`
+    /// reads memory there).
+    fn vl(&mut self, g: &mut Globals, vl: Option<&VoxelList>) {
+        let Some(vl) = vl else {
+            self.0 += "NULL ";
+            return;
+        };
+        self.i(i64::from(vl.vtype));
+        self.i(i64::from(vl.nvox));
+        self.i(i64::from(vl.max_vox));
+        let n = vl.nvox.max(0) as usize;
+        let short = [
+            vl.xi.len(),
+            vl.yi.len(),
+            vl.zi.len(),
+            vl.fi.len(),
+            vl.xd.len(),
+            vl.yd.len(),
+            vl.zd.len(),
+            vl.vsrc.len(),
+            vl.vdst.len(),
+        ]
+        .into_iter()
+        .any(|l| l < n);
+        if short {
+            g.notices.add(
+                &larmorx_core::defects::FS_890,
+                "the probe prints a list past its arrays",
+            );
+            self.0 += "PAST ";
+            return;
+        }
+        for i in 0..n {
+            for v in [vl.xi[i], vl.yi[i], vl.zi[i], vl.fi[i]] {
+                self.i(i64::from(v));
+            }
+            for v in [vl.xd[i], vl.yd[i], vl.zd[i], vl.vsrc[i], vl.vdst[i]] {
+                self.f(v);
+            }
+        }
+        for s in [&vl.mx, &vl.my, &vl.mz, &vl.t] {
+            self.i(i64::from(s.is_some()));
+        }
+    }
+}
+
+/// `set_user`: the environment of `ltawr` (with `FSLOUTPUTTYPE` after it).
+fn r34_env(t: &mut Toks) -> Environment {
+    let k = t.i();
+    let u = String::from_utf8(t.hex()).expect("an ASCII name");
+    let mut env = Environment::default();
+    match k {
+        1 => env.set("USER", u),
+        2 => env.set("LOGNAME", u),
+        3 => env.set("USER", ""),
+        _ => {}
+    }
+    env.set("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", R34_TIME);
+    env
+}
+
+/// A scratch folder of its own per call (the tests run cases in several threads at once).
+fn r34_dir(tag: &str) -> std::path::PathBuf {
+    static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("larmorx-fsvol-{tag}-{}-{call}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("a scratch folder");
+    dir
+}
+
+#[inline(never)]
+fn r34_lta_cmds(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::{ltaapply as la, ltawrite as lw, rotmat as rm};
+    match cmd {
+        "ltawr" => {
+            let mut env = r34_env(t);
+            let fsl = r25_fsl_env(t);
+            if let Some(v) = fsl.get("FSLOUTPUTTYPE") {
+                env.set("FSLOUTPUTTYPE", v.clone());
+            }
+            if t.i() != 0 {
+                cx.g.gdiag_no = 1;
+            }
+            let name = String::from_utf8(t.hex()).expect("an ASCII name");
+            let l = r25_get_lta(cx, t)?;
+            let dir = r34_dir("ltawr");
+            cx.g.errno = 0;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = lw::lta_write_ex(g, a, b, &env, Some(&dir), &l, &name);
+            let file = std::fs::read(dir.join(&name)).ok();
+            let _ = std::fs::remove_dir_all(&dir);
+            let r = r?;
+            o.i(i64::from(r));
+            o.i(i64::from(cx.g.errno));
+            match file {
+                Some(f) => o.hex(&f),
+                None => o.0 += "absent ",
+            }
+        }
+        "ltadvg" => {
+            let vg = geom_of(t);
+            let mut s: Vec<u8> = Vec::new();
+            let r = lw::lta_dump_vol_geom(&mut s, &vg);
+            let _ = cx.a.write_all(&s);
+            o.i(i64::from(r));
+        }
+        "ltaxf" => {
+            let mut src = get_vol(cx, t)?;
+            r24_fill_pat(cx, t, &mut src)?;
+            fill_painted(cx, t, &mut src)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let mut l = r25_get_lta(cx, t)?;
+            let interp = t.i();
+            let mut env = match t.i() {
+                0 => Environment::default(),
+                1 => Environment::from_pairs([("USE_AVERAGE305", "true")]),
+                _ => Environment::from_pairs([("USE_AVERAGE305", "")]),
+            };
+            let fsl = r25_fsl_env(t);
+            if let Some(v) = fsl.get("FSLOUTPUTTYPE") {
+                env.set("FSLOUTPUTTYPE", v.clone());
+            }
+            cx.g.gdiag = t.next().parse().expect("Gdiag");
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = la::lta_transform_interp(g, a, b, &env, &src, dst.as_mut(), &mut l, interp)?;
+            o.ret(&r, dst.as_ref());
+            o.lta_full(Some(&l));
+        }
+        "ltapt" => {
+            let l = r25_get_lta(cx, t)?;
+            let k = t.i();
+            let mut m = get_m44(t);
+            for _ in 0..k {
+                let (x, y, z) = (t.f(), t.f(), t.f());
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                let given = m.is_some();
+                let r = la::lta_transform_at_point(g, a, b, &l, x, y, z, m.as_mut())?;
+                o.i(i64::from(given && matches!(r, Ret::Given)));
+                match r {
+                    Ret::New(n) => o.m(Some(&n)),
+                    Ret::Given => o.m(m.as_ref()),
+                    Ret::Null => o.m(None),
+                }
+            }
+        }
+        "ltacor" => {
+            let mut l = r25_get_lta(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = la::lta_voxel_transform_to_coronal_ras_transform(g, a, b, &mut l)?;
+            o.i(i64::from(r));
+            o.lta_full(Some(&l));
+        }
+        "fixmni" => {
+            let k = t.i();
+            for _ in 0..k {
+                let (x, y, z) = (t.f(), t.f(), t.f());
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                let (p, q, r) = la::fix_mni_tal(g, a, b, x, y, z)?;
+                o.i(0);
+                o.f(p);
+                o.f(q);
+                o.f(r);
+            }
+        }
+        "ltamod" => {
+            let mut l = r25_get_lta(cx, t)?;
+            let src = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            cx.g.vg_is_equal_threshold = t.d();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = la::lta_modify_src_dst_geom(g, a, b, &mut l, src.as_ref(), dst.as_ref());
+            o.i(i64::from(r));
+            o.lta_full(Some(&l));
+        }
+        "devxfm" => {
+            let sd = String::from_utf8(t.hex()).expect("an ASCII name");
+            let subj = String::from_utf8(t.hex()).expect("an ASCII name");
+            let mk = t.i() != 0;
+            let (mgz, mgh) = (t.hex(), t.hex());
+            let cor = t.i() != 0;
+            let xname = String::from_utf8(t.hex()).expect("an ASCII name");
+            let xbytes = t.hex();
+            let (havex, nullname, sdmode) = (t.i() != 0, t.i() != 0, t.i());
+            let mut x = get_m44(t);
+            if t.i() != 0 {
+                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW
+                    | larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+            }
+            let dir = r34_dir("devxfm");
+            let s2 = dir.join(&sd).join(&subj).join("mri");
+            std::fs::create_dir_all(dir.join(&sd)).expect("a folder");
+            if mk {
+                std::fs::create_dir_all(s2.join("transforms")).expect("a folder");
+                if !mgz.is_empty() {
+                    std::fs::write(s2.join("orig.mgz"), &mgz).expect("a file");
+                }
+                if !mgh.is_empty() {
+                    std::fs::write(s2.join("orig.mgh"), &mgh).expect("a file");
+                }
+                if cor {
+                    std::fs::create_dir_all(s2.join("orig")).expect("a folder");
+                }
+                if havex {
+                    std::fs::write(s2.join("transforms").join(&xname), &xbytes).expect("a file");
+                }
+            }
+            let env = if sdmode == 1 {
+                Environment::from_pairs([("SUBJECTS_DIR", sd.as_str())])
+            } else {
+                Environment::default()
+            };
+            let mut io = NoIo(env);
+            cx.g.errno = 0;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let given = x.is_some();
+            let r = la::devolve_xfm_with_subjects_dir(
+                g,
+                a,
+                b,
+                Some(&dir),
+                &subj,
+                x.as_mut(),
+                if nullname { None } else { Some(xname.as_str()) },
+                if sdmode == 2 { Some(sd.as_str()) } else { None },
+                &mut io,
+            );
+            let _ = std::fs::remove_dir_all(&dir);
+            let r = r?;
+            o.i(i64::from(given && matches!(r, Ret::Given)));
+            match r {
+                Ret::New(m) => o.m(Some(&m)),
+                Ret::Given => o.m(x.as_ref()),
+                Ret::Null => o.m(None),
+            }
+        }
+        "angrm" => {
+            let a = [t.d(), t.d(), t.d()];
+            let (g, ao, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = rm::mri_angles2rot_mat(g, ao, b, &a)?;
+            o.m(Some(&r));
+        }
+        "affp2m" => {
+            let mut p = [0.0f64; 12];
+            for v in &mut p {
+                *v = t.d();
+            }
+            let mut m = get_m44(t);
+            let given = m.is_some();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = rm::tranform_affine_params2_matrix(g, a, b, &p, m.as_mut())?;
+            o.i(i64::from(given && matches!(r, Ret::Given)));
+            match r {
+                Ret::New(n) => o.m(Some(&n)),
+                Ret::Given => o.m(m.as_ref()),
+                Ret::Null => o.m(None),
+            }
+        }
+        "affm2p" => {
+            let m = get_m44(t);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            match rm::tranform_extract_affine_params(g, a, b, m.as_ref())? {
+                None => o.0 += "NULL ",
+                Some(p) => {
+                    for v in p {
+                        o.d(v);
+                    }
+                }
+            }
+        }
+        "ltarot" => {
+            let mut l = r25_get_lta(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = rm::lta_mat2rot_mat(g, a, b, &mut l)?;
+            o.i(i64::from(r));
+            o.lta_full(Some(&l));
+        }
+        _ => {
+            // rmsmj
+            let m1 = get_m44(t).expect("a matrix");
+            let m2 = get_m44(t).expect("a matrix");
+            let rad = t.d();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = rm::rms_reg_diff_mj(g, a, b, &m1, &m2, rad)?;
+            o.d(r);
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r34_vl_cmds(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    match cmd {
+        "vlcre" => {
+            let mut m = get_vol(cx, t)?;
+            r24_fill_pat(cx, t, &mut m)?;
+            fill_painted(cx, t, &mut m)?;
+            let (lo, hi) = (t.f(), t.f());
+            let mode = t.i();
+            let given = if mode == 1 {
+                Some(r34_get_vl(cx, t)?)
+            } else {
+                None
+            };
+            let (skip, border) = (t.i(), t.i() != 0);
+            let mut given = given;
+            if mode == 2 {
+                let (a2, b2) = (t.f(), t.f());
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                given = Some(vlst::vlst_create(g, a, b, &m, a2, b2, None, 0, false)?);
+            }
+            if t.i() != 0 {
+                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW
+                    | larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+            }
+            cx.g.gx = t.i();
+            cx.g.gy = t.i();
+            cx.g.gz = t.i();
+            let had = given.is_some();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vlst::vlst_create(g, a, b, &m, lo, hi, given, skip, border)?;
+            o.i(i64::from(had));
+            o.i(i64::from(r.mri.is_some_and(|x| std::ptr::eq(x, &m))));
+            o.vl(&mut cx.g, Some(&r));
+        }
+        "vlsort" => {
+            let mut src = r34_get_vl(cx, t)?;
+            let mode = t.i();
+            match mode {
+                1 => {
+                    let mut dst = r34_get_vl(cx, t)?;
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    vlst::vlst_sort(g, a, b, vlst::SortInto::Given(&src, &mut dst))?;
+                    o.i(1);
+                    o.vl(&mut cx.g, Some(&dst));
+                    o.vl(&mut cx.g, Some(&src));
+                }
+                2 => {
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    vlst::vlst_sort(g, a, b, vlst::SortInto::Same(&mut src))?;
+                    o.i(1);
+                    o.vl(&mut cx.g, Some(&src));
+                }
+                _ => {
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    let r = vlst::vlst_sort(g, a, b, vlst::SortInto::New(&src))?;
+                    o.i(0);
+                    o.vl(&mut cx.g, r.as_ref());
+                }
+            }
+        }
+        "vlstat" => {
+            let mut vl = r34_get_vl(cx, t)?;
+            let m = if t.i() != 0 {
+                let mut m = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut m)?;
+                Some(m)
+            } else {
+                None
+            };
+            vl.mri = m.as_ref();
+            vlst::vlst_compute_stats(&mut cx.g, &mut cx.b, &mut vl)?;
+            o.d(vl.mean);
+            o.d(vl.std);
+        }
+        "vlcopy" => {
+            let mut src = r34_get_vl(cx, t)?;
+            if t.i() != 0 {
+                src.mx = Some(vec![0.0]);
+            }
+            if t.i() != 0 {
+                src.my = Some(vec![0.0]);
+            }
+            if t.i() != 0 {
+                src.mz = Some(vec![0.0]);
+            }
+            if t.i() != 0 {
+                src.t = Some(vec![0.0]);
+            }
+            let mut dst = if t.i() != 0 {
+                Some(r34_get_vl(cx, t)?)
+            } else {
+                None
+            };
+            let (into, start, num) = (t.i() != 0, t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if into {
+                vlst::vlst_copy_into(g, a, b, &src, dst.as_mut(), start, num)?
+            } else {
+                vlst::vlst_copy(g, a, b, &src, dst.as_mut(), start, num)?
+            };
+            o.i(i64::from(matches!(r, Ret::Given)));
+            match r {
+                Ret::New(v) => o.vl(&mut cx.g, Some(&v)),
+                Ret::Given => o.vl(&mut cx.g, dst.as_ref()),
+                Ret::Null => o.vl(&mut cx.g, None),
+            }
+        }
+        _ => {
+            // vladd
+            let mut vl = r34_get_vl(cx, t)?;
+            let k = t.i();
+            for _ in 0..k {
+                let op = t.i();
+                let (x, y, z) = (t.i(), t.i(), t.i());
+                let (xd, yd, zd) = (t.f(), t.f(), t.f());
+                let (g, b) = (&mut cx.g, &mut cx.b);
+                let r = match op {
+                    0 => vlst::vlst_add(g, b, &mut vl, x, y, z, xd, yd, zd)?,
+                    1 => vlst::vlst_add_unique(g, b, &mut vl, x, y, z, xd, yd, zd)?,
+                    2 => {
+                        let (v1, v2) = (t.f(), t.f());
+                        vlst::vlst_add_with_value(g, b, &mut vl, x, y, z, xd, yd, zd, v1, v2)?
+                    }
+                    _ => vlst::vlst_in_list(g, b, &vl, x, y, z)?,
+                };
+                o.i(i64::from(r));
+            }
+            o.vl(&mut cx.g, Some(&vl));
+            let mut p = Some(vl);
+            o.i(i64::from(vlst::vlst_free(&mut p)));
+            o.i(i64::from(p.is_none()));
+            o.i(i64::from(vlst::vlst_free(&mut p)));
         }
     }
     Ok(())

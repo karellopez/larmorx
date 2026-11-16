@@ -197,7 +197,9 @@ pub fn tranform_affine_params2_matrix(
 /// QR decomposition (`MatrixQRdecomposition` into 4 x 4 matrices) with `Q P` and `P R`, `P` the
 /// diagonal of the signs of `R`'s diagonal (its first negated again when `M`'s determinant, in
 /// `float`, is below 0; `float` products); the rotations `atan2(Q23, Q33)`, `atan2(Q13,
-/// sqrt(Q23² + Q33²))` (`pow(q, 2.0)`), `atan2(Q12, Q11)` in degrees (`* 180 / pi`); the scales
+/// sqrt(Q23² + Q33²))` (`pow(q, 2.0)`), `atan2(Q12, Q11)` in degrees: the first and the last of
+/// two floats, so C++'s `atan2f` and `* 180` in `float`, the middle one in `double`, each then
+/// divided by pi in `double`; the scales
 /// `R`'s diagonal; the shears `R12 / R11`, `R13 / R11`, `R23 / R22` (`float` divisions). `None`
 /// for no matrix (after `ERROR: TranformExtractAffineParams() input matrix is NULL` on standard
 /// output).
@@ -234,13 +236,22 @@ pub fn tranform_extract_affine_params(
     matrix_multiply(g, out, err, Some(&pm), Some(&r0), Some(&mut r))?;
     let libm = Libm::new(g.mode());
     let pow2 = |x: f64| nan_of(libm.pow(x, 2.0), x);
-    let deg = |a: f64| sse::div64(sse::mul64(a, 180.0), PI);
-    let q = |row, col| f64::from(q.relt(row, col));
-    p[3] = deg(atan2(q(2, 3), q(3, 3)));
-    let h = sse::sqrt64(sse::add64(pow2(q(2, 3)), pow2(q(3, 3))));
-    p[4] = deg(atan2(q(1, 3), h));
-    p[5] = deg(atan2(q(1, 2), q(1, 1)));
-    note_glibc07(g, &libm, "pow");
+    // atan2 of two floats is C++'s float overload (atan2f), its result times 180 in float, then
+    // divided by pi in double (the official build's object code)
+    let atan2f = |y: f32, x: f32| {
+        if x.is_nan() || y.is_nan() {
+            sse::add(x, y)
+        } else {
+            libm.atan2f(y, x)
+        }
+    };
+    let degf = |a: f32| sse::div64(f64::from(sse::mul(a, 180.0)), PI);
+    let qf = |row, col| q.relt(row, col);
+    p[3] = degf(atan2f(qf(2, 3), qf(3, 3)));
+    let h = sse::sqrt64(sse::add64(pow2(f64::from(qf(2, 3))), pow2(f64::from(qf(3, 3)))));
+    p[4] = sse::div64(sse::mul64(atan2(f64::from(qf(1, 3)), h), 180.0), PI);
+    p[5] = degf(atan2f(qf(1, 2), qf(1, 1)));
+    note_glibc07(g, &libm, "atan2f and pow");
     p[6] = f64::from(r.relt(1, 1));
     p[7] = f64::from(r.relt(2, 2));
     p[8] = f64::from(r.relt(3, 3));

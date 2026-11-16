@@ -6,6 +6,9 @@
 //! compare (FreeSurfer reads or writes memory it does not own, or crashes; `mpx` writes `G` for
 //! those volumes, and compares the rest with FreeSurfer's own build).
 
+// The fixture indexes the vertices and their positions with one number, as the C does.
+#![allow(clippy::needless_range_loop)]
+
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::histo_alloc;

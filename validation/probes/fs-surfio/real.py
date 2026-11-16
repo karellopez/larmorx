@@ -180,7 +180,21 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"flr bbf {s / 'surf' / f'{hemi}.white'} {dx(0.5)}")
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
-    kind = "lbl" if a.lbl else "mpx" if a.mpx else "ann" if a.ann else "vps" if a.vps else "pvw" if a.pvw else "curv" if a.curv else "flood"
+    kind = (
+        "lbl"
+        if a.lbl
+        else "mpx"
+        if a.mpx
+        else "ann"
+        if a.ann
+        else "vps"
+        if a.vps
+        else "pvw"
+        if a.pvw
+        else "curv"
+        if a.curv
+        else "flood"
+    )
     cases_path = inputs / f"real-{kind}-cases.txt"
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}

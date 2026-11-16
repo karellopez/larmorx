@@ -30,6 +30,7 @@ mod hypot;
 mod log;
 mod log10;
 mod log10_glibc;
+mod log10f;
 mod log_glibc;
 mod logf;
 mod logf_glibc;
@@ -113,6 +114,11 @@ pub use tanhf_glibc::{expm1f_glibc, tanhf_glibc};
 /// correctly rounded, for `reproduce`; [`log10`] (correctly rounded) is the default
 /// ([`Libm::log10`] chooses by the mode).
 pub use log10_glibc::log10_glibc;
+
+/// The base-10 logarithm for `f32`, correctly rounded (CORE-MATH's `cr_log10f`; no fused
+/// multiply-adds). glibc's `log10f` (fdlibm's) is not correctly rounded; `log10f_glibc` has its
+/// bits, for `reproduce`.
+pub use log10f::log10f;
 
 /// The arc cosine for `f32`, correctly rounded (CORE-MATH's `cr_acosf`; no fused multiply-adds,
 /// so no FMA-compiled copy). The `double` [`acos`] rounded to `f32` differs from it on two floats

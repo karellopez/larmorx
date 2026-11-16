@@ -554,6 +554,8 @@ void set_env6(int bits)
   if (bits & 256) setenv("KILLIANY_SWAP", "1", 1);
   // piece 31 (track A relay 38): gcamComputeMetricProperties' negative nodes
   if (bits & 512) setenv("SHOW_NEG", "1", 1);
+  // piece 23 (track A relay 40): TiffReadImage's debugging lines
+  if (bits & 1024) setenv("FS_TIFF_DEBUG", "1", 1);
 }
 
 // piece 7: Bruker ParaVision studies

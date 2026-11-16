@@ -9,13 +9,14 @@
 //! holds: the SGI images (`RGBReadImage`, `RGBwrite`, over [`crate::rgb`]), the PGM, PPM and PBM
 //! stubs (FreeSurfer is built without netpbm: `pgm not supported`, ...), the HIPS stubs (the HIPS
 //! library is gone: `utils/hips.cpp`'s functions print `error: hips is not supported` and return
-//! 0, HIPS's "no error"), and the JPEG reader and writer (`JPEGReadImage`, `JPEGWriteImage`).
+//! 0, HIPS's "no error"), the JPEG reader and writer (`JPEGReadImage`, `JPEGWriteImage`) and the
+//! TIFF reader and writer (`TiffReadImage`, `TiffWriteImage`: [`tiffio`]).
 //!
 //! TIFF images (libtiff) and the JPEG codec (the IJG's library) are third-party code FreeSurfer
 //! bundles (`docs/freesurfer/third-party.md`, P-05: the main package's, track C's). JPEG images are
 //! read and written over `larmorx_io::jpeg` (IJG 6b, track C's; `JPEGReadImage` and
-//! `JPEGWriteImage` since track A's relay 39); reading or writing a TIFF image says `... is not
-//! ported yet` until FreeSurfer's TIFF functions are wired to `larmorx_io::tiff`.
+//! `JPEGWriteImage` since track A's relay 39), TIFF images over `larmorx_io::tiff` (libtiff 3.6.1,
+//! track C's; since track A's relay 40).
 //!
 //! The image a reader returns is `ImageToMRI`'s input, the one a writer takes `MRItoImage`'s
 //! output: both are fs.volume's, called through [`crate::upper`].
@@ -53,6 +54,7 @@ use larmorx_freesurfer_core::log::{
     ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
 use larmorx_freesurfer_core::matrix::{MATRIX_COMPLEX, Matrix};
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::utils;
 use larmorx_freesurfer_core::utils::str_upper;
 use larmorx_freesurfer_mri::mri::Mri;
@@ -63,6 +65,9 @@ use crate::image::{Image, PFBYTE, PFCOMPLEX, PFFLOAT, PFRGB, image_alloc, image_
 use crate::minc::Std;
 use crate::rgb::RgbImage;
 use crate::upper;
+
+#[path = "imageio_tiff.rs"]
+pub(crate) mod tiffio;
 
 /// The image file types (`include/image.h`).
 pub const HIPS_IMAGE: i32 = 0;
@@ -125,38 +130,41 @@ pub fn image_unpack_file_name(g: &mut Globals, name: &str) -> (String, i32, i32)
     (out, frame, ty)
 }
 
-fn not_ported(err: &mut dyn Write, what: &str, name: &str) {
-    let _ = writeln!(
-        err,
-        "larmorx-freesurfer: {what} is not ported yet ({name}; the codec is third-party code, track C's)"
-    );
-}
-
 /// What [`image_read`] gives.
 pub enum Read {
     /// The image.
     Image(Image),
     /// FreeSurfer's `NULL` (after the reader's message, if it has one).
     Null,
-    /// A format whose codec is not ported yet (its message given).
-    NotPorted,
 }
 
 /// `ImageRead(fname, nthreads, start_frame, end_frame)`: the image the name's type gives
-/// ([`image_unpack_file_name`]). The threads and frames concern TIFF images only.
+/// ([`image_unpack_file_name`]). The frames (inclusive; `end_frame` below 0: to the last) concern
+/// TIFF images only: the name's `#<frame>` when it has one, else `start_frame` (the threads
+/// change nothing: FreeSurfer reads the pages one after the other).
+#[allow(clippy::too_many_arguments)]
 pub fn image_read(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
+    env: &Environment,
     dir: Option<&Path>,
     fname: &str,
+    start_frame: i32,
+    end_frame: i32,
 ) -> Result<Read, Fatal> {
     let (buf, frame0, ty) = image_unpack_file_name(g, fname);
     match ty {
-        TIFF_IMAGE => {
-            not_ported(err, "reading TIFF images", &buf);
-            Ok(Read::NotPorted)
-        }
+        TIFF_IMAGE => tiffio::read_image(
+            g,
+            out,
+            err,
+            env,
+            dir,
+            &buf,
+            if frame0 < 0 { start_frame } else { frame0 },
+            end_frame,
+        ),
         MATLAB_IMAGE => {
             diag_printf(
                 g,
@@ -489,18 +497,22 @@ fn rgb_read_image(
     Ok(Some(im))
 }
 
-/// `mri_read`'s image branch: [`image_read`], then `ImageToMRI` (fs.volume's, through
+/// `mri_read`'s image branch: [`image_read`] (`FS_IMAGEREAD_NTHREADS` threads, which change
+/// nothing; the frames `start_frame` to `end_frame`), then `ImageToMRI` (fs.volume's, through
 /// [`upper`]) and `ImageFree`. FS-718 when the reader fails.
+#[allow(clippy::too_many_arguments)]
 pub fn read_as_volume(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
+    env: &Environment,
     dir: Option<&Path>,
     fname: &str,
+    start_frame: i32,
+    end_frame: i32,
 ) -> Result<Option<Mri>, Fatal> {
-    let mut i = match image_read(g, out, err, dir, fname)? {
+    let mut i = match image_read(g, out, err, env, dir, fname, start_frame, end_frame)? {
         Read::Image(i) => i,
-        Read::NotPorted => return Ok(None),
         Read::Null => {
             null_image(g, err, fname)?;
             return Ok(None);
@@ -541,7 +553,7 @@ fn null_image(g: &mut Globals, err: &mut dyn Write, fname: &str) -> Result<(), F
 }
 
 /// What [`image_f_write`] did: FreeSurfer's result (always 0) and whether the image was written.
-struct Wrote {
+pub(crate) struct Wrote {
     ok: bool,
     code: i32,
 }
@@ -580,7 +592,7 @@ fn image_write(
 }
 
 /// `ImageFWrite(I, fp, fname)`: by the type of the name ([`image_unpack_file_name`]): SGI images
-/// (`RGBwrite`), TIFF (not ported yet), PGM and PPM (`pgm not supported`, `ppm not supported`),
+/// (`RGBwrite`), TIFF (`TiffWriteImage`), PGM and PPM (`pgm not supported`, `ppm not supported`),
 /// HIPS (its stubs: the `endian` parameter's look-up and setting, the header and each frame, each a
 /// message; nothing written); every other type (JPEG, MATLAB, PBM) the JPEG writer, which takes
 /// images of bytes only (`JPEGWrite: only PFBYTE currently supported`).
@@ -607,13 +619,7 @@ fn image_f_write(
             };
             rgb_write(g, err, dir, im, &buf)
         }
-        TIFF_IMAGE => {
-            not_ported(err, "writing TIFF images", &buf);
-            Ok(Wrote {
-                ok: false,
-                code: -1,
-            })
-        }
+        TIFF_IMAGE => tiffio::write_image(g, out, err, dir, im, &buf),
         PGM_IMAGE => Ok(refused(g, err, "pgm not supported")),
         PPM_IMAGE => Ok(refused(g, err, "ppm not supported")),
         HIPS_IMAGE => {

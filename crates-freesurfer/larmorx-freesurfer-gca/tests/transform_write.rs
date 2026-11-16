@@ -255,3 +255,50 @@ fn fs858_fs859_linear_files_freesurfer_misreads() {
         assert_eq!(id.ttype, 1);
     }
 }
+
+/// FS-875: a morph with an affine and its inverse's index volumes copied (`TransformCopy` into a
+/// new transform): the default keeps both; `reproduce` loses them, as FreeSurfer does. FS-876: a
+/// copy into a transform of the other kind does not use it.
+#[test]
+fn fs875_fs876_a_morph_copy_keeps_its_inverse_and_affine() {
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut g = Globals::new(mode);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut t = morph(&mut g, [2, 2, 2], 1);
+        let mut vol = || {
+            larmorx_freesurfer_mri::mri::mri_alloc(&mut g, &mut o, &mut e, 2, 2, 2, MRI_FLOAT)
+                .unwrap()
+        };
+        let (x, y, z) = (vol(), vol(), vol());
+        let larmorx_freesurfer_core::ret::Ret::New(id) =
+            larmorx_freesurfer_core::matrix_ops::matrix_identity(&mut g, &mut o, &mut e, 4, None)
+                .unwrap()
+        else {
+            panic!("an identity matrix")
+        };
+        {
+            let gc = t.gcam_mut();
+            gc.mri_xind = Some(x);
+            gc.mri_yind = Some(y);
+            gc.mri_zind = Some(z);
+            gc.m_affine = Some(id);
+        }
+        let c = tr::transform_copy(&mut g, &mut o, &mut e, &t, None)
+            .unwrap()
+            .unwrap();
+        assert!(ids(&g).contains(&"FS-875"));
+        let gc = c.gcam();
+        assert_eq!(gc.mri_xind.is_some(), mode.fix(), "{mode:?}");
+        assert_eq!(gc.m_affine.is_some(), mode.fix(), "{mode:?}");
+        assert_eq!(gc.nodes.len(), 8);
+        assert_eq!(gc.nodes[3].x, t.gcam().nodes[3].x);
+        // into a linear transform array: not used
+        let lta = larmorx_freesurfer_mri::lta::lta_alloc(&mut g, &mut o, &mut e, 1, None).unwrap();
+        let d = Transform::new(0, Xform::Lta(lta));
+        let c = tr::transform_copy(&mut g, &mut o, &mut e, &t, Some(d))
+            .unwrap()
+            .unwrap();
+        assert!(ids(&g).contains(&"FS-876"));
+        assert_eq!(c.ttype, MORPH_3D_TYPE);
+    }
+}

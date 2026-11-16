@@ -23,12 +23,16 @@
 //! MRIreadEx with their non-finite voxels removed), piece 29's two (the conformed-size checks,
 //! the command lines), piece 30's four (MRIreorder, the selective-average headers read and
 //! written, LabelRemoveOverlap), piece 31's two (GCA morphs read as volumes) and piece 32's three
-//! (GCA morphs written, read and written again, TRANSFORMs read and sampled),
-//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`, none since piece 23),
+//! (GCA morphs written, read and written again, TRANSFORMs read, sampled, written, copied and
+//! applied),
+//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: one since relay 40),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-16, track A relay 39, with piece 32:
-//! 4,800 cases, 4,291 lines identical, 42 of them with memory digits; 509 hashed as `SKIP`, 61
-//! of them `VARY`),
+//! --light` on Linux x64 from the unit oracle's build (2026-11-16, track A relay 40, with piece
+//! 23's TIFF files and piece 32's `W`, `C`, `A`, `D` queries: 4,800 cases, 4,272 lines
+//! identical, 40 of them with memory digits; 528 hashed as `SKIP`, 169 of them `VARY`; then case
+//! 4015, a heavy one in debug builds, left out: 4,799 cases, 527 `SKIP`; and piece 22's two
+//! cases that named the BRIK with another case of its letters, now a missing name (`fsio`'s
+//! output for them checked: identical)),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -49,8 +53,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "f8918d3de29a39a6924f9d7f41194ae0cea0b90ce1f4bf17e6af71885229dbee";
-const SKIPPED: usize = 509;
+const OFFICIAL_SHA256: &str = "011a8c010e6ebd07ef9168c1757041a7c959cceaa0bc8687e8f9ac8d7e83f381";
+const SKIPPED: usize = 527;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

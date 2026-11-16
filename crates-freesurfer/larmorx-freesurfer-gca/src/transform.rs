@@ -12,46 +12,59 @@
 //! (4827), `TransformSetMRIVolGeomToDst` (4835), `TransformCopyVolGeomToMRI` (411) and
 //! `TransformSourceVoxelToAtlas` (4877).
 //!
-//! Not here yet (their callees are not ported): `TransformWrite` (the LTA writers, fs.volume),
-//! `TransformCopy` (`GCAMcopy`), `TransformApply*` and `TransformCreateDensityMap` (the morph's
-//! resamplings and `LTAtransform`), `TransformCompose`, `TransformConcat`, `TransformInvertReplace`,
-//! `TransformRas2Vox` and `TransformVox2Ras`.
+//! Since relay 40: `TransformWrite` (4140), `TransformCopy` (4154, with `GCAMcopy`, gcamorph.cpp
+//! 17347), `TransformApplyType` (2660), `TransformApply` (2678) and `TransformCreateDensityMap`
+//! (4122) for linear transform arrays (a GCA morph's resamplings, `GCAMmorphToAtlas` and its
+//! density form, are not ported yet: a message and no volume).
+//!
+//! Not here yet (their callees are not ported): `TransformApplyInverse` and
+//! `TransformApplyInverseType` (`LTAinverseTransformInterp`, `GCAMmorphFromAtlas`),
+//! `TransformCompose` (`LTAcompose`), `TransformConcat` (`GCAMconcat2`/`3`),
+//! `TransformInvertReplace` (`GCAMfillInverse`), `TransformRas2Vox` and `TransformVox2Ras`
+//! (`LTArasToVoxelXform`, `LTAvoxelToRasXform`, `GCAMvoxToRas`).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-io.md` Part 34): FS-857 (the inverse
 //! sample of a morph of spacing 0), FS-858 (a linear transform file whose type is the morph's),
 //! FS-859 (a transform array without transforms), FS-860 (freeing no transform), FS-861 (the
 //! inverse sample of a morph of no nodes), FS-862 (the nearest sample one voxel past the index
-//! volumes).
+//! volumes), FS-875 (a morph's copy loses its inverse and affine), FS-876 (a copy into a transform
+//! of the other kind).
 
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861, FS_862};
+use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861, FS_862, FS_876};
+use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
 use larmorx_freesurfer_core::matrix_io::matrix_ascii_write_into;
-use larmorx_freesurfer_core::matrix_ops::matrix_identity;
+use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_identity};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_core::utils::{file_name_only, nint};
 use larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN;
 use larmorx_freesurfer_io::{mriio, registerio};
+use larmorx_freesurfer_mri::copy::mri_copy;
+use larmorx_freesurfer_mri::lta::lta_copy;
 use larmorx_freesurfer_mri::lta::{
     LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, LinearTransform, Lta, MORPH_3D_TYPE, lta_alloc, lta_free,
 };
 use larmorx_freesurfer_mri::mri::{Mri, mri_copy_vol_geom_to_mri};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
+use larmorx_freesurfer_volume::arith::{Pair, mri_scalar_mul};
+use larmorx_freesurfer_volume::ltaapply::{lta_transform, lta_transform_interp};
 use larmorx_freesurfer_volume::ltaops::{lta_change_type, lta_fill_inverse};
 use larmorx_freesurfer_volume::ltaread::{
     LtaIo, RegisterDat, lta_read_ex, transform_file_name_type,
 };
+use larmorx_freesurfer_volume::ltawrite::lta_write_ex;
 use larmorx_freesurfer_volume::sample::sample_volume;
 use larmorx_freesurfer_volume::talairachex::transform_with_matrix;
 
-use crate::gcam::{GCAM_POSITION_INVALID, Gcam, gcam_invert, gcam_read};
+use crate::gcam::{GCAM_POSITION_INVALID, Gcam, gcam_copy, gcam_invert, gcam_read};
 
 /// What a `TRANSFORM` holds (`xform`): a linear transform array or a GCA morph.
 #[derive(Debug)]
@@ -948,4 +961,185 @@ pub fn transform_source_voxel_to_atlas(
         NO_ERROR,
         [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])],
     ))
+}
+
+/// What a function of a GCA morph this port has not yet ported says (its callee named).
+fn morph_not_ported(err: &mut dyn Write, what: &str, callee: &str) {
+    let _ = writeln!(
+        err,
+        "larmorx-freesurfer: {what} of a GCA morph is not ported yet (it needs {callee})"
+    );
+}
+
+/// `TransformWrite(transform, fname)` (4140): a GCA morph through `GCAMwrite` (its default data
+/// format, absolute voxel coordinates), a linear transform array through `LTAwriteEx` (the name's
+/// type decides the format: `.lta`, `.xfm`, `register.dat`, FSL's `.mat`); their status.
+pub fn transform_write(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    t: &mut Transform,
+    fname: &str,
+) -> Result<i32, Fatal> {
+    match &mut t.xform {
+        Xform::Morph(gcam) => crate::gcam_write::gcam_write(
+            g,
+            out,
+            err,
+            env,
+            dir,
+            gcam,
+            fname,
+            crate::gcam_write::WARPFIELD_DTFMT_ABS_CRS,
+        ),
+        Xform::Lta(lta) => lta_write_ex(g, out, err, env, dir, lta, fname),
+    }
+}
+
+/// `TransformCopy(tsrc, tdst)` (4154): the type, copies of the three inverse index volumes (into
+/// the destination's own when it has them), and the transform (`GCAMcopy`, FS-875; `LTAcopy`,
+/// whose arrays of another count give FreeSurfer's message and no transform: `None`). FS-876: a
+/// destination of the other kind is not used (FreeSurfer copies into its memory), noted.
+pub fn transform_copy(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Transform,
+    dst: Option<Transform>,
+) -> Result<Option<Transform>, Fatal> {
+    let morph = matches!(src.xform, Xform::Morph(_));
+    let dst = match dst {
+        Some(d) if matches!(d.xform, Xform::Morph(_)) != morph => {
+            g.notices.add(
+                &FS_876,
+                "TransformCopy: a transform copied into one of the other kind (FreeSurfer copies into its memory)",
+            );
+            None
+        }
+        d => d,
+    };
+    let (mut xn, mut yn, mut zn, mut xform) = match dst {
+        Some(d) => (d.mri_xn, d.mri_yn, d.mri_zn, Some(d.xform)),
+        None => (None, None, None, None),
+    };
+    for (s, d) in [
+        (&src.mri_xn, &mut xn),
+        (&src.mri_yn, &mut yn),
+        (&src.mri_zn, &mut zn),
+    ] {
+        *d = match s {
+            None => None,
+            Some(s) => match mri_copy(g, out, err, s, d.as_mut())? {
+                Ret::New(m) => Some(m),
+                Ret::Given => d.take(),
+                Ret::Null => None,
+            },
+        };
+    }
+    let xform = match (&src.xform, xform.take()) {
+        (Xform::Morph(s), Some(Xform::Morph(mut d))) => {
+            gcam_copy(g, out, err, s, Some(&mut d))?;
+            Xform::Morph(d)
+        }
+        (Xform::Morph(s), _) => match gcam_copy(g, out, err, s, None)? {
+            Ret::New(m) => Xform::Morph(Box::new(m)),
+            _ => return Ok(None),
+        },
+        (Xform::Lta(s), Some(Xform::Lta(mut d))) => match lta_copy(g, out, err, s, Some(&mut d))? {
+            Ret::Given => Xform::Lta(d),
+            _ => return Ok(None),
+        },
+        (Xform::Lta(s), _) => match lta_copy(g, out, err, s, None)? {
+            Ret::New(l) => Xform::Lta(l),
+            _ => return Ok(None),
+        },
+    };
+    let mut t = Transform::new(src.ttype, xform);
+    t.mri_xn = xn;
+    t.mri_yn = yn;
+    t.mri_zn = zn;
+    Ok(Some(t))
+}
+
+/// `TransformApplyType(transform, mri_src, mri_dst, interp_type)` (2660): a linear transform array
+/// through `LTAtransformInterp` (into `mri_dst` when given); a GCA morph through
+/// `GCAMmorphToAtlas` (not ported yet: its message and no volume).
+#[allow(clippy::too_many_arguments)]
+pub fn transform_apply_type(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    t: &mut Transform,
+    src: &Mri,
+    dst: Option<&mut Mri>,
+    interp: i32,
+) -> Result<Ret<Mri>, Fatal> {
+    match &mut t.xform {
+        Xform::Morph(_) => {
+            morph_not_ported(err, "TransformApplyType", "GCAMmorphToAtlas");
+            Ok(Ret::Null)
+        }
+        Xform::Lta(lta) => lta_transform_interp(g, out, err, env, src, dst, lta, interp),
+    }
+}
+
+/// `TransformApply(transform, mri_src, mri_dst)` (2678): a new volume (`mri_dst` is not used): a
+/// linear transform array through `LTAtransform` (trilinear); a GCA morph through
+/// `GCAMmorphToAtlas` (not ported yet).
+pub fn transform_apply(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    t: &mut Transform,
+    src: &Mri,
+) -> Result<Ret<Mri>, Fatal> {
+    match &mut t.xform {
+        Xform::Morph(_) => {
+            morph_not_ported(err, "TransformApply", "GCAMmorphToAtlas");
+            Ok(Ret::Null)
+        }
+        Xform::Lta(lta) => lta_transform(g, out, err, env, src, None, lta),
+    }
+}
+
+/// `TransformCreateDensityMap(transform, mri_src, mri_dst)` (4122): a linear transform array:
+/// [`transform_apply`], then `scaling volume by <det>...` (`%2.3f` of the first transform's
+/// determinant, a `float`) on standard output and the volume multiplied by it in place; a GCA
+/// morph through `GCAMmorphToAtlasWithDensityCorrection` (not ported yet).
+pub fn transform_create_density_map(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    t: &mut Transform,
+    src: &Mri,
+) -> Result<Ret<Mri>, Fatal> {
+    if matches!(t.xform, Xform::Morph(_)) {
+        morph_not_ported(
+            err,
+            "TransformCreateDensityMap",
+            "GCAMmorphToAtlasWithDensityCorrection",
+        );
+        return Ok(Ret::Null);
+    }
+    let r = transform_apply(g, out, err, env, t, src)?;
+    let lta = t.lta();
+    let Some(m_l) = first(g, err, lta, "TransformCreateDensityMap")?.m_l.clone() else {
+        // MatrixDeterminant of no matrix (a transform array always has its matrices)
+        return Err(Fatal::Exit(139));
+    };
+    let det = matrix_determinant(g, err, &m_l);
+    let _ =
+        out.write_all(format!("scaling volume by {}...\n", fmt_f(f64::from(det), 2, 3)).as_bytes());
+    match r {
+        Ret::New(mut m) => {
+            mri_scalar_mul(g, out, err, Pair::Same(&mut m), det)?;
+            Ok(Ret::New(m))
+        }
+        other => Ok(other),
+    }
 }

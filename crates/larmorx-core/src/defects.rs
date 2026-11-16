@@ -2293,6 +2293,34 @@ defects! {
         "the inverse sample of a GCA morph with no nodes (a grid of size 0) reads a node past the grid: memory contents or a crash";
     FS_862 = "FS-862", "FreeSurfer", true,
         "the nearest-voxel sample of a GCA morph's inverse (an image voxel to the atlas, as the atlas programs ask it) at a point within half a voxel of the image's far face reads one voxel past the inverse: another voxel's value, or memory contents past the last slice";
+    FS_863 = "FS-863", "FreeSurfer", true,
+        "reading a TIFF image whose last page's link to the next cannot be read, or asking for pages past those read: FreeSurfer writes and reads its memory past the pages it counted (a crash or wrong frames)";
+    FS_864 = "FS-864", "FreeSurfer", true,
+        "reading a TIFF image with frames outside its pages (a frame number past the last page, or a range ending past it): FreeSurfer reads memory contents for the missing pages, or makes an image of no frames or of a negative number of frames (the program then ends on its allocation)";
+    FS_865 = "FS-865", "FreeSurfer", true,
+        "reading or writing a TIFF image whose pages do not fit the image FreeSurfer makes for them (a later page larger than the first, rows longer than the image's at its last row, 1-bit rows at the image's end, grey tiles, 4-sample rows of fewer than 8 bits a sample, a width of 0): FreeSurfer reads or writes past the image's memory (a crash or memory corruption)";
+    FS_866 = "FS-866", "FreeSurfer", true,
+        "reading a 1-bit TIFF image: each row is unpacked to a whole number of bytes, so up to 7 pixels past the width spill into the next row (for top-left images the row already read), and a fill order of low bit first is applied a second time (the pixels of each byte mirrored)";
+    FS_867 = "FS-867", "FreeSurfer", true,
+        "reading a TIFF image: whether a page of separate planes is refused, and whether a 1-bit image's fill order of low bit first is taken into account, depends on memory contents (the same file is refused or read as contiguous planes from one call to another)";
+    FS_868 = "FS-868", "FreeSurfer", true,
+        "reading a TIFF image with a page of separate planes: after its message (PLANARCONFIG_SEPARATE unsupported) the program ends on an allocation of 2^64 - 3 bytes with that error's code (status 253), or goes on with an image of no pixels";
+    FS_869 = "FS-869", "FreeSurfer", true,
+        "reading several pages of a TIFF image: each page is placed after width x height x samples x (bits / 8) bytes for each page before it, so 1-bit pages all land on the first frame and 4-sample pages a third past their frames; the check that the pages have the same size misses the last page and pages of the same size but another shape";
+    FS_870 = "FS-870", "FreeSurfer", true,
+        "reading a tiled TIFF image: the tiles of a row are counted as width / tile width + 1, one too many when the width is a multiple of the tile width (every tile after the first row misplaced or dropped); every tile is placed as 3-byte pixels whatever its samples and bits, and a bottom-left orientation is read as top-left";
+    FS_871 = "FS-871", "FreeSurfer", true,
+        "reading a tiled TIFF image whose tile cannot be read, whose tiles have a width or length of 0, or whose tiles cannot be held in memory: FreeSurfer copies memory contents, divides by zero, never ends, or reads into no memory (a crash)";
+    FS_872 = "FS-872", "FreeSurfer", true,
+        "reading a TIFF image of samples FreeSurfer's image cannot hold (grey samples of other than 1, 8, 16, 32 or 64 bits, colour samples of other than 8 bits): the rows are stored as they come in an image of bytes or of 3-byte pixels, packed or past the rows: wrong pixels";
+    FS_873 = "FS-873", "FreeSurfer", true,
+        "reading a TIFF image: a field the page does not hold and libtiff gives no default for (the photometric interpretation, the compression, the size of a page that could not be read) is printed (Gdiag's verbose lines) or used as the image's size from memory contents";
+    FS_874 = "FS-874", "FreeSurfer", true,
+        "writing a TIFF image: images of bytes are labelled signed (SampleFormat 2) and floating-point images are labelled as signed integers (a second SampleFormat replaces the first): other readers take bytes above 127 as negative and floats as integers";
+    FS_875 = "FS-875", "FreeSurfer", true,
+        "copying a GCA morph into a new one (a transform copied, as concatenating transforms does): the copy keeps neither the morph's inverse (its index volumes) nor its affine matrix, so the copy has no inverse and is written without its affine";
+    FS_876 = "FS-876", "FreeSurfer", true,
+        "copying a transform into one of the other kind (a linear transform array into a GCA morph, or the reverse): FreeSurfer copies into the other structure's memory (a crash or memory corruption)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

@@ -8,7 +8,8 @@
 //! pixel size, a cut header, tables or rows, run-length rows of length -1, longer than the buffer
 //! or running past the width), MATLAB files (piece 5's), HIPS names (any other extension, or a
 //! name with `@<image type>`), PGM, PPM and PBM files, JPEG files (since relay 39: track C's
-//! generated files, now and then damaged), TIFF files (not ported: SKIP),
+//! generated files, now and then damaged), TIFF files (since relay 40: track C's generated files of
+//! one to three pages, now and then damaged, and the port's own writes read back),
 //! missing files and folders, with and without `#` frames; `ixw` (piece 17's `vwr`, `how` 31 or
 //! `MRIwrite` by the name) of volumes of every type as SGI, MATLAB (the JPEG writer), PGM, PPM,
 //! PBM, HIPS, TIFF and JPEG names, `#` and folder names, volumes 65,536 pixels wide or tall; and
@@ -18,6 +19,7 @@ use std::io::Write;
 
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_io::jpeg::cases as jpeg_cases;
+use larmorx_io::tiff::cases as tiff_cases;
 
 use super::piece4::file_entry;
 use super::piece12::fhex;
@@ -248,18 +250,99 @@ fn read_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
                     jpeg_cases::damage(&mut f, seed, g.int(1, 4) as u32);
                 }
                 entries.push(file_entry(name, &f));
+            } else if name.contains(".t") || name.contains(".s") {
+                // relay 40: TIFF files of track C's generator (libtiff 3.6.1 reads them), of
+                // at most 96 KiB
+                if !g.chance(12) {
+                    let seed = g.below(1 << 40);
+                    let mut f = Vec::new();
+                    for i in 0..64 {
+                        f = tiff_cases::make(seed, i);
+                        if f.len() <= 96 << 10 && tiff_steady(&f) {
+                            break;
+                        }
+                    }
+                    entries.push(file_entry(name, &f));
+                } else if !g.chance(3) {
+                    entries.push(file_entry(name, b"II*\x00\x08\x00\x00\x00\xff\xd8\xff"));
+                }
             } else if !g.chance(3) {
                 entries.push(file_entry(name, b"II*\x00\x08\x00\x00\x00\xff\xd8\xff"));
             }
             (name.into(), if g.chance(2) { 21 } else { -1 })
         }
     };
-    let name = if g.chance(10) {
-        format!("{name}#{}", g.pick(&["0", "1", "0:1", "x", "-2"]))
+    let tiff = name.contains(".t") || name.contains(".s");
+    let name = if g.chance(if tiff { 4 } else { 10 }) {
+        format!(
+            "{name}#{}",
+            g.pick(&["0", "1", "0:1", "x", "-2", "2", "1:2", "0:2", "5", "0:7"])
+        )
     } else {
         name
     };
     (name, ty)
+}
+
+/// Whether a generated TIFF file reads the same whatever the machine's memory: libtiff's reading
+/// of it (track C's transcript) the same with 768 MiB of allocations as with 16 GiB, and
+/// FreeSurfer's image of its pages and a tile buffer under 256 MiB (FreeSurfer's probe runs with
+/// 1 GiB of address space, the port as a 16 GiB machine).
+fn tiff_steady(f: &[u8]) -> bool {
+    use larmorx_io::tiff::{Options, Tiff, Value, tag};
+    let Ok(d) = tempfile::Builder::new().prefix("fs tiff ~").tempdir() else {
+        return false;
+    };
+    let path = d.path().join("t.tif");
+    if std::fs::write(&path, f).is_err() {
+        return false;
+    }
+    let p = path.to_string_lossy().into_owned();
+    let small = Options {
+        max_alloc: Some(768 << 20),
+        ..Options::default()
+    };
+    let big = Options {
+        max_alloc: Some(1 << 34),
+        ..Options::default()
+    };
+    tiff_cases::reset_thread_state();
+    let a = tiff_cases::port_read(&p, small);
+    tiff_cases::reset_thread_state();
+    let b = tiff_cases::port_read(&p, big);
+    tiff_cases::reset_thread_state();
+    if (a.0, a.1) != (b.0, b.1) {
+        return false;
+    }
+    let mut cap = larmorx_core::cfmt::Captured::default();
+    let mut bytes: u64 = 0;
+    if let Ok(Some(mut t)) = Tiff::open(&p, "r", big, &mut cap) {
+        for _ in 0..8 {
+            let mut get = |tg| match t.get_field_defaulted(tg, &mut cap) {
+                Some(Value::U32(x)) => u64::from(x),
+                Some(Value::U16(x)) => u64::from(x),
+                _ => 0,
+            };
+            let (w, h, spp) = (
+                get(tag::IMAGEWIDTH),
+                get(tag::IMAGELENGTH),
+                get(tag::SAMPLESPERPIXEL),
+            );
+            bytes = bytes.saturating_add(w.saturating_mul(h).saturating_mul(spp.max(3)) * 8);
+            let ts = t.tile_size() as i64;
+            if !(0..=1 << 28).contains(&ts) || bytes > 1 << 28 {
+                t.close(&mut cap);
+                tiff_cases::reset_thread_state();
+                return false;
+            }
+            if !t.read_directory(&mut cap).unwrap_or(false) {
+                break;
+            }
+        }
+        t.close(&mut cap);
+    }
+    tiff_cases::reset_thread_state();
+    true
 }
 
 /// A plain volume in `read_mri14`'s fields: the given shape and type, the voxels (`None`: zeros),
@@ -316,6 +399,8 @@ fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
         "w/o.x",
         "w/o",
         "w/o.tif",
+        "w/o.tif",
+        "w/o.tiff",
         "w/o.jpg",
         "w/no/o.rgb",
         "w/o.rgb#2",
@@ -373,7 +458,7 @@ fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
     t.push("-1".into());
     t.push(g.pick(&[-1i64, 0, 3]).to_string());
     t.push(enc(Some(name.as_bytes())));
-    let back = alloc && nf > 0 && g.chance(3);
+    let back = alloc && nf > 0 && (g.chance(3) || name.contains(".tif") && g.chance(2));
     t.push(i64::from(back).to_string());
     t
 }
@@ -430,9 +515,21 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     let mut t = t;
     let mut entries = Vec::new();
     let (name, ty) = read_case(g, &mut entries);
-    t.push(if g.chance(10) { "8" } else { "0" }.into()); // Gdiag (DIAG_WRITE)
+    let tiff = name.contains(".t") || name.contains(".s");
+    // Gdiag (hexadecimal: DIAG_WRITE, DIAG_VERBOSE for the TIFF reader's lines)
+    t.push(
+        if tiff && g.chance(6) {
+            "10000000"
+        } else if g.chance(10) {
+            "8"
+        } else {
+            "0"
+        }
+        .into(),
+    );
     t.push(if g.chance(8) { "0" } else { "1" }.into()); // MRIIO_Strip_Pound
-    t.push("0".into()); // piece 6's environment bits
+    // piece 6's environment bits (1024: FS_TIFF_DEBUG)
+    t.push(if tiff && g.chance(8) { "1024" } else { "0" }.into());
     t.push(ty.to_string());
     t.push(enc(Some(name.as_bytes())));
     t.push(if entries.is_empty() {
@@ -454,6 +551,9 @@ pub fn run(
     extra: &mut Vec<&'static str>,
 ) -> Result<(), u8> {
     g.progname = "fsio".into();
+    // libtiff's library-wide state as a new process has it (each of FreeSurfer's cases runs in
+    // a new child)
+    tiff_cases::reset_thread_state();
     let r = if tk[0] == "ixw" {
         let mut t: Vec<&str> = vec!["vwr"];
         t.extend_from_slice(&tk[1..]);
@@ -467,6 +567,10 @@ pub fn run(
     // case reads a MATLAB name back
     let mat_name = enc(Some(b"w/o.mat"));
     if tk[0] == "ixw" && tk.get(5) == Some(&"10000040") && tk.contains(&mat_name.as_str()) {
+        extra.push("VARY");
+    }
+    // FS_TIFF_DEBUG's lines print FreeSurfer's heap addresses
+    if tk[0] != "ixw" && tk.get(3) == Some(&"1024") {
         extra.push("VARY");
     }
     for n in g.notices.as_slice() {
@@ -496,6 +600,44 @@ pub fn run(
         // FreeSurfer's pixels from memory contents; the 8 bytes it writes past an SGI header
         // (harmless, or a crash in the allocator, as the heap lies)
         if matches!(id, "FS-727" | "FS-720") {
+            extra.push("VARY");
+        }
+        // relay 40: TIFF images: FreeSurfer's stack contents, writes and reads past its buffers,
+        // its crashes and hangs on tiles; ImageAllocBuffer's clearing past a buffer smaller than
+        // the frames (FS-405: the heap after it)
+        if matches!(id, "FS-863" | "FS-865" | "FS-871" | "FS-873" | "FS-405") {
+            extra.push("SKIP");
+        }
+        // libtiff's defects whose original behaviour is memory contents, a crash or the stack
+        // (track C's fs-tiff probe compares them apart: its VARY list)
+        if matches!(
+            id,
+            "FS-815"
+                | "FS-816"
+                | "FS-818"
+                | "FS-819"
+                | "FS-820"
+                | "FS-821"
+                | "FS-822"
+                | "FS-823"
+                | "FS-824"
+                | "FS-825"
+                | "FS-826"
+                | "FS-828"
+                | "FS-830"
+                | "FS-831"
+                | "FS-832"
+                | "FS-833"
+                | "FS-834"
+                | "FS-835"
+                | "FS-838"
+                | "FS-840"
+                | "FS-884"
+        ) {
+            extra.push("VARY");
+        }
+        // the upper bytes of FreeSurfer's int (measured: see the findings, Part 35)
+        if id == "FS-867" {
             extra.push("VARY");
         }
     }

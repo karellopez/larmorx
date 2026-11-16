@@ -359,6 +359,17 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   the case lines are `gcw 0 0 <head> - <out> <format>`); their `.m3d` outputs pass `fsio`'s 64 MiB file limit (`SIGXFSZ`). Since relay 39
   piece 23 writes real JPEG files (track C's `larmorx_io::jpeg::cases`, now and then damaged) for its `.jpg` and
   `.jpeg` names: seeds 7 and 13, 1,200 image cases each, identical on every compared case.
+- Since relay 40 piece 23 writes real TIFF files for its `.tif`, `.tiff`, `.svs` names (track C's
+  `larmorx_io::tiff::cases::make`, one to three pages, now and then damaged; kept only when libtiff reads them alike
+  with 768 MiB and 16 GiB and their images stay under 256 MiB: `fsio` runs with 1 GiB), frames up to `#0:7`, `Gdiag`
+  0x10000000 now and then and the environment bit 1024 (`FS_TIFF_DEBUG`, compared apart: its lines print heap
+  addresses; `fsio` REBUILT); writes of `.tif`/`.tiff` names read back. `SKIP` for FS-863, FS-865, FS-871, FS-873 and
+  FS-405; `VARY` for FS-867 (memory contents: measured, see `docs/findings/freesurfer-io.md` Part 35) and libtiff's
+  memory-dependent defects (track C's fs-tiff list). The port's example runs its cases in a short temporary folder
+  (libtiff cuts file names to 100 bytes in some messages). Seeds 7 and 13 (1,200 piece-23 cases each): `reproduce`
+  identical on every compared case (877, 867), 0 different. `tiff_hand_cases.py`: 16 hand-made files for the
+  measurements of Part 35 (`python3 -P tiff_hand_cases.py > hand.txt`, then `fsio hand.txt` and `fs_io_probe run
+  hand.txt reproduce`, each inside `boxed.sh`).
 - `reorder_triples.py` (relay 37): dimension numbers that pass `MRIreorder`'s check only through 32-bit overflow
   (FS-843; `python3 -P reorder_triples.py [count]`); official `mri_convert -r <a> <b> <c>` with them ends with a
   segmentation fault (status 139).

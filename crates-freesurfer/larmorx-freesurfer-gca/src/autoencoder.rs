@@ -22,7 +22,7 @@
 //! dereferences a null pointer), FS-879 (`SAEalloc`'s and the kernels' sizes past 32 bits),
 //! FS-880 and FS-925 (weights read past a layer's matrix's columns: the next rows', then memory
 //! contents past the matrix), FS-921 (a later layer's volume takes the
-//! autoencoder's stored extent), FS-922 (`SAEalloc`'s check run of a window of one voxel with no
+//! autoencoder's stored extent; FS-927 where that extent is larger than the kernel), FS-922 (`SAEalloc`'s check run of a window of one voxel with no
 //! inputs), FS-923 (that check's dump of a layer without hidden units), FS-924 (`MatrixReadFrom`
 //! far past the file's end, in fs.core), FS-04 (the random weights `SAEalloc` makes are seeded
 //! from the clock without `FREESURFER_SEED`).
@@ -30,7 +30,9 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
-use larmorx_core::defects::{FS_877, FS_878, FS_879, FS_880, FS_921, FS_922, FS_923, FS_925};
+use larmorx_core::defects::{
+    FS_877, FS_878, FS_879, FS_880, FS_921, FS_922, FS_923, FS_925, FS_927,
+};
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::alloc::{CALLOC_LIMIT, ENOMEM};
 use larmorx_freesurfer_core::cscan::Scanf;
@@ -51,7 +53,7 @@ use larmorx_freesurfer_io::fio;
 use larmorx_freesurfer_mri::mri::{
     MAX_INDEX, MRI_FLOAT, MRI_INT, Mri, mri_alloc_sequence, mri_copy_header, use_vol_geom_to_mri,
 };
-use larmorx_freesurfer_mri::vol_geom::{VolGeom, init_vol_geom};
+use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_volume::arith::mri_clear;
 use larmorx_freesurfer_volume::vgeom::read_vol_geom;
@@ -580,8 +582,16 @@ pub fn sae_read(
     if sae_alloc(g, env, out, err, whalf, nlevels, stype, scale)?.is_none() {
         return Ok(None);
     }
-    let mut vg = VolGeom::default();
-    init_vol_geom(&mut vg);
+    // the autoencoder's geometry as calloc leaves it (VOL_GEOM's constructor is not run): zeros
+    let mut vg = VolGeom {
+        xsize: 0.0,
+        ysize: 0.0,
+        zsize: 0.0,
+        x_r: 0.0,
+        y_s: 0.0,
+        z_a: 0.0,
+        ..VolGeom::default()
+    };
     read_vol_geom(g, err, &mut fp, &mut vg);
     let mut sae = Sae {
         whalf,
@@ -812,8 +822,9 @@ pub fn sae_layer_weights_to_mri(
             src.height = width;
             src.depth = 1;
         } else if larger {
+            // its own ID: a probe tells it from FS-921's kept header by the ID
             g.notices.add(
-                &FS_921,
+                &FS_927,
                 format!("{what}: FreeSurfer reads past the voxels' memory; refused"),
             );
             log::error_printf(

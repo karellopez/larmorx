@@ -11,7 +11,7 @@
 //! missing), then per layer its seven matrices (real, now and then complex or of an unknown type;
 //! the window's inputs or fewer (FS-880, FS-925) or more; vectors of other sizes: `MatrixReadFrom`'s
 //! refusal; weights with NaN, infinite, subnormal values) and its kernel size. Frames by the name:
-//! none (layer 0), `#0` to `#3` (a later layer through the ones before it, FS-921; past the
+//! none (layer 0), `#0` to `#3` (a later layer through the ones before it, FS-921 and FS-927; past the
 //! count: the program's end). Faults: the file cut short, a missing file, a folder, an empty file,
 //! a text that is not an autoencoder. The environment bit 2048 sets `FREESURFER_SEED` (the reader's
 //! random weights, printed by the one-voxel check).
@@ -33,8 +33,11 @@ fn bed(d: &mut Vec<u8>, v: f64) {
     d.extend_from_slice(&v.to_bits().to_be_bytes());
 }
 
-/// A weight: now and then a special number.
-fn weight(g: &mut Gen) -> f64 {
+/// A weight: in a file of special numbers, now and then one.
+fn weight(g: &mut Gen, special: bool) -> f64 {
+    if !special {
+        return g.int(-40, 40) as f64 / 16.0;
+    }
     match g.below(60) {
         0 => f64::from_bits(0x7ff8_0000_0000_0000),
         1 => f64::from_bits(0xfff4_0000_0000_0001),
@@ -49,13 +52,13 @@ fn weight(g: &mut Gen) -> f64 {
 }
 
 /// `MatrixWriteInto`: type, rows, columns, then each element (two for a complex one).
-fn matrix(g: &mut Gen, d: &mut Vec<u8>, mtype: i32, rows: i32, cols: i32) {
+fn matrix(g: &mut Gen, d: &mut Vec<u8>, sp: bool, mtype: i32, rows: i32, cols: i32) {
     be32(d, mtype);
     be32(d, rows);
     be32(d, cols);
     let n = i64::from(rows.max(0)) * i64::from(cols.max(0)) * if mtype == 2 { 2 } else { 1 };
     for _ in 0..n.min(1 << 16) {
-        let w = weight(g);
+        let w = weight(g, sp);
         bed(d, w);
     }
 }
@@ -104,9 +107,18 @@ fn vol_geom(g: &mut Gen, d: &mut Vec<u8>, lines: usize, ext: (i32, i32, i32)) {
 
 /// One layer's matrices and kernel size: `ninputs` inputs, `nhidden` hidden units, `noutputs`
 /// outputs; now and then a matrix of another type or size.
-fn layer(g: &mut Gen, d: &mut Vec<u8>, ninputs: i32, nhidden: i32, noutputs: i32, ksize: i32) {
+#[allow(clippy::too_many_arguments)]
+fn layer(
+    g: &mut Gen,
+    d: &mut Vec<u8>,
+    sp: bool,
+    ninputs: i32,
+    nhidden: i32,
+    noutputs: i32,
+    ksize: i32,
+) {
     fn odd(g: &mut Gen, v: i32) -> i32 {
-        if g.chance(25) {
+        if g.chance(70) {
             v + g.pick(&[-1, 1, 2])
         } else {
             v
@@ -117,20 +129,20 @@ fn layer(g: &mut Gen, d: &mut Vec<u8>, ninputs: i32, nhidden: i32, noutputs: i32
         1 => 7,
         _ => 1,
     };
-    matrix(g, d, t_ih, nhidden, ninputs);
-    let c = if g.chance(25) { 2 } else { 1 };
+    matrix(g, d, sp, t_ih, nhidden, ninputs);
+    let c = if g.chance(70) { 2 } else { 1 };
     let t_ob = if g.chance(40) { 2 } else { 1 };
-    matrix(g, d, t_ob, noutputs, c);
+    matrix(g, d, sp, t_ob, noutputs, c);
     let r = odd(g, nhidden);
-    matrix(g, d, 1, r, 1);
+    matrix(g, d, sp, 1, r, 1);
     let r = odd(g, noutputs);
-    matrix(g, d, 1, r, nhidden);
+    matrix(g, d, sp, 1, r, nhidden);
     let r = odd(g, ninputs);
-    matrix(g, d, 1, r, 1);
+    matrix(g, d, sp, 1, r, 1);
     let r = odd(g, nhidden);
-    matrix(g, d, 1, r, 1);
+    matrix(g, d, sp, 1, r, 1);
     let r = odd(g, noutputs);
-    matrix(g, d, 1, r, 1);
+    matrix(g, d, sp, 1, r, 1);
     be32(d, ksize);
 }
 
@@ -161,9 +173,9 @@ fn header_fits(whalf: i64, nlevels: i64, stype: i32, scale: &str) -> bool {
         || weights <= 2_000_000
 }
 
-/// An autoencoder file, and whether it holds a one-voxel window (its check prints the random
-/// weights).
-fn sae_bytes(g: &mut Gen) -> (Vec<u8>, bool) {
+/// An autoencoder file, whether it holds a one-voxel window (its check prints the random
+/// weights), and its header's layer count.
+fn sae_bytes(g: &mut Gen) -> (Vec<u8>, bool, i64) {
     let whalf: i64 = match g.below(40) {
         0..=4 => 0,
         5 => g.pick(&[-1, -2]),
@@ -179,11 +191,11 @@ fn sae_bytes(g: &mut Gen) -> (Vec<u8>, bool) {
         _ => 1,
     };
     let stype = g.pick(&[1, 1, 1, 9, 9, 2, 10, 0, 8]);
-    let nenc: i64 = match g.below(16) {
+    let nenc: i64 = match g.below(24) {
         0 => g.pick(&[0, -1]),
         1 => 5,
-        2..=5 => 2,
-        6 | 7 => 3,
+        2..=9 => 2,
+        10..=14 => 3,
         _ => 1,
     };
     let scale = match g.below(60) {
@@ -225,6 +237,10 @@ fn sae_bytes(g: &mut Gen) -> (Vec<u8>, bool) {
     let mut ext = (wsize.max(1), wsize.max(1), depth.max(1));
     if g.chance(4) {
         ext = g.pick(&[(7, 7, 1), (3, 3, 3), (9, 9, 9), (256, 256, 256)]);
+    } else if nenc >= 2 && !g.chance(3) {
+        // a later layer's kernel (ksize + 2 whalf a side, one slice) is at least this large
+        let k = g.int(1, 3) as i32;
+        ext = (k, k, 1);
     }
     let vlines = if g.chance(14) { g.below(8) as usize } else { 8 };
     vol_geom(g, &mut d, vlines, ext);
@@ -236,7 +252,8 @@ fn sae_bytes(g: &mut Gen) -> (Vec<u8>, bool) {
     let mut nhidden = g.pick(&[1, 2, 2, 3, 4, 0]);
     let noutputs = if stype & 2 != 0 { 1 } else { ninputs };
     let ks = g.pick(&[1, 2, 2, 3]);
-    layer(g, &mut d, ninputs, nhidden, noutputs, ks);
+    let sp = g.chance(6);
+    layer(g, &mut d, sp, ninputs, nhidden, noutputs, ks);
     for _ in 1..file_layers {
         let ksize = g.pick(&[1, 2, 2, 3, 0, -1]);
         let prev = nhidden;
@@ -246,9 +263,9 @@ fn sae_bytes(g: &mut Gen) -> (Vec<u8>, bool) {
         }
         nhidden = g.pick(&[1, 2, 2, 3]);
         let nout = if g.chance(2) { 1 } else { nin };
-        layer(g, &mut d, nin, nhidden, nout, ksize);
+        layer(g, &mut d, sp, nin, nhidden, nout, ksize);
     }
-    (d, whalf == 0)
+    (d, whalf == 0, nenc)
 }
 
 fn read_case(g: &mut Gen, entries: &mut Vec<String>, env: &mut i32) -> (String, i64) {
@@ -263,21 +280,24 @@ fn read_case(g: &mut Gen, entries: &mut Vec<String>, env: &mut i32) -> (String, 
     ]);
     let file = name.split('@').next().unwrap_or(name);
     let mut one_voxel = false;
+    let mut nenc = 1;
     match g.below(40) {
         0 => entries.push(format!("D{}", hex(file.as_bytes()))),
         1 => {}
         2 => entries.push(file_entry(file, b"not an autoencoder at all\n")),
         3 => entries.push(file_entry(file, b"")),
         4..=7 => {
-            let (mut b, ov) = sae_bytes(g);
+            let (mut b, ov, n) = sae_bytes(g);
             one_voxel = ov;
+            nenc = n;
             let cut = g.below(b.len() as u64 + 1) as usize;
             b.truncate(cut);
             entries.push(file_entry(file, &b));
         }
         _ => {
-            let (b, ov) = sae_bytes(g);
+            let (b, ov, n) = sae_bytes(g);
             one_voxel = ov;
+            nenc = n;
             entries.push(file_entry(file, &b));
         }
     }
@@ -285,11 +305,13 @@ fn read_case(g: &mut Gen, entries: &mut Vec<String>, env: &mut i32) -> (String, 
     if (one_voxel && !g.chance(5)) || g.chance(10) {
         *env |= 2048;
     }
+    // a later layer of the file's mostly (through the ones before it)
     let frame: Option<i32> = match g.below(12) {
-        0..=5 => None,
-        6 | 7 => Some(1),
-        8 => Some(2),
-        9 => Some(g.pick(&[3, 5])),
+        0..=3 => None,
+        4..=8 if nenc >= 2 => Some(g.int(1, nenc.min(3) - 1) as i32),
+        4 | 5 => Some(1),
+        9 => Some(2),
+        10 => Some(g.pick(&[3, 5])),
         _ => Some(0),
     };
     let name = match frame {
@@ -341,9 +363,8 @@ pub fn run(
         // FreeSurfer crashes, writes outside its memory or reads outside the volume's voxels
         if matches!(
             n.defect.id,
-            "FS-878" | "FS-922" | "FS-923" | "FS-924" | "FS-926" | "FS-53"
-        ) || (n.defect.id == "FS-921" && n.detail.ends_with("refused"))
-        {
+            "FS-878" | "FS-922" | "FS-923" | "FS-924" | "FS-926" | "FS-927" | "FS-53"
+        ) {
             extra.push("SKIP");
         }
         // memory contents: the header's missing numbers, weights past the matrix, the clock's

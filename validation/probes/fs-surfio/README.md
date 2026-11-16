@@ -442,7 +442,8 @@ named by its FreeSurfer function, on every field of every vertex; the folder's f
 the port's side in `tests/fs_surfio/vcp.rs`), seeds 7, 13 (500 cases each) and 17 (1,000): 0 different
 in both modes. `flr war` (`mris_place_surface --area-map` of each recorded white and pial surface):
 the twelve files are recon-all's `?h.area` and `?h.area.pial` byte for byte, in both builds
-(`real.py --scl`, 36 of 36 identical in both modes).
+(`real.py --scl`, 36 of 36 identical in both modes). Seed 1 (1,680 cases): 1,628 identical, 52
+counted, hash `98549f42...`.
 
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also

@@ -27,7 +27,7 @@ use std::io::Write;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{FS_901, FS_903, FS_904, FS_905, FS_906, FS_907};
 use larmorx_core::glibc_qsort::qsort;
-use larmorx_core::math::{acos, Libm};
+use larmorx_core::math::{Libm, acos};
 use larmorx_freesurfer_core::cscan::Bytes;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;

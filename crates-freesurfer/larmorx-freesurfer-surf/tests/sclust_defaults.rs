@@ -219,7 +219,11 @@ fn the_clusterwise_p_values_log10f() {
             ..Default::default()
         }];
         assert_eq!(sclust::set_surface_val_to_cwp(&mut r.g, &mut s, &list), 0.0);
-        let expect = if mode.reproduce() { -log10f_glibc(p) } else { -log10f(p) };
+        let expect = if mode.reproduce() {
+            -log10f_glibc(p)
+        } else {
+            -log10f(p)
+        };
         assert_eq!(s.vertex(0).val.to_bits(), expect.to_bits(), "{mode:?}");
         assert_eq!(s.vertex(1).val, 0.0);
     }

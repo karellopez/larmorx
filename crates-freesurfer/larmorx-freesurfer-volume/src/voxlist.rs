@@ -737,3 +737,81 @@ pub fn vlst_add_with_value(
     vl.vsrc[ind as usize] = vsrc;
     Ok(NO_ERROR)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_mri::mri::{MRI_UCHAR, mri_alloc_sequence};
+    use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
+
+    /// A 3 x 3 x 3 cube of ones in a 5 x 5 x 5 volume: 27 voxels, 26 on its border.
+    fn cube(g: &mut Globals) -> Mri {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut m = mri_alloc_sequence(g, &mut out, &mut err, 5, 5, 5, MRI_UCHAR, 1).unwrap();
+        for z in 1..4 {
+            for y in 1..4 {
+                for x in 1..4 {
+                    mri_set_vox_val(g, &mut err, &mut m, x, y, z, 0, 1.0, 0).unwrap();
+                }
+            }
+        }
+        m
+    }
+
+    #[test]
+    fn create_counts_the_border_by_default() {
+        for (mode, n) in [(UpstreamDefects::Fix, 26), (UpstreamDefects::Reproduce, 1)] {
+            let mut g = Globals::new(mode);
+            let m = cube(&mut g);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let all = vlst_create(&mut g, &mut out, &mut err, &m, 1.0, 1.0, None, 0, false).unwrap();
+            assert_eq!(all.nvox, 27);
+            assert_eq!(all.max_vox, 0);
+            let r = vlst_create(&mut g, &mut out, &mut err, &m, 1.0, 1.0, None, 0, true);
+            if mode.reproduce() {
+                // FreeSurfer's count is the one interior voxel: the border writes past the arrays
+                assert!(r.is_err());
+            } else {
+                assert_eq!(r.unwrap().nvox, n);
+            }
+            assert!(g.notices.as_slice().iter().any(|x| x.defect.id == "FS-888"));
+        }
+    }
+
+    #[test]
+    fn sort_moves_frames_by_default() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut vl = vlst_alloc(&mut g, &mut err, 3).unwrap();
+            vl.vsrc = vec![1.0, 3.0, 2.0];
+            vl.xi = vec![0, 1, 2];
+            vl.fi = vec![0, 1, 2];
+            vlst_sort(&mut g, &mut out, &mut err, SortInto::Same(&mut vl)).unwrap();
+            assert_eq!(vl.vsrc, [3.0, 2.0, 1.0]);
+            assert_eq!(vl.xi, [1, 2, 0]);
+            let fi = if mode.reproduce() { [0, 1, 2] } else { [1, 2, 0] };
+            assert_eq!(vl.fi, fi);
+        }
+    }
+
+    #[test]
+    fn add_until_full_and_free() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut err = Vec::new();
+        let mut vl = vlst_alloc(&mut g, &mut err, 2).unwrap();
+        vl.nvox = 0;
+        assert_eq!(vlst_add_unique(&mut g, &mut err, &mut vl, 1, 2, 3, 0.0, 0.0, 0.0).unwrap(), 1);
+        assert_eq!(vlst_add_unique(&mut g, &mut err, &mut vl, 1, 2, 3, 0.0, 0.0, 0.0).unwrap(), 0);
+        assert_eq!(vlst_add(&mut g, &mut err, &mut vl, 4, 5, 6, 0.0, 0.0, 0.0).unwrap(), NO_ERROR);
+        assert_eq!(
+            vlst_add(&mut g, &mut err, &mut vl, 7, 8, 9, 0.0, 0.0, 0.0).unwrap(),
+            ERROR_NOMEMORY
+        );
+        assert_eq!(vlst_in_list(&mut g, &mut err, &vl, 4, 5, 6).unwrap(), 1);
+        let mut p = Some(vl);
+        assert_eq!(vlst_free(&mut p), NO_ERROR);
+        assert_eq!(vlst_free(&mut p), ERROR_BADPARM);
+    }
+}

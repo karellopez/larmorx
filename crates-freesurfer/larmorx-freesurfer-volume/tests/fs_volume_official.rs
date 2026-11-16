@@ -8,8 +8,9 @@
 //! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, FS-300, FS-302 to FS-310, FS-314,
 //! FS-315, FS-322 to FS-325, FS-327, FS-163, FS-330, FS-463, FS-465, FS-467, FS-469 to FS-471,
 //! FS-473, FS-475, FS-479, FS-482, FS-484 to FS-488, FS-490, FS-491, FS-493, FS-496 to FS-499, FS-501,
-//! FS-502, FS-504, FS-508, FS-509, FS-511, FS-515, FS-517, and the eigen-systems it never returns
-//! from, FS-47, FS-48, ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
+//! FS-502, FS-504, FS-508, FS-509, FS-511, FS-515, FS-517, FS-886, FS-887, FS-889, FS-890, fs.io's
+//! FS-167, and the eigen-systems it never returns from, FS-47, FS-48, ITK-112, ITK-115, ITK-116,
+//! hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
 mod cases;
@@ -32,23 +33,27 @@ use sha2::{Digest, Sha256};
 /// transform.cpp's LTA operations, resample.cpp's segmentation mapping and SPM warp, mri2.cpp's
 /// segment statistics, borders, concatenation, edits, shifts and crops; relay 29, 257 commands
 /// (2026-11-15): mri2.cpp's fill onto a coarser grid, bright non-white-matter voxels, voxel
-/// topology and binary-volume classes): 5,140 cases, 4,765 lines identical, 375 hashed as `SKIP`,
-/// 26 hashed as `HEAVY` (identical too).
-const N: usize = 5140;
-const OFFICIAL_SHA256: &str = "d18ca1b6afbd2c9bedc741eaeda8e14266b41035990f1df7c0de987e3eb4c402";
-const SKIPPED: usize = 375;
+/// topology and binary-volume classes; relay 34, 275 commands (2026-11-16): transform.cpp's LTA
+/// writers, LTAtransformInterp and its helpers, the MNI and tkregister helpers, rotations and
+/// affine parameters (the official code with the correctly rounded atan2 the project decided for
+/// `reproduce`), voxlist.cpp's lists): 5,500 cases, 5,115 lines identical, 385 hashed as `SKIP`,
+/// 23 hashed as `HEAVY` (identical too).
+const N: usize = 5500;
+const OFFICIAL_SHA256: &str = "e5554290c86893a1d7372b8cc0bce17444979537407874d10d3631134e5a7a8d";
+const SKIPPED: usize = 385;
 /// The cases hashed as `HEAVY`.
-const HEAVY: usize = 26;
+const HEAVY: usize = 23;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 59] = [
+const SKIP: [&str; 64] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
     "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
     "FS-330", "FS-463", "FS-465", "FS-467", "FS-163", "FS-469", "FS-470", "FS-471", "FS-473",
     "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488", "FS-490",
     "FS-491", "FS-493", "FS-496", "FS-497", "FS-498", "FS-499", "FS-501", "FS-502", "FS-504",
-    "FS-508", "FS-509", "FS-511", "FS-515", "FS-517",
+    "FS-508", "FS-509", "FS-511", "FS-515", "FS-517", "FS-167", "FS-886", "FS-887", "FS-889",
+    "FS-890",
 ];
 
 /// `check.py`'s `heavy`: `MRIconform` resampling onto its 256^3 grid and

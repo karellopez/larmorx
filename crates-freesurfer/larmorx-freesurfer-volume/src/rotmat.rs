@@ -330,3 +330,57 @@ pub fn rms_reg_diff_mj(
     let a = sse::div64(sse::mul64(sse::mul64(radius, radius), trace), 5.0);
     Ok(sse::sqrt64(sse::add64(a, f64::from(ttt.relt(1, 1)))))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    /// The parameters of a matrix made from parameters come back (to float precision).
+    #[test]
+    fn affine_parameters_round_trip() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let p = [3.0, -4.5, 12.25, 10.0, -20.0, 35.0, 1.1, 0.9, 1.05, 0.02, -0.03, 0.01];
+            let m = tranform_affine_params2_matrix(&mut g, &mut out, &mut err, &p, None)
+                .unwrap()
+                .unwrap_new();
+            let q = tranform_extract_affine_params(&mut g, &mut out, &mut err, Some(&m))
+                .unwrap()
+                .unwrap();
+            for (a, b) in p.iter().zip(q.iter()) {
+                assert!((a - b).abs() < 1e-4 * a.abs().max(1.0), "{p:?} {q:?}");
+            }
+        }
+    }
+
+    /// A rotation about z by 90 degrees; no matrix gives no parameters.
+    #[test]
+    fn angles_and_no_matrix() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let r = mri_angles2rot_mat(&mut g, &mut out, &mut err, &[0.0, 0.0, PI / 2.0]).unwrap();
+        assert!((r.relt(1, 2) + 1.0).abs() < 1e-7 && (r.relt(2, 1) - 1.0).abs() < 1e-7);
+        assert_eq!(r.relt(4, 4), 1.0);
+        let none = tranform_extract_affine_params(&mut g, &mut out, &mut err, None).unwrap();
+        assert!(none.is_none());
+        assert_eq!(
+            out,
+            b"ERROR: TranformExtractAffineParams() input matrix is NULL\n"
+        );
+    }
+
+    /// Two equal registrations differ by 0; a shift of (3, 4, 0) by 5.
+    #[test]
+    fn rms_difference() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let a = identity(&mut g, &mut out, &mut err).unwrap();
+        let mut b = a.clone();
+        assert_eq!(rms_reg_diff_mj(&mut g, &mut out, &mut err, &a, &b, 70.0).unwrap(), 0.0);
+        b.set_relt(1, 4, 3.0);
+        b.set_relt(2, 4, 4.0);
+        assert_eq!(rms_reg_diff_mj(&mut g, &mut out, &mut err, &a, &b, 70.0).unwrap(), 5.0);
+    }
+}

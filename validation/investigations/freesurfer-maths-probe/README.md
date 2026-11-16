@@ -18,8 +18,8 @@ tree, which is closed to FreeSurfer's clean-room implementers, so they never bui
 | `guard_malloc.c` | the guard allocator of the guard runs (`LD_PRELOAD`): in each child, every allocation on pages of its own, with an inaccessible page right after its last byte (`MALLOC_GUARD_` unset or `over`) or right before its first (`MALLOC_GUARD_=under`), its other bytes a fill byte (`MALLOC_PERTURB_`'s value); no other program's code |
 | `build.sh` | builds both with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>`, the allocator as `guard_malloc.so` beside the output (the spec writer's or the orchestrator's step, not the implementer's) |
 | `compare.py` | the comparison loop of the spec's §23: 24 groups of seeded and fixed cases, run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
-| `models.py` | statements of the spec checked as models: `affine` (§3's operand order on every `affine` line of the probe), `scanf` (§18.1's `errno` at the end of the input, on the C library's `sscanf` itself: random calls compiled into a small C program with `cc`), `fs13` (§2.2's FS-13 outcome of every negative size of `mmake-sizes` and `mmake-sizes-old`, with `--grid` every size from -20 x -20 to 2 x 2) |
-| `standin.py` | a stand-in candidate that checks the loop's own rules: the probe's saved lines (`refs --save`) with the refusals and NaN signs the spec allows, or (`--break`) without them |
+| `models.py` | statements of the spec checked as models: `affine` (§3's operand order on every `affine` line of the probe), `scanf` (§18.1's `errno` at the end of the input, on the C library's `sscanf` itself: random calls compiled into a small C program with `cc`), `fs13` (§2.2's FS-13 outcome of every negative size of `mmake-sizes` and `mmake-sizes-old`, with `--grid` every size from -20 x -20 to 2 x 2), `svdpinv` (§17.5's SVD pseudo-inverse after a failed decomposition, NaN by NaN, on every such line of the group `svd`) |
+| `standin.py` | a stand-in candidate that checks the loop's own rules: the probe's saved lines (`refs --save`) with the refusals the spec allows, or (`--break`) without them or with NaNs' signs flipped |
 
 The prebuilt probe and allocator: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_maths_probe`
 and `guard_malloc.so` beside it. Their build (the larmorx commit, this folder's `build.sh`, the
@@ -246,11 +246,10 @@ numbers masked (`todseed`, `rfinit 0`). A difference is allowed on a line where 
 not finish (`TIMEOUT`, `CRASH`) and the candidate did; in the groups `eigen` and `svd` a `TIMEOUT`
 line also needs the spec's refusal on the candidate's standard error (`never returns on this
 matrix`; VNL's `suspicious return value (<info>) from SVDC`), in both modes (the batch's `refusal`);
-(2) in the group `svd`, a line whose input holds an infinite or NaN float and that differs only in
-the bits of NaNs (signs and payloads, in the printed numbers and in VNL's printed matrix: `nan` and
-`-nan` taken as one): the official build's LINPACK kernels pass NaNs on in another order than the
-main package's float SVD (spec §17.4; the batch's `nanbits`), counted as "NaN bits only"; (3) a
-**memory** line; (4) in `--mode fix`, a line where the candidate noted a defect. Every other
+(2) a **memory** line; (3) in `--mode fix`, a line where the candidate noted a defect. NaNs' bits
+(signs and payloads) are compared as every other bit (since 2026-11-16: the main package's float SVD
+gives the official build's, spec §17.4, and §17.5 states the SVD pseudo-inverse's NaNs after a
+failed decomposition). Every other
 difference is unexplained: exit status 1, the first three of each group printed. The loop prints,
 per group, the identical lines and those of each allowed kind, and the IDs the candidate noted on
 the allowed lines.
@@ -261,7 +260,10 @@ triangle only or below the diagonal, which the routine never reads; `oeigen`, th
 path, `meigen` where the matrix is symmetric without a NaN; and 11 picked matrices),
 `svd-nonfinite` (matrices of up to 6 x 5 with such entries: `msvd`, `msvdvalues`, `mcond`,
 `msvdpinverse`; 6 picked matrices; 16 condition numbers of finite rows and columns whose products
-overflow) hold matrices on which FreeSurfer never returns and matrices it finishes: with `--mode
+overflow) hold matrices on which FreeSurfer never returns and matrices it finishes (`svd-failed`,
+2026-11-16: 129 matrices of 1 to 9 columns and their transposed shapes, NaNs of distinct signs and
+payloads, quiet and signalling, in one whole row or column or scattered: `msvdpinverse` new and
+given, `msvd`; LINPACK fails on every one of 2 columns or more): with `--mode
 reproduce` the finished ones are compared as every other line. `mfiles-cut` holds binary matrix
 files cut at every byte of the header, of the first element (into FreeSurfer's matrix and into a
 given one), of a later element and of a complex element's parts (FS-49). Each batch has a generator
@@ -310,5 +312,14 @@ of its own, so the groups' other batches keep their cases.
   but 74 memory lines (rows -9 to -16 with a negative column count: their arrays show the matrix's
   record, addresses included); `models.py fs13 --grid --probe <the probe> --scratch <scratch>/fs13`:
   4,904 calls as §2.2's FS-13 text.
+- 2026-11-16 (track E, relay 6): the fixed batch `svd-failed` added to the group `svd` (339 calls:
+  `msvdpinverse` new and given, `msvd`, on 129 matrices with NaNs of distinct signs and payloads);
+  `refs --groups svd` cold, warm and without the cache give the spec's new hash
+  (`oracles/logs/fs-maths-probe-r6-svd-2026-11-16.log`); `models.py svdpinv --probe <the probe>
+  --scratch <scratch>/models`: 300 of 300 SVD pseudo-inverses after a failed decomposition as §17.5's
+  steps (16 in `svd`, 44 in `svd-nonfinite`, 240 in `svd-failed`). The `nanbits` allowance is gone:
+  `standin.py` as the candidate (`--groups eigen,svd`, the saved lines of both groups) gives no
+  unexplained difference; with `--break refusal` 295 lines are unexplained, with `--break nanbits` 572
+  (86 in `eigen`, 486 in `svd`; log `oracles/logs/fs-maths-probe-r6-standin-2026-11-16.log`).
 - About 40 minutes for a cold `refs` on the reference machine (most of it the guard runs of `eigen`
   and `svd`), seconds warm; `compare` about 10 minutes more (the candidate's runs).

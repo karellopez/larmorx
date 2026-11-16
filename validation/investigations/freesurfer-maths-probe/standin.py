@@ -2,10 +2,10 @@
 """A stand-in candidate that checks ``compare.py``'s own rules (README.md, "What may differ"): it
 prints the probe's lines of a batch as ``compare.py refs --save DIR`` saved them (the plain run),
 changed as the spec allows a clean room to differ: where FreeSurfer never returned (``TIMEOUT``) in
-the groups ``eigen`` and ``svd``, the spec's refusal (§17); in the group ``svd``, on the lines whose
-input holds an infinite or NaN number, every printed NaN with its sign flipped (§17.4). With
-``--break refusal`` the refusal lines carry no message, with ``--break nanbits`` the NaNs of the
-group ``eigen`` are flipped too: ``compare.py compare`` must then report unexplained differences.
+the groups ``eigen`` and ``svd``, the spec's refusal (§17). With ``--break refusal`` the refusal
+lines carry no message; with ``--break nanbits``, in those two groups, every printed NaN of a line
+whose input holds an infinite or NaN number has its sign flipped (the spec allows no difference in
+NaNs' bits since 2026-11-16): ``compare.py compare`` must then report unexplained differences.
 
     standin.py --save DIR [--break refusal|nanbits] batch <file>
 
@@ -63,9 +63,7 @@ def main() -> int:
         if line.startswith(b"TIMEOUT") and group in REFUSAL:
             msg = b"" if a.brk == "refusal" else REFUSAL[group]
             line = b"refused | x x" + msg.hex().encode()
-        elif (group == "svd" and nonfinite_input(case)) or (
-            group == "eigen" and a.brk == "nanbits"
-        ):
+        elif a.brk == "nanbits" and group in REFUSAL and nonfinite_input(case):
             line = flip_nans(line)
         out.write(line + b"\n")
     return 0

@@ -10,18 +10,23 @@
 //! separate process (`docs/licensing.md`). Its queue items (`docs/freesurfer/queue.md`, 3.3-01
 //! to 3.3-09) bring the code; so far the pieces `mri_read` needs to read an atlas as a volume
 //! (`readGCA`, track A's relay 35 of FreeSurfer's foundations) and a morph as a volume (`GCAMread`
-//! and `mri_read`'s branch of type `MGH_MORPH`, relay 38); `PROVENANCE.md` lists what each piece
+//! and `mri_read`'s branch of type `MGH_MORPH`, relay 38), `TRANSFORM` and the morph writer
+//! (`MRIwriteType`'s branch of type `MGH_MORPH`, relay 39); `PROVENANCE.md` lists what each piece
 //! translates.
 #![forbid(unsafe_code)]
 
 pub mod cma_names;
 pub mod gca;
 pub mod gcam;
+pub mod gcam_write;
 pub mod likely;
 pub mod read;
+pub mod transform;
 
-/// Registers this crate's readers with fs.io's `mri_read` (the atlas and the morph as volumes).
+/// Registers this crate's readers and writer with fs.io's `mri_read` and `MRIwriteType` (the atlas
+/// and the morph as volumes, a three-frame volume as a morph).
 pub fn register_io() {
     likely::register_io();
     gcam::register_io();
+    gcam_write::register_io();
 }

@@ -124,6 +124,9 @@ pub struct Globals {
     /// `MRIremoveNaNs`'s `static int first` (`mriio.cpp`), inverted: true once its `NaN found at
     /// voxel` line has been printed (once per process).
     pub remove_nans_shown: bool,
+    /// `gcamComputeMetricProperties`' `static bool reported` (`gcamorph.cpp`): true once its
+    /// `width:<w> too small for parallelism` line has been printed (once per process).
+    pub gcam_metric_width_reported: bool,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -188,6 +191,7 @@ impl Globals {
             sample_volume_derivative_sign: 1.0,
             minc_find_volume_count: 0,
             remove_nans_shown: false,
+            gcam_metric_width_reported: false,
             notices: Notices::new(mode),
         }
     }

@@ -2371,3 +2371,89 @@ Sources: `utils/mriio.cpp` 11570-11616 (`MRIreorderVox2RAS`), 11618-11842 (`MRIr
 - **Measured.** Piece 30 seeds 7, 13 and 21 (1,100 cases each): `reproduce` identical on 970, 949 and 961 compared,
   130, 151 and 139 skipped, 0 different; `fix` differs only with notices (FS-01, FS-847). The light run (seed 1, 4,800 portable cases):
   4,357 identical (46 with memory digits), 324 SKIP, 119 VARY, 0 different.
+
+## Part 33: GCA morphs read as volumes (relay 38 of track A)
+
+Sources: `utils/mriio.cpp` 656-692 (`mri_read`'s `MGH_MORPH` branch); `utils/gcamorph.cpp` 74 (`GCAM_VERSION`), 235
+(`GCAMN_SUB`), 1110-1150 (`GCAMread`), 1152-1156 (`__warpfieldRead`), 1158-1317 (`__m3zRead`), 1319-1381
+(`GCAMalloc`), 1684-1718 (`GCAMfree`, `GCAMfreeContents`), 3460-3702 (`gcamComputeMetricProperties`), 7501-7645
+(`GCAMinvert`), 7797-7922 (`GCAMwriteMRI`), 9330-9363 (`GCAMstoreMetricProperties`, `GCAMcomputeOriginalProperties`),
+9365-9500 (`GCAMcopyNodePositions`), 10524-10594 (`GCAMmorphFieldFromAtlas`), 11184-11261 (`GCAMrasToVox`),
+15494-15549 (`GCAMwriteWarpToMRI`); `utils/warpfield.cpp` 412-566 (`Warpfield::read`); `include/gcamorph.h` (the
+node, the structure, the field numbers 0-24, the validity and position constants); `include/mri.h` 562-608
+(`VOL_GEOM::read(znzFile, niftiheaderext = false, shearless = true)`), 793-813 (the morph members of `MRI`);
+`utils/mri.cpp` 9573-9670 (`MRIinterpolateIntoVolume[Frame]`); `utils/gca.cpp` 9156-10015 (`cma_label_to_name`);
+`utils/mrinorm.cpp` 1761, 1922, 2074, 2154, 2224, 2453, 2497, 2577 (the Voronoi diagram's and the soap bubble's
+`Gdiag` lines). The port: fs.gca `gcam.rs` (registered with fs.io through `upper.rs`'s `read_morph`, as `readGCA`
+is), `cma_names.rs` (generated: `validation/probes/fs-gcam/cma_names.py`); fs.volume `interpolate_into.rs`; the
+`Gdiag` lines in fs.filter's `norm.rs`; `larmorx_core::math::log10f_glibc`.
+
+- **`mri_convert` does not read a morph through `mri_read`.** `mri_convert.cpp` 1927-1941: an input of type
+  `MGH_MORPH` is read with `GCAMread` and written with `GCAMwrite` (an `.mgz` output: `Warpfield::convert`,
+  `[INFO] Warpfield::convert(): ...` lines), then `exit(0)`. `mri_read`'s branch is reached by programs that read a
+  morph as a volume (`MRIread`, `MRIreadHeader`: `mri_info <m3z>`), and by the probe's `mrd`. The recorded heads'
+  morphs were compared through the probe (absolute names).
+- **The extra metric pass.** `GCAMcomputeOriginalProperties` calls `gcamComputeMetricProperties` and then
+  `GCAMstoreMetricProperties`, which computes them again: four passes in `GCAMread` (two on the original positions,
+  two on the current ones), three more for a RAS morph. The results do not change between passes; `SHOW_NEG`'s lines
+  do (the port's first version made three passes: piece 31's `SHOW_NEG` cases printed each original-position line
+  once where FreeSurfer prints it twice).
+- **`SHOW_NEG` (FS-852).** `#pragma omp parallel for ... schedule(static, 1)` over x with per-thread counters
+  (`gcam_neg_counter[tid]`) summed after the loop: `gcam->neg` is 0 throughout, so the `gcam->neg == 0 &&
+  getenv("SHOW_NEG")` test passes for every negative node (meant, by its look, for the first only; kept, rule C), and
+  the lines come in the threads' order (x = t, t + n, ... per thread). The probe runs one thread: x-major.
+- **`width < 4`.** A `static bool reported` per call site (gcamorph.cpp 2627, 3512, 6436): the line once per process
+  for each; `__FILE__` the official build's root (`larmorx_freesurfer_core::diag::BUILD_ROOT`, which the unit
+  oracle's build keeps through its prefix map), `__LINE__` the line of the `__LINE__` token (3513, measured).
+- **`GCAMwriteMRI`'s logarithms.** `d` is a `float`; in C++ `log10(fabs(d))` and `log(d)` resolve to the `float`
+  overloads: the object code (`gcamorph.cpp.o`) has two relocations to `log10f` and one to `logf` in `GCAMwriteMRI`,
+  `fabs` inlined (`andps`). The port's first version took the `double` functions: piece 31's frame-21 cases differed in
+  the last bit. glibc 2.35's `log10f` is fdlibm's `e_log10f.c` over `__ieee754_logf` (the FMA build of Arm's `logf`
+  on this machine, `sysdeps/x86_64/fpu/multiarch/e_logf.c`'s alias) behind the SVID wrapper (`log10f@@GLIBC_2.2.5`):
+  `larmorx_core::math::log10f_glibc`, all 2^32 inputs identical to the system's (`validation/investigations/
+  glibc-maths/result-float-2026-11-16.json`). `logf` there is `logf@@GLIBC_2.27` (a program linked against 2.35).
+- **`GCAMalloc` (FS-851).** `calloc(width, 8)`, per x `calloc(height, 8)`, per row `calloc(depth, 264)`
+  (`sizeof(GCA_MORPH_NODE)` on x86-64: `char invalid` + `int label`, 15 `double`s, 4 `int`s, `float prior`, `GC1D
+  *gc`, 13 `float`s, `int status`, 4 `float`s, 2 `double`s, `float target_dist`, padded to 8), every node written
+  (`origx = x`, ...) right after its row's `calloc`: the memory is touched as it is allocated, so past the machine's
+  memory the outcome is the machine's (overcommit: the process is killed or a `calloc` fails, `ErrorExit`). A negative
+  size is a `calloc` of a wrapped `size_t`: `NULL` at once, FreeSurfer's message (`ErrorExit` prints `errno`'s
+  `Cannot allocate memory` first), status 254. In the probe's child (1 GiB of address space) a grid of 2,000 x 2,000 x
+  1,000 fails inside the loops at an address-space-dependent row. 128 x 128 x 128 nodes: 553 MB (`mri_info` of a head's
+  morph: 534 MiB peak; the port: 524 MiB, its node 248 bytes).
+- **The tags.** `znzTAGreadStart(file, &len, TAG_MGH_XFORM)`: tag 31 is returned with length 0, then
+  `znzReadMatrix` reads a tag of its own (the writer's `znzWriteMatrix(file, m, 0)`: tag 0, a 64-bit length 1,600) and
+  the text; `TAG_GCAMORPH_GEOM`, `_TYPE`, `_LABELS` have no length in `znzTAGreadStart`; any other tag's length is
+  read and its data not skipped (the switch has no default): the data's bytes become tags. `__m3zWrite` writes only
+  those four tags, so FreeSurfer's own files never meet this (kept, rule C). The node loop reads `width * height *
+  depth` nodes whatever the file holds; a cut file gives `freadFloat: fread failed` at every float read (six per
+  node) and memory contents (FS-167).
+- **Damaged compressed data (FS-854).** zlib's `gz_decomp` returns -1 on `Z_DATA_ERROR` before it updates the
+  output it made (`state->x.have`): the 16 KiB piece in which inflate meets the damage is lost whole. A small `.m3z`
+  is inflated in the first piece, so its version read fails (memory contents: `invalid version #
+  -84738284731288386897617700092871966720.000` in the probe, 0 in the port, compared apart). A morph whose damage lies
+  beyond its nodes' pieces reaches the tag loop with every read failing and `znzeof` false: the tag is
+  `znzreadInt`'s slot (the number read before it), so the loop never ends or ends as that number decides; a 20 x 20 x
+  20 morph with 8,000 labels and a damaged CRC gave a volume in the probe (the slot ended it), as the port's
+  `reproduce` does.
+- **`Warpfield::read` (FS-855).** `MRI`'s `VOL_GEOM gcamorph_image_vg, gcamorph_atlas_vg` are default-initialised
+  (`VOL_GEOM() {}`: `valid`, `width`, `height`, `depth` indeterminate; the rest have initialisers): an `.mgz` warp
+  without tag 10/15 gives the morph geometries of memory contents, which the RAS formats (`get_RAS2Vox(0, true)`,
+  `get_Vox2RAS`) and the node-coordinate frames (`MRIalloc(gcam->image.width, ...)`) use. The probe's case of an
+  image of width 0 (from such a warp) crashed (SIGSEGV) after the `MRI::Shape` lines. `__warpmap` is never freed.
+- **The node-coordinate frames.** `GCAMmorphFieldFromAtlas` calls `GCAMwriteMRI` (its volume never freed), frees
+  any inverse and rebuilds it: `GCAMinvert` on an image-sized template, `MRIinterpolateIntoVolume` into `float`
+  volumes, then `MRIbuildVoronoiDiagram(xind, ctrl, xind)` (source and destination the same volume: the source is
+  read only at the control voxels before they are written, so a copy as source gives the same values) and
+  `MRIsoapBubble(xind, ctrl, xind, 50, 1)`. Without a geometry tag the image is `initVolGeom`'s 256 x 256 x 256:
+  FreeSurfer's soap bubble then takes minutes (the probe's 5-second limit ends it; piece 31 gives those frames a
+  small valid image). The `Gdiag` lines of the Voronoi diagram (`Voronoi: <n> voxels assigned, <r> remaining, <v>
+  visited.`, six spaces more for shorts, a newline after the loop) and of the soap bubble (`soap bubble iteration <i>
+  of <n>` on standard error, `iter <i>: max change <c>` on standard output for floats) were missing from fs.filter:
+  added (track D's file). `DIAG_WRITE` writes `xi.mgz`, `c.mgz`, `xis.mgz`, `yi.mgz`, `zi.mgz` and `ctrl.mgh` into the
+  working folder (the port writes the first five; `ctrl.mgh` needs fs.io, which fs.filter does not link).
+- **What the probe measured (piece 31).** Seeds 7, 13 and 21 (816 piece-31 cases each): `reproduce` identical on every
+  compared case (592, 584, 596), 37 skipped (FS-851, FS-855, FS-854 by default), 639 compared apart (FS-167, most of
+  them identical: unknown tags whose data is read as a labels tag past the file's end, cut files, damaged streams); 0
+  different; `fix` differs only with notices. The six recorded heads' `talairach.m3z` (classic recipe), frames none,
+  0, 3-6, 13-24 through `mrd`: 108 of 108 identical in both modes.

@@ -464,7 +464,6 @@ pub fn mri_add_command_line(
 fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MGH_MORPH => "GCA morph (m3z)",
         MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         _ => return None,
@@ -670,6 +669,16 @@ pub fn mri_read(
         let r = read_gca(g, out, err, dir, &copy, start_frame, end_frame)?;
         // readGCA chose the frames
         start_frame = -1;
+        r
+    } else if mtype == identify::MGH_MORPH {
+        let Some(read_morph) = crate::upper::get().read_morph else {
+            crate::upper::missing(err, "reading GCA morphs", "fs.gca", "GCAMread", &copy);
+            return Ok(None);
+        };
+        // the morph is read whole whatever volume_flag says
+        let (r, s, e) = read_morph(g, out, err, env, dir, &copy, start_frame, end_frame)?;
+        start_frame = s;
+        end_frame = e;
         r
     } else if mtype == identify::IMAGE_FILE {
         // every voxel read whatever volume_flag says; the frames are not checked

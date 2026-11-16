@@ -7,7 +7,8 @@
 //!
 //! FreeSurfer's `utils/mriio.cpp` reads an image file as a volume through `ImageToMRI` and writes
 //! one through `MRItoImage` (`utils/mri.cpp`, ported in fs.volume, which sits above fs.io), and
-//! reads a GCA atlas as a volume through `readGCA` (its GCA functions in fs.gca). The
+//! reads a GCA atlas as a volume through `readGCA` and a GCA morph through `GCAMread` (their GCA
+//! functions in fs.gca). The
 //! crate that holds a conversion registers it here once ([`register`]; idempotent), and every
 //! program that links that crate calls its registration before it runs (the `larmorx-freesurfer`
 //! program does so for every crate it links; the fs.io probe and its tests too). A conversion that
@@ -20,6 +21,7 @@ use std::sync::RwLock;
 
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_mri::mri::Mri;
 
 use crate::image::Image;
@@ -44,18 +46,34 @@ pub type ReadGca = fn(
     i32,
 ) -> Result<Option<Mri>, Fatal>;
 
+/// `mri_read`'s branch of type `MGH_MORPH` (fs.gca: `GCAMread` and the volume of a GCA morph):
+/// the volume, or `None` (after FreeSurfer's messages), and the start and end frames `mri_read`
+/// goes on with.
+pub type ReadMorph = fn(
+    &mut Globals,
+    &mut dyn Write,
+    &mut dyn Write,
+    &Environment,
+    Option<&Path>,
+    &str,
+    i32,
+    i32,
+) -> Result<(Option<Mri>, i32, i32), Fatal>;
+
 /// The registered conversions.
 #[derive(Clone, Copy, Default)]
 pub struct Upper {
     pub image_to_mri: Option<ImageToMri>,
     pub mri_to_image: Option<MriToImage>,
     pub read_gca: Option<ReadGca>,
+    pub read_morph: Option<ReadMorph>,
 }
 
 static UPPER: RwLock<Upper> = RwLock::new(Upper {
     image_to_mri: None,
     mri_to_image: None,
     read_gca: None,
+    read_morph: None,
 });
 
 /// Registers conversions: `f` sets the fields its crate provides.

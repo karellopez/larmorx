@@ -4555,3 +4555,159 @@ FS-843 (FreeSurfer crashes), FS-844 and FS-58 (memory, crashes), FS-845 where th
 reads, crashes), FS-847 where the port refuses, FS-849. Measured (2026-11-15, observed): seeds 7, 13 and 21 (1,100
 piece-30 cases each): `reproduce` identical on all 2,880 compared (970, 949 and 961), 420 skipped, 0 different; `fix`
 differs only with notices (FS-01, FS-847).
+
+## 142. GCA morphs read as volumes (`mri_read`'s type 29, `MGH_MORPH`)
+
+A GCA morph is a grid of nodes over an atlas: each node has an original position (the atlas voxel it was made at),
+a current position (where it maps to in the image, in voxels), integer node coordinates, a label, a validity
+(valid 0, *area invalid* 1, *position invalid* 2), a status, and the volumes of the parallelepipeds its neighbours
+span. `mri_read` of type 29 (a name ending in `.m3z` or `.m3d`, a name of type 29, or `@m3z`/`@m3d`) reads the morph
+whole whatever the header-only flag says, and gives one volume, chosen by the name's start frame (`#<n>`; none: -1).
+After it the frame range is 0 to 0 when a frame was given (the volume has one frame), and the voxels are checked for
+NaN and infinity as for any one-frame read (`nan_inf_check`, §42); without a frame the result is not checked.
+
+1. **Finding the file.** A name `fopen` cannot open for reading: `ERROR: cannot find or read <name>` (standard
+   output; a folder can be opened). Then the name's format by `mri_identify` (§27): type 29 reads the morph file
+   (2); MGH or NIfTI reads a warp volume (3), its spacing 0 taken as 1; any other gives nothing. Nothing:
+   `MRIread(<name>): could not read .m3z` (an error, `ERROR_BADPARM`, after the `errno` text when `errno` is set);
+   no volume.
+2. **The morph file** (big-endian; a name holding `.m3z` anywhere is read through zlib, which reads plain data as it
+   is). A name that cannot be opened: `GCAMread(<name>): could not open file`. The version (`float`): anything but
+   1.0 (NaN included) gives `GCAMread(<name>): invalid version # <v>` (`%2.3f`; `ERROR_BADFILE`) and nothing; a
+   folder's read fails (`freadFloat: fread failed` after `Is a directory`) and its version is memory contents
+   (FS-167; 0 here). Then three `int`s, the grid's width, height and depth; the nodes are allocated (4); an `int`
+   spacing and a `float` `exp_k`. Per node, x outermost, then y, then z: `origx`, `origy`, `origz`, `x`, `y`, `z`
+   (`float`s, kept as `double`s), `xn`, `yn`, `zn` (`int`s). A node whose six positions are all within `FLT_EPSILON`
+   of 0 is position-invalid; else a node on the grid's border (x 0 or width - 1, and so on) is area-invalid; else
+   valid. Every float read that fails prints `freadFloat: fread failed` (an error, `ERROR_BADFILE`), the end of the
+   file included; a number the file cuts is memory contents (FS-167). `det` is 1, both geometries not valid.
+   Then, unless `FS_SKIP_TAGS` is set, tags until a tag 0 or the end of the file, each an `int` (§11's reader with
+   `TAG_MGH_XFORM` taken without a length):
+   - 12, the labels: an `int` per node (x outermost); status *labeled* (1); with `Gdiag & DIAG_SHOW` and
+     `DIAG_VERBOSE`: `reading labels out of gcam file...` (standard output) first;
+   - 10, the geometries: the image's, then the atlas's, each §15's block without shears (`valid`, width, height,
+     depth as `int`s, the voxel sizes, direction cosines and centre as 15 `float`s, 512 name bytes); with the same
+     `Gdiag`: on standard error `GCAMORPH_GEOM tag found.  Reading src and dst information.`, `src geometry:`, the
+     image's geometry as the eight-line text block (`valid = <v>  # volume info valid` or `invalid`, `filename =
+     <name>`, `volume = <w> <h> <d>`, then `voxelsize = `, `xras   = `, `yras   = `, `zras   = `, `cras   = `, each
+     with three numbers `%.15e`), `dst geometry:`, the atlas's;
+   - 11, the type: an `int` (2 voxels, 1 RAS, anything else kept); with the same `Gdiag`: `gcam->type = vox` (2) or
+     `ras` (any other);
+   - 31, the affine: §12's matrix tag (its own tag number and length, then 1,600 bytes of text) and `det` the
+     matrix's determinant (as `MatrixDeterminant` computes it, a `float`);
+   - any other tag: its length is read (a 64-bit `int`, or as §11 says for the old tags) and nothing more: the
+     bytes after it are read as the next tag.
+   FS-854: compressed data that zlib finds damaged after the nodes.
+3. **A warp volume** (MGH or NIfTI, read with `MRIread`, §134: `[ERROR] Warpfield::read() failed reading <name>`
+   when that fails; another format: `[ERROR] Warpfield::read(): <name> is not in mgz/nii format`; all on standard
+   output). Its version must be the warp's, `(3 << 8) | 1` (else `[ERROR] <name> is not mgz warp file`), nothing.
+   A node per voxel (the volume's width, height and depth), each at `origx = c`, `xn = c` (and so on: the voxel's
+   column, row, slice), valid; `det` 1; spacing and `exp_k` from the volume's morph metadata (tag 13, §17; spacing 1,
+   `exp_k` 0 without it); type voxels; the geometries the volume's (tags 10, 15); with an affine (tag 14): `[DEBUG]
+   Warpfield::read() __warpmap->gcamorphAffine (spacing=<s>, exp-k=<k>):` (`%d`, `%.2f`), the matrix (§12's
+   `MatrixPrint`), the affine copied and `det` its determinant, `[DEBUG] Warpfield::read() gcam->m_affine
+   (spacing=<s>, exp-k=<k>, det=<d>):` (`%.2f`) and the matrix again; with labels (tag 12): `[DEBUG]
+   Warpfield::read() gcam->status = GCAM_LABELED`, status labeled, each node's label. The current positions from
+   the three frames by the metadata's format: 0, absolute voxels (`x = v0`); 1, displacements in voxels (`x = v0 +
+   c`, the sum in `double`); 2, absolute RAS; 3, RAS displacements (`v` plus the atlas voxel's RAS, the atlas's
+   voxel-to-RAS matrix with shears times `(c, r, s, 1)` accumulated in `double`, stored as `float`, the sum in
+   `float`); for 2 and 3 the position is the image's RAS-to-voxel matrix with shears (the inverse of its voxel-to-RAS
+   matrix) times the RAS point, accumulated in `double`, stored as `float`. Any other format leaves the nodes at
+   their own coordinates. FS-855: a warp volume without its geometries.
+4. **The nodes' memory.** The node table (`width` pointers of 8 bytes), then for each x a row table (`height`
+   pointers) and its `height` rows of `depth` nodes of 264 bytes, each filled (every node at its own coordinates:
+   `origx = x`, `x = x`, ...; everything else 0) as it is made. A negative size ends the program (status 254 after
+   `Cannot allocate memory`, `ERROR_NOMEMORY`): `GCAMalloc: could not allocate nodes` (width), `GCAMalloc: could not
+   allocate 0th **` (height, width positive), `GCAMalloc: could not allocate 0,0th *` (depth, width and height
+   positive); a size of 0 makes no node. FS-851: sizes past the machine's memory. The two geometries start as
+   `initVolGeom`'s (256 x 256 x 256 of 1 mm, coronal, centre 0, not valid, name `unknown`).
+5. **After the reading.** When `det` is above 0, every node's three original areas become `spacing³ / det` (the cube
+   in 32-bit `int`: FS-853; the quotient in `double`, stored as `float`) and `setting orig areas to linear transform
+   determinant scaled <a>` (`%2.2f`; standard output). Then the *original properties* (6), the *metric properties*
+   (7) once more, and each node's original position saved.
+6. **The original properties**: the current positions saved, the original positions made current, the metric
+   properties computed, computed again and *stored* (where `det` is within `FLT_EPSILON` of 0, each node's original
+   areas become its areas; a valid node whose original area is within `FLT_EPSILON` of 0 or negative becomes
+   area-invalid), the saved positions made current again, the metric properties computed again.
+7. **The metric properties** (on the current positions). At the first computation in a process on a grid narrower
+   than 4: `<build root>/utils/gcamorph.cpp:3513 width:<w> too small for parallelism` (standard error; the build
+   root is the official build's folder). Per node, x outermost: a position-invalid node is skipped. Otherwise its
+   area starts at 0. *Towards the next nodes*, when x, y and z are each below their last and the three nodes after it
+   (x + 1, y + 1, z + 1) are not position-invalid: `vi`, `vj`, `vk` the differences of those nodes' positions minus
+   this node's (each component in `double`, stored as `float`), `area1 = (vj × vk) · vi` in `float` as `x3 (y1 z2 -
+   z1 y2) + y3 (z1 x2 - x1 z2) + z3 (x1 y2 - y1 x2)` for `v1 = vj`, `v2 = vk`, `v3 = vi`, summed left to right, each
+   product and sum a `float` operation; `area1` 0 when x, y or z is at its last; left as it was when a neighbour is
+   position-invalid. *Towards the previous nodes*, when x, y and z are each above 0 and the three nodes before it are
+   not position-invalid: `vi` this node minus the one before it in x, `vj`, `vk` the ones before it in y and z minus
+   this node, `area2` the same triple product; 0 at the near border. Each one computed is added to the area (the sum
+   in `double`, stored as `float`); the area is then their mean (`area / count` in `float`); with neither, the node
+   becomes area-invalid with area 0. A valid node with a parallelepiped of volume 0 or less and a positive original
+   area is negative: with `SHOW_NEG` set, `node (<x>, <y>, <z>), label <name> (<label>) - NEGATIVE!` (standard
+   output) for every such node at every computation (FS-852), `<name>` the label's name in FreeSurfer's CMA list
+   (`Unknown`, `Left_Cerebral_White_Matter`, ...; empty for a label it does not list).
+8. **A RAS morph** (type 1) is taken to voxels: through the image geometry's voxel-to-RAS matrix (`float`: the
+   direction cosines times the voxel sizes, the translation `centre - M (width / 2, height / 2, depth / 2)`), each
+   node's current and original positions as `float`s times it (a `float` product, accumulated in `float`), stored
+   back; area-invalid nodes become valid; the original properties (6); type voxels. With `Gdiag & DIAG_SHOW` and
+   `DIAG_VERBOSE`: `ras 2 vox matrix:` and the matrix.
+9. **The volume.** Without a frame: three `float` frames over the morph's grid (its width, height, depth), the
+   atlas geometry's direction cosines and centre, voxel sizes the atlas's times the spacing (`float`), each voxel the
+   node's displacement `x - origx`, `y - origy`, `z - origz` (`double`, stored as `float`). With a frame `f` (printed
+   first: `reading 'frame' # <f> from gcam (see gcamorph.h for definitions)`): the field `f` over the same grid, one
+   `float` frame: 0, 1, 2 the gradient (0 after reading); 3 the label; 4, 5, 6 the original position; 13, 14, 15 the
+   current position; 10 the means (0: no node read has a class); 16 the Jacobian `area / orig_area` (`float`; 1 where
+   the original area is within `FLT_EPSILON` of 0); 22 its logarithm (`logf`, glibc's single-precision function;
+   -100 below 0); 17 the area; 18 the original area; 19 negative: 1 when the node is not position-invalid and either
+   original area is positive while its area is 0 or less, else 0; 20 the smaller of `area1` and `area2` (`a < b ? a
+   : b`) for a valid node, else 0; 21 that smaller area `d` for a valid node: 0 above 1, `-log10f(d)` in (0, 1],
+   `log10f(|d|)` otherwise (glibc's single-precision `log10f`; NaN quiet), else 0; 23 the status; 24 the validity.
+   11, 12 and anything past 24 end the program at the first node: `GCAMwriteMRI(<f>): unknown which parameter`
+   (`ERROR_BADPARM`, status 252). 7, 8, 9 (the node coordinates `xn`, `yn`, `zn`) go through the morph's inverse onto
+   a `float` volume of the image geometry (its sizes and voxel sizes): every node that is not position-invalid
+   (z outermost, then y, then x) adds its own x, y and z (and 1 to a count) trilinearly around its current position
+   clamped into the image (below 0 to 0, past the last to the last; the eight weights from `d = position - (float)
+   corner` and `1 - d` in `double`, `((wx wy) wz) value` added to each `float` voxel in `double`, the corners in the
+   order (lower x, lower y, lower z), (lower, lower, upper), (lower, upper, lower), ...); each voxel with a count is
+   divided by it (`float`) and is a control point unless its count is below 0.1; then each index volume is filled
+   from its control points (the Voronoi diagram, then 50 passes of the soap bubble with a minimum change of 1: the
+   same functions `mri_normalize` uses, `specs/freesurfer-filter.md`), and each voxel of the result takes the field's
+   value at the node `nint` of its three indices (nothing where they fall outside the grid). With `Gdiag &
+   DIAG_SHOW` and `DIAG_VERBOSE`: `performing soap bubble of x indices...` (and y, z) and those functions' own lines.
+   With `DIAG_WRITE` too: the index volumes written into the working folder (`xi.mgz`, `c.mgz`, `xis.mgz`, `yi.mgz`,
+   `zi.mgz`; the Voronoi diagram's `ctrl.mgh`).
+
+**larmorx by default**: a grid whose nodes would take more than 16 GiB refused before any node is made, with
+FreeSurfer's message at the allocation a machine of that memory refuses (rule B, FS-851, both modes); compressed
+data damaged after the nodes refused (rule B, FS-854: `GCAMread(<name>): the compressed data is damaged`, then the
+`could not read .m3z` error; `reproduce`: the tags end there); the spacing's cube exact (rule A, FS-853); `SHOW_NEG`'s
+lines in the order x, y, z (FS-852: FreeSurfer's lines come in its threads' order); a warp volume without its
+geometries reads their sizes as 0 (FS-855: memory contents in FreeSurfer), and the node-coordinate frames of an image
+with a size of 0 or less end the program (`GCAMmorphFieldFromAtlas: the image (<w> x <h> x <d>) has no voxels
+(FreeSurfer crashes here)`, both modes). Kept (rule C): unknown tags' bytes read as tags (FreeSurfer's writer writes
+none); the frames 11, 12 and past 24 ending the program; `SHOW_NEG` printing every negative node at every
+computation.
+
+## 143. Validation plan (part 33)
+
+Piece 31 of the fs.io probe: `m3d` and `m3h` (`mri_read` of type -1 or 29, and `MRIreadHeader`) of morph files
+built in the format above: versions 1.0, 2.0, 0.999, NaN; grids of 1 to 5 nodes a side, 0, negative sizes in each
+place, 2,000 x 2,000 x 1,000 or 2,000; spacings 1, 2, 3, 0, -2, 1,291, -2,000; `exp_k` 20 or special; nodes
+displaced by 0 to 3 voxels (now and then mirrored in x, so their volumes turn negative), all six positions zero or
+nearly, NaN (quiet, signalling), infinite, subnormal, -0, 1e30; node coordinates now and then -1, 7, `INT_MAX`;
+then tags in any order: labels (CMA labels, negative, past the list), the geometries (sizes 0 to 5, voxel sizes and
+direction cosines ordinary or special; a small valid image for the node-coordinate frames), the type (2, 1, 0, 7),
+the affine (ordinary, singular, a negative or NaN determinant), unknown tags (3, 7, 99) with short data, a tag 0 or
+the file's end; `FS_SKIP_TAGS`, `SHOW_NEG`; frames none, 0 to 24, 7 to 9 through the inverse, 11, 12, 25; `Gdiag` 0,
+0x40, 0x10000040, 0x10000048; faults: the file cut short, missing, a folder, not a morph, empty, a `.dat@m3z` name;
+compressed and plain; and MGH warp volumes named `@m3z` (the warp's version or not; formats 0 to 3, -1, 7; spacings 1,
+2, 0, -3; with or without the geometries, the affine, the labels; NaN voxels). Printed: the volume's header,
+geometry, matrices, the voxels' hash, `errno` and every message. Not compared: FS-851 (the machine's memory),
+FS-855 (memory contents, crashes), FS-854 by default; compared apart: FS-167 and FS-854 under `reproduce` (memory
+contents). Measured (2026-11-16, observed): seeds 7, 13 and 21 (816 piece-31 cases each): `reproduce` identical on
+every compared case (592, 584 and 596 identical; 37 skipped, 639 compared apart, most of them identical), 0
+different; `fix` differs only with notices (FS-01, FS-853, FS-852, and the identification's FS-91, FS-94, FS-95,
+FS-176, FS-841). The six recorded heads' `mri/transforms/talairach.m3z` (`runs/<dataset>-classic`, 128 x 128 x 128
+nodes, spacing 2) through the official probe's `mrd` with the frames none, 0, 3 to 6 and 13 to 24: all 108 volumes
+identical in both modes (`fix` only without FreeSurfer's NUL byte); peak memory 524 MiB for one head (FreeSurfer's
+`mri_info`: 534 MiB). Damaged compressed data after the nodes, the machine's memory, the empty image and the defaults:
+the fs.gca unit tests (`crates-freesurfer/larmorx-freesurfer-gca/tests/gcam_read.rs`).

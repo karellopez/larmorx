@@ -545,6 +545,11 @@ pub fn run(
         {
             extra.push("SKIP");
         }
+        // a write outside a volume (frame 2 of an atlas of no inputs writes its volume of no
+        // frames: FreeSurfer crashes; found by relay 38's light run)
+        if n.defect.id == "FS-53" {
+            extra.push("SKIP");
+        }
     }
     r
 }

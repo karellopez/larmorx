@@ -27,8 +27,9 @@
 //!   10,000 only, with two messages for each voxel left out. Rule A: every voxel, noted.
 //! - **FS-912** (the program ends): more than 10,000 faces near one face end the program
 //!   (status 1). Rule A: any number.
-//! - **FS-913** (a hang): a face whose sampling would take more than 2^32 steps (a corner that
-//!   is not finite after a finite one, or a face of millions of voxels): FreeSurfer runs for
+//! - **FS-913** (a hang): a face whose sampling takes more than 2^28 steps, more than 2^22
+//!   voxels (by default) or more than a million voxels past the full list (`reproduce`): a
+//!   corner that is not finite next to finite ones, a face kilometres across. FreeSurfer runs for
 //!   hours, two messages for each voxel past the 10,000th. Refused in both modes (a clear error).
 //!
 //! `MHTexpandToTouchingFaces`' capacity (10,000 faces) is never reached: a vertex lists at most
@@ -59,8 +60,13 @@ pub const MHT_MAX_FACES: usize = 10000;
 /// `MHT_MAX_TOUCHING_FACES`: the faces touching one face (never reached: at most 3 x 255).
 pub const MHT_MAX_TOUCHING_FACES: usize = 10000;
 /// FS-913: the steps of one face's sampling (main steps, rung steps, path voxels) past which it
-/// is refused.
-pub const SAMPLING_LIMIT: u64 = 1 << 32;
+/// is refused (2^28: a face kilometres across at 1 mm).
+pub const SAMPLING_LIMIT: u64 = 1 << 28;
+/// FS-913: the voxels of one face past which it is refused by default (2^22).
+pub const VOXEL_LIMIT: usize = 1 << 22;
+/// FS-913: the voxels left out of one face's full list (each with FreeSurfer's two messages) past
+/// which it is refused with `reproduce`.
+pub const DROPPED_LIMIT: u64 = 1_000_000;
 /// `RUNGRECIPFACTOR`: slightly less than one, so rungs stop short of a voxel's edge.
 const RUNGRECIPFACTOR: f64 = 0.9995;
 /// `SamplesPerMHTRes`.
@@ -133,6 +139,8 @@ struct VoxelList {
     seen: Option<HashSet<[i32; 3]>>,
     /// The sampling's steps so far (FS-913).
     work: u64,
+    /// The voxels left out of the full list (FS-911, FS-913).
+    dropped: u64,
 }
 
 impl VoxelList {
@@ -141,6 +149,7 @@ impl VoxelList {
             voxels: Vec::new(),
             seen: None,
             work: 0,
+            dropped: 0,
         }
     }
 
@@ -154,9 +163,10 @@ impl VoxelList {
     /// `mhtVoxelList_Add`: the voxel appended unless listed. FS-911: a full list (10,000) prints
     /// `mhtVoxelList_Add(x, y, z): complete list too big!` on standard error and as an error
     /// (`ERROR_NOMEMORY`) and drops the voxel with `reproduce`; by default the list grows.
-    fn add(&mut self, g: &mut Globals, err: &mut dyn Write, v: [i32; 3]) {
+    /// FS-913: past [`DROPPED_LIMIT`] dropped voxels or [`VOXEL_LIMIT`] voxels, refused.
+    fn add(&mut self, g: &mut Globals, err: &mut dyn Write, v: [i32; 3]) -> Result<(), Fatal> {
         if self.contains(v) {
-            return;
+            return Ok(());
         }
         if self.voxels.len() >= MAX_VOXELS {
             g.notices.add(
@@ -166,13 +176,24 @@ impl VoxelList {
                 ),
             );
             if g.notices.reproduce() {
+                self.dropped += 1;
+                if self.dropped > DROPPED_LIMIT {
+                    refuse(
+                        g,
+                        err,
+                        &format!("more than {DROPPED_LIMIT} voxels beyond its list's {MAX_VOXELS}"),
+                    )?;
+                }
                 let msg = format!(
                     "mhtVoxelList_Add({}, {}, {}): complete list too big!",
                     v[0], v[1], v[2]
                 );
                 let _ = writeln!(err, "{msg}");
                 log::error_printf(g, err, ERROR_NO_MEMORY, &msg);
-                return;
+                return Ok(());
+            }
+            if self.voxels.len() >= VOXEL_LIMIT {
+                refuse(g, err, &format!("more than {VOXEL_LIMIT} voxels"))?;
             }
         }
         self.voxels.push(v);
@@ -181,6 +202,7 @@ impl VoxelList {
         } else if self.voxels.len() > 256 {
             self.seen = Some(self.voxels.iter().copied().collect());
         }
+        Ok(())
     }
 
     /// `mhtVoxelList_AddPath(oldvc, newvc)`: every voxel of the box from `oldvc` to `newvc`
@@ -211,7 +233,7 @@ impl VoxelList {
                 while within(zv, new[2], iz) {
                     count += 1;
                     if count >= 1 {
-                        self.add(g, err, [xv, yv, zv]);
+                        self.add(g, err, [xv, yv, zv])?;
                     }
                     zv = zv.wrapping_add(iz);
                 }
@@ -222,26 +244,35 @@ impl VoxelList {
         Ok(())
     }
 
-    /// FS-913: `n` more steps of the sampling; past [`SAMPLING_LIMIT`] the face is refused (a
-    /// clear error, `ERROR_BADPARM`, in both modes: FreeSurfer runs for hours).
+    /// FS-913: `n` more steps of the sampling; past [`SAMPLING_LIMIT`] the face is refused.
     fn spend(&mut self, g: &mut Globals, err: &mut dyn Write, n: u64) -> Result<(), Fatal> {
         self.work = self.work.saturating_add(n);
         if self.work > SAMPLING_LIMIT {
-            g.notices.add(
-                &FS_913,
-                format!(
-                    "the surface hash table: a face whose sampling takes more than {SAMPLING_LIMIT} steps (FreeSurfer runs for hours): refused"
-                ),
-            );
-            log::error_exit(
+            refuse(
                 g,
                 err,
-                ERROR_BADPARM,
-                "surface hash table: a face too large for its voxels (more than 2^32 sampling steps; a resolution above 0 and finite coordinates are needed)\n",
+                &format!("more than {SAMPLING_LIMIT} sampling steps"),
             )?;
         }
         Ok(())
     }
+}
+
+/// FS-913: a face whose sampling FreeSurfer would spend hours on (or fill the memory with): a
+/// clear error (`ERROR_BADPARM`) in both modes.
+fn refuse(g: &mut Globals, err: &mut dyn Write, why: &str) -> Result<(), Fatal> {
+    g.notices.add(
+        &FS_913,
+        format!("the surface hash table: a face whose sampling takes {why} (FreeSurfer runs for hours): refused"),
+    );
+    log::error_exit(
+        g,
+        err,
+        ERROR_BADPARM,
+        &format!(
+            "surface hash table: a face too large for its voxels ({why}; a resolution above 0 and finite coordinates are needed)\n"
+        ),
+    )
 }
 
 /// C's `(int) x` of a `double` on x86-64 (`cvttsd2si`): toward zero, `INT_MIN` for NaN and values
@@ -338,8 +369,8 @@ fn sample_triangle(
     let dif_b2a = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     let dif_c2a = [a[0] - c[0], a[1] - c[1], a[2] - c[2]];
     let (lb, lc) = (lensq(dif_b2a), lensq(dif_c2a));
-    // MAX(a, b): (a > b ? a : b)
-    let temp = if lb > lc { lb } else { lc };
+    // MAX(a, b) of macros.h: (a >= b ? a : b)
+    let temp = if lb >= lc { lb } else { lc };
     let main_dbl = temp.sqrt() * SAMPLES_PER_MHT_RES * recip;
     let mut mainsteps = steps(g, err, main_dbl)?;
     if 0 >= mainsteps {
@@ -363,8 +394,8 @@ fn sample_triangle(
         let vox_c2a = world2voxel(g, err, mhtres, posn_c2a)?;
         let mut changed = false;
         if mainstep == 0 {
-            list.add(g, err, vox_b2a);
-            list.add(g, err, vox_c2a);
+            list.add(g, err, vox_b2a)?;
+            list.add(g, err, vox_c2a)?;
             changed = true;
         } else {
             if old_b2a != vox_b2a {

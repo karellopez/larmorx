@@ -24,9 +24,13 @@
 //! (glibc's double `acos` agrees with it on every input measured, `docs/findings/freesurfer-libm.md`),
 //! with glibc's default NaN for an argument beyond one.
 //!
+//! Since relay 39 of track D also `mrisMarkIntersections` (13027-13064) on fs.surf's surface hash
+//! table ([`crate::mht`]) and `MRISmarkEdge`'s hole filling ([`crate::vals`]).
+//!
 //! Defects (`larmorx_core::defects`): FS-535 (the corners after `MRISedges` failed), FS-536 (the
 //! quality printers with an empty list), FS-537 (the corner statistics on the edges' old unit
-//! vectors), FS-538 (the edge statistics on the faces' old normals, or none).
+//! vectors), FS-538 (the edge statistics on the faces' old normals, or none), FS-914 and FS-916
+//! (`mrisMarkIntersections`' hole count and ripped vertices, kept).
 
 use std::io::Write;
 

@@ -11,7 +11,7 @@
 //! `SKIP`), against the port's output with `reproduce` (a case the port marks
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
 //! `stl`, `tri`, `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii`, `gwr`, `mpf`, `mpg`,
-//! `fli`, `bvl`, `crv`, `pvw`, `vps`, `ann`, `mpx`, `lbl`, `wvl`, `scl` and `vcp` cases run in a
+//! `fli`, `bvl`, `crv`, `pvw`, `vps`, `ann`, `mpx`, `lbl`, `wvl`, `scl`, `vcp` and `mht` cases run in a
 //! temporary folder of their own.
 //!
 //! When the hash differs, the assertion names the first case whose output differs from the
@@ -26,13 +26,13 @@ use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
-const SKIP: [&str; 51] = [
+const SKIP: [&str; 52] = [
     "FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144", "FS-151", "FS-154",
     "FS-157", "FS-158", "FS-160", "FS-346", "FS-352", "FS-354", "FS-356", "FS-357", "FS-358",
     "FS-359", "FS-360", "FS-361", "FS-362", "FS-367", "FS-370", "FS-371", "FS-372", "FS-373",
     "FS-76", "FS-376", "FS-379", "FS-380", "FS-48h", "FS-382", "FS-383", "FS-384", "FS-386",
     "FS-388", "FS-389", "FS-391", "FS-392", "FS-53", "FS-521", "FS-533", "FS-534", "FS-614",
-    "FS-622", "FS-623", "NP", "FS-191", "FS-625u", "FS-634",
+    "FS-622", "FS-623", "NP", "FS-191", "FS-625u", "FS-634", "FS-913",
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 

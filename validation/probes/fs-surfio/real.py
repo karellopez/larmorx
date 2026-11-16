@@ -40,7 +40,9 @@ track D): the same labels' island and hole removal (``LabelRemoveIslandsSurf``,
 ``LabelRemoveHolesSurf``, ``LabelRemoveHolesAndIslandsSurf``), the clusters of ``|x| >= 20`` mm
 (``sclustMapSurfClusters``) with their table, the clusterwise-p values, the old summary and a growth
 by distance; and ``mris_place_surface --area-map`` of each white and pial surface
-(``MRISwriteArea``), the file against the recorded ``?h.area`` and ``?h.area.pial``. Prints the
+(``MRISwriteArea``), the file against the recorded ``?h.area`` and ``?h.area.pial``. With
+``--mki`` (relay 39 of track D): ``mrisMarkIntersections`` without and with hole filling on each
+head's ``orig.nofix``, ``orig``, ``white``, ``pial`` and ``inflated`` surfaces. Prints the
 counts;
 the lines name machine paths, so no hash is recorded from them.
 
@@ -126,6 +128,12 @@ def main(argv: list[str] | None = None) -> int:
         "head's recorded labels and white surface",
     )
     ap.add_argument(
+        "--mki",
+        action="store_true",
+        help="relay 39 of track D: mrisMarkIntersections (flr mki) on each head's orig.nofix, "
+        "orig, white, pial and inflated surfaces, without and with hole filling",
+    )
+    ap.add_argument(
         "--mpx",
         action="store_true",
         help="relay 37 of track D: group (e) (flr mpx) on each head's white surface and sphere: "
@@ -148,6 +156,11 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.mki:
+                for surf in ("orig.nofix", "orig", "white", "pial", "inflated"):
+                    for fill in (0, 1):
+                        lines.append(f"flr mki {s / 'surf' / f'{hemi}.{surf}'} {fill}")
+                continue
             if a.scl:
                 for c in LABELS:
                     lines.append(
@@ -204,7 +217,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "scl"
+        "mki"
+        if a.mki
+        else "scl"
         if a.scl
         else "lbl"
         if a.lbl
@@ -246,13 +261,18 @@ def main(argv: list[str] | None = None) -> int:
     same = differ = fix_same = 0
     bad = []
     notices: dict[str, int] = {}
-    for case, c, (r, _, _), (f, _, ids) in zip(
+    fs901_crashes = 0
+    for case, c, (r, _, rids), (f, _, ids) in zip(
         lines, official, rows["reproduce"][0], rows["fix"][0], strict=True
     ):
         for x in filter(None, ids.split(",")):
             notices[x] = notices.get(x, 0) + 1
         if c == r:
             same += 1
+        elif c.startswith("CRASH 11 ") and "FS-901" in rids.split(","):
+            # relay 39 of track D: a cluster growth deeper than FreeSurfer's stack (FS-901): the
+            # official build crashes, the port grows it in full in both modes (never reproduced)
+            fs901_crashes += 1
         else:
             differ += 1
             names = " ".join(Path(x).name for x in case.split()[2:])
@@ -264,6 +284,7 @@ def main(argv: list[str] | None = None) -> int:
         "served": done.cached,
         "reproduce_identical": same,
         "reproduce_differ": differ,
+        "official_crash_fs901": fs901_crashes,
         "fix_identical": fix_same,
         "fix_notices": notices,
         "seconds_official": round(t_official, 1),

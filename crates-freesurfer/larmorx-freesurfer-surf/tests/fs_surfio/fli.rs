@@ -993,6 +993,41 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             o.s(&format!("{:016x}", super::mpx::fnv64(&w)));
             o.s(if w == r { "SAME" } else { "DIFF" });
         }
+        "mki" => {
+            // relay 39 of track D: `fssurfio.cpp`'s `flr mki` (mrisMarkIntersections on a recorded
+            // surface)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let fill = t.i();
+            o.i(i64::from(
+                larmorx_freesurfer_surf::props10::mris_mark_intersections(
+                    g, &mut io, &mut s, fill,
+                )?,
+            ));
+            let nv = s.nvertices.max(0) as usize;
+            let marked: Vec<usize> = (0..nv).filter(|&v| s.vertex(v).marked != 0).collect();
+            o.i(marked.len() as i64);
+            for v in marked {
+                o.i(v as i64);
+            }
+            if fill != 0 {
+                let mx = (0..nv)
+                    .map(|v| s.vertex(v).undefval)
+                    .max()
+                    .unwrap_or(0)
+                    .max(0);
+                o.i(i64::from(mx));
+                let mut c = vec![0i64; mx as usize + 1];
+                for v in 0..nv {
+                    let u = s.vertex(v).undefval;
+                    if u > 0 {
+                        c[u as usize] += 1;
+                    }
+                }
+                for k in 1..=mx as usize {
+                    o.i(c[k]);
+                }
+            }
+        }
         "sgd" => {
             // relay 38 of track D: `fssurfio.cpp`'s `flr sgd` (the stack measurement: every value
             // 1, one map of the clusters); the port also gives the deepest path of the growth

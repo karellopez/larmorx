@@ -10,7 +10,7 @@
 //! `Gdiag_no`, faces and vertices ripped, marks and original positions now and then; then 1 to 5
 //! operations: the tables (`ft`, `ftd`, `vt`) and their buckets in the box of the vertices'
 //! voxels, `MHTdoesFaceIntersect` for every face (`dfi`), `MHTisVectorFilled` (`ivf`),
-//! `MHTaddAllFaces` and `MHTremoveAllFaces` (`add`, `rem`), a vertex moved (`mv`),
+//! `MHTaddAllFaces` and `MHTremoveAllFaces` (`add`, `rem`), a vertex moved by up to 3 mm (`mv`),
 //! `MHTtestIsMRISselfIntersecting` (`tis`), `mrisMarkIntersections` (`mi`), `MRISfillHoles`
 //! (`fh`), `MRISmarkEdge` (`me`), `MHTfree` (`free`); after each `errno`: the generator and the
 //! port's answers, as `fssurfio.cpp`'s.
@@ -20,6 +20,7 @@ use super::mpd::{grid, ico};
 use super::srd::{Mesh, mesh};
 use super::*;
 
+use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc_sequence};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_surf::mht::{self, Mht, MhtFnoUsage, TABLE_CENTER, TABLE_SIZE};
@@ -241,7 +242,16 @@ pub(super) fn mht_tokens(t: &mut Vec<String>, g: &mut Gen) {
             0 | 1 => {
                 t.push("ft".into());
                 ix(t, which(g, orig));
-                fv(t, res(g, heavy));
+                // a large face at a fine resolution: FreeSurfer's quadratic list search passes the
+                // official probe's alarm
+                fv(
+                    t,
+                    if big {
+                        g.pick(&[1.0, 2.0])
+                    } else {
+                        res(g, heavy)
+                    },
+                );
             }
             2 | 3 => t.push("ftd".into()),
             4 => {
@@ -501,8 +511,11 @@ pub(super) fn mht_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "mv" => {
                 let vno = t.i() as usize;
+                let (dx, dy, dz) = (t.f(), t.f(), t.f());
                 let x = s.vertex_mut(vno);
-                (x.x, x.y, x.z) = (t.f(), t.f(), t.f());
+                x.x = sse::add(x.x, dx);
+                x.y = sse::add(x.y, dy);
+                x.z = sse::add(x.z, dz);
             }
             "tis" => {
                 let r = t.f();

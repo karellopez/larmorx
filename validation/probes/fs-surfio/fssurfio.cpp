@@ -4186,6 +4186,29 @@ void flr_case()
     out += t;
     out += w == r ? "SAME " : "DIFF ";
     unlink(name.c_str());
+  } else if (op == "mki") {
+    // relay 39 of track D: mrisMarkIntersections on a recorded surface (`mki <surface> <fill>`):
+    // the faces counted, the vertices marked (their count and numbers); with hole filling the
+    // vertices of each cluster number (1 to the largest)
+    MRIS *s = MRISread(next());
+    int fill = geti();
+    if (!s) fail("cannot read the surface");
+    oi(mrisMarkIntersections(s, fill));
+    int nm = 0, mx = 0;
+    for (int v = 0; v < s->nvertices; v++) {
+      if (s->vertices[v].marked) nm++;
+      if (s->vertices[v].undefval > mx) mx = s->vertices[v].undefval;
+    }
+    oi(nm);
+    for (int v = 0; v < s->nvertices; v++)
+      if (s->vertices[v].marked) oi(v);
+    if (fill) {
+      oi(mx);
+      std::vector<int> c(mx + 1, 0);
+      for (int v = 0; v < s->nvertices; v++)
+        if (s->vertices[v].undefval > 0) c[s->vertices[v].undefval]++;
+      for (int k = 1; k <= mx; k++) oi(c[k]);
+    }
   } else if (op == "sgd") {
     // relay 38 of track D, the stack measurement (validation/probes/fs-surfio/stack.py): a surface
     // (`sgd <surface>`) with every value 1, one sclustMapSurfClusters (0.5, no upper bound, positive
@@ -5769,7 +5792,9 @@ void mht_case()
       mht_dump(s, mht);
     } else if (op == "mv") {
       int vno = geti();
-      s->vertices[vno].x = getf(); s->vertices[vno].y = getf(); s->vertices[vno].z = getf();
+      // moved by the case's amounts (relative, so its faces stay small: FreeSurfer's list search is
+      // quadratic in a face's voxels, and the official probe's alarm is 5 seconds)
+      s->vertices[vno].x += getf(); s->vertices[vno].y += getf(); s->vertices[vno].z += getf();
     } else if (op == "tis") {
       oi(MHTtestIsMRISselfIntersecting(s, getf()));
     } else if (op == "mi") {

@@ -1854,7 +1854,7 @@ defects! {
     FS_912 = "FS-912", "FreeSurfer", true,
         "the surface hash table's intersection test ends the program (MHT_MAX_FACES exceeded!, exit status 1) when more than 10,000 faces lie in the voxels of the face tested";
     FS_913 = "FS-913", "FreeSurfer", true,
-        "the surface hash table of faces runs for hours on a face whose sampling takes more than 2^32 steps (a corner that is not finite next to finite ones, a face millions of voxels across), printing two error messages for each voxel past the 10,000th";
+        "the surface hash table of faces runs for hours on a face whose sampling takes hundreds of millions of steps (a corner that is not finite next to finite ones, a face kilometres across), printing two error messages for each voxel past the 10,000th";
     FS_914 = "FS-914", "FreeSurfer", false,
         "the hole counts printed when holes are filled are not the number of holes: marking a surface's intersections with hole filling (mrisMarkIntersections, mris_remove_intersection --fill-holes) prints Found N holes counting the unmarked region around the holes as one, and MRISfillHoles prints found -1 holes when no vertex is below its threshold";
     FS_915 = "FS-915", "FreeSurfer", true,

@@ -4893,3 +4893,97 @@ stops writing at its 64 MiB file limit; its bytes are the `.m3z`'s stream). JPEG
 files: track C's test encoder, now and then damaged): seeds 7 and 13 (1,200 image cases each): `reproduce` identical on
 every compared case (seed 13: 54 JPEG reads compared, 21 decoded, 33 IJG errors). The defaults and the cases FreeSurfer
 crashes on: `crates-freesurfer/larmorx-freesurfer-gca/tests/transform_write.rs`.
+
+## 148. TIFF images (`mri_read` and `MRIwriteType` of the image type for `.tif`, `.tiff`, `.svs` names)
+
+The library is libtiff 3.6.1 as FreeSurfer builds it (`larmorx_io::tiff`, the main package's; its behaviour and
+messages: `docs/findings/libtiff-3.6.1.md`). Its messages go to standard error as `<module>: <message>.` (warnings
+with `Warning, `); file names in them are cut to 100 bytes where libtiff cuts them.
+
+1. **Which pages.** `mri_read`'s frames (the name's `#<n>` or `#<a>:<b>` while `MRIIO_Strip_Pound` is set, else the
+   caller's, none by default) or, when the name keeps its `#<n>` (`MRIIO_Strip_Pound` off), that page: the pages from
+   the first frame (below 0: page 0) to the last frame (inclusive; none: the file's last page). The file's pages are
+   counted by following the chain of directories (a chain that loops: libtiff's FS-814), then read one after the
+   other until one fails; the count is printed with `FS_TIFF_DEBUG` (below). Frames outside the pages read (FS-864):
+   by default `TiffReadImage(<name>): frames <a> to <b> asked of a file of <n> pages` (`ERROR_BADPARM`) and no image;
+   with `reproduce` FreeSurfer's outcome (an image of no frames, of a negative number of frames: the program ends on
+   its allocation, `ImageAlloc: could not allocate <rows>x<cols> buffer`; pages past those read: memory contents,
+   FS-863, not reproduced: the frames from there on stay zero).
+2. **The image.** Its size, samples and bits are the first frame's page's: 1 sample of 16, 32, 64 bits gives shorts,
+   floats, doubles (`ImageToMRI` then takes shorts as ints and refuses doubles: `IMAGE type = 6 not supported`); of
+   any other number of bits bytes; 3 or 4 samples give 3-byte RGB pixels (the fourth sample dropped); any other
+   number of samples ends the program (`IMAGE: nsamples=<n>, bits_per_sample=<b>.  only grey scale or RGB image is
+   supported`, `ERROR_BADPARM`). Layouts the image cannot hold (FS-872: grey samples of other than 1, 8, 16, 32 or 64
+   bits; colour samples of other than 8 bits): by default `TiffReadImage(<name>): pages of <s> samples of <b> bits
+   are not supported` (`ERROR_UNSUPPORTED`) and no image; `reproduce` stores the rows as they come. The pixel sizes:
+   resolution unit 1 or 3 (none, centimetres): `100 / xres` mm, `100 / yres` mm (`double` divisions stored as
+   `float`); otherwise (inches, the default) `25.4 / xres`, `25.4 / yres` (`10.0 * 2.54` in `double` first); a
+   resolution missing: 0.1 for unit 1, 25.4 otherwise (as `float`). With `Gdiag`'s verbose bit (0x10000000) the
+   lines `\ntiff info\n`, `  size: (<w>, <h>)`, `  samples/pixel: <n>`, `  bits/sample: <b>`, `  orientation: <o>`, a
+   photometric line (0 `min value is white.`, 1 `min value is black.`, 2 `RGB color model.`, 3 `use palette.`, 4
+   `$holdout mask.`, 5 `color separations.`, 6 `YCbCr6 CCIR 601.`, 8 `1976 CIE L*a*b* `, 10 `ITU L*a*b* `, others
+   `unknown type`: the values above 32767 never match, read as negative 16-bit numbers) and a compression line (1
+   `no compression`, 5 `Lempel-Ziv & Welch`, 7 `JPEG DCT compression`, others `<c> see /usr/include/tiff.h for
+   meaning` with the 16-bit value as signed: PackBits prints -32763) on standard error, each with two spaces before
+   it; a field the page lacks: FS-873 (0 here).
+3. **Each page.** The file opened again for each frame (libtiff's warnings of each page printed again). A page of
+   separate planes: in the counting pass `TiffReadDirectoryInfo():  PLANARCONFIG_SEPARATE unsupported`
+   (`ERROR_UNSUPPORTED`; FS-868: by default no image; `reproduce`: the program ends on an allocation of 2^64 - 3
+   bytes with code -3 when the image has pixels), at the page's reading `TiffReadImageDirectory():  PLANARCONFIG_SEPARATE
+   unsupported` on standard output and status 1 (FS-867: whether FreeSurfer recognises separate planes at all
+   depends on memory contents; the port always does). Pages of other sizes than the earlier selected ones:
+   `TiffReadImageDirectory():  pages have different image size. open them individually.` (no newline) on standard
+   output and status 1 (FS-869: FreeSurfer compares a page only with the pages two or more before it; by default
+   every page is compared with the first frame's, size and shape). The page's place in the image: by default frame
+   `<frame> - <first frame>`; FreeSurfer's (`reproduce`, FS-869): after `width x height x samples x (bits / 8)`
+   bytes for each selected page before it.
+4. **Stripped pages.** `TiffReadStrippedImage(): read strip image <w> x <h>, nsamples = <n>, bits_per_sample = <b>`
+   on standard output, then each row in turn: top-left orientation (1, the default) into the image's row `h - 1 -
+   r`, bottom-left (4) into row `r`; any other ends the program at the first row (`IMAGE: orientation = <o>. we
+   support only topleft or botleft`, `ERROR_BADPARM`; the first frame's page's orientation for every page). A row
+   that libtiff fails to read: `TiffReadStrippedImage():  TIFFReadScanline returned error` (`ERROR_BADFILE`) and the
+   page's reading ends (the image is kept). 1 sample: the decoded row into the image's row; 1-bit rows unpacked to
+   bytes of 0 and 1 (FS-866: by default `width` pixels, the high bit first (libtiff already puts the bits in that
+   order); FreeSurfer's 8 pixels per byte of the row, up to 7 past the width into the next row, and the low bit
+   first for a fill order of 2). 4 samples: the first three of each pixel. 3 samples: the row as decoded. Other
+   counts: nothing read.
+5. **Tiled pages.** `TiffReadTiledImage(): read tile images <w> x <h>, tile size <tw> x <tl>, nsamples = <n>,
+   bits_per_sample = <b>`, then the tiles left to right, top to bottom. By default (FS-870) each tile's rows inside
+   the image at the rows of the orientation (as for strips), its columns inside the image by the image's pixel size
+   (1-bit samples unpacked high bit first, the fourth of 4 samples dropped); a tile that libtiff fails to read:
+   `TiffReadTiledImage():  TIFFReadTile returned error` and the page ends (FS-871); tiles of a width or length of 0
+   or that cannot be held: `TiffReadTiledImage(): tiles of <tw> x <tl> cannot be read` (FS-871). FreeSurfer's
+   (`reproduce`): `width / tw + 1` tiles a row, every tile row copied as `tw x n x (b / 8)` bytes into 3-byte pixels
+   at row `h - 1 - y` whatever the orientation.
+6. **`FS_TIFF_DEBUG`** in the environment (from then on for the process): `[DEBUG] TiffReadImage(): pages found=<n>,
+   pages to read=<k> [<a>, <b>), image buf size=<bytes>`, per page `[DEBUG] TiffReadImageDirectory(): #<frame:03>
+   I_tmp->image=<address> (I->image=<address>) <w:4> x <h:4> (nsamples=<n>, bits/sample=<b>, imagesize=<bytes>,
+   tiled=<0|1>, scanlinesize=<bytes>, tilesize=<bytes>)`, and the tiled reader's lines per tile, on standard output
+   (the addresses are the process's: they differ from run to run).
+7. **Writing** (`MRIwriteType` of a `.tif`/`.tiff` name: the volume's first frame as an image of bytes, ints or
+   floats): `TIFFOpen(<name>, "w")` (a failure: libtiff's message, nothing more, FS-731), then per frame (one) the
+   fields SampleFormat, ImageWidth, ImageLength, Orientation 4, SamplesPerPixel 1, SampleFormat again, BitsPerSample
+   8 or 32, PlanarConfiguration 1, Photometric 1, ResolutionUnit 2, XResolution and YResolution `nint(25.4 / size)`
+   when the size is not below `FLT_EPSILON`, Compression Deflate (zlib level 6), each row of the image (row 0
+   first) as a scanline, the directory; the file closed. FS-874: by default SampleFormat 1 for bytes and 3 for
+   floats; FreeSurfer's (`reproduce`) 2 for every image. A row that libtiff refuses: `TiffWrite: TIFFWriteScanline
+   returned error` (`ERROR_BADFILE`) and the file is left as written (nothing more reaches it).
+
+## 149. Validation plan (part 35)
+
+Piece 23 of the fs.io probe (`ixd`, `ixh`, `ixw`) with TIFF files: track C's generated files of one to three pages
+(`larmorx_io::tiff::cases::make`: both byte orders, every codec FreeSurfer's libtiff configures, strips and tiles, 1
+to 5 samples of 1 to 64 bits, contiguous and separate planes, the orientations, fill orders, resolutions, a third
+damaged), kept only when libtiff reads them alike with 768 MiB and with 16 GiB of memory and their images stay under
+256 MiB (FreeSurfer's probe runs with 1 GiB); frames `#0`, `#1`, `#0:1`, `#2`, `#1:2`, `#0:2`, `#5`, `#0:7`, `#x`,
+`#-2`; `Gdiag` 0x10000000 now and then; `FS_TIFF_DEBUG` (the environment bit 1024) now and then; writes of byte,
+int and float volumes to `.tif`/`.tiff` names, read back. The black-box form: the official `fsio`'s `mrd`/`mrh` and
+`vwr` lines, or `mri_convert <in.tif> <out.mgz>` and `mri_convert <in.mgz> <out.tif>`. Not compared: FS-863, FS-865,
+FS-871, FS-873, FS-405 (memory contents and writes past buffers); compared apart: FS-867 (memory contents decide
+FreeSurfer's outcome: measured, the same file refused or read from one call path to another), libtiff's own
+memory-dependent defects (track C's list), `FS_TIFF_DEBUG`'s addresses. Measured (2026-11-16, observed): seeds 7 and
+13 (1,200 piece-23 cases each): `reproduce` identical on every compared case (877 and 867), 0 different; `fix`
+differs only with notices. Hand-made files (one and several pages, 1-bit rows of both fill orders, tiles of widths
+that are and are not multiples of the tile width, separate planes in the first and a later page, pages of other
+sizes and shapes): `reproduce` identical where FreeSurfer's outcome does not depend on memory; the corrected
+defaults: `crates-freesurfer/larmorx-freesurfer-io/tests/tiff_images.rs`.

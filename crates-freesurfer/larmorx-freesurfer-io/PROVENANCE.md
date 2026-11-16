@@ -430,3 +430,9 @@ is NaN), the FS-58 refusal and their notices are larmorx's own.
 | `utils/warpfield.cpp` 55-74, 659-951; `utils/mriio.cpp` 9655-9661 | `Warpfield::Warpfield(MRI *)` (its matrices with shears), `Warpfield::changeFormat` and `__changeFormatFrom_abs_crs`, `__changeFormatFrom_disp_crs`, `__changeFormatFrom_abs_ras`, `__changeFormatFrom_disp_ras`, as `niiWrite` calls them (the volume changed in place) | `warpfield.rs`, `mriio_write.rs` |
 | `utils/mriio.cpp` 1179-1190 | `MRIwriteType`'s `MGH_MORPH` branch: through `upper.rs`'s `write_morph` (fs.gca's `gcam_write.rs`; the message of a program that does not link it) | `mriio.rs`, `upper.rs` |
 
+
+## FreeSurfer files and functions translated (relay 40 of track A: TIFF images)
+
+| FreeSurfer file (lines) | Functions | Here |
+|---|---|---|
+| `utils/imageio.cpp` 59-81, 147-169, 459-470, 762-1325, 1397-1494; `utils/mriio.cpp` 785-794 | `TiffDirectoryInfo`, `FS_TIFF_DEBUG`, `ImageFWrite`'s and `ImageRead`'s TIFF branches, `TiffReadImage`, `TiffReadImageDirectory`, `TiffReadStrippedImage`, `TiffReadDirectoryInfo`, `TiffReadTiledImage`, `TiffWriteImage` over track C's `larmorx_io::tiff` (libtiff 3.6.1), `mri_read`'s image branch with its frames (FS-863 to FS-874) | `imageio_tiff.rs`, `imageio.rs`, `mriio.rs` |

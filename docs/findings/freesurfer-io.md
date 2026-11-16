@@ -2541,3 +2541,98 @@ defaults `ABS_CRS` and `doGCAMsampleMorph = 0`); `utils/mriio.cpp` 1179-1190 (`M
   that invert. The six recorded heads (`gcw`): 30 of 30 identical in both modes; their `.m3d` outputs (75 MiB) passed
   the official probe's 64 MiB file limit (`SIGXFSZ`), their stream being the `.m3z`'s. JPEG (piece 23, real files):
   seed 13's 54 JPEG reads identical (21 decoded, 33 IJG errors).
+
+## Part 35: TIFF images (relay 40 of track A)
+
+Sources: `utils/imageio.cpp` 59-81 (`TiffDirectoryInfo`, `FS_TIFF_DEBUG`), 147-169 (`ImageFWrite`), 459-470
+(`ImageRead`'s TIFF branch), 762-971 (`TiffReadImage`), 974-1024 (`TiffReadImageDirectory`), 1027-1145
+(`TiffReadStrippedImage`), 1154-1229 (`TiffReadDirectoryInfo`), 1239-1325 (`TiffReadTiledImage`), 1397-1494
+(`TiffWriteImage`); `utils/image.cpp` 65-77, 104-129 (`ImageAlloc`, `ImageAllocBuffer`); `utils/mriio.cpp` 785-794.
+The port: fs.io `imageio_tiff.rs` over track C's `larmorx_io::tiff` (used as it is).
+
+- **The page table (FS-863).** `TiffDirectoryInfo tiffdirectoryinfo[nframe]` is a VLA sized by
+  `TIFFNumberOfDirectories`, which stops before a directory whose next-link cannot be read, while
+  `TiffReadDirectoryInfo`'s `do { ... } while (TIFFReadDirectory(tif))` reads that directory too (3.6.1's
+  `TIFFReadDirectory` takes an unreadable link as 0): one entry is written past the VLA. A directory that
+  `TIFFReadDirectory` fails on ends the loop: its entry and the later ones are never written, yet
+  `TiffReadImageDirectory` reads `tiffdirectoryinfo[i]` for every `i < nframe` (the frame index) and
+  `tiffdirectoryinfo[nframe].is_tiled`. The port keeps every page it reads; by default frames outside the pages read
+  are refused (FS-864); `reproduce` stops at the first entry FreeSurfer would take from its stack (the rest of the
+  image zeros), noted; the probe does not compare those cases.
+- **The frame range (FS-864).** `end_frame` is `nframe` when below 0, else `end_frame + 1`, never compared with the
+  pages; `nframe_toread = end_frame - frame0` can be 0 (an image of no frames: `ImageAlloc` with `nframes` 0 gives an
+  image with a buffer of `imagebufsize` 0 bytes... falling back to `sizeimage * 0`: `hcalloc(0)`), negative
+  (`sizeimage * num_frame` wraps: `hcalloc` fails, `ImageAlloc: could not allocate` with `Gerror`), or larger than the
+  pages (entries never written). `TIFFSetDirectory(tif, frame0)` (a `uint16`: frame 65,536 is page 0) is not checked:
+  past the last page it leaves the last page read by the counting pass current (3.6.1 returns before freeing the
+  directory when `tif_nextdiroff` is 0), so the fields are that page's.
+- **`int` variables of `uint16` fields (FS-867).** `int planar_config` (in `TiffReadDirectoryInfo`'s loop and in
+  `TiffReadImageDirectory`) and `int fillorder` (`TiffReadStrippedImage`) receive `TIFFGetFieldDefaulted`'s 2-byte
+  writes: the upper bytes are the stack slot's. Measured with hand-made files (`validation/probes/fs-io/tiff_hand_cases.py`): one single-page
+  file of separate planes is read as contiguous planes (the comparison with `PLANARCONFIG_SEPARATE` fails) through
+  `mrd` without a frame, and refused (`PLANARCONFIG_SEPARATE unsupported`) through `mrd` of `name#0` and with `Gdiag`
+  0x10000000: the same function, other stack contents. A second page of separate planes after a contiguous one was
+  refused on every path tried. The port compares the 16-bit value (both modes; `reproduce` takes the upper bytes as
+  0, noted where they decide); the probe compares these cases apart.
+- **The error code as a size (FS-868).** `TiffReadDirectoryInfo` returns `unsigned long` and
+  `ErrorReturn(ERROR_UNSUPPORTED, ...)` returns -3: `imagebufsize` is 2^64 - 3. `ImageAllocBuffer`'s `hcalloc` fails
+  (`errno` ENOMEM: `error: Cannot allocate memory` before the message) and `ImageAlloc` exits with `Gerror`, -3
+  (status 253), unless the image's `sizeimage` is 0 (no buffer is allocated: the program goes on). The entry of the
+  failing page holds only `is_tiled`.
+- **Page offsets (FS-869).** `sizeimage = width * height * nsamples * (bits_per_sample / 8)` in `unsigned long`: 0 for
+  1-bit pages (and 2- and 4-bit), so every 1-bit page lands at offset 0 (the first frame) and the later frames stay
+  zero; 4-sample pages count 4 bytes a pixel while the image holds 3. `imagebufsize` is the sum of those sizes, used
+  as the buffer's size when not 0; `ImageAllocBuffer` then clears `sizeimage * num_frame` bytes whatever it allocated
+  (FS-405: past a smaller buffer, the heap; one generated case crashed later in `malloc`). The size check
+  (`pages have different image size`) runs over the selected pages before the current one only: two pages never
+  compare; the third is compared with the second. Pages of equal byte size but another shape pass and are read with
+  their own width into the first page's rows (one hand case: `free(): invalid next size`, status 134).
+- **1-bit rows (FS-866).** libtiff 3.6.1's `TIFFFillStrip` reverses the raw bytes when the file's fill order is not
+  the handle's (`FILLORDER_MSB2LSB`), so decoded rows are high bit first; FreeSurfer's unpacking then reads them low
+  bit first for `fillorder == FILLORDER_LSB2MSB` (when FS-867's upper bytes are 0): measured, a file with fill order 2
+  gives FreeSurfer the same pixels as the same bytes with fill order 1. The unpacking writes `8 * scanlinesize`
+  pixels from column 0 of row `index` (`IMAGEpix(I_tmp, col + bit, index)`): the pixels past the width land in row
+  `index + 1` (top-left: the row read just before, overwritten; bottom-left: the next row, overwritten by its own
+  read) and, for the image's last row, past the buffer (the probe skips those, FS-865). `bitmap` is a copy of the
+  decoded row (`memmove(bitmap, buf, scanlinesize)`).
+- **4-sample rows.** `ipix = calloc(scanlinesize)` gets the decoded row; the copy reads `4 * width` bytes of it (past
+  it for fewer than 8 bits a sample: FS-865) and frees `buf` (the same pointer).
+- **Tiles (FS-870, FS-871).** `num_tile_x = width / tile_width + 1` is the tiles per row only when the width is not a
+  multiple of the tile width; the placement `ntiles_read % num_tile_x` then misplaces the tiles after the first row:
+  measured, a 32 x 32 RGB image in tiles of 16 reads differently from its true pixels, a 40 x 20 image correctly
+  (FreeSurfer's outputs equal the port's `reproduce`). `IMAGERGBpix` (3 bytes a pixel) for every layout: grey tiles
+  land three times too far (past the image: FS-865); `tile_bytes_per_row = tile_width * nsamples * (bits / 8)` is 0
+  for 1-bit tiles (zeros, the loop ends at the image's height) and copies 4-byte pixels of RGBA tiles into 3-byte
+  rows. `TIFFReadTile`'s -1 becomes `bytes_left_tilebuf = 2^64 - 1`: the copies read past `tilebuf`. A tile width of 0
+  divides by zero; a length of 0 never ends the `y` loop; a tile size that `calloc` refuses gives `TIFFReadTile` a
+  null buffer. Orientation is ignored (always `height - im_idx_height - 1`). The default: the tiles per row
+  `ceil(width / tile_width)`, the image's pixel size, the orientation as for strips, a failed tile ends the page with
+  a message as a failed scanline does; `reproduce` FreeSurfer's placement with bounds-checked copies.
+- **Unset fields (FS-873).** `photometric` and `compression` have no default in 3.6.1's `TIFFVGetFieldDefaulted`
+  (`COMPRESSION` is set by `TIFFDefaultDirectory` for every directory read, so only a failed directory lacks it):
+  printed only with `DIAG_VERBOSE`. `width` and `height` lack a value only for a directory that failed to read
+  (`frame0` at or past the failing page). The `switch` on `photometricInt`/`compressionInt` (the `short` promoted):
+  `PHOTOMETRIC_LOGL` (32844), `PHOTOMETRIC_LOGLUV` and `COMPRESSION_PACKBITS` (32773) never match.
+- **An image of no pixels.** A width of 0 gives `sizeimage` 0: `ImageAllocBuffer` allocates nothing (`I->image`
+  NULL) and the rows are read into `NULL + offset`; zlib's `inflate` refuses a null `next_out` (`Z_STREAM_ERROR`, its
+  `msg` NULL: `ZIPDecode: <name>: zlib error: (null).`, then FreeSurfer's `TIFFReadScanline returned error`).
+  Measured: a 0 x 2 volume written as TIFF (`ZIPEncode: <name>: Encoder error: buffer error.` on both sides) and read
+  back. The port cannot give libtiff a null buffer (track C's API takes slices): it reads empty rows, noted (FS-865,
+  not compared).
+- **`TiffWriteImage` (FS-874).** `sample_format` is set first, then `TIFFSetField(out, TIFFTAG_SAMPLEFORMAT,
+  SAMPLEFORMAT_INT)` again: every file says signed integers (bytes and floats alike). `MRItoImage` gives bytes, ints
+  and floats only (the `PFSHORT`, `PFDOUBLE` and default branches are unreachable from `MRIwriteType`); it takes the
+  volume's first frame (one page). The failed paths return without `TIFFClose` (the handle leaks; nothing is
+  flushed); `ImageFWrite` ignores the result (FS-731). The resolution: `(double)nint(2.54 * 10.0 / I->xsize)` when
+  `!FZERO(I->xsize)`.
+- **Other facts.** `FS_TIFF_DEBUG` is a file-level `static bool`, set by `TiffReadImage` when the variable is in the
+  environment and never cleared (fs.core's `Globals::fs_tiff_debug`). The multi-threaded page loop is `#if 0`;
+  `FS_IMAGEREAD_NTHREADS` is read by `mri_read` (`atoi`) and changes nothing. `I->sizepix` is overwritten with `100 /
+  res` or `2.54 / res` (pixels, not bytes: nothing reads it afterwards). libtiff cuts file names to 100 bytes in some
+  messages: the port names the file by its path joined to the program's directory (the probe's example now runs in a
+  short temporary folder); an open taking FreeSurfer's name beside the path would remove the difference (asked of
+  track C).
+- **What the probe measured (piece 23).** Seeds 7 and 13 (1,200 piece-23 cases each): `reproduce` identical on every
+  compared case (877 and 867), 118 and 131 skipped, 205 and 202 compared apart, 0 different; `fix` differs only with
+  notices. 16 hand-made files (`validation/probes/fs-io/tiff_hand_cases.py`): `reproduce` identical but the FS-867 file (memory contents) and the different-shape pages
+  (FS-865: FreeSurfer's heap check aborts).

@@ -843,3 +843,105 @@ oracle's `libutils.a` member `mri2.cpp.o` (`objdump -dr -C`, `<scratch>/C/r20/mr
 - No new not-comparable IDs: FS-803, FS-804, FS-806's reads and writes past a volume are the voxel functions' FS-53
   (`check.py`'s SKIP already).
 
+
+## 26. Writing transforms, moving volumes by them, the MNI and tkregister helpers, rotations (3.1-39 and 3.1-40; relay 34)
+`transform.cpp`'s `LTAwrite` (687), `LTAwriteEx` (3280), `ltaFSLwrite` (1626), `ltaMNIwrite` (1663), `LTAread` (700),
+`LTAtransform` (907), `LTAtransformInterp` (912), `LTAtransformAtPoint` (1388), `LTAvoxelTransformToCoronalRasTransform`
+(1946), `FixMNITal` (1983), `DevolveXFM` (2027), `DevolveXFMWithSubjectsDir` (2032), `LTAmodifySrcDstGeom` (3582),
+`LTAdumpVolGeom` (4221), `MRIangles2RotMat` (4591), `LTAmat2RotMat` (4956), `RMSregDiffMJ` (4989),
+`TranformAffineParams2Matrix` (5228), `TranformExtractAffineParams` (5298), in `larmorx_freesurfer_volume::ltawrite`,
+`ltaapply` and `rotmat`. The object code read: the unit oracle's `libutils.a` member `transform.cpp.o` (`objdump -dr -C`).
+- **`TranformExtractAffineParams`'s angles:** `atan2(Q->rptr[2][3], Q->rptr[3][3])*180/M_PI` takes two `float`s, so C++
+  picks `std::atan2(float, float)`: the object code calls `atan2f`, multiplies by `180.0f` in `float` (`mulss .LC290`),
+  converts (`cvtss2sd`) and only then divides by `M_PI` in `double`; `p[5]` likewise. `p[4]`'s
+  `atan2(Q13, sqrt(pow(Q23, 2.0) + pow(Q33, 2.0)))` has a `double` second argument: `atan2`, `pow` and `sqrt` calls
+  (`-fno-builtin` keeps `pow(x, 2.0)` and `sqrt` as calls) and `mulsd`/`divsd`. The shears are `divss`. The first probe
+  run (relay 34, seed 7) showed `p[3]` and `p[5]` off by float-sized amounts until the port took `atan2f`; `LTAmat2RotMat`,
+  built on it, then matched too. `atan2f` is glibc's (fdlibm's, `atan2f_glibc`) with `reproduce`, correctly rounded by
+  default (GLIBC-07); the `double` `atan2` is correctly rounded in both modes (`freesurfer-libm.md` §2).
+- **`LTAwriteEx`:** the extension is `FileNameExtension`'s (after the last `.` of the whole name, folders included:
+  `fsvol.d/w` writes an `.lta`); `LTA` excludes only the `REGISTER_DAT` branch. The `.lta` header's user is `getenv("USER")`
+  (an empty value used as it is), then `LOGNAME`, then `UNKNOWN`; the date `currentDateTime()` with its override. The
+  register branch passes `lta->subject` (never `NULL`: an empty subject prints `subject-unknown`), `xforms[0].src.xsize`
+  and `.zsize`, `fscale` and `FLT2INT_ROUND`; `regio_write_register` reports a failed `fopen` with `perror`, which (glibc
+  2.35) `dup`s standard error and `fdopen`s it `"w+"` when the stream is not yet oriented: on a descriptor open for writing
+  only (the probe's child, a pipe's write end) that fails with `EINVAL`, which `errno` keeps; an oriented stream keeps
+  `fopen`'s `errno`. The probe orients standard error (`fwide(stderr, -1)`) for its `ltawr` command, as track A's fs-io
+  probe does for `regio_read_register`. `ltaFSLwrite` leaks `LTAalloc`'s identity (overwritten by `MatrixCopy`'s result)
+  and leaves the file created and empty when the conversion keeps another type (`could not convert to FSL format`).
+  `ltaMNIwrite` writes nothing after `Linear_Transform =` for types other than RAS-to-RAS, MNI and voxel-to-voxel (a file
+  `ltaMNIreadEx` then refuses).
+- **`LTAtransformInterp`:** `tran->dst.valid == 1` (exactly 1) picks the transform's destination geometry for a new
+  destination, while the voxel-to-voxel branch tests `lta->xforms[0].dst.valid` (any non-zero value): a geometry of
+  validity 2 gives a clone of the source as destination and is then used as valid. `USE_AVERAGE305` counts when set to any
+  value, the empty string included (`getenv` not `NULL`). `tmp = MatrixMultiply(tmp, r2i, tmp)` multiplies into its own
+  first operand (FreeSurfer copies it). The octree branch is reached only by arrays of 0 or of 2 or more transforms (one
+  transform returns before it); for 0 its inverse matrix stays `MatrixAlloc`'s zeros, so every voxel takes the source's
+  voxel at the destination's index tables' entries for (0, 0, 0). It loops over the source's extent and writes the
+  destination's voxels (FS-53 where the destination is smaller), and reads the source at indices clamped to the
+  destination's extent (FS-53 where the source is smaller). `DiagHeartbeat((float)y3 / (float)(depth - 1))` divides by 0
+  for one slice (an infinity or NaN that only decides whether a heartbeat line prints).
+- **FS-886** (a, memory; rule B): `LTAtransformAtPoint`'s `double w_p[MAX_TRANSFORMS]` (4,096) on the stack, indexed up
+  to `num_xforms`; an `.lta` file sets `nxforms` freely. Both modes end with an error above 4,096. `m_tmp` is a `static`
+  `MATRIX`, overwritten before each use (no state between calls). The weight's `exp` is glibc's with `reproduce`
+  (GLIBC-07 by default where the last bit differs); `MatrixScalarMul` takes the share as `float`.
+- **FS-887** (a, memory; rule B): `char dirname[2000], xfmpath[2000]` filled by `sprintf` from `SUBJECTS_DIR` (or
+  `sdir`), the subject and `xfmname` without a bound. Both modes end with an error at 2,000 bytes or more.
+- **`DevolveXFMWithSubjectsDir`:** reads the original volume's header (`MRIreadHeader`), so it goes through fs.io's
+  readers, their messages and defects (the probe's `.mgz` that is not compressed reads the header from zlib's transparent
+  pass-through and stops in `MRIalloc` for a frame count made of the file's text: FS-167's memory contents in the port,
+  not compared). `fopen(xfmpath)` is kept open across `LTAreadEx` (closed after the copy: never on the error paths, a
+  leak). `MatrixMultiply(XFM, Mfix, XFM)` multiplies into its first operand; a given `XFM` is changed in place and
+  returned. `printf` messages go to standard output.
+- **`LTAmodifySrcDstGeom`:** `VOL_GEOM svg, dvg;` are constructed (the member initialisers: shears 0, `ras_good_flag` 0)
+  and filled by `getVolGeom`, which copies neither the shears nor `ras_good_flag`, so `svg.vgprint()` prints shears of 0.
+  The geometries compare with `vg_isEqual` (`vg_isEqual_Threshold`); a transform's geometry of validity other than 0 and 1
+  counts as valid.
+- **`LTAvoxelTransformToCoronalRasTransform`** changes only `xforms[0]` and the array's type (not the transform's own
+  type, nor its inverse, nor the other transforms).
+- **`MRIangles2RotMat`:** `R3 = MatrixMultiply(R3, Rx, R3)` into its own first operand; the angles' `cos`/`sin` are the
+  `double` functions (glibc's with `reproduce`).
+- **`TranformAffineParams2Matrix`:** `MatrixMultiplyD(R, R3, R)`, `MatrixMultiplyD(M, ZZ, M)`, `MatrixMultiplyD(M, S, M)`
+  into their first operands; a given `M` of another size makes the first product return `NULL`, which then becomes the
+  next product's first operand (`MatrixMultiplyD(): m1 is null`, the program's end).
+- **`LTAmat2RotMat`:** `TranformExtractAffineParams(lta->xforms[0].m_L, par)` into a stack array; without a matrix it
+  returns `NULL` and `par[3..5]` stay stack contents (FS-504 in the port: an error).
+- **`FixMNITal`:** `stuff_four_by_four` takes `float`s: Brett's coefficients rounded to `float`; the product is
+  `MatrixMultiply`'s (`float` sums).
+
+## 27. Voxel lists (3.1-40, `voxlist.cpp`; relay 34)
+`VLSTcreate` (98), `compare_sort` (176), `VLSTsort` (217), `VLSTfree` (254), `VLSTcomputeStats` (419), `VLSTalloc` (588),
+`VLSTcopy` (610), `VLSTcopyInto` (649), `VLSTaddUnique` (688), `VLSTaddWithValue` (695), `VLSTadd` (709), `VLSTinList`
+(723), in `larmorx_freesurfer_volume::voxlist`. Callers on recon-all's paths: `mri_ca_label` (`VLSTcreate(mri_border, 1,
+1, NULL, 0, 0)`; `VLSTalloc` + `nvox = 0` + `VLSTadd` in `find_unlikely_voxels_in_region`), `gcamorph.cpp`
+(`VLSTcreate(mri_std, .001, 1e10, NULL, 0, 0)` then `VLSTsort(vl, vl)`; the border lists), `mrimorph.cpp`
+(`VLSTcreate` of masks, `VLSTcomputeStats`): `border_only` 0 and `skip` 0 everywhere.
+- **FS-888** (c, rule A): the counting loop `continue`s when `border_only && MRIneighborsInRange(...) < 6` (a border
+  voxel) and counts the rest that lie in the range (the interior), while the filling loop stores the voxels in the range
+  with fewer than six neighbours in it (the border). `vl->nvox` is the interior's count; the arrays (`calloc` of that
+  count, at least 1) are too short when the border is larger (a heap overflow), and their last entries stay zeros when it
+  is smaller. Default: the border voxels counted; `reproduce` FreeSurfer's count (an error where it writes past).
+- **FS-889** (a, hang or memory; rule B): `skip++` then `f += skip`: `skip` -1 never advances, below -1 runs to negative
+  frames.
+- **FS-890** (a, memory; rule B): `VLSTsort` sizes its table by `vl_src->nvox` and fills it with `vl_dst->nvox` entries
+  (a given destination of more voxels writes past it); every function indexes the arrays by `nvox`, `start` and `num`
+  without comparing with what was allocated (`max_vox` is the only bound `VLSTadd` and `VLSTcopy` test).
+- **FS-891** (c, rule A): `SORT_VOXEL` has no frame field: `xi, yi, zi, vsrc, vdst, xd, yd, zd` are permuted, `fi` stays.
+  `gcamorph.cpp`'s `VLSTsort(vl, vl)` sorts a one-frame list (no difference there). The comparator returns 0 only for
+  equal `vsrc` and indices; a NaN `vsrc` falls through to the indices (glibc's `qsort` is the merge sort on any machine
+  the programs run on, `larmorx_core::glibc_qsort`); `SORT_VOXEL` is 32 bytes, so glibc sorts the elements themselves
+  (indirect sorting starts above 32), which gives the same order anyway.
+- **FS-892** (c, rule C): `VLSTcreate` sets `nvox` but never `max_vox`; a new list keeps `calloc`'s 0. No program adds to
+  a `VLSTcreate` list (`mri_ca_label` adds to a `VLSTalloc` list): kept.
+- **FS-893** (c, rule C): `VLSTcopy`/`VLSTcopyInto` `calloc` the destination's slope arrays (leaking any it had) and copy
+  none of the source's slopes or parameterisation; the allocation check needs all four of the destination's when the
+  source has `mx` (a source with `mx` and no `t` ends the program). No program copies a spline list: kept.
+- `VLSTcreate` with a given list whose `max_vox` is below the count frees `xi`, `yi`, `zi`, `fi` and sets them `NULL`, then
+  allocates all nine arrays again (the old `xd`, `yd`, `zd`, `vsrc`, `vdst` leak); with `max_vox` at least the count the
+  arrays are reused and entries past the count keep their values. `vl->mri` is set to the volume.
+- `VLSTcomputeStats` reads frame 0 at each voxel (not its `fi`) and computes `sqrt(E[v²] - E[v]²)` in one pass: a list
+  of equal values can give a tiny negative difference and a NaN (FreeSurfer's arithmetic; reproduced in both modes).
+- `VLSTadd` writes the indices and coordinates only (`vsrc`, `vdst`, `fi` untouched); `VLSTaddWithValue` then sets the
+  values. `VLSTfree(&vl)` of `NULL` returns `ERROR_BADPARM` silently.
+- The probe's `vlcopy` with a negative `num` and a source with slopes: `calloc(-1, 4)` fails with `ENOMEM`, which
+  `ErrorExit` prints first (`Cannot allocate memory`).

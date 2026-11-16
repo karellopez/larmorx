@@ -224,3 +224,19 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   (6794-6844, 6846-6867, 6868-6888), `DEMorphBinVol::check` (6890-6922), `DEMorphBinVol::dump` (6923-6935),
   `DEMorphBinVol::copyFrame` (6937-6964); `include/mri2.h` the classes' fields and defaults (225-237, 249-271,
   281-300). Changes: FS-803, FS-805, FS-808 (rule A), FS-804 (frame 0), FS-806, FS-807 (rule B: errors).
+- `src/ltawrite.rs` (3.1-39; relay 34): `utils/transform.cpp` `LTAwrite` (687-690), `LTAread` (700-704: its `return
+  LTAreadEx`), `ltaFSLwrite` (1626-1659), `ltaMNIwrite` (1663-1720), `LTAwriteEx` (3279-3321), `LTAdumpVolGeom`
+  (4221-4235). Changes: FS-504 (errors).
+- `src/ltaapply.rs` (3.1-39, 3.1-40; relay 34): `utils/transform.cpp` `MAX_TRANSFORMS` (54), `LTAtransform` (907-910),
+  `LTAtransformInterp` (912-1155), `LTAtransformAtPoint` (1388-1430), `LTAvoxelTransformToCoronalRasTransform`
+  (1946-1976), `FixMNITal` (1983-2016), `DevolveXFM` (2027-2030), `DevolveXFMWithSubjectsDir` (2032-2124),
+  `LTAmodifySrcDstGeom` (3582-3641); `include/mri.h` `VOL_GEOM`'s member initialisers (185-202). Changes: FS-504,
+  FS-886, FS-887 (errors).
+- `src/rotmat.rs` (3.1-40; relay 34): `utils/transform.cpp` `MRIangles2RotMat` (4591-4652), `LTAmat2RotMat`
+  (4956-4977), `RMSregDiffMJ` (4989-5024), `TranformAffineParams2Matrix` (5228-5289), `TranformExtractAffineParams`
+  (5298-5361; the official object code's `atan2f` for its two `float`-argument angles). Changes: FS-504 (error).
+- `src/voxlist.rs` (3.1-40; relay 34): `utils/voxlist.cpp` `VLSTcreate` (98-169), `compare_sort` (176-215), `VLSTsort`
+  (217-252), `VLSTfree` (254-276), `VLSTcomputeStats` (419-446), `VLSTalloc` (588-608), `VLSTcopy` (610-647),
+  `VLSTcopyInto` (649-686), `VLSTaddUnique` (688-693), `VLSTaddWithValue` (695-707), `VLSTadd` (709-721), `VLSTinList`
+  (723-730); `include/voxlist.h` `VOXEL_LIST` (32-56). Changes: FS-888, FS-891 (rule A), FS-889, FS-890 (errors);
+  FS-892, FS-893 kept (rule C).

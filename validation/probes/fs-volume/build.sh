@@ -32,10 +32,12 @@ for p in jpeg/libjpeg tiff/libtiff xml2/libxml2 minc/libminc netcdf/libnetcdf nr
   libs+=("$b/packages/$p.a")
 done
 for l in vnl_algo vnl v3p_netlib netlib vcl; do libs+=("$itk/lib/libitk$l-4.13.a"); done
-"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 "$out/fsvolume.o" -o "$out/fsvolume" \
+# --wrap=atan2: the commands affm2p and ltarot take CORE-MATH's correctly rounded atan2 (the
+# project's choice for reproduce; fsvolume.cpp's __wrap_atan2, loaded from oracles/core-math-preload)
+"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,--wrap=atan2 -O3 "$out/fsvolume.o" -o "$out/fsvolume" \
   "${libs[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
   "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
-  /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt
-sha256sum "$out/fsvolume" "$here/fsvolume.cpp" > "$out/BUILD_INFO.txt"
+  /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
+sha256sum "$out/fsvolume" "$here/fsvolume.cpp" "$ws/oracles/core-math-preload/libcrmath.so" > "$out/BUILD_INFO.txt"
 "$gcc" --version | head -1 >> "$out/BUILD_INFO.txt"
 echo "built $out/fsvolume"

@@ -246,3 +246,28 @@ both modes. Seed 1, 5,140 cases: 4,765 identical, 375 not comparable, 26 hashed 
 `d18ca1b6afbd2c9bedc741eaeda8e14266b41035990f1df7c0de987e3eb4c402`, passing with AArch64's NaN emulated in debug and
 release (`oracles/logs/fs-found-c-r29-trap-volume.log`) and on Windows x64 (the cross-check tool). `check.py`'s `SKIP`
 is unchanged.
+
+Measured 2026-11-16 (part 18: relay 34, 275 commands; logs `oracles/logs/fs-found-c-r34-*`): transform.cpp's writers
+`ltawr` (`LTAwriteEx`: arrays of 0 to 2 transforms of every type between the pool's geometries, names ending `.lta`,
+`.LTA`, `.xfm`, `.XFM`, `.dat`, `.reg`, `.fslmat`, `.mat`, none, a `.` in a folder, folders that do not exist; `USER`,
+`LOGNAME`, both unset or `USER` empty, `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` always set; `FSLOUTPUTTYPE`;
+`Gdiag_no`; the return, `errno` and the file's bytes), `ltadvg` (`LTAdumpVolGeom`); the moves `ltaxf`
+(`LTAtransformInterp`: volumes of up to 4 x 4 x 4 voxels and 2 frames, given destinations, 0 to 3 transforms of every
+type, interpolation 0 to 3, `USE_AVERAGE305` unset, `true` or empty, `DIAG_VERBOSE`, `DIAG_HEARTBEAT`), `ltapt`
+(`LTAtransformAtPoint`, given and new matrices), `ltacor` (`LTAvoxelTransformToCoronalRasTransform`), `fixmni`
+(`FixMNITal`), `ltamod` (`LTAmodifySrcDstGeom`, `vg_isEqual_Threshold`), `devxfm` (`DevolveXFMWithSubjectsDir` in a
+subjects folder the case builds beside the cases: `orig.mgz` (gzipped MGH), `orig.mgh`, a slice folder, a file that is
+not gzipped; `talairach.xfm` or `reg.lta` texts, good and damaged; `SUBJECTS_DIR`, a given folder, none; a given `XFM`;
+what a case that ended the child left is removed first); `angrm`, `affp2m`, `affm2p`, `ltarot`, `rmsmj` (rotations,
+affine parameters, Jenkinson's RMS); voxlist.cpp's `vlcre`, `vlsort`, `vlstat`, `vlcopy`, `vladd`. `fsvolume` is linked
+with `--wrap=atan2`: `affm2p` and `ltarot` take CORE-MATH's correctly rounded `atan2` (`oracles/core-math-preload`,
+loaded at start), the project's decision for `reproduce` (`docs/findings/freesurfer-libm.md` §2); with glibc's, 2 of
+1,000 `affm2p` cases (seed 13) differed in `p[4]`'s last bit. `ltawr` orients standard error first (`fwide`): glibc's
+`perror` on a write-only standard error not yet oriented leaves `EINVAL` (track A's finding). Seed 7, 18,000 cases of
+the new commands: 17,193 identical with `reproduce`, 807 not comparable (177 identical all the same), 0 different;
+seed 13, 18,000 cases: 17,183 identical, 817 not comparable (208 identical), 0 different; `fix` different only with
+notices (FS-888, FS-891, FS-506, FS-507, FS-12, FS-52, FS-164, GLIBC-07, FS-01); the port's debug and release builds
+agree on seed 13's 9,000 cases in both modes. Seed 1, 5,500 cases: 5,115 identical, 385 not comparable, 23 hashed as
+`HEAVY`, hash `e5554290c86893a1d7372b8cc0bce17444979537407874d10d3631134e5a7a8d`, passing with AArch64's NaN emulated in
+debug and release (`oracles/logs/fs-found-c-r34-trap-volume.log`) and on Windows x64 (the cross-check tool).
+`check.py`'s `SKIP` adds FS-886, FS-887, FS-889, FS-890 and fs.io's FS-167 (an MGH header cut short: memory contents).

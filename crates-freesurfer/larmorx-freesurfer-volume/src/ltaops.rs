@@ -51,7 +51,12 @@ use crate::vgeom::{get_vol_geom, vg_i_to_r, vg_is_equal, vg_r_to_i, vol_geom_tex
 
 /// FS-504: FreeSurfer reads outside an array or through a missing matrix here; an error in both
 /// modes (`<what>` names the function).
-fn outside(g: &mut Globals, err: &mut dyn Write, what: &str, why: &str) -> Result<(), Fatal> {
+pub(crate) fn outside(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    what: &str,
+    why: &str,
+) -> Result<(), Fatal> {
     g.notices.add(
         &FS_504,
         format!("{what}: {why} (FreeSurfer reads memory it does not own)"),

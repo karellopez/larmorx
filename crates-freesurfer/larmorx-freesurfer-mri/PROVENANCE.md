@@ -101,3 +101,8 @@ Taken early from `fs.volume`'s item 3.1-39 for the surfaces' `MRIS::lta` (the or
   past its list; `Mri::new_beyond` takes what the list's storage holds there (`None`: memory never
   written), `Mri::new` none. By default each missing extent is 1; with `reproduce` those values, 0
   for memory never written (`docs/findings/freesurfer-io.md` Part 3).
+- Relay 41 (track A): `voxel.rs`' `row_place` and `copy.rs`' `row_offset` bound FreeSurfer's slice and row pointer
+  arrays by the allocation's shape (`MRI::initSlices`: `depth * nframes` slices of `height` rows, made once), the
+  slice index by the header's depth (`MRIFseq_vox`): the same as before for every volume whose header keeps its
+  allocation's extent; a header a caller changed (`useVolGeomToMRI` in `SAElayerWeightsToMRI`, FS-921) is read as
+  FreeSurfer reads it (`docs/findings/freesurfer-io.md` Part 36).

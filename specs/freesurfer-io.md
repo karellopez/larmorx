@@ -5018,3 +5018,95 @@ and 2 and `TransformCreateDensityMap` of a float volume of 1 to 4 voxels a side 
 result's size, geometry, type, frames and voxels). Not compared: a GCA morph's resamplings (not ported). Measured
 (2026-11-16, observed): seed 7 (1,200 piece-32 cases; 68 `W`, 56 `C`, 128 `A`, 63 `D` queries): `reproduce`
 identical on every compared case (915), 0 different; `fix` differs only with notices (FS-875 among them).
+
+## 152. Stacked autoencoders read as volumes (`mri_read` of type 30: `.ae`, `.sae`, `.csae` names, `@sae`)
+
+1. **The file** (as FreeSurfer's training programs write it): a text line `whalf nencoders scale type nlevels`
+   (`%d %d %lf %d %d` and a newline), a volume-geometry block (the geometry block's text form, as in `.lta` files: `valid`,
+   `filename`, `volume`, `voxelsize`, `xras`, `yras`, `zras`, `cras`), then `nencoders` layers. A layer is seven
+   matrices in the binary matrix form (a big-endian `int` type (1 real, 2 complex), rows and columns, then each
+   element as a big-endian `double`, rounded to `float`; a complex element two): the input-to-hidden weights (hidden
+   units x inputs), the output bias (outputs x 1), the hidden bias, the hidden-to-output weights (outputs x hidden),
+   the input, hidden and output vectors; then the layer's kernel size (a big-endian `int`). `type` holds flags: 2
+   (focused: one output) and 8 (2-D: a window of one slice).
+2. **Reading.** A file that does not open: `SAEread(<name>): could not open file` (`ERROR_NOFILE`, after the
+   system's error text), then `MRIread(<name>): could not read autoencoder` (`ERROR_BADPARM`) and no volume. A first
+   line that does not give its five numbers: `File(<name>) Warning: expected number of values to read does not match
+   those read` on standard error (FS-877: FreeSurfer goes on with memory contents for the numbers missing; by default
+   the error `SAEread(<name>): the header line does not hold its 5 numbers` and no volume; `reproduce` takes them as
+   0, noted). Then a check layer is made from the header: the window has `w = 2 whalf + 1` voxels a side, `n = w * w
+   * nlevels` inputs (times `w` unless 2-D), `h = nint(scale n)` hidden units (`nint`: `specs/freesurfer-core.md`), one output when
+   focused, else `n`; `allocating SAE with inputs/hidden <n>/<h>` on standard output. Its matrices are allocated in
+   the order output vector, input vector, input-to-hidden (h x n), hidden-to-output, output vector, hidden bias, then
+   `h` integers (a negative `h`: `AEaalloc(<n>, <h>): could not alloc hidden class labels` after `Cannot allocate
+   memory`, and no check layer), hidden net, hidden vector, output bias; each allocation of a negative or too large
+   size ends as the matrix allocator's rule says (FS-13, FS-926). Its weights are drawn with FreeSurfer's random
+   number generator (`randomNumber`, `specs/freesurfer-core.md`; the first draw seeds it from `FREESURFER_SEED`, printing `Setting seed for
+   random number genererator to <value>`, or else prints `<program> supposed to be reproducible but seed not set` on
+   standard error and seeds from the clock, FS-04): for each input `i` (outer) and hidden unit `j`, two draws, within
+   [-1, 1] then [-0.1, 0.1], the second kept; then the same for the hidden-to-output weights (hidden unit outer,
+   output inner); then one draw within [-1, 1] per hidden bias, the vector divided by its Euclidean norm (in
+   `double`); then the same for the output bias. Sizes past 32 bits (`w`, `n`): FS-879 (by default the error
+   `SAEalloc: the window|the inputs: <exact> does not fit an int` and no volume; `reproduce` FreeSurfer's wrapped
+   32-bit values).
+3. **The one-voxel check** (`whalf` 0): the first input set to 0, the network run, the layer dumped; then the input
+   set to 1, run and dumped. Running: hidden net = weights x input (each element accumulated in `float`) + hidden
+   bias (in `float`); hidden = `1 / (1 + exp(-net))` in `double`, stored as `float`; output = hidden-to-output x hidden
+   + output bias. The dump of a layer of one input: `f(I=<i> * wij=<w> + bj=<b> = <net>) = <hidden> * wjk=<w2> +
+   bk=<b2> = <out>, E=<out - i>` (each the first element as `%2.2f`; `E` computed in `float`); of more inputs the lines
+   `v_input`, `v_output`, `v_error` (then the error `MatrixPrint: mat = NULL!`), `v_hidden_bias`, `v_hidden_net`,
+   `v_hidden`, `m_input_to_hidden`, `v_output_bias`, `m_hidden_to_output`, each name followed by the matrix as the
+   matrix printer writes it (`% 2.5f`, two spaces between, `;` and a new line after each row). FS-922: no inputs
+   (`nlevels` 0 or below): FreeSurfer writes the first input outside its memory; FS-923: one input and no hidden
+   unit: FreeSurfer's dump reads a weight that does not exist (a crash); both refused in both modes (`SAEalloc: a
+   window of one voxel ... cannot be checked`, no volume). A check layer that could not be made: FS-878.
+4. **The geometry and the layers.** The geometry block is read into a geometry of zeros (every field 0, not the usual
+   defaults). Then the first layer: none when the stream is at its end (its end-of-file flag set by an earlier read);
+   else the input-to-hidden weights and the output bias are read as new matrices (a matrix that cannot be read or
+   allocated: FS-878, refused in both modes; the binary matrix reader's own rules for a file that ends early: FS-49,
+   FS-924), a layer of their sizes is made as in 2 (the weights' columns as inputs, rows as hidden units, the bias's
+   rows as outputs; its own random draws), the two copied into it (a destination smaller than the source: nothing
+   copied), then the hidden bias, hidden-to-output weights, input, hidden and output vectors read into the layer's own
+   (a file matrix of another type or size: `MatrixReadFrom: specified matrix does not match file`, the stream past its
+   three numbers only), and the kernel size. Then the layers 2 to `nencoders`, each followed by `layer <k> read with
+   <hidden units> hidden units`; a stream at its end there: FS-878 (refused). A file that ends before its first layer
+   with `nencoders` above 1: FS-878.
+5. **The volume.** The frame named after the file name's `#` (none: -1) is the layer. A layer at or past `nencoders`
+   ends the program (`CSAlayerWeightsToMRI: invalid layer <l> (<n> encoders)`, `ERROR_BADPARM`), checked before
+   anything else; an autoencoder without a first layer then: FS-878 (refused). Layer 0 or below: a float volume of `w`
+   x `w` x (`w`, or 1 when 2-D) voxels (no geometry set), one frame per hidden unit and level (hidden unit slowest);
+   voxel `(x, y, z)` of frame `h nlevels + l` is the first layer's weight of hidden unit `h` from input `((l w + x) w +
+   y) d + z + 1` (`d` the depth). Layer `L` from 1: the volume of layer `L - 1` (`P`, of header width `wp`, `hp =
+   (wp - 1) / 2`), a float volume of one slice, `k + 2 hp` voxels a side (`k` the layer's kernel size), one frame per
+   hidden unit, given the autoencoder's geometry (FS-921, below) and a count volume of integers of the same extent
+   (the geometry's header copied); for each hidden unit `h`: for each previous hidden unit `p`, kernel row `x` and
+   column `y` (the visible unit `v`, counted in that order from 0), each voxel `(xp, yp)` of `P` (over its header
+   width and height): the place `(x + xp, y + yp)` (the index tables' value: past the last voxel, the last), its count
+   increased, its value set to `P(xp, yp, p) * weight(h, v) + value` (`float`; the product's NaN first); then each
+   voxel with a count above 0 divided by its count (in `float`), and the counts cleared. The volume of `L - 1` is then
+   freed. FS-880 and FS-925: a weight past the matrix's columns: FreeSurfer reads on into the next hidden units'
+   weights (FS-880), then past the matrix (memory contents, FS-925); by default the error `<function>: the layer's
+   weights have <c> inputs, the volume needs <n>` and no volume; `reproduce` FreeSurfer's (0 past the matrix, noted).
+6. **FS-921: a later layer's extent.** FreeSurfer gives the layer's volume the autoencoder's stored geometry, its
+   extent included (the training volume's: usually 256 x 256 x 256): the header then names more voxels than the
+   volume holds. By default the stored geometry without its extent (the kernel's kept); `reproduce` FreeSurfer's
+   header where the stored extent is not larger than the kernel's (the volume's later readings stay in its memory,
+   as FreeSurfer's do); where it is larger, FS-927: FreeSurfer reads past the voxels' memory, refused
+   (`SAElayerWeightsToMRI: the autoencoder's extent ... is larger than the layer's kernel ...`, no volume).
+7. **`mri_read` after the volume**: frames 0 to the last are taken (the name's frame was the layer), the non-finite
+   check runs (`nan_inf_check`, as for every format: the first NaN or infinite voxel ends the reading with its message), the header-only
+   read (`MRIreadHeader`) copies the volume as for any format.
+
+## 153. Validation plan (part 37)
+
+Piece 33 of the fs-io probe: `aed` and `aeh` (piece 6's `mrd` and `mrh`) of generated autoencoder files: headers with
+every number and some missing, windows of 1 to 7 voxels a side (one voxel: the check run and dumped; negative, past
+32 bits), 0 to 3 levels, scales ordinary, 0, NaN, infinite, huge; the focused and 2-D types; 1 to 3 layers (0, -1, 5,
+or more than the file holds); geometry blocks valid or not, cut short, small 2-D extents, the training volume's
+extent; per layer the seven matrices (real, complex, of an unknown type; the window's inputs, fewer, more; vectors of
+other sizes; weights with NaN, infinite and subnormal values in a sixth of the files); frames none, `#0` to `#3`,
+`#5`; faults (cut, missing, a folder, empty, not an autoencoder); `FREESURFER_SEED` set (environment bit 2048) or the
+clock. Black box: FreeSurfer 8.2.0's `mri_convert <file>.sae[#<layer>] out.mgz`. Measured (2026-11-16, observed): seeds
+7, 13 and 21 (about 790 piece-33 cases each): `reproduce` identical on every compared case (423, 435, 442), 0
+different; `fix` differs only with notices. Not compared: FreeSurfer's crashes (FS-878, FS-922, FS-923, FS-927, FS-13,
+FS-926, FS-924), memory contents (FS-877, FS-925, FS-49), the clock's weights printed by the check.

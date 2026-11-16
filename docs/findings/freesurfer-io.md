@@ -2653,3 +2653,64 @@ The port: fs.io `imageio_tiff.rs` over track C's `larmorx_io::tiff` (used as it 
   (`GCAMmorphToAtlas`, `GCAMmorphFromAtlas`, `LTAinverseTransformInterp`, `LTAcompose`, `GCAMconcat2/3`,
   `GCAMfillInverse`, `LTArasToVoxelXform`, `LTAvoxelToRasXform`, `GCAMvoxToRas`). Measured: piece 32 seed 7 with the
   `W`, `C`, `A`, `D` queries: `reproduce` identical on every compared case (915), 0 different.
+
+## Part 36: stacked autoencoders read as volumes (relay 41 of track A)
+
+Sources: `utils/autoencoder.cpp` 72-103 (`SAEalloc`), 105-202 (`AEalloc`), 204-250 (`AEfree`, `SAEfree`), 303-351
+(`SAEactivateNetwork`, `AEactivateLayer`), 1538-1561 (`SAEinputWeightsToMRI`), 1598-1650 (`AEread`, `SAEread`),
+1652-1700 (`AEdump`), 2008-2075 (`SAElayerWeightsToMRI`); `utils/mriio.cpp` 695-704; `utils/matrix.cpp` 395-500
+(`MatrixAlloc_new`), 2255-2287 (`MatrixReadFrom`); `utils/transform.cpp` 381-411 (`useVolGeomToMRI`). The port: fs.gca
+`autoencoder.rs`, the hook `read_autoencoder` in fs.io's `upper.rs`.
+
+- **The header's numbers (FS-877).** `int whalf, nencoders, type, nlevels; double scale` are locals passed to
+  `fscanf`; a line that ends early leaves the rest uninitialised (one case printed `inputs/hidden 884682/0` where the
+  port's zeros give `0/0`; another `4095625/0`). The probe compares these apart.
+- **Two allocations of the first layer.** `SAEalloc` makes a layer from the header (its weights drawn at random and,
+  for a window of one voxel, run and dumped), then `SAEread` replaces `sae->first` with the layer `AEread` makes from
+  the file's matrices (another `AEalloc`, more draws): the header's layer is leaked. Its only visible traces: the
+  `allocating SAE ...` line, the random draws (the generator's state after the reading) and the dumps.
+- **The geometry is calloc's.** `sae = calloc(1, sizeof(SAE))`: the `VOL_GEOM` member's constructor never runs, so the
+  fields `readVolGeom` does not set are 0 (direction cosines included), not the constructor's coronal defaults
+  (measured: a block of six lines gave a zero third direction).
+- **Null layers (FS-878).** `AEread` returns `NULL` when `feof(fp)` (glibc sets it only after a read that found no
+  byte: a file that ends exactly after the last kernel size is not at its end, and the next layer's
+  `MatrixReadFrom` reads memory contents: FS-49); `SAEread`'s loop then writes `ae->next->prev` through `NULL`; a
+  missing first layer is dereferenced by `SAEinputWeightsToMRI` (`sae->first->v_hidden`); `MatrixReadFrom`'s `NULL`
+  (an unknown type, a size it cannot allocate) is dereferenced by `AEalloc(prev, m->cols, ...)`; `AEalloc`'s `NULL`
+  (the `calloc` of a negative hidden-unit count) by `MatrixCopy(..., ae->v_output_bias)` or the check's
+  `v_input->rptr[1][1]`. All crashes; refused in both modes.
+- **The one-voxel check (FS-922, FS-923).** `if (whalf == 0)` writes `sae->first->v_input->rptr[1][1]`: with
+  `nlevels` 0 or below the input vector has no row 1 (its row pointer is read past the pointer array); `AEdump` reads
+  `rptr[1][1]` of every matrix: with no hidden units `m_input_to_hidden` (0 rows) has no row 1 pointer (measured: a
+  crash, `SIGSEGV`).
+- **Weights past the columns (FS-880, FS-925).** Neither weights-to-volume function compares the window or kernel with
+  the matrix's columns: `MATRIX_RELT(m, h + 1, i)` is `rptr[h + 1] + i`, and `MatrixAlloc_new` lays the rows out one
+  after another (`rptr[r] = data + (r - 1) cols - 1`), so a column past the row reads the next row's weights; past the
+  last row the 64-byte rounded block (not cleared past its numbers) or the heap.
+- **The later layer's extent (FS-921, FS-927).** `useVolGeomToMRI(&sae->vg, mri)` sets the volume's `width`, `height`,
+  `depth` from the stored geometry (the training volume's; 0 when the file has none) without reallocating: the chunk
+  keeps the kernel's strides, the slice and row pointer arrays the kernel's sizes. `mri_read`'s `nan_inf_check` then
+  walks the header's extent through `MRIFseq_vox` (`slices[k + t depth][j]`), past the slice array for a depth above
+  1; the next layer takes `whalf_prev = (width - 1) / 2` from the header. The port models FreeSurfer's pointers by the
+  allocation's shape (fs.mri `voxel.rs`' `row_place`, `copy.rs`' `row_offset`: the same as the header's for every
+  other volume), so a smaller stored extent is reproduced exactly; a larger one is refused under `reproduce`.
+- **The sum's operand order.** `MRIsetVoxVal(mri, xk, yk, 0, h, val + val_prev)` compiles (`autoencoder.cpp.o` of the
+  unit oracle's build) to `mulss` of the weight into `val_prev`, then `addss` of `val` (spilled at `0x18(%rsp)`) into
+  that: the product's NaN wins when both are NaN; the division is `divss` of the count into `val`.
+- **`MatrixReadFrom` far past the end (FS-924).** After a matrix whose size does not match the destination
+  (`specified matrix does not match file`), the stream is three numbers in: the next "matrix header" is made of
+  doubles' bytes (rows near 1,072,693,248 for 1.0's high word). FreeSurfer allocates that (`MatrixAlloc_new`: 8 bytes
+  of row pointers per row and the numbers) and calls `freadDouble` for every element past the file's end, each
+  printing `freadDouble: fread failed`. Under the port's `reproduce` this ran out of a 12 GiB memory box on seed 7's
+  piece-33 case 500 (2026-11-16, its messages kept in memory: about 30 bytes each for about a billion numbers); it was
+  not run again outside the box. The port now stops at the first number past the end when 2^20 or more follow
+  (`MatrixReadFrom: the file ends <n> numbers before the matrix does (FreeSurfer prints an error for each)`), FS-924.
+- **Row-pointer blocks (FS-926).** The same headers ask for matrices of many rows and no columns (1,071,906,816 x 0 in
+  one case): `MatrixAlloc_new`'s single block is `64 + (rows + 1) * 8 + (rows * cols + 2) * 4` bytes rounded to 64:
+  8.6 GB of pointers before any number. Under `fsio`'s 1 GiB address space `posix_memalign` fails, the mmap fallback
+  prints `MatrixAlloc(r, c): Using mmap'd tmpfile` and dereferences an unset file pointer (`SIGSEGV`); on a machine
+  with the memory it clears and fills the pointers. The port keeps no pointers: it notes blocks above 256 MiB (the
+  probe skips them) and refuses blocks above `MACHINE_BYTES` (16 GiB) as FS-13 does.
+- **Where autoencoders come from.** Only `utils/autoencoder.cpp` reads and writes them; the training and applying
+  programs (`mri_train_autoencoder`, `mri_apply_autoencoder`) are in FreeSurfer's `attic/`, not built in 8.2.0, so
+  `mri_read` (through `mri_convert` and the other readers) is the only way an 8.2.0 program meets one.

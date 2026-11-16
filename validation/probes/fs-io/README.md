@@ -370,6 +370,20 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   identical on every compared case (877, 867), 0 different. `tiff_hand_cases.py`: 16 hand-made files for the
   measurements of Part 35 (`python3 -P tiff_hand_cases.py > hand.txt`, then `fsio hand.txt` and `fs_io_probe run
   hand.txt reproduce`, each inside `boxed.sh`).
+- Piece 33 (track A relay 41): stacked autoencoders read as volumes. `aed` and `aeh` (piece 6's `mrd` and `mrh`: type
+  -1 or 30, `.sae`, `.ae`, `.csae`, `.SAE`, `.dat@sae` names) of autoencoder files built by `tests/fs_io/piece33.rs` as
+  FreeSurfer's training programs write them: the header line (windows of one to seven voxels a side, one voxel now and
+  then: the reader's check run and dumped; negative or past 32 bits, FS-879; 0 to 3 levels; scales ordinary, 0, NaN,
+  infinite, huge; the focused and 2-D types; 0 to 5 layers; numbers missing, FS-877), the geometry block (valid or
+  not, cut short, small 2-D extents, the training volume's), per layer its seven matrices (real, complex, an unknown
+  type; the window's inputs, fewer: FS-880, FS-925, more; vectors of other sizes; special weights in a sixth of the
+  files) and its kernel size; frames none, `#0` to `#3`, `#5` (a later layer: FS-921, FS-927; past the count: the
+  program's end); faults (cut, missing, a folder, empty, not an autoencoder). The environment bit 2048 sets
+  `FREESURFER_SEED` to 4711 on both sides (`fsio` REBUILT). The port's side sets the process name `fsio` (printed by
+  `randomNumber` without a seed). `SKIP` for FS-878, FS-922, FS-923, FS-924, FS-926, FS-927, FS-53 and FS-13; `VARY`
+  for FS-877, FS-925, FS-49 and the clock's random weights printed by the check (FS-04 under `reproduce`). Seeds 7, 13
+  and 21 (about 790 piece-33 cases each, `subset.py ... aed,aeh`): `reproduce` identical on every compared case (423,
+  435, 442), 0 different; `fix` differs only with notices.
 - `reorder_triples.py` (relay 37): dimension numbers that pass `MRIreorder`'s check only through 32-bit overflow
   (FS-843; `python3 -P reorder_triples.py [count]`); official `mri_convert -r <a> <b> <c>` with them ends with a
   segmentation fault (status 139).

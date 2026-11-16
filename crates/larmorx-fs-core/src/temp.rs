@@ -71,12 +71,15 @@ fn new_dir(dir: &[u8]) -> Option<Vec<u8>> {
     let mut seed = 0;
     for _ in 0..100 {
         let p = candidate(dir, b"", &mut seed);
-        let mut b = fs::DirBuilder::new();
         #[cfg(unix)]
-        {
+        let b = {
             use std::os::unix::fs::DirBuilderExt;
+            let mut b = fs::DirBuilder::new();
             b.mode(0o700);
-        }
+            b
+        };
+        #[cfg(not(unix))]
+        let b = fs::DirBuilder::new();
         match b.create(path_of(&p)) {
             Ok(()) => return Some(p),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,

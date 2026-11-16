@@ -25,8 +25,8 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{FS_851, FS_852, FS_853, FS_854, FS_855};
-use larmorx_freesurfer_core::alloc::MACHINE_BYTES;
 use larmorx_core::math::Libm;
+use larmorx_freesurfer_core::alloc::MACHINE_BYTES;
 use larmorx_freesurfer_core::cstd::{fmt_f, note_glibc07};
 use larmorx_freesurfer_core::diag::{BUILD_ROOT, DIAG_SHOW, DIAG_WRITE, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;

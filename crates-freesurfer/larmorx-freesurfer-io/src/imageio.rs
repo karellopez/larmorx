@@ -44,8 +44,6 @@ use std::path::Path;
 use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{FS_405, FS_718, FS_719, FS_727, FS_730, FS_731, FS_732};
 use larmorx_freesurfer_core::alloc::MACHINE_BYTES;
-use larmorx_freesurfer_core::utils;
-use larmorx_io::jpeg;
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::diag::{DIAG_WRITE, diag_printf};
 use larmorx_freesurfer_core::globals::Globals;
@@ -54,12 +52,14 @@ use larmorx_freesurfer_core::log::{
     ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
 use larmorx_freesurfer_core::matrix::{MATRIX_COMPLEX, Matrix};
+use larmorx_freesurfer_core::utils;
 use larmorx_freesurfer_core::utils::str_upper;
 use larmorx_freesurfer_mri::mri::Mri;
+use larmorx_io::jpeg;
 
 use crate::cfile::CFile;
-use crate::minc::Std;
 use crate::image::{Image, PFBYTE, PFCOMPLEX, PFFLOAT, PFRGB, image_alloc, image_free};
+use crate::minc::Std;
 use crate::rgb::RgbImage;
 use crate::upper;
 

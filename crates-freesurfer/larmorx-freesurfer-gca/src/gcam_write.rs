@@ -43,8 +43,8 @@ use larmorx_freesurfer_volume::vgeom::get_vol_geom;
 use larmorx_io::znz::ZnzFile;
 
 use crate::gcam::{
-    GCAM_RAS, GCAM_VALID, GCAM_VERSION, GCAM_VOX, GCAM_AREA_INVALID, Gcam,
-    ORIGINAL_POSITIONS, SAVED_ORIGINAL_POSITIONS, gcam_alloc, gcam_compute_metric_properties,
+    GCAM_AREA_INVALID, GCAM_RAS, GCAM_VALID, GCAM_VERSION, GCAM_VOX, Gcam, ORIGINAL_POSITIONS,
+    SAVED_ORIGINAL_POSITIONS, gcam_alloc, gcam_compute_metric_properties,
     gcam_compute_original_properties, gcam_copy_node_positions, gcam_ras_to_vox,
 };
 use crate::transform::{transform_alloc, transform_free, transform_invert, transform_sample};
@@ -211,7 +211,8 @@ pub fn gcam_read_warp_from_mri(
                 for zp in 0..d.max(0) {
                     let mut v = [0f64; 3];
                     for (f, slot) in v.iter_mut().enumerate() {
-                        *slot = f64::from(mri_get_vox_val(g, err, mri_warp, xp, yp, zp, f as i32, 0)?);
+                        *slot =
+                            f64::from(mri_get_vox_val(g, err, mri_warp, xp, yp, zp, f as i32, 0)?);
                     }
                     set(gcam.node_mut(xp, yp, zp), v);
                 }
@@ -344,9 +345,20 @@ fn set_warp(
         }
         image_crs.set_relt(4, 1, 1.0);
         let mut image_ras = Matrix::real(4, 1);
-        matrix_multiply_d(g, out, err, Some(src_vox2ras), Some(&image_crs), Some(&mut image_ras))?;
+        matrix_multiply_d(
+            g,
+            out,
+            err,
+            Some(src_vox2ras),
+            Some(&image_crs),
+            Some(&mut image_ras),
+        )?;
         if fmt == WARPFIELD_DTFMT_ABS_RAS {
-            Some([image_ras.relt(1, 1), image_ras.relt(2, 1), image_ras.relt(3, 1)])
+            Some([
+                image_ras.relt(1, 1),
+                image_ras.relt(2, 1),
+                image_ras.relt(3, 1),
+            ])
         } else {
             let mut atlas_crs = Matrix::real(4, 1);
             atlas_crs.set_relt(1, 1, c as f32);
@@ -354,7 +366,14 @@ fn set_warp(
             atlas_crs.set_relt(3, 1, s as f32);
             atlas_crs.set_relt(4, 1, 1.0);
             let mut atlas_ras = Matrix::real(4, 1);
-            matrix_multiply_d(g, out, err, Some(dst_vox2ras), Some(&atlas_crs), Some(&mut atlas_ras))?;
+            matrix_multiply_d(
+                g,
+                out,
+                err,
+                Some(dst_vox2ras),
+                Some(&atlas_crs),
+                Some(&mut atlas_ras),
+            )?;
             Some([
                 sse::sub(image_ras.relt(1, 1), atlas_ras.relt(1, 1)),
                 sse::sub(image_ras.relt(2, 1), atlas_ras.relt(2, 1)),
@@ -414,7 +433,16 @@ fn warpfield_convert(
         "[INFO] Warpfield::convert(): gcam atlas [{} x {} x {}]",
         gcam.atlas.width, gcam.atlas.height, gcam.atlas.depth
     );
-    let mut warp = mri_alloc_sequence(g, out, err, gcam.width, gcam.height, gcam.depth, MRI_FLOAT, 3)?;
+    let mut warp = mri_alloc_sequence(
+        g,
+        out,
+        err,
+        gcam.width,
+        gcam.height,
+        gcam.depth,
+        MRI_FLOAT,
+        3,
+    )?;
     mri_copy_vol_geom_to_mri(&mut warp, &gcam.atlas);
     let version = ((MGZ_INTENT_WARPMAP & 0xffff) << 8) | MGH_VERSION;
     warp.intent = MGZ_INTENT_WARPMAP;
@@ -456,7 +484,19 @@ fn warpfield_convert(
                 let n = gcam.node(c, r, s);
                 let f = [n.x as f32, n.y as f32, n.z as f32];
                 let label = n.label;
-                set_warp(g, out, err, &mut warp, &src_vox2ras, &dst_vox2ras, c, r, s, f, label)?;
+                set_warp(
+                    g,
+                    out,
+                    err,
+                    &mut warp,
+                    &src_vox2ras,
+                    &dst_vox2ras,
+                    c,
+                    r,
+                    s,
+                    f,
+                    label,
+                )?;
             }
         }
     }
@@ -480,7 +520,17 @@ fn warpfield_write(
     datainterp: i32,
 ) -> Result<i32, Fatal> {
     let mut warp = warpfield_convert(g, out, err, env, gcam, datainterp)?;
-    let ret = mriio::mri_write(g, out, err, env, dir, &mut warp, fname, None, MGZ_INTENT_UNKNOWN)?;
+    let ret = mriio::mri_write(
+        g,
+        out,
+        err,
+        env,
+        dir,
+        &mut warp,
+        fname,
+        None,
+        MGZ_INTENT_UNKNOWN,
+    )?;
     if ret != 0 {
         let _ = writeln!(out, "ERROR: Warpfield::write({fname})");
     }
@@ -571,7 +621,16 @@ pub fn write_morph(
     gcam_init_vol_geom(&mut gcam, mri, mri);
     gcam_init_no_gca(g, out, err, env, dir, &mut gcam, mri)?;
     gcam_read_warp_from_mri(g, out, err, &mut gcam, mri, true)?;
-    let w = gcam_write_inner(g, out, err, env, dir, &mut gcam, fname, WARPFIELD_DTFMT_ABS_CRS)?;
+    let w = gcam_write_inner(
+        g,
+        out,
+        err,
+        env,
+        dir,
+        &mut gcam,
+        fname,
+        WARPFIELD_DTFMT_ABS_CRS,
+    )?;
     drop(gcam);
     if w.writer == NO_ERROR {
         return Ok(NO_ERROR);

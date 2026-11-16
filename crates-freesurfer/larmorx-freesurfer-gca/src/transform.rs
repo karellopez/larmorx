@@ -268,7 +268,10 @@ pub fn transform_read(
         let Some(gcam) = gcam_read(g, out, err, env, dir, fname)? else {
             return Ok(None);
         };
-        return Ok(Some(Transform::new(MORPH_3D_TYPE, Xform::Morph(Box::new(gcam)))));
+        return Ok(Some(Transform::new(
+            MORPH_3D_TYPE,
+            Xform::Morph(Box::new(gcam)),
+        )));
     }
     let mut io = GcaLtaIo { env };
     let Some(lta) = lta_read_ex(g, out, err, dir, fname, &mut io)? else {
@@ -687,12 +690,7 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
     let sp = gcam.spacing as f32;
     let (x, y, z) = (sse::div(x, sp), sse::div(y, sp), sse::div(z, sp));
     let (width, height, depth) = (gcam.width, gcam.height, gcam.depth);
-    if x >= width as f32
-        || y >= height as f32
-        || z >= depth as f32
-        || x < 0.0
-        || y < 0.0
-        || z < 0.0
+    if x >= width as f32 || y >= height as f32 || z >= depth as f32 || x < 0.0 || y < 0.0 || z < 0.0
     {
         return (ERROR_BADPARM, [0.0; 3]);
     }

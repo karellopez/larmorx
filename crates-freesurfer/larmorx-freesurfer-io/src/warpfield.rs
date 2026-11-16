@@ -54,12 +54,20 @@ fn mul(
 
 /// `a - b` per coordinate (`float`).
 fn minus(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
-    [sse::sub(a[0], b[0]), sse::sub(a[1], b[1]), sse::sub(a[2], b[2])]
+    [
+        sse::sub(a[0], b[0]),
+        sse::sub(a[1], b[1]),
+        sse::sub(a[2], b[2]),
+    ]
 }
 
 /// `a + b` per coordinate (`float`).
 fn plus(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
-    [sse::add(a[0], b[0]), sse::add(a[1], b[1]), sse::add(a[2], b[2])]
+    [
+        sse::add(a[0], b[0]),
+        sse::add(a[1], b[1]),
+        sse::add(a[2], b[2]),
+    ]
 }
 
 /// `new Warpfield(mri)` then `changeFormat(newformat)`: the volume's format set to `newformat`;

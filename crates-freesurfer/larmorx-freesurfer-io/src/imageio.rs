@@ -41,19 +41,24 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_718, FS_719, FS_727, FS_730, FS_731, FS_732};
+use larmorx_core::cfmt::Streams;
+use larmorx_core::defects::{FS_405, FS_718, FS_719, FS_727, FS_730, FS_731, FS_732};
+use larmorx_freesurfer_core::alloc::MACHINE_BYTES;
+use larmorx_freesurfer_core::utils;
+use larmorx_io::jpeg;
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::diag::{DIAG_WRITE, diag_printf};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
-    self, ERROR_BAD_PARM, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_FILE, ERROR_UNSUPPORTED, Fatal,
-    NO_ERROR,
+    self, ERROR_BAD_FILE, ERROR_BAD_PARM, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_FILE,
+    ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
 use larmorx_freesurfer_core::matrix::{MATRIX_COMPLEX, Matrix};
 use larmorx_freesurfer_core::utils::str_upper;
 use larmorx_freesurfer_mri::mri::Mri;
 
 use crate::cfile::CFile;
+use crate::minc::Std;
 use crate::image::{Image, PFBYTE, PFCOMPLEX, PFFLOAT, PFRGB, image_alloc, image_free};
 use crate::rgb::RgbImage;
 use crate::upper;
@@ -191,8 +196,10 @@ pub fn image_read(
             match CFile::open(dir, &buf, "rb") {
                 Ok(f) => {
                     let _ = f.close();
-                    not_ported(err, "reading JPEG images", &buf);
-                    Ok(Read::NotPorted)
+                    // a file whose reading fails (a folder) gives the codec no bytes, as
+                    // jpeg_stdio_src's fread gives it none
+                    let data = std::fs::read(utils::resolve(dir, &buf)).unwrap_or_default();
+                    jpeg_read_image(g, out, err, &data)
                 }
                 Err(e) => {
                     g.errno = e;
@@ -218,6 +225,137 @@ pub fn image_read(
         RGBI_IMAGE => Ok(rgb_read_image(g, err, dir, &buf)?.map_or(Read::Null, Read::Image)),
         _ => Ok(Read::Null),
     }
+}
+
+/// Streams that keep nothing (the header read whose messages the decompression repeats).
+struct Silent;
+
+impl Streams for Silent {
+    fn out(&mut self, _: &str) {}
+    fn err(&mut self, _: &str) {}
+}
+
+/// The JPEG codec's options: the mode, and the machine's memory for its coefficient buffer.
+fn jpeg_options(g: &Globals) -> jpeg::Options {
+    jpeg::Options {
+        upstream_defects: g.mode(),
+        max_alloc: Some(MACHINE_BYTES),
+    }
+}
+
+/// `JPEGReadImage(fname)` on the file's bytes: the IJG decompressor with RGB output
+/// (`larmorx_io::jpeg::decode_rgb`: its messages on standard error, an error ending the program
+/// with status 1) into an RGB image of the file's size (`ImageAlloc(height, width, PFRGB, 1)`),
+/// the file's first row at the image's last row.
+fn jpeg_read_image(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    data: &[u8],
+) -> Result<Read, Fatal> {
+    let opts = jpeg_options(g);
+    // ImageAlloc follows jpeg_start_decompress: the sizes from the header, read here silently
+    let dims = jpeg::read_header(data, &mut Silent, opts)
+        .ok()
+        .map(|h| (h.image_height as i32, h.image_width as i32));
+    let mut im = match dims {
+        Some((h, w)) => Some(image_alloc(g, err, h, w, PFRGB, 1, 0)?),
+        None => None,
+    };
+    let (orows, ocols) = im.as_ref().map_or((0, 0), |i| (i.orows, i.ocols));
+    let mut rowctr = i64::from(orows) - 1;
+    let r = {
+        let mut s = Std { out, err };
+        let pix = im.as_mut().and_then(|i| i.image.as_mut());
+        let mut pix = pix;
+        jpeg::decode_rgb(data, &mut s, opts, &mut g.notices, &mut |row| {
+            if let Some(p) = pix.as_deref_mut() {
+                let off = rowctr * i64::from(ocols) * 3;
+                if off >= 0 {
+                    let off = off as usize;
+                    let n = row.len().min(p.len().saturating_sub(off));
+                    p[off..off + n].copy_from_slice(&row[..n]);
+                }
+            }
+            rowctr -= 1;
+        })
+    };
+    if r.is_err() {
+        // IJG's error_exit: its message is out, the program ends with EXIT_FAILURE
+        return Err(Fatal::Exit(1));
+    }
+    Ok(im.map_or(Read::Null, Read::Image))
+}
+
+/// `JPEGWriteImage(I, fname, frame)` of an image of bytes: the file made (`fopen(fname, "wb")`; a
+/// failure ends the program with `JPEGWriteImage:  Could not open file`, `ERROR_BAD_FILE`), then
+/// the IJG compressor of one grey component with its defaults (`larmorx_io::jpeg::encode_gray`)
+/// of `ocols` x `orows` samples, the image's last row first (`IMAGEpix(I, 0, rows - r - 1)`); an
+/// error of the codec ends the program with status 1 (the file stays as written).
+fn jpeg_write_image(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    im: &Image,
+    fname: &str,
+) -> Result<Wrote, Fatal> {
+    let mut fp = match CFile::open(dir, fname, "wb") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            log::error_exit(
+                g,
+                err,
+                ERROR_BAD_FILE,
+                "JPEGWriteImage:  Could not open file",
+            )?;
+            return Ok(Wrote {
+                ok: false,
+                code: ERROR_BAD_FILE,
+            });
+        }
+    };
+    let (rows, ocols) = (i64::from(im.rows), i64::from(im.ocols));
+    let pix: &[u8] = im.image.as_deref().unwrap_or(&[]);
+    // a row outside the pixels (an image whose rows exceed its allocated rows): FS-405
+    let outside = (0..i64::from(im.orows)).any(|r| {
+        let off = (rows - r - 1) * ocols;
+        off < 0 || off + ocols > pix.len() as i64
+    });
+    if outside && im.orows > 0 && im.ocols > 0 {
+        g.notices.add(
+            &FS_405,
+            "JPEGWriteImage: a row outside the image's pixels (FreeSurfer reads memory there; zeros here)",
+        );
+    }
+    let r = {
+        let mut s = Std { out, err };
+        jpeg::encode_gray(
+            im.ocols.max(0) as u32,
+            im.orows.max(0) as u32,
+            &mut |r, row| {
+                let off = (rows - i64::from(r) - 1) * ocols;
+                row.fill(0);
+                if off >= 0 && (off as usize) < pix.len() {
+                    let off = off as usize;
+                    let n = row.len().min(pix.len() - off);
+                    row[..n].copy_from_slice(&pix[off..off + n]);
+                }
+            },
+            &mut fp,
+            &mut s,
+        )
+    };
+    if r.is_err() {
+        let _ = fp.close();
+        return Err(Fatal::Exit(1));
+    }
+    let _ = fp.close();
+    Ok(Wrote {
+        ok: true,
+        code: NO_ERROR,
+    })
 }
 
 /// `ImageFRead(fp, fname, start, nframes)` over the HIPS stubs: the header read is HIPS's (its
@@ -447,7 +585,7 @@ fn image_write(
 /// images of bytes only (`JPEGWrite: only PFBYTE currently supported`).
 fn image_f_write(
     g: &mut Globals,
-    _out: &mut dyn Write,
+    out: &mut dyn Write,
     err: &mut dyn Write,
     dir: Option<&Path>,
     im: Option<&Image>,
@@ -503,11 +641,7 @@ fn image_f_write(
                     "JPEGWrite: only PFBYTE currently supported",
                 ));
             }
-            not_ported(err, "writing JPEG images", &buf);
-            Ok(Wrote {
-                ok: false,
-                code: -1,
-            })
+            jpeg_write_image(g, out, err, dir, im, &buf)
         }
     }
 }

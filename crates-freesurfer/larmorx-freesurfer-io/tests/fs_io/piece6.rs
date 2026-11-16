@@ -738,6 +738,10 @@ fn answer(
     if bits & 256 != 0 {
         pairs.push(("KILLIANY_SWAP", "1"));
     }
+    // piece 31: gcamComputeMetricProperties' negative nodes
+    if bits & 512 != 0 {
+        pairs.push(("SHOW_NEG", "1"));
+    }
     let mut env = Environment::from_pairs(pairs);
     for (k, v) in more_env {
         // ASCII values only (the generated cases'): the same on every platform

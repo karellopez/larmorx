@@ -22,6 +22,7 @@ pub mod coords;
 pub mod deriv;
 pub mod frames;
 pub mod image;
+pub mod interpolate_into;
 pub mod io_frames;
 pub mod label_coords;
 pub mod labels;

@@ -549,6 +549,8 @@ void set_env6(int bits)
   if (bits & 64) setenv("GE_ODD", "1", 1);
   if (bits & 128) setenv("GE_EVEN", "1", 1);
   if (bits & 256) setenv("KILLIANY_SWAP", "1", 1);
+  // piece 31 (track A relay 38): gcamComputeMetricProperties' negative nodes
+  if (bits & 512) setenv("SHOW_NEG", "1", 1);
 }
 
 // piece 7: Bruker ParaVision studies
@@ -1849,18 +1851,24 @@ void run_piece6(const std::string &cmd0)
   // piece 27 (track A relay 35): gcd and gch (GCA atlases, .gca and .gcz) as mrd and mrh do
   // piece 28 (track A relay 36): mrr and mrx (MRIread, MRIreadEx) below; piece 29: cnf, acl
   // piece 30 (track A relay 37): reo (MRIreorder), sxl and sxw (selxavgio), lro (LabelRemoveOverlap)
+  // piece 31 (track A relay 38): m3d and m3h (GCA morphs, .m3z and .m3d, and MGH warps named @m3z)
+  // as mrd and mrh do, after MRIread's licence check's variables (Warpfield::read calls MRIread)
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
               cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and" || cmd0 == "ixd" || cmd0 == "nnd" ||
-              cmd0 == "mcd" || cmd0 == "gcd"
+              cmd0 == "mcd" || cmd0 == "gcd" || cmd0 == "m3d"
           ? "mrd"
       : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh" || cmd0 == "imh" ||
               cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh" || cmd0 == "ixh" || cmd0 == "nnh" ||
-              cmd0 == "mch" || cmd0 == "gch"
+              cmd0 == "mch" || cmd0 == "gch" || cmd0 == "m3h"
           ? "mrh"
           : cmd0;
   if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
+  if (cmd0 == "m3d" || cmd0 == "m3h") {
+    setenv("FREESURFER_HOME", "/nonexistent-freesurfer-home", 1);
+    if (!getenv("FS_LICENSE")) setenv("FS_LICENSE", "/usr/local/freesurfer/license.txt", 1);
+  }
   if (nifti) Gdiag_no = (int)geti();
   if (cmd0 == "ard" || cmd0 == "arh") {
     N_Zero_Pad_Input = (int)geti();
@@ -2937,7 +2945,7 @@ int main(int argc, char *argv[])
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
-                                 "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro"};
+                                 "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

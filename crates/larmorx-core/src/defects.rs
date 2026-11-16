@@ -2219,6 +2219,16 @@ defects! {
         "writing a selective-average header whose lists hold fewer numbers than its counts reads past them: memory contents written, or a crash";
     FS_850 = "FS-850", "FreeSurfer", false,
         "removing a label's overlap with another (LabelRemoveOverlap, mri_label2label and mri_cor2label --ring): points without a surface vertex match each other, so every such point is removed when the other label has one (kept: the programs that call it pass surface labels, whose points all have vertices)";
+    FS_851 = "FS-851", "FreeSurfer", true,
+        "reading a GCA morph (.m3z, .m3d) or warp volume whose header asks for millions of nodes: FreeSurfer keeps and fills 264 bytes of memory for each node before it reads one (550 MB for 128 x 128 x 128 nodes), so past the machine's memory it ends (GCAMalloc: could not allocate ...) or the system ends it, and below it fills the memory: the outcome depends on the machine";
+    FS_852 = "FS-852", "FreeSurfer", true,
+        "reading a GCA morph with SHOW_NEG set on several threads: its lines naming each node whose volume turned negative come in the threads' order when those nodes lie in more than one column of x (which lines are printed does not depend on the threads)";
+    FS_853 = "FS-853", "FreeSurfer", true,
+        "reading a GCA morph whose spacing is 1,291 or more (or -1,291 or less): the cube of the spacing, which sets every node's original volume, is computed in 32 bits and wraps around: wrong volumes, Jacobians and negative-node counts";
+    FS_854 = "FS-854", "FreeSurfer", true,
+        "reading a compressed GCA morph (.m3z) whose compressed data is damaged after its nodes: the reading of its tags never ends, or ends as memory contents decide";
+    FS_855 = "FS-855", "FreeSurfer", true,
+        "reading an MGH or NIfTI warp volume as a GCA morph when the volume has no morph geometries (its geometry tag missing): the geometries' validity and sizes are memory contents, which the RAS warp formats and the node-coordinate frames use; and those frames of a morph whose image geometry has a size of 0 or less crash the program";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

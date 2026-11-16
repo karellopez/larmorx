@@ -46,6 +46,7 @@ pub mod temp;
 pub mod timedate;
 pub mod usage;
 pub mod version;
+pub mod volume;
 pub mod xdbg;
 
 pub use env::Environment;

@@ -19,26 +19,45 @@ const ERANGE: i32 = 34;
 pub struct CStream {
     pub bytes: Vec<u8>,
     pub pos: usize,
+    /// The end-of-file flag (`feof`): set when a read finds no more bytes, cleared by a move.
+    pub eof: bool,
 }
 
 impl CStream {
     /// A stream over `bytes` at its start.
     pub fn new(bytes: Vec<u8>) -> CStream {
-        CStream { bytes, pos: 0 }
+        CStream {
+            bytes,
+            pos: 0,
+            eof: false,
+        }
     }
 
-    fn peek(&self) -> Option<u8> {
+    /// `fseek(.., SEEK_SET)` to a place within the bytes: the end-of-file flag cleared.
+    pub fn seek(&mut self, pos: usize) {
+        self.pos = pos.min(self.bytes.len());
+        self.eof = false;
+    }
+
+    pub(crate) fn peek(&self) -> Option<u8> {
         self.bytes.get(self.pos).copied()
     }
 
     /// `fgets(buffer of n bytes)`: up to `n - 1` bytes or through the newline; `None` at the end.
     pub fn fgets(&mut self, n: usize) -> Option<Vec<u8>> {
-        if self.pos >= self.bytes.len() || n < 2 {
+        if n < 2 {
+            return None;
+        }
+        if self.pos >= self.bytes.len() {
+            self.eof = true;
             return None;
         }
         let mut out = Vec::new();
         while out.len() < n - 1 {
-            let Some(c) = self.peek() else { break };
+            let Some(c) = self.peek() else {
+                self.eof = true;
+                break;
+            };
             self.pos += 1;
             out.push(c);
             if c == b'\n' {
@@ -56,7 +75,7 @@ impl CStream {
         s
     }
 
-    fn skip_space(&mut self) {
+    pub(crate) fn skip_space(&mut self) {
         while self.peek().is_some_and(is_c_space) {
             self.pos += 1;
         }
@@ -229,12 +248,12 @@ fn hex_exact(text: &[u8]) -> bool {
 /// One `scanf` call's reading (§18.1): the first time the call meets the end of its input it
 /// keeps `errno`'s value (0 when that meeting is a conversion's skip of white space), and every
 /// later meeting sets `errno` back to it; each call starts afresh.
-struct Call {
+pub(crate) struct Call {
     kept: Option<i32>,
 }
 
 impl Call {
-    fn new() -> Call {
+    pub(crate) fn new() -> Call {
         Call { kept: None }
     }
 
@@ -245,7 +264,7 @@ impl Call {
     }
 
     /// A conversion's skip of white space; false at the end of the input (an input failure).
-    fn skip(&mut self, p: &mut Process, s: &mut CStream) -> bool {
+    pub(crate) fn skip(&mut self, p: &mut Process, s: &mut CStream) -> bool {
         s.skip_space();
         if s.peek().is_none() {
             self.meet(p, true);
@@ -255,7 +274,7 @@ impl Call {
     }
 
     /// White space in the format that reads (not just before a conversion).
-    fn ws(&mut self, p: &mut Process, s: &mut CStream) {
+    pub(crate) fn ws(&mut self, p: &mut Process, s: &mut CStream) {
         s.skip_space();
         if s.peek().is_none() {
             self.meet(p, false);
@@ -263,7 +282,7 @@ impl Call {
     }
 
     /// A `%f` conversion: its value, or none (an input or matching failure).
-    fn f(&mut self, p: &mut Process, s: &mut CStream) -> Option<f32> {
+    pub(crate) fn f(&mut self, p: &mut Process, s: &mut CStream) -> Option<f32> {
         if !self.skip(p, s) {
             return None;
         }
@@ -281,8 +300,36 @@ impl Call {
         }
     }
 
+    /// A `%s` conversion (`width` bytes at most): the word, or none (an input failure). A word
+    /// read to its width does not look past itself.
+    pub(crate) fn s(
+        &mut self,
+        p: &mut Process,
+        s: &mut CStream,
+        width: Option<usize>,
+    ) -> Option<Vec<u8>> {
+        if !self.skip(p, s) {
+            return None;
+        }
+        let start = s.pos;
+        loop {
+            if width.is_some_and(|w| s.pos - start >= w) {
+                break;
+            }
+            match s.peek() {
+                Some(c) if !is_c_space(c) => s.pos += 1,
+                Some(_) => break,
+                None => {
+                    self.meet(p, false);
+                    break;
+                }
+            }
+        }
+        Some(s.bytes[start..s.pos].to_vec())
+    }
+
     /// A `%d` conversion (a 64-bit `long` kept to its low 32 bits): its value, or none.
-    fn d(&mut self, p: &mut Process, s: &mut CStream) -> Option<i32> {
+    pub(crate) fn d(&mut self, p: &mut Process, s: &mut CStream) -> Option<i32> {
         if !self.skip(p, s) {
             return None;
         }

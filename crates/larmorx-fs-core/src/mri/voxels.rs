@@ -206,12 +206,28 @@ impl Process {
         mode: i32,
         function: &str,
     ) -> Result<f32, Stop> {
+        if c < 0 || r < 0 || s < 0 {
+            return Ok(sse::narrow(m.outside_val));
+        }
+        // the types without a value give -1e10 without reading a voxel (a volume without voxels
+        // included, observed: fs.volume's probe); the others need voxels (FS-58)
+        let reads = matches!(
+            m.kind,
+            types::FLOAT_COMPLEX
+                | types::UCHAR
+                | types::SHORT
+                | types::USHRT
+                | types::INT
+                | types::RGB
+                | types::LONG
+                | types::FLOAT
+        );
+        if !reads {
+            return Ok(-1e10);
+        }
         if !m.has_voxels() {
             self.no_voxels(function)?;
             return Ok(0.0);
-        }
-        if c < 0 || r < 0 || s < 0 {
-            return Ok(sse::narrow(m.outside_val));
         }
         let at = [c, r, s, f];
         match m.kind {
@@ -262,6 +278,20 @@ impl Process {
         v: f32,
         mode: i32,
     ) -> Result<i32, Stop> {
+        let stores = matches!(
+            m.kind,
+            types::FLOAT_COMPLEX
+                | types::UCHAR
+                | types::SHORT
+                | types::USHRT
+                | types::INT
+                | types::RGB
+                | types::LONG
+                | types::FLOAT
+        );
+        if !stores {
+            return Ok(1);
+        }
         if !m.has_voxels() {
             self.no_voxels("MRIsetVoxVal")?;
             return Ok(0);

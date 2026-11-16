@@ -182,3 +182,38 @@ fn fs631_a_label_without_places_next_to_a_kept_mark() {
         assert!(r.noted("FS-631"));
     }
 }
+
+/// FS-633: the area error of a vertex takes its own faces' original areas by default, the
+/// surface's first faces' with `reproduce` (vertex 2 lies on face 1 only).
+#[test]
+fn fs633_the_area_error_takes_the_vertex_faces() {
+    use larmorx_freesurfer_surf::{facenorm, valfile};
+    let mut vals = Vec::new();
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut r = Run::new(mode);
+        let mut s = alloc::alloc(&mut r.g, &mut r.out, &mut r.err, &r.sg, 4, 2).unwrap();
+        s.face_mut(0).v = [0, 1, 3];
+        s.face_mut(1).v = [1, 2, 3];
+        (s.face_mut(0).area, s.face_mut(1).area) = (1.0, 2.0);
+        facenorm::set_face_orig_area(&mut s, 0, 0.25);
+        facenorm::set_face_orig_area(&mut s, 1, 0.5);
+        let faces: [&[i32]; 4] = [&[0], &[0, 1], &[1], &[0, 1]];
+        for (vno, f) in faces.iter().enumerate() {
+            let t = s.topology_mut(vno);
+            t.f = Some(f.to_vec());
+            t.num = f.len() as u8;
+        }
+        let td = tempfile::tempdir().unwrap();
+        let mut io = Io {
+            out: &mut r.out,
+            err: &mut r.err,
+            env: &r.env,
+        };
+        valfile::write_area_error_to_val_file(&mut r.g, &mut io, Some(td.path()), &mut s, "ae.w")
+            .unwrap();
+        vals.push(s.vertex(2).val);
+        assert_eq!(r.noted("FS-633"), !mode.reproduce());
+    }
+    // its own face 1: 2 - 0.5; FreeSurfer's face 0: 2 - 0.25
+    assert_eq!(vals, vec![1.5, 1.75]);
+}

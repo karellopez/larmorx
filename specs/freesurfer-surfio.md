@@ -4681,3 +4681,62 @@ both modes. On recorded heads (the probe's `flr lbl`; three heads, both hemisphe
 erosion and dilation by 2, the mask, the inversion): 24 of 24 identical in both modes. A clean-room
 implementer's black-box form: `mri_label2label --label-dilate` and `--label-erode` of a recorded
 label onto its own subject's white surface.
+
+## 130. The values written: MRIcopyMRIS, MRISwriteValues, the area error (queue items 3.1-47/48; relay 37 of track D)
+
+**130.1 A vertex field into a volume** (`MRIcopyMRIS(mri, surf, frame, field)`). Without a volume:
+a new float volume of `vertices` x 1 x 1 and `frame + 1` frames. A volume whose width x height x
+depth (an `int` product) is not the vertex count: `ERROR: MRIcopyMRIS: Surf/Src dimension mismatch.`
+and no volume; a frame not below its frame count: `ERROR: MRIScopyMRI: requested frame number is too
+large.` and `ERROR:   requested = <f>, max = <n>` (FreeSurfer's wording, naming the other function)
+and no volume (all on standard output). Then, in slice, row, column order, each voxel of frame
+`frame` set (the volume's own setter) to the next vertex's `field`: `val`, `curv`, `border`,
+`marked`, `marked2`, `marked3`, `stat`, `d`, `valbak`, `val2`, `val2bak`, `imag_val`, `curvbak`,
+`fsmask`, `fieldsign`, `nc`, `undefval`, `x`, `y`, `z`, `vnum` (the neighbour count), `ripflag`,
+`annotation`, `area`, `group_avg_area`, `K`, `H`, `k1`, `k2`, `nx`, `ny`, `nz`, `tx`, `ty`, `tz`,
+`tdx`, `tdy`, `tdz`, `dx`, `dy`, `dz`, `mean` (integer fields converted to `float` to nearest); any
+other name gives `ERROR: MRIcopyMRIS(): field <name> not supported` at the first voxel and no volume
+(a given volume keeps what was set; a surface without vertices never checks the name). The volume
+is returned.
+
+**130.2 Writing the values** (`MRISwriteValues(mris, name)`). A name fs.io's format test knows as a
+volume (`freesurfer-io.md`'s `mri_identify`): 130.1 of `val` at frame 0 written by `MRIwrite` (with
+`Gdiag`'s show and verbose bits `Saving surf vals in 'volume' format to <name>` first), its status
+returned. Otherwise a w file: the name, with `.w` added unless its last dot is followed by `w`
+(FS-126: a name of 1,024 bytes or more, with `.w` added, ends FreeSurfer with a buffer-overflow abort;
+taken whole by default); with `Gdiag`'s show bit `writing surface values to <file>.`; a file that
+cannot be created ends the program (`Can't create file <file>` with its newline, `ERROR_NOFILE`);
+with show and verbose `num = <n>`. The file: 0 (2 bytes), the count of vertices whose value is not 0
+(a NaN counts; -0 does not) (3 bytes), then for each of them in order its number (3 bytes) and value
+(a big-endian `float`); a value that is not finite gives the error `MRISwriteValues(<file>): val at
+vertex <k> is not finite` and is written anyway. Then on standard output `avg = %2.3f, stdev =
+%2.3f, min = %2.3f, max = %2.3f`: the mean of the written values in `double` (each widened and added
+to the sum), the standard deviation `sqrt(sum2 / n - mean²)` with `sum2` the sum of the `float`
+squares (each square widened and the sum added to it: the order decides a NaN), 0 when that variance
+is not above 0; min and max from 1000 and -1000 (NaN never taken); with no value written `Warning:
+all vertex values are zero`. `NO_ERROR`.
+
+**130.3 The area error** (`MRISwriteAreaErrorToValFile(mris, name)`). Each vertex whose rip flag is
+0 gets `val = (sum of its faces' areas - sum of its faces' original areas) / (its face count)`
+(`float`, each sum in order; no face: NaN), the original areas from the face-normal cache (§26),
+then 130.2 (its status ignored); `NO_ERROR`. FS-633 (rule A): FreeSurfer sums the original areas of
+the surface's faces numbered 0 to `count - 1`, not of the vertex's own faces; the port takes the
+vertex's own faces by default, FreeSurfer's with `reproduce`, noted where they differ. FS-634
+(class a): a vertex listing more faces than the surface has (a face listed twice) makes FreeSurfer
+read the cache past the faces; the vertex's own face is taken there in both modes, noted (§131's
+probe counts such a case, not compared).
+
+## 131. Validation plan, part 29
+
+The probe's command of relay 37, `wvl` (an empty work folder with `d`; `SURFER_SIDEDOOR`): §127's
+meshes read by `MRISread`, 0 to 3 vertices ripped, `Gdiag`'s show and verbose bits one case in four,
+the values given (a third 0, special floats in heavy cases) or not; then 1 to 4 of 130.2 and 130.3 to
+the names `v.w`, `v`, `v.wq`, `d/v`, `d/v.w`, `v.mgh`, `v.nii`, `nodir/v`, `nodir/v.mgh` (a folder that
+does not exist), `MRISstoreMetricProperties` (the faces' original areas 130.3 reads), 130.1 of 19
+field names (one unknown) at frames 0 to 2 into a new volume or a given one (the vertex count, one
+more, or half of it in two rows; 1 or 2 frames); then the values and every file in the folder by
+its bytes. Compared with the official build with `reproduce`: identical; the default identical but
+where a noted correction changed the result. Observed (relay 37): seeds 7 (300 cases), 13 and 17
+(1,000 each): 0 different in both modes (one seed-17 case of FS-634 counted). A clean-room
+implementer's black-box form: `mris_calc`'s
+or `mri_surf2surf`'s value output (`--tfmt w`, `.mgh`) of a recorded `?h.thickness`.

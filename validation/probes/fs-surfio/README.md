@@ -409,3 +409,11 @@ side in `tests/fs_surfio/lbl.rs`), seeds 7 (300 cases), 13 and 17 (1,000 each): 
 `reproduce`, `fix` different only with notices (FS-632, the error messages' FS-01). `flr lbl`
 (`real.py --lbl`: three heads, both hemispheres, four labels each on `?h.white`): 24 of 24 identical
 in both modes.
+
+Measured 2026-11-16 (relay 37 of track D, 54 commands): `wvl` (`MRISwriteValues` and
+`MRISwriteAreaErrorToValFile` to w-file and volume names, `MRISstoreMetricProperties`, `MRIcopyMRIS`
+of 19 field names into new and given volumes; the folder's files by their bytes; the port's side in
+`tests/fs_surfio/wvl.rs`), seeds 7 (300 cases), 13 and 17 (1,000 each): 0 different with `reproduce`,
+`fix` different only with notices (FS-633, FS-01); one seed-17 case of FS-634 (a vertex listing more
+faces than the surface has: FreeSurfer reads its face-normal cache past the faces and crashed) counted,
+not compared (`check.py`'s `SKIP`).

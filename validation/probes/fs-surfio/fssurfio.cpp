@@ -5169,6 +5169,85 @@ void lbl_case()
   }
 }
 
+// ---- relay 37 of track D: wvl, the values written (MRISwriteValues, MRISwriteAreaErrorToValFile,
+// MRIcopyMRIS) ------------------------------------------------------------------------------------
+
+static void wvl_dump_vol(MRI *m)
+{
+  oi(m->nframes);
+  for (int f = 0; f < m->nframes; f++)
+    for (int s = 0; s < m->depth; s++)
+      for (int r = 0; r < m->height; r++)
+        for (int c = 0; c < m->width; c++) of(MRIgetVoxVal(m, c, r, s, f));
+}
+
+void wvl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int nrip = geti();
+  std::vector<int> rips;
+  for (int k = 0; k < nrip; k++) rips.push_back(geti());
+  int gd = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno : rips) s->vertices[vno].ripflag = 1;
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  if (geti())
+    for (int vno = 0; vno < nv; vno++) s->vertices[vno].val = getf();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "sm") {
+      oi(MRISstoreMetricProperties(s));
+    } else if (op == "wv" || op == "ae") {
+      std::string name = geth();
+      oi(op == "wv" ? MRISwriteValues(s, name.c_str()) : MRISwriteAreaErrorToValFile(s, name.c_str()));
+    } else if (op == "cm") {
+      int frame = geti();
+      std::string field = geth();
+      MRI *given = NULL;
+      if (geti()) {
+        int w = geti(), h = geti(), d = geti(), nfr = geti();
+        given = MRIallocSequence(w, h, d, MRI_FLOAT, nfr);
+      }
+      MRI *r = MRIcopyMRIS(given, s, frame, field.c_str());
+      if (!r) out += "NULL ";
+      else wvl_dump_vol(r);
+    } else fail("wvl op");
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) of(s->vertices[vno].val);
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *f = fopen(name.c_str(), "rb");
+    if (!f) { out += "NOFILE "; continue; }
+    std::string b;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+    fclose(f);
+    ox(b);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -5425,6 +5504,8 @@ void run_case()
     mpx_case();
   } else if (cmd == "lbl") {
     lbl_case();
+  } else if (cmd == "wvl") {
+    wvl_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

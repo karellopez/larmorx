@@ -24,8 +24,8 @@
 //! FS-133 (more faces in a triangle-property file than the surface has), FS-134 (a surface or path
 //! name of 1,024 bytes or more overruns `FileNamePath`'s buffer).
 //!
-//! Not here (they wait for fs.io's format identification `mri_identify`, track A):
-//! `MRISwriteValues` and `MRISwriteAreaErrorToValFile` (its only caller writes through it).
+//! `MRISwriteValues` and `MRISwriteAreaErrorToValFile` are in [`crate::valfile`] (relay 37 of
+//! track D: they waited for fs.io's format identification `mri_identify`).
 
 use std::path::Path;
 

@@ -84,6 +84,8 @@ mod swr;
 mod tri;
 #[path = "vps.rs"]
 mod vps;
+#[path = "wvl.rs"]
+mod wvl;
 
 /// The generator's state, and whether it may make names of about 1,024 bytes (not with seed 1,
 /// the platform-independent set: file systems differ on such names).
@@ -160,12 +162,12 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 53] = [
+const COMMANDS: [&str; 54] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
     "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
-    "mpg", "fli", "bvl", "crv", "pvw", "vps", "ann", "mpx", "lbl",
+    "mpg", "fli", "bvl", "crv", "pvw", "vps", "ann", "mpx", "lbl", "wvl",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1062,6 +1064,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "ann" => ann::ann_tokens(&mut t, &mut g),
             "mpx" => mpx::mpx_tokens(&mut t, &mut g),
             "lbl" => lbl::lbl_tokens(&mut t, &mut g),
+            "wvl" => wvl::wvl_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2746,6 +2749,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "ann" => ann::ann_case(cx, t, o)?,
         "mpx" => mpx::mpx_case(cx, t, o)?,
         "lbl" => lbl::lbl_case(cx, t, o)?,
+        "wvl" => wvl::wvl_case(cx, t, o)?,
         // relay 32 of track D: the recorded heads (real.py); never generated
         "flr" => fli::flr_case(cx, t, o)?,
         "names" => {

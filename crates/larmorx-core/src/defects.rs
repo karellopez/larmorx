@@ -1825,6 +1825,10 @@ defects! {
         "dilating a label on a surface (LabelDilate) writes its new points past the label's places when the label is full and its growth by half does not enlarge it: a label without places (half of nothing is nothing), which gains points when a ripped vertex keeps a mark (the marks' clearing skips ripped vertices), or a growth beyond the 2^26 places larmorx allocates (FS-426)";
     FS_632 = "FS-632", "FreeSurfer", true,
         "inverting a label on a surface (MRISlabelInvert, and LabelRemoveHolesSurf through it) crashes the program when the label has a point beyond the surface's vertices (its mask is refused and then read)";
+    FS_633 = "FS-633", "FreeSurfer", true,
+        "writing a surface's area error as a value file (MRISwriteAreaErrorToValFile) takes each vertex's original area from the surface's first faces (as many as the vertex has) instead of from the vertex's own faces, so the values written are not the vertices' area errors";
+    FS_634 = "FS-634", "FreeSurfer", true,
+        "writing a surface's area error as a value file (MRISwriteAreaErrorToValFile) reads the face-normal cache past the surface's faces for a vertex that lists more faces than the surface has (a face listed twice): a crash or another array's data";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

@@ -1794,3 +1794,26 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
   with the same surface).
 - `LabelArea`'s sum compiles to `addsd` with the running total first (label.cpp.o).
 - The recorded heads (real.py --lbl, 24 labels): FreeSurfer 11.1 s, the port 18.7 s.
+
+## 32. The values written: MRIcopyMRIS, MRISwriteValues, MRISwriteAreaErrorToValFile (relay 37 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `MRIcopyMRIS` (`utils/mrisurf_mri.cpp`
+5084) into `surfmri.rs` beside `MRIScopyMRI`; `MRISwriteValues` (`utils/mrisurf_io.cpp` 721; its
+w-file branch compiled as `MRISwriteValues [clone .part.10]`) and `MRISwriteAreaErrorToValFile`
+(586) into `valfile.rs` (sfile.rs's note that they waited for fs.io's `mri_identify` is resolved).
+
+- `MRIcopyMRIS`: its frame message says `MRIScopyMRI` (copied text); the `strcmp` chain lists
+  `marked`, `marked2`, `marked3` and `d` twice (the first match wins, the same field).
+- `MRISwriteValues`: `strcpy(fname, sname)` and `strcat(fname, ".w")` are fortified
+  (`__strcpy_chk`, `__strcat_chk` with 1,024): FS-126's abort. `sum2 += f * f` compiles to `mulss`
+  then `addsd` with the square as the destination (the square's NaN kept); `sum += f` keeps the sum
+  first; `max`/`min` are `maxsd`/`minsd` with the value as the destination (the C comparisons'
+  results). The volume branch leaks its volume; `MRIwrite(TempMRI, sname)` takes the default
+  vector (NULL) and intent (-1).
+- **FS-633:** `getFaceNorm(mris, fno)` inside `for (fno = 0; fno < vt->num; fno++)` takes the loop's
+  counter where `vt->f[fno]` (used for `face->area` on the line before) is meant. Its only caller
+  (mrisurf_integrate.cpp, under `Gdiag & DIAG_WRITE`) writes diagnostic files.
+- **FS-634:** `getFaceNorm(mris, fno)` for `fno` up to `vt->num - 1` reads past the cache when a
+  vertex lists more faces than the surface has (srd's random meshes list a face twice for a vertex
+  whose face repeats it): the official probe crashed (signal 11) on seed 17's case 766; the port's
+  first version indexed past its cache too (found by `wvl`, fixed before the commit).

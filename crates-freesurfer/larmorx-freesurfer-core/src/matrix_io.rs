@@ -15,12 +15,15 @@
 //!   contents. By default `MatrixReadFrom` gives the error `MatrixReadFrom: the file ends before
 //!   the matrix does` and `NULL`; `reproduce` reads the missing bytes as 0 (`freadDouble`'s
 //!   message kept).
+//! - **FS-924** (`reproduce`): a short file whose matrix asks for a million numbers or more past
+//!   its end (a size read from misaligned bytes): FreeSurfer prints `freadDouble: fread failed`
+//!   for each; `reproduce` stops after the first with an error and `NULL` ([`PAST_END_LIMIT`]).
 //! - FS-25 for `MatrixWriteTxt` (it prints a complex matrix's floats as if real).
 
 use std::io::{BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 
-use larmorx_core::defects::FS_49;
+use larmorx_core::defects::{FS_49, FS_924};
 
 use crate::cscan::{Bytes, Call, Reader, Scanf, Stream};
 use crate::cstd;
@@ -434,13 +437,22 @@ pub fn matrix_read_from(
         }
     };
     let mut refused = false;
+    let per = if m.mtype == MATRIX_COMPLEX { 2 } else { 1 };
+    let total = i64::from(m.rows.max(0)) * i64::from(m.cols.max(0)) * per;
+    let mut done: i64 = 0;
     'rows: for row in 1..=m.rows {
         for col in 1..=m.cols {
-            let n = if m.mtype == MATRIX_COMPLEX { 2 } else { 1 };
+            let n = per as isize;
             for k in 0..n {
                 let was_short = slot.short;
                 let d = slot.double(g, err, fp);
+                done += 1;
                 if slot.short && !was_short && short_file(g, err) {
+                    refused = true;
+                    break 'rows;
+                }
+                if slot.short && !was_short && total - done >= PAST_END_LIMIT {
+                    endless(g, err, total - done + 1);
                     refused = true;
                     break 'rows;
                 }
@@ -461,6 +473,30 @@ pub fn matrix_read_from(
         Some(x) => Ret::New(x),
         None => Ret::Given,
     })
+}
+
+/// FS-924: the numbers past the file's end from which `reproduce` stops (FreeSurfer prints
+/// `freadDouble: fread failed` for each one: about 30 MiB of messages at this count).
+pub const PAST_END_LIMIT: i64 = 1 << 20;
+
+/// FS-924 under `reproduce`: a matrix whose numbers go on for [`PAST_END_LIMIT`] or more past the
+/// file's end (a size from misaligned bytes asks for up to two billion): FreeSurfer prints an
+/// error for each and fills a matrix of that size; refused here after the first error.
+fn endless(g: &mut Globals, err: &mut dyn Write, missing: i64) {
+    g.notices.add(
+        &FS_924,
+        format!(
+            "MatrixReadFrom: {missing} numbers past the file's end (FreeSurfer prints an error for each); refused"
+        ),
+    );
+    log::error_printf(
+        g,
+        err,
+        ERROR_BADFILE,
+        &format!(
+            "MatrixReadFrom: the file ends {missing} numbers before the matrix does (FreeSurfer prints an error for each)"
+        ),
+    );
 }
 
 /// FS-49's notice under `reproduce` for a file that ended early (`memory` when a number took a

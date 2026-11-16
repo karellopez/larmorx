@@ -556,6 +556,8 @@ void set_env6(int bits)
   if (bits & 512) setenv("SHOW_NEG", "1", 1);
   // piece 23 (track A relay 40): TiffReadImage's debugging lines
   if (bits & 1024) setenv("FS_TIFF_DEBUG", "1", 1);
+  // piece 33 (track A relay 41): the autoencoder reader's random weights
+  if (bits & 2048) setenv("FREESURFER_SEED", "4711", 1);
 }
 
 // piece 7: Bruker ParaVision studies
@@ -1865,15 +1867,16 @@ void run_piece6(const std::string &cmd0)
   // piece 30 (track A relay 37): reo (MRIreorder), sxl and sxw (selxavgio), lro (LabelRemoveOverlap)
   // piece 31 (track A relay 38): m3d and m3h (GCA morphs, .m3z and .m3d, and MGH warps named @m3z)
   // as mrd and mrh do, after MRIread's licence check's variables (Warpfield::read calls MRIread)
+  // piece 33 (track A relay 41): aed and aeh (stacked autoencoders, .sae, .ae, .csae) as mrd and mrh do
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
               cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and" || cmd0 == "ixd" || cmd0 == "nnd" ||
-              cmd0 == "mcd" || cmd0 == "gcd" || cmd0 == "m3d"
+              cmd0 == "mcd" || cmd0 == "gcd" || cmd0 == "m3d" || cmd0 == "aed"
           ? "mrd"
       : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh" || cmd0 == "imh" ||
               cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh" || cmd0 == "ixh" || cmd0 == "nnh" ||
-              cmd0 == "mch" || cmd0 == "gch" || cmd0 == "m3h"
+              cmd0 == "mch" || cmd0 == "gch" || cmd0 == "m3h" || cmd0 == "aeh"
           ? "mrh"
           : cmd0;
   if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
@@ -3105,7 +3108,7 @@ int main(int argc, char *argv[])
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
                                  "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h",
-                                 "m3w", "trs", "gcw"};
+                                 "m3w", "trs", "gcw", "aed", "aeh"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

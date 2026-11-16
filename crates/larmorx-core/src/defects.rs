@@ -2321,6 +2321,26 @@ defects! {
         "copying a GCA morph into a new one (a transform copied, as concatenating transforms does): the copy keeps neither the morph's inverse (its index volumes) nor its affine matrix, so the copy has no inverse and is written without its affine";
     FS_876 = "FS-876", "FreeSurfer", true,
         "copying a transform into one of the other kind (a linear transform array into a GCA morph, or the reverse): FreeSurfer copies into the other structure's memory (a crash or memory corruption)";
+    FS_877 = "FS-877", "FreeSurfer", true,
+        "reading a stacked autoencoder (.ae, .sae, .csae) whose first line does not hold its five numbers (window half-width, layer count, scale, type, levels): after a warning the reading goes on with memory contents for the numbers missing";
+    FS_878 = "FS-878", "FreeSurfer", true,
+        "reading a stacked autoencoder whose file ends before a layer it announces, whose layer matrices cannot be read or made, or whose check of a one-voxel window has no first layer: FreeSurfer crashes";
+    FS_879 = "FS-879", "FreeSurfer", true,
+        "reading a stacked autoencoder whose window, input count, frame count or later layer's kernel does not fit a 32-bit integer: the sizes wrap around";
+    FS_880 = "FS-880", "FreeSurfer", true,
+        "reading a stacked autoencoder as a volume when a layer's weight matrix has fewer inputs than the window (or the kernel through the layer before) needs: the voxels take the next hidden units' weights";
+    FS_921 = "FS-921", "FreeSurfer", true,
+        "reading a later layer of a stacked autoencoder as a volume (frame #1 and on): the volume's header takes the extent of the autoencoder's training volume while its voxels are the kernel's, so the header and the voxels disagree (reads past the voxels, and the next layer's kernel sized from that extent)";
+    FS_922 = "FS-922", "FreeSurfer", true,
+        "reading a stacked autoencoder whose window is one voxel and whose levels are 0 or fewer: the check run on reading writes its first input outside the layer's memory (memory corruption or a crash)";
+    FS_923 = "FS-923", "FreeSurfer", true,
+        "reading a stacked autoencoder whose window is one voxel, with one level and no hidden units: the check run on reading reads the first weight of a matrix that has none (a crash)";
+    FS_924 = "FS-924", "FreeSurfer", true,
+        "reading a binary matrix (MatrixReadFrom: the layers of an autoencoder file) from a file that ends early, when the matrix's size asks for a million numbers or more past the end (a size read from misaligned bytes asks for up to two billion): an error line for each number and a matrix of that size filled from memory contents (billions of lines, gigabytes of memory)";
+    FS_925 = "FS-925", "FreeSurfer", true,
+        "reading a stacked autoencoder as a volume when a layer's weight matrix has fewer inputs than the window (or the kernel through the layer before) needs: the last hidden unit's voxels take memory contents past the matrix";
+    FS_926 = "FS-926", "FreeSurfer", true,
+        "allocating a matrix of many rows (a size read from a damaged or misaligned file, such as a billion rows of no numbers): FreeSurfer asks for 8 bytes per row before any number (gigabytes), so whether it goes on or crashes depends on the machine's memory";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

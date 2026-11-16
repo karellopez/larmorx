@@ -347,8 +347,8 @@ pub fn triangle_ray_intersect(
     }
     let inv = matrix_svd_inverse(g, out, err, &m_u, None)?.into_new();
     let point = sub_sse(orig_pt, u0);
-    for r in 0..3 {
-        v_p.set_relt(r as i32 + 1, 1, narrow(point[r]));
+    for (r, &p) in point.iter().enumerate() {
+        v_p.set_relt(r as i32 + 1, 1, narrow(p));
     }
     matrix_multiply(g, out, err, inv.as_ref(), Some(&v_p), Some(&mut v_r))?;
     let t = widen(v_r.relt(3, 1));

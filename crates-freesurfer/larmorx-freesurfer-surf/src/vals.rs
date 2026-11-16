@@ -80,7 +80,7 @@ pub fn fill_holes(
             0,
         )?;
         let below = val < thresh;
-        let inverted = if below == !(val > thresh) {
+        let inverted = if below == (val.is_nan() || val <= thresh) {
             below
         } else {
             g.notices.add(

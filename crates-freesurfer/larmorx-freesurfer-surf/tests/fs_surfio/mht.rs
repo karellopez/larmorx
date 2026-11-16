@@ -326,7 +326,7 @@ pub(super) fn mht_tokens(t: &mut Vec<String>, g: &mut Gen) {
 /// `x / res + 1000`, truncated, `None` when the conversion is undefined (as the C++ probe's).
 fn vox(x: f32, res: f32) -> Option<i32> {
     let w = f64::from(x) / f64::from(res) + f64::from(TABLE_CENTER);
-    (w > -2_147_483_649.0 && w < 2_147_483_648.0).then(|| w as i32)
+    (w > -2_147_483_649.0 && w < 2_147_483_648.0).then_some(w as i32)
 }
 
 fn dump(
@@ -536,9 +536,8 @@ pub(super) fn mht_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 let thresh = t.d();
                 let mut m: Option<Mri> = None;
                 if usemri {
-                    let mut x =
-                        mri_alloc_sequence(g, io.out, io.err, nv as i32, 1, 1, MRI_FLOAT, 1)?;
-                    for v in 0..nv as i32 {
+                    let mut x = mri_alloc_sequence(g, io.out, io.err, nv, 1, 1, MRI_FLOAT, 1)?;
+                    for v in 0..nv {
                         let val = t.f();
                         mri_set_vox_val(g, io.err, &mut x, v, 0, 0, 0, val, 0)?;
                     }
@@ -549,7 +548,7 @@ pub(super) fn mht_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 o.i(i64::from(r));
                 vertices(&s, o);
                 if let Some(m) = &m {
-                    for v in 0..nv as i32 {
+                    for v in 0..nv {
                         o.f(mri_get_vox_val(g, io.err, m, v, 0, 0, 0, 0)?);
                     }
                 }

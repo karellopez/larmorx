@@ -357,13 +357,13 @@ fn sample_triangle(
         1.0
     };
     if g.notices.reproduce() {
-        if !(mhtres > 0.0) {
+        if mhtres.is_nan() || mhtres <= 0.0 {
             g.notices.add(
                 &FS_909,
                 format!("the surface hash table: a resolution of {mhtres} (not above 0)"),
             );
         }
-    } else if !(mhtres > 0.0) {
+    } else if mhtres.is_nan() || mhtres <= 0.0 {
         undefined(g, err, "the resolution", f64::from(mhtres))?;
     }
     let dif_b2a = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];

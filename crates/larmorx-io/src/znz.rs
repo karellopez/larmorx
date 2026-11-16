@@ -1020,7 +1020,9 @@ impl GzFile {
         Ok(())
     }
 
-    /// `gzseek64`.
+    /// `gzseek64` (its `z_off64_t` arithmetic wraps as the C build's does: a seek to an offset
+    /// near `i64::MIN`, as a NIfTI header's NaN `vox_offset` converts, gives the release build's
+    /// result in debug builds too).
     pub fn gzseek(&mut self, mut offset: i64, whence: Whence) -> i64 {
         if self.err != Z_OK && self.err != Z_BUF_ERROR {
             return -1;
@@ -1029,15 +1031,18 @@ impl GzFile {
             return -1;
         }
         if whence == Whence::Set {
-            offset -= self.x_pos;
+            offset = offset.wrapping_sub(self.x_pos);
         } else if self.seek {
-            offset += self.skip;
+            offset = offset.wrapping_add(self.skip);
         }
         self.seek = false;
-        if self.mode == GzMode::Read && self.how == How::Copy && self.x_pos + offset >= 0 {
+        if self.mode == GzMode::Read
+            && self.how == How::Copy
+            && self.x_pos.wrapping_add(offset) >= 0
+        {
             if self
                 .file
-                .seek(SeekFrom::Current(offset - self.x_have as i64))
+                .seek(SeekFrom::Current(offset.wrapping_sub(self.x_have as i64)))
                 .is_err()
             {
                 return -1;
@@ -1048,14 +1053,14 @@ impl GzFile {
             self.seek = false;
             self.error(Z_OK);
             self.avail_in = 0;
-            self.x_pos += offset;
+            self.x_pos = self.x_pos.wrapping_add(offset);
             return self.x_pos;
         }
         if offset < 0 {
             if self.mode != GzMode::Read {
                 return -1;
             }
-            offset += self.x_pos;
+            offset = offset.wrapping_add(self.x_pos);
             if offset < 0 {
                 return -1;
             }
@@ -1074,7 +1079,7 @@ impl GzFile {
             self.seek = true;
             self.skip = offset;
         }
-        self.x_pos + offset
+        self.x_pos.wrapping_add(offset)
     }
 
     /// `gzeof`: whether a read went past the end.

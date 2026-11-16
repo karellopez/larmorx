@@ -682,7 +682,8 @@ pub fn mri_read(
         r
     } else if mtype == identify::IMAGE_FILE {
         // every voxel read whatever volume_flag says; the frames are not checked
-        let r = crate::imageio::read_as_volume(g, out, err, dir, &copy)?;
+        let r =
+            crate::imageio::read_as_volume(g, out, err, env, dir, &copy, start_frame, end_frame)?;
         start_frame = -1;
         end_frame = -1;
         r

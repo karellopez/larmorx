@@ -8,7 +8,7 @@
 //!                                              ones without the heavy ones, `cases::HEAVY_SEED1`)
 //!     fs_io_probe run <cases> fix|reproduce    one line per case: the output, a tab, the
 //!                                              defects the port noted (comma-separated); the
-//!                                              files in <cases>.port/
+//!                                              files in a temporary folder
 
 #[path = "../tests/fs_io/cases.rs"]
 mod cases;
@@ -37,7 +37,14 @@ fn main() {
                 "reproduce" => UpstreamDefects::Reproduce,
                 m => panic!("mode {m}"),
             };
-            let base = std::path::PathBuf::from(format!("{}.port", args[2]));
+            // a short folder of the system's (libtiff's messages cut the file's name to 100
+            // bytes: the port names the file by its path in this folder, FreeSurfer by its
+            // name relative to its own)
+            let tmp = tempfile::Builder::new()
+                .prefix("fsio")
+                .tempdir()
+                .expect("a temporary directory");
+            let base = tmp.path().to_path_buf();
             let w = cases::Work {
                 fix: base.join("fix"),
                 dat: base.join("dat"),

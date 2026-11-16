@@ -742,6 +742,10 @@ fn answer(
     if bits & 512 != 0 {
         pairs.push(("SHOW_NEG", "1"));
     }
+    // piece 23 (relay 40): TiffReadImage's debugging lines
+    if bits & 1024 != 0 {
+        pairs.push(("FS_TIFF_DEBUG", "1"));
+    }
     let mut env = Environment::from_pairs(pairs);
     for (k, v) in more_env {
         // ASCII values only (the generated cases'): the same on every platform

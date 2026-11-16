@@ -127,6 +127,9 @@ pub struct Globals {
     /// `gcamComputeMetricProperties`' `static bool reported` (`gcamorph.cpp`): true once its
     /// `width:<w> too small for parallelism` line has been printed (once per process).
     pub gcam_metric_width_reported: bool,
+    /// `imageio.cpp`'s `static bool FS_TIFF_DEBUG`: true once a TIFF image was read with
+    /// `FS_TIFF_DEBUG` in the environment (for the rest of the process).
+    pub fs_tiff_debug: bool,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -192,6 +195,7 @@ impl Globals {
             minc_find_volume_count: 0,
             remove_nans_shown: false,
             gcam_metric_width_reported: false,
+            fs_tiff_debug: false,
             notices: Notices::new(mode),
         }
     }

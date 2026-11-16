@@ -24,7 +24,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_851, FS_852, FS_853, FS_854, FS_855};
+use larmorx_core::defects::{FS_851, FS_852, FS_853, FS_854, FS_855, FS_875};
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::alloc::MACHINE_BYTES;
 use larmorx_freesurfer_core::cstd::{fmt_f, note_glibc07};
@@ -35,11 +35,13 @@ use larmorx_freesurfer_core::log::{
 };
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy, matrix_multiply, matrix_multiply_d};
 use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_inverse, matrix_print};
+use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_core::utils::{self, nint};
 use larmorx_freesurfer_filter::norm::{CONTROL_MARKED, mri_build_voronoi_diagram, mri_soap_bubble};
 use larmorx_freesurfer_io::{fio, identify, mriio, tags};
+use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{
     MGH_VERSION, MGZ_INTENT_WARPMAP, MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc, mri_alloc_header,
     mri_alloc_sequence, mri_copy_header, mri_copy_vol_geom_to_mri,
@@ -1191,7 +1193,8 @@ fn atlas_volume(
 
 /// `GCAMwriteWarpToMRI(gcam, NULL)`: a three-frame float volume of the morph's grid (the atlas
 /// geometry, voxel sizes times the spacing) holding each node's displacement in voxels, `x -
-/// origx`, `y - origy`, `z - origz` (in `double`, stored as `float`).
+/// origx`, `y - origy`, `z - origz` (in `double`, stored as `float`; a NaN position's bits as
+/// SSE passes them on, the first operand's: `sse`).
 pub fn gcam_write_warp_to_mri(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -1204,9 +1207,39 @@ pub fn gcam_write_warp_to_mri(
         for y in 0..h.max(0) {
             for z in 0..d.max(0) {
                 let n = gcam.node(x, y, z).clone();
-                mri_set_vox_val(g, err, &mut warp, x, y, z, 0, (n.x - n.origx) as f32, 0)?;
-                mri_set_vox_val(g, err, &mut warp, x, y, z, 1, (n.y - n.origy) as f32, 0)?;
-                mri_set_vox_val(g, err, &mut warp, x, y, z, 2, (n.z - n.origz) as f32, 0)?;
+                mri_set_vox_val(
+                    g,
+                    err,
+                    &mut warp,
+                    x,
+                    y,
+                    z,
+                    0,
+                    sse::sub64(n.x, n.origx) as f32,
+                    0,
+                )?;
+                mri_set_vox_val(
+                    g,
+                    err,
+                    &mut warp,
+                    x,
+                    y,
+                    z,
+                    1,
+                    sse::sub64(n.y, n.origy) as f32,
+                    0,
+                )?;
+                mri_set_vox_val(
+                    g,
+                    err,
+                    &mut warp,
+                    x,
+                    y,
+                    z,
+                    2,
+                    sse::sub64(n.z, n.origz) as f32,
+                    0,
+                )?;
                 if x == g.gx && y == g.gy && z == g.gz {
                     let f = |v: f64| fmt_f(v, 2, 1);
                     let _ = writeln!(
@@ -1660,6 +1693,99 @@ pub fn register_io() {
     larmorx_freesurfer_io::upper::register(|u| {
         u.read_morph = Some(read_morph);
     });
+}
+
+/// `GCAMcopy(gcamsrc, gcamdst)` (gcamorph.cpp 17347): the morph copied into `dst` (another grid:
+/// `GCAMcopy: incompatible size.` and the end, `ERROR_BADPARM`) or into a new one
+/// (`GCAMalloc`): the sizes, `neg`, `exp_k`, the spacing, the index volumes of the inverse, the
+/// two geometries, `ninputs`, the type, the status, the affine, its determinant and every node.
+/// FS-875: FreeSurfer copies the index volumes and the affine into the destination's own, and
+/// keeps no copy when the destination has none (a new morph has none): by default the copies
+/// are kept; `reproduce` leaves them out, noted.
+pub fn gcam_copy(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Gcam,
+    dst: Option<&mut Gcam>,
+) -> Result<Ret<Gcam>, Fatal> {
+    if let Some(d) = &dst
+        && (d.width, d.height, d.depth) != (src.width, src.height, src.depth)
+    {
+        log::error_exit(g, err, ERROR_BADPARM, "GCAMcopy: incompatible size.\n")?;
+    }
+    let mut fresh = None;
+    let given = dst.is_some();
+    let d: &mut Gcam = match dst {
+        Some(d) => d,
+        None => fresh.insert(gcam_alloc(g, err, src.width, src.height, src.depth)?),
+    };
+    d.width = src.width;
+    d.height = src.height;
+    d.depth = src.depth;
+    d.neg = src.neg;
+    d.exp_k = src.exp_k;
+    d.spacing = src.spacing;
+    let keep = |g: &mut Globals, what: &str| {
+        g.notices.add(
+            &FS_875,
+            format!(
+                "GCAMcopy: the {what} copied into a morph without one (FreeSurfer keeps no copy)"
+            ),
+        );
+        g.notices.fix()
+    };
+    if let (Some(x), Some(y), Some(z)) = (&src.mri_xind, &src.mri_yind, &src.mri_zind) {
+        for (s, t) in [
+            (x, &mut d.mri_xind),
+            (y, &mut d.mri_yind),
+            (z, &mut d.mri_zind),
+        ] {
+            match t {
+                Some(t) => {
+                    mri_copy(g, out, err, s, Some(t))?;
+                }
+                None => {
+                    if keep(g, "inverse's index volume")
+                        && let Ret::New(m) = mri_copy(g, out, err, s, None)?
+                    {
+                        *t = Some(m);
+                    }
+                }
+            }
+        }
+    } else {
+        d.mri_xind = None;
+        d.mri_yind = None;
+        d.mri_zind = None;
+    }
+    d.image = src.image.clone();
+    d.atlas = src.atlas.clone();
+    d.ninputs = src.ninputs;
+    d.mtype = src.mtype;
+    d.status = src.status;
+    match (&src.m_affine, &mut d.m_affine) {
+        (Some(s), Some(t)) => {
+            matrix_copy(g, out, err, Some(s), Some(t))?;
+        }
+        (Some(s), None) => {
+            if keep(g, "affine")
+                && let Ret::New(m) = matrix_copy(g, out, err, Some(s), None)?
+            {
+                d.m_affine = Some(m);
+            }
+        }
+        // MatrixCopy(NULL, ...) returns NULL and leaves the destination's
+        (None, _) => {}
+    }
+    d.det = src.det;
+    d.geom_unset = src.geom_unset;
+    d.nodes.clone_from(&src.nodes);
+    Ok(if given {
+        Ret::Given
+    } else {
+        fresh.map_or(Ret::Null, Ret::New)
+    })
 }
 
 #[cfg(test)]

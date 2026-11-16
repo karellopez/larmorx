@@ -376,8 +376,9 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   or into itself), the transform printed after `V`, `X`, `O` (`ptrans`). `SKIP` also for FS-928 and track C's FS-504
   and FS-957. Seeds 7, 13 and 21 (about 400 `trs` cases each): `reproduce` identical on every compared case (238, 248,
   244), 0 different (`fsio` REBUILT). `gcw_nifti_difference.txt`: one `gcw` case (a NIfTI warp written from a warp
-  volume with NaNs) whose written file differs from `fsio`'s (findings Part 37): `fsio gcw_nifti_difference.txt` and
-  `fs_io_probe run gcw_nifti_difference.txt reproduce`, each inside `boxed.sh`.
+  volume without geometries) whose written file `fsio` makes from memory contents after other cases (identical to
+  the port's when run alone; findings Part 37): `fsio gcw_nifti_difference.txt`, the same after 4,376 cases of the
+  recorded set, and `fs_io_probe run gcw_nifti_difference.txt reproduce`, each inside `boxed.sh`.
 - Piece 33 (track A relay 41): stacked autoencoders read as volumes. `aed` and `aeh` (piece 6's `mrd` and `mrh`: type
   -1 or 30, `.sae`, `.ae`, `.csae`, `.SAE`, `.dat@sae` names) of autoencoder files built by `tests/fs_io/piece33.rs` as
   FreeSurfer's training programs write them: the header line (windows of one to seven voxels a side, one voxel now and

@@ -2737,11 +2737,14 @@ track C's fs.volume `ltaapply.rs` and `ltaconv.rs` (used as they are).
   (but `[xm][yp][zm]`'s), adds terms 1-3, then `addsd`s that sum into term 4 (`movapd` of term 4, `addsd` of the sum),
   terms 5-7 into that, and the result into term 8. Only the NaN a sum of two NaNs keeps depends on it (one seed-7 `f`
   query: `7fe00001` from a signalling NaN in a node's y against a quiet one).
-- **A difference left for the next relay: `gcw` of a warp volume with NaN voxels written as NIfTI.** The case
+- **A memory dependence left for the next relay: `gcw` of a warp volume written as NIfTI.** The case
   `validation/probes/fs-io/gcw_nifti_difference.txt` (a 3 x 2 x 2 warp volume of three frames with two quiet NaNs
-  and three 1e30 values, an unknown warp format 7 in its tag, written to `o.nii` in format 0) gives another FNV-1a of
-  the written file than `fsio` (seed 1's portable case 4377 when piece 32 drew the new queries from the main
-  generator). Not caused by this relay's code (the functions it changed are not on that path: `Warpfield`'s
-  `MatrixMultiplyD` and subtractions were checked against `warpfield.cpp.o` and `matrix.cpp.o` and agree); the
-  written bytes are not printed by the probe, so the next relay compares them (`fsio` keeping its fixture, or a
-  print of the file). The recorded set does not hold that case.
+  and three 1e30 values, its warp tag of format 7 and no geometry tag, written to `o.nii` in format 0; `GCAMwrite`
+  prints `gcam image [0 x 0 x 0]`) gives `fsio` two outputs: run alone (or after 0 cases), the written file has the
+  port's bytes (every voxel 0; FNV-1a `405afea9a37dc9dc`); run after the 4,376 cases before it in a recorded set (the
+  same process: each case a forked child), its voxels are per-frame constants (`-65536`, `-8320`, `7.4e8`) and 64 bytes
+  of the header extension at offsets 376-391, 456-471, 548-563, 640-655 differ (FNV-1a `fe6976ea86a90170`; measured
+  2026-11-16 with `strace -f -e trace=openat,write` of `fsio` on both case files). So FreeSurfer's conversion of a
+  morph without geometries reads memory it never wrote (a matrix or geometry of the image of no voxels); the port
+  gives zeros. Not caused by this relay's code (the functions it changed are not on that path). The next relay finds
+  the read, gives it a defect ID and marks the case `VARY`. The recorded set does not hold that case.

@@ -36,6 +36,7 @@ pub enum Dst<'a> {
 
 /// Which volume a function returned (§6).
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum VolOut {
     /// None (`NULL`).
     Nothing,
@@ -50,6 +51,7 @@ pub enum VolOut {
 }
 
 /// Where the destination is while a function works.
+#[allow(clippy::large_enum_variant)]
 enum Slot<'a> {
     None,
     Own(Mri),

@@ -252,7 +252,10 @@ impl Process {
     /// `MRIcompareHeaders(a, b)` (§16): 1 when either is absent or the headers differ, else 0.
     pub fn mri_compare_headers(&mut self, a: Option<&Mri>, b: Option<&Mri>) -> i32 {
         let (Some(a), Some(b)) = (a, b) else { return 1 };
-        let differ = |x: f32, y: f32| !(sse::sub32(x, y).abs() < f32::EPSILON);
+        // differs by FLT_EPSILON or more, or a NaN difference
+        let differ = |x: f32, y: f32| {
+            sse::sub32(x, y).abs().partial_cmp(&f32::EPSILON) != Some(std::cmp::Ordering::Less)
+        };
         let (g, h) = (&a.geom, &b.geom);
         let pairs = [
             (g.xsize, h.xsize),
@@ -286,7 +289,8 @@ impl Process {
         if pairs.iter().any(|&(x, y)| differ(x, y)) {
             return 1;
         }
-        if !(sse::sub64(a.flip_angle, b.flip_angle).abs() < f64::from(f32::EPSILON)) {
+        let flip = sse::sub64(a.flip_angle, b.flip_angle).abs();
+        if flip.partial_cmp(&f64::from(f32::EPSILON)) != Some(std::cmp::Ordering::Less) {
             return 1;
         }
         #[allow(clippy::float_cmp)]

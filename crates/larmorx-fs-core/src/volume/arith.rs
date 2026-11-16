@@ -870,10 +870,7 @@ impl Process {
                             if !add {
                                 last_f = sse::sub32(ea.to_f32(), eb.to_f32());
                                 last_is_float = true;
-                            } else if ka == types::FLOAT {
-                                last_f = sse::add32(ea.to_f32(), eb.to_f32());
-                                last_is_float = true;
-                            } else if kd == types::FLOAT {
+                            } else if ka == types::FLOAT || kd == types::FLOAT {
                                 last_f = sse::add32(ea.to_f32(), eb.to_f32());
                                 last_is_float = true;
                             } else {
@@ -956,10 +953,15 @@ impl Process {
                     else {
                         unreachable!()
                     };
-                    let o = if ub == 0 {
-                        if ua == 0 { 0 } else { 255 }
-                    } else {
-                        ua / ub
+                    let o = match ua.checked_div(ub) {
+                        Some(q) => q,
+                        None => {
+                            if ua == 0 {
+                                0
+                            } else {
+                                255
+                            }
+                        }
                     };
                     self.direct_put(v.d_mut(), xa, y, z, 0, &[o], what)?;
                     if ub == 0 && x + 1 < i64::from(g.width) {
@@ -975,9 +977,7 @@ impl Process {
                             );
                         }
                     }
-                    if ub != 0 {
-                        pa += 1;
-                    } else if !reproduce {
+                    if ub != 0 || !reproduce {
                         pa += 1;
                     }
                 }

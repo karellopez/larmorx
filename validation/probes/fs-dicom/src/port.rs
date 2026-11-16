@@ -6,7 +6,7 @@
 use larmorx_core::cfmt::{Captured, Stream};
 use larmorx_core::defects::{Notices, UpstreamDefects};
 use larmorx_io::dicom::cond::{self, Condition, DCM_ELEMENTLENGTHERROR};
-use larmorx_io::dicom::{self, CondStack, Data, DcmObject, Dialect};
+use larmorx_io::dicom::{self, CondStack, Data, DcmObject, Dialect, Element};
 use std::path::Path;
 
 /// FreeSurfer 8.2.0's copy of CTN 3.0.6, as the probe models it.
@@ -113,6 +113,9 @@ pub struct PortRun {
     pub notices: Vec<&'static str>,
     pub details: Vec<String>,
     pub unsupported: bool,
+    /// One per value request (op 8): whether the port could not give CTN's bytes (memory never
+    /// written, FS-91 and FS-951, or FS-953's swap past the value).
+    pub value_flags: Vec<bool>,
 }
 
 pub fn run(file: &Path, ops: &[i64], dialect: &dyn Dialect) -> PortRun {
@@ -121,7 +124,10 @@ pub fn run(file: &Path, ops: &[i64], dialect: &dyn Dialect) -> PortRun {
     let mut out = Captured::default();
     let mut notices = Notices::new(UpstreamDefects::Reproduce);
     let mut object: Option<DcmObject> = None;
+    let mut element = Element::default();
+    let mut ctx: u32 = 0;
     let mut unsupported = false;
+    let mut value_flags = Vec::new();
     for pair in ops.chunks_exact(2) {
         let (op, arg) = (pair[0], pair[1]);
         match op {
@@ -177,6 +183,72 @@ pub fn run(file: &Path, ops: &[i64], dialect: &dyn Dialect) -> PortRun {
                 put_u64(&mut b, code);
                 put_s(&mut b, &text);
             }
+            7 => {
+                let c = match dicom::get_element(
+                    object.as_ref(),
+                    arg as u32,
+                    dialect,
+                    &mut stack,
+                    &mut out,
+                    &mut notices,
+                ) {
+                    Ok(e) => {
+                        element = e;
+                        cond::DCM_NORMAL
+                    }
+                    Err(c) => c,
+                };
+                b.push(b'g');
+                put_u64(&mut b, c);
+                put_u32(&mut b, element.tag);
+                put_u32(&mut b, element.representation);
+                put_u64(&mut b, element.multiplicity);
+                put_u32(&mut b, element.length);
+                put_s(&mut b, element.description.as_bytes());
+                b.push(b'0');
+            }
+            8 => {
+                if arg >= 0 {
+                    element.length = arg as u32;
+                }
+                let fsz = std::fs::metadata(file).map(|m| m.len() as i64).unwrap_or(0);
+                let room = (element.length as i64).min(fsz + 4096) as usize;
+                let before = notices.as_slice().len();
+                let r = dicom::get_element_value(
+                    object.as_ref(),
+                    &element,
+                    &mut ctx,
+                    dialect,
+                    &mut stack,
+                    &mut out,
+                    &mut notices,
+                );
+                let noticed = notices.as_slice()[before..]
+                    .iter()
+                    .any(|n| matches!(n.defect.id, "FS-91" | "FS-951" | "FS-953"));
+                value_flags.push(r.unknown > 0 || noticed);
+                let mut buf = vec![0xa5u8; room];
+                let n = r.data.len().min(room);
+                buf[..n].copy_from_slice(&r.data[..n]);
+                b.push(b'v');
+                put_u64(&mut b, r.cond);
+                put_u32(&mut b, r.rtn_length.unwrap_or(0xa5a5_a5a5));
+                put_u64(&mut b, ctx as u64);
+                put_u32(&mut b, room as u32);
+                b.extend_from_slice(&buf);
+            }
+            9 => ctx = arg as u32,
+            10 => element.tag = arg as u32,
+            11 => element.representation = arg as u32,
+            12 => {
+                let ok = std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(file)
+                    .and_then(|f| f.set_len(arg as u64))
+                    .is_ok();
+                b.push(b't');
+                put_u32(&mut b, ok as u32);
+            }
             _ => {}
         }
     }
@@ -187,5 +259,6 @@ pub fn run(file: &Path, ops: &[i64], dialect: &dyn Dialect) -> PortRun {
         notices: notices.as_slice().iter().map(|n| n.defect.id).collect(),
         details: notices.as_slice().iter().map(|n| format!("{}: {}", n.defect.id, n.detail)).collect(),
         unsupported,
+        value_flags,
     }
 }

@@ -48,6 +48,8 @@ mod dict_table;
 pub mod element;
 pub mod read;
 #[cfg(test)]
+mod element_tests;
+#[cfg(test)]
 mod tests;
 
 pub use cond::{CondStack, Condition};

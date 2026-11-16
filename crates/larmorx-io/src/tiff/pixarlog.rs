@@ -9,8 +9,9 @@
 //! rounded functions of [`larmorx_core::math`], with `reproduce` glibc 2.35's; they give the
 //! same tables (`tests::the_tables_are_the_same_with_either_exp`).
 //!
-//! libtiff 3.6.1 sizes its row buffer by the rows per strip (the default 2^32 - 1 overflows it),
-//! never checks that allocation, and reads the first code of a row through the tables without
+//! libtiff 3.6.1 sizes its row buffer by the rows per strip (the default 2^32 - 1 overflows it)
+//! and never checks that allocation (FS-829: where it fails, every row fails with a zlib error;
+//! by default the buffer is what a row needs). It reads the first code of a row through the tables without
 //! masking it to 11 bits; for 11- and 12-bit samples a scanline holds fewer codes than a row,
 //! and the accumulators read codes never inflated and write past the buffer (FS-840). By default
 //! the row buffer is what a row needs, the first code is masked and the codes are cut to whole
@@ -23,7 +24,7 @@ use super::Tiff;
 use super::fields::tag;
 use super::next::Out;
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::FS_840;
+use larmorx_core::defects::{FS_829, FS_840, FS_881};
 use larmorx_core::zlib::{self as z, Inflate};
 
 const TSIZE: usize = 2048;
@@ -103,6 +104,8 @@ pub(crate) struct PixarLog {
     tbuf: Vec<u16>,
     tbuf_def: Vec<bool>,
     tbuf_bytes: u64,
+    /// libtiff 3.6.1's allocation of the row buffer failed (the null pointer is kept).
+    tbuf_null: bool,
     stride: u16,
     state_init: bool,
     pub user_datafmt: i32,
@@ -112,6 +115,7 @@ pub(crate) struct PixarLog {
 /// The accumulators' notes.
 #[derive(Default)]
 struct Flags {
+    shift12: bool,
     undefined: bool,
     beyond_tbuf: bool,
     unmasked: bool,
@@ -190,16 +194,24 @@ impl Tiff {
         sp.tbuf.clear();
         sp.tbuf_def.clear();
         sp.tbuf_bytes = bytes;
-        let wanted = u64::from(stride) * u64::from(self.dir.imagewidth) * u64::from(self.dir.rowsperstrip) * 2;
-        if !self.fix() && (bytes != wanted || bytes > 1 << 31) {
+        let cannot = !self.can_alloc(bytes);
+        let fix = self.fix();
+        let sp = self.codec.pixarlog.as_mut().expect("PixarLog state");
+        sp.tbuf_null = cannot && !fix;
+        if cannot {
             self.notices.add(
-                &FS_840,
+                &FS_829,
                 format!(
-                    "the PixarLog row buffer of {name} is allocated with {bytes} bytes \
-                     ({stride} samples x {} pixels x {} rows per strip x 2, in 32 bits) and \
-                     never checked: where that allocation fails libtiff 3.6.1 decodes through a \
-                     null pointer (a crash)",
-                    self.dir.imagewidth, self.dir.rowsperstrip
+                    "the PixarLog row buffer of {name} asks for {bytes} bytes ({stride} samples x \
+                     {} pixels x {} rows per strip x 2, in 32 bits), which cannot be allocated: \
+                     libtiff 3.6.1 does not check, and every row fails with a zlib error{}",
+                    self.dir.imagewidth,
+                    self.dir.rowsperstrip,
+                    if fix {
+                        " (corrected: the buffer is what a row needs)"
+                    } else {
+                        ""
+                    }
                 ),
             );
         }
@@ -248,7 +260,10 @@ impl Tiff {
             FMT_16BIT | FMT_12BITPICIO | FMT_11BITLOG => (i64::from(occ) as u64 / 2) as i32,
             FMT_8BIT | FMT_8BITABGR => occ,
             _ => {
-                let m = format!("{} bit input not supported in PixarLog", self.dir.bitspersample);
+                let m = format!(
+                    "{} bit input not supported in PixarLog",
+                    self.dir.bitspersample
+                );
                 self.error(Some(&self.name.clone()), &m, s);
                 return 0;
             }
@@ -260,7 +275,16 @@ impl Tiff {
         if sp.inflate.is_none() {
             return 0;
         }
-        let (past, tbuf_bytes) = (sp.in_at + sp.in_left as usize > self.raw_defined, sp.tbuf_bytes);
+        if sp.tbuf_null {
+            // inflate's output is the null pointer a failed allocation gave: Z_STREAM_ERROR
+            let m = format!("{name}: zlib error: (null)");
+            self.error(Some(MODULE), &m, s);
+            return 0;
+        }
+        let (past, tbuf_bytes) = (
+            sp.in_at + sp.in_left as usize > self.raw_defined,
+            sp.tbuf_bytes,
+        );
         if past {
             self.past_raw_notice();
         }
@@ -375,7 +399,10 @@ impl Tiff {
         let t = tables(!fix);
         let stride = i32::from(sp.stride);
         let mut fl = Flags::default();
-        let mut o = Out { buf: op, past: false };
+        let mut o = Out {
+            buf: op,
+            past: false,
+        };
         let mut hang = false;
         {
             let mut i = 0i32;
@@ -416,7 +443,25 @@ impl Tiff {
                 format!(
                     "decoding {name}: a PixarLog row starts with a code above 2047, which \
                      libtiff 3.6.1 looks up unmasked (memory past its tables){}",
-                    if fix { "; masked to 11 bits (as libtiff 4.0.10 does)" } else { "; read as 0" }
+                    if fix {
+                        "; masked to 11 bits (as libtiff 4.0.10 does)"
+                    } else {
+                        "; read as 0"
+                    }
+                ),
+            );
+        }
+        if fl.shift12 {
+            self.notices.add(
+                &FS_881,
+                format!(
+                    "decoding {name}: PixarLog 12-bit samples, {stride} per pixel: libtiff 3.6.1 \
+                     gives each pixel the next one's value{}",
+                    if fix {
+                        " (corrected: each pixel its own value)"
+                    } else {
+                        ""
+                    }
                 ),
             );
         }
@@ -519,7 +564,17 @@ fn first(a: &mut Acc, v: u32) -> usize {
 /// One output value: sample `k` of the row at byte `at`, from `code` (a table index; for
 /// 11-bit output the value itself, `masked` or not).
 #[allow(clippy::too_many_arguments)]
-fn put(o: &mut Out, fl: &mut Flags, fmt: i32, t: &Tables, at: i64, k: i64, code: usize, defined: bool, masked: bool) {
+fn put(
+    o: &mut Out,
+    fl: &mut Flags,
+    fmt: i32,
+    t: &Tables,
+    at: i64,
+    k: i64,
+    code: usize,
+    defined: bool,
+    masked: bool,
+) {
     if !defined {
         fl.undefined = true;
     }
@@ -602,7 +657,17 @@ fn accumulate(
                 let (v, def) = a.get(up + w + j as i64);
                 c[j] = c[j].wrapping_add(v);
                 d[j] &= def;
-                put(o, a.fl, fmt, t, at, w + j as i64, (c[j] & mask) as usize, d[j], true);
+                put(
+                    o,
+                    a.fl,
+                    fmt,
+                    t,
+                    at,
+                    w + j as i64,
+                    (c[j] & mask) as usize,
+                    d[j],
+                    true,
+                );
             }
         }
     } else {
@@ -623,8 +688,10 @@ fn accumulate(
                 let sum = next.wrapping_add(cur) & 0xffff;
                 a.set(up + w + s, sum, dc && dn);
                 // horizontalAccumulate12 looks up wp[stride] after the sum, the others *wp
+                // (FS-881: by default the 12-bit decoder too)
                 let (code, dcode) = if fmt == FMT_12BITPICIO {
-                    (sum, dc && dn)
+                    a.fl.shift12 = true;
+                    if a.fix { (cur, dc) } else { (sum, dc && dn) }
                 } else {
                     (cur, dc)
                 };

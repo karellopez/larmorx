@@ -2645,6 +2645,8 @@ defects! {
         "writing a rational value that is NaN, infinite or above 4294967295 converts it to an unsigned 32-bit integer out of range (undefined; x86-64 gives 0 or its low 32 bits); clamped to 0 or 4294967295";
     FS_828 = "FS-828", "libtiff 3.6.1", true,
         "a directory that counts more entries than it fills writes the rest as memory never written; written as zeros";
+    FS_829 = "FS-829", "libtiff 3.6.1", true,
+        "the PixarLog decoder sizes its row buffer by the rows per strip in 32 bits and never checks the allocation: where it fails (the default of 2^32 - 1 rows per strip asks for about 8 GiB), zlib is given a null output and every row fails with a zlib error; corrected, the buffer is what a row needs";
     FS_830 = "FS-830", "libtiff 3.6.1", true,
         "after a TIFFReadDirectory that fails, the scanline and tile sizes of the previous directory are kept: TIFFReadScanline and TIFFReadTile write that many bytes into a buffer sized for the new directory (memory past it); only the buffer is written";
     FS_831 = "FS-831", "libtiff 3.6.1", true,
@@ -2666,7 +2668,9 @@ defects! {
     FS_839 = "FS-839", "libtiff 3.6.1", true,
         "the CCITT RLE/W decoder aligns each row to a 16-bit word by the bits it holds, not by the row's position: a row that ends with the decoder holding bits read from the next word loses them, and the next row starts a word late (Premature EOF or wrong rows of a valid image); corrected, each row starts at the next 16-bit boundary of the strip";
     FS_840 = "FS-840", "libtiff 3.6.1", true,
-        "the PixarLog decoder sizes its row buffer by the rows per strip in 32 bits (the default of 2^32 - 1 overflows it) and never checks the allocation (a failure crashes), inflates past the buffer when a call needs more, looks the first codes of a row up through its tables without masking them to 11 bits (memory past the tables), and for 11- and 12-bit samples, whose scanline holds fewer codes than a row, reads codes never inflated and writes past the caller's buffer; corrected as libtiff 4.0.10 does: the buffer what a row needs, the first codes masked, the codes cut to whole rows with its warning";
+        "the PixarLog decoder inflates past its row buffer when a call needs more than the rows per strip gave it, looks the first codes of a row up through its tables without masking them to 11 bits (memory past the tables), and for 11- and 12-bit samples, whose scanline holds fewer codes than a row, reads codes never inflated (memory contents) and writes past the caller's buffer; corrected as libtiff 4.0.10 does: the buffer what a row needs, the first codes masked, the codes cut to whole rows with its warning";
+    FS_881 = "FS-881", "libtiff 3.6.1", true,
+        "the PixarLog decoder for 12-bit samples (PICIO's) with one, two or more than four samples per pixel gives each pixel the next pixel's value, so the second pixel's value is lost and the row's last values come from past the row; corrected, each pixel gets its own value, as the 8-bit, 16-bit and floating-point decoders give it";
 }
 
 /// The register entry with ID `id`.

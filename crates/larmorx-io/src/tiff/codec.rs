@@ -7,8 +7,8 @@
 
 use super::dir::{Layer, PostDecode};
 use super::fax3::{Fax, FaxKind};
-use super::pixarlog::PixarLog;
 use super::fields::Table;
+use super::pixarlog::PixarLog;
 use super::{TIFF_NOBITREV, Tiff, Unported, compression as c};
 use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{FS_817, FS_818, FS_819, FS_831, FS_832, FS_833};

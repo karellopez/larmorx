@@ -447,8 +447,8 @@ pub fn thunder_strip(r: &mut Rng, rows: u32, width: u32) -> Vec<u8> {
 }
 
 /// A little-endian TIFF of one strip: `width` x `rows`, `bps` bits, one sample, `compression`,
-/// photometric `photometric`, the extra `(tag, type, value)` SHORT or LONG entries, the strip's
-/// bytes.
+/// photometric `photometric`, the extra `(tag, type, value)` SHORT or LONG entries (replacing
+/// the defaults of their tags), the strip's bytes.
 pub fn one_strip_file(
     width: u32,
     rows: u32,
@@ -476,21 +476,37 @@ pub fn one_strip_file(
         (278, 4, rows),
         (279, 4, data.len() as u32),
     ];
+    tags.retain(|t| extra.iter().all(|e| e.0 != t.0));
     tags.extend_from_slice(extra);
     tags.sort_by_key(|t| t.0);
+    // BitsPerSample and SampleFormat give one value per sample
+    let spp = tags.iter().find(|t| t.0 == 277).map_or(1, |t| t.2.max(1));
+    let entries_end = out.len() + 2 + 12 * tags.len() + 4;
+    let mut far: Vec<u8> = Vec::new();
     out.extend_from_slice(&(tags.len() as u16).to_le_bytes());
     for (t, ty, v) in tags {
+        let count = if t == 258 || t == 339 { spp } else { 1 };
         out.extend_from_slice(&t.to_le_bytes());
         out.extend_from_slice(&ty.to_le_bytes());
-        out.extend_from_slice(&1u32.to_le_bytes());
-        if ty == 3 {
-            out.extend_from_slice(&(v as u16).to_le_bytes());
-            out.extend_from_slice(&[0, 0]);
+        out.extend_from_slice(&count.to_le_bytes());
+        let mut val: Vec<u8> = Vec::new();
+        for _ in 0..count {
+            if ty == 3 {
+                val.extend_from_slice(&(v as u16).to_le_bytes());
+            } else {
+                val.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        if val.len() <= 4 {
+            val.resize(4, 0);
+            out.extend_from_slice(&val);
         } else {
-            out.extend_from_slice(&v.to_le_bytes());
+            out.extend_from_slice(&((entries_end + far.len()) as u32).to_le_bytes());
+            far.extend_from_slice(&val);
         }
     }
     out.extend_from_slice(&[0; 4]);
+    out.extend_from_slice(&far);
     out
 }
 
@@ -498,11 +514,7 @@ pub fn one_strip_file(
 /// small steps; now and then a first code past 2047, or the count off), in the file's byte
 /// order, deflated at level 1, 6 or 9.
 pub fn pixarlog_strip(r: &mut Rng, n: u64, big: bool) -> Vec<u8> {
-    let n = if r.chance(8) {
-        r.below(n + 8)
-    } else {
-        n
-    };
+    let n = if r.chance(8) { r.below(n + 8) } else { n };
     let mut v = Vec::with_capacity(2 * n as usize);
     let mut k = 0u64;
     while k < n {
@@ -517,7 +529,11 @@ pub fn pixarlog_strip(r: &mut Rng, n: u64, big: bool) -> Vec<u8> {
             } else {
                 (r.below(9) as i32 - 4) as u16
             };
-            v.extend_from_slice(&if big { c.to_be_bytes() } else { c.to_le_bytes() });
+            v.extend_from_slice(&if big {
+                c.to_be_bytes()
+            } else {
+                c.to_le_bytes()
+            });
         }
         k += row;
     }

@@ -293,3 +293,77 @@ fn ccitt_streams_decode_to_their_images() {
         }
     }
 }
+
+/// PixarLog strips (deflated 11-bit codes, differenced as libtiff's encoder differences them:
+/// from the first pixel for three or four samples per pixel, from the second otherwise) decode to
+/// the tables' values of the codes, for 8-bit, 16-bit, float and 11-bit samples.
+#[test]
+fn pixarlog_strips_decode_to_their_codes() {
+    use super::cases::Rng;
+    use super::codecgen::one_strip_file;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let t = super::pixarlog::tables(false);
+    let mut r = Rng::new(5);
+    let mut n = 0;
+    for (bps, sf, size) in [(8u16, 1u32, 1usize), (16, 1, 2), (32, 3, 4), (11, 1, 2)] {
+        for spp in [1u32, 2, 3, 4, 5] {
+            let (width, rows) = (1 + r.below(40) as u32, 1 + r.below(6) as u32);
+            let s = spp as usize;
+            let mut codes: Vec<u16> = Vec::new();
+            let mut want: Vec<Vec<u16>> = Vec::new();
+            for _ in 0..rows {
+                let v: Vec<u16> = (0..width as usize * s)
+                    .map(|_| r.below(2048) as u16)
+                    .collect();
+                let mut c = v.clone();
+                // the encoder's differences: from the first pixel (3, 4 samples) or the second
+                let from = if s == 3 || s == 4 { s } else { 2 * s };
+                for k in (from..c.len()).rev() {
+                    c[k] = v[k].wrapping_sub(v[k - s]) & 0x7ff;
+                }
+                codes.extend_from_slice(&c);
+                want.push(v);
+            }
+            let raw: Vec<u8> = codes.iter().flat_map(|c| c.to_le_bytes()).collect();
+            let data = larmorx_core::zlib::compress_vec(&raw, 6).expect("deflate");
+            let extra = [(277u16, 3u16, spp), (339, 3, sf), (278, 4, rows)];
+            let file = one_strip_file(width, rows, bps, 32909, 1, &extra, &data);
+            let p = dir.path().join(format!("p{n}.tif"));
+            n += 1;
+            std::fs::write(&p, &file).expect("write");
+            let mut cap = Captured::default();
+            let mut tf = Tiff::open(
+                p.to_str().expect("path"),
+                "r",
+                opts(UpstreamDefects::Fix),
+                &mut cap,
+            )
+            .expect("ported")
+            .unwrap_or_else(|| panic!("opened: {}", cap.text(Stream::Err)));
+            let rb = width as usize * s * size;
+            for (y, v) in want.iter().enumerate() {
+                let mut buf = vec![0u8; rb.max(tf.scanline_size() as usize)];
+                let rr = tf
+                    .read_scanline(&mut buf, y as u32, 0, &mut cap)
+                    .expect("ported");
+                if bps == 11 {
+                    // a scanline of 11-bit samples holds fewer codes than a row: cut to none
+                    assert_eq!(rr, 1, "{}", cap.text(Stream::Err));
+                    continue;
+                }
+                assert_eq!(rr, 1, "bps {bps} spp {spp}: {}", cap.text(Stream::Err));
+                for (k, &c) in v.iter().enumerate() {
+                    let c = c as usize;
+                    let got = &buf[k * size..(k + 1) * size];
+                    let exp: Vec<u8> = match bps {
+                        8 => vec![t.to_8[c]],
+                        16 => t.to_16[c].to_le_bytes().to_vec(),
+                        _ => t.to_f[c].to_le_bytes().to_vec(),
+                    };
+                    assert_eq!(got, &exp[..], "bps {bps} spp {spp} row {y} sample {k}");
+                }
+            }
+            tf.close(&mut cap);
+        }
+    }
+}

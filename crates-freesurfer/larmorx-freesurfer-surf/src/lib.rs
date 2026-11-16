@@ -75,6 +75,9 @@
 //!   bounding volume and the interior of a surface (FS-606, FS-607).
 //! - [`labelsurf`] (fs.surf's piece of `label.cpp`, taken early): a label's vertices marked, measured,
 //!   filled, eroded, dilated and inverted on a surface, its mask (FS-630..FS-632).
+//! - [`sclust`] (fs.surf's `surfcluster.cpp`, taken early for `label.cpp`): a surface's clusters
+//!   grown, summarised, sorted, pruned and listed (FS-901, FS-903..FS-907).
+//! - [`valcopy`]: the copies between a surface's vertex fields and its vectors (FS-908).
 //! - [`props11`]: a surface moved to Talairach space (FS-629), the vertex-to-voxel conversions, the
 //!   normal-dot and principal-curvature distributions (FS-626..FS-628), Ashburner's triangle energy.
 #![forbid(unsafe_code)]
@@ -123,6 +126,7 @@ pub mod props8;
 pub mod props9;
 pub mod readwrite;
 pub mod scanf;
+pub mod sclust;
 pub mod sfile;
 pub mod sras;
 pub mod stl;
@@ -131,6 +135,7 @@ pub mod surfmri;
 pub mod surfread;
 pub mod topology;
 pub mod trifile;
+pub mod valcopy;
 pub mod valfile;
 pub mod views;
 pub mod vpos;

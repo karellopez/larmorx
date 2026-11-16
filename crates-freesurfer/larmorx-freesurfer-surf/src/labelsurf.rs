@@ -6,7 +6,9 @@
 //! `LabelArea` (line 1373), `LabelMark` (1480), `LabelMark2` (1498), `LabelUnmark` (1604),
 //! `LabelMarkSurface` (1781), `LabelFillMarked` (943), the file-local `update_vertex_indices`
 //! (3938), `LabelErode` (2195), `LabelDilate` (2259), `MRISlabelInvert` (2850) and
-//! `utils/mrisurf_mri.cpp`'s `MRISlabel2Mask` (5955). FS-630 to FS-632.
+//! `utils/mrisurf_mri.cpp`'s `MRISlabel2Mask` (5955); `LabelRemoveHolesSurf` (4138),
+//! `LabelRemoveIslandsSurf` (4167) and `LabelRemoveHolesAndIslandsSurf` (4216) through
+//! [`crate::sclust`] (relay 38). FS-630 to FS-632, FS-902.
 //!
 //! A label's surface handle (`LABEL::mris`, which `LabelInit` sets) is taken to be the surface the
 //! caller passes, as every FreeSurfer caller does; its template volume (`LABEL::mri_template`) is
@@ -15,7 +17,7 @@
 // The loops index as FreeSurfer's C does (one vertex number for several arrays).
 #![allow(clippy::needless_range_loop)]
 
-use larmorx_core::defects::{FS_630, FS_631, FS_632};
+use larmorx_core::defects::{FS_630, FS_631, FS_632, FS_902};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::ret::Ret;
@@ -29,6 +31,7 @@ use larmorx_freesurfer_volume::frames::mri_const;
 use crate::coords::Io;
 use crate::discrete::clear_marks;
 use crate::mris::Mris;
+use crate::sclust;
 use crate::sras;
 use crate::views::vertex_coord2xyz_float;
 
@@ -528,4 +531,168 @@ pub fn mris_label_invert(
         }
     }
     Ok(Some(inv))
+}
+
+/// A label's `float` `stat` stored in a `double` table and read back (`cvtss2sd`, `cvtsd2ss`): a
+/// signalling NaN comes back quiet.
+fn through_double(x: f32) -> f32 {
+    if x.is_nan() {
+        f32::from_bits(x.to_bits() | 0x0040_0000)
+    } else {
+        x
+    }
+}
+
+/// `LabelRemoveIslandsSurf(surf, lb)`: the label's largest connected piece on the surface. Every
+/// vertex's `val` set to 0, each point's vertex (deleted points too) to 1; the clusters of the
+/// values in [0.5, 2] ([`sclust::map_surf_clusters`], sorted by area); on standard output a line
+/// of 37 dashes, the clusters' table ([`sclust::dump_surf_cluster_sum`]), the dashes again, each
+/// cluster's vertex count as `<n> ` on its own line, `n = <k> <count>` for the first cluster with
+/// the most vertices; the new label (`LabelAlloc` of that count plus one places with the label's
+/// subject name, so `SUBJECTS_DIR` must be set; its coordinate kind and space copied) of that
+/// cluster's vertices in order, each with its current position and the vertex's `stat`. The
+/// surface keeps the cluster numbers (`undefval`) and the values.
+///
+/// **FS-902:** a label without points makes no cluster and FreeSurfer crashes after the table;
+/// larmorx gives an empty label (one place) by default (rule A), the crash (status 139) with
+/// `reproduce`. FS-630: a point naming no vertex of the surface is skipped (FreeSurfer writes
+/// outside the vertices).
+pub fn label_remove_islands_surf(
+    g: &mut Globals,
+    io: &mut Io,
+    surf: &mut Mris,
+    lb: &Label,
+) -> Result<Label, Fatal> {
+    let nv = usize::try_from(surf.nvertices).unwrap_or(0);
+    for vtxno in 0..nv {
+        surf.vertex_mut(vtxno).val = 0.0;
+    }
+    for n in 0..npoints(lb) {
+        if let Some(vno) = vertex_of(g, surf, lb.lv[n].vno, "LabelRemoveIslandsSurf") {
+            surf.vertex_mut(vno).val = 1.0;
+        }
+    }
+    let (scs, nclusters) = sclust::map_surf_clusters(g, io, surf, 0.5, 2.0, 1, 0.0, None, None)?;
+    let scs = scs.unwrap_or_default();
+    let _ = writeln!(io.out, "-------------------------------------");
+    sclust::dump_surf_cluster_sum(io.out, &scs, nclusters);
+    let _ = writeln!(io.out, "-------------------------------------");
+    let (mut max_size, mut n_max) = (0i32, 0usize);
+    for (n, s) in scs
+        .iter()
+        .enumerate()
+        .take(usize::try_from(nclusters).unwrap_or(0))
+    {
+        let _ = writeln!(io.out, "{} ", s.nmembers);
+        if max_size < s.nmembers {
+            max_size = s.nmembers;
+            n_max = n;
+        }
+    }
+    let _ = writeln!(io.out, "n = {n_max} {max_size}");
+    let members = match scs.get(n_max) {
+        Some(s) => s.nmembers,
+        None => {
+            if g.notices.reproduce() {
+                g.notices.add(
+                    &FS_902,
+                    "LabelRemoveIslandsSurf of a label without points: FreeSurfer crashes (status 139)",
+                );
+                return Err(Fatal::Exit(139));
+            }
+            g.notices.add(
+                &FS_902,
+                "LabelRemoveIslandsSurf of a label without points: an empty label (FreeSurfer crashes)",
+            );
+            0
+        }
+    };
+    let mut out = label_alloc(
+        g,
+        io.env,
+        io.err,
+        members.wrapping_add(1),
+        Some(&lb.subject_name),
+        None,
+    )?;
+    out.coords = lb.coords;
+    out.n_points = members;
+    out.space = lb.space.clone();
+    let mut n = 0usize;
+    let want = n_max as i32 + 1;
+    for vtxno in 0..nv {
+        let v = surf.vertex(vtxno);
+        if v.undefval != want {
+            continue;
+        }
+        let Some(lv) = out.lv.get_mut(n) else {
+            break;
+        };
+        lv.vno = vtxno as i32;
+        (lv.x, lv.y, lv.z) = (v.x, v.y, v.z);
+        lv.stat = v.stat;
+        n += 1;
+    }
+    Ok(out)
+}
+
+/// The original `stat` of each of `lb`'s points written back into `out`'s points of the same
+/// vertex (0 for a vertex `lb` does not hold): a `double` table of one entry per vertex. FS-630: a
+/// point of `lb` naming no vertex of the surface is skipped (FreeSurfer writes outside the
+/// table).
+fn restore_stats(g: &mut Globals, surf: &Mris, lb: &Label, out: &mut Label, what: &str) {
+    let mut stat = vec![0.0f32; usize::try_from(surf.nvertices).unwrap_or(0)];
+    for n in 0..npoints(lb) {
+        if let Some(vno) = vertex_of(g, surf, lb.lv[n].vno, what) {
+            stat[vno] = through_double(lb.lv[n].stat);
+        }
+    }
+    for n in 0..npoints(out) {
+        let vno = out.lv[n].vno;
+        if let Some(&s) = usize::try_from(vno).ok().and_then(|v| stat.get(v)) {
+            out.lv[n].stat = s;
+        }
+    }
+}
+
+/// `LabelRemoveHolesSurf(surf, lb)`: the label with its holes filled: its inversion
+/// ([`mris_label_invert`]) without islands ([`label_remove_islands_surf`]), inverted back; each
+/// point's `stat` then the original label's at its vertex (0 for a filled vertex). `None` where an
+/// inversion gives none (FS-632). **FS-902:** a label covering every vertex has an empty inversion,
+/// on which FreeSurfer crashes (as [`label_remove_islands_surf`]).
+pub fn label_remove_holes_surf(
+    g: &mut Globals,
+    io: &mut Io,
+    surf: &mut Mris,
+    lb: &Label,
+) -> Result<Option<Label>, Fatal> {
+    let Some(inv) = mris_label_invert(g, io, surf, lb)? else {
+        return Ok(None);
+    };
+    let no_islands = label_remove_islands_surf(g, io, surf, &inv)?;
+    let Some(mut no_holes) = mris_label_invert(g, io, surf, &no_islands)? else {
+        return Ok(None);
+    };
+    restore_stats(g, surf, lb, &mut no_holes, "LabelRemoveHolesSurf");
+    Ok(Some(no_holes))
+}
+
+/// `LabelRemoveHolesAndIslandsSurf(surf, lb)`: `Removing label holes` (standard output),
+/// [`label_remove_holes_surf`], `Removing label islands`, [`label_remove_islands_surf`] of its
+/// result; each point's `stat` then the original label's at its vertex. `None` where the hole
+/// removal gives none (FreeSurfer crashes there: FS-632).
+pub fn label_remove_holes_and_islands_surf(
+    g: &mut Globals,
+    io: &mut Io,
+    surf: &mut Mris,
+    lb: &Label,
+) -> Result<Option<Label>, Fatal> {
+    let _ = writeln!(io.out, "Removing label holes");
+    let Some(holes) = label_remove_holes_surf(g, io, surf, lb)? else {
+        return Ok(None);
+    };
+    let _ = writeln!(io.out, "Removing label islands");
+    let mut out = label_remove_islands_surf(g, io, surf, &holes)?;
+    restore_stats(g, surf, lb, &mut out, "LabelRemoveHolesAndIslandsSurf");
+    Ok(Some(out))
 }

@@ -4740,3 +4740,217 @@ where a noted correction changed the result. Observed (relay 37): seeds 7 (300 c
 (1,000 each): 0 different in both modes (one seed-17 case of FS-634 counted). A clean-room
 implementer's black-box form: `mris_calc`'s
 or `mri_surf2surf`'s value output (`--tfmt w`, `.mgh`) of a recorded `?h.thickness`.
+
+## 132. A surface's clusters (fs.surf's `surfcluster.cpp`, taken early; relay 38 of track D)
+
+A cluster lives in the vertices' `undefval` (an `int`): 0 outside every cluster, its number (from 1)
+inside. A value is **in range** for `(thmin, thmax, thsign)` when, after taking its magnitude
+(`thsign` 0) or its negation (`thsign` -1; any other sign leaves it), it is at least `thmin` and,
+when `thmax` is above 0, at most `thmax` (a NaN is never in range). All sums below are in vertex
+order; `float` sums round each step to `float`, `double` sums to `double`; where a NaN can reach a
+printed or stored result, its sign and payload are x86-64's (a NaN operand quieted, of two the one
+named first below; `0/0` the default NaN with its sign set).
+
+**132.1 Growing.** `sclustGrowSurfCluster(c, seed, surf, thmin, thmax, thsign)`: `c` 0 prints `ERROR:
+clustGrowSurfCluster(): ClusterNo is 0` (standard output) and returns 1. Otherwise the seed gets
+`undefval = c` (whatever its value), then the growth goes depth first: at each vertex, its `vnum`
+neighbours in list order; a neighbour is taken when its `undefval` is 0 at that moment, its value's
+magnitude is not below `thmin`, and its value is in range; a taken neighbour gets `c` and its own
+neighbours are all looked at before the next neighbour of the vertex that took it. Returns 0.
+`sclustMapSurfClusters(surf, thmin, thmax, thsign, minarea, &n, T, fwhmmap)`: every `undefval` 0;
+then each vertex in order whose `undefval` is 0 and whose value is in range seeds cluster `k`
+(from 1); with `minarea` above 0 a cluster whose area (132.2) is below `minarea` gets its vertices'
+`undefval` back to 0 and its number is reused. `n` = the clusters made; none: no list. Otherwise the
+summary (132.3), sorted (132.4; with `Gdiag_no` above 1 both lists printed by 132.5 between `---
+Surface Cluster Summary (unsorted) ---------------` and `---------- sorted ---------------`), the
+vertices renumbered to the sorted order (132.4); the sorted list. **FS-901** (class a): the official
+build's growth needs one stack frame of 80 bytes per vertex of the current depth-first path; when
+the path passes what its 8 MiB stack holds (§133's measurement) the program crashes (signal 11). The
+port grows the whole cluster in both modes, in the same order, and notes the case.
+
+**132.2 Per-cluster measures.** `sclustSurfaceArea(c, surf, &n)`: the `float` sum of the cluster's
+vertex areas (`area`, or `group_avg_area` when `group_avg_vtxarea_loaded` is not 0) and their count;
+when `group_avg_surface_area` is above 0 and the vertex areas are not loaded, the sum times
+`(group_avg_surface_area / total_area)` (that quotient in `float`). `sclustWeight(c, surf, mri,
+useArea)`: the `double` sum of each member's value (`val`, or `MRIgetVoxVal(mri, vertex, 0, 0, 0)`),
+times its area (as above, each area widened to `double` and scaled by the widened quotient) with
+`useArea`, returned as `float`. `sclustSurfaceMax(c, surf, &v)`: the first member's value, replaced by
+each later one of larger magnitude; `v` its vertex (left unchanged with no member; then 0 is
+returned). `sclustSurfaceCentroid(c, surf, xyz)`: the `float` sums of x, y, z divided by the member
+count as a `float` (0/0 for no member), widened; returns 0. `sclustZeroSurfaceClusterNo(c)` (members'
+`undefval` 0), `sclustZeroSurfaceNonClusters` (non-members' `val` 0), `sclustSetSurfaceValToClusterNo`
+(`val` the cluster number as `float`) return 0. `sclustCountClusters`: the largest `undefval` (at least
+0) as a `float`. `sclustSetSurfaceValToCWP(surf, list)`: each vertex's `val` 0 outside clusters; else
+its list entry's `pval_clusterwise` narrowed to `float`, `p`: 50 if `p` is ±0, else `-log10f(p)`
+(glibc 2.35's `log10f` in both modes; a negative `p` sets `errno` to EDOM); negated unless the entry's
+`maxval` is above 0; returns 0.
+
+**132.3 The summary** (`SurfClusterSummary(surf, T, &n, fwhmmap)`). The mean vertex area `a` =
+`group_avg_surface_area` (loaded) or `total_area`, divided in `float` by the vertex count, widened.
+`FS_CLUSTER_USE_AVG_VERTEX_AREA` read with `sscanf("%d")` (unset or no number: 0). With `Gdiag_no`
+above 0: `ClusterUseAvgVertexArea = <u>, avgvertexarea = <a %g>`. `n` = 132.2's count (none: no
+summary). With a FWHM map: the `double` sum, in order, of its values above 0 (each widened, the new
+value first: `f + sum`) divided by their count (none: 0/0), `m2` its square; with `Gdiag_no` above 0
+`fwhm mean = <%g>`. Then one pass over the vertices with `undefval` `k` not 0: member count +1; the
+first member sets `maxval` and its vertex, and zeroes the two weights and the centroid sums; the
+vertex area `A` is its `area` / `group_avg_area` (as 132.2, no scaling) or, with the variable not 0,
+`a` narrowed; with a map, `A = (float)((double)A x q)` with `q = m2` where the map's value `f` is 0
+and `q = m2 / (f x f)` (in `double`) otherwise; `area += A` (`float`); a value of larger magnitude
+than `maxval` replaces it and its vertex; `weightvtx = (double)val + weightvtx`; `weightarea =
+(double)(A x val) + weightarea` (the product in `float`, `A` first); the centroid sums `+= x, y, z`
+(`float`). Then per cluster: `clusterno` its number, the largest value's vertex's position, the
+weights narrowed to `float`, the centroid sums divided by the member count as `float`; with `T`, the
+position and the centroid each as `T x [x y z 1]'` (`MatrixMultiply` into a 4 x 1 matrix: a `T` of
+another shape leaves the previous product, after `MatrixMultiply`'s messages), its first three rows.
+With `Gdiag_no` above 0 finally `SurfClusterSumFast: n=<n>, t = <seconds>`.
+**`SurfClusterSummaryOld(surf, T, &n)`**: the above without a map unless `USE_FAST_SURF_SMOOTHER` is
+`0`; then (with `Gdiag_no` above 0 `SurfClusterSummary()` first) each cluster 1 to `n` by 132.2's
+functions (area and count, the two weights, the largest value, the centroid narrowed), the
+transforms as above, and `SurfClusterSum: n=<n>, t = <seconds>`.
+
+**132.4 Sorting, renumbering, pruning.** `SortSurfClusterSum(list, n)`: a copy sorted by glibc
+2.35's `qsort` (`specs/glibc-qsort.md`, the merge order of 104-byte elements) with the comparison:
+smaller `pval_clusterwise` first, then larger `area`, then larger `|maxval|`, else 0 (a NaN decides
+nothing). `sclustReMap(surf, n, list)`: each vertex's number `k` replaced by the place (from 1) of
+the entry whose `clusterno` is `k` (0 stays 0), then the entries numbered 1 to `n`; returns 0.
+`sclustReMap0`: each vertex whose number equals the `clusterno` of an entry gets the first such
+entry's place (with `Gdiag_no` above 1 `sclustReMap:` and `new = %3d old = %3d` per entry first).
+`sclustMaxClusterArea` (the largest area, `double`), `sclustMaxClusterCount` (the largest count),
+`sclustMaxClusterWeightVtx(list, n, sign)` (from `(float)(-sign x 10e10)`, 0 for sign 0: the
+`weightvtx` of largest magnitude for 0, the largest for +1, the smallest for -1, the start kept for
+any other sign; a NaN never taken); each 0 for `n` 0. `sclustPruneByCWPval(list, n, thresh, &m,
+surf)`: the entries with `pval_clusterwise <= thresh`, in order; each vertex of an entry above
+`thresh` gets `undefval` and `val` 0, each vertex of a kept entry its new place. **FS-904** (class a):
+more than 10,000 clusters are written past FreeSurfer's renumbering table; any number is renumbered
+in both modes, noted. **FS-905** (class a, memory never written): an entry whose p-value is NaN is
+neither kept nor removed in FreeSurfer (its vertices keep their value and get a number from memory
+never written); default: its vertices removed (rule A); `reproduce`: value kept, number 0; noted.
+
+**132.5 Output.** `DumpSurfClusterSum(fp, list, n)`: per entry `%4d  %4d  %8.4f  %6d    %6.2f  %4d
+%5.1f %5.1f %5.1f   %5.1f %5.1f %5.1f` (its index from 0, `clusterno`, `maxval`, its vertex, `area`,
+count, position, transformed position); returns 0. `sclustAnnot(surf, n)`: the surface's colour
+table replaced by `CTABalloc(n + 1)` (random colours: `FREESURFER_SEED` decides them), entries 1 to
+`n` named `cluster-%03d`; each vertex's annotation 0 for number 0 or above `n`, else its entry's.
+`sclustSaveAsPointSet(name, list, n, surf)`: a text file, per entry `%g %g %g` of its largest value's
+vertex's position, then `info`, `numpoints <n>`, `useRealRAS 0`; returns 0. **FS-906** (class a): a
+file that cannot be created crashes FreeSurfer; default: `ERROR: sclustSaveAsPointSet(): could not
+open <name>` (standard output) and 1 (rule A); `reproduce`: the crash (status 139).
+
+**132.6 Growing by distance** (`sclustGrowByDist(surf, seed, dthresh, shape, vtxno, list)`). No
+list: `ERROR: vtxlist is NULL`, -1. The function keeps a state between calls (seed, sphere radius and
+its square, the count listed, the visits). A call with `vtxno` not negative before any first call:
+`ERROR: set vtxno to a negative value when calling this function!`, -1. A first call (`vtxno`
+negative) takes the seed (for `shape` 1, spherical, `r2 = (float)(y² + x² + z²)` widened and `r =
+sqrt(r2)`; another shape keeps the earlier radius), clears every `undefval`, zeroes the count and
+visits from the seed; a later call continues from `vtxno`. A visit: a vertex whose `undefval` is not
+0 returns 0; its distance to the seed is, spherical, `r x acos((double)(float)(x1 x2 + y1 y2 + z1 z2)
+/ r2)` (`acos` outside [-1, 1] sets EDOM; correctly rounded in both modes, as larmorx's `acos`),
+flat, `sqrtf((x1 - x2)² + (y1 - y2)²)` in `float`; above `dthresh` returns 0 (a NaN distance is not
+above); otherwise the vertex is listed at the count's place, the count grows, its `undefval` becomes 1
+and each of its `vnum` neighbours is visited in order (depth first). The call returns the count (0
+when its own first visit returned). **FS-901** as 132.1 (96 bytes per nested visit). **FS-907**
+(class a): a continuation reads the earlier seed through FreeSurfer's pointer; one whose seed is not
+a vertex of the surface given returns -1 in both modes, noted.
+
+**132.7 The label clean-ups** (`label.cpp`). `LabelRemoveIslandsSurf(surf, label)`: every `val` 0,
+each point's vertex (deleted points too) 1 (FS-630 for a point naming no vertex); 132.1's map with
+`(0.5, 2, +1, 0)`, no transform, no map; then on standard output 37 dashes, 132.5's table, the dashes,
+each cluster's count as `<n> ` on a line of its own, and `n = <k> <count>` for the first entry (in the
+sorted order) with the most members; the result: `LabelAlloc(count + 1)` with the label's subject name
+(`SUBJECTS_DIR` must be set), its coordinate kind and space copied, `count` points: the vertices whose
+number is `k + 1`, in order, each with its current position and the vertex's `stat`. The surface
+keeps the numbers and values. **FS-902** (class a): a label without points makes no cluster and
+FreeSurfer crashes after the table; default: an empty label (one place; rule A); `reproduce`: the
+crash (status 139). `LabelRemoveHolesSurf(surf, label)`: §128.4's inversion, its islands removed,
+inverted back; each point's `stat` then the original label's `stat` at that vertex (through a
+`double` table: a signalling NaN comes back quiet; 0 where the original has no point); a label
+covering every vertex has an empty inversion (FS-902). `LabelRemoveHolesAndIslandsSurf`: `Removing
+label holes`, the hole removal, `Removing label islands`, the island removal of its result, the
+original `stat`s as before. **FS-903** (class a): every function above that indexes the cluster list
+or the vertices by a cluster number or a seed (the summary, `sclustSetSurfaceValToCWP`, `sclustReMap`,
+the pruning, `sclustAnnot`, the growths' seeds) reads or writes outside its arrays in FreeSurfer for
+a negative number, a number beyond the list, or a seed that is not a vertex; the port skips such a
+vertex (left as it was; annotation 0 in `sclustAnnot`) in both modes, noted.
+
+## 133. Validation plan, part 30
+
+The probe's command of relay 38, `scl` (an empty work folder; `SURFER_SIDEDOOR`, `FREESURFER_SEED`
+1234): §127's meshes (grids of up to 6 x 5, icosahedra of 1 or 2 subdivisions, srd's small meshes)
+read by `MRISread`, every vertex's value from {0, ±0.25 ... ±3} (NaN, ±inf, -0 and a signalling NaN
+in heavy cases), the group-average flag one case in four, the group-average surface area (0, 100,
+1000, -5), the total area (0, 50, 500, -1) one case in five, per-vertex group-average areas one in
+three, preset cluster numbers (-1 to 3) one in six, `Gdiag_no` -1 to 2, `FS_CLUSTER_USE_AVG_VERTEX_AREA`
+unset, 1, 0, x, 2, `USE_FAST_SURF_SMOOTHER` unset, 0, 1; then 1 to 5 of 132.1-132.6's functions (the
+map with `thmin` in {0.5, 1, 0, 1.5, -1}, `thmax` in {-1, 2, 0, 3, 1.5}, signs {0, ±1, 2}, `minarea` 0
+to 50, a 4 x 4 or 3 x 4 transform, a FWHM map; growths from any vertex, cluster numbers -2 to 5; the
+measures of clusters -1 to 4; p-values set by hand, NaN and negative ones in heavy cases; pruning at
+0 to 1; annotations of 0 to 4 clusters; growths by distance of 0.5 to 1000 mm, flat and spherical,
+continued now and then; point sets to `p.txt`, `d/p.txt`, `nodir/p.txt`), after each the vertices'
+numbers, values and annotations, the whole list and `errno`. An operation FreeSurfer would make read
+or write outside its arrays for (FS-903; FS-905's NaN p-values) is written `G` on both sides. The
+probe's `lbl` (§129) gained 132.7's three functions (`ri`, `rh`, `rhi`; `G` for a point naming no
+vertex in `ri`, a negative one in `rh`/`rhi`), with some vertices' `stat` set first. Compared with the
+official build with `reproduce`: identical; the default identical but where a noted correction
+changed the result. Observed (relay 38): `scl` seeds 7 and 13 (500 cases each): 0 different in both
+modes; `lbl` seeds 7 and 13 (500 each; 74 of FS-902's crashes compared as crashes): 0 different.
+FS-901's depth (`validation/probes/fs-surfio/stack.py`, flat grids and the recorded heads' white
+surfaces, the official build at an 8 MiB stack): growths 103,500 deep complete, 104,000 and deeper
+crash (observed); one cluster of a whole recorded hemisphere (119,164 to 148,828 vertices) goes 71,053
+to 87,414 deep (observed). On recorded heads (`flr scl`; observed 24 of 24 identical in both modes): the three label clean-ups of
+`cortex.label` and Brodmann labels, the clusters of `|x| >= 20 mm` with `minarea` 10 and a transform,
+the clusterwise-p values, the old summary, a flat growth by distance of 25 mm from vertex 0. A
+clean-room implementer's black-box form: `mri_surfcluster --in <thickness> --thmin 2.5 --sum` on a
+recorded white surface, and `mri_label2label --annot-fill-holes`.
+
+## 134. Copies between vertex fields; fields written through the curvature (queue items 3.1-47/48; relay 38 of track D)
+
+**134.1 The copies** (each returns `NO_ERROR`). Over the vertices whose rip flag is 0 (ripped
+vertices unchanged): `MRISsetCroppedToZero` (`cropped` 0), `MRISaddToValues(mris, x)` (`val = val +
+x` in `float`, `val`'s NaN first), and the copies `val` from `mean`, `mean_imag`, `std_error`, `stat`,
+`imag_val`, `val2`, `curv`, `val2bak`; `stat`, `imag_val`, `val2`, `val2bak`, `valbak` from `val`;
+`imag_val` from `curv`; `curv` from `val`, `imag_val`, `origarea`, `area`, `d`, and from the mark as a
+`float`; `d` from `curv`; the mark from `fixedval` (its low 16 bits) and from `(int) curv` (x86-64's
+conversion: `INT_MIN` for NaN and out of range, then the low 16 bits); `MRIScopyFromCropped(mris, w)`
+and `MRIScopyToCropped(mris, w)`: `val` (`w` 1) or the mark (`w` 11) from or to `cropped` (`val` to
+`cropped` as `(int) val`); any other `w` ends the program at the first vertex not ripped with
+`MRIScopyFromCropped: <w> unsupported target` (both functions' wording; `ERROR_UNSUPPORTED`). Over
+every vertex: the mark to `marked2`, `marked3` and back, `annotation = (int) val`; `MRISclearFaceMarks`:
+every face's mark 0. The names with two forms (`MRIScopyValuesToCurvature` /
+`MRIScopyCurvatureFromValues`, `MRIScopyImagValuesToCurvature` / `MRIScopyCurvatureFromImagValues`,
+`MRIScopyValuesToVal2Bak` / `MRIScopyValToVal2Bak`) are the same copy.
+
+**134.2 Vectors.** `MRISimportCurvatureVector(mris, v)`, `MRISimportValVector(mris, v)`: each
+vertex's `curv` / `val` from `v` (every vertex); `MRISimportValFromMatrixColumn(mris, m, c)`: `val`
+from row `vertex + 1` of column `c`; `MRISexportValVector`: the values; `MRISexportValVectorDouble(mris,
+v, k)`: each value widened into `v[vertex + k]`. **FS-908** (class a): a vector of fewer values than
+vertices, or a matrix of fewer rows or without column `c`, is read outside in FreeSurfer; the vertices
+beyond it are left alone in both modes, noted.
+
+**134.3 Through the curvature.** `MRISwriteD`, `MRISwriteMarked`, `MRISwriteArea(mris, name)`: the
+curvatures saved, `d`, the mark or the area copied into them (134.1, vertices not ripped),
+§122's `MRISwriteCurvature(mris, name)` (its status not returned), the curvatures restored;
+`NO_ERROR`. `MRISreadMarked(mris, name)`: the curvatures saved, §122's `MRISreadCurvatureFile`; its
+failure returns `Gerror` (the curvatures as the read left them); else the marks from `(int) curv`
+(134.1) and the curvatures restored, `NO_ERROR`. `mris_place_surface --area-map <surface> <out>` is
+`MRISread`, `MRIScomputeMetricProperties`, `MRISwriteArea`.
+
+## 135. Validation plan, part 31
+
+The probe's command of relay 38, `vcp` (an empty work folder with `d`; `SURFER_SIDEDOOR`): §127's
+meshes read by `MRISread`, 0 to 3 vertices ripped, every vertex's 13 `float` fields (`val`, `curv`,
+`stat`, `mean`, `mean_imag`, `std_error`, `imag_val`, `val2`, `val2bak`, `valbak`, `d`, `area`,
+`origarea`: -5 to 5 in eighths; NaN, ±inf, -0, a signalling NaN, 1e10, -3e9 in heavy cases) and 6
+integer fields (`marked`, `marked2`, `marked3`, `cropped`, `fixedval`, `annotation`: -3 to 5; ±70,000,
+32,768, `INT_MAX`, `INT_MIN` in heavy cases), every face's mark; then 1 to 6 of 134.1-134.3's
+functions by name (vectors of the vertex count, two more or one fewer; matrices of the vertex count
+of rows, one more or one fewer, columns 0 to 4 of 1 to 3; `w` 1, 11 or 3; the writers to `c`,
+`c.asc`, `c.vtk`, `c.mgh`, `d/c`, `nodir/c`; the reader from a name written before, `none`, `c`, `d/c`),
+after each its status, `errno`, every field and face mark; at the end every file in the folder by its
+bytes. An import FreeSurfer would read outside its vector or matrix for (FS-908) is written `G` on
+both sides. Compared with the official build with `reproduce`: identical; the default identical but
+where a noted correction changed the result. Observed (relay 38): seeds 7, 13 (500 cases each) and 17
+(1,000): 0 different in both modes. On recorded heads (`flr war`, `mris_place_surface --area-map` of
+each white and pial surface of three heads): the twelve files written are recon-all's `?h.area` and
+`?h.area.pial` byte for byte, in the official build and the port (observed). A clean-room
+implementer's black-box form: `mris_place_surface --area-map` of a recorded `?h.white` against its
+`?h.area`.

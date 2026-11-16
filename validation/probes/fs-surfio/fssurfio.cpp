@@ -59,6 +59,12 @@
 #include "topo_parms.h"
 #include "tritri.h"
 #include "label.h"
+#include "surfcluster.h"
+
+// sclustReMap0 is defined in surfcluster.cpp but not declared in its header (relay 38)
+int sclustReMap0(MRI_SURFACE *Surf, int nClusters, SCS *scs_sorted);
+// MRIScopyValuesToVal2Bak likewise (mrisurf_vals.cpp)
+int MRIScopyValuesToVal2Bak(MRI_SURFACE *mris);
 
 // fastmarching.h's declaration (the header redefines mrisurf_metricProperties.h's macros)
 void MRISextractOutsideDistanceMap(MRIS *mris, MRI *mri_src, int label, int offset, float resolution,
@@ -4143,6 +4149,124 @@ void flr_case()
     }
     LABEL *inv = MRISlabelInvert(s, a);
     pts(inv);
+  } else if (op == "war") {
+    // relay 38 of track D: mris_place_surface --area-map on a recorded head (`war <surface>
+    // <recorded>`): MRISread, MRIScomputeMetricProperties, MRISwriteArea into the work folder; the
+    // status, the written file's length and FNV-1a, and whether it is the recorded file byte for
+    // byte
+    std::string sn = next();
+    MRIS *s = MRISread(sn.c_str());
+    std::string rec = next();
+    if (!s) fail("cannot read the surface");
+    MRIScomputeMetricProperties(s);
+    mkdir(workdir.c_str(), 0700);
+    // a name with a folder and the hemisphere first: MRISwriteCurvature keeps it as given (a name
+    // without a folder goes beside the surface)
+    std::string base = sn.substr(sn.rfind('/') + 1);
+    std::string name = workdir + "/" + base.substr(0, 2) + ".w.area";
+    oi(MRISwriteArea(s, name.c_str()));
+    auto slurp = [](const std::string &p) {
+      std::string b;
+      if (FILE *f = fopen(p.c_str(), "rb")) {
+        char buf[65536];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+        fclose(f);
+      }
+      return b;
+    };
+    std::string w = slurp(name), r = slurp(rec);
+    oi((long long)w.size());
+    uint64_t h = 0xcbf29ce484222325ull;
+    for (unsigned char c : w) h = (h ^ c) * 0x100000001b3ull;
+    char t[24];
+    snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+    out += t;
+    out += w == r ? "SAME " : "DIFF ";
+    unlink(name.c_str());
+  } else if (op == "sgd") {
+    // relay 38 of track D, the stack measurement (validation/probes/fs-surfio/stack.py): a surface
+    // (`sgd <surface>`) with every value 1, one sclustMapSurfClusters (0.5, no upper bound, positive
+    // sign, no area minimum): the cluster count and the first cluster's vertex count, or a crash
+    MRIS *s = MRISread(next());
+    if (!s) fail("cannot read the surface");
+    for (int v = 0; v < s->nvertices; v++) s->vertices[v].val = 1;
+    int n = 0;
+    SCS *l = sclustMapSurfClusters(s, 0.5, -1, 1, 0, &n, NULL, NULL);
+    oi(n);
+    oi(l ? l[0].nmembers : -1);
+  } else if (op == "scl") {
+    // relay 38 of track D: surfcluster.cpp and the label clean-ups on a recorded head (`scl <white>
+    // <label>`): LabelRemoveIslandsSurf, LabelRemoveHolesSurf, LabelRemoveHolesAndIslandsSurf of
+    // the label (each label's count and FNV-1a, the vertices' cluster numbers' FNV-1a); then the
+    // clusters of |x| at least 20 mm (sclustMapSurfClusters, thsign 0, minarea 10, a transform),
+    // the list's count and FNV-1a, its table (DumpSurfClusterSum) on standard output, the cluster
+    // numbers' FNV-1a; sclustSetSurfaceValToCWP (p-values 10^-k), the values' FNV-1a;
+    // SurfClusterSummaryOld's FNV-1a; sclustGrowByDist from vertex 0 within 25 mm (flat), its count
+    // and the list's FNV-1a
+    MRIS *s = MRISread(next());
+    LABEL *a = LabelRead(NULL, next());
+    if (!s || !a) fail("cannot read the inputs");
+    setenv("SUBJECTS_DIR", "/", 1);
+    std::string hb;
+    auto put = [&hb](const void *p, size_t n) { hb.append((const char *)p, n); };
+    auto flush = [&hb]() {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : hb) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+      hb.clear();
+    };
+    auto pts = [&](LABEL *l) {
+      oi(l->n_points);
+      oi(l->max_points);
+      for (int k = 0; k < l->n_points; k++) {
+        LV *p = &l->lv[k];
+        put(&p->vno, 4); put(&p->x, 4); put(&p->y, 4); put(&p->z, 4); put(&p->stat, 4);
+      }
+      flush();
+    };
+    auto undef = [&]() {
+      for (int v = 0; v < s->nvertices; v++) put(&s->vertices[v].undefval, 4);
+      flush();
+    };
+    auto list = [&](SCS *l, int n) {
+      oi(n);
+      // the 19 four-byte fields (76 bytes), then the three p-values (the 4 bytes between them are
+      // padding)
+      for (int k = 0; k < n; k++) { put(&l[k], 76); put(&l[k].pval_clusterwise, 24); }
+      flush();
+    };
+    pts(LabelRemoveIslandsSurf(s, a));
+    undef();
+    pts(LabelRemoveHolesSurf(s, a));
+    undef();
+    pts(LabelRemoveHolesAndIslandsSurf(s, a));
+    undef();
+    for (int v = 0; v < s->nvertices; v++) s->vertices[v].val = s->vertices[v].x;
+    MATRIX *T = MatrixIdentity(4, NULL);
+    T->rptr[1][4] = 1.5;
+    T->rptr[2][2] = 0.75;
+    int n = 0;
+    SCS *l = sclustMapSurfClusters(s, 20, -1, 0, 10, &n, T, NULL);
+    list(l, n);
+    DumpSurfClusterSum(stdout, l, n);
+    undef();
+    const double pv[5] = {1.0, 0.1, 0.01, 0.001, 0.0001};
+    for (int k = 0; k < n; k++) l[k].pval_clusterwise = pv[k % 5];
+    sclustSetSurfaceValToCWP(s, l);
+    for (int v = 0; v < s->nvertices; v++) put(&s->vertices[v].val, 4);
+    flush();
+    for (int v = 0; v < s->nvertices; v++) s->vertices[v].val = s->vertices[v].x;
+    setenv("USE_FAST_SURF_SMOOTHER", "0", 1);
+    int n2 = 0;
+    SCS *l2 = SurfClusterSummaryOld(s, T, &n2);
+    list(l2, n2);
+    std::vector<int> vl(s->nvertices, -2);
+    oi(sclustGrowByDist(s, 0, 25.0, 0, -1, vl.data()));
+    for (int v = 0; v < s->nvertices; v++) put(&vl[v], 4);
+    flush();
   } else if (op == "mpx") {
     // relay 37 of track D: group (e) on a recorded head (`mpx <white> <sphere>`): the white
     // surface (its Talairach transform read from ../mri/transforms by MRISread) with the sphere's
@@ -5052,7 +5176,8 @@ static bool lbl_outside(const std::string &op, LABEL *a, int nv)
   if (op == "ar" || op == "fm") return any_out;
   if (op == "er") return live_out || beyond;
   if (op == "di") return live_out || beyond || a->max_points == 0;
-  if (op == "l2m" || op == "inv") return negative;
+  if (op == "l2m" || op == "inv" || op == "rh" || op == "rhi") return negative;
+  if (op == "ri") return any_out;
   return false;
 }
 
@@ -5109,6 +5234,12 @@ void lbl_case()
     s->vertices[marks[3 * k]].marked = marks[3 * k + 1];
     s->vertices[marks[3 * k]].marked2 = marks[3 * k + 2];
   }
+  // relay 38: the vertices' stat (LabelRemoveIslandsSurf copies it)
+  int nst = geti();
+  for (int k = 0; k < nst; k++) {
+    int vno = geti();
+    s->vertices[vno].stat = getf();
+  }
   int max = geti(), n = geti();
   LABEL *a = LabelAlloc(max, NULL, NULL);
   a->coords = geti();
@@ -5147,7 +5278,15 @@ void lbl_case()
       args = {f, st, given, nfr};
     }
     if (lbl_outside(op, a, nv)) { out += "G "; continue; }
-    if (op == "mk") oi(LabelMark(a, s));
+    if (op == "ri" || op == "rh" || op == "rhi") {
+      // relay 38: LabelRemoveIslandsSurf, LabelRemoveHolesSurf, LabelRemoveHolesAndIslandsSurf;
+      // the new label, then the vertices' cluster numbers and values
+      LABEL *l = op == "ri" ? LabelRemoveIslandsSurf(s, a)
+                 : op == "rh" ? LabelRemoveHolesSurf(s, a) : LabelRemoveHolesAndIslandsSurf(s, a);
+      if (!l) out += "NULL ";
+      else { oh(l->subject_name); lbl_dump(l, s); }
+      for (int v = 0; v < nv; v++) { oi(s->vertices[v].undefval); of(s->vertices[v].val); }
+    } else if (op == "mk") oi(LabelMark(a, s));
     else if (op == "mk2") oi(LabelMark2(a, s));
     else if (op == "um") oi(LabelUnmark(a, s));
     else if (op == "ms") oi(LabelMarkSurface(a, s));
@@ -5166,6 +5305,344 @@ void lbl_case()
       else { oh(l->subject_name); lbl_dump(l, s); }
     } else fail("lbl op");
     lbl_dump(a, s);
+  }
+}
+
+// ---- relay 38 of track D: scl, surfcluster.cpp whole --------------------------------------------
+
+// scl: a surface read by MRISread (d/lh.s0), every vertex's value from the case, the group-average
+// areas and their flags, now and then preset cluster numbers, Gdiag_no, FS_CLUSTER_USE_AVG_VERTEX_AREA
+// and USE_FAST_SURF_SMOOTHER; then 1 to 5 of surfcluster.cpp's functions on the case's current
+// cluster list; `G` where FreeSurfer would read or write outside its arrays (FS-903 to FS-905) or
+// past a cluster list's end; after each the vertices' cluster numbers, values and annotations, the
+// list (every field) and errno
+static void scl_dump_list(SCS *l, int n)
+{
+  oi(n);
+  for (int k = 0; k < n; k++) {
+    SCS *c = &l[k];
+    oi(c->clusterno); oi(c->nmembers); of(c->area); of(c->weightvtx); of(c->weightarea);
+    of(c->maxval); oi(c->vtxmaxval); of(c->x); of(c->y); of(c->z); of(c->xxfm); of(c->yxfm);
+    of(c->zxfm); of(c->cx); of(c->cy); of(c->cz); of(c->cxxfm); of(c->cyxfm); of(c->czxfm);
+    od(c->pval_clusterwise); od(c->pval_clusterwise_low); od(c->pval_clusterwise_hi);
+  }
+}
+
+static MATRIX *scl_xfm(int kind)
+{
+  if (kind == 0) return NULL;
+  int rows = kind == 1 ? 4 : 3;
+  MATRIX *m = MatrixAlloc(rows, 4, MATRIX_REAL);
+  for (int r = 1; r <= rows; r++)
+    for (int c = 1; c <= 4; c++) m->rptr[r][c] = getf();
+  return m;
+}
+
+static MRI *scl_map(int nv)
+{
+  if (!geti()) return NULL;
+  MRI *m = MRIallocSequence(nv, 1, 1, MRI_FLOAT, 1);
+  for (int v = 0; v < nv; v++) MRIsetVoxVal(m, v, 0, 0, 0, getf());
+  return m;
+}
+
+void scl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  // sclustAnnot's colour table draws random colours
+  setenv("FREESURFER_SEED", "1234", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  Gdiag_no = geti();
+  std::string avg = next(), ufss = next();
+  if (avg != "-") setenv("FS_CLUSTER_USE_AVG_VERTEX_AREA", avg.c_str(), 1);
+  if (ufss != "-") setenv("USE_FAST_SURF_SMOOTHER", ufss.c_str(), 1);
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  int gd = Gdiag_no;
+  Gdiag_no = -1;
+  MRIS *s = MRISread("d/lh.s0");
+  Gdiag_no = gd;
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int v = 0; v < nv; v++) s->vertices[v].val = getf();
+  s->group_avg_vtxarea_loaded = geti();
+  s->group_avg_surface_area = getf();
+  if (geti()) s->total_area = getf();
+  if (geti()) for (int v = 0; v < nv; v++) s->vertices[v].group_avg_area = getf();
+  if (geti()) for (int v = 0; v < nv; v++) s->vertices[v].undefval = geti();
+  SCS *list = NULL;
+  int nlist = 0;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    errno = 0;
+    bool outside = false, beyond = false, nanp = false;
+    for (int v = 0; v < nv; v++) {
+      int c = s->vertices[v].undefval;
+      if (c < 0) outside = true;
+      if (c > nlist) beyond = true;
+    }
+    for (int c = 0; c < nlist; c++)
+      if (std::isnan(list[c].pval_clusterwise)) nanp = true;
+    if (op == "map") {
+      float thmin = getf(), thmax = getf();
+      int thsign = geti();
+      float minarea = getf();
+      MATRIX *T = scl_xfm(geti());
+      MRI *fw = scl_map(nv);
+      int n = 0;
+      SCS *r = sclustMapSurfClusters(s, thmin, thmax, thsign, minarea, &n, T, fw);
+      oi(n);
+      if (r) { free(list); list = r; nlist = n; }
+      else out += "NULL ";
+    } else if (op == "grow") {
+      int c = geti(), seed = geti();
+      float thmin = getf(), thmax = getf();
+      int thsign = geti();
+      oi(sclustGrowSurfCluster(c, seed, s, thmin, thmax, thsign));
+    } else if (op == "area") {
+      int c = geti(), n = -7;
+      of(sclustSurfaceArea(c, s, &n));
+      oi(n);
+    } else if (op == "wt") {
+      int c = geti();
+      MRI *m = scl_map(nv);
+      int ua = geti();
+      of(sclustWeight(c, s, m, ua));
+    } else if (op == "max") {
+      int c = geti(), vm = -7;
+      of(sclustSurfaceMax(c, s, &vm));
+      oi(vm);
+    } else if (op == "cen") {
+      double xyz[3] = {0, 0, 0};
+      oi(sclustSurfaceCentroid(geti(), s, xyz));
+      od(xyz[0]); od(xyz[1]); od(xyz[2]);
+    } else if (op == "zero") of(sclustZeroSurfaceClusterNo(geti(), s));
+    else if (op == "zeronon") of(sclustZeroSurfaceNonClusters(s));
+    else if (op == "tocn") of(sclustSetSurfaceValToClusterNo(s));
+    else if (op == "cwp") {
+      if (outside || beyond) { out += "G "; continue; }
+      of(sclustSetSurfaceValToCWP(s, list));
+    } else if (op == "count") of(sclustCountClusters(s));
+    else if (op == "sum" || op == "sumold") {
+      MATRIX *T = scl_xfm(geti());
+      MRI *fw = op == "sum" ? scl_map(nv) : NULL;
+      if (outside) { out += "G "; continue; }
+      int n = -7;
+      SCS *r = op == "sum" ? SurfClusterSummary(s, T, &n, fw) : SurfClusterSummaryOld(s, T, &n);
+      oi(n);
+      if (r) { free(list); list = r; nlist = n; }
+      else out += "NULL ";
+    } else if (op == "dump") oi(DumpSurfClusterSum(stdout, list, nlist));
+    else if (op == "sort") {
+      SCS *r = SortSurfClusterSum(list, nlist);
+      free(list);
+      list = r;
+    } else if (op == "remap" || op == "remap0") {
+      bool bad = false;
+      for (int c = 0; c < nlist; c++)
+        if (list[c].clusterno < 1 || list[c].clusterno > nlist) bad = true;
+      if (op == "remap" && (bad || beyond)) { out += "G "; continue; }
+      oi(op == "remap" ? sclustReMap(s, nlist, list) : sclustReMap0(s, nlist, list));
+    } else if (op == "maxa") od(sclustMaxClusterArea(list, nlist));
+    else if (op == "maxc") oi(sclustMaxClusterCount(list, nlist));
+    else if (op == "maxw") of(sclustMaxClusterWeightVtx(list, nlist, geti()));
+    else if (op == "pv") {
+      for (int c = 0; c < 6; c++) {
+        double p = getd();
+        if (c < nlist) list[c].pval_clusterwise = p;
+      }
+    } else if (op == "prune") {
+      double th = getd();
+      if (outside || beyond || nanp) { out += "G "; continue; }
+      int n = -7;
+      SCS *r = sclustPruneByCWPval(list, nlist, th, &n, s);
+      oi(n);
+      free(list);
+      list = r;
+      nlist = n;
+    } else if (op == "annot") {
+      int n = geti();
+      if (outside) { out += "G "; continue; }
+      oi(sclustAnnot(s, n));
+      COLOR_TABLE *ct = s->ct;
+      oi(ct->nentries);
+      for (int e = 0; e < ct->nentries; e++) {
+        CTE *x = ct->entries[e];
+        oh(x->name); oi(x->ri); oi(x->gi); oi(x->bi); oi(x->ai);
+      }
+    } else if (op == "gbd") {
+      int seed = geti();
+      double d = getd();
+      int shape = geti(), vtxno = geti();
+      std::vector<int> l(nv > 0 ? nv : 1, -2);
+      oi(sclustGrowByDist(s, seed, d, shape, vtxno, l.data()));
+      for (int v = 0; v < nv; v++) oi(l[v]);
+    } else if (op == "pts") {
+      std::string name = next();
+      oi(sclustSaveAsPointSet((char *)name.c_str(), list, nlist, s));
+      FILE *f = fopen(name.c_str(), "rb");
+      if (!f) out += "NOFILE ";
+      else {
+        std::string b;
+        char buf[4096];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+        fclose(f);
+        ox(b);
+      }
+    } else fail("scl op");
+    for (int v = 0; v < nv; v++) {
+      oi(s->vertices[v].undefval); of(s->vertices[v].val); oi(s->vertices[v].annotation);
+    }
+    scl_dump_list(list, nlist);
+    oi(errno);
+  }
+}
+
+// ---- relay 38 of track D: vcp, the copies between vertex fields (mrisurf_vals.cpp) and the
+// fields written through the curvature (MRISwriteD, MRISwriteMarked, MRISwriteArea, MRISreadMarked)
+
+// vcp: a surface read by MRISread (d/lh.s0), 0 to 3 vertices ripped, every vertex's 13 float and 6
+// integer fields and every face's mark from the case; then 1 to 6 operations, each named by its
+// FreeSurfer function; `G` where FreeSurfer would read outside the caller's vector or matrix
+// (FS-908); after each the fields and the face marks; at the end every file in the folder
+static void vcp_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->val); of(x->curv); of(x->stat); of(x->mean); of(x->mean_imag); of(x->std_error);
+    of(x->imag_val); of(x->val2); of(x->val2bak); of(x->valbak); of(x->d); of(x->area);
+    of(x->origarea);
+    oi(x->marked); oi(x->marked2); oi(x->marked3); oi(x->cropped); oi(x->fixedval);
+    oi(x->annotation);
+  }
+  for (int f = 0; f < s->nfaces; f++) oi(s->faces[f].marked);
+}
+
+void vcp_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nrip = geti();
+  for (int k = 0; k < nrip; k++) s->vertices[geti()].ripflag = 1;
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s->vertices[v];
+    x->val = getf(); x->curv = getf(); x->stat = getf(); x->mean = getf(); x->mean_imag = getf();
+    x->std_error = getf(); x->imag_val = getf(); x->val2 = getf(); x->val2bak = getf();
+    x->valbak = getf(); x->d = getf(); x->area = getf(); x->origarea = getf();
+    x->marked = geti(); x->marked2 = geti(); x->marked3 = geti(); x->cropped = geti();
+    x->fixedval = geti(); x->annotation = geti();
+  }
+  for (int f = 0; f < nf; f++) s->faces[f].marked = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "MRISsetCroppedToZero") oi(MRISsetCroppedToZero(s));
+    else if (op == "MRISaddToValues") oi(MRISaddToValues(s, getf()));
+    else if (op == "MRISimportCurvatureVector" || op == "MRISimportValVector") {
+      int n = geti();
+      std::vector<float> a(n > 0 ? n : 1);
+      for (int i = 0; i < n; i++) a[i] = getf();
+      if (n < nv) { out += "G "; continue; }
+      oi(op == "MRISimportValVector" ? MRISimportValVector(s, a.data()) : MRISimportCurvatureVector(s, a.data()));
+    } else if (op == "MRISimportValFromMatrixColumn") {
+      int rows = geti(), cols = geti(), col = geti();
+      MATRIX *m = MatrixAlloc(rows, cols, MATRIX_REAL);
+      for (int r = 1; r <= rows; r++)
+        for (int c = 1; c <= cols; c++) m->rptr[r][c] = getf();
+      if (rows < nv || col < 1 || col > cols) { out += "G "; continue; }
+      oi(MRISimportValFromMatrixColumn(s, m, col));
+    } else if (op == "MRISexportValVector") {
+      std::vector<float> a(nv > 0 ? nv : 1);
+      oi(MRISexportValVector(s, a.data()));
+      for (int i = 0; i < nv; i++) of(a[i]);
+    } else if (op == "MRISexportValVectorDouble") {
+      int off = geti();
+      std::vector<double> a(nv + off > 0 ? nv + off : 1, -3.0);
+      oi(MRISexportValVectorDouble(s, a.data(), off));
+      for (int i = 0; i < nv + off; i++) od(a[i]);
+    } else if (op == "MRIScopyMarkedToMarked2") oi(MRIScopyMarkedToMarked2(s));
+    else if (op == "MRIScopyMarked2ToMarked") oi(MRIScopyMarked2ToMarked(s));
+    else if (op == "MRIScopyMarkedToMarked3") oi(MRIScopyMarkedToMarked3(s));
+    else if (op == "MRIScopyMarked3ToMarked") oi(MRIScopyMarked3ToMarked(s));
+    else if (op == "MRIScopyValsToAnnotations") oi(MRIScopyValsToAnnotations(s));
+    else if (op == "MRIScopyMeansToValues") oi(MRIScopyMeansToValues(s));
+    else if (op == "MRIScopyImaginaryMeansToValues") oi(MRIScopyImaginaryMeansToValues(s));
+    else if (op == "MRIScopyStandardErrorsToValues") oi(MRIScopyStandardErrorsToValues(s));
+    else if (op == "MRIScopyStatsToValues") oi(MRIScopyStatsToValues(s));
+    else if (op == "MRIScopyStatsFromValues") oi(MRIScopyStatsFromValues(s));
+    else if (op == "MRIScopyValuesToImagValues") oi(MRIScopyValuesToImagValues(s));
+    else if (op == "MRIScopyImagValuesToValues") oi(MRIScopyImagValuesToValues(s));
+    else if (op == "MRIScopyVal2ToVal") oi(MRIScopyVal2ToVal(s));
+    else if (op == "MRIScopyCurvatureToValues") oi(MRIScopyCurvatureToValues(s));
+    else if (op == "MRIScopyVal2BakToVal") oi(MRIScopyVal2BakToVal(s));
+    else if (op == "MRIScopyCurvatureToImagValues") oi(MRIScopyCurvatureToImagValues(s));
+    else if (op == "MRIScopyValuesToCurvature") oi(MRIScopyValuesToCurvature(s));
+    else if (op == "MRIScopyImagValuesToCurvature") oi(MRIScopyImagValuesToCurvature(s));
+    else if (op == "MRIScopyCurvatureFromValues") oi(MRIScopyCurvatureFromValues(s));
+    else if (op == "MRIScopyCurvatureFromImagValues") oi(MRIScopyCurvatureFromImagValues(s));
+    else if (op == "MRIScopyValToVal2") oi(MRIScopyValToVal2(s));
+    else if (op == "MRIScopyValuesToVal2Bak") oi(MRIScopyValuesToVal2Bak(s));
+    else if (op == "MRIScopyValToValBak") oi(MRIScopyValToValBak(s));
+    else if (op == "MRIScopyValToVal2Bak") oi(MRIScopyValToVal2Bak(s));
+    else if (op == "MRIScopyFromCropped") oi(MRIScopyFromCropped(s, geti()));
+    else if (op == "MRIScopyToCropped") oi(MRIScopyToCropped(s, geti()));
+    else if (op == "MRISorigAreaToCurv") oi(MRISorigAreaToCurv(s));
+    else if (op == "MRISareaToCurv") oi(MRISareaToCurv(s));
+    else if (op == "MRISmarkedToCurv") oi(MRISmarkedToCurv(s));
+    else if (op == "MRIScurvToMarked") oi(MRIScurvToMarked(s));
+    else if (op == "MRISdToCurv") oi(MRISdToCurv(s));
+    else if (op == "MRIScurvToD") oi(MRIScurvToD(s));
+    else if (op == "MRIScopyFixedValFlagsToMarks") oi(MRIScopyFixedValFlagsToMarks(s));
+    else if (op == "MRISclearFaceMarks") oi(MRISclearFaceMarks(s));
+    else if (op == "MRISwriteD") oi(MRISwriteD(s, next()));
+    else if (op == "MRISwriteMarked") oi(MRISwriteMarked(s, next()));
+    else if (op == "MRISwriteArea") oi(MRISwriteArea(s, next()));
+    else if (op == "MRISreadMarked") oi(MRISreadMarked(s, next()));
+    else fail("vcp op");
+    oi(errno);
+    vcp_dump(s);
+  }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *f = fopen(name.c_str(), "rb");
+    if (!f) { out += "NOFILE "; continue; }
+    std::string b;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+    fclose(f);
+    ox(b);
   }
 }
 
@@ -5504,6 +5981,10 @@ void run_case()
     mpx_case();
   } else if (cmd == "lbl") {
     lbl_case();
+  } else if (cmd == "scl") {
+    scl_case();
+  } else if (cmd == "vcp") {
+    vcp_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {
@@ -5556,6 +6037,10 @@ static std::string untime(const std::string &t)
     } else if (line.rfind("  MRISfillInterior t = ", 0) == 0) {
       // relay 32 of track D: MRISfillInterior's elapsed time (with Gdiag_no > 0)
       line = "  MRISfillInterior t = <t>";
+    } else if ((line.rfind("SurfClusterSumFast: n=", 0) == 0 || line.rfind("SurfClusterSum: n=", 0) == 0) &&
+               line.find(", t = ") != std::string::npos) {
+      // relay 38 of track D: the cluster summaries' elapsed times (with Gdiag_no > 0)
+      line = line.substr(0, line.find(", t = ") + 6) + "<t>";
     }
     r += line;
     if (j == std::string::npos) break;

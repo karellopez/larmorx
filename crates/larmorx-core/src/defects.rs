@@ -1829,6 +1829,22 @@ defects! {
         "writing a surface's area error as a value file (MRISwriteAreaErrorToValFile) takes each vertex's original area from the surface's first faces (as many as the vertex has) instead of from the vertex's own faces, so the values written are not the vertices' area errors";
     FS_634 = "FS-634", "FreeSurfer", true,
         "writing a surface's area error as a value file (MRISwriteAreaErrorToValFile) reads the face-normal cache past the surface's faces for a vertex that lists more faces than the surface has (a face listed twice): a crash or another array's data";
+    FS_901 = "FS-901", "FreeSurfer", true,
+        "growing a cluster on a surface (sclustMapSurfClusters, sclustGrowSurfCluster, sclustGrowByDist; mri_surfcluster, mri_glmfit's simulations, label hole and island removal, mris_remove_intersection's hole filling, mri_fieldsign) crashes the program (a stack overflow, signal 11) when the cluster is large enough: its growth's path through the vertices passes what the program's 8 MiB stack holds (about 104,000 vertices; a whole hemisphere's cluster on a surface of 120,000 to 150,000 vertices goes 71,000 to 87,000 deep, so high-resolution surfaces of more than about 175,000 vertices crash)";
+    FS_902 = "FS-902", "FreeSurfer", true,
+        "removing a surface label's islands (LabelRemoveIslandsSurf; also its hole removal, LabelRemoveHolesSurf, and both, LabelRemoveHolesAndIslandsSurf; mri_label2label --annot-fill-holes) crashes the program for a label without points, and so the hole removal for a label that covers every vertex of the surface";
+    FS_903 = "FS-903", "FreeSurfer", true,
+        "the surface cluster functions (the cluster summary, the renumbering after sorting, the clusterwise-p pruning and its map of values, the cluster annotation, the cluster growths' seeds) read or write outside their arrays for a vertex whose cluster number is negative or beyond the cluster list, or for a seed that is not one of the surface's vertices; every caller gives the numbers the cluster growth made";
+    FS_904 = "FS-904", "FreeSurfer", true,
+        "pruning surface clusters by their clusterwise p-value (sclustPruneByCWPval; mri_surfcluster --cwpvalthresh) writes past its renumbering table for more than 10,000 clusters: memory corrupted";
+    FS_905 = "FS-905", "FreeSurfer", true,
+        "pruning surface clusters by their clusterwise p-value (sclustPruneByCWPval) neither keeps nor removes a cluster whose p-value is NaN: the cluster is left out of the list, but its vertices keep their values and get a cluster number from memory never written";
+    FS_906 = "FS-906", "FreeSurfer", true,
+        "saving surface clusters as a point set (sclustSaveAsPointSet; mri_surfcluster --pointset) crashes the program when the file cannot be created";
+    FS_907 = "FS-907", "FreeSurfer", true,
+        "growing a cluster by distance (sclustGrowByDist) continued by a later call reads the earlier call's seed vertex, which may belong to a surface already freed or with fewer vertices; every caller starts each growth anew";
+    FS_908 = "FS-908", "FreeSurfer", true,
+        "importing a surface's values or curvatures from a vector or a matrix column (MRISimportValVector, MRISimportCurvatureVector, MRISimportValFromMatrixColumn) reads outside the vector or the matrix when it holds fewer values than the surface has vertices, or for a column the matrix does not have; every caller passes one value per vertex";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

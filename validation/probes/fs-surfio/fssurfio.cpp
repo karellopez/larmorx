@@ -62,6 +62,7 @@
 #include "surfcluster.h"
 #include "mrishash.h"
 #include "mrishash_internals.h"
+#include "mrisurf_vals.h"
 
 // sclustReMap0 is defined in surfcluster.cpp but not declared in its header (relay 38)
 int sclustReMap0(MRI_SURFACE *Surf, int nClusters, SCS *scs_sorted);
@@ -5908,6 +5909,205 @@ void wvl_case()
   }
 }
 
+// ---- relay 40 of track D: vls, mrisurf_vals.cpp's marks, settings, rip flags, face tests and
+// filters (valmarks.rs, valfilter.rs)
+
+// vls: a surface read by MRISread (d/lh.s0), now and then its neighbourhood set to 2 hops
+// (MRISsetNeighborhoodSize), 0 to 3 vertices ripped, Gdiag's show and verbose bits or not, the
+// extra gradients or not, every vertex's 19 float and 5 integer fields (and its extra gradients)
+// and every face's mark from the case, a label of 0 to 6 points; then 1 to 6 operations, each
+// named by its FreeSurfer function; `G` where FreeSurfer would write outside the vertices for a
+// label point (FS-917); after each the vertices' fields, the faces' marks and the curvature extremes
+static void vls_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->val); of(x->val2); of(x->val2bak); of(x->valbak); of(x->curv); of(x->d); of(x->stat);
+    of(x->dx); of(x->dy); of(x->dz); of(x->odx); of(x->ody); of(x->odz); of(x->tx); of(x->tdx);
+    oi(x->ripflag); oi(x->marked); oi(x->marked2); oi(x->flags); oi(x->fixedval); oi(x->annotation);
+    if (s->dx2) { of(s->dx2[v]); of(s->dy2[v]); of(s->dz2[v]); }
+  }
+  for (int f = 0; f < s->nfaces; f++) oi(s->faces[f].marked);
+  of(s->max_curv); of(s->min_curv);
+}
+
+// after the long-range sampling: each vertex's neighbours in use, their size and original
+// distances; the surface's neighbourhood size, mean neighbour count and flag
+static void vls_topo_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX_TOPOLOGY *t = &s->vertices_topology[v];
+    oi(t->vtotal); oi(t->nsizeCur);
+    for (int i = 0; i < t->vtotal; i++) oi(t->v[i]);
+    if (s->vertices[v].dist_orig)
+      for (int i = 0; i < t->vtotal; i++) of(s->vertices[v].dist_orig[i]);
+    else out += "N ";
+  }
+  oi(s->nsize); of(s->avg_nbrs); oi(s->vtotalsMightBeTooBig);
+}
+
+void vls_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nsize = geti();
+  if (nsize > 1) MRISsetNeighborhoodSize(s, nsize);
+  int nrip = geti();
+  for (int k = 0; k < nrip; k++) s->vertices[geti()].ripflag = 1;
+  if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+  bool extra = geti() != 0;
+  if (extra) {
+    s->dx2 = (float *)calloc(nv, sizeof(float));
+    s->dy2 = (float *)calloc(nv, sizeof(float));
+    s->dz2 = (float *)calloc(nv, sizeof(float));
+  }
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s->vertices[v];
+    x->val = getf(); x->val2 = getf(); x->val2bak = getf(); x->valbak = getf(); x->curv = getf();
+    x->d = getf(); x->stat = getf(); x->dx = getf(); x->dy = getf(); x->dz = getf();
+    x->odx = getf(); x->ody = getf(); x->odz = getf();
+    x->whitex = getf(); x->whitey = getf(); x->whitez = getf();
+    x->pialx = getf(); x->pialy = getf(); x->pialz = getf();
+    x->marked = geti(); x->marked2 = geti(); x->annotation = geti(); x->flags = geti();
+    x->fixedval = geti();
+    if (extra) { s->dx2[v] = getf(); s->dy2[v] = getf(); s->dz2[v] = getf(); }
+  }
+  for (int f = 0; f < nf; f++) s->faces[f].marked = geti();
+  // relay 40: the long-range sampling's seed, diagnostic vertex, heartbeat and vertex pair
+  setenv("FREESURFER_SEED", std::to_string(geti()).c_str(), 1);
+  Gdiag_no = geti();
+  if (geti()) Gdiag |= DIAG_HEARTBEAT;
+  int vd1 = geti(), vd2 = geti();
+  if (vd1 >= 0) setenv("VDIAG1", std::to_string(vd1).c_str(), 1);
+  if (vd2 >= 0) setenv("VDIAG2", std::to_string(vd2).c_str(), 1);
+  int npts = geti();
+  LABEL *lab = LabelAlloc(npts > 0 ? npts : 1, NULL, NULL);
+  lab->n_points = npts;
+  bool outside = false;
+  for (int i = 0; i < npts; i++) {
+    lab->lv[i].vno = geti();
+    if (lab->lv[i].vno < 0 || lab->lv[i].vno >= nv) outside = true;
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "MRISinvertMarks") oi(MRISinvertMarks(s));
+    else if (op == "MRISnotMarked") oi(MRISnotMarked(s));
+    else if (op == "MRIScountMarked") oi(MRIScountMarked(s, geti()));
+    else if (op == "MRISmarkedVertices") oi(MRISmarkedVertices(s));
+    else if (op == "MRISsetAllMarks") oi(MRISsetAllMarks(s, geti()));
+    else if (op == "MRISthresholdValIntoMarked") oi(MRISthresholdValIntoMarked(s, getf()));
+    else if (op == "MRISmarkVerticesWithValOverThresh") oi(MRISmarkVerticesWithValOverThresh(s, getf()));
+    else if (op == "MRISexpandMarked") oi(MRISexpandMarked(s));
+    else if (op == "MRISerodeMarked") oi(MRISerodeMarked(s, geti()));
+    else if (op == "MRIScloseMarked") oi(MRIScloseMarked(s, geti()));
+    else if (op == "MRISopenMarked") oi(MRISopenMarked(s, geti()));
+    else if (op == "MRISclearMark2s") oi(MRISclearMark2s(s));
+    else if (op == "MRISsetFlags") oi(MRISsetFlags(s, geti()));
+    else if (op == "MRISclearFlags") oi(MRISclearFlags(s, geti()));
+    else if (op == "mrisSetVal") mrisSetVal(s, getf());
+    else if (op == "mrisSetValAndClearVal2") mrisSetValAndClearVal2(s, getf());
+    else if (op == "mrisClearGradient") oi(mrisClearGradient(s));
+    else if (op == "MRISclearGradient") oi(MRISclearGradient(s));
+    else if (op == "mrisClearExtraGradient") oi(mrisClearExtraGradient(s));
+    else if (op == "mrisClearMomentum") oi(mrisClearMomentum(s));
+    else if (op == "MRISnegateValues") oi(MRISnegateValues(s));
+    else if (op == "MRISsetVals") oi(MRISsetVals(s, getf()));
+    else if (op == "MRISsetValues") oi(MRISsetValues(s, getf()));
+    else if (op == "MRISscaleVals") oi(MRISscaleVals(s, getf()));
+    else if (op == "MRISmulVal") oi(MRISmulVal(s, getf()));
+    else if (op == "MRISsqrtVal") oi(MRISsqrtVal(s));
+    else if (op == "MRISsetVal2") oi(MRISsetVal2(s, getf()));
+    else if (op == "MRISclearFixedValFlags") oi(MRISclearFixedValFlags(s));
+    else if (op == "MRISextractCurvatureVectorDouble") {
+      int off = geti();
+      std::vector<double> a(nv + off > 0 ? nv + off : 1, -3.0);
+      oi(MRISextractCurvatureVectorDouble(s, a.data(), off));
+      for (int i = 0; i < nv + off; i++) od(a[i]);
+    } else if (op == "MRISextractCurvatureDoubleVector") {
+      std::vector<double> a(nv > 0 ? nv : 1, -3.0);
+      oi(MRISextractCurvatureDoubleVector(s, a.data()));
+      for (int i = 0; i < nv; i++) od(a[i]);
+    } else if (op == "MRISabsVals") oi(MRISabsVals(s));
+    else if (op == "MRISabsCurvature") oi(MRISabsCurvature(s));
+    else if (op == "MRISclearD") MRISclearD(s);
+    else if (op == "MRISripLabel" || op == "MRISripNotLabel") {
+      if (outside) { out += "G "; continue; }
+      oi(op == "MRISripLabel" ? MRISripLabel(s, lab) : MRISripNotLabel(s, lab));
+    } else if (op == "MRISripMarked") oi(MRISripMarked(s));
+    else if (op == "MRISripUnmarked") oi(MRISripUnmarked(s));
+    else if (op == "MRISripZeroThicknessRegions") oi(MRISripZeroThicknessRegions(s));
+    else if (op == "mrisMarkBadEdgeVertices") oi(mrisMarkBadEdgeVertices(s, geti()));
+    else if (op == "mrisAnyVertexOfFaceMarked") oi(mrisAnyVertexOfFaceMarked(s, geti()));
+    else if (op == "triangleMarked") oi(triangleMarked(s, geti()));
+    else if (op == "findNonMarkedFace") { int a = geti(), b = geti(); oi(findNonMarkedFace(s, a, b)); }
+    else if (op == "detectContrast") oi(detectContrast(s));
+    else if (op == "MRISminFilterCurvatures") oi(MRISminFilterCurvatures(s, geti()));
+    else if (op == "MRISmaxFilterCurvatures") oi(MRISmaxFilterCurvatures(s, geti()));
+    else if (op == "MRISaverageMarkedCurvatures") oi(MRISaverageMarkedCurvatures(s, geti()));
+    else if (op == "MRISaverageMarkedVals") oi(MRISaverageMarkedVals(s, geti()));
+    else if (op == "MRISaverageVals") oi(MRISaverageVals(s, geti()));
+    else if (op == "MRISaverageD") oi(MRISaverageD(s, geti()));
+    else if (op == "MRISaverageVal2s") oi(MRISaverageVal2s(s, geti()));
+    else if (op == "MRISaverageVal2baks") oi(MRISaverageVal2baks(s, geti()));
+    else if (op == "MRISaverageMarkedStats") oi(MRISaverageMarkedStats(s, geti()));
+    else if (op == "MRISmedianFilterVals") oi(MRISmedianFilterVals(s, geti()));
+    else if (op == "MRISmedianFilterVal2s") oi(MRISmedianFilterVal2s(s, geti()));
+    else if (op == "MRISmedianFilterVal2baks") oi(MRISmedianFilterVal2baks(s, geti()));
+    else if (op == "MRISmedianFilterCurvature") oi(MRISmedianFilterCurvature(s, geti()));
+    else if (op == "MRISmedianFilterD") { int n = geti(), vt = geti(); oi(MRISmedianFilterD(s, n, vt)); }
+    else if (op == "MRISgaussianFilterD") oi(MRISgaussianFilterD(s, getd()));
+    else if (op == "MRISmodeFilterVals") oi(MRISmodeFilterVals(s, geti()));
+    else if (op == "MRISmodeFilterZeroVals") oi(MRISmodeFilterZeroVals(s));
+    else if (op == "MRISsoapBubbleVals") oi(MRISsoapBubbleVals(s, geti()));
+    else if (op == "MRISsoapBubbleD") oi(MRISsoapBubbleD(s, geti()));
+    else if (op == "MRISsampleDistances") {
+      int m = geti();
+      std::vector<int> nb(m + 1 > 1 ? m + 1 : 1);
+      for (size_t i = 0; i < nb.size(); i++) nb[i] = geti();
+      oi(MRISsampleDistances(s, nb.data(), m));
+      vls_topo_dump(s);
+    } else if (op == "MRISsampleAtEachDistance") {
+      int a = geti(), b = geti();
+      oi(MRISsampleAtEachDistance(s, a, b));
+      vls_topo_dump(s);
+    }
+    else fail("vls op");
+    vls_dump(s);
+  }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    if (name == "d/lh.s0") continue;
+    oh(name.c_str());
+    FILE *f = fopen(name.c_str(), "rb");
+    if (!f) { out += "NOFILE "; continue; }
+    std::string b;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+    fclose(f);
+    ox(b);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -6170,6 +6370,8 @@ void run_case()
     vcp_case();
   } else if (cmd == "mht") {
     mht_case();
+  } else if (cmd == "vls") {
+    vls_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

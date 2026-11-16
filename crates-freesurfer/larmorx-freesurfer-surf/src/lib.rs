@@ -82,6 +82,10 @@
 //!   table of faces or vertices, the faces' self-intersection tests (FS-909..FS-913); [`tritri`]:
 //!   the triangle-triangle and ray-triangle intersections; [`vals`]: the hole filling of a surface
 //!   map (FS-914, FS-915).
+//! - [`valmarks`] and [`valfilter`] (fs.surf's `mrisurf_vals.cpp`, taken early): the marks, the
+//!   per-vertex settings, the rip flags and the face tests (FS-917); the averages, medians,
+//!   Gaussian, mode and soap-bubble filters of the per-vertex values (FS-971..FS-973); [`sampdist`]:
+//!   the long-range neighbours sampled with their distances (FS-974..FS-977).
 //! - [`props11`]: a surface moved to Talairach space (FS-629), the vertex-to-voxel conversions, the
 //!   normal-dot and principal-curvature distributions (FS-626..FS-628), Ashburner's triangle energy.
 #![forbid(unsafe_code)]
@@ -130,6 +134,7 @@ pub mod props7;
 pub mod props8;
 pub mod props9;
 pub mod readwrite;
+pub mod sampdist;
 pub mod scanf;
 pub mod sclust;
 pub mod sfile;
@@ -143,6 +148,8 @@ pub mod trifile;
 pub mod tritri;
 pub mod valcopy;
 pub mod valfile;
+pub mod valfilter;
+pub mod valmarks;
 pub mod vals;
 pub mod views;
 pub mod vpos;

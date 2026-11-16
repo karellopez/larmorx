@@ -379,7 +379,10 @@ fn frames_and_planes_refused() {
     assert!(r.err.contains("ImageAlloc: could not allocate 3x4 buffer"));
     // FS_TIFF_DEBUG's lines
     let r = read(fix, d.path(), "f.tif", &[("FS_TIFF_DEBUG", "1")]);
-    assert!(r.out.contains("[DEBUG] TiffReadImage(): pages found=1, pages to read=1 [0, 1)"));
+    assert!(
+        r.out
+            .contains("[DEBUG] TiffReadImage(): pages found=1, pages to read=1 [0, 1)")
+    );
     assert!(r.vol.is_some());
 }
 

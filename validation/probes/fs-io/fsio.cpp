@@ -2130,6 +2130,46 @@ void run_piece6(const std::string &cmd0)
         oi(TransformSetMRIVolGeomToDst(t, m)); pmri(m);
         oi(TransformCopyVolGeomToMRI(t, m)); pmri(m);
       }
+      // piece 32 (track A relay 40): W TransformWrite under a name (the user and the creation time
+      // fixed), its status, errno and the folder's files; C TransformCopy into a new transform,
+      // which the later queries use (the original freed); A TransformApplyType and D
+      // TransformCreateDensityMap of a float volume made here (w h d interp), the result's size,
+      // geometry and voxels
+      else if (k == "W") {
+        bool wn;
+        std::string fn = getstr(&wn);
+        setenv("USER", "u", 1);
+        setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "Sun Nov 16 12:00:00 2026", 1);
+        errno = 0;
+        int r = TransformWrite(t, fn.c_str());
+        fflush(NULL);
+        oi(r); oi(errno);
+        odir12();
+      } else if (k == "C") {
+        TRANSFORM *c = TransformCopy(t, NULL);
+        oi(c->type); oi(c->mri_xn != NULL);
+        if (c->type == MORPH_3D_TYPE) {
+          GCA_MORPH *gm = (GCA_MORPH *)c->xform;
+          oi(gm->mri_xind != NULL); oi(gm->m_affine != NULL);
+        }
+        TransformFree(&t);
+        t = c;
+      } else if (k == "A" || k == "D") {
+        int w = (int)geti(), h = (int)geti(), d = (int)geti(), interp = (int)geti();
+        MRI *src = MRIalloc(w, h, d, MRI_FLOAT);
+        for (int z = 0; z < d; z++)
+          for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) MRIsetVoxVal(src, x, y, z, 0, (float)(x + 3 * y + 7 * z) * 0.5f);
+        MRI *r = k == "A" ? TransformApplyType(t, src, NULL, interp) : TransformCreateDensityMap(t, src, NULL);
+        fflush(stdout);
+        if (!r) out += "N ";
+        else {
+          pmri(r);
+          oi(r->type); oi(r->nframes);
+          if (r->chunk && r->ischunked) fnv_bytes((const unsigned char *)r->chunk, r->bytes_total);
+          else out += "nochunk ";
+        }
+      }
       fflush(stdout);
     }
     oi(TransformFree(&t));

@@ -2301,6 +2301,10 @@ defects! {
         "reading a TIFF image: a field the page does not hold and libtiff gives no default for (the photometric interpretation, the compression, the size of a page that could not be read) is printed (Gdiag's verbose lines) or used as the image's size from memory contents";
     FS_874 = "FS-874", "FreeSurfer", true,
         "writing a TIFF image: images of bytes are labelled signed (SampleFormat 2) and floating-point images are labelled as signed integers (a second SampleFormat replaces the first): other readers take bytes above 127 as negative and floats as integers";
+    FS_875 = "FS-875", "FreeSurfer", true,
+        "copying a GCA morph into a new one (a transform copied, as concatenating transforms does): the copy keeps neither the morph's inverse (its index volumes) nor its affine matrix, so the copy has no inverse and is written without its affine";
+    FS_876 = "FS-876", "FreeSurfer", true,
+        "copying a transform into one of the other kind (a linear transform array into a GCA morph, or the reverse): FreeSurfer copies into the other structure's memory (a crash or memory corruption)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

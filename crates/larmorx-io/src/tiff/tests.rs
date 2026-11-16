@@ -61,6 +61,52 @@ fn a_missing_file_and_a_bad_header() {
 }
 
 #[test]
+fn a_name_given_apart_from_the_path_shows_in_messages() {
+    // open_named: the file opened is the path, every message and TIFFFileName show the name
+    let dir = tempfile::tempdir().expect("tempdir");
+    let p = dir.path().join("bad.tif");
+    std::fs::write(&p, b"XY*\0\0\0\0\0").expect("write");
+    let path = p.to_str().expect("path");
+    let mut cap = Captured::default();
+    let r = Tiff::open_named(
+        path,
+        "rel/bad.tif",
+        "r",
+        opts(UpstreamDefects::Fix),
+        &mut cap,
+    );
+    assert!(r.expect("ported").is_none());
+    assert_eq!(
+        cap.text(Stream::Err),
+        "rel/bad.tif: Not a TIFF file, bad magic number 22872 (0x5958).\n"
+    );
+    let mut cap = Captured::default();
+    let missing = dir.path().join("none.tif");
+    let r = Tiff::open_named(
+        missing.to_str().expect("path"),
+        "none.tif",
+        "r",
+        opts(UpstreamDefects::Fix),
+        &mut cap,
+    );
+    assert!(r.expect("ported").is_none());
+    assert_eq!(cap.text(Stream::Err), "TIFFOpen: none.tif: Cannot open.\n");
+    // a file that opens: its name is the given one
+    let w = dir.path().join("w.tif");
+    let mut cap = Captured::default();
+    let t = Tiff::open_named(
+        w.to_str().expect("path"),
+        "shown.tif",
+        "w",
+        opts(UpstreamDefects::Fix),
+        &mut cap,
+    )
+    .expect("ported")
+    .expect("opened");
+    assert_eq!(t.file_name(), "shown.tif");
+}
+
+#[test]
 fn a_written_file_reads_back() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path().join("w.tif");

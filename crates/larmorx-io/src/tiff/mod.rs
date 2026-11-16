@@ -315,11 +315,25 @@ impl Tiff {
         opts: Options,
         s: &mut dyn Streams,
     ) -> Result<Option<Tiff>, Unported> {
+        Tiff::open_named(name, name, mode, opts, s)
+    }
+
+    /// [`Tiff::open`] of the file at `path` for a caller that gave libtiff the name `name` (a
+    /// program run in process with its own working directory joins it and the name it was given):
+    /// every message and [`Tiff::file_name`] show `name`, the file opened is `path`.
+    /// `open(n, ...)` is `open_named(n, n, ...)`.
+    pub fn open_named(
+        path: &str,
+        name: &str,
+        mode: &str,
+        opts: Options,
+        s: &mut dyn Streams,
+    ) -> Result<Option<Tiff>, Unported> {
         const MODULE: &str = "TIFFOpen";
         let Some(m) = get_mode(mode, MODULE, &opts.messages, s) else {
             return Ok(None);
         };
-        let Some(fd) = Fd::open(name, m.0 != Mode::RdOnly, m.2) else {
+        let Some(fd) = Fd::open(path, m.0 != Mode::RdOnly, m.2) else {
             opts.messages
                 .error(Some(MODULE), &format!("{name}: Cannot open"), s);
             return Ok(None);

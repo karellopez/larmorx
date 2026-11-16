@@ -2,7 +2,7 @@
 //! Float matrices (spec §2, §8.1, §16): the record and its addressing, allocation, freeing, the
 //! copy, and the products accumulated in double and in float.
 
-use larmorx_core::defects::{FS_13, FS_14, FS_15, FS_16};
+use larmorx_core::defects::{FS_13, FS_14, FS_15, FS_16, FS_926};
 
 use super::{Output, Returned};
 use crate::process::{BUILD_ROOT, Process, Stop, codes};
@@ -246,6 +246,26 @@ impl Process {
             );
             return Ok(None);
         }
+        // The default allocator's block (each size modulo 2^64 before each rounding up).
+        let up = |b: u64| b.wrapping_add(63) & !63;
+        let pointers = 64u64.wrapping_add(8u64.wrapping_mul((i64::from(rows) + 1) as u64));
+        let numbers = (4 * k * (rc + 2)) as u64;
+        let block = up(pointers).wrapping_add(up(numbers));
+        // FS-926 (both modes): a block above 256 MiB is made, one above 16 GiB is the answer
+        // of a machine without that memory; the old allocator has no such block.
+        if !old && rows >= 0 && cols >= 0 && block > 1 << 28 {
+            if block > 1 << 34 {
+                self.note(
+                    &FS_926,
+                    "a matrix whose block asks for more than 16 GiB: refused, the program ends with status 1",
+                );
+                return Err(self.matrix_alloc_failed(rows, cols));
+            }
+            self.note(
+                &FS_926,
+                "a matrix whose block asks for more than 256 MiB (up to 16 GiB): made",
+            );
+        }
         // §2.1's length; non-negative here (a negative count gives a length of 0 or more).
         let len = if complex {
             2 * rc + if old { 2 } else { 4 }
@@ -258,11 +278,6 @@ impl Process {
             return Err(self.matrix_alloc_failed(rows, cols));
         }
         data.resize(len, 0.0);
-        // The default allocator's block (each size modulo 2^64 before each rounding up).
-        let up = |b: u64| b.wrapping_add(63) & !63;
-        let pointers = 64u64.wrapping_add(8u64.wrapping_mul((i64::from(rows) + 1) as u64));
-        let numbers = (4 * k * (rc + 2)) as u64;
-        let block = up(pointers).wrapping_add(up(numbers));
         let in_buf = buffer && !old && block <= 192;
         if !old && (-16..=-9).contains(&rows) {
             // The array lies over the matrix's own record (FS-13, `reproduce` only).

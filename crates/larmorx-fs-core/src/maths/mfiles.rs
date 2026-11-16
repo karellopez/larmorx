@@ -3,7 +3,7 @@
 //! `%f` and `%d` as §18.1 describes glibc 2.35's (FS-49 for a binary file that ends early).
 
 use larmorx_core::cscan::{self, is_c_space};
-use larmorx_core::defects::FS_49;
+use larmorx_core::defects::{FS_49, FS_924};
 
 use super::Returned;
 use super::matrix::{MATRIX_COMPLEX, Matrix};
@@ -541,20 +541,43 @@ impl Process {
                 Ok(f) => f,
                 Err(r) => return Ok(r),
             };
+        let given = fresh.is_none();
         let target: &mut Matrix = match (fresh.as_mut(), m) {
             (Some(f), _) => f,
             (None, Some(g)) => g,
             (None, None) => return Ok(Returned::Nothing),
         };
         let per = if kind == MATRIX_COMPLEX { 2 } else { 1 };
+        let total = i64::from(rows.max(0)) * i64::from(cols.max(0)) * per;
         let mut vals = Vec::new();
         let mut slot8 = [0u8; 8];
-        for _ in 0..(i64::from(rows.max(0)) * i64::from(cols.max(0)) * per) {
+        let mut cut = false;
+        for i in 0..total {
             let b = s.read(8);
             if b.len() < 8 {
                 self.error_printf(codes::BAD_FILE, b"freadDouble: fread failed");
                 if !reproduce {
                     return Ok(self.ends_early());
+                }
+                if !cut {
+                    cut = true;
+                    // FS-924: the doubles to read from the first one cut, that one included.
+                    let n = total - i;
+                    if n > 1 << 20 {
+                        self.note(
+                            &FS_924,
+                            "a binary matrix file that ends a million numbers or more early refused",
+                        );
+                        let msg = format!(
+                            "MatrixReadFrom: the file ends {n} numbers before the matrix does (FreeSurfer prints an error for each)"
+                        );
+                        self.error_printf(codes::BAD_FILE, msg.as_bytes());
+                        // A given matrix keeps the numbers read before the cut.
+                        if given {
+                            put_values(target, kind, rows, cols, &vals);
+                        }
+                        return Ok(Returned::Nothing);
+                    }
                 }
                 self.note(
                     &FS_49,
@@ -565,18 +588,7 @@ impl Process {
             vals.push(sse::narrow(f64::from_be_bytes(slot8)));
             slot8.reverse();
         }
-        let mut k = 0;
-        for r in 1..=rows {
-            for c in 1..=cols {
-                if kind == MATRIX_COMPLEX {
-                    target.set_pair(r, c, vals[k], vals[k + 1]);
-                    k += 2;
-                } else {
-                    target.set(r, c, vals[k]);
-                    k += 1;
-                }
-            }
-        }
+        put_values(target, kind, rows, cols, &vals);
         Ok(match fresh {
             Some(f) => Returned::New(f),
             None => Returned::Output,
@@ -634,6 +646,31 @@ impl Process {
                 msg.extend_from_slice(b") - file open failed\n");
                 self.error_printf(codes::NO_FILE, &msg);
                 codes::NO_FILE
+            }
+        }
+    }
+}
+
+/// The numbers read, element by element in row order (a complex element's real part, then its
+/// imaginary part), into a matrix; the elements after the last number read are left as they are.
+fn put_values(target: &mut Matrix, kind: i32, rows: i32, cols: i32, vals: &[f32]) {
+    let mut k = 0;
+    for r in 1..=rows {
+        for c in 1..=cols {
+            if kind == MATRIX_COMPLEX {
+                match (vals.get(k), vals.get(k + 1)) {
+                    (Some(&re), Some(&im)) => target.set_pair(r, c, re, im),
+                    (Some(&re), None) => {
+                        let (_, im) = target.pair(r, c);
+                        target.set_pair(r, c, re, im);
+                    }
+                    _ => return,
+                }
+                k += 2;
+            } else {
+                let Some(&v) = vals.get(k) else { return };
+                target.set(r, c, v);
+                k += 1;
             }
         }
     }

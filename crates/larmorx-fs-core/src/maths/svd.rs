@@ -436,8 +436,10 @@ impl Process {
                     &FS_46,
                     "a failed decomposition ignored (its singular values 0)",
                 );
+                // What the failure leaves (§17.4, §17.5): U as given (m's own numbers), every
+                // singular value +0, V all +0; the steps below then make §17.5's NaNs.
                 Svd {
-                    u: vec![0.0; rows * cols],
+                    u: numbers_rm(m),
                     w: vec![0.0; cols],
                     v: vec![0.0; cols * cols],
                 }

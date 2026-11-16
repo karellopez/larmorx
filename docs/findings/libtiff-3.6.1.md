@@ -87,7 +87,43 @@ PixarLog strips (8, 16 and 32 bits, one to five samples) and SGILog rows (LogL 1
   `inflateSync`; another error prints `zlib error: <message>`, where the message is zlib's last
   (`(null)` when zlib set none since its reset).
 
-## Defects (FS-814 to FS-840, FS-881 to FS-885)
+## Reads into no buffer (relay 36)
+
+`TIFFReadScanline(tif, NULL, row, sample)` and `TIFFReadTile(tif, NULL, ...)` (FreeSurfer's image
+readers pass a null pointer for an image 0 pixels wide: its rows of 1 and 3 samples point into an
+image that was never allocated; its 4-sample rows get `calloc(0, 1)`'s buffer, not null) seek,
+fill and start the strip or tile as any read does, then hand the null pointer and the scanline's
+or tile's size to the codec (`larmorx_io::tiff::Tiff::read_scanline_null`, `read_tile_null`):
+
+- a size of 0 (a width of 0): every codec reads as into a buffer of no bytes (None, PackBits,
+  LZW, the CCITT decoders, NeXT, ThunderScan, PixarLog and SGILog write nothing for a row of 0
+  bytes; the predictor and the byte swap touch nothing), except **Deflate**: zlib's `inflate`
+  refuses a null output buffer before it looks at its input (`Z_STREAM_ERROR`, the stream
+  unchanged), so every such row fails with `ZIPDecode: <name>: zlib error: <zlib's message>.`
+  (`(null)` after the strip's `inflateReset`) and -1, with or without the predictor. Into a buffer
+  of no bytes the same Deflate row inflates what it can without output: 1 while zlib makes
+  progress or stands at the stream's end, else zlib's `Z_BUF_ERROR` (`zlib error`, -1);
+- a size of more than 0: Deflate's refusal as above; the other codecs write through the null
+  pointer once they decode a byte, and the byte swap of 16-, 32- and 64-bit samples of a file of
+  the other byte order swaps there (also after a codec that is not implemented: its -1 counts as
+  success): a crash (FS-958). A codec that fails before writing (no data left, `Not enough data`)
+  returns -1 as with a buffer.
+
+Starting a strip divides by the strips per image and starting a tile by the tiles across, the
+tiles down (each rounded up in 32 bits) and the tiles per image: a count of 0 ends the program with
+SIGFPE (FS-959). A width of 0 never gets there through `TIFFReadTile` (`Col 0 out of range`), but a
+tile width or length near 2^32 (2^32 - 1 stands for the whole image in `TIFFComputeTile`, not in
+`TIFFStartTile`) or a strip count that overflows does; reads of 0 bytes reach it where reads with a
+buffer skip such tiles (a tile size of 0).
+
+The probe's `nopix` runs also showed that `TIFFFetchStripThing` reads a LONG strip array of the
+directory's count straight into the array: a read cut short by the end of the file leaves there
+the bytes it got (as read, never swapped), the rest zero, and the directory's read fails (`Error
+fetching data for field "StripByteCounts"`) with that array in place; a caller that reads on uses
+those values (a strip byte count made of the file's text bytes, for one). The port keeps them since
+relay 36.
+
+## Defects (FS-814 to FS-840, FS-881 to FS-885, FS-958, FS-959)
 
 Each is corrected by default; `LARMORX_UPSTREAM_DEFECTS=reproduce` gives libtiff's result where
 it is deterministic. Where libtiff's behaviour depends on memory contents or crashes, the port
@@ -127,6 +163,8 @@ does what the correction does and notes it.
 | FS-883 | SGILog: runs and literals not stopped at the row's pixel count, a run's two bytes and a 24-bit pixel's three read when fewer are left, rows of 0 bytes never end | the loops stop at the row's end and the data's, as libtiff 4.0.10 |
 | FS-884 | SGILog: pixels written past the translation buffer when it is smaller than a row (memory past it) | not written |
 | FS-885 | a CCITT file's FaxSubAddress entry before its Compression entry is first registered as an unknown tag that passes its count; the codec's tag method then gets the count where the string's address goes (a crash) | set from the string |
+| FS-958 | a scanline or tile of more than 0 bytes read into no buffer: the codecs but Deflate write through the null pointer once they decode a byte, the byte swap swaps there (a crash) | decoded and dropped, nothing swapped |
+| FS-959 | starting a strip or tile divides by a count of 0 (the strips per image, the tiles across or down after a 32-bit overflow): SIGFPE | row, column and sample 0 |
 
 Many of these are reached only through a directory that failed to read: libtiff's
 `TIFFSetDirectory` returns 0 but leaves the half-read directory in place, with the previous

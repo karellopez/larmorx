@@ -10,8 +10,10 @@
 //! Sibidanov (the copyright and permission notice are reproduced below). The operations and
 //! their order are kept exactly (the C has no fused multiply-adds); hex-float constants are
 //! written as their exact bit patterns, each with the original literal in a comment. Errno and
-//! the exception flags are not modelled. A zero gives -inf, a negative argument (-0 excepted)
-//! the negative quiet NaN `0xffc00000` the C function returns, a NaN argument itself quieted.
+//! the exception flags are not modelled. A zero gives -inf; a negative argument (-0 excepted)
+//! the positive quiet NaN `0x7fc00000`, as glibc's `log10f` gives it (the C returns `0xffc00000`:
+//! the two choices of `Libm::log10f` then differ only by rounding); a NaN argument itself
+//! quieted.
 //! Checked against the C function (compiled without fused multiply-adds) on every one of the
 //! 2^32 floats (`validation/investigations/coremath-log10f/`).
 
@@ -238,8 +240,10 @@ fn as_special(x: f32) -> f32 {
     if ax > 0xff00_0000 {
         return x + x; // x = NaN
     }
-    // x < 0: the C raises FE_INVALID
-    f32::from_bits(0x1ff8 << 19)
+    // x < 0: the C raises FE_INVALID and returns 0xffc00000; glibc's log10f, the other choice
+    // of `Libm::log10f`, the positive quiet NaN: so that the two differ only by rounding, this
+    // one too
+    f32::from_bits(0x7fc0_0000)
 }
 
 /// `log10(x)` for `f32`, correctly rounded (CORE-MATH's `cr_log10f`).
@@ -317,8 +321,8 @@ mod tests {
         assert_eq!(log10f(0.0), f32::NEG_INFINITY);
         assert_eq!(log10f(-0.0), f32::NEG_INFINITY);
         assert_eq!(log10f(f32::INFINITY), f32::INFINITY);
-        assert_eq!(log10f(-1.0).to_bits(), 0xffc0_0000);
-        assert_eq!(log10f(f32::NEG_INFINITY).to_bits(), 0xffc0_0000);
+        assert_eq!(log10f(-1.0).to_bits(), 0x7fc0_0000);
+        assert_eq!(log10f(f32::NEG_INFINITY).to_bits(), 0x7fc0_0000);
         assert!(log10f(f32::NAN).is_nan());
         assert_eq!(log10f(f32::from_bits(0x7f80_0001)).to_bits(), 0x7fc0_0001);
         for n in 0..=10 {

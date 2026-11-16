@@ -121,8 +121,8 @@ pub use log10_glibc::log10_glibc;
 pub use log10f_glibc::log10f_glibc;
 
 /// The base-10 logarithm for `f32`, correctly rounded (CORE-MATH's `cr_log10f`; no fused
-/// multiply-adds). glibc's `log10f` (fdlibm's) is not correctly rounded; `log10f_glibc` has its
-/// bits, for `reproduce`.
+/// multiply-adds). glibc's `log10f` (fdlibm's) is not correctly rounded; [`log10f_glibc`] has
+/// its bits, for `reproduce` ([`Libm::log10f`] chooses by the mode).
 pub use log10f::log10f;
 
 /// The arc cosine for `f32`, correctly rounded (CORE-MATH's `cr_acosf`; no fused multiply-adds,

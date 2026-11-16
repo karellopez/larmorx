@@ -21,6 +21,10 @@ Result (2026-11-16, gcc 11.4 with `-O2 -ffp-contract=off`, glibc 2.35, log
     positive finite floats 2139095039, cr_log10f != (float)cr_log10 on 1, != libc log10f on 29787060
     special 0 ff800000 -0 ff800000 -1 ffc00000 -inf ffc00000 inf 7f800000 snan 7fc00001 tiny c23369f4
 
+The port returns glibc's positive quiet NaN `0x7fc00000` for a negative argument where the C
+returns `0xffc00000` (`Libm::log10f`'s two choices then differ only by rounding; the checksums
+read every NaN as `0x7fc00000`).
+
 So glibc 2.35's `log10f` is one unit off on 29,787,060 of the 2,139,095,039 positive finite floats
 (1.39 %; the first 20 are printed in the log), and the double logarithm rounded to float on one.
 The Rust port gives both checksums (`math::log10f::tests`, the full one with

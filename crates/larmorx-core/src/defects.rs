@@ -2699,6 +2699,18 @@ defects! {
         "a transform array's weighted transform at a point (LTAtransformAtPoint, and LTAtransformInterp of several transforms) keeps the weights of at most 4,096 transforms: an array of more writes past them";
     FS_887 = "FS-887", "FreeSurfer", true,
         "making a subject's transform work with tkregister's coordinates (DevolveXFM, DevolveXFMWithSubjectsDir) builds the paths of the subject's folder, original volume and transform in 2,000 bytes: a longer path writes past them";
+    FS_888 = "FS-888", "FreeSurfer", true,
+        "a voxel list of a range's border voxels (VLSTcreate with border_only) counts the voxels whose six neighbours all lie in the range and then stores the border voxels: the list's count is the interior's, its last voxels zeros, or its arrays too short for the border's (writes past them); corrected: the border voxels are counted";
+    FS_889 = "FS-889", "FreeSurfer", true,
+        "a voxel list made with a negative skip (VLSTcreate) never ends (skip -1) or reads frames before the first";
+    FS_890 = "FS-890", "FreeSurfer", true,
+        "the voxel-list functions (VLSTcreate, VLSTsort, VLSTcopy, VLSTcopyInto, VLSTadd, VLSTinList, VLSTcomputeStats, VLSTaddWithValue) read or write past a list's arrays when a count or an index goes beyond what was allocated, and a sort of a destination list of more voxels than its source writes past its sort table";
+    FS_891 = "FS-891", "FreeSurfer", true,
+        "sorting a voxel list (VLSTsort) moves each voxel's indices, coordinates and values but not its frame index: after the sort the voxels of a list of several frames carry other voxels' frames; corrected: the frames move with their voxels";
+    FS_892 = "FS-892", "FreeSurfer", false,
+        "a voxel list made from a volume (VLSTcreate) keeps its maximum count at 0 (a new list) or the given list's: adding a voxel to it (VLSTadd) is refused as too many voxels; kept (no program adds to such a list)";
+    FS_893 = "FS-893", "FreeSurfer", false,
+        "copying a voxel list with spline slopes (VLSTcopy, VLSTcopyInto) gives the copy slope arrays of zeros instead of the source's slopes, and ends the program when the source has slopes but no parameterisation; kept (no program copies a spline list)";
 }
 
 /// The register entry with ID `id`.

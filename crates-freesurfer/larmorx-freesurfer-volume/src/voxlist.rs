@@ -10,7 +10,7 @@
 //! `max_vox` are kept as FreeSurfer keeps them, apart from the arrays' lengths. The volume a list
 //! was made from is a reference (`vl->mri`).
 //!
-//! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-volume.md` §31):
+//! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-volume.md` §27):
 //! - **FS-888** (rule A): `VLSTcreate` with `border_only` counts the voxels in the range whose six
 //!   neighbours all are (the interior), and then stores the border voxels: the list's count is
 //!   the interior's, and its arrays are too short when the border is larger. By default the
@@ -449,6 +449,11 @@ fn copy_slopes(
     num: i32,
 ) -> Result<(), Fatal> {
     let fresh = || (num >= 0).then(|| vec![0.0f32; num as usize]);
+    let any = src.mx.is_some() || src.my.is_some() || src.mz.is_some() || src.t.is_some();
+    if num < 0 && any {
+        // calloc of a negative count fails
+        g.errno = ENOMEM;
+    }
     if src.mx.is_some() {
         dst.mx = fresh();
     }

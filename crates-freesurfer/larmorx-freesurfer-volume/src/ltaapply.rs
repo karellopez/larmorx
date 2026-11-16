@@ -12,7 +12,7 @@
 //! relative name is opened in `dir`, the program's working directory, when given. The C library's
 //! `exp` is glibc's with `reproduce`, correctly rounded by default (GLIBC-07 where they differ).
 //!
-//! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-volume.md` §30):
+//! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-volume.md` §26):
 //! - **FS-504** (memory, crash): an array without transforms, or a transform without its matrix,
 //!   where FreeSurfer reads one: an error in both modes.
 //! - **FS-886** (memory): `LTAtransformAtPoint` keeps each transform's weight in an array of 4,096:

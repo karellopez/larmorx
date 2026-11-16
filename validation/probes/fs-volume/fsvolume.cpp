@@ -13,6 +13,7 @@
 // when FreeSurfer's code ended the child. Floats and doubles in and out are their bits in hex;
 // byte strings (files) are hex, `-` for none.
 
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -55,6 +56,22 @@ double ham_sinc(double x, double fullwidth);
 int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
 int MRIsincSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, int hw, double *pval);
 int MRIsampleSeqVolume(const MRI *mri, double x, double y, double z, float *valvect, int firstframe, int lastframe);
+
+// relay 34: the double atan2 of the official code (linked with --wrap=atan2, build.sh). The
+// project decided correctly rounded atan2 for reproduce too (docs/findings/freesurfer-libm.md §2):
+// commands that set atan2_cr take CORE-MATH's (oracles/core-math-preload/libcrmath.so) for
+// numbers; a NaN argument keeps glibc's x + y
+extern "C" double __real_atan2(double, double);
+namespace {
+double (*cr_atan2)(double, double) = nullptr;
+bool atan2_cr = false;
+}
+extern "C" double __wrap_atan2(double y, double x)
+{
+  double r = __real_atan2(y, x);
+  if (!atan2_cr || !cr_atan2 || x != x || y != y) return r;
+  return cr_atan2(y, x);
+}
 
 const char *Progname = "fsvolume";
 
@@ -3069,6 +3086,7 @@ void run_case()
     oi(r != NULL && r == m);
     om(r);
   } else if (cmd == "affm2p") {
+    atan2_cr = true;
     MATRIX *m = get_m44();
     fflush(stdout);
     double *p = TranformExtractAffineParams(m, NULL);
@@ -3076,6 +3094,7 @@ void run_case()
     if (!p) out += "NULL ";
     else for (int k = 0; k < 12; k++) od(p[k]);
   } else if (cmd == "ltarot") {
+    atan2_cr = true;
     LTA *l = get_lta_full();
     fflush(stdout);
     oi(LTAmat2RotMat(l));
@@ -3187,6 +3206,18 @@ int main(int argc, char *argv[])
   }
   if (argv[1][0] != '/') fail("the cases must be given by an absolute path");
   scratch = std::string(argv[1]) + ".out";
+  {
+    char self[4096];
+    ssize_t k = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (k <= 0) fail("readlink /proc/self/exe");
+    self[k] = 0;
+    std::string so = std::string(self);
+    so = so.substr(0, so.rfind('/')) + "/../../core-math-preload/libcrmath.so";
+    void *h = dlopen(so.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (!h) fail("cannot load oracles/core-math-preload/libcrmath.so");
+    cr_atan2 = (double (*)(double, double))dlsym(h, "atan2");
+    if (!cr_atan2) fail("no atan2 in libcrmath.so");
+  }
   FILE *fp = fopen(argv[1], "r");
   if (!fp) fail("cannot open the cases");
   std::vector<std::string> lines;

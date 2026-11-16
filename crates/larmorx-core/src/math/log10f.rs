@@ -275,9 +275,8 @@ pub fn log10f(x: f32) -> f32 {
     let mut ub = r as f32;
     let lb = (r + EPS) as f32;
     if ub != lb {
-        let mut f = z
-            * ((C[0] + z * C[1])
-                + z2 * ((C[2] + z * C[3]) + z2 * (C[4] + z * C[5] + z2 * C[6])));
+        let mut f =
+            z * ((C[0] + z * C[1]) + z2 * ((C[2] + z * C[3]) + z2 * (C[4] + z * C[5] + z2 * C[6])));
         f += LN10L * ef;
         f += TL[j] - TL[0];
         let el = ef * LN10H;
@@ -336,7 +335,10 @@ mod tests {
     fn where_the_others_round_otherwise() {
         let x = f32::from_bits(0x0efe_ee7a);
         assert_eq!(log10f(x).to_bits(), 0xc1e9_9d23);
-        assert_eq!((super::super::log10(f64::from(x)) as f32).to_bits(), 0xc1e9_9d22);
+        assert_eq!(
+            (super::super::log10(f64::from(x)) as f32).to_bits(),
+            0xc1e9_9d22
+        );
         for (x, cr) in [
             (0x0000_0142u32, 0xc229_61e9u32),
             (0x0000_0437, 0xc227_4823),

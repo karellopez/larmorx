@@ -97,8 +97,9 @@ pub fn lta_set_vol_geom(lta: &mut Lta, mri_src: &Mri, mri_dst: &Mri) -> i32 {
 /// `MRIrasXformToVoxelXform(mri_src, mri_dst, M)` (`ras2vox(dst) * (M * vox2ras(src))`, the
 /// destination the source when there is none; `NULL` when a product fails), each in place (FS-954:
 /// FreeSurfer stores them all in the first transform, `reproduce`); then the geometries
-/// ([`lta_set_vol_geom`]; with no destination volume FS-957: the source's for both, `reproduce`
-/// an error where FreeSurfer crashes) and the type `LINEAR_VOX_TO_VOX`. `NO_ERROR`.
+/// ([`lta_set_vol_geom`]; with no destination volume and a transform FS-957: the source's for
+/// both, `reproduce` an error where FreeSurfer crashes) and the type `LINEAR_VOX_TO_VOX`.
+/// `NO_ERROR`.
 pub fn lta_ras_to_voxel_xform(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -135,6 +136,8 @@ pub fn lta_ras_to_voxel_xform(
         Some(d) => {
             lta_set_vol_geom(lta, mri_src, d);
         }
+        // an array of no transforms reads no geometry
+        None if n == 0 => {}
         None => {
             g.notices.add(
                 &FS_957,

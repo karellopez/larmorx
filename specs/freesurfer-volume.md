@@ -2258,3 +2258,51 @@ radians and degrees, NaN, infinities, 1e300; singular and generic matrices), `vl
 skips 0 to 2; slope arrays). Expected: identical with `reproduce` but where FreeSurfer touches memory it does not own
 (FS-504, FS-886, FS-887, FS-889, FS-890, the shared voxel defects, fs.io's FS-167), counted and not compared; the default
 differs only with a notice.
+
+## 67. The inverse move; conversions between voxel and RAS coordinates; composition (3.1-40: relay 35)
+- **`LTAinverseTransformInterp(src, dst, lta, interp)`**: section 63's `LTAtransformInterp` with the array's inverse
+  transforms (`inv_xforms`, as `LTAfillInverse` fills them: each matrix's inverse, source and destination geometries
+  exchanged; section 54), with these differences. No `REGISTER_DAT` change first: such an array (and any type other than
+  the three below) ends the program with `LTAtransform: unknown linear transform` (`ERROR_BADPARM`). One transform
+  without a destination: the source's clone (`MRIclone`, its Talairach file name kept); when the inverse's destination
+  geometry has `valid` exactly 1, the clone's centre becomes that geometry's (`c_r`, `c_a`, `c_s`), `ras_good_flag` 1 and
+  the cached matrices recomputed, with `INFO: Modifying dst c_(r,a,s), using the transform dst` on standard error under
+  `DIAG_VERBOSE`; else with `USE_AVERAGE305` set (any value) the two `INFO` lines of section 63 and the centre
+  (-0.0950, -16.5100, 9.7500); else `INFO: Transform dst volume info is not used (valid flag = 0).` and the clone as it
+  is. `LINEAR_RAS_TO_RAS`: `MRIapplyRASlinearTransformInterp` of the inverse's matrix. `LINEAR_VOX_TO_VOX`: the RAS
+  matrix `(i2r M) r2i` from the inverse's matrix and geometries (its destination geometry when `valid` is not 0, else
+  `INFO: LTA inv dst geometry information missing!` and the same two further lines as section 63, and the destination
+  volume's; its source geometry likewise, `INFO: LTA inv src geometry information missing!`, the source volume's).
+  `LINEAR_PHYSVOX_TO_PHYSVOX`: the array changed to `LINEAR_RAS_TO_RAS` first (section 54, which fills the inverses
+  again), then the inverse's matrix as RAS-to-RAS. No transform or several: section 63's octree part unchanged (the
+  forward transforms at each voxel, inverted there).
+- **`LTAvoxelToRasXform(lta, src, dst)`**: for each transform, its matrix `M` (taken as voxel to voxel) is replaced: with
+  a source volume, `vox2ras(dst) (M ras2vox(src))` (`float` products; the destination volume the source when none is
+  given; the volumes' scanner matrices); without one, from the transform's own geometries, `ras2vox(D) (M vox2ras(S))`
+  (`S` its source geometry's voxel-to-RAS matrix with base 0, `vg_i_to_r` of section 4, computed first, then `D` its destination
+  geometry's RAS-to-voxel matrix: the conversion in the other direction, FS-955, which the original keeps). A product
+  that fails leaves no matrix. The array's type becomes `LINEAR_RAS_TO_RAS` whatever it was; the transforms' own types
+  are not changed. Returns `NO_ERROR`.
+- **`LTArasToVoxelXform(lta, src, dst)`**: an array already `LINEAR_VOX_TO_VOX` is left alone. Otherwise each transform's
+  matrix `M` (taken as RAS to RAS) becomes `ras2vox(dst) (M vox2ras(src))` (the destination volume the source when none
+  is given), each in place (FS-954: the original stores each result in the first transform, so an array of several ends
+  with the first holding the last one's conversion and the others unconverted: `reproduce`). Then every transform's
+  source geometry is the source volume's and its destination geometry the destination volume's (`LTAsetVolGeom`: sizes,
+  cosines, centre, extent, file name, `valid` from the volume's `ras_good_flag`); with no destination volume and at least
+  one transform, FS-957: the original crashes reading the missing volume; corrected, the source's for both (`reproduce`:
+  an error). The array's type becomes `LINEAR_VOX_TO_VOX`. Returns `NO_ERROR`.
+- **`LTAcompose(src, left, right, dst)`**: without `dst`, a new array of one transform (`LTAalloc(1, NULL)`, fs.mri's:
+  type 0, `LINEAR_VOX_TO_VOX`, identity matrices) whose first transform takes the source's first transform's geometries. Then, with `L` the
+  source's first matrix and `D` the destination's first matrix: with `left`, `D = left L`; with `right`, `D = L right`
+  (`float` products, into `D`; a destination transform without a matrix keeps none). With both, into another array, the
+  original's second product starts again from `L` (`L right`, the left one lost: FS-956, `reproduce`); corrected, and in
+  place (`dst` the source itself) in both modes, `(left L) right`. The destination's type and its other transforms are
+  not changed; the destination is returned. An array without transforms: an error (FS-504).
+
+## 68. Validation plan (section 67)
+The probe's `ltaixf` (as `ltaxf`, section 66, with inverse transforms given or left as `LTAalloc`'s identity and
+geometries), `ltav2r` (0 to 3 transforms of every type, with and without source and destination volumes of the pool's
+geometries), `ltar2v` (the same, a destination volume or none), `ltacmp` (0 to 2 transforms, a left matrix, a right one,
+both or none, into a new array, another array of 0 to 2 transforms or the source itself). Expected: identical with
+`reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
+counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).

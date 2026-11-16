@@ -240,3 +240,8 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   `VLSTcopyInto` (649-686), `VLSTaddUnique` (688-693), `VLSTaddWithValue` (695-707), `VLSTadd` (709-721), `VLSTinList`
   (723-730); `include/voxlist.h` `VOXEL_LIST` (32-56). Changes: FS-888, FS-891 (rule A), FS-889, FS-890 (errors);
   FS-892, FS-893 kept (rule C).
+- `src/ltaapply.rs`, relay 35: `utils/transform.cpp` `LTAinverseTransformInterp` (1157-1381; its octree loop shared
+  with `LTAtransformInterp`'s as `octree`). Changes: FS-504 (errors).
+- `src/ltaconv.rs` (3.1-40; relay 35): `utils/transform.cpp` `LTAvoxelToRasXform` (1898-1928), `LTArasToVoxelXform`
+  (1930-1944), `LTAsetVolGeom` (4280-4289), `LTAcompose` (4844-4857); `utils/mri.cpp` `MRIcopyVolGeomFromMRI`
+  (16279-16301, through fs.mri). Changes: FS-954, FS-956, FS-957 (rule A), FS-955 kept (rule C), FS-504 (errors).

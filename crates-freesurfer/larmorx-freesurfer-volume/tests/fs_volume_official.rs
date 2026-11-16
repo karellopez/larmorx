@@ -8,9 +8,9 @@
 //! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, FS-300, FS-302 to FS-310, FS-314,
 //! FS-315, FS-322 to FS-325, FS-327, FS-163, FS-330, FS-463, FS-465, FS-467, FS-469 to FS-471,
 //! FS-473, FS-475, FS-479, FS-482, FS-484 to FS-488, FS-490, FS-491, FS-493, FS-496 to FS-499, FS-501,
-//! FS-502, FS-504, FS-508, FS-509, FS-511, FS-515, FS-517, FS-886, FS-887, FS-889, FS-890, fs.io's
-//! FS-167, and the eigen-systems it never returns from, FS-47, FS-48, ITK-112, ITK-115, ITK-116,
-//! hashed as `SKIP`).
+//! FS-502, FS-504, FS-508, FS-509, FS-511, FS-515, FS-517, FS-886, FS-887, FS-889, FS-890,
+//! FS-957, fs.io's FS-167, and the eigen-systems it never returns from, FS-47, FS-48, ITK-112,
+//! ITK-115, ITK-116, hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
 mod cases;
@@ -36,13 +36,14 @@ use sha2::{Digest, Sha256};
 /// topology and binary-volume classes; relay 34, 275 commands (2026-11-16): transform.cpp's LTA
 /// writers, LTAtransformInterp and its helpers, the MNI and tkregister helpers, rotations and
 /// affine parameters (the official code with the correctly rounded atan2 the project decided for
-/// `reproduce`), voxlist.cpp's lists): 5,500 cases, 5,115 lines identical, 385 hashed as `SKIP`,
-/// 23 hashed as `HEAVY` (identical too).
-const N: usize = 5500;
-const OFFICIAL_SHA256: &str = "e5554290c86893a1d7372b8cc0bce17444979537407874d10d3631134e5a7a8d";
-const SKIPPED: usize = 385;
+/// `reproduce`), voxlist.cpp's lists; relay 35, 279 commands (2026-11-16): LTAinverseTransformInterp,
+/// LTAvoxelToRasXform, LTArasToVoxelXform, LTAcompose): 5,580 cases, 5,185 lines identical, 395
+/// hashed as `SKIP`, 26 hashed as `HEAVY` (identical too).
+const N: usize = 5580;
+const OFFICIAL_SHA256: &str = "34c600cf7461870de2c46970677d0bdeff03f1932250cae9569ec1338a3d8a53";
+const SKIPPED: usize = 395;
 /// The cases hashed as `HEAVY`.
-const HEAVY: usize = 23;
+const HEAVY: usize = 26;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 65] = [

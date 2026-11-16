@@ -4980,6 +4980,148 @@ void mpx_case()
   }
 }
 
+// ---- relay 37 of track D: lbl, label.cpp's surface-label functions --------------------------
+
+// lbl: a surface read by MRISread (d/lh.s0), rip flags and marks, SUBJECTS_DIR set or not, a label
+// (LabelAlloc, its points from the case, a subject name or none, a vertex index table with the
+// surface handle, a template volume); then 1 to 4 of LabelMark (mk), LabelMark2 (mk2),
+// LabelUnmark (um), LabelMarkSurface (ms), LabelArea (ar), LabelFillMarked (fm), LabelErode (er),
+// LabelDilate (di), MRISlabel2Mask (l2m), MRISlabelInvert (inv); `G` where FreeSurfer would read or
+// write outside the surface's vertices or the label's places; after each the label (every place),
+// the marks and the index table
+static bool lbl_outside(const std::string &op, LABEL *a, int nv)
+{
+  bool live_out = false, beyond = false, any_out = false, negative = false;
+  for (int k = 0; k < a->n_points; k++) {
+    int v = a->lv[k].vno;
+    bool out_ = v < 0 || v >= nv;
+    if (a->lv[k].deleted == 0 && out_) live_out = true;
+    if (v >= nv) beyond = true;
+    if (out_) any_out = true;
+    if (v < 0) negative = true;
+  }
+  if (op == "mk" || op == "mk2") return live_out;
+  if (op == "um") return beyond;
+  if (op == "ar" || op == "fm") return any_out;
+  if (op == "er") return live_out || beyond;
+  if (op == "di") return live_out || beyond || a->max_points == 0;
+  if (op == "l2m" || op == "inv") return negative;
+  return false;
+}
+
+static void lbl_dump(LABEL *a, MRIS *s)
+{
+  oi(a->n_points);
+  oi(a->max_points);
+  for (int k = 0; k < a->max_points; k++) {
+    LV *p = &a->lv[k];
+    oi(p->vno);
+    of(p->x); of(p->y); of(p->z); of(p->stat);
+    oi(p->deleted);
+    oi(p->xv); oi(p->yv); oi(p->zv);
+  }
+  for (int vno = 0; vno < s->nvertices; vno++) { oi(s->vertices[vno].marked); oi(s->vertices[vno].marked2); }
+  if (!a->vertex_label_ind) out += "N ";
+  else for (int vno = 0; vno < s->nvertices; vno++) oi(a->vertex_label_ind[vno]);
+}
+
+static void lbl_dump_mask(MRI *m)
+{
+  oi(m->nframes);
+  for (int f = 0; f < m->nframes; f++)
+    for (int c = 0; c < m->width; c++) of(MRIgetVoxVal(m, c, 0, 0, f));
+}
+
+void lbl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int nrip = geti();
+  std::vector<int> rips;
+  for (int k = 0; k < nrip; k++) rips.push_back(geti());
+  int nmark = geti();
+  std::vector<int> marks;
+  for (int k = 0; k < 3 * nmark; k++) marks.push_back(geti());
+  if (geti()) setenv("SUBJECTS_DIR", workdir.c_str(), 1);
+  else unsetenv("SUBJECTS_DIR");
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno : rips) s->vertices[vno].ripflag = 1;
+  for (int k = 0; k < nmark; k++) {
+    s->vertices[marks[3 * k]].marked = marks[3 * k + 1];
+    s->vertices[marks[3 * k]].marked2 = marks[3 * k + 2];
+  }
+  int max = geti(), n = geti();
+  LABEL *a = LabelAlloc(max, NULL, NULL);
+  a->coords = geti();
+  if (geti()) strcpy(a->subject_name, "subj");
+  a->n_points = n;
+  for (int k = 0; k < n; k++) {
+    LV *p = &a->lv[k];
+    p->vno = geti();
+    p->x = getf(); p->y = getf(); p->z = getf();
+    p->deleted = geti();
+    p->stat = getf();
+  }
+  if (geti()) {
+    a->vertex_label_ind = (int *)calloc(nv > 0 ? nv : 1, sizeof(int));
+    a->mris = s;
+  }
+  MRI *tpl = NULL;
+  if (geti()) {
+    int w = geti(), h = geti(), d = geti();
+    tpl = MRIalloc(w, h, d, MRI_UCHAR);
+    fli_geom(tpl);
+    MRIreInitCache(tpl);
+    a->mri_template = tpl;
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    std::vector<int> args;
+    if (op == "er") args.push_back(geti());
+    else if (op == "di") { args.push_back(geti()); args.push_back(geti()); }
+    else if (op == "l2m") {
+      int f = geti(), st = geti(), given = geti();
+      int nfr = given ? geti() : 0;
+      args = {f, st, given, nfr};
+    }
+    if (lbl_outside(op, a, nv)) { out += "G "; continue; }
+    if (op == "mk") oi(LabelMark(a, s));
+    else if (op == "mk2") oi(LabelMark2(a, s));
+    else if (op == "um") oi(LabelUnmark(a, s));
+    else if (op == "ms") oi(LabelMarkSurface(a, s));
+    else if (op == "ar") od(LabelArea(a, s));
+    else if (op == "fm") oi(LabelFillMarked(a, s));
+    else if (op == "er") oi(LabelErode(a, s, args[0]));
+    else if (op == "di") oi(LabelDilate(a, s, args[0], args[1]));
+    else if (op == "l2m") {
+      MRI *given = args[2] ? MRIallocSequence(nv, 1, 1, MRI_FLOAT, args[3]) : NULL;
+      MRI *r = MRISlabel2Mask(s, a, given, args[0], args[1]);
+      if (!r) out += "NULL ";
+      else lbl_dump_mask(r);
+    } else if (op == "inv") {
+      LABEL *l = MRISlabelInvert(s, a);
+      if (!l) out += "NULL ";
+      else { oh(l->subject_name); lbl_dump(l, s); }
+    } else fail("lbl op");
+    lbl_dump(a, s);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -5234,6 +5376,8 @@ void run_case()
     ann_case();
   } else if (cmd == "mpx") {
     mpx_case();
+  } else if (cmd == "lbl") {
+    lbl_case();
   } else if (cmd == "gii") {
     gii_case();
   } else if (cmd == "gwr") {

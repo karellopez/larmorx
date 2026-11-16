@@ -1819,6 +1819,12 @@ defects! {
         "the principal-curvature distribution of mris_fix_topology (mrisComputePrincipalCurvatureDistributions) floors and normalises the first 100 x 100 voxels of its k1-k2 volume whatever the volume's size: a larger volume keeps its other voxels as raw counts outside the normalisation, and a smaller one, or one not of floats, is read and written outside its voxels (every caller passes 100 x 100 floats)";
     FS_629 = "FS-629", "FreeSurfer", true,
         "moving a surface to Talairach space (MRIStalairachTransform) crashes the program for a surface that has a Talairach transform but no surface-RAS-to-Talairach matrix, and writes past the destination's vertices when the destination surface has fewer vertices than the source (every caller moves one surface in place)";
+    FS_630 = "FS-630", "FreeSurfer", true,
+        "the label functions on a surface (LabelMark, LabelMark2, LabelUnmark, LabelArea, LabelFillMarked, and through them LabelErode and LabelDilate) read or write outside the surface's vertices for a label point that names no vertex (-1, a volume label's points) or a vertex beyond the surface's, and outside the label's vertex index table when it is shorter than the surface";
+    FS_631 = "FS-631", "FreeSurfer", true,
+        "dilating a label on a surface (LabelDilate) writes its new points past the label's places when the label is full and its growth by half does not enlarge it: a label without places (half of nothing is nothing), which gains points when a ripped vertex keeps a mark (the marks' clearing skips ripped vertices), or a growth beyond the 2^26 places larmorx allocates (FS-426)";
+    FS_632 = "FS-632", "FreeSurfer", true,
+        "inverting a label on a surface (MRISlabelInvert, and LabelRemoveHolesSurf through it) crashes the program when the label has a point beyond the surface's vertices (its mask is refused and then read)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

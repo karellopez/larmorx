@@ -13,8 +13,7 @@ call zeroed), and twice under the guard allocator (``guard_malloc.so`` beside th
 ``LD_PRELOAD``: a guard page after, then before, each allocation, fill bytes ``MALLOC_PERTURB_`` 90
 and 165): a line whose four results are not the same depends on memory FreeSurfer does not own
 (**memory**, README.md). A batch may require the spec's refusal where FreeSurfer never returns
-(``refusal``) and allow differences in NaNs' bits only on lines with infinite or NaN inputs
-(``nanbits``). The probe's runs go through the oracle-output cache (``oracle_cache.run``,
+(``refusal``). The probe's runs go through the oracle-output cache (``oracle_cache.run``,
 one thread, the family ``freesurfer``) when the validation package is importable
 (``PYTHONPATH=validation/src``), else directly (``--no-cache``). The candidate runs with
 ``LARMORX_UPSTREAM_DEFECTS`` set to the mode. Exit status 1 when a difference is not explained
@@ -56,20 +55,6 @@ def nonfinite_input(src: str) -> bool:
         ):
             return True
     return False
-
-
-def nan_masked(line: bytes) -> bytes:
-    """The line with every float NaN (8 hexadecimal digits, exponent all ones, a significand) as
-    ``NaN``, in the result and in the streams' printed text (``nan``, ``-nan``)."""
-    res, o, e = decode(line)
-
-    def tok(m: re.Match[bytes]) -> bytes:
-        v = int(m.group(0), 16)
-        return b"NaN" if v & 0x7F800000 == 0x7F800000 and v & 0x7FFFFF else m.group(0)
-
-    res = re.sub(rb"\b[0-9a-f]{8}\b", tok, res)
-    o, e = (re.sub(rb"-?nan", b"nan", x) for x in (o, e))
-    return res + b" | " + o + b" | " + e
 
 
 def f64(v: float) -> str:
@@ -130,9 +115,6 @@ class Batch:
     #: where FreeSurfer never returns (``TIMEOUT``), the candidate's standard error must match this
     #: (the spec's refusal in both modes); empty: any line that is not TIMEOUT or CRASH
     refusal: bytes = b""
-    #: why a line with an infinite or NaN input may differ from the probe's in its NaNs' bits only
-    #: (their signs and payloads; README.md, "What may differ"); empty: never
-    nanbits: str = ""
 
 
 class Gen:
@@ -934,9 +916,62 @@ class Gen:
             L += [f"{at}mpinverse {a} {self.mat(r, rows, cols)}"]
             L += [f"{at}msvdpinverse {a} new", f"{at}msvdpinverse {a} {self.mat(r, cols, rows)}"]
         return [
-            Batch("svd", "svd", L, refusal=SVD_REFUSAL, nanbits=SVD_NANBITS),
+            Batch("svd", "svd", L, refusal=SVD_REFUSAL),
             self.svd_nonfinite(),
+            self.svd_failed(),
         ]
+
+    def svd_failed(self) -> Batch:
+        """The SVD pseudo-inverse after a failed decomposition (spec §17.5, FS-46 under
+        ``reproduce``): matrices of 1 to 9 columns (and their transposed shapes) with NaNs of
+        distinct signs and payloads, quiet and signalling, in chosen places (one row full of them,
+        or scattered), on which LINPACK mostly fails; the result's NaN in each column (each row for
+        fewer rows than columns) is the one the spec's steps pick. Its own generator."""
+        r = self.rng("svd-failed")
+        pool = [
+            0x7FC12345,
+            0xFFD00001,
+            0x7F800001,
+            0xFF812345,
+            0x7FC00000,
+            0xFFC00000,
+            0x7FE00007,
+            0xFFA0BEEF,
+            0x7FC0F00D,
+            0xFF900003,
+            0x7F80CAFE,
+            0xFFF00011,
+        ]
+        L = []
+        for n in range(1, 10):
+            shapes = [(n, n), (n + 1, n), (n + 3, n)]
+            if n >= 2:
+                shapes += [(n, n + 1), (n, n + 3)]  # fewer rows than columns: the transposed path
+            for rows, cols in shapes:
+                for kind in ("row", "scatter", "few"):
+                    a = [
+                        f32(float(r.choice([-9, -7, -5, -3, -2, -1, 1, 2, 3, 4, 6, 8])))
+                        for _ in range(rows * cols)
+                    ]
+                    if kind == "row":  # one row (one column for the transposed shape) full of NaNs
+                        nans = r.sample(pool, k=min(len(pool), n))
+                        if rows >= cols:
+                            j = r.randrange(rows)
+                            for k in range(cols):
+                                a[j * cols + k] = f"{nans[k % len(nans)]:08x}"
+                        else:
+                            j = r.randrange(cols)
+                            for k in range(rows):
+                                a[k * cols + j] = f"{nans[k % len(nans)]:08x}"
+                    else:
+                        for _ in range(r.randint(2, 6) if kind == "scatter" else 1):
+                            a[r.randrange(rows * cols)] = f"{r.choice(pool):08x}"
+                    m = f"1 {rows} {cols} {' '.join(a)}"
+                    given = self.mat(r, cols, rows)
+                    L += [f"@1 msvdpinverse {m} new", f"@1 msvdpinverse {m} {given}"]
+                    if rows >= cols:
+                        L.append(f"@1 msvd {m} 1 {cols} 1 {' '.join(['00000000'] * cols)} new")
+        return Batch("svd", "svd-failed", L, refusal=SVD_REFUSAL)
 
     def svd_nonfinite(self) -> Batch:
         """FS-48's two kinds (spec §17.4): matrices with infinite or NaN entries on which LINPACK
@@ -985,7 +1020,7 @@ class Gen:
             k = r.randint(2, 5)
             big = [f32(r.choice([1e20, -3e25, 7e30, 2e19])) for _ in range(k)]
             L += [f"@1 mnscond 1 1 {k} {' '.join(big)}", f"@1 mnscond 1 {k} 1 {' '.join(big)}"]
-        return Batch("svd", "svd-nonfinite", L, refusal=SVD_REFUSAL, nanbits=SVD_NANBITS)
+        return Batch("svd", "svd-nonfinite", L, refusal=SVD_REFUSAL)
 
     def mfiles(self) -> list[Batch]:
         r = self.rng("mfiles")
@@ -1153,11 +1188,6 @@ class Gen:
 
 #: FS-48 (spec §17.4): where LINPACK never returns, both modes give VNL's failure lines.
 SVD_REFUSAL = rb"suspicious return value \(\d+\) from SVDC"
-#: Why the SVD's lines of matrices with infinite or NaN entries may differ in NaNs' bits only.
-SVD_NANBITS = (
-    "LINPACK's ssvdc as the official build compiled it passes NaNs on in an operand order the main "
-    "package's vnl_svd_f32 does not follow yet (spec §17.4)"
-)
 
 GROUPS = [
     "hmake",
@@ -1408,11 +1438,6 @@ def main() -> int:
                 t["FreeSurfer did not finish"] += 1
                 noted.update(ids)
                 continue
-            cand_line = res + b" | x" + o.hex().encode() + b" x" + e.hex().encode()
-            if b.nanbits and nonfinite_input(src) and nan_masked(p) == nan_masked(cand_line):
-                t["NaN bits only"] += 1
-                noted.update(ids)
-                continue
             if mem:
                 t["memory"] += 1
                 noted.update(ids)
@@ -1427,14 +1452,14 @@ def main() -> int:
                 print(f"DIFFERS: {b.group}: {src[:160]}")
                 print(f"    probe     {p[:200]!r}\n    candidate {q[:200]!r}")
     print(
-        f"mode {a.mode}: group, calls: identical, FreeSurfer did not finish, NaN bits only, memory, "
+        f"mode {a.mode}: group, calls: identical, FreeSurfer did not finish, memory, "
         "defect corrected, unexplained"
     )
     for g in groups:
         t = tally.get(g, Counter())
         print(
             f"  {g:10s} {t['calls']:6d}: {t['identical']:6d} {t['FreeSurfer did not finish']:4d} "
-            f"{t['NaN bits only']:4d} {t['memory']:5d} {t['defect corrected']:5d} {t['unexplained']:5d}"
+            f"{t['memory']:5d} {t['defect corrected']:5d} {t['unexplained']:5d}"
         )
     if noted:
         print(

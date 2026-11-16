@@ -18,6 +18,12 @@ numbers (black box: the probe's lines and the spec's text, nothing else).
         complex, both allocation forms, both allocators: 4,160 calls) against the outcome the spec
         gives: a matrix (its numbers, its place in the caller's buffer), FreeSurfer's two lines and
         exit, or a crash
+    python -P models.py svdpinv --probe P --scratch DIR
+        §17.5's SVD pseudo-inverse after a failed decomposition: every ``msvdpinverse`` line of the
+        group ``svd`` (its batches ``svd``, ``svd-nonfinite`` and ``svd-failed``) whose standard
+        error holds VNL's failure lines, against the spec's steps on what the failure leaves (U the
+        matrix's own numbers, the singular values and V zeros) with §16's product in float and
+        x86-64's NaN rules (§7)
 
 The probe runs through the oracle-output cache (one thread, the family ``freesurfer``) when the
 validation package is importable (``PYTHONPATH=validation/src``), else directly. Exit status 1 when a
@@ -401,11 +407,116 @@ def fs13(runner, scratch: Path, grid: bool) -> int:
     return 1 if bad else 0
 
 
+# ---- §17.5: the SVD pseudo-inverse after a failed decomposition ----------------------------------
+
+
+def fdiv(a: int, b: int) -> int:
+    return sse(lambda x, y: x / y, a, b)
+
+
+def fproduct(m1: list[list[int]], m2: list[list[int]]) -> list[list[int]]:
+    """§16's float product: each term m2(i, c) x m1(r, i); 4 or more terms in blocks of four
+    (val + p0, p1 + val, p2 + val, val + p3), the rest (or all of 3 or fewer) as val + p."""
+    k = len(m2)
+    out = []
+    for row in m1:
+        line = []
+        for c in range(len(m2[0])):
+            p = [fmul(m2[i][c], row[i]) for i in range(k)]
+            val = 0
+            blocks = k // 4 if k >= 4 else 0
+            for b in range(blocks):
+                val = fadd(val, p[4 * b])
+                val = fadd(p[4 * b + 1], val)
+                val = fadd(p[4 * b + 2], val)
+                val = fadd(val, p[4 * b + 3])
+            for x in p[4 * blocks :]:
+                val = fadd(val, x)
+            line.append(val)
+        out.append(line)
+    return out
+
+
+def transpose(m: list[list[int]]) -> list[list[int]]:
+    return [list(c) for c in zip(*m, strict=True)]
+
+
+def pinv_failed(a: list[list[int]]) -> list[list[int]]:
+    """§17.5's steps on a failed decomposition: U keeps A's numbers, w and V are zeros; the cut r
+    from the ratios w_k / w_1 (float division, compared in double with 1e-4); V_r x diag(1 / w) x
+    U_r^T with §16's product; fewer rows than columns: the transpose of the transpose's result."""
+    rows, cols = len(a), len(a[0])
+    if rows < cols:
+        return transpose(pinv_failed(transpose(a)))
+    w = [0] * cols
+    v = [[0] * cols for _ in range(cols)]
+    r = cols
+    for k in range(cols):
+        q = fdiv(w[k], w[0])
+        if not isnan(q) and float(f32(q)) < 1e-4:
+            r = k
+            break
+    if r == 0:
+        return []
+    s_inv = [[fdiv(0x3F800000, w[i]) if i == j else 0 for j in range(r)] for i in range(r)]
+    v_r = [row[:r] for row in v]
+    u_rt = transpose([row[:r] for row in a])
+    return fproduct(fproduct(v_r, s_inv), u_rt)
+
+
+def read_matrix(tok: list[str], at: int) -> tuple[list[list[int]], int]:
+    """A float matrix argument (type 1) at tok[at]: the rows, the index after it."""
+    rows, cols = int(tok[at + 1]), int(tok[at + 2])
+    vals = [int(t, 16) for t in tok[at + 3 : at + 3 + rows * cols]]
+    return [vals[i * cols : (i + 1) * cols] for i in range(rows)], at + 3 + rows * cols
+
+
+def svdpinv(runner, scratch: Path) -> int:
+    batches = C.Gen(7).svd()
+    good = bad = 0
+    for b in batches:
+        path = C.write_batch(scratch, b)
+        out = C.parse(
+            runner._run(
+                [str(runner.probe), "batch", str(path)],
+                dict(C.BASE_ENV),
+                "",
+                "freesurfer-maths-probe",
+            )
+        )
+        seen = 0
+        for src, line in zip(b.lines, out, strict=True):
+            tok = src.split()
+            if tok[0].startswith("@"):
+                tok = tok[1:]
+            res, _, err = C.decode(line)
+            if tok[0] != "msvdpinverse" or b"from SVDC" not in err:
+                continue
+            if res.split(b" ", 1)[0] in (b"TIMEOUT", b"CRASH"):
+                continue
+            seen += 1
+            a, _ = read_matrix(tok, 1)
+            want = pinv_failed(a)
+            got = res.decode().split()
+            rows, cols = len(want), len(want[0])
+            ok = got[:3] == ["1", str(rows), str(cols)]
+            ok = ok and [int(t, 16) for t in got[5 : 5 + rows * cols]] == [
+                x for r in want for x in r
+            ]
+            good += ok
+            bad += not ok
+            if not ok and bad <= 3:
+                print(f"DIFFERS: {src[:120]}\n    probe {line[:200]!r}")
+        print(f"svdpinv: {b.name}: {seen} pseudo-inverses after a failed decomposition")
+    print(f"svdpinv: {good + bad} such lines: as §17.5's steps {good}, not {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("command", choices=["affine", "scanf", "fs13"])
+    ap.add_argument("command", choices=["affine", "scanf", "fs13", "svdpinv"])
     ap.add_argument("--probe", type=Path)
     ap.add_argument("--scratch", type=Path, required=True)
     ap.add_argument("--no-cache", action="store_true")
@@ -422,6 +533,8 @@ def main() -> int:
     runner = C.Runner(a.probe.resolve(), scratch, not a.no_cache)
     if a.command == "fs13":
         return fs13(runner, scratch, a.grid)
+    if a.command == "svdpinv":
+        return svdpinv(runner, scratch)
     return affine(runner, scratch)
 
 

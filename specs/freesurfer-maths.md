@@ -9,7 +9,9 @@ filled from the source as behaviour (§0, §3, §5.1, §18.2, §19), the defects
 `larmorx_core::defects` checked. Amended by its relay 4 (2026-11-13), from the clean room's
 black-box runs: §17.1, §17.2 and §17.4 (which matrices with infinite or NaN entries make FreeSurfer
 hang and which it finishes, with their results under `reproduce`), §18.2 (the bytes of a file cut
-short under `reproduce`), §8.8 (the ports' NaNs). What black-box runs confirmed is marked
+short under `reproduce`), §8.8 (the ports' NaNs); by its relay 6 (2026-11-16): §17.4 and §17.5
+(the SVD pseudo-inverse after a failed decomposition, NaN by NaN; no NaN-bit allowance left in
+§23), §2.2 (FS-926) and §18.2 (FS-924). What black-box runs confirmed is marked
 **(observed)**, with the probe command or the comparison group behind it.
 
 **Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
@@ -156,6 +158,13 @@ allocator never uses the buffer.
   0, noted), FreeSurfer's two lines and exit where the old allocator gives them; in every other case
   (FreeSurfer crashes, or a product beyond an `int`) the default's refusal, noted.
 - An allocation that the machine cannot give: the same two lines and exit status 1.
+- **FS-926.** The default allocator's block (the header, the row pointers and the numbers, each
+  part rounded up as above) grows by 8 bytes a row before any number: a matrix of many rows (a size
+  read from a damaged or misaligned file: a billion rows of no numbers) asks for gigabytes, and
+  whether FreeSurfer gets them depends on the machine's memory. **Both modes:** a block above 256 MiB
+  (2^28 bytes) and up to 16 GiB (2^34 bytes): the matrix made, FS-926 noted; above 16 GiB: the answer
+  of a machine without that memory, the two lines and exit status 1, FS-926 noted (the same on
+  every machine). The old allocator has no such block.
 
 ### 2.3 Freeing
 
@@ -1063,11 +1072,16 @@ has the port's W and V bit for bit, and U's numbers but for the bits of some NaN
   failure, nothing written, FS-48 noted (rule B: such a matrix has no singular value decomposition,
   and whether FreeSurfer returns on it depends only on where the entries fall).
 - **The NaNs' bits** in a decomposition of such a matrix: the signs and payloads of U's NaNs follow
-  the operand order of LINPACK's BLAS kernels as the official build compiled them (the order
-  `larmorx_core::vnl_qr`'s kernels `nrm2_t`, `dot_t`, `axpy_t`, `scal_t` record for the QR), which
-  `vnl_svd_f32` does not follow yet: **(observed)** 82 of those 111 decompositions differ from the
-  port in U's NaNs' bits only (W and V identical), 29 not at all. §23's comparison allows that
-  difference on the lines of matrices with an infinite or NaN entry until the port follows them.
+  the operand order of LINPACK's BLAS kernels as the official build compiled them, which the main
+  package's `vnl_svd_f32` follows (since 2026-11-13: its U, W and V are the official build's bit for
+  bit, NaNs included, on every matrix it decomposes). **(observed)** before that change 82 of the
+  exploration's 111 decompositions differed from the port in U's NaNs' bits only; after it, the
+  fs.maths clean room's comparison found NaN-bit differences in the group `svd` only on 10 SVD
+  pseudo-inverses after a failed decomposition (the steps §17.5 now states), so §23's comparison
+  allows no difference in NaNs' bits (2026-11-16).
+- **After a failure** the decomposition leaves U, w and V as the caller gave them (nothing written):
+  the functions of §17.5 that ignore the failure go on with those numbers (the SVD pseudo-inverse's
+  steps on them, NaN by NaN, are §17.5's).
 
 ### 17.5 The SVD functions
 
@@ -1107,12 +1121,37 @@ has the port's W and V bit for bit, and U's numbers but for the bits of some NaN
   mᵀ. Else nothing returned when every element is within 1e-11 of 0; r the index of the first
   singular value whose ratio to the first (float division, compared in double) is below 1e-4, minus
   one (all: cols); the result `V_r × diag(1.0f / w_1..r) × U_rᵀ` (the first r columns of V and U;
-  float products). **FS-46:** FreeSurfer returns a new matrix whatever `out`, ignores a failed
-  decomposition (the singular values 0: a result of infinities and NaN) and crashes for fewer rows than
-  columns when the inner result is nothing. **Default:** into `out`; a failure an error
-  `MatrixSVDPseudoInverse: the decomposition failed (a <r> x <c> matrix LINPACK cannot decompose)` +
-  `\n`, code -4, nothing returned; an empty inner result: nothing returned. **Reproduce:** as
-  FreeSurfer, nothing returned where it crashes.
+  float products, §16's operand order: first `V_r × diag(...)`, then that product × `U_rᵀ`).
+  **FS-46:** FreeSurfer returns a new matrix whatever `out`, ignores a failed decomposition (a result
+  whose every number is a NaN, below) and crashes for fewer rows than columns when the inner result
+  is nothing. **Default:** into `out`; a failure an error `MatrixSVDPseudoInverse: the decomposition
+  failed (a <r> x <c> matrix LINPACK cannot decompose)` + `\n`, code -4, nothing returned; an empty
+  inner result: nothing returned. **Reproduce:** as FreeSurfer, nothing returned where it crashes,
+  and a given `out` never written. **After a failed decomposition** (VNL's failure lines of §17.4 on
+  standard error, nothing else) the steps above run on what the failure leaves (§17.4): U holds m's
+  own numbers, every singular value is +0 and V is all +0. So:
+  - no ratio is below 1e-4 (0 / 0 is a NaN, and a comparison with a NaN is false): r = cols;
+  - each reciprocal `1.0f / +0` is `+inf`; the off-diagonal elements of `diag(...)` stay +0;
+  - `V_r × diag(...)` (cols × cols): each term `inf × 0` on the diagonal is the NaN made from numbers
+    (N, bits `ffc00000`, §7) and the others `0 × 0`, so every element is N;
+  - that product × `U_rᵀ` (cols × rows; `U_rᵀ` is mᵀ): element (i, j) sums the cols products
+    `m(j, k) × N` (k = 1 to cols; §16: m's number the first operand), each one `m(j, k)` quieted
+    (its quiet bit set, sign and payload kept) when `m(j, k)` is a NaN and N otherwise (an infinity
+    and 0 included), and §16's sum keeps one of them. With every term a NaN, the sum of 3 or fewer
+    terms keeps the first (k = 1); of 4 or more, the third term of the last whole block of four
+    (k = 4q - 1 with q = ⌊cols / 4⌋: k = 3 for 4 to 7 columns, 7 for 8 to 11, ...), the terms after
+    that block changing nothing.
+
+  So the result's column j holds one NaN in every row, picked from row j of m as just said. With
+  fewer rows than columns the same steps run on mᵀ and that result is transposed: row i of the
+  result (cols × rows) holds one NaN in every column, picked the same way from column i of m among
+  its rows numbers (q = ⌊rows / 4⌋). A matrix of 1 column never failed (**(observed)**: the 9 of
+  `svd-failed`, 27 lines). **(observed)** every
+  such line of §23's group `svd` (300: 16 in the batch `svd`, 44 in `svd-nonfinite`, 240 in
+  `svd-failed`, matrices of 2 to 9 columns, quiet and signalling NaNs of both signs) as these steps
+  (`models.py svdpinv` beside the probe); for example the 4 x 4 matrix with rows `3 6 NaN₁ 0`,
+  `0 9 7 -8`, `-1 0 4 0`, `-2 -1 NaN₂ 0` (NaN₁ = `7fc00000`, NaN₂ = `7fc12345`): LINPACK fails (its
+  `info` 4) and each row of the result is `7fc00000 ffc00000 ffc00000 7fc12345`.
 
 ## 18. Matrix files
 
@@ -1212,6 +1251,17 @@ the `errno` from before it, 0 in the probe, while `1e40` followed by a new line 
   Each element is then rounded to float as usual. **(observed)** every `mreadbin` case of §23's
   `mfiles` and `mfiles-cut` batches whose bytes come from the file or earlier numbers: FreeSurfer's
   numbers; those that take a byte from memory are the probe's memory lines.
+
+  **FS-924** (under `reproduce`): FreeSurfer prints `freadDouble: fread failed` for every double it
+  cannot read, the first one cut short and each one after it, and fills the whole matrix (a size
+  read from misaligned bytes asks for up to two billion numbers: gigabytes of lines and memory).
+  Counting the doubles to read (two for a complex element) from the first one the file cuts, that
+  one included: below 2^20 + 1 of them (fewer than 2^20 after it), FreeSurfer's lines and numbers as
+  above; from 2^20 + 1, the first `freadDouble: fread failed` line, then an error `MatrixReadFrom:
+  the file ends <n> numbers before the matrix does (FreeSurfer prints an error for each)` (n that
+  count), code -5, FS-924 noted, nothing returned (a given `m` keeps the numbers read before the cut).
+  The default refuses at the first missing number (FS-49). Not in the probe (the lines of one such
+  case are tens of megabytes).
 - **Text write** (file name, m): not openable: an error `MatrixWriteTxt(<name>) - file open failed` +
   `\n`, code -1, returned. Each row: each element `%+4.5f` and a space, then `\n`. Real only (FS-25).
   Success.
@@ -1330,10 +1380,10 @@ it, and again from the cache:
 | `minimizers` | 13 | 181 | 11 | 0 | 0 | `cbea1be24fc233c0f353a05041189aee308c5501359f6fad0e016c9135ffd2e4` |
 | `nr` | 14 | 5 | 0 | 0 | 0 | `ba8b8aea531d281110a5a52a4a2455fe313fc4e8b3a5a4ce6b1e1cc19eaad69d` |
 | `eigen` | 17.1 to 17.3 | 1,460 | 252 | 0 | 153 | `c3ddceff612985227ad6d69acf56662aaa0584974c847c827005539ce38b17f3` |
-| `svd` | 17.4, 17.5 | 2,280 | 354 | 0 | 142 | `af777aba4138e1ab5d48ba2ee4e4cc8477a2f3d0abc1d9334c05d1a10c40aad7` |
+| `svd` | 17.4, 17.5 | 2,619 | 354 | 0 | 142 | `e9ebe994f41da2186d1db9474ad78d48dff661a3771a9c9885c5e7b341e785ea` |
 | `mfiles` | 18 | 723 | 28 | 0 | 1 | `8f0ce51069988159cef0214e0f1d893466876b02e7c25233935648a8668c1886` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 28,168 | 1,769 | 137 | 299 | |
+| all | | 28,507 | 1,769 | 137 | 299 | |
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
@@ -1347,7 +1397,10 @@ own candidate without an unexplained line in both modes). The group `mmake` gain
 `mmake-sizes` and `mmake-sizes-old` (FS-13's sizes, §2.2, 372 calls each: the matrices FreeSurfer
 makes, its crashes, the old allocator's exits) the same day: its hash from then (cold, warm and
 without the cache identical; the probe as its own candidate identical but the 74 lines whose arrays
-show the record's addresses, memory lines). `mfiles`' one `TIMEOUT` is a memory line (an empty
+show the record's addresses, memory lines). The group `svd` gained the fixed batch `svd-failed` (§17.5's
+SVD pseudo-inverse after a failed decomposition, 339 calls) on 2026-11-16 (relay 6): its hash from
+then (cold, warm and without the cache identical; `models.py svdpinv`: its 240 such lines and the 60
+of the other two batches as §17.5). `mfiles`' one `TIMEOUT` is a memory line (an empty
 file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
 
 ### 23.3 The comparison
@@ -1363,17 +1416,15 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   FreeSurfer never returned (`TIMEOUT`), the candidate's standard error must also hold the refusal of
   §17 (`never returns on this matrix` for the eigensystems, VNL's `suspicious return value (<info>)
   from SVDC` for the SVD), in both modes;
-- in the group `svd`, a line whose input holds an infinite or NaN number and that differs only in
-  the bits of NaNs (their signs and payloads, in the printed numbers and in VNL's printed matrix):
-  the official build's LINPACK kernels (§17.4);
 - a **memory** line (FreeSurfer reads what it does not own, among others FS-16, FS-21, FS-22, FS-27,
   FS-31 to FS-33, FS-40, FS-42, FS-49, ITK-106, ITK-110, ITK-111; the clean room reads 0 there, §1);
 - in `--mode fix`, a line where the candidate noted a defect (the corrected result).
 
 So with `--mode reproduce` the matrices with infinite or NaN entries that FreeSurfer finishes (FS-47,
 FS-48: the batches `eigen-nonfinite` and `svd-nonfinite` hold both kinds) are compared as any other
-line, and the files cut short (FS-49: the batch `mfiles-cut`, every byte of the header, of the first
-element and of later ones) likewise, but where a byte comes from memory.
+line, NaNs' bits included (§17.4; the batch `svd-failed` holds the SVD pseudo-inverses after a
+failed decomposition, §17.5), and the files cut short (FS-49: the batch `mfiles-cut`, every byte of
+the header, of the first element and of later ones) likewise, but where a byte comes from memory.
 
 The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
 the allowed lines; exit status 1 for any other difference.
@@ -1411,6 +1462,7 @@ Where each defect of this module is specified (its two modes there):
 | FS-23 | 5.3 | FS-36 | 13.4 | FS-49 | 18.2 |
 | FS-24 | 5.7 | FS-37 | 13.3 | FS-50 | 5.3 |
 | FS-25 | 7 | FS-38 | 13.6 | FS-51 | 5.7 |
+| FS-924 | 18.2 | FS-926 | 2.2 | | |
 
 VNL's own (the main package's ports carry them): ITK-106 (§13.3), ITK-110, ITK-111, ITK-112 (§17.2).
 FS-12 (`nint`) is `specs/freesurfer-core.md`'s.

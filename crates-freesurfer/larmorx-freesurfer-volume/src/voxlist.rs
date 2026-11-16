@@ -77,7 +77,10 @@ pub struct VoxelList<'a> {
 
 /// FS-890: FreeSurfer reads or writes past the list's arrays here; an error in both modes.
 fn past(g: &mut Globals, err: &mut dyn Write, what: &str, detail: String) -> Result<(), Fatal> {
-    g.notices.add(&FS_890, format!("{what}: {detail} (past the list's arrays)"));
+    g.notices.add(
+        &FS_890,
+        format!("{what}: {detail} (past the list's arrays)"),
+    );
     log::error_exit(
         g,
         err,
@@ -227,8 +230,22 @@ pub fn vlst_create<'a>(
                             fmt_f(val, 2, 1)
                         );
                     }
-                    if !within(i, &[vl.xi.len(), vl.yi.len(), vl.zi.len(), vl.fi.len(), vl.vsrc.len()]) {
-                        past(g, err, "VLSTcreate", format!("voxel {i} of an array of {}", vl.xi.len()))?;
+                    if !within(
+                        i,
+                        &[
+                            vl.xi.len(),
+                            vl.yi.len(),
+                            vl.zi.len(),
+                            vl.fi.len(),
+                            vl.vsrc.len(),
+                        ],
+                    ) {
+                        past(
+                            g,
+                            err,
+                            "VLSTcreate",
+                            format!("voxel {i} of an array of {}", vl.xi.len()),
+                        )?;
                     }
                     let i = i as usize;
                     vl.xi[i] = x;
@@ -331,7 +348,12 @@ pub fn vlst_sort<'a>(
         )?;
     }
     if !within(i64::from(n) - 1, &dst.lens()) && n > 0 {
-        past(g, err, "VLSTsort", format!("{n} voxels of arrays of {}", dst.xi.len()))?;
+        past(
+            g,
+            err,
+            "VLSTsort",
+            format!("{n} voxels of arrays of {}", dst.xi.len()),
+        )?;
     }
     let n = n as usize;
     let mut v: Vec<SortVoxel> = (0..n)
@@ -395,11 +417,18 @@ pub fn vlst_compute_stats(
     };
     let n = vl.nvox;
     if !within(i64::from(n) - 1, &[vl.xi.len(), vl.yi.len(), vl.zi.len()]) {
-        past(g, err, "VLSTcomputeStats", format!("{n} voxels of arrays of {}", vl.xi.len()))?;
+        past(
+            g,
+            err,
+            "VLSTcomputeStats",
+            format!("{n} voxels of arrays of {}", vl.xi.len()),
+        )?;
     }
     let (mut mean, mut std) = (0.0f64, 0.0f64);
     for i in 0..n as usize {
-        let val = f64::from(mri_get_vox_val(g, err, mri, vl.xi[i], vl.yi[i], vl.zi[i], 0, 0)?);
+        let val = f64::from(mri_get_vox_val(
+            g, err, mri, vl.xi[i], vl.yi[i], vl.zi[i], 0, 0,
+        )?);
         mean = sse::add64(mean, val);
         std = sse::add64(std, sse::mul64(val, val));
     }
@@ -490,10 +519,20 @@ fn copy_voxel(
     j: i64,
 ) -> Result<(), Fatal> {
     if !within(i, &src.lens()) {
-        past(g, err, what, format!("source voxel {i} of arrays of {}", src.xi.len()))?;
+        past(
+            g,
+            err,
+            what,
+            format!("source voxel {i} of arrays of {}", src.xi.len()),
+        )?;
     }
     if !within(j, &dst.lens()) {
-        past(g, err, what, format!("destination voxel {j} of arrays of {}", dst.xi.len()))?;
+        past(
+            g,
+            err,
+            what,
+            format!("destination voxel {j} of arrays of {}", dst.xi.len()),
+        )?;
     }
     let (i, j) = (i as usize, j as usize);
     dst.xi[j] = src.xi[i];
@@ -642,8 +681,23 @@ pub fn vlst_add(
         return Ok(ERROR_NOMEMORY);
     }
     let i = i64::from(vl.nvox);
-    if !within(i, &[vl.xi.len(), vl.yi.len(), vl.zi.len(), vl.xd.len(), vl.yd.len(), vl.zd.len()]) {
-        past(g, err, "VLSTadd", format!("voxel {i} of arrays of {}", vl.xi.len()))?;
+    if !within(
+        i,
+        &[
+            vl.xi.len(),
+            vl.yi.len(),
+            vl.zi.len(),
+            vl.xd.len(),
+            vl.yd.len(),
+            vl.zd.len(),
+        ],
+    ) {
+        past(
+            g,
+            err,
+            "VLSTadd",
+            format!("voxel {i} of arrays of {}", vl.xi.len()),
+        )?;
     }
     let i = i as usize;
     vl.xi[i] = x;
@@ -668,19 +722,34 @@ pub fn vlst_in_list(
 ) -> Result<i32, Fatal> {
     for n in 0..vl.nvox.max(0) as usize {
         if n >= vl.xi.len() {
-            past(g, err, "VLSTinList", format!("voxel {n} of arrays of {}", vl.xi.len()))?;
+            past(
+                g,
+                err,
+                "VLSTinList",
+                format!("voxel {n} of arrays of {}", vl.xi.len()),
+            )?;
         }
         if vl.xi[n] != x {
             continue;
         }
         if n >= vl.yi.len() {
-            past(g, err, "VLSTinList", format!("voxel {n} of arrays of {}", vl.yi.len()))?;
+            past(
+                g,
+                err,
+                "VLSTinList",
+                format!("voxel {n} of arrays of {}", vl.yi.len()),
+            )?;
         }
         if vl.yi[n] != y {
             continue;
         }
         if n >= vl.zi.len() {
-            past(g, err, "VLSTinList", format!("voxel {n} of arrays of {}", vl.zi.len()))?;
+            past(
+                g,
+                err,
+                "VLSTinList",
+                format!("voxel {n} of arrays of {}", vl.zi.len()),
+            )?;
         }
         if vl.zi[n] == z {
             return Ok(1);
@@ -731,7 +800,12 @@ pub fn vlst_add_with_value(
     }
     let ind = i64::from(vl.nvox) - 1;
     if !within(ind, &[vl.vsrc.len(), vl.vdst.len()]) {
-        past(g, err, "VLSTaddWithValue", format!("voxel {ind} of arrays of {}", vl.vsrc.len()))?;
+        past(
+            g,
+            err,
+            "VLSTaddWithValue",
+            format!("voxel {ind} of arrays of {}", vl.vsrc.len()),
+        )?;
     }
     vl.vdst[ind as usize] = vdst;
     vl.vsrc[ind as usize] = vsrc;
@@ -765,7 +839,8 @@ mod tests {
             let mut g = Globals::new(mode);
             let m = cube(&mut g);
             let (mut out, mut err) = (Vec::new(), Vec::new());
-            let all = vlst_create(&mut g, &mut out, &mut err, &m, 1.0, 1.0, None, 0, false).unwrap();
+            let all =
+                vlst_create(&mut g, &mut out, &mut err, &m, 1.0, 1.0, None, 0, false).unwrap();
             assert_eq!(all.nvox, 27);
             assert_eq!(all.max_vox, 0);
             let r = vlst_create(&mut g, &mut out, &mut err, &m, 1.0, 1.0, None, 0, true);
@@ -791,7 +866,11 @@ mod tests {
             vlst_sort(&mut g, &mut out, &mut err, SortInto::Same(&mut vl)).unwrap();
             assert_eq!(vl.vsrc, [3.0, 2.0, 1.0]);
             assert_eq!(vl.xi, [1, 2, 0]);
-            let fi = if mode.reproduce() { [0, 1, 2] } else { [1, 2, 0] };
+            let fi = if mode.reproduce() {
+                [0, 1, 2]
+            } else {
+                [1, 2, 0]
+            };
             assert_eq!(vl.fi, fi);
         }
     }
@@ -802,9 +881,18 @@ mod tests {
         let mut err = Vec::new();
         let mut vl = vlst_alloc(&mut g, &mut err, 2).unwrap();
         vl.nvox = 0;
-        assert_eq!(vlst_add_unique(&mut g, &mut err, &mut vl, 1, 2, 3, 0.0, 0.0, 0.0).unwrap(), 1);
-        assert_eq!(vlst_add_unique(&mut g, &mut err, &mut vl, 1, 2, 3, 0.0, 0.0, 0.0).unwrap(), 0);
-        assert_eq!(vlst_add(&mut g, &mut err, &mut vl, 4, 5, 6, 0.0, 0.0, 0.0).unwrap(), NO_ERROR);
+        assert_eq!(
+            vlst_add_unique(&mut g, &mut err, &mut vl, 1, 2, 3, 0.0, 0.0, 0.0).unwrap(),
+            1
+        );
+        assert_eq!(
+            vlst_add_unique(&mut g, &mut err, &mut vl, 1, 2, 3, 0.0, 0.0, 0.0).unwrap(),
+            0
+        );
+        assert_eq!(
+            vlst_add(&mut g, &mut err, &mut vl, 4, 5, 6, 0.0, 0.0, 0.0).unwrap(),
+            NO_ERROR
+        );
         assert_eq!(
             vlst_add(&mut g, &mut err, &mut vl, 7, 8, 9, 0.0, 0.0, 0.0).unwrap(),
             ERROR_NOMEMORY

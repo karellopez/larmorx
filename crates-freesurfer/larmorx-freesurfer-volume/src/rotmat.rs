@@ -181,7 +181,9 @@ pub fn tranform_affine_params2_matrix(
             }
             m
         }
-        None => fresh.insert(matrix_multiply_d(g, out, err, Some(&t), Some(&r), None)?.unwrap_new()),
+        None => {
+            fresh.insert(matrix_multiply_d(g, out, err, Some(&t), Some(&r), None)?.unwrap_new())
+        }
     };
     mul_into_left(g, out, err, dst, &zz, true)?;
     mul_into_left(g, out, err, dst, &sh, true)?;
@@ -248,7 +250,10 @@ pub fn tranform_extract_affine_params(
     let degf = |a: f32| sse::div64(f64::from(sse::mul(a, 180.0)), PI);
     let qf = |row, col| q.relt(row, col);
     p[3] = degf(atan2f(qf(2, 3), qf(3, 3)));
-    let h = sse::sqrt64(sse::add64(pow2(f64::from(qf(2, 3))), pow2(f64::from(qf(3, 3)))));
+    let h = sse::sqrt64(sse::add64(
+        pow2(f64::from(qf(2, 3))),
+        pow2(f64::from(qf(3, 3))),
+    ));
     p[4] = sse::div64(sse::mul64(atan2(f64::from(qf(1, 3)), h), 180.0), PI);
     p[5] = degf(atan2f(qf(1, 2), qf(1, 1)));
     note_glibc07(g, &libm, "atan2f and pow");
@@ -275,8 +280,8 @@ pub fn lta_mat2rot_mat(
         outside(g, err, "LTAmat2RotMat", "no first transform's matrix")?;
         return Ok(0);
     }
-    let mut par = tranform_extract_affine_params(g, out, err, lta.xforms[0].m_l.as_ref())?
-        .expect("a matrix");
+    let mut par =
+        tranform_extract_affine_params(g, out, err, lta.xforms[0].m_l.as_ref())?.expect("a matrix");
     for v in &mut par[0..3] {
         *v = 0.0;
     }
@@ -342,7 +347,9 @@ mod tests {
         for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
             let mut g = Globals::new(mode);
             let (mut out, mut err) = (Vec::new(), Vec::new());
-            let p = [3.0, -4.5, 12.25, 10.0, -20.0, 35.0, 1.1, 0.9, 1.05, 0.02, -0.03, 0.01];
+            let p = [
+                3.0, -4.5, 12.25, 10.0, -20.0, 35.0, 1.1, 0.9, 1.05, 0.02, -0.03, 0.01,
+            ];
             let m = tranform_affine_params2_matrix(&mut g, &mut out, &mut err, &p, None)
                 .unwrap()
                 .unwrap_new();
@@ -378,9 +385,15 @@ mod tests {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let a = identity(&mut g, &mut out, &mut err).unwrap();
         let mut b = a.clone();
-        assert_eq!(rms_reg_diff_mj(&mut g, &mut out, &mut err, &a, &b, 70.0).unwrap(), 0.0);
+        assert_eq!(
+            rms_reg_diff_mj(&mut g, &mut out, &mut err, &a, &b, 70.0).unwrap(),
+            0.0
+        );
         b.set_relt(1, 4, 3.0);
         b.set_relt(2, 4, 4.0);
-        assert_eq!(rms_reg_diff_mj(&mut g, &mut out, &mut err, &a, &b, 70.0).unwrap(), 5.0);
+        assert_eq!(
+            rms_reg_diff_mj(&mut g, &mut out, &mut err, &a, &b, 70.0).unwrap(),
+            5.0
+        );
     }
 }

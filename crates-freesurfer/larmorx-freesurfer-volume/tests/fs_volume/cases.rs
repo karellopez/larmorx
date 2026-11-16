@@ -9209,7 +9209,11 @@ fn r34_vl(g: &mut Gen, t: &mut Vec<String>, n: i64, nvox: i64, max_vox: i64, ext
     let vals: &[f32] = &[1.0, 2.0, 2.0, 0.5, -3.0, 100.0, f32::NAN, 7.25];
     for _ in 0..n {
         for e in ext {
-            let v = if g.chance(20) { e } else { g.int(0, (e - 1).max(0)) };
+            let v = if g.chance(20) {
+                e
+            } else {
+                g.int(0, (e - 1).max(0))
+            };
             t.push(v.to_string());
         }
         t.push(g.pick(&[0i64, 0, 0, 1]).to_string());
@@ -9274,7 +9278,11 @@ fn r34_angle(g: &mut Gen, deg: bool) -> f64 {
         return g.pick(&[f64::NAN, f64::INFINITY, -0.0, 1e300]);
     }
     let a = g.int(-3600, 3600) as f64 / 20.0;
-    if deg { a } else { a * std::f64::consts::PI / 180.0 }
+    if deg {
+        a
+    } else {
+        a * std::f64::consts::PI / 180.0
+    }
 }
 
 fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
@@ -9303,7 +9311,11 @@ fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 "fsvol.d/w",
             ];
             t.push(hex(g.pick(names).as_bytes()));
-            let n = if g.chance(25) { 0 } else { g.pick(&[1, 1, 1, 2]) };
+            let n = if g.chance(25) {
+                0
+            } else {
+                g.pick(&[1, 1, 1, 2])
+            };
             let ty = g.pick(&[0i64, 1, 1, 2, 14, 15, 12, 21, 10]);
             r34_lta(g, t, &pool, n, ty);
         }
@@ -9357,7 +9369,11 @@ fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             }
         }
         "ltacor" | "ltarot" => {
-            let n = if g.chance(20) { 0 } else { g.pick(&[1, 1, 1, 2]) };
+            let n = if g.chance(20) {
+                0
+            } else {
+                g.pick(&[1, 1, 1, 2])
+            };
             let ty = g.pick(&R25_TYPES);
             r34_lta(g, t, &pool, n, ty);
         }
@@ -9423,8 +9439,16 @@ fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             } else {
                 Vec::new()
             };
-            t.push(if mgz.is_empty() { "-".to_owned() } else { hex(&mgz) });
-            t.push(if mgh.is_empty() { "-".to_owned() } else { hex(&mgh) });
+            t.push(if mgz.is_empty() {
+                "-".to_owned()
+            } else {
+                hex(&mgz)
+            });
+            t.push(if mgh.is_empty() {
+                "-".to_owned()
+            } else {
+                hex(&mgh)
+            });
             t.push(i64::from(which == 5 || g.chance(8)).to_string());
             let lta = g.chance(4);
             let name = if lta { "reg.lta" } else { "talairach.xfm" };
@@ -9529,7 +9553,11 @@ fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             t.push(mode.to_string());
             if mode == 1 {
                 let m = g.int(0, 7);
-                let mv = if g.chance(8) { g.int(0, m) } else { g.int(0, m.min(nv)) };
+                let mv = if g.chance(8) {
+                    g.int(0, m)
+                } else {
+                    g.int(0, m.min(nv))
+                };
                 r34_vl(g, t, m, mv, m, ext);
             }
         }
@@ -9563,11 +9591,23 @@ fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             let given = g.chance(2);
             t.push(i64::from(given).to_string());
             let into = g.chance(3);
-            let start = if g.chance(10) { g.int(-1, n + 1) } else { g.int(0, n.max(1) - 1) };
-            let num = if g.chance(10) { g.int(-1, n + 2) } else { g.int(0, (n - start.max(0)).max(0)) };
+            let start = if g.chance(10) {
+                g.int(-1, n + 1)
+            } else {
+                g.int(0, n.max(1) - 1)
+            };
+            let num = if g.chance(10) {
+                g.int(-1, n + 2)
+            } else {
+                g.int(0, (n - start.max(0)).max(0))
+            };
             if given {
                 let need = if into { start + num } else { num };
-                let m = if g.chance(8) { g.int(0, 6) } else { need.max(0) + g.int(0, 2) };
+                let m = if g.chance(8) {
+                    g.int(0, 6)
+                } else {
+                    need.max(0) + g.int(0, 2)
+                };
                 let mx = if g.chance(8) { g.int(0, m) } else { m };
                 let nv = g.int(0, m);
                 r34_vl(g, t, m, nv, mx, ext);
@@ -9690,7 +9730,8 @@ fn r34_env(t: &mut Toks) -> Environment {
 fn r34_dir(tag: &str) -> std::path::PathBuf {
     static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("larmorx-fsvol-{tag}-{}-{call}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("larmorx-fsvol-{tag}-{}-{call}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("a scratch folder");
     dir
 }

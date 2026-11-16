@@ -44,9 +44,7 @@ use larmorx_freesurfer_io::mriio::mri_read_header;
 use larmorx_freesurfer_mri::lta::{
     LINEAR_PHYSVOX_TO_PHYSVOX, LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, Lta, REGISTER_DAT,
 };
-use larmorx_freesurfer_mri::mri::{
-    Mri, mri_alloc_sequence, mri_copy_header, use_vol_geom_to_mri,
-};
+use larmorx_freesurfer_mri::mri::{Mri, mri_alloc_sequence, mri_copy_header, use_vol_geom_to_mri};
 use larmorx_freesurfer_mri::tkreg::xfm_crs2xyz_tkreg;
 use larmorx_freesurfer_mri::vol_geom::{
     VolGeom, extract_i_to_r, extract_r_to_i, reinit_cache, vgprint, xfm_crs2xyz,
@@ -105,7 +103,9 @@ pub fn lta_transform_at_point(
     if n > MAX_TRANSFORMS {
         g.notices.add(
             &FS_886,
-            format!("LTAtransformAtPoint of {n} transforms (its weight array holds {MAX_TRANSFORMS})"),
+            format!(
+                "LTAtransformAtPoint of {n} transforms (its weight array holds {MAX_TRANSFORMS})"
+            ),
         );
         log::error_exit(
             g,
@@ -136,8 +136,18 @@ pub fn lta_transform_at_point(
     }
     note_glibc07(g, &libm, "exp");
     if wtotal.abs() < 1e-15 {
-        let Some(m0) = lta.xforms.first().filter(|_| n > 0).and_then(|lt| lt.m_l.as_ref()) else {
-            outside(g, err, "LTAtransformAtPoint", "no transform's matrix to copy")?;
+        let Some(m0) = lta
+            .xforms
+            .first()
+            .filter(|_| n > 0)
+            .and_then(|lt| lt.m_l.as_ref())
+        else {
+            outside(
+                g,
+                err,
+                "LTAtransformAtPoint",
+                "no transform's matrix to copy",
+            )?;
             return Ok(Ret::Null);
         };
         let m0 = m0.clone();
@@ -151,7 +161,12 @@ pub fn lta_transform_at_point(
                 continue;
             }
             let Some(ml) = lt.m_l.as_ref() else {
-                outside(g, err, "LTAtransformAtPoint", "a transform without its matrix")?;
+                outside(
+                    g,
+                    err,
+                    "LTAtransformAtPoint",
+                    "a transform without its matrix",
+                )?;
                 return Ok(Ret::Null);
             };
             matrix_scalar_mul(g, out, err, ml, w_k_p as f32, Some(&mut m_tmp))?;
@@ -434,7 +449,8 @@ pub fn lta_voxel_transform_to_coronal_ras_transform(
         )?;
         return Ok(ERROR_BADPARM);
     }
-    let m_tmp = matrix_multiply(g, out, err, lta.xforms[0].m_l.as_ref(), Some(&v), None)?.into_new();
+    let m_tmp =
+        matrix_multiply(g, out, err, lta.xforms[0].m_l.as_ref(), Some(&v), None)?.into_new();
     match lta.xforms[0].m_l.as_mut() {
         Some(ml) => {
             matrix_multiply(g, out, err, Some(&w), m_tmp.as_ref(), Some(ml))?;
@@ -500,8 +516,18 @@ pub fn lta_modify_src_dst_geom(
     let n = lta.num_xforms.max(0) as usize;
     for lt in &mut lta.xforms[..n] {
         for (vol, vg, mine, what) in [
-            (src, &mut svg, &mut lt.src, "INFO: src volume info differs from the one stored in lta. gets modified now.\n"),
-            (dst, &mut dvg, &mut lt.dst, "INFO: dst volume info differs from the one stored in lta.  gets modified now.\n"),
+            (
+                src,
+                &mut svg,
+                &mut lt.src,
+                "INFO: src volume info differs from the one stored in lta. gets modified now.\n",
+            ),
+            (
+                dst,
+                &mut dvg,
+                &mut lt.dst,
+                "INFO: dst volume info differs from the one stored in lta.  gets modified now.\n",
+            ),
         ] {
             let Some(vol) = vol else { continue };
             if mine.valid != 0 {
@@ -525,7 +551,10 @@ fn path2000(g: &mut Globals, err: &mut dyn Write, s: String) -> Result<String, F
     if s.len() >= 2000 {
         g.notices.add(
             &FS_887,
-            format!("DevolveXFMWithSubjectsDir: a path of {} bytes (its buffer holds 2,000)", s.len()),
+            format!(
+                "DevolveXFMWithSubjectsDir: a path of {} bytes (its buffer holds 2,000)",
+                s.len()
+            ),
         );
         log::error_exit(
             g,
@@ -656,13 +685,23 @@ pub fn devolve_xfm_with_subjects_dir(
                 lta_voxel_transform_to_coronal_ras_transform(g, out, err, &mut lta)?;
             }
             if lta.num_xforms <= 0 || lta.xforms.is_empty() {
-                outside(g, err, "DevolveXFMWithSubjectsDir", "an array without transforms")?;
+                outside(
+                    g,
+                    err,
+                    "DevolveXFMWithSubjectsDir",
+                    "an array without transforms",
+                )?;
                 return Ok(Ret::Null);
             }
             let m = match matrix_copy(g, out, err, lta.xforms[0].m_l.as_ref(), None)? {
                 Ret::New(m) => m,
                 _ => {
-                    outside(g, err, "DevolveXFMWithSubjectsDir", "a transform without its matrix")?;
+                    outside(
+                        g,
+                        err,
+                        "DevolveXFMWithSubjectsDir",
+                        "a transform without its matrix",
+                    )?;
                     return Ok(Ret::Null);
                 }
             };

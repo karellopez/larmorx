@@ -11,14 +11,37 @@ this file is open to everyone. The comparisons and the tools are in
 
 ## The comparison
 
-- **What:** all 24 groups of the spec's §23.2 as amended on 2026-11-13 (28,168 calls, seed 7; the
+- **What:** all 24 groups of the spec's §23.2 as amended on 2026-11-16 (28,507 calls, seed 7; the
   fixed batches `mmake-sizes`, `mmake-sizes-old`, `affine-nan`, `eigen-nonfinite`, `svd-nonfinite`,
-  `mfiles-cut` and `mfiles-end` included), on the probe (plainly, again, and in two guard runs) and on
-  the clean room's candidate, in both modes. `reproduce`: 26,676 identical, 1,121 where FreeSurfer
-  did not finish, 361 memory lines, 10 lines of `svd` that differ in the bits of NaNs only (§17.4:
-  the official build's LINPACK kernels), none other. `fix`: 22,898 identical, 1,121 not finished, 502
-  memory, 3,647 corrected by a noted defect, none other.
-- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-13, relay 6).
+  `svd-failed`, `mfiles-cut` and `mfiles-end` included), on the probe (plainly, again, and in two
+  guard runs) and on the clean room's candidate, in both modes, with no allowance for NaNs' bits.
+  `reproduce`: 27,025 identical, 1,121 where FreeSurfer did not finish, 361 memory lines, none other.
+  `fix`: 22,904 identical, 1,121 not finished, 502 memory, 3,980 corrected by a noted defect, none
+  other.
+- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-16, relay 7; relay 6's
+  run, 2026-11-13: 10 lines of `svd` differed in NaNs' bits, below).
+
+## The SVD pseudo-inverse after a failed decomposition (§17.4, §17.5, amended)
+
+- **What:** under `reproduce`, `MatrixSVDPseudoInverse` goes on after LINPACK fails. Relay 6 ran its
+  steps on a U of zeros (every result element the NaN `ffc00000`): 10 lines of `svd` differed in the
+  bits of NaNs only. The amended spec says the failure leaves U as the caller gave it, m's own
+  numbers (with the singular values and V +0): the products then keep m's NaNs, quieted, where §16's
+  sums pick them. With that change all 339 calls of the new batch `svd-failed` and every other `svd`
+  line are identical.
+- **How we know:** *validated* (`compare.py compare`, group `svd`, both modes, 2026-11-16).
+
+## FS-924 and FS-926 (§18.2, §2.2): sizes from damaged files
+
+- **What:** both are not in the probe (gigabytes). The clean room applies them as the spec states:
+  FS-926 in the default allocator (a block above 2^28 bytes made and noted, above 2^34 bytes the two
+  lines and status 1, both modes; the old allocator never), FS-924 in the binary reader under
+  `reproduce` (more than 2^20 numbers missing from the first one cut: the first `freadDouble` line,
+  the error with the count, nothing returned, a given matrix keeping the numbers read before the
+  cut). In the probe's `mfiles` group two lines meet FS-924 (allowed lines: a size taken from
+  memory); no other line changed.
+- **How we know:** *tested* (`tests/defects_maths.rs`, direct calls) and the `mfiles` and `mmake`
+  groups unchanged (2026-11-16).
 
 ## The minimizers (§13)
 
@@ -107,10 +130,13 @@ those groups is identical:
 - **What remains:** `OpenNonSymmetricEigenSystem` of a matrix with a NaN entry that FreeSurfer
   finishes (`oeigenns 4 41700000 3f800000 4106db6e 42752492 40a00000 40e00000 c0dc0000 42b8db6e
   41200000 41200000 7fc00000 40400000 41980000 c2740000 41a00000 3f800000`): the official build's
-  eigenvectors are `0 0 0 0 0 0 NaN NaN …`, the clean room's (through
-  `larmorx_core::vnl_eigen::real_eigensystem`) all NaN, and their signs differ between larmorx's
-  debug and release builds (an optimisation changes a NaN's sign inside the port). The golden cases
-  give `oeigen` and `oeigenns` finite arguments until that port follows the official build too.
+  result is `0` and the 20 floats `00000000` x 6, then `7fc00000 7fc00000 00000000 00000000` three
+  times and `7fc00000 7fc00000`; the clean room's (through
+  `larmorx_core::vnl_eigen::real_eigensystem`) is `00000000` x 4 and `7fc00000` x 16 (2026-11-16).
+  Since the port's change of 2026-11-13 its results are the same in debug and release builds and
+  under the AArch64 emulation, so the golden cases give `oeigen` and `oeigenns` special values (relay
+  7); the difference from the official build on this matrix is the port's (not in the probe's
+  `eigen` batches, where every line is identical).
 - **How we know:** *measured* (`compare.py`, the probe on that line; the golden cases under
   `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`'s emulation, debug and release).
 
@@ -124,8 +150,7 @@ those groups is identical:
   infinity of `MatrixNSConditionNumber`'s product, LINPACK's failures with their `info`) and `fix`
   refuses, noted. Before the amendment (both modes refused every such matrix) 5 lines of `eigen` and
   8 of `svd` differed in `reproduce`; now none, the batches `eigen-nonfinite` (236 lines) and
-  `svd-nonfinite` (360) included. 10 lines of `svd` differ in the bits of NaNs in U only (the
-  allowance of §17.4: the port's BLAS kernels do not yet follow the official build's order).
+  `svd-nonfinite` (360) included, NaNs' bits too (no allowance since 2026-11-16).
 - **How we know:** *validated* (`compare.py compare`, both modes).
 
 ## Golden cases and platforms
@@ -135,7 +160,9 @@ those groups is identical:
   §18.1's end of the input on memory streams), identical in debug and release builds on x86-64 and
   under the AArch64 NaN emulation of both (202 to 280 NaN signs flipped by the emulation, none
   reaching a result).
-- **How we know:** *measured* (2026-11-13, again after relay 6's changes).
+- **How we know:** *measured* (2026-11-13, again after relay 6's changes; relay 7: the
+  eigensystems with special values, the decomposition hashes re-recorded, identical in all four
+  runs).
 
 ## Speed (indicative)
 

@@ -28,7 +28,8 @@ Python), or `docs/parts/`. Its only inputs were:
 `src/maths/` (FreeSurfer 8.2.0's mathematics, `fs.maths`, queue item C3.1-02) and `src/clib/printf.rs`
 were written by the same clean-room implementers, under the same restrictions as above, from
 [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) as of commit `a59c9d0e` (2026-11-13),
-brought to its amendments of commit `3a1ef09e` (2026-11-13: §2.2, §3, §17, §18.1, §18.2), never
+brought to its amendments of commits `3a1ef09e` (2026-11-13: §2.2, §3, §17, §18.1, §18.2) and
+`a8c62d4e` (2026-11-16: §2.2 FS-926, §17.4, §17.5, §18.2 FS-924), never
 from Numerical Recipes' code. Its inputs:
 
 | Input | What it gave |

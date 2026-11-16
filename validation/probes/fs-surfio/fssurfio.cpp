@@ -60,6 +60,8 @@
 #include "tritri.h"
 #include "label.h"
 #include "surfcluster.h"
+#include "mrishash.h"
+#include "mrishash_internals.h"
 
 // sclustReMap0 is defined in surfcluster.cpp but not declared in its header (relay 38)
 int sclustReMap0(MRI_SURFACE *Surf, int nClusters, SCS *scs_sorted);
@@ -5646,6 +5648,162 @@ void vcp_case()
   }
 }
 
+// ---- relay 39 of track D: mht, the surface hash table (mrishash.cpp's tables and face tests),
+// mrisMarkIntersections, MRISfillHoles, MRISmarkEdge's hole filling ----------------------------------
+
+// a coordinate's table voxel (x / res + 1000, truncated), false when the int conversion is undefined
+static bool mht_vox(double x, float res, int *v)
+{
+  double w = x / res + TABLE_CENTER;
+  if (!(w > -2147483649.0 && w < 2147483648.0)) return false;
+  *v = (int)w;
+  return true;
+}
+
+// the table's buckets in the box of the vertices' voxels (every vertex's `which` position, the
+// defined voxels clamped into the table, one voxel of margin): each existing bucket's voxel, count
+// and list; BOX <n> for a box of more than 400,000 voxels
+static void mht_dump(MRIS *s, MRIS_HASH_TABLE *mht)
+{
+  if (!mht) { out += "NOMHT "; return; }
+  oi(mht->which()); of(mht->vres()); oi((int)mht->fno_usage());
+  int lo[3] = {TABLE_SIZE, TABLE_SIZE, TABLE_SIZE}, hi[3] = {-1, -1, -1};
+  for (int v = 0; v < s->nvertices; v++) {
+    float c[3];
+    MRISvertexCoord2XYZ_float(&s->vertices[v], mht->which(), &c[0], &c[1], &c[2]);
+    for (int k = 0; k < 3; k++) {
+      int x;
+      if (!mht_vox(c[k], mht->vres(), &x)) continue;
+      if (x < 0) x = 0;
+      if (x >= TABLE_SIZE) x = TABLE_SIZE - 1;
+      if (x < lo[k]) lo[k] = x;
+      if (x > hi[k]) hi[k] = x;
+    }
+  }
+  long long vol = 1;
+  for (int k = 0; k < 3; k++) {
+    if (hi[k] < 0) { out += "EMPTYBOX "; return; }
+    lo[k] = std::max(0, lo[k] - 1);
+    hi[k] = std::min(TABLE_SIZE - 1, hi[k] + 1);
+    vol *= hi[k] - lo[k] + 1;
+  }
+  for (int k = 0; k < 3; k++) { oi(lo[k]); oi(hi[k]); }
+  if (vol > 400000) { out += "BOX "; oi(vol); return; }
+  for (int x = lo[0]; x <= hi[0]; x++)
+    for (int y = lo[1]; y <= hi[1]; y++)
+      for (int z = lo[2]; z <= hi[2]; z++) {
+        MHBT *b = MHTacqBucketAtVoxIx(mht, x, y, z);
+        if (!b) continue;
+        oi(x); oi(y); oi(z); oi(b->nused);
+        for (int i = 0; i < b->nused; i++) oi(b->bins[i].fno);
+        MHTrelBucket(&b);
+      }
+  out += "; ";
+}
+
+static void mht_vertices(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    oi(s->vertices[v].marked); of(s->vertices[v].val); oi(s->vertices[v].undefval);
+  }
+}
+
+void mht_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int gdiag_no = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  Gdiag_no = -1;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  Gdiag_no = gdiag_no;
+  int nfrip = geti();
+  for (int k = 0; k < nfrip; k++) s->faces[geti()].ripflag = 1;
+  int nvrip = geti();
+  for (int k = 0; k < nvrip; k++) s->vertices[geti()].ripflag = 1;
+  if (geti()) for (int v = 0; v < nv; v++) s->vertices[v].marked = geti();
+  if (geti())
+    for (int v = 0; v < nv; v++) {
+      s->vertices[v].origx = getf(); s->vertices[v].origy = getf(); s->vertices[v].origz = getf();
+    }
+  MRIS_HASH_TABLE *mht = NULL;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    errno = 0;
+    if (op == "ft" || op == "vt") {
+      int which = geti();
+      float res = getf();
+      MHTfree(&mht);
+      mht = op == "ft" ? MHTcreateFaceTable_Resolution(s, which, res) : MHTcreateVertexTable_Resolution(s, which, res);
+      mht_dump(s, mht);
+    } else if (op == "ftd") {
+      MHTfree(&mht);
+      mht = MHTcreateFaceTable(s);
+      mht_dump(s, mht);
+    } else if (op == "dfi") {
+      if (!mht) { out += "G "; continue; }
+      for (int f = 0; f < nf; f++) oi(MHTdoesFaceIntersect(mht, s, f));
+    } else if (op == "ivf") {
+      int vno = geti();
+      float dx = getf(), dy = getf(), dz = getf();
+      if (!mht) { out += "G "; continue; }
+      oi(MHTisVectorFilled(mht, vno, dx, dy, dz));
+    } else if (op == "add" || op == "rem") {
+      int vno = geti();
+      if (!mht) { out += "G "; continue; }
+      oi(op == "add" ? MHTaddAllFaces(mht, s, vno) : MHTremoveAllFaces(mht, s, vno));
+      mht_dump(s, mht);
+    } else if (op == "mv") {
+      int vno = geti();
+      s->vertices[vno].x = getf(); s->vertices[vno].y = getf(); s->vertices[vno].z = getf();
+    } else if (op == "tis") {
+      oi(MHTtestIsMRISselfIntersecting(s, getf()));
+    } else if (op == "mi") {
+      oi(mrisMarkIntersections(s, geti()));
+      mht_vertices(s);
+    } else if (op == "fh") {
+      std::string field = next();
+      int usemri = geti();
+      double thresh = getd();
+      MRI *m = NULL;
+      if (usemri) {
+        m = MRIallocSequence(nv, 1, 1, MRI_FLOAT, 1);
+        for (int v = 0; v < nv; v++) MRIsetVoxVal(m, v, 0, 0, 0, getf());
+      }
+      oi(MRISfillHoles(s, field == "-" ? NULL : (char *)field.c_str(), m, thresh));
+      mht_vertices(s);
+      if (m) {
+        for (int v = 0; v < nv; v++) of(MRIgetVoxVal(m, v, 0, 0, 0));
+        MRIfree(&m);
+      }
+    } else if (op == "me") {
+      int id = geti();
+      double th = getd();
+      int fill = geti();
+      oi(MRISmarkEdge(s, NULL, id, th, fill));
+      mht_vertices(s);
+    } else if (op == "free") {
+      MHTfree(&mht);
+      out += mht ? "SET " : "FREED ";
+    } else fail("mht op");
+    oi(errno);
+  }
+}
+
 // ---- relay 37 of track D: wvl, the values written (MRISwriteValues, MRISwriteAreaErrorToValFile,
 // MRIcopyMRIS) ------------------------------------------------------------------------------------
 
@@ -5985,6 +6143,8 @@ void run_case()
     scl_case();
   } else if (cmd == "vcp") {
     vcp_case();
+  } else if (cmd == "mht") {
+    mht_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

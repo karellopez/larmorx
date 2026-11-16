@@ -422,7 +422,7 @@ pub(super) fn mpg_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "mke" => {
                 let (id, m, th) = (t.i(), t.i(), t.d());
                 let mk = mask.as_ref().filter(|_| m != 0);
-                let r = props10::mris_mark_edge(g, sg, &mut io, &mut s, mk, id, th)?;
+                let r = props10::mris_mark_edge(g, sg, &mut io, &mut s, mk, id, th, 0)?;
                 o.i(i64::from(r));
                 for vno in 0..s.nvertices as usize {
                     o.i(i64::from(s.vertex(vno).marked));

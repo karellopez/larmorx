@@ -78,6 +78,10 @@
 //! - [`sclust`] (fs.surf's `surfcluster.cpp`, taken early for `label.cpp`): a surface's clusters
 //!   grown, summarised, sorted, pruned and listed (FS-901, FS-903..FS-907).
 //! - [`valcopy`]: the copies between a surface's vertex fields and its vectors (FS-908).
+//! - [`mht`] (fs.surf's `mrishash.cpp`, taken early for `mrisMarkIntersections`): the surface hash
+//!   table of faces or vertices, the faces' self-intersection tests (FS-909..FS-913); [`tritri`]:
+//!   the triangle-triangle and ray-triangle intersections; [`vals`]: the hole filling of a surface
+//!   map (FS-914, FS-915).
 //! - [`props11`]: a surface moved to Talairach space (FS-629), the vertex-to-voxel conversions, the
 //!   normal-dot and principal-curvature distributions (FS-626..FS-628), Ashburner's triangle energy.
 #![forbid(unsafe_code)]
@@ -103,6 +107,7 @@ pub mod ico;
 pub mod labelsurf;
 pub mod lta;
 pub mod metric;
+pub mod mht;
 pub mod mp;
 pub mod mp_faster;
 pub mod mp_slow;
@@ -135,7 +140,9 @@ pub mod surfmri;
 pub mod surfread;
 pub mod topology;
 pub mod trifile;
+pub mod tritri;
 pub mod valcopy;
 pub mod valfile;
+pub mod vals;
 pub mod views;
 pub mod vpos;

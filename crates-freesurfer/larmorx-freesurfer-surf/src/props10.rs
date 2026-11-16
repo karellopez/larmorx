@@ -30,7 +30,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_535, FS_536, FS_537, FS_538};
+use larmorx_core::defects::{FS_535, FS_536, FS_537, FS_538, FS_914, FS_916};
 use larmorx_core::x87::F80;
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag;
@@ -48,6 +48,7 @@ use crate::metric::compute_curvature_min_max;
 use crate::mp;
 use crate::mris::Mris;
 use crate::positions::{restore_vertex_positions, save_vertex_positions};
+use crate::sclust;
 use crate::views::{ORIGINAL_VERTICES, TMP_VERTICES};
 
 /// `M_PI`.
@@ -842,17 +843,17 @@ pub fn mris_max_edge_stat_to_overlay(
     Ok(Some(overlay))
 }
 
-/// `MRISmarkEdge(surf, mask, metricid, thresh, FillHoles)` without its hole filling (`FillHoles`
-/// 0): the face metric, the edges when there are none, `MRIScomputeMetricProperties` and the edge
+/// `MRISmarkEdge(surf, mask, metricid, thresh, FillHoles)`: the face metric, the edges when there are none, `MRIScomputeMetricProperties` and the edge
 /// metric; the marks cleared (`MRISclearMarks`: unripped vertices); then for each edge kept (none
 /// of its vertices ripped or under 0.5 in the mask: both ends for the length, all four for the
 /// others) whose statistic passes the threshold, its vertices marked (`marked` 1) and the edge
 /// counted: length (0) below `thresh` marks its two ends, the hinge dot product's magnitude (1)
 /// or the hinge angle (2, degrees) above it all four. Another `metricid` prints `ERROR:
 /// MRISmaxEdgeStatToOverlay() metricid <m> unrecognized` at the first edge kept and returns -1.
-/// Returns the edges counted. FreeSurfer's `FillHoles` then fills the holes of the marked map
-/// (`MRISfillHoles`, the surface clusters of fs.surf, queue item 3.4-04) and adds the vertices it
-/// fills: that step comes with fs.surf's clusters.
+/// Returns the edges counted; with `fill_holes` not 0 the holes of the marked map filled too
+/// ([`crate::vals::fill_holes`] of the field `marked` at 0.5, the mask not applied) and the
+/// vertices it fills (or its -1) added.
+#[allow(clippy::too_many_arguments)]
 pub fn mris_mark_edge(
     g: &mut Globals,
     sg: &mut SurfGlobals,
@@ -861,6 +862,7 @@ pub fn mris_mark_edge(
     mask: Option<&Mri>,
     metricid: i32,
     thresh: f64,
+    fill_holes: i32,
 ) -> Result<i32, Fatal> {
     mris_face_metric(sg, io, surf);
     if surf.edges.is_none() {
@@ -898,7 +900,75 @@ pub fn mris_mark_edge(
         }
         nhits = nhits.wrapping_add(1);
     }
+    if fill_holes != 0 {
+        let nfill = crate::vals::fill_holes(g, io, surf, Some("marked"), None, 0.5)?;
+        nhits = nhits.wrapping_add(nfill);
+    }
     Ok(nhits)
+}
+
+/// `mrisMarkIntersections(mris, FillHoles)` (`utils/mrisurf_metricProperties.cpp` 13027): a face
+/// table of the current positions ([`crate::mht::Mht::create_face_table`]); the marks cleared
+/// (`MRISclearMarks`: unripped vertices only); each face that intersects another of the table
+/// (none of its corners shared) counted and its three vertices marked. With `fill_holes`:
+/// `mrisMarkIntersections(): Filling any holes`, each vertex's `val` set to 1 where it is not
+/// marked (else 0), the clusters of those found (`sclustMapSurfClusters` at 0.5, no upper
+/// threshold, positive, no minimum area; largest area first), `  Found <n> holes` (the clusters,
+/// the region around the holes included: FS-914, kept), and every vertex of a cluster after the
+/// first marked. Standard output. Returns the faces counted.
+///
+/// FS-916 (kept): a ripped vertex keeps its earlier mark, and the hole filling counts it by that
+/// mark (noted when one is marked).
+pub fn mris_mark_intersections(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &mut Mris,
+    fill_holes: i32,
+) -> Result<i32, Fatal> {
+    let mht = crate::mht::Mht::create_face_table(g, io.err, mris)?;
+    crate::discrete::clear_marks(mris);
+    let nv = usize::try_from(mris.nvertices).unwrap_or(0);
+    if (0..nv).any(|v| mris.vertex(v).ripflag != 0 && mris.vertex(v).marked != 0) {
+        g.notices.add(
+            &FS_916,
+            "mrisMarkIntersections: a ripped vertex keeps its earlier mark (the marks' clearing skips ripped vertices; kept)",
+        );
+    }
+    let mut num = 0i32;
+    for fno in 0..mris.nfaces {
+        if mht.does_face_intersect(g, io.err, mris, fno)? != 0 {
+            num = num.wrapping_add(1);
+            let fv = mris.face(fno as usize).v;
+            for vno in fv {
+                mris.vertex_mut(vno as usize).marked = 1;
+            }
+        }
+    }
+    if fill_holes != 0 {
+        let _ = writeln!(io.out, "mrisMarkIntersections(): Filling any holes");
+        for n in 0..nv {
+            let v = mris.vertex_mut(n);
+            v.val = f32::from(u8::from(v.marked == 0));
+        }
+        let (_, nclusters) = sclust::map_surf_clusters(g, io, mris, 0.5, -1.0, 1, 0.0, None, None)?;
+        if nclusters > 0 {
+            g.notices.add(
+                &FS_914,
+                format!(
+                    "mrisMarkIntersections: Found {nclusters} holes counts the region around the holes as one (kept)"
+                ),
+            );
+        }
+        let _ = writeln!(io.out, "  Found {nclusters} holes");
+        if nclusters > 0 {
+            for n in 0..nv {
+                if mris.vertex(n).undefval > 1 {
+                    mris.vertex_mut(n).marked = 1;
+                }
+            }
+        }
+    }
+    Ok(num)
 }
 
 /// The four statistics both printers take: the triangle areas, the corner angles (degrees), the

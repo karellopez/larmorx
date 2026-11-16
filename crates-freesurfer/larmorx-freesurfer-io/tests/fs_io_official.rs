@@ -28,8 +28,9 @@
 //! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: one since relay 40),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
 //! --light` on Linux x64 from the unit oracle's build (2026-11-16, track A relay 41, with piece
-//! 33's autoencoders: 4,799 cases (case 4794, a heavy one in debug builds, left out), 4,279 lines
-//! identical, 61 of them with memory digits; 520 hashed as `SKIP`, 169 of them `VARY`),
+//! 33's autoencoders and piece 32's queries `I`, `V`, `X`, `O`: 4,799 cases (case 4794, a heavy
+//! one in debug builds, left out), 4,278 lines identical, 61 of them with memory digits; 521
+//! hashed as `SKIP`, 168 of them `VARY`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -50,8 +51,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "9942d7495da4d9988468a8cd448e73362e3c5ca67bddb5222bfd33b72c2b1db0";
-const SKIPPED: usize = 520;
+const OFFICIAL_SHA256: &str = "7ba8e6aa70e33a2ea3cdb9a1d89c224fb4490413f34d7dab423b90e2528f15e0";
+const SKIPPED: usize = 521;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

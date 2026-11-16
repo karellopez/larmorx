@@ -715,6 +715,14 @@ def test_glibc_source_dates_and_the_rules_table():
             None,
         ),
         (f"{WT}/validation/investigations/freesurfer-mri-probe/README.md", "read", "repo", None),
+        # and of fs.volume's parts 1 to 3 (2026-11-16)
+        (
+            f"{WT}/validation/investigations/freesurfer-volume-probe/fs_volume_probe.cpp",
+            "read",
+            "repo",
+            None,
+        ),
+        (f"{WT}/validation/probes/fs-volume/fsvolume.cpp", "read", "restricted", "R14"),
         (f"{WT}/validation/probes/fs-maths/check.py", "read", "restricted", "R14"),
         (f"{WT}/validation/probes/fs-mri/README.md", "read", "restricted", "R14"),
         (f"{WT}/validation/probes/x87-extended/patterns.cpp", "read", "restricted", "R14"),

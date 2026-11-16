@@ -1168,7 +1168,7 @@ defects! {
     FS_45 = "FS-45", "FreeSurfer", true,
         "MatrixPseudoInverse of a matrix with fewer rows than columns crashes for a zero matrix and for a caller's output it cannot fill (one of the other shape), and given an output of the transposed shape it fills it, frees it and returns a new matrix";
     FS_46 = "FS-46", "FreeSurfer", true,
-        "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), returns a pseudo-inverse of infinities when the decomposition fails, and crashes for a zero matrix with fewer rows than columns";
+        "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), returns a matrix of NaNs when the decomposition fails, and crashes for a zero matrix with fewer rows than columns";
     FS_47 = "FS-47", "FreeSurfer", true,
         "MatrixEigenSystem of a symmetric matrix with infinite entries, and MatrixCalculateEigenSystemHelper's symmetric case of a matrix with infinite or NaN entries in its upper triangle, never return on many such matrices (VNL's ITK-115), and on the others return the values VNL computes, though such a matrix has no eigensystem";
     FS_48 = "FS-48", "FreeSurfer", true,
@@ -2366,9 +2366,9 @@ defects! {
     FS_432 = "FS-432", "FreeSurfer", true,
         "writing several volumes at once (the echoes of a multi-echo series) under one name, a name of 1,024 bytes or more with its suffix is written past FreeSurfer's buffer: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,
-        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
+        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes past the memory FreeSurfer sets aside for that word (undefined behaviour; no effect on the official build's results)";
     FS_286 = "FS-286", "FreeSurfer", true,
-        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes the word past its 2-byte buffer: memory corruption, a crash or wrong values";
+        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes past the memory FreeSurfer sets aside for that word: the official build then takes the line's key from that word's third byte on instead of the line's first word (a line 'valid == 1' is not counted)";
     FS_287 = "FS-287", "FreeSurfer", true,
         "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
     FS_288 = "FS-288", "FreeSurfer", true,
@@ -2388,7 +2388,7 @@ defects! {
     FS_295 = "FS-295", "FreeSurfer", true,
         "MRIextractInto sets a new volume's start and end positions (xstart, xend and the others) with the voxel sizes truncated to integers: sub-millimetre voxels give 0, 1.5 mm voxels 1";
     FS_296 = "FS-296", "FreeSurfer", true,
-        "MRIscalarMulFrame stores a NaN product into a byte volume by C's conversion, which is undefined for NaN";
+        "MRIscalarMulFrame stores a NaN product into a byte volume as a value the C language leaves undefined (0 in the official build)";
     FS_297 = "FS-297", "FreeSurfer", true,
         "MRIextractInto of a volume of 64-bit integers (long) copies each row of the box from half its first column in the source to half its first column in the destination: the box's voxels come from the wrong place, half voxels included";
     FS_298 = "FS-298", "FreeSurfer", true,

@@ -13,17 +13,21 @@ it (files in; values, rows, messages and files out), measured with the different
 from the unit oracle, GCC 8.4.0, `-O3`; each case in a forked child, so a crash or a hang of the
 library is seen as the child's signal or timeout).
 
-## Results (2026-11-16, track C relay 32)
+## Results (2026-11-16, track C relays 32 and 33)
 
 | set | cases | identical | expected differences (noted) | differing |
 |---|---|---|---|---|
 | generated files read (seeds 1 to 9, 2,000 or 3,000 each; seeds 8 and 9 with the final code) | 25,000 | 20,000 | 1,587 crashes of the original (a defect noted), 464 hangs of the original (FS-814, FS-818), 552 memory-dependent results (FS-815 to FS-834 noted), 2,393 codecs not ported yet | 4, resolved: 3 originals timed out under the machine's load (identical when run alone), 1 crash of the original noted once FS-833 covered the byte swap |
-| files written by a scanline writer (the writer below; seeds 1 to 4) | 5,300 | 5,300 (transcripts and file bytes) | – | 0 |
+| generated files read with every codec decoding (relay 33's code: seeds 101 to 107, 3,000 each; CCITT, NeXT, ThunderScan, PixarLog and SGILog files among them; the port's allocation limit the originals') | 21,000 | 18,302 | 1,426 crashes of the original (a defect noted), 481 hangs of the original (FS-814, FS-818), 785 memory-dependent results noted | 6, resolved: the originals timed out under the machine's load (identical when run alone) |
+| files written by a scanline writer (the writer below; seeds 1 to 4, and 33 with relay 33's code) | 6,300 | 6,300 (transcripts and file bytes) | – | 0 |
 | zlib's decompressor alone (`validation/probes/zlib-deflate inflate`, seeds 1 and 2) | 10,000 streams, every call | all | – | 0 |
 
 libtiff 3.6.1 as released and FreeSurfer's copy gave the same results but where memory contents
 decide (about 1 % of the files read: heap layouts differ between the two builds). Logs
-`<workspace>/oracles/logs/fs-found-c-r32-tiff-*.log`.
+`<workspace>/oracles/logs/fs-found-c-r32-tiff-*.log`, `fs-found-c-r33-tiff-*.log`. Unit tests decode
+clean CCITT streams (every scheme and Group 3 option, both fill orders, widths up to 2,700),
+PixarLog strips (8, 16 and 32 bits, one to five samples) and SGILog rows (LogL 16-bit, LogLuv
+24- and 32-bit raw, with and without RowsPerStrip) to the images they code.
 
 ## Configuration and messages
 

@@ -104,7 +104,7 @@ impl Attr {
     }
 }
 
-fn afni_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
+fn afni_case(g: &mut Gen, entries: &mut Vec<String>, portable: bool) -> (String, i64) {
     let nf = if g.chance(25) {
         0
     } else {
@@ -377,6 +377,9 @@ fn afni_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
         _ => entries.push(file_entry("w/a+orig.BRIK", &data)),
     }
     let name = match g.below(14) {
+        // a name the BRIK's differs from only by case: another file on case-insensitive file
+        // systems (Windows, macOS) in the portable cases (relay 40)
+        0 if portable => "w/c+orig.brik",
         0 => "w/a+orig.brik",
         1 => "w/a+orig",
         2 => "w/b+orig.BRIK",
@@ -548,7 +551,7 @@ fn write_case(g: &mut Gen, mut t: Vec<String>) -> Vec<String> {
     t
 }
 
-pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
+pub fn generate(g: &mut Gen, kind: &str, portable: bool) -> Vec<String> {
     let t = vec![kind.to_owned()];
     if kind == "kwr" {
         return write_case(g, t);
@@ -556,7 +559,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     let mut t = t;
     let mut entries = Vec::new();
     let (name, ty) = match kind {
-        "afd" | "afh" => afni_case(g, &mut entries),
+        "afd" | "afh" => afni_case(g, &mut entries, portable),
         "cud" | "cuh" => curv_case(g, &mut entries),
         _ => annot_case(g, &mut entries),
     };

@@ -50,3 +50,10 @@ memory file much slower (prelude's and BET's calls of 10 to 60 MiB, five times e
 modes); a call far from its allowance (most of them: 2 MiB and more) is decided by one pair as
 before, since a difference of 1 MiB is beyond the spread seen. Only a call within 1 MiB of its
 allowance (`extracttxt`, always: its typical margin is about 0.7 MiB) or above it runs five pairs.
+
+With the final rule (5a77c548): `extracttxt`'s test 20 times boxed, 20 passed (margins 0.32 to 1.43
+MiB; `fs-found-c-r36-mem-extracttxt-20.log`); the whole memory file once, boxed, with `FSLDIR` set:
+121 passed (`fs-found-c-r36-mem-whole.log`; 56 minutes while the Rust gates ran beside it at 12
+jobs). Of its 214 measurements through the entry point only `extracttxt`'s two (one per mode) came
+within 1 MiB of their allowance and ran five pairs; every other was at least 1.5 MiB from it and
+ran one pair, as before.

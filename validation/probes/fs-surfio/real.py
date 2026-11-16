@@ -28,7 +28,12 @@ the pial and white coordinates and the pial positions (``MRISreadVertexPositions
 (relay 36 of track D): each head's recorded annotations (``ANNOTS``) read into its white surface
 (``MRISreadAnnotation``), written as an annotation file, a segmentation and GIFTI
 (``MRISwriteAnnotation``), the annotation file compared with the recorded one byte for byte, each
-read back. Prints the counts;
+read back. With ``--mpx`` (relay 37 of track D): each head's white surface with its sphere's
+canonical coordinates: the principal-curvature and normal-dot distributions
+(``mrisComputePrincipalCurvatureDistributions``, ``mrisComputeNormalDotDistribution``, 100 bins, a
+100 x 100 volume), Ashburner's sampled energy at 64 vertices of the sphere
+(``mrisSampleAshburnerTriangleEnergy``) and the white surface moved to Talairach space in place
+(``MRIStalairachTransform``). Prints the counts;
 the lines name machine paths, so no hash is recorded from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]

@@ -4473,3 +4473,128 @@ identical with `reproduce`; `aparc`, `aparc.a2009s`, `aparc.DKTatlas` and `BA_ex
 as an annotation file, a segmentation and GIFTI and read back: 24 of 24 identical in both modes
 (observed). A clean-room implementer's black-box form: recon-all's `label/?h.aparc.annot` written
 back by 124.11 is the recorded file byte for byte when read by 124.8 first.
+
+## 126. The Talairach move, the vertex-to-voxel conversions, two distributions and Ashburner's energy (queue items 3.1-49/50; relay 37 of track D)
+
+**126.1 The move to Talairach space** (`MRIStalairachTransform(src, dst)`). Without a destination,
+the destination is a copy of the source (§105.9's copy). A source without a Talairach transform
+(`lta`): the destination is returned unchanged. Otherwise the destination's distances are freed
+(§15), then for each of the source's vertex numbers `vno` below the
+source's vertex count, the destination's vertex `vno` is moved through the source's
+surface-RAS-to-Talairach matrix (`freesurfer-volume.md` §46's point through a 4 x 4 `float` matrix: the
+coordinates as `float`, the result stored as `float`); the bounding box of the moved positions starts from 10000 and
+-10000 and takes each new coordinate above its high or below its low end (NaN never), every vertex
+counted, ripped ones too; the box and its centre (`0.5 (lo + hi)` in `float`) are stored. With no
+vertex the box is (10000, -10000) on each axis and the centre 0. The destination is returned.
+FS-629 (rule A for the crash): a source with a transform, vertices and no matrix: FreeSurfer
+crashes; the port gives the error `MRIStalairachTransform: the surface has a Talairach transform but
+no matrix from surface RAS to Talairach space` and no surface (status `ERROR_BADPARM` for the
+in-place form), `reproduce` the crash (exit status 139). A destination with fewer vertices than the
+source: FreeSurfer writes past it; the error `MRIStalairachTransform: the destination has <n>
+vertices, the source <m>` and no surface in both modes. Every FreeSurfer caller moves one surface in
+place.
+
+**126.2 Vertex to voxel.** Each converts one vertex's coordinates (`float`, widened to `double`) to
+the volume's voxel coordinates through §118's cached map (`MRISsurfaceRASToVoxelCached`, FS-604),
+except the second: `MRISvertexToVoxel` (the current position), `MRISvertexToVoxelNotCached` (the
+current position through §118's uncached conversion), `MRISorigVertexToVoxel` (the original
+position), `MRISwhiteVertexToVoxel` (the white position), `MRISvertexCoordToVoxel(.., which)` (the
+coordinate set `which` as §3's selector gives it, widened: an unsupported set ends the
+program), `MRISvertexNormalToVoxel` (the voxel of `position + normal`, each sum in `float`, minus the
+voxel of the position, in `double`), `MRISvertexNormalToVoxelScaled` (that difference divided by its
+length `sqrt((nx² + ny²) + nz²)`; a length below `FLT_EPSILON` returns `ERROR_BADPARM` and leaves
+the outputs unwritten). Each returns `NO_ERROR` otherwise.
+
+**126.3 The normal-dot distribution** (`mrisComputeNormalDotDistribution(mris, h)`). The current
+positions are saved into the temporary set (§25), the original ones restored and the metric
+properties computed (§38). For each vertex whose rip flag is 0 and each of its `vnum` neighbours: the
+offset `d = neighbour - vertex` (`float`) and the dot `(dy ny) dz nz + dx nx` (FS-627: a product
+where the sum of the three terms is meant; kept, rule D: to be measured at `mris_fix_topology`'s
+port; the order of the operations as written decides a NaN); the smallest and largest dot from
+100000 and -100000 (NaN never). The histogram's bin size is `(max - min) / (nbins - 2)` (`float`),
+its bins `min - bin_size`, then each the previous plus the bin size. Each dot is then counted
+(`+= 1`) in bin `(dot - bins[0]) / bin_size`, truncated toward 0 (a NaN or a value beyond the `int`
+range gives -2147483648), negative ones in bin 0, those at `nbins` or beyond in bin `nbins` (FS-626
+below). Then each count in use that is 0 becomes 0.01 and every count is divided by the number of
+offsets counted (`float`; 0 offsets give infinities and NaNs); the histogram is then smoothed into
+itself from a copy (`freesurfer-maths.md` §5's `HISTOsmooth`, sigma 2, the copy's bin size set to the histogram's). With
+`Gdiag`'s write and verbose bits the smoothed and the copy are plotted to `ndot.plt` and `rdot.plt`
+(`freesurfer-maths.md` §5's plot). The current positions are restored from the temporary set and the metric
+properties computed again; `NO_ERROR`. FS-626 (rule B): with fewer than 3 bins the bin size divides
+by 0 or a negative count, and with one bin the largest dots are counted one past the last bin,
+outside the counts: by default the error `mrisComputeNormalDotDistribution: a histogram of <n> bins
+(3 or more are needed)`, `ERROR_BADPARM` and nothing changed; `reproduce` computes as FreeSurfer
+does (a count past the histogram's allocation is lost). With 3 bins or more a dot at bin `nbins`
+(possible only through rounding) goes to the last bin by default, past it with `reproduce`.
+
+**126.4 The principal-curvature distributions** (`mrisComputePrincipalCurvatureDistributions(mris,
+h_k1, h_k2, mri)`). The second fundamental form is computed (§103). Over the vertices whose rip flag
+is 0: the smallest and largest `k1` and `k2` (from 100000 and -100000), each low end raised to -3
+and each high end lowered to 3 when beyond. Each histogram's bin size is its range over its bin
+count (`float`), its bins from the low end in steps of it; the volume's `xsize` and `ysize` become
+the ranges over its width and height, its `xstart` and `ystart` the low ends (the volume's other
+geometry untouched). Each such vertex is counted (`+= 1`) in its `k1` bin and its `k2` bin
+(`(k - low) / bin_size` truncated as in 126.3, kept within 0 and the last bin) and at voxel
+(`(k1 - xstart) / xsize`, `(k2 - ystart) / ysize`) of the volume's first slice and frame, each kept
+within the volume's columns and rows. The counts are then normalised as in 126.3 by the number of
+vertices counted. In the volume's first slice, every voxel whose magnitude is below `FLT_EPSILON`
+becomes 0.1; their sum (`float`, column by column, each column's rows in order) then divides each.
+With `Gdiag`'s write and verbose bits the histograms are plotted to `k1.plt` and `k2.plt` and the
+volume written to `mri_k1_k2.mgh`. `NO_ERROR`. FS-628: FreeSurfer floors and normalises the first
+100 x 100 voxels whatever the volume's size (every caller passes 100 x 100 floats): a volume narrower
+or lower than 100, or not of floats, is refused in both modes (`mrisComputePrincipalCurvatureDistributions:
+the k1-k2 volume must hold floats and be 100 x 100 or larger (<w> x <h>, type <t>)`, `ERROR_BADPARM`,
+nothing changed); a larger one is floored and normalised over its whole first slice by default (rule
+A), over its 100 x 100 corner with `reproduce`. FS-626: a histogram without bins (FreeSurfer counts
+every vertex one before its first bin) is refused by default (`...: a histogram of 0 bins`,
+`ERROR_BADPARM`); `reproduce` computes, those counts lost.
+
+**126.5 Ashburner's triangle energy** (`mrisSampleAshburnerTriangleEnergy(mris, vno, parms, cx, cy,
+cz)`, of the integration parameters only `l_ashburner_lambda`, a `float`). The point is projected
+onto the sphere of the surface's radius (§6's projection, the radius as `float`),
+the vertex moved there; for each of its `num` faces the energy below, summed in `double` (each new
+energy plus the sum so far); the vertex's position restored (its bits); the sum over the face count,
+as `float` (no face: the NaN of 0 / 0). A face's energy: its tangent axes from the current positions
+in `double`: `e1` the first edge (vertex 1 minus vertex 0) over its length, `e2` the second edge
+(vertex 2 minus vertex 0) over its length with its component along `e1` removed (`e2 - e1 (e1 . e2)`,
+the z product taken as `dot e1z`) and over its new length; any of the three lengths below
+`FLT_EPSILON` gives the first vertex's own tangent axes (`e1x` .. `e2z`, their bits) instead; the axes
+as `float`. Each vertex's canonical position and current position in that plane (`float`):
+`x1 = (cy e1y + cx e1x) + cz e1z`, `x2 = (cx e2x + cy e2y) + cz e2z` for the canonical rows,
+`y1 = (y e1y + x e1x) + z e1z`, `y2 = (x e2x + y e2y) + z e2z` for the current rows, except that the
+third vertex's current rows are `e1z z + (e1y y + e1x x)` and `e2z z + (e2y y + x e2x)` (the operand
+orders decide which NaN is kept). The canonical rows with a row of ones make the 3 x 3 matrix X, the
+current ones Y; `X` inverted (`freesurfer-maths.md` §8.8's `MatrixInverse`; it fails: the energy is `log(1e-8)²`, glibc's
+`log` with `reproduce`), `Y X⁻¹` (§8.1's product), its upper-left 2 x 2 block `J`, its determinant
+(§8.8, `float`); negative: `log(1e-8)²`; `J`'s eigenvalues (`freesurfer-maths.md` §17's `MatrixEigenSystem`; a matrix the
+eigensystem never returns on: `log(1e-8)²`); either not finite: `log(1e-8)²`; else each eigenvalue
+`s` at most 0 becomes 1e-8 (`float`), then `logf(s)²` (`float`; glibc's `logf` with `reproduce`,
+correctly rounded by default), and the energy is `((s22 + s11) ((det + 1) lambda)) / 2` in `double`
+(each `float` factor widened).
+
+## 127. Validation plan, part 27
+
+The probe's command of relay 37, `mpx` (an empty work folder; `SURFER_SIDEDOOR`): a mesh (§85's
+probe's shapes: subdivided icosahedra, open grids, small random meshes) read by `MRISread`, 0 to 3
+vertices ripped, the radius (the icosahedron's, others, NaN, 0 or infinity in heavy cases), the
+canonical positions zero or the positions scaled (now and then disturbed, now and then special
+floats), 0 to 4 per-vertex overrides of the current, original and white positions, the normals and
+the tangent axes (signalling and quiet NaNs in heavy cases), `Gdiag`'s write and verbose bits one
+case in six (set after the read), the surface's volume geometry as read or the case's, one volume
+(bytes or floats, 2 to 6 voxels a side, §119's probe's geometries), a Talairach transform and its 4 x
+4 matrix or not; then 1 to 4 of: 126.1 in place or into a copy, one of 126.2's seven conversions
+(an unsupported coordinate set now and then), 126.3 with 100 bins mostly (0, 1, 2, 3, 10, 50 now and
+then), 126.4 with 100 bins mostly (1, 7, 50 now and then) and a 100 x 100 float volume mostly (120 x
+100, 100 x 130 x 2, 101 x 103; 50 x 100 floats and 100 x 100 bytes written `G` on both sides: memory
+FreeSurfer does not own), 126.5 at a vertex with a point near it and lambda 1, 0.5, 2, 0 or a special
+float; each result printed in full (126.4's volume by its voxels' FNV-1a), and with `Gdiag`'s bits the
+folder's files by name, length and FNV-1a. Compared with the official build with `reproduce`:
+identical; the default identical but where a noted correction changed the result or the default's
+correctly rounded `logf` and `log` moved an energy's last bits. Observed (relay 37): seeds 7 (300
+cases), 13 and 17 (1,000 each): 0 different in both modes; on recorded heads (the probe's `flr mpx`;
+three heads, both hemispheres: 126.4 and 126.3 on the white surface with the sphere's canonical
+coordinates, 126.5 at 64 vertices of the sphere with the point 0.5 mm along x, 126.1 in place with
+the head's `talairach.xfm`): 6 of 6 identical with `reproduce`; the default differs only in the
+energies' last bits (`logf`). A clean-room implementer's black-box form: a binary built on FreeSurfer
+8.2.0's `libutils` that calls these functions by name on the recorded heads' `surf/?h.white` and
+`surf/?h.sphere`.

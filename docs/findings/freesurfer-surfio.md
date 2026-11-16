@@ -1727,3 +1727,40 @@ mrisutils.cpp 1287 `MRISseg2annot`; annotation.cpp 914 `MRISannot2seg`) and `sur
   the probe's 5-second alarm inside the 16 GiB box; the port refuses the allocation (FS-03's
   assertion on the faces). The generator now writes that file without the line under that variable
   (`srd`'s cases keep the other form).
+
+## 30. The Talairach move, the vertex-to-voxel conversions, two distributions, Ashburner's energy (relay 37 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
+`crates-freesurfer/larmorx-freesurfer-surf/src/props11.rs` from `utils/mrisurf_metricProperties.cpp`:
+`MRIStalairachTransform` 607 (with the file's `SURFACE_DIMENSION_CALC_*` macros, 102-125),
+`MRISvertexToVoxel` 8478 and its six siblings to 8576, `mrisComputeNormalDotDistribution` 8617,
+`mrisComputePrincipalCurvatureDistributions` 8719, `get_face_axes` 8838, `ashburnerTriangleEnergy`
+8952 and `mrisSampleAshburnerTriangleEnergy` 9081 (the two file-local functions are inlined into the
+last; the probe calls it with a `calloc`ed `INTEGRATION_PARMS` whose `l_ashburner_lambda`, a `float` at
+offset 0x2c, is the only field read). Operand orders from the unit oracle's
+`mrisurf_metricProperties.cpp.o` (`<scratch>/D/relay37/mp.asm`, objdump of that object):
+
+- `MRIStalairachTransform`: the loop runs over `mris_src->nvertices` and reads and writes
+  `mris->vertices[vno]` (FS-629's smaller destination); `TransformWithMatrix(NULL, ...)` faults (no
+  check of `SRASToTalSRAS_`). The bounding box compares the transformed doubles with the box's floats
+  widened (`comisd`), the centre is `addss` + `mulss 0.5` (GCC folded `(float)((double)lo +
+  (double)hi)` into a float add, the same value); with no vertex the centres are stored as 0 directly.
+- `mrisComputeNormalDotDistribution`: `dot = dx * nx + dy * ny * dz * nz` (FS-627) compiles to
+  `((dy*ny)*dz)*nz + dx*nx` (`addss` with the product chain first); min and max are `minss`/`maxss`
+  with the dot as destination (the C comparisons' results, NaN never taken). `bin = MIN(nbins,
+  MAX(0, bin))` lets `bin == nbins` (FS-626); the counts' normalisation is vectorised (`cmpneqps`,
+  `divps`) with the same per-lane result; `h_dot->bins[0]` is read even for 0 bins.
+- `mrisComputePrincipalCurvatureDistributions`: the `for (x < 100) for (y < 100)` loops are
+  hard-coded (FS-628; `MRIFvox` through `slices[0][y]`), the clamps `MAX(-3, min)`, `MIN(3, max)`
+  as `cmpnless`/`comiss`; `MIN(nbins - 1, MAX(0, bin))` gives -1 for 0 bins (FS-626: `counts[-1]`, the
+  heap chunk's size field). FZERO is `fabs(f) < FLT_EPSILON` (macros.h 80), not 1e-7.
+- `get_face_axes`: `SCALAR_MUL(e1, 1.0 / norm, e1)` expands (tritri.h 64, unparenthesised) to
+  `e1[k] * 1.0 / norm`, a division; `SCALAR_MUL(tmp, dot, e1)`'s z product is compiled `dot * e1z`.
+- `ashburnerTriangleEnergy`: the tangent-plane rows' orders as spec §126.5 states them (read
+  instruction by instruction from `mrisSampleAshburnerTriangleEnergy`'s body, 0x350-0x66d); the
+  thread's static matrices are fully rewritten each call (`m_evectors` reused only as
+  `MatrixEigenSystem`'s output), so a call depends on nothing before it; `log(SMALL) *
+  log(SMALL)` calls glibc's `log` twice (no folding under `-fno-builtin`); `log(s11)` of a `float`
+  is `logf`; `(1 + det)` is computed `det + 1.0f`, `lambda * (1 + det) * (s11 + s22)` as `(s22 + s11)
+  * ((det + 1) * lambda)`, and `sse_total += sse` as `sse + sse_total`.
+- The recorded heads (real.py --mpx): FreeSurfer 10.3 s, the port 15.3 s for the six hemispheres.

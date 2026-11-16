@@ -2677,6 +2677,8 @@ defects! {
         "the SGILog decoders' run and literal loops do not stop at the row's pixel count (they write on past it and the row fails as short by a negative count), a run reads its two bytes and a 24-bit LogLuv pixel its three when fewer are left, and rows of 0 bytes never end; corrected as libtiff 4.0.10 does: the loops stop at the row's end and at the data's";
     FS_884 = "FS-884", "libtiff 3.6.1", true,
         "the SGILog decoders write pixels past their translation buffer when it is smaller than a row (FS-882's sizes) or a run goes past the row (FS-883): memory past the buffer; not written";
+    FS_885 = "FS-885", "libtiff 3.6.1", true,
+        "a CCITT file whose FaxSubAddress entry comes before its Compression entry: the reader registers the tag as an unknown one that passes its count before the codec registers its own, and then hands the codec's tag method the count where the string's address goes (a crash); set from the string";
 }
 
 /// The register entry with ID `id`.

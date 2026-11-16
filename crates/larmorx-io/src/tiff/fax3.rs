@@ -18,7 +18,7 @@ use super::Tiff;
 use super::fields::tag;
 use super::next::Out;
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_838, FS_839};
+use larmorx_core::defects::{FS_838, FS_839, FS_885};
 
 #[cfg(test)]
 const S_NULL: u8 = 0;
@@ -790,9 +790,28 @@ impl Tiff {
             tag::CONSECUTIVEBADFAXLINES => sp.badfaxrun = a.int(),
             tag::FAXRECVPARAMS => sp.recvparams = a.int(),
             tag::FAXSUBADDRESS => {
-                sp.subaddress = match a {
-                    Arg::Str(b) => Some(b.to_vec()),
-                    _ => Some(Vec::new()),
+                let v = match a {
+                    Arg::Str(b) => b.to_vec(),
+                    // FS-885: the tag came before Compression and was registered as an unknown
+                    // tag that passes its count; libtiff 3.6.1 hands the count to this method
+                    // where the string's address goes (a crash)
+                    Arg::Count(_, super::dir::Data::Bytes(b)) => {
+                        b.iter().copied().take_while(|&c| c != 0).collect()
+                    }
+                    _ => Vec::new(),
+                };
+                let counted = matches!(a, Arg::Count(..));
+                sp.subaddress = Some(v);
+                if counted {
+                    let name = self.name.clone();
+                    self.notices.add(
+                        &FS_885,
+                        format!(
+                            "{name}: a FaxSubAddress before the Compression field, read as an \
+                             unknown tag that passes its count: libtiff 3.6.1 takes the count \
+                             for the string's address (a crash); set from the string"
+                        ),
+                    );
                 }
             }
             tag::FAXRECVTIME => sp.recvtime = a.int(),

@@ -83,7 +83,7 @@ decide (about 1 % of the files read: heap layouts differ between the two builds)
   `inflateSync`; another error prints `zlib error: <message>`, where the message is zlib's last
   (`(null)` when zlib set none since its reset).
 
-## Defects (FS-814 to FS-840, FS-881 to FS-884)
+## Defects (FS-814 to FS-840, FS-881 to FS-885)
 
 Each is corrected by default; `LARMORX_UPSTREAM_DEFECTS=reproduce` gives libtiff's result where
 it is deterministic. Where libtiff's behaviour depends on memory contents or crashes, the port
@@ -122,6 +122,7 @@ does what the correction does and notes it.
 | FS-882 | SGILog: the translation buffer sized by the width times the rows per strip in an int: the default rows per strip makes it negative, so every LogL or LogLuv image without RowsPerStrip (and every tiled one) fails with `No space for SGILog translation buffer` | a strip's or a tile's pixels, as libtiff 4.0.10 |
 | FS-883 | SGILog: runs and literals not stopped at the row's pixel count, a run's two bytes and a 24-bit pixel's three read when fewer are left, rows of 0 bytes never end | the loops stop at the row's end and the data's, as libtiff 4.0.10 |
 | FS-884 | SGILog: pixels written past the translation buffer when it is smaller than a row (memory past it) | not written |
+| FS-885 | a CCITT file's FaxSubAddress entry before its Compression entry is first registered as an unknown tag that passes its count; the codec's tag method then gets the count where the string's address goes (a crash) | set from the string |
 
 Many of these are reached only through a directory that failed to read: libtiff's
 `TIFFSetDirectory` returns 0 but leaves the half-read directory in place, with the previous

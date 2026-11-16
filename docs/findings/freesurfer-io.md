@@ -2457,3 +2457,87 @@ is), `cma_names.rs` (generated: `validation/probes/fs-gcam/cma_names.py`); fs.vo
   them identical: unknown tags whose data is read as a labels tag past the file's end, cut files, damaged streams); 0
   different; `fix` differs only with notices. The six recorded heads' `talairach.m3z` (classic recipe), frames none,
   0, 3-6, 13-24 through `mrd`: 108 of 108 identical in both modes.
+
+## Part 34: TRANSFORM, the GCA morph writer, the warp format change, JPEG images (relay 39 of track A)
+
+Sources: `include/transform.h` 62-70 (`TRANSFORM`), 141-150 (the types); `utils/transform.cpp` 411-424
+(`TransformCopyVolGeomToMRI`), 2126-2175 (`TransformRead`), 2177-2201 (`TransformFree`), 2209-2291
+(`TransformSample`), 2292-2362 (`TransformSampleReal`), 2365-2443 (`TransformSampleReal2`), 2449-2516
+(`TransformSampleInverse`), 2518-2564 (`TransformSampleInverseFloat`), 2566-2606 (`TransformSampleInverseVoxel`),
+2608-2658 (`TransformAlloc`, `TransformSwapInverse`, `TransformInvert`), 4553-4578 (`TransformSampleDirection`),
+4793-4842 (the geometry getters and setters), 4877-4901 (`TransformSourceVoxelToAtlas`); `utils/gcamorph.cpp` 352-363
+(`GCAMwrite`), 365-372 (`__warpfieldWrite`), 374-454 (`__m3zWrite`), 1383-1393 (`GCAMinitVolGeom`), 1417-1679
+(`GCAMinit`), 5236-5330 (`boundsCheckf`, `GCAMsampleMorph`), 15111-15178 (`GCAMreadWarpFromMRI`);
+`utils/warpfield.cpp` 41-74 (the constructors), 132-236 (`Warpfield::convert`), 567-585 (`Warpfield::write`), 590-655
+(`setWarp`), 659-951 (`changeFormat` and its four `__changeFormatFrom_*`); `include/warpfield.h` (the formats, the
+defaults `ABS_CRS` and `doGCAMsampleMorph = 0`); `utils/mriio.cpp` 1179-1190 (`MRIwriteType`'s `MGH_MORPH` branch),
+9647-9661 (`niiWrite`'s warp branch); `utils/imageio.cpp` 119-131 (`ImageWrite`), 147-169 (`ImageFWrite`'s dispatch),
+1687-1721 (`JPEGReadImage`), 1744-1781 (`JPEGWriteImage`); `mri_convert/mri_convert.cpp` 1927-1941. The port: fs.gca
+`transform.rs`, `gcam_write.rs` (registered with fs.io through `upper.rs`'s new `write_morph`); fs.io `warpfield.rs`,
+`imageio.rs`'s JPEG functions over `larmorx_io::jpeg` (track C's).
+
+- **`MRIwriteType`'s branch ignores `GCAMwrite` (FS-856).** `GCAMwrite(gcam, fname);` is a statement: `error` stays
+  `NO_ERROR`. `__warpfieldWrite` returns 0 whatever `Warpfield::write` returned, and `GCAMwrite` returns
+  `ERROR_BADPARM` without a message for a name of another format (`mri_identify` gives the name's type: `.img` is
+  ANALYZE). So a failed open (`GCAMwrite(<f>): could not open file`), a failed warp write (`ERROR:
+  Warpfield::write(<f>)`) and a name `GCAMwrite` does not write all return 0 to `MRIwrite`'s caller (`mri_convert`
+  then exits 0). Rule A: by default the writer's status, with a message for the silent case; `reproduce` 0. The
+  morph writer's name check is `strstr(fname, ".m3z")` (case-sensitive, anywhere: `a.m3z.m3d` is compressed, `O.M3Z`
+  is not), while `mri_identify` lower-cases the extension: an `O.M3Z` file is a plain morph under an `.m3z` name
+  (FreeSurfer's reader, which compresses by the same test, reads it back; kept).
+- **`GCAMinit` without an atlas.** `TransformAlloc(LINEAR_VOX_TO_VOX, mri_image)` is `LTAalloc(1, mri)`: its centre
+  comes from `MRIboundingBox(mri, 70, ...)` over the three-frame volume (unused here). The `|| 1  // ALWAYS!!` test
+  makes every node valid with `ox = m_L (x, y, z, 1)` (`float` product: the identity, so `ox = x`); `label`, `n` and
+  `prior` stay as `GCAMalloc` left them (0). `gcam->spacing = 1` is set after the node loop; the inverse index volumes
+  (`MRIalloc`, not `MRIcopyHeader`: the default geometry) hold `TransformSample(x, y, z) / spacing`. None of this
+  reaches the file but `origx`..`z` and the affine (the identity: `det` 1); the metric passes do print (the `width:<w>
+  too small for parallelism` line, `SHOW_NEG`). `GCAMreadWarpFromMRI(gcam, mri, 1)` always meets the same dims here
+  (the morph is made with the volume's), so its trilinear branch is reached only by other callers (`mri_convert`'s
+  `-at` of a morph output, 2022-2031): ported for them.
+- **`Warpfield::convert` precomputes and leaks.** `gcam->image.get_RAS2Vox()` (`MatrixInverse` of `get_Vox2RAS(0,
+  false)`, its argument leaked) and the three others are computed for every conversion, used only by the RAS formats;
+  the four 4 x 1 matrices allocated at the top are never used (`setWarp` allocates its own four per voxel: 4 x 128^3
+  allocations for a head). `doGCAMsampleMorph` is 0 on this path (the default): each atlas voxel takes the node of the
+  same index ("this will work only if gcam and gcam->atlas have the same size"); the morph's grid, not the atlas's
+  size, sets the volume's extent.
+- **`niiWrite` changes the caller's volume.** `Warpfield *warp = new Warpfield(mri); warp->changeFormat(DISP_RAS)`:
+  the constructor keeps `__warpmap = mri` with `__freewarpmap = false`, and `changeFormat` rewrites the volume's three
+  frames and its `warpFieldFormat` in place; the object is leaked (never deleted, so the volume is never freed by
+  it). After `MRIwrite(<warp>, x.nii)` the volume in memory holds RAS displacements (kept, rule C: no caller reads it
+  after the write; the probe prints the volume's voxels after the write and they agree). The constructor's matrices
+  use the shears (`get_RAS2Vox(0, true)`), `convert`'s do not (`get_Vox2RAS()`): the same file written as `.mgz` in
+  format 3 and as `.nii` from format 0 can differ in the last bits for sheared geometries (kept, rule C: FreeSurfer's
+  output).
+- **`TransformSampleReal`'s rounding (FS-862).** `xv` is clamped to `[0, extent - 1]` as a `float`, then `xi =
+  nint(xv)` is used unclamped: a point with `extent - 0.5 <= xv < extent` is not clamped (only `xv >= extent` is)
+  and rounds to `extent`. `MRIgetVoxVal` checks only negative indices (FS-52): a column past the row reads
+  the next row's first voxel, a slice past the last reads past the buffer (FS-53). `TransformSample` clamps its `xi`
+  (its `nint` values are overwritten by the trilinear samples anyway). Measured: piece 32 seed 7, one case (z = 1.5 on
+  a depth of 2: the official probe printed `0000b85e 34b23430 0000b85e`, memory). Rule A: the last voxel by default.
+- **`TransformSampleInverse`'s division (FS-857, FS-861).** `nint(xv / gcam->spacing)` is `int / int` (truncating
+  towards 0), converted to `double` for `nint`: no rounding happens; `spacing` 0 is `SIGFPE`. An `.m3z` keeps its
+  spacing 0 (`GCAMread` turns only a warp volume's 0 into 1). A grid of 0 nodes: `xn = width - 1 = -1`, then `xn < 0`
+  makes it 0: `nodes[0][0][0]` of an empty table.
+- **`TransformRead` of a linear file of type 11 (FS-858).** `ltaReadFileEx` takes any `type = <n>`; `TransformRead`
+  sets `trans->type = lta->type`, so 11 makes every `transform->type == MORPH_3D_TYPE` test take the `LTA` as a
+  `GCA_MORPH` (`TransformFree` calls `GCAMfree` on it). A file with `nxforms = 0` (FS-859) is read (`LTAalloc(0)`:
+  `calloc(0, ...)`) and every use reads `xforms[0]` past it.
+- **`TransformSample`'s statics.** `v_input`, `v_canon` (and an unused `m_L_inv`) are allocated once per function and
+  process; the input vector's fourth element stays 1 and the output's is overwritten by each product: no state between
+  calls. `LTAchangeType` converts the array in place: the `Converting to LTA type ...` lines once per array.
+- **JPEG.** `JPEGReadImage` creates the decompressor before `fopen` (nothing printed by that), reads through
+  `jpeg_stdio_src`, sets `out_color_space` twice (grey, then RGB), and allocates the image after
+  `jpeg_start_decompress` (the port reads the header silently first to size the image; the messages are the
+  decompression's). IJG's `error_exit` is the standard one (`exit(EXIT_FAILURE)`). `ImageWrite` opens `fname` with
+  `"wb"` before `ImageFWrite`, and `JPEGWriteImage` opens the unpacked name again: two handles on the same file when
+  the name has no frame suffix (the outer one writes nothing). `ImageFWrite`'s `default:` sits before `case
+  JPEG_IMAGE:`: MATLAB, PBM and HIPS-less names of any other type write JPEG files. `JPEGReadHeader` is reached only
+  through `ImageReadHeader`/`ImageFReadHeader`, which no FreeSurfer 8.2.0 program calls (not ported).
+- **What the probe measured (piece 32).** Seeds 7 and 13 (1,200 piece-32 cases each, `m3w`, `gcw`, `trs`):
+  `reproduce` identical on every compared case (958 and 945), 58 and 79 skipped (FS-851, FS-855, FS-857 to FS-861,
+  FS-58), 184 and 176 compared apart (FS-167, FS-49, FS-53), 0 different; `fix` differs only with notices. Two
+  `trs` cases with `FS_SKIP_TAGS` and an inverse took the official probe past its 5 seconds (the image then is
+  `initVolGeom`'s 256 x 256 x 256 and the soap bubble runs on it): the generator leaves `FS_SKIP_TAGS` out of the cases
+  that invert. The six recorded heads (`gcw`): 30 of 30 identical in both modes; their `.m3d` outputs (75 MiB) passed
+  the official probe's 64 MiB file limit (`SIGXFSZ`), their stream being the `.m3z`'s. JPEG (piece 23, real files):
+  seed 13's 54 JPEG reads identical (21 decoded, 33 IJG errors).

@@ -341,6 +341,24 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   identical on every compared case (592, 584, 596), 0 different; `fix` differs only with notices. The recorded heads'
   `talairach.m3z` through `mrd` with absolute names (frames none, 0, 3-6, 13-24): 108 of 108 identical (findings
   Part 33).
+- Piece 32 (track A relay 39): GCA morphs written, and transforms. `m3w` (piece 17's `vwr`: `MRIwrite` of `.m3z`,
+  `.m3d`, `@m3z` names, `MRIwriteType(..., MGH_MORPH)` of `.mgz`, `.mgh`, `.nii`, `.nii.gz`, `.m3z`, `.img` and
+  extension-less names) of three-frame volumes (one, two or four now and then) of float displacements (NaN, infinite,
+  subnormal now and then), bytes, shorts or ints, the files inflated and half the time read back with `mri_read`;
+  `gcw` (`GCAMread` of piece 31's morphs and warp volumes, then `GCAMwrite` under a morph or warp name in each of the
+  four warp formats: `mri_convert`'s path for a morph); `trs` (`TransformRead` of `.lta` files of types 0, 1, 14 and
+  11 with one, two or no transforms, MNI `.xfm`, `register.dat`, `identity.nofile`, piece 31's morphs, missing files;
+  `TransformInvert` not, without a volume or with a header of the source geometry; then up to six queries: `s`, `r`,
+  `R` (`TransformSample`, `...Real`, `...Real2`), `i`, `f`, `v` (`TransformSampleInverse`, `...Float`, `...Voxel`), `d`
+  (`TransformSampleDirection`), `a` (`TransformSourceVoxelToAtlas`), `g` (the two geometries), `w`
+  (`TransformSwapInverse`), `m` (the geometry setters); `TransformFree`). `fsio` sets `FREESURFER_HOME` and `FS_LICENSE`
+  as for `mrr`. Built by `tests/fs_io/piece32.rs`. `SKIP` for FS-851, FS-855, FS-857 to FS-861 and FS-58; `VARY` for
+  FS-167, FS-49 and FS-53. Seeds 7 and 13 (1,200 piece-32 cases each): `reproduce` identical on every compared case
+  (958, 945), 0 different. The six recorded heads' `talairach.m3z` through `gcw` (`.m3z`, `.mgz` in formats 0 and 3,
+  `.nii.gz`, `.nii`): 30 of 30 identical in both modes (`heads_gcw.py <worktree> <folder>` inside `boxed.sh`:
+  the case lines are `gcw 0 0 <head> - <out> <format>`); their `.m3d` outputs pass `fsio`'s 64 MiB file limit (`SIGXFSZ`). Since relay 39
+  piece 23 writes real JPEG files (track C's `larmorx_io::jpeg::cases`, now and then damaged) for its `.jpg` and
+  `.jpeg` names: seeds 7 and 13, 1,200 image cases each, identical on every compared case.
 - `reorder_triples.py` (relay 37): dimension numbers that pass `MRIreorder`'s check only through 32-bit overflow
   (FS-843; `python3 -P reorder_triples.py [count]`); official `mri_convert -r <a> <b> <c>` with them ends with a
   segmentation fault (status 139).

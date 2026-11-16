@@ -2279,6 +2279,20 @@ defects! {
         "reading a compressed GCA morph (.m3z) whose compressed data is damaged after its nodes: the reading of its tags never ends, or ends as memory contents decide";
     FS_855 = "FS-855", "FreeSurfer", true,
         "reading an MGH or NIfTI warp volume as a GCA morph when the volume has no morph geometries (its geometry tag missing): the geometries' validity and sizes are memory contents, which the RAS warp formats and the node-coordinate frames use; and those frames of a morph whose image geometry has a size of 0 or less crash the program";
+    FS_856 = "FS-856", "FreeSurfer", true,
+        "writing a three-frame volume as a GCA morph (an .m3z or .m3d name, or the morph type asked for): success is reported whatever the morph's writer did: a file that cannot be made, a warp volume whose write fails, or a name of another format, for which nothing is written and nothing is said";
+    FS_857 = "FS-857", "FreeSurfer", true,
+        "the inverse sample of a GCA morph whose spacing is 0 (an atlas voxel to the image, as the atlas programs ask it) divides by the spacing in integers: the program crashes";
+    FS_858 = "FS-858", "FreeSurfer", true,
+        "reading a linear transform file (.lta) whose type is 11, the GCA morph's type, as a transform: every later use treats the linear transform as a morph: memory contents or a crash";
+    FS_859 = "FS-859", "FreeSurfer", true,
+        "using a linear transform file that holds no transform (nxforms = 0) as a transform (sampling a point, its geometries): the first transform is read past the array: memory contents or a crash";
+    FS_860 = "FS-860", "FreeSurfer", true,
+        "freeing a transform that was never read (a transform file that could not be read): the program crashes";
+    FS_861 = "FS-861", "FreeSurfer", true,
+        "the inverse sample of a GCA morph with no nodes (a grid of size 0) reads a node past the grid: memory contents or a crash";
+    FS_862 = "FS-862", "FreeSurfer", true,
+        "the nearest-voxel sample of a GCA morph's inverse (an image voxel to the atlas, as the atlas programs ask it) at a point within half a voxel of the image's far face reads one voxel past the inverse: another voxel's value, or memory contents past the last slice";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

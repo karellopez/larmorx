@@ -372,7 +372,7 @@ fn read_case(g: &mut Gen) -> Vec<String> {
     for _ in 0..nq {
         let k = g.pick(&[
             "s", "s", "r", "R", "i", "i", "f", "v", "d", "a", "g", "w", "m", "W", "C", "A", "A",
-            "D",
+            "D", "I", "I", "V", "X", "O", "O",
         ]);
         t.push(k.into());
         match k {
@@ -419,6 +419,21 @@ fn read_case(g: &mut Gen) -> Vec<String> {
                     t.push(g.int(1, 4).to_string());
                 }
                 t.push(g.pick(&[0i64, 1, 1, 2]).to_string());
+            }
+            // relay 41: TransformApplyInverseType's volume and interpolation (-1:
+            // TransformApplyInverse); TransformVox2Ras's and TransformRas2Vox's volumes;
+            // TransformCompose's matrices and destination
+            "I" => {
+                for _ in 0..3 {
+                    t.push(g.int(1, 4).to_string());
+                }
+                t.push(g.pick(&[-1i64, 0, 1, 1, 2]).to_string());
+            }
+            "V" | "X" => t.push(g.pick(&[0i64, 1]).to_string()),
+            "O" => {
+                for _ in 0..3 {
+                    t.push(g.pick(&[0i64, 1]).to_string());
+                }
             }
             _ => {}
         }
@@ -629,6 +644,54 @@ fn gcw(
     Ok(())
 }
 
+/// `fsio`'s `ptrans`: the transform's type; a morph's type and the FNV-1a 64 of its nodes' current
+/// and original positions; an array's type, count, first matrix and its two geometries.
+fn ptrans(o: &mut Out, tr: &Transform) {
+    o.i(i64::from(tr.ttype));
+    if tr.ttype == larmorx_freesurfer_mri::lta::MORPH_3D_TYPE {
+        let gm = tr.gcam();
+        o.i(i64::from(gm.mtype));
+        let mut b = Vec::with_capacity(gm.nodes.len() * 48);
+        for n in &gm.nodes {
+            for v in [n.x, n.y, n.z, n.origx, n.origy, n.origz] {
+                b.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        super::piece11::fnv(o, &b);
+    } else {
+        let l = tr.lta();
+        o.i(i64::from(l.ltype));
+        o.i(i64::from(l.num_xforms));
+        if l.num_xforms > 0 {
+            let x = &l.xforms[0];
+            match &x.m_l {
+                None => o.0.push_str("N "),
+                Some(m) => {
+                    o.i(i64::from(m.rows));
+                    o.i(i64::from(m.cols));
+                    for r in 1..=m.rows {
+                        for c in 1..=m.cols {
+                            fh(o, m.relt(r, c));
+                        }
+                    }
+                }
+            }
+            for v in [&x.src, &x.dst] {
+                o.i(i64::from(v.valid));
+                o.i(i64::from(v.width));
+                o.i(i64::from(v.height));
+                o.i(i64::from(v.depth));
+                for f in [
+                    v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s, v.z_r,
+                    v.z_a, v.z_s, v.c_r, v.c_a, v.c_s,
+                ] {
+                    fh(o, f);
+                }
+            }
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn query(
     g: &mut Globals,
@@ -735,7 +798,7 @@ fn query(
             }
             *tr = c;
         }
-        "A" | "D" => {
+        "A" | "D" | "I" => {
             let (wd, ht, dp, interp) = (
                 t.int() as i32,
                 t.int() as i32,
@@ -753,10 +816,11 @@ fn query(
                     }
                 }
             }
-            let r = if k == "A" {
-                tr::transform_apply_type(g, out, err, env, tr, &src, None, interp)?
-            } else {
-                tr::transform_create_density_map(g, out, err, env, tr, &src)?
+            let r = match k {
+                "A" => tr::transform_apply_type(g, out, err, env, tr, &src, None, interp)?,
+                "D" => tr::transform_create_density_map(g, out, err, env, tr, &src)?,
+                _ if interp < 0 => tr::transform_apply_inverse(g, out, err, env, tr, &src, None)?,
+                _ => tr::transform_apply_inverse_type(g, out, err, env, tr, &src, None, interp)?,
             };
             match r {
                 larmorx_freesurfer_core::ret::Ret::New(m) => {
@@ -769,6 +833,55 @@ fn query(
                     }
                 }
                 _ => o.0.push_str("N "),
+            }
+        }
+        "V" | "X" => {
+            let mode = t.int();
+            let a = tr::transform_get_src_vol_geom(g, err, tr)?;
+            let b = tr::transform_get_dst_vol_geom(g, err, tr)?;
+            let mut ms =
+                mri::mri_alloc_header(g, out, err, a.width, a.height, a.depth, mri::MRI_UCHAR, 1)?;
+            mri::mri_copy_vol_geom_to_mri(&mut ms, &a);
+            let mut md =
+                mri::mri_alloc_header(g, out, err, b.width, b.height, b.depth, mri::MRI_UCHAR, 1)?;
+            mri::mri_copy_vol_geom_to_mri(&mut md, &b);
+            let r = if k == "V" {
+                tr::transform_vox2ras(g, out, err, tr, (mode != 0).then_some(&ms), None)?
+            } else {
+                let d = (mode != 0).then_some(&md);
+                tr::transform_ras2vox(g, out, err, env, tr, Some(&ms), d)?
+            };
+            o.i(i64::from(r));
+            ptrans(o, tr);
+        }
+        "O" => {
+            let (l, r, into) = (t.int() != 0, t.int() != 0, t.int() != 0);
+            let mut ml = larmorx_freesurfer_core::matrix::Matrix::real(4, 4);
+            let mut mr = larmorx_freesurfer_core::matrix::Matrix::real(4, 4);
+            for i in 1..=4 {
+                ml.set_relt(i, i, 1.0);
+                mr.set_relt(i, i, 1.0);
+            }
+            ml.set_relt(1, 4, 2.0);
+            ml.set_relt(2, 4, -1.0);
+            ml.set_relt(3, 4, 0.5);
+            mr.set_relt(1, 1, 0.0);
+            mr.set_relt(1, 2, -1.0);
+            mr.set_relt(2, 1, 1.0);
+            mr.set_relt(2, 2, 0.0);
+            mr.set_relt(3, 3, 2.0);
+            let (lm, rm) = (l.then_some(&ml), r.then_some(&mr));
+            if into {
+                if tr::transform_compose_in_place(g, out, err, tr, lm, rm)? {
+                    ptrans(o, tr);
+                } else {
+                    o.0.push_str("N ");
+                }
+            } else {
+                match tr::transform_compose(g, out, err, tr, lm, rm, None)? {
+                    larmorx_freesurfer_core::ret::Ret::New(c) => ptrans(o, &c),
+                    _ => o.0.push_str("N "),
+                }
             }
         }
         _ => {
@@ -825,7 +938,19 @@ pub fn run(
         // FreeSurfer crashes, reads memory contents or depends on the machine's memory
         if matches!(
             n.defect.id,
-            "FS-851" | "FS-855" | "FS-857" | "FS-858" | "FS-859" | "FS-860" | "FS-861" | "FS-58"
+            "FS-851"
+                | "FS-855"
+                | "FS-857"
+                | "FS-858"
+                | "FS-859"
+                | "FS-860"
+                | "FS-861"
+                | "FS-58"
+                // relay 41: track C's LTA conversions where FreeSurfer reads memory or crashes,
+                // and the conversions this port refuses (FS-928)
+                | "FS-504"
+                | "FS-957"
+                | "FS-928"
         ) {
             extra.push("SKIP");
         }

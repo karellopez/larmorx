@@ -2343,6 +2343,8 @@ defects! {
         "allocating a matrix of many rows (a size read from a damaged or misaligned file, such as a billion rows of no numbers): FreeSurfer asks for 8 bytes per row before any number (gigabytes), so whether it goes on or crashes depends on the machine's memory";
     FS_927 = "FS-927", "FreeSurfer", true,
         "reading a later layer of a stacked autoencoder as a volume (frame #1 and on) when the autoencoder's stored extent is larger than the layer's kernel (as for any autoencoder trained on a volume): the volume's header names more voxels than its memory holds, so the reading goes on with memory contents or crashes";
+    FS_928 = "FS-928", "FreeSurfer", true,
+        "converting a linear transform from RAS to voxels without a source volume, composing a linear transform into a destination that holds a GCA morph, or making the density map of a linear transform that cannot be applied (a singular matrix): FreeSurfer dereferences a null pointer or writes into the morph's memory (a crash or memory corruption)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

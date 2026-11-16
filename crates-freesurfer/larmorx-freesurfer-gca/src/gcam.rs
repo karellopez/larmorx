@@ -1086,7 +1086,7 @@ pub fn gcam_copy_node_positions(
 /// `GCAMrasToVox(gcam, mri)`: each node's current and original positions taken from RAS to the
 /// image's voxels: through the image geometry's voxel-to-RAS matrix when `mri` is `None` (as
 /// FreeSurfer's code does since 2018, keeping its earlier results), else the volume's RAS-to-voxel
-/// matrix; the positions as `float`s through a `float` product (`MatrixMultiply`). A node that is
+/// matrix computed from its geometry (`extract_r_to_i`, not the cached one); the positions as `float`s through a `float` product (`MatrixMultiply`). A node that is
 /// `GCAM_AREA_INVALID` becomes valid; then the original properties, type `GCAM_VOX`, and the
 /// volume's geometry as the image's when one is given. `Gdiag & DIAG_SHOW` with `DIAG_VERBOSE`
 /// prints `ras 2 vox matrix:` and the matrix.
@@ -1099,18 +1099,30 @@ pub fn gcam_ras_to_vox(
     mri: Option<&Mri>,
 ) -> Result<i32, Fatal> {
     let m = match mri {
-        None => vg_get_voxel_to_ras_xform(g, out, err, &gcam.image, 0)?,
-        Some(v) => match &v.vg.r_to_i {
-            Some(m) => m.clone(),
-            None => {
-                vol_geom::extract_r_to_i(g, out, err, &v.vg)?.unwrap_or_else(|| Matrix::real(4, 4))
-            }
-        },
+        None => Some(vg_get_voxel_to_ras_xform(g, out, err, &gcam.image, 0)?),
+        // MRIgetRasToVoxelXform is extract_r_to_i: computed from the geometry, never the cache;
+        // NULL for a singular geometry (the first product then ends the program)
+        Some(v) => vol_geom::extract_r_to_i(g, out, err, &v.vg)?,
     };
     if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
         let _ = out.write_all(b"ras 2 vox matrix:\n");
-        print_matrix(g, out, err, &m);
+        let mut buf = Vec::new();
+        matrix_print(g, Some(&mut buf), out, err, m.as_ref(), 5);
+        let _ = out.write_all(&buf);
     }
+    let Some(m) = m else {
+        // MatrixMultiply(NULL, v1, v2) at the first node: its message and the program's end
+        if !gcam.nodes.is_empty() {
+            let v1 = Matrix::real(4, 1);
+            matrix_multiply(g, out, err, None, Some(&v1), None)?;
+        }
+        gcam_compute_original_properties(g, out, err, env, gcam)?;
+        gcam.mtype = GCAM_VOX;
+        if let Some(v) = mri {
+            larmorx_freesurfer_volume::vgeom::get_vol_geom(&v.vg, &mut gcam.image);
+        }
+        return Ok(NO_ERROR);
+    };
     let mut v1 = Matrix::real(4, 1);
     v1.set_relt(4, 1, 1.0);
     let mut v2 = v1.clone();
@@ -1150,6 +1162,48 @@ pub fn gcam_ras_to_vox(
     if let Some(v) = mri {
         larmorx_freesurfer_volume::vgeom::get_vol_geom(&v.vg, &mut gcam.image);
     }
+    Ok(NO_ERROR)
+}
+
+/// `GCAMvoxToRas(gcam)` (gcamorph.cpp 11265): nothing for a morph of type `GCAM_RAS`; else each
+/// node's current and original positions taken from the image's voxels to RAS through the image
+/// geometry's voxel-to-RAS matrix (`vg_getVoxelToRasXform`), as `float`s through a `float` product
+/// (`MatrixMultiply`); then type `GCAM_RAS`. `Gdiag & DIAG_SHOW` with `DIAG_VERBOSE` prints `vox 2
+/// ras matrix:` and the matrix. `NO_ERROR`.
+pub fn gcam_vox_to_ras(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    gcam: &mut Gcam,
+) -> Result<i32, Fatal> {
+    if gcam.mtype == GCAM_RAS {
+        return Ok(NO_ERROR);
+    }
+    let m = vg_get_voxel_to_ras_xform(g, out, err, &gcam.image, 0)?;
+    if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
+        let _ = out.write_all(b"vox 2 ras matrix:\n");
+        print_matrix(g, out, err, &m);
+    }
+    let mut v1 = Matrix::real(4, 1);
+    v1.set_relt(4, 1, 1.0);
+    let mut v2 = v1.clone();
+    for n in gcam.nodes.iter_mut() {
+        v1.set_relt(1, 1, n.x as f32);
+        v1.set_relt(2, 1, n.y as f32);
+        v1.set_relt(3, 1, n.z as f32);
+        matrix_multiply(g, out, err, Some(&m), Some(&v1), Some(&mut v2))?;
+        n.x = f64::from(v2.relt(1, 1));
+        n.y = f64::from(v2.relt(2, 1));
+        n.z = f64::from(v2.relt(3, 1));
+        v1.set_relt(1, 1, n.origx as f32);
+        v1.set_relt(2, 1, n.origy as f32);
+        v1.set_relt(3, 1, n.origz as f32);
+        matrix_multiply(g, out, err, Some(&m), Some(&v1), Some(&mut v2))?;
+        n.origx = f64::from(v2.relt(1, 1));
+        n.origy = f64::from(v2.relt(2, 1));
+        n.origz = f64::from(v2.relt(3, 1));
+    }
+    gcam.mtype = GCAM_RAS;
     Ok(NO_ERROR)
 }
 

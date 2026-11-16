@@ -3,6 +3,9 @@
 //! the C formatting of their arguments, and the condition stack (`condition.c`), with the defined
 //! behaviour of FS-90 where a message would overflow CTN's buffer.
 
+use std::fs::File;
+use std::sync::Arc;
+
 use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{self, Notices};
 
@@ -290,6 +293,7 @@ pub fn os_text(errno: i32) -> String {
         9 => "Bad file descriptor",
         12 => "Cannot allocate memory",
         13 => "Permission denied",
+        14 => "Bad address",
         20 => "Not a directory",
         21 => "Is a directory",
         22 => "Invalid argument",
@@ -319,6 +323,7 @@ pub fn errno_of(e: &std::io::Error) -> i32 {
 
 /// `errno` values CTN's calls leave (Linux's).
 pub const EBADF: i32 = 9;
+pub const EFAULT: i32 = 14;
 pub const EINVAL: i32 = 22;
 
 /// The stack's size (`MAXEDB`).
@@ -331,7 +336,9 @@ pub const TEXT_KEPT: usize = 256;
 /// CTN's process state: its condition stack (`condition.c`'s `EDBStack` and `stackPtr`; entries
 /// above the top stay as they were, the overflow rule exposes entry 0), and the C library's
 /// `errno` and file descriptors as CTN's own calls leave them (a read that fails, a descriptor
-/// closed twice: the text a later `perror` prints). One per process in C, one per value here.
+/// closed twice: the text a later `perror` prints; the open file behind each descriptor, through
+/// which `DCM_GetElementValue` reads pixel data left in the file). One per process in C, one per
+/// value here.
 #[derive(Clone, Debug)]
 pub struct CondStack {
     entries: Vec<(Condition, Vec<u8>)>,
@@ -345,7 +352,7 @@ pub struct CondStack {
     pub stderr_read_write: bool,
     /// Whether anything was written to standard error (its stream's orientation is set).
     pub stderr_oriented: bool,
-    fds: Vec<i32>,
+    fds: Vec<(i32, Option<Arc<File>>)>,
 }
 
 impl Default for CondStack {
@@ -366,19 +373,43 @@ impl CondStack {
         }
     }
 
-    /// A descriptor `open` gives (the lowest free one after the standard streams).
+    /// A descriptor `open` gives (the lowest free one after the standard streams), with no file
+    /// behind it to read.
     pub fn open_fd(&mut self) -> i32 {
+        self.register(None)
+    }
+
+    /// A descriptor `open` gives for `file` (the lowest free one after the standard streams): a
+    /// later read through the descriptor reads `file` until it is closed.
+    pub fn open_fd_for(&mut self, file: Arc<File>) -> i32 {
+        self.register(Some(file))
+    }
+
+    fn register(&mut self, file: Option<Arc<File>>) -> i32 {
         let mut fd = 3;
-        while self.fds.contains(&fd) {
+        while self.fds.iter().any(|(f, _)| *f == fd) {
             fd += 1;
         }
-        self.fds.push(fd);
+        self.fds.push((fd, file));
         fd
+    }
+
+    /// Whether descriptor `fd` is open.
+    pub fn is_open(&self, fd: i32) -> bool {
+        self.fds.iter().any(|(f, _)| *f == fd)
+    }
+
+    /// The file behind the open descriptor `fd` (`None`: not open, or opened with no file).
+    pub fn file_of(&self, fd: i32) -> Option<&Arc<File>> {
+        self.fds
+            .iter()
+            .find(|(f, _)| *f == fd)
+            .and_then(|(_, file)| file.as_ref())
     }
 
     /// `close(fd)`: `EBADF` in `errno` when it is not open.
     pub fn close_fd(&mut self, fd: i32) {
-        match self.fds.iter().position(|&f| f == fd) {
+        match self.fds.iter().position(|(f, _)| *f == fd) {
             Some(i) => {
                 self.fds.remove(i);
             }

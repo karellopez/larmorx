@@ -10,13 +10,15 @@
 //! - [`cond`]: CTN's conditions (the codes and messages of `dcmcond.c`) and its condition stack
 //!   (`condition.c`: 100 entries, texts kept to 256 bytes, the overflow rule);
 //! - [`dict`]: CTN's data dictionary (1,478 entries in 36 groups) and `DCM_LookupElement`;
-//! - [`read`]: [`read::open_file`] and [`read::close_object`].
+//! - [`read`]: [`read::open_file`] and [`read::close_object`];
+//! - [`element`]: [`element::get_element`] and [`element::get_element_value`] (`DCM_GetElement`,
+//!   `DCM_GetElementValue`), an element and its value by tag.
 //!
 //! [`Dialect`]: the points where a program built on CTN may change it (a message's text, the
 //! byte swap of 4-byte integers); [`Ctn`] is CTN 3.0.6's own behaviour. D13's corrections of
-//! CTN's defects are FS-90 to FS-95 (`larmorx_core::defects`). The source is CTN 3.0.6
-//! (`PROVENANCE.md`); the behaviour is proved by the differential probe
-//! `validation/probes/fs-dicom` against CTN 3.0.6 built from its source.
+//! CTN's defects are FS-90 to FS-98 and FS-951 to FS-953 (`larmorx_core::defects`; FS-894's
+//! messages are kept). The source is CTN 3.0.6 (`PROVENANCE.md`); the behaviour is proved by the
+//! differential probe `validation/probes/fs-dicom` against CTN 3.0.6 built from its source.
 //!
 //! CTN's notice (its three paragraphs, which every distribution of derivative works includes):
 //!
@@ -43,11 +45,13 @@
 pub mod cond;
 pub mod dict;
 mod dict_table;
+pub mod element;
 pub mod read;
 #[cfg(test)]
 mod tests;
 
 pub use cond::{CondStack, Condition};
+pub use element::{Element, ValueRead, get_element, get_element_value};
 pub use read::{close_object, open_file, open_file_named};
 
 /// CTN's value representations (`DCM_VALUEREPRESENTATION`), with its numbers.

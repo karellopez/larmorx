@@ -2741,6 +2741,14 @@ defects! {
         "a voxel list made from a volume (VLSTcreate) keeps its maximum count at 0 (a new list) or the given list's: adding a voxel to it (VLSTadd) is refused as too many voxels; kept (no program adds to such a list)";
     FS_893 = "FS-893", "FreeSurfer", false,
         "copying a voxel list with spline slopes (VLSTcopy, VLSTcopyInto) gives the copy slope arrays of zeros instead of the source's slopes, and ends the program when the source has slopes but no parameterisation; kept (no program copies a spline list)";
+    FS_894 = "FS-894", "CTN", false,
+        "the messages of an element that is not found name the routine DCM_GetElementVM for a request of DCM_GetElement, and DCM_GetElementValue's message for a group that holds no element (a group whose only element was its group length, read with DCM_NOGROUPLENGTH) shows the group's number where the element's goes; kept (messages only)";
+    FS_951 = "FS-951", "CTN", true,
+        "the value of a sequence asked for with another representation (DCM_GetElementValue refuses only a request that itself says SQ) is copied from the memory that holds the sequence's list of items: memory contents, or a crash past it; refused as for a sequence (Cannot retrieve value of element with SQ representation)";
+    FS_952 = "FS-952", "CTN", true,
+        "a request of 4,294,967,295 bytes of pixel data left in the file (an encapsulated value, whose length is undefined, asked for whole) reads nothing, the read failing, and the failure is taken for a complete read: the request succeeds with nothing written into the caller's buffer (memory never written); corrected: the read is reported as failed (DCM failed to access file)";
+    FS_953 = "FS-953", "CTN", true,
+        "an odd number of bytes of 16-bit pixel data in the reverse byte order (big endian) asked for (a request of an odd length) is swapped two bytes at a time past its end until the 32-bit count wraps: the program crashes; the whole pairs are swapped and the last byte is kept";
 }
 
 /// The register entry with ID `id`.

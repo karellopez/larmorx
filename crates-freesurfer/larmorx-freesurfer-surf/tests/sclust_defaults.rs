@@ -2,7 +2,7 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! The surface clusters' corrections (relay 38 of track D, `sclust.rs` and `labelsurf.rs`'s
-//! island and hole removal, FS-901 to FS-907) where the probe's `scl` and `lbl` write `G` or
+//! island and hole removal, FS-901 to FS-907; `valcopy.rs`, FS-908) where the probe's `scl`, `lbl` and `vcp` write `G` or
 //! FreeSurfer crashes, and the growth deeper than FreeSurfer's stack.
 
 use larmorx_core::defects::UpstreamDefects;
@@ -263,5 +263,40 @@ fn fs907_a_continuation_without_the_seed() {
         );
         assert_eq!(n, -1);
         assert!(r.noted("FS-907"));
+    }
+}
+
+/// FS-908: importing values from a vector shorter than the surface, or from a matrix column the
+/// matrix does not have, leaves the vertices beyond it alone in both modes (FreeSurfer reads
+/// outside the vector or the matrix).
+#[test]
+fn fs908_imports_from_short_vectors_and_matrices() {
+    use larmorx_freesurfer_core::matrix::{MATRIX_REAL, matrix_alloc};
+    use larmorx_freesurfer_surf::valcopy;
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut r = Run::new(mode);
+        let mut s = r.chain(3);
+        valcopy::import_val_vector(&mut r.g, &mut s, &[5.0, 6.0]);
+        assert_eq!(
+            (s.vertex(0).val, s.vertex(1).val, s.vertex(2).val),
+            (5.0, 6.0, 1.0)
+        );
+        assert!(r.noted("FS-908"));
+        let mut r = Run::new(mode);
+        let mut m = matrix_alloc(&mut r.g, &mut r.out, &mut r.err, 2, 1, MATRIX_REAL)
+            .unwrap()
+            .unwrap();
+        m.set_relt(1, 1, 7.0);
+        m.set_relt(2, 1, 8.0);
+        valcopy::import_val_from_matrix_column(&mut r.g, &mut s, &m, 1);
+        assert_eq!(
+            (s.vertex(0).val, s.vertex(1).val, s.vertex(2).val),
+            (7.0, 8.0, 1.0)
+        );
+        assert!(r.noted("FS-908"));
+        let mut r = Run::new(mode);
+        valcopy::import_val_from_matrix_column(&mut r.g, &mut s, &m, 2);
+        assert_eq!(s.vertex(0).val, 7.0);
+        assert!(r.noted("FS-908"));
     }
 }

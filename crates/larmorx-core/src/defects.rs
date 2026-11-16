@@ -1843,6 +1843,8 @@ defects! {
         "saving surface clusters as a point set (sclustSaveAsPointSet; mri_surfcluster --pointset) crashes the program when the file cannot be created";
     FS_907 = "FS-907", "FreeSurfer", true,
         "growing a cluster by distance (sclustGrowByDist) continued by a later call reads the earlier call's seed vertex, which may belong to a surface already freed or with fewer vertices; every caller starts each growth anew";
+    FS_908 = "FS-908", "FreeSurfer", true,
+        "importing a surface's values or curvatures from a vector or a matrix column (MRISimportValVector, MRISimportCurvatureVector, MRISimportValFromMatrixColumn) reads outside the vector or the matrix when it holds fewer values than the surface has vertices, or for a column the matrix does not have; every caller passes one value per vertex";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

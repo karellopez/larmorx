@@ -63,6 +63,8 @@
 
 // sclustReMap0 is defined in surfcluster.cpp but not declared in its header (relay 38)
 int sclustReMap0(MRI_SURFACE *Surf, int nClusters, SCS *scs_sorted);
+// MRIScopyValuesToVal2Bak likewise (mrisurf_vals.cpp)
+int MRIScopyValuesToVal2Bak(MRI_SURFACE *mris);
 
 // fastmarching.h's declaration (the header redefines mrisurf_metricProperties.h's macros)
 void MRISextractOutsideDistanceMap(MRIS *mris, MRI *mri_src, int label, int offset, float resolution,
@@ -4147,6 +4149,41 @@ void flr_case()
     }
     LABEL *inv = MRISlabelInvert(s, a);
     pts(inv);
+  } else if (op == "war") {
+    // relay 38 of track D: mris_place_surface --area-map on a recorded head (`war <surface>
+    // <recorded>`): MRISread, MRIScomputeMetricProperties, MRISwriteArea into the work folder; the
+    // status, the written file's length and FNV-1a, and whether it is the recorded file byte for
+    // byte
+    std::string sn = next();
+    MRIS *s = MRISread(sn.c_str());
+    std::string rec = next();
+    if (!s) fail("cannot read the surface");
+    MRIScomputeMetricProperties(s);
+    mkdir(workdir.c_str(), 0700);
+    // a name with a folder and the hemisphere first: MRISwriteCurvature keeps it as given (a name
+    // without a folder goes beside the surface)
+    std::string base = sn.substr(sn.rfind('/') + 1);
+    std::string name = workdir + "/" + base.substr(0, 2) + ".w.area";
+    oi(MRISwriteArea(s, name.c_str()));
+    auto slurp = [](const std::string &p) {
+      std::string b;
+      if (FILE *f = fopen(p.c_str(), "rb")) {
+        char buf[65536];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+        fclose(f);
+      }
+      return b;
+    };
+    std::string w = slurp(name), r = slurp(rec);
+    oi((long long)w.size());
+    uint64_t h = 0xcbf29ce484222325ull;
+    for (unsigned char c : w) h = (h ^ c) * 0x100000001b3ull;
+    char t[24];
+    snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+    out += t;
+    out += w == r ? "SAME " : "DIFF ";
+    unlink(name.c_str());
   } else if (op == "sgd") {
     // relay 38 of track D, the stack measurement (validation/probes/fs-surfio/stack.py): a surface
     // (`sgd <surface>`) with every value 1, one sclustMapSurfClusters (0.5, no upper bound, positive
@@ -5473,6 +5510,142 @@ void scl_case()
   }
 }
 
+// ---- relay 38 of track D: vcp, the copies between vertex fields (mrisurf_vals.cpp) and the
+// fields written through the curvature (MRISwriteD, MRISwriteMarked, MRISwriteArea, MRISreadMarked)
+
+// vcp: a surface read by MRISread (d/lh.s0), 0 to 3 vertices ripped, every vertex's 13 float and 6
+// integer fields and every face's mark from the case; then 1 to 6 operations, each named by its
+// FreeSurfer function; `G` where FreeSurfer would read outside the caller's vector or matrix
+// (FS-908); after each the fields and the face marks; at the end every file in the folder
+static void vcp_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->val); of(x->curv); of(x->stat); of(x->mean); of(x->mean_imag); of(x->std_error);
+    of(x->imag_val); of(x->val2); of(x->val2bak); of(x->valbak); of(x->d); of(x->area);
+    of(x->origarea);
+    oi(x->marked); oi(x->marked2); oi(x->marked3); oi(x->cropped); oi(x->fixedval);
+    oi(x->annotation);
+  }
+  for (int f = 0; f < s->nfaces; f++) oi(s->faces[f].marked);
+}
+
+void vcp_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nrip = geti();
+  for (int k = 0; k < nrip; k++) s->vertices[geti()].ripflag = 1;
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s->vertices[v];
+    x->val = getf(); x->curv = getf(); x->stat = getf(); x->mean = getf(); x->mean_imag = getf();
+    x->std_error = getf(); x->imag_val = getf(); x->val2 = getf(); x->val2bak = getf();
+    x->valbak = getf(); x->d = getf(); x->area = getf(); x->origarea = getf();
+    x->marked = geti(); x->marked2 = geti(); x->marked3 = geti(); x->cropped = geti();
+    x->fixedval = geti(); x->annotation = geti();
+  }
+  for (int f = 0; f < nf; f++) s->faces[f].marked = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "MRISsetCroppedToZero") oi(MRISsetCroppedToZero(s));
+    else if (op == "MRISaddToValues") oi(MRISaddToValues(s, getf()));
+    else if (op == "MRISimportCurvatureVector" || op == "MRISimportValVector") {
+      int n = geti();
+      std::vector<float> a(n > 0 ? n : 1);
+      for (int i = 0; i < n; i++) a[i] = getf();
+      if (n < nv) { out += "G "; continue; }
+      oi(op == "MRISimportValVector" ? MRISimportValVector(s, a.data()) : MRISimportCurvatureVector(s, a.data()));
+    } else if (op == "MRISimportValFromMatrixColumn") {
+      int rows = geti(), cols = geti(), col = geti();
+      MATRIX *m = MatrixAlloc(rows, cols, MATRIX_REAL);
+      for (int r = 1; r <= rows; r++)
+        for (int c = 1; c <= cols; c++) m->rptr[r][c] = getf();
+      if (rows < nv || col < 1 || col > cols) { out += "G "; continue; }
+      oi(MRISimportValFromMatrixColumn(s, m, col));
+    } else if (op == "MRISexportValVector") {
+      std::vector<float> a(nv > 0 ? nv : 1);
+      oi(MRISexportValVector(s, a.data()));
+      for (int i = 0; i < nv; i++) of(a[i]);
+    } else if (op == "MRISexportValVectorDouble") {
+      int off = geti();
+      std::vector<double> a(nv + off > 0 ? nv + off : 1, -3.0);
+      oi(MRISexportValVectorDouble(s, a.data(), off));
+      for (int i = 0; i < nv + off; i++) od(a[i]);
+    } else if (op == "MRIScopyMarkedToMarked2") oi(MRIScopyMarkedToMarked2(s));
+    else if (op == "MRIScopyMarked2ToMarked") oi(MRIScopyMarked2ToMarked(s));
+    else if (op == "MRIScopyMarkedToMarked3") oi(MRIScopyMarkedToMarked3(s));
+    else if (op == "MRIScopyMarked3ToMarked") oi(MRIScopyMarked3ToMarked(s));
+    else if (op == "MRIScopyValsToAnnotations") oi(MRIScopyValsToAnnotations(s));
+    else if (op == "MRIScopyMeansToValues") oi(MRIScopyMeansToValues(s));
+    else if (op == "MRIScopyImaginaryMeansToValues") oi(MRIScopyImaginaryMeansToValues(s));
+    else if (op == "MRIScopyStandardErrorsToValues") oi(MRIScopyStandardErrorsToValues(s));
+    else if (op == "MRIScopyStatsToValues") oi(MRIScopyStatsToValues(s));
+    else if (op == "MRIScopyStatsFromValues") oi(MRIScopyStatsFromValues(s));
+    else if (op == "MRIScopyValuesToImagValues") oi(MRIScopyValuesToImagValues(s));
+    else if (op == "MRIScopyImagValuesToValues") oi(MRIScopyImagValuesToValues(s));
+    else if (op == "MRIScopyVal2ToVal") oi(MRIScopyVal2ToVal(s));
+    else if (op == "MRIScopyCurvatureToValues") oi(MRIScopyCurvatureToValues(s));
+    else if (op == "MRIScopyVal2BakToVal") oi(MRIScopyVal2BakToVal(s));
+    else if (op == "MRIScopyCurvatureToImagValues") oi(MRIScopyCurvatureToImagValues(s));
+    else if (op == "MRIScopyValuesToCurvature") oi(MRIScopyValuesToCurvature(s));
+    else if (op == "MRIScopyImagValuesToCurvature") oi(MRIScopyImagValuesToCurvature(s));
+    else if (op == "MRIScopyCurvatureFromValues") oi(MRIScopyCurvatureFromValues(s));
+    else if (op == "MRIScopyCurvatureFromImagValues") oi(MRIScopyCurvatureFromImagValues(s));
+    else if (op == "MRIScopyValToVal2") oi(MRIScopyValToVal2(s));
+    else if (op == "MRIScopyValuesToVal2Bak") oi(MRIScopyValuesToVal2Bak(s));
+    else if (op == "MRIScopyValToValBak") oi(MRIScopyValToValBak(s));
+    else if (op == "MRIScopyValToVal2Bak") oi(MRIScopyValToVal2Bak(s));
+    else if (op == "MRIScopyFromCropped") oi(MRIScopyFromCropped(s, geti()));
+    else if (op == "MRIScopyToCropped") oi(MRIScopyToCropped(s, geti()));
+    else if (op == "MRISorigAreaToCurv") oi(MRISorigAreaToCurv(s));
+    else if (op == "MRISareaToCurv") oi(MRISareaToCurv(s));
+    else if (op == "MRISmarkedToCurv") oi(MRISmarkedToCurv(s));
+    else if (op == "MRIScurvToMarked") oi(MRIScurvToMarked(s));
+    else if (op == "MRISdToCurv") oi(MRISdToCurv(s));
+    else if (op == "MRIScurvToD") oi(MRIScurvToD(s));
+    else if (op == "MRIScopyFixedValFlagsToMarks") oi(MRIScopyFixedValFlagsToMarks(s));
+    else if (op == "MRISclearFaceMarks") oi(MRISclearFaceMarks(s));
+    else if (op == "MRISwriteD") oi(MRISwriteD(s, next()));
+    else if (op == "MRISwriteMarked") oi(MRISwriteMarked(s, next()));
+    else if (op == "MRISwriteArea") oi(MRISwriteArea(s, next()));
+    else if (op == "MRISreadMarked") oi(MRISreadMarked(s, next()));
+    else fail("vcp op");
+    oi(errno);
+    vcp_dump(s);
+  }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *f = fopen(name.c_str(), "rb");
+    if (!f) { out += "NOFILE "; continue; }
+    std::string b;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) b.append(buf, n);
+    fclose(f);
+    ox(b);
+  }
+}
+
 // ---- relay 37 of track D: wvl, the values written (MRISwriteValues, MRISwriteAreaErrorToValFile,
 // MRIcopyMRIS) ------------------------------------------------------------------------------------
 
@@ -5810,6 +5983,8 @@ void run_case()
     lbl_case();
   } else if (cmd == "scl") {
     scl_case();
+  } else if (cmd == "vcp") {
+    vcp_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

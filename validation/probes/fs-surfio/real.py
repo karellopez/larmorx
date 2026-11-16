@@ -39,7 +39,9 @@ canonical coordinates: the principal-curvature and normal-dot distributions
 track D): the same labels' island and hole removal (``LabelRemoveIslandsSurf``,
 ``LabelRemoveHolesSurf``, ``LabelRemoveHolesAndIslandsSurf``), the clusters of ``|x| >= 20`` mm
 (``sclustMapSurfClusters``) with their table, the clusterwise-p values, the old summary and a growth
-by distance. Prints the counts;
+by distance; and ``mris_place_surface --area-map`` of each white and pial surface
+(``MRISwriteArea``), the file against the recorded ``?h.area`` and ``?h.area.pial``. Prints the
+counts;
 the lines name machine paths, so no hash is recorded from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]
@@ -150,6 +152,11 @@ def main(argv: list[str] | None = None) -> int:
                 for c in LABELS:
                     lines.append(
                         f"flr scl {s / 'surf' / f'{hemi}.white'} {s / 'label' / f'{hemi}.{c}'}"
+                    )
+                # mris_place_surface --area-map (MRISwriteArea) against the recorded files
+                for surf, rec in (("white", "area"), ("pial", "area.pial")):
+                    lines.append(
+                        f"flr war {s / 'surf' / f'{hemi}.{surf}'} {s / 'surf' / f'{hemi}.{rec}'}"
                     )
                 continue
             if a.lbl:

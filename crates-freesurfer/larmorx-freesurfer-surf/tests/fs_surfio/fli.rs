@@ -971,6 +971,28 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             let inv = labelsurf::mris_label_invert(g, &mut io, &s, &a)?.expect("the inversion");
             pts(&inv, o);
         }
+        "war" => {
+            // relay 38 of track D: `fssurfio.cpp`'s `flr war` (mris_place_surface --area-map: the
+            // surface read, its metric properties, MRISwriteArea; the file against the recorded one)
+            let sn = t.next();
+            let mut s = surf(g, sg, &mut io, sn)?;
+            let rec = t.next();
+            larmorx_freesurfer_surf::mp::compute_metric_properties(g, sg, &mut io, &mut s)?;
+            let td = tempfile::tempdir().expect("a work folder");
+            // a name with a folder and the hemisphere first, kept as given (a name without a
+            // folder goes beside the surface)
+            let base = sn.rsplit('/').next().unwrap_or(sn);
+            let name = td.path().join(format!("{}.w.area", &base[..2]));
+            let name = name.to_string_lossy().into_owned();
+            let st =
+                larmorx_freesurfer_surf::curvfile::write_area(g, &mut io, None, &mut s, &name)?;
+            o.i(i64::from(st));
+            let w = std::fs::read(&name).unwrap_or_default();
+            let r = std::fs::read(rec).unwrap_or_default();
+            o.i(w.len() as i64);
+            o.s(&format!("{:016x}", super::mpx::fnv64(&w)));
+            o.s(if w == r { "SAME" } else { "DIFF" });
+        }
         "sgd" => {
             // relay 38 of track D: `fssurfio.cpp`'s `flr sgd` (the stack measurement: every value
             // 1, one map of the clusters); the port also gives the deepest path of the growth

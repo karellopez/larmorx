@@ -436,6 +436,14 @@ the three clean-ups, the clusters of `|x| >= 20 mm` with a transform, the cluste
 old summary, a growth by distance): 24 of 24 identical in both modes (FreeSurfer 13.1 s, the port
 21.9 s). Seed 1 (1,650 cases): 1,593 identical, 57 counted, hash `bb6a3c15...`.
 
+Measured 2026-11-16 (relay 38 of track D, 56 commands): `vcp` (`mrisurf_vals.cpp`'s copies between
+vertex fields and vectors, and `MRISwriteD`, `MRISwriteMarked`, `MRISwriteArea`, `MRISreadMarked`, each
+named by its FreeSurfer function, on every field of every vertex; the folder's files by their bytes;
+the port's side in `tests/fs_surfio/vcp.rs`), seeds 7, 13 (500 cases each) and 17 (1,000): 0 different
+in both modes. `flr war` (`mris_place_surface --area-map` of each recorded white and pial surface):
+the twelve files are recon-all's `?h.area` and `?h.area.pial` byte for byte, in both builds
+(`real.py --scl`, 36 of 36 identical in both modes).
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

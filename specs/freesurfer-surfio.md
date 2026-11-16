@@ -4901,3 +4901,56 @@ to 87,414 deep (observed). On recorded heads (`flr scl`; observed 24 of 24 ident
 the clusterwise-p values, the old summary, a flat growth by distance of 25 mm from vertex 0. A
 clean-room implementer's black-box form: `mri_surfcluster --in <thickness> --thmin 2.5 --sum` on a
 recorded white surface, and `mri_label2label --annot-fill-holes`.
+
+## 134. Copies between vertex fields; fields written through the curvature (queue items 3.1-47/48; relay 38 of track D)
+
+**134.1 The copies** (each returns `NO_ERROR`). Over the vertices whose rip flag is 0 (ripped
+vertices unchanged): `MRISsetCroppedToZero` (`cropped` 0), `MRISaddToValues(mris, x)` (`val = val +
+x` in `float`, `val`'s NaN first), and the copies `val` from `mean`, `mean_imag`, `std_error`, `stat`,
+`imag_val`, `val2`, `curv`, `val2bak`; `stat`, `imag_val`, `val2`, `val2bak`, `valbak` from `val`;
+`imag_val` from `curv`; `curv` from `val`, `imag_val`, `origarea`, `area`, `d`, and from the mark as a
+`float`; `d` from `curv`; the mark from `fixedval` (its low 16 bits) and from `(int) curv` (x86-64's
+conversion: `INT_MIN` for NaN and out of range, then the low 16 bits); `MRIScopyFromCropped(mris, w)`
+and `MRIScopyToCropped(mris, w)`: `val` (`w` 1) or the mark (`w` 11) from or to `cropped` (`val` to
+`cropped` as `(int) val`); any other `w` ends the program at the first vertex not ripped with
+`MRIScopyFromCropped: <w> unsupported target` (both functions' wording; `ERROR_UNSUPPORTED`). Over
+every vertex: the mark to `marked2`, `marked3` and back, `annotation = (int) val`; `MRISclearFaceMarks`:
+every face's mark 0. The names with two forms (`MRIScopyValuesToCurvature` /
+`MRIScopyCurvatureFromValues`, `MRIScopyImagValuesToCurvature` / `MRIScopyCurvatureFromImagValues`,
+`MRIScopyValuesToVal2Bak` / `MRIScopyValToVal2Bak`) are the same copy.
+
+**134.2 Vectors.** `MRISimportCurvatureVector(mris, v)`, `MRISimportValVector(mris, v)`: each
+vertex's `curv` / `val` from `v` (every vertex); `MRISimportValFromMatrixColumn(mris, m, c)`: `val`
+from row `vertex + 1` of column `c`; `MRISexportValVector`: the values; `MRISexportValVectorDouble(mris,
+v, k)`: each value widened into `v[vertex + k]`. **FS-908** (class a): a vector of fewer values than
+vertices, or a matrix of fewer rows or without column `c`, is read outside in FreeSurfer; the vertices
+beyond it are left alone in both modes, noted.
+
+**134.3 Through the curvature.** `MRISwriteD`, `MRISwriteMarked`, `MRISwriteArea(mris, name)`: the
+curvatures saved, `d`, the mark or the area copied into them (134.1, vertices not ripped),
+§122's `MRISwriteCurvature(mris, name)` (its status not returned), the curvatures restored;
+`NO_ERROR`. `MRISreadMarked(mris, name)`: the curvatures saved, §122's `MRISreadCurvatureFile`; its
+failure returns `Gerror` (the curvatures as the read left them); else the marks from `(int) curv`
+(134.1) and the curvatures restored, `NO_ERROR`. `mris_place_surface --area-map <surface> <out>` is
+`MRISread`, `MRIScomputeMetricProperties`, `MRISwriteArea`.
+
+## 135. Validation plan, part 31
+
+The probe's command of relay 38, `vcp` (an empty work folder with `d`; `SURFER_SIDEDOOR`): §127's
+meshes read by `MRISread`, 0 to 3 vertices ripped, every vertex's 13 `float` fields (`val`, `curv`,
+`stat`, `mean`, `mean_imag`, `std_error`, `imag_val`, `val2`, `val2bak`, `valbak`, `d`, `area`,
+`origarea`: -5 to 5 in eighths; NaN, ±inf, -0, a signalling NaN, 1e10, -3e9 in heavy cases) and 6
+integer fields (`marked`, `marked2`, `marked3`, `cropped`, `fixedval`, `annotation`: -3 to 5; ±70,000,
+32,768, `INT_MAX`, `INT_MIN` in heavy cases), every face's mark; then 1 to 6 of 134.1-134.3's
+functions by name (vectors of the vertex count, two more or one fewer; matrices of the vertex count
+of rows, one more or one fewer, columns 0 to 4 of 1 to 3; `w` 1, 11 or 3; the writers to `c`,
+`c.asc`, `c.vtk`, `c.mgh`, `d/c`, `nodir/c`; the reader from a name written before, `none`, `c`, `d/c`),
+after each its status, `errno`, every field and face mark; at the end every file in the folder by its
+bytes. An import FreeSurfer would read outside its vector or matrix for (FS-908) is written `G` on
+both sides. Compared with the official build with `reproduce`: identical; the default identical but
+where a noted correction changed the result. Observed (relay 38): seeds 7, 13 (500 cases each) and 17
+(1,000): 0 different in both modes. On recorded heads (`flr war`, `mris_place_surface --area-map` of
+each white and pial surface of three heads): the twelve files written are recon-all's `?h.area` and
+`?h.area.pial` byte for byte, in the official build and the port (observed). A clean-room
+implementer's black-box form: `mris_place_surface --area-map` of a recorded `?h.white` against its
+`?h.area`.

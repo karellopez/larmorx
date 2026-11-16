@@ -1882,3 +1882,24 @@ the unit oracle's `surfcluster.cpp.o` (`<scratch>/D/relay38/sclust.asm`) and `la
 - `LabelRemoveHolesSurf`'s `stat` table is `double` (`cvtss2sd` at the store, `cvtsd2ss` at the
   load: a signalling NaN comes back quiet).
 - `sclustSaveAsPointSet`'s `%g` takes the vertex's `float` coordinates promoted.
+
+## 34. The copies between vertex fields; MRISwriteD / Marked / Area, MRISreadMarked (relay 38 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_vals.cpp` 400-411,
+496-509, 712-771, 857-1384 (every two-operand copy, the cropped copies, the curvature copies,
+`MRISclearFaceMarks`) into `valcopy.rs`; `utils/mrisurf_io.cpp` 810-823 (`MRISwriteD`), 5984-6017
+(`MRISwriteMarked`, `MRISreadMarked`), 6023-6036 (`MRISwriteArea`) into `curvfile.rs`.
+
+- `MRIScopyToCropped`'s unsupported-target message names `MRIScopyFromCropped` (copied text);
+  `MRISreadMarked`'s allocation message names `MRISwriteMarked` (never reached: `calloc` of a
+  vertex count); `MRISreadMarked` returns `Gerror` without restoring the curvatures or freeing its
+  copy when the read fails.
+- `MRIScopyValuesToVal2Bak` is defined but not declared in any header (the probe declares it).
+- `MRISaddToValues` compiles to `movss val; addss x; movss` (the vertex's value the destination).
+- **FS-908:** the imports index `curvs[vno]`, `vals[vno]`, `*MATRIX_RELT(m, vno + 1, col)` for every
+  vertex, unchecked (`MATRIX_RELT` of column 0 reads the matrix's own padding).
+- `mris_place_surface --area-map` (recon-all's `?h.area`, `?h.area.pial`) is `MRISread`,
+  `MRIScomputeMetricProperties`, `MRISwriteArea`; MRISwriteCurvature places a name without a folder
+  beside the surface with its hemisphere first (the probe's first `flr war` run wrote six files
+  `?h.w.area` into the recorded heads' folders that way: moved to
+  `<workspace>/archive/2026-11-16-relay38-stray-area-files/`).

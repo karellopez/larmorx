@@ -2544,6 +2544,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R25_CROP.contains(&c) => r25_gen_crop(&mut g, &mut t, c),
             c if R29.contains(&c) => r29_gen(&mut g, &mut t, c),
             c if R34.contains(&c) => r34_gen(&mut g, &mut t, c),
+            c if R35.contains(&c) => r35_gen(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -3009,7 +3010,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 275] = [
+pub const COMMANDS: [&str; 279] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3285,6 +3286,10 @@ pub const COMMANDS: [&str; 275] = [
     "vlstat",
     "vlcopy",
     "vladd",
+    "ltaixf",
+    "ltav2r",
+    "ltar2v",
+    "ltacmp",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5624,6 +5629,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "demb" | "demt" | "demm" | "demc" => r29_demorph(cx, t, o, cmd)?,
         c if R34[..13].contains(&c) => r34_lta_cmds(cx, t, o, cmd)?,
         c if R34.contains(&c) => r34_vl_cmds(cx, t, o, cmd)?,
+        c if R35.contains(&c) => r35_cmds(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -10100,6 +10106,217 @@ fn r34_vl_cmds(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(),
             o.i(i64::from(vlst::vlst_free(&mut p)));
             o.i(i64::from(p.is_none()));
             o.i(i64::from(vlst::vlst_free(&mut p)));
+        }
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------------------------------------
+// Relay 35: transform.cpp's LTAinverseTransformInterp, LTAvoxelToRasXform, LTArasToVoxelXform
+// (with LTAsetVolGeom) and LTAcompose, for track A's TRANSFORM functions.
+
+const R35: [&str; 4] = ["ltaixf", "ltav2r", "ltar2v", "ltacmp"];
+
+/// A small volume of the cases along one of the pool's geometries (`get_vol`'s tokens).
+fn r35_vol(g: &mut Gen, t: &mut Vec<String>, pool: &[Vec<String>]) {
+    let s = r25_shape(g, &[0, 3, 3, 1], 1, 4);
+    let gi = g.below(pool.len() as u64) as usize;
+    r25_vol_geo(g, t, s, &pool[gi]);
+}
+
+fn r35_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    let pool = r25_pool(g);
+    match cmd {
+        "ltaixf" => {
+            let nf = if g.chance(4) { 2 } else { 1 };
+            let s = r25_shape(g, &[0, 0, 3, 3, 1, 4], nf, 4);
+            let gi = g.below(pool.len() as u64) as usize;
+            r25_vol_geo(g, t, s, &pool[gi]);
+            r29_pat(g, t, &[10, 100, 3], &[0, 1, -2], &[0, 2, 5]);
+            let vals: &[f32] = &[0.0, 1.0, 2.5, -3.0, 100.0, 7.0];
+            fill_paint(g, t, s, &[vals, vals], &[vals]);
+            let given = g.chance(3);
+            t.push(i64::from(given).to_string());
+            if given {
+                let o = Shape {
+                    w: g.int(1, 4),
+                    h: g.int(1, 4),
+                    d: g.int(1, 3),
+                    ty: g.pick(&[0, 3, 3, 1]),
+                    nf: if g.chance(5) { g.int(1, 3) } else { s.nf },
+                    hdr: false,
+                    drop: false,
+                };
+                let gj = g.below(pool.len() as u64) as usize;
+                r25_vol_geo(g, t, o, &pool[gj]);
+            }
+            let n = if g.chance(5) {
+                g.pick(&[0usize, 2, 2, 3])
+            } else {
+                1
+            };
+            let ty = g.pick(&[1i64, 1, 0, 0, 0, 2, 14, 21, 10]);
+            r34_lta(g, t, &pool, n, ty);
+            t.push(g.pick(&[0i64, 1, 1, 1, 2, 3]).to_string());
+            t.push(g.pick(&[0i64, 0, 1, 2]).to_string());
+            t.push(g.pick(&[1i64, 1, 0, 2]).to_string());
+            t.push(g.pick(&[0u64, 0, 0, 0x1000_0000, 0x4000]).to_string());
+        }
+        "ltav2r" => {
+            let n = if g.chance(20) {
+                0
+            } else {
+                g.pick(&[1usize, 1, 1, 2, 3])
+            };
+            let ty = g.pick(&R25_TYPES);
+            r34_lta(g, t, &pool, n, ty);
+            for _ in 0..2 {
+                let have = !g.chance(3);
+                t.push(i64::from(have).to_string());
+                if have {
+                    r35_vol(g, t, &pool);
+                }
+            }
+        }
+        "ltar2v" => {
+            let n = if g.chance(20) {
+                0
+            } else {
+                g.pick(&[1usize, 1, 1, 2, 3])
+            };
+            let ty = g.pick(&R25_TYPES);
+            r34_lta(g, t, &pool, n, ty);
+            r35_vol(g, t, &pool);
+            let have = !g.chance(5);
+            t.push(i64::from(have).to_string());
+            if have {
+                r35_vol(g, t, &pool);
+            }
+        }
+        _ => {
+            // ltacmp
+            let n = if g.chance(20) {
+                0
+            } else {
+                g.pick(&[1usize, 1, 1, 2])
+            };
+            let ty = g.pick(&R25_TYPES);
+            r34_lta(g, t, &pool, n, ty);
+            m44(g, t);
+            m44(g, t);
+            let mode = g.pick(&[0i64, 0, 1, 2]);
+            t.push(mode.to_string());
+            if mode == 1 {
+                let m = if g.chance(10) {
+                    0
+                } else {
+                    g.pick(&[1usize, 1, 2])
+                };
+                let ty2 = g.pick(&R25_TYPES);
+                r34_lta(g, t, &pool, m, ty2);
+            }
+        }
+    }
+}
+
+fn r35_cmds(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::{ltaapply as la, ltaconv as lc};
+    match cmd {
+        "ltaixf" => {
+            let mut src = get_vol(cx, t)?;
+            r24_fill_pat(cx, t, &mut src)?;
+            fill_painted(cx, t, &mut src)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let mut l = r25_get_lta(cx, t)?;
+            let interp = t.i();
+            let mut env = match t.i() {
+                0 => Environment::default(),
+                1 => Environment::from_pairs([("USE_AVERAGE305", "true")]),
+                _ => Environment::from_pairs([("USE_AVERAGE305", "")]),
+            };
+            let fsl = r25_fsl_env(t);
+            if let Some(v) = fsl.get("FSLOUTPUTTYPE") {
+                env.set("FSLOUTPUTTYPE", v.clone());
+            }
+            cx.g.gdiag = t.next().parse().expect("Gdiag");
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = la::lta_inverse_transform_interp(
+                g,
+                a,
+                b,
+                &env,
+                &src,
+                dst.as_mut(),
+                &mut l,
+                interp,
+            )?;
+            o.ret(&r, dst.as_ref());
+            o.lta_full(Some(&l));
+        }
+        "ltav2r" => {
+            let mut l = r25_get_lta(cx, t)?;
+            let src = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = lc::lta_voxel_to_ras_xform(g, a, b, &mut l, src.as_ref(), dst.as_ref())?;
+            o.i(i64::from(r));
+            o.lta_full(Some(&l));
+        }
+        "ltar2v" => {
+            let mut l = r25_get_lta(cx, t)?;
+            let src = get_vol(cx, t)?;
+            let dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = lc::lta_ras_to_voxel_xform(g, a, b, &mut l, &src, dst.as_ref())?;
+            o.i(i64::from(r));
+            o.lta_full(Some(&l));
+        }
+        _ => {
+            // ltacmp
+            let mut l = r25_get_lta(cx, t)?;
+            let ml = get_m44(t);
+            let mr = get_m44(t);
+            let mode = t.i();
+            match mode {
+                1 => {
+                    let mut d = r25_get_lta(cx, t)?;
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    let r = lc::lta_compose(g, a, b, &l, ml.as_ref(), mr.as_ref(), Some(&mut d))?;
+                    o.i(i64::from(matches!(r, Ret::Given)));
+                    o.lta_full(if r.is_null() { None } else { Some(&d) });
+                    o.lta_full(Some(&l));
+                }
+                2 => {
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    lc::lta_compose_in_place(g, a, b, &mut l, ml.as_ref(), mr.as_ref())?;
+                    o.i(1);
+                    o.lta_full(Some(&l));
+                }
+                _ => {
+                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                    let r = lc::lta_compose(g, a, b, &l, ml.as_ref(), mr.as_ref(), None)?;
+                    o.i(0);
+                    let n = r.into_new();
+                    o.lta_full(n.as_ref());
+                    o.lta_full(Some(&l));
+                }
+            }
         }
     }
     Ok(())

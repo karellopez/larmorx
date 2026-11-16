@@ -72,8 +72,7 @@ pub fn lta_voxel_to_ras_xform(
             }
             Some(s) => {
                 let ml = lta.xforms[i].m_l.clone();
-                mri_voxel_xform_to_ras_xform(g, out, err, s, mri_dst, ml.as_ref(), None)?
-                    .into_new()
+                mri_voxel_xform_to_ras_xform(g, out, err, s, mri_dst, ml.as_ref(), None)?.into_new()
             }
         };
         lta.xforms[i].m_l = m;
@@ -309,4 +308,99 @@ pub fn lta_compose_in_place(
         )?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_mri::lta::LINEAR_RAS_TO_RAS;
+    use larmorx_freesurfer_mri::mri::{MRI_UCHAR, mri_alloc_sequence};
+
+    fn diag(a: f32, b: f32, c: f32) -> Matrix {
+        let mut m = Matrix::real(4, 4);
+        m.set_relt(1, 1, a);
+        m.set_relt(2, 2, b);
+        m.set_relt(3, 3, c);
+        m.set_relt(4, 4, 1.0);
+        m
+    }
+
+    fn elems(m: &Matrix) -> Vec<f32> {
+        (1..=4)
+            .flat_map(|r| (1..=4).map(move |c| (r, c)))
+            .map(|(r, c)| m.relt(r, c))
+            .collect()
+    }
+
+    #[test]
+    fn compose_with_both_matrices() {
+        // L = diag(2, 3, 5), left = diag(7, 1, 1), right = diag(1, 11, 1)
+        for (mode, want) in [
+            (UpstreamDefects::Fix, diag(14.0, 33.0, 5.0)),
+            (UpstreamDefects::Reproduce, diag(2.0, 33.0, 5.0)),
+        ] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut src = lta_alloc(&mut g, &mut out, &mut err, 1, None).unwrap();
+            src.xforms[0].m_l = Some(diag(2.0, 3.0, 5.0));
+            let (l, r) = (diag(7.0, 1.0, 1.0), diag(1.0, 11.0, 1.0));
+            let new = lta_compose(&mut g, &mut out, &mut err, &src, Some(&l), Some(&r), None)
+                .unwrap()
+                .unwrap_new();
+            assert_eq!(
+                elems(new.xforms[0].m_l.as_ref().unwrap()),
+                elems(&want),
+                "{mode:?}"
+            );
+            assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-956"));
+            // in place, both apply in either mode
+            lta_compose_in_place(&mut g, &mut out, &mut err, &mut src, Some(&l), Some(&r)).unwrap();
+            assert_eq!(
+                elems(src.xforms[0].m_l.as_ref().unwrap()),
+                elems(&diag(14.0, 33.0, 5.0))
+            );
+        }
+    }
+
+    #[test]
+    fn ras_to_voxel_converts_each_transform() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let vol =
+                mri_alloc_sequence(&mut g, &mut out, &mut err, 4, 4, 4, MRI_UCHAR, 1).unwrap();
+            let mut lta = lta_alloc(&mut g, &mut out, &mut err, 2, None).unwrap();
+            lta.ltype = LINEAR_RAS_TO_RAS;
+            lta.xforms[0].m_l = Some(diag(2.0, 2.0, 2.0));
+            lta.xforms[1].m_l = Some(diag(3.0, 3.0, 3.0));
+            let conv = |g: &mut Globals, m: &Matrix| {
+                let (mut out, mut err) = (Vec::new(), Vec::new());
+                mri_ras_xform_to_voxel_xform(g, &mut out, &mut err, &vol, None, Some(m))
+                    .unwrap()
+                    .unwrap()
+            };
+            let (c0, c1) = (
+                conv(&mut g, &diag(2.0, 2.0, 2.0)),
+                conv(&mut g, &diag(3.0, 3.0, 3.0)),
+            );
+            lta_ras_to_voxel_xform(&mut g, &mut out, &mut err, &mut lta, &vol, None).unwrap_or(0);
+            assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-954"));
+            assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-957"));
+            if mode == UpstreamDefects::Fix {
+                assert_eq!(elems(lta.xforms[0].m_l.as_ref().unwrap()), elems(&c0));
+                assert_eq!(elems(lta.xforms[1].m_l.as_ref().unwrap()), elems(&c1));
+                // FS-957: the source's geometry for both
+                assert_eq!(lta.xforms[1].dst.width, 4);
+                assert_eq!(lta.ltype, LINEAR_VOX_TO_VOX);
+            } else {
+                // FreeSurfer: the last transform's conversion in the first, the second unchanged
+                assert_eq!(elems(lta.xforms[0].m_l.as_ref().unwrap()), elems(&c1));
+                assert_eq!(
+                    elems(lta.xforms[1].m_l.as_ref().unwrap()),
+                    elems(&diag(3.0, 3.0, 3.0))
+                );
+            }
+        }
+    }
 }

@@ -51,6 +51,8 @@
 
 extern double vg_isEqual_Threshold;
 extern double MRIsampleVolumeDerivativeSign;
+// transform.cpp defines LTAinverseTransformInterp without declaring it in transform.h
+MRI *LTAinverseTransformInterp(MRI *mri_src, MRI *mri_dst, LTA *lta, int interp);
 // defined in mri.cpp, not declared in its headers
 double ham_sinc(double x, double fullwidth);
 int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
@@ -2988,6 +2990,59 @@ void run_case()
     oi(r != NULL && r == dst);
     put_vol(r);
     put_lta_full(l);
+  } else if (cmd == "ltaixf") {
+    // relay 35: LTAinverseTransformInterp (the inverse transforms; one transform: the RAS, voxel
+    // and physical-voxel paths and the destination made from the inverse's geometry; none or
+    // several: the octree path), USE_AVERAGE305, FSLOUTPUTTYPE, Gdiag
+    MRI *src = get_vol();
+    fill_pat(src);
+    fill_paint(src);
+    MRI *dst = geti() ? get_vol() : NULL;
+    LTA *l = get_lta_full();
+    int interp = geti();
+    int avg = geti();
+    if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+    else unsetenv("USE_AVERAGE305");
+    set_fsltype();
+    Gdiag = (unsigned long)geti();
+    fflush(stdout);
+    MRI *r = LTAinverseTransformInterp(src, dst, l, interp);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+    put_lta_full(l);
+  } else if (cmd == "ltav2r") {
+    // relay 35: LTAvoxelToRasXform, with volumes or from the transforms' own geometries
+    LTA *l = get_lta_full();
+    MRI *src = geti() ? get_vol() : NULL;
+    MRI *dst = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    oi(LTAvoxelToRasXform(l, src, dst));
+    fflush(stdout);
+    put_lta_full(l);
+  } else if (cmd == "ltar2v") {
+    // relay 35: LTArasToVoxelXform (with LTAsetVolGeom), a destination volume or none
+    LTA *l = get_lta_full();
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    oi(LTArasToVoxelXform(l, src, dst));
+    fflush(stdout);
+    put_lta_full(l);
+  } else if (cmd == "ltacmp") {
+    // relay 35: LTAcompose with a left matrix, a right one, both or none, into a new array,
+    // another one or the source itself
+    LTA *l = get_lta_full();
+    MATRIX *ml = get_m44();
+    MATRIX *mr = get_m44();
+    int mode = geti();
+    LTA *d = mode == 1 ? get_lta_full() : mode == 2 ? l : NULL;
+    fflush(stdout);
+    LTA *r = LTAcompose(l, ml, mr, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_lta_full(r);
+    if (mode != 2) put_lta_full(l);
   } else if (cmd == "ltapt") {
     LTA *l = get_lta_full();
     int n = geti();

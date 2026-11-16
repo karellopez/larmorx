@@ -2476,7 +2476,7 @@ defects! {
     FS_503 = "FS-503", "FreeSurfer", true,
         "the thresholded region histogram (MRIhistogramRegionWithThreshold) with several threads adds per-thread histograms of fractional counts, whose sums depend on the number of threads";
     FS_504 = "FS-504", "FreeSurfer", true,
-        "the transform-array functions (LTAconcat, LTAreduce, LTAmriIsSource, LTAmriIsTarget, LTAprint, LTAchangeType's diagnostic print) given no array, an array without transforms or a transform without a 4 x 4 matrix read memory they do not own or crash";
+        "the transform-array functions (LTAconcat, LTAreduce, LTAmriIsSource, LTAmriIsTarget, LTAprint, LTAchangeType's diagnostic print, the writers LTAwrite and LTAwriteEx, LTAtransformAtPoint, LTAvoxelTransformToCoronalRasTransform, DevolveXFM) given no array, an array without transforms or a transform without a 4 x 4 matrix read memory they do not own or crash";
     FS_505 = "FS-505", "FreeSurfer", true,
         "filling a transform array's inverses (LTAfillInverse, and every function that calls it) computes the inverse of a transform whose inverse has no matrix and loses it: the inverse stays without a matrix";
     FS_506 = "FS-506", "FreeSurfer", true,
@@ -2679,6 +2679,10 @@ defects! {
         "the SGILog decoders write pixels past their translation buffer when it is smaller than a row (FS-882's sizes) or a run goes past the row (FS-883): memory past the buffer; not written";
     FS_885 = "FS-885", "libtiff 3.6.1", true,
         "a CCITT file whose FaxSubAddress entry comes before its Compression entry: the reader registers the tag as an unknown one that passes its count before the codec registers its own, and then hands the codec's tag method the count where the string's address goes (a crash); set from the string";
+    FS_886 = "FS-886", "FreeSurfer", true,
+        "a transform array's weighted transform at a point (LTAtransformAtPoint, and LTAtransformInterp of several transforms) keeps the weights of at most 4,096 transforms: an array of more writes past them";
+    FS_887 = "FS-887", "FreeSurfer", true,
+        "making a subject's transform work with tkregister's coordinates (DevolveXFM, DevolveXFMWithSubjectsDir) builds the paths of the subject's folder, original volume and transform in 2,000 bytes: a longer path writes past them";
 }
 
 /// The register entry with ID `id`.

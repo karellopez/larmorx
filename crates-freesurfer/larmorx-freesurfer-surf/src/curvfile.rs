@@ -290,6 +290,82 @@ pub fn read_curv_mri(
     Ok(NO_ERROR)
 }
 
+// ---- a vertex field written through the curvature (relay 38 of track D) ----------------------
+
+/// `MRISwriteD`, `MRISwriteMarked`, `MRISwriteArea` (`utils/mrisurf_io.cpp` 810, 5984, 6023): the
+/// curvatures saved, the field copied into them (`set`, vertices not ripped), [`write_curvature`]
+/// of `sname` (its status not returned), the curvatures restored; `NO_ERROR`.
+fn write_through_curv(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &mut Mris,
+    sname: &str,
+    set: fn(&mut Mris) -> i32,
+) -> Result<i32, Fatal> {
+    let saved = crate::metric::extract_curvature_vector(mris);
+    set(mris);
+    write_curvature(g, io, dir, mris, sname, None)?;
+    crate::valcopy::import_curvature_vector(g, mris, &saved);
+    Ok(NO_ERROR)
+}
+
+/// `MRISwriteD(mris, sname)`: each vertex's `d` written as a curvature file ([`write_curvature`]'s
+/// formats), the curvatures kept. `NO_ERROR`.
+pub fn write_d(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &mut Mris,
+    sname: &str,
+) -> Result<i32, Fatal> {
+    write_through_curv(g, io, dir, mris, sname, crate::valcopy::d_to_curv)
+}
+
+/// `MRISwriteMarked(mris, sname)`: each vertex's mark (as a `float`) written as a curvature file.
+/// `NO_ERROR`.
+pub fn write_marked(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &mut Mris,
+    sname: &str,
+) -> Result<i32, Fatal> {
+    write_through_curv(g, io, dir, mris, sname, crate::valcopy::marked_to_curv)
+}
+
+/// `MRISwriteArea(mris, sname)`: each vertex's area written as a curvature file. `NO_ERROR`.
+pub fn write_area(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &mut Mris,
+    sname: &str,
+) -> Result<i32, Fatal> {
+    write_through_curv(g, io, dir, mris, sname, crate::valcopy::area_to_curv)
+}
+
+/// `MRISreadMarked(mris, sname)` (`utils/mrisurf_io.cpp` 5999): the curvatures saved, the file read
+/// as curvatures ([`read_curvature_file`]; its failure returns `Gerror` with the curvatures as the
+/// read left them), each vertex's mark set from its curvature (`(int) curv`, vertices not ripped),
+/// the curvatures restored. `NO_ERROR`.
+pub fn read_marked(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &mut Mris,
+    sname: &str,
+) -> Result<i32, Fatal> {
+    let saved = crate::metric::extract_curvature_vector(mris);
+    if read_curvature_file(g, sg, io, dir, mris, sname, None, None)? != NO_ERROR {
+        return Ok(g.gerror);
+    }
+    crate::valcopy::curv_to_marked(mris);
+    crate::valcopy::import_curvature_vector(g, mris, &saved);
+    Ok(NO_ERROR)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

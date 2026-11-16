@@ -9,7 +9,9 @@
 //! the surface handle, a template volume, now and then); then 1 to 4 operations: `LabelMark`
 //! (`mk`), `LabelMark2` (`mk2`), `LabelUnmark` (`um`), `LabelMarkSurface` (`ms`), `LabelArea`
 //! (`ar`), `LabelFillMarked` (`fm`), `LabelErode` (`er`), `LabelDilate` (`di`), `MRISlabel2Mask`
-//! (`l2m`) and `MRISlabelInvert` (`inv`); an operation whose label has a point FreeSurfer would
+//! (`l2m`), `MRISlabelInvert` (`inv`) and since relay 38 `LabelRemoveIslandsSurf` (`ri`),
+//! `LabelRemoveHolesSurf` (`rh`) and `LabelRemoveHolesAndIslandsSurf` (`rhi`), with some
+//! vertices' `stat` set first; an operation whose label has a point FreeSurfer would
 //! read or write outside the surface's vertices or the label's places for (FS-630, FS-631) is written
 //! `G` on both sides;
 //! after each the label (every place), the marks and the index table: the generator and the
@@ -60,6 +62,13 @@ pub(super) fn lbl_tokens(t: &mut Vec<String>, g: &mut Gen) {
         ix(t, g.pick(&[0, 1, 2]));
     }
     ix(t, i64::from(!g.chance(6)));
+    // relay 38: the vertices' stat (LabelRemoveIslandsSurf copies it)
+    let nst = if nv > 0 { g.pick(&[0, 0, 1, 3]) } else { 0 };
+    ix(t, nst);
+    for _ in 0..nst {
+        ix(t, g.int(0, nv - 1));
+        fv(t, g.int(-8, 8) as f32 / 4.0);
+    }
     // the label
     let max = g.pick(&[0, 1, 2, 3, 5, 8, 12, 12]);
     let n = if max == 0 { 0 } else { g.int(0, max) };
@@ -93,7 +102,10 @@ pub(super) fn lbl_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let nops = g.int(1, 4);
     ix(t, nops);
     for _ in 0..nops {
-        match g.below(13) {
+        match g.below(16) {
+            13 => t.push("ri".into()),
+            14 => t.push("rh".into()),
+            15 => t.push("rhi".into()),
             0 => t.push("mk".into()),
             1 => t.push("mk2".into()),
             2 => t.push("um".into()),
@@ -146,7 +158,8 @@ fn outside(op: &str, a: &Label, nv: i32) -> bool {
         "ar" | "fm" => any_out,
         "er" => live_out || beyond,
         "di" => live_out || beyond || a.max_points == 0,
-        "l2m" | "inv" => negative,
+        "l2m" | "inv" | "rh" | "rhi" => negative,
+        "ri" => any_out,
         _ => false,
     }
 }
@@ -230,6 +243,10 @@ pub(super) fn lbl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         v.marked = m1 as i16;
         v.marked2 = m2 as i16;
     }
+    for _ in 0..t.i() {
+        let vno = t.i();
+        s.vertex_mut(vno as usize).stat = t.f();
+    }
     let (max, n) = (t.i(), t.i());
     let mut a = label_alloc(g, io.env, io.err, max, None, None)?;
     a.coords = t.i();
@@ -283,6 +300,26 @@ pub(super) fn lbl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             continue;
         }
         match op {
+            "ri" | "rh" | "rhi" => {
+                let l = match op {
+                    "ri" => Some(labelsurf::label_remove_islands_surf(
+                        g, &mut io, &mut s, &a,
+                    )?),
+                    "rh" => labelsurf::label_remove_holes_surf(g, &mut io, &mut s, &a)?,
+                    _ => labelsurf::label_remove_holes_and_islands_surf(g, &mut io, &mut s, &a)?,
+                };
+                match l {
+                    None => o.s("NULL"),
+                    Some(l) => {
+                        o.h(Some(&l.subject_name));
+                        dump(&l, &s, o);
+                    }
+                }
+                for vno in 0..s.nvertices.max(0) as usize {
+                    o.i(i64::from(s.vertex(vno).undefval));
+                    o.f(s.vertex(vno).val);
+                }
+            }
             "mk" => o.i(i64::from(labelsurf::label_mark(g, &a, &mut s))),
             "mk2" => o.i(i64::from(labelsurf::label_mark2(g, &a, &mut s))),
             "um" => o.i(i64::from(labelsurf::label_unmark(g, &a, &mut s))),

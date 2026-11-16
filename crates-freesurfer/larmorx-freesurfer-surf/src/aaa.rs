@@ -426,6 +426,8 @@ pub struct SurfGlobals {
     /// `annotation_table_file`), as the surface library's annotation functions use it (`annot`'s
     /// `MRISseg2annot` sets it, `MRISannot2seg` reads it; relay 36 of track D).
     pub atable: larmorx_freesurfer_io::annotation::AnnotationTables,
+    /// `sclustGrowByDist`'s statics (`surfcluster.cpp` lines 865-867; relay 38 of track D).
+    pub sclust_by_dist: crate::sclust::ByDistState,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -475,6 +477,7 @@ impl Default for SurfGlobals {
             vox2sras: Default::default(),
             laminar_wm: None,
             atable: Default::default(),
+            sclust_by_dist: Default::default(),
         }
     }
 }

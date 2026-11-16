@@ -971,6 +971,210 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             let inv = labelsurf::mris_label_invert(g, &mut io, &s, &a)?.expect("the inversion");
             pts(&inv, o);
         }
+        "war" => {
+            // relay 38 of track D: `fssurfio.cpp`'s `flr war` (mris_place_surface --area-map: the
+            // surface read, its metric properties, MRISwriteArea; the file against the recorded one)
+            let sn = t.next();
+            let mut s = surf(g, sg, &mut io, sn)?;
+            let rec = t.next();
+            larmorx_freesurfer_surf::mp::compute_metric_properties(g, sg, &mut io, &mut s)?;
+            let td = tempfile::tempdir().expect("a work folder");
+            // a name with a folder and the hemisphere first, kept as given (a name without a
+            // folder goes beside the surface)
+            let base = sn.rsplit('/').next().unwrap_or(sn);
+            let name = td.path().join(format!("{}.w.area", &base[..2]));
+            let name = name.to_string_lossy().into_owned();
+            let st =
+                larmorx_freesurfer_surf::curvfile::write_area(g, &mut io, None, &mut s, &name)?;
+            o.i(i64::from(st));
+            let w = std::fs::read(&name).unwrap_or_default();
+            let r = std::fs::read(rec).unwrap_or_default();
+            o.i(w.len() as i64);
+            o.s(&format!("{:016x}", super::mpx::fnv64(&w)));
+            o.s(if w == r { "SAME" } else { "DIFF" });
+        }
+        "sgd" => {
+            // relay 38 of track D: `fssurfio.cpp`'s `flr sgd` (the stack measurement: every value
+            // 1, one map of the clusters); the port also gives the deepest path of the growth
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            for v in 0..s.nvertices.max(0) as usize {
+                s.vertex_mut(v).val = 1.0;
+            }
+            let mut deepest = 0usize;
+            for v in 0..s.nvertices.max(0) as usize {
+                s.vertex_mut(v).undefval = 0;
+            }
+            let mut c = 1;
+            for v in 0..s.nvertices.max(0) as usize {
+                if s.vertex(v).undefval == 0 {
+                    let (_, d) = larmorx_freesurfer_surf::sclust::grow_surf_cluster_depth(
+                        g, &mut io, c, v as i32, &mut s, 0.5, -1.0, 1,
+                    );
+                    deepest = deepest.max(d);
+                    c += 1;
+                }
+            }
+            let (l, n) = larmorx_freesurfer_surf::sclust::map_surf_clusters(
+                g, &mut io, &mut s, 0.5, -1.0, 1, 0.0, None, None,
+            )?;
+            o.i(i64::from(n));
+            o.i(i64::from(l.map_or(-1, |l| l[0].nmembers)));
+            o.s(&format!("depth {deepest}"));
+        }
+        "scl" => {
+            // relay 38 of track D: `fssurfio.cpp`'s `flr scl` (the label clean-ups on a recorded
+            // head, the clusters of |x| at least 20 mm with their table, the clusterwise-p values,
+            // the old summary, a growth by distance)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let ln = t.next();
+            let a = larmorx_freesurfer_io::label::label_read(
+                g, io.env, io.out, io.err, None, None, ln,
+            )?
+            .expect("the label");
+            let env2 = Environment::from_pairs(vec![
+                ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
+                ("SUBJECTS_DIR".to_owned(), "/".to_owned()),
+            ]);
+            let env3 = Environment::from_pairs(vec![
+                ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
+                ("SUBJECTS_DIR".to_owned(), "/".to_owned()),
+                ("USE_FAST_SURF_SMOOTHER".to_owned(), "0".to_owned()),
+            ]);
+            let (out, err) = (io.out, io.err);
+            let mut io = coords::Io {
+                out,
+                err,
+                env: &env2,
+            };
+            let flush = |hb: &mut Vec<u8>, o: &mut Out| {
+                o.s(&format!("{:016x}", super::mpx::fnv64(hb)));
+                hb.clear();
+            };
+            let pts = |l: &larmorx_freesurfer_io::label::Label, o: &mut Out| {
+                o.i(i64::from(l.n_points));
+                o.i(i64::from(l.max_points));
+                let mut hb = Vec::new();
+                for p in &l.lv[..l.n_points.max(0) as usize] {
+                    hb.extend_from_slice(&p.vno.to_le_bytes());
+                    for f in [p.x, p.y, p.z, p.stat] {
+                        hb.extend_from_slice(&f.to_le_bytes());
+                    }
+                }
+                flush(&mut hb, o);
+            };
+            let undef = |s: &Mris, o: &mut Out| {
+                let mut hb = Vec::new();
+                for v in 0..s.nvertices.max(0) as usize {
+                    hb.extend_from_slice(&s.vertex(v).undefval.to_le_bytes());
+                }
+                flush(&mut hb, o);
+            };
+            let list =
+                |l: &[larmorx_freesurfer_surf::sclust::SurfClusterSum], n: i32, o: &mut Out| {
+                    o.i(i64::from(n));
+                    let mut hb = Vec::new();
+                    for c in &l[..n.max(0) as usize] {
+                        hb.extend_from_slice(&c.clusterno.to_le_bytes());
+                        hb.extend_from_slice(&c.nmembers.to_le_bytes());
+                        for f in [c.area, c.weightvtx, c.weightarea, c.maxval] {
+                            hb.extend_from_slice(&f.to_le_bytes());
+                        }
+                        hb.extend_from_slice(&c.vtxmaxval.to_le_bytes());
+                        for f in [
+                            c.x, c.y, c.z, c.xxfm, c.yxfm, c.zxfm, c.cx, c.cy, c.cz, c.cxxfm,
+                            c.cyxfm, c.czxfm,
+                        ] {
+                            hb.extend_from_slice(&f.to_le_bytes());
+                        }
+                        for d in [
+                            c.pval_clusterwise,
+                            c.pval_clusterwise_low,
+                            c.pval_clusterwise_hi,
+                        ] {
+                            hb.extend_from_slice(&d.to_le_bytes());
+                        }
+                    }
+                    flush(&mut hb, o);
+                };
+            use larmorx_freesurfer_surf::sclust;
+            let l1 = labelsurf::label_remove_islands_surf(g, &mut io, &mut s, &a)?;
+            pts(&l1, o);
+            undef(&s, o);
+            match labelsurf::label_remove_holes_surf(g, &mut io, &mut s, &a)? {
+                Some(l) => pts(&l, o),
+                None => o.s("NULL"),
+            }
+            undef(&s, o);
+            match labelsurf::label_remove_holes_and_islands_surf(g, &mut io, &mut s, &a)? {
+                Some(l) => pts(&l, o),
+                None => o.s("NULL"),
+            }
+            undef(&s, o);
+            for v in 0..s.nvertices.max(0) as usize {
+                let x = s.vertex(v).x;
+                s.vertex_mut(v).val = x;
+            }
+            let Ret::New(mut tm) =
+                larmorx_freesurfer_core::matrix_ops::matrix_identity(g, io.out, io.err, 4, None)?
+            else {
+                panic!("an identity matrix");
+            };
+            tm.set_relt(1, 4, 1.5);
+            tm.set_relt(2, 2, 0.75);
+            let (l, n) = sclust::map_surf_clusters(
+                g,
+                &mut io,
+                &mut s,
+                20.0,
+                -1.0,
+                0,
+                10.0,
+                Some(&tm),
+                None,
+            )?;
+            let mut l = l.unwrap_or_default();
+            list(&l, n, o);
+            sclust::dump_surf_cluster_sum(io.out, &l, n);
+            undef(&s, o);
+            let pv = [1.0, 0.1, 0.01, 0.001, 0.0001];
+            for (k, c) in l.iter_mut().enumerate().take(n.max(0) as usize) {
+                c.pval_clusterwise = pv[k % 5];
+            }
+            sclust::set_surface_val_to_cwp(g, &mut s, &l);
+            let mut hb = Vec::new();
+            for v in 0..s.nvertices.max(0) as usize {
+                hb.extend_from_slice(&s.vertex(v).val.to_le_bytes());
+            }
+            flush(&mut hb, o);
+            for v in 0..s.nvertices.max(0) as usize {
+                let x = s.vertex(v).x;
+                s.vertex_mut(v).val = x;
+            }
+            let mut io3 = coords::Io {
+                out: io.out,
+                err: io.err,
+                env: &env3,
+            };
+            let (l2, n2) = sclust::surf_cluster_summary_old(g, &mut io3, &s, Some(&tm))?;
+            list(&l2.unwrap_or_default(), n2, o);
+            let mut vl = vec![-2i32; s.nvertices.max(0) as usize];
+            o.i(i64::from(sclust::grow_by_dist(
+                g,
+                sg,
+                &mut io3,
+                &mut s,
+                0,
+                25.0,
+                0,
+                -1,
+                Some(&mut vl),
+            )));
+            let mut hb = Vec::new();
+            for x in &vl {
+                hb.extend_from_slice(&x.to_le_bytes());
+            }
+            flush(&mut hb, o);
+        }
         "mpx" => {
             // relay 37 of track D: `fssurfio.cpp`'s `flr mpx` (group (e) on a recorded head: the
             // distributions on the white surface with the sphere's canonical coordinates,

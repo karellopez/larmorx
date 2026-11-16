@@ -2566,7 +2566,7 @@ defects! {
     FS_817 = "FS-817", "libtiff 3.6.1", true,
         "decoders read past a strip's data: a PackBits run or literal at the end of the data takes bytes an earlier strip left in libtiff's buffer, and the test for old-style LZW codes looks at two bytes of a one-byte strip; corrected as libtiff 4 does, decoding stops at the end of the data and a strip under two bytes is never old-style";
     FS_818 = "FS-818", "libtiff 3.6.1", true,
-        "LZW decoding of damaged data uses table entries the decoder never writes (codes 256 and 257 right after a Clear code: memory contents), and the decoder for old-style LZW codes follows null links (a crash) and writes before the start of its row; read as zeros, decoding stopped, nothing written there";
+        "LZW decoding of damaged data uses table entries the decoder never writes (codes 256 and 257 right after a Clear code: memory contents), the decoder for old-style LZW codes follows null links (a crash) and writes before the start of its row, and a table entry linked to itself is followed for ever (a hang); read as zeros, decoding stopped, nothing written there";
     FS_819 = "FS-819", "libtiff 3.6.1", true,
         "a decoder that reads past a strip's data reads bytes of libtiff's raw buffer that no read has written since the buffer was allocated (memory contents); read as 0";
     FS_820 = "FS-820", "libtiff 3.6.1", true,
@@ -2596,7 +2596,7 @@ defects! {
     FS_833 = "FS-833", "libtiff 3.6.1", true,
         "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes (memory past the buffers); nothing is written";
     FS_834 = "FS-834", "libtiff 3.6.1", true,
-        "a SamplesPerPixel of several values (and an entry left unchecked by FS-820) is passed as the address of its array where one value goes: the field takes the address's low bits (nondeterministic); ignored as a wrong count, with libtiff's incorrect-count warning";
+        "a SamplesPerPixel of several values, of a floating-point type or of a string type (and such an entry left unchecked by FS-820) is passed as an array's or a string's address, or as a floating-point argument, where one integer goes: the field takes an address's low bits or a register never set (nondeterministic); ignored with libtiff's incorrect-count or wrong-type warning";
 }
 
 /// The register entry with ID `id`.

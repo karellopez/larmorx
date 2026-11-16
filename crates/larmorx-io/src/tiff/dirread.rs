@@ -886,6 +886,54 @@ impl Tiff {
         let Some(fip) = self.field_with_tag(t, s) else {
             return false;
         };
+        let float_like = |t: u16| {
+            matches!(
+                t,
+                fields::TIFF_RATIONAL
+                    | fields::TIFF_SRATIONAL
+                    | fields::TIFF_FLOAT
+                    | fields::TIFF_DOUBLE
+            )
+        };
+        let int_like = |t: u16| {
+            matches!(
+                t,
+                fields::TIFF_BYTE
+                    | fields::TIFF_SBYTE
+                    | fields::TIFF_SHORT
+                    | fields::TIFF_SSHORT
+                    | fields::TIFF_LONG
+                    | fields::TIFF_SLONG
+            )
+        };
+        let text_like = |t: u16| matches!(t, fields::TIFF_ASCII | fields::TIFF_UNDEFINED);
+        if !fip.passcount
+            && ((dp.count == 1
+                && ((int_like(fip.ty) && float_like(dp.ty))
+                    || (float_like(fip.ty) && int_like(dp.ty))))
+                || ((int_like(fip.ty) || float_like(fip.ty)) && text_like(dp.ty)))
+        {
+            // Read without the type check (the pass for SamplesPerPixel, FS-820's unchecked
+            // entries): libtiff passes a floating-point value where an integer is read, the
+            // reverse, or a string's address, so the field takes a register never set or an
+            // address's bits (FS-834). Ignored as libtiff's type check does elsewhere.
+            self.notices.add(
+                &FS_834,
+                format!(
+                    "{}: {} of type {} is passed to libtiff 3.6.1's setter in the wrong form: the \
+                     field takes a register never set (nondeterministic); ignored as a wrong type",
+                    self.name, fip.name, dp.ty
+                ),
+            );
+            let m = format!(
+                "{}: wrong data type {} for \"{}\"; tag ignored",
+                cut(&self.name, 1000),
+                dp.ty,
+                fip.name
+            );
+            self.warning(Some(MODULE), &m, s);
+            return true;
+        }
         if dp.count > 1 && !fip.passcount && fip.readcount == 1 {
             // libtiff 3.6.1 passes the array's address where the one value goes (FS-834): the
             // field takes the address's low bits (nondeterministic). As libtiff's count check

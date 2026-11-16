@@ -1030,6 +1030,9 @@ impl Tiff {
         };
         let mut never_written = false;
         let mut null_deref = false;
+        // A loop in the code table's links (an entry linked to itself): libtiff follows it for
+        // ever (a hang) or, old-style, writes before the row until it crashes.
+        let mut endless = false;
         let result: i32 = 'body: {
             if sp.dec_restart != 0 {
                 let mut codep = sp.dec_codep;
@@ -1198,6 +1201,7 @@ impl Tiff {
                     if i64::from(tab[codep as usize].length) > occ {
                         sp.dec_codep = codep;
                         if compat {
+                            let mut steps = 0;
                             loop {
                                 if codep == NIL {
                                     null_deref = true;
@@ -1211,6 +1215,15 @@ impl Tiff {
                                 if i64::from(tab[codep as usize].length) <= occ {
                                     break;
                                 }
+                                steps += 1;
+                                if steps > CSIZE {
+                                    endless = true;
+                                    break;
+                                }
+                            }
+                            if endless {
+                                ret = Some(0);
+                                break;
                             }
                             if null_deref {
                                 ret = Some(0);
@@ -1237,11 +1250,21 @@ impl Tiff {
                             }
                             break;
                         }
+                        let mut steps = 0;
                         loop {
                             codep = tab[codep as usize].next;
                             if !(codep != NIL && i64::from(tab[codep as usize].length) > occ) {
                                 break;
                             }
+                            steps += 1;
+                            if steps > CSIZE {
+                                endless = true;
+                                break;
+                            }
+                        }
+                        if endless {
+                            ret = Some(0);
+                            break;
                         }
                         if codep != NIL {
                             sp.dec_restart = occ;
@@ -1267,6 +1290,7 @@ impl Tiff {
                         op += len;
                         occ -= len;
                         let mut tp = op;
+                        let mut steps = 0;
                         loop {
                             tp -= 1;
                             let e = tab[codep as usize];
@@ -1275,6 +1299,15 @@ impl Tiff {
                             if codep == NIL {
                                 break;
                             }
+                            steps += 1;
+                            if steps > CSIZE {
+                                endless = true;
+                                break;
+                            }
+                        }
+                        if endless {
+                            ret = Some(0);
+                            break;
                         }
                         continue;
                     }
@@ -1344,6 +1377,13 @@ impl Tiff {
         if null_deref {
             self.null_entry_notice(
                 "libtiff's old-style LZW decoder follows a null table link here (a crash); \
+                 decoding stopped",
+            );
+        }
+        if endless {
+            self.null_entry_notice(
+                "the code table's links loop back (an entry linked to itself): libtiff 3.6.1 \
+                 follows them for ever (a hang, or writes before the row until it crashes); \
                  decoding stopped",
             );
         }

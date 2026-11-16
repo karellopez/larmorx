@@ -2259,6 +2259,8 @@ defects! {
         "freeing a transform that was never read (a transform file that could not be read): the program crashes";
     FS_861 = "FS-861", "FreeSurfer", true,
         "the inverse sample of a GCA morph with no nodes (a grid of size 0) reads a node past the grid: memory contents or a crash";
+    FS_862 = "FS-862", "FreeSurfer", true,
+        "the nearest-voxel sample of a GCA morph's inverse (an image voxel to the atlas, as the atlas programs ask it) at a point within half a voxel of the image's far face reads one voxel past the inverse: another voxel's value, or memory contents past the last slice";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

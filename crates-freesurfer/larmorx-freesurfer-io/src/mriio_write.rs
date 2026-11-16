@@ -1254,11 +1254,7 @@ pub fn nii_write(
                 "[INFO] niiWrite(): convert displacement from {} to {WARPFIELD_DTFMT_DISP_RAS}",
                 m.warp_field_format
             );
-            let _ = writeln!(
-                err,
-                "larmorx-freesurfer: writing a warp map's displacements in another format (Warpfield::changeFormat) is not ported yet ({fname})"
-            );
-            return Ok(-1);
+            crate::warpfield::change_format(g, out, err, m, WARPFIELD_DTFMT_DISP_RAS)?;
         }
     }
     let r = mri_to_nifti_qform(g, out, err, m, &mut hdr)?;

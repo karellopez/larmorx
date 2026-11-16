@@ -20,12 +20,13 @@
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-io.md` Part 34): FS-857 (the inverse
 //! sample of a morph of spacing 0), FS-858 (a linear transform file whose type is the morph's),
 //! FS-859 (a transform array without transforms), FS-860 (freeing no transform), FS-861 (the
-//! inverse sample of a morph of no nodes).
+//! inverse sample of a morph of no nodes), FS-862 (the nearest sample one voxel past the index
+//! volumes).
 
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861};
+use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861, FS_862};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
@@ -495,8 +496,11 @@ pub fn transform_sample(
 }
 
 /// `TransformSampleReal(transform, xv, yv, zv, ...)`: as [`transform_sample`], a morph's index
-/// volumes read at the nearest voxel (`nint` of the clamped point, not clamped again) times the
-/// spacing; a linear array's result with each coordinate below 0 set to 0.
+/// volumes read at the nearest voxel (`nint` of the clamped point) times the spacing; a linear
+/// array's result with each coordinate below 0 set to 0. FS-862: FreeSurfer does not clamp the
+/// rounded voxel, so a point within half a voxel of the far face reads one voxel past the index
+/// volumes (another voxel, or memory past the last slice): by default the last voxel; `reproduce`
+/// FreeSurfer's index.
 #[allow(clippy::too_many_arguments)]
 pub fn transform_sample_real(
     g: &mut Globals,
@@ -516,9 +520,25 @@ pub fn transform_sample_real(
         let xv = clamp_to(xv, xi_m.vg.width);
         let yv = clamp_to(yv, yi_m.vg.height);
         let zv = clamp_to(zv, zi_m.vg.depth);
-        let xi = nint(g, f64::from(xv));
-        let yi = nint(g, f64::from(yv));
-        let zi = nint(g, f64::from(zv));
+        let mut xi = nint(g, f64::from(xv));
+        let mut yi = nint(g, f64::from(yv));
+        let mut zi = nint(g, f64::from(zv));
+        let (w, h, d) = (xi_m.vg.width, yi_m.vg.height, zi_m.vg.depth);
+        if xi >= w || yi >= h || zi >= d {
+            g.notices.add(
+                &FS_862,
+                if g.notices.reproduce() {
+                    "TransformSampleReal of a morph at a point within half a voxel of the index volumes' far face: read one voxel past them, as in FreeSurfer"
+                } else {
+                    "TransformSampleReal of a morph at a point within half a voxel of the index volumes' far face: the last voxel read (FreeSurfer reads one past it)"
+                },
+            );
+            if g.notices.fix() {
+                xi = xi.min(w - 1);
+                yi = yi.min(h - 1);
+                zi = zi.min(d - 1);
+            }
+        }
         let spacing = gcam.spacing as f32;
         let mut p = [0f32; 3];
         for (k, m) in [xi_m, yi_m, zi_m].into_iter().enumerate() {
@@ -827,10 +847,14 @@ pub fn transform_get_src_vol_geom(
     err: &mut dyn Write,
     t: &Transform,
 ) -> Result<VolGeom, Fatal> {
+    let mut vg = VolGeom::default();
     if t.is_morph() {
-        return Ok(t.gcam().image.clone());
+        vg.assign(g, &t.gcam().image);
+    } else {
+        let src = &first(g, err, t.lta(), "TransformGetSrcVolGeom")?.src;
+        vg.assign(g, src);
     }
-    Ok(first(g, err, t.lta(), "TransformGetSrcVolGeom")?.src.clone())
+    Ok(vg)
 }
 
 /// `TransformGetDstVolGeom(transform, &vg)`: a morph's atlas geometry, a linear array's first
@@ -840,10 +864,14 @@ pub fn transform_get_dst_vol_geom(
     err: &mut dyn Write,
     t: &Transform,
 ) -> Result<VolGeom, Fatal> {
+    let mut vg = VolGeom::default();
     if t.is_morph() {
-        return Ok(t.gcam().atlas.clone());
+        vg.assign(g, &t.gcam().atlas);
+    } else {
+        let dst = &first(g, err, t.lta(), "TransformGetDstVolGeom")?.dst;
+        vg.assign(g, dst);
     }
-    Ok(first(g, err, t.lta(), "TransformGetDstVolGeom")?.dst.clone())
+    Ok(vg)
 }
 
 /// `TransformSetMRIVolGeomToSrc(transform, mri)`: `MRIcopyVolGeomToMRI` of
@@ -882,10 +910,8 @@ pub fn transform_copy_vol_geom_to_mri(
     mri: &mut Mri,
 ) -> Result<i32, Fatal> {
     if !t.is_morph() {
-        let vg = first(g, err, t.lta(), "TransformCopyVolGeomToMRI")?
-            .dst
-            .clone();
-        mri_copy_vol_geom_to_mri(mri, &vg);
+        let dst = &first(g, err, t.lta(), "TransformCopyVolGeomToMRI")?.dst;
+        mri_copy_vol_geom_to_mri(mri, dst);
     }
     Ok(NO_ERROR)
 }

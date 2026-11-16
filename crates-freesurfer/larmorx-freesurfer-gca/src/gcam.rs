@@ -1695,40 +1695,6 @@ pub fn register_io() {
     });
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn allocation_failures_follow_freesurfer_s_order() {
-        assert_eq!(alloc_failure(3, 4, 5), None);
-        assert_eq!(alloc_failure(0, -1, -1), None);
-        assert_eq!(
-            alloc_failure(-1, 1, 1).as_deref(),
-            Some("GCAMalloc: could not allocate nodes")
-        );
-        assert_eq!(
-            alloc_failure(2, -3, 1).as_deref(),
-            Some("GCAMalloc: could not allocate 0th **")
-        );
-        assert_eq!(
-            alloc_failure(2, 3, -1).as_deref(),
-            Some("GCAMalloc: could not allocate 0,0th *")
-        );
-        // 1,000 x 1,000 x 1,000 nodes of 264 bytes pass 16 GiB within x = 65
-        let m = alloc_failure(1000, 1000, 1000).unwrap();
-        assert!(m.starts_with("GCAMalloc: could not allocate 65,"), "{m}");
-        assert_eq!(alloc_failure(128, 128, 128), None);
-    }
-
-    #[test]
-    fn names_are_freesurfer_s() {
-        assert_eq!(cma_label_to_name(0), "Unknown");
-        assert_eq!(cma_label_to_name(2), "Left_Cerebral_White_Matter");
-        assert_eq!(cma_label_to_name(-77), "");
-    }
-}
-
 /// `GCAMcopy(gcamsrc, gcamdst)` (gcamorph.cpp 17347): the morph copied into `dst` (another grid:
 /// `GCAMcopy: incompatible size.` and the end, `ERROR_BADPARM`) or into a new one
 /// (`GCAMalloc`): the sizes, `neg`, `exp_k`, the spacing, the index volumes of the inverse, the
@@ -1743,10 +1709,10 @@ pub fn gcam_copy(
     src: &Gcam,
     dst: Option<&mut Gcam>,
 ) -> Result<Ret<Gcam>, Fatal> {
-    if let Some(d) = &dst {
-        if (d.width, d.height, d.depth) != (src.width, src.height, src.depth) {
-            log::error_exit(g, err, ERROR_BADPARM, "GCAMcopy: incompatible size.\n")?;
-        }
+    if let Some(d) = &dst
+        && (d.width, d.height, d.depth) != (src.width, src.height, src.depth)
+    {
+        log::error_exit(g, err, ERROR_BADPARM, "GCAMcopy: incompatible size.\n")?;
     }
     let mut fresh = None;
     let given = dst.is_some();
@@ -1780,10 +1746,10 @@ pub fn gcam_copy(
                     mri_copy(g, out, err, s, Some(t))?;
                 }
                 None => {
-                    if keep(g, "inverse's index volume") {
-                        if let Ret::New(m) = mri_copy(g, out, err, s, None)? {
-                            *t = Some(m);
-                        }
+                    if keep(g, "inverse's index volume")
+                        && let Ret::New(m) = mri_copy(g, out, err, s, None)?
+                    {
+                        *t = Some(m);
                     }
                 }
             }
@@ -1803,10 +1769,10 @@ pub fn gcam_copy(
             matrix_copy(g, out, err, Some(s), Some(t))?;
         }
         (Some(s), None) => {
-            if keep(g, "affine") {
-                if let Ret::New(m) = matrix_copy(g, out, err, Some(s), None)? {
-                    d.m_affine = Some(m);
-                }
+            if keep(g, "affine")
+                && let Ret::New(m) = matrix_copy(g, out, err, Some(s), None)?
+            {
+                d.m_affine = Some(m);
             }
         }
         // MatrixCopy(NULL, ...) returns NULL and leaves the destination's
@@ -1820,4 +1786,38 @@ pub fn gcam_copy(
     } else {
         fresh.map_or(Ret::Null, Ret::New)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allocation_failures_follow_freesurfer_s_order() {
+        assert_eq!(alloc_failure(3, 4, 5), None);
+        assert_eq!(alloc_failure(0, -1, -1), None);
+        assert_eq!(
+            alloc_failure(-1, 1, 1).as_deref(),
+            Some("GCAMalloc: could not allocate nodes")
+        );
+        assert_eq!(
+            alloc_failure(2, -3, 1).as_deref(),
+            Some("GCAMalloc: could not allocate 0th **")
+        );
+        assert_eq!(
+            alloc_failure(2, 3, -1).as_deref(),
+            Some("GCAMalloc: could not allocate 0,0th *")
+        );
+        // 1,000 x 1,000 x 1,000 nodes of 264 bytes pass 16 GiB within x = 65
+        let m = alloc_failure(1000, 1000, 1000).unwrap();
+        assert!(m.starts_with("GCAMalloc: could not allocate 65,"), "{m}");
+        assert_eq!(alloc_failure(128, 128, 128), None);
+    }
+
+    #[test]
+    fn names_are_freesurfer_s() {
+        assert_eq!(cma_label_to_name(0), "Unknown");
+        assert_eq!(cma_label_to_name(2), "Left_Cerebral_White_Matter");
+        assert_eq!(cma_label_to_name(-77), "");
+    }
 }

@@ -326,9 +326,9 @@ pub(crate) fn read_image(
     }
     let nframe_toread = end_frame.wrapping_sub(frame0);
     if g.fs_tiff_debug {
-        let _ = write!(
+        let _ = writeln!(
             s.out,
-            "[DEBUG] TiffReadImage(): pages found={nframe}, pages to read={nframe_toread} [{frame0}, {end_frame}), image buf size={imagebufsize}\n"
+            "[DEBUG] TiffReadImage(): pages found={nframe}, pages to read={nframe_toread} [{frame0}, {end_frame}), image buf size={imagebufsize}"
         );
     }
     let _ = ported(tif.set_directory(frame0 as u16, &mut s))?;
@@ -634,18 +634,16 @@ fn with_bytes<R>(
     let mut tmp = vec![0u8; n];
     let lo = at.max(0);
     let hi = (at + n as i128).min(len);
-    if let Some(pix) = im.image.as_deref() {
-        if lo < hi {
-            tmp[(lo - at) as usize..(hi - at) as usize]
-                .copy_from_slice(&pix[lo as usize..hi as usize]);
-        }
+    if let Some(pix) = im.image.as_deref()
+        && lo < hi
+    {
+        tmp[(lo - at) as usize..(hi - at) as usize].copy_from_slice(&pix[lo as usize..hi as usize]);
     }
     let r = f(&mut tmp);
-    if let Some(pix) = im.image.as_deref_mut() {
-        if lo < hi {
-            pix[lo as usize..hi as usize]
-                .copy_from_slice(&tmp[(lo - at) as usize..(hi - at) as usize]);
-        }
+    if let Some(pix) = im.image.as_deref_mut()
+        && lo < hi
+    {
+        pix[lo as usize..hi as usize].copy_from_slice(&tmp[(lo - at) as usize..(hi - at) as usize]);
     }
     r
 }

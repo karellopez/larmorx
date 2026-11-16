@@ -152,7 +152,7 @@ impl Grid {
         if self.w <= 0 || self.h <= 0 || self.d <= 0 {
             0
         } else {
-            (self.w * self.h * self.d) as usize
+            (i64::from(self.w) * i64::from(self.h) * i64::from(self.d)) as usize
         }
     }
 }

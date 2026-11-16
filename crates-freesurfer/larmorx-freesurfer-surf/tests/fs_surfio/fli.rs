@@ -20,11 +20,12 @@ use super::sfile::list_files;
 use super::srd::{Mesh, be4, mesh};
 use super::*;
 
+use larmorx_freesurfer_core::histo::histo_alloc;
 use larmorx_freesurfer_core::ret::Ret;
-use larmorx_freesurfer_mri::mri::{Mri, mri_alloc};
+use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_surf::{annot, curvfile, mriflood, readwrite, sras, valfile, vpos};
+use larmorx_freesurfer_surf::{annot, curvfile, mriflood, props11, readwrite, sras, valfile, vpos};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
 pub(super) const FRAMES: [[f32; 9]; 6] = [
@@ -890,6 +891,92 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             o.f(s.total_area);
             o.f(s.orig_area);
             o.d(s.radius);
+        }
+        "mpx" => {
+            // relay 37 of track D: `fssurfio.cpp`'s `flr mpx` (group (e) on a recorded head: the
+            // distributions on the white surface with the sphere's canonical coordinates,
+            // Ashburner's energy on the sphere, the white surface moved to Talairach space)
+            let (wn, sn) = (t.next(), t.next());
+            let mut s = surf(g, sg, &mut io, wn)?;
+            let mut sp = surf(g, sg, &mut io, sn)?;
+            let mut hb: Vec<u8> = Vec::new();
+            let flush = |hb: &mut Vec<u8>, o: &mut Out| {
+                o.s(&format!("{:016x}", super::mpx::fnv64(hb)));
+                hb.clear();
+            };
+            let put = |hb: &mut Vec<u8>, f: f32| hb.extend_from_slice(&f.to_le_bytes());
+            o.i(i64::from(vpos::read_canonical_coordinates(
+                g, sg, &mut io, None, &mut s, sn,
+            )?));
+            let mut h1 = histo_alloc(g, io.err, 100)?;
+            let mut h2 = histo_alloc(g, io.err, 100)?;
+            let mut hd = histo_alloc(g, io.err, 100)?;
+            let mut m = mri_alloc(g, io.out, io.err, 100, 100, 1, MRI_FLOAT)?;
+            o.i(i64::from(
+                props11::compute_principal_curvature_distributions(
+                    g, sg, &mut io, None, &mut s, &mut h1, &mut h2, &mut m,
+                )?,
+            ));
+            o.i(i64::from(props11::compute_normal_dot_distribution(
+                g, sg, &mut io, None, &mut s, &mut hd,
+            )?));
+            for h in [&h1, &h2, &hd] {
+                o.f(h.bin_size);
+                for b in 0..h.nbins.max(0) as usize {
+                    put(&mut hb, h.bins[b]);
+                    put(&mut hb, h.counts[b]);
+                }
+                flush(&mut hb, o);
+            }
+            for x in [m.vg.xsize, m.vg.ysize, m.xstart, m.ystart] {
+                o.f(x);
+            }
+            for y in 0..100 {
+                for x in 0..100 {
+                    put(&mut hb, mri_get_vox_val(g, io.err, &m, x, y, 0, 0, 0)?);
+                }
+            }
+            flush(&mut hb, o);
+            for v in 0..s.nvertices.max(0) as usize {
+                put(&mut hb, s.vertex(v).k1);
+                put(&mut hb, s.vertex(v).k2);
+            }
+            flush(&mut hb, o);
+            for v in 0..s.nvertices.max(0) as usize {
+                let x = s.vertex(v);
+                for f in [x.x, x.y, x.z, x.nx, x.ny, x.nz, x.area] {
+                    put(&mut hb, f);
+                }
+            }
+            flush(&mut hb, o);
+            o.i(i64::from(vpos::read_canonical_coordinates(
+                g, sg, &mut io, None, &mut sp, sn,
+            )?));
+            for k in 0..64i64 {
+                let vno = (k * i64::from(sp.nvertices) / 64) as usize;
+                let (x, y, z) = {
+                    let v = sp.vertex(vno);
+                    (v.x + 0.5, v.y, v.z)
+                };
+                let e = props11::sample_ashburner_triangle_energy(
+                    g, &mut io, &mut sp, vno, 1.0, x, y, z,
+                )?;
+                put(&mut hb, e);
+            }
+            flush(&mut hb, o);
+            props11::talairach_transform_in_place(g, &mut io, &mut s)?;
+            for v in 0..s.nvertices.max(0) as usize {
+                let x = s.vertex(v);
+                for f in [x.x, x.y, x.z] {
+                    put(&mut hb, f);
+                }
+            }
+            flush(&mut hb, o);
+            for x in [
+                s.xlo, s.ylo, s.zlo, s.xhi, s.yhi, s.zhi, s.xctr, s.yctr, s.zctr,
+            ] {
+                o.f(x);
+            }
         }
         "ann" => {
             // relay 36 of track D: `fssurfio.cpp`'s `flr ann` (a recorded annotation read, written

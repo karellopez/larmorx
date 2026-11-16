@@ -146,9 +146,12 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     FreeSurfer's binary takes glibc's: a `surf` rotation (`Z`: `sinf`, `cosf`), a `posn`
     canonical-coordinates step (`cc`, or `sv 3`: `atan2f`), an `mpd` case (the discrete
     curvatures' and the pseudo-normal's `acosf`), a `vps` case that reads canonical coordinates
-    (`C`: `atan2f`; relay 36 of track D)."""
+    (`C`: `atan2f`; relay 36 of track D), an `mpx` case with Ashburner's energy (`ash`: `logf`,
+    `log`; relay 37 of track D)."""
     if cmd == "surf":
         return "Z" in toks
+    if cmd == "mpx":
+        return "ash" in toks
     if cmd == "vps":
         return "C" in toks
     if cmd == "posn":

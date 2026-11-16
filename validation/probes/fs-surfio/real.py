@@ -99,6 +99,12 @@ def main(argv: list[str] | None = None) -> int:
         "surface: sphere, smoothwm, pial, white",
     )
     ap.add_argument(
+        "--mpx",
+        action="store_true",
+        help="relay 37 of track D: group (e) (flr mpx) on each head's white surface and sphere: "
+        "the two distributions, Ashburner's sampled energy, the move to Talairach space",
+    )
+    ap.add_argument(
         "--ann",
         action="store_true",
         help="relay 36 of track D: the annotation files (flr ann): each head's recorded "
@@ -115,6 +121,10 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.mpx:
+                sd = s / "surf"
+                lines.append(f"flr mpx {sd / f'{hemi}.white'} {sd / f'{hemi}.sphere'}")
+                continue
             if a.ann:
                 for c in ANNOTS:
                     lines.append(
@@ -149,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"flr bbf {s / 'surf' / f'{hemi}.white'} {dx(0.5)}")
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
-    kind = "ann" if a.ann else "vps" if a.vps else "pvw" if a.pvw else "curv" if a.curv else "flood"
+    kind = "mpx" if a.mpx else "ann" if a.ann else "vps" if a.vps else "pvw" if a.pvw else "curv" if a.curv else "flood"
     cases_path = inputs / f"real-{kind}-cases.txt"
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}

@@ -4096,6 +4096,64 @@ void flr_case()
       out += t;
     }
     oi(s->status); of(s->total_area); of(s->orig_area); od(s->radius);
+  } else if (op == "mpx") {
+    // relay 37 of track D: group (e) on a recorded head (`mpx <white> <sphere>`): the white
+    // surface (its Talairach transform read from ../mri/transforms by MRISread) with the sphere's
+    // canonical coordinates: mrisComputePrincipalCurvatureDistributions (100 bins each, a 100 x
+    // 100 float volume) and mrisComputeNormalDotDistribution (100 bins), each status, bin size and
+    // the FNV-1a of each histogram's bins and counts, of the volume's voxels, of k1 and k2, of the
+    // positions and normals after; the sphere with its own canonical coordinates:
+    // mrisSampleAshburnerTriangleEnergy (lambda 1) at 64 vertices with the point 0.5 mm along x,
+    // the energies' FNV-1a; the white surface moved to Talairach space in place
+    // (MRIStalairachTransform): its positions' FNV-1a, its box and centre
+    std::string wn = next(), sn = next();
+    MRIS *s = MRISread(wn.c_str());
+    MRIS *sp = MRISread(sn.c_str());
+    if (!s || !sp) fail("cannot read the inputs");
+    std::string hb;
+    auto put = [&hb](float f) { hb.append((const char *)&f, 4); };
+    auto flush = [&hb]() {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : hb) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+      hb.clear();
+    };
+    oi(MRISreadCanonicalCoordinates(s, sn.c_str()));
+    HISTOGRAM *h1 = HISTOalloc(100), *h2 = HISTOalloc(100), *hd = HISTOalloc(100);
+    MRI *m = MRIalloc(100, 100, 1, MRI_FLOAT);
+    oi(mrisComputePrincipalCurvatureDistributions(s, h1, h2, m));
+    oi(mrisComputeNormalDotDistribution(s, hd));
+    for (HISTOGRAM *h : {h1, h2, hd}) {
+      of(h->bin_size);
+      for (int b = 0; b < h->nbins; b++) { put(h->bins[b]); put(h->counts[b]); }
+      flush();
+    }
+    of(m->xsize); of(m->ysize); of(m->xstart); of(m->ystart);
+    for (int y = 0; y < 100; y++)
+      for (int x = 0; x < 100; x++) put(MRIgetVoxVal(m, x, y, 0, 0));
+    flush();
+    for (int v = 0; v < s->nvertices; v++) { put(s->vertices[v].k1); put(s->vertices[v].k2); }
+    flush();
+    for (int v = 0; v < s->nvertices; v++) {
+      VERTEX *x = &s->vertices[v];
+      for (float f : {x->x, x->y, x->z, x->nx, x->ny, x->nz, x->area}) put(f);
+    }
+    flush();
+    oi(MRISreadCanonicalCoordinates(sp, sn.c_str()));
+    INTEGRATION_PARMS *parms = (INTEGRATION_PARMS *)calloc(1, sizeof(INTEGRATION_PARMS));
+    parms->l_ashburner_lambda = 1.0f;
+    for (int k = 0; k < 64; k++) {
+      int vno = (int)((long long)k * sp->nvertices / 64);
+      VERTEX *v = &sp->vertices[vno];
+      put(mrisSampleAshburnerTriangleEnergy(sp, vno, parms, v->x + 0.5f, v->y, v->z));
+    }
+    flush();
+    MRIStalairachTransform(s, s);
+    for (int v = 0; v < s->nvertices; v++) { put(s->vertices[v].x); put(s->vertices[v].y); put(s->vertices[v].z); }
+    flush();
+    for (float f : {s->xlo, s->ylo, s->zlo, s->xhi, s->yhi, s->zhi, s->xctr, s->yctr, s->zctr}) of(f);
   } else if (op == "ann") {
     // relay 36 of track D: a recorded annotation read into its white surface
     // (MRISreadAnnotation), written as an annotation file, a segmentation (.mgz) and GIFTI

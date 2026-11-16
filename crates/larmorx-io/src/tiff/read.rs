@@ -6,9 +6,11 @@
 //! (`TIFFReadTile`, `TIFFReadEncodedTile`, `TIFFFillTile`, `TIFFStartTile`), the raw buffer
 //! (`TIFFReadBufferSetup`), unmapped.
 
+use super::codec::Decode;
+use super::dir::PostDecode;
 use super::{Mode, TIFF_CODERSETUP, TIFF_MYBUFFER, TIFF_NOBITREV, Tiff, Unported, values};
 use larmorx_core::cfmt::Streams;
-use larmorx_core::defects::{FS_826, FS_830};
+use larmorx_core::defects::{FS_826, FS_830, FS_958, FS_959};
 
 /// `TIFFhowmany(x, y)` in `uint32` (a division by zero is the caller's).
 fn howmany(x: u32, y: u32) -> u32 {
@@ -244,10 +246,37 @@ impl Tiff {
 
     /// `TIFFReadScanline(tif, buf, row, sample)`: 1, or -1. `buf` receives
     /// `TIFFScanlineSize` bytes (a shorter slice is filled as far as it goes: the C function
-    /// writes past the caller's buffer).
+    /// writes past the caller's buffer). A slice of no bytes is C's buffer of no bytes (not
+    /// `NULL`: [`Tiff::read_scanline_null`]).
     pub fn read_scanline(
         &mut self,
         buf: &mut [u8],
+        row: u32,
+        sample: u16,
+        s: &mut dyn Streams,
+    ) -> Result<i32, Unported> {
+        self.read_scanline_into(Some(buf), row, sample, s)
+    }
+
+    /// `TIFFReadScanline(tif, NULL, row, sample)`: a scanline read into no buffer, 1 or -1.
+    /// For a scanline of 0 bytes (an image 0 pixels wide) every codec reads as into a buffer of
+    /// no bytes, except Deflate's (with or without the predictor), whose `inflate` refuses a
+    /// null output buffer: `ZIPDecode: <name>: zlib error: <zlib's message, (null) when none>`
+    /// and -1. A scanline of more bytes: Deflate's refusal as well; the other codecs write the
+    /// decoded bytes through the null pointer in libtiff (a crash): here they are decoded and
+    /// dropped, with FS-958's notice.
+    pub fn read_scanline_null(
+        &mut self,
+        row: u32,
+        sample: u16,
+        s: &mut dyn Streams,
+    ) -> Result<i32, Unported> {
+        self.read_scanline_into(None, row, sample, s)
+    }
+
+    fn read_scanline_into(
+        &mut self,
+        buf: Option<&mut [u8]>,
         row: u32,
         sample: u16,
         s: &mut dyn Streams,
@@ -262,6 +291,11 @@ impl Tiff {
         if e != 0 {
             let m = self.codec.decoderow;
             let cc = self.scanlinesize;
+            let Some(buf) = buf else {
+                e = self.decode_null(m, cc, "scanline", s);
+                self.row = row.wrapping_add(1);
+                return Ok(if e > 0 { 1 } else { -1 });
+            };
             let mut tmp = self.caller_buffer(buf, cc, "scanline");
             let b: &mut [u8] = match tmp.as_mut() {
                 Some(t) => t,
@@ -278,6 +312,63 @@ impl Tiff {
             }
         }
         Ok(if e > 0 { 1 } else { -1 })
+    }
+
+    /// Whether decoding method `m` writes its bytes into the caller's buffer (Deflate's is
+    /// refused when there is none; the methods of no decoder fail before).
+    fn writes_into_caller(&self, m: Decode) -> bool {
+        match m {
+            Decode::NoRow | Decode::NoStrip | Decode::NoTile | Decode::Zip => false,
+            Decode::PredRow => self.writes_into_caller(self.codec.predictor.coderow),
+            Decode::PredTile => self.writes_into_caller(self.codec.predictor.codetile),
+            _ => true,
+        }
+    }
+
+    /// Decoding method `m` into no buffer (C's `NULL`), `cc` bytes asked: Deflate's refusal
+    /// (`zip_decode`); a codec that writes `cc > 0` bytes decodes into a buffer dropped after
+    /// (libtiff writes through the null pointer: FS-958).
+    fn decode_null(&mut self, m: Decode, cc: i32, what: &str, s: &mut dyn Streams) -> i32 {
+        let mut scratch = Vec::new();
+        if cc > 0 && self.writes_into_caller(m) {
+            let name = self.name.clone();
+            self.notices.add(
+                &FS_958,
+                format!(
+                    "{name}: a {what} of {cc} bytes read into no buffer: libtiff 3.6.1's codec \
+                     writes its bytes through the null pointer (a crash) once it decodes any; \
+                     decoded here and dropped"
+                ),
+            );
+            if !self.can_alloc(cc as u64) {
+                return 0;
+            }
+            scratch = vec![0u8; cc as usize];
+        }
+        self.null_out = true;
+        let e = self.decode(m, &mut scratch, cc, s);
+        self.null_out = false;
+        if e != 0 {
+            // libtiff byte-swaps the bytes "decoded" (a decoder that is not implemented
+            // returns -1, taken as success here) in place
+            let unit = match self.codec.postdecode {
+                PostDecode::None => 0,
+                PostDecode::Swab16 => 2,
+                PostDecode::Swab32 => 4,
+                PostDecode::Swab64 => 8,
+            };
+            if unit > 0 && cc >= unit {
+                let name = self.name.clone();
+                self.notices.add(
+                    &FS_958,
+                    format!(
+                        "{name}: a {what} of {cc} bytes read into no buffer: libtiff 3.6.1 swaps \
+                         its bytes through the null pointer (a crash); nothing swapped here"
+                    ),
+                );
+            }
+        }
+        e
     }
 
     /// `TIFFSeek(tif, row, sample)`.
@@ -455,6 +546,20 @@ impl Tiff {
         true
     }
 
+    /// FS-959: `TIFFStartStrip` or `TIFFStartTile` divides by a count of 0 (the strips or tiles
+    /// per image, the tiles across or down rounded up in 32 bits): the program ends with
+    /// SIGFPE; here the quotient and the remainder are 0.
+    fn divides_by_zero(&mut self, what: &str, n: u32, by: &str) {
+        let name = self.name.clone();
+        self.notices.add(
+            &FS_959,
+            format!(
+                "{name}: starting {what} {n}, libtiff 3.6.1 divides by the {by}, 0 (SIGFPE); \
+                 its row, column and sample taken as 0"
+            ),
+        );
+    }
+
     /// `TIFFStartStrip(tif, strip)`.
     pub(crate) fn start_strip(&mut self, strip: u32, s: &mut dyn Streams) -> bool {
         if !self.coder_setup(s) {
@@ -463,6 +568,7 @@ impl Tiff {
         self.curstrip = strip;
         let spi = self.dir.stripsperimage;
         self.row = if spi == 0 {
+            self.divides_by_zero("strip", strip, "strips per image");
             0
         } else {
             (strip % spi).wrapping_mul(self.dir.rowsperstrip)
@@ -479,18 +585,24 @@ impl Tiff {
         }
         self.curtile = tile;
         let d = &self.dir;
-        let hx = howmany(d.imagewidth, d.tilewidth);
-        let hy = howmany(d.imagelength, d.tilelength);
+        let across = |n: u32, by: u32| if by == 0 { 0 } else { howmany(n, by) };
+        let hx = across(d.imagewidth, d.tilewidth);
+        let hy = across(d.imagelength, d.tilelength);
+        let (tl, tw, spi) = (d.tilelength, d.tilewidth, d.stripsperimage);
+        if hx == 0 || hy == 0 || spi == 0 {
+            let what = if spi == 0 {
+                "tiles per image"
+            } else {
+                "tiles across or down"
+            };
+            self.divides_by_zero("tile", tile, what);
+        }
         self.row = if hx == 0 {
             0
         } else {
-            (tile % hx).wrapping_mul(d.tilelength)
+            (tile % hx).wrapping_mul(tl)
         };
-        self.col = if hy == 0 {
-            0
-        } else {
-            (tile % hy).wrapping_mul(d.tilewidth)
-        };
+        self.col = if hy == 0 { 0 } else { (tile % hy).wrapping_mul(tw) };
         self.rawcp = 0;
         self.rawcc = self.strip_entry(true, tile).unwrap_or(0) as i32;
         self.pre_decode(s)
@@ -500,6 +612,32 @@ impl Tiff {
     pub fn read_tile(
         &mut self,
         buf: &mut [u8],
+        x: u32,
+        y: u32,
+        z: u32,
+        sample: u16,
+        s: &mut dyn Streams,
+    ) -> Result<i32, Unported> {
+        self.read_tile_into(Some(buf), x, y, z, sample, s)
+    }
+
+    /// `TIFFReadTile(tif, NULL, x, y, z, s)`: a tile read into no buffer, as
+    /// [`Tiff::read_scanline_null`] reads a scanline (Deflate's refusal; FS-958 for a codec
+    /// that writes a tile of more than 0 bytes); the tile's size, or -1.
+    pub fn read_tile_null(
+        &mut self,
+        x: u32,
+        y: u32,
+        z: u32,
+        sample: u16,
+        s: &mut dyn Streams,
+    ) -> Result<i32, Unported> {
+        self.read_tile_into(None, x, y, z, sample, s)
+    }
+
+    fn read_tile_into(
+        &mut self,
+        buf: Option<&mut [u8]>,
         x: u32,
         y: u32,
         z: u32,
@@ -521,7 +659,7 @@ impl Tiff {
     fn read_encoded_tile(
         &mut self,
         tile: u32,
-        buf: &mut [u8],
+        buf: Option<&mut [u8]>,
         size: i32,
         s: &mut dyn Streams,
     ) -> i32 {
@@ -541,6 +679,13 @@ impl Tiff {
         };
         if self.fill(tile, true, s) {
             let m = self.codec.decodetile;
+            let Some(buf) = buf else {
+                return if self.decode_null(m, size, "tile", s) != 0 {
+                    size
+                } else {
+                    -1
+                };
+            };
             let mut tmp = self.caller_buffer(buf, size, "tile");
             let b: &mut [u8] = match tmp.as_mut() {
                 Some(t) => t,

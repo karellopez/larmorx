@@ -226,8 +226,19 @@ fn difference(v: &mut [u8], row: usize, stride: usize, bps: u16, big: bool) {
 }
 
 /// The file of case `i` of `seed`.
-#[allow(clippy::too_many_lines)]
 pub fn make(seed: u64, i: u64) -> Vec<u8> {
+    make_with(seed, i, false)
+}
+
+/// The file of case `i` of `seed` whose directories are mostly 0 pixels wide (an image of no
+/// pixels: FreeSurfer then reads its scanlines into no buffer), their strips now and then
+/// followed by a few more bytes.
+pub fn make_no_pixels(seed: u64, i: u64) -> Vec<u8> {
+    make_with(seed, i, true)
+}
+
+#[allow(clippy::too_many_lines)]
+fn make_with(seed: u64, i: u64, no_pixels: bool) -> Vec<u8> {
     let mut r = Rng::new(seed.wrapping_mul(1_000_003).wrapping_add(i));
     let big = r.chance(3);
     let mut w = W {
@@ -245,6 +256,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
     for _ in 0..ndir {
         let wmax = if r.chance(8) { 300 } else { 40 };
         let width = 1 + r.below(wmax) as u32;
+        let width = if no_pixels && !r.chance(5) { 0 } else { width };
         let lmax = if r.chance(8) { 300 } else { 40 };
         let length = 1 + r.below(lmax) as u32;
         let spp: u16 = r.pick(&[1, 1, 1, 3, 3, 4, 2, 5]);
@@ -414,6 +426,11 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                     (0..n).map(|_| r.next_u64() as u8).collect()
                 }
             };
+            let mut enc = enc;
+            if no_pixels && r.chance(2) {
+                let n = 1 + r.below(8);
+                enc.extend((0..n).map(|_| r.next_u64() as u8));
+            }
             w.pad();
             offsets.push(w.out.len() as u32);
             counts.push(enc.len() as u32);
@@ -933,28 +950,52 @@ fn u32_of(v: Option<Value>) -> u32 {
     }
 }
 
+/// The buffers a read transcript reads the scanlines and tiles into.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Buffers {
+    /// A buffer of the scanline's or tile's size filled with 0xab first; sizes of 0 skipped.
+    Filled,
+    /// No buffer (C's `NULL`) whatever the size.
+    Null,
+    /// As `Filled`, and sizes of 0 read into a buffer of no bytes (C's `calloc(0, 1)`).
+    Empty,
+}
+
 /// The data of the current directory as the read transcript reads it: every scanline (or
-/// tile) of up to five samples, each into a buffer filled with 0xab first.
-fn data_text(t: &mut Tiff, out: &mut String, cap: &mut Captured) -> Result<(), super::Unported> {
+/// tile) of up to five samples, each into a buffer filled with 0xab first (`Filled`), into no
+/// buffer (`Null`) or, when the size is 0, into a buffer of no bytes (`Empty`).
+fn data_text(
+    t: &mut Tiff,
+    out: &mut String,
+    cap: &mut Captured,
+    mode: Buffers,
+) -> Result<(), super::Unported> {
     let tiled = t.tiled();
     let sls = t.scanline_size();
     let ts = t.tile_size();
     out.push_str(&format!(" tiled {} sls {sls} ts {ts}\n", i32::from(tiled)));
     let size = if tiled { ts } else { sls };
-    if size <= 0 || size > 16 << 20 {
+    let smallest = if mode == Buffers::Filled { 1 } else { 0 };
+    if size < smallest || size > 16 << 20 {
         out.push_str(" skip\n");
         return Ok(());
     }
+    let null = mode == Buffers::Null;
     let length = u32_of(t.get_field_defaulted(tag::IMAGELENGTH, cap));
     let width = u32_of(t.get_field_defaulted(tag::IMAGEWIDTH, cap));
     let spp = u32_of(t.get_field_defaulted(tag::SAMPLESPERPIXEL, cap));
     let planar = u32_of(t.get_field_defaulted(tag::PLANARCONFIG, cap));
     let nsamp = if planar == 2 { spp.clamp(1, 5) } else { 1 };
-    let mut buf = vec![0xabu8; size as usize];
+    let mut buf = vec![0xabu8; if null { 0 } else { size as usize }];
     let mut reads = 0u32;
     if !tiled {
         for sample in 0..nsamp {
             for row in 0..length.min(400) {
+                if null {
+                    let r = t.read_scanline_null(row, sample as u16, cap)?;
+                    out.push_str(&format!(" r {row} {sample} {r}\n"));
+                    continue;
+                }
                 buf.fill(0xab);
                 let r = t.read_scanline(&mut buf, row, sample as u16, cap)?;
                 out.push_str(&format!(" r {row} {sample} {r} {:016x}\n", fnv(&buf)));
@@ -968,9 +1009,14 @@ fn data_text(t: &mut Tiff, out: &mut String, cap: &mut Captured) -> Result<(), s
             while y < length {
                 let mut x = 0u32;
                 while x < width {
-                    buf.fill(0xab);
-                    let r = t.read_tile(&mut buf, x, y, 0, sample as u16, cap)?;
-                    out.push_str(&format!(" t {x} {y} {sample} {r} {:016x}\n", fnv(&buf)));
+                    if null {
+                        let r = t.read_tile_null(x, y, 0, sample as u16, cap)?;
+                        out.push_str(&format!(" t {x} {y} {sample} {r}\n"));
+                    } else {
+                        buf.fill(0xab);
+                        let r = t.read_tile(&mut buf, x, y, 0, sample as u16, cap)?;
+                        out.push_str(&format!(" t {x} {y} {sample} {r} {:016x}\n", fnv(&buf)));
+                    }
                     reads += 1;
                     if reads >= 200 {
                         break 'all;
@@ -997,6 +1043,16 @@ pub fn port_read(
     path: &str,
     opts: Options,
 ) -> (String, String, Vec<&'static str>, Option<super::Unported>) {
+    port_read_with(path, opts, Buffers::Filled)
+}
+
+/// [`port_read`] with the scanlines and tiles read into the buffers `mode` names (the probe's
+/// `tf_read` in its modes 0, 2 and 3).
+pub fn port_read_with(
+    path: &str,
+    opts: Options,
+    mode: Buffers,
+) -> (String, String, Vec<&'static str>, Option<super::Unported>) {
     let mut cap = Captured::default();
     let mut out = String::new();
     let mut ids: Vec<&'static str> = Vec::new();
@@ -1013,7 +1069,7 @@ pub fn port_read(
                 let r = t.set_directory(d, &mut cap)?;
                 out.push_str(&format!("setdir {d} {}\n", i32::from(r)));
                 fields_text(&mut t, &mut out, &mut cap);
-                data_text(&mut t, &mut out, &mut cap)?;
+                data_text(&mut t, &mut out, &mut cap, mode)?;
             }
             let r = t.set_directory(0, &mut cap)?;
             out.push_str(&format!("setdir 0 {}\n", i32::from(r)));

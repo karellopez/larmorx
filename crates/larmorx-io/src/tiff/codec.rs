@@ -660,8 +660,14 @@ impl Tiff {
         if matches!(m, Decode::Lzw | Decode::LzwCompat) && self.not_started("LZW") {
             return 0;
         }
-        if m == Decode::Zip && self.not_started("Deflate") {
-            return 0;
+        if m == Decode::Zip {
+            if self.null_out && self.codec.zip.as_ref().is_some_and(|z| z.inflate.is_some()) {
+                // zlib refuses no output buffer before it looks at its input or its size
+                return self.zip_decode(buf, cc, s);
+            }
+            if self.not_started("Deflate") {
+                return 0;
+            }
         }
         if cc < 0 && matches!(m, Decode::Dump | Decode::Zip | Decode::PixarLog) {
             let name = self.name.clone();
@@ -1493,6 +1499,19 @@ impl Tiff {
     /// `ZIPDecode`.
     fn zip_decode(&mut self, op: &mut [u8], occ: i32, s: &mut dyn Streams) -> i32 {
         const MODULE: &str = "ZIPDecode";
+        if self.null_out {
+            // No buffer (C's NULL): zlib's `inflate` refuses a null output pointer before it
+            // reads anything (Z_STREAM_ERROR), the stream's message as it stands.
+            let msg = self
+                .codec
+                .zip
+                .as_ref()
+                .and_then(|z| z.inflate.as_ref())
+                .and_then(|i| i.msg);
+            let m = format!("{}: zlib error: {}", self.name, msg.unwrap_or("(null)"));
+            self.error(Some(MODULE), &m, s);
+            return 0;
+        }
         let past = self
             .codec
             .zip

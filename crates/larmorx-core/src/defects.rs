@@ -2801,6 +2801,10 @@ defects! {
         "composing a transform with a matrix on the left and one on the right into another array (LTAcompose) gives only the right product: the left one is computed and then overwritten (composing in place gives both); corrected: the right matrix multiplies the left product";
     FS_957 = "FS-957", "FreeSurfer", true,
         "converting a transform array from RAS to voxel coordinates with no destination volume (LTArasToVoxelXform) converts the matrices with the source as the destination, then copies the geometry of the missing volume: the program crashes; corrected: the source's geometry for both";
+    FS_958 = "FS-958", "libtiff 3.6.1", true,
+        "a scanline or tile of more than 0 bytes read into no buffer (TIFFReadScanline or TIFFReadTile given a null pointer): the codecs other than Deflate write the decoded bytes through the null pointer (a crash) once they decode any (Deflate's zlib refuses it: `zlib error`, -1), and the byte swap of 16-, 32- and 64-bit samples of a file of the other byte order swaps them there (also after a codec that is not implemented, whose -1 is taken as success); decoded and dropped";
+    FS_959 = "FS-959", "libtiff 3.6.1", true,
+        "starting a strip or tile divides by a count of 0 (the strips per image, from a strip count that overflows 32 bits; the tiles across or down, from a tile width or length near 2^32 whose rounding overflows): the program ends with SIGFPE; corrected: row, column and sample 0";
 }
 
 /// The register entry with ID `id`.

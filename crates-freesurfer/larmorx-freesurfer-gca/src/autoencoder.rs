@@ -875,18 +875,11 @@ pub fn sae_layer_weights_to_mri(
                                 weights_refused(g, err, "SAElayerWeightsToMRI", m, need);
                                 return Ok(None);
                             };
+                            // the official build: mulss into val_prev, then addss of val into
+                            // it (val_prev's NaN first)
                             let val_prev = sse::mul(val_prev, w);
-                            mri_set_vox_val(
-                                g,
-                                err,
-                                &mut mri,
-                                xk,
-                                yk,
-                                0,
-                                h,
-                                sse::add(val, val_prev),
-                                0,
-                            )?;
+                            let sum = sse::add(val_prev, val);
+                            mri_set_vox_val(g, err, &mut mri, xk, yk, 0, h, sum, 0)?;
                         }
                     }
                     v = v.wrapping_add(1);

@@ -75,13 +75,17 @@ impl Mri {
     /// The row pointer `slices[s + f depth][r]` plus `c` elements of `size` bytes (`elem` bytes
     /// the row's stride per voxel: FreeSurfer's row pointers step by the voxel's size): `Outside`
     /// when the row pointer itself lies outside FreeSurfer's slice and row arrays.
+    ///
+    /// The slice is `s + f depth` with the header's depth; the slice and row pointer arrays are
+    /// the allocation's (`shape`: the same as the header's unless a caller changed the header's
+    /// extent, as `SAElayerWeightsToMRI` does under `reproduce`, FS-921).
     fn row_place(&self, c: i32, r: i32, s: i32, f: i32, size: u64, elem: u64) -> Place {
-        let sl = s.wrapping_add(f.wrapping_mul(self.vg.depth));
-        let nslices = self.vg.depth.wrapping_mul(self.nframes);
-        if !(0..nslices).contains(&sl) || !(0..self.vg.height).contains(&r) {
+        let sl = i64::from(s.wrapping_add(f.wrapping_mul(self.vg.depth)));
+        let nslices = self.shape.depth * self.shape.nframes;
+        if !(0..nslices).contains(&sl) || !(0..self.shape.height).contains(&i64::from(r)) {
             return Place::Outside;
         }
-        let row = (i128::from(sl) * i128::from(self.vg.height) + i128::from(r))
+        let row = (i128::from(sl) * i128::from(self.shape.height) + i128::from(r))
             * i128::from(self.vox_per_row)
             * i128::from(elem);
         let b = row + i128::from(c) * i128::from(size);

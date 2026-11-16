@@ -418,6 +418,31 @@ of 19 field names into new and given volumes; the folder's files by their bytes;
 faces than the surface has: FreeSurfer reads its face-normal cache past the faces and crashed) counted,
 not compared (`check.py`'s `SKIP`).
 
+Measured 2026-11-16 (relay 38 of track D, 55 commands): `scl` (`surfcluster.cpp` whole: a surface
+read by `MRISread` with every vertex's value, the group-average areas and flags, preset cluster
+numbers, `Gdiag_no`, `FS_CLUSTER_USE_AVG_VERTEX_AREA`, `USE_FAST_SURF_SMOOTHER`, `FREESURFER_SEED`
+1234; 1 to 5 of the cluster map, growth, measures, summaries, table, sort, renumberings, maxima, hand
+p-values, pruning, annotation, growth by distance and point set, on the case's current list; after
+each the vertices' numbers, values, annotations, the list and `errno`; `G` where FreeSurfer reads or
+writes outside its arrays; the port's side in `tests/fs_surfio/scl.rs`), seeds 7, 13 (500 cases each)
+and 17 (1,000): 0 different with `reproduce`, `fix` different only with notices (FS-906's point sets
+in a missing folder, the messages' FS-01). The first runs found `glibc`'s `acos` EDOM outside [-1, 1]
+(a vertex farther from the centre than the seed) and the colour table's clock seed (FS-04, hence
+`FREESURFER_SEED`). `lbl` gained `LabelRemoveIslandsSurf` (`ri`), `LabelRemoveHolesSurf` (`rh`),
+`LabelRemoveHolesAndIslandsSurf` (`rhi`) with some vertices' `stat` set: seeds 7, 13 (500 each) and 17
+(1,000): 0 different (238 of FS-902's crashes on empty labels and full inversions compared as
+crashes). `flr scl` (`real.py --scl`: three heads, both hemispheres, four labels each on `?h.white`:
+the three clean-ups, the clusters of `|x| >= 20 mm` with a transform, the clusterwise-p values, the
+old summary, a growth by distance): 24 of 24 identical in both modes (FreeSurfer 13.1 s, the port
+21.9 s). Seed 1 (1,650 cases): 1,593 identical, 57 counted, hash `bb6a3c15...`.
+
+`stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
+overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
+prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000
+to 400 x 400 vertices, 0.1 mm apart) the official build completes a growth 103,500 levels deep and
+crashes from 104,000; one cluster of each recorded head's whole white surface (119,164 to 148,828
+vertices) goes 71,053 to 87,414 deep and completes. The port grows every one in full.
+
 `lc.py <object.o> .LC<n> ...` (relay 37 of track D) prints an object file's local constants as
 `float` and `double` (the values the disassembly's `.LC` loads name: findings §30's FZERO bound, the
 distributions' limits, Ashburner's `SMALL`).

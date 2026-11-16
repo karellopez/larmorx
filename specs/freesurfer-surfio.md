@@ -4782,7 +4782,8 @@ count as a `float` (0/0 for no member), widened; returns 0. `sclustZeroSurfaceCl
 (`val` the cluster number as `float`) return 0. `sclustCountClusters`: the largest `undefval` (at least
 0) as a `float`. `sclustSetSurfaceValToCWP(surf, list)`: each vertex's `val` 0 outside clusters; else
 its list entry's `pval_clusterwise` narrowed to `float`, `p`: 50 if `p` is ±0, else `-log10f(p)`
-(glibc 2.35's `log10f` in both modes; a negative `p` sets `errno` to EDOM); negated unless the entry's
+(glibc 2.35's `log10f` with `reproduce`, the correctly rounded one by default; the two differ in the
+last bit on some arguments; a negative `p` sets `errno` to EDOM); negated unless the entry's
 `maxval` is above 0; returns 0.
 
 **132.3 The summary** (`SurfClusterSummary(surf, T, &n, fwhmmap)`). The mean vertex area `a` =

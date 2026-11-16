@@ -27,7 +27,7 @@ use std::io::Write;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{FS_901, FS_903, FS_904, FS_905, FS_906, FS_907};
 use larmorx_core::glibc_qsort::qsort;
-use larmorx_core::math::{acos, log10f_glibc};
+use larmorx_core::math::{acos, Libm};
 use larmorx_freesurfer_core::cscan::Bytes;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -451,10 +451,12 @@ pub fn set_surface_val_to_cluster_no(surf: &mut Mris) -> f32 {
 
 /// `sclustSetSurfaceValToCWP(Surf, scs)`: each vertex's `val` becomes 0 outside every cluster,
 /// else its cluster's clusterwise p-value `p` as a `float`: 50 when it is 0 (either sign), else
-/// `-log10f(p)`; negated unless the cluster's `maxval` is above 0. The base-10 logarithm is glibc
-/// 2.35's `log10f` in both modes. FS-903: a cluster number beyond the list (or negative) is left
+/// `-log10f(p)`; negated unless the cluster's `maxval` is above 0. The base-10 logarithm is
+/// correctly rounded by default and glibc 2.35's `log10f` with `reproduce` (fs.core's [`Libm`];
+/// they differ in the last bit on some arguments). FS-903: a cluster number beyond the list (or negative) is left
 /// alone (FreeSurfer reads outside the list). 0.
 pub fn set_surface_val_to_cwp(g: &mut Globals, surf: &mut Mris, scs: &[SurfClusterSum]) -> f32 {
+    let libm = Libm::quiet(g.mode());
     for vtx in 0..nverts(surf) {
         let c = surf.vertex(vtx).undefval;
         let val = if c == 0 {
@@ -478,7 +480,7 @@ pub fn set_surface_val_to_cwp(g: &mut Globals, surf: &mut Mris, scs: &[SurfClust
                     // glibc's log10f of a negative number: EDOM
                     g.errno = 33;
                 }
-                -log10f_glibc(p)
+                -libm.log10f(p)
             };
             if s.maxval > 0.0 { val } else { -val }
         };

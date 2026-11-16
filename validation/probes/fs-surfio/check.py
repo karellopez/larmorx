@@ -17,7 +17,7 @@ memory decides, FS-354); ``fix`` may
 differ only where a defect it corrects changed the result (its notices), or where the default's
 correctly rounded ``sinf``/``cosf`` replace glibc's (a ``surf`` case that rotates, ``Z``) or its
 correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordinates' angles,
-``cc`` or ``sv 3``): these name nothing, as every FreeSurfer computation that takes
+``cc`` or ``sv 3``), or the other cases ``libm_case`` lists: these name nothing, as every FreeSurfer computation that takes
 ``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
@@ -149,9 +149,12 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     canonical-coordinates step (`cc`, or `sv 3`: `atan2f`), an `mpd` case (the discrete
     curvatures' and the pseudo-normal's `acosf`), a `vps` case that reads canonical coordinates
     (`C`: `atan2f`; relay 36 of track D), an `mpx` case with Ashburner's energy (`ash`: `logf`,
-    `log`; relay 37 of track D)."""
+    `log`; relay 37 of track D), an `scl` case that sets the clusterwise p-values (`cwp`:
+    `log10f`; relay 39 of track D)."""
     if cmd == "surf":
         return "Z" in toks
+    if cmd == "scl":
+        return "cwp" in toks
     if cmd == "mpx":
         return "ash" in toks
     if cmd == "vps":

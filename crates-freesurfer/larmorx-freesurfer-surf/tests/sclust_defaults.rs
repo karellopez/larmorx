@@ -199,6 +199,32 @@ fn fs905_a_nan_clusterwise_p_value() {
     }
 }
 
+/// The clusterwise p-values' `-log10f`: correctly rounded by default, glibc 2.35's with
+/// `reproduce` (a `p` on which the two differ in the last bit).
+#[test]
+fn the_clusterwise_p_values_log10f() {
+    use larmorx_core::math::{log10f, log10f_glibc};
+    let p = (0x3c23_d70a_u32..)
+        .map(f32::from_bits)
+        .find(|&p| log10f(p) != log10f_glibc(p))
+        .unwrap();
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut r = Run::new(mode);
+        let mut s = r.chain(2);
+        s.vertex_mut(0).undefval = 1;
+        let list = vec![SurfClusterSum {
+            clusterno: 1,
+            pval_clusterwise: f64::from(p),
+            maxval: 1.0,
+            ..Default::default()
+        }];
+        assert_eq!(sclust::set_surface_val_to_cwp(&mut r.g, &mut s, &list), 0.0);
+        let expect = if mode.reproduce() { -log10f_glibc(p) } else { -log10f(p) };
+        assert_eq!(s.vertex(0).val.to_bits(), expect.to_bits(), "{mode:?}");
+        assert_eq!(s.vertex(1).val, 0.0);
+    }
+}
+
 /// FS-906: a point set that cannot be created: an error and 1 by default, FreeSurfer's crash
 /// (status 139) with `reproduce`.
 #[test]

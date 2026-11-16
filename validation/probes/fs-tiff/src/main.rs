@@ -123,7 +123,8 @@ fn c_run(lib: Lib, mode: i32, path: &Path, p: &[i32], d: &[f64], data: &[u8]) ->
 /// difference with one of them noted is expected.
 const VARY: &[&str] = &[
     "FS-815", "FS-816", "FS-818", "FS-819", "FS-820", "FS-821", "FS-822", "FS-823", "FS-824",
-    "FS-825", "FS-826", "FS-828", "FS-830", "FS-831", "FS-832", "FS-833", "FS-834",
+    "FS-825", "FS-826", "FS-828", "FS-830", "FS-831", "FS-832", "FS-833", "FS-834", "FS-835",
+    "FS-838", "FS-840", "FS-884",
 ];
 
 #[derive(Default)]
@@ -141,10 +142,14 @@ struct Tally {
     notices: std::collections::BTreeMap<&'static str, u64>,
 }
 
+/// The port's allocation limit: about what the originals' children get (their address space
+/// is capped at 4 GiB, the library's own mappings included).
+const MAX_ALLOC: u64 = (4 << 30) - (256 << 20);
+
 fn opts(mode: UpstreamDefects) -> Options {
     Options {
         upstream_defects: mode,
-        max_alloc: None,
+        max_alloc: Some(MAX_ALLOC),
         messages: Default::default(),
     }
 }
@@ -166,9 +171,13 @@ fn one_read(fs: Lib, up: Lib, path: &Path, t: &Mutex<Tally>, label: &str, verbos
     let cfs = c_run(fs, 0, path, &[], &[], &[]);
     let cup = c_run(up, 0, path, &[], &[], &[]);
     cases::reset_thread_state();
-    let (pout, perr, ids, unp) = cases::port_read(path.to_str().expect("path"), opts(UpstreamDefects::Reproduce));
+    let (pout, perr, ids, unp) = cases::port_read(
+        path.to_str().expect("path"),
+        opts(UpstreamDefects::Reproduce),
+    );
     cases::reset_thread_state();
-    let (fout, ferr, fids, _) = cases::port_read(path.to_str().expect("path"), opts(UpstreamDefects::Fix));
+    let (fout, ferr, fids, _) =
+        cases::port_read(path.to_str().expect("path"), opts(UpstreamDefects::Fix));
     let mut t = t.lock().expect("tally");
     t.cases += 1;
     for id in ids.iter().chain(fids.iter()) {
@@ -184,8 +193,13 @@ fn one_read(fs: Lib, up: Lib, path: &Path, t: &Mutex<Tally>, label: &str, verbos
         }
     }
     if verbose {
-        eprintln!("== original (FreeSurfer's build), kind {} status {}\n{}-- stderr\n{}", cfs.kind, cfs.status, cfs.out, cfs.err);
-        eprintln!("== port (reproduce), notices {ids:?}, unported {unp:?}\n{pout}-- stderr\n{perr}");
+        eprintln!(
+            "== original (FreeSurfer's build), kind {} status {}\n{}-- stderr\n{}",
+            cfs.kind, cfs.status, cfs.out, cfs.err
+        );
+        eprintln!(
+            "== port (reproduce), notices {ids:?}, unported {unp:?}\n{pout}-- stderr\n{perr}"
+        );
         eprintln!("== port (fix), notices {fids:?}\n{fout}-- stderr\n{ferr}");
     }
     if unp.is_some() {
@@ -196,7 +210,10 @@ fn one_read(fs: Lib, up: Lib, path: &Path, t: &Mutex<Tally>, label: &str, verbos
     if same {
         // The fix may differ only with a notice.
         if (fout != pout || ferr != perr) && fids.is_empty() && t.diffs.len() < 40 {
-            t.diffs.push(format!("{label}: fix differs without a notice: {}", first_diff(&pout, &fout)));
+            t.diffs.push(format!(
+                "{label}: fix differs without a notice: {}",
+                first_diff(&pout, &fout)
+            ));
         }
         t.same += 1;
         return;
@@ -206,6 +223,10 @@ fn one_read(fs: Lib, up: Lib, path: &Path, t: &Mutex<Tally>, label: &str, verbos
         t.hang_noted += 1;
     } else if cfs.kind == 2 && !ids.is_empty() {
         t.crash_noted += 1;
+        if !ids.iter().any(|i| VARY.contains(i)) {
+            // a crash the port explains only by a deterministic defect: listed for a look
+            eprintln!("CRASH {label}: signal {}, notices {ids:?}", cfs.status);
+        }
     } else if noted_vary {
         t.vary += 1;
     } else if cfs.err.contains("No space") != perr.contains("No space") {
@@ -216,7 +237,10 @@ fn one_read(fs: Lib, up: Lib, path: &Path, t: &Mutex<Tally>, label: &str, verbos
         } else {
             first_diff(&cfs.err, &perr)
         };
-        t.diffs.push(format!("{label}: kind {} status {}: {d}", cfs.kind, cfs.status));
+        t.diffs.push(format!(
+            "{label}: kind {} status {}: {d}",
+            cfs.kind, cfs.status
+        ));
     } else {
         t.diffs.push(String::new());
     }
@@ -229,26 +253,45 @@ fn report(what: &str, t: &Tally) {
     }
     println!(
         "{what}: {} cases: {} identical, {} vary (memory/crash defects noted), {} crashes of the original noted, {} hangs noted, {} unported codecs, {} allocation-limit, {} release/FreeSurfer differ, {} differing",
-        t.cases, t.same, t.vary, t.crash_noted, t.hang_noted, t.unported, t.alloc, t.up_fs_differ,
+        t.cases,
+        t.same,
+        t.vary,
+        t.crash_noted,
+        t.hang_noted,
+        t.unported,
+        t.alloc,
+        t.up_fs_differ,
         t.diffs.len()
     );
     println!("notices: {:?}", t.notices);
     if !t.builds.is_empty() {
-        println!("release and FreeSurfer's build differ without a noted defect: {:?}", t.builds);
+        println!(
+            "release and FreeSurfer's build differ without a noted defect: {:?}",
+            t.builds
+        );
     }
-    println!("{}", if t.diffs.is_empty() { "VERIFY-PASS" } else { "VERIFY-FAIL" });
+    println!(
+        "{}",
+        if t.diffs.is_empty() {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
+    );
 }
 
 fn par(n: u64, threads: usize, f: impl Fn(u64) + Sync) {
     let next = AtomicU64::new(0);
     std::thread::scope(|sc| {
         for _ in 0..threads.max(1) {
-            sc.spawn(|| loop {
-                let i = next.fetch_add(1, Ordering::Relaxed);
-                if i >= n {
-                    break;
+            sc.spawn(|| {
+                loop {
+                    let i = next.fetch_add(1, Ordering::Relaxed);
+                    if i >= n {
+                        break;
+                    }
+                    f(i);
                 }
-                f(i);
             });
         }
     });
@@ -257,11 +300,21 @@ fn par(n: u64, threads: usize, f: impl Fn(u64) + Sync) {
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let out = PathBuf::from(&a[2]);
-    let fs = load(&std::fs::canonicalize(&out).expect("out").join("libtf_fs.so"));
-    let up = load(&std::fs::canonicalize(&out).expect("out").join("libtf_up.so"));
+    let fs = load(
+        &std::fs::canonicalize(&out)
+            .expect("out")
+            .join("libtf_fs.so"),
+    );
+    let up = load(
+        &std::fs::canonicalize(&out)
+            .expect("out")
+            .join("libtf_up.so"),
+    );
     std::fs::create_dir_all(&a[3]).expect("scratch");
     // Files are named relative to the scratch folder (short names in the messages).
-    let file_arg = a.get(4).map(|f| std::fs::canonicalize(f).unwrap_or_else(|_| PathBuf::from(f)));
+    let file_arg = a
+        .get(4)
+        .map(|f| std::fs::canonicalize(f).unwrap_or_else(|_| PathBuf::from(f)));
     std::env::set_current_dir(&a[3]).expect("cd scratch");
     let scratch = PathBuf::from(".");
     let num = |i: usize| a[i].parse::<u64>().expect("number");
@@ -277,6 +330,42 @@ fn main() {
                 let _ = std::fs::remove_file(&p);
             });
             report(&format!("read seed {seed}"), &t.lock().expect("tally"));
+        }
+        "stats" => {
+            // per compression of each directory read: rows or tiles read whole (1 or a size)
+            // and failed (-1), the port in reproduce mode
+            let (seed, n) = (num(4), num(5));
+            let mut st: std::collections::BTreeMap<String, (u64, u64)> = Default::default();
+            for i in 0..n {
+                let p = PathBuf::from(format!("s{seed}-{i}.tif"));
+                std::fs::write(&p, cases::make(seed, i)).expect("write");
+                cases::reset_thread_state();
+                let (pout, _, _, _) =
+                    cases::port_read(p.to_str().expect("path"), opts(UpstreamDefects::Reproduce));
+                let _ = std::fs::remove_file(&p);
+                let mut comp = String::from("?");
+                for l in pout.lines() {
+                    if let Some(v) = l.strip_prefix(" f 259 1 ") {
+                        comp = v.to_string();
+                    }
+                    let w: Vec<&str> = l.split_whitespace().collect();
+                    let ok = match w.first() {
+                        Some(&"r") => w.get(3).map(|v| *v == "1"),
+                        Some(&"t") => w.get(4).map(|v| *v != "-1"),
+                        _ => None,
+                    };
+                    if let Some(ok) = ok {
+                        if !ok && std::env::var("FS_TIFF_SHOW").is_ok_and(|v| v == comp) {
+                            eprintln!("case {i}: {l}");
+                        }
+                        let e = st.entry(comp.clone()).or_default();
+                        if ok { e.0 += 1 } else { e.1 += 1 }
+                    }
+                }
+            }
+            for (c, (ok, bad)) in st {
+                println!("compression {c}: {ok} read, {bad} failed");
+            }
         }
         "one" => {
             let (seed, i) = (num(4), num(5));
@@ -317,7 +406,11 @@ fn main() {
                 let bu = std::fs::read(&pu).unwrap_or_default();
                 let _ = std::fs::remove_file(&pu);
                 cases::reset_thread_state();
-                let (po, pe, ids) = cases::port_write(pp.to_str().expect("path"), &c, opts(UpstreamDefects::Reproduce));
+                let (po, pe, ids) = cases::port_write(
+                    pp.to_str().expect("path"),
+                    &c,
+                    opts(UpstreamDefects::Reproduce),
+                );
                 let bp = std::fs::read(&pp).unwrap_or_default();
                 let mut t = t.lock().expect("tally");
                 t.cases += 1;
@@ -335,10 +428,19 @@ fn main() {
                     } else if oc.err != pe {
                         first_diff(&oc.err, &pe)
                     } else {
-                        let k = bc.iter().zip(&bp).position(|(x, y)| x != y).unwrap_or(bc.len().min(bp.len()));
-                        format!("files differ at byte {k} (lengths {} {})", bc.len(), bp.len())
+                        let k = bc
+                            .iter()
+                            .zip(&bp)
+                            .position(|(x, y)| x != y)
+                            .unwrap_or(bc.len().min(bp.len()));
+                        format!(
+                            "files differ at byte {k} (lengths {} {})",
+                            bc.len(),
+                            bp.len()
+                        )
                     };
-                    t.diffs.push(format!("write seed {seed} case {i}: kind {} {d}", oc.kind));
+                    t.diffs
+                        .push(format!("write seed {seed} case {i}: kind {} {d}", oc.kind));
                 }
                 for p in [&pc, &pu, &pp] {
                     let _ = std::fs::remove_file(p);

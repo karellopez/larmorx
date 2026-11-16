@@ -2657,6 +2657,8 @@ defects! {
         "writing a rational value that is NaN, infinite or above 4294967295 converts it to an unsigned 32-bit integer out of range (undefined; x86-64 gives 0 or its low 32 bits); clamped to 0 or 4294967295";
     FS_828 = "FS-828", "libtiff 3.6.1", true,
         "a directory that counts more entries than it fills writes the rest as memory never written; written as zeros";
+    FS_829 = "FS-829", "libtiff 3.6.1", true,
+        "the PixarLog decoder sizes its row buffer by the rows per strip in 32 bits and never checks the allocation: where it fails (the default of 2^32 - 1 rows per strip asks for about 8 GiB), zlib is given a null output and every row fails with a zlib error; corrected, the buffer is what a row needs";
     FS_830 = "FS-830", "libtiff 3.6.1", true,
         "after a TIFFReadDirectory that fails, the scanline and tile sizes of the previous directory are kept: TIFFReadScanline and TIFFReadTile write that many bytes into a buffer sized for the new directory (memory past it); only the buffer is written";
     FS_831 = "FS-831", "libtiff 3.6.1", true,
@@ -2667,6 +2669,28 @@ defects! {
         "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes (memory past the buffers); nothing is written";
     FS_834 = "FS-834", "libtiff 3.6.1", true,
         "a SamplesPerPixel of several values, of a floating-point type or of a string type (and such an entry left unchecked by FS-820) is passed as an array's or a string's address, or as a floating-point argument, where one integer goes: the field takes an address's low bits or a register never set (nondeterministic); ignored with libtiff's incorrect-count or wrong-type warning";
+    FS_835 = "FS-835", "libtiff 3.6.1", true,
+        "the NeXT, ThunderScan and CCITT decoders write past the buffer they are given when the data asks for more pixels than a row holds (a span or a run past the row, a row size larger than the buffer): memory after the buffer; only the buffer is written";
+    FS_836 = "FS-836", "libtiff 3.6.1", true,
+        "the NeXT decoder reads a row's code byte and a literal span's four-byte header without checking that the strip still has them, does not check a span against its row, lets a run of pixels go past the image width, and counts a tile's pixels by the image's width; corrected as libtiff 4.0.10 does: the reads and spans checked, runs stopped at the row's end, a tile's width used";
+    FS_837 = "FS-837", "libtiff 3.6.1", true,
+        "the ThunderScan decoder writes a run of pixels, and the deltas of a byte, in full when they go past the row's pixel count: the pixels land in the next row or past the buffer; corrected, nothing is written past the row (the pixel count and its error message unchanged)";
+    FS_838 = "FS-838", "libtiff 3.6.1", true,
+        "the CCITT decoders keep the runs of the current and the reference line in one block that damaged data makes them read or write outside (a crash or memory contents) or read where nothing was written (memory contents), and a row size of 0 bytes never returns; corrected as libtiff 4 does: the block cleared, the row stopped at the first access outside it with a Buffer overflow error, nothing decoded for a row size of 0";
+    FS_839 = "FS-839", "libtiff 3.6.1", true,
+        "the CCITT RLE/W decoder aligns each row to a 16-bit word by the bits it holds, not by the row's position: a row that ends with the decoder holding bits read from the next word loses them, and the next row starts a word late (Premature EOF or wrong rows of a valid image); corrected, each row starts at the next 16-bit boundary of the strip";
+    FS_840 = "FS-840", "libtiff 3.6.1", true,
+        "the PixarLog decoder inflates past its row buffer when a call needs more than the rows per strip gave it, looks the first codes of a row up through its tables without masking them to 11 bits (memory past the tables), and for 11- and 12-bit samples, whose scanline holds fewer codes than a row, reads codes never inflated (memory contents) and writes past the caller's buffer; corrected as libtiff 4.0.10 does: the buffer what a row needs, the first codes masked, the codes cut to whole rows with its warning";
+    FS_881 = "FS-881", "libtiff 3.6.1", true,
+        "the PixarLog decoder for 12-bit samples (PICIO's) with one, two or more than four samples per pixel gives each pixel the next pixel's value, so the second pixel's value is lost and the row's last values come from past the row; corrected, each pixel gets its own value, as the 8-bit, 16-bit and floating-point decoders give it";
+    FS_882 = "FS-882", "libtiff 3.6.1", true,
+        "the SGILog decoders size their translation buffer by the image width times the rows per strip in an int: the default of 2^32 - 1 rows per strip makes it negative, so every LogL or LogLuv image without RowsPerStrip (and every tiled one) fails with No space for SGILog translation buffer, and a product past 2^31 gives a buffer smaller than a row; corrected as libtiff 4.0.10 does: a strip's (the rows per strip at most the image length) or a tile's pixels";
+    FS_883 = "FS-883", "libtiff 3.6.1", true,
+        "the SGILog decoders' run and literal loops do not stop at the row's pixel count (they write on past it and the row fails as short by a negative count), a run reads its two bytes and a 24-bit LogLuv pixel its three when fewer are left, and rows of 0 bytes never end; corrected as libtiff 4.0.10 does: the loops stop at the row's end and at the data's";
+    FS_884 = "FS-884", "libtiff 3.6.1", true,
+        "the SGILog decoders write pixels past their translation buffer when it is smaller than a row (FS-882's sizes) or a run goes past the row (FS-883): memory past the buffer; not written";
+    FS_885 = "FS-885", "libtiff 3.6.1", true,
+        "a CCITT file whose FaxSubAddress entry comes before its Compression entry: the reader registers the tag as an unknown one that passes its count before the codec registers its own, and then hands the codec's tag method the count where the string's address goes (a crash); set from the string";
 }
 
 /// The register entry with ID `id`.

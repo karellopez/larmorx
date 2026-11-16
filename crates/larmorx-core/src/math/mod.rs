@@ -30,6 +30,7 @@ mod hypot;
 mod log;
 mod log10;
 mod log10_glibc;
+mod log10f;
 mod log10f_glibc;
 mod log_glibc;
 mod logf;
@@ -118,6 +119,11 @@ pub use log10_glibc::log10_glibc;
 /// [`logf_glibc`], Sun's notice; glibc's wrapper's results for `x <= 0`, measured): not correctly
 /// rounded, for `reproduce` and the replicas (FreeSurfer's morph fields).
 pub use log10f_glibc::log10f_glibc;
+
+/// The base-10 logarithm for `f32`, correctly rounded (CORE-MATH's `cr_log10f`; no fused
+/// multiply-adds). glibc's `log10f` (fdlibm's) is not correctly rounded; [`log10f_glibc`] has
+/// its bits, for `reproduce` ([`Libm::log10f`] chooses by the mode).
+pub use log10f::log10f;
 
 /// The arc cosine for `f32`, correctly rounded (CORE-MATH's `cr_acosf`; no fused multiply-adds,
 /// so no FMA-compiled copy). The `double` [`acos`] rounded to `f32` differs from it on two floats

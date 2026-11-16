@@ -116,9 +116,11 @@ pub enum PkgSite {
     AttGetAlloc,
     /// `micreate_std_variable`: a name that is not a standard MINC variable.
     BadStdVar,
-    /// `MI_create_dim_variable`, `MI_create_dimwidth_variable`: a dimension variable of more than
-    /// one dimension.
+    /// `MI_create_dim_variable`: a dimension variable of more than one dimension.
     WrongNDims,
+    /// `MI_create_dimwidth_variable`: a dimension-width variable of more than one dimension (a
+    /// site of its own, as a program's copy may report it apart).
+    WrongNDimsWidth,
     /// `MI_create_dimwidth_variable`: a name without the `-width` suffix.
     BadSuffix,
     /// `MI_verify_maxmin_dims`: `image-max` / `image-min` over the image's fastest dimensions.

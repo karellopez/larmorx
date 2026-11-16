@@ -13,17 +13,21 @@ it (files in; values, rows, messages and files out), measured with the different
 from the unit oracle, GCC 8.4.0, `-O3`; each case in a forked child, so a crash or a hang of the
 library is seen as the child's signal or timeout).
 
-## Results (2026-11-16, track C relay 32)
+## Results (2026-11-16, track C relays 32 and 33)
 
 | set | cases | identical | expected differences (noted) | differing |
 |---|---|---|---|---|
 | generated files read (seeds 1 to 9, 2,000 or 3,000 each; seeds 8 and 9 with the final code) | 25,000 | 20,000 | 1,587 crashes of the original (a defect noted), 464 hangs of the original (FS-814, FS-818), 552 memory-dependent results (FS-815 to FS-834 noted), 2,393 codecs not ported yet | 4, resolved: 3 originals timed out under the machine's load (identical when run alone), 1 crash of the original noted once FS-833 covered the byte swap |
-| files written by a scanline writer (the writer below; seeds 1 to 4) | 5,300 | 5,300 (transcripts and file bytes) | – | 0 |
+| generated files read with every codec decoding (relay 33's code: seeds 101 to 107, 3,000 each; CCITT, NeXT, ThunderScan, PixarLog and SGILog files among them; the port's allocation limit the originals') | 21,000 | 18,302 | 1,426 crashes of the original (a defect noted), 481 hangs of the original (FS-814, FS-818), 785 memory-dependent results noted | 6, resolved: the originals timed out under the machine's load (identical when run alone) |
+| files written by a scanline writer (the writer below; seeds 1 to 4, and 33 with relay 33's code) | 6,300 | 6,300 (transcripts and file bytes) | – | 0 |
 | zlib's decompressor alone (`validation/probes/zlib-deflate inflate`, seeds 1 and 2) | 10,000 streams, every call | all | – | 0 |
 
 libtiff 3.6.1 as released and FreeSurfer's copy gave the same results but where memory contents
 decide (about 1 % of the files read: heap layouts differ between the two builds). Logs
-`<workspace>/oracles/logs/fs-found-c-r32-tiff-*.log`.
+`<workspace>/oracles/logs/fs-found-c-r32-tiff-*.log`, `fs-found-c-r33-tiff-*.log`. Unit tests decode
+clean CCITT streams (every scheme and Group 3 option, both fill orders, widths up to 2,700),
+PixarLog strips (8, 16 and 32 bits, one to five samples) and SGILog rows (LogL 16-bit, LogLuv
+24- and 32-bit raw, with and without RowsPerStrip) to the images they code.
 
 ## Configuration and messages
 
@@ -49,19 +53,41 @@ decide (about 1 % of the files read: heap layouts differ between the two builds)
 ## Codecs
 
 - **None, PackBits, LZW, Deflate (both numbers), the horizontal predictor** are translated and
-  exact. libtiff 3.6.1 encodes no LZW (`LZW compression is not available to due to Unisys patent
+  exact; so are the decoders below (their encoders are not ported: no caller writes them). libtiff 3.6.1 encodes no LZW (`LZW compression is not available to due to Unisys patent
   enforcement`); it decodes new-style and old-style (bit-reversed, `Old-style LZW codes, convert
   file`) codes.
-- **Not ported yet** (the next relay): CCITT RLE, RLE/W, Group 3 and Group 4, PixarLog and SGILog,
-  which register private tags when selected (the port stops with `Unported` as soon as a
-  directory selects them), and the ThunderScan and NeXT decoders (`Unported` at their first
-  strip).
+- **CCITT RLE, RLE/W, Group 3 (one- and two-dimensional) and Group 4** (relay 33) decode as
+  libtiff's state tables say; the tables are `mkg3states`' (equal to FreeSurfer's `tif_fax3sm.c`).
+  A Group 3 file's `T4Options` (and a Group 4 file's `T6Options`, whose bit 0 libtiff reads the
+  same way) chooses the two-dimensional decoder; RLE and RLE/W align each row to a byte or a
+  16-bit word; damaged codes give `Bad code word at scanline <row> (x <pixel>)`, `Premature EOL`
+  or `Line length mismatch` (warnings) and `Premature EOF`; a sample of other than one bit is
+  refused (`Bits/sample must be 1 for Group 3/4 encoding/decoding`). The private tags
+  (BadFaxLines, CleanFaxData, ConsecutiveBadFaxLines, FaxRecvParams, FaxSubAddress, FaxRecvTime)
+  are kept; a tag a scheme does not register (T4Options in an RLE file) is set from its count
+  (libtiff's tag method takes the count where the value goes).
+- **NeXT** (2-bit grey) and **ThunderScan** (4-bit, rows only: tiles give `ThunderScan tile
+  decoding is not implemented`) decode their run codes; `NeXTDecode: Not enough data for
+  scanline`, `ThunderDecode: Not enough data` or `Too much data at scanline <row> (<n> != <m>)`.
+- **PixarLog** (11-bit companded codes, horizontally differenced, deflated) gives floats, 16-bit,
+  12-bit (PICIO), 11-bit or 8-bit samples by the BitsPerSample and SampleFormat
+  (`PixarLog compression can't handle bits depth/data format combination` otherwise); its tables
+  are the same with glibc's `exp` and `log` as with the correctly rounded ones. For one, two or
+  more than four samples per pixel the differences start from the second pixel, as libtiff's
+  encoder makes them.
+- **SGILog** (LogL: photometric 32844; LogLuv: 32845, 32-bit with compression 34676 and 24-bit
+  with 34677) gives floating-point Y or XYZ, 16-bit values, 8-bit grey or RGB, or the raw codes,
+  by the samples, the bits and the format (`No support for converting user data format to LogL`
+  or `LogLuv` otherwise; `Inappropriate photometric interpretation <n> for SGILog compression;
+  must be either LogLUV or LogL` for another photometric; separate planes refused for LogLuv).
+  The conversions take `exp`: by default the correctly rounded one, with `reproduce` glibc's;
+  a value the other changes is named (GLIBC-07).
 - The Deflate decoder inflates one scanline per call with `Z_PARTIAL_FLUSH`; after
   `Z_DATA_ERROR` it prints `Decoding error at scanline <row>, <zlib message>` and calls
   `inflateSync`; another error prints `zlib error: <message>`, where the message is zlib's last
   (`(null)` when zlib set none since its reset).
 
-## Defects (FS-814 to FS-834; FS-829 not used)
+## Defects (FS-814 to FS-840, FS-881 to FS-885)
 
 Each is corrected by default; `LARMORX_UPSTREAM_DEFECTS=reproduce` gives libtiff's result where
 it is deterministic. Where libtiff's behaviour depends on memory contents or crashes, the port
@@ -84,11 +110,23 @@ does what the correction does and notes it.
 | FS-826 | reading a strip or tile whose arrays a failed `TIFFReadDirectory` never read (a null pointer) | refused |
 | FS-827 | a rational written from NaN, an infinity or a value above 4294967295 converts out of range (x86-64: 0 or the low 32 bits) | clamped |
 | FS-828 | a directory counting more entries than it fills writes the rest as memory never written | zeros |
+| FS-829 | PixarLog's row buffer is sized by the rows per strip in 32 bits and never checked: where the allocation fails (the default 2^32 - 1 rows per strip asks for about 8 GiB), every row fails with `zlib error: (null)` | the buffer a row needs |
 | FS-830 | after a failed `TIFFReadDirectory`, the previous directory's scanline and tile sizes stay: a read writes that many bytes into a buffer sized for the new directory | only the caller's buffer is written |
 | FS-831 | when a strip's start fails in the codec's setup (an unsupported predictor), the next row is decoded without a start: the LZW or Deflate decoder's input was never set (a crash) | nothing decoded |
 | FS-832 | the predictor works by whole pixels while bytes are left, past a row whose length is not a multiple of the pixel's | past the caller's buffer nothing is touched |
 | FS-833 | a negative strip or tile size (a stripped image's `TIFFTileSize` overflows 32 bits; kept after a failed `TIFFReadDirectory`) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes | nothing written |
 | FS-834 | a SamplesPerPixel of several values, of a floating-point type or of a string type is passed as an address or a floating-point argument where one integer goes (the field takes an address's bits or a register never set) | ignored, with libtiff's incorrect-count or wrong-type warning |
+| FS-835 | the NeXT, ThunderScan, CCITT, PixarLog and SGILog decoders write past the buffer they are given when the data asks for more pixels than a row holds | only the buffer is written |
+| FS-836 | NeXT: a row's code byte and a span's header read without checking the strip has them, spans not checked against the row, runs past the image width, a tile's runs counted in image pixels | libtiff 4.0.10's decoder: the reads and spans checked, runs stopped at the row's end, a tile's width used |
+| FS-837 | ThunderScan: a run, or a byte's deltas, written in full past the row's pixel count | nothing written past the row (the count and its message unchanged) |
+| FS-838 | CCITT: the runs of the current and reference lines kept in one block that damaged data reads or writes outside (a crash, memory contents) or reads where nothing was written; a row size of 0 never returns | the block cleared, the row stopped at the first access outside it (`Buffer overflow at line <row> of strip <n>`), nothing decoded for a row size of 0 |
+| FS-839 | CCITT RLE/W: each row aligned to a 16-bit word by the bits the decoder holds, not by the row's position: a row ending with the decoder holding bits of the next word loses them, and the next row starts a word late (valid images decode wrong) | each row starts at the next 16-bit boundary of the strip |
+| FS-840 | PixarLog: inflating past the row buffer when a call needs more, the first codes of a row looked up without masking them to 11 bits (memory past the tables), and for 11- and 12-bit samples codes never inflated read and the caller's buffer written past | libtiff 4.0.10's decoder: the buffer a row needs, the first codes masked, the codes cut to whole rows (`stride <n> is not a multiple of sample count, <m>, data truncated`) |
+| FS-881 | PixarLog 12-bit samples with one, two or more than four samples a pixel: each pixel gets the next one's value | each pixel its own value, as for 8, 16 bits and floats |
+| FS-882 | SGILog: the translation buffer sized by the width times the rows per strip in an int: the default rows per strip makes it negative, so every LogL or LogLuv image without RowsPerStrip (and every tiled one) fails with `No space for SGILog translation buffer` | a strip's or a tile's pixels, as libtiff 4.0.10 |
+| FS-883 | SGILog: runs and literals not stopped at the row's pixel count, a run's two bytes and a 24-bit pixel's three read when fewer are left, rows of 0 bytes never end | the loops stop at the row's end and the data's, as libtiff 4.0.10 |
+| FS-884 | SGILog: pixels written past the translation buffer when it is smaller than a row (memory past it) | not written |
+| FS-885 | a CCITT file's FaxSubAddress entry before its Compression entry is first registered as an unknown tag that passes its count; the codec's tag method then gets the count where the string's address goes (a crash) | set from the string |
 
 Many of these are reached only through a directory that failed to read: libtiff's
 `TIFFSetDirectory` returns 0 but leaves the half-read directory in place, with the previous

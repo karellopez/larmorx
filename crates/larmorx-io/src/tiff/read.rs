@@ -602,7 +602,11 @@ impl Tiff {
         } else {
             (tile % hx).wrapping_mul(tl)
         };
-        self.col = if hy == 0 { 0 } else { (tile % hy).wrapping_mul(tw) };
+        self.col = if hy == 0 {
+            0
+        } else {
+            (tile % hy).wrapping_mul(tw)
+        };
         self.rawcp = 0;
         self.rawcc = self.strip_entry(true, tile).unwrap_or(0) as i32;
         self.pre_decode(s)

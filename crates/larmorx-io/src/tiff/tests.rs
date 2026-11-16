@@ -267,6 +267,140 @@ fn generated_files_digest() {
 
 const DIGEST: u64 = 0x41d8_59c3_cf79_74af;
 
+/// A little-endian TIFF of one directory: `(tag, type, value)` entries (SHORT values in the
+/// field's first two bytes), the strip `strip` after them (StripOffsets and StripByteCounts
+/// added).
+fn one_strip_file(entries: &[(u16, u16, u32)], strip: &[u8]) -> Vec<u8> {
+    let mut e: Vec<(u16, u16, u32)> = entries.to_vec();
+    let n = e.len() as u32 + 2;
+    let data_at = 8 + 2 + 12 * n + 4;
+    e.push((273, 4, data_at));
+    e.push((279, 4, strip.len() as u32));
+    e.sort_by_key(|x| x.0);
+    let mut f = b"II*\0\x08\0\0\0".to_vec();
+    f.extend_from_slice(&(n as u16).to_le_bytes());
+    for (tag, ty, v) in e {
+        f.extend_from_slice(&tag.to_le_bytes());
+        f.extend_from_slice(&ty.to_le_bytes());
+        f.extend_from_slice(&1u32.to_le_bytes());
+        if ty == 3 {
+            f.extend_from_slice(&(v as u16).to_le_bytes());
+            f.extend_from_slice(&[0, 0]);
+        } else {
+            f.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    f.extend_from_slice(&0u32.to_le_bytes());
+    f.extend_from_slice(strip);
+    f
+}
+
+/// FreeSurfer's image of no pixels: the scanlines of a 0-pixel-wide image read into no buffer
+/// (TIFFReadScanline given NULL) are refused by Deflate's zlib, read by the other codecs as into
+/// a buffer of no bytes; a scanline of 1 byte into no buffer is FS-958.
+#[test]
+fn scanlines_read_into_no_buffer() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let deflated = larmorx_core::zlib::compress_vec(&[], 6).expect("deflate");
+    let cases: [(u16, u32, &[u8]); 4] = [
+        (8, 0, &deflated),
+        (32773, 0, &[0x80]),
+        (1, 0, &[7]),
+        (1, 1, &[7, 8]),
+    ];
+    for (k, (compression, width, strip)) in cases.into_iter().enumerate() {
+        let f = one_strip_file(
+            &[
+                (256, 4, width),
+                (257, 4, 2),
+                (258, 3, 8),
+                (259, 3, u32::from(compression)),
+                (262, 3, 1),
+                (277, 3, 1),
+                (278, 4, 2),
+            ],
+            strip,
+        );
+        let name = format!("n{k}.tif");
+        let path = dir.path().join(&name);
+        std::fs::write(&path, &f).expect("write");
+        for null in [true, false] {
+            cases::reset_thread_state();
+            let mut cap = Captured::default();
+            let mut t = Tiff::open_named(
+                path.to_str().expect("path"),
+                &name,
+                "r",
+                opts(UpstreamDefects::Fix),
+                &mut cap,
+            )
+            .expect("ported")
+            .expect("opened");
+            let mut got = Vec::new();
+            for row in 0..2 {
+                let r = if null {
+                    t.read_scanline_null(row, 0, &mut cap)
+                } else {
+                    t.read_scanline(&mut [], row, 0, &mut cap)
+                };
+                got.push(r.expect("ported"));
+            }
+            t.close(&mut cap);
+            let ids: Vec<&str> = take_closed_notices().iter().map(|n| n.defect.id).collect();
+            let err = cap.text(Stream::Err);
+            match (compression, width, null) {
+                (8, _, true) => {
+                    assert_eq!(got, [-1, -1]);
+                    assert_eq!(
+                        err,
+                        format!("ZIPDecode: {name}: zlib error: (null).\n").repeat(2)
+                    );
+                }
+                (1, 1, true) => {
+                    assert_eq!(got, [1, 1], "{err}");
+                    assert_eq!(ids, ["FS-958"]);
+                }
+                (1, 1, false) => {
+                    // a buffer of no bytes for a scanline of one (FS-830's notice)
+                    assert_eq!(got, [1, 1], "{err}");
+                    assert_eq!(ids, ["FS-830"]);
+                }
+                _ => {
+                    assert_eq!(got, [1, 1], "{compression} {null}: {err}");
+                    assert!(err.is_empty() && ids.is_empty(), "{err} {ids:?}");
+                }
+            }
+        }
+    }
+}
+
+/// The files of no pixels read into no buffer and into buffers of no bytes, both modes:
+/// recorded after the probe's `nopix` runs (relay 36; seeds 3 to 5, 9,000 files read twice).
+#[test]
+fn no_pixel_files_digest() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let prefix = format!("{}{}", dir.path().display(), std::path::MAIN_SEPARATOR);
+    let mut all = Vec::new();
+    for i in 0..200 {
+        let name = format!("z{i}.tif");
+        let p = dir.path().join(&name);
+        std::fs::write(&p, cases::make_no_pixels(4243, i)).expect("write");
+        for b in [cases::Buffers::Null, cases::Buffers::Empty] {
+            for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+                cases::reset_thread_state();
+                let (out, err, ids, _) =
+                    cases::port_read_with(p.to_str().expect("path"), opts(mode), b);
+                all.extend_from_slice(out.as_bytes());
+                all.extend_from_slice(err.replace(&prefix, "").as_bytes());
+                all.extend_from_slice(format!("{ids:?}").as_bytes());
+            }
+        }
+    }
+    assert_eq!(fnv(&all), NO_PIXEL_DIGEST, "digest {:#018x}", fnv(&all));
+}
+
+const NO_PIXEL_DIGEST: u64 = 0x0ffb_42dd_e541_f2e9;
+
 /// CCITT streams made by the generator (its own encoder) decode to the image they encode, in
 /// every scheme and Group 3 option, both fill orders.
 #[test]

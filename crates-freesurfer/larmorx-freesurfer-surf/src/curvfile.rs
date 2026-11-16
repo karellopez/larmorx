@@ -290,58 +290,6 @@ pub fn read_curv_mri(
     Ok(NO_ERROR)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use larmorx_core::defects::UpstreamDefects;
-    use larmorx_freesurfer_core::run::Environment;
-
-    fn surface(g: &mut Globals, sg: &SurfGlobals, nv: i32) -> Mris {
-        let (mut out, mut err) = (Vec::new(), Vec::new());
-        let mut m = crate::alloc::alloc(g, &mut out, &mut err, sg, nv, 0).expect("a surface");
-        m.fname = "d/lh.white".to_owned();
-        for k in 0..nv as usize {
-            m.vertex_mut(k).curv = k as f32 * 0.5 - 1.0;
-        }
-        m
-    }
-
-    /// The new binary format: written, then read back by name (the hemisphere put before it).
-    #[test]
-    fn new_format_round_trip() {
-        let td = tempfile::tempdir().expect("a folder");
-        std::fs::create_dir(td.path().join("d")).expect("d");
-        let d = Some(td.path());
-        let env = Environment::from_pairs(Vec::<(String, String)>::new());
-        let (mut out, mut err) = (Vec::new(), Vec::new());
-        let mut io = Io {
-            out: &mut out,
-            err: &mut err,
-            env: &env,
-        };
-        let mut g = Globals::new(UpstreamDefects::Fix);
-        let mut sg = SurfGlobals::default();
-        let mut m = surface(&mut g, &sg, 4);
-        let r = write_curvature(&mut g, &mut io, d, &mut m, "curv", None).expect("written");
-        assert_eq!(r, NO_ERROR);
-        let b = std::fs::read(td.path().join("d/lh.curv")).expect("the file");
-        assert_eq!(&b[..3], &[0xff, 0xff, 0xff]);
-        assert_eq!(b.len(), 3 + 12 + 16);
-        let mut m2 = surface(&mut g, &sg, 4);
-        for k in 0..4 {
-            m2.vertex_mut(k).curv = 9.0;
-        }
-        let r = read_curvature_file(&mut g, &mut sg, &mut io, d, &mut m2, "curv", None, None)
-            .expect("read");
-        assert_eq!(r, NO_ERROR);
-        for k in 0..4 {
-            assert_eq!(m2.vertex(k).curv.to_bits(), m.vertex(k).curv.to_bits());
-        }
-        assert_eq!(m2.min_curv, -1.0);
-        assert_eq!(m2.max_curv, 0.5);
-    }
-}
-
 // ---- a vertex field written through the curvature (relay 38 of track D) ----------------------
 
 /// `MRISwriteD`, `MRISwriteMarked`, `MRISwriteArea` (`utils/mrisurf_io.cpp` 810, 5984, 6023): the
@@ -416,4 +364,56 @@ pub fn read_marked(
     crate::valcopy::curv_to_marked(mris);
     crate::valcopy::import_curvature_vector(g, mris, &saved);
     Ok(NO_ERROR)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_core::run::Environment;
+
+    fn surface(g: &mut Globals, sg: &SurfGlobals, nv: i32) -> Mris {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut m = crate::alloc::alloc(g, &mut out, &mut err, sg, nv, 0).expect("a surface");
+        m.fname = "d/lh.white".to_owned();
+        for k in 0..nv as usize {
+            m.vertex_mut(k).curv = k as f32 * 0.5 - 1.0;
+        }
+        m
+    }
+
+    /// The new binary format: written, then read back by name (the hemisphere put before it).
+    #[test]
+    fn new_format_round_trip() {
+        let td = tempfile::tempdir().expect("a folder");
+        std::fs::create_dir(td.path().join("d")).expect("d");
+        let d = Some(td.path());
+        let env = Environment::from_pairs(Vec::<(String, String)>::new());
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mut io = Io {
+            out: &mut out,
+            err: &mut err,
+            env: &env,
+        };
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut sg = SurfGlobals::default();
+        let mut m = surface(&mut g, &sg, 4);
+        let r = write_curvature(&mut g, &mut io, d, &mut m, "curv", None).expect("written");
+        assert_eq!(r, NO_ERROR);
+        let b = std::fs::read(td.path().join("d/lh.curv")).expect("the file");
+        assert_eq!(&b[..3], &[0xff, 0xff, 0xff]);
+        assert_eq!(b.len(), 3 + 12 + 16);
+        let mut m2 = surface(&mut g, &sg, 4);
+        for k in 0..4 {
+            m2.vertex_mut(k).curv = 9.0;
+        }
+        let r = read_curvature_file(&mut g, &mut sg, &mut io, d, &mut m2, "curv", None, None)
+            .expect("read");
+        assert_eq!(r, NO_ERROR);
+        for k in 0..4 {
+            assert_eq!(m2.vertex(k).curv.to_bits(), m.vertex(k).curv.to_bits());
+        }
+        assert_eq!(m2.min_curv, -1.0);
+        assert_eq!(m2.max_curv, 0.5);
+    }
 }

@@ -465,6 +465,18 @@ whole surface passes its stack) and the port grows it in full. Faces found inter
 face table, every face's test and `mrisMarkIntersections`: on ds000005's `lh.white` 0.82, 0.25,
 0.88 and 1.04 s.
 
+Measured 2026-11-16 (relay 40 of track D, 58 commands): `vls` (`mrisurf_vals.cpp`'s marks,
+settings, rip flags, face tests, averages, medians, Gaussian, mode and soap-bubble filters and the
+long-range sampling: `MRISsampleDistances` and `MRISsampleAtEachDistance` with `FREESURFER_SEED`,
+`Gdiag_no`, the heartbeat bit and a `VDIAG` pair from the case, the files they write; grids, srd's
+meshes and icosahedra, now and then at 2 hops; the port's side in `tests/fs_surfio/vls.rs`), seeds 7,
+13 (500 cases each) and 17 (1,000): 0 different with `reproduce`, `fix` different only with notices
+(FS-03's failed assertions, FS-01's `ErrorExit` messages, FS-12, FS-972, FS-974 to FS-977). The
+official build's results include its signal 8 on small surfaces with the heartbeat bit (FS-974) and
+its signal 11 writing a ripped `Gdiag_no`'s log (FS-977), both reproduced. A label point outside the
+surface (FS-917) is written `G`; `MRISmodeFilterZeroVals` runs only in cases without special values
+(FS-973's NaN makes the official filter print for ever).
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

@@ -5103,3 +5103,199 @@ size): identical where the official build completes; it crashes (stack overflow,
 the holes of `orig.nofix` surfaces, which the port grows in full (observed). A clean-room
 implementer's black-box form: `mris_remove_intersection` (with and without `--fill-holes`) on a
 recorded `?h.orig`, and `mris_info`'s `num_intersecting_faces`.
+
+## 138. Marks, settings, rip flags and face tests of a surface's vertices (fs.surf's `mrisurf_vals.cpp`, taken early; relay 40 of track D)
+
+**138.1 Counts and marks** (each returns `NO_ERROR` unless said). `MRIScountMarked(mris, t)`: the
+vertices not ripped whose mark (a 16-bit integer) is at least `t`; `MRISmarkedVertices`: those whose
+mark is above 0. `MRISsetAllMarks(mris, m)`: every vertex's mark `m` (ripped ones too; the low 16
+bits). Over the vertices not ripped: `MRISinvertMarks` and `MRISnotMarked` (the same): a mark of 0
+becomes 1, any other 0; `MRISthresholdValIntoMarked(mris, t)`: the mark 1 where `val >= t`, else 0
+(NaN: 0); `MRISmarkVerticesWithValOverThresh(mris, t)`: 1 where `val > t`, else 0; `MRISclearMark2s`:
+`marked2` 0. `MRISexpandMarked`: in vertex order over every vertex (ripped ones too), a vertex whose
+mark is 1 gives each 1-hop neighbour whose mark is 0 the mark 2 (a neighbour marked 2 in this pass
+does not spread); then every mark 2 (those set before too) becomes 1. `MRISerodeMarked(mris, n)`: `n`
+steps; in each, every vertex not ripped takes the smallest mark of itself and its 1-hop neighbours
+(ripped ones included), all computed from the step's start (stored as a `float` in `tx`, which keeps
+it). `MRIScloseMarked(mris, n)`: §99.2's dilation then the erosion, `n` steps each; `MRISopenMarked`:
+the erosion then the dilation. `MRISsetFlags(mris, f)` and `MRISclearFlags(mris, f)`: the bits `f`
+set in, or cleared from, every vertex's flags.
+
+**138.2 Settings.** `mrisSetVal(mris, x)`: every vertex's `val` (ripped ones too; no status);
+`mrisSetValAndClearVal2(mris, x)`: and `val2` 0; `MRISclearD`: every `d` 0. Over the vertices not
+ripped: `MRISclearGradient` and `mrisClearGradient` (the same): `dx dy dz` 0; `mrisClearMomentum`:
+`odx ody odz` 0; `mrisClearExtraGradient`: when the surface has its extra gradients, their three
+entries 0; `MRISsetVals` and `MRISsetValues` (the same): `val`; `MRISsetVal2`: `val2`;
+`MRISclearFixedValFlags`: `fixedval` 0; `MRISnegateValues`: `val`'s sign bit flipped (a NaN's too:
+the official build flips the bit); `MRISabsVals`, `MRISabsCurvature`: `val`'s or `curv`'s sign bit
+cleared; `MRISscaleVals(mris, s)` and `MRISmulVal(mris, s)` (the same): `val * s` in `float`, `val`'s
+NaN first; `MRISsqrtVal`: a `val` above 0 replaced by its square root. `MRISextractCurvatureVectorDouble
+(mris, v, k)`: each vertex's `curv` widened into `v[vertex + k]`; `MRISextractCurvatureDoubleVector(mris,
+v)`: into `v[vertex]`.
+
+**138.3 Rip flags.** `MRISripLabel(mris, label)`: each label point's vertex ripped (deleted points
+too). `MRISripNotLabel(mris, label)`: each point's vertex marked 1; every vertex whose mark is then 0
+ripped (ripped ones again, counted); each point's vertex's mark 0 again; `MRISripNotLabel() ripped
+<n>/<nvertices> vertices (<k> unripped)` on standard output (`n` the vertices ripped by it, `k` the
+others). **FS-917** (class a): a label point naming no vertex of the surface (-1, or beyond it) is
+written outside the vertices by FreeSurfer; both modes skip the point, noted. `MRISripMarked`: every
+vertex whose mark is not 0 ripped; `MRISripUnmarked`: every one whose mark is 0;
+`MRISripZeroThicknessRegions`: every vertex not ripped whose white and pial positions differ by less
+than `FLT_EPSILON` (1.1920929e-7) along each axis (the `float` differences; NaN: no) ripped.
+
+**138.4 Face tests and the rest.** `mrisAnyVertexOfFaceMarked(mris, f)` and `triangleMarked` (the
+same): 1 when a vertex of face `f` has a mark other than 0. `findNonMarkedFace(mris, v, w)`: the first
+face of vertex `v`'s list whose mark is 0 and that has `w` as a vertex, else -1; a `v` outside the
+surface, or `w` equal to `v`, is a failed assertion (`ASSERTION FAILED: <official source
+folder>/utils/mrisurf_vals.cpp:1768 (0 <= vno) && (vno < mris->nvertices)`, or `:1769 vno != vn1`;
+FS-03). `mrisMarkBadEdgeVertices(mris, m)`: for each vertex not ripped, its first 1-hop neighbour of a
+number at least its own whose edge with it lies in a number of faces other than 2 (the vertex's other
+1-hop neighbours that are neighbours of that one and make a face with the two, §105's face test):
+both marked `m`; the vertex's other edges not looked at; returns twice the vertices that found one.
+`detectContrast(mris)`: `Detecting contrast direction:` on standard error, then the means of the
+vertices not ripped of `val2` (white matter) and `val2bak` (grey matter), summed in vertex order in
+`double`: ` right direction [ GM (<gm>) < WM (<wm>) ]` and 1 when the white mean is the larger, else `
+inverted [ WM (<wm>) < GM (<gm>) ]` and -1 (`%3.2f`; no vertex: `0 / 0`, printed `-nan`).
+
+## 139. Filters of the vertices' values (fs.surf's `mrisurf_vals.cpp`, taken early; relay 40 of track D)
+
+Each filter step reads the values of the step before (its new values in `tdx` first, then copied),
+but the soap bubbles, which update in place in vertex order. All return `NO_ERROR` unless said.
+
+**139.1 Averages** (`float`). One step's new value of a vertex: its own value plus its 1-hop
+neighbours' that count, in list order, the running sum the first operand (its NaN passed on), over
+their count plus one (counted in `float` from 0); a vertex whose 1-hop count is not above 0 keeps its
+value undivided (the official build skips the division by 1: a signalling NaN stays signalling).
+`MRISaverageVals`, `MRISaverageVal2s`, `MRISaverageVal2baks`, `MRISaverageD`, `MRISaverageCurvatures`
+(§116; then the curvature extremes): `navgs` steps of `val`, `val2`, `val2bak`, `d`, `curv`, over the
+vertices not ripped and their neighbours not ripped. `MRISaverageMarkedVals`: of `val`, a vertex
+unmarked (mark 0) neither changing nor counted. `MRISaverageMarkedCurvatures`: of `curv` at the marked
+vertices, every neighbour not ripped counted; then the extremes. `MRISaverageMarkedStats`: of `stat`
+as `MRISaverageVals`, each step then marking 2 every vertex not ripped of mark 0 whose new `stat` is
+not within `FLT_EPSILON` of 0 (NaN included). `MRISminFilterCurvatures` and `MRISmaxFilterCurvatures`:
+`n` steps of `curv` replaced by the smallest (largest) of it and its neighbours not ripped (by `<`, `>`
+in list order: a NaN neighbour never wins, a vertex's own NaN is kept); then the extremes.
+
+**139.2 Medians.** `MRISmedianFilterVals`, `...Val2s`, `...Val2baks`, `...Curvature` (`n` steps of
+`val`, `val2`, `val2bak`, `curv`) and `MRISmedianFilterD(mris, n, t)` (of `d`; over the neighbours in
+use when `t` is not 0, else the 1-hop ones): the vertex's value and its neighbours' not ripped, in
+list order, sorted by glibc 2.35's `qsort` (`specs/glibc-qsort.md`'s merge order, the comparison 1, -1
+or 0 by `>` then `<`: a NaN compares equal to everything); the middle one of an odd count, else
+`(a[n/2 - 1] + a[n/2]) * 0.5` in `float`, the lower one first. **FS-971** (class a): more than 1,023
+values are written past FreeSurfer's list of 1,024; both modes sort them all, noted.
+`MRISgaussianFilterD(mris, w)`: one step of `d`: `(d w + sum of the neighbours' d (1 - w)) / (w +
+their count (1 - w))` in `double` (each product the value first; `1 - w` computed once), stored as a
+`float`.
+
+**139.3 Modes.** The table's last entry `max`: from 0, raised by every vertex's `val` (ripped ones
+too) above it (`max` as a `float`), truncated as x86-64 does (`INT_MIN` for NaN and beyond the `int`
+range). `max + 1` below 0: `Cannot allocate memory` and `MRISmodeFilterVals: could not allocate histo
+array of <max + 1> ints` on standard error (`ErrorExit`, `ERROR_NOMEMORY`: status 254; both filters'
+wording). A vertex's mode: its 1-hop neighbours' values rounded (`nint`, §8: FS-12), those below 0
+skipped, each counted; from 0 (`MRISmodeFilterVals`) or 1 (`MRISmodeFilterZeroVals`) upwards to `max`,
+the value of the largest count, the first of a tie, at 1 a count of 0 never winning; 0 when none
+wins. **FS-972** (class a): a value that rounds above `max` (2.6 next to a largest value of 2.6) is
+counted outside FreeSurfer's table: `reproduce` drops it (FreeSurfer's result); by default the table
+covers every rounded value, noted. The passes: the marks cleared (§99.2); each vertex not ripped and
+of mark 0 counted as zero when its `val` rounds to 0 and given its mode in `valbak`
+(`MRISmodeFilterZeroVals`: only those rounding to 0; the others' `valbak` their `val`); then each
+vertex not ripped marked 0 when its `val` differs from `valbak` (`!=`: a NaN always differs), counted
+as changed, else 1, and given `valbak`; each vertex not ripped of mark 0 then unmarks its 1-hop
+neighbours; `iter <k>: <changed> changed, <zeros> zero` on standard output. `MRISmodeFilterVals(mris,
+n)`: up to `n` passes, ending after one without change; `MRISmodeFilterZeroVals`: while a pass changed
+some vertex and processed some zero. The marks cleared at the end. **FS-973** (class a: a hang): with
+`reproduce`'s `nint` (NaN gives `INT_MIN`), a NaN value next to a lasting zero changes at every pass
+and FreeSurfer never ends (a line per pass); both modes end at the first pass that leaves every
+value, `valbak` and mark as the pass before did, noted.
+
+**139.4 Soap bubbles.** `MRISsoapBubbleVals(mris, n)` and `MRISsoapBubbleD` (`val`, `d`): with
+`Gdiag`'s show and verbose bits `performing soap bubble smoothing of vals for <n> iterations.` (`D
+vals`) on standard output; `n` passes in vertex order, in place: each vertex not ripped whose mark is
+not 1 and whose 1-hop neighbours include marked ones (any mark but 0, ripped ones too) takes their
+mean (`double`, from 0, stored as a `float`) and the mark 2.
+
+## 140. The long-range neighbours (fs.surf's `mrisurf_vals.cpp`, taken early; relay 40 of track D)
+
+**140.1** `MRISsampleDistances(mris, counts, m)` (for `mris_register`, `mris_sphere`,
+`mris_curvature`): `m` of 100 or more ends the program (`MRISsampleDistances: temporaries are too
+small`, `ERROR_OUT_OF_BOUNDS`). With `VDIAG1` set, `\nlooking for vertex pair <VDIAG1>, <VDIAG2>`
+(`atoi`; -1 when unset). With `Gdiag`'s heartbeat bit, `\nsampling <k> dists/vertex (<a> at each dist)
+= <b>MB` (`k` the counts of the distances beyond the surface's neighbourhood size; `a = k / (m -
+nsize)`, `b = k * vertices not ripped * 4 * 3 / 1048576`, `float`, `%2.1f`). For each vertex in order:
+with the heartbeat bit, `%<p> done` at every tenth vertex (`p = 100 vno / nvertices`, `%1.0f`);
+**FS-974** (class a): fewer than 10 vertices make FreeSurfer divide by 0 (signal 8), as `reproduce`
+ends; by default every vertex is reported. A ripped vertex skipped. Otherwise: its neighbours in use
+set to its largest neighbourhood (an assertion that it is above 0, line 3604); the surface's size
+`nsize` that one (the first vertex's; another size ends the program: `MRISsampleDistances: different
+vertexs had different nsizeMax`); its neighbour list and distance arrays given room for `capacity` =
+its count in use + the counts summed, the new places 0 (**FS-976**, class a: counts summing below 0,
+or a capacity above 32,767, make FreeSurfer read and write outside the list; both modes stop with
+`MRISsampleDistances: cannot sample ...`, `ERROR_BADPARM`, noted). The walk: the vertex marked 1;
+ring `r` from 1 to `m`: every vertex not ripped and not marked among the 1-hop neighbours of the
+ring before's (in order) marked `r` and appended (more than 20,000 walked end the program:
+`MRISsampleDistances: too many neighbors`); then each ring vertex's `d`: the smallest, over its
+neighbours not ripped of a mark other than 0 and `r`, of their straight distance (`float`; beyond ring
+1 divided by 1.09, or 1.2071068 on a quadrangle surface) plus their `d`, from 1,000,000; rings 1 and 2
+then the straight distance to the vertex instead; a `d` of 500,000 or more prints `***** WARNING -
+surface distance not found at vno <v>, vall[<n>] = <w> (vnb[<n>] = <u> ******` (no newline) and
+ends with status 1; the `VDIAG` pair prints `vn <w> is <d> mm from v <v> at ring <r>` (`%2.3f`).
+Then, in place, each ring vertex's `d` the smaller of it and, over its neighbours of mark `r`, their
+`d` plus their straight distance (divided as before). A ring asked for (count above 0) with no more
+vertices than asked is appended whole (each with its `d` as the original distance; the room checked:
+an assertion, line 3844); else `count` vertices drawn: an index `nint(randomNumber(0, found - 1))`
+(drawn again while it names one taken), kept unless its angle with one taken from this ring
+(`Vector3Angle` of the two vertices' `float` offsets from the vertex, as a `float`) is below
+`0.9 * 2 pi / count` (as a `float`); after `found + 1` tries the angle shrinks by a quarter, and an
+angle below `FLT_EPSILON` keeps the draw (the room: line 3889). With `Gdiag_no` the vertex and the
+verbose bit: `v<n>` (the walk's count and vertices) and `vn<n>` (the neighbours in use) written in
+the work folder, every vertex's `curv` its `d` and §122's `MRISwriteCurvature` of `lh.dist`
+(`rh.dist`). The walked vertices' marks and `d` 0. **140.2** Then each vertex's immediate neighbours
+(its first `v3num`, `v2num` or `vnum` by its largest size) take their straight distances as original
+distances; `vtotalsMightBeTooBig` 1; for each pair (a vertex not ripped and each of its neighbours in
+use not ripped, the first place of the vertex in that one's list) both original distances their mean
+(`(a + b) * 0.5`, `float`, the neighbour's first). On standard error, for each original distance not
+below 1e-15 in size (NaN counts as not zero) at a vertex other than 0 before any such: `first zero
+distance at v <v>, n <n> (vn = <w>)` (FreeSurfer's wording), and the zero ones: `zero distance at v
+<v>, n <n> (vn = <w>)` for the first 49, `further zeroes elided` at the 50th, then `Of <n> neighbours,
+<k> are at distance zero`. With `Gdiag_no` (0 or more): `v<n>.log` with `<i>: <neighbour>, <distance>`
+(`%f`) per neighbour in use (**FS-977**, class a: a `Gdiag_no` beyond the vertices, or a ripped one
+without original distances, is read outside; the second is FreeSurfer's crash (signal 11), as
+`reproduce` ends; otherwise both modes skip the log, noted). `avg_nbrs` the neighbours in use summed
+over the vertices not ripped, as a `float` quotient; with the show and verbose bits `avg_nbrs = <a>`
+(`%2.1f`); with the heartbeat bit ` done.`. **140.3** `MRISsampleAtEachDistance(mris, n, k)`: nothing
+for `n` 0; with the heartbeat or show bit `sampling long-range distances` (no newline); then 140.1 with
+`k` at each distance up to `n` (**FS-975**, class a: `n` of 200 or more writes past FreeSurfer's array
+of 200; both modes go on, and 140.1 stops at 100, noted).
+
+## 141. Validation plan, part 33
+
+The probe's command of relay 40, `vls` (an empty work folder with `d`; `SURFER_SIDEDOOR`, and
+`FREESURFER_SEED` from the case): grids of 2 to 5 x 2 to 5, srd's small meshes, icosahedra of 1 or 2
+subdivisions read by `MRISread`, now and then (grids and icosahedra) the neighbourhood set to 2 hops
+(`MRISsetNeighborhoodSize`), 0 to 3 vertices ripped, `Gdiag`'s show and verbose bits one case in four,
+the extra gradients one in three, every vertex's 13 `float` values (`val val2 val2bak valbak curv d
+stat dx dy dz odx ody odz`: -5 to 5 in eighths, or whole numbers 0 to 4; NaN, ±inf, -0, signalling
+and negative NaNs, 1e10, -3e9 in heavy cases), white and pial positions (equal, 1e-8 or 2e-7 apart,
+or eighths apart; a NaN in heavy cases), 5 integers (mark, `marked2`, annotation, flags, `fixedval`:
+-1 to 3; ±70,000, 32,768, `INT_MAX`, `INT_MIN` in heavy cases) and its extra gradients, every face's
+mark, the seed (1 to 999), `Gdiag_no` (-1, a vertex one case in ten), the heartbeat bit one case in
+eight, the `VDIAG` pair one in eight, a label of 0 to 6 points (in heavy cases now and then -1 or
+beyond the surface); then 1 to 6 of 138-140's functions by name (counts 0 to 3; marks and flags as
+the integers; thresholds and factors as the values; the Gaussian weight 0, 0.25, 0.5, 0.75 or 1, NaN
+in heavy cases; faces in the surface; `findNonMarkedFace`'s vertex now and then -1 or beyond, its
+second vertex now and then the same; the sampling to 0 to 4 rings (100 one case in twenty) with
+counts 0 to 20, at each distance to 0 to 3 (150 or 250 now and then) with 0 to 8;
+`MRISmodeFilterZeroVals` only in cases without special values: FS-973's NaN would make the official
+build print for the probe's whole 5-second alarm); after each its status, every vertex's 15 values
+(with `tx` and `tdx`), rip flag, mark, `marked2`, flags, `fixedval`, annotation and extra gradients,
+every face's mark and the curvature extremes; after a sampling also every vertex's neighbours in use,
+their size and original distances, the surface's size, `avg_nbrs` and flag; at the end every file in
+the folder but the surface by its bytes. A rip by a label with a point outside the surface (FS-917)
+is written `G` on both sides. Compared with the official build with `reproduce`: identical; the
+default identical but where a noted correction changed the result. Observed (relay 40): seeds 7, 13
+(500 cases each) and 17 (1,000): 0 different in both modes. `tests/vals_defaults.rs` checks FS-917,
+FS-971 (1,100 neighbours in use), FS-972, FS-973, FS-974, FS-976, an undivided lone vertex, a
+median's NaN order and `detectContrast`'s `-nan` (the reproduce values observed from the official
+build's arithmetic). A clean-room implementer's black-box forms: `mris_register` and `mris_sphere`
+(their long-range distances and averages), `mris_ca_label`'s and `mris_fix_topology`'s smoothing,
+against the recorded heads.

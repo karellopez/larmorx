@@ -1963,3 +1963,66 @@ its tests (88-1499 less the closest-vertex and closest-face searches, 2304-2416)
   one unmarked cluster of the whole surface goes deeper than its stack (`mris_remove_intersection
   --fill-holes` on such a surface would crash too); the port grows it in full. On `orig`, `white`,
   `pial` and `inflated` the growth completes.
+
+## 36. mrisurf_vals.cpp's marks, settings, rips, filters and the long-range sampling (relay 40 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_vals.cpp` 57-299,
+366-460, 512-700, 774-856, 1404-1545, 1686-1790, 1857-2200 (but 2200-2284, `#if 0`), 2286-2537,
+2693-2900, 2977-3108, 3224-3272, 3435-4110 into `crates-freesurfer/larmorx-freesurfer-surf/src/`
+`valmarks.rs` (marks, settings, rips, face tests, `detectContrast`), `valfilter.rs` (averages,
+medians, the Gaussian, mode and soap-bubble filters) and `sampdist.rs` (`MRISsampleAtEachDistance`,
+`MRISsampleDistances`, `MRISsampleDistances_new`). Left for their programs' items (reached by one
+program or none on the default paths): `MRISlogOdds` (`MRISdistanceTransform`), `MRISripZeros`,
+`MRISripUnknown`, `MRISdilateRipped`, `MRISerodeRipped` (`MRISsetRipInFacesWithRippedVertices`),
+`MRISdilateConfined`, `MRISmarkRandomVertices`, the `VALS_VP` setters (1790-1855), the three
+`MRISaccumulate*` (their `SQR(dof)` overflows `int` past 46,340), `MRIScomputeAverageCircularPhaseGradient`,
+`MRISmodeFilterAnnotations`, `MRISannotation_to_label`, `MRISgetHistogram`, `MRISclearWhichAndVal2`,
+`MRISdilateVertexToSum`.
+
+- **The object code decides the bits** (the unit oracle's `mrisurf_vals.cpp.o`, `objdump -d`):
+  `MRISnegateValues`' `v->val *= -1.0` is `xorps` (the sign bit flipped, a NaN's too);
+  `MRISabsVals`, `MRISabsCurvature` `andps`; `MRISscaleVals`, `MRISmulVal` `mulss` with `val` the
+  destination. Every averaging loop (`MRISaverageVals`' OpenMP body `._omp_fn.0` too, and
+  `MRISaverageCurvatures`) tests `vnum <= 0` and then stores the value without the `divss` by 1: a
+  signalling NaN at a vertex without neighbours stays signalling (the port did divide in
+  `props10::mris_average_curvatures` before this relay; it now shares `valfilter`'s loop). The sum is
+  `addss <neighbour>, <val>` (the running value the destination); `num` counts from 0 in `float`.
+  The medians' even middle is `addss a[n/2], a[n/2 - 1]` then `mulss 0.5`: the lower element is the
+  first operand (the C writes `a[n/2] + a[n/2 - 1]`). `MRISgaussianFilterD`: `nbr_wt = 1 - wt` once,
+  each product `cvtss2sd d` times the weight (`d` first), the sum and norm `addsd` in place, the
+  quotient `cvtsd2ss`. The soap bubbles: `mean` from 0.0 (`addsd mean, cvtss2sd(val)`), `divsd` by
+  the count, `cvtsd2ss`. `MRISminFilterCurvatures` uses `minss` with the neighbour as the destination:
+  the C `<`'s result.
+- **`MAX_NEIGHBORS`** (1024) is the medians' stack array (`sub $0x1000,%rsp`): more than 1,023 values
+  overrun it into the stack protector (FS-971).
+- **The mode filters' table** is `calloc(max_val + 1, sizeof(int))` and `memset` at every vertex,
+  then a scan of `max_val + 1` entries: `O(nvertices x max_val)` time; the port counts only the values
+  met (the same answer, `mode_of`). `max_val` is raised by `v->val > max_val` (`cvtsi2ss`, `comiss`)
+  and set by `cvttss2si` (`INT_MIN` for NaN and beyond); glibc's `calloc` returns `NULL` with `errno`
+  `ENOMEM` when `nmemb * size` overflows `size_t` (a negative `max_val + 1`), so `ErrorExit` prints
+  `Cannot allocate memory` first. `calloc(0, 4)` (a `max_val` of -1) gives a valid block of no
+  entries: `histo[0]` is then read outside it, but the scan `1..=max_val` is empty and `max_index`
+  stays 0, so the answer (0) does not depend on what is read. FS-972's write past the table is one
+  `int` increment past a `calloc`ed block; in 2,000 probe cases the official build never crashed on it.
+- **FS-973's hang** prints `iter <k>: ...` with `printf` on an unbuffered standard output for as long
+  as the program runs: the probe keeps NaN out of the cases that may call `MRISmodeFilterZeroVals`
+  (a 5-second alarm would fill its output file with millions of lines).
+- **`MRISsampleDistances`' trace** (`static int traceCount; ... (++traceCount > 0) ? NULL :
+  "./MRISsampleDistances_new.txt"`) is never opened: the counter is above 0 at its first test, so
+  `mrisDumpShape` and the `IMMEDIATE EXIT` are dead code. `mrisCheckVertexFaceTopology` is
+  `returnTrue()` (its checks are switched off). `MULTI_DIST_SCALING` is undefined (0): the
+  `distance_scale` paths and the `c[]`, `nc[]` report are not compiled; `c[]`/`nc[]` accumulate but
+  are never read. `vnb[]` is only read by the warning. `vt->v` is `realloc`ed to `vCapacity`; with a
+  negative sum of counts `vCapacity` can fall below `vtotal` (later reads beyond the block) or below
+  0 (`realloc` of a huge size gives `NULL`, then `vnt->v[n2]` faults); `vt->vtotal` is a `short`, so
+  more than 32,767 wraps it negative and `cheapAssert(vt->vtotal < vCapacity)` passes (FS-976).
+- **FS-974** is `vno % (mris->nvertices / 10)` evaluated before the rip test, at vertex 0: `idiv` by
+  0, signal 8 (observed in the probe on grids of fewer than 10 vertices).
+- **FS-977:** the `v<n>.log` loop reads `v->dist_orig[i]` of `Gdiag_no` without a rip test; a ripped
+  vertex never had its original distances grown, and a surface read by `MRISread` has none: the
+  official build faults (signal 11) after creating the empty file (observed); a `Gdiag_no` beyond
+  the vertices reads `vertices_topology[Gdiag_no]` outside the array (not generated).
+- **The repeated neighbours.** `MRISread` leaves every vertex's `nsizeMax` at 3, so the sampling
+  starts from `vtotal = v3num` and appends the asked rings again (the source's comment: "IT IS
+  PUTTING REPEATS OF THE 1..v->nsize rings ONTO THE END OF THE LIST"); the symmetric averaging uses
+  the first place of the vertex in each neighbour's list.

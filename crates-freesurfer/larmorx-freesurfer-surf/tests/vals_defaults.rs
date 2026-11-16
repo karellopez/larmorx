@@ -267,3 +267,109 @@ fn the_contrast_of_no_vertex() {
         "Detecting contrast direction: inverted [ WM (-nan) < GM (-nan) ]\n"
     );
 }
+
+/// A closed octahedron (6 vertices, 8 faces).
+fn octahedron() -> (Vec<[f32; 3]>, Vec<[i32; 3]>) {
+    let v = vec![
+        [1.0, 0.0, 0.0],
+        [-1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, -1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, -1.0],
+    ];
+    let f = vec![
+        [0, 2, 4],
+        [2, 1, 4],
+        [1, 3, 4],
+        [3, 0, 4],
+        [2, 0, 5],
+        [1, 2, 5],
+        [3, 1, 5],
+        [0, 3, 5],
+    ];
+    (v, f)
+}
+
+/// The long-range sampling on an octahedron (`MRISread` leaves every vertex's largest
+/// neighbourhood at 3 hops: its 4 neighbours and the opposite vertex in use): the opposite vertex
+/// (2 hops) appended once more (FreeSurfer's repeat), its distance the straight one, 2 (rings 1
+/// and 2 are measured straight); the immediate ones straight; marks and `d` cleared; `avg_nbrs` the
+/// mean count in use.
+#[test]
+fn the_long_range_sampling_of_an_octahedron() {
+    let mut r = Run::new(UpstreamDefects::Reproduce);
+    let (v, f) = octahedron();
+    let mut s = r.surface(&v, &f);
+    let mut io = io!(r);
+    let rc = larmorx_freesurfer_surf::sampdist::sample_distances(
+        &mut r.g,
+        &mut io,
+        None,
+        &mut s,
+        &[0, 0, 1],
+        2,
+    )
+    .unwrap();
+    assert_eq!(rc, 0);
+    for vno in 0..6 {
+        let t = s.topology(vno);
+        assert_eq!(t.vtotal, 6, "vertex {vno}");
+        // the opposite vertex: 0-1, 2-3, 4-5
+        assert_eq!(t.v.as_ref().unwrap()[4] as usize, vno ^ 1);
+        assert_eq!(t.v.as_ref().unwrap()[5] as usize, vno ^ 1);
+        let d = s.vertex(vno).dist_orig.as_ref().unwrap();
+        assert_eq!(d[0], 2.0f32.sqrt());
+        assert_eq!((d[4], d[5]), (2.0, 2.0));
+        assert_eq!(s.vertex(vno).marked, 0);
+        assert_eq!(s.vertex(vno).d, 0.0);
+    }
+    assert_eq!(s.avg_nbrs, 6.0);
+    assert_eq!(s.vtotalsMightBeTooBig, 1);
+}
+
+/// FS-976: counts that sum below 0: a clear error in both modes. FS-974: the progress report on a
+/// surface of fewer than 10 vertices: every vertex reported by default; `reproduce` ends with
+/// signal 8's status.
+#[test]
+fn the_long_range_sampling_refusals() {
+    use larmorx_freesurfer_core::diag::DIAG_HEARTBEAT;
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut r = Run::new(mode);
+        let (v, f) = octahedron();
+        let mut s = r.surface(&v, &f);
+        let mut io = io!(r);
+        let e = larmorx_freesurfer_surf::sampdist::sample_distances(
+            &mut r.g,
+            &mut io,
+            None,
+            &mut s,
+            &[0, 2, -5],
+            2,
+        )
+        .unwrap_err();
+        assert_eq!(e.status(), 252, "{mode:?}");
+        assert!(r.noted("FS-976"));
+
+        let mut r = Run::new(mode);
+        let mut s = r.surface(&v, &f);
+        r.g.gdiag |= DIAG_HEARTBEAT;
+        let mut io = io!(r);
+        let res = larmorx_freesurfer_surf::sampdist::sample_distances(
+            &mut r.g,
+            &mut io,
+            None,
+            &mut s,
+            &[0, 0],
+            1,
+        );
+        assert!(r.noted("FS-974"));
+        if mode == UpstreamDefects::Reproduce {
+            assert_eq!(res.unwrap_err().status(), 136);
+        } else {
+            assert_eq!(res.unwrap(), 0);
+            let out = String::from_utf8_lossy(&r.out).into_owned();
+            assert_eq!(out.matches(" done\n").count(), 6, "{out}");
+        }
+    }
+}

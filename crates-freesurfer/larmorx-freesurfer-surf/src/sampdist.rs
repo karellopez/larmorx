@@ -35,6 +35,9 @@
 //!   without original distances: the diagnostic log reads outside them (the second through a null
 //!   pointer: signal 11, as `reproduce` ends); otherwise both modes skip the log (noted).
 
+// The walk indexes as FreeSurfer's C does (one place for several arrays).
+#![allow(clippy::needless_range_loop)]
+
 use std::path::Path;
 
 use larmorx_core::defects::{FS_974, FS_975, FS_976, FS_977};
@@ -625,7 +628,8 @@ pub fn sample_distances(
             let d = mris.vertex(vno).dist_orig.as_ref().expect("dist_orig")[n];
             let w = nb(mris, vno, n);
             // DZERO: |d| < 1e-15 (a NaN is not zero)
-            if !(f64::from(d).abs() < 1e-15) {
+            let zero = f64::from(d).abs() < 1e-15;
+            if !zero {
                 if non_zeroes == 0 && vno != 0 {
                     let _ = writeln!(io.err, "first zero distance at v {vno}, n {n} (vn = {w})");
                 }

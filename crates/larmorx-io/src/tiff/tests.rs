@@ -187,8 +187,9 @@ fn a_directory_loop_is_counted_once() {
 }
 
 /// The digest of the generated files read in both modes and the writing cases: recorded after
-/// the probe's runs (relay 32: seeds 1 to 6, 15,300 files read, 2,300 written, identical where
-/// the original's behaviour does not depend on memory contents).
+/// the probe's runs (relay 32: seeds 1 to 6, 15,300 files read, 2,300 written; relay 33, with the
+/// CCITT, NeXT, ThunderScan, PixarLog and SGILog files: seeds 101 to 107; identical where the
+/// original's behaviour does not depend on memory contents).
 #[test]
 fn generated_files_digest() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -218,7 +219,7 @@ fn generated_files_digest() {
     assert_eq!(fnv(&all), DIGEST, "digest {:#018x}", fnv(&all));
 }
 
-const DIGEST: u64 = 0xe67f_3fcd_5a45_2473;
+const DIGEST: u64 = 0x41d8_59c3_cf79_74af;
 
 /// CCITT streams made by the generator (its own encoder) decode to the image they encode, in
 /// every scheme and Group 3 option, both fill orders.

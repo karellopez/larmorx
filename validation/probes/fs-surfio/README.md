@@ -399,3 +399,13 @@ as a libm case). Seed 1, 1,560 cases: 1,518 identical, 42 `SKIP`, hash
 the hash test and `props11_defaults` pass in debug and release, plain and under the AArch64 NaN
 emulation (67,867 and 376,617 flips), and on the Windows laptop; seed 7's `mpx`, `vps` and `ann`
 outputs (1,500) identical under the emulation in both modes.
+
+Measured 2026-11-16 (relay 37 of track D, 53 commands): `lbl` (label.cpp's surface-label functions:
+`LabelMark`, `LabelMark2`, `LabelUnmark`, `LabelMarkSurface`, `LabelArea`, `LabelFillMarked`,
+`LabelErode`, `LabelDilate`, `MRISlabel2Mask`, `MRISlabelInvert`, on a label from `LabelAlloc` with
+the case's points, index table, surface and template handles; an operation FreeSurfer would read or
+write outside the surface's vertices or the label's places for written `G` on both sides; the port's
+side in `tests/fs_surfio/lbl.rs`), seeds 7 (300 cases), 13 and 17 (1,000 each): 0 different with
+`reproduce`, `fix` different only with notices (FS-632, the error messages' FS-01). `flr lbl`
+(`real.py --lbl`: three heads, both hemispheres, four labels each on `?h.white`): 24 of 24 identical
+in both modes.

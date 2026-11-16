@@ -25,7 +25,9 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_surf::{annot, curvfile, mriflood, props11, readwrite, sras, valfile, vpos};
+use larmorx_freesurfer_surf::{
+    annot, curvfile, labelsurf, mriflood, props11, readwrite, sras, valfile, vpos,
+};
 
 /// The direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`) the cases pick from.
 pub(super) const FRAMES: [[f32; 9]; 6] = [
@@ -891,6 +893,83 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             o.f(s.total_area);
             o.f(s.orig_area);
             o.d(s.radius);
+        }
+        "lbl" => {
+            // relay 37 of track D: `fssurfio.cpp`'s `flr lbl` (a recorded label on its white
+            // surface: the area, the marks, erosion and dilation of copies, the mask, the
+            // inversion)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let ln = t.next();
+            let a = larmorx_freesurfer_io::label::label_read(
+                g, io.env, io.out, io.err, None, None, ln,
+            )?
+            .expect("the label");
+            let env2 = Environment::from_pairs(vec![
+                ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
+                ("SUBJECTS_DIR".to_owned(), "/".to_owned()),
+            ]);
+            let mut io = coords::Io {
+                out: io.out,
+                err: io.err,
+                env: &env2,
+            };
+            let flush = |hb: &mut Vec<u8>, o: &mut Out| {
+                o.s(&format!("{:016x}", super::mpx::fnv64(hb)));
+                hb.clear();
+            };
+            let pts = |l: &larmorx_freesurfer_io::label::Label, o: &mut Out| {
+                o.i(i64::from(l.n_points));
+                let mut hb = Vec::new();
+                for p in &l.lv[..l.n_points.max(0) as usize] {
+                    hb.extend_from_slice(&p.vno.to_le_bytes());
+                    for f in [p.x, p.y, p.z] {
+                        hb.extend_from_slice(&f.to_le_bytes());
+                    }
+                    hb.push(p.deleted);
+                    hb.extend_from_slice(&p.stat.to_le_bytes());
+                }
+                flush(&mut hb, o);
+            };
+            let mut hb = Vec::new();
+            o.d(labelsurf::label_area(g, &a, &s));
+            larmorx_freesurfer_surf::discrete::clear_marks(&mut s);
+            o.i(i64::from(labelsurf::label_mark_surface(
+                &mut io, &a, &mut s,
+            )));
+            for v in 0..s.nvertices.max(0) as usize {
+                hb.extend_from_slice(&s.vertex(v).marked.to_le_bytes());
+            }
+            flush(&mut hb, o);
+            larmorx_freesurfer_surf::discrete::clear_marks(&mut s);
+            let mut e = larmorx_freesurfer_io::label::label_copy(g, io.env, io.err, &a, None)?;
+            o.i(i64::from(labelsurf::label_erode(
+                g, &mut io, &mut e, &mut s, 2,
+            )?));
+            pts(&e, o);
+            let mut dl = larmorx_freesurfer_io::label::label_copy(g, io.env, io.err, &a, None)?;
+            o.i(i64::from(labelsurf::label_dilate(
+                g,
+                &mut io,
+                &mut dl,
+                &mut s,
+                2,
+                larmorx_freesurfer_surf::views::CURRENT_VERTICES,
+                None,
+            )?));
+            pts(&dl, o);
+            match labelsurf::mris_label2mask(g, &mut io, &s, &a, None, 0, false)? {
+                Ret::New(m) => {
+                    for v in 0..s.nvertices.max(0) {
+                        hb.extend_from_slice(
+                            &mri_get_vox_val(g, io.err, &m, v, 0, 0, 0, 0)?.to_le_bytes(),
+                        );
+                    }
+                    flush(&mut hb, o);
+                }
+                _ => o.s("NULL"),
+            }
+            let inv = labelsurf::mris_label_invert(g, &mut io, &s, &a)?.expect("the inversion");
+            pts(&inv, o);
         }
         "mpx" => {
             // relay 37 of track D: `fssurfio.cpp`'s `flr mpx` (group (e) on a recorded head: the

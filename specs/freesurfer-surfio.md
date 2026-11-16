@@ -4598,3 +4598,86 @@ the head's `talairach.xfm`): 6 of 6 identical with `reproduce`; the default diff
 energies' last bits (`logf`). A clean-room implementer's black-box form: a binary built on FreeSurfer
 8.2.0's `libutils` that calls these functions by name on the recorded heads' `surf/?h.white` and
 `surf/?h.sphere`.
+
+## 128. A label's vertices on a surface (fs.surf's piece of `label.cpp`, taken early; relay 37 of track D)
+
+The label (`freesurfer-io.md` §76-78: places `max_points`, points `n_points`, each point a vertex
+number, a position, `deleted`, `stat`, voxel coordinates; a vertex index table and a surface and
+template handle, or none) and a surface. FS-630 (class a): every function here that reads or
+writes a point's vertex skips a point naming no vertex of the surface (-1, as a volume label's
+points, or a number beyond the surface's), with a notice, in both modes; FreeSurfer reads or writes
+outside the surface's vertices there. Where FreeSurfer itself checks, its message is kept (below).
+A label's surface handle is taken to be the surface given, as every FreeSurfer caller sets it.
+
+**128.1 Marks and area.** `LabelMark(label, surf)`: each point not deleted sets its vertex's
+`marked` to 1 (ripped vertices too). `LabelMark2`: likewise `marked2`. `LabelUnmark`: each point's
+vertex (deleted points too; a negative vertex skipped) gets `marked` 0. `LabelMarkSurface`: each
+point not deleted whose vertex is not negative: a vertex beyond the surface's stops with `ERROR:
+LabelMarkSurface: label point <v> exceeds nvertices <n>` (standard output) and 1, the points before
+it marked; else its vertex marked 1 unless ripped. Each returns `NO_ERROR` (0) otherwise.
+`LabelArea(label, surf)`: the sum in `double` (each vertex's `float` area added in the points'
+order) over the points not deleted whose vertex is not ripped.
+
+**128.2 Filling the marked** (`LabelFillMarked(label, surf)`). Passes until one adds nothing or the
+label is full; each pass goes through the points present before it, while the points and those
+added in the pass are fewer than the places: the point's vertex gets mark 2; when that vertex is not
+ripped, each of its `vnum` neighbours in order that is not ripped and has mark 1 gets mark 2 and is
+added at the label's end (its vertex number and current position; the place's other fields as they
+were), the pass stopping as soon as the label is full. `NO_ERROR`.
+
+**128.3 Erosion and dilation.** `LabelErode(label, surf, n)` and `LabelDilate(label, surf, n,
+coords)`: `n` below 1 gives `LabelErode: num_times < 1` (`LabelDilate: ...`) as an error and
+`ERROR_BADPARM`. The surface's marks are cleared first (§99.2: ripped vertices keep theirs). Each of
+`n` passes marks the label (128.1), then:
+- erosion: every point not deleted whose vertex is not negative is deleted (`deleted` 1) when one of
+  its `vnum` neighbours (not negative) has mark 0; a vertex or neighbour beyond the surface's ends
+  the program (`LabelErode: label vertex <v> too big for surface (<n>)`, `LabelErode: neighbor label
+  vertex <v> too big for surface (<n>)`, `ERROR_BADPARM`);
+- dilation: every vertex in order whose mark is not 1 and one of whose `vnum` neighbours has a mark
+  above 0 (ripped vertices included) is added at the label's end: a full label first grown to
+  `nint(1.5 x places)` places (`freesurfer-io.md` §78's `LabelRealloc`: the new places zeroed); the
+  point's vertex number, its coordinates of the set `coords` (§3; an unsupported set ends the
+  program, after the point was counted); its place written at its vertex in the index table when
+  there is one; with surface and template handles, its voxel in the template (§118's uncached
+  conversion of the position, each coordinate `nint`ed);
+then the label is unmarked (128.1). After the passes the index table is rebuilt when the label has
+one and a surface handle (each entry for the surface's vertices -1, then each point not deleted
+writes its place at its vertex; entries outside the table skipped with FS-630), and erosion clears
+the surface's marks again. `NO_ERROR`. FS-631 (class a): a full label whose growth does not enlarge
+it (no places: `nint(0)` is 0; such a label gains points when a ripped vertex keeps a mark) gets its
+points written past its places by FreeSurfer; in both modes one more place is made, noted.
+
+**128.4 The mask and the inversion.** `MRISlabel2Mask(surf, label, mask, frame, statflag)`: without
+a mask, a new float volume of one voxel per vertex (width the vertex count, height and depth 1) and
+`frame + 1` frames of zeros (`freesurfer-volume.md` §38's `MRIconst`); a frame the mask lacks gives
+`ERROR: MRISlabel2Mask(): frame=<f> >= mask->nframes-1=<n-1>` (standard output) and no mask; each point
+in order: a vertex at or beyond the vertex count gives `ERROR: MRISlabel2Mask(): label vertex <v> is
+>= nvertices <n>` and no mask (a given mask keeps what was set before); else its voxel (the vertex,
+0, 0, `frame`) set to 1, or to its `stat` with `statflag` (the volume's own setter: a negative vertex
+goes where that setter puts it). `MRISlabelInvert(surf, label)`: the mask of the label (frame 0, no
+stat); a new label (`LabelAlloc` with the label's subject name: `SUBJECTS_DIR` must be set) of the
+vertices whose mask value is below 0.5, in order, each with its current position and `stat` 0, as
+many points as places. FS-632 (class a): when the mask is refused (a point beyond the surface)
+FreeSurfer crashes; the port gives no label by default, the crash (exit status 139) with `reproduce`.
+
+## 129. Validation plan, part 28
+
+The probe's command of relay 37, `lbl` (an empty work folder; `SURFER_SIDEDOOR`; `SUBJECTS_DIR` set
+five cases in six): §127's meshes read by `MRISread`, 0 to 3 vertices ripped, 0 to 4 vertices'
+`marked` (-1, 0, 1, 2) and `marked2` (0 to 2) set; a label of 0 to 12 places and as many points or
+fewer (vertices of the surface mostly, -1 or beyond it in heavy cases; positions, `stat`, one point in
+five deleted; coordinate kinds 1 to 3; the subject name `subj` one case in three), a vertex index
+table of one entry per vertex with the surface handle one case in three, a template volume (bytes,
+4 to 8 voxels a side, §119's geometries) one case in four; then 1 to 4 of 128.1-128.4's functions
+(erosion and dilation by 0 to 3, the dilation's coordinate set current, original, canonical, pial,
+an unsupported one; the mask with frames 0 to 2, `statflag` either, a given mask of 1 or 2 frames or
+none), after each the label's every place, the vertices' marks and the index table. An operation
+whose label has a point FreeSurfer would read or write outside the surface's vertices for (FS-630),
+or a dilation of a label without places (FS-631), is written `G` on both sides. Compared with the
+official build with `reproduce`: identical; the default identical but where a noted correction
+changed the result. Observed (relay 37): seeds 7 (300 cases), 13 and 17 (1,000 each): 0 different in
+both modes. On recorded heads (the probe's `flr lbl`; three heads, both hemispheres, `cortex.label`,
+`BA1_exvivo.label`, `BA44_exvivo.thresh.label`, `MT_exvivo.label` on `?h.white`: the area, the marks,
+erosion and dilation by 2, the mask, the inversion): 24 of 24 identical in both modes. A clean-room
+implementer's black-box form: `mri_label2label --label-dilate` and `--label-erode` of a recorded
+label onto its own subject's white surface.

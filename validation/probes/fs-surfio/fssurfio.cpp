@@ -4096,6 +4096,53 @@ void flr_case()
       out += t;
     }
     oi(s->status); of(s->total_area); of(s->orig_area); od(s->radius);
+  } else if (op == "lbl") {
+    // relay 37 of track D: a recorded label on its white surface (`lbl <white> <label>`, the label
+    // read by LabelRead): LabelArea; LabelMarkSurface, the marks' FNV-1a; LabelErode by 2 and
+    // LabelDilate by 2 (CURRENT_VERTICES) of a copy, each status and the points' FNV-1a;
+    // MRISlabel2Mask of the label, the mask's FNV-1a; MRISlabelInvert, its count and FNV-1a
+    MRIS *s = MRISread(next());
+    LABEL *a = LabelRead(NULL, next());
+    if (!s || !a) fail("cannot read the inputs");
+    setenv("SUBJECTS_DIR", "/", 1);
+    std::string hb;
+    auto put = [&hb](const void *p, size_t n) { hb.append((const char *)p, n); };
+    auto flush = [&hb]() {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : hb) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+      hb.clear();
+    };
+    auto pts = [&](LABEL *l) {
+      oi(l->n_points);
+      for (int k = 0; k < l->n_points; k++) {
+        LV *p = &l->lv[k];
+        put(&p->vno, 4); put(&p->x, 4); put(&p->y, 4); put(&p->z, 4); put(&p->deleted, 1); put(&p->stat, 4);
+      }
+      flush();
+    };
+    od(LabelArea(a, s));
+    MRISclearMarks(s);
+    oi(LabelMarkSurface(a, s));
+    for (int v = 0; v < s->nvertices; v++) put(&s->vertices[v].marked, 2);
+    flush();
+    MRISclearMarks(s);
+    LABEL *e = LabelCopy(a, NULL);
+    oi(LabelErode(e, s, 2));
+    pts(e);
+    LABEL *d = LabelCopy(a, NULL);
+    oi(LabelDilate(d, s, 2, CURRENT_VERTICES));
+    pts(d);
+    MRI *m = MRISlabel2Mask(s, a, NULL);
+    if (!m) out += "NULL ";
+    else {
+      for (int v = 0; v < s->nvertices; v++) { float f = MRIgetVoxVal(m, v, 0, 0, 0); put(&f, 4); }
+      flush();
+    }
+    LABEL *inv = MRISlabelInvert(s, a);
+    pts(inv);
   } else if (op == "mpx") {
     // relay 37 of track D: group (e) on a recorded head (`mpx <white> <sphere>`): the white
     // surface (its Talairach transform read from ../mri/transforms by MRISread) with the sphere's

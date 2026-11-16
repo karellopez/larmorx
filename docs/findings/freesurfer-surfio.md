@@ -1764,3 +1764,33 @@ offset 0x2c, is the only field read). Operand orders from the unit oracle's
   is `logf`; `(1 + det)` is computed `det + 1.0f`, `lambda * (1 + det) * (s11 + s22)` as `(s22 + s11)
   * ((det + 1) * lambda)`, and `sse_total += sse` as `sse + sse_total`.
 - The recorded heads (real.py --mpx): FreeSurfer 10.3 s, the port 15.3 s for the six hemispheres.
+
+## 31. A label's vertices on a surface: label.cpp's surface-label functions (relay 37 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
+`crates-freesurfer/larmorx-freesurfer-surf/src/labelsurf.rs` from `utils/label.cpp` (`LabelArea`
+1373, `LabelMark` 1480, `LabelMark2` 1498, `LabelUnmark` 1604, `LabelMarkSurface` 1781,
+`LabelFillMarked` 943, `update_vertex_indices` 3938 (file-local), `LabelErode` 2195, `LabelDilate`
+2259, `MRISlabelInvert` 2850) and `utils/mrisurf_mri.cpp` 5955 (`MRISlabel2Mask`, default arguments
+`frame = 0`, `statflag = 0` in mrisurf.h). `LabelRemoveHolesSurf` 4138 and `LabelRemoveIslandsSurf`
+4167 wait for surfcluster.cpp's `sclustMapSurfClusters` (with `SurfClusterSummary`,
+`SortSurfClusterSum`, `sclustReMap`, `sclustGrowSurfCluster`'s recursion) and `DumpSurfClusterSum`.
+
+- **FS-630:** `LabelMark`/`LabelMark2` test `vno < 0 || vno >= nvertices` only for `DiagBreak()` and
+  then write `mris->vertices[vno].marked`; `LabelUnmark` skips only `vno < 0`; `LabelArea` reads
+  `v->ripflag` before testing `lv->deleted`; `LabelFillMarked` indexes `vertices_topology[lv->vno]`
+  unchecked; `update_vertex_indices` writes `vertex_label_ind[lv->vno]` unchecked over
+  `mris->nvertices` entries of a table `LabelCopy` allocates with the source's `max_points`.
+- **FS-631:** `LabelRealloc(area, nint(area->max_points * 1.5))` returns unchanged for `max_points`
+  0 (`if (max_points <= lb->max_points) return`), then `lv[n_points++]` is written past the
+  `calloc(0)`; reachable because `MRISclearMarks` (`MRISsetMarks`, mrisurf_vals.cpp 116) skips
+  ripped vertices, so a ripped vertex's mark makes its neighbours dilate into an empty label (found by
+  `lbl` seed 7 when the probe compared such a case: FreeSurfer's label ended with 15 points and 0
+  places, the port's with 16 and 18: the heap writes changed what followed).
+- **FS-632:** `MRISlabelInvert` calls `MRIgetVoxVal(tmpmri, ...)` on the NULL mask.
+- `LabelDilate` uses `area->mris` (cast) for `MRISsurfaceRASToVoxel` and `update_vertex_indices`
+  uses `area->mris->nvertices`, not the `mris` argument: the port takes them to be the same (every
+  caller's labels get the handle from `LabelInit(area, tpl, mris, ...)` or `LabelFillUnassignedVertices`
+  with the same surface).
+- `LabelArea`'s sum compiles to `addsd` with the running total first (label.cpp.o).
+- The recorded heads (real.py --lbl, 24 labels): FreeSurfer 11.1 s, the port 18.7 s.

@@ -112,7 +112,7 @@ pub(super) fn lbl_tokens(t: &mut Vec<String>, g: &mut Gen) {
                     if g.chance(10) {
                         14
                     } else {
-                        g.pick(&[0, 0, 1, 3, 8])
+                        g.pick(&[4, 4, 0, 1, 3, 8])
                     },
                 );
             }

@@ -2,11 +2,11 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (1,680 cases, thirty of each of
-//! the 56 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1680` on Linux x64 from the unit
-//! oracle's build (2026-11-16, relay 38 of track D, from the clean commit 019171c8: 1,628 lines
-//! identical, 52 counted, not compared, where
+//! official build's output lines for the probe's cases of seed 1 (1,710 cases, thirty of each of
+//! the 57 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1710` on Linux x64 from the unit
+//! oracle's build (2026-11-16, relay 39 of track D, from the clean commit aa2df66f: 1,673 lines
+//! identical, 37 counted, not compared, where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
 //! `SKIP`), against the port's output with `reproduce` (a case the port marks
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
@@ -36,7 +36,7 @@ const SKIP: [&str; 52] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "98549f421c824caf512ade131cbb9dc64e6a42892ebc0004771fb435cced62d3";
+const OFFICIAL_SHA256: &str = "3c5075be4d25d48bc3afbb57bcb1cb22f0877eca5fd20a21847a0a5b8c9d6dc8";
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_surfio/official_digests.txt");
@@ -51,7 +51,7 @@ fn d48(b: &[u8]) -> String {
 /// Each case of seed 1: its line, the bytes hashed for it (`SKIP\n` or its output and a
 /// newline), its output and its notices.
 fn outputs() -> Vec<(String, Vec<u8>, String, Vec<&'static str>)> {
-    cases::generate(1, 1680)
+    cases::generate(1, 1710)
         .into_iter()
         .map(|line| {
             let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
@@ -182,7 +182,7 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
         ..SurfGlobals::default()
     };
     let (mut noted, mut changed, mut cases) = (0, 0, 0);
-    for line in cases::generate(1, 103 * 56) {
+    for line in cases::generate(1, 103 * 57) {
         if !line.starts_with("mprop ") {
             continue;
         }

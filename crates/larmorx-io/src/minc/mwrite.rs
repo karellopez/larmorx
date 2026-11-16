@@ -430,7 +430,7 @@ fn create_dimwidth_variable(
     if ndims > 1 {
         s.log_pkg_error(
             c,
-            Some(PkgSite::WrongNDims),
+            Some(PkgSite::WrongNDimsWidth),
             MI_ERR_WRONGNDIMS,
             "Too many dimensions for a dimension variable",
         )?;

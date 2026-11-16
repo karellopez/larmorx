@@ -2671,6 +2671,12 @@ defects! {
         "the PixarLog decoder inflates past its row buffer when a call needs more than the rows per strip gave it, looks the first codes of a row up through its tables without masking them to 11 bits (memory past the tables), and for 11- and 12-bit samples, whose scanline holds fewer codes than a row, reads codes never inflated (memory contents) and writes past the caller's buffer; corrected as libtiff 4.0.10 does: the buffer what a row needs, the first codes masked, the codes cut to whole rows with its warning";
     FS_881 = "FS-881", "libtiff 3.6.1", true,
         "the PixarLog decoder for 12-bit samples (PICIO's) with one, two or more than four samples per pixel gives each pixel the next pixel's value, so the second pixel's value is lost and the row's last values come from past the row; corrected, each pixel gets its own value, as the 8-bit, 16-bit and floating-point decoders give it";
+    FS_882 = "FS-882", "libtiff 3.6.1", true,
+        "the SGILog decoders size their translation buffer by the image width times the rows per strip in an int: the default of 2^32 - 1 rows per strip makes it negative, so every LogL or LogLuv image without RowsPerStrip (and every tiled one) fails with No space for SGILog translation buffer, and a product past 2^31 gives a buffer smaller than a row; corrected as libtiff 4.0.10 does: a strip's (the rows per strip at most the image length) or a tile's pixels";
+    FS_883 = "FS-883", "libtiff 3.6.1", true,
+        "the SGILog decoders' run and literal loops do not stop at the row's pixel count (they write on past it and the row fails as short by a negative count), a run reads its two bytes and a 24-bit LogLuv pixel its three when fewer are left, and rows of 0 bytes never end; corrected as libtiff 4.0.10 does: the loops stop at the row's end and at the data's";
+    FS_884 = "FS-884", "libtiff 3.6.1", true,
+        "the SGILog decoders write pixels past their translation buffer when it is smaller than a row (FS-882's sizes) or a run goes past the row (FS-883): memory past the buffer; not written";
 }
 
 /// The register entry with ID `id`.

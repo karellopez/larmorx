@@ -170,6 +170,7 @@ pub(crate) enum Layer {
     Zip,
     Fax,
     PixarLog,
+    LogLuv,
 }
 
 impl Tiff {
@@ -289,6 +290,11 @@ impl Tiff {
                 }
                 Layer::PixarLog => {
                     if let Some(st) = self.pixarlog_vsetfield(tag, a.int()) {
+                        return st;
+                    }
+                }
+                Layer::LogLuv => {
+                    if let Some(st) = self.logluv_vsetfield(tag, a.int(), s) {
                         return st;
                     }
                 }
@@ -717,6 +723,11 @@ impl Tiff {
                 }
                 Layer::PixarLog => {
                     if let Some(v) = self.pixarlog_vgetfield(t) {
+                        return Some(v);
+                    }
+                }
+                Layer::LogLuv => {
+                    if let Some(v) = self.logluv_vgetfield(t) {
                         return Some(v);
                     }
                 }

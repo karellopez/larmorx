@@ -20,6 +20,7 @@ use super::next::Out;
 use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{FS_838, FS_839};
 
+#[cfg(test)]
 const S_NULL: u8 = 0;
 const S_PASS: u8 = 1;
 const S_HORIZ: u8 = 2;

@@ -13,7 +13,8 @@
 //! `tif_dir.c`, `tif_dirinfo.c`, `tif_dirread.c`, `tif_aux.c`, `tif_read.c`, `tif_strip.c`,
 //! `tif_tile.c`, `tif_swab.c`, `tif_compress.c`, `tif_codec.c`, `tif_dumpmode.c`,
 //! `tif_packbits.c`, `tif_lzw.c`, `tif_zip.c`, `tif_predict.c`, `tif_close.c`, `tif_write.c`,
-//! `tif_dirwrite.c`, `tif_flush.c`); the method tables become enums; what no caller of this port
+//! `tif_dirwrite.c`, `tif_flush.c`, `tif_fax3.c` with `mkg3states.c`, `tif_next.c`,
+//! `tif_thunder.c`, `tif_pixarlog.c`, `tif_luv.c`); the method tables become enums; what no caller of this port
 //! can reach (memory-mapped files, client procedures, tag extenders, `TIFFPrintDirectory`, the
 //! RGBA image interface) is left out; corrections of the defects found are on by default
 //! (FS-814 onwards: `docs/findings/libtiff-3.6.1.md`). `PROVENANCE.md` lists the files.
@@ -25,11 +26,12 @@
 //! standard error through [`larmorx_core::libtiff`]'s handlers and returns what the C function
 //! returns.
 //!
-//! Not ported yet (the next part of this port): the CCITT codecs (`tif_fax3.c`: RLE, RLE/W,
-//! Group 3, Group 4), PixarLog and SGILog (`tif_pixarlog.c`, `tif_luv.c`), which also bring
-//! private tags, and the ThunderScan and NeXT decoders (`tif_thunder.c`, `tif_next.c`). A file
-//! that selects one of them gives [`Unported`] at the point the original would start using it
-//! (the directory for the first group, decoding for the second).
+//! The codecs: None, PackBits, LZW, Deflate (with the predictor), the CCITT decoders (RLE,
+//! RLE/W, Group 3, Group 4: `fax3.rs`), NeXT, ThunderScan, PixarLog and SGILog (`next.rs`,
+//! `thunder.rs`, `pixarlog.rs`, `luv.rs`); their encoders but Deflate's, PackBits' and None's
+//! are left out (no caller of this port writes them). JPEG, old JPEG and JBIG are not configured
+//! in FreeSurfer's build (libtiff's own error). [`Unported`] stays in the signatures for the
+//! callers; no file gives it now.
 //!
 //! The behaviour is proved by the differential probe `validation/probes/fs-tiff` against
 //! libtiff 3.6.1 built from its release and FreeSurfer 8.2.0's copy of it.
@@ -51,6 +53,7 @@ mod dirread;
 pub mod fax3;
 pub mod fields;
 mod io;
+mod luv;
 mod next;
 mod pixarlog;
 mod read;

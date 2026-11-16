@@ -8,8 +8,9 @@
 use super::dir::{Layer, PostDecode};
 use super::fax3::{Fax, FaxKind};
 use super::fields::Table;
+use super::luv::LogLuv;
 use super::pixarlog::PixarLog;
-use super::{TIFF_NOBITREV, Tiff, Unported, compression as c};
+use super::{TIFF_NOBITREV, Tiff, compression as c};
 use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{FS_817, FS_818, FS_819, FS_831, FS_832, FS_833};
 use larmorx_core::zlib::{self as z, Deflate, Inflate};
@@ -24,6 +25,7 @@ pub(crate) enum SetupDecode {
     Zip,
     Fax,
     PixarLog,
+    LogLuv,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -51,6 +53,9 @@ pub(crate) enum Decode {
     Next,
     Thunder,
     PixarLog,
+    Luv,
+    LuvStrip,
+    LuvTile,
     PredRow,
     PredTile,
 }
@@ -70,6 +75,7 @@ pub(crate) enum Cleanup {
     Zip,
     Fax,
     PixarLog,
+    LogLuv,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -263,6 +269,7 @@ pub(crate) struct Codec {
     pub zip: Option<Box<Zip>>,
     pub fax: Option<Box<Fax>>,
     pub pixarlog: Option<Box<PixarLog>>,
+    pub logluv: Option<Box<LogLuv>>,
     /// PackBits' row size for its encoder (`tif_data`).
     pub packbits_rowsize: i32,
 }
@@ -295,6 +302,7 @@ impl Default for Codec {
             zip: None,
             fax: None,
             pixarlog: None,
+            logluv: None,
             packbits_rowsize: 0,
         }
     }
@@ -438,11 +446,7 @@ impl Tiff {
                 return self.fax_init(scheme, s);
             }
             c::PIXARLOG => self.pixarlog_init(),
-            c::SGILOG | c::SGILOG24 => {
-                // These codecs register private tags and tag methods at this point; not
-                // ported yet.
-                self.unported = Some(Unported(codec_name(scheme).unwrap_or("?")));
-            }
+            c::SGILOG | c::SGILOG24 => self.logluv_init(scheme),
             _ => {}
         }
         true
@@ -477,6 +481,7 @@ impl Tiff {
                 k.pixarlog = None;
                 k.has_pred = false;
             }
+            Cleanup::LogLuv => k.logluv = None,
         }
         k.layers.clear();
     }
@@ -520,6 +525,7 @@ impl Tiff {
             }
             SetupDecode::Fax => self.fax_setup(s),
             SetupDecode::PixarLog => self.pixarlog_setup(s),
+            SetupDecode::LogLuv => self.logluv_setup(s),
             SetupDecode::Zip => {
                 let sp = self.codec.zip.as_mut().expect("ZIP state");
                 match Inflate::init() {
@@ -682,6 +688,9 @@ impl Tiff {
             Decode::Next => self.next_decode(buf, cc, s),
             Decode::Thunder => self.thunder_decode_row(buf, cc, s),
             Decode::PixarLog => self.pixarlog_decode(buf, cc, s),
+            Decode::Luv => self.logluv_decode(buf, cc, s),
+            Decode::LuvStrip => self.logluv_decode_rows(buf, cc, false, s),
+            Decode::LuvTile => self.logluv_decode_rows(buf, cc, true, s),
             Decode::PredRow => {
                 let inner = self.codec.predictor.coderow;
                 if self.decode(inner, buf, cc, s) != 0 {

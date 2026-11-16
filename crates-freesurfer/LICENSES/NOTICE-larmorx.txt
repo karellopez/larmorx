@@ -202,9 +202,13 @@ the public domain (the Unlicense).
 
 libtiff 3.6.1's error and warning reporting (tif_error.c, tif_warning.c, tif_unix.c's handlers),
 translated into Rust in crates/larmorx-core/src/libtiff.rs, and its reader and writer (directories,
-strips and tiles, the None, PackBits, LZW and Deflate codecs, the predictor), translated into Rust
-in crates/larmorx-io/src/tiff/ (altered versions: see crates/larmorx-io/PROVENANCE.md). Its notice
-(LICENSES/libtiff.txt):
+strips and tiles, the None, PackBits, LZW and Deflate codecs, the predictor, and the CCITT, NeXT,
+ThunderScan, PixarLog and SGILog decoders), translated into Rust in crates/larmorx-io/src/tiff/
+(altered versions: see crates/larmorx-io/PROVENANCE.md). The CCITT decoder is derived, with
+permission, from Frank Cringle's viewfax (Copyright (C) 1990, 1995 Frank D. Cringle), as
+libtiff's is; the SGILog decoders (tif_luv.c, uvcode.h) are Copyright (c) 1997 Greg Ward Larson
+and Copyright (c) 1997 Silicon Graphics, Inc., under the same notice with Greg Larson's name
+beside Sam Leffler's (in LICENSES/libtiff.txt). Its notice (LICENSES/libtiff.txt):
 
   Copyright (c) 1988-1997 Sam Leffler
   Copyright (c) 1991-1997 Silicon Graphics, Inc.

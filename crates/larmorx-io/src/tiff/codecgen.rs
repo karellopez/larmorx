@@ -540,3 +540,67 @@ pub fn pixarlog_strip(r: &mut Rng, n: u64, big: bool) -> Vec<u8> {
     let level = r.pick(&[1, 6, 9]);
     larmorx_core::zlib::compress_vec(&v, level).unwrap_or_default()
 }
+
+/// One strip of SGILog data: `rows` rows of `width` pixels; `planes` 2 (LogL: two byte planes
+/// per row, run-length coded), 4 (32-bit LogLuv: four), 0 (24-bit LogLuv: three bytes a pixel);
+/// now and then a count off or the data cut.
+pub fn sgilog_strip(r: &mut Rng, rows: u32, width: u32, planes: u32) -> Vec<u8> {
+    let mut v = Vec::new();
+    let w = width as usize;
+    for _ in 0..rows {
+        if planes == 0 {
+            for _ in 0..w {
+                v.extend_from_slice(&[r.next_u64() as u8, r.next_u64() as u8, r.next_u64() as u8]);
+            }
+            continue;
+        }
+        for _ in 0..planes {
+            let mut b = vec![0u8; w];
+            let mut x = 0;
+            while x < w {
+                let len = 1 + r.below(12) as usize;
+                let val = r.next_u64() as u8;
+                let run = r.chance(2);
+                for k in x..(x + len).min(w) {
+                    b[k] = if run { val } else { r.next_u64() as u8 };
+                }
+                x += len;
+            }
+            // runs of 4 or more as runs (128 + n - 2, at most 129), the rest literals (at most 127)
+            let mut k = 0;
+            while k < w {
+                let mut n = 1;
+                while k + n < w && b[k + n] == b[k] && n < 129 {
+                    n += 1;
+                }
+                if n >= 4 {
+                    let n = if r.chance(40) { n + 1 } else { n };
+                    v.push((128 + n - 2) as u8);
+                    v.push(b[k]);
+                    k += n;
+                } else {
+                    let mut m = 0;
+                    while k + m < w && m < 127 {
+                        let mut rr = 1;
+                        while k + m + rr < w && b[k + m + rr] == b[k + m] && rr < 4 {
+                            rr += 1;
+                        }
+                        if rr >= 4 {
+                            break;
+                        }
+                        m += 1;
+                    }
+                    let m = m.max(1);
+                    v.push(m as u8);
+                    v.extend_from_slice(&b[k..(k + m).min(w)]);
+                    k += m;
+                }
+            }
+        }
+    }
+    if r.chance(8) && !v.is_empty() {
+        let n = r.below(v.len() as u64) as usize;
+        v.truncate(n);
+    }
+    v
+}

@@ -158,6 +158,12 @@ impl Tiff {
                         if cc == 0 {
                             return self.next_bad(s);
                         }
+                        if cc < 0 && bp >= self.raw_defined {
+                            // past the data and the bytes the raw buffer holds: libtiff 3.6.1
+                            // reads on through memory (FS-819) until a code fills the row
+                            self.past_raw_notice();
+                            return self.next_bad(s);
+                        }
                         n = i32::from(self.raw_byte(bp, end));
                         bp += 1;
                         cc = cc.wrapping_sub(1);

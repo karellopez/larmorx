@@ -252,7 +252,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         let planar: u16 = if r.chance(5) { 2 } else { 1 };
         let comp: u16 = r.pick(&[
             1, 1, 1, 32773, 32773, 32946, 32946, 8, 5, 5, 5, 99, 7, 6, 34661, 32809, 32766, 2, 3,
-            3, 3, 4, 4, 4, 32771, 32809, 32766, 32909, 32909, 32909,
+            3, 3, 4, 4, 4, 32771, 32809, 32766, 32909, 32909, 32909, 34676, 34676, 34677, 34677,
         ]);
         let fax = matches!(comp, 2 | 3 | 4 | 32771);
         // the codecs' own sample layouts, now and then another
@@ -316,6 +316,32 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         } else {
             None
         };
+        // SGILog: LogL or LogLuv with the sample layouts its decoders know, now and then not
+        let (photometric, bps, spp, planar, sampleformat) =
+            if matches!(comp, 34676 | 34677) && !r.chance(10) {
+                let logl = r.chance(3);
+                let (b, sp, f) = if logl {
+                    r.pick(&[
+                        (16u16, 1u16, 2u16),
+                        (16, 1, 1),
+                        (32, 1, 3),
+                        (8, 1, 1),
+                        (8, 1, 4),
+                    ])
+                } else {
+                    r.pick(&[
+                        (32u16, 3u16, 3u16),
+                        (16, 3, 2),
+                        (8, 3, 1),
+                        (32, 1, 1),
+                        (32, 1, 4),
+                    ])
+                };
+                let pl = if r.chance(15) { 2 } else { 1 };
+                (Some(if logl { 32844 } else { 32845 }), b, sp, pl, Some(f))
+            } else {
+                (photometric, bps, spp, planar, sampleformat)
+            };
         // The geometry of the data.
         let samples_per_unit = if planar == 1 { u32::from(spp) } else { 1 };
         let row_bits = |cols: u32| u64::from(cols) * u64::from(bps) * u64::from(samples_per_unit);
@@ -362,6 +388,16 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                 }
                 32766 => super::codecgen::next_strip(&mut r, nrows, cols, row_bytes(cols)),
                 32809 => super::codecgen::thunder_strip(&mut r, nrows, cols),
+                34676 | 34677 => super::codecgen::sgilog_strip(
+                    &mut r,
+                    nrows,
+                    cols,
+                    match (photometric, comp) {
+                        (Some(32844), _) => 2,
+                        (_, 34677) => 0,
+                        _ => 4,
+                    },
+                ),
                 32909 => super::codecgen::pixarlog_strip(
                     &mut r,
                     u64::from(nrows) * u64::from(cols) * u64::from(samples_per_unit),

@@ -367,3 +367,115 @@ fn pixarlog_strips_decode_to_their_codes() {
         }
     }
 }
+
+/// SGILog rows (LogL's two byte planes, LogLuv's four, run-length coded; 24-bit LogLuv's three
+/// bytes a pixel) read raw or as 16-bit values give the values coded, by default with and
+/// without RowsPerStrip.
+#[test]
+fn sgilog_rows_decode_to_their_values() {
+    use super::cases::Rng;
+    use super::codecgen::one_strip_file;
+    // one byte plane: a run where four or more bytes repeat, literals otherwise
+    fn plane(b: &[u8], out: &mut Vec<u8>) {
+        let mut k = 0;
+        while k < b.len() {
+            let mut n = 1;
+            while k + n < b.len() && b[k + n] == b[k] && n < 129 {
+                n += 1;
+            }
+            if n >= 4 {
+                out.push((128 + n - 2) as u8);
+                out.push(b[k]);
+                k += n;
+            } else {
+                let m = (b.len() - k).min(127);
+                out.push(m as u8);
+                out.extend_from_slice(&b[k..k + m]);
+                k += m;
+            }
+        }
+    }
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut r = Rng::new(9);
+    for (n, (comp, photo, spp, bps, sf, rps)) in [
+        (34676u16, 32844u32, 1u32, 16u32, 2u32, true),
+        (34676, 32844, 1, 16, 2, false),
+        (34676, 32845, 1, 32, 1, true),
+        (34677, 32845, 1, 32, 1, true),
+        (34677, 32845, 1, 32, 1, false),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (width, rows) = (1 + r.below(300) as u32, 1 + r.below(5) as u32);
+        let mut data = Vec::new();
+        let mut want: Vec<Vec<u8>> = Vec::new();
+        for _ in 0..rows {
+            let vals: Vec<u32> = (0..width)
+                .map(|_| {
+                    if r.chance(3) {
+                        0x1234_5678
+                    } else {
+                        r.next_u64() as u32
+                    }
+                })
+                .collect();
+            if photo == 32844 {
+                let v: Vec<u16> = vals.iter().map(|&x| x as u16).collect();
+                for sh in [8, 0] {
+                    let b: Vec<u8> = v.iter().map(|&x| (x >> sh) as u8).collect();
+                    plane(&b, &mut data);
+                }
+                want.push(v.iter().flat_map(|x| x.to_le_bytes()).collect());
+            } else if comp == 34676 {
+                for sh in [24, 16, 8, 0] {
+                    let b: Vec<u8> = vals.iter().map(|&x| (x >> sh) as u8).collect();
+                    plane(&b, &mut data);
+                }
+                want.push(vals.iter().flat_map(|x| x.to_le_bytes()).collect());
+            } else {
+                for &x in &vals {
+                    data.extend_from_slice(&[(x >> 16) as u8, (x >> 8) as u8, x as u8]);
+                }
+                want.push(
+                    vals.iter()
+                        .flat_map(|x| (x & 0xff_ffff).to_le_bytes())
+                        .collect(),
+                );
+            }
+        }
+        let mut extra = vec![(277u16, 3u16, spp), (339, 3, sf)];
+        if rps {
+            extra.push((278, 4, rows));
+        } else {
+            extra.push((278, 4, u32::MAX));
+        }
+        let file = one_strip_file(width, rows, bps as u16, comp, photo as u16, &extra, &data);
+        let p = dir.path().join(format!("l{n}.tif"));
+        std::fs::write(&p, &file).expect("write");
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut cap = Captured::default();
+            let mut tf = Tiff::open(p.to_str().expect("path"), "r", opts(mode), &mut cap)
+                .expect("ported")
+                .unwrap_or_else(|| panic!("opened: {}", cap.text(Stream::Err)));
+            for (y, w) in want.iter().enumerate() {
+                let mut buf = vec![0u8; tf.scanline_size() as usize];
+                let rr = tf
+                    .read_scanline(&mut buf, y as u32, 0, &mut cap)
+                    .expect("ported");
+                if !rps && mode == UpstreamDefects::Reproduce {
+                    // FS-882: libtiff 3.6.1's buffer of width x (2^32 - 1) pixels
+                    assert_eq!(rr, -1);
+                    assert!(
+                        cap.text(Stream::Err)
+                            .contains("No space for SGILog translation buffer")
+                    );
+                    continue;
+                }
+                assert_eq!(rr, 1, "case {n} {mode}: {}", cap.text(Stream::Err));
+                assert_eq!(&buf, w, "case {n} {mode} row {y}");
+            }
+            tf.close(&mut cap);
+        }
+    }
+}

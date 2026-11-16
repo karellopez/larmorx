@@ -124,7 +124,7 @@ fn c_run(lib: Lib, mode: i32, path: &Path, p: &[i32], d: &[f64], data: &[u8]) ->
 const VARY: &[&str] = &[
     "FS-815", "FS-816", "FS-818", "FS-819", "FS-820", "FS-821", "FS-822", "FS-823", "FS-824",
     "FS-825", "FS-826", "FS-828", "FS-830", "FS-831", "FS-832", "FS-833", "FS-834", "FS-835",
-    "FS-838", "FS-840",
+    "FS-838", "FS-840", "FS-884",
 ];
 
 #[derive(Default)]

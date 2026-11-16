@@ -15,6 +15,7 @@ programs' bits and every crate shares one translation (decision log, "glibc's ex
 | `tanhf_glibc`, `expm1f_glibc` (2026-11-13) | `__tanhf`, `__expm1f` (one build) | fdlibm, Sun's notice (`s_tanhf.c` `dacb3c557d21…`, `s_expm1f.c` `b3b864ad6abe…`) |
 | `acosf_glibc` (2026-11-13) | `acosf@@GLIBC_2.2.5`: `__ieee754_acosf` behind glibc's SVID wrapper (one build) | fdlibm, Sun's notice (`e_acosf.c` `60a8c9b2d144…`); the wrapper's NaN for `\|x\| > 1` (`0x7fc00000`) measured, its code (LGPL) not translated |
 | `log10_glibc` (2026-11-14) | `log10@@GLIBC_2.2.5`: `__ieee754_log10` over the FMA build's `__ieee754_log`, behind glibc's SVID wrapper (one build) | fdlibm, Sun's notice (`e_log10.c` `55570c500ba6…`); the wrapper's results for `x <= 0` (`-inf`, `0x7ff8000000000000`) measured, its code (LGPL) not translated |
+| `log10f_glibc` (2026-11-16) | `log10f@@GLIBC_2.2.5`: `__ieee754_log10f` over the FMA build's `__ieee754_logf`, behind glibc's SVID wrapper (one build) | fdlibm, Sun's notice (`e_log10f.c` `659d90e01161…`); the wrapper's results for `x <= 0` (`-inf`, `0x7fc00000`) measured, its code (LGPL) not translated |
 
 The default everywhere stays correctly rounded (`larmorx_core::math::sinf`, ...); these are for
 `reproduce` and the replicas. glibc's LGPL functions (the double `sin`, `cos`, `tan`, `asin`,
@@ -28,7 +29,7 @@ current symbol versions: `logf@@GLIBC_2.27`, `exp@@GLIBC_2.29`, ...), and compar
 (NaN results included, no canonicalisation):
 
 - `verify float`: every one of the 2^32 float inputs of `sinf`, `cosf`, `sincosf` (both outputs),
-  `logf`, `expf`, `atanf`, `tanhf`, `expm1f`, `acosf`, against glibc; `sinf_glibc`, `cosf_glibc` and their SSE2 builds
+  `logf`, `expf`, `atanf`, `tanhf`, `expm1f`, `acosf`, `log10f` (2026-11-16), against glibc; `sinf_glibc`, `cosf_glibc` and their SSE2 builds
   against the AFNI replicas' translation (before it became a re-export); and counts where glibc's
   two builds differ.
 - `verify pairs`, `verify double`: `powf`, `atan2f`, `exp`, `log`, `log10`, `pow` on the seeded families

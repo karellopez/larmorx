@@ -54,6 +54,7 @@ struct Libm {
     tanhf: F32,
     expm1f: F32,
     acosf: F32,
+    log10f: F32,
     powf: F32x2,
     atan2f: F32x2,
     exp: F64,
@@ -94,6 +95,7 @@ impl Libm {
                 tanhf: t::<*mut c_void, F32>(symbol(h, c"tanhf")),
                 expm1f: t::<*mut c_void, F32>(symbol(h, c"expm1f")),
                 acosf: t::<*mut c_void, F32>(symbol(h, c"acosf")),
+                log10f: t::<*mut c_void, F32>(symbol(h, c"log10f")),
                 powf: t::<*mut c_void, F32x2>(symbol(h, c"powf")),
                 atan2f: t::<*mut c_void, F32x2>(symbol(h, c"atan2f")),
                 exp: t::<*mut c_void, F64>(symbol(h, c"exp")),
@@ -317,7 +319,7 @@ fn sse2(m: &Libm, threads: usize, out: Option<&str>) {
 
 /// Every float input of the one-argument float functions.
 fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
-    let names: [(&'static str, &'static str); 18] = [
+    let names: [(&'static str, &'static str); 19] = [
         ("sinf_glibc", "glibc sinf"),
         ("cosf_glibc", "glibc cosf"),
         ("sincosf_glibc (sine)", "glibc sincosf"),
@@ -330,6 +332,10 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
         (
             "acosf_glibc",
             "glibc acosf (acosf@@GLIBC_2.2.5, its SVID wrapper)",
+        ),
+        (
+            "log10f_glibc",
+            "glibc log10f (log10f@@GLIBC_2.2.5, its SVID wrapper)",
         ),
         (
             "tanhf_glibc",
@@ -370,7 +376,7 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
             let x = f32::from_bits(i as u32);
             let what = || format!("{i:#010x}");
             let (gs, gc) = m.sincos(x);
-            let pairs: [(f32, f32); 16] = [
+            let pairs: [(f32, f32); 17] = [
                 ((m.sinf)(x), lx::sinf_glibc(x)),
                 ((m.cosf)(x), lx::cosf_glibc(x)),
                 (gs, lx::sincosf_glibc(x).0),
@@ -381,6 +387,7 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
                 ((m.tanhf)(x), lx::tanhf_glibc(x)),
                 ((m.expm1f)(x), lx::expm1f_glibc(x)),
                 ((m.acosf)(x), lx::acosf_glibc(x)),
+                ((m.log10f)(x), lx::log10f_glibc(x)),
                 (larmorx_afni_replica::fdlibm::tanhf(x), lx::tanhf_glibc(x)),
                 (larmorx_afni_replica::fdlibm::expm1f(x), lx::expm1f_glibc(x)),
                 (afni::sinf(x), lx::sinf_glibc(x)),
@@ -393,14 +400,14 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
             }
             let (s2, c2) = lx::sincosf_glibc_sse2(x);
             let (rs, rc) = (lx::sinf_glibc_sse2(x), lx::cosf_glibc_sse2(x));
-            v[16].count(
+            v[17].count(
                 b32(rs) << 32 | b32(rc),
                 rs.is_nan(),
                 b32(s2) << 32 | b32(c2),
                 what,
             );
             // Where the SSE2 build differs from the FMA build (a count, not a failure).
-            v[17].count(
+            v[18].count(
                 b32(lx::sinf_glibc(x)) << 32 | b32(lx::cosf_glibc(x)),
                 false,
                 b32(rs) << 32 | b32(rc),

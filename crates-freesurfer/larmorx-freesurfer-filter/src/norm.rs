@@ -16,6 +16,8 @@ use std::io::Write;
 
 use larmorx_core::defects::{FS_583, FS_585, FS_586};
 use larmorx_freesurfer_core::affine::float_to_int;
+use larmorx_freesurfer_core::cstd::fmt_f;
+use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::ret::Ret;
@@ -260,6 +262,32 @@ enum Ver {
     Uchar,
 }
 
+/// The Voronoi diagram's line after each layer with `Gdiag & DIAG_SHOW` and `DIAG_VERBOSE` (the
+/// short version's with six spaces before its end).
+fn voronoi_line(
+    g: &Globals,
+    err: &mut dyn Write,
+    ver: Ver,
+    nchanged: i32,
+    total: i32,
+    visited: i32,
+) {
+    if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
+        let pad = if ver == Ver::Short { "      " } else { "" };
+        let _ = writeln!(
+            err,
+            "Voronoi: {nchanged} voxels assigned, {total} remaining, {visited} visited.{pad}"
+        );
+    }
+}
+
+/// The soap bubble's line before each pass with `Gdiag & DIAG_SHOW` and `DIAG_VERBOSE`.
+fn soap_line(g: &Globals, err: &mut dyn Write, i: i32, niter: i32) {
+    if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
+        let _ = writeln!(err, "soap bubble iteration {} of {niter}", i + 1);
+    }
+}
+
 /// `MRIbuildVoronoiDiagram(mri_src, mri_ctrl, mri_dst)`: a float, short or byte source (another
 /// type: `NULL` after `MRIbuildVoronoiDiagram: src type <t> unsupported`); the destination (a
 /// clone of the source when none is given; FS-583 for a short source) must be of the source's
@@ -499,6 +527,7 @@ pub fn mri_build_voronoi_diagram(
                 marked[p] = CONTROL_NBR;
             }
             frontier = next;
+            let visited = frontier.len() as i32;
             for &p in &frontier {
                 let (x, y, z) = coords(p);
                 let mut mean = 0.0f32;
@@ -526,6 +555,7 @@ pub fn mri_build_voronoi_diagram(
                 }
             }
             total = total.wrapping_sub(nchanged);
+            voronoi_line(g, err, ver, nchanged, total, visited);
             if !(nchanged > 0 && total > 0) {
                 break;
             }
@@ -535,6 +565,7 @@ pub fn mri_build_voronoi_diagram(
     #[allow(clippy::while_immutable_condition)]
     while !frontier_ok {
         let mut nchanged = 0i32;
+        let mut visited = 0i32;
         mark_unmarked(&mut marked, ec, &tc, CONTROL_NBR, CONTROL_TMP);
         replace(&mut marked, CONTROL_NBR, CONTROL_MARKED);
         replace(&mut marked, CONTROL_TMP, CONTROL_NBR);
@@ -549,6 +580,7 @@ pub fn mri_build_voronoi_diagram(
                     if mark != CONTROL_NBR {
                         continue;
                     }
+                    visited += 1;
                     let mut mean = 0.0f32;
                     let mut n = 0i32;
                     for zk in -1..=1 {
@@ -582,9 +614,13 @@ pub fn mri_build_voronoi_diagram(
             }
         }
         total = total.wrapping_sub(nchanged);
+        voronoi_line(g, err, ver, nchanged, total, visited);
         if !(nchanged > 0 && total > 0) {
             break;
         }
+    }
+    if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
+        let _ = err.write_all(b"\n");
     }
     match ver {
         Ver::Float => put_floats(d, 0, &dv),
@@ -691,7 +727,7 @@ pub fn mri_soap_bubble(
     }
     let mut tmp = mri_copy(g, out, err, d, None)?.unwrap_new();
     match src_type {
-        MRI_FLOAT => soap_float(g, err, &meta, ctrl, d, &mut tmp, niter, min_change)?,
+        MRI_FLOAT => soap_float(g, out, err, &meta, ctrl, d, &mut tmp, niter, min_change)?,
         MRI_SHORT => soap_short(g, err, &meta, ctrl, d, &mut tmp, niter)?,
         _ => soap_bytes(g, err, &meta, ctrl, d, &mut tmp, niter)?,
     }
@@ -711,6 +747,7 @@ pub fn mri_soap_bubble(
 #[allow(clippy::too_many_arguments)]
 fn soap_float(
     g: &mut Globals,
+    out: &mut dyn Write,
     err: &mut dyn Write,
     m: &Meta,
     ctrl: &Mri,
@@ -767,7 +804,8 @@ fn soap_float(
                 }
             }
         }
-        for _ in 0..niter {
+        for i in 0..niter {
+            soap_line(g, err, i, niter);
             for z in z1..=z2 {
                 for y in y1..=y2 {
                     for x in x1..=x2 {
@@ -802,6 +840,13 @@ fn soap_float(
             x2 = (x2 + 1).min(w - 1);
             y2 = (y2 + 1).min(h - 1);
             z2 = (z2 + 1).min(dep - 1);
+            if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
+                let _ = writeln!(
+                    out,
+                    "iter {i}: max change {}",
+                    fmt_f(f64::from(max_change), 0, 6)
+                );
+            }
             if max_change < min_change {
                 break;
             }
@@ -900,7 +945,8 @@ fn soap_short(
                 }
             }
         }
-        for _ in 0..niter {
+        for i in 0..niter {
+            soap_line(g, err, i, niter);
             for z in 0..e.d as i32 {
                 for y in 0..e.h as i32 {
                     for x in 0..e.w as i32 {
@@ -961,7 +1007,8 @@ fn soap_bytes(
     let by_value = wide && !g.notices.reproduce();
     for f in 0..m.nframes.max(0) {
         let fd = f as usize * d.vg.depth as usize;
-        for _ in 0..niter {
+        for i in 0..niter {
+            soap_line(g, err, i, niter);
             for z in 0..e.d as i32 {
                 for y in 0..e.h as i32 {
                     for x in 0..e.w as i32 {

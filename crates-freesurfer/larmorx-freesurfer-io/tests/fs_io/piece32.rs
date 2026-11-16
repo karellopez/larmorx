@@ -368,77 +368,96 @@ fn read_case(g: &mut Gen) -> Vec<String> {
     });
     t.push(inv.to_string());
     let nq = g.int(1, 6);
+    let nq_at = t.len();
     t.push(nq.to_string());
     for _ in 0..nq {
         let k = g.pick(&[
             "s", "s", "r", "R", "i", "i", "f", "v", "d", "a", "g", "w", "m", "W", "C", "A", "A",
-            "D", "I", "I", "V", "X", "O", "O",
+            "D",
         ]);
         t.push(k.into());
-        match k {
-            "s" | "r" | "R" | "f" => {
-                for _ in 0..3 {
-                    t.push(fhex(coord(g)));
-                }
-            }
-            "i" | "a" => {
-                for _ in 0..3 {
-                    t.push(g.pick(&[-1i64, 0, 1, 2, 3, 4, 7, 9]).to_string());
-                }
-            }
-            "v" => {
-                for _ in 0..3 {
-                    t.push(g.int(1, 5).to_string());
-                }
-                for _ in 0..3 {
-                    t.push(g.pick(&[-1i64, 0, 1, 2, 3, 4, 7]).to_string());
-                }
-            }
-            "d" => {
-                for _ in 0..6 {
-                    t.push(fhex(coord(g)));
-                }
-            }
-            // relay 40: TransformWrite's name; TransformApplyType's and
-            // TransformCreateDensityMap's volume (width, height, depth) and interpolation
-            "W" => {
-                let n = g.pick(&[
-                    "w/tw.lta",
-                    "w/tw.lta",
-                    "w/tw.xfm",
-                    "w/tw.dat",
-                    "w/tw.m3z",
-                    "w/tw.mat",
-                    "w/no/tw.lta",
-                    "w/tw",
-                ]);
-                t.push(enc(Some(n.as_bytes())));
-            }
-            "A" | "D" => {
-                for _ in 0..3 {
-                    t.push(g.int(1, 4).to_string());
-                }
-                t.push(g.pick(&[0i64, 1, 1, 2]).to_string());
-            }
-            // relay 41: TransformApplyInverseType's volume and interpolation (-1:
-            // TransformApplyInverse); TransformVox2Ras's and TransformRas2Vox's volumes;
-            // TransformCompose's matrices and destination
-            "I" => {
-                for _ in 0..3 {
-                    t.push(g.int(1, 4).to_string());
-                }
-                t.push(g.pick(&[-1i64, 0, 1, 1, 2]).to_string());
-            }
-            "V" | "X" => t.push(g.pick(&[0i64, 1]).to_string()),
-            "O" => {
-                for _ in 0..3 {
-                    t.push(g.pick(&[0i64, 1]).to_string());
-                }
-            }
-            _ => {}
-        }
+        query_args(g, k, &mut t);
     }
+    // relay 41's queries (I, V, X, O): drawn from a generator seeded by the case's text so far,
+    // so the earlier cases of every seed keep their stream (the recorded test's set with them)
+    let seed = t.join(" ").bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    });
+    let mut h = Gen::new(seed);
+    let extra = h.below(3) as i64;
+    for _ in 0..extra {
+        let k = h.pick(&["I", "I", "V", "X", "O", "O"]);
+        t.push(k.into());
+        query_args(&mut h, k, &mut t);
+    }
+    t[nq_at] = (nq + extra).to_string();
     t
+}
+
+/// A query's arguments (after its letter).
+fn query_args(g: &mut Gen, k: &str, t: &mut Vec<String>) {
+    match k {
+        "s" | "r" | "R" | "f" => {
+            for _ in 0..3 {
+                t.push(fhex(coord(g)));
+            }
+        }
+        "i" | "a" => {
+            for _ in 0..3 {
+                t.push(g.pick(&[-1i64, 0, 1, 2, 3, 4, 7, 9]).to_string());
+            }
+        }
+        "v" => {
+            for _ in 0..3 {
+                t.push(g.int(1, 5).to_string());
+            }
+            for _ in 0..3 {
+                t.push(g.pick(&[-1i64, 0, 1, 2, 3, 4, 7]).to_string());
+            }
+        }
+        "d" => {
+            for _ in 0..6 {
+                t.push(fhex(coord(g)));
+            }
+        }
+        // relay 40: TransformWrite's name; TransformApplyType's and
+        // TransformCreateDensityMap's volume (width, height, depth) and interpolation
+        "W" => {
+            let n = g.pick(&[
+                "w/tw.lta",
+                "w/tw.lta",
+                "w/tw.xfm",
+                "w/tw.dat",
+                "w/tw.m3z",
+                "w/tw.mat",
+                "w/no/tw.lta",
+                "w/tw",
+            ]);
+            t.push(enc(Some(n.as_bytes())));
+        }
+        "A" | "D" => {
+            for _ in 0..3 {
+                t.push(g.int(1, 4).to_string());
+            }
+            t.push(g.pick(&[0i64, 1, 1, 2]).to_string());
+        }
+        // relay 41: TransformApplyInverseType's volume and interpolation (-1:
+        // TransformApplyInverse); TransformVox2Ras's and TransformRas2Vox's volumes;
+        // TransformCompose's matrices and destination
+        "I" => {
+            for _ in 0..3 {
+                t.push(g.int(1, 4).to_string());
+            }
+            t.push(g.pick(&[-1i64, 0, 1, 1, 2]).to_string());
+        }
+        "V" | "X" => t.push(g.pick(&[0i64, 1]).to_string()),
+        "O" => {
+            for _ in 0..3 {
+                t.push(g.pick(&[0i64, 1]).to_string());
+            }
+        }
+        _ => {}
+    }
 }
 
 /// `gcw`: a morph file of piece 31 (`.m3d`, `.m3z`, now and then an MGH warp volume) read and

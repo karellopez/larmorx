@@ -25,7 +25,7 @@
 //! written, LabelRemoveOverlap), piece 31's two (GCA morphs read as volumes), piece 32's three
 //! (GCA morphs written, read and written again, TRANSFORMs read, sampled, written, copied and
 //! applied) and piece 33's two (stacked autoencoders read as volumes),
-//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: one since relay 40),
+//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: none since relay 41),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
 //! --light` on Linux x64 from the unit oracle's build (2026-11-16, track A relay 41, with piece
 //! 33's autoencoders: 4,799 cases (case 4794, a heavy one in debug builds, left out), 4,279 lines

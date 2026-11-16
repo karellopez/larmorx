@@ -302,3 +302,73 @@ fn fs875_fs876_a_morph_copy_keeps_its_inverse_and_affine() {
         assert_eq!(c.ttype, MORPH_3D_TYPE);
     }
 }
+
+/// Relay 41: `TransformCompose` (a left and a right matrix: FS-956 decides how both apply; one of
+/// them alone multiplies the first matrix), `TransformCompose` of a morph (unsupported, `NULL`),
+/// FS-928 (a composition into a morph refused), `TransformVox2Ras` of a morph (the image's
+/// voxel-to-RAS matrix: a coronal image of 4 voxels a side, sizes 1, centre 0) and of a linear
+/// array (its type becomes RAS to RAS), `TransformApplyInverse` of a morph (not ported yet).
+#[test]
+fn compose_and_convert() {
+    let t = tempfile::tempdir().unwrap();
+    let env = Environment::default();
+    let lta = "type      = 0\nnxforms   = 1\nmean      = 0.0000 0.0000 0.0000\nsigma     = 1.0000\n1 4 4\n1 0 0 2\n0 1 0 0\n0 0 1 0\n0 0 0 1\n";
+    let p = write(t.path(), "v.lta", lta.as_bytes());
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let mut g = Globals::new(UpstreamDefects::Fix);
+    let v = tr::transform_read(&mut g, &mut o, &mut e, &env, None, &p)
+        .unwrap()
+        .unwrap();
+    let mut right = larmorx_freesurfer_core::matrix::Matrix::real(4, 4);
+    for i in 1..=4 {
+        right.set_relt(i, i, 1.0);
+    }
+    right.set_relt(2, 4, 5.0);
+    // L * right: a shift of 2 in x and 5 in y
+    let c = tr::transform_compose(&mut g, &mut o, &mut e, &v, None, Some(&right), None)
+        .unwrap()
+        .into_new()
+        .unwrap();
+    let m = c.lta().xforms[0].m_l.as_ref().unwrap();
+    assert_eq!((m.relt(1, 4), m.relt(2, 4)), (2.0, 5.0));
+    // into itself, left and right: (left * L) * right
+    let mut w = tr::transform_read(&mut g, &mut o, &mut e, &env, None, &p)
+        .unwrap()
+        .unwrap();
+    assert!(
+        tr::transform_compose_in_place(&mut g, &mut o, &mut e, &mut w, Some(&right), Some(&right))
+            .unwrap()
+    );
+    let m = w.lta().xforms[0].m_l.as_ref().unwrap();
+    assert_eq!((m.relt(1, 4), m.relt(2, 4)), (2.0, 10.0));
+    // a morph cannot be composed, nor composed into
+    let mut mo = morph(&mut g, [2, 2, 2], 1);
+    assert!(
+        tr::transform_compose(&mut g, &mut o, &mut e, &mo, None, Some(&right), None)
+            .unwrap()
+            .is_null()
+    );
+    assert!(String::from_utf8_lossy(&e).contains("TransformCompose: MORPH_3D_TYPE unsupported"));
+    let r = tr::transform_compose(&mut g, &mut o, &mut e, &v, None, None, Some(&mut mo)).unwrap();
+    assert!(r.is_null() && ids(&g).contains(&"FS-928"));
+    // a morph's positions to RAS (type GCAM_RAS afterwards), a linear array's type
+    let x0 = mo.gcam().nodes[0].x;
+    assert_eq!(
+        tr::transform_vox2ras(&mut g, &mut o, &mut e, &mut mo, None, None).unwrap(),
+        0
+    );
+    assert_eq!(mo.gcam().mtype, gcam::GCAM_RAS);
+    assert_ne!(mo.gcam().nodes[0].x, x0);
+    let mut u = tr::transform_read(&mut g, &mut o, &mut e, &env, None, &p)
+        .unwrap()
+        .unwrap();
+    tr::transform_vox2ras(&mut g, &mut o, &mut e, &mut u, None, None).unwrap();
+    assert_eq!(u.ttype, larmorx_freesurfer_mri::lta::LINEAR_RAS_TO_RAS);
+    // a morph's inverse resampling is not ported yet
+    let src = mri_alloc_sequence(&mut g, &mut o, &mut e, 2, 2, 2, MRI_FLOAT, 1).unwrap();
+    let mut e2 = Vec::new();
+    let r =
+        tr::transform_apply_inverse(&mut g, &mut o, &mut e2, &env, &mut mo, &src, None).unwrap();
+    assert!(r.is_null());
+    assert!(String::from_utf8_lossy(&e2).contains("GCAMmorphFromAtlas"));
+}

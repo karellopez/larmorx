@@ -1845,6 +1845,22 @@ defects! {
         "growing a cluster by distance (sclustGrowByDist) continued by a later call reads the earlier call's seed vertex, which may belong to a surface already freed or with fewer vertices; every caller starts each growth anew";
     FS_908 = "FS-908", "FreeSurfer", true,
         "importing a surface's values or curvatures from a vector or a matrix column (MRISimportValVector, MRISimportCurvatureVector, MRISimportValFromMatrixColumn) reads outside the vector or the matrix when it holds fewer values than the surface has vertices, or for a column the matrix does not have; every caller passes one value per vertex";
+    FS_909 = "FS-909", "FreeSurfer", true,
+        "the surface hash table of faces (mrisMarkIntersections, the intersection removal of mris_fix_topology, mris_place_surface, mris_remesh and mris_remove_intersection, the self-intersection tests) given a resolution that is not above 0, or a surface coordinate that is not finite or so far from the origin that its voxel number passes the int range, stores the faces in the table's first bucket and looks them up nowhere: intersections are missed without a word";
+    FS_910 = "FS-910", "FreeSurfer", true,
+        "the surface hash table of faces misses every intersection of faces more than 1,000 voxels from the origin along an axis (1,000 mm at its default resolution of 1 mm): such faces are stored at the table's edge but looked for beyond it";
+    FS_911 = "FS-911", "FreeSurfer", true,
+        "the surface hash table of faces lists a face that touches more than 10,000 of its voxels in the first 10,000 only, with two error messages (complete list too big!) for each voxel left out, so intersections with the rest of the face are missed";
+    FS_912 = "FS-912", "FreeSurfer", true,
+        "the surface hash table's intersection test ends the program (MHT_MAX_FACES exceeded!, exit status 1) when more than 10,000 faces lie in the voxels of the face tested";
+    FS_913 = "FS-913", "FreeSurfer", true,
+        "the surface hash table of faces runs for hours on a face whose sampling takes hundreds of millions of steps (a corner that is not finite next to finite ones, a face kilometres across), printing two error messages for each voxel past the 10,000th";
+    FS_914 = "FS-914", "FreeSurfer", false,
+        "the hole counts printed when holes are filled are not the number of holes: marking a surface's intersections with hole filling (mrisMarkIntersections, mris_remove_intersection --fill-holes) prints Found N holes counting the unmarked region around the holes as one, and MRISfillHoles prints found -1 holes when no vertex is below its threshold";
+    FS_915 = "FS-915", "FreeSurfer", true,
+        "filling the holes of a surface map (MRISfillHoles, and the hinge removal's hole filling through MRISmarkEdge) treats a vertex whose value equals the threshold, or is NaN, as neither in the map nor in a hole: it stays out of the map even inside a hole, and it separates the holes around it";
+    FS_916 = "FS-916", "FreeSurfer", false,
+        "marking a surface's intersections (mrisMarkIntersections) leaves the marks of ripped vertices as they were, and its hole filling counts a ripped vertex as marked or not by that old mark; the programs' surfaces have no ripped vertices there";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

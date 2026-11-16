@@ -4782,7 +4782,8 @@ count as a `float` (0/0 for no member), widened; returns 0. `sclustZeroSurfaceCl
 (`val` the cluster number as `float`) return 0. `sclustCountClusters`: the largest `undefval` (at least
 0) as a `float`. `sclustSetSurfaceValToCWP(surf, list)`: each vertex's `val` 0 outside clusters; else
 its list entry's `pval_clusterwise` narrowed to `float`, `p`: 50 if `p` is ±0, else `-log10f(p)`
-(glibc 2.35's `log10f` in both modes; a negative `p` sets `errno` to EDOM); negated unless the entry's
+(glibc 2.35's `log10f` with `reproduce`, the correctly rounded one by default; the two differ in the
+last bit on some arguments; a negative `p` sets `errno` to EDOM); negated unless the entry's
 `maxval` is above 0; returns 0.
 
 **132.3 The summary** (`SurfClusterSummary(surf, T, &n, fwhmmap)`). The mean vertex area `a` =
@@ -4954,3 +4955,151 @@ each white and pial surface of three heads): the twelve files written are recon-
 `?h.area.pial` byte for byte, in the official build and the port (observed). A clean-room
 implementer's black-box form: `mris_place_surface --area-map` of a recorded `?h.white` against its
 `?h.area`.
+
+## 136. The surface hash table, the intersections, the holes (fs.surf's `mrishash.cpp`, `tritri.cpp`, `MRISfillHoles`, taken early; relay 39 of track D)
+
+**136.1 The table.** A grid of 2000 x 2000 x 2000 buckets of `res` millimetres (default 1), the
+origin's bucket 1000 on each axis: a coordinate `x`'s bucket is `(int)(x / res + 1000)` in `double`
+(truncated toward 0). A bucket is made the first time something is listed in it and lists face (or
+vertex) numbers, each once, in the order they were added; a bucket emptied by removals still
+exists. A store into a voxel outside 0 to 1999 on an axis is clamped onto the table's edge. A face
+table (`MHTcreateFaceTable_Resolution(surf, which, res)`; `MHTcreateFaceTable(surf)` is the current
+positions at 1 mm) first takes every face's centroid (the three corners' `which` coordinates summed
+in `float`, each sum divided by 3 in `float`; a `which` the coordinate accessor does not know ends
+the program with its message), then lists each face whose rip flag is 0, in face order, in every
+voxel its triangle touches (136.2). A vertex table (`MHTcreateVertexTable_Resolution(surf, which,
+res)`, `MHTcreateVertexTable` at 1 mm) takes the same centroids, then lists each vertex whose rip
+flag is 0 in the voxel of its `which` position, here computed in `float` (`x / res` then `+ 1000`).
+
+**136.2 The voxels a triangle touches.** For corners `a`, `b`, `c` (the face's first, second and
+third, `double`): `recip = 1 / res` (1 when `res` is 0). The longer of `|a - b|` and `|a - c|`
+(their squares `sb`, `sc` compared as `sb >= sc ? sb : sc`, so a NaN `sb` gives `sc`) gives `M = ceil(2 L recip)` main steps
+(1 when not above 0). Two points start at `b` and `c` and move by `(a - b) / M` and `(a - c) / M`
+(each step added to the running point), for steps 0 to `M`. Step 0 lists the two points' voxels
+(`b`'s, then `c`'s). At each later step, for each point in turn (`b`'s side first), when its voxel
+differs from that side's voxel last recorded, the box from the recorded voxel to the new one is
+listed (x outermost, then y, then z, each axis stepping from the recorded towards the new; the
+recorded voxel itself left out); if either side moved, both sides' recorded voxels become their
+new ones. Then, unless both points are in the same voxel, a rung from the `b`-side point to the
+`c`-side point: `R = ceil(2 l recip)` steps (1 at least) for its length `l`, each step `0.9995 / R`
+of the rung added to a running point that starts at the `b`-side point; at each step whose voxel
+differs from the rung's last recorded voxel (starting at the `b`-side point's), the box between them
+is listed as above and recorded. Listing a voxel already in the face's list does nothing; the list
+holds 10,000 voxels (FS-911).
+
+**136.3 Removing and adding a vertex's faces.** `MHTremoveAllFaces(mht, surf, vno)` and
+`MHTaddAllFaces(mht, surf, vno)` (face tables only: a vertex table ends the program with
+`checkConstructedWithFaces: MRIS_HASH_TABLE_NoSurface not initialized for faces`, `ERROR_BADPARM`)
+take each of the vertex's faces in its face order (ripped faces skipped), sample its triangle at the
+surface's present positions (136.2) and remove the face from (add it to) each voxel's bucket
+(removal keeps the rest in order; a voxel without a bucket is skipped). Both return `NO_ERROR`.
+
+**136.4 Does a face intersect another?** `MHTdoesFaceIntersect(mht, surf, fno)` (face tables only, as
+136.3): 0 for a ripped face. Else the faces to ignore: `fno`, then for each of its corners in turn
+each of that corner's faces not yet listed. The face's triangle is sampled (136.2); the faces listed
+in the buckets of those voxels, in the voxels' and the buckets' orders, each once, the ignored ones
+left out, are tested in turn against it (136.6): 1 at the first that intersects, else 0. A voxel
+outside 0 to 1999 is looked up nowhere (FS-910). More than 10,000 such faces end the program
+(FS-912). `MHTisVectorFilled(mht, vno, dx, dy, dz)` (face tables of the current positions only:
+another `which` ends the program with `isVectorFilled: mht not loaded using CURRENT_VERTICES`,
+`ERROR_BADPARM`): the vertex moved by `(dx, dy, dz)` (added in `float`), each of its faces in turn
+(its corners at the table's positions, the vertex's at the moved one) tested as above with that
+face's ignored faces: 1 at the first that intersects, else 0. `MHTtestIsMRISselfIntersecting(surf,
+res)`: a face table of the current positions at `res`; 1 at the first face that intersects, else 0.
+
+**136.5 Marking the intersections** (`mrisMarkIntersections(surf, FillHoles)`). A face table of the
+current positions at 1 mm; every unripped vertex's mark cleared (ripped vertices keep theirs:
+FS-916); each face, in order, that intersects (136.4) counted and its three vertices marked 1. With
+`FillHoles` not 0: `mrisMarkIntersections(): Filling any holes`; each vertex's `val` set to 1 if its
+mark is 0, else 0; the surface clusters of `val` above 0.5 (§132.1's map: no upper threshold,
+positive sign, no minimum area, so the largest area is cluster 1); `  Found <n> holes` with `n` the
+cluster count (FS-914); with `n` above 0 every vertex of a cluster numbered above 1 marked 1.
+Standard output. Returns the faces counted. `mris_remove_intersection <in> <out> [--fill-holes]`
+calls it first.
+
+**136.6 Two triangles** (`tri_tri_intersect(V0, V1, V2, U0, U1, U2)`, Möller 1997, in `double`).
+`N1 = (V1 - V0) x (V2 - V0)`, `d1 = -N1 . V0`; the signed distances `du_i = N1 . U_i + d1` (the dot
+products `x x + y y + z z` left to right). If any `|du_i| > 1e-6` and `du0 du1 > 0` and `du0 du2 > 0`:
+0. Each `|du_i| < 1e-6` becomes 0 (the magnitudes kept from before); the products recomputed; when
+`|du0| < 1e-5`, `|du1| < 1e-5` and `|du2| < 1e-6` (the old magnitudes) all distances and products
+are 0. The same for `V` against `U`'s plane (`N2`, `d2`, `dv_i`). The line's direction `D = N1 x N2`;
+`index` its first largest magnitude component (x unless y's is greater, then z's if greater than
+the running maximum). Each triangle's interval on the line from its corners' `index` components
+`p0, p1, p2` and distances `d0, d1, d2` (products `d0 d1`, `d0 d2`): `d0 d1 > 0`: from corner 2
+(`p2 + (p0 - p2) d2 / (d2 - d0)` and `p2 + (p1 - p2) d2 / (d2 - d1)`, each `((p - q) d) / (d - e)`);
+else `d0 d2 > 0`: from corner 1; else `d1 d2 > 0` or `d0 != 0`: from corner 0; else `d1 != 0`: from
+corner 1; else `d2 != 0`: from corner 2; else the triangles are coplanar: the answer is the coplanar
+test with `N1`. Each interval sorted; 0 if they do not overlap (one's end below the other's start),
+else 1. The coplanar test projects onto the axis plane where `N1` is largest (`|N0| > |N1|`: `|N0| >
+|N2|` drops x, else z; otherwise `|N2| > |N1|` drops z, else y), tests each edge of V against each
+edge of U (Antonio's test: `A` the V edge, `B = U0 - U1`, `C = V0 - U0` in the plane's two axes, `f =
+Ay Bx - Ax By`, `d = By Cx - Bx Cy`; when `f > 0` and `0 <= d <= f`, or `f < 0` and `f <= d <= 0`,
+`e = Ax Cy - Ay Cx` in `[0, f]` (or `[f, 0]`) is an intersection), then whether `V0` lies in U or `U0`
+in V (the three edge-line values all of one sign, strictly). `triangle_ray_intersect` and
+`intersect_RayTriangle` (the file's ray tests) as their sources; no default-path program in this wave
+calls them.
+
+**136.7 Filling holes** (`MRISfillHoles(surf, fieldname, mri, thresh)`). Both a field name and a
+volume: `ERROR: MRISfillHoles(): fieldname=<name> and mri is non-null`, -1; neither: `ERROR:
+MRISfillHoles(): both fieldname and mri are null`, -1. A field name: the field copied into a new
+volume of one voxel per vertex (`MRIcopyMRIS`, §130.1; its failure: -1). For each vertex the map's
+value `v` (`float`, widened): the map set to 1 if `v > thresh` else 0, the vertex's `val` set to 1 if
+`v < thresh` else 0 (FS-915). The clusters of `val` (as 136.5); `MRISfillHoes(): found <n - 1> holes`
+(FreeSurfer's spelling); with `n` above 1 every vertex of a cluster above 1 set to 1 in the map and
+counted. A field name: the map copied back into the field (`MRIScopyMRI`) and `  MRISfillHoles()
+field <name>, found <n - 1> holes, filled <k> vertices`; a volume: `  MRISfillHoles() found <n - 1>
+holes, filled <k> vertices`. Standard output; returns `k`. `MRISmarkEdge(surf, mask, metric, thresh,
+FillHoles)` (§121) with `FillHoles` not 0 then fills the holes of `marked` at 0.5 (the mask not
+applied) and adds the vertices filled (or the -1) to its count.
+
+**136.8 Defects.** **FS-909** (class a): a resolution not above 0 (or NaN), a coordinate not finite
+or so far that `x / res + 1000` passes the `int` range, or a step count beyond it: FreeSurfer takes
+`INT_MIN` (the store clamps it to bucket 0; a lookup finds nothing; a step count becomes 1). By
+default a clear error (`ERROR_BADPARM`, rule B); `reproduce` as FreeSurfer. **FS-910** (class c): a
+lookup of a voxel outside the table is clamped as the stores are (rule A); `reproduce` looks nowhere.
+**FS-911** (class c): a face touching more than 10,000 voxels: with `reproduce` each voxel beyond
+prints `mhtVoxelList_Add(<x>, <y>, <z>): complete list too big!` on standard error and as an error
+(`ERROR_NOMEMORY`) and is left out; by default every voxel is listed (rule A). **FS-912** (class a):
+more than 10,000 faces near one face: with `reproduce` `mhtDoesTriangleVoxelListIntersect:
+MHT_MAX_FACES exceeded!` as an error (`ERROR_NO_MEMORY`) and exit status 1; by default any number
+(rule A). **FS-913** (class a, a hang): a face whose sampling passes 2^28 steps (main steps, rung
+steps and listed box voxels), 2^22 voxels (by default) or a million voxels left out of the full list
+(`reproduce`): refused in both modes, `surface hash table: a face too large for its voxels (...)`,
+`ERROR_BADPARM` (FreeSurfer runs for hours, two messages per voxel). **FS-914** (class f, rule C,
+kept in both modes): the hole counts printed (136.5's count includes the region around the holes;
+136.7's is -1 with no vertex below the threshold). **FS-915** (class c): a map value equal to the
+threshold, or NaN, is in neither map, so it is never filled and separates holes; by default the
+inverted map is the binarized map's complement (rule A), `reproduce` as FreeSurfer. **FS-916**
+(class c, rule C, kept): ripped vertices keep their old marks in 136.5 and count by them in the
+hole filling.
+
+## 137. Validation plan, part 32
+
+The probe's command of relay 39, `mht` (an empty work folder with `d`; `SURFER_SIDEDOOR`): grids of
+up to 6 x 5 with vertices moved by up to 3 mm in quarters, srd's small meshes scaled into 12 mm,
+icosahedra of 1 or 2 subdivisions (radius 3 to 8) crumpled the same way, two grids crossing, a
+triangle of 20, 150 or 160 mm over a small grid (FS-911), a triangle over a 76 x 76 grid of 0.25 mm
+(FS-912); now and then every vertex moved 1,001.5, -1,000.75 or 1,600 mm along an axis (FS-910), in
+heavy cases a coordinate NaN, infinite, 1e12 or -3e9; `Gdiag_no` -1 or 2; 1 to 3 faces and 1 or 2
+vertices ripped, marks 0 to 2, original positions (the current ones scaled by 0.5, 1 or 2, plus
+0.25) now and then; then 1 to 5 operations: a face table at `which` 4 (0 with original positions;
+1, 2, 3 or 99 now and then) and resolution 1, 0.5, 2 or 0.25 (0, -1, -0.5, NaN in heavy cases; 1 or
+2 for the large triangles), the default table, a vertex table, every face's test, a vertex's moved
+test (each move -3 to 3 mm), its faces removed or added, a vertex moved by -3 to 3 mm in each
+coordinate, the self-intersection test, 136.5 without or with holes filled, 136.7 of `marked`,
+`val`, `curv`, `undefval`, `nosuch` or a volume (both now and then) at 0.5, 1, 0 (NaN in heavy cases)
+with volume values in {0, 1, 0.5, 2, -1}, `MRISmarkEdge` (metrics 0, 1, 2, 5; thresholds 0.5 to 150;
+with or without holes filled), the table freed; after a table operation the table's `which`,
+resolution and kind and every bucket in the box of the vertices' voxels (the defined voxels clamped,
+one voxel of margin; a box of more than 400,000 voxels written as its size), after 136.5, 136.7 and
+`MRISmarkEdge` each vertex's mark, `val` and `undefval`, then `errno`. A test without a table is
+written `G` on both sides. Compared with the official build with `reproduce`: identical; the default
+identical but where a noted correction changed the result; FS-913's cases (the official build
+stopped by the probe's 5-second alarm) counted, not compared. Observed (relay 39): seeds 7, 13 (500
+cases each) and 17 (1,000): 0 different in both modes (16 FS-913 cases counted). On recorded heads
+(`flr mki`, `real.py --mki`: three heads' `orig.nofix`, `orig`, `white`, `pial` and `inflated`
+surfaces, with and without holes filled: the faces counted, the vertices marked, each cluster's
+size): identical where the official build completes; it crashes (stack overflow, FS-901) filling
+the holes of `orig.nofix` surfaces, which the port grows in full (observed). A clean-room
+implementer's black-box form: `mris_remove_intersection` (with and without `--fill-holes`) on a
+recorded `?h.orig`, and `mris_info`'s `num_intersecting_faces`.

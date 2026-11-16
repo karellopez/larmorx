@@ -1903,3 +1903,63 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_va
   beside the surface with its hemisphere first (the probe's first `flr war` run wrote six files
   `?h.w.area` into the recorded heads' folders that way: moved to
   `<workspace>/archive/2026-11-16-relay38-stray-area-files/`).
+
+## 35. The surface hash table, mrisMarkIntersections, MRISfillHoles (relay 39 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrishash.cpp`'s face table and
+its tests (88-1499 less the closest-vertex and closest-face searches, 2304-2416) into
+`crates-freesurfer/larmorx-freesurfer-surf/src/mht.rs`; `utils/tritri.cpp` 1-497 into `tritri.rs`;
+`utils/mrisurf_vals.cpp` 299-361 (`MRISfillHoles`) into `vals.rs`;
+`utils/mrisurf_metricProperties.cpp` 13027-13064 (`mrisMarkIntersections`) and `MRISmarkEdge`'s
+`FillHoles` step into `props10.rs`.
+
+- **The table's storage.** FreeSurfer's `MRIS_HASH_TABLE_NoSurface` holds `MHBT
+  **buckets[2000][2000]` (32 MB, zeroed by `bzero` in the constructor; a column of 2000 bucket
+  pointers `calloc`ed at its first bucket, each bucket `calloc`ed with 4 bins, doubled by
+  `reallocBins`); the port keeps a map from the voxel to its list (only looked up by voxel: the
+  diagnostics' whole-table walk in `captureFaceData`, behind `Gdiag & DIAG_SHOW`, prints nothing:
+  its `fprintf` is inside `if (0)`). The OpenMP locks (`lockBucket`, `checkThread0`) change nothing
+  in a serial caller. `existsBuckets2` gates on the column; a lookup without a bucket is the same as
+  one without a column.
+- **`MAX`** is `macros.h`'s `((a) >= (b) ? (a) : (b))` (`matrix.h` includes `macros.h` before
+  `hips.h`'s guarded one; `mrisurf_base.h`'s is not included in `mrishash.cpp`).
+- **`W2VOX`** is `(int)((x / ares) + TABLE_CENTER)` with `ares` the `float` resolution promoted and
+  `x` `double`; the vertex table's `WORLD_TO_VOXEL(float)` overload computes in `float`. The
+  `float` overload of `mhtAddFaceOrVertexAtCoords` is only reached by `captureVertexData`.
+- **`mhtFaceToMHT`'s `Gx >= 0` block** computes three distances and calls `DiagBreak()` (nothing
+  seen).
+- **The capacities.** `VOXEL_LISTgw` (10,000 voxels, 120 KB on the stack) prints
+  `fprintf(stderr, "%s(%d, %d, %d): complete list too big!\n", __func__, ...)` and `ErrorPrintf`s
+  the same text for each voxel left out (FS-911); `mhtDoesTriangleVoxelListIntersect`'s `int
+  facelist[10000]` `ErrorPrintf`s `%s: MHT_MAX_FACES exceeded!` and calls `exit(1)` (FS-912);
+  `MHTexpandToTouchingFaces`'s 10,000 (`"%s:%d exceeded fnoListCapacity"`, `__FILE__` the official
+  build's `<build>/utils/mrishash.cpp`, lines 1337 and 1354) is never reached: `VERTEX_TOPOLOGY::num`
+  is an `unsigned char`, so a face touches at most 3 x 255 faces.
+- **FS-910:** `mhtAddFaceOrVertexAtVoxIx` clamps (`Coerces (xv,yv,zv) to be sane`), but
+  `acqBucket(int, int, int)` returns `NULL` for any index outside `[0, TABLE_SIZE)`.
+- **FS-909, FS-913:** `ceil` and the voxel arithmetic are converted with `cvttsd2si`: `INT_MIN` for
+  NaN and out-of-range values; `mainsteps_reqd`/`rungsteps_reqd` then become 1, a voxel `INT_MIN`.
+  A NaN corner `a` with finite `b`, `c` makes the main walk's points NaN from step 1: the path from
+  the finite voxel to `INT_MIN` on the NaN axis spans 2^31 voxels, each beyond the list's 10,000
+  printing two messages after a 10,000-entry search: hours (the official probe's 5-second alarm
+  ends it). A NaN `b` or `c`: `MAX` takes the other length when the first is NaN. The port's first
+  limit (2^32 steps) let one such path of 2.1 x 10^9 voxels run in a unit test with `reproduce`,
+  each dropped voxel's two messages into the test's buffer, until its 16 GiB memory box ended it
+  (relay 39, `tests/mht_defaults.rs`'s FS-913 case): the limits are now 2^28 steps, 2^22 voxels and
+  a million dropped voxels.
+- **The official build's speed.** `mhtVoxelList_Add`'s duplicate search is linear, so a face of `n`
+  voxels costs about `n^2 / 2` comparisons: a 1,000 mm sliver (a vertex moved far from a far
+  surface) passed the probe's 5-second alarm in FreeSurfer and took 0.45 s in the port (whose list
+  keeps a set beside it past 256 voxels); the probe's moves are relative and its large triangles at
+  1 or 2 mm since.
+- **FS-914:** `mrisMarkIntersections` prints `  Found %d holes` with `nClusters`;
+  `MRISfillHoles` prints `MRISfillHoes(): found %d holes` (sic) and its summary with `nClusters - 1`,
+  and frees the cluster list only when `nClusters > 1` (a leak, nothing seen).
+- **FS-915:** the binarized map is `val > thresh`, the inverted one `val < thresh`.
+- **FS-916:** `MRISclearMarks` skips ripped vertices; the hole filling's `val = !marked` covers every
+  vertex, and the clusters grow through ripped vertices (`sclustGrowSurfCluster` ignores rip flags).
+- **FS-901 on recorded heads:** `mrisMarkIntersections(…, 1)` on a recorded `?h.orig.nofix`
+  (`real.py --mki`) crashes the official build (signal 11) in the hole filling's cluster growth: the
+  one unmarked cluster of the whole surface goes deeper than its stack (`mris_remove_intersection
+  --fill-holes` on such a surface would crash too); the port grows it in full. On `orig`, `white`,
+  `pial` and `inflated` the growth completes.

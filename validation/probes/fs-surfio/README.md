@@ -445,6 +445,26 @@ the twelve files are recon-all's `?h.area` and `?h.area.pial` byte for byte, in 
 (`real.py --scl`, 36 of 36 identical in both modes). Seed 1 (1,680 cases): 1,628 identical, 52
 counted, hash `98549f42...`.
 
+Measured 2026-11-16 (relay 39 of track D, 57 commands): `mht` (fs.surf's surface hash table:
+the face and vertex tables with every bucket in the box of the vertices' voxels, every face's
+intersection test, a vertex's moved test, its faces removed and added, the self-intersection test,
+`mrisMarkIntersections` without and with hole filling, `MRISfillHoles` of a field or a volume,
+`MRISmarkEdge` with hole filling; folded grids, crumpled icosahedra, crossing sheets, a 150 mm
+triangle (FS-911), a triangle over 11,250 faces (FS-912), surfaces beyond the table (FS-910),
+coordinates that are not finite (FS-909, FS-913); the port's side in `tests/fs_surfio/mht.rs`), seeds
+7, 13 (500 cases each) and 17 (1,000): 0 different with `reproduce`, `fix` different only with
+notices; FS-913's cases (the official build stopped by the 5-second alarm, the port refusing them)
+counted. A vertex moved far from a far surface made a 1,000 mm sliver that FreeSurfer's quadratic
+voxel-list search could not finish in 5 seconds (the port: 0.45 s): `mv` moves by up to 3 mm since.
+`flr mki` (`real.py --mki`: three heads, both hemispheres, `orig.nofix`, `orig`, `white`, `pial`,
+`inflated`, without and with hole filling): 56 of 60 identical in both modes; the other 4 are
+`orig.nofix` with hole filling, where the official build crashes (FS-901: the one cluster of the
+whole surface passes its stack) and the port grows it in full. Faces found intersecting: 0 on every
+`orig.nofix`, 0 to 60 on `orig` (ds002422's left 60, right 30), 0 or 27 on `white`, 0 or 22 on
+`pial`, 1 to 159 on `inflated`. `fs_mht_timing <surface>` (the port's example) times the read, the
+face table, every face's test and `mrisMarkIntersections`: on ds000005's `lh.white` 0.82, 0.25,
+0.88 and 1.04 s.
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

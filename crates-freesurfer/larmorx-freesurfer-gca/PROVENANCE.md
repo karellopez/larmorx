@@ -85,3 +85,20 @@ FS-851 to FS-855 are larmorx's own (`docs/findings/freesurfer-io.md` Part 33, `s
 |---|---|---|
 | `utils/transform.cpp` 2660-2697, 4122-4176 | `TransformApplyType`, `TransformApply`, `TransformCreateDensityMap` (their linear branches; the morph's: not ported yet), `TransformWrite`, `TransformCopy` (FS-876) | `transform.rs` |
 | `utils/gcamorph.cpp` 17347-17393 | `GCAMcopy` (FS-875) | `gcam.rs` |
+
+## Relay 41 of track A: stacked autoencoders read as volumes
+
+| FreeSurfer file (lines) | Functions | Here |
+|---|---|---|
+| `utils/autoencoder.cpp` 72-250, 303-351, 1538-1561, 1598-1700, 2008-2075 | `SAEalloc`, `AEalloc`, `AEfree` and `SAEfree` (nothing a caller sees), `SAEactivateNetwork` and `AEactivateLayer` (one layer, no inputs zeroed), `SAEinputWeightsToMRI`, `AEread`, `SAEread`, `AEdump`, `SAElayerWeightsToMRI` (FS-877 to FS-880, FS-921 to FS-923, FS-925, FS-927) | `autoencoder.rs` |
+| `utils/mriio.cpp` 695-704 | `mri_read`'s branch of type `MGH_AUTOENCODER` | `autoencoder.rs` (`read_autoencoder`, registered with fs.io's `upper.rs`) |
+| `utils/transform.cpp` 2699-2733, 4535-4552, 4858-4875 | `TransformApplyInverse`, `TransformApplyInverseType` (linear arrays; a morph's `GCAMmorphFromAtlas` not ported yet), `TransformRas2Vox`, `TransformVox2Ras`, `TransformCompose` (FS-928) on track C's fs.volume `LTAinverseTransformInterp`, `LTArasToVoxelXform`, `LTAvoxelToRasXform`, `LTAcompose` | `transform.rs` |
+| `utils/gcamorph.cpp` 11265-11316 | `GCAMvoxToRas` | `gcam.rs` |
+
+The sum of `SAElayerWeightsToMRI` follows the official object code's operand order (`autoencoder.cpp.o`: `mulss`
+into the product, `addss` of the voxel's value into it); the defaults of FS-877 to FS-880, FS-921 to FS-923, FS-925
+and FS-927 are larmorx's own (`docs/findings/freesurfer-io.md` Part 36, `specs/freesurfer-io.md` §152).
+
+Relay 41 also: `GCAMrasToVox` with a volume takes `extract_r_to_i` of its geometry (`MRIgetRasToVoxelXform` is that
+macro), not the cached matrix; `GCAMsampleMorph`'s products and sums follow `gcamorph.cpp.o`'s operand orders (the
+NaN a sum of two keeps); `TransformCreateDensityMap` of a transform that could not be applied is FS-928.

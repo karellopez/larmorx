@@ -380,6 +380,7 @@ void print_rmat(const MATRIX *m)
     for (int c = 1; c <= m->cols; c++) of(m->rptr[r][c]);
 }
 
+
 // piece 4 (3.1-27): the format probe. A case's files are made in the fixture's folder `w`
 // (removed first): `-`, or entries separated by `,`: `D<hex name>` a folder, `F<hex name>:<size>`
 // a file of that many zero bytes, then `+<offset>:<hex bytes>` patches.
@@ -481,6 +482,41 @@ void fnv_bytes(const unsigned char *b, size_t n)
   snprintf(t, sizeof t, "fnv%016" PRIx64 " ", h);
   out += t;
 }
+
+// piece 32 (track A relay 41): a transform after a conversion: its type; a morph's type and the
+// FNV-1a 64 of its nodes' current and original positions (doubles, x slowest); an array's type,
+// count, first matrix and its two geometries' extents, voxel sizes, cosines and centres
+static void pvg32(const VOL_GEOM &v)
+{
+  oi(v.valid); oi(v.width); oi(v.height); oi(v.depth);
+  const float f[] = {v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s,
+                     v.z_r, v.z_a, v.z_s, v.c_r, v.c_a, v.c_s};
+  for (float x : f) of(x);
+}
+static void ptrans(TRANSFORM *t)
+{
+  oi(t->type);
+  if (t->type == MORPH_3D_TYPE) {
+    GCA_MORPH *gm = (GCA_MORPH *)t->xform;
+    oi(gm->type);
+    std::vector<double> d;
+    for (int x = 0; x < gm->width; x++)
+      for (int y = 0; y < gm->height; y++)
+        for (int z = 0; z < gm->depth; z++) {
+          GCA_MORPH_NODE *n = &gm->nodes[x][y][z];
+          d.insert(d.end(), {n->x, n->y, n->z, n->origx, n->origy, n->origz});
+        }
+    fnv_bytes((const unsigned char *)d.data(), d.size() * sizeof(double));
+  } else {
+    LTA *l = (LTA *)t->xform;
+    oi(l->type); oi(l->num_xforms);
+    if (l->num_xforms > 0) {
+      print_rmat(l->xforms[0].m_L);
+      pvg32(l->xforms[0].src);
+      pvg32(l->xforms[0].dst);
+    }
+  }
+}
 void print_t(const Transform *t)
 {
   if (!t) { out += "N "; return; }
@@ -556,6 +592,8 @@ void set_env6(int bits)
   if (bits & 512) setenv("SHOW_NEG", "1", 1);
   // piece 23 (track A relay 40): TiffReadImage's debugging lines
   if (bits & 1024) setenv("FS_TIFF_DEBUG", "1", 1);
+  // piece 33 (track A relay 41): the autoencoder reader's random weights
+  if (bits & 2048) setenv("FREESURFER_SEED", "4711", 1);
 }
 
 // piece 7: Bruker ParaVision studies
@@ -1865,15 +1903,16 @@ void run_piece6(const std::string &cmd0)
   // piece 30 (track A relay 37): reo (MRIreorder), sxl and sxw (selxavgio), lro (LabelRemoveOverlap)
   // piece 31 (track A relay 38): m3d and m3h (GCA morphs, .m3z and .m3d, and MGH warps named @m3z)
   // as mrd and mrh do, after MRIread's licence check's variables (Warpfield::read calls MRIread)
+  // piece 33 (track A relay 41): aed and aeh (stacked autoencoders, .sae, .ae, .csae) as mrd and mrh do
   const bool nifti = cmd0 == "nrd" || cmd0 == "nrh" || cmd0 == "ard" || cmd0 == "arh";
   const std::string cmd =
       cmd0 == "nrd" || cmd0 == "ard" || cmd0 == "vrd" || cmd0 == "xrd" || cmd0 == "grd" || cmd0 == "srd" || cmd0 == "imd" ||
               cmd0 == "afd" || cmd0 == "cud" || cmd0 == "and" || cmd0 == "ixd" || cmd0 == "nnd" ||
-              cmd0 == "mcd" || cmd0 == "gcd" || cmd0 == "m3d"
+              cmd0 == "mcd" || cmd0 == "gcd" || cmd0 == "m3d" || cmd0 == "aed"
           ? "mrd"
       : cmd0 == "nrh" || cmd0 == "arh" || cmd0 == "vrh" || cmd0 == "xrh" || cmd0 == "grh" || cmd0 == "srh" || cmd0 == "imh" ||
               cmd0 == "afh" || cmd0 == "cuh" || cmd0 == "anh" || cmd0 == "ixh" || cmd0 == "nnh" ||
-              cmd0 == "mch" || cmd0 == "gch" || cmd0 == "m3h"
+              cmd0 == "mch" || cmd0 == "gch" || cmd0 == "m3h" || cmd0 == "aeh"
           ? "mrh"
           : cmd0;
   if (cmd0 == "xrd" || cmd0 == "xrh") mriio_set_gdf_crop_flag((int)geti());
@@ -2154,13 +2193,17 @@ void run_piece6(const std::string &cmd0)
         }
         TransformFree(&t);
         t = c;
-      } else if (k == "A" || k == "D") {
+      } else if (k == "A" || k == "D" || k == "I") {
+        // piece 32 (track A relay 41): I TransformApplyInverseType (interp -1: TransformApplyInverse)
         int w = (int)geti(), h = (int)geti(), d = (int)geti(), interp = (int)geti();
         MRI *src = MRIalloc(w, h, d, MRI_FLOAT);
         for (int z = 0; z < d; z++)
           for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) MRIsetVoxVal(src, x, y, z, 0, (float)(x + 3 * y + 7 * z) * 0.5f);
-        MRI *r = k == "A" ? TransformApplyType(t, src, NULL, interp) : TransformCreateDensityMap(t, src, NULL);
+        MRI *r = k == "A"   ? TransformApplyType(t, src, NULL, interp)
+                 : k == "D" ? TransformCreateDensityMap(t, src, NULL)
+                 : interp < 0 ? TransformApplyInverse(t, src, NULL)
+                              : TransformApplyInverseType(t, src, NULL, interp);
         fflush(stdout);
         if (!r) out += "N ";
         else {
@@ -2168,6 +2211,37 @@ void run_piece6(const std::string &cmd0)
           oi(r->type); oi(r->nframes);
           if (r->chunk && r->ischunked) fnv_bytes((const unsigned char *)r->chunk, r->bytes_total);
           else out += "nochunk ";
+        }
+      }
+      // piece 32 (track A relay 41): V TransformVox2Ras (0: no volume, 1: a header of the source
+      // geometry), X TransformRas2Vox (a header of the source geometry; 0: no destination, 1: a
+      // header of the destination geometry), O TransformCompose (left and right matrices given or
+      // not; 0: into a new transform, 1: into itself); then the transform (ptrans)
+      else if (k == "V" || k == "X") {
+        int mode = (int)geti();
+        VOL_GEOM a, b;
+        TransformGetSrcVolGeom(t, &a);
+        TransformGetDstVolGeom(t, &b);
+        MRI *ms = MRIallocHeader(a.width, a.height, a.depth, MRI_UCHAR, 1);
+        MRIcopyVolGeomToMRI(ms, &a);
+        MRI *md = MRIallocHeader(b.width, b.height, b.depth, MRI_UCHAR, 1);
+        MRIcopyVolGeomToMRI(md, &b);
+        int r = k == "V" ? TransformVox2Ras(t, mode ? ms : NULL, NULL) : TransformRas2Vox(t, ms, mode ? md : NULL);
+        fflush(stdout);
+        oi(r);
+        ptrans(t);
+      } else if (k == "O") {
+        int l = (int)geti(), rr = (int)geti(), into = (int)geti();
+        MATRIX *ml = MatrixIdentity(4, NULL), *mr = MatrixIdentity(4, NULL);
+        *MATRIX_RELT(ml, 1, 4) = 2; *MATRIX_RELT(ml, 2, 4) = -1; *MATRIX_RELT(ml, 3, 4) = 0.5;
+        *MATRIX_RELT(mr, 1, 1) = 0; *MATRIX_RELT(mr, 1, 2) = -1; *MATRIX_RELT(mr, 2, 1) = 1;
+        *MATRIX_RELT(mr, 2, 2) = 0; *MATRIX_RELT(mr, 3, 3) = 2;
+        TRANSFORM *c = TransformCompose(t, l ? ml : NULL, rr ? mr : NULL, into ? t : NULL);
+        fflush(stdout);
+        if (!c) out += "N ";
+        else {
+          ptrans(c);
+          if (c != t) TransformFree(&c);
         }
       }
       fflush(stdout);
@@ -3105,7 +3179,7 @@ int main(int argc, char *argv[])
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
                                  "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h",
-                                 "m3w", "trs", "gcw"};
+                                 "m3w", "trs", "gcw", "aed", "aeh"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

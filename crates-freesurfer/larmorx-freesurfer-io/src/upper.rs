@@ -7,8 +7,9 @@
 //!
 //! FreeSurfer's `utils/mriio.cpp` reads an image file as a volume through `ImageToMRI` and writes
 //! one through `MRItoImage` (`utils/mri.cpp`, ported in fs.volume, which sits above fs.io), and
-//! reads a GCA atlas as a volume through `readGCA` and a GCA morph through `GCAMread`, and writes a
-//! three-frame volume as a morph through `GCAMwrite` (their GCA functions in fs.gca). The
+//! reads a GCA atlas as a volume through `readGCA`, a GCA morph through `GCAMread` and a stacked
+//! autoencoder through `SAEread`, and writes a three-frame volume as a morph through `GCAMwrite`
+//! (their GCA and autoencoder functions in fs.gca). The
 //! crate that holds a conversion registers it here once ([`register`]; idempotent), and every
 //! program that links that crate calls its registration before it runs (the `larmorx-freesurfer`
 //! program does so for every crate it links; the fs.io probe and its tests too). A conversion that
@@ -72,6 +73,18 @@ pub type WriteMorph = fn(
     &str,
 ) -> Result<i32, Fatal>;
 
+/// `mri_read`'s branch of type `MGH_AUTOENCODER` (fs.gca: `SAEread` and
+/// `SAElayerWeightsToMRI(sae, start_frame)`): the volume, or `None` (after FreeSurfer's messages).
+pub type ReadAutoencoder = fn(
+    &mut Globals,
+    &mut dyn Write,
+    &mut dyn Write,
+    &Environment,
+    Option<&Path>,
+    &str,
+    i32,
+) -> Result<Option<Mri>, Fatal>;
+
 /// The registered conversions.
 #[derive(Clone, Copy, Default)]
 pub struct Upper {
@@ -80,6 +93,7 @@ pub struct Upper {
     pub read_gca: Option<ReadGca>,
     pub read_morph: Option<ReadMorph>,
     pub write_morph: Option<WriteMorph>,
+    pub read_autoencoder: Option<ReadAutoencoder>,
 }
 
 static UPPER: RwLock<Upper> = RwLock::new(Upper {
@@ -88,6 +102,7 @@ static UPPER: RwLock<Upper> = RwLock::new(Upper {
     read_gca: None,
     read_morph: None,
     write_morph: None,
+    read_autoencoder: None,
 });
 
 /// Registers conversions: `f` sets the fields its crate provides.

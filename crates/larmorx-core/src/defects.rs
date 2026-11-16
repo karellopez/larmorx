@@ -2645,6 +2645,16 @@ defects! {
         "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes (memory past the buffers); nothing is written";
     FS_834 = "FS-834", "libtiff 3.6.1", true,
         "a SamplesPerPixel of several values, of a floating-point type or of a string type (and such an entry left unchecked by FS-820) is passed as an array's or a string's address, or as a floating-point argument, where one integer goes: the field takes an address's low bits or a register never set (nondeterministic); ignored with libtiff's incorrect-count or wrong-type warning";
+    FS_835 = "FS-835", "libtiff 3.6.1", true,
+        "the NeXT, ThunderScan and CCITT decoders write past the buffer they are given when the data asks for more pixels than a row holds (a span or a run past the row, a row size larger than the buffer): memory after the buffer; only the buffer is written";
+    FS_836 = "FS-836", "libtiff 3.6.1", true,
+        "the NeXT decoder reads a row's code byte and a literal span's four-byte header without checking that the strip still has them, does not check a span against its row, lets a run of pixels go past the image width, and counts a tile's pixels by the image's width; corrected as libtiff 4.0.10 does: the reads and spans checked, runs stopped at the row's end, a tile's width used";
+    FS_837 = "FS-837", "libtiff 3.6.1", true,
+        "the ThunderScan decoder writes a run of pixels, and the deltas of a byte, in full when they go past the row's pixel count: the pixels land in the next row or past the buffer; corrected, nothing is written past the row (the pixel count and its error message unchanged)";
+    FS_838 = "FS-838", "libtiff 3.6.1", true,
+        "the CCITT decoders keep the runs of the current and the reference line in one block that damaged data makes them read or write outside (a crash or memory contents) or read where nothing was written (memory contents), and a row size of 0 bytes never returns; corrected as libtiff 4 does: the block cleared, the row stopped at the first access outside it with a Buffer overflow error, nothing decoded for a row size of 0";
+    FS_839 = "FS-839", "libtiff 3.6.1", true,
+        "the CCITT RLE/W decoder aligns each row to a 16-bit word by the bits it holds, not by the row's position: a row that ends with the decoder holding bits read from the next word loses them, and the next row starts a word late (Premature EOF or wrong rows of a valid image); corrected, each row starts at the next 16-bit boundary of the strip";
 }
 
 /// The register entry with ID `id`.

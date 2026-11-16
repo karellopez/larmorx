@@ -219,3 +219,77 @@ fn generated_files_digest() {
 }
 
 const DIGEST: u64 = 0xe67f_3fcd_5a45_2473;
+
+/// CCITT streams made by the generator (its own encoder) decode to the image they encode, in
+/// every scheme and Group 3 option, both fill orders.
+#[test]
+fn ccitt_streams_decode_to_their_images() {
+    use super::cases::Rng;
+    use super::codecgen::{bilevel, fax_encode, one_strip_file, pack};
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut r = Rng::new(77);
+    let mut n = 0;
+    for (comp, g3) in [
+        (2u16, 0u32),
+        (32771, 0),
+        (3, 0),
+        (3, 4),
+        (3, 1),
+        (3, 5),
+        (4, 0),
+    ] {
+        for width in [1u32, 7, 8, 63, 64, 65, 200, 1800, 2700] {
+            for fillorder in [1u32, 2] {
+                let rows = 1 + r.below(12) as u32;
+                let img = bilevel(&mut r, width, rows);
+                let mut data = fax_encode(comp, g3, 1 + n % 3, &img, n % 2 == 0, None);
+                if fillorder == 2 {
+                    for b in &mut data {
+                        *b = b.reverse_bits();
+                    }
+                }
+                let mut extra = vec![(266u16, 3u16, fillorder)];
+                if comp == 3 {
+                    extra.push((292, 4, g3));
+                }
+                let file = one_strip_file(width, rows, 1, comp, 0, &extra, &data);
+                let p = dir.path().join(format!("c{n}.tif"));
+                n += 1;
+                std::fs::write(&p, &file).expect("write");
+                let mut cap = Captured::default();
+                let mut t = Tiff::open(
+                    p.to_str().expect("path"),
+                    "r",
+                    opts(UpstreamDefects::Fix),
+                    &mut cap,
+                )
+                .expect("ported")
+                .expect("opened");
+                let rb = t.scanline_size() as usize;
+                for (y, row) in img.iter().enumerate() {
+                    let mut buf = vec![0u8; rb];
+                    let rr = t
+                        .read_scanline(&mut buf, y as u32, 0, &mut cap)
+                        .expect("ported");
+                    assert_eq!(
+                        rr,
+                        1,
+                        "comp {comp} g3 {g3} width {width} row {y}: {}",
+                        cap.text(Stream::Err)
+                    );
+                    assert_eq!(
+                        buf,
+                        pack(row, rb),
+                        "comp {comp} g3 {g3} width {width} row {y}"
+                    );
+                }
+                t.close(&mut cap);
+                assert_eq!(
+                    cap.text(Stream::Err),
+                    "",
+                    "comp {comp} g3 {g3} width {width}"
+                );
+            }
+        }
+    }
+}

@@ -6,6 +6,7 @@
 //! of `struct tiff` become the enums below.
 
 use super::dir::{Layer, PostDecode};
+use super::fax3::{Fax, FaxKind};
 use super::fields::Table;
 use super::{TIFF_NOBITREV, Tiff, Unported, compression as c};
 use larmorx_core::cfmt::Streams;
@@ -20,6 +21,7 @@ pub(crate) enum SetupDecode {
     NotConfigured,
     Lzw,
     Zip,
+    Fax,
     Unported(&'static str),
 }
 
@@ -29,6 +31,7 @@ pub(crate) enum PreDecode {
     None,
     Lzw,
     Zip,
+    Fax,
 }
 
 /// `tif_decoderow`, `tif_decodestrip`, `tif_decodetile`.
@@ -42,6 +45,9 @@ pub(crate) enum Decode {
     Lzw,
     LzwCompat,
     Zip,
+    Fax(FaxKind),
+    Next,
+    Thunder,
     PredRow,
     PredTile,
 }
@@ -59,6 +65,7 @@ pub(crate) enum Cleanup {
     Void,
     Lzw,
     Zip,
+    Fax,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -250,6 +257,7 @@ pub(crate) struct Codec {
     pub has_pred: bool,
     pub lzw: Option<Box<Lzw>>,
     pub zip: Option<Box<Zip>>,
+    pub fax: Option<Box<Fax>>,
     /// PackBits' row size for its encoder (`tif_data`).
     pub packbits_rowsize: i32,
 }
@@ -280,6 +288,7 @@ impl Default for Codec {
             has_pred: false,
             lzw: None,
             zip: None,
+            fax: None,
             packbits_rowsize: 0,
         }
     }
@@ -342,7 +351,7 @@ impl Tiff {
     }
 
     /// `TIFFSetCompressionScheme(tif, scheme)`: the codec's init status.
-    pub(crate) fn set_compression_scheme(&mut self, scheme: u16, _s: &mut dyn Streams) -> bool {
+    pub(crate) fn set_compression_scheme(&mut self, scheme: u16, s: &mut dyn Streams) -> bool {
         self.set_default_compression_state();
         let k = &mut self.codec;
         match scheme {
@@ -404,21 +413,25 @@ impl Tiff {
                 k.cleanup = Cleanup::Zip;
                 self.predictor_init();
             }
-            c::THUNDERSCAN => k.setupdecode = SetupDecode::Unported("ThunderScan"),
-            c::NEXT => k.setupdecode = SetupDecode::Unported("NeXT"),
+            c::THUNDERSCAN => {
+                k.decoderow = Decode::Thunder;
+                k.decodestrip = Decode::Thunder;
+            }
+            c::NEXT => {
+                k.decoderow = Decode::Next;
+                k.decodestrip = Decode::Next;
+                k.decodetile = Decode::Next;
+            }
             c::JPEG | c::OJPEG | c::JBIG => {
                 k.decodestatus = false;
                 k.setupdecode = SetupDecode::NotConfigured;
                 k.encodestatus = false;
                 k.setupencode = SetupEncode::NotConfigured;
             }
-            c::CCITTRLE
-            | c::CCITTRLEW
-            | c::CCITTFAX3
-            | c::CCITTFAX4
-            | c::PIXARLOG
-            | c::SGILOG
-            | c::SGILOG24 => {
+            c::CCITTRLE | c::CCITTRLEW | c::CCITTFAX3 | c::CCITTFAX4 => {
+                return self.fax_init(scheme, s);
+            }
+            c::PIXARLOG | c::SGILOG | c::SGILOG24 => {
                 // These codecs register private tags and tag methods at this point; not
                 // ported yet.
                 self.unported = Some(Unported(codec_name(scheme).unwrap_or("?")));
@@ -452,6 +465,7 @@ impl Tiff {
                 k.zip = None;
                 k.has_pred = false;
             }
+            Cleanup::Fax => k.fax = None,
         }
         k.layers.clear();
     }
@@ -497,6 +511,7 @@ impl Tiff {
                 }
                 true
             }
+            SetupDecode::Fax => self.fax_setup(s),
             SetupDecode::Zip => {
                 let sp = self.codec.zip.as_mut().expect("ZIP state");
                 match Inflate::init() {
@@ -581,6 +596,7 @@ impl Tiff {
         match self.codec.predecode {
             PreDecode::None => true,
             PreDecode::Lzw => self.lzw_pre_decode(s),
+            PreDecode::Fax => self.fax_pre_decode(),
             PreDecode::Zip => {
                 let rawcc = self.rawcc;
                 let sp = self.codec.zip.as_mut().expect("ZIP state");
@@ -653,6 +669,9 @@ impl Tiff {
             Decode::Lzw => self.lzw_decode(buf, cc, s),
             Decode::LzwCompat => self.lzw_decode_compat(buf, cc, s),
             Decode::Zip => self.zip_decode(buf, cc, s),
+            Decode::Fax(k) => self.fax_decode(k, buf, cc, s),
+            Decode::Next => self.next_decode(buf, cc, s),
+            Decode::Thunder => self.thunder_decode_row(buf, cc, s),
             Decode::PredRow => {
                 let inner = self.codec.predictor.coderow;
                 if self.decode(inner, buf, cc, s) != 0 {
@@ -770,7 +789,9 @@ impl Tiff {
         let n = n.min(buf.len());
         let at = self.rawcp;
         let have = self.raw_defined.saturating_sub(at).min(n);
-        buf[..have].copy_from_slice(&self.rawdata[at..at + have]);
+        if have > 0 {
+            buf[..have].copy_from_slice(&self.rawdata[at..at + have]);
+        }
         if have < n {
             buf[have..n].fill(0);
             self.past_raw_notice();
@@ -792,7 +813,7 @@ impl Tiff {
 
     /// A raw byte at `at` as the decoders read it: past the strip's `end`, what the buffer
     /// holds from an earlier strip (FS-817), or never written (FS-819: 0).
-    fn raw_byte(&mut self, at: usize, end: usize) -> u8 {
+    pub(crate) fn raw_byte(&mut self, at: usize, end: usize) -> u8 {
         if at >= self.raw_defined {
             self.past_raw_notice();
             return 0;

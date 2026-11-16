@@ -44,13 +44,18 @@
 #[doc(hidden)]
 pub mod cases;
 mod codec;
+#[doc(hidden)]
+pub mod codecgen;
 mod dir;
 mod dirread;
+pub mod fax3;
 pub mod fields;
 mod io;
+mod next;
 mod read;
 #[cfg(test)]
 mod tests;
+mod thunder;
 mod write;
 
 use larmorx_core::cfmt::Streams;

@@ -123,7 +123,7 @@ pub(crate) enum Arg<'a> {
 }
 
 impl Arg<'_> {
-    fn int(&self) -> u32 {
+    pub(crate) fn int(&self) -> u32 {
         match *self {
             Arg::Int(v) | Arg::Int2(v, _) | Arg::Count(v, _) => v,
             Arg::Dbl(d) => d as i64 as u32,
@@ -168,6 +168,7 @@ pub enum Value {
 pub(crate) enum Layer {
     Predictor,
     Zip,
+    Fax,
 }
 
 impl Tiff {
@@ -279,6 +280,11 @@ impl Tiff {
                     self.dir.set_bit(bit::PREDICTOR);
                     self.flags |= TIFF_DIRTYDIRECT;
                     return true;
+                }
+                Layer::Fax => {
+                    if let Some(st) = self.fax_vsetfield(tag, &a) {
+                        return st;
+                    }
                 }
                 _ => {}
             }
@@ -697,6 +703,11 @@ impl Tiff {
                 }
                 Layer::Predictor if t == tag::PREDICTOR => {
                     return Some(Value::U16(self.codec.predictor.predictor as u16));
+                }
+                Layer::Fax => {
+                    if let Some(v) = self.fax_vgetfield(t) {
+                        return Some(v);
+                    }
                 }
                 _ => {}
             }

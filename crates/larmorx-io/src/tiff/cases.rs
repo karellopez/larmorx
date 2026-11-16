@@ -251,8 +251,23 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         let bps: u16 = r.pick(&[8, 8, 8, 16, 16, 1, 4, 32, 64, 12, 2]);
         let planar: u16 = if r.chance(5) { 2 } else { 1 };
         let comp: u16 = r.pick(&[
-            1, 1, 1, 32773, 32773, 32946, 32946, 8, 5, 5, 5, 99, 7, 6, 34661, 32809, 32766,
+            1, 1, 1, 32773, 32773, 32946, 32946, 8, 5, 5, 5, 99, 7, 6, 34661, 32809, 32766, 2, 3,
+            3, 3, 4, 4, 4, 32771, 32809, 32766,
         ]);
+        let fax = matches!(comp, 2 | 3 | 4 | 32771);
+        // the codecs' own sample layouts, now and then another
+        let (bps, spp, planar) = match comp {
+            _ if r.chance(10) => (bps, spp, planar),
+            2 | 3 | 4 | 32771 => (1, if r.chance(10) { spp } else { 1 }, planar),
+            32809 => (4, 1, 1),
+            32766 => (2, 1, 1),
+            _ => (bps, spp, planar),
+        };
+        let g3: u32 = match comp {
+            3 => r.pick(&[0, 1, 1, 4, 5, 5]),
+            4 => r.pick(&[0, 0, 0, 1, 2]),
+            _ => 0,
+        };
         let predictor = if matches!(comp, 5 | 8 | 32946) {
             r.pick(&[0u16, 1, 2, 2, 2, 3])
         } else if r.chance(20) {
@@ -298,7 +313,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         let samples_per_unit = if planar == 1 { u32::from(spp) } else { 1 };
         let row_bits = |cols: u32| u64::from(cols) * u64::from(bps) * u64::from(samples_per_unit);
         let row_bytes = |cols: u32| row_bits(cols).div_ceil(8) as usize;
-        let mut blocks: Vec<Vec<u8>> = Vec::new();
+        let mut blocks: Vec<(Vec<u8>, u32, u32)> = Vec::new();
         let nplanes = if planar == 2 { usize::from(spp) } else { 1 };
         if tiled && tw > 0 && th > 0 {
             let across = width.div_ceil(tw);
@@ -310,7 +325,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                     if predictor == 2 && (bps == 8 || bps == 16) {
                         difference(&mut p, row, samples_per_unit as usize, bps, big);
                     }
-                    blocks.push(p);
+                    blocks.push((p, tw, th));
                 }
             }
         } else {
@@ -324,15 +339,22 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                     if predictor == 2 && (bps == 8 || bps == 16) {
                         difference(&mut p, row, samples_per_unit as usize, bps, big);
                     }
-                    blocks.push(p);
+                    blocks.push((p, width, rows));
                 }
             }
         }
         let old_lzw = r.chance(6);
         let mut offsets = Vec::new();
         let mut counts = Vec::new();
-        for p in &blocks {
+        for (p, cols, nrows) in &blocks {
+            let (cols, nrows) = (*cols, *nrows);
             let enc = match comp {
+                2 | 3 | 4 | 32771 => {
+                    let img = super::codecgen::bilevel(&mut r, cols, nrows);
+                    super::codecgen::fax_strip(&mut r, comp, g3, &img)
+                }
+                32766 => super::codecgen::next_strip(&mut r, nrows, cols, row_bytes(cols)),
+                32809 => super::codecgen::thunder_strip(&mut r, nrows, cols),
                 1 => p.clone(),
                 32773 => packbits_encode(p),
                 32946 | 8 => {
@@ -527,6 +549,51 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                 count: 1,
                 data: w.shorts(&[r.pick(&[1, 2, 3, 4]), 0]),
             });
+        }
+        if (comp == 3 && !r.chance(6)) || (fax && r.chance(12)) {
+            tags.push(Tag {
+                tag: 292,
+                ty: 4,
+                count: 1,
+                data: w.longs(&[g3]),
+            });
+        }
+        if comp == 4 && (g3 != 0 || r.chance(3)) {
+            tags.push(Tag {
+                tag: 293,
+                ty: 4,
+                count: 1,
+                data: w.longs(&[g3]),
+            });
+        }
+        if fax && r.chance(4) {
+            let t = r.pick(&[326u16, 327, 328, 34908, 34909, 34910]);
+            if t == 34909 {
+                let text: Vec<u8> = (0..1 + r.below(12))
+                    .map(|_| b'0' + r.below(10) as u8)
+                    .chain([0])
+                    .collect();
+                tags.push(Tag {
+                    tag: t,
+                    ty: 2,
+                    count: text.len() as u32,
+                    data: text,
+                });
+            } else if r.chance(2) && t != 34908 && t != 34910 {
+                tags.push(Tag {
+                    tag: t,
+                    ty: 3,
+                    count: 1,
+                    data: w.shorts(&[r.below(100) as u16, 0]),
+                });
+            } else {
+                tags.push(Tag {
+                    tag: t,
+                    ty: 4,
+                    count: 1,
+                    data: w.longs(&[r.below(1000) as u32]),
+                });
+            }
         }
         if predictor != 0 {
             tags.push(Tag {

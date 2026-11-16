@@ -30,6 +30,12 @@ of an original runs three times (the cache's confirmation runs, its output place
 each), its peak kept in its entry for this machine and its outputs stored; afterwards the call is
 served, its outputs replayed and its peak the median of the three, and only larmorx runs
 (:func:`_original_peak`; ``--oracle-cache refresh`` measures again, ``off`` measures every time).
+
+A call measured within ``RECHECK_MIB`` (1 MiB) of its allowance, or above it, runs five times
+with the entry point beside it, and the pair of the median difference decides (:func:`larmorx_peak`,
+2026-11-16): a peak through the entry point varies by about 1 MiB from run to run, more than the
+10 % of a small original's peak, so a single pair failed now and then without any change of
+larmorx; the rule's allowance is the same.
 """
 
 from __future__ import annotations
@@ -176,6 +182,57 @@ def allowance(original_mib: float, entry_mib: float | None = None) -> float:
     return RATIO * original_mib + (OVERHEAD_MIB if entry_mib is None else entry_mib)
 
 
+#: A call whose first measurement is within this many MiB of the allowance, or above it, is
+#: measured again (:func:`larmorx_peak`). A peak through the Python entry point varies from run to
+#: run by about 1 MiB in steps of 0.25 MiB (2026-11-16, the main machine, FLIRT's ``extracttxt`` in
+#: the environment of its test, 150 pairs: ``python -m larmorx --version`` 14.50 to 15.50 MiB, the
+#: call 15.50 to 16.75, their difference 0.50 to 2.00 MiB, each at most 0.75 from the typical 1.25),
+#: so a call whose typical peak is this close to the allowance passes or fails it by chance: FSL's
+#: 1.75 MiB allows ``extracttxt`` 1.925 MiB beyond the entry point, and 2 pairs in 150 failed it
+#: (``validation/investigations/memory-small-calls/``).
+RECHECK_MIB = 1.0
+#: The pairs of runs of a call measured again (:data:`RECHECK_MIB`).
+REPEATS = 5
+
+
+def larmorx_peak(
+    cmd: list[str],
+    env: dict[str, str],
+    cwd: Path | None,
+    original_mib: float,
+    reset=None,
+) -> tuple[int, float, float, str]:
+    """larmorx's call ``cmd`` through the Python entry point: its exit status, its peak (MiB),
+    the entry point's peak (:func:`entry_peak`, in the same environment and folder) and its
+    standard output. The entry point and the call run once, in a pair; when the call's peak is
+    within :data:`RECHECK_MIB` of the allowance (:func:`allowance` of ``original_mib`` and the
+    entry point's peak) or above it, the pair runs again until there are :data:`REPEATS`, ``reset``
+    emptying the call's output place before each repeat so each run starts alike, and the peaks
+    are those of the pair whose difference (the call's less the entry point's) is the median of
+    the pairs': no pair in 30 blocks of five failed ``extracttxt``, against 2 in 150 single pairs;
+    the least peak of each side, tried first, still failed 1 block of three in 50 (the entry
+    point's low peaks are more frequent than the call's). The allowance is the rule's as it was: a
+    call whose typical peak is above it is above it in the median too. The exit status and the
+    outputs are those of the last run (every run must give the same exit status)."""
+    pairs: list[tuple[float, float]] = []
+    codes: list[int] = []
+    out = ""
+    while True:
+        if pairs and reset is not None:
+            reset()
+        entry = entry_peak(env, cwd)
+        code, mib, out = _peak_run(cmd, env, cwd)
+        codes.append(code)
+        pairs.append((mib, entry))
+        if len(pairs) == 1 and mib <= allowance(original_mib, entry) - RECHECK_MIB:
+            break
+        if len(pairs) == REPEATS:
+            break
+    assert len(set(codes)) == 1, f"{cmd[3:5]}: exit statuses {codes} from run to run"
+    mib, entry = sorted(pairs, key=lambda p: p[0] - p[1])[len(pairs) // 2]
+    return codes[-1], mib, entry, out
+
+
 @pytest.mark.parametrize(("program", "size", "spacing", "args"), CASES)
 def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing, args):
     if programs.ants_bin() is None or not (programs.ants_bin() / program).is_file():
@@ -216,8 +273,13 @@ def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing
     for mode in ("reproduce", "fix"):
         out = tmp_path / f"larmorx-{mode}.nii.gz"
         l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode}
-        entry = entry_peak(l_env)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "ants", program, *argv(out)], l_env)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "ants", program, *argv(out)],
+            l_env,
+            None,
+            ants_mib,
+            lambda p=out: p.unlink(missing_ok=True),
+        )
         assert code == 0
         print(f"{program} ({mode}): larmorx {mib:.1f} MiB, ANTs {ants_mib:.1f}, entry {entry:.1f}")
         assert mib <= allowance(ants_mib, entry), (
@@ -325,8 +387,13 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", tool, *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", tool, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(f"{tool} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}")
         assert mib <= allowance(fsl_mib, entry), (
@@ -405,8 +472,13 @@ def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, ar
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", program, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"{program} {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
@@ -462,8 +534,13 @@ def test_fast_replica_needs_no_more_memory_than_fsl(tmp_path, name, args):
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "fast", *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", "fast", *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(f"fast {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}")
         assert mib <= allowance(fsl_mib, entry), (
@@ -546,8 +623,13 @@ def test_topup_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, ar
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", program, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"{program} {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
@@ -624,9 +706,12 @@ def test_avwutils_replica_needs_no_more_memory_than_fsl(tmp_path, name, program,
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib, out = _peak_run(
-            [sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir
+        code, mib, entry, out = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", program, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
         )
         assert code == 0
         print(
@@ -683,8 +768,13 @@ def test_prelude_replica_needs_no_more_memory_than_fsl(tmp_path, name, extra):
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "prelude", *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", "prelude", *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"prelude {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
@@ -740,9 +830,12 @@ def test_t2smap_replica_needs_no_more_memory_than_tedana(tmp_path, name, fit):
             # takes the run's thread count (2026-11-11)
             "OMP_NUM_THREADS": "1",
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak(
-            [sys.executable, "-m", "larmorx", "tedana", "t2smap", *words], l_env, r_dir
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "tedana", "t2smap", *words],
+            l_env,
+            r_dir,
+            t_mib,
+            _emptier(r_dir),
         )
         assert code == 0
         print(
@@ -792,8 +885,13 @@ def test_prelude_original_needs_no_more_memory_than_fsl(tmp_path, name, extra):
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "prelude", *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", "prelude", *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"prelude original {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
@@ -865,8 +963,13 @@ def test_prelude_original_large_map_needs_no_more_memory_than_fsl(tmp_path, name
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "prelude", *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", "prelude", *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"prelude original {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
@@ -913,8 +1016,13 @@ def test_fast_original_needs_no_more_memory_than_fsl(tmp_path, name, args):
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "fast", *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", "fast", *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"fast {name} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, "
@@ -967,8 +1075,13 @@ def test_topup_original_needs_no_more_memory_than_fsl(tmp_path, name, program, a
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", program, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"{program} {name} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, "
@@ -1014,8 +1127,13 @@ def test_avwutils_original_needs_no_more_memory_than_fsl(tmp_path, name, program
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", program, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"{program} {name} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, "
@@ -1109,8 +1227,13 @@ def test_flirt_original_needs_no_more_memory_than_fsl(tmp_path, name, program, a
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", program, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == codes[mode], f"{program} {name} original ({mode}): exit {code}"
         print(
             f"{program} {name} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, "
@@ -1169,8 +1292,13 @@ def test_bet_original_needs_no_more_memory_than_fsl(tmp_path, tool, args):
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", tool, *words], l_env, r_dir)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "fsl", tool, *words],
+            l_env,
+            r_dir,
+            fsl_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(
             f"{tool} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
@@ -1298,8 +1426,13 @@ def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
         r_dir = tmp_path / f"larmorx-{mode}"
         r_dir.mkdir()
         l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode}
-        entry = entry_peak(l_env)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "ants", program, *argv(r_dir)], l_env)
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "ants", program, *argv(r_dir)],
+            l_env,
+            None,
+            ants_mib,
+            _emptier(r_dir),
+        )
         assert code == 0
         print(f"{program} ({mode}): larmorx {mib:.1f} MiB, ANTs {ants_mib:.1f}, entry {entry:.1f}")
         assert mib <= allowance(ants_mib, entry), (
@@ -1414,9 +1547,12 @@ def test_larmorx_needs_no_more_memory_than_afni(tmp_path, program, args):
         r_dir = tmp_path / f"larmorx-{mode}"
         r_dir.mkdir()
         l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "LARMORX_IMPLEMENTATION": "replica"}
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak(
-            [sys.executable, "-m", "larmorx", "afni", program, *argv(r_dir)], l_env, r_dir
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "afni", program, *argv(r_dir)],
+            l_env,
+            r_dir,
+            afni_mib,
+            _emptier(r_dir),
         )
         assert code == 0
         print(f"{program} ({mode}): larmorx {mib:.1f} MiB, AFNI {afni_mib:.1f}, entry {entry:.1f}")
@@ -1481,9 +1617,12 @@ def test_volreg_original_needs_no_more_memory_than_afni(tmp_path, name, args):
         r_dir = tmp_path / f"larmorx-{mode}"
         r_dir.mkdir()
         l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "LARMORX_IMPLEMENTATION": "original"}
-        entry = entry_peak(l_env, r_dir)
-        code, mib = _peak(
-            [sys.executable, "-m", "larmorx", "afni", "3dvolreg", *argv(r_dir)], l_env, r_dir
+        code, mib, entry, _ = larmorx_peak(
+            [sys.executable, "-m", "larmorx", "afni", "3dvolreg", *argv(r_dir)],
+            l_env,
+            r_dir,
+            afni_mib,
+            _emptier(r_dir),
         )
         assert code == 0
         print(f"3dvolreg original {name} ({mode}): larmorx {mib:.1f} MiB, AFNI {afni_mib:.1f}, entry {entry:.1f}")  # fmt: skip

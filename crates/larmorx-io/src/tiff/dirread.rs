@@ -581,8 +581,15 @@ impl Tiff {
     /// `TIFFFetchData(tif, dir, cp)`: the bytes read, swapped to the machine's order (`None`
     /// with its message on failure). `cap`: the bytes the caller's buffer holds.
     fn fetch_data(&mut self, dp: &DirEntry, s: &mut dyn Streams) -> Option<Vec<u8>> {
+        self.fetch_data_raw(dp, s).ok()
+    }
+
+    /// [`Tiff::fetch_data`], and on failure the bytes a short read wrote into the caller's
+    /// buffer before it failed (as read, never swapped; none when the seek failed).
+    fn fetch_data_raw(&mut self, dp: &DirEntry, s: &mut dyn Streams) -> Result<Vec<u8>, Vec<u8>> {
         let w = fields::data_width(dp.ty);
         let cc = dp.count.wrapping_mul(w as u32) as i32;
+        let mut partial = Vec::new();
         let ok = if !self.seek_ok(dp.offset) {
             None
         } else {
@@ -599,11 +606,13 @@ impl Tiff {
                 if cc == 0 {
                     // TIFFFetchData returns the byte count, which its callers take for a
                     // failure when it is 0 (no message).
-                    return None;
+                    return Err(Vec::new());
                 }
                 buf.truncate(cc.max(0) as usize);
                 Some(buf)
             } else {
+                buf.truncate(got.max(0) as usize);
+                partial = buf;
                 None
             }
         };
@@ -614,7 +623,7 @@ impl Tiff {
                 .unwrap_or_default();
             let m = format!("Error fetching data for field \"{f}\"");
             self.error(Some(&self.name.clone()), &m, s);
-            return None;
+            return Err(partial);
         };
         if self.swab() {
             match dp.ty {
@@ -630,7 +639,7 @@ impl Tiff {
                 _ => {}
             }
         }
-        Some(buf)
+        Ok(buf)
     }
 
     /// `TIFFFetchString(tif, dir, cp)`: the bytes of the string (without the NUL added later).
@@ -1253,15 +1262,22 @@ impl Tiff {
                 }
                 None => status = false,
             }
+        } else if dp.count == 1 {
+            lp[0] = dp.offset;
+            status = true;
         } else {
-            match self.fetch_long_array(dp, s) {
-                Some(v) => {
-                    let n = v.len().min(lp.len());
-                    lp[..n].copy_from_slice(&v[..n]);
-                    status = true;
-                }
-                None => status = false,
+            // TIFFFetchLongArray reads into the array itself: a short read leaves there the
+            // bytes it got (as read, never swapped), the rest zero.
+            let (b, ok) = match self.fetch_data_raw(dp, s) {
+                Ok(b) => (b, true),
+                Err(b) => (b, false),
+            };
+            for (k, c) in b.chunks(4).take(lp.len()).enumerate() {
+                let mut w = [0u8; 4];
+                w[..c.len()].copy_from_slice(c);
+                lp[k] = u32::from_le_bytes(w);
             }
+            status = ok;
         }
         // The array stays (zeroed, partly filled) even when the fetch fails.
         if counts {

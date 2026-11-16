@@ -8,8 +8,9 @@
  *   tf_read:  TIFFOpen "r", TIFFNumberOfDirectories, for each of the first six directories
  *             TIFFSetDirectory, TIFFGetFieldDefaulted of the queried tags, TIFFGetField of the
  *             tile size, TIFFIsTiled, TIFFScanlineSize, TIFFTileSize, every scanline (or tile)
- *             of up to five samples; TIFFSetDirectory(0) and TIFFReadDirectory up to 8 times;
- *             TIFFClose;
+ *             of up to five samples (into buffers of the size, mode 0; into no buffer, mode 2;
+ *             sizes of 0 into a buffer of no bytes too, mode 3); TIFFSetDirectory(0) and
+ *             TIFFReadDirectory up to 8 times; TIFFClose;
  *   tf_write: FreeSurfer's TiffWriteImage: TIFFOpen "w", its TIFFSetField calls,
  *             TIFFWriteScanline per row, TIFFWriteDirectory, TIFFClose. */
 #include <errno.h>
@@ -118,7 +119,9 @@ static void fields_text(TIFF *t) {
   }
 }
 
-static void data_text(TIFF *t) {
+/* mode 0: buffers of the size filled with 0xab first, sizes of 0 skipped; 2: no buffer (NULL)
+ * whatever the size, no hash; 3: as 0, and sizes of 0 read into calloc(0, 1)'s buffer. */
+static void data_text(TIFF *t, int mode) {
   int tiled = TIFFIsTiled(t);
   tsize_t sls = TIFFScanlineSize(t), ts = TIFFTileSize(t), size;
   uint32 length = 0, width = 0, tw = 0, th = 0;
@@ -128,18 +131,23 @@ static void data_text(TIFF *t) {
   unsigned reads = 0;
   say(" tiled %d sls %d ts %d\n", tiled ? 1 : 0, (int)sls, (int)ts);
   size = tiled ? ts : sls;
-  if (size <= 0 || size > (16 << 20)) { say(" skip\n"); return; }
+  if (size < (mode == 0 ? 1 : 0) || size > (16 << 20)) { say(" skip\n"); return; }
   TIFFGetFieldDefaulted(t, TIFFTAG_IMAGELENGTH, &length);
   TIFFGetFieldDefaulted(t, TIFFTAG_IMAGEWIDTH, &width);
   TIFFGetFieldDefaulted(t, TIFFTAG_SAMPLESPERPIXEL, &spp);
   TIFFGetFieldDefaulted(t, TIFFTAG_PLANARCONFIG, &planar);
   nsamp = planar == 2 ? (spp < 1 ? 1 : spp > 5 ? 5 : spp) : 1;
-  buf = malloc((size_t)size);
+  buf = mode == 2 ? NULL : size == 0 ? calloc(0, 1) : malloc((size_t)size);
   if (!tiled) {
     for (sample = 0; sample < nsamp; sample++) {
       uint32 row;
       for (row = 0; row < length && row < 400; row++) {
         int r;
+        if (mode == 2) {
+          r = TIFFReadScanline(t, NULL, row, (tsample_t)sample);
+          say(" r %u %u %d\n", row, sample, r);
+          continue;
+        }
         memset(buf, 0xab, (size_t)size);
         r = TIFFReadScanline(t, buf, row, (tsample_t)sample);
         say(" r %u %u %d %016llx\n", row, sample, r, fnv(buf, (size_t)size));
@@ -155,9 +163,14 @@ static void data_text(TIFF *t) {
       for (y = 0; y < length && reads < 200; y = (y > 0xffffffffu - th) ? 0xffffffffu : y + th) {
         for (x = 0; x < width && reads < 200; x = (x > 0xffffffffu - tw) ? 0xffffffffu : x + tw) {
           tsize_t r;
-          memset(buf, 0xab, (size_t)size);
-          r = TIFFReadTile(t, buf, x, y, 0, (tsample_t)sample);
-          say(" t %u %u %u %d %016llx\n", x, y, sample, (int)r, fnv(buf, (size_t)size));
+          if (mode == 2) {
+            r = TIFFReadTile(t, NULL, x, y, 0, (tsample_t)sample);
+            say(" t %u %u %u %d\n", x, y, sample, (int)r);
+          } else {
+            memset(buf, 0xab, (size_t)size);
+            r = TIFFReadTile(t, buf, x, y, 0, (tsample_t)sample);
+            say(" t %u %u %u %d %016llx\n", x, y, sample, (int)r, fnv(buf, (size_t)size));
+          }
           reads++;
         }
       }
@@ -180,7 +193,7 @@ static void child_read(const Job *j, int fd) {
     int r = TIFFSetDirectory(t, d);
     say("setdir %u %d\n", (unsigned)d, r ? 1 : 0);
     fields_text(t);
-    data_text(t);
+    data_text(t, j->mode);
   }
   {
     int r = TIFFSetDirectory(t, 0);
@@ -260,8 +273,8 @@ static int run(const Job *job, int timeout_ms, int mem_mb, unsigned char **out, 
       setrlimit(RLIMIT_AS, &rl);
     }
     switch (job->mode) {
-      case 0: child_read(job, pd[1]); break;
-      default: child_write(job, pd[1]); break;
+      case 1: child_write(job, pd[1]); break;
+      default: child_read(job, pd[1]); break;
     }
     fflush(stdout);
     fflush(stderr);

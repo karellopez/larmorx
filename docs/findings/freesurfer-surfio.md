@@ -1817,3 +1817,68 @@ w-file branch compiled as `MRISwriteValues [clone .part.10]`) and `MRISwriteArea
   vertex lists more faces than the surface has (srd's random meshes list a face twice for a vertex
   whose face repeats it): the official probe crashed (signal 11) on seed 17's case 766; the port's
   first version indexed past its cache too (found by `wvl`, fixed before the commit).
+
+## 33. A surface's clusters: surfcluster.cpp, LabelRemoveIslandsSurf / HolesSurf (relay 38 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/surfcluster.cpp` whole into
+`crates-freesurfer/larmorx-freesurfer-surf/src/sclust.rs` (every function of the file, the
+header-less `sclustReMap0` included); `utils/label.cpp`'s `LabelRemoveHolesSurf` 4138,
+`LabelRemoveIslandsSurf` 4167 and `LabelRemoveHolesAndIslandsSurf` 4216 into `labelsurf.rs`.
+`clustValueInRange` is fs.filter's `volcluster.rs` (`clust_value_in_range`), reused. Object code:
+the unit oracle's `surfcluster.cpp.o` (`<scratch>/D/relay38/sclust.asm`) and `label.cpp.o`.
+
+- **The two recursions** (`sclustGrowSurfCluster` 118, `sclustGrowByDist` 863) run on an explicit
+  stack of (vertex, next neighbour) frames; the official recursion's order is kept exactly: the
+  neighbour's `undefval`, `|val| < thmin` and `clustValueInRange` tests happen when the loop reaches
+  that neighbour (after the earlier neighbours' whole subtrees), and `sclustGrowByDist` visits every
+  neighbour (its tests are at the callee's entry, so a vertex beyond the distance is visited, not
+  marked, as many times as it is reached). The frames: `sclustGrowSurfCluster` pushes six registers
+  and takes 0x18 bytes (80 bytes a level with the return address); `sclustGrowByDist` 0x28 (96).
+  `vnum` is re-read after each recursive call (`movzwl 0x20`): the topology does not change during a
+  growth.
+- **FS-901:** with 8 MiB the official recursion holds 104,857 nested 80-byte `sclustGrowSurfCluster`
+  frames less what the rest of the program takes: measured (`validation/probes/fs-surfio/stack.py`,
+  `<scratch>/D/relay38/stack.log`), the official probe completes a growth 103,500 levels deep (2 x
+  51,750 strips, 100 x 1,000 and 200 x 500 grids at 100,000) and crashes at 104,000 (2 x 52,000) and
+  beyond (3 x 40,000, 300 x 600, 400 x 400); the port's depth for each. One cluster of a whole
+  recorded hemisphere (the six white surfaces of `real.py`'s heads, 119,164 to 148,828 vertices) goes
+  71,053 to 87,414 deep (58 to 60 % of its vertices): no crash; a hemisphere of more than about
+  175,000 vertices (high-resolution surfaces) would. `real.py --scl`'s labels (cortex and three
+  Brodmann labels on six hemispheres): 24 of 24 identical in both modes, no FS-901. The callers on recon-all's default paths
+  (`mrisMarkIntersections(…, FillHoles)` and `MRISfillHoles`, which cluster the inverse of the
+  intersections: the whole surface) are reached only with `--fill-holes` (`mris_remove_intersection`
+  defaults to `FillHoles = 0`, `mris_make_surfaces`/`mris_place_surface` pass 0); `mri_label2label
+  --annot-fill-holes` (`AnnotFillHoles` → `LabelRemoveHolesSurf` of each parcel, whose inversion is
+  most of the hemisphere), `mri_surfcluster` and `mri_glmfit`'s simulations reach it with large
+  clusters. Measured by `validation/probes/fs-surfio/stack.py` (see §133 of the spec for the
+  numbers).
+- **FS-902:** `scs[nMax].nmembers` with `scs == NULL` (`NClusters == 0`) after `DumpSurfClusterSum`
+  printed nothing; the dashes and `n = 0 0` are printed before the crash.
+- **FS-903:** `SurfClusterSummary` indexes `scs[clusterno - 1]` for any `undefval` not 0;
+  `sclustSetSurfaceValToCWP` `scs[vtx_clusterno - 1]`; `sclustReMap` `Orig2Sorted[cOld - 1]` and
+  `Orig2Sorted[undefval - 1]`; `sclustPruneByCWPval` `ClusterList[n - 1]`; `sclustAnnot` passes a
+  negative number to `CTABannotationAtIndex` (`index %d was OOB`) and stores its uninitialised `annot`
+  (the previous vertex's in practice: a stack slot); the growths index `vertices[SeedVtx]` unchecked.
+- **FS-904:** `int map[10000]` on the stack of `sclustPruneByCWPval`.
+- **FS-905:** the first loop keeps `pval <= thresh`, the second removes `pval > thresh`: a NaN is in
+  neither, and its vertices get `map[n - 1] + 1` with `map[n - 1]` never written.
+- **FS-906:** `fopen(fname, "w")` unchecked, then `fprintf(fp, ...)` on `NULL` (glibc crashes in
+  `__fprintf_chk`'s stream lock even when the list is empty: `info` is always written).
+- **FS-907:** `static VERTEX *v1` keeps a pointer into the surface of the first call; the
+  `ncalls == 0 && vtxno >= 0` check does not work after the first call (FreeSurfer's own comment).
+- Operand orders (the NaNs): `SurfClusterSummary`'s `weightvtx[n] += vtxval` and `weightarea[n] +=
+  vtxval * vtxarea` compile to `cvtss2sd val; addsd weight` and `mulss val, area; cvtss2sd; addsd
+  weight` (the new term the destination: `add64(term, sum)`, the product `area * val`); the FWHM
+  sum likewise (`fwhm + sum`); `area +=`, the centroid sums, `sclustSurfaceArea` and `sclustWeight`
+  keep the running value first. `fwhm == 0 → 1.0` folds to `q = fwhmmean2` (no division).
+  `sclustSetSurfaceValToCWP`'s `val * SIGN(maxval)` compiles to a select: `val` itself for `maxval >
+  0`, else `-(double)val` narrowed (exact; a NaN keeps its quieted payload). `sclustGrowByDist`'s
+  flat distance is `sqrtss` (`sqrtf` called only for a negative sum: never), the spherical one
+  `cvtss2sd` of the `float` dot product (`(x1 x2 + y1 y2) + z1 z2`), `divsd r2`, `acos`, `mulsd r`;
+  `r2 = (y² + x²) + z²` in `float`. glibc's `acos` sets EDOM outside [-1, 1] (a vertex farther from
+  the origin than the seed: found by `scl`'s `errno`).
+- `sclustSurfaceCentroid`, `sclustMaxClusterWeightVtx` (`minss`/`maxss` with the new value first:
+  the C comparisons' results, a NaN never taken) as their C.
+- `LabelRemoveHolesSurf`'s `stat` table is `double` (`cvtss2sd` at the store, `cvtsd2ss` at the
+  load: a signalling NaN comes back quiet).
+- `sclustSaveAsPointSet`'s `%g` takes the vertex's `float` coordinates promoted.

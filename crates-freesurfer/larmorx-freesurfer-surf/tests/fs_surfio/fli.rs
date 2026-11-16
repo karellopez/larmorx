@@ -971,6 +971,34 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             let inv = labelsurf::mris_label_invert(g, &mut io, &s, &a)?.expect("the inversion");
             pts(&inv, o);
         }
+        "sgd" => {
+            // relay 38 of track D: `fssurfio.cpp`'s `flr sgd` (the stack measurement: every value
+            // 1, one map of the clusters); the port also gives the deepest path of the growth
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            for v in 0..s.nvertices.max(0) as usize {
+                s.vertex_mut(v).val = 1.0;
+            }
+            let mut deepest = 0usize;
+            for v in 0..s.nvertices.max(0) as usize {
+                s.vertex_mut(v).undefval = 0;
+            }
+            let mut c = 1;
+            for v in 0..s.nvertices.max(0) as usize {
+                if s.vertex(v).undefval == 0 {
+                    let (_, d) = larmorx_freesurfer_surf::sclust::grow_surf_cluster_depth(
+                        g, &mut io, c, v as i32, &mut s, 0.5, -1.0, 1,
+                    );
+                    deepest = deepest.max(d);
+                    c += 1;
+                }
+            }
+            let (l, n) = larmorx_freesurfer_surf::sclust::map_surf_clusters(
+                g, &mut io, &mut s, 0.5, -1.0, 1, 0.0, None, None,
+            )?;
+            o.i(i64::from(n));
+            o.i(i64::from(l.map_or(-1, |l| l[0].nmembers)));
+            o.s(&format!("depth {deepest}"));
+        }
         "scl" => {
             // relay 38 of track D: `fssurfio.cpp`'s `flr scl` (the label clean-ups on a recorded
             // head, the clusters of |x| at least 20 mm with their table, the clusterwise-p values,

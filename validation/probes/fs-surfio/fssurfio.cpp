@@ -4147,6 +4147,17 @@ void flr_case()
     }
     LABEL *inv = MRISlabelInvert(s, a);
     pts(inv);
+  } else if (op == "sgd") {
+    // relay 38 of track D, the stack measurement (validation/probes/fs-surfio/stack.py): a surface
+    // (`sgd <surface>`) with every value 1, one sclustMapSurfClusters (0.5, no upper bound, positive
+    // sign, no area minimum): the cluster count and the first cluster's vertex count, or a crash
+    MRIS *s = MRISread(next());
+    if (!s) fail("cannot read the surface");
+    for (int v = 0; v < s->nvertices; v++) s->vertices[v].val = 1;
+    int n = 0;
+    SCS *l = sclustMapSurfClusters(s, 0.5, -1, 1, 0, &n, NULL, NULL);
+    oi(n);
+    oi(l ? l[0].nmembers : -1);
   } else if (op == "scl") {
     // relay 38 of track D: surfcluster.cpp and the label clean-ups on a recorded head (`scl <white>
     // <label>`): LabelRemoveIslandsSurf, LabelRemoveHolesSurf, LabelRemoveHolesAndIslandsSurf of

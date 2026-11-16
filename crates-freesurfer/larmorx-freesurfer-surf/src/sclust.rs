@@ -58,6 +58,10 @@ pub const GROW_FRAME_BYTES: usize = 80;
 pub const BY_DIST_FRAME_BYTES: usize = 96;
 /// The stack of the official programs' main thread (8 MiB, the usual `ulimit -s`).
 pub const OFFICIAL_STACK_BYTES: usize = 8 << 20;
+/// What the rest of a program takes of that stack (its other frames, the environment), as a
+/// margin: the official probe completes a growth 103,500 levels deep and crashes at 104,000
+/// (`validation/probes/fs-surfio/stack.py`), so 68 to 108 KB; FS-901 is noted from 128 KiB less.
+pub const STACK_MARGIN_BYTES: usize = 128 << 10;
 
 /// `SURFCLUSTERSUM` (`SCS`): one cluster's summary (104 bytes in C).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -148,14 +152,15 @@ fn widen(x: f32) -> f64 {
     }
 }
 
-/// FS-901 noted when a growth's deepest path passes what the official build's 8 MiB stack holds
-/// (its frames of `frame` bytes): FreeSurfer crashes there (signal 11).
+/// FS-901 noted when a growth's deepest path comes within [`STACK_MARGIN_BYTES`] of what the
+/// official build's 8 MiB stack holds (its frames of `frame` bytes): FreeSurfer crashes there
+/// (signal 11), or is about to.
 fn note_depth(g: &mut Globals, what: &str, deepest: usize, frame: usize) {
-    if deepest.saturating_mul(frame) >= OFFICIAL_STACK_BYTES {
+    if deepest.saturating_mul(frame) + STACK_MARGIN_BYTES >= OFFICIAL_STACK_BYTES {
         g.notices.add(
             &FS_901,
             format!(
-                "{what}: a path of {deepest} vertices ({} bytes of stack in FreeSurfer's recursion, more than its 8 MiB): FreeSurfer crashes (stack overflow); grown in full",
+                "{what}: a path of {deepest} vertices ({} bytes of stack in FreeSurfer's recursion, its 8 MiB less 128 KiB or more): FreeSurfer crashes (stack overflow); grown in full",
                 deepest * frame
             ),
         );
@@ -230,8 +235,9 @@ pub fn map_surf_clusters(
 /// Otherwise the seed's `undefval` becomes the number, then each of its `vnum` neighbours in order
 /// whose `undefval` is (still) 0, whose value's magnitude is not below `thmin` and whose value is
 /// in range is grown in turn, depth first (each neighbour's own neighbours before the next
-/// neighbour). Returns 0. FS-901: noted when the deepest path passes what FreeSurfer's recursion
-/// can hold (it crashes); the cluster is grown in full in both modes. FS-903: a seed that is not
+/// neighbour). Returns 0. FS-901: noted when the deepest path comes near what FreeSurfer's
+/// recursion can hold (it crashes from about 104,000 vertices); the cluster is grown in full in
+/// both modes. FS-903: a seed that is not
 /// one of the surface's vertices grows nothing (FreeSurfer writes outside the vertices), 0.
 #[allow(clippy::too_many_arguments)]
 pub fn grow_surf_cluster(
@@ -244,12 +250,28 @@ pub fn grow_surf_cluster(
     thmax: f32,
     thsign: i32,
 ) -> i32 {
+    grow_surf_cluster_depth(g, io, cluster_no, seed, surf, thmin, thmax, thsign).0
+}
+
+/// [`grow_surf_cluster`] and the deepest path of its growth (the nested calls FreeSurfer's
+/// recursion makes, the seed's included; 0 when nothing is grown): what FS-901 measures.
+#[allow(clippy::too_many_arguments)]
+pub fn grow_surf_cluster_depth(
+    g: &mut Globals,
+    io: &mut Io,
+    cluster_no: i32,
+    seed: i32,
+    surf: &mut Mris,
+    thmin: f32,
+    thmax: f32,
+    thsign: i32,
+) -> (i32, usize) {
     if cluster_no == 0 {
         let _ = writeln!(io.out, "ERROR: clustGrowSurfCluster(): ClusterNo is 0");
-        return 1;
+        return (1, 0);
     }
     let Some(seed) = vertex_in(g, surf, seed, "sclustGrowSurfCluster") else {
-        return 0;
+        return (0, 0);
     };
     surf.vertex_mut(seed).undefval = cluster_no;
     // each frame: the vertex and the next of its neighbours to look at (the recursion's loop)
@@ -281,7 +303,7 @@ pub fn grow_surf_cluster(
         deepest = deepest.max(stack.len());
     }
     note_depth(g, "sclustGrowSurfCluster", deepest, GROW_FRAME_BYTES);
-    0
+    (0, deepest)
 }
 
 /// `sclustSurfaceArea(ClusterNo, Surf, &nvtxs)`: the `float` sum, in vertex order, of the areas

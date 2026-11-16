@@ -35,7 +35,11 @@ canonical coordinates: the principal-curvature and normal-dot distributions
 (``mrisSampleAshburnerTriangleEnergy``) and the white surface moved to Talairach space in place
 (``MRIStalairachTransform``). With ``--lbl`` (relay 37 of track D): each head's recorded labels
 (``LABELS``) on its white surface: ``LabelArea``, ``LabelMarkSurface``, ``LabelErode`` and
-``LabelDilate`` by 2, ``MRISlabel2Mask``, ``MRISlabelInvert``. Prints the counts;
+``LabelDilate`` by 2, ``MRISlabel2Mask``, ``MRISlabelInvert``. With ``--scl`` (relay 38 of
+track D): the same labels' island and hole removal (``LabelRemoveIslandsSurf``,
+``LabelRemoveHolesSurf``, ``LabelRemoveHolesAndIslandsSurf``), the clusters of ``|x| >= 20`` mm
+(``sclustMapSurfClusters``) with their table, the clusterwise-p values, the old summary and a growth
+by distance. Prints the counts;
 the lines name machine paths, so no hash is recorded from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]
@@ -114,6 +118,12 @@ def main(argv: list[str] | None = None) -> int:
         "recorded labels and white surface",
     )
     ap.add_argument(
+        "--scl",
+        action="store_true",
+        help="relay 38 of track D: surfcluster.cpp and the label clean-ups (flr scl) on each "
+        "head's recorded labels and white surface",
+    )
+    ap.add_argument(
         "--mpx",
         action="store_true",
         help="relay 37 of track D: group (e) (flr mpx) on each head's white surface and sphere: "
@@ -136,6 +146,12 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.scl:
+                for c in LABELS:
+                    lines.append(
+                        f"flr scl {s / 'surf' / f'{hemi}.white'} {s / 'label' / f'{hemi}.{c}'}"
+                    )
+                continue
             if a.lbl:
                 for c in LABELS:
                     lines.append(
@@ -181,7 +197,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "lbl"
+        "scl"
+        if a.scl
+        else "lbl"
         if a.lbl
         else "mpx"
         if a.mpx

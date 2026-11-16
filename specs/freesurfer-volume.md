@@ -4,14 +4,37 @@ Written by the replica author of queue items 3.1-35 to 3.1-40 as their spec writ
 (`docs/porting-guide.md` §1): behaviour, maths, conventions, messages and the validation plan, from
 FreeSurfer 8.2.0's source and the official build's outputs, never code or routines. A clean-room
 implementer writes the clean room (queue C3.1-05 and on) from this file, black-box runs of the
-official programs (and of the probe `validation/probes/fs-volume/`, a black-box run of FreeSurfer's
-code), `specs/freesurfer-mri.md` (the structure these functions work on) and the cited standards.
+official programs and of the open probe (§69), `specs/freesurfer-mri.md` (the structure these
+functions work on), `specs/freesurfer-maths.md`, `specs/freesurfer-core.md` and the cited standards.
+Made ready for the clean room part by part by the spec finisher (FreeSurfer's foundations, track E):
+**parts 1 to 3 (§1-17) by its relay 6 (2026-11-16)**: the black-box validation plan (§69) with its
+open probe, a read-through as a clean-room reader, the defects' texts in `larmorx_core::defects`
+checked. The sections after §17 are not yet read through that way: their validation plans still
+name the replica's closed probe, which the implementer does not open (§69 says what to do
+meanwhile). What black-box runs confirmed is marked **(observed)**.
 
-Status: **parts 1 to 3** (§1-17): part 1 (§1-5) the volume-geometry text block of linear transform and surface files,
-the geometry's copies, matrices, comparison and printer (3.1-39's first piece, taken first for the
-surface readers); part 2 (§6-12) 3.1-35's voxel arithmetic; part 3 (§13-17) 3.1-35's coordinates and
-geometry. Not yet: `MRIfindApproximateSkullBoundingBox`, `MRItranslate`, the rotations and
-`MRItoImageView` (they need the samplers of 3.1-36 and the image structure).
+**Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
+any other copy, the installed package's scripts, Python and libraries), the replica crates
+(`crates-freesurfer/`, among them `larmorx-freesurfer-volume`), the documents written from
+FreeSurfer's source (`docs/freesurfer/`, `docs/findings/freesurfer-*.md`), the replica's probes and
+checks (`validation/probes/fs-*`, among them `validation/probes/fs-volume/`), the unit oracle's build
+tree and tools (`<workspace>/oracles/freesurfer-8.2.0-unit/` except running the prebuilt probes in
+its `probes/` folder and loading `probes/guard_malloc.so` beside them;
+`validation/investigations/freesurfer-unit-oracle/`), the replay tool's and the unit oracle's Python
+(`validation/src/larmorx_validation/freesurfer/`, `freesurfer_unit.py`: run, never read),
+`docs/parts/` and the scratch folders of FreeSurfer's parts. **It may read** this spec, the other
+FreeSurfer specs it cites, the standards cited (IEEE 754-2008, C11, POSIX), the main package's open
+code and documentation (for example `larmorx_core::cscan`, `larmorx_core::cfmt`,
+`larmorx_core::defects`), the open probe folders `validation/investigations/freesurfer-volume-probe/`,
+`freesurfer-mri-probe/`, `freesurfer-maths-probe/` and `glibc-scanf-probe/` (calls only: their
+READMEs say how to run them), and run as black boxes the prebuilt probes
+`<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe` (with the guard allocator beside
+it), `fs_mri_probe`, `fs_maths_probe`, the official FreeSurfer 8.2.0 programs and the C library.
+
+Status: parts 1 to 3 (§1-17): part 1 (§1-5) the volume-geometry text block of linear transform and
+surface files, the geometry's copies, matrices, comparison and printer; part 2 (§6-12) the voxel
+arithmetic; part 3 (§13-17) coordinates and geometry. Then the samplers, moves, the head box and
+the transform reader (§18-22), the CMA labels (§23-24), and the rest of the module (§25-68).
 
 ## 1. Conventions
 
@@ -20,8 +43,8 @@ geometry. Not yet: `MRIfindApproximateSkullBoundingBox`, `MRItranslate`, the rot
 - A *stream* is a C `FILE *` (ISO C 7.21): a line is read as `fgets` reads it, a position as
   `ftell` gives it, a move as `fseek(..., SEEK_SET)` makes it.
 - Numbers in text are converted as glibc 2.35's `sscanf` converts them (`%d`: a `long` whose low 32
-  bits are kept; `%f`: correctly rounded to float; `specs/freesurfer-core.md` and
-  `larmorx-freesurfer-core`'s scanf rules), and printed as glibc's `printf` prints them.
+  bits are kept; `%f`: correctly rounded to float; `specs/freesurfer-maths.md` §18.1 and the main
+  package's `larmorx_core::cscan`), and printed as glibc's `printf` prints them.
 
 ## 2. Writing the volume-geometry block (`writeVolGeom(fp, vg)`)
 
@@ -110,7 +133,9 @@ failing move back sets `errno` as `fseek` does.
   neither counted nor read; `reproduce` counts it. Both say so when the previous key is one of the
   eight. (With FS-286's `reproduce`, the kept key is the one FS-286 gives.)
 - **FS-288**: a line with no word before any line with a word compares memory never written with
-  the keys; both modes count it as no key and say so (the probe does not compare such cases).
+  the keys; both modes count it as no key and say so. **(observed)** the 4 such reads of §69's
+  `vgblock` (a first line empty, of spaces or a tab) give, in all four runs, the geometry read
+  without that line (the stream's positions later by its length): what "no key" gives.
 
 ## 4. Copies, matrices, comparison, printer
 
@@ -148,23 +173,15 @@ failing move back sets `errno` as `fseek` does.
 
 ## 5. Validation plan (part 1)
 
-- The probe `validation/probes/fs-volume/` (`check.py --seed <s> --n <n>`, inside `boxed.sh`) runs
-  each case through FreeSurfer's own functions and through the port: commands `vgwrite` (the bytes
-  written), `vgread` (the geometry after reading generated files: well-formed blocks as `vgwrite`
-  writes them, and blocks with missing, repeated, reordered, blank, odd and over-long lines, long
-  words, odd second words, CRLF endings, NUL bytes, numbers in every glibc form (`nan`, `inf`,
-  hexadecimal, overflowing, underflowing, partial), no final newline, data after the block; then the
-  stream's position, end-of-file and error flags, `errno` and the next 64 bytes), `vgprint0`,
-  `getvg`, `copyvg`, `vgi2r`, `vgr2i`, `tkrv2r`, `vgeq0`.
-- Expected: every line identical with `reproduce` except FS-288's (counted, not compared); the
-  default differs only where it notes a defect.
+- §69's groups `vgblock` and `vgcopy` (the open probe's `vgwrite`, `vgread`, `vgprint`, `getvg`,
+  `copyvg`, `vgi2r`, `vgr2i`, `tkrv2r`, `vgeq`): every line identical with `reproduce` but the
+  memory lines (FS-288's among them); the default differs only where it notes a defect.
 - Then the replays of the first programs that read these blocks (the LTA readers, the surface
   readers) on the recorded heads.
 
 ## 6. Voxel arithmetic: conventions (part 2)
 
-Part 2 (§6-12) is 3.1-35's first piece: the voxel arithmetic of `mri.cpp`, with `MRIcopyFrame` and
-`MRIcalcCRASforExtractedVolume` (from 3.1-36 and 3.1-37).
+Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforExtractedVolume`.
 
 - **Destinations.** `f(src, dst, ...)` writes into `dst`, or into a new volume when `dst` is `NULL`,
   and returns it; `dst` may be `src` itself (and, for two sources, either source). Each function
@@ -183,8 +200,11 @@ Part 2 (§6-12) is 3.1-35's first piece: the voxel arithmetic of `mri.cpp`, with
 - **Arithmetic** in `float` (single precision, x86-64's NaN rules, `specs/freesurfer-maths.md` §1)
   unless said otherwise; `nint(x)` is `(int)(x + 0.5)` (`x - 0.5` below 0) in double with FS-12's
   rule outside `int`. Storing an integer into a narrower integer type keeps its low bits.
-- **Errors**: "an error" is FreeSurfer's error line (`ErrorPrintf`); "the program ends" an exit with
-  the status given.
+- **Errors**: "an error" is FreeSurfer's C-style error line (`ErrorPrintf`: `specs/freesurfer-core.md`
+  §2's C-style error calls, `error: <text>` on standard error with `errno`'s text first when it is
+  set and FS-01's NUL before the new line); "the program ends" its C-style exit (`ErrorExit`, the
+  core spec's §2 and §3) with the status given, which the probe prints modulo 256 (`EXIT 252` for
+  -4, `EXIT 253` for -3).
 
 ## 7. Clones, clearing, size checks, frame copies
 
@@ -294,7 +314,12 @@ The second volume is walked with the first's extent and frames.
   6. A source type other than `uchar`, `short`, `ushort`, `int`, `long`, `float`: the program ends
      (`MRIextractInto: unsupported source type <t>`, status -3).
   7. For every frame, slice and row of the box, `dx` voxels copied (a negative `dx`: FS-294, the
-     program ends here; FreeSurfer crashes).
+     program ends here; FreeSurfer crashes): the bytes of voxels `x0 ..` of the source's row to
+     voxels `x1 ..` of the destination's. **FS-297**: for a `long` source (8-byte voxels)
+     FreeSurfer starts each row's copy at byte `4 x0` of the source's row and byte `4 x1` of the
+     destination's (half the column), copying `8 dx` bytes (**(observed)**: §69's `vextract`);
+     `reproduce` does so, the default copies whole voxels; both note FS-297 when a box of voxels is
+     copied with `x0` or `x1` not 0.
   8. The destination takes the source's voxel sizes, `thick`, `ps` and pulse parameters, its centre
      from `MRIcalcCRASforExtractedVolume`, recomputed cached matrices and a deep copy of the
      source's colour table when it has one.
@@ -307,15 +332,9 @@ The second volume is walked with the first's extent and frames.
 
 ## 12. Validation plan (part 2)
 
-The probe's commands `clone`, `clonesp`, `clear`, `match`, `cpframe`, `cpframes`, `linscale`,
-`smul`, `smulf`, `thresh`, `uthresh`, `invc`, `binz`, `abs`, `pos`, `neg`, `mul2`, `sub2`, `add2`,
-`div2`, `sam`, `vrange`, `vrangef`, `vrangereg`, `lrange`, `extract`, `cras` on generated volumes of
-up to 4 x 4 x 3 voxels and 0 to 3 frames of every type (headers only too), float voxels from a table
-of special values (zeros of both signs, halves, 255.5, 1e10, the largest float, a subnormal,
-infinities, NaNs of both signs and with payloads), the destination new, given (of the same or
-another shape and type) or a source, cached matrices kept stale, recomputed or dropped. Expected:
-identical with `reproduce` but where FreeSurfer reads or writes memory it does not own or crashes
-(FS-53, FS-58, FS-290, FS-294; FS-288 for part 1), which are counted, not compared.
+§69's groups `vmake`, `vrange`, `vscale`, `vtwo` and `vextract`: identical with `reproduce` but where
+FreeSurfer reads or writes memory it does not own or crashes (FS-53, FS-58, FS-290, FS-294), lines
+the loop allows; the default differs only where it notes a defect.
 
 ## 13. Coordinates and geometry (part 3): tkregister RAS
 
@@ -416,14 +435,10 @@ destination's `dof` is incremented; the destination is returned.
 
 ## 17. Validation plan (part 3)
 
-The probe's commands `avg` (destination new, given or the source; `dof` 0 to 7, negative and
-`INT_MAX`), `dsign`, `sras` (the four matrices), `spt` (the three point conversions),
-`ostr`, `vtal` (with and without a transform of finite or special entries), `com`, `pca`, `cmph`
-(against nothing, itself, another volume or a copy with one field nudged by 1e-8 to 0.5), `dump`
-(with and without a registration matrix), on part 2's volumes with their cached matrices kept,
-recomputed or dropped and coordinates including NaN, infinities and 1e10. Expected: identical with
-`reproduce` but where FreeSurfer reads memory it does not own or never returns (FS-53, FS-58,
-FS-290, FS-47, FS-48, ITK-112, ITK-115, ITK-116), counted and not compared.
+§69's groups `vcoords`, `vstats` and `vheader`: identical with `reproduce` but where FreeSurfer
+reads memory it does not own, crashes or never returns (FS-53, FS-58, FS-290; the principal
+components of a covariance with infinite or NaN entries: FS-47, ITK-112), lines the loop allows;
+the default differs only where it notes a defect.
 
 ## 18. Sampling a volume at a point (3.1-36)
 A point is given in voxel coordinates (column `x`, row `y`, slice `z`, `double`). Results are `double`
@@ -2306,3 +2321,96 @@ geometries), `ltar2v` (the same, a destination volume or none), `ltacmp` (0 to 2
 both or none, into a new array, another array of 0 to 2 transforms or the source itself). Expected: identical with
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
+
+## 69. Validation plan (black box), parts 1 to 3
+
+### 69.1 The probe
+
+The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
+(calls of the functions of §2 to §16 by name) and the comparison loop; its README lists every
+command, its arguments and what it prints, and the encodings (every float and double as its bits;
+the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
+them, with the working volume W, the destination D and the region R added). The implementer runs
+the prebuilt probe `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe` (FreeSurfer
+8.2.0's library as the official build compiles it: the unit oracle, GCC 8.4.0 and FreeSurfer's
+flags) with the fs.maths probe's `guard_malloc.so` beside it, and never builds them. Each call runs
+in a child process of its own with an alarm: its line is the printed result, or `EXIT <status>`
+where FreeSurfer's error functions end the program, `CRASH <signal>`, `TIMEOUT` where FreeSurfer
+never returns; then its standard output and standard error.
+
+### 69.2 The groups and their reference hashes
+
+`compare.py refs` (seed 7) runs each group's batch on the probe four times (plainly, plainly again in
+another process, and in the two guard runs: an inaccessible page right after each allocation, fill
+byte 90, then right before it, fill byte 165). A line whose four results are not the same depends
+on memory FreeSurfer does not own or never wrote (a **memory** line). The hash is the SHA-256 of the
+group's plain lines, each memory line and each line where FreeSurfer crashed as `<memory>`.
+**(observed)** on the reference machine (glibc 2.35, Linux 6.8, x86-64), through the oracle-output
+cache, from it and without it (2026-11-16, the prebuilt probe from commit 77392db5; log
+`oracles/logs/fs-volume-probe-r6-refs-2026-11-16.log`):
+
+| Group | § | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
+|---|---|---|---|---|---|---|
+| `vgblock` | 2, 3 | 560 | 0 | 0 | 0 | `8f624ebe5a7f4d8d13b4b7340273a7cb74de9ffdc4091014e5d0e485cc2f129c` |
+| `vgcopy` | 4 | 1,080 | 0 | 0 | 0 | `00e69896354533ad4c775b34f1d590b49589967b02a0b2edcfc8e938fc0eb4a6` |
+| `vmake` | 7 | 1,050 | 247 | 60 | 0 | `a9ad575b5184bf3259c1c5a6c50f5e8775bed25f23f14cb22922661be0f244c7` |
+| `vrange` | 8 | 800 | 131 | 0 | 0 | `72fe99dd6152cf8ef6d036bd26f82a5e0e1d65d1d7353a7632633dfa6ae1ab25` |
+| `vscale` | 9 | 1,100 | 292 | 79 | 0 | `ef854bf17ded0d4cb9067aa20cbdbeaa39d545232aac69ca241e4a64cfdf7be9` |
+| `vtwo` | 10 | 200 | 40 | 0 | 0 | `bc6ac4d54061ea47af8bfac7addf91d7495ae2454b847382122a67e19a629811` |
+| `vextract` | 11 | 600 | 180 | 219 | 0 | `17b9a4d5a8fa98eb92aee924805fe9eff6adaacc5b6be6598852474c4c636ba4` |
+| `vcoords` | 13, 14 | 1,350 | 0 | 57 | 0 | `69ac886bc59fb2b67e82e40194230ac63b6cd6c424a9895bb63305d722a43881` |
+| `vstats` | 15, 15b | 750 | 42 | 11 | 9 | `a0c66fd4593df2e6a7935e7031bf97069cfd77a70ca1455d4ba7fcaa8b346e90` |
+| `vheader` | 16 | 606 | 0 | 0 | 0 | `b8b24feb576e087bae4fb68785ce0f3a482c7a291cfcd4930859101a94228eef` |
+| all | | 8,096 | 932 | 426 | 9 | |
+
+The exits are FreeSurfer's own: a volume of a type without a voxel size given voxels (`could not
+allocate memory for slice ...`, status 1), `MRIcopyFrames`' mismatch (§7, status -4), an extracted
+box of a type FreeSurfer does not copy (§11, -3) or of a non-positive size (status 1), the
+tkregister products without an inverse (§13, -4); the timeouts are principal components of
+covariances with infinite or NaN entries (§15). Among the crashes: volumes without voxels walked
+directly (FS-58), destinations or second volumes smaller than the first (FS-290), boxes FreeSurfer
+copies with a negative length (FS-294) and destinations of another type it frees (FS-293).
+
+### 69.3 The comparison
+
+`compare.py compare --candidate <program> --mode reproduce` (then `--mode fix`) runs every case on
+the clean room's program, which takes the probe's commands and prints the same lines, with
+`LARMORX_UPSTREAM_DEFECTS` set to the mode; its defect notices (`upstream defect <ID> ...` on
+standard error) are taken out and their IDs kept. Every line must be identical, byte for byte, but:
+
+- a line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`): the candidate's line must not be one
+  (the defects of those cases say what the clean room gives: FS-58, FS-290, FS-294; FS-47 and
+  ITK-112 for the principal components);
+- a **memory** line (FreeSurfer reads or writes what it does not own: FS-53, FS-289's other voxels
+  where they lie outside, FS-290);
+- in `--mode fix`, a line where the candidate noted a defect (the corrected result).
+
+The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
+the allowed lines; exit status 1 for any other difference. **(observed)** with the probe as its own
+candidate: no unexplained difference in either mode; with `reproduce` 8,026 of the 8,096 lines
+identical, 69 memory lines whose contents changed from process to process (11 in `vmake`, 3 in
+`vtwo`, 55 in `vextract`) and one where FreeSurfer crashed in one process and not in the other
+(`vextract`).
+
+### 69.4 The defects of parts 1 to 3 (index)
+
+| Defect | § | Defect | § | Defect | § |
+|---|---|---|---|---|---|
+| FS-285 | 3 | FS-290 | 6 | FS-295 | 11 |
+| FS-286 | 3 | FS-291 | 9, 10 | FS-296 | 9 |
+| FS-287 | 3 | FS-292 | 10 | FS-297 | 11 |
+| FS-288 | 3 | FS-293 | 11 | | |
+| FS-289 | 6 | FS-294 | 11 | | |
+
+Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-53 and FS-58
+(`specs/freesurfer-mri.md`), FS-47 and ITK-112 (`specs/freesurfer-maths.md` §17).
+
+### 69.5 Beyond the probe, and the sections after §17
+
+- **The replays** of the programs that use these functions with `reproduce`, on the recorded heads,
+  when they are ported.
+- **Every platform:** the clean room's own golden checks (its results on the other five platforms
+  are its Linux results; a NaN's bits as x86-64 gives them).
+- **§18 to §68** are not yet in the open probe: until they are, their clean room checks them against
+  the official programs as black boxes and against the replays; their validation plans name the
+  replica's probe, which the implementer does not open.

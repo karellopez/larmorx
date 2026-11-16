@@ -7,7 +7,8 @@
 //! `MRISreadValues` 1844 with `MRISreadValuesIntoArray` 1872 (the values from a volume, a
 //! curvature file or a w file), `MRISwriteNormals` 2690, `MRISreadNormals` 2711,
 //! `MRISwriteWhiteNormals` 2734 and `MRISwritePrincipalDirection` 2758 (three vectors per vertex
-//! as a volume of three frames).
+//! as a volume of three frames); since relay 37 `MRISwriteValues` 721 (the values as a w file or a
+//! volume) and `MRISwriteAreaErrorToValFile` 586 (FS-633).
 //!
 //! The defects: FS-619 (`MRISwriteIntoVolume` without a volume makes one of the wrong shape and
 //! refuses it), FS-620 (`MRISreadValuesIntoArray`'s frame message reads the freed header: a
@@ -21,13 +22,16 @@
 
 use std::path::Path;
 
-use larmorx_core::defects::{FS_126, FS_619, FS_620, FS_621, FS_622, FS_623};
+use larmorx_core::defects::{FS_126, FS_619, FS_620, FS_621, FS_622, FS_623, FS_633, FS_634};
 use larmorx_freesurfer_core::cstd::fmt_f;
+use larmorx_freesurfer_core::diag::DIAG_SHOW;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
     self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOFILE, ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
-use larmorx_freesurfer_io::fio::{fread_float, fread3, fwrite_float, fwrite_int};
+use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sqrt64, sub, sub64};
+use larmorx_freesurfer_io::fio::{fread_float, fread3, fwrite_float, fwrite_int, fwrite2, fwrite3};
 use larmorx_freesurfer_io::identify::{self, MRI_VOLUME_TYPE_UNKNOWN};
 use larmorx_freesurfer_io::mriio;
 use larmorx_freesurfer_mri::mri::{
@@ -38,6 +42,7 @@ use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use crate::aaa::SurfGlobals;
 use crate::coords::Io;
 use crate::curvio;
+use crate::facenorm;
 use crate::formats;
 use crate::mris::{Mris, Vertex};
 use crate::names::{
@@ -46,6 +51,7 @@ use crate::names::{
 use crate::readwrite;
 use crate::sfile::{self, STRLEN, c_str, nonneg, open, open_failed, strcpy_checked};
 use crate::stl;
+use crate::surfmri;
 use crate::surfread::verbose_show;
 
 /// `VERTEX_VALS` (`VERTEX_VAL`), `VERTEX_AREA`, `VERTEX_CURV`, `VERTEX_ANNOTATION`, `VERTEX_DX`,
@@ -538,4 +544,207 @@ pub fn read_values_into_array(
     }
     fp.close();
     Ok((NO_ERROR, Some(array)))
+}
+
+// ---- the values written: MRISwriteValues, MRISwriteAreaErrorToValFile (relay 37) --------------
+
+/// `MRISwriteValues(mris, sname)`: a name of a volume format (fs.io's `mri_identify` knows it):
+/// the vertices' values as a float volume of one voxel per vertex (`MRIcopyMRIS(NULL, mris, 0,
+/// "val")`), written by `MRIwrite` (with `DIAG_SHOW` and verbose: `Saving surf vals in 'volume'
+/// format to <name>` first), its status returned. Otherwise a w file: the name, `.w` added unless
+/// its last dot is followed by `w` (FS-126 for a name of 1,024 bytes or more, with `.w`); with
+/// `DIAG_SHOW`: `writing surface values to <file>.`; a file that cannot be created ends the program
+/// (`Can't create file <file>` with its newline, `ERROR_NOFILE`); with `DIAG_SHOW` and verbose `num =
+/// <n>`; then 0 (2 bytes), the count of vertices whose value is not 0 (NaN counts), and for each of
+/// them its number (3 bytes) and value (a big-endian float; a value that is not finite is the
+/// error `MRISwriteValues(<file>): val at vertex <k> is not finite`, written anyway). Then on
+/// standard output `avg = %2.3f, stdev = %2.3f, min = %2.3f, max = %2.3f` (the values' mean and
+/// standard deviation in `double`, from the sums of the values and of their `float` squares, 0 when
+/// the variance is not above 0; min and max from 1000 and -1000), or `Warning: all vertex values are
+/// zero`. `NO_ERROR`.
+pub fn write_values(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &Mris,
+    sname: &str,
+) -> Result<i32, Fatal> {
+    const F: &str = "MRISwriteValues";
+    let sname = c_str(sname);
+    let ftype = identify::mri_identify(g, dir, io.env, io.out, io.err, sname)?;
+    if ftype != MRI_VOLUME_TYPE_UNKNOWN {
+        let mut temp = match surfmri::copy_mris(g, io, None, mris, 0, "val")? {
+            Ret::New(m) => m,
+            _ => {
+                let _ = writeln!(io.out, "ERROR: MRISwriteValues: could not alloc MRI");
+                return Ok(1);
+            }
+        };
+        if verbose_show(g) {
+            let _ = writeln!(io.out, "Saving surf vals in 'volume' format to {sname}");
+        }
+        return mriio::mri_write(
+            g,
+            io.out,
+            io.err,
+            io.env,
+            dir,
+            &mut temp,
+            sname,
+            None,
+            MGZ_INTENT_UNKNOWN,
+        );
+    }
+    let mut fname = strcpy_checked(g, io, sname, F)?;
+    let w = match fname.rfind('.') {
+        Some(i) => fname.as_bytes().get(i + 1) == Some(&b'w'),
+        None => false,
+    };
+    if !w {
+        if fname.len() + 2 >= STRLEN {
+            g.notices.add(
+                &FS_126,
+                format!("{F}: a w-file name of {} bytes with .w, 1,024 or more, is taken whole (FreeSurfer aborts)", fname.len() + 2),
+            );
+            if g.notices.reproduce() {
+                let _ = io
+                    .err
+                    .write_all(b"*** buffer overflow detected ***: terminated\n");
+                return Err(Fatal::Exit(134));
+            }
+        }
+        fname.push_str(".w");
+    }
+    if g.gdiag & DIAG_SHOW != 0 {
+        let _ = writeln!(io.out, "writing surface values to {fname}.");
+    }
+    let mut fp = match open(dir, &fname, "wb") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            log::error_exit(
+                g,
+                io.err,
+                ERROR_NOFILE,
+                &format!("Can't create file {fname}\n"),
+            )?;
+            unreachable!("ErrorExit returns only through its Err");
+        }
+    };
+    let n = nonneg(mris.nvertices);
+    let num = (0..n).filter(|&k| mris.vertex(k).val != 0.0).count() as i32;
+    if verbose_show(g) {
+        let _ = writeln!(io.out, "num = {num}");
+    }
+    fwrite2(&mut fp, 0);
+    fwrite3(&mut fp, num);
+    let (mut sum, mut sum2, mut max, mut min) = (0.0f64, 0.0f64, -1000.0f64, 1000.0f64);
+    for k in 0..n {
+        let f = mris.vertex(k).val;
+        if f == 0.0 {
+            continue;
+        }
+        fwrite3(&mut fp, k as i32);
+        if !f.is_finite() {
+            log::error_printf(
+                g,
+                io.err,
+                ERROR_BADPARM,
+                &format!("MRISwriteValues({fname}): val at vertex {k} is not finite"),
+            );
+        }
+        fwrite_float(&mut fp, f);
+        sum = add64(sum, f64::from(f));
+        // the official build: the square first (`addsd` of the running sum into it)
+        sum2 = add64(f64::from(mul(f, f)), sum2);
+        if f64::from(f) > max {
+            max = f64::from(f);
+        }
+        if f64::from(f) < min {
+            min = f64::from(f);
+        }
+    }
+    fp.close();
+    if num > 0 {
+        let nf = f64::from(num);
+        sum = div64(sum, nf);
+        let var = sub64(div64(sum2, nf), mul64(sum, sum));
+        let sd = if var > 0.0 { sqrt64(var) } else { 0.0 };
+        let _ = writeln!(
+            io.out,
+            "avg = {}, stdev = {}, min = {}, max = {}",
+            fmt_f(sum, 2, 3),
+            fmt_f(sd, 2, 3),
+            fmt_f(min, 2, 3),
+            fmt_f(max, 2, 3)
+        );
+    } else {
+        let _ = writeln!(io.out, "Warning: all vertex values are zero");
+    }
+    Ok(NO_ERROR)
+}
+
+/// `MRISwriteAreaErrorToValFile(mris, name)`: each unripped vertex's value set to the difference of
+/// its faces' summed area and summed original area (`float`, in order) over its face count (0 faces:
+/// NaN), then [`write_values`] (its status ignored). `NO_ERROR`.
+///
+/// **FS-633:** FreeSurfer sums the original areas of the faces numbered 0 to `num - 1` of the
+/// surface (the face-normal cache's entries by the loop's count), not of the vertex's faces; by
+/// default the vertex's own faces (rule A), FreeSurfer's with `reproduce`; noted where they differ.
+/// **FS-634:** a vertex listing more faces than the surface has (a face listed twice) makes
+/// FreeSurfer read the cache past the faces (a crash or another array's data); its own face's is
+/// taken there in both modes, noted.
+pub fn write_area_error_to_val_file(
+    g: &mut Globals,
+    io: &mut Io,
+    dir: Option<&Path>,
+    mris: &mut Mris,
+    name: &str,
+) -> Result<i32, Fatal> {
+    let rep = g.notices.reproduce();
+    let mut moved = 0usize;
+    for vno in 0..nonneg(mris.nvertices) {
+        if mris.vertex(vno).ripflag != 0 {
+            continue;
+        }
+        let faces: Vec<i32> = {
+            let vt = mris.topology(vno);
+            let f = vt.f.as_deref().unwrap_or(&[]);
+            f[..usize::from(vt.num).min(f.len())].to_vec()
+        };
+        let (mut area, mut orig_area) = (0.0f32, 0.0f32);
+        let mut theirs = 0.0f32;
+        let nfaces = nonneg(mris.nfaces);
+        for (k, &fno) in faces.iter().enumerate() {
+            area = add(area, mris.face(fno as usize).area);
+            let own = facenorm::get_face_norm(mris, fno as usize).orig_area;
+            let fs = if k < nfaces {
+                facenorm::get_face_norm(mris, k).orig_area
+            } else {
+                // FS-634: FreeSurfer reads the cache past the surface's faces
+                g.notices.add(
+                    &FS_634,
+                    format!("MRISwriteAreaErrorToValFile: vertex {vno} lists {} faces of a surface of {nfaces}: FreeSurfer's original area of face {k} is read outside the faces (the vertex's own face's taken)", faces.len()),
+                );
+                own
+            };
+            orig_area = add(orig_area, if rep { fs } else { own });
+            theirs = add(theirs, fs);
+        }
+        let n = f32::from(u8::try_from(faces.len()).unwrap_or(u8::MAX));
+        let val = div(sub(area, orig_area), n);
+        if !rep {
+            let fs = div(sub(area, theirs), n);
+            moved += usize::from(fs.to_bits() != val.to_bits());
+        }
+        mris.vertex_mut(vno).val = val;
+    }
+    if moved > 0 {
+        g.notices.add(
+            &FS_633,
+            format!("MRISwriteAreaErrorToValFile: {moved} vertices' area errors from their own faces' original areas (FreeSurfer: the faces numbered from 0)"),
+        );
+    }
+    write_values(g, io, dir, mris, name)?;
+    Ok(NO_ERROR)
 }

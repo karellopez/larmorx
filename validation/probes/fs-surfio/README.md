@@ -381,3 +381,43 @@ scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py 
 scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py --vps
 scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-surfio/real.py --ann
 ```
+
+Measured 2026-11-16 (relay 37 of track D, 52 commands): `mpx` (group (e) of queue items 3.1-49/50:
+`MRIStalairachTransform` in place and into a clone, the seven vertex-to-voxel conversions,
+`mrisComputeNormalDotDistribution`, `mrisComputePrincipalCurvatureDistributions` (a volume FreeSurfer
+would read outside written `G` on both sides), `mrisSampleAshburnerTriangleEnergy` (the probe calls it
+with a `calloc`ed `INTEGRATION_PARMS`); with `Gdiag`'s write and verbose bits the folder's files by
+name, length and FNV-1a; the port's side in `tests/fs_surfio/mpx.rs`), seeds 7 (300 cases), 13 and 17
+(1,000 each): 0 different with `reproduce` (9, 15 and 13 counted: FS-121 and FS-06 of the read), `fix`
+different only with notices (FS-626, FS-628, FS-629, the read's FS-01; FS-627 is kept in both modes).
+`flr mpx` (`real.py --mpx`: three heads, both hemispheres: the two distributions on `?h.white` with
+`?h.sphere`'s canonical coordinates, Ashburner's energy at 64 vertices of `?h.sphere`, `?h.white` moved
+to Talairach space with the head's `talairach.xfm`): 6 of 6 identical with `reproduce`; `fix` differs
+only in the energies' last bits (correctly rounded `logf`; `check.py` counts an `mpx` case with `ash`
+as a libm case). Seed 1, 1,560 cases: 1,518 identical, 42 `SKIP`, hash
+`bf4fe88a9440b98a1060b3fd332b829f52347515ca86557a5d7a63b1ebca2d21`, from the clean commit 5c59b521;
+the hash test and `props11_defaults` pass in debug and release, plain and under the AArch64 NaN
+emulation (67,867 and 376,617 flips), and on the Windows laptop; seed 7's `mpx`, `vps` and `ann`
+outputs (1,500) identical under the emulation in both modes.
+
+Measured 2026-11-16 (relay 37 of track D, 53 commands): `lbl` (label.cpp's surface-label functions:
+`LabelMark`, `LabelMark2`, `LabelUnmark`, `LabelMarkSurface`, `LabelArea`, `LabelFillMarked`,
+`LabelErode`, `LabelDilate`, `MRISlabel2Mask`, `MRISlabelInvert`, on a label from `LabelAlloc` with
+the case's points, index table, surface and template handles; an operation FreeSurfer would read or
+write outside the surface's vertices or the label's places for written `G` on both sides; the port's
+side in `tests/fs_surfio/lbl.rs`), seeds 7 (300 cases), 13 and 17 (1,000 each): 0 different with
+`reproduce`, `fix` different only with notices (FS-632, the error messages' FS-01). `flr lbl`
+(`real.py --lbl`: three heads, both hemispheres, four labels each on `?h.white`): 24 of 24 identical
+in both modes.
+
+Measured 2026-11-16 (relay 37 of track D, 54 commands): `wvl` (`MRISwriteValues` and
+`MRISwriteAreaErrorToValFile` to w-file and volume names, `MRISstoreMetricProperties`, `MRIcopyMRIS`
+of 19 field names into new and given volumes; the folder's files by their bytes; the port's side in
+`tests/fs_surfio/wvl.rs`), seeds 7 (300 cases), 13 and 17 (1,000 each): 0 different with `reproduce`,
+`fix` different only with notices (FS-633, FS-01); one seed-17 case of FS-634 (a vertex listing more
+faces than the surface has: FreeSurfer reads its face-normal cache past the faces and crashed) counted,
+not compared (`check.py`'s `SKIP`).
+
+`lc.py <object.o> .LC<n> ...` (relay 37 of track D) prints an object file's local constants as
+`float` and `double` (the values the disassembly's `.LC` loads name: findings §30's FZERO bound, the
+distributions' limits, Ashburner's `SMALL`).

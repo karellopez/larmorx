@@ -28,7 +28,14 @@ the pial and white coordinates and the pial positions (``MRISreadVertexPositions
 (relay 36 of track D): each head's recorded annotations (``ANNOTS``) read into its white surface
 (``MRISreadAnnotation``), written as an annotation file, a segmentation and GIFTI
 (``MRISwriteAnnotation``), the annotation file compared with the recorded one byte for byte, each
-read back. Prints the counts;
+read back. With ``--mpx`` (relay 37 of track D): each head's white surface with its sphere's
+canonical coordinates: the principal-curvature and normal-dot distributions
+(``mrisComputePrincipalCurvatureDistributions``, ``mrisComputeNormalDotDistribution``, 100 bins, a
+100 x 100 volume), Ashburner's sampled energy at 64 vertices of the sphere
+(``mrisSampleAshburnerTriangleEnergy``) and the white surface moved to Talairach space in place
+(``MRIStalairachTransform``). With ``--lbl`` (relay 37 of track D): each head's recorded labels
+(``LABELS``) on its white surface: ``LabelArea``, ``LabelMarkSurface``, ``LabelErode`` and
+``LabelDilate`` by 2, ``MRISlabel2Mask``, ``MRISlabelInvert``. Prints the counts;
 the lines name machine paths, so no hash is recorded from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]
@@ -70,6 +77,8 @@ CURVS = (
 VALS = ("thickness", "curv", "sulc", "area", "w-g.pct.mgh")
 # relay 36 of track D: the annotations recon-all writes (mris_ca_label) and reads
 ANNOTS = ("aparc.annot", "aparc.a2009s.annot", "aparc.DKTatlas.annot", "BA_exvivo.annot")
+# relay 37 of track D: the labels recon-all writes (mri_label2label's) and its cortex label
+LABELS = ("cortex.label", "BA1_exvivo.label", "BA44_exvivo.thresh.label", "MT_exvivo.label")
 
 
 def dx(v: float) -> str:
@@ -99,6 +108,18 @@ def main(argv: list[str] | None = None) -> int:
         "surface: sphere, smoothwm, pial, white",
     )
     ap.add_argument(
+        "--lbl",
+        action="store_true",
+        help="relay 37 of track D: label.cpp's surface-label functions (flr lbl) on each head's "
+        "recorded labels and white surface",
+    )
+    ap.add_argument(
+        "--mpx",
+        action="store_true",
+        help="relay 37 of track D: group (e) (flr mpx) on each head's white surface and sphere: "
+        "the two distributions, Ashburner's sampled energy, the move to Talairach space",
+    )
+    ap.add_argument(
         "--ann",
         action="store_true",
         help="relay 36 of track D: the annotation files (flr ann): each head's recorded "
@@ -115,6 +136,16 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.lbl:
+                for c in LABELS:
+                    lines.append(
+                        f"flr lbl {s / 'surf' / f'{hemi}.white'} {s / 'label' / f'{hemi}.{c}'}"
+                    )
+                continue
+            if a.mpx:
+                sd = s / "surf"
+                lines.append(f"flr mpx {sd / f'{hemi}.white'} {sd / f'{hemi}.sphere'}")
+                continue
             if a.ann:
                 for c in ANNOTS:
                     lines.append(
@@ -149,7 +180,21 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"flr bbf {s / 'surf' / f'{hemi}.white'} {dx(0.5)}")
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
-    kind = "ann" if a.ann else "vps" if a.vps else "pvw" if a.pvw else "curv" if a.curv else "flood"
+    kind = (
+        "lbl"
+        if a.lbl
+        else "mpx"
+        if a.mpx
+        else "ann"
+        if a.ann
+        else "vps"
+        if a.vps
+        else "pvw"
+        if a.pvw
+        else "curv"
+        if a.curv
+        else "flood"
+    )
     cases_path = inputs / f"real-{kind}-cases.txt"
     cases_path.write_text("".join(x + "\n" for x in lines), encoding="utf-8")
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}

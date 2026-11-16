@@ -72,7 +72,8 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # its end, FS-622; a volume whose voxel count overflows an int, FS-623; a volume format the port
 # does not read yet (DICOM), NP, the runner's mark for its placeholder message; a binary colour
 # table's entry count beyond the machine's memory, FS-191, whose outcome depends on the machine; a
-# caller's colour table FreeSurfer has freed used again, FS-625u, the runner's mark):
+# caller's colour table FreeSurfer has freed used again, FS-625u, the runner's mark; relay 37 of
+# track D, the area error's face-normal cache read past the surface's faces, FS-634):
 # counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
@@ -125,6 +126,7 @@ SKIP: tuple[str, ...] = (
     "NP",
     "FS-191",
     "FS-625u",
+    "FS-634",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port
@@ -146,9 +148,12 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     FreeSurfer's binary takes glibc's: a `surf` rotation (`Z`: `sinf`, `cosf`), a `posn`
     canonical-coordinates step (`cc`, or `sv 3`: `atan2f`), an `mpd` case (the discrete
     curvatures' and the pseudo-normal's `acosf`), a `vps` case that reads canonical coordinates
-    (`C`: `atan2f`; relay 36 of track D)."""
+    (`C`: `atan2f`; relay 36 of track D), an `mpx` case with Ashburner's energy (`ash`: `logf`,
+    `log`; relay 37 of track D)."""
     if cmd == "surf":
         return "Z" in toks
+    if cmd == "mpx":
+        return "ash" in toks
     if cmd == "vps":
         return "C" in toks
     if cmd == "posn":

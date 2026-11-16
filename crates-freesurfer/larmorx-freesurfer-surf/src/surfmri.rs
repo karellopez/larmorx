@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! A vertex field from a volume of one voxel per vertex: `MRIScopyMRI` (`utils/mrisurf_mri.cpp`
-//! 4898; wave 3.4's fs.surf piece taken early in relay 36 of track D, for `MRISread`'s
-//! group-average area).
+//! A vertex field from a volume of one voxel per vertex and back: `MRIScopyMRI`
+//! (`utils/mrisurf_mri.cpp` 4898; wave 3.4's fs.surf piece taken early in relay 36 of track D, for
+//! `MRISread`'s group-average area) and `MRIcopyMRIS` (5084; relay 37, for `MRISwriteValues`'
+//! volume formats).
 
 use larmorx_freesurfer_core::cstd::double_to_int_x86;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
-use larmorx_freesurfer_mri::mri::Mri;
-use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
+use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc_sequence};
+use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
 use crate::coords::Io;
 use crate::mris::{Mris, Vertex};
@@ -123,4 +125,127 @@ pub fn copy_mri(
         }
     }
     Ok(0)
+}
+
+/// The field `name` of a vertex as `MRIcopyMRIS`'s `strcmp` chain reads it (an integer field
+/// converted to `float` as C converts it, to nearest); `None` for a name it does not know.
+fn get_field(v: &Vertex, vnum: i16, name: &[u8]) -> Option<f32> {
+    Some(match name {
+        b"val" => v.val,
+        b"curv" => v.curv,
+        b"border" => f32::from(v.border),
+        b"marked" => f32::from(v.marked),
+        b"marked2" => f32::from(v.marked2),
+        b"stat" => v.stat,
+        b"d" => v.d,
+        b"valbak" => v.valbak,
+        b"val2" => v.val2,
+        b"val2bak" => v.val2bak,
+        b"imag_val" => v.imag_val,
+        b"curvbak" => v.curvbak,
+        b"fsmask" => v.fsmask,
+        b"fieldsign" => v.fieldsign,
+        b"nc" => v.nc,
+        b"undefval" => v.undefval as f32,
+        b"marked3" => f32::from(v.marked3),
+        b"x" => v.x,
+        b"y" => v.y,
+        b"z" => v.z,
+        b"vnum" => f32::from(vnum),
+        b"ripflag" => f32::from(v.ripflag),
+        b"annotation" => v.annotation as f32,
+        b"area" => v.area,
+        b"group_avg_area" => v.group_avg_area,
+        b"K" => v.K,
+        b"H" => v.H,
+        b"k1" => v.k1,
+        b"k2" => v.k2,
+        b"nx" => v.nx,
+        b"ny" => v.ny,
+        b"nz" => v.nz,
+        b"tx" => v.tx,
+        b"ty" => v.ty,
+        b"tz" => v.tz,
+        b"tdx" => v.tdx,
+        b"tdy" => v.tdy,
+        b"tdz" => v.tdz,
+        b"dx" => v.dx,
+        b"dy" => v.dy,
+        b"dz" => v.dz,
+        b"mean" => v.mean,
+        _ => return None,
+    })
+}
+
+/// `MRIcopyMRIS(mri, surf, frame, field)`: the vertices' `field` in turn (`val`, `curv`, `border`,
+/// the marks, `stat`, `d`, the value backups, `imag_val`, `curvbak`, `fsmask`, `fieldsign`, `nc`,
+/// `undefval`, `x`, `y`, `z`, the neighbour count `vnum`, `ripflag`, `annotation`, the areas, `K`,
+/// `H`, `k1`, `k2`, the normals, the temporary positions and moves, the moves, `mean`; integer
+/// fields converted to `float`) into frame `frame` of the volume's voxels in slice, row, column
+/// order (`MRIsetVoxVal`), into a new float volume of one voxel per vertex and `frame + 1` frames
+/// when there is none. `Null` after `ERROR: MRIcopyMRIS: Surf/Src dimension mismatch.` when the
+/// voxel count (width x height x depth, an `int` product) is not the vertex count, after `ERROR:
+/// MRIScopyMRI: requested frame number is too large.` and `ERROR:   requested = <f>, max = <n>`
+/// (FreeSurfer's own wording) for a frame not below the frame count, or after `ERROR:
+/// MRIcopyMRIS(): field <name> not supported` at the first voxel for a field it does not know (all
+/// on standard output; a given volume keeps the voxels set before).
+pub fn copy_mris(
+    g: &mut Globals,
+    io: &mut Io,
+    mri: Option<&mut Mri>,
+    surf: &Mris,
+    frame: i32,
+    field: &str,
+) -> Result<Ret<Mri>, Fatal> {
+    let mut fresh = None;
+    let m: &mut Mri = match mri {
+        Some(m) => m,
+        None => fresh.insert(mri_alloc_sequence(
+            g,
+            io.out,
+            io.err,
+            surf.nvertices,
+            1,
+            1,
+            MRI_FLOAT,
+            frame.wrapping_add(1),
+        )?),
+    };
+    let nvox = m.width.wrapping_mul(m.height).wrapping_mul(m.depth);
+    if surf.nvertices != nvox {
+        let _ = writeln!(io.out, "ERROR: MRIcopyMRIS: Surf/Src dimension mismatch.");
+        return Ok(Ret::Null);
+    }
+    if frame >= m.nframes {
+        let _ = writeln!(
+            io.out,
+            "ERROR: MRIScopyMRI: requested frame number is too large."
+        );
+        let _ = writeln!(io.out, "ERROR:   requested = {frame}, max = {}", m.nframes);
+        return Ok(Ret::Null);
+    }
+    let name = field.as_bytes();
+    let name = &name[..name.iter().position(|&c| c == 0).unwrap_or(name.len())];
+    let mut vtx = 0usize;
+    let (w, h, d) = (m.width, m.height, m.depth);
+    for s in 0..d {
+        for r in 0..h {
+            for c in 0..w {
+                let Some(val) = get_field(surf.vertex(vtx), surf.topology(vtx).vnum, name) else {
+                    let _ = writeln!(
+                        io.out,
+                        "ERROR: MRIcopyMRIS(): field {} not supported",
+                        String::from_utf8_lossy(name)
+                    );
+                    return Ok(Ret::Null);
+                };
+                mri_set_vox_val(g, io.err, m, c, r, s, frame, val, 0)?;
+                vtx += 1;
+            }
+        }
+    }
+    Ok(match fresh {
+        Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
 }

@@ -1811,6 +1811,24 @@ defects! {
         "reading a surface segmentation (an MGH or NIfTI file of one value per vertex) as an annotation (MRISreadAnnotation) maps its numbers through the first colour table the program used for that, not through the file's own, when an earlier one was used (a second segmentation with another colour table gets the first table's colours)";
     FS_625 = "FS-625", "FreeSurfer", true,
         "reading a surface segmentation as an annotation (MRISreadAnnotation of an MGH or NIfTI file) with a colour table given by the caller frees that table, so a later use of it (another read with it, or the surface's table when it came from it) reads freed memory: a crash or garbage";
+    FS_626 = "FS-626", "FreeSurfer", true,
+        "the normal-dot and principal-curvature distributions mris_fix_topology learns its retessellation from (mrisComputeNormalDotDistribution, mrisComputePrincipalCurvatureDistributions) accept histograms of too few bins: the normal-dot one divides its bin size by the bin count minus 2 (zero or negative below 3 bins; with one bin its largest dots are counted one past the last bin, outside its counts), a curvature histogram without bins counts every vertex one before its first bin (memory corrupted); every caller passes 100 bins";
+    FS_627 = "FS-627", "FreeSurfer", false,
+        "the normal-dot distribution of mris_fix_topology (mrisComputeNormalDotDistribution) takes each edge's dot product with the vertex normal as dx nx + dy ny dz nz, a product where the sum dx nx + dy ny + dz nz is meant, so the histogram is not that of the edges' normal components";
+    FS_628 = "FS-628", "FreeSurfer", true,
+        "the principal-curvature distribution of mris_fix_topology (mrisComputePrincipalCurvatureDistributions) floors and normalises the first 100 x 100 voxels of its k1-k2 volume whatever the volume's size: a larger volume keeps its other voxels as raw counts outside the normalisation, and a smaller one, or one not of floats, is read and written outside its voxels (every caller passes 100 x 100 floats)";
+    FS_629 = "FS-629", "FreeSurfer", true,
+        "moving a surface to Talairach space (MRIStalairachTransform) crashes the program for a surface that has a Talairach transform but no surface-RAS-to-Talairach matrix, and writes past the destination's vertices when the destination surface has fewer vertices than the source (every caller moves one surface in place)";
+    FS_630 = "FS-630", "FreeSurfer", true,
+        "the label functions on a surface (LabelMark, LabelMark2, LabelUnmark, LabelArea, LabelFillMarked, and through them LabelErode and LabelDilate) read or write outside the surface's vertices for a label point that names no vertex (-1, a volume label's points) or a vertex beyond the surface's, and outside the label's vertex index table when it is shorter than the surface";
+    FS_631 = "FS-631", "FreeSurfer", true,
+        "dilating a label on a surface (LabelDilate) writes its new points past the label's places when the label is full and its growth by half does not enlarge it: a label without places (half of nothing is nothing), which gains points when a ripped vertex keeps a mark (the marks' clearing skips ripped vertices), or a growth beyond the 2^26 places larmorx allocates (FS-426)";
+    FS_632 = "FS-632", "FreeSurfer", true,
+        "inverting a label on a surface (MRISlabelInvert, and LabelRemoveHolesSurf through it) crashes the program when the label has a point beyond the surface's vertices (its mask is refused and then read)";
+    FS_633 = "FS-633", "FreeSurfer", true,
+        "writing a surface's area error as a value file (MRISwriteAreaErrorToValFile) takes each vertex's original area from the surface's first faces (as many as the vertex has) instead of from the vertex's own faces, so the values written are not the vertices' area errors";
+    FS_634 = "FS-634", "FreeSurfer", true,
+        "writing a surface's area error as a value file (MRISwriteAreaErrorToValFile) reads the face-normal cache past the surface's faces for a vertex that lists more faces than the surface has (a face listed twice): a crash or another array's data";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

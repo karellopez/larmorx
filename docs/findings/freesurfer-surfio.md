@@ -1727,3 +1727,93 @@ mrisutils.cpp 1287 `MRISseg2annot`; annotation.cpp 914 `MRISannot2seg`) and `sur
   the probe's 5-second alarm inside the 16 GiB box; the port refuses the allocation (FS-03's
   assertion on the faces). The generator now writes that file without the line under that variable
   (`srd`'s cases keep the other form).
+
+## 30. The Talairach move, the vertex-to-voxel conversions, two distributions, Ashburner's energy (relay 37 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
+`crates-freesurfer/larmorx-freesurfer-surf/src/props11.rs` from `utils/mrisurf_metricProperties.cpp`:
+`MRIStalairachTransform` 607 (with the file's `SURFACE_DIMENSION_CALC_*` macros, 102-125),
+`MRISvertexToVoxel` 8478 and its six siblings to 8576, `mrisComputeNormalDotDistribution` 8617,
+`mrisComputePrincipalCurvatureDistributions` 8719, `get_face_axes` 8838, `ashburnerTriangleEnergy`
+8952 and `mrisSampleAshburnerTriangleEnergy` 9081 (the two file-local functions are inlined into the
+last; the probe calls it with a `calloc`ed `INTEGRATION_PARMS` whose `l_ashburner_lambda`, a `float` at
+offset 0x2c, is the only field read). Operand orders from the unit oracle's
+`mrisurf_metricProperties.cpp.o` (`<scratch>/D/relay37/mp.asm`, objdump of that object):
+
+- `MRIStalairachTransform`: the loop runs over `mris_src->nvertices` and reads and writes
+  `mris->vertices[vno]` (FS-629's smaller destination); `TransformWithMatrix(NULL, ...)` faults (no
+  check of `SRASToTalSRAS_`). The bounding box compares the transformed doubles with the box's floats
+  widened (`comisd`), the centre is `addss` + `mulss 0.5` (GCC folded `(float)((double)lo +
+  (double)hi)` into a float add, the same value); with no vertex the centres are stored as 0 directly.
+- `mrisComputeNormalDotDistribution`: `dot = dx * nx + dy * ny * dz * nz` (FS-627) compiles to
+  `((dy*ny)*dz)*nz + dx*nx` (`addss` with the product chain first); min and max are `minss`/`maxss`
+  with the dot as destination (the C comparisons' results, NaN never taken). `bin = MIN(nbins,
+  MAX(0, bin))` lets `bin == nbins` (FS-626); the counts' normalisation is vectorised (`cmpneqps`,
+  `divps`) with the same per-lane result; `h_dot->bins[0]` is read even for 0 bins.
+- `mrisComputePrincipalCurvatureDistributions`: the `for (x < 100) for (y < 100)` loops are
+  hard-coded (FS-628; `MRIFvox` through `slices[0][y]`), the clamps `MAX(-3, min)`, `MIN(3, max)`
+  as `cmpnless`/`comiss`; `MIN(nbins - 1, MAX(0, bin))` gives -1 for 0 bins (FS-626: `counts[-1]`, the
+  heap chunk's size field). FZERO is `fabs(f) < FLT_EPSILON` (macros.h 80), not 1e-7.
+- `get_face_axes`: `SCALAR_MUL(e1, 1.0 / norm, e1)` expands (tritri.h 64, unparenthesised) to
+  `e1[k] * 1.0 / norm`, a division; `SCALAR_MUL(tmp, dot, e1)`'s z product is compiled `dot * e1z`.
+- `ashburnerTriangleEnergy`: the tangent-plane rows' orders as spec §126.5 states them (read
+  instruction by instruction from `mrisSampleAshburnerTriangleEnergy`'s body, 0x350-0x66d); the
+  thread's static matrices are fully rewritten each call (`m_evectors` reused only as
+  `MatrixEigenSystem`'s output), so a call depends on nothing before it; `log(SMALL) *
+  log(SMALL)` calls glibc's `log` twice (no folding under `-fno-builtin`); `log(s11)` of a `float`
+  is `logf`; `(1 + det)` is computed `det + 1.0f`, `lambda * (1 + det) * (s11 + s22)` as `(s22 + s11)
+  * ((det + 1) * lambda)`, and `sse_total += sse` as `sse + sse_total`.
+- The recorded heads (real.py --mpx): FreeSurfer 10.3 s, the port 15.3 s for the six hemispheres.
+
+## 31. A label's vertices on a surface: label.cpp's surface-label functions (relay 37 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). Ported into
+`crates-freesurfer/larmorx-freesurfer-surf/src/labelsurf.rs` from `utils/label.cpp` (`LabelArea`
+1373, `LabelMark` 1480, `LabelMark2` 1498, `LabelUnmark` 1604, `LabelMarkSurface` 1781,
+`LabelFillMarked` 943, `update_vertex_indices` 3938 (file-local), `LabelErode` 2195, `LabelDilate`
+2259, `MRISlabelInvert` 2850) and `utils/mrisurf_mri.cpp` 5955 (`MRISlabel2Mask`, default arguments
+`frame = 0`, `statflag = 0` in mrisurf.h). `LabelRemoveHolesSurf` 4138 and `LabelRemoveIslandsSurf`
+4167 wait for surfcluster.cpp's `sclustMapSurfClusters` (with `SurfClusterSummary`,
+`SortSurfClusterSum`, `sclustReMap`, `sclustGrowSurfCluster`'s recursion) and `DumpSurfClusterSum`.
+
+- **FS-630:** `LabelMark`/`LabelMark2` test `vno < 0 || vno >= nvertices` only for `DiagBreak()` and
+  then write `mris->vertices[vno].marked`; `LabelUnmark` skips only `vno < 0`; `LabelArea` reads
+  `v->ripflag` before testing `lv->deleted`; `LabelFillMarked` indexes `vertices_topology[lv->vno]`
+  unchecked; `update_vertex_indices` writes `vertex_label_ind[lv->vno]` unchecked over
+  `mris->nvertices` entries of a table `LabelCopy` allocates with the source's `max_points`.
+- **FS-631:** `LabelRealloc(area, nint(area->max_points * 1.5))` returns unchanged for `max_points`
+  0 (`if (max_points <= lb->max_points) return`), then `lv[n_points++]` is written past the
+  `calloc(0)`; reachable because `MRISclearMarks` (`MRISsetMarks`, mrisurf_vals.cpp 116) skips
+  ripped vertices, so a ripped vertex's mark makes its neighbours dilate into an empty label (found by
+  `lbl` seed 7 when the probe compared such a case: FreeSurfer's label ended with 15 points and 0
+  places, the port's with 16 and 18: the heap writes changed what followed).
+- **FS-632:** `MRISlabelInvert` calls `MRIgetVoxVal(tmpmri, ...)` on the NULL mask.
+- `LabelDilate` uses `area->mris` (cast) for `MRISsurfaceRASToVoxel` and `update_vertex_indices`
+  uses `area->mris->nvertices`, not the `mris` argument: the port takes them to be the same (every
+  caller's labels get the handle from `LabelInit(area, tpl, mris, ...)` or `LabelFillUnassignedVertices`
+  with the same surface).
+- `LabelArea`'s sum compiles to `addsd` with the running total first (label.cpp.o).
+- The recorded heads (real.py --lbl, 24 labels): FreeSurfer 11.1 s, the port 18.7 s.
+
+## 32. The values written: MRIcopyMRIS, MRISwriteValues, MRISwriteAreaErrorToValFile (relay 37 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `MRIcopyMRIS` (`utils/mrisurf_mri.cpp`
+5084) into `surfmri.rs` beside `MRIScopyMRI`; `MRISwriteValues` (`utils/mrisurf_io.cpp` 721; its
+w-file branch compiled as `MRISwriteValues [clone .part.10]`) and `MRISwriteAreaErrorToValFile`
+(586) into `valfile.rs` (sfile.rs's note that they waited for fs.io's `mri_identify` is resolved).
+
+- `MRIcopyMRIS`: its frame message says `MRIScopyMRI` (copied text); the `strcmp` chain lists
+  `marked`, `marked2`, `marked3` and `d` twice (the first match wins, the same field).
+- `MRISwriteValues`: `strcpy(fname, sname)` and `strcat(fname, ".w")` are fortified
+  (`__strcpy_chk`, `__strcat_chk` with 1,024): FS-126's abort. `sum2 += f * f` compiles to `mulss`
+  then `addsd` with the square as the destination (the square's NaN kept); `sum += f` keeps the sum
+  first; `max`/`min` are `maxsd`/`minsd` with the value as the destination (the C comparisons'
+  results). The volume branch leaks its volume; `MRIwrite(TempMRI, sname)` takes the default
+  vector (NULL) and intent (-1).
+- **FS-633:** `getFaceNorm(mris, fno)` inside `for (fno = 0; fno < vt->num; fno++)` takes the loop's
+  counter where `vt->f[fno]` (used for `face->area` on the line before) is meant. Its only caller
+  (mrisurf_integrate.cpp, under `Gdiag & DIAG_WRITE`) writes diagnostic files.
+- **FS-634:** `getFaceNorm(mris, fno)` for `fno` up to `vt->num - 1` reads past the cache when a
+  vertex lists more faces than the surface has (srd's random meshes list a face twice for a vertex
+  whose face repeats it): the official probe crashed (signal 11) on seed 17's case 766; the port's
+  first version indexed past its cache too (found by `wvl`, fixed before the commit).

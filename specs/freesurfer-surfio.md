@@ -4473,3 +4473,270 @@ identical with `reproduce`; `aparc`, `aparc.a2009s`, `aparc.DKTatlas` and `BA_ex
 as an annotation file, a segmentation and GIFTI and read back: 24 of 24 identical in both modes
 (observed). A clean-room implementer's black-box form: recon-all's `label/?h.aparc.annot` written
 back by 124.11 is the recorded file byte for byte when read by 124.8 first.
+
+## 126. The Talairach move, the vertex-to-voxel conversions, two distributions and Ashburner's energy (queue items 3.1-49/50; relay 37 of track D)
+
+**126.1 The move to Talairach space** (`MRIStalairachTransform(src, dst)`). Without a destination,
+the destination is a copy of the source (§105.9's copy). A source without a Talairach transform
+(`lta`): the destination is returned unchanged. Otherwise the destination's distances are freed
+(§15), then for each of the source's vertex numbers `vno` below the
+source's vertex count, the destination's vertex `vno` is moved through the source's
+surface-RAS-to-Talairach matrix (`freesurfer-volume.md` §46's point through a 4 x 4 `float` matrix: the
+coordinates as `float`, the result stored as `float`); the bounding box of the moved positions starts from 10000 and
+-10000 and takes each new coordinate above its high or below its low end (NaN never), every vertex
+counted, ripped ones too; the box and its centre (`0.5 (lo + hi)` in `float`) are stored. With no
+vertex the box is (10000, -10000) on each axis and the centre 0. The destination is returned.
+FS-629 (rule A for the crash): a source with a transform, vertices and no matrix: FreeSurfer
+crashes; the port gives the error `MRIStalairachTransform: the surface has a Talairach transform but
+no matrix from surface RAS to Talairach space` and no surface (status `ERROR_BADPARM` for the
+in-place form), `reproduce` the crash (exit status 139). A destination with fewer vertices than the
+source: FreeSurfer writes past it; the error `MRIStalairachTransform: the destination has <n>
+vertices, the source <m>` and no surface in both modes. Every FreeSurfer caller moves one surface in
+place.
+
+**126.2 Vertex to voxel.** Each converts one vertex's coordinates (`float`, widened to `double`) to
+the volume's voxel coordinates through §118's cached map (`MRISsurfaceRASToVoxelCached`, FS-604),
+except the second: `MRISvertexToVoxel` (the current position), `MRISvertexToVoxelNotCached` (the
+current position through §118's uncached conversion), `MRISorigVertexToVoxel` (the original
+position), `MRISwhiteVertexToVoxel` (the white position), `MRISvertexCoordToVoxel(.., which)` (the
+coordinate set `which` as §3's selector gives it, widened: an unsupported set ends the
+program), `MRISvertexNormalToVoxel` (the voxel of `position + normal`, each sum in `float`, minus the
+voxel of the position, in `double`), `MRISvertexNormalToVoxelScaled` (that difference divided by its
+length `sqrt((nx² + ny²) + nz²)`; a length below `FLT_EPSILON` returns `ERROR_BADPARM` and leaves
+the outputs unwritten). Each returns `NO_ERROR` otherwise.
+
+**126.3 The normal-dot distribution** (`mrisComputeNormalDotDistribution(mris, h)`). The current
+positions are saved into the temporary set (§25), the original ones restored and the metric
+properties computed (§38). For each vertex whose rip flag is 0 and each of its `vnum` neighbours: the
+offset `d = neighbour - vertex` (`float`) and the dot `(dy ny) dz nz + dx nx` (FS-627: a product
+where the sum of the three terms is meant; kept, rule D: to be measured at `mris_fix_topology`'s
+port; the order of the operations as written decides a NaN); the smallest and largest dot from
+100000 and -100000 (NaN never). The histogram's bin size is `(max - min) / (nbins - 2)` (`float`),
+its bins `min - bin_size`, then each the previous plus the bin size. Each dot is then counted
+(`+= 1`) in bin `(dot - bins[0]) / bin_size`, truncated toward 0 (a NaN or a value beyond the `int`
+range gives -2147483648), negative ones in bin 0, those at `nbins` or beyond in bin `nbins` (FS-626
+below). Then each count in use that is 0 becomes 0.01 and every count is divided by the number of
+offsets counted (`float`; 0 offsets give infinities and NaNs); the histogram is then smoothed into
+itself from a copy (`freesurfer-maths.md` §5's `HISTOsmooth`, sigma 2, the copy's bin size set to the histogram's). With
+`Gdiag`'s write and verbose bits the smoothed and the copy are plotted to `ndot.plt` and `rdot.plt`
+(`freesurfer-maths.md` §5's plot). The current positions are restored from the temporary set and the metric
+properties computed again; `NO_ERROR`. FS-626 (rule B): with fewer than 3 bins the bin size divides
+by 0 or a negative count, and with one bin the largest dots are counted one past the last bin,
+outside the counts: by default the error `mrisComputeNormalDotDistribution: a histogram of <n> bins
+(3 or more are needed)`, `ERROR_BADPARM` and nothing changed; `reproduce` computes as FreeSurfer
+does (a count past the histogram's allocation is lost). With 3 bins or more a dot at bin `nbins`
+(possible only through rounding) goes to the last bin by default, past it with `reproduce`.
+
+**126.4 The principal-curvature distributions** (`mrisComputePrincipalCurvatureDistributions(mris,
+h_k1, h_k2, mri)`). The second fundamental form is computed (§103). Over the vertices whose rip flag
+is 0: the smallest and largest `k1` and `k2` (from 100000 and -100000), each low end raised to -3
+and each high end lowered to 3 when beyond. Each histogram's bin size is its range over its bin
+count (`float`), its bins from the low end in steps of it; the volume's `xsize` and `ysize` become
+the ranges over its width and height, its `xstart` and `ystart` the low ends (the volume's other
+geometry untouched). Each such vertex is counted (`+= 1`) in its `k1` bin and its `k2` bin
+(`(k - low) / bin_size` truncated as in 126.3, kept within 0 and the last bin) and at voxel
+(`(k1 - xstart) / xsize`, `(k2 - ystart) / ysize`) of the volume's first slice and frame, each kept
+within the volume's columns and rows. The counts are then normalised as in 126.3 by the number of
+vertices counted. In the volume's first slice, every voxel whose magnitude is below `FLT_EPSILON`
+becomes 0.1; their sum (`float`, column by column, each column's rows in order) then divides each.
+With `Gdiag`'s write and verbose bits the histograms are plotted to `k1.plt` and `k2.plt` and the
+volume written to `mri_k1_k2.mgh`. `NO_ERROR`. FS-628: FreeSurfer floors and normalises the first
+100 x 100 voxels whatever the volume's size (every caller passes 100 x 100 floats): a volume narrower
+or lower than 100, or not of floats, is refused in both modes (`mrisComputePrincipalCurvatureDistributions:
+the k1-k2 volume must hold floats and be 100 x 100 or larger (<w> x <h>, type <t>)`, `ERROR_BADPARM`,
+nothing changed); a larger one is floored and normalised over its whole first slice by default (rule
+A), over its 100 x 100 corner with `reproduce`. FS-626: a histogram without bins (FreeSurfer counts
+every vertex one before its first bin) is refused by default (`...: a histogram of 0 bins`,
+`ERROR_BADPARM`); `reproduce` computes, those counts lost.
+
+**126.5 Ashburner's triangle energy** (`mrisSampleAshburnerTriangleEnergy(mris, vno, parms, cx, cy,
+cz)`, of the integration parameters only `l_ashburner_lambda`, a `float`). The point is projected
+onto the sphere of the surface's radius (§6's projection, the radius as `float`),
+the vertex moved there; for each of its `num` faces the energy below, summed in `double` (each new
+energy plus the sum so far); the vertex's position restored (its bits); the sum over the face count,
+as `float` (no face: the NaN of 0 / 0). A face's energy: its tangent axes from the current positions
+in `double`: `e1` the first edge (vertex 1 minus vertex 0) over its length, `e2` the second edge
+(vertex 2 minus vertex 0) over its length with its component along `e1` removed (`e2 - e1 (e1 . e2)`,
+the z product taken as `dot e1z`) and over its new length; any of the three lengths below
+`FLT_EPSILON` gives the first vertex's own tangent axes (`e1x` .. `e2z`, their bits) instead; the axes
+as `float`. Each vertex's canonical position and current position in that plane (`float`):
+`x1 = (cy e1y + cx e1x) + cz e1z`, `x2 = (cx e2x + cy e2y) + cz e2z` for the canonical rows,
+`y1 = (y e1y + x e1x) + z e1z`, `y2 = (x e2x + y e2y) + z e2z` for the current rows, except that the
+third vertex's current rows are `e1z z + (e1y y + e1x x)` and `e2z z + (e2y y + x e2x)` (the operand
+orders decide which NaN is kept). The canonical rows with a row of ones make the 3 x 3 matrix X, the
+current ones Y; `X` inverted (`freesurfer-maths.md` §8.8's `MatrixInverse`; it fails: the energy is `log(1e-8)²`, glibc's
+`log` with `reproduce`), `Y X⁻¹` (§8.1's product), its upper-left 2 x 2 block `J`, its determinant
+(§8.8, `float`); negative: `log(1e-8)²`; `J`'s eigenvalues (`freesurfer-maths.md` §17's `MatrixEigenSystem`; a matrix the
+eigensystem never returns on: `log(1e-8)²`); either not finite: `log(1e-8)²`; else each eigenvalue
+`s` at most 0 becomes 1e-8 (`float`), then `logf(s)²` (`float`; glibc's `logf` with `reproduce`,
+correctly rounded by default), and the energy is `((s22 + s11) ((det + 1) lambda)) / 2` in `double`
+(each `float` factor widened).
+
+## 127. Validation plan, part 27
+
+The probe's command of relay 37, `mpx` (an empty work folder; `SURFER_SIDEDOOR`): a mesh (§85's
+probe's shapes: subdivided icosahedra, open grids, small random meshes) read by `MRISread`, 0 to 3
+vertices ripped, the radius (the icosahedron's, others, NaN, 0 or infinity in heavy cases), the
+canonical positions zero or the positions scaled (now and then disturbed, now and then special
+floats), 0 to 4 per-vertex overrides of the current, original and white positions, the normals and
+the tangent axes (signalling and quiet NaNs in heavy cases), `Gdiag`'s write and verbose bits one
+case in six (set after the read), the surface's volume geometry as read or the case's, one volume
+(bytes or floats, 2 to 6 voxels a side, §119's probe's geometries), a Talairach transform and its 4 x
+4 matrix or not; then 1 to 4 of: 126.1 in place or into a copy, one of 126.2's seven conversions
+(an unsupported coordinate set now and then), 126.3 with 100 bins mostly (0, 1, 2, 3, 10, 50 now and
+then), 126.4 with 100 bins mostly (1, 7, 50 now and then) and a 100 x 100 float volume mostly (120 x
+100, 100 x 130 x 2, 101 x 103; 50 x 100 floats and 100 x 100 bytes written `G` on both sides: memory
+FreeSurfer does not own), 126.5 at a vertex with a point near it and lambda 1, 0.5, 2, 0 or a special
+float; each result printed in full (126.4's volume by its voxels' FNV-1a), and with `Gdiag`'s bits the
+folder's files by name, length and FNV-1a. Compared with the official build with `reproduce`:
+identical; the default identical but where a noted correction changed the result or the default's
+correctly rounded `logf` and `log` moved an energy's last bits. Observed (relay 37): seeds 7 (300
+cases), 13 and 17 (1,000 each): 0 different in both modes; on recorded heads (the probe's `flr mpx`;
+three heads, both hemispheres: 126.4 and 126.3 on the white surface with the sphere's canonical
+coordinates, 126.5 at 64 vertices of the sphere with the point 0.5 mm along x, 126.1 in place with
+the head's `talairach.xfm`): 6 of 6 identical with `reproduce`; the default differs only in the
+energies' last bits (`logf`). A clean-room implementer's black-box form: a binary built on FreeSurfer
+8.2.0's `libutils` that calls these functions by name on the recorded heads' `surf/?h.white` and
+`surf/?h.sphere`.
+
+## 128. A label's vertices on a surface (fs.surf's piece of `label.cpp`, taken early; relay 37 of track D)
+
+The label (`freesurfer-io.md` §76-78: places `max_points`, points `n_points`, each point a vertex
+number, a position, `deleted`, `stat`, voxel coordinates; a vertex index table and a surface and
+template handle, or none) and a surface. FS-630 (class a): every function here that reads or
+writes a point's vertex skips a point naming no vertex of the surface (-1, as a volume label's
+points, or a number beyond the surface's), with a notice, in both modes; FreeSurfer reads or writes
+outside the surface's vertices there. Where FreeSurfer itself checks, its message is kept (below).
+A label's surface handle is taken to be the surface given, as every FreeSurfer caller sets it.
+
+**128.1 Marks and area.** `LabelMark(label, surf)`: each point not deleted sets its vertex's
+`marked` to 1 (ripped vertices too). `LabelMark2`: likewise `marked2`. `LabelUnmark`: each point's
+vertex (deleted points too; a negative vertex skipped) gets `marked` 0. `LabelMarkSurface`: each
+point not deleted whose vertex is not negative: a vertex beyond the surface's stops with `ERROR:
+LabelMarkSurface: label point <v> exceeds nvertices <n>` (standard output) and 1, the points before
+it marked; else its vertex marked 1 unless ripped. Each returns `NO_ERROR` (0) otherwise.
+`LabelArea(label, surf)`: the sum in `double` (each vertex's `float` area added in the points'
+order) over the points not deleted whose vertex is not ripped.
+
+**128.2 Filling the marked** (`LabelFillMarked(label, surf)`). Passes until one adds nothing or the
+label is full; each pass goes through the points present before it, while the points and those
+added in the pass are fewer than the places: the point's vertex gets mark 2; when that vertex is not
+ripped, each of its `vnum` neighbours in order that is not ripped and has mark 1 gets mark 2 and is
+added at the label's end (its vertex number and current position; the place's other fields as they
+were), the pass stopping as soon as the label is full. `NO_ERROR`.
+
+**128.3 Erosion and dilation.** `LabelErode(label, surf, n)` and `LabelDilate(label, surf, n,
+coords)`: `n` below 1 gives `LabelErode: num_times < 1` (`LabelDilate: ...`) as an error and
+`ERROR_BADPARM`. The surface's marks are cleared first (§99.2: ripped vertices keep theirs). Each of
+`n` passes marks the label (128.1), then:
+- erosion: every point not deleted whose vertex is not negative is deleted (`deleted` 1) when one of
+  its `vnum` neighbours (not negative) has mark 0; a vertex or neighbour beyond the surface's ends
+  the program (`LabelErode: label vertex <v> too big for surface (<n>)`, `LabelErode: neighbor label
+  vertex <v> too big for surface (<n>)`, `ERROR_BADPARM`);
+- dilation: every vertex in order whose mark is not 1 and one of whose `vnum` neighbours has a mark
+  above 0 (ripped vertices included) is added at the label's end: a full label first grown to
+  `nint(1.5 x places)` places (`freesurfer-io.md` §78's `LabelRealloc`: the new places zeroed); the
+  point's vertex number, its coordinates of the set `coords` (§3; an unsupported set ends the
+  program, after the point was counted); its place written at its vertex in the index table when
+  there is one; with surface and template handles, its voxel in the template (§118's uncached
+  conversion of the position, each coordinate `nint`ed);
+then the label is unmarked (128.1). After the passes the index table is rebuilt when the label has
+one and a surface handle (each entry for the surface's vertices -1, then each point not deleted
+writes its place at its vertex; entries outside the table skipped with FS-630), and erosion clears
+the surface's marks again. `NO_ERROR`. FS-631 (class a): a full label whose growth does not enlarge
+it (no places: `nint(0)` is 0; such a label gains points when a ripped vertex keeps a mark) gets its
+points written past its places by FreeSurfer; in both modes one more place is made, noted.
+
+**128.4 The mask and the inversion.** `MRISlabel2Mask(surf, label, mask, frame, statflag)`: without
+a mask, a new float volume of one voxel per vertex (width the vertex count, height and depth 1) and
+`frame + 1` frames of zeros (`freesurfer-volume.md` §38's `MRIconst`); a frame the mask lacks gives
+`ERROR: MRISlabel2Mask(): frame=<f> >= mask->nframes-1=<n-1>` (standard output) and no mask; each point
+in order: a vertex at or beyond the vertex count gives `ERROR: MRISlabel2Mask(): label vertex <v> is
+>= nvertices <n>` and no mask (a given mask keeps what was set before); else its voxel (the vertex,
+0, 0, `frame`) set to 1, or to its `stat` with `statflag` (the volume's own setter: a negative vertex
+goes where that setter puts it). `MRISlabelInvert(surf, label)`: the mask of the label (frame 0, no
+stat); a new label (`LabelAlloc` with the label's subject name: `SUBJECTS_DIR` must be set) of the
+vertices whose mask value is below 0.5, in order, each with its current position and `stat` 0, as
+many points as places. FS-632 (class a): when the mask is refused (a point beyond the surface)
+FreeSurfer crashes; the port gives no label by default, the crash (exit status 139) with `reproduce`.
+
+## 129. Validation plan, part 28
+
+The probe's command of relay 37, `lbl` (an empty work folder; `SURFER_SIDEDOOR`; `SUBJECTS_DIR` set
+five cases in six): §127's meshes read by `MRISread`, 0 to 3 vertices ripped, 0 to 4 vertices'
+`marked` (-1, 0, 1, 2) and `marked2` (0 to 2) set; a label of 0 to 12 places and as many points or
+fewer (vertices of the surface mostly, -1 or beyond it in heavy cases; positions, `stat`, one point in
+five deleted; coordinate kinds 1 to 3; the subject name `subj` one case in three), a vertex index
+table of one entry per vertex with the surface handle one case in three, a template volume (bytes,
+4 to 8 voxels a side, §119's geometries) one case in four; then 1 to 4 of 128.1-128.4's functions
+(erosion and dilation by 0 to 3, the dilation's coordinate set current, original, canonical, pial,
+an unsupported one; the mask with frames 0 to 2, `statflag` either, a given mask of 1 or 2 frames or
+none), after each the label's every place, the vertices' marks and the index table. An operation
+whose label has a point FreeSurfer would read or write outside the surface's vertices for (FS-630),
+or a dilation of a label without places (FS-631), is written `G` on both sides. Compared with the
+official build with `reproduce`: identical; the default identical but where a noted correction
+changed the result. Observed (relay 37): seeds 7 (300 cases), 13 and 17 (1,000 each): 0 different in
+both modes. On recorded heads (the probe's `flr lbl`; three heads, both hemispheres, `cortex.label`,
+`BA1_exvivo.label`, `BA44_exvivo.thresh.label`, `MT_exvivo.label` on `?h.white`: the area, the marks,
+erosion and dilation by 2, the mask, the inversion): 24 of 24 identical in both modes. A clean-room
+implementer's black-box form: `mri_label2label --label-dilate` and `--label-erode` of a recorded
+label onto its own subject's white surface.
+
+## 130. The values written: MRIcopyMRIS, MRISwriteValues, the area error (queue items 3.1-47/48; relay 37 of track D)
+
+**130.1 A vertex field into a volume** (`MRIcopyMRIS(mri, surf, frame, field)`). Without a volume:
+a new float volume of `vertices` x 1 x 1 and `frame + 1` frames. A volume whose width x height x
+depth (an `int` product) is not the vertex count: `ERROR: MRIcopyMRIS: Surf/Src dimension mismatch.`
+and no volume; a frame not below its frame count: `ERROR: MRIScopyMRI: requested frame number is too
+large.` and `ERROR:   requested = <f>, max = <n>` (FreeSurfer's wording, naming the other function)
+and no volume (all on standard output). Then, in slice, row, column order, each voxel of frame
+`frame` set (the volume's own setter) to the next vertex's `field`: `val`, `curv`, `border`,
+`marked`, `marked2`, `marked3`, `stat`, `d`, `valbak`, `val2`, `val2bak`, `imag_val`, `curvbak`,
+`fsmask`, `fieldsign`, `nc`, `undefval`, `x`, `y`, `z`, `vnum` (the neighbour count), `ripflag`,
+`annotation`, `area`, `group_avg_area`, `K`, `H`, `k1`, `k2`, `nx`, `ny`, `nz`, `tx`, `ty`, `tz`,
+`tdx`, `tdy`, `tdz`, `dx`, `dy`, `dz`, `mean` (integer fields converted to `float` to nearest); any
+other name gives `ERROR: MRIcopyMRIS(): field <name> not supported` at the first voxel and no volume
+(a given volume keeps what was set; a surface without vertices never checks the name). The volume
+is returned.
+
+**130.2 Writing the values** (`MRISwriteValues(mris, name)`). A name fs.io's format test knows as a
+volume (`freesurfer-io.md`'s `mri_identify`): 130.1 of `val` at frame 0 written by `MRIwrite` (with
+`Gdiag`'s show and verbose bits `Saving surf vals in 'volume' format to <name>` first), its status
+returned. Otherwise a w file: the name, with `.w` added unless its last dot is followed by `w`
+(FS-126: a name of 1,024 bytes or more, with `.w` added, ends FreeSurfer with a buffer-overflow abort;
+taken whole by default); with `Gdiag`'s show bit `writing surface values to <file>.`; a file that
+cannot be created ends the program (`Can't create file <file>` with its newline, `ERROR_NOFILE`);
+with show and verbose `num = <n>`. The file: 0 (2 bytes), the count of vertices whose value is not 0
+(a NaN counts; -0 does not) (3 bytes), then for each of them in order its number (3 bytes) and value
+(a big-endian `float`); a value that is not finite gives the error `MRISwriteValues(<file>): val at
+vertex <k> is not finite` and is written anyway. Then on standard output `avg = %2.3f, stdev =
+%2.3f, min = %2.3f, max = %2.3f`: the mean of the written values in `double` (each widened and added
+to the sum), the standard deviation `sqrt(sum2 / n - mean²)` with `sum2` the sum of the `float`
+squares (each square widened and the sum added to it: the order decides a NaN), 0 when that variance
+is not above 0; min and max from 1000 and -1000 (NaN never taken); with no value written `Warning:
+all vertex values are zero`. `NO_ERROR`.
+
+**130.3 The area error** (`MRISwriteAreaErrorToValFile(mris, name)`). Each vertex whose rip flag is
+0 gets `val = (sum of its faces' areas - sum of its faces' original areas) / (its face count)`
+(`float`, each sum in order; no face: NaN), the original areas from the face-normal cache (§26),
+then 130.2 (its status ignored); `NO_ERROR`. FS-633 (rule A): FreeSurfer sums the original areas of
+the surface's faces numbered 0 to `count - 1`, not of the vertex's own faces; the port takes the
+vertex's own faces by default, FreeSurfer's with `reproduce`, noted where they differ. FS-634
+(class a): a vertex listing more faces than the surface has (a face listed twice) makes FreeSurfer
+read the cache past the faces; the vertex's own face is taken there in both modes, noted (§131's
+probe counts such a case, not compared).
+
+## 131. Validation plan, part 29
+
+The probe's command of relay 37, `wvl` (an empty work folder with `d`; `SURFER_SIDEDOOR`): §127's
+meshes read by `MRISread`, 0 to 3 vertices ripped, `Gdiag`'s show and verbose bits one case in four,
+the values given (a third 0, special floats in heavy cases) or not; then 1 to 4 of 130.2 and 130.3 to
+the names `v.w`, `v`, `v.wq`, `d/v`, `d/v.w`, `v.mgh`, `v.nii`, `nodir/v`, `nodir/v.mgh` (a folder that
+does not exist), `MRISstoreMetricProperties` (the faces' original areas 130.3 reads), 130.1 of 19
+field names (one unknown) at frames 0 to 2 into a new volume or a given one (the vertex count, one
+more, or half of it in two rows; 1 or 2 frames); then the values and every file in the folder by
+its bytes. Compared with the official build with `reproduce`: identical; the default identical but
+where a noted correction changed the result. Observed (relay 37): seeds 7 (300 cases), 13 and 17
+(1,000 each): 0 different in both modes (one seed-17 case of FS-634 counted). A clean-room
+implementer's black-box form: `mris_calc`'s
+or `mri_surf2surf`'s value output (`--tfmt w`, `.mgh`) of a recorded `?h.thickness`.

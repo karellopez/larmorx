@@ -1189,7 +1189,7 @@ pub(super) fn swap_in_place(
             if item.tag == TAG_PIXEL_DATA && bits_allocated != 16 {
                 return;
             }
-            if d.len() % 2 != 0 {
+            if !d.len().is_multiple_of(2) {
                 // FS-953: CTN swaps on past the value until its 32-bit count wraps (a crash)
                 notices.add(
                     &defects::FS_953,

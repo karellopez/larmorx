@@ -469,7 +469,7 @@ fn digest_of_element_requests() {
                 el(&mut body, 0xfffe_e000, None, item.len() as u32, &item, big);
                 el(&mut ds, t, vr_opt, body.len() as u32, &body, big);
             } else if t == 0x0028_0100 {
-                let bits: u16 = if next() % 2 == 0 { 16 } else { 8 };
+                let bits: u16 = if next().is_multiple_of(2) { 16 } else { 8 };
                 let b = if big {
                     bits.to_be_bytes()
                 } else {

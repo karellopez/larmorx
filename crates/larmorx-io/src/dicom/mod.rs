@@ -46,9 +46,9 @@ pub mod cond;
 pub mod dict;
 mod dict_table;
 pub mod element;
-pub mod read;
 #[cfg(test)]
 mod element_tests;
+pub mod read;
 #[cfg(test)]
 mod tests;
 

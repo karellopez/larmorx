@@ -258,7 +258,7 @@ fn read_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
                     let mut f = Vec::new();
                     for i in 0..64 {
                         f = tiff_cases::make(seed, i);
-                        if f.len() <= 96 << 10 {
+                        if f.len() <= 96 << 10 && tiff_steady(&f) {
                             break;
                         }
                     }
@@ -282,6 +282,67 @@ fn read_case(g: &mut Gen, entries: &mut Vec<String>) -> (String, i64) {
         name
     };
     (name, ty)
+}
+
+/// Whether a generated TIFF file reads the same whatever the machine's memory: libtiff's reading
+/// of it (track C's transcript) the same with 768 MiB of allocations as with 16 GiB, and
+/// FreeSurfer's image of its pages and a tile buffer under 256 MiB (FreeSurfer's probe runs with
+/// 1 GiB of address space, the port as a 16 GiB machine).
+fn tiff_steady(f: &[u8]) -> bool {
+    use larmorx_io::tiff::{Options, Tiff, Value, tag};
+    let Ok(d) = tempfile::Builder::new().prefix("fs tiff ~").tempdir() else {
+        return false;
+    };
+    let path = d.path().join("t.tif");
+    if std::fs::write(&path, f).is_err() {
+        return false;
+    }
+    let p = path.to_string_lossy().into_owned();
+    let small = Options {
+        max_alloc: Some(768 << 20),
+        ..Options::default()
+    };
+    let big = Options {
+        max_alloc: Some(1 << 34),
+        ..Options::default()
+    };
+    tiff_cases::reset_thread_state();
+    let a = tiff_cases::port_read(&p, small);
+    tiff_cases::reset_thread_state();
+    let b = tiff_cases::port_read(&p, big);
+    tiff_cases::reset_thread_state();
+    if (a.0, a.1) != (b.0, b.1) {
+        return false;
+    }
+    let mut cap = larmorx_core::cfmt::Captured::default();
+    let mut bytes: u64 = 0;
+    if let Ok(Some(mut t)) = Tiff::open(&p, "r", big, &mut cap) {
+        for _ in 0..8 {
+            let mut get = |tg| match t.get_field_defaulted(tg, &mut cap) {
+                Some(Value::U32(x)) => u64::from(x),
+                Some(Value::U16(x)) => u64::from(x),
+                _ => 0,
+            };
+            let (w, h, spp) = (
+                get(tag::IMAGEWIDTH),
+                get(tag::IMAGELENGTH),
+                get(tag::SAMPLESPERPIXEL),
+            );
+            bytes = bytes.saturating_add(w.saturating_mul(h).saturating_mul(spp.max(3)) * 8);
+            let ts = t.tile_size() as i64;
+            if !(0..=1 << 28).contains(&ts) || bytes > 1 << 28 {
+                t.close(&mut cap);
+                tiff_cases::reset_thread_state();
+                return false;
+            }
+            if !t.read_directory(&mut cap).unwrap_or(false) {
+                break;
+            }
+        }
+        t.close(&mut cap);
+    }
+    tiff_cases::reset_thread_state();
+    true
 }
 
 /// A plain volume in `read_mri14`'s fields: the given shape and type, the voxels (`None`: zeros),
@@ -490,6 +551,9 @@ pub fn run(
     extra: &mut Vec<&'static str>,
 ) -> Result<(), u8> {
     g.progname = "fsio".into();
+    // libtiff's library-wide state as a new process has it (each of FreeSurfer's cases runs in
+    // a new child)
+    tiff_cases::reset_thread_state();
     let r = if tk[0] == "ixw" {
         let mut t: Vec<&str> = vec!["vwr"];
         t.extend_from_slice(&tk[1..]);
@@ -539,9 +603,38 @@ pub fn run(
             extra.push("VARY");
         }
         // relay 40: TIFF images: FreeSurfer's stack contents, writes and reads past its buffers,
-        // its crashes and hangs on tiles
-        if matches!(id, "FS-863" | "FS-865" | "FS-871" | "FS-873") {
+        // its crashes and hangs on tiles; ImageAllocBuffer's clearing past a buffer smaller than
+        // the frames (FS-405: the heap after it)
+        if matches!(id, "FS-863" | "FS-865" | "FS-871" | "FS-873" | "FS-405") {
             extra.push("SKIP");
+        }
+        // libtiff's defects whose original behaviour is memory contents, a crash or the stack
+        // (track C's fs-tiff probe compares them apart: its VARY list)
+        if matches!(
+            id,
+            "FS-815"
+                | "FS-816"
+                | "FS-818"
+                | "FS-819"
+                | "FS-820"
+                | "FS-821"
+                | "FS-822"
+                | "FS-823"
+                | "FS-824"
+                | "FS-825"
+                | "FS-826"
+                | "FS-828"
+                | "FS-830"
+                | "FS-831"
+                | "FS-832"
+                | "FS-833"
+                | "FS-834"
+                | "FS-835"
+                | "FS-838"
+                | "FS-840"
+                | "FS-884"
+        ) {
+            extra.push("VARY");
         }
         // the upper bytes of FreeSurfer's int (measured: see the findings, Part 35)
         if id == "FS-867" {

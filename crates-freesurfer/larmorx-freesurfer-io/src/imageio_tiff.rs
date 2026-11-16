@@ -766,6 +766,18 @@ fn read_image_directory(
     r
 }
 
+/// FS-865: a page of rows read into an image of no pixels (a width of 0): FreeSurfer gives
+/// libtiff null buffers (zlib refuses them: `zlib error: (null)` for Deflate pages); here the
+/// rows of 0 bytes are read into empty buffers.
+fn no_pixels(g: &mut Globals, im: &Image, height: i32, what: &str) {
+    if im.image.is_none() && height > 0 {
+        g.notices.add(
+            &FS_865,
+            format!("{what}: {height} rows read into an image of no pixels (FreeSurfer gives libtiff null buffers)"),
+        );
+    }
+}
+
 /// The pixel's bytes in FreeSurfer's pointer of a grey row (`IMAGEpix`, `IMAGESpix`,
 /// `IMAGEFpix`, `IMAGEDpix` by the bits).
 fn grey_bytes(bits: i16) -> i128 {
@@ -814,6 +826,7 @@ fn read_stripped(
     );
     let sl = tif.scanline_size();
     let scanlinesize = sl as u32;
+    no_pixels(g, im, height, "TiffReadStrippedImage");
     let ocols = i128::from(im.ocols);
     let base = i128::from(base);
     let what = "TiffReadStrippedImage";
@@ -1015,6 +1028,17 @@ fn read_tiled(
         // reproduce: the page is not read (FreeSurfer's outcome is a crash or a hang)
         return Ok(NO_ERROR);
     }
+    no_pixels(g, im, height, "TiffReadTiledImage");
+    let num_tile_x = width / tile_width + 1;
+    let tiles_x = (i64::from(width) + i64::from(tile_width) - 1) / i64::from(tile_width);
+    if i64::from(num_tile_x) != tiles_x || nsamples != 3 || bits != 8 || orientation != 1 {
+        g.notices.add(
+            &FS_870,
+            format!(
+                "TiffReadTiledImage: {width} pixels a row in tiles of {tile_width} counted as {num_tile_x} tiles (of {tiles_x}), {nsamples} samples of {bits} bits placed as 3-byte pixels, orientation {orientation} read as top-left"
+            ),
+        );
+    }
     if g.notices.fix() {
         return read_tiled_fixed(
             g,
@@ -1034,16 +1058,6 @@ fn read_tiled(
     let what = "TiffReadTiledImage";
     let mut tilebuf = vec![0u8; tilesize as usize];
     let mut ntiles_read: i32 = -1;
-    let num_tile_x = width / tile_width + 1;
-    let tiles_x = (i64::from(width) + i64::from(tile_width) - 1) / i64::from(tile_width);
-    if i64::from(num_tile_x) != tiles_x || nsamples != 3 || bits != 8 || orientation != 1 {
-        g.notices.add(
-            &FS_870,
-            format!(
-                "TiffReadTiledImage: {width} pixels a row in tiles of {tile_width} counted as {num_tile_x} tiles (of {tiles_x}), {nsamples} samples of {bits} bits placed as 3-byte pixels, orientation {orientation} read as top-left"
-            ),
-        );
-    }
     let bps = i64::from(i32::from(bits) / 8) as u64;
     let tile_bytes_per_row = (tile_width as i64 as u64)
         .wrapping_mul(i64::from(nsamples) as u64)

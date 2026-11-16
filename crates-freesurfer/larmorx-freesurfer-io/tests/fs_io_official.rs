@@ -25,11 +25,12 @@
 //! written, LabelRemoveOverlap), piece 31's two (GCA morphs read as volumes) and piece 32's three
 //! (GCA morphs written, read and written again, TRANSFORMs read, sampled, written, copied and
 //! applied),
-//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`, none since piece 23),
+//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: one since relay 40),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
 //! --light` on Linux x64 from the unit oracle's build (2026-11-16, track A relay 40, with piece
 //! 23's TIFF files and piece 32's `W`, `C`, `A`, `D` queries: 4,800 cases, 4,272 lines
-//! identical, 40 of them with memory digits; 528 hashed as `SKIP`, 169 of them `VARY`),
+//! identical, 40 of them with memory digits; 528 hashed as `SKIP`, 169 of them `VARY`; then case
+//! 4015, a heavy one in debug builds, left out: 4,799 cases, 527 `SKIP`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -50,8 +51,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "d0448dce548d7c9765282b229d12bacc092cc7761db0e954aa59d59f30158e2e";
-const SKIPPED: usize = 528;
+const OFFICIAL_SHA256: &str = "06f20103aa18446837cfb271db0298e42b4e8ee9e91ea6d72628691032695573";
+const SKIPPED: usize = 527;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

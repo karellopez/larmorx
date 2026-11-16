@@ -1193,7 +1193,8 @@ fn atlas_volume(
 
 /// `GCAMwriteWarpToMRI(gcam, NULL)`: a three-frame float volume of the morph's grid (the atlas
 /// geometry, voxel sizes times the spacing) holding each node's displacement in voxels, `x -
-/// origx`, `y - origy`, `z - origz` (in `double`, stored as `float`).
+/// origx`, `y - origy`, `z - origz` (in `double`, stored as `float`; a NaN position's bits as
+/// SSE passes them on, the first operand's: `sse`).
 pub fn gcam_write_warp_to_mri(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -1206,9 +1207,39 @@ pub fn gcam_write_warp_to_mri(
         for y in 0..h.max(0) {
             for z in 0..d.max(0) {
                 let n = gcam.node(x, y, z).clone();
-                mri_set_vox_val(g, err, &mut warp, x, y, z, 0, (n.x - n.origx) as f32, 0)?;
-                mri_set_vox_val(g, err, &mut warp, x, y, z, 1, (n.y - n.origy) as f32, 0)?;
-                mri_set_vox_val(g, err, &mut warp, x, y, z, 2, (n.z - n.origz) as f32, 0)?;
+                mri_set_vox_val(
+                    g,
+                    err,
+                    &mut warp,
+                    x,
+                    y,
+                    z,
+                    0,
+                    sse::sub64(n.x, n.origx) as f32,
+                    0,
+                )?;
+                mri_set_vox_val(
+                    g,
+                    err,
+                    &mut warp,
+                    x,
+                    y,
+                    z,
+                    1,
+                    sse::sub64(n.y, n.origy) as f32,
+                    0,
+                )?;
+                mri_set_vox_val(
+                    g,
+                    err,
+                    &mut warp,
+                    x,
+                    y,
+                    z,
+                    2,
+                    sse::sub64(n.z, n.origz) as f32,
+                    0,
+                )?;
                 if x == g.gx && y == g.gy && z == g.gz {
                     let f = |v: f64| fmt_f(v, 2, 1);
                     let _ = writeln!(

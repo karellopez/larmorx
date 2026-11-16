@@ -17,8 +17,8 @@ library is seen as the child's signal or timeout).
 
 | set | cases | identical | expected differences (noted) | differing |
 |---|---|---|---|---|
-| generated files read (seeds 1 to 7; 2,000 or 3,000 each) | 19,000 | 15,182 | 1,213 crashes of the original (a defect noted), 346 hangs of the original (FS-814), 425 memory-dependent results (FS-815 to FS-834 noted), 1,831 codecs not ported yet | 3, resolved: 2 originals timed out under load (identical when run alone), 1 crash of the original noted once FS-833 covered the byte swap |
-| files written by a scanline writer (the writer below; seeds 1 to 3) | 4,300 | 4,300 (transcripts and file bytes) | – | 0 |
+| generated files read (seeds 1 to 9, 2,000 or 3,000 each; seeds 8 and 9 with the final code) | 25,000 | 20,000 | 1,587 crashes of the original (a defect noted), 464 hangs of the original (FS-814, FS-818), 552 memory-dependent results (FS-815 to FS-834 noted), 2,393 codecs not ported yet | 4, resolved: 3 originals timed out under the machine's load (identical when run alone), 1 crash of the original noted once FS-833 covered the byte swap |
+| files written by a scanline writer (the writer below; seeds 1 to 4) | 5,300 | 5,300 (transcripts and file bytes) | – | 0 |
 | zlib's decompressor alone (`validation/probes/zlib-deflate inflate`, seeds 1 and 2) | 10,000 streams, every call | all | – | 0 |
 
 libtiff 3.6.1 as released and FreeSurfer's copy gave the same results but where memory contents
@@ -73,7 +73,7 @@ does what the correction does and notes it.
 | FS-815 | a size in bytes that does not fit 32 bits is allocated cut to 32 bits, then written past (a crash) | refused as an allocation failure (`No space ...`) |
 | FS-816 | a second Compression field in a directory keeps the first codec's tag methods after freeing it: the next `TIFFSetField` or `TIFFGetField` runs them on freed state (a crash or an endless recursion) | the current codec's methods |
 | FS-817 | a PackBits run or literal at the end of a strip's data takes bytes an earlier strip left in the raw buffer; the old-style LZW test looks at two bytes of a one-byte strip | stops at the end of the data, as libtiff 4 does (reproduce: the bytes the buffer holds) |
-| FS-818 | LZW decoding of damaged data uses table entries never written (codes 256 and 257 after a Clear), and the old-style decoder follows null links and writes before its row | zeros; decoding stopped; nothing written there |
+| FS-818 | LZW decoding of damaged data uses table entries never written (codes 256 and 257 after a Clear); the old-style decoder follows null links and writes before its row; an entry linked to itself is followed for ever (a hang) | zeros; decoding stopped; nothing written there |
 | FS-819 | a decoder reads raw-buffer bytes no read has written (memory contents), for instance when a strip is read with the state a failed `TIFFReadDirectory` left | read as 0 |
 | FS-820 | the type check of an entry that matches no entry of its field, when that field is the last of its table, reads past the table and stops checking the directory: later entries are read unchecked and an unknown one crashes the reader | every entry checked |
 | FS-821 | a directory of no strips without StripByteCounts: the estimate divides by zero or trims index 65535 of empty arrays | nothing estimated |
@@ -88,7 +88,7 @@ does what the correction does and notes it.
 | FS-831 | when a strip's start fails in the codec's setup (an unsupported predictor), the next row is decoded without a start: the LZW or Deflate decoder's input was never set (a crash) | nothing decoded |
 | FS-832 | the predictor works by whole pixels while bytes are left, past a row whose length is not a multiple of the pixel's | past the caller's buffer nothing is touched |
 | FS-833 | a negative strip or tile size (a stripped image's `TIFFTileSize` overflows 32 bits; kept after a failed `TIFFReadDirectory`) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes | nothing written |
-| FS-834 | a SamplesPerPixel of several values is passed as its array's address where one value goes (the field takes the address's low bits) | ignored, with libtiff's incorrect-count warning |
+| FS-834 | a SamplesPerPixel of several values, of a floating-point type or of a string type is passed as an address or a floating-point argument where one integer goes (the field takes an address's bits or a register never set) | ignored, with libtiff's incorrect-count or wrong-type warning |
 
 Many of these are reached only through a directory that failed to read: libtiff's
 `TIFFSetDirectory` returns 0 but leaves the half-read directory in place, with the previous

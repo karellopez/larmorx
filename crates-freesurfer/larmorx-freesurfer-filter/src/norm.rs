@@ -264,7 +264,14 @@ enum Ver {
 
 /// The Voronoi diagram's line after each layer with `Gdiag & DIAG_SHOW` and `DIAG_VERBOSE` (the
 /// short version's with six spaces before its end).
-fn voronoi_line(g: &Globals, err: &mut dyn Write, ver: Ver, nchanged: i32, total: i32, visited: i32) {
+fn voronoi_line(
+    g: &Globals,
+    err: &mut dyn Write,
+    ver: Ver,
+    nchanged: i32,
+    total: i32,
+    visited: i32,
+) {
     if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
         let pad = if ver == Ver::Short { "      " } else { "" };
         let _ = writeln!(
@@ -834,7 +841,11 @@ fn soap_float(
             y2 = (y2 + 1).min(h - 1);
             z2 = (z2 + 1).min(dep - 1);
             if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
-                let _ = writeln!(out, "iter {i}: max change {}", fmt_f(f64::from(max_change), 0, 6));
+                let _ = writeln!(
+                    out,
+                    "iter {i}: max change {}",
+                    fmt_f(f64::from(max_change), 0, 6)
+                );
             }
             if max_change < min_change {
                 break;

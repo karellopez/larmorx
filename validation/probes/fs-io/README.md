@@ -328,6 +328,19 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `lro` (`LabelRemoveOverlap`). `SKIP` for FS-843 (FreeSurfer crashes), FS-844 and FS-58, FS-845 where the port
   refuses, FS-848, FS-847 where the port refuses, FS-849. Seeds 7, 13 and 21 (1,100 cases each): `reproduce`
   identical on all 2,880 compared, 420 skipped; `fix` differs only with notices (FS-01, FS-847).
+- Piece 31 (track A relay 38): GCA morphs read as volumes. `m3d` and `m3h` (piece 6's `mrd` and `mrh`: type -1 or
+  29, `.m3z` and `.m3d` names, `.dat@m3z`, and MGH warp volumes named `@m3z`) of morph files built by
+  `tests/fs_io/piece31.rs` as `GCAMwrite` lays them out: versions 1.0, 2.0, 0.999, NaN; grids of 1 to 5 nodes a side,
+  0, negative sizes, 2,000 x 2,000 x 1,000 or 2,000 (FS-851); spacings 1, 2, 3, 0, -2, 1,291 (FS-853), -2,000; nodes
+  displaced (now and then mirrored: negative volumes), with invalid positions, NaN, infinite, subnormal values; tags
+  in any order (labels, geometries, type, affine, unknown tags), a tag 0 or the file's end; `FS_SKIP_TAGS`, `SHOW_NEG`
+  (the environment bit 512, both sides); frames none, 0 to 24, 7 to 9 (through the inverse: a small valid image), 11,
+  12, 25; faults (cut, missing, a folder, not a morph, empty, damaged compressed data). `fsio` sets `FREESURFER_HOME`
+  and `FS_LICENSE` as for `mrr` (a warp volume is read with `MRIread`). `SKIP` for FS-851, FS-855 and FS-854 by
+  default; `VARY` for FS-167 and FS-854 under `reproduce`. Seeds 7, 13 and 21 (816 piece-31 cases each): `reproduce`
+  identical on every compared case (592, 584, 596), 0 different; `fix` differs only with notices. The recorded heads'
+  `talairach.m3z` through `mrd` with absolute names (frames none, 0, 3-6, 13-24): 108 of 108 identical (findings
+  Part 33).
 - `reorder_triples.py` (relay 37): dimension numbers that pass `MRIreorder`'s check only through 32-bit overflow
   (FS-843; `python3 -P reorder_triples.py [count]`); official `mri_convert -r <a> <b> <c>` with them ends with a
   segmentation fault (status 139).

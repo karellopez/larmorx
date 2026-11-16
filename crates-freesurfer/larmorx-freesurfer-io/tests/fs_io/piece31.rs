@@ -69,9 +69,7 @@ fn small(g: &mut Gen) -> f32 {
 fn vol_geom(g: &mut Gen, small_image: bool) -> Vec<u8> {
     let mut b = Vec::new();
     let dim = |g: &mut Gen| {
-        if small_image {
-            g.int(1, 4) as i32
-        } else if g.chance(3) {
+        if small_image || g.chance(3) {
             g.int(1, 4) as i32
         } else {
             g.pick(&[0, 2, 3, 5])
@@ -492,7 +490,10 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
     let mut entries = Vec::new();
     let mut env = 0;
     let (name, ty) = read_case(g, &mut entries, &mut env);
-    t.push(g.pick(&["0", "0", "0", "40", "10000040", "10000048"]).into()); // Gdiag
+    t.push(
+        g.pick(&["0", "0", "0", "40", "10000040", "10000048"])
+            .into(),
+    ); // Gdiag
     t.push(if g.chance(12) { "0" } else { "1" }.into()); // MRIIO_Strip_Pound
     t.push(env.to_string()); // piece 6's environment bits (512: SHOW_NEG)
     t.push(ty.to_string());
@@ -521,8 +522,14 @@ pub fn run(
     let r = super::piece6::run_env(&t, g, out, err, o, w, extra, &[]);
     for n in g.notices.as_slice() {
         // the machine's memory, a reading that never ends, memory contents or a crash
-        if matches!(n.defect.id, "FS-851" | "FS-854" | "FS-855") {
+        if matches!(n.defect.id, "FS-851" | "FS-855")
+            || (n.defect.id == "FS-854" && !g.notices.reproduce())
+        {
             extra.push("SKIP");
+        }
+        // FreeSurfer's tags after damaged compressed data end as memory contents decide
+        if n.defect.id == "FS-854" && g.notices.reproduce() {
+            extra.push("VARY");
         }
     }
     r

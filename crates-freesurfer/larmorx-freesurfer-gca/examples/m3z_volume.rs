@@ -24,9 +24,10 @@ fn main() {
     let mut g = Globals::new(mode);
     g.mriio_strip_pound = 1;
     let (mut out, mut err) = (std::io::stdout(), std::io::stderr());
-    let env = Environment::from_pairs(std::env::vars().filter(|(k, _)| {
-        matches!(k.as_str(), "FS_SKIP_TAGS" | "SHOW_NEG" | "FS_LEAVE_NANS")
-    }));
+    let env = Environment::from_pairs(
+        std::env::vars()
+            .filter(|(k, _)| matches!(k.as_str(), "FS_SKIP_TAGS" | "SHOW_NEG" | "FS_LEAVE_NANS")),
+    );
     let m = larmorx_freesurfer_io::mriio::mri_read(
         &mut g, &mut out, &mut err, &env, None, &args[1], -1, true, -1, -1,
     );

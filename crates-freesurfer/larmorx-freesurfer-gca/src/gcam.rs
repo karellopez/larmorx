@@ -247,7 +247,7 @@ fn alloc_failure(width: i32, height: i32, depth: i32) -> Option<String> {
     let per_x = row_table + u64::from(height.unsigned_abs()) * row;
     // the first x whose row table or rows pass the machine's memory
     let room = MACHINE_BYTES - total;
-    let full = if per_x == 0 { u64::MAX } else { room / per_x };
+    let full = room.checked_div(per_x).unwrap_or(u64::MAX);
     if full >= u64::from(width.unsigned_abs()) {
         return None;
     }
@@ -351,8 +351,8 @@ fn damaged(fp: &mut ZnzFile) -> bool {
 /// `GCAM_LABELED`), `TAG_GCAMORPH_GEOM` (the image's and the atlas's geometries), `TAG_GCAMORPH_TYPE`
 /// (an `int`), `TAG_MGH_XFORM` (without a length; the affine matrix's tag and text after it,
 /// `det` its determinant); other tags (with a length, which is not skipped) are passed over.
-/// FS-854: a compressed file damaged after its nodes is refused (FreeSurfer's tag loop never ends,
-/// or ends as memory contents decide).
+/// FS-854: a compressed file damaged after its nodes is refused by default (FreeSurfer's tag loop
+/// never ends, or ends as memory contents decide); `reproduce` ends the tags there.
 fn m3z_read(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -457,8 +457,12 @@ fn m3z_read(
         if damaged(&mut fp) {
             g.notices.add(
                 &FS_854,
-                "GCAMread: the compressed morph is damaged after its nodes: FreeSurfer's reading of its tags never ends (or ends as memory contents decide)",
+                "GCAMread: the compressed morph is damaged after its nodes: FreeSurfer's reading of its tags never ends, or ends as memory contents decide (reproduce: ended here)",
             );
+            if g.notices.reproduce() {
+                // the tags end here, as when memory gives FreeSurfer a tag 0
+                break;
+            }
             g.errno = 0;
             log::error_printf(
                 g,
@@ -778,7 +782,13 @@ pub fn gcam_read(
     }
     gcam_compute_original_properties(g, out, err, env, &mut gcam)?;
     gcam_compute_metric_properties(g, out, err, env, &mut gcam)?;
-    gcam_copy_node_positions(g, err, &mut gcam, ORIGINAL_POSITIONS, SAVED_ORIGINAL_POSITIONS);
+    gcam_copy_node_positions(
+        g,
+        err,
+        &mut gcam,
+        ORIGINAL_POSITIONS,
+        SAVED_ORIGINAL_POSITIONS,
+    );
     Ok(Some(gcam))
 }
 
@@ -830,11 +840,7 @@ pub fn gcam_store_metric_properties(
 
 /// `GCAMN_SUB(a, b, v)` then the vector's `float`s: `a - b` in `double` per axis, stored as `float`.
 fn sub3(a: &GcamNode, b: &GcamNode) -> [f32; 3] {
-    [
-        (a.x - b.x) as f32,
-        (a.y - b.y) as f32,
-        (a.z - b.z) as f32,
-    ]
+    [(a.x - b.x) as f32, (a.y - b.y) as f32, (a.z - b.z) as f32]
 }
 
 /// `VectorTripleProduct(v1, v2, v3)`: `(v1 x v2) . v3` in `float`, summed as FreeSurfer sums it.
@@ -1093,7 +1099,9 @@ pub fn gcam_ras_to_vox(
         None => vg_get_voxel_to_ras_xform(g, out, err, &gcam.image, 0)?,
         Some(v) => match &v.vg.r_to_i {
             Some(m) => m.clone(),
-            None => vol_geom::extract_r_to_i(g, out, err, &v.vg)?.unwrap_or_else(|| Matrix::real(4, 4)),
+            None => {
+                vol_geom::extract_r_to_i(g, out, err, &v.vg)?.unwrap_or_else(|| Matrix::real(4, 4))
+            }
         },
     };
     if g.gdiag & DIAG_SHOW != 0 && verbose_on(g) {
@@ -1235,7 +1243,8 @@ fn node_value(n: &GcamNode, which: i32) -> Option<f32> {
     Some(match which {
         GCAM_NEG => {
             if n.invalid != GCAM_POSITION_INVALID
-                && ((n.orig_area1 > 0.0 && n.area1 <= 0.0) || (n.orig_area2 > 0.0 && n.area2 <= 0.0))
+                && ((n.orig_area1 > 0.0 && n.area1 <= 0.0)
+                    || (n.orig_area2 > 0.0 && n.area2 <= 0.0))
             {
                 1.0
             } else {

@@ -3,7 +3,7 @@
 // 2026 Karel Lopez Vilaret.
 //! fs.io against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the official
 //! build's output lines for the probe's recorded cases (`cases::recorded_cases`: seed 1's 4,800
-//! portable cases, about 32 of each of the 149 commands that behave alike on every platform: piece
+//! portable cases, about 32 of each of the 151 commands that behave alike on every platform: piece
 //! 1's ten, piece 2's twelve, piece 3's six, piece 4's seven (the format probe's file cases made
 //! portable), piece 5's seven (mosaics, MATLAB files), piece 6's five (reading volumes and
 //! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images), piece 9's
@@ -22,17 +22,14 @@
 //! volumes written), piece 27's two (GCA atlases read as volumes), piece 28's two (MRIread and
 //! MRIreadEx with their non-finite voxels removed), piece 29's two (the conformed-size checks,
 //! the command lines), piece 30's four (MRIreorder, the selective-average headers read and
-//! written, LabelRemoveOverlap), piece 31's two (GCA morphs read as volumes) and piece 32's three
+//! written, LabelRemoveOverlap), piece 31's two (GCA morphs read as volumes), piece 32's three
 //! (GCA morphs written, read and written again, TRANSFORMs read, sampled, written, copied and
-//! applied),
+//! applied) and piece 33's two (stacked autoencoders read as volumes),
 //! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: one since relay 40),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-16, track A relay 40, with piece
-//! 23's TIFF files and piece 32's `W`, `C`, `A`, `D` queries: 4,800 cases, 4,272 lines
-//! identical, 40 of them with memory digits; 528 hashed as `SKIP`, 169 of them `VARY`; then case
-//! 4015, a heavy one in debug builds, left out: 4,799 cases, 527 `SKIP`; and piece 22's two
-//! cases that named the BRIK with another case of its letters, now a missing name (`fsio`'s
-//! output for them checked: identical)),
+//! --light` on Linux x64 from the unit oracle's build (2026-11-16, track A relay 41, with piece
+//! 33's autoencoders: 4,799 cases (case 4794, a heavy one in debug builds, left out), 4,279 lines
+//! identical, 61 of them with memory digits; 520 hashed as `SKIP`, 169 of them `VARY`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -53,8 +50,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "011a8c010e6ebd07ef9168c1757041a7c959cceaa0bc8687e8f9ac8d7e83f381";
-const SKIPPED: usize = 527;
+const OFFICIAL_SHA256: &str = "9942d7495da4d9988468a8cd448e73362e3c5ca67bddb5222bfd33b72c2b1db0";
+const SKIPPED: usize = 520;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

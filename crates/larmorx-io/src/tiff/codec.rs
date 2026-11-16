@@ -7,6 +7,7 @@
 
 use super::dir::{Layer, PostDecode};
 use super::fax3::{Fax, FaxKind};
+use super::pixarlog::PixarLog;
 use super::fields::Table;
 use super::{TIFF_NOBITREV, Tiff, Unported, compression as c};
 use larmorx_core::cfmt::Streams;
@@ -22,7 +23,7 @@ pub(crate) enum SetupDecode {
     Lzw,
     Zip,
     Fax,
-    Unported(&'static str),
+    PixarLog,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -32,6 +33,7 @@ pub(crate) enum PreDecode {
     Lzw,
     Zip,
     Fax,
+    PixarLog,
 }
 
 /// `tif_decoderow`, `tif_decodestrip`, `tif_decodetile`.
@@ -48,6 +50,7 @@ pub(crate) enum Decode {
     Fax(FaxKind),
     Next,
     Thunder,
+    PixarLog,
     PredRow,
     PredTile,
 }
@@ -66,6 +69,7 @@ pub(crate) enum Cleanup {
     Lzw,
     Zip,
     Fax,
+    PixarLog,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -258,6 +262,7 @@ pub(crate) struct Codec {
     pub lzw: Option<Box<Lzw>>,
     pub zip: Option<Box<Zip>>,
     pub fax: Option<Box<Fax>>,
+    pub pixarlog: Option<Box<PixarLog>>,
     /// PackBits' row size for its encoder (`tif_data`).
     pub packbits_rowsize: i32,
 }
@@ -289,6 +294,7 @@ impl Default for Codec {
             lzw: None,
             zip: None,
             fax: None,
+            pixarlog: None,
             packbits_rowsize: 0,
         }
     }
@@ -431,7 +437,8 @@ impl Tiff {
             c::CCITTRLE | c::CCITTRLEW | c::CCITTFAX3 | c::CCITTFAX4 => {
                 return self.fax_init(scheme, s);
             }
-            c::PIXARLOG | c::SGILOG | c::SGILOG24 => {
+            c::PIXARLOG => self.pixarlog_init(),
+            c::SGILOG | c::SGILOG24 => {
                 // These codecs register private tags and tag methods at this point; not
                 // ported yet.
                 self.unported = Some(Unported(codec_name(scheme).unwrap_or("?")));
@@ -442,7 +449,7 @@ impl Tiff {
     }
 
     /// `TIFFPredictorInit(tif)`.
-    fn predictor_init(&mut self) {
+    pub(crate) fn predictor_init(&mut self) {
         self.fields.merge(Table::Predict);
         let k = &mut self.codec;
         k.layers.insert(0, Layer::Predictor);
@@ -466,6 +473,10 @@ impl Tiff {
                 k.has_pred = false;
             }
             Cleanup::Fax => k.fax = None,
+            Cleanup::PixarLog => {
+                k.pixarlog = None;
+                k.has_pred = false;
+            }
         }
         k.layers.clear();
     }
@@ -492,10 +503,6 @@ impl Tiff {
                 self.error(Some(&self.name.clone()), &m, s);
                 false
             }
-            SetupDecode::Unported(n) => {
-                self.unported = Some(Unported(n));
-                false
-            }
             SetupDecode::Lzw => {
                 let sp = self.codec.lzw.as_mut().expect("LZW state");
                 if sp.codetab.is_none() {
@@ -512,6 +519,7 @@ impl Tiff {
                 true
             }
             SetupDecode::Fax => self.fax_setup(s),
+            SetupDecode::PixarLog => self.pixarlog_setup(s),
             SetupDecode::Zip => {
                 let sp = self.codec.zip.as_mut().expect("ZIP state");
                 match Inflate::init() {
@@ -597,6 +605,7 @@ impl Tiff {
             PreDecode::None => true,
             PreDecode::Lzw => self.lzw_pre_decode(s),
             PreDecode::Fax => self.fax_pre_decode(),
+            PreDecode::PixarLog => self.pixarlog_pre_decode(),
             PreDecode::Zip => {
                 let rawcc = self.rawcc;
                 let sp = self.codec.zip.as_mut().expect("ZIP state");
@@ -648,7 +657,7 @@ impl Tiff {
         if m == Decode::Zip && self.not_started("Deflate") {
             return 0;
         }
-        if cc < 0 && matches!(m, Decode::Dump | Decode::Zip) {
+        if cc < 0 && matches!(m, Decode::Dump | Decode::Zip | Decode::PixarLog) {
             let name = self.name.clone();
             self.notices.add(
                 &FS_833,
@@ -672,6 +681,7 @@ impl Tiff {
             Decode::Fax(k) => self.fax_decode(k, buf, cc, s),
             Decode::Next => self.next_decode(buf, cc, s),
             Decode::Thunder => self.thunder_decode_row(buf, cc, s),
+            Decode::PixarLog => self.pixarlog_decode(buf, cc, s),
             Decode::PredRow => {
                 let inner = self.codec.predictor.coderow;
                 if self.decode(inner, buf, cc, s) != 0 {

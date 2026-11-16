@@ -52,6 +52,7 @@ pub mod fax3;
 pub mod fields;
 mod io;
 mod next;
+mod pixarlog;
 mod read;
 #[cfg(test)]
 mod tests;

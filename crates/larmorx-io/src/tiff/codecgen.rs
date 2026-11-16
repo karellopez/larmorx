@@ -493,3 +493,34 @@ pub fn one_strip_file(
     out.extend_from_slice(&[0; 4]);
     out
 }
+
+/// One strip of PixarLog data: `n` 11-bit codes (horizontally differenced: a first code, then
+/// small steps; now and then a first code past 2047, or the count off), in the file's byte
+/// order, deflated at level 1, 6 or 9.
+pub fn pixarlog_strip(r: &mut Rng, n: u64, big: bool) -> Vec<u8> {
+    let n = if r.chance(8) {
+        r.below(n + 8)
+    } else {
+        n
+    };
+    let mut v = Vec::with_capacity(2 * n as usize);
+    let mut k = 0u64;
+    while k < n {
+        let row = 1 + r.below(64);
+        for j in 0..row.min(n - k) {
+            let c: u16 = if j == 0 {
+                if r.chance(20) {
+                    2048 + r.below(60000) as u16
+                } else {
+                    r.below(2048) as u16
+                }
+            } else {
+                (r.below(9) as i32 - 4) as u16
+            };
+            v.extend_from_slice(&if big { c.to_be_bytes() } else { c.to_le_bytes() });
+        }
+        k += row;
+    }
+    let level = r.pick(&[1, 6, 9]);
+    larmorx_core::zlib::compress_vec(&v, level).unwrap_or_default()
+}

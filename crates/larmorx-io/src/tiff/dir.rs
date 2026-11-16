@@ -169,6 +169,7 @@ pub(crate) enum Layer {
     Predictor,
     Zip,
     Fax,
+    PixarLog,
 }
 
 impl Tiff {
@@ -283,6 +284,11 @@ impl Tiff {
                 }
                 Layer::Fax => {
                     if let Some(st) = self.fax_vsetfield(tag, &a) {
+                        return st;
+                    }
+                }
+                Layer::PixarLog => {
+                    if let Some(st) = self.pixarlog_vsetfield(tag, a.int()) {
                         return st;
                     }
                 }
@@ -706,6 +712,11 @@ impl Tiff {
                 }
                 Layer::Fax => {
                     if let Some(v) = self.fax_vgetfield(t) {
+                        return Some(v);
+                    }
+                }
+                Layer::PixarLog => {
+                    if let Some(v) = self.pixarlog_vgetfield(t) {
                         return Some(v);
                     }
                 }

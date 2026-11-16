@@ -252,7 +252,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         let planar: u16 = if r.chance(5) { 2 } else { 1 };
         let comp: u16 = r.pick(&[
             1, 1, 1, 32773, 32773, 32946, 32946, 8, 5, 5, 5, 99, 7, 6, 34661, 32809, 32766, 2, 3,
-            3, 3, 4, 4, 4, 32771, 32809, 32766,
+            3, 3, 4, 4, 4, 32771, 32809, 32766, 32909, 32909, 32909,
         ]);
         let fax = matches!(comp, 2 | 3 | 4 | 32771);
         // the codecs' own sample layouts, now and then another
@@ -261,6 +261,7 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
             2 | 3 | 4 | 32771 => (1, if r.chance(10) { spp } else { 1 }, planar),
             32809 => (4, 1, 1),
             32766 => (2, 1, 1),
+            32909 => (r.pick(&[8, 8, 16, 16, 32, 11, 12]), spp, planar),
             _ => (bps, spp, planar),
         };
         let g3: u32 = match comp {
@@ -304,7 +305,13 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
         } else {
             Some(r.pick(&[1, 1, 0, 2, 2, 3, 6, 5, 4]))
         };
-        let sampleformat: Option<u16> = if r.chance(2) {
+        let sampleformat: Option<u16> = if comp == 32909 && !r.chance(8) {
+            match bps {
+                32 => Some(3),
+                12 => Some(r.pick(&[2, 4])),
+                _ => Some(r.pick(&[1, 4])),
+            }
+        } else if r.chance(2) {
             Some(r.pick(&[1, 1, 2, 3, 4, 7, 0]))
         } else {
             None
@@ -355,6 +362,11 @@ pub fn make(seed: u64, i: u64) -> Vec<u8> {
                 }
                 32766 => super::codecgen::next_strip(&mut r, nrows, cols, row_bytes(cols)),
                 32809 => super::codecgen::thunder_strip(&mut r, nrows, cols),
+                32909 => super::codecgen::pixarlog_strip(
+                    &mut r,
+                    u64::from(nrows) * u64::from(cols) * u64::from(samples_per_unit),
+                    big,
+                ),
                 1 => p.clone(),
                 32773 => packbits_encode(p),
                 32946 | 8 => {

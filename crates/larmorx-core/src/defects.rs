@@ -2655,6 +2655,8 @@ defects! {
         "the CCITT decoders keep the runs of the current and the reference line in one block that damaged data makes them read or write outside (a crash or memory contents) or read where nothing was written (memory contents), and a row size of 0 bytes never returns; corrected as libtiff 4 does: the block cleared, the row stopped at the first access outside it with a Buffer overflow error, nothing decoded for a row size of 0";
     FS_839 = "FS-839", "libtiff 3.6.1", true,
         "the CCITT RLE/W decoder aligns each row to a 16-bit word by the bits it holds, not by the row's position: a row that ends with the decoder holding bits read from the next word loses them, and the next row starts a word late (Premature EOF or wrong rows of a valid image); corrected, each row starts at the next 16-bit boundary of the strip";
+    FS_840 = "FS-840", "libtiff 3.6.1", true,
+        "the PixarLog decoder sizes its row buffer by the rows per strip in 32 bits (the default of 2^32 - 1 overflows it) and never checks the allocation (a failure crashes), inflates past the buffer when a call needs more, looks the first codes of a row up through its tables without masking them to 11 bits (memory past the tables), and for 11- and 12-bit samples, whose scanline holds fewer codes than a row, reads codes never inflated and writes past the caller's buffer; corrected as libtiff 4.0.10 does: the buffer what a row needs, the first codes masked, the codes cut to whole rows with its warning";
 }
 
 /// The register entry with ID `id`.

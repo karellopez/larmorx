@@ -162,9 +162,9 @@ impl larmorx_io::minc::Dialect for FsMinc {
             // micreate_std_variable's name in no list (the copy has two more BAD_STDVAR sites, 603
             // and 1213, that MINC 1.5.1 does not have)
             S::BadStdVar => "minc_convenience.c:1223",
-            // two sites share it: MI_create_dim_variable's (611) and MI_create_dimwidth_variable's
-            // (689); the first
+            // MI_create_dim_variable's and MI_create_dimwidth_variable's
             S::WrongNDims => "minc_convenience.c:611",
+            S::WrongNDimsWidth => "minc_convenience.c:689",
             S::BadSuffix => "minc_convenience.c:681",
             S::MaxMinDims => "minc_convenience.c:754",
         };

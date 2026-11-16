@@ -474,6 +474,10 @@ sites track A wires (`imageio.rs`).
 
 ## TIFF: FreeSurfer's calls of libtiff 3.6.1 (`utils/imageio.cpp`; track C relay 32, 2026-11-16)
 
+Since relay 33 every codec FreeSurfer's build configures decodes (the CCITT schemes, NeXT,
+ThunderScan, PixarLog, SGILog): `Unported` is never returned, and imageio's "is not ported yet"
+paths for TIFF can go.
+
 The library is larmorx-io's `tiff` (open findings: `docs/findings/libtiff-3.6.1.md`); these are the
 call sites track A wires (`imageio.rs`'s TIFF image reading and writing, "not ported yet" until now).
 FreeSurfer's `packages/tiff` is libtiff 3.6.1 (two `$Id` lines, one cast in `tif_print.c`), built with

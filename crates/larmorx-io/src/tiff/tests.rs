@@ -187,8 +187,9 @@ fn a_directory_loop_is_counted_once() {
 }
 
 /// The digest of the generated files read in both modes and the writing cases: recorded after
-/// the probe's runs (relay 32: seeds 1 to 6, 15,300 files read, 2,300 written, identical where
-/// the original's behaviour does not depend on memory contents).
+/// the probe's runs (relay 32: seeds 1 to 6, 15,300 files read, 2,300 written; relay 33, with the
+/// CCITT, NeXT, ThunderScan, PixarLog and SGILog files: seeds 101 to 107; identical where the
+/// original's behaviour does not depend on memory contents).
 #[test]
 fn generated_files_digest() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -218,4 +219,264 @@ fn generated_files_digest() {
     assert_eq!(fnv(&all), DIGEST, "digest {:#018x}", fnv(&all));
 }
 
-const DIGEST: u64 = 0xe67f_3fcd_5a45_2473;
+const DIGEST: u64 = 0x41d8_59c3_cf79_74af;
+
+/// CCITT streams made by the generator (its own encoder) decode to the image they encode, in
+/// every scheme and Group 3 option, both fill orders.
+#[test]
+fn ccitt_streams_decode_to_their_images() {
+    use super::cases::Rng;
+    use super::codecgen::{bilevel, fax_encode, one_strip_file, pack};
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut r = Rng::new(77);
+    let mut n = 0;
+    for (comp, g3) in [
+        (2u16, 0u32),
+        (32771, 0),
+        (3, 0),
+        (3, 4),
+        (3, 1),
+        (3, 5),
+        (4, 0),
+    ] {
+        for width in [1u32, 7, 8, 63, 64, 65, 200, 1800, 2700] {
+            for fillorder in [1u32, 2] {
+                let rows = 1 + r.below(12) as u32;
+                let img = bilevel(&mut r, width, rows);
+                let mut data = fax_encode(comp, g3, 1 + n % 3, &img, n % 2 == 0, None);
+                if fillorder == 2 {
+                    for b in &mut data {
+                        *b = b.reverse_bits();
+                    }
+                }
+                let mut extra = vec![(266u16, 3u16, fillorder)];
+                if comp == 3 {
+                    extra.push((292, 4, g3));
+                }
+                let file = one_strip_file(width, rows, 1, comp, 0, &extra, &data);
+                let p = dir.path().join(format!("c{n}.tif"));
+                n += 1;
+                std::fs::write(&p, &file).expect("write");
+                let mut cap = Captured::default();
+                let mut t = Tiff::open(
+                    p.to_str().expect("path"),
+                    "r",
+                    opts(UpstreamDefects::Fix),
+                    &mut cap,
+                )
+                .expect("ported")
+                .expect("opened");
+                let rb = t.scanline_size() as usize;
+                for (y, row) in img.iter().enumerate() {
+                    let mut buf = vec![0u8; rb];
+                    let rr = t
+                        .read_scanline(&mut buf, y as u32, 0, &mut cap)
+                        .expect("ported");
+                    assert_eq!(
+                        rr,
+                        1,
+                        "comp {comp} g3 {g3} width {width} row {y}: {}",
+                        cap.text(Stream::Err)
+                    );
+                    assert_eq!(
+                        buf,
+                        pack(row, rb),
+                        "comp {comp} g3 {g3} width {width} row {y}"
+                    );
+                }
+                t.close(&mut cap);
+                assert_eq!(
+                    cap.text(Stream::Err),
+                    "",
+                    "comp {comp} g3 {g3} width {width}"
+                );
+            }
+        }
+    }
+}
+
+/// PixarLog strips (deflated 11-bit codes, differenced as libtiff's encoder differences them:
+/// from the first pixel for three or four samples per pixel, from the second otherwise) decode to
+/// the tables' values of the codes, for 8-bit, 16-bit, float and 11-bit samples.
+#[test]
+fn pixarlog_strips_decode_to_their_codes() {
+    use super::cases::Rng;
+    use super::codecgen::one_strip_file;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let t = super::pixarlog::tables(false);
+    let mut r = Rng::new(5);
+    let mut n = 0;
+    for (bps, sf, size) in [(8u16, 1u32, 1usize), (16, 1, 2), (32, 3, 4), (11, 1, 2)] {
+        for spp in [1u32, 2, 3, 4, 5] {
+            let (width, rows) = (1 + r.below(40) as u32, 1 + r.below(6) as u32);
+            let s = spp as usize;
+            let mut codes: Vec<u16> = Vec::new();
+            let mut want: Vec<Vec<u16>> = Vec::new();
+            for _ in 0..rows {
+                let v: Vec<u16> = (0..width as usize * s)
+                    .map(|_| r.below(2048) as u16)
+                    .collect();
+                let mut c = v.clone();
+                // the encoder's differences: from the first pixel (3, 4 samples) or the second
+                let from = if s == 3 || s == 4 { s } else { 2 * s };
+                for k in (from..c.len()).rev() {
+                    c[k] = v[k].wrapping_sub(v[k - s]) & 0x7ff;
+                }
+                codes.extend_from_slice(&c);
+                want.push(v);
+            }
+            let raw: Vec<u8> = codes.iter().flat_map(|c| c.to_le_bytes()).collect();
+            let data = larmorx_core::zlib::compress_vec(&raw, 6).expect("deflate");
+            let extra = [(277u16, 3u16, spp), (339, 3, sf), (278, 4, rows)];
+            let file = one_strip_file(width, rows, bps, 32909, 1, &extra, &data);
+            let p = dir.path().join(format!("p{n}.tif"));
+            n += 1;
+            std::fs::write(&p, &file).expect("write");
+            let mut cap = Captured::default();
+            let mut tf = Tiff::open(
+                p.to_str().expect("path"),
+                "r",
+                opts(UpstreamDefects::Fix),
+                &mut cap,
+            )
+            .expect("ported")
+            .unwrap_or_else(|| panic!("opened: {}", cap.text(Stream::Err)));
+            let rb = width as usize * s * size;
+            for (y, v) in want.iter().enumerate() {
+                let mut buf = vec![0u8; rb.max(tf.scanline_size() as usize)];
+                let rr = tf
+                    .read_scanline(&mut buf, y as u32, 0, &mut cap)
+                    .expect("ported");
+                if bps == 11 {
+                    // a scanline of 11-bit samples holds fewer codes than a row: cut to none
+                    assert_eq!(rr, 1, "{}", cap.text(Stream::Err));
+                    continue;
+                }
+                assert_eq!(rr, 1, "bps {bps} spp {spp}: {}", cap.text(Stream::Err));
+                for (k, &c) in v.iter().enumerate() {
+                    let c = c as usize;
+                    let got = &buf[k * size..(k + 1) * size];
+                    let exp: Vec<u8> = match bps {
+                        8 => vec![t.to_8[c]],
+                        16 => t.to_16[c].to_le_bytes().to_vec(),
+                        _ => t.to_f[c].to_le_bytes().to_vec(),
+                    };
+                    assert_eq!(got, &exp[..], "bps {bps} spp {spp} row {y} sample {k}");
+                }
+            }
+            tf.close(&mut cap);
+        }
+    }
+}
+
+/// SGILog rows (LogL's two byte planes, LogLuv's four, run-length coded; 24-bit LogLuv's three
+/// bytes a pixel) read raw or as 16-bit values give the values coded, by default with and
+/// without RowsPerStrip.
+#[test]
+fn sgilog_rows_decode_to_their_values() {
+    use super::cases::Rng;
+    use super::codecgen::one_strip_file;
+    // one byte plane: a run where four or more bytes repeat, literals otherwise
+    fn plane(b: &[u8], out: &mut Vec<u8>) {
+        let mut k = 0;
+        while k < b.len() {
+            let mut n = 1;
+            while k + n < b.len() && b[k + n] == b[k] && n < 129 {
+                n += 1;
+            }
+            if n >= 4 {
+                out.push((128 + n - 2) as u8);
+                out.push(b[k]);
+                k += n;
+            } else {
+                let m = (b.len() - k).min(127);
+                out.push(m as u8);
+                out.extend_from_slice(&b[k..k + m]);
+                k += m;
+            }
+        }
+    }
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut r = Rng::new(9);
+    for (n, (comp, photo, spp, bps, sf, rps)) in [
+        (34676u16, 32844u32, 1u32, 16u32, 2u32, true),
+        (34676, 32844, 1, 16, 2, false),
+        (34676, 32845, 1, 32, 1, true),
+        (34677, 32845, 1, 32, 1, true),
+        (34677, 32845, 1, 32, 1, false),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (width, rows) = (1 + r.below(300) as u32, 1 + r.below(5) as u32);
+        let mut data = Vec::new();
+        let mut want: Vec<Vec<u8>> = Vec::new();
+        for _ in 0..rows {
+            let vals: Vec<u32> = (0..width)
+                .map(|_| {
+                    if r.chance(3) {
+                        0x1234_5678
+                    } else {
+                        r.next_u64() as u32
+                    }
+                })
+                .collect();
+            if photo == 32844 {
+                let v: Vec<u16> = vals.iter().map(|&x| x as u16).collect();
+                for sh in [8, 0] {
+                    let b: Vec<u8> = v.iter().map(|&x| (x >> sh) as u8).collect();
+                    plane(&b, &mut data);
+                }
+                want.push(v.iter().flat_map(|x| x.to_le_bytes()).collect());
+            } else if comp == 34676 {
+                for sh in [24, 16, 8, 0] {
+                    let b: Vec<u8> = vals.iter().map(|&x| (x >> sh) as u8).collect();
+                    plane(&b, &mut data);
+                }
+                want.push(vals.iter().flat_map(|x| x.to_le_bytes()).collect());
+            } else {
+                for &x in &vals {
+                    data.extend_from_slice(&[(x >> 16) as u8, (x >> 8) as u8, x as u8]);
+                }
+                want.push(
+                    vals.iter()
+                        .flat_map(|x| (x & 0xff_ffff).to_le_bytes())
+                        .collect(),
+                );
+            }
+        }
+        let mut extra = vec![(277u16, 3u16, spp), (339, 3, sf)];
+        if rps {
+            extra.push((278, 4, rows));
+        } else {
+            extra.push((278, 4, u32::MAX));
+        }
+        let file = one_strip_file(width, rows, bps as u16, comp, photo as u16, &extra, &data);
+        let p = dir.path().join(format!("l{n}.tif"));
+        std::fs::write(&p, &file).expect("write");
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut cap = Captured::default();
+            let mut tf = Tiff::open(p.to_str().expect("path"), "r", opts(mode), &mut cap)
+                .expect("ported")
+                .unwrap_or_else(|| panic!("opened: {}", cap.text(Stream::Err)));
+            for (y, w) in want.iter().enumerate() {
+                let mut buf = vec![0u8; tf.scanline_size() as usize];
+                let rr = tf
+                    .read_scanline(&mut buf, y as u32, 0, &mut cap)
+                    .expect("ported");
+                if !rps && mode == UpstreamDefects::Reproduce {
+                    // FS-882: libtiff 3.6.1's buffer of width x (2^32 - 1) pixels
+                    assert_eq!(rr, -1);
+                    assert!(
+                        cap.text(Stream::Err)
+                            .contains("No space for SGILog translation buffer")
+                    );
+                    continue;
+                }
+                assert_eq!(rr, 1, "case {n} {mode}: {}", cap.text(Stream::Err));
+                assert_eq!(&buf, w, "case {n} {mode} row {y}");
+            }
+            tf.close(&mut cap);
+        }
+    }
+}

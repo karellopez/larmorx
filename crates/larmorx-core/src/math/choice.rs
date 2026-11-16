@@ -200,6 +200,12 @@ impl Libm {
         self.choose32(|| super::cosf(x), || super::cosf_glibc(x))
     }
 
+    /// The base-10 logarithm for `f32` ([`super::log10f`] or [`super::log10f_glibc`]).
+    #[inline]
+    pub fn log10f(&self, x: f32) -> f32 {
+        self.choose32(|| super::log10f(x), || super::log10f_glibc(x))
+    }
+
     /// The arc cosine for `f32` ([`super::acosf`] or [`super::acosf_glibc`]).
     #[inline]
     pub fn acosf(&self, x: f32) -> f32 {
@@ -254,7 +260,7 @@ mod tests {
         // seeded arguments: every result the chosen function's, and the witness set exactly
         // when the two differ on one of them
         let mut s = 0x243f_6a88_85a3_08d3u64;
-        let mut any = [false; 13];
+        let mut any = [false; 14];
         for _ in 0..20_000 {
             s ^= s << 13;
             s ^= s >> 7;
@@ -305,7 +311,7 @@ mod tests {
                 assert_eq!((a.to_bits(), b.to_bits()), (c.to_bits(), g.to_bits()));
                 any[k] |= c.to_bits() != g.to_bits();
             }
-            let pairs32: [(f32, f32, f32, f32); 7] = [
+            let pairs32: [(f32, f32, f32, f32); 8] = [
                 (
                     fix.expf(f),
                     rep.expf(f),
@@ -343,6 +349,12 @@ mod tests {
                     super::super::acosf_glibc(p - 1.5),
                 ),
                 (
+                    fix.log10f(p),
+                    rep.log10f(p),
+                    super::super::log10f(p),
+                    super::super::log10f_glibc(p),
+                ),
+                (
                     fix.atan2f(f, p),
                     rep.atan2f(f, p),
                     super::super::atan2(f64::from(f), f64::from(p)) as f32,
@@ -355,7 +367,7 @@ mod tests {
             }
         }
         // glibc's differ somewhere on 20,000 arguments for each, so both witnesses saw it
-        assert!(any.iter().filter(|&&a| a).count() >= 10, "{any:?}");
+        assert!(any.iter().filter(|&&a| a).count() >= 11, "{any:?}");
         assert!(fix.differed() && rep.differed());
     }
 

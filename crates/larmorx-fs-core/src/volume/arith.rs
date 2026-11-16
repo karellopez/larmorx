@@ -3,7 +3,7 @@
 //! ranges, scaling, thresholds, binarising and signs, and the functions of two volumes; FS-289
 //! to FS-292 and FS-296.
 
-use larmorx_core::defects::{FS_291, FS_292, FS_296};
+use larmorx_core::defects::{FS_291, FS_292, FS_296, FS_332};
 
 use super::{Dst, VolOut, Vols, direct_place};
 use crate::mri::voxels::Place;
@@ -170,6 +170,21 @@ impl Process {
         match dst {
             Dst::New | Dst::Other => Ok(VolOut::New(self.mri_clone_new(src)?)),
             Dst::Src => {
+                // FS-332: FreeSurfer frees the destination's colour table (the source's own)
+                // before copying the source's: the copy of no table fails and the volume keeps
+                // none (`reproduce`); by default the volume keeps its table.
+                if src.ct.is_some() {
+                    if self.mode().reproduce() {
+                        self.note(
+                            &FS_332,
+                            "a volume cloned into itself lost its colour table (FreeSurfer frees it before copying it)",
+                        );
+                        src.ct = None;
+                        self.error_printf(codes::BAD_PARM, b"CTABdeepCopy: ct was NULL");
+                    } else {
+                        self.note(&FS_332, "a volume cloned into itself kept its colour table");
+                    }
+                }
                 let s = src.clone();
                 if let Some(ct) = &s.ct {
                     src.ct = self.ctab_deep_copy(Some(ct));
@@ -291,7 +306,7 @@ impl Process {
         if df >= n {
             self.error_printf(
                 codes::BAD_PARM,
-                format!("MRIcopyFrame: dst frame #{df} out of range (nframes={n})").as_bytes(),
+                format!("MRIcopyFrame: dst frame #{df} out of range (nframes={n})\n").as_bytes(),
             );
             return Ok(false);
         }
@@ -325,7 +340,7 @@ impl Process {
         if self.mri_match(v.a(), v.d()) == 0 {
             let (a, d) = (&v.a().geom, &v.d().geom);
             let msg = format!(
-                "MRIcopyFrames({s0}, {s1}, {d0}): src ({}, {}, {}) doesn't match destimation ({}, {}, {})",
+                "MRIcopyFrames({s0}, {s1}, {d0}): src ({}, {}, {}) doesn't match destimation ({}, {}, {})\n",
                 a.width, a.height, a.depth, d.width, d.height, d.depth
             );
             self.error_exit(codes::BAD_PARM, msg.as_bytes())?;
@@ -541,8 +556,9 @@ impl Process {
             _ => src.kind == types::UCHAR,
         };
         self.map_voxels(src, dst, &mut |_, val| {
+            // with `only_nonzero` the other voxels get their own value (observed: the probe's `vscale`)
             if only_nonzero != 0 && f64::from(val.abs()) < 1e-15 {
-                return None;
+                return Some(val);
             }
             let mut o = sse::add32(sse::mul32(val, scale), offset);
             if uchar {
@@ -872,7 +888,9 @@ impl Process {
                                 last_is_float = false;
                             }
                         }
-                        if !direct_dst {
+                        // a destination without direct access is not written; nor, for a sum, any
+                        // destination of a source without it (observed: the probe's `vtwo`)
+                        if !direct_dst || (add && !direct_src) {
                             continue;
                         }
                         let bytes = if kd == types::FLOAT {

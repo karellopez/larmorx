@@ -2,7 +2,7 @@
 //! Voxel access (spec §5): reading and writing a voxel, the derivatives, the defects of indices
 //! outside the volume (FS-52, FS-53), long volumes (FS-54) and volumes without voxels (FS-58).
 
-use larmorx_core::defects::{FS_52, FS_53, FS_54, FS_58};
+use larmorx_core::defects::{FS_52, FS_53, FS_54, FS_58, UpstreamDefects};
 
 use super::types;
 use super::volume::Mri;
@@ -361,10 +361,11 @@ impl Process {
         let half = row.wrapping_add((c as i64 as u64).wrapping_mul(4));
         let before = m.voxels.clone().expect("voxels");
         let reproduce = self.mode().reproduce();
+        // FreeSurfer's rounding (FS-12's `reproduce`), to tell where the default differs
         let i = if reproduce {
             self.nint(xd)
         } else {
-            let mut q = Process::silent(self.env.clone(), self.mode());
+            let mut q = Process::silent(self.env.clone(), UpstreamDefects::Reproduce);
             q.nint(xd)
         };
         let mut theirs = before.clone();

@@ -50,6 +50,7 @@ mod codec;
 pub mod codecgen;
 mod dir;
 mod dirread;
+#[doc(hidden)]
 pub mod fax3;
 pub mod fields;
 mod io;

@@ -11,7 +11,8 @@ import sys
 
 
 def main(path: str) -> None:
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
     h = 0xCBF29CE484222325
     sizes = []
     for name in ("TIFFFaxMainTable", "TIFFFaxWhiteTable", "TIFFFaxBlackTable"):

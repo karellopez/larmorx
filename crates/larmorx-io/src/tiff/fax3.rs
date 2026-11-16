@@ -876,11 +876,11 @@ impl Tiff {
             self.error(Some("Fax3SetupState"), &m, s);
             return false;
         }
-        let true_entries = 2 * u64::from(if needs_ref {
+        let true_entries = 2 * if needs_ref {
             2 * (u64::from(rowpixels).div_ceil(32) * 32)
         } else {
             u64::from(rowpixels)
-        }) + 3;
+        } + 3;
         if u64::from(entries) != true_entries {
             self.notices.add(
                 &FS_838,
@@ -1106,10 +1106,7 @@ impl Tiff {
             }
             Ok(1)
         })();
-        let r = match r {
-            Ok(v) => v,
-            Err(Ovf) => -1,
-        };
+        let r = r.unwrap_or(-1);
         // UNCACHE_STATE
         let (cp, acc, avail, eolcnt) = (d.cp, d.acc, d.avail, d.eolcnt);
         let msgs = std::mem::take(&mut d.msgs);

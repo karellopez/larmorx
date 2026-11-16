@@ -37,7 +37,8 @@ const PHOTOMETRIC_LOGLUV: u16 = 32845;
 const U_NEU: f64 = 0.210526316;
 const V_NEU: f64 = 0.473684211;
 const UVSCALE: f64 = 410.0;
-const M_LN2: f64 = 0.693_147_180_559_945_309_42;
+/// `M_LN2` (`0.69314718055994530942`, the double nearest ln 2).
+const M_LN2: f64 = std::f64::consts::LN_2;
 /// `UV_SQSIZ`, `(float)0.003500`.
 const UV_SQSIZ: f32 = f32::from_bits(0x3b65_6042);
 /// `UV_VSTART`, `(float)0.016940`.
@@ -89,6 +90,9 @@ const UV_ROW: [(u32, i16, i16); 163] = [
     (0x3b54bad8, 69, 15964), (0x3b87b13a, 62, 16033), (0x3bc36545, 55, 16095), (0x3c10d174, 47, 16150),
     (0x3c2bde40, 40, 16197), (0x3c8b3700, 31, 16237), (0x3cc1d085, 21, 16268),
 ];
+
+/// A choice of `exp`.
+type ExpFn = fn(f64) -> f64;
 
 /// Which row decoder setup chose (`tif_decoderow`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -764,7 +768,7 @@ impl Tiff {
             return 0;
         }
         // the conversion, each value with the mode's exp; GLIBC-07 where the other's differs
-        let (mine, other): (fn(f64) -> f64, fn(f64) -> f64) = if fix {
+        let (mine, other): (ExpFn, ExpFn) = if fix {
             (larmorx_core::math::exp, larmorx_core::math::exp_glibc)
         } else {
             (larmorx_core::math::exp_glibc, larmorx_core::math::exp)

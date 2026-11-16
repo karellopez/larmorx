@@ -52,7 +52,7 @@ impl BitW {
     }
     /// Zero bits to the next multiple of `bits` bits.
     pub fn align(&mut self, bits: u32) {
-        while (self.out.len() as u32 * 8 + self.n) % bits != 0 {
+        while !(self.out.len() as u32 * 8 + self.n).is_multiple_of(bits) {
             self.bit(false);
         }
     }
@@ -302,13 +302,13 @@ pub fn fax_encode(
             3 => {
                 if g3 & 4 != 0 {
                     // the end of line ends on a byte boundary
-                    while (w.bits() + 12) % 8 != 0 {
+                    while !(w.bits() + 12).is_multiple_of(8) {
                         w.bit(false);
                     }
                 }
                 eol(&mut w);
                 if g3 & 1 != 0 {
-                    let one = i as u64 % k.max(1) == 0;
+                    let one = (i as u64).is_multiple_of(k.max(1));
                     w.bit(one);
                     if one {
                         row_1d(&mut w, row);

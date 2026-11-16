@@ -54,7 +54,8 @@ pub fn tables(glibc: bool) -> &'static Tables {
     static CR: OnceLock<Tables> = OnceLock::new();
     static GL: OnceLock<Tables> = OnceLock::new();
     let make = || {
-        let (exp, log): (fn(f64) -> f64, fn(f64) -> f64) = if glibc {
+        type F = fn(f64) -> f64;
+        let (exp, log): (F, F) = if glibc {
             (larmorx_core::math::exp_glibc, larmorx_core::math::log_glibc)
         } else {
             (larmorx_core::math::exp, larmorx_core::math::log)

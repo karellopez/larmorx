@@ -36,8 +36,8 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
-    FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666, FS_672, FS_717,
-    FS_841, FS_842,
+    FS_53, FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666, FS_672,
+    FS_717, FS_841, FS_842,
 };
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
@@ -181,11 +181,31 @@ pub fn nan_inf_check(g: &mut Globals, err: &mut dyn Write, m: &Mri) -> i32 {
     };
     let (w, h, d, nf) = (m.width, m.height, m.depth, m.nframes);
     let row = m.vox_per_row as usize;
+    // the volume's own slices and rows (its header can name more: FS-921 under `reproduce`)
+    let (slices, rows) = (m.shape.depth * m.shape.nframes, m.shape.height);
+    let mut noted = false;
     for i in 0..w {
         for j in 0..h {
             for k in 0..d {
                 for t in 0..nf {
-                    let o = (((t * d + k) * h + j) as usize * row + i as usize) * 4;
+                    let sl = i64::from(t) * i64::from(d) + i64::from(k);
+                    let o = ((sl * i64::from(h) + i64::from(j)) as usize)
+                        .saturating_mul(row)
+                        .saturating_add(i as usize)
+                        .saturating_mul(4);
+                    if sl >= slices || i64::from(j) >= rows || o + 4 > chunk.len() {
+                        if !noted {
+                            noted = true;
+                            g.notices.add(
+                                &FS_53,
+                                format!(
+                                    "nan_inf_check({i}, {j}, {k}, {t}): an index outside the volume, at memory outside the volume's buffer (its header names {w} x {h} x {d} x {nf} voxels, its memory {} x {rows} x {} x {})",
+                                    m.shape.width, m.shape.depth, m.shape.nframes
+                                ),
+                            );
+                        }
+                        continue;
+                    }
                     let v = f32::from_le_bytes(chunk[o..o + 4].try_into().unwrap());
                     if !v.is_finite() {
                         let what = if v.is_infinite() { "Inf" } else { "NaN" };
@@ -464,7 +484,6 @@ pub fn mri_add_command_line(
 fn not_ported(mtype: i32) -> Option<&'static str> {
     use crate::identify::*;
     Some(match mtype {
-        MGH_AUTOENCODER => "autoencoder",
         DICOM_FILE | SIEMENS_DICOM_FILE => "DICOM",
         _ => return None,
     })
@@ -679,6 +698,19 @@ pub fn mri_read(
         let (r, s, e) = read_morph(g, out, err, env, dir, &copy, start_frame, end_frame)?;
         start_frame = s;
         end_frame = e;
+        r
+    } else if mtype == identify::MGH_AUTOENCODER {
+        let Some(read_autoencoder) = crate::upper::get().read_autoencoder else {
+            crate::upper::missing(err, "reading autoencoders", "fs.gca", "SAEread", &copy);
+            return Ok(None);
+        };
+        // the layer is the start frame; every frame of its volume is then taken, whatever
+        // volume_flag says
+        let r = read_autoencoder(g, out, err, env, dir, &copy, start_frame)?;
+        if let Some(m) = &r {
+            start_frame = 0;
+            end_frame = m.nframes - 1;
+        }
         r
     } else if mtype == identify::IMAGE_FILE {
         // every voxel read whatever volume_flag says; the frames are not checked

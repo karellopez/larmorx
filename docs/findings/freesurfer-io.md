@@ -2653,3 +2653,98 @@ The port: fs.io `imageio_tiff.rs` over track C's `larmorx_io::tiff` (used as it 
   (`GCAMmorphToAtlas`, `GCAMmorphFromAtlas`, `LTAinverseTransformInterp`, `LTAcompose`, `GCAMconcat2/3`,
   `GCAMfillInverse`, `LTArasToVoxelXform`, `LTAvoxelToRasXform`, `GCAMvoxToRas`). Measured: piece 32 seed 7 with the
   `W`, `C`, `A`, `D` queries: `reproduce` identical on every compared case (915), 0 different.
+
+## Part 36: stacked autoencoders read as volumes (relay 41 of track A)
+
+Sources: `utils/autoencoder.cpp` 72-103 (`SAEalloc`), 105-202 (`AEalloc`), 204-250 (`AEfree`, `SAEfree`), 303-351
+(`SAEactivateNetwork`, `AEactivateLayer`), 1538-1561 (`SAEinputWeightsToMRI`), 1598-1650 (`AEread`, `SAEread`),
+1652-1700 (`AEdump`), 2008-2075 (`SAElayerWeightsToMRI`); `utils/mriio.cpp` 695-704; `utils/matrix.cpp` 395-500
+(`MatrixAlloc_new`), 2255-2287 (`MatrixReadFrom`); `utils/transform.cpp` 381-411 (`useVolGeomToMRI`). The port: fs.gca
+`autoencoder.rs`, the hook `read_autoencoder` in fs.io's `upper.rs`.
+
+- **The header's numbers (FS-877).** `int whalf, nencoders, type, nlevels; double scale` are locals passed to
+  `fscanf`; a line that ends early leaves the rest uninitialised (one case printed `inputs/hidden 884682/0` where the
+  port's zeros give `0/0`; another `4095625/0`). The probe compares these apart.
+- **Two allocations of the first layer.** `SAEalloc` makes a layer from the header (its weights drawn at random and,
+  for a window of one voxel, run and dumped), then `SAEread` replaces `sae->first` with the layer `AEread` makes from
+  the file's matrices (another `AEalloc`, more draws): the header's layer is leaked. Its only visible traces: the
+  `allocating SAE ...` line, the random draws (the generator's state after the reading) and the dumps.
+- **The geometry is calloc's.** `sae = calloc(1, sizeof(SAE))`: the `VOL_GEOM` member's constructor never runs, so the
+  fields `readVolGeom` does not set are 0 (direction cosines included), not the constructor's coronal defaults
+  (measured: a block of six lines gave a zero third direction).
+- **Null layers (FS-878).** `AEread` returns `NULL` when `feof(fp)` (glibc sets it only after a read that found no
+  byte: a file that ends exactly after the last kernel size is not at its end, and the next layer's
+  `MatrixReadFrom` reads memory contents: FS-49); `SAEread`'s loop then writes `ae->next->prev` through `NULL`; a
+  missing first layer is dereferenced by `SAEinputWeightsToMRI` (`sae->first->v_hidden`); `MatrixReadFrom`'s `NULL`
+  (an unknown type, a size it cannot allocate) is dereferenced by `AEalloc(prev, m->cols, ...)`; `AEalloc`'s `NULL`
+  (the `calloc` of a negative hidden-unit count) by `MatrixCopy(..., ae->v_output_bias)` or the check's
+  `v_input->rptr[1][1]`. All crashes; refused in both modes.
+- **The one-voxel check (FS-922, FS-923).** `if (whalf == 0)` writes `sae->first->v_input->rptr[1][1]`: with
+  `nlevels` 0 or below the input vector has no row 1 (its row pointer is read past the pointer array); `AEdump` reads
+  `rptr[1][1]` of every matrix: with no hidden units `m_input_to_hidden` (0 rows) has no row 1 pointer (measured: a
+  crash, `SIGSEGV`).
+- **Weights past the columns (FS-880, FS-925).** Neither weights-to-volume function compares the window or kernel with
+  the matrix's columns: `MATRIX_RELT(m, h + 1, i)` is `rptr[h + 1] + i`, and `MatrixAlloc_new` lays the rows out one
+  after another (`rptr[r] = data + (r - 1) cols - 1`), so a column past the row reads the next row's weights; past the
+  last row the 64-byte rounded block (not cleared past its numbers) or the heap.
+- **The later layer's extent (FS-921, FS-927).** `useVolGeomToMRI(&sae->vg, mri)` sets the volume's `width`, `height`,
+  `depth` from the stored geometry (the training volume's; 0 when the file has none) without reallocating: the chunk
+  keeps the kernel's strides, the slice and row pointer arrays the kernel's sizes. `mri_read`'s `nan_inf_check` then
+  walks the header's extent through `MRIFseq_vox` (`slices[k + t depth][j]`), past the slice array for a depth above
+  1; the next layer takes `whalf_prev = (width - 1) / 2` from the header. The port models FreeSurfer's pointers by the
+  allocation's shape (fs.mri `voxel.rs`' `row_place`, `copy.rs`' `row_offset`: the same as the header's for every
+  other volume), so a smaller stored extent is reproduced exactly; a larger one is refused under `reproduce`.
+- **The sum's operand order.** `MRIsetVoxVal(mri, xk, yk, 0, h, val + val_prev)` compiles (`autoencoder.cpp.o` of the
+  unit oracle's build) to `mulss` of the weight into `val_prev`, then `addss` of `val` (spilled at `0x18(%rsp)`) into
+  that: the product's NaN wins when both are NaN; the division is `divss` of the count into `val`.
+- **`MatrixReadFrom` far past the end (FS-924).** After a matrix whose size does not match the destination
+  (`specified matrix does not match file`), the stream is three numbers in: the next "matrix header" is made of
+  doubles' bytes (rows near 1,072,693,248 for 1.0's high word). FreeSurfer allocates that (`MatrixAlloc_new`: 8 bytes
+  of row pointers per row and the numbers) and calls `freadDouble` for every element past the file's end, each
+  printing `freadDouble: fread failed`. Under the port's `reproduce` this ran out of a 12 GiB memory box on seed 7's
+  piece-33 case 500 (2026-11-16, its messages kept in memory: about 30 bytes each for about a billion numbers); it was
+  not run again outside the box. The port now stops at the first number past the end when 2^20 or more follow
+  (`MatrixReadFrom: the file ends <n> numbers before the matrix does (FreeSurfer prints an error for each)`), FS-924.
+- **Row-pointer blocks (FS-926).** The same headers ask for matrices of many rows and no columns (1,071,906,816 x 0 in
+  one case): `MatrixAlloc_new`'s single block is `64 + (rows + 1) * 8 + (rows * cols + 2) * 4` bytes rounded to 64:
+  8.6 GB of pointers before any number. Under `fsio`'s 1 GiB address space `posix_memalign` fails, the mmap fallback
+  prints `MatrixAlloc(r, c): Using mmap'd tmpfile` and dereferences an unset file pointer (`SIGSEGV`); on a machine
+  with the memory it clears and fills the pointers. The port keeps no pointers: it notes blocks above 256 MiB (the
+  probe skips them) and refuses blocks above `MACHINE_BYTES` (16 GiB) as FS-13 does.
+- **Where autoencoders come from.** Only `utils/autoencoder.cpp` reads and writes them; the training and applying
+  programs (`mri_train_autoencoder`, `mri_apply_autoencoder`) are in FreeSurfer's `attic/`, not built in 8.2.0, so
+  `mri_read` (through `mri_convert` and the other readers) is the only way an 8.2.0 program meets one.
+
+## Part 37: TRANSFORM on track C's LTA functions, GCAMvoxToRas, GCAMsampleMorph's NaNs (relay 41 of track A)
+
+Sources: `utils/transform.cpp` 2699-2733 (`TransformApplyInverse`, `TransformApplyInverseType`), 4122-4139
+(`TransformCreateDensityMap`), 4535-4552 (`TransformRas2Vox`, `TransformVox2Ras`), 4858-4875 (`TransformCompose`);
+`utils/gcamorph.cpp` 5274-5320 (`GCAMsampleMorph`), 11184-11263 (`GCAMrasToVox`), 11265-11316 (`GCAMvoxToRas`);
+`include/mri.h` 1951 (`#define MRIgetRasToVoxelXform extract_r_to_i`). The port: fs.gca `transform.rs`, `gcam.rs` on
+track C's fs.volume `ltaapply.rs` and `ltaconv.rs` (used as they are).
+
+- **`GCAMrasToVox(gcam, mri)` with a volume** takes `MRIgetRasToVoxelXform(mri)`, a macro for `extract_r_to_i`: the
+  inverse of the voxel-to-RAS matrix computed from the geometry each time, not `mri->r_to_i__`. The port's earlier
+  translation took the cached matrix (the same for any volume whose cache is current; not for a header given a
+  geometry by `MRIcopyVolGeomToMRI`, which does not refresh the cache); `extract_r_to_i` of a singular geometry is
+  `NULL`, and the first node's `MatrixMultiply(NULL, ...)` ends the program. Found by the new `X` query.
+- **`TransformCreateDensityMap` of a singular array (FS-928).** `TransformApply` gives `NULL` after
+  `MRIlinearTransform: xform is singular`; the density map prints `scaling volume by 0.000...` and calls
+  `MRIscalarMul(NULL, NULL, det)`, which reads `mri_src->width` (`SIGSEGV`; one seed-21 case).
+- **`GCAMsampleMorph`'s operand orders** (`gcamorph.cpp.o`): the eight weights are `mulss` chains in which the corners
+  at `xp` start from `ypd` (`ypd * xmd`) and `[xp][yp][zm]`'s is `zpd * (ymd * xmd)`; x and y load each position and
+  `mulsd` the weight into it, then `addsd` each term into the running sum; z `mulsd`s the position into the weight
+  (but `[xm][yp][zm]`'s), adds terms 1-3, then `addsd`s that sum into term 4 (`movapd` of term 4, `addsd` of the sum),
+  terms 5-7 into that, and the result into term 8. Only the NaN a sum of two NaNs keeps depends on it (one seed-7 `f`
+  query: `7fe00001` from a signalling NaN in a node's y against a quiet one).
+- **A memory dependence left for the next relay: `gcw` of a warp volume written as NIfTI.** The case
+  `validation/probes/fs-io/gcw_nifti_difference.txt` (a 3 x 2 x 2 warp volume of three frames with two quiet NaNs
+  and three 1e30 values, its warp tag of format 7 and no geometry tag, written to `o.nii` in format 0; `GCAMwrite`
+  prints `gcam image [0 x 0 x 0]`) gives `fsio` two outputs: run alone (or after 0 cases), the written file has the
+  port's bytes (every voxel 0; FNV-1a `405afea9a37dc9dc`); run after the 4,376 cases before it in a recorded set (the
+  same process: each case a forked child), its voxels are per-frame constants (`-65536`, `-8320`, `7.4e8`) and 64 bytes
+  of the header extension at offsets 376-391, 456-471, 548-563, 640-655 differ (FNV-1a `fe6976ea86a90170`; measured
+  2026-11-16 with `strace -f -e trace=openat,write` of `fsio` on both case files). So FreeSurfer's conversion of a
+  morph without geometries reads memory it never wrote (a matrix or geometry of the image of no voxels); the port
+  gives zeros. Not caused by this relay's code (the functions it changed are not on that path). The next relay finds
+  the read, gives it a defect ID and marks the case `VARY`. The recorded set does not hold that case.

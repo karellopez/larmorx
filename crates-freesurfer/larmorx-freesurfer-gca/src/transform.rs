@@ -17,23 +17,26 @@
 //! (4122) for linear transform arrays (a GCA morph's resamplings, `GCAMmorphToAtlas` and its
 //! density form, are not ported yet: a message and no volume).
 //!
-//! Not here yet (their callees are not ported): `TransformApplyInverse` and
-//! `TransformApplyInverseType` (`LTAinverseTransformInterp`, `GCAMmorphFromAtlas`),
-//! `TransformCompose` (`LTAcompose`), `TransformConcat` (`GCAMconcat2`/`3`),
-//! `TransformInvertReplace` (`GCAMfillInverse`), `TransformRas2Vox` and `TransformVox2Ras`
-//! (`LTArasToVoxelXform`, `LTAvoxelToRasXform`, `GCAMvoxToRas`).
+//! Since relay 41 (on track C's `LTAinverseTransformInterp`, `LTAcompose`, `LTArasToVoxelXform`
+//! and `LTAvoxelToRasXform` in fs.volume): `TransformApplyInverse` (2699) and
+//! `TransformApplyInverseType` (2717) for linear transform arrays (a GCA morph's,
+//! `GCAMmorphFromAtlas`, not ported yet), `TransformCompose` (4858), `TransformRas2Vox` (4535) and
+//! `TransformVox2Ras` (4544, with `GCAMvoxToRas`, gcamorph.cpp 11265).
+//!
+//! Not here yet (their callees are not ported): `TransformConcat` (`GCAMconcat2`/`3`),
+//! `TransformInvertReplace` (`GCAMfillInverse`), a GCA morph's resamplings.
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-io.md` Part 34): FS-857 (the inverse
 //! sample of a morph of spacing 0), FS-858 (a linear transform file whose type is the morph's),
 //! FS-859 (a transform array without transforms), FS-860 (freeing no transform), FS-861 (the
 //! inverse sample of a morph of no nodes), FS-862 (the nearest sample one voxel past the index
 //! volumes), FS-875 (a morph's copy loses its inverse and affine), FS-876 (a copy into a transform
-//! of the other kind).
+//! of the other kind), FS-928 (a conversion without its volume, a composition into a morph).
 
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861, FS_862, FS_876};
+use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861, FS_862, FS_876, FS_928};
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
@@ -51,11 +54,16 @@ use larmorx_freesurfer_mri::lta::lta_copy;
 use larmorx_freesurfer_mri::lta::{
     LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, LinearTransform, Lta, MORPH_3D_TYPE, lta_alloc, lta_free,
 };
-use larmorx_freesurfer_mri::mri::{Mri, mri_copy_vol_geom_to_mri};
+use larmorx_freesurfer_mri::mri::{Mri, SAMPLE_TRILINEAR, mri_copy_vol_geom_to_mri};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 use larmorx_freesurfer_volume::arith::{Pair, mri_scalar_mul};
-use larmorx_freesurfer_volume::ltaapply::{lta_transform, lta_transform_interp};
+use larmorx_freesurfer_volume::ltaapply::{
+    lta_inverse_transform_interp, lta_transform, lta_transform_interp,
+};
+use larmorx_freesurfer_volume::ltaconv::{
+    lta_compose, lta_compose_in_place, lta_ras_to_voxel_xform, lta_voxel_to_ras_xform,
+};
 use larmorx_freesurfer_volume::ltaops::{lta_change_type, lta_fill_inverse};
 use larmorx_freesurfer_volume::ltaread::{
     LtaIo, RegisterDat, lta_read_ex, transform_file_name_type,
@@ -737,18 +745,48 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
     {
         return (ERROR_BADPARM, [0.0; 3]);
     }
+    // the official build's operand orders (gcamorph.cpp.o; they decide which NaN a sum of two
+    // keeps): the weights of the corners with xp are ypd * xmd (and zpd * (ymd * xmd) for
+    // [xp][yp][zm]); x and y multiply each position by its weight and add the terms in order;
+    // z multiplies the weight by the position (but [xm][yp][zm]'s) and adds the fourth term and
+    // the eighth before the sum so far
+    let w = [
+        sse::mul(sse::mul(xpd, ypd), zpd),
+        sse::mul(sse::mul(xpd, ypd), zmd),
+        sse::mul(sse::mul(xpd, ymd), zpd),
+        sse::mul(sse::mul(xpd, ymd), zmd),
+        sse::mul(sse::mul(ypd, xmd), zpd),
+        sse::mul(sse::mul(ypd, xmd), zmd),
+        sse::mul(zpd, sse::mul(ymd, xmd)),
+        sse::mul(sse::mul(ymd, xmd), zmd),
+    ]
+    .map(f64::from);
+    let pos = |k: usize, i: usize| {
+        let (a, b, c, ..) = corners[i];
+        let n = gcam.node(a, b, c);
+        [n.x, n.y, n.z][k]
+    };
     let mut p = [0f32; 3];
-    for (k, out) in p.iter_mut().enumerate() {
-        let mut sum = 0f64;
-        for (i, &(a, b, c, wa, wb, wc)) in corners.iter().enumerate() {
-            let n = gcam.node(a, b, c);
-            let pos = [n.x, n.y, n.z][k];
-            let w = sse::mul(sse::mul(wa, wb), wc);
-            let term = sse::mul64(f64::from(w), pos);
-            sum = if i == 0 { term } else { sse::add64(sum, term) };
+    for (k, out) in p.iter_mut().enumerate().take(2) {
+        let mut sum = sse::mul64(pos(k, 0), w[0]);
+        for (i, &wi) in w.iter().enumerate().skip(1) {
+            sum = sse::add64(sum, sse::mul64(pos(k, i), wi));
         }
         *out = sum as f32;
     }
+    let t: Vec<f64> = (0..8)
+        .map(|i| {
+            if i == 2 {
+                sse::mul64(pos(2, i), w[i])
+            } else {
+                sse::mul64(w[i], pos(2, i))
+            }
+        })
+        .collect();
+    let s = sse::add64(sse::add64(t[0], t[1]), t[2]);
+    let s = sse::add64(t[3], s);
+    let s = sse::add64(sse::add64(sse::add64(s, t[4]), t[5]), t[6]);
+    p[2] = sse::add64(t[7], s) as f32;
     (NO_ERROR, p)
 }
 
@@ -1140,6 +1178,205 @@ pub fn transform_create_density_map(
             mri_scalar_mul(g, out, err, Pair::Same(&mut m), det)?;
             Ok(Ret::New(m))
         }
-        other => Ok(other),
+        // no volume (a transform that cannot be applied): FreeSurfer scales NULL (FS-928)
+        _ => {
+            refused_928(
+                g,
+                err,
+                "TransformCreateDensityMap of a transform that could not be applied",
+            );
+            Ok(Ret::Null)
+        }
     }
+}
+
+/// `TransformApplyInverseType(transform, mri_src, mri_dst, interp_type)` (2717): a linear transform
+/// array: its inverses filled (`LTAfillInverse`: a matrix that cannot be inverted ends the program)
+/// and `LTAinverseTransformInterp` (into `mri_dst` when given); a GCA morph through
+/// `GCAMmorphFromAtlas` (not ported yet: its message and no volume).
+#[allow(clippy::too_many_arguments)]
+pub fn transform_apply_inverse_type(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    t: &mut Transform,
+    src: &Mri,
+    dst: Option<&mut Mri>,
+    interp: i32,
+) -> Result<Ret<Mri>, Fatal> {
+    match &mut t.xform {
+        Xform::Morph(_) => {
+            morph_not_ported(err, "TransformApplyInverseType", "GCAMmorphFromAtlas");
+            Ok(Ret::Null)
+        }
+        Xform::Lta(lta) => {
+            lta_fill_inverse(g, out, err, lta)?;
+            lta_inverse_transform_interp(g, out, err, env, src, dst, lta, interp)
+        }
+    }
+}
+
+/// `TransformApplyInverse(transform, mri_src, mri_dst)` (2699): [`transform_apply_inverse_type`]
+/// with trilinear interpolation for a linear transform array (a GCA morph's, nearest neighbour,
+/// is not ported yet).
+pub fn transform_apply_inverse(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    t: &mut Transform,
+    src: &Mri,
+    dst: Option<&mut Mri>,
+) -> Result<Ret<Mri>, Fatal> {
+    if matches!(t.xform, Xform::Morph(_)) {
+        morph_not_ported(err, "TransformApplyInverse", "GCAMmorphFromAtlas");
+        return Ok(Ret::Null);
+    }
+    transform_apply_inverse_type(g, out, err, env, t, src, dst, SAMPLE_TRILINEAR)
+}
+
+/// FS-928: FreeSurfer dereferences a null pointer or uses a structure of the other kind here (a
+/// crash or memory corruption): both modes stop with `what` as an error.
+fn refused_928(g: &mut Globals, err: &mut dyn Write, what: &str) {
+    g.notices.add(
+        &FS_928,
+        format!("{what}: FreeSurfer crashes or writes another structure's memory; refused"),
+    );
+    log::error_printf(
+        g,
+        err,
+        ERROR_BADPARM,
+        &format!("{what} (FreeSurfer crashes here)\n"),
+    );
+}
+
+/// `TransformRas2Vox(transform, mri_src, mri_dst)` (4535): a GCA morph through `GCAMrasToVox(gcam,
+/// mri_src)`; a linear transform array becomes `LINEAR_VOX_TO_VOX` and goes through
+/// `LTArasToVoxelXform(lta, mri_src, mri_dst)` (which needs `mri_src` unless the array is already
+/// of voxels: FS-928 without it). Their status.
+pub fn transform_ras2vox(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    t: &mut Transform,
+    src: Option<&Mri>,
+    dst: Option<&Mri>,
+) -> Result<i32, Fatal> {
+    if !matches!(t.xform, Xform::Morph(_)) {
+        t.ttype = LINEAR_VOX_TO_VOX;
+    }
+    match &mut t.xform {
+        Xform::Morph(gcam) => crate::gcam::gcam_ras_to_vox(g, out, err, env, gcam, src),
+        Xform::Lta(lta) => match src {
+            Some(s) => lta_ras_to_voxel_xform(g, out, err, lta, s, dst),
+            None if lta.ltype == LINEAR_VOX_TO_VOX => Ok(NO_ERROR),
+            None => {
+                refused_928(
+                    g,
+                    err,
+                    "TransformRas2Vox of a linear transform without a source volume",
+                );
+                Ok(ERROR_BADPARM)
+            }
+        },
+    }
+}
+
+/// `TransformVox2Ras(transform, mri_src, mri_dst)` (4544): a GCA morph through `GCAMvoxToRas`; a
+/// linear transform array becomes `LINEAR_RAS_TO_RAS` and goes through `LTAvoxelToRasXform(lta,
+/// mri_src, mri_dst)`. Their status.
+pub fn transform_vox2ras(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    t: &mut Transform,
+    src: Option<&Mri>,
+    dst: Option<&Mri>,
+) -> Result<i32, Fatal> {
+    if !matches!(t.xform, Xform::Morph(_)) {
+        t.ttype = LINEAR_RAS_TO_RAS;
+    }
+    match &mut t.xform {
+        Xform::Morph(gcam) => crate::gcam::gcam_vox_to_ras(g, out, err, gcam),
+        Xform::Lta(lta) => lta_voxel_to_ras_xform(g, out, err, lta, src, dst),
+    }
+}
+
+/// `TransformCompose(t_src, m_left, m_right, t_dst)` (4858) into another transform: with no `t_dst`,
+/// a new one (`TransformAlloc(t_src's type, NULL)`: for a morph `TransformAlloc(MORPH_3D_TYPE):
+/// unsupported`); a GCA morph: `TransformCompose: MORPH_3D_TYPE unsupported` (`ERROR_UNSUPPORTED`)
+/// and `Null`; a linear transform array through `LTAcompose(lta_src, m_left, m_right, lta_dst)`.
+/// FS-928: a destination that holds a GCA morph (FreeSurfer writes into it as if it were an array),
+/// refused. For `t_dst` the source itself: [`transform_compose_in_place`].
+#[allow(clippy::too_many_arguments)]
+pub fn transform_compose(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    t_src: &Transform,
+    m_left: Option<&Matrix>,
+    m_right: Option<&Matrix>,
+    t_dst: Option<&mut Transform>,
+) -> Result<Ret<Transform>, Fatal> {
+    let mut fresh = None;
+    let given = t_dst.is_some();
+    let dst: Option<&mut Transform> = match t_dst {
+        Some(d) => Some(d),
+        None => match transform_alloc(g, out, err, t_src.ttype, None)? {
+            Some(d) => Some(fresh.insert(d)),
+            None => None,
+        },
+    };
+    let Xform::Lta(lta_src) = &t_src.xform else {
+        log::error_printf(
+            g,
+            err,
+            ERROR_UNSUPPORTED,
+            "TransformCompose: MORPH_3D_TYPE unsupported",
+        );
+        return Ok(Ret::Null);
+    };
+    let Some(dst) = dst else {
+        return Ok(Ret::Null);
+    };
+    let Xform::Lta(lta_dst) = &mut dst.xform else {
+        refused_928(
+            g,
+            err,
+            "TransformCompose of a linear transform into a GCA morph",
+        );
+        return Ok(Ret::Null);
+    };
+    lta_compose(g, out, err, lta_src, m_left, m_right, Some(lta_dst))?;
+    Ok(match fresh {
+        Some(d) => Ret::New(d),
+        None if given => Ret::Given,
+        None => Ret::Null,
+    })
+}
+
+/// `TransformCompose(t, m_left, m_right, t)` (4858) into the transform itself: a GCA morph:
+/// `TransformCompose: MORPH_3D_TYPE unsupported` and `false` (FreeSurfer's `NULL`); a linear
+/// transform array through `LTAcompose` in place (`lta_compose_in_place`); `true`.
+pub fn transform_compose_in_place(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    t: &mut Transform,
+    m_left: Option<&Matrix>,
+    m_right: Option<&Matrix>,
+) -> Result<bool, Fatal> {
+    let Xform::Lta(lta) = &mut t.xform else {
+        log::error_printf(
+            g,
+            err,
+            ERROR_UNSUPPORTED,
+            "TransformCompose: MORPH_3D_TYPE unsupported",
+        );
+        return Ok(false);
+    };
+    lta_compose_in_place(g, out, err, lta, m_left, m_right)?;
+    Ok(true)
 }

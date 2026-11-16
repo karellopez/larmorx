@@ -44,8 +44,9 @@ const ROWS_STEPPED: [i32; 8] = [
 /// The byte offset of `slices[k][y]` in a volume's buffer, or `None` where FreeSurfer reads a slice
 /// or row pointer it does not have (an index beyond its slices or rows: memory contents).
 fn row_offset(m: &Mri, k: i64, y: i64) -> Option<u64> {
-    let slices = i64::from(m.vg.depth) * i64::from(m.nframes);
-    if m.chunk.is_none() || !(0..slices).contains(&k) || !(0..i64::from(m.vg.height)).contains(&y) {
+    // the allocation's slices and rows (the header's unless a caller changed its extent: FS-921)
+    let slices = m.shape.depth * m.shape.nframes;
+    if m.chunk.is_none() || !(0..slices).contains(&k) || !(0..m.shape.height).contains(&y) {
         return None;
     }
     let vox = k as u64 * m.vox_per_slice + y as u64 * m.vox_per_row;

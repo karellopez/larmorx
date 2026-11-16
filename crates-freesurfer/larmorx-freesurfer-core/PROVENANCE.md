@@ -224,3 +224,11 @@ with status 139 (`docs/findings/freesurfer-maths.md`, "Relay 24").
 Changes for relay 33 of track A: `VERuser` and `getAllInfo` set `errno` 0 (glibc 2.35's `getpwuid`,
 whether it finds the user or not; `system::passwd_name`); their callers (`FSENVgetenv`,
 `handleVersionOption`, argparse's `--all-info`) pass the program's globals.
+
+## Relay 41 (track A)
+
+- `matrix.rs`: FS-926: `MatrixAlloc_new`'s one block (`utils/matrix.cpp` 394-516: the header, `rows + 1` row
+  pointers and the numbers, each part rounded to 64 bytes) noted above 256 MiB and refused above `MACHINE_BYTES`
+  (the port keeps no row pointers; `docs/findings/freesurfer-io.md` Part 36).
+- `matrix_io.rs`: FS-924: `MatrixReadFrom` (`utils/matrix.cpp` 2255-2287) under `reproduce` stops at the first number
+  past the file's end when 2^20 or more follow (FreeSurfer prints `freadDouble: fread failed` for each).

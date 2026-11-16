@@ -746,6 +746,10 @@ fn answer(
     if bits & 1024 != 0 {
         pairs.push(("FS_TIFF_DEBUG", "1"));
     }
+    // piece 33 (relay 41): the autoencoder reader's random weights
+    if bits & 2048 != 0 {
+        pairs.push(("FREESURFER_SEED", "4711"));
+    }
     let mut env = Environment::from_pairs(pairs);
     for (k, v) in more_env {
         // ASCII values only (the generated cases'): the same on every platform

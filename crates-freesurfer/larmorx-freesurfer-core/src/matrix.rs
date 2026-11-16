@@ -37,6 +37,11 @@
 //!   with a size that wrapped), or prints `MatrixAlloc(r, c): allocation failed` and exits with 1.
 //!   Both modes print the two lines and exit with 1 (the crash depends on memory contents and is
 //!   never reproduced); FS-13 is noted.
+//! - **FS-926** (both modes): the new allocator's block holds a row pointer (8 bytes) per row, so a
+//!   matrix of many rows (a size read from a damaged or misaligned file: a billion rows of no
+//!   numbers) asks for gigabytes before any number: past 256 MiB the outcome depends on the
+//!   machine's memory (noted), past `MACHINE_BYTES` the port answers as a machine without that
+//!   memory (FS-13's lines and exit).
 //! - **FS-14** (corrected by default): `MatrixCopy` copies element by element through
 //!   `MATRIX_RELT` whatever the type, so of a complex matrix it copies `cols` floats per row from
 //!   the float before the row's first pair (the first row's starts at the unused float before the
@@ -56,7 +61,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_13, FS_14, FS_15, FS_16};
+use larmorx_core::defects::{FS_13, FS_14, FS_15, FS_16, FS_926};
 
 use crate::diag::BUILD_ROOT;
 use crate::globals::Globals;
@@ -322,6 +327,11 @@ pub fn matrix_alloc_new_size(rows: i32, cols: i32, mtype: i16) -> usize {
     round(size)
 }
 
+/// FS-926: the size of the new allocator's block (the header, a row pointer per row, the numbers)
+/// above which whether FreeSurfer's allocation succeeds depends on the machine's memory (noted:
+/// 256 MiB, the fs-io probe's limit for such allocations; refused above `MACHINE_BYTES`).
+pub const BIG_BLOCK: u64 = 1 << 28;
+
 /// FS-13's two lines and exit status 1 (see the module's documentation).
 fn alloc_failed(
     g: &mut Globals,
@@ -380,8 +390,35 @@ fn matrix_alloc_wkr(
             }
         }
     };
-    if !old && buf {
-        m.in_buf = matrix_alloc_new_size(rows, cols, mtype) <= MATRIX_BUFFER_SIZE;
+    if !old && (rows < 0 || cols < 0) {
+        // FS-13's empty matrix of a negative size (`reproduce`)
+        if buf {
+            m.in_buf = matrix_alloc_new_size(rows, cols, mtype) <= MATRIX_BUFFER_SIZE;
+        }
+    } else if !old {
+        // FS-926: the new allocator's one block holds a row pointer per row: a matrix of many
+        // rows asks for gigabytes before any number (the port keeps no pointers)
+        let block = matrix_alloc_new_size(rows, cols, mtype) as u64;
+        if block > crate::alloc::MACHINE_BYTES {
+            g.notices.add(
+                &FS_926,
+                format!(
+                    "MatrixAlloc({rows}, {cols}): a block of {block} bytes with its row pointers: refused as by a machine without that memory"
+                ),
+            );
+            return Err(alloc_failed(g, out, err, AllocFailure { rows, cols }));
+        }
+        if block > BIG_BLOCK {
+            g.notices.add(
+                &FS_926,
+                format!(
+                    "MatrixAlloc({rows}, {cols}): a block of {block} bytes with its row pointers: FreeSurfer's allocation succeeds or fails with the machine's memory"
+                ),
+            );
+        }
+        if buf {
+            m.in_buf = block as usize <= MATRIX_BUFFER_SIZE;
+        }
     }
     if rows >= 1 && mtype != MATRIX_REAL && mtype != MATRIX_COMPLEX {
         log::error_printf(

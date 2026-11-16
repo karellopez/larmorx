@@ -12,6 +12,7 @@ import re
 import struct
 import subprocess
 import sys
+from pathlib import Path
 
 
 def main(argv: list[str]) -> int:
@@ -23,7 +24,7 @@ def main(argv: list[str]) -> int:
         m = re.match(r"\s*\[\s*(\d+)\]\s+(\S+)\s+\S+\s+[0-9a-f]+\s+([0-9a-f]+)\s+([0-9a-f]+)", line)
         if m:
             sec[int(m.group(1))] = (m.group(2), int(m.group(3), 16))
-    data = open(obj, "rb").read()
+    data = Path(obj).read_bytes()
     for line in syms.splitlines():
         p = line.split()
         if len(p) >= 8 and p[7] in names and p[6].isdigit():

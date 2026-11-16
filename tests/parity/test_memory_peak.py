@@ -31,11 +31,11 @@ each), its peak kept in its entry for this machine and its outputs stored; after
 served, its outputs replayed and its peak the median of the three, and only larmorx runs
 (:func:`_original_peak`; ``--oracle-cache refresh`` measures again, ``off`` measures every time).
 
-A small call (an original's peak under ``SMALL_MIB``, 2026-11-16) runs five times with the
-entry point beside it, and the pair of the median difference is kept (:func:`larmorx_peak`): the
-10 % of a peak of a few MiB is less than the spread of a peak through the entry point from run
-to run, so a single pair failed now and then without any change of larmorx; the rule's
-allowance is the same.
+A call measured within ``RECHECK_MIB`` (1 MiB) of its allowance, or above it, runs five times
+with the entry point beside it, and the pair of the median difference decides (:func:`larmorx_peak`,
+2026-11-16): a peak through the entry point varies by about 1 MiB from run to run, more than the
+10 % of a small original's peak, so a single pair failed now and then without any change of
+larmorx; the rule's allowance is the same.
 """
 
 from __future__ import annotations
@@ -182,19 +182,16 @@ def allowance(original_mib: float, entry_mib: float | None = None) -> float:
     return RATIO * original_mib + (OVERHEAD_MIB if entry_mib is None else entry_mib)
 
 
-#: Below this original peak (MiB) the rule's 10 % is about the spread of a peak through the
-#: Python entry point from run to run (2026-11-16, the main machine, FLIRT's ``extracttxt`` in the
-#: environment of its test, 150 pairs: ``python -m larmorx --version`` 14.50 to 15.50 MiB, the
-#: call 15.50 to 16.75, their difference 0.50 to 2.00 against the 1.925 FSL's 1.75 MiB allows:
-#: 2 pairs in 150 failed; ``validation/investigations/memory-small-calls/``). Such a call and the
-#: entry point are then measured :data:`REPEATS` times, in pairs one after the other, and the
-#: pair whose difference is the median of the pairs' kept (:func:`larmorx_peak`): no pair in 50
-#: blocks of three failed, nor in 30 of five; the least peak of each side, tried first, failed one
-#: block in 50 (the entry point's low peaks are more frequent than the call's). The rule's
-#: allowance (:func:`allowance`) is unchanged: a call whose typical peak is above it is above it
-#: in the median too.
-SMALL_MIB = 64.0
-#: The pairs of runs of a small call (:data:`SMALL_MIB`).
+#: A call whose first measurement is within this many MiB of the allowance, or above it, is
+#: measured again (:func:`larmorx_peak`). A peak through the Python entry point varies from run to
+#: run by about 1 MiB in steps of 0.25 MiB (2026-11-16, the main machine, FLIRT's ``extracttxt`` in
+#: the environment of its test, 150 pairs: ``python -m larmorx --version`` 14.50 to 15.50 MiB, the
+#: call 15.50 to 16.75, their difference 0.50 to 2.00 MiB, each at most 0.75 from the typical 1.25),
+#: so a call whose typical peak is this close to the allowance passes or fails it by chance: FSL's
+#: 1.75 MiB allows ``extracttxt`` 1.925 MiB beyond the entry point, and 2 pairs in 150 failed it
+#: (``validation/investigations/memory-small-calls/``).
+RECHECK_MIB = 1.0
+#: The pairs of runs of a call measured again (:data:`RECHECK_MIB`).
 REPEATS = 5
 
 
@@ -207,25 +204,32 @@ def larmorx_peak(
 ) -> tuple[int, float, float, str]:
     """larmorx's call ``cmd`` through the Python entry point: its exit status, its peak (MiB),
     the entry point's peak (:func:`entry_peak`, in the same environment and folder) and its
-    standard output. For an original of less than :data:`SMALL_MIB` the entry point and the call
-    run :data:`REPEATS` times each, in pairs (the entry point, then the call), ``reset`` emptying
-    the call's output place before each repeat so each run starts alike; the peaks are those of
-    the pair whose difference (the call's less the entry point's) is the median of the pairs',
-    the exit status and the outputs those of the last run (every run must give the same exit
-    status). Otherwise each runs once."""
-    n = REPEATS if original_mib < SMALL_MIB else 1
+    standard output. The entry point and the call run once, in a pair; when the call's peak is
+    within :data:`RECHECK_MIB` of the allowance (:func:`allowance` of ``original_mib`` and the
+    entry point's peak) or above it, the pair runs again until there are :data:`REPEATS`, ``reset``
+    emptying the call's output place before each repeat so each run starts alike, and the peaks
+    are those of the pair whose difference (the call's less the entry point's) is the median of
+    the pairs': no pair in 30 blocks of five failed ``extracttxt``, against 2 in 150 single pairs;
+    the least peak of each side, tried first, still failed 1 block of three in 50 (the entry
+    point's low peaks are more frequent than the call's). The allowance is the rule's as it was: a
+    call whose typical peak is above it is above it in the median too. The exit status and the
+    outputs are those of the last run (every run must give the same exit status)."""
     pairs: list[tuple[float, float]] = []
     codes: list[int] = []
     out = ""
-    for k in range(n):
-        if k and reset is not None:
+    while True:
+        if pairs and reset is not None:
             reset()
         entry = entry_peak(env, cwd)
         code, mib, out = _peak_run(cmd, env, cwd)
         codes.append(code)
         pairs.append((mib, entry))
+        if len(pairs) == 1 and mib <= allowance(original_mib, entry) - RECHECK_MIB:
+            break
+        if len(pairs) == REPEATS:
+            break
     assert len(set(codes)) == 1, f"{cmd[3:5]}: exit statuses {codes} from run to run"
-    mib, entry = sorted(pairs, key=lambda p: p[0] - p[1])[n // 2]
+    mib, entry = sorted(pairs, key=lambda p: p[0] - p[1])[len(pairs) // 2]
     return codes[-1], mib, entry, out
 
 

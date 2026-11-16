@@ -1,9 +1,10 @@
 # The peak of a small call through the Python entry point, from run to run
 
-What it shows: why `tests/parity/test_memory_peak.py` measures a small call (an original whose
-peak is under `SMALL_MIB`, 64 MiB) in five pairs and keeps the pair of the median difference
-(`larmorx_peak`), and that this keeps the user's rule as it is (larmorx's peak at most 1.10 times
-the original's plus the entry point's own peak: CLAUDE.md, "Memory similar to the original's").
+What it shows: why `tests/parity/test_memory_peak.py` measures a call whose first measurement is
+within `RECHECK_MIB` (1 MiB) of its allowance, or above it, in five pairs (the entry point, then
+the call) and keeps the pair of the median difference (`larmorx_peak`), and that this keeps the
+user's rule as it is (larmorx's peak at most 1.10 times the original's plus the entry point's own
+peak: CLAUDE.md, "Memory similar to the original's").
 
 A call through `python -m larmorx` pays the interpreter's start-up and larmorx's Rust core
 (`python -m larmorx --version`, about 15 MiB here). Both that peak and a small call's vary from
@@ -44,5 +45,8 @@ limit is above it in the median too, so the rule is not loosened. In the default
 (the whole `os.environ`, `spread.py` without `--flirt-env`, 80 pairs) both peaks were higher and
 the typical difference 1.5 MiB: the test's own environment is the one that counts.
 
-Afterwards: the test 20 times boxed (`fs-found-c-r36-mem-extracttxt-20.log`), 20 passed, the
-margin of each measurement 0.12 to 1.12 MiB.
+Why a band and not a size: five pairs for every original under 64 MiB (the first form) made the
+memory file much slower (prelude's and BET's calls of 10 to 60 MiB, five times each in both
+modes); a call far from its allowance (most of them: 2 MiB and more) is decided by one pair as
+before, since a difference of 1 MiB is beyond the spread seen. Only a call within 1 MiB of its
+allowance (`extracttxt`, always: its typical margin is about 0.7 MiB) or above it runs five pairs.

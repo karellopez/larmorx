@@ -2587,6 +2587,46 @@ defects! {
         "storing (level 0) can slide the window down while more bytes wait to be hashed than lie before the current position; after a switch to a compressing level (deflateParams) the next fill of the window reads far before its start and the program crashes (zlib 1.2.12 limits the count to the position)";
     FS_813 = "FS-813", "IJG libjpeg 6b", true,
         "a JPEG file whose scan names one component twice (two frame components with one identifier, or an identifier repeated in the scan's list) is decoded without a complaint: in a file of one scan the component left out keeps the memory contents of the decoder's sample buffer, so its colour comes from whatever that memory held; in a file of several scans the second copy decides that component's coefficients (libjpeg 9 refuses such a scan)";
+    FS_814 = "FS-814", "libtiff 3.6.1", true,
+        "counting the directories of a TIFF file whose chain of directories loops back (a directory's link points to an earlier one) never returns; corrected, the count stops at the first directory seen again";
+    FS_815 = "FS-815", "libtiff 3.6.1", true,
+        "a directory entry or a strip count whose size in bytes does not fit 32 bits is allocated with its size cut to 32 bits and then written past (a crash); refused as an allocation failure, with libtiff's No space message";
+    FS_816 = "FS-816", "libtiff 3.6.1", true,
+        "a directory with a second Compression field that names another codec with private tags (LZW, Deflate, the CCITT codecs, PixarLog, SGILog) keeps the first codec's tag methods after freeing it: the next TIFFSetField or TIFFGetField runs them on freed or another codec's state (a crash or an endless recursion); the current codec's methods are used";
+    FS_817 = "FS-817", "libtiff 3.6.1", true,
+        "decoders read past a strip's data: a PackBits run or literal at the end of the data takes bytes an earlier strip left in libtiff's buffer, and the test for old-style LZW codes looks at two bytes of a one-byte strip; corrected as libtiff 4 does, decoding stops at the end of the data and a strip under two bytes is never old-style";
+    FS_818 = "FS-818", "libtiff 3.6.1", true,
+        "LZW decoding of damaged data uses table entries the decoder never writes (codes 256 and 257 right after a Clear code: memory contents), the decoder for old-style LZW codes follows null links (a crash) and writes before the start of its row, and a table entry linked to itself is followed for ever (a hang); read as zeros, decoding stopped, nothing written there";
+    FS_819 = "FS-819", "libtiff 3.6.1", true,
+        "a decoder that reads past a strip's data reads bytes of libtiff's raw buffer that no read has written since the buffer was allocated (memory contents); read as 0";
+    FS_820 = "FS-820", "libtiff 3.6.1", true,
+        "the type check of a directory entry whose type matches none of its field's entries, when that field is the last of its table, reads the memory after the table, and checks no later entry of the directory: those are read without their type and count checked, and an unknown tag among them crashes the reader; corrected, every entry is checked";
+    FS_821 = "FS-821", "libtiff 3.6.1", true,
+        "a directory of no strips (an image length of 0) without StripByteCounts: estimating the counts divides by zero (a crash) or trims the strip at index 65535 of empty arrays (memory outside them); nothing is estimated";
+    FS_822 = "FS-822", "libtiff 3.6.1", true,
+        "per-sample fields (BitsPerSample, Compression, MinSampleValue, MaxSampleValue, SampleFormat) given as LONG values for several samples are read as the 16-bit halves of the values, so they differ (Cannot handle different per-sample values), and past five samples the reader writes past its buffer; corrected, they are read as LONG values";
+    FS_823 = "FS-823", "libtiff 3.6.1", true,
+        "an SMinSampleValue or SMaxSampleValue of type ASCII, UNDEFINED or an unknown type: libtiff's error message passes no type, so its number and its field name come from memory never given (garbage or a crash); the message is written with the type";
+    FS_824 = "FS-824", "libtiff 3.6.1", true,
+        "ExtraSamples of more than four BYTE values are read as half as many 16-bit values, the rest of the array being memory never written, so the samples are refused or set from that memory; corrected, the bytes are the values";
+    FS_825 = "FS-825", "libtiff 3.6.1", true,
+        "a one-character ASCII or UNDEFINED value of a field that passes its count (an unknown tag, InkNames) is passed with the string where the count goes: the count is an address (an allocation of any size) and the copy reads a pointer never given (a crash or a failure); set as one value";
+    FS_826 = "FS-826", "libtiff 3.6.1", true,
+        "reading a strip or tile of a directory whose strip arrays were never read (a TIFFReadDirectory that failed) or past their end reads a null pointer or memory outside the arrays (a crash); refused";
+    FS_827 = "FS-827", "libtiff 3.6.1", true,
+        "writing a rational value that is NaN, infinite or above 4294967295 converts it to an unsigned 32-bit integer out of range (undefined; x86-64 gives 0 or its low 32 bits); clamped to 0 or 4294967295";
+    FS_828 = "FS-828", "libtiff 3.6.1", true,
+        "a directory that counts more entries than it fills writes the rest as memory never written; written as zeros";
+    FS_830 = "FS-830", "libtiff 3.6.1", true,
+        "after a TIFFReadDirectory that fails, the scanline and tile sizes of the previous directory are kept: TIFFReadScanline and TIFFReadTile write that many bytes into a buffer sized for the new directory (memory past it); only the buffer is written";
+    FS_831 = "FS-831", "libtiff 3.6.1", true,
+        "when a strip's start fails in the codec's setup (an unsupported predictor), reading the next row of that strip calls the LZW or Deflate decoder without a start: its input pointers were never set (a crash); nothing is decoded";
+    FS_832 = "FS-832", "libtiff 3.6.1", true,
+        "the predictor's horizontal differencing works by whole pixels while bytes are left, so a row whose byte count is not a multiple of the pixel's (a scanline size left from another directory) is processed past its end; past the caller's buffer nothing is touched";
+    FS_833 = "FS-833", "libtiff 3.6.1", true,
+        "a negative strip or tile size (TIFFTileSize of a stripped image overflows 32 bits; kept after a TIFFReadDirectory that failed) makes the None decoder copy, the Deflate decoder inflate into, and the byte swap of 16-, 32- and 64-bit samples swap, about 2^64 bytes (memory past the buffers); nothing is written";
+    FS_834 = "FS-834", "libtiff 3.6.1", true,
+        "a SamplesPerPixel of several values, of a floating-point type or of a string type (and such an entry left unchecked by FS-820) is passed as an array's or a string's address, or as a floating-point argument, where one integer goes: the field takes an address's low bits or a register never set (nondeterministic); ignored with libtiff's incorrect-count or wrong-type warning";
 }
 
 /// The register entry with ID `id`.

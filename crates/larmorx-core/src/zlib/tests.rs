@@ -143,3 +143,71 @@ fn dictionary_past_the_window_is_zeros() {
     assert_eq!(dict.len(), 512);
     assert!(d.notices.contains(&FS_812));
 }
+
+/// zlib's own decompressor on streams of every level and window, called with small slices of
+/// input and output: the same bytes as the input, `Z_STREAM_END` at the end, the check value.
+#[test]
+fn inflate_round_trips_in_small_steps() {
+    for (k, &(level, wbits)) in [(6, 15), (1, 9), (9, 12), (0, 15), (6, -15), (3, -9)]
+        .iter()
+        .enumerate()
+    {
+        let data: Vec<u8> = (0..40_000u32)
+            .map(|i| (((i * 7 + k as u32) % 251) ^ (i >> 5)) as u8)
+            .collect();
+        let mut d = Deflate::init2(level, Z_DEFLATED, wbits, 8, Z_DEFAULT_STRATEGY).unwrap();
+        let mut z = vec![0u8; compress_bound(data.len() as u64) as usize + 64];
+        let (r, _, n) = d.deflate(&data, &mut z, Z_FINISH);
+        assert_eq!(r, Z_STREAM_END);
+        z.truncate(n);
+        let mut inf = Inflate::init2(wbits).unwrap();
+        let mut out = vec![0u8; data.len()];
+        let (mut i, mut o) = (0usize, 0usize);
+        let mut step = 1usize;
+        loop {
+            let ie = (i + step).min(z.len());
+            let oe = (o + step * 3 / 2 + 1).min(out.len());
+            let (r, used, wrote) = inf.inflate(&z[i..ie], &mut out[o..oe], Z_PARTIAL_FLUSH);
+            i += used;
+            o += wrote;
+            step = step % 700 + 37;
+            if r == Z_STREAM_END {
+                break;
+            }
+            assert!(r == Z_OK || r == Z_BUF_ERROR, "{r}");
+        }
+        assert_eq!(o, data.len());
+        assert_eq!(out, data);
+        assert_eq!(i, z.len());
+        if wbits > 0 {
+            assert_eq!(inf.adler, adler32(1, Some(&data)));
+        }
+    }
+}
+
+/// The messages of damaged streams and `inflateSync`'s search for a flush point.
+#[test]
+fn inflate_messages_and_sync() {
+    let mut inf = Inflate::init().unwrap();
+    let mut out = [0u8; 16];
+    assert_eq!(
+        inf.inflate(&[0x78, 0x9d], &mut out, Z_NO_FLUSH).0,
+        Z_DATA_ERROR
+    );
+    assert_eq!(inf.msg, Some("incorrect header check"));
+    let mut inf = Inflate::init().unwrap();
+    // A zlib header, then a block of type 3.
+    assert_eq!(
+        inf.inflate(&[0x78, 0x9c, 0x07], &mut out, Z_NO_FLUSH).0,
+        Z_DATA_ERROR
+    );
+    assert_eq!(inf.msg, Some("invalid block type"));
+    // inflateSync finds 00 00 ff ff and resets (msg cleared), ready for a new block.
+    let (r, used) = inf.sync(&[1, 0, 0, 0xff, 0xff, 9]);
+    assert_eq!((r, used), (Z_OK, 5));
+    assert_eq!(inf.msg, None);
+    // No input and no progress: Z_BUF_ERROR, the message unchanged.
+    let mut inf = Inflate::init().unwrap();
+    assert_eq!(inf.inflate(&[], &mut out, Z_PARTIAL_FLUSH).0, Z_BUF_ERROR);
+    assert_eq!(inf.msg, None);
+}

@@ -6,10 +6,13 @@
 //! `deflateParams` change and the hooks of IBM Z's hardware compressor, which an x86-64 build
 //! compiles to nothing).
 //!
-//! The decompressor is not here: larmorx reads deflate data through zlib-rs (flate2) and
-//! [`crate::miniz`]; their output is fixed by the format. A compressor chooses its own matches
-//! and blocks, so only a translation of zlib's gives zlib's bytes (an MGZ or a GIFTI file
-//! identical to FreeSurfer's).
+//! A compressor chooses its own matches and blocks, so only a translation of zlib's gives zlib's
+//! bytes (an MGZ or a GIFTI file identical to FreeSurfer's). The decompressor's output is fixed
+//! by the format, and larmorx reads most deflate data through zlib-rs (flate2) and
+//! [`crate::miniz`]; [`Inflate`] is zlib's own (`inflate.c`, `inftrees.c`, `inffast.c`) for the
+//! readers whose messages and behaviour on damaged data must be zlib's (libtiff's Deflate
+//! strips: `inflate` one row at a time, `inflateSync` after an error, `strm->msg` in the
+//! messages).
 //!
 //! The interface follows zlib's `z_stream` with Rust's slices in place of its pointers: each
 //! call takes the input still available (`next_in`/`avail_in`) and the output space
@@ -20,12 +23,14 @@
 #[doc(hidden)]
 pub mod cases;
 mod deflate;
+mod inflate;
 mod trees;
 
 #[cfg(test)]
 mod tests;
 
 pub use deflate::{Deflate, GzHeader};
+pub use inflate::{Inflate, Mode as InflateMode};
 
 // zlib.h's constants.
 pub const Z_NO_FLUSH: i32 = 0;

@@ -1,0 +1,17 @@
+[package]
+name = "fs-tiff"
+description = "larmorx-io's TIFF port against libtiff 3.6.1 as FreeSurfer 8.2.0 builds it and as released"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build.
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+larmorx-io = { path = "../../../crates/larmorx-io" }
+
+[profile.release]
+debug = false

@@ -26,7 +26,8 @@ use std::path::Path;
 
 use larmorx_core::defects::{FS_851, FS_852, FS_853, FS_854, FS_855};
 use larmorx_freesurfer_core::alloc::MACHINE_BYTES;
-use larmorx_freesurfer_core::cstd::fmt_f;
+use larmorx_core::math::Libm;
+use larmorx_freesurfer_core::cstd::{fmt_f, note_glibc07};
 use larmorx_freesurfer_core::diag::{BUILD_ROOT, DIAG_SHOW, DIAG_WRITE, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
@@ -1232,7 +1233,7 @@ fn cmin(a: f32, b: f32) -> f32 {
 
 /// One node's value of `which` for [`gcam_write_mri`], or `None` for a field FreeSurfer does not
 /// write.
-fn node_value(n: &GcamNode, which: i32) -> Option<f32> {
+fn node_value(libm: &Libm, n: &GcamNode, which: i32) -> Option<f32> {
     let jac = |n: &GcamNode| {
         if fzero(f64::from(n.orig_area)) {
             1.0
@@ -1265,9 +1266,9 @@ fn node_value(n: &GcamNode, which: i32) -> Option<f32> {
                 if d > 1.0 {
                     0.0
                 } else if d > 0.0 {
-                    -larmorx_core::math::log10f_glibc(d.abs())
+                    -libm.log10f(d.abs())
                 } else {
-                    larmorx_core::math::log10f_glibc(d.abs())
+                    libm.log10f(d.abs())
                 }
             } else {
                 0.0
@@ -1283,7 +1284,7 @@ fn node_value(n: &GcamNode, which: i32) -> Option<f32> {
                 -100.0
             } else {
                 // logf (C++'s float overload)
-                larmorx_core::math::logf_glibc(d)
+                libm.logf(d)
             }
         }
         GCAM_AREA => n.area,
@@ -1311,8 +1312,9 @@ fn node_value(n: &GcamNode, which: i32) -> Option<f32> {
 /// current positions, node coordinates, status, validity, areas, the Jacobian `area / orig_area`
 /// (1 where `orig_area` is within `FLT_EPSILON` of 0) and its logarithm (`logf`; -100 below 0),
 /// whether either parallelepiped turned negative, the smaller area and its signed `log10f`
-/// (0 above 1, `-log10f(d)` in (0, 1], `log10f(|d|)` otherwise: glibc's float functions, as the
-/// official build's C++ calls the float overloads). Another field
+/// (0 above 1, `-log10f(d)` in (0, 1], `log10f(|d|)` otherwise: the float functions, as the
+/// official build's C++ calls the float overloads; correctly rounded by default, glibc 2.35's
+/// with `reproduce`, GLIBC-07 noted where the two differ on a node's value). Another field
 /// ends the program (`GCAMwriteMRI(<which>): unknown which parameter`) at the first node.
 pub fn gcam_write_mri(
     g: &mut Globals,
@@ -1322,10 +1324,11 @@ pub fn gcam_write_mri(
     which: i32,
 ) -> Result<Mri, Fatal> {
     let mut m = atlas_volume(g, out, err, gcam, 1)?;
+    let libm = Libm::new(g.mode());
     for x in 0..gcam.width.max(0) {
         for y in 0..gcam.height.max(0) {
             for z in 0..gcam.depth.max(0) {
-                let Some(d) = node_value(gcam.node(x, y, z), which) else {
+                let Some(d) = node_value(&libm, gcam.node(x, y, z), which) else {
                     log::error_exit(
                         g,
                         err,
@@ -1338,6 +1341,15 @@ pub fn gcam_write_mri(
             }
         }
     }
+    note_glibc07(
+        g,
+        &libm,
+        if which == GCAM_LOG_JACOBIAN {
+            "logf"
+        } else {
+            "log10f"
+        },
+    );
     Ok(m)
 }
 

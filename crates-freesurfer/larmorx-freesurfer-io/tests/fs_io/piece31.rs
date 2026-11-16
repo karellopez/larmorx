@@ -351,7 +351,7 @@ pub(crate) fn gz_stored(b: &[u8], split: Option<usize>, damage: bool) -> Vec<u8>
 
 /// An MGH warp volume (`Warpfield::write`'s layout, compressed): three float frames, the warp's
 /// version or another, the morph's metadata, geometries, affine and labels as tags.
-fn warp_mgz(g: &mut Gen) -> Vec<u8> {
+pub(crate) fn warp_mgz(g: &mut Gen) -> Vec<u8> {
     let mut b = Vec::new();
     let version = if g.chance(6) { 1 } else { (3 << 8) | 1 };
     be32(&mut b, version);

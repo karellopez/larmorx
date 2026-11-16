@@ -12,6 +12,10 @@
 //! displacements), `.m3z`, and names of other formats or none (FS-856); the file's bytes, and half
 //! the time the file read back with `mri_read` (the morph reader of relay 38).
 //!
+//! `gcw` reads a morph (piece 31's files, now and then a warp volume) and writes it again
+//! (`GCAMwrite`, `mri_convert`'s path for a morph input) under a morph or warp name in each warp
+//! format; the status and the files.
+//!
 //! `trs` reads a transform (`TransformRead`): `.lta` files (types 0, 1, 14 and 11, FS-858; one,
 //! two or no transforms, FS-859; geometries valid or not), MNI `.xfm` files, `register.dat` files,
 //! `identity.nofile`, morphs (`.m3d`, `.m3z`: piece 31's files with a small image), missing files;
@@ -27,6 +31,8 @@ use std::io::Write;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_gca::gcam::gcam_read;
+use larmorx_freesurfer_gca::gcam_write::gcam_write;
 use larmorx_freesurfer_gca::transform::{self as tr, Transform};
 use larmorx_freesurfer_mri::mri::{self, Mri};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
@@ -34,10 +40,10 @@ use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use super::piece4::{file_entry, setup};
 use super::piece6::oname;
 use super::piece10::Toks;
-use super::piece12::fhex;
+use super::piece12::{fhex, odir};
 use super::{Gen, Out, Work, enc, hex};
 
-pub const KINDS: [&str; 2] = ["m3w", "trs"];
+pub const KINDS: [&str; 3] = ["m3w", "trs", "gcw"];
 
 // ---------------------------------------------------------------- generation
 
@@ -383,11 +389,50 @@ fn read_case(g: &mut Gen) -> Vec<String> {
     t
 }
 
-pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
-    if kind == "m3w" {
-        write_case(g)
+/// `gcw`: a morph file of piece 31 (`.m3d`, `.m3z`, now and then an MGH warp volume) read and
+/// written again under a morph or warp name with one of the four warp formats.
+fn rewrite_case(g: &mut Gen) -> Vec<String> {
+    let mut t = vec!["gcw".to_owned()];
+    t.push(g.pick(&["0", "0", "0", "40"]).into());
+    let mut entries = Vec::new();
+    let name = if g.chance(8) {
+        let b = super::piece31::warp_mgz(g);
+        entries.push(file_entry("w/a.mgz", &b));
+        "w/a.mgz"
+    } else if g.chance(3) {
+        let (b, _) = super::piece31::m3z_bytes(g, false);
+        entries.push(file_entry("w/a.m3z", &super::piece31::gz_stored(&b, None, false)));
+        "w/a.m3z"
     } else {
-        read_case(g)
+        let (b, _) = super::piece31::m3z_bytes(g, false);
+        entries.push(file_entry("w/a.m3d", &b));
+        "w/a.m3d"
+    };
+    let bits = if g.chance(10) { 1 } else { 0 } | if g.chance(8) { 512 } else { 0 };
+    t.push(bits.to_string());
+    t.push(enc(Some(name.as_bytes())));
+    t.push(entries.join(","));
+    let out = g.pick(&[
+        "w/o.m3z",
+        "w/o.m3z",
+        "w/o.m3d",
+        "w/o.mgz",
+        "w/o.mgz",
+        "w/o.nii",
+        "w/o.nii.gz",
+        "w/o.img",
+        "w/no/o.m3d",
+    ]);
+    t.push(enc(Some(out.as_bytes())));
+    t.push(g.pick(&[0i64, 0, 0, 1, 2, 3]).to_string());
+    t
+}
+
+pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
+    match kind {
+        "m3w" => write_case(g),
+        "gcw" => rewrite_case(g),
+        _ => read_case(g),
     }
 }
 
@@ -493,6 +538,44 @@ fn trs(
     }
     let mut tr = Some(tr);
     o.i(i64::from(tr::transform_free(g, &mut tr)));
+    o.i(i64::from(g.errno));
+    Ok(())
+}
+
+fn gcw(
+    tk: &[&str],
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    o: &mut Out,
+    w: &Work,
+) -> Result<(), Fatal> {
+    let dir = Some(w.fix.as_path());
+    g.progname = "fsio".into();
+    let mut t = Toks { t: tk, i: 1 };
+    g.gdiag = u64::from_str_radix(t.next(), 16).unwrap();
+    let bits = t.int();
+    let mut pairs: Vec<(&str, &str)> = Vec::new();
+    if bits & 1 != 0 {
+        pairs.push(("FS_SKIP_TAGS", "1"));
+    }
+    if bits & 512 != 0 {
+        pairs.push(("SHOW_NEG", "1"));
+    }
+    let env = Environment::from_pairs(pairs);
+    let name = t.string();
+    setup(w, t.next());
+    let oname_ = t.string();
+    let datainterp = t.int() as i32;
+    g.errno = 0;
+    let Some(mut gcam) = gcam_read(g, out, err, &env, dir, &name)? else {
+        o.0.push_str("N ");
+        o.i(i64::from(g.errno));
+        return Ok(());
+    };
+    let r = gcam_write(g, out, err, &env, dir, &mut gcam, &oname_, datainterp)?;
+    o.i(i64::from(r));
+    odir(o, w);
     o.i(i64::from(g.errno));
     Ok(())
 }
@@ -606,7 +689,12 @@ pub fn run(
     } else {
         let s = super::Shared::default();
         let (mut o2, mut e2) = (s.clone(), s.clone());
-        let r = trs(tk, g, &mut o2, &mut e2, o, w).map_err(Fatal::status);
+        let r = if tk[0] == "gcw" {
+            gcw(tk, g, &mut o2, &mut e2, o, w)
+        } else {
+            trs(tk, g, &mut o2, &mut e2, o, w)
+        }
+        .map_err(Fatal::status);
         let text = s.0.borrow().clone();
         let _ = out.write_all(&text);
         r

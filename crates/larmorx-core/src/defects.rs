@@ -2436,9 +2436,11 @@ defects! {
     FS_940 = "FS-940", "FreeSurfer", true,
         "moving a surface through a GCA morph: a vertex outside the morph's grid, or next to a node of invalid position, before any vertex the morph could move gets a position from memory contents";
     FS_941 = "FS-941", "FreeSurfer", true,
-        "moving a surface through a RAS-to-RAS linear transform with a volume given (mris_sphere's transform option): the warnings that the volume's centre differs from the transform's source or from the surface's volume never appear for different centres, only for a centre that is not a finite number";
+        "moving a surface through a RAS-to-RAS linear transform with a volume given (mris_sphere's transform option): the warning that the volume's centre differs from the centre of the volume the surface was made on never appears for different centres (only for a centre that is not a finite number), though the surface is then shifted";
     FS_942 = "FS-942", "FreeSurfer", true,
         "moving a surface through a linear transform of a type other than voxel-to-voxel or RAS-to-RAS (a physical-voxel or coronal transform file): the program crashes at the first vertex that is not ripped";
+    FS_943 = "FS-943", "FreeSurfer", false,
+        "moving a surface through a RAS-to-RAS linear transform with a volume given: the warning that the volume's centre differs from the transform's source volume never appears for different centres (only for a centre that is not a finite number); kept, as a RAS-to-RAS transform does not depend on its source's centre (the warning would be wrong for the usual transform from the raw volume to the conformed one)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

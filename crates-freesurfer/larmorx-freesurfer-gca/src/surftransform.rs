@@ -20,7 +20,7 @@
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-io.md` Part 41): FS-939 (a vertex
 //! the morph cannot sample after one it could: the earlier vertex's position), FS-940 (before any:
-//! memory contents), FS-941 (the c_(ras) checks compare each value with itself), FS-942 (a linear
+//! memory contents), FS-941 and FS-943 (the c_(ras) checks compare each value with itself), FS-942 (a linear
 //! transform of another type: a null matrix), FS-858 (a linear array given with the morph's type).
 
 use std::io::Write;
@@ -539,10 +539,14 @@ fn linear(
     Ok(())
 }
 
-/// The two c_(ras) warnings of a RAS-to-RAS transform with a source volume: the transform's
-/// source geometry (when valid) and the surface's (when valid) against the volume. FreeSurfer
-/// compares each centre with itself (FS-941: the warnings appear only for a centre that is not
-/// finite); larmorx compares them with the volume's centre by default.
+/// The two c_(ras) warnings of a RAS-to-RAS transform with a source volume, each comparing a
+/// centre with itself in FreeSurfer (a warning only for a centre that is not finite). The
+/// transform's source geometry (when valid): kept as FreeSurfer's in both modes (FS-943, rule C: a
+/// RAS-to-RAS transform does not depend on its source's centre, and the comparison FreeSurfer
+/// meant warns on every recorded head's `rawavg2orig.lta` with `orig.mgz`, where the result is
+/// right). The surface's geometry (when valid): compared with the volume's centre by default
+/// (FS-941, rule A: the surface's tkregister coordinates are taken to scanner RAS with the
+/// volume's centre, so a different centre shifts it); `reproduce` FreeSurfer's.
 fn centre_warnings(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -555,42 +559,34 @@ fn centre_warnings(
         return;
     };
     let mri = mri.vg.clone();
-    let reproduce = g.notices.reproduce();
-    for (which, other, valid) in [
-        ("the transform src", src, src_valid),
-        ("the surface stored volume", &mris.vg, mris.vg.valid == 1),
-    ] {
-        if !valid {
-            continue;
-        }
-        let theirs = centres_differ(other, other);
-        let ours = centres_differ(&mri, other);
-        if theirs != ours {
-            g.notices.add(
-                &FS_941,
-                format!(
-                    "MRIStransform's c_(ras) check of the input volume and {which}: FreeSurfer compares the centre with itself ({} the warning)",
-                    if ours { "no" } else { "a" }
-                ),
-            );
-        }
-        if !(if reproduce { theirs } else { ours }) {
-            continue;
-        }
-        if which == "the transform src" {
-            let _ = err.write_all(banner(52).as_bytes());
-            let _ = err.write_all(
-                b"WARNING: c_(ras) values are not equal for the input volume and the transform src.\n",
-            );
-            let _ = err.write_all(b"WARNING: The transformed surface position may be shifted.\n");
-            let _ = err.write_all(banner(51).as_bytes());
-        } else {
-            let _ = err.write_all(banner(57).as_bytes());
-            let _ = err.write_all(
-                b"WARNING: c_(ras) values are not equal for the input volume and the surface stored volume.\n",
-            );
-            let _ = err.write_all(b"WARNING: The transformed surface position may be shifted.\n");
-            let _ = err.write_all(banner(57).as_bytes());
-        }
+    if src_valid && centres_differ(src, src) {
+        let _ = err.write_all(banner(52).as_bytes());
+        let _ = err.write_all(
+            b"WARNING: c_(ras) values are not equal for the input volume and the transform src.\n",
+        );
+        let _ = err.write_all(b"WARNING: The transformed surface position may be shifted.\n");
+        let _ = err.write_all(banner(51).as_bytes());
+    }
+    if mris.vg.valid != 1 {
+        return;
+    }
+    let theirs = centres_differ(&mris.vg, &mris.vg);
+    let ours = centres_differ(&mri, &mris.vg);
+    if theirs != ours {
+        g.notices.add(
+            &FS_941,
+            format!(
+                "MRIStransform's check of the volume's centre against the surface's volume: FreeSurfer compares the surface's centre with itself and {} the warning",
+                if ours { "omits" } else { "prints" }
+            ),
+        );
+    }
+    if if g.notices.reproduce() { theirs } else { ours } {
+        let _ = err.write_all(banner(57).as_bytes());
+        let _ = err.write_all(
+            b"WARNING: c_(ras) values are not equal for the input volume and the surface stored volume.\n",
+        );
+        let _ = err.write_all(b"WARNING: The transformed surface position may be shifted.\n");
+        let _ = err.write_all(banner(57).as_bytes());
     }
 }

@@ -118,3 +118,16 @@ FS-930's chain in one thread's order); `val` across the loop as the object code 
 `strcpy`); `gcamComputeMetricProperties`' differences and sums and the node volumes' triple product in the object
 code's operand orders (fs.core's `triple_product`). FS-932's default (the first slice sampled) is larmorx's own
 (rule A).
+
+## Relay 45 of track A: a surface moved through a transform
+
+| FreeSurfer 8.2.0 | Functions | Module |
+|---|---|---|
+| `utils/mrisurf_metricProperties.cpp` 2150-2549 | `MRIStransform` (a GCA morph; a linear transform array, RAS to RAS and voxel to voxel; the five ways of giving its volumes; FS-939 to FS-943, FS-858) | `surftransform.rs` |
+
+Relay 45 also: the morph branch calls fs.gca's `GCAMsampleMorph` and `GCAMrasToVox`, fs.volume's tkregister matrices
+(`voxelFromSurfaceRAS_`, `surfaceRASFromVoxel_`, `surfaceRASFromRAS_`, `MRIvoxelToSurfaceRAS`), `TransformWithMatrix`
+and `getVolGeom`, fs.mri's `RASFromSurfaceRAS_`, `MRIallocHeader`, `MRIalloc`, `useVolGeomToMRI`, `MRIreInitCache` and
+fs.surf's `mrisComputeSurfaceDimensions` (track D's), in FreeSurfer's order; `transform.rs`'s `GcaLtaIo` is public
+(the programs that call `LTAread` themselves). The probe `validation/probes/fs-gcam/` (`fsgcam`) and its port side
+`examples/fs_gca_probe.rs`, `tests/fs_gca/cases.rs`, `tests/fs_gca_official.rs` (hash), `tests/surftransform.rs`.

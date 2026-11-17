@@ -2,7 +2,7 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! `MRIStransform` (track A's relay 45): small cases known by hand, and the defaults of FS-939 to
-//! FS-942. The fs-gcam probe compares the rest with FreeSurfer's own code
+//! FS-943. The fs-gcam probe compares the rest with FreeSurfer's own code
 //! (`validation/probes/fs-gcam`, `tests/fs_gca_official.rs`).
 
 use larmorx_core::defects::UpstreamDefects;
@@ -186,8 +186,12 @@ fn fs858_a_linear_array_of_the_morph_type_ends_the_program() {
 }
 
 #[test]
-fn fs941_the_centre_warning_compares_the_volume_by_default() {
-    let warn = "WARNING: c_(ras) values are not equal for the input volume and the transform src.";
+fn fs941_fs943_the_centre_warnings() {
+    // the volume's centre (9, 0, 0) differs from the surface's volume's (FS-941: warned by
+    // default) and from the transform's source (FS-943: never warned, as FreeSurfer)
+    let surf =
+        "WARNING: c_(ras) values are not equal for the input volume and the surface stored volume.";
+    let src = "the transform src";
     for (mode, shown) in [
         (UpstreamDefects::Fix, true),
         (UpstreamDefects::Reproduce, false),
@@ -195,12 +199,23 @@ fn fs941_the_centre_warning_compares_the_volume_by_default() {
         let mut g = Globals::new(mode);
         let mut v = volume(&mut g, &coronal(8, [9.0, 0.0, 0.0]));
         let mut s = surface(&mut g, &[[1.0, 2.0, 3.0]], 0);
-        s.vg.valid = 0;
         let mut t = linear(&mut g, LINEAR_RAS_TO_RAS, [0.0; 3]);
         let (r, text) = run(&mut g, &mut s, Volumes::Same(&mut v), &mut t);
         assert_eq!(r.unwrap(), 0);
-        assert_eq!(text.contains(warn), shown, "{text}");
+        assert_eq!(text.contains(surf), shown, "{text}");
+        assert!(!text.contains(src), "{text}");
         assert_eq!(ids(&g), ["FS-941"]);
+        // a centre that is not finite: both warnings in both modes, nothing noted
+        let mut g = Globals::new(mode);
+        let mut s = surface(&mut g, &[[1.0, 2.0, 3.0]], 0);
+        s.vg.c_a = f32::NAN;
+        if let Xform::Lta(l) = &mut t.xform {
+            l.xforms[0].src.c_s = f32::INFINITY;
+        }
+        let (r, text) = run(&mut g, &mut s, Volumes::Same(&mut v), &mut t);
+        assert_eq!(r.unwrap(), 0);
+        assert!(text.contains(surf) && text.contains(src), "{text}");
+        assert!(ids(&g).is_empty());
     }
 }
 

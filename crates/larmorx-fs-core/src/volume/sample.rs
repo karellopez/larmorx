@@ -132,21 +132,21 @@ impl Process {
         f: i32,
         what: &str,
     ) -> Result<f64, Stop> {
-        if let Some(v) = inside_voxel(m, x, y, z, f, self.mode().reproduce()) {
+        let reproduce = self.mode().reproduce();
+        if m.kind == types::LONG && !self.noted(&FS_298) {
+            let d = if reproduce {
+                "a 64-bit volume read as 32-bit integers at the voxels' places"
+            } else {
+                "a 64-bit volume sampled at its voxels' values"
+            };
+            self.note(&FS_298, format!("{what}: {d}"));
+        }
+        if let Some(v) = inside_voxel(m, x, y, z, f, reproduce) {
             return Ok(v);
         }
         self.direct_needs_voxels(m, what)?;
         let (x, y, z, f) = (i64::from(x), i64::from(y), i64::from(z), i64::from(f));
         if m.kind == types::LONG {
-            let reproduce = self.mode().reproduce();
-            if !self.noted(&FS_298) {
-                let d = if reproduce {
-                    "a 64-bit volume read as 32-bit integers at the voxels' places"
-                } else {
-                    "a 64-bit volume sampled at its voxels' values"
-                };
-                self.note(&FS_298, format!("{what}: {d}"));
-            }
             if reproduce {
                 let place = direct_place(m, x, y, z, f, 4);
                 let b = self.direct_read8(m, place, 4, what);

@@ -5299,3 +5299,150 @@ median's NaN order and `detectContrast`'s `-nan` (the reproduce values observed 
 build's arithmetic). A clean-room implementer's black-box forms: `mris_register` and `mris_sphere`
 (their long-range distances and averages), `mris_ca_label`'s and `mris_fix_topology`'s smoothing,
 against the recorded heads.
+
+## 142. The rest of the vertex-value functions: rip dilation, the vector registration's values, the mode filter of the annotations, disks of a target sum (fs.surf's `mrisurf_vals.cpp`, taken early; relay 41 of track D)
+
+Each of these serves one program, or none on the default paths. All return 0 (`NO_ERROR`) unless
+said.
+
+**142.1 Rips and faces.** `MRISsetRipInFacesWithRippedVertices(mris)`: every face ripped (flag 1)
+when one of its three vertices is ripped (flag not 0), else not (0); every vertex then a border
+vertex (`border` 1) when it is a vertex of a ripped face, else 0. `MRISdilateRipped(mris, n)` (for
+`mri_surf2surf`'s patch dilation, `mris_map_cuts`, `mris_register_to_volume`): `n` times (none for `n`
+not above 0), every vertex's new flag is its own, but a vertex of flag 0 next (1 hop) to a vertex of
+flag not 0 gets 1; the flags are kept through `tx` (each vertex's `tx` ends as its flag, as a
+`float`); then the faces as above. `MRISerodeRipped(mris, n)` (`mris_nudge`, the surface deformation):
+`n` times, every vertex's new flag the smallest of its own and its 1-hop neighbours' (as signed
+bytes: -1 is below 0), through `tx`; then the faces. `MRISripZeros(surf, mri)` (`mri_fieldsign`):
+with a volume whose width is not the vertex count, `ERROR: MRISripZeros(): dimension mismatch` on
+standard output and 1; else every vertex of flag 0 whose value (frame 0 of the volume's first row at
+its column, as a `double`; without a volume its `val`) is below 1e-5 in magnitude gets flag 1 (NaN:
+not); 0. `MRISripUnknown(surf)` (`mri_gtmpvc`'s surfaces): every vertex (ripped ones too) whose
+annotation's colour is not in the surface's colour table, or is its first entry's, gets flag 1. An
+annotation's colour: its low byte red, the next green, the next blue; its index the first entry of
+those three components (an empty place never matches), else -1. **FS-984** (class a: memory never
+written): for a surface without a colour table FreeSurfer prints `CTABfindAnnotation: ct was NULL`
+(standard error) for each vertex and decides by an index it never computed; both modes take -1 (every
+vertex ripped), noted.
+
+**142.2 The vector registration's values** (`mris_register`'s vector mode, `mris_make_template`):
+each vertex may carry two arrays of `nvals` floats, the values in use and the original ones.
+`MRISsetCurvaturesToValues(mris, f)`, `MRISsetCurvaturesToOrigValues`, `MRISsetOrigValuesToCurvatures`,
+`MRISsetOrigValuesToValues`, `MRISsetValuesToCurvatures`: for every vertex of rip flag 0 in order, the
+named copy at field `f` (values in use `<-` curvature, originals `<-` curvature, curvature `<-`
+originals, values in use `<-` originals, curvature `<-` values in use). No return value. **FS-980**
+(class a): a field outside a vertex's arrays reads or writes outside them in FreeSurfer; both modes
+skip that vertex, noted. **FS-981** (class a: a crash): an unripped vertex without arrays crashes
+FreeSurfer (signal 11; the vertices before it already set): `reproduce` ends so; by default it is
+skipped, noted.
+
+**142.3 The mode filter of the annotations** (`MRISmodeFilterAnnotations(mris, n)`: `mris_ca_label`
+with its default of 10 passes). The program's annotation table (`annotation.cpp`: entries of an
+index, a name and an annotation; the default table file `$FREESURFER_HOME/Simple_surface_labels2009.txt`,
+`./` without `FREESURFER_HOME`, read on the first lookup while the program has none; a colour table
+sets it, entry `k` index `k`, only while the program has none). (1) `max`, from 0: the largest table
+index of every vertex's annotation (ripped ones too; -1 for one the table does not hold). (2) `max + 1`
+below 0 (an index of 2^31 - 1): `Cannot allocate memory` and `MRISmodeFilterVals: could not allocate
+histo array of <max + 1> ints` on standard error (`ErrorExit`, `ERROR_NOMEMORY`). (3) With a surface
+colour table, the program's table set from it (`set_atable_from_ctable(): <k> entries` on standard
+output when it had none). (4) Up to `n` passes: for every vertex of rip flag 0, in order, its
+neighbours in use (`vtotal`: ripped ones too) and then itself counted by table index (the
+annotations the table does not hold skipped), each index remembering the last annotation counted
+under it; the candidate first the vertex's own (its index's count and its annotation; count 0 and
+annotation 0 when the table does not hold it); then indices 1 to `max` in order, a larger count
+replacing the candidate (ties to the earlier); the candidate is the vertex's new annotation (kept in
+`undefval`). Then every vertex of flag 0 takes its new annotation, those that changed counted; a pass
+without a change ends the passes. (5) `<k> filter iterations complete (<n> requested, <changed>
+changed)` on standard output, `k` the pass that changed nothing (from 0), or `n`. **FS-978** (class
+c): (1) runs before (3), and (3) sets nothing when the program has a table, so a surface whose
+annotations come from its own colour table is filtered through the default file's table or one used
+before; without a table and without a default file every lookup of (1) fails (`could not open
+translation file ./Simple_surface_labels2009.txt` on standard error, one per lookup), `max` stays 0,
+and (4) can change only the annotations the table does not hold (to 0). By default, for a surface
+with a colour table of entries, (3) is done first and every lookup goes through a table built from
+the surface's own colour table (the program's table set as FreeSurfer sets it); noted when
+FreeSurfer's lookups would differ (a program table of other indices or annotations, or none with
+vertices to filter). `mris_ca_label` sets the table from the same colour table first: its results are
+the same in both modes. **FS-979** (class a): in FS-978's second case FreeSurfer counts the indices
+above 0 outside its counts of one entry (memory corrupted); `reproduce` gives the result its defined
+part decides (each vertex keeps an annotation the table holds, the others become 0), noted.
+
+**142.4 A disk of a target sum** (`MRISdilateVertexToSum(vno, surf, measure, target)`:
+`mri_binarize --dilate-vertex-sum` with a measure volume, `--dilate-vertex` with the areas and a
+target of pi r^2). `MRISdilateVertexToSum(): vno=<vno>, targetSum = <target>` (`%g`) on standard
+output; no mask after `ERROR: MRISdilateVertexToSum(): surf is NULL`, `... vno=<vno> out of range 0 to
+<n>`, `... measure->width=<w> != nvertices = <n>`; without a measure the surface's metric properties
+are computed (§38, its areas) and a target not above 0 gives `... targetSum = <target>, must be > 0
+with area`. Then passes of 1, 2, ... hops: each pass lists the vertices within `h - 1` links of `vno`
+(§112.2's hop lists, which set every listed vertex's `undefval` to its hop) and sums their values
+(the measure's frame 0 of its first row, as `float` widened to `double`, each value added before the
+running sum; or each vertex's `area` added after it), from 0; a vertex counted; then `hop <h> <sum>
+<count>` (`%3d %8.3f %6d`); the passes go on while the sum is below the target (NaN ends them). The
+count is never reset between passes: **FS-982** (class c): FreeSurfer reports `ERROR:
+MRISdilateVertexToSum(): not possible to achieve target sum <target>` (no mask) as soon as its count
+over every pass reaches the surface's vertex count, though the last pass holds fewer (on recon-all's
+white surfaces a disk of 50 mm, 7,854 mm^2, about 11,000 to 12,600 vertices, is reported as not
+possible at pass 45 or 46, the count past 119,000); and when the vertex's part of the surface is used
+up it goes on with a pass per vertex counted. By default the check uses each pass's own count (a pass
+holding every vertex reports it), a pass that adds no vertex reports it at once, and the hop lines
+keep FreeSurfer's running count; noted when the outcome differs. The mask: a new `float` volume of
+one voxel per vertex (`MRIalloc`), 1 at the vertices of the last pass's hop lists, 0 elsewhere.
+**FS-983** (class a: a crash): with a target no pass is needed for (not above 0 with a measure, not a
+number) FreeSurfer builds the mask from hop lists of no hops and crashes (signal 11; FS-530):
+`reproduce` ends so; by default `ERROR: MRISdilateVertexToSum(): targetSum = <target>, must be > 0`
+(` with area` without a measure) and no mask.
+
+**142.5 The rest.** `MRISdilateConfined(surf, mask, a, n, id)` (`annotation.cpp`'s area-32 split): two
+copies of the mask (one voxel per vertex); `n` times: every vertex in order, with `a` above -1 one whose
+annotation's colour-table index (142.1) is not `a` set to 0 in the second copy; else one set (not 0)
+in the first copy set to 1 in the second; else set to 1 when one of its 1-hop neighbours of flag 0 is
+set in the first; then the second copied into the first. With `id` above 0 every vertex set in the
+result gets the annotation of colour-table index `id` (its blue byte, green, red). The result. FS-984
+for a surface without a colour table and `a` above -1; **FS-985** (class a: memory never written): an
+index the table has no annotation for (no table: `CTABannotationAtIndex: ct was NULL`; outside it:
+`... index <id> was OOB`; an empty place: no message) leaves FreeSurfer's annotation unwritten; both
+modes change no annotation, noted. `MRISannotation_to_label(mris, k)` (`mris_hausdorff_dist`): the
+vertices of flag 0 whose annotation is that of colour-table index `k`, in vertex order, as a new label
+of exactly as many places named as the entry; none when there are none; FS-985 likewise (no label).
+`MRISaccumulateMeansOnSurface(mris, t, d)`, `...ImaginaryMeans...` (`mean`, `mean_imag`):
+`(x t + val d) / (t + d)` at every vertex of flag 0, in `float` (each product the count first, the
+counts as `float`, the sum `t + d` in `int`, wrapping); `...StandardErrors...` (`std_error`): `(x t^2
++ val d^2) / (t + d)^2`, the squares in `int` (wrapping). `MRISclearWhichAndVal2(mris, w)`: `w` 2
+clears the original area and `val2` of every vertex of flag 0, 3 its curvature and `val2`, 1 and 10
+every vertex's `val` and `val2`; any other `w` fails an assertion at the first vertex of flag 0
+(`ASSERTION FAILED: .../utils/mrisurf_vals.cpp:4137 false`; FS-03). `MRISmarkRandomVertices(mris, p)`:
+every vertex of flag 0 in order marked 1 when a draw of `randomNumber(0, 1)` (`specs/freesurfer-core.md` §9, as a `float`) is
+below `p`. Not ported: `MRISlogOdds` (waits for `MRISdistanceTransform`), `MRISgetHistogram` and
+`MRIScomputeAverageCircularPhaseGradient` (no program calls them).
+
+## 143. Validation plan, part 34
+
+The probe's command of relay 41, `vlr` (an empty work folder with `d`; `SURFER_SIDEDOOR`, and
+`FREESURFER_SEED` from the case): vls's grids, srd's small meshes and icosahedra read by `MRISread`,
+now and then at 2 hops; every vertex's rip flag (0; 1, 2 or -1 in one case in three), annotation (one
+of six colours of the case, now and then 0, -1, `0xffffff` or another), curvature, `val` (eighths; 0,
+-0, 5e-6, -9e-6, 2e-5 or NaN one time in four), `val2`, original area, `mean`, `mean_imag`, `std_error`,
+mark and vector-registration values (0 to 3 pairs; none for some vertices in one case in six); every
+face's rip flag; the program's table: none, a table file where FreeSurfer looks for its default one
+(lines `<index> <name> <r> <g> <b> 0` of the case's colours; indices repeated, 70,000 or negative now
+and then; a line it cannot read; none), or a colour table set as the table; the surface's colour table
+(none one case in four; 0 to 6 entries, empty places); `Gdiag_no`; a seed; a measure volume (float,
+`uchar`, `int` or `short`; its width now and then one off) of eighths (NaN, -NaN, inf, -2 in heavy
+cases); then 1 to 4 of 142's functions (filter passes 0 to 10; dilations and erosions 0 to 3; fields
+0 to 2, now and then -1, 3 or 7; disks around a vertex (now and then -1 or beyond) with the measure,
+the areas or no surface, targets 0.5 to 1,000, now and then 0, -1, NaN, inf or 1e9; the accumulation
+counts 0 to 50,000 and -1; the clear's fields 0, 1, 2, 3, 5, 10; probabilities -1 to 2; label indices
+-1 to 5); after each its status, every vertex's flag, border, annotation, `undefval`, curvature, `tx`,
+area, values, mark and value arrays, every face's flag, a disk's or a confined dilation's mask, a
+label's size, places, name and vertices. `G` (both sides) where FreeSurfer would read memory it never
+wrote (FS-980, FS-984, FS-985). Compared with the official build with `reproduce`: identical; the
+default identical but where a noted correction changed the result. Observed (relay 41): seeds 7, 13
+(500 cases each) and 17 (1,000): 0 different in both modes. On the recorded heads (`real.py --vlr`, 3
+heads, both hemispheres): `mris_ca_label`'s filter of `aparc`, `aparc.a2009s`, `aparc.DKTatlas` and
+`BA_exvivo` and disks of 5, 20 and 50 mm around vertices 0, 1,000 and 50,000: 78 of 78 identical with
+`reproduce`; by default the 18 disks of 50 mm, which FreeSurfer reports as not possible (FS-982), are
+found (11,002 to 12,639 vertices, 55 to 59 hops; observed). `tests/valrest_defaults.rs` checks
+FS-978 to FS-985 in both modes, indices of 2^31 - 2 and 2^31 - 1, the rips and faces and the unknown
+field's assertion. A clean-room implementer's black-box forms: `mris_ca_label` (its filter, on the
+recorded heads), `mri_binarize --dilate-vertex` and `--dilate-vertex-sum`, `mri_surf2surf`'s patch
+dilation.

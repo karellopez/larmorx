@@ -4476,6 +4476,33 @@ void flr_case()
     if (!e) fail("cannot read the surface");
     oi(MRISevertSurface(e));
     hash(e);
+  } else if (op == "sbl") {
+    // relay 42 of track D: the soap bubbles on a recorded surface (`sbl <surface> <label> <n>`):
+    // the label's vertices free (mark 0), the others fixed (1); MRISsoapBubbleVertexPositions and
+    // the weighted bubble on a second read, each with `n` passes; the positions' FNV-1a
+    std::string sf = next(), lf = next();
+    int n = geti();
+    LABEL *l = LabelRead(NULL, lf.c_str());
+    if (!l) fail("cannot read the label");
+    for (int w = 0; w < 2; w++) {
+      MRIS *s = MRISread(sf.c_str());
+      if (!s) fail("cannot read the surface");
+      for (int v = 0; v < s->nvertices; v++) s->vertices[v].marked = 1;
+      for (int k = 0; k < l->n_points; k++) {
+        int v = l->lv[k].vno;
+        if (v >= 0 && v < s->nvertices) s->vertices[v].marked = 0;
+      }
+      oi(w ? MRISweightedSoapBubbleVertexPositions(s, n) : MRISsoapBubbleVertexPositions(s, n));
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (int v = 0; v < s->nvertices; v++) {
+        float c[3] = {s->vertices[v].x, s->vertices[v].y, s->vertices[v].z};
+        const unsigned char *b = (const unsigned char *)c;
+        for (int k = 0; k < 12; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      }
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
   } else if (op == "maf") {
     // relay 41 of track D: mris_ca_label's mode filter on a recorded annotation (`maf <surface>
     // <annotation>`): the annotation read (MRISreadAnnotation), the program's table set from its

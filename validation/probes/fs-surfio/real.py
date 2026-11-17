@@ -138,6 +138,12 @@ def main(argv: list[str] | None = None) -> int:
         "(flr maf) and mri_binarize's disks of 5, 20 and 50 mm around three vertices (flr dvs)",
     )
     ap.add_argument(
+        "--sbl",
+        action="store_true",
+        help="relay 42 of track D: the soap bubbles (flr sbl) on each head's white and orig "
+        "surfaces, the vertices of its cortex label free and the others fixed, 25 passes",
+    )
+    ap.add_argument(
         "--top",
         action="store_true",
         help="relay 42 of track D: mrisurf_topology.cpp's rest (flr top) on each head's "
@@ -174,6 +180,13 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.sbl:
+                for surf in ("white", "orig"):
+                    lines.append(
+                        f"flr sbl {s / 'surf' / f'{hemi}.{surf}'} "
+                        f"{s / 'label' / f'{hemi}.cortex.label'} 25"
+                    )
+                continue
             if a.top:
                 for surf in ("orig.premesh", "orig.nofix", "orig", "white"):
                     lines.append(
@@ -251,7 +264,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "top"
+        "sbl"
+        if a.sbl
+        else "top"
         if a.top
         else "vlr"
         if a.vlr

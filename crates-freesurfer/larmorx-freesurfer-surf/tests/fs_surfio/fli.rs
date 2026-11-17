@@ -1111,6 +1111,49 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             )?));
             hash(&e, o);
         }
+        "sbl" => {
+            // relay 42 of track D: `fssurfio.cpp`'s `flr sbl` (the soap bubbles on a recorded
+            // surface, its label's vertices free)
+            let sf = t.next().to_owned();
+            let lf = t.next().to_owned();
+            let n = t.i();
+            let l = larmorx_freesurfer_io::label::label_read(
+                g, io.env, io.out, io.err, None, None, &lf,
+            )?
+            .expect("the label");
+            for w in 0..2 {
+                let mut s = surf(g, sg, &mut io, &sf)?;
+                for v in 0..s.nvertices.max(0) as usize {
+                    s.vertex_mut(v).marked = 1;
+                }
+                for k in 0..l.n_points.max(0) as usize {
+                    let v = l.lv[k].vno;
+                    if v >= 0 && v < s.nvertices {
+                        s.vertex_mut(v as usize).marked = 0;
+                    }
+                }
+                let r = if w == 1 {
+                    larmorx_freesurfer_surf::soap::weighted_soap_bubble_vertex_positions(
+                        g, &mut io, &mut s, n,
+                    )?
+                } else {
+                    larmorx_freesurfer_surf::soap::soap_bubble_vertex_positions(
+                        g, &mut io, &mut s, n,
+                    )
+                };
+                o.i(i64::from(r));
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                for v in 0..s.nvertices.max(0) as usize {
+                    let x = s.vertex(v);
+                    for c in [x.x, x.y, x.z] {
+                        for b in c.to_le_bytes() {
+                            h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+                        }
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+            }
+        }
         "maf" => {
             // relay 41 of track D: `fssurfio.cpp`'s `flr maf` (mris_ca_label's mode filter on a
             // recorded annotation)

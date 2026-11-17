@@ -55,6 +55,8 @@ pub const TABLE_SIZE: i32 = 2000;
 pub const TABLE_CENTER: i32 = TABLE_SIZE / 2;
 /// `MAX_VOXELS`: a face's voxel list's capacity (FS-911).
 pub const MAX_VOXELS: usize = 10000;
+/// The 64-bit words of the column bits (2000 x 2000 columns).
+const COLUMN_WORDS: usize = (TABLE_SIZE as usize * TABLE_SIZE as usize).div_ceil(64);
 /// `MHT_MAX_FACES`: the faces near one face (FS-912).
 pub const MHT_MAX_FACES: usize = 10000;
 /// `MHT_MAX_TOUCHING_FACES`: the faces touching one face (never reached: at most 3 x 255).
@@ -129,6 +131,9 @@ pub struct Mht {
     /// The smallest and largest voxel numbers of the buckets made, along each axis (the closest
     /// searches stop where no bucket can be left: [`crate::mhtfind`]).
     pub(crate) bbox: Option<([i32; 3], [i32; 3])>,
+    /// One bit per column `(xv, yv)` that holds a bucket (FreeSurfer's array of column pointers,
+    /// as bits): an empty column is known without a map lookup.
+    cols: Vec<u64>,
     /// `nfaces`: the surface's faces when the table was made.
     pub nfaces: i32,
     /// `f`: each face's centroid.
@@ -501,6 +506,7 @@ impl Mht {
             which,
             buckets: Buckets::default(),
             bbox: None,
+            cols: vec![0; COLUMN_WORDS],
             nfaces,
             f,
         })
@@ -589,10 +595,17 @@ impl Mht {
         if !(0..TABLE_SIZE).contains(&xv)
             || !(0..TABLE_SIZE).contains(&yv)
             || !(0..TABLE_SIZE).contains(&zv)
+            || !self.has_column(xv, yv)
         {
             return None;
         }
         self.buckets.get(&key(xv, yv, zv)).map(Vec::as_slice)
+    }
+
+    /// Whether column `(xv, yv)` (each in `0..TABLE_SIZE`) holds a bucket.
+    pub(crate) fn has_column(&self, xv: i32, yv: i32) -> bool {
+        let col = (xv * TABLE_SIZE + yv) as usize;
+        self.cols[col / 64] & (1 << (col % 64)) != 0
     }
 
     /// The number of buckets made so far.
@@ -625,6 +638,8 @@ impl Mht {
                 [hi[0].max(c[0]), hi[1].max(c[1]), hi[2].max(c[2])],
             ),
         });
+        let col = (c[0] * TABLE_SIZE + c[1]) as usize;
+        self.cols[col / 64] |= 1 << (col % 64);
         let b = self.buckets.entry(key(c[0], c[1], c[2])).or_default();
         if !b.contains(&forvnum) {
             b.push(forvnum);

@@ -144,6 +144,13 @@ def main(argv: list[str] | None = None) -> int:
         "surfaces, the vertices of its cortex label free and the others fixed, 25 passes",
     )
     ap.add_argument(
+        "--prj",
+        action="store_true",
+        help="relay 43 of track D: mrisurf_project.cpp (flr prj) on each head's qsphere.nofix "
+        "and sphere: mris_fix_topology's projection onto the sphere, the ellipsoids, the "
+        "spherical projection, mrisAssignFaces, the cylinder",
+    )
+    ap.add_argument(
         "--lrr",
         action="store_true",
         help="relay 43 of track D: the label's rips (flr lrr) on each head's white surface with "
@@ -195,6 +202,10 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.prj:
+                sd = s / "surf"
+                lines.append(f"flr prj {sd / f'{hemi}.qsphere.nofix'} {sd / f'{hemi}.sphere'}")
+                continue
             if a.lrr:
                 for c in LABELS:
                     lines.append(
@@ -293,7 +304,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "lrr"
+        "prj"
+        if a.prj
+        else "lrr"
         if a.lrr
         else "mcl"
         if a.mcl

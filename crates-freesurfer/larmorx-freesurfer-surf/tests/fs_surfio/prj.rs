@@ -56,7 +56,11 @@ pub(super) fn prj_tokens(t: &mut Vec<String>, g: &mut Gen) {
     };
     if g.chance(4) {
         // off centre
-        let o = [g.int(-8, 8) as f32, g.int(-8, 8) as f32, g.int(-8, 8) as f32];
+        let o = [
+            g.int(-8, 8) as f32,
+            g.int(-8, 8) as f32,
+            g.int(-8, 8) as f32,
+        ];
         for p in &mut m.v {
             for k in 0..3 {
                 p[k] += o[k];
@@ -74,7 +78,11 @@ pub(super) fn prj_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let nv = m.v.len() as i64;
     ix(t, g.pick(&[0, 0, 3, 4, 4, 5, 2]));
     dv(t, g.pick(&[100.0, 100.0, 50.0, 0.0, 10.0]));
-    let nrip = if g.chance(5) && nv > 1 { g.int(1, 2) } else { 0 };
+    let nrip = if g.chance(5) && nv > 1 {
+        g.int(1, 2)
+    } else {
+        0
+    };
     ix(t, nrip);
     for _ in 0..nrip {
         ix(t, g.int(0, nv - 1));
@@ -82,6 +90,7 @@ pub(super) fn prj_tokens(t: &mut Vec<String>, g: &mut Gen) {
     ix(t, g.pick(&[0, 0, 0, 0x1000_0040, 0x40]));
     let nops = g.int(1, 4);
     ix(t, nops);
+    let mut sp = false;
     for _ in 0..nops {
         match g.below(12) {
             0 => {
@@ -97,7 +106,10 @@ pub(super) fn prj_tokens(t: &mut Vec<String>, g: &mut Gen) {
                     );
                 }
             }
-            1 => t.push("sp".into()),
+            1 => {
+                t.push("sp".into());
+                sp = true;
+            }
             2 | 3 => {
                 t.push("pos".into());
                 dv(
@@ -115,9 +127,12 @@ pub(super) fn prj_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 dv(t, g.pick(&[100.0, 0.0, 60.0]));
             }
             5 | 6 => {
+                // the canonical positions only after `sp` set them (all 0 otherwise: every face at
+                // the origin, which FreeSurfer's fallback search walks shell by shell to); coarse
+                // tables (the official probe's alarm is 5 seconds)
                 t.push("af".into());
-                ix(t, g.pick(&[4, 4, 3]));
-                fv(t, g.pick(&[1.0, 2.0, 4.0, 10.0]));
+                ix(t, if sp && g.chance(2) { 3 } else { 4 });
+                fv(t, g.pick(&[4.0, 4.0, 10.0]));
             }
             7 => {
                 t.push("cyl".into());
@@ -227,10 +242,16 @@ pub(super) fn prj_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "sp" => project::spherical_projection(&mut s),
             "pos" => {
                 let r = t.d();
-                o.i(i64::from(project::project_onto_sphere(g, &mut io, &mut s, r)));
+                o.i(i64::from(project::project_onto_sphere(
+                    g, &mut io, &mut s, r,
+                )));
             }
             "pos2" => {
                 let (same, r) = (t.i(), t.d());
+                if same == 0 {
+                    // the probe's second surface (the file read again: MRISread's messages)
+                    readwrite::read(g, sg, &mut io, d, "d/lh.s0", true)?;
+                }
                 o.i(i64::from(project::project_onto_sphere_src_dst(
                     g,
                     &mut io,

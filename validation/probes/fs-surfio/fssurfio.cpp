@@ -4504,6 +4504,64 @@ void flr_case()
       snprintf(t, sizeof t, "%016" PRIx64 " ", h);
       out += t;
     }
+  } else if (op == "prj") {
+    // relay 43 of track D: mrisurf_project.cpp on recorded surfaces (`prj <qsphere.nofix> <sphere>`):
+    // (1) mris_fix_topology's MRISprojectOntoSphere(mris, mris, 100) of the qsphere; (2) the sphere
+    // projected orthographically onto the default ellipsoid (MRISprojectOntoEllipsoid(s, s, 0, 0,
+    // 0)) and radially into a copy; (3) mrisSphericalProjection of the qsphere; (4) a face table of
+    // the sphere's canonical positions (the sphere's own) at 1 mm and mrisAssignFaces of the qsphere
+    // projected at radius 100; (5) the sphere onto a cylinder of 60 mm. Each: the positions' FNV-1a
+    // (faces' numbers for (4); after (5) the areas too)
+    std::string qf = next(), sf = next();
+    auto put4 = [](uint64_t &h, const void *p) {
+      const unsigned char *b = (const unsigned char *)p;
+      for (int k = 0; k < 4; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+    };
+    auto hex = [&](uint64_t h) {
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    auto phash = [&](MRIS *m, bool area) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (int v = 0; v < m->nvertices; v++) {
+        put4(h, &m->vertices[v].x); put4(h, &m->vertices[v].y); put4(h, &m->vertices[v].z);
+        if (area) put4(h, &m->vertices[v].area);
+      }
+      hex(h);
+      oi(m->status);
+    };
+    MRIS *q = MRISread(qf.c_str());
+    MRIS *s = MRISread(sf.c_str());
+    if (!q || !s) fail("cannot read the surfaces");
+    MRISprojectOntoSphere(q, q, 100.0f);
+    phash(q, false);
+    MRISprojectOntoEllipsoid(s, s, 0.0f, 0.0f, 0.0f);
+    phash(s, false);
+    MRIS *s2 = MRISread(sf.c_str());
+    MRIS *r = MRISradialProjectOntoEllipsoid(s2, NULL, 0.0f, 0.0f, 0.0f);
+    phash(r, false);
+    MRIS *q2 = MRISread(qf.c_str());
+    mrisSphericalProjection(q2);
+    phash(q2, false);
+    MRIS *s3 = MRISread(sf.c_str());
+    for (int v = 0; v < s3->nvertices; v++) {
+      s3->vertices[v].cx = s3->vertices[v].x; s3->vertices[v].cy = s3->vertices[v].y; s3->vertices[v].cz = s3->vertices[v].z;
+    }
+    MRIS_HASH_TABLE *mht = MHTcreateFaceTable_Resolution(s3, CANONICAL_VERTICES, 1.0f);
+    s3->radius = 100;
+    mrisAssignFaces(s3, mht, CANONICAL_VERTICES);
+    MHTfree(&mht);
+    {
+      uint64_t h = 0xcbf29ce484222325ull;
+      int found = 0;
+      for (int v = 0; v < s3->nvertices; v++) { put4(h, &s3->vertices[v].fno); found += s3->vertices[v].fno >= 0; }
+      hex(h);
+      oi(found);
+    }
+    MRIS *s4 = MRISread(sf.c_str());
+    oi(MRISprojectOntoCylinder(s4, 60.0f));
+    phash(s4, true);
   } else if (op == "lrr") {
     // relay 43 of track D: the label's rips on a recorded surface (`lrr <surface> <label>`): (1)
     // the label read, every odd point's vertex set to -1 (LabelToFlat then finds the closest vertex

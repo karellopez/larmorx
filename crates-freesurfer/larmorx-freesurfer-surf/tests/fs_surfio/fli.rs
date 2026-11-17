@@ -1154,6 +1154,70 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 o.s(&format!("{h:016x}"));
             }
         }
+        "prj" => {
+            // relay 43 of track D: `fssurfio.cpp`'s `flr prj` (mrisurf_project.cpp on recorded
+            // surfaces)
+            use larmorx_freesurfer_surf::mht::Mht;
+            use larmorx_freesurfer_surf::project;
+            use larmorx_freesurfer_surf::views::CANONICAL_VERTICES;
+            let qf = t.next().to_owned();
+            let sf = t.next().to_owned();
+            fn put4(h: &mut u64, b: [u8; 4]) {
+                for c in b {
+                    *h = (*h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+            }
+            let phash = |m: &Mris, area: bool, o: &mut Out| {
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                for v in 0..m.nvertices.max(0) as usize {
+                    let x = m.vertex(v);
+                    for c in [x.x, x.y, x.z] {
+                        put4(&mut h, c.to_le_bytes());
+                    }
+                    if area {
+                        put4(&mut h, x.area.to_le_bytes());
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+                o.i(i64::from(m.status.0));
+            };
+            let mut q = surf(g, sg, &mut io, &qf)?;
+            let mut s = surf(g, sg, &mut io, &sf)?;
+            project::project_onto_sphere_src_dst(g, &mut io, &mut q, true, f64::from(100.0f32))?;
+            phash(&q, false, o);
+            project::project_onto_ellipsoid(g, sg, &mut io, &mut s, false, 0.0, 0.0, 0.0)?;
+            phash(&s, false, o);
+            let mut s2 = surf(g, sg, &mut io, &sf)?;
+            let r = project::radial_project_onto_ellipsoid(
+                g, sg, &mut io, &mut s2, true, 0.0, 0.0, 0.0,
+            )?
+            .expect("a copy");
+            phash(&r, false, o);
+            let mut q2 = surf(g, sg, &mut io, &qf)?;
+            project::spherical_projection(&mut q2);
+            phash(&q2, false, o);
+            let mut s3 = surf(g, sg, &mut io, &sf)?;
+            for v in 0..s3.nvertices.max(0) as usize {
+                let x = s3.vertex_mut(v);
+                (x.cx, x.cy, x.cz) = (x.x, x.y, x.z);
+            }
+            let m = Mht::create_face_table_resolution(g, io.err, &s3, CANONICAL_VERTICES, 1.0)?;
+            s3.radius = 100.0;
+            project::assign_faces(g, io.err, &mut s3, &m, CANONICAL_VERTICES)?;
+            let (mut h, mut found) = (0xcbf2_9ce4_8422_2325u64, 0);
+            for v in 0..s3.nvertices.max(0) as usize {
+                let f = s3.vertex(v).fno;
+                put4(&mut h, f.to_le_bytes());
+                found += i64::from(f >= 0);
+            }
+            o.s(&format!("{h:016x}"));
+            o.i(found);
+            let mut s4 = surf(g, sg, &mut io, &sf)?;
+            o.i(i64::from(project::project_onto_cylinder(
+                g, sg, &mut io, None, &mut s4, 60.0,
+            )?));
+            phash(&s4, true, o);
+        }
         "lrr" => {
             // relay 43 of track D: `fssurfio.cpp`'s `flr lrr` (the label's rips on a recorded
             // surface and label)

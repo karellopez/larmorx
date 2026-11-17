@@ -2212,7 +2212,11 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrishash.c
   (`MinDistSq` starts at 1e6): `MHTfindClosestFaceGeneric(..., 1000, -1, ...)` at 1 mm on a table with
   no face near walks 1,000 shells (8 x 10^9 voxels), `mris_register_label_map`'s 8000 mm 4 x 10^12. The
   port stops at the table's farthest bucket (its box of buckets kept as they are made), the same
-  answer.
+  answer; it knows an empty column from one bit (FreeSurfer's 2000 x 2000 column pointers, 32 MB,
+  as 0.5 MB of bits), and with `reproduce` passes over the shells of a probe beyond the table that
+  reach no voxel of it (a NaN probe's voxel is `INT_MIN`: FreeSurfer walks every shell of nothing
+  up to the caller's limit, 8 x 10^9 voxels at 1,000 mm and 1 mm; the probe's `prj` cases met it
+  after `MRISprojectOntoSphere` with a NaN radius).
 - `MHTfindReportCounts` (469) and its three counters have no caller in 8.2.0: not ported.
 
 ## 41. label.cpp's LabelToFlat and the label rips (relay 43 of track D)
@@ -2228,3 +2232,36 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/label.cpp`
 - No defect: the four functions read only points within the surface; a label with fewer places than
   `n_points` would read past its points in FreeSurfer as in every label function (the port's labels
   hold their places).
+
+## 42. mrisurf_project.cpp (relay 43 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_project.cpp` whole into
+`crates-freesurfer/larmorx-freesurfer-surf/src/project.rs`; the object code (`mrisurf_project.cpp.o` of
+the unit oracle) decides the types:
+
+- `mrisSphericalProjectXYZ`'s `sqrt(SQR(xs) + ...)` takes libstdc++'s `float` overload (`sqrtss`, a
+  `sqrtf` call only for `errno` on a negative input), so `dist` is a `float` root widened; `lambda =
+  DEFAULT_RADIUS / dist` and `xs * lambda` are `double`. `MRISradialProjectOntoEllipsoid`'s `denom` is a
+  `float` root too, though the file declares `extern double sqrt(double)` (after the first functions;
+  the overload still wins). `MRISprojectOntoCylinder`'s `-1.0 + (float)radius / sqrt(x2 + z2)` is
+  compiled as `radius / sqrtf(x2 + z2) - 1.0f` (`subss`: exact, the sum of two floats rounded once
+  either way). `MRISprojectOntoEllipsoid` takes `(float)sqrt((double)(g * g - 4 * f * h))`: glibc's
+  `sqrt`, which sets `errno` to `EDOM` for a negative argument, and the `ErrorPrintf` that follows then
+  prints `Numerical argument out of domain` first (seen in the probe, reproduced).
+- Operand orders (NaN bits): `dx = x * d`, `dy = y * d`, `dz = d * z` in the sphere's and the
+  ellipsoid's moves, the cylinder's `v->x = dx + x`, `v->z = dz + z`; the radial sum `(y-term + x-term)
+  + z-term`; the ellipsoid's `4 * f * h` as `h * (4 f)`, `-g + root` as `root - g`, `2 * f` as `f + f`,
+  its DIAG sum `dz² + (dx² + dy²)`; the sphere's DIAG sum `(dy² + dx²) + dz²` then `sqrt + total`.
+- `DEFAULT_A`, `DEFAULT_B`, `DEFAULT_C` are all 122.0 (one `.LC17`). `FZERO(a)` and the status tests
+  compare in `float`; the sphere's `FZERO(r)` and `FZERO(dist)` in `double` (`fabs` calls).
+- `MRISprojectOntoEllipsoid`'s failure returns `MRISradialProjectOntoEllipsoid(mris_src, mris_dst, ...)`
+  from inside its loop: with `(mris, mris)` the vertices before the failing one stay projected
+  orthographically and are then projected radially from there; no `avgdist` line, the ellipsoid's
+  `MRISupdateEllipsoidSurface` once (the radial one's).
+- `mrisAssignFaces` (an OpenMP loop under `if_ROMP(experimental)`, each vertex alone) moves each
+  vertex onto the sphere first (`project_point_onto_sphere` inlined: `dx = x * d`, ..., `dz = d * z`;
+  the results equal `base`'s order, as the subtraction takes the coordinate's NaN first) and ignores
+  `which_vertices`.
+- No defect of their own: the cylinder and the ellipsoid print their errors and go on with what they
+  computed; the crashes the probe meets after them (a cylinder of a surface with vertices on its axis,
+  then `MRISupdateSurface`) are the metric properties' known ones (FS-06, FS-121).

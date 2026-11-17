@@ -558,6 +558,23 @@ heads, both hemispheres, `white` with `cortex.label`, `BA1_exvivo.label`, `BA44_
 `LabelRip`): 24 of 24 identical with `reproduce` (the default differs in all 24 by FS-986, as relay 42
 found for every recorded cortex label). Official 33 s, port 53 s (the reads are track A's).
 
+Also relay 43, 63 commands: `prj` (`mrisurf_project.cpp`: icosahedra of radius 5 to 120, grids and small
+meshes, off centre or crumpled, NaN or infinite coordinates in heavy cases; the status, radius, rips and
+`Gdiag` of the case; the point and surface spherical projections, `MRISprojectOntoSphere` in its two
+forms, `mrisAssignFaces` (coarse face tables: FreeSurfer's fallback search is slow), the cylinder, the
+two ellipsoids into the surface or a copy; the port's side in `tests/fs_surfio/prj.rs`), seeds 7, 13
+(500 cases each) and 17 (1,000): 0 different in both modes; counted, not compared: FS-06, FS-121,
+FS-122 (the metric properties of a surface the cylinder left not finite: the official build crashes);
+the official build passes the 5-second alarm in 34 cases (huge faces after an axis of 0), the port
+refuses them (FS-913). `flr prj` (`real.py --prj`: three heads, both hemispheres: `mris_fix_topology`'s
+`MRISprojectOntoSphere(mris, mris, 100)` of `?h.qsphere.nofix`, the orthographic ellipsoid of
+`?h.sphere` in place and the radial one into a copy, `mrisSphericalProjection`, `mrisAssignFaces` with
+the sphere's canonical face table at 1 mm, the cylinder of 60 mm): 6 of 6 identical in both modes.
+Official 26 s, port 33-34 s (the reads are track A's). Relay 43 also re-ran `mcl` (seeds 7, 13, 17:
+0 different in both modes) after the searches' faster paths: a column bit per table column, the
+shells of a probe beyond the table passed over with `reproduce`, the probe's voxel clamped into the
+table by default (FS-999).
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

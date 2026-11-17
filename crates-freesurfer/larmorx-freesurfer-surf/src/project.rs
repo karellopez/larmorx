@@ -35,6 +35,8 @@ use crate::mris::Mris;
 use crate::props8;
 use crate::tritri::narrow;
 
+/// `EDOM` (Linux).
+const EDOM: i32 = 33;
 /// `DEFAULT_RADIUS`.
 pub const DEFAULT_RADIUS: f64 = 100.0;
 /// `DEFAULT_A`, `DEFAULT_B`, `DEFAULT_C` (all 122 mm).
@@ -127,7 +129,11 @@ pub fn project_onto_sphere(g: &mut Globals, io: &mut Io, mris: &mut Mris, r: f64
         }
     }
     if show {
-        let _ = writeln!(io.out, "sphere_project: total dist = {}", fmt_f(total, 0, 6));
+        let _ = writeln!(
+            io.out,
+            "sphere_project: total dist = {}",
+            fmt_f(total, 0, 6)
+        );
     }
     mris.status = if mris.status == MrisStatus::PARAMETERIZED_SPHERE {
         MrisStatus::PARAMETERIZED_SPHERE
@@ -202,7 +208,9 @@ pub fn assign_faces(
         let p = [f64::from(v.x), f64::from(v.y), f64::from(v.z)];
         let (mut fno, _) = mht.find_closest_face_generic(g, err, mris, p, 8.0, 8, 1)?;
         if fno < 0 {
-            fno = mht.find_closest_face_generic(g, err, mris, p, 1000.0, -1, -1)?.0;
+            fno = mht
+                .find_closest_face_generic(g, err, mris, p, 1000.0, -1, -1)?
+                .0;
         }
         mris.vertex_mut(vno).fno = fno;
     }
@@ -275,6 +283,7 @@ fn ellipsoid_status(a: f32, b: f32, c: f32) -> MrisStatus {
 /// ...), scaled onto the ellipsoid along the line from the centre: `abc x1 / sqrt(b²c² x1² + a²c²
 /// y1² + a²b² z1²)` in `float` (the root in `float`); then `MRISupdateEllipsoidSurface` and the
 /// status (a sphere when the axes agree).
+#[allow(clippy::too_many_arguments)]
 pub fn radial_project_onto_ellipsoid(
     g: &mut Globals,
     sg: &mut SurfGlobals,
@@ -406,6 +415,10 @@ fn orthographic(g: &mut Globals, io: &mut Io, dst: &mut Mris, a: f32, b: f32, c:
         let gg = add(gg, gg);
         let h = sub(add(add(div(x2, a2), div(y2, b2)), div(z2, c2)), 1.0);
         let disc = sub(mul(gg, gg), mul(h, mul(4.0, f)));
+        // glibc's sqrt: EDOM for an argument below 0 (the error message below then prints it)
+        if disc < 0.0 {
+            g.errno = EDOM;
+        }
         let root = narrow(sqrt64(f64::from(disc)));
         let d = div(sub(root, gg), add(f, f));
         if !d.is_finite() {

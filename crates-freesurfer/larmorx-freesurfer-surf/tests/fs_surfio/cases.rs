@@ -55,8 +55,6 @@ mod lbl;
 mod life;
 #[path = "mcl.rs"]
 mod mcl;
-#[path = "prj.rs"]
-mod prj;
 #[path = "mht.rs"]
 mod mht;
 #[path = "mpb.rs"]
@@ -75,6 +73,8 @@ mod mpg;
 mod mprop;
 #[path = "mpx.rs"]
 mod mpx;
+#[path = "prj.rs"]
+mod prj;
 #[path = "pvw.rs"]
 mod pvw;
 #[path = "sbl.rs"]

@@ -34,8 +34,15 @@
 //!   as FreeSurfer does and skips the others (FS-576, noted).
 //! - **FS-999** (wrong result): a vertex or face beyond the table is listed at its edge
 //!   (`mhtAddFaceOrVertexAtVoxIx` coerces), but a search beyond the table looks nowhere: a probe at
-//!   a vertex beyond the table does not find it. Rule A: such voxels are looked up at the table's
-//!   edge, as the stores do (each edge bucket once per search); `reproduce` looks nowhere.
+//!   a vertex beyond the table does not find it. Rule A: a probe whose voxel is beyond the table is
+//!   searched from the table's nearest voxel (its distances its own), and voxels beyond the table
+//!   are looked up at the table's edge, as the stores do (each edge bucket once per search);
+//!   `reproduce` looks nowhere.
+//!
+//! Speed, with the same answers: an empty column of the table is known from one bit (FreeSurfer's
+//! array of column pointers); the shells end at the table's farthest bucket; with `reproduce` the
+//! shells of a probe beyond the table that hold no voxel of the table are passed over (FreeSurfer's
+//! two tests before each shell are monotone in its radius, so they are made at the range's ends).
 //!
 //! `MHTfindReportCounts` (the last search's bucket counts) has no caller in FreeSurfer 8.2.0 and
 //! is not ported.
@@ -86,15 +93,11 @@ impl<'a> Search<'a> {
     fn bucket(&mut self, g: &mut Globals, v: [i64; 3]) -> Option<&'a [i32]> {
         let inside = v.iter().all(|&c| (0..i64::from(TABLE_SIZE)).contains(&c));
         if inside {
-            return self
-                .mht
-                .buckets
-                .get(&key(v[0] as i32, v[1] as i32, v[2] as i32))
-                .map(Vec::as_slice);
+            return self.mht.bucket(v[0] as i32, v[1] as i32, v[2] as i32);
         }
         let c = v.map(|c| coerce(c.clamp(-1, i64::from(TABLE_SIZE)) as i32));
         let k = key(c[0], c[1], c[2]);
-        let edge = self.mht.buckets.get(&k).filter(|b| !b.is_empty());
+        let edge = self.mht.bucket(c[0], c[1], c[2]).filter(|b| !b.is_empty());
         edge?;
         g.notices.add(
             &FS_999,
@@ -106,7 +109,7 @@ impl<'a> Search<'a> {
         if g.notices.reproduce() || !self.edges.insert(k) {
             return None;
         }
-        edge.map(Vec::as_slice)
+        edge
     }
 
     /// FS-576 (FS-998 with `reproduce`): a number of the table of the other kind beyond the
@@ -311,6 +314,25 @@ impl Mht {
             vox[k] = i64::from(v);
             near8[k] = if m <= 0.5 { -1 } else { 0 };
         }
+        // FS-999 by default: a probe whose voxel is beyond the table is searched from the table's
+        // nearest voxel (its distances still the probe's own), as its stores were clamped
+        if !g.notices.reproduce()
+            && vox
+                .iter()
+                .any(|&c| !(0..i64::from(TABLE_SIZE)).contains(&c))
+            && self.bbox.is_some()
+        {
+            g.notices.add(
+                &FS_999,
+                format!(
+                    "the surface hash table: a search from voxel ({}, {}, {}) beyond the table, where FreeSurfer looks for nothing (searched from the table's edge)",
+                    vox[0], vox[1], vox[2]
+                ),
+            );
+            for c in &mut vox {
+                *c = (*c).clamp(0, i64::from(TABLE_SIZE) - 1);
+            }
+        }
         let at = |o: [i64; 3]| [vox[0] + o[0], vox[1] + o[1], vox[2] + o[2]];
         let mut central27 = [[[false; 3]; 3]; 3];
         for xvi in 0..=1 {
@@ -362,18 +384,37 @@ impl Mht {
                     .unwrap_or(-1),
             };
             let bounded = g.notices.reproduce() || probe_inside;
+            // the first shell with a voxel inside the table (Chebyshev distance from the probe's
+            // voxel to the table): the shells before it look at nothing (`reproduce`'s probe
+            // beyond the table)
+            let first = (0..3)
+                .map(|k| (-vox[k]).max(vox[k] - (i64::from(TABLE_SIZE) - 1)).max(0))
+                .max()
+                .unwrap_or(0);
+            // FreeSurfer's two tests before a shell (monotone in the shell's radius)
+            let stop = |s: &Search, rvox: i32| {
+                let remaining = mul64(mhtres, f64::from(rvox - 1));
+                s.found_within(remaining) || max_distance_mm <= remaining
+            };
             let mut rvox: i32 = 2;
             while rvox <= max_mhts {
-                let remaining = mul64(mhtres, f64::from(rvox - 1));
-                if s.found_within(remaining) {
-                    break 'done;
-                }
-                if max_distance_mm <= remaining {
+                if stop(&s, rvox) {
                     break 'done;
                 }
                 if bounded && i64::from(rvox) > last {
                     // nothing left to find: the same answer as the rest of FreeSurfer's shells
                     break 'done;
+                }
+                if bounded && i64::from(rvox) < first {
+                    // shells of nothing up to `first - 1`: FreeSurfer's tests before each of them
+                    // hold at one of the range's ends if anywhere (they are monotone)
+                    let end =
+                        i32::try_from((first - 1).min(i64::from(max_mhts))).unwrap_or(max_mhts);
+                    if stop(&s, end) {
+                        break 'done;
+                    }
+                    rvox = end + 1;
+                    continue;
                 }
                 let r = i64::from(rvox);
                 let wall_jump = r + r;

@@ -5761,10 +5761,13 @@ MRIS_HASH_TABLE_NoSurface not initialized for faces`) and `MHTfindClosestFaceGen
 **148.5 Defects.** **FS-998** (rule B): the unchecked searches on a table of the other kind read its
 numbers as numbers of the kind searched for; by default FreeSurfer's own check's message and the end
 of the program; `reproduce` goes on: a number within the surface's vertices (faces) is used, one beyond
-(**FS-576**, FreeSurfer reads memory outside them) skipped. **FS-999** (rule A): a voxel beyond the
-table is scanned at the table's edge (its coordinates clamped into 0 to 1999), as the stores clamp
-(136.1), each such edge bucket once per search, and the shells' early end of 148.1 not used while the
-probe's own voxel is beyond the table; `reproduce` scans nothing there. **FS-909** (rule B): a probe
+(**FS-576**, FreeSurfer reads memory outside them) skipped. **FS-999** (rule A): a probe whose voxel is
+beyond the table (of a table that holds something) is searched from the table's nearest voxel (each
+coordinate clamped into 0 to 1999; the distances are still the probe's own), and a voxel beyond the
+table is scanned at the table's edge (its coordinates clamped), as the stores clamp (136.1), each such
+edge bucket once per search; `reproduce` scans nothing there. With `reproduce`, a probe beyond the
+table looks at nothing until a shell reaches the table; an implementation may pass those shells over
+when 148.1 (e)'s two tests, which only grow true with the radius, hold at neither end of the range. **FS-909** (rule B): a probe
 voxel number that is not an `int` (148.1 (b)) ends the program by default (`surface hash table: a
 search's probe voxel number <v> is not finite or too large for its voxels ...`, `ERROR_BADPARM`);
 `reproduce` takes `INT_MIN` (nothing is found). Nothing else of these searches prints, and they
@@ -5827,3 +5830,76 @@ recorded heads (`real.py --lrr`: three heads, both hemispheres, `white` with `co
 before `LabelRipRestOfSurface`, so that 150.1 finds it; the threshold at 0.5; `LabelRip`): 24 of 24
 identical with `reproduce`, the default different by FS-986 in all 24 (observed). `tests/labelsurf_defaults.rs` checks 150.1's search and 150.2-150.3's rips. A clean-room
 implementer's black-box forms: `mris_make_surfaces -highres <label>`, `mris_expand -label <label>`.
+
+## 152. Projections onto a sphere, a cylinder and an ellipsoid (fs.surf's `mrisurf_project.cpp`, taken early; relay 43 of track D)
+
+`FZERO(x)` is `|x| < FLT_EPSILON` (1.1920929e-7), in the type of `x`. `%f` and `%2.2f` are C's.
+
+**152.1** `mrisSphericalProjectXYZ(xs, ys, zs, &xd, &yd, &zd)`: twice: `s = xs² + ys² + zs²` in `float`
+(summed left to right), `dist` its `float` square root widened to `double`, `lambda = 100 / dist`,
+each output `(float)(x lambda)` in `double`; the second time from the first's outputs.
+`mrisSphericalProjection(surf)`: each unripped vertex's current position so projected, then copied to
+its canonical position (`cx cy cz`).
+
+**152.2** `MRISprojectOntoSphere(surf, r)` (`mris_fix_topology`'s `MRISprojectOntoSphere(mris, mris,
+100)`, `mris_spherical_average`, the classifiers' spheres): `r` 100 when `FZERO(r)` (in `double`);
+unless the status is a sphere (4) or a parameterized sphere (5), the surface is centred (§16's centre); `radius = r`; the distances released but the original ones; each unripped vertex, in `double`:
+`dist = sqrt(x² + y² + z²)` (summed left to right), `d = 0` when `FZERO(dist)` else `1 - r / dist`,
+the position `p - d p` rounded to `float`; with `DIAG_SHOW` and verbose diagnostics `sphere_project:
+total dist = %f` (the sum of each move's length) on standard output; the status becomes a sphere (a
+parameterized sphere stays one); then `MRISupdateEllipsoidSurface` (§42's orientation). The two-surface form
+`MRISprojectOntoSphere(src, dst, r)` asserts `src == dst` (`ASSERTION FAILED: <build>/utils/
+mrisurf_project.cpp:165 mris_src == mris_dst`, FS-03); the `MRIS_MP` form is
+`ASSERTION FAILED: ...:158 false`.
+
+**152.3** `mrisAssignFaces(surf, mht, which)` (the spherical integrations' face lookup): each
+unripped vertex's current position moved onto the sphere of the surface's radius (rounded to
+`float`; §6's projection of a point onto a sphere), then its `fno` the face of `MHTfindClosestFaceGeneric`
+(148.4) at 8 mm, 8 shells, projected into, or when none at 1,000 mm unprojected. `which` is unused.
+
+**152.4** `MRISprojectOntoCylinder(surf, radius)`: centred; each vertex (ripped ones too) in `float`:
+`d = radius / sqrt(x² + z²) - 1` (the root in `float`); a `d` that is not finite prints `point
+(%2.2f,%2.2f,%2.2f) cannot be projected on cylinder` (no newline) as an error (`ERROR_BADPARM`) and is
+used; `x += d x`, `z += d z`; then `MRISupdateSurface` (metric properties and the second fundamental
+form, §105's `MRISupdateSurface`). Returns `NO_ERROR`.
+
+**152.5** `MRISprojectOntoEllipsoid(src, dst, a, b, c)` (`mrisProjectSurface` of an ellipsoid: `(mris,
+mris, 0, 0, 0)`): `a b c` 122 mm each when `FZERO(a)`; a `NULL` destination is a copy of the source
+(`MRISclone`, §105); the destination centred, its `a b c` set; each vertex (ripped ones too) in `float`: `f =
+x²/a⁶ + y²/b⁶ + z²/c⁶`, `g = 2 (x²/a⁴ + y²/b⁴ + z²/c⁴)`, `h = x²/a² + y²/b² + z²/c² - 1` (each sum left to
+right; `a⁶ = a² a⁴`), `d = ((float) sqrt((double)(g² - h 4f)) - g) / (f + f)`; a `d` that is not finite
+prints `point (%2.2f,%2.2f,%2.2f) cannot be projected on ell (%2.0f,%2.0f,%2.0f...` and a newline as
+an error and the rest is 152.6 from the source into the destination (the vertices already moved stay
+moved where the two are one surface); else `x += d x / a²` (and `y`, `z`). With `DIAG_SHOW` and verbose
+diagnostics `ellipsoid_project: avgdist = %f` (the mean move, in `float`) on standard output. Then
+`MRISupdateEllipsoidSurface`, and the status a sphere (4) when `FZERO(a - b)` and `FZERO(b - c)` (in
+`float`), else an ellipsoid (3).
+
+**152.6** `MRISradialProjectOntoEllipsoid(src, dst, a, b, c)`: the axes as 152.5; a `NULL` destination
+a copy; each vertex (ripped ones too) of the source relative to the destination's centre (`xctr
+yctr zctr`), in `float`: `x1 = x - x0` ..., `denom = sqrt(b²c² x1² + a²c² y1² + a²b² z1²)` (the root in
+`float`; the products `((b b) c) c`, `((a a) c) c`, `((a a) b) b`; the sum `(y-term + x-term) +
+z-term`), the destination's position `abc x1 / denom` (`abc = (a b) c`); then
+`MRISupdateEllipsoidSurface` and the status as 152.5.
+
+## 153. Validation plan, part 39
+
+The probe's command `prj` (relay 43): icosahedra of radius 5 to 120 (now and then crumpled or off
+centre), open grids and srd's small meshes (heavy cases: a coordinate NaN, infinite or a vertex at the
+origin); the status 0, 2, 3, 4 or 5, the radius 0 to 100, a vertex or two ripped, `Gdiag` 0,
+`DIAG_SHOW`, or with verbose diagnostics; then 1 to 4 of: 152.1's point projection (NaN, 0 and 10^30
+in heavy cases) and surface projection, 152.2 (r 0 to 100; NaN, -50, 10^-9 in heavy cases) and its
+two-surface form, 152.3 with face tables of the current or canonical positions at 1 to 10 mm, 152.4
+(radius 5 to 100; NaN, 0, -5), 152.5 and 152.6 (axes 0 to 122; NaN, -10, 10^-30) into the surface or a
+new copy; after each the surface (status, radius, axes, centre, areas; each vertex's positions,
+canonical positions and face; each face's area; after 152.4 the vertices' areas, normals and
+curvatures). Compared with the official build with `reproduce`: identical; the default identical but
+where a noted correction changed the result. Observed (relay 43): seeds 7, 13 (500 cases each) and 17
+(1,000): 0 different in both modes (162 counted, not compared: FS-06, FS-121, FS-122, the metric
+properties of a surface a projection left not finite; 34 that FreeSurfer runs past the probe's 5-second
+alarm: face tables of faces made huge by an axis of 0). On the recorded heads
+(`real.py --prj`: three heads, both hemispheres, `mris_fix_topology`'s `MRISprojectOntoSphere(qsphere,
+100)` on `?h.qsphere.nofix` against the recorded `?h.qsphere.nofix` read and projected, the radial and
+orthographic ellipsoids of `?h.sphere`, the spherical projection, `mrisAssignFaces` on the sphere's
+canonical table, the cylinder of 60 mm): 6 of 6 identical in both modes (observed). A clean-room implementer's black-box forms:
+`mris_fix_topology` (its sphere), `mris_sphere` and `mris_register` (the projections between steps).

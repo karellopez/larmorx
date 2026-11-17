@@ -321,5 +321,12 @@ of its own, so the groups' other batches keep their cases.
   `standin.py` as the candidate (`--groups eigen,svd`, the saved lines of both groups) gives no
   unexplained difference; with `--break refusal` 295 lines are unexplained, with `--break nanbits` 572
   (86 in `eigen`, 486 in `svd`; log `oracles/logs/fs-maths-probe-r6-standin-2026-11-16.log`).
+- 2026-11-17 (track E, relay 8): the fixed batches `melements-nan` (180 calls: `madd` and `msub` with
+  NaNs of different payloads in both operands, rows of 1 to 9 columns, the output new, either operand
+  or another given matrix) and `mvectors-nan` (21 calls: `vcross` and `vtriple` with NaNs as both
+  factors of each product, both products of each difference, a cross term and its element, the
+  triple product's terms in pairs) added to `melements` and `mvectors`; `refs --groups
+  melements,mvectors` cold, warm and without the cache give the spec's new hashes; the probe as its own
+  candidate identical in both modes (`oracles/logs/fs-maths-probe-r8-nan-2026-11-17.log`).
 - About 40 minutes for a cold `refs` on the reference machine (most of it the guard runs of `eigen`
   and `svd`), seconds warm; `compare` about 10 minutes more (the candidate's runs).

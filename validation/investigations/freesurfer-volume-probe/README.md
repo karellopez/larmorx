@@ -1,11 +1,11 @@
-# FreeSurfer 8.2.0's volume functions, as a black box (parts 1 to 4)
+# FreeSurfer 8.2.0's volume functions, as a black box (parts 1 to 5)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
-[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 4 (§1 to §22:
+[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 5 (§1 to §24:
 the volume-geometry text block, its copies, matrices, comparison and printer; the voxel
 arithmetic; coordinates, orientation, the Talairach point, centre of mass, principal components,
 the running average, the header comparison, determinant and dump; the samplers, the moves, the
-head's box and the transform reader). **Open to the clean-room
+head's box and the transform reader; the CMA label tests and the segmentation functions). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C
 library's) by name, the reading and printing of their arguments, results and the structures'
 fields, and a comparison loop; no FreeSurfer code, nothing written from its source. The implementer
@@ -16,8 +16,8 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §69: 14 groups of seeded cases and one of fixed cases (`vrules`; 9,489 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
-| `models.py` | a statement of the spec checked as a model of the probe's printed voxels: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`) |
+| `compare.py` | the comparison loop of the spec's §69: 15 groups of seeded cases and two of fixed cases (`vrules`, `vrules4`; 9,960 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -35,8 +35,11 @@ fs_volume_probe batch <file>      # or - for standard input
 Each line of the file is one call: `[@<seconds>] [+gdiag=<hex>] <command> <arguments>`, run as the
 fs.mri probe runs its lines ([`../freesurfer-mri-probe/README.md`](../freesurfer-mri-probe/README.md),
 "Running it": a child process each, an alarm of 2 seconds unless `@` sets another, the line
-`<result> | <standard output> <standard error>`, `EXIT <status>`, `CRASH <signal>`, `TIMEOUT`). The
-commands that write or read a file use `vg.out` and `vg.in` in the working directory.
+`<result> | <standard output> <standard error>`, `EXIT <status>`, `CRASH <signal>`, `TIMEOUT`). From the
+build of relay 8 (commit `9319981f`) each child orients its standard error before the call, as a program
+that has written to it (the C library's `perror` then leaves `errno` alone: the spec's §21). The
+commands that write or read a file use `vg.out` and `vg.in` in the working directory (`ltaread` and
+`ltareads` their own names, `bvc` and `bvr` the folder `subj`).
 
 ## Encodings
 
@@ -53,6 +56,7 @@ fs.mri probe's (its README, "Encodings"). Added here:
 | a volume (printed) | `null`, or the fs.mri probe's header (its "volume (printed)" without the index tables and frames), the colour table (CT, each entry with its count), the voxels |
 | a result (printed) | `self`, `other` or `given` when the returned volume is that one, then the volume; then, when a given destination is not the result, the destination's state |
 | unset | an output the call may leave is 7.0 before the call (`40e00000`, `401c000000000000`) |
+| P, a painting | n, then n times `x y z value` (integers and a float): frame 0's voxels set with `MRIsetVoxVal` after the volume is made |
 
 ## Commands
 
@@ -107,6 +111,15 @@ The spec's sections in brackets.
 | `skull W i n (i×6 f)×n` | n boxes `x0 y0 z0 x1 y1 z1 value` written into frame 0 (`MRIsetVoxVal`, every voxel from the first corner to the second), then `MRIfindApproximateSkullBoundingBox` (the threshold) into a box set to -7 [§20] | its value, the box's six integers |
 | `tftype n x×n` | `TransformFileNameType` of each name [§21] | the integers |
 | `ltaread x x\|nofile i` | the second string written to a file named by the first in the working directory (`nofile`: no file, any old one removed), `USE_AVERAGE305` unset (0), set to `true` (1) or set empty (2), `errno` set to 0, `LTAreadEx` of the name, the file removed | `errno`, then the array (the fs.mri probe's LTA, or `null`) |
+| `ltareads n (x x\|nofile)×n i` | as `ltaread`, n files read one after the other in one process (`USE_AVERAGE305` as the last integer says) | per file `errno` and the array |
+| `cmalab n (i f)×n` | per pair: §23's label tests (`IS_FUTURE_WMSA`, `IS_LH_LAYER`, `IS_CC`, `IS_RH_LAYER`, `IS_LAYER`, `IS_UNKNOWN`, `IS_BRAIN`, `IS_WM`, `IS_CEREBRAL_WM`, `IS_HYPO`, `IS_WMSA`, `IS_WMH`, `IS_THALAMUS`, `IS_GM`, `IS_VENTRAL_DC`, `IS_CEREBELLAR_WM`, `IS_CEREBELLAR_GM`, `IS_CEREBELLUM`, `IS_CHOROID`, `IS_HIPPO`, `IS_AMYGDALA`, `IS_MTL`, `IS_CORTEX`, `IS_LAT_VENT`, `IS_CSF`, `IS_INF_LAT_VENT`, `IS_VENTRICLE`, `IS_CAUDATE`, `IS_PUTAMEN`, `IS_CLAUSTRUM`, `IS_ACCUMBENS`, `IS_PALLIDUM`, `LABEL_WITH_NO_TOPOLOGY_CONSTRAINT`, `IS_FIMBRIA`, `IS_GRAY_MATTER`, `IS_WHITE_MATTER`, `IS_FLUID`, `IS_LH_CLASS`, `IS_RH_CLASS`, `IS_GRAY_CLASS`, `IS_WHITE_CLASS`, `IS_CSF_CLASS`, then `IS_CLASS` with the classes 0, 1, 2, 7) of the integer, of the float and of the float as a double; `IsSubCorticalGray` and `MRIasegContraLatLabel` of the integer [§23] | three strings of 46 digits 0/1, then the two integers |
+| `cmavol W P W P i` | `SupraTentorialVolCorrection`, `CorticalGMVolCorrection` (the segmentation, the ribbon, `hemi`) | two doubles |
+| `lrswap W P` | `MRIlrswapAseg` | the volume |
+| `fixrib W P W P D` | `MRIfixAsegWithRibbon` (the segmentation, the ribbon, the destination) | the result |
+| `lrseg W P M M` | `MRIlrswapSeg` (the segmentation, the `lh` and `rh` lists) | the volume or `null` |
+| `ohe W P n i×n i` | `MRIoneHotEncode` (the segmentation, the list, `force1`) | the volume |
+| `bvc i d×16` | the folder `subj/stats` in the working directory made (1) or not (0), `CacheBrainVolumeStats` of the 16 values for `subj` in `.` | the file's bytes (a string), or `null` |
+| `bvr i x` | the folder made (1, the string written to `subj/stats/brainvol.stats`) or not (0), `ReadCachedBrainVolumeStats` of `subj` in `.` | the count, then the doubles |
 
 ## The models
 
@@ -116,7 +129,7 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 4 python -P \
   --probe <workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe --scratch <scratch>/models
 ```
 
-Prints how many lines match the model (by the types met: `uchar` only, a tensor, other types), how
+(`fs291`; `skull` and `cma` the same way.) Prints how many lines match the model (by the types met: `uchar` only, a tensor, other types), how
 many it leaves out (FreeSurfer crashed or read memory it does not own) and how many differ; exit
 status 1 when one differs.
 
@@ -136,7 +149,10 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
 The candidate, the guard runs, the memory lines and what may differ are as in the fs.mri probe's
 loop (its README, "The comparison loop"), without its `FS-264` batches: a difference is allowed on a
 line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`) and the candidate did, on a **memory**
-line, and in `--mode fix` on a line where the candidate noted a defect. Every call gets 10 seconds
+line, in `--mode fix` on a line where the candidate noted a defect, and in both modes on a `vsample`
+line where the candidate noted FS-300 (the cubic frame sampler's window points outside the volume,
+which FreeSurfer never reads: the probe's four runs agree on them only because the probe's own
+earlier work leaves the same bytes on the stack, so they count as memory). Every call gets 10 seconds
 (`@10`) but `pca`'s (2: FreeSurfer's eigensystem never returns on some covariances) and the two
 `ltaread` calls of FS-307 (3: FreeSurfer never returns). The groups:
 `vgblock` (§2-3: 60 writes; 500 reads of generated blocks: well-formed, with lines missing,
@@ -158,7 +174,14 @@ with a bright head and dark margins of 6 to 15 voxels, a dark inside, painted bo
 texts with comments, odd separators and numbers, 0 to 3 transforms, matrices of other sizes, the
 geometry blocks, subject and intensity lines, cut files; `.xfm` texts in the information lines'
 forms, cut; `.fslmat`, `register.dat` texts; `identity.nofile`; missing files; `USE_AVERAGE305`
-unset, `true` and empty): volumes of up to 4 x 4 x 4 voxels (5 for
+unset, `true` and empty), the fixed cases of `vrules4` (relay 8, §18-21: the cubic weights outside 0
+to 3, the sinc kernel's NaNs, `MRIrotate_I` with matrices and centres of other sizes, the `.xfm`
+reader's buffer at the end of the file, its three forms of information lines, several `.xfm` files
+in one process for `minctracc`'s count, the FSL, `register.dat` and `identity.nofile` readers' fields,
+`TransformFileNameType`'s `#` and `@` rules) and part 5's `vcma` (§23: every label from -3 to 1005
+and the ranges above 1000 as an integer, a float and a double; segmentations and ribbons of up to 4
+x 4 x 4 voxels of six types with painted labels, NaN and odd values, `hemi` 0 to 3; the swaps, the
+ribbon fix, the one-hot encoding; the statistics cache's lines in their forms): volumes of up to 4 x 4 x 4 voxels (5 for
 `vextract`, 6 for `vcoords`) and 0 to 3 frames of every type (the types without a voxel size
 header-only), headers only too, destinations new, of the same shape, of another shape or a source,
 cached matrices as allocated, recomputed or dropped.
@@ -178,3 +201,14 @@ cached matrices as allocated, recomputed or dropped.
   without it; the probe as its own candidate: no unexplained difference in either mode;
   `models.py skull`: 160 of 160 lines as the model (log
   `oracles/logs/fs-volume-probe-r7-final-2026-11-17.log`).
+- Relay 8 (2026-11-17): the prebuilt probe rebuilt from commit `9319981f` (part 5's commands,
+  `ltareads`, standard error oriented before each call; its build in `BUILD_INFO.txt`, the same bytes
+  twice; the 420314bb build kept in `<workspace>/archive/2026-11-17-fs-volume-probe-420314bb/`): every
+  earlier group's hash unchanged but `vltaread`'s, whose only changed lines are its six missing
+  `register.dat` cases (`errno` 2 and `No such file or directory` instead of 22 and `Invalid argument`,
+  the 420314bb build's lines compared one by one); the new groups `vrules4` (94 calls) and `vcma`
+  (377) the same cold, warm and without the cache (`vcma` twice without it); the probe as its own
+  candidate: no unexplained difference in either mode; `models.py fs291` 127, `skull` 160 and `cma`
+  95 lines as their models (logs `oracles/logs/fs-volume-probe-r8-final-2026-11-17.log`,
+  `fs-volume-probe-r8-vcma-2026-11-17.log`). The loop lets a `vsample` line noting FS-300 differ in
+  both modes (its window points FreeSurfer never reads).

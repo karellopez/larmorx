@@ -397,7 +397,12 @@ impl Process {
         inputs: &mut dyn TransformInputs,
     ) -> Result<Option<Lta>, Stop> {
         let Some(mut s) = read_file(self, inputs, fname) else {
-            self.lt_error(codes::NO_FILE, "ltMNIreadEx: could not open file ", fname, "");
+            self.lt_error(
+                codes::NO_FILE,
+                "ltMNIreadEx: could not open file ",
+                fname,
+                "",
+            );
             return Ok(None);
         };
         // the line buffer: the last line fgetl gave (kept when it gives none)
@@ -554,7 +559,12 @@ impl Process {
             b"INFO: This REGISTER_DAT transform is valid only for volumes between  COR types with c_(r,a,s) = 0.\n",
         );
         let Some(reg) = self.regio_read_register(fname, inputs)? else {
-            self.lt_error(codes::BAD_FILE, "ltaReadRegisterDat: could not read ", fname, "");
+            self.lt_error(
+                codes::BAD_FILE,
+                "ltaReadRegisterDat: could not read ",
+                fname,
+                "",
+            );
             return Ok(None);
         };
         let mut lta = self.lta_alloc(1, None)?;
@@ -607,7 +617,10 @@ impl Process {
             );
         }
         let mut vals = [0f32; 3];
-        for (k, what) in ["inplaneres", "betplaneres", "intensity"].iter().enumerate() {
+        for (k, what) in ["inplaneres", "betplaneres", "intensity"]
+            .iter()
+            .enumerate()
+        {
             let Some(Got::F(x)) = scanf(self, &mut s, b"%f").first().cloned() else {
                 fail(self, what);
                 return Ok(None);

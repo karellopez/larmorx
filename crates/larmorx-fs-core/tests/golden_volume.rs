@@ -799,12 +799,18 @@ const MOVE: &[(&str, Make)] = &[
     ("rotx", |g| {
         let a = g.w(&[0, 3, 4]);
         let d = g.dst(&a, false);
-        format!("{a} {d} {}", g.pick(&["3fc90fdb", "3e99999a", "00000000", "7fc00000", "bf800000"]))
+        format!(
+            "{a} {d} {}",
+            g.pick(&["3fc90fdb", "3e99999a", "00000000", "7fc00000", "bf800000"])
+        )
     }),
     ("roty", |g| {
         let a = g.w(&[0, 3, 4]);
         let d = g.dst(&a, false);
-        format!("{a} {d} {}", g.pick(&["3fc90fdb", "3e99999a", "7f800000", "40000000"]))
+        format!(
+            "{a} {d} {}",
+            g.pick(&["3fc90fdb", "3e99999a", "7f800000", "40000000"])
+        )
     }),
     ("rotz", |g| {
         let a = g.w(&[0, 3, 4]);
@@ -816,14 +822,26 @@ const MOVE: &[(&str, Make)] = &[
 /// `skull W thresh n (x0 y0 z0 x1 y1 z1 value)×n` (§20) on a plain volume of 4 to 24 voxels a
 /// side: a bright head with dark margins, a dark inside, painted boxes.
 fn skull(g: &mut G) -> String {
-    let n = if g.one_in(4) { g.int(4, 11) } else { g.int(12, 24) };
+    let n = if g.one_in(4) {
+        g.int(4, 11)
+    } else {
+        g.int(12, 24)
+    };
     let dims = [n, if g.one_in(3) { g.int(4, 24) } else { n }, n];
     let t = g.pick(&["0", "3", "4"]);
     let fill = g.pick(&["-1", "0", "7"]);
     let one = "3f800000";
     let zero = "00000000";
-    let geo = [one, one, one, "1", one, zero, zero, zero, one, zero, zero, zero, one];
-    let mut w = format!("{} {} {} {t} 1 0 {fill} {}", dims[0], dims[1], dims[2], geo.join(" "));
+    let geo = [
+        one, one, one, "1", one, zero, zero, zero, one, zero, zero, zero, one,
+    ];
+    let mut w = format!(
+        "{} {} {} {t} 1 0 {fill} {}",
+        dims[0],
+        dims[1],
+        dims[2],
+        geo.join(" ")
+    );
     w.push_str(&format!(" {zero} {zero} {zero} {zero} {zero} {zero}"));
     w.push_str(&format!(" 1 {}", dims[2]));
     for _ in 0..11 {
@@ -859,7 +877,9 @@ fn skull(g: &mut G) -> String {
     }
     for _ in 0..g.int(0, 2) {
         let lo: Vec<i64> = dims.iter().map(|&x| g.int(0, x - 1)).collect();
-        let hi: Vec<i64> = (0..3).map(|k| (lo[k] + g.int(0, dims[k])).min(dims[k] - 1)).collect();
+        let hi: Vec<i64> = (0..3)
+            .map(|k| (lo[k] + g.int(0, dims[k])).min(dims[k] - 1))
+            .collect();
         boxes.push(format!(
             "{} {} {} {} {} {} {}",
             lo[0],
@@ -868,7 +888,9 @@ fn skull(g: &mut G) -> String {
             hi[0],
             hi[1],
             hi[2],
-            g.pick(&["00000000", "41f00000", "42f00000", "437f0000", "c1200000", "7fc00000"])
+            g.pick(&[
+                "00000000", "41f00000", "42f00000", "437f0000", "c1200000", "7fc00000"
+            ])
         ));
     }
     let th = g.pick(&["-5", "0", "1", "50", "100", "100", "150", "255", "300"]);
@@ -960,8 +982,22 @@ fn transform_text(g: &mut G, kind: u64) -> String {
 const LTAREAD: &[(&str, Make)] = &[
     ("tftype", |g| {
         let names = [
-            "a.lta", "b.XfM", "c.m3z", "d.nii.gz", "nii.gz", "x.fslmat", "y.dat", "noext", "a@lta",
-            "a.lta@xfm#y", "a#b.xfm", "a.", "@", "", "dir.d/file", "a.LtA#.xfm",
+            "a.lta",
+            "b.XfM",
+            "c.m3z",
+            "d.nii.gz",
+            "nii.gz",
+            "x.fslmat",
+            "y.dat",
+            "noext",
+            "a@lta",
+            "a.lta@xfm#y",
+            "a#b.xfm",
+            "a.",
+            "@",
+            "",
+            "dir.d/file",
+            "a.LtA#.xfm",
         ];
         let n = g.int(1, 4);
         let v: Vec<String> = (0..n)
@@ -976,7 +1012,15 @@ const LTAREAD: &[(&str, Make)] = &[
             1 => ("t.xfm", Some(transform_text(g, 1))),
             2 => ("t.fslmat", Some(transform_text(g, 2))),
             3 => (g.pick(&["t.dat", "t.reg"]), Some(transform_text(g, 3))),
-            _ => (g.pick(&["identity.nofile", "d/identity.nofile", "none.lta", "none.dat"]), None),
+            _ => (
+                g.pick(&[
+                    "identity.nofile",
+                    "d/identity.nofile",
+                    "none.lta",
+                    "none.dat",
+                ]),
+                None,
+            ),
         };
         let text = text.map_or("nofile".to_owned(), |t| xs(t.as_bytes()));
         let vol = if g.one_in(2) {

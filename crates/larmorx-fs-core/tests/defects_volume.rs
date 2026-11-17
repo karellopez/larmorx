@@ -150,11 +150,7 @@ const CASES: &[(&str, bool, &str)] = &[
         true,
         "ltamem x74 x747970203d20310a6e78666f726d73203d20300a7375626a65637420626572740a 0 none",
     ),
-    (
-        "FS-309",
-        true,
-        "ltamem x74 x74 2 none",
-    ),
+    ("FS-309", true, "ltamem x74 x74 2 none"),
     (
         "FS-310",
         false,

@@ -88,7 +88,14 @@ fn inside_voxel(m: &Mri, x: i32, y: i32, z: i32, f: i32, reproduce: bool) -> Opt
 
 /// The element [`inside_voxel`] reads.
 #[inline]
-pub(crate) fn inside_elem(m: &Mri, x: i32, y: i32, z: i32, f: i32, reproduce: bool) -> Option<Elem> {
+pub(crate) fn inside_elem(
+    m: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    f: i32,
+    reproduce: bool,
+) -> Option<Elem> {
     let v = m.voxels.as_deref()?;
     let g = &m.geom;
     if x < 0 || y < 0 || z < 0 || f < 0 || x >= g.width || y >= g.height || z >= g.depth {
@@ -101,7 +108,8 @@ pub(crate) fn inside_elem(m: &Mri, x: i32, y: i32, z: i32, f: i32, reproduce: bo
     if n as u64 != m.bytes_per_vox {
         return None;
     }
-    let i = ((i64::from(f) * i64::from(g.depth) + i64::from(z)) * i64::from(g.height) + i64::from(y))
+    let i = ((i64::from(f) * i64::from(g.depth) + i64::from(z)) * i64::from(g.height)
+        + i64::from(y))
         * i64::from(g.width)
         + i64::from(x);
     let o = usize::try_from(i).ok()? * n;
@@ -146,12 +154,10 @@ impl Process {
         }
         self.direct_needs_voxels(m, what)?;
         let (x, y, z, f) = (i64::from(x), i64::from(y), i64::from(z), i64::from(f));
-        if m.kind == types::LONG {
-            if reproduce {
-                let place = direct_place(m, x, y, z, f, 4);
-                let b = self.direct_read8(m, place, 4, what);
-                return Ok(f64::from(i32::from_le_bytes([b[0], b[1], b[2], b[3]])));
-            }
+        if m.kind == types::LONG && reproduce {
+            let place = direct_place(m, x, y, z, f, 4);
+            let b = self.direct_read8(m, place, 4, what);
+            return Ok(f64::from(i32::from_le_bytes([b[0], b[1], b[2], b[3]])));
         }
         let n = super::arith::elem_size(m.kind).expect("a sampled type");
         let place = direct_place(m, x, y, z, f, n);
@@ -499,8 +505,9 @@ impl Process {
             for j in ry.0..ry.1 {
                 for i in rx.0..rx.1 {
                     let (px, py, pz) = (low[0] - 1 + i, low[1] - 1 + j, low[2] - 1 + k);
-                    let inside =
-                        (0..e[0]).contains(&px) && (0..e[1]).contains(&py) && (0..e[2]).contains(&pz);
+                    let inside = (0..e[0]).contains(&px)
+                        && (0..e[1]).contains(&py)
+                        && (0..e[2]).contains(&pz);
                     let v = if inside {
                         if !interpolated(m.kind) {
                             self.error_printf(
@@ -673,7 +680,8 @@ impl Process {
                 );
                 self.error_printf(
                     codes::BAD_PARM,
-                    format!("{name}: half-width {hw} holds more than 128 voxels on an axis").as_bytes(),
+                    format!("{name}: half-width {hw} holds more than 128 voxels on an axis")
+                        .as_bytes(),
                 );
                 return Ok(codes::BAD_PARM);
             }
@@ -711,27 +719,12 @@ impl Process {
             }
             sum_z = sse::add64(sum_z, sse::mul64(sum_y, sse::div64(*wz, sums[2])));
         }
-        let mut v = sum_z;
-        match m.kind {
-            types::UCHAR => {
-                if v < 0.0 {
-                    v = 0.0;
-                }
-                if v > 255.0 {
-                    v = 255.0;
-                }
-            }
-            types::SHORT => {
-                if v < 0.0 {
-                    v = 0.0;
-                }
-                if v > 65535.0 {
-                    v = 65535.0;
-                }
-            }
-            _ => {}
-        }
-        *pval = v;
+        // C's `if (v < 0) v = 0; if (v > hi) v = hi;` (`clamp` is the same: a NaN stays)
+        *pval = match m.kind {
+            types::UCHAR => sum_z.clamp(0.0, 255.0),
+            types::SHORT => sum_z.clamp(0.0, 65535.0),
+            _ => sum_z,
+        };
         Ok(codes::NONE)
     }
 }

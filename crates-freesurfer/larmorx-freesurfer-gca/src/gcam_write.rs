@@ -293,6 +293,10 @@ pub fn m3z_write(
         }
     }
     fio::znz_write_int(f, tags::TAG_GCAMORPH_GEOM);
+    if gcam.geom_unset {
+        // relay 42: the geometries' validity and sizes written as memory holds them in FreeSurfer
+        crate::gcam::unset_geometry(g, "the morph file's geometry tag");
+    }
     vol_geom_write(f, &gcam.image, false, true);
     vol_geom_write(f, &gcam.atlas, false, true);
     fio::znz_write_int(f, tags::TAG_GCAMORPH_TYPE);

@@ -138,6 +138,20 @@ def main(argv: list[str] | None = None) -> int:
         "(flr maf) and mri_binarize's disks of 5, 20 and 50 mm around three vertices (flr dvs)",
     )
     ap.add_argument(
+        "--sbl",
+        action="store_true",
+        help="relay 42 of track D: the soap bubbles (flr sbl) on each head's white and orig "
+        "surfaces, the vertices of its cortex label free and the others fixed, 25 passes",
+    )
+    ap.add_argument(
+        "--top",
+        action="store_true",
+        help="relay 42 of track D: mrisurf_topology.cpp's rest (flr top) on each head's "
+        "orig.premesh, orig.nofix, orig and white surfaces with its cortex label: the Euler "
+        "counts (the premesh ones against recon-all.log's mris_euler_number lines), the surface "
+        "check, the removal of the vertices outside the label, the renumbering, the eversion",
+    )
+    ap.add_argument(
         "--mki",
         action="store_true",
         help="relay 39 of track D: mrisMarkIntersections (flr mki) on each head's orig.nofix, "
@@ -166,6 +180,20 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.sbl:
+                for surf in ("white", "orig"):
+                    lines.append(
+                        f"flr sbl {s / 'surf' / f'{hemi}.{surf}'} "
+                        f"{s / 'label' / f'{hemi}.cortex.label'} 25"
+                    )
+                continue
+            if a.top:
+                for surf in ("orig.premesh", "orig.nofix", "orig", "white"):
+                    lines.append(
+                        f"flr top {s / 'surf' / f'{hemi}.{surf}'} "
+                        f"{s / 'label' / f'{hemi}.cortex.label'}"
+                    )
+                continue
             if a.vlr:
                 for c in ANNOTS:
                     lines.append(
@@ -236,7 +264,11 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "vlr"
+        "sbl"
+        if a.sbl
+        else "top"
+        if a.top
+        else "vlr"
         if a.vlr
         else "mki"
         if a.mki
@@ -300,8 +332,31 @@ def main(argv: list[str] | None = None) -> int:
             bad.append({"case": f"{case.split()[1]} {names}", "o": c[:2000], "p": r[:2000]})
         if f == c:
             fix_same += 1
+    # relay 42 of track D: the port's Euler counts of each orig.premesh against recon-all.log's
+    # mris_euler_number line (`euler # = v-e+f = 2g-2: <v> - <e> + <f> = <euler> --> ...`)
+    euler_log = {"checked": 0, "same": 0}
+    if a.top:
+        for case, (r, _, _) in zip(lines, rows["reproduce"][0], strict=True):
+            surf = Path(case.split()[2])
+            if not surf.name.endswith(".orig.premesh"):
+                continue
+            log = (surf.parent.parent / "scripts" / "recon-all.log").read_text(errors="replace")
+            want = None
+            take = False
+            for ln in log.splitlines():
+                if ln.strip() == f"mris_euler_number ../surf/{surf.name}":
+                    take = True
+                elif take and ln.startswith("euler # = v-e+f = 2g-2: "):
+                    nums = ln.split(":", 1)[1].split("-->")[0].replace("=", " ").split()
+                    v, e, f, eu = int(nums[0]), int(nums[2]), int(nums[4]), int(nums[5])
+                    want = (eu, v, f, e)
+                    break
+            got = tuple(int(x) for x in r.split()[1:5])
+            euler_log["checked"] += 1
+            euler_log["same"] += int(want == got)
     summary = {
         "cases": len(lines),
+        "euler_vs_recon_all_log": euler_log,
         "served": done.cached,
         "reproduce_identical": same,
         "reproduce_differ": differ,

@@ -2080,3 +2080,92 @@ ones, past it when one is ripped).
   `(float)t * x` and `(float)d * val` with the count the destination, `addss`, `divss` by `(float)(t +
   d)`, and `SQR(dof)` by 32-bit `imul` (wrapping past 46,340); `MRISmarkRandomVertices` narrows the
   draw with `cvtsd2ss` and marks when `p > r` (`comiss`).
+
+## 38. mrisurf_topology.cpp's rest (relay 42 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_topology.cpp` 320-356,
+407-488, 509-603, 836-849, 878-904, 921-950, 995-1028, 1688-1834, 1957-1967, 2160-2215, 2698-2715,
+2726-2872, 2874-3085, 3143-3159, 3355-3416 into `crates-freesurfer/larmorx-freesurfer-surf/src/toprest.rs`.
+With relays 12-41's `topology.rs`, `nbhd.rs`, `coords.rs`, `props8.rs`, `props10.rs`, `discrete.rs`,
+`binarize.rs` and `valrest.rs`, every function of the file is ported but `mrisDivideEdgeTopologically`,
+`mrisDivideFace` and `mrisInitializeNeighborhood` (2258-2519: `mris_fix_topology`'s retessellation
+through `mrisurf_defect.cpp`'s `mrisDivideEdge`, with fs.defect's item; they use stack arrays of 100
+and 5,000 entries against `uchar` counts) and `MRISfromVerticesAndFaces` (2217-2255, called only by
+`python/fsbindings/bindings_surface.cpp`), and the testing helpers `MRIS_VertexNeighbourInfo_*`.
+
+- **`MRISremoveRipped`'s dead growth** (FS-986): the loop at 2926-2942 walks the list from its head
+  to `endOfList` and begins (line 2932) with `if (affectedVnosPlus2[vno]) continue;` — every listed vertex's
+  entry is at least 1 (the end of the list), so every walked vertex is skipped and no neighbour is
+  ever added; `headAffectedVnosPlus2 == startOfRippedTail` after it, so the recompute loop at
+  2954-3012 never runs and `MRISfindNeighborsAtVertex_new` is never called. The comment on the
+  inner test ("already noted, includes ripped") was copied onto the outer one. The intended path,
+  run by the default, has two problems of its own the port avoids: after the search re-allocates
+  `vt->v` to the new rings' size (`resizeVertexV`, smaller), the loop at 2995-2998 reads and writes
+  the sampled entries past that size (the port saves them first and grows the list), and it reads
+  `v->dist[i]` for `i < vtotal` though an added edge (`mrisAddEdge` reallocates the list, not the
+  distances) can leave the distances shorter (the port reads what the vertex has). On the recorded
+  heads every removal of the vertices outside `cortex.label` meets FS-986 (24 of 24).
+- **`removeRippedFaces`** (FS-987): 2760-2772 compact `v->f` (`v->f[v->num++] = out_faces[...]`) but
+  never `v->n`. The second test `mris->faces[fno].ripflag == 1` reads the new index's face, always an
+  unripped one after the compaction: never true.
+- **`removeRippedVertices`** (FS-988, FS-995): 2803 `memcpy(mris->vertices+out_vno, mris->vertices+vno,
+  sizeof(VERTEX))` ("GROSS HACK") moves the `VERTEX` only; `vertices_topology` is not moved, and the
+  loop at 2808-2843 runs `vno < nvertices` (the new count) over the old topologies, testing
+  `mris->vertices[vno2].ripflag == 1` on the compacted array; `out_vnos` is -1 for every ripped
+  vertex, so a neighbour that test keeps maps to -1, and so does a kept face's ripped vertex
+  (2845-2850). In 2,000 probe cases (`top` seeds 7, 13, 17) almost every renumbering of a surface with
+  a ripped vertex before an unripped one wrote -1 (182 of them in `reproduce`). The struct copies
+  share `FACE::norm`/`gradNorm` (`DMATRIX *`) and `VERTEX::vp` between two places (FS-994):
+  `MRISfree` releases both. Only `MRISinflateBrain` with `explode_flag` (`mris_inflate`'s explosion)
+  calls the renumbering (`mrisurf_integrate.cpp` 2848), after `MRISsetOrigArea`.
+- **`mrisRemoveEdge` / `mrisRemoveVertexLink`** (FS-989, FS-992): both carry `// BUG doesn't adjust
+  v2num etc.`. `mrisRemoveEdge` moves `(vnum - i)` entries after decrementing `vnum` and never touches
+  `vtotal`. `mrisRemoveVertexLink` moves `(v->vtotal - (n + 1)) * sizeof(int)` bytes: an `int` times a
+  `size_t`, so a negative count becomes about 2^64; glibc 2.35's `__memmove_avx_unaligned_erms`, for a
+  length past its large-copy threshold with the destination before the source, copies the first and
+  last vectors of the range (the last ones computed from the wrapped end: memory just before the
+  list) before a loop that runs no time: the probe saw other vertices' lists hold numbers such as
+  1050841300 afterwards, no crash. `MRISremoveTriangleLinks` is called only `if
+  (IS_QUADRANGULAR(mris))` by the integrators (`mrisurf_integrate.cpp` 813, 1276, 2295, 2606, 2732,
+  2970), `mrisurf_mri.cpp` (119, 479, 902, 1091), `mris_smooth` and `retinotopy.cpp`; recon-all's
+  surfaces are triangle files (type 3).
+- **`mrisRemoveLink`** (FS-990): 2177-2185 set `face->ripflag = 1` for a face holding `vno2`, then test
+  `if (face->ripflag >= 2)` before calling `mrisRemoveFace`: only a face already ripped with a flag
+  of 2 or more is removed (and that face may not hold `vno2`). `mrisRemoveFace` (2698-2715) counts with
+  `mrisCountValidLinks(vno1, vno2)`, which counts `vno1 -> vno2` in face order only. Callers:
+  `mrisTearStressedRegions` (`mrisurf_deform.cpp` 2389, 2411, `explode_flag`), `mrisurf_deform.cpp`
+  81, and an `#if 0` block of `MRISinflateBrain`.
+- **`MRISisSurfaceValid`** (FS-991): 1763-1764 `vnop = vn->v[0]; mris->vertices[vnop].marked = 1;`
+  with no test of `vnum`; `MRISread`'s lists of a vertex without neighbours come from
+  `mrisCompleteTopology`. The final `if (patch && (nffm || nvc)) return 0; else if (nvf || nffs ||
+  nffm || nvc) return 0;` makes a patch with border vertices or single-face edges return 0 too.
+- **`MRISgetSpatOrderedNeighbors`** (FS-993): 3361 `face = &surf->faces[vt->f[0]]` with no test of
+  `num`; the corner loop `for(k=0; k < 3; k++) if(face->v[k]==centervno) break;` leaves `k` 3 when
+  the face does not hold the centre, then `k++` gives 4 and `face->v[4]` reads `FACE`'s next fields.
+- The probe's `top` needed `mrisRemoveFace`, `mrisRemoveVertexLink`, `mrisStoreVtotalInV3num` and
+  `MRISgetNeighborsBeginEnd` declared by hand (no header, or `utils/mrisurf_deform.h` only).
+
+## 39. mrisurf_deform.cpp's soap bubbles (relay 42 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_deform.cpp` 2502-2592
+(`MRISsoapBubbleVertexPositions`), 2600-2692 (`MRISweightedSoapBubbleVertexPositions`), 2700-2782
+(`MRISsoapBubbleOrigVertexPositions`), 2784-2870 (`MRISsoapBubbleTargetVertexPositions`) into
+`crates-freesurfer/larmorx-freesurfer-surf/src/soap.rs`.
+
+- **The diagnostic vertex** (FS-996): 2510 and 2608 test `Gdiag_no >= 0 && (mris->vertices[Gdiag_no].marked
+  == 0)` with no upper bound; the weighted bubble also calls `MRISprintVertexStats(mris, Gdiag_no, ...)`
+  under `DIAG_VERBOSE_ON` (2688), which reads the vertex too.
+- **The plain bubble's count** starts at 1 (`num++` for the centre, the `if (v->marked == 2)` test
+  commented out at 2531), so `num > 0` always holds and every unripped vertex not fixed is computed
+  and marked 3 in the first pass, whatever its neighbours; the original and target bubbles use only
+  neighbours of mark 1 or 2 (`vn->marked > 2` skipped), so a free region is filled from its border
+  inwards, one ring per pass.
+- **The weighted bubble's sums**: `float x` with `x += norm * vn->x` (`norm` a `double`): the sum is
+  rounded back to `float` at every term (SSE2, no excess precision); `v->tdx = x / total_norm` divides
+  in `double`. Its `if (total_norm > 0)` always holds.
+- The plain bubble's moving message prints `tdx` (the new position) after "from" and `x` (the old)
+  after "-->": its words are the wrong way round; kept (a message only, no ID: the values are right).
+- `mris_fix_topology` runs `MRISsoapBubbleVertexPositions(mris_corrected, nsmooth)` on the
+  retessellated vertices (`mrisurf_defect.cpp` 8866, recon-all's default path); `mris_make_surfaces`
+  1617, 1763, 4869, 5130; `mrisurf_mri.cpp` 706; `mris_smooth` 163 (its marked-vertex option);
+  `mrisurf_deform.cpp` 4003-4004, 4064, 4135, 5382.

@@ -127,16 +127,20 @@ those groups is identical:
   x86-64's NaN rules (main `c9ab2a4e`), every `minverse` line is identical in `reproduce` (852 and
   10 not finished) and none is unexplained in `fix`; the golden cases give these three commands
   special values again, identical on every build and under the emulation.
-- **What remains:** `OpenNonSymmetricEigenSystem` of a matrix with a NaN entry that FreeSurfer
-  finishes (`oeigenns 4 41700000 3f800000 4106db6e 42752492 40a00000 40e00000 c0dc0000 42b8db6e
-  41200000 41200000 7fc00000 40400000 41980000 c2740000 41a00000 3f800000`): the official build's
-  result is `0` and the 20 floats `00000000` x 6, then `7fc00000 7fc00000 00000000 00000000` three
-  times and `7fc00000 7fc00000`; the clean room's (through
-  `larmorx_core::vnl_eigen::real_eigensystem`) is `00000000` x 4 and `7fc00000` x 16 (2026-11-16).
-  Since the port's change of 2026-11-13 its results are the same in debug and release builds and
-  under the AArch64 emulation, so the golden cases give `oeigen` and `oeigenns` special values (relay
-  7); the difference from the official build on this matrix is the port's (not in the probe's
-  `eigen` batches, where every line is identical).
+- **Not comparable: one matrix with a NaN entry** (corrected 2026-11-17; relay 7 had listed it as a
+  difference of the main package's eigensystem port): `OpenNonSymmetricEigenSystem` of `oeigenns 4
+  41700000 3f800000 4106db6e 42752492 40a00000 40e00000 c0dc0000 42b8db6e 41200000 41200000 7fc00000
+  40400000 41980000 c2740000 41a00000 3f800000`. The official build's result there is memory
+  contents: it prints ` *** vnl_real_eigensystem: Failed on 4th eigenvalue`, and its 20 floats change
+  with the allocator's fill (a plain run: `00000000` x 6, then `7fc00000 7fc00000 00000000 00000000`
+  three times and `7fc00000 7fc00000`; with `MALLOC_PERTURB_=90`, and with the guard allocator's fill
+  90, all `80000000`; with the guard's under-allocation and fill 165, all `7f800000`); in a fresh
+  process where that memory is zero it gives the clean room's result (`00000000` x 4 and `7fc00000`
+  x 16, through `larmorx_core::vnl_eigen::real_eigensystem`). So the line is a memory line, not a
+  difference of the port (the orchestrator's runs, 2026-11-17). The port's results are the same in
+  debug and release builds and under the AArch64 emulation (since its change of 2026-11-13), so the
+  golden cases give `oeigen` and `oeigenns` special values (relay 7); every line of the probe's
+  `eigen` batches is identical.
 - **How we know:** *measured* (`compare.py`, the probe on that line; the golden cases under
   `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`'s emulation, debug and release).
 

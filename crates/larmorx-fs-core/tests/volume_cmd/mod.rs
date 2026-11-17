@@ -20,8 +20,10 @@ use std::sync::{Arc, Mutex};
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
 use larmorx_fs_core::maths::mfiles::CStream;
-use larmorx_fs_core::mri::{Mri, Region, VolGeom, types};
+use larmorx_fs_core::mri::{LinearTransform, Lta, Mri, Region, VolGeom, types};
 use larmorx_fs_core::volume::geometry::SurfacePoint;
+use larmorx_fs_core::volume::ltaread::{FileSystem, TransformInputs};
+use larmorx_fs_core::volume::moves::axis;
 use larmorx_fs_core::volume::vgcopy::VG_IS_EQUAL_THRESHOLD;
 use larmorx_fs_core::volume::{Dst, VolOut};
 use larmorx_fs_core::{Environment, Process, Stop};
@@ -580,9 +582,222 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             let r = p.mri_set_sample_volume_derivative_sign(s);
             l.putd(r);
         }
+        // part 4
+        "samp" => {
+            let k = l.tok().to_owned();
+            let mut a = getw(p, l)?;
+            a.outside_val = l.getd();
+            let n = l.geti();
+            for _ in 0..n {
+                let (x, y, z) = (l.getd(), l.getd(), l.getd());
+                let (f, aux) = (l.geti(), l.geti());
+                let mut v = UNSETD;
+                let r = match k.as_str() {
+                    "tri" => p.mri_sample_volume(&a, x, y, z, &mut v)?,
+                    "typ" => p.mri_sample_volume_type(&a, x, y, z, &mut v, aux)?,
+                    "frm" => p.mri_sample_volume_frame(&a, x, y, z, f, &mut v)?,
+                    "fty" => p.mri_sample_volume_frame_type(&a, x, y, z, f, aux, &mut v)?,
+                    "cub" => p.mri_cubic_sample_volume(&a, x, y, z, &mut v)?,
+                    "cubf" => p.mri_cubic_sample_volume_frame(&a, x, y, z, f, &mut v)?,
+                    "sinc" => p.mri_sinc_sample_volume(&a, x, y, z, aux, &mut v)?,
+                    "sincf" => p.mri_sinc_sample_volume_frame(&a, x, y, z, f, aux, &mut v)?,
+                    _ => args::bad("unknown sampler"),
+                };
+                l.puti(i64::from(r));
+                l.putd(v);
+            }
+        }
+        "coef" | "hsinc" => {
+            let n = l.geti();
+            for _ in 0..n {
+                let x = l.getd();
+                let v = if c == "coef" {
+                    let i = l.geti();
+                    p.mri_cubic_coeff(x, i)
+                } else {
+                    let fw = l.getd();
+                    p.ham_sinc(x, fw)
+                };
+                l.putd(v);
+            }
+        }
+        "trans" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let (dx, dy, dz) = (l.getd(), l.getd(), l.getd());
+            let r = p.mri_translate(&mut a, dst(&mut d), dx, dy, dz)?;
+            putres(l, r, &a, None, &d);
+        }
+        "rot" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let mr = l.getm(p)?;
+            let mo = l.getm(p)?;
+            let r = p.mri_rotate_i(&mut a, dst(&mut d), mr.as_ref(), mo.as_ref())?;
+            putres(l, r, &a, None, &d);
+        }
+        "rotx" | "roty" | "rotz" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let angle = l.getf();
+            let which = match c.as_str() {
+                "rotx" => axis::X,
+                "roty" => axis::Y,
+                _ => axis::Z,
+            };
+            let r = p.mri_rotate_axis(&mut a, dst(&mut d), angle, which)?;
+            putres(l, r, &a, None, &d);
+        }
+        "skull" => {
+            let mut a = getw(p, l)?;
+            let t = l.geti();
+            let n = l.geti();
+            for _ in 0..n {
+                let c0 = [l.geti(), l.geti(), l.geti()];
+                let c1 = [l.geti(), l.geti(), l.geti()];
+                let v = l.getf();
+                for z in c0[2]..=c1[2] {
+                    for y in c0[1]..=c1[1] {
+                        for x in c0[0]..=c1[0] {
+                            p.mri_set_vox_val(&mut a, x, y, z, 0, v, 0)?;
+                        }
+                    }
+                }
+            }
+            let mut b = Region {
+                x: -7,
+                y: -7,
+                z: -7,
+                dx: -7,
+                dy: -7,
+                dz: -7,
+            };
+            let r = p.mri_find_approximate_skull_bounding_box(&a, t, &mut b)?;
+            l.puti(i64::from(r));
+            for v in [b.x, b.y, b.z, b.dx, b.dy, b.dz] {
+                l.puti(i64::from(v));
+            }
+        }
+        "tftype" => {
+            let n = l.geti();
+            for _ in 0..n {
+                let name = l.getx();
+                let t = p.transform_file_name_type(&name);
+                l.puti(i64::from(t));
+            }
+        }
+        "ltaread" => {
+            let name = l.getx();
+            let have = !l.take("nofile");
+            let bytes = if have { l.getx() } else { Vec::new() };
+            let avg = l.geti();
+            match avg {
+                0 => p.env.remove(b"USE_AVERAGE305"),
+                1 => p.env.set(b"USE_AVERAGE305", b"true"),
+                _ => p.env.set(b"USE_AVERAGE305", b""),
+            }
+            let path = larmorx_fs_core::files::path_of(&name);
+            let _ = std::fs::remove_file(&path);
+            if have && std::fs::write(&path, &bytes).is_err() {
+                args::bad("cannot write the transform file");
+            }
+            p.errno = 0;
+            let r = p.lta_read_ex(&name, &mut FileSystem);
+            if have {
+                let _ = std::fs::remove_file(&path);
+            }
+            let lta = r?;
+            l.puti(i64::from(p.errno));
+            putlta(l, lta.as_ref());
+        }
+        // the golden cases' reader of an in-memory file and volume (no file system)
+        "ltamem" => {
+            let name = l.getx();
+            let bytes = if l.take("nofile") {
+                None
+            } else {
+                Some(l.getx())
+            };
+            let avg = l.geti();
+            let vol = if l.take("none") {
+                None
+            } else {
+                let vname = l.getx();
+                Some((vname, getg(l)))
+            };
+            match avg {
+                0 => p.env.remove(b"USE_AVERAGE305"),
+                1 => p.env.set(b"USE_AVERAGE305", b"true"),
+                _ => p.env.set(b"USE_AVERAGE305", b""),
+            }
+            let mut m = Memory { name, bytes, vol };
+            p.errno = 0;
+            let name = m.name.clone();
+            let lta = p.lta_read_ex(&name, &mut m)?;
+            l.puti(i64::from(p.errno));
+            putlta(l, lta.as_ref());
+        }
         _ => args::bad("unknown command"),
     }
     Ok(())
+}
+
+/// The golden cases' transform inputs: one file's bytes (none: `ENOENT`) and one named volume's
+/// geometry (others: `ENOENT`).
+struct Memory {
+    name: Vec<u8>,
+    bytes: Option<Vec<u8>>,
+    vol: Option<(Vec<u8>, VolGeom)>,
+}
+
+impl TransformInputs for Memory {
+    fn read_file(&mut self, name: &[u8]) -> Result<Vec<u8>, i32> {
+        match &self.bytes {
+            Some(b) if name == self.name.as_slice() => Ok(b.clone()),
+            _ => Err(2),
+        }
+    }
+
+    fn volume_geometry(&mut self, p: &mut Process, name: &[u8]) -> Option<VolGeom> {
+        match &self.vol {
+            Some((n, g)) if n.as_slice() == name => Some(g.clone()),
+            _ => {
+                p.errno = 2;
+                None
+            }
+        }
+    }
+}
+
+/// LT (the fs.mri probe's): `x0 y0 z0 sigma m_L m_dL m_last_dL type label src dst`.
+fn putlt(l: &mut Line, lt: &LinearTransform) {
+    l.putf(lt.x0);
+    l.putf(lt.y0);
+    l.putf(lt.z0);
+    l.putf(lt.sigma);
+    l.putm(lt.m_l.as_ref());
+    l.putm(lt.m_dl.as_ref());
+    l.putm(lt.m_last_dl.as_ref());
+    l.puti(i64::from(lt.kind));
+    l.puti(i64::from(lt.label));
+    l.putg(&lt.src, true);
+    l.putg(&lt.dst, true);
+}
+
+/// LTA (the fs.mri probe's): `<n> <type> <fscale> <subject>`, the transforms and the inverse
+/// transforms; `null` for none.
+fn putlta(l: &mut Line, lta: Option<&Lta>) {
+    let Some(lta) = lta else {
+        l.out("null");
+        return;
+    };
+    l.puti(i64::from(lta.num_xforms()));
+    l.puti(i64::from(lta.kind));
+    l.putf(lta.fscale);
+    l.puts(Some(&lta.subject));
+    for lt in lta.xforms.iter().chain(&lta.inv_xforms) {
+        putlt(l, lt);
+    }
 }
 
 /// One line of a batch (its tokens, the `@<seconds>` and `+gdiag=<hex>` prefixes included) on a

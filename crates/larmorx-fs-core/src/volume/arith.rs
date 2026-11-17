@@ -3,7 +3,7 @@
 //! ranges, scaling, thresholds, binarising and signs, and the functions of two volumes; FS-289
 //! to FS-292 and FS-296.
 
-use larmorx_core::defects::{FS_291, FS_292, FS_296, FS_332};
+use larmorx_core::defects::{FS_265, FS_291, FS_292, FS_296, FS_332};
 
 use super::{Dst, VolOut, Vols, direct_place};
 use crate::mri::voxels::Place;
@@ -430,8 +430,8 @@ impl Process {
     }
 
     /// `MRIvalRangeRegion(mri, &min, &max, region)` (§8): frame 0 over the region, its start
-    /// raised to 0 and its end lowered to the extent (no region: the whole volume; FreeSurfer
-    /// needs one); returns 0.
+    /// raised to 0 and its end lowered to the extent; returns 0. FS-265: without a region
+    /// FreeSurfer crashes; both modes take the whole volume.
     pub fn mri_val_range_region(
         &mut self,
         m: &Mri,
@@ -448,6 +448,12 @@ impl Process {
             dy: g.height,
             dz: g.depth,
         };
+        if region.is_none() {
+            self.note(
+                &FS_265,
+                "MRIvalRangeRegion without a region: the whole volume (FreeSurfer crashes)",
+            );
+        }
         let r = region.unwrap_or(&whole);
         let span = |s: i32, d: i32, e: i32| (s.max(0), s.saturating_add(d).min(e));
         let (x0, x1) = span(r.x, r.dx, g.width);
@@ -557,10 +563,11 @@ impl Process {
         };
         self.map_voxels(src, dst, &mut |_, val| {
             // with `only_nonzero` the other voxels get their own value (observed: the probe's `vscale`)
-            if only_nonzero != 0 && f64::from(val.abs()) < 1e-15 {
-                return Some(val);
-            }
-            let mut o = sse::add32(sse::mul32(val, scale), offset);
+            let mut o = if only_nonzero != 0 && f64::from(val.abs()) < 1e-15 {
+                val
+            } else {
+                sse::add32(sse::mul32(val, scale), offset)
+            };
             if uchar {
                 o = clip(o, 0.0, 255.0);
             }
@@ -688,10 +695,16 @@ impl Process {
         })
     }
 
-    /// FS-291: a byte function on a volume of another type. `reproduce`: the rows' first bytes
-    /// taken as byte voxels (true); by default the end of the program.
-    fn bytes_only(&mut self, name: &str, kind: i32) -> Result<(), Stop> {
-        if kind == types::UCHAR {
+    /// FS-291: a byte function whose volumes (`kinds`, in the order the spec names them) are not
+    /// all bytes. `reproduce`: each row's first bytes taken as byte voxels (true). By default,
+    /// when the source's width, height and depth are all positive, the end of the program with
+    /// the first type that is not `uchar`; else nothing is walked.
+    fn bytes_only(&mut self, name: &str, kinds: &[i32], src: &Mri) -> Result<(), Stop> {
+        let Some(&kind) = kinds.iter().find(|&&k| k != types::UCHAR) else {
+            return Ok(());
+        };
+        let g = &src.geom;
+        if g.width <= 0 || g.height <= 0 || g.depth <= 0 {
             return Ok(());
         }
         if self.mode().reproduce() {
@@ -718,10 +731,8 @@ impl Process {
     pub fn mri_invert_contrast(&mut self, src: &mut Mri, dst: Dst, t: f32) -> Result<VolOut, Stop> {
         let mut v = Vols::new(src, None, dst);
         self.clone_dst(&mut v)?;
-        self.bytes_only("MRIinvertContrast", v.a().kind)?;
-        if let Some(k) = Some(v.d().kind).filter(|&k| k != v.a().kind) {
-            self.bytes_only("MRIinvertContrast", k)?;
-        }
+        let kinds = [v.a().kind, v.d().kind];
+        self.bytes_only("MRIinvertContrast", &kinds, v.a())?;
         let g = v.a().geom.clone();
         let what = "MRIinvertContrast";
         for z in 0..i64::from(g.depth) {
@@ -1001,12 +1012,8 @@ impl Process {
             v.set_dst(d);
         }
         let name = "MRIscaleAndMultiply";
-        self.bytes_only(name, v.a().kind)?;
-        for k in [v.b().kind, v.d().kind] {
-            if k != v.a().kind {
-                self.bytes_only(name, k)?;
-            }
-        }
+        let kinds = [v.a().kind, v.b().kind, v.d().kind];
+        self.bytes_only(name, &kinds, v.a())?;
         let g = v.a().geom.clone();
         for z in 0..i64::from(g.depth) {
             for y in 0..i64::from(g.height) {

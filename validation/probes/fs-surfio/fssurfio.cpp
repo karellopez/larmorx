@@ -115,6 +115,12 @@ const char *Progname = "fssurfio";
 int MRIS_Hcurvature_determineSign(MRIS *apmris);
 // relay 20: declared in mrisurf_sseTerms.h (not included here)
 int mrisAverageSignedGradients(MRIS *mris, int num_avgs);
+// relay 42 of track D (top): declared in mrisurf_topology.cpp or utils/mrisurf_deform.h only
+int mrisRemoveFace(MRIS *mris, int fno);
+int mrisRemoveVertexLink(MRIS *mris, int vno1, int vno2);
+int mrisStoreVtotalInV3num(MRIS *mris);
+void MRISgetNeighborsBeginEnd(MRIS const *mris, int vno, size_t inner_nbhd_size, size_t outer_nbhd_size,
+                              size_t *neighborsIndexBegin, size_t *neighborsIndexEnd);
 
 namespace {
 
@@ -4413,6 +4419,90 @@ void flr_case()
       oi(MRISreadAnnotation(s, ("./" + n).c_str()));
       ann_fnv();
     }
+  } else if (op == "top") {
+    // relay 42 of track D: mrisurf_topology.cpp's rest on a recorded surface (`top <surface>
+    // <label>`): the Euler counts, the defect index, the neighbours in use and the surface check
+    // (MRISisSurfaceValid, verbose 1); the vertices outside the label ripped with their faces and
+    // removed (LabelRipRestOfSurface's steps: MRISsetRipInFacesWithRippedVertices, MRISremoveRipped),
+    // the counts and the topology's FNV-1a; the distances released and the surface renumbered
+    // (MRISrenumberRemovingRippedFacesAndVertices), the counts and FNV-1a; the surface read again
+    // and everted (MRISevertSurface), its FNV-1a
+    std::string sf = next(), lf = next();
+    MRIS *s = MRISread(sf.c_str());
+    if (!s) fail("cannot read the surface");
+    auto counts = [&](MRIS *m) {
+      int a, b, c;
+      oi(MRIScomputeEulerNumber(m, &a, &b, &c)); oi(a); oi(b); oi(c);
+      oi(MRIStopologicalDefectIndex(m)); oi(mrisCountTotalNeighbors(m));
+    };
+    auto hash = [&](MRIS *m) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      auto put = [&](int x) {
+        const unsigned char *b = (const unsigned char *)&x;
+        for (int k = 0; k < 4; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      };
+      for (int v = 0; v < m->nvertices; v++) {
+        VERTEX_TOPOLOGY *t = &m->vertices_topology[v];
+        put(m->vertices[v].ripflag); put(t->num);
+        for (int k = 0; k < t->num; k++) { put(t->f[k]); put(t->n[k]); }
+        put(t->vnum); put(t->v2num); put(t->v3num); put(t->vtotal);
+        for (int k = 0; k < t->vtotal; k++) put(t->v[k]);
+      }
+      for (int f = 0; f < m->nfaces; f++) {
+        for (int k = 0; k < 3; k++) put(m->faces[f].v[k]);
+        put(m->faces[f].ripflag);
+      }
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    counts(s);
+    oi(MRISisSurfaceValid(s, 0, 1));
+    LABEL *l = LabelRead(NULL, lf.c_str());
+    if (!l) fail("cannot read the label");
+    for (int v = 0; v < s->nvertices; v++) s->vertices[v].ripflag = 1;
+    for (int n = 0; n < l->n_points; n++) {
+      int v = l->lv[n].vno;
+      if (v >= 0 && v < s->nvertices) s->vertices[v].ripflag = 0;
+    }
+    MRISsetRipInFacesWithRippedVertices(s);
+    MRISremoveRipped(s);
+    counts(s); hash(s);
+    MRISfreeDistsButNotOrig(s);
+    MRISfreeDistOrigs(s);
+    MRISrenumberRemovingRippedFacesAndVertices(s);
+    oi(s->nvertices); oi(s->nfaces); hash(s);
+    MRIS *e = MRISread(sf.c_str());
+    if (!e) fail("cannot read the surface");
+    oi(MRISevertSurface(e));
+    hash(e);
+  } else if (op == "sbl") {
+    // relay 42 of track D: the soap bubbles on a recorded surface (`sbl <surface> <label> <n>`):
+    // the label's vertices free (mark 0), the others fixed (1); MRISsoapBubbleVertexPositions and
+    // the weighted bubble on a second read, each with `n` passes; the positions' FNV-1a
+    std::string sf = next(), lf = next();
+    int n = geti();
+    LABEL *l = LabelRead(NULL, lf.c_str());
+    if (!l) fail("cannot read the label");
+    for (int w = 0; w < 2; w++) {
+      MRIS *s = MRISread(sf.c_str());
+      if (!s) fail("cannot read the surface");
+      for (int v = 0; v < s->nvertices; v++) s->vertices[v].marked = 1;
+      for (int k = 0; k < l->n_points; k++) {
+        int v = l->lv[k].vno;
+        if (v >= 0 && v < s->nvertices) s->vertices[v].marked = 0;
+      }
+      oi(w ? MRISweightedSoapBubbleVertexPositions(s, n) : MRISsoapBubbleVertexPositions(s, n));
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (int v = 0; v < s->nvertices; v++) {
+        float c[3] = {s->vertices[v].x, s->vertices[v].y, s->vertices[v].z};
+        const unsigned char *b = (const unsigned char *)c;
+        for (int k = 0; k < 12; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      }
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    }
   } else if (op == "maf") {
     // relay 41 of track D: mris_ca_label's mode filter on a recorded annotation (`maf <surface>
     // <annotation>`): the annotation read (MRISreadAnnotation), the program's table set from its
@@ -6310,6 +6400,191 @@ void vlr_case()
   }
 }
 
+// ---- relay 42 of track D: top, mrisurf_topology.cpp's rest (toprest.rs)
+
+// top: a surface read by MRISread (d/lh.s0: vls's meshes), its neighbourhood set to 1 to 3 hops
+// (with its distances or not), its type (3, or 0: a quadrangle surface), every vertex's rip flag
+// and mark and every face's rip flag from the case, Gdiag; then 1 to 6 operations named by their
+// FreeSurfer functions (`freedists`: MRISfreeDistsButNotOrig and MRISfreeDistOrigs, which the
+// renumbering needs first); after each the surface's counts and every vertex's (to nvertices) rip flag,
+// mark, faces with their places, counts, neighbour list (mrisVertexVSize entries) and distances,
+// every face's vertices and rip flag
+static void top_dump(MRIS *s)
+{
+  oi(s->nvertices); oi(s->nfaces); oi(s->nsize); oi(s->max_nsize); oi(s->triangle_links_removed);
+  oi(s->dist_alloced_flags); oi(s->dist_nsize);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &s->vertices_topology[vno];
+    oi(v->ripflag); oi(v->marked); oi(vt->num);
+    for (int k = 0; k < vt->num; k++) { oi(vt->f[k]); oi(vt->n[k]); }
+    oi(vt->vnum); oi(vt->v2num); oi(vt->v3num); oi(vt->vtotal); oi(vt->nsizeMax); oi(vt->nsizeCur);
+    int vs = mrisVertexVSize(s, vno);
+    oi(vs);
+    for (int k = 0; k < vs; k++) oi(vt->v[k]);
+    oi(v->dist != NULL);
+    if (v->dist) for (int k = 0; k < vt->vtotal && k < v->dist_capacity; k++) of(v->dist[k]);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) {
+    FACE *f = &s->faces[fno];
+    oi(f->v[0]); oi(f->v[1]); oi(f->v[2]); oi(f->ripflag);
+  }
+}
+
+void top_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nsize = geti(), dmode = geti();
+  if (dmode == 1) MRISsetNeighborhoodSizeAndDist(s, nsize);
+  else if (nsize > 1) MRISsetNeighborhoodSize(s, nsize);
+  s->type = geti();
+  for (int v = 0; v < nv; v++) {
+    s->vertices[v].ripflag = (char)geti();
+    s->vertices[v].marked = (short)geti();
+  }
+  for (int f = 0; f < nf; f++) s->faces[f].ripflag = (char)geti();
+  Gdiag = (unsigned long)(unsigned int)geti();
+  // a vertex or face the surface no longer has (after a renumbering): `G`, skipped on both sides
+  auto G = [&](int a) { if (a >= 0 && a < s->nvertices) return false; out += "G "; return true; };
+  auto GF = [&](int f) { if (f >= 0 && f < s->nfaces) return false; out += "G "; return true; };
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "edgeExists") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(edgeExists(s, a, b)); }
+    else if (op == "mrisCountValidLinks") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(mrisCountValidLinks(s, a, b)); }
+    else if (op == "mrisAddEdge") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; mrisAddEdge(s, a, b); }
+    else if (op == "mrisRemoveEdge") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; mrisRemoveEdge(s, a, b); }
+    else if (op == "mrisRemoveVertexLink") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(mrisRemoveVertexLink(s, a, b)); }
+    else if (op == "MRISremoveTriangleLinks") oi(MRISremoveTriangleLinks(s));
+    else if (op == "mrisCountTotalNeighbors") oi(mrisCountTotalNeighbors(s));
+    else if (op == "MRIScomputeEulerNumber") {
+      int a, b, c;
+      oi(MRIScomputeEulerNumber(s, &a, &b, &c)); oi(a); oi(b); oi(c);
+    }
+    else if (op == "MRIStopologicalDefectIndex") oi(MRIStopologicalDefectIndex(s));
+    else if (op == "mrisStoreVtotalInV3num") oi(mrisStoreVtotalInV3num(s));
+    else if (op == "mrisVertexReplacingNeighbors") { int a = geti(), b = geti(); if (G(a)) continue; mrisVertexReplacingNeighbors(s, a, b); }
+    else if (op == "mrisForgetNeighborhoods") mrisForgetNeighborhoods(s);
+    else if (op == "MRIScountTotalNeighbors") oi(MRIScountTotalNeighbors(s, geti()));
+    else if (op == "MRISgetNeighborsBeginEnd") {
+      int vno = geti(), a = geti(), b = geti();
+      if (G(vno)) continue;
+      size_t x = 7, y = 7;
+      MRISgetNeighborsBeginEnd(s, vno, (size_t)a, (size_t)b, &x, &y);
+      oi((long long)x); oi((long long)y);
+    }
+    else if (op == "MRISisSurfaceValid") { int a = geti(), b = geti(); oi(MRISisSurfaceValid(s, a, b)); }
+    else if (op == "vertexInFace") { int a = geti(), b = geti(); if (G(a) || GF(b)) continue; oi(vertexInFace(s, a, b)); }
+    else if (op == "mrisRemoveLink") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(mrisRemoveLink(s, a, b)); }
+    else if (op == "mrisRemoveFace") { int f = geti(); if (GF(f)) continue; oi(mrisRemoveFace(s, f)); }
+    else if (op == "MRISrenumberRemovingRippedFacesAndVertices") {
+      MRISrenumberRemovingRippedFacesAndVertices(s);
+      // the vertex number -1 in a face or a kept neighbour list (FS-995): the next reads go outside
+      // the vertices: the state printed, the case stopped (the port does the same)
+      bool minus = false;
+      for (int f = 0; f < s->nfaces; f++)
+        for (int n = 0; n < 3; n++) minus |= s->faces[f].v[n] < 0;
+      for (int v = 0; v < s->nvertices; v++)
+        for (int n = 0; n < s->vertices_topology[v].v3num; n++) minus |= s->vertices_topology[v].v[n] < 0;
+      if (minus) { top_dump(s); out += "STOP "; return; }
+    }
+    else if (op == "MRISremoveRipped") MRISremoveRipped(s);
+    else if (op == "MRISevertSurface") oi(MRISevertSurface(s));
+    else if (op == "MRISgetSpatOrderedNeighbors") {
+      int vno = geti();
+      if (G(vno)) continue;
+      std::vector<int> l = MRISgetSpatOrderedNeighbors(s, vno);
+      oi((long long)l.size());
+      for (int x : l) oi(x);
+    }
+    else if (op == "MRISsetRipInFacesWithRippedVertices") MRISsetRipInFacesWithRippedVertices(s);
+    else if (op == "MRIS_setNsizeCur") { int a = geti(), b = geti(); if (G(a)) continue; MRIS_setNsizeCur(s, a, b); }
+    else if (op == "rip") { int a = geti(), r = geti(); if (G(a)) continue; s->vertices[a].ripflag = (char)r; }
+    else if (op == "freedists") { MRISfreeDistsButNotOrig(s); MRISfreeDistOrigs(s); }
+    else fail("top op");
+    top_dump(s);
+  }
+}
+
+// sbl: the soap bubbles of mrisurf_deform.cpp (soap.rs): a surface read by MRISread (d/lh.s0:
+// vls's meshes), now and then at 2 hops; every vertex's rip flag, mark, current, original and
+// target positions from the case (each a small offset from the read position, now and then NaN);
+// Gdiag, Gdiag_no; then 1 to 3 of the four bubbles with a pass count, `freedists` and `marks`
+// (the marks set again from the case); after each every vertex's positions, tdx tdy tdz, mark and
+// marked3
+static void sbl_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->x); of(x->y); of(x->z); of(x->origx); of(x->origy); of(x->origz);
+    of(x->targx); of(x->targy); of(x->targz); of(x->tdx); of(x->tdy); of(x->tdz);
+    oi(x->marked); oi(x->marked3);
+  }
+}
+
+void sbl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nsize = geti();
+  if (nsize > 1) MRISsetNeighborhoodSize(s, nsize);
+  std::vector<short> marks(nv);
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s->vertices[v];
+    x->ripflag = (char)geti();
+    marks[v] = (short)geti();
+    x->marked = marks[v];
+    x->x += getf(); x->y += getf(); x->z += getf();
+    x->origx = x->x + getf(); x->origy = x->y + getf(); x->origz = x->z + getf();
+    x->targx = x->x + getf(); x->targy = x->y + getf(); x->targz = x->z + getf();
+  }
+  Gdiag = (unsigned long)(unsigned int)geti();
+  Gdiag_no = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "MRISsoapBubbleVertexPositions") oi(MRISsoapBubbleVertexPositions(s, geti()));
+    else if (op == "MRISweightedSoapBubbleVertexPositions") oi(MRISweightedSoapBubbleVertexPositions(s, geti()));
+    else if (op == "MRISsoapBubbleOrigVertexPositions") oi(MRISsoapBubbleOrigVertexPositions(s, geti()));
+    else if (op == "MRISsoapBubbleTargetVertexPositions") oi(MRISsoapBubbleTargetVertexPositions(s, geti()));
+    else if (op == "freedists") { MRISfreeDistsButNotOrig(s); MRISfreeDistOrigs(s); }
+    else if (op == "marks") { for (int v = 0; v < nv; v++) s->vertices[v].marked = marks[v]; }
+    else fail("sbl op");
+    sbl_dump(s);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -6576,6 +6851,10 @@ void run_case()
     vls_case();
   } else if (cmd == "vlr") {
     vlr_case();
+  } else if (cmd == "top") {
+    top_case();
+  } else if (cmd == "sbl") {
+    sbl_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

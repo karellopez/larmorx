@@ -75,7 +75,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # caller's colour table FreeSurfer has freed used again, FS-625u, the runner's mark; relay 37 of
 # track D, the area error's face-normal cache read past the surface's faces, FS-634; relay 39 of
 # track D, the surface hash table's sampling that runs for hours, refused, FS-913, ended in
-# FreeSurfer by the probe's alarm): counted, never compared
+# FreeSurfer by the probe's alarm; relay 42 of track D, the surface check's empty neighbour list,
+# FS-991, a link removal's copy over the memory around a list, FS-992, the ordered neighbours'
+# reads outside a vertex's faces, FS-993, and the soap bubble's diagnostic vertex beyond the
+# surface, FS-996): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -129,6 +132,10 @@ SKIP: tuple[str, ...] = (
     "FS-625u",
     "FS-634",
     "FS-913",
+    "FS-991",
+    "FS-992",
+    "FS-993",
+    "FS-996",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port

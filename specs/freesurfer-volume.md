@@ -777,8 +777,8 @@ interchangeable; "ends the program" is §6's C-style exit with the code given, a
 | FS-310 (a `src` or `dst` word with no word after it) | the program ends, code -5, `mincFindVolume: no word after src or dst (FreeSurfer crashes here)` + `\n` | the same |
 
 The probe cannot check these cases' own lines (FreeSurfer crashes, never returns or reads memory
-there; §69.3's allowed lines), except FS-298 and FS-299 under `reproduce` and FS-306's
-classification; the clean room's own tests check the rest against this table.
+there; §69.3's allowed lines; FS-306's names crash it), except FS-298 and FS-299 under `reproduce`;
+the clean room's own tests check the rest against this table.
 
 ## 23. The CMA labels and the segmentation functions (`cma.h`, `cma.cpp`; 3.1-35 piece c)
 **The label numbers** are those of FreeSurfer's colour table (`FreeSurferColorLUT.txt`, distributed

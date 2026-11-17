@@ -574,7 +574,7 @@ pub fn dilate_vertex_to_sum(
         }
     }
     // FS-983: a target no pass is needed for (not above 0, or not a number): 0 hops
-    if !(target_sum > 0.0) {
+    if target_sum.is_nan() || target_sum <= 0.0 {
         g.notices.add(
             &FS_983,
             format!(

@@ -374,8 +374,9 @@ struct Shape {
 }
 
 fn shape(g: &mut Gen) -> Shape {
+    // the rare types: RGB, float complex, long and tensor (relay 37: FS-960's rows)
     let ty = if g.chance(10) {
-        g.pick(&[9, 7, 2])
+        g.pick(&[9, 7, 2, 6])
     } else {
         g.pick(&[0, 0, 1, 3, 3, 4, 10, 2])
     };
@@ -401,7 +402,7 @@ fn like(g: &mut Gen, s: Shape) -> Shape {
         o
     } else if g.chance(6) {
         Shape {
-            ty: g.pick(&[0, 1, 3, 4, 10, 2]),
+            ty: g.pick(&[0, 1, 3, 4, 10, 2, 6]),
             ..s
         }
     } else {
@@ -589,7 +590,11 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 let mode = g.pick(&[0, 0, 1, 2]);
                 t.push(mode.to_string());
                 if mode == 1 {
-                    let o = like(&mut g, s);
+                    let mut o = like(&mut g, s);
+                    // FS-291's and FS-960's tensor destination (relay 37)
+                    if cmd == "invc" && g.chance(6) {
+                        o.ty = 6;
+                    }
                     vol_of(&mut g, &mut t, o);
                     s.nf = s.nf.min(o.nf);
                 }
@@ -635,6 +640,10 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     let mut p = like(&mut g, s);
                     if cmd == "div2" && g.chance(2) {
                         p.ty = 0;
+                    }
+                    // FS-291's and FS-960's tensor destination (relay 37)
+                    if cmd == "sam" && g.chance(6) {
+                        p.ty = 6;
                     }
                     vol_of(&mut g, &mut t, p);
                 }
@@ -836,7 +845,11 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 let mode = g.pick(&[0, 0, 0, 1, 2]);
                 t.push(mode.to_string());
                 if mode == 1 {
-                    let o = like(&mut g, s);
+                    let mut o = like(&mut g, s);
+                    // FS-301's and FS-960's tensor destination (relay 37)
+                    if g.chance(5) {
+                        o.ty = 6;
+                    }
                     vol_of(&mut g, &mut t, o);
                 }
                 if cmd == "trans" {
@@ -903,7 +916,11 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 let d = g.chance(4);
                 t.push(i64::from(d).to_string());
                 if d {
-                    let o = like(&mut g, s);
+                    let mut o = like(&mut g, s);
+                    // FS-301's and FS-960's tensor destination (relay 37)
+                    if g.chance(5) {
+                        o.ty = 6;
+                    }
                     vol_of(&mut g, &mut t, o);
                 }
                 t.push(fx(g.pick(&[

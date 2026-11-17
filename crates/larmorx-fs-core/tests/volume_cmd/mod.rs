@@ -580,6 +580,45 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             let r = p.mri_set_sample_volume_derivative_sign(s);
             l.putd(r);
         }
+        // part 4
+        "samp" => {
+            let k = l.tok().to_owned();
+            let mut a = getw(p, l)?;
+            a.outside_val = l.getd();
+            let n = l.geti();
+            for _ in 0..n {
+                let (x, y, z) = (l.getd(), l.getd(), l.getd());
+                let (f, aux) = (l.geti(), l.geti());
+                let mut v = UNSETD;
+                let r = match k.as_str() {
+                    "tri" => p.mri_sample_volume(&a, x, y, z, &mut v)?,
+                    "typ" => p.mri_sample_volume_type(&a, x, y, z, &mut v, aux)?,
+                    "frm" => p.mri_sample_volume_frame(&a, x, y, z, f, &mut v)?,
+                    "fty" => p.mri_sample_volume_frame_type(&a, x, y, z, f, aux, &mut v)?,
+                    "cub" => p.mri_cubic_sample_volume(&a, x, y, z, &mut v)?,
+                    "cubf" => p.mri_cubic_sample_volume_frame(&a, x, y, z, f, &mut v)?,
+                    "sinc" => p.mri_sinc_sample_volume(&a, x, y, z, aux, &mut v)?,
+                    "sincf" => p.mri_sinc_sample_volume_frame(&a, x, y, z, f, aux, &mut v)?,
+                    _ => args::bad("unknown sampler"),
+                };
+                l.puti(i64::from(r));
+                l.putd(v);
+            }
+        }
+        "coef" | "hsinc" => {
+            let n = l.geti();
+            for _ in 0..n {
+                let x = l.getd();
+                let v = if c == "coef" {
+                    let i = l.geti();
+                    p.mri_cubic_coeff(x, i)
+                } else {
+                    let fw = l.getd();
+                    p.ham_sinc(x, fw)
+                };
+                l.putd(v);
+            }
+        }
         _ => args::bad("unknown command"),
     }
     Ok(())

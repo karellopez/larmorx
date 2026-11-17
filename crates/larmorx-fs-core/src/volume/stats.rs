@@ -2,24 +2,13 @@
 //! Centre of mass, principal components, the running average (spec §15, §15b) and the header
 //! comparison, determinant, dump and derivative sign (§16).
 
-use larmorx_core::defects::FS_290;
-
-use super::arith::Elem;
-use super::{Dst, VolOut, Vols, direct_place};
+use super::{Dst, VolOut, Vols};
 use crate::clib::printf::sprintf_f64;
 use crate::maths::Returned;
 use crate::maths::matrix::{MATRIX_REAL, Matrix};
-use crate::mri::{Mri, types};
+use crate::mri::Mri;
 use crate::process::{Process, Stop, codes};
 use crate::sse;
-
-/// Whether a nearest sample reads the type (§15): uchar, short, ushort, int, float.
-fn sampled(kind: i32) -> bool {
-    matches!(
-        kind,
-        types::UCHAR | types::SHORT | types::USHRT | types::INT | types::FLOAT
-    )
-}
 
 impl Process {
     /// `MRIindexNotInVolume(mri, c, r, s)` (§15): 0 inside, -1 when the coordinates rounded to
@@ -37,22 +26,6 @@ impl Process {
         if near { -1 } else { 1 }
     }
 
-    /// One voxel of frame `f` read directly as a sample (§15, §15b): its value as a float; a
-    /// volume without voxels reads memory it does not own (FS-290: 0).
-    fn sample_voxel(&mut self, m: &Mri, x: i32, y: i32, z: i32, f: i32, what: &str) -> f32 {
-        if !m.has_voxels() {
-            self.note(
-                &FS_290,
-                format!("{what}: a volume without voxels read as 0 (FreeSurfer reads memory it does not own)"),
-            );
-            return 0.0;
-        }
-        let n = m.bytes_per_vox;
-        let place = direct_place(m, i64::from(x), i64::from(y), i64::from(z), i64::from(f), n);
-        let b = self.direct_read(m, place, n as usize, what);
-        Elem::decode(m.kind, &b).to_f32()
-    }
-
     /// `MRIsampleVolumeType(mri, x, y, z, &val, SAMPLE_NEAREST)` (§15): its value and the sample.
     pub fn mri_sample_nearest(
         &mut self,
@@ -61,24 +34,9 @@ impl Process {
         y: f64,
         z: f64,
     ) -> Result<(i32, f64), Stop> {
-        if self.mri_index_not_in_volume(m, x, y, z) == 1 {
-            return Ok((codes::NONE, m.outside_val));
-        }
-        let e = [m.geom.width, m.geom.height, m.geom.depth];
-        let p = [x, y, z];
-        let mut q = [0i32; 3];
-        for k in 0..3 {
-            q[k] = self.nint(p[k]).max(0).min(e[k] - 1);
-        }
-        if !sampled(m.kind) {
-            self.error_printf(
-                codes::UNSUPPORTED,
-                format!("MRIsampleVolumeType: unsupported volume type {}", m.kind).as_bytes(),
-            );
-            return Ok((codes::UNSUPPORTED, 0.0));
-        }
-        let v = self.sample_voxel(m, q[0], q[1], q[2], 0, "MRIsampleVolumeType");
-        Ok((codes::NONE, sse::widen(v)))
+        let mut v = 0.0;
+        let r = self.nearest_frame(m, x, y, z, 0, "MRIsampleVolumeType", &mut v)?;
+        Ok((r, v))
     }
 
     /// `MRIcenterOfMass(mri, means, threshold)` (§15): the means of the voxels above the
@@ -233,7 +191,7 @@ impl Process {
     /// `MRIsampleVolumeFrameType(mri, x, y, z, frame, SAMPLE_NEAREST)` at whole coordinates
     /// inside the volume (§15b): the voxel of that frame; 0 and the error for another type.
     fn frame_sample(&mut self, m: &Mri, x: i32, y: i32, z: i32, f: i32) -> f32 {
-        if !sampled(m.kind) {
+        if !super::sample::nearest_type(m.kind) {
             self.error_printf(
                 codes::UNSUPPORTED,
                 format!(
@@ -244,7 +202,7 @@ impl Process {
             );
             return 0.0;
         }
-        self.sample_voxel(m, x, y, z, f, "MRIsampleVolumeFrameType")
+        self.nearest_voxel(m, [x, y, z], f, "MRIsampleVolumeFrameType")
     }
 
     // ---- §16

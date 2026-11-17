@@ -944,9 +944,17 @@ an `int` label by truncation toward zero. A NaN or a value outside the `int` ran
   exponent after a digit; the longest such start of the word, which must then read whole as
   `strtod` reads it and must not overflow (`12abc,` gives 12, `0x10,` gives 0 (its leading 0),
   `1e,`, `1e400,`, `inf,`, `nan,` give nothing; a word of one character gives nothing); a later line
-  replaces an earlier one's value. A line naming a measure whose words give no number and that ends
-  in white space (a carriage return included) makes FreeSurfer abort (FS-314: by default the line
-  gives no number). Then a measure below 0 (none found, or a negative value; -0 is not below 0) ends
+  replaces an earlier one's value. **FS-314:** a line naming a measure whose words give no number and
+  that ends in white space (a carriage return included) ends FreeSurfer with the C++ runtime's two
+  lines on standard error and an abort (status 134): `terminate called after throwing an instance of
+  'std::length_error'` + `\n` + `  what():  basic_string::_M_create` + `\n` when a word of the line
+  (a run of bytes that are not white space, as the stream reads it) is longer than 15 bytes, else
+  `terminate called after throwing an instance of 'std::bad_alloc'` + `\n` + `  what():
+  std::bad_alloc` + `\n` (**(observed)**: words of 15 and 16 bytes, white space of every kind at the
+  end; a line without white space at its end gives no number, as the default does). **Default:** that
+  line gives no number (noted), so the measure may still come from another line or be missing below;
+  **reproduce:** FreeSurfer's two lines and status 134, as for FS-05 (`specs/freesurfer-core.md`
+  §9); the first such line in the file's order decides. Then a measure below 0 (none found, or a negative value; -0 is not below 0) ends
   the program: `error: could not find stat for <names> in <name>` (status 1), the first such
   measure in the table's order (**(observed)**: §69's `bvc` and `bvr`).
 
@@ -2725,7 +2733,7 @@ negative length (FS-294) and destinations of another type it frees (FS-293); in 
 the volume's (FS-290), volumes without their cached matrices copied (FS-252), the rotations about an
 axis by NaN or infinite angles (FS-304), names of 500 bytes (FS-306) and FS-309, FS-310; in part 5,
 segmentations without their cached matrices copied (FS-252, `CRASH 11`) and FS-314's aborts (`CRASH 6`,
-the exception named by the memory FreeSurfer overwrote: `std::length_error` or `std::bad_alloc`), with
+the exception named by the line's longest word, §23: `std::length_error` or `std::bad_alloc`), with
 FS-315's lists read past their end among the memory lines; part 5's exits are the statistics cache's
 (§23: the folder missing for writing, a measure not found, and the statistics computed without a
 subject's files, status 255).

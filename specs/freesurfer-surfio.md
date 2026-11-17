@@ -6240,8 +6240,10 @@ not marked: edges sharing a vertex are passed over; edges that cross on the sphe
 canonical positions) mark `g` and list it (the 100,001st listed ends the program: `Too many intersected
 faces for face <fno> (<v0>, <v1>, <v2>)`, `ERROR_BADPARM`). The list: `fno` first, then the faces found.
 Every listed face's rip flag (`fno`'s too) cleared at the end. Returns the list's length. FS-1012 as
-158.9 for a table of vertices. **FS-1013**: a box of more than 2^28 steps (a face kilometres across, an
-infinite coordinate: FreeSurfer runs for hours or never ends) is refused in both modes with
+158.9 for a table of vertices. **FS-1013**: a walk of more than 2^28 steps (each loop's steps over the
+outer loops' steps, an empty outer loop running none: a face kilometres across, or an infinite
+coordinate under non-empty outer loops; FreeSurfer runs for hours or never ends) is refused in both
+modes with
 `mrisFindAllOverlappingFaces: face <fno>'s bounding box (...) to (...) needs <n> lookups at 0.5 mm
 (FreeSurfer runs for hours or never ends): refused` as an error (`ERROR_BADPARM`).
 

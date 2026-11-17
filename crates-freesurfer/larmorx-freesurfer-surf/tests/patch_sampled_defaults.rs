@@ -6,9 +6,10 @@
 //! written and read back keeps its vertices, positions and borders and rips the others; the ASCII
 //! reader's defects FS-1007, FS-1008 and FS-1010 are errors by default and FreeSurfer's with
 //! `reproduce`; a GIFTI patch (FS-1006) is refused; sampling the pial positions through the
-//! canonical sphere gives the pial corner at a vertex; the minimization energy is the squared
-//! thickness; FS-1011 and FS-1012 end the program by default; the ray along a vertex's normal meets
-//! the far face; each face's overlap list starts with it, lists each face once and clears its marks.
+//! canonical sphere at a face's centroid gives the pial corners' mean; the minimization energy is
+//! the squared distance from the white position; FS-1011 and FS-1012 end the program by default;
+//! the ray along a vertex's normal meets the far face; each face's overlap list starts with it,
+//! lists each face once and clears its marks.
 
 use larmorx_core::defects::{
     FS_1006, FS_1007, FS_1008, FS_1010, FS_1011, FS_1012, UpstreamDefects,

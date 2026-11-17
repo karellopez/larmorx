@@ -39,8 +39,8 @@ use crate::views::CURRENT_VERTICES;
 pub const MAX_INT_FACES: usize = 100_000;
 /// The capacity of the overlapping faces' first list (`all_faces[1000000]`).
 pub const MAX_ALL_FACES: usize = 1_000_000;
-/// FS-1013: the buckets of one face's bounding-box walk past which it is refused (2^28: a face
-/// about 300 mm across in each direction at half a millimetre).
+/// FS-1013: the steps of one face's bounding-box walk (its loops' steps and lookups) past which it
+/// is refused (2^28: a face about 300 mm across in each direction at half a millimetre).
 pub const WALK_LIMIT: f64 = (1u64 << 28) as f64;
 
 /// FS-1012 for a face number from the table outside the surface's faces (a table of vertices).
@@ -144,8 +144,9 @@ pub fn distance_to_surface(
         if direction_triangle_intersection(g, io, mris, p, n, mht, &mut dist, -1)? != 0 {
             return Ok(narrow(dist));
         }
+        // `dist` is never NaN here (a hit returns at once)
         dist = add64(0.25, dist);
-        if !(128.0 > dist) {
+        if dist >= 128.0 {
             return Ok(0.0);
         }
     }
@@ -154,11 +155,28 @@ pub fn distance_to_surface(
 /// The number of values `for (x = lo; x <= hi; x += 0.5)` takes (0 when it takes none; infinite
 /// for a bound that is not finite).
 fn steps(lo: f64, hi: f64) -> f64 {
-    if !(lo <= hi) {
-        0.0
-    } else {
-        ((hi - lo) / 0.5).floor() + 1.0
+    match lo.partial_cmp(&hi) {
+        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal) => {
+            ((hi - lo) / 0.5).floor() + 1.0
+        }
+        _ => 0.0,
     }
+}
+
+/// The steps of the three nested loops (`x` outermost): each loop's own steps over the outer ones'
+/// (an empty outer loop runs none of the inner: 0, never 0 times infinity).
+fn walk_steps(sx: f64, sy: f64, sz: f64) -> f64 {
+    let mut walk = 0.0;
+    if sx > 0.0 {
+        walk += sx;
+        if sy > 0.0 {
+            walk += sx * sy;
+            if sz > 0.0 {
+                walk += sx * sy * sz;
+            }
+        }
+    }
+    walk
 }
 
 /// `mrisFindAllOverlappingFaces(mris, mht, fno, flist)`: face `fno`'s bounding box over its
@@ -195,8 +213,8 @@ pub fn find_all_overlapping_faces(
         y1 = if y > y1 { y } else { y1 };
         z1 = if z > z1 { z } else { z1 };
     }
-    let walk = steps(x0, x1) * steps(y0, y1) * steps(z0, z1);
-    if !(walk <= WALK_LIMIT) {
+    let walk = walk_steps(steps(x0, x1), steps(y0, y1), steps(z0, z1));
+    if walk > WALK_LIMIT {
         let message = format!(
             "{WHO}: face {fno}'s bounding box ({x0}, {y0}, {z0}) to ({x1}, {y1}, {z1}) needs {walk} lookups at 0.5 mm (FreeSurfer runs for hours or never ends): refused"
         );

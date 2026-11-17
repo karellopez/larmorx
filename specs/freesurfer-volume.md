@@ -653,7 +653,8 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
   so that programs run in one process each see their own. Type RAS-to-RAS.
 - **FSL** (`.fslmat`): three rows `%f %f %f %f`, type `FSLREG_TYPE`. **`register.dat`**: an INFO line
   (`INFO: This REGISTER_DAT transform is valid only for volumes between  COR types with c_(r,a,s) =
-  0.`), then `regio_read_register`'s subject, intensity (`fscale`) and matrix; the source geometry not
+  0.`), then `regio_read_register`'s subject, intensity (`fscale`) and matrix (`specs/freesurfer-io.md`
+  §46); the source geometry not
   valid with sizes (in-plane, in-plane, between-plane), the destination's not valid with sizes 1.
 - Errors keep `errno` (a failed open, a volume that does not exist) for the error messages after.
 

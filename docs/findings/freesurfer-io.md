@@ -2818,3 +2818,11 @@ assigns them to the new volume), 413-447 (`read`: `gcam->image = __warpmap->gcam
   after them `C-48..C-41` (observed the long's eight bytes reversed): memory contents, marked `VARY`. A header cut
   in the sizes reaches the short (memory: observed 0, bytes 6 and 7 of the `rbp` `swapInt` pushes) and stays
   `VARY`.
+- **The same memory in an `.m3z` written from such a morph** (found by the mixed subsets of seeds 7 and 13: five
+  `gcw` cases whose official file changed with the cases run before them, identical to the port's when run alone):
+  `GCAMwrite(o.m3z)` of a morph read from a warp volume read with `FS_SKIP_TAGS` (`MRITAGread` returns at once) or
+  without tag 10: `__m3zWrite` writes `((VOL_GEOM*)&gcam->image)->write(file)`, whose `valid`, `width`, `height`,
+  `depth` are the never-written fields (traced with `strace -f -e trace=openat,write -xx` of `fsio` on the case alone
+  and after the 1,124 cases before it: offsets 460-475 and 1,048-1,063 of the decompressed file, `0` alone and the
+  bytes of `"n dlr to"`... later; the rest of the geometry the defaults, the name `\0nknown`: `initVolGeom`'s
+  `unknown` with `strcpy` of an empty name over it). The port notes FS-855 in `m3z_write` too (`SKIP` in piece 32).

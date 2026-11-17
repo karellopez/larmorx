@@ -2296,7 +2296,7 @@ defects! {
     FS_854 = "FS-854", "FreeSurfer", true,
         "reading a compressed GCA morph (.m3z) whose compressed data is damaged after its nodes: the reading of its tags never ends, or ends as memory contents decide";
     FS_855 = "FS-855", "FreeSurfer", true,
-        "reading an MGH or NIfTI warp volume as a GCA morph when the volume has no morph geometries (its geometry tag missing): the geometries' validity and sizes are memory contents, which the RAS warp formats and the node-coordinate frames use; and those frames of a morph whose image geometry has a size of 0 or less crash the program";
+        "reading an MGH or NIfTI warp volume as a GCA morph when the volume has no morph geometries (its geometry tag missing): the geometries' validity and sizes are memory contents, which the RAS warp formats and the node-coordinate frames use and which writing the morph carries into its outputs (the sizes printed, an .m3z's geometry tag, a warp volume's tags); and those frames of a morph whose image geometry has a size of 0 or less crash the program";
     FS_856 = "FS-856", "FreeSurfer", true,
         "writing a three-frame volume as a GCA morph (an .m3z or .m3d name, or the morph type asked for): success is reported whatever the morph's writer did: a file that cannot be made, a warp volume whose write fails, or a name of another format, for which nothing is written and nothing is said";
     FS_857 = "FS-857", "FreeSurfer", true,

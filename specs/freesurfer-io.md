@@ -5198,10 +5198,13 @@ crashes or reads memory), a GCA morph's resamplings (not ported).
    - Reading such a volume as a GCA morph (§142 item 3) gives the morph those geometries (FS-855): their sizes are
      printed by the morph's conversion to a warp volume (`[INFO] Warpfield::convert(): gcam image [<w> x <h> x <d>]`,
      `... gcam atlas [...]`, §145 item 4) and stored in the new warp volume, so writing it (`GCAMwrite` to an MGH or
-     NIfTI name, `mri_convert <warp>.mgz <out>.nii`) meets both items above.
+     NIfTI name, `mri_convert <warp>.mgz <out>.nii`) meets both items above; written as a morph file (`GCAMwrite` to
+     an `.m3z` or `.m3d` name, §145 item 3) its geometry tag holds them (observed: after other work in the process,
+     16 bytes of earlier output text per geometry). The same when the tags are not read at all (`FS_SKIP_TAGS` set).
 3. **larmorx, both modes** (memory contents cannot be reproduced): the validity flags and sizes are 0 (a fresh
    process's values), noted: FS-929 where a warp volume without those geometries is written (its tags, a NIfTI
-   output's conversion through RAS), FS-855 where a morph read from one prints or stores them. A geometry is taken as
+   output's conversion through RAS), FS-855 where a morph read from one prints or stores them (an `.m3z`'s geometry
+   tag included). A geometry is taken as
    never given when every field equals the made volume's defaults with validity and sizes 0 (a tag holding exactly
    those values is noted too, though FreeSurfer's output is then the same).
 4. **Validation.** Piece 32's `gcw` (a warp volume read as a morph and written in a warp format) and piece 14's

@@ -2149,14 +2149,14 @@ and 5,000 entries against `uchar` counts) and `MRISfromVerticesAndFaces` (2217-2
 
 CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_deform.cpp` 2502-2588
 (`MRISsoapBubbleVertexPositions`), 2600-2692 (`MRISweightedSoapBubbleVertexPositions`), 2700-2775
-(`MRISsoapBubbleOrigVertexPositions`), 2784-2862 (`MRISsoapBubbleTargetVertexPositions`) into
+(`MRISsoapBubbleOrigVertexPositions`), 2784-2870 (`MRISsoapBubbleTargetVertexPositions`) into
 `crates-freesurfer/larmorx-freesurfer-surf/src/soap.rs`.
 
 - **The diagnostic vertex** (FS-996): 2510 and 2608 test `Gdiag_no >= 0 && (mris->vertices[Gdiag_no].marked
   == 0)` with no upper bound; the weighted bubble also calls `MRISprintVertexStats(mris, Gdiag_no, ...)`
-  under `DIAG_VERBOSE_ON` (2689), which reads the vertex too.
+  under `DIAG_VERBOSE_ON` (2688), which reads the vertex too.
 - **The plain bubble's count** starts at 1 (`num++` for the centre, the `if (v->marked == 2)` test
-  commented out at 2530), so `num > 0` always holds and every unripped vertex not fixed is computed
+  commented out at 2531), so `num > 0` always holds and every unripped vertex not fixed is computed
   and marked 3 in the first pass, whatever its neighbours; the original and target bubbles use only
   neighbours of mark 1 or 2 (`vn->marked > 2` skipped), so a free region is filled from its border
   inwards, one ring per pass.

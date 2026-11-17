@@ -423,3 +423,37 @@ fn compose_and_convert() {
     assert!(r.is_null());
     assert!(String::from_utf8_lossy(&e2).contains("GCAMmorphFromAtlas"));
 }
+
+/// A warp volume read as a morph by its absolute name: on Windows too (relay 42: MRIread put the
+/// working directory before a name without `/`, so `C:\...\w.mgz` could not be opened).
+#[test]
+fn a_warp_volume_read_by_its_absolute_name() {
+    let t = tempfile::tempdir().unwrap();
+    let env = Environment::default();
+    let mut g = Globals::new(UpstreamDefects::Fix);
+    let mut m = warp(&mut g, [2, 2, 1], |x, y, _| [x as f32, y as f32, 0.5]);
+    m.intent = MGZ_INTENT_WARPMAP;
+    m.version = ((MGZ_INTENT_WARPMAP & 0xffff) << 8) | MGH_VERSION;
+    m.warp_field_format = larmorx_freesurfer_gca::gcam_write::WARPFIELD_DTFMT_ABS_CRS;
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let dir = Some(t.path());
+    let r = mri_write(
+        &mut g,
+        &mut out,
+        &mut err,
+        &env,
+        dir,
+        &mut m,
+        "w.mgz",
+        None,
+        MGZ_INTENT_UNKNOWN,
+    )
+    .unwrap();
+    assert_eq!(r, 0);
+    let p = t.path().join("w.mgz").to_string_lossy().into_owned();
+    let gc = gcam::gcam_read(&mut g, &mut out, &mut err, &env, None, &p)
+        .unwrap()
+        .unwrap_or_else(|| panic!("{}", String::from_utf8_lossy(&err)));
+    assert_eq!((gc.width, gc.height, gc.depth), (2, 2, 1));
+    assert_eq!(gc.node(1, 1, 0).x, 1.0);
+}

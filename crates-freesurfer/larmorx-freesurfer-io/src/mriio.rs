@@ -129,9 +129,12 @@ fn fits(g: &mut Globals, who: &str, name: &str) {
 }
 
 /// The name with the working directory before it when it holds no `/` (`getcwd`; the name alone
-/// when there is none).
+/// when there is none). On Windows a `\` counts as a folder too (relay 42: the port's own;
+/// FreeSurfer runs only where `/` is the separator, and an absolute Windows name such as
+/// `C:\data\a.mgz` is Linux's `/data/a.mgz`, which it takes as it is).
 fn with_cwd(g: &mut Globals, dir: Option<&Path>, who: &str, fname: &str) -> String {
-    let full = if fname.contains('/') {
+    let windows_folder = cfg!(windows) && fname.contains('\\');
+    let full = if fname.contains('/') || windows_folder {
         fname.to_owned()
     } else {
         match system::cwd(dir) {

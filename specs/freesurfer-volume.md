@@ -543,9 +543,13 @@ in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's v
   `MRIsincSampleVolumeFrame`): no whole-coordinate shortcut; unambiguously outside gives
   `outside_val`; coordinates clamped as the trilinear's. On each axis the voxels `j` from `max(ceil(c)
   - hw, 0)` to below `min(floor(c) + hw, extent - 1)` (the last voxel never taken) with weights
-  `ham_sinc(c - j, 2 hw)`: 1 when `|d| < 1e-5`, else `sin(pi d) / (pi d) * (0.54 + 0.46 cos(2 pi d /
-  fullwidth))` (`sin`, `cos` of `double`: glibc 2.35's bits with `reproduce`; an infinite argument
-  gives the default NaN), each axis's weights summed (`w + sum`) and divided by the sum. The value is
+  `ham_sinc(c - j, 2 hw)`: 1 when `|d| < 1e-5` (a NaN `d` is not), else the product `h r` of the
+  window `h = 0.54 + 0.46 cos((2 pi) d / fullwidth)` and the ratio `r = sin(pi d) / (pi d)` (`pi` the
+  `double` nearest to π, `2 pi` its double; `sin`, `cos` of `double`: glibc 2.35's bits with
+  `reproduce`; an infinite argument gives the default NaN). The window is the left operand of that
+  product: where both are NaN the window's NaN is kept (**(observed)**: §22's `hsinc` of -infinity
+  with a NaN full width gives the width's NaN, quieted). Each axis's weights are summed (`w + sum`)
+  and divided by the sum. The value is
   `sum_z += sum_y * (wz / Sz)` over z of `sum_y += sum_x * (wy / Sy)` over y of `sum_x += v * (wx /
   Sx)` over x (accumulators on the left). A point whose `ceil(z)` equals the depth gives 0. Bytes and
   shorts clip a negative result to 0; bytes clip above 255, shorts above 65535 (to those values). More

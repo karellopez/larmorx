@@ -13,6 +13,7 @@ pub mod arith;
 pub mod extract;
 pub mod geomblock;
 pub mod geometry;
+pub mod moves;
 pub mod sample;
 pub mod stats;
 pub mod vgcopy;

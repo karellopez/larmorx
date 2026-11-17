@@ -22,6 +22,7 @@ use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
 use larmorx_fs_core::maths::mfiles::CStream;
 use larmorx_fs_core::mri::{Mri, Region, VolGeom, types};
 use larmorx_fs_core::volume::geometry::SurfacePoint;
+use larmorx_fs_core::volume::moves::axis;
 use larmorx_fs_core::volume::vgcopy::VG_IS_EQUAL_THRESHOLD;
 use larmorx_fs_core::volume::{Dst, VolOut};
 use larmorx_fs_core::{Environment, Process, Stop};
@@ -618,6 +619,33 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 };
                 l.putd(v);
             }
+        }
+        "trans" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let (dx, dy, dz) = (l.getd(), l.getd(), l.getd());
+            let r = p.mri_translate(&mut a, dst(&mut d), dx, dy, dz)?;
+            putres(l, r, &a, None, &d);
+        }
+        "rot" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let mr = l.getm(p)?;
+            let mo = l.getm(p)?;
+            let r = p.mri_rotate_i(&mut a, dst(&mut d), mr.as_ref(), mo.as_ref())?;
+            putres(l, r, &a, None, &d);
+        }
+        "rotx" | "roty" | "rotz" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let angle = l.getf();
+            let which = match c.as_str() {
+                "rotx" => axis::X,
+                "roty" => axis::Y,
+                _ => axis::Z,
+            };
+            let r = p.mri_rotate_axis(&mut a, dst(&mut d), angle, which)?;
+            putres(l, r, &a, None, &d);
         }
         _ => args::bad("unknown command"),
     }

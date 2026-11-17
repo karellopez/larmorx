@@ -1154,6 +1154,82 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 o.s(&format!("{h:016x}"));
             }
         }
+        "lrr" => {
+            // relay 43 of track D: `fssurfio.cpp`'s `flr lrr` (the label's rips on a recorded
+            // surface and label)
+            use larmorx_freesurfer_io::label::{Label, label_read};
+            use larmorx_freesurfer_surf::labelsurf;
+            let sf = t.next().to_owned();
+            let lf = t.next().to_owned();
+            fn put4(h: &mut u64, b: [u8; 4]) {
+                for c in b {
+                    *h = (*h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+            }
+            let lhash = |l: &Label, o: &mut Out| {
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                for n in 0..l.n_points.max(0) as usize {
+                    let p = &l.lv[n];
+                    put4(&mut h, p.vno.to_le_bytes());
+                    for x in [p.x, p.y, p.z] {
+                        put4(&mut h, x.to_le_bytes());
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let shash = |s: &Mris, o: &mut Out| {
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                let mut put = |x: i32| put4(&mut h, x.to_le_bytes());
+                for v in 0..s.nvertices.max(0) as usize {
+                    let vt = s.topology(v);
+                    put(i32::from(s.vertex(v).ripflag));
+                    put(i32::from(vt.num));
+                    for k in 0..usize::from(vt.num) {
+                        put(vt.f.as_ref().expect("f")[k]);
+                        put(i32::from(vt.n.as_ref().expect("n")[k]));
+                    }
+                    for x in [vt.vnum, vt.v2num, vt.v3num, vt.vtotal] {
+                        put(i32::from(x));
+                    }
+                    for k in 0..vt.vtotal.max(0) as usize {
+                        put(vt.v.as_ref().expect("v")[k]);
+                    }
+                }
+                for f in 0..s.nfaces.max(0) as usize {
+                    for x in s.face(f).v {
+                        put(x);
+                    }
+                    put(i32::from(s.face(f).ripflag));
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let mut s = surf(g, sg, &mut io, &sf)?;
+            let mut l = label_read(g, io.env, io.out, io.err, None, None, &lf)?.expect("the label");
+            for n in (1..l.n_points.max(0) as usize).step_by(2) {
+                l.lv[n].vno = -1;
+            }
+            o.i(i64::from(labelsurf::label_rip_rest_of_surface(
+                g, sg, &mut io, &mut l, &mut s, None,
+            )?));
+            lhash(&l, o);
+            shash(&s, o);
+            let mut s2 = surf(g, sg, &mut io, &sf)?;
+            let mut l2 =
+                label_read(g, io.env, io.out, io.err, None, None, &lf)?.expect("the label");
+            o.i(i64::from(labelsurf::label_rip_rest_of_surface(
+                g,
+                sg,
+                &mut io,
+                &mut l2,
+                &mut s2,
+                Some(0.5),
+            )?));
+            lhash(&l2, o);
+            shash(&s2, o);
+            let mut s3 = surf(g, sg, &mut io, &sf)?;
+            o.i(i64::from(labelsurf::label_rip(&mut s3, &l2, 1)));
+            shash(&s3, o);
+        }
         "mcl" => {
             // relay 43 of track D: `fssurfio.cpp`'s `flr mcl` (the closest searches on recorded
             // surfaces: mri_surf2volseg's, mri_surf2surf's, mri_relabel_hypointensities' and
@@ -1180,8 +1256,12 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 let off = if pass == 1 { 2.0f32 } else { 0.0 };
                 for v in 0..p.nvertices.max(0) as usize {
                     let x = p.vertex(v);
-                    let (r, d) =
-                        m.find_closest_vertex_no_xyz(g, io.err, &w, [x.x + off, x.y + off, x.z + off])?;
+                    let (r, d) = m.find_closest_vertex_no_xyz(
+                        g,
+                        io.err,
+                        &w,
+                        [x.x + off, x.y + off, x.z + off],
+                    )?;
                     found += i64::from(r >= 0);
                     h = mix(mix(h, &r.to_le_bytes()), &d.to_le_bytes());
                 }

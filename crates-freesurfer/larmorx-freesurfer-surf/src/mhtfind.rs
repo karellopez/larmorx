@@ -145,22 +145,11 @@ impl<'a> Search<'a> {
                     let (x, y, z) = vertex_coord2xyz_float(g, err, vtx, self.mht.which())?;
                     [x, y, z]
                 }
-                Kind::Face { project_into_face } => {
+                Kind::Face { .. } => {
                     if self.beyond(g, n, self.mht.nfaces.min(self.mris.nfaces), "face") {
                         continue;
                     }
                     let c = self.mht.f[n as usize];
-                    if project_into_face > 0 {
-                        let mut d = [[0f64; 3]; 3];
-                        for (i, row) in d.iter_mut().enumerate() {
-                            let vno = self.mris.face(n as usize).v[i];
-                            *row = corner(g, err, self.mris, vno, self.mht.which())?;
-                        }
-                        let (r, _) = face_barycentric_coords_raw(g, d[0], d[1], d[2], self.probe);
-                        if r < 0 {
-                            continue;
-                        }
-                    }
                     [c.cx, c.cy, c.cz]
                 }
             };
@@ -171,6 +160,21 @@ impl<'a> Search<'a> {
             );
             if sq >= self.best_sq {
                 continue;
+            }
+            // FreeSurfer tests the projection before the distance; a face the distance rejects is
+            // rejected either way, so the test is made only for a face that would be taken
+            if let Kind::Face { project_into_face } = self.kind
+                && project_into_face > 0
+            {
+                let mut c = [[0f64; 3]; 3];
+                for (i, row) in c.iter_mut().enumerate() {
+                    let vno = self.mris.face(n as usize).v[i];
+                    *row = corner(g, err, self.mris, vno, self.mht.which())?;
+                }
+                let (r, _) = face_barycentric_coords_raw(g, c[0], c[1], c[2], self.probe);
+                if r < 0 {
+                    continue;
+                }
             }
             self.best_sq = sq;
             self.best = n;
@@ -201,7 +205,12 @@ impl Mht {
 
     /// FS-998: a search of the other kind of table, unchecked in FreeSurfer: FreeSurfer's own
     /// check's error by default (rule B); `reproduce` goes on (the numbers read as the other kind).
-    fn other_kind(&self, g: &mut Globals, err: &mut dyn Write, want: MhtFnoUsage) -> Result<(), Fatal> {
+    fn other_kind(
+        &self,
+        g: &mut Globals,
+        err: &mut dyn Write,
+        want: MhtFnoUsage,
+    ) -> Result<(), Fatal> {
         if self.fno_usage() == want {
             return Ok(());
         }
@@ -489,7 +498,9 @@ impl Mht {
     ) -> Result<i32, Fatal> {
         let (mut vno, _) = self.generic(g, err, mris, p.map(f64::from), 1000.0, 3, Kind::Vertex)?;
         if vno < 0 {
-            vno = self.brute_force_closest_vertex(g, err, mris, p, self.which())?.0;
+            vno = self
+                .brute_force_closest_vertex(g, err, mris, p, self.which())?
+                .0;
         }
         Ok(vno)
     }
@@ -522,13 +533,17 @@ impl Mht {
         let (mut vno, _) = self.generic(g, err, mris, probe, 1000.0, 1, Kind::Vertex)?;
         if vno < 0 && do_global_search != 0 {
             for i in 2..=4 {
-                vno = self.generic(g, err, mris, probe, 1000.0, i, Kind::Vertex)?.0;
+                vno = self
+                    .generic(g, err, mris, probe, 1000.0, i, Kind::Vertex)?
+                    .0;
                 if vno >= 0 {
                     break;
                 }
             }
             if vno < 0 {
-                vno = self.brute_force_closest_vertex(g, err, mris, p, self.which())?.0;
+                vno = self
+                    .brute_force_closest_vertex(g, err, mris, p, self.which())?
+                    .0;
             }
         }
         Ok(vno)
@@ -584,7 +599,8 @@ impl Mht {
                 "0 <= vno && vno < mris_for_v->nvertices",
             ));
         }
-        let (x, y, z) = vertex_coord2xyz_float(g, err, mris_for_v.vertex(vno as usize), self.which())?;
+        let (x, y, z) =
+            vertex_coord2xyz_float(g, err, mris_for_v.vertex(vno as usize), self.which())?;
         Ok([x, y, z])
     }
 
@@ -748,4 +764,3 @@ pub fn brute_force_closest_face(
     }
     Ok((min_fno, sqrt(min_dsq)))
 }
-

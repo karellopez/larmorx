@@ -526,6 +526,38 @@ surface, read by FreeSurfer). `flr sbl` (`real.py --sbl`: three heads, both hemi
 `orig`, `cortex.label`'s vertices free, 25 passes of the plain and the weighted bubble): 12 of 12
 identical in both modes. Official 17 s, port 31-33 s.
 
+Relay 43 of track D, 62 commands: `mcl` (the closest searches of the surface hash table: face and
+vertex tables of crumpled grids, small meshes, icosahedra and crossing sheets, now and then beyond the
+table (FS-999), at resolutions 0.25 to 10 mm (0, -1, NaN in heavy cases); `MHTfindClosestVertexGeneric`,
+`MHTfindClosestVertexNoXYZ`, `MHTfindClosestSetVertexNo`, `MHTfindVnoOfClosestVertexInTable`,
+`MHTfindClosestVertexInTable`, `MHTfindClosestVertexNo2`, `MHTfindClosestVertex2`,
+`MHTfindClosestVertexSet2` (a second surface: the file read again, its vertices moved),
+`MHTfindClosestFaceGeneric`, `MHTfindClosestFaceNoGeneric`, `MHTBruteForceClosestFace`, every vertex of
+the second surface searched, vertices moved or ripped after the table was made; the port's side in
+`tests/fs_surfio/mcl.rs`). A face search with no limit on its shells is asked for only where a face
+is found early (FreeSurfer looks at every voxel up to the distance otherwise: the alarm). Seeds 7, 13
+(500 cases each) and 17 (1,000): 0 different in both modes; counted, not compared: FS-576 (a search of
+the other kind of table reading a number beyond the surface: memory in FreeSurfer), FS-121. `flr mcl`
+(`real.py --mcl`: three heads, both hemispheres: `mri_surf2volseg`'s vertex table of `white` at 16 mm
+and `MHTfindClosestVertexNoXYZ` of every `pial` vertex and of each moved by 2 mm; `mri_surf2surf`'s
+table of `sphere.reg` at 16 mm and `MHTfindClosestVertexNo2` and `MHTfindClosestVertexSet2` of every
+vertex of the other hemisphere's `sphere.reg`; `mri_relabel_hypointensities`' table at 1 mm and
+`MHTfindClosestVertexInTable`; `mrisProjectOntoSurface`'s face table of `white` and its two face
+searches of every `pial` vertex): 6 of 6 identical in both modes (every `pial` vertex finds a
+`white` vertex within 16 mm, 7 % within 1 mm; 94 % of them need the second face search). Official
+201 s, port 239-243 s. `fs_mhtfind_timing <white> <pial> <sphere.reg> <other sphere.reg>` (the port's
+example) times each part (ds000005 `lh`: the reads 2.6 s, the 16 mm vertex searches 6.9 s, the
+spheres' 1.6 s, the 1 mm table 0.07 s, the projected face searches 15.7 s, the second ones 0.7 s).
+
+Also relay 43: `lbl` gains `LabelToFlat` (`tf`), `LabelRipRestOfSurface` (`rr`),
+`LabelRipRestOfSurfaceWithThreshold` (`rrt`) and `LabelRip` (`rp`), each rip followed by top's dump of
+the surface; seeds 7, 13 (500 cases each) and 17 (1,000): 0 different with `reproduce`, `fix` different
+only with notices (FS-986, FS-357, FS-902, FS-632, FS-01, FS-03). `flr lrr` (`real.py --lrr`: three
+heads, both hemispheres, `white` with `cortex.label`, `BA1_exvivo.label`, `BA44_exvivo.thresh.label`,
+`MT_exvivo.label`: `LabelRipRestOfSurface` with every odd point's vertex cleared, the threshold at 0.5,
+`LabelRip`): 24 of 24 identical with `reproduce` (the default differs in all 24 by FS-986, as relay 42
+found for every recorded cortex label). Official 33 s, port 53 s (the reads are track A's).
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

@@ -4503,6 +4503,61 @@ void flr_case()
       snprintf(t, sizeof t, "%016" PRIx64 " ", h);
       out += t;
     }
+  } else if (op == "lrr") {
+    // relay 43 of track D: the label's rips on a recorded surface (`lrr <surface> <label>`): (1)
+    // the label read, every odd point's vertex set to -1 (LabelToFlat then finds the closest vertex
+    // of its position), LabelRipRestOfSurface; (2) the label read again,
+    // LabelRipRestOfSurfaceWithThreshold at 0.5 on a second read; (3) LabelRip (outside 1) on a
+    // third read. For each: the status, the label's points' FNV-1a (vertex, position) and the
+    // surface's (top's topology hash)
+    std::string sf = next(), lf = next();
+    auto put4 = [](uint64_t &h, const void *p) {
+      const unsigned char *b = (const unsigned char *)p;
+      for (int k = 0; k < 4; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+    };
+    auto hex = [&](uint64_t h) {
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    auto lhash = [&](LABEL *l) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (int n = 0; n < l->n_points; n++) {
+        put4(h, &l->lv[n].vno); put4(h, &l->lv[n].x); put4(h, &l->lv[n].y); put4(h, &l->lv[n].z);
+      }
+      hex(h);
+    };
+    auto shash = [&](MRIS *m) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      auto put = [&](int x) { put4(h, &x); };
+      for (int v = 0; v < m->nvertices; v++) {
+        VERTEX_TOPOLOGY *t = &m->vertices_topology[v];
+        put(m->vertices[v].ripflag); put(t->num);
+        for (int k = 0; k < t->num; k++) { put(t->f[k]); put(t->n[k]); }
+        put(t->vnum); put(t->v2num); put(t->v3num); put(t->vtotal);
+        for (int k = 0; k < t->vtotal; k++) put(t->v[k]);
+      }
+      for (int f = 0; f < m->nfaces; f++) {
+        for (int k = 0; k < 3; k++) put(m->faces[f].v[k]);
+        put(m->faces[f].ripflag);
+      }
+      hex(h);
+    };
+    MRIS *s = MRISread(sf.c_str());
+    LABEL *l = LabelRead(NULL, lf.c_str());
+    if (!s || !l) fail("cannot read the inputs");
+    for (int n = 1; n < l->n_points; n += 2) l->lv[n].vno = -1;
+    oi(LabelRipRestOfSurface(l, s));
+    lhash(l); shash(s);
+    MRIS *s2 = MRISread(sf.c_str());
+    LABEL *l2 = LabelRead(NULL, lf.c_str());
+    if (!s2 || !l2) fail("cannot read the inputs");
+    oi(LabelRipRestOfSurfaceWithThreshold(l2, s2, 0.5f));
+    lhash(l2); shash(s2);
+    MRIS *s3 = MRISread(sf.c_str());
+    if (!s3) fail("cannot read the surface");
+    oi(LabelRip(s3, l2, 1));
+    shash(s3);
   } else if (op == "mcl") {
     // relay 43 of track D: the closest searches on recorded surfaces (`mcl <white> <pial> <sphere.reg>
     // <other sphere.reg>`): (1) mri_surf2volseg's: a vertex table of the white surface at 16 mm, each
@@ -5444,6 +5499,8 @@ static bool lbl_outside(const std::string &op, LABEL *a, int nv)
   return false;
 }
 
+static void top_dump(MRIS *s);
+
 static void lbl_dump(LABEL *a, MRIS *s)
 {
   oi(a->n_points);
@@ -5540,8 +5597,19 @@ void lbl_case()
       int nfr = given ? geti() : 0;
       args = {f, st, given, nfr};
     }
+    // relay 43: LabelRipRestOfSurfaceWithThreshold's threshold, LabelRip's Outside
+    float thr = 0;
+    int outside_ = 0;
+    if (op == "rrt") thr = getf();
+    else if (op == "rp") outside_ = geti();
     if (lbl_outside(op, a, nv)) { out += "G "; continue; }
-    if (op == "ri" || op == "rh" || op == "rhi") {
+    if (op == "tf") oi(LabelToFlat(a, s));
+    else if (op == "rr" || op == "rrt" || op == "rp") {
+      // relay 43: the label's rips, then the surface (top's dump)
+      oi(op == "rr" ? LabelRipRestOfSurface(a, s)
+         : op == "rrt" ? LabelRipRestOfSurfaceWithThreshold(a, s, thr) : LabelRip(s, a, outside_));
+      top_dump(s);
+    } else if (op == "ri" || op == "rh" || op == "rhi") {
       // relay 38: LabelRemoveIslandsSurf, LabelRemoveHolesSurf, LabelRemoveHolesAndIslandsSurf;
       // the new label, then the vertices' cluster numbers and values
       LABEL *l = op == "ri" ? LabelRemoveIslandsSurf(s, a)

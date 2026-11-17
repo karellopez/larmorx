@@ -444,9 +444,9 @@ pub(super) fn mcl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 let glob = t.i();
                 let Some(m) = need(&table, o) else { continue };
                 if op == "vi" {
-                    o.i(i64::from(
-                        m.find_vno_of_closest_vertex_in_table(g, io.err, &s, p, glob)?,
-                    ));
+                    o.i(i64::from(m.find_vno_of_closest_vertex_in_table(
+                        g, io.err, &s, p, glob,
+                    )?));
                 } else {
                     let v = m.find_closest_vertex_in_table(g, io.err, &s, p, glob)?;
                     o.i(v.map_or(-1, |v| v as i64));
@@ -518,7 +518,8 @@ pub(super) fn mcl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 for v in 0..nv as usize {
                     let x = s2.vertex(v);
                     let p = [f64::from(x.x), f64::from(x.y), f64::from(x.z)];
-                    let (f, dist) = m.find_closest_face_generic(g, io.err, &s, p, dmax, mm, proj)?;
+                    let (f, dist) =
+                        m.find_closest_face_generic(g, io.err, &s, p, dmax, mm, proj)?;
                     o.i(i64::from(f));
                     o.d(dist);
                 }

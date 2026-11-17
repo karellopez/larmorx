@@ -144,6 +144,13 @@ def main(argv: list[str] | None = None) -> int:
         "surfaces, the vertices of its cortex label free and the others fixed, 25 passes",
     )
     ap.add_argument(
+        "--lrr",
+        action="store_true",
+        help="relay 43 of track D: the label's rips (flr lrr) on each head's white surface with "
+        "its cortex and BA labels: LabelRipRestOfSurface (every odd point's vertex cleared, so "
+        "LabelToFlat finds it), LabelRipRestOfSurfaceWithThreshold at 0.5, LabelRip",
+    )
+    ap.add_argument(
         "--mcl",
         action="store_true",
         help="relay 43 of track D: the closest searches of the surface hash table (flr mcl) on "
@@ -188,6 +195,12 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.lrr:
+                for c in LABELS:
+                    lines.append(
+                        f"flr lrr {s / 'surf' / f'{hemi}.white'} {s / 'label' / f'{hemi}.{c}'}"
+                    )
+                continue
             if a.mcl:
                 sd = s / "surf"
                 other = "rh" if hemi == "lh" else "lh"
@@ -280,7 +293,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "mcl"
+        "lrr"
+        if a.lrr
+        else "mcl"
         if a.mcl
         else "sbl"
         if a.sbl

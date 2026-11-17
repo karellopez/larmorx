@@ -217,3 +217,80 @@ fn fs633_the_area_error_takes_the_vertex_faces() {
     // its own face 1: 2 - 0.5; FreeSurfer's face 0: 2 - 0.25
     assert_eq!(vals, vec![1.5, 1.75]);
 }
+
+/// `LabelToFlat` (relay 43): a point naming a vertex takes its position; a point naming none takes
+/// the closest vertex within one millimetre and its position, or stays as it is.
+#[test]
+fn label_to_flat_finds_the_closest_vertex() {
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut r = Run::new(mode);
+        let mut s = r.triangle();
+        for (vno, p) in [[0.0f32, 0.0, 0.0], [4.0, 0.0, 0.0], [0.0, 4.0, 0.0]]
+            .iter()
+            .enumerate()
+        {
+            let v = s.vertex_mut(vno);
+            (v.x, v.y, v.z) = (p[0], p[1], p[2]);
+        }
+        let mut a = r.label(3, &[1, -1, 9]);
+        (a.lv[1].x, a.lv[1].y, a.lv[1].z) = (0.25, 3.75, 0.5);
+        (a.lv[2].x, a.lv[2].y, a.lv[2].z) = (2.0, 2.0, 0.0);
+        assert_eq!(
+            labelsurf::label_to_flat(&mut r.g, &mut r.err, &mut a, &s).unwrap(),
+            NO_ERROR
+        );
+        assert_eq!((a.lv[0].vno, a.lv[0].x), (1, 4.0));
+        assert_eq!((a.lv[1].vno, a.lv[1].x, a.lv[1].y), (2, 0.0, 4.0));
+        // nothing within a millimetre: kept as it was
+        assert_eq!((a.lv[2].vno, a.lv[2].x), (9, 2.0), "{mode:?}");
+    }
+}
+
+/// `LabelRip` and `LabelRipRestOfSurface(WithThreshold)` (relay 43): the label's vertices kept
+/// (with a threshold only those whose `stat` is not below it, a NaN `stat` kept), every other
+/// vertex ripped with its faces.
+#[test]
+fn the_label_rips() {
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut r = Run::new(mode);
+        let mut s = r.triangle();
+        let a = r.label(2, &[0, 2]);
+        assert_eq!(labelsurf::label_rip(&mut s, &a, 1), NO_ERROR);
+        let rips: Vec<i8> = (0..3).map(|v| s.vertex(v).ripflag).collect();
+        assert_eq!((rips, s.face(0).ripflag), (vec![0, 1, 0], 1));
+        labelsurf::label_rip(&mut s, &a, 0);
+        let rips: Vec<i8> = (0..3).map(|v| s.vertex(v).ripflag).collect();
+        assert_eq!(rips, vec![1, 0, 1]);
+        let mut a = r.label(3, &[0, 1, 2]);
+        (a.lv[0].stat, a.lv[1].stat, a.lv[2].stat) = (0.25, f32::NAN, 0.75);
+        let mut s = r.triangle();
+        // a 1-hop surface with its face lists (MRISremoveRipped reads them)
+        for vno in 0..3usize {
+            let t = s.topology_mut(vno);
+            (t.vtotal, t.nsizeCur, t.nsizeMax, t.num) = (2, 1, 1, 1);
+            t.f = Some(vec![0]);
+            t.n = Some(vec![vno as u8]);
+        }
+        let mut io = Io {
+            out: &mut r.out,
+            err: &mut r.err,
+            env: &r.env,
+        };
+        let res = labelsurf::label_rip_rest_of_surface(
+            &mut r.g,
+            &mut r.sg,
+            &mut io,
+            &mut a,
+            &mut s,
+            Some(0.5),
+        );
+        assert!(
+            res.is_ok(),
+            "{}{}",
+            String::from_utf8_lossy(&r.out),
+            String::from_utf8_lossy(&r.err)
+        );
+        let rips: Vec<i8> = (0..3).map(|v| s.vertex(v).ripflag).collect();
+        assert_eq!((rips, s.face(0).ripflag), (vec![1, 0, 0], 1), "{mode:?}");
+    }
+}

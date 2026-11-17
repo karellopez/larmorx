@@ -529,7 +529,8 @@ in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's v
   `min(4, extent + 1 - low)`) are summed, z outermost, x innermost: `val = (((wx * v) * wy) * wz) +
   val` (the term on the left for NaNs), with the weights for i = 0..3 of `f`: `((2 - f) f - 1) f`,
   `(3 f - 5) f f + 2`, `((4 - 3 f) f + 1) f`, `(f - 1) f f` (`MRIcubicCoeff`; they sum to 2; another `i`
-  gives the error `MRIcubicCoeff: called wrong by MRIcubicSampleVolume!` and the value 3); the sum is
+  gives the error `MRIcubicCoeff: called wrong by MRIcubicSampleVolume!` and the value -3,
+  `ERROR_UNSUPPORTED` as a `double`, `c008000000000000` (**(observed)**: §22's `coef`)); the sum is
   divided by 8 (FS-299: `reproduce` divides by the number of points summed). `MRIcubicSampleVolumeFrame`
   does the same on a frame (no frame check), every point of the 4 x 4 x 4 window summed (those outside
   as 0: FS-300) and the sum times 0.125. Types as the trilinear; another gives `MRIcubicSampleVolume:

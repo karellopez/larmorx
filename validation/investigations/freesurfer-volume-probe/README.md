@@ -16,7 +16,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §69: 14 groups of seeded cases and one of fixed cases (`vrules`; 9,483 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §69: 14 groups of seeded cases and one of fixed cases (`vrules`; 9,489 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | a statement of the spec checked as a model of the probe's printed voxels: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -137,7 +137,8 @@ The candidate, the guard runs, the memory lines and what may differ are as in th
 loop (its README, "The comparison loop"), without its `FS-264` batches: a difference is allowed on a
 line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`) and the candidate did, on a **memory**
 line, and in `--mode fix` on a line where the candidate noted a defect. Every call gets 10 seconds
-(`@10`) but `pca`'s (2: FreeSurfer's eigensystem never returns on some covariances). The groups:
+(`@10`) but `pca`'s (2: FreeSurfer's eigensystem never returns on some covariances) and the two
+`ltaread` calls of FS-307 (3: FreeSurfer never returns). The groups:
 `vgblock` (§2-3: 60 writes; 500 reads of generated blocks: well-formed, with lines missing,
 repeated, reordered or blank, lines of white space or other keys, first words of 63 to 200 bytes,
 odd second words, numbers in glibc's other forms, lines longer than 1,039 bytes, NUL bytes, CRLF
@@ -171,3 +172,9 @@ cached matrices as allocated, recomputed or dropped.
   without it, the other groups' hashes unchanged, the probe as its own candidate identical in both
   modes (log `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`); `models.py fs291`: 127 lines as
   the model, none different, 50 memory or crash.
+- Relay 7, part 4: the prebuilt probe rebuilt from commit `420314bb` (part 4's commands; its build
+  in `BUILD_INFO.txt`, the same bytes twice): every earlier group's hash unchanged; part 4's groups
+  `vsample`, `vmove`, `vskull`, `vltaread` (1,309 calls) the same through the cache cold, warm and
+  without it; the probe as its own candidate: no unexplained difference in either mode;
+  `models.py skull`: 160 of 160 lines as the model (log
+  `oracles/logs/fs-volume-probe-r7-final-2026-11-17.log`).

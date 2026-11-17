@@ -12,6 +12,11 @@ nothing else).
         model's. Lines where FreeSurfer crashed or read memory it does not own (§69's memory lines),
         and those whose walk leaves a volume's rows (FS-290), are counted apart.
 
+    python -P models.py skull --probe P --scratch DIR
+        every line of the group vskull against §20's walks (and §15's centre of mass), from the
+        inputs as compare.py makes them: the printed box, or the end of the program, and the
+        messages on standard output.
+
 The probe runs through the oracle-output cache (one thread, the family ``freesurfer``) when the
 validation package is importable (``PYTHONPATH=validation/src``), else directly. Exit status 1 when a
 line differs from its model.
@@ -90,7 +95,7 @@ def make(params: tuple, tab: list[int]) -> Vol:
 def recording_gen() -> tuple[object, dict[str, tuple]]:
     """A compare.py generator whose working volumes are recorded with their shape and fill."""
     seen: dict[str, tuple] = {}
-    gen = C.Gen(7)
+    gen = C.Gen4b(7)
     orig = gen.wvol
 
     def wvol(r, shape=None, special=0.05, ct=0.1, **kw):
@@ -216,11 +221,164 @@ def fs291(runner, scratch: Path) -> int:
     return 1 if bad else 0
 
 
+def nint(x: float) -> int:
+    """FreeSurfer's rounding (half away from zero) of a finite double."""
+    return int(x + 0.5) if x >= 0 else int(x - 0.5)
+
+
+def skull_volume(params: tuple, boxes: list[tuple], tab: list[int]) -> tuple[list[float], tuple]:
+    """The volume's frame 0 as floats after the painted boxes (§5's writes)."""
+    v = make(params, tab)
+    w, h, d, t = v.w, v.h, v.d, v.t
+    n = w * h * d
+    if t == 0:
+        vals = [float(b) for b in v.buf[:n]]
+    elif t == 4:
+        vals = [float(x) for x in struct.unpack(f"<{n}h", bytes(v.buf[: 2 * n]))]
+    else:
+        with np.errstate(invalid="ignore"):  # a signalling NaN of the fill, quieted
+            vals = list(np.frombuffer(bytes(v.buf[: 4 * n]), dtype="<f4").astype(np.float64))
+    for x0, y0, z0, x1, y1, z1, val in boxes:
+        if t == 3:
+            stored = val
+        else:
+            lo, hi = (0.0, 255.0) if t == 0 else (-32768.0, 32767.0)
+            c = val
+            if c < lo:
+                c = lo
+            if c > hi:
+                c = hi
+            k = -(2**31) if c != c else nint(c)  # FS-12 under reproduce
+            k &= 0xFF if t == 0 else 0xFFFF
+            stored = float(k if t == 0 or k < 0x8000 else k - 0x10000)
+        for z in range(z0, z1 + 1):
+            for y in range(y0, y1 + 1):
+                for x in range(x0, x1 + 1):
+                    vals[x + y * w + z * w * h] = stored
+    return vals, (w, h, d)
+
+
+def skull_model(vals: list[float], dims: tuple, thresh: int) -> tuple[str, list[str]]:
+    """§20's walks (and §15's centre of mass): the printed box, or EXIT 252, and the messages."""
+    w, h, d = dims
+    tb = thresh & 0xFF
+    wt = mx = my = mz = 0.0
+    for z in range(d):
+        for y in range(h):
+            for x in range(w):
+                v = vals[x + y * w + z * w * h]
+                if v > tb:
+                    wt += v
+                    mx += float(np.float32(x)) * v
+                    my += float(np.float32(y)) * v
+                    mz += float(np.float32(z)) * v
+    cx, cy, cz = (mx / wt, my / wt, mz / wt) if wt > 0 else (0.0, 0.0, 0.0)
+
+    def sample(x: int, y: int, z: int) -> float:
+        if 0 <= x < w and 0 <= y < h and 0 <= z < d:
+            return vals[x + y * w + z * w * h]
+        return 0.0  # outside_val
+
+    def walk(c: int, step: int, end: int, at, left: bool = False, top: bool = False) -> int:
+        n, s, b, longest, e, m = 0, c, 0, 0, c, 0
+        p = c
+        while (p >= 0) if step < 0 else (p < end):
+            v = at(p)
+            if v < thresh:
+                if top and b > m:
+                    m = b
+                if n == 0:
+                    s = p
+                n += 1
+                b = 0
+            else:
+                b += 1
+                if b > 30:
+                    longest = 0
+                if (n > longest) if left else (n >= longest):
+                    longest, e = n, s
+                    m = 0
+                n = 0
+            p += step
+        if n > longest or (top and n > longest // 2 and m > 15):
+            longest, e = n, s
+        if longest < 10:
+            e = 0 if step < 0 else end - 1
+        return e
+
+    msgs = []
+    while True:
+        y, z = nint(cy), nint(cz)
+        bx = walk(nint(cx), -1, w, lambda p, y=y, z=z: sample(p, y, z), left=True)
+        right = walk(nint(cx), 1, w, lambda p, y=y, z=z: sample(p, y, z))
+        bdx = right - bx + 1
+        if bdx > 10:
+            break
+        cy -= 10
+        msgs.append(
+            f"left/right detection failed, moving y coord to {nint(cy) + 10} from {nint(cy)}"
+        )
+        if cy < 0:
+            return "EXIT 252", msgs
+    xt, z = max(0, nint(cx) - 20), nint(cz)
+    by = walk(nint(cy), -1, h, lambda p: sample(xt, p, z), top=True)
+    x = nint(cx)
+    bdy = walk(nint(cy), 1, h, lambda p: sample(x, p, z)) - by + 1
+    y = nint(cy)
+    bz = walk(nint(cz), -1, d, lambda p: sample(x, y, p))
+    bdz = walk(nint(cz), 1, d, lambda p: sample(x, y, p)) - bz + 1
+    if bdz < 5:
+        x2 = x - 15
+        bz = walk(nint(cz), -1, d, lambda p: sample(x2, y, p))
+        bdz = walk(nint(cz), 1, d, lambda p: sample(x2, y, p)) - bz + 1
+    return f"0 {bx} {by} {bz} {bdx} {bdy} {bdz}", msgs
+
+
+def skull(runner, scratch: Path) -> int:
+    gen, seen = recording_gen()
+    tab = table()
+    tally: Counter[str] = Counter()
+    bad = 0
+    for b in gen.vskull():
+        path = C.write_batch(scratch, b)
+        plain, memory = runner.probe_runs(b, path)
+        for line, out, mem in zip(b.lines, plain, memory, strict=True):
+            w_s, rest = split(line.partition(" ")[2], seen)
+            params = seen[w_s]
+            tok = rest.split()
+            thresh, n = int(tok[0]), int(tok[1])
+            boxes = []
+            for k in range(n):
+                q = tok[2 + 7 * k : 9 + 7 * k]
+                val = float(np.frombuffer(bytes.fromhex(q[6])[::-1], dtype=np.float32)[0])
+                boxes.append((*map(int, q[:6]), val))
+            vals, dims = skull_volume(params, boxes, tab)
+            res, msgs = skull_model(vals, dims, thresh)
+            text = out.decode("latin-1")
+            got, _, streams = text.rpartition(" | ")
+            so = bytes.fromhex(streams.split(" ")[0][1:]).decode("latin-1")
+            want_so = "".join(m + "\n" for m in msgs)
+            if mem:
+                tally["memory"] += 1
+            elif got.strip() == res and so == want_so:
+                tally["as the model (" + ("exit" if res.startswith("EXIT") else "a box") + ")"] += 1
+            else:
+                bad += 1
+                if bad <= 3:
+                    print(
+                        f"DIFFERS: {line[:100]}\n  probe {got[:80]} | {so[:120]!r}\n  model {res} | {want_so[:120]!r}"
+                    )
+    for k, v in sorted(tally.items()):
+        print(f"skull: {k}: {v}")
+    print(f"skull: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("command", choices=["fs291"])
+    ap.add_argument("command", choices=["fs291", "skull"])
     ap.add_argument("--probe", type=Path, required=True)
     ap.add_argument("--scratch", type=Path, required=True)
     ap.add_argument("--no-cache", action="store_true")
@@ -228,7 +386,7 @@ def main() -> int:
     scratch = a.scratch.resolve()
     scratch.mkdir(parents=True, exist_ok=True)
     runner = C.Runner(a.probe.resolve(), scratch, not a.no_cache)
-    return fs291(runner, scratch)
+    return fs291(runner, scratch) if a.command == "fs291" else skull(runner, scratch)
 
 
 if __name__ == "__main__":

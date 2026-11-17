@@ -602,6 +602,46 @@ impl Mht {
         self.buckets.get(&key(xv, yv, zv)).map(Vec::as_slice)
     }
 
+    /// `MHTacqBucket(mht, x, y, z)`: the bucket of the voxel that holds the point (each `float`
+    /// coordinate's `WORLD_TO_VOXEL`; FS-909 for one that is not an `int`): its key (the bucket's
+    /// identity, for a caller that compares buckets) and its list, or `None` when the voxel has no
+    /// bucket. FS-910: a voxel beyond the table is looked up at the table's edge by default (as a
+    /// face there is stored), nowhere with `reproduce` (FreeSurfer's).
+    pub fn acq_bucket(
+        &self,
+        g: &mut Globals,
+        err: &mut dyn Write,
+        x: f32,
+        y: f32,
+        z: f32,
+    ) -> Result<Option<(u64, &[i32])>, Fatal> {
+        let xv = self.world_to_voxel_f32(g, err, x)?;
+        let yv = self.world_to_voxel_f32(g, err, y)?;
+        let zv = self.world_to_voxel_f32(g, err, z)?;
+        let inside = (0..TABLE_SIZE).contains(&xv)
+            && (0..TABLE_SIZE).contains(&yv)
+            && (0..TABLE_SIZE).contains(&zv);
+        let (xv, yv, zv) = if inside {
+            (xv, yv, zv)
+        } else {
+            g.notices.add(
+                &FS_910,
+                format!(
+                    "the surface hash table: a point at voxel ({xv}, {yv}, {zv}) beyond the table (FreeSurfer looks for nothing there; looked up at the table's edge)"
+                ),
+            );
+            if g.notices.reproduce() {
+                return Ok(None);
+            }
+            (coerce(xv), coerce(yv), coerce(zv))
+        };
+        if !self.has_column(xv, yv) {
+            return Ok(None);
+        }
+        let k = key(xv, yv, zv);
+        Ok(self.buckets.get(&k).map(|b| (k, b.as_slice())))
+    }
+
     /// Whether column `(xv, yv)` (each in `0..TABLE_SIZE`) holds a bucket.
     pub(crate) fn has_column(&self, xv: i32, yv: i32) -> bool {
         let col = (xv * TABLE_SIZE + yv) as usize;

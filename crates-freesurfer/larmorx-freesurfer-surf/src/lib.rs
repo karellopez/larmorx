@@ -88,6 +88,10 @@
 //!   the long-range neighbours sampled with their distances (FS-974..FS-977).
 //! - [`props11`]: a surface moved to Talairach space (FS-629), the vertex-to-voxel conversions, the
 //!   normal-dot and principal-curvature distributions (FS-626..FS-628), Ashburner's triangle energy.
+//! - [`patchread`] (relay 45 of track D): the patch readers `MRISreadPatchNoRemove` and
+//!   `MRISreadPatch` (FS-1006..FS-1010); [`sampled`]: the surface deformation's sampled energies
+//!   with `MRISsampleFaceCoordsCanonical` (FS-1011, FS-1012); [`overlap`]: the ray along a normal
+//!   through the face table's faces and the faces overlapping a face.
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -122,6 +126,8 @@ pub mod mris_mp;
 pub mod mrisurf;
 pub mod names;
 pub mod nbhd;
+pub mod overlap;
+pub mod patchread;
 pub mod positions;
 pub mod project;
 pub mod props;
@@ -137,6 +143,7 @@ pub mod props8;
 pub mod props9;
 pub mod readwrite;
 pub mod sampdist;
+pub mod sampled;
 pub mod scanf;
 pub mod sclust;
 pub mod sfile;

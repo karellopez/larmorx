@@ -884,9 +884,18 @@ an `int` label by truncation toward zero. A NaN or a value outside the `int` ran
   that gives -1), stored as the volume's type stores a value; its messages as above, voxel by voxel.
 - **`MRIlrswapSeg(seg, lh, rh)`**: the labels of each list are the first `rows` numbers of its matrix
   in row order (`rows` its row count: an `n x 1` list, as FreeSurfer's callers pass, gives its n
-  numbers; a `1 x n` list its first number only); a matrix with fewer numbers than rows (0 columns) is
-  read past its end (FS-315, an error here). Different row counts: `ERROR: MRIlrswapSeg(): lh=<rows>
-  != rh=<rows>` on standard output and no volume. Else a new volume like `seg` with its pulse
+  numbers; a `1 x n` list its first number only). Different row counts: `ERROR: MRIlrswapSeg(): lh=<rows>
+  != rh=<rows>` on standard output and no volume. **FS-315:** a list with fewer numbers than rows (0
+  columns and at least one row; under FS-13's `reproduce` also a negative column count) is read past
+  its end, where FreeSurfer reads memory it did not write (**(observed)**: most such lines differ
+  between the probe's four runs). **Default:**
+  after the row counts' check, before any voxel is written, the program ends, code -4 (§6),
+  `MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)`;
+  **reproduce:** the numbers past a list's end are NaN (equal to no label: they swap nothing, and a
+  voxel equal to the other list's number at that place takes the NaN as its new label, FS-311's
+  conversion), the rest as below; FS-315 noted in both modes (**(observed)**: the probe's lines whose
+  four runs agree give `nswaps 0` and every voxel its own label, as the NaNs do). Lists of no rows
+  read nothing (`nswaps 0`). Else a new volume like `seg` with its pulse
   parameters and a copy of its colour table, whose frame 0 holds, for each voxel, the label of the
   first pair (in list order) the voxel's label equals (compared as `float`s, the `lh` side first at
   each pair), swapped (the other side, truncated to an `int` as a label), else the voxel's label; a

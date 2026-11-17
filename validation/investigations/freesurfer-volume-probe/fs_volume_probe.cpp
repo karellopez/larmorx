@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-// A black-box probe of FreeSurfer 8.2.0's volume functions (specs/freesurfer-volume.md, parts 1 to 4:
+// A black-box probe of FreeSurfer 8.2.0's volume functions (specs/freesurfer-volume.md, parts 1 to 5:
 // the volume-geometry text block and its copies, matrices, comparison and printer; the voxel
 // arithmetic; coordinates, orientation, centre of mass, principal components, the running average,
-// the header comparison and dump; the samplers, moves, the head's box and the transform reader), linked against the unit oracle's libutils.a (GCC 8.4.0,
+// the header comparison and dump; the samplers, moves, the head's box and the transform reader; the
+// CMA label tests and segmentation functions), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
 // and the reading and printing of their arguments, results and the structures' fields: no FreeSurfer
 // code. The commands and encodings are in README.md beside this file (the volume, geometry and header
@@ -13,6 +14,7 @@
 //                                  with an alarm; one result line per call on standard output
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -27,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include "cma.h"
 #include "colortab.h"
 #include "diag.h"
 #include "error.h"
@@ -706,6 +709,59 @@ static void putres(const MRI *res, const MRI *a, const MRI *b, const MRI *given)
   putv(res);
   if (given && given != res && given != a && given != b) putv(given);
 }
+// voxels of frame 0 set (MRIsetVoxVal): n, then n times x y z value (a float)
+static void paint(MRI *m)
+{
+  int n = geti();
+  for (int i = 0; i < n; i++) {
+    int x = geti(), y = geti(), z = geti();
+    float v = getf();
+    MRIsetVoxVal(m, x, y, z, 0, v);
+  }
+}
+// the label tests of cma.h on one value, as 0/1 in this order (README.md, "cmalab")
+template <typename L> static std::string labtests(L l)
+{
+  const bool t[] = {
+      IS_FUTURE_WMSA(l), IS_LH_LAYER(l), IS_CC(l), IS_RH_LAYER(l), IS_LAYER(l), IS_UNKNOWN(l), IS_BRAIN(l),
+      IS_WM(l), IS_CEREBRAL_WM(l), IS_HYPO(l), IS_WMSA(l), IS_WMH(l), IS_THALAMUS(l), IS_GM(l),
+      IS_VENTRAL_DC(l), IS_CEREBELLAR_WM(l), IS_CEREBELLAR_GM(l), IS_CEREBELLUM(l), IS_CHOROID(l),
+      IS_HIPPO(l), IS_AMYGDALA(l), IS_MTL(l), IS_CORTEX(l), IS_LAT_VENT(l), IS_CSF(l), IS_INF_LAT_VENT(l),
+      IS_VENTRICLE(l), IS_CAUDATE(l), IS_PUTAMEN(l), IS_CLAUSTRUM(l), IS_ACCUMBENS(l), IS_PALLIDUM(l),
+      LABEL_WITH_NO_TOPOLOGY_CONSTRAINT(l), IS_FIMBRIA(l), IS_GRAY_MATTER(l), IS_WHITE_MATTER(l),
+      IS_FLUID(l), IS_LH_CLASS(l), IS_RH_CLASS(l), IS_GRAY_CLASS(l), IS_WHITE_CLASS(l), IS_CSF_CLASS(l),
+      IS_CLASS(l, CSF_CLASS), IS_CLASS(l, GM_CLASS), IS_CLASS(l, WM_CLASS), IS_CLASS(l, OTHER_CLASS)};
+  std::string b;
+  for (bool x : t) b += x ? '1' : '0';
+  return b;
+}
+// the transform file of `ltaread` and `ltareads`: written (unless `nofile`), read, removed
+static void read_transform(const std::string &name, bool have, const std::string &bytes)
+{
+  unlink(name.c_str());
+  if (have) {
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) bad("cannot write the transform file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  LTA *lta = LTAreadEx(name.c_str());
+  puti(errno);
+  putlta(lta);
+  if (have) unlink(name.c_str());
+}
+// the subject folder of `bvc` and `bvr`: subj/stats in the working directory, made or not
+static void subject_folder(bool make)
+{
+  unlink("subj/stats/brainvol.stats");
+  rmdir("subj/stats");
+  rmdir("subj");
+  if (make) {
+    mkdir("subj", 0700);
+    mkdir("subj/stats", 0700);
+  }
+}
 // a region: x y z dx dy dz, or null
 static MRI_REGION *getreg(MRI_REGION *r)
 {
@@ -1095,18 +1151,101 @@ static void call(const std::string &c)
     int avg = geti();  // USE_AVERAGE305: 0 unset, 1 set to "true", 2 set and empty
     if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
     else unsetenv("USE_AVERAGE305");
-    unlink(name.c_str());
-    if (have) {
-      FILE *fp = fopen(name.c_str(), "wb");
-      if (!fp) bad("cannot write the transform file");
-      fwrite(bytes.data(), 1, bytes.size(), fp);
+    read_transform(name, have, bytes);
+  }
+  else if (c == "ltareads") {
+    int n = geti();
+    std::vector<std::string> names, texts;
+    std::vector<bool> haves;
+    for (int i = 0; i < n; i++) {
+      names.push_back(getx());
+      haves.push_back(!take("nofile"));
+      texts.push_back(haves.back() ? getx() : std::string());
+    }
+    int avg = geti();
+    if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+    else unsetenv("USE_AVERAGE305");
+    for (int i = 0; i < n; i++) read_transform(names[i], haves[i], texts[i]);
+  }
+  else if (c == "cmalab") {
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int v = geti();
+      float f = getf();
+      out(labtests(v));
+      out(labtests(f));
+      out(labtests((double)f));
+      puti(IsSubCorticalGray(v));
+      puti(MRIasegContraLatLabel(v));
+    }
+  }
+  else if (c == "cmavol") {
+    MRI *aseg = getw();
+    paint(aseg);
+    MRI *ribbon = getw();
+    paint(ribbon);
+    int hemi = geti();
+    putd(SupraTentorialVolCorrection(aseg, ribbon));
+    putd(CorticalGMVolCorrection(aseg, ribbon, hemi));
+  }
+  else if (c == "lrswap") {
+    MRI *aseg = getw();
+    paint(aseg);
+    putv(MRIlrswapAseg(aseg));
+  }
+  else if (c == "fixrib") {
+    MRI *aseg = getw();
+    paint(aseg);
+    MRI *ribbon = getw();
+    paint(ribbon);
+    MRI *d = getdst(aseg, ribbon);
+    putres(MRIfixAsegWithRibbon(aseg, ribbon, d), aseg, ribbon, d);
+  }
+  else if (c == "lrseg") {
+    MRI *seg = getw();
+    paint(seg);
+    MATRIX *lh = getm();
+    MATRIX *rh = getm();
+    putv(MRIlrswapSeg(seg, lh, rh));
+  }
+  else if (c == "ohe") {
+    MRI *seg = getw();
+    paint(seg);
+    int n = geti();
+    std::vector<int> list;
+    for (int i = 0; i < n; i++) list.push_back(geti());
+    int force1 = geti();
+    putv(MRIoneHotEncode(seg, list, force1));
+  }
+  else if (c == "bvc") {
+    subject_folder(geti() != 0);
+    std::vector<double> stats;
+    for (int i = 0; i < 16; i++) stats.push_back(getd());
+    CacheBrainVolumeStats(stats, "subj", ".");
+    FILE *fp = fopen("subj/stats/brainvol.stats", "rb");
+    if (fp) {
+      fclose(fp);
+      std::string b = slurp("subj/stats/brainvol.stats");
+      out(hexbytes(b.data(), b.size()));
+    }
+    else
+      out("null");
+    subject_folder(false);
+  }
+  else if (c == "bvr") {
+    bool make = geti() != 0;
+    std::string text = getx();
+    subject_folder(make);
+    if (make) {
+      FILE *fp = fopen("subj/stats/brainvol.stats", "wb");
+      if (!fp) bad("cannot write the statistics file");
+      fwrite(text.data(), 1, text.size(), fp);
       fclose(fp);
     }
-    errno = 0;
-    LTA *lta = LTAreadEx(name.c_str());
-    puti(errno);
-    putlta(lta);
-    if (have) unlink(name.c_str());
+    std::vector<double> stats = ReadCachedBrainVolumeStats("subj", ".");
+    puti((long long)stats.size());
+    for (double v : stats) putd(v);
+    subject_folder(false);
   }
   else
     bad("unknown command");

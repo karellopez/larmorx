@@ -17,6 +17,11 @@ nothing else).
         inputs as compare.py makes them: the printed box, or the end of the program, and the
         messages on standard output.
 
+    python -P models.py cma --probe P --scratch DIR
+        every ``cmalab`` line of the group vcma against §23's tables: the label tests (each a set of
+        numbers, ranges or a combination, compared in the value's own type, a NaN equal to nothing),
+        ``IS_CLASS``, ``IsSubCorticalGray`` and ``MRIasegContraLatLabel`` with its message.
+
 The probe runs through the oracle-output cache (one thread, the family ``freesurfer``) when the
 validation package is importable (``PYTHONPATH=validation/src``), else directly. Exit status 1 when a
 line differs from its model.
@@ -374,11 +379,151 @@ def skull(runner, scratch: Path) -> int:
     return 1 if bad else 0
 
 
+# ---- §23's label tables (the spec's text, restated as data) ------------------------------------
+
+#: Each label test of §23 in the probe's order: a set of numbers, a range (lo, hi), or a combination.
+_SETS: dict[str, object] = {
+    "IS_FUTURE_WMSA": {87, 88, 89},
+    "IS_LH_LAYER": (270, 277),
+    "IS_CC": (251, 255),
+    "IS_RH_LAYER": (370, 377),
+    "IS_LAYER": ("or", "IS_LH_LAYER", "IS_RH_LAYER"),
+    "IS_UNKNOWN": {0, 255, 190, 191},
+    "IS_BRAIN": "brain",
+    "IS_WM": ("or", {2, 41, 187, 186, 28, 60}, "IS_CC", "IS_CEREBELLAR_WM"),
+    "IS_CEREBRAL_WM": {2, 41},
+    "IS_HYPO": ("or", {77, 78, 79}, "IS_FUTURE_WMSA"),
+    "IS_WMSA": ("or", "IS_HYPO"),
+    "IS_WMH": ("or", "IS_WM", "IS_HYPO"),
+    "IS_THALAMUS": {10, 49},
+    "IS_GM": {3, 42},
+    "IS_VENTRAL_DC": {28, 60},
+    "IS_CEREBELLAR_WM": {7, 46},
+    "IS_CEREBELLAR_GM": {8, 47},
+    "IS_CEREBELLUM": ("or", "IS_CEREBELLAR_WM", "IS_CEREBELLAR_GM"),
+    "IS_CHOROID": {31, 63},
+    "IS_HIPPO": {17, 53},
+    "IS_AMYGDALA": {18, 54},
+    "IS_MTL": ("or", "IS_HIPPO", "IS_AMYGDALA"),
+    "IS_CORTEX": {3, 42},
+    "IS_LAT_VENT": {4, 43, 44, 5},
+    "IS_CSF": ("or", "IS_LAT_VENT", {24, 122, 14, 15}),
+    "IS_INF_LAT_VENT": {5, 44},
+    "IS_VENTRICLE": ("or", "IS_LAT_VENT", {14, 15}),
+    "IS_CAUDATE": {11, 50},
+    "IS_PUTAMEN": {12, 51},
+    "IS_CLAUSTRUM": {138, 139},
+    "IS_ACCUMBENS": {26, 58},
+    "IS_PALLIDUM": {13, 52},
+    "LABEL_WITH_NO_TOPOLOGY_CONSTRAINT": {82, 81, 78, 79, 31, 63, 77, 98, 129, 122, 118, 120, 80},
+    "IS_FIMBRIA": {553, 503, 212},
+    "IS_GRAY_MATTER": {3, 17, 18, 12, 11, 8, 26, 42, 53, 54, 51, 50, 47, 58},
+    "IS_WHITE_MATTER": {7, 2, 46, 41},
+    "IS_FLUID": {4, 5, 43, 44, 0},
+    "IS_LH_CLASS": {3, 2, 17, 18, 12, 13, 11, 4, 5, 8, 7, 10, 30, 31, 28, 26},
+    "IS_RH_CLASS": {42, 41, 53, 54, 51, 52, 50, 43, 44, 47, 46, 49, 62, 63, 60, 58},
+    "IS_GRAY_CLASS": {3, 42, 11, 50},
+    "IS_WHITE_CLASS": {2, 41},
+    "IS_CSF_CLASS": {4, 43, 24, 122, 14, 15, 72, 555, 505, 215},
+}
+#: IS_CLASS(l, c) for the classes 0, 1, 2 and 7: CSF, gray, white, white
+_CLASSES = ["IS_CSF_CLASS", "IS_GRAY_CLASS", "IS_WHITE_CLASS", "IS_WHITE_CLASS"]
+
+
+def labtest(name: str, x: float) -> bool:
+    """§23's test `name` of the value x (an int, a float or a double: compared as a real number, a
+    NaN equal to nothing and neither smaller nor larger)."""
+    d = _SETS[name]
+    if d == "brain":
+        return (not labtest("IS_UNKNOWN", x) and x < 98) or labtest("IS_CC", x)
+    if isinstance(d, set):
+        return x in d if x == x else False
+    if isinstance(d, tuple) and d and d[0] == "or":
+        return any(
+            labtest(p, x) if isinstance(p, str) else (x == x and x in p) for p in d[1:]
+        )
+    lo, hi = d
+    return lo <= x <= hi
+
+
+def labbits(x: float) -> str:
+    return "".join("1" if labtest(n, x) else "0" for n in [*_SETS, *_CLASSES])
+
+
+#: MRIasegContraLatLabel below 1000: the labels that are their own counterpart, and the pairs
+CONTRA_SELF = {0, 14, 15, 16, 24, 72, 77, 80, 85, 165, 251, 252, 253, 254, 255, 257, 258, 259, 260}
+CONTRA_SELF |= {262, 502, 514, 853, 883, 902, 914}
+CONTRA_PAIRS = [(i, i + 39) for i in range(1, 14)] + [(17, 53), (18, 54), (19, 55), (20, 56)]
+CONTRA_PAIRS += [(i, i + 32) for i in range(25, 40)]
+CONTRA_PAIRS += [(73, 74), (78, 79), (81, 82), (83, 84), (96, 97), (138, 139), (265, 266)]
+CONTRA_PAIRS += [(819, 820), (821, 822), (843, 844), (865, 866), (869, 870)]
+SUBCORT_GRAY = {10, 49, 11, 50, 12, 51, 13, 52, 17, 53, 18, 54, 26, 58, 28, 60, 27, 59}
+
+
+def contra(v: int) -> tuple[int, str]:
+    """§23's MRIasegContraLatLabel: the label and its message on standard output."""
+    if v == 0:
+        return 0, ""
+    if v > 999:
+        for lo, hi, step in (
+            (1000, 1998, 1000), (2000, 2998, -1000), (3000, 3998, 1000), (4000, 4998, -1000),
+            (11100, 11998, 1000), (12100, 12998, -1000), (13100, 13998, 1000), (14100, 14998, -1000),
+        ):  # fmt: skip
+            if lo <= v <= hi:
+                return v + step, ""
+        return {5001: 5002, 5002: 5001}.get(v, -1), ""
+    if v in CONTRA_SELF:
+        return v, ""
+    for a, b in CONTRA_PAIRS:
+        if v in (a, b):
+            return (b if v == a else a), ""
+    return -1, f"MRIasegContraLatLabel() id={v} unrecognized\n"
+
+
+def f32_of(h: str) -> float:
+    return struct.unpack(">f", bytes.fromhex(h))[0]
+
+
+def cma(runner, scratch: Path) -> int:
+    gen = C.Gen5(7)
+    tally: Counter[str] = Counter()
+    bad = 0
+    for b in gen.vcma():
+        lines = [ln for ln in b.lines if ln.startswith("cmalab ")]
+        b2 = C.Batch(b.group, "vcma-cmalab", lines)
+        path = C.write_batch(scratch, b2)
+        plain, memory = runner.probe_runs(b2, path)
+        for line, out, mem in zip(lines, plain, memory, strict=True):
+            tok = line.split()
+            n = int(tok[1])
+            want, msgs = [], ""
+            for k in range(n):
+                v, f = int(tok[2 + 2 * k]), f32_of(tok[3 + 2 * k])
+                c, m = contra(v)
+                want += [labbits(v), labbits(f), labbits(f), str(int(v in SUBCORT_GRAY)), str(c)]
+                msgs += m
+            text = out.decode("latin-1")
+            got, _, streams = text.rpartition(" | ")
+            so = bytes.fromhex(streams.split(" ")[0][1:]).decode("latin-1")
+            if mem:
+                tally["memory"] += 1
+            elif got.split() == want and so == msgs:
+                tally["as the tables"] += 1
+            else:
+                bad += 1
+                if bad <= 3:
+                    print(f"DIFFERS: {line[:100]}\n  probe {got[:200]}\n  model {' '.join(want)[:200]}")
+    for k, v in sorted(tally.items()):
+        print(f"cma: {k}: {v} lines")
+    print(f"cma: differ from the tables: {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("command", choices=["fs291", "skull"])
+    ap.add_argument("command", choices=["fs291", "skull", "cma"])
     ap.add_argument("--probe", type=Path, required=True)
     ap.add_argument("--scratch", type=Path, required=True)
     ap.add_argument("--no-cache", action="store_true")
@@ -386,7 +531,7 @@ def main() -> int:
     scratch = a.scratch.resolve()
     scratch.mkdir(parents=True, exist_ok=True)
     runner = C.Runner(a.probe.resolve(), scratch, not a.no_cache)
-    return fs291(runner, scratch) if a.command == "fs291" else skull(runner, scratch)
+    return {"fs291": fs291, "skull": skull, "cma": cma}[a.command](runner, scratch)
 
 
 if __name__ == "__main__":

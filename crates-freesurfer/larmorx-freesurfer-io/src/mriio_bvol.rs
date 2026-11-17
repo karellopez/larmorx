@@ -38,7 +38,7 @@ use larmorx_freesurfer_core::log::{
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_inverse};
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::{sse, utils};
+use larmorx_freesurfer_core::{pathsep, sse, utils};
 use larmorx_freesurfer_mri::info::mri_limits;
 use larmorx_freesurfer_mri::mri::{
     self, MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, MriFrame,
@@ -125,7 +125,7 @@ pub fn decompose_b_fname(
 ) -> Result<(String, String), i32> {
     fits(g, "decompose_b_fname", fname);
     let mut copy = fname.as_bytes().to_vec();
-    let slash = copy.iter().rposition(|&c| c == b'/');
+    let slash = pathsep::rfind_sep(&copy);
     let dot = copy.iter().rposition(|&c| c == b'.');
     let underscore = copy.iter().rposition(|&c| c == b'_');
     let (dir, start) = match slash {
@@ -1246,7 +1246,7 @@ pub fn bvolume_write(
     let mri: &Mri = converted.as_ref().unwrap_or(vol);
     let stem = write_stem(fname);
     let _ = writeln!(out, "INFO: bvolumeWrite: stem = {stem}");
-    let output_dir = match stem.rfind('/') {
+    let output_dir = match pathsep::rfind_sep_str(&stem) {
         None => String::new(),
         Some(c) => format!("{}/", &stem[..c]),
     };

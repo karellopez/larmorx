@@ -2882,3 +2882,32 @@ the unit oracle's `gcamorph.cpp.o`, `matrix.cpp.o`, `dmatrix.cpp.o` (objdump; `<
 8. **GCAMsampleMorph's NaN point** (FS-933): `boundsCheckf` passes a NaN; `(int)NaN` is `INT_MIN`, `MAX(.., 0)` 0,
    `xp = MIN(width - 1, 1)`: with an extent of 0 or less the node index is -1 or the grid has no nodes (observed:
    `CRASH 11`, a morph of 3 x 0 x -5 nodes and spacing 0 through `TransformApplyType`).
+
+## Part 40: MRIreorder4, mriio_command_line; Windows names; the 3.1 inventory (relay 44 of track A)
+
+Sources: `utils/mriio.cpp` 437-462 (`mriio_command_line`), 11520-11568 (`MRIreorder4`); `mri_convert/mri_convert.cpp`
+280-284 (the call of `mriio_command_line`), 380-383 (`--reorder4`, `get_ints` without a check), 3475-3491 (the call
+and its messages); `include/mri.h` 891, 893 (`MRIgetVoxVal`/`MRIsetVoxVal`, mode `MRI_COMPLEX_REAL` by default).
+Object code: the unit oracle's `mriio.cpp.o` (objdump of `MRIreorder4`).
+
+1. **MRIreorder4's floats**: the voxel is `float MRIgetVoxVal(...)` stored in a `double v` and passed to
+   `MRIsetVoxVal(..., float voxval, ...)`; the official build has no `cvtss2sd`/`cvtsd2ss` in the function (the
+   round trip folded), so the float passes through unchanged, a signalling NaN included. The port passes the `f32`.
+2. **FS-937**: `newdims[n] = olddims[order[n] - 1]` and `dnew[n] = dold[order[n] - 1]` index arrays of four `int` on
+   the stack without a check; `mri_convert --reorder4` takes any integers (`get_ints`). Class a; refused in both modes.
+3. **FS-938**: a repeated value gives a result whose extent along both dimensions is the same source extent, and
+   every source voxel goes to `dnew` (in bounds: `dold[k] < olddims[k]`), so the result is defined: places reached
+   several times keep the last source voxel in the loop's order (columns outermost, frames innermost), the others
+   stay as `MRIallocSequence` cleared them. Rule B (an input that makes no sense, silently an arbitrary volume): an
+   error by default, FreeSurfer's volume with `reproduce`.
+4. **mriio_command_line**: `command_line` (`static char *`, line 190) is written there and read nowhere in
+   FreeSurfer 8.2.0 (grep of `utils/` and the programs); the `malloc` is never freed. Nothing to reproduce.
+5. **Windows names** (fs.core `pathsep`, the port's own): FreeSurfer's name functions split at `/` only; on Windows the
+   port also splits at `\` (Linux and macOS unchanged byte for byte). Kept split at `/` everywhere because they are
+   data, not names of the running machine: a GIFTI array's `Name` metadata (`posix_basename` in fs.surf's gifti.rs);
+   glob patterns (glibc's `glob` takes `\` as an escape: a Windows pattern is written with `/`); the `TZ` file path.
+   The port's environment table also takes a variable's name in any ASCII case as the same variable on Windows (the
+   SSH sessions of the Windows helper name the search path `Path`).
+6. **The 3.1 inventory** (track A's items 3.1-21..30, 3.1-33/34, 3.1-55): every owned function ported or folded;
+   `validation/investigations/freesurfer-inventory/ready.py` lists what each program's own item still has in track A's
+   files (the table: the track's NOTES, relay 44).

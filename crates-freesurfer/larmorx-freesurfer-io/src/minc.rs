@@ -25,7 +25,7 @@ use std::path::Path;
 
 use larmorx_core::cfmt::Streams;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::sse;
+use larmorx_freesurfer_core::{pathsep, sse};
 use larmorx_io::xfm::{Dialect, GeneralTransform, Transform, TransformType};
 
 /// The C streams as `larmorx_core::cfmt`'s [`Streams`].
@@ -384,7 +384,11 @@ pub fn input_transform_file(
 ) -> Option<GeneralTransform> {
     let mut streams = Std { out, err };
     let path: Vec<u8> = match dir {
-        Some(d) if !filename.is_empty() && filename[0] != b'/' && filename[0] != b'~' => {
+        Some(d)
+            if !filename.is_empty()
+                && !pathsep::is_absolute_name(filename)
+                && filename[0] != b'~' =>
+        {
             let mut p = d.to_string_lossy().into_owned().into_bytes();
             if cfg!(windows) && !p.starts_with(b"\\\\?\\") {
                 for c in p.iter_mut().filter(|c| **c == b'\\') {

@@ -13,13 +13,16 @@
 //! hexadecimal or not numbers; names with and without a stem, missing, a folder, `NULL`), `sxw`
 //! (`sv_sxadat_by_stem` or `sv_sxadat` of a header read, into a file or a folder) and `lro`
 //! (`LabelRemoveOverlap` of two labels of vertices and points without one, deleted or not).
+//! Since relay 44 `ro4` (`MRIreorder4` of a source made as `reo`'s, of every voxel type, the
+//! value-less ones now and then; the order every permutation of 1 to 4, now and then with a
+//! value repeated (FS-938) or outside 1 to 4 (FS-937: SKIP)).
 
 use std::io::Write;
 
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_io::label::{Label, LabelVertex, label_remove_overlap};
-use larmorx_freesurfer_io::reorder::mri_reorder;
+use larmorx_freesurfer_io::reorder::{mri_reorder, mri_reorder4};
 use larmorx_freesurfer_io::selxavgio::{self, SxaDat};
 use larmorx_freesurfer_mri::mri::{self, Mri};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
@@ -28,7 +31,7 @@ use super::piece4::{file_entry, setup};
 use super::piece6::print_mri;
 use super::{Gen, Out, Work, dec, enc};
 
-pub const KINDS: [&str; 4] = ["reo", "sxl", "sxw", "lro"];
+pub const KINDS: [&str; 5] = ["reo", "sxl", "sxw", "lro", "ro4"];
 
 fn hx(v: f32) -> String {
     format!("{:08x}", v.to_bits())
@@ -155,6 +158,65 @@ fn gen_reo(g: &mut Gen, t: &mut Vec<String>) {
     }
     t.push(dmode.to_string());
     for v in [dd[0], dd[1], dd[2], dnf, dty] {
+        t.push(v.to_string());
+    }
+}
+
+/// `ro4`'s case: a source as `reo`'s (extents 0 to 4, frames 0 to 3, every voxel type), then the
+/// order's four values.
+fn gen_ro4(g: &mut Gen, t: &mut Vec<String>) {
+    for _ in 0..3 {
+        t.push(if g.chance(25) { 0 } else { g.int(1, 4) }.to_string());
+    }
+    t.push(
+        if g.chance(30) {
+            0
+        } else {
+            g.pick(&[1, 1, 2, 3])
+        }
+        .to_string(),
+    );
+    let ty = if g.chance(15) {
+        g.pick(&[5, 6, 8])
+    } else {
+        g.pick(&[0, 0, 1, 2, 3, 3, 4, 7, 9, 10])
+    };
+    t.push(ty.to_string());
+    for _ in 0..3 {
+        t.push(hx(g.pick(&[1.0f32, 0.5, 2.0, 1.5, 3.0, 0.9375])));
+    }
+    let cos: [f32; 9] = match g.below(4) {
+        0 => [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+        1 => [0.6, 0.8, 0.0, -0.8, 0.6, 0.0, 0.0, 0.0, 1.0],
+        _ => [-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0],
+    };
+    for c in cos {
+        t.push(hx(c));
+    }
+    for _ in 0..3 {
+        t.push(hx(g.int(-40, 40) as f32 / 4.0));
+    }
+    let n = g.int(0, 13) as usize;
+    let mut pat: Vec<u8> = (0..n).map(|_| g.below(256) as u8).collect();
+    if (ty == 3 || ty == 7) && g.chance(3) {
+        // a signalling NaN and 1.0: the NaN's payload must come through
+        pat.extend_from_slice(&[0x01, 0x00, 0xa0, 0x7f, 0x00, 0x00, 0x80, 0x3f]);
+    }
+    t.push(enc(Some(&pat)));
+    let mut order = [1, 2, 3, 4];
+    for i in (1..4).rev() {
+        let j = g.below(i as u64 + 1) as usize;
+        order.swap(i, j);
+    }
+    if g.chance(8) {
+        // a value repeated (FS-938)
+        let k = g.below(4) as usize;
+        order[k] = order[(k + 1 + g.below(3) as usize) % 4];
+    } else if g.chance(15) {
+        // outside 1 to 4 (FS-937)
+        order[g.below(4) as usize] = g.pick(&[0, 5, -1, 2147483647]);
+    }
+    for v in order {
         t.push(v.to_string());
     }
 }
@@ -334,6 +396,7 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
         "reo" => gen_reo(g, &mut t),
         "sxl" => gen_sxl(g, &mut t),
         "sxw" => gen_sxw(g, &mut t),
+        "ro4" => gen_ro4(g, &mut t),
         _ => gen_lro(g, &mut t),
     }
     t
@@ -511,6 +574,41 @@ pub fn run(
             if let Some(d) = dst.as_ref() {
                 print_mri(o, w, Some(d));
             }
+            o.i(i64::from(g.errno));
+        }
+        "ro4" => {
+            let p: Vec<i32> = tk[1..6].iter().map(|s| s.parse().unwrap()).collect();
+            let geo: Vec<f32> = tk[6..21].iter().map(|s| f32_of(s)).collect();
+            let pat = dec(tk[21]).unwrap_or_default();
+            let ord: Vec<i32> = tk[22..26].iter().map(|s| s.parse().unwrap()).collect();
+            let mut src = mri::mri_alloc_sequence(g, out, err, p[0], p[1], p[2], p[4], p[3])
+                .map_err(fatal)?;
+            {
+                let v = &mut src.vg;
+                (v.xsize, v.ysize, v.zsize) = (geo[0], geo[1], geo[2]);
+                (v.x_r, v.x_a, v.x_s) = (geo[3], geo[4], geo[5]);
+                (v.y_r, v.y_a, v.y_s) = (geo[6], geo[7], geo[8]);
+                (v.z_r, v.z_a, v.z_s) = (geo[9], geo[10], geo[11]);
+                (v.c_r, v.c_a, v.c_s) = (geo[12], geo[13], geo[14]);
+                v.ras_good_flag = 1;
+            }
+            reinit_cache(g, out, err, &mut src.vg).map_err(fatal)?;
+            if let Some(c) = src.chunk.as_mut()
+                && !pat.is_empty()
+            {
+                let n = (src.bytes_total as usize).min(c.len());
+                for (i, b) in c[..n].iter_mut().enumerate() {
+                    *b = pat[i % pat.len()];
+                }
+            }
+            g.errno = 0;
+            let r = mri_reorder4(g, out, err, &src, [ord[0], ord[1], ord[2], ord[3]]);
+            if has(g, "FS-937") || has(g, "FS-58") {
+                // FreeSurfer reads stack memory or crashes
+                extra.push("SKIP");
+            }
+            let r = r.map_err(fatal)?;
+            print_mri(o, w, r.as_ref());
             o.i(i64::from(g.errno));
         }
         "sxl" => {

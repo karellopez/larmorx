@@ -411,6 +411,10 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   for FS-877, FS-925, FS-49 and the clock's random weights printed by the check (FS-04 under `reproduce`). Seeds 7, 13
   and 21 (about 790 piece-33 cases each, `subset.py ... aed,aeh`): `reproduce` identical on every compared case (423,
   435, 442), 0 different; `fix` differs only with notices.
+- Piece 30 since relay 44: `ro4` (`MRIreorder4` of a source made as `reo`'s, every voxel type, the value-less ones
+  now and then; the order every permutation of 1 to 4, now and then a value repeated (FS-938) or outside 1 to 4
+  (FS-937: `SKIP`)). `fsio` REBUILT. Seeds 7 and 13 (`subset.py ... ro4,reo`): `reproduce` identical on every compared
+  case (362 and 370 `ro4`), 0 different; `fix` differs only with notices.
 - `reorder_triples.py` (relay 37): dimension numbers that pass `MRIreorder`'s check only through 32-bit overflow
   (FS-843; `python3 -P reorder_triples.py [count]`); official `mri_convert -r <a> <b> <c>` with them ends with a
   segmentation fault (status 139).

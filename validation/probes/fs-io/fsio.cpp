@@ -1946,6 +1946,7 @@ void run_piece6(const std::string &cmd0)
   // piece 27 (track A relay 35): gcd and gch (GCA atlases, .gca and .gcz) as mrd and mrh do
   // piece 28 (track A relay 36): mrr and mrx (MRIread, MRIreadEx) below; piece 29: cnf, acl
   // piece 30 (track A relay 37): reo (MRIreorder), sxl and sxw (selxavgio), lro (LabelRemoveOverlap)
+  // and since relay 44 ro4 (MRIreorder4)
   // piece 31 (track A relay 38): m3d and m3h (GCA morphs, .m3z and .m3d, and MGH warps named @m3z)
   // as mrd and mrh do, after MRIread's licence check's variables (Warpfield::read calls MRIread)
   // piece 33 (track A relay 41): aed and aeh (stacked autoencoders, .sae, .ae, .csae) as mrd and mrh do
@@ -2101,6 +2102,23 @@ void run_piece6(const std::string &cmd0)
     MRI *r = MRIreorder(src, dst, xd, yd, zd);
     print_mri6(r);
     if (dst) print_mri6(dst);
+    oi(errno);
+  } else if (cmd == "ro4") {
+    // piece 30 (track A relay 44): MRIreorder4 of a volume made here as reo's source, the order's
+    // four values given, then the result printed
+    int w = (int)geti(), h = (int)geti(), d = (int)geti(), nf = (int)geti(), type = (int)geti();
+    float geo[15];
+    for (float &x : geo) x = getf();
+    bool vn;
+    std::string pat = getstr(&vn);
+    int order[4];
+    for (int &o : order) o = (int)geti();
+    MRI *src = MRIallocSequence(w, h, d, type, nf);
+    geo30(src, geo);
+    fill30(src, pat);
+    errno = 0;
+    MRI *r = MRIreorder4(src, order);
+    print_mri6(r);
     oi(errno);
   } else if (cmd == "sxl") {
     // piece 30: is_sxa_volume, then ld_sxadat_from_stem (or ld_sxadat of the name) and
@@ -3299,7 +3317,7 @@ int main(int argc, char *argv[])
                                  "vrd", "vrh", "vwr", "xrd", "xrh", "grd", "grh", "gfd", "gfh",
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
-                                 "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h",
+                                 "mrr", "mrx", "cnf", "acl", "reo", "ro4", "sxl", "sxw", "lro", "m3d", "m3h",
                                  "m3w", "trs", "gcw", "aed", "aeh", "mgf"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)

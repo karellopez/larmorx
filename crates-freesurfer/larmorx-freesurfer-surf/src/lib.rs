@@ -123,6 +123,7 @@ pub mod mrisurf;
 pub mod names;
 pub mod nbhd;
 pub mod positions;
+pub mod project;
 pub mod props;
 pub mod props10;
 pub mod props11;

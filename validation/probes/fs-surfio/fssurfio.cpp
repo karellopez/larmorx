@@ -63,6 +63,7 @@
 #include "mrishash.h"
 #include "mrishash_internals.h"
 #include "mrisurf_vals.h"
+#include "mrisurf_project.h"
 #include "annotation.h"
 
 // sclustReMap0 is defined in surfcluster.cpp but not declared in its header (relay 38)
@@ -6906,6 +6907,81 @@ void mcl_case()
   }
 }
 
+// prj: mrisurf_project.cpp (project.rs, relay 43 of track D): a surface read by MRISread (d/lh.s0),
+// its status, radius, rips and Gdiag from the case; then 1 to 4 projections; after each the surface
+static void prj_dump(MRIS *s, bool curv)
+{
+  oi(s->status); od(s->radius);
+  of(s->a); of(s->b); of(s->c); of(s->xctr); of(s->yctr); of(s->zctr);
+  of(s->total_area); of(s->neg_area); of(s->neg_orig_area);
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->x); of(x->y); of(x->z); of(x->cx); of(x->cy); of(x->cz);
+    oi(x->fno);
+    if (curv) { of(x->area); of(x->nx); of(x->ny); of(x->nz); of(x->H); of(x->K); }
+  }
+  for (int f = 0; f < s->nfaces; f++) of(s->faces[f].area);
+}
+
+void prj_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  s->status = (MRIS_Status)geti();
+  s->radius = getd();
+  int nrip = geti();
+  for (int k = 0; k < nrip; k++) s->vertices[geti()].ripflag = 1;
+  Gdiag = (unsigned long)(unsigned int)geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    errno = 0;
+    bool curv = false;
+    if (op == "spx") {
+      float x = getf(), y = getf(), z = getf(), a = 0, b = 0, c = 0;
+      mrisSphericalProjectXYZ(x, y, z, &a, &b, &c);
+      of(a); of(b); of(c);
+      continue;
+    } else if (op == "sp") mrisSphericalProjection(s);
+    else if (op == "pos") { double r = getd(); oi(MRISprojectOntoSphere(s, r) == s ? 0 : 1); }
+    else if (op == "pos2") {
+      int same = geti();
+      double r = getd();
+      MRIS *o2 = same ? s : MRISread("d/lh.s0");
+      oi(MRISprojectOntoSphere(s, o2, r) == s ? 0 : 1);
+    } else if (op == "af") {
+      int which = geti();
+      float res = getf();
+      MRIS_HASH_TABLE *mht = MHTcreateFaceTable_Resolution(s, which, res);
+      mrisAssignFaces(s, mht, which);
+      MHTfree(&mht);
+    } else if (op == "cyl") { oi(MRISprojectOntoCylinder(s, getf())); curv = true; }
+    else if (op == "ell" || op == "rad") {
+      float a = getf(), b = getf(), c = getf();
+      int isnew = geti();
+      MRIS *r = op == "ell" ? MRISprojectOntoEllipsoid(s, isnew ? NULL : s, a, b, c)
+                            : MRISradialProjectOntoEllipsoid(s, isnew ? NULL : s, a, b, c);
+      if (isnew) { out += "NEW "; prj_dump(r, false); MRISfree(&r); }
+    } else fail("prj op");
+    prj_dump(s, curv);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -7178,6 +7254,8 @@ void run_case()
     sbl_case();
   } else if (cmd == "mcl") {
     mcl_case();
+  } else if (cmd == "prj") {
+    prj_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

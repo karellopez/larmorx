@@ -2,16 +2,16 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (1,860 cases, thirty of each of
-//! the 62 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1860` on Linux x64 from the unit
-//! oracle's build (2026-11-17, relay 43 of track D, from the clean commit 7878f84c: 1,808 lines
-//! identical, 52 counted, not compared, where
+//! official build's output lines for the probe's cases of seed 1 (1,890 cases, thirty of each of
+//! the 63 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1890` on Linux x64 from the unit
+//! oracle's build (2026-11-17, relay 43 of track D, from the clean commit 156af4c5: 1,842 lines
+//! identical, 48 counted, not compared, where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
 //! `SKIP`), against the port's output with `reproduce` (a case the port marks
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
 //! `stl`, `tri`, `fnam`, `swr`, `srd`, `mpb`, `mpc`, `mpd`, `mpe`, `gii`, `gwr`, `mpf`, `mpg`,
-//! `fli`, `bvl`, `crv`, `pvw`, `vps`, `ann`, `mpx`, `lbl`, `wvl`, `scl`, `vcp`, `mht`, `vls`, `vlr`, `top`, `sbl` and `mcl` cases run in a
+//! `fli`, `bvl`, `crv`, `pvw`, `vps`, `ann`, `mpx`, `lbl`, `wvl`, `scl`, `vcp`, `mht`, `vls`, `vlr`, `top`, `sbl`, `mcl` and `prj` cases run in a
 //! temporary folder of their own.
 //!
 //! When the hash differs, the assertion names the first case whose output differs from the
@@ -37,7 +37,7 @@ const SKIP: [&str; 57] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "8f9b61d672ce58a1691f0228d8e4856b2d12dc63532a3d49665b2774952cb3fe";
+const OFFICIAL_SHA256: &str = "bccac3b9bd17095f6326a4ae57e8e22ce1e35270efe93e6e2b0fd4a4877acd04";
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_surfio/official_digests.txt");
@@ -52,7 +52,7 @@ fn d48(b: &[u8]) -> String {
 /// Each case of seed 1: its line, the bytes hashed for it (`SKIP\n` or its output and a
 /// newline), its output and its notices.
 fn outputs() -> Vec<(String, Vec<u8>, String, Vec<&'static str>)> {
-    cases::generate(1, 1860)
+    cases::generate(1, 1890)
         .into_iter()
         .map(|line| {
             let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);

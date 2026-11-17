@@ -305,14 +305,18 @@ The second volume is walked with the first's extent and frames.
   type and those frames with its header. Types differ: `va - vb` read and written. One type: direct,
   `(float) va - (float) vb`, stored as `nint` in an integer destination's bits (wrapping: a
   `uchar` destination stores `-1` as 255) or as the float; a source type without direct access
-  (`RGB`, complex) leaves the previous difference (0 at first); a destination of such a type is not
-  written.
-- `MRIadd(a, b, dst)`: as `MRIsubtract`, and: when `a` is `uchar` or the types differ, `va + vb` read,
-  clipped to [0, 255] for a `uchar` destination, written; otherwise direct, the sum in the source
-  type's C arithmetic (`short`, `ushort` as `int`; `int` wrapping in 32 bits, except into a `long`
-  destination, where it is a 64-bit sum; `long` wrapping in 64 bits; `float` in float), then stored:
-  into an integer destination its low bits (a `float` sum `nint`-ed first), into a `float`
-  destination the first value as float plus the second converted to float.
+  (only `uchar`, `short`, `ushort`, `int`, `long` and `float` have it: `RGB`, tensor and complex do
+  not) leaves the previous difference (0 at first), which is written; a destination of such a type
+  is not written (**(observed)**: `vrules`).
+- `MRIadd(a, b, dst)`: frames and a new destination as `MRIsubtract`; when `a` is `uchar` or the
+  types differ, `va + vb` read, clipped to [0, 255] for a `uchar` destination, written; otherwise
+  direct, the sum in the source type's C arithmetic (`short`, `ushort` as `int`; `int` wrapping in
+  32 bits, except into a `long` destination, where it is a 64-bit sum; `long` wrapping in 64 bits;
+  `float` in float), then stored: into an integer destination its low bits (a `float` sum `nint`-ed
+  first), into a `float` destination the first value as float plus the second converted to float.
+  Unlike `MRIsubtract`, when the sources' type or the destination's has no direct access (`RGB`,
+  tensor, complex), the destination is not written at all (**(observed)**: `vtwo`, 1 line;
+  `vrules`).
 - `MRIdivide(a, b, dst)`: without `dst` a one-frame `float` volume of `a`'s extent with `a`'s header.
   Unless all three are `uchar`: frame 0, `va / vb` in double (0 when `|vb| < FLT_EPSILON`), written.
   All `uchar` (direct, frame 0): the integer quotient; where `vb` is 0: 0 when `va` is 0, else 255.

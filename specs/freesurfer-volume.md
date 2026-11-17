@@ -314,9 +314,10 @@ The second volume is walked with the first's extent and frames.
   32 bits, except into a `long` destination, where it is a 64-bit sum; `long` wrapping in 64 bits;
   `float` in float), then stored: into an integer destination its low bits (a `float` sum `nint`-ed
   first), into a `float` destination the first value as float plus the second converted to float.
-  Unlike `MRIsubtract`, when the sources' type or the destination's has no direct access (`RGB`,
-  tensor, complex), the destination is not written at all (**(observed)**: `vtwo`, 1 line;
-  `vrules`).
+  Unlike `MRIsubtract`, in this direct case (one source type, not `uchar`) a source type or a
+  destination type without direct access (`RGB`, tensor, complex) leaves the destination not
+  written at all (**(observed)**: `vtwo`, 1 line; `vrules`); the read-and-write case writes an
+  `RGB` destination as §5 writes it.
 - `MRIdivide(a, b, dst)`: without `dst` a one-frame `float` volume of `a`'s extent with `a`'s header.
   Unless all three are `uchar`: frame 0, `va / vb` in double (0 when `|vb| < FLT_EPSILON`), written.
   All `uchar` (direct, frame 0): the integer quotient; where `vb` is 0: 0 when `va` is 0, else 255.

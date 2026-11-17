@@ -4,7 +4,9 @@
 //! A vertex field from a volume of one voxel per vertex and back: `MRIScopyMRI`
 //! (`utils/mrisurf_mri.cpp` 4898; wave 3.4's fs.surf piece taken early in relay 36 of track D, for
 //! `MRISread`'s group-average area) and `MRIcopyMRIS` (5084; relay 37, for `MRISwriteValues`'
-//! volume formats).
+//! volume formats); `MRIScomputeDistanceToSurface` (7172; queue item 3.4-02, taken early in relay
+//! 44: mri_relabel_hypointensities', mri_ca_label's, mri_normalize's and mri_aparc2aseg's signed
+//! distance to a surface).
 
 use larmorx_freesurfer_core::cstd::double_to_int_x86;
 use larmorx_freesurfer_core::globals::Globals;
@@ -13,7 +15,16 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc_sequence};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
+use larmorx_freesurfer_core::sse::div;
+use larmorx_freesurfer_core::utils::nint;
+use larmorx_freesurfer_filter::fastmarch::{DTRANS_MODE_SIGNED, mri_distance_transform};
+use larmorx_freesurfer_mri::copy::mri_copy;
+use larmorx_freesurfer_volume::arith::mri_clone;
+use larmorx_freesurfer_volume::resize::mri_extract_region_and_pad;
+
+use crate::aaa::SurfGlobals;
 use crate::coords::Io;
+use crate::mriflood::mris_fill_interior;
 use crate::mris::{Mris, Vertex};
 
 /// C's conversion of a `float` to an integer field (`cvttss2si`, then the field's low bits).
@@ -248,4 +259,51 @@ pub fn copy_mris(
         Some(m) => Ret::New(m),
         None => Ret::Given,
     })
+}
+
+/// `PAD`: the margin of the interior's volume (voxels) and the distances' limit (mm).
+const PAD: i32 = 10;
+
+/// `MRIScomputeDistanceToSurface(mris, mri_dist, resolution)`: the surface's interior
+/// (`MRISfillInterior` at `resolution`) into a clone of `mri_dist` (its extent and header, voxels
+/// zero) or, without one, into a volume of the surface's bounding box; without `mri_dist` that
+/// volume cut to its whole extent with `PAD` (10) voxels of margin (`MRIextractRegionAndPad`, its
+/// messages), else copied (`MRIcopy`); then the signed distance to the interior's edge
+/// (`MRIdistanceTransform` of label 1, negative inside, up to `nint(10 / xsize)` voxels: the
+/// quotient in `float`) into `mri_dist` or a new volume of the mask's header.
+pub fn compute_distance_to_surface(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    mris: &mut Mris,
+    mri_dist: Option<&mut Mri>,
+    resolution: f32,
+) -> Result<Ret<Mri>, Fatal> {
+    let res = f64::from(resolution);
+    let (mask, mri_dist) = match mri_dist {
+        Some(d) => {
+            let mut tmp = mri_clone(g, io.out, io.err, d, None)?.unwrap_new();
+            mris_fill_interior(g, sg, io, mris, res, Some(&mut tmp))?;
+            let mask = mri_copy(g, io.out, io.err, &tmp, None)?.unwrap_new();
+            (mask, Some(d))
+        }
+        None => {
+            let mut tmp = mris_fill_interior(g, sg, io, mris, res, None)?.unwrap_new();
+            let mask = mri_extract_region_and_pad(g, io.out, io.err, &mut tmp, None, PAD)?;
+            (mask, None)
+        }
+    };
+    let max_dist = nint(g, f64::from(div(PAD as f32, mask.vg.xsize))) as f32;
+    mri_distance_transform(
+        g,
+        io.out,
+        io.err,
+        io.env,
+        &mask,
+        mri_dist,
+        1,
+        max_dist,
+        DTRANS_MODE_SIGNED,
+        None,
+    )
 }

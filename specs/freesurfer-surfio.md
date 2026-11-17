@@ -5903,3 +5903,137 @@ alarm: face tables of faces made huge by an axis of 0). On the recorded heads
 orthographic ellipsoids of `?h.sphere`, the spherical projection, `mrisAssignFaces` on the sphere's
 canonical table, the cylinder of 60 mm): 6 of 6 identical in both modes (observed). A clean-room implementer's black-box forms:
 `mris_fix_topology` (its sphere), `mris_sphere` and `mris_register` (the projections between steps).
+
+## 154. The projection back onto a surface's kind, the flattening of a patch, the removal of self-intersections (fs.deform's `mrisurf_deform.cpp`, taken early) and the signed distance to a surface (fs.surf's `mrisurf_mri.cpp`; relay 44 of track D)
+
+`FZERO(x)` is `|x| < FLT_EPSILON` (1.1920929e-7), in the type of `x`. A NaN produced from two NaN
+operands carries the first operand's sign and payload (quieted); the orders below are the ones that
+decide it. Status numbers: surface 0, patch 1, plane 2, ellipsoid 3, sphere 4, parameterized sphere 5,
+rigid body 6, spherical patch 7, unoriented sphere 8, pial 9.
+
+**154.1 The rotation** (`transform(&x, &y, &z, nx, ny, nz, d)`, all `float`): `z' = (nx x + ny y) + nz
+z`, `y' = ((-ny) / d) x + (nx / d) y`, `x' = c1 x + c2 y - d z` with `c1 = (nx nz) / d`, `c2 = (ny nz) /
+d` (each quotient formed as written, then multiplied). For a vertex's position the sum is formed as
+`((y c2) + (x c1)) - (z d)` (each product with the coordinate first), for its normal as `((c1 x) + (c2
+y)) - (z d)`; `y'` and `z'` as written, the coefficient first.
+
+**154.2 `MRISflattenPatch(surf)`** (`mris_flatten`; `mrisProjectSurface` of a plane): a surface whose
+status is already a plane has each unripped vertex's `z` set to 0 and nothing else; returns 0.
+Otherwise: the vertex normals and areas (§40); over the unripped vertices, in `float` and in vertex
+order, the sums of `x`, `y`, `z` and of the normals' `nx`, `ny`, `nz`, and their count `an`; the mean
+position `(x, y, z) / an` (each sum divided by `(float) an`; 0/0 when every vertex is ripped). With
+`DIAG_SHOW` and verbose diagnostics: `flatten: avg p = {%2.1f, %2.1f, %2.1f}` (the mean) and `flatten:
+sum n = {%2.2f, %2.2f, %2.2f}` (the sums) on standard output. Then `d0 = sqrt((nx² + ny²) + nz²)` in
+`float` and `n = (nx, ny, nz) / d0`; `d = sqrt(nx² + ny²)` of the unit normal, in `float`. When `d` is
+not `FZERO` (a NaN `d` is not): with the diagnostics `flatten: norm n = {%2.2f, %2.2f, %2.2f}`; each
+unripped vertex in order: its position minus the mean (stored), `d1 = sqrt((x² + y²) + z²)`, the
+position rotated by 154.1, `d2 = sqrt(z'² + (x'² + y'²))`, its normal rotated by 154.1; when `|d1 -
+d2|` (in `float`) exceeds 0.0001, `flatten: d1=%f, d2=%f` on standard output. With the diagnostics after
+the loop: `flatten: transformed n = {%2.1f, %2.1f, %2.1f}`, the unit normal rotated (its `z'` formed as
+`nz² + (nx² + ny²)`, its `y'` as `(nx / d) ny + ((-ny) / d) nx`, its `x'` as `(c1 nx + ny c2) - nz d`).
+When `d` is `FZERO` nothing is centred or rotated. Then every vertex's `z` (ripped ones too) set to 0,
+with `DIAG_SHOW` the diagnostic vertex `Gdiag_no` reported as `vertex %d flattened @ (%2.2f, %2.2f,
+%2.2f)`; the status a plane (2); the metric properties (§38). With `DIAG_SHOW` and `Gdiag_no >= 0`, the
+report of 154.8 (FS-1002, FS-1003, FS-1005). Returns 0. FS-1004: when the unripped vertices' normals
+sum to exactly zero (`d0 = 0`), FreeSurfer's `n` is NaN and every unripped position becomes NaN; by
+default such a patch is treated as one already facing z (no centring, no rotation), noted; `reproduce`
+gives FreeSurfer's NaNs.
+
+**154.3 `mrisProjectSurface(surf)`** (the deformation steps' projection back onto the surface's kind):
+by status: a plane, 154.2; a spherical patch, §152.1's spherical projection; a sphere or a
+parameterized sphere, §152.2 with the surface's radius; an ellipsoid, §152.5 into the surface itself
+with the axes 0 (the default 122 mm); the pial status, 154.4 with the pial positions; any other status
+(a rigid body included, and numbers outside 0 to 9) nothing. Returns 0.
+
+**154.4 The pial projection** (`mrisProjectOntoSurface(surf, PIAL_VERTICES)`): each unripped vertex
+in order, through the face table the surface carries: the closest face within 8 mm and 8 shells that
+the vertex projects into (148.4, `project_into_face` 1; the probe point the current position widened
+to `double`). When there is none, or its distance exceeds 0.5 (a NaN distance does not), the closest
+face within 1,000 mm with no limit on the shells and no projection test (148.4, -1, -1); the vertex's
+barycentric coordinates in it at the pial positions (§96's barycentric coordinates, surface form); negative ones set
+to 0; `norm = sqrt((l0² + l1²) + l2²)` in `double`; when `norm` is `FZERO`, `l0 = 1`, else `l0 = l0 /
+norm`, `l1 = l1 / norm`; `l2 = 1 - (l1 + l0)`; when `l2 < 0`: `l2 = 0`, `l1 = 1 - l0`, and when that is
+negative too `(l0, l1) = (1, 0)`; the new position `Σ l_n p_n` over the face's corners at the pial
+positions, in `double` from 0, in corner order, each term formed `x_n l_n`, `y_n l_n`, `l_n z_n`. With
+`Gdiag_no` at the vertex: `v %d:  lambda = (%2.2f %2.2f %2.2f)`. Otherwise (a face found within 0.5)
+the position projected onto that face's plane at the pial positions (§96's projection onto a triangle's plane;
+the corners widened to `double`). With `Gdiag_no` at the vertex: `v %d: (%2.2f %2.2f %2.2f) projected to
+(%2.2f %2.2f %2.2f), delta = (%2.2f %2.2f %2.2f)` (the old position, the new one in `double`, the old
+minus the new in `double`). The new position rounded to `float`. FS-1001: a surface without a face
+table (with an unripped vertex), or a vertex with no face within 1,000 mm, crashes FreeSurfer's program
+(status 139, `reproduce`); by default the program ends with `mrisProjectOntoSurface: the surface has no
+face table (FreeSurfer reads through a null pointer)` or `mrisProjectOntoSurface: vertex <n> has no face
+within 1000 mm (FreeSurfer reads through a null pointer)` as an error (`ERROR_BADPARM`), noted. A table
+of vertices (148's FS-998) answering a number beyond the surface's faces: FS-576, an error in both
+modes.
+
+**154.5 The `MRIS_MP` projection** (`mrisProjectSurface` of the metric-property copy, and its
+`canDo`): the projection never returns: a sphere ends with §152.2's `MRIS_MP` assertion
+(`mrisurf_project.cpp:158 false`), every other status with `ASSERTION FAILED:
+<build>/utils/mrisurf_deform.cpp:328 false` (FS-03). Whether it can take a status: a sphere only; for
+any other status, the first time in the program for that status (one bit per status number modulo 32),
+`debug: need to process surface status <n>` on standard error when verbose diagnostics are on. No
+FreeSurfer 8.2.0 program takes this path.
+
+**154.6 `MRISremoveIntersections(surf, FillHoles)`** (`mris_fix_topology`, `mris_remove_intersection`,
+`mris_place_surface`, `mris_remesh`, `mris_topo_fixer`): the intersecting faces' vertices marked
+(§136.5 with `FillHoles`); none: returns 0 at once, silent. Otherwise `removing intersecting faces`;
+`old = min = nvertices`; the positions saved (`TMP2_VERTICES`, §25); the marks cleared and counted
+again (§136.5); `nbrs = 0`, `no_progress = 0`, the step `n = 0`. While the count `num > 0`: if `num >
+old` or (`num == old` and `no_progress >= nbrs`): `no_progress` + 1, `step %d with no progress
+(num=%d, old_num=%d)`, and (`nbrs` is always 0 here, below 5) the search ends when `no_progress > 15`;
+else `no_progress` reset to 0 when `num < old` (else + 1) and, when `num < min`, `min = num` and the
+positions saved again. Then the marks dilated `nbrs` times (none), `old = num`, `%03d: %d intersecting`
+(the step, the count), the marks inverted (§138's `MRISnotMarked`: the intersecting vertices become
+the free ones), the soap bubble of §146.1 with 100 passes; the search ends after the step numbered
+101 (102 steps at most); the marks cleared and counted again. After the loop, when `num > min`, the
+saved positions restored (§25) and counted once more without hole filling. `terminating search with %d
+intersecting`. Standard output; returns 0.
+
+**154.7 `MRIScomputeDistanceToSurface(surf, dist, resolution)`** (`mri_relabel_hypointensities`,
+`mri_ca_label`, `mri_normalize`, `mri_aparc2aseg`: a `float` clone of their volume at its voxel size;
+the deformation's: no volume, 0.5 mm): with a volume `dist`, a volume of its extent, type, frames and
+header with voxels 0 (`MRIclone`), the surface's interior drawn into it (`MRISfillInterior` at
+`resolution`, filter spec's interior), and the mask a copy of that; without one, the interior drawn
+into a new volume of the surface's bounding box and the mask that volume with 10 voxels of margin on
+every side (volume spec's `MRIextractRegionAndPad` without a region, with its messages). Then the signed
+distance of label 1 in the mask (filter spec §6, `DTRANS_MODE_SIGNED`: negative inside), up to
+`nint(10 / xsize)` voxels (the quotient in `float`, the mask's voxel size), into `dist` (cleared
+first) or a new `float` volume of the mask's header, which is returned.
+
+**154.8 The flattening's report** (154.2, with `DIAG_SHOW` and a diagnostic vertex `v`): `%d @ (%2.1f,
+%2.1f, %2.1f): area %2.3f, oa %2.3f, nz=%2.3f, vnum=%d` (its number, position, area, original area,
+normal's z, 1-hop count); then for each 1-hop neighbour `u` in list order `%d @ (%2.1f, %2.1f, %2.1f):
+area %2.3f, oa %2.3f, nz=%2.3f, vnum=%d, d=%2.2f, od=%2.2f` (`u`'s number, position, area, original
+area, normal's z and 1-hop count, then `v`'s distance and original distance to its `n`th neighbour);
+an empty line. FS-1003: FreeSurfer prints `v`'s original area on every neighbour's line; by default
+each neighbour's own, noted where they differ. FS-1002: a diagnostic vertex beyond the surface's
+vertices: FreeSurfer reads memory outside them; no report in either mode, noted (likewise distances
+fewer than the neighbours: the report ends there). FS-1005: a vertex with neighbours on a surface
+holding no distances (or no neighbour list): FreeSurfer crashes (status 139 with `reproduce`); by
+default the report ends with its first line and an empty line, noted.
+
+## 155. Validation plan, part 40
+
+The probe's command `dfm` (relay 44): icosahedra of radius 5 to 100 (often crumpled: self-intersecting),
+off centre now and then, open grids and srd's small meshes (heavy cases: a coordinate NaN or a vertex
+at the origin); the radius 10 to 100, now and then a vertex or two ripped, `Gdiag` 0, `DIAG_SHOW`, or
+with verbose diagnostics, `Gdiag_no` none, 0, 3 or beyond the surface; then 1 to 5 of: 154.3 after
+setting a status 0 to 9 or 12 (the pial status with or without a face table, and with its set-up: the
+current positions saved as the pial ones, moved by a fixed pattern of 0.25 to 1 mm, a face table of
+the pial or current positions at 2 to 8 mm), 154.2 after setting the status 0 to 4, 154.6 with and
+without hole filling, the move, the positions saved (pial, canonical, flattened), a face table set or
+removed, 154.7 at 1 to 4 mm without a volume or into a new `float` volume of 8³ or 16³ voxels (its type,
+extent, voxel size, centre and the FNV-1a of its voxels in column order); after each the surface
+(status, radius, total and negative area; each vertex's position, normal, area and mark; each face's
+area). Compared with the official build with `reproduce`: identical; the default identical but where a
+noted correction changed the result. Observed (relay 44): seeds 7, 13 (300 cases each) and 17 (500): 0
+different in both modes (68 to 131 counted, not compared: the metric properties' FS-121 after a flattening that
+leaves faces without a normal, FS-996 and FS-1002's diagnostic vertex beyond the surface, FS-06; 2 to 4
+that FreeSurfer runs past the probe's 5-second alarm: hash-table voxel lists of huge faces, a large
+interior). On the recorded heads (`real.py --rmi`: three heads, both hemispheres: 154.6 on `?h.orig.nofix`,
+`orig.premesh`, `orig` and `white` without and with hole filling; 154.7 of `white` into a `float` clone of
+`aseg.presurf.mgz` at its voxel size and into a new volume at 0.5 mm): 54 of 60 identical in both
+modes; the other 6, hole fillings, crash FreeSurfer's program by overflowing its stack (FS-901), and
+the port completes them (observed). A clean-room implementer's black-box forms: `mris_remove_intersection`
+(154.6 on any surface), `mri_relabel_hypointensities` (154.7 into its volume), `mris_flatten` (154.2).

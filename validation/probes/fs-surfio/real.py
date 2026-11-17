@@ -144,6 +144,15 @@ def main(argv: list[str] | None = None) -> int:
         "surfaces, the vertices of its cortex label free and the others fixed, 25 passes",
     )
     ap.add_argument(
+        "--rmi",
+        action="store_true",
+        help="relay 44 of track D: MRISremoveIntersections (flr rmi) on each head's orig.nofix, "
+        "orig.premesh, orig and white surfaces, without and with hole filling; "
+        "MRIScomputeDistanceToSurface into a float clone of aseg.presurf.mgz (flr cds: "
+        "mri_relabel_hypointensities' call) and into a new volume at 0.5 mm (flr cdn) of the "
+        "white surface",
+    )
+    ap.add_argument(
         "--prj",
         action="store_true",
         help="relay 43 of track D: mrisurf_project.cpp (flr prj) on each head's qsphere.nofix "
@@ -202,6 +211,14 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.rmi:
+                sd = s / "surf"
+                for surf in ("orig.nofix", "orig.premesh", "orig", "white"):
+                    for fill in (0, 1):
+                        lines.append(f"flr rmi {sd / f'{hemi}.{surf}'} {fill}")
+                lines.append(f"flr cds {sd / f'{hemi}.white'} {s / 'mri' / 'aseg.presurf.mgz'}")
+                lines.append(f"flr cdn {sd / f'{hemi}.white'} {struct.pack('>f', 0.5).hex()}")
+                continue
             if a.prj:
                 sd = s / "surf"
                 lines.append(f"flr prj {sd / f'{hemi}.qsphere.nofix'} {sd / f'{hemi}.sphere'}")
@@ -304,7 +321,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "prj"
+        "rmi"
+        if a.rmi
+        else "prj"
         if a.prj
         else "lrr"
         if a.lrr

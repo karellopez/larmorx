@@ -575,6 +575,23 @@ Official 26 s, port 33-34 s (the reads are track A's). Relay 43 also re-ran `mcl
 shells of a probe beyond the table passed over with `reproduce`, the probe's voxel clamped into the
 table by default (FS-999).
 
+Relay 44 of track D, 64 commands: `dfm` (`mrisurf_deform.cpp`'s `mrisProjectSurface` and
+`MRISflattenPatch`, `MRISremoveIntersections`, `MRIScomputeDistanceToSurface`; the port's side in
+`tests/fs_surfio/dfm.rs`, fs.deform's crate for the first two: icosahedra of radius 5 to 100, often
+crumpled into self-intersections, grids and small meshes; the radius, rips, `Gdiag` and `Gdiag_no` of
+the case; 1 to 5 of: a projection after setting a status (the pial one with or without a face table,
+and with its set-up: the positions saved as pial, a fixed move, a face table), a flattening after
+setting a status, the intersection removal with and without hole filling, the move, a position set
+saved, a face table set or removed, the signed distance into a new or a given volume), seeds 7, 13
+(300 cases each) and 17 (500): 0 different in both modes; counted, not compared: FS-121 (the metric
+properties after a flattening leaves faces without a normal), FS-996 and FS-1002 (a diagnostic vertex
+beyond the surface), FS-06; 2 to 4 per seed past the official build's 5-second alarm. `flr rmi`,
+`flr cds`, `flr cdn` (`real.py --rmi`: three heads, both hemispheres: `MRISremoveIntersections` of
+`orig.nofix`, `orig.premesh`, `orig` and `white` without and with hole filling, the distance to
+`white` into a float clone of `aseg.presurf.mgz` (mri_relabel_hypointensities' call) and into a new
+volume at 0.5 mm): 54 of 60 identical in both modes; the other 6, hole fillings, overflow the official
+build's stack (FS-901: it crashes, the port completes). Official 471 s, port 501-510 s.
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

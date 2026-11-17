@@ -138,6 +138,7 @@ SKIP: tuple[str, ...] = (
     "FS-993",
     "FS-996",
     "FS-576",
+    "FS-1002",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port

@@ -1814,8 +1814,10 @@ pub fn gcam_copy(
         d.mri_yind = None;
         d.mri_zind = None;
     }
-    d.image = src.image.clone();
-    d.atlas = src.atlas.clone();
+    // VOL_GEOM's copy assignment: the fields, the name by strcpy (bytes past its end stay the
+    // destination's: a new morph's "unknown"), the cached matrices
+    d.image.assign(g, &src.image);
+    d.atlas.assign(g, &src.atlas);
     d.ninputs = src.ninputs;
     d.mtype = src.mtype;
     d.status = src.status;

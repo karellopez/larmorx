@@ -1258,7 +1258,7 @@ fn divide_walk(g: &mut Globals, v: &Vols, zz: i64, yy: i64, w: i64, lag: bool) -
     let d = v.dref();
     let rd = |g: &mut Globals, is_dst: bool, m: &Mri, x: i64, writes: &[(i64, i64)]| -> i64 {
         if is_dst
-            && matches!(rows::at(d, zz, yy, x, 1), rows::At::In(_))
+            && matches!(rows::at(g, WHAT, d, zz, yy, x, 1), rows::At::In(_))
             && let Some(&(_, val)) = writes.iter().rev().find(|(i, _)| *i == x)
         {
             return val;

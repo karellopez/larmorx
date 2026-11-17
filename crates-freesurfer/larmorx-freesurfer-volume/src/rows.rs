@@ -12,14 +12,19 @@
 //! `Wrapped` reads give FreeSurfer's other voxel with `reproduce` and 0 by default, writes go there
 //! with `reproduce` and nowhere by default; FS-290: `Outside` reads give 0 and writes go nowhere in
 //! both modes. Both say so.
+//!
+//! A tensor volume's row pointers all hold its first voxel (FreeSurfer's allocation steps the rows
+//! of every other type, not this one's): FS-960. `reproduce` walks a tensor volume's every row
+//! there, from the start of its buffer; the default steps its rows as for the other types (each
+//! row at its own place). Noted where a walk reaches a row but slice 0's row 0.
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_58, FS_289, FS_290};
+use larmorx_core::defects::{FS_58, FS_289, FS_290, FS_960};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_TENSOR, MRI_UCHAR, MRI_USHRT, Mri,
 };
 
 /// Where a direct access lands.
@@ -30,14 +35,46 @@ pub(crate) enum At {
     Outside,
 }
 
-/// The element of `size` bytes at `x` of row `y` of slice `sl` (`z + f depth`).
-pub(crate) fn at(m: &Mri, sl: i64, y: i64, x: i64, size: usize) -> At {
+/// The element of `size` bytes at `x` of row `y` of slice `sl` (`z + f depth`), with a tensor
+/// volume's rows where the mode puts them (FS-960, noted).
+pub(crate) fn at(g: &mut Globals, what: &str, m: &Mri, sl: i64, y: i64, x: i64, size: usize) -> At {
+    let first = tensor_first(g, what, m, sl, y);
+    at_rows(m, sl, y, x, size, first)
+}
+
+/// Whether row `y` of slice `sl` of `m` is found at the volume's first voxel: a tensor volume's
+/// row but slice 0's row 0, with `reproduce` (FS-960, noted in both modes).
+fn tensor_first(g: &mut Globals, what: &str, m: &Mri, sl: i64, y: i64) -> bool {
+    let nsl = i64::from(m.vg.depth) * i64::from(m.nframes);
+    if m.mtype != MRI_TENSOR
+        || m.chunk.is_none()
+        || (sl == 0 && y == 0)
+        || !(0..nsl).contains(&sl)
+        || !(0..i64::from(m.vg.height)).contains(&y)
+    {
+        return false;
+    }
+    g.notices.add(
+        &FS_960,
+        format!(
+            "{what} walks a tensor volume's rows, which FreeSurfer finds all at its first voxel"
+        ),
+    );
+    g.notices.reproduce()
+}
+
+/// [`at`] with the rows stepped (`first` false) or all at the first voxel (`first` true).
+fn at_rows(m: &Mri, sl: i64, y: i64, x: i64, size: usize, first: bool) -> At {
     let nsl = i64::from(m.vg.depth) * i64::from(m.nframes);
     if m.chunk.is_none() || !(0..nsl).contains(&sl) || !(0..i64::from(m.vg.height)).contains(&y) {
         return At::Outside;
     }
     let row_bytes = i128::from(m.vox_per_row) * m.bytes_per_vox as i128;
-    let base = (i128::from(sl) * i128::from(m.vg.height) + i128::from(y)) * row_bytes;
+    let base = if first {
+        0
+    } else {
+        (i128::from(sl) * i128::from(m.vg.height) + i128::from(y)) * row_bytes
+    };
     let b = base + i128::from(x) * size as i128;
     if b < 0 || b + size as i128 > i128::from(m.bytes_total) {
         return At::Outside;
@@ -66,7 +103,8 @@ pub(crate) fn touch(g: &mut Globals, what: &str, m: &Mri, sl: i64, y: i64) -> bo
     ok
 }
 
-/// The byte offset of `slices[sl][y]` plus `off` bytes, when `n` bytes from there lie in the buffer.
+/// The byte offset of `slices[sl][y]` plus `off` bytes, when `n` bytes from there lie in the buffer
+/// (the rows stepped: its callers refuse a tensor volume first).
 pub(crate) fn row_bytes_at(m: &Mri, sl: i64, y: i64, off: i64, n: usize) -> Option<usize> {
     let nsl = i64::from(m.vg.depth) * i64::from(m.nframes);
     if m.chunk.is_none() || !(0..nsl).contains(&sl) || !(0..i64::from(m.vg.height)).contains(&y) {
@@ -78,9 +116,10 @@ pub(crate) fn row_bytes_at(m: &Mri, sl: i64, y: i64, off: i64, n: usize) -> Opti
     (b >= 0 && b + n as i128 <= i128::from(m.bytes_total)).then_some(b as usize)
 }
 
-/// `memset(slices[sl][y], 0, n)`: the first `n` bytes of a row (always inside the row here).
+/// `memset(slices[sl][y], 0, n)`: the first `n` bytes of a row (always inside the row here; its
+/// caller refuses a tensor volume first).
 pub(crate) fn zero_row(m: &mut Mri, sl: i64, y: i64, n: usize) {
-    if let At::In(o) | At::Wrapped(o) = at(m, sl, y, 0, 1) {
+    if let At::In(o) | At::Wrapped(o) = at_rows(m, sl, y, 0, 1, false) {
         let chunk = m.chunk.as_mut().expect("voxels");
         let end = (o + n).min(chunk.len());
         chunk[o..end].fill(0);
@@ -173,7 +212,7 @@ fn note(g: &mut Globals, what: &str, a: At, write: bool) -> bool {
 
 /// A direct read of type `ty` at `(sl, y, x)`: 0 where FreeSurfer's access is not made.
 pub(crate) fn read(g: &mut Globals, what: &str, m: &Mri, sl: i64, y: i64, x: i64, ty: i32) -> Num {
-    let a = at(m, sl, y, x, elem_size(ty));
+    let a = at(g, what, m, sl, y, x, elem_size(ty));
     let zero = if ty == MRI_FLOAT {
         Num::F(0.0)
     } else {
@@ -207,7 +246,7 @@ pub(crate) fn write(
     ty: i32,
     v: Num,
 ) {
-    let a = at(m, sl, y, x, elem_size(ty));
+    let a = at(g, what, m, sl, y, x, elem_size(ty));
     let o = match a {
         At::In(o) => o,
         At::Wrapped(o) => {

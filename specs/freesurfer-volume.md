@@ -488,17 +488,30 @@ A point is given in voxel coordinates (column `x`, row `y`, slice `z`, `double`)
 in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's value.
 - **Whole coordinates.** When each coordinate is within `FLT_EPSILON` (in `double`, `|trunc(c) - c| <
   1.1920928955078125e-07`, a NaN or a value outside the `int` range never whole) of its integer,
-  every sampler but the sinc one takes the nearest voxel instead.
-- **Nearest** (`MRIsampleVolumeType` with `SAMPLE_NEAREST` or an unknown type;
-  `MRIsampleVolumeFrameType` likewise on a frame): a point unambiguously outside (§14's
-  "index not in volume" 1, NaN included) gives the volume's `outside_val`; else each coordinate is
+  every sampler but the sinc ones takes the nearest voxel instead, before any other check: the
+  trilinear and cubic samplers of frame 0 the nearest sample of frame 0, their frame variants and
+  `MRIsampleVolumeFrameType` the nearest sample of their frame (whose frame is not checked).
+- **Choosing the sampler.** `MRIsampleVolumeType(mri, x, y, z, pval, type)`: type 1
+  (`SAMPLE_TRILINEAR`) is `MRIsampleVolume`, 3 (`SAMPLE_CUBIC`) `MRIcubicSampleVolume`, 2
+  (`SAMPLE_SINC`) `MRIsincSampleVolume` with the half-width 5; every other code (0
+  `SAMPLE_NEAREST`, 5 the cubic B-spline, -1, 7, ...) the nearest sample of frame 0.
+  `MRIsampleVolumeFrameType(mri, x, y, z, frame, type, pval)`: whole coordinates (above) the
+  nearest sample whatever the type; else 1 is `MRIsampleVolumeFrame`; 5 gives the error
+  `MRIsampleVolumeFrameType(5): First create coeff image and then use it to sample (see
+  mriBSpline).` and 2 `MRIsampleVolumeFrameType(2): unsupported interpolation type`, each returning
+  `ERROR_UNSUPPORTED` (-3) with `*pval` unchanged; every other code (3 and 0 included) the nearest
+  sample of the frame (**(observed)**: §22's `vsample`).
+- **Nearest** (the nearest sample of frame 0, `MRIsampleVolumeType`'s, §15; of a frame,
+  `MRIsampleVolumeFrameType`'s): a point unambiguously outside (§15's "index not in volume" 1, NaN
+  included) gives the volume's `outside_val` and 0, whatever the type; else each coordinate is
   rounded half away from zero (`nint`), clamped to `[0, extent - 1]`, and the voxel read as `float`.
   Types: bytes, shorts, unsigned shorts, ints, floats; another gives 0 and the error
   `MRIsampleVolumeType: unsupported volume type <t>` (`MRIsampleVolumeFrameType: ...`), code
   `ERROR_UNSUPPORTED`. The frame variant does not check the frame (a frame past the volume's reads
   outside it: FS-290).
-- **Trilinear** (`MRIsampleVolume`, frame 0; `MRIsampleVolumeFrame`, which first gives `outside_val`
-  for a frame at or past the volume's frames): unambiguously outside gives `outside_val`; else each
+- **Trilinear** (`MRIsampleVolume`, frame 0; `MRIsampleVolumeFrame`, which after the
+  whole-coordinate shortcut gives `outside_val` for a frame at or past the volume's frames):
+  unambiguously outside gives `outside_val`; else each
   coordinate `c >= extent` becomes `extent - 1`, then `c < 0` becomes 0; `m = max(trunc(c), 0)`, `p =
   min(extent - 1, m + 1)`; `md = c - (float)m` and `pd = 1 - md` in `double`. The value is the sum of
   the eight corners' `((wx * wy) * wz) * v` (wx is `pd` for the `m` corner, `md` for the `p` corner;
@@ -550,22 +563,43 @@ in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's v
   the source's centre, `ras_good_flag` 0 (an angle whose rotation cannot be inverted: FS-304).
 
 ## 20. The head's box (`MRIfindApproximateSkullBoundingBox(mri, thresh, box)`)
-From the centre of mass of the voxels above `(unsigned char) thresh` (§15), walks along lines through
-it, sampling the nearest voxel; a sample `< thresh` is dark. A walk keeps the longest run of dark
-samples (its first sample the edge): a bright sample ends the current run, and after more than 30
-bright samples in a row the longest is forgotten. A dark run at the walk's end counts too; the edge
-is the volume's border when no run reaches 10 samples. Runs as long as the longest replace it except
-in the first walk.
-- x: down from the centre's x at its y and z (the left edge, `box.x`), up to the width (the right
-  edge; `box.dx = right - left + 1`). While `box.dx <= 10`, the centre's y moves down by 10, `left/right
-  detection failed, moving y coord to <nint(y) + 10> from <nint(y)>` is printed (standard output), and
-  x is searched again; when y becomes negative, `MRIfindApproximateSkullBoundingBox failed: check
-  input volume` (`ErrorExit`, `ERROR_BADPARM`).
-- y: down from the centre at x `max(0, nint(cx) - 20)` (`box.y`); a final dark run also counts when
-  it is at least half the longest and more than 15 bright samples came before it after the longest
-  was last replaced. Then up from the centre at the centre's x (`box.dy`).
-- z: down and up at the centre's x and y (`box.z`, `box.dz`); when `box.dz < 5`, both again 15
-  voxels to the left. Returns `NO_ERROR`. A centre of mass that is not a number: FS-305.
+The centre `(cx, cy, cz)` is the centre of mass of the voxels above `(unsigned char) thresh` (§15's
+`MRIcenterOfMass`: zeros when no voxel is above it). Each edge comes from a *walk*: from a start
+position `c` along one axis, one voxel at a time, down to 0 or up to `extent - 1` (both included;
+no step when `c` is already past that end), the other two coordinates fixed. Each position is the
+nearest sample of frame 0 (§15, §18: `outside_val` outside the volume), *dark* when it is below
+`thresh` (the `int`, compared in `double`), else *bright* (a NaN is bright). A walk keeps the
+current dark run's length `n` (0) and first position `s` (`c`), the count `b` of bright samples in a
+row (0), the longest run's length `L` (0) and the edge `E` (`c`), and at each sample:
+
+- dark: `s` becomes the position when `n` is 0; `n += 1`; `b = 0`;
+- bright: `b += 1`; when `b > 30`, `L = 0`; then the current run replaces the longest (`L = n`,
+  `E = s`) when `n > L` in the walk to the left edge, `n >= L` in every other walk; then `n = 0`
+  (so in the other walks, from the 31st bright sample in a row on, `E` becomes `s` again at each
+  bright sample);
+- after the last sample: `L = n`, `E = s` when `n > L`; then, when `L < 10`, `E` becomes the end the
+  walk went to (0, or `extent - 1`).
+
+The walks, with `nint` (half away from zero) of the centre's coordinates:
+
+1. **Left and right**: down and up the x axis from `nint(cx)` at `y = nint(cy)`, `z = nint(cz)`:
+   `box.x` = the left walk's `E`, `box.dx` = the right walk's `E - box.x + 1`. When `box.dx <= 10`:
+   `cy -= 10`, then standard output gets `left/right detection failed, moving y coord to <nint(cy) +
+   10> from <nint(cy)>` (the moved `cy`), and when `cy < 0` the program ends
+   (`MRIfindApproximateSkullBoundingBox failed: check input volume`, `ErrorExit`, `ERROR_BADPARM`),
+   else both walks again (**(observed)**: §22's `vskull`, a volume 10 voxels wide).
+2. **Top**: down the y axis from `nint(cy)` at `x = max(0, nint(cx) - 20)`, `z = nint(cz)`, keeping
+   also `M` (0): at each dark sample `M = max(M, b)` first (the bright samples just before it), and
+   `M = 0` whenever the longest is replaced at a bright sample; after the last sample the last run
+   also replaces the longest when `n > L / 2` (integer division) and `M > 15` (before the `L < 10`
+   rule). `box.y` = `E`.
+3. **Bottom**: up the y axis from `nint(cy)` at `x = nint(cx)`, `z = nint(cz)`: `box.dy = E - box.y +
+   1`.
+4. **Back and front**: down and up the z axis from `nint(cz)` at `x = nint(cx)`, `y = nint(cy)`:
+   `box.z`, `box.dz = E - box.z + 1`; when `box.dz < 5`, both again at `x = nint(cx) - 15` (not
+   clamped).
+
+Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
 
 ## 21. Reading a linear transform (`LTAreadEx(fname)`, 3.1-39)
 - **The type from the name** (`TransformFileNameType`): the text after the last `@`, or without one
@@ -574,14 +608,31 @@ in the first walk.
   ending in `nii.gz` (as written, more than 6 bytes) a morph; `OCT`, `LTA` and no extension an LTA;
   `XFM` MINC; `FSLMAT` FSL; anything else `REGISTER_DAT`.
 - A name whose file part is `identity.nofile` gives an identity RAS-to-RAS LTA without reading.
-- **An `.lta`** (any type but the three below): lines read skip blank lines, `#` comments and leading
-  space, and cut at `#`. Line 1 `type = <n>`, line 2 `nxforms = <n>` (as `scanf` matches them: white
-  space matches any; FS-308, FS-309); for each transform `mean = <x> <y> <z>`, `sigma = <s>` and the
-  matrix (`MatrixAsciiReadFrom`: `<type> <rows> <cols>` then the numbers); then for each transform a
-  raw line `src volume info...` reads the source geometry (§1's block), a following `dst volume
-  info...` the destination's; then any later lines `subject <word>` and `fscale <number>`. Defaults:
-  subject empty, `fscale` 0.15. Errors: `ltaReadFile(<fname>): can't open file`, `... can't read
-  data` (`NULL`).
+- **An `.lta`** (any type but the three below: `.lta`, `.oct`, no extension and the morphs' names),
+  in this order:
+  1. The first two lines as `fgetl` reads them (`specs/freesurfer-core.md` §10, at most 1,022 bytes
+     each: blank lines, lines of white space and `#` comment lines skipped, leading white space
+     dropped, the line cut at its first `#`, the new line dropped). No first line (an empty file,
+     or only such lines): `ltaReadFile(<fname>): can't read data` (`ERROR_BADFILE`) and `NULL`.
+     Line 1 is matched against `type      = %d\n`, line 2 against `nxforms   = %d\n` as `sscanf`
+     matches (each run of white space in the pattern matches any white space, none included; the
+     words and `=` must be there): a line that does not match leaves the type or the count unset
+     (FS-308); a file of a single such line: FS-309.
+  2. An array of that many transforms (`LTAalloc`, `specs/freesurfer-mri.md` §20) with that type.
+     Then, for each transform, straight from the stream (no line is skipped, a `#` is a character
+     like another): `fscanf` with `mean      = %f %f %f\n` (x0, y0, z0) and with `sigma     =
+     %f\n` (sigma), each stopping at its first mismatch (the fields not reached keep the
+     allocation's values), then `MatrixAsciiReadFrom` into the transform's matrix
+     (`specs/freesurfer-maths.md` §18.2: `<type> <rows> <cols>` and the numbers).
+  3. Then, for each transform, the next raw line (`fgets` of at most 1,022 bytes; at the end of the
+     file nothing more for it): when it starts with the 15 bytes `src volume info`, the source
+     geometry is read from the stream (§3), the next raw line is read, and when that one starts with
+     `dst volume info` the destination's geometry (§3).
+  4. The subject empty and `fscale` 0.15; then each remaining raw line starting with `subject` sets
+     the subject to its second word (`%*s %s`), each starting with `fscale` sets `fscale` (`%*s
+     %f`).
+  A file that cannot be opened: `ltaReadFile(<fname>): can't open file` and `NULL`. (**(observed)**:
+  §22's `vltaread`.)
 - **An `.xfm`**: line 1 must start `MNI Transform File` (else `ltMNIreadEx:<fname> does not start as
   'MNI Transform File'`); line 2 starting `%` is the volume information, else no volumes are looked
   for (and `Transform_Type...` there skips one more line to the matrix); line 3 starting `%` is the

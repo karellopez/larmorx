@@ -5,8 +5,8 @@
 //! official build's output lines for the probe's cases of seed 1 (1,980 cases, thirty of each of
 //! the 66 commands; `metric`'s through the probe built with a stub metric-properties step),
 //! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1980` on Linux x64 from the unit
-//! oracle's build (2026-11-17, relay 44 of track D, from the clean commit 7d4e5ad8: 1,845 lines
-//! identical, 75 counted, not compared, where
+//! oracle's build (2026-11-18, relay 45 of track D, from the clean commit 92b6234c: 1,921 lines
+//! identical, 59 counted, not compared, where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
 //! `SKIP`), against the port's output with `reproduce` (a case the port marks
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
@@ -37,7 +37,7 @@ const SKIP: [&str; 61] = [
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "a3492512c1c10721186771316e6ee843a8a4dd4c4ec267d2b144d469e65285f3";
+const OFFICIAL_SHA256: &str = "e72569096b18ed48613f5fc0a01600fcccbeeaef5b9d8135a491d5159d9054a8";
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_surfio/official_digests.txt");

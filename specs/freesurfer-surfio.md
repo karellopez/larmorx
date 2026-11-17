@@ -6140,7 +6140,7 @@ either reader with or without the conversion, by names that exist or not (a fold
 the vertex and face counts, patch flag, status, total area, the box, each vertex's position, normal,
 area, rip and border flags and its face and neighbour counts, each face's rip flag and area. With
 `reproduce` identical to the official build; by default identical but where a noted correction changed
-the result. Observed (relay 45): seeds 7, 13 and 17 (500 cases each): RESULTSPTC.
+the result. Observed (relay 45): seeds 7, 13 and 17 (500 cases each): 0 different in both modes (80, 83 and 71 counted, not compared: binary patches that end before their numbers, FS-49 and FS-167; ASCII patches' first numbers, FS-1010; labels that cannot be opened, `PE`; the metric properties' FS-121; one case past the probe's 5-second alarm at seed 13).
 
 ## 158. The sampled energies, the ray along a normal, the overlapping faces (fs.surfio's pieces of the metric properties; relay 45 of track D)
 
@@ -6261,6 +6261,6 @@ vertex along its normal at `dist` 0 to 5, its own vertex skipped or not; 158.10 
 or its opposite; 158.11 of a face, with every face's rip flag after it; a new table; the faces assigned;
 a vertex or a face ripped. At the end each vertex's position and face. With `reproduce` identical to the
 official build; by default identical but where a noted correction changed the result. Observed (relay
-45): RESULTSSMP. On the recorded heads (`real.py --smr`): RESULTSREAL. A clean-room implementer's
+45): seeds 7, 13 and 17 (500 cases each): 0 different in both modes (30, 23 and 22 counted, not compared: FS-1012's faces outside the surface, the tables of vertices' FS-576, the metric properties' FS-121; 8, 5 and 10 cases past the probe's 5-second alarm: the face tables' voxel lists of huge faces, FS-911 and FS-913, and overlap walks of huge boxes, FS-1013). On the recorded heads (`real.py --smr`): three heads, both hemispheres (each `?h.sphere` with its `white` and `pial` positions and normals, a canonical face table at 1 mm and its faces assigned: 158.2 to 158.7 at 64 vertices; 158.10 along 64 white vertices' normals both ways; 158.11 of 200 faces of `?h.qsphere.nofix`): 6 of 6 identical in both modes (observed; official 22 s, port 20 s). A clean-room implementer's
 black-box forms: `mris_register` and `mris_sphere` (158.3 to 158.7 through their sums), `mris_fix_topology`
 (158.11), `mris_convert -p` and `mri_surf2surf --patch` (156).

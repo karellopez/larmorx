@@ -427,7 +427,7 @@ is NaN), the FS-58 refusal and their notices are larmorx's own.
 
 | FreeSurfer file (lines) | Functions | Here |
 |---|---|---|
-| `utils/warpfield.cpp` 55-74, 659-951; `utils/mriio.cpp` 9655-9661 | `Warpfield::Warpfield(MRI *)` (its matrices with shears), `Warpfield::changeFormat` and `__changeFormatFrom_abs_crs`, `__changeFormatFrom_disp_crs`, `__changeFormatFrom_abs_ras`, `__changeFormatFrom_disp_ras`, as `niiWrite` calls them (the volume changed in place) | `warpfield.rs`, `mriio_write.rs` |
+| `utils/warpfield.cpp` 55-74, 659-951; `utils/mriio.cpp` 9655-9661 | `Warpfield::Warpfield(MRI *)` (its matrices with shears), `Warpfield::changeFormat` and `__changeFormatFrom_abs_crs`, `__changeFormatFrom_disp_crs`, `__changeFormatFrom_abs_ras`, `__changeFormatFrom_disp_ras`, as `niiWrite` calls them (the volume changed in place); FS-929 (relay 42: `include/mri.h` 183-220's `VOL_GEOM` leaves `valid`, `width`, `height`, `depth` unset, so a warp volume read without tags 10 and 15 writes memory contents into them and converts through them; `mriio.cpp` 12424-12430, 8656-8665) | `warpfield.rs`, `mriio_write.rs` |
 | `utils/mriio.cpp` 1179-1190 | `MRIwriteType`'s `MGH_MORPH` branch: through `upper.rs`'s `write_morph` (fs.gca's `gcam_write.rs`; the message of a program that does not link it) | `mriio.rs`, `upper.rs` |
 
 

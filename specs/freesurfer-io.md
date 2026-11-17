@@ -5160,3 +5160,36 @@ positions; an array's type, count, first matrix and two geometries). Black box: 
 (about 400 `trs` cases each, 285 with the new queries in seed 7): `reproduce` identical on every compared case (238,
 248, 244), 0 different; `fix` differs only with notices. Not compared: FS-928, track C's FS-504 and FS-957 (FreeSurfer
 crashes or reads memory), a GCA morph's resamplings (not ported).
+
+## 156. Warp volumes whose morph geometries were never given (FS-929, FS-855)
+
+1. **The geometries a warp volume carries.** Every volume holds an image and an atlas geometry for its warp (tags 10
+   and 15: §15's stored form, §16's writer, §17's reader); FreeSurfer gives their fields defaults when a volume is
+   made (voxel sizes 1, the coronal directions, centre 0, no shears, an empty name) except four: the validity flag and
+   the three sizes, which hold whatever memory held (observed: 0 in a fresh process; numbers made of earlier text
+   bytes, such as `540024864 x 2019307808 x 538992944`, after other work in the same process). Only reading tag 10 or
+   15, or assigning a geometry, sets them. So they are memory contents in a warp volume read without those tags: an
+   MGH warp volume (tag 13 with a known format, no tag 10 or 15) and a NIfTI displacement field (intent 1006) without
+   FreeSurfer's header extension, which `niiRead` takes as a warp volume of RAS displacements (format 3).
+2. **Where they reach an output.**
+   - Writing a volume whose warp format is known (not -1) writes both tags with both geometries (§16): the validity
+     flags and sizes are written as memory holds them (MGH and NIfTI; 16 bytes per geometry per tag).
+   - Writing such a volume as NIfTI in another format than 3 converts its frames to RAS displacements (§145 item 5)
+     through the geometries' voxel-to-RAS matrices, whose translation uses the sizes: every voxel's three values
+     depend on them (by a constant per frame when the directions and voxel sizes are the defaults). A conversion
+     between formats 0 and 1 only does not use them.
+   - Reading such a volume as a GCA morph (§142 item 3) gives the morph those geometries (FS-855): their sizes are
+     printed by the morph's conversion to a warp volume (`[INFO] Warpfield::convert(): gcam image [<w> x <h> x <d>]`,
+     `... gcam atlas [...]`, §145 item 4) and stored in the new warp volume, so writing it (`GCAMwrite` to an MGH or
+     NIfTI name, `mri_convert <warp>.mgz <out>.nii`) meets both items above.
+3. **larmorx, both modes** (memory contents cannot be reproduced): the validity flags and sizes are 0 (a fresh
+   process's values), noted: FS-929 where a warp volume without those geometries is written (its tags, a NIfTI
+   output's conversion through RAS), FS-855 where a morph read from one prints or stores them. A geometry is taken as
+   never given when every field equals the made volume's defaults with validity and sizes 0 (a tag holding exactly
+   those values is noted too, though FreeSurfer's output is then the same).
+4. **Validation.** Piece 32's `gcw` (a warp volume read as a morph and written in a warp format) and piece 14's
+   volume writes: the cases noting FS-929 are compared apart (`VARY`), those noting FS-855 not compared; the
+   observed difference: `validation/probes/fs-io/gcw_nifti_difference.txt` run alone gives the port's bytes (FNV-1a
+   `405afea9a37dc9dc`, the sizes 0) and after 4,376 other cases of seed 1's recorded set in the same process
+   `fe6976ea86a90170` (the sizes above). Black box: FreeSurfer 8.2.0's `mri_convert w.mgz o.nii` of such a warp
+   volume, in a fresh process and after other work, and `mri_info` (which prints the geometries).

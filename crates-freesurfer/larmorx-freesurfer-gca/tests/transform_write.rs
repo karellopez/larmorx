@@ -14,11 +14,13 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{ERROR_BADPARM, ERROR_UNSUPPORTED};
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_gca::gcam::{self, GCAM_POSITION_INVALID, gcam_alloc};
-use larmorx_freesurfer_gca::gcam_write::write_morph;
+use larmorx_freesurfer_gca::gcam_write::{gcam_write, write_morph};
 use larmorx_freesurfer_gca::transform::{self as tr, Transform, Xform};
+use larmorx_freesurfer_io::mriio::mri_write;
 use larmorx_freesurfer_mri::lta::MORPH_3D_TYPE;
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc_header, mri_alloc_sequence,
+    MGH_VERSION, MGZ_INTENT_UNKNOWN, MGZ_INTENT_WARPMAP, MRI_FLOAT, MRI_UCHAR, Mri,
+    mri_alloc_header, mri_alloc_sequence,
 };
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
@@ -79,6 +81,54 @@ fn a_written_morph_reads_back_as_its_displacements() {
         assert_eq!((n.x, n.y, n.z), (2.5, 0.5, 3.0));
         // the identity's affine matrix, determinant 1
         assert_eq!(gc.det, 1.0);
+    }
+}
+
+/// FS-929 (and FS-855): a warp volume whose morph geometries were never given (here a volume made
+/// in memory; in files, one without the geometry tag), written as MGH, then read as a GCA morph and
+/// written as NIfTI (`mri_convert`'s path, which converts the displacements to RAS through those
+/// geometries): noted in both modes, the geometries' validity and sizes 0 (FreeSurfer: memory
+/// contents, 0 only in a fresh process).
+#[test]
+fn fs929_a_warp_volume_without_morph_geometries_written() {
+    let t = tempfile::tempdir().unwrap();
+    let env = Environment::default();
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut g = Globals::new(mode);
+        let mut m = warp(&mut g, [3, 2, 2], |x, y, z| [x as f32, y as f32, z as f32]);
+        m.intent = MGZ_INTENT_WARPMAP;
+        m.version = ((MGZ_INTENT_WARPMAP & 0xffff) << 8) | MGH_VERSION;
+        m.warp_field_format = larmorx_freesurfer_gca::gcam_write::WARPFIELD_DTFMT_ABS_CRS;
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let p = t.path().join("w.mgz").to_string_lossy().into_owned();
+        let r = mri_write(
+            &mut g,
+            &mut out,
+            &mut err,
+            &env,
+            None,
+            &mut m,
+            &p,
+            None,
+            MGZ_INTENT_UNKNOWN,
+        )
+        .unwrap();
+        assert_eq!(r, 0);
+        assert!(ids(&g).contains(&"FS-929"), "{:?}", ids(&g));
+        let mut g = Globals::new(mode);
+        let mut gc = gcam::gcam_read(&mut g, &mut out, &mut err, &env, None, &p)
+            .unwrap()
+            .unwrap();
+        assert!(gc.geom_unset);
+        assert!(!ids(&g).contains(&"FS-929"));
+        let q = t.path().join("o.nii").to_string_lossy().into_owned();
+        let r = gcam_write(&mut g, &mut out, &mut err, &env, None, &mut gc, &q, 0).unwrap();
+        assert_eq!(r, 0);
+        let text = String::from_utf8_lossy(&out).into_owned();
+        assert!(text.contains("gcam image [0 x 0 x 0]"), "{text}");
+        assert!(text.contains("convert displacement from 0 to 3"), "{text}");
+        assert!(ids(&g).contains(&"FS-855"), "{:?}", ids(&g));
+        assert!(ids(&g).contains(&"FS-929"), "{:?}", ids(&g));
     }
 }
 

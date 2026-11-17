@@ -60,6 +60,8 @@ pub const WARPFIELD_DTFMT_DISP_RAS: i32 = 3;
 pub fn gcam_init_vol_geom(gcam: &mut Gcam, mri_image: &Mri, mri_atlas: &Mri) -> i32 {
     get_vol_geom(&mri_image.vg, &mut gcam.image);
     get_vol_geom(&mri_atlas.vg, &mut gcam.atlas);
+    // both geometries given now (FS-855's memory contents gone)
+    gcam.geom_unset = false;
     NO_ERROR
 }
 
@@ -416,6 +418,12 @@ fn warpfield_convert(
     if gcam.mtype == GCAM_RAS {
         let _ = out.write_all(b"converting GCAM from GCAM_RAS to GCAM_VOX\n");
         gcam_ras_to_vox(g, out, err, env, gcam, None)?;
+    }
+    if gcam.geom_unset {
+        crate::gcam::unset_geometry(
+            g,
+            "the morph's printed sizes and its conversion to a warp volume",
+        );
     }
     let _ = out.write_all(b"[INFO] Warpfield::convert(): converting GCAM ...\n");
     let _ = writeln!(

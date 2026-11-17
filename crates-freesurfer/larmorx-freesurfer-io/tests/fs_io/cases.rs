@@ -1447,8 +1447,10 @@ pub(crate) fn run_line_with(
         let earlier = n.detail.ends_with("as in FreeSurfer");
         let memory =
             piece2::KINDS.contains(&t[0]) && ((id == "FS-167" || id == "FS-49") && !earlier);
+        // FS-929 (relay 42): a warp volume's morph geometries never given, written (memory
+        // contents in FreeSurfer: its bytes the port's after a fresh start, others later)
         if memory
-            || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187")
+            || matches!(id, "FS-168" | "FS-170" | "FS-180" | "FS-187" | "FS-929")
             || (id == "FS-192" && !earlier)
         {
             extra.push("VARY");

@@ -2747,4 +2747,48 @@ track C's fs.volume `ltaapply.rs` and `ltaconv.rs` (used as they are).
   2026-11-16 with `strace -f -e trace=openat,write` of `fsio` on both case files). So FreeSurfer's conversion of a
   morph without geometries reads memory it never wrote (a matrix or geometry of the image of no voxels); the port
   gives zeros. Not caused by this relay's code (the functions it changed are not on that path). The next relay finds
-  the read, gives it a defect ID and marks the case `VARY`. The recorded set does not hold that case.
+  the read, gives it a defect ID and marks the case `VARY`. The recorded set does not hold that case. **Found by
+  relay 42: Part 38** (`VOL_GEOM`'s four fields no constructor sets; FS-929, FS-855).
+
+## Part 38: fs.mri's voxels of the types without values; warp volumes whose morph geometries were never given (relay 42 of track A)
+
+Sources: `utils/mri.cpp` 1626-1693 (`MRIgetVoxVal`), 1737-1825 (`MRIsetVoxVal`); `include/mri.h` 183-220 (`VOL_GEOM`:
+"VOL_GEOM doesn't initialize valid, width, height, depth", the empty constructor `VOL_GEOM() {}`), 793-794 (the
+`MRI` members `gcamorph_image_vg`, `gcamorph_atlas_vg`), 808 (`warpFieldFormat = WARPFIELD_DTFMT_UNKNOWN`);
+`utils/mri.cpp` 181 (`MRI::MRI(Shape, ...)`: sets neither geometry's four fields); `utils/mriio.cpp` 8656-8665
+(`niiRead` of a NIfTI `NIFTI_INTENT_DISPVECT` without the header extension: intent warp map, format DISP_RAS, no
+geometries), 9647-9661 (`niiWrite`'s `new Warpfield(mri)` and `changeFormat(DISP_RAS)`), 12353-12371 (`MRITAGread` of
+`TAG_GCAMORPH_GEOM`, `TAG_GCAMORPH_GEOM_PLUSSHEAR`: the only readers that set them), 12424-12430 (`MRITAGwrite`: both
+tags whenever `warpFieldFormat != UNKNOWN`); `utils/warpfield.cpp` 56-74 (`Warpfield(MRI *)`: `get_RAS2Vox(0, true)`
+and `get_Vox2RAS(0, true)` of both geometries), 132-230 (`convert`: prints `gcam image [...]`, `gcam atlas [...]`,
+assigns them to the new volume), 413-447 (`read`: `gcam->image = __warpmap->gcamorph_image_vg`), 678-735
+(`__changeFormatFrom_abs_crs`); `utils/gcamorph.cpp` 352-372 (`GCAMwrite`, `__warpfieldWrite`).
+
+- **`MRIgetVoxVal` / `MRIsetVoxVal` of the types they do not handle** (`MRI_BITMAP`, `MRI_TENSOR`,
+  `MRI_DOUBLE_COMPLEX`, any other code): after the negative-index checks (get only), neither switch has a case, so
+  `-10000000000.9` (as a float) is returned and `MRIsetVoxVal` returns 1 without a write: no voxel is touched, so a
+  volume without voxels does not crash (track E's R7.5, measured on the mri probe's `novox` group and on
+  `validation/probes/fs-mri/novox_hand_cases.txt`: tensor, bitmap, double complex, 11 and -1 headers identical with
+  `reproduce`). The port raised FS-58's error for every type without voxels; now only for the eight types FreeSurfer
+  reads and writes (`fs.mri` `voxel.rs`'s `has_values`). Bitmap, double complex and unknown codes cannot be
+  allocated with voxels (`MRIallocSequence`: `could not allocate memory for slice 1 out of 2`; the port's default
+  refuses them as FS-55), so the probe's `vox` cases draw them as headers only.
+- **The gcw NIfTI case (Part 37) is `VOL_GEOM`'s four uninitialised fields.** `MRI`'s constructor never sets
+  `gcamorph_image_vg` / `gcamorph_atlas_vg`'s `valid`, `width`, `height`, `depth` (the struct's own initialisers
+  cover the rest), and `new MRI` takes heap memory: 0 in a fresh process, earlier contents later (measured: `gcam image
+  [540024864 x 2019307808 x 538992944]`, `gcam atlas [540155936 x 538980384 x 538976313]` after 4,376 other cases in the
+  same `fsio` process: bytes of earlier output text, `0x20302020` = `"  0 "`). The case's path: `GCAMread` of an
+  MGH warp volume whose tags hold the format (7: no node moved) but no geometry tag -> `Warpfield::read` copies both
+  geometries into the morph -> `GCAMwrite(o.nii)` -> `Warpfield::convert` prints their sizes and assigns them to the
+  new warp volume -> `MRIwrite` -> `niiWrite` converts ABS_CRS to DISP_RAS through `MRIxfmCRS2XYZ` of both (the
+  translation `c - M (width/2, height/2, depth/2)` takes the sizes: the per-frame constants `-65536`, `-8320`, `7.4e8`)
+  and `MRITAGwrite` writes both tags with the four fields (16 bytes per geometry per tag: the four 16-byte runs at
+  offsets 376, 456, 548 and 640 of the extension). Every warp volume read without the tags (an MGH warp volume, a
+  NIfTI displacement field from another program) and written again meets the tag write; `mri_info` prints them.
+- **What the port does.** Its `VolGeom::default()` is the made geometry with the four fields 0; a geometry equal to it
+  is taken as never given (`fs.io` `warpfield.rs`'s `geometries_unset`: a tag holding exactly those values is noted
+  too, with FreeSurfer's output then the same). FS-929 (new, class a: memory never written; both modes 0, noted):
+  `mri_tag_write` of a volume with a known warp format, and `change_format` through RAS of a volume with voxels.
+  FS-855 (relay 38's) now also where a morph read from such a volume is converted (`gcam_write.rs`'s
+  `warpfield_convert`); `GCAMinitVolGeom` clears the morph's flag. Piece 32's rule skips FS-855's cases (as before);
+  the common rule of the fs-io probe (`tests/fs_io/cases.rs`) marks FS-929's `VARY`.

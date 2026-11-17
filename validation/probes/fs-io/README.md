@@ -378,7 +378,10 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   244), 0 different (`fsio` REBUILT). `gcw_nifti_difference.txt`: one `gcw` case (a NIfTI warp written from a warp
   volume without geometries) whose written file `fsio` makes from memory contents after other cases (identical to
   the port's when run alone; findings Part 37): `fsio gcw_nifti_difference.txt`, the same after 4,376 cases of the
-  recorded set, and `fs_io_probe run gcw_nifti_difference.txt reproduce`, each inside `boxed.sh`.
+  recorded set, and `fs_io_probe run gcw_nifti_difference.txt reproduce`, each inside `boxed.sh`. Relay 42 found the
+  read (findings Part 38): the warp volume's morph geometries' validity and sizes, never set without their tags; the
+  case now notes FS-855 (`SKIP` in piece 32) and FS-929 (`VARY` in every piece: a warp volume without those
+  geometries written).
 - Piece 33 (track A relay 41): stacked autoencoders read as volumes. `aed` and `aeh` (piece 6's `mrd` and `mrh`: type
   -1 or 30, `.sae`, `.ae`, `.csae`, `.SAE`, `.dat@sae` names) of autoencoder files built by `tests/fs_io/piece33.rs` as
   FreeSurfer's training programs write them: the header line (windows of one to seven voxels a side, one voxel now and

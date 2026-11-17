@@ -20,8 +20,9 @@ use std::sync::{Arc, Mutex};
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
 use larmorx_fs_core::maths::mfiles::CStream;
-use larmorx_fs_core::mri::{Mri, Region, VolGeom, types};
+use larmorx_fs_core::mri::{LinearTransform, Lta, Mri, Region, VolGeom, types};
 use larmorx_fs_core::volume::geometry::SurfacePoint;
+use larmorx_fs_core::volume::ltaread::NoHeaders;
 use larmorx_fs_core::volume::moves::axis;
 use larmorx_fs_core::volume::vgcopy::VG_IS_EQUAL_THRESHOLD;
 use larmorx_fs_core::volume::{Dst, VolOut};
@@ -677,9 +678,72 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 l.puti(i64::from(v));
             }
         }
+        "tftype" => {
+            let n = l.geti();
+            for _ in 0..n {
+                let name = l.getx();
+                let t = p.transform_file_name_type(&name);
+                l.puti(i64::from(t));
+            }
+        }
+        "ltaread" => {
+            let name = l.getx();
+            let have = !l.take("nofile");
+            let bytes = if have { l.getx() } else { Vec::new() };
+            let avg = l.geti();
+            match avg {
+                0 => p.env.remove(b"USE_AVERAGE305"),
+                1 => p.env.set(b"USE_AVERAGE305", b"true"),
+                _ => p.env.set(b"USE_AVERAGE305", b""),
+            }
+            let path = larmorx_fs_core::files::path_of(&name);
+            let _ = std::fs::remove_file(&path);
+            if have && std::fs::write(&path, &bytes).is_err() {
+                args::bad("cannot write the transform file");
+            }
+            p.errno = 0;
+            let r = p.lta_read_ex(&name, &mut NoHeaders);
+            if have {
+                let _ = std::fs::remove_file(&path);
+            }
+            let lta = r?;
+            l.puti(i64::from(p.errno));
+            putlta(l, lta.as_ref());
+        }
         _ => args::bad("unknown command"),
     }
     Ok(())
+}
+
+/// LT (the fs.mri probe's): `x0 y0 z0 sigma m_L m_dL m_last_dL type label src dst`.
+fn putlt(l: &mut Line, lt: &LinearTransform) {
+    l.putf(lt.x0);
+    l.putf(lt.y0);
+    l.putf(lt.z0);
+    l.putf(lt.sigma);
+    l.putm(lt.m_l.as_ref());
+    l.putm(lt.m_dl.as_ref());
+    l.putm(lt.m_last_dl.as_ref());
+    l.puti(i64::from(lt.kind));
+    l.puti(i64::from(lt.label));
+    l.putg(&lt.src, true);
+    l.putg(&lt.dst, true);
+}
+
+/// LTA (the fs.mri probe's): `<n> <type> <fscale> <subject>`, the transforms and the inverse
+/// transforms; `null` for none.
+fn putlta(l: &mut Line, lta: Option<&Lta>) {
+    let Some(lta) = lta else {
+        l.out("null");
+        return;
+    };
+    l.puti(i64::from(lta.num_xforms()));
+    l.puti(i64::from(lta.kind));
+    l.putf(lta.fscale);
+    l.puts(Some(&lta.subject));
+    for lt in lta.xforms.iter().chain(&lta.inv_xforms) {
+        putlt(l, lt);
+    }
 }
 
 /// One line of a batch (its tokens, the `@<seconds>` and `+gdiag=<hex>` prefixes included) on a

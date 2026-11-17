@@ -2,8 +2,6 @@
 //! The head's box (spec §20): `MRIfindApproximateSkullBoundingBox`, walks along lines through the
 //! centre of mass for the longest dark run; FS-305.
 
-use std::io::Write;
-
 use larmorx_core::defects::FS_305;
 
 use crate::mri::{Mri, Region};
@@ -214,7 +212,7 @@ impl Process {
                 a.wrapping_add(10),
                 b
             );
-            let _ = self.out().write_all(line.as_bytes());
+            self.put_out(line.as_bytes());
             if cy < 0.0 {
                 self.error_exit(
                     codes::BAD_PARM,

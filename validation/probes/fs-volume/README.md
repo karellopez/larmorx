@@ -285,3 +285,18 @@ seed 13's 2,000 cases in both modes. Seed 1, 5,580 cases: 5,185 identical, 395 n
 hash `34c600cf7461870de2c46970677d0bdeff03f1932250cae9569ec1338a3d8a53`, passing with AArch64's NaN emulated in debug
 (72,725 flips) and release (62,790) (`oracles/logs/fs-found-c-r35-trap-volume.log`) and on Windows x64 (the cross-check
 tool). `check.py`'s `SKIP` adds FS-957. The binary before this part: `<scratch>/C/fsvolume.before-r35`.
+
+Measured 2026-11-17 (relay 37: tensor volumes, FS-960; no new command, `fsvolume` unchanged): the generator draws tensor
+volumes (type 6) among its rare types and as second volumes, and as the destinations of `invc`, `sam` and the moves; the
+equalisations `geq` and `heq` take short volumes where they drew int or long ones (an int volume whose voxels keep the
+fill formula's bytes spans about 2^31 intensities: a histogram of 14 GB on both sides; the first seed-7 run of every
+command was killed by its 24 GiB box in the port's `run` there, the two cases found by running the cases in 6 GiB boxes
+1,000 at a time: FreeSurfer's child 12 GB at its alarm, the port 14 GB in 204 s and more than 20 GiB). `check.py --dump
+<file>` writes every case's lines. Seed 7, 27,900 cases (every command, logs `oracles/logs/fs-found-c-r37-all7c.log`):
+25,912 identical with `reproduce`, 1,988 not comparable, 0 different (one `ltapt` line differed first: `MatrixAdd`'s NaN
+order, `docs/findings/freesurfer-maths.md`, fixed); seed 13, 27,900: 25,867 identical, 2,033 not comparable, 0 different;
+seeds 7 and 13, the 8,000 cases each of `invc`, `sam`, `trans`, `rot`, `rotx`, `roty`, `rotz`, `fpow`: 6,683 and 6,697
+identical, 0 different. The lines where the port notes FS-960 and compares: seed 7 168 of those commands and 33 of every
+command, seed 13 166 and 34, all identical with `reproduce`; with the rows stepped (the port before this part) 18, 9, 15
+and 7 of them were. `fix` differs only with notices. Seed 1, 5,580 cases: 5,190 identical, 390 not comparable, 26 hashed as
+`HEAVY`, hash `04bbf7500f1221f31acac11580a834c5fa87936f592c4670a29f9562400c69f2`.

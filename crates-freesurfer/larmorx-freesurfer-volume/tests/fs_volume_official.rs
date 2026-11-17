@@ -37,11 +37,14 @@ use sha2::{Digest, Sha256};
 /// writers, LTAtransformInterp and its helpers, the MNI and tkregister helpers, rotations and
 /// affine parameters (the official code with the correctly rounded atan2 the project decided for
 /// `reproduce`), voxlist.cpp's lists; relay 35, 279 commands (2026-11-16): LTAinverseTransformInterp,
-/// LTAvoxelToRasXform, LTArasToVoxelXform, LTAcompose): 5,580 cases, 5,185 lines identical, 395
-/// hashed as `SKIP`, 26 hashed as `HEAVY` (identical too).
+/// LTAvoxelToRasXform, LTArasToVoxelXform, LTAcompose; relay 37 (2026-11-17): tensor volumes among
+/// the random types and as the destinations of the byte-only functions and the moves (FS-960: a
+/// tensor volume's rows), MatrixAdd's NaN order, the equalisations' volumes of short instead of int
+/// or long): 5,580 cases, 5,190 lines identical, 390 hashed as `SKIP`, 26 hashed as `HEAVY`
+/// (identical too).
 const N: usize = 5580;
-const OFFICIAL_SHA256: &str = "34c600cf7461870de2c46970677d0bdeff03f1932250cae9569ec1338a3d8a53";
-const SKIPPED: usize = 395;
+const OFFICIAL_SHA256: &str = "04bbf7500f1221f31acac11580a834c5fa87936f592c4670a29f9562400c69f2";
+const SKIPPED: usize = 390;
 /// The cases hashed as `HEAVY`.
 const HEAVY: usize = 26;
 
@@ -271,4 +274,30 @@ fn rgb_image_frames_read_their_own_pixels() {
         assert_eq!(v as i32, want, "{mode}");
         assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-466"));
     }
+}
+
+/// FS-960: a tensor volume's rows all start at its first voxel in FreeSurfer, so
+/// `MRIinvertContrast`'s byte walk of a 4 x 4 tensor volume (FS-291's `reproduce`) walks each of its
+/// rows over the volume's first four bytes and leaves the rest as it was (seed 7, relay 37: the
+/// official line).
+#[test]
+fn tensor_rows_start_at_the_first_voxel() {
+    let line = "invc 4 4 1 6 1 0 19 -1 2 3 4 40000000 3f800000 00000000 0 bf800000 3f4ccccd bf4ccccd \
+        3f19999a 3f4ccccd 3f7eb852 3f4ccccd 3f4ccccd 3f3504f3 41f90000 42c88000 41400000 \
+        00000000 00000000 00000000 orig/001.mgz 0 0 c2c38000 c2280000 42900000 c2050000 c1ac0000 \
+        42840000 3fc00000 3f700000 3a83126f 00000000 41f40000 0000000000000000 3 1 2 40000000";
+    let official = "1 4 4 1 1 6 0 0 c2c38000 c2280000 42900000 c2050000 c1ac0000 42840000 3fc00000 3f700000 \
+        3a83126f 00000000 41f40000 0000000000000000 3 4 4 1 40000000 3f800000 00000000 0 \
+        bf800000 3f4ccccd bf4ccccd 3f19999a 3f4ccccd 3f7eb852 3f4ccccd 3f4ccccd 3f3504f3 \
+        41f90000 42c88000 41400000 00000000 00000000 00000000 6f7269672f3030312e6d677a c0000000 \
+        3fcccccd bfcccccd 00000000 3f19999a 3f4ccccd 3f7eb852 00000000 00000000 00000000 \
+        00000000 00000000 4207b333 42bee666 41535c29 3f800000 NULL \
+        7fa4c9ee13385d82b4d9fe23486d92b7e90e33587da2c7ec1e43688db2d7fc2153789dc2e70c315688add2f71c41668bbde2072c51769bc0f2173c6186abd0f5 \
+        |";
+    let (r, ids) = cases::run_line(line, UpstreamDefects::Reproduce);
+    assert!(ids.contains(&"FS-960"), "{ids:?}");
+    assert_eq!(r.trim_end(), official);
+    let (f, ids) = cases::run_line(line, UpstreamDefects::Fix);
+    assert!(ids.contains(&"FS-291"), "{ids:?}");
+    assert!(f.contains("unsupported type 6"), "{f}");
 }

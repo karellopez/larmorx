@@ -196,7 +196,15 @@ impl Two<'_> {
     fn dput(&mut self, g: &mut Globals, x: i32, y: i32, z: i32, v: i64) {
         let reproduce = g.notices.reproduce();
         let d = self.d();
-        let stored = match rows::at(d, i64::from(z), i64::from(y), i64::from(x), 1) {
+        let stored = match rows::at(
+            g,
+            "MRIfillFG",
+            d,
+            i64::from(z),
+            i64::from(y),
+            i64::from(x),
+            1,
+        ) {
             rows::At::In(_) => true,
             rows::At::Wrapped(_) => reproduce,
             rows::At::Outside => false,

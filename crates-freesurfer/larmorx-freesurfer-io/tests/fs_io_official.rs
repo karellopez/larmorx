@@ -21,16 +21,15 @@
 //! piece 24's two (NRRD volumes read), piece 25's two (MINC volumes read), piece 26's one (MINC
 //! volumes written), piece 27's two (GCA atlases read as volumes), piece 28's two (MRIread and
 //! MRIreadEx with their non-finite voxels removed), piece 29's two (the conformed-size checks,
-//! the command lines), piece 30's four (MRIreorder, the selective-average headers read and
-//! written, LabelRemoveOverlap), piece 31's two (GCA morphs read as volumes), piece 32's three
+//! the command lines), piece 30's five (MRIreorder, the selective-average headers read and
+//! written, LabelRemoveOverlap, MRIreorder4), piece 31's two (GCA morphs read as volumes), piece 32's three
 //! (GCA morphs written, read and written again, TRANSFORMs read, sampled, written, copied and
 //! applied) and piece 33's two (stacked autoencoders read as volumes),
 //! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: one since relay 40),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
-//! --light` on Linux x64 from the unit oracle's build (2026-11-17, track A relay 42, with
-//! mghRead's numbers cut by the end of a file through the official build's read slots (FS-167) and
-//! FS-929's warp volumes: 4,799 cases (case 4794, a heavy one in debug builds, left out), 4,282
-//! lines identical, 61 of them with memory digits; 517 hashed as `SKIP`, 163 of them `VARY`),
+//! --light` on Linux x64 from the unit oracle's build (2026-11-17, track A relay 44, with
+//! piece 30's `ro4`: 4,799 cases (case 4794, a heavy one in debug builds, left out), 4,269 lines
+//! identical, 68 of them with memory digits; 530 hashed as `SKIP`, 158 of them `VARY`),
 //! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
 //! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
 //! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
@@ -51,8 +50,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "26a4a2e4d55fff908d7f0aba65a4ce043dea10cc005594665f0ac6e295e356cb";
-const SKIPPED: usize = 514;
+const OFFICIAL_SHA256: &str = "8b852c06632d543df01ed6b21b1c96ef5e492205dca00037840de63f93e0d030";
+const SKIPPED: usize = 530;
 
 /// The recorded per-case digests: `<case line> <output or SKIP>`, 12 hex digits each.
 const DIGESTS: &str = include_str!("fs_io/official_digests.txt");

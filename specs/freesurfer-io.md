@@ -5337,3 +5337,40 @@ A morph (§142) maps atlas voxels to image voxels. These functions resample a vo
 - Black box: FreeSurfer 8.2.0's `mri_convert <in>.mgz <out>.mgz -at <morph>.m3z` (item 1 of §157) and `mri_vol2vol
   --mov <in> --targ <atlas> --gcam ...`; `mri_warp_convert --inm3z <m> --outm3z <o> --lta1 <a> --lta2 <b>` (§158
   item 2).
+
+## 160. A volume's four dimensions reordered (`MRIreorder4`: `mri_convert --reorder4 <o1> <o2> <o3> <o4>`)
+
+1. The result is a new volume of the source's voxel type whose dimension `n` (1 columns, 2 rows, 3 slices, 4 frames)
+   is the source's dimension `order[n]`: its extents are the source's extents in that order, frames included. The
+   header is the source's, copied as `specs/freesurfer-mri.md` §6 copies a header (voxel sizes, direction cosines,
+   centre, the cached voxel-to-RAS matrices, times, names): a reordering does not adjust the geometry (unlike §138's
+   `MRIreorder`).
+2. Every source voxel `(c, r, s, f)` is read as its float value (the complex types: the real part) and written as a
+   float at the place whose index `n` is the source's index `order[n]`; the float passes unchanged (a NaN keeps its
+   payload, a signalling NaN stays signalling: no conversion through a wider type). The source's columns are the
+   outermost loop, then rows, slices, frames. Voxels of the types without values read and write as
+   `specs/freesurfer-mri.md` §5 says.
+3. An order whose four values are 1, 2, 3 and 4 in any order is the only meaningful one. FreeSurfer does not check:
+   - a value outside 1 to 4 (FS-937): FreeSurfer reads memory outside its four-element arrays for the extents and
+     the indices (undefined: memory contents or a crash). Both modes: refused with the error `MRIreorder4: order value
+     <v> outside 1 to 4` (code `ERROR_BADPARM`), no volume (the program then prints `error reordering all axes` and
+     ends with 1), noted;
+   - a value repeated (FS-938): FreeSurfer makes a volume with that extent twice; each voxel goes to the place its
+     repeated index gives, so a place reached several times keeps the last source voxel written there (the source's
+     loop order), every other voxel stays 0. Default: refused with the error `MRIreorder4: order <o1> <o2> <o3> <o4>
+     is not a permutation of 1 2 3 4`, no volume, noted; `reproduce`: FreeSurfer's volume, noted.
+4. `mri_convert` prints `reordering all axes...` and `reordering, values are <o1> <o2> <o3> <o4>` before the call
+   (the program's lines, with its item), and after a refusal `error reordering all axes` on standard error, exit 1.
+5. `mriio_command_line(argc, argv)`: `mri_convert` calls it first; FreeSurfer keeps the arguments joined by blanks
+   in a buffer that nothing reads: no effect a caller can see; it returns `NO_ERROR`.
+
+## 161. Validation plan (part 40)
+
+- Closed probe: piece 30's `ro4` (relay 44): `MRIreorder4` of a source made in the case as `reo`'s (extents 0 to 4,
+  frames 0 to 3; bytes, ints, longs, floats with signalling NaNs, shorts, complex, RGB, unsigned shorts, now and then
+  the value-less types), the order every permutation of 1 to 4, now and then with a value repeated (FS-938) or
+  outside 1 to 4 (FS-937: `SKIP`); the result's header and voxels printed. `fsio` REBUILT.
+- Measured (relay 44): seeds 7 and 13 (about 400 `ro4` cases each, `subset.py ... ro4,reo`): `reproduce` identical
+  on every compared case (362 and 370 `ro4` cases), 0 different; `fix` differs only with notices (FS-938).
+- Black box: FreeSurfer 8.2.0's `mri_convert <in>.mgz <out>.mgz --reorder4 4 1 2 3` (and with `1 1 3 4`, `1 2 5 4`)
+  against the port's program; the output volumes compared byte for byte (`mri_info` of the result for the extents).

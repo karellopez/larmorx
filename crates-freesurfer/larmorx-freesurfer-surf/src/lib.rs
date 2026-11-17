@@ -138,6 +138,7 @@ pub mod sampdist;
 pub mod scanf;
 pub mod sclust;
 pub mod sfile;
+pub mod soap;
 pub mod sras;
 pub mod stl;
 pub mod surfbase;

@@ -6495,6 +6495,69 @@ void top_case()
   }
 }
 
+// sbl: the soap bubbles of mrisurf_deform.cpp (soap.rs): a surface read by MRISread (d/lh.s0:
+// vls's meshes), now and then at 2 hops; every vertex's rip flag, mark, current, original and
+// target positions from the case (each a small offset from the read position, now and then NaN);
+// Gdiag, Gdiag_no; then 1 to 3 of the four bubbles with a pass count, `freedists` and `marks`
+// (the marks set again from the case); after each every vertex's positions, tdx tdy tdz, mark and
+// marked3
+static void sbl_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->x); of(x->y); of(x->z); of(x->origx); of(x->origy); of(x->origz);
+    of(x->targx); of(x->targy); of(x->targz); of(x->tdx); of(x->tdy); of(x->tdz);
+    oi(x->marked); oi(x->marked3);
+  }
+}
+
+void sbl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nsize = geti();
+  if (nsize > 1) MRISsetNeighborhoodSize(s, nsize);
+  std::vector<short> marks(nv);
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s->vertices[v];
+    x->ripflag = (char)geti();
+    marks[v] = (short)geti();
+    x->marked = marks[v];
+    x->x += getf(); x->y += getf(); x->z += getf();
+    x->origx = x->x + getf(); x->origy = x->y + getf(); x->origz = x->z + getf();
+    x->targx = x->x + getf(); x->targy = x->y + getf(); x->targz = x->z + getf();
+  }
+  Gdiag = (unsigned long)(unsigned int)geti();
+  Gdiag_no = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "MRISsoapBubbleVertexPositions") oi(MRISsoapBubbleVertexPositions(s, geti()));
+    else if (op == "MRISweightedSoapBubbleVertexPositions") oi(MRISweightedSoapBubbleVertexPositions(s, geti()));
+    else if (op == "MRISsoapBubbleOrigVertexPositions") oi(MRISsoapBubbleOrigVertexPositions(s, geti()));
+    else if (op == "MRISsoapBubbleTargetVertexPositions") oi(MRISsoapBubbleTargetVertexPositions(s, geti()));
+    else if (op == "freedists") { MRISfreeDistsButNotOrig(s); MRISfreeDistOrigs(s); }
+    else if (op == "marks") { for (int v = 0; v < nv; v++) s->vertices[v].marked = marks[v]; }
+    else fail("sbl op");
+    sbl_dump(s);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -6763,6 +6826,8 @@ void run_case()
     vlr_case();
   } else if (cmd == "top") {
     top_case();
+  } else if (cmd == "sbl") {
+    sbl_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

@@ -394,7 +394,18 @@ fn read_case(g: &mut Gen) -> Vec<String> {
         t.push(k.into());
         query_args(&mut h, k, &mut t);
     }
-    t[nq_at] = (nq + extra).to_string();
+    // relay 43's queries (K, P): from a generator seeded by the case's text so far again
+    let seed2 = t.join(" ").bytes().fold(0x8422_2325_cbf2_9ce4u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    });
+    let mut h2 = Gen::new(seed2);
+    let extra2 = h2.below(3) as i64;
+    for _ in 0..extra2 {
+        let k = h2.pick(&["K", "K", "P"]);
+        t.push(k.into());
+        query_args(&mut h2, k, &mut t);
+    }
+    t[nq_at] = (nq + extra + extra2).to_string();
     t
 }
 
@@ -455,6 +466,9 @@ fn query_args(g: &mut Gen, k: &str, t: &mut Vec<String>) {
             t.push(g.pick(&[-1i64, 0, 1, 1, 2]).to_string());
         }
         "V" | "X" => t.push(g.pick(&[0i64, 1]).to_string()),
+        // relay 43: TransformConcat's second transform; TransformInvertReplace's volume
+        "K" => t.push(g.pick(&[0i64, 1, 1, 2, 2, 3, 4, 4]).to_string()),
+        "P" => t.push(g.pick(&[0i64, 1, 2]).to_string()),
         "O" => {
             for _ in 0..3 {
                 t.push(g.pick(&[0i64, 1]).to_string());
@@ -621,7 +635,7 @@ fn trs(
         let k = t.next();
         o.0.push_str(k);
         o.0.push(' ');
-        query(g, out, err, &env, o, w, &mut tr, k, &mut t)?;
+        query(g, out, err, &env, o, w, &mut tr, k, &mut t, &name)?;
     }
     let mut tr = Some(tr);
     o.i(i64::from(tr::transform_free(g, &mut tr)));
@@ -715,6 +729,82 @@ fn ptrans(o: &mut Out, tr: &Transform) {
     }
 }
 
+/// `fsio`'s `pvgfull`: a geometry's numbers and the FNV-1a 64 of its whole name buffer.
+fn pvgfull(o: &mut Out, v: &VolGeom) {
+    for x in [v.valid, v.width, v.height, v.depth] {
+        o.i(i64::from(x));
+    }
+    for x in [
+        v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s, v.z_r, v.z_a, v.z_s,
+        v.c_r, v.c_a, v.c_s, v.s_r, v.s_a, v.s_s,
+    ] {
+        fh(o, x);
+    }
+    super::piece11::fnv(o, v.fname.buffer());
+}
+
+/// `fsio`'s `ptrans43`: a morph's extent, spacing, type, nodes (FNV-1a 64), whether it has an
+/// inverse, its two geometries in full; an array as [`ptrans`].
+fn ptrans43(o: &mut Out, tr: &Transform) {
+    if tr.ttype != larmorx_freesurfer_mri::lta::MORPH_3D_TYPE {
+        ptrans(o, tr);
+        return;
+    }
+    o.i(i64::from(tr.ttype));
+    let gm = tr.gcam();
+    for v in [gm.width, gm.height, gm.depth, gm.spacing, gm.mtype] {
+        o.i(i64::from(v));
+    }
+    let mut b = Vec::with_capacity(gm.nodes.len() * 68);
+    for n in &gm.nodes {
+        for v in [n.x, n.y, n.z, n.origx, n.origy, n.origz] {
+            b.extend_from_slice(&v.to_le_bytes());
+        }
+        for v in [n.xn, n.yn, n.zn, n.label, i32::from(n.invalid)] {
+            b.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    super::piece11::fnv(o, &b);
+    o.i(i64::from(gm.mri_xind.is_some()));
+    pvgfull(o, &gm.image);
+    pvgfull(o, &gm.atlas);
+}
+
+/// `fsio`'s `identity43`: an identity array (voxel to voxel) on one geometry.
+fn identity43(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    vg: &VolGeom,
+) -> Result<Transform, Fatal> {
+    let mut l = larmorx_freesurfer_mri::lta::lta_alloc(g, out, err, 1, None)?;
+    l.ltype = larmorx_freesurfer_mri::lta::LINEAR_VOX_TO_VOX;
+    l.xforms[0].src.assign(g, vg);
+    l.xforms[0].dst.assign(g, vg);
+    Ok(Transform::new(
+        larmorx_freesurfer_mri::lta::LINEAR_VOX_TO_VOX,
+        tr::Xform::Lta(l),
+    ))
+}
+
+/// Whether a morph's composition or inverse would pass `fsio`'s limits (relay 43): a new grid or
+/// an inverse of more than 2^20 nodes (264 bytes each: past `fsio`'s 1 GiB, or minutes).
+fn past_limits_43(tr: &Transform, k: &str) -> bool {
+    if tr.ttype != larmorx_freesurfer_mri::lta::MORPH_3D_TYPE {
+        return false;
+    }
+    let gm = tr.gcam();
+    let voxels = |v: &VolGeom, sp: i64| {
+        let d = |n: i32| (i64::from(n) / sp).unsigned_abs();
+        d(v.width) * d(v.height) * d(v.depth)
+    };
+    if k == "P" {
+        voxels(&gm.image, 1) > 1 << 20
+    } else {
+        gm.spacing != 0 && voxels(&gm.atlas, i64::from(gm.spacing)) > 1 << 20
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn query(
     g: &mut Globals,
@@ -726,6 +816,7 @@ fn query(
     tr: &mut Transform,
     k: &str,
     t: &mut Toks,
+    name: &str,
 ) -> Result<(), Fatal> {
     match k {
         "s" | "r" | "R" | "f" => {
@@ -902,6 +993,73 @@ fn query(
             o.i(i64::from(r));
             ptrans(o, tr);
         }
+        "K" | "P" => {
+            let mode = t.int();
+            if past_limits_43(tr, k) {
+                let _ = err.write_all(NOT_RUN);
+                o.0.push_str("N ");
+                return Ok(());
+            }
+            let a = tr::transform_get_src_vol_geom(g, err, tr)?;
+            let b = tr::transform_get_dst_vol_geom(g, err, tr)?;
+            let dir = Some(w.fix.as_path());
+            if k == "P" {
+                let m = if mode != 0 {
+                    let v = if mode == 1 { &a } else { &b };
+                    let mut m = mri::mri_alloc_header(
+                        g,
+                        out,
+                        err,
+                        v.width,
+                        v.height,
+                        v.depth,
+                        mri::MRI_UCHAR,
+                        1,
+                    )?;
+                    mri::mri_copy_vol_geom_to_mri(&mut m, v);
+                    Some(m)
+                } else {
+                    None
+                };
+                tr::transform_invert_replace(g, out, err, env, dir, tr, m.as_ref())?;
+                ptrans43(o, tr);
+                return Ok(());
+            }
+            let u = if mode == 0 || mode == 4 {
+                let u = tr::transform_read(g, out, err, env, dir, name)?;
+                match u {
+                    Some(mut u) => {
+                        if mode == 4
+                            && u.ttype == larmorx_freesurfer_mri::lta::MORPH_3D_TYPE
+                            && tr.ttype == larmorx_freesurfer_mri::lta::MORPH_3D_TYPE
+                        {
+                            let atlas = tr.gcam().atlas.clone();
+                            u.gcam_mut().image.assign(g, &atlas);
+                        }
+                        Some(u)
+                    }
+                    None => None,
+                }
+            } else {
+                Some(identity43(g, out, err, if mode == 1 { &b } else { &a })?)
+            };
+            let Some(u) = u else {
+                o.0.push_str("N ");
+                return Ok(());
+            };
+            // the case's transform is moved into the array and taken back after
+            let none = larmorx_freesurfer_mri::lta::lta_alloc(g, out, err, 0, None)?;
+            let t0 = std::mem::replace(tr, Transform::new(0, tr::Xform::Lta(none)));
+            let (mut arr, at) = if mode == 2 {
+                (vec![u, t0], 1)
+            } else {
+                (vec![t0, u], 0)
+            };
+            let c = tr::transform_concat(g, out, err, env, &mut arr);
+            *tr = arr.swap_remove(at);
+            let c = c?;
+            ptrans43(o, &c);
+        }
         "O" => {
             let (l, r, into) = (t.int() != 0, t.int() != 0, t.int() != 0);
             let mut ml = larmorx_freesurfer_core::matrix::Matrix::real(4, 4);
@@ -1001,6 +1159,9 @@ pub fn run(
                 | "FS-928"
                 // relay 43: a morph sampled outside its nodes (FreeSurfer crashes)
                 | "FS-933"
+                | "FS-934"
+                | "FS-935"
+                | "FS-936"
         ) {
             extra.push("SKIP");
         }

@@ -26,8 +26,8 @@
 //! `TransformCreateDensityMap`, `TransformApplyInverse` and `TransformApplyInverseType`
 //! (`GCAMmorphToAtlas`, its density form and `GCAMmorphFromAtlas`: `crate::morph`).
 //!
-//! Not here yet (their callees are not ported): `TransformConcat` (`GCAMconcat2`/`3`),
-//! `TransformInvertReplace` (`GCAMfillInverse`).
+//! Since relay 43 also `TransformConcat` (5026, with `GCAMconcat2`/`3`) and
+//! `TransformInvertReplace` (5073, with `GCAMfillInverse`: `crate::concat`).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-io.md` Part 34): FS-857 (the inverse
 //! sample of a morph of spacing 0), FS-858 (a linear transform file whose type is the morph's),
@@ -71,13 +71,16 @@ use larmorx_freesurfer_volume::ltaapply::{
 use larmorx_freesurfer_volume::ltaconv::{
     lta_compose, lta_compose_in_place, lta_ras_to_voxel_xform, lta_voxel_to_ras_xform,
 };
-use larmorx_freesurfer_volume::ltaops::{lta_change_type, lta_fill_inverse};
+use larmorx_freesurfer_volume::ltaops::{
+    InvertInto, lta_change_type, lta_concat2, lta_fill_inverse, lta_invert,
+};
 use larmorx_freesurfer_volume::ltaread::{
     LtaIo, RegisterDat, lta_read_ex, transform_file_name_type,
 };
 use larmorx_freesurfer_volume::ltawrite::lta_write_ex;
 use larmorx_freesurfer_volume::sample::sample_volume;
 use larmorx_freesurfer_volume::talairachex::transform_with_matrix;
+use larmorx_freesurfer_volume::vgeom::get_vol_geom;
 
 use crate::gcam::{GCAM_POSITION_INVALID, Gcam, gcam_copy, gcam_invert, gcam_read};
 use crate::morph::{
@@ -1419,4 +1422,122 @@ pub fn transform_compose_in_place(
     };
     lta_compose_in_place(g, out, err, lta, m_left, m_right)?;
     Ok(true)
+}
+
+/// `TransformConcat(trxArray, numTrx)` (5026): the composition of the transforms, the first
+/// applied to images first: a copy of the last ([`transform_copy`]), then each earlier one
+/// composed into it. A morph after a morph: `GCAMconcat2(earlier, current, current)`
+/// ([`gcam_concat2_into_second`]); a linear array before a morph: `GCAMconcat3(earlier, current,
+/// NULL)`; a morph before a linear array: `GCAMconcat3(NULL, earlier, current)`, the transform
+/// becoming a morph; two linear arrays: `LTAconcat2(earlier, current, 0)` (no array: `ERROR:
+/// TransformConcat(): LTAs do not match`, the program ends; the transform keeps its type). The
+/// earlier transforms can change (a morph in RAS is taken to voxels, a linear array inverted to
+/// match). No transform: `TransformConcat(): no transform passed`, the program ends.
+pub fn transform_concat(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    trx: &mut [Transform],
+) -> Result<Transform, Fatal> {
+    let Some((last, rest)) = trx.split_last_mut() else {
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            "TransformConcat(): no transform passed\n",
+        )?;
+        return Err(Fatal::Exit(1));
+    };
+    let Some(mut o) = transform_copy(g, out, err, last, None)? else {
+        return Err(Fatal::Exit(139));
+    };
+    for next in rest.iter_mut().rev() {
+        let (o_morph, n_morph) = (o.is_morph(), next.is_morph());
+        match (o_morph, n_morph) {
+            (true, true) => {
+                crate::concat::gcam_concat2_into_second(
+                    g,
+                    out,
+                    err,
+                    env,
+                    next.gcam_mut(),
+                    o.gcam_mut(),
+                )?;
+            }
+            (true, false) => {
+                let m = crate::concat::gcam_concat3(
+                    g,
+                    out,
+                    err,
+                    env,
+                    Some(next.lta()),
+                    o.gcam_mut(),
+                    None,
+                )?;
+                o.xform = Xform::Morph(Box::new(m));
+            }
+            (false, true) => {
+                let m = crate::concat::gcam_concat3(
+                    g,
+                    out,
+                    err,
+                    env,
+                    None,
+                    next.gcam_mut(),
+                    Some(o.lta()),
+                )?;
+                o.xform = Xform::Morph(Box::new(m));
+                o.ttype = MORPH_3D_TYPE;
+            }
+            (false, false) => {
+                let r = lta_concat2(g, out, err, env, next.lta_mut(), o.lta_mut(), false)?;
+                match r {
+                    Some(l) => o.xform = Xform::Lta(l),
+                    None => {
+                        log::error_exit(
+                            g,
+                            err,
+                            ERROR_BADPARM,
+                            "ERROR: TransformConcat(): LTAs do not match",
+                        )?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(o)
+}
+
+/// `TransformInvertReplace(transform, mri)` (5073): the transform replaced by its inverse. A GCA
+/// morph: its image geometry first taken from `mri` when given (`getVolGeom`), then
+/// `GCAMfillInverse` ([`crate::concat::gcam_fill_inverse`]; FS-936 when it makes no morph); a
+/// linear array: `LTAinvert(lta, NULL)` (the transform's type kept).
+#[allow(clippy::too_many_arguments)]
+pub fn transform_invert_replace(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    t: &mut Transform,
+    mri: Option<&Mri>,
+) -> Result<(), Fatal> {
+    match &mut t.xform {
+        Xform::Morph(gcam) => {
+            if let Some(m) = mri {
+                get_vol_geom(&m.vg, &mut gcam.image);
+            }
+            match crate::concat::gcam_fill_inverse(g, out, err, env, dir, gcam)? {
+                Some(inv) => t.xform = Xform::Morph(Box::new(inv)),
+                None => crate::concat::no_inverse(g, err)?,
+            }
+        }
+        Xform::Lta(lta) => {
+            if let Ret::New(l) = lta_invert(g, out, err, InvertInto::New(lta))? {
+                t.xform = Xform::Lta(l);
+            }
+        }
+    }
+    Ok(())
 }

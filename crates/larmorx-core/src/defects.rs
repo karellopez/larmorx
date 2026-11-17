@@ -2391,6 +2391,12 @@ defects! {
         "resampling a volume of more than one slice onto a GCA morph's atlas: every atlas voxel whose point falls at or below the volume's first slice (between -1 and 0, the first slice itself included) is 0, while points down to -1 along the other two axes take the edge voxels' values (an identity morph loses the first slice)";
     FS_933 = "FS-933", "FreeSurfer", true,
         "resampling a volume through a GCA morph of spacing 0 (or sampling it at a point that is not a number) whose grid has no nodes along one of its axes: FreeSurfer reads outside the morph's nodes (a crash)";
+    FS_934 = "FS-934", "FreeSurfer", true,
+        "composing a GCA morph with a linear transform array whose transforms do not chain (one's destination is not the next one's source or destination): after the error line FreeSurfer reads the reduced array it did not get (a crash)";
+    FS_935 = "FS-935", "FreeSurfer", true,
+        "composing a GCA morph of spacing 0 with linear transforms: FreeSurfer divides the atlas extent by the spacing as integers (a division by zero: a crash)";
+    FS_936 = "FS-936", "FreeSurfer", true,
+        "replacing a GCA morph by its inverse when the morph has no inverse yet and the volume its image geometry names cannot be read: after the error line FreeSurfer keeps no morph in the transform, and its next use crashes";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

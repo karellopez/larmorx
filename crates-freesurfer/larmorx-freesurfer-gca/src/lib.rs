@@ -18,6 +18,7 @@
 
 pub mod autoencoder;
 pub mod cma_names;
+pub mod concat;
 pub mod gca;
 pub mod gcam;
 pub mod gcam_write;

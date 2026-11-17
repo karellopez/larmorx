@@ -264,8 +264,11 @@ max when it is larger (a NaN never does), so a volume whose values all lie above
 
 All map each voxel of each frame of the source's extent into the destination (a clone without one).
 
-- `MRIlinearScale(src, dst, scale, offset, only_nonzero)`: `v * scale + offset` (for every voxel, or
-  only those with `|v| >= 1e-15` when `only_nonzero`), clipped to [0, 255] for a `uchar` destination.
+- `MRIlinearScale(src, dst, scale, offset, only_nonzero)`: each voxel `v` becomes `v * scale +
+  offset` (in float), but when `only_nonzero` is set and `|v| < 1e-15` (in double) it stays `v`;
+  either way the value is then clipped to [0, 255] for a `uchar` destination (a NaN is not) and
+  written. So with `only_nonzero` the other voxels are written too, with their own values (the
+  destination's earlier values there are replaced: **(observed)**, `vscale`, 6 lines, and `vrules`).
 - `MRIscalarMul(src, dst, s)`: `v * s`.
 - `MRIscalarMulFrame(src, dst, s, frame)`: one frame, direct by the source's type: `uchar`
   `v * s` clipped to [0, 255] and truncated (a NaN stored as 0: FS-296); `float` the product;

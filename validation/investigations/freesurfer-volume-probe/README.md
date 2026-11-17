@@ -201,3 +201,14 @@ cached matrices as allocated, recomputed or dropped.
   without it; the probe as its own candidate: no unexplained difference in either mode;
   `models.py skull`: 160 of 160 lines as the model (log
   `oracles/logs/fs-volume-probe-r7-final-2026-11-17.log`).
+- Relay 8 (2026-11-17): the prebuilt probe rebuilt from commit `9319981f` (part 5's commands,
+  `ltareads`, standard error oriented before each call; its build in `BUILD_INFO.txt`, the same bytes
+  twice; the 420314bb build kept in `<workspace>/archive/2026-11-17-fs-volume-probe-420314bb/`): every
+  earlier group's hash unchanged but `vltaread`'s, whose only changed lines are its six missing
+  `register.dat` cases (`errno` 2 and `No such file or directory` instead of 22 and `Invalid argument`,
+  the 420314bb build's lines compared one by one); the new groups `vrules4` (94 calls) and `vcma`
+  (377) the same cold, warm and without the cache (`vcma` twice without it); the probe as its own
+  candidate: no unexplained difference in either mode; `models.py fs291` 127, `skull` 160 and `cma`
+  95 lines as their models (logs `oracles/logs/fs-volume-probe-r8-final-2026-11-17.log`,
+  `fs-volume-probe-r8-vcma-2026-11-17.log`). The loop lets a `vsample` line noting FS-300 differ in
+  both modes (its window points FreeSurfer never reads).

@@ -189,16 +189,20 @@ fn inverse_samples_of_a_morph() {
         tr::transform_sample_inverse(&mut g, &mut o, &mut e, &env, &mut t, 2, 4, 4).unwrap();
     assert_eq!(r, ERROR_BADPARM);
     // the trilinear sample of the nodes (GCAMsampleMorph): (1, 1, 1) / 2 lies between nodes 0 and 1
-    let (r, p) = tr::gcam_sample_morph(t.gcam(), 1.0, 1.0, 1.0);
+    let (r, p) = tr::gcam_sample_morph(&mut g, &mut e, t.gcam(), 1.0, 1.0, 1.0).unwrap();
     assert_eq!((r, p), (0, [1.5, 0.5, 0.5]));
     // outside the grid, or next to a node of invalid position
     assert_eq!(
-        tr::gcam_sample_morph(t.gcam(), 6.0, 0.0, 0.0).0,
+        tr::gcam_sample_morph(&mut g, &mut e, t.gcam(), 6.0, 0.0, 0.0)
+            .unwrap()
+            .0,
         ERROR_BADPARM
     );
     t.gcam_mut().node_mut(0, 0, 0).invalid = GCAM_POSITION_INVALID;
     assert_eq!(
-        tr::gcam_sample_morph(t.gcam(), 1.0, 1.0, 1.0).0,
+        tr::gcam_sample_morph(&mut g, &mut e, t.gcam(), 1.0, 1.0, 1.0)
+            .unwrap()
+            .0,
         ERROR_BADPARM
     );
     // a morph without inverse index volumes

@@ -39,7 +39,9 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861, FS_862, FS_876, FS_928};
+use larmorx_core::defects::{
+    FS_857, FS_858, FS_859, FS_860, FS_861, FS_862, FS_876, FS_928, FS_933,
+};
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
@@ -715,13 +717,44 @@ pub fn transform_sample_inverse(
 /// around it (`(int)` of the point, the next ones clamped to the grid), `ERROR_BADPARM` when one
 /// of them has an invalid position, else their current positions weighted by the distances
 /// (`float` weights times the `double` positions, summed in `double`, stored as `float`).
-pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3]) {
+///
+/// FS-933: a NaN point (a spacing of 0 makes one of the voxel 0) passes the check; on a grid
+/// without nodes along one of its axes FreeSurfer then reads outside the nodes (a crash): the
+/// program ends here in both modes.
+pub fn gcam_sample_morph(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    gcam: &Gcam,
+    x: f32,
+    y: f32,
+    z: f32,
+) -> Result<(i32, [f32; 3]), Fatal> {
+    match sample_morph(gcam, x, y, z) {
+        Some(r) => Ok(r),
+        None => {
+            g.notices.add(
+                &FS_933,
+                "GCAMsampleMorph of a NaN point on a morph without nodes along an axis: FreeSurfer reads outside the nodes (a crash)",
+            );
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                "GCAMsampleMorph: a NaN point of a morph without nodes along an axis (FreeSurfer reads outside its nodes and crashes here)",
+            )?;
+            Ok((ERROR_BADPARM, [0.0; 3]))
+        }
+    }
+}
+
+/// [`gcam_sample_morph`]'s arithmetic; `None` when a corner is outside the nodes.
+fn sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> Option<(i32, [f32; 3])> {
     let sp = gcam.spacing as f32;
     let (x, y, z) = (sse::div(x, sp), sse::div(y, sp), sse::div(z, sp));
     let (width, height, depth) = (gcam.width, gcam.height, gcam.depth);
     if x >= width as f32 || y >= height as f32 || z >= depth as f32 || x < 0.0 || y < 0.0 || z < 0.0
     {
-        return (ERROR_BADPARM, [0.0; 3]);
+        return Some((ERROR_BADPARM, [0.0; 3]));
     }
     // (int) of a NaN is INT_MIN on x86-64 (cvttss2si): MAX(..., 0) gives 0 there and here
     let trunc = |v: f32| if v.is_nan() { i32::MIN } else { v as i32 };
@@ -737,6 +770,14 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
     let xpd = sse::sub(1.0, xmd);
     let ypd = sse::sub(1.0, ymd);
     let zpd = sse::sub(1.0, zmd);
+    // a NaN point on a grid without nodes along an axis: corners outside the nodes (FS-933)
+    if [xm, xp, ym, yp, zm, zp]
+        .iter()
+        .zip([width, width, height, height, depth, depth])
+        .any(|(&v, n)| v < 0 || v >= n)
+    {
+        return None;
+    }
     let corners = [
         (xm, ym, zm, xpd, ypd, zpd),
         (xm, ym, zp, xpd, ypd, zmd),
@@ -751,7 +792,7 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
         .iter()
         .any(|&(a, b, c, ..)| gcam.node(a, b, c).invalid == GCAM_POSITION_INVALID)
     {
-        return (ERROR_BADPARM, [0.0; 3]);
+        return Some((ERROR_BADPARM, [0.0; 3]));
     }
     // the official build's operand orders (gcamorph.cpp.o; they decide which NaN a sum of two
     // keeps): the weights of the corners with xp are ypd * xmd (and zpd * (ymd * xmd) for
@@ -795,7 +836,7 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
     let s = sse::add64(t[3], s);
     let s = sse::add64(sse::add64(sse::add64(s, t[4]), t[5]), t[6]);
     p[2] = sse::add64(t[7], s) as f32;
-    (NO_ERROR, p)
+    Some((NO_ERROR, p))
 }
 
 /// `TransformSampleInverseFloat(transform, xv, yv, zv, ...)`: a morph through
@@ -813,7 +854,7 @@ pub fn transform_sample_inverse_float(
     zv: f32,
 ) -> Result<(i32, [f32; 3]), Fatal> {
     if t.is_morph() {
-        return Ok(gcam_sample_morph(t.gcam(), xv, yv, zv));
+        return gcam_sample_morph(g, err, t.gcam(), xv, yv, zv);
     }
     let lta = t.lta_mut();
     to_vox2vox(g, out, err, env, lta)?;

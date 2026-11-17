@@ -34,7 +34,9 @@ use larmorx_freesurfer_core::log::{
     self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOMEMORY, ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy, matrix_multiply, matrix_multiply_d};
-use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_inverse, matrix_print};
+use larmorx_freesurfer_core::matrix_ops::{
+    matrix_determinant, matrix_inverse, matrix_print, triple_product,
+};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse;
@@ -843,18 +845,17 @@ pub fn gcam_store_metric_properties(
 
 /// `GCAMN_SUB(a, b, v)` then the vector's `float`s: `a - b` in `double` per axis, stored as `float`.
 fn sub3(a: &GcamNode, b: &GcamNode) -> [f32; 3] {
-    [(a.x - b.x) as f32, (a.y - b.y) as f32, (a.z - b.z) as f32]
+    [
+        sse::sub64(a.x, b.x) as f32,
+        sse::sub64(a.y, b.y) as f32,
+        sse::sub64(a.z, b.z) as f32,
+    ]
 }
 
-/// `VectorTripleProduct(v1, v2, v3)`: `(v1 x v2) . v3` in `float`, summed as FreeSurfer sums it.
+/// `VectorTripleProduct(v1, v2, v3)`: `(v1 x v2) . v3` in `float`, in the official build's operand
+/// orders (fs.core's [`triple_product`]).
 fn triple(v1: [f32; 3], v2: [f32; 3], v3: [f32; 3]) -> f32 {
-    let [x1, y1, z1] = v1;
-    let [x2, y2, z2] = v2;
-    let [x3, y3, z3] = v3;
-    let cross = |a: f32, b: f32, c: f32, d: f32| sse::sub(sse::mul(a, b), sse::mul(c, d));
-    let mut total = sse::mul(x3, cross(y1, z2, z1, y2));
-    total = sse::add(total, sse::mul(y3, cross(z1, x2, x1, z2)));
-    sse::add(total, sse::mul(z3, cross(x1, y2, y1, x2)))
+    triple_product(v1, v2, v3)
 }
 
 /// `cma_label_to_name(label)`: the label's name (`utils/gca.cpp`'s list; the first equal one), or
@@ -925,7 +926,7 @@ pub fn gcam_compute_metric_properties(
                             bad = true;
                         }
                         area1 = Some(a1);
-                        area = (f64::from(area) + f64::from(a1)) as f32;
+                        area = sse::add64(f64::from(area), f64::from(a1)) as f32;
                     }
                 } else {
                     area1 = Some(0.0);
@@ -945,7 +946,7 @@ pub fn gcam_compute_metric_properties(
                         if a2 <= 0.0 {
                             bad = true;
                         }
-                        area = (f64::from(area) + f64::from(a2)) as f32;
+                        area = sse::add64(f64::from(area), f64::from(a2)) as f32;
                     }
                 } else {
                     area2 = Some(0.0);

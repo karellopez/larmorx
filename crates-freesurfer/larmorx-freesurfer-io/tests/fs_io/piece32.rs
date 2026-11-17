@@ -999,8 +999,14 @@ pub fn run(
                 | "FS-504"
                 | "FS-957"
                 | "FS-928"
+                // relay 43: a morph sampled outside its nodes (FreeSurfer crashes)
+                | "FS-933"
         ) {
             extra.push("SKIP");
+        }
+        // relay 43: a resampling's first failed sample takes memory contents in FreeSurfer
+        if n.defect.id == "FS-931" {
+            extra.push("VARY");
         }
         if matches!(n.defect.id, "FS-167" | "FS-49") && !n.detail.ends_with("as in FreeSurfer") {
             extra.push("VARY");

@@ -194,7 +194,8 @@ pub fn gcam_morph_to_atlas(
     for x in 0..width.max(0) {
         for y in 0..height.max(0) {
             for z in 0..depth.max(0) {
-                let (r, [xd, yd, zd]) = gcam_sample_morph(gcam, x as f32, y as f32, z as f32);
+                let (r, [xd, yd, zd]) =
+                    gcam_sample_morph(g, err, gcam, x as f32, y as f32, z as f32)?;
                 if r != NO_ERROR {
                     continue;
                 }

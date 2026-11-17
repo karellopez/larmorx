@@ -2389,6 +2389,8 @@ defects! {
         "resampling a volume through a GCA morph when the first voxel sampled fails (an unsupported interpolation such as sinc, or an unsupported volume type): that voxel, and those after it until one is sampled, take memory contents";
     FS_932 = "FS-932", "FreeSurfer", true,
         "resampling a volume of more than one slice onto a GCA morph's atlas: every atlas voxel whose point falls at or below the volume's first slice (between -1 and 0, the first slice itself included) is 0, while points down to -1 along the other two axes take the edge voxels' values (an identity morph loses the first slice)";
+    FS_933 = "FS-933", "FreeSurfer", true,
+        "resampling a volume through a GCA morph of spacing 0 (or sampling it at a point that is not a number) whose grid has no nodes along one of its axes: FreeSurfer reads outside the morph's nodes (a crash)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

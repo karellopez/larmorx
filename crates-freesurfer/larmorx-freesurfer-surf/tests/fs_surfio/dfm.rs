@@ -261,9 +261,7 @@ pub(super) fn dfm_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "cds" => {
                 let (res, w) = (t.f(), t.i());
                 let mut given = if w > 0 {
-                    Some(mri_alloc(
-                        g, io.out, io.err, w as i32, w as i32, w as i32, MRI_FLOAT,
-                    )?)
+                    Some(mri_alloc(g, io.out, io.err, w, w, w, MRI_FLOAT)?)
                 } else {
                     None
                 };

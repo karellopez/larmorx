@@ -9,6 +9,8 @@
 //! status, and FS-1001 and FS-1004 in both modes (the probe's `dfm` command compares the rest with
 //! FreeSurfer's own code).
 
+#![allow(clippy::needless_range_loop)]
+
 use std::sync::Arc;
 
 use larmorx_core::defects::UpstreamDefects;

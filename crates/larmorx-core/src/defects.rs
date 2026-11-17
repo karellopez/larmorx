@@ -2528,7 +2528,7 @@ defects! {
     FS_311 = "FS-311", "FreeSurfer", true,
         "the segmentation functions (left-right label swaps, the ribbon fix, one-hot encoding, the brain volume corrections) turn a voxel value or a label list entry that is NaN or beyond the 32-bit integer range into the label -2147483648";
     FS_312 = "FS-312", "FreeSurfer", true,
-        "the supratentorial and cortical gray matter volume corrections count each thalamus voxel twice (the thalamus labels are tested twice since two of their names became one label)";
+        "the supratentorial and cortical gray matter volume corrections count each thalamus voxel twice";
     FS_313 = "FS-313", "FreeSurfer", true,
         "the cortical gray matter volume correction subtracts the left vessel label's voxels in the ribbon but not the right vessel label's";
     FS_314 = "FS-314", "FreeSurfer", true,

@@ -610,7 +610,29 @@ class Gen:
                     f"mnormcol {a} {self.mat(r, rows + 1, cols)} new",
                     f"mcolscale {a} {self.mat(r, 1, max(1, cols - 1))}",
                 ]
-        return [Batch("melements", "melements", L)]
+        return [
+            Batch("melements", "melements", L),
+            Batch("melements", "melements-nan", self.melements_nan()),
+        ]
+
+    @staticmethod
+    def melements_nan() -> list[str]:
+        """§8.2's NaN order of MatrixAdd and MatrixSubtract (fixed cases): NaNs of different payloads in
+        both operands, in one element or in all, rows of 1 to 9 columns, the output new, the first
+        operand, the second or another given matrix."""
+        one, two = "3f800000", "40000000"
+
+        def mat(rows: int, cols: int, first: str, rest: str) -> str:
+            return f"1 {rows} {cols} " + " ".join([first] + [rest] * (rows * cols - 1))
+
+        L = []
+        for rows, cols in ((1, 3), (2, 3), (5, 1), (1, 4), (4, 4), (1, 5), (2, 5), (1, 7), (3, 9)):
+            for c in ("madd", "msub"):
+                for a, b in (("7fc00061", "ffc00062"), ("7f800063", "7fc00064")):
+                    for o in ("new", "self", "other", mat(rows, cols, one, one)):
+                        L.append(f"{c} {mat(rows, cols, a, one)} {mat(rows, cols, b, two)} {o}")
+                    L.append(f"{c} {mat(rows, cols, a, a)} {mat(rows, cols, b, b)} new")
+        return L
 
     def mregions(self) -> list[Batch]:
         r = self.rng("mregions")
@@ -660,7 +682,52 @@ class Gen:
             "xyznorm 00000000 80000000 00000000",
             f"v3angle {self.mat(r, 3, 1, values=['0'] * 3)} {self.mat(r, 3, 1)}",
         ]
-        return [Batch("mvectors", "mvectors", L)]
+        return [
+            Batch("mvectors", "mvectors", L),
+            Batch("mvectors", "mvectors-nan", self.mvectors_nan()),
+        ]
+
+    @staticmethod
+    def mvectors_nan() -> list[str]:
+        """§8.5's NaN order of the cross and triple products (fixed cases): NaNs of different payloads
+        as both factors of each product, as both products of each difference, as a cross term and its
+        element of the third vector, and as the triple product's three terms in pairs."""
+        one, two, three, four = "3f800000", "40000000", "40400000", "40800000"
+
+        def n(t: int) -> str:
+            return f"7fc000{t:02x}"
+
+        def v(a: str, b: str, c: str) -> str:
+            return f"1 3 1 {a} {b} {c}"
+
+        L = [
+            # each element's first product, then its second product, both factors NaN
+            f"vcross {v(one, n(0x11), two)} {v(three, four, n(0x12))} new",
+            f"vcross {v(three, one, n(0x21))} {v(n(0x22), four, two)} new",
+            f"vcross {v(n(0x31), two, one)} {v(three, n(0x32), four)} new",
+            f"vcross {v(one, two, n(0x13))} {v(three, n(0x14), four)} new",
+            f"vcross {v(n(0x23), one, two)} {v(three, four, n(0x24))} new",
+            f"vcross {v(one, n(0x33), two)} {v(n(0x34), three, four)} new",
+            # each element's two products NaN, one factor each
+            f"vcross {v(one, n(0x15), n(0x16))} {v(three, four, two)} new",
+            f"vcross {v(n(0x26), one, n(0x25))} {v(three, four, two)} new",
+            f"vcross {v(n(0x35), n(0x36), one)} {v(three, four, two)} new",
+            f"vcross {v(n(0x26), one, n(0x25))} {v(three, four, two)} self",
+            f"vcross {v(n(0x26), one, n(0x25))} {v(three, four, two)} other",
+            # the triple product: a term against its element, the three terms in pairs
+            f"vtriple {v(one, n(0x41), two)} {v(three, four, one)} {v(n(0x42), one, one)}",
+            f"vtriple {v(three, one, n(0x43))} {v(one, four, two)} {v(one, n(0x44), one)}",
+            f"vtriple {v(one, two, three)} {v(two, three, one)} {v(n(0x51), n(0x52), one)}",
+            f"vtriple {v(one, two, three)} {v(two, three, one)} {v(n(0x51), n(0x52), n(0x53))}",
+            f"vtriple {v(one, two, three)} {v(two, three, one)} {v(one, n(0x52), n(0x53))}",
+            f"vtriple {v(one, two, three)} {v(two, three, one)} {v(n(0x51), one, n(0x53))}",
+            # the third term's own orders and the second term's difference
+            f"vtriple {v(n(0x71), one, two)} {v(three, n(0x72), four)} {v(one, one, one)}",
+            f"vtriple {v(one, n(0x73), two)} {v(n(0x74), three, four)} {v(one, one, one)}",
+            f"vtriple {v(n(0x75), n(0x76), two)} {v(three, four, one)} {v(one, one, one)}",
+            f"vtriple {v(one, two, n(0x77))} {v(three, four, n(0x78))} {v(one, one, one)}",
+        ]
+        return L
 
     def mprint(self) -> list[Batch]:
         r = self.rng("mprint")

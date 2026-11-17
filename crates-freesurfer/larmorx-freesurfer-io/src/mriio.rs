@@ -450,6 +450,13 @@ pub fn mri_remove_nans(
     }
 }
 
+/// `mriio_command_line(argc, argv)` (`mri_convert` calls it first; relay 44, the item of its program
+/// taken early): FreeSurfer joins the arguments with blanks into a `static` buffer that nothing
+/// reads, so the call has no effect a caller can see; `NO_ERROR` (no arguments too).
+pub fn mriio_command_line(_argv: &[String]) -> i32 {
+    NO_ERROR
+}
+
 /// `MRIaddCommandLine(mri, cmdline)`: the line (its bytes before a NUL, as `strcpy` copies them)
 /// recorded as the volume's next command line; `NO_ERROR`. A volume that already records
 /// `MAX_CMDS` (1,000) prints the error `can't add cmd to mri since max cmds (<n>) has been

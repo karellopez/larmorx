@@ -2419,6 +2419,10 @@ defects! {
         "composing a GCA morph of spacing 0 with linear transforms: FreeSurfer divides the atlas extent by the spacing as integers (a division by zero: a crash)";
     FS_936 = "FS-936", "FreeSurfer", true,
         "replacing a GCA morph by its inverse when the morph has no inverse yet and the volume its image geometry names cannot be read: after the error line FreeSurfer keeps no morph in the transform, and its next use crashes";
+    FS_937 = "FS-937", "FreeSurfer", true,
+        "reordering all four dimensions of a volume (mri_convert --reorder4) with an order value outside 1 to 4: FreeSurfer reads memory outside its arrays for the result's extents and the voxels' places (undefined behaviour: memory contents or a crash)";
+    FS_938 = "FS-938", "FreeSurfer", true,
+        "reordering all four dimensions of a volume (mri_convert --reorder4) with an order that repeats a dimension: FreeSurfer silently makes a volume with that dimension twice, each voxel at the place its repeated index gives (a place reached several times keeps the last value, the others stay 0)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

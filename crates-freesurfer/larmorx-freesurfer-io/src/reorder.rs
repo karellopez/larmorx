@@ -3,7 +3,9 @@
 // 2026 Karel Lopez Vilaret.
 //! Reordering a volume's axes (`utils/mriio.cpp`, item 3.1-30): `MRIreorderVox2RAS` (the
 //! voxel-to-RAS matrix of the reordered volume) and `MRIreorder` (the voxels moved: `mri_convert
-//! -r`, `mri_robust_register`, `mri_robust_template`, the conform step's slice order).
+//! -r`, `mri_robust_register`, `mri_robust_template`, the conform step's slice order); since
+//! relay 44 `MRIreorder4` (the four dimensions reordered: `mri_convert --reorder4`, the item of
+//! its program, 3.2-07, taken early).
 //!
 //! Defects (`larmorx_core::defects`; mechanisms in `docs/findings/freesurfer-io.md`, Part 32):
 //! - **FS-843** (crash): dimension numbers whose absolute values' product and sum both come to
@@ -17,10 +19,17 @@
 //!   written past its voxels). Refused by default; with `reproduce` the bytes go where FreeSurfer
 //!   puts them while they stay in the destination's voxels (refused where they would not), noted.
 //! - FS-58 (crash): a source or destination without voxels.
+//! - **FS-937** (out of bounds): `MRIreorder4` with an order value outside 1 to 4 reads
+//!   FreeSurfer's arrays of four dimensions and indices outside them (stack memory: the extents of
+//!   the result and the voxels' places are memory contents). Refused in both modes, noted.
+//! - **FS-938** (rule B): `MRIreorder4` with an order that is not a permutation (a value
+//!   repeated): FreeSurfer makes a volume with that dimension twice and puts each voxel at the
+//!   place its repeated index gives (a voxel written several times keeps the last source voxel's
+//!   value, the rest stay 0). Refused by default; `reproduce` gives FreeSurfer's volume, noted.
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_58, FS_843, FS_844, FS_845};
+use larmorx_core::defects::{FS_58, FS_843, FS_844, FS_845, FS_937, FS_938};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::matrix::matrix_multiply;
@@ -31,6 +40,7 @@ use larmorx_freesurfer_mri::mri::{
     mri_alloc_sequence, mri_copy_header,
 };
 use larmorx_freesurfer_mri::vol_geom::{set_vox2ras_from_matrix, xfm_crs2xyz};
+use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
 /// `XDIM`, `YDIM`, `ZDIM` (`mri.h`).
 pub const XDIM: i32 = 1;
@@ -440,6 +450,91 @@ fn move_voxels(src: &Mri, d: &mut Mri, size: usize, dims: [i32; 3]) {
     }
 }
 
+/// `MRIreorder4(mri, order)`: a new volume whose dimension `n` (columns, rows, slices, frames) is
+/// the source's dimension `order[n]` (1 to 4), of the source's type, with the source's header
+/// copied unchanged (`MRIcopyHeader`: voxel sizes and the voxel-to-RAS matrix stay the source's).
+/// Each voxel moves by `MRIgetVoxVal` and `MRIsetVoxVal` (its float, a NaN's payload kept: the
+/// official build passes the float through), the source's columns outermost and frames innermost.
+/// `None` when the volume cannot be made (`mri_convert`: `error reordering all axes`, exit 1);
+/// FS-937 and FS-938 above.
+pub fn mri_reorder4(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    mri: &Mri,
+    order: [i32; 4],
+) -> Result<Option<Mri>, Fatal> {
+    if let Some(&v) = order.iter().find(|&&v| !(1..=4).contains(&v)) {
+        g.notices.add(
+            &FS_937,
+            format!(
+                "MRIreorder4: the order value {v} is outside 1 to 4 (FreeSurfer reads stack memory for the result's extents and the voxels' places): refused"
+            ),
+        );
+        g.errno = 0;
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("MRIreorder4: order value {v} outside 1 to 4"),
+        );
+        return Ok(None);
+    }
+    let mut seen = [false; 4];
+    let repeated = order
+        .iter()
+        .any(|&v| std::mem::replace(&mut seen[v as usize - 1], true));
+    if repeated {
+        g.notices.add(
+            &FS_938,
+            format!(
+                "MRIreorder4({} {} {} {}): an order that is not a permutation (FreeSurfer makes a volume with a dimension twice{})",
+                order[0],
+                order[1],
+                order[2],
+                order[3],
+                if g.notices.reproduce() {
+                    ", as here"
+                } else {
+                    "): refused"
+                }
+            ),
+        );
+        if !g.notices.reproduce() {
+            g.errno = 0;
+            log::error_printf(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!(
+                    "MRIreorder4: order {} {} {} {} is not a permutation of 1 2 3 4",
+                    order[0], order[1], order[2], order[3]
+                ),
+            );
+            return Ok(None);
+        }
+    }
+    let olddims = [mri.vg.width, mri.vg.height, mri.vg.depth, mri.nframes];
+    let newdims = order.map(|v| olddims[v as usize - 1]);
+    let mut result = mri_alloc_sequence(
+        g, out, err, newdims[0], newdims[1], newdims[2], mri.mtype, newdims[3],
+    )?;
+    mri_copy_header(g, out, err, mri, Some(&mut result))?;
+    for c0 in 0..olddims[0] {
+        for r0 in 0..olddims[1] {
+            for s0 in 0..olddims[2] {
+                for f0 in 0..olddims[3] {
+                    let dold = [c0, r0, s0, f0];
+                    let d = order.map(|v| dold[v as usize - 1]);
+                    let v = mri_get_vox_val(g, err, mri, c0, r0, s0, f0, 0)?;
+                    mri_set_vox_val(g, err, &mut result, d[0], d[1], d[2], d[3], v, 0)?;
+                }
+            }
+        }
+    }
+    Ok(Some(result))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -473,6 +568,56 @@ mod tests {
         // destination (y, x): source column x moves to destination row x
         assert_eq!(b[1], a[3]);
         assert_eq!(b[2], a[1]);
+    }
+
+    #[test]
+    fn reorders_four_dimensions() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        // 3 columns, 2 rows, 1 slice, 2 frames; the frames become the columns
+        let src = vol(&mut g, 3, 2, 1, 2, MRI_UCHAR);
+        let r = mri_reorder4(&mut g, &mut o, &mut e, &src, [4, 1, 2, 3])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (r.vg.width, r.vg.height, r.vg.depth, r.nframes),
+            (2, 3, 2, 1)
+        );
+        assert_eq!((r.vg.xsize, r.vg.ysize), (src.vg.xsize, src.vg.ysize));
+        for (c, rr, f) in [(0, 0, 0), (2, 1, 1), (1, 0, 1)] {
+            let a = mri_get_vox_val(&mut g, &mut e, &src, c, rr, 0, f, 0).unwrap();
+            let b = mri_get_vox_val(&mut g, &mut e, &r, f, c, rr, 0, 0).unwrap();
+            assert_eq!(a, b);
+        }
+        assert!(g.notices.is_empty());
+    }
+
+    #[test]
+    fn reorder4_refusals() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let src = vol(&mut g, 2, 2, 1, 1, MRI_UCHAR);
+            // outside 1 to 4: refused in both modes
+            let r = mri_reorder4(&mut g, &mut o, &mut e, &src, [1, 2, 5, 4]).unwrap();
+            assert!(r.is_none() && g.notices.contains(&FS_937));
+            // a value repeated: refused by default, FreeSurfer's volume with reproduce
+            let r = mri_reorder4(&mut g, &mut o, &mut e, &src, [1, 1, 3, 4]).unwrap();
+            assert!(g.notices.contains(&FS_938));
+            match mode {
+                UpstreamDefects::Fix => assert!(r.is_none()),
+                UpstreamDefects::Reproduce => {
+                    let r = r.unwrap();
+                    assert_eq!((r.vg.width, r.vg.height), (2, 2));
+                    // (c, c) holds the last row's voxel of column c; (1, 0) stays 0
+                    let last = mri_get_vox_val(&mut g, &mut e, &src, 1, 1, 0, 0, 0).unwrap();
+                    let diag = mri_get_vox_val(&mut g, &mut e, &r, 1, 1, 0, 0, 0).unwrap();
+                    assert_eq!(diag, last);
+                    let off = mri_get_vox_val(&mut g, &mut e, &r, 1, 0, 0, 0, 0).unwrap();
+                    assert_eq!(off, 0.0);
+                }
+            }
+        }
     }
 
     #[test]

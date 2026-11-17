@@ -63,6 +63,7 @@
 #include "mrishash.h"
 #include "mrishash_internals.h"
 #include "mrisurf_vals.h"
+#include "annotation.h"
 
 // sclustReMap0 is defined in surfcluster.cpp but not declared in its header (relay 38)
 int sclustReMap0(MRI_SURFACE *Surf, int nClusters, SCS *scs_sorted);
@@ -6108,6 +6109,123 @@ void vls_case()
   }
 }
 
+// ---- relay 41 of track D: vlr, mrisurf_vals.cpp's functions of one program each (valrest.rs)
+
+// vlr: a surface read by MRISread (d/lh.s0: vls's meshes), now and then its neighbourhood set to
+// 2 hops, every vertex's rip flag, annotation, curvature and vector-registration values (VALS_VP,
+// or none) and every face's rip flag from the case; the program's annotation table set or not (a
+// table file in the work folder where FreeSurfer looks for its default one, or a colour table set
+// as the table), the surface's colour table, Gdiag_no, a measure volume of one voxel per vertex
+// (or none); then 1 to 4 operations named by their FreeSurfer functions; `G` where a value setter
+// would read or write outside a vertex's arrays (FS-980); after each the vertices' rip flags,
+// borders, annotations, undefvals, curvatures, tx, areas and values, the faces' rip flags, and
+// for MRISdilateVertexToSum its mask
+static void vlr_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    oi(x->ripflag); oi(x->border); oi(x->annotation); oi(x->undefval); of(x->curv); of(x->tx);
+    of(x->area);
+    VALS_VP *vp = (VALS_VP *)x->vp;
+    if (!vp) { out += "N "; continue; }
+    oi(vp->nvals);
+    for (int k = 0; k < vp->nvals; k++) { of(vp->vals[k]); of(vp->orig_vals[k]); }
+  }
+  for (int f = 0; f < s->nfaces; f++) oi(s->faces[f].ripflag);
+}
+
+void vlr_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nsize = geti();
+  if (nsize > 1) MRISsetNeighborhoodSize(s, nsize);
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s->vertices[v];
+    x->ripflag = (char)geti();
+    x->annotation = geti();
+    x->curv = getf();
+    int nvals = geti();
+    if (nvals >= 0) {
+      VALS_VP *vp = (VALS_VP *)calloc(1, sizeof(VALS_VP));
+      vp->nvals = nvals;
+      vp->vals = (float *)calloc(nvals > 0 ? nvals : 1, sizeof(float));
+      vp->orig_vals = (float *)calloc(nvals > 0 ? nvals : 1, sizeof(float));
+      for (int k = 0; k < nvals; k++) { vp->vals[k] = getf(); vp->orig_vals[k] = getf(); }
+      x->vp = vp;
+    }
+  }
+  for (int f = 0; f < nf; f++) s->faces[f].ripflag = (char)geti();
+  // the program's annotation table: 0 none, 1 a table file where FreeSurfer looks for its
+  // default one (FREESURFER_HOME unset: ./Simple_surface_labels2009.txt), 2 a colour table set as
+  // the table
+  int tmode = geti();
+  if (tmode == 1) {
+    std::string text = geth();
+    FILE *tf = fopen("Simple_surface_labels2009.txt", "wb");
+    if (!tf) fail("the table file");
+    fwrite(text.data(), 1, text.size(), tf);
+    fclose(tf);
+  } else if (tmode == 2) {
+    COLOR_TABLE *pre = ann_ctab();
+    oi(set_atable_from_ctable(pre));
+  }
+  s->ct = ann_ctab();
+  Gdiag_no = geti();
+  int vmode = geti();
+  MRI *measure = NULL;
+  if (vmode > 0) {
+    int type = geti(), w = geti();
+    measure = MRIallocSequence(w, 1, 1, type, 1);
+    for (int c = 0; c < w; c++) MRIsetVoxVal(measure, c, 0, 0, 0, getf());
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "MRISmodeFilterAnnotations") oi(MRISmodeFilterAnnotations(s, geti()));
+    else if (op == "MRISdilateRipped") oi(MRISdilateRipped(s, geti()));
+    else if (op == "MRISerodeRipped") oi(MRISerodeRipped(s, geti()));
+    else if (op == "MRISsetRipInFacesWithRippedVertices") MRISsetRipInFacesWithRippedVertices(s);
+    else if (op.compare(0, 7, "MRISset") == 0) {
+      int fno = geti();
+      bool outside = false;
+      for (int v = 0; v < nv; v++) {
+        VALS_VP *vp = (VALS_VP *)s->vertices[v].vp;
+        if (!s->vertices[v].ripflag && vp && (fno < 0 || fno >= vp->nvals)) outside = true;
+      }
+      if (outside) { out += "G "; continue; }
+      if (op == "MRISsetCurvaturesToValues") MRISsetCurvaturesToValues(s, fno);
+      else if (op == "MRISsetCurvaturesToOrigValues") MRISsetCurvaturesToOrigValues(s, fno);
+      else if (op == "MRISsetOrigValuesToCurvatures") MRISsetOrigValuesToCurvatures(s, fno);
+      else if (op == "MRISsetOrigValuesToValues") MRISsetOrigValuesToValues(s, fno);
+      else if (op == "MRISsetValuesToCurvatures") MRISsetValuesToCurvatures(s, fno);
+      else fail("vlr setter");
+    } else if (op == "MRISdilateVertexToSum") {
+      int vno = geti(), which = geti();
+      double target = getd();
+      MRI *m = MRISdilateVertexToSum(vno, which == 2 ? NULL : s, which == 1 ? measure : NULL, target);
+      mpf_vol(m);
+    }
+    else fail("vlr op");
+    vlr_dump(s);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -6372,6 +6490,8 @@ void run_case()
     mht_case();
   } else if (cmd == "vls") {
     vls_case();
+  } else if (cmd == "vlr") {
+    vlr_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

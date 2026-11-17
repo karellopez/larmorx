@@ -150,6 +150,7 @@ pub mod valcopy;
 pub mod valfile;
 pub mod valfilter;
 pub mod valmarks;
+pub mod valrest;
 pub mod vals;
 pub mod views;
 pub mod vpos;

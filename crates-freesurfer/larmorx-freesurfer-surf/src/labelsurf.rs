@@ -8,7 +8,9 @@
 //! (3938), `LabelErode` (2195), `LabelDilate` (2259), `MRISlabelInvert` (2850) and
 //! `utils/mrisurf_mri.cpp`'s `MRISlabel2Mask` (5955); `LabelRemoveHolesSurf` (4138),
 //! `LabelRemoveIslandsSurf` (4167) and `LabelRemoveHolesAndIslandsSurf` (4216) through
-//! [`crate::sclust`] (relay 38). FS-630 to FS-632, FS-902.
+//! [`crate::sclust`] (relay 38); `LabelToFlat` (500), `LabelRipRestOfSurface` (629), `LabelRip`
+//! (662) and `LabelRipRestOfSurfaceWithThreshold` (690) through [`crate::mhtfind`] and
+//! [`crate::toprest`] (relay 43). FS-630 to FS-632, FS-902.
 //!
 //! A label's surface handle (`LABEL::mris`, which `LabelInit` sets) is taken to be the surface the
 //! caller passes, as every FreeSurfer caller does; its template volume (`LABEL::mri_template`) is
@@ -28,12 +30,16 @@ use larmorx_freesurfer_mri::mri::Mri;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_volume::frames::mri_const;
 
+use crate::aaa::SurfGlobals;
 use crate::coords::Io;
 use crate::discrete::clear_marks;
+use crate::mht::Mht;
 use crate::mris::Mris;
 use crate::sclust;
 use crate::sras;
-use crate::views::vertex_coord2xyz_float;
+use crate::toprest;
+use crate::valrest::set_rip_in_faces_with_ripped_vertices;
+use crate::views::{CURRENT_VERTICES, vertex_coord2xyz_float};
 
 fn npoints(area: &Label) -> usize {
     usize::try_from(area.n_points).unwrap_or(0)
@@ -695,4 +701,89 @@ pub fn label_remove_holes_and_islands_surf(
     let mut out = label_remove_islands_surf(g, io, surf, &holes)?;
     restore_stats(g, surf, lb, &mut out, "LabelRemoveHolesAndIslandsSurf");
     Ok(Some(out))
+}
+
+// ---- the label's rips (relay 43) -------------------------------------------------------------
+
+/// `LabelToFlat(area, mris)`: a vertex table of the current positions at 1 mm
+/// (`MHTcreateVertexTable`); each point naming a vertex of the surface takes its current position;
+/// every other point (-1, or beyond the surface) the closest vertex within one voxel of its
+/// position (`MHTfindVnoOfClosestVertexInTable`, no global search: [`Mht::find_vno_of_closest_vertex_in_table`])
+/// and that vertex's position, or stays as it is when there is none. `NO_ERROR`.
+pub fn label_to_flat(
+    g: &mut Globals,
+    err: &mut dyn std::io::Write,
+    area: &mut Label,
+    mris: &Mris,
+) -> Result<i32, Fatal> {
+    let mht = Mht::create_vertex_table(g, err, mris, CURRENT_VERTICES)?;
+    for n in 0..npoints(area) {
+        let lv = area.lv[n];
+        let vno = if (0..mris.nvertices).contains(&lv.vno) {
+            lv.vno
+        } else {
+            let vno =
+                mht.find_vno_of_closest_vertex_in_table(g, err, mris, [lv.x, lv.y, lv.z], 0)?;
+            if vno < 0 {
+                continue;
+            }
+            area.lv[n].vno = vno;
+            vno
+        };
+        let v = mris.vertex(vno as usize);
+        let p = &mut area.lv[n];
+        (p.x, p.y, p.z) = (v.x, v.y, v.z);
+    }
+    Ok(NO_ERROR)
+}
+
+/// `LabelRipRestOfSurface(area, mris)` and `LabelRipRestOfSurfaceWithThreshold(area, mris,
+/// thresh)` (`thresh` `Some`): [`label_to_flat`]; every vertex ripped; each point naming a vertex
+/// of the surface (with a threshold, only a point whose `stat` is not below it: a NaN `stat` or
+/// threshold keeps the point) unrips it, deleted points too; then
+/// `MRISsetRipInFacesWithRippedVertices` and `MRISremoveRipped` ([`toprest::remove_ripped`]).
+/// `NO_ERROR`.
+pub fn label_rip_rest_of_surface(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    area: &mut Label,
+    mris: &mut Mris,
+    thresh: Option<f32>,
+) -> Result<i32, Fatal> {
+    label_to_flat(g, io.err, area, mris)?;
+    for vno in 0..mris.nvertices.max(0) as usize {
+        mris.vertex_mut(vno).ripflag = 1;
+    }
+    for n in 0..npoints(area) {
+        let lv = area.lv[n];
+        if let Some(t) = thresh
+            && lv.stat < t
+        {
+            continue;
+        }
+        if (0..mris.nvertices).contains(&lv.vno) {
+            mris.vertex_mut(lv.vno as usize).ripflag = 0;
+        }
+    }
+    set_rip_in_faces_with_ripped_vertices(mris);
+    toprest::remove_ripped(g, sg, io, mris)?;
+    Ok(NO_ERROR)
+}
+
+/// `LabelRip(mris, area, outside)`: every vertex's rip flag set to `outside`, then each point
+/// naming a vertex of the surface (deleted points too) sets it to `!outside` (1 for 0, else 0);
+/// then `MRISsetRipInFacesWithRippedVertices`. `NO_ERROR`.
+pub fn label_rip(mris: &mut Mris, area: &Label, outside: i32) -> i32 {
+    for vno in 0..mris.nvertices.max(0) as usize {
+        mris.vertex_mut(vno).ripflag = outside as i8;
+    }
+    for n in 0..npoints(area) {
+        let vno = area.lv[n].vno;
+        if (0..mris.nvertices).contains(&vno) {
+            mris.vertex_mut(vno as usize).ripflag = i8::from(outside == 0);
+        }
+    }
+    set_rip_in_faces_with_ripped_vertices(mris);
+    NO_ERROR
 }

@@ -1154,6 +1154,225 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 o.s(&format!("{h:016x}"));
             }
         }
+        "prj" => {
+            // relay 43 of track D: `fssurfio.cpp`'s `flr prj` (mrisurf_project.cpp on recorded
+            // surfaces)
+            use larmorx_freesurfer_surf::mht::Mht;
+            use larmorx_freesurfer_surf::project;
+            use larmorx_freesurfer_surf::views::CANONICAL_VERTICES;
+            let qf = t.next().to_owned();
+            let sf = t.next().to_owned();
+            fn put4(h: &mut u64, b: [u8; 4]) {
+                for c in b {
+                    *h = (*h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+            }
+            let phash = |m: &Mris, area: bool, o: &mut Out| {
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                for v in 0..m.nvertices.max(0) as usize {
+                    let x = m.vertex(v);
+                    for c in [x.x, x.y, x.z] {
+                        put4(&mut h, c.to_le_bytes());
+                    }
+                    if area {
+                        put4(&mut h, x.area.to_le_bytes());
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+                o.i(i64::from(m.status.0));
+            };
+            let mut q = surf(g, sg, &mut io, &qf)?;
+            let mut s = surf(g, sg, &mut io, &sf)?;
+            project::project_onto_sphere_src_dst(g, &mut io, &mut q, true, f64::from(100.0f32))?;
+            phash(&q, false, o);
+            project::project_onto_ellipsoid(g, sg, &mut io, &mut s, false, 0.0, 0.0, 0.0)?;
+            phash(&s, false, o);
+            let mut s2 = surf(g, sg, &mut io, &sf)?;
+            let r = project::radial_project_onto_ellipsoid(
+                g, sg, &mut io, &mut s2, true, 0.0, 0.0, 0.0,
+            )?
+            .expect("a copy");
+            phash(&r, false, o);
+            let mut q2 = surf(g, sg, &mut io, &qf)?;
+            project::spherical_projection(&mut q2);
+            phash(&q2, false, o);
+            let mut s3 = surf(g, sg, &mut io, &sf)?;
+            for v in 0..s3.nvertices.max(0) as usize {
+                let x = s3.vertex_mut(v);
+                (x.cx, x.cy, x.cz) = (x.x, x.y, x.z);
+            }
+            let m = Mht::create_face_table_resolution(g, io.err, &s3, CANONICAL_VERTICES, 1.0)?;
+            s3.radius = 100.0;
+            project::assign_faces(g, io.err, &mut s3, &m, CANONICAL_VERTICES)?;
+            let (mut h, mut found) = (0xcbf2_9ce4_8422_2325u64, 0);
+            for v in 0..s3.nvertices.max(0) as usize {
+                let f = s3.vertex(v).fno;
+                put4(&mut h, f.to_le_bytes());
+                found += i64::from(f >= 0);
+            }
+            o.s(&format!("{h:016x}"));
+            o.i(found);
+            let mut s4 = surf(g, sg, &mut io, &sf)?;
+            o.i(i64::from(project::project_onto_cylinder(
+                g, sg, &mut io, None, &mut s4, 60.0,
+            )?));
+            phash(&s4, true, o);
+        }
+        "lrr" => {
+            // relay 43 of track D: `fssurfio.cpp`'s `flr lrr` (the label's rips on a recorded
+            // surface and label)
+            use larmorx_freesurfer_io::label::{Label, label_read};
+            use larmorx_freesurfer_surf::labelsurf;
+            let sf = t.next().to_owned();
+            let lf = t.next().to_owned();
+            fn put4(h: &mut u64, b: [u8; 4]) {
+                for c in b {
+                    *h = (*h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+            }
+            let lhash = |l: &Label, o: &mut Out| {
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                for n in 0..l.n_points.max(0) as usize {
+                    let p = &l.lv[n];
+                    put4(&mut h, p.vno.to_le_bytes());
+                    for x in [p.x, p.y, p.z] {
+                        put4(&mut h, x.to_le_bytes());
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let shash = |s: &Mris, o: &mut Out| {
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                let mut put = |x: i32| put4(&mut h, x.to_le_bytes());
+                for v in 0..s.nvertices.max(0) as usize {
+                    let vt = s.topology(v);
+                    put(i32::from(s.vertex(v).ripflag));
+                    put(i32::from(vt.num));
+                    for k in 0..usize::from(vt.num) {
+                        put(vt.f.as_ref().expect("f")[k]);
+                        put(i32::from(vt.n.as_ref().expect("n")[k]));
+                    }
+                    for x in [vt.vnum, vt.v2num, vt.v3num, vt.vtotal] {
+                        put(i32::from(x));
+                    }
+                    for k in 0..vt.vtotal.max(0) as usize {
+                        put(vt.v.as_ref().expect("v")[k]);
+                    }
+                }
+                for f in 0..s.nfaces.max(0) as usize {
+                    for x in s.face(f).v {
+                        put(x);
+                    }
+                    put(i32::from(s.face(f).ripflag));
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            let mut s = surf(g, sg, &mut io, &sf)?;
+            let mut l = label_read(g, io.env, io.out, io.err, None, None, &lf)?.expect("the label");
+            for n in (1..l.n_points.max(0) as usize).step_by(2) {
+                l.lv[n].vno = -1;
+            }
+            o.i(i64::from(labelsurf::label_rip_rest_of_surface(
+                g, sg, &mut io, &mut l, &mut s, None,
+            )?));
+            lhash(&l, o);
+            shash(&s, o);
+            let mut s2 = surf(g, sg, &mut io, &sf)?;
+            let mut l2 =
+                label_read(g, io.env, io.out, io.err, None, None, &lf)?.expect("the label");
+            o.i(i64::from(labelsurf::label_rip_rest_of_surface(
+                g,
+                sg,
+                &mut io,
+                &mut l2,
+                &mut s2,
+                Some(0.5),
+            )?));
+            lhash(&l2, o);
+            shash(&s2, o);
+            let mut s3 = surf(g, sg, &mut io, &sf)?;
+            o.i(i64::from(labelsurf::label_rip(&mut s3, &l2, 1)));
+            shash(&s3, o);
+        }
+        "mcl" => {
+            // relay 43 of track D: `fssurfio.cpp`'s `flr mcl` (the closest searches on recorded
+            // surfaces: mri_surf2volseg's, mri_surf2surf's, mri_relabel_hypointensities' and
+            // mrisProjectOntoSurface's calls)
+            use larmorx_freesurfer_surf::mht::Mht;
+            use larmorx_freesurfer_surf::views::CURRENT_VERTICES;
+            let w = surf(g, sg, &mut io, t.next())?;
+            let p = surf(g, sg, &mut io, t.next())?;
+            let sr = surf(g, sg, &mut io, t.next())?;
+            let so = surf(g, sg, &mut io, t.next())?;
+            fn mix(mut h: u64, b: &[u8]) -> u64 {
+                for &c in b {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                h
+            }
+            let put = |o: &mut Out, n: i64, h: u64| {
+                o.i(n);
+                o.s(&format!("{h:016x}"));
+            };
+            let m = Mht::create_vertex_table_resolution(g, io.err, &w, CURRENT_VERTICES, 16.0)?;
+            for pass in 0..2 {
+                let (mut h, mut found) = (0xcbf2_9ce4_8422_2325u64, 0);
+                let off = if pass == 1 { 2.0f32 } else { 0.0 };
+                for v in 0..p.nvertices.max(0) as usize {
+                    let x = p.vertex(v);
+                    let (r, d) = m.find_closest_vertex_no_xyz(
+                        g,
+                        io.err,
+                        &w,
+                        [x.x + off, x.y + off, x.z + off],
+                    )?;
+                    found += i64::from(r >= 0);
+                    h = mix(mix(h, &r.to_le_bytes()), &d.to_le_bytes());
+                }
+                put(o, found, h);
+            }
+            let m = Mht::create_vertex_table_resolution(g, io.err, &sr, CURRENT_VERTICES, 16.0)?;
+            let (mut h, mut h2, mut found, mut found2) =
+                (0xcbf2_9ce4_8422_2325u64, 0xcbf2_9ce4_8422_2325u64, 0, 0);
+            for v in 0..so.nvertices {
+                let (r, d) = m.find_closest_vertex_no2(g, io.out, io.err, &sr, &so, v)?;
+                found += i64::from(r >= 0);
+                h = mix(mix(h, &r.to_le_bytes()), &d.to_le_bytes());
+                let r2 = m
+                    .find_closest_vertex_set2(g, io.out, io.err, &sr, &so, v)?
+                    .map_or(-1, |x| x as i32);
+                found2 += i64::from(r2 >= 0);
+                h2 = mix(h2, &r2.to_le_bytes());
+            }
+            put(o, found, h);
+            put(o, found2, h2);
+            let m = Mht::create_vertex_table(g, io.err, &w, CURRENT_VERTICES)?;
+            let (mut h, mut found) = (0xcbf2_9ce4_8422_2325u64, 0);
+            for v in 0..p.nvertices.max(0) as usize {
+                let x = p.vertex(v);
+                let r = m
+                    .find_closest_vertex_in_table(g, io.err, &w, [x.x, x.y, x.z], 0)?
+                    .map_or(-1, |x| x as i32);
+                found += i64::from(r >= 0);
+                h = mix(h, &r.to_le_bytes());
+            }
+            put(o, found, h);
+            let m = Mht::create_face_table(g, io.err, &w)?;
+            let (mut h, mut found, mut wide) = (0xcbf2_9ce4_8422_2325u64, 0, 0);
+            for v in 0..p.nvertices.max(0) as usize {
+                let x = p.vertex(v);
+                let q = [f64::from(x.x), f64::from(x.y), f64::from(x.z)];
+                let (mut fno, mut d) = m.find_closest_face_generic(g, io.err, &w, q, 8.0, 8, 1)?;
+                if fno < 0 || d > 0.5 {
+                    wide += 1;
+                    (fno, d) = m.find_closest_face_generic(g, io.err, &w, q, 1000.0, -1, -1)?;
+                }
+                found += i64::from(fno >= 0);
+                h = mix(mix(h, &fno.to_le_bytes()), &d.to_le_bytes());
+            }
+            put(o, found, h);
+            o.i(wide);
+        }
         "maf" => {
             // relay 41 of track D: `fssurfio.cpp`'s `flr maf` (mris_ca_label's mode filter on a
             // recorded annotation)

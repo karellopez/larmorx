@@ -2423,6 +2423,14 @@ defects! {
         "reordering all four dimensions of a volume (mri_convert --reorder4) with an order value outside 1 to 4: FreeSurfer reads memory outside its arrays for the result's extents and the voxels' places (undefined behaviour: memory contents or a crash)";
     FS_938 = "FS-938", "FreeSurfer", true,
         "reordering all four dimensions of a volume (mri_convert --reorder4) with an order that repeats a dimension: FreeSurfer silently makes a volume with that dimension twice, each voxel at the place its repeated index gives (a place reached several times keeps the last value, the others stay 0)";
+    FS_939 = "FS-939", "FreeSurfer", true,
+        "moving a surface through a GCA morph (mri_normalize -surface with a morph): a vertex outside the morph's grid, or next to a node of invalid position, silently gets the position of the last vertex the morph moved";
+    FS_940 = "FS-940", "FreeSurfer", true,
+        "moving a surface through a GCA morph: a vertex outside the morph's grid, or next to a node of invalid position, before any vertex the morph could move gets a position from memory contents";
+    FS_941 = "FS-941", "FreeSurfer", true,
+        "moving a surface through a RAS-to-RAS linear transform with a volume given (mris_sphere's transform option): the warnings that the volume's centre differs from the transform's source or from the surface's volume never appear for different centres, only for a centre that is not a finite number";
+    FS_942 = "FS-942", "FreeSurfer", true,
+        "moving a surface through a linear transform of a type other than voxel-to-voxel or RAS-to-RAS (a physical-voxel or coronal transform file): the program crashes at the first vertex that is not ripped";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

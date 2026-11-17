@@ -217,9 +217,10 @@ pub fn transform_alloc(
 
 /// fs.io's readers behind fs.volume's `LtaIo` (`LTAreadEx`'s calls): `MRIreadHeader` of a volume a
 /// transform's comment names, and `regio_read_register` (an `.lta` never reaches it here:
-/// `TransformFileNameType` sends those names to the `.lta` reader).
-struct GcaLtaIo<'e> {
-    env: &'e Environment,
+/// `TransformFileNameType` sends those names to the `.lta` reader). Public for the programs that
+/// read a linear transform array with `LTAread` themselves (`mris_sphere`).
+pub struct GcaLtaIo<'e> {
+    pub env: &'e Environment,
 }
 
 impl LtaIo for GcaLtaIo<'_> {

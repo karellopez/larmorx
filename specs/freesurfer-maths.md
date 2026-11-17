@@ -596,7 +596,12 @@ is written (an output that is also an input gives the same result).
   that is not cols x rows.
 - **Add, subtract** (m1, m2, out): `m2` of another size: `MatrixAdd: incompatable matrices <r1> x
   <c1> + <r2> x <c2>` (subtract: `MatrixSubtract: ...` with `-`) + `\n`; a given `out` of another size:
-  `MatrixAdd: incompatable matrices <r1> x <c1> = <r> x <c>` + `\n`. Each element in float.
+  `MatrixAdd: incompatable matrices <r1> x <c1> = <r> x <c>` + `\n`. Each element in float. Where
+  both elements are NaNs, `MatrixAdd` keeps the first operand's (m1's) NaN when the rows have 4 or
+  more columns and `out` is neither operand (a new matrix or another given one), else the second
+  operand's (m2's: rows of 3 columns or fewer, or `out` is m1 or m2), alike for every element;
+  `MatrixSubtract` keeps m1's (**(observed)**: §23's batch `melements-nan`, `madd` and `msub` with
+  `new`, `self`, `other` and a given output, 1 to 9 columns, NaNs in one element or in all).
 - **Scalar product** (in, v, out), **square** (in, out): each element `x v`, `x x` in float; a given
   `out` of another size: `MatrixScalarMul: incompatable matrices <r> x <c> != <ro> x <co>` + `\n`
   (`MatrixSquareElts: ...`).
@@ -682,8 +687,15 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
   1 column: an error, code -4, `VectorCrossProduct: must be 3-vectors` (no new line; the triple
   product's message too), nothing returned (the triple product: 0). Absent `out`: a clone (§8.2) of
   v1. With (x1, y1, z1), (x2, y2, z2), (x3, y3, z3) the first three elements: out = (y1 z2 - z1 y2,
-  z1 x2 - x1 z2, x1 y2 - y1 x2) in float; triple = `x3 (y1 z2 - z1 y2)`, then `+ y3 (z1 x2 - x1 z2)`,
-  then `+ z3 (x1 y2 - y1 x2)`, in float.
+  z1 x2 - z2 x1, x1 y2 - y1 x2) in float, each product with its factors in that order (where both
+  are NaNs the left factor's NaN is kept: in the second element's second product z2's) and each
+  difference keeping its first product's NaN where both are NaNs; triple = `t3 + (t2 + t1)` in float
+  with `t1 = (y1 z2 - z1 y2) x3`, `t2 = (z1 x2 - z2 x1) y3`, `t3 = (x1 y2 - y1 x2) z3` (the cross
+  terms as the cross product computes them, each the left factor of its product, and in each sum the
+  left operand as written: so where NaNs meet, `t3`'s is kept, then `t2`'s, then `t1`'s). The value is
+  that of `x3 (...) + y3 (...) + z3 (...)` added left to right; only the NaNs kept differ
+  (**(observed)**: §23's batch `mvectors-nan`, `vcross` and `vtriple` with NaNs of distinct payloads
+  in every factor and in pairs).
 - **Angle of 3-vectors** (v1, v2): the lengths l1, l2 in double (`sqrt` of `x² + y² + z²` of the
   widened elements); norm = l1 l2; 0 when |norm| < `FLT_EPSILON`; the dot product of the first three
   elements in **float**, widened; norm becomes |dot| when that is larger; `acos(1.0)` (0) when dot >
@@ -1370,9 +1382,9 @@ it, and again from the cache:
 | `mproduct` | 2.5, 8.1, 16 | 1,202 | 20 | 2 | 0 | `4f285237bdaa014c350f7011104306f2b6f55ade4b4867700d4d17db05d65c5d` |
 | `affine` | 3 | 276 | 2 | 0 | 0 | `b6c634cae9ef4cbf608faf76b9f7c897a1e9118a9a7948876f02221b662dcb43` |
 | `dmatrix` | 4, 12 | 2,904 | 8 | 1 | 1 | `719f4ea4e5bf36174a84e21120f0c7dd87fb4a1086981864ab7daf8acfc040b4` |
-| `melements` | 8.2 | 3,500 | 31 | 0 | 0 | `e60f3eb349c7fed12395e0f494d8d38a4f6789ad19f1ed782f5cecb7717c68c0` |
+| `melements` | 8.2 | 3,680 | 31 | 0 | 0 | `2f121205fd6ecd4c688da9590074d2e77acc86fc0af8054d564b0f1312fc581f` |
 | `mregions` | 8.3 | 880 | 83 | 0 | 0 | `c50b1b9f577cc67267a4d837f5e912d4f777409d8237b05c0a1ed9bbfb500742` |
-| `mvectors` | 8.4, 8.5 | 1,602 | 172 | 0 | 0 | `22123ebdb26ee3c5817014a14a633a0eca6b2b81ec32d38d2dd48d0a159435eb` |
+| `mvectors` | 8.4, 8.5 | 1,623 | 172 | 0 | 0 | `e141d395c45b7d416e8b4655bc68138f34b06c23aad796bbf65ef9d0762e9167` |
 | `mprint` | 8.6, 8.7 | 363 | 0 | 1 | 0 | `99f11898d09954688429163f63a6dae14d07aaeb034ee8620dbe0c59efa72127` |
 | `minverse` | 8.8 | 862 | 10 | 1 | 0 | `f17057e0444970110a0051cfe1638031987eb2b9fbf05a6b31fdc8ea6f0b5935` |
 | `primes` | 9 | 215 | 2 | 0 | 0 | `7161c5f85f0251b95dcb00423c7ea90119bd46deff0750af6a77ff640cf5859c` |
@@ -1383,7 +1395,7 @@ it, and again from the cache:
 | `svd` | 17.4, 17.5 | 2,619 | 354 | 0 | 142 | `e9ebe994f41da2186d1db9474ad78d48dff661a3771a9c9885c5e7b341e785ea` |
 | `mfiles` | 18 | 723 | 28 | 0 | 1 | `8f0ce51069988159cef0214e0f1d893466876b02e7c25233935648a8668c1886` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 28,507 | 1,769 | 137 | 299 | |
+| all | | 28,708 | 1,769 | 137 | 299 | |
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
@@ -1400,7 +1412,11 @@ without the cache identical; the probe as its own candidate identical but the 74
 show the record's addresses, memory lines). The group `svd` gained the fixed batch `svd-failed` (§17.5's
 SVD pseudo-inverse after a failed decomposition, 339 calls) on 2026-11-16 (relay 6): its hash from
 then (cold, warm and without the cache identical; `models.py svdpinv`: its 240 such lines and the 60
-of the other two batches as §17.5). `mfiles`' one `TIMEOUT` is a memory line (an empty
+of the other two batches as §17.5). The groups `melements` and `mvectors` gained the fixed batches
+`melements-nan` (§8.2's `MatrixAdd` and `MatrixSubtract` NaN order, 180 calls) and `mvectors-nan`
+(§8.5's cross and triple products, 21 calls) on 2026-11-17 (relay 8): their hashes from then (cold,
+warm and without the cache identical; the probe as its own candidate identical in both modes; log
+`oracles/logs/fs-maths-probe-r8-nan-2026-11-17.log`). `mfiles`' one `TIMEOUT` is a memory line (an empty
 file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
 
 ### 23.3 The comparison

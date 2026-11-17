@@ -2147,8 +2147,8 @@ and 5,000 entries against `uchar` counts) and `MRISfromVerticesAndFaces` (2217-2
 
 ## 39. mrisurf_deform.cpp's soap bubbles (relay 42 of track D)
 
-CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_deform.cpp` 2502-2588
-(`MRISsoapBubbleVertexPositions`), 2600-2692 (`MRISweightedSoapBubbleVertexPositions`), 2700-2775
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_deform.cpp` 2502-2592
+(`MRISsoapBubbleVertexPositions`), 2600-2692 (`MRISweightedSoapBubbleVertexPositions`), 2700-2782
 (`MRISsoapBubbleOrigVertexPositions`), 2784-2870 (`MRISsoapBubbleTargetVertexPositions`) into
 `crates-freesurfer/larmorx-freesurfer-surf/src/soap.rs`.
 

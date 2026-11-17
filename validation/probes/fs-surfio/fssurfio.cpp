@@ -4419,6 +4419,63 @@ void flr_case()
       oi(MRISreadAnnotation(s, ("./" + n).c_str()));
       ann_fnv();
     }
+  } else if (op == "top") {
+    // relay 42 of track D: mrisurf_topology.cpp's rest on a recorded surface (`top <surface>
+    // <label>`): the Euler counts, the defect index, the neighbours in use and the surface check
+    // (MRISisSurfaceValid, verbose 1); the vertices outside the label ripped with their faces and
+    // removed (LabelRipRestOfSurface's steps: MRISsetRipInFacesWithRippedVertices, MRISremoveRipped),
+    // the counts and the topology's FNV-1a; the distances released and the surface renumbered
+    // (MRISrenumberRemovingRippedFacesAndVertices), the counts and FNV-1a; the surface read again
+    // and everted (MRISevertSurface), its FNV-1a
+    std::string sf = next(), lf = next();
+    MRIS *s = MRISread(sf.c_str());
+    if (!s) fail("cannot read the surface");
+    auto counts = [&](MRIS *m) {
+      int a, b, c;
+      oi(MRIScomputeEulerNumber(m, &a, &b, &c)); oi(a); oi(b); oi(c);
+      oi(MRIStopologicalDefectIndex(m)); oi(mrisCountTotalNeighbors(m));
+    };
+    auto hash = [&](MRIS *m) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      auto put = [&](int x) {
+        const unsigned char *b = (const unsigned char *)&x;
+        for (int k = 0; k < 4; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      };
+      for (int v = 0; v < m->nvertices; v++) {
+        VERTEX_TOPOLOGY *t = &m->vertices_topology[v];
+        put(m->vertices[v].ripflag); put(t->num);
+        for (int k = 0; k < t->num; k++) { put(t->f[k]); put(t->n[k]); }
+        put(t->vnum); put(t->v2num); put(t->v3num); put(t->vtotal);
+        for (int k = 0; k < t->vtotal; k++) put(t->v[k]);
+      }
+      for (int f = 0; f < m->nfaces; f++) {
+        for (int k = 0; k < 3; k++) put(m->faces[f].v[k]);
+        put(m->faces[f].ripflag);
+      }
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    counts(s);
+    oi(MRISisSurfaceValid(s, 0, 1));
+    LABEL *l = LabelRead(NULL, lf.c_str());
+    if (!l) fail("cannot read the label");
+    for (int v = 0; v < s->nvertices; v++) s->vertices[v].ripflag = 1;
+    for (int n = 0; n < l->n_points; n++) {
+      int v = l->lv[n].vno;
+      if (v >= 0 && v < s->nvertices) s->vertices[v].ripflag = 0;
+    }
+    MRISsetRipInFacesWithRippedVertices(s);
+    MRISremoveRipped(s);
+    counts(s); hash(s);
+    MRISfreeDistsButNotOrig(s);
+    MRISfreeDistOrigs(s);
+    MRISrenumberRemovingRippedFacesAndVertices(s);
+    oi(s->nvertices); oi(s->nfaces); hash(s);
+    MRIS *e = MRISread(sf.c_str());
+    if (!e) fail("cannot read the surface");
+    oi(MRISevertSurface(e));
+    hash(e);
   } else if (op == "maf") {
     // relay 41 of track D: mris_ca_label's mode filter on a recorded annotation (`maf <surface>
     // <annotation>`): the annotation read (MRISreadAnnotation), the program's table set from its

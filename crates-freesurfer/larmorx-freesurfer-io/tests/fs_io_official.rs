@@ -26,7 +26,7 @@
 //! (GCA morphs written, read and written again, TRANSFORMs read, sampled, written, copied and
 //! applied), piece 33's two (stacked autoencoders read as volumes) and piece 34's one (GE ROI series
 //! read),
-//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: one since relay 40),
+//! without those that take seconds in a debug build (`cases::HEAVY_SEED1`: three since relay 45),
 //! recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
 //! --light` on Linux x64 from the unit oracle's build (2026-11-17, track A relay 45, with
 //! piece 34's `gro`: 4,799 cases (case 4794, a heavy one in debug builds, left out), 4,285 lines

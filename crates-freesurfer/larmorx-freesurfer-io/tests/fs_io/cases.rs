@@ -289,8 +289,10 @@ const FORMATS: [&str; 20] = [
 ];
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
-/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-16, track A
-/// relay 41, with piece 33's autoencoders and piece 32's new queries drawn from case-seeded
+/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-17, track A
+/// relay 45, with piece 34's GE ROI series shifting the kinds (3 cases: a selective-average header,
+/// a MATLAB file and a binary colour table whose counts ask for millions of numbers, 95.6 of 97.1
+/// s); 2026-11-16, track A relay 41, with piece 33's autoencoders and piece 32's new queries drawn from case-seeded
 /// generators (1 case: a GE Genesis series through the patched reader, 3.2 of 4.6 s); relay 40, with piece 23's TIFF files and piece 32's new queries (1 case: a selective-average
 /// header whose counts ask for billions of numbers, 179.7 of 181.1 s); 2026-11-15, track A
 /// relay 31, with piece 23 (none: 1.4 s in all); relay 29, with piece 21 (Siemens .ima: 2 cases, the .mat readers, 4.2 of 5.3 s); relay
@@ -300,7 +302,7 @@ const FORMATS: [&str; 20] = [
 /// allocate and hash millions of numbers, 28.9 of the 29.8 s). The recorded test (`fs_io_official.rs`) leaves them to
 /// the probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep
 /// them.
-pub const HEAVY_SEED1: [usize; 1] = [4794];
+pub const HEAVY_SEED1: [usize; 3] = [1824, 2793, 3076];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]

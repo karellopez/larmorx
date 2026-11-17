@@ -628,7 +628,10 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
   upper-cased (only the part before a `#` is upper-cased): `M3D`, `M3Z`, `MGZ`, `NII` and a name
   ending in `nii.gz` (as written, more than 6 bytes) a morph; `OCT`, `LTA` and no extension an LTA;
   `XFM` MINC; `FSLMAT` FSL; anything else `REGISTER_DAT`.
-- A name whose file part is `identity.nofile` gives an identity RAS-to-RAS LTA without reading.
+- A name whose file part (`specs/freesurfer-core.md` §10's file name only) is `identity.nofile`
+  gives, without reading anything, `LTAalloc(1, NULL)`'s array with the array's type and its
+  transform's type RAS-to-RAS (1) and the 4 x 4 identity as the matrix; the rest as allocated
+  (`sigma` 10,000, the mean (0, 0, 0), `fscale` 0, the empty subject).
 - **An `.lta`** (any type but the three below: `.lta`, `.oct`, no extension and the morphs' names),
   in this order:
   1. The first two lines as `fgetl` reads them (`specs/freesurfer-core.md` §10, at most 1,022 bytes
@@ -713,11 +716,19 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
      above likewise belongs to the program run. (**(observed)**: §22's `vltaread` and `vrules4`: the
      three forms, one and two `.mnc` words, `USE_AVERAGE305` only with an information line 2.)
   6. The array's type is RAS-to-RAS (1).
-- **FSL** (`.fslmat`): three rows `%f %f %f %f`, type `FSLREG_TYPE`. **`register.dat`**: an INFO line
-  (`INFO: This REGISTER_DAT transform is valid only for volumes between  COR types with c_(r,a,s) =
-  0.`), then `regio_read_register`'s subject, intensity (`fscale`) and matrix (`specs/freesurfer-io.md`
-  §46); the source geometry not
-  valid with sizes (in-plane, in-plane, between-plane), the destination's not valid with sizes 1.
+- **FSL** (`.fslmat`): a file that cannot be opened: `ltFSLread: could not open file <fname>`
+  (`ERROR_NOFILE`) and `NULL`; else one transform, `sigma` 1, the mean (0, 0, 0), whose matrix rows 1
+  to 3 come from the next three lines (`fgetl`, 900 bytes; `%f %f %f %f` as in the `.xfm`'s step 4;
+  a missing one: `ltFSLread: could not read row <r> from <fname>`, `ERROR_BADFILE`, `NULL`); the
+  array's type `FSLREG_TYPE` (15).
+- **`register.dat`**: an INFO line on standard output (`INFO: This REGISTER_DAT transform is valid
+  only for volumes between  COR types with c_(r,a,s) = 0.`), then one transform with `sigma` 1 (its
+  mean as allocated) and `regio_read_register`'s subject, intensity (as `fscale`) and matrix
+  (`specs/freesurfer-io.md` §46); when that fails, `ltaReadRegisterDat: could not read <fname>`
+  (`ERROR_BADPARM`) and `NULL`. The source geometry not valid with sizes (in-plane, in-plane,
+  between-plane), the destination's not valid with sizes 1; the array's type `REGISTER_DAT` (14).
+- The transform's own `type` stays as allocated (-1) for the `.xfm`, FSL and `register.dat` readers;
+  their `fscale` is 0 but `register.dat`'s (**(observed)**: §22's `vltaread` and `vrules4`).
 - Errors keep `errno` (a failed open, a volume that does not exist) for the error messages after.
 
 ## 22. Validation plan (3.1-36's samplers, the moves, the head box, reading transforms)

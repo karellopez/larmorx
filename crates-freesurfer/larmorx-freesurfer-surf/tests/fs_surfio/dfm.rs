@@ -261,7 +261,9 @@ pub(super) fn dfm_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "cds" => {
                 let (res, w) = (t.f(), t.i());
                 let mut given = if w > 0 {
-                    Some(mri_alloc(g, io.out, io.err, w as i32, w as i32, w as i32, MRI_FLOAT)?)
+                    Some(mri_alloc(
+                        g, io.out, io.err, w as i32, w as i32, w as i32, MRI_FLOAT,
+                    )?)
                 } else {
                     None
                 };
@@ -285,7 +287,9 @@ pub(super) fn dfm_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                         o.i(i64::from(m.vg.width));
                         o.i(i64::from(m.vg.height));
                         o.i(i64::from(m.vg.depth));
-                        for x in [m.vg.xsize, m.vg.ysize, m.vg.zsize, m.vg.c_r, m.vg.c_a, m.vg.c_s] {
+                        for x in [
+                            m.vg.xsize, m.vg.ysize, m.vg.zsize, m.vg.c_r, m.vg.c_a, m.vg.c_s,
+                        ] {
                             o.f(x);
                         }
                         let mut h = 0xcbf29ce484222325u64;

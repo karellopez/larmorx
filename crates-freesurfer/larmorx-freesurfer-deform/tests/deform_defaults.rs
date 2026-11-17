@@ -326,7 +326,8 @@ fn the_signed_distance_of_an_octahedron() {
         .into_new()
         .expect("a new volume");
     let (w, h, dp) = (d.vg.width, d.vg.height, d.vg.depth);
-    let at = |g: &mut Globals, x, y, z| mri_get_vox_val(g, &mut Vec::new(), &d, x, y, z, 0, 0).unwrap();
+    let at =
+        |g: &mut Globals, x, y, z| mri_get_vox_val(g, &mut Vec::new(), &d, x, y, z, 0, 0).unwrap();
     // the centre is inside (negative), a corner of the padded box outside (positive)
     assert!(at(&mut r.g, w / 2, h / 2, dp / 2) < 0.0);
     assert!(at(&mut r.g, 0, 0, 0) > 0.0);

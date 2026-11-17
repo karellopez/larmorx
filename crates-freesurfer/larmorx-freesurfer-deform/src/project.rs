@@ -23,9 +23,7 @@ use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag::{self, BUILD_ROOT, DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
-use larmorx_freesurfer_core::sse::{
-    add, add64, div, div64, mul, mul64, sqrt, sqrt64, sub, sub64,
-};
+use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sqrt, sqrt64, sub, sub64};
 use larmorx_freesurfer_surf::aaa::{MrisStatus, SurfGlobals};
 use larmorx_freesurfer_surf::coords::Io;
 use larmorx_freesurfer_surf::mht::Mht;
@@ -412,8 +410,20 @@ pub fn flatten_patch(
     y = div(y, af);
     z = div(z, af);
     if verbose_show(g) {
-        let _ = writeln!(io.out, "flatten: avg p = {{{}, {}, {}}}", f1(x), f1(y), f1(z));
-        let _ = writeln!(io.out, "flatten: sum n = {{{}, {}, {}}}", f2(nx), f2(ny), f2(nz));
+        let _ = writeln!(
+            io.out,
+            "flatten: avg p = {{{}, {}, {}}}",
+            f1(x),
+            f1(y),
+            f1(z)
+        );
+        let _ = writeln!(
+            io.out,
+            "flatten: sum n = {{{}, {}, {}}}",
+            f2(nx),
+            f2(ny),
+            f2(nz)
+        );
     }
     let d0 = sqrt(add(add(mul(nx, nx), mul(ny, ny)), mul(nz, nz)));
     let zero_normal = an > 0 && d0 == 0.0;
@@ -435,7 +445,13 @@ pub fn flatten_patch(
         // FZERO(d): d is a square root (not negative, or NaN, which is not zero)
         if d >= f32::EPSILON || d.is_nan() {
             if verbose_show(g) {
-                let _ = writeln!(io.out, "flatten: norm n = {{{}, {}, {}}}", f2(nx), f2(ny), f2(nz));
+                let _ = writeln!(
+                    io.out,
+                    "flatten: norm n = {{{}, {}, {}}}",
+                    f2(nx),
+                    f2(ny),
+                    f2(nz)
+                );
             }
             let n = (nx, ny, nz);
             for k in 0..nv {

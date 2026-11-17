@@ -2709,8 +2709,23 @@ right after another:
   keeps the tag number's bytes, a 64-bit length cut after 4 or more of its bytes keeps the tag
   number's for its last four (cut earlier: memory contents); the binary colour tables in znzlib files
   (§13) as on C streams. `znzreadDouble` and `znzreadShort` read elsewhere (eight bytes 16 below,
-  overwritten by every other reader's call): their missing bytes stay memory contents, as do every
-  other caller's (mghRead's header, the geometry and frame readers).
+  overwritten by every other reader's call): a short's missing bytes stay memory contents.
+- Since relay 42 (observed, `mgh_slot_cases.py`): `znzreadFloat` reads into the same four bytes as
+  `znzreadInt` and then reverses them in place, so after a float they hold its value least significant
+  byte first: a float cut by the file is the file's bytes followed by the earlier number's bytes as
+  they lie there, read big-endian, and after it the four bytes are reversed again (two floats cut at 0
+  bytes in a row alternate between the two orders). A double cut by the file keeps the earlier
+  double's bytes as `znzreadDouble` left them (its value least significant byte first, reversed again
+  after the read) when no other reader ran between the two; any other reader overwrites them (memory
+  contents). Doubles do not reach the four bytes of ints and floats. The runs with nothing else
+  between: mghRead's six sizes, its short (which leaves the four bytes) and its fifteen geometry
+  floats (the first size's earlier bytes memory contents); each morph geometry of tags 10 and 15 (the
+  validity, extent, the fifteen floats, the three shears, the NIfTI extension's name length; the
+  name's read between the two geometries leaves memory contents); tag 13's format, spacing and
+  `exp_k`; every label of tag 12; the frames of tag 42 (within a frame the type to the label, then
+  after the name the dof alone, then after the matrix tag the threshold and units, the diffusion
+  doubles as above, the longs with the ints; from one frame to the next); the scan parameters' floats
+  (tag 45) around their double; the twelve floats of tag 8 and the nine numbers of tag 9.
 
 By default the missing bytes are 0 (noted: FS-49, FS-167, FS-192); with `reproduce` the earlier
 number's bytes where the rule above gives them (the notice ends "as in FreeSurfer"), 0 elsewhere (noted
@@ -2721,7 +2736,9 @@ the probe's `ctr` and `tr` cases (seed 7, 3,846 cases: identical on 2,697, 0 dif
 4,045, 0 different); since relay 26 `ztr`, `fsr` and the volume readers too (seed 7, 5,048 cases of
 `ztr`, `ctr`, `tr`, `fsr`, `mgr`, `mrd`, `mrh`, `mri`, `nrd`: identical on 4,060, 0 different, 73 of them
 lines with FS-167 now compared), lines whose notices end "as in FreeSurfer" compared, the others
-counted apart.
+counted apart. Since relay 42: `validation/probes/fs-io/mgh_slot_cases.py` (21 hand-made files read by
+the probe's `mgf`, which prints every frame's fields after the volume: each comparable case identical
+with `reproduce` and different with `fix`; observed 2026-11-17).
 
 ## 101. ANALYZE read (`analyzeRead(name, read_volume)`; `mri_read`'s ANALYZE 2 and ANALYZE 4D 16)
 

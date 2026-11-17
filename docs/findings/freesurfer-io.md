@@ -2792,3 +2792,29 @@ assigns them to the new volume), 413-447 (`read`: `gcam->image = __warpmap->gcam
   FS-855 (relay 38's) now also where a morph read from such a volume is converted (`gcam_write.rs`'s
   `warpfield_convert`); `GCAMinitVolGeom` clears the morph's flag. Piece 32's rule skips FS-855's cases (as before);
   the common rule of the fs-io probe (`tests/fs_io/cases.rs`) marks FS-929's `VARY`.
+- **FS-167 at mghRead's other readers (item 2 of relay 42).** Object code (`<scratch>/A/rl42/mgh/`: `mghRead.dis`,
+  `geom.dis`, `frames.dis`; `fio.cpp.o`, `znzlib.c.o`), relative to the calling function's stack pointer `C`:
+  `znzreadInt` (`push rbx; sub $0x10`) and `znzreadFloat` (the same) read 4 bytes at `C-28`, the canary at
+  `C-24`; `znzreadFloat` then calls `byteswapbuffloat(C-28, 1)` (in place), `znzreadInt` passes the value to
+  `swapInt` in a register; `znzreadLong` 8 bytes at `C-32`; `znzreadDouble` (`push rbp; push rbx; sub $0x18`) 8
+  bytes at `C-48`, `swapDouble`'s result stored back there, its canary at `C-40`, its pushes at `C-16`/`C-24`
+  (so `C-32..C-25` untouched); `znzreadShort` (the same frame) 2 bytes at `C-42`; `znzreadIntEx` pushes at
+  `C-16`/`C-24` and reads into the caller's variable. `znzread`'s gz branch pushes `rbx` below the reader's frame
+  (`C-48` for a reader at `C-32`) and its plain branch tail-jumps to `__fread_chk`; `swapInt`/`swapLong64` push
+  `rbp` at `C-48`. So: ints, floats and longs share `C-32..C-25` (Slot49's eight bytes), which only a call from the
+  caller's own frame (a name's `znzread`, `read_tagid_len`, `read_matrix`, an allocation) overwrites; doubles share
+  `C-48..C-41`, which every int, float, long or short read overwrites. The calls between the reads: `mghRead`
+  (`znzreadIntEx`, 6 `znzreadInt`, `znzreadShort`, 15 `znzreadFloat`, then `znzread` of the unused space),
+  `read_gcamorph_geom` (`VOL_GEOM::read` inlined twice: 4 ints, 15 floats (+3 shears), [the extension's name
+  length], the name's `znzread`), `read_gcamorph_meta` (2 ints, a float), `read_gcamorph_labels` (one call site in
+  the loops), `read_mri_frames` (per frame: int, 6 floats, int, 2 floats, 3 x 3 floats in loops, int, `znzread` of
+  the name, int, `read_tagid_len`, `read_matrix`, [debug print], float, int, [8 doubles, then 4 x (2 longs, a
+  double)]), `read_scan_parameters` (2 floats, a double, a float, then the direction's allocation),
+  `read_ras_xform` (12 floats), `read_ras_xform_extra` (3 floats, 3 ints, 3 floats). The port gives each its
+  slots (`fio::znz_read_float_in`, `znz_read_double_in`; `fstagsio.rs`'s `FrameSlots`). Measured:
+  `validation/probes/fs-io/mgh_slot_cases.py` (21 cases through the new `mgf`, which prints the frames): every
+  case of the model identical with `reproduce` (fix differs), the doubles' chain DY..TM identical; the longs
+  after the doubles take `C-32..C-29` from memory (observed `00 6c a8 38`, part of an address) and the amplitudes
+  after them `C-48..C-41` (observed the long's eight bytes reversed): memory contents, marked `VARY`. A header cut
+  in the sizes reaches the short (memory: observed 0, bytes 6 and 7 of the `rbp` `swapInt` pushes) and stays
+  `VARY`.

@@ -61,6 +61,18 @@ Their results are in `docs/freesurfer/` (closed too).
       python -P validation/investigations/freesurfer-inventory/ported.py <scratch>/core.json \
           <scratch>/edges.json . 3.1-42 3.1-47 -v
 
+- `ready.py`: what of a module's reached code is left, and what of it could be ported now (track
+  A, relay 44 of FreeSurfer's foundations). Every function of the modules named that a
+  default-path program reaches (the ones waves.py gives to a program's own item included), marked
+  as `ported.py` marks them; a function left is `READY` when every callee left is READY itself
+  (C++ destructors are drops; `perm.*` modules are not scanned; `FOLDED` lists what the port folds
+  or leaves out by decision), else it waits for the callees named. Listed by the program reaching
+  it (one program) or "shared", in the programs' wave order. A reading aid (static reach): every
+  line is checked by hand before it goes into a plan.
+
+      python -P validation/investigations/freesurfer-inventory/ready.py <scratch>/core.json \
+          <scratch>/edges.json . fs.io fs.mri fs.labels [--programs mri_convert] [-v]
+
 - `report_code.py`: code.md's tables (Markdown on standard output) and `docs/freesurfer/code.toml`
   from the build graph and the three call-graph views (full, core, core calls-only); the commands
   in code.md §6.

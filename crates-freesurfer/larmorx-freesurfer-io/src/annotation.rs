@@ -21,6 +21,7 @@ use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{ERROR_BAD_PARM, ERROR_NO_FILE, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::pathsep;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_mri::ctab::ColorTable;
 
@@ -174,7 +175,7 @@ pub fn read_named_annotation_table(
     if t.num_entries != 0 {
         return NO_ERROR;
     }
-    let fname = if name.contains(&b'/') {
+    let fname = if pathsep::has_sep(name) {
         name.to_vec()
     } else {
         let mut f = env

@@ -39,6 +39,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
     self, ERROR_BADPARM, ERROR_NO_FILE, ERROR_NOFILE, Fatal, NO_ERROR,
 };
+use larmorx_freesurfer_core::pathsep;
 use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sub};
 use larmorx_freesurfer_core::utils::{delta_angle, file_name_path, nint};
 use larmorx_freesurfer_io::cfile::CFile;
@@ -477,7 +478,7 @@ pub fn write_dists(
 ) -> Result<i32, Fatal> {
     const F: &str = "MRISwriteDists";
     let sname = c_str(sname);
-    let fname = if !sname.contains('/') {
+    let fname = if !pathsep::has_sep_str(sname) {
         // the surface's own name is at most 1,023 bytes (MRIS::fname's buffer)
         let path = file_name_path(&mris.fname);
         let hemi = if mris.hemisphere == LEFT_HEMISPHERE {

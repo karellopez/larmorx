@@ -26,7 +26,8 @@
 //! - [`alloc`]: the C library's `calloc` as the port models it (larmorx's own code; FS-760).
 //! - The C library's behaviour they need, larmorx's own code: [`cstd`] (conversions), [`cglob`]
 //!   (`glob`, `fnmatch`), [`ctime`] (`gmtime`, `localtime` with the time-zone files,
-//!   `strftime("%c")`), [`system`] (the user's and the machine's names).
+//!   `strftime("%c")`), [`system`] (the user's and the machine's names); [`pathsep`] (the folder
+//!   separator: `/`, and `\` too on Windows only).
 //! - `fs.spline` (queue item 3.1-54): [`spline`], John Burkardt's 2006 cubic spline as FreeSurfer
 //!   changed it (`SplineCubicSet`, `SplineCubicValue`, `d3_np_fs`, `OpenSpline`, `OpenSplint`; FS-103).
 #![forbid(unsafe_code)]
@@ -58,6 +59,7 @@ pub mod matrix_decomp;
 pub mod matrix_io;
 pub mod matrix_ops;
 pub mod numerics;
+pub mod pathsep;
 pub mod pdf;
 pub mod prime;
 pub mod random;

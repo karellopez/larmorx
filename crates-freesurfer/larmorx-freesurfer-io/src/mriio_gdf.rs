@@ -26,7 +26,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
     self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_MEMORY, ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
-use larmorx_freesurfer_core::{sse, utils};
+use larmorx_freesurfer_core::{pathsep, sse, utils};
 use larmorx_freesurfer_mri::mri::{self, MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri};
 
 use crate::bfileio;
@@ -812,7 +812,7 @@ pub fn sdt_read(
     fits(g, "sdtRead", fname);
     let hname = match fname.rfind('.') {
         Some(d) => {
-            let last_slash = fname.rfind('/');
+            let last_slash = pathsep::rfind_sep_str(fname);
             if last_slash.is_some_and(|s| s > d) {
                 // FS-675: the '.' is in a folder's name
                 g.notices.add(

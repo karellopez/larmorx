@@ -31,6 +31,7 @@ use larmorx_freesurfer_core::fio::Tsv;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADFILE};
 use larmorx_freesurfer_core::machine;
+use larmorx_freesurfer_core::pathsep;
 use larmorx_freesurfer_core::utils;
 use larmorx_io::znz::ZnzFile;
 
@@ -742,12 +743,10 @@ fn text(b: &[u8]) -> String {
 /// removed, then everything before the last slash, kept as it is (`a//b` gives `a/`); `.` when
 /// there is no slash, `/` when the slash is the first character, and also for an empty name or
 /// one of slashes only; `None` for `None`. FS-168: a one-character name gives `.` (FreeSurfer's
-/// result depends on memory it has freed).
+/// result depends on memory it has freed). On Windows a `\` counts as a slash
+/// (`larmorx_freesurfer_core::pathsep`).
 pub fn fio_dirname(g: &mut Globals, pathname: Option<&str>) -> Option<String> {
-    let mut p = c_bytes(pathname?);
-    while let [rest @ .., b'/'] = p {
-        p = rest;
-    }
+    let p = pathsep::trim_end_seps(c_bytes(pathname?));
     let l = p.len();
     if l < 2 {
         if l == 0 {
@@ -759,7 +758,7 @@ pub fn fio_dirname(g: &mut Globals, pathname: Option<&str>) -> Option<String> {
         );
         return Some(".".into());
     }
-    match p.iter().rposition(|&c| c == b'/') {
+    match pathsep::rfind_sep(p) {
         None => Some(".".into()),
         Some(0) => Some("/".into()),
         Some(n) => Some(text(&p[..n])),
@@ -768,7 +767,8 @@ pub fn fio_dirname(g: &mut Globals, pathname: Option<&str>) -> Option<String> {
 
 /// `fio_basename(pathname, ext)`: `ext` removed from the end when it matches and is shorter than
 /// the name, then trailing slashes, then everything after the last slash; `/` for an empty
-/// result, the character itself for a one-character one; `None` for `None`.
+/// result, the character itself for a one-character one; `None` for `None`. On Windows a `\`
+/// counts as a slash (`larmorx_freesurfer_core::pathsep`).
 pub fn fio_basename(pathname: Option<&str>, ext: Option<&str>) -> Option<String> {
     let mut p = c_bytes(pathname?);
     if let Some(e) = ext {
@@ -777,16 +777,14 @@ pub fn fio_basename(pathname: Option<&str>, ext: Option<&str>) -> Option<String>
             p = &p[..p.len() - e.len()];
         }
     }
-    while let [rest @ .., b'/'] = p {
-        p = rest;
-    }
+    p = pathsep::trim_end_seps(p);
     if p.is_empty() {
         return Some("/".into());
     }
     if p.len() < 2 {
         return Some(text(&p[..1]));
     }
-    match p.iter().rposition(|&c| c == b'/') {
+    match pathsep::rfind_sep(p) {
         None => Some(text(p)),
         Some(n) => Some(text(&p[n + 1..])),
     }
@@ -1460,6 +1458,13 @@ mod tests {
         assert_eq!(fio_extension(Some("a.")), None);
         assert_eq!(fio_extension(Some("abc")), None);
         assert_eq!(fio_dirname(&mut gl, None), None);
+        // a `\` separates folders on Windows only (larmorx_freesurfer_core::pathsep)
+        let w = cfg!(windows);
+        assert_eq!(d(&mut gl, "C:\\d\\a.mgz\\"), if w { "C:\\d" } else { "." });
+        assert_eq!(
+            b("C:\\d\\a.mgz", Some(".mgz")),
+            if w { "a" } else { "C:\\d\\a" }
+        );
     }
 
     #[test]

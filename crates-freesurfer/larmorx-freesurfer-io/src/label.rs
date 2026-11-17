@@ -29,7 +29,7 @@ use larmorx_freesurfer_core::log::{
     self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_FILE, ERROR_NOMEMORY, Fatal, NO_ERROR,
 };
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::utils;
+use larmorx_freesurfer_core::{pathsep, utils};
 use larmorx_freesurfer_mri::mri::{
     Transform4, get_inverse_linear_transform_ptr, get_linear_transform_ptr,
 };
@@ -579,7 +579,7 @@ pub fn label_read(
     let lname_bytes = label_name.as_bytes();
     name_fits(g, "LabelRead: a label name", lname_bytes.len());
     let mut fname: Vec<u8>;
-    if subject_name.is_some() && !lname_bytes.contains(&b'/') {
+    if subject_name.is_some() && !pathsep::has_sep(lname_bytes) {
         let Some(sdir) = getenv(env, "SUBJECTS_DIR") else {
             no_subjects_dir(g, err)?;
             return Ok(None);
@@ -713,7 +713,7 @@ pub fn label_write(
     if let Some(dot) = is_label(g, &lname) {
         lname.truncate(dot);
     }
-    let fname: Vec<u8> = if !lname.contains(&b'/') && !c_str(&area.subject_name).is_empty() {
+    let fname: Vec<u8> = if !pathsep::has_sep(&lname) && !c_str(&area.subject_name).is_empty() {
         let Some(sdir) = getenv(env, "SUBJECTS_DIR") else {
             no_subjects_dir(g, err)?;
             return Ok(ERROR_NO_FILE);

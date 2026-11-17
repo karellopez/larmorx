@@ -109,6 +109,16 @@ def block(fields: dict[str, str], order: list[str] | None = None) -> list[str]:
     return lines
 
 
+def fixed_w(w: int, h: int, d: int, t: int, f: int = 1, hdr: int = 0, fill: str | int = 5) -> str:
+    """A W (README.md) of a plain geometry: voxel sizes 1, identity cosines, centre 0, no shears,
+    plain header fields, the cache recomputed, no registration matrix, no colour table."""
+    one, zero = f32(1.0), f32(0.0)
+    geo = [one, one, one, "1", one, zero, zero, zero, one, zero, zero, zero, one]
+    geo += [zero] * 6
+    head = ["1", str(max(d, 1)), *([zero] * 11), f64(0.0), "0", zero, zero, "0"]
+    return " ".join([f"{w} {h} {d} {t} {f} {hdr}", str(fill), *geo, *head, "1", "null", "null"])
+
+
 def e15(v: float) -> str:
     if v != v:
         return "nan"
@@ -534,6 +544,51 @@ class Gen:
         ]
         return [Batch("vheader", "vheader", L)]
 
+    def vrules(self) -> list[Batch]:
+        """§6-15: fixed cases of single rules (the spec's statements of 2026-11-17)."""
+        W = fixed_w
+        t100 = f32(100.0)
+        L = []
+        # FS-291 with tensor volumes (type 6), whose rows all start at the first voxel (§6, §9, §10)
+        L += [f"invc {W(3, 2, 2, 6)} new {t100}", f"invc {W(3, 2, 2, 6, f=2)} new {t100}"]
+        L += [f"invc {W(3, 2, 2, 6)} {W(3, 2, 2, 6, fill=0)} {t100}"]
+        L += [f"invc {W(3, 2, 2, 6)} {W(3, 2, 2, t, fill=0)} {t100}" for t in (0, 1, 4, 3)]
+        L += [f"invc {W(3, 2, 2, t)} {W(3, 2, 2, 6, fill=0)} {t100}" for t in (0, 1, 4, 10, 3)]
+        L += [f"invc {W(3, 2, 2, t)} new {t100}" for t in (1, 4, 2)]
+        L += [f"invc {W(4, 3, 2, 1)} {W(2, 2, 1, 6, fill=0)} {t100}"]
+        L += [f"invc {W(3, 2, 2, 6, hdr=1)} new {t100}"]
+        for a, b, dd in ((6, 0, "new"), (0, 6, "new"), (0, 0, "t6"), (1, 0, "t6"), (6, 6, "new")):
+            dst = W(3, 2, 2, 6, fill=0) if dd == "t6" else dd
+            L += [f"sam {W(3, 2, 2, a)} {f32(2.0)} {W(3, 2, 2, b, fill=9)} {dst}"]
+        L += [f"sam {W(3, 2, 2, 4)} {f32(0.5)} {W(3, 2, 2, 0, fill=9)} {W(3, 2, 2, 6, fill=0)}"]
+        # MRIclear of a bitmap (type 5: never with voxels) and of volumes without voxels (§7)
+        L += [f"clear {W(2, 2, 2, t, f=f, hdr=1)}" for t in (5, 0) for f in (0, 1, 2)]
+        L += [f"clear {W(2, 2, 2, t)}" for t in (6, 7, 9)]
+        # MRIlinearScale with only_nonzero: the other voxels written as they are (§9)
+        for nz in (1, 0):
+            for dst in ("new", W(4, 3, 2, 0, fill=9), W(4, 3, 2, 3, fill=9)):
+                L += [f"linscale {W(4, 3, 2, 3, fill='t0')} {dst} {f32(2.0)} {f32(50.0)} {nz}"]
+            L += [
+                f"linscale {W(4, 3, 2, 0, fill=0)} {W(4, 3, 2, 0, fill=9)} {f32(2.0)} {f32(-3.0)} {nz}"
+            ]
+        # two sources of one type without direct access, destinations without it (§10)
+        for c in ("add2", "sub2"):
+            for a, dd in ((9, 3), (7, 1), (6, 1), (1, 9), (1, 6), (3, 7)):
+                L += [f"{c} {W(2, 2, 1, a)} {W(2, 2, 1, a, fill=9)} {W(2, 2, 1, dd, fill=77)}"]
+            L += [f"{c} {W(2, 2, 1, 6, hdr=1)} {W(2, 2, 1, 6, fill=9, hdr=1)} new"]
+        # the frame copies' messages (§7)
+        L += [f"cpframe {W(2, 2, 2, 0, f=2)} {W(2, 2, 2, 0, fill=9)} 1 2"]
+        L += [f"cpframes {W(2, 2, 2, 0, f=2)} {W(1, 2, 2, 0, f=2, fill=9)} 0 1 0"]
+        # MRIvalRangeRegion without a region (§8, FS-265)
+        L += [f"vrangereg {W(2, 2, 2, t, hdr=h)} null" for t, h in ((3, 0), (0, 0), (0, 1))]
+        L += [f"vrangereg {W(2, 2, 2, 3)} 0 0 0 2 2 2"]
+        # MRIsampleVolumeType: the outside check before the type's (§15)
+        out = f64(10.0)
+        for t, h in ((6, 0), (2, 0), (8, 1), (5, 1), (3, 0), (0, 1)):
+            for x in (0.0, -5.0, -0.4, 1.6):
+                L += [f"snear {W(2, 2, 2, t, hdr=h)} {f64(x)} {f64(0.0)} {f64(1.0)} {out}"]
+        return [Batch("vrules", "vrules", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -546,6 +601,7 @@ GROUPS = [
     "vcoords",
     "vstats",
     "vheader",
+    "vrules",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

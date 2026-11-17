@@ -15,7 +15,8 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §69: 10 groups of seeded cases (8,096 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §69: 10 groups of seeded cases and one of fixed cases (`vrules`; 8,180 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | a statement of the spec checked as a model of the probe's printed voxels: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -98,6 +99,18 @@ The spec's sections in brackets.
 | `dump W` | `MRIdump` to standard output | its value |
 | `dsign d` | `MRIsetSampleVolumeDerivativeSign` | the double returned |
 
+## The models
+
+```sh
+PYTHONPATH=validation/src scripts/orchestration/boxed.sh 4 python -P \
+  validation/investigations/freesurfer-volume-probe/models.py fs291 \
+  --probe <workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe --scratch <scratch>/models
+```
+
+Prints how many lines match the model (by the types met: `uchar` only, a tensor, other types), how
+many it leaves out (FreeSurfer crashed or read memory it does not own) and how many differ; exit
+status 1 when one differs.
+
 ## The comparison loop
 
 ```sh
@@ -121,7 +134,10 @@ repeated, reordered or blank, lines of white space or other keys, first words of
 odd second words, numbers in glibc's other forms, lines longer than 1,039 bytes, NUL bytes, CRLF
 endings, no final newline, data after the block, an empty file), `vgcopy` (§4), `vmake` (§7),
 `vrange` (§8), `vscale` (§9), `vtwo` (§10), `vextract` (§11), `vcoords` (§13-14), `vstats` (§15,
-§15b), `vheader` (§16): volumes of up to 4 x 4 x 4 voxels (5 for `vextract`, 6 for `vcoords`) and 0
+§15b), `vheader` (§16), and the fixed cases of `vrules` (§6-15: FS-291 with tensor volumes, the
+clear of a bitmap and of volumes without voxels, `MRIlinearScale` with `only_nonzero`, sums and
+differences of types without direct access, the frame copies' messages, `MRIvalRangeRegion` without
+a region, `MRIsampleVolumeType`'s order of checks): volumes of up to 4 x 4 x 4 voxels (5 for `vextract`, 6 for `vcoords`) and 0
 to 3 frames of every type (the types without a voxel size header-only), headers only too,
 destinations new, of the same shape, of another shape or a source, cached matrices as allocated,
 recomputed or dropped.

@@ -197,6 +197,15 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   0 and such writes are dropped) or outside its buffer (FS-290: reads 0, writes dropped, in both
   modes; FreeSurfer reads and writes memory it does not own). A volume without voxels walked
   directly ends the program here (FreeSurfer crashes: FS-58).
+- **A tensor volume's rows.** FreeSurfer finds every row of a tensor volume (type 6), of every slice
+  and frame, at the volume's first voxel, as its full copy does (`specs/freesurfer-mri.md` §13,
+  FS-166): element `x` of any row of a tensor volume, walked directly, is element `x` from the start
+  of its buffer. So a direct walk reads the same first bytes for every row, and writes every row over
+  the same first bytes: the last row written stays there, and the rest of the buffer is not touched
+  (**(observed)**: `vscale`, `vtwo`, `vrules`, §69). The volume's other accesses (`MRIgetVoxVal`,
+  `MRIsetVoxVal`) are not affected: for a tensor they read -1e10 and write nothing
+  (`specs/freesurfer-mri.md` §5). In parts 1 to 3 only FS-291's `reproduce` walks a tensor volume
+  directly.
 - **Arithmetic** in `float` (single precision, x86-64's NaN rules, `specs/freesurfer-maths.md` §1)
   unless said otherwise; `nint(x)` is `(int)(x + 0.5)` (`x - 0.5` below 0) in double with FS-12's
   rule outside `int`. Storing an integer into a narrower integer type keeps its low bits.
@@ -260,9 +269,18 @@ All map each voxel of each frame of the source's extent into the destination (a 
   frame; the others are copied.
 - `MRIbinarize(src, dst, t, low, high)`: `low` where `v < t` (in double), else `high` (NaN: `high`).
 - `MRIinvertContrast(src, dst, t)`: frame 0, `uchar` voxels (direct): `v > t` becomes `255 - v`.
-  FS-291: on another type FreeSurfer takes the first `width` bytes of each row as voxels;
-  `reproduce` does so, the default ends the program with `MRIinvertContrast: unsupported type <t>
-  (uchar volumes only)`.
+  FS-291: when the source or the destination has another type, FreeSurfer takes the first `width`
+  bytes of each of its rows as `uchar` voxels, reading the source's and writing the destination's
+  there (a row of slice `z`, row `y`: §6's place of element 0 of that row, of the volume's own
+  element size; a tensor volume's rows all at its first voxel, §6). So, **(observed)** (§69's
+  `vscale` and `vrules`): a tensor source gives every row its own first `width` bytes; a tensor
+  destination ends with the last row's result in its first `width` bytes (slice `depth - 1`, row
+  `height - 1` of the source's extent) and the rest of its bytes as they were; a destination of
+  another non-`uchar` type gets each row's result in that row's first `width` bytes, the rest of the
+  row as it was. `reproduce` does so; the default, when the source's width, height and depth are
+  all positive, ends the program (status -3, `ERROR_UNSUPPORTED`) with `MRIinvertContrast:
+  unsupported type <t> (uchar volumes only)`, `<t>` the source's type when it is not `uchar`, else
+  the destination's.
 - `MRIabs`, `MRIpos`, `MRIneg(src, dst)`: without `dst` a new volume of the source's extent, type
   and frames with its header; frames innermost (for each voxel, its frames in order); `|v|`, a
   negative `v` set to 0, a positive `v` set to 0.
@@ -293,7 +311,9 @@ The second volume is walked with the first's extent and frames.
   (`reproduce`); the default moves on in all three.
 - `MRIscaleAndMultiply(a, s, b, dst)`: without `dst` a one-frame volume of `a`'s extent and type with
   its header; frame 0, `uchar` (direct): `nint(va * (vb / s))` clipped to [0, 255]. FS-291 as
-  `MRIinvertContrast`.
+  `MRIinvertContrast` (§9), for the three volumes: `<t>` the first source's type when it is not
+  `uchar`, else the second's, else the destination's (**(observed)**: `vtwo`, 2 lines with a tensor
+  destination given, which keeps the last row's result; `vrules`).
 
 ## 11. Extracting a region
 

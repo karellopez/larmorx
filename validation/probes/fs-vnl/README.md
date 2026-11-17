@@ -57,6 +57,11 @@ whose site table can be changed at run time, for `--only eiglearn` (development 
 matrices differ from VNL, prints the table, the sites that decide matrices and a few matrices that
 still differ (a guide for reading the object code, not a proof).
 
+`itk111/` (2026-11-17): `rg_probe.cxx` runs `rg_` and `vnl_real_eigensystem` on one matrix and shows
+which of `wr`, `wi` and the eigenvectors `rg_` writes; on the fs.maths clean room's reproducer `hqr2`
+fails at once and VNL's result is memory contents (ITK-111; its README has the commands and the
+official probe's results under four allocator fills).
+
 `order/qr/` (2026-11-13): the loops of LINPACK's QR kernels are unrolled and partly vectorized, so
 their operand order is read by running them instead: `kern.c` calls `sdot`/`ddot`, `saxpy`/`daxpy`
 and `sscal`/`dscal` in `libfsvnl.so` on NaNs with distinct payloads (lengths 1 to `NMAX`, four

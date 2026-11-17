@@ -227,7 +227,13 @@ uninitialised (`vnl_c_vector_construct` does nothing for them):
   gives 0.
 - `vnl_real_eigensystem` never writes `Vreal`'s columns of a complex pair (a caller that copies
   `Vreal` copies memory); when `hqr2` fails it builds `D` and
-  `V` from eigenvalues it never found. The port gives 0 and says so.
+  `V` from eigenvalues it never found. The port gives 0 and says so. *Measured* 2026-11-17
+  (`validation/probes/fs-vnl/itk111/`): on the fs.maths clean room's reproducer (a 4 x 4 matrix with a
+  NaN on its diagonal) `hqr2` fails on the first eigenvalue it looks for (`ierr` 4) and writes none
+  of `wr`, `wi`; `OpenNonSymmetricEigenSystem`'s official result then changes with the allocator's
+  fill (plainly six 0s and columns 2 and 3 NaN, as earlier heap values took columns 0 and 1 for a
+  complex pair; all `-0` with `MALLOC_PERTURB_=90`; all infinite with the guard allocator's fill 165),
+  and VNL in a fresh process (that memory zero bytes) gives the port's result: `D` 0, `Vreal` NaN.
 - `vnl_cholesky::rcond_` is set only by a successful `estimate_condition`.
 - `vnl_qr::solve` of a one-row matrix whose entry is 0 leaves its solution unwritten (LINPACK's
   `ju = 0` branch returns `info = 1` before writing `b`).

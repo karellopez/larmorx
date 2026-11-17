@@ -2213,6 +2213,44 @@ mod tests {
 
     const REAL_EIGEN_NAN_BITS: u64 = 0x49f7_e86e_5e22_5ffe;
 
+    /// The clean room's reproducer (a NaN on the diagonal of a 4 x 4 matrix): `hqr2` fails on
+    /// the first eigenvalue it looks for (`ierr` 4) and writes none of `wr`, `wi`, so VNL builds
+    /// `D`, `V` and `Vreal` from memory contents (ITK-111: the official build's result changes
+    /// with the allocator's fill, validation/probes/fs-vnl/itk111/). Here they are 0, as in VNL
+    /// where that memory is zero bytes (a fresh process): `D` all 0 and every column real, its
+    /// vectors NaN.
+    #[test]
+    fn a_failed_hqr2_gives_vnls_result_on_zeroed_memory() {
+        let f = |b: u32| f64::from(f32::from_bits(b));
+        let m: Vec<f64> = [
+            0x4170_0000u32,
+            0x3f80_0000,
+            0x4106_db6e,
+            0x4275_2492,
+            0x40a0_0000,
+            0x40e0_0000,
+            0xc0dc_0000,
+            0x42b8_db6e,
+            0x4120_0000,
+            0x4120_0000,
+            0x7fc0_0000,
+            0x4040_0000,
+            0x4198_0000,
+            0xc274_0000,
+            0x41a0_0000,
+            0x3f80_0000,
+        ]
+        .into_iter()
+        .map(f)
+        .collect();
+        let es = real_eigensystem(&m, 4).unwrap();
+        assert_eq!(es.ierr, 4);
+        assert!(es.notices.iter().any(|n| n.defect.id == "ITK-111"));
+        assert!(es.d_re.iter().chain(&es.d_im).all(|v| v.to_bits() == 0));
+        assert!(es.vreal_written.iter().all(|&w| w));
+        assert!(es.vreal.iter().all(|v| v.is_nan()));
+    }
+
     #[test]
     fn pythag_is_the_hypotenuse() {
         assert!((pythag(3.0, 4.0).unwrap() - 5.0).abs() < 1e-15);

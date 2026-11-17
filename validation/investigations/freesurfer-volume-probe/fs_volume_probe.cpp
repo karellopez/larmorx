@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// A black-box probe of FreeSurfer 8.2.0's volume functions (specs/freesurfer-volume.md, parts 1 to 3:
+// A black-box probe of FreeSurfer 8.2.0's volume functions (specs/freesurfer-volume.md, parts 1 to 4:
 // the volume-geometry text block and its copies, matrices, comparison and printer; the voxel
 // arithmetic; coordinates, orientation, centre of mass, principal components, the running average,
-// the header comparison and dump), linked against the unit oracle's libutils.a (GCC 8.4.0,
+// the header comparison and dump; the samplers, moves, the head's box and the transform reader), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
 // and the reading and printing of their arguments, results and the structures' fields: no FreeSurfer
 // code. The commands and encodings are in README.md beside this file (the volume, geometry and header
@@ -36,6 +36,9 @@
 
 // functions of FreeSurfer's library that its headers do not declare
 int MRIcopyVolGeomToMRI(MRI *mri, const VOL_GEOM *vg);
+int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
+int MRIsincSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, int hw, double *pval);
+double ham_sinc(double x, double fullwidth);
 
 const char *Progname = "fs_volume_probe";
 
@@ -1011,6 +1014,98 @@ static void call(const std::string &c)
   }
   else if (c == "dsign") {
     putd(MRIsetSampleVolumeDerivativeSign(getd()));
+  }
+  // ---- part 4 (the spec's §18 to §21)
+  else if (c == "samp") {
+    std::string k = tok();
+    MRI *a = getw();
+    a->outside_val = getd();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int f = geti(), aux = geti();
+      double v = UNSETD;
+      int r;
+      if (k == "tri") r = MRIsampleVolume(a, x, y, z, &v);
+      else if (k == "typ") r = MRIsampleVolumeType(a, x, y, z, &v, aux);
+      else if (k == "frm") r = MRIsampleVolumeFrame(a, x, y, z, f, &v);
+      else if (k == "fty") r = MRIsampleVolumeFrameType(a, x, y, z, f, aux, &v);
+      else if (k == "cub") r = MRIcubicSampleVolume(a, x, y, z, &v);
+      else if (k == "cubf") r = MRIcubicSampleVolumeFrame(a, x, y, z, f, &v);
+      else if (k == "sinc") r = MRIsincSampleVolume(a, x, y, z, aux, &v);
+      else if (k == "sincf") r = MRIsincSampleVolumeFrame(a, x, y, z, f, aux, &v);
+      else bad("unknown sampler");
+      puti(r);
+      putd(v);
+    }
+  }
+  else if (c == "coef" || c == "hsinc") {
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd();
+      if (c == "coef") putd(MRIcubicCoeff(x, geti()));
+      else putd(ham_sinc(x, getd()));
+    }
+  }
+  else if (c == "trans") {
+    MRI *a = getw();
+    MRI *d = getdst(a);
+    double dx = getd(), dy = getd(), dz = getd();
+    putres(MRItranslate(a, d, dx, dy, dz), a, NULL, d);
+  }
+  else if (c == "rot") {
+    MRI *a = getw();
+    MRI *d = getdst(a);
+    MATRIX *mr = getm();
+    MATRIX *mo = getm();
+    putres(MRIrotate_I(a, d, mr, mo), a, NULL, d);
+  }
+  else if (c == "rotx" || c == "roty" || c == "rotz") {
+    MRI *a = getw();
+    MRI *d = getdst(a);
+    float angle = getf();
+    MRI *r = c == "rotx" ? MRIrotateX_I(a, d, angle) : c == "roty" ? MRIrotateY_I(a, d, angle) : MRIrotateZ_I(a, d, angle);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "skull") {
+    MRI *a = getw();
+    int t = geti();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int x0 = geti(), y0 = geti(), z0 = geti(), x1 = geti(), y1 = geti(), z1 = geti();
+      float v = getf();
+      for (int z = z0; z <= z1; z++)
+        for (int y = y0; y <= y1; y++)
+          for (int x = x0; x <= x1; x++) MRIsetVoxVal(a, x, y, z, 0, v);
+    }
+    MRI_REGION box;
+    box.x = box.y = box.z = box.dx = box.dy = box.dz = -7;
+    puti(MRIfindApproximateSkullBoundingBox(a, t, &box));
+    for (int v : {box.x, box.y, box.z, box.dx, box.dy, box.dz}) puti(v);
+  }
+  else if (c == "tftype") {
+    int n = geti();
+    for (int i = 0; i < n; i++) puti(TransformFileNameType(getx().c_str()));
+  }
+  else if (c == "ltaread") {
+    std::string name = getx();
+    bool have = !take("nofile");
+    std::string bytes = have ? getx() : std::string();
+    int avg = geti();  // USE_AVERAGE305: 0 unset, 1 set to "true", 2 set and empty
+    if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+    else unsetenv("USE_AVERAGE305");
+    unlink(name.c_str());
+    if (have) {
+      FILE *fp = fopen(name.c_str(), "wb");
+      if (!fp) bad("cannot write the transform file");
+      fwrite(bytes.data(), 1, bytes.size(), fp);
+      fclose(fp);
+    }
+    errno = 0;
+    LTA *lta = LTAreadEx(name.c_str());
+    puti(errno);
+    putlta(lta);
+    if (have) unlink(name.c_str());
   }
   else
     bad("unknown command");

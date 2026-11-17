@@ -16,7 +16,7 @@ clean-room implementers, so they never build it.
 |---|---|
 | `fs_mri_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §23: 15 groups of seeded and fixed cases (9,379 calls in 24 batches), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §23: 16 groups of seeded and fixed cases (9,511 calls in 25 batches), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | two of the spec's §9 statements checked as models of the probe's printed numbers: `surface` (`surfaceRASFromRAS_` is the float product of the K and inv(T) the `tkreg` command prints) and `fs331` (every line of the batch `tkreg-given` as FS-331's model) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_mri_probe`; its guard runs
@@ -178,4 +178,9 @@ each allowed kind, and the IDs the candidate noted on the allowed lines.
   40 of 40 different from `VGras2tkreg`'s matrix; `models.py fs331`: 65 of 65 lines as the model
   (both through the oracle-output cache, `PYTHONPATH=validation/src`, `--probe` and `--scratch` as
   for `refs`).
+- Relay 7 (2026-11-17): the fixed group `novox` (132 calls: one access per line on header-only volumes
+  of the 11 types): its hash in the spec's §23.2, the same from the cache and without it; the probe
+  as its own candidate identical in both modes; negative reads give `outside_val` for every type,
+  tensor, bitmap and double complex read -1e10 and write 1, the 8 other types crash (FS-58). Log
+  `oracles/logs/fs-mri-probe-r7-novox-2026-11-17.log`.
 - About 2 to 3 minutes for a cold `refs` (most of it the guard runs), seconds warm.

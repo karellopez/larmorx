@@ -1,10 +1,11 @@
-# FreeSurfer 8.2.0's volume functions, as a black box (parts 1 to 3)
+# FreeSurfer 8.2.0's volume functions, as a black box (parts 1 to 4)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
-[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 3 (§1 to §17:
+[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 4 (§1 to §22:
 the volume-geometry text block, its copies, matrices, comparison and printer; the voxel
 arithmetic; coordinates, orientation, the Talairach point, centre of mass, principal components,
-the running average, the header comparison, determinant and dump). **Open to the clean-room
+the running average, the header comparison, determinant and dump; the samplers, the moves, the
+head's box and the transform reader). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C
 library's) by name, the reading and printing of their arguments, results and the structures'
 fields, and a comparison loop; no FreeSurfer code, nothing written from its source. The implementer
@@ -15,7 +16,8 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §69: 10 groups of seeded cases (8,096 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §69: 14 groups of seeded cases and one of fixed cases (`vrules`; 9,489 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | a statement of the spec checked as a model of the probe's printed voxels: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -97,6 +99,26 @@ The spec's sections in brackets.
 | `vdet W` | `MRIvolumeDeterminant` | a float |
 | `dump W` | `MRIdump` to standard output | its value |
 | `dsign d` | `MRIsetSampleVolumeDerivativeSign` | the double returned |
+| `samp k W d n (d d d i i)×n` | with the volume's `outside_val` set to the first double, n points `x y z frame aux`, each with the sampler k: `tri` `MRIsampleVolume`, `typ` `MRIsampleVolumeType` (aux the interpolation code), `frm` `MRIsampleVolumeFrame`, `fty` `MRIsampleVolumeFrameType` (aux the code), `cub` `MRIcubicSampleVolume`, `cubf` `MRIcubicSampleVolumeFrame`, `sinc` `MRIsincSampleVolume` (aux the half-width), `sincf` `MRIsincSampleVolumeFrame` (aux the half-width) [§18] | per point its value and the sample (a double, unset 7.0) |
+| `coef n (d i)×n`, `hsinc n (d d)×n` | `MRIcubicCoeff(x, i)`, `ham_sinc(x, fullwidth)` | the doubles |
+| `trans W D d d d` | `MRItranslate` (dx dy dz) [§19] | the result |
+| `rot W D M M` | `MRIrotate_I` (the rotation matrix, the centre: a matrix or `null`) | the result |
+| `rotx`, `roty`, `rotz` `W D f` | `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I` (the angle) | the result |
+| `skull W i n (i×6 f)×n` | n boxes `x0 y0 z0 x1 y1 z1 value` written into frame 0 (`MRIsetVoxVal`, every voxel from the first corner to the second), then `MRIfindApproximateSkullBoundingBox` (the threshold) into a box set to -7 [§20] | its value, the box's six integers |
+| `tftype n x×n` | `TransformFileNameType` of each name [§21] | the integers |
+| `ltaread x x\|nofile i` | the second string written to a file named by the first in the working directory (`nofile`: no file, any old one removed), `USE_AVERAGE305` unset (0), set to `true` (1) or set empty (2), `errno` set to 0, `LTAreadEx` of the name, the file removed | `errno`, then the array (the fs.mri probe's LTA, or `null`) |
+
+## The models
+
+```sh
+PYTHONPATH=validation/src scripts/orchestration/boxed.sh 4 python -P \
+  validation/investigations/freesurfer-volume-probe/models.py fs291 \
+  --probe <workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe --scratch <scratch>/models
+```
+
+Prints how many lines match the model (by the types met: `uchar` only, a tensor, other types), how
+many it leaves out (FreeSurfer crashed or read memory it does not own) and how many differ; exit
+status 1 when one differs.
 
 ## The comparison loop
 
@@ -115,13 +137,44 @@ The candidate, the guard runs, the memory lines and what may differ are as in th
 loop (its README, "The comparison loop"), without its `FS-264` batches: a difference is allowed on a
 line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`) and the candidate did, on a **memory**
 line, and in `--mode fix` on a line where the candidate noted a defect. Every call gets 10 seconds
-(`@10`) but `pca`'s (2: FreeSurfer's eigensystem never returns on some covariances). The groups:
+(`@10`) but `pca`'s (2: FreeSurfer's eigensystem never returns on some covariances) and the two
+`ltaread` calls of FS-307 (3: FreeSurfer never returns). The groups:
 `vgblock` (§2-3: 60 writes; 500 reads of generated blocks: well-formed, with lines missing,
 repeated, reordered or blank, lines of white space or other keys, first words of 63 to 200 bytes,
 odd second words, numbers in glibc's other forms, lines longer than 1,039 bytes, NUL bytes, CRLF
 endings, no final newline, data after the block, an empty file), `vgcopy` (§4), `vmake` (§7),
 `vrange` (§8), `vscale` (§9), `vtwo` (§10), `vextract` (§11), `vcoords` (§13-14), `vstats` (§15,
-§15b), `vheader` (§16): volumes of up to 4 x 4 x 4 voxels (5 for `vextract`, 6 for `vcoords`) and 0
-to 3 frames of every type (the types without a voxel size header-only), headers only too,
-destinations new, of the same shape, of another shape or a source, cached matrices as allocated,
-recomputed or dropped.
+§15b), `vheader` (§16), and the fixed cases of `vrules` (§6-15: FS-291 with tensor volumes, the
+clear of a bitmap and of volumes without voxels, `MRIlinearScale` with `only_nonzero`, sums and
+differences of types without direct access, the frame copies' messages, `MRIvalRangeRegion` without
+a region, `MRIsampleVolumeType`'s order of checks), and part 4's `vsample` (§18: the eight samplers at
+points inside, at and past the edges, whole and within `FLT_EPSILON` of whole, NaN, infinite and
+beyond the int range, frames past the volume's, interpolation codes 0 to 7 and -1, half-widths 0 to
+6, 70 and -1; the cubic weights and the sinc kernel), `vmove` (§19: translations, rotations by
+matrices (rotations, random, singular, NaN, of other sizes) about given or default centres, rotations
+about an axis by NaN, infinite and ordinary angles), `vskull` (§20: volumes of 4 to 64 voxels a side,
+with a bright head and dark margins of 6 to 15 voxels, a dark inside, painted boxes, thresholds -5 to
+300) and `vltaread` (§21: names with `.`, `@`, `#`, `nii.gz` and 500-byte names classified; `.lta`
+texts with comments, odd separators and numbers, 0 to 3 transforms, matrices of other sizes, the
+geometry blocks, subject and intensity lines, cut files; `.xfm` texts in the information lines'
+forms, cut; `.fslmat`, `register.dat` texts; `identity.nofile`; missing files; `USE_AVERAGE305`
+unset, `true` and empty): volumes of up to 4 x 4 x 4 voxels (5 for
+`vextract`, 6 for `vcoords`) and 0 to 3 frames of every type (the types without a voxel size
+header-only), headers only too, destinations new, of the same shape, of another shape or a source,
+cached matrices as allocated, recomputed or dropped.
+
+## Results (the reference machine: glibc 2.35, Linux 6.8, x86-64)
+
+- Relay 6 (2026-11-16): `refs`, seed 7, the prebuilt probe from commit `77392db5`: the hashes of
+  the spec's §69.2, the same through the oracle-output cache cold, warm and without it; the probe
+  as its own candidate: no unexplained difference in either mode.
+- Relay 7 (2026-11-17): the fixed group `vrules` (84 calls), the same hash from the cache and
+  without it, the other groups' hashes unchanged, the probe as its own candidate identical in both
+  modes (log `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`); `models.py fs291`: 127 lines as
+  the model, none different, 50 memory or crash.
+- Relay 7, part 4: the prebuilt probe rebuilt from commit `420314bb` (part 4's commands; its build
+  in `BUILD_INFO.txt`, the same bytes twice): every earlier group's hash unchanged; part 4's groups
+  `vsample`, `vmove`, `vskull`, `vltaread` (1,309 calls) the same through the cache cold, warm and
+  without it; the probe as its own candidate: no unexplained difference in either mode;
+  `models.py skull`: 160 of 160 lines as the model (log
+  `oracles/logs/fs-volume-probe-r7-final-2026-11-17.log`).

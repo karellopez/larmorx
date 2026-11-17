@@ -7,11 +7,11 @@ implementer writes the clean room (queue C3.1-05 and on) from this file, black-b
 official programs and of the open probe (§69), `specs/freesurfer-mri.md` (the structure these
 functions work on), `specs/freesurfer-maths.md`, `specs/freesurfer-core.md` and the cited standards.
 Made ready for the clean room part by part by the spec finisher (FreeSurfer's foundations, track E):
-**parts 1 to 3 (§1-17) by its relay 6 (2026-11-16)**: the black-box validation plan (§69) with its
-open probe, a read-through as a clean-room reader, the defects' texts in `larmorx_core::defects`
-checked. The sections after §17 are not yet read through that way: their validation plans still
-name the replica's closed probe, which the implementer does not open (§69 says what to do
-meanwhile). What black-box runs confirmed is marked **(observed)**.
+**parts 1 to 3 (§1-17) by its relay 6 (2026-11-16), part 4 (§18-22) by its relay 7
+(2026-11-17)**: the black-box validation plan (§69) with its open probe, a read-through as a
+clean-room reader, the defects' texts in `larmorx_core::defects` checked. The sections after §22
+are not yet read through that way: their validation plans still name the replica's closed probe,
+which the implementer does not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
 **Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
 any other copy, the installed package's scripts, Python and libraries), the replica crates
@@ -197,14 +197,24 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   0 and such writes are dropped) or outside its buffer (FS-290: reads 0, writes dropped, in both
   modes; FreeSurfer reads and writes memory it does not own). A volume without voxels walked
   directly ends the program here (FreeSurfer crashes: FS-58).
+- **A tensor volume's rows.** FreeSurfer finds every row of a tensor volume (type 6), of every slice
+  and frame, at the volume's first voxel, as its full copy does (`specs/freesurfer-mri.md` §13,
+  FS-166): element `x` of any row of a tensor volume, walked directly, is element `x` from the start
+  of its buffer. So a direct walk reads the same first bytes for every row, and writes every row over
+  the same first bytes: the last row written stays there, and the rest of the buffer is not touched
+  (**(observed)**: `vscale`, `vtwo`, `vrules`, §69). The volume's other accesses (`MRIgetVoxVal`,
+  `MRIsetVoxVal`) are not affected: for a tensor they read -1e10 and write nothing
+  (`specs/freesurfer-mri.md` §5). In parts 1 to 4 FS-291's `reproduce` (§9, §10) and FS-301's
+  (§19: a tensor destination of the moves) walk a tensor volume directly.
 - **Arithmetic** in `float` (single precision, x86-64's NaN rules, `specs/freesurfer-maths.md` §1)
   unless said otherwise; `nint(x)` is `(int)(x + 0.5)` (`x - 0.5` below 0) in double with FS-12's
   rule outside `int`. Storing an integer into a narrower integer type keeps its low bits.
 - **Errors**: "an error" is FreeSurfer's C-style error line (`ErrorPrintf`: `specs/freesurfer-core.md`
   §2's C-style error calls, `error: <text>` on standard error with `errno`'s text first when it is
-  set and FS-01's NUL before the new line); "the program ends" its C-style exit (`ErrorExit`, the
-  core spec's §2 and §3) with the status given, which the probe prints modulo 256 (`EXIT 252` for
-  -4, `EXIT 253` for -3).
+  set and FS-01's NUL before the new line; a text written below with a final `\n` keeps it, so the
+  line is `error: <text>\n`, the NUL, then the new line); "the program ends" its C-style exit
+  (`ErrorExit`, the core spec's §2 and §3) with the status given, which the probe prints modulo 256
+  (`EXIT 252` for -4, `EXIT 253` for -3).
 
 ## 7. Clones, clearing, size checks, frame copies
 
@@ -212,22 +222,30 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   header; else a clone.
 - `MRIcloneBySpace(src, type, nframes)`: a new volume of the source's extent, `type` and `nframes`
   (the source's when negative), the source's header and pulse parameters (TR, TE, TI, flip angle).
-- `MRIclear(mri)`: every voxel's bytes set to 0 (types `uchar`, `short`, `ushort`, `int`, `long`,
-  `float`); another type: the error `MRIclear: unsupported input type <type>`, returns
-  `ERROR_UNSUPPORTED` (-3); else 0.
+- `MRIclear(mri)`: for types `uchar`, `short`, `ushort`, `int`, `long` and `float`, every row of every
+  slice and frame (frames outermost) set to 0, its `width x size` bytes; the bitmap (type 5) is not
+  refused either: each row's first `width / 8` bytes (integer division). Another type: the error
+  `MRIclear: unsupported input type <type>`, returns `ERROR_UNSUPPORTED` (-3); else 0. A volume
+  without voxels with at least one row (height and depth x frames both positive) is §6's direct walk
+  of a volume without voxels (FS-58: FreeSurfer crashes; the error here), and a bitmap volume never
+  has voxels (`specs/freesurfer-mri.md` §4, FS-55): so a bitmap volume (and any volume without
+  voxels of the six types) gives FS-58's error when it has a row and returns 0 when it has none
+  (**(observed)**: `vmake`; `vrules`, 9 lines: no rows 0, a row `CRASH 11`, tensor, float complex
+  and RGB -3 with the error).
 - `MRImatch(a, b)`: 1 when width, height, depth and type are equal. `MRImatchDimensions(a, b)`: 1
   when the extents are equal and each voxel size differs by less than `FLT_EPSILON` (the float
   difference, absolute). `MRIcheckSize(src, check, w, h, d)`: 0 without `check`; else 1 when
   `check`'s extent is `w x h x d`, a 0 taken from `src`.
 - `MRIcopyFrame(src, dst, sf, df)`: without `dst`, a new volume of the source's extent and type with
   `df + 1` frames, the source's header and pulse parameters. When `df` is not below `dst`'s frame
-  count: the error `MRIcopyFrame: dst frame #<df> out of range (nframes=<n>)` and `NULL`. Else, for
+  count: the error `MRIcopyFrame: dst frame #<df> out of range (nframes=<n>)\n` and `NULL`. Else, for
   every voxel of the source's extent (slices, then rows, then columns), the voxel of frame `sf` is
   read and written into frame `df`.
 - `MRIcopyFrames(src, dst, s0, s1, d0)`: without `dst`, a new volume of `s1 - s0 + 1` frames with the
   source's header; when the two do not `MRImatch`, the program ends (status `ERROR_BADPARM`, -4)
   with `MRIcopyFrames(<s0>, <s1>, <d0>): src (<w>, <h>, <d>) doesn't match destimation (<w>, <h>,
-  <d>)`; then `MRIcopyFrame` of frames `s0 .. s1` into `d0 ..`, `NULL` at the first failure.
+  <d>)\n` (**(observed)**, both messages: `vmake`, `vrules`: `error: <text>\n`, the NUL, `\n`);
+  then `MRIcopyFrame` of frames `s0 .. s1` into `d0 ..`, `NULL` at the first failure.
 
 ## 8. Value ranges
 
@@ -240,7 +258,10 @@ max when it is larger (a NaN never does), so a volume whose values all lie above
   (direct); another type: the error `MRIvalRange: unsupported type <type>`, `ERROR_UNSUPPORTED`, the
   range not set.
 - `MRIvalRangeRegion(mri, region)`: frame 0 over the region, its start raised to 0 and its end
-  (`x + dx`, ...) lowered to the extent; returns 0.
+  (`x + dx`, ...) lowered to the extent; returns 0. **FS-265** (rule A): without a region FreeSurfer
+  crashes (**(observed)**: `vrange`, every such line, and `vrules`: `CRASH 11`, with voxels or
+  without); both modes take the whole volume (the region `0 0 0 width height depth`), as
+  `MRIextractRegion` does without one (§11), and note FS-265.
 - `MRIlabelValRange(mri, labeled, label)`: the voxels (all frames) whose `nint` of the labelled
   volume's value at the same place and frame is `label`; the first such voxel sets both min and max.
 
@@ -248,8 +269,11 @@ max when it is larger (a NaN never does), so a volume whose values all lie above
 
 All map each voxel of each frame of the source's extent into the destination (a clone without one).
 
-- `MRIlinearScale(src, dst, scale, offset, only_nonzero)`: `v * scale + offset` (for every voxel, or
-  only those with `|v| >= 1e-15` when `only_nonzero`), clipped to [0, 255] for a `uchar` destination.
+- `MRIlinearScale(src, dst, scale, offset, only_nonzero)`: each voxel `v` becomes `v * scale +
+  offset` (in float), but when `only_nonzero` is set and `|v| < 1e-15` (in double) it stays `v`;
+  either way the value is then clipped to [0, 255] for a `uchar` destination (a NaN is not) and
+  written. So with `only_nonzero` the other voxels are written too, with their own values (the
+  destination's earlier values there are replaced: **(observed)**, `vscale`, 6 lines, and `vrules`).
 - `MRIscalarMul(src, dst, s)`: `v * s`.
 - `MRIscalarMulFrame(src, dst, s, frame)`: one frame, direct by the source's type: `uchar`
   `v * s` clipped to [0, 255] and truncated (a NaN stored as 0: FS-296); `float` the product;
@@ -260,9 +284,18 @@ All map each voxel of each frame of the source's extent into the destination (a 
   frame; the others are copied.
 - `MRIbinarize(src, dst, t, low, high)`: `low` where `v < t` (in double), else `high` (NaN: `high`).
 - `MRIinvertContrast(src, dst, t)`: frame 0, `uchar` voxels (direct): `v > t` becomes `255 - v`.
-  FS-291: on another type FreeSurfer takes the first `width` bytes of each row as voxels;
-  `reproduce` does so, the default ends the program with `MRIinvertContrast: unsupported type <t>
-  (uchar volumes only)`.
+  FS-291: when the source or the destination has another type, FreeSurfer takes the first `width`
+  bytes of each of its rows as `uchar` voxels, reading the source's and writing the destination's
+  there (a row of slice `z`, row `y`: §6's place of element 0 of that row, of the volume's own
+  element size; a tensor volume's rows all at its first voxel, §6). So, **(observed)** (§69's
+  `vscale` and `vrules`): a tensor source gives every row its own first `width` bytes; a tensor
+  destination ends with the last row's result in its first `width` bytes (slice `depth - 1`, row
+  `height - 1` of the source's extent) and the rest of its bytes as they were; a destination of
+  another non-`uchar` type gets each row's result in that row's first `width` bytes, the rest of the
+  row as it was. `reproduce` does so; the default, when the source's width, height and depth are
+  all positive, ends the program (status -3, `ERROR_UNSUPPORTED`) with `MRIinvertContrast:
+  unsupported type <t> (uchar volumes only)`, `<t>` the source's type when it is not `uchar`, else
+  the destination's.
 - `MRIabs`, `MRIpos`, `MRIneg(src, dst)`: without `dst` a new volume of the source's extent, type
   and frames with its header; frames innermost (for each voxel, its frames in order); `|v|`, a
   negative `v` set to 0, a positive `v` set to 0.
@@ -277,14 +310,19 @@ The second volume is walked with the first's extent and frames.
   type and those frames with its header. Types differ: `va - vb` read and written. One type: direct,
   `(float) va - (float) vb`, stored as `nint` in an integer destination's bits (wrapping: a
   `uchar` destination stores `-1` as 255) or as the float; a source type without direct access
-  (`RGB`, complex) leaves the previous difference (0 at first); a destination of such a type is not
-  written.
-- `MRIadd(a, b, dst)`: as `MRIsubtract`, and: when `a` is `uchar` or the types differ, `va + vb` read,
-  clipped to [0, 255] for a `uchar` destination, written; otherwise direct, the sum in the source
-  type's C arithmetic (`short`, `ushort` as `int`; `int` wrapping in 32 bits, except into a `long`
-  destination, where it is a 64-bit sum; `long` wrapping in 64 bits; `float` in float), then stored:
-  into an integer destination its low bits (a `float` sum `nint`-ed first), into a `float`
-  destination the first value as float plus the second converted to float.
+  (only `uchar`, `short`, `ushort`, `int`, `long` and `float` have it: `RGB`, tensor and complex do
+  not) leaves the previous difference (0 at first), which is written; a destination of such a type
+  is not written (**(observed)**: `vrules`).
+- `MRIadd(a, b, dst)`: frames and a new destination as `MRIsubtract`; when `a` is `uchar` or the
+  types differ, `va + vb` read, clipped to [0, 255] for a `uchar` destination, written; otherwise
+  direct, the sum in the source type's C arithmetic (`short`, `ushort` as `int`; `int` wrapping in
+  32 bits, except into a `long` destination, where it is a 64-bit sum; `long` wrapping in 64 bits;
+  `float` in float), then stored: into an integer destination its low bits (a `float` sum `nint`-ed
+  first), into a `float` destination the first value as float plus the second converted to float.
+  Unlike `MRIsubtract`, in this direct case (one source type, not `uchar`) a source type or a
+  destination type without direct access (`RGB`, tensor, complex) leaves the destination not
+  written at all (**(observed)**: `vtwo`, 1 line; `vrules`); the read-and-write case writes an
+  `RGB` destination as §5 writes it.
 - `MRIdivide(a, b, dst)`: without `dst` a one-frame `float` volume of `a`'s extent with `a`'s header.
   Unless all three are `uchar`: frame 0, `va / vb` in double (0 when `|vb| < FLT_EPSILON`), written.
   All `uchar` (direct, frame 0): the integer quotient; where `vb` is 0: 0 when `va` is 0, else 255.
@@ -293,7 +331,9 @@ The second volume is walked with the first's extent and frames.
   (`reproduce`); the default moves on in all three.
 - `MRIscaleAndMultiply(a, s, b, dst)`: without `dst` a one-frame volume of `a`'s extent and type with
   its header; frame 0, `uchar` (direct): `nint(va * (vb / s))` clipped to [0, 255]. FS-291 as
-  `MRIinvertContrast`.
+  `MRIinvertContrast` (§9), for the three volumes: `<t>` the first source's type when it is not
+  `uchar`, else the second's, else the destination's (**(observed)**: `vtwo`, 2 lines with a tensor
+  destination given, which keeps the last row's result; `vrules`).
 
 ## 11. Extracting a region
 
@@ -381,11 +421,14 @@ accumulation) and inverses `MatrixInverse`'s (none when an element of the result
 - `MRIindexNotInVolume(mri, c, r, s)`: 0 when every coordinate is in `[0, extent - 1]`; else -1 when
   each coordinate rounded to nearest (ties to even) as a `float` is in `[0, extent)`; else 1 (NaN
   coordinates give 1).
-- `MRIsampleVolumeType(..., SAMPLE_NEAREST)`: 1 above gives `outside_val`. Otherwise the voxel of
-  frame 0 at the coordinates rounded by `nint` (half away from zero; FS-12 for numbers outside
-  `int`), each clamped to `[0, extent - 1]`, as a `float` (an `int` voxel rounded to `float`); a
-  type other than uchar, short, ushort, int, float gives 0 and the error `MRIsampleVolumeType:
-  unsupported volume type <t>` (`ERROR_UNSUPPORTED`).
+- `MRIsampleVolumeType(..., SAMPLE_NEAREST)`, in this order: 1 above gives the sample `outside_val`
+  and returns 0, whatever the volume's type (with voxels or without). Otherwise the coordinates
+  are rounded by `nint` (half away from zero; FS-12 for numbers outside `int`), each clamped to
+  `[0, extent - 1]`; then a type other than uchar, short, ushort, int, float (long, RGB, tensor,
+  bitmap, the complex types, with voxels or without) gives the sample 0, the error
+  `MRIsampleVolumeType: unsupported volume type <t>` and returns `ERROR_UNSUPPORTED` (-3); else the
+  voxel of frame 0 there as a `float` (an `int` voxel rounded to `float`), returning 0
+  (**(observed)**: `vstats`; `vrules`, inside, outside and at the ambiguous -0.4 for six types).
 - `MRIcenterOfMass(mri, means, threshold)`: over the voxels in z, y, x order, each sampled as above
   (so an unsupported type prints its error once per voxel), those above `threshold` (a byte)
   accumulate in `double`: `weight += v`, `mx += x * v` (x converted to `float`, then `double`), the
@@ -445,17 +488,30 @@ A point is given in voxel coordinates (column `x`, row `y`, slice `z`, `double`)
 in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's value.
 - **Whole coordinates.** When each coordinate is within `FLT_EPSILON` (in `double`, `|trunc(c) - c| <
   1.1920928955078125e-07`, a NaN or a value outside the `int` range never whole) of its integer,
-  every sampler but the sinc one takes the nearest voxel instead.
-- **Nearest** (`MRIsampleVolumeType` with `SAMPLE_NEAREST` or an unknown type;
-  `MRIsampleVolumeFrameType` likewise on a frame): a point unambiguously outside (§14's
-  "index not in volume" 1, NaN included) gives the volume's `outside_val`; else each coordinate is
+  every sampler but the sinc ones takes the nearest voxel instead, before any other check: the
+  trilinear and cubic samplers of frame 0 the nearest sample of frame 0, their frame variants and
+  `MRIsampleVolumeFrameType` the nearest sample of their frame (whose frame is not checked).
+- **Choosing the sampler.** `MRIsampleVolumeType(mri, x, y, z, pval, type)`: type 1
+  (`SAMPLE_TRILINEAR`) is `MRIsampleVolume`, 3 (`SAMPLE_CUBIC`) `MRIcubicSampleVolume`, 2
+  (`SAMPLE_SINC`) `MRIsincSampleVolume` with the half-width 5; every other code (0
+  `SAMPLE_NEAREST`, 5 the cubic B-spline, -1, 7, ...) the nearest sample of frame 0.
+  `MRIsampleVolumeFrameType(mri, x, y, z, frame, type, pval)`: whole coordinates (above) the
+  nearest sample whatever the type; else 1 is `MRIsampleVolumeFrame`; 5 gives the error
+  `MRIsampleVolumeFrameType(5): First create coeff image and then use it to sample (see
+  mriBSpline).` and 2 `MRIsampleVolumeFrameType(2): unsupported interpolation type`, each returning
+  `ERROR_UNSUPPORTED` (-3) with `*pval` unchanged; every other code (3 and 0 included) the nearest
+  sample of the frame (**(observed)**: §22's `vsample`).
+- **Nearest** (the nearest sample of frame 0, `MRIsampleVolumeType`'s, §15; of a frame,
+  `MRIsampleVolumeFrameType`'s): a point unambiguously outside (§15's "index not in volume" 1, NaN
+  included) gives the volume's `outside_val` and 0, whatever the type; else each coordinate is
   rounded half away from zero (`nint`), clamped to `[0, extent - 1]`, and the voxel read as `float`.
   Types: bytes, shorts, unsigned shorts, ints, floats; another gives 0 and the error
   `MRIsampleVolumeType: unsupported volume type <t>` (`MRIsampleVolumeFrameType: ...`), code
   `ERROR_UNSUPPORTED`. The frame variant does not check the frame (a frame past the volume's reads
   outside it: FS-290).
-- **Trilinear** (`MRIsampleVolume`, frame 0; `MRIsampleVolumeFrame`, which first gives `outside_val`
-  for a frame at or past the volume's frames): unambiguously outside gives `outside_val`; else each
+- **Trilinear** (`MRIsampleVolume`, frame 0; `MRIsampleVolumeFrame`, which after the
+  whole-coordinate shortcut gives `outside_val` for a frame at or past the volume's frames):
+  unambiguously outside gives `outside_val`; else each
   coordinate `c >= extent` becomes `extent - 1`, then `c < 0` becomes 0; `m = max(trunc(c), 0)`, `p =
   min(extent - 1, m + 1)`; `md = c - (float)m` and `pd = 1 - md` in `double`. The value is the sum of
   the eight corners' `((wx * wy) * wz) * v` (wx is `pd` for the `m` corner, `md` for the `p` corner;
@@ -507,22 +563,43 @@ in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's v
   the source's centre, `ras_good_flag` 0 (an angle whose rotation cannot be inverted: FS-304).
 
 ## 20. The head's box (`MRIfindApproximateSkullBoundingBox(mri, thresh, box)`)
-From the centre of mass of the voxels above `(unsigned char) thresh` (§15), walks along lines through
-it, sampling the nearest voxel; a sample `< thresh` is dark. A walk keeps the longest run of dark
-samples (its first sample the edge): a bright sample ends the current run, and after more than 30
-bright samples in a row the longest is forgotten. A dark run at the walk's end counts too; the edge
-is the volume's border when no run reaches 10 samples. Runs as long as the longest replace it except
-in the first walk.
-- x: down from the centre's x at its y and z (the left edge, `box.x`), up to the width (the right
-  edge; `box.dx = right - left + 1`). While `box.dx <= 10`, the centre's y moves down by 10, `left/right
-  detection failed, moving y coord to <nint(y) + 10> from <nint(y)>` is printed (standard output), and
-  x is searched again; when y becomes negative, `MRIfindApproximateSkullBoundingBox failed: check
-  input volume` (`ErrorExit`, `ERROR_BADPARM`).
-- y: down from the centre at x `max(0, nint(cx) - 20)` (`box.y`); a final dark run also counts when
-  it is at least half the longest and more than 15 bright samples came before it after the longest
-  was last replaced. Then up from the centre at the centre's x (`box.dy`).
-- z: down and up at the centre's x and y (`box.z`, `box.dz`); when `box.dz < 5`, both again 15
-  voxels to the left. Returns `NO_ERROR`. A centre of mass that is not a number: FS-305.
+The centre `(cx, cy, cz)` is the centre of mass of the voxels above `(unsigned char) thresh` (§15's
+`MRIcenterOfMass`: zeros when no voxel is above it). Each edge comes from a *walk*: from a start
+position `c` along one axis, one voxel at a time, down to 0 or up to `extent - 1` (both included;
+no step when `c` is already past that end), the other two coordinates fixed. Each position is the
+nearest sample of frame 0 (§15, §18: `outside_val` outside the volume), *dark* when it is below
+`thresh` (the `int`, compared in `double`), else *bright* (a NaN is bright). A walk keeps the
+current dark run's length `n` (0) and first position `s` (`c`), the count `b` of bright samples in a
+row (0), the longest run's length `L` (0) and the edge `E` (`c`), and at each sample:
+
+- dark: `s` becomes the position when `n` is 0; `n += 1`; `b = 0`;
+- bright: `b += 1`; when `b > 30`, `L = 0`; then the current run replaces the longest (`L = n`,
+  `E = s`) when `n > L` in the walk to the left edge, `n >= L` in every other walk; then `n = 0`
+  (so in the other walks, from the 31st bright sample in a row on, `E` becomes `s` again at each
+  bright sample);
+- after the last sample: `L = n`, `E = s` when `n > L`; then, when `L < 10`, `E` becomes the end the
+  walk went to (0, or `extent - 1`).
+
+The walks, with `nint` (half away from zero) of the centre's coordinates:
+
+1. **Left and right**: down and up the x axis from `nint(cx)` at `y = nint(cy)`, `z = nint(cz)`:
+   `box.x` = the left walk's `E`, `box.dx` = the right walk's `E - box.x + 1`. When `box.dx <= 10`:
+   `cy -= 10`, then standard output gets `left/right detection failed, moving y coord to <nint(cy) +
+   10> from <nint(cy)>` (the moved `cy`), and when `cy < 0` the program ends
+   (`MRIfindApproximateSkullBoundingBox failed: check input volume`, `ErrorExit`, `ERROR_BADPARM`),
+   else both walks again (**(observed)**: §22's `vskull`, a volume 10 voxels wide).
+2. **Top**: down the y axis from `nint(cy)` at `x = max(0, nint(cx) - 20)`, `z = nint(cz)`, keeping
+   also `M` (0): at each dark sample `M = max(M, b)` first (the bright samples just before it), and
+   `M = 0` whenever the longest is replaced at a bright sample; after the last sample the last run
+   also replaces the longest when `n > L / 2` (integer division) and `M > 15` (before the `L < 10`
+   rule). `box.y` = `E`.
+3. **Bottom**: up the y axis from `nint(cy)` at `x = nint(cx)`, `z = nint(cz)`: `box.dy = E - box.y +
+   1`.
+4. **Back and front**: down and up the z axis from `nint(cz)` at `x = nint(cx)`, `y = nint(cy)`:
+   `box.z`, `box.dz = E - box.z + 1`; when `box.dz < 5`, both again at `x = nint(cx) - 15` (not
+   clamped).
+
+Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
 
 ## 21. Reading a linear transform (`LTAreadEx(fname)`, 3.1-39)
 - **The type from the name** (`TransformFileNameType`): the text after the last `@`, or without one
@@ -531,14 +608,31 @@ in the first walk.
   ending in `nii.gz` (as written, more than 6 bytes) a morph; `OCT`, `LTA` and no extension an LTA;
   `XFM` MINC; `FSLMAT` FSL; anything else `REGISTER_DAT`.
 - A name whose file part is `identity.nofile` gives an identity RAS-to-RAS LTA without reading.
-- **An `.lta`** (any type but the three below): lines read skip blank lines, `#` comments and leading
-  space, and cut at `#`. Line 1 `type = <n>`, line 2 `nxforms = <n>` (as `scanf` matches them: white
-  space matches any; FS-308, FS-309); for each transform `mean = <x> <y> <z>`, `sigma = <s>` and the
-  matrix (`MatrixAsciiReadFrom`: `<type> <rows> <cols>` then the numbers); then for each transform a
-  raw line `src volume info...` reads the source geometry (§1's block), a following `dst volume
-  info...` the destination's; then any later lines `subject <word>` and `fscale <number>`. Defaults:
-  subject empty, `fscale` 0.15. Errors: `ltaReadFile(<fname>): can't open file`, `... can't read
-  data` (`NULL`).
+- **An `.lta`** (any type but the three below: `.lta`, `.oct`, no extension and the morphs' names),
+  in this order:
+  1. The first two lines as `fgetl` reads them (`specs/freesurfer-core.md` §10, at most 1,022 bytes
+     each: blank lines, lines of white space and `#` comment lines skipped, leading white space
+     dropped, the line cut at its first `#`, the new line dropped). No first line (an empty file,
+     or only such lines): `ltaReadFile(<fname>): can't read data` (`ERROR_BADFILE`) and `NULL`.
+     Line 1 is matched against `type      = %d\n`, line 2 against `nxforms   = %d\n` as `sscanf`
+     matches (each run of white space in the pattern matches any white space, none included; the
+     words and `=` must be there): a line that does not match leaves the type or the count unset
+     (FS-308); a file of a single such line: FS-309.
+  2. An array of that many transforms (`LTAalloc`, `specs/freesurfer-mri.md` §20) with that type.
+     Then, for each transform, straight from the stream (no line is skipped, a `#` is a character
+     like another): `fscanf` with `mean      = %f %f %f\n` (x0, y0, z0) and with `sigma     =
+     %f\n` (sigma), each stopping at its first mismatch (the fields not reached keep the
+     allocation's values), then `MatrixAsciiReadFrom` into the transform's matrix
+     (`specs/freesurfer-maths.md` §18.2: `<type> <rows> <cols>` and the numbers).
+  3. Then, for each transform, the next raw line (`fgets` of at most 1,022 bytes; at the end of the
+     file nothing more for it): when it starts with the 15 bytes `src volume info`, the source
+     geometry is read from the stream (§3), the next raw line is read, and when that one starts with
+     `dst volume info` the destination's geometry (§3).
+  4. The subject empty and `fscale` 0.15; then each remaining raw line starting with `subject` sets
+     the subject to its second word (`%*s %s`), each starting with `fscale` sets `fscale` (`%*s
+     %f`).
+  A file that cannot be opened: `ltaReadFile(<fname>): can't open file` and `NULL`. (**(observed)**:
+  §22's `vltaread`.)
 - **An `.xfm`**: line 1 must start `MNI Transform File` (else `ltMNIreadEx:<fname> does not start as
   'MNI Transform File'`); line 2 starting `%` is the volume information, else no volumes are looked
   for (and `Transform_Type...` there skips one more line to the matrix); line 3 starting `%` is the
@@ -559,21 +653,21 @@ in the first walk.
   so that programs run in one process each see their own. Type RAS-to-RAS.
 - **FSL** (`.fslmat`): three rows `%f %f %f %f`, type `FSLREG_TYPE`. **`register.dat`**: an INFO line
   (`INFO: This REGISTER_DAT transform is valid only for volumes between  COR types with c_(r,a,s) =
-  0.`), then `regio_read_register`'s subject, intensity (`fscale`) and matrix; the source geometry not
+  0.`), then `regio_read_register`'s subject, intensity (`fscale`) and matrix (`specs/freesurfer-io.md`
+  §46); the source geometry not
   valid with sizes (in-plane, in-plane, between-plane), the destination's not valid with sizes 1.
 - Errors keep `errno` (a failed open, a volume that does not exist) for the error messages after.
 
 ## 22. Validation plan (3.1-36's samplers, the moves, the head box, reading transforms)
-The probe's commands `stri`, `styp`, `sfrm`, `sfty`, `scub`, `scubf`, `ssinc`, `ssincf` (four points
-per case: inside, at and past the edges, whole and within `FLT_EPSILON`, NaN, infinities, 1e10, frames
-past the volume's, half-widths 0 to 6 and 70, 1000, -1, `outside_val` 0, -5.5, a NaN, 1e300), `coef`,
-`hsinc`, `trans`, `rot` (rotations about each axis, random and NaN matrices, with and without a
-centre), `rotx`, `roty`, `rotz` (NaN and infinite angles), `skull` (volumes of 6 to 48 voxels with
-painted boxes, thresholds -5 to 300), `tftype` (names with `.`, `@`, `#`, `nii.gz`, 600-byte names) and
-`ltaread` (`.xfm`, `.lta`, `.fslmat` texts with odd numbers, cut files, missing lines, the
-volume-information forms; `USE_AVERAGE305` unset, set to `true` and set empty). Expected: identical with `reproduce` but where FreeSurfer reads memory it
-does not own, crashes or never returns (FS-300, FS-302 to FS-310), counted and not compared.
-
+§69's groups `vsample`, `vmove`, `vskull` and `vltaread` (the open probe's commands `samp`, `coef`,
+`hsinc`, `trans`, `rot`, `rotx`, `roty`, `rotz`, `skull`, `tftype` and `ltaread`; §69.2 says what
+each covers and gives its reference hash): identical with `reproduce` but where FreeSurfer reads
+memory it does not own, crashes or never returns (frames past the volume's, FS-290; header copies
+of volumes without their cached matrices, FS-252; FS-300, FS-302, FS-304 to FS-310), lines the loop
+allows; the default differs only where it notes a defect. The open folder's `models.py skull` checks
+§20's walks on every `vskull` line (the box or the end of the program, and the messages). Not in the
+probe: an `.xfm` that names a volume that exists (its geometry comes from the header reader of
+`specs/freesurfer-io.md`): the clean room's own tests, against §21's text.
 
 ## 23. The CMA labels and the segmentation functions (`cma.h`, `cma.cpp`; 3.1-35 piece c)
 **The label numbers** are those of FreeSurfer's colour table (`FreeSurferColorLUT.txt`, distributed
@@ -2322,12 +2416,12 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 3
+## 69. Validation plan (black box), parts 1 to 4
 
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §16 by name) and the comparison loop; its README lists every
+(calls of the functions of §2 to §21 by name) and the comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
 them, with the working volume W, the destination D and the region R added). The implementer runs
@@ -2346,8 +2440,10 @@ byte 90, then right before it, fill byte 165). A line whose four results are not
 on memory FreeSurfer does not own or never wrote (a **memory** line). The hash is the SHA-256 of the
 group's plain lines, each memory line and each line where FreeSurfer crashed as `<memory>`.
 **(observed)** on the reference machine (glibc 2.35, Linux 6.8, x86-64), through the oracle-output
-cache, from it and without it (2026-11-16, the prebuilt probe from commit 77392db5; log
-`oracles/logs/fs-volume-probe-r6-refs-2026-11-16.log`):
+cache, from it and without it (2026-11-16, the prebuilt probe from commit 77392db5, log
+`oracles/logs/fs-volume-probe-r6-refs-2026-11-16.log`; again 2026-11-17 with the prebuilt probe from
+commit 420314bb, which adds part 4's commands: every earlier hash the same, log
+`oracles/logs/fs-volume-probe-r7-final-2026-11-17.log`):
 
 | Group | § | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
 |---|---|---|---|---|---|---|
@@ -2361,15 +2457,50 @@ cache, from it and without it (2026-11-16, the prebuilt probe from commit 77392d
 | `vcoords` | 13, 14 | 1,350 | 0 | 57 | 0 | `69ac886bc59fb2b67e82e40194230ac63b6cd6c424a9895bb63305d722a43881` |
 | `vstats` | 15, 15b | 750 | 42 | 11 | 9 | `a0c66fd4593df2e6a7935e7031bf97069cfd77a70ca1455d4ba7fcaa8b346e90` |
 | `vheader` | 16 | 606 | 0 | 0 | 0 | `b8b24feb576e087bae4fb68785ce0f3a482c7a291cfcd4930859101a94228eef` |
-| all | | 8,096 | 932 | 426 | 9 | |
+| `vrules` | 6-15 | 84 | 11 | 1 | 0 | `ecb640a82099e45687b2560c6802d721f4bb47a46090720e7d3ab03c29b12c43` |
+| `vsample` | 18 | 540 | 19 | 0 | 0 | `e2566632d2bd1d8fb9a6dc7279791a6d03d8746f8000afa6f6cfefef1dc6c6ad` |
+| `vmove` | 19 | 300 | 68 | 0 | 0 | `407ad510e8441405b80fe84a713d752ce46e9513b4ebae1dc737e106db4630b0` |
+| `vskull` | 20 | 160 | 0 | 80 | 0 | `e165d185b2da38a73bc31b32cfccbc249b552880b1159ed0f67b610ae77bbebf` |
+| `vltaread` | 21 | 309 | 25 | 15 | 2 | `d2abc60623f474177b420fd2062fefc3484302d5bb41ddb91f16a6b573176ebf` |
+| all | | 9,489 | 1,055 | 522 | 11 | |
+
+Part 4's groups (relay 7): `vsample` (§18: the eight samplers at points inside, at and past the
+edges, whole and within `FLT_EPSILON` of whole, NaN, infinite and beyond the `int` range, frames past
+the volume's, interpolation codes 0 to 7 and -1, half-widths 0 to 6, 70 and -1, every type with a size
+and some without; the cubic weights, the sinc kernel), `vmove` (§19: translations by whole, fractional,
+NaN and infinite shifts; rotations by rotation, random, singular, NaN and odd-sized matrices about a
+given or the default centre; rotations about an axis by ordinary, NaN and infinite angles; given
+destinations of the same or another shape), `vskull` (§20: volumes of 4 to 64 voxels a side with a
+bright head and dark margins of 6 to 15 voxels, a dark inside, painted boxes, thresholds -5 to 300;
+`models.py skull`: all 160 lines as §20's walks, the 80 boxes and the 80 ends of the program with
+their messages) and `vltaread` (§21: names with `.`, `@`, `#`, `nii.gz` and of 500 bytes classified;
+`.lta` texts with comments, other separators, 0 to 3 transforms and -1, matrices of other sizes, the
+geometry blocks, the subject and intensity lines, cut files; `.xfm` texts in the information lines'
+forms, cut; `.fslmat`, `register.dat` texts; `identity.nofile`; missing files; `USE_AVERAGE305` unset,
+`true` and empty; fixed cases of FS-307, FS-309, FS-310; the two FS-307 calls get 3 seconds).
+
+`vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
+`oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
+the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
+volumes (§6, §9, §10), `MRIclear` of a bitmap and of volumes without voxels (§7), `MRIlinearScale`
+with `only_nonzero` (§9), sums and differences of types without direct access (§10), the frame
+copies' messages (§7), `MRIvalRangeRegion` without a region (FS-265, §8) and the order of
+`MRIsampleVolumeType`'s checks (§15). `models.py fs291` (README.md, "The models") checks §9's byte
+walk on every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`: 127 lines as the model (10
+`uchar` only, 30 with a tensor volume, 87 with other types), none different, 50 where FreeSurfer
+crashed or read memory it does not own **(observed)**.
 
 The exits are FreeSurfer's own: a volume of a type without a voxel size given voxels (`could not
 allocate memory for slice ...`, status 1), `MRIcopyFrames`' mismatch (§7, status -4), an extracted
 box of a type FreeSurfer does not copy (§11, -3) or of a non-positive size (status 1), the
-tkregister products without an inverse (§13, -4); the timeouts are principal components of
-covariances with infinite or NaN entries (§15). Among the crashes: volumes without voxels walked
-directly (FS-58), destinations or second volumes smaller than the first (FS-290), boxes FreeSurfer
-copies with a negative length (FS-294) and destinations of another type it frees (FS-293).
+tkregister products without an inverse (§13, -4), the head's box that finds no width (§20, -4), an
+`.lta` of -1 transforms (`LTAalloc(-1): could not allocate xforms`, -2: `specs/freesurfer-mri.md`
+§20); the timeouts are principal components of covariances with infinite or NaN entries (§15) and
+FS-307's `.xfm` files (§21). Among the crashes: volumes without voxels walked directly (FS-58),
+destinations or second volumes smaller than the first (FS-290), boxes FreeSurfer copies with a
+negative length (FS-294) and destinations of another type it frees (FS-293); in part 4, frames past
+the volume's (FS-290), volumes without their cached matrices copied (FS-252), the rotations about an
+axis by NaN or infinite angles (FS-304), names of 500 bytes (FS-306) and FS-309, FS-310.
 
 ### 69.3 The comparison
 
@@ -2390,27 +2521,34 @@ the allowed lines; exit status 1 for any other difference. **(observed)** with t
 candidate: no unexplained difference in either mode; with `reproduce` 8,026 of the 8,096 lines
 identical, 69 memory lines whose contents changed from process to process (11 in `vmake`, 3 in
 `vtwo`, 55 in `vextract`) and one where FreeSurfer crashed in one process and not in the other
-(`vextract`).
+(`vextract`); relay 7 (the prebuilt probe from 420314bb): no unexplained difference in either mode,
+every line of `vrules` and of part 4's groups identical, memory lines whose contents changed from
+process to process 11 in `vmake`, 2 or 3 in `vtwo` and 57 in `vextract`.
 
-### 69.4 The defects of parts 1 to 3 (index)
+### 69.4 The defects of parts 1 to 4 (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
 | FS-285 | 3 | FS-290 | 6 | FS-295 | 11 |
 | FS-286 | 3 | FS-291 | 9, 10 | FS-296 | 9 |
 | FS-287 | 3 | FS-292 | 10 | FS-297 | 11 |
-| FS-288 | 3 | FS-293 | 11 | | |
-| FS-289 | 6 | FS-294 | 11 | | |
+| FS-288 | 3 | FS-293 | 11 | FS-265 | 8 |
+| FS-289 | 6 | FS-294 | 11 | FS-298 | 18 |
+| FS-299 | 18 | FS-300 | 18 | FS-301 | 19 |
+| FS-302 | 18 | FS-303 | 19 | FS-304 | 19 |
+| FS-305 | 20 | FS-306 | 21 | FS-307 | 21 |
+| FS-308 | 21 | FS-309 | 21 | FS-310 | 21 |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-53 and FS-58
-(`specs/freesurfer-mri.md`), FS-47 and ITK-112 (`specs/freesurfer-maths.md` §17).
+(`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
+ITK-112 (`specs/freesurfer-maths.md` §17).
 
-### 69.5 Beyond the probe, and the sections after §17
+### 69.5 Beyond the probe, and the sections after §22
 
 - **The replays** of the programs that use these functions with `reproduce`, on the recorded heads,
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§18 to §68** are not yet in the open probe: until they are, their clean room checks them against
+- **§23 to §68** are not yet in the open probe: until they are, their clean room checks them against
   the official programs as black boxes and against the replays; their validation plans name the
   replica's probe, which the implementer does not open.

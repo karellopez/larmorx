@@ -195,16 +195,17 @@ type, `ptype` (2) and the voxel counts. Types: 0 uchar, 1 int, 2 long (8 bytes),
 Voxel (c, r, s, f) of a volume of type T is the T at element `c + r W + s W H + f W H D` of the
 buffer (little-endian), computed as `size_t` (§1).
 
-- **Reading** (`MRIgetVoxVal`, a float): negative c, r or s give `outside_val`. A complex volume
-  gives the real (mode 0) or imaginary (mode 1) part; another mode ends with `MRIgetVoxVal():
-  unsupported operation <mode>` (status 253). The integer and float types give their value
-  converted to float; tensor, bitmap and the others give -1e10.
-- **Writing** (`MRIsetVoxVal`): a complex part is stored as given. Otherwise the value is clipped:
-  uchar [0, 255], short [-32768, 32767], ushort [0, 65535], int to [-2^31, 2^31] as floats (so 2^31
-  stays, then fails to round), long to [-2^63, 2^63] as floats; then rounded with FreeSurfer's
+- **Reading** (`MRIgetVoxVal`, a float): negative c, r or s give `outside_val` (checked first, for
+  every type). A float complex volume (type 7) gives the real (mode 0) or imaginary (mode 1) part;
+  another mode ends with `MRIgetVoxVal(): unsupported operation <mode>` (status 253). The integer
+  and float types give their value converted to float; the types without a value (tensor, bitmap,
+  double complex and any code outside 0 to 10) give -1e10 whatever the mode, reading no voxel.
+- **Writing** (`MRIsetVoxVal`, no index check): a float complex part is stored as given. Otherwise
+  the value is clipped: uchar [0, 255], short [-32768, 32767], ushort [0, 65535], int to [-2^31,
+  2^31] as floats (so 2^31 stays, then fails to round), long to [-2^63, 2^63] as floats; then rounded with FreeSurfer's
   `nint` (`specs/freesurfer-core.md`: x + 0.5 or x - 0.5 truncated, beyond the int range FS-12) for
   the integer types and stored (narrowed to the type: uchar and ushort keep the low bits of the
-  int). Returns 0, or 1 (nothing stored) for tensor, bitmap and the others.
+  int). Returns 0, or 1 (nothing stored, no voxel touched) for the types without a value.
 - **Indices outside the volume** are not checked (but negative c, r, s when reading). FS-52: where
   the element still lies in the buffer it is another voxel (a column past the end of a row is the
   next row's first voxel; a negative index when writing an earlier voxel): by default reading gives
@@ -218,8 +219,16 @@ buffer (little-endian), computed as `size_t` (§1).
   the low (c even) or high (c odd) half of the row's voxel `c / 2`. By default the value is stored
   once, rounded (x ± 0.5 truncated) in the long range; `reproduce` does both stores.
 - **A volume without voxels** (FS-58): reading or writing a voxel of it, its derivatives (and the
-  bounding box, §17), FreeSurfer crashes. Both modes: the C-style error `<function>(): the volume
-  has no voxels (FreeSurfer crashes here)` (for example `MRIgetVoxVal(): ...`), status 252, noted.
+  bounding box, §17), FreeSurfer crashes, except where the access touches no voxel: a read with a
+  negative c, r or s gives `outside_val` (every type), and a volume of a type without a value reads
+  -1e10 and writes nothing (returning 1) as it does with voxels (negative indices of a write
+  included), so its derivatives are made of those reads (`(-1e10 - outside_val) / (2.0 * size)` at
+  column 0 of a `dx`, 0 between two such reads). Where FreeSurfer crashes, both modes: the C-style
+  error `<function>(): the volume has no voxels (FreeSurfer crashes here)` (for example
+  `MRIgetVoxVal(): ...`), status 252, noted.
+  (**(observed)**: §23's `novox`, one access per line on header-only volumes of the 11 types: the
+  negative reads `outside_val` for all, tensor, bitmap and double complex -1e10 and 1, the 8 others
+  crash.)
 - **Derivatives** (`MRIgetVoxDx`, `Dy`, `Dz`): `(V(+1) - V(-1)) / (2.0 * size)`, the difference of
   the two float reads in float, the division in double, returned as float.
 
@@ -669,8 +678,9 @@ sequence of its own (`--groups` with a part of the list makes the same cases).
 | shapes | 1 | 100 | 0 | 0 | §15 | `94e8090680e00ebb904f93132e322cfdb1fdacbe1ab02b7ca9e0423b389e337c` |
 | bbox | 1 | 500 | 17 | 0 | §17: volumes of 1 to 4 voxels a side, one or two frames, filled or zero, up to three voxels set around the threshold (NaN, -1, large), thresholds 70, 0, -1, 69, 100, 255, 10^6 and the int limits; unsupported types; headers (FS-58) | `c4a2fbfcc4f6306e6a1a0b4d54da1a65603d5edf3cbef4d851e8c4225de9f939` |
 | lta | 2 | 911 | 94 | 12 | §20-22: arrays of -5 to 3 transforms with and without a volume; copies into nothing, an array of the same or another count, transforms with absent or odd-sized matrices (FS-195, FS-196, FS-198); a copy into no transform; freeing none (FS-197) | `35a9b034c7ce90e2b6fabe9ea06d0d3c633a746ea890dcdda4c275d6093f5822` |
+| novox | 1 | 132 | 72 | 0 | §5: one access per line on volumes without voxels of the 11 types: reads at negative and other indices and with an unsupported mode, writes (negative indices too), derivatives (FS-58; relay 7) | `f04550cf4d019e03fdeb14820ddf02dc919b2387aef5fdf7d0667c8d325838cd` |
 
-In all: 9,379 calls, 408 memory or crashed lines, 635 that end the program (the messages and exit
+In all: 9,511 calls, 480 memory or crashed lines, 635 that end the program (the messages and exit
 statuses of §3 to §22), none where FreeSurfer never returns. About 2 to 3 minutes for a cold `refs`
 on the reference machine, seconds warm; `compare` as long again (the candidate's runs). The groups
 `matrices` and `tkreg` with their fixed batches (relay 5): the same hashes cold, warm and without the

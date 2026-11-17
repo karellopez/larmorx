@@ -6031,5 +6031,9 @@ noted correction changed the result. Observed (relay 44): seeds 7 and 13 (300 ca
 in both modes (68 to 81 counted, not compared: the metric properties' FS-121 after a flattening that
 leaves faces without a normal, FS-996 and FS-1002's diagnostic vertex beyond the surface, FS-06; 2 to 4
 that FreeSurfer runs past the probe's 5-second alarm: hash-table voxel lists of huge faces, a large
-interior). RMIPLACEHOLDER A clean-room implementer's black-box forms: `mris_remove_intersection`
+interior). On the recorded heads (`real.py --rmi`: three heads, both hemispheres: 154.6 on `?h.orig.nofix`,
+`orig.premesh`, `orig` and `white` without and with hole filling; 154.7 of `white` into a `float` clone of
+`aseg.presurf.mgz` at its voxel size and into a new volume at 0.5 mm): 54 of 60 identical in both
+modes; the other 6, hole fillings, crash FreeSurfer's program by overflowing its stack (FS-901), and
+the port completes them (observed). A clean-room implementer's black-box forms: `mris_remove_intersection`
 (154.6 on any surface), `mri_relabel_hypointensities` (154.7 into its volume), `mris_flatten` (154.2).

@@ -562,11 +562,23 @@ in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's v
   point `(i - dx, j - dy, k - dz)` lies in `[0, extent)` on all three axes gets the trilinear sample
   there stored as `(unsigned char) nint(val)` (the low byte of the rounded value; FS-301 for other
   destination types); the rest stay 0. The destination's `ras_good_flag` becomes 0.
-- `MRIrotate_I(src, dst, R, O)`: `R`'s inverse (`MatrixInverse`; none gives the error `MRIrotate_I:
-  rotation matrix is singular` and `NULL`); the destination as above; the centre `O` or the source's
-  half extents as `float`, truncated to `int` (`io`); for each voxel (z outermost) the point `R^-1 (v -
-  io) + O` in `float` (`MatrixMultiply` then `MatrixAdd`) is sampled trilinearly and stored as above.
-  With `Gdiag` 99 the inverse and the centre are printed (`MatrixPrint`, 5 decimals).
+- `MRIrotate_I(src, dst, R, O)`: first `R`'s inverse (`MatrixInverse`, `specs/freesurfer-maths.md`
+  §8.8: a matrix that is not square or is singular gives its error, then the error `MRIrotate_I:
+  rotation matrix is singular` and `NULL`, a given destination untouched); then the destination as
+  above (a clone of the source, or the given one cleared). The centre: `O` when given (its elements
+  (1, 1), (2, 1), (3, 1)), else a new 3 x 1 matrix of the source's half extents (`width / 2.0`,
+  `height / 2.0`, `depth / 2.0` stored as `float`); `io` = those three elements truncated to `int`.
+  Two 3 x 1 matrices are made once for the whole walk, the offset `Y` and the point `X` (both zero at
+  first). For each voxel `(x, y, z)` (z outermost, x innermost): `Y = (x - io_x, y - io_y, z - io_z)`
+  (as `float`), `MatrixMultiply(R^-1, Y, X)`, then `MatrixAdd(X, O, X)`, and the point `X` (each
+  element as `double`) is sampled trilinearly (§18, `MRIsampleVolume`) and stored as above. When a
+  matrix call refuses its sizes, its error is given once per voxel and `X` keeps what it held: an `R`
+  of another size than 3 x 3 (`MatrixMultiply`'s size error, `specs/freesurfer-maths.md` §8.1, on
+  standard output and standard error) leaves the product out, so each voxel adds `O` to the previous
+  voxel's point and the k-th voxel of the walk (k from 1) is sampled at the `float` sum of k copies of
+  `O`; an `O` of another size than 3 x 1 (`MatrixAdd`'s error, §8.2) leaves `O` out, so the point is
+  `R^-1 Y` (**(observed)**: §22's `vmove` and `vrules4`). The destination's `ras_good_flag` becomes
+  0. With `Gdiag` 99 the inverse and the centre are printed (`MatrixPrint`, 5 decimals).
 - `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I(src, dst, angle)`: a given destination is cleared;
   the result is always a new volume, `MRIrotate_I` with `MatrixAllocRotation(3, angle, axis)` about
   the source's centre, `ras_good_flag` 0 (an angle whose rotation cannot be inverted: FS-304).

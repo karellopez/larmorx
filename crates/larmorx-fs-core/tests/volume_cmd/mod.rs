@@ -686,29 +686,24 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 l.puti(i64::from(t));
             }
         }
-        "ltaread" => {
-            let name = l.getx();
-            let have = !l.take("nofile");
-            let bytes = if have { l.getx() } else { Vec::new() };
+        "ltaread" | "ltareads" => {
+            let n = if c == "ltareads" { l.geti() } else { 1 };
+            let mut files = Vec::new();
+            for _ in 0..n {
+                let name = l.getx();
+                let have = !l.take("nofile");
+                let bytes = if have { Some(l.getx()) } else { None };
+                files.push((name, bytes));
+            }
             let avg = l.geti();
             match avg {
                 0 => p.env.remove(b"USE_AVERAGE305"),
                 1 => p.env.set(b"USE_AVERAGE305", b"true"),
                 _ => p.env.set(b"USE_AVERAGE305", b""),
             }
-            let path = larmorx_fs_core::files::path_of(&name);
-            let _ = std::fs::remove_file(&path);
-            if have && std::fs::write(&path, &bytes).is_err() {
-                args::bad("cannot write the transform file");
+            for (name, bytes) in files {
+                read_transform(p, l, &name, bytes.as_deref())?;
             }
-            p.errno = 0;
-            let r = p.lta_read_ex(&name, &mut FileSystem);
-            if have {
-                let _ = std::fs::remove_file(&path);
-            }
-            let lta = r?;
-            l.puti(i64::from(p.errno));
-            putlta(l, lta.as_ref());
         }
         // the golden cases' reader of an in-memory file and volume (no file system)
         "ltamem" => {
@@ -742,6 +737,32 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
     Ok(())
 }
 
+/// The probe's `read_transform`: the file written (unless there is none), `errno` set to 0,
+/// `LTAreadEx` of the name, the file removed; `errno` and the array printed.
+fn read_transform(
+    p: &mut Process,
+    l: &mut Line,
+    name: &[u8],
+    bytes: Option<&[u8]>,
+) -> Result<(), Stop> {
+    let path = larmorx_fs_core::files::path_of(name);
+    let _ = std::fs::remove_file(&path);
+    if let Some(b) = bytes
+        && std::fs::write(&path, b).is_err()
+    {
+        args::bad("cannot write the transform file");
+    }
+    p.errno = 0;
+    let r = p.lta_read_ex(name, &mut FileSystem);
+    if bytes.is_some() {
+        let _ = std::fs::remove_file(&path);
+    }
+    let lta = r?;
+    l.puti(i64::from(p.errno));
+    putlta(l, lta.as_ref());
+    Ok(())
+}
+
 /// The golden cases' transform inputs: one file's bytes (none: `ENOENT`) and one named volume's
 /// geometry (others: `ENOENT`).
 struct Memory {
@@ -758,13 +779,10 @@ impl TransformInputs for Memory {
         }
     }
 
-    fn volume_geometry(&mut self, p: &mut Process, name: &[u8]) -> Option<VolGeom> {
+    fn volume_geometry(&mut self, _p: &mut Process, name: &[u8]) -> Result<Option<VolGeom>, i32> {
         match &self.vol {
-            Some((n, g)) if n.as_slice() == name => Some(g.clone()),
-            _ => {
-                p.errno = 2;
-                None
-            }
+            Some((n, g)) if n.as_slice() == name => Ok(Some(g.clone())),
+            _ => Err(2),
         }
     }
 }

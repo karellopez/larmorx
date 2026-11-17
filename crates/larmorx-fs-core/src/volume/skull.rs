@@ -170,8 +170,7 @@ impl Process {
 
     /// `MRIfindApproximateSkullBoundingBox(mri, thresh, box)` (§20): `NO_ERROR` and the box; the
     /// end of the program when no left-to-right width is found. FS-305: a centre of mass that is
-    /// not a number ends the program by default; `reproduce` walks as FreeSurfer does and ends it
-    /// only where FreeSurfer never returns.
+    /// not a number ends the program in both modes, before any walk (§22's modes table).
     pub fn mri_find_approximate_skull_bounding_box(
         &mut self,
         m: &Mri,
@@ -181,19 +180,14 @@ impl Process {
         let (_, centre) = self.mri_center_of_mass(m, thresh as u8)?;
         let [cx, mut cy, cz] = centre;
         let t = f64::from(thresh);
-        let nan = centre.iter().any(|c| c.is_nan());
-        if nan && !self.mode().reproduce() {
+        // FS-305, both modes: a centre of mass that is not a number ends the program before any
+        // walk (FreeSurfer walks about two billion voxels outside the volume or never returns)
+        if centre.iter().any(|c| c.is_nan()) {
             self.note(
                 &FS_305,
-                "a centre of mass that is not a number: no box (FreeSurfer walks about two billion voxels outside the volume or never returns)",
+                "a centre of mass that is not a number ends the program (FreeSurfer walks about two billion voxels outside the volume or never returns)",
             );
             return self.skull_not_a_number();
-        }
-        if nan {
-            self.note(
-                &FS_305,
-                "a centre of mass that is not a number: walks outside the volume, as FreeSurfer's",
-            );
         }
         let (x, z) = (i64::from(self.nint(cx)), i64::from(self.nint(cz)));
         loop {
@@ -220,13 +214,6 @@ impl Process {
                 )?;
                 return Ok(codes::BAD_PARM);
             }
-            if cy.is_nan() {
-                self.note(
-                    &FS_305,
-                    "a centre of mass that is not a number: no width found, so FreeSurfer never returns",
-                );
-                return self.skull_not_a_number();
-            }
         }
         let y = i64::from(self.nint(cy));
         let xt = i64::from(self.nint(cx).wrapping_sub(20).max(0));
@@ -252,7 +239,7 @@ impl Process {
     fn skull_not_a_number(&mut self) -> Result<i32, Stop> {
         self.error_exit(
             codes::BAD_PARM,
-            b"MRIfindApproximateSkullBoundingBox: the volume's centre of mass is not a number",
+            b"MRIfindApproximateSkullBoundingBox: the centre of mass is not a number (FreeSurfer walks 2^31 voxels or never returns here)\n",
         )?;
         Ok(codes::BAD_PARM)
     }

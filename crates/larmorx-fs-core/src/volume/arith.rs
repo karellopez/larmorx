@@ -5,7 +5,7 @@
 
 use larmorx_core::defects::{FS_265, FS_291, FS_292, FS_296, FS_332};
 
-use super::{Dst, VolOut, Vols, direct_place};
+use super::{Dst, VolOut, Vols};
 use crate::mri::voxels::Place;
 use crate::mri::{Mri, Region, types};
 use crate::process::{Process, Stop, codes};
@@ -110,7 +110,7 @@ impl Process {
     ) -> Result<Elem, Stop> {
         self.direct_needs_voxels(m, what)?;
         let n = elem_size(kind).expect("a direct type");
-        let place = direct_place(m, x, y, z, f, n);
+        let place = self.place_of(m, x, y, z, f, n);
         let b = self.direct_read(m, place, n as usize, what);
         Ok(Elem::decode(kind, &b))
     }
@@ -128,7 +128,7 @@ impl Process {
         what: &str,
     ) -> Result<(), Stop> {
         self.direct_needs_voxels(m, what)?;
-        let place = direct_place(m, x, y, z, f, b.len() as u64);
+        let place = self.place_of(m, x, y, z, f, b.len() as u64);
         self.direct_write(m, place, b, what);
         Ok(())
     }

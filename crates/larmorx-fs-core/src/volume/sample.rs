@@ -10,7 +10,6 @@ use larmorx_core::defects::{FS_290, FS_298, FS_299, FS_300, FS_302};
 use larmorx_core::math;
 
 use super::arith::Elem;
-use super::direct_place;
 use crate::mri::{Mri, types};
 use crate::process::{Process, Stop, codes};
 use crate::sse;
@@ -155,12 +154,12 @@ impl Process {
         self.direct_needs_voxels(m, what)?;
         let (x, y, z, f) = (i64::from(x), i64::from(y), i64::from(z), i64::from(f));
         if m.kind == types::LONG && reproduce {
-            let place = direct_place(m, x, y, z, f, 4);
+            let place = self.place_of(m, x, y, z, f, 4);
             let b = self.direct_read8(m, place, 4, what);
             return Ok(f64::from(i32::from_le_bytes([b[0], b[1], b[2], b[3]])));
         }
         let n = super::arith::elem_size(m.kind).expect("a sampled type");
-        let place = direct_place(m, x, y, z, f, n);
+        let place = self.place_of(m, x, y, z, f, n);
         let b = self.direct_read8(m, place, n as usize, what);
         Ok(elem_f64(Elem::decode(m.kind, &b)))
     }
@@ -216,7 +215,7 @@ impl Process {
             return 0.0;
         }
         let n = m.bytes_per_vox;
-        let place = direct_place(
+        let place = self.place_of(
             m,
             i64::from(q[0]),
             i64::from(q[1]),
@@ -518,14 +517,9 @@ impl Process {
                         }
                         self.sampler_read(m, px, py, pz, f, name)?
                     } else {
-                        // FS-300: by default 0; with `reproduce` the double the official build
-                        // gives there in every run observed (all bits set: a NaN)
+                        // FS-300: 0 in both modes (FreeSurfer adds memory it never reads)
                         outside = true;
-                        if self.mode().reproduce() {
-                            f64::from_bits(u64::MAX)
-                        } else {
-                            0.0
-                        }
+                        0.0
                     };
                     let term = sse::mul64(
                         sse::mul64(sse::mul64(w[0][i as usize], v), w[1][j as usize]),
@@ -538,17 +532,10 @@ impl Process {
         }
         if frame.is_some() {
             if outside {
-                if self.mode().reproduce() {
-                    self.note(
-                        &FS_300,
-                        "MRIcubicSampleVolumeFrame: the window's points outside the volume added as the official build's all-ones NaN (memory FreeSurfer never read)",
-                    );
-                } else {
-                    self.note(
-                        &FS_300,
-                        "MRIcubicSampleVolumeFrame: the window's points outside the volume added as 0 (FreeSurfer adds memory it never read)",
-                    );
-                }
+                self.note(
+                    &FS_300,
+                    "MRIcubicSampleVolumeFrame: the window's points outside the volume added as 0 (FreeSurfer adds memory it never reads)",
+                );
             }
             *pval = sse::mul64(val, 0.125);
             return Ok(codes::NONE);
@@ -674,15 +661,16 @@ impl Process {
             let hi = floor_i(p[k]).wrapping_add(hw).min(e[k] - 1);
             let n = i64::from(hi) - i64::from(lo);
             if n > 128 {
+                // FS-302, both modes: the end of the program (FreeSurfer writes past its arrays)
                 self.note(
                     &FS_302,
-                    format!("{name}: a window of {n} voxels on an axis refused (FreeSurfer writes past its 128 weights)"),
+                    format!("{name}: a window of {n} voxels on an axis ends the program (FreeSurfer writes past its 128 weights)"),
                 );
-                self.error_printf(
+                self.error_exit(
                     codes::BAD_PARM,
-                    format!("{name}: half-width {hw} holds more than 128 voxels on an axis")
+                    format!("{name}: a half-width of {hw} needs more than 128 weights on an axis (FreeSurfer writes past its arrays here)\n")
                         .as_bytes(),
-                );
+                )?;
                 return Ok(codes::BAD_PARM);
             }
             first[k] = lo;

@@ -90,13 +90,13 @@ pub struct MhtFace {
 }
 
 /// A voxel's key in the map (each coordinate in `0..TABLE_SIZE`).
-fn key(xv: i32, yv: i32, zv: i32) -> u64 {
+pub(crate) fn key(xv: i32, yv: i32, zv: i32) -> u64 {
     ((xv as u64) << 32) | ((yv as u64) << 16) | zv as u64
 }
 
 /// A multiply-and-shift hash of a voxel's key (deterministic; the map is only looked up).
 #[derive(Default)]
-struct VoxHasher(u64);
+pub(crate) struct VoxHasher(u64);
 
 impl Hasher for VoxHasher {
     fn finish(&self) -> u64 {
@@ -115,7 +115,7 @@ impl Hasher for VoxHasher {
     }
 }
 
-type Buckets = HashMap<u64, Vec<i32>, BuildHasherDefault<VoxHasher>>;
+pub(crate) type Buckets = HashMap<u64, Vec<i32>, BuildHasherDefault<VoxHasher>>;
 
 /// `MRIS_HASH_TABLE` of a surface (`MRIS_HASH_TABLE_IMPL` over `MRIS *`). The surface itself is
 /// not kept: each call takes it (FreeSurfer's calls pass the table's surface again, and its
@@ -125,7 +125,10 @@ pub struct Mht {
     fno_usage: MhtFnoUsage,
     vres: f32,
     which: i32,
-    buckets: Buckets,
+    pub(crate) buckets: Buckets,
+    /// The smallest and largest voxel numbers of the buckets made, along each axis (the closest
+    /// searches stop where no bucket can be left: [`crate::mhtfind`]).
+    pub(crate) bbox: Option<([i32; 3], [i32; 3])>,
     /// `nfaces`: the surface's faces when the table was made.
     pub nfaces: i32,
     /// `f`: each face's centroid.
@@ -277,7 +280,7 @@ fn refuse(g: &mut Globals, err: &mut dyn Write, why: &str) -> Result<(), Fatal> 
 
 /// C's `(int) x` of a `double` on x86-64 (`cvttsd2si`): toward zero, `INT_MIN` for NaN and values
 /// outside the range; `None` for those.
-fn cvtt(x: f64) -> Option<i32> {
+pub(crate) fn cvtt(x: f64) -> Option<i32> {
     if x.is_nan() || !(-2_147_483_649.0 < x && x < 2_147_483_648.0) {
         None
     } else {
@@ -287,7 +290,12 @@ fn cvtt(x: f64) -> Option<i32> {
 
 /// FS-909: an undefined conversion of the table's arithmetic: by default a clear error (rule B,
 /// `ERROR_BADPARM`); `reproduce` x86-64's `INT_MIN`.
-fn undefined(g: &mut Globals, err: &mut dyn Write, what: &str, x: f64) -> Result<i32, Fatal> {
+pub(crate) fn undefined(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    what: &str,
+    x: f64,
+) -> Result<i32, Fatal> {
     let detail =
         format!("the surface hash table: {what} {x} is not an int (FreeSurfer takes -2147483648)");
     g.notices.add(&FS_909, detail.clone());
@@ -321,7 +329,7 @@ fn steps(g: &mut Globals, err: &mut dyn Write, x: f64) -> Result<i32, Fatal> {
     }
 }
 
-type Pt = [f64; 3];
+pub(crate) type Pt = [f64; 3];
 
 fn world2voxel(g: &mut Globals, err: &mut dyn Write, res: f32, p: Pt) -> Result<[i32; 3], Fatal> {
     Ok([
@@ -445,7 +453,7 @@ fn sample_triangle(
 
 /// A vertex's coordinates `which` (`MRISvertexCoord2XYZ_float`: an unsupported `which` is its
 /// fatal error), widened.
-fn corner(
+pub(crate) fn corner(
     g: &mut Globals,
     err: &mut dyn Write,
     mris: &Mris,
@@ -457,7 +465,7 @@ fn corner(
 }
 
 /// Coerced into `0..TABLE_SIZE`, as the stores coerce.
-fn coerce(v: i32) -> i32 {
+pub(crate) fn coerce(v: i32) -> i32 {
     v.clamp(0, TABLE_SIZE - 1)
 }
 
@@ -492,6 +500,7 @@ impl Mht {
             vres,
             which,
             buckets: Buckets::default(),
+            bbox: None,
             nfaces,
             f,
         })
@@ -608,10 +617,15 @@ impl Mht {
     /// `mhtAddFaceOrVertexAtVoxIx(xv, yv, zv, forvnum)`: the voxel coerced into the table, its
     /// bucket made when there is none, `forvnum` appended unless listed.
     fn add_at_vox(&mut self, xv: i32, yv: i32, zv: i32, forvnum: i32) {
-        let b = self
-            .buckets
-            .entry(key(coerce(xv), coerce(yv), coerce(zv)))
-            .or_default();
+        let c = [coerce(xv), coerce(yv), coerce(zv)];
+        self.bbox = Some(match self.bbox {
+            None => (c, c),
+            Some((lo, hi)) => (
+                [lo[0].min(c[0]), lo[1].min(c[1]), lo[2].min(c[2])],
+                [hi[0].max(c[0]), hi[1].max(c[1]), hi[2].max(c[2])],
+            ),
+        });
+        let b = self.buckets.entry(key(c[0], c[1], c[2])).or_default();
         if !b.contains(&forvnum) {
             b.push(forvnum);
         }
@@ -631,7 +645,7 @@ impl Mht {
 
     /// `checkConstructedWithFaces`: a vertex table is `checkConstructedWithFaces:
     /// MRIS_HASH_TABLE_NoSurface not initialized for faces` (fatal, `ERROR_BADPARM`).
-    fn check_faces(&self, g: &mut Globals, err: &mut dyn Write) -> Result<(), Fatal> {
+    pub(crate) fn check_faces(&self, g: &mut Globals, err: &mut dyn Write) -> Result<(), Fatal> {
         if self.fno_usage != MhtFnoUsage::Face {
             log::error_exit(
                 g,

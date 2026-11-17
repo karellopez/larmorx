@@ -1905,6 +1905,14 @@ defects! {
         "renumbering a surface without its ripped faces and vertices, when unripped faces hold ripped vertices or vertices have neighbours ripped with a flag other than 1, writes the vertex number -1 into those faces and neighbour lists: the program's later reads of them go outside the surface's vertices (memory contents or a crash)";
     FS_996 = "FS-996", "FreeSurfer", true,
         "the soap-bubble smoothing of a surface's positions (MRISsoapBubbleVertexPositions: mris_fix_topology, mris_make_surfaces, mris_smooth; the weighted one) reads the diagnostic vertex (Gdiag_no) before each pass without checking that the surface has it: a diagnostic vertex beyond the surface's vertices reads memory outside them (its report printed from there, or a crash)";
+    FS_997 = "FS-997", "FreeSurfer", false,
+        "the closest-vertex search of the surface hash table within one voxel (MHTfindClosestVertexNoXYZ: mri_surf2volseg, mri_vol2surf, mri_label2label, mris_ca_label, mris_place_surface, mris_register) returns no vertex (-1, at 1000 mm) for a point with no vertex within one voxel of the table, although its description promises a full search then; the programs take that answer as far from the surface, so it is kept";
+    FS_998 = "FS-998", "FreeSurfer", true,
+        "a closest-vertex search of the surface hash table on a table of faces (MHTfindClosestVertexGeneric, MHTfindClosestVertexNo2, MHTfindClosestVertex2, MHTfindClosestVertexSet2, MHTfindClosestVertexInTable), or a closest-face search on a table of vertices (MHTfindClosestFaceGeneric), is not refused: the face numbers are read as vertex numbers (or the other way round), and those beyond the surface's vertices (faces) read memory outside them";
+    FS_576 = "FS-576", "FreeSurfer", true,
+        "a closest search of the surface hash table on a table of the other kind (FS-998) reads, for a face number beyond the surface's vertices (or a vertex number beyond its faces), memory outside the surface's vertices (faces): its answer depends on memory contents, or the program crashes";
+    FS_999 = "FS-999", "FreeSurfer", true,
+        "the closest-vertex and closest-face searches of the surface hash table look for nothing beyond the table (1,000 of its voxels from the origin), although a vertex or face beyond the table is stored at its edge: a point at such a vertex does not find it";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

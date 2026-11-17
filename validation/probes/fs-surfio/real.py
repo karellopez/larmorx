@@ -144,6 +144,14 @@ def main(argv: list[str] | None = None) -> int:
         "surfaces, the vertices of its cortex label free and the others fixed, 25 passes",
     )
     ap.add_argument(
+        "--mcl",
+        action="store_true",
+        help="relay 43 of track D: the closest searches of the surface hash table (flr mcl) on "
+        "each head's white, pial and sphere.reg surfaces (the other hemisphere's sphere.reg): "
+        "mri_surf2volseg's, mri_surf2surf's, mri_relabel_hypointensities' and "
+        "mrisProjectOntoSurface's calls",
+    )
+    ap.add_argument(
         "--top",
         action="store_true",
         help="relay 42 of track D: mrisurf_topology.cpp's rest (flr top) on each head's "
@@ -180,6 +188,14 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.mcl:
+                sd = s / "surf"
+                other = "rh" if hemi == "lh" else "lh"
+                lines.append(
+                    f"flr mcl {sd / f'{hemi}.white'} {sd / f'{hemi}.pial'} "
+                    f"{sd / f'{hemi}.sphere.reg'} {sd / f'{other}.sphere.reg'}"
+                )
+                continue
             if a.sbl:
                 for surf in ("white", "orig"):
                     lines.append(
@@ -264,7 +280,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "sbl"
+        "mcl"
+        if a.mcl
+        else "sbl"
         if a.sbl
         else "top"
         if a.top

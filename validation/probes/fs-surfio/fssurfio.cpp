@@ -4503,6 +4503,101 @@ void flr_case()
       snprintf(t, sizeof t, "%016" PRIx64 " ", h);
       out += t;
     }
+  } else if (op == "mcl") {
+    // relay 43 of track D: the closest searches on recorded surfaces (`mcl <white> <pial> <sphere.reg>
+    // <other sphere.reg>`): (1) mri_surf2volseg's: a vertex table of the white surface at 16 mm, each
+    // pial vertex and the same moved by 2 mm along each axis (MHTfindClosestVertexNoXYZ); (2)
+    // mri_surf2surf's: a vertex table of the sphere at 16 mm, each vertex of the other sphere
+    // (MHTfindClosestVertexNo2) and MHTfindClosestVertexSet2; (3) mri_relabel_hypointensities': a vertex
+    // table of the white surface at 1 mm, each pial vertex (MHTfindClosestVertexInTable, no global
+    // search); (4) mrisProjectOntoSurface's: a face table of the white surface (MHTcreateFaceTable),
+    // each pial vertex at 8 mm, 8 shells, into its face, then at 1000 mm unprojected when none is
+    // found within 0.5 mm (MHTfindClosestFaceGeneric). For each: the count found and the answers'
+    // FNV-1a (the number as 4 bytes, the distance's bytes)
+    MRIS *w = MRISread(next());
+    MRIS *p = MRISread(next());
+    MRIS *sr = MRISread(next());
+    MRIS *so = MRISread(next());
+    if (!w || !p || !sr || !so) fail("cannot read the surfaces");
+    auto mix = [](uint64_t h, const void *b, int n) {
+      const unsigned char *c = (const unsigned char *)b;
+      for (int k = 0; k < n; k++) h = (h ^ c[k]) * 0x100000001b3ull;
+      return h;
+    };
+    auto put = [&](int n, uint64_t h) {
+      oi(n);
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+    };
+    MRIS_HASH_TABLE *mht = MHTcreateVertexTable_Resolution(w, CURRENT_VERTICES, 16);
+    for (int pass = 0; pass < 2; pass++) {
+      uint64_t h = 0xcbf29ce484222325ull;
+      int found = 0;
+      for (int v = 0; v < p->nvertices; v++) {
+        float d = 0, o = pass ? 2.0f : 0.0f;
+        int r = MHTfindClosestVertexNoXYZ(mht, w, p->vertices[v].x + o, p->vertices[v].y + o, p->vertices[v].z + o, &d);
+        found += r >= 0;
+        h = mix(h, &r, 4);
+        h = mix(h, &d, 4);
+      }
+      put(found, h);
+    }
+    MHTfree(&mht);
+    mht = MHTcreateVertexTable_Resolution(sr, CURRENT_VERTICES, 16);
+    {
+      uint64_t h = 0xcbf29ce484222325ull, h2 = h;
+      int found = 0, found2 = 0;
+      for (int v = 0; v < so->nvertices; v++) {
+        float d = 0;
+        int r = MHTfindClosestVertexNo2(mht, sr, so, &so->vertices[v], &d);
+        found += r >= 0;
+        h = mix(h, &r, 4);
+        h = mix(h, &d, 4);
+        VERTEX *x = MHTfindClosestVertexSet2(mht, sr, so, &so->vertices[v]);
+        int r2 = x ? (int)(x - sr->vertices) : -1;
+        found2 += r2 >= 0;
+        h2 = mix(h2, &r2, 4);
+      }
+      put(found, h);
+      put(found2, h2);
+    }
+    MHTfree(&mht);
+    mht = MHTcreateVertexTable(w, CURRENT_VERTICES);
+    {
+      uint64_t h = 0xcbf29ce484222325ull;
+      int found = 0;
+      for (int v = 0; v < p->nvertices; v++) {
+        VERTEX *x = MHTfindClosestVertexInTable(mht, w, p->vertices[v].x, p->vertices[v].y, p->vertices[v].z, 0);
+        int r = x ? (int)(x - w->vertices) : -1;
+        found += r >= 0;
+        h = mix(h, &r, 4);
+      }
+      put(found, h);
+    }
+    MHTfree(&mht);
+    mht = MHTcreateFaceTable(w);
+    {
+      uint64_t h = 0xcbf29ce484222325ull;
+      int found = 0, wide = 0;
+      for (int v = 0; v < p->nvertices; v++) {
+        VERTEX *x = &p->vertices[v];
+        FACE *face = NULL;
+        int fno = -1;
+        double d = 0;
+        MHTfindClosestFaceGeneric(mht, w, x->x, x->y, x->z, 8.0, 8, 1, &face, &fno, &d);
+        if (face == NULL || d > 0.5) {
+          wide++;
+          MHTfindClosestFaceGeneric(mht, w, x->x, x->y, x->z, 1000, -1, -1, &face, &fno, &d);
+        }
+        found += fno >= 0;
+        h = mix(h, &fno, 4);
+        h = mix(h, &d, 8);
+      }
+      put(found, h);
+      oi(wide);
+    }
+    MHTfree(&mht);
   } else if (op == "maf") {
     // relay 41 of track D: mris_ca_label's mode filter on a recorded annotation (`maf <surface>
     // <annotation>`): the annotation read (MRISreadAnnotation), the program's table set from its
@@ -6585,6 +6680,164 @@ void sbl_case()
   }
 }
 
+// mcl: the closest searches of the surface hash table (mhtfind.rs, relay 43 of track D): a surface
+// read by MRISread (d/lh.s0) twice, the second's vertices moved by the case's offsets and their
+// original positions set to the current ones; faces and vertices ripped, original positions now and
+// then; then 1 to 6 operations: tables, searches at a point or at a vertex of the second surface,
+// every vertex of the second surface searched, a vertex moved or ripped
+void mcl_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  int gdiag_no = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  Gdiag_no = -1;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  MRIS *s2 = MRISread("d/lh.s0");
+  if (!s2) { out += "NULL2 "; return; }
+  Gdiag_no = gdiag_no;
+  int nfrip = geti();
+  for (int k = 0; k < nfrip; k++) s->faces[geti()].ripflag = 1;
+  int nvrip = geti();
+  for (int k = 0; k < nvrip; k++) s->vertices[geti()].ripflag = 1;
+  if (geti())
+    for (int v = 0; v < nv; v++) {
+      s->vertices[v].origx = getf(); s->vertices[v].origy = getf(); s->vertices[v].origz = getf();
+    }
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s2->vertices[v];
+    x->x += getf(); x->y += getf(); x->z += getf();
+    x->origx = x->x; x->origy = x->y; x->origz = x->z;
+  }
+  MRIS_HASH_TABLE *mht = NULL;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    errno = 0;
+    if (op == "ft" || op == "vt") {
+      int which = geti();
+      float res = getf();
+      MHTfree(&mht);
+      mht = op == "ft" ? MHTcreateFaceTable_Resolution(s, which, res) : MHTcreateVertexTable_Resolution(s, which, res);
+    } else if (op == "ftd") {
+      MHTfree(&mht);
+      mht = MHTcreateFaceTable(s);
+    } else if (op == "vtd") {
+      int which = geti();
+      MHTfree(&mht);
+      mht = MHTcreateVertexTable(s, which);
+    } else if (op == "vg") {
+      double px = getd(), py = getd(), pz = getd(), dmax = getd();
+      int mm = geti();
+      if (!mht) { out += "G "; continue; }
+      int vno = -7;
+      double dist = -7;
+      MHTfindClosestVertexGeneric(mht, px, py, pz, dmax, mm, &vno, &dist);
+      oi(vno); od(dist);
+    } else if (op == "vx" || op == "vs") {
+      float x = getf(), y = getf(), z = getf();
+      if (!mht) { out += "G "; continue; }
+      if (op == "vx") {
+        float dist = -7;
+        oi(MHTfindClosestVertexNoXYZ(mht, s, x, y, z, &dist));
+        of(dist);
+      } else oi(MHTfindClosestSetVertexNo(mht, s, x, y, z));
+    } else if (op == "vi" || op == "vit") {
+      float x = getf(), y = getf(), z = getf();
+      int glob = geti();
+      if (!mht) { out += "G "; continue; }
+      if (op == "vi") oi(MHTfindVnoOfClosestVertexInTable(mht, s, x, y, z, glob));
+      else {
+        VERTEX *v = MHTfindClosestVertexInTable(mht, s, x, y, z, glob);
+        oi(v ? (long long)(v - s->vertices) : -1);
+      }
+    } else if (op == "v2" || op == "vp2" || op == "vs2") {
+      int vno = geti();
+      if (!mht) { out += "G "; continue; }
+      if (op == "v2") {
+        float dist = -7;
+        oi(MHTfindClosestVertexNo2(mht, s, s2, &s2->vertices[vno], &dist));
+        of(dist);
+      } else if (op == "vp2") {
+        float dist = -7;
+        VERTEX *v = MHTfindClosestVertex2(mht, s, s2, &s2->vertices[vno], &dist);
+        oi(v ? (long long)(v - s->vertices) : -1);
+        of(dist);
+      } else {
+        VERTEX *v = MHTfindClosestVertexSet2(mht, s, s2, &s2->vertices[vno]);
+        oi(v ? (long long)(v - s->vertices) : -1);
+      }
+    } else if (op == "fg" || op == "fn") {
+      double px = getd(), py = getd(), pz = getd(), dmax = getd();
+      int mm = geti(), proj = geti();
+      if (!mht) { out += "G "; continue; }
+      int fno = -7;
+      double dist = -7;
+      if (op == "fg") {
+        FACE *face = (FACE *)1;
+        MHTfindClosestFaceGeneric(mht, s, px, py, pz, dmax, mm, proj, &face, &fno, &dist);
+        if (face != (fno < 0 ? NULL : &s->faces[fno])) fail("fg face");
+      } else MHTfindClosestFaceNoGeneric(mht, s, px, py, pz, dmax, mm, proj, &fno, &dist);
+      oi(fno); od(dist);
+    } else if (op == "bf") {
+      float x = getf(), y = getf(), z = getf();
+      int which = geti();
+      float dist = -7;
+      oi(MHTBruteForceClosestFace(s, x, y, z, which, &dist));
+      of(dist);
+    } else if (op == "av") {
+      double dmax = getd();
+      int mm = geti();
+      if (!mht) { out += "G "; continue; }
+      for (int v = 0; v < nv; v++) {
+        VERTEX *x = &s2->vertices[v];
+        int vno = -7;
+        double dist = -7;
+        MHTfindClosestVertexGeneric(mht, x->x, x->y, x->z, dmax, mm, &vno, &dist);
+        oi(vno); od(dist);
+      }
+    } else if (op == "ax") {
+      if (!mht) { out += "G "; continue; }
+      for (int v = 0; v < nv; v++) {
+        VERTEX *x = &s2->vertices[v];
+        float dist = -7;
+        oi(MHTfindClosestVertexNoXYZ(mht, s, x->x, x->y, x->z, &dist));
+        of(dist);
+      }
+    } else if (op == "af") {
+      double dmax = getd();
+      int mm = geti(), proj = geti();
+      if (!mht) { out += "G "; continue; }
+      for (int v = 0; v < nv; v++) {
+        VERTEX *x = &s2->vertices[v];
+        int fno = -7;
+        double dist = -7;
+        FACE *face = NULL;
+        MHTfindClosestFaceGeneric(mht, s, x->x, x->y, x->z, dmax, mm, proj, &face, &fno, &dist);
+        oi(fno); od(dist);
+      }
+    } else if (op == "mv") {
+      int vno = geti();
+      s->vertices[vno].x += getf(); s->vertices[vno].y += getf(); s->vertices[vno].z += getf();
+    } else if (op == "rip") {
+      s->vertices[geti()].ripflag = 1;
+    } else fail("mcl op");
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -6855,6 +7108,8 @@ void run_case()
     top_case();
   } else if (cmd == "sbl") {
     sbl_case();
+  } else if (cmd == "mcl") {
+    mcl_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

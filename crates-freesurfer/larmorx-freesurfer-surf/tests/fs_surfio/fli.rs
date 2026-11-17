@@ -1154,6 +1154,81 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 o.s(&format!("{h:016x}"));
             }
         }
+        "mcl" => {
+            // relay 43 of track D: `fssurfio.cpp`'s `flr mcl` (the closest searches on recorded
+            // surfaces: mri_surf2volseg's, mri_surf2surf's, mri_relabel_hypointensities' and
+            // mrisProjectOntoSurface's calls)
+            use larmorx_freesurfer_surf::mht::Mht;
+            use larmorx_freesurfer_surf::views::CURRENT_VERTICES;
+            let w = surf(g, sg, &mut io, t.next())?;
+            let p = surf(g, sg, &mut io, t.next())?;
+            let sr = surf(g, sg, &mut io, t.next())?;
+            let so = surf(g, sg, &mut io, t.next())?;
+            fn mix(mut h: u64, b: &[u8]) -> u64 {
+                for &c in b {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                h
+            }
+            let put = |o: &mut Out, n: i64, h: u64| {
+                o.i(n);
+                o.s(&format!("{h:016x}"));
+            };
+            let m = Mht::create_vertex_table_resolution(g, io.err, &w, CURRENT_VERTICES, 16.0)?;
+            for pass in 0..2 {
+                let (mut h, mut found) = (0xcbf2_9ce4_8422_2325u64, 0);
+                let off = if pass == 1 { 2.0f32 } else { 0.0 };
+                for v in 0..p.nvertices.max(0) as usize {
+                    let x = p.vertex(v);
+                    let (r, d) =
+                        m.find_closest_vertex_no_xyz(g, io.err, &w, [x.x + off, x.y + off, x.z + off])?;
+                    found += i64::from(r >= 0);
+                    h = mix(mix(h, &r.to_le_bytes()), &d.to_le_bytes());
+                }
+                put(o, found, h);
+            }
+            let m = Mht::create_vertex_table_resolution(g, io.err, &sr, CURRENT_VERTICES, 16.0)?;
+            let (mut h, mut h2, mut found, mut found2) =
+                (0xcbf2_9ce4_8422_2325u64, 0xcbf2_9ce4_8422_2325u64, 0, 0);
+            for v in 0..so.nvertices {
+                let (r, d) = m.find_closest_vertex_no2(g, io.out, io.err, &sr, &so, v)?;
+                found += i64::from(r >= 0);
+                h = mix(mix(h, &r.to_le_bytes()), &d.to_le_bytes());
+                let r2 = m
+                    .find_closest_vertex_set2(g, io.out, io.err, &sr, &so, v)?
+                    .map_or(-1, |x| x as i32);
+                found2 += i64::from(r2 >= 0);
+                h2 = mix(h2, &r2.to_le_bytes());
+            }
+            put(o, found, h);
+            put(o, found2, h2);
+            let m = Mht::create_vertex_table(g, io.err, &w, CURRENT_VERTICES)?;
+            let (mut h, mut found) = (0xcbf2_9ce4_8422_2325u64, 0);
+            for v in 0..p.nvertices.max(0) as usize {
+                let x = p.vertex(v);
+                let r = m
+                    .find_closest_vertex_in_table(g, io.err, &w, [x.x, x.y, x.z], 0)?
+                    .map_or(-1, |x| x as i32);
+                found += i64::from(r >= 0);
+                h = mix(h, &r.to_le_bytes());
+            }
+            put(o, found, h);
+            let m = Mht::create_face_table(g, io.err, &w)?;
+            let (mut h, mut found, mut wide) = (0xcbf2_9ce4_8422_2325u64, 0, 0);
+            for v in 0..p.nvertices.max(0) as usize {
+                let x = p.vertex(v);
+                let q = [f64::from(x.x), f64::from(x.y), f64::from(x.z)];
+                let (mut fno, mut d) = m.find_closest_face_generic(g, io.err, &w, q, 8.0, 8, 1)?;
+                if fno < 0 || d > 0.5 {
+                    wide += 1;
+                    (fno, d) = m.find_closest_face_generic(g, io.err, &w, q, 1000.0, -1, -1)?;
+                }
+                found += i64::from(fno >= 0);
+                h = mix(mix(h, &fno.to_le_bytes()), &d.to_le_bytes());
+            }
+            put(o, found, h);
+            o.i(wide);
+        }
         "maf" => {
             // relay 41 of track D: `fssurfio.cpp`'s `flr maf` (mris_ca_label's mode filter on a
             // recorded annotation)

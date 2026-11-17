@@ -33,7 +33,7 @@ fn dv(t: &mut Vec<String>, x: f64) {
 
 /// Two `w` by `h` grids crossing: one in the plane z = 0 (heights `k/16`), one turned into the
 /// plane y = `h/2` and moved.
-fn sheets(g: &mut Gen) -> Mesh {
+pub(super) fn sheets(g: &mut Gen) -> Mesh {
     let (w, h) = (g.int(3, 5), g.int(3, 5));
     let a = grid(g, w, h);
     let b = grid(g, w, h);
@@ -53,7 +53,7 @@ fn sheets(g: &mut Gen) -> Mesh {
 }
 
 /// Some vertices moved by up to 3 mm in each coordinate (quarters), so faces cross.
-fn crumple(g: &mut Gen, m: &mut Mesh, k: u64) {
+pub(super) fn crumple(g: &mut Gen, m: &mut Mesh, k: u64) {
     for p in &mut m.v {
         if g.chance(k) {
             for c in p.iter_mut() {

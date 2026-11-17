@@ -112,6 +112,7 @@ pub mod labelsurf;
 pub mod lta;
 pub mod metric;
 pub mod mht;
+pub mod mhtfind;
 pub mod mp;
 pub mod mp_faster;
 pub mod mp_slow;

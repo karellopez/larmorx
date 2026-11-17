@@ -1901,6 +1901,8 @@ defects! {
         "the neighbours of a vertex in order around it (MRISgetSpatOrderedNeighbors: mris_skeletonize) read memory never written for a vertex without faces, and past a face's three vertices for a vertex its first face does not hold";
     FS_994 = "FS-994", "FreeSurfer", true,
         "renumbering a surface without its ripped faces and vertices copies each moved face's normal matrices and each moved vertex's user data without moving them: two places share them, and releasing the surface releases them twice";
+    FS_995 = "FS-995", "FreeSurfer", true,
+        "renumbering a surface without its ripped faces and vertices, when unripped faces hold ripped vertices or vertices have neighbours ripped with a flag other than 1, writes the vertex number -1 into those faces and neighbour lists: the program's later reads of them go outside the surface's vertices (memory contents or a crash)";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

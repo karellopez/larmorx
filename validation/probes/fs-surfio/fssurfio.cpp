@@ -115,6 +115,12 @@ const char *Progname = "fssurfio";
 int MRIS_Hcurvature_determineSign(MRIS *apmris);
 // relay 20: declared in mrisurf_sseTerms.h (not included here)
 int mrisAverageSignedGradients(MRIS *mris, int num_avgs);
+// relay 42 of track D (top): declared in mrisurf_topology.cpp or utils/mrisurf_deform.h only
+int mrisRemoveFace(MRIS *mris, int fno);
+int mrisRemoveVertexLink(MRIS *mris, int vno1, int vno2);
+int mrisStoreVtotalInV3num(MRIS *mris);
+void MRISgetNeighborsBeginEnd(MRIS const *mris, int vno, size_t inner_nbhd_size, size_t outer_nbhd_size,
+                              size_t *neighborsIndexBegin, size_t *neighborsIndexEnd);
 
 namespace {
 
@@ -6310,6 +6316,110 @@ void vlr_case()
   }
 }
 
+// ---- relay 42 of track D: top, mrisurf_topology.cpp's rest (toprest.rs)
+
+// top: a surface read by MRISread (d/lh.s0: vls's meshes), its neighbourhood set to 1 to 3 hops
+// (with its distances or not), its type (3, or 0: a quadrangle surface), every vertex's rip flag
+// and mark and every face's rip flag from the case, Gdiag; then 1 to 6 operations named by their
+// FreeSurfer functions; after each the surface's counts and every vertex's (to nvertices) rip flag,
+// mark, faces with their places, counts, neighbour list (mrisVertexVSize entries) and distances,
+// every face's vertices and rip flag
+static void top_dump(MRIS *s)
+{
+  oi(s->nvertices); oi(s->nfaces); oi(s->nsize); oi(s->max_nsize); oi(s->triangle_links_removed);
+  oi(s->dist_alloced_flags); oi(s->dist_nsize);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &s->vertices_topology[vno];
+    oi(v->ripflag); oi(v->marked); oi(vt->num);
+    for (int k = 0; k < vt->num; k++) { oi(vt->f[k]); oi(vt->n[k]); }
+    oi(vt->vnum); oi(vt->v2num); oi(vt->v3num); oi(vt->vtotal); oi(vt->nsizeMax); oi(vt->nsizeCur);
+    int vs = mrisVertexVSize(s, vno);
+    oi(vs);
+    for (int k = 0; k < vs; k++) oi(vt->v[k]);
+    oi(v->dist != NULL);
+    if (v->dist) for (int k = 0; k < vt->vtotal && k < v->dist_capacity; k++) of(v->dist[k]);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) {
+    FACE *f = &s->faces[fno];
+    oi(f->v[0]); oi(f->v[1]); oi(f->v[2]); oi(f->ripflag);
+  }
+}
+
+void top_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nsize = geti(), dmode = geti();
+  if (dmode == 1) MRISsetNeighborhoodSizeAndDist(s, nsize);
+  else if (nsize > 1) MRISsetNeighborhoodSize(s, nsize);
+  s->type = geti();
+  for (int v = 0; v < nv; v++) {
+    s->vertices[v].ripflag = (char)geti();
+    s->vertices[v].marked = (short)geti();
+  }
+  for (int f = 0; f < nf; f++) s->faces[f].ripflag = (char)geti();
+  Gdiag = (unsigned long)(unsigned int)geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    if (op == "edgeExists") { int a = geti(), b = geti(); oi(edgeExists(s, a, b)); }
+    else if (op == "mrisCountValidLinks") { int a = geti(), b = geti(); oi(mrisCountValidLinks(s, a, b)); }
+    else if (op == "mrisAddEdge") { int a = geti(), b = geti(); mrisAddEdge(s, a, b); }
+    else if (op == "mrisRemoveEdge") { int a = geti(), b = geti(); mrisRemoveEdge(s, a, b); }
+    else if (op == "mrisRemoveVertexLink") { int a = geti(), b = geti(); oi(mrisRemoveVertexLink(s, a, b)); }
+    else if (op == "MRISremoveTriangleLinks") oi(MRISremoveTriangleLinks(s));
+    else if (op == "mrisCountTotalNeighbors") oi(mrisCountTotalNeighbors(s));
+    else if (op == "MRIScomputeEulerNumber") {
+      int a, b, c;
+      oi(MRIScomputeEulerNumber(s, &a, &b, &c)); oi(a); oi(b); oi(c);
+    }
+    else if (op == "MRIStopologicalDefectIndex") oi(MRIStopologicalDefectIndex(s));
+    else if (op == "mrisStoreVtotalInV3num") oi(mrisStoreVtotalInV3num(s));
+    else if (op == "mrisVertexReplacingNeighbors") { int a = geti(), b = geti(); mrisVertexReplacingNeighbors(s, a, b); }
+    else if (op == "mrisForgetNeighborhoods") mrisForgetNeighborhoods(s);
+    else if (op == "MRIScountTotalNeighbors") oi(MRIScountTotalNeighbors(s, geti()));
+    else if (op == "MRISgetNeighborsBeginEnd") {
+      int vno = geti(), a = geti(), b = geti();
+      size_t x = 7, y = 7;
+      MRISgetNeighborsBeginEnd(s, vno, (size_t)a, (size_t)b, &x, &y);
+      oi((long long)x); oi((long long)y);
+    }
+    else if (op == "MRISisSurfaceValid") { int a = geti(), b = geti(); oi(MRISisSurfaceValid(s, a, b)); }
+    else if (op == "vertexInFace") { int a = geti(), b = geti(); oi(vertexInFace(s, a, b)); }
+    else if (op == "mrisRemoveLink") { int a = geti(), b = geti(); oi(mrisRemoveLink(s, a, b)); }
+    else if (op == "mrisRemoveFace") oi(mrisRemoveFace(s, geti()));
+    else if (op == "MRISrenumberRemovingRippedFacesAndVertices") MRISrenumberRemovingRippedFacesAndVertices(s);
+    else if (op == "MRISremoveRipped") MRISremoveRipped(s);
+    else if (op == "MRISevertSurface") oi(MRISevertSurface(s));
+    else if (op == "MRISgetSpatOrderedNeighbors") {
+      std::vector<int> l = MRISgetSpatOrderedNeighbors(s, geti());
+      oi((long long)l.size());
+      for (int x : l) oi(x);
+    }
+    else if (op == "MRISsetRipInFacesWithRippedVertices") MRISsetRipInFacesWithRippedVertices(s);
+    else if (op == "MRIS_setNsizeCur") { int a = geti(), b = geti(); MRIS_setNsizeCur(s, a, b); }
+    else if (op == "rip") { int a = geti(); s->vertices[a].ripflag = (char)geti(); }
+    else fail("top op");
+    top_dump(s);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -6576,6 +6686,8 @@ void run_case()
     vls_case();
   } else if (cmd == "vlr") {
     vlr_case();
+  } else if (cmd == "top") {
+    top_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

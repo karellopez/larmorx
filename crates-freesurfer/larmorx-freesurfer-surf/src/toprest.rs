@@ -58,6 +58,12 @@
 //!   face list's first entry from memory never written, and of a vertex its first face does not
 //!   hold reads past that face's three vertices. Both modes return the neighbours found up to there
 //!   (none for a vertex without faces), noted.
+//! - **FS-995** (out of bounds): the renumbering of a surface whose unripped faces hold ripped
+//!   vertices, or whose vertices have neighbours ripped with a flag other than 1, writes the vertex
+//!   number -1 into those faces and lists; FreeSurfer's later reads of them go outside the
+//!   surface's vertices. `reproduce` writes -1 (noted; the probe compares nothing after it); the
+//!   default rips those faces first, so they are removed with the ripped ones (and the lists drop
+//!   every ripped neighbour, FS-988).
 //! - **FS-994** (memory): the renumbering copies each kept face (its normal matrices) and vertex
 //!   (its user data) to its new place without moving them, so two places share them and releasing
 //!   the surface releases them twice. larmorx's copies are its own; nothing is reproduced.
@@ -65,7 +71,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{
-    FS_986, FS_987, FS_988, FS_989, FS_990, FS_991, FS_992, FS_993, FS_994,
+    FS_986, FS_987, FS_988, FS_989, FS_990, FS_991, FS_992, FS_993, FS_994, FS_995,
 };
 use larmorx_freesurfer_core::diag;
 use larmorx_freesurfer_core::globals::Globals;
@@ -907,6 +913,15 @@ fn remove_ripped_vertices(
                 );
             }
             let mapped = out_vnos[vno2 as usize];
+            if mapped < 0 {
+                g.notices.add(
+                    &FS_995,
+                    format!(
+                        "MRISrenumberRemovingRippedFacesAndVertices: vertex {vno}'s neighbour {vno2} ripped with flag {} kept as -1 (FreeSurfer's later reads of it go outside the vertices)",
+                        old_rip[vno2 as usize]
+                    ),
+                );
+            }
             let vt = mris.topology_mut(vno);
             let k = usize::try_from(vt.v3num).unwrap_or(0);
             vt.v.as_mut().expect("VERTEX_TOPOLOGY::v is NULL")[k] = mapped;
@@ -942,11 +957,19 @@ fn remove_ripped_vertices(
             }
         }
     }
+    let mut minus = false;
     for fno in 0..nfaces(mris) {
         let f = mris.face_mut(fno);
         for n in 0..VERTICES_PER_FACE {
             f.v[n] = out_vnos[f.v[n] as usize];
+            minus |= f.v[n] < 0;
         }
+    }
+    if minus {
+        g.notices.add(
+            &FS_995,
+            "MRISrenumberRemovingRippedFacesAndVertices: a kept face holds a ripped vertex, now -1 (FreeSurfer's later reads of it go outside the vertices)",
+        );
     }
     alloc::removed_vertices(g, io.out, io.err, mris, nvertices)
 }
@@ -962,6 +985,26 @@ pub fn renumber_removing_ripped_faces_and_vertices(
 ) -> Result<(), Fatal> {
     if mris.dist_alloced_flags != 0 {
         return Err(assert_at(g, io, 2859, "!mris->dist_alloced_flags"));
+    }
+    if !g.notices.reproduce() {
+        let mut ripped = 0;
+        for fno in 0..nfaces(mris) {
+            let fv = mris.face(fno).v;
+            if mris.face(fno).ripflag == 0
+                && fv.iter().any(|&x| mris.vertex(x as usize).ripflag != 0)
+            {
+                mris.face_mut(fno).ripflag = 1;
+                ripped += 1;
+            }
+        }
+        if ripped > 0 {
+            g.notices.add(
+                &FS_995,
+                format!(
+                    "MRISrenumberRemovingRippedFacesAndVertices: {ripped} unripped faces hold ripped vertices: removed with the ripped faces (FreeSurfer keeps them with the vertex number -1)"
+                ),
+            );
+        }
     }
     remove_ripped_faces(g, io, mris)?;
     remove_ripped_vertices(g, sg, io, mris)

@@ -517,6 +517,15 @@ removal, the renumbering, the eversion): 24 of 24 identical with `reproduce`; th
 Euler counts equal recon-all's `mris_euler_number` lines. Official 23 s, port 40-42 s (the reads are
 track A's).
 
+Also relay 42, 61 commands: `sbl` (the four soap bubbles of `mrisurf_deform.cpp` with rips, marks of
+0 to 3 and -1, offset current, original and target positions (NaN in heavy cases), `Gdiag`'s show and
+verbose bits, `Gdiag_no` (now and then beyond the surface), the distances released or the marks set
+again between them; the port's side in `tests/fs_surfio/sbl.rs`), seeds 7, 13 (500 cases each) and 17
+(1,000): 0 different in both modes; counted, not compared: FS-996 (a diagnostic vertex beyond the
+surface, read by FreeSurfer). `flr sbl` (`real.py --sbl`: three heads, both hemispheres, `white` and
+`orig`, `cortex.label`'s vertices free, 25 passes of the plain and the weighted bubble): 12 of 12
+identical in both modes. Official 17 s, port 31-33 s.
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

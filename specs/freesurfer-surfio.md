@@ -5622,3 +5622,69 @@ the surface check's messages, the ordered neighbours, the triangle links and FS-
 implementer's black-box forms: `mris_euler_number` (its counts and defect index on any surface),
 `mris_topo_fixer`'s check, `mris_flatten` and `mri_surf2surf` with patches or labels (the removal),
 `mris_inflate -explode` (the renumbering).
+
+## 146. The soap bubbles (fs.surf's `mrisurf_deform.cpp`, taken early; relay 42 of track D)
+
+The marks: 1 a fixed vertex, 0 one never computed, 2 one computed by an earlier pass, 3 one
+computed in this pass (not yet usable). `%2.1f` below is C's `printf` of the `float` widened to
+`double`.
+
+**146.1** `MRISsoapBubbleVertexPositions(mris, n)` (`mris_fix_topology`'s smoothing of the
+retessellated vertices, `mris_make_surfaces`, `mris_smooth`): every vertex's mark saved in `marked3`;
+then `n` passes (none for `n` not above 0), each: (a) when `Gdiag_no` is not negative and that vertex
+is unmarked, `v <d> @ (<x>, <y>, <z>) will be moved during soap bubble:` and for each 1-hop neighbour
+`\tnbr <k>=<vno>, marked = <m>, (<x>, <y>, <z>)` on standard output (`%2.1f`); (b) every unripped
+vertex whose mark is not 1, in order: `tdx tdy tdz` the mean of its own position and its unripped
+1-hop neighbours' (in list order): the sum and the count in `float` (the count from 1), the sum
+divided by the count in `float`; counted when its mark was 0; its mark 3; (c) every unripped vertex
+whose mark is not 1, in order: for `Gdiag_no`, `iter <i>: moving v <vno> from (<tdx>, <tdy>, <tdz>) -->
+(<x>, <y>, <z>)` (`%2.1f`; the new position printed first); a marked vertex takes `tdx tdy tdz` as its
+position; a mark of 3 becomes 2; (d) with `DIAG_SHOW` and verbose diagnostics `<i>: <counted> vertices
+marked` when some were counted. Then every mark restored from `marked3`. Returns 0. **FS-996** (class
+a): (a) reads the diagnostic vertex with no check that the surface has it: one beyond the surface's
+vertices reads memory outside them in FreeSurfer; both modes skip (a) then, noted.
+
+**146.2** `MRISweightedSoapBubbleVertexPositions(mris, n)` (`mris_make_surfaces`): `n` passes, each:
+(a) as 146.1 (FS-996 likewise); (b) every vertex in order: a ripped one or one of mark 1 gets its
+position in `tdx tdy tdz`; every other one: a weight 1 for itself, and for each 1-hop neighbour (in
+list order, ripped ones too) a weight of 1, or 20 for a ripped one; each coordinate's sum a `float`
+from the vertex's own, to which each neighbour's term `weight x` (in `double`) is added in `double`
+and the result rounded to `float`; the weights summed in `double`; `tdx tdy tdz` each sum (widened)
+divided by the weights' sum, rounded to `float`; counted when its mark was 0; its mark 3; (c) and (d)
+as 146.1; (e) with verbose diagnostics `MRISprintVertexStats` of `Gdiag_no` on the current positions
+(§105; none for a negative `Gdiag_no`; FS-996: none beyond the surface). The marks are not saved or
+restored. Returns 0.
+
+**146.3** `MRISsoapBubbleOrigVertexPositions(mris, n)` (the surface deformation's ico
+retessellation) and `MRISsoapBubbleTargetVertexPositions(mris, n)`, on the original (`origx origy
+origz`) or target (`targx targy targz`) positions: up to `n` passes, each: (b) every unripped vertex
+whose mark is not 1, in order: the sum (in `float`, from 0) of its own position when its mark is 2
+and of its unripped 1-hop neighbours' of mark 1 or 2 (in list order), with their count (in `float`);
+when the count is above 0, `tdx tdy tdz` the sum over the count (in `float`), counted when its mark
+was 0, its mark 3; (c) every unripped vertex whose mark is not 1, in order: a marked one takes `tdx
+tdy tdz` as the positions (the original ones through `MRISsetOriginalXYZ`, §16: a surface that keeps
+its original distances reports the logic problem `dist_orig not freed when setOriginalXYZ called.
+Add call to MRISfreeDistOrigs(MRIS*)` for the call at line 2760 of `utils/mrisurf_deform.cpp`), a mark
+of 3 becomes 2; (d) with `DIAG_SHOW` (verbose or not) `<i>: <counted> vertices marked`; after a pass
+that counted none, the sixth such pass ends the passes. Then every unripped vertex whose mark is not 1
+gets the mark 0. Returns 0.
+
+## 147. Validation plan, part 36
+
+The probe's command `sbl` (relay 42): vls's grids (2 to 6 by 2 to 5), srd's small meshes and
+icosahedra read by `MRISread`, now and then at 2 hops; every vertex's rip flag (1 for one vertex in
+eight of a third of the cases), mark (mostly 1 or 0 in a case's proportion; 2, 3 or -1 one time in
+twelve), current, original and target positions (the position read plus thirty-seconds in [-0.5,
+0.5], NaN in heavy cases); `Gdiag` 0, `DIAG_SHOW`, `DIAG_SHOW | DIAG_VERBOSE` or `DIAG_VERBOSE`;
+`Gdiag_no` -1, a vertex (one case in six) or beyond the surface (heavy cases); then 1 to 3 of the four
+bubbles (passes 0, 1, 2, 3, 5, 10, 25), the distances released or the case's marks set again; after
+each its status and every vertex's positions, `tdx tdy tdz`, mark and `marked3`. Compared with the
+official build with `reproduce`: identical; the default identical but where a noted correction changed
+the result. Observed (relay 42): seeds 7, 13 (500 cases each) and 17 (1,000): 0 different in both
+modes (27 counted, not compared: FS-996, FS-121). On the recorded heads (`real.py --sbl`, 3 heads, both
+hemispheres, `white` and `orig`, the vertices of `cortex.label` free and the others fixed, 25 passes
+of the plain and the weighted bubble): 12 of 12 identical in both modes. `tests/soap_defaults.rs`
+checks the relaxation (free vertices the mean of their neighbourhood, fixed ones unmoved, the marks
+restored), the weight of a ripped neighbour, FS-996 and the diagnostic report, the target bubble's
+end after six idle passes. A clean-room implementer's black-box forms: `mris_smooth -n <n>` with its
+soap bubble, `mris_fix_topology` (its smoothing of the retessellated vertices, on the recorded heads).

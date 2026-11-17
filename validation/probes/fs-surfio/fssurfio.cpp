@@ -4413,6 +4413,57 @@ void flr_case()
       oi(MRISreadAnnotation(s, ("./" + n).c_str()));
       ann_fnv();
     }
+  } else if (op == "maf") {
+    // relay 41 of track D: mris_ca_label's mode filter on a recorded annotation (`maf <surface>
+    // <annotation>`): the annotation read (MRISreadAnnotation), the program's table set from its
+    // colour table (set_atable_from_ctable, as mris_ca_label does first), MRISmodeFilterAnnotations
+    // with mris_ca_label's 10 passes; the vertices changed, their numbers' and the annotations'
+    // FNV-1a
+    MRIS *s = MRISread(next());
+    std::string af = next();
+    if (!s) fail("cannot read the surface");
+    oi(MRISreadAnnotation(s, af.c_str()));
+    std::vector<int> before(s->nvertices);
+    for (int v = 0; v < s->nvertices; v++) before[v] = s->vertices[v].annotation;
+    oi(set_atable_from_ctable(s->ct));
+    oi(MRISmodeFilterAnnotations(s, 10));
+    uint64_t h = 0xcbf29ce484222325ull, hv = h;
+    int nch = 0;
+    for (int v = 0; v < s->nvertices; v++) {
+      const unsigned char *b = (const unsigned char *)&s->vertices[v].annotation;
+      for (int k = 0; k < 4; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      if (s->vertices[v].annotation != before[v]) {
+        nch++;
+        const unsigned char *c = (const unsigned char *)&v;
+        for (int k = 0; k < 4; k++) hv = (hv ^ c[k]) * 0x100000001b3ull;
+      }
+    }
+    oi(nch);
+    char t[48];
+    snprintf(t, sizeof t, "%016" PRIx64 " %016" PRIx64 " ", h, hv);
+    out += t;
+  } else if (op == "dvs") {
+    // relay 41 of track D: mri_binarize --dilate-vertex (`dvs <surface> <vno> <radius>`): the disk
+    // of area pi r^2 around the vertex (MRISdilateVertexToSum with the surface's areas); the mask's
+    // voxels set and their numbers' FNV-1a
+    MRIS *s = MRISread(next());
+    int vno = geti();
+    double radius = getd();
+    if (!s) fail("cannot read the surface");
+    MRI *m = MRISdilateVertexToSum(vno, s, NULL, M_PI * radius * radius);
+    if (!m) { out += "NULL "; return; }
+    uint64_t hv = 0xcbf29ce484222325ull;
+    int n = 0;
+    for (int c = 0; c < m->width; c++)
+      if (MRIgetVoxVal(m, c, 0, 0, 0) != 0) {
+        n++;
+        const unsigned char *b = (const unsigned char *)&c;
+        for (int k = 0; k < 4; k++) hv = (hv ^ b[k]) * 0x100000001b3ull;
+      }
+    oi(n);
+    char t[24];
+    snprintf(t, sizeof t, "%016" PRIx64 " ", hv);
+    out += t;
   } else fail("flr op");
 }
 

@@ -1028,6 +1028,77 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 }
             }
         }
+        "maf" => {
+            // relay 41 of track D: `fssurfio.cpp`'s `flr maf` (mris_ca_label's mode filter on a
+            // recorded annotation)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let af = t.next().to_owned();
+            let r = annot::read_annotation(g, sg, &mut io, None, &mut s, &af, -1, None)?;
+            o.i(i64::from(r));
+            let nv = s.nvertices.max(0) as usize;
+            let before: Vec<i32> = (0..nv).map(|v| s.vertex(v).annotation).collect();
+            o.i(i64::from(larmorx_freesurfer_io::annotation::set_atable_from_ctable(
+                g,
+                io.out,
+                io.err,
+                &mut sg.atable,
+                s.ct.as_ref(),
+            )));
+            o.i(i64::from(
+                larmorx_freesurfer_surf::valrest::mode_filter_annotations(
+                    g, sg, &mut io, None, &mut s, 10,
+                )?,
+            ));
+            let (mut h, mut hv) = (0xcbf2_9ce4_8422_2325u64, 0xcbf2_9ce4_8422_2325u64);
+            let mut nch = 0;
+            for (v, &b) in before.iter().enumerate() {
+                let a = s.vertex(v).annotation;
+                for c in a.to_le_bytes() {
+                    h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                if a != b {
+                    nch += 1;
+                    for c in (v as i32).to_le_bytes() {
+                        hv = (hv ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                    }
+                }
+            }
+            o.i(nch);
+            o.s(&format!("{h:016x}"));
+            o.s(&format!("{hv:016x}"));
+        }
+        "dvs" => {
+            // relay 41 of track D: `fssurfio.cpp`'s `flr dvs` (mri_binarize --dilate-vertex)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let vno = t.i() as i32;
+            let radius = t.d();
+            let m = larmorx_freesurfer_surf::valrest::dilate_vertex_to_sum(
+                g,
+                sg,
+                &mut io,
+                vno,
+                Some(&mut s),
+                None,
+                std::f64::consts::PI * radius * radius,
+            )?;
+            let Some(m) = m else {
+                o.s("NULL");
+                return Ok(());
+            };
+            let mut hv = 0xcbf2_9ce4_8422_2325u64;
+            let mut n = 0;
+            for c in 0..m.vg.width {
+                let x = larmorx_freesurfer_mri::voxel::mri_get_vox_val(g, io.err, &m, c, 0, 0, 0, 0)?;
+                if x != 0.0 {
+                    n += 1;
+                    for b in c.to_le_bytes() {
+                        hv = (hv ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+                    }
+                }
+            }
+            o.i(n);
+            o.s(&format!("{hv:016x}"));
+        }
         "sgd" => {
             // relay 38 of track D: `fssurfio.cpp`'s `flr sgd` (the stack measurement: every value
             // 1, one map of the clusters); the port also gives the deepest path of the growth

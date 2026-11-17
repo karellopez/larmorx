@@ -6027,8 +6027,8 @@ removed, 154.7 at 1 to 4 mm without a volume or into a new `float` volume of 8³
 extent, voxel size, centre and the FNV-1a of its voxels in column order); after each the surface
 (status, radius, total and negative area; each vertex's position, normal, area and mark; each face's
 area). Compared with the official build with `reproduce`: identical; the default identical but where a
-noted correction changed the result. Observed (relay 44): seeds 7 and 13 (300 cases each): 0 different
-in both modes (68 to 81 counted, not compared: the metric properties' FS-121 after a flattening that
+noted correction changed the result. Observed (relay 44): seeds 7, 13 (300 cases each) and 17 (500): 0
+different in both modes (68 to 131 counted, not compared: the metric properties' FS-121 after a flattening that
 leaves faces without a normal, FS-996 and FS-1002's diagnostic vertex beyond the surface, FS-06; 2 to 4
 that FreeSurfer runs past the probe's 5-second alarm: hash-table voxel lists of huge faces, a large
 interior). On the recorded heads (`real.py --rmi`: three heads, both hemispheres: 154.6 on `?h.orig.nofix`,

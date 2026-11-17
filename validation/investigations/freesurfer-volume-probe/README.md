@@ -136,7 +136,10 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
 The candidate, the guard runs, the memory lines and what may differ are as in the fs.mri probe's
 loop (its README, "The comparison loop"), without its `FS-264` batches: a difference is allowed on a
 line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`) and the candidate did, on a **memory**
-line, and in `--mode fix` on a line where the candidate noted a defect. Every call gets 10 seconds
+line, in `--mode fix` on a line where the candidate noted a defect, and in both modes on a `vsample`
+line where the candidate noted FS-300 (the cubic frame sampler's window points outside the volume,
+which FreeSurfer never reads: the probe's four runs agree on them only because the probe's own
+earlier work leaves the same bytes on the stack, so they count as memory). Every call gets 10 seconds
 (`@10`) but `pca`'s (2: FreeSurfer's eigensystem never returns on some covariances) and the two
 `ltaread` calls of FS-307 (3: FreeSurfer never returns). The groups:
 `vgblock` (§2-3: 60 writes; 500 reads of generated blocks: well-formed, with lines missing,

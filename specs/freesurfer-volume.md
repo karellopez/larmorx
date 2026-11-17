@@ -532,8 +532,12 @@ in `*pval`; when a sampler fails before setting it, `*pval` keeps the caller's v
   gives the error `MRIcubicCoeff: called wrong by MRIcubicSampleVolume!` and the value -3,
   `ERROR_UNSUPPORTED` as a `double`, `c008000000000000` (**(observed)**: §22's `coef`)); the sum is
   divided by 8 (FS-299: `reproduce` divides by the number of points summed). `MRIcubicSampleVolumeFrame`
-  does the same on a frame (no frame check), every point of the 4 x 4 x 4 window summed (those outside
-  as 0: FS-300) and the sum times 0.125. Types as the trilinear; another gives `MRIcubicSampleVolume:
+  does the same on a frame (no frame check), but every point of the 4 x 4 x 4 window is summed and the
+  sum multiplied by 0.125: the points outside the volume are never read, so FreeSurfer adds memory
+  contents there (FS-300). Both modes take those points as 0 and note FS-300. (The probe's runs show
+  the NaN with all bits set, `ffffffffffffffff`, at such points in all four runs, the stack zeroed or
+  filled before the call included: bytes the probe's own earlier work leaves on the stack, not a
+  value FreeSurfer defines; §69.3 lets those lines differ in both modes.) Types as the trilinear; another gives `MRIcubicSampleVolume:
   unsupported type <t>` at the first point (`*pval` unchanged).
 - **Windowed sinc** (`MRIsincSampleVolume(mri, x, y, z, hw)`, `SAMPLE_SINC` with `hw` 5;
   `MRIsincSampleVolumeFrame`): no whole-coordinate shortcut; unambiguously outside gives
@@ -2515,7 +2519,10 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   ITK-112 for the principal components);
 - a **memory** line (FreeSurfer reads or writes what it does not own: FS-53, FS-289's other voxels
   where they lie outside, FS-290);
-- in `--mode fix`, a line where the candidate noted a defect (the corrected result).
+- in `--mode fix`, a line where the candidate noted a defect (the corrected result);
+- in both modes, a `vsample` line where the candidate noted FS-300 (§18: the cubic frame sampler's
+  window points FreeSurfer never reads; the probe's four runs agree there only by accident of its
+  own stack).
 
 The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
 the allowed lines; exit status 1 for any other difference. **(observed)** with the probe as its own

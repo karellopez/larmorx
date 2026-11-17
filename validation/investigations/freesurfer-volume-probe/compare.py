@@ -659,7 +659,9 @@ class Gen4(Gen):
                     for _ in range(n)
                 )
             )
-        return [Batch("vsample", "vsample", L)]
+        # FS-300: the frame variant's window points outside the volume are memory contents (the
+        # probe's four runs agree on them by accident of its own stack): a line noting it may differ
+        return [Batch("vsample", "vsample", L, both="FS-300")]
 
     def vmove(self) -> list[Batch]:
         """§19: translations and rotations of a volume."""

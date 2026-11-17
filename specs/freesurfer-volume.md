@@ -221,9 +221,16 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   header; else a clone.
 - `MRIcloneBySpace(src, type, nframes)`: a new volume of the source's extent, `type` and `nframes`
   (the source's when negative), the source's header and pulse parameters (TR, TE, TI, flip angle).
-- `MRIclear(mri)`: every voxel's bytes set to 0 (types `uchar`, `short`, `ushort`, `int`, `long`,
-  `float`); another type: the error `MRIclear: unsupported input type <type>`, returns
-  `ERROR_UNSUPPORTED` (-3); else 0.
+- `MRIclear(mri)`: for types `uchar`, `short`, `ushort`, `int`, `long` and `float`, every row of every
+  slice and frame (frames outermost) set to 0, its `width x size` bytes; the bitmap (type 5) is not
+  refused either: each row's first `width / 8` bytes (integer division). Another type: the error
+  `MRIclear: unsupported input type <type>`, returns `ERROR_UNSUPPORTED` (-3); else 0. A volume
+  without voxels with at least one row (height and depth x frames both positive) is §6's direct walk
+  of a volume without voxels (FS-58: FreeSurfer crashes; the error here), and a bitmap volume never
+  has voxels (`specs/freesurfer-mri.md` §4, FS-55): so a bitmap volume (and any volume without
+  voxels of the six types) gives FS-58's error when it has a row and returns 0 when it has none
+  (**(observed)**: `vmake`; `vrules`, 9 lines: no rows 0, a row `CRASH 11`, tensor, float complex
+  and RGB -3 with the error).
 - `MRImatch(a, b)`: 1 when width, height, depth and type are equal. `MRImatchDimensions(a, b)`: 1
   when the extents are equal and each voxel size differs by less than `FLT_EPSILON` (the float
   difference, absolute). `MRIcheckSize(src, check, w, h, d)`: 0 without `check`; else 1 when

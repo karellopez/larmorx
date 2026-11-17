@@ -42,7 +42,11 @@ track D): the same labels' island and hole removal (``LabelRemoveIslandsSurf``,
 by distance; and ``mris_place_surface --area-map`` of each white and pial surface
 (``MRISwriteArea``), the file against the recorded ``?h.area`` and ``?h.area.pial``. With
 ``--mki`` (relay 39 of track D): ``mrisMarkIntersections`` without and with hole filling on each
-head's ``orig.nofix``, ``orig``, ``white``, ``pial`` and ``inflated`` surfaces. Prints the
+head's ``orig.nofix``, ``orig``, ``white``, ``pial`` and ``inflated`` surfaces. With ``--vlr``
+(relay 41 of track D): mris_ca_label's mode filter (``MRISmodeFilterAnnotations``, 10 passes, the
+table set from the annotation's colour table first) on each head's recorded annotations, and
+mri_binarize's ``--dilate-vertex`` disks (``MRISdilateVertexToSum`` with the areas, pi r^2 for r of
+5, 20 and 50 mm) around vertices 0, 1000 and 50000 of each white surface. Prints the
 counts;
 the lines name machine paths, so no hash is recorded from them.
 
@@ -128,6 +132,12 @@ def main(argv: list[str] | None = None) -> int:
         "head's recorded labels and white surface",
     )
     ap.add_argument(
+        "--vlr",
+        action="store_true",
+        help="relay 41 of track D: mris_ca_label's mode filter of each head's recorded annotations "
+        "(flr maf) and mri_binarize's disks of 5, 20 and 50 mm around three vertices (flr dvs)",
+    )
+    ap.add_argument(
         "--mki",
         action="store_true",
         help="relay 39 of track D: mrisMarkIntersections (flr mki) on each head's orig.nofix, "
@@ -156,6 +166,15 @@ def main(argv: list[str] | None = None) -> int:
         sub = head.split("-", 1)[1]
         s = ws / "oracles" / "freesurfer-8.2.0" / "runs" / f"{head}-classic" / "subjects" / sub
         for hemi in ("lh", "rh"):
+            if a.vlr:
+                for c in ANNOTS:
+                    lines.append(
+                        f"flr maf {s / 'surf' / f'{hemi}.white'} {s / 'label' / f'{hemi}.{c}'}"
+                    )
+                for vno in (0, 1000, 50000):
+                    for r in (5.0, 20.0, 50.0):
+                        lines.append(f"flr dvs {s / 'surf' / f'{hemi}.white'} {vno} {dx(r)}")
+                continue
             if a.mki:
                 for surf in ("orig.nofix", "orig", "white", "pial", "inflated"):
                     for fill in (0, 1):
@@ -217,7 +236,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "mki"
+        "vlr"
+        if a.vlr
+        else "mki"
         if a.mki
         else "scl"
         if a.scl

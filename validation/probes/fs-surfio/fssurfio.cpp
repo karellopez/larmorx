@@ -63,6 +63,7 @@
 #include "mrishash.h"
 #include "mrishash_internals.h"
 #include "mrisurf_vals.h"
+#include "annotation.h"
 
 // sclustReMap0 is defined in surfcluster.cpp but not declared in its header (relay 38)
 int sclustReMap0(MRI_SURFACE *Surf, int nClusters, SCS *scs_sorted);
@@ -4412,6 +4413,57 @@ void flr_case()
       oi(MRISreadAnnotation(s, ("./" + n).c_str()));
       ann_fnv();
     }
+  } else if (op == "maf") {
+    // relay 41 of track D: mris_ca_label's mode filter on a recorded annotation (`maf <surface>
+    // <annotation>`): the annotation read (MRISreadAnnotation), the program's table set from its
+    // colour table (set_atable_from_ctable, as mris_ca_label does first), MRISmodeFilterAnnotations
+    // with mris_ca_label's 10 passes; the vertices changed, their numbers' and the annotations'
+    // FNV-1a
+    MRIS *s = MRISread(next());
+    std::string af = next();
+    if (!s) fail("cannot read the surface");
+    oi(MRISreadAnnotation(s, af.c_str()));
+    std::vector<int> before(s->nvertices);
+    for (int v = 0; v < s->nvertices; v++) before[v] = s->vertices[v].annotation;
+    oi(set_atable_from_ctable(s->ct));
+    oi(MRISmodeFilterAnnotations(s, 10));
+    uint64_t h = 0xcbf29ce484222325ull, hv = h;
+    int nch = 0;
+    for (int v = 0; v < s->nvertices; v++) {
+      const unsigned char *b = (const unsigned char *)&s->vertices[v].annotation;
+      for (int k = 0; k < 4; k++) h = (h ^ b[k]) * 0x100000001b3ull;
+      if (s->vertices[v].annotation != before[v]) {
+        nch++;
+        const unsigned char *c = (const unsigned char *)&v;
+        for (int k = 0; k < 4; k++) hv = (hv ^ c[k]) * 0x100000001b3ull;
+      }
+    }
+    oi(nch);
+    char t[48];
+    snprintf(t, sizeof t, "%016" PRIx64 " %016" PRIx64 " ", h, hv);
+    out += t;
+  } else if (op == "dvs") {
+    // relay 41 of track D: mri_binarize --dilate-vertex (`dvs <surface> <vno> <radius>`): the disk
+    // of area pi r^2 around the vertex (MRISdilateVertexToSum with the surface's areas); the mask's
+    // voxels set and their numbers' FNV-1a
+    MRIS *s = MRISread(next());
+    int vno = geti();
+    double radius = getd();
+    if (!s) fail("cannot read the surface");
+    MRI *m = MRISdilateVertexToSum(vno, s, NULL, M_PI * radius * radius);
+    if (!m) { out += "NULL "; return; }
+    uint64_t hv = 0xcbf29ce484222325ull;
+    int n = 0;
+    for (int c = 0; c < m->width; c++)
+      if (MRIgetVoxVal(m, c, 0, 0, 0) != 0) {
+        n++;
+        const unsigned char *b = (const unsigned char *)&c;
+        for (int k = 0; k < 4; k++) hv = (hv ^ b[k]) * 0x100000001b3ull;
+      }
+    oi(n);
+    char t[24];
+    snprintf(t, sizeof t, "%016" PRIx64 " ", hv);
+    out += t;
   } else fail("flr op");
 }
 
@@ -6108,6 +6160,156 @@ void vls_case()
   }
 }
 
+// ---- relay 41 of track D: vlr, mrisurf_vals.cpp's functions of one program each (valrest.rs)
+
+// vlr: a surface read by MRISread (d/lh.s0: vls's meshes), now and then its neighbourhood set to
+// 2 hops, every vertex's rip flag, annotation, curvature and vector-registration values (VALS_VP,
+// or none) and every face's rip flag from the case; the program's annotation table set or not (a
+// table file in the work folder where FreeSurfer looks for its default one, or a colour table set
+// as the table), the surface's colour table, Gdiag_no, a measure volume of one voxel per vertex
+// (or none); then 1 to 4 operations named by their FreeSurfer functions; `G` where a value setter
+// would read or write outside a vertex's arrays (FS-980); after each the vertices' rip flags,
+// borders, annotations, undefvals, curvatures, tx, areas and values, the faces' rip flags, and
+// for MRISdilateVertexToSum its mask
+static void vlr_dump(MRIS *s)
+{
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    oi(x->ripflag); oi(x->border); oi(x->annotation); oi(x->undefval); of(x->curv); of(x->tx);
+    of(x->area);
+    of(x->val); of(x->val2); of(x->origarea); of(x->mean); of(x->mean_imag); of(x->std_error);
+    oi(x->marked);
+    VALS_VP *vp = (VALS_VP *)x->vp;
+    if (!vp) { out += "N "; continue; }
+    oi(vp->nvals);
+    for (int k = 0; k < vp->nvals; k++) { of(vp->vals[k]); of(vp->orig_vals[k]); }
+  }
+  for (int f = 0; f < s->nfaces; f++) oi(s->faces[f].ripflag);
+}
+
+void vlr_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nsize = geti();
+  if (nsize > 1) MRISsetNeighborhoodSize(s, nsize);
+  for (int v = 0; v < nv; v++) {
+    VERTEX *x = &s->vertices[v];
+    x->ripflag = (char)geti();
+    x->annotation = geti();
+    x->curv = getf();
+    x->val = getf(); x->val2 = getf(); x->origarea = getf(); x->mean = getf(); x->mean_imag = getf();
+    x->std_error = getf();
+    x->marked = (short)geti();
+    int nvals = geti();
+    if (nvals >= 0) {
+      VALS_VP *vp = (VALS_VP *)calloc(1, sizeof(VALS_VP));
+      vp->nvals = nvals;
+      vp->vals = (float *)calloc(nvals > 0 ? nvals : 1, sizeof(float));
+      vp->orig_vals = (float *)calloc(nvals > 0 ? nvals : 1, sizeof(float));
+      for (int k = 0; k < nvals; k++) { vp->vals[k] = getf(); vp->orig_vals[k] = getf(); }
+      x->vp = vp;
+    }
+  }
+  for (int f = 0; f < nf; f++) s->faces[f].ripflag = (char)geti();
+  // the program's annotation table: 0 none, 1 a table file where FreeSurfer looks for its
+  // default one (FREESURFER_HOME unset: ./Simple_surface_labels2009.txt), 2 a colour table set as
+  // the table
+  int tmode = geti();
+  if (tmode == 1) {
+    std::string text = geth();
+    FILE *tf = fopen("Simple_surface_labels2009.txt", "wb");
+    if (!tf) fail("the table file");
+    fwrite(text.data(), 1, text.size(), tf);
+    fclose(tf);
+  } else if (tmode == 2) {
+    COLOR_TABLE *pre = ann_ctab();
+    oi(set_atable_from_ctable(pre));
+  }
+  s->ct = ann_ctab();
+  Gdiag_no = geti();
+  setenv("FREESURFER_SEED", std::to_string(geti()).c_str(), 1);
+  int vmode = geti();
+  MRI *measure = NULL;
+  if (vmode > 0) {
+    int type = geti(), w = geti();
+    measure = MRIallocSequence(w, 1, 1, type, 1);
+    for (int c = 0; c < w; c++) MRIsetVoxVal(measure, c, 0, 0, 0, getf());
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    // a colour-table index with an annotation
+    auto has = [&](int i) { return s->ct && i >= 0 && i < s->ct->nentries && s->ct->entries[i]; };
+    if (op == "MRISripZeros") oi(MRISripZeros(s, geti() == 1 ? measure : NULL));
+    else if (op == "MRISripUnknown") {
+      if (!s->ct && nv > 0) { out += "G "; continue; }
+      oi(MRISripUnknown(s));
+    } else if (op == "MRISdilateConfined") {
+      int annotidmask = geti(), niters = geti(), newid = geti(), ty = geti();
+      MRI *mask = MRIallocSequence(nv, 1, 1, ty, 1);
+      for (int c = 0; c < nv; c++) MRIsetVoxVal(mask, c, 0, 0, 0, getf());
+      if ((annotidmask > -1 && !s->ct && nv > 0) || (newid > 0 && !has(newid))) { out += "G "; continue; }
+      mpf_vol(MRISdilateConfined(s, mask, annotidmask, niters, newid));
+    } else if (op == "MRISaccumulateMeansOnSurface") { int a = geti(), b = geti(); oi(MRISaccumulateMeansOnSurface(s, a, b)); }
+    else if (op == "MRISaccumulateImaginaryMeansOnSurface") { int a = geti(), b = geti(); oi(MRISaccumulateImaginaryMeansOnSurface(s, a, b)); }
+    else if (op == "MRISaccumulateStandardErrorsOnSurface") { int a = geti(), b = geti(); oi(MRISaccumulateStandardErrorsOnSurface(s, a, b)); }
+    else if (op == "MRISclearWhichAndVal2") MRISclearWhichAndVal2(s, geti());
+    else if (op == "MRISmarkRandomVertices") oi(MRISmarkRandomVertices(s, getf()));
+    else if (op == "MRISannotation_to_label") {
+      int i = geti();
+      if (!has(i)) { out += "G "; continue; }
+      LABEL *l = MRISannotation_to_label(s, i);
+      if (!l) out += "NULL ";
+      else {
+        oi(l->n_points); oi(l->max_points); oh(l->name);
+        for (int k = 0; k < l->n_points; k++) oi(l->lv[k].vno);
+      }
+    }
+    else if (op == "MRISmodeFilterAnnotations") oi(MRISmodeFilterAnnotations(s, geti()));
+    else if (op == "MRISdilateRipped") oi(MRISdilateRipped(s, geti()));
+    else if (op == "MRISerodeRipped") oi(MRISerodeRipped(s, geti()));
+    else if (op == "MRISsetRipInFacesWithRippedVertices") MRISsetRipInFacesWithRippedVertices(s);
+    else if (op.compare(0, 7, "MRISset") == 0) {
+      int fno = geti();
+      bool outside = false;
+      for (int v = 0; v < nv; v++) {
+        VALS_VP *vp = (VALS_VP *)s->vertices[v].vp;
+        if (!s->vertices[v].ripflag && vp && (fno < 0 || fno >= vp->nvals)) outside = true;
+      }
+      if (outside) { out += "G "; continue; }
+      if (op == "MRISsetCurvaturesToValues") MRISsetCurvaturesToValues(s, fno);
+      else if (op == "MRISsetCurvaturesToOrigValues") MRISsetCurvaturesToOrigValues(s, fno);
+      else if (op == "MRISsetOrigValuesToCurvatures") MRISsetOrigValuesToCurvatures(s, fno);
+      else if (op == "MRISsetOrigValuesToValues") MRISsetOrigValuesToValues(s, fno);
+      else if (op == "MRISsetValuesToCurvatures") MRISsetValuesToCurvatures(s, fno);
+      else fail("vlr setter");
+    } else if (op == "MRISdilateVertexToSum") {
+      int vno = geti(), which = geti();
+      double target = getd();
+      MRI *m = MRISdilateVertexToSum(vno, which == 2 ? NULL : s, which == 1 ? measure : NULL, target);
+      mpf_vol(m);
+    }
+    else fail("vlr op");
+    vlr_dump(s);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -6372,6 +6574,8 @@ void run_case()
     mht_case();
   } else if (cmd == "vls") {
     vls_case();
+  } else if (cmd == "vlr") {
+    vlr_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

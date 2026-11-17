@@ -2026,3 +2026,57 @@ program or none on the default paths): `MRISlogOdds` (`MRISdistanceTransform`), 
   starts from `vtotal = v3num` and appends the asked rings again (the source's comment: "IT IS
   PUTTING REPEATS OF THE 1..v->nsize rings ONTO THE END OF THE LIST"); the symmetric averaging uses
   the first place of the vertex in each neighbour's list.
+
+## 37. mrisurf_vals.cpp's one-program rest (relay 41 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_vals.cpp` 1485-1527,
+1547-1785 (but `mrisMarkBadEdgeVertices`, relay 40's), 1790-1855, 2539-2596, 2901-2975, 3274-3306,
+4113-4204 and `utils/mrisurf_topology.cpp` 2665-2690 into `crates-freesurfer/larmorx-freesurfer-surf/src/valrest.rs`.
+With relay 40's `valmarks.rs`, `valfilter.rs`, `sampdist.rs` and relay 38's `valcopy.rs`, every
+function of the file is ported but `MRISlogOdds` (it waits for `MRISdistanceTransform`),
+`MRISgetHistogram` and `MRIScomputeAverageCircularPhaseGradient` (no caller in FreeSurfer 8.2.0; the
+second writes `VECTOR_ELT(vdf, n + 1)` for every 1-hop neighbour while `vdf` holds only the unripped
+ones, past it when one is ripped).
+
+- **`MRISmodeFilterAnnotations`' order** (FS-978, FS-979): the `max_index` loop calls
+  `annotation_to_index`, which reads `$FREESURFER_HOME/Simple_surface_labels2009.txt` when
+  `num_entries <= 0`; only then `if (mris->ct) set_atable_from_ctable(mris->ct)`, which returns at
+  once when `num_entries > 0`. The comment ("reset the annotation table using the surface's own
+  colortable when it's available") says what was meant. `mris_ca_label` calls
+  `set_atable_from_ctable(gcsa->ct)` at line 160 with `mris->ct = gcsa->ct`, so its tables agree
+  (the recorded heads' filter: identical in both modes). The object code (`mrisurf_vals.cpp.o`):
+  `max_index + 1` is `add $1, %r13d; movslq` (32-bit, then sign-extended: an index of `INT_MAX`
+  asks `calloc` for `0xffffffff80000000` entries and fails; `ErrorExit` prints `-2147483648`); each
+  vertex `memset`s both tables (`(max_index + 1) * 4` bytes) and the candidate scan runs `i = 1 ..
+  max_index` only when `max_index` is not 0. With FS-979's tables of one entry (`calloc(1, 4)`: a
+  32-byte chunk), `histo[1..5]` land in the chunk's padding and `histo[6..]` in the next chunk
+  (`annotations`', `histo[8 + j]` aliasing `annotations[j]`); in 2,000 probe cases (63 to 105 of them
+  FS-979's) the official build never crashed and always gave the defined part's result.
+- **`MRISdilateVertexToSum`** (FS-982, FS-983): `nvertices` is declared before the `while` and only
+  incremented. The object code adds a measure value as `cvtss2sd; addsd (%rsp), %xmm0` (the value
+  the first operand) and an area as `addsd %xmm0, %xmm1` (the sum first). The loop test is `comisd`
+  then `jbe`: a NaN sum or target ends it. With no pass run the compiler calls `SetSurfHopList(vno,
+  surf, 0)` and returns the mask at once (the mask loop removed): `SetSurfHopListAlloc` `calloc`s
+  arrays of 0 hops and `vtxlist[0][0]` writes through a zeroed pointer (signal 11, FS-530). The hop
+  lists of the error paths and the final one are leaked. On the recorded heads' white surfaces
+  (119,000 to 122,000 vertices), the running count passes the vertex count at pass 45 or 46 for a
+  disk of 50 mm (the passes' own counts 11,000 to 12,600 at the end): FreeSurfer's `--dilate-vertex`
+  works up to a radius of about 40 mm on a hemisphere.
+- **The `VALS_VP` setters** dereference `v->vp` for every unripped vertex: NULL faults (FS-981); the
+  arrays are `calloc`ed (`orig_vals`) and `malloc`ed (`vals`, not cleared) with `nvals =
+  parms->nfields` in `MRISvectorRegistration`, so `MRISsetValuesToCurvatures` before a store reads
+  uninitialised memory there (the caller's matter; the port's arrays are what the caller gives).
+  The port hangs a `ValsVp` behind a mutex on the vertex's `vp` (`Opaque`), shared by copies as C
+  shares the pointer.
+- **`MRISripUnknown`, `MRISdilateConfined`** keep `annotid` in a stack slot never initialised
+  (`0x4(%rsp)` in `MRISripUnknown`): with `ct == NULL` `CTABfindAnnotation` returns before writing it
+  (FS-984). `MRISdilateConfined`'s inner `continue` after a set neighbour only continues the
+  neighbour loop (setting the voxel again), which changes nothing; its `new_annot` is unwritten when
+  `CTABannotationAtIndex` fails (FS-985), as is `MRISannotation_to_label`'s `annot` (which then
+  `LabelAlloc`s with `mris->ct->entries[annot_index]->name`: a crash for no table or an empty place).
+- **Arithmetic** from the object code: `MRISripZeros` calls `fabs` (`-fno-builtin`) and tests
+  `1e-5 > |v|` with `comisd` (NaN never rips); `MRISdilateRipped` and `MRISerodeRipped` store the flag
+  in `tx` by `cvtsi2ss` and back by `cvttss2si` (exact for a byte); the accumulations compute
+  `(float)t * x` and `(float)d * val` with the count the destination, `addss`, `divss` by `(float)(t +
+  d)`, and `SQR(dof)` by 32-bit `imul` (wrapping past 46,340); `MRISmarkRandomVertices` narrows the
+  draw with `cvtsd2ss` and marks when `p > r` (`comiss`).

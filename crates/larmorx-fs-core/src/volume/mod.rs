@@ -15,6 +15,7 @@ pub mod geomblock;
 pub mod geometry;
 pub mod moves;
 pub mod sample;
+pub mod skull;
 pub mod stats;
 pub mod vgcopy;
 

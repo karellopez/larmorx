@@ -647,6 +647,36 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             let r = p.mri_rotate_axis(&mut a, dst(&mut d), angle, which)?;
             putres(l, r, &a, None, &d);
         }
+        "skull" => {
+            let mut a = getw(p, l)?;
+            let t = l.geti();
+            let n = l.geti();
+            for _ in 0..n {
+                let c0 = [l.geti(), l.geti(), l.geti()];
+                let c1 = [l.geti(), l.geti(), l.geti()];
+                let v = l.getf();
+                for z in c0[2]..=c1[2] {
+                    for y in c0[1]..=c1[1] {
+                        for x in c0[0]..=c1[0] {
+                            p.mri_set_vox_val(&mut a, x, y, z, 0, v, 0)?;
+                        }
+                    }
+                }
+            }
+            let mut b = Region {
+                x: -7,
+                y: -7,
+                z: -7,
+                dx: -7,
+                dy: -7,
+                dz: -7,
+            };
+            let r = p.mri_find_approximate_skull_bounding_box(&a, t, &mut b)?;
+            l.puti(i64::from(r));
+            for v in [b.x, b.y, b.z, b.dx, b.dy, b.dz] {
+                l.puti(i64::from(v));
+            }
+        }
         _ => args::bad("unknown command"),
     }
     Ok(())

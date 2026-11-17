@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import random
 import re
 import struct
@@ -590,6 +591,294 @@ class Gen:
         return [Batch("vrules", "vrules", L)]
 
 
+class Gen4(Gen):
+    """The groups of part 4 (§18 to §21)."""
+
+    #: coordinates of the samplers: inside, at and past the edges, whole and within FLT_EPSILON of
+    #: whole, NaN, infinities, beyond the int range
+    @staticmethod
+    def coord(r: random.Random, ext: int) -> str:
+        k = r.random()
+        if k < 0.35:
+            return f64(r.uniform(-1.5, ext + 0.5))
+        if k < 0.55:
+            return f64(float(r.randint(-1, ext)))
+        if k < 0.7:
+            w = float(r.randint(0, ext - 1))
+            e = r.choice(
+                [1e-8, -1e-8, 1.1920928955078125e-07, -1.1920928955078125e-07, 1.19e-07, 2e-7]
+            )
+            return f64(w + e)
+        if k < 0.8:
+            return f64(r.choice([ext - 1.0, ext - 0.5, ext - 0.5000001, -0.5, -0.4999999, 0.5]))
+        if k < 0.9:
+            return f"{r.choice(DSPECIAL):016x}"
+        return f64(r.choice([1e10, -1e10, 2147483647.6, -2147483648.0, -2147483649.5, 1e300]))
+
+    def vsample(self) -> list[Batch]:
+        """§18: the samplers at points, frames and half-widths; the cubic weights, the sinc kernel."""
+        r = self.rng("vsample")
+        L = []
+        outs = [f64(x) for x in (0.0, -5.5, 1e300)] + [f"{DSPECIAL[4]:016x}"]
+        kinds = ["tri", "typ", "frm", "fty", "cub", "cubf", "sinc", "sincf"]
+        for i in range(480):
+            k = kinds[i % 8]
+            types = [*NUMERIC, 6, 7, 9] if r.random() < 0.15 else NUMERIC
+            s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 3), hdr=0.02)
+            a = self.wvol(r, shape=s, special=0.15, ct=0.0)
+            ext = min(int(x) for x in s.split()[:3])
+            nf = int(s.split()[4])
+            pts = []
+            for _ in range(r.randint(1, 3)):
+                xyz = [self.coord(r, max(ext, 1)) for _ in range(3)]
+                if k in ("typ", "fty"):
+                    aux = r.choice([0, 1, 1, 2, 3, 5, -1, 7])
+                elif k in ("sinc", "sincf"):
+                    aux = r.choice([0, 1, 2, 3, 4, 5, 6, 5, 70, -1])
+                else:
+                    aux = 0
+                pts.append(f"{' '.join(xyz)} {r.randint(0, nf + 1)} {aux}")
+            L.append(f"samp {k} {a} {r.choice(outs)} {len(pts)} {' '.join(pts)}")
+        xs = [f64(x) for x in (0.0, 1.0, 0.5, 0.25, 1e-9, -0.5, 1.5, 2.0)] + [
+            f"{v:016x}" for v in DSPECIAL[2:6]
+        ]
+        for _ in range(30):
+            n = r.randint(1, 6)
+            L.append(
+                f"coef {n} "
+                + " ".join(
+                    f"{r.choice(xs) if r.random() < 0.5 else f64(r.random())} {r.randint(-1, 4)}"
+                    for _ in range(n)
+                )
+            )
+            fws = [f64(x) for x in (10.0, 2.0, 1.0, 0.0, 140.0, -10.0)] + [f"{DSPECIAL[4]:016x}"]
+            L.append(
+                f"hsinc {n} "
+                + " ".join(
+                    f"{r.choice(xs) if r.random() < 0.4 else f64(r.uniform(-6, 6))} {r.choice(fws)}"
+                    for _ in range(n)
+                )
+            )
+        return [Batch("vsample", "vsample", L)]
+
+    def vmove(self) -> list[Batch]:
+        """§19: translations and rotations of a volume."""
+        r = self.rng("vmove")
+        L = []
+        sh = [f64(x) for x in (0.0, 1.0, -1.0, 0.5, 2.0, -0.25)] + [
+            f"{v:016x}" for v in DSPECIAL[2:6]
+        ]
+        for _ in range(100):
+            s = self.vshape(r, types=[*NUMERIC, 9, 6], ext=(1, 4), frames=(1, 2), hdr=0.02)
+            a = self.wvol(r, shape=s, special=0.1, ct=0.05)
+            d = lambda: r.choice(sh) if r.random() < 0.6 else f64(r.uniform(-3, 3))  # noqa: E731
+            L.append(f"trans {a} {self.dst(r, s)} {d()} {d()} {d()}")
+            k = r.random()
+            if k < 0.5:
+                t = r.uniform(-math.pi, math.pi)
+                c, sn = math.cos(t), math.sin(t)
+                rows = [[1, 0, 0], [0, c, -sn], [0, sn, c]]
+                r.shuffle(rows)
+                m = "3 3 " + " ".join(f32(v) for row in rows for v in row)
+            elif k < 0.8:
+                m = self.mat(r, 3, 3, special=0.1)
+            elif k < 0.9:
+                m = "3 3 " + " ".join(f32(v) for v in (1, 2, 3, 2, 4, 6, 0, 0, 1))  # singular
+            else:
+                m = self.mat(r, r.choice([2, 4]), r.choice([2, 3, 4]))
+            o = "null" if r.random() < 0.5 else self.mat(r, 3, 1, special=0.1)
+            L.append(f"rot {a} {self.dst(r, s)} {m} {o}")
+            ang = r.choice([f32(0.0), f32(1.5707963705062866), f32(0.3), "7fc00000", "7f800000"])
+            ang = ang if r.random() < 0.5 else f32(r.uniform(-4, 4))
+            L.append(f"{r.choice(['rotx', 'roty', 'rotz'])} {a} {self.dst(r, s)} {ang}")
+        return [Batch("vmove", "vmove", L)]
+
+    def vskull(self) -> list[Batch]:
+        """§20: the head's box of volumes with painted boxes."""
+        r = self.rng("vskull")
+        L = []
+        for i in range(160):
+            n = r.choice([6, 12, 20, 32, 48, 48, 64]) if i % 8 else r.randint(4, 11)
+            dims = [n if r.random() < 0.7 else r.randint(4, 64) for _ in range(3)]
+            t = r.choice([0, 0, 3, 4])
+            fill = r.choice([-1, -1, r.randint(0, 255)])
+            a = fixed_w(dims[0], dims[1], dims[2], t, fill=fill)
+            boxes = []
+            if i % 3 and min(dims) >= 20:  # a bright head with dark margins of 6 to 15 voxels
+                m = [r.randint(6, min(15, x // 2 - 2)) for x in dims]
+                hi = [x - 1 - r.randint(6, min(15, x // 2 - 2)) for x in dims]
+                boxes.append(
+                    f"{' '.join(map(str, m))} {' '.join(map(str, hi))} {f32(r.choice([120.0, 200.0]))}"
+                )
+                if r.random() < 0.5:  # a dark inside (ventricles, a gap)
+                    c = [(a + b) // 2 for a, b in zip(m, hi, strict=True)]
+                    w = [r.randint(1, 12) for _ in range(3)]
+                    lo2 = [max(0, c[j] - w[j]) for j in range(3)]
+                    hi2 = [min(dims[j] - 1, c[j] + w[j]) for j in range(3)]
+                    boxes.append(f"{' '.join(map(str, lo2))} {' '.join(map(str, hi2))} {f32(0.0)}")
+            for _ in range(r.randint(0, 3) if not boxes else r.randint(0, 1)):
+                lo = [r.randint(0, x - 1) for x in dims]
+                hi = [min(x - 1, lo[j] + r.randint(0, x)) for j, x in enumerate(dims)]
+                v = r.choice([0.0, 30.0, 120.0, 200.0, 255.0, -10.0, 1e6, float("nan")])
+                boxes.append(f"{' '.join(map(str, lo))} {' '.join(map(str, hi))} {f32(v)}")
+            th = r.choice([-5, 0, 1, 50, 50, 100, 100, 100, 150, 255, 300])
+            L.append(f"skull {a} {th} {len(boxes)} {' '.join(boxes)}".rstrip())
+        return [Batch("vskull", "vskull", L)]
+
+
+class Gen4b(Gen4):
+    """§21: the transform reader."""
+
+    def vgtext(self, r: random.Random) -> str:
+        """A volume-geometry block (§2's form), sometimes damaged."""
+        f = lambda: f"{r.uniform(-2, 2):.6f}"  # noqa: E731
+        lines = [
+            f"valid = {r.choice([1, 1, 0])}  # volume info valid",
+            f"filename = {r.choice(['orig.mgz', '/x/y.nii.gz', ''])}",
+            f"volume = {r.randint(1, 256)} {r.randint(1, 256)} {r.randint(1, 256)}",
+            f"voxelsize = {r.choice(['1.000000000000000e+00', '9.375e-01', '2'])} 1 1",
+            f"xras   = {f()} {f()} {f()}",
+            f"yras   = {f()} {f()} {f()}",
+            f"zras   = {f()} {f()} {f()}",
+            f"cras   = {f()} {f()} {f()}",
+        ]
+        if r.random() < 0.15:
+            del lines[r.randrange(len(lines))]
+        return "".join(ln + "\n" for ln in lines)
+
+    def ltatext(self, r: random.Random) -> str:
+        n = r.choice([1, 1, 1, 2, 0, -1, 3])
+        t = r.choice([0, 1, 1, 21, 14, 2])
+        head = ["# transform file x.lta", "# created by someone", ""] if r.random() < 0.6 else []
+        sp = r.choice(["      ", " ", "\t"])
+        body = [f"type{sp}= {t}{r.choice(['', ' # LINEAR_RAS_TO_RAS'])}", f"nxforms{sp}= {n}"]
+        if r.random() < 0.08:
+            body[0] = r.choice(["typ = 1", "type 1", ""])
+        if r.random() < 0.08:
+            body[1] = r.choice(["nxform = 1", "nxforms = x", "# nothing"])
+        for _ in range(max(n, 0)):
+            body.append(
+                f"mean      = {r.uniform(-5, 5):.4f} {r.uniform(-5, 5):.4f} {r.uniform(-5, 5):.4f}"
+            )
+            body.append(f"sigma     = {r.choice(['10000.0000', '1', '1e3', 'nan'])}")
+            rows, cols = (4, 4) if r.random() < 0.9 else (r.choice([3, 4]), r.choice([3, 4, 5]))
+            body.append(f"1 {rows} {cols}")
+            for _ in range(rows):
+                body.append(" ".join(f"{r.uniform(-2, 2):.15e}" for _ in range(cols)))
+        text = "".join(ln + "\n" for ln in head + body)
+        for _ in range(max(n, 0)):
+            if r.random() < 0.7:
+                text += "src volume info\n" + self.vgtext(r)
+                if r.random() < 0.85:
+                    text += "dst volume info\n" + self.vgtext(r)
+        if r.random() < 0.5:
+            text += f"subject {r.choice(['bert', 'fsaverage', 'a' * 40])}\n"
+        if r.random() < 0.5:
+            text += f"fscale {r.choice(['0.1', '1e-3', 'x', '-2'])}\n"
+        if r.random() < 0.1:
+            text = text[: r.randrange(len(text) + 1)]
+        return text
+
+    def xfmtext(self, r: random.Random) -> str:
+        rows = [" ".join(f"{r.uniform(-2, 2):.6f}" for _ in range(4)) for _ in range(3)]
+        rows[2] += ";"
+        info = r.choice(
+            [
+                "%Generated by mritotal src s.mnc dst average_305.mnc",
+                "%Generated by x minctracc in.mnc out.mnc -lsq9",
+                "%Generated by x minctracc only.mnc -lsq9",
+                "%Generated by some tool",
+                "%src.mnc dst.mnc",
+                "%Generated by mritotal src a.mnc dst b",
+            ]
+        )
+        info2 = r.choice(["%a.mnc src2.mnc", "%Generated again", ""])
+        lines = [r.choice(["MNI Transform File", "MNI Transform File extra", "Not MNI"])]
+        k = r.random()
+        if k < 0.6:
+            lines += [info] + ([info2] if info2 else []) + [""]
+        elif k < 0.8:
+            lines += [info, "%third", "%fourth", "skipped"]
+        lines += ["Transform_Type = Linear;", "Linear_Transform =", *rows]
+        if r.random() < 0.08:
+            lines = lines[: r.randint(1, len(lines) - 1)]
+        return "".join(ln + "\n" for ln in lines)
+
+    def vltaread(self) -> list[Batch]:
+        """§21: names classified, and transform files read in their forms."""
+        r = self.rng("vltaread")
+        L = []
+        names = ["a.lta", "b.LTA", "c.xfm", "d.XfM", "e.m3z", "f.M3D", "g.mgz", "h.nii", "i.nii.gz"]
+        names += [
+            "nii.gz",
+            "j.NII.GZ",
+            "x.fslmat",
+            "y.dat",
+            "z.reg",
+            "noext",
+            "dir.d/file",
+            "a@lta",
+        ]
+        names += [
+            "a.xfm@lta",
+            "a.lta#x",
+            "a#b.xfm",
+            "a.b#c.d",
+            "@",
+            "",
+            ".",
+            "a.",
+            "a.oct",
+            "x@y#z",
+        ]
+        names += [
+            "a.lta@xfm#y",
+            "p/q.xfm",
+            "a.nii.gzz",
+            "M3Z",
+            "a.mgh",
+            "a.LtA#.xfm",
+            "a.lta.",
+            "#",
+        ]
+        for _ in range(40):
+            pick = r.sample(names, r.randint(1, 5))
+            L.append(f"tftype {len(pick)} " + " ".join(xs(n) for n in pick))
+        for n in (499, 500, 600):
+            L.append(f"tftype 1 {xs('a' * (n - 4) + '.lta')}")
+        for i in range(260):
+            avg = r.choice([0, 0, 1, 2])
+            k = i % 13
+            if k < 6:
+                name, text = r.choice(["t.lta", "t.LTA", "t"]), self.ltatext(r)
+            elif k < 9:
+                name, text = r.choice(["t.xfm", "t.XFM"]), self.xfmtext(r)
+            elif k == 9:
+                rows = [" ".join(f"{r.uniform(-2, 2):.6f}" for _ in range(4)) for _ in range(4)]
+                if r.random() < 0.2:
+                    rows = rows[: r.randint(0, 3)]
+                name, text = "t.fslmat", "".join(x + "\n" for x in rows)
+            elif k == 10:
+                rows = [" ".join(f"{r.uniform(-2, 2):.6f}" for _ in range(4)) for _ in range(4)]
+                text = f"bert\n{r.choice(['1', '0.9375'])}\n{r.choice(['1', '1.5'])}\n0.15\n"
+                text += "".join(x + "\n" for x in rows) + r.choice(
+                    ["", "round\n", "tkreg\n", "bad\n"]
+                )
+                name = r.choice(["t.dat", "t.reg", "t.txt"])
+            elif k == 11:
+                L.append(
+                    f"ltaread {xs(r.choice(['identity.nofile', 'd/identity.nofile']))} nofile {avg}"
+                )
+                continue
+            else:
+                L.append(
+                    f"ltaread {xs(r.choice(['none.lta', 'none.xfm', 'none.fslmat', 'none.dat']))} nofile {avg}"
+                )
+                continue
+            L.append(f"ltaread {xs(name)} {xs(text)} {avg}")
+        return [Batch("vltaread", "vltaread", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -602,6 +891,10 @@ GROUPS = [
     "vstats",
     "vheader",
     "vrules",
+    "vsample",
+    "vmove",
+    "vskull",
+    "vltaread",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -707,6 +1000,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
+    gen = gen if isinstance(gen, Gen4b) else Gen4b(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

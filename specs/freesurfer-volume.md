@@ -679,14 +679,20 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
      does not start as 'MNI Transform File'` (`ERROR_NOFILE`) and `NULL` (an empty file included).
   2. Line 2: a buffer starting with `%` is the first information line, `I1`. Otherwise there is no
      volume information (step 5 is skipped), and a buffer starting with the 14 bytes `Transform_Type`
-     has one more line read, then the matrix (step 4).
-  3. Line 3 (unless step 2 went to the matrix): a buffer starting with `%` is the second information
-     line, `I2`; then lines are read as long as the buffer starts with `%` (the end of the file with
-     the buffer still starting with `%`, the file's last piece a `%` line: FS-307; a `#` line or a
-     blank line read at the end changes the buffer and ends this loop), so the first line that does
-     not start with `%` is passed over; then one more line is read, and when its buffer starts with
-     `Transform_Type` one more. A line 3 that does not start with `%`: when it starts with
-     `Transform_Type`, one more line is read.
+     has one more line read, then the matrix (step 4); a line 2 that starts with neither goes on to
+     step 3 like a `%` line 2.
+  3. Line 3 is read whenever step 2 did not go to the matrix: after a `%` line 2 and after a line 2
+     that starts with neither `%` nor `Transform_Type` (so such a line 2 is followed by at least one
+     more line passed over before the rows: a file of `MNI Transform File`, `Linear_Transform =` and
+     three rows gives `could not read row 3 ... (0 0 1 7)`, its first row taken as line 3,
+     **(observed)**). A buffer starting with `%` is then the second information line, `I2` (unused
+     after a line 2 that was not one); then lines are read as long as the buffer starts with `%` (the
+     end of the file with the buffer still starting with `%`, the file's last piece a `%` line:
+     FS-307; a `#` line or a blank line read at the end changes the buffer and ends this loop), so the
+     first line that does not start with `%` is passed over; then one more line is read, and when its
+     buffer starts with `Transform_Type` one more. A line 3 that does not start with `%`: when it
+     starts with `Transform_Type`, one more line is read. Every line read in steps 2 and 3 is passed
+     over: the rows come from the lines after the last of them (**(observed)**: §22's `vrules5`).
   4. The matrix: three rows, r = 1 to 3, each from the next line, its returned text (without its
      leading white space) scanned with `%f %f %f %f` into row r of the transform's matrix, the numbers
      not matched keeping their values (the identity's). No line for row r: `ltMNIreadEx: could not

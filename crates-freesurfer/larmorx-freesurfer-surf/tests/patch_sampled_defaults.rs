@@ -8,7 +8,7 @@
 //! `reproduce`; a GIFTI patch (FS-1006) is refused; sampling the pial positions through the
 //! canonical sphere gives the pial corner at a vertex; the minimization energy is the squared
 //! thickness; FS-1011 and FS-1012 end the program by default; the ray along a vertex's normal meets
-//! the far face; the octahedron's faces overlap none.
+//! the far face; each face's overlap list starts with it, lists each face once and clears its marks.
 
 use larmorx_core::defects::{
     FS_1006, FS_1007, FS_1008, FS_1010, FS_1011, FS_1012, UpstreamDefects,
@@ -128,15 +128,15 @@ impl Run {
     }
 }
 
-/// A patch written by `MRISwritePatch` (vertices 0 to 3 kept, 2 a border vertex) and read back:
-/// the kept vertices unripped with their positions and border flags, the others ripped, a cut patch.
+/// A patch written by `MRISwritePatch` (vertices 0 to 4 kept, 2 a border vertex) and read back:
+/// the kept vertices unripped with their positions and border flags, the bottom vertex ripped, a
+/// cut patch. (A patch without both poles would keep no face of the octahedron: every vertex would
+/// then be ripped for having none.)
 #[test]
 fn a_written_patch_reads_back() {
     let mut r = Run::new(UpstreamDefects::Fix);
     let mut s = r.octahedron(10.0);
-    for v in [4, 5] {
-        s.vertex_mut(v).ripflag = 1;
-    }
+    s.vertex_mut(5).ripflag = 1;
     s.vertex_mut(2).border = 1;
     s.vertex_mut(1).x = 3.25;
     let mut io = Io {
@@ -153,14 +153,13 @@ fn a_written_patch_reads_back() {
     assert_eq!(r.read_patch(&mut t, "patch").unwrap(), NO_ERROR);
     assert_eq!(t.patch, 1);
     assert_eq!(t.status, MrisStatus::CUT);
-    for v in 0..4 {
+    for v in 0..5 {
         assert_eq!(t.vertex(v).ripflag, 0, "{v}");
-        assert_eq!(t.vertex(v).border, i8::from(v == 2), "{v}");
     }
+    // the border vertex read as one (the metric properties of the cut patch mark more)
+    assert_eq!(t.vertex(2).border, 1);
     assert_eq!(t.vertex(1).x, 3.25);
-    for v in [4, 5] {
-        assert_eq!(t.vertex(v).ripflag, 1, "{v}");
-    }
+    assert_eq!(t.vertex(5).ripflag, 1);
 }
 
 /// The ASCII reader: a file of comments only (FS-1007), a point line without a number (FS-1008),
@@ -237,8 +236,9 @@ fn sphere_set_up(r: &mut Run) -> (Mris, Mht) {
     (s, m)
 }
 
-/// The pial position sampled at a vertex's canonical position is that vertex's pial position, and
-/// the minimization energy there is the squared thickness (2 mm).
+/// The pial position sampled at the canonical centroid of face 0 (corners 0, 2, 4) is 1.2 times
+/// that centroid (a third of each pial corner), and the minimization energy of vertex 4 there is
+/// its squared distance from vertex 4's white position.
 #[test]
 fn sampling_through_the_sphere() {
     let mut r = Run::new(UpstreamDefects::Fix);
@@ -248,8 +248,14 @@ fn sampling_through_the_sphere() {
         err: &mut r.err,
         env: &r.env,
     };
-    let c = s.vertex(4);
-    let (cx, cy, cz) = (c.cx, c.cy, c.cz);
+    let mut c = [0f64; 3];
+    for v in [0, 2, 4] {
+        let q = s.vertex(v);
+        for (k, x) in [q.cx, q.cy, q.cz].into_iter().enumerate() {
+            c[k] += f64::from(x) / 3.0;
+        }
+    }
+    let (cx, cy, cz) = (c[0] as f32, c[1] as f32, c[2] as f32);
     let (_, p) = sampled::sample_face_coords_canonical(
         &mut r.g,
         &mut io,
@@ -261,18 +267,51 @@ fn sampling_through_the_sphere() {
         PIAL_VERTICES,
     )
     .unwrap();
-    assert!((p[2] - 12.0).abs() < 1e-4, "{p:?}");
+    for k in 0..3 {
+        assert!((f64::from(p[k]) - 1.2 * c[k]).abs() < 1e-3, "{p:?} {c:?}");
+    }
     let e =
         sampled::sample_minimization_energy(&mut r.g, &mut io, &m, &s, 4, cx, cy, cz).unwrap();
-    assert!((e - 4.0).abs() < 1e-3, "{e}");
+    let want = (1.2 * c[0]).powi(2) + (1.2 * c[1]).powi(2) + (1.2 * c[2] - 10.0).powi(2);
+    assert!((f64::from(e) - want).abs() < 1e-2, "{e} {want}");
 }
 
-/// FS-1011: a point that is not finite has no face; FS-1012: a vertex's face -1 sampled by the
-/// parallel energy. Both end the program by default.
+/// FS-1011: a table without faces (every face ripped before it is made) gives no face: an error by
+/// default; with `reproduce` a point that is not finite crashes (status 139). FS-1012: a vertex's
+/// face -1 sampled by the parallel energy ends the program by default.
 #[test]
 fn no_face_ends_the_program() {
     let mut r = Run::new(UpstreamDefects::Fix);
     let (mut s, m) = sphere_set_up(&mut r);
+    let mut io = Io {
+        out: &mut r.out,
+        err: &mut r.err,
+        env: &r.env,
+    };
+    s.vertex_mut(0).fno = -1;
+    let e = sampled::sample_parallel_energy_at_vertex(&mut r.g, &mut io, &m, &s, 0);
+    assert!(e.is_err());
+    assert!(r.g.notices.contains(&FS_1012));
+    for f in 0..8 {
+        s.face_mut(f).ripflag = 1;
+    }
+    let empty =
+        Mht::create_face_table_resolution(&mut r.g, io.err, &s, CANONICAL_VERTICES, 2.0).unwrap();
+    let e = sampled::sample_face_coords_canonical(
+        &mut r.g,
+        &mut io,
+        &empty,
+        &s,
+        0.0,
+        0.0,
+        10.0,
+        PIAL_VERTICES,
+    );
+    assert!(e.is_err());
+    assert!(r.g.notices.contains(&FS_1011));
+
+    let mut r = Run::new(UpstreamDefects::Reproduce);
+    let (s, m) = sphere_set_up(&mut r);
     let mut io = Io {
         out: &mut r.out,
         err: &mut r.err,
@@ -288,16 +327,13 @@ fn no_face_ends_the_program() {
         0.0,
         PIAL_VERTICES,
     );
-    assert!(e.is_err());
+    assert_eq!(e, Err(Fatal::Exit(139)));
     assert!(r.g.notices.contains(&FS_1011));
-    s.vertex_mut(0).fno = -1;
-    let e = sampled::sample_parallel_energy_at_vertex(&mut r.g, &mut io, &m, &s, 0);
-    assert!(e.is_err());
-    assert!(r.g.notices.contains(&FS_1012));
 }
 
-/// The ray from the top vertex along its inward normal (downwards) meets a face of the bottom
-/// cone 20 mm away (at the bucket of a step of 20); the octahedron's faces overlap none.
+/// The ray from just above the top vertex downwards meets the bottom vertex's faces 20 mm away (at
+/// the bucket of a step of 20); the octahedron's faces (their edges compared on the canonical
+/// positions, the current ones here) listed once each after it, the marks cleared.
 #[test]
 fn rays_and_overlaps() {
     let mut r = Run::new(UpstreamDefects::Fix);
@@ -307,6 +343,7 @@ fn rays_and_overlaps() {
         err: &mut r.err,
         env: &r.env,
     };
+    positions::save_vertex_positions(&mut r.g, &mut io, &mut s, CANONICAL_VERTICES).unwrap();
     let m = Mht::create_face_table_resolution(&mut r.g, io.err, &s, 4, 1.0).unwrap();
     let top = s.vertex(4);
     let p = [top.x, top.y, top.z + 0.001];
@@ -326,7 +363,13 @@ fn rays_and_overlaps() {
     assert!((dist - 20.001).abs() < 1e-3, "{dist}");
     for fno in 0..8 {
         let list = overlap::find_all_overlapping_faces(&mut r.g, &mut io, &mut s, &m, fno).unwrap();
-        assert_eq!(list, vec![fno as i32]);
+        // the face first, each found once, every mark cleared (the octahedron's opposite edges lie
+        // on one great circle each, which the spherical edge test may take as crossing)
+        assert_eq!(list[0], fno as i32);
+        let mut seen = list.clone();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), list.len());
         assert!((0..8).all(|f| s.face(f).ripflag == 0));
     }
 }

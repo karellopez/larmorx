@@ -6,6 +6,8 @@
 //! vertices relaxed to the mean of their neighbours with the fixed ones unmoved, the marks restored,
 //! the original and target bubbles' early end.
 
+#![allow(clippy::needless_range_loop)]
+
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::run::Environment;
@@ -109,7 +111,6 @@ fn grid(w: i32, h: i32) -> (Vec<[f32; 3]>, Vec<[i32; 3]>) {
     (v, f)
 }
 
-
 /// A 5 by 5 grid whose interior (9 vertices) is free and lifted by 1, its border fixed (mark 1).
 fn lifted(r: &mut Run) -> Mris {
     let (v, f) = grid(5, 5);
@@ -131,9 +132,14 @@ fn the_free_vertices_relax_and_the_fixed_stay() {
     for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
         let mut r = Run::new(mode);
         let mut s = lifted(&mut r);
-        let before: Vec<(f32, f32, f32)> = (0..25).map(|v| (s.vertex(v).x, s.vertex(v).y, s.vertex(v).z)).collect();
+        let before: Vec<(f32, f32, f32)> = (0..25)
+            .map(|v| (s.vertex(v).x, s.vertex(v).y, s.vertex(v).z))
+            .collect();
         let mut io = io!(r);
-        assert_eq!(soap::soap_bubble_vertex_positions(&mut r.g, &mut io, &mut s, 500), 0);
+        assert_eq!(
+            soap::soap_bubble_vertex_positions(&mut r.g, &mut io, &mut s, 500),
+            0
+        );
         for vno in 0..25 {
             let x = s.vertex(vno);
             let (i, j) = (vno % 5, vno / 5);
@@ -144,19 +150,30 @@ fn the_free_vertices_relax_and_the_fixed_stay() {
             }
             // the marks restored; every free vertex the mean of itself and its neighbours
             assert_eq!(x.marked, 0);
-            let ring = s.topology(vno).v.as_ref().unwrap()[..s.topology(vno).vnum as usize].to_vec();
+            let ring =
+                s.topology(vno).v.as_ref().unwrap()[..s.topology(vno).vnum as usize].to_vec();
             let n = ring.len() as f32 + 1.0;
             let mz = (x.z + ring.iter().map(|&w| s.vertex(w as usize).z).sum::<f32>()) / n;
-            assert!((x.z - mz).abs() < 1e-4, "vertex {vno}: {} against {mz}", x.z);
+            assert!(
+                (x.z - mz).abs() < 1e-4,
+                "vertex {vno}: {} against {mz}",
+                x.z
+            );
         }
         // the weighted bubble: a ripped neighbour weighs 20
         let mut s = lifted(&mut r);
         s.vertex_mut(0).ripflag = 1;
         let mut io = io!(r);
-        assert_eq!(soap::weighted_soap_bubble_vertex_positions(&mut r.g, &mut io, &mut s, 1), Ok(0));
+        assert_eq!(
+            soap::weighted_soap_bubble_vertex_positions(&mut r.g, &mut io, &mut s, 1),
+            Ok(0)
+        );
         let (a, b) = (s.vertex(6), s.vertex(12));
         assert_eq!(a.marked, 2);
-        assert!(a.z < b.z, "the vertex next to the ripped one is pulled down more");
+        assert!(
+            a.z < b.z,
+            "the vertex next to the ripped one is pulled down more"
+        );
     }
 }
 
@@ -204,7 +221,11 @@ fn the_original_and_target_bubbles_end_after_six_idle_passes() {
         if (1..4).contains(&i) && (1..4).contains(&j) {
             // a free vertex: unmarked again, its target the mean of the border's
             assert_eq!(x.marked, 0);
-            assert!(x.targz.is_finite() && x.targz < 3.5 && x.targz > 2.5, "{vno}: {}", x.targz);
+            assert!(
+                x.targz.is_finite() && x.targz < 3.5 && x.targz > 2.5,
+                "{vno}: {}",
+                x.targz
+            );
         } else {
             assert_eq!((x.marked, x.targz), (1, x.z + 3.0));
         }

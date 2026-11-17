@@ -60,10 +60,7 @@ pub(super) fn sbl_tokens(t: &mut Vec<String>, g: &mut Gen) {
             fv(t, offset(g, heavy));
         }
     }
-    ix(
-        t,
-        g.pick(&[0, 0, 0, 0x40, 0x1000_0040, 0x1000_0000]),
-    );
+    ix(t, g.pick(&[0, 0, 0, 0x40, 0x1000_0040, 0x1000_0000]));
     ix(
         t,
         if nv > 0 && g.chance(6) {
@@ -99,7 +96,8 @@ fn dump(s: &Mris, o: &mut Out) {
     for vno in 0..s.nvertices.max(0) as usize {
         let x = s.vertex(vno);
         for f in [
-            x.x, x.y, x.z, x.origx, x.origy, x.origz, x.targx, x.targy, x.targz, x.tdx, x.tdy, x.tdz,
+            x.x, x.y, x.z, x.origx, x.origy, x.origz, x.targx, x.targy, x.targz, x.tdx, x.tdy,
+            x.tdz,
         ] {
             o.f(f);
         }

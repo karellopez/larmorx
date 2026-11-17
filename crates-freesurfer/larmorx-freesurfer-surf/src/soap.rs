@@ -18,7 +18,6 @@
 //!   `Gdiag_no` beyond the surface's vertices reads outside them (its report printed from memory
 //!   there, or a crash). Both modes skip the report, noted.
 
-
 use larmorx_core::defects::FS_996;
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag;

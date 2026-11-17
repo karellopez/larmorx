@@ -102,3 +102,19 @@ and FS-927 are larmorx's own (`docs/findings/freesurfer-io.md` Part 36, `specs/f
 Relay 41 also: `GCAMrasToVox` with a volume takes `extract_r_to_i` of its geometry (`MRIgetRasToVoxelXform` is that
 macro), not the cached matrix; `GCAMsampleMorph`'s products and sums follow `gcamorph.cpp.o`'s operand orders (the
 NaN a sum of two keeps); `TransformCreateDensityMap` of a transform that could not be applied is FS-928.
+
+## Relay 43 of track A: a morph's resamplings, compositions and inverse
+
+| FreeSurfer 8.2.0 | Functions | Module |
+|---|---|---|
+| `utils/gcamorph.cpp` 3900-3955, 4313-4484, 5336-5367, 9900-9934 | `GCAMmorphFromAtlas` (its inverse path: no morph read from a file has an atlas), `GCAMmorphToAtlas`, `GCAMmorphToAtlasWithDensityCorrection`, `GCAMsampleInverseMorph`, `gcamCreateJacobianImage` (FS-930, FS-931, FS-932) | `morph.rs` |
+| `utils/gcamorph.cpp` 7647-7659, 16269-16522 | `GCAMfreeInverse`, `GCAMconcat2` (into the second morph, `TransformConcat`'s call), `GCAMconcat3`, `GCAMfillInverse` (FS-934, FS-935, FS-936, FS-17) | `concat.rs` |
+| `utils/transform.cpp` 2660-2734, 4122-4135, 5026-5090 | the morph branches of `TransformApplyType`, `TransformApply`, `TransformApplyInverse`, `TransformApplyInverseType`, `TransformCreateDensityMap`; `TransformConcat`, `TransformInvertReplace` | `transform.rs` |
+| `utils/gcamorph.cpp` 5274-5320 | `GCAMsampleMorph`'s NaN point outside the nodes (FS-933: both modes end the program) | `transform.rs` |
+
+Relay 43 also: `GCAMmorphToAtlas`' OpenMP loop runs as one thread does (the voxels are independent; the messages and
+FS-930's chain in one thread's order); `val` across the loop as the object code keeps it (one stack slot,
+`docs/findings/freesurfer-io.md` Part 39); `GCAMcopy` assigns the geometries as `VOL_GEOM::operator=` (the name by
+`strcpy`); `gcamComputeMetricProperties`' differences and sums and the node volumes' triple product in the object
+code's operand orders (fs.core's `triple_product`). FS-932's default (the first slice sampled) is larmorx's own
+(rule A).

@@ -11,15 +11,29 @@ this file is open to everyone. The comparisons and the tools are in
 
 ## The comparison
 
-- **What:** all 24 groups of the spec's §23.2 as amended on 2026-11-16 (28,507 calls, seed 7; the
-  fixed batches `mmake-sizes`, `mmake-sizes-old`, `affine-nan`, `eigen-nonfinite`, `svd-nonfinite`,
-  `svd-failed`, `mfiles-cut` and `mfiles-end` included), on the probe (plainly, again, and in two
-  guard runs) and on the clean room's candidate, in both modes, with no allowance for NaNs' bits.
-  `reproduce`: 27,025 identical, 1,121 where FreeSurfer did not finish, 361 memory lines, none other.
-  `fix`: 22,904 identical, 1,121 not finished, 502 memory, 3,980 corrected by a noted defect, none
-  other.
-- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-16, relay 7; relay 6's
+- **What:** all 24 groups of the spec's §23.2 as amended on 2026-11-17 (28,708 calls, seed 7; the
+  fixed batches `mmake-sizes`, `mmake-sizes-old`, `affine-nan`, `melements-nan`, `mvectors-nan`,
+  `eigen-nonfinite`, `svd-nonfinite`, `svd-failed`, `mfiles-cut` and `mfiles-end` included), on the
+  probe (plainly, again, and in two guard runs) and on the clean room's candidate, in both modes,
+  with no allowance for NaNs' bits. `reproduce`: 27,226 identical, 1,121 where FreeSurfer did not
+  finish, 361 memory lines, none other. `fix`: 23,105 identical, 1,121 not finished, 502 memory,
+  3,980 corrected by a noted defect, none other.
+- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-17, relay 9; relay 6's
   run, 2026-11-13: 10 lines of `svd` differed in NaNs' bits, below).
+
+## `MatrixAdd`'s and the cross products' NaN order (§8.2, §8.5, amended)
+
+- **What:** the spec writer's batches `melements-nan` (180 calls) and `mvectors-nan` (21) state
+  which NaN a sum, a difference and the cross and triple products keep. Where both elements are
+  NaNs, `MatrixAdd` keeps the first operand's NaN for rows of 4 or more columns into a new or another
+  given matrix, and the second operand's for shorter rows or when the output is one of the
+  operands; `MatrixSubtract` keeps the first's. The cross product's terms take their factors as
+  written (`z1 x2 - z2 x1` in the second element), and the triple product is `t3 + (t2 + t1)`. The
+  clean room follows that (an operand as the output: `matrix_add_sub_in_place`); every line of both
+  groups is identical in `reproduce`, and the crate's golden cases hold such NaN pairs (checked
+  against the probe: every result identical, 2026-11-17).
+- **How we know:** *validated* (`compare.py compare --groups melements,mvectors`, both modes, relay
+  9).
 
 ## The SVD pseudo-inverse after a failed decomposition (§17.4, §17.5, amended)
 
@@ -70,7 +84,8 @@ those groups is identical:
   product), which the spec's order matches.
 - `MatrixMultiplyD`'s complex sums: the term first (`term + (double) re`); `MatrixMultiply`'s float
   sums in blocks of four (`v + p0`, `p1 + v`, `p2 + v`, `v + p3`, then `v + p`; the spec's §16).
-- `VectorTripleProduct`'s order (a fit over its NaN cases).
+- `VectorTripleProduct`'s order (a fit over its NaN cases; the spec's §8.5 states it since
+  2026-11-17, above).
 - The peak searches take a bin when `!(count <= pct × largest)` (a NaN count is a candidate);
   `HISTOinit`'s bin size `<= 0` becomes 1 (a NaN stays); `HISTOfindLinearFit` starts at
   (a, b) = (1, 0); `HISTOfindCurrentPeak` clips a start beyond the last bin; `hp.plt` holds Z's bins

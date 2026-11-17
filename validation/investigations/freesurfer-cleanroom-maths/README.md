@@ -21,7 +21,7 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
   --candidate <target>/release/fs-maths-candidate --scratch <scratch>/maths --mode reproduce   # then fix
 ```
 
-## Results (2026-11-16, seed 7, every group again after relay 7: the spec as amended at `a8c62d4e`, no NaN-bit allowance left; the probe's reference hashes are the spec's §23.2)
+## Results (2026-11-17, seed 7, every group again after relay 9: the spec as amended at `2b9ef87c`, no NaN-bit allowance; the probe's reference hashes are the spec's §23.2)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
 unexplained.
@@ -39,9 +39,9 @@ unexplained.
 | mproduct | 1,202 | 1,200 / 2 / 0 / 0 / **0** | 900 / 2 / 18 / 282 / **0** |
 | affine | 276 | 274 / 2 / 0 / 0 / **0** | 172 / 2 / 0 / 102 / **0** |
 | dmatrix | 2,904 | 2,895 / 9 / 0 / 0 / **0** | 2,878 / 9 / 0 / 17 / **0** |
-| melements | 3,500 | 3,469 / 31 / 0 / 0 / **0** | 2,796 / 31 / 0 / 673 / **0** |
+| melements | 3,680 | 3,649 / 31 / 0 / 0 / **0** | 2,976 / 31 / 0 / 673 / **0** |
 | mregions | 880 | 871 / 3 / 6 / 0 / **0** | 69 / 3 / 80 / 728 / **0** |
-| mvectors | 1,602 | 1,430 / 172 / 0 / 0 / **0** | 1,382 / 172 / 0 / 48 / **0** |
+| mvectors | 1,623 | 1,451 / 172 / 0 / 0 / **0** | 1,403 / 172 / 0 / 48 / **0** |
 | mprint | 363 | 363 / 0 / 0 / 0 / **0** | 360 / 0 / 0 / 3 / **0** |
 | minverse | 862 | 852 / 10 / 0 / 0 / **0** | 801 / 10 / 0 / 51 / **0** |
 | primes | 215 | 215 / 0 / 0 / 0 / **0** | 213 / 0 / 2 / 0 / **0** |
@@ -52,11 +52,12 @@ unexplained.
 | svd | 2,619 | 2,169 / 373 / 77 / 0 / **0** | 1,225 / 373 / 114 / 907 / **0** |
 | mfiles | 723 | 695 / 1 / 27 / 0 / **0** | 378 / 1 / 27 / 317 / **0** |
 | rfields | 16 | 16 / 0 / 0 / 0 / **0** | 16 / 0 / 0 / 0 / **0** |
-| all | 28,507 | 27,025 / 1,121 / 361 / 0 / **0** | 22,904 / 1,121 / 502 / 3,980 / **0** |
+| all | 28,708 | 27,226 / 1,121 / 361 / 0 / **0** | 23,105 / 1,121 / 502 / 3,980 / **0** |
 
-Totals: `reproduce` 27,025 of 28,507 identical (1,121 not finished, 361 memory); `fix` 22,904
+Totals: `reproduce` 27,226 of 28,708 identical (1,121 not finished, 361 memory); `fix` 23,105
 identical (1,121 not finished, 502 memory, 3,980 corrected by a noted defect); none unexplained in
-either mode, NaNs' bits included.
+either mode, NaNs' bits included (relay 9, 2026-11-17: the fixed batches `melements-nan` and
+`mvectors-nan` of the amended §8.2 and §8.5 included).
 
 The differences left, all understood:
 

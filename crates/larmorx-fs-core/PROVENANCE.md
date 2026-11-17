@@ -29,7 +29,8 @@ Python), or `docs/parts/`. Its only inputs were:
 were written by the same clean-room implementers, under the same restrictions as above, from
 [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) as of commit `a59c9d0e` (2026-11-13),
 brought to its amendments of commits `3a1ef09e` (2026-11-13: §2.2, §3, §17, §18.1, §18.2) and
-`a8c62d4e` (2026-11-16: §2.2 FS-926, §17.4, §17.5, §18.2 FS-924), never
+`a8c62d4e` (2026-11-16: §2.2 FS-926, §17.4, §17.5, §18.2 FS-924) and `2b9ef87c` (2026-11-17: §8.2's
+and §8.5's NaN orders), never
 from Numerical Recipes' code. Its inputs:
 
 | Input | What it gave |
@@ -56,15 +57,16 @@ brought to its amendments of commit `023bbf8a` (2026-11-13: §3, §6, §9, §13)
 ## Clean-room implementation from specs/freesurfer-volume.md
 
 `src/volume/` (FreeSurfer 8.2.0's volume functions, `fs.volume`, the rest of queue item C3.1-05;
-parts 1 to 4 of the spec, §1 to §22) was written by the same clean-room implementers, under the same
+parts 1 to 5 of the spec, §1 to §24) was written by the same clean-room implementers, under the same
 restrictions as above, from [`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) as of
-commit `7ef384ea` (2026-11-16; its parts 1 to 3 made ready for the clean room) and commit `36d98b93`
-(2026-11-17; the answers to the clean room's questions and part 4 made ready), never from its
-sections after §22. Its inputs:
+commit `7ef384ea` (2026-11-16; its parts 1 to 3 made ready for the clean room), commit `36d98b93`
+(2026-11-17; the answers to the clean room's questions and part 4 made ready) and commit `53a939af`
+(2026-11-17; part 4's measured corrections, §22's modes table, FS-960, and part 5 made ready), never
+from its sections after §24. Its inputs:
 
 | Input | What it gave |
 |---|---|
-| [`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §17 and §69 | the behaviour of every function of parts 1 to 3: the volume-geometry text block's writer and reader, the geometry's copies, matrices, comparison and printer, the clones, clearing, size checks and frame copies, value ranges, scaling, thresholds, binarising and signs, the functions of two volumes, the extraction of a region and its centre, the tkregister matrices and points, the orientation string, slice direction and Talairach point, the index check, the nearest sample, centre of mass, principal components and running average, the header comparison, determinant, dump and derivative sign; part 4 (§18 to §22): the samplers (nearest, trilinear, cubic, windowed sinc and their frame variants, the cubic weights, the sinc kernel), the moves (translations, rotations by a matrix and about an axis), the head's box, the reader of linear transforms (`.lta`, MINC `.xfm`, FSL, `register.dat`, `identity.nofile`); the defects FS-265, FS-285 to FS-310 with their corrections and `reproduce` |
+| [`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §17 and §69 | the behaviour of every function of parts 1 to 3: the volume-geometry text block's writer and reader, the geometry's copies, matrices, comparison and printer, the clones, clearing, size checks and frame copies, value ranges, scaling, thresholds, binarising and signs, the functions of two volumes, the extraction of a region and its centre, the tkregister matrices and points, the orientation string, slice direction and Talairach point, the index check, the nearest sample, centre of mass, principal components and running average, the header comparison, determinant, dump and derivative sign; part 4 (§18 to §22): the samplers (nearest, trilinear, cubic, windowed sinc and their frame variants, the cubic weights, the sinc kernel), the moves (translations, rotations by a matrix and about an axis), the head's box, the reader of linear transforms (`.lta`, MINC `.xfm`, FSL, `register.dat`, `identity.nofile`); part 5 (§23, §24): the CMA label tests, `IsSubCorticalGray`, `MRIasegContraLatLabel`, the brain volume corrections, the left-right swaps, the ribbon fix, the one-hot encoding, the brain volume statistics' cache; the defects FS-265, FS-285 to FS-315 and FS-960 with their corrections and `reproduce` |
 | [`specs/freesurfer-io.md`](../../specs/freesurfer-io.md) §46 (commit `be11ca54`) | `regio_read_register` of a `register.dat` (its fields, messages and rounding methods; FS-258), which §21's reader calls |
 | [`specs/freesurfer-mri.md`](../../specs/freesurfer-mri.md), [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md), [`specs/freesurfer-core.md`](../../specs/freesurfer-core.md) and this crate's clean rooms of them | the volume structure, voxel access and header copy, the float matrices, the eigensystem, the scanf model of the C library, the messages |
 | The open probe folder [`validation/investigations/freesurfer-volume-probe/`](../../validation/investigations/freesurfer-volume-probe/README.md) (its README, `compare.py`, `models.py`'s statement of §20's walks, and `fs_volume_probe.cpp`'s calls and print forms) and black-box runs of the prebuilt probe `fs_volume_probe` (with the fs.maths probe's guard allocator) | the comparisons of the spec's §69 (`validation/investigations/freesurfer-cleanroom-volume/`), the behaviours measured beyond the spec's text (`docs/findings/fs-volume-clean-room.md`), the new defect FS-332 |

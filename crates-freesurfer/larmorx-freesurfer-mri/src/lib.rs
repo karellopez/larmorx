@@ -135,6 +135,49 @@ mod tests {
     }
 
     #[test]
+    fn fs58_not_for_the_types_without_values() {
+        // bitmap, tensor, double complex and unknown codes: FreeSurfer touches no voxel, so a
+        // volume without voxels reads -1e10 and writes nothing (1), without FS-58 (relay 42);
+        // the types but tensor are refused by the default's allocation (FS-55)
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let types: &[i32] = if mode == UpstreamDefects::Fix {
+                &[mri::MRI_TENSOR]
+            } else {
+                &[
+                    mri::MRI_BITMAP,
+                    mri::MRI_TENSOR,
+                    mri::MRI_DOUBLE_COMPLEX,
+                    11,
+                    -1,
+                ]
+            };
+            for &ty in types {
+                let (mut g, mut o, mut e) = setup(mode);
+                let mut m = mri::mri_alloc_header(&mut g, &mut o, &mut e, 2, 2, 2, ty, 1).unwrap();
+                m.outside_val = 7.5;
+                assert_eq!(
+                    voxel::mri_get_vox_val(&mut g, &mut e, &m, 1, 0, 0, 0, 0),
+                    Ok(-10000000000.9_f64 as f32)
+                );
+                assert_eq!(
+                    voxel::mri_get_vox_val(&mut g, &mut e, &m, 0, -1, 0, 0, 0),
+                    Ok(7.5)
+                );
+                assert_eq!(
+                    voxel::mri_set_vox_val(&mut g, &mut e, &mut m, 5, 9, 0, 3, 1.0, 0),
+                    Ok(1)
+                );
+                // both neighbours -1e10 (at column 0 the left one is outside_val)
+                assert_eq!(
+                    voxel::mri_get_vox_dx(&mut g, &mut e, &m, 1, 0, 0, 0),
+                    Ok(0.0)
+                );
+                assert!(!g.notices.contains(&FS_58), "type {ty}");
+            }
+        }
+    }
+
+    #[test]
     fn fs59_an_assigned_geometry_without_matrices() {
         for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
             let (mut g, mut o, mut e) = setup(mode);

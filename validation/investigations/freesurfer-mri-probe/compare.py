@@ -803,6 +803,23 @@ class Gen:
         lines.append("ltafreenull")
         return [Batch("lta", "lta", lines), Batch("lta", "lta-matrices", odd)]
 
+    def novox(self) -> list[Batch]:
+        """§5: one voxel access each on volumes made without voxels, of every type: negative
+        indices first, then the types without a value (tensor, bitmap, double complex), which read
+        and write no voxel, and the others (FS-58)."""
+        out = f64(10.0)
+        ops = [
+            "get -1 0 0 0 0",
+            "get 0 -1 0 0 0",
+            "get 0 0 -1 0 0",
+            "get 0 0 0 0 0",
+            "get 1 1 1 0 1",
+        ]
+        ops += ["get 0 0 0 0 7", f"set 0 0 0 0 0 {f32(100.0)}", f"set -1 -1 -1 0 1 {f32(100.0)}"]
+        ops += ["dx 0 0 0 0", "dx 1 0 0 0", "dy 0 1 0 0", "dz 1 1 1 0"]
+        lines = [f"vox 2 2 2 {t} 1 1 5 {out} 1 {op}" for t in range(11) for op in ops]
+        return [Batch("novox", "novox", lines)]
+
 
 GROUPS = [
     "alloc",
@@ -820,6 +837,7 @@ GROUPS = [
     "shapes",
     "bbox",
     "lta",
+    "novox",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

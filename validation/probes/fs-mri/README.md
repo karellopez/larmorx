@@ -41,3 +41,14 @@ where FreeSurfer prints a matrix it freed, are skipped like FS-53's), the four n
 5,625; `fix` different only with a notice. Seed 1, 980 cases: 922 identical, 58 not comparable, hash
 `ecce606b6218d98ab5325c5e7234805bf08d4da20179bd9caaad57cb4a4793e5`, passing with AArch64's NaN
 emulated in debug and release; the port's 49,000 lines identical with and without the emulation.
+
+Measured 2026-11-17 (track A relay 42: `MRIgetVoxVal` and `MRIsetVoxVal` of the types they touch no
+voxel of, bitmap, tensor, double complex and unknown codes, read -1e10 and write nothing (1)
+without voxels too, no FS-58; the `vox` cases draw every type, bitmap and double complex as headers,
+since FreeSurfer cannot allocate their voxels): seed 7, 49,000 cases (`check.py --seed 7 --n 49000`
+inside `boxed.sh 10`): 46,762 of 46,762 comparable lines identical with `reproduce` (2,238 not
+comparable, 1,555 of them `vox` lines of FS-53 and FS-58); `fix` different only with a notice. Seed
+1, 980 cases: 925 identical, 55 not comparable, hash
+`3c5496c0dab1565a09525cbc11ce29701a3f9d20444a46d50383c85b89113339`. `novox_hand_cases.txt`: the
+hand cases (every type, with and without voxels; the first ten lines identical with `reproduce`,
+the float and float complex headers FS-58).

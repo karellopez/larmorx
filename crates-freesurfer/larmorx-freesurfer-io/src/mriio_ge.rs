@@ -21,13 +21,19 @@
 //! (gelxRead's messages name genesisRead), FS-685 (several echoes: the header freed past its frame
 //! table), FS-167 (a header cut short: memory contents), FS-249
 //! (names past FreeSurfer's buffers).
+//!
+//! Since relay 45 of track A also `MRIreadGeRoi` ([`mri_read_ge_roi`]: `mri_convert --roi`'s GE ROI
+//! series; FS-944 to FS-947).
 
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_167, FS_249, FS_680, FS_681, FS_682, FS_683, FS_684, FS_685};
+use larmorx_core::defects::{
+    FS_167, FS_249, FS_680, FS_681, FS_682, FS_683, FS_684, FS_685, FS_944, FS_945, FS_946, FS_947,
+};
+use larmorx_freesurfer_core::alloc::{CALLOC_LIMIT, MACHINE_BYTES};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, Fatal};
+use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOMEMORY, Fatal};
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::{cstd, pathsep, sse, utils};
 use larmorx_freesurfer_mri::mri::{self, MRI_SHORT, Mri};
@@ -1126,6 +1132,202 @@ pub fn ximg_read(
     Ok(Some(m))
 }
 
+/// `MRIreadGeRoi`'s message when a read falls short (`ErrorPrintf`, the `errno` text first).
+fn roi_short(g: &mut Globals, err: &mut dyn Write, fp: &CFile) {
+    if let Some(e) = fp.read_errno() {
+        g.errno = e;
+    }
+    log::error_printf(g, err, ERROR_BADFILE, "MRIreadGeRoi(): could not read file");
+}
+
+/// `fseek(fp, offset, SEEK_SET)`, its `errno` kept.
+fn seek_set(g: &mut Globals, fp: &mut CFile, offset: i64) {
+    let mut errno = g.errno;
+    fp.fseek(&mut errno, offset, 0);
+    g.errno = errno;
+}
+
+/// `MRIreadGeRoi(fname, n_slices)` (`utils/mriio.cpp` 10445; `mri_convert --roi`, the slice count
+/// from `--in_like` or `--in_k_count`; track A's relay 45): a series of GE ROI files, one slice of
+/// big-endian shorts each. The named file gives the width and height (big-endian `int`s at bytes
+/// 8 and 12; a file that ends first: `MRIreadGeRoi(): could not read file`, each); its base name's
+/// first three consecutive digits (after the last folder separator: `/`, and `\` on Windows only)
+/// split it into `<prefix>` and `<postfix>`, printed as `<prefix>---<postfix>` on standard
+/// output; then slice `i` (0 to `n_slices - 1`) is `<prefix><i as %03d><postfix>`: a missing file
+/// is skipped, a present one gives its pixel offset (a big-endian `int` at byte 4) and its rows
+/// from there (each row's shorts swapped from big-endian; a row the file cuts: `MRIreadGeRoi():
+/// error reading from file file <name>` and no volume). No file of the series: `MRIreadGeRoi():
+/// didn't read any ROI files`. The volume is `MRIalloc(width, height, n_slices, MRI_SHORT)`'s
+/// (its geometry the allocation's).
+///
+/// Defects (`docs/findings/freesurfer-io.md` Part 42): FS-944 (the named file ends before its
+/// width or height: memory contents, 0 here), FS-945 (the first slice read ends before its offset:
+/// memory contents, 0 here), FS-946 (a later slice does: the earlier offset's bytes as FreeSurfer
+/// holds them, byte-swapped once more, with `reproduce`; 0 by default), FS-947 (a volume past 16
+/// GiB, which FreeSurfer clears whole before reading: refused in both modes), FS-249 (a name past
+/// FreeSurfer's buffers: used whole).
+pub fn mri_read_ge_roi(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    fname: &str,
+    n_slices: i32,
+) -> Result<Option<Mri>, Fatal> {
+    const WHO: &str = "MRIreadGeRoi";
+    let Ok(mut fp) = CFile::open(dir, fname, "r") else {
+        return Ok(fail0(
+            g,
+            err,
+            ERROR_BADFILE,
+            &format!("MRIreadGeRoi(): error opening file {fname}"),
+        ));
+    };
+    seek_set(g, &mut fp, 8);
+    let mut size = [0i32; 2];
+    for (k, what) in ["width", "height"].iter().enumerate() {
+        let mut b = [0u8; 4];
+        let got = fp.read_bytes(&mut b);
+        if got < 4 {
+            roi_short(g, err, &fp);
+            g.notices.add(
+                &FS_944,
+                format!(
+                    "{WHO}: the {what} (bytes {} to {}) ends after {got} of its 4 bytes: FreeSurfer's others are memory contents (0 here)",
+                    8 + 4 * k,
+                    11 + 4 * k
+                ),
+            );
+        }
+        size[k] = i32::from_be_bytes(b);
+    }
+    let (width, height) = (size[0], size[1]);
+    fp.close();
+    let name = fname.as_bytes();
+    let mut i = pathsep::rfind_sep_str(fname).map_or(0, |p| p + 1);
+    let mut n_digits = 0;
+    while i < name.len() && n_digits < 3 {
+        if name[i].is_ascii_digit() {
+            n_digits += 1;
+        } else {
+            n_digits = 0;
+        }
+        i += 1;
+    }
+    if n_digits < 3 {
+        return Ok(fail0(
+            g,
+            err,
+            ERROR_BADPARM,
+            "MRIreadGeRoi(): bad GE file name (couldn't find three consecutive digits in the base file name)",
+        ));
+    }
+    if fname.len() >= STRLEN {
+        g.notices.add(
+            &FS_249,
+            format!(
+                "{WHO}: a name of {} bytes used whole (FreeSurfer's buffer holds 1023)",
+                fname.len()
+            ),
+        );
+    }
+    let (prefix, postfix) = (&fname[..i - 3], &fname[i..]);
+    let _ = writeln!(out, "{prefix}---{postfix}");
+    if width > 0 && height > 0 && n_slices > 0 {
+        let bytes = width as u64 * height as u64 * n_slices as u64 * 2;
+        if bytes > MACHINE_BYTES && bytes <= CALLOC_LIMIT {
+            g.notices.add(
+                &FS_947,
+                format!(
+                    "{WHO}: a volume of {width} x {height} x {n_slices} shorts ({bytes} bytes), which FreeSurfer clears whole before reading: its outcome depends on the machine's memory; refused as by a machine without that memory"
+                ),
+            );
+            return Ok(fail0(
+                g,
+                err,
+                ERROR_NOMEMORY,
+                "MRIreadGeRoi(): couldn't allocate MRI structure",
+            ));
+        }
+    }
+    let mut m = Some(mri::mri_alloc(
+        g, out, err, width, height, n_slices, MRI_SHORT,
+    )?);
+    // MRIclear: the volume is zero already
+    let mut read_one = false;
+    // the pixel offset as FreeSurfer's variable holds it (its bytes in memory); `None` before a
+    // read first reached it
+    let mut offset_mem: Option<[u8; 4]> = None;
+    for slice in 0..n_slices.max(0) {
+        let use_name = format!("{prefix}{slice:03}{postfix}");
+        let mut fp = match CFile::open(dir, &use_name, "r") {
+            Ok(f) => f,
+            Err(e) => {
+                g.errno = e;
+                continue;
+            }
+        };
+        seek_set(g, &mut fp, 4);
+        let mut b = offset_mem.unwrap_or([0; 4]);
+        let got = fp.read_bytes(&mut b);
+        if got < 4 {
+            roi_short(g, err, &fp);
+            if offset_mem.is_none() {
+                b[got..].fill(0);
+                g.notices.add(
+                    &FS_945,
+                    format!(
+                        "{WHO}: {use_name}'s pixel offset ends after {got} of its 4 bytes, the first offset read: FreeSurfer's others are memory contents (0 here)"
+                    ),
+                );
+            } else if g.notices.reproduce() {
+                g.notices.add(
+                    &FS_946,
+                    format!(
+                        "{WHO}: {use_name}'s pixel offset ends after {got} of its 4 bytes: the others are the earlier slice's offset as FreeSurfer holds it, as in FreeSurfer"
+                    ),
+                );
+            } else {
+                b[got..].fill(0);
+                g.notices.add(
+                    &FS_946,
+                    format!(
+                        "{WHO}: {use_name}'s pixel offset ends after {got} of its 4 bytes: the others read as 0 (FreeSurfer's are the earlier slice's offset as it holds it)"
+                    ),
+                );
+            }
+        }
+        let offset = i32::from_be_bytes(b);
+        offset_mem = Some(offset.to_le_bytes());
+        seek_set(g, &mut fp, i64::from(offset));
+        let vol = m.as_mut().expect("the volume");
+        for y in 0..vol.vg.height.max(0) {
+            if !read_row(&mut fp, vol, y, slice, 0) {
+                fp.close();
+                mri::mri_free(g, err, &mut m);
+                return Ok(fail0(
+                    g,
+                    err,
+                    ERROR_BADFILE,
+                    &format!("MRIreadGeRoi(): error reading from file file {use_name}"),
+                ));
+            }
+        }
+        fp.close();
+        read_one = true;
+    }
+    if !read_one {
+        mri::mri_free(g, err, &mut m);
+        return Ok(fail0(
+            g,
+            err,
+            ERROR_BADFILE,
+            "MRIreadGeRoi(): didn't read any ROI files",
+        ));
+    }
+    Ok(m)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1335,5 +1537,68 @@ mod tests {
         );
         let text = String::from_utf8(e).unwrap();
         assert!(text.contains("genesisRead(): can't determine file name format for e1s2x6"));
+    }
+
+    /// A GE ROI file: the pixel offset 16, `w` x `h`, then the shorts `base + k` (big-endian).
+    fn roi_file(w: i32, h: i32, base: i16) -> Vec<u8> {
+        let mut b = vec![0u8; 16];
+        put(&mut b, 4, &16i32.to_be_bytes());
+        put(&mut b, 8, &w.to_be_bytes());
+        put(&mut b, 12, &h.to_be_bytes());
+        for k in 0..(w * h) as i16 {
+            b.extend_from_slice(&(base + k).to_be_bytes());
+        }
+        b
+    }
+
+    #[test]
+    fn a_ge_roi_series_reads_with_a_missing_slice() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("roi000.img"), roi_file(2, 1, 10)).unwrap();
+        std::fs::write(dir.path().join("roi002.img"), roi_file(2, 1, -300)).unwrap();
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let m = mri_read_ge_roi(&mut g, &mut o, &mut e, Some(dir.path()), "roi000.img", 3)
+            .unwrap()
+            .unwrap();
+        assert_eq!(String::from_utf8(o).unwrap(), "roi---.img\n");
+        assert!(e.is_empty());
+        assert_eq!((m.vg.width, m.vg.height, m.vg.depth), (2, 1, 3));
+        assert_eq!(shorts(&m), [10, 11, 0, 0, -300, -299]);
+        // no three digits, no series
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        std::fs::write(dir.path().join("r12.img"), roi_file(2, 1, 0)).unwrap();
+        let r = mri_read_ge_roi(&mut g, &mut o, &mut e, Some(dir.path()), "r12.img", 3).unwrap();
+        assert!(r.is_none());
+        assert!(String::from_utf8_lossy(&e).contains("bad GE file name"));
+        let r = mri_read_ge_roi(&mut g, &mut o, &mut e, Some(dir.path()), "roi000.img", 0).unwrap();
+        assert!(r.is_none());
+        assert!(String::from_utf8_lossy(&e).contains("didn't read any ROI files"));
+    }
+
+    /// FS-946: a later slice cut inside its offset takes the earlier offset's bytes, byte-reversed
+    /// (`reproduce`); the default reads the missing bytes as 0.
+    #[test]
+    fn fs946_a_slice_cut_inside_its_offset() {
+        let dir = tempfile::tempdir().unwrap();
+        // the first file's offset 272: FreeSurfer then holds the bytes 0x10 0x01 0 0
+        let mut a = roi_file(1, 1, 7);
+        put(&mut a, 4, &272i32.to_be_bytes());
+        put(&mut a, 272, &7i16.to_be_bytes());
+        std::fs::write(dir.path().join("s000"), &a).unwrap();
+        // a second file of 5 bytes gives its offset's first byte, 0: with reproduce the memory
+        // 0x00 0x01 0 0, offset 65,536, past the end (no volume); by default 0 (the file's first
+        // two bytes read as the slice's short)
+        std::fs::write(dir.path().join("s001"), [0u8; 5]).unwrap();
+        for (mode, ok) in [
+            (UpstreamDefects::Reproduce, false),
+            (UpstreamDefects::Fix, true),
+        ] {
+            let mut g = Globals::new(mode);
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let r = mri_read_ge_roi(&mut g, &mut o, &mut e, Some(dir.path()), "s000", 2).unwrap();
+            assert_eq!(r.is_some(), ok, "{}", String::from_utf8_lossy(&e));
+            assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-946"));
+        }
     }
 }

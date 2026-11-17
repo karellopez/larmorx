@@ -2441,6 +2441,14 @@ defects! {
         "moving a surface through a linear transform of a type other than voxel-to-voxel or RAS-to-RAS (a physical-voxel or coronal transform file): the program crashes at the first vertex that is not ripped";
     FS_943 = "FS-943", "FreeSurfer", false,
         "moving a surface through a RAS-to-RAS linear transform with a volume given: the warning that the volume's centre differs from the transform's source volume never appears for different centres (only for a centre that is not a finite number); kept, as a RAS-to-RAS transform does not depend on its source's centre (the warning would be wrong for the usual transform from the raw volume to the conformed one)";
+    FS_944 = "FS-944", "FreeSurfer", true,
+        "reading a GE ROI series (mri_convert --roi): a named file that ends before the image's width or height (shorter than 16 bytes) gives a width or height from memory contents";
+    FS_945 = "FS-945", "FreeSurfer", true,
+        "reading a GE ROI series: the first slice file read that ends before its pixel data offset (shorter than 8 bytes) reads its pixels from an offset made of memory contents";
+    FS_946 = "FS-946", "FreeSurfer", true,
+        "reading a GE ROI series: a slice file that ends before its pixel data offset after another slice was read takes the offset's missing bytes from the earlier slice's offset, in reversed byte order: its pixels are read from an unrelated place";
+    FS_947 = "FS-947", "FreeSurfer", true,
+        "reading a GE ROI series whose named file asks for a volume of more than 16 GiB: FreeSurfer clears the whole volume before reading a slice, so it goes on or exhausts the machine's memory depending on the machine";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

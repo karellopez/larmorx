@@ -2120,6 +2120,17 @@ void run_piece6(const std::string &cmd0)
     MRI *r = MRIreorder4(src, order);
     print_mri6(r);
     oi(errno);
+  } else if (cmd == "gro") {
+    // piece 34 (track A relay 45): MRIreadGeRoi of a series the case makes in w (the named file,
+    // the slices <prefix><%03d><postfix>), with the slice count given
+    bool nn;
+    std::string name = getstr(&nn);
+    int n_slices = (int)geti();
+    setup(next());
+    errno = 0;
+    MRI *m = MRIreadGeRoi(name.c_str(), n_slices);
+    print_mri6(m);
+    oi(errno);
   } else if (cmd == "sxl") {
     // piece 30: is_sxa_volume, then ld_sxadat_from_stem (or ld_sxadat of the name) and
     // sxa_framepower of the header read

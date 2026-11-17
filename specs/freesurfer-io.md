@@ -36,7 +36,7 @@ volume's axes reordered, the selective-average headers, a label's overlap with a
 stacked autoencoders; **part 38** (§154-155): transforms applied backwards, converted and composed; **part 39**
 (§156-159): warp volumes without their geometries, volumes resampled through morphs, transforms composed and
 inverted in place; **part 40** (§160-161): a volume's four dimensions reordered; **part 41** (§162-163): a surface
-moved through a transform.
+moved through a transform; **part 42** (§164-165): GE ROI series read.
 
 ## 1. Conventions
 
@@ -5487,3 +5487,47 @@ Returns 0; every failure ends the program (`ErrorExit`, code `ERROR_BADPARM`, th
   (its `mri_normalize` passes `identity.nofile`, its `mris_sphere` no transform).
 - Black box: FreeSurfer 8.2.0's `mris_transform <surface> <transform> <out>` (the call without volumes) and `mri_normalize
   ... -surface <surface> <transform>` (the distance map it builds from the moved surface).
+
+## 164. GE ROI series read (`MRIreadGeRoi(name, n_slices)`: `mri_convert --roi`, the slice count from `--in_like`'s depth or `--in_k_count`)
+
+1. **The named file.** A file that cannot be opened for reading: `MRIreadGeRoi(): error opening file <name>`
+   (`ERROR_BADFILE`, `errno` cleared first), no volume (a folder opens; its reads fail with `EISDIR`). From byte 8:
+   the width, then the height, each a big-endian 32-bit `int`; a read that falls short prints `MRIreadGeRoi(): could
+   not read file` (`ERROR_BADFILE`, after the `errno` text when `errno` is set: `Is a directory` for a folder) and goes
+   on (FS-944: the missing bytes are memory contents in FreeSurfer; 0 here in both modes, noted).
+2. **The series' name.** In the name's base (after its last folder separator: `/`; on Windows `\` too) the first run of
+   three consecutive ASCII digits (a run of more digits: its first three) splits the name: `<prefix>` is everything
+   before those three digits (the folder included), `<postfix>` everything after them. No such run: `MRIreadGeRoi():
+   bad GE file name (couldn't find three consecutive digits in the base file name)` (`ERROR_BADPARM`), no volume.
+   Then `<prefix>---<postfix>` and a newline on standard output. A name of 1,024 bytes or more passes FreeSurfer's
+   buffers (FS-249): used whole.
+3. **The volume**: `MRIalloc(width, height, n_slices, MRI_SHORT)` (`specs/freesurfer-mri.md` §4: extents of 0 or
+   less print `MRI::Shape`'s lines; the allocation's geometry is kept; every voxel 0). FS-947: a volume of more
+   than 16 GiB (all three extents positive) is cleared whole by FreeSurfer before any slice is read, so it goes on or
+   exhausts the machine's memory depending on the machine: refused in both modes with `MRIreadGeRoi(): couldn't
+   allocate MRI structure` (`ERROR_NOMEMORY`, `errno` cleared), noted.
+4. **The slices**, `i` from 0 to `n_slices - 1`: the name `<prefix><i><postfix>` with `i` at least three digits
+   (zero-filled; 1000 and above four). A file that cannot be opened is skipped (`errno` keeps the open's error, which a
+   later `could not read file` prints). From byte 4 the pixel offset (a big-endian `int`; a short read: `could not
+   read file`, and the offset's missing bytes are: before any offset was read, memory contents, FS-945, 0 here in both
+   modes; after, the earlier slice's offset as FreeSurfer holds it, its bytes in the machine's (little-endian) order,
+   so that the value comes out byte-reversed, FS-946: `reproduce` that, the default 0). Then the file is positioned at
+   the offset (a negative offset fails with `EINVAL`, set in `errno`, and the position stays where the offset's read
+   left it); for each of the volume's rows (`height`), `width` shorts are read (a row the file cuts: `MRIreadGeRoi():
+   error reading from file file <name>` (`file` twice), `errno` cleared, no volume), each short's two bytes
+   exchanged (big-endian to the machine's), into row `y` of slice `i`.
+5. No slice file read: `MRIreadGeRoi(): didn't read any ROI files` (`ERROR_BADFILE`), no volume. Else the volume.
+
+## 165. Validation plan (part 42)
+
+- Closed probe: piece 34's `gro` (relay 45; `fsio` REBUILT): `MRIreadGeRoi` of a series made in the fixture's folder
+  `w`: names in seven forms (a folder in the prefix, digits before the three, a postfix of digits), the named file a
+  slice, a file of the series' name of its own (cut before its width or height now and then: FS-944), a name whose
+  digits run on, a missing file, a folder, a name without three digits; widths and heights 0 to 5, 0, -1, long rows,
+  65,536 x 65,536 (FS-947, or past `fsio`'s 1 GiB: `SKIP`, not run); 0 to 5 slices, 12, or 1,002 with the slices 1,000
+  and 1,001; each slice present or not, its offset in the header, 0, past the end, negative, its rows whole or cut;
+  slice files cut before or inside their offset (FS-945: `SKIP`; FS-946 compared). The volume (piece 6's print) and
+  `errno`. `SKIP` for FS-944, FS-945, FS-947.
+- Measured (relay 45): MEASURED_GRO
+- Black box: FreeSurfer 8.2.0's `mri_convert --roi --in_k_count <n> <first slice> <out>.mgz` on such series, the
+  outputs compared byte for byte.

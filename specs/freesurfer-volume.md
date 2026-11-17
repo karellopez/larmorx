@@ -211,8 +211,9 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   rule outside `int`. Storing an integer into a narrower integer type keeps its low bits.
 - **Errors**: "an error" is FreeSurfer's C-style error line (`ErrorPrintf`: `specs/freesurfer-core.md`
   §2's C-style error calls, `error: <text>` on standard error with `errno`'s text first when it is
-  set and FS-01's NUL before the new line); "the program ends" its C-style exit (`ErrorExit`, the
-  core spec's §2 and §3) with the status given, which the probe prints modulo 256 (`EXIT 252` for
+  set and FS-01's NUL before the new line; a text written below with a final `\n` keeps it, so the
+  line is `error: <text>\n`, the NUL, then the new line); "the program ends" its C-style exit
+  (`ErrorExit`, the core spec's §2 and §3) with the status given, which the probe prints modulo 256 (`EXIT 252` for
   -4, `EXIT 253` for -3).
 
 ## 7. Clones, clearing, size checks, frame copies
@@ -237,13 +238,14 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   `check`'s extent is `w x h x d`, a 0 taken from `src`.
 - `MRIcopyFrame(src, dst, sf, df)`: without `dst`, a new volume of the source's extent and type with
   `df + 1` frames, the source's header and pulse parameters. When `df` is not below `dst`'s frame
-  count: the error `MRIcopyFrame: dst frame #<df> out of range (nframes=<n>)` and `NULL`. Else, for
+  count: the error `MRIcopyFrame: dst frame #<df> out of range (nframes=<n>)\n` and `NULL`. Else, for
   every voxel of the source's extent (slices, then rows, then columns), the voxel of frame `sf` is
   read and written into frame `df`.
 - `MRIcopyFrames(src, dst, s0, s1, d0)`: without `dst`, a new volume of `s1 - s0 + 1` frames with the
   source's header; when the two do not `MRImatch`, the program ends (status `ERROR_BADPARM`, -4)
   with `MRIcopyFrames(<s0>, <s1>, <d0>): src (<w>, <h>, <d>) doesn't match destimation (<w>, <h>,
-  <d>)`; then `MRIcopyFrame` of frames `s0 .. s1` into `d0 ..`, `NULL` at the first failure.
+  <d>)\n` (**(observed)**, both messages: `vmake`, `vrules`: `error: <text>\n`, the NUL, `\n`);
+  then `MRIcopyFrame` of frames `s0 .. s1` into `d0 ..`, `NULL` at the first failure.
 
 ## 8. Value ranges
 

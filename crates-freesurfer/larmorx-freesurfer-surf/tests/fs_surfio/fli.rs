@@ -1037,13 +1037,15 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             o.i(i64::from(r));
             let nv = s.nvertices.max(0) as usize;
             let before: Vec<i32> = (0..nv).map(|v| s.vertex(v).annotation).collect();
-            o.i(i64::from(larmorx_freesurfer_io::annotation::set_atable_from_ctable(
-                g,
-                io.out,
-                io.err,
-                &mut sg.atable,
-                s.ct.as_ref(),
-            )));
+            o.i(i64::from(
+                larmorx_freesurfer_io::annotation::set_atable_from_ctable(
+                    g,
+                    io.out,
+                    io.err,
+                    &mut sg.atable,
+                    s.ct.as_ref(),
+                ),
+            ));
             o.i(i64::from(
                 larmorx_freesurfer_surf::valrest::mode_filter_annotations(
                     g, sg, &mut io, None, &mut s, 10,
@@ -1088,7 +1090,8 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             let mut hv = 0xcbf2_9ce4_8422_2325u64;
             let mut n = 0;
             for c in 0..m.vg.width {
-                let x = larmorx_freesurfer_mri::voxel::mri_get_vox_val(g, io.err, &m, c, 0, 0, 0, 0)?;
+                let x =
+                    larmorx_freesurfer_mri::voxel::mri_get_vox_val(g, io.err, &m, c, 0, 0, 0, 0)?;
                 if x != 0.0 {
                     n += 1;
                     for b in c.to_le_bytes() {

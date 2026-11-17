@@ -271,7 +271,14 @@ fn set_side(
 
 /// `MRISsetCurvaturesToValues(mris, fno)`: every unripped vertex's `vals[fno]` its `curv`.
 pub fn set_curvatures_to_values(g: &mut Globals, mris: &mut Mris, fno: i32) -> Result<(), Fatal> {
-    set_side(g, mris, fno, Side::Curv, Side::Vals, "MRISsetCurvaturesToValues")
+    set_side(
+        g,
+        mris,
+        fno,
+        Side::Curv,
+        Side::Vals,
+        "MRISsetCurvaturesToValues",
+    )
 }
 
 /// `MRISsetCurvaturesToOrigValues(mris, fno)`: every unripped vertex's `orig_vals[fno]` its
@@ -281,7 +288,14 @@ pub fn set_curvatures_to_orig_values(
     mris: &mut Mris,
     fno: i32,
 ) -> Result<(), Fatal> {
-    set_side(g, mris, fno, Side::Curv, Side::Orig, "MRISsetCurvaturesToOrigValues")
+    set_side(
+        g,
+        mris,
+        fno,
+        Side::Curv,
+        Side::Orig,
+        "MRISsetCurvaturesToOrigValues",
+    )
 }
 
 /// `MRISsetOrigValuesToCurvatures(mris, fno)`: every unripped vertex's `curv` its
@@ -291,25 +305,48 @@ pub fn set_orig_values_to_curvatures(
     mris: &mut Mris,
     fno: i32,
 ) -> Result<(), Fatal> {
-    set_side(g, mris, fno, Side::Orig, Side::Curv, "MRISsetOrigValuesToCurvatures")
+    set_side(
+        g,
+        mris,
+        fno,
+        Side::Orig,
+        Side::Curv,
+        "MRISsetOrigValuesToCurvatures",
+    )
 }
 
 /// `MRISsetOrigValuesToValues(mris, fno)`: every unripped vertex's `vals[fno]` its
 /// `orig_vals[fno]`.
 pub fn set_orig_values_to_values(g: &mut Globals, mris: &mut Mris, fno: i32) -> Result<(), Fatal> {
-    set_side(g, mris, fno, Side::Orig, Side::Vals, "MRISsetOrigValuesToValues")
+    set_side(
+        g,
+        mris,
+        fno,
+        Side::Orig,
+        Side::Vals,
+        "MRISsetOrigValuesToValues",
+    )
 }
 
 /// `MRISsetValuesToCurvatures(mris, fno)`: every unripped vertex's `curv` its `vals[fno]`.
 pub fn set_values_to_curvatures(g: &mut Globals, mris: &mut Mris, fno: i32) -> Result<(), Fatal> {
-    set_side(g, mris, fno, Side::Vals, Side::Curv, "MRISsetValuesToCurvatures")
+    set_side(
+        g,
+        mris,
+        fno,
+        Side::Vals,
+        Side::Curv,
+        "MRISsetValuesToCurvatures",
+    )
 }
 
 // ---- the mode filter of the annotations ------------------------------------------------------
 
 /// The index of the first entry of `annotation` in a table built here (no file read), or -1.
 fn own_index(t: &AnnotationTables, annotation: i32) -> i32 {
-    let n = usize::try_from(t.num_entries).unwrap_or(0).min(t.atable.len());
+    let n = usize::try_from(t.num_entries)
+        .unwrap_or(0)
+        .min(t.atable.len());
     t.atable[..n]
         .iter()
         .find(|e| e.annotation == annotation)
@@ -318,8 +355,13 @@ fn own_index(t: &AnnotationTables, annotation: i32) -> i32 {
 
 /// A table's `(index, annotation)` pairs, the part of it the mode filter reads.
 fn pairs(t: &AnnotationTables) -> Vec<(i32, i32)> {
-    let n = usize::try_from(t.num_entries).unwrap_or(0).min(t.atable.len());
-    t.atable[..n].iter().map(|e| (e.index, e.annotation)).collect()
+    let n = usize::try_from(t.num_entries)
+        .unwrap_or(0)
+        .min(t.atable.len());
+    t.atable[..n]
+        .iter()
+        .map(|e| (e.index, e.annotation))
+        .collect()
 }
 
 /// `MRISmodeFilterAnnotations(mris, niter)`: the largest annotation index over every vertex (at
@@ -660,7 +702,13 @@ pub fn rip_zeros(
 /// A vertex annotation's colour-table index (`CTABfindAnnotation`): the first entry of its
 /// colour, or -1. FS-984: without a colour table FreeSurfer reports `CTABfindAnnotation: ct was
 /// NULL` and reads an index it never wrote; both modes take -1 (noted).
-fn find_annotation(g: &mut Globals, err: &mut dyn Write, mris: &Mris, annot: i32, who: &str) -> i32 {
+fn find_annotation(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mris: &Mris,
+    annot: i32,
+    who: &str,
+) -> i32 {
     match mris.ct.as_ref() {
         Some(ct) => colortab::ctab_find_annotation(ct, annot),
         None => {

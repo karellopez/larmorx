@@ -23,8 +23,8 @@ use super::*;
 use larmorx_freesurfer_io::annotation;
 use larmorx_freesurfer_mri::mri::mri_alloc_sequence;
 use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
-use larmorx_freesurfer_surf::{nbhd, readwrite};
 use larmorx_freesurfer_surf::valrest::{self, ValsVp};
+use larmorx_freesurfer_surf::{nbhd, readwrite};
 
 /// The value setters, by their FreeSurfer names.
 const SETTERS: [&str; 5] = [
@@ -225,16 +225,20 @@ pub(super) fn vlr_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 ix(t, g.pick(&[0, 1, 1, 2, 3, 10]));
             }
             3 => {
-                t.push(
-                    g.pick(&["MRISdilateRipped", "MRISerodeRipped"])
-                        .into(),
-                );
+                t.push(g.pick(&["MRISdilateRipped", "MRISerodeRipped"]).into());
                 ix(t, g.pick(&[0, 1, 1, 2, 3]));
             }
             4 => t.push("MRISsetRipInFacesWithRippedVertices".into()),
             5 | 6 => {
                 t.push(g.pick(&SETTERS).into());
-                ix(t, if g.chance(8) { g.pick(&[-1, 3, 7]) } else { g.int(0, 2) });
+                ix(
+                    t,
+                    if g.chance(8) {
+                        g.pick(&[-1, 3, 7])
+                    } else {
+                        g.int(0, 2)
+                    },
+                );
             }
             _ => {
                 t.push("MRISdilateVertexToSum".into());
@@ -469,7 +473,9 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "MRISmarkRandomVertices" => {
                 let p = t.f();
-                o.i(i64::from(valrest::mark_random_vertices(g, &mut io, &mut s, p)?));
+                o.i(i64::from(valrest::mark_random_vertices(
+                    g, &mut io, &mut s, p,
+                )?));
             }
             "MRISannotation_to_label" => {
                 let i = t.i() as i32;

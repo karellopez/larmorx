@@ -89,7 +89,16 @@ impl Run {
 
     /// A volume of one voxel per vertex, every voxel `x`.
     fn measure(&mut self, n: i32, x: f32) -> Mri {
-        let mut m = mri_alloc(&mut self.g, &mut self.out, &mut self.err, n, 1, 1, MRI_FLOAT).unwrap();
+        let mut m = mri_alloc(
+            &mut self.g,
+            &mut self.out,
+            &mut self.err,
+            n,
+            1,
+            1,
+            MRI_FLOAT,
+        )
+        .unwrap();
         for c in 0..n {
             mri_set_vox_val(&mut self.g, &mut self.err, &mut m, c, 0, 0, 0, x, 0).unwrap();
         }
@@ -177,7 +186,13 @@ fn mode_filter_through_the_surfaces_own_table() {
         let (v, f) = fan(5);
         let mut s = r.surface(&v, &f);
         let other = ctab(&[Some((0, 0, 0)), Some(A), Some(C)]);
-        annotation::set_atable_from_ctable(&mut r.g, &mut r.out, &mut r.err, &mut r.sg.atable, Some(&other));
+        annotation::set_atable_from_ctable(
+            &mut r.g,
+            &mut r.out,
+            &mut r.err,
+            &mut r.sg.atable,
+            Some(&other),
+        );
         s.ct = Some(ctab(&[Some((0, 0, 0)), Some(A), Some(B)]));
         s.vertex_mut(0).annotation = annot(A);
         for k in 1..s.nvertices as usize {
@@ -188,7 +203,12 @@ fn mode_filter_through_the_surfaces_own_table() {
         let want = if mode.reproduce() { annot(A) } else { annot(B) };
         assert_eq!(s.vertex(0).annotation, want, "{mode:?}");
         assert_eq!(r.noted("FS-978"), !mode.reproduce());
-        assert!(r.text().contains("filter iterations complete (10 requested, 0 changed)"), "{}", r.text());
+        assert!(
+            r.text()
+                .contains("filter iterations complete (10 requested, 0 changed)"),
+            "{}",
+            r.text()
+        );
     }
 }
 
@@ -215,7 +235,10 @@ fn mode_filter_without_a_table() {
             assert!(r.noted("FS-979"));
             assert_eq!(s.vertex(0).annotation, annot(A));
             assert_eq!(s.vertex(1).annotation, 0, "C is not in the table");
-            assert!(String::from_utf8_lossy(&r.err).contains("could not open translation file ./Simple_surface_labels2009.txt"));
+            assert!(
+                String::from_utf8_lossy(&r.err)
+                    .contains("could not open translation file ./Simple_surface_labels2009.txt")
+            );
         } else {
             assert!(r.noted("FS-978") && !r.noted("FS-979"));
             assert_eq!(s.vertex(0).annotation, annot(B));
@@ -245,13 +268,20 @@ fn mode_filter_large_indices() {
             s.vertex_mut(k).annotation = annot(B);
         }
         let mut io = io!(r);
-        let res =
-            valrest::mode_filter_annotations(&mut r.g, &mut r.sg, &mut io, Some(td.path()), &mut s, 2);
+        let res = valrest::mode_filter_annotations(
+            &mut r.g,
+            &mut r.sg,
+            &mut io,
+            Some(td.path()),
+            &mut s,
+            2,
+        );
         if fails {
             assert!(res.is_err());
             assert!(
-                String::from_utf8_lossy(&r.err)
-                    .contains("MRISmodeFilterVals: could not allocate histo array of -2147483648 ints"),
+                String::from_utf8_lossy(&r.err).contains(
+                    "MRISmodeFilterVals: could not allocate histo array of -2147483648 ints"
+                ),
                 "{}",
                 String::from_utf8_lossy(&r.err)
             );
@@ -284,9 +314,19 @@ fn value_setters() {
         }
         valrest::set_curvatures_to_values(&mut r.g, &mut s, 1).unwrap();
         assert!(r.noted("FS-980"));
-        let vals = |s: &Mris, k: usize| valrest::vals_vp(s.vertex(k)).unwrap().lock().unwrap().clone();
+        let vals = |s: &Mris, k: usize| {
+            valrest::vals_vp(s.vertex(k))
+                .unwrap()
+                .lock()
+                .unwrap()
+                .clone()
+        };
         assert_eq!(vals(&s, 0).vals, vec![-1.0, 0.5]);
-        assert_eq!(vals(&s, 2).vals, vec![-1.0], "vertex 2 holds one value: skipped");
+        assert_eq!(
+            vals(&s, 2).vals,
+            vec![-1.0],
+            "vertex 2 holds one value: skipped"
+        );
         valrest::set_orig_values_to_curvatures(&mut r.g, &mut s, 0).unwrap();
         assert_eq!(s.vertex(3).curv, -2.0);
         s.vertex_mut(1).vp = Default::default();
@@ -297,7 +337,11 @@ fn value_setters() {
         } else {
             res.unwrap();
             assert_eq!(s.vertex(0).curv, -1.0);
-            assert_eq!(s.vertex(1).curv, -2.0, "vertex 1 without values keeps its curvature");
+            assert_eq!(
+                s.vertex(1).curv,
+                -2.0,
+                "vertex 1 without values keeps its curvature"
+            );
         }
     }
 }
@@ -314,16 +358,29 @@ fn dilation_counts_each_pass() {
         let n = s.nvertices;
         let m = r.measure(n, 1.0);
         let mut io = io!(r);
-        let mask =
-            valrest::dilate_vertex_to_sum(&mut r.g, &mut r.sg, &mut io, 0, Some(&mut s), Some(&m), 40.0)
-                .unwrap();
+        let mask = valrest::dilate_vertex_to_sum(
+            &mut r.g,
+            &mut r.sg,
+            &mut io,
+            0,
+            Some(&mut s),
+            Some(&m),
+            40.0,
+        )
+        .unwrap();
         if mode.reproduce() {
             assert!(mask.is_none());
-            assert!(r.text().contains("not possible to achieve target sum 40"), "{}", r.text());
+            assert!(
+                r.text().contains("not possible to achieve target sum 40"),
+                "{}",
+                r.text()
+            );
         } else {
             let mask = mask.expect("a mask");
             let set = (0..n)
-                .filter(|&c| mri_get_vox_val(&mut r.g, &mut r.err, &mask, c, 0, 0, 0, 0).unwrap() != 0.0)
+                .filter(|&c| {
+                    mri_get_vox_val(&mut r.g, &mut r.err, &mask, c, 0, 0, 0, 0).unwrap() != 0.0
+                })
                 .count();
             assert!((40..=44).contains(&set), "{set} vertices");
             assert!(r.noted("FS-982"));
@@ -377,15 +434,25 @@ fn dilation_target_not_above_zero() {
         let n = s.nvertices;
         let m = r.measure(n, 1.0);
         let mut io = io!(r);
-        let res =
-            valrest::dilate_vertex_to_sum(&mut r.g, &mut r.sg, &mut io, 0, Some(&mut s), Some(&m), 0.0);
+        let res = valrest::dilate_vertex_to_sum(
+            &mut r.g,
+            &mut r.sg,
+            &mut io,
+            0,
+            Some(&mut s),
+            Some(&m),
+            0.0,
+        );
         assert!(r.noted("FS-983"));
         if mode.reproduce() {
             assert!(matches!(res, Err(Fatal::Exit(139))));
             assert!(r.noted("FS-530"));
         } else {
             assert!(res.unwrap().is_none());
-            assert!(r.text().contains("ERROR: MRISdilateVertexToSum(): targetSum = 0, must be > 0\n"));
+            assert!(
+                r.text()
+                    .contains("ERROR: MRISdilateVertexToSum(): targetSum = 0, must be > 0\n")
+            );
         }
     }
 }
@@ -403,7 +470,11 @@ fn colour_table_lookups_without_a_table() {
         assert!((0..s.nvertices as usize).all(|k| s.vertex(k).ripflag == 1));
         assert!(String::from_utf8_lossy(&r.err).contains("CTABfindAnnotation: ct was NULL"));
         let mut io = io!(r);
-        assert!(valrest::annotation_to_label(&mut r.g, &mut io, &s, 1).unwrap().is_none());
+        assert!(
+            valrest::annotation_to_label(&mut r.g, &mut io, &s, 1)
+                .unwrap()
+                .is_none()
+        );
         assert!(r.noted("FS-985"));
         s.ct = Some(ctab(&[Some(A), None]));
         for k in 0..s.nvertices as usize {
@@ -414,7 +485,11 @@ fn colour_table_lookups_without_a_table() {
         let mut io = io!(r);
         let out = valrest::dilate_confined(&mut r.g, &mut io, &mut s, &mask, 0, 1, 1).unwrap();
         assert_eq!(out.vg.width, s.nvertices);
-        assert_eq!(s.vertex(0).annotation, annot(A), "an empty place: no new annotation");
+        assert_eq!(
+            s.vertex(0).annotation,
+            annot(A),
+            "an empty place: no new annotation"
+        );
     }
 }
 

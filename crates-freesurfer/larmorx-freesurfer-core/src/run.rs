@@ -68,19 +68,45 @@ impl Environment {
         )
     }
 
-    /// The value of `name` (`getenv`): `None` when it is not set.
+    /// The name under which `name` is stored: itself, or on Windows, whose variable names do not
+    /// depend on case (`Path` is `PATH`), a name equal to it but for ASCII case.
+    fn stored(&self, name: &std::ffi::OsStr) -> Option<OsString> {
+        if self.0.contains_key(name) {
+            return Some(name.to_owned());
+        }
+        if !cfg!(windows) {
+            return None;
+        }
+        let name = name.to_str()?;
+        self.0
+            .keys()
+            .find(|k| k.to_str().is_some_and(|k| k.eq_ignore_ascii_case(name)))
+            .cloned()
+    }
+
+    /// The value of `name` (`getenv`): `None` when it is not set (on Windows any case of the
+    /// name).
     pub fn get(&self, name: &str) -> Option<&OsString> {
-        self.0.get(std::ffi::OsStr::new(name))
+        let name = std::ffi::OsStr::new(name);
+        match self.0.get(name) {
+            Some(v) => Some(v),
+            None => self.0.get(&self.stored(name)?),
+        }
     }
 
-    /// Sets `name` (`setenv` with overwrite).
+    /// Sets `name` (`setenv` with overwrite; on Windows a variable of the name in another case is
+    /// the same variable, and keeps its name).
     pub fn set(&mut self, name: impl Into<OsString>, value: impl Into<OsString>) {
-        self.0.insert(name.into(), value.into());
+        let name = name.into();
+        let key = self.stored(&name).unwrap_or(name);
+        self.0.insert(key, value.into());
     }
 
-    /// Removes `name` (`unsetenv`).
+    /// Removes `name` (`unsetenv`; on Windows in any case).
     pub fn remove(&mut self, name: &str) {
-        self.0.remove(std::ffi::OsStr::new(name));
+        if let Some(k) = self.stored(std::ffi::OsStr::new(name)) {
+            self.0.remove(&k);
+        }
     }
 
     /// Every variable, in byte order of the names.
@@ -124,6 +150,18 @@ mod tests {
         env.remove("SUBJECTS_DIR");
         let names: Vec<_> = env.iter().map(|(k, _)| k.to_str().unwrap()).collect();
         assert_eq!(names, ["FREESURFER_HOME"]);
+        // Windows' variable names do not depend on case; elsewhere they do
+        let w = cfg!(windows);
+        let mut env = Environment::from_pairs([("Path", "/bin")]);
+        assert_eq!(env.get("PATH").is_some(), w);
+        env.set("PATH", "/usr/bin");
+        assert_eq!(env.iter().count(), if w { 1 } else { 2 });
+        assert_eq!(
+            env.get("Path").unwrap(),
+            if w { "/usr/bin" } else { "/bin" }
+        );
+        env.remove("PATH");
+        assert_eq!(env.get("Path").is_some(), !w);
     }
 
     #[test]

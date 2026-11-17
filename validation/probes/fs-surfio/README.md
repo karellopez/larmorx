@@ -477,6 +477,25 @@ its signal 11 writing a ripped `Gdiag_no`'s log (FS-977), both reproduced. A lab
 surface (FS-917) is written `G`; `MRISmodeFilterZeroVals` runs only in cases without special values
 (FS-973's NaN makes the official filter print for ever).
 
+Measured 2026-11-17 (relay 41 of track D, 59 commands): `vlr` (`mrisurf_vals.cpp`'s functions of
+one program each: the rip dilation and erosion with the faces' flags, `MRISripZeros`,
+`MRISripUnknown`, the vector registration's value setters, `MRISmodeFilterAnnotations` with the
+program's annotation table (none, a table file where FreeSurfer looks for its default one, or a
+colour table set first) and the surface's colour table, `MRISdilateVertexToSum` with a measure, the
+areas or no surface, `MRISdilateConfined`, the accumulations, `MRISclearWhichAndVal2`,
+`MRISmarkRandomVertices` with `FREESURFER_SEED`, `MRISannotation_to_label`; the port's side in
+`tests/fs_surfio/vlr.rs`), seeds 7, 13 (500 cases each) and 17 (1,000): 0 different with
+`reproduce`, `fix` different only with notices (FS-978, FS-981 to FS-983, FS-03, FS-01, FS-12). The
+official build's results include its signal 11 for a value setter on a vertex without values
+(FS-981) and for a disk of no hops (FS-983 through FS-530), both reproduced, and FS-979's writes past
+its one-entry tables, which never crashed it. `G` where FreeSurfer reads memory it never wrote: a
+field outside a vertex's values (FS-980), a surface without a colour table (FS-984), an index without
+an annotation (FS-985). `flr maf` and `flr dvs` (`real.py --vlr`: three heads, both hemispheres;
+`mris_ca_label`'s filter of four recorded annotations, `mri_binarize --dilate-vertex` disks of 5, 20
+and 50 mm around vertices 0, 1,000 and 50,000): 78 of 78 identical with `reproduce`; the default
+finds the 18 disks of 50 mm FreeSurfer reports as not possible (FS-982: its count over the passes
+passes the vertex count at pass 45 or 46). Official 53 s, port 71-75 s (the reads are track A's).
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

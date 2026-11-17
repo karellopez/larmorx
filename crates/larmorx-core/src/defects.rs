@@ -1865,6 +1865,22 @@ defects! {
         "marking a surface's intersections (mrisMarkIntersections) leaves the marks of ripped vertices as they were, and its hole filling counts a ripped vertex as marked or not by that old mark; the programs' surfaces have no ripped vertices there";
     FS_917 = "FS-917", "FreeSurfer", true,
         "ripping a surface's vertices by a label (MRISripLabel, MRISripNotLabel: mris_place_surface's label option) writes outside the surface's vertices for a label point that names no vertex (-1, a volume label's points) or a vertex beyond the surface's";
+    FS_978 = "FS-978", "FreeSurfer", true,
+        "the mode filter of a surface's annotations (MRISmodeFilterAnnotations, mris_ca_label) filters through the program's annotation table, which it sets from the surface's colour table only when the program has none and only after it has sized its counts: a surface whose annotations come from its own colour table is filtered through another table (the default table file's, or one the program used before), and when the program has no table and the default file cannot be read the filter changes nothing but the annotations it does not know (mris_ca_label sets the table from the same colour table first, so its results are not changed)";
+    FS_979 = "FS-979", "FreeSurfer", true,
+        "in FS-978's second case (no annotation table and no default table file), the mode filter of a surface's annotations counts every annotation of the surface's colour table outside its counts of one entry: memory is corrupted and the program may crash";
+    FS_980 = "FS-980", "FreeSurfer", true,
+        "the vector registration's value setters (MRISsetCurvaturesToValues, MRISsetCurvaturesToOrigValues, MRISsetOrigValuesToCurvatures, MRISsetOrigValuesToValues, MRISsetValuesToCurvatures) read or write outside a vertex's value arrays for a field number outside them";
+    FS_981 = "FS-981", "FreeSurfer", true,
+        "the vector registration's value setters crash the program for an unripped vertex that has no value arrays";
+    FS_982 = "FS-982", "FreeSurfer", true,
+        "dilating a vertex to a target sum (MRISdilateVertexToSum, mri_binarize --dilate-vertex-sum) counts the vertices of all its passes together, so it reports the target as not possible once its passes together have counted as many vertices as the surface has, though the last pass's disk holds fewer (a disk of a few hundred vertices on a whole hemisphere is still found; on a small surface the dilation stops early); when the vertex's part of the surface is used up before the target is reached it goes on with a pass for every vertex it counted, each pass over the whole part";
+    FS_983 = "FS-983", "FreeSurfer", true,
+        "dilating a vertex to a target sum (MRISdilateVertexToSum) with a target that needs no pass (not above 0 with a measure given, or not a number) builds its mask from hop lists of no hops: the program crashes";
+    FS_984 = "FS-984", "FreeSurfer", true,
+        "ripping a surface's unknown vertices (MRISripUnknown: mri_gtmpvc's surfaces) and the confined dilation of a surface mask with an annotation to stay in (MRISdilateConfined), for a surface without a colour table, decide each vertex by a colour-table index the program never computed (memory contents): the vertices ripped or dilated are arbitrary";
+    FS_985 = "FS-985", "FreeSurfer", true,
+        "the confined dilation of a surface mask with a new annotation (MRISdilateConfined) and the label of an annotation (MRISannotation_to_label: mris_hausdorff_dist) take the annotation of a colour-table index the table does not hold (no table, an index outside it or an empty place) from memory never written: the dilated vertices get an arbitrary annotation, and the label holds the vertices of an arbitrary one (or the program crashes)";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

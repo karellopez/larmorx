@@ -79,7 +79,7 @@ fn annot_file(g: &mut Gen, nv: i64, colours: &[(i64, i64, i64)]) -> Vec<u8> {
     b
 }
 
-fn ctab_tokens(t: &mut Vec<String>, g: &mut Gen, colours: &[(i64, i64, i64)]) {
+pub(super) fn ctab_tokens(t: &mut Vec<String>, g: &mut Gen, colours: &[(i64, i64, i64)]) {
     let nct = if g.chance(4) { -1 } else { g.int(0, 6) };
     ix(t, nct);
     for k in 0..nct.max(0) {
@@ -179,7 +179,7 @@ pub(super) fn ann_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
 }
 
-fn read_ctab(t: &mut Toks) -> Option<ColorTable> {
+pub(super) fn read_ctab(t: &mut Toks) -> Option<ColorTable> {
     let nct = t.i();
     if nct < 0 {
         return None;

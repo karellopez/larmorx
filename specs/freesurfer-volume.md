@@ -421,11 +421,14 @@ accumulation) and inverses `MatrixInverse`'s (none when an element of the result
 - `MRIindexNotInVolume(mri, c, r, s)`: 0 when every coordinate is in `[0, extent - 1]`; else -1 when
   each coordinate rounded to nearest (ties to even) as a `float` is in `[0, extent)`; else 1 (NaN
   coordinates give 1).
-- `MRIsampleVolumeType(..., SAMPLE_NEAREST)`: 1 above gives `outside_val`. Otherwise the voxel of
-  frame 0 at the coordinates rounded by `nint` (half away from zero; FS-12 for numbers outside
-  `int`), each clamped to `[0, extent - 1]`, as a `float` (an `int` voxel rounded to `float`); a
-  type other than uchar, short, ushort, int, float gives 0 and the error `MRIsampleVolumeType:
-  unsupported volume type <t>` (`ERROR_UNSUPPORTED`).
+- `MRIsampleVolumeType(..., SAMPLE_NEAREST)`, in this order: 1 above gives the sample `outside_val`
+  and returns 0, whatever the volume's type (with voxels or without). Otherwise the coordinates
+  are rounded by `nint` (half away from zero; FS-12 for numbers outside `int`), each clamped to
+  `[0, extent - 1]`; then a type other than uchar, short, ushort, int, float (long, RGB, tensor,
+  bitmap, the complex types, with voxels or without) gives the sample 0, the error
+  `MRIsampleVolumeType: unsupported volume type <t>` and returns `ERROR_UNSUPPORTED` (-3); else the
+  voxel of frame 0 there as a `float` (an `int` voxel rounded to `float`), returning 0
+  (**(observed)**: `vstats`; `vrules`, inside, outside and at the ambiguous -0.4 for six types).
 - `MRIcenterOfMass(mri, means, threshold)`: over the voxels in z, y, x order, each sampled as above
   (so an unsupported type prints its error once per voxel), those above `threshold` (a byte)
   accumulate in `double`: `weight += v`, `mx += x * v` (x converted to `float`, then `double`), the

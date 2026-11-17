@@ -337,3 +337,78 @@ fn fs39_evaluation_limit_at_the_driver() {
         assert!(d.end_error < 19.0, "{}", d.end_error);
     }
 }
+
+/// FS-926 (both modes): a default allocator's block above 256 MiB is made (here 2^25 rows of no
+/// numbers: 256 MiB of row pointers), one above 16 GiB is refused with the two lines and status 1
+/// (2^31 - 1 rows); the old allocator has no such block.
+#[test]
+fn fs926_blocks_of_many_rows() {
+    use larmorx_core::defects::FS_926;
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let m = p
+            .matrix_alloc(1 << 25, 0, 1)
+            .expect("made")
+            .expect("a matrix");
+        assert_eq!((m.rows, m.cols), (1 << 25, 0));
+        assert!(p.notices().contains(&FS_926));
+        let mut p = Process::silent(Environment::new(), mode);
+        let r = p.matrix_alloc(i32::MAX, 0, 1);
+        assert!(matches!(r, Err(s) if s.status() == 1));
+        assert!(p.notices().contains(&FS_926));
+        let mut p = Process::silent(Environment::new(), mode);
+        assert!(p.matrix_alloc(1 << 20, 4, 1).expect("made").is_some());
+        assert!(!p.notices().contains(&FS_926));
+        let mut env = Environment::new();
+        env.set(b"FREESURFER_MatrixAlloc_old", b"1");
+        let mut p = Process::silent(env, mode);
+        assert!(p.matrix_alloc(1 << 25, 0, 1).expect("made").is_some());
+        assert!(!p.notices().contains(&FS_926));
+    }
+}
+
+/// FS-924 (`reproduce`): a binary matrix file that ends more than 2^20 numbers early is refused
+/// after the first `freadDouble` line (a given matrix keeps the numbers read before the cut); at
+/// 2^20 or fewer FreeSurfer's lines and numbers (FS-49). The default refuses at the first missing
+/// number (FS-49).
+#[test]
+fn fs924_files_that_end_far_too_early() {
+    use larmorx_core::defects::{FS_49, FS_924};
+    use larmorx_fs_core::maths::Returned;
+    use larmorx_fs_core::maths::matrix::Matrix;
+    use larmorx_fs_core::maths::mfiles::CStream;
+    let rows: i32 = (1 << 20) + 2;
+    let mut bytes = Vec::new();
+    for v in [1i32, rows, 1] {
+        bytes.extend_from_slice(&v.to_be_bytes());
+    }
+    bytes.extend_from_slice(&2.5f64.to_be_bytes());
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let mut given = Matrix::zeros(rows, 1, 1);
+        given.set(2, 1, 7.0);
+        let r = p
+            .matrix_read_from(&mut CStream::new(bytes.clone()), Some(&mut given))
+            .expect("returns");
+        assert!(matches!(r, Returned::Nothing));
+        if mode == UpstreamDefects::Reproduce {
+            assert!(p.notices().contains(&FS_924));
+            assert_eq!((given.at(1, 1), given.at(2, 1)), (2.5, 7.0));
+        } else {
+            assert!(p.notices().contains(&FS_49));
+            assert!(!p.notices().contains(&FS_924));
+        }
+    }
+    // One number short of the limit after the first one read: FreeSurfer's matrix (FS-49).
+    let mut small = Vec::new();
+    for v in [1i32, (1 << 20) + 1, 1] {
+        small.extend_from_slice(&v.to_be_bytes());
+    }
+    small.extend_from_slice(&2.5f64.to_be_bytes());
+    let mut p = Process::silent(Environment::new(), UpstreamDefects::Reproduce);
+    let r = p
+        .matrix_read_from(&mut CStream::new(small), None)
+        .expect("returns");
+    assert!(matches!(r, Returned::New(_)));
+    assert!(!p.notices().contains(&FS_924));
+}

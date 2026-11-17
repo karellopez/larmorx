@@ -94,6 +94,9 @@ pub struct Process {
     pub(crate) zone: Option<crate::timedate::ZoneCache>,
     pub(crate) vm_peak: [i32; 5],
     pub(crate) maths: crate::maths::MathsState,
+    /// The derivative sign of the volume samplers (`MRIsetSampleVolumeDerivativeSign`, 1 at
+    /// the start: `specs/freesurfer-volume.md` §16).
+    pub derivative_sign: f64,
 }
 
 impl Process {
@@ -132,6 +135,7 @@ impl Process {
             zone: None,
             vm_peak: [0; 5],
             maths: Default::default(),
+            derivative_sign: 1.0,
         }
     }
 

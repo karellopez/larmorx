@@ -28,7 +28,8 @@ Python), or `docs/parts/`. Its only inputs were:
 `src/maths/` (FreeSurfer 8.2.0's mathematics, `fs.maths`, queue item C3.1-02) and `src/clib/printf.rs`
 were written by the same clean-room implementers, under the same restrictions as above, from
 [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) as of commit `a59c9d0e` (2026-11-13),
-brought to its amendments of commit `3a1ef09e` (2026-11-13: §2.2, §3, §17, §18.1, §18.2), never
+brought to its amendments of commits `3a1ef09e` (2026-11-13: §2.2, §3, §17, §18.1, §18.2) and
+`a8c62d4e` (2026-11-16: §2.2 FS-926, §17.4, §17.5, §18.2 FS-924), never
 from Numerical Recipes' code. Its inputs:
 
 | Input | What it gave |
@@ -51,3 +52,18 @@ brought to its amendments of commit `023bbf8a` (2026-11-13: §3, §6, §9, §13)
 | [`specs/freesurfer-core.md`](../../specs/freesurfer-core.md), [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) and this crate's clean rooms of them | the messages, `nint` and the conversions; the float matrices, their products, inverse, determinant and printing |
 | The open probe folder [`validation/investigations/freesurfer-mri-probe/`](../../validation/investigations/freesurfer-mri-probe/README.md) (its README, `compare.py`, and `fs_mri_probe.cpp`'s calls and print forms) and black-box runs of the prebuilt probe `fs_mri_probe` (FreeSurfer 8.2.0's compiled volume structure, with the fs.maths probe's guard allocator) | the comparisons of the spec's §23 (`validation/investigations/freesurfer-cleanroom-mri/`), the behaviours measured beyond the spec's text (`docs/findings/fs-mri-clean-room.md`), the new defect FS-331 |
 | larmorx's own Apache-2.0 code: `larmorx_core::defects`, `larmorx_core::drand48`, `larmorx_core::cfmt` | the defect register's entries, the C library's generator, the number formats |
+
+## Clean-room implementation from specs/freesurfer-volume.md
+
+`src/volume/` (FreeSurfer 8.2.0's volume functions, `fs.volume`, the rest of queue item C3.1-05;
+parts 1 to 3 of the spec, §1 to §17) was written by the same clean-room implementers, under the same
+restrictions as above, from [`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) as of
+commit `7ef384ea` (2026-11-16; its parts 1 to 3 made ready for the clean room), never from its
+sections after §17. Its inputs:
+
+| Input | What it gave |
+|---|---|
+| [`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §17 and §69 | the behaviour of every function of parts 1 to 3: the volume-geometry text block's writer and reader, the geometry's copies, matrices, comparison and printer, the clones, clearing, size checks and frame copies, value ranges, scaling, thresholds, binarising and signs, the functions of two volumes, the extraction of a region and its centre, the tkregister matrices and points, the orientation string, slice direction and Talairach point, the index check, the nearest sample, centre of mass, principal components and running average, the header comparison, determinant, dump and derivative sign; the defects FS-285 to FS-297 with their corrections and `reproduce` |
+| [`specs/freesurfer-mri.md`](../../specs/freesurfer-mri.md), [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md), [`specs/freesurfer-core.md`](../../specs/freesurfer-core.md) and this crate's clean rooms of them | the volume structure, voxel access and header copy, the float matrices, the eigensystem, the scanf model of the C library, the messages |
+| The open probe folder [`validation/investigations/freesurfer-volume-probe/`](../../validation/investigations/freesurfer-volume-probe/README.md) (its README, `compare.py`, and `fs_volume_probe.cpp`'s calls and print forms) and black-box runs of the prebuilt probe `fs_volume_probe` (with the fs.maths probe's guard allocator) | the comparisons of the spec's §69 (`validation/investigations/freesurfer-cleanroom-volume/`), the behaviours measured beyond the spec's text (`docs/findings/fs-volume-clean-room.md`), the new defect FS-332 |
+| larmorx's own Apache-2.0 code: `larmorx_core::defects`, `larmorx_core::cscan`, `larmorx_core::cfmt` | the defect register's entries, the C library's readings and number formats |

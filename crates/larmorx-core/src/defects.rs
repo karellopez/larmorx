@@ -1387,6 +1387,8 @@ defects! {
         "the 4 x 4 matrix helpers (MRImatrixOfDirectionCosines, MRImatrixOfVoxelSizes, MRImatrixOfTranslations, a geometry's toMatrix and RASFromSurfaceRAS_ given a matrix to fill; MRIsetVox2RASFromMatrix given its matrix) given a matrix with fewer than 4 rows or columns write or read past its elements: a crash, memory contents, or other elements of the matrix changed";
     FS_331 = "FS-331", "FreeSurfer", true,
         "RASFromSurfaceRAS_ (and VGtkreg2RAS) given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, the program ends when one of the matrix's first 4 x 4 numbers left unwritten is not finite, and one of more than 4 rows gives nothing after a size-mismatch error";
+    FS_332 = "FS-332", "FreeSurfer", true,
+        "MRIclone given the source itself as its destination frees the source's colour table before copying it: the volume loses its colour table after an error that no table could be copied";
     FS_167 = "FS-167", "FreeSurfer", true,
         "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents; znzreadInt and znzreadLong keep there the bytes of the number read just before them, as freadInt does (FS-49): a tag's length cut by the end of a compressed or plain volume file, and a binary colour table's numbers in such a file";
     FS_168 = "FS-168", "FreeSurfer", true,

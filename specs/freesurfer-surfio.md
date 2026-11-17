@@ -5446,3 +5446,179 @@ FS-978 to FS-985 in both modes, indices of 2^31 - 2 and 2^31 - 1, the rips and f
 field's assertion. A clean-room implementer's black-box forms: `mris_ca_label` (its filter, on the
 recorded heads), `mri_binarize --dilate-vertex` and `--dilate-vertex-sum`, `mri_surf2surf`'s patch
 dilation.
+
+## 144. The rest of the topology: Euler counts, edge and link removal, the surface check, the removal and renumbering of ripped vertices, the eversion (fs.surf's `mrisurf_topology.cpp`, taken early; relay 42 of track D)
+
+A vertex's neighbour list holds its 1-hop neighbours first (`vnum` of them), then those at 2 and 3
+hops (`v2num`, `v3num` counted from the start), then any sampled ones; `vtotal` are in use (the
+count of its current size `nsizeCur`, or more after a sampling); `nsizeMax` the largest size it
+knows. Its face list holds `num` faces and, for each, the vertex's place (0 to 2) in that face.
+
+**144.1 Counts.** `MRIScomputeEulerNumber(mris, &nv, &nf, &ne)` (`mris_euler_number`,
+`mris_fix_topology`, `mri_segstats`'s surface counts): `nf` the unripped faces, `nv` the unripped
+vertices, `ne` for each unripped vertex its 1-hop neighbours of a larger number that are unripped;
+returns `nv - ne + nf`. `MRIStopologicalDefectIndex(mris)`: with the same counts `e`, `|2 - e| + |2 ne -
+3 nf|`. `mrisCountTotalNeighbors(mris)`: over the unripped vertices, `vtotal + 1`.
+`MRIScountTotalNeighbors(mris, n)`: over the unripped vertices, 1 each (`n` 0) or `vnum`, `v2num`,
+`v3num` (`n` 1, 2, 3); each such vertex must know `n` hops (`nsize <= vt->nsizeMax`, an assertion,
+line 931 of `utils/mrisurf_topology.cpp`, FS-03); any other `n` (negative) ends the program with
+`MRIScountNeighbors(<n>): max nbhd size = 3` (`ErrorExit`, `ERROR_UNSUPPORTED`). `edgeExists(mris,
+a, b)`: 1 when `b` is among `a`'s 1-hop neighbours. `vertexInFace(mris, v, f)`: 1 when `f` is in
+`v`'s face list. `mrisCountValidLinks(mris, a, b)`: the unripped faces of `a`'s list in which `b`
+follows `a` (the vertex after it in the face, the first after the third), each place of `a` counted;
+the other direction is not counted (FS-990). `MRISgetNeighborsBeginEnd(mris, v, inner, outer)`: the
+places of the neighbours from `inner` to `outer` hops: begin 0, `vnum`, `v2num` (inner 1, 2, 3), end
+`vnum`, `v2num`, `v3num` (outer 1, 2, 3), each count read as a signed 16-bit value widened to an
+unsigned 64-bit one; `(0, 0)` when `inner > outer`; otherwise, unless `outer` is at most 1, the
+vertex's clock must be the surface's (assertion, line 1009), and another `inner` or `outer` fails one
+(lines 1015, 1021).
+
+**144.2 Edges and links.** `mrisAddEdge(mris, a, b)`: each of the two gets the other at the end of
+its 1-hop ring (its list made exactly `vnum + 1` long, so neighbours beyond one hop are dropped), its
+count in use its 1-hop count, its sizes 1 (§87's edge addition, with its messages).
+`mrisRemoveEdge(mris, a, b)`: the first `b` among `a`'s 1-hop neighbours removed, the later 1-hop
+neighbours moved one place down; `vnum` one less; `vtotal`, `v2num` and `v3num` left as they were,
+so the old last 1-hop neighbour also stands after the ring (FS-989). Nothing when `b` is not there.
+`mrisRemoveVertexLink(mris, a, b)`: the first `b` among `a`'s 1-hop neighbours removed from the
+neighbours in use (those after it, up to `vtotal`, moved down one place); `vnum` and `vtotal` one
+less; `v2num` and `v3num` as they were (FS-989); returns 0. **FS-992** (class a: memory corrupted):
+when `vtotal` is below the place after `b` (a neighbourhood size of 0), FreeSurfer moves a negative
+count of entries: its memory copy then writes over the memory around the list (observed: the program
+goes on with other vertices' lists corrupted); both modes move the 1-hop ring's later entries down
+and lower `vnum` only, noted. `MRISremoveTriangleLinks(mris)`: only for a quadrangle surface (type
+0, `MRIS_BINARY_QUADRANGLE_FILE`) whose links are not yet removed (`triangle_links_removed`, then set
+to 1): with `DIAG_SHOW` and verbose diagnostics `removing non-quadrangular links.` on standard output;
+then for every unripped face of an even number (0, 2, ...), with `s` = `nint(sqrt(1.9 v0) + sqrt(3.5
+v1))` of its first two vertices (§4's repeatable face-split choice, with FS-12), the link between its second
+and third vertices removed both ways when `s` is even (C's truncating division: `(s / 2) * 2 == s`),
+else between its first and third; returns 0. `mrisRemoveFace(mris, f)`: the face ripped (flag 1);
+for each of its edges in face order `(v_k, v_k+1)`, when `mrisCountValidLinks(v_k, v_k+1)` is 0 the
+edge removed both ways (`mrisRemoveEdge`); returns 0. **FS-990** (class c, kept: rule D, to be
+measured at the programs that tear surfaces, `mris_inflate`'s and `mris_flatten`'s explosion): on a
+consistently ordered surface the face beside it holds the same edge in the other direction, which
+the count misses, so the face's links are removed though another face holds them. `mrisRemoveLink(mris,
+a, b)`: the edge removed both ways; each face of `a`'s list that holds `b` ripped (flag 1); each face
+of `a`'s list whose flag is then 2 or more removed (`mrisRemoveFace`: never one it ripped, FS-990: so
+the other links of the ripped faces stay, though no unripped face may hold them); then each of `a` and
+`b` ripped (flag 1) when no face of its list is unripped; returns 0.
+
+**144.3 Neighbourhood resets.** `mrisStoreVtotalInV3num(mris)`: every vertex's `v3num` set to its
+`vtotal`. `mrisVertexReplacingNeighbors(mris, v, n)`: the surface's `max_nsize` 1, its `nsize` -1
+unless it was 1, every vertex's distances released (§15); the vertex's
+sizes 1, its list made `n` long (new places 0; not changed for `n` 0 or less), `vnum` `n` (§5's
+setting, with its message), `v2num` and `v3num` 0, `vtotal` `n`. `mrisForgetNeighborhoods(mris)`:
+that for every vertex with its own `vnum`, then `nsize` 1.
+
+**144.4 The surface check.** `MRISisSurfaceValid(mris, patch, verbose)` (`mris_topo_fixer`): every
+vertex and face whatever its flags. (1) Border vertices: those whose `vnum` is not their `num`; with
+`verbose` 2 first `\nchecking for border faces...\n`, and for each (when `patch` is 0) `vertex <v> :
+vnum = <vnum> num=<num>`. (2) With `verbose` 2 `\nchecking for single or multiple faces...\n`; for each
+vertex `n` and each 1-hop neighbour `p` in order, the faces of `n`'s list that hold `p`: fewer than 2 a
+single-face edge (with `verbose` 2 and `patch` 0: `edge <n> <--> <p> : single face`), more than 2 a
+multiple-face edge (`... : multiple face`, `verbose` 2); `ne` the sum of every vertex's `vnum`, halved
+(C's integer division); `euler = nvertices - ne + nfaces`. (3) With `verbose` 2 `\nchecking for
+corner configurations...\n`; for each vertex `n`: its 1-hop neighbours' marks set to 0; the mark of
+the vertex its list's first entry names set to 1; then passes over `n`'s faces in list order until a
+pass marks nothing: a face holding a marked vertex other than `n` marks its first unmarked vertex
+other than `n` (one per face per pass); a 1-hop neighbour left unmarked makes `n` a corner
+configuration (`vertex <n> : corner configuration` with `verbose` 2). The marks stay as set. **FS-991**
+(class a: memory never written / a crash): for a vertex without neighbours FreeSurfer reads the first
+entry of an empty list (the mark of an arbitrary vertex set) or, without a list, crashes; both modes
+set no mark for an empty list, `reproduce` ends the program without a list (signal 11), noted; a
+list that still holds an entry (its neighbours removed) is used as it is. (4) With `verbose` not 0,
+on standard error: `Surface Diagnostics:       \n   eno=<euler> (nv=<nvertices>, nf=<nfaces>, ne=<ne>)\n
+  # of border vertices [ #v ~ #f ]     <n> \n   # of edges with single face          <n> \n   # of
+edges with more than 2 faces    <n> \n   # of corner configurations           <n>\n` (the spaces as
+written). Returns 0 when `patch` is not 0 and there are multiple-face edges or corners; otherwise 0
+when any of the four counts is not 0 (a patch with border vertices or single-face edges therefore
+returns 0 too); else 1.
+
+**144.5 Removing the ripped vertices from the lists** (`MRISremoveRipped(mris)`: `MRISreadPatch`, the
+label rips of `mri_surf2surf`, `mris_flatten`, the integrator's tearing). (1) Every ripped vertex
+(flag not 0): its `vtotal` must equal its count at `nsizeCur` (assertion, line 2905; a `nsizeCur`
+not 1 to 3 fails §5's count at `i` hops), its faces ripped (flag 1). (2) Every ripped face (those ripped
+before too): its three vertex numbers checked (each in `[0, nvertices)`, assertion line 3038) and
+set to 0. (3) Every vertex of a ripped face that is unripped keeps in its face list only the unripped
+faces (in order, with their places). **FS-986** (class c): the function is meant to find again the
+rings of the unripped vertices near the ripped ones, but FreeSurfer's selection of those vertices
+selects none, so the unripped vertices keep the ripped ones (and their distances) among their
+neighbours. By default the vertices within one hop more than the largest `nsizeMax` of an unripped
+vertex from a ripped vertex (found ring by ring from the ripped vertices, the most recently found
+first) have their rings found again to their own `nsizeMax` through unripped vertices only (§88's
+neighbour search with its FS-357 correction; the surface's clock and `vtotal` at `nsizeCur` set as
+that search sets them), their sampled neighbours beyond those rings kept but the ripped ones, and
+their distances (current and original, where they have them) carried by neighbour number; then (2)
+and (3). `reproduce` leaves the lists. Noted when a ripped vertex has an unripped 1-hop neighbour.
+
+**144.6 Renumbering without the ripped faces and vertices**
+(`MRISrenumberRemovingRippedFacesAndVertices(mris)`: `mris_inflate`'s explosion). The surface must
+keep no distances (`dist_alloced_flags` 0, assertion line 2859; every surface `MRISread` gives keeps
+its distances: they must be released first, §15). (a) The faces: the unripped ones moved down over
+the ripped ones in order (with their face-normal cache entries; not their deferred entries); every
+vertex's face list renumbered, its removed faces dropped; `nfaces` the unripped count. (b) The
+vertices: the unripped ones moved down in order; every kept vertex's list filtered: each entry of its
+first `vtotal` that is not ripped kept and renumbered, `vnum` and `v2num` the kept ones among the
+first `vnum` and `v2num`, `v3num` all kept, `nsizeMax` its `nsizeCur`, then `vtotal` and `nsizeCur`
+those of the surface's `nsize` (2, 3; 1 for any other); each kept vertex must know `nsize` hops
+(assertion, line 2829). Every face's vertices renumbered; `nvertices` the unripped count. **FS-987**
+(class c): FreeSurfer drops the removed faces from each vertex's face list but not their places, so
+after a removed face each kept face is paired with the place of the face before it. **FS-988** (class
+c): FreeSurfer moves each kept vertex's data to its new number but not its neighbour and face lists:
+the vertex now numbered `k` keeps the lists of the vertex numbered `k` before, its neighbours are
+tested by the flags of the vertices that have their numbers after the move, and only a flag of 1
+drops one. By default both lists move with their vertex and every ripped neighbour (any flag not 0)
+is dropped by its own flag. **FS-995** (class a): kept faces that hold ripped vertices, and (in
+FreeSurfer's order, often) neighbours dropped as ripped by FreeSurfer's test but numbered for
+removal, get the vertex number -1; the program's later reads through them go outside the surface's
+vertices. `reproduce` writes -1, noted; by default the faces holding ripped vertices are ripped first
+(removed with the others), noted. **FS-994** (class a): the moved faces' normal matrices and the moved
+vertices' user data are shared by two places, so releasing the surface releases them twice; larmorx
+keeps one copy each, noted.
+
+**144.7 Eversion and ordered neighbours.** `MRISevertSurface(mris)` (`mris_sphere`, `mris_register`
+with `-reverse`/`-evert`): every unripped face's first two vertices swapped and each of the two
+vertices' places in that face set again in its face list (as §16's face reversal sets them); returns 0.
+`MRISgetSpatOrderedNeighbors(mris, c)` (`mris_skeletonize`): the two vertices after `c` in its first
+face (the next and the one after, cyclically), then, `vnum - 2` times, the first 1-hop neighbour of
+`c` (in list order) that is not yet in the list and has both `c` and the list's last vertex among its
+own 1-hop neighbours (each matching entry counted, two hits needed), if any.
+`MRISisNextSpatOrderedNeighbor(mris, c, t, list)`: that test. **FS-993** (class a): a vertex without
+faces reads its first face from memory never written, and one its first face does not hold reads past
+the face's three vertices; both modes return the list found so far (none), noted.
+
+Not here: `mrisDivideEdgeTopologically` and `mrisDivideFace` (`mris_fix_topology`'s retessellation,
+with fs.defect's item) and `MRISfromVerticesAndFaces` (FreeSurfer's Python bindings only).
+
+## 145. Validation plan, part 35
+
+The probe's command of relay 42, `top` (an empty work folder with `d`; `SURFER_SIDEDOOR`): vls's
+grids (2 to 5 by 2 to 4), srd's small meshes and icosahedra (1 subdivision; 2 one case in thirty)
+read by `MRISread`; the neighbourhood set to 1, 2 or 3 hops, with its distances in one case in three
+(`MRISsetNeighborhoodSizeAndDist`); the type 3, or 0 (a quadrangle surface) one case in four; every
+vertex's flag (0; 1, 2 or -1 in one vertex in six of half the cases) and mark (0 or 1); every face's
+flag (1 for one face in eight of a quarter of the cases); `Gdiag` 0 or `DIAG_SHOW | DIAG_VERBOSE`
+(one in eight); then 1 to 6 of 144's functions and `MRISsetRipInFacesWithRippedVertices`,
+`MRIS_setNsizeCur` (sizes 0 to 3), a rip of one vertex, and `freedists` (the two distance releases,
+before most renumberings, which are mostly preceded by the faces' rips too); the edges mostly the
+mesh's (either direction), now and then any two vertices; after each: `nvertices`, `nfaces`, `nsize`,
+`max_nsize`, `triangle_links_removed`, `dist_alloced_flags`, `dist_nsize`, and for every vertex its
+flag, mark, faces with their places, the four counts, `nsizeMax`, `nsizeCur`, the list's `mrisVertexVSize`
+entries and its distances, for every face its vertices and flag. `G` (both sides) for a vertex or
+face number the surface no longer has (after a renumbering); after a renumbering that wrote -1 into a
+face or a kept list (FS-995) the state and `STOP` (both sides). Compared with the official build with
+`reproduce`: identical; the default identical but where a noted correction changed the result.
+Observed (relay 42): seeds 7, 13 (500 cases each) and 17 (1,000): 0 different with `reproduce` (17 of
+2,000 counted, not compared: FS-121, FS-991, FS-992, FS-993); the default differs only with notices.
+On the recorded heads (`real.py --top`, 3 heads, both hemispheres, `orig.premesh`, `orig.nofix`, `orig`
+and `white`, each with its `cortex.label`): the Euler counts, the defect index, the neighbours in use,
+the surface check, the removal of the vertices outside the label (`LabelRipRestOfSurface`'s steps),
+the renumbering and the eversion: 24 of 24 identical with `reproduce`; every `orig.premesh`'s Euler
+counts equal recon-all's `mris_euler_number` lines in `recon-all.log` (6 of 6; observed). The default
+differs in every case (FS-986: the removal's rings found again; FS-988: the renumbering's lists).
+`tests/toprest_defaults.rs` checks the counts of closed and open surfaces, FS-986's corrected rings
+(against rings found through the unripped faces) and distances, FS-987/988's consistent renumbering
+(every face held at its place, symmetric rings, the same Euler counts), FS-995, FS-992, FS-991, FS-993,
+the surface check's messages, the ordered neighbours, the triangle links and FS-990. A clean-room
+implementer's black-box forms: `mris_euler_number` (its counts and defect index on any surface),
+`mris_topo_fixer`'s check, `mris_flatten` and `mri_surf2surf` with patches or labels (the removal),
+`mris_inflate -explode` (the renumbering).

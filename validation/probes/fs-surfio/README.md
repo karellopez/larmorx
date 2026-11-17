@@ -496,6 +496,27 @@ and 50 mm around vertices 0, 1,000 and 50,000): 78 of 78 identical with `reprodu
 finds the 18 disks of 50 mm FreeSurfer reports as not possible (FS-982: its count over the passes
 passes the vertex count at pass 45 or 46). Official 53 s, port 71-75 s (the reads are track A's).
 
+Measured 2026-11-17 (relay 42 of track D, 60 commands): `top` (the rest of `mrisurf_topology.cpp`:
+`edgeExists`, `mrisCountValidLinks`, `mrisAddEdge`, `mrisRemoveEdge`, `mrisRemoveVertexLink`,
+`MRISremoveTriangleLinks` on surfaces typed as quadrangle files, `mrisCountTotalNeighbors`,
+`MRIScomputeEulerNumber`, `MRIStopologicalDefectIndex`, `mrisStoreVtotalInV3num`,
+`mrisVertexReplacingNeighbors`, `mrisForgetNeighborhoods`, `MRIScountTotalNeighbors`,
+`MRISgetNeighborsBeginEnd`, `MRISisSurfaceValid`, `vertexInFace`, `mrisRemoveLink`, `mrisRemoveFace`,
+`MRISrenumberRemovingRippedFacesAndVertices` (after `freedists`, `MRISfreeDistsButNotOrig` and
+`MRISfreeDistOrigs`), `MRISremoveRipped`, `MRISevertSurface`, `MRISgetSpatOrderedNeighbors`, with
+`MRISsetRipInFacesWithRippedVertices`, `MRIS_setNsizeCur` and rips between them, at 1 to 3 hops with or
+without distances; the port's side in `tests/fs_surfio/top.rs`), seeds 7, 13 (500 cases each) and 17
+(1,000): 0 different with `reproduce`, `fix` different only with notices (FS-986 to FS-990, FS-993,
+FS-995, FS-357, FS-03, FS-01). `G` (both sides) for a vertex or face a renumbering removed; after a
+renumbering that wrote the vertex number -1 (FS-995) both sides print the state and `STOP`. Counted,
+not compared: FS-991 (the surface check of a vertex without neighbours), FS-992 (a link removal whose
+copy runs over the memory around the list: the official build goes on with corrupted lists), FS-993.
+`flr top` (`real.py --top`: three heads, both hemispheres, `orig.premesh`, `orig.nofix`, `orig` and
+`white` with `cortex.label`: the counts, `MRISisSurfaceValid`, `LabelRipRestOfSurface`'s rip and
+removal, the renumbering, the eversion): 24 of 24 identical with `reproduce`; the six `orig.premesh`
+Euler counts equal recon-all's `mris_euler_number` lines. Official 23 s, port 40-42 s (the reads are
+track A's).
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

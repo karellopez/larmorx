@@ -137,7 +137,17 @@ endings, no final newline, data after the block, an empty file), `vgcopy` (§4),
 §15b), `vheader` (§16), and the fixed cases of `vrules` (§6-15: FS-291 with tensor volumes, the
 clear of a bitmap and of volumes without voxels, `MRIlinearScale` with `only_nonzero`, sums and
 differences of types without direct access, the frame copies' messages, `MRIvalRangeRegion` without
-a region, `MRIsampleVolumeType`'s order of checks): volumes of up to 4 x 4 x 4 voxels (5 for `vextract`, 6 for `vcoords`) and 0
-to 3 frames of every type (the types without a voxel size header-only), headers only too,
-destinations new, of the same shape, of another shape or a source, cached matrices as allocated,
-recomputed or dropped.
+a region, `MRIsampleVolumeType`'s order of checks): volumes of up to 4 x 4 x 4 voxels (5 for
+`vextract`, 6 for `vcoords`) and 0 to 3 frames of every type (the types without a voxel size
+header-only), headers only too, destinations new, of the same shape, of another shape or a source,
+cached matrices as allocated, recomputed or dropped.
+
+## Results (the reference machine: glibc 2.35, Linux 6.8, x86-64)
+
+- Relay 6 (2026-11-16): `refs`, seed 7, the prebuilt probe from commit `77392db5`: the hashes of
+  the spec's §69.2, the same through the oracle-output cache cold, warm and without it; the probe
+  as its own candidate: no unexplained difference in either mode.
+- Relay 7 (2026-11-17): the fixed group `vrules` (84 calls), the same hash from the cache and
+  without it, the other groups' hashes unchanged, the probe as its own candidate identical in both
+  modes (log `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`); `models.py fs291`: 127 lines as
+  the model, none different, 50 memory or crash.

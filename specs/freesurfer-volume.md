@@ -2404,7 +2404,19 @@ cache, from it and without it (2026-11-16, the prebuilt probe from commit 77392d
 | `vcoords` | 13, 14 | 1,350 | 0 | 57 | 0 | `69ac886bc59fb2b67e82e40194230ac63b6cd6c424a9895bb63305d722a43881` |
 | `vstats` | 15, 15b | 750 | 42 | 11 | 9 | `a0c66fd4593df2e6a7935e7031bf97069cfd77a70ca1455d4ba7fcaa8b346e90` |
 | `vheader` | 16 | 606 | 0 | 0 | 0 | `b8b24feb576e087bae4fb68785ce0f3a482c7a291cfcd4930859101a94228eef` |
-| all | | 8,096 | 932 | 426 | 9 | |
+| `vrules` | 6-15 | 84 | 11 | 1 | 0 | `ecb640a82099e45687b2560c6802d721f4bb47a46090720e7d3ab03c29b12c43` |
+| all | | 8,180 | 943 | 427 | 9 | |
+
+`vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
+`oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
+the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
+volumes (§6, §9, §10), `MRIclear` of a bitmap and of volumes without voxels (§7), `MRIlinearScale`
+with `only_nonzero` (§9), sums and differences of types without direct access (§10), the frame
+copies' messages (§7), `MRIvalRangeRegion` without a region (FS-265, §8) and the order of
+`MRIsampleVolumeType`'s checks (§15). `models.py fs291` (README.md, "The models") checks §9's byte
+walk on every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`: 127 lines as the model (10
+`uchar` only, 30 with a tensor volume, 87 with other types), none different, 50 where FreeSurfer
+crashed or read memory it does not own **(observed)**.
 
 The exits are FreeSurfer's own: a volume of a type without a voxel size given voxels (`could not
 allocate memory for slice ...`, status 1), `MRIcopyFrames`' mismatch (§7, status -4), an extracted
@@ -2433,7 +2445,7 @@ the allowed lines; exit status 1 for any other difference. **(observed)** with t
 candidate: no unexplained difference in either mode; with `reproduce` 8,026 of the 8,096 lines
 identical, 69 memory lines whose contents changed from process to process (11 in `vmake`, 3 in
 `vtwo`, 55 in `vextract`) and one where FreeSurfer crashed in one process and not in the other
-(`vextract`).
+(`vextract`); `vrules` (relay 7): its 84 lines identical in both modes.
 
 ### 69.4 The defects of parts 1 to 3 (index)
 

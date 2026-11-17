@@ -45,6 +45,10 @@ use super::{Gen, Out, Work, enc, hex};
 
 pub const KINDS: [&str; 3] = ["m3w", "trs", "gcw"];
 
+/// What the port's side writes for a resampling past fsio's time or message limits (not run; the
+/// case is marked `SKIP`).
+const NOT_RUN: &[u8] = b"fs_io_probe: a morph resampling past fsio's limits, not run\n";
+
 // ---------------------------------------------------------------- generation
 
 /// A displacement: small steps, now and then NaN, infinite, subnormal or large.
@@ -824,6 +828,26 @@ fn query(
                 t.int() as i32,
                 t.int() as i32,
             );
+            // relay 43: a morph's resampling past fsio's limits is not run (marked SKIP): the
+            // inverse of a large image (FS_SKIP_TAGS leaves 256 x 256 x 256 voxels: GCAMinvert takes
+            // FreeSurfer minutes, past fsio's 5 seconds) or a sinc sample of a large grid (an
+            // error line per voxel, past fsio's 64 MiB of messages)
+            if tr.ttype == larmorx_freesurfer_mri::lta::MORPH_3D_TYPE {
+                let gm = tr.gcam();
+                let voxels = |v: &VolGeom| {
+                    i64::from(v.width.max(0))
+                        * i64::from(v.height.max(0))
+                        * i64::from(v.depth.max(0))
+                };
+                let grid = if k == "I" { &gm.image } else { &gm.atlas };
+                let big = voxels(grid) > 1 << 20;
+                let sinc = interp == larmorx_freesurfer_mri::mri::SAMPLE_SINC && k != "D";
+                if big && (sinc || (k == "I" && gm.mri_xind.is_none())) {
+                    let _ = err.write_all(NOT_RUN);
+                    o.0.push_str("N ");
+                    return Ok(());
+                }
+            }
             let mut src = mri::mri_alloc(g, out, err, wd, ht, dp, mri::MRI_FLOAT)?;
             for z in 0..dp {
                 for y in 0..ht {
@@ -835,11 +859,16 @@ fn query(
                     }
                 }
             }
+            let dir = Some(w.fix.as_path());
             let r = match k {
                 "A" => tr::transform_apply_type(g, out, err, env, tr, &src, None, interp)?,
-                "D" => tr::transform_create_density_map(g, out, err, env, tr, &src)?,
-                _ if interp < 0 => tr::transform_apply_inverse(g, out, err, env, tr, &src, None)?,
-                _ => tr::transform_apply_inverse_type(g, out, err, env, tr, &src, None, interp)?,
+                "D" => tr::transform_create_density_map(g, out, err, env, dir, tr, &src, None)?,
+                _ if interp < 0 => {
+                    tr::transform_apply_inverse(g, out, err, env, dir, tr, &src, None)?
+                }
+                _ => {
+                    tr::transform_apply_inverse_type(g, out, err, env, dir, tr, &src, None, interp)?
+                }
             };
             match r {
                 larmorx_freesurfer_core::ret::Ret::New(m) => {
@@ -947,8 +976,8 @@ pub fn run(
         .map_err(Fatal::status);
         let text = s.0.borrow().clone();
         let _ = out.write_all(&text);
-        // a GCA morph's resampling (relay 40: not ported yet)
-        if text.windows(15).any(|x| x == b"is not ported y") {
+        // a resampling past fsio's limits, not run (relay 43)
+        if text.windows(NOT_RUN.len()).any(|x| x == NOT_RUN) {
             extra.push("SKIP");
         }
         r

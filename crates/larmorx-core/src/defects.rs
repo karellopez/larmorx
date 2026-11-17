@@ -2383,6 +2383,12 @@ defects! {
         "converting a linear transform from RAS to voxels without a source volume, composing a linear transform into a destination that holds a GCA morph, or making the density map of a linear transform that cannot be applied (a singular matrix): FreeSurfer dereferences a null pointer or writes into the morph's memory (a crash or memory corruption)";
     FS_929 = "FS-929", "FreeSurfer", true,
         "writing a warp volume (MGH or NIfTI) whose morph geometries were never given: one read without its geometry tag (an MGH warp volume, or a NIfTI displacement field without FreeSurfer's header extension), or a GCA morph read from such a volume and written as a warp volume: the geometries' validity and sizes written into the file's tags, and a NIfTI output's displacements when FreeSurfer converts them to RAS through those geometries, are memory contents";
+    FS_930 = "FS-930", "FreeSurfer", true,
+        "resampling a volume through a GCA morph (onto the atlas, or back onto the image) with an interpolation the sampler does not support (sinc), or a volume type it does not read: each voxel whose sample fails (one error line each) takes the value of the voxel before it instead of a value of its own";
+    FS_931 = "FS-931", "FreeSurfer", true,
+        "resampling a volume through a GCA morph when the first voxel sampled fails (an unsupported interpolation such as sinc, or an unsupported volume type): that voxel, and those after it until one is sampled, take memory contents";
+    FS_932 = "FS-932", "FreeSurfer", true,
+        "resampling a volume of more than one slice onto a GCA morph's atlas: every atlas voxel whose point falls at or below the volume's first slice (between -1 and 0, the first slice itself included) is 0, while points down to -1 along the other two axes take the edge voxels' values (an identity morph loses the first slice)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

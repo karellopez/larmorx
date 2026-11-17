@@ -11,7 +11,9 @@
 //!
 //! Also FreeSurfer's mathematics (`maths`, `specs/freesurfer-maths.md`) and its volume structure
 //! (`mri`, `specs/freesurfer-mri.md`: the geometry, the volume and its voxels, the copies, the
-//! tkregister and FSL matrices, the linear transform arrays).
+//! tkregister and FSL matrices, the linear transform arrays) and its volume functions (`volume`,
+//! `specs/freesurfer-volume.md` parts 1 to 3: the volume-geometry text block, the voxel
+//! arithmetic, coordinates and geometry).
 //!
 //! No global state: a program run owns one [`Process`], which holds what FreeSurfer keeps
 //! process-wide (§1) and the environment table it reads (porting guide §9.1: the library never
@@ -46,6 +48,7 @@ pub mod temp;
 pub mod timedate;
 pub mod usage;
 pub mod version;
+pub mod volume;
 pub mod xdbg;
 
 pub use env::Environment;

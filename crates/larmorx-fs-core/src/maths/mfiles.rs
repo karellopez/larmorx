@@ -3,7 +3,7 @@
 //! `%f` and `%d` as §18.1 describes glibc 2.35's (FS-49 for a binary file that ends early).
 
 use larmorx_core::cscan::{self, is_c_space};
-use larmorx_core::defects::FS_49;
+use larmorx_core::defects::{FS_49, FS_924};
 
 use super::Returned;
 use super::matrix::{MATRIX_COMPLEX, Matrix};
@@ -19,26 +19,45 @@ const ERANGE: i32 = 34;
 pub struct CStream {
     pub bytes: Vec<u8>,
     pub pos: usize,
+    /// The end-of-file flag (`feof`): set when a read finds no more bytes, cleared by a move.
+    pub eof: bool,
 }
 
 impl CStream {
     /// A stream over `bytes` at its start.
     pub fn new(bytes: Vec<u8>) -> CStream {
-        CStream { bytes, pos: 0 }
+        CStream {
+            bytes,
+            pos: 0,
+            eof: false,
+        }
     }
 
-    fn peek(&self) -> Option<u8> {
+    /// `fseek(.., SEEK_SET)` to a place within the bytes: the end-of-file flag cleared.
+    pub fn seek(&mut self, pos: usize) {
+        self.pos = pos.min(self.bytes.len());
+        self.eof = false;
+    }
+
+    pub(crate) fn peek(&self) -> Option<u8> {
         self.bytes.get(self.pos).copied()
     }
 
     /// `fgets(buffer of n bytes)`: up to `n - 1` bytes or through the newline; `None` at the end.
     pub fn fgets(&mut self, n: usize) -> Option<Vec<u8>> {
-        if self.pos >= self.bytes.len() || n < 2 {
+        if n < 2 {
+            return None;
+        }
+        if self.pos >= self.bytes.len() {
+            self.eof = true;
             return None;
         }
         let mut out = Vec::new();
         while out.len() < n - 1 {
-            let Some(c) = self.peek() else { break };
+            let Some(c) = self.peek() else {
+                self.eof = true;
+                break;
+            };
             self.pos += 1;
             out.push(c);
             if c == b'\n' {
@@ -56,7 +75,7 @@ impl CStream {
         s
     }
 
-    fn skip_space(&mut self) {
+    pub(crate) fn skip_space(&mut self) {
         while self.peek().is_some_and(is_c_space) {
             self.pos += 1;
         }
@@ -229,12 +248,12 @@ fn hex_exact(text: &[u8]) -> bool {
 /// One `scanf` call's reading (§18.1): the first time the call meets the end of its input it
 /// keeps `errno`'s value (0 when that meeting is a conversion's skip of white space), and every
 /// later meeting sets `errno` back to it; each call starts afresh.
-struct Call {
+pub(crate) struct Call {
     kept: Option<i32>,
 }
 
 impl Call {
-    fn new() -> Call {
+    pub(crate) fn new() -> Call {
         Call { kept: None }
     }
 
@@ -245,7 +264,7 @@ impl Call {
     }
 
     /// A conversion's skip of white space; false at the end of the input (an input failure).
-    fn skip(&mut self, p: &mut Process, s: &mut CStream) -> bool {
+    pub(crate) fn skip(&mut self, p: &mut Process, s: &mut CStream) -> bool {
         s.skip_space();
         if s.peek().is_none() {
             self.meet(p, true);
@@ -255,7 +274,7 @@ impl Call {
     }
 
     /// White space in the format that reads (not just before a conversion).
-    fn ws(&mut self, p: &mut Process, s: &mut CStream) {
+    pub(crate) fn ws(&mut self, p: &mut Process, s: &mut CStream) {
         s.skip_space();
         if s.peek().is_none() {
             self.meet(p, false);
@@ -263,7 +282,7 @@ impl Call {
     }
 
     /// A `%f` conversion: its value, or none (an input or matching failure).
-    fn f(&mut self, p: &mut Process, s: &mut CStream) -> Option<f32> {
+    pub(crate) fn f(&mut self, p: &mut Process, s: &mut CStream) -> Option<f32> {
         if !self.skip(p, s) {
             return None;
         }
@@ -281,8 +300,36 @@ impl Call {
         }
     }
 
+    /// A `%s` conversion (`width` bytes at most): the word, or none (an input failure). A word
+    /// read to its width does not look past itself.
+    pub(crate) fn s(
+        &mut self,
+        p: &mut Process,
+        s: &mut CStream,
+        width: Option<usize>,
+    ) -> Option<Vec<u8>> {
+        if !self.skip(p, s) {
+            return None;
+        }
+        let start = s.pos;
+        loop {
+            if width.is_some_and(|w| s.pos - start >= w) {
+                break;
+            }
+            match s.peek() {
+                Some(c) if !is_c_space(c) => s.pos += 1,
+                Some(_) => break,
+                None => {
+                    self.meet(p, false);
+                    break;
+                }
+            }
+        }
+        Some(s.bytes[start..s.pos].to_vec())
+    }
+
     /// A `%d` conversion (a 64-bit `long` kept to its low 32 bits): its value, or none.
-    fn d(&mut self, p: &mut Process, s: &mut CStream) -> Option<i32> {
+    pub(crate) fn d(&mut self, p: &mut Process, s: &mut CStream) -> Option<i32> {
         if !self.skip(p, s) {
             return None;
         }
@@ -541,20 +588,43 @@ impl Process {
                 Ok(f) => f,
                 Err(r) => return Ok(r),
             };
+        let given = fresh.is_none();
         let target: &mut Matrix = match (fresh.as_mut(), m) {
             (Some(f), _) => f,
             (None, Some(g)) => g,
             (None, None) => return Ok(Returned::Nothing),
         };
         let per = if kind == MATRIX_COMPLEX { 2 } else { 1 };
+        let total = i64::from(rows.max(0)) * i64::from(cols.max(0)) * per;
         let mut vals = Vec::new();
         let mut slot8 = [0u8; 8];
-        for _ in 0..(i64::from(rows.max(0)) * i64::from(cols.max(0)) * per) {
+        let mut cut = false;
+        for i in 0..total {
             let b = s.read(8);
             if b.len() < 8 {
                 self.error_printf(codes::BAD_FILE, b"freadDouble: fread failed");
                 if !reproduce {
                     return Ok(self.ends_early());
+                }
+                if !cut {
+                    cut = true;
+                    // FS-924: the doubles to read from the first one cut, that one included.
+                    let n = total - i;
+                    if n > 1 << 20 {
+                        self.note(
+                            &FS_924,
+                            "a binary matrix file that ends a million numbers or more early refused",
+                        );
+                        let msg = format!(
+                            "MatrixReadFrom: the file ends {n} numbers before the matrix does (FreeSurfer prints an error for each)"
+                        );
+                        self.error_printf(codes::BAD_FILE, msg.as_bytes());
+                        // A given matrix keeps the numbers read before the cut.
+                        if given {
+                            put_values(target, kind, rows, cols, &vals);
+                        }
+                        return Ok(Returned::Nothing);
+                    }
                 }
                 self.note(
                     &FS_49,
@@ -565,18 +635,7 @@ impl Process {
             vals.push(sse::narrow(f64::from_be_bytes(slot8)));
             slot8.reverse();
         }
-        let mut k = 0;
-        for r in 1..=rows {
-            for c in 1..=cols {
-                if kind == MATRIX_COMPLEX {
-                    target.set_pair(r, c, vals[k], vals[k + 1]);
-                    k += 2;
-                } else {
-                    target.set(r, c, vals[k]);
-                    k += 1;
-                }
-            }
-        }
+        put_values(target, kind, rows, cols, &vals);
         Ok(match fresh {
             Some(f) => Returned::New(f),
             None => Returned::Output,
@@ -634,6 +693,31 @@ impl Process {
                 msg.extend_from_slice(b") - file open failed\n");
                 self.error_printf(codes::NO_FILE, &msg);
                 codes::NO_FILE
+            }
+        }
+    }
+}
+
+/// The numbers read, element by element in row order (a complex element's real part, then its
+/// imaginary part), into a matrix; the elements after the last number read are left as they are.
+fn put_values(target: &mut Matrix, kind: i32, rows: i32, cols: i32, vals: &[f32]) {
+    let mut k = 0;
+    for r in 1..=rows {
+        for c in 1..=cols {
+            if kind == MATRIX_COMPLEX {
+                match (vals.get(k), vals.get(k + 1)) {
+                    (Some(&re), Some(&im)) => target.set_pair(r, c, re, im),
+                    (Some(&re), None) => {
+                        let (_, im) = target.pair(r, c);
+                        target.set_pair(r, c, re, im);
+                    }
+                    _ => return,
+                }
+                k += 2;
+            } else {
+                let Some(&v) = vals.get(k) else { return };
+                target.set(r, c, v);
+                k += 1;
             }
         }
     }

@@ -8,8 +8,6 @@
 //! (the probe's file commands are left to the comparison; the matrix files' readers and writers
 //! run on memory streams below), no clock.
 //!
-//! Some decompositions get finite arguments only (below).
-//!
 //! Record: `FS_CORE_GOLDEN_RECORD=1 cargo test -p larmorx-fs-core --test golden_maths --
 //! --nocapture` prints `GOLDEN <case> <sha256>` for each case instead of checking it. The cases
 //! also run under the AArch64 NaN emulation
@@ -25,11 +23,11 @@ use sha2::{Digest, Sha256};
 const GOLDEN: &[(&str, &str)] = &[
     (
         "decomp.fix",
-        "fc91cc7ff0bd22143b153f39bc4458cd583b018fe8977065e74a09e396ba838c",
+        "c261fbf23a7917c066940e414ca37d8d9dd30c1826d161c450786afc92470725",
     ),
     (
         "decomp.reproduce",
-        "6738c38c222a62e96a98865bb7811d9f6b6431e3d699fe5a48e6de431ee33cde",
+        "8ce178982eaa736b55719fec138412d673c477ede256112e248fed46e6cd7e0a",
     ),
     (
         "dmatrix.fix",
@@ -720,9 +718,8 @@ const DMATRIX: &[(&str, Make)] = &[
     }),
 ];
 
-/// The decompositions (§8.8, §17). The eigensystems of `OpenEigenSystem` and
-/// `OpenNonSymmetricEigenSystem` (VNL's routines in the main package, whose NaN results are not
-/// yet the official build's on every build) get finite arguments only.
+/// The decompositions (§8.8, §17), special values included (the main package's VNL routines give
+/// x86-64's NaN results on every build since 2026-11-13).
 const DECOMP: &[(&str, Make)] = &[
     ("minverse", |g| format!("{} {}", g.msq(true), g.om(true))),
     ("mdet", |g| g.msq(true)),
@@ -735,11 +732,11 @@ const DECOMP: &[(&str, Make)] = &[
     }),
     ("oeigen", |g| {
         let n = g.int(1, 4) as usize;
-        format!("{n} {}", g.fs(n * n, false))
+        format!("{n} {}", g.fs(n * n, true))
     }),
     ("oeigenns", |g| {
         let n = g.int(1, 4) as usize;
-        format!("{n} {}", g.fs(n * n, false))
+        format!("{n} {}", g.fs(n * n, true))
     }),
     ("meigen", |g| format!("{} {}", g.msq(true), g.om(true))),
     ("meigenhelper", |g| {

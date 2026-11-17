@@ -197,12 +197,16 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   0 and such writes are dropped) or outside its buffer (FS-290: reads 0, writes dropped, in both
   modes; FreeSurfer reads and writes memory it does not own). A volume without voxels walked
   directly ends the program here (FreeSurfer crashes: FS-58).
-- **A tensor volume's rows.** FreeSurfer finds every row of a tensor volume (type 6), of every slice
-  and frame, at the volume's first voxel, as its full copy does (`specs/freesurfer-mri.md` §13,
-  FS-166): element `x` of any row of a tensor volume, walked directly, is element `x` from the start
-  of its buffer. So a direct walk reads the same first bytes for every row, and writes every row over
-  the same first bytes: the last row written stays there, and the rest of the buffer is not touched
-  (**(observed)**: `vscale`, `vtwo`, `vrules`, §69). The volume's other accesses (`MRIgetVoxVal`,
+- **A tensor volume's rows (FS-960).** FreeSurfer finds every row of a tensor volume (type 6), of
+  every slice and frame, at the volume's first voxel, as its full copy does (`specs/freesurfer-mri.md`
+  §13, FS-166): element `x` of any row of a tensor volume, walked directly, is element `x` from the
+  start of its buffer. So a direct walk reads the same first bytes for every row, and writes every row
+  over the same first bytes: the last row written stays there, and the rest of the buffer is not
+  touched (**(observed)**: `vscale`, `vtwo`, `vrules`, §69). **Default:** each row at its own place,
+  as the other types' rows lie (row `y` of slice `s = z + f depth` from byte `(s height + y) w b` of
+  the buffer, `w` the width, `b` the bytes per voxel: 4 for a tensor); **reproduce:** FreeSurfer's
+  (every row at the first voxel). FS-960 is noted in both modes where a direct walk reaches a row of a
+  tensor volume other than slice 0's row 0. The volume's other accesses (`MRIgetVoxVal`,
   `MRIsetVoxVal`) are not affected: for a tensor they read -1e10 and write nothing
   (`specs/freesurfer-mri.md` §5). In parts 1 to 4 FS-291's `reproduce` (§9, §10) and FS-301's
   (§19: a tensor destination of the moves) walk a tensor volume directly.
@@ -2652,6 +2656,7 @@ process to process 11 in `vmake`, 2 or 3 in `vtwo` and 57 in `vextract`.
 | FS-302 | 18 | FS-303 | 19 | FS-304 | 19 |
 | FS-305 | 20 | FS-306 | 21 | FS-307 | 21 |
 | FS-308 | 21 | FS-309 | 21 | FS-310 | 21 |
+| FS-960 | 6 | | | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and

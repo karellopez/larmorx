@@ -6968,6 +6968,11 @@ fn r24_pat_sp(g: &mut Gen, t: &mut Vec<String>, s: Shape, a: &[i64], b: &[i64], 
     }
 }
 
+/// The equalisation commands (`MRIgetEqualizeHisto`, `MRIhistoEqualize`).
+fn eq_cmd(cmd: &str) -> bool {
+    cmd == "geq" || cmd == "heq"
+}
+
 /// `get_histo`'s tokens: -1 for `NULL`, else its allocation, the bins in use and a seed.
 fn r24_histo_toks(g: &mut Gen, t: &mut Vec<String>) {
     if g.chance(2) {
@@ -6999,6 +7004,12 @@ fn r24_gen_histo(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
     // a histogram of one bin per intensity takes gigabytes on both sides)
     if !matches!(s.ty, 0 | 1 | 2 | 3 | 4 | 10) {
         s.ty = g.pick(&[0, 3, 4, 1]);
+    }
+    // the equalisations' histogram has one bin per intensity of the whole volume: an int or long
+    // volume whose voxels keep the fill formula's bytes spans about 2^31 intensities (14 GB in both
+    // FreeSurfer and the port, minutes; found at seed 7 with relay 37's types): short instead
+    if eq_cmd(cmd) && matches!(s.ty, 1 | 2) {
+        s.ty = 4;
     }
     let big = cmd == "hsegm" || g.chance(3);
     if big {
@@ -7072,6 +7083,9 @@ fn r24_gen_histo(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
         }
         "heq" => {
             let mut u = r24_like(g, s);
+            if matches!(u.ty, 1 | 2) {
+                u.ty = 4;
+            }
             u.hdr = u.hdr && g.chance(4);
             vol_of(g, t, u);
             r24_fill_paint(g, t, u, &[&[0.0, 10.0, 100.0]], &[vals]);

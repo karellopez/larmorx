@@ -2848,7 +2848,7 @@ defects! {
     FS_959 = "FS-959", "libtiff 3.6.1", true,
         "starting a strip or tile divides by a count of 0 (the strips per image, from a strip count that overflows 32 bits; the tiles across or down, from a tile width or length near 2^32 whose rounding overflows): the program ends with SIGFPE; corrected: row, column and sample 0";
     FS_960 = "FS-960", "FreeSurfer", true,
-        "the volume operations that walk a volume's rows directly (MRIinvertContrast and MRIscaleAndMultiply on another type than bytes, MRItranslate, MRIrotate_I and the rotations about an axis into another type, mri_framepower) find every row of a tensor volume, of every slice and frame, at the volume's first voxel: each row reads the same first values, and each row written replaces them, the rest of the volume unchanged; corrected: each row at its own place";
+        "the volume operations that walk a volume's rows directly (MRIinvertContrast and MRIscaleAndMultiply on another type than bytes, MRItranslate and MRIrotate_I into another type, mri_framepower, the byte walks of the set and label operations) find every row of a tensor volume, of every slice and frame, at the volume's first voxel: each row reads the same first values, and each row written replaces them, the rest of the volume unchanged; corrected: each row at its own place";
 }
 
 /// The register entry with ID `id`.

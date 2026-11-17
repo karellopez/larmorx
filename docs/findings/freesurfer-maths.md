@@ -870,3 +870,21 @@ GLIBC-07 in both modes wherever the two choices give another value on an argumen
   programs decompose matrices with at least one column: design matrices, 4 x 4 transforms,
   coordinate sets). Also seen on the same probe: `mpinverse` of a 0 x 0 matrix crashes too; its path
   is `MatrixInverse`'s `OpenLUMatrixInverse` of 0 x 0 (FS-33, memory it does not own), not the SVD.
+
+## `MatrixAdd`'s NaNs (track C relay 37, 2026-11-17, found by the fs-volume probe's `ltapt`)
+- **What:** the official build's `MatrixAdd` (`matrix.cpp` 1108-1136, `objdump -dr` of the unit oracle's
+  `matrix.cpp.o`) adds a row four at a time (`addps`, `m1`'s elements in the destination register: `m1 + m2`, the
+  one to three left over `m1 + m2` too) only when the output's row overlaps neither operand's row (a check on
+  16-byte windows from element 1) and the rows have more than 3 columns; otherwise the one-by-one loop at `+0x200`
+  computes `movss m2, %xmm0; addss m1, %xmm0`: `m2 + m1`. Where both elements are NaNs, the first operand's NaN
+  comes out, so `MatrixAdd(a, b, a)`, `MatrixAdd(a, b, b)` and every sum of 1 to 3 columns give `b`'s NaN, a
+  separate output of 4 or more columns `a`'s. `MatrixSubtract` keeps `m1 - m2` in both loops.
+- **How we know:** *measured* with the open maths probe (`fs_maths_probe batch`, `madd` of NaN `7fc00001` with
+  `ffc00002`): `new` 4 x 4 `7fc00001`; `self` and `other` 4 x 4 `ffc00002`; `new` 2 x 3 `ffc00002`; `new` 2 x 5
+  `7fc00001`. The fs-volume probe's `ltapt` (`LTAtransformAtPoint`'s `MatrixAdd(m_L, m_tmp, m_L)`, seed 7 case
+  with a NaN point and a transform holding a positive NaN) differed in one NaN's sign before.
+- **The port:** `matrix_ops`' `add_sub` adds `m2 + m1` for 3 columns or fewer; the new `matrix_add_into` is the sum
+  into an operand (`m2 + m1` at every size); fs.volume's `LTAtransformAtPoint`, `MRIrotate_I` and
+  `MRIprincipleComponents` call it. Not a defect (no register entry): the source leaves the order to the compiler.
+- **Not checked yet:** `DMatrixAdd` (`dmatrix.cpp`, doubles two at a time) for the same pattern; the autoencoder's
+  in-place sums (`fs.gca`, vectors of one column: already `m2 + m1` by the column rule).

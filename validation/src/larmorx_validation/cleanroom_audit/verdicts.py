@@ -348,14 +348,20 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", s.lower())
 
 
+# A print counts as its maker's only from shortly before the commit's date (clocks, a command's
+# own start) to thirty minutes after it, as printed-only's window.
+PRINT_LO, PRINT_HI = -120, 1800
+
+
 def attribute(
     commits: dict[str, dict],
     printed: list[dict],
     commands: list[dict],
     edits: dict[str, list[tuple[float, str]]],
 ) -> dict[str, dict]:
-    """Each commit's maker: ``printed`` (the hash printed by an agent that ran a commit command
-    within ten minutes of the commit's date), ``subject`` (a commit command carrying its subject,
+    """Each commit's maker: ``printed`` (the hash printed, from two minutes before the commit's
+    date to thirty after it, by an agent that ran a commit command within ten minutes of that
+    date), ``subject`` (a commit command carrying its subject,
     from thirty minutes before the commit to fifteen after),
     ``time`` (a commit command within two minutes by an agent that edited one of its files in the
     three hours before), ``printed-only`` (the first print within thirty minutes), or None.
@@ -384,6 +390,11 @@ def attribute(
         res = {"maker": None, "how": None, "delta_s": None, "line": None, "printed_by": []}
         cands = []
         for r in by_prefix.get(h[:7], []):
+            # "right after making it": a print of the hash long after the commit (a later
+            # `git log` in the same worktree, a merge's fast-forward) is no sign of its maker;
+            # a long command's late output is found by the command loop below
+            if not PRINT_LO <= epoch(r["ts"]) - cd <= PRINT_HI:
+                continue
             if h.startswith(r["hash"]):
                 v = near(r["key"], cd)
                 cands.append((0 if v else 1, abs(epoch(r["ts"]) - cd), r["key"], v))

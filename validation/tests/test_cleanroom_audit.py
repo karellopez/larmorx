@@ -935,3 +935,43 @@ def test_freesurfer_pieces_in_other_companions_are_freesurfer_family(path, famil
     """FreeSurfer's preparation (2026-11-12): GSL's and tkregister2_cmdl's replicas, and recon-all's copies."""
     cls = rs.classify(rs.locate(path, CTX), "read")
     assert cls.family == family
+
+
+def test_a_late_print_of_a_hash_does_not_make_its_printer_the_maker():
+    """2026-11-17: the orchestrator's `git log --oneline -1` in a clean room's worktree, three days
+    after the commit, beside an unrelated commit command of its own 221 s before that commit's
+    date, took the commit from the implementer whose commit command carried its subject."""
+    from larmorx_validation.cleanroom_audit import verdicts as vd
+
+    h = "2f7e53d81989bf7215b894358373b216ccc4de3f"
+    commits = {
+        h: {
+            "commit_date": "2026-11-13T20:45:15+01:00",
+            "subject": "fs.maths and fs.mri clean rooms: the documents after relay 6",
+            "files": [{"path": "crates/larmorx-fs-core/PROVENANCE.md", "status": "M"}],
+        }
+    }
+    commands = [
+        {
+            "key": "s/agent-impl",
+            "line": 569,
+            "ts": "2026-11-13T19:45:14Z",
+            "command": 'git commit -q -m "fs.maths and fs.mri clean rooms: the documents after'
+            ' relay 6" && git rev-parse --short HEAD',
+            "result": "2f7e53d8",
+        },
+        {
+            "key": "s/main",
+            "line": 67261,
+            "ts": "2026-11-13T19:41:34Z",
+            "command": "git merge --no-ff -q other -m batch",
+            "result": "",
+        },
+    ]
+    late = {"key": "s/main", "hash": h[:8], "ts": "2026-11-16T21:57:00Z", "line": 99999}
+    got = vd.attribute(commits, [late], commands, {})[h]
+    assert (got["maker"], got["how"]) == ("s/agent-impl", "subject")
+    # the same print right after the commit still names its printer
+    soon = dict(late, ts="2026-11-13T19:46:00Z")
+    got = vd.attribute(commits, [soon], commands, {})[h]
+    assert (got["maker"], got["how"]) == ("s/main", "printed")

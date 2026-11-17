@@ -735,6 +735,14 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
 - The transform's own `type` stays as allocated (-1) for the `.xfm`, FSL and `register.dat` readers;
   their `fscale` is 0 but `register.dat`'s (**(observed)**: §22's `vltaread` and `vrules4`).
 - Errors keep `errno` (a failed open, a volume that does not exist) for the error messages after.
+  `register.dat`'s reader prints its failures with the C library's `perror`
+  (`specs/freesurfer-io.md` §46), which leaves `errno` as it was once the process has written to its
+  standard error; both implementations follow that case (the C library sets `EINVAL`, 22, instead
+  when nothing has been written to standard error yet and it is open for writing only). So a
+  `register.dat` that does not exist gives `regio_read_register(): No such file or directory`,
+  `Could not open <fname>`, then the error `No such file or directory` before `ltaReadRegisterDat:
+  could not read <fname>`, and `errno` 2. The probe orients its standard error before each call (from
+  its build of relay 8, §69.2) so that its lines show that case.
 
 ## 22. Validation plan (3.1-36's samplers, the moves, the head box, reading transforms)
 §69's groups `vsample`, `vmove`, `vskull` and `vltaread` (the open probe's commands `samp`, `coef`,

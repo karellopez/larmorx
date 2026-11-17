@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 #include <string>
 #include <vector>
 
@@ -1149,6 +1150,9 @@ static std::string run_line(const Toks &line)
     dup2(e, 2);
     close(o);
     close(e);
+    // standard error byte-oriented, as in a program that has written to it: the C library's perror
+    // then leaves errno as it was (specs/freesurfer-io.md §46)
+    fwide(stderr, -1);
     alarm(seconds);
     T.assign(line.begin() + (long)first, line.end());
     P = 0;

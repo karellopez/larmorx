@@ -755,6 +755,31 @@ allows; the default differs only where it notes a defect. The open folder's `mod
 probe: an `.xfm` that names a volume that exists (its geometry comes from the header reader of
 `specs/freesurfer-io.md`): the clean room's own tests, against §21's text.
 
+**The defects' modes in §18 to §21** (the same in both implementations; each case notes its ID;
+where larmorx ends the program, its message is given exactly so that the two implementations are
+interchangeable; "ends the program" is §6's C-style exit with the code given, a message with its own
+`\n`):
+
+| Defect | Default | `reproduce` |
+|---|---|---|
+| FS-298 (64-bit integers in the samplers) | the voxel's value | element `x` of the row read as the 32-bit integer at the row's byte `4 x` (little-endian: the low half of voxel `x / 2` for an even `x`, the high half for an odd one) |
+| FS-299 (the cubic sampler's sum) | divided by 8 | divided by the number of points summed |
+| FS-300 (the cubic frame sampler's unread points) | 0 | 0 |
+| FS-301 (the moves into another type) | the sample stored with the destination's own write (`specs/freesurfer-mri.md` §5's `MRIsetVoxVal`, frame 0, the sample as `float`) | `(unsigned char) nint(sample)` written at byte `x` of the destination's row `y` of slice `z` (frame 0) whatever its type; a byte destination gets that byte in both modes |
+| FS-302 (the sinc samplers' 128 weights) | the program ends, code -4, `<sampler>: a half-width of <hw> needs more than 128 weights on an axis (FreeSurfer writes past its arrays here)` + `\n` (`<sampler>` `MRIsincSampleVolume` or `MRIsincSampleVolumeFrame`), when a window holds more than 128 voxels on an axis | the same |
+| FS-303 (a type the trilinear sampler refuses, in the moves) | each voxel stores the previous voxel's sample, 0 before the first | the same |
+| FS-304 (a rotation about an axis that cannot be inverted) | after `MRIrotate_I`'s errors, the program ends, code -4, `<function>(): no rotated volume (FreeSurfer crashes here)` + `\n` (`MRIrotateX_I`, `MRIrotateY_I` or `MRIrotateZ_I`) | the same |
+| FS-305 (a centre of mass that is not a number) | when any of the three means is a NaN, before any walk: the program ends, code -4, `MRIfindApproximateSkullBoundingBox: the centre of mass is not a number (FreeSurfer walks 2^31 voxels or never returns here)` + `\n` | the same |
+| FS-306 (a name of 500 bytes or more) | the whole name classified | the same |
+| FS-307 (an `.xfm` whose last piece is a `%` line in step 3's loop) | exactly where FreeSurfer would never return (the end of the file with the buffer still starting with `%`; not when a `#` or blank line read at the end changed it): the program ends, code -5, `ltMNIreadEx: <fname> ends with a % line (FreeSurfer never returns here)` + `\n` | the same |
+| FS-308 (`type =` or `nxforms =` not matched) | the unset value taken as 0 | the same |
+| FS-309 (an `.lta` of one line) | the program ends, code -5, `ltaReadFile(<fname>): no second line (FreeSurfer crashes here)` + `\n` | the same |
+| FS-310 (a `src` or `dst` word with no word after it) | the program ends, code -5, `mincFindVolume: no word after src or dst (FreeSurfer crashes here)` + `\n` | the same |
+
+The probe cannot check these cases' own lines (FreeSurfer crashes, never returns or reads memory
+there; §69.3's allowed lines), except FS-298 and FS-299 under `reproduce` and FS-306's
+classification; the clean room's own tests check the rest against this table.
+
 ## 23. The CMA labels and the segmentation functions (`cma.h`, `cma.cpp`; 3.1-35 piece c)
 **The label numbers** are those of FreeSurfer's colour table (`FreeSurferColorLUT.txt`, distributed
 with FreeSurfer: 0 `Unknown`, 2 `Left-Cerebral-White-Matter`, 3 `Left-Cerebral-Cortex`, 41 and 42

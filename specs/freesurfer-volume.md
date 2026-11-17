@@ -213,8 +213,8 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   §2's C-style error calls, `error: <text>` on standard error with `errno`'s text first when it is
   set and FS-01's NUL before the new line; a text written below with a final `\n` keeps it, so the
   line is `error: <text>\n`, the NUL, then the new line); "the program ends" its C-style exit
-  (`ErrorExit`, the core spec's §2 and §3) with the status given, which the probe prints modulo 256 (`EXIT 252` for
-  -4, `EXIT 253` for -3).
+  (`ErrorExit`, the core spec's §2 and §3) with the status given, which the probe prints modulo 256
+  (`EXIT 252` for -4, `EXIT 253` for -3).
 
 ## 7. Clones, clearing, size checks, frame copies
 
@@ -258,7 +258,10 @@ max when it is larger (a NaN never does), so a volume whose values all lie above
   (direct); another type: the error `MRIvalRange: unsupported type <type>`, `ERROR_UNSUPPORTED`, the
   range not set.
 - `MRIvalRangeRegion(mri, region)`: frame 0 over the region, its start raised to 0 and its end
-  (`x + dx`, ...) lowered to the extent; returns 0.
+  (`x + dx`, ...) lowered to the extent; returns 0. **FS-265** (rule A): without a region FreeSurfer
+  crashes (**(observed)**: `vrange`, every such line, and `vrules`: `CRASH 11`, with voxels or
+  without); both modes take the whole volume (the region `0 0 0 width height depth`), as
+  `MRIextractRegion` does without one (§11), and note FS-265.
 - `MRIlabelValRange(mri, labeled, label)`: the voxels (all frames) whose `nint` of the labelled
   volume's value at the same place and frame is `label`; the first such voxel sets both min and max.
 
@@ -2436,7 +2439,7 @@ identical, 69 memory lines whose contents changed from process to process (11 in
 | FS-285 | 3 | FS-290 | 6 | FS-295 | 11 |
 | FS-286 | 3 | FS-291 | 9, 10 | FS-296 | 9 |
 | FS-287 | 3 | FS-292 | 10 | FS-297 | 11 |
-| FS-288 | 3 | FS-293 | 11 | | |
+| FS-288 | 3 | FS-293 | 11 | FS-265 | 8 |
 | FS-289 | 6 | FS-294 | 11 | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-53 and FS-58

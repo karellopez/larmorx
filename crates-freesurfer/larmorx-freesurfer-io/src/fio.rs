@@ -623,6 +623,57 @@ pub fn znz_read_float(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) ->
     f32::from_be_bytes(b)
 }
 
+/// [`znz_read_float`] into the caller's model of FreeSurfer's memory: the official build's
+/// `znzreadFloat` reads into the same four bytes as `znzreadInt` (the slot's bytes 4 to 7) and then
+/// reverses them in place (`byteswapbuffloat`), so after it the slot holds the value's bytes least
+/// significant first; a number the file cuts keeps there the bytes the earlier number left
+/// (FS-167, as FS-49; relay 42, measured in `fio.cpp.o`).
+pub fn znz_read_float_in(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    fp: &mut ZnzFile,
+    slot: &mut Slot49,
+) -> f32 {
+    let (ret, b, got) = znzread_n(fp, [0u8; 4]);
+    if ret != 1 {
+        log::error_printf(g, err, ERROR_BADFILE, "freadFloat: fread failed");
+    }
+    slot.put_int(&b, got);
+    let (v, unknown) = slot.take(g, 4, 4, got);
+    if got < 4 {
+        note_slot(g, &FS_167, "znzreadFloat", got, 4, unknown);
+    }
+    slot.b[4..8].reverse();
+    slot.known[4..8].reverse();
+    f32::from_be_bytes(v.try_into().unwrap())
+}
+
+/// [`znz_read_double`] into the caller's model of the memory `znzreadDouble` reads into: eight
+/// bytes 48 below the caller's frame, which the double's own call to `znzread` does not reach and
+/// which it leaves holding the value least significant byte first (`swapDouble`'s result stored
+/// back), so a double the file cuts keeps there the bytes the earlier double left; any other
+/// reader's call (`znzreadInt`, `znzreadFloat`, `znzreadLong`, `znzreadShort`) overwrites them:
+/// the caller then calls [`Slot49::clobber`] on this slot (FS-167; relay 42, measured in
+/// `fio.cpp.o` and `znzlib.c.o`).
+pub fn znz_read_double_in(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    fp: &mut ZnzFile,
+    dslot: &mut Slot49,
+) -> f64 {
+    let (ret, b, got) = znzread_n(fp, [0u8; 8]);
+    dslot.b[..got].copy_from_slice(&b[..got]);
+    dslot.known[..got].fill(true);
+    let (v, unknown) = dslot.take(g, 0, 8, got);
+    if got < 8 {
+        note_slot(g, &FS_167, "znzreadDouble", got, 8, unknown);
+    }
+    znz_failed(g, err, fp, ret, "znzreadDouble: znzread failed");
+    dslot.b.reverse();
+    dslot.known.reverse();
+    f64::from_be_bytes(v.try_into().unwrap())
+}
+
 fn znzwrite_bytes(fp: &mut ZnzFile, b: &[u8]) -> i32 {
     fs_znzwrite(fp, b, b.len(), 1) as i32
 }

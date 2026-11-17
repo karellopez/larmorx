@@ -883,7 +883,8 @@ pub(crate) fn run_line_with(
             let mut e2 = shared.clone();
             return piece5::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
-        if piece6::KINDS.contains(&t[0]) {
+        // `mgf`: piece 6's mghRead with the frames printed (relay 42's hand cases only)
+        if piece6::KINDS.contains(&t[0]) || t[0] == "mgf" {
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece6::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);

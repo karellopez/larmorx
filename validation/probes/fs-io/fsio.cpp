@@ -1932,7 +1932,39 @@ void run_piece6(const std::string &cmd0)
   // standard error byte-oriented, as in a program that has written to it: glibc's perror then
   // leaves errno alone (on an unoriented, write-only standard error it sets EINVAL)
   fwide(stderr, -1);
-  if (cmd == "mrh" || cmd == "mri" || cmd == "mrd" || cmd == "mgr" || cmd == "gfd" || cmd == "gfh") {
+  if (cmd == "mgf") {
+    // track A relay 42: mghRead as mgr (Gdiag, the environment bits, read_volume, frame, the name,
+    // the files), then every frame's fields as the frame tag left them (a file that ends inside
+    // the tag: the numbers' missing bytes, FS-167): type, TE, TR, flip, TI, TD, TM, the sequence
+    // type, echo spacing and train length, the three directions, label, the name's 1,024 bytes
+    // (FNV-1a), dof, m_ras2vox, thresh, units, the diffusion doubles and longs
+    Gdiag = strtoull(next(), NULL, 16);
+    set_env6((int)geti());
+    int rv = (int)geti(), frame = (int)geti();
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = mghRead(name.c_str(), rv, frame);
+    print_mri6(m);
+    if (!m || !m->frames) out += "N ";
+    else
+      for (int i = 0; i < m->nframes; i++) {
+        const MRI_FRAME &f = m->frames[i];
+        oi(f.type); of(f.TE); of(f.TR); of(f.flip); of(f.TI); of(f.TD); od(f.TM);
+        oi(f.sequence_type); of(f.echo_spacing); of(f.echo_train_len);
+        for (int k = 0; k < 3; k++) of(f.read_dir[k]);
+        for (int k = 0; k < 3; k++) of(f.pe_dir[k]);
+        for (int k = 0; k < 3; k++) of(f.slice_dir[k]);
+        oi(f.label);
+        fnv_bytes((const unsigned char *)f.name, STRLEN);
+        oi(f.dof); print_rmat(f.m_ras2vox); of(f.thresh); oi(f.units);
+        od(f.DX); od(f.DY); od(f.DZ); od(f.DR); od(f.DP); od(f.DS); od(f.bvalue);
+        oi(f.D1_ramp); oi(f.D1_flat); od(f.D1_amp); oi(f.D2_ramp); oi(f.D2_flat); od(f.D2_amp);
+        oi(f.D3_ramp); oi(f.D3_flat); od(f.D3_amp); oi(f.D4_ramp); oi(f.D4_flat); od(f.D4_amp);
+      }
+    oi(errno);
+  } else if (cmd == "mrh" || cmd == "mri" || cmd == "mrd" || cmd == "mgr" || cmd == "gfd" || cmd == "gfh") {
     Gdiag = strtoull(next(), NULL, 16);
     if (cmd != "mgr") MRIIO_Strip_Pound = (int)geti();
     set_env6((int)geti());
@@ -3179,7 +3211,7 @@ int main(int argc, char *argv[])
                                  "srd", "srh", "imd", "imh", "afd", "afh", "cud", "cuh", "and", "anh",
                                  "kwr", "ixd", "ixh", "ixw", "nnd", "nnh", "mcd", "mch", "mcw", "gcd", "gch",
                                  "mrr", "mrx", "cnf", "acl", "reo", "sxl", "sxw", "lro", "m3d", "m3h",
-                                 "m3w", "trs", "gcw", "aed", "aeh"};
+                                 "m3w", "trs", "gcw", "aed", "aeh", "mgf"};
       std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
       for (const char *k : p6)
         if (c0 == k)

@@ -703,7 +703,7 @@ fn answer(
         return Ok(());
     }
     g.gdiag = u64::from_str_radix(next(), 16).unwrap();
-    if tk[0] != "mgr" {
+    if !matches!(tk[0], "mgr" | "mgf") {
         g.mriio_strip_pound = next().parse().unwrap();
     }
     let bits: i32 = next().parse().unwrap();
@@ -772,7 +772,7 @@ fn answer(
             twice = next() == "1";
         }
     }
-    if tk[0] == "mgr" {
+    if matches!(tk[0], "mgr" | "mgf") {
         rv = next() != "0";
         frame = next().parse().unwrap();
     }
@@ -802,6 +802,50 @@ fn answer(
     }
     .map_err(fatal)?;
     print_mri(o, w, m.as_ref());
+    if tk[0] == "mgf" {
+        print_frames(o, m.as_ref());
+    }
     o.i(i64::from(g.errno));
     Ok(())
+}
+
+/// The probe's `mgf` (track A relay 42, hand cases only): every frame's fields as the frame tag
+/// left them (FS-167's numbers of a file that ends inside the tag).
+fn print_frames(o: &mut Out, m: Option<&Mri>) {
+    let Some(m) = m.filter(|m| !m.frames.is_empty()) else {
+        o.0.push_str("N ");
+        return;
+    };
+    for f in m.frames.iter().take(m.nframes.max(0) as usize) {
+        o.i(i64::from(f.ftype));
+        for x in [f.te, f.tr, f.flip, f.ti, f.td] {
+            fh(o, x);
+        }
+        dh(o, f.tm);
+        o.i(i64::from(f.sequence_type));
+        fh(o, f.echo_spacing);
+        fh(o, f.echo_train_len);
+        for x in f.read_dir.iter().chain(&f.pe_dir).chain(&f.slice_dir) {
+            fh(o, *x);
+        }
+        o.i(i64::from(f.label));
+        fnv(o, f.name.buffer());
+        o.i(i64::from(f.dof));
+        rmat(o, f.m_ras2vox.as_ref());
+        fh(o, f.thresh);
+        o.i(i64::from(f.units));
+        for x in [f.dx, f.dy, f.dz, f.dr, f.dp, f.ds, f.bvalue] {
+            dh(o, x);
+        }
+        for (ramp, flat, amp) in [
+            (f.d1_ramp, f.d1_flat, f.d1_amp),
+            (f.d2_ramp, f.d2_flat, f.d2_amp),
+            (f.d3_ramp, f.d3_flat, f.d3_amp),
+            (f.d4_ramp, f.d4_flat, f.d4_amp),
+        ] {
+            o.i(ramp);
+            o.i(flat);
+            dh(o, amp);
+        }
+    }
 }

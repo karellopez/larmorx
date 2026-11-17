@@ -50,10 +50,11 @@
 //!   modes skip the mark of an empty list (noted); `reproduce` ends the program (signal 11) without
 //!   a list; a list that still holds an entry (a vertex whose neighbours were removed) is used as
 //!   FreeSurfer uses it.
-//! - **FS-992** (crash): `mrisRemoveVertexLink` of a vertex whose neighbours in use are fewer than
-//!   the place of the neighbour removed (a neighbourhood size of 0) moves a negative count of
-//!   entries: the program crashes. `reproduce` ends it so (signal 11); the default removes the
-//!   neighbour from the 1-hop ring only.
+//! - **FS-992** (memory corrupted): `mrisRemoveVertexLink` of a vertex whose neighbours in use are
+//!   fewer than the place of the neighbour removed (a neighbourhood size of 0) moves a negative
+//!   count of entries: glibc's copy then writes over the memory around the vertex's list (measured:
+//!   the program goes on with other vertices' lists corrupted). Both modes remove the neighbour
+//!   from the 1-hop ring only (noted).
 //! - **FS-993** (memory outside): `MRISgetSpatOrderedNeighbors` of a vertex without faces reads its
 //!   face list's first entry from memory never written, and of a vertex its first face does not
 //!   hold reads past that face's three vertices. Both modes return the neighbours found up to there
@@ -61,7 +62,7 @@
 //! - **FS-995** (out of bounds): the renumbering of a surface whose unripped faces hold ripped
 //!   vertices, or whose vertices have neighbours ripped with a flag other than 1, writes the vertex
 //!   number -1 into those faces and lists; FreeSurfer's later reads of them go outside the
-//!   surface's vertices. `reproduce` writes -1 (noted; the probe compares nothing after it); the
+//!   surface's vertices. `reproduce` writes -1 (noted; the probe stops both sides there); the
 //!   default rips those faces first, so they are removed with the ripped ones (and the lists drop
 //!   every ripped neighbour, FS-988).
 //! - **FS-994** (memory): the renumbering copies each kept face (its normal matrices) and vertex
@@ -199,7 +200,8 @@ pub fn remove_edge(
 /// removed from its neighbours in use (those after it moved one place down; the 1-hop count and
 /// the count in use one less; the 2- and 3-hop counts left as they were, FS-989). FS-992: fewer
 /// neighbours in use than the place after the one removed: FreeSurfer moves a negative count of
-/// entries and crashes (`reproduce`: signal 11); the default moves the 1-hop ring's entries only.
+/// entries, which corrupts the memory around the list; both modes move the 1-hop ring's entries
+/// only (noted).
 /// `NO_ERROR`.
 pub fn remove_vertex_link(
     g: &mut Globals,
@@ -219,12 +221,9 @@ pub fn remove_vertex_link(
         g.notices.add(
             &FS_992,
             format!(
-                "mrisRemoveVertexLink({vno1}, {vno2}): {vtotal} neighbours in use below the place {n} removed (FreeSurfer moves {count} entries and crashes)"
+                "mrisRemoveVertexLink({vno1}, {vno2}): {vtotal} neighbours in use below the place {n} removed (FreeSurfer moves {count} entries, over the memory around the list): the 1-hop ring's moved"
             ),
         );
-        if g.notices.reproduce() {
-            return Err(Fatal::Exit(139));
-        }
         let v = mris
             .topology_mut(vno1)
             .v
@@ -1120,16 +1119,15 @@ pub fn remove_ripped(
         } else {
             Vec::new()
         };
-        if mris.vertex(vno).dist.is_some() {
-            for i in 0..old_vtotal {
-                let n = v_of(mris, vno, i) as usize;
-                dist_cache[n] = mris.vertex(vno).dist.as_ref().expect("dist")[i];
+        // (the distances a vertex has: an added edge leaves its distances shorter than its list)
+        if let Some(d) = mris.vertex(vno).dist.as_ref() {
+            for i in 0..old_vtotal.min(d.len()) {
+                dist_cache[v_of(mris, vno, i) as usize] = d[i];
             }
         }
-        if mris.vertex(vno).dist_orig.is_some() {
-            for i in 0..old_vtotal {
-                let n = v_of(mris, vno, i) as usize;
-                dist_orig_cache[n] = mris.vertex(vno).dist_orig.as_ref().expect("dist_orig")[i];
+        if let Some(d) = mris.vertex(vno).dist_orig.as_ref() {
+            for i in 0..old_vtotal.min(d.len()) {
+                dist_orig_cache[v_of(mris, vno, i) as usize] = d[i];
             }
         }
         nbhd::find_new(g, sg, io, mris, vno, old_max, MAX_NEIGHBORS, &mut lists)?;
@@ -1162,26 +1160,23 @@ pub fn remove_ripped(
             mris.topology_mut(vno).vtotal = new_vtotal as i16;
         }
         let vtotal = usize::try_from(mris.topology(vno).vtotal).unwrap_or(0);
-        if mris.vertex(vno).dist.is_some() {
-            for i in 0..vtotal {
+        let vals: Vec<(f32, f32)> = (0..vtotal)
+            .map(|i| {
                 let n = v_of(mris, vno, i) as usize;
-                let d = dist_cache[n];
-                let dv = mris.vertex_mut(vno).dist.as_mut().expect("dist");
-                if dv.len() <= i {
-                    dv.resize(i + 1, 0.0);
-                }
-                dv[i] = d;
+                (dist_cache[n], dist_orig_cache[n])
+            })
+            .collect();
+        let v = mris.vertex_mut(vno);
+        if let Some(dv) = v.dist.as_mut() {
+            let k = dv.len().min(vals.len());
+            for (x, &(d, _)) in dv[..k].iter_mut().zip(&vals) {
+                *x = d;
             }
         }
-        if mris.vertex(vno).dist_orig.is_some() {
-            for i in 0..vtotal {
-                let n = v_of(mris, vno, i) as usize;
-                let d = dist_orig_cache[n];
-                let dv = mris.vertex_mut(vno).dist_orig.as_mut().expect("dist_orig");
-                if dv.len() <= i {
-                    dv.resize(i + 1, 0.0);
-                }
-                dv[i] = d;
+        if let Some(dv) = v.dist_orig.as_mut() {
+            let k = dv.len().min(vals.len());
+            for (x, &(_, d)) in dv[..k].iter_mut().zip(&vals) {
+                *x = d;
             }
         }
         p = affected[vno];

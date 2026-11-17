@@ -6321,7 +6321,8 @@ void vlr_case()
 // top: a surface read by MRISread (d/lh.s0: vls's meshes), its neighbourhood set to 1 to 3 hops
 // (with its distances or not), its type (3, or 0: a quadrangle surface), every vertex's rip flag
 // and mark and every face's rip flag from the case, Gdiag; then 1 to 6 operations named by their
-// FreeSurfer functions; after each the surface's counts and every vertex's (to nvertices) rip flag,
+// FreeSurfer functions (`freedists`: MRISfreeDistsButNotOrig and MRISfreeDistOrigs, which the
+// renumbering needs first); after each the surface's counts and every vertex's (to nvertices) rip flag,
 // mark, faces with their places, counts, neighbour list (mrisVertexVSize entries) and distances,
 // every face's vertices and rip flag
 static void top_dump(MRIS *s)
@@ -6373,16 +6374,19 @@ void top_case()
   }
   for (int f = 0; f < nf; f++) s->faces[f].ripflag = (char)geti();
   Gdiag = (unsigned long)(unsigned int)geti();
+  // a vertex or face the surface no longer has (after a renumbering): `G`, skipped on both sides
+  auto G = [&](int a) { if (a >= 0 && a < s->nvertices) return false; out += "G "; return true; };
+  auto GF = [&](int f) { if (f >= 0 && f < s->nfaces) return false; out += "G "; return true; };
   int nops = geti();
   for (int k = 0; k < nops; k++) {
     std::string op = next();
     out += op + " ";
     fflush(stdout);
-    if (op == "edgeExists") { int a = geti(), b = geti(); oi(edgeExists(s, a, b)); }
-    else if (op == "mrisCountValidLinks") { int a = geti(), b = geti(); oi(mrisCountValidLinks(s, a, b)); }
-    else if (op == "mrisAddEdge") { int a = geti(), b = geti(); mrisAddEdge(s, a, b); }
-    else if (op == "mrisRemoveEdge") { int a = geti(), b = geti(); mrisRemoveEdge(s, a, b); }
-    else if (op == "mrisRemoveVertexLink") { int a = geti(), b = geti(); oi(mrisRemoveVertexLink(s, a, b)); }
+    if (op == "edgeExists") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(edgeExists(s, a, b)); }
+    else if (op == "mrisCountValidLinks") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(mrisCountValidLinks(s, a, b)); }
+    else if (op == "mrisAddEdge") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; mrisAddEdge(s, a, b); }
+    else if (op == "mrisRemoveEdge") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; mrisRemoveEdge(s, a, b); }
+    else if (op == "mrisRemoveVertexLink") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(mrisRemoveVertexLink(s, a, b)); }
     else if (op == "MRISremoveTriangleLinks") oi(MRISremoveTriangleLinks(s));
     else if (op == "mrisCountTotalNeighbors") oi(mrisCountTotalNeighbors(s));
     else if (op == "MRIScomputeEulerNumber") {
@@ -6391,30 +6395,44 @@ void top_case()
     }
     else if (op == "MRIStopologicalDefectIndex") oi(MRIStopologicalDefectIndex(s));
     else if (op == "mrisStoreVtotalInV3num") oi(mrisStoreVtotalInV3num(s));
-    else if (op == "mrisVertexReplacingNeighbors") { int a = geti(), b = geti(); mrisVertexReplacingNeighbors(s, a, b); }
+    else if (op == "mrisVertexReplacingNeighbors") { int a = geti(), b = geti(); if (G(a)) continue; mrisVertexReplacingNeighbors(s, a, b); }
     else if (op == "mrisForgetNeighborhoods") mrisForgetNeighborhoods(s);
     else if (op == "MRIScountTotalNeighbors") oi(MRIScountTotalNeighbors(s, geti()));
     else if (op == "MRISgetNeighborsBeginEnd") {
       int vno = geti(), a = geti(), b = geti();
+      if (G(vno)) continue;
       size_t x = 7, y = 7;
       MRISgetNeighborsBeginEnd(s, vno, (size_t)a, (size_t)b, &x, &y);
       oi((long long)x); oi((long long)y);
     }
     else if (op == "MRISisSurfaceValid") { int a = geti(), b = geti(); oi(MRISisSurfaceValid(s, a, b)); }
-    else if (op == "vertexInFace") { int a = geti(), b = geti(); oi(vertexInFace(s, a, b)); }
-    else if (op == "mrisRemoveLink") { int a = geti(), b = geti(); oi(mrisRemoveLink(s, a, b)); }
-    else if (op == "mrisRemoveFace") oi(mrisRemoveFace(s, geti()));
-    else if (op == "MRISrenumberRemovingRippedFacesAndVertices") MRISrenumberRemovingRippedFacesAndVertices(s);
+    else if (op == "vertexInFace") { int a = geti(), b = geti(); if (G(a) || GF(b)) continue; oi(vertexInFace(s, a, b)); }
+    else if (op == "mrisRemoveLink") { int a = geti(), b = geti(); if (G(a) || G(b)) continue; oi(mrisRemoveLink(s, a, b)); }
+    else if (op == "mrisRemoveFace") { int f = geti(); if (GF(f)) continue; oi(mrisRemoveFace(s, f)); }
+    else if (op == "MRISrenumberRemovingRippedFacesAndVertices") {
+      MRISrenumberRemovingRippedFacesAndVertices(s);
+      // the vertex number -1 in a face or a kept neighbour list (FS-995): the next reads go outside
+      // the vertices: the state printed, the case stopped (the port does the same)
+      bool minus = false;
+      for (int f = 0; f < s->nfaces; f++)
+        for (int n = 0; n < 3; n++) minus |= s->faces[f].v[n] < 0;
+      for (int v = 0; v < s->nvertices; v++)
+        for (int n = 0; n < s->vertices_topology[v].v3num; n++) minus |= s->vertices_topology[v].v[n] < 0;
+      if (minus) { top_dump(s); out += "STOP "; return; }
+    }
     else if (op == "MRISremoveRipped") MRISremoveRipped(s);
     else if (op == "MRISevertSurface") oi(MRISevertSurface(s));
     else if (op == "MRISgetSpatOrderedNeighbors") {
-      std::vector<int> l = MRISgetSpatOrderedNeighbors(s, geti());
+      int vno = geti();
+      if (G(vno)) continue;
+      std::vector<int> l = MRISgetSpatOrderedNeighbors(s, vno);
       oi((long long)l.size());
       for (int x : l) oi(x);
     }
     else if (op == "MRISsetRipInFacesWithRippedVertices") MRISsetRipInFacesWithRippedVertices(s);
-    else if (op == "MRIS_setNsizeCur") { int a = geti(), b = geti(); MRIS_setNsizeCur(s, a, b); }
-    else if (op == "rip") { int a = geti(); s->vertices[a].ripflag = (char)geti(); }
+    else if (op == "MRIS_setNsizeCur") { int a = geti(), b = geti(); if (G(a)) continue; MRIS_setNsizeCur(s, a, b); }
+    else if (op == "rip") { int a = geti(), r = geti(); if (G(a)) continue; s->vertices[a].ripflag = (char)r; }
+    else if (op == "freedists") { MRISfreeDistsButNotOrig(s); MRISfreeDistOrigs(s); }
     else fail("top op");
     top_dump(s);
   }

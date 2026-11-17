@@ -5,7 +5,8 @@
 //! (`toprest.rs`): a surface read by `MRISread` (`d/lh.s0`: vls's open grids, subdivided icosahedra
 //! and srd's small meshes), its neighbourhood set to 1 to 3 hops (with its distances or not), its
 //! type (3, or 0: a quadrangle surface), every vertex's rip flag and mark and every face's rip flag
-//! from the case, `Gdiag`; then 1 to 6 operations named by their FreeSurfer functions; after each
+//! from the case, `Gdiag`; then 1 to 6 operations named by their FreeSurfer functions (`freedists`:
+//! `MRISfreeDistsButNotOrig` and `MRISfreeDistOrigs`, which the renumbering needs first); after each
 //! the surface's counts and every vertex's rip flag, mark, faces with their places, counts,
 //! neighbour list (`mrisVertexVSize` entries) and distances, every face's vertices and rip flag:
 //! the generator and the port's answers, as `fssurfio.cpp`'s.
@@ -15,8 +16,7 @@ use super::mpd::{grid, ico};
 use super::srd::{Mesh, mesh};
 use super::*;
 
-use larmorx_core::defects::FS_995;
-use larmorx_freesurfer_surf::{nbhd, readwrite, toprest, valrest};
+use larmorx_freesurfer_surf::{dist, nbhd, readwrite, toprest, valrest};
 
 /// The directed edges of the mesh's faces (a face's vertex and the next).
 fn edges(m: &Mesh) -> Vec<(i64, i64)> {
@@ -53,7 +53,7 @@ pub(super) fn top_tokens(t: &mut Vec<String>, g: &mut Gen) {
         ix(
             t,
             if rips && g.chance(6) {
-                g.pick(&[1, 1, 1, 2, -1])
+                g.pick(&[1, 1, 1, 1, 1, 2, -1])
             } else {
                 0
             },
@@ -76,8 +76,12 @@ pub(super) fn top_tokens(t: &mut Vec<String>, g: &mut Gen) {
         }
     };
     let nops = g.int(1, 6);
-    ix(t, nops);
+    let mut ops: Vec<String> = Vec::new();
+    let mut count = 0i64;
+    let outer = t;
+    let t = &mut ops;
     for _ in 0..nops {
+        count += 1;
         if nv == 0 {
             t.push(
                 g.pick(&[
@@ -180,15 +184,20 @@ pub(super) fn top_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 t.push("mrisRemoveFace".into());
                 ix(t, face(g));
             }
-            // the renumbering asserts that no distances are kept: with them, mostly the removal
-            20 | 26 => t.push(
-                if dmode == 1 && !g.chance(8) {
-                    "MRISremoveRipped"
-                } else {
-                    "MRISrenumberRemovingRippedFacesAndVertices"
+            // the renumbering asserts that no distances are kept (MRISread's surfaces keep
+            // theirs): mostly released first
+            20 | 26 => {
+                // the faces of the ripped vertices ripped first, mostly (else FS-995)
+                if !g.chance(4) {
+                    t.push("MRISsetRipInFacesWithRippedVertices".into());
+                    count += 1;
                 }
-                .into(),
-            ),
+                if !g.chance(8) {
+                    t.push("freedists".into());
+                    count += 1;
+                }
+                t.push("MRISrenumberRemovingRippedFacesAndVertices".into());
+            }
             21 | 22 => t.push("MRISremoveRipped".into()),
             23 => t.push(
                 g.pick(&["MRISevertSurface", "MRISsetRipInFacesWithRippedVertices"])
@@ -212,6 +221,8 @@ pub(super) fn top_tokens(t: &mut Vec<String>, g: &mut Gen) {
             _ => unreachable!(),
         }
     }
+    ix(outer, count);
+    outer.append(&mut ops);
 }
 
 fn dump(s: &Mris, o: &mut Out) {
@@ -312,6 +323,14 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         s.face_mut(fno).ripflag = t.i() as i8;
     }
     g.gdiag = t.i() as u32 as u64;
+    // a vertex or face the surface no longer has (after a renumbering): `G`, skipped on both sides
+    let gv = |s: &Mris, o: &mut Out, xs: &[i32]| {
+        let bad = xs.iter().any(|&a| a < 0 || a >= s.nvertices);
+        if bad {
+            o.s("G");
+        }
+        bad
+    };
     let nops = t.i();
     for _ in 0..nops {
         let op = t.next();
@@ -319,22 +338,37 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         match op {
             "edgeExists" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a, b]) {
+                    continue;
+                }
                 o.i(i64::from(toprest::edge_exists(&s, a as usize, b)));
             }
             "mrisCountValidLinks" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a, b]) {
+                    continue;
+                }
                 o.i(i64::from(toprest::count_valid_links(&s, a as usize, b)));
             }
             "mrisAddEdge" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a, b]) {
+                    continue;
+                }
                 toprest::add_edge(g, sg, &mut io, &mut s, a as usize, b as usize);
             }
             "mrisRemoveEdge" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a, b]) {
+                    continue;
+                }
                 toprest::remove_edge(g, sg, io.err, &mut s, a as usize, b);
             }
             "mrisRemoveVertexLink" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a, b]) {
+                    continue;
+                }
                 o.i(i64::from(toprest::remove_vertex_link(
                     g, sg, io.err, &mut s, a as usize, b,
                 )?));
@@ -359,6 +393,9 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "mrisStoreVtotalInV3num" => o.i(i64::from(toprest::store_vtotal_in_v3num(&mut s))),
             "mrisVertexReplacingNeighbors" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a]) {
+                    continue;
+                }
                 toprest::vertex_replacing_neighbors(g, sg, io.err, &mut s, a as usize, b);
             }
             "mrisForgetNeighborhoods" => toprest::forget_neighborhoods(g, sg, io.err, &mut s),
@@ -368,6 +405,9 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "MRISgetNeighborsBeginEnd" => {
                 let (vno, a, b) = (t.i(), t.i(), t.i());
+                if gv(&s, o, &[vno]) {
+                    continue;
+                }
                 let (x, y) = toprest::get_neighbors_begin_end(
                     g,
                     &mut io,
@@ -385,26 +425,47 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "vertexInFace" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a]) {
+                    continue;
+                }
+                if b < 0 || b >= s.nfaces {
+                    o.s("G");
+                    continue;
+                }
                 o.i(i64::from(toprest::vertex_in_face(&s, a as usize, b)));
             }
             "mrisRemoveLink" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a, b]) {
+                    continue;
+                }
                 o.i(i64::from(toprest::remove_link(
                     g, sg, io.err, &mut s, a as usize, b as usize,
                 )));
             }
             "mrisRemoveFace" => {
                 let f = t.i();
+                if f < 0 || f >= s.nfaces {
+                    o.s("G");
+                    continue;
+                }
                 o.i(i64::from(toprest::remove_face(
                     g, sg, io.err, &mut s, f as usize,
                 )));
             }
             "MRISrenumberRemovingRippedFacesAndVertices" => {
                 toprest::renumber_removing_ripped_faces_and_vertices(g, sg, &mut io, &mut s)?;
-                // FS-995 reproduced: FreeSurfer's next reads go outside the vertices (the case is
-                // counted, not compared): the port stops here
-                if g.notices.reproduce() && g.notices.contains(&FS_995) {
+                // the vertex number -1 in a face or a kept neighbour list (FS-995 reproduced):
+                // FreeSurfer's next reads go outside the vertices: both sides stop here
+                let minus = (0..s.nfaces.max(0) as usize).any(|f| s.face(f).v.contains(&-1))
+                    || (0..s.nvertices.max(0) as usize).any(|v| {
+                        let vt = s.topology(v);
+                        let n = vt.v3num.max(0) as usize;
+                        vt.v.as_ref().is_some_and(|l| l[..n].iter().any(|&x| x < 0))
+                    });
+                if minus {
                     dump(&s, o);
+                    o.s("STOP");
                     return Ok(());
                 }
             }
@@ -412,6 +473,9 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "MRISevertSurface" => o.i(i64::from(toprest::evert_surface(g, &mut io, &mut s)?)),
             "MRISgetSpatOrderedNeighbors" => {
                 let vno = t.i();
+                if gv(&s, o, &[vno]) {
+                    continue;
+                }
                 let l = toprest::get_spat_ordered_neighbors(g, &s, vno as usize);
                 o.i(l.len() as i64);
                 for x in l {
@@ -423,11 +487,21 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "MRIS_setNsizeCur" => {
                 let (a, b) = (t.i(), t.i());
+                if gv(&s, o, &[a]) {
+                    continue;
+                }
                 nbhd::set_nsize_cur(g, &mut io, &mut s, a as usize, b)?;
             }
             "rip" => {
-                let a = t.i();
-                s.vertex_mut(a as usize).ripflag = t.i() as i8;
+                let (a, r) = (t.i(), t.i());
+                if gv(&s, o, &[a]) {
+                    continue;
+                }
+                s.vertex_mut(a as usize).ripflag = r as i8;
+            }
+            "freedists" => {
+                dist::free_dists_but_not_orig(&mut s);
+                dist::free_dist_origs(&mut s);
             }
             _ => panic!("top op {op}"),
         }

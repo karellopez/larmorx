@@ -1896,7 +1896,7 @@ defects! {
     FS_991 = "FS-991", "FreeSurfer", true,
         "the surface check of mris_topo_fixer (MRISisSurfaceValid) starts each vertex's corner check from its first neighbour, also for a vertex without neighbours: it marks a vertex named by memory never written, or crashes for a vertex without a neighbour list";
     FS_992 = "FS-992", "FreeSurfer", true,
-        "removing a neighbour from a vertex's lists when the vertex has fewer neighbours in use than the neighbour's place (a neighbourhood size of 0) moves a negative count of entries: the program crashes";
+        "removing a neighbour from a vertex's lists when the vertex has fewer neighbours in use than the neighbour's place (a neighbourhood size of 0) moves a negative count of entries: the memory around the vertex's list is overwritten (other vertices' lists corrupted) or the program crashes";
     FS_993 = "FS-993", "FreeSurfer", true,
         "the neighbours of a vertex in order around it (MRISgetSpatOrderedNeighbors: mris_skeletonize) read memory never written for a vertex without faces, and past a face's three vertices for a vertex its first face does not hold";
     FS_994 = "FS-994", "FreeSurfer", true,

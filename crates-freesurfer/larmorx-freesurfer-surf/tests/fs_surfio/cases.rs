@@ -15,7 +15,7 @@ use std::sync::Arc;
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
     FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, FS_530, FS_531, FS_532,
-    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, FS_902, FS_906, FS_974, FS_977, FS_981, FS_991, FS_992, Notice,
+    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, FS_902, FS_906, FS_974, FS_977, FS_981, FS_991, Notice,
     UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
@@ -2951,8 +2951,7 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_906)
                     || cx.g.notices.contains(&FS_977)
                     || cx.g.notices.contains(&FS_981)
-                    || cx.g.notices.contains(&FS_991)
-                    || cx.g.notices.contains(&FS_992)) =>
+                    || cx.g.notices.contains(&FS_991)) =>
         {
             "CRASH 11".to_owned()
         }

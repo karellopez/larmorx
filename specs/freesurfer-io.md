@@ -5528,6 +5528,9 @@ Returns 0; every failure ends the program (`ErrorExit`, code `ERROR_BADPARM`, th
   and 1,001; each slice present or not, its offset in the header, 0, past the end, negative, its rows whole or cut;
   slice files cut before or inside their offset (FS-945: `SKIP`; FS-946 compared). The volume (piece 6's print) and
   `errno`. `SKIP` for FS-944, FS-945, FS-947.
-- Measured (relay 45): MEASURED_GRO
+- Measured (relay 45): seeds 7, 13 and 21 (389 `gro` cases each): `reproduce` identical on every compared case (296,
+  302, 294), 0 different (93, 87, 95 `SKIP`); `fix` differs only with notices (FS-01's byte, FS-946). Every path met:
+  volumes read (178 of seed 7's cases), each message of items 1 to 5, `EISDIR` and `EINVAL` before `could not read
+  file`, four-digit slice names.
 - Black box: FreeSurfer 8.2.0's `mri_convert --roi --in_k_count <n> <first slice> <out>.mgz` on such series, the
   outputs compared byte for byte.

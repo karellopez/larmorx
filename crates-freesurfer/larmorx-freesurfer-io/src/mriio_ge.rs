@@ -1234,8 +1234,8 @@ pub fn mri_read_ge_roi(
     let (prefix, postfix) = (&fname[..i - 3], &fname[i..]);
     let _ = writeln!(out, "{prefix}---{postfix}");
     if width > 0 && height > 0 && n_slices > 0 {
-        let bytes = width as u64 * height as u64 * n_slices as u64 * 2;
-        if bytes > MACHINE_BYTES && bytes <= CALLOC_LIMIT {
+        let bytes = width as u128 * height as u128 * n_slices as u128 * 2;
+        if bytes > u128::from(MACHINE_BYTES) && bytes <= u128::from(CALLOC_LIMIT) {
             g.notices.add(
                 &FS_947,
                 format!(

@@ -205,7 +205,7 @@ pub fn run(
             {
                 let wd = i32::from_be_bytes(b[8..12].try_into().unwrap());
                 let ht = i32::from_be_bytes(b[12..16].try_into().unwrap());
-                let bytes = i64::from(wd) * i64::from(ht) * i64::from(n_slices) * 2;
+                let bytes = i128::from(wd) * i128::from(ht) * i128::from(n_slices) * 2;
                 // a negative extent: no chunk, and each slice's buffer is the extents' product
                 // in 32-bit arithmetic (wrapping), widened, times 2
                 let slice = (i64::from(wd.wrapping_mul(ht)) as u64).wrapping_mul(2);

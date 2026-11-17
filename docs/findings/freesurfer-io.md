@@ -2965,3 +2965,35 @@ tkregister matrices, `MRIvoxelToSurfaceRAS`); `utils/talairachex.cpp` 207 (`Tran
 9. **Arithmetic.** The morph branch's source matrix is computed once; `MRIvoxelToSurfaceRAS` recomputes the
    destination's tkregister vox2ras for every vertex (its diagnostic too); the sample is widened with `cvtss2sd`
    (a signalling NaN quieted, as Rust's `f64::from` does in both builds) and the result narrowed with `cvtsd2ss`.
+
+## Part 42: MRIreadGeRoi (relay 45 of track A)
+
+Sources: `utils/mriio.cpp` 10445-10560 (`MRIreadGeRoi`); `mri_convert/mri_convert.cpp` 1377-1380 (`--roi`), 2057-2090
+(the call, its slice count `mri_in_like->depth` or `in_n_k`); `utils/mri.cpp` 264-310 (`MRI::initSlices`: a slice's
+own buffer `calloc(width * height * bytes_per_vox, 1)`, the extents' product in `int`).
+
+1. **Reach.** Only `mri_convert --roi` (with `--in_like` or `--in_k_count`; a GE Genesis input type) calls it; no
+   recorded step does.
+2. **FS-944.** `int width, height` are locals; `fread(&width, 4, 1, fp)` of a file that ends inside them copies the
+   bytes it has (glibc's partial `fread`) and leaves the rest as the stack held them; the result is then swapped
+   (`orderIntBytes`) and used as the volume's extent. Memory contents: 0 here in both modes, the probe's `SKIP`.
+3. **FS-945, FS-946.** `int pixel_data_offset` is declared once before the slice loop. Each slice's read goes into it
+   and the swapped value is stored back, so a slice file that ends inside its offset keeps, in the bytes it did not
+   give, the earlier slice's offset as the machine holds it (little-endian), and the swap then reverses them: an
+   offset unrelated to the file (FS-946, deterministic: `reproduce` reproduces it; by default the missing bytes are
+   0, as the port's other cut headers). Before any slice the bytes are the stack's (FS-945: 0 in both modes, `SKIP`).
+4. **FS-947.** `MRIalloc` then `MRIclear` writes every byte of the volume before any slice is read: a header asking
+   for more than the machine's memory exhausts it (or the allocation fails, depending on the machine's overcommit).
+   Both modes refuse volumes past 16 GiB (the port's `MACHINE_BYTES`, as FS-760) with FreeSurfer's own message for a
+   failed allocation, `MRIreadGeRoi(): couldn't allocate MRI structure`. The port does not write the zeros again
+   (`MRIclear` of a fresh allocation): no visible effect, less memory touched.
+5. **errno.** A slice that cannot be opened leaves its `fopen` error in `errno`, and a negative offset's `fseek` sets
+   `EINVAL`; the next `could not read file` prints that text first. `ErrorReturn`'s exits clear `errno` first.
+6. **The probe's limits.** `fsio` runs each case with 1 GiB of address space: a volume over 256 MiB within 16 GiB, or
+   (a negative extent: no chunk, one buffer per slice of the 32-bit product times 2) a slice buffer over 256 MiB, is not
+   run on the port's side (`SKIP`): FreeSurfer's allocation there depends on that limit (seed 7's first run: a width
+   of -2,080,923,885 and a height of 1,035,852,531 make 0.8 GiB slices, refused under `fsio`'s limit, given on a real
+   machine; the port then fails at the index tables, as FreeSurfer would).
+7. **A generator's memory.** The port's case generator first filled the slices of a 65,536 x 65,536 header (8 GiB per
+   slice): its 20 GiB memory box ended it. Slices over 64 KiB are now the header alone (the reader fails at their first
+   row, or refuses them first: FS-947).

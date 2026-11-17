@@ -69,6 +69,8 @@
 //!   (its user data) to its new place without moving them, so two places share them and releasing
 //!   the surface releases them twice. larmorx's copies are its own; nothing is reproduced.
 
+#![allow(clippy::needless_range_loop)]
+
 use std::io::Write;
 
 use larmorx_core::defects::{
@@ -102,12 +104,18 @@ fn assert_at(g: &mut Globals, io: &mut Io, line: i32, tst: &str) -> Fatal {
 
 /// `vt->v[i]` (a missing list or an entry past it is FreeSurfer's invalid read: a panic).
 fn v_of(mris: &Mris, vno: usize, i: usize) -> i32 {
-    mris.topology(vno).v.as_ref().expect("VERTEX_TOPOLOGY::v is NULL")[i]
+    mris.topology(vno)
+        .v
+        .as_ref()
+        .expect("VERTEX_TOPOLOGY::v is NULL")[i]
 }
 
 /// `vt->f[i]`.
 fn f_of(mris: &Mris, vno: usize, i: usize) -> i32 {
-    mris.topology(vno).f.as_ref().expect("VERTEX_TOPOLOGY::f is NULL")[i]
+    mris.topology(vno)
+        .f
+        .as_ref()
+        .expect("VERTEX_TOPOLOGY::f is NULL")[i]
 }
 
 /// `EVEN(n)` (`macros.h`): `((n / 2) * 2) == n`, C's truncating division.
@@ -312,7 +320,11 @@ pub fn remove_face(
     for vno in 0..VERTICES_PER_FACE {
         let face = mris.face(fno);
         let vno1 = face.v[vno];
-        let vno2 = face.v[if vno < VERTICES_PER_FACE - 1 { vno + 1 } else { 0 }];
+        let vno2 = face.v[if vno < VERTICES_PER_FACE - 1 {
+            vno + 1
+        } else {
+            0
+        }];
         if count_valid_links(mris, vno1 as usize, vno2) == 0 {
             if count_valid_links(mris, vno2 as usize, vno1) != 0 {
                 g.notices.add(
@@ -368,7 +380,8 @@ pub fn remove_link(
         let fv = mris.face(f).v;
         (0..VERTICES_PER_FACE).any(|k| {
             let (a, b) = (fv[k], fv[(k + 1) % VERTICES_PER_FACE]);
-            let linked = edge_exists(mris, a as usize, b) != 0 || edge_exists(mris, b as usize, a) != 0;
+            let linked =
+                edge_exists(mris, a as usize, b) != 0 || edge_exists(mris, b as usize, a) != 0;
             linked && !held(mris, a, b)
         })
     });
@@ -462,7 +475,12 @@ pub fn topological_defect_index(mris: &Mris) -> i32 {
 /// count of their `nsize`-hop neighbourhood (1, 2, 3). Each such vertex must know `nsize` hops
 /// (else a failed assertion, line 931); any other `nsize` ends the program with `MRIScountNeighbors(
 /// <nsize>): max nbhd size = 3` (`ERROR_UNSUPPORTED`).
-pub fn count_total_neighbors(g: &mut Globals, io: &mut Io, mris: &Mris, nsize: i32) -> Result<i32, Fatal> {
+pub fn count_total_neighbors(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &Mris,
+    nsize: i32,
+) -> Result<i32, Fatal> {
     let mut total = 0i32;
     for vno in 0..nverts(mris) {
         if mris.vertex(vno).ripflag != 0 {
@@ -577,7 +595,12 @@ pub fn vertex_replacing_neighbors(
 
 /// `mrisForgetNeighborhoods(mris)`: [`vertex_replacing_neighbors`] of every vertex with its own
 /// 1-hop count; then the surface's neighbourhood size 1.
-pub fn forget_neighborhoods(g: &Globals, sg: &mut SurfGlobals, err: &mut dyn Write, mris: &mut Mris) {
+pub fn forget_neighborhoods(
+    g: &Globals,
+    sg: &mut SurfGlobals,
+    err: &mut dyn Write,
+    mris: &mut Mris,
+) {
     for vno in 0..nverts(mris) {
         let vnum = i32::from(mris.topology(vno).vnum);
         vertex_replacing_neighbors(g, sg, err, mris, vno, vnum);
@@ -1104,14 +1127,9 @@ pub fn remove_ripped(
                 usize::try_from(vt.vtotal).unwrap_or(0),
             )
         };
-        let old_cached = usize::try_from(vertex_vnum(
-            g,
-            io.out,
-            io.err,
-            mris.topology(vno),
-            old_max,
-        )?)
-        .unwrap_or(0);
+        let old_cached =
+            usize::try_from(vertex_vnum(g, io.out, io.err, mris.topology(vno), old_max)?)
+                .unwrap_or(0);
         let tail: Vec<i32> = if old_vtotal > old_cached {
             (old_cached..old_vtotal)
                 .map(|i| v_of(mris, vno, i))
@@ -1133,14 +1151,9 @@ pub fn remove_ripped(
         nbhd::find_new(g, sg, io, mris, vno, old_max, MAX_NEIGHBORS, &mut lists)?;
         set_nsize_cur(g, io, mris, vno, old_cur)?;
         if old_vtotal > old_cached {
-            let mut new_vtotal = usize::try_from(vertex_vnum(
-                g,
-                io.out,
-                io.err,
-                mris.topology(vno),
-                old_max,
-            )?)
-            .unwrap_or(0);
+            let mut new_vtotal =
+                usize::try_from(vertex_vnum(g, io.out, io.err, mris.topology(vno), old_max)?)
+                    .unwrap_or(0);
             let kept: Vec<i32> = tail
                 .into_iter()
                 .filter(|&x| mris.vertex(x as usize).ripflag == 0)
@@ -1276,7 +1289,12 @@ pub fn evert_surface(g: &mut Globals, io: &mut Io, mris: &mut Mris) -> Result<i3
 /// `MRISisNextSpatOrderedNeighbor(mris, centervno, vnotest, vnolist)`: 1 when `vnotest` is not in
 /// the list and both the centre and the list's last vertex are among its 1-hop neighbours (two
 /// hits among them, each entry counted for each it equals), else 0.
-pub fn is_next_spat_ordered_neighbor(mris: &Mris, centervno: i32, vnotest: i32, vnolist: &[i32]) -> i32 {
+pub fn is_next_spat_ordered_neighbor(
+    mris: &Mris,
+    centervno: i32,
+    vnotest: i32,
+    vnolist: &[i32],
+) -> i32 {
     if vnolist.contains(&vnotest) {
         return 0;
     }

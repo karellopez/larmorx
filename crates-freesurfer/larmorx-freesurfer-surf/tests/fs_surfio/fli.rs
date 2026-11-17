@@ -1077,9 +1077,9 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 o.s(&format!("{h:016x}"));
             };
             counts(&s, o);
-            o.i(i64::from(larmorx_freesurfer_surf::toprest::is_surface_valid(
-                g, &mut io, &mut s, 0, 1,
-            )?));
+            o.i(i64::from(
+                larmorx_freesurfer_surf::toprest::is_surface_valid(g, &mut io, &mut s, 0, 1)?,
+            ));
             let l = larmorx_freesurfer_io::label::label_read(
                 g, io.env, io.out, io.err, None, None, &lf,
             )?

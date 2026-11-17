@@ -401,7 +401,9 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "mrisForgetNeighborhoods" => toprest::forget_neighborhoods(g, sg, io.err, &mut s),
             "MRIScountTotalNeighbors" => {
                 let n = t.i();
-                o.i(i64::from(toprest::count_total_neighbors(g, &mut io, &s, n)?));
+                o.i(i64::from(toprest::count_total_neighbors(
+                    g, &mut io, &s, n,
+                )?));
             }
             "MRISgetNeighborsBeginEnd" => {
                 let (vno, a, b) = (t.i(), t.i(), t.i());
@@ -421,7 +423,9 @@ pub(super) fn top_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "MRISisSurfaceValid" => {
                 let (a, b) = (t.i(), t.i());
-                o.i(i64::from(toprest::is_surface_valid(g, &mut io, &mut s, a, b)?));
+                o.i(i64::from(toprest::is_surface_valid(
+                    g, &mut io, &mut s, a, b,
+                )?));
             }
             "vertexInFace" => {
                 let (a, b) = (t.i(), t.i());

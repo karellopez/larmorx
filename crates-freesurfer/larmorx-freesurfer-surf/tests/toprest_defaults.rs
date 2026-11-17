@@ -79,7 +79,12 @@ impl Run {
     }
 
     fn ids(&self) -> Vec<&'static str> {
-        self.g.notices.as_slice().iter().map(|n| n.defect.id).collect()
+        self.g
+            .notices
+            .as_slice()
+            .iter()
+            .map(|n| n.defect.id)
+            .collect()
     }
 }
 
@@ -94,7 +99,12 @@ fn grid(w: i32, h: i32) -> (Vec<[f32; 3]>, Vec<[i32; 3]>) {
     let mut f = Vec::new();
     for j in 0..h - 1 {
         for i in 0..w - 1 {
-            let (a, b, c, d) = (j * w + i, j * w + i + 1, (j + 1) * w + i, (j + 1) * w + i + 1);
+            let (a, b, c, d) = (
+                j * w + i,
+                j * w + i + 1,
+                (j + 1) * w + i,
+                (j + 1) * w + i + 1,
+            );
             f.push([a, b, d]);
             f.push([a, d, c]);
         }
@@ -127,7 +137,11 @@ fn octahedron() -> (Vec<[f32; 3]>, Vec<[i32; 3]>) {
 
 fn list(s: &Mris, vno: usize, n: i16) -> Vec<i32> {
     let n = n.max(0) as usize;
-    s.topology(vno).v.as_ref().map(|v| v[..n].to_vec()).unwrap_or_default()
+    s.topology(vno)
+        .v
+        .as_ref()
+        .map(|v| v[..n].to_vec())
+        .unwrap_or_default()
 }
 
 /// The rings of `vno` up to `hops` through unripped vertices, from its faces (each face's other
@@ -224,8 +238,15 @@ fn fs986_the_removal_finds_the_rings_again_without_the_ripped_vertices() {
             assert_eq!(vt.vtotal, vt.v2num, "vertex {vno}");
             let d = s.vertex(vno).dist.as_ref().unwrap();
             for (i, x) in list(&s, vno, vt.vtotal).into_iter().enumerate() {
-                let old = before[vno].iter().find(|(y, _)| *y == x).expect("a neighbour before");
-                assert_eq!(d[i].to_bits(), old.1.to_bits(), "vertex {vno}'s distance to {x}");
+                let old = before[vno]
+                    .iter()
+                    .find(|(y, _)| *y == x)
+                    .expect("a neighbour before");
+                assert_eq!(
+                    d[i].to_bits(),
+                    old.1.to_bits(),
+                    "vertex {vno}'s distance to {x}"
+                );
             }
             // every face kept in its list holds it at its place
             for k in 0..usize::from(vt.num) {
@@ -249,7 +270,8 @@ fn consistent(s: &Mris) -> bool {
             }
             let vt = s.topology(x as usize);
             let ok = (0..usize::from(vt.num)).any(|k| {
-                vt.f.as_ref().unwrap()[k] == fno as i32 && usize::from(vt.n.as_ref().unwrap()[k]) == n
+                vt.f.as_ref().unwrap()[k] == fno as i32
+                    && usize::from(vt.n.as_ref().unwrap()[k]) == n
             });
             if !ok {
                 return false;
@@ -257,9 +279,11 @@ fn consistent(s: &Mris) -> bool {
         }
     }
     (0..s.nvertices as usize).all(|a| {
-        list(s, a, s.topology(a).vnum)
-            .iter()
-            .all(|&b| b >= 0 && b < s.nvertices && list(s, b as usize, s.topology(b as usize).vnum).contains(&(a as i32)))
+        list(s, a, s.topology(a).vnum).iter().all(|&b| {
+            b >= 0
+                && b < s.nvertices
+                && list(s, b as usize, s.topology(b as usize).vnum).contains(&(a as i32))
+        })
     })
 }
 
@@ -279,7 +303,10 @@ fn fs987_fs988_the_renumbering_moves_the_lists_with_the_vertices() {
         toprest::renumber_removing_ripped_faces_and_vertices(&mut r.g, &mut r.sg, &mut io, &mut s)
             .unwrap();
         let ids = r.ids();
-        assert!(ids.contains(&"FS-987") && ids.contains(&"FS-988"), "{mode:?} {ids:?}");
+        assert!(
+            ids.contains(&"FS-987") && ids.contains(&"FS-988"),
+            "{mode:?} {ids:?}"
+        );
         assert_eq!((s.nvertices, s.nfaces), (15, 18 - 6));
         assert_eq!(consistent(&s), !mode.reproduce(), "{mode:?}");
         if !mode.reproduce() {
@@ -348,7 +375,9 @@ fn fs991_fs993_a_vertex_without_neighbours() {
             assert_eq!(res, Err(Fatal::Exit(139)));
         } else {
             assert_eq!(res, Ok(1));
-            assert!(String::from_utf8_lossy(&r.err).contains("# of border vertices [ #v ~ #f ]     0"));
+            assert!(
+                String::from_utf8_lossy(&r.err).contains("# of border vertices [ #v ~ #f ]     0")
+            );
         }
         let l = toprest::get_spat_ordered_neighbors(&mut r.g, &s, 6);
         assert!(l.is_empty() && r.ids().contains(&"FS-993"));
@@ -361,7 +390,10 @@ fn the_surface_check_counts_borders_and_the_ordered_neighbours_go_around() {
     let (v, f) = octahedron();
     let mut s = r.surface(&v, &f);
     let mut io = io!(r);
-    assert_eq!(toprest::is_surface_valid(&mut r.g, &mut io, &mut s, 0, 2), Ok(1));
+    assert_eq!(
+        toprest::is_surface_valid(&mut r.g, &mut io, &mut s, 0, 2),
+        Ok(1)
+    );
     let l = toprest::get_spat_ordered_neighbors(&mut r.g, &s, 4);
     assert_eq!(l.len(), 4);
     for k in 0..4 {
@@ -371,11 +403,17 @@ fn the_surface_check_counts_borders_and_the_ordered_neighbours_go_around() {
     let mut s = r.surface(&v, &f);
     r.err.clear();
     let mut io = io!(r);
-    assert_eq!(toprest::is_surface_valid(&mut r.g, &mut io, &mut s, 0, 1), Ok(0));
+    assert_eq!(
+        toprest::is_surface_valid(&mut r.g, &mut io, &mut s, 0, 1),
+        Ok(0)
+    );
     assert!(String::from_utf8_lossy(&r.err).contains("# of edges with single face          16"));
     // a patch: its single-face edges still answer 0 (the second test runs after the first)
     let mut io = io!(r);
-    assert_eq!(toprest::is_surface_valid(&mut r.g, &mut io, &mut s, 1, 0), Ok(0));
+    assert_eq!(
+        toprest::is_surface_valid(&mut r.g, &mut io, &mut s, 1, 0),
+        Ok(0)
+    );
 }
 
 #[test]
@@ -386,10 +424,16 @@ fn triangle_links_of_a_quadrangle_surface_once() {
     s.r#type = 0;
     let before: i32 = (0..9).map(|x| i32::from(s.topology(x).vnum)).sum();
     let mut io = io!(r);
-    assert_eq!(toprest::remove_triangle_links(&mut r.g, &mut r.sg, &mut io, &mut s), Ok(0));
+    assert_eq!(
+        toprest::remove_triangle_links(&mut r.g, &mut r.sg, &mut io, &mut s),
+        Ok(0)
+    );
     let after: i32 = (0..9).map(|x| i32::from(s.topology(x).vnum)).sum();
     assert_eq!((s.triangle_links_removed, before - after), (1, 8));
-    assert_eq!(toprest::remove_triangle_links(&mut r.g, &mut r.sg, &mut io, &mut s), Ok(0));
+    assert_eq!(
+        toprest::remove_triangle_links(&mut r.g, &mut r.sg, &mut io, &mut s),
+        Ok(0)
+    );
     let again: i32 = (0..9).map(|x| i32::from(s.topology(x).vnum)).sum();
     assert_eq!(again, after);
     for x in 0..9 {

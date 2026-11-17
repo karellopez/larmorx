@@ -687,8 +687,15 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
   1 column: an error, code -4, `VectorCrossProduct: must be 3-vectors` (no new line; the triple
   product's message too), nothing returned (the triple product: 0). Absent `out`: a clone (§8.2) of
   v1. With (x1, y1, z1), (x2, y2, z2), (x3, y3, z3) the first three elements: out = (y1 z2 - z1 y2,
-  z1 x2 - x1 z2, x1 y2 - y1 x2) in float; triple = `x3 (y1 z2 - z1 y2)`, then `+ y3 (z1 x2 - x1 z2)`,
-  then `+ z3 (x1 y2 - y1 x2)`, in float.
+  z1 x2 - z2 x1, x1 y2 - y1 x2) in float, each product with its factors in that order (where both
+  are NaNs the left factor's NaN is kept: in the second element's second product z2's) and each
+  difference keeping its first product's NaN where both are NaNs; triple = `t3 + (t2 + t1)` in float
+  with `t1 = (y1 z2 - z1 y2) x3`, `t2 = (z1 x2 - z2 x1) y3`, `t3 = (x1 y2 - y1 x2) z3` (the cross
+  terms as the cross product computes them, each the left factor of its product, and in each sum the
+  left operand as written: so where NaNs meet, `t3`'s is kept, then `t2`'s, then `t1`'s). The value is
+  that of `x3 (...) + y3 (...) + z3 (...)` added left to right; only the NaNs kept differ
+  (**(observed)**: the open probe's `vcross` and `vtriple` with NaNs of distinct payloads in every
+  factor and in pairs).
 - **Angle of 3-vectors** (v1, v2): the lengths l1, l2 in double (`sqrt` of `x² + y² + z²` of the
   widened elements); norm = l1 l2; 0 when |norm| < `FLT_EPSILON`; the dot product of the first three
   elements in **float**, widened; norm becomes |dot| when that is larger; `acos(1.0)` (0) when dot >

@@ -5213,3 +5213,127 @@ crashes or reads memory), a GCA morph's resamplings (not ported).
    `405afea9a37dc9dc`, the sizes 0) and after 4,376 other cases of seed 1's recorded set in the same process
    `fe6976ea86a90170` (the sizes above). Black box: FreeSurfer 8.2.0's `mri_convert w.mgz o.nii` of such a warp
    volume, in a fresh process and after other work, and `mri_info` (which prints the geometries).
+
+## 157. A volume resampled through a GCA morph (`TransformApply`, `TransformApplyType`, `TransformCreateDensityMap`, `TransformApplyInverse`, `TransformApplyInverseType` of a morph)
+
+A morph (§142) maps atlas voxels to image voxels. These functions resample a volume through it; FreeSurfer 8.2.0's
+`mri_convert -at <morph>` and `mri_vol2vol --gcam` reach them.
+
+1. **Onto the atlas** (`TransformApply`: trilinear, every frame; `TransformApplyType(t, src, dst, interp)`: the given
+   interpolation, every frame, into `dst` when given). The output has the atlas geometry's extent (a given `dst` of
+   another extent: `invalid input MRI size for GCAMmorphToAtlas()`, the program ends with status 252), the source's
+   type and frames, and the atlas geometry made shear-free (§16's shears folded into the direction cosines, the
+   centre and the voxel sizes) as its geometry. With `MGH_TAL` set the line `INFO: adding MGH tal offset (-7.4,
+   24.9, -18.9) to xform` is printed and the offsets (-7.42, 24.88, -18.85) are added to every sampled point. Each
+   atlas voxel `(x, y, z)` (x slowest, then y, then z) takes its point in the image from the morph's nodes: the
+   voxel divided by the spacing (single precision); outside `[0, extent)` of the node grid on an axis, or when one of
+   the eight surrounding nodes has an invalid position, the voxel is not written (it stays 0, or the given `dst`'s
+   value). Otherwise the eight nodes' current positions are weighted trilinearly (§142's sampling, single-precision
+   weights, double-precision sums, the point stored as single precision); the offset is added in double precision
+   and the point stored as single precision again. Then, per frame: when the point is inside the source (`x > -1`,
+   `y > -1`, `x` below the source's width and `y` below its height, `z` below its depth, and `z` exactly 0 for a
+   source of one slice or `z > 0` for more: FS-932 below), the source's sample there with the interpolation (§129's
+   frame sampler: whole points take the nearest voxel whatever the interpolation; trilinear; sinc, and cubic B-spline
+   which this port does not have yet, print `MRIsampleVolumeFrameType(<type>): unsupported interpolation type` or its
+   B-spline message and give no value: FS-930, FS-931); else 0. The value is stored as single precision through the
+   type's clipping (§129). With `USE_AVERAGE305` set, `INFO: Environmental variable USE_AVERAGE305 set` and `INFO:
+   Modifying dst c_(r,a,s), using average_305 values` go to standard error and the output's centre becomes (-0.0950,
+   -16.5100, 9.7500).
+2. **The density form** (`TransformCreateDensityMap` of a morph): item 1 with trilinear sampling and only the first
+   frame, then each output voxel times the morph's Jacobian at it: the Jacobian volume has one voxel per node, the
+   node's original volume divided by its current one (single precision; 1 where both are below single precision's
+   epsilon in magnitude, 0.001 where only the current one is), after the node volumes are recomputed (§142's metric
+   properties, with their message for narrow grids); it is sampled trilinearly at the output voxel divided by the
+   spacing (single precision); a point outside or within half a voxel of the Jacobian grid's edge leaves the voxel
+   unscaled. The product is double precision (the voxel's value times the Jacobian: the voxel's NaN first), stored as
+   single precision. With `Gdiag` bits `DIAG_WRITE` and `DIAG_VERBOSE` the Jacobian volume is written as `jac.mgz`.
+   The node at `(Gx, Gy, Gz)` prints `jacobian(<x>, <y>, <z>) = <%2.3f>`.
+3. **Back onto the image** (`TransformApplyInverse`: nearest neighbour; `TransformApplyInverseType`: the given
+   interpolation; both always a new volume). The output has the image geometry's extent and geometry, the source's
+   type and frames. The morph's inverse is made on it first when the morph has none (§154's inversion; a morph
+   already inverted keeps its inverse). Each output voxel (x slowest): its atlas point from the inverse's three
+   index volumes (each sampled trilinearly, times the spacing in double precision, stored as single precision;
+   without an inverse `ERROR: GCAMsampleInverseMorph(): GCAM not inverted` on standard output and the voxel not
+   written), then per frame the source's sample there with the interpolation (§129; FS-930, FS-931), stored as in
+   item 1.
+4. **Defects.**
+   - FS-930: a sample that gives no value (sinc; cubic B-spline in item 3; a volume type the trilinear sampler does
+     not read) writes the value of the voxel written before it in the same call (the previous sample's, or 0 from a
+     point outside). larmorx by default writes 0 and notes it; `reproduce` writes the previous value.
+   - FS-931: when no voxel has been written yet in the call, that value is memory contents (both modes: 0, noted).
+   - FS-932: a point with `z` in (-1, 0] (the first slice included) of a source of more than one slice gives 0 in item
+     1, while `x` and `y` down to -1 take the edge voxels: an identity morph loses the first slice. larmorx by default
+     samples it like the other axes (rule A), noted; `reproduce` gives 0.
+   - FS-933: a morph of spacing 0 makes the point of voxel 0 not a number; on a grid without nodes along one of its
+     axes FreeSurfer then reads outside the nodes (a crash): both modes end the program (`GCAMsampleMorph: a NaN
+     point of a morph without nodes along an axis (FreeSurfer reads outside its nodes and crashes here)`).
+   - OpenMP: FreeSurfer computes item 1's columns in threads; the voxels do not depend on each other, so the values
+     are the same with any thread count, but the error lines of item 1 and FS-930/931's chains then follow the
+     threads (each thread's first failed voxel memory contents). larmorx computes them in the order of one thread.
+
+## 158. Transforms composed and inverted in place (`TransformConcat`, `TransformInvertReplace`)
+
+1. **`TransformConcat(array, n)`**: the composition, the first transform applied to an image first. No transform:
+   `TransformConcat(): no transform passed`, the program ends. The result starts as a copy of the last transform
+   (§150's copy: a morph's copy without its inverse and affine as FreeSurfer's, FS-875), then each earlier transform,
+   from the second last to the first, is composed into it:
+   - a morph into a morph (morph 1 the earlier, morph 2 the result): morph 1's atlas geometry must equal morph 2's
+     image geometry (the geometry comparison of §16 at `vg_isEqual_Threshold`; else `ERROR: GCAMconcat2(): geometry
+     does not match` and the end). Morphs in RAS are taken to voxels first (`GCAMconcat2(): converting GCAM 1 from
+     GCAM_RAS to GCAM_VOX`, `... GCAM 2 ...`, §142's conversion without a volume). The result's image geometry
+     becomes morph 1's (copied as a geometry is assigned: the name as a C string, the bytes past its end staying
+     the result's), its inverse is dropped, its spacing stays, its type becomes voxels. Each node (x slowest): its
+     current position (single precision) is sampled through morph 1 (§157 item 1's node sampling): outside, the node
+     becomes invalid with zero current and original positions; else the sample is its position, its node coordinates
+     its own indices, its original position its indices times the spacing (integers), its label kept.
+   - a linear array before a morph: the result becomes the composition `array -> morph` (item 2, `lta1`); a morph
+     before a linear array: the composition `morph -> array` (item 2, `lta2`), and the transform's type becomes
+     the morph's; two arrays: their concatenation (§138's `LTAconcat2` without reduction; none: `ERROR:
+     TransformConcat(): LTAs do not match`, the end), the transform keeping its type. The earlier transforms
+     themselves can change: a morph in RAS is converted to voxels; an array may be inverted to match.
+2. **The composition `lta1 -> morph -> lta2`** (also `mri_warp_convert --lta1/--lta2`): each array is first reduced to
+   one transform (§138; transforms that do not chain: `ERROR: LTAreduce(): ...`, then FS-934). `lta2` must start at
+   the morph's atlas, or end there (`WARNING: GCAMconcat3(): inverting LTA 2 to match geometry`, then inverted); else
+   `Atlas volume geom <threshold, %g> (<which field of its source differs: 0, or the field's number>, <of its
+   destination>) ` (standard output), the atlas geometry on standard error and `ERROR: GCAMconcat3(): LTA 2 geometry
+   does not match atlas src or dst`, the end. `lta1` must end at the morph's image, or start there (`WARNING:
+   GCAMconcat3(): inverting LTA 1 to match geometry`); else `gcam->image vol geom`, the image geometry as an LTA
+   file's geometry block (standard output) and `ERROR: GCAMconcat3(): LTA 1 geometry does not match`. A missing array
+   is the identity on the morph's atlas (`lta2`) or image (`lta1`). Both become voxel to voxel with their inverses.
+   The new morph has `lta2`'s destination extent divided by the morph's spacing (integer division: FS-935) nodes per
+   axis, `lta1`'s source as image, `lta2`'s destination as atlas, the morph's spacing, type voxels (a morph in RAS is
+   converted first: `GCAMconcat3(): converting from GCAM_RAS to GCAM_VOX`, after the allocation). Each node `(c, r,
+   s)` (c slowest): the point `(c, r, s)` times the spacing (single precision), through `lta2`'s inverse (§138's
+   double-accumulated product, single-precision elements), sampled through the morph (outside: invalid, zero
+   positions), through `lta1`'s inverse: its current position; its original position the first point; its node
+   coordinates its indices; its label 0.
+3. **`TransformInvertReplace(t, mri)`**: an array becomes its inverse (`LTAinvert`, §138; the type kept). A morph: with
+   a volume given, its image geometry first becomes that volume's; then `Allocating inv_gcam...(<w>, <h>, <d>)` (the
+   image extent) and a new morph of that many nodes whose image is the old atlas and atlas the old image. When the
+   morph has no inverse yet, the header of the volume its image geometry names is read (`MRIreadHeader`): none gives
+   `ERROR: reading <name>` and no morph (FS-936); else `GCAMfillInverse: Must invert gcam explicitely! ` and the
+   inverse is made on it (§154). Each node `(x, y, z)` of the image grid then takes the three index volumes' values
+   there as its original and current positions, and the same values truncated to integers as its node coordinates
+   (out of the integer range or NaN: FS-17). The old morph is freed.
+4. **Defects.** FS-934 (an array whose transforms do not chain: FreeSurfer then reads the array it did not get, a
+   crash), FS-935 (a spacing of 0: an integer division by zero, a crash), FS-936 (no morph after the inversion: the
+   transform's next use crashes): larmorx ends the program in both modes with a message saying so.
+
+## 159. Validation plan (part 39)
+
+- Closed probe: piece 32's `trs` queries `A`, `D` and `I` (relay 41's queries, now compared for morphs: §157) and
+  relay 43's `K` (`TransformConcat` of the case's transform with itself read again, with an identity on its source or
+  destination geometry before or after it, or with a copy whose image is its atlas) and `P` (`TransformInvertReplace`
+  without a volume or with a header of the source or destination geometry); `fsio` REBUILT for `K` and `P`. Cases past
+  `fsio`'s limits are not run (`SKIP`): an inverse of an image of more than 2^20 voxels without one, a sinc sample of
+  a grid of more than 2^20 voxels, a composition or inverse of more than 2^20 nodes. `SKIP` also for FS-933 to
+  FS-936; `VARY` for FS-931.
+- Measured (relay 43): seeds 7, 13 and 21 (about 390 `trs` cases each): `reproduce` identical on every compared case
+  (258, 271, 267), 0 different; `fix` differs only with notices. Seed 7's `K` cases: about 40 compositions run to
+  their end (morphs and arrays), about 25 stopped by a geometry check, the rest by earlier errors; its `P` cases:
+  about 17 inverse morphs made.
+- Found by these cases and corrected in the port (both now compared): the cross and triple products' NaN choices
+  (fs.maths; §142's node volumes through them), a morph copy's geometry names (§150: assigned as C strings).
+- Black box: FreeSurfer 8.2.0's `mri_convert <in>.mgz <out>.mgz -at <morph>.m3z` (item 1 of §157) and `mri_vol2vol
+  --mov <in> --targ <atlas> --gcam ...`; `mri_warp_convert --inm3z <m> --outm3z <o> --lta1 <a> --lta2 <b>` (§158
+  item 2).

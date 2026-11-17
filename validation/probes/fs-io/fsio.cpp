@@ -517,6 +517,51 @@ static void ptrans(TRANSFORM *t)
     }
   }
 }
+// piece 32 (track A relay 43): a transform after TransformConcat or TransformInvertReplace: a
+// morph's extent, spacing, type, the FNV-1a 64 of its nodes (current and original positions,
+// node coordinates, label, validity) and its two geometries in full (the whole name buffer
+// hashed); an array as ptrans
+static void pvgfull(const VOL_GEOM &v)
+{
+  oi(v.valid); oi(v.width); oi(v.height); oi(v.depth);
+  const float f[] = {v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s,
+                     v.z_r, v.z_a, v.z_s, v.c_r, v.c_a, v.c_s, v.s_r, v.s_a, v.s_s};
+  for (float x : f) of(x);
+  fnv_bytes((const unsigned char *)v.fname, sizeof v.fname);
+}
+static void ptrans43(TRANSFORM *t)
+{
+  if (t->type != MORPH_3D_TYPE) { ptrans(t); return; }
+  oi(t->type);
+  GCA_MORPH *gm = (GCA_MORPH *)t->xform;
+  oi(gm->width); oi(gm->height); oi(gm->depth); oi(gm->spacing); oi(gm->type);
+  std::vector<unsigned char> b;
+  for (int x = 0; x < gm->width; x++)
+    for (int y = 0; y < gm->height; y++)
+      for (int z = 0; z < gm->depth; z++) {
+        GCA_MORPH_NODE *n = &gm->nodes[x][y][z];
+        const double d[] = {n->x, n->y, n->z, n->origx, n->origy, n->origz};
+        const int i[] = {n->xn, n->yn, n->zn, n->label, (int)n->invalid};
+        b.insert(b.end(), (const unsigned char *)d, (const unsigned char *)d + sizeof d);
+        b.insert(b.end(), (const unsigned char *)i, (const unsigned char *)i + sizeof i);
+      }
+  fnv_bytes(b.data(), b.size());
+  oi(gm->mri_xind != NULL);
+  pvgfull(gm->image);
+  pvgfull(gm->atlas);
+}
+// an identity transform array (voxel to voxel) on one geometry
+static TRANSFORM *identity43(const VOL_GEOM &vg)
+{
+  LTA *l = LTAalloc(1, NULL);
+  l->type = LINEAR_VOX_TO_VOX;
+  l->xforms[0].src = vg;
+  l->xforms[0].dst = vg;
+  TRANSFORM *t = (TRANSFORM *)calloc(1, sizeof(TRANSFORM));
+  t->type = LINEAR_VOX_TO_VOX;
+  t->xform = (void *)l;
+  return t;
+}
 void print_t(const Transform *t)
 {
   if (!t) { out += "N "; return; }
@@ -2275,6 +2320,50 @@ void run_piece6(const std::string &cmd0)
           ptrans(c);
           if (c != t) TransformFree(&c);
         }
+      }
+      // piece 32 (track A relay 43): K TransformConcat of two transforms (0: [t, t read again], 1:
+      // [t, an identity on t's destination geometry], 2: [an identity on t's source geometry, t],
+      // 3: [t, an identity on t's source geometry], 4: [t, t read again with its image geometry
+      // t's atlas geometry (a morph)]), the result printed (ptrans43) and freed, t kept as
+      // TransformConcat left it; P TransformInvertReplace (0: no volume, 1: a header of t's
+      // source geometry, 2: of its destination geometry), then t printed (ptrans43)
+      else if (k == "K") {
+        int mode = (int)geti();
+        VOL_GEOM a, b;
+        TransformGetSrcVolGeom(t, &a);
+        TransformGetDstVolGeom(t, &b);
+        TRANSFORM *u = NULL;
+        if (mode == 0 || mode == 4) {
+          u = TransformRead(name.c_str());
+          if (u && mode == 4 && u->type == MORPH_3D_TYPE && t->type == MORPH_3D_TYPE)
+            ((GCA_MORPH *)u->xform)->image = ((GCA_MORPH *)t->xform)->atlas;
+        } else {
+          u = identity43(mode == 1 ? b : a);
+        }
+        if (!u) out += "N ";
+        else {
+          TRANSFORM *arr[2] = {t, u};
+          if (mode == 2) { arr[0] = u; arr[1] = t; }
+          TRANSFORM *c = TransformConcat(arr, 2);
+          fflush(stdout);
+          ptrans43(c);
+          TransformFree(&c);
+          TransformFree(&u);
+        }
+      } else if (k == "P") {
+        int mode = (int)geti();
+        VOL_GEOM a, b;
+        TransformGetSrcVolGeom(t, &a);
+        TransformGetDstVolGeom(t, &b);
+        MRI *m = NULL;
+        if (mode) {
+          const VOL_GEOM &v = mode == 1 ? a : b;
+          m = MRIallocHeader(v.width, v.height, v.depth, MRI_UCHAR, 1);
+          MRIcopyVolGeomToMRI(m, &v);
+        }
+        TransformInvertReplace(t, m);
+        fflush(stdout);
+        ptrans43(t);
       }
       fflush(stdout);
     }

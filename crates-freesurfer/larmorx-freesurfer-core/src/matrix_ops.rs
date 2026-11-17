@@ -1178,15 +1178,17 @@ pub fn vector_cross_product(
     let e = |g: &mut Globals, v: &Matrix, i: i32| read_relt(g, v, i, 1);
     let (x1, y1, z1) = (e(g, v1, 1), e(g, v1, 2), e(g, v1, 3));
     let (x2, y2, z2) = (e(g, v2, 1), e(g, v2, 2), e(g, v2, 3));
+    // the official build's operand orders (matrix.cpp.o; they decide which NaN a product of two
+    // keeps): the second element's second product is z2 * x1
     let cross = |a: f32, b: f32, c: f32, d: f32| sse::sub(sse::mul(a, b), sse::mul(c, d));
     write_relt(g, d, 1, 1, cross(y1, z2, z1, y2));
-    write_relt(g, d, 2, 1, cross(z1, x2, x1, z2));
+    write_relt(g, d, 2, 1, cross(z1, x2, z2, x1));
     write_relt(g, d, 3, 1, cross(x1, y2, y1, x2));
     Ok(done(fresh))
 }
 
 /// `VectorTripleProduct(v1, v2, v3)`: `(v1 x v2) . v3` in `float`, summed as FreeSurfer sums it
-/// (`x3 (y1 z2 - z1 y2)`, then `+ y3 (...)`, then `+ z3 (...)`); 0 after `VectorCrossProduct:
+/// (`x3 (y1 z2 - z1 y2)`, then `+ y3 (...)`, then `+ z3 (...)`; NaNs as [`triple_product`]); 0 after `VectorCrossProduct:
 /// must be 3-vectors` when `v1` has neither 3 rows nor 1 column. FS-25, FS-31.
 pub fn vector_triple_product(
     g: &mut Globals,
@@ -1202,11 +1204,22 @@ pub fn vector_triple_product(
     let (x1, y1, z1) = (e(g, v1, 1), e(g, v1, 2), e(g, v1, 3));
     let (x2, y2, z2) = (e(g, v2, 1), e(g, v2, 2), e(g, v2, 3));
     let (x3, y3, z3) = (e(g, v3, 1), e(g, v3, 2), e(g, v3, 3));
+    triple_product([x1, y1, z1], [x2, y2, z2], [x3, y3, z3])
+}
+
+/// `VectorTripleProduct`'s arithmetic on the nine elements, in the official build's operand
+/// orders (matrix.cpp.o; they decide which NaN a sum or product of two keeps): each cross term
+/// times its element of `v3` (the cross term the destination; the second cross term's second
+/// product `z2 * x1`), the second term plus the first, then the third plus that.
+pub fn triple_product(v1: [f32; 3], v2: [f32; 3], v3: [f32; 3]) -> f32 {
+    let [x1, y1, z1] = v1;
+    let [x2, y2, z2] = v2;
+    let [x3, y3, z3] = v3;
     let cross = |a: f32, b: f32, c: f32, d: f32| sse::sub(sse::mul(a, b), sse::mul(c, d));
-    let mut total = sse::mul(x3, cross(y1, z2, z1, y2));
-    total = sse::add(total, sse::mul(y3, cross(z1, x2, x1, z2)));
-    total = sse::add(total, sse::mul(z3, cross(x1, y2, y1, x2)));
-    total
+    let t1 = sse::mul(cross(y1, z2, z1, y2), x3);
+    let t2 = sse::mul(cross(z1, x2, z2, x1), y3);
+    let s = sse::add(t2, t1);
+    sse::add(sse::mul(cross(x1, y2, y1, x2), z3), s)
 }
 
 /// `Vector3Angle(v1, v2)`: the angle between two 3-vectors in `double`: the lengths from the

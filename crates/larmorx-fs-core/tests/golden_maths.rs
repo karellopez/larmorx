@@ -55,11 +55,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "matrix.fix",
-        "f6621db09c4d9337ada82d0c37491327c770d9379e4319754953f0d7b79d55fc",
+        "5699d84f9f0942ae0c01b3bd8140d82d7a097c6ec2c2e14332de1a8d133b1bda",
     ),
     (
         "matrix.reproduce",
-        "2ffc7d39ba68f615262ec5550d4c37665616bcaf39c07b2dc8991344536f64ec",
+        "f4a9156a4261cc7f2baf9f537d436bf6ba23619bf2638098ba9f610d4435dca4",
     ),
     (
         "mfiles.fix",
@@ -549,6 +549,10 @@ const MATRIX: &[(&str, Make)] = &[
     ("msub", |g| {
         format!("{} {} {}", g.m(true), g.m(true), g.om(true))
     }),
+    // §8.2's NaN order: NaNs of distinct payloads in both operands, rows of 2 or 5 columns,
+    // every kind of output
+    ("madd", nan_pair),
+    ("msub", nan_pair),
     ("mscale", |g| {
         format!("{} {} {}", g.m(true), g.om(true), g.f(true))
     }),
@@ -615,6 +619,14 @@ const MATRIX: &[(&str, Make)] = &[
     }),
     ("vtriple", |g| {
         format!("{} {} {}", g.m(true), g.m(true), g.m(true))
+    }),
+    // §8.5's operand order: NaNs of distinct payloads in every factor
+    ("vcross", |g| {
+        let out = ["new", "self", "other"][g.below(3) as usize];
+        format!("{} {} {out}", nan_vec(g, 1), nan_vec(g, 2))
+    }),
+    ("vtriple", |g| {
+        format!("{} {} {}", nan_vec(g, 1), nan_vec(g, 2), nan_vec(g, 3))
     }),
     ("v3angle", |g| format!("{} {}", g.m(true), g.m(true))),
     ("xyznorm", |g| g.fs(3, true)),
@@ -971,4 +983,40 @@ fn matrix_files() {
         }
         check(&format!("mfiles.{tag}"), &out);
     }
+}
+
+/// Two matrices of the same size whose elements are NaNs of distinct payloads (or numbers), and
+/// an output: new, either operand or another given matrix (§8.2).
+fn nan_pair(g: &mut G) -> String {
+    let (r, c) = (g.int(1, 2), *[2i64, 5].get(g.below(2) as usize).unwrap_or(&2));
+    let el = |g: &mut G, base: u32, k: i64| -> String {
+        if g.one_in(4) {
+            "3f800000".to_owned()
+        } else {
+            format!("{:08x}", base + k as u32)
+        }
+    };
+    let a: Vec<String> = (0..r * c).map(|k| el(g, 0x7fc0_0010, k)).collect();
+    let b: Vec<String> = (0..r * c).map(|k| el(g, 0xffc0_0100, k)).collect();
+    let out = match g.below(4) {
+        0 => "new".to_owned(),
+        1 => "self".to_owned(),
+        2 => "other".to_owned(),
+        _ => format!("1 {r} {c} {}", vec!["00000000"; (r * c) as usize].join(" ")),
+    };
+    format!("1 {r} {c} {} 1 {r} {c} {} {out}", a.join(" "), b.join(" "))
+}
+
+/// A 3-vector of NaNs of distinct payloads (some elements numbers) (§8.5).
+fn nan_vec(g: &mut G, k: u32) -> String {
+    let v: Vec<String> = (0..3u32)
+        .map(|i| {
+            if g.one_in(3) {
+                "40000000".to_owned()
+            } else {
+                format!("{:08x}", 0x7fc0_0000 + (k << 8) + i + 1)
+            }
+        })
+        .collect();
+    format!("1 3 1 {}", v.join(" "))
 }

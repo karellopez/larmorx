@@ -792,14 +792,33 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 l.putd(v);
             }
         }
-        // the golden cases' reader of an in-memory file and volume (no file system)
-        "ltamem" => {
-            let name = l.getx();
-            let bytes = if l.take("nofile") {
-                None
-            } else {
-                Some(l.getx())
-            };
+        // the golden cases' cache text and reading (no file system)
+        "bvtext" => {
+            let stats: Vec<f64> = (0..16).map(|_| l.getd()).collect();
+            l.out(&hexbytes(&cma::brain_volume_stats_text(&stats)));
+        }
+        "bvparse" => {
+            let text = l.getx();
+            let stats = p.parse_brain_volume_stats(&text, b"./subj/stats/brainvol.stats")?;
+            l.puti(stats.len() as i64);
+            for v in stats {
+                l.putd(v);
+            }
+        }
+        // the golden cases' reader of in-memory files and a volume (no file system): `ltamem`
+        // one file, `ltamems n` several in one process
+        "ltamem" | "ltamems" => {
+            let n = if c == "ltamems" { l.geti() } else { 1 };
+            let mut files = Vec::new();
+            for _ in 0..n {
+                let name = l.getx();
+                let bytes = if l.take("nofile") {
+                    None
+                } else {
+                    Some(l.getx())
+                };
+                files.push((name, bytes));
+            }
             let avg = l.geti();
             let vol = if l.take("none") {
                 None
@@ -812,16 +831,24 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 1 => p.env.set(b"USE_AVERAGE305", b"true"),
                 _ => p.env.set(b"USE_AVERAGE305", b""),
             }
-            let mut m = Memory { name, bytes, vol };
-            p.errno = 0;
-            let name = m.name.clone();
-            let lta = p.lta_read_ex(&name, &mut m)?;
-            l.puti(i64::from(p.errno));
-            putlta(l, lta.as_ref());
+            let names: Vec<Vec<u8>> = files.iter().map(|(n, _)| n.clone()).collect();
+            let mut m = Memory { files, vol };
+            for name in names {
+                p.errno = 0;
+                let lta = p.lta_read_ex(&name, &mut m)?;
+                l.puti(i64::from(p.errno));
+                putlta(l, lta.as_ref());
+            }
         }
         _ => args::bad("unknown command"),
     }
     Ok(())
+}
+
+/// The cache's text written from `stats` (for the golden cases' generator).
+#[allow(dead_code)]
+pub fn cache_text(stats: &[f64]) -> Vec<u8> {
+    cma::brain_volume_stats_text(stats)
 }
 
 /// P, a painting: `n`, then `n` times `x y z value`, frame 0's voxels set (`MRIsetVoxVal`).
@@ -887,18 +914,17 @@ fn read_transform(
     Ok(())
 }
 
-/// The golden cases' transform inputs: one file's bytes (none: `ENOENT`) and one named volume's
-/// geometry (others: `ENOENT`).
+/// The golden cases' transform inputs: files' bytes (a name without any: `ENOENT`) and one
+/// named volume's geometry (others: `ENOENT`).
 struct Memory {
-    name: Vec<u8>,
-    bytes: Option<Vec<u8>>,
+    files: Vec<(Vec<u8>, Option<Vec<u8>>)>,
     vol: Option<(Vec<u8>, VolGeom)>,
 }
 
 impl TransformInputs for Memory {
     fn read_file(&mut self, name: &[u8]) -> Result<Vec<u8>, i32> {
-        match &self.bytes {
-            Some(b) if name == self.name.as_slice() => Ok(b.clone()),
+        match self.files.iter().find(|(n, _)| n.as_slice() == name) {
+            Some((_, Some(b))) => Ok(b.clone()),
             _ => Err(2),
         }
     }

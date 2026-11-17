@@ -820,13 +820,7 @@ impl Process {
         subjdir: &[u8],
     ) -> Result<(), Stop> {
         let name = Process::brainvol_name(subject, subjdir);
-        let mut text = Vec::new();
-        for (k, (names, desc)) in BRAIN_VOLUME_MEASURES.iter().enumerate() {
-            let v = stats.get(k).copied().unwrap_or(0.0);
-            text.extend_from_slice(format!("# Measure {names}, {desc}, ").as_bytes());
-            text.extend_from_slice(&sprintf_f64(b"%.12f", v));
-            text.extend_from_slice(b", mm^3\n");
-        }
+        let text = brain_volume_stats_text(stats);
         if std::fs::write(crate::files::path_of(&name), &text).is_err() {
             let mut m = b"could not open file ".to_vec();
             m.extend_from_slice(&name);
@@ -852,6 +846,14 @@ impl Process {
             self.cache_brain_volume_stats(&stats, subject, subjdir)?;
             return Ok(stats);
         };
+        self.parse_brain_volume_stats(&bytes, &name)
+    }
+
+    /// The 16 measures of a cache's bytes (§23's reading; `name` the file's name for the error):
+    /// every measure from -1, each line naming measures gives them its first number; a measure
+    /// below 0 ends the program (status 1). FS-314: a line naming a measure without a number and
+    /// ending in white space gives no number (FreeSurfer aborts).
+    pub fn parse_brain_volume_stats(&mut self, bytes: &[u8], name: &[u8]) -> Result<Vec<f64>, Stop> {
         let mut stats = [-1.0f64; 16];
         let mut lines: Vec<&[u8]> = bytes.split(|&c| c == b'\n').collect();
         if bytes.last() == Some(&b'\n') {
@@ -882,7 +884,6 @@ impl Process {
                         .last()
                         .is_some_and(|&c| larmorx_core::cscan::is_c_space(c))
                     {
-                        // FreeSurfer aborts here; both modes give the line no number
                         self.note(
                             &FS_314,
                             "a cache line naming a measure without a number and ending in white space gives no number (FreeSurfer aborts)",
@@ -895,12 +896,25 @@ impl Process {
             if *v < 0.0 {
                 let mut m = format!("could not find stat for {} in ", BRAIN_VOLUME_MEASURES[k].0)
                     .into_bytes();
-                m.extend_from_slice(&name);
+                m.extend_from_slice(name);
                 self.fatal(1, &m)?;
             }
         }
         Ok(stats.to_vec())
     }
+}
+
+/// The cache's 16 lines (§23's writing): `# Measure <names>, <description>, <value>, mm^3`, the
+/// value as `printf("%.12f")` writes it (a missing value as 0).
+pub fn brain_volume_stats_text(stats: &[f64]) -> Vec<u8> {
+    let mut text = Vec::new();
+    for (k, (names, desc)) in BRAIN_VOLUME_MEASURES.iter().enumerate() {
+        let v = stats.get(k).copied().unwrap_or(0.0);
+        text.extend_from_slice(format!("# Measure {names}, {desc}, ").as_bytes());
+        text.extend_from_slice(&sprintf_f64(b"%.12f", v));
+        text.extend_from_slice(b", mm^3\n");
+    }
+    text
 }
 
 fn contains(hay: &[u8], needle: &[u8]) -> bool {

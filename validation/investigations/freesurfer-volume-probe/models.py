@@ -439,9 +439,7 @@ def labtest(name: str, x: float) -> bool:
     if isinstance(d, set):
         return x in d if x == x else False
     if isinstance(d, tuple) and d and d[0] == "or":
-        return any(
-            labtest(p, x) if isinstance(p, str) else (x == x and x in p) for p in d[1:]
-        )
+        return any(labtest(p, x) if isinstance(p, str) else (x == x and x in p) for p in d[1:])
     lo, hi = d
     return lo <= x <= hi
 
@@ -512,7 +510,9 @@ def cma(runner, scratch: Path) -> int:
             else:
                 bad += 1
                 if bad <= 3:
-                    print(f"DIFFERS: {line[:100]}\n  probe {got[:200]}\n  model {' '.join(want)[:200]}")
+                    print(
+                        f"DIFFERS: {line[:100]}\n  probe {got[:200]}\n  model {' '.join(want)[:200]}"
+                    )
     for k, v in sorted(tally.items()):
         print(f"cma: {k}: {v} lines")
     print(f"cma: differ from the tables: {bad}")

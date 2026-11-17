@@ -8,10 +8,11 @@ official programs and of the open probe (§69), `specs/freesurfer-mri.md` (the s
 functions work on), `specs/freesurfer-maths.md`, `specs/freesurfer-core.md` and the cited standards.
 Made ready for the clean room part by part by the spec finisher (FreeSurfer's foundations, track E):
 **parts 1 to 3 (§1-17) by its relay 6 (2026-11-16), part 4 (§18-22) by its relay 7
-(2026-11-17)**: the black-box validation plan (§69) with its open probe, a read-through as a
-clean-room reader, the defects' texts in `larmorx_core::defects` checked. The sections after §22
-are not yet read through that way: their validation plans still name the replica's closed probe,
-which the implementer does not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
+(2026-11-17), part 5 (§23-24) by its relay 8 (2026-11-17, with part 4's measured corrections)**: the
+black-box validation plan (§69) with its open probe, a read-through as a clean-room reader, the
+defects' texts in `larmorx_core::defects` checked. The sections after §24 are not yet read through
+that way: their validation plans still name the replica's closed probe, which the implementer does
+not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
 **Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
 any other copy, the installed package's scripts, Python and libraries), the replica crates
@@ -33,8 +34,8 @@ it), `fs_mri_probe`, `fs_maths_probe`, the official FreeSurfer 8.2.0 programs an
 
 Status: parts 1 to 3 (§1-17): part 1 (§1-5) the volume-geometry text block of linear transform and
 surface files, the geometry's copies, matrices, comparison and printer; part 2 (§6-12) the voxel
-arithmetic; part 3 (§13-17) coordinates and geometry. Then the samplers, moves, the head box and
-the transform reader (§18-22), the CMA labels (§23-24), and the rest of the module (§25-68).
+arithmetic; part 3 (§13-17) coordinates and geometry; part 4 (§18-22) the samplers, moves, the head
+box and the transform reader; part 5 (§23-24) the CMA labels. Then the rest of the module (§25-68).
 
 ## 1. Conventions
 
@@ -2603,12 +2604,12 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 4
+## 69. Validation plan (black box), parts 1 to 5
 
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §21 by name) and the comparison loop; its README lists every
+(calls of the functions of §2 to §23 by name) and the comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
 them, with the working volume W, the destination D and the region R added). The implementer runs
@@ -2715,7 +2716,7 @@ identical, 69 memory lines whose contents changed from process to process (11 in
 every line of `vrules` and of part 4's groups identical, memory lines whose contents changed from
 process to process 11 in `vmake`, 2 or 3 in `vtwo` and 57 in `vextract`.
 
-### 69.4 The defects of parts 1 to 4 (index)
+### 69.4 The defects of parts 1 to 5 (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
@@ -2728,18 +2729,20 @@ process to process 11 in `vmake`, 2 or 3 in `vtwo` and 57 in `vextract`.
 | FS-302 | 18 | FS-303 | 19 | FS-304 | 19 |
 | FS-305 | 20 | FS-306 | 21 | FS-307 | 21 |
 | FS-308 | 21 | FS-309 | 21 | FS-310 | 21 |
-| FS-960 | 6 | | | | |
+| FS-311 | 23 | FS-312 | 23 | FS-313 | 23 |
+| FS-314 | 23 | FS-315 | 23 | FS-960 | 6 |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
-ITK-112 (`specs/freesurfer-maths.md` §17).
+ITK-112 (`specs/freesurfer-maths.md` §17); FS-252 again in part 5 (segmentations copied without their
+cached matrices).
 
-### 69.5 Beyond the probe, and the sections after §22
+### 69.5 Beyond the probe, and the sections after §24
 
 - **The replays** of the programs that use these functions with `reproduce`, on the recorded heads,
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§23 to §68** are not yet in the open probe: until they are, their clean room checks them against
+- **§25 to §68** are not yet in the open probe: until they are, their clean room checks them against
   the official programs as black boxes and against the replays; their validation plans name the
   replica's probe, which the implementer does not open.

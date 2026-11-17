@@ -100,15 +100,17 @@ fn fs929_a_warp_volume_without_morph_geometries_written() {
         m.version = ((MGZ_INTENT_WARPMAP & 0xffff) << 8) | MGH_VERSION;
         m.warp_field_format = larmorx_freesurfer_gca::gcam_write::WARPFIELD_DTFMT_ABS_CRS;
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let p = t.path().join("w.mgz").to_string_lossy().into_owned();
+        // names relative to the folder (an absolute Windows name is not one MRIread takes)
+        let dir = Some(t.path());
+        let p = "w.mgz";
         let r = mri_write(
             &mut g,
             &mut out,
             &mut err,
             &env,
-            None,
+            dir,
             &mut m,
-            &p,
+            p,
             None,
             MGZ_INTENT_UNKNOWN,
         )
@@ -116,13 +118,12 @@ fn fs929_a_warp_volume_without_morph_geometries_written() {
         assert_eq!(r, 0);
         assert!(ids(&g).contains(&"FS-929"), "{:?}", ids(&g));
         let mut g = Globals::new(mode);
-        let mut gc = gcam::gcam_read(&mut g, &mut out, &mut err, &env, None, &p)
+        let mut gc = gcam::gcam_read(&mut g, &mut out, &mut err, &env, dir, p)
             .unwrap()
             .unwrap();
         assert!(gc.geom_unset);
         assert!(!ids(&g).contains(&"FS-929"));
-        let q = t.path().join("o.nii").to_string_lossy().into_owned();
-        let r = gcam_write(&mut g, &mut out, &mut err, &env, None, &mut gc, &q, 0).unwrap();
+        let r = gcam_write(&mut g, &mut out, &mut err, &env, dir, &mut gc, "o.nii", 0).unwrap();
         assert_eq!(r, 0);
         let text = String::from_utf8_lossy(&out).into_owned();
         assert!(text.contains("gcam image [0 x 0 x 0]"), "{text}");

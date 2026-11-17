@@ -886,5 +886,5 @@ GLIBC-07 in both modes wherever the two choices give another value on an argumen
 - **The port:** `matrix_ops`' `add_sub` adds `m2 + m1` for 3 columns or fewer; the new `matrix_add_into` is the sum
   into an operand (`m2 + m1` at every size); fs.volume's `LTAtransformAtPoint`, `MRIrotate_I` and
   `MRIprincipleComponents` call it. Not a defect (no register entry): the source leaves the order to the compiler.
-- **Not checked yet:** `DMatrixAdd` (`dmatrix.cpp`, doubles two at a time) for the same pattern; the autoencoder's
+- **Not checked here:** `DMatrixAdd` (`dmatrix.cpp`: `DMatrixAddMul(m1, m2, 1, 1)`, its own OpenMP loops); the autoencoder's
   in-place sums (`fs.gca`, vectors of one column: already `m2 + m1` by the column rule).

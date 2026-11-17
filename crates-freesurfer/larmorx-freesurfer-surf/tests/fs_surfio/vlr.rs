@@ -339,7 +339,7 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     }
     for vno in 0..nv as usize {
         let ripflag = t.i() as i8;
-        let annotation = t.i() as i32;
+        let annotation = t.i();
         let curv = t.f();
         let (val, val2, origarea, mean, mean_imag, std_error) =
             (t.f(), t.f(), t.f(), t.f(), t.f(), t.f());
@@ -456,7 +456,7 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             "MRISaccumulateMeansOnSurface"
             | "MRISaccumulateImaginaryMeansOnSurface"
             | "MRISaccumulateStandardErrorsOnSurface" => {
-                let (a, b) = (t.i() as i32, t.i() as i32);
+                let (a, b) = (t.i(), t.i());
                 o.i(i64::from(match op {
                     "MRISaccumulateMeansOnSurface" => {
                         valrest::accumulate_means_on_surface(&mut s, a, b)
@@ -468,7 +468,7 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 }));
             }
             "MRISclearWhichAndVal2" => {
-                let which = t.i() as i32;
+                let which = t.i();
                 valrest::clear_which_and_val2(g, &mut io, &mut s, which)?;
             }
             "MRISmarkRandomVertices" => {
@@ -478,7 +478,7 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 )?));
             }
             "MRISannotation_to_label" => {
-                let i = t.i() as i32;
+                let i = t.i();
                 let ok = s.ct.as_ref().is_some_and(|ct| {
                     i >= 0 && i < ct.nentries() && ct.entries[i as usize].is_some()
                 });

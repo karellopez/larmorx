@@ -1072,7 +1072,7 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         "dvs" => {
             // relay 41 of track D: `fssurfio.cpp`'s `flr dvs` (mri_binarize --dilate-vertex)
             let mut s = surf(g, sg, &mut io, t.next())?;
-            let vno = t.i() as i32;
+            let vno = t.i();
             let radius = t.d();
             let m = larmorx_freesurfer_surf::valrest::dilate_vertex_to_sum(
                 g,

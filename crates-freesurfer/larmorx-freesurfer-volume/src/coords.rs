@@ -16,7 +16,7 @@ use larmorx_freesurfer_core::log::{self, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
 use larmorx_freesurfer_core::matrix_decomp::matrix_eigen_system;
 use larmorx_freesurfer_core::matrix_ops::{
-    matrix_add, matrix_inverse, matrix_print, matrix_scalar_mul, matrix_transpose,
+    matrix_add_into, matrix_inverse, matrix_print, matrix_scalar_mul, matrix_transpose,
 };
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{add64, div64, mul64, sub64};
@@ -539,8 +539,9 @@ pub fn principle_components(
                         None => m_xt = matrix_transpose(g, out, err, &m_x, None)?.into_new(),
                     }
                     matrix_multiply(g, out, err, Some(&m_x), m_xt.as_ref(), Some(&mut m_tmp))?;
+                    // mCov = MatrixAdd(mTmp, mCov, mCov)
                     let c = m_cov.clone();
-                    matrix_add(g, out, err, &m_tmp, &c, Some(&mut m_cov))?;
+                    matrix_add_into(g, out, err, &m_tmp, &c, &mut m_cov)?;
                 }
             }
         }

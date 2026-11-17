@@ -411,7 +411,9 @@ pub fn matrix_transpose(
     Ok(done(fresh))
 }
 
-/// The shared body of `MatrixAdd` and `MatrixSubtract`.
+/// The shared body of `MatrixAdd` and `MatrixSubtract`. `aliased`: the output is one of the
+/// operands in FreeSurfer's call.
+#[allow(clippy::too_many_arguments)]
 fn add_sub(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -420,6 +422,7 @@ fn add_sub(
     m2: &Matrix,
     m_out: Option<&mut Matrix>,
     subtract: bool,
+    aliased: bool,
 ) -> Result<Ret<Matrix>, Fatal> {
     let (name, op) = if subtract {
         ("MatrixSubtract", "-")
@@ -462,6 +465,11 @@ fn add_sub(
     if given && real_only(g, err, name, &[m]) {
         return Ok(Ret::Null);
     }
+    // The official build's MatrixAdd adds each row four at a time (`m1 + m2`, the one to three
+    // left over likewise) when the output's row overlaps neither operand's and a row has 4 or more
+    // columns; otherwise one by one as `m2 + m1` (two NaNs: the second's comes out; the open maths
+    // probe's `madd ... new/self/other`, relay 37 of track C). MatrixSubtract keeps `m1 - m2`.
+    let swapped = !subtract && (aliased || cols <= 3);
     for row in 1..=rows {
         for col in 1..=cols {
             let a = read_relt(g, m1, row, col);
@@ -473,6 +481,8 @@ fn add_sub(
                 col,
                 if subtract {
                     sse::sub(a, b)
+                } else if swapped {
+                    sse::add(b, a)
                 } else {
                     sse::add(a, b)
                 },
@@ -484,8 +494,8 @@ fn add_sub(
 
 /// `MatrixAdd(m1, m2, mOut)`: element by element in `float`; `Null` after `MatrixAdd:
 /// incompatable matrices ...` for operands of other sizes or an output of another size. A sum
-/// into an operand: pass a copy as the operand (each element is read before it is written, so
-/// the result is the same). FS-25.
+/// into an operand (`MatrixAdd(a, b, a)` or `MatrixAdd(a, b, b)`): [`matrix_add_into`], whose
+/// NaNs come out in the official build's in-place order. FS-25.
 pub fn matrix_add(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -494,7 +504,22 @@ pub fn matrix_add(
     m2: &Matrix,
     m_out: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
-    add_sub(g, out, err, m1, m2, m_out, false)
+    add_sub(g, out, err, m1, m2, m_out, false, false)
+}
+
+/// `MatrixAdd(m1, m2, mOut)` where `mOut` is `m1` or `m2` itself in FreeSurfer's call: pass a copy
+/// as that operand and the matrix as `m_out` (each element is read before it is written). The
+/// values are [`matrix_add`]'s; where both elements are NaNs, the second operand's comes out (the
+/// official build's loop for overlapping rows).
+pub fn matrix_add_into(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m1: &Matrix,
+    m2: &Matrix,
+    m_out: &mut Matrix,
+) -> Result<Ret<Matrix>, Fatal> {
+    add_sub(g, out, err, m1, m2, Some(m_out), false, true)
 }
 
 /// `MatrixSubtract(m1, m2, mOut)`: as [`matrix_add`], `m1 - m2`.
@@ -506,7 +531,7 @@ pub fn matrix_subtract(
     m2: &Matrix,
     m_out: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
-    add_sub(g, out, err, m1, m2, m_out, true)
+    add_sub(g, out, err, m1, m2, m_out, true, false)
 }
 
 /// The element-wise map of `MatrixScalarMul` and `MatrixSquareElts`: a new output of `mIn`'s

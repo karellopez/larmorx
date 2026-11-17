@@ -994,3 +994,28 @@ default steps or by fMRIPrep (their callers: `mri_nl_align`, `mri_linear_align`,
   the shared voxel defects FS-53, FS-323, FS-325), 0 different; seed 13, 4,000 cases: 3,702 identical, 298 not comparable, 0
   different; `fix` different only with notices; the port's debug and release builds agree on seed 13's 2,000 cases in both
   modes.
+
+## 29. A tensor volume's rows (relay 37): FS-960
+Source: `MRI::initSlices` (`utils/mri.cpp` 264-313). For a chunked volume each row pointer is the running pointer
+`ptr`, advanced after the row by a `switch (type)` with cases for `MRI_UCHAR`, `MRI_SHORT`, `MRI_USHRT`, `MRI_RGB`,
+`MRI_INT`, `MRI_LONG` and `MRI_FLOAT` (`MRI_FLOAT_COMPLEX` steps by `bytes_per_vox * vox_per_row` before the
+switch): `MRI_TENSOR` has no case, so every `slices[s][r]` of a tensor volume, of every slice and frame, is `chunk`.
+`MRIsizeof(MRI_TENSOR)` is `sizeof(float)`, so the buffer itself has the volume's size and `MRIgetVoxVal` /
+`MRIsetVoxVal` (through `chunk` and the strides) are not affected; track A's FS-166 (`MRIcopy` of a tensor volume) is
+the same allocation seen by the full copy (E's `specs/freesurfer-volume.md` §6, "A tensor volume's rows").
+- **The direct walks that can meet a tensor volume** here: `MRIinvertContrast` and `MRIscaleAndMultiply` (`MRIvox`
+  of any type: FS-291's `reproduce`), `MRItranslate` and `MRIrotate_I` into a tensor destination (FS-301's
+  `reproduce`; a tensor source is refused by the trilinear sampler but at whole coordinates, FS-303),
+  `mri_framepower` (`MRIFseq_vox` of any type), and the byte walks the probe found meeting tensor volumes in its
+  commands `grow`, `onfg`, `dtl`, `dlu`, `nearnz`, `tmask`, `union` and `smulf` (seed 7: every such line identical
+  with `reproduce` now, 9 of 33 before). The others refuse a tensor volume before walking it (`MRIclear`,
+  `MRIextractInto`'s `ErrorExit`, `MRItoImage`, `MRIvalRangeFrame`, `MRIscalarMulFrame`, `MRInormalizeSequence`) or
+  have no direct path for it (`MRIsubtract`'s and `MRIadd`'s direct cases read and write nothing: E's R7.4, as the
+  port did). The axis rotations rotate into a new clone of the source (`MRIrotate_I(mri_src, NULL, ...)`), so a given
+  tensor destination is only cleared (`MRIclear: unsupported input type 6`).
+- **FS-960** (c, rule A): `reproduce` finds a tensor volume's every row at the start of its buffer (`rows.rs`: element
+  `x` of any row is element `x` of the buffer), so each row reads the same first values and the last row written
+  stays there; the default steps the rows as for the other types (each row at its own place), as FS-166's default
+  copies the whole volume. Noted in both modes where a walk reaches a row but slice 0's row 0.
+- **The probe** (`validation/probes/fs-volume`; the generator now draws tensor volumes among its rare types and as
+  `invc`'s, `sam`'s and the moves' destinations): see the README's relay 37 paragraph for the numbers.

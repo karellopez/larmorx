@@ -754,9 +754,13 @@ impl ArgumentParser {
         av: &[String],
         help: HelpFn,
     ) -> Result<(), Fatal> {
-        // the program's name: the last of av[0]'s '/'-separated parts (empty after a final '/')
+        // the program's name: the last of av[0]'s '/'-separated parts (empty after a final '/';
+        // `\` separates too on Windows: crate::pathsep)
         let progname = match av.first() {
-            Some(a0) if !a0.is_empty() => a0.rsplit('/').next().unwrap_or("").to_owned(),
+            Some(a0) if !a0.is_empty() => match crate::pathsep::rfind_sep_str(a0) {
+                Some(i) => a0[i + 1..].to_owned(),
+                None => a0.clone(),
+            },
             _ => String::new(),
         };
         if let Some(a0) = av.first() {

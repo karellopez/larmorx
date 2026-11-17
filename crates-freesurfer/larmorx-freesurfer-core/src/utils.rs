@@ -37,6 +37,7 @@ use crate::cstd;
 use crate::diag::{self, BUILD_ROOT};
 use crate::globals::Globals;
 use crate::log::{self, Fatal};
+use crate::pathsep::rfind_sep_str;
 use crate::run::Environment;
 use crate::sse;
 
@@ -119,10 +120,10 @@ fn cut_at_last(s: &mut String, c: char) {
     }
 }
 
-/// `FileNameOnly(full_name, fname)`: the part after the last `/`, cut at its last `#`, then at
-/// its last `@`.
+/// `FileNameOnly(full_name, fname)`: the part after the last `/` (or `\` on Windows:
+/// [`crate::pathsep`]), cut at its last `#`, then at its last `@`.
 pub fn file_name_only(full_name: &str) -> String {
-    let mut f = match full_name.rfind('/') {
+    let mut f = match rfind_sep_str(full_name) {
         Some(i) => full_name[i + 1..].to_owned(),
         None => full_name.to_owned(),
     };
@@ -133,7 +134,7 @@ pub fn file_name_only(full_name: &str) -> String {
 
 /// `FileName(full_name)`: as [`file_name_only`], after skipping one leading `@`.
 pub fn file_name(full_name: &str) -> String {
-    let f = match full_name.rfind('/') {
+    let f = match rfind_sep_str(full_name) {
         Some(i) => &full_name[i + 1..],
         None => full_name,
     };
@@ -200,10 +201,10 @@ pub fn stricmp(g: &mut Globals, str1: &str, str2: &str) -> i32 {
     strcmp(str_upper(str1).as_bytes(), str_upper(str2).as_bytes())
 }
 
-/// `FileNamePath(fname, pathName)`: everything before the last `/` (empty for `/name`), or `.`
-/// without one (the Linux build's choice).
+/// `FileNamePath(fname, pathName)`: everything before the last `/` (or `\` on Windows:
+/// [`crate::pathsep`]; empty for `/name`), or `.` without one (the Linux build's choice).
 pub fn file_name_path(fname: &str) -> String {
-    match fname.rfind('/') {
+    match rfind_sep_str(fname) {
         Some(i) => fname[..i].to_owned(),
         None => ".".to_owned(),
     }
@@ -1181,6 +1182,15 @@ mod tests {
         assert_eq!(file_name_path("/a/b/c"), "/a/b");
         assert_eq!(file_name_path("/c"), "");
         assert_eq!(file_name_path("c"), ".");
+        // a `\` separates folders on Windows only (crate::pathsep)
+        let w = cfg!(windows);
+        let n = "C:\\d\\s\\c.mgz#3";
+        assert_eq!(
+            file_name_only(n),
+            if w { "c.mgz" } else { "C:\\d\\s\\c.mgz" }
+        );
+        assert_eq!(file_name(n), file_name_only(n));
+        assert_eq!(file_name_path(n), if w { "C:\\d\\s" } else { "." });
         assert_eq!(file_name_remove_extension("a.b/c"), "a");
         let mut gl = g(UpstreamDefects::Fix);
         assert_eq!(file_name_extension(&mut gl, "a.nii.gz"), "gz");

@@ -46,7 +46,7 @@ use larmorx_freesurfer_core::log::{
     NO_ERROR,
 };
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::{sse, system, utils};
+use larmorx_freesurfer_core::{pathsep, sse, system, utils};
 use larmorx_freesurfer_mri::mri::{
     self, MAX_CMDS, MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_SHORT, MRI_TENSOR, MRI_UCHAR,
     MRI_USHRT, Mri,
@@ -129,12 +129,11 @@ fn fits(g: &mut Globals, who: &str, name: &str) {
 }
 
 /// The name with the working directory before it when it holds no `/` (`getcwd`; the name alone
-/// when there is none). On Windows a `\` counts as a folder too (relay 42: the port's own;
+/// when there is none). On Windows a `\` counts as a folder too (`pathsep`, the port's own;
 /// FreeSurfer runs only where `/` is the separator, and an absolute Windows name such as
 /// `C:\data\a.mgz` is Linux's `/data/a.mgz`, which it takes as it is).
 fn with_cwd(g: &mut Globals, dir: Option<&Path>, who: &str, fname: &str) -> String {
-    let windows_folder = cfg!(windows) && fname.contains('\\');
-    let full = if fname.contains('/') || windows_folder {
+    let full = if pathsep::has_sep_str(fname) {
         fname.to_owned()
     } else {
         match system::cwd(dir) {

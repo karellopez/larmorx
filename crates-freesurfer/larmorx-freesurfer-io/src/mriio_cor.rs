@@ -23,7 +23,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
     self, ERROR_BAD_FILE, ERROR_BADFILE, ERROR_BADPARM, Fatal, NO_ERROR,
 };
-use larmorx_freesurfer_core::{sse, utils};
+use larmorx_freesurfer_core::{pathsep, sse, utils};
 use larmorx_freesurfer_mri::mri::{
     self, MRI_FLOAT, MRI_FLOAT_COMPLEX, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR,
     MRI_USHRT, Mri,
@@ -223,12 +223,10 @@ pub fn cor_read(
         }
         Ok(true) => {}
         Ok(false) => {
-            // the name up to its last '/' (its final character not looked at); none: empty
+            // the name up to its last '/' (`\` too on Windows; its final character not looked
+            // at); none: empty
             let n = use_name.len();
-            let cut = use_name[..n.saturating_sub(1)]
-                .iter()
-                .rposition(|&c| c == b'/')
-                .unwrap_or(0);
+            let cut = pathsep::rfind_sep(&use_name[..n.saturating_sub(1)]).unwrap_or(0);
             use_name.truncate(cut);
             let s = text(&use_name);
             match stat_dir(g, dir, &s) {
@@ -252,7 +250,7 @@ pub fn cor_read(
             }
         }
     }
-    if use_name.last() != Some(&b'/') {
+    if !pathsep::ends_with_sep(&use_name) {
         use_name.push(b'/');
     }
     let base = text(&use_name);
@@ -502,7 +500,7 @@ pub fn cor_read(
     (m.vg.c_r, m.vg.c_a, m.vg.c_s) = (c_r, c_a, c_s);
     let mut bad_transform = false;
     if !xform.is_empty() {
-        let mut t = if xform[0] == b'/' {
+        let mut t = if pathsep::is_absolute_name(&xform) {
             xform.clone()
         } else {
             let mut t = fname.as_bytes().to_vec();
@@ -718,7 +716,7 @@ pub fn cor_write(
     }
     fits(g, "corWrite", fname);
     let mut use_name = fname.to_owned();
-    if !use_name.ends_with('/') {
+    if !pathsep::ends_with_sep(use_name.as_bytes()) {
         use_name.push('/');
     }
     let target = utils::resolve(dir, &use_name);
@@ -727,9 +725,9 @@ pub fn cor_write(
         // slash too); macOS answers ENOTDIR for a file: the existing name gives Linux's EEXIST on
         // every platform, as FreeSurfer's official programs run on Linux (CI, batch 14).
         let exists = !cfg!(target_os = "linux")
-            && std::fs::symlink_metadata(
-                target.as_os_str().to_string_lossy().trim_end_matches('/'),
-            )
+            && std::fs::symlink_metadata(pathsep::trim_end_seps_str(
+                &target.as_os_str().to_string_lossy(),
+            ))
             .is_ok();
         let code = if exists {
             EEXIST

@@ -22,6 +22,7 @@ use larmorx_freesurfer_core::log::{
     ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
 use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
+use larmorx_freesurfer_core::pathsep;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::utils::{file_exists, file_name_path, resolve};
 use larmorx_freesurfer_io::fio::{
@@ -542,7 +543,7 @@ pub fn read_transform(
 /// The hemisphere a surface name gives (`MRISreadOverAlloc_new`): from the first byte of its last
 /// part (after its last `/`), in upper case: `R` right, `L` left, `B` both, else none.
 fn hemisphere_from_name(fname: &str) -> i32 {
-    let last = match fname.rfind('/') {
+    let last = match pathsep::rfind_sep_str(fname) {
         Some(i) => &fname[i + 1..],
         None => fname,
     };

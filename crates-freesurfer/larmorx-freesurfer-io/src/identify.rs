@@ -26,7 +26,7 @@ use larmorx_core::defects::{FS_221, FS_222, FS_223, FS_226};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, Fatal};
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::utils;
+use larmorx_freesurfer_core::{pathsep, utils};
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_SHORT};
 
 use crate::bruker;
@@ -522,13 +522,13 @@ pub fn is_cor(g: &mut Globals, dir: Option<&Path>, fname: &str) -> i32 {
 }
 
 /// POSIX's `basename` (`libgen.h`): the last component, trailing slashes ignored; `/` for a name
-/// of slashes, `.` for an empty one.
+/// of slashes, `.` for an empty one. On Windows a `\` counts as a slash (`pathsep`).
 fn xpg_basename(name: &str) -> &str {
-    let t = name.trim_end_matches('/');
+    let t = pathsep::trim_end_seps_str(name);
     if t.is_empty() {
         return if name.is_empty() { "." } else { "/" };
     }
-    match t.rfind('/') {
+    match pathsep::rfind_sep_str(t) {
         Some(i) => &t[i + 1..],
         None => t,
     }
@@ -906,6 +906,11 @@ mod tests {
         assert_eq!(mri_get_volume_name(&mut g, "a.mgz@mgh#1"), "a.mgz");
         assert_eq!(xpg_basename("a/COR-1/"), "COR-1");
         assert_eq!(xpg_basename("//"), "/");
+        let w = cfg!(windows);
+        assert_eq!(
+            xpg_basename("C:\\a\\COR-1\\"),
+            if w { "COR-1" } else { "C:\\a\\COR-1\\" }
+        );
         assert_eq!(is_mgh(&mut g, "x.mgz"), 1);
         assert_eq!(is_mgh(&mut r, "x.mgz"), 0);
         assert_eq!(is_mgh(&mut r, ".mgz"), 1);

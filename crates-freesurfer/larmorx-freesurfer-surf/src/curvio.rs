@@ -41,6 +41,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
     self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOFILE, ERROR_NOMEMORY, Fatal, NO_ERROR,
 };
+use larmorx_freesurfer_core::pathsep;
 use larmorx_freesurfer_core::utils::file_name_path;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_io::fio::{
@@ -355,7 +356,7 @@ fn value_file_name(
     func: &str,
     lines: (u32, u32),
 ) -> Result<String, Fatal> {
-    if sname.contains('/') {
+    if pathsep::has_sep_str(sname) {
         return strcpy_checked(g, io, sname, func);
     }
     let path = file_name_path(c_str(&mris.fname));
@@ -668,7 +669,7 @@ pub fn build_file_name_read(
 ) -> (i32, String) {
     const F: &str = "MRISbuildFileName_read";
     let sname = c_str(sname);
-    if sname.contains('/') {
+    if pathsep::has_sep_str(sname) {
         return (NO_ERROR, caller_buffer(g, sname.to_owned(), F));
     }
     let b = sname.as_bytes();

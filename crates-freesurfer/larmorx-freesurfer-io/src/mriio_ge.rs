@@ -29,7 +29,7 @@ use larmorx_core::defects::{FS_167, FS_249, FS_680, FS_681, FS_682, FS_683, FS_6
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::run::Environment;
-use larmorx_freesurfer_core::{cstd, sse, utils};
+use larmorx_freesurfer_core::{cstd, pathsep, sse, utils};
 use larmorx_freesurfer_mri::mri::{self, MRI_SHORT, Mri};
 
 use crate::cfile::CFile;
@@ -438,7 +438,7 @@ fn genesis(
             ),
         );
     }
-    let (fdir, base) = match fname.rfind('/') {
+    let (fdir, base) = match pathsep::rfind_sep_str(fname) {
         None => ("", fname),
         Some(i) => (&fname[..=i], &fname[i + 1..]),
     };
@@ -776,7 +776,7 @@ fn gelx(
             ),
         );
     }
-    let (fdir, base) = match fname.rfind('/') {
+    let (fdir, base) = match pathsep::rfind_sep_str(fname) {
         None => ("", fname),
         Some(i) => (&fname[..=i], &fname[i + 1..]),
     };
@@ -963,7 +963,7 @@ pub fn ximg_read(
             ),
         );
     }
-    let (fdir, base) = match fname.rfind('/') {
+    let (fdir, base) = match pathsep::rfind_sep_str(fname) {
         None => ("", fname),
         Some(i) => (&fname[..=i], &fname[i + 1..]),
     };

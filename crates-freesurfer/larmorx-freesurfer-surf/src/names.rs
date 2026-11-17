@@ -12,6 +12,7 @@ use std::path::Path;
 use larmorx_core::defects::{FS_126, FS_148, FS_355, FS_356};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::pathsep;
 use larmorx_freesurfer_core::utils::{file_name_only, file_name_path, str_upper, stricmp};
 use larmorx_freesurfer_io::fio::fio_file_exists_readable;
 use larmorx_freesurfer_io::identify::{
@@ -58,7 +59,7 @@ fn unchecked(g: &mut Globals, part: &str, func: &str) {
 
 /// `FileNameOnly(name, buf)` into a `char[STRLEN]` (FS-356).
 fn name_only(g: &mut Globals, name: &str, func: &str) -> String {
-    let last = match name.rfind('/') {
+    let last = match pathsep::rfind_sep_str(name) {
         Some(i) => &name[i + 1..],
         None => name,
     };
@@ -168,7 +169,7 @@ pub fn write_curvature_getfilename(
             && (b[0] == b'l' || b[0] == b'r')
     };
     let posix = io.env.get("FS_POSIX").is_some();
-    let fname = if !sname.contains('/') {
+    let fname = if !pathsep::has_sep_str(sname) {
         let path = name_path(g, c_str(&mris.fname), F);
         match (hemi_named(sname), posix) {
             (false, true) => snprintf_name(g, io, format!("./{hemi}.{sname}"), F, 6720),
@@ -214,7 +215,7 @@ pub fn read_curvature_file_getfilename(
 ) -> Result<(i32, String), Fatal> {
     const F: &str = "MRISreadCurvatureFile_getfilename";
     let sname = c_str(sname);
-    let fname = if !sname.contains('/') {
+    let fname = if !pathsep::has_sep_str(sname) {
         if io.env.get("FS_POSIX").is_some() {
             snprintf_name(g, io, format!("./{sname}"), F, 6795)
         } else {
@@ -297,7 +298,7 @@ pub fn write_annotation_getfilename(
 ) -> Result<(i32, String), Fatal> {
     const F: &str = "MRISwriteAnnotation_getfilename";
     let sname = c_str(sname);
-    let mut fname = if !sname.contains('/') {
+    let mut fname = if !pathsep::has_sep_str(sname) {
         let no_path = name_only(g, sname, F);
         let hemi = if mris.hemisphere == LEFT_HEMISPHERE {
             "lh"
@@ -351,7 +352,7 @@ pub fn read_annotation_getfilename(
     const F: &str = "MRISreadAnnotation_getfilename";
     let sname = c_str(sname);
     let mut fname = match mris {
-        Some(mris) if !sname.contains('/') => {
+        Some(mris) if !pathsep::has_sep_str(sname) => {
             let no_path = name_only(g, sname, F);
             let hemi = if mris.hemisphere == LEFT_HEMISPHERE {
                 "lh"

@@ -557,7 +557,7 @@ pub fn find_neighbors_at_vertex(
 /// search again with each vertex shown, check the surface ([`check_vertex_vertex_topology_wkr`],
 /// always) and fail an assertion (line 1409).
 #[allow(clippy::too_many_arguments)]
-fn find_new(
+pub(crate) fn find_new(
     g: &mut Globals,
     sg: &mut SurfGlobals,
     io: &mut Io,

@@ -15,8 +15,8 @@ use std::sync::Arc;
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
     FS_350, FS_351, FS_364, FS_377, FS_387, FS_395, FS_396, FS_398, FS_523, FS_530, FS_531, FS_532,
-    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, FS_902, FS_906, FS_974, FS_977, FS_981, Notice,
-    UpstreamDefects,
+    FS_535, FS_536, FS_538, FS_620, FS_629, FS_632, FS_902, FS_906, FS_974, FS_977, FS_981, FS_991,
+    Notice, UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -73,6 +73,8 @@ mod mprop;
 mod mpx;
 #[path = "pvw.rs"]
 mod pvw;
+#[path = "sbl.rs"]
+mod sbl;
 #[path = "scl.rs"]
 mod scl;
 #[path = "sfile.rs"]
@@ -85,6 +87,8 @@ mod sread;
 mod stl;
 #[path = "swr.rs"]
 mod swr;
+#[path = "top.rs"]
+mod top;
 #[path = "tri.rs"]
 mod tri;
 #[path = "vcp.rs"]
@@ -173,13 +177,13 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 59] = [
+const COMMANDS: [&str; 61] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
     "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd", "mpe", "gii", "gwr", "mpf",
     "mpg", "fli", "bvl", "crv", "pvw", "vps", "ann", "mpx", "lbl", "wvl", "scl", "vcp", "mht",
-    "vls", "vlr",
+    "vls", "vlr", "top", "sbl",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1081,6 +1085,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "vcp" => vcp::vcp_tokens(&mut t, &mut g),
             "vls" => vls::vls_tokens(&mut t, &mut g),
             "vlr" => vlr::vlr_tokens(&mut t, &mut g),
+            "top" => top::top_tokens(&mut t, &mut g),
+            "sbl" => sbl::sbl_tokens(&mut t, &mut g),
             "mht" => mht::mht_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
@@ -2771,6 +2777,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "vcp" => vcp::vcp_case(cx, t, o)?,
         "vls" => vls::vls_case(cx, t, o)?,
         "vlr" => vlr::vlr_case(cx, t, o)?,
+        "top" => top::top_case(cx, t, o)?,
+        "sbl" => sbl::sbl_case(cx, t, o)?,
         "mht" => mht::mht_case(cx, t, o)?,
         // relay 32 of track D: the recorded heads (real.py); never generated
         "flr" => fli::flr_case(cx, t, o)?,
@@ -2946,7 +2954,8 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_902)
                     || cx.g.notices.contains(&FS_906)
                     || cx.g.notices.contains(&FS_977)
-                    || cx.g.notices.contains(&FS_981)) =>
+                    || cx.g.notices.contains(&FS_981)
+                    || cx.g.notices.contains(&FS_991)) =>
         {
             "CRASH 11".to_owned()
         }

@@ -1028,6 +1028,132 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 }
             }
         }
+        "top" => {
+            // relay 42 of track D: `fssurfio.cpp`'s `flr top` (mrisurf_topology.cpp's rest on a
+            // recorded surface and label)
+            let sf = t.next().to_owned();
+            let lf = t.next().to_owned();
+            let mut s = surf(g, sg, &mut io, &sf)?;
+            let counts = |s: &Mris, o: &mut Out| {
+                let c = larmorx_freesurfer_surf::toprest::compute_euler_number(s);
+                for x in [c.euler, c.nvertices, c.nfaces, c.nedges] {
+                    o.i(i64::from(x));
+                }
+                o.i(i64::from(
+                    larmorx_freesurfer_surf::toprest::topological_defect_index(s),
+                ));
+                o.i(i64::from(
+                    larmorx_freesurfer_surf::toprest::count_total_neighbors_in_use(s),
+                ));
+            };
+            let hash = |s: &Mris, o: &mut Out| {
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                let mut put = |x: i32| {
+                    for c in x.to_le_bytes() {
+                        h = (h ^ u64::from(c)).wrapping_mul(0x0000_0100_0000_01b3);
+                    }
+                };
+                for v in 0..s.nvertices.max(0) as usize {
+                    let vt = s.topology(v);
+                    put(i32::from(s.vertex(v).ripflag));
+                    put(i32::from(vt.num));
+                    for k in 0..usize::from(vt.num) {
+                        put(vt.f.as_ref().expect("f")[k]);
+                        put(i32::from(vt.n.as_ref().expect("n")[k]));
+                    }
+                    for x in [vt.vnum, vt.v2num, vt.v3num, vt.vtotal] {
+                        put(i32::from(x));
+                    }
+                    for k in 0..vt.vtotal.max(0) as usize {
+                        put(vt.v.as_ref().expect("v")[k]);
+                    }
+                }
+                for f in 0..s.nfaces.max(0) as usize {
+                    for x in s.face(f).v {
+                        put(x);
+                    }
+                    put(i32::from(s.face(f).ripflag));
+                }
+                o.s(&format!("{h:016x}"));
+            };
+            counts(&s, o);
+            o.i(i64::from(
+                larmorx_freesurfer_surf::toprest::is_surface_valid(g, &mut io, &mut s, 0, 1)?,
+            ));
+            let l = larmorx_freesurfer_io::label::label_read(
+                g, io.env, io.out, io.err, None, None, &lf,
+            )?
+            .expect("the label");
+            for v in 0..s.nvertices.max(0) as usize {
+                s.vertex_mut(v).ripflag = 1;
+            }
+            for n in 0..l.n_points.max(0) as usize {
+                let v = l.lv[n].vno;
+                if v >= 0 && v < s.nvertices {
+                    s.vertex_mut(v as usize).ripflag = 0;
+                }
+            }
+            larmorx_freesurfer_surf::valrest::set_rip_in_faces_with_ripped_vertices(&mut s);
+            larmorx_freesurfer_surf::toprest::remove_ripped(g, sg, &mut io, &mut s)?;
+            counts(&s, o);
+            hash(&s, o);
+            larmorx_freesurfer_surf::dist::free_dists_but_not_orig(&mut s);
+            larmorx_freesurfer_surf::dist::free_dist_origs(&mut s);
+            larmorx_freesurfer_surf::toprest::renumber_removing_ripped_faces_and_vertices(
+                g, sg, &mut io, &mut s,
+            )?;
+            o.i(i64::from(s.nvertices));
+            o.i(i64::from(s.nfaces));
+            hash(&s, o);
+            let mut e = surf(g, sg, &mut io, &sf)?;
+            o.i(i64::from(larmorx_freesurfer_surf::toprest::evert_surface(
+                g, &mut io, &mut e,
+            )?));
+            hash(&e, o);
+        }
+        "sbl" => {
+            // relay 42 of track D: `fssurfio.cpp`'s `flr sbl` (the soap bubbles on a recorded
+            // surface, its label's vertices free)
+            let sf = t.next().to_owned();
+            let lf = t.next().to_owned();
+            let n = t.i();
+            let l = larmorx_freesurfer_io::label::label_read(
+                g, io.env, io.out, io.err, None, None, &lf,
+            )?
+            .expect("the label");
+            for w in 0..2 {
+                let mut s = surf(g, sg, &mut io, &sf)?;
+                for v in 0..s.nvertices.max(0) as usize {
+                    s.vertex_mut(v).marked = 1;
+                }
+                for k in 0..l.n_points.max(0) as usize {
+                    let v = l.lv[k].vno;
+                    if v >= 0 && v < s.nvertices {
+                        s.vertex_mut(v as usize).marked = 0;
+                    }
+                }
+                let r = if w == 1 {
+                    larmorx_freesurfer_surf::soap::weighted_soap_bubble_vertex_positions(
+                        g, &mut io, &mut s, n,
+                    )?
+                } else {
+                    larmorx_freesurfer_surf::soap::soap_bubble_vertex_positions(
+                        g, &mut io, &mut s, n,
+                    )
+                };
+                o.i(i64::from(r));
+                let mut h = 0xcbf2_9ce4_8422_2325u64;
+                for v in 0..s.nvertices.max(0) as usize {
+                    let x = s.vertex(v);
+                    for c in [x.x, x.y, x.z] {
+                        for b in c.to_le_bytes() {
+                            h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+                        }
+                    }
+                }
+                o.s(&format!("{h:016x}"));
+            }
+        }
         "maf" => {
             // relay 41 of track D: `fssurfio.cpp`'s `flr maf` (mris_ca_label's mode filter on a
             // recorded annotation)

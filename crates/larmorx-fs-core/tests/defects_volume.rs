@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4): each one noted in
+//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 4): each one noted in
 //! both modes on a case that meets it, and its two modes' results different where the correction
 //! changes them (memory reads and crashes give the same result in both modes). The cases are lines
 //! of the comparison's own seeded batches (the shortest line on which the clean room notes the
-//! defect in both modes), run through the probe's commands (`tests/volume_cmd/`); FS-292, FS-296
-//! and FS-297, which those batches do not meet in both modes, on lines written here. Also the
+//! defect in both modes), run through the probe's commands (`tests/volume_cmd/`; the transform
+//! files in memory, `ltamem`); FS-292, FS-296, FS-297, FS-302, FS-305 and FS-258, which those
+//! batches do not meet in both modes, on lines written here. Also the
 //! others' defects these parts meet (FS-12, FS-47, ITK-112, FS-52, FS-53, FS-58).
 
 mod volume_cmd;
@@ -99,6 +100,62 @@ const CASES: &[(&str, bool, &str)] = &[
         true,
         "smul 1 2 4 9 1 0 79 3f000000 3f700000 3f800000 0 3f068259 bf5e0192 bf1be4f0 3f7ffb3f 3ec90923 be0d8bca 3f33efbb be2912d2 bf402963 7f7fffff 7fc00000 42428187 00000000 00000000 00000000 4 6 310a9efc 4199341a c0000000 42b13ecd 282d8b42 c2a28eeb 40ca3f32 a7b2bc0d 42600000 41800000 c1880000 40423974425ebc50 9 c2832741 c1880000 0 1 null null self c0e00000",
     ),
+    (
+        "FS-265",
+        false,
+        "vrangereg 2 2 2 3 1 0 5 3f800000 3f800000 3f800000 1 3f800000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 00000000 00000000 00000000 1 2 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 0000000000000000 0 00000000 00000000 0 1 null null null",
+    ),
+    (
+        "FS-298",
+        true,
+        "roty 3 4 4 2 2 0 66 3f700000 00000000 3f700000 1 3f800000 00000000 00000000 00000000 bf800000 00000000 00000000 00000000 3f800000 c19cf626 42600000 42400000 00000000 00000000 00000000 2 0 42b86e5e 42c60000 b918e4ea 42a5f662 ffc00000 421c0000 429de331 c28ceccf 425b60ce c2c20207 c274e26a be32cf03992708c3 1 428a0000 41900000 0 1 null null new bee2cd17",
+    ),
+    (
+        "FS-299",
+        true,
+        "samp cub 3 3 3 10 1 0 92 3f800000 3fc00000 3fc00000 1 3f5a7908 bf295a3b bf42f347 3f38fe13 3f5635a2 bf156b1a bf7538dd 3d7d1a62 3f0a109c 42015d09 a4a6ed87 42a00000 00000000 00000000 00000000 2 2 4291ac99 42700000 4ff7ddad 428ccd3f 4217e460 425b129f 42800000 41980000 40e40b8a 4136f6c4 42000000 c054da9602f01281 1 426c894c 7f7fffff 1 1 null null 7e37e43c8800759c 1 3e8ad7f29abcaf48 3ff000001ff19e24 3e7ff19e23a836fc 2 0",
+    ),
+    (
+        "FS-300",
+        true,
+        "samp cubf 1 4 4 2 3 0 -1 3f800000 3f800000 3f800000 1 00000000 3f800000 00000000 00000000 00000000 3f800000 3f800000 00000000 00000000 c20d381d 42b00000 42340000 00000000 00000000 00000000 3 5 c29be39e bffdef3c ba266780 40800000 c2854fcd 42540000 c2154b02 c6bb656f 4b393ea8 c2c3a834 422b7825 40e9fe3850d07eaa 2 42b80000 42600000 2 1 null null 0000000000000000 1 3fd5539c7e463df0 0000000000000000 be45798ee2308c3a 0 0",
+    ),
+    (
+        "FS-301",
+        true,
+        "rotx 2 2 3 6 2 0 7 3f700000 3f800000 3fc00000 1 00000000 00000000 3f800000 00000000 bf800000 00000000 bf800000 00000000 00000000 42c3bb2b 42280000 c101d35e 00000000 00000000 00000000 2 8 42c60000 7f800000 42380000 40400000 41900000 a245d637 c2302cb8 42780000 4250a203 420c0000 41c80000 c017274365c7e510 0 bf800000 bfa84141 0 2 null null new 00000000",
+    ),
+    (
+        "FS-303",
+        true,
+        "rotx 2 2 3 6 2 0 7 3f700000 3f800000 3fc00000 1 00000000 00000000 3f800000 00000000 bf800000 00000000 bf800000 00000000 00000000 42c3bb2b 42280000 c101d35e 00000000 00000000 00000000 2 8 42c60000 7f800000 42380000 40400000 41900000 a245d637 c2302cb8 42780000 4250a203 420c0000 41c80000 c017274365c7e510 0 bf800000 bfa84141 0 2 null null new 00000000",
+    ),
+    (
+        "FS-304",
+        true,
+        "rotz 4 4 3 10 2 0 2 40400000 3f800000 3f700000 0 be81da55 3df8718f 3f316868 bf0dc223 3e858403 3f48402b becf733b bebf69e7 3e8bc07e 42843b77 42a40000 429aa945 00000000 00000000 00000000 4 1 42000000 42afdb88 41852a63 bf9f1dc1 c2c3071c 428a0000 c2ba8e54 c2a0a768 42ac0000 41e578c5 b85e4878 40539b46ace17328 4 42400000 c1fd4d0c 2 0 null null new 7fc00000",
+    ),
+    (
+        "FS-306",
+        false,
+        "tftype 1 x616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161612e6c7461",
+    ),
+    (
+        "FS-307",
+        true,
+        "ltamem x662e78666d x4d4e49205472616e73666f726d2046696c650a25610a25620a25630a 0 none",
+    ),
+    (
+        "FS-308",
+        true,
+        "ltamem x74 x747970203d20310a6e78666f726d73203d20300a7375626a65637420626572740a 0 none",
+    ),
+    ("FS-309", true, "ltamem x74 x74 2 none"),
+    (
+        "FS-310",
+        false,
+        "ltamem x672e78666d x4d4e49205472616e73666f726d2046696c650a2547656e6572617465642062792078206473740a0a5472616e73666f726d5f54797065203d204c696e6561723b0a4c696e6561725f5472616e73666f726d203d0a312030203020300a302031203020300a302030203120303b0a 0 none",
+    ),
 ];
 
 /// The line in `mode`: its result and streams without the notices, and the IDs noted.
@@ -190,4 +247,54 @@ fn fs297_long_box() {
         true,
         &format!("extinto {} new 1 0 0 1 1 1 0 0 0", w("3 1 1 2 1 0", "9")),
     );
+}
+
+/// FS-302: a sinc window of 138 voxels on an axis is refused in both modes (FreeSurfer writes
+/// past its 128 weights).
+#[test]
+fn fs302_a_sinc_window_beyond_128_voxels() {
+    let x = 70.5f64.to_bits();
+    let line = format!(
+        "samp sinc {} 0000000000000000 1 {x:016x} 0000000000000000 0000000000000000 0 70",
+        w("140 1 1 0 1 0", "5")
+    );
+    check("FS-302", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(fix.starts_with("-4 401c000000000000 |"), "{fix}");
+}
+
+/// FS-305: an infinite voxel makes the centre of mass not a number: the program ends by
+/// default; `reproduce` walks outside the volume as FreeSurfer does.
+#[test]
+fn fs305_a_centre_of_mass_that_is_not_a_number() {
+    let line = format!(
+        "skull {} 1 2 0 0 0 0 0 0 7f800000 3 3 3 8 8 8 43480000",
+        w("12 12 12 3 1 0", "-1")
+    );
+    check("FS-305", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(fix.starts_with("EXIT 252"), "{fix}");
+}
+
+/// FS-258: a register.dat's subject of 1,000 bytes is kept whole, noted in both modes.
+#[test]
+fn fs258_a_register_dat_subject_of_1000_bytes() {
+    let mut text = "a".repeat(1000);
+    text.push_str("\n1\n1\n0.15\n");
+    for r in 0..4 {
+        for c in 0..4 {
+            text.push_str(if r == c { "1 " } else { "0 " });
+        }
+        text.push('\n');
+    }
+    text.push_str("round\n");
+    let hex = |b: &[u8]| -> String {
+        let mut s = "x".to_owned();
+        for c in b {
+            s.push_str(&format!("{c:02x}"));
+        }
+        s
+    };
+    let line = format!("ltamem {} {} 0 none", hex(b"t.dat"), hex(text.as_bytes()));
+    check("FS-258", false, &line);
 }

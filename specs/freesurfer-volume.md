@@ -623,11 +623,16 @@ The walks, with `nint` (half away from zero) of the centre's coordinates:
 Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
 
 ## 21. Reading a linear transform (`LTAreadEx(fname)`, 3.1-39)
-- **The type from the name** (`TransformFileNameType`): the text after the last `@`, or without one
-  after the last `.` of the name cut at its first `#` (that cut not applied to an `@` part), compared
-  upper-cased (only the part before a `#` is upper-cased): `M3D`, `M3Z`, `MGZ`, `NII` and a name
-  ending in `nii.gz` (as written, more than 6 bytes) a morph; `OCT`, `LTA` and no extension an LTA;
-  `XFM` MINC; `FSLMAT` FSL; anything else `REGISTER_DAT`.
+- **The type from the name** (`TransformFileNameType`): the name is cut at its first `#`; a cut name
+  of more than 6 bytes ending in `nii.gz` (as written) is a morph. Else the *extension* is the text
+  after the last `@` of the whole name (even one after the `#`), or without an `@` the text after the
+  last `.` of the cut name (inside a directory's name too: `d/e.f/g` gives `f/g`). The cut name is
+  upper-cased, so an extension before the `#` is compared upper-cased and one after it as written
+  (`a#b@xfm` is not MINC, `a#b@XFM` is), and an `@` part before the `#` ends there (`a.lta@xfm#y` is
+  MINC). The extension `M3D`, `M3Z`, `MGZ` or `NII`: a morph (11); `OCT` or `LTA`: an LTA (10); `XFM`:
+  MINC (12); `FSLMAT`: FSL (15); anything else, the empty extension included (`a.`, `.`, `a.lta.`,
+  `@`, `a.xfm@`): `REGISTER_DAT` (14). No extension (no `@`, no `.` in the cut name: `noext`, `M3Z`,
+  `#`, the empty name): an LTA (10). (**(observed)**: §22's `vltaread` and `vrules4`.)
 - A name whose file part (`specs/freesurfer-core.md` §10's file name only) is `identity.nofile`
   gives, without reading anything, `LTAalloc(1, NULL)`'s array with the array's type and its
   transform's type RAS-to-RAS (1) and the 4 x 4 identity as the matrix; the rest as allocated

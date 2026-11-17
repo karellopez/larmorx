@@ -232,3 +232,11 @@ whether it finds the user or not; `system::passwd_name`); their callers (`FSENVg
   (the port keeps no row pointers; `docs/findings/freesurfer-io.md` Part 36).
 - `matrix_io.rs`: FS-924: `MatrixReadFrom` (`utils/matrix.cpp` 2255-2287) under `reproduce` stops at the first number
   past the file's end when 2^20 or more follow (FreeSurfer prints `freadDouble: fread failed` for each).
+
+## Relay 43 (track A)
+
+`VectorCrossProduct` and `VectorTripleProduct` (`matrix_ops`) follow `matrix.cpp.o`'s operand orders, which decide
+which NaN a product or sum of two keeps: the cross product's second element `z1*x2 - z2*x1`, each triple-product term
+the cross term times its element of `v3`, the second term plus the first, then the third plus that (new `pub fn
+triple_product` on the nine elements, used by fs.gca's node volumes). `DMatrixAddMul`'s order (`dmatrix.cpp.o`) was
+checked for track C: unchanged.

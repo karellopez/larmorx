@@ -14,17 +14,20 @@
 //!
 //! Since relay 40: `TransformWrite` (4140), `TransformCopy` (4154, with `GCAMcopy`, gcamorph.cpp
 //! 17347), `TransformApplyType` (2660), `TransformApply` (2678) and `TransformCreateDensityMap`
-//! (4122) for linear transform arrays (a GCA morph's resamplings, `GCAMmorphToAtlas` and its
-//! density form, are not ported yet: a message and no volume).
+//! (4122) for linear transform arrays.
 //!
 //! Since relay 41 (on track C's `LTAinverseTransformInterp`, `LTAcompose`, `LTArasToVoxelXform`
 //! and `LTAvoxelToRasXform` in fs.volume): `TransformApplyInverse` (2699) and
-//! `TransformApplyInverseType` (2717) for linear transform arrays (a GCA morph's,
-//! `GCAMmorphFromAtlas`, not ported yet), `TransformCompose` (4858), `TransformRas2Vox` (4535) and
-//! `TransformVox2Ras` (4544, with `GCAMvoxToRas`, gcamorph.cpp 11265).
+//! `TransformApplyInverseType` (2717) for linear transform arrays, `TransformCompose` (4858),
+//! `TransformRas2Vox` (4535) and `TransformVox2Ras` (4544, with `GCAMvoxToRas`, gcamorph.cpp
+//! 11265).
 //!
-//! Not here yet (their callees are not ported): `TransformConcat` (`GCAMconcat2`/`3`),
-//! `TransformInvertReplace` (`GCAMfillInverse`), a GCA morph's resamplings.
+//! Since relay 43: a GCA morph's resamplings in `TransformApply`, `TransformApplyType`,
+//! `TransformCreateDensityMap`, `TransformApplyInverse` and `TransformApplyInverseType`
+//! (`GCAMmorphToAtlas`, its density form and `GCAMmorphFromAtlas`: `crate::morph`).
+//!
+//! Since relay 43 also `TransformConcat` (5026, with `GCAMconcat2`/`3`) and
+//! `TransformInvertReplace` (5073, with `GCAMfillInverse`: `crate::concat`).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-io.md` Part 34): FS-857 (the inverse
 //! sample of a morph of spacing 0), FS-858 (a linear transform file whose type is the morph's),
@@ -36,7 +39,9 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_857, FS_858, FS_859, FS_860, FS_861, FS_862, FS_876, FS_928};
+use larmorx_core::defects::{
+    FS_857, FS_858, FS_859, FS_860, FS_861, FS_862, FS_876, FS_928, FS_933,
+};
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
@@ -54,7 +59,9 @@ use larmorx_freesurfer_mri::lta::lta_copy;
 use larmorx_freesurfer_mri::lta::{
     LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, LinearTransform, Lta, MORPH_3D_TYPE, lta_alloc, lta_free,
 };
-use larmorx_freesurfer_mri::mri::{Mri, SAMPLE_TRILINEAR, mri_copy_vol_geom_to_mri};
+use larmorx_freesurfer_mri::mri::{
+    Mri, SAMPLE_NEAREST, SAMPLE_TRILINEAR, mri_copy_vol_geom_to_mri,
+};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 use larmorx_freesurfer_volume::arith::{Pair, mri_scalar_mul};
@@ -64,15 +71,21 @@ use larmorx_freesurfer_volume::ltaapply::{
 use larmorx_freesurfer_volume::ltaconv::{
     lta_compose, lta_compose_in_place, lta_ras_to_voxel_xform, lta_voxel_to_ras_xform,
 };
-use larmorx_freesurfer_volume::ltaops::{lta_change_type, lta_fill_inverse};
+use larmorx_freesurfer_volume::ltaops::{
+    InvertInto, lta_change_type, lta_concat2, lta_fill_inverse, lta_invert,
+};
 use larmorx_freesurfer_volume::ltaread::{
     LtaIo, RegisterDat, lta_read_ex, transform_file_name_type,
 };
 use larmorx_freesurfer_volume::ltawrite::lta_write_ex;
 use larmorx_freesurfer_volume::sample::sample_volume;
 use larmorx_freesurfer_volume::talairachex::transform_with_matrix;
+use larmorx_freesurfer_volume::vgeom::get_vol_geom;
 
 use crate::gcam::{GCAM_POSITION_INVALID, Gcam, gcam_copy, gcam_invert, gcam_read};
+use crate::morph::{
+    gcam_morph_from_atlas, gcam_morph_to_atlas, gcam_morph_to_atlas_with_density_correction,
+};
 
 /// What a `TRANSFORM` holds (`xform`): a linear transform array or a GCA morph.
 #[derive(Debug)]
@@ -707,13 +720,44 @@ pub fn transform_sample_inverse(
 /// around it (`(int)` of the point, the next ones clamped to the grid), `ERROR_BADPARM` when one
 /// of them has an invalid position, else their current positions weighted by the distances
 /// (`float` weights times the `double` positions, summed in `double`, stored as `float`).
-pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3]) {
+///
+/// FS-933: a NaN point (a spacing of 0 makes one of the voxel 0) passes the check; on a grid
+/// without nodes along one of its axes FreeSurfer then reads outside the nodes (a crash): the
+/// program ends here in both modes.
+pub fn gcam_sample_morph(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    gcam: &Gcam,
+    x: f32,
+    y: f32,
+    z: f32,
+) -> Result<(i32, [f32; 3]), Fatal> {
+    match sample_morph(gcam, x, y, z) {
+        Some(r) => Ok(r),
+        None => {
+            g.notices.add(
+                &FS_933,
+                "GCAMsampleMorph of a NaN point on a morph without nodes along an axis: FreeSurfer reads outside the nodes (a crash)",
+            );
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                "GCAMsampleMorph: a NaN point of a morph without nodes along an axis (FreeSurfer reads outside its nodes and crashes here)",
+            )?;
+            Ok((ERROR_BADPARM, [0.0; 3]))
+        }
+    }
+}
+
+/// [`gcam_sample_morph`]'s arithmetic; `None` when a corner is outside the nodes.
+fn sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> Option<(i32, [f32; 3])> {
     let sp = gcam.spacing as f32;
     let (x, y, z) = (sse::div(x, sp), sse::div(y, sp), sse::div(z, sp));
     let (width, height, depth) = (gcam.width, gcam.height, gcam.depth);
     if x >= width as f32 || y >= height as f32 || z >= depth as f32 || x < 0.0 || y < 0.0 || z < 0.0
     {
-        return (ERROR_BADPARM, [0.0; 3]);
+        return Some((ERROR_BADPARM, [0.0; 3]));
     }
     // (int) of a NaN is INT_MIN on x86-64 (cvttss2si): MAX(..., 0) gives 0 there and here
     let trunc = |v: f32| if v.is_nan() { i32::MIN } else { v as i32 };
@@ -729,6 +773,14 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
     let xpd = sse::sub(1.0, xmd);
     let ypd = sse::sub(1.0, ymd);
     let zpd = sse::sub(1.0, zmd);
+    // a NaN point on a grid without nodes along an axis: corners outside the nodes (FS-933)
+    if [xm, xp, ym, yp, zm, zp]
+        .iter()
+        .zip([width, width, height, height, depth, depth])
+        .any(|(&v, n)| v < 0 || v >= n)
+    {
+        return None;
+    }
     let corners = [
         (xm, ym, zm, xpd, ypd, zpd),
         (xm, ym, zp, xpd, ypd, zmd),
@@ -743,7 +795,7 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
         .iter()
         .any(|&(a, b, c, ..)| gcam.node(a, b, c).invalid == GCAM_POSITION_INVALID)
     {
-        return (ERROR_BADPARM, [0.0; 3]);
+        return Some((ERROR_BADPARM, [0.0; 3]));
     }
     // the official build's operand orders (gcamorph.cpp.o; they decide which NaN a sum of two
     // keeps): the weights of the corners with xp are ypd * xmd (and zpd * (ymd * xmd) for
@@ -787,7 +839,7 @@ pub fn gcam_sample_morph(gcam: &Gcam, x: f32, y: f32, z: f32) -> (i32, [f32; 3])
     let s = sse::add64(t[3], s);
     let s = sse::add64(sse::add64(sse::add64(s, t[4]), t[5]), t[6]);
     p[2] = sse::add64(t[7], s) as f32;
-    (NO_ERROR, p)
+    Some((NO_ERROR, p))
 }
 
 /// `TransformSampleInverseFloat(transform, xv, yv, zv, ...)`: a morph through
@@ -805,7 +857,7 @@ pub fn transform_sample_inverse_float(
     zv: f32,
 ) -> Result<(i32, [f32; 3]), Fatal> {
     if t.is_morph() {
-        return Ok(gcam_sample_morph(t.gcam(), xv, yv, zv));
+        return gcam_sample_morph(g, err, t.gcam(), xv, yv, zv);
     }
     let lta = t.lta_mut();
     to_vox2vox(g, out, err, env, lta)?;
@@ -1001,14 +1053,6 @@ pub fn transform_source_voxel_to_atlas(
     ))
 }
 
-/// What a function of a GCA morph this port has not yet ported says (its callee named).
-fn morph_not_ported(err: &mut dyn Write, what: &str, callee: &str) {
-    let _ = writeln!(
-        err,
-        "larmorx-freesurfer: {what} of a GCA morph is not ported yet (it needs {callee})"
-    );
-}
-
 /// `TransformWrite(transform, fname)` (4140): a GCA morph through `GCAMwrite` (its default data
 /// format, absolute voxel coordinates), a linear transform array through `LTAwriteEx` (the name's
 /// type decides the format: `.lta`, `.xfm`, `register.dat`, FSL's `.mat`); their status.
@@ -1103,7 +1147,8 @@ pub fn transform_copy(
 
 /// `TransformApplyType(transform, mri_src, mri_dst, interp_type)` (2660): a linear transform array
 /// through `LTAtransformInterp` (into `mri_dst` when given); a GCA morph through
-/// `GCAMmorphToAtlas` (not ported yet: its message and no volume).
+/// `GCAMmorphToAtlas(mri_src, gcam, mri_dst, -1, interp_type)` (every frame:
+/// [`gcam_morph_to_atlas`]).
 #[allow(clippy::too_many_arguments)]
 pub fn transform_apply_type(
     g: &mut Globals,
@@ -1116,17 +1161,14 @@ pub fn transform_apply_type(
     interp: i32,
 ) -> Result<Ret<Mri>, Fatal> {
     match &mut t.xform {
-        Xform::Morph(_) => {
-            morph_not_ported(err, "TransformApplyType", "GCAMmorphToAtlas");
-            Ok(Ret::Null)
-        }
+        Xform::Morph(gcam) => gcam_morph_to_atlas(g, out, err, env, src, gcam, dst, -1, interp),
         Xform::Lta(lta) => lta_transform_interp(g, out, err, env, src, dst, lta, interp),
     }
 }
 
 /// `TransformApply(transform, mri_src, mri_dst)` (2678): a new volume (`mri_dst` is not used): a
 /// linear transform array through `LTAtransform` (trilinear); a GCA morph through
-/// `GCAMmorphToAtlas` (not ported yet).
+/// `GCAMmorphToAtlas(mri_src, gcam, NULL, -1, SAMPLE_TRILINEAR)`.
 pub fn transform_apply(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -1136,33 +1178,34 @@ pub fn transform_apply(
     src: &Mri,
 ) -> Result<Ret<Mri>, Fatal> {
     match &mut t.xform {
-        Xform::Morph(_) => {
-            morph_not_ported(err, "TransformApply", "GCAMmorphToAtlas");
-            Ok(Ret::Null)
+        Xform::Morph(gcam) => {
+            gcam_morph_to_atlas(g, out, err, env, src, gcam, None, -1, SAMPLE_TRILINEAR)
         }
         Xform::Lta(lta) => lta_transform(g, out, err, env, src, None, lta),
     }
 }
 
-/// `TransformCreateDensityMap(transform, mri_src, mri_dst)` (4122): a linear transform array:
-/// [`transform_apply`], then `scaling volume by <det>...` (`%2.3f` of the first transform's
-/// determinant, a `float`) on standard output and the volume multiplied by it in place; a GCA
-/// morph through `GCAMmorphToAtlasWithDensityCorrection` (not ported yet).
+/// `TransformCreateDensityMap(transform, mri_src, mri_dst)` (4122): a GCA morph through
+/// `GCAMmorphToAtlasWithDensityCorrection(mri_src, gcam, mri_dst, 0)` (the first frame, each voxel
+/// times the morph's Jacobian: [`gcam_morph_to_atlas_with_density_correction`]); a linear
+/// transform array: [`transform_apply`] (`mri_dst` not used), then `scaling volume by <det>...`
+/// (`%2.3f` of the first transform's determinant, a `float`) on standard output and the volume
+/// multiplied by it in place.
+#[allow(clippy::too_many_arguments)]
 pub fn transform_create_density_map(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
     env: &Environment,
+    dir: Option<&Path>,
     t: &mut Transform,
     src: &Mri,
+    dst: Option<&mut Mri>,
 ) -> Result<Ret<Mri>, Fatal> {
-    if matches!(t.xform, Xform::Morph(_)) {
-        morph_not_ported(
-            err,
-            "TransformCreateDensityMap",
-            "GCAMmorphToAtlasWithDensityCorrection",
+    if let Xform::Morph(gcam) = &mut t.xform {
+        return gcam_morph_to_atlas_with_density_correction(
+            g, out, err, env, dir, src, gcam, dst, 0,
         );
-        return Ok(Ret::Null);
     }
     let r = transform_apply(g, out, err, env, t, src)?;
     let lta = t.lta();
@@ -1193,23 +1236,22 @@ pub fn transform_create_density_map(
 /// `TransformApplyInverseType(transform, mri_src, mri_dst, interp_type)` (2717): a linear transform
 /// array: its inverses filled (`LTAfillInverse`: a matrix that cannot be inverted ends the program)
 /// and `LTAinverseTransformInterp` (into `mri_dst` when given); a GCA morph through
-/// `GCAMmorphFromAtlas` (not ported yet: its message and no volume).
+/// `GCAMmorphFromAtlas(mri_src, gcam, NULL, interp_type)` (a new volume, `mri_dst` not used:
+/// [`gcam_morph_from_atlas`]).
 #[allow(clippy::too_many_arguments)]
 pub fn transform_apply_inverse_type(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
     env: &Environment,
+    dir: Option<&Path>,
     t: &mut Transform,
     src: &Mri,
     dst: Option<&mut Mri>,
     interp: i32,
 ) -> Result<Ret<Mri>, Fatal> {
     match &mut t.xform {
-        Xform::Morph(_) => {
-            morph_not_ported(err, "TransformApplyInverseType", "GCAMmorphFromAtlas");
-            Ok(Ret::Null)
-        }
+        Xform::Morph(gcam) => gcam_morph_from_atlas(g, out, err, env, dir, src, gcam, None, interp),
         Xform::Lta(lta) => {
             lta_fill_inverse(g, out, err, lta)?;
             lta_inverse_transform_interp(g, out, err, env, src, dst, lta, interp)
@@ -1217,23 +1259,24 @@ pub fn transform_apply_inverse_type(
     }
 }
 
-/// `TransformApplyInverse(transform, mri_src, mri_dst)` (2699): [`transform_apply_inverse_type`]
-/// with trilinear interpolation for a linear transform array (a GCA morph's, nearest neighbour,
-/// is not ported yet).
+/// `TransformApplyInverse(transform, mri_src, mri_dst)` (2699): a linear transform array as
+/// [`transform_apply_inverse_type`] with trilinear interpolation; a GCA morph through
+/// `GCAMmorphFromAtlas(mri_src, gcam, NULL, SAMPLE_NEAREST)`.
+#[allow(clippy::too_many_arguments)]
 pub fn transform_apply_inverse(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
     env: &Environment,
+    dir: Option<&Path>,
     t: &mut Transform,
     src: &Mri,
     dst: Option<&mut Mri>,
 ) -> Result<Ret<Mri>, Fatal> {
-    if matches!(t.xform, Xform::Morph(_)) {
-        morph_not_ported(err, "TransformApplyInverse", "GCAMmorphFromAtlas");
-        return Ok(Ret::Null);
+    if let Xform::Morph(gcam) = &mut t.xform {
+        return gcam_morph_from_atlas(g, out, err, env, dir, src, gcam, None, SAMPLE_NEAREST);
     }
-    transform_apply_inverse_type(g, out, err, env, t, src, dst, SAMPLE_TRILINEAR)
+    transform_apply_inverse_type(g, out, err, env, dir, t, src, dst, SAMPLE_TRILINEAR)
 }
 
 /// FS-928: FreeSurfer dereferences a null pointer or uses a structure of the other kind here (a
@@ -1379,4 +1422,122 @@ pub fn transform_compose_in_place(
     };
     lta_compose_in_place(g, out, err, lta, m_left, m_right)?;
     Ok(true)
+}
+
+/// `TransformConcat(trxArray, numTrx)` (5026): the composition of the transforms, the first
+/// applied to images first: a copy of the last ([`transform_copy`]), then each earlier one
+/// composed into it. A morph after a morph: `GCAMconcat2(earlier, current, current)`
+/// ([`gcam_concat2_into_second`]); a linear array before a morph: `GCAMconcat3(earlier, current,
+/// NULL)`; a morph before a linear array: `GCAMconcat3(NULL, earlier, current)`, the transform
+/// becoming a morph; two linear arrays: `LTAconcat2(earlier, current, 0)` (no array: `ERROR:
+/// TransformConcat(): LTAs do not match`, the program ends; the transform keeps its type). The
+/// earlier transforms can change (a morph in RAS is taken to voxels, a linear array inverted to
+/// match). No transform: `TransformConcat(): no transform passed`, the program ends.
+pub fn transform_concat(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    trx: &mut [Transform],
+) -> Result<Transform, Fatal> {
+    let Some((last, rest)) = trx.split_last_mut() else {
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            "TransformConcat(): no transform passed\n",
+        )?;
+        return Err(Fatal::Exit(1));
+    };
+    let Some(mut o) = transform_copy(g, out, err, last, None)? else {
+        return Err(Fatal::Exit(139));
+    };
+    for next in rest.iter_mut().rev() {
+        let (o_morph, n_morph) = (o.is_morph(), next.is_morph());
+        match (o_morph, n_morph) {
+            (true, true) => {
+                crate::concat::gcam_concat2_into_second(
+                    g,
+                    out,
+                    err,
+                    env,
+                    next.gcam_mut(),
+                    o.gcam_mut(),
+                )?;
+            }
+            (true, false) => {
+                let m = crate::concat::gcam_concat3(
+                    g,
+                    out,
+                    err,
+                    env,
+                    Some(next.lta()),
+                    o.gcam_mut(),
+                    None,
+                )?;
+                o.xform = Xform::Morph(Box::new(m));
+            }
+            (false, true) => {
+                let m = crate::concat::gcam_concat3(
+                    g,
+                    out,
+                    err,
+                    env,
+                    None,
+                    next.gcam_mut(),
+                    Some(o.lta()),
+                )?;
+                o.xform = Xform::Morph(Box::new(m));
+                o.ttype = MORPH_3D_TYPE;
+            }
+            (false, false) => {
+                let r = lta_concat2(g, out, err, env, next.lta_mut(), o.lta_mut(), false)?;
+                match r {
+                    Some(l) => o.xform = Xform::Lta(l),
+                    None => {
+                        log::error_exit(
+                            g,
+                            err,
+                            ERROR_BADPARM,
+                            "ERROR: TransformConcat(): LTAs do not match",
+                        )?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(o)
+}
+
+/// `TransformInvertReplace(transform, mri)` (5073): the transform replaced by its inverse. A GCA
+/// morph: its image geometry first taken from `mri` when given (`getVolGeom`), then
+/// `GCAMfillInverse` ([`crate::concat::gcam_fill_inverse`]; FS-936 when it makes no morph); a
+/// linear array: `LTAinvert(lta, NULL)` (the transform's type kept).
+#[allow(clippy::too_many_arguments)]
+pub fn transform_invert_replace(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    t: &mut Transform,
+    mri: Option<&Mri>,
+) -> Result<(), Fatal> {
+    match &mut t.xform {
+        Xform::Morph(gcam) => {
+            if let Some(m) = mri {
+                get_vol_geom(&m.vg, &mut gcam.image);
+            }
+            match crate::concat::gcam_fill_inverse(g, out, err, env, dir, gcam)? {
+                Some(inv) => t.xform = Xform::Morph(Box::new(inv)),
+                None => crate::concat::no_inverse(g, err)?,
+            }
+        }
+        Xform::Lta(lta) => {
+            if let Ret::New(l) = lta_invert(g, out, err, InvertInto::New(lta))? {
+                t.xform = Xform::Lta(l);
+            }
+        }
+    }
+    Ok(())
 }

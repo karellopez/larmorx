@@ -18,10 +18,12 @@
 
 pub mod autoencoder;
 pub mod cma_names;
+pub mod concat;
 pub mod gca;
 pub mod gcam;
 pub mod gcam_write;
 pub mod likely;
+pub mod morph;
 pub mod read;
 pub mod transform;
 

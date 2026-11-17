@@ -189,16 +189,20 @@ fn inverse_samples_of_a_morph() {
         tr::transform_sample_inverse(&mut g, &mut o, &mut e, &env, &mut t, 2, 4, 4).unwrap();
     assert_eq!(r, ERROR_BADPARM);
     // the trilinear sample of the nodes (GCAMsampleMorph): (1, 1, 1) / 2 lies between nodes 0 and 1
-    let (r, p) = tr::gcam_sample_morph(t.gcam(), 1.0, 1.0, 1.0);
+    let (r, p) = tr::gcam_sample_morph(&mut g, &mut e, t.gcam(), 1.0, 1.0, 1.0).unwrap();
     assert_eq!((r, p), (0, [1.5, 0.5, 0.5]));
     // outside the grid, or next to a node of invalid position
     assert_eq!(
-        tr::gcam_sample_morph(t.gcam(), 6.0, 0.0, 0.0).0,
+        tr::gcam_sample_morph(&mut g, &mut e, t.gcam(), 6.0, 0.0, 0.0)
+            .unwrap()
+            .0,
         ERROR_BADPARM
     );
     t.gcam_mut().node_mut(0, 0, 0).invalid = GCAM_POSITION_INVALID;
     assert_eq!(
-        tr::gcam_sample_morph(t.gcam(), 1.0, 1.0, 1.0).0,
+        tr::gcam_sample_morph(&mut g, &mut e, t.gcam(), 1.0, 1.0, 1.0)
+            .unwrap()
+            .0,
         ERROR_BADPARM
     );
     // a morph without inverse index volumes
@@ -358,7 +362,7 @@ fn fs875_fs876_a_morph_copy_keeps_its_inverse_and_affine() {
 /// them alone multiplies the first matrix), `TransformCompose` of a morph (unsupported, `NULL`),
 /// FS-928 (a composition into a morph refused), `TransformVox2Ras` of a morph (the image's
 /// voxel-to-RAS matrix: a coronal image of 4 voxels a side, sizes 1, centre 0) and of a linear
-/// array (its type becomes RAS to RAS), `TransformApplyInverse` of a morph (not ported yet).
+/// array (its type becomes RAS to RAS).
 #[test]
 fn compose_and_convert() {
     let t = tempfile::tempdir().unwrap();
@@ -415,13 +419,6 @@ fn compose_and_convert() {
         .unwrap();
     tr::transform_vox2ras(&mut g, &mut o, &mut e, &mut u, None, None).unwrap();
     assert_eq!(u.ttype, larmorx_freesurfer_mri::lta::LINEAR_RAS_TO_RAS);
-    // a morph's inverse resampling is not ported yet
-    let src = mri_alloc_sequence(&mut g, &mut o, &mut e, 2, 2, 2, MRI_FLOAT, 1).unwrap();
-    let mut e2 = Vec::new();
-    let r =
-        tr::transform_apply_inverse(&mut g, &mut o, &mut e2, &env, &mut mo, &src, None).unwrap();
-    assert!(r.is_null());
-    assert!(String::from_utf8_lossy(&e2).contains("GCAMmorphFromAtlas"));
 }
 
 /// A warp volume read as a morph by its absolute name: on Windows too (relay 42: MRIread put the

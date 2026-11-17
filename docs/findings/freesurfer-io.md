@@ -2826,3 +2826,59 @@ assigns them to the new volume), 413-447 (`read`: `gcam->image = __warpmap->gcam
   and after the 1,124 cases before it: offsets 460-475 and 1,048-1,063 of the decompressed file, `0` alone and the
   bytes of `"n dlr to"`... later; the rest of the geometry the defaults, the name `\0nknown`: `initVolGeom`'s
   `unknown` with `strcpy` of an empty name over it). The port notes FS-855 in `m3z_write` too (`SKIP` in piece 32).
+
+## Part 39: a GCA morph's resamplings, compositions and inverse; the cross and triple products' NaNs; GCAMcopy's geometry names (relay 43 of track A)
+
+Sources: `utils/gcamorph.cpp` 3900-3990 (`GCAMmorphFromAtlas`; its `else` branch after `if (1 || !sample_type)` is
+dead code), 4313-4430 (`GCAMmorphToAtlas`), 4432-4484 (`GCAMmorphToAtlasWithDensityCorrection`), 5274-5334
+(`GCAMsampleMorph`), 5336-5367 (`GCAMsampleInverseMorph`), 7647 (`GCAMfreeInverse`), 9900-9934
+(`gcamCreateJacobianImage`), 16269-16341 (`GCAMconcat2`), 16343-16460 (`GCAMconcat3`), 16462-16522
+(`GCAMfillInverse`), 17347-17392 (`GCAMcopy`); `utils/transform.cpp` 2660-2734 (`TransformApply*`), 4122
+(`TransformCreateDensityMap`), 5026-5070 (`TransformConcat`), 5073-5090 (`TransformInvertReplace`); `utils/matrix.cpp`
+2582-2602 (`VectorTripleProduct`), `VectorCrossProduct`; `include/mri.h` 266-300 (`VOL_GEOM::operator=`). Object code:
+the unit oracle's `gcamorph.cpp.o`, `matrix.cpp.o`, `dmatrix.cpp.o` (objdump; `<scratch>/A/rl43/`).
+
+1. **`GCAMmorphToAtlas`' `val`.** The OpenMP region's outlined function (`._omp_fn.7`) keeps `double val` at one stack
+   slot (`0x90(%rsp)`) for the whole loop: the `else` branch stores 0 there (`movq $0x0,0x90(%rsp)`), a successful
+   `MRIsampleVolumeFrameType` writes it through its pointer, and `MRIsetVoxVal` reads it (`cvtsd2ss 0x90(%rsp)`). A
+   failed sample (`SAMPLE_SINC`, or `SAMPLE_CUBIC_BSPLINE` in `GCAMmorphFromAtlas`, which calls the sampler with
+   type 5; the trilinear sampler's unsupported volume types) returns without writing it: the voxel takes the previous
+   value (FS-930), the first in a call memory contents (FS-931; `GCAMmorphFromAtlas`'s `val` is a function-scope
+   local, the same). The port models the slot (`morph.rs` `Chain`, a signalling-NaN sentinel tells an unwritten
+   sample). The offsets: `cvtss2sd` of the point, `addsd` of the offset (the point's NaN kept), `cvtsd2ss`.
+   `nint(xd)` is computed for a `DiagBreak` test only (no effect; the port skips it).
+2. **FS-932.** The source test `((mri_src->depth == 1 && zd == 0) || (mri_src->depth > 1 && zd > 0))` against `xd >
+   -1` and `yd > -1`: for 3-D sources the lower bound of z is 0 (exclusive), so slice 0 is never sampled. The 2-D
+   case and `GCAMmorphToAtlasType` (not reached by `TRANSFORM`, not ported) keep the same test. Rule A: the port's
+   default tests `zd > -1` for sources of more than one slice.
+3. **The density form.** `val *= jacobian` is `mulsd 0x58(%rsp),%xmm0` (the voxel's value the destination); the
+   Jacobian `orig_area / area` is `divss` with `FZERO` on `area` first (`andps`/`comiss`), the two constants chosen
+   by `cmpltss`/`andps` (1 or 0.001). `frame` (the parameter) is reused as the loop variable after the frame range
+   is computed.
+4. **NaN orders of `VectorTripleProduct` and `VectorCrossProduct`** (found by the `D` query: a node whose volume is a
+   NaN from two NaN positions). `matrix.cpp.o`: the cross product's second element is `z1*x2 - z2*x1` (the second
+   product `mulss %xmm1,%xmm4` with `z2` the destination, the C text `x1 * z2`); the triple product multiplies each
+   cross term by its element of `v3` with the term the destination (`mulss 0x4(%rdx),%xmm0`), adds the second term
+   to the first with the second the destination, then the third to that sum. The port's fs.core (`vector_cross_product`,
+   `vector_triple_product`, `triple_product`) and gcam.rs's node volumes follow them; `gcamComputeMetricProperties`'
+   `GCAMN_SUB` (`subsd` with the first node the destination) and `gcamn->area += area1` (`cvtss2sd` of `area`,
+   `addsd` of `area1`) through `sse::sub64`/`add64`. fs.maths' recorded cases did not tell the orders apart (no case
+   with NaNs of two payloads meeting in those products).
+5. **`DMatrixAddMul`** (track C's question, relay 37): its outlined loop is unswitched by `v1`/`v2`; for `v1 = v2 = 1`
+   the element is `(m + 0.0) + m'` with the running value the destination of the second `addsd`, as the port's
+   `add64(add64(0, m1), m2)`; fs.maths' `dmat` cases (NaNs of several payloads and both signs in a third of the
+   cases, in both matrices) compare it with the official code: identical. Nothing to change.
+6. **`GCAMcopy`'s geometries.** `gcamdst->image = gcamsrc->image` is `VOL_GEOM::operator=` (`include/mri.h` 266: the
+   name by `strcpy`), so a new morph's `initVolGeom` name `unknown` stays past a shorter name (`\0nknown` after an
+   empty one) and reaches an `.m3z`'s geometry tag (512 name bytes). The port cloned the geometry (relay 40); it now
+   assigns (`VolGeom::assign`). Found by a `trs` case `C` then `W` that relay 41's `A` query had kept out of the
+   comparison (the whole case `SKIP`ped while a morph's resampling was not ported).
+7. **`GCAMconcat3`'s failures.** `LTAreduce` returns NULL for arrays that do not chain and `lta2->xforms[0]` is read
+   (FS-934); `width = lta2->xforms[0].dst.width / gcam->spacing` (`idiv`: SIGFPE for 0, FS-935); `lta2->xforms[0].src
+   = lta2->xforms[0].dst = gcam->atlas` assigns the destination, then the source from it. `TransformInvertReplace`
+   frees the old morph and stores `GCAMfillInverse`'s NULL (FS-936; `GCAMfree` of it at `TransformFree` dereferences
+   NULL). `TransformConcat` and `TransformInvertReplace` have no caller in FreeSurfer 8.2.0's programs;
+   `mri_warp_convert` calls `GCAMconcat3`.
+8. **GCAMsampleMorph's NaN point** (FS-933): `boundsCheckf` passes a NaN; `(int)NaN` is `INT_MIN`, `MAX(.., 0)` 0,
+   `xp = MIN(width - 1, 1)`: with an extent of 0 or less the node index is -1 or the grid has no nodes (observed:
+   `CRASH 11`, a morph of 3 x 0 x -5 nodes and spacing 0 through `TransformApplyType`).

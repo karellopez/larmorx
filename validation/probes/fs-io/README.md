@@ -382,6 +382,17 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   read (findings Part 38): the warp volume's morph geometries' validity and sizes, never set without their tags; the
   case now notes FS-855 (`SKIP` in piece 32) and FS-929 (`VARY` in every piece: a warp volume without those
   geometries written).
+- Piece 32 since relay 43: the `A`, `D` and `I` queries of morphs are compared (a morph's resamplings: `GCAMmorphToAtlas`,
+  its density form, `GCAMmorphFromAtlas`); `trs` draws 0 to 2 more queries from a third case-seeded generator: `K`
+  (`TransformConcat` of the case's transform with itself read again, an identity on its source or destination
+  geometry before or after it, or a copy whose image is its atlas) and `P` (`TransformInvertReplace` without a volume or
+  with a header of the source or destination geometry), printed by `ptrans43` (a morph's nodes, inverse and full
+  geometries, name buffers hashed whole). Cases past `fsio`'s limits are not run on the port's side (`fs_io_probe: a
+  morph resampling past fsio's limits, not run`, `SKIP`): an inverse of an image of more than 2^20 voxels without one,
+  a sinc sample of a grid of more than 2^20 voxels, a composition or inverse of more than 2^20 nodes. `SKIP` for
+  FS-933 to FS-936, `VARY` for FS-931. Seeds 7, 13 and 21 (about 390 `trs` cases each): `reproduce` identical on every
+  compared case (258, 271, 267), 0 different; `fix` differs only with notices. `fsio` REBUILT (old binary
+  `<scratch>/A/rl43/fsio.before-rl43`).
 - Relay 42 (FS-167 at mghRead's readers, findings Part 38): `mgf` (piece 6's `mgr`, then every frame's fields; hand
   cases only, not drawn by the generator) and `mgh_slot_cases.py` (21 hand-made `.mgh`/`.mgz` files cut inside
   mghRead's header, tags 10, 12, 13 and 42: `reproduce` identical on every case of the read slots, `fix` different;

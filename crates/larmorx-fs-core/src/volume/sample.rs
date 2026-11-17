@@ -77,6 +77,38 @@ fn elem_f64(e: Elem) -> f64 {
     }
 }
 
+/// A voxel of a volume with voxels inside its extent and frames, read as a double (the samplers'
+/// fast path: the byte place §6's row tables give, element `x` of row `y` of slice `z + f depth`,
+/// none of FS-289's or FS-290's places); `None` for any other read (and for a 64-bit volume under
+/// `reproduce`, FS-298).
+#[inline]
+fn inside_voxel(m: &Mri, x: i32, y: i32, z: i32, f: i32, reproduce: bool) -> Option<f64> {
+    inside_elem(m, x, y, z, f, reproduce).map(elem_f64)
+}
+
+/// The element [`inside_voxel`] reads.
+#[inline]
+pub(crate) fn inside_elem(m: &Mri, x: i32, y: i32, z: i32, f: i32, reproduce: bool) -> Option<Elem> {
+    let v = m.voxels.as_deref()?;
+    let g = &m.geom;
+    if x < 0 || y < 0 || z < 0 || f < 0 || x >= g.width || y >= g.height || z >= g.depth {
+        return None;
+    }
+    if f >= m.nframes || m.kind == types::TENSOR || (m.kind == types::LONG && reproduce) {
+        return None;
+    }
+    let n = super::arith::elem_size(m.kind)? as usize;
+    if n as u64 != m.bytes_per_vox {
+        return None;
+    }
+    let i = ((i64::from(f) * i64::from(g.depth) + i64::from(z)) * i64::from(g.height) + i64::from(y))
+        * i64::from(g.width)
+        + i64::from(x);
+    let o = usize::try_from(i).ok()? * n;
+    let b = v.get(o..o + n)?;
+    Some(Elem::decode(m.kind, b))
+}
+
 /// C's `ceil` / `floor` of a double as an `int` (x86-64's conversion).
 fn ceil_i(c: f64) -> i32 {
     cvtt(c.ceil())
@@ -100,26 +132,30 @@ impl Process {
         f: i32,
         what: &str,
     ) -> Result<f64, Stop> {
+        if let Some(v) = inside_voxel(m, x, y, z, f, self.mode().reproduce()) {
+            return Ok(v);
+        }
         self.direct_needs_voxels(m, what)?;
         let (x, y, z, f) = (i64::from(x), i64::from(y), i64::from(z), i64::from(f));
         if m.kind == types::LONG {
-            if self.mode().reproduce() {
-                self.note(
-                    &FS_298,
-                    format!("{what}: a 64-bit volume read as 32-bit integers at the voxels' places"),
-                );
-                let place = direct_place(m, x, y, z, f, 4);
-                let b = self.direct_read(m, place, 4, what);
-                return Ok(f64::from(i32::from_le_bytes(b[..4].try_into().expect("4"))));
+            let reproduce = self.mode().reproduce();
+            if !self.noted(&FS_298) {
+                let d = if reproduce {
+                    "a 64-bit volume read as 32-bit integers at the voxels' places"
+                } else {
+                    "a 64-bit volume sampled at its voxels' values"
+                };
+                self.note(&FS_298, format!("{what}: {d}"));
             }
-            self.note(
-                &FS_298,
-                format!("{what}: a 64-bit volume sampled at its voxels' values"),
-            );
+            if reproduce {
+                let place = direct_place(m, x, y, z, f, 4);
+                let b = self.direct_read8(m, place, 4, what);
+                return Ok(f64::from(i32::from_le_bytes([b[0], b[1], b[2], b[3]])));
+            }
         }
         let n = super::arith::elem_size(m.kind).expect("a sampled type");
         let place = direct_place(m, x, y, z, f, n);
-        let b = self.direct_read(m, place, n as usize, what);
+        let b = self.direct_read8(m, place, n as usize, what);
         Ok(elem_f64(Elem::decode(m.kind, &b)))
     }
 
@@ -163,6 +199,9 @@ impl Process {
     /// The nearest sampler's voxel read (§15): a float; a volume without voxels, or a frame past
     /// the volume's, reads memory FreeSurfer does not own (FS-290: 0).
     pub(crate) fn nearest_voxel(&mut self, m: &Mri, q: [i32; 3], f: i32, name: &str) -> f32 {
+        if let Some(e) = inside_elem(m, q[0], q[1], q[2], f, false) {
+            return e.to_f32();
+        }
         if !m.has_voxels() {
             self.note(
                 &FS_290,
@@ -179,7 +218,7 @@ impl Process {
             i64::from(f),
             n,
         );
-        let b = self.direct_read(m, place, n as usize, name);
+        let b = self.direct_read8(m, place, n as usize, name);
         Elem::decode(m.kind, &b).to_f32()
     }
 
@@ -508,7 +547,13 @@ impl Process {
             return Ok(codes::NONE);
         }
         let d = if count != 8 {
-            if self.mode().reproduce() {
+            if self.noted(&FS_299) {
+                if self.mode().reproduce() {
+                    f64::from(count)
+                } else {
+                    8.0
+                }
+            } else if self.mode().reproduce() {
                 self.note(
                     &FS_299,
                     format!("MRIcubicSampleVolume: the sum divided by the {count} points added"),

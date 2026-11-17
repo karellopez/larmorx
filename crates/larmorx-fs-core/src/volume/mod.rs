@@ -218,6 +218,19 @@ impl Process {
         }
     }
 
+    /// [`Process::direct_read`] of at most 8 bytes into a fixed array (no allocation: the
+    /// samplers' voxel reads).
+    pub(crate) fn direct_read8(&mut self, m: &Mri, place: Place, n: usize, what: &str) -> [u8; 8] {
+        let mut out = [0u8; 8];
+        if let (Place::In(o), Some(v)) = (place, m.voxels.as_deref()) {
+            out[..n].copy_from_slice(&v[o as usize..o as usize + n]);
+            return out;
+        }
+        let b = self.direct_read(m, place, n, what);
+        out[..n].copy_from_slice(&b);
+        out
+    }
+
     /// A direct write of bytes at a place (§6): inside, written; at another voxel, written with
     /// `reproduce` and dropped by default (FS-289); outside the buffer, dropped (FS-290).
     pub(crate) fn direct_write(&mut self, m: &mut Mri, place: Place, b: &[u8], what: &str) {

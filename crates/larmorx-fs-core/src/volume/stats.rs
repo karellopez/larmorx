@@ -44,11 +44,22 @@ impl Process {
     pub fn mri_center_of_mass(&mut self, m: &Mri, threshold: u8) -> Result<(i32, [f64; 3]), Stop> {
         let (mut w, mut s) = (0.0f64, [0.0f64; 3]);
         let g = m.geom.clone();
+        // a voxel of a type the nearest sampler reads, inside the volume, is its own nearest
+        // sample (the same value: an int rounded to float)
+        let direct = super::sample::nearest_type(m.kind) && m.has_voxels();
         for z in 0..g.depth {
             for y in 0..g.height {
                 for x in 0..g.width {
-                    let (_, v) =
-                        self.mri_sample_nearest(m, f64::from(x), f64::from(y), f64::from(z))?;
+                    let v = match direct
+                        .then(|| super::sample::inside_elem(m, x, y, z, 0, false))
+                        .flatten()
+                    {
+                        Some(e) => sse::widen(e.to_f32()),
+                        None => {
+                            self.mri_sample_nearest(m, f64::from(x), f64::from(y), f64::from(z))?
+                                .1
+                        }
+                    };
                     if v > f64::from(threshold) {
                         w = sse::add64(w, v);
                         for (k, c) in [x, y, z].into_iter().enumerate() {

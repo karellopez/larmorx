@@ -25,7 +25,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::{
-    X_ROTATION, Y_ROTATION, Z_ROTATION, matrix_add, matrix_alloc_rotation, matrix_inverse,
+    X_ROTATION, Y_ROTATION, Z_ROTATION, matrix_add_into, matrix_alloc_rotation, matrix_inverse,
     matrix_print,
 };
 use larmorx_freesurfer_core::ret::Ret;
@@ -300,8 +300,9 @@ pub fn mri_rotate_i(
             for y1 in 0..w {
                 my.set_relt(1, 1, y1.wrapping_sub(y1o) as f32);
                 matrix_multiply(g, out, err, Some(&rinv), Some(&my), Some(&mut mx))?;
+                // MatrixAdd(mX, mO, mX)
                 let prod = mx.clone();
-                matrix_add(g, out, err, &prod, m_o, Some(&mut mx))?;
+                matrix_add_into(g, out, err, &prod, m_o, &mut mx)?;
                 let x = [
                     f64::from(mx.relt(1, 1)),
                     f64::from(mx.relt(2, 1)),

@@ -32,7 +32,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::{
-    matrix_add, matrix_clear, matrix_inverse, matrix_scalar_mul,
+    matrix_add_into, matrix_clear, matrix_inverse, matrix_scalar_mul,
 };
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
@@ -171,8 +171,9 @@ pub fn lta_transform_at_point(
                 return Ok(Ret::Null);
             };
             matrix_scalar_mul(g, out, err, ml, w_k_p as f32, Some(&mut m_tmp))?;
+            // MatrixAdd(m_L, m_tmp, m_L)
             let acc = m.clone();
-            matrix_add(g, out, err, &acc, &m_tmp, Some(m))?;
+            matrix_add_into(g, out, err, &acc, &m_tmp, m)?;
         }
     }
     Ok(match fresh {

@@ -159,6 +159,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument("--show", type=int, default=5, help="differing cases to print")
     ap.add_argument(
+        "--dump",
+        type=Path,
+        help="write every case's lines (official, reproduce, fix) as JSON lines",
+    )
+    ap.add_argument(
         "--only", help="comma-separated commands to keep (a check while porting; no official hash)"
     )
     a = ap.parse_args(argv)
@@ -203,6 +208,18 @@ def main(argv: list[str] | None = None) -> int:
 
     rep, fix = port_lines("reproduce"), port_lines("fix")
     assert len(official) == len(rep) == len(fix) == len(cases)
+    if a.dump:
+        with a.dump.open("w", encoding="utf-8") as fh:
+            for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
+                row = {
+                    "case": case,
+                    "official": c,
+                    "reproduce": r,
+                    "ids": ids,
+                    "fix": f,
+                    "fids": fids,
+                }
+                fh.write(json.dumps(row) + "\n")
     equal, differ, skipped, skipped_same = Counter(), Counter(), Counter(), Counter()
     fix_differ, fix_unexplained, fix_ids, rep_ids = Counter(), Counter(), Counter(), Counter()
     hashed = hashlib.sha256()

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //! FreeSurfer 8.2.0's volume functions (`fs.volume`), a clean room of
-//! `specs/freesurfer-volume.md` parts 1 to 3: the volume-geometry text block (§2, §3), the
-//! geometry's copies, matrices, comparison and printer (§4), the voxel arithmetic (§6-§11) and
-//! coordinates and geometry (§13-§16).
+//! `specs/freesurfer-volume.md` parts 1 to 4: the volume-geometry text block (§2, §3), the
+//! geometry's copies, matrices, comparison and printer (§4), the voxel arithmetic (§6-§11),
+//! coordinates and geometry (§13-§16), the samplers (§18), the moves (§19), the head's box (§20)
+//! and the reader of linear transforms (§21).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a
@@ -13,6 +14,10 @@ pub mod arith;
 pub mod extract;
 pub mod geomblock;
 pub mod geometry;
+pub mod ltaread;
+pub mod moves;
+pub mod sample;
+pub mod skull;
 pub mod stats;
 pub mod vgcopy;
 
@@ -150,7 +155,9 @@ pub fn direct_place(m: &Mri, x: i64, y: i64, z: i64, f: i64, esize: u64) -> Plac
 }
 
 /// The place of `n` bytes from byte `byte` of row `y` of slice `z + f depth` (§6): inside the
-/// volume when they lie within that row of a voxel the volume has.
+/// volume when they lie within that row of a voxel the volume has. Every row of a tensor volume
+/// (type 6) starts at the volume's first voxel (§6: FreeSurfer's row tables of a tensor volume,
+/// met only by FS-291's and FS-301's `reproduce`).
 pub fn row_byte_place(m: &Mri, byte: i64, y: i64, z: i64, f: i64, n: u64) -> Place {
     let g = &m.geom;
     let (w, h, d) = (i64::from(g.width), i64::from(g.height), i64::from(g.depth));
@@ -159,7 +166,12 @@ pub fn row_byte_place(m: &Mri, byte: i64, y: i64, z: i64, f: i64, n: u64) -> Pla
         return Place::Beyond;
     }
     let row_len = w * m.bytes_per_vox as i64;
-    let o = (t * h + y) * row_len + byte;
+    let row = if m.kind == crate::mri::types::TENSOR {
+        0
+    } else {
+        (t * h + y) * row_len
+    };
+    let o = row + byte;
     let len = m.voxels.as_ref().map_or(0, |v| v.len() as i64);
     if o < 0 || o + n as i64 > len {
         return Place::Beyond;
@@ -205,6 +217,19 @@ impl Process {
                 vec![0; n]
             }
         }
+    }
+
+    /// [`Process::direct_read`] of at most 8 bytes into a fixed array (no allocation: the
+    /// samplers' voxel reads).
+    pub(crate) fn direct_read8(&mut self, m: &Mri, place: Place, n: usize, what: &str) -> [u8; 8] {
+        let mut out = [0u8; 8];
+        if let (Place::In(o), Some(v)) = (place, m.voxels.as_deref()) {
+            out[..n].copy_from_slice(&v[o as usize..o as usize + n]);
+            return out;
+        }
+        let b = self.direct_read(m, place, n, what);
+        out[..n].copy_from_slice(&b);
+        out
     }
 
     /// A direct write of bytes at a place (§6): inside, written; at another voxel, written with

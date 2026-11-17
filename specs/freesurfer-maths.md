@@ -596,7 +596,12 @@ is written (an output that is also an input gives the same result).
   that is not cols x rows.
 - **Add, subtract** (m1, m2, out): `m2` of another size: `MatrixAdd: incompatable matrices <r1> x
   <c1> + <r2> x <c2>` (subtract: `MatrixSubtract: ...` with `-`) + `\n`; a given `out` of another size:
-  `MatrixAdd: incompatable matrices <r1> x <c1> = <r> x <c>` + `\n`. Each element in float.
+  `MatrixAdd: incompatable matrices <r1> x <c1> = <r> x <c>` + `\n`. Each element in float. Where
+  both elements are NaNs, `MatrixAdd` keeps the first operand's (m1's) NaN when the rows have 4 or
+  more columns and `out` is neither operand (a new matrix or another given one), else the second
+  operand's (m2's: rows of 3 columns or fewer, or `out` is m1 or m2), alike for every element;
+  `MatrixSubtract` keeps m1's (**(observed)**: the open probe's `madd` and `msub` with `new`, `self`,
+  `other` and a given output, 1 to 9 columns, NaNs in one element or in all).
 - **Scalar product** (in, v, out), **square** (in, out): each element `x v`, `x x` in float; a given
   `out` of another size: `MatrixScalarMul: incompatable matrices <r> x <c> != <ro> x <co>` + `\n`
   (`MatrixSquareElts: ...`).

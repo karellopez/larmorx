@@ -60,6 +60,8 @@ pub const WARPFIELD_DTFMT_DISP_RAS: i32 = 3;
 pub fn gcam_init_vol_geom(gcam: &mut Gcam, mri_image: &Mri, mri_atlas: &Mri) -> i32 {
     get_vol_geom(&mri_image.vg, &mut gcam.image);
     get_vol_geom(&mri_atlas.vg, &mut gcam.atlas);
+    // both geometries given now (FS-855's memory contents gone)
+    gcam.geom_unset = false;
     NO_ERROR
 }
 
@@ -291,6 +293,10 @@ pub fn m3z_write(
         }
     }
     fio::znz_write_int(f, tags::TAG_GCAMORPH_GEOM);
+    if gcam.geom_unset {
+        // relay 42: the geometries' validity and sizes written as memory holds them in FreeSurfer
+        crate::gcam::unset_geometry(g, "the morph file's geometry tag");
+    }
     vol_geom_write(f, &gcam.image, false, true);
     vol_geom_write(f, &gcam.atlas, false, true);
     fio::znz_write_int(f, tags::TAG_GCAMORPH_TYPE);
@@ -416,6 +422,12 @@ fn warpfield_convert(
     if gcam.mtype == GCAM_RAS {
         let _ = out.write_all(b"converting GCAM from GCAM_RAS to GCAM_VOX\n");
         gcam_ras_to_vox(g, out, err, env, gcam, None)?;
+    }
+    if gcam.geom_unset {
+        crate::gcam::unset_geometry(
+            g,
+            "the morph's printed sizes and its conversion to a warp volume",
+        );
     }
     let _ = out.write_all(b"[INFO] Warpfield::convert(): converting GCAM ...\n");
     let _ = writeln!(

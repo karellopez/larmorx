@@ -12,7 +12,9 @@
 //! buffer (another voxel: by default reading gives `outside_val` and writing does nothing, with
 //! `reproduce` FreeSurfer's voxel), FS-53 where it does not (memory the program does not own: both
 //! modes read `outside_val` by default, 0 with `reproduce`, and write nothing). `MRI_LONG` volumes:
-//! FS-54. A volume without voxels: FS-58.
+//! FS-54. A volume without voxels: FS-58, only where FreeSurfer touches a voxel (the types it reads
+//! and writes); the others (`MRI_BITMAP`, `MRI_TENSOR`, `MRI_DOUBLE_COMPLEX`, unknown codes) read
+//! `-1e10` and write nothing (1) with or without voxels, as FreeSurfer.
 
 use std::io::Write;
 
@@ -125,6 +127,21 @@ impl Mri {
 /// What `MRIgetVoxVal` returns for a type it does not read (`-10000000000.9` as a `float`).
 const NO_TYPE: f32 = -10000000000.9_f64 as f32;
 
+/// The types `MRIgetVoxVal` and `MRIsetVoxVal` read and write (the others touch no voxel).
+fn has_values(mtype: i32) -> bool {
+    matches!(
+        mtype,
+        MRI_UCHAR
+            | MRI_SHORT
+            | MRI_USHRT
+            | MRI_RGB
+            | MRI_INT
+            | MRI_LONG
+            | MRI_FLOAT
+            | MRI_FLOAT_COMPLEX
+    )
+}
+
 /// The notice of an access outside the volume, and whether FreeSurfer's is reproduced.
 fn outside(g: &mut Globals, what: &str, p: Place, c: i32, r: i32, s: i32, f: i32) -> bool {
     let (d, kind) = match p {
@@ -152,7 +169,8 @@ fn no_voxels(g: &mut Globals, err: &mut dyn Write, what: &str) -> Result<(), Fat
 /// `MRIgetVoxVal(mri, c, r, s, f, mode)`: the voxel as a `float`; `outside_val` for a negative
 /// column, row or slice; `mode` picks a complex voxel's real or imaginary part (another mode ends
 /// the program, `MRIgetVoxVal(): unsupported operation <mode>`); `-1e10` for a type it does not
-/// read (`MRI_TENSOR` and the others). FS-52, FS-53, FS-58.
+/// read (`MRI_BITMAP`, `MRI_TENSOR`, `MRI_DOUBLE_COMPLEX` and unknown codes), with or without
+/// voxels. FS-52, FS-53, FS-58 (a volume without voxels of a type it reads).
 #[allow(clippy::too_many_arguments)]
 pub fn mri_get_vox_val(
     g: &mut Globals,
@@ -166,6 +184,10 @@ pub fn mri_get_vox_val(
 ) -> Result<f32, Fatal> {
     if c < 0 || r < 0 || s < 0 {
         return Ok(mri.outside_val as f32);
+    }
+    if !has_values(mri.mtype) {
+        // FreeSurfer touches no voxel for these types, with or without voxels
+        return Ok(NO_TYPE);
     }
     if mri.chunk.is_none() {
         no_voxels(g, err, "MRIgetVoxVal")?;
@@ -233,8 +255,8 @@ fn nint_long(x: f64) -> i64 {
 /// [0, 255], `short` [-32768, 32767], `ushort` [0, 65535], `int` and `long` the `int` range in
 /// `float`), rounded with `nint` (FS-12 beyond `int`) for the integer types, stored; a complex
 /// voxel's part by `mode` (another mode ends the program, `MRIsetVoxVal(): unsupported operation
-/// <mode>`), not clipped. 0; 1 for a type it does not write (nothing written). FS-52, FS-53,
-/// FS-54, FS-58.
+/// <mode>`), not clipped. 0; 1 for a type it does not write (nothing written, with or without
+/// voxels). FS-52, FS-53, FS-54, FS-58 (a volume without voxels of a type it writes).
 #[allow(clippy::too_many_arguments)]
 // C's two comparisons per type, as written (the same values as `clamp`, NaN kept)
 #[allow(clippy::manual_clamp)]
@@ -249,6 +271,10 @@ pub fn mri_set_vox_val(
     voxval: f32,
     mode: i32,
 ) -> Result<i32, Fatal> {
+    if !has_values(mri.mtype) {
+        // nothing written, with or without voxels, as FreeSurfer
+        return Ok(1);
+    }
     if mri.chunk.is_none() {
         no_voxels(g, err, "MRIsetVoxVal")?;
         return Ok(0);

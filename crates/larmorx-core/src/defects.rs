@@ -2314,7 +2314,7 @@ defects! {
     FS_854 = "FS-854", "FreeSurfer", true,
         "reading a compressed GCA morph (.m3z) whose compressed data is damaged after its nodes: the reading of its tags never ends, or ends as memory contents decide";
     FS_855 = "FS-855", "FreeSurfer", true,
-        "reading an MGH or NIfTI warp volume as a GCA morph when the volume has no morph geometries (its geometry tag missing): the geometries' validity and sizes are memory contents, which the RAS warp formats and the node-coordinate frames use; and those frames of a morph whose image geometry has a size of 0 or less crash the program";
+        "reading an MGH or NIfTI warp volume as a GCA morph when the volume has no morph geometries (its geometry tag missing): the geometries' validity and sizes are memory contents, which the RAS warp formats and the node-coordinate frames use and which writing the morph carries into its outputs (the sizes printed, an .m3z's geometry tag, a warp volume's tags); and those frames of a morph whose image geometry has a size of 0 or less crash the program";
     FS_856 = "FS-856", "FreeSurfer", true,
         "writing a three-frame volume as a GCA morph (an .m3z or .m3d name, or the morph type asked for): success is reported whatever the morph's writer did: a file that cannot be made, a warp volume whose write fails, or a name of another format, for which nothing is written and nothing is said";
     FS_857 = "FS-857", "FreeSurfer", true,
@@ -2381,6 +2381,8 @@ defects! {
         "reading a later layer of a stacked autoencoder as a volume (frame #1 and on) when the autoencoder's stored extent is larger than the layer's kernel (as for any autoencoder trained on a volume): the volume's header names more voxels than its memory holds, so the reading goes on with memory contents or crashes";
     FS_928 = "FS-928", "FreeSurfer", true,
         "converting a linear transform from RAS to voxels without a source volume, composing a linear transform into a destination that holds a GCA morph, or making the density map of a linear transform that cannot be applied (a singular matrix): FreeSurfer dereferences a null pointer or writes into the morph's memory (a crash or memory corruption)";
+    FS_929 = "FS-929", "FreeSurfer", true,
+        "writing a warp volume (MGH or NIfTI) whose morph geometries were never given: one read without its geometry tag (an MGH warp volume, or a NIfTI displacement field without FreeSurfer's header extension), or a GCA morph read from such a volume and written as a warp volume: the geometries' validity and sizes written into the file's tags, and a NIfTI output's displacements when FreeSurfer converts them to RAS through those geometries, are memory contents";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

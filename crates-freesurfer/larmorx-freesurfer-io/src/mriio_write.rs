@@ -551,6 +551,9 @@ pub fn mri_tag_write(
     let info = g.gdiag & DIAG_INFO != 0;
     let mut io = FsTagsIo::new(fp, niftiheaderext);
     if m.warp_field_format != WARPFIELD_DTFMT_UNKNOWN {
+        if crate::warpfield::geometries_unset(m) {
+            crate::warpfield::note_unset_geometries(g, "the geometry tags written");
+        }
         io.write_gcamorph_geom(
             g,
             out,

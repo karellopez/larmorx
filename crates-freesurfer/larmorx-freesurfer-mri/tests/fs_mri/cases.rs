@@ -269,9 +269,12 @@ fn voxval(g: &mut Gen) -> f32 {
 
 fn vox(g: &mut Gen, t: &mut Vec<String>) {
     let (w, h, d) = (g.int(1, 3), g.int(1, 3), g.int(1, 2));
-    let ty = g.pick(&[0, 1, 2, 3, 4, 6, 7, 9, 10]);
+    // bitmap (5) and double complex (8) volumes are made without voxels (FreeSurfer cannot
+    // allocate theirs): the types MRIgetVoxVal and MRIsetVoxVal touch no voxel of (relay 42)
+    let ty = g.pick(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     let nf = g.int(1, 2);
     let hdr = g.chance(25);
+    let hdr = hdr || matches!(ty, 5 | 8);
     for v in [w, h, d, ty, nf, i64::from(hdr)] {
         t.push(v.to_string());
     }

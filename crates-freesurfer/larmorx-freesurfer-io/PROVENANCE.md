@@ -358,6 +358,14 @@ table reader (`utils/colortab.cpp` 351-830, both versions inlined into `CTABread
 keeps one for the whole read and forgets it at each other call FreeSurfer makes between two numbers.
 The default's zeros, the notices' texts and FS-192's split notice are larmorx's own.
 
+Changes for relay 42, FS-167 at mghRead's readers (findings Part 38): `fio::znz_read_float_in` (the slot's
+four bytes reversed in place after the read, as `utils/fio.cpp`'s `znzreadFloat` calls `byteswapbuffloat`) and
+`fio::znz_read_double_in` (a second slot: `znzreadDouble`'s eight bytes, kept between two doubles, overwritten
+by every other reader); `mriio::mgh_read`'s header (`utils/mriio.cpp` 10874-10960), `fstagsio::vol_geom_read`
+(`include/mri.h` 561-610), `read_gcamorph_meta`, `read_gcamorph_labels`, `read_mri_frames` (`utils/fstagsio.cpp`
+876-960, the port's `FrameSlots`), `read_scan_parameters`, `read_ras_xform`, `read_ras_xform_extra` read through
+them, from the unit oracle's `mriio.cpp.o`, `fstagsio.cpp.o`, `fio.cpp.o` and nifti's `znzlib.c.o` (`objdump`).
+
 Changes for relay 26: the ANALYZE files are C streams (`cfile::CFile`); `lstat`'s length from the file
 system's metadata of the name itself; the scale factor's type change and product are fs.volume's paths
 copied (see the table), the general functions staying in larmorx-freesurfer-volume. niftilib's
@@ -427,7 +435,7 @@ is NaN), the FS-58 refusal and their notices are larmorx's own.
 
 | FreeSurfer file (lines) | Functions | Here |
 |---|---|---|
-| `utils/warpfield.cpp` 55-74, 659-951; `utils/mriio.cpp` 9655-9661 | `Warpfield::Warpfield(MRI *)` (its matrices with shears), `Warpfield::changeFormat` and `__changeFormatFrom_abs_crs`, `__changeFormatFrom_disp_crs`, `__changeFormatFrom_abs_ras`, `__changeFormatFrom_disp_ras`, as `niiWrite` calls them (the volume changed in place) | `warpfield.rs`, `mriio_write.rs` |
+| `utils/warpfield.cpp` 55-74, 659-951; `utils/mriio.cpp` 9655-9661 | `Warpfield::Warpfield(MRI *)` (its matrices with shears), `Warpfield::changeFormat` and `__changeFormatFrom_abs_crs`, `__changeFormatFrom_disp_crs`, `__changeFormatFrom_abs_ras`, `__changeFormatFrom_disp_ras`, as `niiWrite` calls them (the volume changed in place); FS-929 (relay 42: `include/mri.h` 183-220's `VOL_GEOM` leaves `valid`, `width`, `height`, `depth` unset, so a warp volume read without tags 10 and 15 writes memory contents into them and converts through them; `mriio.cpp` 12424-12430, 8656-8665) | `warpfield.rs`, `mriio_write.rs` |
 | `utils/mriio.cpp` 1179-1190 | `MRIwriteType`'s `MGH_MORPH` branch: through `upper.rs`'s `write_morph` (fs.gca's `gcam_write.rs`; the message of a program that does not link it) | `mriio.rs`, `upper.rs` |
 
 

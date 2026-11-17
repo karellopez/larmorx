@@ -14,12 +14,14 @@
 
 use std::io::Write;
 
+use larmorx_core::defects::FS_929;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply_d};
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_mri::mri::{MGZ_INTENT_WARPMAP, Mri};
 use larmorx_freesurfer_mri::tkreg::{get_ras2vox, get_vox2ras};
+use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
 /// `WarpfieldDTFMT`'s formats.
@@ -70,6 +72,23 @@ fn plus(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     ]
 }
 
+/// Whether a warp volume's image or atlas geometry was never given (no geometry tag read, nothing
+/// assigned): FreeSurfer's validity flag and sizes of such a geometry are memory contents (it never
+/// writes them), the port's 0 (FS-929 where they reach an output).
+pub fn geometries_unset(m: &Mri) -> bool {
+    m.gcamorph_image_vg == VolGeom::default() || m.gcamorph_atlas_vg == VolGeom::default()
+}
+
+/// FS-929's notice: a warp volume without its morph geometries written, `what` using them.
+pub fn note_unset_geometries(g: &mut Globals, what: &str) {
+    g.notices.add(
+        &FS_929,
+        format!(
+            "a warp volume without its morph geometries written: {what} use their validity and sizes, which are memory contents in FreeSurfer (0 here)"
+        ),
+    );
+}
+
 /// `new Warpfield(mri)` then `changeFormat(newformat)`: the volume's format set to `newformat`;
 /// when it differs from the old one, every atlas voxel's three frames converted (in `float`, the
 /// matrix products in `double` through `MatrixMultiplyD`): to and from voxels with the image
@@ -102,6 +121,14 @@ pub fn change_format(
     }
     if !(WARPFIELD_DTFMT_ABS_CRS..=WARPFIELD_DTFMT_DISP_RAS).contains(&format) {
         return Ok(());
+    }
+    let crs_only = matches!(format, WARPFIELD_DTFMT_ABS_CRS | WARPFIELD_DTFMT_DISP_CRS)
+        && matches!(
+            newformat,
+            WARPFIELD_DTFMT_ABS_CRS | WARPFIELD_DTFMT_DISP_CRS
+        );
+    if !crs_only && geometries_unset(m) && m.vg.width > 0 && m.vg.height > 0 && m.vg.depth > 0 {
+        note_unset_geometries(g, "the displacements converted to or from RAS");
     }
     let (w, h, d) = (m.vg.width, m.vg.height, m.vg.depth);
     for c in 0..w.max(0) {

@@ -2709,8 +2709,23 @@ right after another:
   keeps the tag number's bytes, a 64-bit length cut after 4 or more of its bytes keeps the tag
   number's for its last four (cut earlier: memory contents); the binary colour tables in znzlib files
   (§13) as on C streams. `znzreadDouble` and `znzreadShort` read elsewhere (eight bytes 16 below,
-  overwritten by every other reader's call): their missing bytes stay memory contents, as do every
-  other caller's (mghRead's header, the geometry and frame readers).
+  overwritten by every other reader's call): a short's missing bytes stay memory contents.
+- Since relay 42 (observed, `mgh_slot_cases.py`): `znzreadFloat` reads into the same four bytes as
+  `znzreadInt` and then reverses them in place, so after a float they hold its value least significant
+  byte first: a float cut by the file is the file's bytes followed by the earlier number's bytes as
+  they lie there, read big-endian, and after it the four bytes are reversed again (two floats cut at 0
+  bytes in a row alternate between the two orders). A double cut by the file keeps the earlier
+  double's bytes as `znzreadDouble` left them (its value least significant byte first, reversed again
+  after the read) when no other reader ran between the two; any other reader overwrites them (memory
+  contents). Doubles do not reach the four bytes of ints and floats. The runs with nothing else
+  between: mghRead's six sizes, its short (which leaves the four bytes) and its fifteen geometry
+  floats (the first size's earlier bytes memory contents); each morph geometry of tags 10 and 15 (the
+  validity, extent, the fifteen floats, the three shears, the NIfTI extension's name length; the
+  name's read between the two geometries leaves memory contents); tag 13's format, spacing and
+  `exp_k`; every label of tag 12; the frames of tag 42 (within a frame the type to the label, then
+  after the name the dof alone, then after the matrix tag the threshold and units, the diffusion
+  doubles as above, the longs with the ints; from one frame to the next); the scan parameters' floats
+  (tag 45) around their double; the twelve floats of tag 8 and the nine numbers of tag 9.
 
 By default the missing bytes are 0 (noted: FS-49, FS-167, FS-192); with `reproduce` the earlier
 number's bytes where the rule above gives them (the notice ends "as in FreeSurfer"), 0 elsewhere (noted
@@ -2721,7 +2736,9 @@ the probe's `ctr` and `tr` cases (seed 7, 3,846 cases: identical on 2,697, 0 dif
 4,045, 0 different); since relay 26 `ztr`, `fsr` and the volume readers too (seed 7, 5,048 cases of
 `ztr`, `ctr`, `tr`, `fsr`, `mgr`, `mrd`, `mrh`, `mri`, `nrd`: identical on 4,060, 0 different, 73 of them
 lines with FS-167 now compared), lines whose notices end "as in FreeSurfer" compared, the others
-counted apart.
+counted apart. Since relay 42: `validation/probes/fs-io/mgh_slot_cases.py` (21 hand-made files read by
+the probe's `mgf`, which prints every frame's fields after the volume: each comparable case identical
+with `reproduce` and different with `fix`; observed 2026-11-17).
 
 ## 101. ANALYZE read (`analyzeRead(name, read_volume)`; `mri_read`'s ANALYZE 2 and ANALYZE 4D 16)
 
@@ -5160,3 +5177,39 @@ positions; an array's type, count, first matrix and two geometries). Black box: 
 (about 400 `trs` cases each, 285 with the new queries in seed 7): `reproduce` identical on every compared case (238,
 248, 244), 0 different; `fix` differs only with notices. Not compared: FS-928, track C's FS-504 and FS-957 (FreeSurfer
 crashes or reads memory), a GCA morph's resamplings (not ported).
+
+## 156. Warp volumes whose morph geometries were never given (FS-929, FS-855)
+
+1. **The geometries a warp volume carries.** Every volume holds an image and an atlas geometry for its warp (tags 10
+   and 15: §15's stored form, §16's writer, §17's reader); FreeSurfer gives their fields defaults when a volume is
+   made (voxel sizes 1, the coronal directions, centre 0, no shears, an empty name) except four: the validity flag and
+   the three sizes, which hold whatever memory held (observed: 0 in a fresh process; numbers made of earlier text
+   bytes, such as `540024864 x 2019307808 x 538992944`, after other work in the same process). Only reading tag 10 or
+   15, or assigning a geometry, sets them. So they are memory contents in a warp volume read without those tags: an
+   MGH warp volume (tag 13 with a known format, no tag 10 or 15) and a NIfTI displacement field (intent 1006) without
+   FreeSurfer's header extension, which `niiRead` takes as a warp volume of RAS displacements (format 3).
+2. **Where they reach an output.**
+   - Writing a volume whose warp format is known (not -1) writes both tags with both geometries (§16): the validity
+     flags and sizes are written as memory holds them (MGH and NIfTI; 16 bytes per geometry per tag).
+   - Writing such a volume as NIfTI in another format than 3 converts its frames to RAS displacements (§145 item 5)
+     through the geometries' voxel-to-RAS matrices, whose translation uses the sizes: every voxel's three values
+     depend on them (by a constant per frame when the directions and voxel sizes are the defaults). A conversion
+     between formats 0 and 1 only does not use them.
+   - Reading such a volume as a GCA morph (§142 item 3) gives the morph those geometries (FS-855): their sizes are
+     printed by the morph's conversion to a warp volume (`[INFO] Warpfield::convert(): gcam image [<w> x <h> x <d>]`,
+     `... gcam atlas [...]`, §145 item 4) and stored in the new warp volume, so writing it (`GCAMwrite` to an MGH or
+     NIfTI name, `mri_convert <warp>.mgz <out>.nii`) meets both items above; written as a morph file (`GCAMwrite` to
+     an `.m3z` or `.m3d` name, §145 item 3) its geometry tag holds them (observed: after other work in the process,
+     16 bytes of earlier output text per geometry). The same when the tags are not read at all (`FS_SKIP_TAGS` set).
+3. **larmorx, both modes** (memory contents cannot be reproduced): the validity flags and sizes are 0 (a fresh
+   process's values), noted: FS-929 where a warp volume without those geometries is written (its tags, a NIfTI
+   output's conversion through RAS), FS-855 where a morph read from one prints or stores them (an `.m3z`'s geometry
+   tag included). A geometry is taken as
+   never given when every field equals the made volume's defaults with validity and sizes 0 (a tag holding exactly
+   those values is noted too, though FreeSurfer's output is then the same).
+4. **Validation.** Piece 32's `gcw` (a warp volume read as a morph and written in a warp format) and piece 14's
+   volume writes: the cases noting FS-929 are compared apart (`VARY`), those noting FS-855 not compared; the
+   observed difference: `validation/probes/fs-io/gcw_nifti_difference.txt` run alone gives the port's bytes (FNV-1a
+   `405afea9a37dc9dc`, the sizes 0) and after 4,376 other cases of seed 1's recorded set in the same process
+   `fe6976ea86a90170` (the sizes above). Black box: FreeSurfer 8.2.0's `mri_convert w.mgz o.nii` of such a warp
+   volume, in a fresh process and after other work, and `mri_info` (which prints the geometries).

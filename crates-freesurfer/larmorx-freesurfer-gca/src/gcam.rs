@@ -699,7 +699,7 @@ fn warpfield_read(
 }
 
 /// FS-855: a morph read from a warp volume without its geometries uses their sizes.
-fn unset_geometry(g: &mut Globals, what: &str) {
+pub(crate) fn unset_geometry(g: &mut Globals, what: &str) {
     g.notices.add(
         &FS_855,
         format!(

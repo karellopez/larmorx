@@ -129,9 +129,12 @@ fn fits(g: &mut Globals, who: &str, name: &str) {
 }
 
 /// The name with the working directory before it when it holds no `/` (`getcwd`; the name alone
-/// when there is none).
+/// when there is none). On Windows a `\` counts as a folder too (relay 42: the port's own;
+/// FreeSurfer runs only where `/` is the separator, and an absolute Windows name such as
+/// `C:\data\a.mgz` is Linux's `/data/a.mgz`, which it takes as it is).
 fn with_cwd(g: &mut Globals, dir: Option<&Path>, who: &str, fname: &str) -> String {
-    let full = if fname.contains('/') {
+    let windows_folder = cfg!(windows) && fname.contains('\\');
+    let full = if fname.contains('/') || windows_folder {
         fname.to_owned()
     } else {
         match system::cwd(dir) {
@@ -1285,19 +1288,24 @@ pub fn mgh_read(
         );
         return Ok(None);
     }
-    let width = fio::znz_read_int(g, err, &mut fp);
-    let height = fio::znz_read_int(g, err, &mut fp);
-    let depth = fio::znz_read_int(g, err, &mut fp);
-    let mut nframes = fio::znz_read_int(g, err, &mut fp);
-    let mtype = fio::znz_read_int(g, err, &mut fp);
-    let dof = fio::znz_read_int(g, err, &mut fp);
+    // FS-167: the official build's header readers, called from mghRead's own frame, read the ints
+    // and floats into the same four bytes (none of the calls between them, the short's included,
+    // writes there): a number the file cuts keeps the earlier number's bytes (the first one's are
+    // memory contents); the short's are another call's (memory contents)
+    let mut slot = fio::Slot49::new();
+    let width = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
+    let height = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
+    let depth = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
+    let mut nframes = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
+    let mtype = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
+    let dof = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
     let mut unused = UNUSED_SPACE_SIZE - 2;
     let good_ras_flag = i32::from(fio::znz_read_short(g, err, &mut fp));
     let mut ras = [0f32; 15];
     if good_ras_flag > 0 {
         unused -= USED_SPACE_SIZE;
         for v in &mut ras {
-            *v = fio::znz_read_float(g, err, &mut fp);
+            *v = fio::znz_read_float_in(g, err, &mut fp, &mut slot);
         }
     }
     let mut ubuf = [0u8; UNUSED_SPACE_SIZE as usize + 1];

@@ -284,6 +284,40 @@ pub fn vol_geom_write(fp: &mut ZnzFile, vg: &VolGeom, niftiheaderext: bool, shea
     }
 }
 
+/// The two places FreeSurfer's official build reads a frame's numbers into, as `read_mri_frames`
+/// leaves them from one read to the next (FS-167; relay 42, measured in `fstagsio.cpp.o`,
+/// `fio.cpp.o` and `znzlib.c.o`): `ints` the four bytes `znzreadInt` and `znzreadFloat` share and
+/// the eight `znzreadLong` reads (a [`fio::Slot49`]), which a double's read does not reach;
+/// `doubles` the eight bytes `znzreadDouble` reads, which every other reader's call overwrites.
+#[derive(Default)]
+struct FrameSlots {
+    ints: fio::Slot49,
+    doubles: fio::Slot49,
+}
+
+impl FrameSlots {
+    fn int(&mut self, g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> i32 {
+        self.doubles.clobber();
+        fio::znz_read_int_in(g, err, fp, &mut self.ints)
+    }
+    fn float(&mut self, g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> f32 {
+        self.doubles.clobber();
+        fio::znz_read_float_in(g, err, fp, &mut self.ints)
+    }
+    fn long(&mut self, g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> i64 {
+        self.doubles.clobber();
+        fio::znz_read_long_in(g, err, fp, &mut self.ints)
+    }
+    fn double(&mut self, g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> f64 {
+        fio::znz_read_double_in(g, err, fp, &mut self.doubles)
+    }
+    /// Another function ran: both places hold its bytes.
+    fn clobber(&mut self) {
+        self.ints.clobber();
+        self.doubles.clobber();
+    }
+}
+
 /// `VOL_GEOM::read(fp, niftiheaderext, shearless)`: the fields [`vol_geom_write`] writes, into
 /// `vg`; an `.mgz`'s 512 name bytes after its first 512 are cleared, the extension's name length
 /// and at most 512 bytes (the rest skipped). FS-186: FreeSurfer does not end the name it reads (an
@@ -298,11 +332,15 @@ pub fn vol_geom_read(
     niftiheaderext: bool,
     shearless: bool,
 ) {
-    vg.valid = fio::znz_read_int(g, err, fp);
-    vg.width = fio::znz_read_int(g, err, fp);
-    vg.height = fio::znz_read_int(g, err, fp);
-    vg.depth = fio::znz_read_int(g, err, fp);
-    let mut f = || fio::znz_read_float(g, err, fp);
+    // FS-167: the ints and floats are read one after another from one frame, into the same four
+    // bytes (the slot; the first number's earlier bytes are memory contents), and the name length
+    // too; the name's read overwrites them (relay 42, measured in fstagsio.cpp.o's inlined copies)
+    let mut slot = fio::Slot49::new();
+    vg.valid = fio::znz_read_int_in(g, err, fp, &mut slot);
+    vg.width = fio::znz_read_int_in(g, err, fp, &mut slot);
+    vg.height = fio::znz_read_int_in(g, err, fp, &mut slot);
+    vg.depth = fio::znz_read_int_in(g, err, fp, &mut slot);
+    let mut f = || fio::znz_read_float_in(g, err, fp, &mut slot);
     vg.xsize = f();
     vg.ysize = f();
     vg.zsize = f();
@@ -327,7 +365,7 @@ pub fn vol_geom_read(
         vg.fname.memset0(GEOM_NAME);
         (GEOM_NAME as i64, 0)
     } else {
-        let len = fio::znz_read_int(g, err, fp);
+        let len = fio::znz_read_int_in(g, err, fp, &mut slot);
         let to_read = i64::from(len).min(GEOM_NAME as i64);
         (to_read, i64::from(len) - to_read)
     };
@@ -955,6 +993,9 @@ impl<'a> FsTagsIo<'a> {
         let ext = self.niftiheaderext;
         let fstart = self.fp.tell();
         let n = mri.nframes.max(0) as usize;
+        // FS-167: the frames' numbers through the official build's two read slots, kept from one
+        // frame to the next (one loop in one frame, no other call between frames)
+        let mut slots = FrameSlots::default();
         for fno in 0..n.min(mri.frames.len()) {
             if ext {
                 let label = fio::znz_read_int(g, err, self.fp);
@@ -965,7 +1006,7 @@ impl<'a> FsTagsIo<'a> {
                 continue;
             }
             let mut fr = std::mem::take(&mut mri.frames[fno]);
-            self.read_frame(g, out, err, &mut fr);
+            self.read_frame(g, out, err, &mut fr, &mut slots);
             mri.frames[fno] = fr;
         }
         let fend = self.fp.tell();
@@ -1010,35 +1051,40 @@ impl<'a> FsTagsIo<'a> {
         out: &mut dyn Write,
         err: &mut dyn Write,
         fr: &mut MriFrame,
+        sl: &mut FrameSlots,
     ) {
         {
             let fp = &mut *self.fp;
-            fr.ftype = fio::znz_read_int(g, err, fp);
-            fr.te = fio::znz_read_float(g, err, fp);
-            fr.tr = fio::znz_read_float(g, err, fp);
-            fr.flip = fio::znz_read_float(g, err, fp);
-            fr.ti = fio::znz_read_float(g, err, fp);
-            fr.td = fio::znz_read_float(g, err, fp);
-            fr.tm = f64::from(fio::znz_read_float(g, err, fp));
-            fr.sequence_type = fio::znz_read_int(g, err, fp);
-            fr.echo_spacing = fio::znz_read_float(g, err, fp);
-            fr.echo_train_len = fio::znz_read_float(g, err, fp);
+            fr.ftype = sl.int(g, err, fp);
+            fr.te = sl.float(g, err, fp);
+            fr.tr = sl.float(g, err, fp);
+            fr.flip = sl.float(g, err, fp);
+            fr.ti = sl.float(g, err, fp);
+            fr.td = sl.float(g, err, fp);
+            fr.tm = f64::from(sl.float(g, err, fp));
+            fr.sequence_type = sl.int(g, err, fp);
+            fr.echo_spacing = sl.float(g, err, fp);
+            fr.echo_train_len = sl.float(g, err, fp);
             for i in 0..3 {
-                fr.read_dir[i] = fio::znz_read_float(g, err, fp);
+                fr.read_dir[i] = sl.float(g, err, fp);
             }
             for i in 0..3 {
-                fr.pe_dir[i] = fio::znz_read_float(g, err, fp);
+                fr.pe_dir[i] = sl.float(g, err, fp);
             }
             for i in 0..3 {
-                fr.slice_dir[i] = fio::znz_read_float(g, err, fp);
+                fr.slice_dir[i] = sl.float(g, err, fp);
             }
-            fr.label = fio::znz_read_int(g, err, fp);
+            fr.label = sl.int(g, err, fp);
             read_name_buffer(fp, fr);
-            fr.dof = fio::znz_read_int(g, err, fp);
+            // the name's read overwrites both slots
+            sl.clobber();
+            fr.dof = sl.int(g, err, fp);
         }
         let mut matlen = 0i64;
         let mattag = self.read_tagid_len(g, err, &mut matlen, 0);
         let m = self.read_matrix(g, out, err);
+        // so do the matrix tag's calls
+        sl.clobber();
         if Self::info(g) {
             let _ = writeln!(
                 out,
@@ -1048,29 +1094,29 @@ impl<'a> FsTagsIo<'a> {
         }
         fr.m_ras2vox = Some(m);
         let fp = &mut *self.fp;
-        fr.thresh = fio::znz_read_float(g, err, fp);
-        fr.units = fio::znz_read_int(g, err, fp);
+        fr.thresh = sl.float(g, err, fp);
+        fr.units = sl.int(g, err, fp);
         if fr.ftype == FRAME_TYPE_DIFFUSION_AUGMENTED {
-            fr.dx = fio::znz_read_double(g, err, fp);
-            fr.dy = fio::znz_read_double(g, err, fp);
-            fr.dz = fio::znz_read_double(g, err, fp);
-            fr.dr = fio::znz_read_double(g, err, fp);
-            fr.dp = fio::znz_read_double(g, err, fp);
-            fr.ds = fio::znz_read_double(g, err, fp);
-            fr.bvalue = fio::znz_read_double(g, err, fp);
-            fr.tm = fio::znz_read_double(g, err, fp);
-            fr.d1_ramp = fio::znz_read_long(g, err, fp);
-            fr.d1_flat = fio::znz_read_long(g, err, fp);
-            fr.d1_amp = fio::znz_read_double(g, err, fp);
-            fr.d2_ramp = fio::znz_read_long(g, err, fp);
-            fr.d2_flat = fio::znz_read_long(g, err, fp);
-            fr.d2_amp = fio::znz_read_double(g, err, fp);
-            fr.d3_ramp = fio::znz_read_long(g, err, fp);
-            fr.d3_flat = fio::znz_read_long(g, err, fp);
-            fr.d3_amp = fio::znz_read_double(g, err, fp);
-            fr.d4_ramp = fio::znz_read_long(g, err, fp);
-            fr.d4_flat = fio::znz_read_long(g, err, fp);
-            fr.d4_amp = fio::znz_read_double(g, err, fp);
+            fr.dx = sl.double(g, err, fp);
+            fr.dy = sl.double(g, err, fp);
+            fr.dz = sl.double(g, err, fp);
+            fr.dr = sl.double(g, err, fp);
+            fr.dp = sl.double(g, err, fp);
+            fr.ds = sl.double(g, err, fp);
+            fr.bvalue = sl.double(g, err, fp);
+            fr.tm = sl.double(g, err, fp);
+            fr.d1_ramp = sl.long(g, err, fp);
+            fr.d1_flat = sl.long(g, err, fp);
+            fr.d1_amp = sl.double(g, err, fp);
+            fr.d2_ramp = sl.long(g, err, fp);
+            fr.d2_flat = sl.long(g, err, fp);
+            fr.d2_amp = sl.double(g, err, fp);
+            fr.d3_ramp = sl.long(g, err, fp);
+            fr.d3_flat = sl.long(g, err, fp);
+            fr.d3_amp = sl.double(g, err, fp);
+            fr.d4_ramp = sl.long(g, err, fp);
+            fr.d4_flat = sl.long(g, err, fp);
+            fr.d4_amp = sl.double(g, err, fp);
         }
     }
 
@@ -1091,15 +1137,18 @@ impl<'a> FsTagsIo<'a> {
     }
 
     /// `read_gcamorph_meta(...)`: two `int`s and a `float` (as a `double`).
+    /// FS-167: one slot for the three (no call between them in the official build).
     pub fn read_gcamorph_meta(&mut self, g: &mut Globals, err: &mut dyn Write) -> (i32, i32, f64) {
-        let a = fio::znz_read_int(g, err, self.fp);
-        let b = fio::znz_read_int(g, err, self.fp);
-        let c = f64::from(fio::znz_read_float(g, err, self.fp));
+        let mut slot = fio::Slot49::new();
+        let a = fio::znz_read_int_in(g, err, self.fp, &mut slot);
+        let b = fio::znz_read_int_in(g, err, self.fp, &mut slot);
+        let c = f64::from(fio::znz_read_float_in(g, err, self.fp, &mut slot));
         (a, b, c)
     }
 
     /// `read_gcamorph_labels(x0, y0, z0, labels)`: `x0 * y0 * z0` `int`s into
-    /// `labels[(x * y0 + y) * z0 + z]` (values beyond `labels` read and dropped).
+    /// `labels[(x * y0 + y) * z0 + z]` (values beyond `labels` read and dropped); a label the file
+    /// cuts keeps the earlier label's bytes (FS-167).
     pub fn read_gcamorph_labels(
         &mut self,
         g: &mut Globals,
@@ -1110,8 +1159,10 @@ impl<'a> FsTagsIo<'a> {
         labels: &mut [i32],
     ) -> i32 {
         let n = (x0.max(0) as usize) * (y0.max(0) as usize) * (z0.max(0) as usize);
+        // FS-167: one slot for every label (a loop of reads with no other call)
+        let mut slot = fio::Slot49::new();
         for i in 0..n {
-            let v = fio::znz_read_int(g, err, self.fp);
+            let v = fio::znz_read_int_in(g, err, self.fp, &mut slot);
             if let Some(p) = labels.get_mut(i) {
                 *p = v;
             }
@@ -1137,10 +1188,12 @@ impl<'a> FsTagsIo<'a> {
         mri: &mut Mri,
         dlen: i64,
     ) -> i32 {
-        mri.te = fio::znz_read_float(g, err, self.fp);
-        mri.ti = fio::znz_read_float(g, err, self.fp);
-        mri.flip_angle = fio::znz_read_double(g, err, self.fp);
-        mri.field_strength = fio::znz_read_float(g, err, self.fp);
+        // FS-167: the floats share one slot, which the double's read does not reach (relay 42)
+        let mut sl = FrameSlots::default();
+        mri.te = sl.float(g, err, self.fp);
+        mri.ti = sl.float(g, err, self.fp);
+        mri.flip_angle = sl.double(g, err, self.fp);
+        mri.field_strength = sl.float(g, err, self.fp);
         let d = dlen.wrapping_sub(20);
         let mut kept = Vec::new();
         let mut bytesread: i64 = 0;
@@ -1195,7 +1248,9 @@ impl<'a> FsTagsIo<'a> {
         err: &mut dyn Write,
         vg: &mut VolGeom,
     ) -> i32 {
-        let mut f = || fio::znz_read_float(g, err, self.fp);
+        // FS-167: one slot for the twelve (relay 42)
+        let mut slot = fio::Slot49::new();
+        let mut f = || fio::znz_read_float_in(g, err, self.fp, &mut slot);
         vg.x_r = f();
         vg.x_a = f();
         vg.x_s = f();
@@ -1226,15 +1281,17 @@ impl<'a> FsTagsIo<'a> {
         err: &mut dyn Write,
         vg: &mut VolGeom,
     ) -> i32 {
-        vg.s_r = fio::znz_read_float(g, err, self.fp);
-        vg.s_a = fio::znz_read_float(g, err, self.fp);
-        vg.s_s = fio::znz_read_float(g, err, self.fp);
-        vg.width = fio::znz_read_int(g, err, self.fp);
-        vg.height = fio::znz_read_int(g, err, self.fp);
-        vg.depth = fio::znz_read_int(g, err, self.fp);
-        vg.xsize = fio::znz_read_float(g, err, self.fp);
-        vg.ysize = fio::znz_read_float(g, err, self.fp);
-        vg.zsize = fio::znz_read_float(g, err, self.fp);
+        // FS-167: one slot for the nine (relay 42)
+        let mut sl = fio::Slot49::new();
+        vg.s_r = fio::znz_read_float_in(g, err, self.fp, &mut sl);
+        vg.s_a = fio::znz_read_float_in(g, err, self.fp, &mut sl);
+        vg.s_s = fio::znz_read_float_in(g, err, self.fp, &mut sl);
+        vg.width = fio::znz_read_int_in(g, err, self.fp, &mut sl);
+        vg.height = fio::znz_read_int_in(g, err, self.fp, &mut sl);
+        vg.depth = fio::znz_read_int_in(g, err, self.fp, &mut sl);
+        vg.xsize = fio::znz_read_float_in(g, err, self.fp, &mut sl);
+        vg.ysize = fio::znz_read_float_in(g, err, self.fp, &mut sl);
+        vg.zsize = fio::znz_read_float_in(g, err, self.fp, &mut sl);
         if Self::info(g) {
             vol_geom::geomprint(
                 out,

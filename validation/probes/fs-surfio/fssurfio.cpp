@@ -7176,6 +7176,176 @@ void dfm_case()
   }
 }
 
+// ptc (relay 45 of track D): the patch readers MRISreadPatchNoRemove and MRISreadPatch on a
+// surface read by MRISread, with the case's input files (ASCII and binary patches, labels, volumes,
+// GIFTI files); rip, border, move and patch-write operations; after each the surface.
+static void ptc_dump(MRIS *s)
+{
+  oi(s->nvertices); oi(s->nfaces); oi(s->patch); oi(s->status); of(s->total_area);
+  of(s->xlo); of(s->xhi); of(s->ylo); of(s->yhi); of(s->zlo); of(s->zhi);
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->x); of(x->y); of(x->z); of(x->nx); of(x->ny); of(x->nz); of(x->area);
+    oi(x->ripflag); oi(x->border);
+    oi(s->vertices_topology[v].num); oi(s->vertices_topology[v].vnum);
+  }
+  for (int f = 0; f < s->nfaces; f++) { oi(s->faces[f].ripflag); of(s->faces[f].area); }
+}
+
+void ptc_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  if (geti()) Gdiag |= DIAG_SHOW;
+  Gdiag_no = geti();
+  if (geti()) setenv("FS_POSIX", "1", 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), b = geth();
+    FILE *f = fopen(name.c_str(), "wb");
+    if (!f) fail("an input file");
+    fwrite(b.data(), 1, b.size(), f);
+    fclose(f);
+  }
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    errno = 0;
+    if (op == "rip") s->vertices[geti()].ripflag = 1;
+    else if (op == "bd") s->vertices[geti()].border = 1;
+    else if (op == "jit") {
+      float a = getf();
+      for (int v = 0; v < s->nvertices; v++) {
+        s->vertices[v].x += a * (float)(((v * 7) % 5) - 2);
+        s->vertices[v].y += a * (float)(((v * 3) % 7) - 3);
+        s->vertices[v].z += a * (float)(((v * 5) % 3) - 1);
+      }
+    } else if (op == "wp") oi(MRISwritePatch(s, name_tok()));
+    else if (op == "nr" || op == "rp") {
+      const char *n = name_tok();
+      bool tkr = geti() != 0;
+      oi(op == "nr" ? MRISreadPatchNoRemove(s, n, tkr) : MRISreadPatch(s, n, tkr));
+    } else fail("ptc op");
+    ptc_dump(s);
+  }
+}
+
+// smp (relay 45 of track D): MRISsampleFaceCoordsCanonical, the sampled energies (their
+// INTEGRATION_PARMS holding the face table only), mrisDirectionTriangleIntersection,
+// MRISdistanceToSurface and mrisFindAllOverlappingFaces on a surface read by MRISread, after the
+// case's set-up operations; at the end each vertex's position and face.
+void smp_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  s->radius = getd();
+  s->avg_vertex_dist = getd();
+  INTEGRATION_PARMS parms;
+  MRIS_HASH_TABLE *mht = NULL;
+  static int flist[MAX_INT_FACES];
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    errno = 0;
+    if (op == "sv") oi(MRISsaveVertexPositions(s, geti()));
+    else if (op == "sn") oi(MRISsaveNormals(s, geti()));
+    else if (op == "jit") {
+      float a = getf();
+      for (int v = 0; v < s->nvertices; v++) {
+        s->vertices[v].x += a * (float)(((v * 7) % 5) - 2);
+        s->vertices[v].y += a * (float)(((v * 3) % 7) - 3);
+        s->vertices[v].z += a * (float)(((v * 5) % 3) - 1);
+      }
+    } else if (op == "mht" || op == "vmht") {
+      int which = geti();
+      float res = getf();
+      if (mht) MHTfree(&mht);
+      mht = op == "mht" ? MHTcreateFaceTable_Resolution(s, which, res)
+                        : MHTcreateVertexTable_Resolution(s, which, res);
+    } else if (op == "fno") {
+      int m = geti();
+      for (int v = 0; v < s->nvertices; v++) s->vertices[v].fno = (v * 7) % (s->nfaces + m) - 1;
+    } else if (op == "asg") mrisAssignFaces(s, mht, CANONICAL_VERTICES);
+    else if (op == "rv") { int v = geti(); if (v < s->nvertices) s->vertices[v].ripflag = 1; }
+    else if (op == "rf") { int f = geti(); if (f < s->nfaces) s->faces[f].ripflag = 1; }
+    else if (op == "sfc") {
+      int which = geti();
+      float x = getf(), y = getf(), z = getf(), px, py, pz;
+      oi(MRISsampleFaceCoordsCanonical(mht, s, x, y, z, which, &px, &py, &pz));
+      of(px); of(py); of(pz);
+    } else if (op == "sme" || op == "sne" || op == "sse" || op == "spe") {
+      int vno = geti();
+      float x = getf(), y = getf(), z = getf();
+      if (vno >= s->nvertices) { out += "NOV "; continue; }
+      parms.mht = mht;
+      float e = op == "sme" ? mrisSampleMinimizationEnergy(s, vno, &parms, x, y, z)
+              : op == "sne" ? mrisSampleNormalEnergy(s, vno, &parms, x, y, z)
+              : op == "sse" ? mrisSampleSpringEnergy(s, vno, x, y, z, &parms)
+                            : mrisSampleParallelEnergy(s, vno, &parms, x, y, z);
+      of(e);
+    } else if (op == "spv") {
+      int vno = geti();
+      if (vno >= s->nvertices) { out += "NOV "; continue; }
+      parms.mht = mht;
+      of(mrisSampleParallelEnergyAtVertex(s, vno, &parms));
+    } else if (op == "dti") {
+      int src = geti(), excl = geti();
+      double dist = getd();
+      if (src >= s->nvertices) { out += "NOV "; continue; }
+      VERTEX *v = &s->vertices[src];
+      oi(mrisDirectionTriangleIntersection(s, v->x, v->y, v->z, v->nx, v->ny, v->nz, mht, &dist, excl));
+      od(dist);
+    } else if (op == "dts") {
+      int src = geti(), sign = geti();
+      if (src >= s->nvertices) { out += "NOV "; continue; }
+      VERTEX *v = &s->vertices[src];
+      float q = (float)sign;
+      of(MRISdistanceToSurface(s, mht, v->x, v->y, v->z, v->nx * q, v->ny * q, v->nz * q));
+    } else if (op == "fao") {
+      int fno = geti();
+      if (fno >= s->nfaces) { out += "NOF "; continue; }
+      int n = mrisFindAllOverlappingFaces(s, mht, fno, flist);
+      oi(n);
+      for (int i = 0; i < n; i++) oi(flist[i]);
+      for (int f = 0; f < s->nfaces; f++) oi(s->faces[f].ripflag);
+    } else fail("smp op");
+  }
+  out += "| ";
+  for (int v = 0; v < s->nvertices; v++) {
+    of(s->vertices[v].x); of(s->vertices[v].y); of(s->vertices[v].z); oi(s->vertices[v].fno);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -7452,6 +7622,10 @@ void run_case()
     prj_case();
   } else if (cmd == "dfm") {
     dfm_case();
+  } else if (cmd == "ptc") {
+    ptc_case();
+  } else if (cmd == "smp") {
+    smp_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

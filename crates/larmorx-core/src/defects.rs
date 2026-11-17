@@ -1913,6 +1913,14 @@ defects! {
         "a closest search of the surface hash table on a table of the other kind (FS-998) reads, for a face number beyond the surface's vertices (or a vertex number beyond its faces), memory outside the surface's vertices (faces): its answer depends on memory contents, or the program crashes";
     FS_999 = "FS-999", "FreeSurfer", true,
         "the closest-vertex and closest-face searches of the surface hash table look for nothing beyond the table (1,000 of its voxels from the origin), although a vertex or face beyond the table is stored at its edge: a point at such a vertex does not find it";
+    FS_1001 = "FS-1001", "FreeSurfer", true,
+        "projecting a surface of the pial status back onto its pial positions (the surface deformation's projection step) crashes the program when the surface carries no face table, or when a vertex has no face within 1,000 mm (a vertex at NaN, a table without faces)";
+    FS_1002 = "FS-1002", "FreeSurfer", true,
+        "flattening a patch (MRISflattenPatch: mris_flatten) with DIAG_SHOW reports the diagnostic vertex (Gdiag_no) without checking that the surface has it (beyond the surface's vertices it reads memory outside them: a report printed from there, or a crash), and crashes the program when that vertex has neighbours but no distances";
+    FS_1003 = "FS-1003", "FreeSurfer", true,
+        "the flattening's report of the diagnostic vertex prints that vertex's original area on every neighbour's line instead of the neighbour's own";
+    FS_1004 = "FS-1004", "FreeSurfer", true,
+        "flattening a patch (MRISflattenPatch: mris_flatten) whose vertex normals sum to zero turns every unripped vertex's position into NaN";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

@@ -29,7 +29,7 @@ type V3 = [f64; 3];
 
 /// `(float) x` of a `double` as x86-64 converts it (`cvtsd2ss`): a NaN keeps its sign and the top
 /// of its payload, quieted.
-pub(crate) fn narrow(x: f64) -> f32 {
+pub fn narrow(x: f64) -> f32 {
     if x.is_nan() {
         let b = x.to_bits();
         f32::from_bits(
@@ -41,7 +41,7 @@ pub(crate) fn narrow(x: f64) -> f32 {
 }
 
 /// `(double) x` of a `float` (`cvtss2sd`): a NaN keeps its sign and payload, quieted.
-fn widen(x: f32) -> f64 {
+pub fn widen(x: f32) -> f64 {
     if x.is_nan() {
         let b = x.to_bits();
         f64::from_bits(

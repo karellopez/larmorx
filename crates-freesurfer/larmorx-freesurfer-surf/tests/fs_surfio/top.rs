@@ -225,7 +225,7 @@ pub(super) fn top_tokens(t: &mut Vec<String>, g: &mut Gen) {
     outer.append(&mut ops);
 }
 
-fn dump(s: &Mris, o: &mut Out) {
+pub(super) fn dump(s: &Mris, o: &mut Out) {
     for x in [
         i64::from(s.nvertices),
         i64::from(s.nfaces),

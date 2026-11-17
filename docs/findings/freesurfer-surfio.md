@@ -2169,3 +2169,99 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_de
   retessellated vertices (`mrisurf_defect.cpp` 8866, recon-all's default path); `mris_make_surfaces`
   1617, 1763, 4869, 5130; `mrisurf_mri.cpp` 706; `mris_smooth` 163 (its marked-vertex option);
   `mrisurf_deform.cpp` 4003-4004, 4064, 4135, 5382.
+
+## 40. mrishash.cpp's closest searches (relay 43 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrishash.cpp` 999-1029
+(`BruteForceClosestFace`), 1497-1634 (the two bucket scans), 1636-1877 (`findClosestVertexGeneric`),
+1922-2162 (`findClosestFaceNoGeneric`), 2165-2300 (`findClosestSetVertexNo`, `findClosestVertexNoXYZ`,
+`findVnoOfClosestVertexInTable`, `mhtBruteForceClosestVertex`), 2423-2562 (the public functions) into
+`crates-freesurfer/larmorx-freesurfer-surf/src/mhtfind.rs`.
+
+- **The dead fallback** (FS-997): `findClosestVertexNoXYZ` (2197-2223) tests `if (-1 == rslt)` where
+  `rslt` is `findClosestVertexGeneric`'s return, which is `NO_ERROR` on every path (its only `return`,
+  1876); the brute-force search after it ("brf - should always find one that is closest") never runs.
+  The callers test the vertex for -1: `mri_surf2volseg.cpp` 738-780 (`if(lhwvtx < 0) dlhw = 1e10`),
+  `mri_aparc2aseg.cpp` 665-673, `mri2.cpp` 4774-5190, `label.cpp` 3656 and 3736 (`min_vno >= 0`),
+  `mrisutils.cpp` 2603 (`dminsurf < l2s->dmax`): the "far" answer is the design they rely on. Rule C.
+- **Unchecked kinds** (FS-998, FS-576): `MHTfindClosestVertexGeneric` (2423), `MHTfindClosestVertexNo2`
+  (2493), `MHTfindClosestVertexSet2` (2520), `MHTfindClosestVertexInTable` (2536) and
+  `MHTfindClosestFaceGeneric` (2546, its check commented out: "seen to fail when VerticesAndSurface")
+  call the table's methods with no `checkConstructed*`. The bucket scans read `surface.vertices(bin->fno)`
+  or `f[fno]` and `surface.faces(fno)` with no bound. Every caller of the generic vertex search in
+  8.2.0 builds a vertex table (`mrisurf_compute_dxyz.cpp` 4878, `mrisurf_sseTerms.cpp` 1394,
+  `mrisurf_deform.cpp` 1693, `mris_compVolFrac.cpp` 81, at 10 mm), every face-search caller a face
+  table (`mrisurf_integrate.cpp` 2179, `mrisurf_deform.cpp` 4276, ...), so the defaults change no
+  recorded run.
+- **The probe beyond the table** (FS-999): `acqBucket` (671-689) returns NULL outside 0..1999 while
+  `mhtAddFaceOrVertexAtVoxIx` coerces stores onto the edge. The searches' `probex_vox + xv` are plain
+  `int` sums (signed overflow far outside the table: the object code adds and wraps; nothing is found
+  either way).
+- **The object code** (`mrishash.cpp.o` of the unit oracle, `SurfaceFromMRIS::XYZPosition`'s
+  instantiation, the one `MHTcreate*` of an `MRIS *` builds): the squared distances are
+  `((tx - px)^2 + (ty - py)^2) + (tz - pz)^2` with the left operand the destination everywhere
+  (`subsd mem`, `mulsd x,x`, `addsd`); `comisd` then `jae` skips (a NaN distance is taken, and replaces
+  any best); `minsd` lowers the distance limit (`max_distance_mm > tempdbl`: NaN kept); the probe's
+  `vol = p / vres + 1000` (`divsd`, `addsd`), `cvttsd2si`; `near8offset = (mod <= 0.5) ? -1 : 0`
+  through `comisd` and `setae` (a NaN place gives 0). `BruteForceClosestFace` sums the centroid from
+  `0.0f`, divides by `3.0f`, and its `sqrt(min_dsq)` is an inline `sqrtss` (the `sqrtf` call only for
+  `errno` on a negative input). The centroid of the face search is read through the non-inlined
+  `mhtFaceCentroid2xyz_float` before the barycentric test (`face_barycentric_coords_template`, its
+  corners through `which_coords`, then `mrisurf_metricProperties.cpp`'s array form: `props2`'s).
+- **Speed**: FreeSurfer's shells run to the caller's limit when nothing within 1,000 mm can be taken
+  (`MinDistSq` starts at 1e6): `MHTfindClosestFaceGeneric(..., 1000, -1, ...)` at 1 mm on a table with
+  no face near walks 1,000 shells (8 x 10^9 voxels), `mris_register_label_map`'s 8000 mm 4 x 10^12. The
+  port stops at the table's farthest bucket (its box of buckets kept as they are made), the same
+  answer; it knows an empty column from one bit (FreeSurfer's 2000 x 2000 column pointers, 32 MB,
+  as 0.5 MB of bits), and with `reproduce` passes over the shells of a probe beyond the table that
+  reach no voxel of it (a NaN probe's voxel is `INT_MIN`: FreeSurfer walks every shell of nothing
+  up to the caller's limit, 8 x 10^9 voxels at 1,000 mm and 1 mm; the probe's `prj` cases met it
+  after `MRISprojectOntoSphere` with a NaN radius).
+- `MHTfindReportCounts` (469) and its three counters have no caller in 8.2.0: not ported.
+
+## 41. label.cpp's LabelToFlat and the label rips (relay 43 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/label.cpp` 500-530
+(`LabelToFlat`), 629-656 (`LabelRipRestOfSurface`), 662-683 (`LabelRip`), 690-714
+(`LabelRipRestOfSurfaceWithThreshold`) into `labelsurf.rs`.
+
+- `LabelToFlat` builds `MHTcreateVertexTable(mris, CURRENT_VERTICES)` (1 mm) on every call and
+  searches with `MHTfindVnoOfClosestVertexInTable(..., 0)`: one voxel, no global search (§40's
+  searches), so a point farther than 1 mm from every vertex keeps its vertex -1 and its position. The
+  rips ignore `deleted`. `LabelRip`'s `v->ripflag = Outside` stores an `int` in a `char` (truncated).
+- No defect: the four functions read only points within the surface; a label with fewer places than
+  `n_points` would read past its points in FreeSurfer as in every label function (the port's labels
+  hold their places).
+
+## 42. mrisurf_project.cpp (relay 43 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_project.cpp` whole into
+`crates-freesurfer/larmorx-freesurfer-surf/src/project.rs`; the object code (`mrisurf_project.cpp.o` of
+the unit oracle) decides the types:
+
+- `mrisSphericalProjectXYZ`'s `sqrt(SQR(xs) + ...)` takes libstdc++'s `float` overload (`sqrtss`, a
+  `sqrtf` call only for `errno` on a negative input), so `dist` is a `float` root widened; `lambda =
+  DEFAULT_RADIUS / dist` and `xs * lambda` are `double`. `MRISradialProjectOntoEllipsoid`'s `denom` is a
+  `float` root too, though the file declares `extern double sqrt(double)` (after the first functions;
+  the overload still wins). `MRISprojectOntoCylinder`'s `-1.0 + (float)radius / sqrt(x2 + z2)` is
+  compiled as `radius / sqrtf(x2 + z2) - 1.0f` (`subss`: exact, the sum of two floats rounded once
+  either way). `MRISprojectOntoEllipsoid` takes `(float)sqrt((double)(g * g - 4 * f * h))`: glibc's
+  `sqrt`, which sets `errno` to `EDOM` for a negative argument, and the `ErrorPrintf` that follows then
+  prints `Numerical argument out of domain` first (seen in the probe, reproduced).
+- Operand orders (NaN bits): `dx = x * d`, `dy = y * d`, `dz = d * z` in the sphere's and the
+  ellipsoid's moves, the cylinder's `v->x = dx + x`, `v->z = dz + z`; the radial sum `(y-term + x-term)
+  + z-term`; the ellipsoid's `4 * f * h` as `h * (4 f)`, `-g + root` as `root - g`, `2 * f` as `f + f`,
+  its DIAG sum `dz² + (dx² + dy²)`; the sphere's DIAG sum `(dy² + dx²) + dz²` then `sqrt + total`.
+- `DEFAULT_A`, `DEFAULT_B`, `DEFAULT_C` are all 122.0 (one `.LC17`). `FZERO(a)` and the status tests
+  compare in `float`; the sphere's `FZERO(r)` and `FZERO(dist)` in `double` (`fabs` calls).
+- `MRISprojectOntoEllipsoid`'s failure returns `MRISradialProjectOntoEllipsoid(mris_src, mris_dst, ...)`
+  from inside its loop: with `(mris, mris)` the vertices before the failing one stay projected
+  orthographically and are then projected radially from there; no `avgdist` line, the ellipsoid's
+  `MRISupdateEllipsoidSurface` once (the radial one's).
+- `mrisAssignFaces` (an OpenMP loop under `if_ROMP(experimental)`, each vertex alone) moves each
+  vertex onto the sphere first (`project_point_onto_sphere` inlined: `dx = x * d`, ..., `dz = d * z`;
+  the results equal `base`'s order, as the subtraction takes the coordinate's NaN first) and ignores
+  `which_vertices`.
+- No defect of their own: the cylinder and the ellipsoid print their errors and go on with what they
+  computed; the crashes the probe meets after them (a cylinder of a surface with vertices on its axis,
+  then `MRISupdateSurface`) are the metric properties' known ones (FS-06, FS-121).

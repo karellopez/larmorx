@@ -11,7 +11,9 @@
 //! (`ar`), `LabelFillMarked` (`fm`), `LabelErode` (`er`), `LabelDilate` (`di`), `MRISlabel2Mask`
 //! (`l2m`), `MRISlabelInvert` (`inv`) and since relay 38 `LabelRemoveIslandsSurf` (`ri`),
 //! `LabelRemoveHolesSurf` (`rh`) and `LabelRemoveHolesAndIslandsSurf` (`rhi`), with some
-//! vertices' `stat` set first; an operation whose label has a point FreeSurfer would
+//! vertices' `stat` set first; since relay 43 `LabelToFlat` (`tf`), `LabelRipRestOfSurface`
+//! (`rr`), `LabelRipRestOfSurfaceWithThreshold` (`rrt`) and `LabelRip` (`rp`), the rips followed
+//! by the surface's topology (top's dump); an operation whose label has a point FreeSurfer would
 //! read or write outside the surface's vertices or the label's places for (FS-630, FS-631) is written
 //! `G` on both sides;
 //! after each the label (every place), the marks and the index table: the generator and the
@@ -102,7 +104,17 @@ pub(super) fn lbl_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let nops = g.int(1, 4);
     ix(t, nops);
     for _ in 0..nops {
-        match g.below(16) {
+        match g.below(20) {
+            16 => t.push("tf".into()),
+            17 => t.push("rr".into()),
+            18 => {
+                t.push("rrt".into());
+                fv(t, g.pick(&[0.0, 0.5, -1.0, 2.0, f32::NAN]));
+            }
+            19 => {
+                t.push("rp".into());
+                ix(t, g.pick(&[0, 1, 1, 2]));
+            }
             13 => t.push("ri".into()),
             14 => t.push("rh".into()),
             15 => t.push("rhi".into()),
@@ -285,7 +297,10 @@ pub(super) fn lbl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     for _ in 0..nops {
         let op = t.next();
         o.s(op);
+        // relay 43: LabelRipRestOfSurfaceWithThreshold's threshold, LabelRip's Outside
+        let thr = if op == "rrt" { t.f() } else { 0.0 };
         let args: Vec<i32> = match op {
+            "rp" => vec![t.i()],
             "er" => vec![t.i()],
             "di" => vec![t.i(), t.i()],
             "l2m" => {
@@ -300,6 +315,18 @@ pub(super) fn lbl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             continue;
         }
         match op {
+            "tf" => o.i(i64::from(labelsurf::label_to_flat(g, io.err, &mut a, &s)?)),
+            "rr" | "rrt" => {
+                let th = (op == "rrt").then_some(thr);
+                o.i(i64::from(labelsurf::label_rip_rest_of_surface(
+                    g, sg, &mut io, &mut a, &mut s, th,
+                )?));
+                super::top::dump(&s, o);
+            }
+            "rp" => {
+                o.i(i64::from(labelsurf::label_rip(&mut s, &a, args[0])));
+                super::top::dump(&s, o);
+            }
             "ri" | "rh" | "rhi" => {
                 let l = match op {
                     "ri" => Some(labelsurf::label_remove_islands_surf(

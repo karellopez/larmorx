@@ -115,6 +115,14 @@ impl Process {
         cr: fn(f64) -> f64,
         glibc: fn(f64) -> f64,
     ) -> f64 {
+        // once GLIBC-07 is noted (one notice per defect) only the mode's function is needed
+        if self.noted(&GLIBC_07) {
+            return if self.mode().reproduce() {
+                glibc(x)
+            } else {
+                cr(x)
+            };
+        }
         let (a, b) = (cr(x), glibc(x));
         self.libm_pick(
             name,

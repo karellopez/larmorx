@@ -273,6 +273,22 @@ impl Call {
         true
     }
 
+    /// An ordinary character of the format: read when the input's next character is it (a
+    /// mismatch leaves that character unread); false at a mismatch or the end of the input.
+    pub(crate) fn lit(&mut self, p: &mut Process, s: &mut CStream, c: u8) -> bool {
+        match s.peek() {
+            Some(x) if x == c => {
+                s.pos += 1;
+                true
+            }
+            Some(_) => false,
+            None => {
+                self.meet(p, false);
+                false
+            }
+        }
+    }
+
     /// White space in the format that reads (not just before a conversion).
     pub(crate) fn ws(&mut self, p: &mut Process, s: &mut CStream) {
         s.skip_space();

@@ -164,9 +164,17 @@ impl Process {
         std::mem::replace(&mut self.notices, Notices::new(self.mode))
     }
 
-    /// Notes that `defect` changed this result (or would have).
+    /// Notes that `defect` changed this result (or would have). The notices keep one per defect,
+    /// the first: a defect already noted is not noted again (nothing is made for it).
     pub fn note(&mut self, defect: &'static Defect, detail: impl Into<String>) {
-        self.notices.add(defect, detail);
+        if !self.notices.contains(defect) {
+            self.notices.add(defect, detail);
+        }
+    }
+
+    /// Whether `defect` has been noted (a loop's note made only once).
+    pub(crate) fn noted(&self, defect: &Defect) -> bool {
+        self.notices.contains(defect)
     }
 
     /// Standard output.

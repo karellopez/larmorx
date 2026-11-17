@@ -2,10 +2,11 @@
 //! Golden cases of fs.volume's clean room (`specs/freesurfer-volume.md` §69.5, CLAUDE.md rule
 //! 10): every command of the black-box probe's grammar (`tests/volume_cmd/`, the comparison's
 //! candidate commands) on seeded arguments, in both defect modes, one SHA-256 per group of the
-//! spec's parts 1 to 3 over every result line (the printed values, both streams and the notices;
+//! spec's parts 1 to 4 over every result line (the printed values, both streams and the notices;
 //! NaN bits included), recorded on Linux x86-64 and checked on every platform. The arguments
 //! come from a seeded generator and plain arithmetic (special values written as their bits); no
-//! file system, no clock; volumes of at most 3 x 3 x 3 voxels and 2 frames.
+//! file system (the transform reader reads an in-memory file, `ltamem`), no clock; volumes of at
+//! most 3 x 3 x 3 voxels and 2 frames, but the head's box (24 voxels a side at most).
 //!
 //! Record: `FS_CORE_GOLDEN_RECORD=1 cargo test -p larmorx-fs-core --test golden_volume --
 //! --nocapture` prints `GOLDEN <case> <sha256>` for each case instead of checking it
@@ -52,12 +53,28 @@ const GOLDEN: &[(&str, &str)] = &[
         "eff5c60c6afce0c9de814c3eff622b7c813d358bc5fe1ac826fcaff498b29a27",
     ),
     (
+        "ltaread.fix",
+        "f621de853e2dcd747f84e2f61c5702f2d15887a9ad88491d5367526baad5a2ed",
+    ),
+    (
+        "ltaread.reproduce",
+        "2198c4b1387b545571736975e9c58a8c408a7ef55e8451d4a90475bbd65c69c0",
+    ),
+    (
         "make.fix",
         "519f882b37c16080e5093bf34215636cb699ff378f32132fbc0a7e9dcefc1a6d",
     ),
     (
         "make.reproduce",
         "062a41326d5cd141784149f7ec16a87a6c7af9ccd170f2cf30ddb6a1bd89124a",
+    ),
+    (
+        "move.fix",
+        "d295d9fb2481dabcbb006a1d6811ad1628b49d6add4fd30ad48d7cede29c880a",
+    ),
+    (
+        "move.reproduce",
+        "6ca697b19faca2478c8fb3079b0f5077947c1eb143f78a3adb01f57b822d0b81",
     ),
     (
         "range.fix",
@@ -68,12 +85,28 @@ const GOLDEN: &[(&str, &str)] = &[
         "c31f9b9c01131e00264322bfb1cd240669e0937061a95d873c28e9efe49edc81",
     ),
     (
+        "sample.fix",
+        "646f2067c3589ba8fc2b39e328bc405b56d222e8cfd5cb7bd7ee79fecbbc6380",
+    ),
+    (
+        "sample.reproduce",
+        "db299f895480701cb0e4ffbf4e28d9bc0ec2b2df076e5f34d1c72f0d253d144f",
+    ),
+    (
         "scale.fix",
         "e1f06d371b6767026d91f38f6dc581e483fc618bd7e96b90f912474e99a78fbc",
     ),
     (
         "scale.reproduce",
         "d21bf3e8b13dda0669abfda0a6b8f9913ac33a2e32abfae343838e97d471c67e",
+    ),
+    (
+        "skull.fix",
+        "8506eb23d287baef3bff5788cc511816760fff645c16ecd778d40faa0a234080",
+    ),
+    (
+        "skull.reproduce",
+        "133c3862398bc90e0a67fec0af190af948a53345e816c7779bfb44e7ff713f5a",
     ),
     (
         "stats.fix",
@@ -346,6 +379,46 @@ impl G {
             }
             3 => self.w(ALL),
             _ => "other".to_owned(),
+        }
+    }
+}
+
+impl G {
+    /// A sampling coordinate (§18): whole, fractional, within `FLT_EPSILON` of whole, past the
+    /// edges, special, beyond the `int` range.
+    fn coord(&mut self) -> String {
+        let v: f64 = match self.below(6) {
+            0 => self.int(-1, 4) as f64,
+            1 => self.int(-2, 8) as f64 / 2.0 + 0.25,
+            2 => {
+                const E: [f64; 4] = [1e-8, -1e-8, 1.192_092_895_507_812_5e-7, 2e-7];
+                self.int(0, 3) as f64 + E[self.below(4) as usize]
+            }
+            3 => self.int(-16, 48) as f64 / 7.0,
+            4 => return self.d(true),
+            _ => [1e10, -2_147_483_648.0, 2_147_483_647.6, -0.5][self.below(4) as usize],
+        };
+        format!("{:016x}", v.to_bits())
+    }
+
+    /// A 3 x 3 matrix (M) of seeded ratios, a permutation with signs, or a singular one.
+    fn mat3(&mut self) -> String {
+        match self.below(4) {
+            0 => {
+                let c = self.cosines(false);
+                format!("3 3 {}", c.join(" "))
+            }
+            1 => "3 3 3f800000 40000000 40400000 40000000 40800000 40c00000 00000000 00000000 3f800000"
+                .to_owned(),
+            _ => {
+                let v: Vec<String> = (0..9)
+                    .map(|_| {
+                        let special = self.one_in(3);
+                        self.f(special)
+                    })
+                    .collect();
+                format!("3 3 {}", v.join(" "))
+            }
         }
     }
 }
@@ -656,6 +729,309 @@ const HEADER: &[(&str, Make)] = &[
     ("dsign", |g| g.d(true)),
 ];
 
+/// `samp <k> W <outside> n (x y z frame aux)×n` (§18).
+fn samp(g: &mut G, k: &str) -> String {
+    let types = if g.one_in(6) { ALL } else { NUMERIC };
+    let a = g.w(types);
+    let n = g.int(1, 3);
+    let mut pts = Vec::new();
+    for _ in 0..n {
+        let aux = match k {
+            "typ" | "fty" => g.pick(&["0", "1", "1", "2", "3", "5", "-1", "7"]),
+            "sinc" | "sincf" => g.pick(&["0", "1", "2", "3", "5", "-1", "70"]),
+            _ => "0",
+        };
+        let (x, y, z) = (g.coord(), g.coord(), g.coord());
+        pts.push(format!("{x} {y} {z} {} {aux}", g.int(0, 3)));
+    }
+    format!("{k} {a} {} {n} {}", g.d(true), pts.join(" "))
+}
+
+const SAMPLE: &[(&str, Make)] = &[
+    ("samp", |g| samp(g, "tri")),
+    ("samp", |g| samp(g, "typ")),
+    ("samp", |g| samp(g, "frm")),
+    ("samp", |g| samp(g, "fty")),
+    ("samp", |g| samp(g, "cub")),
+    ("samp", |g| samp(g, "cubf")),
+    ("samp", |g| samp(g, "sinc")),
+    ("samp", |g| samp(g, "sincf")),
+    ("coef", |g| {
+        let n = g.int(1, 4);
+        let v: Vec<String> = (0..n)
+            .map(|_| format!("{} {}", g.d(true), g.int(-1, 4)))
+            .collect();
+        format!("{n} {}", v.join(" "))
+    }),
+    ("hsinc", |g| {
+        let n = g.int(1, 4);
+        let v: Vec<String> = (0..n)
+            .map(|_| {
+                let fw = g.pick(&["4024000000000000", "4000000000000000", "0000000000000000"]);
+                format!("{} {fw}", g.d(true))
+            })
+            .collect();
+        format!("{n} {}", v.join(" "))
+    }),
+];
+
+const MOVE: &[(&str, Make)] = &[
+    ("trans", |g| {
+        let a = g.w(&[0, 1, 3, 4, 6, 9, 10]);
+        let d = g.dst(&a, false);
+        format!("{a} {d} {} {} {}", g.d(true), g.d(false), g.d(false))
+    }),
+    ("rot", |g| {
+        let a = g.w(&[0, 1, 3, 4, 6, 9, 10]);
+        let d = g.dst(&a, false);
+        let r = if g.one_in(8) {
+            "2 2 3f800000 00000000 00000000 3f800000".to_owned()
+        } else {
+            g.mat3()
+        };
+        let o = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("3 1 {} {} {}", g.f(false), g.f(false), g.f(false))
+        };
+        format!("{a} {d} {r} {o}")
+    }),
+    ("rotx", |g| {
+        let a = g.w(&[0, 3, 4]);
+        let d = g.dst(&a, false);
+        format!(
+            "{a} {d} {}",
+            g.pick(&["3fc90fdb", "3e99999a", "00000000", "7fc00000", "bf800000"])
+        )
+    }),
+    ("roty", |g| {
+        let a = g.w(&[0, 3, 4]);
+        let d = g.dst(&a, false);
+        format!(
+            "{a} {d} {}",
+            g.pick(&["3fc90fdb", "3e99999a", "7f800000", "40000000"])
+        )
+    }),
+    ("rotz", |g| {
+        let a = g.w(&[0, 3, 4]);
+        let d = g.dst(&a, false);
+        format!("{a} {d} {}", g.f(true))
+    }),
+];
+
+/// `skull W thresh n (x0 y0 z0 x1 y1 z1 value)×n` (§20) on a plain volume of 4 to 24 voxels a
+/// side: a bright head with dark margins, a dark inside, painted boxes.
+fn skull(g: &mut G) -> String {
+    let n = if g.one_in(4) {
+        g.int(4, 11)
+    } else {
+        g.int(12, 24)
+    };
+    let dims = [n, if g.one_in(3) { g.int(4, 24) } else { n }, n];
+    let t = g.pick(&["0", "3", "4"]);
+    let fill = g.pick(&["-1", "0", "7"]);
+    let one = "3f800000";
+    let zero = "00000000";
+    let geo = [
+        one, one, one, "1", one, zero, zero, zero, one, zero, zero, zero, one,
+    ];
+    let mut w = format!(
+        "{} {} {} {t} 1 0 {fill} {}",
+        dims[0],
+        dims[1],
+        dims[2],
+        geo.join(" ")
+    );
+    w.push_str(&format!(" {zero} {zero} {zero} {zero} {zero} {zero}"));
+    w.push_str(&format!(" 1 {}", dims[2]));
+    for _ in 0..11 {
+        w.push_str(&format!(" {zero}"));
+    }
+    w.push_str(" 0000000000000000 0 00000000 00000000 0 1 null null");
+    let mut boxes = Vec::new();
+    if dims.iter().all(|&x| x >= 16) {
+        let m: Vec<i64> = dims.iter().map(|&x| g.int(3, x / 4)).collect();
+        let hi: Vec<i64> = dims.iter().map(|&x| x - 1 - g.int(3, x / 4)).collect();
+        boxes.push(format!(
+            "{} {} {} {} {} {} {}",
+            m[0],
+            m[1],
+            m[2],
+            hi[0],
+            hi[1],
+            hi[2],
+            g.pick(&["42f00000", "43480000"])
+        ));
+        if g.one_in(2) {
+            let c: Vec<i64> = (0..3).map(|k| (m[k] + hi[k]) / 2).collect();
+            boxes.push(format!(
+                "{} {} {} {} {} {} {zero}",
+                c[0] - 1,
+                c[1] - 2,
+                c[2] - 1,
+                c[0] + 1,
+                c[1] + 2,
+                c[2] + 1
+            ));
+        }
+    }
+    for _ in 0..g.int(0, 2) {
+        let lo: Vec<i64> = dims.iter().map(|&x| g.int(0, x - 1)).collect();
+        let hi: Vec<i64> = (0..3)
+            .map(|k| (lo[k] + g.int(0, dims[k])).min(dims[k] - 1))
+            .collect();
+        boxes.push(format!(
+            "{} {} {} {} {} {} {}",
+            lo[0],
+            lo[1],
+            lo[2],
+            hi[0],
+            hi[1],
+            hi[2],
+            g.pick(&[
+                "00000000", "41f00000", "42f00000", "437f0000", "c1200000", "7fc00000"
+            ])
+        ));
+    }
+    let th = g.pick(&["-5", "0", "1", "50", "100", "100", "150", "255", "300"]);
+    format!("{w} {th} {} {}", boxes.len(), boxes.join(" "))
+}
+
+const SKULL: &[(&str, Make)] = &[("skull", skull)];
+
+/// Bytes as the probe's string argument.
+fn xs(b: &[u8]) -> String {
+    let mut s = "x".to_owned();
+    for c in b {
+        s.push_str(&format!("{c:02x}"));
+    }
+    s
+}
+
+/// A transform file's text (§21): an `.lta`, an `.xfm`, an FSL matrix or a `register.dat`,
+/// sometimes cut.
+fn transform_text(g: &mut G, kind: u64) -> String {
+    let num = |g: &mut G| format!("{}", g.int(-2000, 2000) as f64 / 1000.0);
+    let row = |g: &mut G| (0..4).map(|_| num(g)).collect::<Vec<_>>().join(" ");
+    let mut t = match kind {
+        0 => {
+            let n = g.pick(&["1", "1", "2", "0", "-1"]);
+            let head = g.pick(&["type      = 1", "type = 21 # x", "typ = 1", "type\t= 14"]);
+            let mut t = format!("# lta\n{head}\nnxforms   = {n}\n");
+            let k: i64 = n.parse().unwrap_or(0);
+            for _ in 0..k.max(0) {
+                t.push_str(&format!("mean      = {} {} {}\n", num(g), num(g), num(g)));
+                t.push_str(&format!("sigma     = {}\n", g.pick(&["1", "1e3", "nan"])));
+                let (r, c) = if g.one_in(5) { (4, 5) } else { (4, 4) };
+                t.push_str(&format!("1 {r} {c}\n"));
+                for _ in 0..r {
+                    let v: Vec<String> = (0..c).map(|_| num(g)).collect();
+                    t.push_str(&format!("{}\n", v.join(" ")));
+                }
+            }
+            for _ in 0..k.max(0) {
+                if g.one_in(2) {
+                    t.push_str("src volume info\nvalid = 1\nfilename = a.mgz\nvolume = 2 3 4\nvoxelsize = 1 1 2\n");
+                    t.push_str("xras   = 1 0 0\nyras   = 0 1 0\nzras   = 0 0 1\ncras   = 1 2 3\n");
+                    t.push_str("dst volume info\nvalid = 0\nfilename = b.mgz\nvolume = 5 5 5\n");
+                }
+            }
+            if g.one_in(2) {
+                t.push_str(&format!("subject {}\n", g.pick(&["bert", "x"])));
+            }
+            if g.one_in(2) {
+                t.push_str(&format!("fscale {}\n", g.pick(&["0.1", "x", "-2"])));
+            }
+            t
+        }
+        1 => {
+            let info = g.pick(&[
+                "%Generated by mritotal src s.mnc dst average_305.mnc",
+                "%Generated by mritotal src there.mnc dst b",
+                "%Generated by x src",
+                "%x minctracc in.mnc there.mnc",
+                "%src.mnc there.mnc",
+            ]);
+            let info2 = g.pick(&["%a.mnc src2.mnc\n", "%a\n%b\n", ""]);
+            let first = g.pick(&["MNI Transform File", "Not MNI"]);
+            format!(
+                "{first}\n{info}\n{info2}\nTransform_Type = Linear;\nLinear_Transform =\n{}\n{}\n{};\n",
+                row(g),
+                row(g),
+                row(g)
+            )
+        }
+        2 => (0..4).map(|_| format!("{}\n", row(g))).collect(),
+        _ => format!(
+            "bert\n{}\n1\n0.15\n{}\n{}\n{}\n{}\n{}",
+            g.pick(&["1", "0.9375"]),
+            row(g),
+            row(g),
+            row(g),
+            row(g),
+            g.pick(&["", "round\n", "tkreg\n", "bad\n"])
+        ),
+    };
+    if g.one_in(8) {
+        let k = g.below(t.len() as u64 + 1) as usize;
+        t.truncate(k);
+    }
+    t
+}
+
+const LTAREAD: &[(&str, Make)] = &[
+    ("tftype", |g| {
+        let names = [
+            "a.lta",
+            "b.XfM",
+            "c.m3z",
+            "d.nii.gz",
+            "nii.gz",
+            "x.fslmat",
+            "y.dat",
+            "noext",
+            "a@lta",
+            "a.lta@xfm#y",
+            "a#b.xfm",
+            "a.",
+            "@",
+            "",
+            "dir.d/file",
+            "a.LtA#.xfm",
+        ];
+        let n = g.int(1, 4);
+        let v: Vec<String> = (0..n)
+            .map(|_| xs(names[g.below(names.len() as u64) as usize].as_bytes()))
+            .collect();
+        format!("{n} {}", v.join(" "))
+    }),
+    ("ltamem", |g| {
+        let kind = g.below(5);
+        let (name, text) = match kind {
+            0 => (g.pick(&["t.lta", "t", "t.m3z"]), Some(transform_text(g, 0))),
+            1 => ("t.xfm", Some(transform_text(g, 1))),
+            2 => ("t.fslmat", Some(transform_text(g, 2))),
+            3 => (g.pick(&["t.dat", "t.reg"]), Some(transform_text(g, 3))),
+            _ => (
+                g.pick(&[
+                    "identity.nofile",
+                    "d/identity.nofile",
+                    "none.lta",
+                    "none.dat",
+                ]),
+                None,
+            ),
+        };
+        let text = text.map_or("nofile".to_owned(), |t| xs(t.as_bytes()));
+        let vol = if g.one_in(2) {
+            format!("{} {}", xs(b"there.mnc"), g.geom(false))
+        } else {
+            "none".to_owned()
+        };
+        format!("{} {text} {} {vol}", xs(name.as_bytes()), g.int(0, 2))
+    }),
+];
+
 fn group(name: &str, table: &[(&str, Make)], per: usize) {
     let seed = name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
@@ -731,4 +1107,24 @@ fn statistics() {
 #[test]
 fn headers() {
     group("header", HEADER, 8);
+}
+
+#[test]
+fn samplers() {
+    group("sample", SAMPLE, 8);
+}
+
+#[test]
+fn moves() {
+    group("move", MOVE, 6);
+}
+
+#[test]
+fn head_box() {
+    group("skull", SKULL, 24);
+}
+
+#[test]
+fn transform_reader() {
+    group("ltaread", LTAREAD, 24);
 }

@@ -1875,6 +1875,10 @@ defects! {
         "dilating a vertex to a target sum (MRISdilateVertexToSum, mri_binarize --dilate-vertex-sum) counts the vertices of all its passes together, so it reports the target as not possible once its passes together have counted as many vertices as the surface has, though the last pass's disk holds fewer (a disk of a few hundred vertices on a whole hemisphere is still found; on a small surface the dilation stops early); when the vertex's part of the surface is used up before the target is reached it goes on with a pass for every vertex it counted, each pass over the whole part";
     FS_983 = "FS-983", "FreeSurfer", true,
         "dilating a vertex to a target sum (MRISdilateVertexToSum) with a target that needs no pass (not above 0 with a measure given, or not a number) builds its mask from hop lists of no hops: the program crashes";
+    FS_984 = "FS-984", "FreeSurfer", true,
+        "ripping a surface's unknown vertices (MRISripUnknown: mri_gtmpvc's surfaces) and the confined dilation of a surface mask with an annotation to stay in (MRISdilateConfined), for a surface without a colour table, decide each vertex by a colour-table index the program never computed (memory contents): the vertices ripped or dilated are arbitrary";
+    FS_985 = "FS-985", "FreeSurfer", true,
+        "the confined dilation of a surface mask with a new annotation (MRISdilateConfined) and the label of an annotation (MRISannotation_to_label: mris_hausdorff_dist) take the annotation of a colour-table index the table does not hold (no table, an index outside it or an empty place) from memory never written: the dilated vertices get an arbitrary annotation, and the label holds the vertices of an arbitrary one (or the program crashes)";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

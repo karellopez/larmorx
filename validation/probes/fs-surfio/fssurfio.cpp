@@ -6126,6 +6126,8 @@ static void vlr_dump(MRIS *s)
     VERTEX *x = &s->vertices[v];
     oi(x->ripflag); oi(x->border); oi(x->annotation); oi(x->undefval); of(x->curv); of(x->tx);
     of(x->area);
+    of(x->val); of(x->val2); of(x->origarea); of(x->mean); of(x->mean_imag); of(x->std_error);
+    oi(x->marked);
     VALS_VP *vp = (VALS_VP *)x->vp;
     if (!vp) { out += "N "; continue; }
     oi(vp->nvals);
@@ -6158,6 +6160,9 @@ void vlr_case()
     x->ripflag = (char)geti();
     x->annotation = geti();
     x->curv = getf();
+    x->val = getf(); x->val2 = getf(); x->origarea = getf(); x->mean = getf(); x->mean_imag = getf();
+    x->std_error = getf();
+    x->marked = (short)geti();
     int nvals = geti();
     if (nvals >= 0) {
       VALS_VP *vp = (VALS_VP *)calloc(1, sizeof(VALS_VP));
@@ -6185,6 +6190,7 @@ void vlr_case()
   }
   s->ct = ann_ctab();
   Gdiag_no = geti();
+  setenv("FREESURFER_SEED", std::to_string(geti()).c_str(), 1);
   int vmode = geti();
   MRI *measure = NULL;
   if (vmode > 0) {
@@ -6197,7 +6203,34 @@ void vlr_case()
     std::string op = next();
     out += op + " ";
     fflush(stdout);
-    if (op == "MRISmodeFilterAnnotations") oi(MRISmodeFilterAnnotations(s, geti()));
+    // a colour-table index with an annotation
+    auto has = [&](int i) { return s->ct && i >= 0 && i < s->ct->nentries && s->ct->entries[i]; };
+    if (op == "MRISripZeros") oi(MRISripZeros(s, geti() == 1 ? measure : NULL));
+    else if (op == "MRISripUnknown") {
+      if (!s->ct && nv > 0) { out += "G "; continue; }
+      oi(MRISripUnknown(s));
+    } else if (op == "MRISdilateConfined") {
+      int annotidmask = geti(), niters = geti(), newid = geti(), ty = geti();
+      MRI *mask = MRIallocSequence(nv, 1, 1, ty, 1);
+      for (int c = 0; c < nv; c++) MRIsetVoxVal(mask, c, 0, 0, 0, getf());
+      if ((annotidmask > -1 && !s->ct && nv > 0) || (newid > 0 && !has(newid))) { out += "G "; continue; }
+      mpf_vol(MRISdilateConfined(s, mask, annotidmask, niters, newid));
+    } else if (op == "MRISaccumulateMeansOnSurface") { int a = geti(), b = geti(); oi(MRISaccumulateMeansOnSurface(s, a, b)); }
+    else if (op == "MRISaccumulateImaginaryMeansOnSurface") { int a = geti(), b = geti(); oi(MRISaccumulateImaginaryMeansOnSurface(s, a, b)); }
+    else if (op == "MRISaccumulateStandardErrorsOnSurface") { int a = geti(), b = geti(); oi(MRISaccumulateStandardErrorsOnSurface(s, a, b)); }
+    else if (op == "MRISclearWhichAndVal2") MRISclearWhichAndVal2(s, geti());
+    else if (op == "MRISmarkRandomVertices") oi(MRISmarkRandomVertices(s, getf()));
+    else if (op == "MRISannotation_to_label") {
+      int i = geti();
+      if (!has(i)) { out += "G "; continue; }
+      LABEL *l = MRISannotation_to_label(s, i);
+      if (!l) out += "NULL ";
+      else {
+        oi(l->n_points); oi(l->max_points); oh(l->name);
+        for (int k = 0; k < l->n_points; k++) oi(l->lv[k].vno);
+      }
+    }
+    else if (op == "MRISmodeFilterAnnotations") oi(MRISmodeFilterAnnotations(s, geti()));
     else if (op == "MRISdilateRipped") oi(MRISdilateRipped(s, geti()));
     else if (op == "MRISerodeRipped") oi(MRISerodeRipped(s, geti()));
     else if (op == "MRISsetRipInFacesWithRippedVertices") MRISsetRipInFacesWithRippedVertices(s);

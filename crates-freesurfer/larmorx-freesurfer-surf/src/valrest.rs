@@ -55,15 +55,21 @@
 //!   summed) on standard output and returns no mask.
 
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use larmorx_core::defects::{FS_978, FS_979, FS_980, FS_981, FS_982, FS_983};
+use larmorx_core::defects::{FS_978, FS_979, FS_980, FS_981, FS_982, FS_983, FS_984, FS_985};
 use larmorx_freesurfer_core::cstd::{fmt_f, format_double};
+use larmorx_freesurfer_core::diag;
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_NOMEMORY, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_NOMEMORY, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::random::random_number;
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_io::annotation::{self, AnnotationTables};
+use larmorx_freesurfer_io::colortab;
+use larmorx_freesurfer_io::label::{Label, label_alloc};
+use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
@@ -616,4 +622,296 @@ pub fn dilate_vertex_to_sum(
         }
     }
     Ok(Some(mask))
+}
+
+// ---- the rest: rips by value and annotation, the confined dilation, the accumulations --------
+
+/// `MRISripZeros(surf, mri)`: every unripped vertex ripped (flag 1) whose value is below 1e-5 in
+/// magnitude: frame 0 of the volume's column of that vertex, or its `val` without a volume. 1
+/// after `ERROR: MRISripZeros(): dimension mismatch` (standard output) for a volume whose width is
+/// not the vertex count; else 0.
+pub fn rip_zeros(
+    g: &mut Globals,
+    io: &mut Io,
+    surf: &mut Mris,
+    mri: Option<&Mri>,
+) -> Result<i32, Fatal> {
+    if let Some(m) = mri
+        && m.vg.width != surf.nvertices
+    {
+        let _ = writeln!(io.out, "ERROR: MRISripZeros(): dimension mismatch");
+        return Ok(1);
+    }
+    for k in 0..nverts(surf) {
+        if surf.vertex(k).ripflag != 0 {
+            continue;
+        }
+        let v = match mri {
+            Some(m) => f64::from(mri_get_vox_val(g, io.err, m, k as i32, 0, 0, 0, 0)?),
+            None => f64::from(surf.vertex(k).val),
+        };
+        if v.abs() < 1e-5 {
+            surf.vertex_mut(k).ripflag = 1;
+        }
+    }
+    Ok(0)
+}
+
+/// A vertex annotation's colour-table index (`CTABfindAnnotation`): the first entry of its
+/// colour, or -1. FS-984: without a colour table FreeSurfer reports `CTABfindAnnotation: ct was
+/// NULL` and reads an index it never wrote; both modes take -1 (noted).
+fn find_annotation(g: &mut Globals, err: &mut dyn Write, mris: &Mris, annot: i32, who: &str) -> i32 {
+    match mris.ct.as_ref() {
+        Some(ct) => colortab::ctab_find_annotation(ct, annot),
+        None => {
+            log::error_printf(g, err, ERROR_BADPARM, "CTABfindAnnotation: ct was NULL");
+            g.notices.add(
+                &FS_984,
+                format!(
+                    "{who}: a surface without a colour table: its annotations' index taken as -1 (FreeSurfer reads one it never wrote)"
+                ),
+            );
+            -1
+        }
+    }
+}
+
+/// `MRISripUnknown(surf)`: every vertex (ripped ones too) ripped whose annotation's colour-table
+/// index is 0 or -1 (not in the table). 0. FS-984.
+pub fn rip_unknown(g: &mut Globals, err: &mut dyn Write, surf: &mut Mris) -> i32 {
+    for vtxno in 0..nverts(surf) {
+        let annot = surf.vertex(vtxno).annotation;
+        let annotid = find_annotation(g, err, surf, annot, "MRISripUnknown");
+        if annotid == 0 || annotid == -1 {
+            surf.vertex_mut(vtxno).ripflag = 1;
+        }
+    }
+    0
+}
+
+/// An annotation of a colour-table index (`CTABannotationAtIndex`): `None` after its messages
+/// (`CTABannotationAtIndex: ct was NULL`, `... index <i> was OOB`; none for an empty place), with
+/// FS-985: FreeSurfer then goes on with an annotation it never wrote.
+fn annotation_at(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mris: &Mris,
+    index: i32,
+    who: &str,
+) -> Option<i32> {
+    let a = match mris.ct.as_ref() {
+        Some(ct) => colortab::ctab_annotation_at_index(g, err, ct, index).ok(),
+        None => {
+            log::error_printf(g, err, ERROR_BADPARM, "CTABannotationAtIndex: ct was NULL");
+            None
+        }
+    };
+    if a.is_none() {
+        g.notices.add(
+            &FS_985,
+            format!(
+                "{who}: colour-table index {index} has no annotation (FreeSurfer goes on with one it never wrote)"
+            ),
+        );
+    }
+    a
+}
+
+/// `MRISdilateConfined(surf, mask, annotidmask, niters, newid)`: a copy of the mask (one voxel per
+/// vertex) dilated `niters` times: each pass, every vertex outside annotation `annotidmask` (its
+/// colour-table index, when not -1) set to 0, every vertex already set (not 0) set to 1, every
+/// other vertex set to 1 when an unripped 1-hop neighbour is set; the pass's result the next
+/// pass's input (`MRIcopy`). With `newid` above 0, every set vertex's annotation that of colour-
+/// table index `newid` (FS-985: none when the table has no such annotation). The dilated mask.
+/// FS-984.
+pub fn dilate_confined(
+    g: &mut Globals,
+    io: &mut Io,
+    surf: &mut Mris,
+    mask: &Mri,
+    annotidmask: i32,
+    niters: i32,
+    newid: i32,
+) -> Result<Mri, Fatal> {
+    const WHO: &str = "MRISdilateConfined";
+    let mut mri1 = mri_copy(g, io.out, io.err, mask, None)?.unwrap_new();
+    let mut mri2 = mri_copy(g, io.out, io.err, mask, None)?.unwrap_new();
+    for _ in 0..niters.max(0) {
+        for vtxno in 0..nverts(surf) {
+            let c = vtxno as i32;
+            if annotidmask > -1 {
+                let annot = surf.vertex(vtxno).annotation;
+                let annotid = find_annotation(g, io.err, surf, annot, WHO);
+                if annotid != annotidmask {
+                    mri_set_vox_val(g, io.err, &mut mri2, c, 0, 0, 0, 0.0, 0)?;
+                    continue;
+                }
+            }
+            let val = mri_get_vox_val(g, io.err, &mri1, c, 0, 0, 0, 0)?;
+            if val != 0.0 {
+                mri_set_vox_val(g, io.err, &mut mri2, c, 0, 0, 0, 1.0, 0)?;
+                continue;
+            }
+            for nb in nbrs(surf, vtxno, surf.topology(vtxno).vnum) {
+                if surf.vertex(nb as usize).ripflag != 0 {
+                    continue;
+                }
+                let val = mri_get_vox_val(g, io.err, &mri1, nb, 0, 0, 0, 0)?;
+                if val != 0.0 {
+                    mri_set_vox_val(g, io.err, &mut mri2, c, 0, 0, 0, 1.0, 0)?;
+                }
+            }
+        }
+        mri_copy(g, io.out, io.err, &mri2, Some(&mut mri1))?;
+    }
+    drop(mri2);
+    if newid > 0
+        && let Some(new_annot) = annotation_at(g, io.err, surf, newid, WHO)
+    {
+        for vtxno in 0..nverts(surf) {
+            if mri_get_vox_val(g, io.err, &mri1, vtxno as i32, 0, 0, 0, 0)? != 0.0 {
+                surf.vertex_mut(vtxno).annotation = new_annot;
+            }
+        }
+    }
+    Ok(mri1)
+}
+
+/// `MRISaccumulateMeansOnSurface(mris, total_dof, new_dof)`: every unripped vertex's `mean` the
+/// weighted mean `(mean * total_dof + val * new_dof) / (total_dof + new_dof)` (`float`). 0.
+pub fn accumulate_means_on_surface(mris: &mut Mris, total_dof: i32, new_dof: i32) -> i32 {
+    let ndof = total_dof.wrapping_add(new_dof) as f32;
+    for vno in 0..nverts(mris) {
+        let v = mris.vertex_mut(vno);
+        if v.ripflag == 0 {
+            let a = sse::mul(total_dof as f32, v.mean);
+            v.mean = sse::div(sse::add(a, sse::mul(new_dof as f32, v.val)), ndof);
+        }
+    }
+    NO_ERROR
+}
+
+/// `MRISaccumulateImaginaryMeansOnSurface(mris, total_dof, new_dof)`: as
+/// [`accumulate_means_on_surface`] for `mean_imag`. 0.
+pub fn accumulate_imaginary_means_on_surface(mris: &mut Mris, total_dof: i32, new_dof: i32) -> i32 {
+    let ndof = total_dof.wrapping_add(new_dof) as f32;
+    for vno in 0..nverts(mris) {
+        let v = mris.vertex_mut(vno);
+        if v.ripflag == 0 {
+            let a = sse::mul(total_dof as f32, v.mean_imag);
+            v.mean_imag = sse::div(sse::add(a, sse::mul(new_dof as f32, v.val)), ndof);
+        }
+    }
+    NO_ERROR
+}
+
+/// `MRISaccumulateStandardErrorsOnSurface(mris, total_dof, new_dof)`: every unripped vertex's
+/// `std_error` `(std_error * total_dof^2 + val * new_dof^2) / (total_dof + new_dof)^2` (the
+/// squares in `int`, wrapping; the rest in `float`). 0.
+pub fn accumulate_standard_errors_on_surface(mris: &mut Mris, total_dof: i32, new_dof: i32) -> i32 {
+    let ndof = total_dof.wrapping_add(new_dof);
+    let (t2, n2, d2) = (
+        total_dof.wrapping_mul(total_dof) as f32,
+        new_dof.wrapping_mul(new_dof) as f32,
+        ndof.wrapping_mul(ndof) as f32,
+    );
+    for vno in 0..nverts(mris) {
+        let v = mris.vertex_mut(vno);
+        if v.ripflag == 0 {
+            let a = sse::mul(t2, v.std_error);
+            v.std_error = sse::div(sse::add(a, sse::mul(n2, v.val)), d2);
+        }
+    }
+    NO_ERROR
+}
+
+/// `VERTEX_VALS` (`include/mrisurf.h`).
+pub const VERTEX_VALS: i32 = 1;
+/// `VERTEX_AREA`.
+pub const VERTEX_AREA: i32 = 2;
+/// `VERTEX_CURV`.
+pub const VERTEX_CURV: i32 = 3;
+/// `VERTEX_LOGODDS`.
+pub const VERTEX_LOGODDS: i32 = 10;
+
+/// `MRISclearWhichAndVal2(mris, which)`: for `VERTEX_AREA` every unripped vertex's `origarea` and
+/// `val2` 0 (`MRISclearOrigAreaAndVal2`), for `VERTEX_CURV` its `curv` and `val2`
+/// (`MRISclearCurvAndVal2`), for `VERTEX_VAL` and `VERTEX_LOGODDS` every vertex's `val` and `val2`
+/// (`mrisSetValAndClearVal2(mris, 0)`); any other field fails FreeSurfer's assertion at the first
+/// unripped vertex (FS-03).
+pub fn clear_which_and_val2(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &mut Mris,
+    which: i32,
+) -> Result<(), Fatal> {
+    match which {
+        VERTEX_AREA => crate::metric::clear_orig_area_and_val2(mris),
+        VERTEX_CURV => crate::metric::clear_curv_and_val2(mris),
+        VERTEX_LOGODDS | VERTEX_VALS => crate::valmarks::set_val_and_clear_val2(mris, 0.0),
+        _ => {
+            if (0..nverts(mris)).any(|vno| mris.vertex(vno).ripflag == 0) {
+                let file = format!("{}/utils/mrisurf_vals.cpp", diag::BUILD_ROOT);
+                return Err(diag::assert_failed(g, io.out, io.err, &file, 4137, "false"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `MRISmarkRandomVertices(mris, prob_marked)`: every unripped vertex marked (1) when a draw of
+/// `randomNumber(0, 1)` (as a `float`) is below `prob_marked`; the others keep their marks. 0.
+pub fn mark_random_vertices(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &mut Mris,
+    prob_marked: f32,
+) -> Result<i32, Fatal> {
+    for vno in 0..nverts(mris) {
+        if mris.vertex(vno).ripflag != 0 {
+            continue;
+        }
+        let r = random_number(g, io.env, io.out, io.err, 0.0, 1.0)? as f32;
+        if r < prob_marked {
+            mris.vertex_mut(vno).marked = 1;
+        }
+    }
+    Ok(NO_ERROR)
+}
+
+/// `MRISannotation_to_label(mris, annot_index)`: the unripped vertices whose annotation is that of
+/// colour-table index `annot_index`, as a new label of as many places named as the entry
+/// (`LabelAlloc`), in vertex order; `None` when there are none, and (FS-985) when the table has no
+/// annotation for the index.
+pub fn annotation_to_label(
+    g: &mut Globals,
+    io: &mut Io,
+    mris: &Mris,
+    annot_index: i32,
+) -> Result<Option<Label>, Fatal> {
+    let Some(annot) = annotation_at(g, io.err, mris, annot_index, "MRISannotation_to_label") else {
+        return Ok(None);
+    };
+    let hits: Vec<i32> = (0..nverts(mris))
+        .filter(|&vno| {
+            let v = mris.vertex(vno);
+            v.ripflag == 0 && v.annotation == annot
+        })
+        .map(|vno| vno as i32)
+        .collect();
+    if hits.is_empty() {
+        return Ok(None);
+    }
+    let name = mris
+        .ct
+        .as_ref()
+        .and_then(|ct| ct.entries[annot_index as usize].as_ref())
+        .map(|e| e.name.clone())
+        .unwrap_or_default();
+    let mut area = label_alloc(g, io.env, io.err, hits.len() as i32, None, Some(&name))?;
+    for (k, vno) in hits.into_iter().enumerate() {
+        area.lv[k].vno = vno;
+        area.n_points += 1;
+    }
+    Ok(Some(area))
 }

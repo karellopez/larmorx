@@ -105,6 +105,19 @@ pub(super) fn vlr_tokens(t: &mut Vec<String>, g: &mut Gen) {
         };
         ix(t, a);
         fv(t, g.int(-40, 40) as f32 / 8.0);
+        // val (now and then 0 or nearly), val2, origarea, mean, mean_imag, std_error, marked
+        fv(
+            t,
+            if g.chance(4) {
+                g.pick(&[0.0, -0.0, 5e-6, -9e-6, 2e-5, f32::NAN])
+            } else {
+                g.int(-40, 40) as f32 / 8.0
+            },
+        );
+        for _ in 0..5 {
+            fv(t, g.int(-40, 40) as f32 / 8.0);
+        }
+        ix(t, g.pick(&[0, 0, 1, 2]));
         let nvals = if nulls && g.chance(5) {
             -1
         } else if heavy && g.chance(10) {
@@ -137,6 +150,7 @@ pub(super) fn vlr_tokens(t: &mut Vec<String>, g: &mut Gen) {
             -1
         },
     );
+    ix(t, g.int(1, 999));
     let vmode = i64::from(g.chance(2));
     ix(t, vmode);
     if vmode > 0 {
@@ -161,6 +175,50 @@ pub(super) fn vlr_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let nops = g.int(1, 4);
     ix(t, nops);
     for _ in 0..nops {
+        if g.chance(3) {
+            match g.below(8) {
+                0 => {
+                    t.push("MRISripZeros".into());
+                    ix(t, if vmode > 0 { g.int(0, 1) } else { 0 });
+                }
+                1 => t.push("MRISripUnknown".into()),
+                2 => {
+                    t.push("MRISdilateConfined".into());
+                    ix(t, g.pick(&[-1, -1, 0, 1, 2, 3]));
+                    ix(t, g.pick(&[0, 1, 2, 3]));
+                    ix(t, g.pick(&[-1, 0, 1, 2, 3, 9]));
+                    ix(t, g.pick(&[3, 3, 0]));
+                    for _ in 0..nv {
+                        fv(t, if g.chance(5) { 1.0 } else { 0.0 });
+                    }
+                }
+                3 => {
+                    t.push(
+                        g.pick(&[
+                            "MRISaccumulateMeansOnSurface",
+                            "MRISaccumulateImaginaryMeansOnSurface",
+                            "MRISaccumulateStandardErrorsOnSurface",
+                        ])
+                        .into(),
+                    );
+                    ix(t, g.pick(&[0, 1, 3, 10, -1, 50000]));
+                    ix(t, g.pick(&[0, 1, 2, 7, -1, 50000]));
+                }
+                4 => {
+                    t.push("MRISclearWhichAndVal2".into());
+                    ix(t, g.pick(&[1, 2, 3, 10, 1, 0, 5]));
+                }
+                5 => {
+                    t.push("MRISmarkRandomVertices".into());
+                    fv(t, g.pick(&[0.0, 0.25, 0.5, 1.0, 2.0, -1.0]));
+                }
+                _ => {
+                    t.push("MRISannotation_to_label".into());
+                    ix(t, g.pick(&[0, 1, 2, 3, 5, -1]));
+                }
+            }
+            continue;
+        }
         match g.below(10) {
             0..=2 => {
                 t.push("MRISmodeFilterAnnotations".into());
@@ -221,6 +279,10 @@ fn dump(s: &Mris, o: &mut Out) {
         o.f(x.curv);
         o.f(x.tx);
         o.f(x.area);
+        for f in [x.val, x.val2, x.origarea, x.mean, x.mean_imag, x.std_error] {
+            o.f(f);
+        }
+        o.i(i64::from(x.marked));
         match valrest::vals_vp(x) {
             None => o.s("N"),
             Some(m) => {
@@ -275,10 +337,20 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         let ripflag = t.i() as i8;
         let annotation = t.i() as i32;
         let curv = t.f();
+        let (val, val2, origarea, mean, mean_imag, std_error) =
+            (t.f(), t.f(), t.f(), t.f(), t.f(), t.f());
+        let marked = t.i() as i16;
         let x = s.vertex_mut(vno);
         x.ripflag = ripflag;
         x.annotation = annotation;
         x.curv = curv;
+        x.val = val;
+        x.val2 = val2;
+        x.origarea = origarea;
+        x.mean = mean;
+        x.mean_imag = mean_imag;
+        x.std_error = std_error;
+        x.marked = marked;
         let nvals = t.i();
         if nvals >= 0 {
             let mut vp = ValsVp {
@@ -314,6 +386,15 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     }
     s.ct = read_ctab(t);
     g.gdiag_no = t.i();
+    let env = Environment::from_pairs(vec![
+        ("SURFER_SIDEDOOR".to_owned(), "1".to_owned()),
+        ("FREESURFER_SEED".to_owned(), t.i().to_string()),
+    ]);
+    let mut io = coords::Io {
+        out: &mut so,
+        err: &mut se,
+        env: &env,
+    };
     let measure = if t.i() > 0 {
         let (ty, w) = (t.i(), t.i());
         let mut m = mri_alloc_sequence(g, io.out, io.err, w, 1, 1, ty, 1)?;
@@ -330,6 +411,87 @@ pub(super) fn vlr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         let op = t.next();
         o.s(op);
         match op {
+            "MRISripZeros" => {
+                let m = if t.i() == 1 { measure.as_ref() } else { None };
+                o.i(i64::from(valrest::rip_zeros(g, &mut io, &mut s, m)?));
+            }
+            "MRISripUnknown" => {
+                if s.ct.is_none() && nv > 0 {
+                    o.s("G");
+                    continue;
+                }
+                o.i(i64::from(valrest::rip_unknown(g, io.err, &mut s)));
+            }
+            "MRISdilateConfined" => {
+                let (annotidmask, niters, newid, ty) = (t.i(), t.i(), t.i(), t.i());
+                let mut mask = mri_alloc_sequence(g, io.out, io.err, nv, 1, 1, ty, 1)?;
+                for c in 0..nv {
+                    let x = t.f();
+                    mri_set_vox_val(g, io.err, &mut mask, c, 0, 0, 0, x, 0)?;
+                }
+                let lookup = |i: i32| {
+                    s.ct.as_ref().is_some_and(|ct| {
+                        i >= 0 && i < ct.nentries() && ct.entries[i as usize].is_some()
+                    })
+                };
+                if (annotidmask > -1 && s.ct.is_none() && nv > 0) || (newid > 0 && !lookup(newid)) {
+                    o.s("G");
+                    continue;
+                }
+                let m = valrest::dilate_confined(
+                    g,
+                    &mut io,
+                    &mut s,
+                    &mask,
+                    annotidmask,
+                    niters,
+                    newid,
+                )?;
+                dump_vol(g, io.err, Some(&m), o);
+            }
+            "MRISaccumulateMeansOnSurface"
+            | "MRISaccumulateImaginaryMeansOnSurface"
+            | "MRISaccumulateStandardErrorsOnSurface" => {
+                let (a, b) = (t.i() as i32, t.i() as i32);
+                o.i(i64::from(match op {
+                    "MRISaccumulateMeansOnSurface" => {
+                        valrest::accumulate_means_on_surface(&mut s, a, b)
+                    }
+                    "MRISaccumulateImaginaryMeansOnSurface" => {
+                        valrest::accumulate_imaginary_means_on_surface(&mut s, a, b)
+                    }
+                    _ => valrest::accumulate_standard_errors_on_surface(&mut s, a, b),
+                }));
+            }
+            "MRISclearWhichAndVal2" => {
+                let which = t.i() as i32;
+                valrest::clear_which_and_val2(g, &mut io, &mut s, which)?;
+            }
+            "MRISmarkRandomVertices" => {
+                let p = t.f();
+                o.i(i64::from(valrest::mark_random_vertices(g, &mut io, &mut s, p)?));
+            }
+            "MRISannotation_to_label" => {
+                let i = t.i() as i32;
+                let ok = s.ct.as_ref().is_some_and(|ct| {
+                    i >= 0 && i < ct.nentries() && ct.entries[i as usize].is_some()
+                });
+                if !ok {
+                    o.s("G");
+                    continue;
+                }
+                match valrest::annotation_to_label(g, &mut io, &s, i)? {
+                    None => o.s("NULL"),
+                    Some(l) => {
+                        o.i(i64::from(l.n_points));
+                        o.i(i64::from(l.max_points));
+                        o.h(Some(&l.name));
+                        for k in 0..l.n_points.max(0) as usize {
+                            o.i(i64::from(l.lv[k].vno));
+                        }
+                    }
+                }
+            }
             "MRISmodeFilterAnnotations" => {
                 let n = t.i();
                 o.i(i64::from(valrest::mode_filter_annotations(

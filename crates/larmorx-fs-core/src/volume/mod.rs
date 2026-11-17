@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //! FreeSurfer 8.2.0's volume functions (`fs.volume`), a clean room of
-//! `specs/freesurfer-volume.md` parts 1 to 3: the volume-geometry text block (§2, §3), the
-//! geometry's copies, matrices, comparison and printer (§4), the voxel arithmetic (§6-§11) and
-//! coordinates and geometry (§13-§16).
+//! `specs/freesurfer-volume.md` parts 1 to 4: the volume-geometry text block (§2, §3), the
+//! geometry's copies, matrices, comparison and printer (§4), the voxel arithmetic (§6-§11),
+//! coordinates and geometry (§13-§16), the samplers (§18), the moves (§19), the head's box (§20)
+//! and the reader of linear transforms (§21).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a

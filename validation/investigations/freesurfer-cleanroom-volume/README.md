@@ -1,7 +1,7 @@
-# fs.volume's clean room against FreeSurfer 8.2.0, as a black box (parts 1 to 3)
+# fs.volume's clean room against FreeSurfer 8.2.0, as a black box (parts 1 to 4)
 
 larmorx's clean room of FreeSurfer's volume functions (`crates/larmorx-fs-core/src/volume/`, written
-from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §17 alone) compared
+from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §22 alone) compared
 with the prebuilt probe of the open folder [`../freesurfer-volume-probe/`](../freesurfer-volume-probe/README.md)
 (FreeSurfer 8.2.0's library as the official build compiles it, with the fs.maths probe's guard
 allocator). The probe is only run, never built.
@@ -27,7 +27,7 @@ The golden cases: `cargo test -p larmorx-fs-core --test golden_volume` (record w
 NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
 as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
 
-## Results (2026-11-17, seed 7, every group of §69.2; the probe's reference hashes are the spec's, cold and warm)
+## Results (2026-11-17, relay 8, seed 7, every group of §69.2; the probe's reference hashes are the spec's)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
 unexplained.
@@ -38,44 +38,51 @@ unexplained.
 | vgcopy | 1,080 | 1,080 / 0 / 0 / 0 / **0** | 1,080 / 0 / 0 / 0 / **0** |
 | vmake | 1,050 | 890 / 135 / 25 / 0 / **0** | 497 / 135 / 110 / 308 / **0** |
 | vrange | 800 | 685 / 115 / 0 / 0 / **0** | 496 / 115 / 3 / 186 / **0** |
-| vscale | 1,100 | 911 / 178 / 4 / 0 / **7** | 506 / 178 / 114 / 302 / **0** |
-| vtwo | 200 | 162 / 32 / 4 / 0 / **2** | 98 / 32 / 6 / 64 / **0** |
+| vscale | 1,100 | 918 / 178 / 4 / 0 / **0** | 506 / 178 / 114 / 302 / **0** |
+| vtwo | 200 | 164 / 32 / 4 / 0 / **0** | 98 / 32 / 6 / 64 / **0** |
 | vextract | 600 | 501 / 43 / 56 / 0 / **0** | 144 / 43 / 131 / 282 / **0** |
 | vcoords | 1,350 | 1,350 / 0 / 0 / 0 / **0** | 1,178 / 0 / 0 / 172 / **0** |
 | vstats | 750 | 711 / 39 / 0 / 0 / **0** | 475 / 39 / 12 / 224 / **0** |
 | vheader | 606 | 606 / 0 / 0 / 0 / **0** | 498 / 0 / 0 / 108 / **0** |
-| all | 8,096 | 7,456 / 542 / 89 / 0 / **9** | 5,467 / 542 / 376 / 1,711 / **0** |
+| vrules | 84 | 73 / 11 / 0 / 0 / **0** | 34 / 11 / 0 / 39 / **0** |
+| vsample | 540 | 521 / 19 / 0 / 0 / **0** | 444 / 19 / 0 / 77 / **0** |
+| vmove | 300 | 235 / 65 / 0 / 0 / **0** | 122 / 65 / 3 / 110 / **0** |
+| vskull | 160 | 160 / 0 / 0 / 0 / **0** | 80 / 0 / 0 / 80 / **0** |
+| vltaread | 309 | 299 / 10 / 0 / 0 / **0** | 195 / 10 / 17 / 87 / **0** |
+| all | 9,489 | 8,753 / 647 / 89 / 0 / **0** | 6,342 / 647 / 396 / 2,104 / **0** |
 
-Totals: `reproduce` 7,456 of 8,096 identical (542 where FreeSurfer did not finish, 89 memory lines),
-9 unexplained; `fix` 5,467 identical (542 not finished, 376 memory, 1,711 corrected by a noted
-defect), none unexplained.
+Totals: `reproduce` 8,753 of 9,489 identical (647 where FreeSurfer did not finish, 89 memory lines),
+none unexplained; `fix` 6,342 identical (647 not finished, 396 memory, 2,104 corrected by a noted
+defect), none unexplained. Relay 7's 9 lines (FS-291 with tensor volumes) are identical since the
+spec's §6 states a tensor volume's rows (all at its first voxel).
 
-- **The 9 unexplained lines** (`vscale` 7, `vtwo` 2) are FS-291's `reproduce` of `MRIinvertContrast`
-  and `MRIscaleAndMultiply` on volumes that are not of bytes: the spec says FreeSurfer takes the
-  first `width` bytes of each row as byte voxels, the clean room does exactly that, and FreeSurfer
-  writes only the destination's first row (with the first row's values when the source is a tensor
-  volume, with the last row's when it is an int or short volume). The spec writer is asked for the
-  rule (the findings). `fix` refuses these calls (FS-291, noted).
 - **Where FreeSurfer did not finish** (crashes: header copies from a volume without its cached
-  matrix, FS-252; volumes without voxels walked directly, FS-58; smaller second volumes, FS-290;
-  rows of a negative length, FS-294; destinations of another type FreeSurfer frees, FS-293; and the
-  principal components of covariances with infinite or NaN entries, FS-47 and ITK-112): the
-  candidate finishes, with the spec's refusal or result.
-- Behaviours measured beyond the spec's text (`docs/findings/fs-volume-clean-room.md`): the voxel
-  reads and writes of the types without a value need no voxels, `MRIclear` clears a bitmap volume,
-  `MRIlinearScale`'s other voxels keep their own value, `MRIadd` of sources without direct access
-  writes nothing, the frame copies' messages end with their own new line, `MRIclone` into itself
-  loses its colour table (FS-332, new).
+  matrix, FS-252; volumes without voxels walked directly, FS-58; smaller second volumes and frames
+  past the volume's, FS-290; rows of a negative length, FS-294; destinations of another type
+  FreeSurfer frees, FS-293; the principal components of covariances with infinite or NaN entries,
+  FS-47 and ITK-112; rotations about an axis without an inverse, FS-304; names of 500 bytes, FS-306;
+  `.lta` files of one line, FS-309; `.xfm` files whose `src` or `dst` word is last, FS-310; the
+  `.xfm` files FreeSurfer never finishes, FS-307): the candidate finishes, with the spec's refusal
+  or result.
+- Behaviours measured beyond the spec's text, part 4's included (`MRIcubicCoeff`'s -3, the cubic
+  frame sampler's all-ones NaN outside the volume, `ham_sinc`'s operand order, `MRIrotate_I`'s
+  `ras_good_flag` and its 3 x 1 matrices, the `.xfm` reader's names and rows): the findings,
+  `docs/findings/fs-volume-clean-room.md`.
 
 ## Golden cases, defect tests, speed
 
 - `cargo test -p larmorx-fs-core --test golden_volume`: every command of the probe's grammar on
   seeded arguments (volumes of at most 3 x 3 x 3 voxels and 2 frames, every type, header-only ones,
-  special values), both modes, 20 SHA-256 over 10 groups (0.02 s in a debug build). Identical in
-  debug and release builds and under the AArch64 NaN emulation of both.
-- `cargo test -p larmorx-fs-core --test defects_volume`: each defect of the spec's §69.4 (FS-285 to
-  FS-297) and FS-332 noted in both modes on a line of the comparison's own batches (the shortest),
-  FS-292, FS-296 and FS-297 on lines written for them, the two modes' results different where the
-  correction changes them; also FS-12, FS-47, ITK-112, FS-52, FS-53 and FS-58.
-- Speed: the spec's plan names no speed measure for these parts (voxel loops of the volume's size;
-  each probe call is dominated by its own process); not measured.
+  special values; the head's box on volumes of up to 24 voxels a side; the transform reader on
+  in-memory files, `ltamem`, a named volume that exists included), both modes, 28 SHA-256 over 14
+  groups (0.09 s in a debug build). Identical in debug and release builds and under the AArch64 NaN
+  emulation of both.
+- `cargo test -p larmorx-fs-core --test defects_volume`: each defect of the spec's §69.4 (FS-265,
+  FS-285 to FS-310) and FS-332, FS-258 noted in both modes on a line of the comparison's own batches
+  (the shortest), FS-292, FS-296, FS-297, FS-302, FS-305 and FS-258 on lines written for them, the
+  two modes' results different where the correction changes them; also FS-12, FS-47, ITK-112,
+  FS-52, FS-53 and FS-58.
+- Speed (part 4; the spec's plan names none): one batch line each through the probe and the
+  candidate, end to end, best of 3: 20,000 points on a 32^3 float volume, trilinear 1.5x faster than
+  FreeSurfer, cubic 1.2x, nearest 1.5x, windowed sinc 0.75x (the main package's `sin` and `cos`
+  ports); the head's box of a 64^3 volume 1.1x. The numbers in the findings.

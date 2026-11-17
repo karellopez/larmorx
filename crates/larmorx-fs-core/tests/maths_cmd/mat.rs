@@ -207,11 +207,17 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             match o {
                 Out::First | Out::Second => {
                     let first = matches!(o, Out::First);
-                    let (mut x, other) = if first { (a.clone(), &b) } else { (b.clone(), &a) };
+                    let (mut x, other) = if first {
+                        (a.clone(), &b)
+                    } else {
+                        (b.clone(), &a)
+                    };
                     let r = p.matrix_add_sub_in_place(&mut x, other, sub, first)?;
                     l.putm_res(&r, Some(&x));
                 }
-                o => mout(l, Some(&a), Some(&b), o, |o| p.matrix_add_sub(&a, &b, o, sub))?,
+                o => mout(l, Some(&a), Some(&b), o, |o| {
+                    p.matrix_add_sub(&a, &b, o, sub)
+                })?,
             }
         }
         "mscale" => {

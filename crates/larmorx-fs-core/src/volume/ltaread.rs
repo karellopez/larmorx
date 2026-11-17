@@ -164,7 +164,9 @@ fn fgetl_buf(s: &mut CStream, n: usize, buf: &mut Vec<u8>) -> Option<Vec<u8>> {
 
 /// The words of an `.xfm`'s information line (§21: split at spaces; a tab belongs to a word).
 fn space_words(line: &[u8]) -> Vec<&[u8]> {
-    line.split(|&c| c == b' ').filter(|w| !w.is_empty()).collect()
+    line.split(|&c| c == b' ')
+        .filter(|w| !w.is_empty())
+        .collect()
 }
 
 fn contains(hay: &[u8], needle: &[u8]) -> bool {
@@ -441,7 +443,9 @@ impl Process {
                         );
                         let mut m = b"ltMNIreadEx: ".to_vec();
                         m.extend_from_slice(fname);
-                        m.extend_from_slice(b" ends with a % line (FreeSurfer never returns here)\n");
+                        m.extend_from_slice(
+                            b" ends with a % line (FreeSurfer never returns here)\n",
+                        );
                         self.error_exit(codes::BAD_FILE, &m)?;
                         return Ok(None);
                     }
@@ -583,7 +587,10 @@ impl Process {
                 }
             }
         } else {
-            dst = w.get(1).filter(|x| contains(x, b".mnc")).map(|x| x.to_vec());
+            dst = w
+                .get(1)
+                .filter(|x| contains(x, b".mnc"))
+                .map(|x| x.to_vec());
             if w.len() > 1 {
                 src = space_words(i2)
                     .get(1)

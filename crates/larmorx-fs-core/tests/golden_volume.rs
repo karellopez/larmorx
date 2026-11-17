@@ -798,7 +798,7 @@ const MOVE: &[(&str, Make)] = &[
             _ => g.mat3(),
         };
         let o = match g.below(6) {
-            0 | 1 | 2 => "null".to_owned(),
+            0..=2 => "null".to_owned(),
             3 => format!("3 2 {} 0 {} 0 {} 0", g.f(false), g.f(false), g.f(false)),
             4 => format!("4 1 {} {} {} 3f800000", g.f(false), g.f(false), g.f(false)),
             _ => format!("3 1 {} {} {}", g.f(false), g.f(false), g.f(false)),
@@ -1054,7 +1054,12 @@ const LTAREAD: &[(&str, Make)] = &[
     // verbose diagnostics with DIAG_SHOW: the volumes' INFO lines (§21, step 5)
     ("+gdiag=10000040 ltamem", |g| {
         let text = transform_text(g, 1);
-        format!("{} {} {} none", xs(b"t.xfm"), xs(text.as_bytes()), g.int(0, 2))
+        format!(
+            "{} {} {} none",
+            xs(b"t.xfm"),
+            xs(text.as_bytes()),
+            g.int(0, 2)
+        )
     }),
     // several .xfm files in one process: minctracc's count (§21, step 5)
     ("ltamems", |g| {
@@ -1090,8 +1095,13 @@ impl G {
             1000, 2035, 5001, -1, 3,
         ];
         match self.below(10) {
-            0 => self.pick(&["7fc00000", "4f32d05e", "cf32d05e", "3fc00000", "c0200000"]).to_owned(),
-            _ => format!("{:08x}", (L[self.below(L.len() as u64) as usize] as f32).to_bits()),
+            0 => self
+                .pick(&["7fc00000", "4f32d05e", "cf32d05e", "3fc00000", "c0200000"])
+                .to_owned(),
+            _ => format!(
+                "{:08x}",
+                (L[self.below(L.len() as u64) as usize] as f32).to_bits()
+            ),
         }
     }
 
@@ -1162,8 +1172,13 @@ fn cache_text(g: &mut G) -> String {
             2 => lines[k].push('\r'),
             3 => lines[k] = format!("{} ", lines[k].replace(", mm^3", ", x,")),
             4 => {
-                let w = g.pick(&["12abc,", "0x10,", "1e,", "1e400,", "inf,", "-0,", "+.5e1,", "7"]);
-                lines[k] = format!("# Measure {}, {w} mm^3", lines[k].split(", ").nth(1).unwrap_or(""));
+                let w = g.pick(&[
+                    "12abc,", "0x10,", "1e,", "1e400,", "inf,", "-0,", "+.5e1,", "7",
+                ]);
+                lines[k] = format!(
+                    "# Measure {}, {w} mm^3",
+                    lines[k].split(", ").nth(1).unwrap_or("")
+                );
             }
             5 => lines[k] = lines[k].replace(", mm^3", ", -2.5, mm^3"),
             _ => lines[k] = lines[k].replace(", mm^3", " ,\t2.5e2, mm^3"),
@@ -1186,7 +1201,11 @@ const CMA: &[(&str, Make)] = &[
             .map(|_| {
                 let l = g.label();
                 let i = f32::from_bits(u32::from_str_radix(&l, 16).unwrap_or(0));
-                let i = if i.is_finite() && i.abs() < 1e6 { i as i32 } else { 270 };
+                let i = if i.is_finite() && i.abs() < 1e6 {
+                    i as i32
+                } else {
+                    270
+                };
                 let f = if g.one_in(3) {
                     format!("{:08x}", (i as f32 + 0.5).to_bits())
                 } else {

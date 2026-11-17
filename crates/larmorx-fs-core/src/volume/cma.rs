@@ -154,10 +154,7 @@ pub fn is_fimbria(l: f64) -> bool {
 }
 /// `IS_GRAY_MATTER`.
 pub fn is_gray_matter(l: f64) -> bool {
-    any(
-        l,
-        &[3, 8, 11, 12, 17, 18, 26, 42, 47, 50, 51, 53, 54, 58],
-    )
+    any(l, &[3, 8, 11, 12, 17, 18, 26, 42, 47, 50, 51, 53, 54, 58])
 }
 /// `IS_WHITE_MATTER`.
 pub fn is_white_matter(l: f64) -> bool {
@@ -178,7 +175,9 @@ pub fn is_lh_class(l: f64) -> bool {
 pub fn is_rh_class(l: f64) -> bool {
     any(
         l,
-        &[41, 42, 43, 44, 46, 47, 49, 50, 51, 52, 53, 54, 58, 60, 62, 63],
+        &[
+            41, 42, 43, 44, 46, 47, 49, 50, 51, 52, 53, 54, 58, 60, 62, 63,
+        ],
     )
 }
 /// `IS_GRAY_CLASS`.
@@ -326,8 +325,27 @@ fn contra(id: i32) -> Option<i32> {
         866 => 865,
         869 => 870,
         870 => 869,
-        14 | 15 | 16 | 24 | 72 | 77 | 80 | 85 | 165 | 251..=255 | 257 | 258 | 259 | 260 | 262
-        | 502 | 514 | 853 | 883 | 902 | 914 => id,
+        14
+        | 15
+        | 16
+        | 24
+        | 72
+        | 77
+        | 80
+        | 85
+        | 165
+        | 251..=255
+        | 257
+        | 258
+        | 259
+        | 260
+        | 262
+        | 502
+        | 514
+        | 853
+        | 883
+        | 902
+        | 914 => id,
         _ => return None,
     })
 }
@@ -393,7 +411,10 @@ pub const BRAIN_VOLUME_MEASURES: [(&str, &str); 16] = [
         "SupraTentorialNotVent, SupraTentorialVolNotVent",
         "Supratentorial volume",
     ),
-    ("SubCortGray, SubCortGrayVol", "Subcortical gray matter volume"),
+    (
+        "SubCortGray, SubCortGrayVol",
+        "Subcortical gray matter volume",
+    ),
     (
         "lhCortex, lhCortexVol",
         "Left hemisphere cortical gray matter volume",
@@ -537,7 +558,11 @@ impl Process {
     /// ribbon (its label not above 0) whose label is a ventricle, choroid plexus, hypointensity,
     /// thalamus, corpus callosum part, ventral diencephalon, hippocampus, amygdala, caudate,
     /// putamen, pallidum or accumbens area; FS-312.
-    pub fn supra_tentorial_vol_correction(&mut self, aseg: &Mri, ribbon: &Mri) -> Result<f64, Stop> {
+    pub fn supra_tentorial_vol_correction(
+        &mut self,
+        aseg: &Mri,
+        ribbon: &Mri,
+    ) -> Result<f64, Stop> {
         let vol = voxel_volume(aseg);
         let mut sum = 0.0f64;
         for cell in cells(aseg) {
@@ -554,7 +579,10 @@ impl Process {
                 }
             } else if any(
                 lf,
-                &[4, 43, 5, 44, 31, 63, 77, 78, 79, 28, 60, 17, 53, 18, 54, 11, 50, 12, 51, 13, 52, 26, 58],
+                &[
+                    4, 43, 5, 44, 31, 63, 77, 78, 79, 28, 60, 17, 53, 18, 54, 11, 50, 12, 51, 13,
+                    52, 26, 58,
+                ],
             ) || is_cc(lf)
             {
                 sum += vol;
@@ -610,7 +638,10 @@ impl Process {
                 }
             } else if any(
                 lf,
-                &[17, 53, 18, 54, 4, 43, 5, 44, 31, 63, 77, 78, 79, 28, 60, 11, 50, 12, 51, 13, 52, 26, 58, 8, 47, 30],
+                &[
+                    17, 53, 18, 54, 4, 43, 5, 44, 31, 63, 77, 78, 79, 28, 60, 11, 50, 12, 51, 13,
+                    52, 26, 58, 8, 47, 30,
+                ],
             ) || is_cc(lf)
             {
                 vol += vox;
@@ -680,11 +711,7 @@ impl Process {
     ) -> Result<Option<Mri>, Stop> {
         if lh.rows != rh.rows {
             self.put_out(
-                format!(
-                    "ERROR: MRIlrswapSeg(): lh={} != rh={}\n",
-                    lh.rows, rh.rows
-                )
-                .as_bytes(),
+                format!("ERROR: MRIlrswapSeg(): lh={} != rh={}\n", lh.rows, rh.rows).as_bytes(),
             );
             return Ok(None);
         }
@@ -771,16 +798,12 @@ impl Process {
         force1: i32,
     ) -> Result<Mri, Stop> {
         let g = &seg.geom;
-        let mut d = self.mri_alloc_sequence(
-            g.width,
-            g.height,
-            g.depth,
-            types::UCHAR,
-            list.len() as i32,
-        )?;
+        let mut d =
+            self.mri_alloc_sequence(g.width, g.height, g.depth, types::UCHAR, list.len() as i32)?;
         self.copy_header_into(seg, &mut d)?;
         self.copy_pulse_parameters(seg, &mut d);
-        let mut line = format!("MRIoneHotEncode(): n={} Force1={force1}: ", list.len()).into_bytes();
+        let mut line =
+            format!("MRIoneHotEncode(): n={} Force1={force1}: ", list.len()).into_bytes();
         for l in list {
             line.extend_from_slice(format!("{l} ").as_bytes());
         }
@@ -853,7 +876,11 @@ impl Process {
     /// every measure from -1, each line naming measures gives them its first number; a measure
     /// below 0 ends the program (status 1). FS-314: a line naming a measure without a number and
     /// ending in white space gives no number (FreeSurfer aborts).
-    pub fn parse_brain_volume_stats(&mut self, bytes: &[u8], name: &[u8]) -> Result<Vec<f64>, Stop> {
+    pub fn parse_brain_volume_stats(
+        &mut self,
+        bytes: &[u8],
+        name: &[u8],
+    ) -> Result<Vec<f64>, Stop> {
         let mut stats = [-1.0f64; 16];
         let mut lines: Vec<&[u8]> = bytes.split(|&c| c == b'\n').collect();
         if bytes.last() == Some(&b'\n') {

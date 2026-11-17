@@ -771,7 +771,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             let stats: Vec<f64> = (0..16).map(|_| l.getd()).collect();
             let r = p.cache_brain_volume_stats(&stats, b"subj", b".");
             match std::fs::read("subj/stats/brainvol.stats") {
-                Ok(b) => l.out(&hexbytes(&b)),
+                Ok(b) => l.out(hexbytes(&b)),
                 Err(_) => l.out("null"),
             }
             subject_folder(false);
@@ -795,7 +795,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
         // the golden cases' cache text and reading (no file system)
         "bvtext" => {
             let stats: Vec<f64> = (0..16).map(|_| l.getd()).collect();
-            l.out(&hexbytes(&cma::brain_volume_stats_text(&stats)));
+            l.out(hexbytes(&cma::brain_volume_stats_text(&stats)));
         }
         "bvparse" => {
             let text = l.getx();
@@ -877,7 +877,9 @@ fn subject_folder(make: bool) {
 /// the probe's runs show it without a subject's files and without `FREESURFER_HOME`
 /// (observed): its two lines and the end of the program, status 255.
 fn compute_stand_in(p: &mut Process) -> Result<Vec<f64>, Stop> {
-    p.put_out(b"[INFO] read, cannot find ./subj/surf/lh.white, trying ./subj/surf/lh.white.gii ...\n");
+    p.put_out(
+        b"[INFO] read, cannot find ./subj/surf/lh.white, trying ./subj/surf/lh.white.gii ...\n",
+    );
     let rule = "-".repeat(74);
     p.put_err(
         format!(

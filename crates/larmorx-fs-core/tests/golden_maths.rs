@@ -988,7 +988,10 @@ fn matrix_files() {
 /// Two matrices of the same size whose elements are NaNs of distinct payloads (or numbers), and
 /// an output: new, either operand or another given matrix (§8.2).
 fn nan_pair(g: &mut G) -> String {
-    let (r, c) = (g.int(1, 2), *[2i64, 5].get(g.below(2) as usize).unwrap_or(&2));
+    let (r, c) = (
+        g.int(1, 2),
+        *[2i64, 5].get(g.below(2) as usize).unwrap_or(&2),
+    );
     let el = |g: &mut G, base: u32, k: i64| -> String {
         if g.one_in(4) {
             "3f800000".to_owned()

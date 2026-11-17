@@ -222,7 +222,15 @@ impl Process {
     }
 
     /// [`row_byte_place`] in this program's mode (FS-960, noted as [`Process::place_of`]).
-    pub(crate) fn row_place(&mut self, m: &Mri, byte: i64, y: i64, z: i64, f: i64, n: u64) -> Place {
+    pub(crate) fn row_place(
+        &mut self,
+        m: &Mri,
+        byte: i64,
+        y: i64,
+        z: i64,
+        f: i64,
+        n: u64,
+    ) -> Place {
         let reproduce = self.mode().reproduce();
         if m.kind == crate::mri::types::TENSOR {
             let t = z + f * i64::from(m.geom.depth);

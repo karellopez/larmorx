@@ -206,11 +206,7 @@ impl Process {
             ("MatrixAdd", "+")
         };
         {
-            let (m1, m2): (&Matrix, &Matrix) = if m_is_first {
-                (m, other)
-            } else {
-                (other, m)
-            };
+            let (m1, m2): (&Matrix, &Matrix) = if m_is_first { (m, other) } else { (other, m) };
             if !self.real_only(name, m1) || !self.real_only(name, m2) {
                 return Ok(Returned::Nothing);
             }

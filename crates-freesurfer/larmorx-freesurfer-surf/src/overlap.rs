@@ -134,7 +134,10 @@ pub fn distance_to_surface(
     p: [f32; 3],
     n: [f32; 3],
 ) -> Result<f32, Fatal> {
-    let len = widen(sqrt(add(add(mul(n[0], n[0]), mul(n[1], n[1])), mul(n[2], n[2]))));
+    let len = widen(sqrt(add(
+        add(mul(n[0], n[0]), mul(n[1], n[1])),
+        mul(n[2], n[2]),
+    )));
     let n = n.map(|c| narrow(div64(widen(c), len)));
     let mut dist = 0.0f64;
     loop {
@@ -209,7 +212,8 @@ pub fn find_all_overlapping_faces(
         while y <= y1 {
             let mut z = z0;
             while z <= z1 {
-                if let Some((k, bins)) = mht.acq_bucket(g, io.err, narrow(x), narrow(y), narrow(z))?
+                if let Some((k, bins)) =
+                    mht.acq_bucket(g, io.err, narrow(x), narrow(y), narrow(z))?
                     && prev != Some(k)
                 {
                     prev = Some(k);

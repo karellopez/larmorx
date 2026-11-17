@@ -4339,6 +4339,84 @@ void flr_case()
     oi(sclustGrowByDist(s, 0, 25.0, 0, -1, vl.data()));
     for (int v = 0; v < s->nvertices; v++) put(&vl[v], 4);
     flush();
+  } else if (op == "smr") {
+    // relay 45 of track D: the sampled energies on a recorded head (`smr <sphere> <white> <pial>
+    // <qsphere.nofix>`): the sphere with its own canonical coordinates, the white and pial
+    // positions and normals (MRIScomputeNormals at each), radius 100, a face table of the
+    // canonical positions at 1 mm and mrisAssignFaces; at 64 vertices with the point 0.5 mm along
+    // x: MRISsampleFaceCoordsCanonical (pial), the minimization, normal, spring, parallel (at the
+    // vertex, sampled) energies, their FNV-1a; the white surface's MRISdistanceToSurface along
+    // each of the 64 vertices' normals, out and in (a face table of the current positions at 1 mm);
+    // the qsphere.nofix's overlapping faces (its canonical positions its own, MHTcreateFaceTable)
+    // of every face numbered a multiple of nfaces / 200: the counts' and lists' FNV-1a
+    std::string sn = next(), wn = next(), pn = next(), qn = next();
+    MRIS *sp = MRISread(sn.c_str());
+    if (!sp) fail("cannot read the inputs");
+    std::string hb;
+    auto put = [&hb](float f) { hb.append((const char *)&f, 4); };
+    auto puti = [&hb](int i) { hb.append((const char *)&i, 4); };
+    auto flush = [&hb]() {
+      uint64_t h = 0xcbf29ce484222325ull;
+      for (unsigned char c : hb) h = (h ^ c) * 0x100000001b3ull;
+      char t[24];
+      snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+      out += t;
+      hb.clear();
+    };
+    oi(MRISreadCanonicalCoordinates(sp, sn.c_str()));
+    MRISsaveVertexPositions(sp, TMP_VERTICES);
+    oi(MRISreadVertexPositions(sp, wn.c_str()));
+    MRIScomputeNormals(sp);
+    MRISsaveVertexPositions(sp, WHITE_VERTICES);
+    MRISsaveNormals(sp, WHITE_VERTICES);
+    oi(MRISreadVertexPositions(sp, pn.c_str()));
+    MRIScomputeNormals(sp);
+    MRISsaveVertexPositions(sp, PIAL_VERTICES);
+    MRISsaveNormals(sp, PIAL_VERTICES);
+    MRISrestoreVertexPositions(sp, TMP_VERTICES);
+    MRIScomputeNormals(sp);
+    sp->radius = 100.0;
+    MRIS_HASH_TABLE *mht = MHTcreateFaceTable_Resolution(sp, CANONICAL_VERTICES, 1.0f);
+    mrisAssignFaces(sp, mht, CANONICAL_VERTICES);
+    INTEGRATION_PARMS parms;
+    parms.mht = mht;
+    for (int k = 0; k < 64; k++) {
+      int vno = (int)((long long)k * sp->nvertices / 64);
+      VERTEX *v = &sp->vertices[vno];
+      float x = v->x + 0.5f, y = v->y, z = v->z, px, py, pz;
+      puti(MRISsampleFaceCoordsCanonical(mht, sp, x, y, z, PIAL_VERTICES, &px, &py, &pz));
+      put(px); put(py); put(pz);
+      put(mrisSampleMinimizationEnergy(sp, vno, &parms, x, y, z));
+      put(mrisSampleNormalEnergy(sp, vno, &parms, x, y, z));
+      put(mrisSampleSpringEnergy(sp, vno, x, y, z, &parms));
+      put(mrisSampleParallelEnergyAtVertex(sp, vno, &parms));
+      put(mrisSampleParallelEnergy(sp, vno, &parms, x, y, z));
+    }
+    flush();
+    MRIS *w = MRISread(wn.c_str());
+    if (!w) fail("cannot read the inputs");
+    MRIS_HASH_TABLE *mw = MHTcreateFaceTable_Resolution(w, CURRENT_VERTICES, 1.0f);
+    for (int k = 0; k < 64; k++) {
+      int vno = (int)((long long)k * w->nvertices / 64);
+      VERTEX *v = &w->vertices[vno];
+      put(MRISdistanceToSurface(w, mw, v->x, v->y, v->z, v->nx, v->ny, v->nz));
+      put(MRISdistanceToSurface(w, mw, v->x, v->y, v->z, -v->nx, -v->ny, -v->nz));
+    }
+    flush();
+    MRIS *q = MRISread(qn.c_str());
+    if (!q) fail("cannot read the inputs");
+    MRISsaveVertexPositions(q, CANONICAL_VERTICES);
+    MRIS_HASH_TABLE *mq = MHTcreateFaceTable(q);
+    static int flist[MAX_INT_FACES];
+    int step = q->nfaces / 200 > 0 ? q->nfaces / 200 : 1, total = 0;
+    for (int fno = 0; fno < q->nfaces; fno += step) {
+      int n = mrisFindAllOverlappingFaces(q, mq, fno, flist);
+      puti(n);
+      total += n;
+      for (int i = 0; i < n; i++) puti(flist[i]);
+    }
+    oi(total);
+    flush();
   } else if (op == "mpx") {
     // relay 37 of track D: group (e) on a recorded head (`mpx <white> <sphere>`): the white
     // surface (its Talairach transform read from ../mri/transforms by MRISread) with the sphere's

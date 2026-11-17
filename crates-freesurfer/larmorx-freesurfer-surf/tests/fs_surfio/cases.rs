@@ -43,10 +43,6 @@ mod cfile;
 mod crv;
 #[path = "dfm.rs"]
 mod dfm;
-#[path = "ptc.rs"]
-mod ptc;
-#[path = "smp.rs"]
-mod smp;
 #[path = "fli.rs"]
 mod fli;
 #[path = "fnam.rs"]
@@ -81,6 +77,8 @@ mod mprop;
 mod mpx;
 #[path = "prj.rs"]
 mod prj;
+#[path = "ptc.rs"]
+mod ptc;
 #[path = "pvw.rs"]
 mod pvw;
 #[path = "sbl.rs"]
@@ -89,6 +87,8 @@ mod sbl;
 mod scl;
 #[path = "sfile.rs"]
 mod sfile;
+#[path = "smp.rs"]
+mod smp;
 #[path = "srd.rs"]
 mod srd;
 #[path = "sread.rs"]

@@ -78,7 +78,14 @@ fn file_for(g: &mut Gen, name: &str, m: &Mesh, heavy: bool) -> Vec<u8> {
 /// now and then (0, beyond, `INT_MIN`).
 fn point_number(g: &mut Gen, nv: i64) -> i64 {
     if g.chance(70) {
-        return g.pick(&[0, nv + 1, nv + 7, -(nv + 1), i64::from(i32::MIN), i64::from(i32::MAX)]);
+        return g.pick(&[
+            0,
+            nv + 1,
+            nv + 7,
+            -(nv + 1),
+            i64::from(i32::MIN),
+            i64::from(i32::MAX),
+        ]);
     }
     let k = g.int(1, nv.max(1));
     if g.chance(4) { -k } else { k }

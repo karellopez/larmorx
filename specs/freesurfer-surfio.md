@@ -6037,3 +6037,230 @@ interior). On the recorded heads (`real.py --rmi`: three heads, both hemispheres
 modes; the other 6, hole fillings, crash FreeSurfer's program by overflowing its stack (FS-901), and
 the port completes them (observed). A clean-room implementer's black-box forms: `mris_remove_intersection`
 (154.6 on any surface), `mri_relabel_hypointensities` (154.7 into its volume), `mris_flatten` (154.2).
+
+## 156. The patch readers (fs.surfio's `MRISreadPatchNoRemove` and `MRISreadPatch`; relay 45 of track D)
+
+A patch is a subset of a surface's vertices with their positions and border flags. Both readers
+take a surface, a patch name `pname` and the conversion flag of the GIFTI case (`dotkrRASConvert`,
+default true).
+
+**156.1 The file and its kind.** The file to read is §60's name for reading (`MRISbuildFileName_read`:
+a name with a `/` as it is; else in the surface name's folder, after the hemisphere's `lh.` or `rh.`
+unless the name starts with one; `FS_POSIX` puts it in `./`). Its kind is §79's type of a name: `.asc`
+an ASCII patch; `.label` a label; a volume name (`.mgz`, `.mgh`, `.nii`, `.nii.gz`, `.img`, ...) a
+volume; `.gii` GIFTI; anything else (no extension, `.patch`, `.3d`, `.geo`, ...) a binary patch. The
+surface's current vertex distances are then released (`MRISfreeDistsButNotOrig`, §15; the original
+ones kept), whatever follows.
+
+**156.2 ASCII** (each line read as `fgetl` reads it: at most 255 bytes, lines empty, blank or starting
+with `#` after their leading white space skipped, everything from a `#` on cut, the newline removed; a
+longer line's rest is the next line). A file that cannot be opened: `MRISreadPatchNoRemove(<file>):
+could not open file` as an error (`errno`'s text first), returns `ERROR_NOFILE` (-1). The first line's
+leading integer (`%d`, C's `sscanf` with `%d %*s`) is the point count `n`. With `DIAG_SHOW`: `reading
+.ASC patch <pname> with <n> vertices (<p>% of total)` on standard output, `p = 100 * n / nvertices` in
+`float` (each operand converted to `float`; `%2.1f`: `inf`, `-nan` as glibc prints them). Every vertex
+is ripped. Then for each point `j` from 0 to `n - 1`: a line whose leading integer `i` is the point's
+number (a missing line: `MRISreadPatchNoRemove(<file>): could not read line for point <j>` and a
+newline, as an error, returns `ERROR_BADPARM` (-4), the surface as far as read); `i < 0` a border vertex
+`k = -i - 1` (two's-complement wrapping: `i` = -2147483648 gives 2147483647), else `k = i - 1` with the
+border flag cleared; `k` outside `[0, nvertices)` ends the program: `MRISreadPatch: bad vertex #
+(<k>) found in patch file` (the zero-based `k`, FS-1009, kept), status `ERROR_BADFILE` (-5). The vertex
+is unripped, its border flag set. Then a line of three numbers (`%lf %lf %lf`; a missing line:
+`MRISreadPatch(<file>): could not read 3 floating values line for point <j>` and a newline,
+`ERROR_BADPARM`), each rounded from `double` to `float` (a NaN keeps its sign and upper payload bits,
+quieted) and set as the vertex's current position; with `DIAG_SHOW` and `Gdiag_no` that vertex,
+`vertex <k> read @ (%2.2f, %2.2f, %2.2f)` on standard output. A point may name a vertex again: the last
+one wins.
+- **FS-1007**: a file holding no line but comments and blank lines crashes FreeSurfer's program
+  (status 139, `reproduce`); by default `MRISreadPatchNoRemove(<file>): the file holds no line
+  (FreeSurfer reads through a null pointer)` as an error, `ERROR_BADFILE` returned (rule B).
+- **FS-1008**: a point line without a leading integer, or a coordinate line with fewer than three
+  numbers: FreeSurfer keeps the previous point's number or the previous point's missing coordinates
+  (`reproduce`). By default `MRISreadPatchNoRemove(<file>): point <j> holds no vertex number` or `...:
+  point <j> holds fewer than 3 coordinates` as an error, `ERROR_BADFILE` returned (rule B).
+- **FS-1010**: the same for the first line's count or the first point (no previous values): FreeSurfer
+  uses memory it never wrote. The same errors by default (`... the first line holds no vertex count`);
+  `reproduce` takes 0 for the missing values, noted as memory.
+
+**156.3 Binary.** A file that cannot be opened: as 156.2's (`ERROR_NOFILE`). Its first big-endian `int`:
+when not negative, the point count of the old form; when negative, a version, and the next `int` the
+count of the new form. With `DIAG_SHOW`: `reading binary patch <pname> ...` (old) or `reading new surface
+format patch <pname> ...` (new), the rest as 156.2's. Every vertex ripped. Each point: a big-endian `int`
+number (as 156.2's, the same exit), then its position: three big-endian `short`s, each `s / 100.0` in
+`double` rounded to `float` (old), or three big-endian `float`s (new). A file that ends early gives the
+missing numbers the memory contents of fs.io's FS-49 and FS-167 (`freadInt`: no message; `freadFloat`:
+`freadFloat: fread failed` as an error per number; read here as 0, noted).
+
+**156.4 A label.** `Reading label <file> as a patch` on standard output; the label read as fs.io's
+`LabelRead` without a subject (`specs/freesurfer-io.md`'s labels; its open failure: its `perror` line, then `<program>:
+could not open label file <file>` as an error) — a label that cannot be read ends the program with
+status 1. Every vertex ripped; each of the label's points unrips its vertex: a negative number prints
+`ERROR: MRISreadPatch(): vno=<n> < 0`, one not below the vertex count `ERROR: MRISreadPatch(): vno=<n> >
+nvertices=<nv>` (also for `n == nv`, FS-1009, kept), each on standard output, and ends the program
+(status 1). Positions and border flags are not changed.
+
+**156.5 A volume.** `Reading volume <file> as a patch, thresh=0.5` on standard output; the volume read
+(fs.io's `MRIread`; failure ends the program, status 1); a width other than the vertex count prints
+`ERROR: MRISreadPatch(): dimension mismatch, width=<w>, nvertices=<nv>` and ends the program (status 1).
+Vertex `k` is kept when voxel `(k, 0, 0)` of frame 0, as a `double`, is above 0.5 (a NaN is not), else
+ripped.
+
+**156.6 GIFTI** (FS-1006). FreeSurfer reads the file with §85's surface reader (GIFTI: §107) into a new surface it
+never gives back: the caller's surface keeps its vertices (only its distances released) and the call
+returns success; the new surface goes through 156.7 and is lost; a file the reader cannot read crashes
+the program (status 139). That is `reproduce`'s behaviour (the reader's messages included). By default
+(rule A): `MRISreadPatchNoRemove(<file>): a GIFTI patch is read into a new surface FreeSurfer does not
+return (the surface given stays whole): refused` as an error, `ERROR_UNSUPPORTED` (-3) returned.
+
+**156.7 The end of `MRISreadPatchNoRemove`** (after 156.2 to 156.5 read without returning an error):
+every vertex without faces (`num` 0) or without 1-hop neighbours (`vnum` 0) ripped; the ripped vertices
+removed (§144's `MRISremoveRipped`, with its FS-986); the surface's bounding box and centre (§16's `mrisComputeSurfaceDimensions`); the patch flag
+set, the status a patch (1); the metric properties and second fundamental form (§105.3's
+`MRISupdateSurface`). Returns `NO_ERROR` (0). (Despite its name it removes the ripped vertices.)
+
+**156.8 `MRISreadPatch`**: `MRISreadPatchNoRemove` (its error code returned as it is); then the ripped
+vertices removed again, every vertex without faces or neighbours ripped (after the removal), the metric
+properties and second fundamental form again. Returns `NO_ERROR`.
+
+## 157. Validation plan, part 41
+
+The probe's command `ptc` (relay 45): an empty work folder with `d`; a surface read from `d/lh.s0`
+(icosahedra of radius 10 to 100, now and then crumpled, open grids, srd's small meshes; heavy cases a
+NaN coordinate), `Gdiag`'s show bit one case in five, `Gdiag_no` (none, 0, 2, the last vertex or beyond),
+`FS_POSIX` one case in six; 0 to 3 input files at their read names (`d/lh.<name>` for a bare name): ASCII
+patches (with or without the header comment, comments and blank lines between points, a count above
+the points or -1, a number line `vno=missing`, two coordinates only, `x y z`, a line longer than 255
+bytes, NaN, inf, -0, 1e40 and hexadecimal numbers, cut files, files of comments only), binary patches of
+both forms (vertex numbers 0, beyond, `INT_MIN`, `INT_MAX` now and then; NaN, inf, -0 floats; counts
+above the points; cut files), labels (numbers -1, the count, beyond), MGH volumes of one voxel per
+vertex (compressed or not, their types and widths varying), GIFTI surfaces of the mesh or of one vertex
+less, random bytes; then 1 to 4 of: a vertex ripped, a border flag set, the current positions moved by
+a fixed pattern, the patch written (§124's `MRISwritePatch`: binary, ASCII, GIFTI names), a patch read by
+either reader with or without the conversion, by names that exist or not (a folder, `./d`). After each:
+the vertex and face counts, patch flag, status, total area, the box, each vertex's position, normal,
+area, rip and border flags and its face and neighbour counts, each face's rip flag and area. With
+`reproduce` identical to the official build; by default identical but where a noted correction changed
+the result. Observed (relay 45): seeds 7, 13 and 17 (500 cases each): RESULTSPTC.
+
+## 158. The sampled energies, the ray along a normal, the overlapping faces (fs.surfio's pieces of the metric properties; relay 45 of track D)
+
+All arithmetic in `float` unless said; "widened" is `float` to `double`, "rounded" `double` to `float`
+(round to nearest; a NaN keeps its sign and upper payload bits, quieted). Sums are left to right in the
+order written; a NaN made from two NaN operands takes the first one's sign and payload (quieted), so the
+orders below decide the bits. `FZERO(x)` is `|x| < FLT_EPSILON` in `float`. The searches are §148.4's
+closest-face search (`MHTfindClosestFaceGeneric`) of a face table: "the face found within `mm` and
+`k` shells" is that search with `project_into_face` 1; "else within 1,000 mm" a second search with
+1,000 mm and no shell or projection limit (-1, -1). The energies read the integration parameters'
+face table only.
+
+**158.1 Projection onto the sphere** of a point `c`, radius `R` the surface's radius rounded to `float`:
+`dist = sqrt((x² + y²) + z²)` (form A) or `sqrt(z² + (x² + y²))` (form B); `d = 0` when `FZERO(dist)`,
+else `1 - R / dist`; the point `c - d c` per coordinate (`x - (d x)`, the product formed `d x`).
+
+**158.2 `MRISsampleFaceCoordsCanonical(mht, surf, x, y, z, which)`**: `norm = sqrt((x² + y²) + z²)`;
+when `|widened norm - radius|` (in `double`, the radius unrounded) is not below `FLT_EPSILON` (a NaN is
+not), the point projected by 158.1 (form A, the same `dist`). Then the face found within 8 mm and 8
+shells (the point widened): its barycentric coordinates at the canonical positions (§96's surface form,
+whatever its answer; its answer is the call's return value); none: the face within 1,000 mm with a
+third for each coordinate (returns 0). The coordinates `which` (§3's selector: an unsupported set ends
+the program as it does there) of the face's three corners in corner order, accumulated from 0 per
+coordinate as `rounded((widened c) λ + widened p)`. **FS-1011**: no face within 1,000 mm either (a point
+that is not finite, a table of no face): FreeSurfer's program crashes (status 139, `reproduce`); by
+default the program ends with `MRISsampleFaceCoordsCanonical: no face within 1000 mm of (<x>, <y>, <z>)
+(FreeSurfer reads through a null pointer)` as an error (`ERROR_BADPARM`).
+
+**158.3 `mrisSampleMinimizationEnergy(surf, vno, parms, cx, cy, cz)`**: the point projected (158.1, form
+B); `p` the pial positions sampled there (158.2); `w` the vertex's white position; `d = p - w`; the
+energy `(dx² + dy²) + dz²`.
+
+**158.4 `mrisSampleNormalEnergy`**: the point projected (form B); `d = p - w` as 158.3; `len = sqrt((dx² +
+dy²) + dz²)`; 0 when widened `len < 0.01`. Else `dz, dx, dy` divided by `len`; `e1 = 1 - ((wnx dx + wny
+dy) + wnz dz)` with the vertex's white normal, each product the normal's component first; `n` the pial
+normals sampled at the projected point (158.2 with the pial normals); `|n| = sqrt(nz² + (nx² + ny²))`; 0
+when widened below 0.01; else `n / |n|`, `e2 = 1 - (nz dz + (dy ny + dx nx))`. The energy
+`rounded(widened sqrt(e1 e1) + widened sqrt(e2 e2))`.
+
+**158.5 `mrisSampleSpringEnergy(surf, vno, cx, cy, cz, parms)`**: `v = avg_vertex_dist` (1 when it is
+0); the point projected (form A); its face: the face found within 4 mm and 4 shells, else within 1,000
+mm; `p` the pial positions sampled on that face at the canonical positions (§96's `MRISsampleFaceCoords`
+with the widened point); then over the vertex's 1-hop neighbours in list order, the unripped ones, each
+neighbour's pial position sampled on its own assigned face (`fno`) at its widened current position,
+summed per coordinate (`xc + xn`), divided by their count (`float`) when there is one. The energy
+`rounded(widened((dx² + dy²) + dz²) / v)` with `d = mean - p`.
+
+**158.6 `mrisSampleParallelEnergyAtVertex(surf, vno, parms)`**: `d` from the vertex's white position to
+the pial position sampled on its assigned face at its current position (`p - w`); `len = sqrt((dx² +
+dy²) + dz²)`; 0 when `FZERO(len)`; else `d / len`. Over the unripped 1-hop neighbours in order: `dn` from
+the neighbour's white position to its pial position sampled on its assigned face when that is not
+negative, else by 158.2 at its current position; `ln` as `len`; a neighbour with `FZERO(ln)` is passed
+over; else `dn / ln`, `e = 1 - ((dxn dx + dyn dy) + dzn dz)` (each product the neighbour's component
+first), `sse = widened sqrt(e e) + sse` in `double`, counted. The energy `rounded(sse / count)` (`sse`
+itself, 0, without one).
+
+**158.7 `mrisSampleParallelEnergy(surf, vno, parms, cx, cy, cz)`**: the point projected (form A); its
+face as 158.5's; the vertex's face and current position set to them; `sse` = widened 158.6 at the vertex
+plus, in order and in `double`, 158.6 at each unripped 1-hop neighbour (`sse + e`), the count from 1; the
+vertex's position and face restored; the energy `rounded(sse / count)` (with an empty neighbour list the
+vertex's own energy).
+
+**158.8 FS-1012**: 158.5 to 158.7 sample a face whose number is outside the surface's faces when both
+searches find none or when a vertex's (or neighbour's) assigned face is -1 (158.5, 158.6's vertex) or
+beyond the faces: FreeSurfer reads memory outside them. The program ends in both modes: `<function>:
+face <n> is outside the surface's <nf> faces (FreeSurfer reads memory outside them)` as an error
+(`ERROR_BADPARM`; `<function>` is `mrisSampleSpringEnergy` or `mrisSampleParallelEnergyAtVertex`).
+
+**158.9 `mrisDirectionTriangleIntersection(surf, x0, y0, z0, nx, ny, nz, mht, &dist, vno)`**: the point
+`q = rounded(widened n * dist + widened p)` per coordinate; its bucket of the table (the table's voxel
+of each `float` coordinate, §136's; beyond the table nothing with `reproduce`, the table's edge by
+default: §136's FS-910); no bucket: returns 0. Else the bucket's faces in its order, skipping a face that
+has vertex `vno` as a corner (-1: none skipped): the ray from the widened `p` along the widened `n`
+against the face's current positions (§136.6's ray-triangle intersection); for a hit, `o` its offset from
+`p` rounded per coordinate, `s = (ox² + oy²) + oz²`, `dot = (ox nx + oy ny) + oz nz`; a hit with `dot >= 0`
+whose widened `sqrt(s)` is below the nearest so far (from 10,000) becomes the nearest and is stored in
+`dist`. Returns 1 when a hit was taken, else 0 (`dist` unchanged). FS-1012: a table of vertices lists
+vertex numbers, read as faces: one beyond the faces ends the program in both modes
+(`mrisDirectionTriangleIntersection: the face table lists <n>, outside the surface's <nf> faces (a
+table of vertices: FreeSurfer reads memory outside them)`).
+
+**158.10 `MRISdistanceToSurface(surf, mht, x0, y0, z0, nx, ny, nz)`**: `len = widened sqrt((nx² + ny²) +
+nz²)`; `n = rounded(widened n / len)` per coordinate; then 158.9 (no vertex skipped) at `dist` 0, 0.25,
+0.5, ... (`dist = 0.25 + dist` in `double`) while `dist < 128`: the first hit's `dist`, rounded; 0 after
+the last.
+
+**158.11 `mrisFindAllOverlappingFaces(surf, mht, fno, flist)`**: the face's bounding box over its
+three corners' current positions, widened, from 100,000 (low) and -100,000 (high): `low = c < low ? c :
+low`, `high = c > high ? c : high` (a NaN coordinate leaves the bound). Then for `x` from the low corner
+while `x <= high` in steps of 0.5 (`double`), inside it `y`, inside that `z`, the bucket of the point
+(each coordinate rounded to `float`; FS-910 as 158.9): a missing bucket passed over; the same bucket as
+the last one taken passed over; else each face it lists in its order whose rip flag is clear collected
+once (its rip flag set as the mark; collecting the 1,000,001st ends the program with `Too many faces`,
+`ERROR_BADPARM`). Every collected face's flag cleared. Then for each collected face `g` in order, for
+each edge `(v_n, v_{n+1 mod 3})` of face `fno`, for each edge `(u_m, u_{m+1 mod 3})` of `g` while `g` is
+not marked: edges sharing a vertex are passed over; edges that cross on the sphere (§36, on the
+canonical positions) mark `g` and list it (the 100,001st listed ends the program: `Too many intersected
+faces for face <fno> (<v0>, <v1>, <v2>)`, `ERROR_BADPARM`). The list: `fno` first, then the faces found.
+Every listed face's rip flag (`fno`'s too) cleared at the end. Returns the list's length. FS-1012 as
+158.9 for a table of vertices. **FS-1013**: a box of more than 2^28 steps (a face kilometres across, an
+infinite coordinate: FreeSurfer runs for hours or never ends) is refused in both modes with
+`mrisFindAllOverlappingFaces: face <fno>'s bounding box (...) to (...) needs <n> lookups at 0.5 mm
+(FreeSurfer runs for hours or never ends): refused` as an error (`ERROR_BADPARM`).
+
+## 159. Validation plan, part 42
+
+The probe's command `smp` (relay 45): a surface read from `d/lh.s0` (icosahedra of 1 or 2 subdivisions
+and radius 10 to 100, a third of them crumpled; open grids; srd's small meshes; heavy cases a NaN or
+zero coordinate), the radius (the icosahedron's, now and then 1 or 50), the mean vertex distance (0, 1 or
+2.5); the set-up: the canonical positions saved, the current ones moved by a fixed pattern now and
+then, the pial positions and normals saved, moved again, the white positions and normals saved; a face
+table (one case in thirty with heavy inputs a vertex table) of the canonical or current positions at 1
+to 8 mm; the vertices' faces by a pattern (now and then -1 or beyond), left at 0, or assigned
+(§152's `mrisAssignFaces`); then 1 to 6 of: 158.2 with the pial, pial-normal, white, canonical, current
+or an unsupported set; 158.3, 158.4, 158.5, 158.6, 158.7 at a vertex and a point near a vertex's position
+(scaled by 1, 0.5, 2 or -1, moved by up to 2 mm; now and then the origin, NaN or 1e30); 158.9 from a
+vertex along its normal at `dist` 0 to 5, its own vertex skipped or not; 158.10 along a vertex's normal
+or its opposite; 158.11 of a face, with every face's rip flag after it; a new table; the faces assigned;
+a vertex or a face ripped. At the end each vertex's position and face. With `reproduce` identical to the
+official build; by default identical but where a noted correction changed the result. Observed (relay
+45): RESULTSSMP. On the recorded heads (`real.py --smr`): RESULTSREAL. A clean-room implementer's
+black-box forms: `mris_register` and `mris_sphere` (158.3 to 158.7 through their sums), `mris_fix_topology`
+(158.11), `mris_convert -p` and `mri_surf2surf --patch` (156).

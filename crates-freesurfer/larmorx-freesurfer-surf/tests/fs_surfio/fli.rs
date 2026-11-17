@@ -1686,6 +1686,113 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             flush(&mut hb, o);
         }
+        "smr" => {
+            // relay 45 of track D: `fssurfio.cpp`'s `flr smr` (the sampled energies, the distance
+            // along the white surface's normals and the overlapping faces on a recorded head)
+            use larmorx_freesurfer_surf::mht::Mht;
+            use larmorx_freesurfer_surf::views::{
+                CANONICAL_VERTICES, CURRENT_VERTICES, PIAL_VERTICES, TMP_VERTICES, WHITE_VERTICES,
+            };
+            use larmorx_freesurfer_surf::{mp_slow, overlap, positions, project, sampled};
+            let (sn, wn, pn, qn) = (t.next(), t.next(), t.next(), t.next());
+            let mut sp = surf(g, sg, &mut io, sn)?;
+            let mut hb: Vec<u8> = Vec::new();
+            let flush = |hb: &mut Vec<u8>, o: &mut Out| {
+                o.s(&format!("{:016x}", super::mpx::fnv64(hb)));
+                hb.clear();
+            };
+            let put = |hb: &mut Vec<u8>, f: f32| hb.extend_from_slice(&f.to_le_bytes());
+            let puti = |hb: &mut Vec<u8>, i: i32| hb.extend_from_slice(&i.to_le_bytes());
+            o.i(i64::from(vpos::read_canonical_coordinates(
+                g, sg, &mut io, None, &mut sp, sn,
+            )?));
+            positions::save_vertex_positions(g, &mut io, &mut sp, TMP_VERTICES)?;
+            for (name, which) in [(wn, WHITE_VERTICES), (pn, PIAL_VERTICES)] {
+                o.i(i64::from(vpos::read_vertex_positions(
+                    g, sg, &mut io, None, &mut sp, name,
+                )?));
+                mp_slow::compute_normals(g, sg, &mut io, &mut sp);
+                positions::save_vertex_positions(g, &mut io, &mut sp, which)?;
+                positions::save_normals(g, &mut io, &mut sp, which)?;
+            }
+            positions::restore_vertex_positions(g, &mut io, &mut sp, TMP_VERTICES)?;
+            mp_slow::compute_normals(g, sg, &mut io, &mut sp);
+            sp.radius = 100.0;
+            let mht = Mht::create_face_table_resolution(g, io.err, &sp, CANONICAL_VERTICES, 1.0)?;
+            project::assign_faces(g, io.err, &mut sp, &mht, CANONICAL_VERTICES)?;
+            for k in 0..64i64 {
+                let vno = (k * i64::from(sp.nvertices) / 64) as usize;
+                let (x, y, z) = {
+                    let v = sp.vertex(vno);
+                    (v.x + 0.5, v.y, v.z)
+                };
+                let (r, p) = sampled::sample_face_coords_canonical(
+                    g,
+                    &mut io,
+                    &mht,
+                    &sp,
+                    x,
+                    y,
+                    z,
+                    PIAL_VERTICES,
+                )?;
+                puti(&mut hb, r);
+                for c in p {
+                    put(&mut hb, c);
+                }
+                let e = [
+                    sampled::sample_minimization_energy(g, &mut io, &mht, &sp, vno, x, y, z)?,
+                    sampled::sample_normal_energy(g, &mut io, &mht, &sp, vno, x, y, z)?,
+                    sampled::sample_spring_energy(g, &mut io, &mht, &sp, vno, x, y, z)?,
+                    sampled::sample_parallel_energy_at_vertex(g, &mut io, &mht, &sp, vno)?,
+                    sampled::sample_parallel_energy(g, &mut io, &mht, &mut sp, vno, x, y, z)?,
+                ];
+                for f in e {
+                    put(&mut hb, f);
+                }
+            }
+            flush(&mut hb, o);
+            let w = surf(g, sg, &mut io, wn)?;
+            let mw = Mht::create_face_table_resolution(g, io.err, &w, CURRENT_VERTICES, 1.0)?;
+            for k in 0..64i64 {
+                let vno = (k * i64::from(w.nvertices) / 64) as usize;
+                let (p, n) = {
+                    let v = w.vertex(vno);
+                    ([v.x, v.y, v.z], [v.nx, v.ny, v.nz])
+                };
+                put(
+                    &mut hb,
+                    overlap::distance_to_surface(g, &mut io, &w, &mw, p, n)?,
+                );
+                put(
+                    &mut hb,
+                    overlap::distance_to_surface(g, &mut io, &w, &mw, p, [-n[0], -n[1], -n[2]])?,
+                );
+            }
+            flush(&mut hb, o);
+            let mut q = surf(g, sg, &mut io, qn)?;
+            positions::save_vertex_positions(g, &mut io, &mut q, CANONICAL_VERTICES)?;
+            let mq = Mht::create_face_table(g, io.err, &q)?;
+            let step = if q.nfaces / 200 > 0 {
+                q.nfaces / 200
+            } else {
+                1
+            };
+            let mut total = 0i64;
+            let mut fno = 0;
+            while fno < q.nfaces {
+                let list =
+                    overlap::find_all_overlapping_faces(g, &mut io, &mut q, &mq, fno as usize)?;
+                puti(&mut hb, list.len() as i32);
+                total += list.len() as i64;
+                for f in list {
+                    puti(&mut hb, f);
+                }
+                fno += step;
+            }
+            o.i(total);
+            flush(&mut hb, o);
+        }
         "mpx" => {
             // relay 37 of track D: `fssurfio.cpp`'s `flr mpx` (group (e) on a recorded head: the
             // distributions on the white surface with the sphere's canonical coordinates,

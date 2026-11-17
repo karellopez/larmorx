@@ -21,9 +21,7 @@ use larmorx_freesurfer_surf::coords::Io;
 use larmorx_freesurfer_surf::mht::Mht;
 use larmorx_freesurfer_surf::mris::Mris;
 use larmorx_freesurfer_surf::views::{CANONICAL_VERTICES, PIAL_VERTICES, WHITE_VERTICES};
-use larmorx_freesurfer_surf::{
-    overlap, patchread, positions, readwrite, sampled, valfile,
-};
+use larmorx_freesurfer_surf::{overlap, patchread, positions, readwrite, sampled, valfile};
 
 struct Run {
     g: Globals,
@@ -231,8 +229,8 @@ fn sphere_set_up(r: &mut Run) -> (Mris, Mht) {
         (p.x, p.y, p.z) = (p.x * 1.2, p.y * 1.2, p.z * 1.2);
     }
     positions::save_vertex_positions(&mut r.g, &mut io, &mut s, PIAL_VERTICES).unwrap();
-    let m = Mht::create_face_table_resolution(&mut r.g, io.err, &s, CANONICAL_VERTICES, 2.0)
-        .unwrap();
+    let m =
+        Mht::create_face_table_resolution(&mut r.g, io.err, &s, CANONICAL_VERTICES, 2.0).unwrap();
     (s, m)
 }
 
@@ -256,22 +254,13 @@ fn sampling_through_the_sphere() {
         }
     }
     let (cx, cy, cz) = (c[0] as f32, c[1] as f32, c[2] as f32);
-    let (_, p) = sampled::sample_face_coords_canonical(
-        &mut r.g,
-        &mut io,
-        &m,
-        &s,
-        cx,
-        cy,
-        cz,
-        PIAL_VERTICES,
-    )
-    .unwrap();
+    let (_, p) =
+        sampled::sample_face_coords_canonical(&mut r.g, &mut io, &m, &s, cx, cy, cz, PIAL_VERTICES)
+            .unwrap();
     for k in 0..3 {
         assert!((f64::from(p[k]) - 1.2 * c[k]).abs() < 1e-3, "{p:?} {c:?}");
     }
-    let e =
-        sampled::sample_minimization_energy(&mut r.g, &mut io, &m, &s, 4, cx, cy, cz).unwrap();
+    let e = sampled::sample_minimization_energy(&mut r.g, &mut io, &m, &s, 4, cx, cy, cz).unwrap();
     let want = (1.2 * c[0]).powi(2) + (1.2 * c[1]).powi(2) + (1.2 * c[2] - 10.0).powi(2);
     assert!((f64::from(e) - want).abs() < 1e-2, "{e} {want}");
 }

@@ -250,9 +250,8 @@ fn read_ascii(
             match n {
                 Some(n) => i = n,
                 None => {
-                    let what = format!(
-                        "MRISreadPatchNoRemove({fname}): point {j} holds no vertex number"
-                    );
+                    let what =
+                        format!("MRISreadPatchNoRemove({fname}): point {j} holds no vertex number");
                     if let Some(code) = missing(g, io, j == 0, what) {
                         return Ok(Some(code));
                     }
@@ -293,9 +292,8 @@ fn read_ascii(
             n
         };
         if read < 3 {
-            let what = format!(
-                "MRISreadPatchNoRemove({fname}): point {j} holds fewer than 3 coordinates"
-            );
+            let what =
+                format!("MRISreadPatchNoRemove({fname}): point {j} holds fewer than 3 coordinates");
             if let Some(code) = missing(g, io, j == 0, what) {
                 return Ok(Some(code));
             }
@@ -422,11 +420,7 @@ fn read_binary(
         sync_read_errno(g, &fp);
     }
     if g.gdiag & DIAG_SHOW != 0 {
-        let kind = if old {
-            "binary"
-        } else {
-            "new surface format"
-        };
+        let kind = if old { "binary" } else { "new surface format" };
         let s = format!(
             "reading {kind} patch {pname} with {npts} vertices ({}% of total)\n",
             percent(npts, mris.nvertices)

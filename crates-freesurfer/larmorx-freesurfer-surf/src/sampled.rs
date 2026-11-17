@@ -62,7 +62,11 @@ fn project_onto_sphere_z_first(cx: f32, cy: f32, cz: f32, radius: f32) -> (f32, 
     } else {
         sub(1.0, div(radius, dist))
     };
-    (sub(cx, mul(d, cx)), sub(cy, mul(d, cy)), sub(cz, mul(d, cz)))
+    (
+        sub(cx, mul(d, cx)),
+        sub(cy, mul(d, cy)),
+        sub(cz, mul(d, cz)),
+    )
 }
 
 /// A face number a sampled energy samples: outside the surface's faces it is FS-1012 (FreeSurfer
@@ -365,8 +369,7 @@ pub fn sample_parallel_energy_at_vertex(
         let q = if nfno >= 0 {
             pial_at(g, io, mris, nfno, pos, WHO)?
         } else {
-            sample_face_coords_canonical(g, io, mht, mris, pos[0], pos[1], pos[2], PIAL_VERTICES)?
-                .1
+            sample_face_coords_canonical(g, io, mht, mris, pos[0], pos[1], pos[2], PIAL_VERTICES)?.1
         };
         let (mut dxn, mut dyn_, mut dzn) = (sub(q[0], wn[0]), sub(q[1], wn[1]), sub(q[2], wn[2]));
         let len = sqrt(add(add(mul(dxn, dxn), mul(dyn_, dyn_)), mul(dzn, dzn)));

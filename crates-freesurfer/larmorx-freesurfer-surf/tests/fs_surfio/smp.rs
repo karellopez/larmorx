@@ -229,7 +229,9 @@ pub(super) fn smp_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             }
             "sn" => {
                 let which = t.i();
-                o.i(i64::from(positions::save_normals(g, &mut io, &mut s, which)?));
+                o.i(i64::from(positions::save_normals(
+                    g, &mut io, &mut s, which,
+                )?));
             }
             "jit" => {
                 let a = t.f();

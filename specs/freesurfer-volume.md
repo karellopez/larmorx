@@ -784,97 +784,169 @@ The probe cannot check these cases' own lines (FreeSurfer crashes, never returns
 there; §69.3's allowed lines; FS-306's names crash it), except FS-298 and FS-299 under `reproduce`;
 the clean room's own tests check the rest against this table.
 
-## 23. The CMA labels and the segmentation functions (`cma.h`, `cma.cpp`; 3.1-35 piece c)
+## 23. The CMA labels and the segmentation functions (3.1-35 piece c)
 **The label numbers** are those of FreeSurfer's colour table (`FreeSurferColorLUT.txt`, distributed
 with FreeSurfer: 0 `Unknown`, 2 `Left-Cerebral-White-Matter`, 3 `Left-Cerebral-Cortex`, 41 and 42
-their right counterparts, ...), under the names below (dashes as underscores).
+their right counterparts, ...); the tables below give every number the functions use.
 
 **The tests** take a label of any numeric type (an `int`, a `float` or a `double` voxel value) and
-compare it, in that type, with the label numbers (`=` equal, `<`, `<=`, `>=`; a NaN is never equal,
-smaller or larger, so it passes only the tests built on `not`):
+compare it, in that type, with the numbers below (`a-b` is the range `a <= l <= b`, so `270.5` is in
+`270-277`; a set holds only its whole numbers). A NaN is equal to no number and neither smaller nor
+larger, so no test holds for a NaN (`IS_BRAIN`'s "not" is joined with `l < 98`). Each test, in the
+order the probe prints them (§69's `cmalab`):
+
+| Test | Holds for |
+|---|---|
+| `IS_FUTURE_WMSA` | 87, 88, 89 |
+| `IS_LH_LAYER` | 270-277 |
+| `IS_CC` | 251-255 |
+| `IS_RH_LAYER` | 370-377 |
+| `IS_LAYER` | `IS_LH_LAYER` or `IS_RH_LAYER` |
+| `IS_UNKNOWN` | 0, 255, 190, 191 |
+| `IS_BRAIN` | (not `IS_UNKNOWN` and `l < 98`) or `IS_CC` (so a negative label is brain, and 255) |
+| `IS_WM` | 2, 41, 187, 186, 28, 60, or `IS_CC`, or `IS_CEREBELLAR_WM` |
+| `IS_CEREBRAL_WM` | 2, 41 |
+| `IS_HYPO`, `IS_WMSA` | 77, 78, 79, or `IS_FUTURE_WMSA` |
+| `IS_WMH` | `IS_WM` or `IS_HYPO` |
+| `IS_THALAMUS` | 10, 49 |
+| `IS_GM`, `IS_CORTEX` | 3, 42 |
+| `IS_VENTRAL_DC` | 28, 60 |
+| `IS_CEREBELLAR_WM` | 7, 46 |
+| `IS_CEREBELLAR_GM` | 8, 47 |
+| `IS_CEREBELLUM` | `IS_CEREBELLAR_WM` or `IS_CEREBELLAR_GM` |
+| `IS_CHOROID` | 31, 63 |
+| `IS_HIPPO` | 17, 53 |
+| `IS_AMYGDALA` | 18, 54 |
+| `IS_MTL` | `IS_HIPPO` or `IS_AMYGDALA` |
+| `IS_LAT_VENT` | 4, 43, 44, 5 (the inferior lateral ventricles included) |
+| `IS_CSF` | `IS_LAT_VENT`, or 24, 122, 14, 15 |
+| `IS_INF_LAT_VENT` | 5, 44 |
+| `IS_VENTRICLE` | `IS_LAT_VENT`, or 14, 15 |
+| `IS_CAUDATE` | 11, 50 |
+| `IS_PUTAMEN` | 12, 51 |
+| `IS_CLAUSTRUM` | 138, 139 |
+| `IS_ACCUMBENS` | 26, 58 |
+| `IS_PALLIDUM` | 13, 52 |
+| `LABEL_WITH_NO_TOPOLOGY_CONSTRAINT` | 77, 78, 79, 80, 81, 82, 31, 63, 98, 118, 120, 122, 129 |
+| `IS_FIMBRIA` | 212, 503, 553 |
+| `IS_GRAY_MATTER` | 3, 8, 11, 12, 17, 18, 26, 42, 47, 50, 51, 53, 54, 58 |
+| `IS_WHITE_MATTER` | 2, 7, 41, 46 |
+| `IS_FLUID` | 0, 4, 5, 43, 44 |
+| `IS_LH_CLASS` | 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 17, 18, 26, 28, 30, 31 |
+| `IS_RH_CLASS` | 41, 42, 43, 44, 46, 47, 49, 50, 51, 52, 53, 54, 58, 60, 62, 63 |
+| `IS_GRAY_CLASS` | 3, 42, 11, 50 |
+| `IS_WHITE_CLASS` | 2, 41 |
+| `IS_CSF_CLASS` | 4, 43, 24, 122, 14, 15, 72, 215, 505, 555 |
 
 - `IS_CLASS(l, c)`: `IS_CSF_CLASS(l)` when `c` is `CSF_CLASS` (0), `IS_GRAY_CLASS(l)` when it is
-  `GM_CLASS` (1), else `IS_WHITE_CLASS(l)`.
+  `GM_CLASS` (1), else `IS_WHITE_CLASS(l)` (`WM_CLASS` 2, `OTHER_CLASS` 7 and any other).
+  (**(observed)**: every label from -3 to 1005 and the ranges above 1000 below, each as an `int`, a
+  nearby `float` (NaN, infinities and fractions included) and that `float` as a `double`: §69's
+  `cmalab`, `models.py cma`.)
 
 **A voxel as a label.** The functions below read each voxel of frame 0 as a `float` and turn it into
 an `int` label by truncation toward zero. A NaN or a value outside the `int` range: FreeSurfer gives
 -2147483648 (FS-311; by default NaN is 0 and the others the range's end, noted).
 
-- **`IsSubCorticalGray(id)`**: 1 for the thalami (10, 49), caudates (11, 50), putamens (12, 51),
-  pallidums (13, 52), hippocampi (17, 53), amygdalae (18, 54), accumbens areas (26, 58), ventral
-  diencephalons (28, 60) and substantiae nigrae (27, 59); else 0.
+- **`IsSubCorticalGray(id)`**: 1 for 10, 49 (thalami), 11, 50 (caudates), 12, 51 (putamens), 13, 52
+  (pallidums), 17, 53 (hippocampi), 18, 54 (amygdalae), 26, 58 (accumbens areas), 28, 60 (ventral
+  diencephalons), 27, 59 (substantiae nigrae); else 0.
 - **`MRIasegContraLatLabel(id)`**: the label of the same structure in the other hemisphere. 0 for 0.
-  Above 999: 1000-1998 and 3000-3998, 11100-11998 and 13100-13998 add 1000; 2000-2998 and 4000-4998,
-  12100-12998 and 14100-14998 take 1000; 5001 and 5002 swap; any other -1, with no message. Below 1000:
-  each lateralized structure of the colour table's left/right pairs gives its counterpart (9 and 48,
-  the old thalamus numbers, swap; so do the limbic labels 865/866, 819/820, 821/822, 843/844,
-  869/870); the labels without a side give themselves (72, `Optic_Chiasm`, the third and fourth
-  ventricles, the brain stem, the corpus callosum's five parts, the extra-cerebral CSF and head,
-  165, 259, 260, 262, 502, 902, 514, 914, the hypointensities, `CSF`, 853, 883); any other gives -1
-  after `MRIasegContraLatLabel() id=<id> unrecognized` on standard output.
+  Above 999: 1000-1998, 3000-3998, 11100-11998 and 13100-13998 add 1000; 2000-2998, 4000-4998,
+  12100-12998 and 14100-14998 take 1000; 5001 and 5002 swap; any other -1, with no message. Below
+  1000 (negative labels included): these pairs swap, 1-13 with 40-52 (`i` and `i + 39`), 17 and 53,
+  18 and 54, 19 and 55, 20 and 56, 25-39 with 57-71 (`i` and `i + 32`), 73 and 74, 78 and 79, 81 and
+  82, 83 and 84, 96 and 97, 138 and 139, 265 and 266, 819 and 820, 821 and 822, 843 and 844, 865 and
+  866, 869 and 870; these give themselves: 14, 15, 16, 24, 72, 77, 80, 85, 165, 251-255, 257, 258,
+  259, 260, 262, 502, 514, 853, 883, 902, 914; any other gives -1 after `MRIasegContraLatLabel()
+  id=<id> unrecognized` + `\n` on standard output (**(observed)**: §69's `cmalab`).
 - **`SupraTentorialVolCorrection(aseg, ribbon)`**: over the segmentation's columns, rows and slices
   (that order, slices innermost), the voxels whose ribbon value (the ribbon read at the same place,
-  as a label) is not above 0 and whose label is a lateral or inferior lateral ventricle, choroid
-  plexus, white-matter hypointensity (77, 78, 79), thalamus, corpus callosum part, ventral
-  diencephalon, hippocampus, amygdala, caudate, putamen, pallidum or accumbens area add the voxel
-  volume (the segmentation's three voxel sizes multiplied as `float`s, left to right, then as a
-  `double`) to a `double` sum, in that order. A thalamus voxel adds it twice in FreeSurfer (FS-312;
-  once by default, noted).
+  as a label) is not above 0 and whose label is a lateral or inferior lateral ventricle (4, 43, 5,
+  44), a choroid plexus (31, 63), a white-matter hypointensity (77, 78, 79), a thalamus (10, 49), a
+  corpus callosum part (251-255), a ventral diencephalon (28, 60), a hippocampus (17, 53), an amygdala
+  (18, 54), a caudate (11, 50), a putamen (12, 51), a pallidum (13, 52) or an accumbens area (26, 58)
+  add the voxel volume (the segmentation's three voxel sizes multiplied as `float`s, left to right,
+  then as a `double`) to a `double` sum, in that order. A thalamus voxel adds it twice in FreeSurfer
+  (FS-312; once by default, noted).
 - **`CorticalGMVolCorrection(aseg, ribbon, hemi)`**: the voxels in the hemisphere's ribbon (`hemi` 1:
   ribbon value 3; 2: 42; any other: every voxel) add the voxel volume to two sums: `vol2` when the
   label is none of 0, 2, 3, 41, 42; `vol` when it is a hippocampus, amygdala, lateral or inferior
   lateral ventricle, choroid plexus, hypointensity (77, 78, 79), thalamus (twice in FreeSurfer:
   FS-312), corpus callosum part, ventral diencephalon, caudate, putamen, pallidum, accumbens area,
-  cerebellar cortex or `Left_vessel` (30; `Right_vessel`, 62, is not counted by FreeSurfer: FS-313,
-  counted by default, noted). Prints `CorticalGMVolCorrection(): hemi=<hemi>, vol1=<vol>,
-  vol2=<vol2>` (`%g`) on standard output; returns `vol`.
+  cerebellar cortex (8, 47) or the left vessel (30; the right vessel, 62, is not counted by
+  FreeSurfer: FS-313, counted by default, noted). Prints `CorticalGMVolCorrection(): hemi=<hemi>,
+  vol1=<vol>, vol2=<vol2>` (`%g`) on standard output; returns `vol`.
 - **`MRIlrswapAseg(aseg)`**: a new volume like `aseg` (its extent, type, frames, header and colour
   table; voxels 0) whose frame 0 holds each voxel's `MRIasegContraLatLabel` (the label itself where
   that gives -1), stored as the volume's type stores a value; its messages as above, voxel by voxel.
-- **`MRIlrswapSeg(seg, lh, rh)`**: `lh` and `rh` are matrices whose first row lists label pairs, read
-  as far as the matrices' row count (FreeSurfer's callers pass one column per pair as rows: `n x 1`;
-  lists with fewer numbers than rows are read past their end: FS-315, an error here). Different row
-  counts: `ERROR: MRIlrswapSeg(): lh=<rows> != rh=<rows>` on standard output and no volume. Else a
-  new volume like `seg` with its pulse parameters and a copy of its colour table, whose frame 0 holds,
-  for each voxel, the label of the first pair (in list order) the voxel's label equals (compared as
-  `float`s, the `lh` side first at each pair), swapped (the other side, as a label), else the voxel's
-  label; `MRIlrswapSeg(): nswaps <count>` on standard output (the voxels swapped).
+- **`MRIlrswapSeg(seg, lh, rh)`**: the labels of each list are the first `rows` numbers of its matrix
+  in row order (`rows` its row count: an `n x 1` list, as FreeSurfer's callers pass, gives its n
+  numbers; a `1 x n` list its first number only); a matrix with fewer numbers than rows (0 columns) is
+  read past its end (FS-315, an error here). Different row counts: `ERROR: MRIlrswapSeg(): lh=<rows>
+  != rh=<rows>` on standard output and no volume. Else a new volume like `seg` with its pulse
+  parameters and a copy of its colour table, whose frame 0 holds, for each voxel, the label of the
+  first pair (in list order) the voxel's label equals (compared as `float`s, the `lh` side first at
+  each pair), swapped (the other side, truncated to an `int` as a label), else the voxel's label; a
+  swap that gives -1 keeps the voxel's label (and still counts). `MRIlrswapSeg(): nswaps <count>` on
+  standard output (the voxels swapped).
 - **`MRIfixAsegWithRibbon(aseg, ribbon, asegfixed)`**: `aseg` copied (`MRIcopy`, into `asegfixed` when
   given), then each voxel whose label is 0, 2, 3, 41 or 42 takes the ribbon's label at that place.
 - **`MRIoneHotEncode(seg, list, force1)`**: a `uchar` volume of `seg`'s extent with one frame per
-  list entry and `seg`'s header and pulse parameters; `MRIoneHotEncode(): n=<n> Force1=<force1>: `,
-  each listed label followed by a blank, and a newline on standard output; each voxel sets 1 in the
+  list entry (an empty list: no frames, after the allocation's message, `specs/freesurfer-mri.md`
+  §2) and `seg`'s header and pulse parameters; `MRIoneHotEncode(): n=<n> Force1=<force1>: `, each
+  listed label followed by a blank, and a newline on standard output; each voxel sets 1 in the
   frame of the first entry equal to its label, else, when `force1` is not 0 and the list holds 0, in
   the frame of the last 0.
-- **The brain volume statistics' cache** (`<subjdir>/<subject>/stats/brainvol.stats`, relative to the
-  program's working directory). Writing (`CacheBrainVolumeStats`): 16 lines `# Measure <names>,
-  <description>, <value>, mm^3` (the names and descriptions of `mri_brainvol_stats`' output, in its
-  order: BrainSeg, BrainSegNotVent, SupraTentorial, SupraTentorialNotVent, SubCortGray, lhCortex,
-  rhCortex, Cortex, TotalGray, lhCerebralWhiteMatter, rhCerebralWhiteMatter, CerebralWhiteMatter,
-  Mask, SupraTentorialNotVentVox, BrainSegNotVentSurf, VentricleChoroidVol), the value as
-  `printf("%.12f")` writes it; a file that cannot be made ends the program (`error: could not open
-  file <name> for writing`, status 1). Reading (`ReadCachedBrainVolumeStats`): a file that cannot be
-  opened: `computing (and caching) brain volume statistics` on standard output, the statistics
-  computed (`ComputeBrainVolumeStats`, the caller's) and written. Else each line holding a measure's
-  `<names>` text gives it the first of the line's white-space-separated words that, without its last
-  character, reads as a C++ stream reads a `double` (an optional sign, digits with at most one point,
-  an exponent after a digit; the longest such start of the word, which must be a whole number for
-  `strtod` and must not overflow; `inf`, `nan`, hexadecimal not read); a line naming a measure whose
-  words give no number and that ends in white space makes FreeSurfer abort (FS-314: by default the
-  line gives no number). A measure without a value (or with a negative one) ends the program: `error:
-  could not find stat for <names> in <name>` (status 1).
+- **The brain volume statistics' cache** (`<subjdir>/<subject>/stats/brainvol.stats`, the name built
+  as `<subjdir>` + `/` + `<subject>` + `/stats/brainvol.stats`, relative to the program's working
+  directory). Writing (`CacheBrainVolumeStats(stats, subject, subjdir)`): 16 lines `# Measure
+  <names>, <description>, <value>, mm^3` + `\n`, the value as `printf("%.12f")` writes it, the
+  names and descriptions in this order (the `<names>` field is the two names with their comma):
+
+  | # | `<names>` | `<description>` |
+  |---|---|---|
+  | 0 | `BrainSeg, BrainSegVol` | `Brain Segmentation Volume` |
+  | 1 | `BrainSegNotVent, BrainSegVolNotVent` | `Brain Segmentation Volume Without Ventricles` |
+  | 2 | `SupraTentorial, SupraTentorialVol` | `Supratentorial volume` |
+  | 3 | `SupraTentorialNotVent, SupraTentorialVolNotVent` | `Supratentorial volume` |
+  | 4 | `SubCortGray, SubCortGrayVol` | `Subcortical gray matter volume` |
+  | 5 | `lhCortex, lhCortexVol` | `Left hemisphere cortical gray matter volume` |
+  | 6 | `rhCortex, rhCortexVol` | `Right hemisphere cortical gray matter volume` |
+  | 7 | `Cortex, CortexVol` | `Total cortical gray matter volume` |
+  | 8 | `TotalGray, TotalGrayVol` | `Total gray matter volume` |
+  | 9 | `lhCerebralWhiteMatter, lhCerebralWhiteMatterVol` | `Left hemisphere cerebral white matter volume` |
+  | 10 | `rhCerebralWhiteMatter, rhCerebralWhiteMatterVol` | `Right hemisphere cerebral white matter volume` |
+  | 11 | `CerebralWhiteMatter, CerebralWhiteMatterVol` | `Total cerebral white matter volume` |
+  | 12 | `Mask, MaskVol` | `Mask Volume` |
+  | 13 | `SupraTentorialNotVentVox, SupraTentorialVolNotVentVox` | `Supratentorial volume voxel count` |
+  | 14 | `BrainSegNotVentSurf, BrainSegVolNotVentSurf` | `Brain Segmentation Volume Without Ventricles from Surf` |
+  | 15 | `VentricleChoroidVol, VentricleChoroidVol` | `Volume of ventricles and choroid plexus` |
+
+  A file that cannot be made ends the program (`error: could not open file <name> for writing`,
+  status 1). Reading (`ReadCachedBrainVolumeStats(subject, subjdir)`): a file that cannot be opened:
+  `computing (and caching) brain volume statistics` on standard output, the statistics computed
+  (`ComputeBrainVolumeStats`, the caller's) and written. Else every measure starts at -1; each line
+  (up to its `\n`) that holds a measure's `<names>` text (anywhere; a line may hold several) gives
+  each of them the first of the line's white-space-separated words that, without its last character,
+  reads as a C++ stream reads a `double`: an optional sign, digits with at most one point, an
+  exponent after a digit; the longest such start of the word, which must then read whole as
+  `strtod` reads it and must not overflow (`12abc,` gives 12, `0x10,` gives 0 (its leading 0),
+  `1e,`, `1e400,`, `inf,`, `nan,` give nothing; a word of one character gives nothing); a later line
+  replaces an earlier one's value. A line naming a measure whose words give no number and that ends
+  in white space (a carriage return included) makes FreeSurfer abort (FS-314: by default the line
+  gives no number). Then a measure below 0 (none found, or a negative value; -0 is not below 0) ends
+  the program: `error: could not find stat for <names> in <name>` (status 1), the first such
+  measure in the table's order (**(observed)**: §69's `bvc` and `bvr`).
 
 ## 24. Validation plan (the CMA labels)
-The probe's commands `cmalab` (labels from the colour table, the parcellations' ranges and odd values,
-each as an `int`, a nearby `float` (NaN and odd values included) and that `float` as a `double`: every
-test, `IS_CLASS` for classes 0, 1, 2 and 7, `IsSubCorticalGray`, `MRIasegContraLatLabel`), `cmavol`
-(segmentations and ribbons of 1 to 48 voxels of every type with painted labels, NaN and odd values,
-`hemi` 0 to 3), `lrswap`, `fixrib` (with and without a destination), `lrseg` (pair lists of 1 to 4
-rows, `n x 1`, `n x 2` and `n x 0`, different row counts), `ohe` (lists of 0 to 4 labels, `force1` 0, 1,
-2), `bvc` (16 values, NaN and infinities included; the stats folder missing) and `bvr` (the cache's
-lines with numbers in other forms, lines missing, doubled, without a number, white space and carriage
-returns at their ends). Expected: identical with `reproduce` but where FreeSurfer reads memory it does
-not own or crashes (FS-314, FS-315, and the volumes' FS-53, FS-58), counted and not compared.
+§69's group `vcma` (the open probe's commands `cmalab`, `cmavol`, `lrswap`, `fixrib`, `lrseg`, `ohe`,
+`bvc` and `bvr`; §69.2 says what it covers and gives its hash): identical with `reproduce` but where
+FreeSurfer reads memory it does not own or crashes (FS-314, FS-315, and the volumes' FS-53, FS-58,
+FS-252), lines the loop allows; the default differs only where it notes a defect. The open folder's
+`models.py cma` checks the tables above on every `cmalab` line. Not in the probe: the statistics
+computed when the cache is missing (`ComputeBrainVolumeStats` reads a subject's files: the replays of
+`mri_segstats` and `mris_anatomical_stats` on the recorded heads).
 
 ## 25. Resolution, planes, fills, resampling by whole factors and changes of type (3.1-36)
 Where two NaNs meet in an operation below, the result keeps the first operand's NaN as written here

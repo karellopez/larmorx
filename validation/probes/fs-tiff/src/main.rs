@@ -7,8 +7,14 @@
 //!   fs-tiff write <out> <scratch> <seed> <n> <threads>   FreeSurfer's TiffWriteImage, files compared
 //!   fs-tiff one <out> <scratch> <seed> <case>            one generated file's transcripts
 //!   fs-tiff file <out> <scratch> <file.tif>              one file's transcripts
+//!   fs-tiff nopix <out> <scratch> <seed> <n> <threads>   files of no pixels (`make_no_pixels`),
+//!                                                        read into no buffer and into empty ones
+//!   fs-tiff null <out> <scratch> <seed> <n> <threads>    generated files read into no buffer
+//! `one` and `file` read with FS_TIFF_BUFFERS=null|empty (default: filled buffers); `one` makes
+//! the file of no pixels with FS_TIFF_GEN=nopix.
 
 use larmorx_core::defects::UpstreamDefects;
+use larmorx_io::tiff::cases::Buffers;
 use larmorx_io::tiff::{Options, cases};
 use std::ffi::{CString, c_char, c_int, c_void};
 use std::path::{Path, PathBuf};
@@ -124,8 +130,26 @@ fn c_run(lib: Lib, mode: i32, path: &Path, p: &[i32], d: &[f64], data: &[u8]) ->
 const VARY: &[&str] = &[
     "FS-815", "FS-816", "FS-818", "FS-819", "FS-820", "FS-821", "FS-822", "FS-823", "FS-824",
     "FS-825", "FS-826", "FS-828", "FS-830", "FS-831", "FS-832", "FS-833", "FS-834", "FS-835",
-    "FS-838", "FS-840", "FS-884",
+    "FS-838", "FS-840", "FS-884", "FS-958",
 ];
+
+/// The shim's read mode for buffers `b` (shim_tiff.c's `data_text`).
+fn shim_mode(b: Buffers) -> i32 {
+    match b {
+        Buffers::Filled => 0,
+        Buffers::Null => 2,
+        Buffers::Empty => 3,
+    }
+}
+
+/// The buffers FS_TIFF_BUFFERS names.
+fn env_buffers() -> Buffers {
+    match std::env::var("FS_TIFF_BUFFERS").as_deref() {
+        Ok("null") => Buffers::Null,
+        Ok("empty") => Buffers::Empty,
+        _ => Buffers::Filled,
+    }
+}
 
 #[derive(Default)]
 struct Tally {
@@ -138,6 +162,11 @@ struct Tally {
     alloc: u64,
     up_fs_differ: u64,
     diffs: Vec<String>,
+    /// Reads of 0-byte scanlines or tiles (the port's transcript, reproduce), those that
+    /// returned -1, and zlib's refusals of no buffer (`zlib error` in the port's messages).
+    zero_reads: u64,
+    zero_failed: u64,
+    zlib_refused: u64,
     builds: Vec<String>,
     notices: std::collections::BTreeMap<&'static str, u64>,
 }
@@ -167,19 +196,56 @@ fn first_diff(a: &str, b: &str) -> String {
     "same lines".into()
 }
 
-fn one_read(fs: Lib, up: Lib, path: &Path, t: &Mutex<Tally>, label: &str, verbose: bool) {
-    let cfs = c_run(fs, 0, path, &[], &[], &[]);
-    let cup = c_run(up, 0, path, &[], &[], &[]);
+fn one_read(
+    fs: Lib,
+    up: Lib,
+    path: &Path,
+    t: &Mutex<Tally>,
+    label: &str,
+    verbose: bool,
+    bufs: Buffers,
+) {
+    let mode = shim_mode(bufs);
+    let cfs = c_run(fs, mode, path, &[], &[], &[]);
+    let cup = c_run(up, mode, path, &[], &[], &[]);
     cases::reset_thread_state();
-    let (pout, perr, ids, unp) = cases::port_read(
+    let (pout, perr, ids, unp) = cases::port_read_with(
         path.to_str().expect("path"),
         opts(UpstreamDefects::Reproduce),
+        bufs,
     );
     cases::reset_thread_state();
-    let (fout, ferr, fids, _) =
-        cases::port_read(path.to_str().expect("path"), opts(UpstreamDefects::Fix));
+    let (fout, ferr, fids, _) = cases::port_read_with(
+        path.to_str().expect("path"),
+        opts(UpstreamDefects::Fix),
+        bufs,
+    );
     let mut t = t.lock().expect("tally");
     t.cases += 1;
+    let mut zero = false;
+    for l in pout.lines() {
+        let w: Vec<&str> = l.split_whitespace().collect();
+        match w.first() {
+            Some(&"tiled") => {
+                let sz = if w.get(1) == Some(&"1") { w.get(5) } else { w.get(3) };
+                zero = sz == Some(&"0");
+            }
+            Some(&"r") | Some(&"t") if zero => {
+                t.zero_reads += 1;
+                let r = if w[0] == "r" { w.get(3) } else { w.get(4) };
+                if r == Some(&"-1") {
+                    t.zero_failed += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    if bufs == Buffers::Null {
+        t.zlib_refused += perr
+            .lines()
+            .filter(|l| l.starts_with("ZIPDecode:") && l.contains("zlib error"))
+            .count() as u64;
+    }
     for id in ids.iter().chain(fids.iter()) {
         *t.notices.entry(id).or_default() += 1;
     }
@@ -263,6 +329,10 @@ fn report(what: &str, t: &Tally) {
         t.up_fs_differ,
         t.diffs.len()
     );
+    println!(
+        "reads of 0 bytes: {} ({} returned -1); zlib's refusals of no buffer (port's messages): {}",
+        t.zero_reads, t.zero_failed, t.zlib_refused
+    );
     println!("notices: {:?}", t.notices);
     if !t.builds.is_empty() {
         println!(
@@ -326,10 +396,45 @@ fn main() {
             par(n, threads, |i| {
                 let p = PathBuf::from(format!("r{seed}-{i}.tif"));
                 std::fs::write(&p, cases::make(seed, i)).expect("write");
-                one_read(fs, up, &p, &t, &format!("seed {seed} case {i}"), false);
+                one_read(
+                    fs,
+                    up,
+                    &p,
+                    &t,
+                    &format!("seed {seed} case {i}"),
+                    false,
+                    Buffers::Filled,
+                );
                 let _ = std::fs::remove_file(&p);
             });
             report(&format!("read seed {seed}"), &t.lock().expect("tally"));
+        }
+        "nopix" | "null" => {
+            // nopix: files of no pixels read into no buffer and into buffers of no bytes;
+            // null: the generated files read into no buffer
+            let (seed, n, threads) = (num(4), num(5), num(6) as usize);
+            let nopix = a[1] == "nopix";
+            let t = Mutex::new(Tally::default());
+            par(n, threads, |i| {
+                let p = PathBuf::from(format!("{}{seed}-{i}.tif", &a[1]));
+                let f = if nopix {
+                    cases::make_no_pixels(seed, i)
+                } else {
+                    cases::make(seed, i)
+                };
+                std::fs::write(&p, f).expect("write");
+                let modes: &[Buffers] = if nopix {
+                    &[Buffers::Null, Buffers::Empty]
+                } else {
+                    &[Buffers::Null]
+                };
+                for &b in modes {
+                    let label = format!("{} seed {seed} case {i} {b:?}", &a[1]);
+                    one_read(fs, up, &p, &t, &label, false, b);
+                }
+                let _ = std::fs::remove_file(&p);
+            });
+            report(&format!("{} seed {seed}", &a[1]), &t.lock().expect("tally"));
         }
         "stats" => {
             // per compression of each directory read: rows or tiles read whole (1 or a size)
@@ -370,15 +475,20 @@ fn main() {
         "one" => {
             let (seed, i) = (num(4), num(5));
             let p = PathBuf::from(format!("one{seed}-{i}.tif"));
-            std::fs::write(&p, cases::make(seed, i)).expect("write");
+            let f = if std::env::var("FS_TIFF_GEN").is_ok_and(|v| v == "nopix") {
+                cases::make_no_pixels(seed, i)
+            } else {
+                cases::make(seed, i)
+            };
+            std::fs::write(&p, f).expect("write");
             let t = Mutex::new(Tally::default());
-            one_read(fs, up, &p, &t, "one", true);
+            one_read(fs, up, &p, &t, "one", true, env_buffers());
             report("one", &t.lock().expect("tally"));
         }
         "file" => {
             let p = file_arg.expect("file");
             let t = Mutex::new(Tally::default());
-            one_read(fs, up, &p, &t, "file", true);
+            one_read(fs, up, &p, &t, "file", true, env_buffers());
             report("file", &t.lock().expect("tally"));
         }
         "write" => {

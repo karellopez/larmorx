@@ -226,6 +226,9 @@ pub struct Tiff {
     pub(crate) raw_defined: usize,
     /// A decoder read past the raw buffer's defined bytes (noted after the call).
     pub(crate) past_raw: std::cell::Cell<bool>,
+    /// A read into no buffer is decoding (the caller's C `NULL`): zlib refuses a null output
+    /// buffer, so the Deflate decoder fails at once.
+    pub(crate) null_out: bool,
     pub(crate) fields: Fields,
     pub(crate) opts: Options,
     pub(crate) notices: Notices,
@@ -381,6 +384,7 @@ impl Tiff {
             rawcc: 0,
             raw_defined: 0,
             past_raw: std::cell::Cell::new(false),
+            null_out: false,
             fields: Fields::new(fields::next_serial()),
             opts,
             notices: Notices::new(opts.upstream_defects),

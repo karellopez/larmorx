@@ -1883,6 +1883,24 @@ defects! {
         "ripping a surface's unknown vertices (MRISripUnknown: mri_gtmpvc's surfaces) and the confined dilation of a surface mask with an annotation to stay in (MRISdilateConfined), for a surface without a colour table, decide each vertex by a colour-table index the program never computed (memory contents): the vertices ripped or dilated are arbitrary";
     FS_985 = "FS-985", "FreeSurfer", true,
         "the confined dilation of a surface mask with a new annotation (MRISdilateConfined) and the label of an annotation (MRISannotation_to_label: mris_hausdorff_dist) take the annotation of a colour-table index the table does not hold (no table, an index outside it or an empty place) from memory never written: the dilated vertices get an arbitrary annotation, and the label holds the vertices of an arbitrary one (or the program crashes)";
+    FS_986 = "FS-986", "FreeSurfer", true,
+        "removing a surface's ripped vertices from its lists (MRISremoveRipped: MRISreadPatch, mris_flatten, the label rips of mri_surf2surf and others) never updates the neighbour lists of the vertices that are kept: they keep the ripped vertices, and their distances, among their neighbours";
+    FS_987 = "FS-987", "FreeSurfer", true,
+        "renumbering a surface without its ripped faces and vertices (MRISrenumberRemovingRippedFacesAndVertices: mris_inflate's tearing) pairs each vertex's kept faces after a removed one with the vertex's place in the face before: the vertex's place in its faces is wrong from there";
+    FS_988 = "FS-988", "FreeSurfer", true,
+        "renumbering a surface without its ripped faces and vertices gives each kept vertex that moves the neighbour and face lists of the vertex that had its new number before (filtered by the rip flags of the moved vertices, a neighbour ripped with a flag other than 1 kept as -1): the renumbered surface's topology is wrong";
+    FS_989 = "FS-989", "FreeSurfer", false,
+        "removing an edge or a triangle link of a surface (MRISremoveTriangleLinks for quadrangle surfaces, the edge and link removals) leaves the counts of the 2- and 3-hop neighbours as they were, and removing an edge also the count of neighbours in use, so the last immediate neighbour is counted again after them; FreeSurfer's programs remove the links of quadrangle surfaces at one hop, where only the immediate counts are read";
+    FS_990 = "FS-990", "FreeSurfer", false,
+        "removing a link between two vertices (the tearing of mris_inflate and mris_flatten) rips the faces that hold both but removes no other link of those faces, so a link no face holds any more stays; removing a face removes a link that a face of the other direction still holds";
+    FS_991 = "FS-991", "FreeSurfer", true,
+        "the surface check of mris_topo_fixer (MRISisSurfaceValid) starts each vertex's corner check from its first neighbour, also for a vertex without neighbours: it marks a vertex named by memory never written, or crashes for a vertex without a neighbour list";
+    FS_992 = "FS-992", "FreeSurfer", true,
+        "removing a neighbour from a vertex's lists when the vertex has fewer neighbours in use than the neighbour's place (a neighbourhood size of 0) moves a negative count of entries: the program crashes";
+    FS_993 = "FS-993", "FreeSurfer", true,
+        "the neighbours of a vertex in order around it (MRISgetSpatOrderedNeighbors: mris_skeletonize) read memory never written for a vertex without faces, and past a face's three vertices for a vertex its first face does not hold";
+    FS_994 = "FS-994", "FreeSurfer", true,
+        "renumbering a surface without its ripped faces and vertices copies each moved face's normal matrices and each moved vertex's user data without moving them: two places share them, and releasing the surface releases them twice";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

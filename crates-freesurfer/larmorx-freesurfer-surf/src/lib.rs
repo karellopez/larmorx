@@ -144,6 +144,7 @@ pub mod surfbase;
 pub mod surfmri;
 pub mod surfread;
 pub mod topology;
+pub mod toprest;
 pub mod trifile;
 pub mod tritri;
 pub mod valcopy;

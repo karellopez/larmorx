@@ -22,7 +22,7 @@ use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
 use larmorx_fs_core::maths::mfiles::CStream;
 use larmorx_fs_core::mri::{LinearTransform, Lta, Mri, Region, VolGeom, types};
 use larmorx_fs_core::volume::geometry::SurfacePoint;
-use larmorx_fs_core::volume::ltaread::NoHeaders;
+use larmorx_fs_core::volume::ltaread::{FileSystem, TransformInputs};
 use larmorx_fs_core::volume::moves::axis;
 use larmorx_fs_core::volume::vgcopy::VG_IS_EQUAL_THRESHOLD;
 use larmorx_fs_core::volume::{Dst, VolOut};
@@ -702,7 +702,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 args::bad("cannot write the transform file");
             }
             p.errno = 0;
-            let r = p.lta_read_ex(&name, &mut NoHeaders);
+            let r = p.lta_read_ex(&name, &mut FileSystem);
             if have {
                 let _ = std::fs::remove_file(&path);
             }
@@ -710,9 +710,63 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             l.puti(i64::from(p.errno));
             putlta(l, lta.as_ref());
         }
+        // the golden cases' reader of an in-memory file and volume (no file system)
+        "ltamem" => {
+            let name = l.getx();
+            let bytes = if l.take("nofile") {
+                None
+            } else {
+                Some(l.getx())
+            };
+            let avg = l.geti();
+            let vol = if l.take("none") {
+                None
+            } else {
+                let vname = l.getx();
+                Some((vname, getg(l)))
+            };
+            match avg {
+                0 => p.env.remove(b"USE_AVERAGE305"),
+                1 => p.env.set(b"USE_AVERAGE305", b"true"),
+                _ => p.env.set(b"USE_AVERAGE305", b""),
+            }
+            let mut m = Memory { name, bytes, vol };
+            p.errno = 0;
+            let name = m.name.clone();
+            let lta = p.lta_read_ex(&name, &mut m)?;
+            l.puti(i64::from(p.errno));
+            putlta(l, lta.as_ref());
+        }
         _ => args::bad("unknown command"),
     }
     Ok(())
+}
+
+/// The golden cases' transform inputs: one file's bytes (none: `ENOENT`) and one named volume's
+/// geometry (others: `ENOENT`).
+struct Memory {
+    name: Vec<u8>,
+    bytes: Option<Vec<u8>>,
+    vol: Option<(Vec<u8>, VolGeom)>,
+}
+
+impl TransformInputs for Memory {
+    fn read_file(&mut self, name: &[u8]) -> Result<Vec<u8>, i32> {
+        match &self.bytes {
+            Some(b) if name == self.name.as_slice() => Ok(b.clone()),
+            _ => Err(2),
+        }
+    }
+
+    fn volume_geometry(&mut self, p: &mut Process, name: &[u8]) -> Option<VolGeom> {
+        match &self.vol {
+            Some((n, g)) if n.as_slice() == name => Some(g.clone()),
+            _ => {
+                p.errno = 2;
+                None
+            }
+        }
+    }
 }
 
 /// LT (the fs.mri probe's): `x0 y0 z0 sigma m_L m_dL m_last_dL type label src dst`.

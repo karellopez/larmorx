@@ -4,8 +4,8 @@
 //! tkregister's `register.dat` (`regio_read_register`, `specs/freesurfer-io.md` §46), and the
 //! identity of `identity.nofile`; FS-306 to FS-310 and FS-258.
 //!
-//! The volumes a MINC transform names are read through a [`VolumeHeaders`] the caller gives
-//! (`specs/freesurfer-io.md`'s header reader); [`NoHeaders`] reads none.
+//! The files and the volumes a MINC transform names are read through the caller's
+//! [`TransformInputs`] ([`FileSystem`]: the file system, no volume headers).
 
 use larmorx_core::cscan::is_c_space;
 use larmorx_core::defects::{FS_258, FS_306, FS_307, FS_308, FS_309, FS_310};
@@ -21,24 +21,31 @@ const EINVAL: i32 = 22;
 /// `ENOENT`.
 const ENOENT: i32 = 2;
 
-/// The geometry of a volume a MINC transform names (§21): its header's, when the file exists and
-/// can be read; `None` otherwise, with `errno` set as a failed open sets it.
-pub trait VolumeHeaders {
-    fn geometry(&mut self, p: &mut Process, name: &[u8]) -> Option<VolGeom>;
-}
+/// What a transform reader reads (§21): the transform file's bytes and the geometries of the
+/// volumes a MINC transform names. The defaults read the file system: a file's bytes, `errno` when
+/// it cannot be opened; a named volume that does not exist sets `errno` (`ENOENT`) and one that
+/// exists is not read here (its geometry is taken as missing; a program gives `specs/freesurfer-io.md`'s
+/// header reader by implementing [`TransformInputs::volume_geometry`]).
+pub trait TransformInputs {
+    /// The bytes of the file `name`, or the `errno` of a failed open.
+    fn read_file(&mut self, name: &[u8]) -> Result<Vec<u8>, i32> {
+        std::fs::read(crate::files::path_of(name)).map_err(|e| e.raw_os_error().unwrap_or(ENOENT))
+    }
 
-/// No header reader: a named volume that does not exist sets `errno` (`ENOENT`); one that exists
-/// is not read (its geometry is taken as missing).
-pub struct NoHeaders;
-
-impl VolumeHeaders for NoHeaders {
-    fn geometry(&mut self, p: &mut Process, name: &[u8]) -> Option<VolGeom> {
+    /// The header's geometry of the volume `name`; `None` (and `errno` set as a failed open
+    /// sets it) when there is none.
+    fn volume_geometry(&mut self, p: &mut Process, name: &[u8]) -> Option<VolGeom> {
         if let Err(e) = std::fs::metadata(crate::files::path_of(name)) {
             p.errno = e.raw_os_error().unwrap_or(ENOENT);
         }
         None
     }
 }
+
+/// The file system, read through [`TransformInputs`]' defaults.
+pub struct FileSystem;
+
+impl TransformInputs for FileSystem {}
 
 /// The average brain's geometry (§21): 172 x 220 x 156 voxels of 1 mm, identity cosines, centre
 /// (-0.095, -16.51, 9.75), valid.
@@ -139,11 +146,11 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
 }
 
 /// A transform file's bytes, or the error of a failed open (`errno` set).
-fn read_file(p: &mut Process, name: &[u8]) -> Option<CStream> {
-    match std::fs::read(crate::files::path_of(name)) {
+fn read_file(p: &mut Process, inputs: &mut dyn TransformInputs, name: &[u8]) -> Option<CStream> {
+    match inputs.read_file(name) {
         Ok(b) => Some(CStream::new(b)),
         Err(e) => {
-            p.errno = e.raw_os_error().unwrap_or(ENOENT);
+            p.errno = e;
             None
         }
     }
@@ -199,12 +206,12 @@ impl Process {
         }
     }
 
-    /// `LTAreadEx(fname)` (§21) with the volumes a MINC transform names read through `headers`:
-    /// the transform array, or `None` after the reader's error.
+    /// `LTAreadEx(fname)` (§21), the files and the volumes a MINC transform names read through
+    /// `inputs`: the transform array, or `None` after the reader's error.
     pub fn lta_read_ex(
         &mut self,
         fname: &[u8],
-        headers: &mut dyn VolumeHeaders,
+        inputs: &mut dyn TransformInputs,
     ) -> Result<Option<Lta>, Stop> {
         let kind = self.transform_file_name_type(fname);
         let file = fname
@@ -218,10 +225,10 @@ impl Process {
             return Ok(Some(lta));
         }
         match kind {
-            file_type::MINC => self.lt_mni_read_ex(fname, headers),
-            file_type::FSL => self.lt_fsl_read(fname),
-            file_type::REGISTER_DAT => self.lta_read_register_dat(fname),
-            _ => self.lta_read_file(fname),
+            file_type::MINC => self.lt_mni_read_ex(fname, inputs),
+            file_type::FSL => self.lt_fsl_read(fname, inputs),
+            file_type::REGISTER_DAT => self.lta_read_register_dat(fname, inputs),
+            _ => self.lta_read_file(fname, inputs),
         }
     }
 
@@ -234,8 +241,12 @@ impl Process {
     }
 
     /// `ltaReadFile` (§21): an `.lta` (and the morphs' names, and names without an extension).
-    fn lta_read_file(&mut self, fname: &[u8]) -> Result<Option<Lta>, Stop> {
-        let Some(mut s) = read_file(self, fname) else {
+    fn lta_read_file(
+        &mut self,
+        fname: &[u8],
+        inputs: &mut dyn TransformInputs,
+    ) -> Result<Option<Lta>, Stop> {
+        let Some(mut s) = read_file(self, inputs, fname) else {
             self.lt_error(codes::NO_FILE, "ltaReadFile(", fname, "): can't open file");
             return Ok(None);
         };
@@ -356,8 +367,12 @@ impl Process {
     }
 
     /// `ltFSLread` (§21): FSL's matrix, type `FSLREG_TYPE`.
-    fn lt_fsl_read(&mut self, fname: &[u8]) -> Result<Option<Lta>, Stop> {
-        let Some(mut s) = read_file(self, fname) else {
+    fn lt_fsl_read(
+        &mut self,
+        fname: &[u8],
+        inputs: &mut dyn TransformInputs,
+    ) -> Result<Option<Lta>, Stop> {
+        let Some(mut s) = read_file(self, inputs, fname) else {
             self.lt_error(codes::NO_FILE, "ltFSLread: could not open file ", fname, "");
             return Ok(None);
         };
@@ -379,9 +394,9 @@ impl Process {
     fn lt_mni_read_ex(
         &mut self,
         fname: &[u8],
-        headers: &mut dyn VolumeHeaders,
+        inputs: &mut dyn TransformInputs,
     ) -> Result<Option<Lta>, Stop> {
-        let Some(mut s) = read_file(self, fname) else {
+        let Some(mut s) = read_file(self, inputs, fname) else {
             self.lt_error(codes::NO_FILE, "ltMNIreadEx: could not open file ", fname, "");
             return Ok(None);
         };
@@ -465,7 +480,7 @@ impl Process {
             let lt = &mut lta.xforms[0];
             for (name, g) in [(src, &mut lt.src), (dst, &mut lt.dst)] {
                 if let Some(name) = name {
-                    *g = match headers.geometry(self, &name) {
+                    *g = match inputs.volume_geometry(self, &name) {
                         Some(h) => h,
                         None if contains(&name, b"average_305") => average_305(&name),
                         None => VolGeom {
@@ -530,11 +545,15 @@ impl Process {
     }
 
     /// `ltaReadRegisterDat` (§21): tkregister's `register.dat`.
-    fn lta_read_register_dat(&mut self, fname: &[u8]) -> Result<Option<Lta>, Stop> {
+    fn lta_read_register_dat(
+        &mut self,
+        fname: &[u8],
+        inputs: &mut dyn TransformInputs,
+    ) -> Result<Option<Lta>, Stop> {
         self.put_out(
             b"INFO: This REGISTER_DAT transform is valid only for volumes between  COR types with c_(r,a,s) = 0.\n",
         );
-        let Some(reg) = self.regio_read_register(fname)? else {
+        let Some(reg) = self.regio_read_register(fname, inputs)? else {
             self.lt_error(codes::BAD_FILE, "ltaReadRegisterDat: could not read ", fname, "");
             return Ok(None);
         };
@@ -557,8 +576,12 @@ impl Process {
     /// `regio_read_register(name, ...)` for a name that is not an `.lta`
     /// (`specs/freesurfer-io.md` §46): the subject, the resolutions, the intensity, the matrix and
     /// the rounding method; `None` after its messages.
-    pub fn regio_read_register(&mut self, name: &[u8]) -> Result<Option<Register>, Stop> {
-        let Some(mut s) = read_file(self, name) else {
+    pub fn regio_read_register(
+        &mut self,
+        name: &[u8],
+        inputs: &mut dyn TransformInputs,
+    ) -> Result<Option<Register>, Stop> {
+        let Some(mut s) = read_file(self, inputs, name) else {
             self.perror(b"regio_read_register()");
             let mut m = b"Could not open ".to_vec();
             m.extend_from_slice(name);

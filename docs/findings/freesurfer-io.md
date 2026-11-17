@@ -2997,3 +2997,7 @@ own buffer `calloc(width * height * bytes_per_vox, 1)`, the extents' product in 
 7. **A generator's memory.** The port's case generator first filled the slices of a 65,536 x 65,536 header (8 GiB per
    slice): its 20 GiB memory box ended it. Slices over 64 KiB are now the header alone (the reader fails at their first
    row, or refuses them first: FS-947).
+8. **The recorded test's shifted cases.** Piece 34's kind moves every later case of `fs_io_official`'s list: two of
+   the port's own size checks then overflowed 64 bits in a debug build (an autoencoder window's cube, fs.gca's
+   `SAEalloc`; the GE ROI volume's size): both now in 128 bits (release builds wrapped, the outcomes the same: the
+   sizes were refused either way). The debug-heavy cases moved too (`HEAVY_SEED1`: 1824, 2793, 3076).

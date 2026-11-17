@@ -1916,11 +1916,13 @@ defects! {
     FS_1001 = "FS-1001", "FreeSurfer", true,
         "projecting a surface of the pial status back onto its pial positions (the surface deformation's projection step) crashes the program when the surface carries no face table, or when a vertex has no face within 1,000 mm (a vertex at NaN, a table without faces)";
     FS_1002 = "FS-1002", "FreeSurfer", true,
-        "flattening a patch (MRISflattenPatch: mris_flatten) with DIAG_SHOW reports the diagnostic vertex (Gdiag_no) without checking that the surface has it (beyond the surface's vertices it reads memory outside them: a report printed from there, or a crash), and crashes the program when that vertex has neighbours but no distances";
+        "flattening a patch (MRISflattenPatch: mris_flatten) with DIAG_SHOW reports the diagnostic vertex (Gdiag_no) without checking that the surface has it: beyond the surface's vertices it reads memory outside them (a report printed from there, or a crash)";
     FS_1003 = "FS-1003", "FreeSurfer", true,
         "the flattening's report of the diagnostic vertex prints that vertex's original area on every neighbour's line instead of the neighbour's own";
     FS_1004 = "FS-1004", "FreeSurfer", true,
         "flattening a patch (MRISflattenPatch: mris_flatten) whose vertex normals sum to zero turns every unripped vertex's position into NaN";
+    FS_1005 = "FS-1005", "FreeSurfer", true,
+        "flattening a patch (MRISflattenPatch: mris_flatten) with DIAG_SHOW and a diagnostic vertex (Gdiag_no) that has neighbours crashes the program when the surface holds no vertex distances";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

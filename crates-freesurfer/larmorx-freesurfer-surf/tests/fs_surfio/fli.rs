@@ -993,6 +993,63 @@ pub(super) fn flr_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
             o.s(&format!("{:016x}", super::mpx::fnv64(&w)));
             o.s(if w == r { "SAME" } else { "DIFF" });
         }
+        "rmi" => {
+            // relay 44 of track D: `fssurfio.cpp`'s `flr rmi` (MRISremoveIntersections on a
+            // recorded surface)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let fill = t.i();
+            o.i(i64::from(
+                larmorx_freesurfer_deform::intersect::remove_intersections(
+                    g, &mut io, &mut s, fill,
+                )?,
+            ));
+            let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+            let mut nm = 0i64;
+            for vno in 0..s.nvertices.max(0) as usize {
+                let v = s.vertex(vno);
+                for x in [v.x, v.y, v.z] {
+                    for b in x.to_le_bytes() {
+                        h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+                    }
+                }
+                nm += i64::from(v.marked != 0);
+            }
+            o.s(&format!("{h:016x}"));
+            o.i(nm);
+        }
+        "cds" => {
+            // relay 44 of track D: `fssurfio.cpp`'s `flr cds` (MRIScomputeDistanceToSurface into a
+            // float clone of a recorded volume)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let v = vol(g, &mut io, t.next())?;
+            let mut d = larmorx_freesurfer_volume::frames::mri_clone_different_type(
+                g,
+                io.out,
+                io.err,
+                &v,
+                larmorx_freesurfer_mri::mri::MRI_FLOAT,
+            )?;
+            let res = d.vg.xsize;
+            larmorx_freesurfer_surf::surfmri::compute_distance_to_surface(
+                g,
+                sg,
+                &mut io,
+                &mut s,
+                Some(&mut d),
+                res,
+            )?;
+            flr_put(g, io.err, Some(&d), o);
+        }
+        "cdn" => {
+            // relay 44 of track D: `fssurfio.cpp`'s `flr cdn` (MRIScomputeDistanceToSurface into a
+            // new volume)
+            let mut s = surf(g, sg, &mut io, t.next())?;
+            let res = t.f();
+            let r = larmorx_freesurfer_surf::surfmri::compute_distance_to_surface(
+                g, sg, &mut io, &mut s, None, res,
+            )?;
+            flr_put(g, io.err, r.into_new().as_ref(), o);
+        }
         "mki" => {
             // relay 39 of track D: `fssurfio.cpp`'s `flr mki` (mrisMarkIntersections on a recorded
             // surface)

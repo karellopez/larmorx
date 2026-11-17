@@ -12,13 +12,13 @@
 //! object code (for a NaN's bits: the positions' rotation and the normals' are compiled with
 //! different orders); the pial projection's fallback works in `double` (`lambda[1] + lambda[0]`
 //! in that order). Defects: FS-1001 (the pial projection without a face table, or for a vertex
-//! with no face within 1,000 mm: FreeSurfer reads through a null pointer), FS-1002 and FS-1003
-//! (the flattening's report of the diagnostic vertex), FS-1004 (a patch whose normals sum to
-//! zero).
+//! with no face within 1,000 mm: FreeSurfer reads through a null pointer), FS-1002, FS-1003 and
+//! FS-1005 (the flattening's report of the diagnostic vertex), FS-1004 (a patch whose normals sum
+//! to zero).
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_576, FS_1001, FS_1002, FS_1003, FS_1004};
+use larmorx_core::defects::{FS_576, FS_1001, FS_1002, FS_1003, FS_1004, FS_1005};
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag::{self, BUILD_ROOT, DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -373,7 +373,7 @@ pub fn project_surface_can_do(
 /// mean, the sum, the unit normal and its rotation printed (`flatten: avg p = {...}`, `flatten:
 /// sum n = {...}`, `flatten: norm n = {...}`, `flatten: transformed n = {...}`); with
 /// `DIAG_SHOW`, the diagnostic vertex when it is flattened (`vertex <n> flattened @ (...)`) and
-/// at the end with its neighbours (FS-1002, FS-1003). FS-1004. `NO_ERROR`.
+/// at the end with its neighbours (FS-1002, FS-1003, FS-1005). FS-1004. `NO_ERROR`.
 pub fn flatten_patch(
     g: &mut Globals,
     sg: &mut SurfGlobals,
@@ -500,10 +500,12 @@ pub fn flatten_patch(
 /// The end of `MRISflattenPatch` with `DIAG_SHOW` and a diagnostic vertex: `<n> @ (<x>, <y>,
 /// <z>): area <a>, oa <oa>, nz=<nz>, vnum=<vnum>`, a line per 1-hop neighbour with its distance
 /// and original distance (`, d=<d>, od=<od>`), an empty line. FS-1002: a diagnostic vertex beyond
-/// the surface's vertices (FreeSurfer reads memory outside them): no report, both modes; one
-/// without distances (FreeSurfer reads through a null pointer): the report ends there by
-/// default, a segmentation fault (status 139) with `reproduce`. FS-1003: FreeSurfer prints the
-/// diagnostic vertex's original area on every neighbour's line; by default each neighbour's own.
+/// the surface's vertices (FreeSurfer reads memory outside them): no report, both modes (and its
+/// distances fewer than its neighbours: the report ends there). FS-1005: a vertex with neighbours
+/// but without distances (FreeSurfer reads through a null pointer): the report ends with its
+/// first line by default, a segmentation fault (status 139) with `reproduce`. FS-1003: FreeSurfer
+/// prints the diagnostic vertex's original area on every neighbour's line; by default each
+/// neighbour's own.
 fn report(g: &mut Globals, io: &mut Io, mris: &Mris) -> Result<(), Fatal> {
     let d = g.gdiag_no;
     if d >= mris.nvertices {
@@ -533,7 +535,7 @@ fn report(g: &mut Globals, io: &mut Io, mris: &Mris) -> Result<(), Fatal> {
     let vnum = usize::try_from(vt.vnum).unwrap_or(0);
     if vnum > 0 && (v.dist.is_none() || v.dist_orig.is_none() || vt.v.is_none()) {
         g.notices.add(
-            &FS_1002,
+            &FS_1005,
             format!(
                 "MRISflattenPatch: the diagnostic vertex {d} has no distances (or neighbours) to report (FreeSurfer reads through a null pointer)"
             ),

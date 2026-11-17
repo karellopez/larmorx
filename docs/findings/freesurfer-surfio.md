@@ -2265,3 +2265,63 @@ the unit oracle) decides the types:
 - No defect of their own: the cylinder and the ellipsoid print their errors and go on with what they
   computed; the crashes the probe meets after them (a cylinder of a surface with vertices on its axis,
   then `MRISupdateSurface`) are the metric properties' known ones (FS-06, FS-121).
+
+## 43. mrisurf_deform.cpp's projection, flattening and intersection removal; MRIScomputeDistanceToSurface (relay 44 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_deform.cpp` 142-386
+(`mris_project_point_into_face`, `mrisProjectOntoSurface`, `mrisSurfaceProjector<MRIS>` and
+`<MRIS_MP>`, `mrisProjectSurface` both forms, `mrisProjectSurface_CanDo`), 2172-2335
+(`MRISflattenPatch`), 4010-4083 (`MRISremoveIntersections`) and `utils/mrisurf_deform.h` 48-61
+(`transform`, a `static` in the header) into the new `crates-freesurfer/larmorx-freesurfer-deform`
+(`project.rs`, `intersect.rs`: fs.deform's crate, queue item 3.4-06 taken early); `utils/mrisurf_mri.cpp`
+7172-7194 (`MRIScomputeDistanceToSurface`) into fs.surf's `surfmri.rs`. The object code
+(`mrisurf_deform.cpp.o` of the unit oracle) decides:
+
+- `MRISflattenPatch` works in `float` throughout: `sqrt(nx * nx + ...)` takes libstdc++'s `float`
+  overload (`sqrtss`; a `sqrtf` call only for a negative argument, which sums of squares never are), so
+  `d`, `d1` and `d2` are `float` roots; `fabs(d1 - d2) > 0.0001` is an `andps` of the `float`
+  difference, widened, against `double` 0.0001. `transform` is inlined twice with different operand
+  orders: the position's `x'` is `((y * c2) + (x * c1)) - (z * d)` (products with the coordinate in
+  the destination register), the normal's `((c1 * x) + (c2 * y)) - (z * d)`; `y'` is `((-ny / d) * x) +
+  ((nx / d) * y)` in both (the negation a sign flip, `xorps`); `d2`'s sum is `z'² + (x'² + y'²)`. The
+  diagnostic `transformed n` reuses `nx² + ny²` (`nz² + s2`), forms `y'` as `((nx / d) * ny) + ((-ny / d)
+  * nx)` and `x'` as `(((nx nz) / d) * nx + ny * ((ny nz) / d)) - nz * d`. `nz /= d` is only computed
+  on the rotation's branch (its value is the same). The mean is `sum / (float) an`, so a patch with
+  every vertex ripped gives 0/0 (and, as its normal sum is 0 too, the NaN rotation of nothing).
+- `mrisProjectSurface(MRIS *)` is a jump table on the status (`ja` past 9: nothing); the pial case
+  inlines `mrisProjectOntoSurface` and `mris_project_point_into_face`. The fallback's `SCALAR_MUL(lambda,
+  1.0 / norm, lambda)` expands to `lambda[i] * 1.0 / norm`: a division (the `* 1.0` folded);
+  `lambda[2] / norm` is never computed (overwritten); `lambda[2] = 1 - (lambda[0] + lambda[1])` is
+  compiled `1 - (lambda[1] + lambda[0])`; the weighted sum's products are `xv * lambda`, `yv * lambda`,
+  `lambda * zv`. The face pointer is `NULL` exactly when `fno < 0` (`MHTfindClosestFaceGeneric` sets it
+  from the number), so a second search finding nothing reads `faces[-1]` in `face_barycentric_coords`
+  (memory before the array) and then crashes on `face->v[n]` (FS-1001), as does a surface whose `mht`
+  is `NULL`. The fallback normalises the clamped barycentric coordinates by their Euclidean length, not
+  their sum; the point lands on the face (its border), not at the face's closest point. Kept, no ID:
+  nothing in FreeSurfer 8.2.0 sets `MRIS_PIAL_SURFACE` (grep: only this switch names it), so no program
+  reaches the pial case; it is ported for completeness and checked by the probe alone.
+- `mrisSurfaceProjector<MRIS_MP>::project` calls `MRISprojectOntoSphere(MRIS_MP *, radius)` for a sphere
+  (itself `cheapAssert(false)`, `mrisurf_project.cpp` 158) and then its own `cheapAssert(false)` (line
+  328, `0x148`): it never returns. Its one caller, `MRIScomputeSSE_asThoughGradientApplied`, sets
+  `useNewBehaviour = false` unconditionally after reading its two environment variables, so the
+  `MRIS_MP` path is dead in 8.2.0; `canDo` is still called there (a `constprop` clone with the function's
+  `static int shown` and an `fs::debug()` stream; `1 << status` is a `shl %cl`, the count modulo 32).
+- `MRISremoveIntersections`: `nbrs` is never changed (its growth is commented out), so `no_progress >=
+  nbrs` always holds, the `MAX_INT_REMOVAL_NEIGHBORS` branch never runs, `MRISdilateMarked(mris, 0)` is
+  a no-op and the else-branch's `no_progress++` is unreachable; `writeit = 0` makes the per-step
+  `MRISwrite` dead. The final recount after a restore uses `FillHoles = 0` whatever the caller passed
+  (it only changes the message's count and the marks left); kept, as the code says.
+- `mrisSmoothBoundaryNormals` (`mrisurf_deform.cpp` 2446) is an empty body (`#if 0`): `MRISreadPatchNoRemove`'s
+  only fs.deform callee does nothing, so the patch readers are READY in fs.surfio (the 3.1 inventory,
+  relay 44's NOTES).
+- `MRIScomputeDistanceToSurface`: `nint(PAD / mri_mask->xsize)` divides the `int` 10 by the `float` voxel
+  size in `float`; with a caller's volume the interior goes into `MRIclone(mri_dist)` and the mask is
+  `MRIcopy` of it (no padding), without one `MRIextractRegionAndPad(mri_tmp, NULL, NULL, 10)` (its
+  `(box.dx, ...)` and `(region->dx, ...)` lines on standard output).
+- Defects (texts in `larmorx_core::defects`): FS-1001 (the pial projection's null reads: refused by
+  default, status 139 with `reproduce`), FS-1002 (the flattening's report of a diagnostic vertex beyond
+  the surface: memory outside it, no report in either mode), FS-1003 (the report's neighbour lines print
+  `v->origarea` instead of `vn->origarea`: corrected by default), FS-1004 (a normal sum of exactly zero:
+  `nx / d0` is 0/0 and every unripped position NaN; by default the patch is left unrotated, as
+  FreeSurfer's own `FZERO(d)` branch does), FS-1005 (the report's `v->dist[n]` with `dist` `NULL`: a
+  crash; by default the report stops).

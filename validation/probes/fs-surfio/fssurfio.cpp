@@ -118,6 +118,8 @@ int MRIS_Hcurvature_determineSign(MRIS *apmris);
 int mrisAverageSignedGradients(MRIS *mris, int num_avgs);
 // relay 42 of track D (top): declared in mrisurf_topology.cpp or utils/mrisurf_deform.h only
 int mrisRemoveFace(MRIS *mris, int fno);
+// relay 44 of track D (dfm): declared in utils/mrisurf_deform.h only
+int mrisProjectSurface(MRIS *mris);
 int mrisRemoveVertexLink(MRIS *mris, int vno1, int vno2);
 int mrisStoreVtotalInV3num(MRIS *mris);
 void MRISgetNeighborsBeginEnd(MRIS const *mris, int vno, size_t inner_nbhd_size, size_t outer_nbhd_size,
@@ -4195,6 +4197,42 @@ void flr_case()
     out += t;
     out += w == r ? "SAME " : "DIFF ";
     unlink(name.c_str());
+  } else if (op == "rmi") {
+    // relay 44 of track D: MRISremoveIntersections on a recorded surface (`rmi <surface> <fill>`):
+    // its result, its messages (standard output), the positions' FNV-1a and the vertices marked
+    MRIS *s = MRISread(next());
+    int fill = geti();
+    if (!s) fail("cannot read the surface");
+    oi(MRISremoveIntersections(s, fill));
+    uint64_t h = 0xcbf29ce484222325ull;
+    int nm = 0;
+    for (int v = 0; v < s->nvertices; v++) {
+      const float p[3] = {s->vertices[v].x, s->vertices[v].y, s->vertices[v].z};
+      const unsigned char *b = (const unsigned char *)p;
+      for (int q = 0; q < 12; q++) h = (h ^ b[q]) * 0x100000001b3ull;
+      nm += s->vertices[v].marked != 0;
+    }
+    char t[24];
+    snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+    out += t;
+    oi(nm);
+  } else if (op == "cds") {
+    // relay 44 of track D: MRIScomputeDistanceToSurface on a recorded surface into a float clone
+    // of a recorded volume at its voxel size (`cds <surface> <volume>`: mri_relabel_hypointensities'
+    // and mri_ca_label's call)
+    MRIS *s = MRISread(next());
+    MRI *v = MRIread(next());
+    if (!s || !v) fail("cannot read the inputs");
+    MRI *d = MRIcloneDifferentType(v, MRI_FLOAT);
+    MRIScomputeDistanceToSurface(s, d, d->xsize);
+    flr_put(d);
+  } else if (op == "cdn") {
+    // relay 44 of track D: MRIScomputeDistanceToSurface on a recorded surface into a new volume
+    // (`cdn <surface> <resolution>`: the deformation's call at 0.5 mm)
+    MRIS *s = MRISread(next());
+    float res = getf();
+    if (!s) fail("cannot read the surface");
+    flr_put(MRIScomputeDistanceToSurface(s, NULL, res));
   } else if (op == "mki") {
     // relay 39 of track D: mrisMarkIntersections on a recorded surface (`mki <surface> <fill>`):
     // the faces counted, the vertices marked (their count and numbers); with hole filling the
@@ -7040,6 +7078,104 @@ void prj_case()
   }
 }
 
+// dfm: mrisurf_deform.cpp's projection (mrisProjectSurface) and flattening (MRISflattenPatch),
+// MRISremoveIntersections and MRIScomputeDistanceToSurface (relay 44 of track D): a surface read
+// by MRISread (d/lh.s0), its radius, rips, Gdiag and Gdiag_no from the case; then 1 to 5
+// operations; after each the surface (status, radius, areas; each vertex's position, normal,
+// area and mark; each face's area)
+static void dfm_dump(MRIS *s)
+{
+  oi(s->status); od(s->radius);
+  of(s->total_area); of(s->neg_area);
+  for (int v = 0; v < s->nvertices; v++) {
+    VERTEX *x = &s->vertices[v];
+    of(x->x); of(x->y); of(x->z); of(x->nx); of(x->ny); of(x->nz); of(x->area); oi(x->marked);
+  }
+  for (int f = 0; f < s->nfaces; f++) of(s->faces[f].area);
+}
+
+static void dfm_free_mht(MRIS *s)
+{
+  if (s->mht) {
+    MRIS_HASH_TABLE *m = (MRIS_HASH_TABLE *)s->mht;
+    MHTfree(&m);
+    s->mht = NULL;
+  }
+}
+
+void dfm_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  int nv = geti(), nf = geti();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  s->radius = getd();
+  int nrip = geti();
+  for (int k = 0; k < nrip; k++) s->vertices[geti()].ripflag = 1;
+  Gdiag = (unsigned long)(unsigned int)geti();
+  Gdiag_no = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    fflush(stdout);
+    errno = 0;
+    if (op == "ps") { s->status = (MRIS_Status)geti(); oi(mrisProjectSurface(s)); }
+    else if (op == "fp") { s->status = (MRIS_Status)geti(); oi(MRISflattenPatch(s)); }
+    else if (op == "rmi") oi(MRISremoveIntersections(s, geti()));
+    else if (op == "jit") {
+      float a = getf();
+      for (int v = 0; v < s->nvertices; v++) {
+        s->vertices[v].x += a * (float)(((v * 7) % 5) - 2);
+        s->vertices[v].y += a * (float)(((v * 3) % 7) - 3);
+        s->vertices[v].z += a * (float)(((v * 5) % 3) - 1);
+      }
+    } else if (op == "sv") oi(MRISsaveVertexPositions(s, geti()));
+    else if (op == "mht") {
+      int which = geti();
+      float res = getf();
+      dfm_free_mht(s);
+      s->mht = MHTcreateFaceTable_Resolution(s, which, res);
+    } else if (op == "nomht") dfm_free_mht(s);
+    else if (op == "cds") {
+      float res = getf();
+      int w = geti();
+      MRI *given = w > 0 ? MRIalloc(w, w, w, MRI_FLOAT) : NULL;
+      MRI *d = MRIScomputeDistanceToSurface(s, given, res);
+      if (!d) out += "NULL ";
+      else {
+        oi(d->type); oi(d->width); oi(d->height); oi(d->depth);
+        of(d->xsize); of(d->ysize); of(d->zsize); of(d->c_r); of(d->c_a); of(d->c_s);
+        uint64_t h = 0xcbf29ce484222325ull;
+        for (int z = 0; z < d->depth; z++)
+          for (int y = 0; y < d->height; y++)
+            for (int x = 0; x < d->width; x++) {
+              float f = MRIgetVoxVal(d, x, y, z, 0);
+              const unsigned char *b = (const unsigned char *)&f;
+              for (int q = 0; q < 4; q++) h = (h ^ b[q]) * 0x100000001b3ull;
+            }
+        char t[24];
+        snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+        out += t;
+      }
+      if (d && d != given) MRIfree(&d);
+      if (given) MRIfree(&given);
+    } else fail("dfm op");
+    dfm_dump(s);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -7314,6 +7450,8 @@ void run_case()
     mcl_case();
   } else if (cmd == "prj") {
     prj_case();
+  } else if (cmd == "dfm") {
+    dfm_case();
   } else if (cmd == "wvl") {
     wvl_case();
   } else if (cmd == "gii") {

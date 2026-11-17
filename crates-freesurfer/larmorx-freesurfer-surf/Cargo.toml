@@ -17,6 +17,8 @@ larmorx-freesurfer-volume.workspace = true
 larmorx-freesurfer-filter.workspace = true
 
 [dev-dependencies]
+# the probe's fs.deform commands (relay 44 of track D); the deform crate builds on this one
+larmorx-freesurfer-deform.workspace = true
 flate2.workspace = true
 sha2.workspace = true
 tempfile.workspace = true

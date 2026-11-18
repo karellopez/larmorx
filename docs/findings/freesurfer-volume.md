@@ -1133,7 +1133,8 @@ object code read: the unit oracle's `libutils.a` member `mriBSpline.cpp.o` (`obj
   cases (a quarter of the paints NaNs of four payloads, a signalling one among them, and infinities): 1,278 identical,
   122 not comparable, 0 different; seed 7, 1,500 cases with the wired callers (105 of them through `MRItoBSpline`): 1,400
   identical, 100 not comparable, 0 different; `fix` different only with notices. Seed 1, 5,720 cases (286 commands):
-  5,284 identical (24 of them `HEAVY`), 436 not comparable, hash `a2c71444...` (`tests/fs_volume_official.rs`).
+  5,284 identical (24 of them `HEAVY`), 436 not comparable, hash `a2c71444...` (`tests/fs_volume_official.rs`); seed 7,
+  28,600 cases of every command: 26,580 identical, 2,020 not comparable, 0 different.
 - **Speed and memory** (`validation/probes/fs-bspline-bench`: FreeSurfer's own functions from the unit oracle against the
   port's release build, one thread, the same volume; log `oracles/logs/fs-found-c-r39-bspline-bench.log`): the outputs'
   FNV-1a hashes are identical in every run. Coefficients of a 256^3 volume: `float` 0.52 s (FreeSurfer) and 0.54 s

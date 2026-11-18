@@ -338,5 +338,7 @@ callers' cases through `MRItoBSpline`): 1,400 identical, 100 not comparable, 0 d
 notices. `check.py`'s `SKIP` adds FS-964 and FS-965 (relay 39 also met FS-965: an `hlab` case of the new seed-1 stream
 made the port's `fix` run grow past its 24 GiB box, `docs/findings/freesurfer-volume.md` §31). Seed 1, 5,720 cases:
 5,284 identical, 436 not comparable, 24 hashed as `HEAVY`, hash
-`a2c71444db657bf3d3d59048d6910a4301c20fe27581b8867b44d3bd2f989409`. The speed and memory against FreeSurfer's own code:
+`a2c71444db657bf3d3d59048d6910a4301c20fe27581b8867b44d3bd2f989409`. Seed 7, 28,600 cases (every command, the final code):
+26,580 identical, 2,020 not comparable (524 identical all the same), 0 different. The speed and memory against
+FreeSurfer's own code:
 `validation/probes/fs-bspline-bench/`.

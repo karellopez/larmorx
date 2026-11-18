@@ -13,10 +13,13 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded from a clean commit (RECORD).
-const N: usize = 0;
-const OFFICIAL_SHA256: &str = "RECORD";
-const SKIPPED: usize = 0;
+/// Recorded 2026-11-18 from the clean commit 42773b91 (`mri_normalize`'s own functions: the bias of
+/// `-w`, the white-matter outlier removals, the white matter's interior, the off-white-matter
+/// removal, the T2 outlier walk, the thresholds; its option loop and help): 450 cases (50 rounds
+/// of 9 commands), 429 lines identical, 21 hashed as `SKIP`.
+const N: usize = 450;
+const OFFICIAL_SHA256: &str = "173c9725504a566c42d59f4ef9f00b01ff894b182ef4c56efc23ad23476d2871";
+const SKIPPED: usize = 21;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 7] = [

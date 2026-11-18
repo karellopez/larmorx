@@ -6,8 +6,11 @@
 //! - [`csv`]: `include/csv.h`'s CSV reader (3.2-04).
 //! - [`stat_table`]: the stats tables of `--in_stats_table` and `--out_stats_table`
 //!   (`utils/stats.cpp`, `utils/fsgdf.cpp`'s item count; 3.2-04, taken from 3.2-07).
+//! - [`options`]: `main`'s start, its option loop and the checks before the input is read, with
+//!   `get_ints`, `get_floats`, `get_string` and the help (3.2-05).
 //!
 //! `include/affine.h`, the rest of 3.2-04, is `larmorx-freesurfer-core`'s `affine` (wave 3.1).
 
 pub mod csv;
+pub mod options;
 pub mod stat_table;

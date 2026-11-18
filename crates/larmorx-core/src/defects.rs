@@ -2495,6 +2495,16 @@ defects! {
         "mri_convert --in_stats_table of a .csv table with a row of fewer fields than its first line reads past the row (a crash or memory contents read as numbers)";
     FS_1037 = "FS-1037", "FreeSurfer", true,
         "mri_convert --in_stats_table of a .tac table of one column reads a second column's name from memory contents (a crash or a comparison of memory)";
+    FS_1038 = "FS-1038", "FreeSurfer", true,
+        "mri_convert's --rescale, -sc (--scale), -osc (--out-scale), --rescale-voxel and -dcm2niix-opts crash when the command line ends before their arguments";
+    FS_1039 = "FS-1039", "FreeSurfer", true,
+        "mri_convert copies a name argument of 1,024 bytes or more (2,000 or more for --new-transform-fname) past the end of its buffer (a crash or corrupted memory)";
+    FS_1040 = "FS-1040", "FreeSurfer", true,
+        "mri_convert --rescale-voxel with an index that is not a number uses memory contents for that index";
+    FS_1041 = "FS-1041", "FreeSurfer", true,
+        "mri_convert -f (--frame) with more than 2,000 frame numbers writes them past the end of its list (a crash or corrupted memory)";
+    FS_1042 = "FS-1042", "FreeSurfer", true,
+        "mri_convert --debug crashes when debug.gdb cannot be created in the working directory";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

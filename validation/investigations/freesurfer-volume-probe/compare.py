@@ -1662,7 +1662,11 @@ class Gen7(Gen6):
         for _ in range(160):
             types = [0, 0, 1, 3, 3, 4, 10] if r.random() < 0.9 else [2, 6, 9]
             s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 2))
-            a = self.rvol(r, shape=s, special=0.05, ct=0.0)
+            a = self.rvol(r, shape=s, special=0.05, ct=0.0).split(" ")
+            # mostly a good RAS: a source without one and of an oblique orientation is refused
+            # before any sampling (§29)
+            a[10] = "1" if r.random() < 0.85 else "0"
+            a = " ".join(a)
             if r.random() < 0.66:
                 b = self.tmpl(r, a)
             else:

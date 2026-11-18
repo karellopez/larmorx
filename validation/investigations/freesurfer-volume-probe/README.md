@@ -286,7 +286,9 @@ cached matrices as allocated, recomputed or dropped.
   `<workspace>/archive/2026-11-18-fs-volume-probe-53b6d7dc/`): every earlier group's hash unchanged; the
   new groups `vrules6` (16 calls), `vframes` (404), `vderiv` (382), `vlinear` (360) and `vresamp` (272) the
   same cold, warm and twice without the cache; the probe as its own candidate: no unexplained
-  difference in either mode; `models.py fs291` 127, `skull` 160, `cma` 95 lines as their models (log
-  `oracles/logs/fs-volume-probe-r10-final-2026-11-18.log`). Points that read memory the program does not
+  difference in either mode; `models.py fs291` 127, `skull` 160, `cma` 95 lines as their models (logs
+  `oracles/logs/fs-volume-probe-r10-final-2026-11-18.log` and, for `vresamp` once its sources mostly had a
+  good RAS (an oblique source without one is refused before any sampling),
+  `fs-volume-probe-r10-vresamp-2026-11-18.log`). Points that read memory the program does not
   own (frames past the volume's, `MRIneighborsOff` at a row or slice outside) and FS-324's two sigmas
   are on lines of their own: a crash or a time-out hides every point of its line.

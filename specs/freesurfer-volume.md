@@ -2810,7 +2810,8 @@ again 2026-11-18 with the prebuilt probe from commit 53b6d7dc, which adds part 6
 earlier hash the same, logs `oracles/logs/fs-volume-probe-r9-final-2026-11-18.log` and
 `fs-volume-probe-r9-vres-2026-11-18.log`; again 2026-11-18 with the prebuilt probe from commit 20578b55,
 which adds part 6b's and 6c's commands: every earlier hash the same, the new groups the same cold, warm
-and in two runs without the cache, log `oracles/logs/fs-volume-probe-r10-final-2026-11-18.log`):
+and in two runs without the cache, logs `oracles/logs/fs-volume-probe-r10-final-2026-11-18.log` and,
+for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-probe-r10-vresamp-2026-11-18.log`):
 
 | Group | § | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
 |---|---|---|---|---|---|---|
@@ -2837,8 +2838,8 @@ and in two runs without the cache, log `oracles/logs/fs-volume-probe-r10-final-2
 | `vframes` | 27 | 404 | 3 | 4 | 0 | `033890aa3080a6e651c8e115099dd21424419af607acf5de90e705af825ba94c` |
 | `vderiv` | 28 | 382 | 47 | 0 | 2 | `4726565ac8cba685842900d60986a556ceb60ead1f798cfa8ee590b5145ce57a` |
 | `vlinear` | 29 | 360 | 16 | 49 | 0 | `546e7400bd4d1d68e4d68a0271c32629d6a168101edc7745b69ed2a9f674c5be` |
-| `vresamp` | 31 | 272 | 15 | 25 | 0 | `c5a3ea5b96ccdced6cb2915fcec1fc7dadefbcb0a9e865dc71ed601531c914b2` |
-| all | | 12,270 | 1,379 | 648 | 13 | |
+| `vresamp` | 31 | 272 | 18 | 22 | 0 | `322f430825ee103718310af328377d0645b3bb7e2abc843e51597a4b813d5456` |
+| all | | 12,270 | 1,382 | 645 | 13 | |
 
 Part 4's groups (relay 7): `vsample` (§18: the eight samplers at points inside, at and past the
 edges, whole and within `FLT_EPSILON` of whole, NaN, infinite and beyond the `int` range, frames past

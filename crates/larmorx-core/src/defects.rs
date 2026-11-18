@@ -2995,6 +2995,8 @@ defects! {
         "the principal axes of an image's intensities (the robust registration's initial orientation) are sorted by finding the largest and the smallest eigenvalue; when none is above another (all equal, or NaN) both are the first and the middle axis is read from a fourth column of the 3 x 3 eigenvector matrix: two numbers of the first column and one past the matrix (memory it does not own); corrected: the eigensystem's own order";
     FS_967 = "FS-967", "FreeSurfer", true,
         "the principal axes of an image with an infinite or NaN voxel have no covariance: the eigensystem then never returns (the program hangs) or stops without eigenvectors, which are read all the same (memory never written); refused with a clear error by default";
+    FS_968 = "FS-968", "FreeSurfer", true,
+        "the distance between two rigid transforms (the robust registration's convergence test) inverts the first with a singular value decomposition; on a matrix with an infinite or NaN entry the decomposition can stop without converging (a warning on standard error), and the distance is computed from the decomposition reached all the same (an arbitrary number); refused with a clear error by default";
 }
 
 /// The register entry with ID `id`.

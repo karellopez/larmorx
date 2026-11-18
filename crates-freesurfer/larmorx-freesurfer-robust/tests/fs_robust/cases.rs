@@ -915,13 +915,13 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "polar" => {
             let a = get_vm(t);
-            let (r, s) = mx::polar_decomposition(&mut cx.b, &a)?;
+            let (r, s) = mx::polar_decomposition(&mut cx.g, &mut cx.b, &a)?;
             o.vm(&r);
             o.vm(&s);
         }
         "polar2" => {
             let a = get_vm(t);
-            let (r, s, d) = mx::polar2_decomposition(&mut cx.b, &a)?;
+            let (r, s, d) = mx::polar2_decomposition(&mut cx.g, &mut cx.b, &a)?;
             o.vm(&r);
             o.vm(&s);
             for v in d {
@@ -937,7 +937,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "rdist" => {
             let a = VnlMatrix::from_4x4(&get_m4(t));
             let b = if t.i() != 0 { Some(VnlMatrix::from_4x4(&get_m4(t))) } else { None };
-            o.d(mx::rigid_trans_dist_sq(&mut cx.b, &a, b.as_ref())?);
+            o.d(mx::rigid_trans_dist_sq(&mut cx.g, &mut cx.b, &a, b.as_ref())?);
         }
         "fdiff" => {
             let a = get_vm(t);

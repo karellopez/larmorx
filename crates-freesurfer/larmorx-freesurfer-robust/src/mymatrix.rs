@@ -22,9 +22,10 @@
 use std::io::Write;
 
 use larmorx_core::cfmt;
+use larmorx_core::defects::FS_968;
 use larmorx_core::vnl_fixed;
 use larmorx_core::vnl_matrix::VnlMatrix;
-use larmorx_core::vnl_svd::{matlab_long, vnl_svd_info};
+use larmorx_core::vnl_svd::{matlab_long, vnl_svd_full};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc};
@@ -121,35 +122,53 @@ pub fn is_diag(a: &VnlMatrix, eps: f64) -> bool {
     sse < eps
 }
 
-/// The singular value decomposition of a square matrix as `vnl_svd<double>(A)` keeps it: `U`,
-/// `V` (row-major) and `W` (`|w|`, zeroed where `|w| <= 0`), or LINPACK's `info` with the
-/// warning VNL prints.
-fn svd(a: &VnlMatrix) -> Result<(VnlMatrix, Vec<f64>, VnlMatrix), (usize, String)> {
-    let n = a.rows;
-    match vnl_svd_info(&a.data, n, a.cols) {
-        Ok((u, w, v)) => {
-            let p = a.cols;
-            let mut um = VnlMatrix::zeros(n, p);
-            for j in 0..p {
-                for i in 0..n {
-                    *um.at_mut(i, j) = u[j * n + i];
-                }
-            }
-            let mut vm = VnlMatrix::zeros(p, p);
-            for j in 0..p {
-                for i in 0..p {
-                    *vm.at_mut(i, j) = v[j * p + i];
-                }
-            }
-            let w = w
-                .iter()
-                .map(|&x| if x.abs() <= 0.0 { 0.0 } else { x.abs() })
-                .collect();
-            Ok((um, w, vm))
-        }
-        Err(info) => Err((info, suspicious_svdc(&a.data, n, a.cols, info))),
-    }
+/// What `vnl_svd<double>(A)` keeps: `U`, `V` (row-major) and `W` (`|w|`, zeroed where `|w| <=
+/// 0`), whether LINPACK converged (its warning when it did not: the decomposition reached is kept,
+/// as VNL keeps it), or `None` where VNL never returns (ITK-116, noted: FreeSurfer hangs).
+struct Svd {
+    u: VnlMatrix,
+    w: Vec<f64>,
+    v: VnlMatrix,
+    warning: Option<String>,
 }
+
+fn svd(g: &mut Globals, a: &VnlMatrix) -> Option<Svd> {
+    let (n, p) = (a.rows, a.cols);
+    let full = vnl_svd_full(&a.data, n, p);
+    if full.never_returns() {
+        for x in &full.notices {
+            g.notices.add(x.defect, x.detail.clone());
+        }
+        return None;
+    }
+    let mut um = VnlMatrix::zeros(n, p);
+    for j in 0..p {
+        for i in 0..n {
+            *um.at_mut(i, j) = full.u[j * n + i];
+        }
+    }
+    let mut vm = VnlMatrix::zeros(p, p);
+    for j in 0..p {
+        for i in 0..p {
+            *vm.at_mut(i, j) = full.v[j * p + i];
+        }
+    }
+    let w = full
+        .w
+        .iter()
+        .map(|&x| if x.abs() <= 0.0 { 0.0 } else { x.abs() })
+        .collect();
+    let warning = (full.info != 0).then(|| suspicious_svdc(&a.data, n, p, full.info));
+    Some(Svd {
+        u: um,
+        w,
+        v: vm,
+        warning,
+    })
+}
+
+/// The error the port gives where VNL's SVD never returns (FreeSurfer hangs: ITK-116).
+const SVD_HANGS: &str = "MyMatrix: VNL's singular value decomposition never returns on this matrix (an infinite or NaN entry)";
 
 /// The lines `vnl_svd<double>` prints on standard error when LINPACK's `dsvdc` does not converge
 /// (ITK 4.13.2's `vnl_svd.hxx`, the official build's path): `info`, the size, and the matrix by
@@ -174,33 +193,35 @@ fn suspicious_svdc(m: &[f64], rows: usize, cols: usize, info: usize) -> String {
 /// `MyMatrix::PolarDecomposition(A, R, S)`: from `vnl_svd<double>(A)`, `R = U V^T` and `S = V W
 /// V^T` (VNL's products). When LINPACK does not converge: VNL's warning, then `MyMatrix
 /// PolarDecomposition ERROR: SVD not possible?` on standard error and the end of the program
-/// (`exit(1)`).
+/// (`exit(1)`). Where VNL never returns (ITK-116: FreeSurfer hangs): an error and `exit(1)`.
 pub fn polar_decomposition(
+    g: &mut Globals,
     err: &mut dyn Write,
     a: &VnlMatrix,
 ) -> Result<(VnlMatrix, VnlMatrix), Fatal> {
-    match svd(a) {
-        Ok((u, w, v)) => {
-            let vt = v.transpose();
-            let r = u.mul(&vt);
-            let s = v.scale_columns(&w).mul(&vt);
-            Ok((r, s))
-        }
-        Err((_, warning)) => {
-            let _ = err.write_all(warning.as_bytes());
-            let _ = writeln!(err, "MyMatrix PolarDecomposition ERROR: SVD not possible?");
-            Err(Fatal::Exit(1))
-        }
+    let Some(d) = svd(g, a) else {
+        let _ = writeln!(err, "{SVD_HANGS}");
+        return Err(Fatal::Exit(1));
+    };
+    if let Some(w) = d.warning {
+        let _ = err.write_all(w.as_bytes());
+        let _ = writeln!(err, "MyMatrix PolarDecomposition ERROR: SVD not possible?");
+        return Err(Fatal::Exit(1));
     }
+    let vt = d.v.transpose();
+    let r = d.u.mul(&vt);
+    let s = d.v.scale_columns(&d.w).mul(&vt);
+    Ok((r, s))
 }
 
 /// `MyMatrix::Polar2Decomposition(A, R, S, D)`: [`polar_decomposition`], then `D[c] = S[c][c]`
 /// and column `c` of `S` divided by it, for each column in order.
 pub fn polar2_decomposition(
+    g: &mut Globals,
     err: &mut dyn Write,
     a: &VnlMatrix,
 ) -> Result<(VnlMatrix, VnlMatrix, Vec<f64>), Fatal> {
-    let (r, mut s) = polar_decomposition(err, a)?;
+    let (r, mut s) = polar_decomposition(g, err, a)?;
     let mut d = vec![0.0; a.cols];
     for c in 0..a.cols {
         d[c] = s.at(c, c);
@@ -238,12 +259,13 @@ pub fn affine_trans_dist_sq(a: &VnlMatrix, b: Option<&VnlMatrix>, r: f64) -> f64
 /// pseudo-inverse; `a` itself for an empty `b`); `tdq` the sum of the squares of its translation;
 /// `rd` = [`rot_matrix_log_norm`] of `d`; `rd rd + tdq`.
 pub fn rigid_trans_dist_sq(
+    g: &mut Globals,
     err: &mut dyn Write,
     a: &VnlMatrix,
     b: Option<&VnlMatrix>,
 ) -> Result<f64, Fatal> {
     let d = match b {
-        Some(b) if !b.is_empty() => b.mul(&matrix_inverse(err, a)),
+        Some(b) if !b.is_empty() => b.mul(&matrix_inverse(g, err, a)?),
         _ => a.clone(),
     };
     let mut tdq = 0.0f64;
@@ -257,25 +279,41 @@ pub fn rigid_trans_dist_sq(
 
 /// `vnl_matrix_inverse<double>(a)` as a matrix: `vnl_svd<double>(a).pinverse()`, `V W^-1 U^T`
 /// with `W^-1` a full matrix (the inverse of each singular value kept, 0 for a zero one), after
-/// VNL's warning when LINPACK does not converge (the decomposition reached is used all the same:
-/// here zeros, see the crate's PROVENANCE.md).
-pub fn matrix_inverse(err: &mut dyn Write, a: &VnlMatrix) -> VnlMatrix {
-    let (u, w, v) = match svd(a) {
-        Ok(d) => d,
-        Err((_, warning)) => {
-            let _ = err.write_all(warning.as_bytes());
-            let n = a.rows;
-            (VnlMatrix::zeros(n, a.cols), vec![0.0; a.cols], VnlMatrix::zeros(a.cols, a.cols))
-        }
+/// VNL's warning when LINPACK does not converge, then (FS-968, rule B) by default an error and the
+/// end of the program; `reproduce` uses the decomposition reached, as VNL does (its NaN bits are not
+/// yet the official build's: the crate's PROVENANCE.md).
+/// Where VNL never returns (ITK-116: FreeSurfer hangs) an error and the end of the program here.
+pub fn matrix_inverse(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    a: &VnlMatrix,
+) -> Result<VnlMatrix, Fatal> {
+    let Some(d) = svd(g, a) else {
+        let _ = writeln!(err, "{SVD_HANGS}");
+        return Err(Fatal::Exit(1));
     };
-    let p = w.len();
+    if let Some(w) = &d.warning {
+        let _ = err.write_all(w.as_bytes());
+        g.notices.add(
+            &FS_968,
+            "the inverse of a matrix whose singular value decomposition did not converge: FreeSurfer's from the decomposition reached",
+        );
+        if !g.notices.reproduce() {
+            let _ = writeln!(
+                err,
+                "MyMatrix: no inverse of a matrix whose singular value decomposition did not converge (an infinite or NaN entry)"
+            );
+            return Err(Fatal::Exit(1));
+        }
+    }
+    let p = d.w.len();
     let mut winv = VnlMatrix::zeros(p, p);
-    for (i, &x) in w.iter().enumerate() {
+    for (i, &x) in d.w.iter().enumerate() {
         if x != 0.0 {
             *winv.at_mut(i, i) = div64(1.0, x);
         }
     }
-    v.mul(&winv).mul(&u.transpose())
+    Ok(d.v.mul(&winv).mul(&d.u.transpose()))
 }
 
 /// `MyMatrix::getFrobeniusDiff(m1, m2)` (VNL): `(m1 - m2).fro_norm()`.

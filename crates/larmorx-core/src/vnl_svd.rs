@@ -220,8 +220,39 @@ pub type Svd = (Vec<f64>, Vec<f64>, Vec<f64>);
 /// The decomposition of [`vnl_svd`], or LINPACK's `info` when it fails to converge (`dsvdc`'s
 /// `m`, the number of singular values still to find), which `vnl_svd` prints in its warning
 /// ([`suspicious_svdc`]).
-#[allow(clippy::many_single_char_names)]
 pub fn vnl_svd_info(m: &[f64], rows: usize, cols: usize) -> Result<Svd, usize> {
+    let full = vnl_svd_full(m, rows, cols);
+    if full.info != 0 {
+        return Err(full.info);
+    }
+    Ok((full.u, full.w, full.v))
+}
+
+/// The decomposition [`vnl_svd`] computes, whether or not LINPACK converged: `U` (rows × cols,
+/// column-major), the singular values' magnitudes, `V` (cols × cols, column-major), LINPACK's
+/// `info` (0, or the `m` of its main loop where it stopped: after 1,000 QR steps on one value, or
+/// where VNL would never return) and the notices.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SvdFull {
+    pub u: Vec<f64>,
+    pub w: Vec<f64>,
+    pub v: Vec<f64>,
+    pub info: usize,
+    /// larmorx's own: ITK-116 when VNL would never return (LINPACK's deflation and splitting steps
+    /// coming back to a state they had been in, on a matrix with an infinite or NaN entry).
+    pub notices: Vec<crate::defects::Notice>,
+}
+
+impl SvdFull {
+    /// Whether VNL's SVD would never return on this matrix (ITK-116).
+    pub fn never_returns(&self) -> bool {
+        self.notices.iter().any(|n| n.defect.id == "ITK-116")
+    }
+}
+
+/// [`SvdFull`] of a `rows × cols` matrix (row-major input, `rows ≥ cols`).
+#[allow(clippy::many_single_char_names)]
+pub fn vnl_svd_full(m: &[f64], rows: usize, cols: usize) -> SvdFull {
     let (n, p) = (rows, cols);
     assert!(n >= p && p > 0 && m.len() == n * p);
     // vnl_fortran_copy: column-major.
@@ -380,9 +411,25 @@ pub fn vnl_svd_info(m: &[f64], rows: usize, cols: usize) -> Result<Svd, usize> {
     let mm = m_;
     let mut iter = 0;
     let maxit = 1000;
+    let mut info = 0usize;
+    let mut notices = Vec::new();
+    // The deflation and splitting steps (kases 1 and 2) do not count as iterations: on an
+    // infinite or NaN entry they can come back to the same singular values and superdiagonal for
+    // ever (ITK-116, as in `vnl_svd_f32`). The state the next pass reads (s, e, m, iter; a NaN
+    // counted as one) is compared with one saved at the powers of two (Brent's cycle detection).
+    let state = |s: &[f64], e: &[f64], m: usize, iter: usize| -> Vec<u64> {
+        let b = |y: &f64| if y.is_nan() { u64::MAX } else { y.to_bits() };
+        let mut v: Vec<u64> = s.iter().chain(e.iter()).map(b).collect();
+        v.push(m as u64);
+        v.push(iter as u64);
+        v
+    };
+    let mut saved = state(&s, &e, m_, iter);
+    let (mut power, mut steps) = (1u64, 0u64);
     while m_ != 0 {
         if iter >= maxit {
-            return Err(m_);
+            info = m_;
+            break;
         }
         // Find l: e[l] is negligible, or l = 0.
         let mut l = 0usize;
@@ -548,11 +595,35 @@ pub fn vnl_svd_info(m: &[f64], rows: usize, cols: usize) -> Result<Svd, usize> {
                 m_ -= 1;
             }
         }
+        let now = state(&s, &e, m_, iter);
+        if now == saved {
+            info = m_;
+            notices.push(crate::defects::Notice::new(
+                &crate::defects::ITK_116,
+                crate::defects::UpstreamDefects::Fix,
+                format!(
+                    "LINPACK's dsvdc came back to a state it had been in ({rows} x {cols} matrix, singular value {m_}): VNL never returns; stopped with info {m_}"
+                ),
+            ));
+            break;
+        }
+        steps += 1;
+        if steps == power {
+            saved = now;
+            power = power.saturating_mul(2);
+            steps = 0;
+        }
     }
     let w = (0..p)
         .map(|j| if j < mm_len { s[j + 1].abs() } else { 0.0 })
         .collect();
-    Ok((u.data, w, v.data))
+    SvdFull {
+        u: u.data,
+        w,
+        v: v.data,
+        info,
+        notices,
+    }
 }
 
 /// `vnl_svd.hxx`'s `__FILE__`: the build's path to the header; ITK's own path from

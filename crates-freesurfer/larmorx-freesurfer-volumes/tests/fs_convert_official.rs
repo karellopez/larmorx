@@ -13,12 +13,12 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-18 from the clean commit 656b40f3 (`mri_convert`'s stats tables in its three
+/// Recorded 2026-11-18 from the clean commit de5d1402 (`mri_convert`'s stats tables in its three
 /// formats, `csv.h`'s reader, its command line to the parse-only report and the checks before the
-/// input is read; 42 fixed cases, then seeded ones): 1,000 cases, 947 lines identical, 53 hashed as
+/// input is read; 45 fixed cases, then seeded ones): 1,000 cases, 947 lines identical, 53 hashed as
 /// `SKIP`.
 const N: usize = 1000;
-const OFFICIAL_SHA256: &str = "0e893e18082f4c0342317f2a5484934723cd75a0b8387876662b4198e127a848";
+const OFFICIAL_SHA256: &str = "0d0e0ee84677d1dd68be7857618595bbde5b3233625fb734cc060783e3192c5d";
 const SKIPPED: usize = 53;
 
 /// `check.py`'s `SKIP`.

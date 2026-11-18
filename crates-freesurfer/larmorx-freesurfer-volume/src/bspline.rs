@@ -108,6 +108,16 @@ fn wide(v: f32) -> f64 {
     }
 }
 
+/// [`wide`] of a value already widened by `f64::from` (the quiet bit set on a NaN).
+#[inline(always)]
+fn wide_bits(d: f64) -> f64 {
+    if d.is_nan() {
+        f64::from_bits(d.to_bits() | 0x0008_0000_0000_0000)
+    } else {
+        d
+    }
+}
+
 /// A volume whose voxels are there and laid out as allocated (its header's extent the
 /// allocation's), of a type `MRIgetVoxVal` reads as a number: its voxel `(c, r, s, f)` in the
 /// extent is element `c + r vpr + s vps + f vpv`, which `MRIgetVoxVal` converts to `float` (and
@@ -957,6 +967,46 @@ fn window_sum(
     f: i32,
 ) -> Result<f64, Fatal> {
     let flat = Flat::of(c).filter(|_| c.mtype == MRI_FLOAT);
+    // the window inside the extent (the mirrored indices always are) of a flat float volume:
+    // direct reads in the same order
+    if let Some(fl) = flat.filter(|fl| (f as u32) < fl.ext[3] as u32) {
+        let chunk = c.chunk.as_deref().expect("voxels");
+        let at = |i: usize| {
+            f64::from(f32::from_le_bytes([
+                chunk[4 * i],
+                chunk[4 * i + 1],
+                chunk[4 * i + 2],
+                chunk[4 * i + 3],
+            ]))
+        };
+        let (ni, nj, nk) = (win.sd[0] as usize, win.sd[1] as usize, win.sd[2] as usize);
+        let inside =
+            |idx: &[i32; 10], n: usize, e: i32| idx[..=n].iter().all(|&v| (v as u32) < e as u32);
+        if inside(&win.xi, ni, fl.ext[0])
+            && inside(&win.yi, nj, fl.ext[1])
+            && inside(&win.zi, nk, fl.ext[2])
+        {
+            let base = f as usize * fl.vpv;
+            let mut interpolated = 0.0f64;
+            for k in 0..=nk {
+                let sk = base + win.zi[k] as usize * fl.vps;
+                let mut w2 = 0.0f64;
+                for j in 0..=nj {
+                    let rj = sk + win.yi[j] as usize * fl.vpr;
+                    let mut w = 0.0f64;
+                    for i in 0..=ni {
+                        w = add64(w, mul64(wide_bits(at(rj + win.xi[i] as usize)), win.xw[i]));
+                    }
+                    w2 = add64(mul64(w, win.yw[j]), w2);
+                }
+                interpolated = add64(mul64(w2, win.zw[k]), interpolated);
+            }
+            if !b.srcneg && interpolated < 0.0 {
+                interpolated = 0.0;
+            }
+            return Ok(interpolated);
+        }
+    }
     let mut interpolated = 0.0f64;
     for k in 0..=win.sd[2] as usize {
         let mut w2 = 0.0f64;
@@ -1093,6 +1143,7 @@ pub fn mri_linear_transform_bspline(
         None => fresh.insert(mri_clone_different_type(g, out, err, c, bspline.srctype)?),
     };
     let (w, h, dd) = (d.vg.width, d.vg.height, d.vg.depth);
+    let dflat = Flat::of(d);
     let mut vx = matrix_alloc(g, out, err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 vector");
     let mut vy = matrix_alloc(g, out, err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 vector");
     vy.set_relt(4, 1, 1.0);
@@ -1109,7 +1160,7 @@ pub fn mri_linear_transform_bspline(
                 for frame in 0..c.nframes {
                     let mut val = 0.0f64;
                     mri_sample_bspline(g, out, err, bspline, x1, x2, x3, frame, &mut val)?;
-                    mri_set_vox_val(g, err, d, y1, y2, y3, frame, val as f32, 0)?;
+                    set(g, err, d, dflat, y1, y2, y3, frame, val as f32)?;
                 }
             }
         }

@@ -167,8 +167,8 @@ commands; logs in `<scratch>/C/r22/`): seed 7, 2,000 cases: 1,941 identical with
 comparable (84 identical), 0 different; `fix` different only with notices. The port's debug and release builds agree
 on seed 13's 4,000 cases in both modes. Seed 1, 3,320 cases: 3,083 identical, 237 not comparable, hash
 `c3cfc45ecb3faa4cac3084f1f8b08334eab226e31b8e8627585fdd19774571c9`, passing with AArch64's NaN emulated in debug and
-release (`oracles/logs/fs-found-c-r22-trap-volume2.log`). `check.py`'s `SKIP` adds FS-487, FS-488. `talvol` leaves
-out `SAMPLE_CUBIC_BSPLINE` (fs.bspline is not ported yet). Relay 22 also measured `fdr` with `log10` now
+release (`oracles/logs/fs-found-c-r22-trap-volume2.log`). `check.py`'s `SKIP` adds FS-487, FS-488. `talvol` left
+out `SAMPLE_CUBIC_BSPLINE` until relay 39 (fs.bspline). Relay 22 also measured `fdr` with `log10` now
 correctly rounded by default (seeds 7 and 13, 987 cases each: 958 and 947 identical with `reproduce`, 0 different;
 `fix` different only with notices, GLIBC-07 among them).
 
@@ -319,3 +319,24 @@ different (a first run had one `ssrob` line different: `MRIsegStatsRobust`'s min
 `lrseg`, `bvr`: 5,777 identical, 1,223 not comparable, 0 different, and its 1,000 `bvr` lines (186 FS-314 aborts) 1,000
 of 1,000 identical by `hand_cases.py compare`; `fix` differs only with notices. Seed 1, 5,580 cases: 5,145 identical, 435
 not comparable, 24 hashed as `HEAVY`, hash `ae9084ceb1f8c1428a5499df49ca822bd1682966625bf5204174d5f816ec5d43`.
+
+Measured 2026-11-18 (relay 39, part 20: fs.bspline, `utils/mriBSpline.cpp`; 286 commands; logs
+`oracles/logs/fs-found-c-r39-*`). New commands: `bsp` (`MRItoBSpline` of a volume of the case, with no B-spline, an
+allocated one of the case's extent, one without coefficients or one whose coefficients are a volume of the case; a
+degree from 2 to 9, now and then 0, 1, 10 or -1; then `MRIfreeBSpline` once or twice), `bsps` (`MRIsampleBSpline` at
+points inside, at the half-voxel edges, outside and special, frames in and out of range), `bspseq`
+(`MRIsampleSeqBSpline`, frame ranges past the volume's now and then), `bsplx` (`MRIlinearTransformBSpline`,
+`MRIapplyRASlinearTransformBSpline` on the pool's geometries), `bsplta` (`LTAtransformBSpline`, `USE_AVERAGE305`),
+`bspdn`, `bspup` (`MRIdownsample2BSpline`, `MRIupsample2BSpline`, with and without a destination). The sources have
+one axis of up to 90 voxels now and then (past the causal start's horizons, 21 to 73 samples) and axes of one voxel
+often; a quarter of the paints are NaNs of four payloads (a signalling one among them) and infinities. A degree
+written over a computed B-spline (`bsps`, `bspseq`, `bsplx`) reaches FS-964. `lxf`, `rsfill`, `vv`, `vvsm`, `vvtk`,
+`talvol`, `ltaxf` and `ltaixf` now draw `SAMPLE_CUBIC_BSPLINE` (5): the port's error there is gone (fs.bspline). Seed 7,
+700 cases of the new commands: 644 identical with `reproduce`, 56 not comparable, 0 different; seed 13, 1,400: 1,278
+identical, 122 not comparable, 0 different; seed 7, 1,500 cases of the new commands and the eight callers (105 of the
+callers' cases through `MRItoBSpline`): 1,400 identical, 100 not comparable, 0 different; `fix` different only with
+notices. `check.py`'s `SKIP` adds FS-964 and FS-965 (relay 39 also met FS-965: an `hlab` case of the new seed-1 stream
+made the port's `fix` run grow past its 24 GiB box, `docs/findings/freesurfer-volume.md` §31). Seed 1, 5,720 cases:
+5,284 identical, 436 not comparable, 24 hashed as `HEAVY`, hash
+`a2c71444db657bf3d3d59048d6910a4301c20fe27581b8867b44d3bd2f989409`. The speed and memory against FreeSurfer's own code:
+`validation/probes/fs-bspline-bench/`.

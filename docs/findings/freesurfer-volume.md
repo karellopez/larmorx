@@ -1051,3 +1051,108 @@ the same allocation seen by the full copy (E's `specs/freesurfer-volume.md` §6,
   copies the whole volume. Noted in both modes where a walk reaches a row but slice 0's row 0.
 - **The probe** (`validation/probes/fs-volume`; the generator now draws tensor volumes among its rare types and as
   `invc`'s, `sam`'s and the moves' destinations): see the README's relay 37 paragraph for the numbers.
+
+## 30. B-splines (`fs.bspline`, queue 3.2-01; relay 39 of track C): FS-962 to FS-964
+Source: `utils/mriBSpline.cpp` (Martin Reuter, MGH; based on Thévenaz, Blu and Unser, IEEE TMI 19 (2000) 739-758, and
+EPFL's 2-D example code; the pyramid filters Unser's, Brigger's and Sage's, NIH and EPFL), `include/mriBSpline.h`. The
+object code read: the unit oracle's `libutils.a` member `mriBSpline.cpp.o` (`objdump -dr -C`, `<scratch>/C/r39/obj/bsp.s`).
+- **Callers** (every program that reaches the module): `MRItoBSpline` of degree 3 and `MRIsampleBSpline` from
+  `MRIlinearTransformInterp` (`mri.cpp` 11516), `MRIresampleFill` (12138), `MRIvol2Vol` (`mri2.cpp` 940),
+  `MRIvol2VolVSM` (3155), `MRIvol2surfVSM` (3382), `GCAMmorphFromAtlas` (`MRIsampleSeqBSpline`), `GCAMmorphToAtlas`,
+  `GCAMmorphToAtlasType`, `MRIapplyMorph` (`gcamorph.cpp`), `GradUnwarp.cpp`, `mri_vol2vol`'s own loops, the robust tools'
+  `InterpolatorBSpline` (degree 3 only: `Interpolator.h` 272), `CostFunctions.cpp`, `JointHisto.cpp`,
+  `mri_robust_register.cpp` (a 2-D test path), `MultiRegistration.cpp` (`MRItoBSpline` into an existing B-spline, then
+  `LTAtransformBSpline`), `Registration.cpp` 3016 and 3029 (`MRIdownsample2BSpline` for the pyramid). No caller of
+  `MRIupsample2BSpline` (commented out in `Interpolator.h` 258); no caller asks for a degree other than 3.
+- **What the port computes as FreeSurfer does** (bit for bit; the probe's numbers below): the three passes (x, then y for
+  a volume more than one voxel high, then z for more than one deep), each line read through `MRIgetVoxVal` (the source's
+  type rules, `float` widened to `double`: a signalling NaN comes out quiet), filtered, stored with `MRIsetVoxVal` as
+  `float`, so each pass rounds to `float`; `srcneg` from the source's values below 0 (NaN and -0 are not); the clip of a
+  negative sample to 0 when the source has no negative value; the mirror boundaries `2 n - 2`; an axis of one voxel
+  taking its voxel with weight 1.
+- **Operand orders** (which of two NaNs survives; `sse.rs`'s rules, the destination operand's NaN first):
+  - gain: `c[n] * lambda` (`lambda` finite); the accelerated causal start: `sum + c[n] * z^n` (`sum` first, `c[n]` first
+    in the product); the full one: `(c[N-1] * z^(N-1)) + c[0]` (the product first, GCC swapped the source's `c[0] + ...`),
+    then `sum + (z^n + z^(2N-2-n)) * c[n]`, then `sum / (1 - z^(2N-2))`;
+  - causal recursion `(c[n-1] * z) + c[n]` (the product first); anticausal start `(z / (z z - 1)) * ((c[N-2] * z) +
+    c[N-1])`; anticausal recursion `(c[n+1] - c[n]) * z` (`c[n+1]` first). So a NaN in a line spreads to the whole line
+    with the first (causal) or last (anticausal) NaN's payload, and across lines by the next pass's order.
+  - sampling (`MRIsampleBSpline` and `MRIsampleSeqBSpline` alike): per row `w + coef * wx` (`w` first, the coefficient
+    first in the product), per slice `(w * wy) + w2`, over the slices `(w2 * wz) + sum` (the new term first in the last
+    two: GCC swapped the source's `w2 += ...`).
+  - pyramids: `ReduceCentered_1D`'s filter `y + (In[i1] + In[i2]) * g[i]` and its Haar step `(y[2k+1] + y[2k]) * 0.5`
+    (the odd sample first, in the vector and the scalar code alike); `ExpandCentered_1D`'s `out + (In[i1] + In[i2]) *
+    h[k]`, `out + h[|k|] * In[i1]`, and its backward Haar step `(out[j] + out[j-1]) * 0.5` for `j >= 2` (the vector
+    loop) but `(out[0] + out[1]) * 0.5` for `j = 1` (the scalar tail: `out[0]` first), `out[0] * 0.5`.
+  - The weights (`BsplineWeights`, not inlined) are finite for every point that reaches them: the source's order of
+    operations gives the official values; GCC folds the constant quotients (`1.0 / 6.0`, ...) as Rust does.
+- **`log`, `pow`**: the horizon `ceil(log(DBL_EPSILON) / log(fabs(z)))` (`log` and `fabs` called: `-fno-builtin`; the
+  `Tolerance` argument constant-propagated, `log` still called) and the full start's `pow(z, N - 1)` are glibc's. For
+  the 18 poles of degrees 2 to 9 the correctly rounded `log` gives the same bits, and `pow` too for every length up to the
+  horizon but one: degree 6's third pole (-0.0014141518083258177) on a line of 5 samples, where glibc's `pow(z, 4)` is
+  one unit in the last place above (`3d9196d024025c2d` against `3d9196d024025c2c`). Degree 6 is never asked for; the
+  port takes `Libm` (glibc's with `reproduce`), the unit test pins the one difference.
+- **Horizons** (the accelerated start needs a line longer than the horizon): degree 2: 21; 3: 28; 9's first pole: 73
+  (the generator draws lines up to 90 samples).
+- **Threads**: every pass's lines are independent (OpenMP over slices, `schedule(static, 1)`); `srcneg` is written by
+  several threads (only set to 1), and the loop variable `x` of the first pass is shared (`firstprivate` lists `tid, y, f,
+  Lines` only), written back only after its loop (the object code keeps it in a register): no effect on the results. The
+  per-thread line buffers are an array of `_MAX_FS_THREADS` (128, `include/base.h` 70) filled for
+  `omp_get_max_threads()` threads: more than 128 threads write past it (not reached by the port, which computes the
+  lines in order).
+- **FS-962** (c, rule A; `MRIupsample2BSpline`, which no program calls): for a source one row high (one slice deep) the
+  y (z) pass's "copy" branch reads the source itself (`getYLine(mri_src, kx, ...)`, `kx` up to the doubled width) over
+  the destination's lines the x pass (the x and y passes) expanded: the output's row holds the source's raw voxels at
+  the doubled columns, past the source's width read from the next row's or slice's voxels (FS-52) or past the buffer
+  (FS-53). The default keeps the expanded lines (the pass is the identity on an axis of one voxel); `reproduce` reads
+  as FreeSurfer (noted). The probe compares the cases whose reads stay in the buffer (most read past it: not comparable).
+- **FS-963** (c, rule D pending): both pyramid functions change the voxel size of an axis of one voxel they do not
+  resample: the downsampling doubles `xsize`, `ysize`, `zsize`, `thick` and `ps` whatever the extent, and its centre
+  (`width / 2 + 0.5`, integer halves) puts the single voxel's centre half a source voxel off; the upsampling halves the
+  sizes (its centre `width / 2.0 - 0.25` keeps the voxel's centre in place). It reaches `mri_robust_register`'s pyramid
+  on 2-D images (`Registration.cpp` 3016) only; whether a correction changes that registration is measured when
+  `mri_robust_register` is ported (3.2-13). Until then both modes give FreeSurfer's geometry, noted.
+- **FS-964** (a, memory): `MRIsampleBSpline` and `MRIsampleSeqBSpline` on a B-spline whose degree is not 2 to 9 (one from
+  `MRIallocBSpline` that was never computed, degree -1; `MRItoBSpline` itself ends with `Invalid spline degree` for
+  other degrees, after allocating): with an axis longer than one voxel the weights end the program (`Invalid spline
+  degree`, status 1) before an index is used, unless the degree is above 9 (the index loop writes `xIndex[10..]` past
+  its 10 entries first); on a volume of one voxel a degree below 0 reads indices never set, 0 and 1 read the voxel. The
+  port: `Invalid spline degree` where FreeSurfer stops cleanly, the voxel for 0 and 1, an error in both modes otherwise.
+- **Kept (rule C, no register entry)**: `MRIdownsample2BSpline`'s dimension check prints `ERROR MRIupsample2BSpline: MRI
+  Dest dimensions not correct!` (the upsampling's name; a message only); an odd extent's last voxel is left out by the
+  downsampling (the source's comment: "odd images get clipped"); `LTAtransformBSpline` has no `REGISTER_DAT` case (an
+  array of that type ends with `unknown linear transform`, unlike `LTAtransformInterp`); `MRIsampleSeqBSpline` does not
+  check its frames against the volume's (frames beyond read through `MRIgetVoxVal`: FS-52, FS-53); the clip to 0 of a
+  negative sample when the source had no negative voxel (a deliberate choice: "if input does not have negative values,
+  clip to zero").
+- **Not translated** (static and never chosen: `GetPyramidFilter` is asked only for `"Centered Spline"`, order 3): the
+  standard and L2 filter families, the other orders, `ReduceStandard_1D`, `ExpandStandard_1D`.
+- **The probe** (`validation/probes/fs-volume`, part 20: `bsp`, `bsps`, `bspseq`, `bsplx`, `bsplta`, `bspdn`, `bspup`, and
+  `SAMPLE_CUBIC_BSPLINE` drawn by `lxf`, `rsfill`, `vv`, `vvsm`, `vvtk`, `talvol`, `ltaxf`, `ltaixf`): seed 7, 700 cases of
+  the new commands: 644 identical with `reproduce`, 56 not comparable (FS-53, FS-58, FS-964), 0 different; seed 13, 1,400
+  cases (a quarter of the paints NaNs of four payloads, a signalling one among them, and infinities): 1,278 identical,
+  122 not comparable, 0 different; seed 7, 1,500 cases with the wired callers (105 of them through `MRItoBSpline`): 1,400
+  identical, 100 not comparable, 0 different; `fix` different only with notices. Seed 1, 5,720 cases (286 commands):
+  5,284 identical (24 of them `HEAVY`), 436 not comparable, hash `a2c71444...` (`tests/fs_volume_official.rs`).
+- **Speed and memory** (`validation/probes/fs-bspline-bench`: FreeSurfer's own functions from the unit oracle against the
+  port's release build, one thread, the same volume; log `oracles/logs/fs-found-c-r39-bspline-bench.log`): the outputs'
+  FNV-1a hashes are identical in every run. Coefficients of a 256^3 volume: `float` 0.52 s (FreeSurfer) and 0.54 s
+  (port), peak resident memory 136,448 kB and 133,644 kB; `uchar` 0.48 s and 0.54 s, 87,296 kB and 84,552 kB.
+  `MRIlinearTransformBSpline` of a 128^3 volume (a rotation of about 3 degrees and a shift): `float` 0.35 s and 0.49 s,
+  `uchar` 0.41 s and 0.53 s, the port's peak memory below FreeSurfer's. The port reads a flat `float` coefficient
+  volume directly (the same values `MRIgetVoxVal` returns); fs.core's `MatrixMultiply` no longer formats its file name
+  unless it fails (it did at every call). The rest of the gap is the per-sample setup; a speed relay can close it bit
+  for bit.
+
+## 31. Histograms with a bin count from the values' range (relay 39): FS-965
+- `MRIhistogram`, `MRIhistogramRegion`, `MRIhistogramLabel`, `MRIhistogramLabelRegion`, `MRIhistogramVoxel`,
+  `MRIhistogramRegionWithThreshold` and the region histogram take `nbins = nint(fmax - fmin + 1)` when asked for 0 bins or
+  fewer, and `HISTOalloc` callocs two `float` arrays of that many bins, which `HISTOinit` then fills: a range of 1.1e9
+  asks for 9,008,828,424 bytes. The probe met it (seed 1, the generator's new stream after relay 39): an `int` volume
+  painted with values up to 1.1e9 and a labelled volume whose NaN voxels FS-12's default reads as label 0 (FreeSurfer's
+  `nint(NaN)` is `INT_MIN`, so FreeSurfer's own case had one bin); the port's `fix` run grew past its 24 GiB box and was
+  killed (the box is the answer: no run outside it).
+- **FS-965** (a, memory; rule B): a count above 2^26 bins (two arrays of 512 MiB) ends with `HISTOalloc(<n>): a histogram
+  of <n> bins (the values' range, <min> to <max>) is refused (FreeSurfer allocates <bytes> bytes here)` and
+  `ERROR_NO_MEMORY` in both modes (FreeSurfer's result there depends on the machine's memory); the probe does not compare
+  those cases.

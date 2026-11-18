@@ -203,9 +203,22 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let a = l.getm(p)?.expect("a matrix");
             let b = l.getm(p)?.expect("a matrix");
             let o = l.getm_out(p)?;
-            mout(l, Some(&a), Some(&b), o, |o| {
-                p.matrix_add_sub(&a, &b, o, c == "msub")
-            })?;
+            let sub = c == "msub";
+            match o {
+                Out::First | Out::Second => {
+                    let first = matches!(o, Out::First);
+                    let (mut x, other) = if first {
+                        (a.clone(), &b)
+                    } else {
+                        (b.clone(), &a)
+                    };
+                    let r = p.matrix_add_sub_in_place(&mut x, other, sub, first)?;
+                    l.putm_res(&r, Some(&x));
+                }
+                o => mout(l, Some(&a), Some(&b), o, |o| {
+                    p.matrix_add_sub(&a, &b, o, sub)
+                })?,
+            }
         }
         "mscale" => {
             let a = l.getm(p)?.expect("a matrix");

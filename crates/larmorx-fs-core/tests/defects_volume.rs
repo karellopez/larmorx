@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 4): each one noted in
+//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 5): each one noted in
 //! both modes on a case that meets it, and its two modes' results different where the correction
-//! changes them (memory reads and crashes give the same result in both modes). The cases are lines
+//! changes them (memory reads and crashes give the same result in both modes; the end of the
+//! program that §22's modes table gives in both modes differs only by FS-01's NUL in its C-style
+//! message). The cases are lines
 //! of the comparison's own seeded batches (the shortest line on which the clean room notes the
 //! defect in both modes), run through the probe's commands (`tests/volume_cmd/`; the transform
 //! files in memory, `ltamem`); FS-292, FS-296, FS-297, FS-302, FS-305 and FS-258, which those
@@ -117,7 +119,7 @@ const CASES: &[(&str, bool, &str)] = &[
     ),
     (
         "FS-300",
-        true,
+        false,
         "samp cubf 1 4 4 2 3 0 -1 3f800000 3f800000 3f800000 1 00000000 3f800000 00000000 00000000 00000000 3f800000 3f800000 00000000 00000000 c20d381d 42b00000 42340000 00000000 00000000 00000000 3 5 c29be39e bffdef3c ba266780 40800000 c2854fcd 42540000 c2154b02 c6bb656f 4b393ea8 c2c3a834 422b7825 40e9fe3850d07eaa 2 42b80000 42600000 2 1 null null 0000000000000000 1 3fd5539c7e463df0 0000000000000000 be45798ee2308c3a 0 0",
     ),
     (
@@ -147,13 +149,13 @@ const CASES: &[(&str, bool, &str)] = &[
     ),
     (
         "FS-308",
-        true,
+        false,
         "ltamem x74 x747970203d20310a6e78666f726d73203d20300a7375626a65637420626572740a 0 none",
     ),
     ("FS-309", true, "ltamem x74 x74 2 none"),
     (
         "FS-310",
-        false,
+        true,
         "ltamem x672e78666d x4d4e49205472616e73666f726d2046696c650a2547656e6572617465642062792078206473740a0a5472616e73666f726d5f54797065203d204c696e6561723b0a4c696e6561725f5472616e73666f726d203d0a312030203020300a302031203020300a302030203120303b0a 0 none",
     ),
 ];
@@ -196,9 +198,14 @@ fn check(id: &str, differs: bool, line: &str) {
 
 #[test]
 fn each_defect_is_noted_in_both_modes() {
-    for &(id, differs, line) in CASES {
-        check(id, differs, line);
-    }
+    let failed: Vec<&str> = CASES
+        .iter()
+        .filter(|&&(id, differs, line)| {
+            std::panic::catch_unwind(|| check(id, differs, line)).is_err()
+        })
+        .map(|&(id, _, _)| id)
+        .collect();
+    assert!(failed.is_empty(), "failed: {failed:?}");
 }
 
 /// A working volume (README.md's W) of shape `v` and fill `fill`: unit voxels, the coronal
@@ -249,8 +256,8 @@ fn fs297_long_box() {
     );
 }
 
-/// FS-302: a sinc window of 138 voxels on an axis is refused in both modes (FreeSurfer writes
-/// past its 128 weights).
+/// FS-302: a sinc window of 138 voxels on an axis ends the program in both modes (FreeSurfer
+/// writes past its 128 weights).
 #[test]
 fn fs302_a_sinc_window_beyond_128_voxels() {
     let x = 70.5f64.to_bits();
@@ -260,11 +267,11 @@ fn fs302_a_sinc_window_beyond_128_voxels() {
     );
     check("FS-302", true, &line);
     let (fix, _) = run(&line, UpstreamDefects::Fix);
-    assert!(fix.starts_with("-4 401c000000000000 |"), "{fix}");
+    assert!(fix.starts_with("EXIT 252 |"), "{fix}");
 }
 
-/// FS-305: an infinite voxel makes the centre of mass not a number: the program ends by
-/// default; `reproduce` walks outside the volume as FreeSurfer does.
+/// FS-305: an infinite voxel makes the centre of mass not a number: the program ends in both
+/// modes, before any walk.
 #[test]
 fn fs305_a_centre_of_mass_that_is_not_a_number() {
     let line = format!(
@@ -297,4 +304,81 @@ fn fs258_a_register_dat_subject_of_1000_bytes() {
     };
     let line = format!("ltamem {} {} 0 none", hex(b"t.dat"), hex(text.as_bytes()));
     check("FS-258", false, &line);
+}
+
+/// A float working volume of shape `v` (frame 0 fill `fill`), painted (README.md's P).
+fn wp(v: &str, fill: &str, paint: &str) -> String {
+    format!("{} {paint}", w(v, fill))
+}
+
+/// FS-311: a NaN voxel as a label: -2147483648 with `reproduce` (unrecognized, kept), 0 by
+/// default (its own contralateral label).
+#[test]
+fn fs311_a_nan_label() {
+    let line = format!("lrswap {}", wp("1 1 1 3 1 0", "0", "1 0 0 0 7fc00000"));
+    check("FS-311", true, &line);
+}
+
+/// FS-312: a thalamus voxel outside the ribbon counts twice with `reproduce`.
+#[test]
+fn fs312_the_thalamus_twice() {
+    let line = format!(
+        "cmavol {} {} 0",
+        wp("1 1 1 3 1 0", "0", "1 0 0 0 41200000"),
+        wp("1 1 1 3 1 0", "0", "0")
+    );
+    check("FS-312", true, &line);
+}
+
+/// FS-313: the right vessel (62) in the ribbon counts by default, not with `reproduce`.
+#[test]
+fn fs313_the_right_vessel() {
+    let line = format!(
+        "cmavol {} {} 0",
+        wp("1 1 1 3 1 0", "0", "1 0 0 0 42780000"),
+        wp("1 1 1 3 1 0", "0", "0")
+    );
+    check("FS-313", true, &line);
+}
+
+/// FS-314: a cache line naming a measure without a number and ending in a blank gives no number
+/// in both modes (FreeSurfer aborts); the measure then missing ends the program.
+#[test]
+fn fs314_a_cache_line_without_a_number() {
+    let text = "# Measure BrainSeg, BrainSegVol, Brain Segmentation Volume, x, mm^3 \n";
+    let mut hex = "x".to_owned();
+    for c in text.bytes() {
+        hex.push_str(&format!("{c:02x}"));
+    }
+    let line = format!("bvparse {hex}");
+    check("FS-314", false, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(fix.starts_with("EXIT 1 |"), "{fix}");
+}
+
+/// FS-315: label lists of 2 x 0: an error by default; `reproduce` reads their numbers as NaN
+/// (no swap).
+#[test]
+fn fs315_label_lists_without_numbers() {
+    let line = format!(
+        "lrseg {} 2 0 2 0",
+        wp("2 1 1 3 1 0", "0", "1 1 0 0 40000000")
+    );
+    check("FS-315", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(fix.starts_with("null |"), "{fix}");
+    assert!(!rep.starts_with("null |"), "{rep}");
+}
+
+/// FS-960: a tensor volume's rows walked directly (FS-291's walk of `MRIinvertContrast`,
+/// `reproduce` only: the default refuses that walk, FS-291, so no function of parts 1 to 5 walks
+/// a tensor by default): every row at the first voxel, noted.
+#[test]
+fn fs960_a_tensor_volumes_rows() {
+    let line = format!("invc {} new 3f800000", w("1 2 1 6 1 0", "9"));
+    let (_, rep_ids) = run(&line, UpstreamDefects::Reproduce);
+    assert!(rep_ids.iter().any(|i| i == "FS-960"), "{rep_ids:?}");
+    let (_, fix_ids) = run(&line, UpstreamDefects::Fix);
+    assert!(fix_ids.iter().any(|i| i == "FS-291"), "{fix_ids:?}");
 }

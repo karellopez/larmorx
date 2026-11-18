@@ -190,7 +190,55 @@ impl Process {
         })
     }
 
-    /// `MatrixAdd(m1, m2, out)` (`subtract`: `MatrixSubtract`).
+    /// `MatrixAdd(m1, m2, m1)` (`m_is_first`) or `MatrixAdd(m1, m2, m2)` (`subtract`:
+    /// `MatrixSubtract`): the result written into the operand `m` itself, `other` the other
+    /// operand. Where both elements are NaNs the sum keeps m2's NaN and the difference m1's (§8.2).
+    pub fn matrix_add_sub_in_place(
+        &mut self,
+        m: &mut Matrix,
+        other: &Matrix,
+        subtract: bool,
+        m_is_first: bool,
+    ) -> Result<Returned<Matrix>, Stop> {
+        let (name, op) = if subtract {
+            ("MatrixSubtract", "-")
+        } else {
+            ("MatrixAdd", "+")
+        };
+        {
+            let (m1, m2): (&Matrix, &Matrix) = if m_is_first { (m, other) } else { (other, m) };
+            if !self.real_only(name, m1) || !self.real_only(name, m2) {
+                return Ok(Returned::Nothing);
+            }
+            if !m1.same_size(m2) {
+                let msg = format!(
+                    "{name}: incompatable matrices {} x {} {op} {} x {}\n",
+                    m1.rows, m1.cols, m2.rows, m2.cols
+                );
+                self.error_printf(codes::BAD_PARM, msg.as_bytes());
+                return Ok(Returned::Nothing);
+            }
+        }
+        for r in 1..=m.rows {
+            for c in 1..=m.cols {
+                let (x, y) = if m_is_first {
+                    (m.at(r, c), other.at(r, c))
+                } else {
+                    (other.at(r, c), m.at(r, c))
+                };
+                let v = if subtract {
+                    sse::sub32(x, y)
+                } else {
+                    sse::add32(y, x)
+                };
+                m.set(r, c, v);
+            }
+        }
+        Ok(Returned::Output)
+    }
+
+    /// `MatrixAdd(m1, m2, out)` (`subtract`: `MatrixSubtract`), `out` neither operand (a new
+    /// matrix or another given one).
     pub fn matrix_add_sub(
         &mut self,
         m1: &Matrix,
@@ -216,6 +264,9 @@ impl Process {
         }
         let b = m2.clone();
         let (r1, c1) = (m1.rows, m1.cols);
+        // §8.2: where both are NaNs the difference keeps m1's NaN, the sum m1's for rows of 4 or
+        // more columns and m2's for shorter rows (**observed**)
+        let first_nan = c1 >= 4;
         self.elementwise(
             name,
             m1,
@@ -229,8 +280,10 @@ impl Process {
             |r, c, x| {
                 if subtract {
                     sse::sub32(x, b.at(r, c))
-                } else {
+                } else if first_nan {
                     sse::add32(x, b.at(r, c))
+                } else {
+                    sse::add32(b.at(r, c), x)
                 }
             },
         )
@@ -1053,9 +1106,12 @@ impl Process {
                 o
             }
         };
-        o.set(1, 1, sse::sub32(sse::mul32(y1, z2), sse::mul32(z1, y2)));
-        o.set(2, 1, sse::sub32(sse::mul32(z1, x2), sse::mul32(x1, z2)));
-        o.set(3, 1, sse::sub32(sse::mul32(x1, y2), sse::mul32(y1, x2)));
+        // §8.5's operand order (which NaN a result keeps): each product's factors and each
+        // difference's products as written
+        let [a, b, c] = Process::cross_terms((x1, y1, z1), (x2, y2, z2));
+        o.set(1, 1, a);
+        o.set(2, 1, b);
+        o.set(3, 1, c);
         Ok(match fresh {
             Some(f) => Returned::New(f),
             None => Returned::Output,
@@ -1085,13 +1141,22 @@ impl Process {
         let (x1, y1, z1) = Process::xyz(v1);
         let (x2, y2, z2) = Process::xyz(v2);
         let (x3, y3, z3) = Process::xyz(v3);
-        // the official build's operand order (which NaN a result keeps), fitted on the probe's
-        // `mvectors` group (several orders fit every case; this is one of them)
-        let a = sse::sub32(sse::mul32(z2, y1), sse::mul32(y2, z1));
-        let b = sse::sub32(sse::mul32(x2, z1), sse::mul32(z2, x1));
-        let c = sse::sub32(sse::mul32(x1, y2), sse::mul32(x2, y1));
-        let t = sse::add32(sse::mul32(b, y3), sse::mul32(a, x3));
-        sse::add32(sse::mul32(c, z3), t)
+        // §8.5: t3 + (t2 + t1), each cross term the left factor of its product
+        let [a, b, c] = Process::cross_terms((x1, y1, z1), (x2, y2, z2));
+        let (t1, t2, t3) = (sse::mul32(a, x3), sse::mul32(b, y3), sse::mul32(c, z3));
+        sse::add32(t3, sse::add32(t2, t1))
+    }
+
+    /// The cross product's three elements in float (§8.5): `y1 z2 - z1 y2`, `z1 x2 - z2 x1`,
+    /// `x1 y2 - y1 x2`, each product's factors and each difference's products in that order
+    /// (where both are NaNs the left one's NaN is kept).
+    fn cross_terms(v1: (f32, f32, f32), v2: (f32, f32, f32)) -> [f32; 3] {
+        let ((x1, y1, z1), (x2, y2, z2)) = (v1, v2);
+        [
+            sse::sub32(sse::mul32(y1, z2), sse::mul32(z1, y2)),
+            sse::sub32(sse::mul32(z1, x2), sse::mul32(z2, x1)),
+            sse::sub32(sse::mul32(x1, y2), sse::mul32(y1, x2)),
+        ]
     }
 
     /// `Vector3Angle(v1, v2)` (acos correctly rounded in both modes, §7).

@@ -2,9 +2,9 @@
 //! Moving a volume (spec §19): translations, rotations by a matrix about a centre and rotations
 //! about an axis; FS-301, FS-303 and FS-304.
 
-use larmorx_core::defects::{FS_289, FS_301, FS_303, FS_304};
+use larmorx_core::defects::{FS_301, FS_303, FS_304};
 
-use super::{Dst, VolOut, Vols, row_byte_place};
+use super::{Dst, VolOut, Vols};
 use crate::maths::Returned;
 use crate::maths::matrix::{MATRIX_REAL, Matrix};
 use crate::mri::{Mri, types};
@@ -56,7 +56,7 @@ impl Process {
                 );
             }
             let b = self.nint(val) as u8;
-            let place = row_byte_place(d, i64::from(x), i64::from(y), i64::from(z), 0, 1);
+            let place = self.row_place(d, i64::from(x), i64::from(y), i64::from(z), 0, 1);
             self.direct_needs_voxels(d, what)?;
             self.direct_write(d, place, &[b], what);
             return Ok(());
@@ -68,14 +68,7 @@ impl Process {
                 d.kind
             ),
         );
-        let g = &d.geom;
-        if x >= g.width || y >= g.height || z >= g.depth {
-            self.note(
-                &FS_289,
-                format!("{what}: a voxel outside the volume not written"),
-            );
-            return Ok(());
-        }
+        // the destination's own write (fs.mri §5's MRIsetVoxVal: its rules outside the extent)
         self.mri_set_vox_val(d, x, y, z, 0, sse::narrow(val), 0)?;
         Ok(())
     }
@@ -184,11 +177,11 @@ impl Process {
             self.matrix_print(Some(false), Some(&inv), 5);
             self.matrix_print(Some(false), Some(&centre), 5);
         }
-        // the vector, its product and the point: 3 x 1 matrices made once; a product or a sum that
-        // fails (an error per voxel) leaves its matrix as it was (observed: the probe's `vmove`,
-        // a 2 x 2 or 4 x 4 rotation samples every voxel at the centre)
+        // the offset Y and the point X: 3 x 1 matrices made once; X = R^-1 Y, then X = X + O in
+        // place. A product or a sum that refuses its sizes (an error per voxel) leaves X as it
+        // was: an R of another size adds O to the previous voxel's point, an O of another size
+        // leaves the point R^-1 Y (observed: the probe's `vmove`, `vrules4`)
         let mut mv = Matrix::zeros(3, 1, MATRIX_REAL);
-        let mut prod = Matrix::zeros(3, 1, MATRIX_REAL);
         let mut p = Matrix::zeros(3, 1, MATRIX_REAL);
         let mut val = 0.0f64;
         let mut first = true;
@@ -198,8 +191,8 @@ impl Process {
                     mv.set(1, 1, x.wrapping_sub(io[0]) as f32);
                     mv.set(2, 1, y.wrapping_sub(io[1]) as f32);
                     mv.set(3, 1, z.wrapping_sub(io[2]) as f32);
-                    self.matrix_multiply(Some(&inv), Some(&mv), Some(&mut prod))?;
-                    self.matrix_add_sub(&prod, &centre, Some(&mut p), false)?;
+                    self.matrix_multiply(Some(&inv), Some(&mv), Some(&mut p))?;
+                    self.matrix_add_sub_in_place(&mut p, &centre, false, true)?;
                     let (px, py, pz) = (
                         sse::widen(p.at(1, 1)),
                         sse::widen(p.at(2, 1)),
@@ -218,7 +211,7 @@ impl Process {
     /// `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I(src, dst, angle)` (§19): a given destination
     /// is cleared; the result is a new volume, `MRIrotate_I` by `MatrixAllocRotation(3, angle,
     /// axis)` about the source's centre, `ras_good_flag` 0. FS-304: an angle whose rotation has no
-    /// inverse gives `NULL` after the error (FreeSurfer crashes).
+    /// inverse ends the program after `MRIrotate_I`'s errors (FreeSurfer crashes).
     pub fn mri_rotate_axis(
         &mut self,
         src: &mut Mri,
@@ -244,10 +237,20 @@ impl Process {
                 Ok(VolOut::New(r))
             }
             _ => {
+                // FS-304, both modes: the end of the program (FreeSurfer crashes)
+                let name = match which {
+                    axis::X => "MRIrotateX_I",
+                    axis::Y => "MRIrotateY_I",
+                    _ => "MRIrotateZ_I",
+                };
                 self.note(
                     &FS_304,
-                    "a rotation about an axis that has no inverse gives no volume (FreeSurfer crashes)",
+                    "a rotation about an axis that has no inverse ends the program (FreeSurfer crashes)",
                 );
+                self.error_exit(
+                    crate::process::codes::BAD_PARM,
+                    format!("{name}(): no rotated volume (FreeSurfer crashes here)\n").as_bytes(),
+                )?;
                 Ok(VolOut::Nothing)
             }
         }

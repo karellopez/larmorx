@@ -12,9 +12,9 @@
 //! Also FreeSurfer's mathematics (`maths`, `specs/freesurfer-maths.md`) and its volume structure
 //! (`mri`, `specs/freesurfer-mri.md`: the geometry, the volume and its voxels, the copies, the
 //! tkregister and FSL matrices, the linear transform arrays) and its volume functions (`volume`,
-//! `specs/freesurfer-volume.md` parts 1 to 4: the volume-geometry text block, the voxel
-//! arithmetic, coordinates and geometry, the samplers, the moves, the head's box and the reader of
-//! linear transforms).
+//! `specs/freesurfer-volume.md` parts 1 to 5: the volume-geometry text block, the voxel
+//! arithmetic, coordinates and geometry, the samplers, the moves, the head's box, the reader of
+//! linear transforms, the CMA labels and the segmentation functions).
 //!
 //! No global state: a program run owns one [`Process`], which holds what FreeSurfer keeps
 //! process-wide (§1) and the environment table it reads (porting guide §9.1: the library never

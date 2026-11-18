@@ -21,6 +21,7 @@ use larmorx_core::defects::UpstreamDefects;
 use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
 use larmorx_fs_core::maths::mfiles::CStream;
 use larmorx_fs_core::mri::{LinearTransform, Lta, Mri, Region, VolGeom, types};
+use larmorx_fs_core::volume::cma;
 use larmorx_fs_core::volume::geometry::SurfacePoint;
 use larmorx_fs_core::volume::ltaread::{FileSystem, TransformInputs};
 use larmorx_fs_core::volume::moves::axis;
@@ -686,38 +687,138 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 l.puti(i64::from(t));
             }
         }
-        "ltaread" => {
-            let name = l.getx();
-            let have = !l.take("nofile");
-            let bytes = if have { l.getx() } else { Vec::new() };
+        "ltaread" | "ltareads" => {
+            let n = if c == "ltareads" { l.geti() } else { 1 };
+            let mut files = Vec::new();
+            for _ in 0..n {
+                let name = l.getx();
+                let have = !l.take("nofile");
+                let bytes = if have { Some(l.getx()) } else { None };
+                files.push((name, bytes));
+            }
             let avg = l.geti();
             match avg {
                 0 => p.env.remove(b"USE_AVERAGE305"),
                 1 => p.env.set(b"USE_AVERAGE305", b"true"),
                 _ => p.env.set(b"USE_AVERAGE305", b""),
             }
-            let path = larmorx_fs_core::files::path_of(&name);
-            let _ = std::fs::remove_file(&path);
-            if have && std::fs::write(&path, &bytes).is_err() {
-                args::bad("cannot write the transform file");
+            for (name, bytes) in files {
+                read_transform(p, l, &name, bytes.as_deref())?;
             }
-            p.errno = 0;
-            let r = p.lta_read_ex(&name, &mut FileSystem);
-            if have {
-                let _ = std::fs::remove_file(&path);
-            }
-            let lta = r?;
-            l.puti(i64::from(p.errno));
-            putlta(l, lta.as_ref());
         }
-        // the golden cases' reader of an in-memory file and volume (no file system)
-        "ltamem" => {
-            let name = l.getx();
-            let bytes = if l.take("nofile") {
-                None
-            } else {
-                Some(l.getx())
-            };
+        // -- §23
+        "cmalab" => {
+            let n = l.geti();
+            for _ in 0..n {
+                let v = l.geti();
+                let f = l.getf();
+                for x in [f64::from(v), f64::from(f), f64::from(f)] {
+                    let t: String = cma::label_tests(x)
+                        .iter()
+                        .map(|&b| if b { '1' } else { '0' })
+                        .collect();
+                    l.out(&t);
+                }
+                l.puti(i64::from(cma::is_sub_cortical_gray(v)));
+                l.puti(i64::from(p.mri_aseg_contra_lat_label(v)));
+            }
+        }
+        "cmavol" => {
+            let mut aseg = getw(p, l)?;
+            paint(p, l, &mut aseg)?;
+            let mut ribbon = getw(p, l)?;
+            paint(p, l, &mut ribbon)?;
+            let hemi = l.geti();
+            let a = p.supra_tentorial_vol_correction(&aseg, &ribbon)?;
+            l.putd(a);
+            let b = p.cortical_gm_vol_correction(&aseg, &ribbon, hemi)?;
+            l.putd(b);
+        }
+        "lrswap" => {
+            let mut aseg = getw(p, l)?;
+            paint(p, l, &mut aseg)?;
+            let r = p.mri_lrswap_aseg(&aseg)?;
+            putv(l, Some(&r));
+        }
+        "fixrib" => {
+            let mut aseg = getw(p, l)?;
+            paint(p, l, &mut aseg)?;
+            let mut ribbon = getw(p, l)?;
+            paint(p, l, &mut ribbon)?;
+            let mut d = getdst(p, l, true)?;
+            let r = p.mri_fix_aseg_with_ribbon(&mut aseg, &mut ribbon, dst(&mut d))?;
+            putres(l, r, &aseg, Some(&ribbon), &d);
+        }
+        "lrseg" => {
+            let mut seg = getw(p, l)?;
+            paint(p, l, &mut seg)?;
+            let lh = l.getm(p)?.expect("a matrix");
+            let rh = l.getm(p)?.expect("a matrix");
+            let r = p.mri_lrswap_seg(&seg, &lh, &rh)?;
+            putv(l, r.as_ref());
+        }
+        "ohe" => {
+            let mut seg = getw(p, l)?;
+            paint(p, l, &mut seg)?;
+            let n = l.geti();
+            let list: Vec<i32> = (0..n).map(|_| l.geti()).collect();
+            let force1 = l.geti();
+            let r = p.mri_one_hot_encode(&seg, &list, force1)?;
+            putv(l, Some(&r));
+        }
+        "bvc" => {
+            subject_folder(l.geti() != 0);
+            let stats: Vec<f64> = (0..16).map(|_| l.getd()).collect();
+            let r = p.cache_brain_volume_stats(&stats, b"subj", b".");
+            match std::fs::read("subj/stats/brainvol.stats") {
+                Ok(b) => l.out(hexbytes(&b)),
+                Err(_) => l.out("null"),
+            }
+            subject_folder(false);
+            r?;
+        }
+        "bvr" => {
+            let make = l.geti() != 0;
+            let text = l.getx();
+            subject_folder(make);
+            if make && std::fs::write("subj/stats/brainvol.stats", &text).is_err() {
+                args::bad("cannot write the statistics file");
+            }
+            let r = p.read_cached_brain_volume_stats(b"subj", b".", &mut compute_stand_in);
+            subject_folder(false);
+            let stats = r?;
+            l.puti(stats.len() as i64);
+            for v in stats {
+                l.putd(v);
+            }
+        }
+        // the golden cases' cache text and reading (no file system)
+        "bvtext" => {
+            let stats: Vec<f64> = (0..16).map(|_| l.getd()).collect();
+            l.out(hexbytes(&cma::brain_volume_stats_text(&stats)));
+        }
+        "bvparse" => {
+            let text = l.getx();
+            let stats = p.parse_brain_volume_stats(&text, b"./subj/stats/brainvol.stats")?;
+            l.puti(stats.len() as i64);
+            for v in stats {
+                l.putd(v);
+            }
+        }
+        // the golden cases' reader of in-memory files and a volume (no file system): `ltamem`
+        // one file, `ltamems n` several in one process
+        "ltamem" | "ltamems" => {
+            let n = if c == "ltamems" { l.geti() } else { 1 };
+            let mut files = Vec::new();
+            for _ in 0..n {
+                let name = l.getx();
+                let bytes = if l.take("nofile") {
+                    None
+                } else {
+                    Some(l.getx())
+                };
+                files.push((name, bytes));
+            }
             let avg = l.geti();
             let vol = if l.take("none") {
                 None
@@ -730,41 +831,110 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 1 => p.env.set(b"USE_AVERAGE305", b"true"),
                 _ => p.env.set(b"USE_AVERAGE305", b""),
             }
-            let mut m = Memory { name, bytes, vol };
-            p.errno = 0;
-            let name = m.name.clone();
-            let lta = p.lta_read_ex(&name, &mut m)?;
-            l.puti(i64::from(p.errno));
-            putlta(l, lta.as_ref());
+            let names: Vec<Vec<u8>> = files.iter().map(|(n, _)| n.clone()).collect();
+            let mut m = Memory { files, vol };
+            for name in names {
+                p.errno = 0;
+                let lta = p.lta_read_ex(&name, &mut m)?;
+                l.puti(i64::from(p.errno));
+                putlta(l, lta.as_ref());
+            }
         }
         _ => args::bad("unknown command"),
     }
     Ok(())
 }
 
-/// The golden cases' transform inputs: one file's bytes (none: `ENOENT`) and one named volume's
-/// geometry (others: `ENOENT`).
+/// The cache's text written from `stats` (for the golden cases' generator).
+#[allow(dead_code)]
+pub fn cache_text(stats: &[f64]) -> Vec<u8> {
+    cma::brain_volume_stats_text(stats)
+}
+
+/// P, a painting: `n`, then `n` times `x y z value`, frame 0's voxels set (`MRIsetVoxVal`).
+fn paint(p: &mut Process, l: &mut Line, m: &mut Mri) -> Result<(), Stop> {
+    let n = l.geti();
+    for _ in 0..n {
+        let (x, y, z) = (l.geti(), l.geti(), l.geti());
+        let v = l.getf();
+        p.mri_set_vox_val(m, x, y, z, 0, v, 0)?;
+    }
+    Ok(())
+}
+
+/// The probe's subject folder `subj/stats` in the working directory, made or not (any old
+/// cache removed).
+fn subject_folder(make: bool) {
+    let _ = std::fs::remove_file("subj/stats/brainvol.stats");
+    let _ = std::fs::remove_dir("subj/stats");
+    let _ = std::fs::remove_dir("subj");
+    if make {
+        let _ = std::fs::create_dir_all("subj/stats");
+    }
+}
+
+/// The caller's `ComputeBrainVolumeStats` (not in the spec: it reads a subject's surfaces) as
+/// the probe's runs show it without a subject's files and without `FREESURFER_HOME`
+/// (observed): its two lines and the end of the program, status 255.
+fn compute_stand_in(p: &mut Process) -> Result<Vec<f64>, Stop> {
+    p.put_out(
+        b"[INFO] read, cannot find ./subj/surf/lh.white, trying ./subj/surf/lh.white.gii ...\n",
+    );
+    let rule = "-".repeat(74);
+    p.put_err(
+        format!(
+            "{rule}\nERROR: FreeSurfer environment FREESURFER_HOME is not defined.\n  If you are outside the NMR-Martinos Center, please set this\n  variable to the location where you installed FreeSurfer.\n  If you are inside the NMR-Martinos Center, please source\n  the standard environment. If you need to install FreeSurfer,\n  go to: http://surfer.nmr.mgh.harvard.edu\n{rule}\n"
+        )
+        .as_bytes(),
+    );
+    Err(Stop::Exit(255))
+}
+
+/// The probe's `read_transform`: the file written (unless there is none), `errno` set to 0,
+/// `LTAreadEx` of the name, the file removed; `errno` and the array printed.
+fn read_transform(
+    p: &mut Process,
+    l: &mut Line,
+    name: &[u8],
+    bytes: Option<&[u8]>,
+) -> Result<(), Stop> {
+    let path = larmorx_fs_core::files::path_of(name);
+    let _ = std::fs::remove_file(&path);
+    if let Some(b) = bytes
+        && std::fs::write(&path, b).is_err()
+    {
+        args::bad("cannot write the transform file");
+    }
+    p.errno = 0;
+    let r = p.lta_read_ex(name, &mut FileSystem);
+    if bytes.is_some() {
+        let _ = std::fs::remove_file(&path);
+    }
+    let lta = r?;
+    l.puti(i64::from(p.errno));
+    putlta(l, lta.as_ref());
+    Ok(())
+}
+
+/// The golden cases' transform inputs: files' bytes (a name without any: `ENOENT`) and one
+/// named volume's geometry (others: `ENOENT`).
 struct Memory {
-    name: Vec<u8>,
-    bytes: Option<Vec<u8>>,
+    files: Vec<(Vec<u8>, Option<Vec<u8>>)>,
     vol: Option<(Vec<u8>, VolGeom)>,
 }
 
 impl TransformInputs for Memory {
     fn read_file(&mut self, name: &[u8]) -> Result<Vec<u8>, i32> {
-        match &self.bytes {
-            Some(b) if name == self.name.as_slice() => Ok(b.clone()),
+        match self.files.iter().find(|(n, _)| n.as_slice() == name) {
+            Some((_, Some(b))) => Ok(b.clone()),
             _ => Err(2),
         }
     }
 
-    fn volume_geometry(&mut self, p: &mut Process, name: &[u8]) -> Option<VolGeom> {
+    fn volume_geometry(&mut self, _p: &mut Process, name: &[u8]) -> Result<Option<VolGeom>, i32> {
         match &self.vol {
-            Some((n, g)) if n.as_slice() == name => Some(g.clone()),
-            _ => {
-                p.errno = 2;
-                None
-            }
+            Some((n, g)) if n.as_slice() == name => Ok(Some(g.clone())),
+            _ => Err(2),
         }
     }
 }

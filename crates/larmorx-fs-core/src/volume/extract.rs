@@ -4,7 +4,7 @@
 
 use larmorx_core::defects::{FS_293, FS_294, FS_295, FS_297};
 
-use super::{Dst, VolOut, Vols, row_byte_place};
+use super::{Dst, VolOut, Vols};
 use crate::clib::printf::sprintf_f64;
 use crate::mri::{Mri, Region, types};
 use crate::process::{DIAG_VERBOSE, Process, Stop, codes};
@@ -203,9 +203,9 @@ impl Process {
                     let (sy, sz) = (i64::from(y0) + y, i64::from(z0) + z);
                     let (dy1, dz1) = (i64::from(y1) + y, i64::from(z1) + z);
                     for i in 0..i64::from(dx) {
-                        let sp = row_byte_place(v.a(), sb + i * bpv, sy, sz, f, bpv as u64);
+                        let sp = self.row_place(v.a(), sb + i * bpv, sy, sz, f, bpv as u64);
                         let b = self.direct_read(v.a(), sp, bpv as usize, what);
-                        let dp = row_byte_place(v.d(), db + i * bpv, dy1, dz1, f, bpv as u64);
+                        let dp = self.row_place(v.d(), db + i * bpv, dy1, dz1, f, bpv as u64);
                         self.direct_write(v.d_mut(), dp, &b, what);
                     }
                 }

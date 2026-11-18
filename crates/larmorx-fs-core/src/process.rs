@@ -97,6 +97,9 @@ pub struct Process {
     /// The derivative sign of the volume samplers (`MRIsetSampleVolumeDerivativeSign`, 1 at
     /// the start: `specs/freesurfer-volume.md` §16).
     pub derivative_sign: f64,
+    /// The `.xfm` reader's count of `minctracc` lines' `.mnc` words (0 at the start of the
+    /// program: `specs/freesurfer-volume.md` §21, step 5).
+    pub mnc_count: i32,
 }
 
 impl Process {
@@ -136,6 +139,7 @@ impl Process {
             vm_peak: [0; 5],
             maths: Default::default(),
             derivative_sign: 1.0,
+            mnc_count: 0,
         }
     }
 

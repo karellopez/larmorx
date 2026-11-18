@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //! FreeSurfer 8.2.0's volume functions (`fs.volume`), a clean room of
-//! `specs/freesurfer-volume.md` parts 1 to 4: the volume-geometry text block (§2, §3), the
+//! `specs/freesurfer-volume.md` parts 1 to 5: the volume-geometry text block (§2, §3), the
 //! geometry's copies, matrices, comparison and printer (§4), the voxel arithmetic (§6-§11),
-//! coordinates and geometry (§13-§16), the samplers (§18), the moves (§19), the head's box (§20)
-//! and the reader of linear transforms (§21).
+//! coordinates and geometry (§13-§16), the samplers (§18), the moves (§19), the head's box (§20),
+//! the reader of linear transforms (§21) and the CMA labels and segmentation functions (§23).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a
@@ -11,6 +11,7 @@
 //! or meets a defect is a method of the program's [`Process`](crate::Process).
 
 pub mod arith;
+pub mod cma;
 pub mod extract;
 pub mod geomblock;
 pub mod geometry;
@@ -21,7 +22,7 @@ pub mod skull;
 pub mod stats;
 pub mod vgcopy;
 
-use larmorx_core::defects::{FS_289, FS_290};
+use larmorx_core::defects::{FS_289, FS_290, FS_960};
 
 use crate::mri::Mri;
 use crate::mri::voxels::Place;
@@ -149,16 +150,33 @@ impl<'a> Vols<'a> {
 
 /// The byte offset of element `x` of row `y` of slice `z + f depth` through the volume's row
 /// tables, with elements of `esize` bytes (direct access, §6): inside the volume, at another
-/// place of its buffer (FS-289) or outside it (FS-290).
-pub fn direct_place(m: &Mri, x: i64, y: i64, z: i64, f: i64, esize: u64) -> Place {
-    row_byte_place(m, x * esize as i64, y, z, f, esize)
+/// place of its buffer (FS-289) or outside it (FS-290). `tensor_first`: FS-960's FreeSurfer
+/// rows of a tensor volume (every row at its first voxel), else each row at its own place.
+pub fn direct_place(
+    m: &Mri,
+    x: i64,
+    y: i64,
+    z: i64,
+    f: i64,
+    esize: u64,
+    tensor_first: bool,
+) -> Place {
+    row_byte_place(m, x * esize as i64, y, z, f, esize, tensor_first)
 }
 
 /// The place of `n` bytes from byte `byte` of row `y` of slice `z + f depth` (§6): inside the
-/// volume when they lie within that row of a voxel the volume has. Every row of a tensor volume
-/// (type 6) starts at the volume's first voxel (§6: FreeSurfer's row tables of a tensor volume,
-/// met only by FS-291's and FS-301's `reproduce`).
-pub fn row_byte_place(m: &Mri, byte: i64, y: i64, z: i64, f: i64, n: u64) -> Place {
+/// volume when they lie within that row of a voxel the volume has. With `tensor_first`, every row
+/// of a tensor volume (type 6) starts at the volume's first voxel (FS-960: FreeSurfer's row
+/// tables of a tensor volume); else row `y` of slice `s` starts at byte `(s height + y) w b`.
+pub fn row_byte_place(
+    m: &Mri,
+    byte: i64,
+    y: i64,
+    z: i64,
+    f: i64,
+    n: u64,
+    tensor_first: bool,
+) -> Place {
     let g = &m.geom;
     let (w, h, d) = (i64::from(g.width), i64::from(g.height), i64::from(g.depth));
     let t = z + f * d;
@@ -166,7 +184,7 @@ pub fn row_byte_place(m: &Mri, byte: i64, y: i64, z: i64, f: i64, n: u64) -> Pla
         return Place::Beyond;
     }
     let row_len = w * m.bytes_per_vox as i64;
-    let row = if m.kind == crate::mri::types::TENSOR {
+    let row = if tensor_first && m.kind == crate::mri::types::TENSOR {
         0
     } else {
         (t * h + y) * row_len
@@ -188,6 +206,49 @@ pub fn row_byte_place(m: &Mri, byte: i64, y: i64, z: i64, f: i64, n: u64) -> Pla
 }
 
 impl Process {
+    /// [`direct_place`] in this program's mode (FS-960, noted where a direct walk reaches a row of
+    /// a tensor volume other than slice 0's row 0).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn place_of(
+        &mut self,
+        m: &Mri,
+        x: i64,
+        y: i64,
+        z: i64,
+        f: i64,
+        esize: u64,
+    ) -> Place {
+        self.row_place(m, x * esize as i64, y, z, f, esize)
+    }
+
+    /// [`row_byte_place`] in this program's mode (FS-960, noted as [`Process::place_of`]).
+    pub(crate) fn row_place(
+        &mut self,
+        m: &Mri,
+        byte: i64,
+        y: i64,
+        z: i64,
+        f: i64,
+        n: u64,
+    ) -> Place {
+        let reproduce = self.mode().reproduce();
+        if m.kind == crate::mri::types::TENSOR {
+            let t = z + f * i64::from(m.geom.depth);
+            if (t != 0 || y != 0) && !self.noted(&FS_960) {
+                let how = if reproduce {
+                    "at the volume's first voxel, as FreeSurfer's"
+                } else {
+                    "at its own place (FreeSurfer finds every row at the first voxel)"
+                };
+                self.note(
+                    &FS_960,
+                    format!("a tensor volume walked directly: each row {how}"),
+                );
+            }
+        }
+        row_byte_place(m, byte, y, z, f, n, reproduce)
+    }
+
     /// A direct read of `n` bytes at a place (§6): inside, the bytes; at another voxel, the bytes
     /// with `reproduce` and zeros by default (FS-289); outside the buffer, zeros (FS-290).
     pub(crate) fn direct_read(&mut self, m: &Mri, place: Place, n: usize, what: &str) -> Vec<u8> {

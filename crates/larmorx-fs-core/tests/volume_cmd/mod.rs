@@ -840,6 +840,108 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 putlta(l, lta.as_ref());
             }
         }
+        // part 6a: resolution, planes, fills, resampling by whole factors, changes of type
+        "setres" => {
+            let mut a = getw(p, l)?;
+            let (x, y, z) = (l.getf(), l.getf(), l.getf());
+            let r = p.mri_set_resolution(&mut a, x, y, z)?;
+            l.puti(i64::from(r));
+            putv(l, Some(&a));
+        }
+        "vfill" => {
+            let mut a = getw(p, l)?;
+            let v = l.getf();
+            let r = p.mri_value_fill(&mut a, v)?;
+            l.puti(i64::from(r));
+            putv(l, Some(&a));
+        }
+        "fillfg" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let seed = [l.geti(), l.geti(), l.geti()];
+            let (th, fv) = (l.geti(), l.geti());
+            let mut npix = -7;
+            let r = p.mri_fill_fg(&mut a, dst(&mut d), seed, th, fv, &mut npix)?;
+            l.puti(i64::from(npix));
+            putres(l, r, &a, None, &d);
+        }
+        "explane" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let (o, w) = (l.geti(), l.geti());
+            let r = p.mri_extract_plane(&mut a, dst(&mut d), o, w)?;
+            putres(l, r, &a, None, &d);
+        }
+        "fillplane" => {
+            let mask = getw(p, l)?;
+            let dv = getw(p, l)?;
+            let (o, w, fv) = (l.geti(), l.geti(), l.geti());
+            let mut d = D::W(Box::new(dv));
+            if let D::W(m) = &mut d {
+                p.mri_fill_plane(&mask, m, o, w, fv)?;
+            }
+            putres(l, VolOut::Given, &mask, None, &d);
+        }
+        "ups" => {
+            let k = l.geti();
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let n = l.geti();
+            let r = match k {
+                0 => p.mri_upsample_n(&mut a, dst(&mut d), n)?,
+                1 => p.mri_upsample2(&mut a, dst(&mut d))?,
+                _ => p.mri_upsample_n_conserve(&mut a, dst(&mut d), n)?,
+            };
+            putres(l, r, &a, None, &d);
+        }
+        "dns2" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let r = p.mri_downsample2(&mut a, dst(&mut d))?;
+            putres(l, r, &a, None, &d);
+        }
+        "dnsn" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let (fc, fr, fs) = (l.getf(), l.getf(), l.getf());
+            let keep = l.geti();
+            let r = p.mri_downsample_n(&mut a, dst(&mut d), fc, fr, fs, keep)?;
+            putres(l, r, &a, None, &d);
+        }
+        "mft" => {
+            let a = getw(p, l)?;
+            let f = l.geti();
+            let t = l.getf();
+            let r = p.mri_mean_frame_thresh(&a, f, t)?;
+            l.putd(r);
+        }
+        "lim" => {
+            let a = getw(p, l)?;
+            let (mut lo, mut hi) = (UNSET, UNSET);
+            let r = p.mri_limits(&a, &mut lo, &mut hi)?;
+            l.puti(i64::from(r));
+            l.putf(lo);
+            l.putf(hi);
+        }
+        "chtype" => {
+            let seq = l.geti();
+            let mut a = getw(p, l)?;
+            let t = l.geti();
+            let (lo, hi) = (l.getf(), l.getf());
+            let ns = l.geti();
+            if l.geti() != 0 {
+                p.env.set(b"FS_FORCE_BIN_CHECK", b"1");
+            } else {
+                p.env.remove(b"FS_FORCE_BIN_CHECK");
+            }
+            let r = if seq != 0 {
+                p.mri_seq_change_type(&mut a, t, lo, hi, ns)?
+            } else {
+                p.mri_change_type(&a, t, lo, hi, ns)?
+            };
+            putv(l, r.as_ref());
+            putv(l, Some(&a));
+        }
         _ => args::bad("unknown command"),
     }
     Ok(())

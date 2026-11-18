@@ -672,10 +672,10 @@ impl Process {
         Ok(d)
     }
 
-    /// The first `rows` numbers of a label list in row order (§23's `MRIlrswapSeg`); with fewer
-    /// numbers than rows (FS-315) `None`, or with `reproduce` the numbers it holds and NaN (equal
-    /// to no label) for those FreeSurfer reads past its end.
-    fn label_list(&mut self, m: &Matrix) -> Option<Vec<f32>> {
+    /// The first `rows` numbers of a label list in row order (§23's `MRIlrswapSeg`), and whether
+    /// it holds fewer numbers than rows (FS-315: FreeSurfer reads past its end there); the
+    /// numbers past its end are NaN (equal to no label), `reproduce`'s fill.
+    fn label_list(m: &Matrix) -> (Vec<f32>, bool) {
         let n = m.rows.max(0) as usize;
         let mut v = Vec::with_capacity(n);
         'rows: for r in 1..=m.rows {
@@ -686,23 +686,16 @@ impl Process {
                 v.push(m.at(r, c));
             }
         }
-        if v.len() < n {
-            if !self.mode().reproduce() {
-                return None;
-            }
-            self.note(
-                &FS_315,
-                "MRIlrswapSeg: a label list with fewer numbers than rows: the numbers past its end as NaN, equal to no label (FreeSurfer reads memory there)",
-            );
-            v.resize(n, f32::NAN);
-        }
-        Some(v)
+        let short = v.len() < n;
+        v.resize(n, f32::NAN);
+        (v, short)
     }
 
     /// `MRIlrswapSeg(seg, lh, rh)` (§23): a clone of `seg` whose frame 0 holds each voxel's label
     /// swapped to the other side of the first pair it equals; `None` after the message when the
-    /// lists' row counts differ. FS-315: a list with fewer numbers than rows is an error by
-    /// default; `reproduce` reads its missing numbers as NaN.
+    /// lists' row counts differ. FS-315: a list with fewer numbers than rows ends the program by
+    /// default (code -4, after the row counts' check, before any voxel is written); `reproduce`
+    /// reads its missing numbers as NaN; noted in both modes.
     pub fn mri_lrswap_seg(
         &mut self,
         seg: &Mri,
@@ -715,17 +708,26 @@ impl Process {
             );
             return Ok(None);
         }
-        let (Some(left), Some(right)) = (self.label_list(lh), self.label_list(rh)) else {
-            self.note(
-                &FS_315,
-                "MRIlrswapSeg: a label list with fewer numbers than rows refused (FreeSurfer reads past its end)",
-            );
-            self.error_printf(
-                codes::BAD_PARM,
-                b"MRIlrswapSeg(): a label list holds fewer numbers than its rows",
-            );
-            return Ok(None);
-        };
+        let (left, short_l) = Process::label_list(lh);
+        let (right, short_r) = Process::label_list(rh);
+        if short_l || short_r {
+            if self.mode().reproduce() {
+                self.note(
+                    &FS_315,
+                    "MRIlrswapSeg: a label list with fewer numbers than rows: the numbers past its end as NaN, equal to no label (FreeSurfer reads memory there)",
+                );
+            } else {
+                self.note(
+                    &FS_315,
+                    "MRIlrswapSeg: a label list with fewer numbers than rows ends the program (FreeSurfer reads past its end)",
+                );
+                self.error_exit(
+                    codes::BAD_PARM,
+                    b"MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)",
+                )?;
+                return Ok(None);
+            }
+        }
         let mut d = self.mri_clone_new(seg)?;
         let mut nswaps = 0i64;
         for cell in cells(seg) {
@@ -911,6 +913,9 @@ impl Process {
                         .last()
                         .is_some_and(|&c| larmorx_core::cscan::is_c_space(c))
                     {
+                        if self.mode().reproduce() {
+                            return Err(self.brain_volume_stats_abort(line));
+                        }
                         self.note(
                             &FS_314,
                             "a cache line naming a measure without a number and ending in white space gives no number (FreeSurfer aborts)",
@@ -928,6 +933,30 @@ impl Process {
             }
         }
         Ok(stats.to_vec())
+    }
+}
+
+impl Process {
+    /// FS-314 under `reproduce`: FreeSurfer's abort on a cache line naming a measure without a
+    /// number and ending in white space, the C++ runtime's two lines on standard error and status
+    /// 134 (`std::length_error` when a word of the line is longer than 15 bytes, else
+    /// `std::bad_alloc`).
+    fn brain_volume_stats_abort(&mut self, line: &[u8]) -> Stop {
+        self.note(
+            &FS_314,
+            "the program aborted (status 134) on a cache line naming a measure without a number and ending in white space, as FreeSurfer's",
+        );
+        let long = line
+            .split(|&c| larmorx_core::cscan::is_c_space(c))
+            .any(|w| w.len() > 15);
+        let text: &[u8] = if long {
+            b"terminate called after throwing an instance of 'std::length_error'\n  what():  basic_string::_M_create\n"
+        } else {
+            b"terminate called after throwing an instance of 'std::bad_alloc'\n  what():  std::bad_alloc\n"
+        };
+        self.put_err(text);
+        self.flush();
+        Stop::Exit(134)
     }
 }
 

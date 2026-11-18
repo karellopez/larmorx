@@ -425,15 +425,27 @@ impl Process {
             );
             return Ok(None);
         }
-        // 2, 3
+        // 2: a `%` line is the first information line; a `Transform_Type` line has one more
+        // line read, then the matrix; a line 2 that is neither goes on to step 3 like a `%` one
+        // (without volume information)
         let mut info: Option<(Vec<u8>, Vec<u8>)> = None;
         fgetl_buf(&mut s, 900, &mut buf);
-        if pct(&buf) {
-            let i1 = buf.clone();
+        let step3 = if pct(&buf) {
+            info = Some((buf.clone(), Vec::new()));
+            true
+        } else if buf.starts_with(b"Transform_Type") {
             fgetl_buf(&mut s, 900, &mut buf);
-            let mut i2 = Vec::new();
+            false
+        } else {
+            true
+        };
+        // 3: line 3, every line read here passed over
+        if step3 {
+            fgetl_buf(&mut s, 900, &mut buf);
             if pct(&buf) {
-                i2 = buf.clone();
+                if let Some((_, i2)) = info.as_mut() {
+                    *i2 = buf.clone();
+                }
                 while pct(&buf) {
                     if fgetl_buf(&mut s, 900, &mut buf).is_none() && pct(&buf) {
                         // FS-307, both modes: FreeSurfer never returns here
@@ -457,9 +469,6 @@ impl Process {
             } else if buf.starts_with(b"Transform_Type") {
                 fgetl_buf(&mut s, 900, &mut buf);
             }
-            info = Some((i1, i2));
-        } else if buf.starts_with(b"Transform_Type") {
-            fgetl_buf(&mut s, 900, &mut buf);
         }
         // 4
         for r in 1..=3 {

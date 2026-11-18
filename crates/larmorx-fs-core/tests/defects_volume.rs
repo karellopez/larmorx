@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 5): each one noted in
+//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 6a): each one noted in
 //! both modes on a case that meets it, and its two modes' results different where the correction
 //! changes them (memory reads and crashes give the same result in both modes; the end of the
 //! program that §22's modes table gives in both modes differs only by FS-01's NUL in its C-style
@@ -341,23 +341,39 @@ fn fs313_the_right_vessel() {
     check("FS-313", true, &line);
 }
 
-/// FS-314: a cache line naming a measure without a number and ending in a blank gives no number
-/// in both modes (FreeSurfer aborts); the measure then missing ends the program.
+/// FS-314: a cache line naming a measure without a number and ending in white space: by default it
+/// gives no number (the measure then missing: status 1); `reproduce` aborts with the C++ runtime's
+/// two lines (status 134), `std::bad_alloc` for words of at most 15 bytes, `std::length_error`
+/// past that.
 #[test]
 fn fs314_a_cache_line_without_a_number() {
-    let text = "# Measure BrainSeg, BrainSegVol, Brain Segmentation Volume, x, mm^3 \n";
-    let mut hex = "x".to_owned();
-    for c in text.bytes() {
-        hex.push_str(&format!("{c:02x}"));
-    }
-    let line = format!("bvparse {hex}");
-    check("FS-314", false, &line);
+    let bv = |text: &str| {
+        let mut hex = "x".to_owned();
+        for c in text.bytes() {
+            hex.push_str(&format!("{c:02x}"));
+        }
+        format!("bvparse {hex}")
+    };
+    let line = bv("# Measure BrainSeg, BrainSegVol, Brain Segmentation Volume, x, mm^3 \n");
+    check("FS-314", true, &line);
     let (fix, _) = run(&line, UpstreamDefects::Fix);
     assert!(fix.starts_with("EXIT 1 |"), "{fix}");
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(rep.starts_with("EXIT 134 |"), "{rep}");
+    assert!(
+        rep.contains("'std::bad_alloc'\n  what():  std::bad_alloc\n"),
+        "{rep}"
+    );
+    let line = bv("# Measure SupraTentorialNotVentVox, SupraTentorialVolNotVentVox, x, mm^3\t\n");
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(
+        rep.contains("'std::length_error'\n  what():  basic_string::_M_create\n"),
+        "{rep}"
+    );
 }
 
-/// FS-315: label lists of 2 x 0: an error by default; `reproduce` reads their numbers as NaN
-/// (no swap).
+/// FS-315: label lists of 2 x 0: the default ends the program (code -4, before any voxel is
+/// written); `reproduce` reads their numbers as NaN (no swap).
 #[test]
 fn fs315_label_lists_without_numbers() {
     let line = format!(
@@ -367,8 +383,15 @@ fn fs315_label_lists_without_numbers() {
     check("FS-315", true, &line);
     let (fix, _) = run(&line, UpstreamDefects::Fix);
     let (rep, _) = run(&line, UpstreamDefects::Reproduce);
-    assert!(fix.starts_with("null |"), "{fix}");
-    assert!(!rep.starts_with("null |"), "{rep}");
+    assert!(fix.starts_with("EXIT 252 |"), "{fix}");
+    assert!(
+        fix.contains("MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)\n"),
+        "{fix}"
+    );
+    assert!(
+        !rep.starts_with("null |") && !rep.starts_with("EXIT"),
+        "{rep}"
+    );
 }
 
 /// FS-960: a tensor volume's rows walked directly (FS-291's walk of `MRIinvertContrast`,
@@ -381,4 +404,44 @@ fn fs960_a_tensor_volumes_rows() {
     assert!(rep_ids.iter().any(|i| i == "FS-960"), "{rep_ids:?}");
     let (_, fix_ids) = run(&line, UpstreamDefects::Fix);
     assert!(fix_ids.iter().any(|i| i == "FS-291"), "{fix_ids:?}");
+}
+
+/// FS-316: a flood fill of a 4 x 2 byte volume seeded at a row past the height (row 5, threshold
+/// 0): by default at the last row (the whole volume filled, npix 8); with `reproduce` at row 3
+/// (the width minus one), outside the volume (nothing filled, npix 1).
+#[test]
+fn fs316_a_seed_row_past_the_height() {
+    let line = format!("fillfg {} new 0 5 0 0 1", w("4 2 1 0 1 0", "200"));
+    check("FS-316", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(fix.starts_with("8 "), "{fix}");
+    assert!(rep.starts_with("1 "), "{rep}");
+}
+
+/// FS-317: a downsampling factor of 0 (§26: not in the probe's cases): with `reproduce` the
+/// extent's infinite quotient becomes -2147483648 and the allocation refuses it (the default's
+/// 2147483647 would ask for a volume of that width, so only `reproduce` runs here; the
+/// conversion's default is the crate's unit test).
+#[test]
+fn fs317_a_factor_of_zero() {
+    let line = format!(
+        "dnsn {} new 00000000 3f800000 3f800000 0",
+        w("1 1 1 3 1 0", "t3")
+    );
+    let (rep, ids) = run(&line, UpstreamDefects::Reproduce);
+    assert!(ids.iter().any(|i| i == "FS-317"), "{ids:?}");
+    assert!(rep.starts_with("EXIT 1 |"), "{rep}");
+}
+
+/// FS-318: the mean of frame 2 of a three-frame volume: frame 0's with `reproduce`, frame 2's by
+/// default.
+#[test]
+fn fs318_the_mean_of_another_frame() {
+    let line = "mft 1 2 2 9 3 0 -1 3f700000 3f800000 3f700000 1 be46941b 3f2efe46 befaaa3a 3f11b6f8 \
+                3ee94a94 bdd0293b 3eaa2836 bc84ee3e bf33501b 4280cbc5 420f6f25 42980000 00000000 \
+                00000000 00000000 0 2 c24a93e7 41c80000 c0800000 c20c24e3 40e00000 a14e1b78 42380000 \
+                40c00000 ff800000 c160f703 40cab906 4055000000000000 1 c2c5623b c0e00000 1 2 null \
+                null 2 41e1e4da";
+    check("FS-318", true, line);
 }

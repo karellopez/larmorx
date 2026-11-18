@@ -223,10 +223,10 @@ pub fn polar2_decomposition(
 ) -> Result<(VnlMatrix, VnlMatrix, Vec<f64>), Fatal> {
     let (r, mut s) = polar_decomposition(g, err, a)?;
     let mut d = vec![0.0; a.cols];
-    for c in 0..a.cols {
-        d[c] = s.at(c, c);
+    for (c, dc) in d.iter_mut().enumerate() {
+        *dc = s.at(c, c);
         for i in 0..s.rows {
-            *s.at_mut(i, c) = div64(s.at(i, c), d[c]);
+            *s.at_mut(i, c) = div64(s.at(i, c), *dc);
         }
     }
     Ok((r, s, d))
@@ -326,6 +326,8 @@ pub fn get_frobenius_diff(m1: &VnlMatrix, m2: &VnlMatrix) -> f64 {
 /// then `t = (trace of the upper 3 x 3 block - 1) / 2` clipped to `[-1, 1]` and `sqrt(2) acos(t)`
 /// (the correctly rounded `acos` in both modes: the project's decision for glibc's `acos`,
 /// GLIBC-07).
+// C's two comparisons, as written (a NaN passes both)
+#[allow(clippy::manual_clamp)]
 pub fn rot_matrix_log_norm(err: &mut dyn Write, m: &Mat4) -> f64 {
     let flat: Vec<f64> = m.iter().flatten().copied().collect();
     let det = vnl_fixed::determinant(&flat, 4);

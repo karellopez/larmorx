@@ -34,8 +34,7 @@ use larmorx_freesurfer_filter::conv::{
     MRI_DEPTH, MRI_HEIGHT, MRI_WIDTH, mri_convolve_gaussian, mri_convolve1d,
 };
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, mri_alloc, mri_alloc_sequence,
-    mri_copy_header,
+    MRI_FLOAT, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, mri_alloc, mri_alloc_sequence, mri_copy_header,
 };
 use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, reinit_cache};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -128,7 +127,13 @@ pub fn mri_valscale(
             Pair::New(src) | Pair::Given(src, _) => src,
             Pair::Same(m) => m,
         };
-        (src.mtype, src.vg.width, src.vg.height, src.vg.depth, src.nframes)
+        (
+            src.mtype,
+            src.vg.width,
+            src.vg.height,
+            src.vg.depth,
+            src.nframes,
+        )
     };
     let supported = matches!(ty, MRI_FLOAT | MRI_SHORT | MRI_USHRT | MRI_UCHAR);
     let mut fresh = None;
@@ -164,7 +169,9 @@ pub fn mri_valscale(
                 };
                 for x in 0..w as usize {
                     let mut val = match src {
-                        Some(sm) => read_elem(sm.chunk.as_ref().expect("the source's voxels"), ty, rs + x),
+                        Some(sm) => {
+                            read_elem(sm.chunk.as_ref().expect("the source's voxels"), ty, rs + x)
+                        }
                         None => read_elem(&dc, ty, rs + x),
                     };
                     val = sub64(wide(val), b) as f32;
@@ -182,12 +189,20 @@ pub fn mri_valscale(
 }
 
 /// `MyMRI::getPrefilter()`: a 5 x 1 x 1 float volume, `0.03504 0.24878 0.43234 0.24878 0.03504`.
-pub fn get_prefilter(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write) -> Result<Mri, Fatal> {
+pub fn get_prefilter(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<Mri, Fatal> {
     filter(g, out, err, &PREFILTER)
 }
 
 /// `MyMRI::getDerfilter()`: `-0.10689 -0.28461 0 0.28461 0.10689`.
-pub fn get_derfilter(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write) -> Result<Mri, Fatal> {
+pub fn get_derfilter(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<Mri, Fatal> {
     filter(g, out, err, &DERFILTER)
 }
 
@@ -537,9 +552,8 @@ pub fn find_right_size(g: &mut Globals, mri: &Mri, conform_size: f32, conform: b
         fmax = fdepth;
     }
     let mut conform_width = ceil_int(g, div64(fmax, cs));
-    if conform_width < 256 {
-        conform_width = 256;
-    } else if (f64::from(conform_width) - 256.0) / 256.0 < 0.1 {
+    // below 256, or within 10 % above it: 256
+    if conform_width < 256 || (f64::from(conform_width) - 256.0) / 256.0 < 0.1 {
         conform_width = 256;
     }
     ret = [conform_width; 3];
@@ -573,7 +587,10 @@ pub fn get_background(g: &mut Globals, err: &mut dyn Write, mri: &Mri) -> Result
     }
     let (mut mins, mut maxs) = (0i32, 0i32);
     // `(maxval-minval)/255.0`: the float difference through double, stored as a float
-    let eps = larmorx_freesurfer_core::sse::div64(wide(larmorx_freesurfer_core::sse::sub(maxval, minval)), 255.0) as f32;
+    let eps = larmorx_freesurfer_core::sse::div64(
+        wide(larmorx_freesurfer_core::sse::sub(maxval, minval)),
+        255.0,
+    ) as f32;
     for &val in &vals {
         if larmorx_freesurfer_core::sse::sub(maxval, val) < eps {
             maxs = maxs.wrapping_add(1);

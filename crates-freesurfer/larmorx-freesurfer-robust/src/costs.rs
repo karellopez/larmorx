@@ -162,7 +162,11 @@ pub fn orientation(g: &mut Globals, err: &mut dyn Write, i: &Mri) -> Result<[[f6
             smallest = k;
         }
     }
-    let mut order = [largest, 3usize.wrapping_sub(smallest).wrapping_sub(largest), smallest];
+    let mut order = [
+        largest,
+        3usize.wrapping_sub(smallest).wrapping_sub(largest),
+        smallest,
+    ];
     let col = |c: usize, r: usize| eig.vectors[r * 3 + c];
     let mut evec = [[0.0f64; 3]; 3];
     if largest == smallest {

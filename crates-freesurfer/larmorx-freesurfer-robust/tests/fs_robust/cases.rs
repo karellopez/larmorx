@@ -227,7 +227,12 @@ fn vol_of(g: &mut Gen, t: &mut Vec<String>, s: Shape) {
         let n = g.int(0, 3);
         t.push(n.to_string());
         for _ in 0..n {
-            for v in [g.int(0, s.w - 1), g.int(0, s.h - 1), g.int(0, s.d - 1), g.int(0, s.nf - 1)] {
+            for v in [
+                g.int(0, s.w - 1),
+                g.int(0, s.h - 1),
+                g.int(0, s.d - 1),
+                g.int(0, s.nf - 1),
+            ] {
                 t.push(v.to_string());
             }
             t.push(fx(intensity(g)));
@@ -262,14 +267,30 @@ fn m44(g: &mut Gen) -> [[f64; 4]; 4] {
     let n = (q.iter().map(|x| x * x).sum::<f64>()).sqrt();
     let [a, b, c, d] = q.map(|x| x / n);
     let r = [
-        [a * a + b * b - c * c - d * d, 2.0 * (b * c - a * d), 2.0 * (b * d + a * c)],
-        [2.0 * (b * c + a * d), a * a - b * b + c * c - d * d, 2.0 * (c * d - a * b)],
-        [2.0 * (b * d - a * c), 2.0 * (c * d + a * b), a * a - b * b - c * c + d * d],
+        [
+            a * a + b * b - c * c - d * d,
+            2.0 * (b * c - a * d),
+            2.0 * (b * d + a * c),
+        ],
+        [
+            2.0 * (b * c + a * d),
+            a * a - b * b + c * c - d * d,
+            2.0 * (c * d - a * b),
+        ],
+        [
+            2.0 * (b * d - a * c),
+            2.0 * (c * d + a * b),
+            a * a - b * b - c * c + d * d,
+        ],
     ];
     let small = g.chance(2);
     let mut m = [[0.0; 4]; 4];
     for i in 0..3 {
-        let s = if g.chance(3) { 1.0 + (g.unit() - 0.5) * 0.4 } else { 1.0 };
+        let s = if g.chance(3) {
+            1.0 + (g.unit() - 0.5) * 0.4
+        } else {
+            1.0
+        };
         for j in 0..3 {
             m[i][j] = if small {
                 // near the identity (a registration's step)
@@ -309,7 +330,11 @@ fn vm(g: &mut Gen, t: &mut Vec<String>, rows: i64, cols: i64) {
     let m = m44(g);
     for r in 0..rows {
         for c in 0..cols {
-            let v = if r < 4 && c < 4 { m[r as usize][c as usize] } else { d64(g) };
+            let v = if r < 4 && c < 4 {
+                m[r as usize][c as usize]
+            } else {
+                d64(g)
+            };
             t.push(dx(v));
         }
     }
@@ -317,9 +342,27 @@ fn vm(g: &mut Gen, t: &mut Vec<String>, rows: i64, cols: i64) {
 
 /// The commands, in the order the generator cycles through them.
 pub const COMMANDS: [&str; 21] = [
-    "vscale", "prefilter", "derfilter", "rand", "subsample", "blur", "partials", "rightsize", "bg",
-    "ltx", "centroid", "orient", "v2m", "vv2m", "m2v", "getvnl", "isdiag", "polar", "polar2",
-    "adist", "rdist",
+    "vscale",
+    "prefilter",
+    "derfilter",
+    "rand",
+    "subsample",
+    "blur",
+    "partials",
+    "rightsize",
+    "bg",
+    "ltx",
+    "centroid",
+    "orient",
+    "v2m",
+    "vv2m",
+    "m2v",
+    "getvnl",
+    "isdiag",
+    "polar",
+    "polar2",
+    "adist",
+    "rdist",
 ];
 /// The commands added after the first ones (cycled with them).
 pub const MORE: [&str; 2] = ["fdiff", "rlog"];
@@ -357,7 +400,10 @@ fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
         }
         "prefilter" | "derfilter" => {}
         "rand" => {
-            t.push(g.pick(&[0, 1, 50, 100, 101, 102, 202, 1000, 2147483647]).to_string());
+            t.push(
+                g.pick(&[0, 1, 50, 100, 101, 102, 202, 1000, 2147483647])
+                    .to_string(),
+            );
         }
         "subsample" => {
             vol(g, t);
@@ -402,7 +448,11 @@ fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             } else {
                 g.pick(&[3, 4, 4, 2])
             };
-            let c = if cmd == "v2m" || cmd == "fdiff" { g.pick(&[n, n, 1, 3]) } else { n };
+            let c = if cmd == "v2m" || cmd == "fdiff" {
+                g.pick(&[n, n, 1, 3])
+            } else {
+                n
+            };
             vm(g, t, n, c);
             if cmd == "isdiag" {
                 t.push(dx(g.pick(&[1e-10, 0.0, 1e-30, 1.0, 1e-3])));
@@ -509,7 +559,11 @@ impl<'a> Toks<'a> {
     }
     fn s(&mut self) -> String {
         let s = self.next();
-        if s == "-" { String::new() } else { s.to_owned() }
+        if s == "-" {
+            String::new()
+        } else {
+            s.to_owned()
+        }
     }
 }
 
@@ -587,7 +641,15 @@ impl Out {
             self.0 += "NULL ";
             return;
         };
-        for v in [m.vg.width, m.vg.height, m.vg.depth, m.nframes, m.mtype, m.imnr0, m.imnr1] {
+        for v in [
+            m.vg.width,
+            m.vg.height,
+            m.vg.depth,
+            m.nframes,
+            m.mtype,
+            m.imnr0,
+            m.imnr1,
+        ] {
             self.i(i64::from(v));
         }
         for v in [
@@ -763,7 +825,12 @@ fn run_line_here(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str
         Ok(()) => o.0.trim_end().to_owned(),
         Err(f) => format!("EXIT {}", f.status()),
     };
-    let mut ids: Vec<&'static str> = cx.g.notices.as_slice().iter().map(|n| n.defect.id).collect();
+    let mut ids: Vec<&'static str> =
+        cx.g.notices
+            .as_slice()
+            .iter()
+            .map(|n| n.defect.id)
+            .collect();
     ids.sort_unstable();
     ids.dedup();
     (format!("{result} | {text}"), ids)
@@ -930,14 +997,27 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "adist" => {
             let a = VnlMatrix::from_4x4(&get_m4(t));
-            let b = if t.i() != 0 { Some(VnlMatrix::from_4x4(&get_m4(t))) } else { None };
+            let b = if t.i() != 0 {
+                Some(VnlMatrix::from_4x4(&get_m4(t)))
+            } else {
+                None
+            };
             let r = t.d();
             o.d(mx::affine_trans_dist_sq(&a, b.as_ref(), r));
         }
         "rdist" => {
             let a = VnlMatrix::from_4x4(&get_m4(t));
-            let b = if t.i() != 0 { Some(VnlMatrix::from_4x4(&get_m4(t))) } else { None };
-            o.d(mx::rigid_trans_dist_sq(&mut cx.g, &mut cx.b, &a, b.as_ref())?);
+            let b = if t.i() != 0 {
+                Some(VnlMatrix::from_4x4(&get_m4(t)))
+            } else {
+                None
+            };
+            o.d(mx::rigid_trans_dist_sq(
+                &mut cx.g,
+                &mut cx.b,
+                &a,
+                b.as_ref(),
+            )?);
         }
         "fdiff" => {
             let a = get_vm(t);

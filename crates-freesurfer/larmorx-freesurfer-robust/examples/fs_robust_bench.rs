@@ -37,8 +37,14 @@ fn main() {
     for z in 0..n {
         for y in 0..n {
             for x in 0..n {
-                let r = (x - n / 2) * (x - n / 2) + (y - n / 2) * (y - n / 2) + (z - n / 3) * (z - n / 3);
-                let v = if r < n * n / 6 { ((x * 7 + y * 13 + z * 29) % 97 + 100) as f32 } else { 0.0 };
+                let r = (x - n / 2) * (x - n / 2)
+                    + (y - n / 2) * (y - n / 2)
+                    + (z - n / 3) * (z - n / 3);
+                let v = if r < n * n / 6 {
+                    ((x * 7 + y * 13 + z * 29) % 97 + 100) as f32
+                } else {
+                    0.0
+                };
                 mri_set_vox_val(&mut g, &mut e, &mut src, x, y, z, 0, v, 0).unwrap();
             }
         }
@@ -64,7 +70,9 @@ fn main() {
         fnv(&p.blur, h)
     });
     run("subsample", &mut |g| {
-        let s = mymri::sub_sample(g, &mut o2, &mut e2, &src, None, true, 0).unwrap().unwrap_new();
+        let s = mymri::sub_sample(g, &mut o2, &mut e2, &src, None, true, 0)
+            .unwrap()
+            .unwrap_new();
         fnv(&s, BASIS)
     });
     run("valscale", &mut |g| {
@@ -74,11 +82,14 @@ fn main() {
         fnv(&s, BASIS)
     });
     run("blur", &mut |g| {
-        let s = mymri::get_blur(g, &mut o2, &mut e2, Pair::New(&src)).unwrap().unwrap_new();
+        let s = mymri::get_blur(g, &mut o2, &mut e2, Pair::New(&src))
+            .unwrap()
+            .unwrap_new();
         fnv(&s, BASIS)
     });
     run("centroid", &mut |g| {
         let c = costs::centroid(g, &mut e2, &src).unwrap();
-        c.iter().fold(0u64, |h, v| h.wrapping_mul(31).wrapping_add(v.to_bits()))
+        c.iter()
+            .fold(0u64, |h, v| h.wrapping_mul(31).wrapping_add(v.to_bits()))
     });
 }

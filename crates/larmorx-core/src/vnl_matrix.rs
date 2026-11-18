@@ -142,8 +142,8 @@ impl VnlMatrix {
         assert_eq!(self.cols, d.len(), "vnl_matrix * vnl_diag_matrix: sizes");
         let mut r = self.clone();
         for i in 0..self.rows {
-            for j in 0..self.cols {
-                r.data[i * self.cols + j] = self.data[i * self.cols + j].sse_mul(d[j]);
+            for (j, &dj) in d.iter().enumerate() {
+                r.data[i * self.cols + j] = self.data[i * self.cols + j].sse_mul(dj);
             }
         }
         r

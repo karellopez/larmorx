@@ -1094,9 +1094,16 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   bin size <%2.2f> (max <%2.1f>) too big for mean/min <%2.2f>/<%2.2f>, scaling down to <%2.2f>`. Every
   voxel (frames, x, y, z) counts as non-zero unless `fabs(v) < 1e-15` (NaN counts), and goes to bin
   `(int)((v - min) / size)` (`float`; FS-317 beyond the `int` range or NaN) clamped to [0, 999]. The low
-  end: bins are added from 0 while their total is below `(int)(((w * f_low) * h) * d)` (`float`), and
-  `min = min + bin * size`; the high end: from 999 down while below `(int)(non-zero * (1 - f_high))`
-  (`double`), `max = bin * size + min` (the product the first operand). `min > max`: `MRIchangeType():
+  end: bins 0, 1, 2, ... are added while their total is below `(int)(((w * f_low) * h) * d)` (`float`;
+  the target counts one frame's voxels, the histogram every frame's) and fewer than all 1000 bins have
+  been added; with `k` the number of bins added (0 to 1000: 1000 when even all of them stay below the
+  target, as with `f_low` 1 or more), `min = min + k * size`. The high end: bins 999, 998, ... are added
+  while their total is below `(int)(non-zero * (1 - f_high))` (`double`) and the bin is above 0 (bin 0
+  is never added); with `j` = 999 minus the number added (999 down to 0), `max = j * size + min`, `min`
+  the low end's new value (the product the first operand). (**(observed)**: `vrules6`'s `chtype` cases
+  of a float volume 254.5, 1.4e-45, 3.25, 2^32 to bytes, `f_high` 0: `f_low` 1 and 2 give `k` = 1000
+  and the bytes 0 0 0 0, `f_low` 0.75 gives `k` = 1 and 0 0 0 255, `f_low` 0 gives `k` = 0 and 255 0 3
+  255.) `min > max`: `MRIchangeType():
   after hist: src_min = <g>, src_max = <g> (f_low = <g>, f_high = <g>)` (`ERROR_BADPARM`), `NULL`. The
   destination range: bytes [0, 255], shorts [-32768, 32767], unsigned shorts [0, 65535], ints and longs
   their limits as `float`s, floats [0, 0]; `scale = (dmax - dmin) / (max - min)` (1 when equal); each

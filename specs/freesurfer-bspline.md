@@ -19,11 +19,16 @@ among them `larmorx-freesurfer-volume`), the documents written from FreeSurfer's
 (`docs/freesurfer/`, `docs/findings/freesurfer-*.md`), the replica's probes (`validation/probes/fs-*`,
 among them `fs-volume` and `fs-bspline-bench`), the unit oracle's build tree and tools, `docs/parts/` and
 the scratch folders of FreeSurfer's parts. **It may read** this spec, the FreeSurfer specs it cites, the
-papers above, IEEE 754-2008, C11, the main package's open code and documentation, and run as black
-boxes the official FreeSurfer 8.2.0 programs (§9).
+papers above, IEEE 754-2008, C11, the main package's open code and documentation, the open probe folder
+`validation/investigations/freesurfer-volume-probe/` (calls only: its README says how to run it), and
+run as black boxes the official FreeSurfer 8.2.0 programs and the prebuilt probe
+`<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe` with the guard allocator
+`guard_malloc.so` beside it (§9; never building them, nor opening anything else in that folder).
 
-Status: complete for the module (every function the programs reach, §2 to §8); the open probe of §9
-is the spec finisher's next piece (track E). What black-box runs confirmed is marked **(observed)**.
+Status: complete for the module (every function the programs reach, §2 to §8). Made ready for the clean
+room by the spec finisher (FreeSurfer's foundations, track E, relay 11, 2026-11-18): the black-box
+validation plan of §9 with its open probe, a read-through as a clean-room reader, the defects' texts
+checked. What black-box runs confirmed is marked **(observed)**.
 
 ## 1. Conventions
 
@@ -39,7 +44,10 @@ is the spec finisher's next piece (track E). What black-box runs confirmed is ma
   `specs/freesurfer-mri.md`'s. Every voxel read here is read through `MRIgetVoxVal` and widened to
   `double`; every voxel written is written through `MRIsetVoxVal`.
 - "Ends the program (message, status 1)": the message on standard output followed by a newline, then
-  `exit(1)`. "An error": FreeSurfer's error printer (`specs/freesurfer-core.md`) on standard error.
+  `exit(1)`. "An error": FreeSurfer's error printer (`specs/freesurfer-core.md`) on standard error, the
+  message exactly as given here (where it ends with a newline of its own, `+ \n` says so; the printer's
+  own end follows it), the function then returning. "The program's end" after an error: the same printer,
+  then the program ends with status 252 (code -4, `ERROR_BADPARM`, modulo 256: `specs/freesurfer-core.md`).
 - The C library's `log`, `pow`, `floor`, `ceil`, `fabs`: `floor`, `ceil` and `fabs` are exact; `log`
   and `pow` give glibc 2.35's last bits (the project's default takes the correctly rounded functions,
   `reproduce` glibc's: `larmorx_core::math::Libm`; §3.3 says where they differ).
@@ -50,10 +58,11 @@ A B-spline is: its **degree** (an `int`), its **coefficients** (a `float` volume
 (an `int`) and whether the source had a **negative** voxel (`srcneg`, 0 or 1).
 
 - `MRIallocBSpline(width, height, depth, nframes)`: coefficients allocated as a `float` volume of that
-  extent (`MRIallocSequence`; its failures are its own, §`specs/freesurfer-mri.md`), degree -1, source
-  type -1, `srcneg` 0.
-- `MRIfreeBSpline(&b)`: with no B-spline, the error `MRIfreeBSpline: null pointer` and
-  `ERROR_BADPARM` (-4); otherwise the coefficients freed (`MRIfree`, whose own `MRIfree: null pointer`
+  extent (`MRIallocSequence`, `specs/freesurfer-mri.md`: its messages are its own; when it gives no
+  volume, the error `MRIalloc: could not allocate MRI_BSPLINE` + `\n` and the program's end, status 254:
+  code -2, `ERROR_NO_MEMORY`), degree -1, source type -1, `srcneg` 0.
+- `MRIfreeBSpline(&b)`: with no B-spline, the error `MRIfreeBSpline: null pointer` + `\n` and
+  `ERROR_BADPARM` (-4) returned; otherwise the coefficients freed (`MRIfree`, whose own `MRIfree: null pointer`
   error a B-spline without coefficients gives), the B-spline freed and set to none, `NO_ERROR` (0).
 
 ## 3. The coefficients (`MRItoBSpline(src, b, degree)`)
@@ -71,6 +80,8 @@ A B-spline is: its **degree** (an `int`), its **coefficients** (a `float` volume
    source: ends the program (`ERROR MRItoBSpline: BSPline Coeff MRI dimensions must be same as Source
    MRI!`, status 1).
 5. A degree other than 2 to 9: ends the program (`Invalid spline degree`, status 1).
+   (A line buffer that cannot be allocated ends the program with `ERROR MRItoBSpline: X Line allocation
+   failed`, `Y ...` or `Z ...` for the pass, status 1: the buffers hold one line of doubles each.)
 6. **Pass x**: for each slice `z`, row `y`, frame `f` (any order: every line is independent; the
    official build runs slices in parallel): the line `L[x] = MRIgetVoxVal(src, x, y, z, f)` for `x` in
    `[0, width)`, widened; if `srcneg` is still 0 and some `L[x] < 0` (NaN and -0 are not), `srcneg = 1`;
@@ -265,7 +276,7 @@ as the source's, `dst`'s as the destination's, the coefficients' when there is n
 ### 5.3 `LTAtransformBSpline(b, dst, lta)`
 
 1. An array of other than one transform: the error `LTAtransformBSpline: numxforms != 1 not supported`
-   and the program's end (`ERROR_BADPARM`).
+   + `\n` and the program's end (status 252), before anything else.
 2. No `dst`: with the transform's destination geometry valid (1), a volume of that geometry's extent,
    the source's type and the coefficients' frames, with the coefficients' header, then the geometry
    applied (`useVolGeomToMRI`); else, with `USE_AVERAGE305` in the environment (any value), on standard
@@ -280,9 +291,11 @@ as the source's, `dst`'s as the destination's, the coefficients' when there is n
    `      We assume that the dst volume passed is the`, `      same as the dst for the transform.` on
    standard error) `dst`'s; `r2i` the source geometry's RAS-to-voxel matrix when valid, else (the same
    three lines with `src`) the coefficients'; then §5.2 with it. `LINEAR_PHYSVOX_TO_PHYSVOX` (2): the
-   array changed to `LINEAR_RAS_TO_RAS` (`LTAchangeType`), then §5.2 with its matrix. Any other type
-   (`REGISTER_DAT` included): the error `LTAtransformBSpline: unknown linear transform` and the
-   program's end (`ERROR_BADPARM`).
+   array changed to `LINEAR_RAS_TO_RAS` (`LTAchangeType`, `specs/freesurfer-volume.md` §54, its errors and
+   ends of the program included: **(observed)** `LTAchangeType: src geometry must be valid` + `\n`, status
+   252, for an invalid source geometry), then §5.2 with its matrix. Any other type (`REGISTER_DAT` (14)
+   included): the error `LTAtransformBSpline: unknown linear transform` + `\n` and the program's end
+   (status 252), after step 2's volume and its messages.
 
 ## 6. Factor-of-two pyramids (the centred cubic spline filters)
 
@@ -353,9 +366,10 @@ status 1). All passes write into `dst` itself (§3.4), so each pass reads the pr
 ## 7. Defects (`larmorx_core::defects`; the register's FS entries)
 
 - **FS-962** (rule A): in §6.4's passes y and z on an axis of one voxel FreeSurfer copies the *source's*
-  line (`MRIgetVoxVal(src, column, ...)` over the destination's columns and rows, which reach past the
-  source's extent: other voxels of the source or memory it does not own) over the lines the earlier
-  passes expanded. The default keeps the expanded lines (nothing is copied when an earlier axis was
+  voxels over the lines the earlier passes expanded: each destination line along that axis gets the
+  source's voxel at the destination's own column and row (`MRIgetVoxVal` of the source there), which lie
+  past the source's extent once the earlier axes were doubled (other voxels of the source or memory it
+  does not own). The default keeps the expanded lines (nothing is copied when an earlier axis was
   expanded; when none was, the copy writes the values already there); `reproduce` copies as FreeSurfer
   does (noted).
 - **FS-963** (rule D, pending `mri_robust_register`'s two-dimensional path): §6.3 and §6.4 change the
@@ -368,8 +382,8 @@ status 1). All passes write into `dst` itself (§3.4), so each pass reads the pr
 
 ## 8. What is not part of the module
 
-The file's other pyramid filters (the standard and L2 families, the other orders of the centred one) and
-its standard reduce and expand: FreeSurfer never chooses them. Threads: every line of §3 and every voxel
+Other pyramid filters (the standard and L2 families, the other orders of the centred one) and the
+standard (not centred) reduce and expand: no FreeSurfer function reaches them. Threads: every line of §3 and every voxel
 of §5 is independent, so any thread count gives the same result.
 
 ## 9. Validation plan (black box)
@@ -383,11 +397,71 @@ of §5 is independent, so any thread count gives the same result.
   through the linear transform of a volume onto another grid) does the same through §4.1. §5.3 and §6.3
   are reached by `mri_robust_template` (its final resampling) and `mri_robust_register` (its pyramid),
   queue items 3.2-13 to 3.2-16.
-- **The open probe** (to come from the spec finisher): calls of `MRItoBSpline`, `MRIsampleBSpline`,
-  `MRIsampleSeqBSpline`, `MRIlinearTransformBSpline`, `MRIapplyRASlinearTransformBSpline`,
-  `LTAtransformBSpline`, `MRIdownsample2BSpline` and `MRIupsample2BSpline` by name on volumes and
-  points given in a line protocol, as `validation/investigations/freesurfer-volume-probe/` does for
-  fs.volume.
+- **The open probe**: `validation/investigations/freesurfer-volume-probe/` (open: calls of FreeSurfer's
+  functions by name and a comparison loop; its README lists every command, its arguments, what it
+  prints and the encodings). The implementer runs the prebuilt probe
+  `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe` (FreeSurfer 8.2.0's library as the
+  official build compiles it: GCC 8.4.0 and FreeSurfer's flags; its B-spline commands since larmorx
+  `d4b27c43`, the build in place from `5d35ae1f`, its `BUILD_INFO.txt` line) with `guard_malloc.so`
+  beside it, and never builds them. Its commands for this
+  module: `bsp` (§3: `MRItoBSpline` with no, a fitting, another or a coefficient-less B-spline), `bsamp`
+  (§4.1), `bsraw` (§4.1 on coefficients given as they are, any degree: FS-964), `bsseq` (§4.2), `bslxf`,
+  `bsras`, `bslta` (§5.1 to §5.3, `USE_AVERAGE305` unset, `true` or empty), `bsdown`, `bsup` (§6.3,
+  §6.4) and `bsfree` (§2). Each call runs in a child process of its own with an alarm: its line is the
+  printed result, or `EXIT <status>` where FreeSurfer ends the program, `CRASH <signal>`, `TIMEOUT`;
+  then its standard output and standard error.
+- **The groups** (`compare.py refs --groups vbspline,vbsrules`, seed 7; each run four times: plainly,
+  plainly again in another process with the stack below the call zeroed, and in the two guard runs: a
+  line whose four results differ depends on memory FreeSurfer does not own or never wrote, a
+  **memory** line; the hash is the SHA-256 of the plain lines, each memory or crash line as
+  `<memory>`). `vbspline` (410 calls): the coefficients of volumes of up to 6 voxels a side of the six
+  numeric types (bytes, 32- and 64-bit integers, floats, shorts, unsigned shorts; voxels with NaNs and
+  infinities; one or two frames; a few without voxels or without cached matrices) for degrees 2 to 9 and
+  0, 1, 10, -1, with no, a fitting, another (of another type or extent) or a coefficient-less B-spline;
+  `MRIsampleBSpline` at points inside, at and past the edges, whole and within `FLT_EPSILON` of whole,
+  NaN, infinite, beyond the `int` range, frames -1 to one past, outside values 0, -5.5 and NaN;
+  `MRIsampleSeqBSpline` with ranges inside, empty and one frame past (that on a line of its own);
+  coefficients sampled as given with degrees -2 to 12 (FS-964; a negative degree on a volume of one voxel
+  left out: its indices are stack contents whose detection changes from process to process); the
+  linear and RAS transforms with matrices identity, scaling, shift, rotation, general, singular, with
+  NaNs, of other sizes and none, into no destination, a given one or the source; transform arrays of 0
+  to 2 transforms of the types 0, 1, 2, 5, 14 and 21 with valid and invalid geometries; both pyramids
+  into no destination, a fitting one, another one or the source. `vbsrules` (71 calls): lines of 80
+  and 20 samples for each degree (longer and shorter than every horizon of §3.3), degree 6 on a line
+  of 5 (§3.3's `pow`), lines with NaNs of four payloads and a signalling NaN, a source of -0 only and one
+  with a negative voxel, one-voxel axes, `MRIsampleBSpline` at one point for each degree and on a step
+  of bytes (the clipped overshoot), FS-964's degrees 10 and 11 on 3 x 3 x 3 and 1 x 1 x 1 coefficients
+  and degrees -1, 0, 1, the three `MRIfreeBSpline` cases, both pyramids on volumes with axes of one
+  voxel (FS-962, FS-963) and into destinations of another extent or frame count.
+  **(observed)** on the reference machine (glibc 2.35, Linux 6.8, x86-64), through the oracle-output
+  cache cold and warm and twice without it (2026-11-18, log
+  `oracles/logs/fs-volume-probe-r11-final-2026-11-18.log`):
+
+  | Group | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
+  |---|---|---|---|---|---|
+  | `vbspline` | 410 | 36 | 30 | 0 | `11b2818d1171eac9015dffd5bf02b1b3d6060722bfc7db71d76d3247c71fde38` |
+  | `vbsrules` | 71 | 3 | 8 | 0 | `713d7bb825ce469535a36d88d3537882127b0d32a16f0504c2b0a10ab1738a90` |
+
+  The memory lines: the upsampling's axes of one voxel (FS-962's reads past the source), a frame-range
+  sample one frame past the volume's, FS-964's degrees above 9; the crashes: sources without their
+  cached matrices, whose header copy crashes (`specs/freesurfer-volume.md`'s FS-252), a source without
+  voxels, and transforms into a given destination with fewer frames than the source (written past its
+  voxels, `specs/freesurfer-mri.md`). The exits are FreeSurfer's own: `Invalid spline degree`, the
+  coefficients' type and extent checks (status 1), the pyramids' destination check (status 1), the
+  matrix product's and inverse's ends of the program and `LTAtransformBSpline`'s and `LTAchangeType`'s
+  errors (status 252).
+- **The comparison** (`compare.py compare --candidate <program> --mode reproduce`, then `--mode fix`,
+  with `--groups vbspline,vbsrules`): as `specs/freesurfer-volume.md` §69.3 says. The candidate takes
+  the probe's commands and prints the same lines, with `LARMORX_UPSTREAM_DEFECTS` set to the mode; its
+  defect notices (`upstream defect <ID> ...` on standard error) are taken out. Every line must be
+  identical, byte for byte, but a line where FreeSurfer did not finish (the candidate's line must not be
+  `TIMEOUT` or `CRASH`: FS-252's and FS-964's errors, the volume functions' rules for frames past), a
+  memory line, and with `fix` a line where the candidate noted a defect (FS-962, FS-964; FS-963 is noted
+  in both modes with FreeSurfer's geometry). **(observed)** with the probe as its own candidate: every
+  line identical in both modes but the memory lines whose contents changed from process to process
+  (3 in `vbspline`, 1 in `vbsrules`).
+- fs.volume's cubic B-spline paths (`MRIlinearTransformInterp` and `MRIapplyRASlinearTransformInterp`
+  with method 5, `MRIresampleFill` with type 5) are `specs/freesurfer-volume.md`'s group `vbsvol` (§69.2).
 - **Reference numbers (observed)**: §3.3's horizons and its one `pow` difference; a 256^3 `float` volume's
   coefficients take about half a second at one thread on the main machine, and hold one `float` volume of
   the source's extent beside the source.

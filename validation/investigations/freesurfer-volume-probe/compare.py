@@ -93,7 +93,9 @@ class Batch:
     env: dict[str, str] = field(default_factory=dict)
     never: str = ""  # why the probe's runs are never cached
     guards: bool = True  # False: the plain runs only
-    both: str = ""  # a defect whose correction holds in both modes: a line noting it may differ
+    # the defects (comma-separated) whose correction holds in both modes because FreeSurfer's value
+    # there is memory it never wrote: a line noting one of them may differ in both modes
+    both: str = ""
 
 
 def block(fields: dict[str, str], order: list[str] | None = None) -> list[str]:
@@ -1554,7 +1556,9 @@ class Gen7(Gen6):
                 pts.append(f"{k} {' '.join(map(str, xyz))} {p} {q} {lohi}")
             a = self.wvol(r, shape=s, special=0.05, ct=0.0)
             L.append(f"nbrs {a} {len(pts)} {' '.join(pts)}")
-        return [Batch("vderiv", "vderiv", L)]
+        # FS-322: a gradient's sample the trilinear sampler refuses is a value never written (the
+        # probe's four runs may agree on it by accident of its own stack): a line noting it may differ
+        return [Batch("vderiv", "vderiv", L, both="FS-322")]
 
     def xmat(self, r: random.Random) -> str:
         """A voxel-to-voxel or RAS matrix of the linear transforms: the identity, a scaling, a
@@ -1626,7 +1630,9 @@ class Gen7(Gen6):
             b = self.rvol(r, special=0.1)
             gd = "+gdiag=10000040 " if r.random() < 0.15 else ""
             L.append(f"{gd}rsmat {a} {b}")
-        return [Batch("vlinear", "vlinear", L)]
+        # FS-325: a linear transform's sample before the first that succeeds is a value never written
+        # (the probe's four runs agree on it by accident of its own stack): a line noting it may differ
+        return [Batch("vlinear", "vlinear", L, both="FS-325")]
 
     # -- part 6c (§31) ---------------------------------------------------------------------------
 
@@ -1705,7 +1711,356 @@ class Gen7(Gen6):
                 L.append(f"repval {a} {d} 1 {frm} {r.randint(0, 255)}")
             else:
                 L.append(f"repval {a} {d} 0 {self.fillv(r)} {self.fillv(r)}")
-        return [Batch("vresamp", "vresamp", L)]
+        # FS-300: the cubic frame sampler's window points outside the source are memory contents, as
+        # in vsample: a line noting it may differ
+        return [Batch("vresamp", "vresamp", L, both="FS-300")]
+
+    @staticmethod
+    def vrules7() -> list[Batch]:
+        """Fixed cases of the clean room's questions on parts 6b and 6c: MRIindexNotInVolume at rows
+        whose rounding as a double and as a float differ (2.500000119, -0.500000119) and around them
+        (§15); the vote onto one 512 mm template voxel from 513 x 3 and 511 x 3 byte sources of 100,
+        127 and 130 frames, so that labels get 202 to 262 votes (FS-326: under reproduce the counts
+        stop at 255; §31)."""
+        L = []
+        w = fixed_w(3, 3, 3, 0)
+        for y in (2.500000119, 2.5, 2.4999999, 2.5000001, 3.5, -0.5, -0.500000119, -0.5000001):
+            L.append(f"inidx {w} {f64(1.0)} {f64(y)} {f64(1.0)}")
+        t = fixed_w(1, 1, 1, 0, fill=0).split(" ")
+        for i in range(3):
+            t[7 + i] = f32(512.0)
+        tmpl = " ".join(t)
+        # 100 frames: at most 202 votes; 127 frames, seed 7: label 1 has 256, label 0 255; 130 frames,
+        # seed 5: label 5 has 262, label 0 261; 511 columns, 130 frames: every label 260
+        for wd, nf, seed in ((513, 100, 7), (513, 127, 7), (513, 130, 5), (511, 130, 9)):
+            a = fixed_w(wd, 3, 1, 0, f=nf, fill=seed)
+            L.append(f"rsfill {a} {tmpl} 6 {f32(0.0)} 0")
+        return [Batch("vrules7", "vrules7", L)]
+
+
+class Gen8(Gen7):
+    """fs.bspline (specs/freesurfer-bspline.md) and fs.volume's cubic B-spline paths."""
+
+    DEGREES = (2, 3, 3, 3, 4, 5, 6, 7, 8, 9)
+
+    def bdeg(self, r: random.Random, odd: float = 0.05) -> int:
+        return r.choice([0, 1, 10, -1]) if r.random() < odd else r.choice(self.DEGREES)
+
+    def bpts(self, r: random.Random, ext: int, nf: int, seq: bool = False) -> list[str]:
+        pts = []
+        for _ in range(r.randint(1, 4)):
+            xyz = " ".join(self.coord(r, max(ext, 1)) for _ in range(3))
+            if seq:
+                first = r.randint(0, nf - 1)
+                last = r.choice([first, nf - 1, first - 1])
+                pts.append(f"{xyz} {first} {last}")
+            else:
+                pts.append(f"{xyz} {r.choice([0, 0, nf - 1, nf, -1])}")
+        return pts
+
+    def bvol(self, r: random.Random, ext: tuple[int, int] = (1, 5), hdr: float = 0.0, **kw) -> str:
+        s = self.vshape(r, types=NUMERIC, ext=ext, frames=(1, 2), hdr=hdr)
+        return self.rvol(r, shape=s, ct=0.0, **kw)
+
+    def gf(self, r: random.Random) -> str:
+        """Gf (the fs.mri probe's): a geometry, its cache flag, a registration matrix."""
+        reg = self.affine(r) if r.random() < 0.1 else "null"
+        return f"{self.geom(r, ext=(1, 5))} {r.choice([0, 1])} {reg}"
+
+    def lt1(self, r: random.Random) -> str:
+        m = self.affine(r, special=0.03) if r.random() < 0.8 else self.xmat(r)
+        if m == "null":
+            m = self.affine(r)
+        parts = [self.fv(r) for _ in range(4)] + [m, "null", "null"]
+        parts += [str(r.choice([0, 1, 2])), "0", self.gf(r), self.gf(r)]
+        return " ".join(parts)
+
+    def bslta(self, r: random.Random) -> str:
+        n = 1 if r.random() < 0.9 else r.choice([0, 2])
+        ty = r.choice([0, 0, 1, 1, 1, 2, 2, 14, 21, 5])
+        lts = [self.lt1(r) for _ in range(2 * n)]
+        return " ".join([str(n), str(ty), f32(1.0), xs(r.choice(["", "bert"])), *lts])
+
+    def vbspline(self) -> list[Batch]:
+        """fs.bspline §2 to §6: the coefficients of volumes of the six numeric types (degrees 2 to
+        9; 0, 1, 10 and -1; a given B-spline, one of other coefficients, one without), sampling at
+        points inside, at and past the edges, NaN and infinite, frames -1 to one past, the
+        frame-range sampler, sampling coefficients as given with degrees -2 to 12, the linear and RAS
+        transforms into no, a given or the source volume, the transform arrays, the factor-of-two
+        pyramids."""
+        r = self.rng("vbspline")
+        L = []
+        for _ in range(50):
+            k = r.choice([0, 0, 0, 0, 0, 0, 1, 2, 3])
+            a = self.bvol(r, ext=(1, 6), hdr=0.03)
+            s = a.split(" ")
+            extra = ""
+            if k == 2:
+                q = r.random()
+                if q < 0.5:
+                    extra = " " + self.rvol(r, shape=" ".join([*s[:3], "3", s[4], "0"]), ct=0.0)
+                elif q < 0.75:
+                    extra = " " + self.rvol(r, shape=" ".join([*s[:3], "0", s[4], "0"]), ct=0.0)
+                else:
+                    extra = " " + self.bvol(r)
+            L.append(f"bsp {k} {a} {self.bdeg(r)}{extra}")
+        outs = [f64(0.0), f64(0.0), f64(-5.5), f"{DSPECIAL[4]:016x}"]
+        for _ in range(100):
+            a = self.bvol(r, special=0.05)
+            s = a.split(" ")
+            ext, nf = min(int(x) for x in s[:3]), int(s[4])
+            pts = self.bpts(r, ext, nf)
+            L.append(f"bsamp {self.bdeg(r, 0.0)} {a} {r.choice(outs)} {len(pts)} {' '.join(pts)}")
+        for _ in range(60):
+            a = self.bvol(r, special=0.05)
+            s = a.split(" ")
+            ext, nf = min(int(x) for x in s[:3]), int(s[4])
+            if r.random() < 0.1:
+                # a frame past the volume's is read where the volume's rules place it: a line of
+                # its own
+                pts = [f"{' '.join(self.coord(r, max(ext, 1)) for _ in range(3))} {nf - 1} {nf}"]
+            else:
+                pts = self.bpts(r, ext, nf, seq=True)
+            L.append(f"bsseq {self.bdeg(r, 0.0)} {a} {r.choice(outs)} {len(pts)} {' '.join(pts)}")
+        for _ in range(40):
+            one = r.random() < 0.3
+            s = self.vshape(r, types=[3], ext=(1, 1) if one else (1, 4), frames=(1, 2))
+            a = self.rvol(r, shape=s, ct=0.0, special=0.05)
+            deg = r.choice([-2, -1, 0, 1, 2, 3, 5, 9, 10, 11, 12])
+            if one and deg < 0:
+                # FS-964: a negative degree on a volume of one voxel reads indices never set (on the
+                # stack): a memory line whose detection changes from process to process
+                deg = r.choice([0, 1, 10])
+            pts = self.bpts(r, 1 if one else 4, int(s.split()[4]))
+            L.append(
+                f"bsraw {deg} {r.randint(0, 1)} {a} {r.choice(outs)} {len(pts)} {' '.join(pts)}"
+            )
+        for cmd, n in (("bslxf", 40), ("bsras", 30)):
+            for _ in range(n):
+                a = self.bvol(r, ext=(1, 4))
+                d = self.rdst(r, " ".join(a.split(" ")[:6]))
+                L.append(f"{cmd} {r.choice([2, 3, 3, 5])} {a} {d} {self.xmat(r)}")
+        for _ in range(30):
+            a = self.bvol(r, ext=(1, 4))
+            d = "new" if r.random() < 0.6 else self.rdst(r, " ".join(a.split(" ")[:6]))
+            L.append(
+                f"bslta {r.choice([3, 3, 2])} {a} {d} {self.bslta(r)} {r.choice([0, 0, 1, 2])}"
+            )
+        for cmd in ("bsdown", "bsup"):
+            for _ in range(30):
+                a = self.bvol(r, ext=(1, 6) if cmd == "bsdown" else (1, 4))
+                s = a.split(" ")
+                dims = [int(x) for x in s[:3]]
+                out = (
+                    [max(1, x // 2) for x in dims]
+                    if cmd == "bsdown"
+                    else [2 * x if x > 1 else 1 for x in dims]
+                )
+                q = r.random()
+                if q < 0.7:
+                    d = "new"
+                elif q < 0.85:
+                    d = self.rvol(r, shape=" ".join([*map(str, out), *s[3:6]]), ct=0.0)
+                elif q < 0.95:
+                    d = self.bvol(r)
+                else:
+                    d = "self"
+                L.append(f"{cmd} {a} {d}")
+        return [Batch("vbspline", "vbspline", L)]
+
+    @staticmethod
+    def vbsrules() -> list[Batch]:
+        """fs.bspline's fixed cases: lines longer and shorter than each degree's horizon (80 and
+        20 samples), degree 6 on a line of 5 (§3.3's pow), lines with NaNs of several payloads, a
+        source with -0 only and with a negative voxel, one-voxel axes, the uchar store of the
+        pyramids, destinations of another extent, FS-962 (an upsampled axis of one voxel), FS-963
+        (a downsampled one), FS-964 (degrees 10, 11 and -1 sampled), MRIfreeBSpline's three cases,
+        transform arrays of 0 and 2 transforms and of an unknown type."""
+        L = []
+        for deg in range(2, 10):
+            L.append(f"bsp 0 {fixed_w(80, 2, 1, 0, fill=7)} {deg}")
+            L.append(f"bsp 0 {fixed_w(20, 1, 2, 0, fill=11)} {deg}")
+            L.append(f"bsp 0 {fixed_w(3, 2, 2, 3, fill='t2')} {deg}")
+        L.append(f"bsp 0 {fixed_w(5, 1, 1, 0, fill=9)} 6")
+        L.append(f"bsp 0 {fixed_w(5, 2, 1, 3, fill='t4')} 6")
+        for seed in (11, 14, 18, 20, 27):
+            L.append(f"bsp 0 {fixed_w(7, 1, 1, 3, fill=f't{seed}')} 3")
+        L.append(f"bsp 0 {fixed_w(1, 1, 1, 3, fill='t1')} 3")
+        L.append(f"bsp 0 {fixed_w(1, 1, 1, 3, fill='t5')} 3")
+        for shape in ((1, 1, 1), (1, 4, 1), (4, 1, 1), (1, 1, 4), (2, 1, 3)):
+            L.append(f"bsp 0 {fixed_w(*shape, 0, fill=40)} 3")
+        mid = f"{f64(1.5)} {f64(0.25)} {f64(0.0)}"
+        for deg in (2, 3, 4, 5, 6, 7, 8, 9):
+            L.append(f"bsamp {deg} {fixed_w(6, 2, 1, 0, fill=7)} {f64(0.0)} 2 {mid} 0 {mid} 1")
+        # a step of bytes: the overshoot below 0 is clipped (a source without negative voxels)
+        L.append(
+            f"bsamp 3 {fixed_w(8, 1, 1, 0, f=2, fill=0)} {f64(0.0)} 3 "
+            f"{f64(0.5)} {f64(0.0)} {f64(0.0)} 0 {f64(2.7)} {f64(0.0)} {f64(0.0)} 0 "
+            f"{f64(6.2)} {f64(0.0)} {f64(0.0)} 1"
+        )
+        for deg in (10, 11, -1, 0, 1):
+            for shape in ((3, 3, 3), (1, 1, 1)) if deg >= 0 else ((3, 3, 3),):
+                L.append(f"bsraw {deg} 0 {fixed_w(*shape, 3, fill='t22')} {f64(0.0)} 1 {mid} 0")
+        L += ["bsfree 0", "bsfree 1", "bsfree 2"]
+        for shape in ((4, 1, 1), (4, 4, 1), (1, 4, 4), (3, 1, 2)):
+            L.append(f"bsup {fixed_w(*shape, 3, fill='t6')} new")
+            L.append(f"bsdown {fixed_w(*shape, 3, fill='t6')} new")
+        L.append(f"bsdown {fixed_w(8, 8, 2, 0, fill=200)} new")
+        L.append(f"bsdown {fixed_w(4, 4, 4, 0, fill=7)} {fixed_w(2, 2, 3, 0)}")
+        L.append(f"bsup {fixed_w(2, 2, 2, 0, fill=7)} {fixed_w(4, 4, 2, 0)}")
+        L.append(f"bsdown {fixed_w(4, 4, 4, 0, fill=7)} {fixed_w(2, 2, 2, 0, f=2)}")
+        return [Batch("vbsrules", "vbsrules", L)]
+
+    def vbsvol(self) -> list[Batch]:
+        """fs.volume's cubic B-spline paths: MRIlinearTransformInterp and
+        MRIapplyRASlinearTransformInterp with method 5 (§29) and MRIresampleFill with type 5 (§31)."""
+        r = self.rng("vbsvol")
+        L = []
+        outs = [f64(0.0)] * 4 + [f64(5.0), f"{DSPECIAL[4]:016x}"]
+        for _ in range(40):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            a = self.rvol(r, shape=s, special=0.05)
+            d = self.rdst(r, s)
+            L.append(f"lxf {r.choice([0, 3])} {a} {r.choice(outs)} {d} {self.xmat(r)} 5")
+        for _ in range(30):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            a = self.rvol(r, shape=s, special=0.05, ct=0.0).split(" ")
+            a[10] = "1" if r.random() < 0.85 else "0"
+            a = " ".join(a)
+            b = self.tmpl(r, a)
+            L.append(f"rsfill {a} {b} 5 {self.fillv(r)} {1 if r.random() < 0.2 else 0}")
+        return [Batch("vbsvol", "vbsvol", L)]
+
+
+class Gen9(Gen8):
+    """Part 7a (§33): statistics, the type names, the box crop, the centre of a sampled volume,
+    orientation strings, the 4 x 4 filler, the voxel and RAS transform matrices."""
+
+    OCHARS = "LRPAISlrpaisXx0 ?\x80\x00"
+
+    def ostring(self, r: random.Random, valid: float = 0.4) -> bytes:
+        if r.random() < valid:
+            axes = [r.choice("LR"), r.choice("PA"), r.choice("IS")]
+            r.shuffle(axes)
+            t = "".join(c.lower() if r.random() < 0.2 else c for c in axes)
+            return t.encode("latin-1") + (b"X" if r.random() < 0.1 else b"")
+        n = r.choice([2, 3, 3, 3, 3, 4, 5])
+        return "".join(r.choice(self.OCHARS) for _ in range(n)).encode("latin-1")
+
+    def vstat7(self) -> list[Batch]:
+        """§33: MRIstats and MRIprintStats of volumes of every type (64-bit integers: FS-329; types
+        the statistics do not read; volumes without voxels: FS-330), MRItype2str of -2 to 12,
+        MRIcropBoundingBox, MRIcalcCRASforSampledVolume (the diagnostic bits; sources without cached
+        matrices), MRIcheckOrientationString and MRIorientationStringToDircos (valid strings in
+        both cases, invalid characters, a NUL, repeated and missing axes, 2 to 5 characters),
+        stuff_four_by_four (none, 4 x 4, other sizes, complex), MRIvoxelXformToRasXform,
+        MRIgetVoxelToVoxelXform and MRIsetVoxelToRasXform (matrices scaled, with NaNs, 3 x 4 and 4
+        x 4; FS_SetVoxToRasXform_Change_VoxSize unset, numbers, words, empty)."""
+        r = self.rng("vstat7")
+        L = []
+        for cmd, n in (("stats", 90), ("pstats", 40)):
+            for _ in range(n):
+                types = [*NUMERIC, 2, 2, 5, 6, 7, 9] if r.random() < 0.3 else NUMERIC
+                s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 3), hdr=0.03)
+                L.append(f"{cmd} {self.wvol(r, shape=s, special=0.08, ct=0.0)}")
+        L.append("type2s 15 " + " ".join(str(t) for t in range(-2, 13)))
+        for _ in range(40):
+            a = self.rvol(r, shape=self.vshape(r, types=NUMERIC, ext=(1, 6), frames=(1, 1)), ct=0.0)
+            box = [r.choice([-3, -1, 0, 1, 2, 5, 9, 2147483647, -2147483648]) for _ in range(3)]
+            box += [r.choice([-1, 0, 1, 3, 7, 100, 2147483647]) for _ in range(3)]
+            L.append(f"cropbb {a} {' '.join(map(str, box))}")
+        for _ in range(50):
+            sa = self.vshape(r, types=NUMERIC, ext=(1, 8), frames=(1, 1))
+            sb = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 1))
+            a = self.wvol(r, shape=sa, special=0.05, ct=0.0)
+            b = self.rvol(r, shape=sb, ct=0.0)
+            gd = "+gdiag=10000040 " if r.random() < 0.12 else ""
+            L.append(f"{gd}crass {a} {b}")
+        for _ in range(70):
+            L.append(f"chkostr {xs(self.ostring(r))}")
+        for _ in range(40):
+            a = self.rvol(r, shape=self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 1)), ct=0.0)
+            L.append(f"o2dc {a} {xs(self.ostring(r, valid=0.7))}")
+        for _ in range(30):
+            k = r.choice([0, 1, 1, 1, 2, 2, 3])
+            size = f" {r.choice([3, 4, 5, 1])} {r.choice([3, 4, 5, 1])}" if k == 2 else ""
+            vals = " ".join(self.fv(r, 0.1) for _ in range(16))
+            L.append(f"s44 {k}{size} {vals}")
+        for _ in range(40):
+            a = self.rvol(r, special=0.05, ct=0.0)
+            b = "null" if r.random() < 0.3 else self.rvol(r, special=0.05, ct=0.0)
+            mv = self.xmat(r)
+            mr = "null" if r.random() < 0.7 else self.affine(r)
+            L.append(f"vx2rx {a} {b} {mv} {mr}")
+        for _ in range(30):
+            L.append(
+                f"v2v {self.rvol(r, special=0.05, ct=0.0)} {self.rvol(r, special=0.05, ct=0.0)}"
+            )
+        envs = ["unset", "unset", "unset", xs("0.5"), xs("1e-9"), xs("abc"), xs(""), xs("10")]
+        for _ in range(50):
+            a = self.rvol(r, special=0.03, ct=0.0)
+            k = r.random()
+            if k < 0.45:
+                m = self.affine(r, special=0.05)
+            elif k < 0.7:
+                sc = [r.choice([1.0, 2.0, 0.5, 1.0005, 3.0]) for _ in range(3)]
+                v = [f32(0.0)] * 16
+                for i in range(3):
+                    v[5 * i] = f32(sc[i] * r.choice([1.0, -1.0]))
+                    v[4 * i + 3] = self.fv(r)
+                v[15] = f32(1.0)
+                m = "4 4 " + " ".join(v)
+            elif k < 0.85:
+                m = self.mat(r, 3, 4, special=0.1)
+            else:
+                m = self.mat(r, 4, 4, special=0.3)
+            L.append(f"setv2r {a} {m} {r.choice(envs)}")
+        return [Batch("vstat7", "vstat7", L)]
+
+    @staticmethod
+    def vrules8() -> list[Batch]:
+        """§33's fixed cases: statistics of one voxel, of a NaN first voxel, of 64-bit integers
+        (FS-329), of a volume without voxels and of types not read (FS-330, printed); orientation
+        strings of 0 to 5 characters (FS-463: fewer than two, lines of their own), every case and
+        letter, NUL and high bytes; the centre of a sampled volume with factors that do not divide."""
+        L = []
+        L.append(f"stats {fixed_w(1, 1, 1, 3, fill='t4')}")
+        L.append(f"stats {fixed_w(3, 1, 1, 3, fill='t18')}")
+        L.append(f"stats {fixed_w(2, 2, 1, 2, fill=9)}")
+        L.append(f"stats {fixed_w(2, 2, 1, 1, fill=9)}")
+        L.append(f"pstats {fixed_w(2, 2, 1, 2, fill=9)}")
+        L.append(f"pstats {fixed_w(2, 1, 1, 9, fill=9)}")
+        L.append(f"stats {fixed_w(2, 1, 1, 6, hdr=1)}")
+        for t in (
+            b"",
+            b"L",
+            b"LP",
+            b"LPS",
+            b"lps",
+            b"RAS",
+            b"LLS",
+            b"XYZ",
+            b"L\x00S",
+            b"LPSX",
+            b"\x80PS",
+            b"SPL",
+            b"IAR",
+            b"aaa",
+            b"LRA",
+            b"rAs",
+        ):
+            L.append(f"chkostr {xs(t)}")
+        for t in (b"LPS", b"RAS", b"lia", b"SRP", b"XPS"):
+            L.append(f"o2dc {fixed_w(2, 2, 2, 0)} {xs(t)}")
+        for sa, sb in (
+            ((8, 8, 8), (3, 3, 3)),
+            ((7, 5, 3), (2, 2, 2)),
+            ((4, 4, 4), (8, 8, 8)),
+            ((256, 1, 1), (3, 1, 1)),
+        ):
+            a = fixed_w(*sa, 0, fill=-1)
+            L.append(f"crass {a} {fixed_w(*sb, 0, fill=-1)}")
+        return [Batch("vrules8", "vrules8", L)]
 
 
 GROUPS = [
@@ -1733,6 +2088,12 @@ GROUPS = [
     "vderiv",
     "vlinear",
     "vresamp",
+    "vrules7",
+    "vbspline",
+    "vbsrules",
+    "vbsvol",
+    "vstat7",
+    "vrules8",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -1840,7 +2201,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen7) else Gen7(gen.seed)
+    gen = gen if isinstance(gen, Gen9) else Gen9(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()
@@ -1983,7 +2344,7 @@ def main() -> int:
                 t["defect corrected"] += 1
                 noted.update(ids)
                 continue
-            if b.both and b.both in ids:
+            if b.both and any(d in ids for d in b.both.split(",")):
                 t["defect corrected"] += 1
                 noted.update(ids)
                 continue

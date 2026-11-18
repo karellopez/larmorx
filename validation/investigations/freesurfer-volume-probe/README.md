@@ -1,4 +1,4 @@
-# FreeSurfer 8.2.0's volume functions, as a black box (parts 1 to 6c)
+# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 6c, fs.bspline)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
 [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 6c (§1 to §32:
@@ -8,7 +8,9 @@ the running average, the header comparison, determinant and dump; the samplers, 
 head's box and the transform reader; the CMA label tests and the segmentation functions; resolution,
 planes, fills, resampling by whole factors and changes of type; the frame-range samplers, the trilinear
 kernel and splatting, derivatives, gradients, neighbour counts, linear transforms; resampling onto a
-template and replacing a value). **Open to the clean-room
+template and replacing a value), and of
+[`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) (§9: the B-spline coefficients,
+their sampling, the transforms through them and the factor-of-two pyramids). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C
 library's) by name, the reading and printing of their arguments, results and the structures'
 fields, and a comparison loop; no FreeSurfer code, nothing written from its source. The implementer
@@ -19,7 +21,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §69: 20 groups of seeded cases and four of fixed cases (`vrules`, `vrules4`, `vrules5`, `vrules6`; 12,270 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 23 groups of seeded cases and seven of fixed cases (`vrules`, `vrules4` to `vrules8`, `vbsrules`; 13,347 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -147,6 +149,22 @@ The spec's sections in brackets.
 | `rsmat W W` | `MRIgetResampleMatrix` (the source, the template; the diagnostic bits through `+gdiag=`) | M |
 | `rsfill W W i f i` | `MRIresampleFill` (the source, the template, the type, the fill), or `MRIresample` when the last integer is 1 [§31] | the result |
 | `repval W D k ...` | k 1: `MRIreplaceValuesUchar` with two integers (as bytes); k 0: `MRIreplaceValues` with two floats | the result |
+| `stats W`, `pstats W` | `MRIstats` into outputs set to 7.0 (the count -7), resp. `MRIprintStats` to standard output [§33] | its value, then for `stats` min, max (floats), the count, mean, std (floats) |
+| `type2s n i×n` | `MRItype2str` of each integer | the strings |
+| `cropbb W i×6` | `MRIcropBoundingBox` of the box `x y z dx dy dz` | its value, the box's six integers |
+| `crass W W` | `MRIcalcCRASforSampledVolume` (the source, the sampled volume) into doubles set to 7.0 | the three doubles, then the source's geometry (printed: its cached matrices kept or made) |
+| `chkostr x`, `o2dc W x` | the string (its bytes, NUL included, in an allocation of its own length and a terminator), `MRIcheckOrientationString`, resp. `MRIorientationStringToDircos` of the volume | the returned text (a string) or `null`; resp. its value and the nine direction cosines (floats) |
+| `s44 k [i i] f×16` | `stuff_four_by_four` into k 0 no matrix, 1 a real 4 x 4, 2 a real one of the two sizes, 3 a complex 4 x 4 | its value, then the matrix (M; a complex one as its 32 floats of storage) |
+| `vx2rx W W\|null M M\|null`, `v2v W W` | `MRIvoxelXformToRasXform` (source, destination or none, the voxel matrix, the RAS matrix given or none), resp. `MRIgetVoxelToVoxelXform` (source, destination) | the matrix (`given` when it is the given one) |
+| `setv2r W M x\|unset` | `FS_SetVoxToRasXform_Change_VoxSize` set to the string or unset, then `MRIsetVoxelToRasXform` of the volume with the matrix | its value, then the volume's geometry (printed) |
+| `bsp k W i [W]` | `MRItoBSpline` of the volume with the degree, the B-spline k 0 none, 1 `MRIallocBSpline` of the volume's extent and frames, 2 one whose coefficients are the second volume, 3 one without coefficients [fs.bspline §3] | `given` or `new`, the degree, the source type, `srcneg`, the coefficients (the volume printed in full: header, index tables, frames, voxels) |
+| `bsamp i W d n (d d d i)×n` | with the volume's `outside_val` set to the double, `MRItoBSpline` with the degree, then n points `x y z frame` sampled by `MRIsampleBSpline` [§4.1] | per point its value and the sample (a double, unset 7.0) |
+| `bsraw i i W d n (d d d i)×n` | a B-spline from `MRIallocBSpline` of the volume's extent and frames with the degree and `srcneg` given (no `MRItoBSpline`), the source type the volume's, its coefficients the volume's floats (a float volume; else zeros), their `outside_val` the double; n points sampled as `bsamp` [§4.1, FS-964] | as `bsamp` |
+| `bsseq i W d n (d d d i i)×n` | as `bsamp`, each point `x y z first last` sampled by `MRIsampleSeqBSpline` into floats set to 7.0 (first at least 0) [§4.2] | per point its value, then the floats of frames first to last |
+| `bslxf i W D M`, `bsras i W D M` | `MRItoBSpline` with the degree, then `MRIlinearTransformBSpline` (voxel to voxel), resp. `MRIapplyRASlinearTransformBSpline` (RAS to RAS), into the destination with the matrix or `null` [§5.1, §5.2] | the result |
+| `bslta i W D LTA i` | `USE_AVERAGE305` unset (0), set to `true` (1) or set empty (2), `MRItoBSpline` with the degree, then `LTAtransformBSpline` into the destination with the array [§5.3] | the result |
+| `bsdown W D`, `bsup W D` | `MRIdownsample2BSpline`, resp. `MRIupsample2BSpline` [§6.3, §6.4] | the result |
+| `bsfree k` | `MRIfreeBSpline` of k 0 none, 1 a B-spline without coefficients, 2 one of 1 x 1 x 1 [§2] | its value, then `none` or `kept` |
 
 ## The models
 
@@ -176,10 +194,12 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
 The candidate, the guard runs, the memory lines and what may differ are as in the fs.mri probe's
 loop (its README, "The comparison loop"), without its `FS-264` batches: a difference is allowed on a
 line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`) and the candidate did, on a **memory**
-line, in `--mode fix` on a line where the candidate noted a defect, and in both modes on a `vsample`
-line where the candidate noted FS-300 (the cubic frame sampler's window points outside the volume,
-which FreeSurfer never reads: the probe's four runs agree on them only because the probe's own
-earlier work leaves the same bytes on the stack, so they count as memory), and in both modes on the
+line, in `--mode fix` on a line where the candidate noted a defect, and in both modes on a line where
+the candidate noted a defect whose value in FreeSurfer is memory on the stack it never wrote, on which
+the probe's four runs agree only because the program's own earlier steps leave the same bytes there:
+FS-300 in `vsample` and `vresamp` (the cubic frame sampler's window points outside the volume), FS-322 in
+`vderiv` (a gradient's sample never written) and FS-325 in `vlinear` (a linear transform's samples before
+the first that succeeds), and in both modes on the
 `bvr` line without a cache that FreeSurfer ends at its licence check (`EXIT 255`, `FREESURFER_HOME is
 not defined`: LARMORX performs no licence check). Under `reproduce` a line where FreeSurfer aborted
 with the C++ runtime's lines (`CRASH 6`, standard error starting `terminate called after throwing`:
@@ -233,8 +253,25 @@ trilinear kernel), `vderiv` (§28: the derivatives with sigmas 0, tiny, negative
 two on lines of their own; the gradients; the eight neighbour counts up to three voxels outside) and
 `vlinear` (§29: `MRIsetValues`, `MRIrasXformToVoxelXform`, the six linear transform functions with
 methods 0 to 4 and 7, `MRIgetResampleMatrix`), and part 6c's `vresamp` (§31: resampling onto templates
-on the source's grid scaled and moved, or random ones, types 0 to 4, 6, 7, the vote with counts past
-255; `MRIreplaceValues` and `MRIreplaceValuesUchar`): volumes of up to 4 x 4 x 4 voxels (5 for
+on the source's grid scaled and moved, or random ones, types 0 to 4, 6, 7, the vote of 8 x 8 x 8 sources;
+`MRIreplaceValues` and `MRIreplaceValuesUchar`), the fixed cases of `vrules7` (relay 11, §15 and §31:
+`MRIindexNotInVolume` at rows whose rounding as a double and as a float differ; the vote of 513 x 3 x 1 and
+511 x 3 x 1 byte sources of 100 to 130 frames onto one 512 mm voxel, 202 to 262 votes a label: FS-326),
+`vstat7` (§33: the statistics and their print of every type, headers only, special floats; the type
+names; box crops with starts and extents up to the `int` range; the centre of a sampled volume with the
+diagnostic bits; orientation strings of 2 to 5 characters, valid ones in both cases and invalid
+characters, NUL and 0x80; the 4 x 4 filler into none, 4 x 4, other sizes, complex; the voxel-to-RAS
+and voxel-to-voxel matrices; `MRIsetVoxelToRasXform` with scaled, odd and NaN matrices and the variable
+unset, a number, a word, empty), the fixed cases of `vrules8` (§33: statistics of one voxel, a NaN first
+voxel, 64-bit integers, types not read, no voxels; orientation strings of 0 to 4 characters, every case,
+NUL and 0x80; centres with factors that do not divide and of 0), `vbsvol` (§29, §31: the linear transforms with method 5 and `MRIresampleFill` with type 5, the cubic
+B-spline), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
+at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
+sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
+new, fitting, other and source destinations) and `vbsrules` (lines of 80 and 20 samples for every degree,
+degree 6 on 5 samples, NaN payloads, -0 only, a step of bytes, one-voxel axes, FS-962, FS-963, FS-964's
+degrees 10 and 11, `MRIfreeBSpline`'s three cases, destinations of another extent): volumes of up to 4 x 4 x 4 voxels (5 for
 `vextract` and `vres`, 6 for `vcoords`) and 0 to 3 frames of every type (the types without a voxel size
 header-only), headers only too, destinations new, of the same shape, of another shape or a source,
 cached matrices as allocated, recomputed or dropped.
@@ -292,3 +329,16 @@ cached matrices as allocated, recomputed or dropped.
   `fs-volume-probe-r10-vresamp-2026-11-18.log`). Points that read memory the program does not
   own (frames past the volume's, `MRIneighborsOff` at a row or slice outside) and FS-324's two sigmas
   are on lines of their own: a crash or a time-out hides every point of its line.
+- Relay 11 (2026-11-18): the fixed group `vrules7` (12 calls; the prebuilt probe from 20578b55) the same
+  cold, warm and twice without the cache (log `oracles/logs/fs-volume-probe-r11-vrules7-2026-11-18.log`);
+  then the prebuilt probe rebuilt from commit `d4b27c43` (fs.bspline's commands) and from `5d35ae1f` (part
+  7a's commands; each build in `BUILD_INFO.txt`, the same bytes twice; the 20578b55 and d4b27c43 builds
+  kept in `<workspace>/archive/2026-11-18-fs-volume-probe-20578b55/` and `-d4b27c43/`): every earlier
+  group's hash unchanged; the new groups `vbspline` (410 calls), `vbsrules` (71), `vbsvol` (70), `vstat7`
+  (481) and `vrules8` (32) the same cold, warm and twice without the cache; the probe as its own
+  candidate: no unexplained difference in either mode; `models.py fs291` 127, `skull` 160, `cma` 95 lines
+  as their models (logs `oracles/logs/fs-volume-probe-r11-final-2026-11-18.log`,
+  `fs-volume-probe-r11-final2-2026-11-18.log`). The loop's both-modes allowance now names FS-300 in
+  `vsample` and `vresamp`, FS-322 in `vderiv` and FS-325 in `vlinear`. A negative B-spline degree on a
+  volume of one voxel (FS-964) is left out: its indices are stack contents whose detection changed in one
+  of four reference runs.

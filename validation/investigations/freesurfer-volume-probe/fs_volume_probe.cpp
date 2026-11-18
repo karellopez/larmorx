@@ -6,7 +6,8 @@
 // CMA label tests and segmentation functions; part 6a: resolution, planes, fills, resampling by whole
 // factors, changes of type; part 6b: frame-range samplers, the trilinear kernel and splatting,
 // derivatives, gradients, neighbour counts, linear transforms; part 6c: resampling onto a template,
-// replacing a value), linked against the unit oracle's libutils.a (GCC 8.4.0,
+// replacing a value; part 7a: statistics, orientation strings, voxel-to-RAS matrices; fs.bspline: the B-spline coefficients, their sampling, transforms and
+// factor-of-two pyramids, specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
 // and the reading and printing of their arguments, results and the structures' fields: no FreeSurfer
 // code. The commands and encodings are in README.md beside this file (the volume, geometry and header
@@ -21,6 +22,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cinttypes>
 #include <cmath>
@@ -33,6 +35,7 @@
 #include <vector>
 
 #include "cma.h"
+#include "mriBSpline.h"
 #include "colortab.h"
 #include "diag.h"
 #include "error.h"
@@ -1488,6 +1491,210 @@ static void call(const std::string &c)
       r = MRIreplaceValues(a, d, from, to);
     }
     putres(r, a, NULL, d);
+  }
+  // ---- part 7a (specs/freesurfer-volume.md §33) ----
+  else if (c == "stats" || c == "pstats") {
+    MRI *a = getw();
+    if (c == "pstats") {
+      puti(MRIprintStats(a, stdout));
+      fflush(stdout);
+    }
+    else {
+      float mn = UNSET, mx = UNSET, mean = UNSET, sd = UNSET;
+      int n = -7;
+      puti(MRIstats(a, &mn, &mx, &n, &mean, &sd));
+      putf(mn);
+      putf(mx);
+      puti(n);
+      putf(mean);
+      putf(sd);
+    }
+  }
+  else if (c == "type2s") {
+    int n = geti();
+    for (int i = 0; i < n; i++) puts_(MRItype2str(geti()));
+  }
+  else if (c == "cropbb") {
+    MRI *a = getw();
+    MRI_REGION box;
+    getreg(&box);
+    puti(MRIcropBoundingBox(a, &box));
+    for (int v : {box.x, box.y, box.z, box.dx, box.dy, box.dz}) puti(v);
+  }
+  else if (c == "crass") {
+    MRI *a = getw(), *b = getw();
+    double r = UNSETD, aa = UNSETD, ss = UNSETD;
+    MRIcalcCRASforSampledVolume(a, b, &r, &aa, &ss);
+    fflush(stderr);
+    putd(r);
+    putd(aa);
+    putd(ss);
+    putg(a, false);
+  }
+  else if (c == "chkostr" || c == "o2dc") {
+    MRI *a = c == "o2dc" ? getw() : NULL;
+    std::string t = getx();
+    // the string in an allocation of its own length and terminator, so that a read past it is a read
+    // past the allocation (the guard runs)
+    char *str = (char *)malloc(t.size() + 1);
+    memcpy(str, t.data(), t.size());
+    str[t.size()] = 0;
+    if (c == "chkostr") {
+      char *e = MRIcheckOrientationString(str);
+      puts_(e);
+    }
+    else {
+      puti(MRIorientationStringToDircos(a, str));
+      fflush(stdout);
+      for (float f : {a->x_r, a->x_a, a->x_s, a->y_r, a->y_a, a->y_s, a->z_r, a->z_a, a->z_s}) putf(f);
+    }
+  }
+  else if (c == "s44") {
+    int k = geti();
+    MATRIX *m = NULL;
+    if (k == 1) m = MatrixAlloc(4, 4, MATRIX_REAL);
+    else if (k == 2) {
+      int rows = geti(), cols = geti();
+      m = MatrixAlloc(rows, cols, MATRIX_REAL);
+    }
+    else if (k == 3)
+      m = MatrixAlloc(4, 4, MATRIX_COMPLEX);
+    float v[16];
+    for (float &f : v) f = getf();
+    puti(stuff_four_by_four(m, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12],
+                            v[13], v[14], v[15]));
+    if (m && m->type == MATRIX_COMPLEX)
+      for (int i = 0; i < 32; i++) putf(m->data[i]);
+    else
+      putm(m);
+  }
+  else if (c == "vx2rx") {
+    MRI *a = getw();
+    MRI *b = take("null") ? NULL : getw();
+    MATRIX *mv = getm(), *mr = getm();
+    MATRIX *r = MRIvoxelXformToRasXform(a, b, mv, mr);
+    putm_res(r, mr);
+  }
+  else if (c == "v2v") {
+    MRI *a = getw(), *b = getw();
+    putm(MRIgetVoxelToVoxelXform(a, b));
+  }
+  else if (c == "setv2r") {
+    MRI *a = getw();
+    MATRIX *m = getm();
+    if (take("unset")) unsetenv("FS_SetVoxToRasXform_Change_VoxSize");
+    else setenv("FS_SetVoxToRasXform_Change_VoxSize", getx().c_str(), 1);
+    puti(MRIsetVoxelToRasXform(a, m));
+    fflush(stdout);
+    putg(a, false);
+  }
+  // ---- fs.bspline (specs/freesurfer-bspline.md) ----
+  else if (c == "bsp") {
+    int k = geti();
+    MRI *a = getw();
+    int deg = geti();
+    MRI_BSPLINE *b = NULL;
+    if (k == 1) b = MRIallocBSpline(a->width, a->height, a->depth, a->nframes);
+    else if (k == 2) {
+      b = MRIallocBSpline(1, 1, 1, 1);
+      MRIfree(&b->coeff);
+      b->coeff = getw();
+    }
+    else if (k == 3) {
+      b = MRIallocBSpline(1, 1, 1, 1);
+      MRIfree(&b->coeff);
+    }
+    else if (k != 0)
+      bad("unknown B-spline kind");
+    MRI_BSPLINE *r = MRItoBSpline(a, b, deg);
+    fflush(stdout);
+    out(r == b && b ? "given" : "new");
+    puti(r->degree);
+    puti(r->srctype);
+    puti(r->srcneg);
+    put_volume(r->coeff);
+  }
+  else if (c == "bsamp" || c == "bsraw") {
+    MRI_BSPLINE *b;
+    if (c == "bsamp") {
+      int deg = geti();
+      MRI *a = getw();
+      a->outside_val = getd();
+      b = MRItoBSpline(a, NULL, deg);
+    }
+    else {
+      int deg = geti(), neg = geti();
+      MRI *a = getw();
+      b = MRIallocBSpline(a->width, a->height, a->depth, a->nframes);
+      b->degree = deg;
+      b->srctype = a->type;
+      b->srcneg = neg;
+      if (has_voxels(a) && a->type == MRI_FLOAT) memcpy(b->coeff->chunk, a->chunk, a->bytes_total);
+      b->coeff->outside_val = getd();
+    }
+    fflush(stdout);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int f = geti();
+      double v = UNSETD;
+      puti(MRIsampleBSpline(b, x, y, z, f, &v));
+      putd(v);
+    }
+  }
+  else if (c == "bsseq") {
+    int deg = geti();
+    MRI *a = getw();
+    a->outside_val = getd();
+    MRI_BSPLINE *b = MRItoBSpline(a, NULL, deg);
+    fflush(stdout);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int first = geti(), last = geti();
+      if (first < 0) bad("a first frame below 0 writes before the array");
+      std::vector<float> vals((size_t)(std::max(first, last) + 1 > 0 ? std::max(first, last) + 1 : 1), UNSET);
+      puti(MRIsampleSeqBSpline(b, x, y, z, vals.data(), first, last));
+      for (int f = first; f <= last; f++) putf(vals[(size_t)f]);
+    }
+  }
+  else if (c == "bslxf" || c == "bsras" || c == "bslta") {
+    int deg = geti();
+    MRI *a = getw();
+    MRI *d = getdst(a);
+    MRI *r;
+    if (c == "bslta") {
+      LTA *lta = getlta();
+      int avg = geti();
+      if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+      else unsetenv("USE_AVERAGE305");
+      MRI_BSPLINE *b = MRItoBSpline(a, NULL, deg);
+      fflush(stdout);
+      r = LTAtransformBSpline(b, d, lta);
+    }
+    else {
+      MATRIX *m = getm();
+      MRI_BSPLINE *b = MRItoBSpline(a, NULL, deg);
+      fflush(stdout);
+      r = c == "bslxf" ? MRIlinearTransformBSpline(b, d, m) : MRIapplyRASlinearTransformBSpline(b, d, m);
+    }
+    fflush(stdout);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "bsdown" || c == "bsup") {
+    MRI *a = getw(), *d = getdst(a);
+    MRI *r = c == "bsdown" ? MRIdownsample2BSpline(a, d) : MRIupsample2BSpline(a, d);
+    fflush(stdout);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "bsfree") {
+    int k = geti();
+    MRI_BSPLINE *b = NULL;
+    if (k >= 1) b = MRIallocBSpline(1, 1, 1, 1);
+    if (k == 1) MRIfree(&b->coeff);
+    int r = MRIfreeBSpline(&b);
+    puti(r);
+    out(b ? "kept" : "none");
   }
   else
     bad("unknown command");

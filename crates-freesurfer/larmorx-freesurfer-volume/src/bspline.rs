@@ -233,12 +233,13 @@ fn set(
     f: i32,
     v: f32,
 ) -> Result<(), Fatal> {
-    if m.mtype == MRI_FLOAT {
-        if let Some(i) = flat.and_then(|fl| fl.index(c, r, s, f)) {
-            let b = m.chunk.as_mut().expect("voxels");
-            b[4 * i..4 * i + 4].copy_from_slice(&v.to_le_bytes());
-            return Ok(());
-        }
+    if let Some(i) = flat
+        .filter(|_| m.mtype == MRI_FLOAT)
+        .and_then(|fl| fl.index(c, r, s, f))
+    {
+        let b = m.chunk.as_mut().expect("voxels");
+        b[4 * i..4 * i + 4].copy_from_slice(&v.to_le_bytes());
+        return Ok(());
     }
     mri_set_vox_val(g, err, m, c, r, s, f, v, 0)?;
     Ok(())
@@ -345,7 +346,9 @@ fn set_line(
 // EPFL's recursive filter
 
 /// `initPoles(Pole, degree)`: the poles of the B-spline of `degree` (2 to 9); another degree ends
-/// the program (`Invalid spline degree` on standard output, status 1).
+/// the program (`Invalid spline degree` on standard output, status 1). The decimal poles are
+/// FreeSurfer's (and EPFL's) 50-digit literals, read to the nearest `double` as C reads them.
+#[allow(clippy::excessive_precision)]
 fn init_poles(out: &mut dyn Write, degree: i32) -> Result<Vec<f64>, Fatal> {
     Ok(match degree {
         2 => vec![8.0f64.sqrt() - 3.0],
@@ -421,7 +424,8 @@ fn initial_causal(libm: &Libm, c: &[f64], z: f64) -> f64 {
         let iz = 1.0 / z;
         let mut z2n = libm.pow(z, (n - 1) as f64);
         let mut sum = add64(mul64(c[n - 1], z2n), c[0]);
-        z2n *= iz * z2n;
+        // `z2n *= z2n * iz` (the official build multiplies `iz * z2n`: the same value)
+        z2n = z2n * (iz * z2n);
         for &ck in &c[1..n - 1] {
             sum = add64(sum, mul64(zn + z2n, ck));
             zn *= z;
@@ -461,7 +465,8 @@ fn convert_to_interpolation_coefficients(libm: &Libm, c: &mut [f64], poles: &[f6
 /// `BsplineWeights(degree, &x, index, weights)`: the `degree + 1` weights of the samples at
 /// `index[0..=degree]` for the point `x` (degrees 2 to 9; another ends the program, `Invalid
 /// spline degree`). The weights are finite for the points that reach them, so plain arithmetic in
-/// the source's order gives the official bits.
+/// the source's order gives the official bits (`x *= x * y` as C writes it: `x * (x * y)`).
+#[allow(clippy::misrefactored_assign_op)]
 fn bspline_weights(
     out: &mut dyn Write,
     degree: i32,

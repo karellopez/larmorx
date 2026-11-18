@@ -945,7 +945,13 @@ an `int` label by truncation toward zero. A NaN or a value outside the `int` ran
   A file that cannot be made ends the program (`error: could not open file <name> for writing`,
   status 1). Reading (`ReadCachedBrainVolumeStats(subject, subjdir)`): a file that cannot be opened:
   `computing (and caching) brain volume statistics` on standard output, the statistics computed
-  (`ComputeBrainVolumeStats`, the caller's) and written. Else every measure starts at -1; each line
+  (`ComputeBrainVolumeStats`, the caller's, outside this spec: it reads the subject's segmentation
+  and surfaces) and written. (**(observed)**: the probe's one such case, a subject without files and
+  no `FREESURFER_HOME`, prints that line and `[INFO] read, cannot find ./subj/surf/lh.white, trying
+  ./subj/surf/lh.white.gii ...` on standard output (`specs/freesurfer-surfio.md` §60) and stops at
+  FreeSurfer's licence check, its framed `ERROR: FreeSurfer environment FREESURFER_HOME is not
+  defined.` on standard error and status 255; LARMORX performs no licence check
+  (`specs/freesurfer-core.md` §19), so §24's loop lets that line differ.) Else every measure starts at -1; each line
   (up to its `\n`) that holds a measure's `<names>` text (anywhere; a line may hold several) gives
   each of them the first of the line's white-space-separated words that, without its last character,
   reads as a C++ stream reads a `double`: an optional sign, digits with at most one point, an
@@ -971,9 +977,11 @@ an `int` label by truncation toward zero. A NaN or a value outside the `int` ran
 `bvc` and `bvr`; §69.2 says what it covers and gives its hash): identical with `reproduce` but where
 FreeSurfer reads memory it does not own or crashes (FS-314, FS-315, and the volumes' FS-53, FS-58,
 FS-252), lines the loop allows; the default differs only where it notes a defect. The open folder's
-`models.py cma` checks the tables above on every `cmalab` line. Not in the probe: the statistics
-computed when the cache is missing (`ComputeBrainVolumeStats` reads a subject's files: the replays of
-`mri_segstats` and `mris_anatomical_stats` on the recorded heads).
+`models.py cma` checks the tables above on every `cmalab` line, and the loop checks FS-314's abort
+under `reproduce` (§69.3). Not in the probe: the statistics computed when the cache is missing
+(`ComputeBrainVolumeStats` reads a subject's files: the replays of `mri_segstats` and
+`mris_anatomical_stats` on the recorded heads); the probe's one line without a cache ends in
+FreeSurfer's licence check (§23), a line the loop lets differ in both modes.
 
 ## 25. Resolution, planes, fills, resampling by whole factors and changes of type (3.1-36)
 Where two NaNs meet in an operation below, the result keeps the first operand's NaN as written here

@@ -49,8 +49,8 @@ use larmorx_freesurfer_mri::tkreg::{tkreg_mtx, xfm_crs2xyz_tkreg};
 use larmorx_freesurfer_mri::vol_geom::{VolGeom, xfm_crs2xyz};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
-use crate::bspline::{MriBspline, mri_sample_bspline, mri_to_bspline};
 use crate::arith::{mri_clear, mri_extract_region};
+use crate::bspline::{MriBspline, mri_sample_bspline, mri_to_bspline};
 use crate::coords::index_not_in_volume;
 use crate::labels::int_of;
 use crate::ltaops::{lta_change_type, lta_fill_inverse, lta_mri_is_source, lta_mri_is_target};

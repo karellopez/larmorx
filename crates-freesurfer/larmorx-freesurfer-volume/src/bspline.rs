@@ -69,7 +69,8 @@ use larmorx_freesurfer_mri::lta::{
     LINEAR_PHYSVOX_TO_PHYSVOX, LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, Lta,
 };
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc_sequence, mri_copy_header, mri_free, use_vol_geom_to_mri,
+    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    mri_alloc_sequence, mri_copy_header, mri_free, use_vol_geom_to_mri,
 };
 use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, extract_r_to_i, reinit_cache};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -107,64 +108,127 @@ fn wide(v: f32) -> f64 {
     }
 }
 
-/// The byte offset of voxel `(c, r, s, f)` of a `float` volume whose voxels are there and laid
-/// out as allocated, when it lies in the extent (`MRIgetVoxVal` and `MRIsetVoxVal` read and write
-/// exactly that `float` there); `None` sends the access through those functions.
-#[inline(always)]
-fn float_at(m: &Mri, c: i32, r: i32, s: i32, f: i32) -> Option<usize> {
-    if m.mtype != MRI_FLOAT
-        || !(0..m.vg.width).contains(&c)
-        || !(0..m.vg.height).contains(&r)
-        || !(0..m.vg.depth).contains(&s)
-        || !(0..m.nframes).contains(&f)
-        || m.shape.width != i64::from(m.vg.width)
-        || m.shape.height != i64::from(m.vg.height)
-        || m.shape.depth != i64::from(m.vg.depth)
-        || m.shape.nframes != i64::from(m.nframes)
-    {
-        return None;
-    }
-    let chunk = m.chunk.as_ref()?;
-    let idx = c as u64 + r as u64 * m.vox_per_row + s as u64 * m.vox_per_slice + f as u64 * m.vox_per_vol;
-    let o = (idx * 4) as usize;
-    (o + 4 <= chunk.len() && (o as u64 + 4) <= m.bytes_total).then_some(o)
+/// A volume whose voxels are there and laid out as allocated (its header's extent the
+/// allocation's), of a type `MRIgetVoxVal` reads as a number: its voxel `(c, r, s, f)` in the
+/// extent is element `c + r vpr + s vps + f vpv`, which `MRIgetVoxVal` converts to `float` (and
+/// `MRIsetVoxVal` stores exactly, for `float`); other accesses go through those functions.
+#[derive(Clone, Copy)]
+struct Flat {
+    vpr: usize,
+    vps: usize,
+    vpv: usize,
+    ext: [i32; 4],
 }
 
-/// `MRIgetVoxVal(m, c, r, s, f)` widened to `double` (a direct read for a `float` voxel in the
-/// extent).
+impl Flat {
+    fn of(m: &Mri) -> Option<Flat> {
+        let size = match m.mtype {
+            MRI_UCHAR => 1,
+            MRI_SHORT | MRI_USHRT => 2,
+            MRI_INT | MRI_RGB | MRI_FLOAT => 4,
+            MRI_LONG => 8,
+            _ => return None,
+        };
+        let v = &m.vg;
+        let chunk = m.chunk.as_ref()?;
+        let same = m.shape.width == i64::from(v.width)
+            && m.shape.height == i64::from(v.height)
+            && m.shape.depth == i64::from(v.depth)
+            && m.shape.nframes == i64::from(m.nframes)
+            && [v.width, v.height, v.depth, m.nframes]
+                .iter()
+                .all(|&e| e > 0);
+        if !same {
+            return None;
+        }
+        let total = (v.width as u64)
+            .checked_mul(v.height as u64)?
+            .checked_mul(v.depth as u64)?
+            .checked_mul(m.nframes as u64)?
+            .checked_mul(size as u64)?;
+        if m.vox_per_row != v.width as u64
+            || m.vox_per_slice != m.vox_per_row * v.height as u64
+            || m.vox_per_vol != m.vox_per_slice * v.depth as u64
+            || total > m.bytes_total
+            || total > chunk.len() as u64
+        {
+            return None;
+        }
+        Some(Flat {
+            vpr: m.vox_per_row as usize,
+            vps: m.vox_per_slice as usize,
+            vpv: m.vox_per_vol as usize,
+            ext: [v.width, v.height, v.depth, m.nframes],
+        })
+    }
+
+    /// The element of `(c, r, s, f)` when it lies in the extent.
+    #[inline(always)]
+    fn index(&self, c: i32, r: i32, s: i32, f: i32) -> Option<usize> {
+        let e = &self.ext;
+        if (c as u32) < e[0] as u32
+            && (r as u32) < e[1] as u32
+            && (s as u32) < e[2] as u32
+            && (f as u32) < e[3] as u32
+        {
+            Some(c as usize + r as usize * self.vpr + s as usize * self.vps + f as usize * self.vpv)
+        } else {
+            None
+        }
+    }
+}
+
+/// Element `i` of a flat volume as `MRIgetVoxVal` converts it to `float`.
+#[inline(always)]
+fn flat_value(m: &Mri, i: usize) -> f32 {
+    let b = m.chunk.as_deref().expect("voxels");
+    match m.mtype {
+        MRI_UCHAR => f32::from(b[i]),
+        MRI_SHORT => f32::from(i16::from_le_bytes([b[2 * i], b[2 * i + 1]])),
+        MRI_USHRT => f32::from(u16::from_le_bytes([b[2 * i], b[2 * i + 1]])),
+        MRI_INT | MRI_RGB => i32::from_le_bytes(b[4 * i..4 * i + 4].try_into().expect("4")) as f32,
+        MRI_LONG => i64::from_le_bytes(b[8 * i..8 * i + 8].try_into().expect("8")) as f32,
+        _ => f32::from_le_bytes(b[4 * i..4 * i + 4].try_into().expect("4")),
+    }
+}
+
+/// `MRIgetVoxVal(m, c, r, s, f)` widened to `double`.
 #[allow(clippy::too_many_arguments)]
 fn get(
     g: &mut Globals,
     err: &mut dyn Write,
     m: &Mri,
+    flat: Option<Flat>,
     c: i32,
     r: i32,
     s: i32,
     f: i32,
 ) -> Result<f64, Fatal> {
-    if let Some(o) = float_at(m, c, r, s, f) {
-        let b = m.chunk.as_ref().expect("voxels");
-        return Ok(wide(f32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]])));
+    if let Some(i) = flat.and_then(|fl| fl.index(c, r, s, f)) {
+        return Ok(wide(flat_value(m, i)));
     }
     Ok(wide(mri_get_vox_val(g, err, m, c, r, s, f, 0)?))
 }
 
-/// `MRIsetVoxVal(m, c, r, s, f, v)` (a direct write for a `float` voxel in the extent).
+/// `MRIsetVoxVal(m, c, r, s, f, v)` (a direct store for a flat `float` volume).
 #[allow(clippy::too_many_arguments)]
 fn set(
     g: &mut Globals,
     err: &mut dyn Write,
     m: &mut Mri,
+    flat: Option<Flat>,
     c: i32,
     r: i32,
     s: i32,
     f: i32,
     v: f32,
 ) -> Result<(), Fatal> {
-    if let Some(o) = float_at(m, c, r, s, f) {
-        let b = m.chunk.as_mut().expect("voxels");
-        b[o..o + 4].copy_from_slice(&v.to_le_bytes());
-        return Ok(());
+    if m.mtype == MRI_FLOAT {
+        if let Some(i) = flat.and_then(|fl| fl.index(c, r, s, f)) {
+            let b = m.chunk.as_mut().expect("voxels");
+            b[4 * i..4 * i + 4].copy_from_slice(&v.to_le_bytes());
+            return Ok(());
+        }
     }
     mri_set_vox_val(g, err, m, c, r, s, f, v, 0)?;
     Ok(())
@@ -203,9 +267,10 @@ fn get_line(
     n: i32,
     line: &mut [f64],
 ) -> Result<(), Fatal> {
+    let flat = Flat::of(m);
     for k in 0..n.max(0) {
         let (x, y, z) = place(axis, a, b, k);
-        line[k as usize] = get(g, err, m, x, y, z, f)?;
+        line[k as usize] = get(g, err, m, flat, x, y, z, f)?;
     }
     Ok(())
 }
@@ -246,6 +311,7 @@ fn set_line(
             return Err(Fatal::Exit(1));
         }
     }
+    let flat = Flat::of(m);
     for k in 0..extent(m, axis) {
         let v = line[k as usize];
         let (x, y, z) = place(axis, a, b, k);
@@ -260,7 +326,7 @@ fn set_line(
         } else {
             v as f32
         };
-        set(g, err, m, x, y, z, f, fv)?;
+        set(g, err, m, flat, x, y, z, f, fv)?;
     }
     Ok(())
 }
@@ -447,7 +513,8 @@ fn bspline_weights(
             wt[0] *= wt[0] / 720.0;
             wt[1] = (361.0 / 192.0
                 - w * (59.0 / 8.0
-                    + w * (-185.0 / 16.0 + w * (25.0 / 3.0 + w * (-5.0 / 2.0 + w) * (1.0 / 2.0 + w)))))
+                    + w * (-185.0 / 16.0
+                        + w * (25.0 / 3.0 + w * (-5.0 / 2.0 + w) * (1.0 / 2.0 + w)))))
                 / 120.0;
             wt[2] = (10543.0 / 960.0
                 + w * (-289.0 / 16.0
@@ -476,8 +543,7 @@ fn bspline_weights(
                 / 720.0;
             wt[2] = (397.0 / 7.0
                 - w * (245.0 / 3.0
-                    + w * (-15.0
-                        + w * (-95.0 / 3.0 + w * (15.0 + w * (5.0 + w * (-5.0 + w)))))))
+                    + w * (-15.0 + w * (-95.0 / 3.0 + w * (15.0 + w * (5.0 + w * (-5.0 + w)))))))
                 / 240.0;
             wt[3] = (2416.0 / 35.0 + w2 * (-48.0 + w2 * (16.0 + w2 * (-4.0 + w)))) / 144.0;
             wt[4] = (1191.0 / 35.0
@@ -505,13 +571,15 @@ fn bspline_weights(
                 + w * (-4177.0 / 32.0
                     + w * (2275.0 / 16.0
                         + w * (-487.0 / 8.0
-                            + w * (-85.0 / 8.0 + w * (41.0 / 2.0 + w * (-5.0 + w * (-2.0 + w))))))))
+                            + w * (-85.0 / 8.0
+                                + w * (41.0 / 2.0 + w * (-5.0 + w * (-2.0 + w))))))))
                 / 1440.0;
             wt[3] = (310661.0 / 1792.0
                 - w * (14219.0 / 64.0
                     + w * (-199.0 / 8.0
                         + w * (-1327.0 / 16.0
-                            + w * (245.0 / 8.0 + w * (53.0 / 4.0 + w * (-8.0 + w * (-1.0 + w))))))))
+                            + w * (245.0 / 8.0
+                                + w * (53.0 / 4.0 + w * (-8.0 + w * (-1.0 + w))))))))
                 / 720.0;
             wt[4] = (2337507.0 / 8960.0
                 + w2 * (-2601.0 / 16.0 + w2 * (387.0 / 8.0 + w2 * (-9.0 + w2))))
@@ -520,7 +588,8 @@ fn bspline_weights(
                 - w * (-14219.0 / 64.0
                     + w * (-199.0 / 8.0
                         + w * (1327.0 / 16.0
-                            + w * (245.0 / 8.0 + w * (-53.0 / 4.0 + w * (-8.0 + w * (1.0 + w))))))))
+                            + w * (245.0 / 8.0
+                                + w * (-53.0 / 4.0 + w * (-8.0 + w * (1.0 + w))))))))
                 / 720.0;
             wt[7] = (39.0 / 16.0 - w * (-6.0 + w * (-9.0 / 2.0 + w2)))
                 * (21.0 / 16.0 + w * (15.0 / 4.0 + w * (9.0 / 2.0 + w * (3.0 + w))))
@@ -550,7 +619,8 @@ fn bspline_weights(
                     + w * (-952.0
                         + w * (938.0 / 3.0
                             + w * (112.0
-                                + w * (-119.0 + w * (56.0 / 3.0 + w * (14.0 + w * (-7.0 + w)))))))))
+                                + w * (-119.0
+                                    + w * (56.0 / 3.0 + w * (14.0 + w * (-7.0 + w)))))))))
                 / 10080.0;
             wt[3] = (44117.0 / 42.0
                 + w * (-2427.0 / 2.0
@@ -585,16 +655,7 @@ fn bspline_weights(
                 / 10080.0;
             wt[9] = w2 * w2;
             wt[9] *= wt[9] * w / 362880.0;
-            wt[8] = 1.0
-                - wt[0]
-                - wt[1]
-                - wt[2]
-                - wt[3]
-                - wt[4]
-                - wt[5]
-                - wt[6]
-                - wt[7]
-                - wt[9];
+            wt[8] = 1.0 - wt[0] - wt[1] - wt[2] - wt[3] - wt[4] - wt[5] - wt[6] - wt[7] - wt[9];
         }
         _ => {
             let _ = writeln!(out, "Invalid spline degree");
@@ -654,7 +715,16 @@ fn new_coeff(
     src: &Mri,
 ) -> Result<Mri, Fatal> {
     let v = &src.vg;
-    let mut c = mri_alloc_sequence(g, out, err, v.width, v.height, v.depth, MRI_FLOAT, src.nframes)?;
+    let mut c = mri_alloc_sequence(
+        g,
+        out,
+        err,
+        v.width,
+        v.height,
+        v.depth,
+        MRI_FLOAT,
+        src.nframes,
+    )?;
     mri_copy_header(g, out, err, src, Some(&mut c))?;
     c.outside_val = src.outside_val;
     Ok(c)
@@ -701,7 +771,10 @@ pub fn mri_to_bspline(
     b.srcneg = false;
     let mut coeff = b.coeff.take().expect("coefficients");
     if coeff.mtype != MRI_FLOAT {
-        let _ = writeln!(out, "ERROR MRItoBSpline: BSpline Coeff MRI needs to be float!");
+        let _ = writeln!(
+            out,
+            "ERROR MRItoBSpline: BSpline Coeff MRI needs to be float!"
+        );
         return Err(Fatal::Exit(1));
     }
     if coeff.vg.width != w || coeff.vg.depth != d || coeff.vg.height != h || coeff.nframes != nf {
@@ -838,10 +911,8 @@ fn window(
             return Err(Fatal::Exit(1));
         }
         if !(0..=1).contains(&degree) {
-            g.notices.add(
-                &FS_964,
-                format!("{what} on a B-spline of degree {degree}"),
-            );
+            g.notices
+                .add(&FS_964, format!("{what} on a B-spline of degree {degree}"));
             log::error_exit(
                 g,
                 err,
@@ -885,13 +956,14 @@ fn window_sum(
     win: &Window,
     f: i32,
 ) -> Result<f64, Fatal> {
+    let flat = Flat::of(c).filter(|_| c.mtype == MRI_FLOAT);
     let mut interpolated = 0.0f64;
     for k in 0..=win.sd[2] as usize {
         let mut w2 = 0.0f64;
         for j in 0..=win.sd[1] as usize {
             let mut w = 0.0f64;
             for i in 0..=win.sd[0] as usize {
-                let v = get(g, err, c, win.xi[i], win.yi[j], win.zi[k], f)?;
+                let v = get(g, err, c, flat, win.xi[i], win.yi[j], win.zi[k], f)?;
                 w = add64(w, mul64(v, win.xw[i]));
             }
             w2 = add64(mul64(w, win.yw[j]), w2);
@@ -962,7 +1034,9 @@ pub fn mri_sample_seq_bspline(
                 g,
                 err,
                 ERROR_BADPARM,
-                &format!("MRIsampleSeqBSpline: frame {f} outside the output vector (FreeSurfer writes outside its array here)\n"),
+                &format!(
+                    "MRIsampleSeqBSpline: frame {f} outside the output vector (FreeSurfer writes outside its array here)\n"
+                ),
             )?;
         }
         Ok(f as usize)
@@ -1207,13 +1281,44 @@ pub fn lta_transform_bspline(
 /// `PyramidFilterCentered`'s order-3 filters: the reduce filter `g` (21 taps) and the expand
 /// filter `h` (16 taps), as FreeSurfer's file writes them.
 const CENTERED3_G: [f64; 21] = [
-    0.708792, 0.328616, -0.165157, -0.114448, 0.0944036, 0.0543881, -0.05193, -0.0284868,
-    0.0281854, 0.0152877, -0.0152508, -0.00825077, 0.00824629, 0.00445865, -0.0044582,
-    -0.00241009, 0.00241022, 0.00130278, -0.00130313, -0.000704109, 0.000704784,
+    0.708792,
+    0.328616,
+    -0.165157,
+    -0.114448,
+    0.0944036,
+    0.0543881,
+    -0.05193,
+    -0.0284868,
+    0.0281854,
+    0.0152877,
+    -0.0152508,
+    -0.00825077,
+    0.00824629,
+    0.00445865,
+    -0.0044582,
+    -0.00241009,
+    0.00241022,
+    0.00130278,
+    -0.00130313,
+    -0.000704109,
+    0.000704784,
 ];
 const CENTERED3_H: [f64; 16] = [
-    1.13726, 0.625601, -0.0870191, -0.159256, 0.0233167, 0.0426725, -0.00624769, -0.0114341,
-    0.00167406, 0.00306375, -0.000448564, -0.000820929, 0.000120192, 0.000219967, -0.0000322054,
+    1.13726,
+    0.625601,
+    -0.0870191,
+    -0.159256,
+    0.0233167,
+    0.0426725,
+    -0.00624769,
+    -0.0114341,
+    0.00167406,
+    0.00306375,
+    -0.000448564,
+    -0.000820929,
+    0.000120192,
+    0.000219967,
+    -0.0000322054,
     -0.00005894,
 ];
 
@@ -1278,7 +1383,10 @@ fn expand_centered(input: &[f64], output: &mut [f64], h: &[f64]) {
                     i2 = kn - i2 - 1;
                 }
             }
-            v = add64(v, mul64(add64(input[i1 as usize], input[i2 as usize]), h[k as usize]));
+            v = add64(
+                v,
+                mul64(add64(input[i1 as usize], input[i2 as usize]), h[k as usize]),
+            );
             k += 2;
         }
         output[j] = v;
@@ -1421,7 +1529,10 @@ pub fn mri_downsample2_bspline(
         }
     };
     if d.vg.width != nxo || d.vg.height != nyo || d.vg.depth != nzo || d.nframes != nfi {
-        let _ = writeln!(out, "ERROR MRIupsample2BSpline: MRI Dest dimensions not correct!");
+        let _ = writeln!(
+            out,
+            "ERROR MRIupsample2BSpline: MRI Dest dimensions not correct!"
+        );
         return Err(Fatal::Exit(1));
     }
     let mut inb = vec![0.0f64; nzi.max(1) as usize];
@@ -1489,7 +1600,10 @@ pub fn mri_upsample2_bspline(
         }
     };
     if d.vg.width != nxo || d.vg.height != nyo || d.vg.depth != nzo || d.nframes != nfi {
-        let _ = writeln!(out, "ERROR MRIupsample2BSpline: MRI Dest dimensions not correct!");
+        let _ = writeln!(
+            out,
+            "ERROR MRIupsample2BSpline: MRI Dest dimensions not correct!"
+        );
         return Err(Fatal::Exit(1));
     }
     // x
@@ -1567,7 +1681,9 @@ fn single_axis_copy(g: &mut Globals, expanded: bool, axis: &str) -> bool {
     if expanded {
         g.notices.add(
             &FS_962,
-            format!("MRIupsample2BSpline copies the source over the expanded lines of a single {axis}"),
+            format!(
+                "MRIupsample2BSpline copies the source over the expanded lines of a single {axis}"
+            ),
         );
         return g.notices.reproduce();
     }
@@ -1613,7 +1729,10 @@ mod tests {
                 );
             }
         }
-        assert_eq!(differ, [(6, (-0.001_414_151_808_325_817_7f64).to_bits(), 5)]);
+        assert_eq!(
+            differ,
+            [(6, (-0.001_414_151_808_325_817_7f64).to_bits(), 5)]
+        );
     }
 
     /// The cubic B-spline's interpolation: the coefficients of a line sampled at its knots give

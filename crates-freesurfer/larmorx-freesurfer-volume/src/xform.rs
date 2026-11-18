@@ -164,7 +164,9 @@ pub fn mri_linear_transform_interp(
                             mri_sample_bspline(g, out, err, b, x1, x2, x3, frame, &mut v)?;
                         }
                         None => {
-                            sample_volume_frame_type(g, err, src, x1, x2, x3, frame, interp, &mut v);
+                            sample_volume_frame_type(
+                                g, err, src, x1, x2, x3, frame, interp, &mut v,
+                            );
                         }
                     }
                     if v.to_bits() != UNWRITTEN {

@@ -242,3 +242,69 @@ fn density_and_inverse_of_an_identity_morph() {
     assert!(matches!(r, Ret::Given));
     assert_eq!(vox(&mut g, &right, 2, 2, 2), 26.0);
 }
+
+/// Cubic B-spline sampling through a morph (relay 39 of track C, fs.bspline): `MRItoBSpline`'s
+/// line, then each voxel the source's B-spline at the morphed point, as `MRIsampleBSpline` gives
+/// it (a morph shifted by a quarter voxel along x; the last column's points lie outside).
+#[test]
+fn cubic_bspline_samples_through_a_morph() {
+    use larmorx_freesurfer_mri::mri::SAMPLE_CUBIC_BSPLINE;
+    use larmorx_freesurfer_volume::bspline::{mri_sample_bspline, mri_to_bspline};
+    let env = Environment::default();
+    let mut g = Globals::new(UpstreamDefects::Fix);
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let src = ramp(&mut g, 4);
+    let gc = identity(&mut g, 4, 0.25);
+    let m = morph::gcam_morph_to_atlas(
+        &mut g,
+        &mut o,
+        &mut e,
+        &env,
+        &src,
+        &gc,
+        None,
+        -1,
+        SAMPLE_CUBIC_BSPLINE,
+    )
+    .unwrap()
+    .into_new()
+    .unwrap();
+    assert_eq!(String::from_utf8_lossy(&o), "MRItoBSpline degree 3\n");
+    let b = mri_to_bspline(&mut g, &mut Vec::new(), &mut Vec::new(), &src, None, 3).unwrap();
+    for x in 0..4 {
+        for y in 0..4 {
+            for z in 1..4 {
+                let want = if x < 3 {
+                    let mut v = 0.0;
+                    let (px, py, pz) = (f64::from(x as f32 + 0.25), f64::from(y), f64::from(z));
+                    mri_sample_bspline(&mut g, &mut o, &mut e, &b, px, py, pz, 0, &mut v).unwrap();
+                    v as f32
+                } else {
+                    // x + 0.25 = 3.25 is not below the width (4): FreeSurfer's test keeps it
+                    let mut v = 0.0;
+                    mri_sample_bspline(
+                        &mut g,
+                        &mut o,
+                        &mut e,
+                        &b,
+                        3.25,
+                        f64::from(y),
+                        f64::from(z),
+                        0,
+                        &mut v,
+                    )
+                    .unwrap();
+                    v as f32
+                };
+                assert_eq!(
+                    vox(&mut g, &m, x, y, z).to_bits(),
+                    want.to_bits(),
+                    "({x}, {y}, {z})"
+                );
+            }
+        }
+    }
+    // the B-spline interpolates: its value is near the ramp's (mirror borders bend it at the edges)
+    let v = vox(&mut g, &m, 1, 2, 2);
+    assert!((v - (1.25 + 6.0 + 18.0)).abs() < 0.05, "{v}");
+}

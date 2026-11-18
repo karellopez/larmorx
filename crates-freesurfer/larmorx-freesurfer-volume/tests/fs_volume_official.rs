@@ -9,8 +9,8 @@
 //! FS-315, FS-322 to FS-325, FS-327, FS-163, FS-330, FS-463, FS-465, FS-467, FS-469 to FS-471,
 //! FS-473, FS-475, FS-479, FS-482, FS-484 to FS-488, FS-490, FS-491, FS-493, FS-496 to FS-499, FS-501,
 //! FS-502, FS-504, FS-508, FS-509, FS-511, FS-515, FS-517, FS-886, FS-887, FS-889, FS-890,
-//! FS-957, fs.io's FS-167, and the eigen-systems it never returns from, FS-47, FS-48, ITK-112,
-//! ITK-115, ITK-116, hashed as `SKIP`).
+//! FS-957, FS-964, FS-965, fs.io's FS-167, and the eigen-systems it never returns from, FS-47,
+//! FS-48, ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
 mod cases;
@@ -42,16 +42,19 @@ use sha2::{Digest, Sha256};
 /// tensor volume's rows), MatrixAdd's NaN order, the equalisations' volumes of short instead of int
 /// or long); relay 38 (2026-11-18): FS-307 only where the `.xfm` loop really hangs, FS-314's and
 /// FS-315's `reproduce`, the downsampling factors 0, -0, NaN, infinity, -3 and 1e-30 drawn (FS-317,
-/// FS-961): 5,580 cases, 5,145 lines identical, 435 hashed as `SKIP`, 24 hashed as `HEAVY`
-/// (identical too).
-const N: usize = 5580;
-const OFFICIAL_SHA256: &str = "ae9084ceb1f8c1428a5499df49ca822bd1682966625bf5204174d5f816ec5d43";
-const SKIPPED: usize = 435;
+/// FS-961); relay 39 (2026-11-18), 286 commands: fs.bspline (mriBSpline.cpp: `bsp`, `bsps`,
+/// `bspseq`, `bsplx`, `bsplta`, `bspdn`, `bspup`), `SAMPLE_CUBIC_BSPLINE` drawn by the linear
+/// transforms, `MRIresampleFill`, `MRIvol2Vol(VSM)`, the Talairach volume and the LTA transforms,
+/// FS-964 and FS-965 hashed as `SKIP`: 5,720 cases, 5,260 lines identical, 436 hashed as `SKIP`,
+/// 24 hashed as `HEAVY` (identical too).
+const N: usize = 5720;
+const OFFICIAL_SHA256: &str = "a2c71444db657bf3d3d59048d6910a4301c20fe27581b8867b44d3bd2f989409";
+const SKIPPED: usize = 436;
 /// The cases hashed as `HEAVY`.
 const HEAVY: usize = 24;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 66] = [
+const SKIP: [&str; 67] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
     "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
@@ -59,7 +62,7 @@ const SKIP: [&str; 66] = [
     "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488", "FS-490",
     "FS-491", "FS-493", "FS-496", "FS-497", "FS-498", "FS-499", "FS-501", "FS-502", "FS-504",
     "FS-508", "FS-509", "FS-511", "FS-515", "FS-517", "FS-167", "FS-886", "FS-887", "FS-889",
-    "FS-890", "FS-957", "FS-964",
+    "FS-890", "FS-957", "FS-964", "FS-965",
 ];
 
 /// `check.py`'s `heavy`: `MRIconform` resampling onto its 256^3 grid and

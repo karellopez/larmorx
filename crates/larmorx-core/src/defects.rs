@@ -2953,6 +2953,8 @@ defects! {
         "halving or doubling a volume's resolution with cubic B-splines (MRIdownsample2BSpline, MRIupsample2BSpline) changes the voxel size of an axis of one voxel, which neither resamples: halving doubles it and moves the voxel's centre by half a source voxel, doubling halves it; kept until measured with the two-dimensional registration that reaches it (rule D)";
     FS_964 = "FS-964", "FreeSurfer", true,
         "sampling a B-spline whose degree is not 2 to 9 (one allocated and never computed, as the computation refuses other degrees) on a volume of one voxel, or with a degree above 9, reads interpolation indices never set or writes them past their arrays: memory contents or a crash; refused with a clear error";
+    FS_965 = "FS-965", "FreeSurfer", true,
+        "a histogram whose bin count is taken from the values' range (one bin per unit, asked for with 0 bins or fewer) of values spanning more than 67,108,864 asks for that many bins: gigabytes of memory allocated and filled, the program slow or killed; refused with a clear error";
 }
 
 /// The register entry with ID `id`.

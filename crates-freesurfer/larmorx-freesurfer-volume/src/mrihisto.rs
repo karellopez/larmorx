@@ -31,11 +31,14 @@
 //!   a peak it has found (a `gray_hi` below -1 with no peak): an error in both modes.
 //! - **FS-503** (b): `MRIhistogramRegionWithThreshold` with several threads sums per-thread
 //!   histograms whose fractional counts then depend on the thread count; one thread's order here.
+//! - **FS-965** (a, memory): a histogram whose bin count comes from the values' range (one bin per
+//!   unit, `nbins` 0 or below) of values spanning more than 2^26 asks for gigabytes (FreeSurfer
+//!   allocates and fills them); an error in both modes.
 
 use std::collections::HashSet;
 use std::io::Write;
 
-use larmorx_core::defects::{FS_12, FS_498, FS_499, FS_500, FS_501, FS_502};
+use larmorx_core::defects::{FS_12, FS_498, FS_499, FS_500, FS_501, FS_502, FS_965};
 use larmorx_freesurfer_core::cstd;
 use larmorx_freesurfer_core::diag::{self, DIAG_SHOW, DIAG_WRITE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -44,7 +47,9 @@ use larmorx_freesurfer_core::histo::{
     histo_find_last_peak_in_region, histo_find_valley, histo_init, histo_plot, histo_realloc,
     histo_smooth, histo_soap_bubble_zeros_in_place,
 };
-use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BADPARM, ERROR_NO_MEMORY, ERROR_UNSUPPORTED, Fatal,
+};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{add, add64, div, mul, sub, sub64};
 use larmorx_freesurfer_core::utils::nint;
@@ -97,18 +102,40 @@ fn fequal(a: f32, b: f32) -> bool {
 
 /// `nint(fmax - fmin + 1.0)`: the difference in `float`, the sum in `double`. A count beyond the
 /// `int` range (or NaN) is FreeSurfer's -2147483648 in both modes (FS-12 noted): a histogram that
-/// cannot be allocated, where a saturated count would ask for 2^31 bins.
-fn span_bins(g: &mut Globals, fmin: f32, fmax: f32) -> i32 {
+/// cannot be allocated, where a saturated count would ask for 2^31 bins. A count above
+/// [`MAX_SPAN_BINS`] (two `float` arrays of that many bins: 512 MiB) ends with an error in both
+/// modes (FS-965: FreeSurfer allocates and fills gigabytes there).
+fn span_bins(g: &mut Globals, err: &mut dyn Write, fmin: f32, fmax: f32) -> Result<i32, Fatal> {
     let v = add64(widen(sub(fmax, fmin)), 1.0);
     if v.is_nan() || v >= 2147483647.5 {
         g.notices.add(
             &FS_12,
             format!("nint of {v}, outside the int range: a histogram of -2147483648 bins"),
         );
-        return i32::MIN;
+        return Ok(i32::MIN);
     }
-    nint(g, v)
+    let n = nint(g, v);
+    if n > MAX_SPAN_BINS {
+        g.notices.add(
+            &FS_965,
+            format!("a histogram of {n} bins from the values' range"),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_NO_MEMORY,
+            &format!(
+                "HISTOalloc({n}): a histogram of {n} bins (the values' range, {fmin:e} to {fmax:e}) is refused (FreeSurfer allocates {} bytes here)",
+                8 * i64::from(n)
+            ),
+        )?;
+        return Err(Fatal::Exit(ERROR_NO_MEMORY));
+    }
+    Ok(n)
 }
+
+/// The largest bin count [`span_bins`] accepts (FS-965).
+pub const MAX_SPAN_BINS: i32 = 1 << 26;
 
 /// `HISTOalloc(nbins)`; a negative count's `calloc` fails with `ENOMEM`, which its error message
 /// prints first.
@@ -235,7 +262,7 @@ pub fn mri_histogram_region(
         return Ok(Ret::Null);
     }
     if nbins <= 0 {
-        nbins = span_bins(g, fmin, fmax);
+        nbins = span_bins(g, err, fmin, fmax)?;
     }
     if nbins <= 0 {
         nbins = 255;
@@ -268,7 +295,7 @@ pub fn region_histogram(
     let (_, fmin, fmax) = mri_val_range_region(g, err, mri, region)?;
     let mut nbins = nbins;
     if nbins == 0 {
-        nbins = span_bins(g, fmin, fmax);
+        nbins = span_bins(g, err, fmin, fmax)?;
     }
     let given = histo.is_some();
     let mut fresh = None;
@@ -355,7 +382,7 @@ pub fn mri_histogram(
     let (_, fmin, mut fmax) = mri_val_range(g, err, mri)?;
     let mut nbins = nbins;
     if nbins == 0 {
-        nbins = span_bins(g, fmin, fmax);
+        nbins = span_bins(g, err, fmin, fmax)?;
     }
     if fmin == fmax {
         fmax = 255.0;
@@ -547,7 +574,7 @@ pub fn mri_histogram_label_region(
     let bmin = int_of(g, WHAT, f64::from(fmin));
     let mut nbins = nbins;
     if nbins <= 0 {
-        nbins = span_bins(g, fmin, fmax);
+        nbins = span_bins(g, err, fmin, fmax)?;
     }
     let mut h = alloc(g, err, nbins)?;
     histo_init(
@@ -631,7 +658,7 @@ pub fn mri_histogram_label(
     let bmin = int_of(g, WHAT, f64::from(fmin));
     let mut nbins = nbins;
     if nbins <= 0 {
-        nbins = span_bins(g, fmin, fmax);
+        nbins = span_bins(g, err, fmin, fmax)?;
     }
     let mut h = alloc(g, err, nbins)?;
     histo_init(
@@ -721,7 +748,7 @@ pub fn mri_histogram_voxel(
     let (_, fmin, fmax) = mri_val_range_region(g, err, mri, &region)?;
     let mut nbins = nbins;
     if nbins <= 0 {
-        nbins = span_bins(g, fmin, fmax);
+        nbins = span_bins(g, err, fmin, fmax)?;
     }
     if nbins <= 0 {
         nbins = 255;
@@ -798,7 +825,7 @@ pub fn mri_histogram_region_with_threshold(
     }
     let mut nbins = nbins;
     if nbins == 0 {
-        nbins = span_bins(g, fmin, fmax);
+        nbins = span_bins(g, err, fmin, fmax)?;
     }
     let mut fresh = None;
     let h = prepare(g, err, histo, nbins, &mut fresh)?;

@@ -59,8 +59,8 @@ use larmorx_freesurfer_mri::mri::{
 use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, extract_r_to_i};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
-use crate::bspline::{MriBspline, mri_sample_bspline, mri_to_bspline};
 use crate::arith::{Pair, mri_replace_values};
+use crate::bspline::{MriBspline, mri_sample_bspline, mri_to_bspline};
 use crate::rows::{self, Num};
 use crate::sample::{
     SAMPLE_CUBIC, SAMPLE_CUBIC_BSPLINE, SAMPLE_NEAREST, SAMPLE_SINC, SAMPLE_TRILINEAR, SAMPLE_VOTE,

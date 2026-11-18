@@ -29,6 +29,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `utils/mriio.cpp` 1297-1308 | `MRIwriteFrame` (track A's module of fs.io, relay 22) | 3.1-30 | `io_frames.rs` |
 | `utils/mriio.cpp` 305-427 | `mriConformed`, `MRIfindMinSize`, `MRIfindRightSize` (fs.io's item, placed beside `getSliceDirection`; track A relay 36) | 3.1-28 | `conformed.rs` |
 | `utils/mri.cpp` 9573-9670 | `MRIinterpolateIntoVolume`, `MRIinterpolateIntoVolumeFrame` (every type; `GCAMinvert`, fs.gca, calls them; track A relay 38) | 3.3-06 | `interpolate_into.rs` |
+| `utils/mriBSpline.cpp` 40-132, 136-250, 252-485, 766-937 (order 3), 1353-1385, 1521-1642, 1644-1668, 1670-2976; `include/mriBSpline.h` | **fs.bspline** (3.2-01; relay 39 of track C): `MRI_BSPLINE`, `MRIallocBSpline`, `MRIfreeBSpline`, `MRItoBSpline`, `MRIsampleBSpline`, `MRIsampleSeqBSpline`, `MRIlinearTransformBSpline`, `MRIapplyRASlinearTransformBSpline`, `LTAtransformBSpline`, `MRIdownsample2BSpline`, `MRIupsample2BSpline`; the static `InitialCausalCoefficient`, `InitialAntiCausalCoefficient`, `ConvertToInterpolationCoefficients`, `get/set{X,Y,Z}Line(Stop)`, `initPoles`, `BsplineWeights`, `PyramidFilterCentered` (order 3, the only filter `GetPyramidFilter` is asked for), `ReduceCentered_1D`, `ExpandCentered_1D`, `Reduce_1D`, `Expand_1D` (the official build's operand orders from the unit oracle's `mriBSpline.cpp.o`, `docs/findings/freesurfer-volume.md` §30). **Credit:** the file follows Thévenaz, Blu and Unser, "Interpolation Revisited", IEEE TMI 19(7) 739-758 (2000), and the example code of EPFL's Biomedical Imaging Group (<http://bigwww.epfl.ch/thevenaz/interpolation/>: the causal and anticausal initialisations, the poles and weights of degrees 2 to 9); its pyramid filters are Michael Unser's (NIH, 1992, 1994), Patrick Brigger's (NIH, 1996) and Daniel Sage's (EPFL, 1999), <http://bigwww.epfl.ch/sage/pyramids/>; FreeSurfer distributes the file (Martin Reuter's) under its licence with MGH's notice (`docs/freesurfer/third-party.md` TP-05, P-10). Not translated: the other pyramid filters (`PyramidFilterSplinel2`, `PyramidFilterSplineL2`, `PyramidFilterCenteredL2`, the other orders of `PyramidFilterCentered`) and `ReduceStandard_1D`, `ExpandStandard_1D`: static, never chosen | 3.2-01 | `bspline.rs` |
 
 No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). `readVolGeom`'s
 `sscanf` calls are modelled on glibc 2.35's behaviour measured as a black box (the open
@@ -245,3 +246,11 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
 - `src/ltaconv.rs` (3.1-40; relay 35): `utils/transform.cpp` `LTAvoxelToRasXform` (1898-1928), `LTArasToVoxelXform`
   (1930-1944), `LTAsetVolGeom` (4280-4289), `LTAcompose` (4844-4857); `utils/mri.cpp` `MRIcopyVolGeomFromMRI`
   (16279-16301, through fs.mri). Changes: FS-954, FS-956, FS-957 (rule A), FS-955 kept (rule C), FS-504 (errors).
+- `src/bspline.rs` (3.2-01, fs.bspline; relay 39 of track C): FS-962 (rule A: the upsampling's copy of the source
+  over expanded lines skipped), FS-963 (rule D, pending: both modes FreeSurfer's voxel sizes), FS-964 (memory:
+  an error in both modes); the lines of each pass computed in order (FreeSurfer's OpenMP lines are independent);
+  `log` and `pow` through `larmorx_core::math::Libm` (correctly rounded by default, glibc 2.35's with
+  `reproduce`: they differ only on degree 6 for lines of 5 samples). `MRIlinearTransformInterp` (`xform.rs`),
+  `MRIvol2Vol` and `MRIvol2VolVSM` (`vol2vol.rs`), `MRIresampleFill` (`resample.rs`) and fs.gca's
+  `GCAMmorphToAtlas` (track A's `larmorx-freesurfer-gca/src/morph.rs`) now sample cubic B-splines through it.
+- `src/mrihisto.rs`, relay 39: FS-965 (memory: an automatic bin count above 2^26 an error in both modes).

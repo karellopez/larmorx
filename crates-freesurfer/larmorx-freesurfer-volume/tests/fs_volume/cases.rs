@@ -10403,11 +10403,7 @@ fn r39_shape(g: &mut Gen, long: bool) -> Shape {
         h: e[1],
         d: e[2],
         ty,
-        nf: if g.chance(6) {
-            g.pick(&[2, 3, 0])
-        } else {
-            1
-        },
+        nf: if g.chance(6) { g.pick(&[2, 3, 0]) } else { 1 },
         hdr: g.chance(60),
         drop: false,
     }
@@ -10448,7 +10444,15 @@ fn r39_vals(g: &mut Gen) -> &'static [f32] {
 fn r39_coord(g: &mut Gen, n: i64) -> f64 {
     let n = n as f64;
     match g.below(12) {
-        0 => g.pick(&[-0.5, -0.5000001, n - 0.5, n - 0.5000001, n - 1.0, 0.0, -0.25]),
+        0 => g.pick(&[
+            -0.5,
+            -0.5000001,
+            n - 0.5,
+            n - 0.5000001,
+            n - 1.0,
+            0.0,
+            -0.25,
+        ]),
         1 => g.pick(&[-1.0, n, 1e10, -1e10, n + 3.5]),
         2 if g.chance(3) => g.pick(&[f64::NAN, f64::INFINITY, -f64::INFINITY, -0.0]),
         3 => g.int(0, (n as i64 - 1).max(0)) as f64,
@@ -10643,11 +10647,7 @@ fn r39_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
                 let gj = g.below(pool.len() as u64) as usize;
                 r25_vol_geo(g, t, o, &pool[gj]);
             }
-            let n = if g.chance(6) {
-                g.pick(&[0usize, 2])
-            } else {
-                1
-            };
+            let n = if g.chance(6) { g.pick(&[0usize, 2]) } else { 1 };
             let ty = g.pick(&[1i64, 1, 0, 0, 0, 2, 14, 21, 10]);
             r34_lta(g, t, &pool, n, ty);
             t.push(g.pick(&[0i64, 0, 1, 2]).to_string());
@@ -10706,11 +10706,15 @@ fn r39_cmds(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fa
             let fr = t.i();
             let mut ob = Some(bsp);
             if fr >= 1 {
-                o.i(i64::from(bs::mri_free_bspline(&mut cx.g, &mut cx.b, &mut ob)));
+                o.i(i64::from(bs::mri_free_bspline(
+                    &mut cx.g, &mut cx.b, &mut ob,
+                )));
                 o.i(i64::from(ob.is_none()));
             }
             if fr >= 2 {
-                o.i(i64::from(bs::mri_free_bspline(&mut cx.g, &mut cx.b, &mut ob)));
+                o.i(i64::from(bs::mri_free_bspline(
+                    &mut cx.g, &mut cx.b, &mut ob,
+                )));
             }
         }
         "bsps" => {

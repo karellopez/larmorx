@@ -1930,6 +1930,115 @@ class Gen8(Gen7):
         return [Batch("vbsvol", "vbsvol", L)]
 
 
+class Gen9(Gen8):
+    """Part 7a (§33): statistics, the type names, the box crop, the centre of a sampled volume,
+    orientation strings, the 4 x 4 filler, the voxel and RAS transform matrices."""
+
+    OCHARS = "LRPAISlrpaisXx0 ?\x80\x00"
+
+    def ostring(self, r: random.Random, valid: float = 0.4) -> bytes:
+        if r.random() < valid:
+            axes = [r.choice("LR"), r.choice("PA"), r.choice("IS")]
+            r.shuffle(axes)
+            t = "".join(c.lower() if r.random() < 0.2 else c for c in axes)
+            return t.encode("latin-1") + (b"X" if r.random() < 0.1 else b"")
+        n = r.choice([2, 3, 3, 3, 3, 4, 5])
+        return "".join(r.choice(self.OCHARS) for _ in range(n)).encode("latin-1")
+
+    def vstat7(self) -> list[Batch]:
+        """§33: MRIstats and MRIprintStats of volumes of every type (64-bit integers: FS-329; types
+        the statistics do not read; volumes without voxels: FS-330), MRItype2str of -2 to 12,
+        MRIcropBoundingBox, MRIcalcCRASforSampledVolume (the diagnostic bits; sources without cached
+        matrices), MRIcheckOrientationString and MRIorientationStringToDircos (valid strings in
+        both cases, invalid characters, a NUL, repeated and missing axes, 2 to 5 characters),
+        stuff_four_by_four (none, 4 x 4, other sizes, complex), MRIvoxelXformToRasXform,
+        MRIgetVoxelToVoxelXform and MRIsetVoxelToRasXform (matrices scaled, with NaNs, 3 x 4 and 4
+        x 4; FS_SetVoxToRasXform_Change_VoxSize unset, numbers, words, empty)."""
+        r = self.rng("vstat7")
+        L = []
+        for cmd, n in (("stats", 90), ("pstats", 40)):
+            for _ in range(n):
+                types = [*NUMERIC, 2, 2, 5, 6, 7, 9] if r.random() < 0.3 else NUMERIC
+                s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 3), hdr=0.03)
+                L.append(f"{cmd} {self.wvol(r, shape=s, special=0.08, ct=0.0)}")
+        L.append("type2s 15 " + " ".join(str(t) for t in range(-2, 13)))
+        for _ in range(40):
+            a = self.rvol(r, shape=self.vshape(r, types=NUMERIC, ext=(1, 6), frames=(1, 1)), ct=0.0)
+            box = [r.choice([-3, -1, 0, 1, 2, 5, 9, 2147483647, -2147483648]) for _ in range(3)]
+            box += [r.choice([-1, 0, 1, 3, 7, 100, 2147483647]) for _ in range(3)]
+            L.append(f"cropbb {a} {' '.join(map(str, box))}")
+        for _ in range(50):
+            sa = self.vshape(r, types=NUMERIC, ext=(1, 8), frames=(1, 1))
+            sb = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 1))
+            a = self.wvol(r, shape=sa, special=0.05, ct=0.0)
+            b = self.rvol(r, shape=sb, ct=0.0)
+            gd = "+gdiag=10000040 " if r.random() < 0.12 else ""
+            L.append(f"{gd}crass {a} {b}")
+        for _ in range(70):
+            L.append(f"chkostr {xs(self.ostring(r))}")
+        for _ in range(40):
+            a = self.rvol(r, shape=self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 1)), ct=0.0)
+            L.append(f"o2dc {a} {xs(self.ostring(r, valid=0.7))}")
+        for _ in range(30):
+            k = r.choice([0, 1, 1, 1, 2, 2, 3])
+            size = f" {r.choice([3, 4, 5, 1])} {r.choice([3, 4, 5, 1])}" if k == 2 else ""
+            vals = " ".join(self.fv(r, 0.1) for _ in range(16))
+            L.append(f"s44 {k}{size} {vals}")
+        for _ in range(40):
+            a = self.rvol(r, special=0.05, ct=0.0)
+            b = "null" if r.random() < 0.3 else self.rvol(r, special=0.05, ct=0.0)
+            mv = self.xmat(r)
+            mr = "null" if r.random() < 0.7 else self.affine(r)
+            L.append(f"vx2rx {a} {b} {mv} {mr}")
+        for _ in range(30):
+            L.append(f"v2v {self.rvol(r, special=0.05, ct=0.0)} {self.rvol(r, special=0.05, ct=0.0)}")
+        envs = ["unset", "unset", "unset", xs("0.5"), xs("1e-9"), xs("abc"), xs(""), xs("10")]
+        for _ in range(50):
+            a = self.rvol(r, special=0.03, ct=0.0)
+            k = r.random()
+            if k < 0.45:
+                m = self.affine(r, special=0.05)
+            elif k < 0.7:
+                sc = [r.choice([1.0, 2.0, 0.5, 1.0005, 3.0]) for _ in range(3)]
+                v = [f32(0.0)] * 16
+                for i in range(3):
+                    v[5 * i] = f32(sc[i] * r.choice([1.0, -1.0]))
+                    v[4 * i + 3] = self.fv(r)
+                v[15] = f32(1.0)
+                m = "4 4 " + " ".join(v)
+            elif k < 0.85:
+                m = self.mat(r, 3, 4, special=0.1)
+            else:
+                m = self.mat(r, 4, 4, special=0.3)
+            L.append(f"setv2r {a} {m} {r.choice(envs)}")
+        return [Batch("vstat7", "vstat7", L)]
+
+    @staticmethod
+    def vrules8() -> list[Batch]:
+        """§33's fixed cases: statistics of one voxel, of a NaN first voxel, of 64-bit integers
+        (FS-329), of a volume without voxels and of types not read (FS-330, printed); orientation
+        strings of 0 to 5 characters (FS-463: fewer than two, lines of their own), every case and
+        letter, NUL and high bytes; the centre of a sampled volume with factors that do not divide."""
+        L = []
+        L.append(f"stats {fixed_w(1, 1, 1, 3, fill='t4')}")
+        L.append(f"stats {fixed_w(3, 1, 1, 3, fill='t18')}")
+        L.append(f"stats {fixed_w(2, 2, 1, 2, fill=9)}")
+        L.append(f"stats {fixed_w(2, 2, 1, 1, fill=9)}")
+        L.append(f"pstats {fixed_w(2, 2, 1, 2, fill=9)}")
+        L.append(f"pstats {fixed_w(2, 1, 1, 9, fill=9)}")
+        L.append(f"stats {fixed_w(2, 1, 1, 6, hdr=1)}")
+        for t in (b"", b"L", b"LP", b"LPS", b"lps", b"RAS", b"LLS", b"XYZ", b"L\x00S", b"LPSX",
+                  b"\x80PS", b"SPL", b"IAR", b"aaa", b"LRA", b"rAs"):
+            L.append(f"chkostr {xs(t)}")
+        for t in (b"LPS", b"RAS", b"lia", b"SRP", b"XPS"):
+            L.append(f"o2dc {fixed_w(2, 2, 2, 0)} {xs(t)}")
+        for sa, sb in (((8, 8, 8), (3, 3, 3)), ((7, 5, 3), (2, 2, 2)), ((4, 4, 4), (8, 8, 8)),
+                       ((256, 1, 1), (3, 1, 1))):
+            a = fixed_w(*sa, 0, fill=-1)
+            L.append(f"crass {a} {fixed_w(*sb, 0, fill=-1)}")
+        return [Batch("vrules8", "vrules8", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -1959,6 +2068,8 @@ GROUPS = [
     "vbspline",
     "vbsrules",
     "vbsvol",
+    "vstat7",
+    "vrules8",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -2066,7 +2177,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen8) else Gen8(gen.seed)
+    gen = gen if isinstance(gen, Gen9) else Gen9(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

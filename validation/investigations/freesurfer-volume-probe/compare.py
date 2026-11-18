@@ -1715,6 +1715,28 @@ class Gen7(Gen6):
         # in vsample: a line noting it may differ
         return [Batch("vresamp", "vresamp", L, both="FS-300")]
 
+    @staticmethod
+    def vrules7() -> list[Batch]:
+        """Fixed cases of the clean room's questions on parts 6b and 6c: MRIindexNotInVolume at rows
+        whose rounding as a double and as a float differ (2.500000119, -0.500000119) and around them
+        (§15); the vote onto one 512 mm template voxel from 513 x 3 and 511 x 3 byte sources of 100,
+        127 and 130 frames, so that labels get 202 to 262 votes (FS-326: under reproduce the counts
+        stop at 255; §31)."""
+        L = []
+        w = fixed_w(3, 3, 3, 0)
+        for y in (2.500000119, 2.5, 2.4999999, 2.5000001, 3.5, -0.5, -0.500000119, -0.5000001):
+            L.append(f"inidx {w} {f64(1.0)} {f64(y)} {f64(1.0)}")
+        t = fixed_w(1, 1, 1, 0, fill=0).split(" ")
+        for i in range(3):
+            t[7 + i] = f32(512.0)
+        tmpl = " ".join(t)
+        # 100 frames: at most 202 votes; 127 frames, seed 7: label 1 has 256, label 0 255; 130 frames,
+        # seed 5: label 5 has 262, label 0 261; 511 columns, 130 frames: every label 260
+        for wd, nf, seed in ((513, 100, 7), (513, 127, 7), (513, 130, 5), (511, 130, 9)):
+            a = fixed_w(wd, 3, 1, 0, f=nf, fill=seed)
+            L.append(f"rsfill {a} {tmpl} 6 {f32(0.0)} 0")
+        return [Batch("vrules7", "vrules7", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -1741,6 +1763,7 @@ GROUPS = [
     "vderiv",
     "vlinear",
     "vresamp",
+    "vrules7",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

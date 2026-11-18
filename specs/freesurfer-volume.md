@@ -1427,7 +1427,13 @@ returns there): the implementations' own tests, against this text.
   frame, column, row, slice (the slice innermost): `(di, dj, dk) = floor(A (si, sj, sk, 1))`; outside the
   template's extent the voxel does not vote; else its label `nint(MRIgetVoxVal(src))` clipped to [0, 255]
   gets one more vote at `(di, dj, dk)` (`MRIsetVoxVal` of the count plus one: a byte, so it stops at 255,
-  FS-326; the default counts every vote). Then for each frame of the template (not only the destination's:
+  FS-326; the default counts every vote). **(observed)**: §69's `vrules7`, byte sources of 1 mm voxels
+  onto a template of one 512 mm voxel with the same centre (the source's voxels before its centre on
+  every axis vote: of 513 columns 0 to 256, of 511 columns 0 to 255, of 3 rows 0 and 1; the others fall
+  outside the template), filled by the fs.mri probe's seed: 513 x 3 x 1 voxels of 100 frames, seed 7, at
+  most 202 votes a label: label 7; of 127 frames, label 1 with 256 votes and label 0 with 255: label
+  0; of 130 frames, seed 5, label 5 with 262 and label 0 with 261: label 0; 511 x 3 x 1 of 130 frames,
+  every label 260 votes: label 0. Then for each frame of the template (not only the destination's:
   frames past the destination's are `MRIsetVoxVal` writes past its voxels: `specs/freesurfer-mri.md`'s rules), column, row, slice:
   the label with the most votes over all source frames (the lowest on ties; 0 when none) is set with
   `MRIsetVoxVal`.
@@ -1449,14 +1455,15 @@ gives its hash): the source on random geometries and in two cases of three the t
 source's grid (its voxels scaled by 1, 2, 0.5 or 1.5, its extent divided to keep the field of view, at
 most 8 voxels a side, its centre moved, mostly a good RAS); types 0 to 4, 6 and 7 (no cubic B-spline:
 `fs.bspline`); fill values with NaNs and special floats; `MRIresample` one case in five; the diagnostic
-bits one in twelve; twelve 8 x 8 x 8 byte sources voting into a template of one 8 mm voxel that holds
-them all, so that the counts pass 255 (FS-326); `MRIreplaceValues` and `MRIreplaceValuesUchar` into a
+bits one in twelve; twelve 8 x 8 x 8 byte sources voting into a template of one 8 mm voxel (an eighth
+of each source votes, about two votes a label: below 255; FS-326's counts past 255 are `vrules7`'s, §69.2);
+`MRIreplaceValues` and `MRIreplaceValuesUchar` into a
 new, a given, another-shaped or the same destination, the value to replace the source's fill byte or
 table floats. Identical with `reproduce` but where FreeSurfer reads memory it does not own or crashes
 (FS-53, FS-58, FS-290, FS-300, FS-327), lines the loop allows; the default differs only with a notice
-(FS-326, FS-328, FS-461, FS-12). The implementations' own tests, against §31's text: FS-327's error, the
-default's vote counts past 255 (280 votes for one label and 320 for another in one voxel) and FS-461's
-default on a two-frame byte volume.
+(FS-326, FS-328, FS-461, FS-12). `vrules7`'s four votes (§31): under `reproduce` FreeSurfer's labels, by
+default the label with the most votes (7, 1, 5 and 0). The implementations' own tests, against §31's
+text: FS-327's error and FS-461's default on a two-frame byte volume.
 
 ## 33. Statistics, orientation strings and voxel-to-RAS matrices (3.1-37, piece a)
 - `MRIstats(mri, &min, &max, &n, &mean, &std)`: a volume without voxels: nothing written, `NO_ERROR`.
@@ -2856,7 +2863,8 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vderiv` | 28 | 382 | 47 | 0 | 2 | `4726565ac8cba685842900d60986a556ceb60ead1f798cfa8ee590b5145ce57a` |
 | `vlinear` | 29 | 360 | 16 | 49 | 0 | `546e7400bd4d1d68e4d68a0271c32629d6a168101edc7745b69ed2a9f674c5be` |
 | `vresamp` | 31 | 272 | 18 | 22 | 0 | `322f430825ee103718310af328377d0645b3bb7e2abc843e51597a4b813d5456` |
-| all | | 12,270 | 1,382 | 645 | 13 | |
+| `vrules7` | 15, 31 | 12 | 0 | 0 | 0 | `c99ef3a5d80c981a0083f473853cc1bdf4e2efddea96830e303a7f6f25b3f6df` |
+| all | | 12,282 | 1,382 | 645 | 13 | |
 
 Part 4's groups (relay 7): `vsample` (§18: the eight samplers at points inside, at and past the
 edges, whole and within `FLT_EPSILON` of whole, NaN, infinite and beyond the `int` range, frames past
@@ -2943,6 +2951,14 @@ absent or odd-sized matrix and of a destination whose matrix does not invert (`M
 `MatrixInverse`'s ends of the program, status 252: `specs/freesurfer-maths.md` §8.1, §8.8) and
 `MRIreplaceValues`' size check (§31, status 252); their crashes are frames, rows and slices past the
 volume's (FS-290), volumes without voxels (FS-58) and FS-327.
+
+Relay 11's group (the prebuilt probe from 20578b55 unchanged; log
+`oracles/logs/fs-volume-probe-r11-vrules7-2026-11-18.log`; the same hash cold, warm and in two runs
+without the cache): `vrules7`, fixed cases of the clean room's questions on parts 6b and 6c:
+`MRIindexNotInVolume` at rows of 2.500000119, 2.5, 2.4999999, 2.5000001, 3.5, -0.5, -0.500000119 and
+-0.5000001 of a 3 x 3 x 3 volume (§15: the `double` rounded); the vote of 513 x 3 x 1 and 511 x 3 x 1 byte
+sources of 100, 127 and 130 frames onto one 512 mm template voxel, labels with 202 to 262 votes
+(FS-326, §31).
 
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,

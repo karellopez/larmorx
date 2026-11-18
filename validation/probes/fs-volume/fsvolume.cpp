@@ -42,6 +42,7 @@
 #include "mri.h"
 #include "mri2.h"
 #include "mri_conform.h"
+#include "mriBSpline.h"
 #include "region.h"
 #include "resample.h"
 #include "talairachex.h"
@@ -3229,6 +3230,106 @@ void run_case()
     oi(VLSTfree(&vl));
     oi(vl == NULL);
     oi(VLSTfree(&vl));
+  } else if (cmd == "bsp" || cmd == "bsps" || cmd == "bspseq" || cmd == "bsplx" || cmd == "bsplta") {
+    // relay 39 (fs.bspline, mriBSpline.cpp): MRItoBSpline of a volume of the case (no B-spline,
+    // an allocated one of the case's extent, one without coefficients, or one whose coefficients
+    // are a volume of the case), a degree, then a degree written over it (-99: kept), then the
+    // command's use of it
+    MRI *src = get_vol();
+    fill_pat(src);
+    fill_paint(src);
+    src->outside_val = getd();
+    int mode = geti();
+    MRI_BSPLINE *b = NULL;
+    if (mode >= 1) {
+      int w = geti(), h = geti(), d = geti(), nf = geti();
+      b = MRIallocBSpline(w, h, d, nf);
+      if (mode == 2) MRIfree(&b->coeff);
+      if (mode == 3) {
+        MRIfree(&b->coeff);
+        b->coeff = get_vol();
+      }
+    }
+    int degree = geti();
+    fflush(stdout);
+    b = MRItoBSpline(src, b, degree);
+    fflush(stdout);
+    int over = geti();
+    if (over != -99) b->degree = over;
+    if (cmd == "bsp") {
+      oi(b->degree);
+      oi(b->srctype);
+      oi(b->srcneg);
+      put_vol(b->coeff);
+      int fr = geti();
+      if (fr >= 1) {
+        fflush(stdout);
+        oi(MRIfreeBSpline(&b));
+        fflush(stdout);
+        oi(b == NULL);
+      }
+      if (fr >= 2) {
+        fflush(stdout);
+        oi(MRIfreeBSpline(&b));
+        fflush(stdout);
+      }
+    } else if (cmd == "bsps") {
+      int n = geti();
+      for (int i = 0; i < n; i++) {
+        double x = getd(), y = getd(), z = getd();
+        int f = geti();
+        double v = -7.0;
+        fflush(stdout);
+        int r = MRIsampleBSpline(b, x, y, z, f, &v);
+        fflush(stdout);
+        oi(r);
+        od(v);
+      }
+    } else if (cmd == "bspseq") {
+      int n = geti();
+      for (int i = 0; i < n; i++) {
+        double x = getd(), y = getd(), z = getd();
+        int first = geti(), last = geti();
+        std::vector<float> vv((size_t)(last + 1 > 1 ? last + 1 : 1), -7.0f);
+        fflush(stdout);
+        int r = MRIsampleSeqBSpline(b, x, y, z, vv.data(), first, last);
+        fflush(stdout);
+        oi(r);
+        for (float v : vv) of(v);
+      }
+    } else if (cmd == "bsplx") {
+      int kind = geti();
+      MRI *dst = geti() ? get_vol() : NULL;
+      MATRIX *A = get_m44();
+      fflush(stdout);
+      MRI *r = kind ? MRIapplyRASlinearTransformBSpline(b, dst, A) : MRIlinearTransformBSpline(b, dst, A);
+      fflush(stdout);
+      oi(r != NULL && r == dst);
+      put_vol(r);
+    } else {
+      MRI *dst = geti() ? get_vol() : NULL;
+      LTA *l = get_lta_full();
+      int avg = geti();
+      if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+      else unsetenv("USE_AVERAGE305");
+      fflush(stdout);
+      MRI *r = LTAtransformBSpline(b, dst, l);
+      fflush(stdout);
+      oi(r != NULL && r == dst);
+      put_vol(r);
+      put_lta_full(l);
+    }
+  } else if (cmd == "bspdn" || cmd == "bspup") {
+    // relay 39: MRIdownsample2BSpline, MRIupsample2BSpline (no destination or one of the case)
+    MRI *src = get_vol();
+    fill_pat(src);
+    fill_paint(src);
+    MRI *dst = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = cmd == "bspdn" ? MRIdownsample2BSpline(src, dst) : MRIupsample2BSpline(src, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
   } else {
     fail("unknown command");
   }

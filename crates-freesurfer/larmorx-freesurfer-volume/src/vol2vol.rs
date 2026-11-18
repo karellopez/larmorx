@@ -18,9 +18,10 @@
 //!   wrote; a shift map of a type the sampler refuses (`MRIsampleSeqVolume: unsupported type`)
 //!   leaves it as it was, at the first such voxel never written. Both modes take 0 there, noted.
 //!
-//! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) needs `fs.bspline` (wave 3.2), and a voxel-shift
-//! transform that is not voxel-to-voxel needs `LTAchangeType` (3.1-39): port errors until they are
-//! ported.
+//! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) samples the source's cubic B-spline
+//! coefficients ([`crate::bspline`], `MRItoBSpline` of degree 3, made once per call). A voxel-shift
+//! transform that is not voxel-to-voxel ends with a port error (its change of type is not wired
+//! here yet).
 //!
 //! `MRIvol2VolFill` (relay 29) maps the other way, each source voxel to its nearest target voxel,
 //! summing (or averaging) the voxels that land in one; FS-504 where `MRImaskAndUpsample` returns no
@@ -49,6 +50,7 @@ use larmorx_freesurfer_mri::vol_geom::{VolGeom, xfm_crs2xyz};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
 use crate::arith::{mri_clear, mri_extract_region};
+use crate::bspline::{MriBspline, mri_sample_bspline, mri_to_bspline};
 use crate::coords::index_not_in_volume;
 use crate::labels::int_of;
 use crate::ltaops::{lta_change_type, lta_fill_inverse, lta_mri_is_source, lta_mri_is_target};
@@ -112,16 +114,6 @@ fn print_matrix(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write, m: Op
     let _ = out.write_all(&buf);
 }
 
-/// The port error for cubic B-spline sampling (`MRItoBSpline`: `fs.bspline`, wave 3.2).
-fn no_bspline(g: &mut Globals, err: &mut dyn Write, what: &str) -> Result<(), Fatal> {
-    log::error_exit(
-        g,
-        err,
-        ERROR_UNSUPPORTED,
-        &format!("{what}: cubic B-spline sampling needs fs.bspline (not yet ported)\n"),
-    )
-}
-
 /// One target voxel's values sampled from the source at `(fcs, frs, fss)` (nearest voxel
 /// `(ics, irs, iss)`) into `valvect`: trilinear for every frame at once, else frame by frame;
 /// sinc samples frame 0 for every frame. Another method prints `ERROR: <who>: interpolation
@@ -136,6 +128,7 @@ fn sample_voxel(
     (ics, irs, iss): (i32, i32, i32),
     interp: i32,
     sinchw: i32,
+    bspline: Option<&MriBspline>,
     valvect: &mut [f32],
     who: &str,
 ) -> Result<(), Fatal> {
@@ -147,6 +140,12 @@ fn sample_voxel(
     for f in 0..src.nframes {
         valvect[f as usize] = match interp {
             SAMPLE_NEAREST => mri_get_vox_val(g, err, src, ics, irs, iss, f, 0)?,
+            SAMPLE_CUBIC_BSPLINE => {
+                let b = bspline.expect("the source's B-spline");
+                let mut rval = 0.0f64;
+                mri_sample_bspline(g, out, err, b, x, y, z, f, &mut rval)?;
+                rval as f32
+            }
             SAMPLE_SINC => {
                 let mut rval = 0.0f64;
                 sinc_sample_volume(g, err, src, x, y, z, sinchw, &mut rval)?;
@@ -208,9 +207,11 @@ pub fn mri_vol2vol(
         print_matrix(g, out, err, m);
     }
     let sinchw = nint(g, f64::from(param));
-    if interp == SAMPLE_CUBIC_BSPLINE {
-        no_bspline(g, err, "MRIvol2Vol")?;
-    }
+    let bspline = if interp == SAMPLE_CUBIC_BSPLINE {
+        Some(mri_to_bspline(g, out, err, src, None, 3)?)
+    } else {
+        None
+    };
     let mut valvect = vec![0.0f32; src.nframes.max(0) as usize];
     let Some(m) = m else {
         return no_matrix(g, err, "MRIvol2Vol");
@@ -242,6 +243,7 @@ pub fn mri_vol2vol(
                     (ics, irs, iss),
                     interp,
                     sinchw,
+                    bspline.as_ref(),
                     &mut valvect,
                     "MRIvol2vol",
                 )?;
@@ -411,9 +413,11 @@ pub fn mri_vol2vol_vsm(
     }
     let sinchw = nint(g, f64::from(param));
     let mut valvect = vec![0.0f32; src.nframes.max(0) as usize];
-    if interp == SAMPLE_CUBIC_BSPLINE {
-        no_bspline(g, err, "MRIvol2VolVSM")?;
-    }
+    let bspline = if interp == SAMPLE_CUBIC_BSPLINE {
+        Some(mri_to_bspline(g, out, err, src, None, 3)?)
+    } else {
+        None
+    };
     let Some(m) = m else {
         return no_matrix(g, err, "MRIvol2VolVSM");
     };
@@ -539,6 +543,7 @@ pub fn mri_vol2vol_vsm(
                     (ics, irs, iss),
                     interp,
                     sinchw,
+                    bspline.as_ref(),
                     &mut valvect,
                     "MRIvol2volVSM",
                 )?;

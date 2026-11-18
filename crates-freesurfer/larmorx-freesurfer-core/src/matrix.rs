@@ -696,18 +696,20 @@ pub fn matrix_multiply(
     m2: Option<&Matrix>,
     m3: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
-    let file = matrix_cpp();
     let Some(m1) = m1 else {
+        let file = matrix_cpp();
         let _ = write!(out, "MatrixMultiply(): m1 is null \n break {file}:725\n");
         log::error_exit(g, err, ERROR_BADPARM, "MatrixMultiply: m1 is null\n")?;
         return Ok(Ret::Null);
     };
     let Some(m2) = m2 else {
+        let file = matrix_cpp();
         let _ = write!(out, "MatrixMultiply(): m2 is null \n break {file}:729\n");
         log::error_exit(g, err, ERROR_BADPARM, "MatrixMultiply: m2 is null\n")?;
         return Ok(Ret::Null);
     };
     if m1.cols != m2.rows {
+        let file = matrix_cpp();
         let _ = write!(
             out,
             "MatrixMultiply(): m1/m2 dim mismatch\n break {file}:733\n"
@@ -736,6 +738,7 @@ pub fn matrix_multiply(
         }
         Some(m3) => {
             if m3.rows != m1.rows || m3.cols != m2.cols {
+                let file = matrix_cpp();
                 let _ = write!(
                     out,
                     "MatrixMultiply(): m3 dim mismatch\n break {file}:748\n"

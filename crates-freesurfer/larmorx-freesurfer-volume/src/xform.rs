@@ -18,15 +18,15 @@
 //!   not whole, a source type the trilinear sampler refuses) gets the last sample that succeeded;
 //!   before the first, a value never written. Both modes take 0 there, noted.
 //!
-//! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) needs `fs.bspline` (wave 3.2): a port error
-//! until it is ported.
+//! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) samples the source's cubic B-spline
+//! coefficients ([`crate::bspline`], `MRItoBSpline` of degree 3, made once per call).
 
 use std::io::Write;
 
 use larmorx_core::defects::FS_325;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_inverse, matrix_print};
 use larmorx_freesurfer_core::ret::Ret;
@@ -36,6 +36,7 @@ use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, extract_r_to_i};
 use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
 
 use crate::arith::{mri_clear, mri_clone};
+use crate::bspline::{mri_sample_bspline, mri_to_bspline};
 use crate::coords::get_slice_direction;
 use crate::resize::{MRI_CORONAL, MRI_HORIZONTAL, MRI_SAGITTAL};
 use crate::sample::{
@@ -132,14 +133,11 @@ pub fn mri_linear_transform_interp(
         mri_set_values(g, err, d, src.outside_val as f32)?;
         d.outside_val = src.outside_val;
     }
-    if interp == SAMPLE_CUBIC_BSPLINE {
-        log::error_exit(
-            g,
-            err,
-            ERROR_UNSUPPORTED,
-            "MRIlinearTransformInterp: cubic B-spline sampling needs fs.bspline (not yet ported)\n",
-        )?;
-    }
+    let bspline = if interp == SAMPLE_CUBIC_BSPLINE {
+        Some(mri_to_bspline(g, out, err, src, None, 3)?)
+    } else {
+        None
+    };
     let (w, h, dd) = (d.vg.width, d.vg.height, d.vg.depth);
     let mut vx = matrix_alloc(g, out, err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 vector");
     let mut vy = matrix_alloc(g, out, err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 vector");
@@ -161,7 +159,16 @@ pub fn mri_linear_transform_interp(
                 }
                 for frame in 0..src.nframes {
                     let mut v = f64::from_bits(UNWRITTEN);
-                    sample_volume_frame_type(g, err, src, x1, x2, x3, frame, interp, &mut v);
+                    match &bspline {
+                        Some(b) => {
+                            mri_sample_bspline(g, out, err, b, x1, x2, x3, frame, &mut v)?;
+                        }
+                        None => {
+                            sample_volume_frame_type(
+                                g, err, src, x1, x2, x3, frame, interp, &mut v,
+                            );
+                        }
+                    }
                     if v.to_bits() != UNWRITTEN {
                         val = v;
                         written = true;

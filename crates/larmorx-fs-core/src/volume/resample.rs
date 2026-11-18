@@ -1037,3 +1037,42 @@ impl Process {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use larmorx_core::defects::{FS_317, UpstreamDefects};
+
+    use crate::{Environment, Process};
+
+    fn process(mode: UpstreamDefects) -> Process {
+        Process::new(
+            Environment::new(),
+            mode,
+            Box::new(std::io::sink()),
+            Box::new(std::io::sink()),
+        )
+    }
+
+    /// FS-317's conversion: numbers inside the `int` range truncated in both modes; NaN and
+    /// numbers beyond it -2147483648 with `reproduce`, 0 or the nearer end by default, noted.
+    #[test]
+    fn fs317_conversions() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut p = process(mode);
+            assert_eq!(p.int_317(-2.9, "t"), -2);
+            assert_eq!(p.int_317(2_147_483_647.9, "t"), i32::MAX);
+            assert_eq!(p.int_317(-2_147_483_648.9, "t"), i32::MIN);
+            assert!(!p.noted(&FS_317));
+        }
+        let mut p = process(UpstreamDefects::Reproduce);
+        for v in [f64::NAN, f64::INFINITY, 3e9, -3e9] {
+            assert_eq!(p.int_317(v, "t"), i32::MIN);
+        }
+        assert!(p.noted(&FS_317));
+        let mut p = process(UpstreamDefects::Fix);
+        assert_eq!(p.int_317(f64::NAN, "t"), 0);
+        assert_eq!(p.int_317(f64::INFINITY, "t"), i32::MAX);
+        assert_eq!(p.int_317(3e9, "t"), i32::MAX);
+        assert_eq!(p.int_317(-3e9, "t"), i32::MIN);
+        assert!(p.noted(&FS_317));
+    }
+}

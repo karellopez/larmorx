@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 5): each one noted in
+//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 6a): each one noted in
 //! both modes on a case that meets it, and its two modes' results different where the correction
 //! changes them (memory reads and crashes give the same result in both modes; the end of the
 //! program that §22's modes table gives in both modes differs only by FS-01's NUL in its C-style
@@ -399,3 +399,44 @@ fn fs960_a_tensor_volumes_rows() {
     let (_, fix_ids) = run(&line, UpstreamDefects::Fix);
     assert!(fix_ids.iter().any(|i| i == "FS-291"), "{fix_ids:?}");
 }
+
+/// FS-316: a flood fill of a 4 x 2 byte volume seeded at a row past the height (row 5, threshold
+/// 0): by default at the last row (the whole volume filled, npix 8); with `reproduce` at row 3
+/// (the width minus one), outside the volume (nothing filled, npix 1).
+#[test]
+fn fs316_a_seed_row_past_the_height() {
+    let line = format!("fillfg {} new 0 5 0 0 1", w("4 2 1 0 1 0", "200"));
+    check("FS-316", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(fix.starts_with("8 "), "{fix}");
+    assert!(rep.starts_with("1 "), "{rep}");
+}
+
+/// FS-317: a downsampling factor of 0 (§26: not in the probe's cases): with `reproduce` the
+/// extent's infinite quotient becomes -2147483648 and the allocation refuses it (the default's
+/// 2147483647 would ask for a volume of that width, so only `reproduce` runs here; the
+/// conversion's default is the crate's unit test).
+#[test]
+fn fs317_a_factor_of_zero() {
+    let line = format!(
+        "dnsn {} new 00000000 3f800000 3f800000 0",
+        w("1 1 1 3 1 0", "t3")
+    );
+    let (rep, ids) = run(&line, UpstreamDefects::Reproduce);
+    assert!(ids.iter().any(|i| i == "FS-317"), "{ids:?}");
+    assert!(rep.starts_with("EXIT 1 |"), "{rep}");
+}
+
+/// FS-318: the mean of frame 2 of a three-frame volume: frame 0's with `reproduce`, frame 2's by
+/// default.
+#[test]
+fn fs318_the_mean_of_another_frame() {
+    let line = "mft 1 2 2 9 3 0 -1 3f700000 3f800000 3f700000 1 be46941b 3f2efe46 befaaa3a 3f11b6f8 \
+                3ee94a94 bdd0293b 3eaa2836 bc84ee3e bf33501b 4280cbc5 420f6f25 42980000 00000000 \
+                00000000 00000000 0 2 c24a93e7 41c80000 c0800000 c20c24e3 40e00000 a14e1b78 42380000 \
+                40c00000 ff800000 c160f703 40cab906 4055000000000000 1 c2c5623b c0e00000 1 2 null \
+                null 2 41e1e4da";
+    check("FS-318", true, line);
+}
+

@@ -2,7 +2,7 @@
 //! Golden cases of fs.volume's clean room (`specs/freesurfer-volume.md` §69.5, CLAUDE.md rule
 //! 10): every command of the black-box probe's grammar (`tests/volume_cmd/`, the comparison's
 //! candidate commands) on seeded arguments, in both defect modes, one SHA-256 per group of the
-//! spec's parts 1 to 5 over every result line (the printed values, both streams and the notices;
+//! spec's parts 1 to 6a over every result line (the printed values, both streams and the notices;
 //! NaN bits included), recorded on Linux x86-64 and checked on every platform. The arguments
 //! come from a seeded generator and plain arithmetic (special values written as their bits); no
 //! file system (the transform reader reads an in-memory file, `ltamem`), no clock; volumes of at
@@ -91,6 +91,14 @@ const GOLDEN: &[(&str, &str)] = &[
     (
         "range.reproduce",
         "c31f9b9c01131e00264322bfb1cd240669e0937061a95d873c28e9efe49edc81",
+    ),
+    (
+        "res.fix",
+        "f4542843b50dab60cdfa52d3bc62b13cf2106aa47ced29aa4d09ddb3043c291d",
+    ),
+    (
+        "res.reproduce",
+        "c91238ecbb64485373e1f49a2ecccdfb528fd6b44e71afbe2c50f87aef3085c2",
     ),
     (
         "sample.fix",
@@ -1255,6 +1263,127 @@ const CMA: &[(&str, Make)] = &[
     ("bvparse", |g| xs(cache_text(g).as_bytes())),
 ];
 
+/// A resampling's destination (§25): none, the source, one of the result's extent, of the
+/// source's shape, or any volume.
+fn rdst(g: &mut G, shape: &str, ext: Option<(i64, i64, i64)>) -> String {
+    let s: Vec<&str> = shape.split(' ').take(6).collect();
+    match g.below(6) {
+        0 | 1 => "new".to_owned(),
+        2 => "self".to_owned(),
+        3 => match ext {
+            Some((w, h, d)) if w > 0 && h > 0 && d > 0 => {
+                g.w_of(&format!("{w} {h} {d} {} {} 0", s[3], s[4]))
+            }
+            _ => g.w_of(&s.join(" ")),
+        },
+        4 => g.w_of(&s.join(" ")),
+        _ => g.w(ALL),
+    }
+}
+
+/// The extent of a shape.
+fn ext3(shape: &str) -> (i64, i64, i64) {
+    let v: Vec<i64> = shape
+        .split(' ')
+        .take(3)
+        .map(|x| x.parse().unwrap_or(1))
+        .collect();
+    (v[0], v[1], v[2])
+}
+
+const FACTORS: &[&str] = &[
+    "3f800000", "40000000", "40400000", "3fc00000", "3f000000", "40800000", "40200000", "3f400000",
+];
+
+const FRACTIONS: &[&str] = &[
+    "00000000", "3c23d70a", "3dcccccd", "3f000000", "3f7fbe77", "3f800000", "bf000000", "7fc00000",
+];
+
+const RES: &[(&str, Make)] = &[
+    ("setres", |g| {
+        let a = g.w(ALL);
+        format!("{a} {} {} {}", g.f(true), g.f(true), g.f(true))
+    }),
+    ("vfill", |g| {
+        let a = g.w(ALL);
+        let v = if g.one_in(2) {
+            g.pick(&[
+                "437f8000", "43800000", "477fff00", "4f000000", "501502f9", "7f800001", "ffc12345",
+                "bf000000",
+            ])
+            .to_owned()
+        } else {
+            g.f(true)
+        };
+        format!("{a} {v}")
+    }),
+    ("fillfg", |g| {
+        let s = g.shape(&[0, 0, 0, 1, 3, 4, 10]);
+        let a = g.w_of(&s);
+        let d = rdst(g, &s, None);
+        let (w, h, dd) = ext3(&s);
+        let seed = [g.int(-1, w), g.int(-1, h), g.int(-1, dd)];
+        let th = g.pick(&["0", "1", "64", "128", "255", "256", "-1"]);
+        let fv = g.pick(&["1", "128", "255", "0", "256", "300", "-1"]);
+        format!("{a} {d} {} {} {} {th} {fv}", seed[0], seed[1], seed[2])
+    }),
+    ("explane", |g| {
+        let s = g.shape(ALL);
+        let a = g.w_of(&s);
+        let d = rdst(g, &s, None);
+        let o = g.pick(&["0", "1", "2", "3", "-1"]);
+        format!("{a} {d} {o} {}", g.int(-1, 4))
+    }),
+    ("fillplane", |g| {
+        let m = g.w(ALL);
+        let d = g.w(ALL);
+        let o = g.pick(&["0", "1", "2", "3"]);
+        let fv = g.pick(&["0", "1", "7", "255", "256", "-3", "70000"]);
+        format!("{m} {d} {o} {} {fv}", g.int(-1, 4))
+    }),
+    ("ups", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let k = g.int(0, 2);
+        let n = g.pick(&["1", "2", "2", "3", "0", "-1"]);
+        let m: i64 = if k == 1 { 2 } else { n.parse().unwrap_or(1) };
+        let (w, h, d) = ext3(&s);
+        let dv = rdst(g, &s, Some((m * w, m * h, m * d)));
+        format!("{k} {a} {dv} {n}")
+    }),
+    ("dns2", |g| {
+        let s = g.shape(ALL);
+        let a = g.w_of(&s);
+        let (w, h, d) = ext3(&s);
+        let dv = rdst(g, &s, Some((w / 2, h / 2, d / 2)));
+        format!("{a} {dv}")
+    }),
+    ("dnsn", |g| {
+        let s = g.shape(ALL);
+        let a = g.w_of(&s);
+        let f = [g.pick(FACTORS), g.pick(FACTORS), g.pick(FACTORS)];
+        let dv = rdst(g, &s, None);
+        format!("{a} {dv} {} {} {} {}", f[0], f[1], f[2], g.int(0, 1))
+    }),
+    ("mft", |g| {
+        let a = g.w(ALL);
+        format!("{a} {} {}", g.int(-1, 3), g.f(true))
+    }),
+    ("lim", |g| g.w(ALL)),
+    ("chtype", |g| {
+        let k = g.int(0, 1);
+        let a = g.w(ALL);
+        let t = ALL[g.below(ALL.len() as u64) as usize];
+        format!(
+            "{k} {a} {t} {} {} {} {}",
+            g.pick(FRACTIONS),
+            g.pick(FRACTIONS),
+            g.int(0, 2),
+            g.int(0, 1)
+        )
+    }),
+];
+
 fn group(name: &str, table: &[(&str, Make)], per: usize) {
     let seed = name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
@@ -1355,4 +1484,9 @@ fn cma_labels() {
 #[test]
 fn transform_reader() {
     group("ltaread", LTAREAD, 24);
+}
+
+#[test]
+fn resampling() {
+    group("res", RES, 8);
 }

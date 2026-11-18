@@ -553,6 +553,82 @@ pub fn get_prior(gcap: &GcaPrior, label: i32) -> f32 {
     gcap.priors[n]
 }
 
+/// `GCAsourceVoxelToPrior(gca, mri, transform, xv, yv, zv, ..)` (`utils/gca.cpp` 1052-1127,
+/// `USE_ROUND` 1; track D, queue item 3.2-24, for `mri_normalize -atlas`): the source voxel to
+/// the atlas's template volume (a voxel-to-voxel linear transform: `TransformWithMatrix` of its
+/// first matrix, each coordinate then narrowed to `float`; a morph: `TransformSample`; any other
+/// type ends the program, `GCAsourceVoxelToPrior: needs vox-to-vox transform`), then to the prior
+/// grid as `GCAvoxelToPriorReal` maps it (`tal`: [`voxel_to_prior_matrix`] of `mri_tal__`, the
+/// same for every voxel) with each coordinate rounded by `nint`. The code is `ERROR_BADPARM` when
+/// the point falls outside the prior grid, and the point is clamped into it.
+#[allow(clippy::too_many_arguments)]
+pub fn gca_source_voxel_to_prior(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &larmorx_freesurfer_core::run::Environment,
+    gca: &Gca,
+    tal: &AffineMatrix,
+    transform: &mut crate::transform::Transform,
+    v: [i32; 3],
+) -> Result<(i32, [i32; 3]), Fatal> {
+    use larmorx_freesurfer_mri::lta::{LINEAR_VOX_TO_VOX, MORPH_3D_TYPE};
+    let (xt, yt, zt) = if transform.ttype != MORPH_3D_TYPE {
+        if transform.ttype == LINEAR_VOX_TO_VOX {
+            let lta = transform.lta();
+            let m = lta.xforms[0]
+                .m_l
+                .as_ref()
+                .expect("a linear transform read from a file has its matrix");
+            let p = larmorx_freesurfer_volume::talairachex::transform_with_matrix(
+                m,
+                f64::from(v[0]),
+                f64::from(v[1]),
+                f64::from(v[2]),
+            );
+            (p[0] as f32, p[1] as f32, p[2] as f32)
+        } else {
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                "GCAsourceVoxelToPrior: needs vox-to-vox transform",
+            )?;
+            (0.0, 0.0, 0.0)
+        }
+    } else {
+        let (_, p) = crate::transform::transform_sample(
+            g, out, err, env, transform, v[0] as f32, v[1] as f32, v[2] as f32,
+        )?;
+        (p[0], p[1], p[2])
+    };
+    let mut vv = AffineVector::default();
+    set_affine_vector(&mut vv, xt, yt, zt);
+    let pv = affine_mv(tal, &vv);
+    let (x, y, z) = get_affine_vector(&pv);
+    let mut p = [
+        nint(g, f64::from(x)),
+        nint(g, f64::from(y)),
+        nint(g, f64::from(z)),
+    ];
+    let dims = [gca.prior_width, gca.prior_height, gca.prior_depth];
+    let mut code = NO_ERROR;
+    for k in 0..3 {
+        if p[k] < 0 || p[k] >= dims[k] {
+            code = ERROR_BADPARM;
+        }
+    }
+    for k in 0..3 {
+        if p[k] < 0 {
+            p[k] = 0;
+        }
+        if p[k] >= dims[k] {
+            p[k] = dims[k] - 1;
+        }
+    }
+    Ok((code, p))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

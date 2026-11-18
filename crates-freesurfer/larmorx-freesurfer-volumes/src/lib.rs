@@ -15,6 +15,8 @@
 //! [`PROGRAMS`] lists the programs of this crate that `larmorx-freesurfer` runs (one line each).
 #![forbid(unsafe_code)]
 
+pub mod mri_normalize;
+
 use larmorx_freesurfer_core::run::Program;
 
 /// The programs of this crate, by their original names.
